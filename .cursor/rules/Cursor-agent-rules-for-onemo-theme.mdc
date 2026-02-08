@@ -1,0 +1,21 @@
+---
+alwaysApply: true
+---
+
+# ONEMO Theme Rules
+
+Read AGENTS.md in the repo root before starting any task.
+
+## This Repo
+
+- Shopify Liquid theme for commerce pages (products, collections, cart, checkout, accounts)
+- Design tool UI is NOT here — it lives in onemo-next
+- Full documentation in ONEMO-TECH-LTD/onemo-ssot-global
+
+## Key Rules
+
+- Always use --store=onemo-dev.myshopify.com for Shopify CLI commands
+- Filter line-item properties starting with _ from all customer-facing templates
+- No metaobjects, no custom apps, no design configurator code
+- Use standard Shopify Liquid patterns: sections, blocks, settings_schema
+- Never publish to PROD without Dan's approval

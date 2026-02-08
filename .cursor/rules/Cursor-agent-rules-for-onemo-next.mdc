@@ -1,0 +1,42 @@
+---
+description: 
+alwaysApply: true
+---
+
+# ONEMO-next rules
+
+
+Read `AGENTS.md` in the repo root before starting any task. It is the primary instruction file.
+
+## Quick Reference
+
+- Stack: Next.js App Router, TypeScript, Supabase, Cloudinary, Shopify Storefront API
+- Database: Supabase is canonical for all design data. Not Shopify.
+- Auth: Supabase Auth (anonymous sessions → account upgrade at save/buy)
+- Cart: Storefront API cartCreate → redirect to checkoutUrl. Never to /cart.
+- Uploads: Browser → Cloudinary direct. Server verifies after, not during.
+- Environments: DEV = onemo-dev.myshopify.com / PROD = onemo-4865.myshopify.com
+- Branches: task/* → PR to staging → promote to main
+- Commits: Conventional format: type(scope): description
+
+## Coding Standards
+
+- TypeScript strict mode, no any types without justification
+- async/await over Promise chains
+- Zod validation on all API route request bodies
+- Named exports for components and utilities
+- Standard error envelope on all API responses: { ok, data } or { ok, error: { code, message, details } }
+- Co-locate tests: __tests__/ next to the module
+
+## Forbidden
+
+- No hardcoded secrets or credentials
+- No PROD changes without Dan's approval
+- No metaobjects, Remix framework, App Proxy, packs, bundles, or sets
+- No console.log in production code (use console.error for actual errors)
+- No architecture changes — flag concerns, don't implement alternatives
+
+## Documentation
+
+Full project documentation lives in ONEMO-TECH-LTD/onemo-ssot-global.
+If you need architectural context, ask Dan to provide the relevant SSOT document.
