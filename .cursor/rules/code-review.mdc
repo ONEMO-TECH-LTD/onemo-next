@@ -1,0 +1,11 @@
+---
+description: Run ONEMO code review before committing or opening a PR. Also invokable by /review anytime.
+globs: ["**/*.ts", "**/*.tsx"]
+alwaysApply: false
+---
+
+# Code Review (ONEMO)
+
+Before committing or marking work ready in this repo, **run the ONEMO code review skill**: invoke `/review` (or say "run ONEMO code review") and report pass/fail and any issues. Use full review for pre-commit/PR; quick scan during development.
+
+The skill can also be triggered **independently** anytime by the user: `/review`, `/code-review`, or "run the ONEMO code review" — use it when asked even if this rule didn’t fire.
