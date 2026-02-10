@@ -1,117 +1,168 @@
-# ONEMO Agent Instructions
+# AGENTS.md — onemo-next
 
-This file is read automatically by all AI coding agents (Codex, Cursor, Claude Code).
-Follow these instructions for every task in this repository.
-
----
+> Read this file at the start of every session. It is the project context for all coding agents.
 
 ## Project
 
-ONEMO is a custom magnetic badge design platform. Users upload images, preview them on
-mod mockups, save to a private library, share publicly, and purchase physical products.
+ONEMO is a custom magnetic badge ("mod") design platform. Customers upload artwork, preview it on a mod mockup, configure options, and purchase.
 
-**Architecture:** Hybrid split — this Next.js app handles design/community features while
-a separate Shopify theme handles commerce (cart, checkout, orders, accounts).
+**This repo** (`onemo-next`) is the Next.js application that handles:
+- Design configurator (`/create`)
+- Design library (`/library`)
+- Community feed (`/community`)
+- Public design pages (`/design/:slug`)
+- Admin moderation page (`/admin/moderation`)
+- All API routes (`/api/*`)
 
-**Stack:** Next.js (App Router) · TypeScript · Vercel · Supabase (Postgres + Auth) · Cloudinary · Shopify Storefront API
+**It does NOT handle:** Shopify theme pages (products, collections, cart, checkout, accounts). Those live in `onemo-theme`.
 
-## Documentation (Single Source of Truth)
+## Stack
 
-All architecture, product specs, compliance rules, and operational procedures live in a
-separate repository: `ONEMO-TECH-LTD/onemo-ssot-global`.
+- **Framework:** Next.js (App Router), TypeScript
+- **Deployment:** Vercel
+- **Database:** Supabase Postgres (canonical for all design data)
+- **Auth:** Supabase Auth (anonymous sessions → account creation)
+- **Images:** Cloudinary (upload, transform, CDN delivery)
+- **Commerce:** Shopify Storefront API (cart creation → checkout redirect)
+- **Routing:** Cloudflare reverse proxy splits paths between Vercel and Shopify
 
-Before starting any task, read the relevant SSOT documents. At minimum, always read:
-- `01-governance/authority-and-rules.md` — defines what you can and cannot do
+## SSOT (Single Source of Truth)
 
-Then load documents relevant to your task:
-- API work → `02-architecture/api-contracts.md`
-- Database/schema → `02-architecture/data-model.md`
-- Auth/security → `02-architecture/security-and-auth.md`
-- Upload/preview → `02-architecture/preview-system.md`
-- Feature specs → `03-product/features-and-flows.md`
-- Environments → `04-operations/environments.md`
-- Moderation → `06-compliance/6.2-moderation.md`
-- GDPR/webhooks → `06-compliance/6.1-gdpr-and-webhooks.md`
+Full architectural docs are in `ONEMO-TECH-LTD/onemo-ssot-global`. Key references:
 
-If the SSOT repo is not available locally, ask Dan for the relevant document content.
+| Topic | File |
+|-------|------|
+| Authority & rules | `1-governance/1.1-authority-and-rules.md` |
+| System overview | `2-architecture/2.1-system-overview.md` |
+| Tech stack | `2-architecture/2.2-tech-stack.md` |
+| Data model | `2-architecture/2.3-data-model.md` |
+| Security & auth | `2-architecture/2.4-security-and-auth.md` |
+| API contracts | `2-architecture/2.5-api-contracts.md` |
+| Preview system | `2-architecture/2.6-preview-system.md` |
+| Invariants | `2-architecture/2.7-invariants-and-failure-modes.md` |
+| Features & flows | `3-product/3.1-features-and-flows.md` |
+| Environments | `4-operations/4.1-environments.md` |
+| Work management | `4-operations/4.6-work-management.md` |
+| Moderation | `6-compliance/6.2-moderation.md` |
 
-## Commands
+## Work Management
 
-```bash
-npm install          # Install dependencies
-npm run dev          # Start dev server (localhost:3000)
-npm test             # Run Vitest tests
-npm run test:e2e     # Run Playwright E2E tests
-npm run lint         # ESLint
-npm run typecheck    # TypeScript type check
-```
+All work is tracked in **Linear** (project: ONEMO-WEB-APP, team: ONEMO).
+
+- Every coding task requires a Linear issue (ONE-XX) before starting
+- Branch naming: `task/<issue-id>-<short-description>` (e.g., `task/one-15-upload-permission`)
+- Include the Linear issue ID (e.g., `ONE-15`) in PR title or description
+- Linear auto-updates status when PRs are opened/reviewed/merged
 
 ## Environments
 
 | Environment | Shopify Store | Supabase | Cloudinary Prefix | Branch |
 |-------------|---------------|----------|-------------------|--------|
-| DEV | `onemo-dev.myshopify.com` | DEV project | `dev/` | `staging` |
-| PROD | `onemo-4865.myshopify.com` | PROD project | *(none)* | `main` |
+| **DEV** | `onemo-dev.myshopify.com` | DEV project | `dev/` | `staging` + `task/*` |
+| **PROD** | `onemo-4865.myshopify.com` | PROD project | *(none)* | `main` |
 
-**Never touch PROD** without Dan's explicit approval. All dev work targets DEV.
-
-## Hard Rules
-
-1. **No PROD changes.** No PROD writes, deployments, migrations, or env var changes without Dan.
-2. **No hardcoded secrets.** Use `process.env.VARIABLE_NAME` only. Never ask Dan for secret values.
-3. **No architecture changes.** The SSOT defines the architecture. If you think it's wrong, flag it — don't change it.
-4. **Supabase is canonical.** All design data lives in Supabase. Shopify is for commerce only.
-5. **Standard error envelope.** All API routes return `{ ok, data }` or `{ ok, error: { code, message, details } }`.
-6. **No forbidden patterns.** Do not use: metaobjects, Remix framework, App Proxy, Fly.io, packs, bundles, or sets.
-7. **Single Custom Mod product.** One Shopify product with variants (Size × Face Material × Colour). Design data goes in line-item properties.
-8. **Conventional commits.** Format: `type(scope): description`. Types: feat, fix, refactor, docs, test, chore, ci.
-9. **Test your work.** Every feature includes tests. Run `npm test` before committing.
-10. **Ask before acting.** If a task brief is unclear, ask Dan. Don't guess on ambiguous requirements.
-
-## Project Structure
-
-```
-src/
-├── app/                 # Next.js App Router
-│   ├── create/          # /create — upload + configurator
-│   ├── library/         # /library — private design library
-│   ├── community/       # /community — public feed
-│   ├── design/          # /design/[slug] — public design pages
-│   ├── admin/           # /admin/moderation — Dan-only admin
-│   └── api/             # API routes
-│       ├── designs/     # CRUD, share, unshare, remix, buy, appeal
-│       ├── cart/        # Storefront API cart creation
-│       ├── upload-permission/  # Cloudinary signed upload params
-│       └── webhooks/    # Shopify webhook handlers
-├── lib/                 # Shared utilities
-│   ├── supabase/        # Supabase client, helpers, types
-│   ├── cloudinary/      # Cloudinary helpers, signing
-│   └── shopify/         # Storefront API client
-└── middleware.ts        # Supabase Auth session refresh
-```
-
-## Key Patterns
-
-- **Auth:** Supabase Auth with anonymous sessions. Account creation at save/buy time.
-- **Uploads:** Browser → Cloudinary direct (signed params from API route). Server verifies after.
-- **Cart:** `POST /api/cart` → Storefront API `cartCreate` + `cartLinesAdd` → redirect to `checkoutUrl`.
-- **Privacy:** Private images use signed URLs (15–60 min). Public sharing creates a separate preview asset.
-- **Moderation:** Self-certification at upload. Cloudinary AI Vision scan at share time only.
-- **RLS:** Supabase Row-Level Security enforces data access. Users see only their own private designs.
+**Cloudinary cloud_name:** `du6q2q4ab` (shared, isolated by folder prefix)
 
 ## Branching
 
-- `main` — production (protected, never push directly)
-- `staging` — integration branch (PR target)
-- `task/<phase>-<description>` — feature branches (e.g., `task/p3-upload-permission`)
+- `main` — production (protected, deploy via Vercel)
+- `staging` — integration (protected, PR target)
+- `task/<issue-id>-<description>` — feature/fix branches
 
-**Flow:** Create `task/*` branch → work → PR to `staging` → CI passes → merge → promote to `main` when stable.
+**Flow:** `task/*` → PR to `staging` → CI + review → merge → promote `staging` → `main` when stable
 
-## Code Style
+## Commands
 
-- TypeScript strict mode
-- Prefer `async/await` over `.then()` chains
-- Use Zod for request validation in API routes
-- Named exports (not default) for components and utilities
-- Error boundaries in page components
-- All API routes wrapped in try/catch with standard error envelope
+```bash
+npm run dev          # Start dev server (localhost:3000)
+npm test             # Run Vitest tests
+npm run lint         # ESLint
+npm run typecheck    # TypeScript check
+npm run build        # Production build
+npm run test:e2e     # Playwright E2E tests
+npm run test:watch   # Vitest watch mode
+```
+
+## Commit Convention
+
+`<type>(<scope>): <description>`
+
+Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `ci`
+Scopes: `upload`, `cart`, `library`, `community`, `auth`, `schema`, `config`, `moderation`
+
+Examples:
+- `feat(upload): add signed permission API route`
+- `fix(cart): handle missing variant gracefully`
+- `test(rls): add RLS policy enforcement tests`
+
+## Hard Rules
+
+1. **No PROD writes without Dan.** Never modify Vercel production env vars, run Supabase PROD migrations, or push to `main` without Dan's explicit approval.
+2. **Supabase is canonical.** All design data lives in Supabase. Shopify receives only line-item properties at cart time and order webhooks.
+3. **No metaobjects, no App Proxy, no Remix (Shopify).** These are not part of the architecture.
+4. **No packs, bundles, or sets.** Single "Custom Mod" product. Quantity via Shopify cart only.
+5. **Variant axes are locked:** Size × Face Material × Trim/Back Colour. No other variant dimensions.
+6. **Never redirect to `/cart`.** Custom design purchases go from `POST /api/cart` → `checkoutUrl` redirect. Headless cart lines don't appear on Shopify's native cart page.
+7. **Asset verification is mandatory.** Every `POST /api/designs` must verify the Cloudinary asset server-side before creating the design record.
+8. **Self-certification before upload.** Users must check the self-certification checkbox before uploading.
+9. **Cloudinary paths use `CLOUDINARY_ENV_PREFIX`.** No hardcoded `dev/` or bare `onemo-designs/` anywhere.
+10. **Secrets never in code.** Use `process.env.VARIABLE_NAME`. No hardcoded credentials, not even temporarily.
+11. **Every task needs a Linear issue.** No undocumented work.
+12. **Conventional commits.** Follow the format above for all commits.
+13. **Filter underscore-prefixed properties.** Line-item properties starting with `_` must never be shown to customers.
+
+## API Error Envelope
+
+All API routes return this shape:
+
+```json
+// Success
+{ "ok": true, "data": { ... } }
+
+// Error
+{ "ok": false, "error": { "code": "STRING_ENUM", "message": "Human readable", "details": {} } }
+```
+
+Error codes: `VALIDATION_ERROR` (400), `AUTH_REQUIRED` (401), `FORBIDDEN` (403), `NOT_FOUND` (404), `ASSET_VERIFICATION_FAILED` (422), `MODERATION_BLOCKED` (403), `RATE_LIMITED` (429), `UPSTREAM_UNAVAILABLE` (502), `INTERNAL_ERROR` (500).
+
+## Key Invariants (Check Before Marking Done)
+
+- **INV-01:** Cloudflare must not cache authenticated/dynamic pages
+- **INV-03:** Upload permission must support retry on signature expiry
+- **INV-04:** Asset verification applies only to original uploads (not derived assets)
+- **INV-05:** Design-buy flow always bypasses theme cart page
+- **INV-06:** Line-item properties have fixed schema, under 1KB total
+- **INV-07:** Self-certified private designs can be purchased but rejected designs cannot
+- **INV-08:** Share endpoint must be idempotent
+- **INV-09:** Remix must only access the public preview asset (never private original)
+- **INV-10:** Background jobs must check resource existence before acting
+- **INV-11:** Cloudinary folder prefix from single env constant
+
+## Review Guidelines
+
+When reviewing PRs (applies to Codex automated reviews and all agents):
+
+### Always Check
+- No secrets, API keys, or tokens in code (search for `api_key`, `secret`, `token`, `password`)
+- No hardcoded store domains (search for `.myshopify.com`, `supabase.co`)
+- No hardcoded Cloudinary paths — must use `CLOUDINARY_ENV_PREFIX` (INV-11)
+- Scope check: PR only touches files relevant to the Linear issue
+- Conventional commit messages on all commits
+- CI checks pass (lint + typecheck + test)
+
+### Architecture Red Flags (Block PR)
+- References to metaobjects, App Proxy, or Shopify Remix framework
+- Any redirect to `/cart` from Next.js flows (INV-05)
+- Client-side code providing derived asset IDs (only original upload asset ID allowed) (INV-04)
+- Code that accesses another user's `cloudinary_asset_id` during remix (INV-09)
+- Missing server-side asset verification on design save (INV-04)
+- Line-item properties exceeding fixed schema or containing JSON blobs (INV-06)
+- `moderation_state` checks missing on cart/share endpoints (INV-07, INV-08)
+- Background jobs that don't check resource existence before acting (INV-10)
+
+### Quality Checks
+- API routes use standard error envelope (`{ ok, data/error }`)
+- Rate limiting present on public-facing endpoints
+- RLS-relevant queries use authenticated Supabase client (not service role) for user-scoped data
+- Loading and error states present for UI components
+- TypeScript types — no `any` without justification
