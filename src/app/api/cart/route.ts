@@ -1,5 +1,5 @@
 import { okResponse } from "@/lib/api/response";
-import { requireAuth } from "@/lib/supabase/session";
+import { requireAuth } from "@/lib/supabase/session-server";
 
 export async function GET() {
   return okResponse({ message: "stub" });

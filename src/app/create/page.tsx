@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { ensureSession } from "@/lib/supabase/session";
+import { ensureSession } from "@/lib/supabase/session-client";
 
 export default function CreatePage() {
   const [userId, setUserId] = useState<string | null>(null);
@@ -36,7 +36,11 @@ export default function CreatePage() {
     <main>
       <h1>Create Page</h1>
       <p>{error ?? "Design tool shell is ready."}</p>
-      <p>{userId ? `Session user: ${userId}` : "Creating anonymous session..."}</p>
+      <p>
+        {userId
+          ? `Session user: ${userId}`
+          : "Creating anonymous session..."}
+      </p>
     </main>
   );
 }
