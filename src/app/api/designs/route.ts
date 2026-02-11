@@ -1,11 +1,20 @@
 import { NextResponse } from "next/server";
 
-const stubResponse = { ok: true, data: { message: "stub" } };
+import { okResponse } from "@/lib/api/response";
+import { requireAuth } from "@/lib/supabase/session";
 
 export async function GET() {
-  return NextResponse.json(stubResponse);
+  return NextResponse.json(okResponse({ message: "stub" }));
 }
 
 export async function POST() {
-  return NextResponse.json(stubResponse);
+  const auth = await requireAuth();
+
+  if ("response" in auth) {
+    return auth.response;
+  }
+
+  return NextResponse.json(
+    okResponse({ message: "stub", userId: auth.user.id })
+  );
 }
