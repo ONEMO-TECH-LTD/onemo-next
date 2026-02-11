@@ -1,0 +1,27 @@
+---
+description: Git and commit rules for all Cursor agents working on ONEMO
+globs:
+  - "**/*"
+alwaysApply: true
+---
+
+# Git Rules — ONEMO Project
+
+## NEVER do these automatically:
+- NEVER run `git add`, `git commit`, `git push`, or `gh pr create`
+- NEVER stage, commit, or push changes — Dan reviews diffs in Cursor and commits manually
+- NEVER create branches — Dan creates branches via CLI
+
+## What to do instead:
+- Make file changes only
+- When finished, summarize what changed and stop
+- If asked to "commit" or "push", explain what you changed and let Dan do it
+
+## Branch conventions:
+- Task branches: `task/<issue-id>-<short-desc>` targeting `staging`
+- `main` and `staging` are protected — never push directly
+
+## PR conventions:
+- Dan creates PRs via `gh pr create`
+- Commit messages: `<type>(<scope>): <description>`
+- Types: feat, fix, refactor, docs, test, chore, ci
