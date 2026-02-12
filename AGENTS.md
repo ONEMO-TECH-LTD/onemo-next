@@ -28,6 +28,21 @@ All three checks (test, lint, typecheck) must pass before opening a PR.
   - Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `ci`
   - Scopes: `upload`, `cart`, `library`, `community`, `auth`, `schema`, `config`, `moderation`
 
+## Agent Branch Rules
+
+All coding agents (Codex, Claude Code, Cursor Composer) MUST follow:
+
+1. **Branch naming:** `task/<issue-id>-<short-description>` (lowercase)
+   - ✅ `task/one-126-anonymous-sessions`
+   - ✅ `task/one-93-liquid-cart-filter`
+   - ❌ `codex/linear-mention-one-126-implement-...` (auto-generated, not allowed)
+
+2. **PR target:** Always `staging`. NEVER `main`.
+
+3. **PR title:** Include Linear issue ID. Example: `feat(auth): implement anonymous sessions (ONE-126)`
+
+4. **One issue per branch** unless explicitly told otherwise.
+
 ## Full Documentation (SSOT)
 
 All architecture, data model, API contracts, invariants, security, operations, and compliance specs live in `docs/ssot/` (submodule of `onemo-ssot-global`).
