@@ -35,6 +35,9 @@ yarn-error.log*
 .env.*.local
 .env
 
+# claude code (user-specific settings)
+.claude/settings.local.json
+
 # vercel
 .vercel
 
