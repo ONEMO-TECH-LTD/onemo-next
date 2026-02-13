@@ -114,21 +114,43 @@ Cost matters. Save expensive models for architecture and planning.
 
 | Agent | Cost | Use For |
 |---|---|---|
-| **Claude Code** (this, Opus 4.6) | Expensive | CTO work, architecture, PR review, Linear, coordination |
+| **Claude Code** (this, Opus 4.6) | Expensive | CTO work, architecture, summary review, Linear, coordination |
 | **Claude Chat** (Opus 4.6) | Expensive | Mobile access, multi-MCP conversations, Session Log |
-| **Codex in Cursor** (GPT-5.3-Codex) | FREE | All application coding — prefer this for every coding task |
-| **Codex Mac app** | FREE | Heavy autonomous coding, cloud tasks |
-| **Cursor Composer** | Credits | Light work — tests, linting, config |
+| **Cursor Composer/Agent** | Credits | All application coding — primary coding agent |
+| **Codex Mac app** | FREE | Heavy autonomous coding, cloud tasks (not currently used) |
 
-Codex prompts: define WHAT (objectives, acceptance criteria, constraints), not HOW. Say "Read Linear issue ONE-XX. Execute it."
+Cursor prompts: reference the Linear issue, don't duplicate requirements. Say "Read Linear issue ONE-XX via Linear MCP. Execute it."
 
-Don't use Claude Code/Chat for work Codex can do for free.
+Review pipeline: Cursor writes → Claude Code reviews summary → fix prompts back to Cursor → push → final diff review → Dan merges. No GitHub bot reviews (Copilot/Claude bot removed).
+
+---
+
+## Cursor Workflow (CRITICAL — read every session)
+
+Cursor agents (Composer/Codex) work **locally inside Cursor's workspace**. Files are NOT on disk, NOT on GitHub, NOT visible to Claude Code until Dan commits and pushes. **Never try to read files from disk or GitHub to verify Cursor agent output.**
+
+### Review Protocol
+
+1. **Dan pastes Cursor agent summary** → review the summary text, not files
+2. **Evaluate against Linear acceptance criteria** — does the summary cover every checkbox?
+3. **Flag issues immediately** — don't defer to follow-up issues. Generate a fix prompt for Cursor instead.
+4. **Fix prompt format:** Numbered list of specific changes. End with "Run `npm run typecheck && npm run lint` after changes. Don't commit."
+5. **Dan sends Cursor the fix prompt** → Cursor fixes → Dan confirms → push
+
+### Rules
+
+- **NEVER** run `git checkout`, `git diff`, `cat`, or `Read` on Cursor agent files — they don't exist on disk yet.
+- **NEVER** check GitHub for unpushed branches.
+- **NEVER** defer fixable issues to follow-up Linear issues. Fix everything before push.
+- **ALWAYS** review from the summary Dan provides. Ask for clarification if summary is insufficient.
+- **ALWAYS** catch ordering/logic issues (e.g., auth before validation) in the summary review phase.
+- After Dan pushes: do a final diff review via `git diff origin/staging...origin/<branch>`, then recommend merge.
 
 ---
 
 ## PR Review
 
-When reviewing PRs, check:
+When reviewing PRs (after push), check:
 - Satisfies Linear issue acceptance criteria?
 - Violates invariants (INV-01–12)? Read `docs/ssot/2-architecture/2.7-invariants-and-failure-modes.md`
 - Follows branching conventions? (`task/<issue-id>-<desc>` → `staging`)
