@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "shopify-admin": {
+      "command": "node",
+      "args": ["/ABSOLUTE/PATH/TO/onemo-next/scripts/shopify-mcp-wrapper.mjs"],
+      "env": {
+        "SHOPIFY_STORE_DOMAIN": "onemo-dev.myshopify.com"
+      }
+    }
+  }
+}
