@@ -5,7 +5,9 @@
 
 ## Project
 
-ONEMO custom magnetic Effect design platform. Customer-facing product name is "Effect" (capital E); Shopify `product_type` stays `Mod` internally. This repo is the Next.js app — design tools, library, community, API routes. Runs on Vercel alongside a Shopify theme for commerce.
+ONEMO custom magnetic Effect design platform. Product name is "Effect" (capital E) everywhere — customer-facing and Shopify `product_type`. This repo is the Next.js app — design tools, library, community, API routes. Runs on Vercel alongside a Shopify theme for commerce.
+
+> **Naming note:** The product was previously called "Mod". All references have been updated to "Effect". If any stale "mod" reference surfaces in code, docs, or Linear issues, treat it as "Effect". Mod = Effect.
 
 ## Commands
 
