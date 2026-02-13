@@ -5,7 +5,7 @@
 
 ## Project
 
-ONEMO custom magnetic badge design platform. This repo is the Next.js app — design tools, library, community, API routes. Runs on Vercel alongside a Shopify theme for commerce.
+ONEMO custom magnetic Effect design platform. Customer-facing product name is "Effect" (capital E); Shopify `product_type` stays `Mod` internally. This repo is the Next.js app — design tools, library, community, API routes. Runs on Vercel alongside a Shopify theme for commerce.
 
 ## Commands
 
@@ -110,4 +110,4 @@ docs/
 - Don't install Redis or external queues — we use Postgres job queue
 - Don't create Shopify products programmatically
 - Don't use `SUPABASE_SERVICE_ROLE_KEY` in client-side code
-- Don't create one product per design — there's a single "Custom Mod" product with line-item properties
+- Don't create one product per design — there's a single "ONEMO Custom Effect" product with line-item properties
