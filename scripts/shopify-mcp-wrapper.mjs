@@ -61,7 +61,7 @@ const child = spawn(
     "shopify-mcp",
     "--accessToken",
     accessToken,
-    "--storeDomain",
+    "--domain",
     storeDomain,
   ],
   {
