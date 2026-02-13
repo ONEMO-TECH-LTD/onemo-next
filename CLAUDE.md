@@ -137,13 +137,29 @@ Cursor agents (Composer/Codex) work **locally inside Cursor's workspace**. Files
 4. **Fix prompt format:** Numbered list of specific changes. End with "Run `npm run typecheck && npm run lint` after changes. Don't commit."
 5. **Dan sends Cursor the fix prompt** → Cursor fixes → Dan confirms → push
 
+### Composer Prompt Format
+
+**Short by default.** Every Linear issue must have a thorough description with acceptance criteria, implementation details, and file paths. The Composer prompt just points to it:
+
+```
+Read Linear issue ONE-XX via Linear MCP. Execute it.
+[One-liner context if needed, e.g., "Use response helpers from src/lib/api/response.ts"]
+Run `npm run typecheck && npm run lint` after changes. Don't commit.
+```
+
+**Never duplicate** the issue description in the prompt. If the issue lacks detail, fix the issue first — don't compensate with a longer prompt.
+
+**Issue quality gate:** Before assigning any issue to Cursor, verify it has: task description, acceptance criteria with checkboxes, file paths, and dependencies. If missing, add them to the issue first.
+
 ### Rules
 
 - **NEVER** run `git checkout`, `git diff`, `cat`, or `Read` on Cursor agent files — they don't exist on disk yet.
 - **NEVER** check GitHub for unpushed branches.
 - **NEVER** defer fixable issues to follow-up Linear issues. Fix everything before push.
+- **NEVER** duplicate issue descriptions in Composer prompts. Point to Linear.
 - **ALWAYS** review from the summary Dan provides. Ask for clarification if summary is insufficient.
 - **ALWAYS** catch ordering/logic issues (e.g., auth before validation) in the summary review phase.
+- **ALWAYS** verify issue has full acceptance criteria before sending to Composer.
 - After Dan pushes: do a final diff review via `git diff origin/staging...origin/<branch>`, then recommend merge.
 
 ---
