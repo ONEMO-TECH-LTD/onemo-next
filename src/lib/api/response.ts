@@ -5,6 +5,7 @@ type ErrorEnvelope = {
   error: {
     code: string;
     message: string;
+    details?: unknown;
   };
 };
 
@@ -18,10 +19,15 @@ export function okResponse<T>(data: T, status = 200) {
   return NextResponse.json(body, { status });
 }
 
-export function errorResponse(code: string, message: string, status: number) {
+export function errorResponse(
+  code: string,
+  message: string,
+  status: number,
+  details?: unknown
+) {
   const body: ErrorEnvelope = {
     ok: false,
-    error: { code, message },
+    error: { code, message, ...(details !== undefined && { details }) },
   };
 
   return NextResponse.json(body, { status });

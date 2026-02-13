@@ -44,45 +44,70 @@ export async function ensureSession(): Promise<SessionResult> {
 }
 
 /**
- * Upgrade an anonymous session to a permanent account.
- * Uses updateUser() (NOT signUp()) to preserve the same user_id.
- * This ensures all designs created during the anonymous session
- * remain accessible after upgrade — RLS keys on auth.uid() = user_id.
+ * Step 1 of anonymous → permanent upgrade: link an email identity.
+ *
+ * Calls updateUser({ email }) which triggers a verification email.
+ * The user must click the link / enter OTP before a password can be set.
+ * Uses updateUser() (NOT signUp()) to preserve the same user_id,
+ * so all designs created during the anonymous session stay accessible
+ * — RLS keys on auth.uid() = user_id.
  */
-export async function upgradeSession(
-  email: string,
-  password: string
-): Promise<SessionResult> {
+export async function linkEmail(email: string): Promise<SessionResult> {
   const supabase = createClient();
 
-  // updateUser() promotes the anonymous user in-place.
-  // The user_id stays the same — no data migration needed.
-  const { data, error } = await supabase.auth.updateUser({
-    email,
-    password,
-  });
+  const { data, error } = await supabase.auth.updateUser({ email });
 
   if (error) {
-    throw new Error(`Unable to upgrade session: ${error.message}`);
+    throw new Error(`Unable to link email: ${error.message}`);
   }
 
   if (!data.user) {
-    throw new Error("Session upgrade succeeded but user is unavailable");
+    throw new Error("Email link succeeded but user is unavailable");
   }
 
-  // Fetch the refreshed session after upgrade
   const { data: sessionData, error: sessionError } =
     await supabase.auth.getSession();
 
   if (sessionError || !sessionData.session) {
     throw new Error(
       sessionError?.message ??
-        "Session upgrade succeeded but session is unavailable"
+        "Email link succeeded but session is unavailable"
     );
   }
 
-  return {
-    user: data.user,
-    session: sessionData.session,
-  };
+  return { user: data.user, session: sessionData.session };
+}
+
+/**
+ * Step 2 of anonymous → permanent upgrade: set password.
+ *
+ * Must only be called AFTER the user has verified their email
+ * (clicked link / entered OTP from Step 1).
+ * Supabase requires email verification before a password can be set
+ * on an anonymous-to-permanent upgrade.
+ */
+export async function setPassword(password: string): Promise<SessionResult> {
+  const supabase = createClient();
+
+  const { data, error } = await supabase.auth.updateUser({ password });
+
+  if (error) {
+    throw new Error(`Unable to set password: ${error.message}`);
+  }
+
+  if (!data.user) {
+    throw new Error("Password update succeeded but user is unavailable");
+  }
+
+  const { data: sessionData, error: sessionError } =
+    await supabase.auth.getSession();
+
+  if (sessionError || !sessionData.session) {
+    throw new Error(
+      sessionError?.message ??
+        "Password update succeeded but session is unavailable"
+    );
+  }
+
+  return { user: data.user, session: sessionData.session };
 }
