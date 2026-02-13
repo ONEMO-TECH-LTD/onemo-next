@@ -5,17 +5,27 @@ import { requireAuth } from "@/lib/supabase/session-server";
 
 const MAX_BYTES = 10_485_760; // 10MB
 const ALLOWED_FORMATS = ["png", "jpg", "jpeg"] as const;
+const VALID_PURPOSE = "private_design_upload" as const;
 
-export async function POST() {
+export async function POST(request: Request) {
   const authResult = await requireAuth();
 
   if (authResult.response) {
     return authResult.response;
   }
 
+  const body = await request.json().catch(() => null);
+  if (body?.purpose !== VALID_PURPOSE) {
+    return errorResponse(
+      "VALIDATION_ERROR",
+      "Invalid or missing purpose.",
+      400
+    );
+  }
+
   const cloudName =
-    process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ??
-    process.env.CLOUDINARY_CLOUD_NAME;
+    process.env.CLOUDINARY_CLOUD_NAME ??
+    process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
   const apiKey = process.env.CLOUDINARY_API_KEY;
   const apiSecret = process.env.CLOUDINARY_API_SECRET;
 
