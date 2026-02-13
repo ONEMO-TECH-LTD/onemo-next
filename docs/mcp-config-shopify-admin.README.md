@@ -20,7 +20,7 @@ Example merged into Claude Desktop config:
   "mcpServers": {
     "shopify-admin": {
       "command": "node",
-      "args": ["/Users/daniilsolopov/onemo-next/scripts/shopify-mcp-wrapper.mjs"],
+      "args": ["/ABSOLUTE/PATH/TO/onemo-next/scripts/shopify-mcp-wrapper.mjs"],
       "env": {
         "SHOPIFY_STORE_DOMAIN": "onemo-dev.myshopify.com"
       }

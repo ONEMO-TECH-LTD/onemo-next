@@ -35,14 +35,18 @@ function loadEnvLocal() {
     const eq = trimmed.indexOf("=");
     if (eq === -1) continue;
     const key = trimmed.slice(0, eq).trim();
-    const value = trimmed.slice(eq + 1).trim();
-    if (value.startsWith('"') && value.endsWith('"')) {
-      env[key] = value.slice(1, -1).replace(/\\"/g, '"');
-    } else if (value.startsWith("'") && value.endsWith("'")) {
-      env[key] = value.slice(1, -1).replace(/\\'/g, "'");
+    const rest = trimmed.slice(eq + 1).trim();
+    let value;
+    if (rest.startsWith('"') && rest.endsWith('"')) {
+      value = rest.slice(1, -1).replace(/\\"/g, '"');
+    } else if (rest.startsWith("'") && rest.endsWith("'")) {
+      value = rest.slice(1, -1).replace(/\\'/g, "'");
     } else {
-      env[key] = value.split("#")[0].trim();
+      const commentIdx = rest.indexOf(" #");
+      value =
+        commentIdx >= 0 ? rest.slice(0, commentIdx).trimEnd() : rest;
     }
+    env[key] = value;
   }
   return env;
 }
