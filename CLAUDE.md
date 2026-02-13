@@ -137,6 +137,22 @@ Cursor agents (Composer/Codex) work **locally inside Cursor's workspace**. Files
 4. **Fix prompt format:** Numbered list of specific changes. End with "Run `npm run typecheck && npm run lint` after changes. Don't commit."
 5. **Dan sends Cursor the fix prompt** → Cursor fixes → Dan confirms → push
 
+### Task Assignment
+
+When presenting a task to Dan, always state:
+
+1. **What it is** — one sentence, plain English, why it matters
+2. **Which agent** — based on complexity:
+
+| Complexity | Agent | Use When |
+|---|---|---|
+| Standard implementation | **Cursor Composer** (Sonnet 4.5) | Clear issue, defined criteria, no design decisions |
+| Complex / multi-concern | **Codex** or Composer with extra context | Judgment calls, edge cases, multi-file coordination |
+| Architecture / planning | **Claude Code** (Opus 4.6 — this agent) | Design, review, SSOT, coordination |
+| Dan-action | **Dan** | Shopify admin, billing, credentials, approvals |
+
+3. **The prompt** (if Cursor/Codex work)
+
 ### Composer Prompt Format
 
 **Short by default.** Every Linear issue must have a thorough description with acceptance criteria, implementation details, and file paths. The Composer prompt just points to it:
