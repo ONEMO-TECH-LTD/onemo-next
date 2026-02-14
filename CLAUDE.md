@@ -28,6 +28,9 @@ When Dan says "continue", "what's next", asks about strategy, status, planning, 
 ### Engineer Mode
 When Dan assigns a `ONE-XX` issue or says "code this", "implement", "work on ONE-XX". Read AGENTS.md for full engineering rules. Branch from `staging`, complete files not snippets, all checks must pass before PR.
 
+### Task Locks (parallel work)
+Before starting any coding task, check `current_tasks/` for existing locks. Create a lock file (`ONE-XX-short-desc.txt`) when you start, delete it when done. See `current_tasks/README.md` for format. This prevents duplicate work when multiple agents run in parallel.
+
 ---
 
 ## Linear — Your Operating Brain
@@ -158,10 +161,13 @@ When presenting a task to Dan, always state:
 **Short by default.** Every Linear issue must have a thorough description with acceptance criteria, implementation details, and file paths. The Composer prompt just points to it:
 
 ```
+Create branch `task/one-XX-short-desc` from staging.
 Read Linear issue ONE-XX via Linear MCP. Execute it.
 [One-liner context if needed, e.g., "Use response helpers from src/lib/api/response.ts"]
 Run `npm run typecheck && npm run lint` after changes. Don't commit.
 ```
+
+**Branch line is mandatory.** Every prompt must start with the branch creation instruction. Format: `task/one-XX-short-desc` (lowercase, hyphenated). Cursor won't create it otherwise.
 
 **Never duplicate** the issue description in the prompt. If the issue lacks detail, fix the issue first — don't compensate with a longer prompt.
 
