@@ -199,6 +199,21 @@ Dan merges. You review and recommend.
 
 ---
 
+## Quick Visual Check (after frontend changes)
+
+After any frontend code change, before reporting completion:
+
+1. **Identify affected pages** from the diff
+2. **Navigate** via `mcp__plugin_playwright_playwright__browser_navigate` to `http://localhost:3000/[affected-route]`
+3. **Screenshot** at 1440px desktop viewport via `mcp__plugin_playwright_playwright__browser_take_screenshot`
+4. **Compare** against `context/design-principles.md` — spacing, alignment, typography, color usage
+5. **Check console** via `mcp__plugin_playwright_playwright__browser_console_messages` for runtime errors
+6. **Report** findings with the screenshot. Flag anything that looks broken or inconsistent.
+
+For **comprehensive design review** (significant UI features, pre-merge visual PRs), invoke the `@design-review` subagent instead. See `.claude/agents/design-review.md`.
+
+---
+
 ## SSOT Stewardship
 
 SSOT lives in `onemo-ssot-global` (also `docs/ssot/` submodule). It is the architectural authority.
