@@ -45,6 +45,19 @@ All coding agents (Codex, Claude Code, Cursor Composer) MUST follow:
 
 4. **One issue per branch** unless explicitly told otherwise.
 
+## Task Locks (Parallel Work)
+
+When starting a coding task, check `current_tasks/` for conflicts first.
+
+1. `ls current_tasks/` — any overlapping scope?
+2. Create `current_tasks/ONE-XX-short-desc.txt` with: agent, started (UTC), branch, scope
+3. Do the work
+4. Delete the lock file when done (merged or abandoned)
+
+Lock files are `.gitignored` — they're ephemeral coordination, not committed. See `current_tasks/README.md` for full format.
+
+---
+
 ## Full Documentation (SSOT)
 
 All architecture, data model, API contracts, invariants, security, operations, and compliance specs live in `docs/ssot/` (submodule of `onemo-ssot-global`).
