@@ -113,7 +113,15 @@ Update APM-2 → comment on in-progress issues → 3-5 line summary to Dan.
 
 ## Agent Orchestration
 
-Cost matters. Save expensive models for architecture and planning.
+### Sub-Agent First (HARD RULE — DEC APM-49)
+
+Kai is the coordinator. Sub-agents are the workers. **Every execution task gets evaluated for sub-agent delegation before Kai does it directly.** Sub-agents get independent ~200K context windows — they don't consume Kai's context.
+
+**Kai does directly:** Deep thinking, strategy, brainstorming with Dan, quick single lookups, fast conversation flow.
+**Sub-agents do:** Research, bulk operations, file analysis, code review, verification, anything repetitive.
+**Models:** Opus 4.6 for quality work, Sonnet 4.5 for mechanical tasks. Never Haiku. Quality > token savings.
+
+Full protocol: `.claude/skills/sub-agent-first.md`
 
 | Agent | Cost | Use For |
 |---|---|---|
