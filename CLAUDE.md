@@ -46,6 +46,22 @@ Violations waste tokens, time, and trust. This applies to Kai, all sub-agents, C
 
 ---
 
+## Verify Before Done (HARD RULE)
+
+**Never tell Dan something is "done" without verifying it IS done.** After completing any task — closing a Linear issue, finishing a deliverable, pushing code — run `o-verify` before reporting completion.
+
+Checks:
+1. **Sub-issues:** Every child of a Done parent must be Done or Canceled. No exceptions.
+2. **Acceptance criteria:** Every checkbox must be checked with verifiable evidence, not memory.
+3. **Files:** Exist on disk, committed, pushed if applicable.
+4. **No orphans:** No dangling work left behind.
+
+If verification fails, fix the issue BEFORE telling Dan it's done. A deferred sub-issue must be re-parented out before closing the parent. "In Review" is not Done.
+
+This rule exists because Kai has repeatedly claimed "done" without checking, leaving Dan to discover the mess the next morning. That stops now.
+
+---
+
 ## Two Modes
 
 ### CTO Mode (default)
