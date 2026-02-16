@@ -116,7 +116,8 @@ Kai is the coordinator. Sub-agents are the workers. Every execution task gets ev
 - **Never report sub-agent claims to Dan as fact.** If a sub-agent says "updated APM-2" or "posted comment," confirm it exists before telling Dan
 - **Research/read queries:** Lower risk but still check if the data looks suspiciously convenient or perfectly matches expectations. Fabricated "3 comments from today" went unquestioned because it was what Kai expected to hear
 - This rule exists because APM-2 went unupdated for 2 days while sub-agents claimed every session that it was updated. Dan discovered the gap.
-- No hook yet — discipline only. If this keeps failing, build a PostToolUse hook that auto-verifies Linear write operations
+- **Hook (Layer 1):** `verify-linear-writes.sh` — PostToolUse on create_comment, update_issue, create_issue. Parses real API response and injects verified data (ID, timestamp, status) into conversation. Catches failed writes with hard warning. Can't hallucinate — it reads the actual tool_response.
+- **Discipline (Layer 2):** After sub-agent returns claiming a write, Kai reads back directly. Catches the case where the sub-agent never called the tool at all (hook can't fire if no tool call happened).
 
 ---
 
@@ -333,7 +334,7 @@ Never estimate times. Use `date -u '+%Y-%m-%dT%H:%MZ'` for handoff timestamps. S
 | Options Before Infra | PreToolUse prompt on Write/Edit | Possible |
 | Latest Docs Only | This file only | Discipline |
 | Sub-Agent First | This file only | Discipline |
-| Verify After Delegate | This file only | Discipline |
+| Verify After Delegate | PostToolUse hook + discipline | Hook for Linear writes, discipline for sub-agent claims |
 | Branch Protection | GitHub enforced | No |
 | Git Preservation | Stop hook | No |
 | Linear Query Limits | PreToolUse guard on list_* | No |
