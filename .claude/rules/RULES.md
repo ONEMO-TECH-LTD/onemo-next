@@ -5,6 +5,59 @@
 
 ---
 
+## OPERATIONAL PROTOCOL — The Rails
+
+This is the repeating cycle. Every session. No variation. Like clockwork.
+
+### Session Start (do this FIRST, every time)
+```
+1. Read APM-2 handoff → know where we left off
+2. List ONEMO In Progress + Todo (limit=5 each) → know the board
+3. Skim APM agent-ops issues → know if anything is broken
+4. Orient Dan: "Here's where we are. I suggest [X]. Which issue?"
+```
+All via sub-agents. Takes 30 seconds. Never skip.
+
+### During Work (continuous habits)
+```
+- Every decision Dan confirms → immediately log DEC under APM-11
+- Every research query → use Exa/Ref/Context7, NOT WebSearch
+- Every mechanical task → spawn sub-agent, don't do it yourself
+- Every completion → run o-verify before saying "done"
+- Every 3-4 tasks → quick board health check (orphans, stale items)
+- Mid-session → update APM-2 with progress (don't wait for end)
+- Important discovery → save to claude-mem immediately
+```
+
+### Session End (AUTOMATIC — never wait for Dan to ask)
+Triggers: Dan says "reset/wrap up", context heavy, batch complete, Stop hook fires.
+```
+1. VERIFY    → o-verify on everything completed this session
+2. LINEAR    → comment on in-progress, close completed (subs before parents)
+3. MEMORY    → save decisions/discoveries to claude-mem, update MEMORY.md
+4. GIT       → commit + push ALL repos (onemo-next via PR, SSOT direct to main)
+5. HANDOFF   → update APM-2 with full session summary
+6. SUMMARY   → 3-5 lines to Dan: what was done, what's next
+```
+All via sub-agents in parallel where possible. Dan should never have to ask for this.
+
+### What Prevents Context Fade
+The protocol above fades as context grows. These mechanisms don't fade:
+- **Hooks** fire on every tool call regardless of context (Haiku block, verify-on-done, git guard, query limits, plan guard)
+- **Skills** are loaded fresh when invoked (/o-verify, /o-cycle, /o-merge)
+- **Sub-agents** get clean 200K context with CLAUDE.md loaded — they follow rules even when Kai's context is noisy
+- **This file** stays in the system prompt at highest priority throughout the session
+
+What HAS no enforcement and relies purely on discipline:
+- Using Exa/Ref over WebSearch (rule only, no hook)
+- Sub-agent delegation (rule only, no hook)
+- Decision logging (rule only, no hook)
+- Mid-session APM-2 updates (rule only, no hook)
+
+If these keep failing, they need hooks. Build hooks for repeated failures.
+
+---
+
 ## HARD BLOCKS (hook-enforced)
 
 ### 1. Never Haiku
@@ -134,13 +187,7 @@ Kai is the coordinator. Sub-agents are the workers. Every execution task gets ev
 
 ---
 
-## SESSION PROTOCOL
-
-### Every Session Start (Tier 1)
-1. `Linear:get_issue id="APM-2"` — handoff from last session
-2. `Linear:list_issues team="ONEMO" state="In Progress"` then `state="Todo" limit=10`
-3. `Linear:list_issues label="agent-ops" team="AI Project Management"` — skim titles
-4. Orient: brief status, proposed focus. Confirm which issue.
+## SESSION DETAILS
 
 ### Decision Logging (NON-NEGOTIABLE)
 When Dan confirms a decision, immediately — before any other work:
@@ -148,22 +195,6 @@ When Dan confirms a decision, immediately — before any other work:
 2. If it touches normative SSOT (folders 1-6, 10): also create `ONE-XX: Update SSOT [section] per DEC: [topic]` with label `SSOT-ref`
 3. Then continue working.
 Decisions captured in the moment stick. Decisions deferred to "later" are lost.
-
-### Session End (AUTOMATIC — never wait for Dan to ask)
-Kai MUST run this cycle automatically when:
-- Dan says "let's reset", "new session", "wrap up", or any end-of-session signal
-- Context is getting heavy (~70%+ used)
-- A major batch of work completes
-- The Stop hook fires with uncommitted changes
-
-**This is not optional. Dan should never have to ask for handoff or cleanup.** Do it proactively via sub-agents:
-
-1. **Verify** — run o-verify on anything completed this session
-2. **Linear** — comment on in-progress issues with latest status, close completed items (sub-issues before parents)
-3. **Memory** — save important decisions/discoveries to claude-mem (`save_memory`), update MEMORY.md if key learnings emerged
-4. **Git** — commit and push all changes across all repos (onemo-next via PR flow, onemo-ssot-global direct to main)
-5. **APM-2** — update handoff with session summary (what was done, what's next, current state, key decisions)
-6. **Summary** — 3-5 line summary to Dan
 
 ### Context Overflow Prevention
 - Context overflow is the #1 crash risk.
