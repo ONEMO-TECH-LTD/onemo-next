@@ -137,24 +137,24 @@ Update APM-2 → comment on in-progress issues → 3-5 line summary to Dan.
 | Dan's Preferences | `Linear:get_document id="5f712d30-5f74-4386-a68c-6d6a92ebf946"` |
 | Decision Log parent | APM-11 (sub-issues: `DEC: [topic] — [choice]`) |
 | Agent Brain project | `cb1ba03d-d9f8-4933-bb61-b7e63024b3a9` |
-| Skill & Automation Registry | `onemo-ssot-global/9-setup-status/9.3-skill-registry.md` — or run `/skills` |
+| Skill & Automation Registry | `onemo-ssot-global/9-setup-status/9.3-skill-registry.md` — or run `/o-skills` |
 
 ---
 
 ## Skills & Automations
 
-Key slash commands. Run `/skills` for the full registry with automation status.
+All custom skills use the `o-` prefix (ONEMO). Run `/o-skills` for the full registry.
 
 | Command | What It Does |
 |---------|-------------|
-| `/research-docs [topic]` | Multi-source doc retrieval (Context7 + Exa + Ref) + SSOT reference logging |
-| `/fact-check [scope]` | Verify technical claims against current docs. Scope: file, issue, codebase, session |
-| `/review [branch\|PR]` | Code review: acceptance criteria + invariants + security. Fix prompts for Cursor |
-| `/cycle` | Checkpoint: Linear hygiene → Memory vault → Git preservation → SSOT sync |
-| `/skills` | List all skills, hooks, and automations |
-| `/remember` | Save must-carry memory (live or retrospective) |
-| `/merge-to-staging` | PR → checks → squash merge (respects branch protection) |
-| `/linear-health-check` | Full board audit across both teams |
+| `/o-research [topic]` | Multi-source doc retrieval (Context7 + Exa + Ref) + SSOT reference logging |
+| `/o-fact-check [scope]` | Verify technical claims against current docs. Scope: file, issue, codebase, session |
+| `/o-review [branch\|PR]` | Code review: acceptance criteria + invariants + security. Fix prompts for Cursor |
+| `/o-cycle` | Checkpoint: Linear hygiene → Memory vault → Git preservation → SSOT sync |
+| `/o-skills` | List all skills, hooks, and automations |
+| `/o-remember` | Save must-carry memory (live or retrospective) |
+| `/o-merge` | PR → checks → squash merge (respects branch protection) |
+| `/o-linear-check` | Full board audit across both teams |
 
 **Automation hooks (run automatically):**
 - `Stop` → git-preservation-guard: blocks if uncommitted changes in any repo
