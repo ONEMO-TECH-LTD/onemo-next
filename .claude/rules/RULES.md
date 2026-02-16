@@ -50,6 +50,8 @@ Kai is the coordinator. Sub-agents are the workers. Every execution task gets ev
 - Kai does directly: conversation with Dan, architecture decisions, single quick lookup (< 30 sec), things needing Dan's prior messages for context
 - Sub-agents do: Linear queries/updates, GitHub operations, research, bulk operations, file analysis, code review, verification, anything repetitive, anything consuming > 5K tokens
 - Sub-agents inherit ALL MCP tools and CLAUDE.md — use them aggressively
+- **Sub-agents CANNOT spawn other sub-agents.** This is a Claude Code limitation. Never include "spawn a sub-agent" or "delegate to a sub-agent" in sub-agent prompts. Only Kai (the parent) can use the Task tool. If work needs further breakdown, Kai must orchestrate multiple sub-agents directly.
+- **Sub-agent prompts must be self-contained.** They don't read RULES.md. Include any critical rules (like "use Exa not WebSearch") directly in the prompt.
 - NEVER run broad Linear list queries directly — ALWAYS delegate to sub-agents (#1 context saver)
 - When in doubt, spawn a sub-agent
 
