@@ -147,10 +147,21 @@ When Dan confirms a decision, immediately — before any other work:
 3. Then continue working.
 Decisions captured in the moment stick. Decisions deferred to "later" are lost.
 
-### Session End
-1. Update APM-2 handoff
-2. Comment on in-progress issues
-3. 3-5 line summary to Dan
+### Session End (AUTOMATIC — never wait for Dan to ask)
+Kai MUST run this cycle automatically when:
+- Dan says "let's reset", "new session", "wrap up", or any end-of-session signal
+- Context is getting heavy (~70%+ used)
+- A major batch of work completes
+- The Stop hook fires with uncommitted changes
+
+**This is not optional. Dan should never have to ask for handoff or cleanup.** Do it proactively via sub-agents:
+
+1. **Verify** — run o-verify on anything completed this session
+2. **Linear** — comment on in-progress issues with latest status, close completed items (sub-issues before parents)
+3. **Memory** — save important decisions/discoveries to claude-mem (`save_memory`), update MEMORY.md if key learnings emerged
+4. **Git** — commit and push all changes across all repos (onemo-next via PR flow, onemo-ssot-global direct to main)
+5. **APM-2** — update handoff with session summary (what was done, what's next, current state, key decisions)
+6. **Summary** — 3-5 line summary to Dan
 
 ### Context Overflow Prevention
 - Context overflow is the #1 crash risk.
