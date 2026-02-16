@@ -45,30 +45,59 @@ All coding agents (Codex, Claude Code, Cursor Composer) MUST follow:
 
 4. **One issue per branch** unless explicitly told otherwise.
 
+## Task Locks (Parallel Work)
+
+When starting a coding task, check `current_tasks/` for conflicts first.
+
+1. `ls current_tasks/` — any overlapping scope?
+2. Create `current_tasks/ONE-XX-short-desc.txt` with: agent, started (UTC), branch, scope
+3. Do the work
+4. Delete the lock file when done (merged or abandoned)
+
+Lock files are `.gitignored` — they're ephemeral coordination, not committed. See `current_tasks/README.md` for full format.
+
+---
+
 ## Full Documentation (SSOT)
 
-All architecture, data model, API contracts, invariants, security, operations, and compliance specs live in `docs/ssot/` (submodule of `onemo-ssot-global`).
+All architecture, data model, API contracts, invariants, security, operations, and compliance specs live in the `onemo-ssot-global` repo (GitHub: `ONEMO-TECH-LTD/onemo-ssot-global`, private). Agents access it directly from their local clone — there is no submodule. The repo is cloned alongside other ONEMO repos (e.g., `../onemo-ssot-global` relative to this repo).
 
 **Key files to read before working on a task:**
 
 | Topic | File |
 |---|---|
-| System overview | `docs/ssot/2-architecture/2.1-system-overview.md` |
-| Tech stack | `docs/ssot/2-architecture/2.2-tech-stack.md` |
-| Data model | `docs/ssot/2-architecture/2.3-data-model.md` |
-| Security & auth | `docs/ssot/2-architecture/2.4-security-and-auth.md` |
-| API contracts | `docs/ssot/2-architecture/2.5-api-contracts.md` |
-| Invariants (must not violate) | `docs/ssot/2-architecture/2.7-invariants-and-failure-modes.md` |
-| Environments & secrets | `docs/ssot/4-operations/4.1-environments.md`, `4.4-secrets-and-local-dev.md` |
-| CI & branching | `docs/ssot/4-operations/4.2-ci-and-branching.md` |
-| GDPR & webhooks | `docs/ssot/6-compliance/6.1-gdpr-and-webhooks.md` |
-| Moderation | `docs/ssot/6-compliance/6.2-moderation.md` |
+| System overview | `onemo-ssot-global/2-architecture/2.1-system-overview.md` |
+| Tech stack | `onemo-ssot-global/2-architecture/2.2-tech-stack.md` |
+| Data model | `onemo-ssot-global/2-architecture/2.3-data-model.md` |
+| Security & auth | `onemo-ssot-global/2-architecture/2.4-security-and-auth.md` |
+| API contracts | `onemo-ssot-global/2-architecture/2.5-api-contracts.md` |
+| Invariants (must not violate) | `onemo-ssot-global/2-architecture/2.7-invariants-and-failure-modes.md` |
+| Environments & secrets | `onemo-ssot-global/4-operations/4.1-environments.md`, `4.4-secrets-and-local-dev.md` |
+| CI & branching | `onemo-ssot-global/4-operations/4.2-ci-and-branching.md` |
+| GDPR & webhooks | `onemo-ssot-global/6-compliance/6.1-gdpr-and-webhooks.md` |
+| Moderation | `onemo-ssot-global/6-compliance/6.2-moderation.md` |
+| Verified external references | `onemo-ssot-global/13-references/` (anti-hallucination layer) |
+| Token naming convention (blueprint) | `onemo-ssot-global/11-design-system/11.5-naming-convention.md` — READ before any token/CSS/theme work |
 
 **Always read the Linear issue description first** — it contains task-specific acceptance criteria and references to relevant SSOT sections.
 
+## Latest Documentation Only (DEC APM-50 — HARD RULE)
+
+Every technical decision and implementation **MUST** be based on the latest verified documentation for the current date. No exceptions. No guessing. No outdated docs.
+
+1. **Verify before using** — check version numbers, dates, changelogs before applying any framework/platform convention
+2. **Search explicitly** — always include `{topic} {current year}` in research queries
+3. **No gap-filling** — if latest info is unavailable, flag it. Never assume.
+4. **Log all references** — every external source used goes into `onemo-ssot-global/13-references/` with URL, date verified, version, summary
+5. **Documentation sub-issue required** — every technical Linear issue must have a sub-issue titled `Docs: [parent title] — references & verification` listing the verified sources the work is based on
+
+This applies to ALL agents: Claude Code, Cursor, Codex, and Dan. Violations waste tokens, time, and trust.
+
+---
+
 ## Key Rules (Non-Negotiable)
 
-These are the most critical rules from SSOT governance. For the complete list with failure modes and mitigations, read `docs/ssot/2-architecture/2.7-invariants-and-failure-modes.md`.
+These are the most critical rules from SSOT governance. For the complete list with failure modes and mitigations, read `onemo-ssot-global/2-architecture/2.7-invariants-and-failure-modes.md`.
 
 1. **Supabase is canonical** for all design data. Shopify is commerce only.
 2. **Cart flow:** `checkoutUrl` redirect. NEVER redirect to `/cart`.
@@ -102,8 +131,7 @@ src/
   types/                  # TypeScript type definitions
 supabase/
   migrations/             # SQL migrations (001_*, 002_*, etc.)
-docs/
-  ssot/                   # SSOT submodule (read-only reference)
+docs/                     # Non-code documentation (MCP configs, etc.)
 ```
 
 ## What NOT To Do
