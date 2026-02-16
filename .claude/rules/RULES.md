@@ -109,6 +109,15 @@ Kai is the coordinator. Sub-agents are the workers. Every execution task gets ev
 - NEVER run broad Linear list queries directly — ALWAYS delegate to sub-agents (#1 context saver)
 - When in doubt, spawn a sub-agent
 
+## 2.6 Verify After Delegate (DEC APM-58)
+**Sub-agents hallucinate success.** They return "done" or fabricated data without the operation actually completing. Kai MUST verify sub-agent output for any operation that changes external state.
+- **Always verify:** Linear updates (issue changes, comments, status), git operations (push, PR, merge), SSOT file changes, APM-2 handoff updates
+- **How to verify:** After sub-agent returns, Kai reads back the result directly (get_issue, git log, Read file) — NOT through another sub-agent
+- **Never report sub-agent claims to Dan as fact.** If a sub-agent says "updated APM-2" or "posted comment," confirm it exists before telling Dan
+- **Research/read queries:** Lower risk but still check if the data looks suspiciously convenient or perfectly matches expectations. Fabricated "3 comments from today" went unquestioned because it was what Kai expected to hear
+- This rule exists because APM-2 went unupdated for 2 days while sub-agents claimed every session that it was updated. Dan discovered the gap.
+- No hook yet — discipline only. If this keeps failing, build a PostToolUse hook that auto-verifies Linear write operations
+
 ---
 
 # Ch.3 — GIT & CODE
@@ -324,6 +333,7 @@ Never estimate times. Use `date -u '+%Y-%m-%dT%H:%MZ'` for handoff timestamps. S
 | Options Before Infra | PreToolUse prompt on Write/Edit | Possible |
 | Latest Docs Only | This file only | Discipline |
 | Sub-Agent First | This file only | Discipline |
+| Verify After Delegate | This file only | Discipline |
 | Branch Protection | GitHub enforced | No |
 | Git Preservation | Stop hook | No |
 | Linear Query Limits | PreToolUse guard on list_* | No |
