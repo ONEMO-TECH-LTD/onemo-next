@@ -1,7 +1,12 @@
+---
+name: cto-operations
+description: "Extended session protocol and CTO procedures. Covers detailed session start, decision logging, PR review checklist, SSOT change authority, and Cursor delegation rules. Always active as background reference."
+user-invocable: false
+---
+
 # CTO Operations — Extended Reference
 
-> Skill: Read when operating in CTO mode for detailed protocols beyond what's in CLAUDE.md.
-> Trigger: "continue", "what's next", architecture/planning questions, or when you need protocol details.
+Read when operating in CTO mode for detailed protocols beyond what's in CLAUDE.md.
 
 ---
 
@@ -42,7 +47,7 @@ When a decision is locked:
 2. Title: `DEC: [topic] — [choice]`
 3. Description: context, alternatives considered, rationale
 4. Status: Decision Log (never move, never close)
-5. If it affects SSOT folders 1-8: propose diff via PR
+5. If it affects SSOT folders 1-6, 10: propose diff via PR
 
 ## Architecture Decision Process
 
@@ -52,21 +57,21 @@ When a decision is locked:
 4. Lock it per Decision Log Protocol above
 5. Update SSOT if normative content affected
 
-## Codex Delegation Rules
+## Cursor Delegation Rules
 
-When assigning work to Codex (Cursor or Mac app):
+When assigning work to Cursor:
 - Reference the Linear issue ID explicitly
 - State objectives and acceptance criteria
 - State constraints (invariants to respect, files not to touch)
 - Don't write implementation code in the prompt
-- Don't specify implementation steps — let Codex figure out HOW
+- Don't specify implementation steps — let Cursor figure out HOW
 - Specify branch naming: `task/<issue-id>-<short-desc>`
 - State whether single-issue or multi-issue branch
 
 ## PR Review Checklist (Detailed)
 
 1. Does implementation satisfy ALL acceptance criteria from Linear issue?
-2. Check against invariants INV-01 through INV-12 (read `docs/ssot/2-architecture/2.7-invariants-and-failure-modes.md`)
+2. Check against invariants INV-01 through INV-12 (read `onemo-ssot-global/2-architecture/2.7-invariants-and-failure-modes.md`)
 3. Branch conventions: from `staging`, named `task/<issue-id>-<desc>`
 4. No hardcoded secrets or credentials
 5. No hardcoded `dev/` prefix — must use `CLOUDINARY_ENV_PREFIX`
@@ -83,9 +88,8 @@ When assigning work to Codex (Cursor or Mac app):
 |--------|---------------|-----|
 | 1-6 | Dan approval | PR + review |
 | 7 | Agents | Append-only, direct to main |
-| 8 | Dan approval | PR + review |
 | 9 | Agents | Direct to main (status only) |
 | 10 | Dan approval | New ADRs via PR. Accepted = immutable. |
 | 11 | Agent proposes | Dan approves |
 
-Normative content rule: folders 1-8 contain permanent rules/specs only. No readiness language, task tracking, status. Status lives in folder 9. Tasks live in Linear.
+Normative content rule: folders 1-6 contain permanent rules/specs only. No readiness language, task tracking, status. Status lives in folder 9. Tasks live in Linear.
