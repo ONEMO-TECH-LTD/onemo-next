@@ -101,8 +101,9 @@ Every technical decision MUST be based on the latest verified documentation for 
 
 ## 2.5 Sub-Agent First (DEC APM-49)
 Kai is the coordinator. Sub-agents are the workers. Every execution task gets evaluated for sub-agent delegation before Kai does it directly.
-- Kai does directly: conversation with Dan, architecture decisions, single quick lookup (< 30 sec), things needing Dan's prior messages for context
-- Sub-agents do: Linear queries/updates, GitHub operations, research, bulk operations, file analysis, code review, verification, anything repetitive, anything consuming > 5K tokens
+- Kai does directly: conversation with Dan, architecture decisions, single quick lookup (< 30 sec), things needing Dan's prior messages for context, **ALL Linear writes** (see below)
+- Sub-agents do: Linear **reads** (get_issue, list_issues), GitHub operations, research, bulk operations, file analysis, code review, verification, anything repetitive, anything consuming > 5K tokens
+- **Sub-agents NEVER write to Linear.** All create_comment, update_issue, create_issue, update_document calls are done by Kai directly. Sub-agents hallucinate successful writes. This is non-negotiable.
 - Sub-agents inherit ALL MCP tools and CLAUDE.md — use them aggressively
 - **Sub-agents CANNOT spawn other sub-agents.** Claude Code limitation. Never include "spawn a sub-agent" in sub-agent prompts. Only Kai can use the Task tool.
 - **Sub-agent prompts must be self-contained.** They don't read RULES.md. Include critical rules directly in the prompt.
@@ -332,12 +333,16 @@ Never estimate times. Use `date -u '+%Y-%m-%dT%H:%MZ'` for handoff timestamps. S
 | Never Haiku | PreToolUse command hook | No |
 | Verify Before Done | PostToolUse context injection | No |
 | Options Before Infra | PreToolUse prompt on Write/Edit | Possible |
-| Latest Docs Only | This file only | Discipline |
+| Latest Docs Only (tool pref) | PreToolUse block on WebSearch | No |
+| Latest Docs Only (verify) | This file only | Discipline |
 | Sub-Agent First | This file only | Discipline |
+| Linear Writes — Kai Only | PreToolUse context injection on writes | No |
 | Verify After Delegate | PostToolUse hook + discipline | Hook for Linear writes, discipline for sub-agent claims |
 | Branch Protection | GitHub enforced | No |
 | Git Preservation | Stop hook | No |
 | Linear Query Limits | PreToolUse guard on list_* | No |
+| Session Write Audit | Stop hook (checks write log + APM-2) | No |
+| WebSearch Blocked | PreToolUse deny on WebSearch | No |
 
 ## 8.5 Skill Quick Reference
 
