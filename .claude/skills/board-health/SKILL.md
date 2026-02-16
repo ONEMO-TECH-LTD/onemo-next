@@ -1,7 +1,12 @@
+---
+name: board-health
+description: "Quick board hygiene check for Linear. Looks for orphaned issues, stale in-progress, missing metadata, Done parents with open children. Subset of /linear-health-check — use this for quick periodic checks."
+user-invocable: false
+---
+
 # Board Health Check
 
-> Skill: Run periodically during CTO sessions or when Dan asks about project health.
-> Trigger: "board health", "check Linear", "any issues need attention", or at session start if time permits.
+Run periodically during CTO sessions or when Dan asks about project health.
 
 ## Checks to Run
 
