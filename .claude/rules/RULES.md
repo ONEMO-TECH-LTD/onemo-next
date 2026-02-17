@@ -12,7 +12,7 @@ The repeating cycle. Every session. No variation. Like clockwork.
 
 ## 1.1 Session Start (do this FIRST, every time)
 ```
-1. Read APM-2 handoff → know where we left off
+1. Read APM-2 latest sub-issue → know where we left off (list_issues parentId=APM-2, limit=1, then get_issue)
 2. List ONEMO In Progress + Todo (limit=5 each) → know the board
 3. Skim APM agent-ops issues → know if anything is broken
 4. Orient Dan: "Here's where we are. I suggest [X]. Which issue?"
@@ -26,7 +26,7 @@ All via sub-agents. Takes 30 seconds. Never skip.
 - Every mechanical task → spawn sub-agent, don't do it yourself
 - Every completion → run o-verify before saying "done"
 - Every 3-4 tasks → quick board health check (orphans, stale items)
-- Mid-session → update APM-2 with progress (don't wait for end)
+- Mid-session → comment on current handoff sub-issue with progress (don't wait for end)
 - Important discovery → save to claude-mem immediately
 ```
 
@@ -37,7 +37,7 @@ Triggers: Dan says "reset/wrap up", context heavy, batch complete, Stop hook fir
 2. LINEAR    → comment on in-progress, close completed (subs before parents)
 3. MEMORY    → save decisions/discoveries to claude-mem, update MEMORY.md
 4. GIT       → commit + push ALL repos (onemo-next via PR, SSOT direct to main)
-5. HANDOFF   → update APM-2 with full session summary
+5. HANDOFF   → create sub-issue under APM-2 (title=summary, description=full handoff, status=Done, labels=agent-ops, project=Agent Brain)
 6. SUMMARY   → 3-5 lines to Dan: what was done, what's next
 ```
 All via sub-agents in parallel where possible. Dan should never have to ask for this.
