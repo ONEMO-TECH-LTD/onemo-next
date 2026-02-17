@@ -16,7 +16,7 @@ Execute in order:
 
 ```
 1. Read latest handoff:
-   a. list_issues parentId="APM-2" limit=1              → latest day issue (e.g., "Feb 17")
+   a. list_issues parentId="APM-2" limit=1 includeArchived=false → latest day issue (e.g., "Feb 17")
    b. list_issues parentId=[day issue ID]                → handoff sub-issues for that day
    c. get_issue id=[latest handoff sub-issue]            → full handoff content
 2. Linear:get_document id="5f712d30-5f74-4386-a68c-6d6a92ebf946"  → Dan's preferences

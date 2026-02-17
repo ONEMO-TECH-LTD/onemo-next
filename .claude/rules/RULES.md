@@ -12,7 +12,7 @@ The repeating cycle. Every session. No variation. Like clockwork.
 
 ## 1.1 Session Start (do this FIRST, every time)
 ```
-1. Read latest handoff → list_issues parentId=APM-2 limit=1 → get latest day issue
+1. Read latest handoff → list_issues parentId=APM-2 limit=1 includeArchived=false → get latest day issue
    → list_issues parentId=[day issue] → read latest handoff sub-issue
 2. List ONEMO In Progress + Todo (limit=5 each) → know the board
 3. Skim APM agent-ops issues → know if anything is broken
@@ -72,12 +72,12 @@ APM-2 (static pointer — never overwrite description)
 ```
 
 **Creating a handoff (session end):**
-1. Check if today's day issue exists under APM-2 (list_issues parentId=APM-2, search by title)
+1. Check if today's day issue exists under APM-2 (list_issues parentId=APM-2 includeArchived=false, search by title)
 2. If not, create it: title=`Feb DD`, parentId=APM-2, labels=[handoff, agent-ops], project=Agent Brain, status=In Progress
 3. Create handoff sub-issue under the day issue: title=short main topic, description=full structured handoff, status=Done, labels=[handoff, agent-ops], project=Agent Brain
 
 **Reading a handoff (session start):**
-1. `list_issues parentId=APM-2 limit=1` → latest day issue
+1. `list_issues parentId=APM-2 limit=1 includeArchived=false` → latest day issue
 2. `list_issues parentId=[day issue]` → all handoff sub-issues for that day
 3. Read the latest sub-issue for current state. Read others for additional context if needed.
 
