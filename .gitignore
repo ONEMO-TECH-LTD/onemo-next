@@ -44,6 +44,25 @@ current_tasks/*.txt
 # vercel
 .vercel
 
+# design system working files (Figma exports, extraction scripts, temp outputs)
+Design System/
+
+# old brain transfer docs (superseded by .claude/rules/)
+CLAUDE BRAIN /
+
+# env snapshots
+.env.production.vercel
+
+# claude-mem debug notes
+claude-mem-fix-*.md
+
+# context drafts
+context/CLAUDE.md
+
+# claude agent/skill drafts
+.claude/agents/CLAUDE.md
+.claude/skills/CLAUDE.md
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
