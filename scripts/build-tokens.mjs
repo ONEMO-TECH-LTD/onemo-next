@@ -90,6 +90,8 @@ const SPACING_NAMES = [
 function toKebab(str) {
   return str
     .toLowerCase()
+    // Normalize accented characters to ASCII (é → e, ü → u, etc.)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     // Remove parenthetical annotations: "(900)", "(0px)", "(1,024px)", etc.
     .replace(/\s*\([^)]*\)\s*/g, '')
     // Replace Unicode One Dot Leader (U+2024) with hyphen
@@ -116,7 +118,7 @@ function toKebabPreserveMode(str) {
     // Transform mode annotations into part of the name
     .replace(/\s*\(([^)]*)\)\s*/g, (match, content) => {
       if (content.includes('light mode') || content.includes('dark mode')) {
-        return '-' + content.replace(/\s+mode\s*/g, '').replace(/\s+/g, '-');
+        return '-' + content.replace(/\s+mode\b/g, '').trim().replace(/\s+/g, '-');
       }
       return '';
     })
@@ -133,7 +135,7 @@ function toKebabPreserveMode(str) {
  * Formula: em = figmaPercentValue / 100
  */
 function letterSpacingToEm(percentValue) {
-  if (percentValue === 0) return '0em';
+  if (percentValue === 0) return '0';
   const em = percentValue / 100;
   // Avoid floating point noise: round to 4 decimal places
   const rounded = Math.round(em * 10000) / 10000;
@@ -372,9 +374,10 @@ function formatPrimitiveValue(path, node) {
     }
 
     if (subCategory === 'Font Family') {
-      // Font family: wrap in quotes, add generic fallback
+      // Font family: wrap in quotes, add appropriate generic fallback
       const fontName = String(value);
-      return `"${fontName}", sans-serif`;
+      const generic = fontName.toLowerCase().includes('mono') ? 'monospace' : 'sans-serif';
+      return `"${fontName}", ${generic}`;
     }
 
     if (subCategory === 'Paragraph Spacing') {
@@ -940,7 +943,11 @@ function generateTokenReference(collections) {
     else if (name.startsWith('border-')) twClass = `border-${name}`;
     else if (name.startsWith('focus-')) twClass = `ring-${name}`;
     else if (name.startsWith('shadow-')) twClass = `shadow-(--color-${name})`;
-    else twClass = `bg-${name}`;
+    else if (name.startsWith('alpha-')) twClass = `bg-${name}`;
+    else if (name.includes('-icon') || name.includes('-fg')) twClass = `text-${name}`;
+    else if (name.includes('-bg') || name.includes('-handle')) twClass = `bg-${name}`;
+    else if (name.includes('-border')) twClass = `border-${name}`;
+    else twClass = `text-${name}`;
 
     lines.push(`| \`--color-${name}\` | \`${twClass}\` | ${toKebab(category)} |\n`);
   }
@@ -1084,7 +1091,14 @@ async function main() {
   // Generate and write token reference
   const tokenRef = generateTokenReference(collections);
   const ssotDir = join(ROOT, '..', 'onemo-ssot-global', '11-design-system');
-  await writeFile(join(ssotDir, '11.9-token-reference.md'), tokenRef);
+  let ssotWritten = false;
+  try {
+    await writeFile(join(ssotDir, '11.9-token-reference.md'), tokenRef);
+    ssotWritten = true;
+  } catch {
+    // SSOT repo not available — write locally as fallback
+    await writeFile(join(OUTPUT_DIR, 'token-reference.md'), tokenRef);
+  }
 
   // Summary
   console.log('─── Generated Files ───');
@@ -1092,7 +1106,7 @@ async function main() {
   console.log(`  aliases.css:          ${aliases.count} tokens`);
   console.log(`  semantic.css:         ${semantic.count} tokens`);
   console.log(`  semantic-inline.css:  ${semanticInline.count} tokens (×3 sections)`);
-  console.log(`  11.9-token-reference.md: written to SSOT`);
+  console.log(`  11.9-token-reference.md: ${ssotWritten ? 'written to SSOT' : 'written locally (SSOT repo not found)'}`);
   console.log(`\nTotal: ${primitives.count + aliases.count + semantic.count + semanticInline.count} CSS custom properties\n`);
   console.log('✅ Done. Run `npm run dev` to verify.\n');
 }
