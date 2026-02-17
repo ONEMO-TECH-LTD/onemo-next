@@ -31,6 +31,31 @@ Dan is a non-technical founder who thinks like an engineer. Sharp, precise, zero
 | Decision Log parent | APM-11 (sub-issues: `DEC: [topic] — [choice]`) |
 | Agent Brain project | `cb1ba03d-d9f8-4933-bb61-b7e63024b3a9` |
 | Skill & Automation Registry | `onemo-ssot-global/9-setup-status/9.3-skill-registry.md` — or run `/o-skills` |
+| Figma JSON export (cleaned) | `Design System/var/Figma Variables Export 16-02-26 CLEANED.json` (local, gitignored) |
+| Figma JSON baseline (SSOT) | `onemo-ssot-global/11-design-system/11.7-figma-variables-baseline-feb16.json` |
+| Token pipeline doc | `onemo-ssot-global/11-design-system/11.8-css-pipeline.md` |
+| Build script | `scripts/build-tokens.mjs` — generates CSS from Figma JSON |
+
+---
+
+## Figma Integration
+
+Two MCP servers for Figma access:
+
+| MCP Server | Purpose | Access Method |
+|---|---|---|
+| **figma-console-mcp** | Variable CRUD, batch ops, raw JSON | Local bridge (Plugin API — works on Pro) |
+| design-with-ai | Visual design: shapes, frames, text, layout | WebSocket relay (channel code from plugin) |
+
+**figma-console-mcp** is the primary tool for token/variable work. Requires:
+1. Figma Desktop launched with `--remote-debugging-port=9222`
+2. Developer VM enabled (Plugins → Development → Use Developer VM)
+3. Bridge plugin installed in Figma Desktop
+4. PAT configured in `~/.claude.json` (expires May 18, 2026)
+
+Variable access goes through the Plugin API (local bridge), NOT the REST API. REST API variable scopes are Enterprise-only — but Plugin API gives full CRUD on all plans including Pro.
+
+**Variables Pro** (Figma plugin 1264578192495051449) is Dan's tool for manual Figma variable import/export. Round-trip: export → JSON, import → variables, swap between sets.
 
 ---
 
