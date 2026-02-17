@@ -1,10 +1,14 @@
 #!/bin/bash
 # audit-session-writes.sh — Stop hook
 # Checks that Linear writes during this session were all verified.
-# Blocks session end if there are FAILED writes or if no APM-2 update was logged.
+# Blocks session end if there are FAILED writes or if no handoff sub-issue was created.
 #
 # Reads from: /tmp/claude-linear-session/writes.log
 # Format per line: TIMESTAMP|OPERATION|ISSUE_ID|DETAIL|STATUS
+#
+# Handoff protocol (DEC APM-61): Each session creates a handoff sub-issue
+# under a day issue under APM-2. The hook checks for create_issue writes
+# with the handoff label pattern.
 #
 # Exit 2 = block session end (user sees warning)
 # Exit 0 = allow
@@ -28,11 +32,15 @@ if [ -n "$FAILED" ]; then
   exit 2
 fi
 
-# Check for APM-2 update (handoff must be updated each session)
-APM2_UPDATE=$(grep "|update_issue|APM-2|" "$LOG_FILE" 2>/dev/null)
-APM2_COMMENT=$(grep "|create_comment|APM-2|" "$LOG_FILE" 2>/dev/null)
-if [ -z "$APM2_UPDATE" ] && [ -z "$APM2_COMMENT" ]; then
-  echo "LINEAR AUDIT: No APM-2 update detected this session. Update the handoff before ending." >&2
+# Check for handoff creation (new protocol: sub-issue under day issue under APM-2)
+# We look for any create_issue call that succeeded — the handoff sub-issue
+HANDOFF_CREATED=$(grep "|create_issue|" "$LOG_FILE" 2>/dev/null | grep "|SUCCESS$")
+# Also accept update_issue or create_comment on APM-2 hierarchy as valid handoff activity
+APM2_ACTIVITY=$(grep -E "\|(update_issue|create_comment)\|APM-" "$LOG_FILE" 2>/dev/null | grep "|SUCCESS$")
+
+if [ -z "$HANDOFF_CREATED" ] && [ -z "$APM2_ACTIVITY" ]; then
+  echo "LINEAR AUDIT: No handoff sub-issue created this session. Create one under today's day issue (APM-2 hierarchy) before ending." >&2
+  echo "  Protocol: create day issue under APM-2 if needed, then create handoff sub-issue under the day issue." >&2
   exit 2
 fi
 

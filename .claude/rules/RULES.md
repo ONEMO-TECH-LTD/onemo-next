@@ -12,7 +12,8 @@ The repeating cycle. Every session. No variation. Like clockwork.
 
 ## 1.1 Session Start (do this FIRST, every time)
 ```
-1. Read APM-2 handoff → know where we left off
+1. Read latest handoff → list_issues parentId=APM-2 limit=1 → get latest day issue
+   → list_issues parentId=[day issue] → read latest handoff sub-issue
 2. List ONEMO In Progress + Todo (limit=5 each) → know the board
 3. Skim APM agent-ops issues → know if anything is broken
 4. Orient Dan: "Here's where we are. I suggest [X]. Which issue?"
@@ -26,7 +27,7 @@ All via sub-agents. Takes 30 seconds. Never skip.
 - Every mechanical task → spawn sub-agent, don't do it yourself
 - Every completion → run o-verify before saying "done"
 - Every 3-4 tasks → quick board health check (orphans, stale items)
-- Mid-session → update APM-2 with progress (don't wait for end)
+- Mid-session → comment on today's handoff sub-issue with progress (don't wait for end)
 - Important discovery → save to claude-mem immediately
 ```
 
@@ -37,7 +38,7 @@ Triggers: Dan says "reset/wrap up", context heavy, batch complete, Stop hook fir
 2. LINEAR    → comment on in-progress, close completed (subs before parents)
 3. MEMORY    → save decisions/discoveries to claude-mem, update MEMORY.md
 4. GIT       → commit + push ALL repos (onemo-next via PR, SSOT direct to main)
-5. HANDOFF   → update APM-2 with full session summary
+5. HANDOFF   → create handoff sub-issue under today's day issue (see Handoff Protocol below)
 6. SUMMARY   → 3-5 lines to Dan: what was done, what's next
 ```
 All via sub-agents in parallel where possible. Dan should never have to ask for this.
@@ -53,9 +54,53 @@ What HAS no enforcement and relies purely on discipline:
 - Using Exa/Ref over WebSearch — no hook
 - Sub-agent delegation — no hook
 - Decision logging — no hook
-- Mid-session APM-2 updates — no hook
+- Mid-session handoff updates — no hook
 
 If these keep failing, they need hooks. Build hooks for repeated failures.
+
+## 1.5 Handoff Protocol (DEC APM-61)
+APM-2 is the handoff hub. Structure: day issues as containers, handoff sub-issues inside.
+
+**Hierarchy:**
+```
+APM-2 (static pointer — never overwrite description)
+  ├── Feb 17 (day issue, In Progress while active, Done when day ends)
+  │    ├── ONE-177 pipeline complete (handoff sub-issue, Done)
+  │    └── Sync process started (handoff sub-issue, Done)
+  ├── Feb 16 (Done)
+  └── Feb 15 (Done)
+```
+
+**Creating a handoff (session end):**
+1. Check if today's day issue exists under APM-2 (list_issues parentId=APM-2, search by title)
+2. If not, create it: title=`Feb DD`, parentId=APM-2, labels=[handoff, agent-ops], project=Agent Brain, status=In Progress
+3. Create handoff sub-issue under the day issue: title=short main topic, description=full structured handoff, status=Done, labels=[handoff, agent-ops], project=Agent Brain
+
+**Reading a handoff (session start):**
+1. `list_issues parentId=APM-2 limit=1` → latest day issue
+2. `list_issues parentId=[day issue]` → all handoff sub-issues for that day
+3. Read the latest sub-issue for current state. Read others for additional context if needed.
+
+**Handoff sub-issue description format:**
+```markdown
+## Completed
+- What was done this session (bullet list with issue IDs)
+
+## Decisions
+- Any decisions made (with DEC references)
+
+## Next
+- What's queued for next session
+
+## Incidents (if any)
+- Anything that went wrong
+```
+
+**Labels:** All handoff issues get `handoff` + `agent-ops` labels. Old days get archived (status=Done). Month labels (e.g., `2026-02`) added when archiving.
+
+**Mid-session updates:** Comment on the current handoff sub-issue — don't create a new one until session end.
+
+**Hook:** `audit-session-writes.sh` verifies a handoff sub-issue was created each session.
 
 ---
 
@@ -122,10 +167,10 @@ Kai is the coordinator. Sub-agents are the workers. Every execution task gets ev
 - **Discipline (Layer 2):** After sub-agent returns claiming a write, Kai reads back directly. Catches the case where the sub-agent never called the tool at all (hook can't fire if no tool call happened).
 
 ## 2.7 Session Write Audit
-Stop hook blocks session end if Linear writes failed or APM-2 wasn't updated.
+Stop hook blocks session end if Linear writes failed or no handoff was created.
 - Every Linear write (create_comment, update_issue, create_issue) is logged to `/tmp/claude-linear-session/writes.log` by verify-linear-writes.sh
 - Session log is cleared on session start by inject-must-carry-context.sh
-- Hook: `audit-session-writes.sh` (Stop) — blocks if any FAILED writes exist or if APM-2 was never updated/commented during the session
+- Hook: `audit-session-writes.sh` (Stop) — blocks if any FAILED writes exist or if no handoff sub-issue was created under APM-2's day issue hierarchy
 
 ---
 
