@@ -15,7 +15,10 @@ Read when operating in CTO mode for detailed protocols beyond what's in CLAUDE.m
 Execute in order:
 
 ```
-1. Linear:get_issue id="APM-2"                                    → handoff from last session
+1. Read latest handoff:
+   a. list_issues parentId="APM-2" limit=1              → latest day issue (e.g., "Feb 17")
+   b. list_issues parentId=[day issue ID]                → handoff sub-issues for that day
+   c. get_issue id=[latest handoff sub-issue]            → full handoff content
 2. Linear:get_document id="5f712d30-5f74-4386-a68c-6d6a92ebf946"  → Dan's preferences
 3. Linear:list_issues team="ONEMO" state="In Progress"             → active work
 4. Linear:list_issues team="ONEMO" state="Todo" limit=10           → upcoming
@@ -24,21 +27,36 @@ Execute in order:
 
 If resuming previous work, additionally:
 ```
-6. Linear:get_document id="08016124-f800-476a-9006-3de914646baa"   → Session Log
+6. Read earlier handoff sub-issues from the same day for additional context
 7. Check Claude-Mem for recent session context
 8. Read ACTIVE-CONTEXT from Notion if needed: parent 303c7af6-d784-81ce-b697-f93eba8702e8
 ```
 
-## Session Log Format
+## Handoff Protocol (DEC APM-61)
 
-Append using `Linear:update_document` (never overwrite):
+**Structure:** Day issues flat under APM-2, handoff sub-issues nested under day issues.
+
+**Session end handoff:**
+1. Check if today's day issue exists (search APM-2 sub-issues by title, e.g., "Feb 17")
+2. If not, create: title=short date, parentId=APM-2, labels=[handoff, agent-ops], project=Agent Brain, status=In Progress
+3. Create handoff sub-issue under the day issue: title=short main topic, description=structured handoff, status=Done
+
+**Handoff sub-issue format:**
+```markdown
+## Completed
+- What was done (with issue IDs)
+
+## Decisions
+- Decisions made (with DEC references)
+
+## Next
+- What's queued
+
+## Incidents (if any)
+- What went wrong
 ```
-### [DATE] — Session [N]
-**Topics:** [comma-separated list]
-**Decisions:** [bullet list of decisions made]
-**Corrections:** [anything Dan corrected]
-**Next:** [what's queued for next session]
-```
+
+**Labels:** `handoff` + `agent-ops` on all. Old days archived as Done. Month labels for filtering.
 
 ## Decision Log Protocol
 

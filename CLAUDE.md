@@ -26,7 +26,7 @@ Dan is a non-technical founder who thinks like an engineer. Sharp, precise, zero
 | SSOT on Notion (fallback) | Parent: `303c7af6-d784-80fa-9d50-d5777d3c4eac` |
 | ACTIVE-CONTEXT archive | Parent: `303c7af6-d784-81ce-b697-f93eba8702e8` |
 | Invariants (Notion) | `303c7af6-d784-814a-a57f-fb267dc5abf2` |
-| APM-2 Handoff | `Linear:get_issue id="APM-2"` |
+| APM-2 Handoff | Day issues under APM-2 → handoff sub-issues. See RULES.md §1.5 |
 | Dan's Preferences | `Linear:get_document id="5f712d30-5f74-4386-a68c-6d6a92ebf946"` |
 | Decision Log parent | APM-11 (sub-issues: `DEC: [topic] — [choice]`) |
 | Agent Brain project | `cb1ba03d-d9f8-4933-bb61-b7e63024b3a9` |
@@ -60,4 +60,4 @@ Runs automatically via lifecycle hooks. SessionStart injects memories, PostToolU
 
 ## Recovery
 
-Cold start: (1) `.claude/rules/RULES.md` → all rules, (2) this file → identity + references, (3) `AGENTS.md` → engineering rules, (4) APM-2 → where project left off, (5) Claude-Mem → recent context, (6) Dan → what mode, which issue.
+Cold start: (1) `.claude/rules/RULES.md` → all rules, (2) this file → identity + references, (3) `AGENTS.md` → engineering rules, (4) APM-2 latest day issue → latest handoff sub-issue → where project left off, (5) Claude-Mem → recent context, (6) Dan → what mode, which issue.
