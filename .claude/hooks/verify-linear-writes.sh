@@ -14,6 +14,13 @@ INPUT=$(cat)
 TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty')
 TOOL_RESPONSE=$(echo "$INPUT" | jq -r '.tool_response // empty')
 
+# --- Session Write Log ---
+# Append every verified write to a session log file so the Stop hook can audit.
+# Log dir: /tmp/claude-linear-session/ — cleared on session start by inject-must-carry-context.sh
+LOG_DIR="/tmp/claude-linear-session"
+mkdir -p "$LOG_DIR"
+TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+
 # Extract key fields depending on the operation
 case "$TOOL_NAME" in
   *create_comment*)
@@ -22,6 +29,7 @@ case "$TOOL_NAME" in
     CREATED_AT=$(echo "$TOOL_RESPONSE" | jq -r '.createdAt // "MISSING"')
 
     if [ "$COMMENT_ID" = "MISSING" ] || [ "$COMMENT_ID" = "null" ] || [ -z "$COMMENT_ID" ]; then
+      echo "${TIMESTAMP}|create_comment|${ISSUE_ID}|NONE|FAILED" >> "${LOG_DIR}/writes.log"
       jq -n '{
         hookSpecificOutput: {
           hookEventName: "PostToolUse",
@@ -29,6 +37,9 @@ case "$TOOL_NAME" in
         }
       }'
     else
+      # Log to session file
+      echo "${TIMESTAMP}|create_comment|${ISSUE_ID}|${COMMENT_ID}|OK" >> "${LOG_DIR}/writes.log"
+
       jq -n --arg cid "$COMMENT_ID" --arg iid "$ISSUE_ID" --arg cat "$CREATED_AT" '{
         hookSpecificOutput: {
           hookEventName: "PostToolUse",
@@ -45,6 +56,7 @@ case "$TOOL_NAME" in
     TITLE=$(echo "$TOOL_RESPONSE" | jq -r '.title // "unknown"')
 
     if [ "$ISSUE_ID" = "MISSING" ] || [ "$ISSUE_ID" = "null" ] || [ -z "$ISSUE_ID" ]; then
+      echo "${TIMESTAMP}|update_issue|unknown|NONE|FAILED" >> "${LOG_DIR}/writes.log"
       jq -n '{
         hookSpecificOutput: {
           hookEventName: "PostToolUse",
@@ -52,6 +64,9 @@ case "$TOOL_NAME" in
         }
       }'
     else
+      # Log to session file
+      echo "${TIMESTAMP}|update_issue|${ISSUE_ID}|${STATUS}|OK" >> "${LOG_DIR}/writes.log"
+
       jq -n --arg iid "$ISSUE_ID" --arg uat "$UPDATED_AT" --arg st "$STATUS" --arg tt "$TITLE" '{
         hookSpecificOutput: {
           hookEventName: "PostToolUse",
@@ -67,6 +82,7 @@ case "$TOOL_NAME" in
     STATUS=$(echo "$TOOL_RESPONSE" | jq -r '.status // "unknown"')
 
     if [ "$ISSUE_ID" = "MISSING" ] || [ "$ISSUE_ID" = "null" ] || [ -z "$ISSUE_ID" ]; then
+      echo "${TIMESTAMP}|create_issue|unknown|NONE|FAILED" >> "${LOG_DIR}/writes.log"
       jq -n '{
         hookSpecificOutput: {
           hookEventName: "PostToolUse",
@@ -74,6 +90,9 @@ case "$TOOL_NAME" in
         }
       }'
     else
+      # Log to session file
+      echo "${TIMESTAMP}|create_issue|${ISSUE_ID}|${STATUS}|OK" >> "${LOG_DIR}/writes.log"
+
       jq -n --arg iid "$ISSUE_ID" --arg tt "$TITLE" --arg st "$STATUS" '{
         hookSpecificOutput: {
           hookEventName: "PostToolUse",

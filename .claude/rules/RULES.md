@@ -44,7 +44,7 @@ All via sub-agents in parallel where possible. Dan should never have to ask for 
 
 ## 1.4 Context Fade Prevention
 The protocol above fades as context grows. These mechanisms don't fade:
-- **Hooks** fire on every tool call regardless of context (Haiku block, verify-on-done, git guard, query limits, plan guard)
+- **Hooks** fire on every tool call regardless of context (Haiku block, verify-on-done, git guard, query limits, plan guard, WebSearch block, session write audit)
 - **Skills** are loaded fresh when invoked (/o-verify, /o-cycle, /o-merge)
 - **Sub-agents** get clean 200K context with CLAUDE.md loaded
 - **This file** stays in the system prompt at highest priority throughout the session
@@ -94,6 +94,7 @@ Every technical decision MUST be based on the latest verified documentation for 
 - Log all references in `onemo-ssot-global/13-references/` with URL, date verified, version, summary
 - Sub-agents must verify too — include doc currency verification in every research prompt
 - **ALWAYS use Exa, Ref, and Context7 for research — NEVER use WebSearch as the primary tool.** Priority: Context7 for library/framework docs, Exa (`mcp__exa__web_search_exa`) for live web with semantic search, Ref (`mcp__ref__ref_search_documentation`) for token-efficient doc excerpts. WebSearch is a last resort only.
+- Hook: `block-websearch.sh` (PreToolUse deny on WebSearch). Ask Dan for explicit override if needed.
 - When spawning sub-agents for research, explicitly tell them: "Use Exa and Ref MCP tools, NOT WebSearch."
 - Minimum 2 independent sources for any verified claim
 - No guessing work, no fictional documentation, no outdated documentation
@@ -118,6 +119,12 @@ Kai is the coordinator. Sub-agents are the workers. Every execution task gets ev
 - This rule exists because APM-2 went unupdated for 2 days while sub-agents claimed every session that it was updated. Dan discovered the gap.
 - **Hook (Layer 1):** `verify-linear-writes.sh` — PostToolUse on create_comment, update_issue, create_issue. Parses real API response and injects verified data (ID, timestamp, status) into conversation. Catches failed writes with hard warning. Can't hallucinate — it reads the actual tool_response.
 - **Discipline (Layer 2):** After sub-agent returns claiming a write, Kai reads back directly. Catches the case where the sub-agent never called the tool at all (hook can't fire if no tool call happened).
+
+## 2.7 Session Write Audit
+Stop hook blocks session end if Linear writes failed or APM-2 wasn't updated.
+- Every Linear write (create_comment, update_issue, create_issue) is logged to `/tmp/claude-linear-session/writes.log` by verify-linear-writes.sh
+- Session log is cleared on session start by inject-must-carry-context.sh
+- Hook: `audit-session-writes.sh` (Stop) — blocks if any FAILED writes exist or if APM-2 was never updated/commented during the session
 
 ---
 
@@ -332,12 +339,15 @@ Never estimate times. Use `date -u '+%Y-%m-%dT%H:%MZ'` for handoff timestamps. S
 | Never Haiku | PreToolUse command hook | No |
 | Verify Before Done | PostToolUse context injection | No |
 | Options Before Infra | PreToolUse prompt on Write/Edit | Possible |
-| Latest Docs Only | This file only | Discipline |
+| Latest Docs Only (tool pref) | PreToolUse block on WebSearch | No |
+| Latest Docs Only (verify) | This file only | Discipline |
 | Sub-Agent First | This file only | Discipline |
 | Verify After Delegate | PostToolUse hook + discipline | Hook for Linear writes, discipline for sub-agent claims |
 | Branch Protection | GitHub enforced | No |
 | Git Preservation | Stop hook | No |
 | Linear Query Limits | PreToolUse guard on list_* | No |
+| Session Write Audit | Stop hook (checks write log + APM-2) | No |
+| WebSearch Blocked | PreToolUse deny on WebSearch | No |
 
 ## 8.5 Skill Quick Reference
 
