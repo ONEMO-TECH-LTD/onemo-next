@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* Align TW4 dark: variant with our [data-theme="dark"] switching.
+   Without this, dark:bg-* uses prefers-color-scheme instead of data attribute. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 /* Token layers — order matters: primitives first, then aliases, then semantic */
 @import "./tokens/primitives.css";
 @import "./tokens/aliases.css";
