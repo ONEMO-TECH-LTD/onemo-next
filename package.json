@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest"
+    "test": "vitest",
+    "validate-tokens": "node scripts/build-tokens.mjs --validate",
+    "test-tokens": "node scripts/test-build-tokens.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",
@@ -22,6 +24,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "culori": "^4.0.2",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
