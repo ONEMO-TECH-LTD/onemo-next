@@ -41,25 +41,6 @@
   --radius-4xl: 24px;
   --radius-full: 9999px;
 
-  /* ═══ Widths ═══ */
-  --spacing-width-xxs: 320px;
-  --spacing-width-xs: 384px;
-  --spacing-width-sm: 480px;
-  --spacing-width-md: 560px;
-  --spacing-width-lg: 640px;
-  --spacing-width-xl: 768px;
-  --spacing-width-2xl: 1024px;
-  --spacing-width-3xl: 1280px;
-  --spacing-width-4xl: 1440px;
-  --spacing-width-5xl: 1600px;
-  --spacing-width-6xl: 1920px;
-  --spacing-paragraph-max-width: 720px;
-
-  /* ═══ Containers ═══ */
-  --spacing-container-padding-mobile: 1rem;
-  --spacing-container-padding-desktop: 2rem;
-  --spacing-container-max-width-desktop: 1280px;
-
   /* ═══ Breakpoints ═══ */
   --breakpoint-sm: 480px;
   --breakpoint-md: 640px;
@@ -199,4 +180,25 @@
   --text-label-xs--letter-spacing: 0.004em;
   --text-label-xs--font-weight: 400;
 
+}
+
+@theme inline {
+  /* ═══ Widths ═══ */
+  --width-xxs: 320px;
+  --width-xs: 384px;
+  --width-sm: 480px;
+  --width-md: 560px;
+  --width-lg: 640px;
+  --width-xl: 768px;
+  --width-2xl: 1024px;
+  --width-3xl: 1280px;
+  --width-4xl: 1440px;
+  --width-5xl: 1600px;
+  --width-6xl: 1920px;
+  --width-paragraph-max-width: 720px;
+
+  /* ═══ Containers ═══ */
+  --container-padding-mobile: 1rem;
+  --container-padding-desktop: 2rem;
+  --container-max-width-desktop: 1280px;
 }
