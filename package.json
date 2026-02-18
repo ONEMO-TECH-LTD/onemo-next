@@ -9,6 +9,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
+    "build-tokens": "node scripts/build-tokens.mjs --validate",
     "validate-tokens": "node scripts/build-tokens.mjs --validate",
     "test-tokens": "node scripts/test-build-tokens.mjs"
   },
