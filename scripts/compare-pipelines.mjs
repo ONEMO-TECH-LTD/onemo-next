@@ -4,13 +4,13 @@ import { readFile, writeFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const DEFAULT_BUILD_DIR = 'src/app/tokens';
-const DEFAULT_SUPERNOVA_DIR = '/tmp/supernova-export-v4/';
 
 function parseArgs(argv) {
   const options = {
     build: DEFAULT_BUILD_DIR,
-    supernova: DEFAULT_SUPERNOVA_DIR,
+    supernova: null,
     output: null,
+    help: false,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -33,12 +33,26 @@ function parseArgs(argv) {
       options.output = value;
       continue;
     }
+    if (arg === '--help') {
+      options.help = true;
+      continue;
+    }
     if (arg.startsWith('--')) {
       throw new Error(`Unknown flag: ${arg}`);
     }
   }
 
   return options;
+}
+
+function printHelp() {
+  console.log('Usage: node scripts/compare-pipelines.mjs [--build PATH] --supernova PATH [--output PATH] [--help]');
+  console.log('');
+  console.log('Flags:');
+  console.log('  --build PATH       build-tokens output directory (default: src/app/tokens)');
+  console.log('  --supernova PATH   Supernova export directory (required)');
+  console.log('  --output PATH      Write markdown report to file instead of stdout');
+  console.log('  --help             Show usage and exit');
 }
 
 async function listCssFiles(dir) {
@@ -428,6 +442,16 @@ async function loadCssDirectory(dir) {
 async function main() {
   const options = parseArgs(process.argv.slice(2));
 
+  if (options.help) {
+    printHelp();
+    return;
+  }
+
+  if (!options.supernova) {
+    console.error('Error: --supernova PATH is required.');
+    process.exit(1);
+  }
+
   const buildFiles = await loadCssDirectory(options.build);
   const superFiles = await loadCssDirectory(options.supernova);
 
@@ -494,4 +518,3 @@ main().catch(error => {
   console.error(`compare-pipelines failed: ${error.message}`);
   process.exit(1);
 });
-

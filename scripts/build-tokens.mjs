@@ -1361,6 +1361,7 @@ function parseCliArgs(argv) {
     validate: false,
     stats: false,
     diff: false,
+    help: false,
     outputDir: DEFAULT_OUTPUT_DIR,
   };
 
@@ -1398,6 +1399,11 @@ function parseCliArgs(argv) {
       continue;
     }
 
+    if (arg === '--help') {
+      options.help = true;
+      continue;
+    }
+
     if (arg.startsWith('--')) {
       throw new Error(`Unknown flag: ${arg}`);
     }
@@ -1410,6 +1416,18 @@ function parseCliArgs(argv) {
   }
 
   return options;
+}
+
+function printHelp() {
+  console.log('Usage: node scripts/build-tokens.mjs [--input PATH] [--output-dir PATH] [--validate] [--stats] [--diff] [--help]');
+  console.log('');
+  console.log('Flags:');
+  console.log('  --input PATH       Explicit JSON source, otherwise auto-discovers latest from Design System/var/');
+  console.log('  --output-dir PATH  Output directory (default: src/app/tokens)');
+  console.log('  --validate         Run 7-check validation suite after build');
+  console.log('  --stats            Print token statistics');
+  console.log('  --diff             Compare with previous output in destination directory');
+  console.log('  --help             Show usage and exit');
 }
 
 async function pathStatOrNull(path) {
@@ -1457,6 +1475,410 @@ async function resolveInputFile(explicitInput) {
 
   const st = await stat(DEFAULT_JSON);
   return { path: DEFAULT_JSON, mtime: st.mtime };
+}
+
+function isObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isLeafTokenNode(value) {
+  return isObject(value) && Object.prototype.hasOwnProperty.call(value, '$value');
+}
+
+function expandKeyValueArrays(value) {
+  if (Array.isArray(value)) {
+    const isKeyValueArray = value.every(item =>
+      isObject(item)
+      && Object.prototype.hasOwnProperty.call(item, 'key')
+      && Object.prototype.hasOwnProperty.call(item, 'value'),
+    );
+    if (isKeyValueArray) {
+      const out = {};
+      for (const item of value) {
+        out[String(item.key)] = expandKeyValueArrays(item.value);
+      }
+      return out;
+    }
+    return value.map(item => expandKeyValueArrays(item));
+  }
+
+  if (isObject(value)) {
+    const out = {};
+    for (const [key, nested] of Object.entries(value)) {
+      out[key] = expandKeyValueArrays(nested);
+    }
+    return out;
+  }
+
+  return value;
+}
+
+function toTitleWords(value) {
+  return String(value)
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function normaliseAliasFamilyKey(rawKey) {
+  const key = String(rawKey).trim().toLowerCase();
+  if (key === 'primary') return 'Primary';
+  if (key === 'secondary - plain') return 'Secondary - Plain';
+  if (key === 'secondary - deco') return 'Secondary - Deco';
+  if (key === 'tertiary') return 'Tertiary';
+  return toTitleWords(rawKey);
+}
+
+function normaliseAliasLetterSpacingKey(rawKey) {
+  const key = String(rawKey).trim();
+  if (key === 'zero' || key === '0') return 'LeS-0 - default';
+
+  const positive = key.match(/^pos-(\d+)$/i);
+  if (positive) return `+${positive[1]}`;
+
+  const negative = key.match(/^neg-(\d+)$/i);
+  if (negative) return `-${negative[1]}`;
+
+  return key;
+}
+
+function wrapModeWithCategory(modeData, categoryName) {
+  if (!isObject(modeData)) return modeData;
+  if (isObject(modeData[categoryName])) return modeData;
+
+  const metadata = {};
+  const payload = {};
+  for (const [key, value] of Object.entries(modeData)) {
+    if (key.startsWith('$')) {
+      metadata[key] = value;
+    } else {
+      payload[key] = value;
+    }
+  }
+
+  return {
+    ...metadata,
+    [categoryName]: payload,
+  };
+}
+
+function normalisePrimitiveTypeMode(modeData) {
+  if (!isObject(modeData)) return modeData;
+  if (isObject(modeData.Typography)) return modeData;
+
+  const basicFonts = isObject(modeData.basic) ? modeData.basic : {};
+  const decorativeFonts = isObject(modeData.deco) ? modeData.deco : {};
+  const typeScale = isObject(modeData.scale) ? modeData.scale : {};
+  const letterSpacing = isObject(modeData.tracking) ? modeData.tracking : {};
+  const paragraphSpacing = isObject(modeData.para) ? modeData.para : {};
+
+  const fontFamily = {};
+  if (Object.keys(basicFonts).length > 0) fontFamily.Basic = basicFonts;
+  if (Object.keys(decorativeFonts).length > 0) fontFamily.Decorative = decorativeFonts;
+
+  return {
+    Typography: {
+      'Font Family': fontFamily,
+      'Type Scale': typeScale,
+      'Letter Spacing': letterSpacing,
+      'Paragraph Spacing': paragraphSpacing,
+    },
+  };
+}
+
+function normaliseAliasColorMode(modeData) {
+  if (!isObject(modeData)) return modeData;
+  if (isObject(modeData.Colors) && (isObject(modeData.Colors.Brand) || isObject(modeData.Colors.System))) {
+    return modeData;
+  }
+
+  const metadata = {};
+  const groups = {};
+  for (const [key, value] of Object.entries(modeData)) {
+    if (key.startsWith('$')) metadata[key] = value;
+    else groups[key] = value;
+  }
+
+  const colors = {};
+  if (isObject(groups.brand)) {
+    colors.Brand = groups.brand;
+  }
+
+  const system = {};
+  for (const [key, value] of Object.entries(groups)) {
+    if (key === 'brand') continue;
+    system[toTitleWords(key)] = value;
+  }
+  if (Object.keys(system).length > 0) {
+    colors.System = system;
+  }
+
+  return {
+    ...metadata,
+    Colors: colors,
+  };
+}
+
+function normaliseAliasTypeMode(modeData) {
+  if (!isObject(modeData)) return modeData;
+
+  const existingTypography = isObject(modeData.Typography) ? modeData.Typography : null;
+  if (existingTypography && isObject(existingTypography['Font-Family'])) {
+    return modeData;
+  }
+
+  const source = existingTypography || modeData;
+  const familyRaw = isObject(source.family) ? source.family : (isObject(source['Font-Family']) ? source['Font-Family'] : {});
+  const styleRaw = isObject(source.style) ? source.style : (isObject(source['Font-Style']) ? source['Font-Style'] : {});
+  const sizeRaw = isObject(source.size) ? source.size : (isObject(source['Font-Size']) ? source['Font-Size'] : {});
+  const heightRaw = isObject(source.height) ? source.height : (isObject(source['Line-Height']) ? source['Line-Height'] : {});
+  const letterRawSource = isObject(source.ls) ? source.ls : (isObject(source['Letter-Spacing']) ? source['Letter-Spacing'] : {});
+  const paragraphRaw = isObject(source.para) ? source.para : (isObject(source['Paragraph-Spacing']) ? source['Paragraph-Spacing'] : {});
+
+  const family = {};
+  for (const [key, value] of Object.entries(familyRaw)) {
+    if (key.startsWith('$')) continue;
+    family[normaliseAliasFamilyKey(key)] = value;
+  }
+
+  const letterRaw = {};
+  for (const [key, value] of Object.entries(letterRawSource)) {
+    if (key.startsWith('$')) continue;
+    letterRaw[normaliseAliasLetterSpacingKey(key)] = value;
+  }
+
+  return {
+    Typography: {
+      'Font-Family': family,
+      'Font-Style': styleRaw,
+      'Font-Size': sizeRaw,
+      'Line-Height': heightRaw,
+      'Letter-Spacing': letterRaw,
+      'Paragraph-Spacing': paragraphRaw,
+    },
+  };
+}
+
+const SEMANTIC_PRESET_KEY_MAP = {
+  font: 'Font',
+  style: 'Style',
+  size: 'Size',
+  line: 'Line',
+  letter: 'Letter',
+  paragraph: 'Paragraph',
+};
+
+function normaliseSemanticTypeMode(modeData) {
+  if (!isObject(modeData)) return modeData;
+
+  function visit(node) {
+    if (!isObject(node) || isLeafTokenNode(node)) return node;
+    const out = {};
+    for (const [key, value] of Object.entries(node)) {
+      const mappedKey = Object.prototype.hasOwnProperty.call(SEMANTIC_PRESET_KEY_MAP, key)
+        ? SEMANTIC_PRESET_KEY_MAP[key]
+        : key;
+      out[mappedKey] = visit(value);
+    }
+    return out;
+  }
+
+  return visit(modeData);
+}
+
+function normalisePrefixedModeKeys(modeData, prefix) {
+  if (!isObject(modeData)) return modeData;
+
+  const out = {};
+  for (const [key, value] of Object.entries(modeData)) {
+    if (key.startsWith('$')) {
+      out[key] = value;
+      continue;
+    }
+    const nextKey = key.startsWith(prefix) ? key : `${prefix}${key}`;
+    out[nextKey] = value;
+  }
+  return out;
+}
+
+function normaliseReferencePath(refPath, targetCollection) {
+  const path = String(refPath).trim();
+  if (!path) return path;
+
+  const parts = path.split('.');
+  const first = parts[0];
+
+  if (targetCollection === '1.0_Primitive_Colours') {
+    if (first === 'Colors') return path;
+    return `Colors.${path}`;
+  }
+
+  if (targetCollection === '1.1_Primitive_Dimensions') {
+    if (first === 'Dimensions') return path;
+    return `Dimensions.${path}`;
+  }
+
+  if (targetCollection === '1.2_Primitive_Type') {
+    if (first === 'Typography') return path;
+    if (first === 'basic') {
+      return `Typography.Font Family.Basic.${parts.slice(1).join('.')}`;
+    }
+    if (first === 'deco') {
+      return `Typography.Font Family.Decorative.${parts.slice(1).join('.')}`;
+    }
+    if (first === 'scale') {
+      return `Typography.Type Scale.${parts.slice(1).join('.')}`;
+    }
+    if (first === 'tracking') {
+      return `Typography.Letter Spacing.${parts.slice(1).join('.')}`;
+    }
+    if (first === 'para') {
+      return `Typography.Paragraph Spacing.${parts.slice(1).join('.')}`;
+    }
+    return `Typography.${path}`;
+  }
+
+  if (targetCollection === '2.0_Alias_Colours') {
+    if (first === 'Colors') return path;
+    if (first.toLowerCase() === 'brand') {
+      return `Colors.Brand.${parts.slice(1).join('.')}`;
+    }
+    if (['error', 'info', 'success', 'warning'].includes(first.toLowerCase())) {
+      return `Colors.System.${toTitleWords(first)}.${parts.slice(1).join('.')}`;
+    }
+    return `Colors.${path}`;
+  }
+
+  if (targetCollection === '2.1_Alias_Type' || targetCollection === '_Alias') {
+    if (first === 'Typography') return path;
+    if (first.toLowerCase() === 'family') {
+      return `Typography.Font-Family.${normaliseAliasFamilyKey(parts.slice(1).join('.'))}`;
+    }
+    if (first.toLowerCase() === 'style') {
+      return `Typography.Font-Style.${parts.slice(1).join('.')}`;
+    }
+    if (first.toLowerCase() === 'size') {
+      return `Typography.Font-Size.${parts.slice(1).join('.')}`;
+    }
+    if (first.toLowerCase() === 'height') {
+      return `Typography.Line-Height.${parts.slice(1).join('.')}`;
+    }
+    if (first.toLowerCase() === 'ls') {
+      const rest = parts.slice(1);
+      if (rest.length === 0) return 'Typography.Letter-Spacing';
+      const [token, ...tail] = rest;
+      const normalisedToken = normaliseAliasLetterSpacingKey(token);
+      return `Typography.Letter-Spacing.${[normalisedToken, ...tail].join('.')}`;
+    }
+    if (first.toLowerCase() === 'para') {
+      return `Typography.Paragraph-Spacing.${parts.slice(1).join('.')}`;
+    }
+    return path;
+  }
+
+  return path;
+}
+
+function rewriteReferences(value, currentCollectionName) {
+  if (Array.isArray(value)) {
+    return value.map(item => rewriteReferences(item, currentCollectionName));
+  }
+
+  if (!isObject(value)) {
+    return value;
+  }
+
+  const out = {};
+  for (const [key, nested] of Object.entries(value)) {
+    out[key] = rewriteReferences(nested, currentCollectionName);
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(out, '$value')
+    && typeof out.$value === 'string'
+    && out.$value.startsWith('{')
+    && out.$value.endsWith('}')
+  ) {
+    const targetCollection = out.$collectionName || currentCollectionName;
+    const innerPath = out.$value.slice(1, -1);
+    const normalisedPath = normaliseReferencePath(innerPath, targetCollection);
+    out.$value = `{${normalisedPath}}`;
+  }
+
+  return out;
+}
+
+function normaliseModeStructure(collectionName, modeData) {
+  if (!isObject(modeData)) return modeData;
+
+  if (collectionName === '1.0_Primitive_Colours') {
+    return wrapModeWithCategory(modeData, 'Colors');
+  }
+
+  if (collectionName === '1.1_Primitive_Dimensions') {
+    return wrapModeWithCategory(modeData, 'Dimensions');
+  }
+
+  if (collectionName === '1.2_Primitive_Type') {
+    return normalisePrimitiveTypeMode(modeData);
+  }
+
+  if (collectionName === '2.0_Alias_Colours') {
+    return normaliseAliasColorMode(modeData);
+  }
+
+  if (collectionName === '2.1_Alias_Type') {
+    return normaliseAliasTypeMode(modeData);
+  }
+
+  if (collectionName === '3.1_Semantic_Type') {
+    return normaliseSemanticTypeMode(modeData);
+  }
+
+  if (collectionName === '3.2_Semantic_Spacing') {
+    return normalisePrefixedModeKeys(modeData, 'spacing-');
+  }
+
+  if (collectionName === '3.4_Semantic_Containers') {
+    return normalisePrefixedModeKeys(modeData, 'container-');
+  }
+
+  if (collectionName === '3.5_Semantic_Radius') {
+    return normalisePrefixedModeKeys(modeData, 'radius-');
+  }
+
+  return modeData;
+}
+
+function normaliseInputCollections(json) {
+  if (!Array.isArray(json)) return json;
+
+  return json.map(entry => {
+    if (!isObject(entry)) return entry;
+    const keys = Object.keys(entry);
+    if (keys.length !== 1) return entry;
+
+    const collectionName = keys[0];
+    const collectionData = expandKeyValueArrays(entry[collectionName]);
+    if (!isObject(collectionData) || !isObject(collectionData.modes)) {
+      return { [collectionName]: collectionData };
+    }
+
+    const modes = {};
+    for (const [modeName, modeData] of Object.entries(collectionData.modes)) {
+      const expandedMode = expandKeyValueArrays(modeData);
+      const structurallyNormalised = normaliseModeStructure(collectionName, expandedMode);
+      modes[modeName] = rewriteReferences(structurallyNormalised, collectionName);
+    }
+
+    return {
+      [collectionName]: {
+        ...collectionData,
+        modes,
+      },
+    };
+  });
 }
 
 function parseCustomProperties(cssText) {
@@ -1862,6 +2284,10 @@ function printTokenStats(stats) {
 
 async function main() {
   const options = parseCliArgs(process.argv.slice(2));
+  if (options.help) {
+    printHelp();
+    return;
+  }
   const input = await resolveInputFile(options.input);
   const jsonPath = input.path;
   const outputDir = options.outputDir;
@@ -1876,7 +2302,7 @@ async function main() {
 
   // Read and parse JSON
   const raw = await readFile(jsonPath, 'utf-8');
-  const json = JSON.parse(raw);
+  const json = normaliseInputCollections(JSON.parse(raw));
   const collections = parseCollections(json);
 
   console.log(`Collections found: ${[...collections.keys()].join(', ')}\n`);
