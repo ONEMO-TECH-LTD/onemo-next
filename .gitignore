@@ -38,6 +38,9 @@ yarn-error.log*
 # claude code (user-specific settings)
 .claude/settings.local.json
 
+# cursor (machine-specific plugin config)
+.cursor/
+
 # task locks (ephemeral, per-agent)
 current_tasks/*.txt
 
