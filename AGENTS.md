@@ -58,6 +58,18 @@ Lock files are `.gitignored` — they're ephemeral coordination, not committed. 
 
 ---
 
+## Universal Brain (Kai Solo Brain)
+
+All agents share a universal knowledge base at `ONEMO-TECH-LTD/kai-solo-brain` (private). Contains agent identities, universal decisions, Dan's working patterns, tool capabilities, and communication protocol.
+
+**Cloud agents (Codex):** Clone `kai-solo-brain` alongside this repo. Read `agents/AGENTS.md` first, then `memory/patterns/dan-patterns.md`, then `protocols/communication.md`.
+
+**Local agents (Claude Code, Cursor):** Brain repo is at `../kai-solo-brain` relative to this repo.
+
+**Slack coordination:** All agents post to #hive-mind (`C0AGC9Z18QL`) with their prefix (e.g., `[Codex]`, `[Mac Kai]`).
+
+---
+
 ## Full Documentation (SSOT)
 
 All architecture, data model, API contracts, invariants, security, operations, and compliance specs live in the `onemo-ssot-global` repo (GitHub: `ONEMO-TECH-LTD/onemo-ssot-global`, private). Agents access it directly from their local clone — there is no submodule. The repo is cloned alongside other ONEMO repos (e.g., `../onemo-ssot-global` relative to this repo).
