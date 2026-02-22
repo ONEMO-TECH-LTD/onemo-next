@@ -26,6 +26,11 @@
             "type": "command",
             "command": "/Users/daniilsolopov/.claude/hooks/inject-must-carry-context.sh",
             "timeout": 15000
+          },
+          {
+            "type": "command",
+            "command": "/Users/daniilsolopov/.claude/hooks/inject-knowledge-digest.sh",
+            "timeout": 15000
           }
         ]
       }
@@ -46,6 +51,10 @@
       {
         "matcher": "WebSearch",
         "hooks": [{ "type": "command", "command": "/Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/hooks/block-websearch.sh", "timeout": 5000 }]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [{ "type": "command", "command": "/Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/hooks/protect-worktree-cwd.sh", "timeout": 5000 }]
       },
       {
         "matcher": "Write|Edit",
@@ -83,6 +92,9 @@
       }
     ],
     "Stop": [
+      {
+        "hooks": [{ "type": "command", "command": "/Users/daniilsolopov/.claude/hooks/sync-claude-mem-db.sh", "timeout": 10000 }]
+      },
       {
         "hooks": [{ "type": "command", "command": "/Users/daniilsolopov/.claude/hooks/git-preservation-guard.sh", "timeout": 10000 }]
       },
