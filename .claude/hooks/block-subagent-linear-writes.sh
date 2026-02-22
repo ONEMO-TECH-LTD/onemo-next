@@ -8,7 +8,7 @@
 # to verify this isn't being delegated.
 #
 # The real enforcement is:
-# 1. RULES.md says sub-agents never write to Linear
+# 1. hard-blocks.md (brain rule) says sub-agents never write to Linear
 # 2. Sub-agent prompts explicitly say "DO NOT write to Linear"
 # 3. This hook injects a reminder on every write as a safety net
 #
