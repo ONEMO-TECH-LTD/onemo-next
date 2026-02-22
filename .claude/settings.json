@@ -5,17 +5,12 @@
   },
   "permissions": {
     "allow": [
-      "Bash(cat /Users/daniilsolopov/Dev/Cursor/kai-solo-brain/**)",
-      "Bash(ls /Users/daniilsolopov/Dev/Cursor/kai-solo-brain/**)",
-      "Read(/Users/daniilsolopov/Dev/Cursor/kai-solo-brain/**)",
-      "Read(/Users/daniilsolopov/Dev/Cursor/onemo-ssot-global/**)",
-      "Read(/Users/daniilsolopov/Dev/Cursor/onemo-theme/**)",
-      "Read(/Users/daniilsolopov/Dev/Cursor/onemo-router-worker/**)",
       "Bash(cat /Users/daniilsolopov/Dev/onemo-dev/kai-solo-brain/**)",
       "Bash(ls /Users/daniilsolopov/Dev/onemo-dev/kai-solo-brain/**)",
       "Read(/Users/daniilsolopov/Dev/onemo-dev/kai-solo-brain/**)",
       "Read(/Users/daniilsolopov/Dev/onemo-dev/onemo-ssot-global/**)",
-      "Read(/Users/daniilsolopov/Dev/onemo-dev/onemo-theme/**)"
+      "Read(/Users/daniilsolopov/Dev/onemo-dev/onemo-theme/**)",
+      "Read(/Users/daniilsolopov/Dev/onemo-dev/onemo-router-worker/**)"
     ]
   },
   "hooks": {
@@ -38,7 +33,7 @@
     "PreToolUse": [
       {
         "matcher": "mcp__*__create_comment|mcp__*__update_issue|mcp__*__create_issue|mcp__*__update_document",
-        "hooks": [{ "type": "command", "command": "/Users/daniilsolopov/Dev/Cursor/onemo-next/.claude/hooks/block-subagent-linear-writes.sh", "timeout": 5000 }]
+        "hooks": [{ "type": "command", "command": "/Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/hooks/block-subagent-linear-writes.sh", "timeout": 5000 }]
       },
       {
         "matcher": "mcp__*__list_*",
@@ -46,11 +41,11 @@
       },
       {
         "matcher": "Task",
-        "hooks": [{ "type": "command", "command": "/Users/daniilsolopov/Dev/Cursor/onemo-next/.claude/hooks/block-haiku-subagents.sh", "timeout": 5000 }]
+        "hooks": [{ "type": "command", "command": "/Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/hooks/block-haiku-subagents.sh", "timeout": 5000 }]
       },
       {
         "matcher": "WebSearch",
-        "hooks": [{ "type": "command", "command": "/Users/daniilsolopov/Dev/Cursor/onemo-next/.claude/hooks/block-websearch.sh", "timeout": 5000 }]
+        "hooks": [{ "type": "command", "command": "/Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/hooks/block-websearch.sh", "timeout": 5000 }]
       },
       {
         "matcher": "Write|Edit",
@@ -65,11 +60,11 @@
     "PostToolUse": [
       {
         "matcher": "mcp__*__update_issue",
-        "hooks": [{ "type": "command", "command": "/Users/daniilsolopov/Dev/Cursor/onemo-next/.claude/hooks/verify-on-done.sh", "timeout": 5000 }]
+        "hooks": [{ "type": "command", "command": "/Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/hooks/verify-on-done.sh", "timeout": 5000 }]
       },
       {
         "matcher": "mcp__*__update_issue|mcp__*__create_comment|mcp__*__create_issue",
-        "hooks": [{ "type": "command", "command": "/Users/daniilsolopov/Dev/Cursor/onemo-next/.claude/hooks/verify-linear-writes.sh", "timeout": 5000 }]
+        "hooks": [{ "type": "command", "command": "/Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/hooks/verify-linear-writes.sh", "timeout": 5000 }]
       },
       {
         "matcher": "*",
@@ -92,7 +87,7 @@
         "hooks": [{ "type": "command", "command": "/Users/daniilsolopov/.claude/hooks/git-preservation-guard.sh", "timeout": 10000 }]
       },
       {
-        "hooks": [{ "type": "command", "command": "/Users/daniilsolopov/Dev/Cursor/onemo-next/.claude/hooks/audit-session-writes.sh", "timeout": 10000 }]
+        "hooks": [{ "type": "command", "command": "/Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/hooks/audit-session-writes.sh", "timeout": 10000 }]
       },
       {
         "hooks": [
