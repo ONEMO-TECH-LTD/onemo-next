@@ -1,0 +1,1 @@
+../../../onemo-ssot-global/2-architecture/2.8-codebase-conventions.md
