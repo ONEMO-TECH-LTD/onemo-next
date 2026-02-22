@@ -45,10 +45,10 @@ Two MCP servers for Figma access:
 | MCP Server | Purpose | Access Method |
 |---|---|---|
 | **figma-console-mcp** | Variable CRUD, batch ops, raw JSON | Local bridge (Plugin API — works on Pro) |
-| design-with-ai | Visual design: shapes, frames, text, layout | WebSocket relay (channel code from plugin) |
+| design-with-ai | Visual design: shapes, frames, text, layout (secondary) | WebSocket relay (channel code from plugin) |
 
 **figma-console-mcp** is the primary tool for token/variable work. Requires:
-1. Figma Desktop launched with `--remote-debugging-port=9222`
+1. Figma Desktop launched with `--remote-debugging-port=9223`
 2. Developer VM enabled (Plugins → Development → Use Developer VM)
 3. Bridge plugin installed in Figma Desktop
 4. PAT configured in `~/.claude.json` (expires May 18, 2026)
@@ -79,7 +79,7 @@ All custom skills use the `o-` prefix. Run `/o-skills` for the full registry.
 
 ## Memory System (Claude-Mem)
 
-Runs automatically via lifecycle hooks. SessionStart injects memories, PostToolUse captures observations, PreCompact saves state, SessionEnd compresses. Supplements but does NOT replace rules or this file.
+Runs automatically via lifecycle hooks. SessionStart injects memories, PostToolUse captures observations, PreCompact saves state, SessionEnd compresses. DB lives in `kai-solo-brain/dot-claude-mem/claude-mem.db` (symlinked from `~/.claude-mem/`, 5.9MB, GitHub-backed). All project memory dirs symlink to `kai-solo-brain/memory/`. Supplements but does NOT replace rules or this file.
 
 ---
 
