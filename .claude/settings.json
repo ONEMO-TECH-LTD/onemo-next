@@ -2,5 +2,117 @@
   "enabledPlugins": {
     "claude-code-setup@claude-plugins-official": true,
     "claude-md-management@claude-plugins-official": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash(cat /Users/daniilsolopov/Documents/Dev/Cursor/kai-solo-brain/**)",
+      "Bash(ls /Users/daniilsolopov/Documents/Dev/Cursor/kai-solo-brain/**)",
+      "Read(/Users/daniilsolopov/Documents/Dev/Cursor/kai-solo-brain/**)",
+      "Read(/Users/daniilsolopov/Documents/Dev/Cursor/onemo-ssot-global/**)",
+      "Read(/Users/daniilsolopov/Documents/Dev/Cursor/onemo-theme/**)",
+      "Read(/Users/daniilsolopov/Documents/Dev/Cursor/onemo-router-worker/**)",
+      "Bash(cat /Users/daniilsolopov/Documents/Dev/onemo-dev/kai-solo-brain/**)",
+      "Bash(ls /Users/daniilsolopov/Documents/Dev/onemo-dev/kai-solo-brain/**)",
+      "Read(/Users/daniilsolopov/Documents/Dev/onemo-dev/kai-solo-brain/**)",
+      "Read(/Users/daniilsolopov/Documents/Dev/onemo-dev/onemo-ssot-global/**)",
+      "Read(/Users/daniilsolopov/Documents/Dev/onemo-dev/onemo-theme/**)"
+    ]
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/Users/daniilsolopov/.claude/plugins/marketplaces/thedotmack/plugin/scripts/bun-runner.js\" \"/Users/daniilsolopov/.claude/plugins/marketplaces/thedotmack/plugin/scripts/worker-service.cjs\" start",
+            "timeout": 60000
+          },
+          {
+            "type": "command",
+            "command": "/Users/daniilsolopov/.claude/hooks/inject-must-carry-context.sh",
+            "timeout": 15000
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "mcp__*__create_comment|mcp__*__update_issue|mcp__*__create_issue|mcp__*__update_document",
+        "hooks": [{ "type": "command", "command": "/Users/daniilsolopov/Documents/Dev/Cursor/onemo-next/.claude/hooks/block-subagent-linear-writes.sh", "timeout": 5000 }]
+      },
+      {
+        "matcher": "mcp__*__list_*",
+        "hooks": [{ "type": "command", "command": "/Users/daniilsolopov/.claude/hooks/guard-linear-queries.sh", "timeout": 10000 }]
+      },
+      {
+        "matcher": "Task",
+        "hooks": [{ "type": "command", "command": "/Users/daniilsolopov/Documents/Dev/Cursor/onemo-next/.claude/hooks/block-haiku-subagents.sh", "timeout": 5000 }]
+      },
+      {
+        "matcher": "WebSearch",
+        "hooks": [{ "type": "command", "command": "/Users/daniilsolopov/Documents/Dev/Cursor/onemo-next/.claude/hooks/block-websearch.sh", "timeout": 5000 }]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [{
+          "type": "prompt",
+          "prompt": "The agent is about to write/edit a file. Input: $ARGUMENTS. Is this a structural/infrastructure change (repo structure, CI/CD, new MCP servers, submodules, env vars, board reorganization, naming conventions)? If yes, return {\"decision\":\"block\",\"reason\":\"Present 2-3 options to Dan first per DEC APM-54\"}. If no (routine code, docs, skill files per approved plan), return {\"decision\":\"allow\"}.",
+          "timeout": 15000,
+          "model": "sonnet"
+        }]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "mcp__*__update_issue",
+        "hooks": [{ "type": "command", "command": "/Users/daniilsolopov/Documents/Dev/Cursor/onemo-next/.claude/hooks/verify-on-done.sh", "timeout": 5000 }]
+      },
+      {
+        "matcher": "mcp__*__update_issue|mcp__*__create_comment|mcp__*__create_issue",
+        "hooks": [{ "type": "command", "command": "/Users/daniilsolopov/Documents/Dev/Cursor/onemo-next/.claude/hooks/verify-linear-writes.sh", "timeout": 5000 }]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/Users/daniilsolopov/.claude/plugins/marketplaces/thedotmack/plugin/scripts/bun-runner.js\" \"/Users/daniilsolopov/.claude/plugins/marketplaces/thedotmack/plugin/scripts/worker-service.cjs\" start",
+            "timeout": 60000
+          },
+          {
+            "type": "command",
+            "command": "/Users/daniilsolopov/.claude/hooks/post-tool-use-wrapper.sh",
+            "timeout": 120000
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [{ "type": "command", "command": "/Users/daniilsolopov/.claude/hooks/git-preservation-guard.sh", "timeout": 10000 }]
+      },
+      {
+        "hooks": [{ "type": "command", "command": "/Users/daniilsolopov/Documents/Dev/Cursor/onemo-next/.claude/hooks/audit-session-writes.sh", "timeout": 10000 }]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/Users/daniilsolopov/.claude/plugins/marketplaces/thedotmack/plugin/scripts/bun-runner.js\" \"/Users/daniilsolopov/.claude/plugins/marketplaces/thedotmack/plugin/scripts/worker-service.cjs\" start",
+            "timeout": 60000
+          },
+          {
+            "type": "command",
+            "command": "node \"/Users/daniilsolopov/.claude/plugins/marketplaces/thedotmack/plugin/scripts/bun-runner.js\" \"/Users/daniilsolopov/.claude/plugins/marketplaces/thedotmack/plugin/scripts/worker-service.cjs\" hook claude-code summarize",
+            "timeout": 120000
+          },
+          {
+            "type": "command",
+            "command": "node \"/Users/daniilsolopov/.claude/plugins/marketplaces/thedotmack/plugin/scripts/bun-runner.js\" \"/Users/daniilsolopov/.claude/plugins/marketplaces/thedotmack/plugin/scripts/worker-service.cjs\" hook claude-code session-complete",
+            "timeout": 30000
+          }
+        ]
+      }
+    ]
   }
 }
