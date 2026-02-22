@@ -1,7 +1,7 @@
 # CLAUDE.md — onemo-next
 
 > Identity, references, and context.
-> All operational rules arrive via symlinks in `.claude/rules/` — 5 from brain, 1 from SSOT.
+> All operational rules arrive via symlinks in `.claude/rules/` — 6 from brain, 1 from SSOT.
 > Requires `kai-solo-brain` at `../kai-solo-brain` and `onemo-ssot-global` at `../onemo-ssot-global`.
 
 ---
