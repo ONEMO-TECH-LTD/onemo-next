@@ -71,6 +71,8 @@ context/CLAUDE.md
 # claude agent/skill drafts
 .claude/agents/CLAUDE.md
 .claude/skills/CLAUDE.md
+.claude/skills/board-health/
+.claude/skills/cto-operations/
 
 # typescript
 *.tsbuildinfo
