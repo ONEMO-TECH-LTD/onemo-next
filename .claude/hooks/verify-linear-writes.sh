@@ -93,10 +93,20 @@ case "$TOOL_NAME" in
       # Log to session file
       echo "${TIMESTAMP}|create_issue|${ISSUE_ID}|${STATUS}|OK" >> "${LOG_DIR}/writes.log"
 
-      jq -n --arg iid "$ISSUE_ID" --arg tt "$TITLE" --arg st "$STATUS" '{
+      # DEC APM-167: Decision vault enforcement
+      # If the issue title contains "DEC" or labels include "decision", remind to vault it
+      DEC_REMINDER=""
+      LABELS=$(echo "$TOOL_RESPONSE" | jq -r '.labels[]? // empty' 2>/dev/null)
+      if echo "$TITLE" | grep -qi "DEC\|decision"; then
+        DEC_REMINDER=" ⚠️ DECISION DETECTED: Title contains 'DEC'. Write this decision to the vault (brain/memory/decisions/universal-decisions.md), commit, and push BEFORE continuing. DEC APM-135 requires single-source storage."
+      elif echo "$LABELS" | grep -qi "decision"; then
+        DEC_REMINDER=" ⚠️ DECISION DETECTED: Issue labeled 'decision'. If this records a confirmed decision, write it to the vault (brain/memory/decisions/universal-decisions.md), commit, and push."
+      fi
+
+      jq -n --arg iid "$ISSUE_ID" --arg tt "$TITLE" --arg st "$STATUS" --arg dr "$DEC_REMINDER" '{
         hookSpecificOutput: {
           hookEventName: "PostToolUse",
-          additionalContext: ("LINEAR WRITE VERIFIED (DEC APM-58): Created " + $iid + " — " + $tt + ". Status: " + $st + ". This is confirmed real data from the API response.")
+          additionalContext: ("LINEAR WRITE VERIFIED (DEC APM-58): Created " + $iid + " — " + $tt + ". Status: " + $st + ". This is confirmed real data from the API response." + $dr)
         }
       }'
     fi
