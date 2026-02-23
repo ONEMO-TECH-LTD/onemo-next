@@ -5,12 +5,43 @@
   },
   "permissions": {
     "allow": [
-      "Bash(cat /Users/daniilsolopov/Dev/onemo-dev/kai-solo-brain/**)",
-      "Bash(ls /Users/daniilsolopov/Dev/onemo-dev/kai-solo-brain/**)",
-      "Read(/Users/daniilsolopov/Dev/onemo-dev/kai-solo-brain/**)",
-      "Read(/Users/daniilsolopov/Dev/onemo-dev/onemo-ssot-global/**)",
-      "Read(/Users/daniilsolopov/Dev/onemo-dev/onemo-theme/**)",
-      "Read(/Users/daniilsolopov/Dev/onemo-dev/onemo-router-worker/**)"
+      "Bash(*)",
+      "WebFetch(*)",
+      "Read(//Users/daniilsolopov/**)",
+      "Write(//Users/daniilsolopov/Dev/**)",
+      "Write(//Users/daniilsolopov/.claude/**)",
+      "Write(//Users/daniilsolopov/.kai-inbox/**)",
+      "Write(//Users/daniilsolopov/.codex/**)",
+      "Write(//Users/daniilsolopov/.gemini/**)",
+      "mcp__f60e8b5d-f5b2-4048-95da-d3b9eac89377__*",
+      "mcp__mcp-search__*",
+      "mcp__exa__*",
+      "mcp__ref__*",
+      "mcp__ec98fd59-c6e6-4776-8d5a-02ab6e3de108__*",
+      "mcp__46e94873-6372-4956-a863-5b8b724e3ebb__*",
+      "mcp__bd1d33a2-8e16-4a41-9c3f-d74d5e02e1aa__*",
+      "mcp__e9248d1d-652b-4f68-84db-c1c2af2ed0bf__*",
+      "mcp__c97d5fab-7627-40db-92c7-b0433b16a2f5__*",
+      "mcp__0cad3c97-425e-4cb5-990b-1533265b051e__*",
+      "mcp__bb2ca654-75d5-47ac-a3fb-1e4953dc075b__*",
+      "mcp__figma-remote__*",
+      "mcp__figma-console__*",
+      "mcp__design-with-ai__*",
+      "mcp__616c86f9-be50-4611-86d6-3425d55b611b__*",
+      "mcp__shopify-dev__*",
+      "mcp__next-devtools__*",
+      "mcp__plugin_playwright_playwright__*",
+      "mcp__Claude_in_Chrome__*",
+      "mcp__mcp-registry__*",
+      "mcp__claude_ai_Slack__*",
+      "mcp__claude_ai_Notion__*",
+      "mcp__claude_ai_Context7__*",
+      "mcp__claude_ai_Supabase__*",
+      "mcp__claude_ai_Cloudflare_Developer_Platform__*",
+      "mcp__claude_ai_Vercel__*",
+      "mcp__claude_ai_Linear__*",
+      "mcp__claude_ai_GitHub__*",
+      "mcp__kai-bus__*"
     ]
   },
   "hooks": {
@@ -92,6 +123,9 @@
       }
     ],
     "Stop": [
+      {
+        "hooks": [{ "type": "command", "command": "/Users/daniilsolopov/.claude/hooks/session-end-reflection.sh", "timeout": 30000 }]
+      },
       {
         "hooks": [{ "type": "command", "command": "/Users/daniilsolopov/.claude/hooks/sync-claude-mem-db.sh", "timeout": 10000 }]
       },
