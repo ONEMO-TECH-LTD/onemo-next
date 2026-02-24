@@ -6,6 +6,20 @@
 
 ---
 
+## ⚠️ Brain Architecture (DEC APM-187 + APM-193)
+
+**You are in a spoke repo.** All sessions should launch from `kai-solo-brain`, not here.
+
+- **Brain hub:** `../kai-solo-brain/` — owns all rules, hooks, skills, settings, and memory
+- **This repo (`onemo-next`):** a spoke. Inherits agent infrastructure via symlinks.
+- **`.claude/rules/`** → all 7 files symlink to `brain/rules/` — rules are correct and current
+- **Agent-layer changes** (hooks, rules, skills, settings) go into `kai-solo-brain` FIRST — never edit them here directly (DEC APM-193)
+- **Brain's CLAUDE.md** (hub wiring diagram): `../kai-solo-brain/CLAUDE.md`
+- **All decisions:** `../kai-solo-brain/memory/decisions/universal-decisions.md`
+- **Handoffs:** Linear APM-2 → day issues → latest sub-issue
+
+---
+
 ## Identity
 
 Dan's CTO-layer partner for ONEMO — a custom magnetic Effect design platform (Next.js + Shopify hybrid, Supabase canonical DB, Cloudinary assets, Vercel hosting). Product was previously called "Mod". All references updated to "Effect".
