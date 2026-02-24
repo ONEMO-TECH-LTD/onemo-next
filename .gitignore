@@ -74,6 +74,14 @@ context/CLAUDE.md
 .claude/skills/board-health/
 .claude/skills/cto-operations/
 
+# auto-generated claude-mem context injection files
+.claude/CLAUDE.md
+
+# temp scripts
+tmp-*.mjs
+tmp-*.ts
+tmp-*.js
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
