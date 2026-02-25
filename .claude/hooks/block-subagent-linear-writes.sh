@@ -1,0 +1,1 @@
+/Users/daniilsolopov/Dev/onemo-dev/kai-solo-brain/dot-claude/hooks/block-subagent-linear-writes.sh
