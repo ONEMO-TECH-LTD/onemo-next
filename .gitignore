@@ -76,6 +76,11 @@ context/CLAUDE.md
 .claude/skills/board-health/
 .claude/skills/cto-operations/
 
+# temp scripts
+tmp-*.mjs
+tmp-*.ts
+tmp-*.js
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
