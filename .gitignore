@@ -73,8 +73,6 @@ context/CLAUDE.md
 .claude/agents/CLAUDE.md
 .claude/hooks/CLAUDE.md
 .claude/skills/CLAUDE.md
-.claude/skills/board-health/
-.claude/skills/cto-operations/
 
 # temp scripts
 tmp-*.mjs
