@@ -79,6 +79,11 @@ tmp-*.mjs
 tmp-*.ts
 tmp-*.js
 
+# temp scripts
+tmp-*.mjs
+tmp-*.ts
+tmp-*.js
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
