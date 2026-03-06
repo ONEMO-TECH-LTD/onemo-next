@@ -938,7 +938,9 @@ function generateSemanticCSS(collections) {
   {
     const fontFamilyRefs = {};
     if (!CONFIG.emitAlias) {
-      const aliasTypeInfo = findCollection(collections, COLLECTION_NAMES.aliasType);
+      // Try new 2.1_Alias_Type first; fall back to legacy _Alias for old baseline JSON
+      const aliasTypeInfo = findCollection(collections, COLLECTION_NAMES.aliasType)
+        || findCollection(collections, COLLECTION_NAMES.aliasLegacy);
       if (aliasTypeInfo) {
         const atMode = getModeData(aliasTypeInfo.collection, ['Desktop', 'Style', 'Value', 'Mode 1']);
         const atTypo = atMode.Typography || atMode;
@@ -948,14 +950,15 @@ function generateSemanticCSS(collections) {
           const semanticName = FONT_FAMILY_ALIAS_MAP[key];
           if (!semanticName) continue;
           const resolved = resolveReference(node.$value, node.$collectionName || '_Primitives', collections);
-          fontFamilyRefs[semanticName] = `var(--primitive-font-${toKebab(String(resolved))})`;
+          if (resolved) fontFamilyRefs[semanticName] = `var(--primitive-font-${toKebab(String(resolved))})`;
         }
       }
     }
     for (const name of Object.values(FONT_FAMILY_ALIAS_MAP)) {
       const ref = CONFIG.emitAlias
         ? `var(--alias-font-${name})`
-        : (fontFamilyRefs[name] || `var(--primitive-font-${name})`);
+        : fontFamilyRefs[name]; // undefined = skip (no broken fallback var)
+      if (!ref) continue; // skip unresolvable font slots rather than emit a broken var()
       lines.push(`  --font-${name}: ${ref};\n`);
       count++;
     }
