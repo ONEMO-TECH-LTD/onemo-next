@@ -47,17 +47,17 @@
   --spacing-inline-m: clamp(1.6875rem, 1.6215rem + 0.2817vi, 1.875rem);
 
   /* ═══ Radius ═══ */
-  --radius-none: {none};
-  --radius-xxs: {xxs};
-  --radius-xs: {xs};
-  --radius-sm: {sm};
-  --radius-md: {md};
-  --radius-lg: {lg};
-  --radius-xl: {xl};
-  --radius-2xl: {2xl};
-  --radius-3xl: {3xl};
-  --radius-4xl: {4xl};
-  --radius-full: {full};
+  --radius-none: 0px;
+  --radius-xxs: 2px;
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-3xl: 20px;
+  --radius-4xl: 24px;
+  --radius-full: 9999px;
 
   /* ═══ Breakpoints ═══ */
   --breakpoint-sm: 480px;
@@ -68,108 +68,108 @@
   --breakpoint-3xl: 1440px;
 
   /* ═══ Typography Composites ═══ */
-  --text-display-2xl: 4.7681rem;
-  --text-display-2xl--line-height: 5.25rem;
+  --text-display-2xl: clamp(3.3594rem, 2.8633rem + 2.1164vi, 4.7681rem);
+  --text-display-2xl--line-height: clamp(3.6875rem, 3.1373rem + 2.3474vi, 5.25rem);
   --text-display-2xl--letter-spacing: -0.04em;
   --text-display-2xl--font-weight: 500;
 
-  --text-display-xl: 3.815rem;
-  --text-display-xl--line-height: 4.375rem;
+  --text-display-xl: clamp(2.7994rem, 2.4418rem + 1.5258vi, 3.815rem);
+  --text-display-xl--line-height: clamp(3.25rem, 2.8539rem + 1.6901vi, 4.375rem);
   --text-display-xl--letter-spacing: -0.035em;
   --text-display-xl--font-weight: 500;
 
-  --text-display-l: 3.0519rem;
-  --text-display-l--line-height: 3.6875rem;
+  --text-display-l: clamp(2.3325rem, 2.0792rem + 1.0808vi, 3.0519rem);
+  --text-display-l--line-height: clamp(2.8125rem, 2.5044rem + 1.3146vi, 3.6875rem);
   --text-display-l--letter-spacing: -0.03em;
   --text-display-l--font-weight: 500;
 
-  --text-display-m: 2.4413rem;
-  --text-display-m--line-height: 3.0625rem;
+  --text-display-m: clamp(1.9438rem, 1.7686rem + 0.7474vi, 2.4413rem);
+  --text-display-m--line-height: clamp(2.4375rem, 2.2174rem + 0.939vi, 3.0625rem);
   --text-display-m--letter-spacing: -0.025em;
   --text-display-m--font-weight: 500;
 
-  --text-display-s: 1.9531rem;
-  --text-display-s--line-height: 2.5625rem;
+  --text-display-s: clamp(1.62rem, 1.5027rem + 0.5005vi, 1.9531rem);
+  --text-display-s--line-height: clamp(2.125rem, 1.971rem + 0.6573vi, 2.5625rem);
   --text-display-s--letter-spacing: -0.02em;
   --text-display-s--font-weight: 500;
 
-  --text-title-screen-primary: 2.4413rem;
-  --text-title-screen-primary--line-height: 3.0625rem;
+  --text-title-screen-primary: clamp(1.9438rem, 1.7686rem + 0.7474vi, 2.4413rem);
+  --text-title-screen-primary--line-height: clamp(2.4375rem, 2.2174rem + 0.939vi, 3.0625rem);
   --text-title-screen-primary--letter-spacing: 0;
   --text-title-screen-primary--font-weight: 600;
 
-  --text-title-screen-secondary: 1.9531rem;
-  --text-title-screen-secondary--line-height: 2.5625rem;
+  --text-title-screen-secondary: clamp(1.62rem, 1.5027rem + 0.5005vi, 1.9531rem);
+  --text-title-screen-secondary--line-height: clamp(2.125rem, 1.971rem + 0.6573vi, 2.5625rem);
   --text-title-screen-secondary--letter-spacing: 0;
   --text-title-screen-secondary--font-weight: 500;
 
-  --text-title-section-primary: 1.5625rem;
-  --text-title-section-primary--line-height: 2.1875rem;
+  --text-title-section-primary: clamp(1.35rem, 1.2752rem + 0.3192vi, 1.5625rem);
+  --text-title-section-primary--line-height: clamp(1.875rem, 1.765rem + 0.4695vi, 2.1875rem);
   --text-title-section-primary--letter-spacing: 0;
   --text-title-section-primary--font-weight: 600;
 
-  --text-title-section-secondary: 1.5625rem;
-  --text-title-section-secondary--line-height: 2.1875rem;
+  --text-title-section-secondary: clamp(1.35rem, 1.2752rem + 0.3192vi, 1.5625rem);
+  --text-title-section-secondary--line-height: clamp(1.875rem, 1.765rem + 0.4695vi, 2.1875rem);
   --text-title-section-secondary--letter-spacing: 0;
   --text-title-section-secondary--font-weight: 500;
 
-  --text-title-product-primary: 1.25rem;
-  --text-title-product-primary--line-height: 1.875rem;
+  --text-title-product-primary: clamp(1.125rem, 1.081rem + 0.1878vi, 1.25rem);
+  --text-title-product-primary--line-height: clamp(1.6875rem, 1.6215rem + 0.2817vi, 1.875rem);
   --text-title-product-primary--letter-spacing: 0;
   --text-title-product-primary--font-weight: 500;
 
-  --text-title-product-secondary: 1rem;
-  --text-title-product-secondary--line-height: 1.5rem;
+  --text-title-product-secondary: clamp(0.9375rem, 0.9155rem + 0.0939vi, 1rem);
+  --text-title-product-secondary--line-height: clamp(1.4375rem, 1.4155rem + 0.0939vi, 1.5rem);
   --text-title-product-secondary--letter-spacing: 0;
   --text-title-product-secondary--font-weight: 400;
 
-  --text-title-headline: 1.25rem;
-  --text-title-headline--line-height: 1.875rem;
+  --text-title-headline: clamp(1.125rem, 1.081rem + 0.1878vi, 1.25rem);
+  --text-title-headline--line-height: clamp(1.6875rem, 1.6215rem + 0.2817vi, 1.875rem);
   --text-title-headline--letter-spacing: 0;
   --text-title-headline--font-weight: 500;
 
-  --text-body-heading: 1.5625rem;
-  --text-body-heading--line-height: 2.1875rem;
+  --text-body-heading: clamp(1.35rem, 1.2752rem + 0.3192vi, 1.5625rem);
+  --text-body-heading--line-height: clamp(1.875rem, 1.765rem + 0.4695vi, 2.1875rem);
   --text-body-heading--letter-spacing: 0;
   --text-body-heading--font-weight: 500;
 
-  --text-body-normal: 1.25rem;
-  --text-body-normal--line-height: 1.875rem;
+  --text-body-normal: clamp(1.125rem, 1.081rem + 0.1878vi, 1.25rem);
+  --text-body-normal--line-height: clamp(1.6875rem, 1.6215rem + 0.2817vi, 1.875rem);
   --text-body-normal--letter-spacing: 0;
   --text-body-normal--font-weight: 400;
 
-  --text-body-strong: 1.25rem;
-  --text-body-strong--line-height: 1.875rem;
+  --text-body-strong: clamp(1.125rem, 1.081rem + 0.1878vi, 1.25rem);
+  --text-body-strong--line-height: clamp(1.6875rem, 1.6215rem + 0.2817vi, 1.875rem);
   --text-body-strong--letter-spacing: 0;
   --text-body-strong--font-weight: 500;
 
-  --text-body-caption: 1rem;
-  --text-body-caption--line-height: 1.5rem;
+  --text-body-caption: clamp(0.9375rem, 0.9155rem + 0.0939vi, 1rem);
+  --text-body-caption--line-height: clamp(1.4375rem, 1.4155rem + 0.0939vi, 1.5rem);
   --text-body-caption--letter-spacing: 0.001em;
   --text-body-caption--font-weight: 400;
 
-  --text-label-xl: 1.5625rem;
-  --text-label-xl--line-height: 2.1875rem;
+  --text-label-xl: clamp(1.35rem, 1.2752rem + 0.3192vi, 1.5625rem);
+  --text-label-xl--line-height: clamp(1.875rem, 1.765rem + 0.4695vi, 2.1875rem);
   --text-label-xl--letter-spacing: 0;
   --text-label-xl--font-weight: 500;
 
-  --text-label-l: 1.25rem;
-  --text-label-l--line-height: 1.875rem;
+  --text-label-l: clamp(1.125rem, 1.081rem + 0.1878vi, 1.25rem);
+  --text-label-l--line-height: clamp(1.6875rem, 1.6215rem + 0.2817vi, 1.875rem);
   --text-label-l--letter-spacing: 0;
   --text-label-l--font-weight: 500;
 
-  --text-label-m: 1rem;
-  --text-label-m--line-height: 1.5rem;
+  --text-label-m: clamp(0.9375rem, 0.9155rem + 0.0939vi, 1rem);
+  --text-label-m--line-height: clamp(1.4375rem, 1.4155rem + 0.0939vi, 1.5rem);
   --text-label-m--letter-spacing: 0.002em;
   --text-label-m--font-weight: 400;
 
-  --text-label-s: 0.8rem;
-  --text-label-s--line-height: 1.1875rem;
+  --text-label-s: clamp(0.7813rem, 0.7746rem + 0.0282vi, 0.8rem);
+  --text-label-s--line-height: clamp(1.125rem, 1.103rem + 0.0939vi, 1.1875rem);
   --text-label-s--letter-spacing: 0.004em;
   --text-label-s--font-weight: 400;
 
-  --text-label-xs: 0.8rem;
-  --text-label-xs--line-height: 1.1875rem;
+  --text-label-xs: clamp(0.7813rem, 0.7746rem + 0.0282vi, 0.8rem);
+  --text-label-xs--line-height: clamp(1.125rem, 1.103rem + 0.0939vi, 1.1875rem);
   --text-label-xs--letter-spacing: 0.004em;
   --text-label-xs--font-weight: 400;
 

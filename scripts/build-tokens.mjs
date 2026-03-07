@@ -1018,7 +1018,8 @@ function generateSemanticCSS(collections) {
   const radiusMode = getModeData(radius.collection, ['Mode 1', 'Value', 'Style']);
   for (const [key, node] of Object.entries(radiusMode)) {
     if (key.startsWith('$')) continue;
-    const value = node.$value;
+    // Resolve through alias chain: 3.5_Semantic_Radius → 2.2_Alias_Radius → 1.1_Primitive_Dimensions
+    const value = resolveReference(node.$value, node.$collectionName || '3.5_Semantic_Radius', collections);
     // Radius stays in px (per 11.8 decision)
     const cssValue = typeof value === 'number' ? `${value}px` : `${value}`;
     lines.push(`  --${key}: ${cssValue};\n`);
@@ -1136,19 +1137,37 @@ function generateTypographyComposites(collections, lines) {
 function emitPreset(presetName, preset, category, variant, size, collections, lines) {
   let count = 0;
 
-  // Resolve Size → font-size in rem
+  // Resolve Size → font-size as clamp() (fluid, DEC APM-104 / DEC-DS-008)
   if (preset.Size) {
-    const sizeVal = resolveReference(preset.Size.$value, preset.Size.$collectionName || '_Alias', collections);
-    const sizeRem = typeof sizeVal === 'number' ? pxToRem(sizeVal) : sizeVal;
-    lines.push(`  --text-${presetName}: ${sizeRem};\n`);
+    const fluid = resolveFluidValues(preset.Size, collections);
+    let sizeVal;
+    if (fluid) {
+      sizeVal = generateClamp(
+        fluid.mobilePx, fluid.desktopPx,
+        CONFIG.viewportBounds.min, CONFIG.viewportBounds.max,
+      );
+    } else {
+      const raw = resolveReference(preset.Size.$value, preset.Size.$collectionName || '_Alias', collections);
+      sizeVal = typeof raw === 'number' ? pxToRem(raw) : raw;
+    }
+    lines.push(`  --text-${presetName}: ${sizeVal};\n`);
     count++;
   }
 
-  // Resolve Line → line-height in rem
+  // Resolve Line → line-height as clamp() (fluid, DEC APM-104 / DEC-DS-008)
   if (preset.Line) {
-    const lineVal = resolveReference(preset.Line.$value, preset.Line.$collectionName || '_Alias', collections);
-    const lineRem = typeof lineVal === 'number' ? pxToRem(lineVal) : lineVal;
-    lines.push(`  --text-${presetName}--line-height: ${lineRem};\n`);
+    const fluid = resolveFluidValues(preset.Line, collections);
+    let lineVal;
+    if (fluid) {
+      lineVal = generateClamp(
+        fluid.mobilePx, fluid.desktopPx,
+        CONFIG.viewportBounds.min, CONFIG.viewportBounds.max,
+      );
+    } else {
+      const raw = resolveReference(preset.Line.$value, preset.Line.$collectionName || '_Alias', collections);
+      lineVal = typeof raw === 'number' ? pxToRem(raw) : raw;
+    }
+    lines.push(`  --text-${presetName}--line-height: ${lineVal};\n`);
     count++;
   }
 
@@ -1265,8 +1284,12 @@ function buildSemanticColorName(path) {
 function buildColorValueRef(node, collections) {
   const value = node.$value;
 
-  // Literal value (rgba, hex)
+  // Literal value (rgba, hex, or numeric dimension like blur)
   if (typeof value !== 'string' || !value.startsWith('{')) {
+    // Blur values from 5.0_Effects are floats — append px unit
+    if (typeof value === 'number' || (node.$type === 'float' && typeof value === 'number')) {
+      return `${value}px`;
+    }
     return value;
   }
 
@@ -1369,7 +1392,10 @@ function generateTokenReference(collections) {
   const radiusMode = getModeData(radius.collection, ['Mode 1', 'Value', 'Style']);
   for (const [key, node] of Object.entries(radiusMode)) {
     if (key.startsWith('$')) continue;
-    lines.push(`| \`--${key}\` | \`rounded-${key.replace('radius-', '')}\` | \`${node.$value}px\` |\n`);
+    // Resolve through alias chain (same fix as CSS emitter — KAI-743)
+    const resolvedValue = resolveReference(node.$value, node.$collectionName || '3.5_Semantic_Radius', collections);
+    const cssVal = typeof resolvedValue === 'number' ? `${resolvedValue}px` : `${resolvedValue}`;
+    lines.push(`| \`--${key}\` | \`rounded-${key.replace('radius-', '')}\` | \`${cssVal}\` |\n`);
   }
 
   // Font slots
@@ -1633,11 +1659,9 @@ async function resolveInputFile(explicitInput) {
     return { path: explicitInput, mtime: st.mtime };
   }
 
-  const latest = await findLatestDesignSystemExport();
-  if (latest) {
-    return { path: latest.path, mtime: latest.mtime };
-  }
-
+  // Always use the config-specified SSOT path (DEC-DS-027).
+  // The old Design System/var/ auto-discovery is removed — canonical source
+  // is onemo-ssot-global/11-design-system/artifacts/ as of Mar 6 2026.
   const st = await stat(DEFAULT_JSON);
   return { path: DEFAULT_JSON, mtime: st.mtime };
 }

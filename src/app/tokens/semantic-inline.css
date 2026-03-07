@@ -21,10 +21,10 @@
   --semantic-shadow-3xl-02: rgba(10, 13, 18, 0.04);
   --semantic-shadow-skeumorphic-inner: rgba(10, 13, 18, 0.05);
   --semantic-shadow-skeumorphic-inner-border: rgba(10, 13, 18, 0.18);
-  --semantic-blur-sm: 8;
-  --semantic-blur-md: 16;
-  --semantic-blur-lg: 24;
-  --semantic-blur-xl: 40;
+  --semantic-blur-sm: 8px;
+  --semantic-blur-md: 16px;
+  --semantic-blur-lg: 24px;
+  --semantic-blur-xl: 40px;
 }
 
 /* ═══ Dark mode overrides ═══ */
@@ -46,10 +46,10 @@
   --semantic-shadow-3xl-02: rgba(0, 0, 0, 0.1);
   --semantic-shadow-skeumorphic-inner: rgba(12, 14, 18, 0.05);
   --semantic-shadow-skeumorphic-inner-border: rgba(12, 14, 18, 0.18);
-  --semantic-blur-sm: 8;
-  --semantic-blur-md: 16;
-  --semantic-blur-lg: 24;
-  --semantic-blur-xl: 40;
+  --semantic-blur-sm: 8px;
+  --semantic-blur-md: 16px;
+  --semantic-blur-lg: 24px;
+  --semantic-blur-xl: 40px;
 }
 
 /* ═══ Dark mode overrides (system preference) ═══ */
@@ -72,10 +72,10 @@
     --semantic-shadow-3xl-02: rgba(0, 0, 0, 0.1);
     --semantic-shadow-skeumorphic-inner: rgba(12, 14, 18, 0.05);
     --semantic-shadow-skeumorphic-inner-border: rgba(12, 14, 18, 0.18);
-    --semantic-blur-sm: 8;
-    --semantic-blur-md: 16;
-    --semantic-blur-lg: 24;
-    --semantic-blur-xl: 40;
+    --semantic-blur-sm: 8px;
+    --semantic-blur-md: 16px;
+    --semantic-blur-lg: 24px;
+    --semantic-blur-xl: 40px;
   }
 }
 
