@@ -220,7 +220,7 @@ export default function TokenTable({
                       : token.cssValue;
                   return (
                     <tr
-                      key={idx}
+                      key={`${token.figmaPath}:${token.cssProperty}`}
                       className="bg-zinc-900 hover:bg-zinc-800 transition-colors"
                     >
                       <td

@@ -5,7 +5,11 @@ import SummaryStats from "./components/SummaryStats";
 import TokenTable from "./components/TokenTable";
 import ValidationPanel from "./components/ValidationPanel";
 
-function loadData(): { mapping: TokenMapping; validation: ValidationReport } {
+function loadData(): {
+  mapping: TokenMapping | null;
+  validation: ValidationReport | null;
+  error: string | null;
+} {
   const mappingPath = path.join(process.cwd(), "scripts", "token-mapping.json");
   const validationPath = path.join(
     process.cwd(),
@@ -15,16 +19,43 @@ function loadData(): { mapping: TokenMapping; validation: ValidationReport } {
     "validation-report.json"
   );
 
-  const mapping: TokenMapping = JSON.parse(readFileSync(mappingPath, "utf-8"));
-  const validation: ValidationReport = JSON.parse(
-    readFileSync(validationPath, "utf-8")
-  );
-
-  return { mapping, validation };
+  try {
+    const mapping: TokenMapping = JSON.parse(
+      readFileSync(mappingPath, "utf-8")
+    );
+    const validation: ValidationReport = JSON.parse(
+      readFileSync(validationPath, "utf-8")
+    );
+    return { mapping, validation, error: null };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { mapping: null, validation: null, error: msg };
+  }
 }
 
 export default function DevTokensPage() {
-  const { mapping, validation } = loadData();
+  const { mapping, validation, error } = loadData();
+
+  if (error || !mapping || !validation) {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <h1 className="text-xl font-semibold text-red-400">
+            Data files not found
+          </h1>
+          <p className="text-sm text-zinc-400 font-mono max-w-md">
+            Run the token pipeline first:
+          </p>
+          <pre className="text-xs bg-zinc-900 border border-zinc-700 rounded px-4 py-3 text-left">
+            {`node scripts/build-tokens.mjs\nnode scripts/generate-token-mapping.mjs\nnode scripts/validate-tokens.mjs`}
+          </pre>
+          {error && (
+            <p className="text-xs text-zinc-600 font-mono mt-2">{error}</p>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   const tokens = mapping.tokens;
 

@@ -101,7 +101,7 @@ export default function SummaryStats({ mapping, validation }: SummaryStatsProps)
                   <div className="flex-1 h-1.5 bg-zinc-700 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-indigo-500 rounded-full"
-                      style={{ width: `${Math.round((count / total) * 100)}%` }}
+                      style={{ width: `${total > 0 ? Math.round((count / total) * 100) : 0}%` }}
                     />
                   </div>
                   <div className="text-xs font-mono text-zinc-400 w-8 text-right">
@@ -128,7 +128,7 @@ export default function SummaryStats({ mapping, validation }: SummaryStatsProps)
                   <div className="flex-1 h-1.5 bg-zinc-700 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-violet-500 rounded-full"
-                      style={{ width: `${Math.round((count / total) * 100)}%` }}
+                      style={{ width: `${total > 0 ? Math.round((count / total) * 100) : 0}%` }}
                     />
                   </div>
                   <div className="text-xs font-mono text-zinc-400 w-8 text-right">
