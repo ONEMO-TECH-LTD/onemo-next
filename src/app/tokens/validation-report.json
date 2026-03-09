@@ -1,0 +1,148 @@
+{
+  "timestamp": "2026-03-09T22:57:35.081Z",
+  "source": "figma-variables-2026-03-06.json",
+  "summary": {
+    "total": 17,
+    "pass": 17,
+    "fail": 0,
+    "warn": 0
+  },
+  "checks": [
+    {
+      "id": "tier-org",
+      "category": "input",
+      "status": "pass",
+      "details": [
+        "All collections belong to a known tier"
+      ]
+    },
+    {
+      "id": "name-safety",
+      "category": "input",
+      "status": "pass",
+      "details": [
+        "No forbidden characters ({, }, .) found in variable name paths"
+      ]
+    },
+    {
+      "id": "mode-completeness",
+      "category": "input",
+      "status": "pass",
+      "details": [
+        "All collections have the correct number of modes"
+      ]
+    },
+    {
+      "id": "collection-structure",
+      "category": "input",
+      "status": "pass",
+      "details": [
+        "All collections follow expected naming structure"
+      ]
+    },
+    {
+      "id": "namespace-compliance",
+      "category": "output",
+      "status": "pass",
+      "details": [
+        "All 1135 CSS custom properties use recognized namespaces"
+      ]
+    },
+    {
+      "id": "no-alias-emission",
+      "category": "output",
+      "status": "pass",
+      "details": [
+        "No --alias-* properties found in CSS output (alias suppression active)"
+      ]
+    },
+    {
+      "id": "no-parentheticals",
+      "category": "output",
+      "status": "pass",
+      "details": [
+        "No parenthetical annotations found in CSS property names"
+      ]
+    },
+    {
+      "id": "no-underscores",
+      "category": "output",
+      "status": "pass",
+      "details": [
+        "No underscores found in CSS property names"
+      ]
+    },
+    {
+      "id": "color-format",
+      "category": "output",
+      "status": "pass",
+      "details": [
+        "All 836 color values are valid CSS"
+      ]
+    },
+    {
+      "id": "fluid-values",
+      "category": "output",
+      "status": "pass",
+      "details": [
+        "All 74 clamp() values are structurally valid"
+      ]
+    },
+    {
+      "id": "typography-completeness",
+      "category": "output",
+      "status": "pass",
+      "details": [
+        "All 21 --text-* composites have required sub-properties"
+      ]
+    },
+    {
+      "id": "breakpoint-order",
+      "category": "output",
+      "status": "pass",
+      "details": [
+        "8 breakpoints in ascending order: 375px → 480px → 640px → 768px → 1024px → 1280px → 1440px → 1920px"
+      ]
+    },
+    {
+      "id": "no-duplicates",
+      "category": "output",
+      "status": "pass",
+      "details": [
+        "No duplicate declarations found across 1135 properties"
+      ]
+    },
+    {
+      "id": "dark-mode-parity",
+      "category": "output",
+      "status": "pass",
+      "details": [
+        "All 127 semantic color tokens have dark mode overrides"
+      ]
+    },
+    {
+      "id": "kebab-transform",
+      "category": "mapping",
+      "status": "pass",
+      "details": [
+        "Spot-checked 30 variable paths — all produce valid kebab-case"
+      ]
+    },
+    {
+      "id": "alias-suppression",
+      "category": "mapping",
+      "status": "pass",
+      "details": [
+        "aliases.css contains only suppression comment — alias layer correctly suppressed"
+      ]
+    },
+    {
+      "id": "primitive-prefix",
+      "category": "mapping",
+      "status": "pass",
+      "details": [
+        "All 443 primitive properties follow --primitive-{category}-{name} pattern"
+      ]
+    }
+  ]
+}
