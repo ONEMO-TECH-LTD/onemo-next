@@ -60,18 +60,13 @@ function isColorValue(value: string): boolean {
 }
 
 function ColorSwatch({ value }: { value: string }) {
-  // Only render swatch for non-alpha colors to avoid browser inconsistencies
-  try {
-    return (
-      <span
-        className="inline-block w-3 h-3 rounded-sm border border-zinc-600 flex-shrink-0 align-middle mr-1"
-        style={{ backgroundColor: value }}
-        title={value}
-      />
-    );
-  } catch {
-    return null;
-  }
+  return (
+    <span
+      className="inline-block w-3 h-3 rounded-sm border border-zinc-600 flex-shrink-0 align-middle mr-1"
+      style={{ backgroundColor: value }}
+      title={value}
+    />
+  );
 }
 
 const PAGE_SIZE = 50;
@@ -212,7 +207,7 @@ export default function TokenTable({
                   </td>
                 </tr>
               ) : (
-                paginated.map((token, idx) => {
+                paginated.map((token) => {
                   const isColor = isColorValue(token.cssValue);
                   const truncatedValue =
                     token.cssValue.length > 48
