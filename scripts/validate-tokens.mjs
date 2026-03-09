@@ -186,6 +186,12 @@ function parseCssProperties(css) {
     lineNum++;
     const trimmed = line.trim();
 
+    // Detect scope closings — reset to default
+    if (trimmed === '}') {
+      currentScope = ':root';
+      continue;
+    }
+
     // Detect scope openings — simple heuristic
     if (trimmed.endsWith('{') && !trimmed.startsWith('--')) {
       currentScope = trimmed.slice(0, -1).trim();
@@ -611,7 +617,7 @@ function checkDarkModeParity(allProps) {
   const darkScopes = new Set(['[data-theme="dark"]', ':root:not([data-theme="light"])']);
   const darkProps = new Set(
     allProps
-      .filter(p => darkScopes.has(p.scope) || p.scope.includes('[data-theme="dark"]') || p.scope.includes(':not([data-theme="light"]'))
+      .filter(p => darkScopes.has(p.scope) || p.scope.includes('[data-theme="dark"]') || p.scope.includes(':not([data-theme="light"])'))
       .map(p => p.property)
   );
 
