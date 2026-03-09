@@ -537,7 +537,8 @@ function flattenTree(obj, pathSoFar = []) {
 // ─── CSS Generation: Primitives ──────────────────────────────────────────────
 
 function generatePrimitivesCSS(collections) {
-  const entries = [];
+  const lightEntries = [];
+  const darkEntries = [];
   const hasSplitPrimitives = hasAnyCollection(collections, [
     ...COLLECTION_NAMES.primitiveColor,
     ...COLLECTION_NAMES.primitiveDimensions,
@@ -573,22 +574,36 @@ function generatePrimitivesCSS(collections) {
     ];
 
     for (const { info, category } of primitiveSources) {
-      const modeData = getModeData(info.collection, ['Core', 'Value', 'Mode 1']);
-      for (const entry of flattenTree(modeData)) {
-        entries.push({ ...entry, path: prependCategory(entry.path, category) });
+      // Check for Light/Dark modes (primitive colors have them)
+      const modePair = getLightDarkModes(info.collection);
+      if (modePair) {
+        // Collection has Light/Dark — emit both
+        for (const entry of flattenTree(modePair.lightMode)) {
+          lightEntries.push({ ...entry, path: prependCategory(entry.path, category) });
+        }
+        for (const entry of flattenTree(modePair.darkMode)) {
+          darkEntries.push({ ...entry, path: prependCategory(entry.path, category) });
+        }
+      } else {
+        // Single-mode collection (Dimensions, Type) — light only
+        const modeData = getModeData(info.collection, ['Core', 'Value', 'Mode 1']);
+        for (const entry of flattenTree(modeData)) {
+          lightEntries.push({ ...entry, path: prependCategory(entry.path, category) });
+        }
       }
     }
   } else {
     const primitives = requireCollection(collections, COLLECTION_NAMES.primitiveLegacy, 'Legacy primitives');
     const modeData = getModeData(primitives.collection, ['Core', 'Value', 'Mode 1']);
-    entries.push(...flattenTree(modeData));
+    lightEntries.push(...flattenTree(modeData));
   }
 
   const lines = [HEADER, ':root {\n'];
   let count = 0;
   let currentCategory = '';
 
-  for (const { path, node } of entries) {
+  // Light mode entries in :root
+  for (const { path, node } of lightEntries) {
     const category = path[0];
     if (category !== currentCategory) {
       if (currentCategory) lines.push('\n');
@@ -604,6 +619,38 @@ function generatePrimitivesCSS(collections) {
   }
 
   lines.push('}\n');
+
+  // Dark mode overrides for primitive colors
+  if (darkEntries.length > 0) {
+    // Build a map of light values to skip unchanged dark entries
+    const lightValueMap = new Map();
+    for (const { path, node } of lightEntries) {
+      const propName = buildPrimitiveName(path);
+      lightValueMap.set(propName, formatPrimitiveValue(path, node));
+    }
+
+    const darkLines = [];
+    for (const { path, node } of darkEntries) {
+      const propName = buildPrimitiveName(path);
+      const darkValue = formatPrimitiveValue(path, node);
+      // Only emit dark override if value differs from light
+      if (darkValue !== lightValueMap.get(propName)) {
+        darkLines.push(`  ${propName}: ${darkValue};\n`);
+      }
+    }
+
+    if (darkLines.length > 0) {
+      lines.push(`\n/* ═══ Dark mode primitive overrides ═══ */\n${CONFIG.darkMode.class} {\n`);
+      lines.push(...darkLines);
+      lines.push('}\n');
+      lines.push(`\n${CONFIG.darkMode.media} {\n  :root:not([data-theme="light"]) {\n`);
+      for (const line of darkLines) {
+        lines.push(`  ${line}`);
+      }
+      lines.push('  }\n}\n');
+    }
+  }
+
   return { css: lines.join(''), count };
 }
 
@@ -1020,17 +1067,19 @@ function generateSemanticCSS(collections) {
     if (key.startsWith('$')) continue;
     // Resolve through alias chain: 3.5_Semantic_Radius → 2.2_Alias_Radius → 1.1_Primitive_Dimensions
     const value = resolveReference(node.$value, node.$collectionName || '3.5_Semantic_Radius', collections);
-    // Radius stays in px (per 11.8 decision)
-    const cssValue = typeof value === 'number' ? `${value}px` : `${value}`;
+    // Radius stays in px (per 11.8 decision). Special case: values >= 9000 → calc(infinity * 1px) per Tailwind v4 convention.
+    const cssValue = typeof value === 'number'
+      ? (value >= 9000 ? 'calc(infinity * 1px)' : `${value}px`)
+      : `${value}`;
     lines.push(`  --${key}: ${cssValue};\n`);
     count++;
   }
 
-  // Breakpoints (derived from widths)
+  // Breakpoints — full set per blueprint (8 breakpoints, ascending)
   lines.push('\n  /* ═══ Breakpoints ═══ */\n');
   const breakpointMap = {
-    sm: 480, md: 640, lg: 768,
-    xl: 1024, '2xl': 1280, '3xl': 1440,
+    xs: 375, sm: 480, md: 640, lg: 768,
+    xl: 1024, '2xl': 1280, '3xl': 1440, '4xl': 1920,
   };
   for (const [name, value] of Object.entries(breakpointMap)) {
     lines.push(`  --breakpoint-${name}: ${value}px;\n`);
@@ -1041,6 +1090,21 @@ function generateSemanticCSS(collections) {
   lines.push('\n  /* ═══ Typography Composites ═══ */\n');
   const typoCount = generateTypographyComposites(collections, lines);
   count += typoCount;
+
+  // Semantic Size — height/width tokens from 3.6_Semantic_Size
+  const sizeResult = findCollection(collections, [...COLLECTION_NAMES.semanticSize || []]);
+  if (sizeResult) {
+    lines.push('\n  /* ═══ Element Sizes ═══ */\n');
+    const sizeMode = getModeData(sizeResult.collection, ['Value', 'Mode 1', 'Style']);
+    for (const entry of flattenTree(sizeMode)) {
+      const nameParts = entry.path.map(p => toKebab(p));
+      const propName = `--size-${nameParts.join('-')}`;
+      const value = resolveReference(entry.node.$value, entry.node.$collectionName || '3.6_Semantic_Size', collections);
+      const cssValue = typeof value === 'number' ? `${value}px` : `${value}`;
+      lines.push(`  ${propName}: ${cssValue};\n`);
+      count++;
+    }
+  }
 
   lines.push('}\n\n');
   lines.push('@theme inline {\n');
@@ -1199,16 +1263,30 @@ function collectSemanticColorEntries(collections) {
 
   for (const collectionInfo of getSemanticColorCollections(collections)) {
     const modePair = getLightDarkModes(collectionInfo.collection);
-    if (!modePair) continue;
 
-    for (const entry of flattenTree(modePair.lightMode)) {
-      const semanticName = buildSemanticColorName(entry.path);
-      lightTokens.set(semanticName, { ...entry, sourceCollection: collectionInfo.name });
-    }
-
-    for (const entry of flattenTree(modePair.darkMode)) {
-      const semanticName = buildSemanticColorName(entry.path);
-      darkTokens.set(semanticName, { ...entry, sourceCollection: collectionInfo.name });
+    if (modePair) {
+      // Collection has explicit Light/Dark modes (e.g. 5.0_Effects)
+      for (const entry of flattenTree(modePair.lightMode)) {
+        const semanticName = buildSemanticColorName(entry.path);
+        lightTokens.set(semanticName, { ...entry, sourceCollection: collectionInfo.name });
+      }
+      for (const entry of flattenTree(modePair.darkMode)) {
+        const semanticName = buildSemanticColorName(entry.path);
+        darkTokens.set(semanticName, { ...entry, sourceCollection: collectionInfo.name });
+      }
+    } else {
+      // Single-mode collection (e.g. 3.0_Semantic_Colours, 4.0_Component_Colours).
+      // Light/dark distinction inherited through the reference chain to primitives.
+      // Use the single mode as both light and dark entries — the difference comes
+      // from which primitive mode is active at runtime via CSS variable cascade.
+      const singleMode = getModeData(collectionInfo.collection, ['Value', 'Mode 1', 'Style']);
+      for (const entry of flattenTree(singleMode)) {
+        const semanticName = buildSemanticColorName(entry.path);
+        lightTokens.set(semanticName, { ...entry, sourceCollection: collectionInfo.name });
+        // Dark entry is the same node — the dark value comes from the primitive
+        // color variables being overridden in the dark scope, not from a separate mode.
+        darkTokens.set(semanticName, { ...entry, sourceCollection: collectionInfo.name });
+      }
     }
   }
 
@@ -1255,10 +1333,17 @@ function generateSemanticInlineCSS(collections) {
   lines.push('  }\n}\n\n');
 
   // Section 3: Register for Tailwind utilities
+  // Colors → --color-*, Shadows → --shadow-*, Blur → --blur-* (per blueprint Section 3.1)
   lines.push('/* ═══ Tailwind theme registration ═══ */\n@theme inline {\n');
 
   for (const semanticName of lightTokens.keys()) {
-    lines.push(`  --color-${semanticName}: var(--semantic-${semanticName});\n`);
+    if (semanticName.startsWith('shadow-')) {
+      lines.push(`  --${semanticName}: var(--semantic-${semanticName});\n`);
+    } else if (semanticName.startsWith('blur-')) {
+      lines.push(`  --${semanticName}: var(--semantic-${semanticName});\n`);
+    } else {
+      lines.push(`  --color-${semanticName}: var(--semantic-${semanticName});\n`);
+    }
   }
 
   lines.push('}\n');
@@ -1306,6 +1391,41 @@ function buildColorValueRef(node, collections) {
 
   // Reference to alias collections
   if (isAliasCollectionName(collectionName)) {
+    if (!CONFIG.emitAlias) {
+      // Alias layer suppressed — resolve through alias chain to primitive, then output var(--primitive-*)
+      // Walk one step into the alias collection to find the primitive reference
+      const aliasCollection = collections.get(collectionName);
+      if (aliasCollection) {
+        for (const modeName of Object.keys(aliasCollection.modes)) {
+          const aliasNode = walkPath(aliasCollection.modes[modeName], refPath);
+          if (aliasNode && aliasNode.$value !== undefined) {
+            if (typeof aliasNode.$value === 'string' && aliasNode.$value.startsWith('{')) {
+              const nextRef = aliasNode.$value.slice(1, -1);
+              const nextCollName = aliasNode.$collectionName;
+              if (isPrimitiveCollectionName(nextCollName)) {
+                // rewriteReferences already normalised the alias $value with the
+                // correct category prefix (e.g. "{Colors.grey.11}"), so nextRef
+                // already has the right shape for buildPrimitiveRefFromPath.
+                return `var(${buildPrimitiveRefFromPath(nextRef)})`;
+              }
+              // Chain goes deeper — recurse
+              return buildColorValueRef(aliasNode, collections);
+            }
+            // Literal value in alias — convert if it's a color
+            if (typeof aliasNode.$value === 'string') {
+              return formatColorToOklch(aliasNode.$value);
+            }
+            return `${aliasNode.$value}`;
+          }
+        }
+      }
+      // Fallback: resolve fully to literal
+      const resolved = resolveReference(value, collectionName, collections);
+      if (typeof resolved === 'string' && (resolved.startsWith('#') || resolved.startsWith('rgb'))) {
+        return formatColorToOklch(resolved);
+      }
+      return typeof resolved === 'string' ? resolved : `${resolved}`;
+    }
     const refProp = buildAliasRefFromPath(refPath);
     return `var(${refProp})`;
   }
@@ -1491,8 +1611,8 @@ function generateTokenReference(collections) {
   lines.push('| CSS Property | Responsive Prefix | Value |\n');
   lines.push('|---|---|---|\n');
   const breakpointMap = {
-    'sm': 480, 'md': 640, 'lg': 768,
-    'xl': 1024, '2xl': 1280, '3xl': 1440,
+    'xs': 375, 'sm': 480, 'md': 640, 'lg': 768,
+    'xl': 1024, '2xl': 1280, '3xl': 1440, '4xl': 1920,
   };
   for (const [name, value] of Object.entries(breakpointMap)) {
     lines.push(`| \`--breakpoint-${name}\` | \`${name}:\` | \`${value}px\` |\n`);
@@ -1933,10 +2053,8 @@ function normaliseReferencePath(refPath, targetCollection) {
     if (first.toLowerCase() === 'brand') {
       return `Colors.Brand.${parts.slice(1).join('.')}`;
     }
-    if (['error', 'info', 'success', 'warning'].includes(first.toLowerCase())) {
-      return `Colors.System.${toTitleWords(first)}.${parts.slice(1).join('.')}`;
-    }
-    return `Colors.${path}`;
+    // Everything non-brand is under Colors.System (matches normaliseAliasColorMode)
+    return `Colors.System.${toTitleWords(first)}.${parts.slice(1).join('.')}`;
   }
 
   if (targetCollection === '2.1_Alias_Type' || targetCollection === '_Alias') {
