@@ -1029,8 +1029,8 @@ function generateSemanticCSS(collections) {
   // Breakpoints (derived from widths)
   lines.push('\n  /* ═══ Breakpoints ═══ */\n');
   const breakpointMap = {
-    sm: 480, md: 640, lg: 768,
-    xl: 1024, '2xl': 1280, '3xl': 1440,
+    xs: 375, sm: 480, md: 640, lg: 768,
+    xl: 1024, '2xl': 1280, '3xl': 1440, '4xl': 1920,
   };
   for (const [name, value] of Object.entries(breakpointMap)) {
     lines.push(`  --breakpoint-${name}: ${value}px;\n`);
@@ -1491,8 +1491,8 @@ function generateTokenReference(collections) {
   lines.push('| CSS Property | Responsive Prefix | Value |\n');
   lines.push('|---|---|---|\n');
   const breakpointMap = {
-    'sm': 480, 'md': 640, 'lg': 768,
-    'xl': 1024, '2xl': 1280, '3xl': 1440,
+    'xs': 375, 'sm': 480, 'md': 640, 'lg': 768,
+    'xl': 1024, '2xl': 1280, '3xl': 1440, '4xl': 1920,
   };
   for (const [name, value] of Object.entries(breakpointMap)) {
     lines.push(`| \`--breakpoint-${name}\` | \`${name}:\` | \`${value}px\` |\n`);
