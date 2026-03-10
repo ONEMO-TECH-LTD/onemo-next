@@ -1,7 +1,7 @@
 # Token Mapping
 
-> Generated: 2026-03-09T19:24:46.535Z
-> Total tokens: 400
+> Generated: 2026-03-10T14:37:23.454Z
+> Total tokens: 543
 
 | # | Figma Collection | Figma Path | CSS Property | CSS Value | Value Type | Tier | Category |
 |---|---|---|---|---|---|---|---|
@@ -300,108 +300,251 @@
 | 293 | 3.3_Semantic_Width | paragraph-max-width | `--width-paragraph-max-width` | `720px` | dimension | semantic | width |
 | 294 | 3.4_Semantic_Containers | container/padding | `--container-padding` | `2.5rem` | dimension | semantic | containers |
 | 295 | 3.4_Semantic_Containers | container/max-width | `--container-max-width` | `1280px` | dimension | semantic | containers |
-| 296 | 3.1_Semantic_Type | display-2xl/Size | `--text-display-2xl` | `clamp(3.3594rem, 2.8633rem + 2.1164vi, 4.7681rem)` | fluid | semantic | typography |
-| 297 | 3.1_Semantic_Type | display-2xl/Line | `--text-display-2xl--line-height` | `clamp(3.6875rem, 3.1373rem + 2.3474vi, 5.25rem)` | fluid | semantic | typography |
-| 298 | 3.1_Semantic_Type | display-2xl/Letter | `--text-display-2xl--letter-spacing` | `-0.04em` | string | semantic | typography |
-| 299 | 3.1_Semantic_Type | display-2xl/Style | `--text-display-2xl--font-weight` | `500` | string | semantic | typography |
-| 300 | 3.1_Semantic_Type | display-xl/Size | `--text-display-xl` | `clamp(2.7994rem, 2.4418rem + 1.5258vi, 3.815rem)` | fluid | semantic | typography |
-| 301 | 3.1_Semantic_Type | display-xl/Line | `--text-display-xl--line-height` | `clamp(3.25rem, 2.8539rem + 1.6901vi, 4.375rem)` | fluid | semantic | typography |
-| 302 | 3.1_Semantic_Type | display-xl/Letter | `--text-display-xl--letter-spacing` | `-0.035em` | string | semantic | typography |
-| 303 | 3.1_Semantic_Type | display-xl/Style | `--text-display-xl--font-weight` | `500` | string | semantic | typography |
-| 304 | 3.1_Semantic_Type | display-l/Size | `--text-display-l` | `clamp(2.3325rem, 2.0792rem + 1.0808vi, 3.0519rem)` | fluid | semantic | typography |
-| 305 | 3.1_Semantic_Type | display-l/Line | `--text-display-l--line-height` | `clamp(2.8125rem, 2.5044rem + 1.3146vi, 3.6875rem)` | fluid | semantic | typography |
-| 306 | 3.1_Semantic_Type | display-l/Letter | `--text-display-l--letter-spacing` | `-0.03em` | string | semantic | typography |
-| 307 | 3.1_Semantic_Type | display-l/Style | `--text-display-l--font-weight` | `500` | string | semantic | typography |
-| 308 | 3.1_Semantic_Type | display-m/Size | `--text-display-m` | `clamp(1.9438rem, 1.7686rem + 0.7474vi, 2.4413rem)` | fluid | semantic | typography |
-| 309 | 3.1_Semantic_Type | display-m/Line | `--text-display-m--line-height` | `clamp(2.4375rem, 2.2174rem + 0.939vi, 3.0625rem)` | fluid | semantic | typography |
-| 310 | 3.1_Semantic_Type | display-m/Letter | `--text-display-m--letter-spacing` | `-0.025em` | string | semantic | typography |
-| 311 | 3.1_Semantic_Type | display-m/Style | `--text-display-m--font-weight` | `500` | string | semantic | typography |
-| 312 | 3.1_Semantic_Type | display-s/Size | `--text-display-s` | `clamp(1.62rem, 1.5027rem + 0.5005vi, 1.9531rem)` | fluid | semantic | typography |
-| 313 | 3.1_Semantic_Type | display-s/Line | `--text-display-s--line-height` | `clamp(2.125rem, 1.971rem + 0.6573vi, 2.5625rem)` | fluid | semantic | typography |
-| 314 | 3.1_Semantic_Type | display-s/Letter | `--text-display-s--letter-spacing` | `-0.02em` | string | semantic | typography |
-| 315 | 3.1_Semantic_Type | display-s/Style | `--text-display-s--font-weight` | `500` | string | semantic | typography |
-| 316 | 3.1_Semantic_Type | title-screen-primary/Size | `--text-title-screen-primary` | `clamp(1.9438rem, 1.7686rem + 0.7474vi, 2.4413rem)` | fluid | semantic | typography |
-| 317 | 3.1_Semantic_Type | title-screen-primary/Line | `--text-title-screen-primary--line-height` | `clamp(2.4375rem, 2.2174rem + 0.939vi, 3.0625rem)` | fluid | semantic | typography |
-| 318 | 3.1_Semantic_Type | title-screen-primary/Letter | `--text-title-screen-primary--letter-spacing` | `0` | string | semantic | typography |
-| 319 | 3.1_Semantic_Type | title-screen-primary/Style | `--text-title-screen-primary--font-weight` | `600` | string | semantic | typography |
-| 320 | 3.1_Semantic_Type | title-screen-secondary/Size | `--text-title-screen-secondary` | `clamp(1.62rem, 1.5027rem + 0.5005vi, 1.9531rem)` | fluid | semantic | typography |
-| 321 | 3.1_Semantic_Type | title-screen-secondary/Line | `--text-title-screen-secondary--line-height` | `clamp(2.125rem, 1.971rem + 0.6573vi, 2.5625rem)` | fluid | semantic | typography |
-| 322 | 3.1_Semantic_Type | title-screen-secondary/Letter | `--text-title-screen-secondary--letter-spacing` | `0` | string | semantic | typography |
-| 323 | 3.1_Semantic_Type | title-screen-secondary/Style | `--text-title-screen-secondary--font-weight` | `500` | string | semantic | typography |
-| 324 | 3.1_Semantic_Type | title-section-primary/Size | `--text-title-section-primary` | `clamp(1.35rem, 1.2752rem + 0.3192vi, 1.5625rem)` | fluid | semantic | typography |
-| 325 | 3.1_Semantic_Type | title-section-primary/Line | `--text-title-section-primary--line-height` | `clamp(1.875rem, 1.765rem + 0.4695vi, 2.1875rem)` | fluid | semantic | typography |
-| 326 | 3.1_Semantic_Type | title-section-primary/Letter | `--text-title-section-primary--letter-spacing` | `0` | string | semantic | typography |
-| 327 | 3.1_Semantic_Type | title-section-primary/Style | `--text-title-section-primary--font-weight` | `600` | string | semantic | typography |
-| 328 | 3.1_Semantic_Type | title-section-secondary/Size | `--text-title-section-secondary` | `clamp(1.35rem, 1.2752rem + 0.3192vi, 1.5625rem)` | fluid | semantic | typography |
-| 329 | 3.1_Semantic_Type | title-section-secondary/Line | `--text-title-section-secondary--line-height` | `clamp(1.875rem, 1.765rem + 0.4695vi, 2.1875rem)` | fluid | semantic | typography |
-| 330 | 3.1_Semantic_Type | title-section-secondary/Letter | `--text-title-section-secondary--letter-spacing` | `0` | string | semantic | typography |
-| 331 | 3.1_Semantic_Type | title-section-secondary/Style | `--text-title-section-secondary--font-weight` | `500` | string | semantic | typography |
-| 332 | 3.1_Semantic_Type | title-product-primary/Size | `--text-title-product-primary` | `clamp(1.125rem, 1.081rem + 0.1878vi, 1.25rem)` | fluid | semantic | typography |
-| 333 | 3.1_Semantic_Type | title-product-primary/Line | `--text-title-product-primary--line-height` | `clamp(1.6875rem, 1.6215rem + 0.2817vi, 1.875rem)` | fluid | semantic | typography |
-| 334 | 3.1_Semantic_Type | title-product-primary/Letter | `--text-title-product-primary--letter-spacing` | `0` | string | semantic | typography |
-| 335 | 3.1_Semantic_Type | title-product-primary/Style | `--text-title-product-primary--font-weight` | `500` | string | semantic | typography |
-| 336 | 3.1_Semantic_Type | title-product-secondary/Size | `--text-title-product-secondary` | `clamp(0.9375rem, 0.9155rem + 0.0939vi, 1rem)` | fluid | semantic | typography |
-| 337 | 3.1_Semantic_Type | title-product-secondary/Line | `--text-title-product-secondary--line-height` | `clamp(1.4375rem, 1.4155rem + 0.0939vi, 1.5rem)` | fluid | semantic | typography |
-| 338 | 3.1_Semantic_Type | title-product-secondary/Letter | `--text-title-product-secondary--letter-spacing` | `0` | string | semantic | typography |
-| 339 | 3.1_Semantic_Type | title-product-secondary/Style | `--text-title-product-secondary--font-weight` | `400` | string | semantic | typography |
-| 340 | 3.1_Semantic_Type | title-headline/Size | `--text-title-headline` | `clamp(1.125rem, 1.081rem + 0.1878vi, 1.25rem)` | fluid | semantic | typography |
-| 341 | 3.1_Semantic_Type | title-headline/Line | `--text-title-headline--line-height` | `clamp(1.6875rem, 1.6215rem + 0.2817vi, 1.875rem)` | fluid | semantic | typography |
-| 342 | 3.1_Semantic_Type | title-headline/Letter | `--text-title-headline--letter-spacing` | `0` | string | semantic | typography |
-| 343 | 3.1_Semantic_Type | title-headline/Style | `--text-title-headline--font-weight` | `500` | string | semantic | typography |
-| 344 | 3.1_Semantic_Type | body-heading/Size | `--text-body-heading` | `clamp(1.35rem, 1.2752rem + 0.3192vi, 1.5625rem)` | fluid | semantic | typography |
-| 345 | 3.1_Semantic_Type | body-heading/Line | `--text-body-heading--line-height` | `clamp(1.875rem, 1.765rem + 0.4695vi, 2.1875rem)` | fluid | semantic | typography |
-| 346 | 3.1_Semantic_Type | body-heading/Letter | `--text-body-heading--letter-spacing` | `0` | string | semantic | typography |
-| 347 | 3.1_Semantic_Type | body-heading/Style | `--text-body-heading--font-weight` | `500` | string | semantic | typography |
-| 348 | 3.1_Semantic_Type | body-normal/Size | `--text-body-normal` | `clamp(1.125rem, 1.081rem + 0.1878vi, 1.25rem)` | fluid | semantic | typography |
-| 349 | 3.1_Semantic_Type | body-normal/Line | `--text-body-normal--line-height` | `clamp(1.6875rem, 1.6215rem + 0.2817vi, 1.875rem)` | fluid | semantic | typography |
-| 350 | 3.1_Semantic_Type | body-normal/Letter | `--text-body-normal--letter-spacing` | `0` | string | semantic | typography |
-| 351 | 3.1_Semantic_Type | body-normal/Style | `--text-body-normal--font-weight` | `400` | string | semantic | typography |
-| 352 | 3.1_Semantic_Type | body-strong/Size | `--text-body-strong` | `clamp(1.125rem, 1.081rem + 0.1878vi, 1.25rem)` | fluid | semantic | typography |
-| 353 | 3.1_Semantic_Type | body-strong/Line | `--text-body-strong--line-height` | `clamp(1.6875rem, 1.6215rem + 0.2817vi, 1.875rem)` | fluid | semantic | typography |
-| 354 | 3.1_Semantic_Type | body-strong/Letter | `--text-body-strong--letter-spacing` | `0` | string | semantic | typography |
-| 355 | 3.1_Semantic_Type | body-strong/Style | `--text-body-strong--font-weight` | `500` | string | semantic | typography |
-| 356 | 3.1_Semantic_Type | body-caption/Size | `--text-body-caption` | `clamp(0.9375rem, 0.9155rem + 0.0939vi, 1rem)` | fluid | semantic | typography |
-| 357 | 3.1_Semantic_Type | body-caption/Line | `--text-body-caption--line-height` | `clamp(1.4375rem, 1.4155rem + 0.0939vi, 1.5rem)` | fluid | semantic | typography |
-| 358 | 3.1_Semantic_Type | body-caption/Letter | `--text-body-caption--letter-spacing` | `0.001em` | string | semantic | typography |
-| 359 | 3.1_Semantic_Type | body-caption/Style | `--text-body-caption--font-weight` | `400` | string | semantic | typography |
-| 360 | 3.1_Semantic_Type | label-xl/Size | `--text-label-xl` | `clamp(1.35rem, 1.2752rem + 0.3192vi, 1.5625rem)` | fluid | semantic | typography |
-| 361 | 3.1_Semantic_Type | label-xl/Line | `--text-label-xl--line-height` | `clamp(1.875rem, 1.765rem + 0.4695vi, 2.1875rem)` | fluid | semantic | typography |
-| 362 | 3.1_Semantic_Type | label-xl/Letter | `--text-label-xl--letter-spacing` | `0` | string | semantic | typography |
-| 363 | 3.1_Semantic_Type | label-xl/Style | `--text-label-xl--font-weight` | `500` | string | semantic | typography |
-| 364 | 3.1_Semantic_Type | label-l/Size | `--text-label-l` | `clamp(1.125rem, 1.081rem + 0.1878vi, 1.25rem)` | fluid | semantic | typography |
-| 365 | 3.1_Semantic_Type | label-l/Line | `--text-label-l--line-height` | `clamp(1.6875rem, 1.6215rem + 0.2817vi, 1.875rem)` | fluid | semantic | typography |
-| 366 | 3.1_Semantic_Type | label-l/Letter | `--text-label-l--letter-spacing` | `0` | string | semantic | typography |
-| 367 | 3.1_Semantic_Type | label-l/Style | `--text-label-l--font-weight` | `500` | string | semantic | typography |
-| 368 | 3.1_Semantic_Type | label-m/Size | `--text-label-m` | `clamp(0.9375rem, 0.9155rem + 0.0939vi, 1rem)` | fluid | semantic | typography |
-| 369 | 3.1_Semantic_Type | label-m/Line | `--text-label-m--line-height` | `clamp(1.4375rem, 1.4155rem + 0.0939vi, 1.5rem)` | fluid | semantic | typography |
-| 370 | 3.1_Semantic_Type | label-m/Letter | `--text-label-m--letter-spacing` | `0.002em` | string | semantic | typography |
-| 371 | 3.1_Semantic_Type | label-m/Style | `--text-label-m--font-weight` | `400` | string | semantic | typography |
-| 372 | 3.1_Semantic_Type | label-s/Size | `--text-label-s` | `clamp(0.7813rem, 0.7746rem + 0.0282vi, 0.8rem)` | fluid | semantic | typography |
-| 373 | 3.1_Semantic_Type | label-s/Line | `--text-label-s--line-height` | `clamp(1.125rem, 1.103rem + 0.0939vi, 1.1875rem)` | fluid | semantic | typography |
-| 374 | 3.1_Semantic_Type | label-s/Letter | `--text-label-s--letter-spacing` | `0.004em` | string | semantic | typography |
-| 375 | 3.1_Semantic_Type | label-s/Style | `--text-label-s--font-weight` | `400` | string | semantic | typography |
-| 376 | 3.1_Semantic_Type | label-xs/Size | `--text-label-xs` | `clamp(0.7813rem, 0.7746rem + 0.0282vi, 0.8rem)` | fluid | semantic | typography |
-| 377 | 3.1_Semantic_Type | label-xs/Line | `--text-label-xs--line-height` | `clamp(1.125rem, 1.103rem + 0.0939vi, 1.1875rem)` | fluid | semantic | typography |
-| 378 | 3.1_Semantic_Type | label-xs/Letter | `--text-label-xs--letter-spacing` | `0.004em` | string | semantic | typography |
-| 379 | 3.1_Semantic_Type | label-xs/Style | `--text-label-xs--font-weight` | `400` | string | semantic | typography |
-| 380 | 5.0_Effects | shadow-xs | `--semantic-shadow-xs` | `rgba(10, 13, 18, 0.05)` | color | semantic-color | color |
-| 381 | 5.0_Effects | shadow-sm_01 | `--semantic-shadow-sm-01` | `rgba(10, 13, 18, 0.1)` | color | semantic-color | color |
-| 382 | 5.0_Effects | shadow-sm_02 | `--semantic-shadow-sm-02` | `rgba(10, 13, 18, 0.1)` | color | semantic-color | color |
-| 383 | 5.0_Effects | shadow-md_01 | `--semantic-shadow-md-01` | `rgba(10, 13, 18, 0.1)` | color | semantic-color | color |
-| 384 | 5.0_Effects | shadow-md_02 | `--semantic-shadow-md-02` | `rgba(10, 13, 18, 0.06)` | color | semantic-color | color |
-| 385 | 5.0_Effects | shadow-lg_01 | `--semantic-shadow-lg-01` | `rgba(10, 13, 18, 0.08)` | color | semantic-color | color |
-| 386 | 5.0_Effects | shadow-lg_02 | `--semantic-shadow-lg-02` | `rgba(10, 13, 18, 0.03)` | color | semantic-color | color |
-| 387 | 5.0_Effects | shadow-lg_03 | `--semantic-shadow-lg-03` | `rgba(10, 13, 18, 0.04)` | color | semantic-color | color |
-| 388 | 5.0_Effects | shadow-xl_01 | `--semantic-shadow-xl-01` | `rgba(10, 13, 18, 0.08)` | color | semantic-color | color |
-| 389 | 5.0_Effects | shadow-xl_02 | `--semantic-shadow-xl-02` | `rgba(10, 13, 18, 0.03)` | color | semantic-color | color |
-| 390 | 5.0_Effects | shadow-xl_03 | `--semantic-shadow-xl-03` | `rgba(10, 13, 18, 0.04)` | color | semantic-color | color |
-| 391 | 5.0_Effects | shadow-2xl_01 | `--semantic-shadow-2xl-01` | `rgba(10, 13, 18, 0.18)` | color | semantic-color | color |
-| 392 | 5.0_Effects | shadow-2xl_02 | `--semantic-shadow-2xl-02` | `rgba(10, 13, 18, 0.04)` | color | semantic-color | color |
-| 393 | 5.0_Effects | shadow-3xl_01 | `--semantic-shadow-3xl-01` | `rgba(10, 13, 18, 0.14)` | color | semantic-color | color |
-| 394 | 5.0_Effects | shadow-3xl_02 | `--semantic-shadow-3xl-02` | `rgba(10, 13, 18, 0.04)` | color | semantic-color | color |
-| 395 | 5.0_Effects | shadow-skeumorphic-inner | `--semantic-shadow-skeumorphic-inner` | `rgba(10, 13, 18, 0.05)` | color | semantic-color | color |
-| 396 | 5.0_Effects | shadow-skeumorphic-inner-border | `--semantic-shadow-skeumorphic-inner-border` | `rgba(10, 13, 18, 0.18)` | color | semantic-color | color |
-| 397 | 5.0_Effects | blur-sm | `--semantic-blur-sm` | `8px` | color | semantic-color | color |
-| 398 | 5.0_Effects | blur-md | `--semantic-blur-md` | `16px` | color | semantic-color | color |
-| 399 | 5.0_Effects | blur-lg | `--semantic-blur-lg` | `24px` | color | semantic-color | color |
-| 400 | 5.0_Effects | blur-xl | `--semantic-blur-xl` | `40px` | color | semantic-color | color |
+| 296 | 3.6_Semantic_Size | height/2xs | `--size-height-2xs` | `16px` | dimension | semantic | size |
+| 297 | 3.6_Semantic_Size | height/s | `--size-height-s` | `24px` | dimension | semantic | size |
+| 298 | 3.6_Semantic_Size | height/m | `--size-height-m` | `32px` | dimension | semantic | size |
+| 299 | 3.6_Semantic_Size | height/l | `--size-height-l` | `48px` | dimension | semantic | size |
+| 300 | 3.6_Semantic_Size | height/xl | `--size-height-xl` | `56px` | dimension | semantic | size |
+| 301 | 3.6_Semantic_Size | height/2xl | `--size-height-2xl` | `72px` | dimension | semantic | size |
+| 302 | 3.6_Semantic_Size | width/2xs | `--size-width-2xs` | `16px` | dimension | semantic | size |
+| 303 | 3.6_Semantic_Size | width/s | `--size-width-s` | `24px` | dimension | semantic | size |
+| 304 | 3.6_Semantic_Size | width/m | `--size-width-m` | `32px` | dimension | semantic | size |
+| 305 | 3.6_Semantic_Size | width/l | `--size-width-l` | `48px` | dimension | semantic | size |
+| 306 | 3.6_Semantic_Size | width/xl | `--size-width-xl` | `56px` | dimension | semantic | size |
+| 307 | 3.6_Semantic_Size | width/2xl | `--size-width-2xl` | `72px` | dimension | semantic | size |
+| 308 | 3.1_Semantic_Type | display-2xl/Size | `--text-display-2xl` | `clamp(3.3594rem, 2.8633rem + 2.1164vi, 4.7681rem)` | fluid | semantic | typography |
+| 309 | 3.1_Semantic_Type | display-2xl/Line | `--text-display-2xl--line-height` | `clamp(3.6875rem, 3.1373rem + 2.3474vi, 5.25rem)` | fluid | semantic | typography |
+| 310 | 3.1_Semantic_Type | display-2xl/Letter | `--text-display-2xl--letter-spacing` | `-0.04em` | string | semantic | typography |
+| 311 | 3.1_Semantic_Type | display-2xl/Style | `--text-display-2xl--font-weight` | `500` | string | semantic | typography |
+| 312 | 3.1_Semantic_Type | display-xl/Size | `--text-display-xl` | `clamp(2.7994rem, 2.4418rem + 1.5258vi, 3.815rem)` | fluid | semantic | typography |
+| 313 | 3.1_Semantic_Type | display-xl/Line | `--text-display-xl--line-height` | `clamp(3.25rem, 2.8539rem + 1.6901vi, 4.375rem)` | fluid | semantic | typography |
+| 314 | 3.1_Semantic_Type | display-xl/Letter | `--text-display-xl--letter-spacing` | `-0.035em` | string | semantic | typography |
+| 315 | 3.1_Semantic_Type | display-xl/Style | `--text-display-xl--font-weight` | `500` | string | semantic | typography |
+| 316 | 3.1_Semantic_Type | display-l/Size | `--text-display-l` | `clamp(2.3325rem, 2.0792rem + 1.0808vi, 3.0519rem)` | fluid | semantic | typography |
+| 317 | 3.1_Semantic_Type | display-l/Line | `--text-display-l--line-height` | `clamp(2.8125rem, 2.5044rem + 1.3146vi, 3.6875rem)` | fluid | semantic | typography |
+| 318 | 3.1_Semantic_Type | display-l/Letter | `--text-display-l--letter-spacing` | `-0.03em` | string | semantic | typography |
+| 319 | 3.1_Semantic_Type | display-l/Style | `--text-display-l--font-weight` | `500` | string | semantic | typography |
+| 320 | 3.1_Semantic_Type | display-m/Size | `--text-display-m` | `clamp(1.9438rem, 1.7686rem + 0.7474vi, 2.4413rem)` | fluid | semantic | typography |
+| 321 | 3.1_Semantic_Type | display-m/Line | `--text-display-m--line-height` | `clamp(2.4375rem, 2.2174rem + 0.939vi, 3.0625rem)` | fluid | semantic | typography |
+| 322 | 3.1_Semantic_Type | display-m/Letter | `--text-display-m--letter-spacing` | `-0.025em` | string | semantic | typography |
+| 323 | 3.1_Semantic_Type | display-m/Style | `--text-display-m--font-weight` | `500` | string | semantic | typography |
+| 324 | 3.1_Semantic_Type | display-s/Size | `--text-display-s` | `clamp(1.62rem, 1.5027rem + 0.5005vi, 1.9531rem)` | fluid | semantic | typography |
+| 325 | 3.1_Semantic_Type | display-s/Line | `--text-display-s--line-height` | `clamp(2.125rem, 1.971rem + 0.6573vi, 2.5625rem)` | fluid | semantic | typography |
+| 326 | 3.1_Semantic_Type | display-s/Letter | `--text-display-s--letter-spacing` | `-0.02em` | string | semantic | typography |
+| 327 | 3.1_Semantic_Type | display-s/Style | `--text-display-s--font-weight` | `500` | string | semantic | typography |
+| 328 | 3.1_Semantic_Type | title-screen-primary/Size | `--text-title-screen-primary` | `clamp(1.9438rem, 1.7686rem + 0.7474vi, 2.4413rem)` | fluid | semantic | typography |
+| 329 | 3.1_Semantic_Type | title-screen-primary/Line | `--text-title-screen-primary--line-height` | `clamp(2.4375rem, 2.2174rem + 0.939vi, 3.0625rem)` | fluid | semantic | typography |
+| 330 | 3.1_Semantic_Type | title-screen-primary/Letter | `--text-title-screen-primary--letter-spacing` | `0` | string | semantic | typography |
+| 331 | 3.1_Semantic_Type | title-screen-primary/Style | `--text-title-screen-primary--font-weight` | `600` | string | semantic | typography |
+| 332 | 3.1_Semantic_Type | title-screen-secondary/Size | `--text-title-screen-secondary` | `clamp(1.62rem, 1.5027rem + 0.5005vi, 1.9531rem)` | fluid | semantic | typography |
+| 333 | 3.1_Semantic_Type | title-screen-secondary/Line | `--text-title-screen-secondary--line-height` | `clamp(2.125rem, 1.971rem + 0.6573vi, 2.5625rem)` | fluid | semantic | typography |
+| 334 | 3.1_Semantic_Type | title-screen-secondary/Letter | `--text-title-screen-secondary--letter-spacing` | `0` | string | semantic | typography |
+| 335 | 3.1_Semantic_Type | title-screen-secondary/Style | `--text-title-screen-secondary--font-weight` | `500` | string | semantic | typography |
+| 336 | 3.1_Semantic_Type | title-section-primary/Size | `--text-title-section-primary` | `clamp(1.35rem, 1.2752rem + 0.3192vi, 1.5625rem)` | fluid | semantic | typography |
+| 337 | 3.1_Semantic_Type | title-section-primary/Line | `--text-title-section-primary--line-height` | `clamp(1.875rem, 1.765rem + 0.4695vi, 2.1875rem)` | fluid | semantic | typography |
+| 338 | 3.1_Semantic_Type | title-section-primary/Letter | `--text-title-section-primary--letter-spacing` | `0` | string | semantic | typography |
+| 339 | 3.1_Semantic_Type | title-section-primary/Style | `--text-title-section-primary--font-weight` | `600` | string | semantic | typography |
+| 340 | 3.1_Semantic_Type | title-section-secondary/Size | `--text-title-section-secondary` | `clamp(1.35rem, 1.2752rem + 0.3192vi, 1.5625rem)` | fluid | semantic | typography |
+| 341 | 3.1_Semantic_Type | title-section-secondary/Line | `--text-title-section-secondary--line-height` | `clamp(1.875rem, 1.765rem + 0.4695vi, 2.1875rem)` | fluid | semantic | typography |
+| 342 | 3.1_Semantic_Type | title-section-secondary/Letter | `--text-title-section-secondary--letter-spacing` | `0` | string | semantic | typography |
+| 343 | 3.1_Semantic_Type | title-section-secondary/Style | `--text-title-section-secondary--font-weight` | `500` | string | semantic | typography |
+| 344 | 3.1_Semantic_Type | title-product-primary/Size | `--text-title-product-primary` | `clamp(1.125rem, 1.081rem + 0.1878vi, 1.25rem)` | fluid | semantic | typography |
+| 345 | 3.1_Semantic_Type | title-product-primary/Line | `--text-title-product-primary--line-height` | `clamp(1.6875rem, 1.6215rem + 0.2817vi, 1.875rem)` | fluid | semantic | typography |
+| 346 | 3.1_Semantic_Type | title-product-primary/Letter | `--text-title-product-primary--letter-spacing` | `0` | string | semantic | typography |
+| 347 | 3.1_Semantic_Type | title-product-primary/Style | `--text-title-product-primary--font-weight` | `500` | string | semantic | typography |
+| 348 | 3.1_Semantic_Type | title-product-secondary/Size | `--text-title-product-secondary` | `clamp(0.9375rem, 0.9155rem + 0.0939vi, 1rem)` | fluid | semantic | typography |
+| 349 | 3.1_Semantic_Type | title-product-secondary/Line | `--text-title-product-secondary--line-height` | `clamp(1.4375rem, 1.4155rem + 0.0939vi, 1.5rem)` | fluid | semantic | typography |
+| 350 | 3.1_Semantic_Type | title-product-secondary/Letter | `--text-title-product-secondary--letter-spacing` | `0` | string | semantic | typography |
+| 351 | 3.1_Semantic_Type | title-product-secondary/Style | `--text-title-product-secondary--font-weight` | `400` | string | semantic | typography |
+| 352 | 3.1_Semantic_Type | title-headline/Size | `--text-title-headline` | `clamp(1.125rem, 1.081rem + 0.1878vi, 1.25rem)` | fluid | semantic | typography |
+| 353 | 3.1_Semantic_Type | title-headline/Line | `--text-title-headline--line-height` | `clamp(1.6875rem, 1.6215rem + 0.2817vi, 1.875rem)` | fluid | semantic | typography |
+| 354 | 3.1_Semantic_Type | title-headline/Letter | `--text-title-headline--letter-spacing` | `0` | string | semantic | typography |
+| 355 | 3.1_Semantic_Type | title-headline/Style | `--text-title-headline--font-weight` | `500` | string | semantic | typography |
+| 356 | 3.1_Semantic_Type | body-heading/Size | `--text-body-heading` | `clamp(1.35rem, 1.2752rem + 0.3192vi, 1.5625rem)` | fluid | semantic | typography |
+| 357 | 3.1_Semantic_Type | body-heading/Line | `--text-body-heading--line-height` | `clamp(1.875rem, 1.765rem + 0.4695vi, 2.1875rem)` | fluid | semantic | typography |
+| 358 | 3.1_Semantic_Type | body-heading/Letter | `--text-body-heading--letter-spacing` | `0` | string | semantic | typography |
+| 359 | 3.1_Semantic_Type | body-heading/Style | `--text-body-heading--font-weight` | `500` | string | semantic | typography |
+| 360 | 3.1_Semantic_Type | body-normal/Size | `--text-body-normal` | `clamp(1.125rem, 1.081rem + 0.1878vi, 1.25rem)` | fluid | semantic | typography |
+| 361 | 3.1_Semantic_Type | body-normal/Line | `--text-body-normal--line-height` | `clamp(1.6875rem, 1.6215rem + 0.2817vi, 1.875rem)` | fluid | semantic | typography |
+| 362 | 3.1_Semantic_Type | body-normal/Letter | `--text-body-normal--letter-spacing` | `0` | string | semantic | typography |
+| 363 | 3.1_Semantic_Type | body-normal/Style | `--text-body-normal--font-weight` | `400` | string | semantic | typography |
+| 364 | 3.1_Semantic_Type | body-strong/Size | `--text-body-strong` | `clamp(1.125rem, 1.081rem + 0.1878vi, 1.25rem)` | fluid | semantic | typography |
+| 365 | 3.1_Semantic_Type | body-strong/Line | `--text-body-strong--line-height` | `clamp(1.6875rem, 1.6215rem + 0.2817vi, 1.875rem)` | fluid | semantic | typography |
+| 366 | 3.1_Semantic_Type | body-strong/Letter | `--text-body-strong--letter-spacing` | `0` | string | semantic | typography |
+| 367 | 3.1_Semantic_Type | body-strong/Style | `--text-body-strong--font-weight` | `500` | string | semantic | typography |
+| 368 | 3.1_Semantic_Type | body-caption/Size | `--text-body-caption` | `clamp(0.9375rem, 0.9155rem + 0.0939vi, 1rem)` | fluid | semantic | typography |
+| 369 | 3.1_Semantic_Type | body-caption/Line | `--text-body-caption--line-height` | `clamp(1.4375rem, 1.4155rem + 0.0939vi, 1.5rem)` | fluid | semantic | typography |
+| 370 | 3.1_Semantic_Type | body-caption/Letter | `--text-body-caption--letter-spacing` | `0.001em` | string | semantic | typography |
+| 371 | 3.1_Semantic_Type | body-caption/Style | `--text-body-caption--font-weight` | `400` | string | semantic | typography |
+| 372 | 3.1_Semantic_Type | label-xl/Size | `--text-label-xl` | `clamp(1.35rem, 1.2752rem + 0.3192vi, 1.5625rem)` | fluid | semantic | typography |
+| 373 | 3.1_Semantic_Type | label-xl/Line | `--text-label-xl--line-height` | `clamp(1.875rem, 1.765rem + 0.4695vi, 2.1875rem)` | fluid | semantic | typography |
+| 374 | 3.1_Semantic_Type | label-xl/Letter | `--text-label-xl--letter-spacing` | `0` | string | semantic | typography |
+| 375 | 3.1_Semantic_Type | label-xl/Style | `--text-label-xl--font-weight` | `500` | string | semantic | typography |
+| 376 | 3.1_Semantic_Type | label-l/Size | `--text-label-l` | `clamp(1.125rem, 1.081rem + 0.1878vi, 1.25rem)` | fluid | semantic | typography |
+| 377 | 3.1_Semantic_Type | label-l/Line | `--text-label-l--line-height` | `clamp(1.6875rem, 1.6215rem + 0.2817vi, 1.875rem)` | fluid | semantic | typography |
+| 378 | 3.1_Semantic_Type | label-l/Letter | `--text-label-l--letter-spacing` | `0` | string | semantic | typography |
+| 379 | 3.1_Semantic_Type | label-l/Style | `--text-label-l--font-weight` | `500` | string | semantic | typography |
+| 380 | 3.1_Semantic_Type | label-m/Size | `--text-label-m` | `clamp(0.9375rem, 0.9155rem + 0.0939vi, 1rem)` | fluid | semantic | typography |
+| 381 | 3.1_Semantic_Type | label-m/Line | `--text-label-m--line-height` | `clamp(1.4375rem, 1.4155rem + 0.0939vi, 1.5rem)` | fluid | semantic | typography |
+| 382 | 3.1_Semantic_Type | label-m/Letter | `--text-label-m--letter-spacing` | `0.002em` | string | semantic | typography |
+| 383 | 3.1_Semantic_Type | label-m/Style | `--text-label-m--font-weight` | `400` | string | semantic | typography |
+| 384 | 3.1_Semantic_Type | label-s/Size | `--text-label-s` | `clamp(0.7813rem, 0.7746rem + 0.0282vi, 0.8rem)` | fluid | semantic | typography |
+| 385 | 3.1_Semantic_Type | label-s/Line | `--text-label-s--line-height` | `clamp(1.125rem, 1.103rem + 0.0939vi, 1.1875rem)` | fluid | semantic | typography |
+| 386 | 3.1_Semantic_Type | label-s/Letter | `--text-label-s--letter-spacing` | `0.004em` | string | semantic | typography |
+| 387 | 3.1_Semantic_Type | label-s/Style | `--text-label-s--font-weight` | `400` | string | semantic | typography |
+| 388 | 3.1_Semantic_Type | label-xs/Size | `--text-label-xs` | `clamp(0.7813rem, 0.7746rem + 0.0282vi, 0.8rem)` | fluid | semantic | typography |
+| 389 | 3.1_Semantic_Type | label-xs/Line | `--text-label-xs--line-height` | `clamp(1.125rem, 1.103rem + 0.0939vi, 1.1875rem)` | fluid | semantic | typography |
+| 390 | 3.1_Semantic_Type | label-xs/Letter | `--text-label-xs--letter-spacing` | `0.004em` | string | semantic | typography |
+| 391 | 3.1_Semantic_Type | label-xs/Style | `--text-label-xs--font-weight` | `400` | string | semantic | typography |
+| 392 | 3.0_Semantic_Colours | text-primary | `--semantic-text-primary` | `var(--alias-colors-base-brand-black)` | color | semantic-color | color |
+| 393 | 3.0_Semantic_Colours | text-primary_on-brand | `--semantic-text-primary-on-brand` | `var(--alias-colors-base-white)` | color | semantic-color | color |
+| 394 | 3.0_Semantic_Colours | text-secondary | `--semantic-text-secondary` | `var(--alias-colors-neutral-11)` | color | semantic-color | color |
+| 395 | 3.0_Semantic_Colours | text-secondary_hover | `--semantic-text-secondary-hover` | `var(--alias-colors-base-brand-black)` | color | semantic-color | color |
+| 396 | 3.0_Semantic_Colours | text-secondary_on-brand | `--semantic-text-secondary-on-brand` | `var(--alias-brand-11)` | color | semantic-color | color |
+| 397 | 3.0_Semantic_Colours | text-tertiary | `--semantic-text-tertiary` | `var(--alias-colors-neutral-11)` | color | semantic-color | color |
+| 398 | 3.0_Semantic_Colours | text-tertiary_hover | `--semantic-text-tertiary-hover` | `var(--alias-colors-base-brand-black)` | color | semantic-color | color |
+| 399 | 3.0_Semantic_Colours | text-tertiary_on-brand | `--semantic-text-tertiary-on-brand` | `var(--alias-brand-11)` | color | semantic-color | color |
+| 400 | 3.0_Semantic_Colours | text-quaternary | `--semantic-text-quaternary` | `var(--alias-colors-neutral-11)` | color | semantic-color | color |
+| 401 | 3.0_Semantic_Colours | text-quaternary_on-brand | `--semantic-text-quaternary-on-brand` | `var(--alias-brand-11)` | color | semantic-color | color |
+| 402 | 3.0_Semantic_Colours | text-white | `--semantic-text-white` | `var(--alias-colors-base-white)` | color | semantic-color | color |
+| 403 | 3.0_Semantic_Colours | text-disabled | `--semantic-text-disabled` | `var(--alias-colors-neutral-8)` | color | semantic-color | color |
+| 404 | 3.0_Semantic_Colours | text-placeholder | `--semantic-text-placeholder` | `var(--alias-colors-neutral-9)` | color | semantic-color | color |
+| 405 | 3.0_Semantic_Colours | text-placeholder_subtle | `--semantic-text-placeholder-subtle` | `var(--alias-colors-neutral-7)` | color | semantic-color | color |
+| 406 | 3.0_Semantic_Colours | text-brand-primary | `--semantic-text-brand-primary` | `var(--alias-brand-11)` | color | semantic-color | color |
+| 407 | 3.0_Semantic_Colours | text-brand-secondary | `--semantic-text-brand-secondary` | `var(--alias-brand-11)` | color | semantic-color | color |
+| 408 | 3.0_Semantic_Colours | text-brand-secondary_hover | `--semantic-text-brand-secondary-hover` | `var(--alias-brand-12)` | color | semantic-color | color |
+| 409 | 3.0_Semantic_Colours | text-brand-tertiary | `--semantic-text-brand-tertiary` | `var(--alias-brand-11)` | color | semantic-color | color |
+| 410 | 3.0_Semantic_Colours | text-brand-tertiary_alt | `--semantic-text-brand-tertiary-alt` | `var(--alias-brand-12)` | color | semantic-color | color |
+| 411 | 3.0_Semantic_Colours | text-error-primary | `--semantic-text-error-primary` | `var(--alias-error-12)` | color | semantic-color | color |
+| 412 | 3.0_Semantic_Colours | text-error-primary_hover | `--semantic-text-error-primary-hover` | `var(--alias-error-12)` | color | semantic-color | color |
+| 413 | 3.0_Semantic_Colours | text-warning-primary | `--semantic-text-warning-primary` | `var(--alias-warning-11)` | color | semantic-color | color |
+| 414 | 3.0_Semantic_Colours | text-success-primary | `--semantic-text-success-primary` | `var(--alias-success-11)` | color | semantic-color | color |
+| 415 | 3.0_Semantic_Colours | border-primary | `--semantic-border-primary` | `var(--alias-colors-neutral-7)` | color | semantic-color | color |
+| 416 | 3.0_Semantic_Colours | border-secondary | `--semantic-border-secondary` | `var(--alias-colors-neutral-6)` | color | semantic-color | color |
+| 417 | 3.0_Semantic_Colours | border-secondary_alt | `--semantic-border-secondary-alt` | `var(--alias-colors-neutral-5)` | color | semantic-color | color |
+| 418 | 3.0_Semantic_Colours | border-tertiary | `--semantic-border-tertiary` | `var(--alias-colors-neutral-5)` | color | semantic-color | color |
+| 419 | 3.0_Semantic_Colours | border-disabled | `--semantic-border-disabled` | `var(--alias-colors-neutral-6)` | color | semantic-color | color |
+| 420 | 3.0_Semantic_Colours | border-disabled_subtle | `--semantic-border-disabled-subtle` | `var(--alias-colors-neutral-5)` | color | semantic-color | color |
+| 421 | 3.0_Semantic_Colours | border-brand | `--semantic-border-brand` | `var(--alias-brand-8)` | color | semantic-color | color |
+| 422 | 3.0_Semantic_Colours | border-brand_alt | `--semantic-border-brand-alt` | `var(--alias-brand-7)` | color | semantic-color | color |
+| 423 | 3.0_Semantic_Colours | border-error | `--semantic-border-error` | `var(--alias-error-8)` | color | semantic-color | color |
+| 424 | 3.0_Semantic_Colours | border-error_subtle | `--semantic-border-error-subtle` | `var(--alias-error-7)` | color | semantic-color | color |
+| 425 | 3.0_Semantic_Colours | fg-primary | `--semantic-fg-primary` | `var(--alias-colors-base-brand-black)` | color | semantic-color | color |
+| 426 | 3.0_Semantic_Colours | fg-secondary | `--semantic-fg-secondary` | `var(--alias-colors-neutral-11)` | color | semantic-color | color |
+| 427 | 3.0_Semantic_Colours | fg-secondary_hover | `--semantic-fg-secondary-hover` | `var(--alias-colors-base-brand-black)` | color | semantic-color | color |
+| 428 | 3.0_Semantic_Colours | fg-tertiary | `--semantic-fg-tertiary` | `var(--alias-colors-neutral-11)` | color | semantic-color | color |
+| 429 | 3.0_Semantic_Colours | fg-tertiary_hover | `--semantic-fg-tertiary-hover` | `var(--alias-colors-base-brand-black)` | color | semantic-color | color |
+| 430 | 3.0_Semantic_Colours | fg-quaternary | `--semantic-fg-quaternary` | `var(--alias-colors-neutral-10)` | color | semantic-color | color |
+| 431 | 3.0_Semantic_Colours | fg-quaternary_hover | `--semantic-fg-quaternary-hover` | `var(--alias-colors-neutral-11)` | color | semantic-color | color |
+| 432 | 3.0_Semantic_Colours | fg-white | `--semantic-fg-white` | `var(--alias-colors-base-white)` | color | semantic-color | color |
+| 433 | 3.0_Semantic_Colours | fg-disabled | `--semantic-fg-disabled` | `var(--alias-colors-neutral-8)` | color | semantic-color | color |
+| 434 | 3.0_Semantic_Colours | fg-disabled_subtle | `--semantic-fg-disabled-subtle` | `var(--alias-colors-neutral-7)` | color | semantic-color | color |
+| 435 | 3.0_Semantic_Colours | fg-brand-primary | `--semantic-fg-brand-primary` | `var(--alias-brand-11)` | color | semantic-color | color |
+| 436 | 3.0_Semantic_Colours | fg-brand-primary_alt | `--semantic-fg-brand-primary-alt` | `var(--alias-brand-11)` | color | semantic-color | color |
+| 437 | 3.0_Semantic_Colours | fg-brand-secondary | `--semantic-fg-brand-secondary` | `var(--alias-brand-9)` | color | semantic-color | color |
+| 438 | 3.0_Semantic_Colours | fg-brand-secondary_alt | `--semantic-fg-brand-secondary-alt` | `var(--alias-brand-10)` | color | semantic-color | color |
+| 439 | 3.0_Semantic_Colours | fg-brand-secondary_hover | `--semantic-fg-brand-secondary-hover` | `var(--alias-brand-10)` | color | semantic-color | color |
+| 440 | 3.0_Semantic_Colours | fg-error-primary | `--semantic-fg-error-primary` | `var(--alias-error-11)` | color | semantic-color | color |
+| 441 | 3.0_Semantic_Colours | fg-error-secondary | `--semantic-fg-error-secondary` | `var(--alias-error-9)` | color | semantic-color | color |
+| 442 | 3.0_Semantic_Colours | fg-warning-primary | `--semantic-fg-warning-primary` | `var(--alias-warning-11)` | color | semantic-color | color |
+| 443 | 3.0_Semantic_Colours | fg-warning-secondary | `--semantic-fg-warning-secondary` | `var(--alias-warning-9)` | color | semantic-color | color |
+| 444 | 3.0_Semantic_Colours | fg-success-primary | `--semantic-fg-success-primary` | `var(--alias-success-11)` | color | semantic-color | color |
+| 445 | 3.0_Semantic_Colours | fg-success-secondary | `--semantic-fg-success-secondary` | `var(--alias-success-9)` | color | semantic-color | color |
+| 446 | 3.0_Semantic_Colours | bg-primary | `--semantic-bg-primary` | `var(--alias-colors-base-brand-white)` | color | semantic-color | color |
+| 447 | 3.0_Semantic_Colours | bg-primary_alt | `--semantic-bg-primary-alt` | `var(--alias-colors-base-brand-white)` | color | semantic-color | color |
+| 448 | 3.0_Semantic_Colours | bg-primary_hover | `--semantic-bg-primary-hover` | `var(--alias-colors-neutral-2)` | color | semantic-color | color |
+| 449 | 3.0_Semantic_Colours | bg-primary-solid | `--semantic-bg-primary-solid` | `var(--alias-colors-base-brand-black-constant)` | color | semantic-color | color |
+| 450 | 3.0_Semantic_Colours | bg-secondary | `--semantic-bg-secondary` | `var(--alias-colors-neutral-2)` | color | semantic-color | color |
+| 451 | 3.0_Semantic_Colours | bg-secondary_alt | `--semantic-bg-secondary-alt` | `var(--alias-colors-neutral-2)` | color | semantic-color | color |
+| 452 | 3.0_Semantic_Colours | bg-secondary_hover | `--semantic-bg-secondary-hover` | `var(--alias-colors-neutral-3)` | color | semantic-color | color |
+| 453 | 3.0_Semantic_Colours | bg-secondary_subtle | `--semantic-bg-secondary-subtle` | `var(--alias-colors-base-brand-white)` | color | semantic-color | color |
+| 454 | 3.0_Semantic_Colours | bg-secondary-solid | `--semantic-bg-secondary-solid` | `var(--alias-colors-neutral-9)` | color | semantic-color | color |
+| 455 | 3.0_Semantic_Colours | bg-tertiary | `--semantic-bg-tertiary` | `var(--alias-colors-neutral-3)` | color | semantic-color | color |
+| 456 | 3.0_Semantic_Colours | bg-quaternary | `--semantic-bg-quaternary` | `var(--alias-colors-neutral-4)` | color | semantic-color | color |
+| 457 | 3.0_Semantic_Colours | bg-active | `--semantic-bg-active` | `var(--alias-colors-neutral-3)` | color | semantic-color | color |
+| 458 | 3.0_Semantic_Colours | bg-disabled | `--semantic-bg-disabled` | `var(--alias-colors-neutral-3)` | color | semantic-color | color |
+| 459 | 3.0_Semantic_Colours | bg-disabled_subtle | `--semantic-bg-disabled-subtle` | `var(--alias-colors-neutral-2)` | color | semantic-color | color |
+| 460 | 3.0_Semantic_Colours | bg-overlay | `--semantic-bg-overlay` | `var(--alias-colors-base-brand-black-constant)` | color | semantic-color | color |
+| 461 | 3.0_Semantic_Colours | bg-brand-primary | `--semantic-bg-brand-primary` | `var(--alias-brand-2)` | color | semantic-color | color |
+| 462 | 3.0_Semantic_Colours | bg-brand-primary_alt | `--semantic-bg-brand-primary-alt` | `var(--alias-brand-2)` | color | semantic-color | color |
+| 463 | 3.0_Semantic_Colours | bg-brand-secondary | `--semantic-bg-brand-secondary` | `var(--alias-brand-3)` | color | semantic-color | color |
+| 464 | 3.0_Semantic_Colours | bg-brand-solid | `--semantic-bg-brand-solid` | `var(--alias-brand-9)` | color | semantic-color | color |
+| 465 | 3.0_Semantic_Colours | bg-brand-solid_hover | `--semantic-bg-brand-solid-hover` | `var(--alias-brand-10)` | color | semantic-color | color |
+| 466 | 3.0_Semantic_Colours | bg-brand-section | `--semantic-bg-brand-section` | `var(--alias-brand-9)` | color | semantic-color | color |
+| 467 | 3.0_Semantic_Colours | bg-brand-section_subtle | `--semantic-bg-brand-section-subtle` | `var(--alias-brand-3)` | color | semantic-color | color |
+| 468 | 3.0_Semantic_Colours | bg-error-primary | `--semantic-bg-error-primary` | `var(--alias-error-2)` | color | semantic-color | color |
+| 469 | 3.0_Semantic_Colours | bg-error-secondary | `--semantic-bg-error-secondary` | `var(--alias-error-3)` | color | semantic-color | color |
+| 470 | 3.0_Semantic_Colours | bg-error-solid | `--semantic-bg-error-solid` | `var(--alias-error-9)` | color | semantic-color | color |
+| 471 | 3.0_Semantic_Colours | bg-error-solid_hover | `--semantic-bg-error-solid-hover` | `var(--alias-error-10)` | color | semantic-color | color |
+| 472 | 3.0_Semantic_Colours | bg-warning-primary | `--semantic-bg-warning-primary` | `var(--alias-warning-2)` | color | semantic-color | color |
+| 473 | 3.0_Semantic_Colours | bg-warning-secondary | `--semantic-bg-warning-secondary` | `var(--alias-warning-3)` | color | semantic-color | color |
+| 474 | 3.0_Semantic_Colours | bg-warning-solid | `--semantic-bg-warning-solid` | `var(--alias-warning-9)` | color | semantic-color | color |
+| 475 | 3.0_Semantic_Colours | bg-success-primary | `--semantic-bg-success-primary` | `var(--alias-success-2)` | color | semantic-color | color |
+| 476 | 3.0_Semantic_Colours | bg-success-secondary | `--semantic-bg-success-secondary` | `var(--alias-success-3)` | color | semantic-color | color |
+| 477 | 3.0_Semantic_Colours | bg-success-solid | `--semantic-bg-success-solid` | `var(--alias-success-9)` | color | semantic-color | color |
+| 478 | 4.0_Component_Colours | toggle-button-fg_disabled | `--semantic-toggle-button-fg-disabled` | `var(--semantic-fg-disabled)` | color | semantic-color | color |
+| 479 | 4.0_Component_Colours | toggle-border | `--semantic-toggle-border` | `var(--semantic-border-primary)` | color | semantic-color | color |
+| 480 | 4.0_Component_Colours | toggle-slim-border_pressed | `--semantic-toggle-slim-border-pressed` | `var(--semantic-bg-brand-solid)` | color | semantic-color | color |
+| 481 | 4.0_Component_Colours | toggle-slim-border_pressed-hover | `--semantic-toggle-slim-border-pressed-hover` | `var(--semantic-bg-brand-solid-hover)` | color | semantic-color | color |
+| 482 | 4.0_Component_Colours | tooltip-supporting-text | `--semantic-tooltip-supporting-text` | `var(--semantic-text-secondary)` | color | semantic-color | color |
+| 483 | 4.0_Component_Colours | text-editor-icon-fg | `--semantic-text-editor-icon-fg` | `var(--semantic-fg-secondary)` | color | semantic-color | color |
+| 484 | 4.0_Component_Colours | text-editor-icon-fg_active | `--semantic-text-editor-icon-fg-active` | `var(--semantic-fg-primary)` | color | semantic-color | color |
+| 485 | 4.0_Component_Colours | button-primary-icon | `--semantic-button-primary-icon` | `var(--semantic-fg-white)` | color | semantic-color | color |
+| 486 | 4.0_Component_Colours | button-primary-icon_hover | `--semantic-button-primary-icon-hover` | `var(--semantic-fg-white)` | color | semantic-color | color |
+| 487 | 4.0_Component_Colours | button-destructive-primary-icon | `--semantic-button-destructive-primary-icon` | `var(--semantic-fg-white)` | color | semantic-color | color |
+| 488 | 4.0_Component_Colours | button-destructive-primary-icon_hover | `--semantic-button-destructive-primary-icon-hover` | `var(--semantic-fg-white)` | color | semantic-color | color |
+| 489 | 4.0_Component_Colours | footer-button-fg | `--semantic-footer-button-fg` | `var(--semantic-text-brand-secondary)` | color | semantic-color | color |
+| 490 | 4.0_Component_Colours | footer-button-fg_hover | `--semantic-footer-button-fg-hover` | `var(--semantic-text-brand-secondary-hover)` | color | semantic-color | color |
+| 491 | 4.0_Component_Colours | icon-fg-brand | `--semantic-icon-fg-brand` | `var(--semantic-fg-brand-primary)` | color | semantic-color | color |
+| 492 | 4.0_Component_Colours | icon-fg-brand_on-brand | `--semantic-icon-fg-brand-on-brand` | `var(--semantic-text-brand-tertiary-alt)` | color | semantic-color | color |
+| 493 | 4.0_Component_Colours | featured-icon-light-fg-brand | `--semantic-featured-icon-light-fg-brand` | `var(--semantic-fg-brand-primary)` | color | semantic-color | color |
+| 494 | 4.0_Component_Colours | featured-icon-light-fg-gray | `--semantic-featured-icon-light-fg-grey` | `var(--semantic-fg-secondary)` | color | semantic-color | color |
+| 495 | 4.0_Component_Colours | featured-icon-light-fg-error | `--semantic-featured-icon-light-fg-error` | `var(--semantic-fg-error-primary)` | color | semantic-color | color |
+| 496 | 4.0_Component_Colours | featured-icon-light-fg-warning | `--semantic-featured-icon-light-fg-warning` | `var(--semantic-fg-warning-primary)` | color | semantic-color | color |
+| 497 | 4.0_Component_Colours | featured-icon-light-fg-success | `--semantic-featured-icon-light-fg-success` | `var(--semantic-fg-success-primary)` | color | semantic-color | color |
+| 498 | 4.0_Component_Colours | slider-handle-bg | `--semantic-slider-handle-bg` | `var(--semantic-bg-primary)` | color | semantic-color | color |
+| 499 | 4.0_Component_Colours | slider-handle-border | `--semantic-slider-handle-border` | `var(--semantic-border-brand)` | color | semantic-color | color |
+| 500 | 4.0_Component_Colours | focus-ring | `--semantic-focus-ring` | `var(--semantic-border-brand)` | color | semantic-color | color |
+| 501 | 4.0_Component_Colours | focus-ring-error | `--semantic-focus-ring-error` | `var(--semantic-border-error)` | color | semantic-color | color |
+| 502 | 5.0_Effects | shadow-xs | `--semantic-shadow-xs` | `rgba(10, 13, 18, 0.05)` | color | semantic-color | color |
+| 503 | 5.0_Effects | shadow-sm_01 | `--semantic-shadow-sm-01` | `rgba(10, 13, 18, 0.1)` | color | semantic-color | color |
+| 504 | 5.0_Effects | shadow-sm_02 | `--semantic-shadow-sm-02` | `rgba(10, 13, 18, 0.1)` | color | semantic-color | color |
+| 505 | 5.0_Effects | shadow-md_01 | `--semantic-shadow-md-01` | `rgba(10, 13, 18, 0.1)` | color | semantic-color | color |
+| 506 | 5.0_Effects | shadow-md_02 | `--semantic-shadow-md-02` | `rgba(10, 13, 18, 0.06)` | color | semantic-color | color |
+| 507 | 5.0_Effects | shadow-lg_01 | `--semantic-shadow-lg-01` | `rgba(10, 13, 18, 0.08)` | color | semantic-color | color |
+| 508 | 5.0_Effects | shadow-lg_02 | `--semantic-shadow-lg-02` | `rgba(10, 13, 18, 0.03)` | color | semantic-color | color |
+| 509 | 5.0_Effects | shadow-lg_03 | `--semantic-shadow-lg-03` | `rgba(10, 13, 18, 0.04)` | color | semantic-color | color |
+| 510 | 5.0_Effects | shadow-xl_01 | `--semantic-shadow-xl-01` | `rgba(10, 13, 18, 0.08)` | color | semantic-color | color |
+| 511 | 5.0_Effects | shadow-xl_02 | `--semantic-shadow-xl-02` | `rgba(10, 13, 18, 0.03)` | color | semantic-color | color |
+| 512 | 5.0_Effects | shadow-xl_03 | `--semantic-shadow-xl-03` | `rgba(10, 13, 18, 0.04)` | color | semantic-color | color |
+| 513 | 5.0_Effects | shadow-2xl_01 | `--semantic-shadow-2xl-01` | `rgba(10, 13, 18, 0.18)` | color | semantic-color | color |
+| 514 | 5.0_Effects | shadow-2xl_02 | `--semantic-shadow-2xl-02` | `rgba(10, 13, 18, 0.04)` | color | semantic-color | color |
+| 515 | 5.0_Effects | shadow-3xl_01 | `--semantic-shadow-3xl-01` | `rgba(10, 13, 18, 0.14)` | color | semantic-color | color |
+| 516 | 5.0_Effects | shadow-3xl_02 | `--semantic-shadow-3xl-02` | `rgba(10, 13, 18, 0.04)` | color | semantic-color | color |
+| 517 | 5.0_Effects | shadow-skeumorphic-inner | `--semantic-shadow-skeumorphic-inner` | `rgba(10, 13, 18, 0.05)` | color | semantic-color | color |
+| 518 | 5.0_Effects | shadow-skeumorphic-inner-border | `--semantic-shadow-skeumorphic-inner-border` | `rgba(10, 13, 18, 0.18)` | color | semantic-color | color |
+| 519 | 5.0_Effects | blur-sm | `--semantic-blur-sm` | `8px` | color | semantic-color | color |
+| 520 | 5.0_Effects | blur-md | `--semantic-blur-md` | `16px` | color | semantic-color | color |
+| 521 | 5.0_Effects | blur-lg | `--semantic-blur-lg` | `24px` | color | semantic-color | color |
+| 522 | 5.0_Effects | blur-xl | `--semantic-blur-xl` | `40px` | color | semantic-color | color |
+| 523 | 5.0_Effects | shadow-xs | `--semantic-shadow-xs` | `rgba(0, 0, 0, 0.15)` | color | semantic-color | color |
+| 524 | 5.0_Effects | shadow-sm_01 | `--semantic-shadow-sm-01` | `rgba(0, 0, 0, 0.25)` | color | semantic-color | color |
+| 525 | 5.0_Effects | shadow-sm_02 | `--semantic-shadow-sm-02` | `rgba(0, 0, 0, 0.2)` | color | semantic-color | color |
+| 526 | 5.0_Effects | shadow-md_01 | `--semantic-shadow-md-01` | `rgba(0, 0, 0, 0.25)` | color | semantic-color | color |
+| 527 | 5.0_Effects | shadow-md_02 | `--semantic-shadow-md-02` | `rgba(0, 0, 0, 0.15)` | color | semantic-color | color |
+| 528 | 5.0_Effects | shadow-lg_01 | `--semantic-shadow-lg-01` | `rgba(0, 0, 0, 0.2)` | color | semantic-color | color |
+| 529 | 5.0_Effects | shadow-lg_02 | `--semantic-shadow-lg-02` | `rgba(0, 0, 0, 0.1)` | color | semantic-color | color |
+| 530 | 5.0_Effects | shadow-lg_03 | `--semantic-shadow-lg-03` | `rgba(0, 0, 0, 0.1)` | color | semantic-color | color |
+| 531 | 5.0_Effects | shadow-xl_01 | `--semantic-shadow-xl-01` | `rgba(0, 0, 0, 0.2)` | color | semantic-color | color |
+| 532 | 5.0_Effects | shadow-xl_02 | `--semantic-shadow-xl-02` | `rgba(0, 0, 0, 0.1)` | color | semantic-color | color |
+| 533 | 5.0_Effects | shadow-xl_03 | `--semantic-shadow-xl-03` | `rgba(0, 0, 0, 0.1)` | color | semantic-color | color |
+| 534 | 5.0_Effects | shadow-2xl_01 | `--semantic-shadow-2xl-01` | `rgba(0, 0, 0, 0.4)` | color | semantic-color | color |
+| 535 | 5.0_Effects | shadow-2xl_02 | `--semantic-shadow-2xl-02` | `rgba(0, 0, 0, 0.1)` | color | semantic-color | color |
+| 536 | 5.0_Effects | shadow-3xl_01 | `--semantic-shadow-3xl-01` | `rgba(0, 0, 0, 0.35)` | color | semantic-color | color |
+| 537 | 5.0_Effects | shadow-3xl_02 | `--semantic-shadow-3xl-02` | `rgba(0, 0, 0, 0.1)` | color | semantic-color | color |
+| 538 | 5.0_Effects | shadow-skeumorphic-inner | `--semantic-shadow-skeumorphic-inner` | `rgba(12, 14, 18, 0.05)` | color | semantic-color | color |
+| 539 | 5.0_Effects | shadow-skeumorphic-inner-border | `--semantic-shadow-skeumorphic-inner-border` | `rgba(12, 14, 18, 0.18)` | color | semantic-color | color |
+| 540 | 5.0_Effects | blur-sm | `--semantic-blur-sm` | `8px` | color | semantic-color | color |
+| 541 | 5.0_Effects | blur-md | `--semantic-blur-md` | `16px` | color | semantic-color | color |
+| 542 | 5.0_Effects | blur-lg | `--semantic-blur-lg` | `24px` | color | semantic-color | color |
+| 543 | 5.0_Effects | blur-xl | `--semantic-blur-xl` | `40px` | color | semantic-color | color |
