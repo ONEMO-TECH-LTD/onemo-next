@@ -1,0 +1,1 @@
+../../../kai-solo-brain/rules/codebase-conventions.md
