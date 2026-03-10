@@ -48,7 +48,7 @@ export default function ValidationPanel({ validation }: ValidationPanelProps) {
       <div className="flex items-center justify-between mb-3">
         <div className="text-xs text-zinc-500 font-mono">
           Source: {validation.source} &mdash;{" "}
-          {new Date(validation.timestamp).toLocaleString()}
+          {validation.timestamp.slice(0, 16).replace("T", " ")}
         </div>
         <div className="flex items-center gap-2 text-xs font-mono">
           <span className="text-emerald-400">{validation.summary.pass} pass</span>
