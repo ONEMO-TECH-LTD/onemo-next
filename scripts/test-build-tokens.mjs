@@ -9,7 +9,7 @@ import { parse, converter } from 'culori';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
-const BASELINE_JSON = join(ROOT, 'context-for-codex/11.7-figma-variables-baseline-feb16.json');
+const BASELINE_JSON = join(ROOT, '../onemo-ssot-global/11-design-system/artifacts/figma-variables-2026-03-10.json');
 const BUILD_SCRIPT = join(ROOT, 'scripts/build-tokens.mjs');
 const toOklch = converter('oklch');
 const OUTPUT_FILES = ['primitives.css', 'aliases.css', 'semantic.css', 'semantic-inline.css'];
