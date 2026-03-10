@@ -1,6 +1,6 @@
 {
-  "generated": "2026-03-09T19:24:46.533Z",
-  "totalTokens": 400,
+  "generated": "2026-03-10T14:37:23.452Z",
+  "totalTokens": 543,
   "tokens": [
     {
       "figmaCollection": "1.0_Primitive_Colours",
@@ -2658,6 +2658,114 @@
       "category": "containers"
     },
     {
+      "figmaCollection": "3.6_Semantic_Size",
+      "figmaPath": "height/2xs",
+      "cssProperty": "--size-height-2xs",
+      "cssValue": "16px",
+      "valueType": "dimension",
+      "tier": "semantic",
+      "category": "size"
+    },
+    {
+      "figmaCollection": "3.6_Semantic_Size",
+      "figmaPath": "height/s",
+      "cssProperty": "--size-height-s",
+      "cssValue": "24px",
+      "valueType": "dimension",
+      "tier": "semantic",
+      "category": "size"
+    },
+    {
+      "figmaCollection": "3.6_Semantic_Size",
+      "figmaPath": "height/m",
+      "cssProperty": "--size-height-m",
+      "cssValue": "32px",
+      "valueType": "dimension",
+      "tier": "semantic",
+      "category": "size"
+    },
+    {
+      "figmaCollection": "3.6_Semantic_Size",
+      "figmaPath": "height/l",
+      "cssProperty": "--size-height-l",
+      "cssValue": "48px",
+      "valueType": "dimension",
+      "tier": "semantic",
+      "category": "size"
+    },
+    {
+      "figmaCollection": "3.6_Semantic_Size",
+      "figmaPath": "height/xl",
+      "cssProperty": "--size-height-xl",
+      "cssValue": "56px",
+      "valueType": "dimension",
+      "tier": "semantic",
+      "category": "size"
+    },
+    {
+      "figmaCollection": "3.6_Semantic_Size",
+      "figmaPath": "height/2xl",
+      "cssProperty": "--size-height-2xl",
+      "cssValue": "72px",
+      "valueType": "dimension",
+      "tier": "semantic",
+      "category": "size"
+    },
+    {
+      "figmaCollection": "3.6_Semantic_Size",
+      "figmaPath": "width/2xs",
+      "cssProperty": "--size-width-2xs",
+      "cssValue": "16px",
+      "valueType": "dimension",
+      "tier": "semantic",
+      "category": "size"
+    },
+    {
+      "figmaCollection": "3.6_Semantic_Size",
+      "figmaPath": "width/s",
+      "cssProperty": "--size-width-s",
+      "cssValue": "24px",
+      "valueType": "dimension",
+      "tier": "semantic",
+      "category": "size"
+    },
+    {
+      "figmaCollection": "3.6_Semantic_Size",
+      "figmaPath": "width/m",
+      "cssProperty": "--size-width-m",
+      "cssValue": "32px",
+      "valueType": "dimension",
+      "tier": "semantic",
+      "category": "size"
+    },
+    {
+      "figmaCollection": "3.6_Semantic_Size",
+      "figmaPath": "width/l",
+      "cssProperty": "--size-width-l",
+      "cssValue": "48px",
+      "valueType": "dimension",
+      "tier": "semantic",
+      "category": "size"
+    },
+    {
+      "figmaCollection": "3.6_Semantic_Size",
+      "figmaPath": "width/xl",
+      "cssProperty": "--size-width-xl",
+      "cssValue": "56px",
+      "valueType": "dimension",
+      "tier": "semantic",
+      "category": "size"
+    },
+    {
+      "figmaCollection": "3.6_Semantic_Size",
+      "figmaPath": "width/2xl",
+      "cssProperty": "--size-width-2xl",
+      "cssValue": "72px",
+      "valueType": "dimension",
+      "tier": "semantic",
+      "category": "size"
+    },
+    {
       "figmaCollection": "3.1_Semantic_Type",
       "figmaPath": "display-2xl/Size",
       "cssProperty": "--text-display-2xl",
@@ -3414,6 +3522,996 @@
       "category": "typography"
     },
     {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "text-primary",
+      "cssProperty": "--semantic-text-primary",
+      "cssValue": "var(--alias-colors-base-brand-black)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "text-primary_on-brand",
+      "cssProperty": "--semantic-text-primary-on-brand",
+      "cssValue": "var(--alias-colors-base-white)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "text-secondary",
+      "cssProperty": "--semantic-text-secondary",
+      "cssValue": "var(--alias-colors-neutral-11)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "text-secondary_hover",
+      "cssProperty": "--semantic-text-secondary-hover",
+      "cssValue": "var(--alias-colors-base-brand-black)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "text-secondary_on-brand",
+      "cssProperty": "--semantic-text-secondary-on-brand",
+      "cssValue": "var(--alias-brand-11)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "text-tertiary",
+      "cssProperty": "--semantic-text-tertiary",
+      "cssValue": "var(--alias-colors-neutral-11)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "text-tertiary_hover",
+      "cssProperty": "--semantic-text-tertiary-hover",
+      "cssValue": "var(--alias-colors-base-brand-black)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "text-tertiary_on-brand",
+      "cssProperty": "--semantic-text-tertiary-on-brand",
+      "cssValue": "var(--alias-brand-11)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "text-quaternary",
+      "cssProperty": "--semantic-text-quaternary",
+      "cssValue": "var(--alias-colors-neutral-11)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "text-quaternary_on-brand",
+      "cssProperty": "--semantic-text-quaternary-on-brand",
+      "cssValue": "var(--alias-brand-11)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "text-white",
+      "cssProperty": "--semantic-text-white",
+      "cssValue": "var(--alias-colors-base-white)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "text-disabled",
+      "cssProperty": "--semantic-text-disabled",
+      "cssValue": "var(--alias-colors-neutral-8)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "text-placeholder",
+      "cssProperty": "--semantic-text-placeholder",
+      "cssValue": "var(--alias-colors-neutral-9)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "text-placeholder_subtle",
+      "cssProperty": "--semantic-text-placeholder-subtle",
+      "cssValue": "var(--alias-colors-neutral-7)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "text-brand-primary",
+      "cssProperty": "--semantic-text-brand-primary",
+      "cssValue": "var(--alias-brand-11)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "text-brand-secondary",
+      "cssProperty": "--semantic-text-brand-secondary",
+      "cssValue": "var(--alias-brand-11)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "text-brand-secondary_hover",
+      "cssProperty": "--semantic-text-brand-secondary-hover",
+      "cssValue": "var(--alias-brand-12)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "text-brand-tertiary",
+      "cssProperty": "--semantic-text-brand-tertiary",
+      "cssValue": "var(--alias-brand-11)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "text-brand-tertiary_alt",
+      "cssProperty": "--semantic-text-brand-tertiary-alt",
+      "cssValue": "var(--alias-brand-12)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "text-error-primary",
+      "cssProperty": "--semantic-text-error-primary",
+      "cssValue": "var(--alias-error-12)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "text-error-primary_hover",
+      "cssProperty": "--semantic-text-error-primary-hover",
+      "cssValue": "var(--alias-error-12)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "text-warning-primary",
+      "cssProperty": "--semantic-text-warning-primary",
+      "cssValue": "var(--alias-warning-11)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "text-success-primary",
+      "cssProperty": "--semantic-text-success-primary",
+      "cssValue": "var(--alias-success-11)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "border-primary",
+      "cssProperty": "--semantic-border-primary",
+      "cssValue": "var(--alias-colors-neutral-7)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "border-secondary",
+      "cssProperty": "--semantic-border-secondary",
+      "cssValue": "var(--alias-colors-neutral-6)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "border-secondary_alt",
+      "cssProperty": "--semantic-border-secondary-alt",
+      "cssValue": "var(--alias-colors-neutral-5)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "border-tertiary",
+      "cssProperty": "--semantic-border-tertiary",
+      "cssValue": "var(--alias-colors-neutral-5)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "border-disabled",
+      "cssProperty": "--semantic-border-disabled",
+      "cssValue": "var(--alias-colors-neutral-6)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "border-disabled_subtle",
+      "cssProperty": "--semantic-border-disabled-subtle",
+      "cssValue": "var(--alias-colors-neutral-5)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "border-brand",
+      "cssProperty": "--semantic-border-brand",
+      "cssValue": "var(--alias-brand-8)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "border-brand_alt",
+      "cssProperty": "--semantic-border-brand-alt",
+      "cssValue": "var(--alias-brand-7)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "border-error",
+      "cssProperty": "--semantic-border-error",
+      "cssValue": "var(--alias-error-8)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "border-error_subtle",
+      "cssProperty": "--semantic-border-error-subtle",
+      "cssValue": "var(--alias-error-7)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "fg-primary",
+      "cssProperty": "--semantic-fg-primary",
+      "cssValue": "var(--alias-colors-base-brand-black)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "fg-secondary",
+      "cssProperty": "--semantic-fg-secondary",
+      "cssValue": "var(--alias-colors-neutral-11)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "fg-secondary_hover",
+      "cssProperty": "--semantic-fg-secondary-hover",
+      "cssValue": "var(--alias-colors-base-brand-black)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "fg-tertiary",
+      "cssProperty": "--semantic-fg-tertiary",
+      "cssValue": "var(--alias-colors-neutral-11)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "fg-tertiary_hover",
+      "cssProperty": "--semantic-fg-tertiary-hover",
+      "cssValue": "var(--alias-colors-base-brand-black)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "fg-quaternary",
+      "cssProperty": "--semantic-fg-quaternary",
+      "cssValue": "var(--alias-colors-neutral-10)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "fg-quaternary_hover",
+      "cssProperty": "--semantic-fg-quaternary-hover",
+      "cssValue": "var(--alias-colors-neutral-11)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "fg-white",
+      "cssProperty": "--semantic-fg-white",
+      "cssValue": "var(--alias-colors-base-white)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "fg-disabled",
+      "cssProperty": "--semantic-fg-disabled",
+      "cssValue": "var(--alias-colors-neutral-8)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "fg-disabled_subtle",
+      "cssProperty": "--semantic-fg-disabled-subtle",
+      "cssValue": "var(--alias-colors-neutral-7)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "fg-brand-primary",
+      "cssProperty": "--semantic-fg-brand-primary",
+      "cssValue": "var(--alias-brand-11)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "fg-brand-primary_alt",
+      "cssProperty": "--semantic-fg-brand-primary-alt",
+      "cssValue": "var(--alias-brand-11)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "fg-brand-secondary",
+      "cssProperty": "--semantic-fg-brand-secondary",
+      "cssValue": "var(--alias-brand-9)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "fg-brand-secondary_alt",
+      "cssProperty": "--semantic-fg-brand-secondary-alt",
+      "cssValue": "var(--alias-brand-10)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "fg-brand-secondary_hover",
+      "cssProperty": "--semantic-fg-brand-secondary-hover",
+      "cssValue": "var(--alias-brand-10)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "fg-error-primary",
+      "cssProperty": "--semantic-fg-error-primary",
+      "cssValue": "var(--alias-error-11)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "fg-error-secondary",
+      "cssProperty": "--semantic-fg-error-secondary",
+      "cssValue": "var(--alias-error-9)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "fg-warning-primary",
+      "cssProperty": "--semantic-fg-warning-primary",
+      "cssValue": "var(--alias-warning-11)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "fg-warning-secondary",
+      "cssProperty": "--semantic-fg-warning-secondary",
+      "cssValue": "var(--alias-warning-9)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "fg-success-primary",
+      "cssProperty": "--semantic-fg-success-primary",
+      "cssValue": "var(--alias-success-11)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "fg-success-secondary",
+      "cssProperty": "--semantic-fg-success-secondary",
+      "cssValue": "var(--alias-success-9)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-primary",
+      "cssProperty": "--semantic-bg-primary",
+      "cssValue": "var(--alias-colors-base-brand-white)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-primary_alt",
+      "cssProperty": "--semantic-bg-primary-alt",
+      "cssValue": "var(--alias-colors-base-brand-white)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-primary_hover",
+      "cssProperty": "--semantic-bg-primary-hover",
+      "cssValue": "var(--alias-colors-neutral-2)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-primary-solid",
+      "cssProperty": "--semantic-bg-primary-solid",
+      "cssValue": "var(--alias-colors-base-brand-black-constant)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-secondary",
+      "cssProperty": "--semantic-bg-secondary",
+      "cssValue": "var(--alias-colors-neutral-2)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-secondary_alt",
+      "cssProperty": "--semantic-bg-secondary-alt",
+      "cssValue": "var(--alias-colors-neutral-2)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-secondary_hover",
+      "cssProperty": "--semantic-bg-secondary-hover",
+      "cssValue": "var(--alias-colors-neutral-3)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-secondary_subtle",
+      "cssProperty": "--semantic-bg-secondary-subtle",
+      "cssValue": "var(--alias-colors-base-brand-white)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-secondary-solid",
+      "cssProperty": "--semantic-bg-secondary-solid",
+      "cssValue": "var(--alias-colors-neutral-9)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-tertiary",
+      "cssProperty": "--semantic-bg-tertiary",
+      "cssValue": "var(--alias-colors-neutral-3)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-quaternary",
+      "cssProperty": "--semantic-bg-quaternary",
+      "cssValue": "var(--alias-colors-neutral-4)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-active",
+      "cssProperty": "--semantic-bg-active",
+      "cssValue": "var(--alias-colors-neutral-3)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-disabled",
+      "cssProperty": "--semantic-bg-disabled",
+      "cssValue": "var(--alias-colors-neutral-3)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-disabled_subtle",
+      "cssProperty": "--semantic-bg-disabled-subtle",
+      "cssValue": "var(--alias-colors-neutral-2)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-overlay",
+      "cssProperty": "--semantic-bg-overlay",
+      "cssValue": "var(--alias-colors-base-brand-black-constant)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-brand-primary",
+      "cssProperty": "--semantic-bg-brand-primary",
+      "cssValue": "var(--alias-brand-2)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-brand-primary_alt",
+      "cssProperty": "--semantic-bg-brand-primary-alt",
+      "cssValue": "var(--alias-brand-2)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-brand-secondary",
+      "cssProperty": "--semantic-bg-brand-secondary",
+      "cssValue": "var(--alias-brand-3)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-brand-solid",
+      "cssProperty": "--semantic-bg-brand-solid",
+      "cssValue": "var(--alias-brand-9)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-brand-solid_hover",
+      "cssProperty": "--semantic-bg-brand-solid-hover",
+      "cssValue": "var(--alias-brand-10)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-brand-section",
+      "cssProperty": "--semantic-bg-brand-section",
+      "cssValue": "var(--alias-brand-9)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-brand-section_subtle",
+      "cssProperty": "--semantic-bg-brand-section-subtle",
+      "cssValue": "var(--alias-brand-3)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-error-primary",
+      "cssProperty": "--semantic-bg-error-primary",
+      "cssValue": "var(--alias-error-2)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-error-secondary",
+      "cssProperty": "--semantic-bg-error-secondary",
+      "cssValue": "var(--alias-error-3)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-error-solid",
+      "cssProperty": "--semantic-bg-error-solid",
+      "cssValue": "var(--alias-error-9)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-error-solid_hover",
+      "cssProperty": "--semantic-bg-error-solid-hover",
+      "cssValue": "var(--alias-error-10)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-warning-primary",
+      "cssProperty": "--semantic-bg-warning-primary",
+      "cssValue": "var(--alias-warning-2)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-warning-secondary",
+      "cssProperty": "--semantic-bg-warning-secondary",
+      "cssValue": "var(--alias-warning-3)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-warning-solid",
+      "cssProperty": "--semantic-bg-warning-solid",
+      "cssValue": "var(--alias-warning-9)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-success-primary",
+      "cssProperty": "--semantic-bg-success-primary",
+      "cssValue": "var(--alias-success-2)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-success-secondary",
+      "cssProperty": "--semantic-bg-success-secondary",
+      "cssValue": "var(--alias-success-3)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "3.0_Semantic_Colours",
+      "figmaPath": "bg-success-solid",
+      "cssProperty": "--semantic-bg-success-solid",
+      "cssValue": "var(--alias-success-9)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "4.0_Component_Colours",
+      "figmaPath": "toggle-button-fg_disabled",
+      "cssProperty": "--semantic-toggle-button-fg-disabled",
+      "cssValue": "var(--semantic-fg-disabled)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "4.0_Component_Colours",
+      "figmaPath": "toggle-border",
+      "cssProperty": "--semantic-toggle-border",
+      "cssValue": "var(--semantic-border-primary)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "4.0_Component_Colours",
+      "figmaPath": "toggle-slim-border_pressed",
+      "cssProperty": "--semantic-toggle-slim-border-pressed",
+      "cssValue": "var(--semantic-bg-brand-solid)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "4.0_Component_Colours",
+      "figmaPath": "toggle-slim-border_pressed-hover",
+      "cssProperty": "--semantic-toggle-slim-border-pressed-hover",
+      "cssValue": "var(--semantic-bg-brand-solid-hover)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "4.0_Component_Colours",
+      "figmaPath": "tooltip-supporting-text",
+      "cssProperty": "--semantic-tooltip-supporting-text",
+      "cssValue": "var(--semantic-text-secondary)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "4.0_Component_Colours",
+      "figmaPath": "text-editor-icon-fg",
+      "cssProperty": "--semantic-text-editor-icon-fg",
+      "cssValue": "var(--semantic-fg-secondary)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "4.0_Component_Colours",
+      "figmaPath": "text-editor-icon-fg_active",
+      "cssProperty": "--semantic-text-editor-icon-fg-active",
+      "cssValue": "var(--semantic-fg-primary)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "4.0_Component_Colours",
+      "figmaPath": "button-primary-icon",
+      "cssProperty": "--semantic-button-primary-icon",
+      "cssValue": "var(--semantic-fg-white)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "4.0_Component_Colours",
+      "figmaPath": "button-primary-icon_hover",
+      "cssProperty": "--semantic-button-primary-icon-hover",
+      "cssValue": "var(--semantic-fg-white)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "4.0_Component_Colours",
+      "figmaPath": "button-destructive-primary-icon",
+      "cssProperty": "--semantic-button-destructive-primary-icon",
+      "cssValue": "var(--semantic-fg-white)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "4.0_Component_Colours",
+      "figmaPath": "button-destructive-primary-icon_hover",
+      "cssProperty": "--semantic-button-destructive-primary-icon-hover",
+      "cssValue": "var(--semantic-fg-white)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "4.0_Component_Colours",
+      "figmaPath": "footer-button-fg",
+      "cssProperty": "--semantic-footer-button-fg",
+      "cssValue": "var(--semantic-text-brand-secondary)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "4.0_Component_Colours",
+      "figmaPath": "footer-button-fg_hover",
+      "cssProperty": "--semantic-footer-button-fg-hover",
+      "cssValue": "var(--semantic-text-brand-secondary-hover)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "4.0_Component_Colours",
+      "figmaPath": "icon-fg-brand",
+      "cssProperty": "--semantic-icon-fg-brand",
+      "cssValue": "var(--semantic-fg-brand-primary)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "4.0_Component_Colours",
+      "figmaPath": "icon-fg-brand_on-brand",
+      "cssProperty": "--semantic-icon-fg-brand-on-brand",
+      "cssValue": "var(--semantic-text-brand-tertiary-alt)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "4.0_Component_Colours",
+      "figmaPath": "featured-icon-light-fg-brand",
+      "cssProperty": "--semantic-featured-icon-light-fg-brand",
+      "cssValue": "var(--semantic-fg-brand-primary)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "4.0_Component_Colours",
+      "figmaPath": "featured-icon-light-fg-gray",
+      "cssProperty": "--semantic-featured-icon-light-fg-grey",
+      "cssValue": "var(--semantic-fg-secondary)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "4.0_Component_Colours",
+      "figmaPath": "featured-icon-light-fg-error",
+      "cssProperty": "--semantic-featured-icon-light-fg-error",
+      "cssValue": "var(--semantic-fg-error-primary)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "4.0_Component_Colours",
+      "figmaPath": "featured-icon-light-fg-warning",
+      "cssProperty": "--semantic-featured-icon-light-fg-warning",
+      "cssValue": "var(--semantic-fg-warning-primary)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "4.0_Component_Colours",
+      "figmaPath": "featured-icon-light-fg-success",
+      "cssProperty": "--semantic-featured-icon-light-fg-success",
+      "cssValue": "var(--semantic-fg-success-primary)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "4.0_Component_Colours",
+      "figmaPath": "slider-handle-bg",
+      "cssProperty": "--semantic-slider-handle-bg",
+      "cssValue": "var(--semantic-bg-primary)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "4.0_Component_Colours",
+      "figmaPath": "slider-handle-border",
+      "cssProperty": "--semantic-slider-handle-border",
+      "cssValue": "var(--semantic-border-brand)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "4.0_Component_Colours",
+      "figmaPath": "focus-ring",
+      "cssProperty": "--semantic-focus-ring",
+      "cssValue": "var(--semantic-border-brand)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "4.0_Component_Colours",
+      "figmaPath": "focus-ring-error",
+      "cssProperty": "--semantic-focus-ring-error",
+      "cssValue": "var(--semantic-border-error)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
       "figmaCollection": "5.0_Effects",
       "figmaPath": "shadow-xs",
       "cssProperty": "--semantic-shadow-xs",
@@ -3562,6 +4660,195 @@
       "figmaPath": "shadow-skeumorphic-inner-border",
       "cssProperty": "--semantic-shadow-skeumorphic-inner-border",
       "cssValue": "rgba(10, 13, 18, 0.18)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "5.0_Effects",
+      "figmaPath": "blur-sm",
+      "cssProperty": "--semantic-blur-sm",
+      "cssValue": "8px",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "5.0_Effects",
+      "figmaPath": "blur-md",
+      "cssProperty": "--semantic-blur-md",
+      "cssValue": "16px",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "5.0_Effects",
+      "figmaPath": "blur-lg",
+      "cssProperty": "--semantic-blur-lg",
+      "cssValue": "24px",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "5.0_Effects",
+      "figmaPath": "blur-xl",
+      "cssProperty": "--semantic-blur-xl",
+      "cssValue": "40px",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "5.0_Effects",
+      "figmaPath": "shadow-xs",
+      "cssProperty": "--semantic-shadow-xs",
+      "cssValue": "rgba(0, 0, 0, 0.15)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "5.0_Effects",
+      "figmaPath": "shadow-sm_01",
+      "cssProperty": "--semantic-shadow-sm-01",
+      "cssValue": "rgba(0, 0, 0, 0.25)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "5.0_Effects",
+      "figmaPath": "shadow-sm_02",
+      "cssProperty": "--semantic-shadow-sm-02",
+      "cssValue": "rgba(0, 0, 0, 0.2)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "5.0_Effects",
+      "figmaPath": "shadow-md_01",
+      "cssProperty": "--semantic-shadow-md-01",
+      "cssValue": "rgba(0, 0, 0, 0.25)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "5.0_Effects",
+      "figmaPath": "shadow-md_02",
+      "cssProperty": "--semantic-shadow-md-02",
+      "cssValue": "rgba(0, 0, 0, 0.15)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "5.0_Effects",
+      "figmaPath": "shadow-lg_01",
+      "cssProperty": "--semantic-shadow-lg-01",
+      "cssValue": "rgba(0, 0, 0, 0.2)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "5.0_Effects",
+      "figmaPath": "shadow-lg_02",
+      "cssProperty": "--semantic-shadow-lg-02",
+      "cssValue": "rgba(0, 0, 0, 0.1)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "5.0_Effects",
+      "figmaPath": "shadow-lg_03",
+      "cssProperty": "--semantic-shadow-lg-03",
+      "cssValue": "rgba(0, 0, 0, 0.1)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "5.0_Effects",
+      "figmaPath": "shadow-xl_01",
+      "cssProperty": "--semantic-shadow-xl-01",
+      "cssValue": "rgba(0, 0, 0, 0.2)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "5.0_Effects",
+      "figmaPath": "shadow-xl_02",
+      "cssProperty": "--semantic-shadow-xl-02",
+      "cssValue": "rgba(0, 0, 0, 0.1)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "5.0_Effects",
+      "figmaPath": "shadow-xl_03",
+      "cssProperty": "--semantic-shadow-xl-03",
+      "cssValue": "rgba(0, 0, 0, 0.1)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "5.0_Effects",
+      "figmaPath": "shadow-2xl_01",
+      "cssProperty": "--semantic-shadow-2xl-01",
+      "cssValue": "rgba(0, 0, 0, 0.4)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "5.0_Effects",
+      "figmaPath": "shadow-2xl_02",
+      "cssProperty": "--semantic-shadow-2xl-02",
+      "cssValue": "rgba(0, 0, 0, 0.1)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "5.0_Effects",
+      "figmaPath": "shadow-3xl_01",
+      "cssProperty": "--semantic-shadow-3xl-01",
+      "cssValue": "rgba(0, 0, 0, 0.35)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "5.0_Effects",
+      "figmaPath": "shadow-3xl_02",
+      "cssProperty": "--semantic-shadow-3xl-02",
+      "cssValue": "rgba(0, 0, 0, 0.1)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "5.0_Effects",
+      "figmaPath": "shadow-skeumorphic-inner",
+      "cssProperty": "--semantic-shadow-skeumorphic-inner",
+      "cssValue": "rgba(12, 14, 18, 0.05)",
+      "valueType": "color",
+      "tier": "semantic-color",
+      "category": "color"
+    },
+    {
+      "figmaCollection": "5.0_Effects",
+      "figmaPath": "shadow-skeumorphic-inner-border",
+      "cssProperty": "--semantic-shadow-skeumorphic-inner-border",
+      "cssValue": "rgba(12, 14, 18, 0.18)",
       "valueType": "color",
       "tier": "semantic-color",
       "category": "color"

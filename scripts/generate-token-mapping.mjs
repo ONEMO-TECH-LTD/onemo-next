@@ -186,6 +186,13 @@ function getLightDarkModes(collection) {
   return { lightName: light[0], darkName: dark[0], lightMode: light[1], darkMode: dark[1] };
 }
 
+function getValueMode(collection) {
+  const entries = Object.entries(collection?.modes || {});
+  const value = entries.find(([n]) => /^value$/i.test(n));
+  if (value) return value[1];
+  return entries.length === 1 ? entries[0][1] : null;
+}
+
 function prependCategory(path, category) {
   if (!category || path[0] === category) return path;
   return [category, ...path];
@@ -848,6 +855,27 @@ function collectAllTokenMappings(collections) {
     });
   }
 
+  // ─── Tier: semantic — sizes ──────────────────────────────────────────────────
+
+  const sizeInfo = findCollection(collections, COLLECTION_NAMES.semanticSize);
+  if (sizeInfo) {
+    const sizeMode = getModeData(sizeInfo.collection, ['Value', 'Mode 1', 'Style']);
+    for (const entry of flattenTree(sizeMode)) {
+      const nameParts = entry.path.map(p => toKebab(p));
+      const resolvedValue = resolveReference(entry.node.$value, entry.node.$collectionName || sizeInfo.name, collections);
+      const cssValue = typeof resolvedValue === 'number' ? `${resolvedValue}px` : `${resolvedValue}`;
+      tokens.push({
+        figmaCollection: sizeInfo.name,
+        figmaPath: entry.path.join('/'),
+        cssProperty: `--size-${nameParts.join('-')}`,
+        cssValue,
+        valueType: 'dimension',
+        tier: 'semantic',
+        category: 'size',
+      });
+    }
+  }
+
   // ─── Tier: semantic — typography composites ──────────────────────────────────
 
   const typoInfo = requireCollection(collections, [...COLLECTION_NAMES.semanticType, ...COLLECTION_NAMES.semanticTypeLegacy], 'Semantic typography');
@@ -910,8 +938,39 @@ function collectAllTokenMappings(collections) {
 
   for (const collectionInfo of getSemanticColorCollections(collections)) {
     const modePair = getLightDarkModes(collectionInfo.collection);
-    if (!modePair) continue;
+    if (!modePair) {
+      const valueMode = getValueMode(collectionInfo.collection);
+      if (valueMode) {
+        for (const entry of flattenTree(valueMode)) {
+          const semanticName = buildSemanticColorName(entry.path);
+          const cssRef = buildColorValueRef(entry.node, collections);
+          tokens.push({
+            figmaCollection: collectionInfo.name,
+            figmaPath: entry.path.join('/'),
+            cssProperty: `--semantic-${semanticName}`,
+            cssValue: cssRef,
+            valueType: 'color',
+            tier: 'semantic-color',
+            category: 'color',
+          });
+        }
+      }
+      continue;
+    }
     for (const entry of flattenTree(modePair.lightMode)) {
+      const semanticName = buildSemanticColorName(entry.path);
+      const cssRef = buildColorValueRef(entry.node, collections);
+      tokens.push({
+        figmaCollection: collectionInfo.name,
+        figmaPath: entry.path.join('/'),
+        cssProperty: `--semantic-${semanticName}`,
+        cssValue: cssRef,
+        valueType: 'color',
+        tier: 'semantic-color',
+        category: 'color',
+      });
+    }
+    for (const entry of flattenTree(modePair.darkMode)) {
       const semanticName = buildSemanticColorName(entry.path);
       const cssRef = buildColorValueRef(entry.node, collections);
       tokens.push({

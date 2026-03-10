@@ -62,58 +62,12 @@ const FONT_WEIGHT_MAP = {
 };
 
 /**
- * Font family alias mapping: normalised Figma key → CSS semantic name
- * Keys match the output of normaliseAliasFamilyKey() on the 2.1_Alias_Type collection.
- * Updated for 2026-03-06 JSON: DS now has two font slots (primary = Chillax, body = Satoshi).
+ * Runtime-loaded naming rules from onemo-ssot-global/11-design-system/naming-rules.json.
+ * These are populated inside main() before any collection processing runs.
  */
-const FONT_FAMILY_ALIAS_MAP = {
-  'Primary': 'primary',
-  'Body': 'body',
-};
-
-const COLLECTION_NAMES = {
-  // ─── Primitive (Layer 1) ──────────────────────────────────────────────────
-  primitiveColor:           ['1.0_Primitive_Colours'],
-  primitiveDimensions:      ['1.1_Primitive_Dimensions'],
-  primitiveType:            ['1.2_Primitive_Type'],
-  primitiveFluidSpacing:    ['1.3_Primitive_Fluid_Spacing'],
-  primitiveFluidTypeSize:   ['1.4_Primitive_Fluid_Type_Size'],
-  primitiveFluidTypeHeight: ['1.5_Primitive_Fluid_Type_Height'],
-
-  // ─── Alias (Layer 2 — internal only, CONFIG.emitAlias = false) ───────────
-  aliasColor:       ['2.0_Alias_Colours'],
-  aliasType:        ['2.1_Alias_Type'],
-  aliasRadius:      ['2.2_Alias_Radius'],
-  aliasWidth:       ['2.3_Alias_Width'],
-  aliasSpacing:     ['2.4_Alias_Spacing'],
-  aliasSize:        ['2.5_Alias_Size'],
-  aliasBorderWidth: ['2.6_Alias_Border_Width'],
-  aliasBreakpoints: ['2.7_Alias_Breakpoints'],
-
-  // ─── Semantic (Layer 3) ───────────────────────────────────────────────────
-  semanticColors:     ['3.0_Semantic_Colours'],
-  semanticType:       ['3.1_Semantic_Type'],
-  semanticSpacing:    ['3.2_Semantic_Spacing'],
-  semanticWidth:      ['3.3_Semantic_Width'],
-  semanticContainers: ['3.4_Semantic_Containers'],
-  semanticRadius:     ['3.5_Semantic_Radius'],
-  semanticSize:       ['3.6_Semantic_Size'],
-
-  // ─── Component & Effects (Layers 4–5) ────────────────────────────────────
-  componentColors: ['4.0_Component_Colours'],
-  effects:         ['5.0_Effects'],
-
-  // ─── Legacy (graceful fallback — absent from the 2026-03-06 JSON) ─────────
-  primitiveLegacy:          ['_Primitives'],
-  aliasLegacy:              ['_Alias'],
-  utility:                  ['6.0_Utility'],
-  semanticColorsLegacy:     ['1. Color modes'],
-  semanticTypeLegacy:       ['6. Typography'],
-  semanticSpacingLegacy:    ['3. Spacing'],
-  semanticWidthLegacy:      ['4. Widths'],
-  semanticContainersLegacy: ['5. Containers'],
-  semanticRadiusLegacy:     ['2. Radius'],
-};
+let FONT_FAMILY_ALIAS_MAP = {};
+let COLLECTION_NAMES = {};
+let BREAKPOINT_MAP = {};
 
 /**
  * Transform a key name to CSS-safe kebab-case
@@ -1075,13 +1029,9 @@ function generateSemanticCSS(collections) {
     count++;
   }
 
-  // Breakpoints — full set per blueprint (8 breakpoints, ascending)
+  // Breakpoints — full set per naming rules
   lines.push('\n  /* ═══ Breakpoints ═══ */\n');
-  const breakpointMap = {
-    xs: 375, sm: 480, md: 640, lg: 768,
-    xl: 1024, '2xl': 1280, '3xl': 1440, '4xl': 1920,
-  };
-  for (const [name, value] of Object.entries(breakpointMap)) {
+  for (const [name, value] of Object.entries(BREAKPOINT_MAP)) {
     lines.push(`  --breakpoint-${name}: ${value}px;\n`);
     count++;
   }
@@ -1610,11 +1560,7 @@ function generateTokenReference(collections) {
   lines.push('\n## Breakpoints\n\n');
   lines.push('| CSS Property | Responsive Prefix | Value |\n');
   lines.push('|---|---|---|\n');
-  const breakpointMap = {
-    'xs': 375, 'sm': 480, 'md': 640, 'lg': 768,
-    'xl': 1024, '2xl': 1280, '3xl': 1440, '4xl': 1920,
-  };
-  for (const [name, value] of Object.entries(breakpointMap)) {
+  for (const [name, value] of Object.entries(BREAKPOINT_MAP)) {
     lines.push(`| \`--breakpoint-${name}\` | \`${name}:\` | \`${value}px\` |\n`);
   }
 
@@ -2612,6 +2558,37 @@ async function main() {
   // Read and parse JSON
   const raw = await readFile(jsonPath, 'utf-8');
   const json = normaliseInputCollections(JSON.parse(raw));
+  let namingRulesRaw;
+  try {
+    namingRulesRaw = await readFile(CONFIG.namingRulesPath, 'utf-8');
+  } catch (error) {
+    throw new Error(`Failed to read naming-rules.json from ${CONFIG.namingRulesPath}: ${error.message}`);
+  }
+
+  let namingRules;
+  try {
+    namingRules = JSON.parse(namingRulesRaw);
+  } catch (error) {
+    throw new Error(`Failed to parse naming-rules.json: ${error.message}`);
+  }
+
+  if (!namingRules.converterCollections) {
+    throw new Error('naming-rules.json is missing required "converterCollections" section');
+  }
+  if (!namingRules.collections?.semantic?.fonts?.slots) {
+    throw new Error('naming-rules.json is missing required "collections.semantic.fonts.slots" section');
+  }
+  if (!namingRules.collections?.semantic?.breakpoints?.values) {
+    throw new Error('naming-rules.json is missing required "collections.semantic.breakpoints.values" section');
+  }
+
+  FONT_FAMILY_ALIAS_MAP = namingRules.collections.semantic.fonts.slots;
+  COLLECTION_NAMES = {
+    ...namingRules.converterCollections,
+    ...((namingRules.converterCollections && namingRules.converterCollections.legacy) || {}),
+  };
+  BREAKPOINT_MAP = namingRules.collections.semantic.breakpoints.values;
+
   const collections = parseCollections(json);
 
   console.log(`Collections found: ${[...collections.keys()].join(', ')}\n`);
