@@ -83,9 +83,9 @@ export default function DevTokensPage() {
             </p>
           </div>
           <div className="text-right text-xs font-mono text-zinc-600">
-            <div>mapping: {new Date(mapping.generated).toLocaleString()}</div>
+            <div>mapping: {mapping.generated.slice(0, 16).replace("T", " ")}</div>
             <div>
-              validation: {new Date(validation.timestamp).toLocaleString()}
+              validation: {validation.timestamp.slice(0, 16).replace("T", " ")}
             </div>
           </div>
         </div>
