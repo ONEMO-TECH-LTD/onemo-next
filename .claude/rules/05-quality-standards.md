@@ -1,1 +1,0 @@
-../../../kai-solo-brain/rules/quality-standards.md

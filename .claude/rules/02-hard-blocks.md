@@ -1,1 +1,0 @@
-../../../kai-solo-brain/rules/hard-blocks.md
