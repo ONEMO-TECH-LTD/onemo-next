@@ -1,1 +1,0 @@
-../../../kai-solo-brain/rules/operational-protocol.md

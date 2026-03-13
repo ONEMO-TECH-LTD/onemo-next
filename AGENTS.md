@@ -2,7 +2,6 @@
 
 > Instructions for AI coding agents (Codex, Claude Code, Cursor).
 > Read automatically at session start.
-> Rules arrive via `.claude/rules/` symlinks — requires companion repos alongside.
 
 ## Project
 
@@ -23,16 +22,16 @@ All three checks (test, lint, typecheck) must pass before opening a PR.
 
 ---
 
-## Companion Repos (required)
+## Supporting Repos
 
-Rules and project knowledge are loaded automatically via `.claude/rules/` symlinks. These repos must be cloned alongside this repo:
+The product docs live outside this repo. Load them on demand instead of mirroring global brain files into `onemo-next`.
 
 | Repo | Clone At | Purpose |
 |---|---|---|
-| `kai-solo-brain` | `../kai-solo-brain` | Universal agent rules (hard blocks, session protocol, Linear workflow, quality standards) |
 | `onemo-ssot-global` | `../onemo-ssot-global` | ONEMO project knowledge (architecture, codebase conventions, design system, specs) |
+| `kai-solo-brain` | `../kai-solo-brain` | Session/agent operating context when cross-repo or session-tracking work needs it |
 
-**Cloud agents (Codex):** Clone both repos alongside this one. Read `kai-solo-brain/agents/AGENTS.md` first, then `kai-solo-brain/memory/patterns/dan-patterns.md`.
+**Cloud agents (Codex):** Clone `onemo-ssot-global` alongside this repo. Use `kai-solo-brain` only when the task needs session protocol, team context, or cross-repo coordination. Do not assume brain-global rules auto-load inside `onemo-next`.
 
 **Slack coordination:** All agents post to #hive-mind (`C0AGC9Z18QL`) with their prefix (e.g., `[Codex]`, `[Mac Kai]`).
 
