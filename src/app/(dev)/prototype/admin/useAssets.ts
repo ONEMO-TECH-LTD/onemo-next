@@ -9,6 +9,11 @@ interface AssetOptions {
   models: Record<string, string>     // display name → path
   materialSets: Record<string, string>  // display name → set name
   materialTextures: Record<string, { normal?: string; roughness?: string; height?: string; sheenColor?: string }>
+  // Per-slot texture file options (for individual Leva dropdowns)
+  normalMaps: Record<string, string>     // "ultrasuede" → "/assets/.../normal.png"
+  roughnessMaps: Record<string, string>
+  heightMaps: Record<string, string>
+  sheenMaps: Record<string, string>
   hdris: Record<string, string>      // display name → path
   loaded: boolean
 }
@@ -23,6 +28,10 @@ const DEFAULT: AssetOptions = {
       height: '/assets/materials/ultrasuede/suede-height.png',
     },
   },
+  normalMaps: { 'ultrasuede': '/assets/materials/ultrasuede/suede-normal.png' },
+  roughnessMaps: { 'ultrasuede': '/assets/materials/ultrasuede/suede-roughness.jpg' },
+  heightMaps: { 'ultrasuede': '/assets/materials/ultrasuede/suede-height.png' },
+  sheenMaps: {},
   hdris: { 'studio (preset)': 'studio' },
   loaded: false,
 }
@@ -74,7 +83,19 @@ export function useAssets(): AssetOptions {
           hdris[`${h.name} (custom)`] = h.path
         }
 
-        setAssets({ models, materialSets, materialTextures, hdris, loaded: true })
+        // Build per-slot texture options from material sets
+        const normalMaps: Record<string, string> = {}
+        const roughnessMaps: Record<string, string> = {}
+        const heightMaps: Record<string, string> = {}
+        const sheenMaps: Record<string, string> = {}
+        for (const m of materialsData.materials || []) {
+          if (m.textures.normal) normalMaps[m.name] = m.textures.normal
+          if (m.textures.roughness) roughnessMaps[m.name] = m.textures.roughness
+          if (m.textures.height) heightMaps[m.name] = m.textures.height
+          if (m.textures.sheenColor) sheenMaps[m.name] = m.textures.sheenColor
+        }
+
+        setAssets({ models, materialSets, materialTextures, normalMaps, roughnessMaps, heightMaps, sheenMaps, hdris, loaded: true })
       } catch {
         // Keep defaults on error
         setAssets((prev) => ({ ...prev, loaded: true }))

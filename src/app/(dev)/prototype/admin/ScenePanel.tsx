@@ -192,7 +192,12 @@ export default function ScenePanel() {
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           <AssetUpload type="shapes" accept=".glb,.gltf" label="+ Model" onUploaded={refreshAssets} />
           <AssetUpload type="env" accept=".exr,.hdr,.hdri" label="+ HDRI" onUploaded={refreshAssets} />
-          <AssetUpload type="materials" accept="image/*" label="+ Texture" onUploaded={refreshAssets} />
+        </div>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+          <AssetUpload type="materials" accept="image/*" label="+ Normal" folder="imported" slot="normal" onUploaded={refreshAssets} />
+          <AssetUpload type="materials" accept="image/*" label="+ Roughness" folder="imported" slot="roughness" onUploaded={refreshAssets} />
+          <AssetUpload type="materials" accept="image/*" label="+ Height" folder="imported" slot="height" onUploaded={refreshAssets} />
+          <AssetUpload type="materials" accept="image/*" label="+ Sheen" folder="imported" slot="sheen" onUploaded={refreshAssets} />
         </div>
       </div>
     </div>

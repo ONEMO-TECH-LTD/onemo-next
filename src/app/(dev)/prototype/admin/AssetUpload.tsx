@@ -9,10 +9,12 @@ interface AssetUploadProps {
   type: 'shapes' | 'env' | 'materials'
   accept: string  // e.g., '.glb,.gltf' or '.exr,.hdr' or 'image/*'
   label: string   // e.g., 'Upload GLB' or 'Upload HDRI'
+  folder?: string // subfolder inside type dir (e.g., 'custom-set')
+  slot?: string   // texture slot name (normal|roughness|height|sheen) — renames file
   onUploaded: () => void  // refresh asset list after upload
 }
 
-export default function AssetUpload({ type, accept, label, onUploaded }: AssetUploadProps) {
+export default function AssetUpload({ type, accept, label, folder, slot, onUploaded }: AssetUploadProps) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
 
@@ -21,7 +23,10 @@ export default function AssetUpload({ type, accept, label, onUploaded }: AssetUp
     const formData = new FormData()
     formData.append('file', file)
 
-    await fetch(`/api/dev/assets/upload?type=${type}`, {
+    const params = new URLSearchParams({ type })
+    if (folder) params.set('folder', folder)
+    if (slot) params.set('slot', slot)
+    await fetch(`/api/dev/assets/upload?${params}`, {
       method: 'POST',
       body: formData,
     })

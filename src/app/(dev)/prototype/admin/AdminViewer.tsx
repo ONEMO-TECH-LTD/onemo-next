@@ -9,6 +9,7 @@ import { useControls } from 'leva'
 import { useSceneStore } from './sceneStore'
 import { useAssets } from './useAssets'
 import { useLevaHighlight } from './useLevaHighlight'
+// useLevaBrowse removed — browse buttons live in ScenePanel (left panel)
 import type { DesignState, ViewerConfig } from '../types'
 
 interface AdminViewerProps {
@@ -73,22 +74,25 @@ function AdminViewerInner({
     groundRadius: { value: 20, min: 1, max: 100, step: 1 },
   }))
 
-  // ─── Textures ──────────────────────────────────────────────
-  const defaultSet = Object.keys(assets.materialSets)[0] || 'ultrasuede'
+  // ─── Textures (read-only dropdowns — select from existing, import via left panel) ─
   const [textureParams] = useControls('Textures', () => ({
-    materialSet: {
-      value: defaultSet,
-      options: assets.materialSets,
+    normalMap: {
+      value: Object.values(assets.normalMaps)[0] || '/assets/materials/ultrasuede/suede-normal.png',
+      options: Object.keys(assets.normalMaps).length > 0 ? assets.normalMaps : { 'ultrasuede': '/assets/materials/ultrasuede/suede-normal.png' },
+    },
+    roughnessMap: {
+      value: Object.values(assets.roughnessMaps)[0] || '/assets/materials/ultrasuede/suede-roughness.jpg',
+      options: Object.keys(assets.roughnessMaps).length > 0 ? assets.roughnessMaps : { 'ultrasuede': '/assets/materials/ultrasuede/suede-roughness.jpg' },
+    },
+    heightMap: {
+      value: Object.values(assets.heightMaps)[0] || '/assets/materials/ultrasuede/suede-height.png',
+      options: Object.keys(assets.heightMaps).length > 0 ? assets.heightMaps : { 'ultrasuede': '/assets/materials/ultrasuede/suede-height.png' },
+    },
+    sheenMap: {
+      value: Object.values(assets.sheenMaps)[0] || 'none',
+      options: { 'none': 'none', ...assets.sheenMaps },
     },
   }))
-
-  // Resolve texture paths from the selected material set
-  const selectedSet = (textureParams as { materialSet: string }).materialSet
-  const resolvedTextures = assets.materialTextures[selectedSet] || {
-    normal: '/assets/materials/ultrasuede/suede-normal.png',
-    roughness: '/assets/materials/ultrasuede/suede-roughness.jpg',
-    height: '/assets/materials/ultrasuede/suede-height.png',
-  }
 
   // ─── Face Material ────────────────────────────────────────
   const [faceParams, setFace] = useControls('Face Material', () => ({
@@ -154,10 +158,10 @@ function AdminViewerInner({
     frame: frameParams,
     scene: sceneParams,
     textures: {
-      normal: resolvedTextures.normal || '/assets/materials/ultrasuede/suede-normal.png',
-      roughness: resolvedTextures.roughness || '/assets/materials/ultrasuede/suede-roughness.jpg',
-      height: resolvedTextures.height || '/assets/materials/ultrasuede/suede-height.png',
-      sheenColor: resolvedTextures.sheenColor,
+      normal: (textureParams as Record<string, string>).normalMap || '/assets/materials/ultrasuede/suede-normal.png',
+      roughness: (textureParams as Record<string, string>).roughnessMap || '/assets/materials/ultrasuede/suede-roughness.jpg',
+      height: (textureParams as Record<string, string>).heightMap || '/assets/materials/ultrasuede/suede-height.png',
+      sheenColor: (textureParams as Record<string, string>).sheenMap,
     },
     colors,
     camera: cameraParams,
