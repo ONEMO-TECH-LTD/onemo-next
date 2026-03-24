@@ -8,7 +8,7 @@ import {
 } from '@react-three/drei'
 import { Suspense, useMemo, useEffect, useRef } from 'react'
 import * as THREE from 'three'
-import { useControls, folder, button } from 'leva'
+import { useControls } from 'leva'
 import { useSceneStore } from './sceneStore'
 
 const DEFAULT_ARTWORK = '/assets/test-artwork.png'
@@ -118,7 +118,7 @@ function EffectModel({
     return tex
   }, [artworkUrl])
 
-  // Apply design state to artwork texture
+  // Apply design state to artwork texture (Three.js texture mutation is intentional)
   useEffect(() => {
     const tex = artworkTexRef.current || artworkMap
     if (!tex) return
@@ -129,6 +129,7 @@ function EffectModel({
       centerOffset - designState.offsetX * repeat,
       centerOffset - designState.offsetY * repeat
     )
+    // eslint-disable-next-line react-hooks/immutability
     tex.needsUpdate = true
   }, [designState, artworkMap])
 
