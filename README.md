@@ -1,36 +1,90 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ONEMO Next.js Application
+
+The ONEMO web application — a custom magnetic Effect design platform where customers create personalized decorative panels through a 3D visual configurator.
+
+## Tech Stack
+
+| Layer | Tool |
+|---|---|
+| Framework | Next.js 16 (App Router) |
+| Styling | Tailwind CSS v4 |
+| 3D Engine | React Three Fiber + drei |
+| Commerce | Shopify Plus (Storefront API + checkout) |
+| Database | Supabase (PostgreSQL) |
+| Assets | Cloudinary |
+| Hosting | Vercel |
+
+## Project Structure
+
+```
+onemo-next/
+├── src/                        ← all runtime source code
+│   ├── app/                    ← Next.js app router
+│   │   ├── (store)/            ← product pages (create, library, community, design)
+│   │   ├── (admin)/            ← admin pages (moderation)
+│   │   ├── (dev)/              ← dev tools (prototype, token dashboard)
+│   │   ├── api/                ← API routes (cart, designs, shopify, uploads)
+│   │   └── tokens/             ← generated CSS token files (do not edit)
+│   ├── components/             ← shared UI components
+│   ├── lib/                    ← service clients (shopify, supabase, cloudinary, api)
+│   ├── __tests__/              ← integration tests
+│   └── middleware.ts           ← Supabase auth session management
+│
+├── public/                     ← static assets served by Next.js (live/in-use only)
+├── asset-library/              ← non-runtime asset container (see asset-library/README.md)
+├── scripts/                    ← build tools and utilities (see scripts/README.md)
+├── supabase/                   ← database migrations
+├── docs/                       ← repo documentation
+│
+├── .agents/                    ← agent skills
+├── .claude/                    ← Claude Code hooks, settings
+├── .cursor/                    ← Cursor rules
+├── .github/                    ← CI workflows
+│
+├── CLAUDE.md                   ← Claude Code project instructions
+├── AGENTS.md                   ← agent engineering rules
+├── CHANGELOG.md                ← release log
+└── config files                ← tsconfig, eslint, postcss, next.config, vitest
+```
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Key Commands
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command | What it does |
+|---|---|
+| `npm run dev` | Start dev server |
+| `npm run build` | Production build |
+| `npm run build-tokens` | Regenerate CSS tokens from Figma JSON |
+| `npm run validate-tokens` | Validate token pipeline |
+| `npm run test` | Run tests |
+| `npm run typecheck` | TypeScript check |
+| `npm run lint` | ESLint |
 
-## Learn More
+## Design Tokens
 
-To learn more about Next.js, take a look at the following resources:
+Tokens are auto-generated from the SSOT Figma Variables export. Never edit `src/app/tokens/*.css` directly.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+# Source: onemo-ssot-global/11-design-system/artifacts/
+# Pipeline: scripts/tokens/build-tokens.mjs
+# Output: src/app/tokens/{primitives,aliases,semantic,semantic-inline}.css
+npm run build-tokens
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Prototype
 
-## Deploy on Vercel
+The 3D Effect configurator prototype lives at `/prototype` (route group: `(dev)`).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+src/app/(dev)/prototype/
+├── page.tsx              ← entry point
+└── EffectViewer.tsx      ← R3F 3D viewer with suede PBR materials
+```

@@ -1,0 +1,874 @@
+═══════════════════════════════════════════════════════
+SECTION 1: PRIMITIVE COLORS (_Primitives.Light.Colors)
+═══════════════════════════════════════════════════════
+Top-level groups: Base, Neutral, ONEMO - UI Palette, ONEMO - Branding Palette, Misc Utility (Untitled UI)
+
+--- Base ---
+  white: #ffffff
+  black: #000000
+  transparent: rgba(255, 255, 255, 0)
+  ONEMO white: #fafafa
+  Brand black: #071013
+
+--- Neutral (light mode ramps) ---
+
+  Gray (light mode):
+    25: #fdfdfd
+    50: #fafafa
+    100: #f5f5f5
+    200: #e9eaeb
+    300: #d5d7da
+    400: #a4a7ae
+    500: #717680
+    600: #535862
+    700: #414651
+    800: #252b37
+    900: #181d27
+    950: #0a0d12
+
+  Gray (dark mode):
+    25: #fafafa
+    50: #f7f7f7
+    100: #f0f0f1
+    200: #ececed
+    300: #cecfd2
+    400: #94979c
+    500: #85888e
+    600: #61656c
+    700: #373a41
+    800: #22262f
+    900: #13161b
+    950: #0c0e12
+
+  Gray (dark mode alpha):
+    25: rgba(255, 255, 255, 0.98)
+    50: rgba(255, 255, 255, 0.96)
+    100: rgba(255, 255, 255, 0.94)
+    200: rgba(255, 255, 255, 0.92)
+    300: rgba(255, 255, 255, 0.8)
+    400: rgba(255, 255, 255, 0.56)
+    500: rgba(255, 255, 255, 0.5)
+    600: rgba(255, 255, 255, 0.35)
+    700: rgba(255, 255, 255, 0.16)
+    800: rgba(255, 255, 255, 0.08)
+    900: rgba(255, 255, 255, 0.04)
+    950: rgba(255, 255, 255, 0)
+
+--- ONEMO - UI Palette ---
+  Color families: Dusty
+  Dusty: #e2f1f9 → #378cbe → #0d1f29 (96 stops)
+
+--- ONEMO - Branding Palette ---
+  Color families: DUSTY, SKY, ICE
+  DUSTY: #ed84d2 → #8e1e70 → #280a1f (288 stops)
+  SKY: #fdfcfc → #9e7f85 → #312d2e (216 stops)
+  ICE: #f2eab2 → #cbb725 → #282409 (96 stops)
+
+--- Misc Utility (Untitled UI) ---
+  Color families: Neautral +, Green, Teal, Cyan, Blue light, Blue, Blue dark, Violet, Purple, Pink, Rosé, Orange dark, Orange, Yellow, Green light
+  Neautral +: #697586 (84 stops)
+  Green: (no 500) (12 stops)
+  Teal: (no 500) (12 stops)
+  Cyan: (no 500) (12 stops)
+  Blue light: (no 500) (12 stops)
+  Blue: (no 500) (12 stops)
+  Blue dark: (no 500) (12 stops)
+  Violet: (no 500) (12 stops)
+  Purple: (no 500) (12 stops)
+  Pink: (no 500) (12 stops)
+  Rosé: (no 500) (12 stops)
+  Orange dark: (no 500) (12 stops)
+  Orange: (no 500) (12 stops)
+  Yellow: (no 500) (12 stops)
+  Green light: (no 500) (12 stops)
+
+--- Primitive Dark Mode Colors ---
+  Dark mode color groups: Base, Neutral, ONEMO - UI Palette, ONEMO - Branding Palette, Misc Utility (Untitled UI)
+
+  Base:
+    white: #ffffff
+    black: #000000
+    transparent: rgba(255, 255, 255, 0)
+    ONEMO white: #fafafa
+    Brand black: #071013
+  Neutral: 36 tokens
+  ONEMO - UI Palette: 96 tokens
+  ONEMO - Branding Palette: 600 tokens
+  Misc Utility (Untitled UI): 252 tokens
+
+
+═══════════════════════════════════════════════════════
+SECTION 2: ALIAS COLORS (_Aliases.Style.Colors)
+═══════════════════════════════════════════════════════
+Top-level groups: Brand, System
+
+--- Brand ---
+  25: {Colors.ONEMO - UI Palette.Dusty.Blue Green.25}
+  50: {Colors.ONEMO - UI Palette.Dusty.Blue Green.50}
+  100: {Colors.ONEMO - UI Palette.Dusty.Blue Green.100}
+  200: {Colors.ONEMO - UI Palette.Dusty.Blue Green.200}
+  300: {Colors.ONEMO - UI Palette.Dusty.Blue Green.300}
+  400: {Colors.ONEMO - UI Palette.Dusty.Blue Green.400}
+  500: {Colors.ONEMO - UI Palette.Dusty.Blue Green.500}
+  600: {Colors.ONEMO - UI Palette.Dusty.Blue Green.600}
+  700: {Colors.ONEMO - UI Palette.Dusty.Blue Green.700}
+  800: {Colors.ONEMO - UI Palette.Dusty.Blue Green.800}
+  900: {Colors.ONEMO - UI Palette.Dusty.Blue Green.900}
+  950: {Colors.ONEMO - UI Palette.Dusty.Blue Green.950}
+
+--- System ---
+  25: {Colors.ONEMO - UI Palette.Dusty.Tomato Jam.25}
+  50: {Colors.ONEMO - UI Palette.Dusty.Tomato Jam.50}
+  100: {Colors.ONEMO - UI Palette.Dusty.Tomato Jam.100}
+  200: {Colors.ONEMO - UI Palette.Dusty.Tomato Jam.200}
+  300: {Colors.ONEMO - UI Palette.Dusty.Tomato Jam.300}
+  400: {Colors.ONEMO - UI Palette.Dusty.Tomato Jam.400}
+  500: {Colors.ONEMO - UI Palette.Dusty.Tomato Jam.500}
+  600: {Colors.ONEMO - UI Palette.Dusty.Tomato Jam.600}
+  700: {Colors.ONEMO - UI Palette.Dusty.Tomato Jam.700}
+  800: {Colors.ONEMO - UI Palette.Dusty.Tomato Jam.800}
+  900: {Colors.ONEMO - UI Palette.Dusty.Tomato Jam.900}
+  950: {Colors.ONEMO - UI Palette.Dusty.Tomato Jam.950}
+  25: {Colors.ONEMO - UI Palette.Dusty.Golden Glow.25}
+  50: {Colors.ONEMO - UI Palette.Dusty.Golden Glow.50}
+  100: {Colors.ONEMO - UI Palette.Dusty.Golden Glow.100}
+  200: {Colors.ONEMO - UI Palette.Dusty.Golden Glow.200}
+  300: {Colors.ONEMO - UI Palette.Dusty.Golden Glow.300}
+  400: {Colors.ONEMO - UI Palette.Dusty.Golden Glow.400}
+  500: {Colors.ONEMO - UI Palette.Dusty.Golden Glow.500}
+  600: {Colors.ONEMO - UI Palette.Dusty.Golden Glow.600}
+  700: {Colors.ONEMO - UI Palette.Dusty.Golden Glow.700}
+  800: {Colors.ONEMO - UI Palette.Dusty.Golden Glow.800}
+  900: {Colors.ONEMO - UI Palette.Dusty.Golden Glow.900}
+  950: {Colors.ONEMO - UI Palette.Dusty.Golden Glow.950}
+  25: {Colors.ONEMO - UI Palette.Dusty.Persian Blue.25}
+  50: {Colors.ONEMO - UI Palette.Dusty.Persian Blue.50}
+  100: {Colors.ONEMO - UI Palette.Dusty.Persian Blue.100}
+  200: {Colors.ONEMO - UI Palette.Dusty.Persian Blue.200}
+  300: {Colors.ONEMO - UI Palette.Dusty.Persian Blue.300}
+  400: {Colors.ONEMO - UI Palette.Dusty.Persian Blue.400}
+  500: {Colors.ONEMO - UI Palette.Dusty.Persian Blue.500}
+  600: {Colors.ONEMO - UI Palette.Dusty.Persian Blue.600}
+  700: {Colors.ONEMO - UI Palette.Dusty.Persian Blue.700}
+  800: {Colors.ONEMO - UI Palette.Dusty.Persian Blue.800}
+  900: {Colors.ONEMO - UI Palette.Dusty.Persian Blue.900}
+  950: {Colors.ONEMO - UI Palette.Dusty.Persian Blue.950}
+  25: {Colors.ONEMO - UI Palette.Dusty.Jade Green.25}
+  50: {Colors.ONEMO - UI Palette.Dusty.Jade Green.50}
+  100: {Colors.ONEMO - UI Palette.Dusty.Jade Green.100}
+  200: {Colors.ONEMO - UI Palette.Dusty.Jade Green.200}
+  300: {Colors.ONEMO - UI Palette.Dusty.Jade Green.300}
+  400: {Colors.ONEMO - UI Palette.Dusty.Jade Green.400}
+  500: {Colors.ONEMO - UI Palette.Dusty.Jade Green.500}
+  600: {Colors.ONEMO - UI Palette.Dusty.Jade Green.600}
+  700: {Colors.ONEMO - UI Palette.Dusty.Jade Green.700}
+  800: {Colors.ONEMO - UI Palette.Dusty.Jade Green.800}
+  900: {Colors.ONEMO - UI Palette.Dusty.Jade Green.900}
+  950: {Colors.ONEMO - UI Palette.Dusty.Jade Green.950}
+
+--- Alias 'Mode' Colors ---
+Top-level groups: Brand, System
+
+  Brand:
+    : {Colors.ONEMO - UI Palette.Dusty.Blue Green.25}
+    : {Colors.ONEMO - UI Palette.Dusty.Blue Green.50}
+    : {Colors.ONEMO - UI Palette.Dusty.Blue Green.100}
+    : {Colors.ONEMO - UI Palette.Dusty.Blue Green.200}
+    : {Colors.ONEMO - UI Palette.Dusty.Blue Green.300}
+    : {Colors.ONEMO - UI Palette.Dusty.Blue Green.400}
+    : {Colors.ONEMO - UI Palette.Dusty.Blue Green.500}
+    : {Colors.ONEMO - UI Palette.Dusty.Blue Green.600}
+    : {Colors.ONEMO - UI Palette.Dusty.Blue Green.700}
+    : {Colors.ONEMO - UI Palette.Dusty.Blue Green.800}
+    : {Colors.ONEMO - UI Palette.Dusty.Blue Green.900}
+    : {Colors.ONEMO - UI Palette.Dusty.Blue Green.950}
+
+  System:
+    25: #f9e3e4
+    50: #f2c4c6
+    100: #eaa6a8
+    200: #e1888b
+    300: #d86b6e
+    400: #ce4e51
+    500: #bf373a
+    600: #9f3133
+    700: #802a2b
+    800: #612223
+    900: #44191a
+    950: #281010
+    25: #fbf9e1
+    50: #f7f3c5
+    100: #f2eda9
+    200: #ece78d
+    300: #e6e172
+    400: #e0da58
+    500: #d8d33e
+    600: #cbc72b
+    700: #a9a726
+    800: #898721
+    900: #69681b
+    950: #494914
+    25: #e4e2f9
+    50: #c7c3f2
+    100: #aba4ea
+    200: #8f87e1
+    300: #746ad8
+    400: #5a4dce
+    500: #4537be
+    600: #3b2fa0
+    700: #312781
+    800: #271f64
+    900: #1c1646
+    950: #110d29
+    25: #e3f9e8
+    50: #c4f2cf
+    100: #a6eab6
+    200: #88e19e
+    300: #6bd887
+    400: #4ece71
+    500: #37bf5d
+    600: #319f50
+    700: #2a8042
+    800: #226134
+    900: #194425
+    950: #102816
+
+
+═══════════════════════════════════════════════════════
+SECTION 3: SEMANTIC COLORS — Light mode
+═══════════════════════════════════════════════════════
+
+--- Colors/Text ---
+  text-primary (900): {Colors.Neutral.Gray (light mode).900}
+  text-primary_on-brand: {Colors.Base.white}
+  text-secondary (700): {Colors.Neutral.Gray (light mode).700}
+  text-secondary_hover: {Colors.Neutral.Gray (light mode).800}
+  text-secondary_on-brand: {Colors.Alias.Brand.200}
+  text-tertiary (600): {Colors.Neutral.Gray (light mode).600}
+  text-tertiary_hover: {Colors.Neutral.Gray (light mode).700}
+  text-tertiary_on-brand: {Colors.Alias.Brand.200}
+  text-quaternary (500): {Colors.Neutral.Gray (light mode).500}
+  text-quaternary_on-brand: {Colors.Alias.Brand.300}
+  text-white: {Colors.Base.white}
+  text-disabled: {Colors.Neutral.Gray (light mode).500}
+  text-placeholder: {Colors.Neutral.Gray (light mode).500}
+  text-placeholder_subtle: {Colors.Neutral.Gray (light mode).300}
+  text-brand-primary (900): {Colors.Alias.Brand.900}
+  text-brand-secondary (700): {Colors.Alias.Brand.700}
+  text-brand-secondary_hover: {Colors.Alias.Brand.800}
+  text-brand-tertiary (600): {Colors.Alias.Brand.600}
+  text-brand-tertiary_alt: {Colors.Alias.Brand.600}
+  text-error-primary (600): {Colors.Alias.System.Error.600}
+  text-error-primary_hover: {Colors.Alias.System.Error.700}
+  text-warning-primary (600): {Colors.Alias.System.Warning.600}
+  text-success-primary (600): {Colors.Alias.System.Success.600}
+
+--- Colors/Border ---
+  border-primary: {Colors.Neutral.Gray (light mode).300}
+  border-secondary: {Colors.Neutral.Gray (light mode).200}
+  border-secondary_alt: rgba(0, 0, 0, 0.08)
+  border-tertiary: {Colors.Neutral.Gray (light mode).100}
+  border-disabled: {Colors.Neutral.Gray (light mode).300}
+  border-disabled_subtle: {Colors.Neutral.Gray (light mode).200}
+  border-brand: {Colors.Alias.Brand.500}
+  border-brand_alt: {Colors.Alias.Brand.600}
+  border-error: {Colors.Alias.System.Error.500}
+  border-error_subtle: {Colors.Alias.System.Error.300}
+
+--- Colors/Foreground ---
+  fg-primary (900): {Colors.Neutral.Gray (light mode).900}
+  fg-secondary (700): {Colors.Neutral.Gray (light mode).700}
+  fg-secondary_hover: {Colors.Neutral.Gray (light mode).800}
+  fg-tertiary (600): {Colors.Neutral.Gray (light mode).600}
+  fg-tertiary_hover: {Colors.Neutral.Gray (light mode).700}
+  fg-quaternary (400): {Colors.Neutral.Gray (light mode).400}
+  fg-quaternary_hover: {Colors.Neutral.Gray (light mode).500}
+  fg-white: {Colors.Base.white}
+  fg-disabled: {Colors.Neutral.Gray (light mode).400}
+  fg-disabled_subtle: {Colors.Neutral.Gray (light mode).300}
+  fg-brand-primary (600): {Colors.Alias.Brand.600}
+  fg-brand-primary_alt: {Colors.Foreground.fg-brand-primary (600)}
+  fg-brand-secondary (500): {Colors.Alias.Brand.500}
+  fg-brand-secondary_alt: {Colors.Foreground.fg-brand-secondary (500)}
+  fg-brand-secondary_hover: {Colors.Alias.Brand.600}
+  fg-error-primary: {Colors.Alias.System.Error.600}
+  fg-error-secondary: {Colors.Alias.System.Error.500}
+  fg-warning-primary: {Colors.Alias.System.Warning.600}
+  fg-warning-secondary: {Colors.Alias.System.Warning.500}
+  fg-success-primary: {Colors.Alias.System.Success.600}
+  fg-success-secondary: {Colors.Alias.System.Success.500}
+
+--- Colors/Background ---
+  bg-primary: {Colors.Base.white}
+  bg-primary_alt: {Colors.Base.white}
+  bg-primary_hover: {Colors.Neutral.Gray (light mode).50}
+  bg-primary-solid: {Colors.Neutral.Gray (light mode).950}
+  bg-secondary: {Colors.Neutral.Gray (light mode).50}
+  bg-secondary_alt: {Colors.Neutral.Gray (light mode).50}
+  bg-secondary_hover: {Colors.Neutral.Gray (light mode).100}
+  bg-secondary_subtle: {Colors.Neutral.Gray (light mode).25}
+  bg-secondary-solid: {Colors.Neutral.Gray (light mode).600}
+  bg-tertiary: {Colors.Neutral.Gray (light mode).100}
+  bg-quaternary: {Colors.Neutral.Gray (light mode).200}
+  bg-active: {Colors.Neutral.Gray (light mode).50}
+  bg-disabled: {Colors.Neutral.Gray (light mode).100}
+  bg-disabled_subtle: {Colors.Neutral.Gray (light mode).50}
+  bg-overlay: {Colors.Neutral.Gray (light mode).950}
+  bg-brand-primary: {Colors.Alias.Brand.50}
+  bg-brand-primary_alt: {Colors.Alias.Brand.50}
+  bg-brand-secondary: {Colors.Alias.Brand.100}
+  bg-brand-solid: {Colors.Alias.Brand.600}
+  bg-brand-solid_hover: {Colors.Alias.Brand.700}
+  bg-brand-section: {Colors.Alias.Brand.800}
+  bg-brand-section_subtle: {Colors.Alias.Brand.700}
+  bg-error-primary: {Colors.Alias.System.Error.50}
+  bg-error-secondary: {Colors.Alias.System.Error.100}
+  bg-error-solid: {Colors.Alias.System.Error.600}
+  bg-error-solid_hover: {Colors.Alias.System.Error.700}
+  bg-warning-primary: {Colors.Alias.System.Warning.50}
+  bg-warning-secondary: {Colors.Alias.System.Warning.100}
+  bg-warning-solid: {Colors.Alias.System.Warning.600}
+  bg-success-primary: {Colors.Alias.System.Success.50}
+  bg-success-secondary: {Colors.Alias.System.Success.100}
+  bg-success-solid: {Colors.Alias.System.Success.600}
+
+--- Colors/Effects ---
+  Focus rings/focus-ring: {Colors.Alias.Brand.500}
+  Focus rings/focus-ring-error: {Colors.Alias.System.Error.500}
+  Shadows/shadow-xs: rgba(10, 13, 18, 0.05)
+  Shadows/shadow-sm_01: rgba(10, 13, 18, 0.1)
+  Shadows/shadow-sm_02: rgba(10, 13, 18, 0.1)
+  Shadows/shadow-md_01: rgba(10, 13, 18, 0.1)
+  Shadows/shadow-md_02: rgba(10, 13, 18, 0.06)
+  Shadows/shadow-lg_01: rgba(10, 13, 18, 0.08)
+  Shadows/shadow-lg_02: rgba(10, 13, 18, 0.03)
+  Shadows/shadow-lg_03: rgba(10, 13, 18, 0.04)
+  Shadows/shadow-xl_01: rgba(10, 13, 18, 0.08)
+  Shadows/shadow-xl_02: rgba(10, 13, 18, 0.03)
+  Shadows/shadow-xl_03: rgba(10, 13, 18, 0.04)
+  Shadows/shadow-2xl_01: rgba(10, 13, 18, 0.18)
+  Shadows/shadow-2xl_02: rgba(10, 13, 18, 0.04)
+  Shadows/shadow-3xl_01: rgba(10, 13, 18, 0.14)
+  Shadows/shadow-3xl_02: rgba(10, 13, 18, 0.04)
+  Shadows/shadow-skeumorphic-inner: rgba(10, 13, 18, 0.05)
+  Shadows/shadow-skeumorphic-inner-border: rgba(10, 13, 18, 0.18)
+
+--- Component colors/Alpha ---
+  alpha-white-10: rgba(255, 255, 255, 0.1)
+  alpha-white-20: rgba(255, 255, 255, 0.2)
+  alpha-white-30: rgba(255, 255, 255, 0.3)
+  alpha-white-40: rgba(255, 255, 255, 0.4)
+  alpha-white-50: rgba(255, 255, 255, 0.5)
+  alpha-white-60: rgba(255, 255, 255, 0.6)
+  alpha-white-70: rgba(255, 255, 255, 0.7)
+  alpha-white-80: rgba(255, 255, 255, 0.8)
+  alpha-white-90: rgba(255, 255, 255, 0.9)
+  alpha-white-100: #ffffff
+  alpha-black-10: rgba(0, 0, 0, 0.1)
+  alpha-black-20: rgba(0, 0, 0, 0.2)
+  alpha-black-30: rgba(0, 0, 0, 0.3)
+  alpha-black-40: rgba(0, 0, 0, 0.4)
+  alpha-black-50: rgba(0, 0, 0, 0.5)
+  alpha-black-60: rgba(0, 0, 0, 0.6)
+  alpha-black-70: rgba(0, 0, 0, 0.7)
+  alpha-black-80: rgba(0, 0, 0, 0.8)
+  alpha-black-90: rgba(0, 0, 0, 0.9)
+  alpha-black-100: #000000
+
+--- Component colors/Utility ---
+  Gray/utility-gray-50: {Colors.Neutral.Gray (light mode).50}
+  Gray/utility-gray-100: {Colors.Neutral.Gray (light mode).100}
+  Gray/utility-gray-200: {Colors.Neutral.Gray (light mode).200}
+  Gray/utility-gray-300: {Colors.Neutral.Gray (light mode).300}
+  Gray/utility-gray-400: {Colors.Neutral.Gray (light mode).400}
+  Gray/utility-gray-500: {Colors.Neutral.Gray (light mode).500}
+  Gray/utility-gray-600: {Colors.Neutral.Gray (light mode).600}
+  Gray/utility-gray-700: {Colors.Neutral.Gray (light mode).700}
+  Gray/utility-gray-800: {Colors.Neutral.Gray (light mode).800}
+  Gray/utility-gray-900: {Colors.Neutral.Gray (light mode).900}
+  Brand/utility-brand-50: {Colors.Alias.Brand.50}
+  Brand/utility-brand-50_alt: {Colors.Alias.Brand.50}
+  Brand/utility-brand-100: {Colors.Alias.Brand.100}
+  Brand/utility-brand-100_alt: {Colors.Alias.Brand.100}
+  Brand/utility-brand-200: {Colors.Alias.Brand.200}
+  Brand/utility-brand-200_alt: {Colors.Alias.Brand.200}
+  Brand/utility-brand-300: {Colors.Alias.Brand.300}
+  Brand/utility-brand-300_alt: {Colors.Alias.Brand.300}
+  Brand/utility-brand-400: {Colors.Alias.Brand.400}
+  Brand/utility-brand-400_alt: {Colors.Alias.Brand.400}
+  Brand/utility-brand-500: {Colors.Alias.Brand.500}
+  Brand/utility-brand-500_alt: {Colors.Alias.Brand.500}
+  Brand/utility-brand-600: {Colors.Alias.Brand.600}
+  Brand/utility-brand-600_alt: {Colors.Alias.Brand.600}
+  Brand/utility-brand-700: {Colors.Alias.Brand.700}
+  Brand/utility-brand-700_alt: {Colors.Alias.Brand.700}
+  Brand/utility-brand-800: {Colors.Alias.Brand.800}
+  Brand/utility-brand-800_alt: {Colors.Alias.Brand.800}
+  Brand/utility-brand-900: {Colors.Alias.Brand.900}
+  Brand/utility-brand-900_alt: {Colors.Alias.Brand.900}
+  Error/utility-error-50: {Colors.Alias.System.Error.50}
+  Error/utility-error-100: {Colors.Alias.System.Error.100}
+  Error/utility-error-200: {Colors.Alias.System.Error.200}
+  Error/utility-error-300: {Colors.Alias.System.Error.300}
+  Error/utility-error-400: {Colors.Alias.System.Error.400}
+  Error/utility-error-500: {Colors.Alias.System.Error.500}
+  Error/utility-error-600: {Colors.Alias.System.Error.600}
+  Error/utility-error-700: {Colors.Alias.System.Error.700}
+  Warning/utility-warning-50: {Colors.Alias.System.Warning.50}
+  Warning/utility-warning-100: {Colors.Alias.System.Warning.100}
+  Warning/utility-warning-200: {Colors.Alias.System.Warning.200}
+  Warning/utility-warning-300: {Colors.Alias.System.Warning.300}
+  Warning/utility-warning-400: {Colors.Alias.System.Warning.400}
+  Warning/utility-warning-500: {Colors.Alias.System.Warning.500}
+  Warning/utility-warning-600: {Colors.Alias.System.Warning.600}
+  Warning/utility-warning-700: {Colors.Alias.System.Warning.700}
+  Success/utility-success-50: {Colors.Alias.System.Success.50}
+  Success/utility-success-100: {Colors.Alias.System.Success.100}
+  Success/utility-success-200: {Colors.Alias.System.Success.200}
+  Success/utility-success-300: {Colors.Alias.System.Success.300}
+  Success/utility-success-400: {Colors.Alias.System.Success.400}
+  Success/utility-success-500: {Colors.Alias.System.Success.500}
+  Success/utility-success-600: {Colors.Alias.System.Success.600}
+  Success/utility-success-700: {Colors.Alias.System.Success.700}
+  Gray blue/utility-gray-blue-50: {Colors.Misc Utility (Untitled UI).Neautral +.Gray blue.50}
+  Gray blue/utility-gray-blue-100: {Colors.Misc Utility (Untitled UI).Neautral +.Gray blue.100}
+  Gray blue/utility-gray-blue-200: {Colors.Misc Utility (Untitled UI).Neautral +.Gray blue.200}
+  Gray blue/utility-gray-blue-300: {Colors.Misc Utility (Untitled UI).Neautral +.Gray blue.300}
+  Gray blue/utility-gray-blue-400: {Colors.Misc Utility (Untitled UI).Neautral +.Gray blue.400}
+  Gray blue/utility-gray-blue-500: {Colors.Misc Utility (Untitled UI).Neautral +.Gray blue.500}
+  Gray blue/utility-gray-blue-600: {Colors.Misc Utility (Untitled UI).Neautral +.Gray blue.600}
+  Gray blue/utility-gray-blue-700: {Colors.Misc Utility (Untitled UI).Neautral +.Gray blue.700}
+  Green/utility-green-50: {Colors.Misc Utility (Untitled UI).Green.50}
+  Green/utility-green-100: {Colors.Misc Utility (Untitled UI).Green.100}
+  Green/utility-green-200: {Colors.Misc Utility (Untitled UI).Green.200}
+  Green/utility-green-300: {Colors.Misc Utility (Untitled UI).Green.300}
+  Green/utility-green-400: {Colors.Misc Utility (Untitled UI).Green.400}
+  Green/utility-green-500: {Colors.Misc Utility (Untitled UI).Green.500}
+  Green/utility-green-600: {Colors.Misc Utility (Untitled UI).Green.600}
+  Green/utility-green-700: {Colors.Misc Utility (Untitled UI).Green.700}
+  Blue light/utility-blue-light-50: {Colors.Misc Utility (Untitled UI).Blue light.50}
+  Blue light/utility-blue-light-100: {Colors.Misc Utility (Untitled UI).Blue light.100}
+  Blue light/utility-blue-light-200: {Colors.Misc Utility (Untitled UI).Blue light.200}
+  Blue light/utility-blue-light-300: {Colors.Misc Utility (Untitled UI).Blue light.300}
+  Blue light/utility-blue-light-400: {Colors.Misc Utility (Untitled UI).Blue light.400}
+  Blue light/utility-blue-light-500: {Colors.Misc Utility (Untitled UI).Blue light.500}
+  Blue light/utility-blue-light-600: {Colors.Misc Utility (Untitled UI).Blue light.600}
+  Blue light/utility-blue-light-700: {Colors.Misc Utility (Untitled UI).Blue light.700}
+  Blue/utility-blue-50: {Colors.Misc Utility (Untitled UI).Blue.50}
+  Blue/utility-blue-100: {Colors.Misc Utility (Untitled UI).Blue.100}
+  Blue/utility-blue-200: {Colors.Misc Utility (Untitled UI).Blue.200}
+  Blue/utility-blue-300: {Colors.Misc Utility (Untitled UI).Blue.300}
+  Blue/utility-blue-400: {Colors.Misc Utility (Untitled UI).Blue.400}
+  Blue/utility-blue-500: {Colors.Misc Utility (Untitled UI).Blue.500}
+  Blue/utility-blue-600: {Colors.Misc Utility (Untitled UI).Blue.600}
+  Blue/utility-blue-700: {Colors.Misc Utility (Untitled UI).Blue.700}
+  Blue dark/utility-blue-dark-50: {Colors.Misc Utility (Untitled UI).Blue dark.50}
+  Blue dark/utility-blue-dark-100: {Colors.Misc Utility (Untitled UI).Blue dark.100}
+  Blue dark/utility-blue-dark-200: {Colors.Misc Utility (Untitled UI).Blue dark.200}
+  Blue dark/utility-blue-dark-300: {Colors.Misc Utility (Untitled UI).Blue dark.300}
+  Blue dark/utility-blue-dark-400: {Colors.Misc Utility (Untitled UI).Blue dark.400}
+  Blue dark/utility-blue-dark-500: {Colors.Misc Utility (Untitled UI).Blue dark.500}
+  Blue dark/utility-blue-dark-600: {Colors.Misc Utility (Untitled UI).Blue dark.600}
+  Blue dark/utility-blue-dark-700: {Colors.Misc Utility (Untitled UI).Blue dark.700}
+  Indigo/utility-indigo-50: {Colors.ONEMO - UI Palette.Dusty.Indigo Bloom.50}
+  Indigo/utility-indigo-100: {Colors.ONEMO - UI Palette.Dusty.Indigo Bloom.100}
+  Indigo/utility-indigo-200: {Colors.ONEMO - UI Palette.Dusty.Indigo Bloom.200}
+  Indigo/utility-indigo-300: {Colors.ONEMO - UI Palette.Dusty.Indigo Bloom.300}
+  Indigo/utility-indigo-400: {Colors.ONEMO - UI Palette.Dusty.Indigo Bloom.400}
+  Indigo/utility-indigo-500: {Colors.ONEMO - UI Palette.Dusty.Indigo Bloom.500}
+  Indigo/utility-indigo-600: {Colors.ONEMO - UI Palette.Dusty.Indigo Bloom.600}
+  Indigo/utility-indigo-700: {Colors.ONEMO - UI Palette.Dusty.Indigo Bloom.700}
+  Purple/utility-purple-50: {Colors.Misc Utility (Untitled UI).Purple.50}
+  Purple/utility-purple-100: {Colors.Misc Utility (Untitled UI).Purple.100}
+  Purple/utility-purple-200: {Colors.Misc Utility (Untitled UI).Purple.200}
+  Purple/utility-purple-300: {Colors.Misc Utility (Untitled UI).Purple.300}
+  Purple/utility-purple-400: {Colors.Misc Utility (Untitled UI).Purple.400}
+  Purple/utility-purple-500: {Colors.Misc Utility (Untitled UI).Purple.500}
+  Purple/utility-purple-600: {Colors.Misc Utility (Untitled UI).Purple.600}
+  Purple/utility-purple-700: {Colors.Misc Utility (Untitled UI).Purple.700}
+  Fuchsia/utility-fuchsia-50: {Colors.ONEMO - UI Palette.Dusty.Raspberry Plum.50}
+  Fuchsia/utility-fuchsia-100: {Colors.ONEMO - UI Palette.Dusty.Raspberry Plum.100}
+  Fuchsia/utility-fuchsia-200: {Colors.ONEMO - UI Palette.Dusty.Raspberry Plum.200}
+  Fuchsia/utility-fuchsia-300: {Colors.ONEMO - UI Palette.Dusty.Raspberry Plum.300}
+  Fuchsia/utility-fuchsia-400: {Colors.ONEMO - UI Palette.Dusty.Raspberry Plum.400}
+  Fuchsia/utility-fuchsia-500: {Colors.ONEMO - UI Palette.Dusty.Raspberry Plum.500}
+  Fuchsia/utility-fuchsia-600: {Colors.ONEMO - UI Palette.Dusty.Raspberry Plum.600}
+  Fuchsia/utility-fuchsia-700: {Colors.ONEMO - UI Palette.Dusty.Raspberry Plum.700}
+  Pink/utility-pink-50: {Colors.Misc Utility (Untitled UI).Pink.50}
+  Pink/utility-pink-100: {Colors.Misc Utility (Untitled UI).Pink.100}
+  Pink/utility-pink-200: {Colors.Misc Utility (Untitled UI).Pink.200}
+  Pink/utility-pink-300: {Colors.Misc Utility (Untitled UI).Pink.300}
+  Pink/utility-pink-400: {Colors.Misc Utility (Untitled UI).Pink.400}
+  Pink/utility-pink-500: {Colors.Misc Utility (Untitled UI).Pink.500}
+  Pink/utility-pink-600: {Colors.Misc Utility (Untitled UI).Pink.600}
+  Pink/utility-pink-700: {Colors.Misc Utility (Untitled UI).Pink.700}
+  Orange dark/utility-orange-dark-50: {Colors.Misc Utility (Untitled UI).Orange dark.50}
+  Orange dark/utility-orange-dark-100: {Colors.Misc Utility (Untitled UI).Orange dark.100}
+  Orange dark/utility-orange-dark-200: {Colors.Misc Utility (Untitled UI).Orange dark.200}
+  Orange dark/utility-orange-dark-300: {Colors.Misc Utility (Untitled UI).Orange dark.300}
+  Orange dark/utility-orange-dark-400: {Colors.Misc Utility (Untitled UI).Orange dark.400}
+  Orange dark/utility-orange-dark-500: {Colors.Misc Utility (Untitled UI).Orange dark.500}
+  Orange dark/utility-orange-dark-600: {Colors.Misc Utility (Untitled UI).Orange dark.600}
+  Orange dark/utility-orange-dark-700: {Colors.Misc Utility (Untitled UI).Orange dark.700}
+  Orange/utility-orange-50: {Colors.Misc Utility (Untitled UI).Orange.50}
+  Orange/utility-orange-100: {Colors.Misc Utility (Untitled UI).Orange.100}
+  Orange/utility-orange-200: {Colors.Misc Utility (Untitled UI).Orange.200}
+  Orange/utility-orange-300: {Colors.Misc Utility (Untitled UI).Orange.300}
+  Orange/utility-orange-400: {Colors.Misc Utility (Untitled UI).Orange.400}
+  Orange/utility-orange-500: {Colors.Misc Utility (Untitled UI).Orange.500}
+  Orange/utility-orange-600: {Colors.Misc Utility (Untitled UI).Orange.600}
+  Orange/utility-orange-700: {Colors.Misc Utility (Untitled UI).Orange.700}
+  Yellow/utility-yellow-50: {Colors.Misc Utility (Untitled UI).Yellow.50}
+  Yellow/utility-yellow-100: {Colors.Misc Utility (Untitled UI).Yellow.100}
+  Yellow/utility-yellow-200: {Colors.Misc Utility (Untitled UI).Yellow.200}
+  Yellow/utility-yellow-300: {Colors.Misc Utility (Untitled UI).Yellow.300}
+  Yellow/utility-yellow-400: {Colors.Misc Utility (Untitled UI).Yellow.400}
+  Yellow/utility-yellow-500: {Colors.Misc Utility (Untitled UI).Yellow.500}
+  Yellow/utility-yellow-600: {Colors.Misc Utility (Untitled UI).Yellow.600}
+  Yellow/utility-yellow-700: {Colors.Misc Utility (Untitled UI).Yellow.700}
+
+--- Component colors/Components ---
+  Buttons/button-primary-icon: {Colors.Alias.Brand.300}
+  Buttons/button-primary-icon_hover: {Colors.Alias.Brand.200}
+  Buttons/button-destructive-primary-icon: {Colors.Alias.System.Error.300}
+  Buttons/button-destructive-primary-icon_hover: {Colors.Alias.System.Error.200}
+  Footers/footer-button-fg: {Colors.Alias.Brand.200}
+  Footers/footer-button-fg_hover: {Colors.Base.white}
+  Icons/Icons/icon-fg-brand: {Colors.Alias.Brand.600}
+  Icons/Icons/icon-fg-brand_on-brand: {Colors.Alias.Brand.200}
+  Icons/Featured icons/featured-icon-light-fg-brand: {Colors.Alias.Brand.600}
+  Icons/Featured icons/featured-icon-light-fg-gray: {Colors.Neutral.Gray (light mode).500}
+  Icons/Featured icons/featured-icon-light-fg-error: {Colors.Alias.System.Error.600}
+  Icons/Featured icons/featured-icon-light-fg-warning: {Colors.Alias.System.Warning.600}
+  Icons/Featured icons/featured-icon-light-fg-success: {Colors.Alias.System.Success.600}
+  Sliders/slider-handle-bg: {Colors.Base.white}
+  Sliders/slider-handle-border: {Colors.Alias.Brand.600}
+  Toggles/toggle-button-fg_disabled: {Colors.Neutral.Gray (light mode).50}
+  Toggles/toggle-border: {Colors.Neutral.Gray (light mode).300}
+  Toggles/toggle-slim-border_pressed: {Colors.Background.bg-brand-solid}
+  Toggles/toggle-slim-border_pressed-hover: {Colors.Background.bg-brand-solid_hover}
+  Tooltips/tooltip-supporting-text: {Colors.Neutral.Gray (light mode).300}
+  Text editor/text-editor-icon-fg: {Colors.Neutral.Gray (light mode).400}
+  Text editor/text-editor-icon-fg_active: {Colors.Neutral.Gray (light mode).500}
+
+Total Light mode semantic tokens: 297
+
+
+═══════════════════════════════════════════════════════
+SECTION 4: SEMANTIC COLORS — Dark mode
+═══════════════════════════════════════════════════════
+
+--- Colors/Text ---
+  text-primary (900): {Colors.Neutral.Gray (dark mode).50}
+  text-primary_on-brand: {Colors.Neutral.Gray (dark mode).50}
+  text-secondary (700): {Colors.Neutral.Gray (dark mode).300}
+  text-secondary_hover: {Colors.Neutral.Gray (dark mode).200}
+  text-secondary_on-brand: {Colors.Neutral.Gray (dark mode).300}
+  text-tertiary (600): {Colors.Neutral.Gray (dark mode).400}
+  text-tertiary_hover: {Colors.Neutral.Gray (dark mode).300}
+  text-tertiary_on-brand: {Colors.Neutral.Gray (dark mode).400}
+  text-quaternary (500): {Colors.Neutral.Gray (dark mode).400}
+  text-quaternary_on-brand: {Colors.Neutral.Gray (dark mode).400}
+  text-white: {Colors.Base.white}
+  text-disabled: {Colors.Neutral.Gray (dark mode).500}
+  text-placeholder: {Colors.Neutral.Gray (dark mode).500}
+  text-placeholder_subtle: {Colors.Neutral.Gray (dark mode).700}
+  text-brand-primary (900): {Colors.Neutral.Gray (dark mode).50}
+  text-brand-secondary (700): {Colors.Neutral.Gray (dark mode).300}
+  text-brand-secondary_hover: {Colors.Neutral.Gray (dark mode).200}
+  text-brand-tertiary (600): {Colors.Neutral.Gray (dark mode).400}
+  text-brand-tertiary_alt: {Colors.Neutral.Gray (dark mode).50}
+  text-error-primary (600): {Colors.Alias.System.Error.400}
+  text-error-primary_hover: {Colors.Alias.System.Error.300}
+  text-warning-primary (600): {Colors.Alias.System.Warning.400}
+  text-success-primary (600): {Colors.Alias.System.Success.400}
+
+--- Colors/Border ---
+  border-primary: {Colors.Neutral.Gray (dark mode).700}
+  border-secondary: {Colors.Neutral.Gray (dark mode).800}
+  border-secondary_alt: {Colors.Neutral.Gray (dark mode).800}
+  border-tertiary: {Colors.Neutral.Gray (dark mode).800}
+  border-disabled: {Colors.Neutral.Gray (dark mode).700}
+  border-disabled_subtle: {Colors.Neutral.Gray (dark mode).800}
+  border-brand: {Colors.Alias.Brand.400}
+  border-brand_alt: {Colors.Neutral.Gray (dark mode).700}
+  border-error: {Colors.Alias.System.Error.400}
+  border-error_subtle: {Colors.Alias.System.Error.500}
+
+--- Colors/Foreground ---
+  fg-primary (900): {Colors.Base.white}
+  fg-secondary (700): {Colors.Neutral.Gray (dark mode).300}
+  fg-secondary_hover: {Colors.Neutral.Gray (dark mode).200}
+  fg-tertiary (600): {Colors.Neutral.Gray (dark mode).400}
+  fg-tertiary_hover: {Colors.Neutral.Gray (dark mode).300}
+  fg-quaternary (400): {Colors.Neutral.Gray (dark mode).600}
+  fg-quaternary_hover: {Colors.Neutral.Gray (dark mode).500}
+  fg-white: {Colors.Base.white}
+  fg-disabled: {Colors.Neutral.Gray (dark mode).500}
+  fg-disabled_subtle: {Colors.Neutral.Gray (dark mode).600}
+  fg-brand-primary (600): {Colors.Alias.Brand.500}
+  fg-brand-primary_alt: {Colors.Neutral.Gray (dark mode).300}
+  fg-brand-secondary (500): {Colors.Alias.Brand.500}
+  fg-brand-secondary_alt: {Colors.Neutral.Gray (dark mode).600}
+  fg-brand-secondary_hover: {Colors.Neutral.Gray (dark mode).500}
+  fg-error-primary: {Colors.Alias.System.Error.500}
+  fg-error-secondary: {Colors.Alias.System.Error.400}
+  fg-warning-primary: {Colors.Alias.System.Warning.500}
+  fg-warning-secondary: {Colors.Alias.System.Warning.400}
+  fg-success-primary: {Colors.Alias.System.Success.500}
+  fg-success-secondary: {Colors.Alias.System.Success.400}
+
+--- Colors/Background ---
+  bg-primary: {Colors.Neutral.Gray (dark mode).950}
+  bg-primary_alt: {Colors.Background.bg-secondary}
+  bg-primary_hover: {Colors.Neutral.Gray (dark mode).800}
+  bg-primary-solid: {Colors.Background.bg-secondary}
+  bg-secondary: {Colors.Neutral.Gray (dark mode).900}
+  bg-secondary_alt: {Colors.Background.bg-primary}
+  bg-secondary_hover: {Colors.Neutral.Gray (dark mode).800}
+  bg-secondary_subtle: {Colors.Neutral.Gray (dark mode).900}
+  bg-secondary-solid: {Colors.Neutral.Gray (dark mode).600}
+  bg-tertiary: {Colors.Neutral.Gray (dark mode).800}
+  bg-quaternary: {Colors.Neutral.Gray (dark mode).700}
+  bg-active: {Colors.Neutral.Gray (dark mode).800}
+  bg-disabled: {Colors.Neutral.Gray (dark mode).800}
+  bg-disabled_subtle: {Colors.Neutral.Gray (dark mode).900}
+  bg-overlay: {Colors.Neutral.Gray (dark mode).800}
+  bg-brand-primary: {Colors.Alias.Brand.500}
+  bg-brand-primary_alt: {Colors.Background.bg-secondary}
+  bg-brand-secondary: {Colors.Alias.Brand.600}
+  bg-brand-solid: {Colors.Alias.Brand.600}
+  bg-brand-solid_hover: {Colors.Alias.Brand.500}
+  bg-brand-section: {Colors.Background.bg-secondary}
+  bg-brand-section_subtle: {Colors.Background.bg-primary}
+  bg-error-primary: {Colors.Alias.System.Error.950}
+  bg-error-secondary: {Colors.Alias.System.Error.600}
+  bg-error-solid: {Colors.Alias.System.Error.600}
+  bg-error-solid_hover: {Colors.Alias.System.Error.500}
+  bg-warning-primary: {Colors.Alias.System.Warning.950}
+  bg-warning-secondary: {Colors.Alias.System.Warning.600}
+  bg-warning-solid: {Colors.Alias.System.Warning.600}
+  bg-success-primary: {Colors.Alias.System.Success.950}
+  bg-success-secondary: {Colors.Alias.System.Success.600}
+  bg-success-solid: {Colors.Alias.System.Success.600}
+
+--- Colors/Effects ---
+  Focus rings/focus-ring: {Colors.Alias.Brand.500}
+  Focus rings/focus-ring-error: {Colors.Alias.System.Error.500}
+  Shadows/shadow-xs: {Colors.Base.transparent}
+  Shadows/shadow-sm_01: {Colors.Base.transparent}
+  Shadows/shadow-sm_02: {Colors.Base.transparent}
+  Shadows/shadow-md_01: {Colors.Base.transparent}
+  Shadows/shadow-md_02: {Colors.Base.transparent}
+  Shadows/shadow-lg_01: {Colors.Base.transparent}
+  Shadows/shadow-lg_02: {Colors.Base.transparent}
+  Shadows/shadow-lg_03: {Colors.Base.transparent}
+  Shadows/shadow-xl_01: {Colors.Base.transparent}
+  Shadows/shadow-xl_02: {Colors.Base.transparent}
+  Shadows/shadow-xl_03: {Colors.Base.transparent}
+  Shadows/shadow-2xl_01: {Colors.Base.transparent}
+  Shadows/shadow-2xl_02: {Colors.Base.transparent}
+  Shadows/shadow-3xl_01: {Colors.Base.transparent}
+  Shadows/shadow-3xl_02: {Colors.Base.transparent}
+  Shadows/shadow-skeumorphic-inner: rgba(12, 14, 18, 0.05)
+  Shadows/shadow-skeumorphic-inner-border: rgba(12, 14, 18, 0.18)
+
+--- Component colors/Alpha ---
+  alpha-white-10: rgba(12, 14, 18, 0.1)
+  alpha-white-20: rgba(12, 14, 18, 0.2)
+  alpha-white-30: rgba(12, 14, 18, 0.3)
+  alpha-white-40: rgba(12, 14, 18, 0.4)
+  alpha-white-50: rgba(12, 14, 18, 0.5)
+  alpha-white-60: rgba(12, 14, 18, 0.6)
+  alpha-white-70: rgba(12, 14, 18, 0.7)
+  alpha-white-80: rgba(12, 14, 18, 0.8)
+  alpha-white-90: rgba(12, 14, 18, 0.9)
+  alpha-white-100: {Colors.Neutral.Gray (dark mode).950}
+  alpha-black-10: rgba(255, 255, 255, 0.1)
+  alpha-black-20: rgba(255, 255, 255, 0.2)
+  alpha-black-30: rgba(255, 255, 255, 0.3)
+  alpha-black-40: rgba(255, 255, 255, 0.4)
+  alpha-black-50: rgba(255, 255, 255, 0.5)
+  alpha-black-60: rgba(255, 255, 255, 0.6)
+  alpha-black-70: rgba(255, 255, 255, 0.7)
+  alpha-black-80: rgba(255, 255, 255, 0.8)
+  alpha-black-90: rgba(255, 255, 255, 0.9)
+  alpha-black-100: #ffffff
+
+--- Component colors/Utility ---
+  Gray/utility-gray-50: {Colors.Neutral.Gray (dark mode).900}
+  Gray/utility-gray-100: {Colors.Neutral.Gray (dark mode).800}
+  Gray/utility-gray-200: {Colors.Neutral.Gray (dark mode).700}
+  Gray/utility-gray-300: {Colors.Neutral.Gray (dark mode).700}
+  Gray/utility-gray-400: {Colors.Neutral.Gray (dark mode).600}
+  Gray/utility-gray-500: {Colors.Neutral.Gray (dark mode).500}
+  Gray/utility-gray-600: {Colors.Neutral.Gray (dark mode).400}
+  Gray/utility-gray-700: {Colors.Neutral.Gray (dark mode).300}
+  Gray/utility-gray-800: {Colors.Neutral.Gray (dark mode).200}
+  Gray/utility-gray-900: {Colors.Neutral.Gray (dark mode).100}
+  Brand/utility-brand-50: {Colors.Alias.Brand.950}
+  Brand/utility-brand-50_alt: {Component colors.Utility.Gray.utility-gray-50}
+  Brand/utility-brand-100: {Colors.Alias.Brand.900}
+  Brand/utility-brand-100_alt: {Component colors.Utility.Gray.utility-gray-100}
+  Brand/utility-brand-200: {Colors.Alias.Brand.800}
+  Brand/utility-brand-200_alt: {Component colors.Utility.Gray.utility-gray-200}
+  Brand/utility-brand-300: {Colors.Alias.Brand.700}
+  Brand/utility-brand-300_alt: {Component colors.Utility.Gray.utility-gray-300}
+  Brand/utility-brand-400: {Colors.Alias.Brand.600}
+  Brand/utility-brand-400_alt: {Component colors.Utility.Gray.utility-gray-400}
+  Brand/utility-brand-500: {Colors.Alias.Brand.500}
+  Brand/utility-brand-500_alt: {Component colors.Utility.Gray.utility-gray-500}
+  Brand/utility-brand-600: {Colors.Alias.Brand.400}
+  Brand/utility-brand-600_alt: {Component colors.Utility.Gray.utility-gray-600}
+  Brand/utility-brand-700: {Colors.Alias.Brand.300}
+  Brand/utility-brand-700_alt: {Component colors.Utility.Gray.utility-gray-700}
+  Brand/utility-brand-800: {Colors.Alias.Brand.200}
+  Brand/utility-brand-800_alt: {Component colors.Utility.Gray.utility-gray-800}
+  Brand/utility-brand-900: {Colors.Alias.Brand.100}
+  Brand/utility-brand-900_alt: {Component colors.Utility.Gray.utility-gray-900}
+  Error/utility-error-50: {Colors.Alias.System.Error.950}
+  Error/utility-error-100: {Colors.Alias.System.Error.900}
+  Error/utility-error-200: {Colors.Alias.System.Error.800}
+  Error/utility-error-300: {Colors.Alias.System.Error.700}
+  Error/utility-error-400: {Colors.Alias.System.Error.600}
+  Error/utility-error-500: {Colors.Alias.System.Error.500}
+  Error/utility-error-600: {Colors.Alias.System.Error.400}
+  Error/utility-error-700: {Colors.Alias.System.Error.300}
+  Warning/utility-warning-50: {Colors.Alias.System.Warning.950}
+  Warning/utility-warning-100: {Colors.Alias.System.Warning.900}
+  Warning/utility-warning-200: {Colors.Alias.System.Warning.800}
+  Warning/utility-warning-300: {Colors.Alias.System.Warning.700}
+  Warning/utility-warning-400: {Colors.Alias.System.Warning.600}
+  Warning/utility-warning-500: {Colors.Alias.System.Warning.500}
+  Warning/utility-warning-600: {Colors.Alias.System.Warning.400}
+  Warning/utility-warning-700: {Colors.Alias.System.Warning.300}
+  Success/utility-success-50: {Colors.Alias.System.Success.950}
+  Success/utility-success-100: {Colors.Alias.System.Success.900}
+  Success/utility-success-200: {Colors.Alias.System.Success.800}
+  Success/utility-success-300: {Colors.Alias.System.Success.700}
+  Success/utility-success-400: {Colors.Alias.System.Success.600}
+  Success/utility-success-500: {Colors.Alias.System.Success.500}
+  Success/utility-success-600: {Colors.Alias.System.Success.400}
+  Success/utility-success-700: {Colors.Alias.System.Success.300}
+  Gray blue/utility-gray-blue-50: {Colors.Misc Utility (Untitled UI).Neautral +.Gray blue.950}
+  Gray blue/utility-gray-blue-100: {Colors.Misc Utility (Untitled UI).Neautral +.Gray blue.900}
+  Gray blue/utility-gray-blue-200: {Colors.Misc Utility (Untitled UI).Neautral +.Gray blue.800}
+  Gray blue/utility-gray-blue-300: {Colors.Misc Utility (Untitled UI).Neautral +.Gray blue.700}
+  Gray blue/utility-gray-blue-400: {Colors.Misc Utility (Untitled UI).Neautral +.Gray blue.600}
+  Gray blue/utility-gray-blue-500: {Colors.Misc Utility (Untitled UI).Neautral +.Gray blue.500}
+  Gray blue/utility-gray-blue-600: {Colors.Misc Utility (Untitled UI).Neautral +.Gray blue.400}
+  Gray blue/utility-gray-blue-700: {Colors.Misc Utility (Untitled UI).Neautral +.Gray blue.300}
+  Green/utility-green-50: {Colors.Misc Utility (Untitled UI).Green.950}
+  Green/utility-green-100: {Colors.Misc Utility (Untitled UI).Green.900}
+  Green/utility-green-200: {Colors.Misc Utility (Untitled UI).Green.800}
+  Green/utility-green-300: {Colors.Misc Utility (Untitled UI).Green.700}
+  Green/utility-green-400: {Colors.Misc Utility (Untitled UI).Green.600}
+  Green/utility-green-500: {Colors.Misc Utility (Untitled UI).Green.500}
+  Green/utility-green-600: {Colors.Misc Utility (Untitled UI).Green.400}
+  Green/utility-green-700: {Colors.Misc Utility (Untitled UI).Green.300}
+  Blue light/utility-blue-light-50: {Colors.Misc Utility (Untitled UI).Blue light.950}
+  Blue light/utility-blue-light-100: {Colors.Misc Utility (Untitled UI).Blue light.900}
+  Blue light/utility-blue-light-200: {Colors.Misc Utility (Untitled UI).Blue light.800}
+  Blue light/utility-blue-light-300: {Colors.Misc Utility (Untitled UI).Blue light.700}
+  Blue light/utility-blue-light-400: {Colors.Misc Utility (Untitled UI).Blue light.600}
+  Blue light/utility-blue-light-500: {Colors.Misc Utility (Untitled UI).Blue light.500}
+  Blue light/utility-blue-light-600: {Colors.Misc Utility (Untitled UI).Blue light.400}
+  Blue light/utility-blue-light-700: {Colors.Misc Utility (Untitled UI).Blue light.300}
+  Blue/utility-blue-50: {Colors.Misc Utility (Untitled UI).Blue.950}
+  Blue/utility-blue-100: {Colors.Misc Utility (Untitled UI).Blue.900}
+  Blue/utility-blue-200: {Colors.Misc Utility (Untitled UI).Blue.800}
+  Blue/utility-blue-300: {Colors.Misc Utility (Untitled UI).Blue.700}
+  Blue/utility-blue-400: {Colors.Misc Utility (Untitled UI).Blue.600}
+  Blue/utility-blue-500: {Colors.Misc Utility (Untitled UI).Blue.500}
+  Blue/utility-blue-600: {Colors.Misc Utility (Untitled UI).Blue.400}
+  Blue/utility-blue-700: {Colors.Misc Utility (Untitled UI).Blue.300}
+  Blue dark/utility-blue-dark-50: {Colors.Misc Utility (Untitled UI).Blue dark.950}
+  Blue dark/utility-blue-dark-100: {Colors.Misc Utility (Untitled UI).Blue dark.900}
+  Blue dark/utility-blue-dark-200: {Colors.Misc Utility (Untitled UI).Blue dark.800}
+  Blue dark/utility-blue-dark-300: {Colors.Misc Utility (Untitled UI).Blue dark.700}
+  Blue dark/utility-blue-dark-400: {Colors.Misc Utility (Untitled UI).Blue dark.600}
+  Blue dark/utility-blue-dark-500: {Colors.Misc Utility (Untitled UI).Blue dark.500}
+  Blue dark/utility-blue-dark-600: {Colors.Misc Utility (Untitled UI).Blue dark.400}
+  Blue dark/utility-blue-dark-700: {Colors.Misc Utility (Untitled UI).Blue dark.300}
+  Indigo/utility-indigo-50: {Colors.ONEMO - UI Palette.Dusty.Indigo Bloom.950}
+  Indigo/utility-indigo-100: {Colors.ONEMO - UI Palette.Dusty.Indigo Bloom.900}
+  Indigo/utility-indigo-200: {Colors.ONEMO - UI Palette.Dusty.Indigo Bloom.800}
+  Indigo/utility-indigo-300: {Colors.ONEMO - UI Palette.Dusty.Indigo Bloom.700}
+  Indigo/utility-indigo-400: {Colors.ONEMO - UI Palette.Dusty.Indigo Bloom.600}
+  Indigo/utility-indigo-500: {Colors.ONEMO - UI Palette.Dusty.Indigo Bloom.500}
+  Indigo/utility-indigo-600: {Colors.ONEMO - UI Palette.Dusty.Indigo Bloom.400}
+  Indigo/utility-indigo-700: {Colors.ONEMO - UI Palette.Dusty.Indigo Bloom.300}
+  Purple/utility-purple-50: {Colors.Misc Utility (Untitled UI).Purple.950}
+  Purple/utility-purple-100: {Colors.Misc Utility (Untitled UI).Purple.900}
+  Purple/utility-purple-200: {Colors.Misc Utility (Untitled UI).Purple.800}
+  Purple/utility-purple-300: {Colors.Misc Utility (Untitled UI).Purple.700}
+  Purple/utility-purple-400: {Colors.Misc Utility (Untitled UI).Purple.600}
+  Purple/utility-purple-500: {Colors.Misc Utility (Untitled UI).Purple.500}
+  Purple/utility-purple-600: {Colors.Misc Utility (Untitled UI).Purple.400}
+  Purple/utility-purple-700: {Colors.Misc Utility (Untitled UI).Purple.300}
+  Fuchsia/utility-fuchsia-50: {Colors.ONEMO - UI Palette.Dusty.Raspberry Plum.950}
+  Fuchsia/utility-fuchsia-100: {Colors.ONEMO - UI Palette.Dusty.Raspberry Plum.900}
+  Fuchsia/utility-fuchsia-200: {Colors.ONEMO - UI Palette.Dusty.Raspberry Plum.800}
+  Fuchsia/utility-fuchsia-300: {Colors.ONEMO - UI Palette.Dusty.Raspberry Plum.700}
+  Fuchsia/utility-fuchsia-400: {Colors.ONEMO - UI Palette.Dusty.Raspberry Plum.600}
+  Fuchsia/utility-fuchsia-500: {Colors.ONEMO - UI Palette.Dusty.Raspberry Plum.500}
+  Fuchsia/utility-fuchsia-600: {Colors.ONEMO - UI Palette.Dusty.Raspberry Plum.400}
+  Fuchsia/utility-fuchsia-700: {Colors.ONEMO - UI Palette.Dusty.Raspberry Plum.300}
+  Pink/utility-pink-50: {Colors.Misc Utility (Untitled UI).Pink.950}
+  Pink/utility-pink-100: {Colors.Misc Utility (Untitled UI).Pink.900}
+  Pink/utility-pink-200: {Colors.Misc Utility (Untitled UI).Pink.800}
+  Pink/utility-pink-300: {Colors.Misc Utility (Untitled UI).Pink.700}
+  Pink/utility-pink-400: {Colors.Misc Utility (Untitled UI).Pink.600}
+  Pink/utility-pink-500: {Colors.Misc Utility (Untitled UI).Pink.500}
+  Pink/utility-pink-600: {Colors.Misc Utility (Untitled UI).Pink.400}
+  Pink/utility-pink-700: {Colors.Misc Utility (Untitled UI).Pink.300}
+  Orange dark/utility-orange-dark-50: {Colors.Misc Utility (Untitled UI).Orange dark.950}
+  Orange dark/utility-orange-dark-100: {Colors.Misc Utility (Untitled UI).Orange dark.900}
+  Orange dark/utility-orange-dark-200: {Colors.Misc Utility (Untitled UI).Orange dark.800}
+  Orange dark/utility-orange-dark-300: {Colors.Misc Utility (Untitled UI).Orange dark.700}
+  Orange dark/utility-orange-dark-400: {Colors.Misc Utility (Untitled UI).Orange dark.600}
+  Orange dark/utility-orange-dark-500: {Colors.Misc Utility (Untitled UI).Orange dark.500}
+  Orange dark/utility-orange-dark-600: {Colors.Misc Utility (Untitled UI).Orange dark.400}
+  Orange dark/utility-orange-dark-700: {Colors.Misc Utility (Untitled UI).Orange dark.300}
+  Orange/utility-orange-50: {Colors.Misc Utility (Untitled UI).Orange.950}
+  Orange/utility-orange-100: {Colors.Misc Utility (Untitled UI).Orange.900}
+  Orange/utility-orange-200: {Colors.Misc Utility (Untitled UI).Orange.800}
+  Orange/utility-orange-300: {Colors.Misc Utility (Untitled UI).Orange.700}
+  Orange/utility-orange-400: {Colors.Misc Utility (Untitled UI).Orange.600}
+  Orange/utility-orange-500: {Colors.Misc Utility (Untitled UI).Orange.500}
+  Orange/utility-orange-600: {Colors.Misc Utility (Untitled UI).Orange.400}
+  Orange/utility-orange-700: {Colors.Misc Utility (Untitled UI).Orange.300}
+  Yellow/utility-yellow-50: {Colors.Misc Utility (Untitled UI).Yellow.950}
+  Yellow/utility-yellow-100: {Colors.Misc Utility (Untitled UI).Yellow.900}
+  Yellow/utility-yellow-200: {Colors.Misc Utility (Untitled UI).Yellow.800}
+  Yellow/utility-yellow-300: {Colors.Misc Utility (Untitled UI).Yellow.700}
+  Yellow/utility-yellow-400: {Colors.Misc Utility (Untitled UI).Yellow.600}
+  Yellow/utility-yellow-500: {Colors.Misc Utility (Untitled UI).Yellow.500}
+  Yellow/utility-yellow-600: {Colors.Misc Utility (Untitled UI).Yellow.400}
+  Yellow/utility-yellow-700: {Colors.Misc Utility (Untitled UI).Yellow.300}
+
+--- Component colors/Components ---
+  Buttons/button-primary-icon: {Colors.Alias.Brand.300}
+  Buttons/button-primary-icon_hover: {Colors.Alias.Brand.200}
+  Buttons/button-destructive-primary-icon: {Colors.Alias.System.Error.300}
+  Buttons/button-destructive-primary-icon_hover: {Colors.Alias.System.Error.200}
+  Footers/footer-button-fg: {Colors.Neutral.Gray (dark mode).300}
+  Footers/footer-button-fg_hover: {Colors.Neutral.Gray (dark mode).100}
+  Icons/Icons/icon-fg-brand: {Colors.Neutral.Gray (dark mode).400}
+  Icons/Icons/icon-fg-brand_on-brand: {Colors.Neutral.Gray (dark mode).400}
+  Icons/Featured icons/featured-icon-light-fg-brand: {Colors.Alias.Brand.200}
+  Icons/Featured icons/featured-icon-light-fg-gray: {Colors.Neutral.Gray (dark mode).200}
+  Icons/Featured icons/featured-icon-light-fg-error: {Colors.Alias.System.Error.200}
+  Icons/Featured icons/featured-icon-light-fg-warning: {Colors.Alias.System.Warning.200}
+  Icons/Featured icons/featured-icon-light-fg-success: {Colors.Alias.System.Success.200}
+  Sliders/slider-handle-bg: {Colors.Foreground.fg-brand-primary (600)}
+  Sliders/slider-handle-border: {Colors.Background.bg-primary}
+  Toggles/toggle-button-fg_disabled: {Colors.Neutral.Gray (dark mode).600}
+  Toggles/toggle-border: {Colors.Base.transparent}
+  Toggles/toggle-slim-border_pressed: {Colors.Base.transparent}
+  Toggles/toggle-slim-border_pressed-hover: {Colors.Base.transparent}
+  Tooltips/tooltip-supporting-text: {Colors.Neutral.Gray (dark mode).300}
+  Text editor/text-editor-icon-fg: {Colors.Neutral.Gray (dark mode).400}
+  Text editor/text-editor-icon-fg_active: {Colors.Base.white}
+
+Total Dark mode semantic tokens: 297

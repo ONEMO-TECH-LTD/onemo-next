@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Non-runtime: backup copies, archives, not linted
+    "asset-library/**",
+    "?archive/**",
   ]),
 ]);
 

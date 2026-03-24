@@ -9,17 +9,23 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
-    "build-tokens": "node scripts/build-tokens.mjs --validate",
-    "validate-tokens": "node scripts/build-tokens.mjs --validate",
-    "test-tokens": "node scripts/test-build-tokens.mjs"
+    "build-tokens": "node scripts/tokens/build-tokens.mjs --validate",
+    "validate-tokens": "node scripts/tokens/build-tokens.mjs --validate",
+    "test-tokens": "node scripts/tokens/test-build-tokens.mjs"
   },
   "dependencies": {
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.5.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.95.3",
+    "@use-gesture/react": "^10.3.1",
+    "leva": "^0.10.1",
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "utopia-core": "^1.6.0"
+    "three": "^0.183.2",
+    "utopia-core": "^1.6.0",
+    "zustand": "^5.0.12"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

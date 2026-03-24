@@ -7,7 +7,7 @@ const GENERATED_DIR = join(PROJECT_ROOT, 'src/app/tokens');
 
 // Dynamic import of config to get the outputs array
 async function getOutputs(): Promise<{ name: string; path: string }[]> {
-  const configPath = join(PROJECT_ROOT, 'scripts/tokens.config.mjs');
+  const configPath = join(PROJECT_ROOT, 'scripts/tokens/tokens.config.mjs');
   const mod = await import(/* webpackIgnore: true */ configPath) as {
     CONFIG: { outputs: { name: string; path: string }[] };
   };
