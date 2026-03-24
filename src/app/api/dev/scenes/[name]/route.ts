@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { readFile, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 
-const SCENES_DIR = join(process.cwd(), 'scenes')
+const SCENES_DIR = join(process.cwd(), 'data', 'scenes')
 
 export async function GET(
   _req: Request,
