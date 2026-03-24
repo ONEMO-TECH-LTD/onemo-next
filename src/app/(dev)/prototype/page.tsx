@@ -13,6 +13,7 @@ const EffectViewer = dynamic(() => import('./core/EffectViewer'), { ssr: false }
 const AdminViewer = dynamic(() => import('./admin/AdminViewer'), { ssr: false })
 const ScenePanel = dynamic(() => import('./admin/ScenePanel'), { ssr: false })
 const ResetPanel = dynamic(() => import('./admin/ResetPanel'), { ssr: false })
+// AssetPanel replaced by per-part MaterialPanels rendered from AdminViewer
 const ColorPanel = dynamic(() => import('./user/ColorPanel'), { ssr: false })
 const Toolbar = dynamic(() => import('./user/Toolbar'), { ssr: false })
 const EditOverlay = dynamic(() => import('./user/EditOverlay'), { ssr: false })
@@ -106,19 +107,32 @@ export default function StudioPage() {
         }}
       />
 
-      {/* Admin wrapper: Leva controls → config → core viewer */}
+      {/* Admin wrapper: material panels + Leva camera/env → config → core viewer */}
       <AdminViewer
         artworkUrl={artworkUrl}
         designState={designState}
         isEditing={isEditing}
+        onTextureChange={setArtworkUrl}
       >
-        {(config) => (
-          <EffectViewer
-            config={config}
-            artworkUrl={artworkUrl}
-            designState={designState}
-            isEditing={isEditing}
-          />
+        {(config, _assetProps, materialPanels) => (
+          <>
+            <EffectViewer
+              config={config}
+              artworkUrl={artworkUrl}
+              designState={designState}
+              isEditing={isEditing}
+            />
+            {/* Per-part material panels — left side, visible when admin is open */}
+            {showAdmin && (
+              <div style={{
+                position: 'absolute', left: 16, top: 130, zIndex: 10,
+                maxHeight: 'calc(100vh - 200px)', overflowY: 'auto',
+                width: 260,
+              }}>
+                {materialPanels}
+              </div>
+            )}
+          </>
         )}
       </AdminViewer>
 

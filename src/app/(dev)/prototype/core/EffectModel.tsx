@@ -6,22 +6,20 @@ import { useGLTF, useTexture, Center } from '@react-three/drei'
 import * as THREE from 'three'
 import type {
   DesignState,
-  FaceMaterialConfig,
-  BackMaterialConfig,
-  FrameMaterialConfig,
+  FaceMaterial,
+  BackMaterial,
+  FrameMaterial,
   SceneSettings,
-  TexturePaths,
 } from '../types'
 
 interface EffectModelProps {
   modelPath: string
   artworkUrl: string
   designState: DesignState
-  face: FaceMaterialConfig
-  back: BackMaterialConfig
-  frame: FrameMaterialConfig
+  face: FaceMaterial
+  back: BackMaterial
+  frame: FrameMaterial
   scene: SceneSettings
-  textures: TexturePaths
 }
 
 export default function EffectModel({
@@ -32,20 +30,28 @@ export default function EffectModel({
   back,
   frame,
   scene: sceneSettings,
-  textures,
 }: EffectModelProps) {
   const { scene } = useGLTF(modelPath)
   const faceMeshRef = useRef<THREE.Mesh | null>(null)
   const artworkTexRef = useRef<THREE.Texture | null>(null)
 
-  // Load textures from config paths
-  const [suedeNormal, suedeRoughness, suedeHeight] = useTexture([
-    textures.normal,
-    textures.roughness,
-    textures.height,
+  // Load face textures
+  const [faceNormal, faceRoughnessTex, faceHeight] = useTexture([
+    face.textures.normal,
+    face.textures.roughness,
+    face.textures.height,
   ])
+  ;[faceNormal, faceRoughnessTex, faceHeight].forEach((tex) => {
+    tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping
+  })
 
-  ;[suedeNormal, suedeRoughness, suedeHeight].forEach((tex) => {
+  // Load back textures (may differ from face)
+  const [backNormal, backRoughnessTex, backHeight] = useTexture([
+    back.textures.normal,
+    back.textures.roughness,
+    back.textures.height,
+  ])
+  ;[backNormal, backRoughnessTex, backHeight].forEach((tex) => {
     tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping
   })
 
@@ -82,59 +88,62 @@ export default function EffectModel({
     tex.needsUpdate = true
   }, [designState, artworkMap])
 
-  // FACE material — reactive to config props
+  // FACE material — uses face-specific textures
+  const fp = face.params
   const faceMaterial = useMemo(() => {
     return new THREE.MeshPhysicalMaterial({
       map: artworkMap,
-      color: new THREE.Color(face.colorMultiplier, face.colorMultiplier, face.colorMultiplier),
-      normalMap: suedeNormal,
-      normalScale: new THREE.Vector2(face.normalScale, face.normalScale),
-      bumpMap: suedeHeight,
-      bumpScale: face.bumpScale,
-      roughnessMap: suedeRoughness,
-      roughness: face.roughness,
-      metalness: face.metalness,
-      sheen: face.sheen,
-      sheenColor: new THREE.Color(face.sheenColor),
-      sheenRoughness: face.sheenRoughness,
-      envMapIntensity: face.envMapIntensity,
+      color: new THREE.Color(fp.colorMultiplier, fp.colorMultiplier, fp.colorMultiplier),
+      normalMap: faceNormal,
+      normalScale: new THREE.Vector2(fp.normalScale, fp.normalScale),
+      bumpMap: faceHeight,
+      bumpScale: fp.bumpScale,
+      roughnessMap: faceRoughnessTex,
+      roughness: fp.roughness,
+      metalness: fp.metalness,
+      sheen: fp.sheen,
+      sheenColor: new THREE.Color(fp.sheenColor),
+      sheenRoughness: fp.sheenRoughness,
+      envMapIntensity: fp.envMapIntensity,
       side: THREE.DoubleSide,
     })
-  }, [artworkMap, suedeNormal, suedeHeight, suedeRoughness, face])
+  }, [artworkMap, faceNormal, faceHeight, faceRoughnessTex, fp])
 
   // FRAME material
+  const frp = frame.params
   const frameMaterial = useMemo(
     () =>
       new THREE.MeshPhysicalMaterial({
-        color: new THREE.Color(frame.color),
-        roughness: frame.roughness,
-        metalness: frame.metalness,
-        clearcoat: frame.clearcoat,
-        clearcoatRoughness: frame.clearcoatRoughness,
+        color: new THREE.Color(frp.color),
+        roughness: frp.roughness,
+        metalness: frp.metalness,
+        clearcoat: frp.clearcoat,
+        clearcoatRoughness: frp.clearcoatRoughness,
         side: THREE.DoubleSide,
       }),
-    [frame]
+    [frp]
   )
 
-  // BACK material
+  // BACK material — uses back-specific textures
+  const bp = back.params
   const backMaterial = useMemo(
     () =>
       new THREE.MeshPhysicalMaterial({
-        color: new THREE.Color(back.color),
-        normalMap: suedeNormal,
-        normalScale: new THREE.Vector2(back.normalScale, back.normalScale),
-        bumpMap: suedeHeight,
-        bumpScale: back.bumpScale,
-        roughnessMap: suedeRoughness,
-        roughness: back.roughness,
+        color: new THREE.Color(bp.color),
+        normalMap: backNormal,
+        normalScale: new THREE.Vector2(bp.normalScale, bp.normalScale),
+        bumpMap: backHeight,
+        bumpScale: bp.bumpScale,
+        roughnessMap: backRoughnessTex,
+        roughness: bp.roughness,
         metalness: 0,
-        sheen: back.sheen,
-        sheenColor: new THREE.Color(back.sheenColor),
-        sheenRoughness: back.sheenRoughness,
-        envMapIntensity: back.envMapIntensity,
+        sheen: bp.sheen,
+        sheenColor: new THREE.Color(bp.sheenColor),
+        sheenRoughness: bp.sheenRoughness,
+        envMapIntensity: bp.envMapIntensity,
         side: THREE.DoubleSide,
       }),
-    [suedeNormal, suedeHeight, suedeRoughness, back]
+    [backNormal, backHeight, backRoughnessTex, bp]
   )
 
   // Override materials and generate planar UVs

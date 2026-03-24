@@ -47,6 +47,7 @@ export interface SceneSettings {
 }
 
 export interface TexturePaths {
+  texture?: string   // diffuse/color texture
   normal: string
   roughness: string
   height: string
@@ -59,16 +60,31 @@ export interface ColorConfig {
   bgColor: string
 }
 
+// Complete material = params + textures (per model part)
+export interface FaceMaterial {
+  params: FaceMaterialConfig
+  textures: TexturePaths
+}
+
+export interface BackMaterial {
+  params: BackMaterialConfig
+  textures: TexturePaths
+}
+
+export interface FrameMaterial {
+  params: FrameMaterialConfig
+  textures: Partial<TexturePaths>  // frame may not use all texture slots
+}
+
 export interface SceneConfig {
   name: string
   created: string
   modified: string
   modelPath: string
-  face: FaceMaterialConfig
-  back: BackMaterialConfig
-  frame: FrameMaterialConfig
+  face: FaceMaterial
+  back: BackMaterial
+  frame: FrameMaterial
   scene: SceneSettings
-  textures: TexturePaths
   colors: ColorConfig
 }
 
@@ -94,13 +110,12 @@ export interface EnvironmentConfig {
 
 // The single config object passed to the core viewer
 export interface ViewerConfig {
-  face: FaceMaterialConfig
-  back: BackMaterialConfig
-  frame: FrameMaterialConfig
-  scene: SceneSettings
-  textures: TexturePaths
-  colors: ColorConfig
   modelPath: string
+  face: FaceMaterial
+  back: BackMaterial
+  frame: FrameMaterial
+  scene: SceneSettings
+  colors: ColorConfig
   camera?: CameraConfig
   environment?: EnvironmentConfig
 }

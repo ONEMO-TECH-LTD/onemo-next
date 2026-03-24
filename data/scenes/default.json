@@ -1,46 +1,58 @@
 {
   "name": "default",
   "created": "2026-03-24T12:00:00.000Z",
-  "modified": "2026-03-24T15:00:00.000Z",
+  "modified": "2026-03-24T16:30:00.000Z",
   "modelPath": "/assets/shapes/effect-70mm-step.glb",
   "face": {
-    "roughness": 1.0,
-    "metalness": 0,
-    "envMapIntensity": 0.1,
-    "normalScale": 0.15,
-    "bumpScale": 1.0,
-    "sheen": 1.0,
-    "sheenColor": "#1a1a1a",
-    "sheenRoughness": 0.8,
-    "colorMultiplier": 1.0
+    "params": {
+      "roughness": 1.0,
+      "metalness": 0,
+      "envMapIntensity": 0.1,
+      "normalScale": 0.15,
+      "bumpScale": 1.0,
+      "sheen": 1.0,
+      "sheenColor": "#1a1a1a",
+      "sheenRoughness": 0.8,
+      "colorMultiplier": 1.0
+    },
+    "textures": {
+      "normal": "/assets/materials/ultrasuede/suede-normal.png",
+      "roughness": "/assets/materials/ultrasuede/suede-roughness.jpg",
+      "height": "/assets/materials/ultrasuede/suede-height.png"
+    }
   },
   "back": {
-    "color": "#080808",
-    "roughness": 1.0,
-    "envMapIntensity": 0.1,
-    "normalScale": 0.15,
-    "bumpScale": 1.0,
-    "sheen": 1.0,
-    "sheenColor": "#1a1a1a",
-    "sheenRoughness": 0.8
+    "params": {
+      "color": "#080808",
+      "roughness": 1.0,
+      "envMapIntensity": 0.1,
+      "normalScale": 0.15,
+      "bumpScale": 1.0,
+      "sheen": 1.0,
+      "sheenColor": "#1a1a1a",
+      "sheenRoughness": 0.8
+    },
+    "textures": {
+      "normal": "/assets/materials/ultrasuede/suede-normal.png",
+      "roughness": "/assets/materials/ultrasuede/suede-roughness.jpg",
+      "height": "/assets/materials/ultrasuede/suede-height.png"
+    }
   },
   "frame": {
-    "color": "#0f0f0f",
-    "roughness": 0.5,
-    "metalness": 0,
-    "clearcoat": 0.4,
-    "clearcoatRoughness": 0.3
+    "params": {
+      "color": "#0f0f0f",
+      "roughness": 0.5,
+      "metalness": 0,
+      "clearcoat": 0.4,
+      "clearcoatRoughness": 0.3
+    },
+    "textures": {}
   },
   "scene": {
     "exposure": 0.7,
     "ambientIntensity": 0.5,
     "envIntensity": 1.0,
     "background": "#ffffff"
-  },
-  "textures": {
-    "normal": "/assets/materials/ultrasuede/suede-normal.png",
-    "roughness": "/assets/materials/ultrasuede/suede-roughness.jpg",
-    "height": "/assets/materials/ultrasuede/suede-height.png"
   },
   "colors": {
     "backColor": "#080808",

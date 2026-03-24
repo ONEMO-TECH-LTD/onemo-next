@@ -1,29 +1,44 @@
-// AdminViewer — wraps core/EffectViewer with Leva controls
-// All useControls() calls live here (DOM side, outside Canvas).
-// Values pass as typed config prop to the core viewer.
+// AdminViewer — manages material state + Leva for camera/env
+// MaterialPanel handles per-part file pickers + sliders
+// Leva only used for Camera + Environment
 
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useControls } from 'leva'
 import { useSceneStore } from './sceneStore'
 import { useAssets } from './useAssets'
 import { useLevaHighlight } from './useLevaHighlight'
-// useLevaBrowse removed — browse buttons live in ScenePanel (left panel)
-import type { DesignState, ViewerConfig } from '../types'
+import MaterialPanel from './MaterialPanel'
+import FileField from './FileField'
+import type {
+  DesignState, ViewerConfig, TexturePaths,
+  FaceMaterialConfig, BackMaterialConfig, FrameMaterialConfig,
+} from '../types'
+
+export interface AssetProps {
+  modelPath: string
+  hdriPath: string
+  onModelChange: (path: string) => void
+  onHdriChange: (path: string) => void
+}
 
 interface AdminViewerProps {
   artworkUrl?: string
   designState: DesignState
   isEditing: boolean
-  children: (config: ViewerConfig) => React.ReactNode
+  onTextureChange?: (path: string) => void
+  children: (config: ViewerConfig, assetProps: AssetProps, materialPanels: React.ReactNode) => React.ReactNode
+}
+
+const DEFAULT_TEXTURES: TexturePaths = {
+  normal: '/assets/materials/ultrasuede/suede-normal.png',
+  roughness: '/assets/materials/ultrasuede/suede-roughness.jpg',
+  height: '/assets/materials/ultrasuede/suede-height.png',
 }
 
 export default function AdminViewer(props: AdminViewerProps) {
   const assets = useAssets()
-
-  // Force remount of controls when assets finish loading
-  // Leva useControls options are static at mount — remount to update
   if (!assets.loaded) {
     return <AdminViewerInner {...props} assets={assets} key="loading" />
   }
@@ -33,24 +48,35 @@ export default function AdminViewer(props: AdminViewerProps) {
 function AdminViewerInner({
   children,
   assets,
+  artworkUrl,
+  onTextureChange,
 }: AdminViewerProps & { assets: ReturnType<typeof useAssets> }) {
-  const registerSetter = useSceneStore((s) => s.registerSetter)
-  const syncValues = useSceneStore((s) => s.syncValues)
   const colors = useSceneStore((s) => s.colors)
 
-  // ─── Scene Setup ──────────────────────────────────────────
-  const [sceneParams, setScene] = useControls('Scene', () => ({
-    model: {
-      value: Object.values(assets.models)[0] || '/assets/shapes/effect-70mm-step.glb',
-      options: assets.models,
-    },
-    exposure: { value: 0.7, min: 0.1, max: 3, step: 0.05 },
-    ambientIntensity: { value: 0.5, min: 0, max: 2, step: 0.05 },
-    envIntensity: { value: 1.0, min: 0, max: 5, step: 0.1 },
-    background: '#ffffff',
-  }))
+  // ─── Model + HDRI paths ───────────────────────────────────
+  const [modelPath, setModelPath] = useState(Object.values(assets.models)[0] || '/assets/shapes/effect-70mm-step.glb')
+  const [hdriPath, setHdriPath] = useState('studio')
 
-  // ─── Camera ───────────────────────────────────────────────
+  // ─── Face Material state ──────────────────────────────────
+  const [faceParams, setFaceParams] = useState<FaceMaterialConfig>({
+    roughness: 1.0, metalness: 0, envMapIntensity: 0.1, normalScale: 0.15,
+    bumpScale: 1.0, sheen: 1.0, sheenColor: '#1a1a1a', sheenRoughness: 0.8, colorMultiplier: 1.0,
+  })
+  const [faceTextures, setFaceTextures] = useState<TexturePaths>({ ...DEFAULT_TEXTURES })
+
+  // ─── Back Material state ──────────────────────────────────
+  const [backParams, setBackParams] = useState<BackMaterialConfig>({
+    color: colors.backColor, roughness: 1.0, envMapIntensity: 0.1, normalScale: 0.15,
+    bumpScale: 1.0, sheen: 1.0, sheenColor: '#1a1a1a', sheenRoughness: 0.8,
+  })
+  const [backTextures, setBackTextures] = useState<TexturePaths>({ ...DEFAULT_TEXTURES })
+
+  // ─── Frame Material state ─────────────────────────────────
+  const [frameParams, setFrameParams] = useState<FrameMaterialConfig>({
+    color: colors.frameColor, roughness: 0.5, metalness: 0, clearcoat: 0.4, clearcoatRoughness: 0.3,
+  })
+
+  // ─── Camera (Leva) ────────────────────────────────────────
   const [cameraParams] = useControls('Camera', () => ({
     fov: { value: 35, min: 10, max: 120, step: 1 },
     distance: { value: 0.2, min: 0.05, max: 2, step: 0.01 },
@@ -62,112 +88,55 @@ function AdminViewerInner({
     autoRotateSpeed: { value: 2, min: 0.1, max: 10, step: 0.1 },
   }))
 
-  // ─── Environment ──────────────────────────────────────────
+  // ─── Environment (Leva) ───────────────────────────────────
   const [envParams] = useControls('Environment', () => ({
-    hdri: {
-      value: Object.values(assets.hdris)[0] || 'studio',
-      options: assets.hdris,
-    },
     envRotation: { value: 0, min: -180, max: 180, step: 1 },
     groundEnabled: false,
     groundHeight: { value: 0, min: -1, max: 1, step: 0.01 },
     groundRadius: { value: 20, min: 1, max: 100, step: 1 },
   }))
 
-  // ─── Textures (read-only dropdowns — select from existing, import via left panel) ─
-  const [textureParams] = useControls('Textures', () => ({
-    normalMap: {
-      value: Object.values(assets.normalMaps)[0] || '/assets/materials/ultrasuede/suede-normal.png',
-      options: Object.keys(assets.normalMaps).length > 0 ? assets.normalMaps : { 'ultrasuede': '/assets/materials/ultrasuede/suede-normal.png' },
-    },
-    roughnessMap: {
-      value: Object.values(assets.roughnessMaps)[0] || '/assets/materials/ultrasuede/suede-roughness.jpg',
-      options: Object.keys(assets.roughnessMaps).length > 0 ? assets.roughnessMaps : { 'ultrasuede': '/assets/materials/ultrasuede/suede-roughness.jpg' },
-    },
-    heightMap: {
-      value: Object.values(assets.heightMaps)[0] || '/assets/materials/ultrasuede/suede-height.png',
-      options: Object.keys(assets.heightMaps).length > 0 ? assets.heightMaps : { 'ultrasuede': '/assets/materials/ultrasuede/suede-height.png' },
-    },
-    sheenMap: {
-      value: Object.values(assets.sheenMaps)[0] || 'none',
-      options: { 'none': 'none', ...assets.sheenMaps },
-    },
+  // ─── Scene (Leva) ────────────────────────────────────────
+  const [sceneParams] = useControls('Scene', () => ({
+    exposure: { value: 0.7, min: 0.1, max: 3, step: 0.05 },
+    ambientIntensity: { value: 0.5, min: 0, max: 2, step: 0.05 },
+    envIntensity: { value: 1.0, min: 0, max: 5, step: 0.1 },
+    background: '#ffffff',
   }))
 
-  // ─── Face Material ────────────────────────────────────────
-  const [faceParams, setFace] = useControls('Face Material', () => ({
-    roughness: { value: 1.0, min: 0, max: 1, step: 0.01 },
-    metalness: { value: 0, min: 0, max: 1, step: 0.01 },
-    envMapIntensity: { value: 0.1, min: 0, max: 2, step: 0.01 },
-    normalScale: { value: 0.15, min: 0, max: 2, step: 0.01 },
-    bumpScale: { value: 1.0, min: 0, max: 5, step: 0.1 },
-    sheen: { value: 1.0, min: 0, max: 1, step: 0.01 },
-    sheenColor: '#1a1a1a',
-    sheenRoughness: { value: 0.8, min: 0, max: 1, step: 0.01 },
-    colorMultiplier: { value: 1.0, min: 0.5, max: 2.5, step: 0.05 },
-  }))
-
-  // ─── Back Material ────────────────────────────────────────
-  const [backParams, setBack] = useControls('Back Material', () => ({
-    color: colors.backColor,
-    roughness: { value: 1.0, min: 0, max: 1, step: 0.01 },
-    envMapIntensity: { value: 0.1, min: 0, max: 2, step: 0.01 },
-    normalScale: { value: 0.15, min: 0, max: 2, step: 0.01 },
-    bumpScale: { value: 1.0, min: 0, max: 5, step: 0.1 },
-    sheen: { value: 1.0, min: 0, max: 1, step: 0.01 },
-    sheenColor: '#1a1a1a',
-    sheenRoughness: { value: 0.8, min: 0, max: 1, step: 0.01 },
-  }))
-
-  // ─── Frame Material ───────────────────────────────────────
-  const [frameParams, setFrame] = useControls('Frame Material', () => ({
-    color: colors.frameColor,
-    roughness: { value: 0.5, min: 0, max: 1, step: 0.01 },
-    metalness: { value: 0, min: 0, max: 1, step: 0.01 },
-    clearcoat: { value: 0.4, min: 0, max: 1, step: 0.01 },
-    clearcoatRoughness: { value: 0.3, min: 0, max: 1, step: 0.01 },
-  }))
-
-  // Register setters with store for save/load
-  useEffect(() => {
-    registerSetter('Face Material', setFace)
-    registerSetter('Back Material', setBack)
-    registerSetter('Frame Material', setFrame)
-    registerSetter('Scene', setScene)
-  }, [registerSetter, setFace, setBack, setFrame, setScene])
-
-  // Sync current values to store
-  useEffect(() => { syncValues('Face Material', faceParams) }, [syncValues, faceParams])
-  useEffect(() => { syncValues('Back Material', backParams) }, [syncValues, backParams])
-  useEffect(() => { syncValues('Frame Material', frameParams) }, [syncValues, frameParams])
-  useEffect(() => { syncValues('Scene', sceneParams) }, [syncValues, sceneParams])
-
-  // Per-value highlighting: labels turn amber when value differs from saved baseline
-  // Clicking a highlighted label resets that specific value
   useLevaHighlight()
 
-  // Determine if HDRI is a preset name or a custom file path
-  const hdriValue = envParams.hdri as string
-  const isPreset = !hdriValue.startsWith('/assets/')
+  const isPreset = !hdriPath.startsWith('/assets/')
 
-  // Build the typed config from Leva values
+  // ─── Param update helpers ─────────────────────────────────
+  const updateFaceParam = (key: string, value: number | string) => {
+    setFaceParams(prev => ({ ...prev, [key]: value }))
+  }
+  const updateBackParam = (key: string, value: number | string) => {
+    setBackParams(prev => ({ ...prev, [key]: value }))
+  }
+  const updateFrameParam = (key: string, value: number | string) => {
+    setFrameParams(prev => ({ ...prev, [key]: value }))
+  }
+  const updateFaceTexture = (slot: keyof TexturePaths, path: string) => {
+    setFaceTextures(prev => ({ ...prev, [slot]: path }))
+  }
+  const updateBackTexture = (slot: keyof TexturePaths, path: string) => {
+    setBackTextures(prev => ({ ...prev, [slot]: path }))
+  }
+
+  // ─── Build config ─────────────────────────────────────────
   const config: ViewerConfig = {
-    modelPath: sceneParams.model as string,
-    face: faceParams,
-    back: backParams,
-    frame: frameParams,
+    modelPath,
+    face: { params: faceParams, textures: faceTextures },
+    back: { params: backParams, textures: backTextures },
+    frame: { params: frameParams, textures: {} },
     scene: sceneParams,
-    textures: {
-      normal: (textureParams as Record<string, string>).normalMap || '/assets/materials/ultrasuede/suede-normal.png',
-      roughness: (textureParams as Record<string, string>).roughnessMap || '/assets/materials/ultrasuede/suede-roughness.jpg',
-      height: (textureParams as Record<string, string>).heightMap || '/assets/materials/ultrasuede/suede-height.png',
-      sheenColor: (textureParams as Record<string, string>).sheenMap,
-    },
     colors,
     camera: cameraParams,
     environment: {
-      preset: isPreset ? hdriValue : 'studio',
-      customHdri: isPreset ? undefined : hdriValue,
+      preset: isPreset ? hdriPath : 'studio',
+      customHdri: isPreset ? undefined : hdriPath,
       envRotation: envParams.envRotation,
       groundEnabled: envParams.groundEnabled,
       groundHeight: envParams.groundHeight,
@@ -175,5 +144,83 @@ function AdminViewerInner({
     },
   }
 
-  return <>{children(config)}</>
+  const assetProps: AssetProps = {
+    modelPath, hdriPath,
+    onModelChange: setModelPath,
+    onHdriChange: setHdriPath,
+  }
+
+  // ─── Material panels (rendered in left panel area) ────────
+  const materialPanels = (
+    <>
+      {/* Model + HDRI file pickers */}
+      <div style={{ background: 'rgba(224,224,224,0.95)', borderRadius: 8, padding: '8px 0', marginBottom: 4 }}>
+        <div style={{ padding: '0 8px 4px', fontSize: 12, fontWeight: 600, color: '#222' }}>Scene Assets</div>
+        <FileField label="Model" value={modelPath} type="shapes" accept=".glb,.gltf" onChange={setModelPath} />
+        <FileField label="HDRI" value={hdriPath} type="env" accept=".exr,.hdr,.hdri" onChange={setHdriPath} />
+      </div>
+
+      {/* Face Material */}
+      <MaterialPanel
+        title="Face"
+        textures={faceTextures}
+        params={faceParams as unknown as Record<string, number | string>}
+        textureSlots={['texture', 'normal', 'roughness', 'height', 'sheenColor']}
+        onTextureChange={updateFaceTexture}
+        onParamChange={updateFaceParam}
+        sliders={[
+          { key: 'roughness', value: 1.0, min: 0, max: 1, step: 0.01 },
+          { key: 'metalness', value: 0, min: 0, max: 1, step: 0.01 },
+          { key: 'envMapIntensity', value: 0.1, min: 0, max: 2, step: 0.01 },
+          { key: 'normalScale', value: 0.15, min: 0, max: 2, step: 0.01 },
+          { key: 'bumpScale', value: 1.0, min: 0, max: 5, step: 0.1 },
+          { key: 'sheen', value: 1.0, min: 0, max: 1, step: 0.01 },
+          { key: 'sheenRoughness', value: 0.8, min: 0, max: 1, step: 0.01 },
+          { key: 'colorMultiplier', value: 1.0, min: 0.5, max: 2.5, step: 0.05 },
+        ]}
+        colors={[{ key: 'sheenColor', value: faceParams.sheenColor }]}
+      />
+
+      {/* Back Material */}
+      <MaterialPanel
+        title="Back"
+        textures={backTextures}
+        params={backParams as unknown as Record<string, number | string>}
+        textureSlots={['texture', 'normal', 'roughness', 'height', 'sheenColor']}
+        onTextureChange={updateBackTexture}
+        onParamChange={updateBackParam}
+        sliders={[
+          { key: 'roughness', value: 1.0, min: 0, max: 1, step: 0.01 },
+          { key: 'envMapIntensity', value: 0.1, min: 0, max: 2, step: 0.01 },
+          { key: 'normalScale', value: 0.15, min: 0, max: 2, step: 0.01 },
+          { key: 'bumpScale', value: 1.0, min: 0, max: 5, step: 0.1 },
+          { key: 'sheen', value: 1.0, min: 0, max: 1, step: 0.01 },
+          { key: 'sheenRoughness', value: 0.8, min: 0, max: 1, step: 0.01 },
+        ]}
+        colors={[
+          { key: 'color', value: backParams.color },
+          { key: 'sheenColor', value: backParams.sheenColor },
+        ]}
+      />
+
+      {/* Frame Material */}
+      <MaterialPanel
+        title="Frame"
+        textures={{}}
+        params={frameParams as unknown as Record<string, number | string>}
+        textureSlots={[]}
+        onTextureChange={() => {}}
+        onParamChange={updateFrameParam}
+        sliders={[
+          { key: 'roughness', value: 0.5, min: 0, max: 1, step: 0.01 },
+          { key: 'metalness', value: 0, min: 0, max: 1, step: 0.01 },
+          { key: 'clearcoat', value: 0.4, min: 0, max: 1, step: 0.01 },
+          { key: 'clearcoatRoughness', value: 0.3, min: 0, max: 1, step: 0.01 },
+        ]}
+        colors={[{ key: 'color', value: frameParams.color }]}
+      />
+    </>
+  )
+
+  return <>{children(config, assetProps, materialPanels)}</>
 }

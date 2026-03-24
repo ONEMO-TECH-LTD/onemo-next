@@ -87,7 +87,6 @@ export default function EffectViewer({
             back={config.back}
             frame={config.frame}
             scene={config.scene}
-            textures={config.textures}
           />
         </Suspense>
 

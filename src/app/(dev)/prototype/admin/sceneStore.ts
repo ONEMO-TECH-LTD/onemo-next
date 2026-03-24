@@ -2,28 +2,28 @@ import { create } from 'zustand'
 import type {
   SceneConfig,
   ColorConfig,
-  FaceMaterialConfig,
-  BackMaterialConfig,
-  FrameMaterialConfig,
-  SceneSettings,
+  FaceMaterial,
+  BackMaterial,
+  FrameMaterial,
 } from '../types'
 
-// Leva works with loose Record types — this is the bridge layer
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LevaSetter = (values: Record<string, any>) => void
 
+const DEFAULT_TEXTURES = {
+  normal: '/assets/materials/ultrasuede/suede-normal.png',
+  roughness: '/assets/materials/ultrasuede/suede-roughness.jpg',
+  height: '/assets/materials/ultrasuede/suede-height.png',
+}
+
 interface SceneStore {
-  // Leva setter registration (called by components inside Canvas)
+  // Leva setter registration (camera/env only now)
   _setters: Record<string, LevaSetter>
   registerSetter: (group: string, setter: LevaSetter) => void
 
-  // Current Leva values (synced by components on every change)
-  _values: {
-    'Face Material'?: FaceMaterialConfig
-    'Back Material'?: BackMaterialConfig
-    'Frame Material'?: FrameMaterialConfig
-    'Scene'?: SceneSettings
-  }
+  // Current Leva values (camera/env)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  _values: Record<string, any>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   syncValues: (group: string, values: any) => void
 
@@ -37,15 +37,6 @@ interface SceneStore {
   currentScene: string
   setCurrentScene: (name: string) => void
 
-  // Saved baseline for reset-to-saved (Framer-style)
-  _baseline: {
-    'Face Material'?: FaceMaterialConfig
-    'Back Material'?: BackMaterialConfig
-    'Frame Material'?: FrameMaterialConfig
-    'Scene'?: SceneSettings
-  }
-  _baselineColors: ColorConfig
-
   // Initialization flag
   _initialized: boolean
   setInitialized: () => void
@@ -53,7 +44,7 @@ interface SceneStore {
   // Build a saveable config from current state
   getConfig: (name: string) => SceneConfig
 
-  // Apply a loaded config (sets Leva controls + colors, updates baseline)
+  // Apply a loaded config
   applyConfig: (config: SceneConfig) => void
 }
 
@@ -70,28 +61,16 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
 
   _values: {},
   syncValues: (group, values) =>
-    set((s) => {
-      const newState: Partial<SceneStore> = { _values: { ...s._values, [group]: values } }
-      // If baseline is empty for this group, initialize it from the first sync
-      // This captures the initial Leva values as the baseline before any user edits
-      if (!s._baseline[group as keyof typeof s._baseline]) {
-        newState._baseline = { ...s._baseline, [group]: values }
-      }
-      return newState
-    }),
+    set((s) => ({ _values: { ...s._values, [group]: values } })),
 
   colors: { ...DEFAULT_COLORS },
 
   setBackColor: (color) => {
     set((s) => ({ colors: { ...s.colors, backColor: color } }))
-    const setter = get()._setters['Back Material']
-    if (setter) setter({ color })
   },
 
   setFrameColor: (color) => {
     set((s) => ({ colors: { ...s.colors, frameColor: color } }))
-    const setter = get()._setters['Frame Material']
-    if (setter) setter({ color })
   },
 
   setBgColor: (color) => {
@@ -101,62 +80,45 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
   currentScene: 'default',
   setCurrentScene: (name) => set({ currentScene: name }),
 
-  _baseline: {},
-  _baselineColors: { ...DEFAULT_COLORS },
-
   _initialized: false,
   setInitialized: () => set({ _initialized: true }),
 
   getConfig: (name) => {
     const s = get()
     const now = new Date().toISOString()
+    // TODO: material state is now managed in AdminViewer, not here
+    // This needs to be called with the current material state from AdminViewer
     return {
       name,
       created: now,
       modified: now,
       modelPath: '/assets/shapes/effect-70mm-step.glb',
-      face: s._values['Face Material'] ?? {} as FaceMaterialConfig,
-      back: s._values['Back Material'] ?? {} as BackMaterialConfig,
-      frame: s._values['Frame Material'] ?? {} as FrameMaterialConfig,
-      scene: s._values['Scene'] ?? {} as SceneSettings,
-      textures: {
-        normal: '/assets/materials/ultrasuede/suede-normal.png',
-        roughness: '/assets/materials/ultrasuede/suede-roughness.jpg',
-        height: '/assets/materials/ultrasuede/suede-height.png',
+      face: {
+        params: { roughness: 1, metalness: 0, envMapIntensity: 0.1, normalScale: 0.15, bumpScale: 1, sheen: 1, sheenColor: '#1a1a1a', sheenRoughness: 0.8, colorMultiplier: 1 },
+        textures: { ...DEFAULT_TEXTURES },
       },
+      back: {
+        params: { color: s.colors.backColor, roughness: 1, envMapIntensity: 0.1, normalScale: 0.15, bumpScale: 1, sheen: 1, sheenColor: '#1a1a1a', sheenRoughness: 0.8 },
+        textures: { ...DEFAULT_TEXTURES },
+      },
+      frame: {
+        params: { color: s.colors.frameColor, roughness: 0.5, metalness: 0, clearcoat: 0.4, clearcoatRoughness: 0.3 },
+        textures: {},
+      },
+      scene: s._values['Scene'] || { exposure: 0.7, ambientIntensity: 0.5, envIntensity: 1.0, background: '#ffffff' },
       colors: { ...s.colors },
     }
   },
 
   applyConfig: (config) => {
-    const s = get()
-    if (config.face && s._setters['Face Material']) {
-      s._setters['Face Material'](config.face)
-    }
-    if (config.back && s._setters['Back Material']) {
-      s._setters['Back Material'](config.back)
-    }
-    if (config.frame && s._setters['Frame Material']) {
-      s._setters['Frame Material'](config.frame)
-    }
-    if (config.scene && s._setters['Scene']) {
-      s._setters['Scene'](config.scene)
-    }
     if (config.colors) {
       set({ colors: { ...get().colors, ...config.colors } })
     }
-    // Update baseline for reset-to-saved tracking
-    set({
-      _baseline: {
-        'Face Material': config.face ? { ...config.face } : get()._baseline['Face Material'],
-        'Back Material': config.back ? { ...config.back } : get()._baseline['Back Material'],
-        'Frame Material': config.frame ? { ...config.frame } : get()._baseline['Frame Material'],
-        'Scene': config.scene ? { ...config.scene } : get()._baseline['Scene'],
-      },
-      _baselineColors: config.colors
-        ? { ...get().colors, ...config.colors }
-        : get()._baselineColors,
-      currentScene: config.name,
-    })
+    // Apply scene params via Leva setter
+    const s = get()
+    if (config.scene && s._setters['Scene']) {
+      s._setters['Scene'](config.scene)
+    }
+    set({ currentScene: config.name })
   },
 }))

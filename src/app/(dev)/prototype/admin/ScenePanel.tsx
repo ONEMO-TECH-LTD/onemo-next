@@ -2,13 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useSceneStore } from './sceneStore'
-import AssetUpload from './AssetUpload'
-
-function refreshAssets() {
-  // Reload page to refresh Leva dropdowns with new assets
-  // Leva useControls options are static at mount — full reload needed
-  window.location.reload()
-}
 
 export default function ScenePanel() {
   const [scenes, setScenes] = useState<string[]>([])
@@ -186,20 +179,6 @@ export default function ScenePanel() {
         </button>
       </div>
 
-      {/* Asset uploads */}
-      <div style={{ borderTop: '1px solid #ccc', paddingTop: 8 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6, color: '#666' }}>Upload Assets</div>
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          <AssetUpload type="shapes" accept=".glb,.gltf" label="+ Model" onUploaded={refreshAssets} />
-          <AssetUpload type="env" accept=".exr,.hdr,.hdri" label="+ HDRI" onUploaded={refreshAssets} />
-        </div>
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
-          <AssetUpload type="materials" accept="image/*" label="+ Normal" folder="imported" slot="normal" onUploaded={refreshAssets} />
-          <AssetUpload type="materials" accept="image/*" label="+ Roughness" folder="imported" slot="roughness" onUploaded={refreshAssets} />
-          <AssetUpload type="materials" accept="image/*" label="+ Height" folder="imported" slot="height" onUploaded={refreshAssets} />
-          <AssetUpload type="materials" accept="image/*" label="+ Sheen" folder="imported" slot="sheen" onUploaded={refreshAssets} />
-        </div>
-      </div>
     </div>
   )
 }
