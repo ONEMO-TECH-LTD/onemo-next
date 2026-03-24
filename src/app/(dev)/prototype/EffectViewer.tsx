@@ -318,7 +318,7 @@ export default function EffectViewer({
         camera={{ position: [0, 0, 0.2], fov: 35, near: 0.001, far: 100 }}
       >
         <Suspense fallback={null}>
-          <Environment preset="studio" intensity={sceneParams.envIntensity} />
+          <Environment preset="studio" environmentIntensity={sceneParams.envIntensity} />
           <EffectModel
             artworkUrl={artworkUrl || DEFAULT_ARTWORK}
             designState={designState}
