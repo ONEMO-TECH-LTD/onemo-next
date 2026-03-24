@@ -21,20 +21,21 @@ export default function ScenePanel() {
     setScenes(data.scenes || [])
   }, [])
 
-  // Load default scene on first mount
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+  // Load default scene on first mount — external system sync
   useEffect(() => {
-    fetchScenes()
-    if (!initialized) {
-      fetch('/api/dev/scenes/default')
-        .then((r) => r.json())
-        .then((config) => {
+    const load = async () => {
+      await fetchScenes()
+      if (!initialized) {
+        try {
+          const r = await fetch('/api/dev/scenes/default')
+          const config = await r.json()
           applyConfig(config)
           setInitialized()
-        })
-        .catch(() => {})
+        } catch { /* default scene may not exist */ }
+      }
     }
-  }, [fetchScenes, initialized, applyConfig, setInitialized])
+    load()
+  }, []) // intentionally empty — runs once on mount
 
   const handleSave = async () => {
     const name = newName.trim() || currentScene
