@@ -28,7 +28,7 @@ Dan is a non-technical founder who thinks like an engineer. Sharp, precise, zero
 | Figma JSON export (cleaned) | `Design System/var/Figma Variables Export 16-02-26 CLEANED.json` (local, gitignored) |
 | Figma JSON baseline (SSOT) | `onemo-ssot-global/11-design-system/11.7-figma-variables-baseline-feb16.json` |
 | Token pipeline doc | `onemo-ssot-global/11-design-system/11.8-css-pipeline.md` |
-| Build script | `scripts/build-tokens.mjs` — generates CSS from Figma JSON |
+| Build script | `scripts/tokens/build-tokens.mjs` — generates CSS from Figma JSON |
 
 ## Local Surface Rule
 
