@@ -2,6 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useSceneStore } from './sceneStore'
+import AssetUpload from './AssetUpload'
+
+function refreshAssets() {
+  // Reload page to refresh Leva dropdowns with new assets
+  // Leva useControls options are static at mount — full reload needed
+  window.location.reload()
+}
 
 export default function ScenePanel() {
   const [scenes, setScenes] = useState<string[]>([])
@@ -152,7 +159,7 @@ export default function ScenePanel() {
       </div>
 
       {/* Save as new */}
-      <div style={{ display: 'flex', gap: 4 }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
         <input
           type="text"
           value={newName}
@@ -177,6 +184,16 @@ export default function ScenePanel() {
         >
           Save As
         </button>
+      </div>
+
+      {/* Asset uploads */}
+      <div style={{ borderTop: '1px solid #ccc', paddingTop: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6, color: '#666' }}>Upload Assets</div>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          <AssetUpload type="shapes" accept=".glb,.gltf" label="+ Model" onUploaded={refreshAssets} />
+          <AssetUpload type="env" accept=".exr,.hdr,.hdri" label="+ HDRI" onUploaded={refreshAssets} />
+          <AssetUpload type="materials" accept="image/*" label="+ Texture" onUploaded={refreshAssets} />
+        </div>
       </div>
     </div>
   )
