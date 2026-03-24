@@ -18,9 +18,9 @@ export default function ScenePanel({ onClose }: { onClose: () => void }) {
     setScenes(data.scenes || [])
   }, [])
 
-  useEffect(() => {
-    fetchScenes()
-  }, [fetchScenes])
+  // Load scenes on mount — fetch is external system sync, not cascading setState
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { fetchScenes() }, [fetchScenes])
 
   const handleSave = async () => {
     const name = newName.trim() || selected

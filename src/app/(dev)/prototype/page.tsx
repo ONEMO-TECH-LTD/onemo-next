@@ -148,7 +148,6 @@ export default function PrototypePage() {
         artworkUrl={artworkUrl}
         isEditing={isEditing}
         designState={designState}
-        onDesignChange={setDesignState}
         backColor={backColor}
         frameColor={frameColor}
         bgColor={bgColor}

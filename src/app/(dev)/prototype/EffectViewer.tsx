@@ -287,7 +287,6 @@ export default function EffectViewer({
   artworkUrl,
   isEditing,
   designState,
-  onDesignChange,
   backColor = '#080808',
   frameColor = '#0f0f0f',
   bgColor = '#ffffff',
@@ -295,7 +294,6 @@ export default function EffectViewer({
   artworkUrl?: string
   isEditing: boolean
   designState: DesignState
-  onDesignChange: (state: DesignState) => void
   backColor?: string
   frameColor?: string
   bgColor?: string
