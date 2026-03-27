@@ -8,6 +8,13 @@ export interface DesignState {
   scale: number
 }
 
+export interface ArtworkConfig {
+  url?: string
+  offsetX: number
+  offsetY: number
+  scale: number
+}
+
 export interface FaceMaterialConfig {
   roughness: number
   metalness: number
@@ -44,6 +51,12 @@ export interface SceneSettings {
   ambientIntensity: number
   envIntensity: number
   background: string
+  toneMapping?: 'neutral' | 'aces'
+  transparentBackground?: boolean
+  shadowEnabled?: boolean
+  dprMin?: number
+  dprMax?: number
+  frameloop?: 'always' | 'demand'
 }
 
 export interface TexturePaths {
@@ -76,6 +89,14 @@ export interface FrameMaterial {
   textures: Partial<TexturePaths>  // frame may not use all texture slots
 }
 
+export interface MaterialPresetConfig {
+  name: string
+  modified: string
+  face: FaceMaterial
+  back: BackMaterial
+  frame: FrameMaterial
+}
+
 export interface SceneConfig {
   name: string
   created: string
@@ -86,6 +107,11 @@ export interface SceneConfig {
   frame: FrameMaterial
   scene: SceneSettings
   colors: ColorConfig
+  camera?: CameraConfig
+  environment?: EnvironmentConfig
+  lighting?: LightingConfig
+  artwork?: ArtworkConfig
+  postprocessing?: PostProcessingConfig
 }
 
 export interface CameraConfig {
@@ -108,6 +134,35 @@ export interface EnvironmentConfig {
   groundRadius: number
 }
 
+export interface DirectionalLightConfig {
+  type?: 'directional' | 'point' | 'spot'
+  enabled: boolean
+  intensity: number
+  color: string
+  x: number
+  y: number
+  z: number
+  targetX?: number
+  targetY?: number
+  targetZ?: number
+}
+
+export interface LightingConfig {
+  key: DirectionalLightConfig
+  fill: DirectionalLightConfig
+  rim: DirectionalLightConfig
+}
+
+export interface PostProcessingConfig {
+  bloomEnabled: boolean
+  bloomIntensity: number
+  bloomLuminanceThreshold: number
+  bloomRadius: number
+  vignetteEnabled: boolean
+  vignetteOffset: number
+  vignetteDarkness: number
+}
+
 // The single config object passed to the core viewer
 export interface ViewerConfig {
   modelPath: string
@@ -118,4 +173,6 @@ export interface ViewerConfig {
   colors: ColorConfig
   camera?: CameraConfig
   environment?: EnvironmentConfig
+  lighting?: LightingConfig
+  postprocessing?: PostProcessingConfig
 }
