@@ -1,38 +1,41 @@
-// Studio theme — colors reference HeroUI dark theme CSS vars (--background, --surface, etc.)
-// Spacing and radius reference ONEMO design tokens (--radius-*, --spacing-*)
-// This file provides JS-side constants for inline layout that cannot use CSS classes,
-// and CSS class helpers for HeroUI component customization.
+// Studio theme — colors reference ONEMO semantic design tokens (--semantic-bg-*, --semantic-text-*, etc.)
+// These tokens flip between light and dark based on data-theme + prefers-color-scheme via semantic-inline.css.
+// Spacing and radius reference ONEMO design tokens (--radius-*, --spacing-*).
+//
+// NOTE: As of 2026-03-27, the dark overrides in semantic-inline.css have identical values to light.
+// The studio will render correctly once the DS ships real dark surface primitives.
+// Missing dark values needed: darker bg-primary/secondary/tertiary, lighter text-primary/secondary.
 
 export const STUDIO_THEME = {
   fontFamily: 'var(--font-body, ui-sans-serif, system-ui, -apple-system, sans-serif)',
-  // Shell / panel backgrounds — HeroUI dark theme vars
-  shellBackground: 'var(--background, #1a1a1a)',
-  baseBackground: 'var(--surface, #282828)',
-  panelBackground: 'var(--surface-secondary, #222222)',
-  sectionHeaderBackground: 'var(--surface-tertiary, #2e2e2e)',
-  // Foreground / text — HeroUI dark theme vars
-  baseForeground: 'var(--foreground, #c8c8c8)',
-  labelForeground: 'var(--muted, #888888)',
-  disabledForeground: 'color-mix(in oklch, var(--foreground) 35%, transparent)',
-  // Borders — HeroUI dark theme vars
-  border: '1px solid color-mix(in oklch, var(--foreground) 12%, transparent)',
-  borderColor: 'color-mix(in oklch, var(--foreground) 12%, transparent)',
-  // Interactive — HeroUI primary color var
-  activeBlue: 'var(--primary, #0a84ff)',
-  buttonBackground: 'var(--primary, #0a84ff)',
-  buttonBackgroundHover: 'var(--primary-600, #1a94ff)',
-  buttonForeground: 'var(--primary-foreground, #ffffff)',
+  // Shell / panel backgrounds — ONEMO semantic bg tokens
+  shellBackground: 'var(--semantic-bg-primary)',
+  baseBackground: 'var(--semantic-bg-secondary)',
+  panelBackground: 'var(--semantic-bg-tertiary)',
+  sectionHeaderBackground: 'var(--semantic-bg-tertiary)',
+  // Foreground / text — ONEMO semantic text tokens
+  baseForeground: 'var(--semantic-text-primary)',
+  labelForeground: 'var(--semantic-text-secondary)',
+  disabledForeground: 'var(--semantic-fg-disabled)',
+  // Borders — ONEMO semantic border tokens
+  border: '1px solid var(--semantic-border-primary)',
+  borderColor: 'var(--semantic-border-primary)',
+  // Interactive — ONEMO brand tokens
+  activeBlue: 'var(--semantic-bg-brand-solid)',
+  buttonBackground: 'var(--semantic-bg-brand-solid)',
+  buttonBackgroundHover: 'var(--semantic-bg-brand-solid-hover)',
+  buttonForeground: 'var(--semantic-fg-white)',
   // Container / input
-  containerBackground: 'color-mix(in oklch, var(--foreground) 5%, transparent)',
-  containerBackgroundHover: 'color-mix(in oklch, var(--foreground) 8%, transparent)',
-  containerForeground: 'var(--foreground, #c8c8c8)',
-  inputBackground: 'var(--field-background, #1e1e1e)',
-  inputBackgroundHover: 'var(--surface, #222222)',
-  inputForeground: 'var(--field-foreground, #c8c8c8)',
+  containerBackground: 'var(--semantic-bg-tertiary)',
+  containerBackgroundHover: 'var(--semantic-bg-quaternary)',
+  containerForeground: 'var(--semantic-text-primary)',
+  inputBackground: 'var(--semantic-bg-secondary)',
+  inputBackgroundHover: 'var(--semantic-bg-secondary-hover)',
+  inputForeground: 'var(--semantic-text-primary)',
   // Misc
-  baseShadow: 'rgba(0, 0, 0, 0.4)',
-  monitorBackground: 'rgba(0, 0, 0, 0.4)',
-  grooveForeground: 'color-mix(in oklch, var(--foreground) 12%, transparent)',
+  baseShadow: 'var(--semantic-shadow-md-01)',
+  monitorBackground: 'var(--semantic-bg-quaternary)',
+  grooveForeground: 'var(--semantic-border-secondary)',
   // Border radius — ONEMO design tokens (flat KeyShot style)
   baseBorderRadius: 'var(--radius-xxs, 2px)',
   bladeBorderRadius: 'var(--radius-xxs, 2px)',
@@ -127,7 +130,7 @@ export function quickPickButtonStyle(active = false) {
       ? `1px solid ${STUDIO_THEME.activeBlue}`
       : STUDIO_THEME.border,
     background: active
-      ? 'color-mix(in oklch, var(--primary, #0a84ff) 12%, transparent)'
+      ? 'var(--semantic-bg-brand-primary)'
       : STUDIO_THEME.inputBackground,
     color: active ? STUDIO_THEME.baseForeground : STUDIO_THEME.labelForeground,
     cursor: 'pointer',

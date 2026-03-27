@@ -112,13 +112,13 @@ export function LibraryPanel({
       <Tabs
         selectedKey={activeTab}
         onSelectionChange={(key) => setActiveTab(key as LibraryTab)}
-        className="w-full shrink-0 border-b border-[color-mix(in_oklch,var(--foreground)_12%,transparent)] bg-[var(--surface-secondary)]"
+        className="w-full shrink-0 border-b border-[var(--semantic-border-primary)] bg-[var(--semantic-bg-tertiary)]"
       >
         <TabList className="flex gap-0 px-1">
-          <Tab id="models" className="h-8 px-2 text-[11px] font-medium text-[var(--muted)] data-[selected]:text-white data-[selected]:border-b-2 data-[selected]:border-[var(--primary,#0a84ff)] cursor-pointer outline-none">Models</Tab>
-          <Tab id="environments" className="h-8 px-2 text-[11px] font-medium text-[var(--muted)] data-[selected]:text-white data-[selected]:border-b-2 data-[selected]:border-[var(--primary,#0a84ff)] cursor-pointer outline-none">Envs</Tab>
-          <Tab id="materials" className="h-8 px-2 text-[11px] font-medium text-[var(--muted)] data-[selected]:text-white data-[selected]:border-b-2 data-[selected]:border-[var(--primary,#0a84ff)] cursor-pointer outline-none">Materials</Tab>
-          <Tab id="artwork" className="h-8 px-2 text-[11px] font-medium text-[var(--muted)] data-[selected]:text-white data-[selected]:border-b-2 data-[selected]:border-[var(--primary,#0a84ff)] cursor-pointer outline-none">Artwork</Tab>
+          <Tab id="models" className="h-8 px-2 text-[11px] font-medium text-[var(--semantic-text-secondary)] data-[selected]:text-[var(--semantic-text-primary)] data-[selected]:border-b-2 data-[selected]:border-[var(--semantic-bg-brand-solid)] cursor-pointer outline-none">Models</Tab>
+          <Tab id="environments" className="h-8 px-2 text-[11px] font-medium text-[var(--semantic-text-secondary)] data-[selected]:text-[var(--semantic-text-primary)] data-[selected]:border-b-2 data-[selected]:border-[var(--semantic-bg-brand-solid)] cursor-pointer outline-none">Envs</Tab>
+          <Tab id="materials" className="h-8 px-2 text-[11px] font-medium text-[var(--semantic-text-secondary)] data-[selected]:text-[var(--semantic-text-primary)] data-[selected]:border-b-2 data-[selected]:border-[var(--semantic-bg-brand-solid)] cursor-pointer outline-none">Materials</Tab>
+          <Tab id="artwork" className="h-8 px-2 text-[11px] font-medium text-[var(--semantic-text-secondary)] data-[selected]:text-[var(--semantic-text-primary)] data-[selected]:border-b-2 data-[selected]:border-[var(--semantic-bg-brand-solid)] cursor-pointer outline-none">Artwork</Tab>
         </TabList>
       </Tabs>
 

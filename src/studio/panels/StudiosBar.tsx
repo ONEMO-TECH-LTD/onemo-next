@@ -136,7 +136,7 @@ export function StudiosBar({
           value={sceneDraftName}
           onChange={(e) => onSceneDraftNameChange(e.target.value)}
           placeholder="Scene name"
-          className="w-[110px] h-6 px-1.5 text-[11px] rounded-[var(--radius-xxs,2px)] bg-[var(--field-background)] border border-[color-mix(in_oklch,var(--foreground)_12%,transparent)] text-[var(--foreground)] placeholder:text-[var(--muted)] outline-none"
+          className="w-[110px] h-6 px-1.5 text-[11px] rounded-[var(--radius-xxs,2px)] bg-[var(--semantic-bg-secondary)] border border-[var(--semantic-border-primary)] text-[var(--semantic-text-primary)] placeholder:text-[var(--semantic-text-secondary)] outline-none"
         />
         <Button
           size="sm"
@@ -159,7 +159,7 @@ export function StudiosBar({
             size="sm"
             variant="outline"
             onPress={onPublishScene}
-            className="h-6 min-h-0 px-2 text-[11px] rounded-[var(--radius-xxs,2px)] text-[var(--primary,#0a84ff)] border-[var(--primary,#0a84ff)]"
+            className="h-6 min-h-0 px-2 text-[11px] rounded-[var(--radius-xxs,2px)] text-[var(--semantic-bg-brand-solid)] border-[var(--semantic-bg-brand-solid)]"
           >
             Publish
           </Button>
