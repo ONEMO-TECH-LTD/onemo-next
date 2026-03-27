@@ -1,11 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import type { TexturePaths } from '@/app/(dev)/prototype/types'
 import {
   STUDIO_THEME,
-  eyebrowStyle,
-  paneSummaryStyle,
-  paneSurfaceStyle,
+  inputStyle,
   primaryButtonStyle,
   quickPickButtonStyle,
   quickPickGridStyle,
@@ -27,6 +26,8 @@ interface MaterialSet {
   textures: Partial<TexturePaths>
 }
 
+type LibraryTab = 'models' | 'environments' | 'materials'
+
 function labelStyle() {
   return {
     fontSize: 10,
@@ -36,15 +37,20 @@ function labelStyle() {
   }
 }
 
-function sectionHeadStyle() {
+function tabButtonStyle(active: boolean) {
   return {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flex: 1,
+    padding: '7px 4px',
+    border: 'none',
+    borderBottom: active ? `2px solid ${STUDIO_THEME.activeBlue}` : '2px solid transparent',
+    background: 'transparent',
+    color: active ? '#ffffff' : STUDIO_THEME.labelForeground,
+    fontSize: 11,
+    fontWeight: active ? 600 : 400,
     cursor: 'pointer',
-    fontSize: 12,
-    fontWeight: 700,
-    color: STUDIO_THEME.baseForeground,
+    fontFamily: 'inherit',
+    textAlign: 'center' as const,
+    whiteSpace: 'nowrap' as const,
   } as const
 }
 
@@ -83,158 +89,288 @@ export function LibraryPanel({
   onSaveMaterialPreset: (value: string) => void
   onLoadMaterialPreset: (value: string) => void
 }) {
+  const [activeTab, setActiveTab] = useState<LibraryTab>('models')
+
   return (
-    <details open style={paneSurfaceStyle()}>
-      <summary style={paneSummaryStyle()}>
-        <div style={eyebrowStyle()}>Library</div>
-        <div style={{ fontSize: 14, fontWeight: 800, color: STUDIO_THEME.baseForeground }}>
-          {assetsLoaded ? `${Object.keys(models).length} Models · ${Object.keys(hdris).length} HDRIs` : 'Scanning…'}
-        </div>
-      </summary>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        flex: 1,
+        minHeight: 200,
+        background: STUDIO_THEME.baseBackground,
+        fontFamily: STUDIO_THEME.fontFamily,
+      }}
+    >
+      {/* Tab bar */}
+      <div
+        style={{
+          display: 'flex',
+          flexShrink: 0,
+          borderBottom: STUDIO_THEME.border,
+          background: STUDIO_THEME.panelBackground,
+        }}
+      >
+        <button style={tabButtonStyle(activeTab === 'models')} onClick={() => setActiveTab('models')}>
+          Models
+        </button>
+        <button style={tabButtonStyle(activeTab === 'environments')} onClick={() => setActiveTab('environments')}>
+          Environments
+        </button>
+        <button style={tabButtonStyle(activeTab === 'materials')} onClick={() => setActiveTab('materials')}>
+          Materials
+        </button>
+      </div>
 
-      <div style={{ display: 'grid', gap: 10, marginTop: 8 }}>
+      {/* Tab content */}
+      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
 
-        {/* Models */}
-        <details open style={{ display: 'grid', gap: 8, paddingTop: 6, borderTop: STUDIO_THEME.border }}>
-          <summary style={sectionHeadStyle()}>Models</summary>
-          <div style={{ display: 'grid', gap: 8, marginTop: 4 }}>
-            <div style={quickPickGridStyle(92)}>
+        {/* Models tab */}
+        {activeTab === 'models' && (
+          <div style={{ padding: 8, display: 'grid', gap: 8 }}>
+            {/* Section header */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <span style={labelStyle()}>
+                {assetsLoaded ? `${Object.keys(models).length} Models` : 'Scanning…'}
+              </span>
+              <label style={primaryButtonStyle()}>
+                Import
+                <input
+                  type="file"
+                  accept=".glb,.gltf"
+                  style={{ display: 'none' }}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0]
+                    if (file) void onAssetUpload('shapes', file)
+                    event.target.value = ''
+                  }}
+                />
+              </label>
+            </div>
+
+            {/* Asset grid — 64px thumbnails */}
+            <div style={quickPickGridStyle(64)}>
               {Object.entries(models).map(([label, value]) => {
                 const active = value === modelPath
                 return (
                   <button key={label} onClick={() => onModelChange(value)} style={quickPickButtonStyle(active)}>
-                    <span style={{ fontSize: 11, fontWeight: 700, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{label}</span>
-                    <span style={{ fontSize: 10, color: active ? STUDIO_THEME.buttonForeground : STUDIO_THEME.labelForeground }}>
-                      {active ? 'Active' : 'Load'}
+                    <div
+                      style={{
+                        width: '100%',
+                        aspectRatio: '1',
+                        background: '#111',
+                        borderRadius: 2,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 18,
+                        color: active ? STUDIO_THEME.activeBlue : STUDIO_THEME.labelForeground,
+                      }}
+                    >
+                      ◻
+                    </div>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        color: active ? STUDIO_THEME.baseForeground : STUDIO_THEME.labelForeground,
+                        textAlign: 'center',
+                        overflowWrap: 'anywhere',
+                        wordBreak: 'break-word',
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      {label}
                     </span>
                   </button>
                 )
               })}
             </div>
-            <label style={primaryButtonStyle()}>
-              Import Model
-              <input
-                type="file"
-                accept=".glb,.gltf"
-                style={{ display: 'none' }}
-                onChange={(event) => {
-                  const file = event.target.files?.[0]
-                  if (file) void onAssetUpload('shapes', file)
-                  event.target.value = ''
-                }}
-              />
-            </label>
           </div>
-        </details>
+        )}
 
-        {/* Environments / HDRIs */}
-        <details open style={{ display: 'grid', gap: 8, paddingTop: 6, borderTop: STUDIO_THEME.border }}>
-          <summary style={sectionHeadStyle()}>Environments</summary>
-          <div style={{ display: 'grid', gap: 8, marginTop: 4 }}>
-            <div style={quickPickGridStyle(92)}>
+        {/* Environments tab */}
+        {activeTab === 'environments' && (
+          <div style={{ padding: 8, display: 'grid', gap: 8 }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <span style={labelStyle()}>
+                {assetsLoaded ? `${Object.keys(hdris).length} HDRIs` : 'Scanning…'}
+              </span>
+              <label style={primaryButtonStyle()}>
+                Import
+                <input
+                  type="file"
+                  accept=".exr,.hdr,.hdri"
+                  style={{ display: 'none' }}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0]
+                    if (file) void onAssetUpload('env', file)
+                    event.target.value = ''
+                  }}
+                />
+              </label>
+            </div>
+
+            <div style={quickPickGridStyle(64)}>
               {Object.entries(hdris).map(([label, value]) => {
                 const active = value === hdriValue
                 return (
                   <button key={label} onClick={() => onHdriChange(value)} style={quickPickButtonStyle(active)}>
-                    <span style={{ fontSize: 11, fontWeight: 700, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{label}</span>
-                    <span style={{ fontSize: 10, color: active ? STUDIO_THEME.buttonForeground : STUDIO_THEME.labelForeground }}>
-                      {active ? 'Active' : 'Load'}
+                    <div
+                      style={{
+                        width: '100%',
+                        aspectRatio: '1',
+                        background: 'radial-gradient(circle at 40% 40%, #555, #111)',
+                        borderRadius: 2,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 16,
+                        color: active ? STUDIO_THEME.activeBlue : STUDIO_THEME.labelForeground,
+                      }}
+                    >
+                      ◉
+                    </div>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        color: active ? STUDIO_THEME.baseForeground : STUDIO_THEME.labelForeground,
+                        textAlign: 'center',
+                        overflowWrap: 'anywhere',
+                        wordBreak: 'break-word',
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      {label}
                     </span>
                   </button>
                 )
               })}
             </div>
-            <label style={primaryButtonStyle()}>
-              Import HDRI
-              <input
-                type="file"
-                accept=".exr,.hdr,.hdri"
-                style={{ display: 'none' }}
-                onChange={(event) => {
-                  const file = event.target.files?.[0]
-                  if (file) void onAssetUpload('env', file)
-                  event.target.value = ''
-                }}
-              />
-            </label>
           </div>
-        </details>
+        )}
 
-        {/* Material Presets */}
-        <details open style={{ display: 'grid', gap: 8, paddingTop: 6, borderTop: STUDIO_THEME.border }}>
-          <summary style={sectionHeadStyle()}>Material Presets</summary>
-          <div style={{ display: 'grid', gap: 8, marginTop: 4 }}>
-            <div style={quickPickGridStyle(92)}>
-              {materialPresetNames.length ? (
-                materialPresetNames.map((name) => {
-                  const active = name === materialPresetDraftName
-                  return (
-                    <button key={name} onClick={() => onLoadMaterialPreset(name)} style={quickPickButtonStyle(active)}>
-                      <span style={{ fontSize: 11, fontWeight: 700, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{name}</span>
-                      <span style={{ fontSize: 10, color: active ? STUDIO_THEME.buttonForeground : STUDIO_THEME.labelForeground }}>
-                        {active ? 'Loaded' : 'Load'}
-                      </span>
-                    </button>
-                  )
-                })
-              ) : (
-                <div style={{ ...statusCardStyle(), gridColumn: '1 / -1' }}>
-                  <span style={labelStyle()}>Presets</span>
-                  <span style={{ fontSize: 11, color: STUDIO_THEME.labelForeground }}>No saved material presets yet.</span>
-                </div>
-              )}
-            </div>
+        {/* Materials tab */}
+        {activeTab === 'materials' && (
+          <div style={{ padding: 8, display: 'grid', gap: 12 }}>
 
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <input
-                value={materialPresetDraftName}
-                onChange={(event) => onMaterialPresetDraftNameChange(event.target.value)}
-                placeholder="Preset name"
+            {/* Material Presets */}
+            <div style={{ display: 'grid', gap: 6 }}>
+              <div
                 style={{
-                  flex: 1,
-                  height: 24,
-                  padding: '0 8px',
-                  borderRadius: STUDIO_THEME.bladeBorderRadius,
-                  border: STUDIO_THEME.border,
-                  background: STUDIO_THEME.containerBackground,
-                  color: STUDIO_THEME.baseForeground,
-                  fontSize: 11,
-                  fontFamily: 'inherit',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
                 }}
-              />
-              <button onClick={() => onSaveMaterialPreset(materialPresetDraftName)} style={secondaryButtonStyle()}>
-                Save
-              </button>
-            </div>
-          </div>
-        </details>
+              >
+                <span style={labelStyle()}>Material Presets</span>
+              </div>
 
-        {/* Material Sets */}
-        {materialSets.length > 0 && (
-          <details style={{ display: 'grid', gap: 8, paddingTop: 6, borderTop: STUDIO_THEME.border }}>
-            <summary style={sectionHeadStyle()}>Material Sets</summary>
-            <div style={{ display: 'grid', gap: 8, marginTop: 4 }}>
-              {materialSets.map((set) => (
-                <div key={set.name} style={statusCardStyle()}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: STUDIO_THEME.baseForeground, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{set.name}</span>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {materialGroups.map((materialGroup) => (
-                      <button
-                        key={`${set.name}-${materialGroup.key}`}
-                        onClick={() => onApplyMaterialSet(materialGroup.key, set.textures)}
-                        style={secondaryButtonStyle()}
-                      >
-                        Apply to {materialGroup.label}
+              <div style={quickPickGridStyle(64)}>
+                {materialPresetNames.length ? (
+                  materialPresetNames.map((name) => {
+                    const active = name === materialPresetDraftName
+                    return (
+                      <button key={name} onClick={() => onLoadMaterialPreset(name)} style={quickPickButtonStyle(active)}>
+                        <div
+                          style={{
+                            width: '100%',
+                            aspectRatio: '1',
+                            background: '#111',
+                            borderRadius: 2,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 18,
+                            color: active ? STUDIO_THEME.activeBlue : STUDIO_THEME.labelForeground,
+                          }}
+                        >
+                          ◈
+                        </div>
+                        <span
+                          style={{
+                            fontSize: 10,
+                            color: active ? STUDIO_THEME.baseForeground : STUDIO_THEME.labelForeground,
+                            textAlign: 'center',
+                            overflowWrap: 'anywhere',
+                            wordBreak: 'break-word',
+                            lineHeight: 1.2,
+                          }}
+                        >
+                          {name}
+                        </span>
                       </button>
-                    ))}
+                    )
+                  })
+                ) : (
+                  <div style={{ ...statusCardStyle(), gridColumn: '1 / -1' }}>
+                    <span style={labelStyle()}>No saved presets</span>
                   </div>
-                </div>
-              ))}
+                )}
+              </div>
+
+              {/* Save preset */}
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input
+                  value={materialPresetDraftName}
+                  onChange={(event) => onMaterialPresetDraftNameChange(event.target.value)}
+                  placeholder="Preset name"
+                  style={{ ...inputStyle(), flex: 1 }}
+                />
+                <button onClick={() => onSaveMaterialPreset(materialPresetDraftName)} style={secondaryButtonStyle()}>
+                  Save
+                </button>
+              </div>
             </div>
-          </details>
+
+            {/* Material Sets */}
+            {materialSets.length > 0 && (
+              <div style={{ display: 'grid', gap: 6 }}>
+                <span style={labelStyle()}>Material Sets</span>
+                {materialSets.map((set) => (
+                  <div key={set.name} style={{ ...statusCardStyle(), padding: '6px 8px' }}>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: STUDIO_THEME.baseForeground,
+                        overflowWrap: 'anywhere',
+                        wordBreak: 'break-word',
+                      }}
+                    >
+                      {set.name}
+                    </span>
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+                      {materialGroups.map((materialGroup) => (
+                        <button
+                          key={`${set.name}-${materialGroup.key}`}
+                          onClick={() => onApplyMaterialSet(materialGroup.key, set.textures)}
+                          style={secondaryButtonStyle()}
+                        >
+                          Apply to {materialGroup.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+          </div>
         )}
 
       </div>
-    </details>
+    </div>
   )
 }

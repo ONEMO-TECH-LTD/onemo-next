@@ -74,12 +74,12 @@ const MAX_SCALE = 4.0
 const DRAG_SENSITIVITY = 0.001
 const SCROLL_SENSITIVITY = 0.002
 const STUDIO_LAYOUT_STORAGE_KEY = 'onemo-studio-layout:v1'
-const DEFAULT_LEFT_DOCK_WIDTH = 272
-const DEFAULT_RIGHT_DOCK_WIDTH = 344
-const MIN_DOCK_WIDTH = 220
-const MIN_VIEWPORT_WIDTH = 520
-const SHELL_HORIZONTAL_PADDING = 20
-const SHELL_COLUMN_GAP = 12
+const DEFAULT_LEFT_DOCK_WIDTH = 220
+const DEFAULT_RIGHT_DOCK_WIDTH = 300
+const MIN_DOCK_WIDTH = 180
+const MIN_VIEWPORT_WIDTH = 400
+const SHELL_HORIZONTAL_PADDING = 0
+const SHELL_COLUMN_GAP = 0
 const STUDIO_LAYOUT_PRESET_ORDER: StudioLayoutPresetId[] = ['balanced', 'viewport', 'lighting']
 const DEFAULT_LAYOUT_PRESET: StudioLayoutPresetId = 'balanced'
 const STUDIO_LAYOUT_PRESET_DEFINITIONS: Record<StudioLayoutPresetId, StudioLayoutPresetDefinition> = {
@@ -107,7 +107,7 @@ const STUDIO_LAYOUT_PRESET_DEFINITIONS: Record<StudioLayoutPresetId, StudioLayou
       showLeftDock: false,
       showRightDock: true,
       leftDockWidth: DEFAULT_LEFT_DOCK_WIDTH,
-      rightDockWidth: 420,
+      rightDockWidth: 360,
     },
   },
 }
@@ -1310,119 +1310,109 @@ export default function StudioPage() {
       style={{
         position: 'fixed',
         inset: 0,
-        background: viewerConfig.colors.bgColor,
-        display: 'grid',
-        gridTemplateColumns: `${showLeftDock ? `${effectiveLeftDockWidth}px` : '0px'} minmax(0, 1fr) ${showRightDock ? `${effectiveRightDockWidth}px` : '0px'}`,
-        gridTemplateRows: 'auto minmax(0, 1fr)',
-        gap: 12,
-        padding: 20,
-        boxSizing: 'border-box',
+        background: STUDIO_THEME.shellBackground,
+        display: 'flex',
+        flexDirection: 'column',
         fontFamily: STUDIO_THEME.fontFamily,
       }}
     >
+      {/* Toolbar — 40px, full width, KeyShot charcoal */}
       <div
         style={{
-          gridColumn: '1 / 4',
-          gridRow: '1',
+          flexShrink: 0,
+          height: 40,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: 12,
-          padding: '8px 12px',
-          background: STUDIO_THEME.baseBackground,
-          border: STUDIO_THEME.border,
+          gap: 8,
+          padding: '0 10px',
+          background: '#252525',
+          borderBottom: STUDIO_THEME.border,
           color: STUDIO_THEME.baseForeground,
-          backdropFilter: 'blur(12px)',
-          boxShadow: `0 2px 4px ${STUDIO_THEME.baseShadow}`,
-          minHeight: 52,
-          borderRadius: STUDIO_THEME.baseBorderRadius,
         }}
       >
-        <div style={{ display: 'grid', gap: 2, minWidth: 0 }}>
-          <div style={{ fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: STUDIO_THEME.labelForeground }}>
-            ONEMO Browser Studio
-          </div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: STUDIO_THEME.baseForeground }}>
+        {/* Left: studio name + dirty indicator */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: STUDIO_THEME.baseForeground, whiteSpace: 'nowrap' }}>
             {currentSceneEntry?.name ?? currentScene}
-            {hasUnsavedChanges ? ' • Dirty' : ' • Saved'}
-          </div>
-          <div style={{ fontSize: 10, color: STUDIO_THEME.labelForeground }}>
-            {currentSceneEntry?.modified
-              ? `Last modified ${new Date(currentSceneEntry.modified).toLocaleString()}`
-              : 'Working from live studio state'}
-          </div>
+          </span>
+          <span
+            style={{
+              fontSize: 10,
+              color: hasUnsavedChanges ? '#f59e0b' : STUDIO_THEME.labelForeground,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {hasUnsavedChanges ? '● Unsaved' : '○ Saved'}
+          </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        {/* Right: action buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
           <button
             onClick={handleQuickSave}
-            style={{ height: 24, padding: '0 10px', borderRadius: STUDIO_THEME.bladeBorderRadius, border: 'none', background: STUDIO_THEME.buttonBackground, color: STUDIO_THEME.buttonForeground, cursor: 'pointer', fontWeight: 700, fontFamily: 'inherit', fontSize: 12 }}
+            style={{ height: 26, padding: '0 10px', borderRadius: STUDIO_THEME.bladeBorderRadius, border: 'none', background: STUDIO_THEME.buttonBackground, color: STUDIO_THEME.buttonForeground, cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit', fontSize: 11 }}
           >
-            Save Studio
+            Save
           </button>
           <button
             onClick={handleResetScene}
-            style={{ height: 24, padding: '0 10px', borderRadius: STUDIO_THEME.bladeBorderRadius, border: 'none', background: STUDIO_THEME.containerBackground, color: hasUnsavedChanges ? STUDIO_THEME.baseForeground : STUDIO_THEME.labelForeground, cursor: 'pointer', fontWeight: 700, fontFamily: 'inherit', fontSize: 12 }}
+            style={{ height: 26, padding: '0 10px', borderRadius: STUDIO_THEME.bladeBorderRadius, border: STUDIO_THEME.border, background: 'transparent', color: hasUnsavedChanges ? STUDIO_THEME.baseForeground : STUDIO_THEME.labelForeground, cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit', fontSize: 11 }}
           >
             Reset
           </button>
           <button
             onClick={handleRefreshWorkspace}
-            style={{ height: 24, padding: '0 10px', borderRadius: STUDIO_THEME.bladeBorderRadius, border: 'none', background: STUDIO_THEME.containerBackground, color: STUDIO_THEME.baseForeground, cursor: 'pointer', fontWeight: 700, fontFamily: 'inherit', fontSize: 12 }}
+            style={{ height: 26, padding: '0 10px', borderRadius: STUDIO_THEME.bladeBorderRadius, border: STUDIO_THEME.border, background: 'transparent', color: STUDIO_THEME.labelForeground, cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit', fontSize: 11 }}
           >
             Refresh
           </button>
           <button
             onClick={handleExportStudioState}
-            style={{ height: 24, padding: '0 10px', borderRadius: STUDIO_THEME.bladeBorderRadius, border: 'none', background: STUDIO_THEME.containerBackground, color: STUDIO_THEME.baseForeground, cursor: 'pointer', fontWeight: 700, fontFamily: 'inherit', fontSize: 12 }}
+            style={{ height: 26, padding: '0 10px', borderRadius: STUDIO_THEME.bladeBorderRadius, border: STUDIO_THEME.border, background: 'transparent', color: STUDIO_THEME.labelForeground, cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit', fontSize: 11 }}
           >
-            Export State
+            Export
           </button>
-          <label style={{ display: 'grid', gap: 2, minWidth: 124 }}>
-            <span style={{ fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', color: STUDIO_THEME.labelForeground }}>
-              Layout Preset
-            </span>
-            <select
-              value={selectedLayoutPreset}
-              onChange={(event) => handleLayoutPresetSelect(event.target.value as StudioLayoutPresetId)}
-              style={{
-                height: 24,
-                borderRadius: STUDIO_THEME.bladeBorderRadius,
-                border: 'none',
-                background: STUDIO_THEME.containerBackground,
-                color: STUDIO_THEME.baseForeground,
-                cursor: 'pointer',
-                fontWeight: 700,
-                fontFamily: 'inherit',
-                fontSize: 11,
-                padding: '0 6px',
-              }}
-            >
-              {STUDIO_LAYOUT_PRESET_ORDER.map((presetId) => (
-                <option key={presetId} value={presetId}>
-                  {STUDIO_LAYOUT_PRESET_DEFINITIONS[presetId].label}
-                </option>
-              ))}
-            </select>
-          </label>
+          {/* Separator */}
+          <div style={{ width: 1, height: 20, background: STUDIO_THEME.borderColor, margin: '0 2px' }} />
+          <select
+            value={selectedLayoutPreset}
+            onChange={(event) => handleLayoutPresetSelect(event.target.value as StudioLayoutPresetId)}
+            style={{
+              height: 26,
+              borderRadius: STUDIO_THEME.bladeBorderRadius,
+              border: STUDIO_THEME.border,
+              background: '#1e1e1e',
+              color: STUDIO_THEME.baseForeground,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              fontSize: 11,
+              padding: '0 6px',
+            }}
+          >
+            {STUDIO_LAYOUT_PRESET_ORDER.map((presetId) => (
+              <option key={presetId} value={presetId}>
+                {STUDIO_LAYOUT_PRESET_DEFINITIONS[presetId].label}
+              </option>
+            ))}
+          </select>
           <button
             onClick={() => setIsEditingLights((value) => !value)}
-            style={{ height: 24, padding: '0 10px', borderRadius: STUDIO_THEME.bladeBorderRadius, border: 'none', background: isEditingLights ? STUDIO_THEME.buttonBackground : STUDIO_THEME.containerBackground, color: isEditingLights ? STUDIO_THEME.buttonForeground : STUDIO_THEME.baseForeground, cursor: 'pointer', fontWeight: 700, fontFamily: 'inherit', fontSize: 12 }}
+            style={{ height: 26, padding: '0 10px', borderRadius: STUDIO_THEME.bladeBorderRadius, border: isEditingLights ? 'none' : STUDIO_THEME.border, background: isEditingLights ? STUDIO_THEME.buttonBackground : 'transparent', color: isEditingLights ? STUDIO_THEME.buttonForeground : STUDIO_THEME.labelForeground, cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit', fontSize: 11 }}
           >
-            {isEditingLights ? 'Done Lights' : 'Edit Lights'}
+            {isEditingLights ? 'Done Lights' : 'Lights'}
           </button>
           {shellActionStatus ? (
             <div
               style={{
-                height: 24,
+                height: 26,
                 display: 'flex',
                 alignItems: 'center',
-                padding: '0 10px',
+                padding: '0 8px',
                 borderRadius: STUDIO_THEME.bladeBorderRadius,
                 background: STUDIO_THEME.containerBackground,
                 color: STUDIO_THEME.baseForeground,
                 fontSize: 11,
-                fontWeight: 700,
                 whiteSpace: 'nowrap',
               }}
             >
@@ -1432,17 +1422,25 @@ export default function StudioPage() {
         </div>
       </div>
 
-      <div
-        style={{
-          gridColumn: '1',
-          gridRow: '2',
-          minHeight: 0,
-          position: 'relative',
-          overflow: 'hidden',
-          visibility: showLeftDock ? 'visible' : 'hidden',
-        }}
-      >
-        <div style={{ height: '100%', overflowY: 'auto', display: 'grid', gap: 10, paddingRight: 4 }}>
+      {/* Work area — flex row: left dock + viewport + right dock */}
+      <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+
+        {/* Left dock */}
+        {showLeftDock && (
+        <div
+          style={{
+            flexShrink: 0,
+            width: effectiveLeftDockWidth,
+            minHeight: 0,
+            position: 'relative',
+            overflow: 'hidden',
+            background: STUDIO_THEME.panelBackground,
+            borderRight: STUDIO_THEME.border,
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <StudiosPanel
             currentScene={currentScene}
             sceneDraftName={sceneDraftName}
@@ -1496,8 +1494,8 @@ export default function StudioPage() {
             onToggleEditing={() => setIsEditing((previous) => !previous)}
             onResetArtwork={() => setDesignState(cloneDesignState(INITIAL_DESIGN))}
           />
-        </div>
-        {showLeftDock ? (
+          </div>
+          {/* Left resize handle */}
           <button
             type="button"
             aria-label="Resize left dock"
@@ -1506,72 +1504,7 @@ export default function StudioPage() {
               position: 'absolute',
               top: 0,
               right: 0,
-              width: 10,
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: 'none',
-              background: 'transparent',
-              cursor: 'col-resize',
-              padding: 0,
-            }}
-          >
-            <span
-              style={{
-                width: 2,
-                height: '28%',
-                borderRadius: 999,
-                background: activeDockResize === 'left' ? STUDIO_THEME.buttonBackground : 'rgba(148, 163, 184, 0.5)',
-              }}
-            />
-          </button>
-        ) : null}
-      </div>
-
-      <div
-        style={{
-          gridColumn: '2',
-          gridRow: '2',
-          minWidth: 0,
-          minHeight: 0,
-          position: 'relative',
-          overflow: 'hidden',
-          touchAction: isEditing ? 'none' : 'auto',
-        }}
-        {...(isEditing ? bind() : {})}
-      >
-        <EffectViewer
-          config={viewerConfig}
-          artworkUrl={artworkUrl}
-          designState={designState}
-          isEditing={isEditing}
-          showLightingHelpers={isEditingLights}
-          editLights={isEditingLights}
-          onLightChange={updateLightTransform}
-        />
-      </div>
-
-      <div
-        style={{
-          gridColumn: '3',
-          gridRow: '2',
-          minHeight: 0,
-          position: 'relative',
-          overflow: 'hidden',
-          visibility: showRightDock ? 'visible' : 'hidden',
-        }}
-      >
-        {showRightDock ? (
-          <button
-            type="button"
-            aria-label="Resize right dock"
-            onPointerDown={handleDockResizeStart('right')}
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: 10,
+              width: 6,
               height: '100%',
               display: 'flex',
               alignItems: 'center',
@@ -1585,15 +1518,87 @@ export default function StudioPage() {
           >
             <span
               style={{
-                width: 2,
-                height: '28%',
-                borderRadius: 999,
-                background: activeDockResize === 'right' ? STUDIO_THEME.buttonBackground : 'rgba(148, 163, 184, 0.5)',
+                width: 1,
+                height: '40%',
+                background: activeDockResize === 'left' ? STUDIO_THEME.activeBlue : STUDIO_THEME.borderColor,
               }}
             />
           </button>
-        ) : null}
-        <InspectorPanel registry={studioRegistry} />
+        </div>
+        )}
+
+        {/* Viewport — black background, fills remaining space */}
+        <div
+          style={{
+            flex: 1,
+            minWidth: 0,
+            minHeight: 0,
+            position: 'relative',
+            overflow: 'hidden',
+            background: '#000000',
+            touchAction: isEditing ? 'none' : 'auto',
+          }}
+          {...(isEditing ? bind() : {})}
+        >
+          <EffectViewer
+            config={viewerConfig}
+            artworkUrl={artworkUrl}
+            designState={designState}
+            isEditing={isEditing}
+            showLightingHelpers={isEditingLights}
+            editLights={isEditingLights}
+            onLightChange={updateLightTransform}
+          />
+        </div>
+
+        {/* Right dock */}
+        {showRightDock && (
+        <div
+          style={{
+            flexShrink: 0,
+            width: effectiveRightDockWidth,
+            minHeight: 0,
+            position: 'relative',
+            overflow: 'hidden',
+            background: STUDIO_THEME.panelBackground,
+            borderLeft: STUDIO_THEME.border,
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          {/* Right resize handle */}
+          <button
+            type="button"
+            aria-label="Resize right dock"
+            onPointerDown={handleDockResizeStart('right')}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: 6,
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: 'none',
+              background: 'transparent',
+              cursor: 'col-resize',
+              padding: 0,
+              zIndex: 1,
+            }}
+          >
+            <span
+              style={{
+                width: 1,
+                height: '40%',
+                background: activeDockResize === 'right' ? STUDIO_THEME.activeBlue : STUDIO_THEME.borderColor,
+              }}
+            />
+          </button>
+          <InspectorPanel registry={studioRegistry} />
+        </div>
+        )}
+
       </div>
     </div>
   )
