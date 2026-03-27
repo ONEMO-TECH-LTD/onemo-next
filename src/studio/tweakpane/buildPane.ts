@@ -293,6 +293,7 @@ export function getStudioPaneSchemaSignature(registry: StudioControlRegistry) {
     tabs: registry.tabs.map((tab) => ({
       id: tab.id,
       title: tab.title,
+      displayTitle: getTabTitle(tab.id, tab.title),
       sections: tab.sections.map((section) => ({
         id: section.id,
         title: section.title,
@@ -316,7 +317,6 @@ export function getStudioPaneSchemaSignature(registry: StudioControlRegistry) {
 export function buildStudioPane(container: HTMLElement, registry: StudioControlRegistry): StudioPaneController {
   const pane = new Pane({
     container,
-    title: registry.title,
   }) as Pane & {
     exportState: () => unknown
     importState: (state: unknown) => void

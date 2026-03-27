@@ -1613,6 +1613,7 @@ export default function StudioPage() {
           currentScene={currentScene}
           sceneDraftName={sceneDraftName}
           sceneNames={sceneNames}
+          sceneEntries={sceneEntries}
           sceneMeta={sceneMeta}
           hasUnsavedChanges={hasUnsavedChanges}
           onSceneDraftNameChange={setSceneDraftName}

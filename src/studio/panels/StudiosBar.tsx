@@ -9,10 +9,16 @@ interface SceneMeta {
   version?: number
 }
 
+interface SceneEntry {
+  slug: string
+  name: string
+}
+
 export function StudiosBar({
   currentScene,
   sceneDraftName,
   sceneNames,
+  sceneEntries,
   sceneMeta,
   hasUnsavedChanges,
   onSceneDraftNameChange,
@@ -25,6 +31,7 @@ export function StudiosBar({
   currentScene: string
   sceneDraftName: string
   sceneNames: string[]
+  sceneEntries?: SceneEntry[]
   sceneMeta?: Record<string, SceneMeta>
   hasUnsavedChanges: boolean
   onSceneDraftNameChange: (value: string) => void
@@ -34,6 +41,12 @@ export function StudiosBar({
   onPublishScene?: () => void
   onArchiveScene?: (value: string) => void
 }) {
+  // Build a slug→name lookup from entries if provided
+  const nameBySlug: Record<string, string> = {}
+  if (sceneEntries) {
+    for (const e of sceneEntries) nameBySlug[e.slug] = e.name
+  }
+
   const savedScenes = sceneNames.length ? sceneNames : ['default']
   const activeStatus = sceneMeta?.[currentScene]?.status ?? 'draft'
   const activeVersion = sceneMeta?.[currentScene]?.version
@@ -64,14 +77,15 @@ export function StudiosBar({
           scrollbarWidth: 'none',
         }}
       >
-        {savedScenes.map((name) => {
-          const active = name === currentScene
-          const status = sceneMeta?.[name]?.status ?? 'draft'
-          const version = sceneMeta?.[name]?.version
+        {savedScenes.map((slug) => {
+          const active = slug === currentScene
+          const status = sceneMeta?.[slug]?.status ?? 'draft'
+          const version = sceneMeta?.[slug]?.version
+          const displayName = nameBySlug[slug] ?? slug
           return (
             <button
-              key={name}
-              onClick={() => onLoadScene(name)}
+              key={slug}
+              onClick={() => onLoadScene(slug)}
               style={{
                 flexShrink: 0,
                 display: 'inline-flex',
@@ -90,7 +104,7 @@ export function StudiosBar({
                 whiteSpace: 'nowrap',
               }}
             >
-              <span>{name}</span>
+              <span>{displayName}</span>
               {status === 'published' && (
                 <span
                   style={{

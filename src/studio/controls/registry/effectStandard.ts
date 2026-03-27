@@ -93,27 +93,6 @@ function buildInspectorTabs(ctx: EffectRegistryContext): StudioTab[] {
                 void ctx.onLoadScene(value)
               },
             },
-            {
-              kind: 'text',
-              path: 'scene.draftName',
-              label: 'Draft Name',
-              get: () => ctx.sceneDraftName,
-              set: (value) => ctx.setSceneDraftName(value),
-            },
-            {
-              kind: 'action',
-              path: 'scene.save',
-              label: 'Studio Save',
-              buttonTitle: 'Save Scene',
-              run: () => ctx.onSaveScene(ctx.sceneDraftName || ctx.currentScene || 'default'),
-            },
-            {
-              kind: 'action',
-              path: 'scene.reset',
-              label: 'Reset',
-              buttonTitle: 'Reset To Saved',
-              run: () => ctx.onResetScene(),
-            },
           ],
         },
         {
@@ -1094,52 +1073,6 @@ function buildInspectorTabs(ctx: EffectRegistryContext): StudioTab[] {
       ],
     },
   ]
-
-  if (ctx.layout) {
-    const layout = ctx.layout
-    tabs.push({
-      id: 'layout',
-      title: 'Layout',
-      sections: [
-        {
-          id: 'preset',
-          title: 'Preset',
-          defaultExpanded: true,
-          fields: [
-            {
-              kind: 'select',
-              path: 'layout.preset',
-              label: 'Layout',
-              options: layout.layoutPresetOptions,
-              get: () => layout.selectedLayoutPreset,
-              set: (value) => layout.onSelectLayoutPreset(value),
-            },
-          ],
-        },
-        {
-          id: 'docks',
-          title: 'Docks',
-          defaultExpanded: true,
-          fields: [
-            {
-              kind: 'boolean',
-              path: 'layout.showLeftDock',
-              label: 'Library',
-              get: () => layout.showLeftDock,
-              set: (value) => layout.setShowLeftDock(value),
-            },
-            {
-              kind: 'boolean',
-              path: 'layout.showRightDock',
-              label: 'Inspector',
-              get: () => layout.showRightDock,
-              set: (value) => layout.setShowRightDock(value),
-            },
-          ],
-        },
-      ],
-    })
-  }
 
   return tabs
 }

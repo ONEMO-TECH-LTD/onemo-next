@@ -1,19 +1,19 @@
 {
   "name": "default",
   "created": "2026-03-24T12:00:00.000Z",
-  "modified": "2026-03-24T16:30:00.000Z",
+  "modified": "2026-03-26T11:26:45.038Z",
   "modelPath": "/assets/shapes/effect-70mm-step.glb",
   "face": {
     "params": {
-      "roughness": 1.0,
+      "roughness": 1,
       "metalness": 0,
       "envMapIntensity": 0.1,
       "normalScale": 0.15,
-      "bumpScale": 1.0,
-      "sheen": 1.0,
+      "bumpScale": 1,
+      "sheen": 1,
       "sheenColor": "#1a1a1a",
       "sheenRoughness": 0.8,
-      "colorMultiplier": 1.0
+      "colorMultiplier": 1
     },
     "textures": {
       "normal": "/assets/materials/ultrasuede/suede-normal.png",
@@ -24,11 +24,11 @@
   "back": {
     "params": {
       "color": "#080808",
-      "roughness": 1.0,
+      "roughness": 1,
       "envMapIntensity": 0.1,
       "normalScale": 0.15,
-      "bumpScale": 1.0,
-      "sheen": 1.0,
+      "bumpScale": 1,
+      "sheen": 1,
       "sheenColor": "#1a1a1a",
       "sheenRoughness": 0.8
     },
@@ -51,12 +51,81 @@
   "scene": {
     "exposure": 0.7,
     "ambientIntensity": 0.5,
-    "envIntensity": 1.0,
-    "background": "#ffffff"
+    "envIntensity": 1,
+    "background": "#000000"
   },
   "colors": {
     "backColor": "#080808",
     "frameColor": "#0f0f0f",
-    "bgColor": "#ffffff"
+    "bgColor": "#000000"
+  },
+  "camera": {
+    "fov": 35,
+    "distance": 0.2,
+    "polarAngle": 90,
+    "azimuthAngle": 0,
+    "enableDamping": true,
+    "dampingFactor": 0.1,
+    "autoRotate": false,
+    "autoRotateSpeed": 2
+  },
+  "environment": {
+    "preset": "studio",
+    "envRotation": 0,
+    "groundEnabled": false,
+    "groundHeight": 0,
+    "groundRadius": 20
+  },
+  "lighting": {
+    "key": {
+      "type": "directional",
+      "enabled": true,
+      "intensity": 1.2,
+      "color": "#ffffff",
+      "x": 1.6,
+      "y": 1.2,
+      "z": 1.6,
+      "targetX": 0,
+      "targetY": 0,
+      "targetZ": 0
+    },
+    "fill": {
+      "type": "directional",
+      "enabled": true,
+      "intensity": 0.45,
+      "color": "#f3f4f6",
+      "x": -1.4,
+      "y": 0.9,
+      "z": 1.2,
+      "targetX": 0,
+      "targetY": 0,
+      "targetZ": 0
+    },
+    "rim": {
+      "type": "directional",
+      "enabled": false,
+      "intensity": 0.35,
+      "color": "#ffffff",
+      "x": -1,
+      "y": 1.6,
+      "z": -1.8,
+      "targetX": 0,
+      "targetY": 0,
+      "targetZ": 0
+    }
+  },
+  "artwork": {
+    "offsetX": 0,
+    "offsetY": 0,
+    "scale": 1
+  },
+  "postprocessing": {
+    "bloomEnabled": false,
+    "bloomIntensity": 0.35,
+    "bloomLuminanceThreshold": 0.7,
+    "bloomRadius": 0.85,
+    "vignetteEnabled": false,
+    "vignetteOffset": 0.35,
+    "vignetteDarkness": 0.55
   }
 }
