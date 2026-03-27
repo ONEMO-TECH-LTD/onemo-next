@@ -464,6 +464,15 @@ export default function StudioPage() {
   const [outputError, setOutputError] = useState<string | null>(null)
   const [shellActionStatus, setShellActionStatus] = useState<string | null>(null)
   const shellActionStatusTimeoutRef = useRef<number | null>(null)
+  const [systemTheme, setSystemTheme] = useState<'light' | 'dark'>('light')
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    setSystemTheme(mq.matches ? 'dark' : 'light')
+    const handler = (e: MediaQueryListEvent) => setSystemTheme(e.matches ? 'dark' : 'light')
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
 
   useEffect(() => {
     leftDockWidthRef.current = leftDockWidth
@@ -1261,6 +1270,7 @@ export default function StudioPage() {
   if (!didBootstrapScene) {
     return (
       <div
+        data-theme={systemTheme}
         style={{
           position: 'fixed',
           inset: 0,
@@ -1324,6 +1334,7 @@ export default function StudioPage() {
 
   return (
     <div
+      data-theme={systemTheme}
       style={{
         position: 'fixed',
         inset: 0,
@@ -1403,7 +1414,7 @@ export default function StudioPage() {
           <select
             value={selectedLayoutPreset}
             onChange={(event) => handleLayoutPresetSelect(event.target.value as StudioLayoutPresetId)}
-            className="h-[26px] rounded-[var(--radius-xxs,2px)] border border-[var(--semantic-border-primary)] bg-[var(--semantic-bg-secondary)] text-[var(--semantic-text-primary)] text-[11px] px-1.5 cursor-pointer font-[inherit]"
+            className="h-[26px] rounded-[var(--radius-xxs,2px)] border border-[var(--border)] bg-[var(--field-background)] text-[var(--field-foreground)] text-[11px] px-1.5 cursor-pointer font-[inherit]"
           >
             {STUDIO_LAYOUT_PRESET_ORDER.map((presetId) => (
               <option key={presetId} value={presetId}>
@@ -1527,7 +1538,7 @@ export default function StudioPage() {
                 value={sceneDraftName}
                 onChange={(e) => setSceneDraftName(e.target.value)}
                 placeholder="Scene name"
-                className="flex-1 min-w-0 h-6 px-1.5 text-[11px] rounded-[var(--radius-xxs,2px)] bg-[var(--semantic-bg-secondary)] border border-[var(--semantic-border-primary)] text-[var(--semantic-text-primary)] placeholder:text-[var(--semantic-text-secondary)] outline-none"
+                className="flex-1 min-w-0 h-6 px-1.5 text-[11px] rounded-[var(--radius-xxs,2px)] bg-[var(--field-background)] border border-[var(--border)] text-[var(--field-foreground)] placeholder:text-[var(--muted)] outline-none"
               />
               <Button
                 size="sm"
@@ -1541,7 +1552,7 @@ export default function StudioPage() {
                 size="sm"
                 variant="outline"
                 onPress={() => void publishScene()}
-                className="h-6 min-h-0 px-2 text-[11px] rounded-[var(--radius-xxs,2px)] shrink-0 text-[var(--semantic-bg-brand-solid)] border-[var(--semantic-bg-brand-solid)]"
+                className="h-6 min-h-0 px-2 text-[11px] rounded-[var(--radius-xxs,2px)] shrink-0 text-[var(--accent)] border-[var(--accent)]"
               >
                 Pub
               </Button>

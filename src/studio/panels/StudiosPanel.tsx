@@ -73,11 +73,11 @@ export function StudiosPanel({
               onPress={() => onLoadScene(name)}
               className={[
                 'w-full justify-start gap-1.5 h-7 min-h-0 px-2 rounded-none',
-                'border-b border-[var(--semantic-border-primary)]',
+                'border-b border-[var(--border)]',
                 'text-[11px] font-normal',
                 active
-                  ? 'bg-[var(--semantic-bg-brand-primary)] text-[var(--semantic-text-primary)] font-semibold'
-                  : 'text-[var(--semantic-text-primary)] hover:bg-[var(--semantic-bg-primary-hover)]',
+                  ? 'bg-[color-mix(in_oklch,var(--accent)_12%,transparent)] text-[var(--foreground)] font-semibold'
+                  : 'text-[var(--foreground)] hover:bg-[color-mix(in_oklch,var(--foreground)_6%,transparent)]',
               ].join(' ')}
             >
               {/* Status dot */}
