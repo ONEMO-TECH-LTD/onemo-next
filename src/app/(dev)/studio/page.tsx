@@ -10,7 +10,8 @@ import type { StudioOutputPayload } from '@/studio/preset/types'
 import { InspectorPanel } from '@/studio/panels/InspectorPanel'
 import { LibraryPanel } from '@/studio/panels/LibraryPanel'
 import { StudiosPanel } from '@/studio/panels/StudiosPanel'
-import { STUDIO_THEME, primaryButtonStyle, secondaryButtonStyle } from '@/studio/theme'
+import { Button } from '@heroui/react'
+import { STUDIO_THEME } from '@/studio/theme'
 
 const EffectViewer = dynamic(() => import('../prototype/core/EffectViewer'), { ssr: false })
 
@@ -1260,6 +1261,7 @@ export default function StudioPage() {
   if (!didBootstrapScene) {
     return (
       <div
+        data-theme="dark"
         style={{
           position: 'fixed',
           inset: 0,
@@ -1323,6 +1325,7 @@ export default function StudioPage() {
 
   return (
     <div
+      data-theme="dark"
       style={{
         position: 'fixed',
         inset: 0,
@@ -1365,46 +1368,44 @@ export default function StudioPage() {
 
         {/* Right: action buttons */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-          <button
-            onClick={handleQuickSave}
-            style={{ height: 26, padding: '0 10px', borderRadius: STUDIO_THEME.bladeBorderRadius, border: 'none', background: STUDIO_THEME.buttonBackground, color: STUDIO_THEME.buttonForeground, cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit', fontSize: 11 }}
+          <Button
+            size="sm"
+            variant="primary"
+            onPress={handleQuickSave}
+            className="h-[26px] min-h-0 px-2.5 text-[11px] rounded-[var(--radius-xxs,2px)]"
           >
             Save
-          </button>
-          <button
-            onClick={handleResetScene}
-            style={{ height: 26, padding: '0 10px', borderRadius: STUDIO_THEME.bladeBorderRadius, border: STUDIO_THEME.border, background: 'transparent', color: hasUnsavedChanges ? STUDIO_THEME.baseForeground : STUDIO_THEME.labelForeground, cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit', fontSize: 11 }}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onPress={handleResetScene}
+            className="h-[26px] min-h-0 px-2.5 text-[11px] rounded-[var(--radius-xxs,2px)]"
           >
             Reset
-          </button>
-          <button
-            onClick={handleRefreshWorkspace}
-            style={{ height: 26, padding: '0 10px', borderRadius: STUDIO_THEME.bladeBorderRadius, border: STUDIO_THEME.border, background: 'transparent', color: STUDIO_THEME.labelForeground, cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit', fontSize: 11 }}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onPress={handleRefreshWorkspace}
+            className="h-[26px] min-h-0 px-2.5 text-[11px] rounded-[var(--radius-xxs,2px)]"
           >
             Refresh
-          </button>
-          <button
-            onClick={handleExportStudioState}
-            style={{ height: 26, padding: '0 10px', borderRadius: STUDIO_THEME.bladeBorderRadius, border: STUDIO_THEME.border, background: 'transparent', color: STUDIO_THEME.labelForeground, cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit', fontSize: 11 }}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onPress={handleExportStudioState}
+            className="h-[26px] min-h-0 px-2.5 text-[11px] rounded-[var(--radius-xxs,2px)]"
           >
             Export
-          </button>
+          </Button>
           {/* Separator */}
           <div style={{ width: 1, height: 20, background: STUDIO_THEME.borderColor, margin: '0 2px' }} />
           <select
             value={selectedLayoutPreset}
             onChange={(event) => handleLayoutPresetSelect(event.target.value as StudioLayoutPresetId)}
-            style={{
-              height: 26,
-              borderRadius: STUDIO_THEME.bladeBorderRadius,
-              border: STUDIO_THEME.border,
-              background: '#1e1e1e',
-              color: STUDIO_THEME.baseForeground,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              fontSize: 11,
-              padding: '0 6px',
-            }}
+            className="h-[26px] rounded-[var(--radius-xxs,2px)] border border-[color-mix(in_oklch,var(--foreground)_12%,transparent)] bg-[var(--field-background)] text-[var(--foreground)] text-[11px] px-1.5 cursor-pointer font-[inherit]"
           >
             {STUDIO_LAYOUT_PRESET_ORDER.map((presetId) => (
               <option key={presetId} value={presetId}>
@@ -1412,12 +1413,14 @@ export default function StudioPage() {
               </option>
             ))}
           </select>
-          <button
-            onClick={() => setIsEditingLights((value) => !value)}
-            style={{ height: 26, padding: '0 10px', borderRadius: STUDIO_THEME.bladeBorderRadius, border: isEditingLights ? 'none' : STUDIO_THEME.border, background: isEditingLights ? STUDIO_THEME.buttonBackground : 'transparent', color: isEditingLights ? STUDIO_THEME.buttonForeground : STUDIO_THEME.labelForeground, cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit', fontSize: 11 }}
+          <Button
+            size="sm"
+            variant={isEditingLights ? 'primary' : 'ghost'}
+            onPress={() => setIsEditingLights((value) => !value)}
+            className="h-[26px] min-h-0 px-2.5 text-[11px] rounded-[var(--radius-xxs,2px)]"
           >
             {isEditingLights ? 'Done Lights' : 'Lights'}
-          </button>
+          </Button>
           {shellActionStatus ? (
             <div
               style={{
@@ -1526,45 +1529,24 @@ export default function StudioPage() {
                 value={sceneDraftName}
                 onChange={(e) => setSceneDraftName(e.target.value)}
                 placeholder="Scene name"
-                style={{
-                  flex: 1,
-                  minWidth: 0,
-                  height: 22,
-                  padding: '0 6px',
-                  border: STUDIO_THEME.border,
-                  borderRadius: STUDIO_THEME.bladeBorderRadius,
-                  background: STUDIO_THEME.inputBackground,
-                  color: STUDIO_THEME.baseForeground,
-                  fontSize: 11,
-                  fontFamily: 'inherit',
-                }}
+                className="flex-1 min-w-0 h-6 px-1.5 text-[11px] rounded-[var(--radius-xxs,2px)] bg-[var(--field-background)] border border-[color-mix(in_oklch,var(--foreground)_12%,transparent)] text-[var(--foreground)] placeholder:text-[var(--muted)] outline-none"
               />
-              <button
-                onClick={() => void saveScene(sceneDraftName || currentScene || 'default')}
-                style={primaryButtonStyle()}
+              <Button
+                size="sm"
+                variant="primary"
+                onPress={() => void saveScene(sceneDraftName || currentScene || 'default')}
+                className="h-6 min-h-0 px-2 text-[11px] rounded-[var(--radius-xxs,2px)] shrink-0"
               >
                 Save
-              </button>
-              <button
-                onClick={() => void publishScene()}
-                style={{
-                  ...secondaryButtonStyle(),
-                  color: STUDIO_THEME.activeBlue,
-                  borderColor: STUDIO_THEME.activeBlue,
-                  flexShrink: 0,
-                  height: 22,
-                  padding: '0 8px',
-                  borderRadius: STUDIO_THEME.bladeBorderRadius,
-                  border: `1px solid ${STUDIO_THEME.activeBlue}`,
-                  background: 'transparent',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                  fontSize: 11,
-                  fontFamily: 'inherit',
-                }}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onPress={() => void publishScene()}
+                className="h-6 min-h-0 px-2 text-[11px] rounded-[var(--radius-xxs,2px)] shrink-0 text-[var(--primary,#0a84ff)] border-[var(--primary,#0a84ff)]"
               >
                 Pub
-              </button>
+              </Button>
             </div>
           </div>
           {/* Left resize handle */}

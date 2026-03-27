@@ -1,6 +1,7 @@
 'use client'
 
-import { STUDIO_THEME, primaryButtonStyle, secondaryButtonStyle } from '@/studio/theme'
+import { Button } from '@heroui/react'
+import { STUDIO_THEME } from '@/studio/theme'
 
 type SceneStatus = 'draft' | 'published' | 'archived'
 
@@ -135,43 +136,43 @@ export function StudiosBar({
           value={sceneDraftName}
           onChange={(e) => onSceneDraftNameChange(e.target.value)}
           placeholder="Scene name"
-          style={{
-            width: 110,
-            height: 24,
-            padding: '0 6px',
-            border: STUDIO_THEME.border,
-            borderRadius: STUDIO_THEME.bladeBorderRadius,
-            background: STUDIO_THEME.inputBackground,
-            color: STUDIO_THEME.baseForeground,
-            fontSize: 11,
-            fontFamily: 'inherit',
-          }}
+          className="w-[110px] h-6 px-1.5 text-[11px] rounded-[var(--radius-xxs,2px)] bg-[var(--field-background)] border border-[color-mix(in_oklch,var(--foreground)_12%,transparent)] text-[var(--foreground)] placeholder:text-[var(--muted)] outline-none"
         />
-        <button onClick={onSaveScene} style={primaryButtonStyle()}>
+        <Button
+          size="sm"
+          variant="primary"
+          onPress={onSaveScene}
+          className="h-6 min-h-0 px-2 text-[11px] rounded-[var(--radius-xxs,2px)]"
+        >
           Save
-        </button>
-        <button onClick={onResetScene} style={secondaryButtonStyle()}>
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          onPress={onResetScene}
+          className="h-6 min-h-0 px-2 text-[11px] rounded-[var(--radius-xxs,2px)]"
+        >
           Reset
-        </button>
+        </Button>
         {onPublishScene && (
-          <button
-            onClick={onPublishScene}
-            style={{
-              ...secondaryButtonStyle(),
-              color: STUDIO_THEME.activeBlue,
-              borderColor: STUDIO_THEME.activeBlue,
-            }}
+          <Button
+            size="sm"
+            variant="outline"
+            onPress={onPublishScene}
+            className="h-6 min-h-0 px-2 text-[11px] rounded-[var(--radius-xxs,2px)] text-[var(--primary,#0a84ff)] border-[var(--primary,#0a84ff)]"
           >
             Publish
-          </button>
+          </Button>
         )}
         {onArchiveScene && activeStatus !== 'archived' && (
-          <button
-            onClick={() => onArchiveScene(currentScene)}
-            style={secondaryButtonStyle()}
+          <Button
+            size="sm"
+            variant="ghost"
+            onPress={() => onArchiveScene(currentScene)}
+            className="h-6 min-h-0 px-2 text-[11px] rounded-[var(--radius-xxs,2px)]"
           >
             Archive
-          </button>
+          </Button>
         )}
       </div>
 

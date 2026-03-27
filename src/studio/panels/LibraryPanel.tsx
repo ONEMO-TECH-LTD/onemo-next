@@ -1,13 +1,12 @@
 'use client'
 
 import { useState } from 'react'
+import { Button, Tabs, Tab, TabList } from '@heroui/react'
 import type { DesignState, TexturePaths } from '@/app/(dev)/prototype/types'
 import {
   STUDIO_THEME,
-  primaryButtonStyle,
   quickPickButtonStyle,
   quickPickGridStyle,
-  secondaryButtonStyle,
   statusCardStyle,
   statusGridStyle,
 } from '@/studio/theme'
@@ -35,23 +34,6 @@ function labelStyle() {
     textTransform: 'uppercase' as const,
     color: STUDIO_THEME.labelForeground,
   }
-}
-
-function tabButtonStyle(active: boolean) {
-  return {
-    flex: 1,
-    padding: '7px 4px',
-    border: 'none',
-    borderBottom: active ? `2px solid ${STUDIO_THEME.activeBlue}` : '2px solid transparent',
-    background: 'transparent',
-    color: active ? '#ffffff' : STUDIO_THEME.labelForeground,
-    fontSize: 11,
-    fontWeight: active ? 600 : 400,
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-    textAlign: 'center' as const,
-    whiteSpace: 'nowrap' as const,
-  } as const
 }
 
 function formatMetric(value: number) {
@@ -126,28 +108,19 @@ export function LibraryPanel({
         fontFamily: STUDIO_THEME.fontFamily,
       }}
     >
-      {/* Tab bar */}
-      <div
-        style={{
-          display: 'flex',
-          flexShrink: 0,
-          borderBottom: STUDIO_THEME.border,
-          background: STUDIO_THEME.panelBackground,
-        }}
+      {/* Tab bar — HeroUI Tabs (React Aria structure) */}
+      <Tabs
+        selectedKey={activeTab}
+        onSelectionChange={(key) => setActiveTab(key as LibraryTab)}
+        className="w-full shrink-0 border-b border-[color-mix(in_oklch,var(--foreground)_12%,transparent)] bg-[var(--surface-secondary)]"
       >
-        <button style={tabButtonStyle(activeTab === 'models')} onClick={() => setActiveTab('models')}>
-          Models
-        </button>
-        <button style={tabButtonStyle(activeTab === 'environments')} onClick={() => setActiveTab('environments')}>
-          Envs
-        </button>
-        <button style={tabButtonStyle(activeTab === 'materials')} onClick={() => setActiveTab('materials')}>
-          Materials
-        </button>
-        <button style={tabButtonStyle(activeTab === 'artwork')} onClick={() => setActiveTab('artwork')}>
-          Artwork
-        </button>
-      </div>
+        <TabList className="flex gap-0 px-1">
+          <Tab id="models" className="h-8 px-2 text-[11px] font-medium text-[var(--muted)] data-[selected]:text-white data-[selected]:border-b-2 data-[selected]:border-[var(--primary,#0a84ff)] cursor-pointer outline-none">Models</Tab>
+          <Tab id="environments" className="h-8 px-2 text-[11px] font-medium text-[var(--muted)] data-[selected]:text-white data-[selected]:border-b-2 data-[selected]:border-[var(--primary,#0a84ff)] cursor-pointer outline-none">Envs</Tab>
+          <Tab id="materials" className="h-8 px-2 text-[11px] font-medium text-[var(--muted)] data-[selected]:text-white data-[selected]:border-b-2 data-[selected]:border-[var(--primary,#0a84ff)] cursor-pointer outline-none">Materials</Tab>
+          <Tab id="artwork" className="h-8 px-2 text-[11px] font-medium text-[var(--muted)] data-[selected]:text-white data-[selected]:border-b-2 data-[selected]:border-[var(--primary,#0a84ff)] cursor-pointer outline-none">Artwork</Tab>
+        </TabList>
+      </Tabs>
 
       {/* Tab content */}
       <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
@@ -165,7 +138,8 @@ export function LibraryPanel({
               <span style={labelStyle()}>
                 {assetsLoaded ? `${Object.keys(models).length} Models` : 'Scanning…'}
               </span>
-              <label style={primaryButtonStyle()}>
+              <label className="button button--sm button--primary cursor-pointer inline-flex items-center h-6 px-2 text-[11px] rounded-[var(--radius-xxs,2px)]">
+
                 Import
                 <input
                   type="file"
@@ -232,7 +206,8 @@ export function LibraryPanel({
               <span style={labelStyle()}>
                 {assetsLoaded ? `${Object.keys(hdris).length} HDRIs` : 'Scanning…'}
               </span>
-              <label style={primaryButtonStyle()}>
+              <label className="button button--sm button--primary cursor-pointer inline-flex items-center h-6 px-2 text-[11px] rounded-[var(--radius-xxs,2px)]">
+
                 Import
                 <input
                   type="file"
@@ -355,8 +330,9 @@ export function LibraryPanel({
               ))}
             </div>
 
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <label style={primaryButtonStyle()}>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <label className="button button--sm button--primary cursor-pointer inline-flex items-center h-6 px-2 text-[11px] rounded-[var(--radius-xxs,2px)]">
+
                 {hasArtwork ? 'Replace' : 'Upload Artwork'}
                 <input
                   type="file"
@@ -370,13 +346,23 @@ export function LibraryPanel({
                 />
               </label>
 
-              <button onClick={onToggleEditing} style={secondaryButtonStyle(isEditing)}>
+              <Button
+                size="sm"
+                variant={isEditing ? 'secondary' : 'ghost'}
+                onPress={onToggleEditing}
+                className="h-6 min-h-0 px-2 text-[11px] rounded-[var(--radius-xxs,2px)]"
+              >
                 {isEditing ? 'Done Editing' : 'Edit Placement'}
-              </button>
+              </Button>
 
-              <button onClick={onResetArtwork} style={secondaryButtonStyle()}>
+              <Button
+                size="sm"
+                variant="ghost"
+                onPress={onResetArtwork}
+                className="h-6 min-h-0 px-2 text-[11px] rounded-[var(--radius-xxs,2px)]"
+              >
                 Reset
-              </button>
+              </Button>
             </div>
 
             <div style={statusGridStyle(3)}>

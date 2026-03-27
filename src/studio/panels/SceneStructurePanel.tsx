@@ -6,7 +6,6 @@ import {
   mutedCopyStyle,
   paneSummaryStyle,
   paneSurfaceStyle,
-  secondaryButtonStyle,
 } from '@/studio/theme'
 
 type SceneFocusTarget = 'scene' | 'model' | 'environment' | 'lights' | 'camera' | 'image'
@@ -114,7 +113,6 @@ export function SceneStructurePanel({
                 key={row.target}
                 onClick={() => onFocusTarget?.(row.target)}
                 style={{
-                  ...secondaryButtonStyle(row.active),
                   display: 'grid',
                   justifyContent: 'stretch',
                   gap: 2,
@@ -122,6 +120,12 @@ export function SceneStructurePanel({
                   height: 'auto',
                   padding: '6px 8px',
                   textAlign: 'left',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  border: row.active ? `1px solid ${STUDIO_THEME.activeBlue}` : STUDIO_THEME.border,
+                  borderRadius: STUDIO_THEME.bladeBorderRadius,
+                  background: row.active ? STUDIO_THEME.buttonBackground : STUDIO_THEME.containerBackground,
+                  color: row.active ? STUDIO_THEME.buttonForeground : STUDIO_THEME.baseForeground,
                 }}
               >
                 {content}

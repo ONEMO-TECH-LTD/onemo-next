@@ -1,5 +1,6 @@
 'use client'
 
+import { Button } from '@heroui/react'
 import type { ViewerConfig } from '@/app/(dev)/prototype/types'
 import type { StudioOutputPayload } from '@/studio/preset/types'
 import {
@@ -8,8 +9,6 @@ import {
   mutedCopyStyle,
   paneSummaryStyle,
   paneSurfaceStyle,
-  primaryButtonStyle,
-  secondaryButtonStyle,
   statusCardStyle,
 } from '@/studio/theme'
 
@@ -143,19 +142,23 @@ export function OutputReviewPanel({
         </div>
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button
-            onClick={onRefresh}
-            disabled={loading}
-            style={{
-              ...secondaryButtonStyle(!loading),
-              cursor: loading ? 'not-allowed' : 'pointer',
-            }}
+          <Button
+            size="sm"
+            variant="ghost"
+            onPress={onRefresh}
+            isDisabled={loading}
+            className="h-6 min-h-0 px-2 text-[11px] rounded-[var(--radius-xxs,2px)]"
           >
             {loading ? 'Refreshing...' : 'Refresh Output Snapshot'}
-          </button>
-          <button onClick={onExportState} style={primaryButtonStyle()}>
+          </Button>
+          <Button
+            size="sm"
+            variant="primary"
+            onPress={onExportState}
+            className="h-6 min-h-0 px-2 text-[11px] rounded-[var(--radius-xxs,2px)]"
+          >
             Export State JSON
-          </button>
+          </Button>
         </div>
 
         {error ? (

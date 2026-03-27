@@ -14,6 +14,7 @@
     "test-tokens": "node scripts/tokens/test-build-tokens.mjs"
   },
   "dependencies": {
+    "@heroui/react": "^3.0.1",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
     "@react-three/postprocessing": "^3.0.4",
@@ -24,6 +25,7 @@
     "@theatre/studio": "^0.7.2",
     "@tweakpane/plugin-essentials": "^0.2.1",
     "@use-gesture/react": "^10.3.1",
+    "framer-motion": "^12.38.0",
     "leva": "^0.10.1",
     "next": "16.1.6",
     "postprocessing": "^6.39.0",

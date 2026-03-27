@@ -1,5 +1,6 @@
 'use client'
 
+import { Button } from '@heroui/react'
 import type { DesignState } from '@/app/(dev)/prototype/types'
 import {
   STUDIO_THEME,
@@ -7,10 +8,8 @@ import {
   mutedCopyStyle,
   paneSummaryStyle,
   paneSurfaceStyle,
-  primaryButtonStyle,
   quickPickButtonStyle,
   quickPickGridStyle,
-  secondaryButtonStyle,
   statusCardStyle,
   statusGridStyle,
 } from '@/studio/theme'
@@ -109,7 +108,7 @@ export function ArtworkWorkspacePanel({
         ) : null}
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <label style={primaryButtonStyle()}>
+          <label className="button button--sm button--primary cursor-pointer inline-flex items-center h-6 px-2 text-[11px] rounded-[var(--radius-xxs,2px)]">
             {hasArtwork ? 'Replace Artwork' : 'Upload Artwork'}
             <input
               type="file"
@@ -123,13 +122,23 @@ export function ArtworkWorkspacePanel({
             />
           </label>
 
-          <button onClick={onToggleEditing} style={secondaryButtonStyle(isEditing)}>
+          <Button
+            size="sm"
+            variant={isEditing ? 'secondary' : 'ghost'}
+            onPress={onToggleEditing}
+            className="h-6 min-h-0 px-2 text-[11px] rounded-[var(--radius-xxs,2px)]"
+          >
             {isEditing ? 'Done Editing' : 'Edit Placement'}
-          </button>
+          </Button>
 
-          <button onClick={onResetArtwork} style={secondaryButtonStyle()}>
+          <Button
+            size="sm"
+            variant="ghost"
+            onPress={onResetArtwork}
+            className="h-6 min-h-0 px-2 text-[11px] rounded-[var(--radius-xxs,2px)]"
+          >
             Reset Placement
-          </button>
+          </Button>
         </div>
 
         <div style={statusGridStyle(3)}>

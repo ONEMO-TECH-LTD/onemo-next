@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* HeroUI component library — must come before custom tokens so token overrides win */
+@import "@heroui/styles";
+
 /* Align TW4 dark: variant with our [data-theme="dark"] switching.
    Without this, dark:bg-* uses prefers-color-scheme instead of data attribute. */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));

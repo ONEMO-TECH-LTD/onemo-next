@@ -1,5 +1,6 @@
 'use client'
 
+import { Button } from '@heroui/react'
 import { STUDIO_THEME } from '@/studio/theme'
 
 type StudioLifecycleStatus = 'draft' | 'published' | 'archived'
@@ -65,25 +66,19 @@ export function StudiosPanel({
           const version = sceneMeta?.[name]?.version
 
           return (
-            <button
+            <Button
               key={name}
-              onClick={() => onLoadScene(name)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                height: 28,
-                padding: '0 8px',
-                border: 'none',
-                borderBottom: STUDIO_THEME.border,
-                background: active ? 'rgba(10, 132, 255, 0.12)' : 'transparent',
-                color: active ? '#ffffff' : STUDIO_THEME.baseForeground,
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                fontSize: 11,
-                fontWeight: active ? 600 : 400,
-                textAlign: 'left',
-              }}
+              variant="ghost"
+              size="sm"
+              onPress={() => onLoadScene(name)}
+              className={[
+                'w-full justify-start gap-1.5 h-7 min-h-0 px-2 rounded-none',
+                'border-b border-[color-mix(in_oklch,var(--foreground)_12%,transparent)]',
+                'text-[11px] font-normal',
+                active
+                  ? 'bg-[color-mix(in_oklch,var(--primary,#0a84ff)_12%,transparent)] text-white font-semibold'
+                  : 'text-[var(--foreground)] hover:bg-[color-mix(in_oklch,var(--foreground)_6%,transparent)]',
+              ].join(' ')}
             >
               {/* Status dot */}
               <span
@@ -128,7 +123,7 @@ export function StudiosPanel({
                   {status}
                 </span>
               )}
-            </button>
+            </Button>
           )
         })}
       </div>
