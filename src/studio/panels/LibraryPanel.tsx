@@ -4,7 +4,6 @@ import { useState } from 'react'
 import type { DesignState, TexturePaths } from '@/app/(dev)/prototype/types'
 import {
   STUDIO_THEME,
-  inputStyle,
   primaryButtonStyle,
   quickPickButtonStyle,
   quickPickGridStyle,
@@ -287,109 +286,55 @@ export function LibraryPanel({
           </div>
         )}
 
-        {/* Materials tab */}
+        {/* Materials tab — browse and load only */}
         {activeTab === 'materials' && (
-          <div style={{ padding: 8, display: 'grid', gap: 12 }}>
+          <div style={{ padding: 8, display: 'grid', gap: 8 }}>
+            <span style={labelStyle()}>
+              {materialPresetNames.length ? `${materialPresetNames.length} Presets` : 'No saved presets'}
+            </span>
 
-            <div style={{ display: 'grid', gap: 6 }}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                }}
-              >
-                <span style={labelStyle()}>Material Presets</span>
-              </div>
-
-              <div style={quickPickGridStyle(64)}>
-                {materialPresetNames.length ? (
-                  materialPresetNames.map((name) => {
-                    const active = name === materialPresetDraftName
-                    return (
-                      <button key={name} onClick={() => onLoadMaterialPreset(name)} style={quickPickButtonStyle(active)}>
-                        <div
-                          style={{
-                            width: '100%',
-                            aspectRatio: '1',
-                            background: '#111',
-                            borderRadius: 2,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: 18,
-                            color: active ? STUDIO_THEME.activeBlue : STUDIO_THEME.labelForeground,
-                          }}
-                        >
-                          ◈
-                        </div>
-                        <span
-                          style={{
-                            fontSize: 10,
-                            color: active ? STUDIO_THEME.baseForeground : STUDIO_THEME.labelForeground,
-                            textAlign: 'center',
-                            overflowWrap: 'anywhere',
-                            wordBreak: 'break-word',
-                            lineHeight: 1.2,
-                          }}
-                        >
-                          {name}
-                        </span>
-                      </button>
-                    )
-                  })
-                ) : (
-                  <div style={{ ...statusCardStyle(), gridColumn: '1 / -1' }}>
-                    <span style={labelStyle()}>No saved presets</span>
-                  </div>
-                )}
-              </div>
-
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <input
-                  value={materialPresetDraftName}
-                  onChange={(event) => onMaterialPresetDraftNameChange(event.target.value)}
-                  placeholder="Preset name"
-                  style={{ ...inputStyle(), flex: 1 }}
-                />
-                <button onClick={() => onSaveMaterialPreset(materialPresetDraftName)} style={secondaryButtonStyle()}>
-                  Save
-                </button>
-              </div>
+            <div style={quickPickGridStyle(64)}>
+              {materialPresetNames.length ? (
+                materialPresetNames.map((name) => {
+                  const active = name === materialPresetDraftName
+                  return (
+                    <button key={name} onClick={() => onLoadMaterialPreset(name)} style={quickPickButtonStyle(active)}>
+                      <div
+                        style={{
+                          width: '100%',
+                          aspectRatio: '1',
+                          background: '#111',
+                          borderRadius: 2,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 18,
+                          color: active ? STUDIO_THEME.activeBlue : STUDIO_THEME.labelForeground,
+                        }}
+                      >
+                        ◈
+                      </div>
+                      <span
+                        style={{
+                          fontSize: 10,
+                          color: active ? STUDIO_THEME.baseForeground : STUDIO_THEME.labelForeground,
+                          textAlign: 'center',
+                          overflowWrap: 'anywhere',
+                          wordBreak: 'break-word',
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        {name}
+                      </span>
+                    </button>
+                  )
+                })
+              ) : (
+                <div style={{ ...statusCardStyle(), gridColumn: '1 / -1' }}>
+                  <span style={labelStyle()}>No saved presets</span>
+                </div>
+              )}
             </div>
-
-            {materialSets.length > 0 && (
-              <div style={{ display: 'grid', gap: 6 }}>
-                <span style={labelStyle()}>Material Sets</span>
-                {materialSets.map((set) => (
-                  <div key={set.name} style={{ ...statusCardStyle(), padding: '6px 8px' }}>
-                    <span
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 600,
-                        color: STUDIO_THEME.baseForeground,
-                        overflowWrap: 'anywhere',
-                        wordBreak: 'break-word',
-                      }}
-                    >
-                      {set.name}
-                    </span>
-                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
-                      {materialGroups.map((materialGroup) => (
-                        <button
-                          key={`${set.name}-${materialGroup.key}`}
-                          onClick={() => onApplyMaterialSet(materialGroup.key, set.textures)}
-                          style={secondaryButtonStyle()}
-                        >
-                          Apply to {materialGroup.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
           </div>
         )}
 

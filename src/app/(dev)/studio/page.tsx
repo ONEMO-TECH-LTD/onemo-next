@@ -127,7 +127,7 @@ function clampDockWidthForViewport(requestedWidth: number, oppositeDockWidth: nu
 const DEFAULT_COLORS: ColorConfig = {
   backColor: '#080808',
   frameColor: '#0f0f0f',
-  bgColor: '#ffffff',
+  bgColor: '#000000',
 }
 
 const DEFAULT_CAMERA: CameraConfig = {
