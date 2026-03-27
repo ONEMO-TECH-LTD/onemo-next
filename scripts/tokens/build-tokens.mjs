@@ -1265,7 +1265,7 @@ function generateSemanticInlineCSS(collections) {
 
   for (const [semanticName, lightEntry] of lightTokens) {
     const darkEntry = darkTokens.get(semanticName) || lightEntry;
-    const cssRef = buildColorValueRef(darkEntry.node, collections);
+    const cssRef = buildColorValueRef(darkEntry.node, collections, 'dark');
     lines.push(`  --semantic-${semanticName}: ${cssRef};\n`);
   }
 
@@ -1276,7 +1276,7 @@ function generateSemanticInlineCSS(collections) {
 
   for (const [semanticName, lightEntry] of lightTokens) {
     const darkEntry = darkTokens.get(semanticName) || lightEntry;
-    const cssRef = buildColorValueRef(darkEntry.node, collections);
+    const cssRef = buildColorValueRef(darkEntry.node, collections, 'dark');
     lines.push(`    --semantic-${semanticName}: ${cssRef};\n`);
   }
 
@@ -1314,9 +1314,49 @@ function buildSemanticColorName(path) {
 }
 
 /**
- * Build a CSS var() reference for a color mode token value
+ * Resolve a primitive collection reference through the Dark mode and return
+ * the literal CSS value (e.g. oklch(...)). Used when generating dark-mode
+ * sections that must contain resolved values, not var() references.
+ *
+ * Returns null if the Dark mode cannot be found or the path cannot be walked.
  */
-function buildColorValueRef(node, collections) {
+function resolvePrimitiveDarkValue(refPath, primitiveCollectionName, collections) {
+  const primColl = collections.get(primitiveCollectionName);
+  if (!primColl) return null;
+
+  const modes = primColl.modes || {};
+  // Look for a mode named "Dark" (case-insensitive)
+  const darkModeName = Object.keys(modes).find(n => /dark/i.test(n));
+  if (!darkModeName) return null;
+
+  const darkModeData = modes[darkModeName];
+  const node = walkPath(darkModeData, refPath);
+  if (!node || node.$value === undefined) return null;
+
+  const rawValue = node.$value;
+  // If this is itself a reference, resolve it recursively through the dark mode
+  if (typeof rawValue === 'string' && rawValue.startsWith('{')) {
+    const innerPath = rawValue.slice(1, -1);
+    const innerCollName = node.$collectionName || primitiveCollectionName;
+    return resolvePrimitiveDarkValue(innerPath, innerCollName, collections);
+  }
+
+  if (typeof rawValue === 'string') return formatColorToOklch(rawValue);
+  return `${rawValue}`;
+}
+
+/**
+ * Build a CSS var() reference for a color mode token value.
+ *
+ * @param {object} node        - The token node from the Figma JSON
+ * @param {Map}    collections - All parsed collections
+ * @param {string} [mode]      - 'light' (default) or 'dark'. When 'dark', primitive
+ *                               color references are resolved through the Dark mode of
+ *                               1.0_Primitive_Colours so the dark section of
+ *                               semantic-inline.css contains concrete values rather
+ *                               than var() references identical to the light section.
+ */
+function buildColorValueRef(node, collections, mode = 'light') {
   const value = node.$value;
 
   // Literal value (rgba, hex, or numeric dimension like blur)
@@ -1356,10 +1396,16 @@ function buildColorValueRef(node, collections) {
                 // rewriteReferences already normalised the alias $value with the
                 // correct category prefix (e.g. "{Colors.grey.11}"), so nextRef
                 // already has the right shape for buildPrimitiveRefFromPath.
+                if (mode === 'dark') {
+                  // Resolve through the primitive collection's Dark mode to emit
+                  // a concrete value so the dark section differs from :root.
+                  const darkValue = resolvePrimitiveDarkValue(nextRef, nextCollName, collections);
+                  if (darkValue !== null) return darkValue;
+                }
                 return `var(${buildPrimitiveRefFromPath(nextRef)})`;
               }
               // Chain goes deeper — recurse
-              return buildColorValueRef(aliasNode, collections);
+              return buildColorValueRef(aliasNode, collections, mode);
             }
             // Literal value in alias — convert if it's a color
             if (typeof aliasNode.$value === 'string') {
@@ -1382,6 +1428,11 @@ function buildColorValueRef(node, collections) {
 
   // Reference to primitive collections
   if (isPrimitiveCollectionName(collectionName)) {
+    if (mode === 'dark') {
+      // Resolve through the primitive collection's Dark mode for a concrete value
+      const darkValue = resolvePrimitiveDarkValue(refPath, collectionName, collections);
+      if (darkValue !== null) return darkValue;
+    }
     const refProp = buildPrimitiveRefFromPath(refPath);
     return `var(${refProp})`;
   }
