@@ -1144,8 +1144,25 @@ export default function StudioPage() {
       onResetScene: resetScene,
       onTextureUpload: handleTextureUpload,
       onAssetUpload: handleAssetUpload,
+      layout: {
+        showLeftDock,
+        showRightDock,
+        selectedLayoutPreset,
+        layoutPresetOptions: STUDIO_LAYOUT_PRESET_ORDER.map((id) => ({
+          label: STUDIO_LAYOUT_PRESET_DEFINITIONS[id].label,
+          value: id,
+        })),
+        setShowLeftDock,
+        setShowRightDock,
+        onSelectLayoutPreset: (value) => {
+          if (!isLayoutPresetId(value)) return
+          setSelectedLayoutPreset(value)
+          applyShellLayout(STUDIO_LAYOUT_PRESET_DEFINITIONS[value].layout)
+        },
+      },
     }),
-    [currentScene, handleAssetUpload, handleTextureUpload, hdriOptions, loadScene, modelOptions, resetScene, saveScene, sceneDraftName, sceneOptions, viewerConfig],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [currentScene, handleAssetUpload, handleTextureUpload, hdriOptions, loadScene, modelOptions, resetScene, saveScene, sceneDraftName, sceneOptions, selectedLayoutPreset, setShowLeftDock, setShowRightDock, showLeftDock, showRightDock, viewerConfig, applyShellLayout, setSelectedLayoutPreset],
   )
 
   const handleQuickSave = useCallback(() => {
