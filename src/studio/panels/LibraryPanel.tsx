@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import type { TexturePaths } from '@/app/(dev)/prototype/types'
+import type { DesignState, TexturePaths } from '@/app/(dev)/prototype/types'
 import {
   STUDIO_THEME,
   inputStyle,
@@ -10,6 +10,7 @@ import {
   quickPickGridStyle,
   secondaryButtonStyle,
   statusCardStyle,
+  statusGridStyle,
 } from '@/studio/theme'
 
 type MaterialKey = 'face' | 'back' | 'frame'
@@ -26,7 +27,7 @@ interface MaterialSet {
   textures: Partial<TexturePaths>
 }
 
-type LibraryTab = 'models' | 'environments' | 'materials'
+type LibraryTab = 'models' | 'environments' | 'materials' | 'artwork'
 
 function labelStyle() {
   return {
@@ -54,6 +55,10 @@ function tabButtonStyle(active: boolean) {
   } as const
 }
 
+function formatMetric(value: number) {
+  return value.toFixed(2)
+}
+
 export function LibraryPanel({
   assetsLoaded,
   models,
@@ -71,6 +76,16 @@ export function LibraryPanel({
   onMaterialPresetDraftNameChange,
   onSaveMaterialPreset,
   onLoadMaterialPreset,
+  // Artwork props
+  hasArtwork,
+  artworks,
+  artworkUrl,
+  isEditing,
+  designState,
+  onArtworkFile,
+  onArtworkSelect,
+  onToggleEditing,
+  onResetArtwork,
 }: {
   assetsLoaded: boolean
   models: Record<string, string>
@@ -88,6 +103,16 @@ export function LibraryPanel({
   onMaterialPresetDraftNameChange: (value: string) => void
   onSaveMaterialPreset: (value: string) => void
   onLoadMaterialPreset: (value: string) => void
+  // Artwork props
+  hasArtwork: boolean
+  artworks: Record<string, string>
+  artworkUrl?: string
+  isEditing: boolean
+  designState: DesignState
+  onArtworkFile: (file: File) => void
+  onArtworkSelect: (value: string) => void
+  onToggleEditing: () => void
+  onResetArtwork: () => void
 }) {
   const [activeTab, setActiveTab] = useState<LibraryTab>('models')
 
@@ -96,8 +121,8 @@ export function LibraryPanel({
       style={{
         display: 'flex',
         flexDirection: 'column',
-        flex: 1,
-        minHeight: 200,
+        height: '100%',
+        minHeight: 0,
         background: STUDIO_THEME.baseBackground,
         fontFamily: STUDIO_THEME.fontFamily,
       }}
@@ -115,10 +140,13 @@ export function LibraryPanel({
           Models
         </button>
         <button style={tabButtonStyle(activeTab === 'environments')} onClick={() => setActiveTab('environments')}>
-          Environments
+          Envs
         </button>
         <button style={tabButtonStyle(activeTab === 'materials')} onClick={() => setActiveTab('materials')}>
           Materials
+        </button>
+        <button style={tabButtonStyle(activeTab === 'artwork')} onClick={() => setActiveTab('artwork')}>
+          Artwork
         </button>
       </div>
 
@@ -128,7 +156,6 @@ export function LibraryPanel({
         {/* Models tab */}
         {activeTab === 'models' && (
           <div style={{ padding: 8, display: 'grid', gap: 8 }}>
-            {/* Section header */}
             <div
               style={{
                 display: 'flex',
@@ -154,7 +181,6 @@ export function LibraryPanel({
               </label>
             </div>
 
-            {/* Asset grid — 64px thumbnails */}
             <div style={quickPickGridStyle(64)}>
               {Object.entries(models).map(([label, value]) => {
                 const active = value === modelPath
@@ -265,7 +291,6 @@ export function LibraryPanel({
         {activeTab === 'materials' && (
           <div style={{ padding: 8, display: 'grid', gap: 12 }}>
 
-            {/* Material Presets */}
             <div style={{ display: 'grid', gap: 6 }}>
               <div
                 style={{
@@ -320,7 +345,6 @@ export function LibraryPanel({
                 )}
               </div>
 
-              {/* Save preset */}
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <input
                   value={materialPresetDraftName}
@@ -334,7 +358,6 @@ export function LibraryPanel({
               </div>
             </div>
 
-            {/* Material Sets */}
             {materialSets.length > 0 && (
               <div style={{ display: 'grid', gap: 6 }}>
                 <span style={labelStyle()}>Material Sets</span>
@@ -366,6 +389,97 @@ export function LibraryPanel({
                 ))}
               </div>
             )}
+
+          </div>
+        )}
+
+        {/* Artwork tab */}
+        {activeTab === 'artwork' && (
+          <div style={{ padding: 8, display: 'grid', gap: 10 }}>
+
+            <div style={statusGridStyle(3)}>
+              {[
+                { label: 'Artwork', value: hasArtwork ? 'Loaded' : 'Empty' },
+                { label: 'Mode', value: isEditing ? 'Editing' : 'Locked' },
+                { label: 'Scale', value: formatMetric(designState.scale) },
+              ].map((item) => (
+                <div key={item.label} style={statusCardStyle()}>
+                  <span style={labelStyle()}>{item.label}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: STUDIO_THEME.baseForeground }}>{item.value}</span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <label style={primaryButtonStyle()}>
+                {hasArtwork ? 'Replace' : 'Upload Artwork'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0]
+                    if (file) onArtworkFile(file)
+                    event.target.value = ''
+                  }}
+                />
+              </label>
+
+              <button onClick={onToggleEditing} style={secondaryButtonStyle(isEditing)}>
+                {isEditing ? 'Done Editing' : 'Edit Placement'}
+              </button>
+
+              <button onClick={onResetArtwork} style={secondaryButtonStyle()}>
+                Reset
+              </button>
+            </div>
+
+            <div style={statusGridStyle(3)}>
+              {[
+                { label: 'Offset X', value: formatMetric(designState.offsetX) },
+                { label: 'Offset Y', value: formatMetric(designState.offsetY) },
+                { label: 'Scale', value: formatMetric(designState.scale) },
+              ].map((metric) => (
+                <div key={metric.label} style={statusCardStyle()}>
+                  <span style={labelStyle()}>{metric.label}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: STUDIO_THEME.baseForeground }}>{metric.value}</span>
+                </div>
+              ))}
+            </div>
+
+            {Object.entries(artworks).length ? (
+              <div style={{ display: 'grid', gap: 8 }}>
+                <div style={labelStyle()}>Artwork Library</div>
+                <div style={quickPickGridStyle(92)}>
+                  {Object.entries(artworks).map(([label, value]) => {
+                    const active = value === artworkUrl
+                    return (
+                      <button
+                        key={label}
+                        onClick={() => onArtworkSelect(value)}
+                        style={quickPickButtonStyle(active)}
+                      >
+                        <img
+                          src={value}
+                          alt={label}
+                          style={{
+                            width: '100%',
+                            aspectRatio: '1 / 1',
+                            objectFit: 'cover',
+                            borderRadius: STUDIO_THEME.bladeBorderRadius,
+                            background: STUDIO_THEME.monitorBackground,
+                          }}
+                        />
+                        <span style={{ fontSize: 11, fontWeight: 700, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{label}</span>
+                        <span style={{ fontSize: 10, color: active ? STUDIO_THEME.buttonForeground : STUDIO_THEME.labelForeground }}>
+                          {active ? 'Active artwork' : 'Select artwork'}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : null}
 
           </div>
         )}

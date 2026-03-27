@@ -7,10 +7,9 @@ import type { ArtworkConfig, CameraConfig, ColorConfig, DesignState, Environment
 import { createEffectStudioRegistry } from '@/studio/controls/registry/effectStandard'
 import { buildStudioOnlyState, type ScenePresetStatus } from '@/studio/persistence/studioDocument'
 import type { StudioOutputPayload } from '@/studio/preset/types'
-import { ArtworkWorkspacePanel } from '@/studio/panels/ArtworkWorkspacePanel'
 import { InspectorPanel } from '@/studio/panels/InspectorPanel'
 import { LibraryPanel } from '@/studio/panels/LibraryPanel'
-import { StudiosPanel } from '@/studio/panels/StudiosPanel'
+import { StudiosBar } from '@/studio/panels/StudiosBar'
 import { STUDIO_THEME } from '@/studio/theme'
 
 const EffectViewer = dynamic(() => import('../prototype/core/EffectViewer'), { ssr: false })
@@ -1457,20 +1456,6 @@ export default function StudioPage() {
             flexDirection: 'column',
           }}
         >
-          <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <StudiosPanel
-            currentScene={currentScene}
-            sceneDraftName={sceneDraftName}
-            sceneNames={sceneNames}
-            sceneMeta={sceneMeta}
-            onSceneDraftNameChange={setSceneDraftName}
-            onSaveScene={() => void saveScene(sceneDraftName || currentScene || 'default')}
-            onResetScene={resetScene}
-            onLoadScene={(value) => void loadScene(value)}
-            onPublishScene={() => void publishScene()}
-            onArchiveScene={(value) => void archiveScene(value)}
-          />
-
           <LibraryPanel
             assetsLoaded={assets.loaded}
             models={assets.models}
@@ -1495,9 +1480,6 @@ export default function StudioPage() {
             onMaterialPresetDraftNameChange={setMaterialPresetDraftName}
             onSaveMaterialPreset={(value) => void saveMaterialPreset(value)}
             onLoadMaterialPreset={(value) => void loadMaterialPreset(value)}
-          />
-
-          <ArtworkWorkspacePanel
             hasArtwork={Boolean(artworkUrl)}
             artworks={assets.artworks}
             artworkUrl={artworkUrl}
@@ -1511,7 +1493,6 @@ export default function StudioPage() {
             onToggleEditing={() => setIsEditing((previous) => !previous)}
             onResetArtwork={() => setDesignState(cloneDesignState(INITIAL_DESIGN))}
           />
-          </div>
           {/* Left resize handle */}
           <button
             type="button"
@@ -1616,6 +1597,31 @@ export default function StudioPage() {
         </div>
         )}
 
+      </div>
+
+      {/* Bottom bar — compact Studios strip */}
+      <div
+        style={{
+          flexShrink: 0,
+          height: 40,
+          background: '#1a1a1a',
+          borderTop: STUDIO_THEME.border,
+          fontFamily: STUDIO_THEME.fontFamily,
+        }}
+      >
+        <StudiosBar
+          currentScene={currentScene}
+          sceneDraftName={sceneDraftName}
+          sceneNames={sceneNames}
+          sceneMeta={sceneMeta}
+          hasUnsavedChanges={hasUnsavedChanges}
+          onSceneDraftNameChange={setSceneDraftName}
+          onSaveScene={() => void saveScene(sceneDraftName || currentScene || 'default')}
+          onResetScene={resetScene}
+          onLoadScene={(value) => void loadScene(value)}
+          onPublishScene={() => void publishScene()}
+          onArchiveScene={(value) => void archiveScene(value)}
+        />
       </div>
     </div>
   )

@@ -1,0 +1,206 @@
+'use client'
+
+import { STUDIO_THEME, primaryButtonStyle, secondaryButtonStyle } from '@/studio/theme'
+
+type SceneStatus = 'draft' | 'published' | 'archived'
+
+interface SceneMeta {
+  status?: SceneStatus
+  version?: number
+}
+
+export function StudiosBar({
+  currentScene,
+  sceneDraftName,
+  sceneNames,
+  sceneMeta,
+  hasUnsavedChanges,
+  onSceneDraftNameChange,
+  onSaveScene,
+  onResetScene,
+  onLoadScene,
+  onPublishScene,
+  onArchiveScene,
+}: {
+  currentScene: string
+  sceneDraftName: string
+  sceneNames: string[]
+  sceneMeta?: Record<string, SceneMeta>
+  hasUnsavedChanges: boolean
+  onSceneDraftNameChange: (value: string) => void
+  onSaveScene: () => void
+  onResetScene: () => void
+  onLoadScene: (value: string) => void
+  onPublishScene?: () => void
+  onArchiveScene?: (value: string) => void
+}) {
+  const savedScenes = sceneNames.length ? sceneNames : ['default']
+  const activeStatus = sceneMeta?.[currentScene]?.status ?? 'draft'
+  const activeVersion = sceneMeta?.[currentScene]?.version
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 0,
+        height: '100%',
+        overflow: 'hidden',
+        fontFamily: STUDIO_THEME.fontFamily,
+      }}
+    >
+      {/* Scene selector — scrollable list of scene chips */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
+          overflowX: 'auto',
+          overflowY: 'hidden',
+          flex: 1,
+          minWidth: 0,
+          padding: '0 8px',
+          height: '100%',
+          scrollbarWidth: 'none',
+        }}
+      >
+        {savedScenes.map((name) => {
+          const active = name === currentScene
+          const status = sceneMeta?.[name]?.status ?? 'draft'
+          const version = sceneMeta?.[name]?.version
+          return (
+            <button
+              key={name}
+              onClick={() => onLoadScene(name)}
+              style={{
+                flexShrink: 0,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                height: 26,
+                padding: '0 10px',
+                border: active ? `1px solid ${STUDIO_THEME.activeBlue}` : STUDIO_THEME.border,
+                borderRadius: STUDIO_THEME.bladeBorderRadius,
+                background: active ? 'rgba(10, 132, 255, 0.15)' : 'transparent',
+                color: active ? '#ffffff' : STUDIO_THEME.labelForeground,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                fontSize: 11,
+                fontWeight: active ? 600 : 400,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <span>{name}</span>
+              {status === 'published' && (
+                <span
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 700,
+                    color: STUDIO_THEME.activeBlue,
+                    letterSpacing: '0.05em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {typeof version === 'number' ? `v${version}` : 'pub'}
+                </span>
+              )}
+              {status === 'draft' && hasUnsavedChanges && active && (
+                <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#f59e0b', flexShrink: 0 }} />
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Divider */}
+      <div style={{ width: 1, height: 20, background: STUDIO_THEME.borderColor, flexShrink: 0 }} />
+
+      {/* Scene name input */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0 8px', flexShrink: 0 }}>
+        <input
+          value={sceneDraftName}
+          onChange={(e) => onSceneDraftNameChange(e.target.value)}
+          placeholder="Scene name"
+          style={{
+            width: 110,
+            height: 24,
+            padding: '0 6px',
+            border: STUDIO_THEME.border,
+            borderRadius: STUDIO_THEME.bladeBorderRadius,
+            background: STUDIO_THEME.inputBackground,
+            color: STUDIO_THEME.baseForeground,
+            fontSize: 11,
+            fontFamily: 'inherit',
+          }}
+        />
+        <button onClick={onSaveScene} style={primaryButtonStyle()}>
+          Save
+        </button>
+        <button onClick={onResetScene} style={secondaryButtonStyle()}>
+          Reset
+        </button>
+        {onPublishScene && (
+          <button
+            onClick={onPublishScene}
+            style={{
+              ...secondaryButtonStyle(),
+              color: STUDIO_THEME.activeBlue,
+              borderColor: STUDIO_THEME.activeBlue,
+            }}
+          >
+            Publish
+          </button>
+        )}
+        {onArchiveScene && activeStatus !== 'archived' && (
+          <button
+            onClick={() => onArchiveScene(currentScene)}
+            style={secondaryButtonStyle()}
+          >
+            Archive
+          </button>
+        )}
+      </div>
+
+      {/* Status indicator */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '0 10px',
+          flexShrink: 0,
+          borderLeft: STUDIO_THEME.border,
+          height: '100%',
+          fontSize: 10,
+          color: STUDIO_THEME.labelForeground,
+        }}
+      >
+        <span
+          style={{
+            display: 'inline-block',
+            width: 6,
+            height: 6,
+            borderRadius: '50%',
+            background:
+              activeStatus === 'published'
+                ? STUDIO_THEME.activeBlue
+                : activeStatus === 'archived'
+                  ? STUDIO_THEME.disabledForeground
+                  : hasUnsavedChanges
+                    ? '#f59e0b'
+                    : '#4ade80',
+          }}
+        />
+        <span>
+          {activeStatus === 'published'
+            ? typeof activeVersion === 'number' ? `v${activeVersion}` : 'Published'
+            : activeStatus === 'archived'
+              ? 'Archived'
+              : hasUnsavedChanges
+                ? 'Unsaved'
+                : 'Saved'}
+        </span>
+      </div>
+    </div>
+  )
+}
