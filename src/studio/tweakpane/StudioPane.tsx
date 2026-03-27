@@ -42,7 +42,7 @@ export function StudioPane({ registry }: { registry: StudioControlRegistry }) {
       ref={containerRef}
       style={{
         width: '100%',
-        height: '100%',
+        flex: 1,
         minHeight: 0,
         overflowY: 'auto',
         overflowX: 'hidden',

@@ -205,19 +205,23 @@ function bindActionField(container: PaneContainer, field: StudioActionField): St
   }
 }
 
+function fileDisplayName(raw: string | undefined): string {
+  if (!raw) return '—'
+  // Show only the filename portion of a path
+  const last = raw.split('/').pop() ?? raw
+  return last.length > 22 ? '...' + last.slice(-20) : last
+}
+
 function bindFileField(container: PaneContainer, field: StudioFileField): StudioFieldBinding {
   let currentField = field
-  const params = { value: currentField.currentValue?.() || 'Bound in ONEMO shell' }
-  const binding = createReadonlyBinding(container, params, currentField.label)
 
-  if (currentField.pick) {
-    container.addButton({
-      title: currentField.buttonTitle ?? 'Choose',
-      label: currentField.label,
-    }).on('click', async () => {
-      await currentField.pick?.()
-    })
-  }
+  // Single row: button whose title shows the current filename + "..." indicator
+  const button = container.addButton({
+    label: currentField.label,
+    title: fileDisplayName(currentField.currentValue?.()) + '  …',
+  }).on('click', async () => {
+    await currentField.pick?.()
+  })
 
   return {
     path: currentField.path,
@@ -225,8 +229,14 @@ function bindFileField(container: PaneContainer, field: StudioFileField): Studio
       currentField = nextField as StudioFileField
     },
     sync() {
-      params.value = currentField.currentValue?.() || 'Bound in ONEMO shell'
-      binding.refresh()
+      // Tweakpane buttons don't expose a title setter; rebuild title via the element if possible
+      try {
+        const el = (button as unknown as { element: HTMLElement }).element
+        const titleEl = el.querySelector('.tp-btnv_t') as HTMLElement | null
+        if (titleEl) titleEl.textContent = fileDisplayName(currentField.currentValue?.()) + '  …'
+      } catch {
+        // Graceful fallback — title stays stale but binding still fires correctly
+      }
     },
   }
 }
@@ -262,17 +272,18 @@ function collectFields(registry: StudioControlRegistry): StudioField[] {
   return registry.tabs.flatMap((tab) => tab.sections.flatMap((section) => section.fields))
 }
 
-function getCompactTabTitle(tabId: string, tabTitle: string) {
-  const explicitTitles: Record<string, string> = {
-    scene: 'Scn',
-    materials: 'Mat',
-    environment: 'Env',
-    lights: 'Lgt',
-    camera: 'Cam',
-    image: 'Img',
+function getTabTitle(tabId: string, tabTitle: string) {
+  const fullTitles: Record<string, string> = {
+    scene: 'Scene',
+    materials: 'Material',
+    environment: 'Environment',
+    lights: 'Lighting',
+    camera: 'Camera',
+    image: 'Image',
+    layout: 'Layout',
   }
 
-  return explicitTitles[tabId] ?? tabTitle.slice(0, 3)
+  return fullTitles[tabId] ?? tabTitle
 }
 
 export function getStudioPaneSchemaSignature(registry: StudioControlRegistry) {
@@ -318,7 +329,7 @@ export function buildStudioPane(container: HTMLElement, registry: StudioControlR
     addTab: (config: { pages: Array<{ title: string }> }) => { pages: TabPageApi[] }
   }).addTab({
     pages: registry.tabs.map((studioTab) => ({
-      title: getCompactTabTitle(studioTab.id, studioTab.title),
+      title: getTabTitle(studioTab.id, studioTab.title),
     })),
   })
 
