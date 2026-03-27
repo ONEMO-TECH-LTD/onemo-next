@@ -9,8 +9,8 @@ import { buildStudioOnlyState, type ScenePresetStatus } from '@/studio/persisten
 import type { StudioOutputPayload } from '@/studio/preset/types'
 import { InspectorPanel } from '@/studio/panels/InspectorPanel'
 import { LibraryPanel } from '@/studio/panels/LibraryPanel'
-import { StudiosBar } from '@/studio/panels/StudiosBar'
-import { STUDIO_THEME } from '@/studio/theme'
+import { StudiosPanel } from '@/studio/panels/StudiosPanel'
+import { STUDIO_THEME, primaryButtonStyle, secondaryButtonStyle } from '@/studio/theme'
 
 const EffectViewer = dynamic(() => import('../prototype/core/EffectViewer'), { ssr: false })
 
@@ -1268,7 +1268,7 @@ export default function StudioPage() {
           gap: 12,
           padding: 20,
           boxSizing: 'border-box',
-          background: DEFAULT_VIEWER_CONFIG.colors.bgColor,
+          background: STUDIO_THEME.shellBackground,
           fontFamily: STUDIO_THEME.fontFamily,
         }}
       >
@@ -1456,43 +1456,117 @@ export default function StudioPage() {
             flexDirection: 'column',
           }}
         >
-          <LibraryPanel
-            assetsLoaded={assets.loaded}
-            models={assets.models}
-            hdris={assets.hdris}
-            materialSets={assets.materialSets}
-            materialPresetNames={assets.materialPresets}
-            materialPresetDraftName={materialPresetDraftName}
-            modelPath={viewerConfig.modelPath}
-            hdriValue={hdriValue}
-            materialGroups={materialGroups}
-            onModelChange={(value) => setViewerConfig((previous) => ({ ...previous, modelPath: value }))}
-            onHdriChange={(value) => setViewerConfig((previous) => ({
-              ...previous,
-              environment: {
-                ...previous.environment!,
-                preset: value.startsWith('/assets/') ? 'studio' : value,
-                customHdri: value.startsWith('/assets/') ? value : undefined,
-              },
-            }))}
-            onAssetUpload={handleAssetUpload}
-            onApplyMaterialSet={applyMaterialSet}
-            onMaterialPresetDraftNameChange={setMaterialPresetDraftName}
-            onSaveMaterialPreset={(value) => void saveMaterialPreset(value)}
-            onLoadMaterialPreset={(value) => void loadMaterialPreset(value)}
-            hasArtwork={Boolean(artworkUrl)}
-            artworks={assets.artworks}
-            artworkUrl={artworkUrl}
-            isEditing={isEditing}
-            designState={designState}
-            onArtworkFile={(file) => void handleArtworkFile(file)}
-            onArtworkSelect={(value) => {
-              setArtworkUrl(value || undefined)
-              setDesignState(cloneDesignState(INITIAL_DESIGN))
+          <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <LibraryPanel
+              assetsLoaded={assets.loaded}
+              models={assets.models}
+              hdris={assets.hdris}
+              materialSets={assets.materialSets}
+              materialPresetNames={assets.materialPresets}
+              materialPresetDraftName={materialPresetDraftName}
+              modelPath={viewerConfig.modelPath}
+              hdriValue={hdriValue}
+              materialGroups={materialGroups}
+              onModelChange={(value) => setViewerConfig((previous) => ({ ...previous, modelPath: value }))}
+              onHdriChange={(value) => setViewerConfig((previous) => ({
+                ...previous,
+                environment: {
+                  ...previous.environment!,
+                  preset: value.startsWith('/assets/') ? 'studio' : value,
+                  customHdri: value.startsWith('/assets/') ? value : undefined,
+                },
+              }))}
+              onAssetUpload={handleAssetUpload}
+              onApplyMaterialSet={applyMaterialSet}
+              onMaterialPresetDraftNameChange={setMaterialPresetDraftName}
+              onSaveMaterialPreset={(value) => void saveMaterialPreset(value)}
+              onLoadMaterialPreset={(value) => void loadMaterialPreset(value)}
+              hasArtwork={Boolean(artworkUrl)}
+              artworks={assets.artworks}
+              artworkUrl={artworkUrl}
+              isEditing={isEditing}
+              designState={designState}
+              onArtworkFile={(file) => void handleArtworkFile(file)}
+              onArtworkSelect={(value) => {
+                setArtworkUrl(value || undefined)
+                setDesignState(cloneDesignState(INITIAL_DESIGN))
+              }}
+              onToggleEditing={() => setIsEditing((previous) => !previous)}
+              onResetArtwork={() => setDesignState(cloneDesignState(INITIAL_DESIGN))}
+            />
+          </div>
+
+          {/* Studios section — compact scene management below Library */}
+          <div
+            style={{
+              flexShrink: 0,
+              borderTop: STUDIO_THEME.border,
+              background: STUDIO_THEME.panelBackground,
+              display: 'flex',
+              flexDirection: 'column',
             }}
-            onToggleEditing={() => setIsEditing((previous) => !previous)}
-            onResetArtwork={() => setDesignState(cloneDesignState(INITIAL_DESIGN))}
-          />
+          >
+            <StudiosPanel
+              currentScene={currentScene}
+              sceneNames={sceneNames}
+              sceneMeta={sceneMeta}
+              onLoadScene={(value) => void loadScene(value)}
+            />
+            {/* Save / name / publish controls */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                padding: '5px 8px',
+                borderTop: STUDIO_THEME.border,
+              }}
+            >
+              <input
+                value={sceneDraftName}
+                onChange={(e) => setSceneDraftName(e.target.value)}
+                placeholder="Scene name"
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  height: 22,
+                  padding: '0 6px',
+                  border: STUDIO_THEME.border,
+                  borderRadius: STUDIO_THEME.bladeBorderRadius,
+                  background: STUDIO_THEME.inputBackground,
+                  color: STUDIO_THEME.baseForeground,
+                  fontSize: 11,
+                  fontFamily: 'inherit',
+                }}
+              />
+              <button
+                onClick={() => void saveScene(sceneDraftName || currentScene || 'default')}
+                style={primaryButtonStyle()}
+              >
+                Save
+              </button>
+              <button
+                onClick={() => void publishScene()}
+                style={{
+                  ...secondaryButtonStyle(),
+                  color: STUDIO_THEME.activeBlue,
+                  borderColor: STUDIO_THEME.activeBlue,
+                  flexShrink: 0,
+                  height: 22,
+                  padding: '0 8px',
+                  borderRadius: STUDIO_THEME.bladeBorderRadius,
+                  border: `1px solid ${STUDIO_THEME.activeBlue}`,
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  fontSize: 11,
+                  fontFamily: 'inherit',
+                }}
+              >
+                Pub
+              </button>
+            </div>
+          </div>
           {/* Left resize handle */}
           <button
             type="button"
@@ -1599,30 +1673,30 @@ export default function StudioPage() {
 
       </div>
 
-      {/* Bottom bar — compact Studios strip */}
+      {/* Bottom bar — minimal status strip */}
       <div
         style={{
           flexShrink: 0,
-          height: 40,
+          height: 24,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '0 10px',
           background: '#1a1a1a',
           borderTop: STUDIO_THEME.border,
           fontFamily: STUDIO_THEME.fontFamily,
+          fontSize: 10,
+          color: STUDIO_THEME.labelForeground,
         }}
       >
-        <StudiosBar
-          currentScene={currentScene}
-          sceneDraftName={sceneDraftName}
-          sceneNames={sceneNames}
-          sceneEntries={sceneEntries}
-          sceneMeta={sceneMeta}
-          hasUnsavedChanges={hasUnsavedChanges}
-          onSceneDraftNameChange={setSceneDraftName}
-          onSaveScene={() => void saveScene(sceneDraftName || currentScene || 'default')}
-          onResetScene={resetScene}
-          onLoadScene={(value) => void loadScene(value)}
-          onPublishScene={() => void publishScene()}
-          onArchiveScene={(value) => void archiveScene(value)}
-        />
+        <span>{currentSceneEntry?.name ?? currentScene}</span>
+        <span
+          style={{
+            color: hasUnsavedChanges ? '#f59e0b' : STUDIO_THEME.labelForeground,
+          }}
+        >
+          {hasUnsavedChanges ? '● Unsaved' : '○ Saved'}
+        </span>
       </div>
     </div>
   )

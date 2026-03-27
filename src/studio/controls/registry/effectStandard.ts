@@ -79,25 +79,9 @@ function buildInspectorTabs(ctx: EffectRegistryContext): StudioTab[] {
       title: 'Scene',
       sections: [
         {
-          id: 'document',
-          title: 'Studio Document',
-          defaultExpanded: true,
-          fields: [
-            {
-              kind: 'select',
-              path: 'scene.activeDocument',
-              label: 'Saved Scene',
-              options: ctx.sceneOptions,
-              get: () => ctx.currentScene,
-              set: (value) => {
-                void ctx.onLoadScene(value)
-              },
-            },
-          ],
-        },
-        {
           id: 'model',
           title: 'Model',
+          defaultExpanded: true,
           fields: [
             {
               kind: 'select',
