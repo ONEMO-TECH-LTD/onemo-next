@@ -3,7 +3,7 @@
 
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, Environment, GizmoHelper, GizmoViewcube, TransformControls, useGLTF } from '@react-three/drei'
-import { Suspense, useCallback, useEffect, useMemo, useRef, type RefObject } from 'react'
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, type RefObject } from 'react'
 import * as THREE from 'three'
 import EffectModel from './EffectModel'
 import type { ViewerConfig, DesignState } from '../types'
@@ -173,7 +173,7 @@ function EditorViewportOverlay({
 }: {
   selectedResourceIds: string[]
   resolveObjectById?: (resourceId: string) => THREE.Object3D | null
-  orbitControlsRef: RefObject<any>
+  orbitControlsRef: RefObject<React.ComponentRef<typeof OrbitControls> | null>
   transformMode: 'translate' | 'rotate' | 'scale' | 'disabled'
   transformSpace: 'world' | 'local'
   showGizmoHelper?: boolean
@@ -187,7 +187,7 @@ function EditorViewportOverlay({
     return resolveObjectById(selectedResourceIds[0])
   }, [resolveObjectById, selectedResourceIds])
 
-  const transformControlsRef = useRef<any>(null)
+  const transformControlsRef = useRef<React.ComponentRef<typeof TransformControls>>(null)
   const lightProxyRef = useRef<THREE.Group>(new THREE.Group())
   const isDraggingRef = useRef(false)
   const selectedLight = selectedObject instanceof THREE.Light ? selectedObject : null
@@ -256,6 +256,7 @@ function EditorViewportOverlay({
 
   return (
     <>
+      {/* eslint-disable-next-line react-hooks/refs -- lightProxyRef is a stable Group instance, safe to access during render */}
       {selectedLight ? <primitive object={lightProxyRef.current} /> : null}
       <SelectionOutline target={selectedObject} />
       {canTransform ? (
@@ -331,7 +332,7 @@ export default function EffectViewer({
     return new THREE.Euler(0, rad, 0)
   }, [env])
 
-  const orbitControlsRef = useRef<any>(null)
+  const orbitControlsRef = useRef<React.ComponentRef<typeof OrbitControls>>(null)
   const handleCreated = useCallback(({ gl, scene, camera }: { gl: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera }) => {
     emitBridge({
       renderer: gl,
