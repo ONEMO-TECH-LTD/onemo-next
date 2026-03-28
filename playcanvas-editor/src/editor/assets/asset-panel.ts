@@ -602,20 +602,6 @@ class AssetPanel extends Panel {
         this._btnClearSearch.parent = this._searchInput;
         this._btnClearSearch.on('click', this._onClickClearSearch.bind(this));
 
-        // Show asset store
-        const btnStore = new Button({
-            text: 'ASSET STORE',
-            icon: 'E244',
-            class: [CLASS_BTN_STORE, CLASS_HIDE_ON_COLLAPSE]
-        });
-        btnStore.on('click', this._onClickStore.bind(this));
-        btnStore.on('hover', () => {
-            tooltip.attach(btnStore.dom);
-            tooltip.text = 'Open Store';
-            tooltip.class.remove('inactive');
-        });
-        this._containerControls.append(btnStore);
-
         // resizable container for a scrollable folders container
         this._containerLeft = new Container({
             class: CLASS_LEFT,

@@ -3,7 +3,6 @@ import '@/common/extensions';
 
 // general
 import './editor';
-import './messenger/messenger';
 import './wasm/wasm';
 
 // realtime
@@ -52,7 +51,6 @@ import './viewport/viewport-connection';
 import './assets/assets';
 import './assets/assets-sync';
 import './assets/assets-mapping';
-import './assets/assets-messenger';
 
 // source files
 import './sourcefiles/sourcefiles';

@@ -316,18 +316,6 @@ editor.once('load', () => {
                 items: editor.call('menu:entities:template')
             }]
         }, {
-            // Testing
-            text: 'Launch',
-            icon: 'E131',
-            shortcut: formatShortcut(`${ctrl}+Enter`),
-            onSelect: () => editor.call('launch', 'default')
-        }, {
-            // Development tools
-            text: 'Code Editor',
-            icon: 'E130',
-            onIsVisible: () => !editor.call('settings:project').get('useLegacyScripts'),
-            onSelect: () => editor.call('picker:codeeditor')
-        }, {
             // Build tools
             text: 'Bake LightMaps',
             icon: 'E191',
@@ -335,11 +323,6 @@ editor.once('load', () => {
                 editor.call('lightmapper:bake');
                 editor.call('entities:shadows:update');
             }
-        }, {
-            // Deployment
-            text: 'Publishing',
-            icon: 'E237',
-            onSelect: () => editor.call('picker:builds-publish')
         }, {
             // Source control
             text: 'Version Control',
@@ -359,45 +342,6 @@ editor.once('load', () => {
             onIsVisible: () => legacyScripts,
             onIsEnabled: () => hasWriteAccess(),
             onSelect: () => editor.call('sceneSettings:priorityScripts')
-        }, {
-            // Help (conventionally last)
-            text: 'Help',
-            icon: 'E138',
-            items: [{
-                text: 'Controls',
-                icon: 'E136',
-                shortcut: formatShortcut('Shift+?'),
-                onSelect: () => editor.call('help:controls')
-            }, {
-                text: 'User Manual',
-                icon: 'E232',
-                onSelect: () => window.open('https://developer.playcanvas.com/user-manual/')
-            }, {
-                text: 'Tutorials',
-                icon: 'E232',
-                onSelect: () => window.open('https://developer.playcanvas.com/tutorials/')
-            }, {
-                text: 'API Reference',
-                icon: 'E232',
-                onSelect: () => window.open('https://api.playcanvas.com/engine/')
-            }, {
-                text: 'Forum',
-                icon: 'E233',
-                onSelect: () => window.open('https://forum.playcanvas.com/')
-            }, {
-                text: 'Log Issue',
-                icon: 'E259',
-                onSelect: () => window.open('https://github.com/playcanvas/editor/issues')
-            }, {
-                text: 'How do I...',
-                icon: 'E138',
-                shortcut: formatShortcut(`${ctrl}+Space`),
-                onSelect: () => editor.call('help:howdoi')
-            }, {
-                text: 'Reset Tips',
-                icon: 'E138',
-                onSelect: () => editor.call('editor:tips:reset')
-            }]
         }]
     });
     menu.position(40, 0);

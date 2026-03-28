@@ -1,7 +1,6 @@
 // config type (injected into HTML)
 declare var config: import('./src/editor-api').EditorBlankConfig |
     import('./src/editor-api').EditorConfig |
-    import('./src/editor-api').CodeEditorConfig |
     import('./src/editor-api').LaunchConfig;
 
 // editor
@@ -16,9 +15,6 @@ declare var log: {
 declare var metrics: {
     increment: (data: any) => void;
 };
-
-// monaco
-declare var monaco: typeof import('monaco-editor');
 
 // pc (bundled in editor, injected in HTML for launch page)
 declare var pc: typeof import('playcanvas');
@@ -47,7 +43,6 @@ declare interface Window {
     editor: typeof editor;
     log: typeof log;
     metrics: typeof metrics;
-    monaco: typeof monaco;
     pc: typeof pc;
     pcui: typeof pcui;
     pcx: typeof pcx;

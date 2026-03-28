@@ -159,19 +159,16 @@ editor.on('load', () => {
         });
     });
 
-    const engineMsg = `Powered by PlayCanvas Engine v${version}`;
-    const engineLink = () => {
-        window.open(`https://github.com/playcanvas/engine/releases/tag/v${version}`, '_blank');
-    };
+    const engineMsg = `3D runtime v${version}`;
     if (editor.call('permissions:write')) {
         // log editor start
         editor.call('console:log', undefined, '===== EDITOR START =====');
 
         // log engine version
-        editor.call('console:log', engineMsg, engineLink);
+        editor.call('console:log', engineMsg);
     } else {
         // log engine version
-        editor.call('layout:console:add', Date.now(), 'info', engineMsg, engineLink);
+        editor.call('layout:console:add', Date.now(), 'info', engineMsg);
 
         // log read-only mode
         editor.call('layout:console:add', Date.now(), 'info', 'Viewing project in read-only mode');

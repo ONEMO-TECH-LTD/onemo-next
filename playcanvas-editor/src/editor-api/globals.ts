@@ -3,7 +3,7 @@ import type { Clipboard } from './clipboard';
 import type { Entities } from './entities';
 import type { History } from './history';
 import type { Jobs } from './jobs';
-import type { Messenger } from './messenger';
+import type { Messenger } from './messenger-api';
 import type { Realtime } from './realtime';
 import type { Rest } from './rest';
 import type { Schema } from './schema';

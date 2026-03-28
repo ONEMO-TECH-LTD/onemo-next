@@ -28,7 +28,7 @@ editor.once('load', () => {
 
     // main panel
     const panel = new Panel({
-        headerText: 'PlayCanvas',
+        headerText: '3D Studio',
         class: 'modal-confirmation-panel'
     });
     overlay.append(panel);

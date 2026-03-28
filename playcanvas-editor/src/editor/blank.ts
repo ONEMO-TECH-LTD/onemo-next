@@ -10,7 +10,6 @@ import '@/common/pcui/pcui';
 // general
 import './editor';
 import './layout/layout';
-import './messenger/messenger';
 import './drop/drop';
 import './search/search';
 

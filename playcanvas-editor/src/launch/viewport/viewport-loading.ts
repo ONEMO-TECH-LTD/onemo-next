@@ -18,13 +18,19 @@ editor.once('load', () => {
 
                     #application-splash {
                         position: absolute;
-                        top: calc(50% - 28px);
+                        top: calc(50% - 44px);
                         width: 264px;
                         left: calc(50% - 132px);
+                        color: #f6f6f6;
+                        font-family: Helvetica, Arial, sans-serif;
+                        text-align: center;
                     }
 
-                    #application-splash img {
-                        width: 100%;
+                    #application-title {
+                        font-size: 28px;
+                        font-weight: 700;
+                        letter-spacing: 0.18em;
+                        text-transform: uppercase;
                     }
 
                     #progress-bar-container {
@@ -61,14 +67,11 @@ editor.once('load', () => {
                 const splash = document.createElement('div');
                 splash.id = 'application-splash';
                 wrapper.appendChild(splash);
-                splash.style.display = 'none';
 
-                const logo = document.createElement('img');
-                logo.src = 'https://playcanvas.com/static-assets/images/play_text_252_white.png';
-                splash.appendChild(logo);
-                logo.onload = () => {
-                    splash.style.display = 'block';
-                };
+                const title = document.createElement('div');
+                title.id = 'application-title';
+                title.textContent = '3D Studio';
+                splash.appendChild(title);
 
                 const container = document.createElement('div');
                 container.id = 'progress-bar-container';

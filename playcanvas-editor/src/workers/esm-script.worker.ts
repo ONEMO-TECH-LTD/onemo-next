@@ -2,7 +2,12 @@ import { JSDocParser } from '@playcanvas/attribute-parser';
 
 import { WorkerServer } from '@/core/worker/worker-server';
 
-import { type Fix } from '../code-editor/monaco/intellisense/attribute-autofill';
+/** Minimal TextEdit shape for attribute-parser quickfixes (was Monaco.languages.TextEdit). */
+type Fix = {
+    range: unknown;
+    text: string;
+    title?: string;
+};
 
 const PLAYCANVAS_ATTRIBUTE_DOCS_URL = {
     target: 'https://developer.playcanvas.com/user-manual/scripting/fundamentals/script-attributes/esm/#attribute-types',

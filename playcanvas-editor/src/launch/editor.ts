@@ -4,7 +4,7 @@ import * as api from '@/editor-api';
 
 class LaunchEditor extends Editor<EditorMethods> {
     constructor() {
-        super('Launch Editor');
+        super('3D Studio Preview');
     }
 
     protected override _registerApi() {

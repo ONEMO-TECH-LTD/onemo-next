@@ -21,9 +21,6 @@ const VIRTUAL_RESOLVED = '\0virtual:empty';
 const NOOP_OUTPUT = '.noop.js';
 
 const STATIC_ASSETS = [
-    { src: 'node_modules/monaco-editor/min/vs', dest: 'dist/js/monaco-editor/min/vs' },
-    { src: 'node_modules/monaco-themes/themes', dest: 'dist/json/monaco-themes' },
-    { src: 'src/json/monaco-themes', dest: 'dist/json/monaco-themes' },
     { src: 'static/json', dest: 'dist/static/json' },
     { src: 'static/img', dest: 'dist/static/img' },
     { src: 'src/wasm/lodepng', dest: 'dist/wasm/lodepng' },
@@ -284,17 +281,6 @@ const PAGE_TARGETS = [
         define: {
             ...shared.define,
             'import.meta.url': 'undefined' // import.meta not supported in iife
-        }
-    },
-    {
-        ...shared,
-        entryPoints: ['src/code-editor/index.ts'],
-        outfile: 'dist/js/code-editor.js',
-        format: 'esm',
-        plugins: pagePlugins,
-        define: {
-            ...shared.define,
-            'import.meta.url': 'undefined' // loaded as UMD in backend, so import.meta is unavailable
         }
     },
     {

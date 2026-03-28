@@ -38,7 +38,7 @@ export * from './realtime/scenes';
 export * from './realtime/asset';
 export * from './realtime/assets';
 export * from './realtime';
-export * from './messenger';
+export * from './messenger-api';
 export * from './jobs';
 export * from './localstorage';
 export * from './clipboard';
