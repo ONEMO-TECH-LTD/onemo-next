@@ -36,9 +36,9 @@ interface EffectViewerProps {
 function disposeHelperObject(helper: THREE.Object3D) {
   helper.traverse((child) => {
     if ('geometry' in child) {
-      const geometry = child.geometry
-      if (geometry && typeof geometry.dispose === 'function') {
-        geometry.dispose()
+      const geo = (child as THREE.Mesh).geometry
+      if (geo && typeof geo.dispose === 'function') {
+        geo.dispose()
       }
     }
 
@@ -59,7 +59,7 @@ function SelectionOutline({ target }: { target: THREE.Object3D | null }) {
   const specialHelperRef = useRef<THREE.Object3D | null>(null)
 
   useEffect(() => {
-    const helper = new THREE.BoxHelper(undefined, 0xffa24c)
+    const helper = new THREE.BoxHelper(new THREE.Object3D(), 0xffa24c)
     helper.visible = false
     scene.add(helper)
     helperRef.current = helper
@@ -237,10 +237,14 @@ function EditorViewportOverlay({
       selectedLight.updateMatrixWorld(true)
     }
 
+    // @ts-expect-error -- TransformControls events exist at runtime but aren't in Object3DEventMap
     controls.addEventListener('dragging-changed', handleDraggingChange)
+    // @ts-expect-error -- TransformControls events exist at runtime but aren't in Object3DEventMap
     controls.addEventListener('objectChange', handleObjectChange)
     return () => {
+      // @ts-expect-error -- TransformControls events exist at runtime but aren't in Object3DEventMap
       controls.removeEventListener('dragging-changed', handleDraggingChange)
+      // @ts-expect-error -- TransformControls events exist at runtime but aren't in Object3DEventMap
       controls.removeEventListener('objectChange', handleObjectChange)
       isDraggingRef.current = false
     }
