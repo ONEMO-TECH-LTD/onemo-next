@@ -13,4 +13,10 @@ export default defineConfig({
       "@": path.resolve(dirname, "src"),
     },
   },
+  test: {
+    exclude: [
+      "node_modules/**",
+      "playcanvas-editor/**",
+    ],
+  },
 });

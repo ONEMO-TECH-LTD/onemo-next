@@ -15,6 +15,8 @@ const eslintConfig = defineConfig([
     // Non-runtime: backup copies, archives, not linted
     "asset-library/**",
     "?archive/**",
+    // PlayCanvas editor fork — has its own lint config
+    "playcanvas-editor/**",
   ]),
 ]);
 
