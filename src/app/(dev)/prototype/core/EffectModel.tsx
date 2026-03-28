@@ -20,6 +20,10 @@ interface EffectModelProps {
   back: BackMaterial
   frame: FrameMaterial
   scene: SceneSettings
+  onReady?: (payload: {
+    modelRoot: THREE.Object3D
+    materialSlots: Map<string, THREE.Material | THREE.Material[]>
+  }) => void
 }
 
 export default function EffectModel({
@@ -30,6 +34,7 @@ export default function EffectModel({
   back,
   frame,
   scene: sceneSettings,
+  onReady,
 }: EffectModelProps) {
   const { scene } = useGLTF(modelPath)
   const faceMeshRef = useRef<THREE.Mesh | null>(null)
@@ -220,6 +225,22 @@ export default function EffectModel({
       }
     })
   }, [scene, faceMaterial, backMaterial, frameMaterial])
+
+  useEffect(() => {
+    if (!onReady) return
+
+    const materialSlots = new Map<string, THREE.Material | THREE.Material[]>()
+    scene.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        materialSlots.set(child.uuid, child.material)
+      }
+    })
+
+    onReady({
+      modelRoot: scene,
+      materialSlots,
+    })
+  }, [scene, onReady, faceMaterial, backMaterial, frameMaterial])
 
   useEffect(() => {
     if (faceMeshRef.current) {
