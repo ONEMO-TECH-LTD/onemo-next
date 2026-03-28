@@ -14,7 +14,7 @@ import {
     importProject,
     publishApp
 } from '../../lib/common';
-import { codeEditorUrl, editorBlankUrl, editorSceneUrl, editorUrl, launchSceneUrl } from '../../lib/config';
+import { editorBlankUrl, editorSceneUrl, editorUrl, launchSceneUrl } from '../../lib/config';
 import { middleware } from '../../lib/middleware';
 import { uniqueName } from '../../lib/utils';
 
@@ -155,12 +155,6 @@ test.describe('navigation', () => {
             await page.goto(editorUrl(projectId), { waitUntil: 'networkidle' });
             sceneId = parseInt(await page.evaluate(() => window.config.scene.id), 10);
             engineVersions = await page.evaluate(() => window.config.engineVersions);
-        })).toStrictEqual([]);
-    });
-
-    test('goto code editor', async () => {
-        expect(await capture('code-editor', page, async () => {
-            await page.goto(codeEditorUrl(projectId), { waitUntil: 'networkidle' });
         })).toStrictEqual([]);
     });
 

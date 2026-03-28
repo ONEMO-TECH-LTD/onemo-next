@@ -167,12 +167,25 @@ class TextResolver extends Events {
         this._panelTop.append(this._btnGoBack);
         this._btnGoBack.on('click', this._onClickGoBack.bind(this));
 
+        const noMonaco = new LegacyLabel({
+            text: 'The embedded merge editor (Monaco code-editor bundle) is not included in this fork. Text conflict actions that require the in-page editor are disabled. Resolve in Cursor/VS Code or restore the code-editor bundle if you need this flow.',
+            multiline: true
+        });
+        noMonaco.class.add('merge-editor-unavailable');
+        this._panelTop.append(noMonaco);
+
         this._iframe = document.createElement('iframe');
         this._iframe.addEventListener('load', () => {
             this._panelTop.hidden = false;
         });
 
-        this._iframe.src = `/editor/code/${config.project.id}?mergeId=${this._mergeId}&conflictId=${this._textualMergeConflict.id}&assetType=${this._conflict.assetType}&mergedFilePath=${this._textualMergeConflict.mergedFilePath}`;
+        this._iframe.src = 'about:blank';
+
+        this._btnMarkResolved.hidden = true;
+        this._btnUseAllFrom.hidden = true;
+        this._btnRevert.hidden = true;
+        this._btnNextConflict.hidden = true;
+        this._btnPrevConflict.hidden = true;
     }
 
     appendToParent(parent: { append: (el: unknown) => void }) {
@@ -191,7 +204,20 @@ class TextResolver extends Events {
     }
 
     _codeEditorMethod(method: string, arg1?: unknown, arg2?: unknown, arg3?: unknown, arg4?: unknown) {
-        return this._iframe.contentWindow.editor.call(method, arg1, arg2, arg3, arg4);
+        const win = this._iframe?.contentWindow as (Window & { editor?: { call: (m: string, ...a: unknown[]) => unknown } }) | null;
+        if (!win?.editor?.call) {
+            if (method === 'editor:merge:getNumberOfConflicts') {
+                return 0;
+            }
+            if (method === 'editor:merge:getContent') {
+                return '';
+            }
+            if (method === 'editor:merge:isDirty') {
+                return false;
+            }
+            return undefined;
+        }
+        return win.editor.call(method, arg1, arg2, arg3, arg4);
     }
 
     _onClickMarkResolved() {

@@ -32,8 +32,8 @@ const SCENE_ID = '1';
 const SCENE_UNIQUE_ID = '1';
 const ROOT_ENTITY_ID = '00000000-0000-0000-0000-000000000001';
 
-const USERNAME = 'christinakal';
-const FULL_NAME = 'Christina Kaliora';
+const USERNAME = 'studio-user';
+const FULL_NAME = 'Studio User';
 const DEFAULT_TIP_FLAGS = {
     mainMenu: true,
     hierarchy: true,
@@ -1132,8 +1132,8 @@ function normalizeProjectSettings(settings = {}) {
 async function fetchPublicProject() {
     const fallback = {
         id: PROJECT_ID,
-        name: 'John Lemon Public Project',
-        description: 'Public PlayCanvas project fixture',
+        name: 'Studio Project',
+        description: 'Local 3D editor fixture',
         private: false,
         private_source_assets: false,
         settings: normalizeProjectSettings(),
@@ -1160,7 +1160,7 @@ async function fetchPublicProject() {
 
 function buildConfig(project, schema) {
     return {
-        version: 'local-playcanvas-host',
+        version: 'studio-host',
         self: {
             id: OWNER_ID,
             username: USERNAME,
@@ -1299,7 +1299,7 @@ function buildHtml(config) {
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>PlayCanvas Editor</title>
+    <title>3D Studio</title>
     <link rel="stylesheet" href="/css/editor.css" />
 </head>
 <body>
@@ -1793,5 +1793,5 @@ server.on('upgrade', (req, socket, head) => {
 });
 
 server.listen(PORT, HOST, () => {
-    console.log(`[step1-host] PlayCanvas editor host ready on ${ORIGIN}`);
+    console.log(`[step1-host] 3D Studio host ready on ${ORIGIN}`);
 });

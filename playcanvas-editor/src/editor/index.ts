@@ -9,6 +9,7 @@ import '@/common/pcui/pcui';
 
 // general
 import './editor';
+import './legacy-store-stubs';
 import './permissions/permissions';
 import './storage/localstorage';
 import './storage/clipboard';
@@ -16,7 +17,6 @@ import './users/users-flags';
 import './hotkey/hotkey';
 import './layout/layout';
 import './console/console';
-import './messenger/messenger';
 import './relay/relay';
 import './history/history-hotkeys';
 import './history/history-status-text';
@@ -38,9 +38,6 @@ import './users/users-colors';
 import './project/project';
 import './project/module';
 import './project/engine-asset';
-
-// store
-import './store/store';
 
 // observer lists
 import './entities/entities';
@@ -179,7 +176,6 @@ import './assets/handle-script-parse';
 import './assets/assets-script-registry';
 import './assets/assets-sprite-utils';
 import './assets/assets-bundles';
-import './assets/assets-move-to-store';
 import './assets/assets-texture-convert';
 import './assets/assets-mapping-removal';
 import './assets/assets-thumbnail-regen';
@@ -275,25 +271,12 @@ import './attributes/attributes-asset';
 // clipboard
 import './storage/clipboard-context-menu';
 
-// chat
-import './chat/chat-connection';
-import './chat/chat-widget';
-import './chat/chat-typing';
-import './chat/chat-system';
-import './chat/chat-notifications';
-
 // toolbar
 import './toolbar/toolbar-logo';
 import './toolbar/toolbar-editor-settings';
-import './toolbar/toolbar-controls';
-import './toolbar/toolbar-github';
-import './toolbar/toolbar-discord';
-import './toolbar/toolbar-forum';
-import './toolbar/toolbar-help';
 import './toolbar/toolbar-gizmos';
 import './toolbar/toolbar-history';
 import './toolbar/toolbar-lightmapper';
-import './toolbar/toolbar-publish';
 import './toolbar/toolbar-code-editor';
 
 // viewport controls
@@ -301,7 +284,6 @@ import './viewport-controls/viewport-scene';
 import './viewport-controls/viewport-launch';
 import './viewport-controls/viewport-cameras';
 import './viewport-controls/viewport-render';
-import './viewport-controls/viewport-whois';
 
 // alerts
 import './alerts/alert-connection';
@@ -325,10 +307,6 @@ import './pickers/picker-project';
 import './pickers/project-management/project-management';
 
 import './pickers/picker-project-main';
-
-// store
-import './pickers/store/picker-store';
-import './pickers/store/picker-storeitem';
 
 // auditor
 import './pickers/auditor/picker-auditor';
@@ -421,7 +399,6 @@ import './viewport/viewport-drop-template';
 import './viewport/viewport-drop-gsplat';
 import './viewport/viewport-engine-data';
 import './viewport/viewport-userdata';
-import './viewport/viewport-user-cameras';
 import './viewport/viewport-tap';
 import './viewport/viewport-pick';
 import './viewport/viewport-rect-select';
@@ -442,15 +419,6 @@ import './viewport/viewport-preview-particles';
 import './viewport/viewport-preview-animation';
 
 // help
-import './help/controls';
-import './help/howdoi';
-import './help/howdoi-popup';
-import './help/howdoi-load';
-import './help/demo-project';
-
-import './guides/guide-bubbles';
-import './guides/guide-intro';
-
 // Template migrations
 import './templates/migrations/fix-corrupted-instances';
 

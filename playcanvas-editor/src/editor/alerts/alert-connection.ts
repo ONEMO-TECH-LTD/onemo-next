@@ -122,7 +122,7 @@ editor.once('load', () => {
         viewportError = true;
         log.error(err);
         console.trace();
-        content.innerHTML = 'Failed creating WebGL Context.<br />Please check <a href="http://webglreport.com/" target="_blank">WebGL Report</a> and report to <a href="http://forum.playcanvas.com/" target="_blank">Forum</a>.';
+        content.innerHTML = 'Failed creating a WebGL context.<br />This environment cannot render the 3D viewport.';
         overlay.hidden = false;
     });
 

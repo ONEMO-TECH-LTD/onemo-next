@@ -33,7 +33,6 @@ const coreConfig = {
         'src/core/**/*.ts',
         'src/common/**/*.ts',
         'src/editor/**/*.ts',
-        'src/code-editor/**/*.ts',
         'src/launch/**/*.ts',
         'src/plugins/**/*.ts'
     ],
@@ -46,7 +45,6 @@ const coreConfig = {
             editor: 'readonly',
             log: 'readonly',
             metrics: 'readonly',
-            monaco: 'readonly',
             pc: 'readonly',
             pcx: 'readonly',
             pcBootstrap: 'readonly'

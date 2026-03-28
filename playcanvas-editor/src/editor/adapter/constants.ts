@@ -16,4 +16,4 @@ export const BLEND_NORMAL = 2;
 
 export const SCENE_SYNC_EPSILON = 0.0001;
 
-export const LOCAL_HOST_VERSION = 'local-playcanvas-host';
+export const LOCAL_HOST_VERSION = 'studio-host';

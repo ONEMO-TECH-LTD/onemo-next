@@ -15,7 +15,6 @@
 - Page variants:
   - **Editor** — `src/editor/index.ts` → `editor.js` (full editor)
   - **Blank** — `src/editor/blank.ts` → `editor-empty.js` (project/scene selection)
-  - **Code Editor** — `src/code-editor/index.ts` → `code-editor.js` (Monaco)
   - **Launch** — `src/launch/index.ts` → `launch.js` (app preview)
 
 ## Architecture

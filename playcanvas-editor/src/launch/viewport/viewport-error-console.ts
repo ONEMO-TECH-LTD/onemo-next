@@ -87,36 +87,20 @@ editor.once('load', () => {
             // at that line and column
             if (url.indexOf('api/files/code') !== -1) {
                 const parts = url.split('//')[1].split('/');
-
-                target = `/editor/code/${parts[4]}/`;
-                if (parts.length > 9) {
-                    target += parts.slice(9).join('/');
-                } else {
-                    target += parts.slice(6).join('/');
-                }
-
-                codeEditorUrl = config.url.home + target;
+                const projectId = parts[4];
+                // In-browser /editor/code/ bundle removed — deep-link project in external IDE.
+                codeEditorUrl = `cursor://playcanvas.playcanvas/project/${projectId}`;
+                target = '_blank';
                 query = `?line=${line}&col=${col}&error=true`;
             } else if (!editor.call('settings:project').get('useLegacyScripts') && url.includes('/api/assets/') && (url.includes('.js') || url.includes('.mjs'))) {
                 const match = url.match(/\/api\/assets\/files\/.+?id=(\d+)/);
                 if (match) {
                     assetId = parseInt(match[1], 10);
-                    switch (ide) {
-                        case 'vscode':
-                        case 'cursor': {
-                            const asset = editor.call('assets:get', assetId);
-                            target = `${ide}:${config.project.id}`;
-                            codeEditorUrl = editor.call('assets:idePath', ide, asset);
-                            query = `?line=${line}&col=${col}&error=true`;
-                            break;
-                        }
-                        default: {
-                            target = `codeeditor:${config.project.id}`;
-                            codeEditorUrl = `${config.url.home}/editor/code/${config.project.id}`;
-                            query = `?tabs=${assetId}&line=${line}&col=${col}&error=true`;
-                            break;
-                        }
-                    }
+                    const asset = editor.call('assets:get', assetId);
+                    const openIde = ide === 'vscode' || ide === 'cursor' ? ide : 'cursor';
+                    target = '_blank';
+                    codeEditorUrl = editor.call('assets:idePath', openIde, asset);
+                    query = `?line=${line}&col=${col}&error=true`;
                 } else {
                     codeEditorUrl = url;
                 }
@@ -133,31 +117,11 @@ editor.once('load', () => {
             if (assetId) {
                 const link = document.getElementById(`error-${errorCount}`);
                 link.addEventListener('click', (e: MouseEvent) => {
-                    if (ide === 'vscode' || ide === 'cursor') {
-                        window.open(codeEditorUrl + query, target);
-                        return;
-                    }
-                    const existing = window.open('', target);
-                    try {
-                        if (existing) {
-                            e.preventDefault();
-                            e.stopPropagation();
-
-                            if (existing.editor && existing.editor.isCodeEditor) {
-                                existing.editor.call('integration:selectWhenReady', assetId, {
-                                    line: line,
-                                    col: col,
-                                    error: true
-                                });
-                            } else {
-                                existing.location.href = codeEditorUrl + query;
-                            }
-                        }
-                    } catch (ex) {
-                        // if we try to access 'existing' and it's in a different
-                        // domain an exception will be raised
-                        window.open(codeEditorUrl + query, target);
-                    }
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const asset = editor.call('assets:get', assetId);
+                    const openIde = ide === 'vscode' || ide === 'cursor' ? ide : 'cursor';
+                    window.open(editor.call('assets:idePath', openIde, asset) + query, '_blank');
                 });
             }
 

@@ -18,13 +18,22 @@
         }
 
         &.logo {
-            background-image: url('https://playcanvas.com/static-assets/images/editor_logo.png');
-            background-size: 80px 40px;
-            background-repeat: no-repeat;
-            background-position: 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(180deg, #495055 0%, #2a3034 100%);
+            color: $text-primary;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
 
             &:hover {
-                background-position: -40px 0;
+                background: linear-gradient(180deg, #5a6268 0%, #343b40 100%);
+            }
+
+            &::after {
+                content: '3D';
             }
         }
 
@@ -107,16 +116,12 @@
             order: 3;
         }
 
-        &.help-howdoi {
+        &.help-controls {
             order: 4;
         }
 
-        &.help-controls {
-            order: 5;
-        }
-
         &.editor-settings {
-            order: 6;
+            order: 5;
         }
     }
 }
@@ -130,7 +135,6 @@
         &.github,
         &.discord,
         &.forum,
-        &.help-howdoi,
         &.help-controls {
             display: none;
         }
