@@ -1,57 +1,9 @@
 import type { EventHandle, Observer } from '@playcanvas/observer';
-import { Application, Entity, LAYERID_SKYBOX, Layer, LayerComposition, Scene } from 'playcanvas';
+import * as THREE from 'three';
 
 import { ThumbnailRenderer } from './thumbnail-renderer';
 
-const scene = {
-    scene: null,
-    cameraEntity: null,
-    lightEntity: null,
-    previewRoot: null,
-    layerComposition: null,
-    layer: null
-};
-
-let sceneInitialized = false;
-
-function initializeScene(graphicsDevice: any) {
-    scene.layer = new Layer({
-        id: LAYERID_SKYBOX,
-        enabled: true,
-        opaqueSortMode: 0
-    });
-
-    scene.layerComposition = new LayerComposition('cubemap-thumbnail-renderer');
-    scene.layerComposition.push(scene.layer);
-
-    scene.scene = new Scene(graphicsDevice);
-    scene.scene.layers = scene.layerComposition;
-
-    scene.cameraEntity = new Entity();
-    scene.cameraEntity.setLocalPosition(0, 0, 0);
-    scene.cameraEntity.addComponent('camera', {
-        nearClip: 1,
-        farClip: 32,
-        clearColor: [0, 0, 0, 1],
-        fov: 75,
-        frustumCulling: false,
-        layers: []
-    });
-
-    scene.lightEntity = new Entity();
-    scene.lightEntity.addComponent('light', {
-        type: 'directional'
-    });
-
-    scene.previewRoot = new Entity();
-    scene.previewRoot.enabled = true;
-    scene.previewRoot.addChild(scene.cameraEntity);
-    scene.previewRoot.addChild(scene.lightEntity);
-    scene.previewRoot.syncHierarchy();
-    scene.previewRoot.enabled = false;
-
-    sceneInitialized = true;
-}
+declare const editor: any;
 
 class Cubemap3dThumbnailRenderer extends ThumbnailRenderer {
     _asset: Observer | null;
@@ -81,31 +33,23 @@ class Cubemap3dThumbnailRenderer extends ThumbnailRenderer {
 
         this._asset = asset;
         this._canvas = canvas;
-
         this._queueRenderHandler = this.queueRender.bind(this);
-
         this._rotationX = 0;
         this._rotationY = 0;
         this._mipLevel = 0;
-
         this._watch = editor.call('assets:cubemap:watch', {
-            asset: asset,
+            asset,
             autoLoad: true,
             callback: this._queueRenderHandler
         });
-
         this._sceneSettings = sceneSettings || editor.call('sceneSettings');
-        this._evtSceneSettings = this._sceneSettings.on('*:set', this._queueRenderHandler);
-
+        this._evtSceneSettings = this._sceneSettings?.on('*:set', this._queueRenderHandler) || null;
         this._queuedRender = false;
         this._frameRequest = null;
     }
 
     queueRender() {
-        if (this._queuedRender) {
-            return;
-        }
-        if (!this._asset) {
+        if (this._queuedRender || !this._asset) {
             return;
         }
 
@@ -115,94 +59,38 @@ class Cubemap3dThumbnailRenderer extends ThumbnailRenderer {
         });
     }
 
-    render(rotationX: number = 0, rotationY: number = 0, mipLevel: number = 0) {
+    async render(rotationX: number = 0, rotationY: number = 0, mipLevel: number = 0) {
         this._queuedRender = false;
 
-        if (!this._asset) {
+        if (!this._asset || !this._canvas) {
             return;
-        }
-
-        const app = Application.getApplication();
-        const device = app.graphicsDevice;
-
-        if (!sceneInitialized) {
-            initializeScene(app.graphicsDevice);
         }
 
         this._rotationX = rotationX;
         this._rotationY = rotationY;
         this._mipLevel = mipLevel;
 
-        let width = this._canvas.width;
-        let height = this._canvas.height;
-
-        if (width > height) {
-            width = height;
-        } else {
-            height = width;
+        const assetIds = Array.from({ length: 6 }, (_value, index) => this._asset?.get(`data.textures.${index}`));
+        const cubeTexture = await this.loadCubemapAssets(assetIds);
+        if (!cubeTexture) {
+            this.clearCanvas(this._canvas);
+            return;
         }
 
-        const rt = this.getRenderTarget(app.graphicsDevice, width, height);
+        const { width, height } = this.getSquareRenderSize(this._canvas);
+        const scene = new THREE.Scene();
+        scene.background = cubeTexture;
 
-        scene.previewRoot.enabled = true;
-        scene.previewRoot._notifyHierarchyStateChanged(scene.previewRoot, true);
+        const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 10);
+        camera.position.set(0, 0, 0.01);
+        camera.rotation.order = 'YXZ';
+        camera.rotation.x = THREE.MathUtils.degToRad(rotationX);
+        camera.rotation.y = THREE.MathUtils.degToRad(rotationY);
 
-        scene.cameraEntity.camera.aspectRatio = height / width;
-        scene.cameraEntity.camera.renderTarget = rt;
-
-        scene.cameraEntity.setLocalEulerAngles(rotationX, rotationY, 0);
-
-        const engineAsset = app.assets.get(this._asset.get('id'));
-
-        if (engineAsset && engineAsset.resources) {
-            if (scene.scene.skybox !== engineAsset.resources[0]) {
-                scene.scene.setSkybox(engineAsset.resources);
-
-                if (engineAsset.file) {
-                    scene.scene.skyboxMip = mipLevel;
-                } else {
-                    scene.scene.skyboxMip = 0;
-                }
-            }
-
-        } else {
-            scene.scene.setSkybox(null);
-        }
-
-        const settings = this._sceneSettings.json();
-        scene.scene.ambientLight.set(settings.render.global_ambient[0], settings.render.global_ambient[1], settings.render.global_ambient[2]);
-        scene.cameraEntity.gammaCorrection = settings.render.gamma_correction;
-        scene.cameraEntity.toneMapping = settings.render.tonemapping;
-        scene.scene.exposure = settings.render.exposure;
-        scene.scene.skyboxIntensity = settings.render.skyboxIntensity === undefined ? 1 : settings.render.skyboxIntensity;
-
-        scene.scene._updateSkyMesh();
-
-        scene.layer.addCamera(scene.cameraEntity.camera);
-        scene.layer.addLight(scene.lightEntity.light);
-
-        // add camera to layer
-        const backupLayers = scene.cameraEntity.camera.layers.slice();
-        const newLayers = scene.cameraEntity.camera.layers;
-        newLayers.push(scene.layer.id);
-        scene.cameraEntity.camera.layers = newLayers;
-
-        app.renderComposition(scene.layerComposition);
-
-        // restore camera layers
-        scene.cameraEntity.camera.layers = backupLayers;
-
-        // read pixels from texture
-        device.gl.bindFramebuffer(device.gl.FRAMEBUFFER, rt.impl._glFrameBuffer);
-        device.gl.readPixels(0, 0, width, height, device.gl.RGBA, device.gl.UNSIGNED_BYTE, rt.pixels);
-
-        // render to canvas
-        const ctx = this._canvas.getContext('2d');
-        ctx.putImageData(new ImageData(rt.pixelsClamped, width, height), (this._canvas.width - width) / 2, (this._canvas.height - height) / 2);
-
-        scene.layer.removeLight(scene.lightEntity.light);
-        scene.layer.removeCamera(scene.cameraEntity.camera);
-        scene.previewRoot.enabled = false;
+        this.renderSceneToCanvas(this._canvas, scene, camera, {
+            clearColor: 0x000000,
+            clearAlpha: 1
+        });
     }
 
     destroy() {
