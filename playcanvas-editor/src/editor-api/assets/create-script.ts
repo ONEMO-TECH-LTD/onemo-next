@@ -99,7 +99,7 @@ ${className}.prototype.update = function(dt) {
 
 function createEsmBoilerplate(className: string, scriptName: string) {
     return `
-import { Script } from 'playcanvas';
+const { Script } = pc;
 
 /**
  * The {@link /reference/api/classes/Engine.Script.html | Script} class is
@@ -129,7 +129,7 @@ export class ${className} extends Script {
 
 function createTsBoilerplate(className: string, scriptName: string) {
     return `
-import { Script } from 'playcanvas';
+const { Script } = pc as any;
 
 /**
  * The {@link /reference/api/classes/Engine.Script.html | Script} class is

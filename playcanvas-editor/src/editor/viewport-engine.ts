@@ -1,9 +1,9 @@
-import { LAYERID_DEPTH, type AppBase } from 'playcanvas';
+import { LAYERID_DEPTH, type AppBase } from '@/common/playcanvas-compat';
 import * as THREE from 'three';
 
 // Centralize remaining engine dependencies for viewport code while swapping math primitives
 // to Three-backed compatibility classes.
-export * from 'playcanvas';
+export * from '@/common/playcanvas-compat';
 
 export const moveViewportDepthLayer = (app: AppBase) => {
     const depthLayer = app.scene.layers.getLayerById(LAYERID_DEPTH);

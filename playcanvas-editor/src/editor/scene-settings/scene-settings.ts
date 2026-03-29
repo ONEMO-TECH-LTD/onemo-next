@@ -1,4 +1,4 @@
-import { GAMMA_NONE, GAMMA_SRGB } from 'playcanvas';
+import { GAMMA_NONE, GAMMA_SRGB } from '@/common/playcanvas-compat';
 
 import { ObserverSync } from '@/common/observer-sync';
 import { formatter as f } from '@/common/utils';
