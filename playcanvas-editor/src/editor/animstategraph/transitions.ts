@@ -7,7 +7,7 @@ import {
     ANIM_INTERRUPTION_PREV,
     ANIM_INTERRUPTION_NEXT_PREV,
     ANIM_INTERRUPTION_PREV_NEXT
-} from 'playcanvas';
+} from '@/common/playcanvas-compat';
 
 import type { History } from '@/editor-api';
 

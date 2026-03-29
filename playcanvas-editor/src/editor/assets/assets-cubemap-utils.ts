@@ -1,4 +1,4 @@
-import { ADDRESS_CLAMP_TO_EDGE, ADDRESS_REPEAT, reprojectTexture, Texture } from 'playcanvas';
+import { ADDRESS_CLAMP_TO_EDGE, ADDRESS_REPEAT, reprojectTexture, Texture } from '@/common/playcanvas-compat';
 
 import {
     readGPUPixels,

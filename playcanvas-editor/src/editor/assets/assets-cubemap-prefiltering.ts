@@ -6,7 +6,7 @@ import {
     reprojectTexture,
     Texture,
     TEXTURETYPE_RGBM
-} from 'playcanvas';
+} from '@/common/playcanvas-compat';
 
 
 import {
@@ -18,7 +18,7 @@ editor.once('load', () => {
 
     let app = null;
 
-    editor.once('viewport:load', (application: import('playcanvas').AppBase) => {
+    editor.once('viewport:load', (application: import('@/common/playcanvas-compat').AppBase) => {
         app = application;
     });
 

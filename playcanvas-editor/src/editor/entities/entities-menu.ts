@@ -1,4 +1,4 @@
-import { ORIENTATION_HORIZONTAL, ORIENTATION_VERTICAL } from 'playcanvas';
+import { ORIENTATION_HORIZONTAL, ORIENTATION_VERTICAL } from '@/common/playcanvas-compat';
 
 import { formatShortcut } from '@/common/utils';
 import { COMPONENT_LOGOS } from '@/core/constants';

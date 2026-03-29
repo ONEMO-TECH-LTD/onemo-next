@@ -1,6 +1,6 @@
 import type { EventHandle, Observer } from '@playcanvas/observer';
 import { Panel, Container } from '@playcanvas/pcui';
-import * as pc from 'playcanvas';
+import * as pc from '@/common/playcanvas-compat';
 
 import { CLASS_MULTIPLE_VALUES } from '@/common/pcui/constants';
 import { pathExists } from '@/common/utils';

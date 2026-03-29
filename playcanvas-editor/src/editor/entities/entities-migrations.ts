@@ -1,5 +1,5 @@
 import type { Observer } from '@playcanvas/observer';
-import { FITMODE_STRETCH, LAYERID_WORLD, LAYERID_DEPTH, LAYERID_SKYBOX, LAYERID_IMMEDIATE, LAYERID_UI, SHADOW_VSM16, SHADOWUPDATE_REALTIME } from 'playcanvas';
+import { FITMODE_STRETCH, LAYERID_WORLD, LAYERID_DEPTH, LAYERID_SKYBOX, LAYERID_IMMEDIATE, LAYERID_UI, SHADOW_VSM16, SHADOWUPDATE_REALTIME } from '@/common/playcanvas-compat';
 
 import { formatter as f } from '@/common/utils';
 

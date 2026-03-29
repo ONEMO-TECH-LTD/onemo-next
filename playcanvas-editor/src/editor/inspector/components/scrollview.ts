@@ -4,7 +4,7 @@ import {
     SCROLL_MODE_INFINITE,
     SCROLLBAR_VISIBILITY_SHOW_ALWAYS,
     SCROLLBAR_VISIBILITY_SHOW_WHEN_REQUIRED
-} from 'playcanvas';
+} from '@/common/playcanvas-compat';
 
 import { deepCopy } from '@/common/utils';
 import type { EntityObserver } from '@/editor-api';

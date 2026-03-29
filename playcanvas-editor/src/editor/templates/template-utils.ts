@@ -1,4 +1,4 @@
-import { guid } from 'playcanvas';
+import { guid } from '@/common/playcanvas-compat';
 
 editor.once('load', () => {
     const IGNORE_ROOT_PATHS_FOR_OVERRIDES = {

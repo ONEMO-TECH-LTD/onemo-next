@@ -1,4 +1,4 @@
-import { ORIENTATION_HORIZONTAL, ORIENTATION_VERTICAL } from 'playcanvas';
+import { ORIENTATION_HORIZONTAL, ORIENTATION_VERTICAL } from '@/common/playcanvas-compat';
 
 import { deepCopy } from '@/common/utils';
 

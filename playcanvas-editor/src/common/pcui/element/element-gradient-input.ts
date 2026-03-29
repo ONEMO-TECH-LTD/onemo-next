@@ -1,5 +1,5 @@
 import { Element, ElementArgs, Canvas } from '@playcanvas/pcui';
-import { CurveSet } from 'playcanvas';
+import { CurveSet } from '@/common/playcanvas-compat';
 
 import { CLASS_MULTIPLE_VALUES } from '../constants';
 

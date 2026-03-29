@@ -1,6 +1,6 @@
 import type { Observer } from '@playcanvas/observer';
 import { Panel } from '@playcanvas/pcui';
-import { AnimTrack, AppBase, Asset, Entity, Template } from 'playcanvas';
+import { AnimTrack, AppBase, Asset, Entity, Template } from '@/common/playcanvas-compat';
 
 import { AnimViewer } from '../../animstategraph/anim-viewer';
 import type { Attribute } from '../attribute.type';

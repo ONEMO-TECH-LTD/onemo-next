@@ -1,4 +1,4 @@
-import { Curve, CurveSet, math } from 'playcanvas';
+import { Curve, CurveSet, math } from '@/common/playcanvas-compat';
 
 import { LegacyButton } from '@/common/ui/button';
 import { LegacyCanvas } from '@/common/ui/canvas';

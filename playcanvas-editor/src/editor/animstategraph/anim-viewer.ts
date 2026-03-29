@@ -27,7 +27,7 @@ import {
     Vec3,
     VertexBuffer,
     VertexFormat
-} from 'playcanvas';
+} from '@/common/playcanvas-compat';
 
 import { createColorMaterial } from '../viewport/viewport-color-material';
 

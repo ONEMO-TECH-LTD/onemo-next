@@ -5,7 +5,7 @@ import {
     FITTING_STRETCH,
     FITTING_SHRINK,
     FITTING_BOTH
-} from 'playcanvas';
+} from '@/common/playcanvas-compat';
 
 import { ComponentInspector, type ComponentInspectorArgs } from './component';
 import type { Attribute } from '../attribute.type.d';

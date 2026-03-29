@@ -1,6 +1,6 @@
 import type { EventHandle, Observer, ObserverList } from '@playcanvas/observer';
 import { Button, Container, type ContainerArgs } from '@playcanvas/pcui';
-import type { Application } from 'playcanvas';
+import type { Application } from '@/common/playcanvas-compat';
 
 import { tooltip, tooltipSimpleItem } from '@/common/tooltips';
 import type { History } from '@/editor-api';
