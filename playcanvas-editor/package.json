@@ -1,8 +1,8 @@
 {
   "name": "@playcanvas/editor",
   "version": "2.20.1",
-  "author": "PlayCanvas <support@playcanvas.com>",
-  "homepage": "https://playcanvas.com",
+  "author": "ONEMO Tech Ltd",
+  "homepage": "https://onemo.com",
   "description": "The PlayCanvas Editor Frontend",
   "keywords": [
     "editor",

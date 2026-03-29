@@ -10,6 +10,8 @@ import {
     BRIDGE_ASSET_ID_BASE,
     BRIDGE_ASSET_TAG,
     BRIDGE_ASSET_UNIQUE_ID_BASE,
+    BLEND_NONE,
+    BLEND_NORMAL,
     BRIDGE_CAMERA_ID,
     BRIDGE_CAMERA_NAME,
     BRIDGE_LIGHT_ID,
@@ -22,6 +24,21 @@ import { createBridgeEntityData, getEntityDisplayName, toObserverEuler, toObserv
 import { createLightComponentData, applyLightObserverChange } from './light-mapper';
 import { createMaterialData, applyMaterialObserverChange } from './material-mapper';
 import { createRenderComponentData, applyRenderObserverChange } from './render-mapper';
+import {
+    decomposeViewerColor,
+    type SavedScene,
+    type SavedSceneCameraComponent,
+    type SavedSceneEntity,
+    type SavedSceneEntityComponents,
+    type SavedSceneLightComponent,
+    type SavedSceneMaterial,
+    type SavedSceneMaterialData,
+    type SavedSceneMaterialRole,
+    type SavedSceneRenderComponent,
+    type SavedSceneSettings,
+    type SavedSceneTexture,
+    type SavedSceneTextureKey
+} from './scene-schema';
 // Monorepo coupling: imports shared types from the prototype viewer.
 // TODO: Extract to a shared types package when the editor is packaged independently.
 import type { EffectViewerBridge } from '../../../../src/app/(dev)/prototype/core/EffectViewer';
@@ -57,30 +74,6 @@ type SceneSnapshot = {
     };
 };
 
-type SavedSceneEntity = {
-    name: string;
-    resource_id: string;
-    parent: string | null;
-    children: string[];
-    enabled: boolean;
-    position: [number, number, number];
-    rotation: [number, number, number];
-    scale: [number, number, number];
-    components: Record<string, unknown>;
-};
-
-type SavedSceneMaterial = {
-    name: string;
-    data: Record<string, unknown>;
-};
-
-type SavedSceneSettings = {
-    exposure: number;
-    skyboxIntensity: number;
-    tonemapping: number;
-    gamma_correction: number;
-};
-
 type BridgeViewerActions = {
     updateConfig: (updater: (config: ViewerConfig) => void) => void;
 };
@@ -96,16 +89,6 @@ type HistoryToggleTarget = {
         enabled?: boolean;
     };
 } | null | undefined;
-
-export type SavedScene = {
-    name: string;
-    created: string;
-    modified: string;
-    modelPath: string;
-    entities: Record<string, SavedSceneEntity>;
-    materials: Record<string, SavedSceneMaterial>;
-    sceneSettings: SavedSceneSettings;
-};
 
 type RuntimeEntityInspector = {
     _templateOverridesInspector: unknown;
@@ -175,6 +158,42 @@ const cloneArray = (value: number[]) => {
 const cloneSerializable = <T>(value: T): T => {
     return JSON.parse(JSON.stringify(value));
 };
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+};
+
+const toSavedRgbTuple = (color: THREE.Color): [number, number, number] => {
+    return [color.r, color.g, color.b];
+};
+
+const TEXTURE_SLOT_ALIASES_BY_PROPERTY: Record<SavedSceneTextureKey, string[]> = {
+    map: ['diffuseMap', 'baseColorMap', 'colorMap'],
+    normalMap: ['normalMap'],
+    bumpMap: ['heightMap', 'bumpMap'],
+    roughnessMap: ['roughnessMap', 'glossMap'],
+    metalnessMap: ['metalnessMap'],
+    aoMap: ['aoMap'],
+    lightMap: ['lightMap'],
+    alphaMap: ['opacityMap'],
+    emissiveMap: ['emissiveMap'],
+    clearcoatMap: ['clearCoatMap'],
+    clearcoatRoughnessMap: ['clearCoatGlossMap'],
+    clearcoatNormalMap: ['clearCoatNormalMap'],
+    sheenColorMap: ['sheenColorMap', 'sheenMap'],
+    sheenRoughnessMap: ['sheenGlossMap'],
+    transmissionMap: ['refractionMap'],
+    thicknessMap: ['thicknessMap'],
+    iridescenceMap: ['iridescenceMap'],
+    iridescenceThicknessMap: ['iridescenceThicknessMap'],
+    anisotropyMap: ['anisotropyMap'],
+    specularColorMap: ['specularMap'],
+    specularIntensityMap: ['specularityFactorMap']
+};
+
+const OBSERVER_TEXTURE_SLOTS = Array.from(new Set(
+    Object.values(TEXTURE_SLOT_ALIASES_BY_PROPERTY).flat()
+));
 
 const getLightRange = (light: THREE.Light) => {
     if (light instanceof THREE.PointLight || light instanceof THREE.SpotLight) {
@@ -349,7 +368,7 @@ export class ObserverR3FBridge {
             }
         }
 
-        if (observer && role === 'frame') {
+        if (observer && (role === 'frame' || role === 'face' || role === 'back')) {
             this.updateViewerConfigMaterial({
                 assetId,
                 material,
@@ -538,21 +557,19 @@ export class ObserverR3FBridge {
                 position: this.asVec3Tuple(object ? toObserverVec3(object.position) : observerPosition, [0, 0, 0]),
                 rotation: this.asVec3Tuple(object ? toObserverEuler(object) : observerRotation, [0, 0, 0]),
                 scale: this.asVec3Tuple(object ? toObserverVec3(object.scale) : observerScale, [1, 1, 1]),
-                components: cloneSerializable(components)
+                components: this.serializeEntityComponents(object, components)
             };
         });
 
         const serializedMaterials: Record<string, SavedSceneMaterial> = {};
         this.materialByAssetId.forEach((material, assetId) => {
             const observer = editor.call('assets:get', assetId) as AssetObserver | null;
-            const observerData = observer?.get('data');
-            const materialData = observerData && typeof observerData === 'object'
-                ? observerData as Record<string, unknown>
-                : createMaterialData(material);
+            const role = this.materialRoleByAssetId.get(assetId) || 'generic';
 
             serializedMaterials[String(assetId)] = {
                 name: String(observer?.get('name') || `Material ${assetId}`),
-                data: cloneSerializable(materialData)
+                role: role === 'generic' ? undefined : role,
+                data: this.serializeMaterialData(material, observer)
             };
         });
 
@@ -749,14 +766,29 @@ export class ObserverR3FBridge {
                 }, [observer]);
             }
 
-            const data = materialData.data || {};
-            this.withSyncGuard(() => {
-                Object.entries(data).forEach(([key, value]) => {
-                    observer.set(`data.${key}`, cloneSerializable(value));
-                    applyMaterialObserverChange(material, `data.${key}`, observer);
-                });
-            }, [observer]);
+            if (materialData.role && materialData.role !== 'generic') {
+                this.materialRoleByAssetId.set(assetId, materialData.role);
+            }
+
+            const data = isRecord(materialData.data) ? materialData.data : {};
+            if (this.isCanonicalSavedMaterialData(data)) {
+                this.applyCanonicalSavedMaterialData(assetId, material, observer, data);
+            } else {
+                this.withSyncGuard(() => {
+                    Object.entries(data).forEach(([key, value]) => {
+                        observer.set(`data.${key}`, cloneSerializable(value));
+                        applyMaterialObserverChange(material, `data.${key}`, observer);
+                    });
+                }, [observer]);
+            }
+
             material.needsUpdate = true;
+            this.updateViewerConfigMaterial({
+                assetId,
+                material,
+                name: observer.get('name') as string || `Material ${assetId}`,
+                role: this.materialRoleByAssetId.get(assetId) || 'generic'
+            }, observer);
         });
 
         this.applySceneSettings(scene.sceneSettings);
@@ -1038,6 +1070,10 @@ export class ObserverR3FBridge {
 
     private syncMaterialAssets(materialState: ReturnType<ObserverR3FBridge['collectMaterialState']>) {
         const activeIds = new Set<number>();
+        const previousBridgeAssets = editor.api.globals.assets.list().filter((asset) => {
+            const tags = asset.get('tags') || [];
+            return Array.isArray(tags) && tags.includes(BRIDGE_ASSET_TAG);
+        }) as AssetObserver[];
 
         materialState.materialRecords.forEach((record, assetId) => {
             activeIds.add(assetId);
@@ -1045,23 +1081,26 @@ export class ObserverR3FBridge {
             this.materialRoleByAssetId.set(assetId, record.role);
 
             const existing = editor.api.globals.assets.get(assetId);
+            const previousAsset = existing || this.findPreviousBridgeAsset(record, previousBridgeAssets);
+            const previousData = previousAsset?.get('data') || {};
+            const previousName = typeof previousAsset?.get('name') === 'string' ? previousAsset.get('name') : record.name;
             if (existing) {
                 this.withSyncGuard(() => {
                     existing.set('name', record.name);
-                    existing.set('data', createMaterialData(record.material, existing.get('data') || {}));
+                    existing.set('data', createMaterialData(record.material, previousData));
                     existing.set('tags', [BRIDGE_ASSET_TAG]);
                 }, [existing]);
             } else {
                 const asset = new Asset({
                     id: assetId,
                     uniqueId: BRIDGE_ASSET_UNIQUE_ID_BASE + assetId,
-                    name: record.name,
+                    name: previousName,
                     type: 'material',
                     source: false,
                     preload: false,
                     path: [],
                     tags: [BRIDGE_ASSET_TAG],
-                    data: createMaterialData(record.material),
+                    data: createMaterialData(record.material, previousData),
                     file: null,
                     meta: null,
                     scope: {
@@ -1070,6 +1109,9 @@ export class ObserverR3FBridge {
                     }
                 });
                 editor.api.globals.assets.add(asset);
+                if (previousName !== record.name) {
+                    this.customMaterialNames.set(assetId, previousName);
+                }
             }
         });
 
@@ -1135,7 +1177,467 @@ export class ObserverR3FBridge {
             });
 
             this.materialBindings.set(assetId, handle);
+            this.reapplyPersistedTextureSlots(assetId, observer);
         });
+    }
+
+    private findPreviousBridgeAsset(record: BridgeMaterialRecord, previousAssets: AssetObserver[]) {
+        return previousAssets.find((asset) => {
+            const assetId = Number(asset.get('id'));
+            const assetRole = this.materialRoleForAsset(assetId);
+            if (record.role !== 'generic' && assetRole === record.role) {
+                return true;
+            }
+
+            return String(asset.get('name') || '') === record.name;
+        }) || null;
+    }
+
+    private reapplyPersistedTextureSlots(assetId: number, observer: AssetObserver) {
+        OBSERVER_TEXTURE_SLOTS.forEach((slot) => {
+            const textureAsset = observer.get(`data.${slot}`);
+            if (textureAsset === null || textureAsset === undefined || textureAsset === '') {
+                return;
+            }
+
+            const textureUrl = this.resolveTextureAssetUrl(textureAsset);
+            if (!textureUrl) {
+                return;
+            }
+
+            void this.applyTexture(assetId, slot, textureUrl).catch((error) => {
+                console.warn('[r3f-bridge] texture load failed', error);
+            });
+        });
+    }
+
+    private serializeEntityComponents(
+        object: THREE.Object3D | null | undefined,
+        components: Record<string, unknown>
+    ): SavedSceneEntityComponents {
+        const result: SavedSceneEntityComponents = {};
+        const renderComponent = isRecord(components.render) ? components.render : null;
+        const lightComponent = isRecord(components.light) ? components.light : null;
+        const cameraComponent = isRecord(components.camera) ? components.camera : null;
+
+        if (object instanceof THREE.Mesh || renderComponent) {
+            result.render = {
+                enabled: typeof renderComponent?.enabled === 'boolean' ? renderComponent.enabled : true,
+                castShadows: object instanceof THREE.Mesh ? !!object.castShadow : !!renderComponent?.castShadows,
+                receiveShadows: object instanceof THREE.Mesh ? !!object.receiveShadow : !!renderComponent?.receiveShadows,
+                materialAssets: Array.isArray(renderComponent?.materialAssets)
+                    ? renderComponent.materialAssets.map((value) => {
+                        return value === null ? null : Number(value);
+                    })
+                    : []
+            } satisfies SavedSceneRenderComponent;
+        }
+
+        if (object instanceof THREE.Light || lightComponent) {
+            const light = object instanceof THREE.Light ? object : null;
+            result.light = {
+                enabled: typeof lightComponent?.enabled === 'boolean' ? lightComponent.enabled : true,
+                type: light instanceof THREE.SpotLight
+                    ? 'spot'
+                    : light instanceof THREE.PointLight
+                        ? 'point'
+                        : (lightComponent?.type === 'spot' || lightComponent?.type === 'point' ? lightComponent.type : 'directional'),
+                color: light ? toSavedRgbTuple(light.color) : this.asVec3Tuple(lightComponent?.color, [1, 1, 1]),
+                intensity: light?.intensity ?? Number(lightComponent?.intensity ?? 1),
+                range: light instanceof THREE.PointLight || light instanceof THREE.SpotLight
+                    ? light.distance || 0
+                    : Number(lightComponent?.range ?? 0),
+                castShadows: light ? !!light.castShadow : !!lightComponent?.castShadows,
+                innerConeAngle: typeof lightComponent?.innerConeAngle === 'number' ? lightComponent.innerConeAngle : undefined,
+                outerConeAngle: typeof lightComponent?.outerConeAngle === 'number' ? lightComponent.outerConeAngle : undefined
+            } satisfies SavedSceneLightComponent;
+        }
+
+        if (object instanceof THREE.Camera || cameraComponent) {
+            const camera = object instanceof THREE.Camera ? object : null;
+            const perspectiveCamera = camera instanceof THREE.PerspectiveCamera ? camera : null;
+            const orthographicCamera = camera instanceof THREE.OrthographicCamera ? camera : null;
+            result.camera = {
+                enabled: typeof cameraComponent?.enabled === 'boolean' ? cameraComponent.enabled : true,
+                projection: perspectiveCamera
+                    ? 0
+                    : orthographicCamera
+                        ? 1
+                        : Number(cameraComponent?.projection ?? 0),
+                clearColor: Array.isArray(cameraComponent?.clearColor)
+                    ? [
+                        Number(cameraComponent.clearColor[0] ?? 1),
+                        Number(cameraComponent.clearColor[1] ?? 1),
+                        Number(cameraComponent.clearColor[2] ?? 1),
+                        Number(cameraComponent.clearColor[3] ?? 1)
+                    ]
+                    : undefined,
+                fov: perspectiveCamera?.fov ?? (typeof cameraComponent?.fov === 'number' ? cameraComponent.fov : undefined),
+                orthoHeight: orthographicCamera ? Math.abs(orthographicCamera.top) : (typeof cameraComponent?.orthoHeight === 'number' ? cameraComponent.orthoHeight : undefined),
+                nearClip: camera?.near ?? Number(cameraComponent?.nearClip ?? 0.1),
+                farClip: camera?.far ?? Number(cameraComponent?.farClip ?? 1000)
+            } satisfies SavedSceneCameraComponent;
+        }
+
+        return result;
+    }
+
+    private serializeMaterialData(material: THREE.Material, observer: AssetObserver | null): SavedSceneMaterialData {
+        const result: SavedSceneMaterialData = {};
+        const physicalMaterial = material instanceof THREE.MeshPhysicalMaterial || material instanceof THREE.MeshStandardMaterial
+            ? material
+            : null;
+        const observerData = isRecord(observer?.get('data')) ? observer.get('data') as Record<string, unknown> : {};
+
+        if (physicalMaterial) {
+            result.color = toSavedRgbTuple(physicalMaterial.color);
+            result.metalness = physicalMaterial.metalness ?? 0;
+            result.roughness = physicalMaterial.roughness ?? 1;
+            result.normalScale = physicalMaterial.normalScale?.x ?? Number(observerData.normalStrength ?? 1);
+            result.bumpScale = physicalMaterial.bumpScale ?? Number(observerData.bumpMapFactor ?? observerData.heightMapFactor ?? 1);
+            result.envMapIntensity = physicalMaterial.envMapIntensity ?? 0;
+            result.emissive = toSavedRgbTuple((physicalMaterial as THREE.MeshPhysicalMaterial).emissive ?? new THREE.Color(0, 0, 0));
+            result.emissiveIntensity = (physicalMaterial as THREE.MeshPhysicalMaterial).emissiveIntensity ?? 1;
+            result.opacity = physicalMaterial.opacity ?? 1;
+            result.transparent = !!physicalMaterial.transparent;
+            result.alphaTest = physicalMaterial.alphaTest ?? 0;
+        }
+
+        if (material instanceof THREE.MeshPhysicalMaterial) {
+            result.clearcoat = material.clearcoat ?? 0;
+            result.clearcoatRoughness = material.clearcoatRoughness ?? 0;
+            result.sheen = material.sheen ?? 0;
+            result.sheenColor = toSavedRgbTuple(material.sheenColor);
+            result.sheenRoughness = material.sheenRoughness ?? 1;
+        }
+
+        const textures = this.serializeMaterialTextures(material, observerData);
+        if (Object.keys(textures).length > 0) {
+            result.textures = textures;
+        }
+
+        return result;
+    }
+
+    private serializeMaterialTextures(
+        material: THREE.Material,
+        observerData: Record<string, unknown>
+    ): Partial<Record<SavedSceneTextureKey, SavedSceneTexture>> {
+        const result: Partial<Record<SavedSceneTextureKey, SavedSceneTexture>> = {};
+
+        (Object.entries(TEXTURE_SLOT_ALIASES_BY_PROPERTY) as [SavedSceneTextureKey, string[]][]).forEach(([propertyKey, observerSlots]) => {
+            const observerSlot = observerSlots.find((slot) => {
+                return observerData[slot] !== undefined && observerData[slot] !== null;
+            }) || observerSlots[0];
+            const propertyName = this.materialPropertyForTextureSlot(observerSlot);
+            const texture = propertyName
+                ? (material as THREE.Material & Record<string, unknown>)[propertyName]
+                : null;
+            const textureUrl = this.resolveSavedTextureUrl(observerData[observerSlot], texture);
+
+            if (!textureUrl) {
+                return;
+            }
+
+            const threeTexture = texture instanceof THREE.Texture ? texture : null;
+            const entry: SavedSceneTexture = {
+                url: textureUrl
+            };
+
+            const channel = observerData[`${observerSlot}Channel`] ?? threeTexture?.userData?.playcanvasChannel;
+            if (typeof channel === 'string' || typeof channel === 'number') {
+                entry.channel = channel;
+            }
+
+            const uv = observerData[`${observerSlot}Uv`];
+            if (typeof uv === 'number') {
+                entry.uv = uv;
+            } else if (typeof threeTexture?.channel === 'number' && threeTexture.channel !== 0) {
+                entry.uv = threeTexture.channel;
+            }
+
+            const offset = Array.isArray(observerData[`${observerSlot}Offset`])
+                ? observerData[`${observerSlot}Offset`]
+                : (threeTexture ? [threeTexture.offset.x, threeTexture.offset.y] : null);
+            if (Array.isArray(offset) && (Number(offset[0] ?? 0) !== 0 || Number(offset[1] ?? 0) !== 0)) {
+                entry.offset = [Number(offset[0] ?? 0), Number(offset[1] ?? 0)];
+            }
+
+            const tiling = Array.isArray(observerData[`${observerSlot}Tiling`])
+                ? observerData[`${observerSlot}Tiling`]
+                : (threeTexture ? [threeTexture.repeat.x, threeTexture.repeat.y] : null);
+            if (Array.isArray(tiling) && (Number(tiling[0] ?? 1) !== 1 || Number(tiling[1] ?? 1) !== 1)) {
+                entry.tiling = [Number(tiling[0] ?? 1), Number(tiling[1] ?? 1)];
+            }
+
+            const rotation = observerData[`${observerSlot}Rotation`];
+            if (typeof rotation === 'number' && rotation !== 0) {
+                entry.rotation = rotation;
+            } else if (threeTexture && threeTexture.rotation !== 0) {
+                entry.rotation = THREE.MathUtils.radToDeg(threeTexture.rotation);
+            }
+
+            result[propertyKey] = entry;
+        });
+
+        return result;
+    }
+
+    private resolveSavedTextureUrl(assetValue: unknown, texture: unknown) {
+        const assetUrl = this.resolveTextureAssetUrl(assetValue);
+        if (assetUrl) {
+            return assetUrl;
+        }
+
+        if (!(texture instanceof THREE.Texture)) {
+            return null;
+        }
+
+        const sourceUrl = texture.userData?.sourceUrl;
+        if (typeof sourceUrl === 'string' && sourceUrl) {
+            return sourceUrl;
+        }
+
+        const image = texture.image as { currentSrc?: string; src?: string } | undefined;
+        if (typeof image?.currentSrc === 'string' && image.currentSrc) {
+            return image.currentSrc;
+        }
+
+        if (typeof image?.src === 'string' && image.src) {
+            return image.src;
+        }
+
+        return null;
+    }
+
+    private isCanonicalSavedMaterialData(data: Record<string, unknown>) {
+        return 'textures' in data ||
+            'color' in data ||
+            'normalScale' in data ||
+            'bumpScale' in data ||
+            'envMapIntensity' in data ||
+            'clearcoat' in data ||
+            'sheenColor' in data ||
+            'transparent' in data;
+    }
+
+    private applyCanonicalSavedMaterialData(
+        assetId: number,
+        material: THREE.Material,
+        observer: AssetObserver,
+        data: Record<string, unknown>
+    ) {
+        const physicalMaterial = material instanceof THREE.MeshPhysicalMaterial || material instanceof THREE.MeshStandardMaterial
+            ? material
+            : null;
+
+        this.withSyncGuard(() => {
+            if (Array.isArray(data.color)) {
+                observer.set('data.diffuse', cloneSerializable(data.color));
+                applyMaterialObserverChange(material, 'data.diffuse', observer);
+            }
+
+            if (typeof data.metalness === 'number') {
+                observer.set('data.metalness', data.metalness);
+                applyMaterialObserverChange(material, 'data.metalness', observer);
+            }
+
+            if (typeof data.roughness === 'number') {
+                observer.set('data.roughness', data.roughness);
+                observer.set('data.shininess', THREE.MathUtils.clamp((1 - data.roughness) * 100, 0, 100));
+                applyMaterialObserverChange(material, 'data.roughness', observer);
+            }
+
+            if (typeof data.normalScale === 'number') {
+                observer.set('data.normalStrength', data.normalScale);
+                applyMaterialObserverChange(material, 'data.normalStrength', observer);
+            }
+
+            if (typeof data.bumpScale === 'number') {
+                observer.set('data.heightMapFactor', data.bumpScale);
+                observer.set('data.bumpMapFactor', data.bumpScale);
+                applyMaterialObserverChange(material, 'data.heightMapFactor', observer);
+            }
+
+            if (Array.isArray(data.emissive)) {
+                observer.set('data.emissive', cloneSerializable(data.emissive));
+                applyMaterialObserverChange(material, 'data.emissive', observer);
+            }
+
+            if (typeof data.emissiveIntensity === 'number') {
+                observer.set('data.emissiveIntensity', data.emissiveIntensity);
+                applyMaterialObserverChange(material, 'data.emissiveIntensity', observer);
+            }
+
+            if (typeof data.opacity === 'number') {
+                observer.set('data.opacity', data.opacity);
+                observer.set('data.blendType', data.opacity < 1 || data.transparent === true ? BLEND_NORMAL : BLEND_NONE);
+                applyMaterialObserverChange(material, 'data.opacity', observer);
+            }
+
+            if (typeof data.alphaTest === 'number') {
+                observer.set('data.alphaTest', data.alphaTest);
+                applyMaterialObserverChange(material, 'data.alphaTest', observer);
+            }
+
+            if (typeof data.clearcoat === 'number') {
+                observer.set('data.clearCoat', data.clearcoat);
+                applyMaterialObserverChange(material, 'data.clearCoat', observer);
+            }
+
+            if (typeof data.clearcoatRoughness === 'number') {
+                observer.set('data.clearcoatRoughness', data.clearcoatRoughness);
+                observer.set('data.clearCoatGloss', 1 - data.clearcoatRoughness);
+                applyMaterialObserverChange(material, 'data.clearcoatRoughness', observer);
+            }
+
+            if (typeof data.sheen === 'number') {
+                observer.set('data.useSheen', data.sheen > 0);
+            }
+
+            if (Array.isArray(data.sheenColor)) {
+                observer.set('data.sheen', cloneSerializable(data.sheenColor));
+                applyMaterialObserverChange(material, 'data.sheen', observer);
+            }
+
+            if (typeof data.sheenRoughness === 'number') {
+                observer.set('data.sheenRoughness', data.sheenRoughness);
+                observer.set('data.sheenGloss', 1 - data.sheenRoughness);
+                applyMaterialObserverChange(material, 'data.sheenRoughness', observer);
+            }
+        }, [observer]);
+
+        if (physicalMaterial && typeof data.envMapIntensity === 'number') {
+            physicalMaterial.envMapIntensity = data.envMapIntensity;
+        }
+
+        this.restoreSavedMaterialTextures(assetId, observer, data.textures);
+    }
+
+    private restoreSavedMaterialTextures(assetId: number, observer: AssetObserver, texturesValue: unknown) {
+        const textures = isRecord(texturesValue) ? texturesValue : {};
+
+        (Object.entries(TEXTURE_SLOT_ALIASES_BY_PROPERTY) as [SavedSceneTextureKey, string[]][]).forEach(([propertyKey, observerSlots]) => {
+            const observerSlot = observerSlots[0];
+            const textureEntry = textures[propertyKey];
+            const clearTextureMetadata = () => {
+                observer.set(`data.${observerSlot}Channel`, null);
+                observer.set(`data.${observerSlot}Uv`, null);
+                observer.set(`data.${observerSlot}Offset`, null);
+                observer.set(`data.${observerSlot}Tiling`, null);
+                observer.set(`data.${observerSlot}Rotation`, null);
+            };
+
+            if (!isRecord(textureEntry) || typeof textureEntry.url !== 'string' || !textureEntry.url) {
+                this.withSyncGuard(() => {
+                    observer.set(`data.${observerSlot}`, null);
+                    clearTextureMetadata();
+                }, [observer]);
+                void this.applyTexture(assetId, observerSlot, null).catch((error) => {
+                    console.warn('[r3f-bridge] texture load failed', error);
+                });
+                return;
+            }
+
+            const matchedAssetId = this.findTextureAssetIdByUrl(textureEntry.url);
+            this.withSyncGuard(() => {
+                observer.set(`data.${observerSlot}`, matchedAssetId);
+
+                if ('channel' in textureEntry) {
+                    observer.set(`data.${observerSlot}Channel`, textureEntry.channel);
+                } else {
+                    observer.set(`data.${observerSlot}Channel`, null);
+                }
+
+                if ('uv' in textureEntry) {
+                    observer.set(`data.${observerSlot}Uv`, textureEntry.uv);
+                } else {
+                    observer.set(`data.${observerSlot}Uv`, null);
+                }
+
+                if (Array.isArray(textureEntry.offset)) {
+                    observer.set(`data.${observerSlot}Offset`, cloneSerializable(textureEntry.offset));
+                } else {
+                    observer.set(`data.${observerSlot}Offset`, null);
+                }
+
+                if (Array.isArray(textureEntry.tiling)) {
+                    observer.set(`data.${observerSlot}Tiling`, cloneSerializable(textureEntry.tiling));
+                } else {
+                    observer.set(`data.${observerSlot}Tiling`, null);
+                }
+
+                if (typeof textureEntry.rotation === 'number') {
+                    observer.set(`data.${observerSlot}Rotation`, textureEntry.rotation);
+                } else {
+                    observer.set(`data.${observerSlot}Rotation`, null);
+                }
+            }, [observer]);
+
+            void this.applyTexture(assetId, observerSlot, textureEntry.url).then(() => {
+                const material = this.materialByAssetId.get(assetId);
+                const propertyName = this.materialPropertyForTextureSlot(observerSlot);
+                const texture = propertyName && material
+                    ? (material as THREE.Material & Record<string, unknown>)[propertyName]
+                    : null;
+
+                if (!(texture instanceof THREE.Texture)) {
+                    return;
+                }
+
+                if ('channel' in textureEntry && textureEntry.channel !== undefined) {
+                    texture.userData.playcanvasChannel = textureEntry.channel;
+                }
+
+                if (typeof textureEntry.uv === 'number' && 'channel' in texture) {
+                    texture.channel = textureEntry.uv;
+                }
+
+                if (Array.isArray(textureEntry.offset)) {
+                    texture.offset.set(
+                        Number(textureEntry.offset[0] ?? 0),
+                        Number(textureEntry.offset[1] ?? 0)
+                    );
+                }
+
+                if (Array.isArray(textureEntry.tiling)) {
+                    texture.repeat.set(
+                        Number(textureEntry.tiling[0] ?? 1),
+                        Number(textureEntry.tiling[1] ?? 1)
+                    );
+                }
+
+                if (typeof textureEntry.rotation === 'number') {
+                    texture.center.set(0.5, 0.5);
+                    texture.rotation = THREE.MathUtils.degToRad(textureEntry.rotation);
+                }
+
+                texture.needsUpdate = true;
+                if (material) {
+                    material.needsUpdate = true;
+                }
+            }).catch((error) => {
+                console.warn('[r3f-bridge] texture load failed', error);
+            });
+        });
+    }
+
+    private findTextureAssetIdByUrl(url: string) {
+        const normalizedUrl = this.normalizeAssetUrl(url);
+        const assets = editor.api.globals.assets.list() as AssetObserver[];
+
+        for (const asset of assets) {
+            if (asset.get('type') !== 'texture') {
+                continue;
+            }
+
+            const assetUrl = this.normalizeAssetUrl(String(asset.get('file.url') || ''));
+            if (assetUrl && assetUrl === normalizedUrl) {
+                return Number(asset.get('id'));
+            }
+        }
+
+        return null;
     }
 
     private updateViewerConfigMaterial(record: BridgeMaterialRecord | undefined, asset: AssetObserver) {
@@ -1143,20 +1645,60 @@ export class ObserverR3FBridge {
             return;
         }
 
-        if (record.role === 'frame') {
-            this.config.frame.params.color = this.rgbArrayToHex(asset.get('data.diffuse'));
-            this.config.frame.params.roughness = Number(asset.get('data.roughness') ?? (1 - Number(asset.get('data.shininess') ?? 100) / 100));
-            this.config.frame.params.metalness = Number(asset.get('data.metalness') ?? 0);
-            this.config.frame.params.clearcoat = Number(asset.get('data.clearcoat') ?? asset.get('data.clearCoat') ?? 0);
-            this.config.frame.params.clearcoatRoughness = Number(asset.get('data.clearcoatRoughness') ?? (1 - Number(asset.get('data.clearCoatGloss') ?? 1)));
+        const material = record.material;
+        const physicalMaterial = material instanceof THREE.MeshPhysicalMaterial || material instanceof THREE.MeshStandardMaterial
+            ? material
+            : null;
+
+        if (!physicalMaterial) {
+            return;
+        }
+
+        const roughness = physicalMaterial.roughness ?? Number(asset.get('data.roughness') ?? (1 - Number(asset.get('data.shininess') ?? 100) / 100));
+        const normalScale = physicalMaterial.normalScale?.x ?? Number(asset.get('data.normalStrength') ?? 1);
+        const bumpScale = physicalMaterial.bumpScale ?? Number(asset.get('data.bumpMapFactor') ?? asset.get('data.heightMapFactor') ?? 1);
+        const envMapIntensity = physicalMaterial.envMapIntensity ?? 0;
+        const sheenEnabled = material instanceof THREE.MeshPhysicalMaterial
+            ? (material.sheen ?? 0) > 0
+            : !!(asset.get('data.sheenEnabled') ?? asset.get('data.useSheen'));
+        const sheenColor = material instanceof THREE.MeshPhysicalMaterial
+            ? this.rgbArrayToHex(toSavedRgbTuple(material.sheenColor))
+            : this.rgbArrayToHex(asset.get('data.sheen'));
+        const sheenRoughness = material instanceof THREE.MeshPhysicalMaterial
+            ? material.sheenRoughness ?? Number(asset.get('data.sheenRoughness') ?? (1 - Number(asset.get('data.sheenGloss') ?? 1)))
+            : Number(asset.get('data.sheenRoughness') ?? (1 - Number(asset.get('data.sheenGloss') ?? 1)));
+
+        if (record.role === 'face') {
+            const faceColor = decomposeViewerColor(toSavedRgbTuple(physicalMaterial.color));
+            this.config.face.params.color = faceColor.color;
+            this.config.face.params.colorMultiplier = faceColor.colorMultiplier;
+            this.config.face.params.roughness = roughness;
+            this.config.face.params.metalness = physicalMaterial.metalness ?? Number(asset.get('data.metalness') ?? 0);
+            this.config.face.params.envMapIntensity = envMapIntensity;
+            this.config.face.params.normalScale = normalScale;
+            this.config.face.params.bumpScale = bumpScale;
+            this.config.face.params.sheen = material instanceof THREE.MeshPhysicalMaterial ? material.sheen ?? Number(sheenEnabled) : Number(sheenEnabled);
+            this.config.face.params.sheenColor = sheenColor;
+            this.config.face.params.sheenRoughness = sheenRoughness;
         }
 
         if (record.role === 'back') {
-            this.config.back.params.color = this.rgbArrayToHex(asset.get('data.diffuse'));
-            this.config.back.params.roughness = Number(asset.get('data.roughness') ?? (1 - Number(asset.get('data.shininess') ?? 100) / 100));
-            this.config.back.params.sheen = !!(asset.get('data.sheenEnabled') ?? asset.get('data.useSheen')) ? 1 : 0;
-            this.config.back.params.sheenColor = this.rgbArrayToHex(asset.get('data.sheen'));
-            this.config.back.params.sheenRoughness = Number(asset.get('data.sheenRoughness') ?? (1 - Number(asset.get('data.sheenGloss') ?? 1)));
+            this.config.back.params.color = this.rgbArrayToHex(toSavedRgbTuple(physicalMaterial.color));
+            this.config.back.params.roughness = roughness;
+            this.config.back.params.envMapIntensity = envMapIntensity;
+            this.config.back.params.normalScale = normalScale;
+            this.config.back.params.bumpScale = bumpScale;
+            this.config.back.params.sheen = material instanceof THREE.MeshPhysicalMaterial ? material.sheen ?? Number(sheenEnabled) : Number(sheenEnabled);
+            this.config.back.params.sheenColor = sheenColor;
+            this.config.back.params.sheenRoughness = sheenRoughness;
+        }
+
+        if (record.role === 'frame' && material instanceof THREE.MeshPhysicalMaterial) {
+            this.config.frame.params.color = this.rgbArrayToHex(toSavedRgbTuple(material.color));
+            this.config.frame.params.roughness = roughness;
+            this.config.frame.params.metalness = material.metalness ?? Number(asset.get('data.metalness') ?? 0);
+            this.config.frame.params.clearcoat = material.clearcoat ?? Number(asset.get('data.clearcoat') ?? asset.get('data.clearCoat') ?? 0);
+            this.config.frame.params.clearcoatRoughness = material.clearcoatRoughness ?? Number(asset.get('data.clearcoatRoughness') ?? (1 - Number(asset.get('data.clearCoatGloss') ?? 1)));
         }
     }
 
@@ -1174,8 +1716,17 @@ export class ObserverR3FBridge {
     }
 
     private resolveTextureAssetUrl(assetId: unknown) {
-        const observer = editor.call('assets:get', Number(assetId)) as AssetObserver | null;
-        const fileUrl = observer?.get('file.url');
+        if (typeof assetId === 'string' && assetId.trim() && (assetId.startsWith('/') || assetId.startsWith('http'))) {
+            return assetId;
+        }
+
+        const numericId = Number(assetId);
+        const observer = editor.call('assets:get', numericId) as AssetObserver | null;
+        const fallback = !observer
+            ? (editor.call('assets:list') as AssetObserver[]).find((asset) => asset.get('id') === numericId) || null
+            : null;
+        const resolvedObserver = observer || fallback;
+        const fileUrl = resolvedObserver?.get('file.url');
         return typeof fileUrl === 'string' && fileUrl ? fileUrl : null;
     }
 
@@ -1331,6 +1882,7 @@ export class ObserverR3FBridge {
             this.textureLoader.load(url, resolve, undefined, reject);
         });
 
+        texture.userData.sourceUrl = url;
         texture.wrapS = THREE.ClampToEdgeWrapping;
         texture.wrapT = THREE.ClampToEdgeWrapping;
         texture.colorSpace = this.isColorTextureSlot(slot)

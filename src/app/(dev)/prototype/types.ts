@@ -9,6 +9,7 @@ export interface DesignState {
 }
 
 export interface FaceMaterialConfig {
+  color?: string
   roughness: number
   metalness: number
   envMapIntensity: number

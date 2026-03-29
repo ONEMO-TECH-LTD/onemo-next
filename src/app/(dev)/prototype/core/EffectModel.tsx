@@ -40,6 +40,26 @@ export default function EffectModel({
   const faceMeshRef = useRef<THREE.Mesh | null>(null)
   const artworkTexRef = useRef<THREE.Texture | null>(null)
 
+  const faceTextureOverride = useMemo(() => {
+    if (!face.textures.texture) return null
+
+    const tex = new THREE.TextureLoader().load(face.textures.texture)
+    tex.colorSpace = THREE.SRGBColorSpace
+    tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping
+    tex.needsUpdate = true
+    return tex
+  }, [face.textures.texture])
+
+  const backColorMap = useMemo(() => {
+    if (!back.textures.texture) return null
+
+    const tex = new THREE.TextureLoader().load(back.textures.texture)
+    tex.colorSpace = THREE.SRGBColorSpace
+    tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping
+    tex.needsUpdate = true
+    return tex
+  }, [back.textures.texture])
+
   // Load face textures
   const [faceNormal, faceRoughnessTex, faceHeight] = useTexture([
     face.textures.normal,
@@ -67,7 +87,7 @@ export default function EffectModel({
       loaded.wrapS = loaded.wrapT = THREE.RepeatWrapping
       loaded.needsUpdate = true
       artworkTexRef.current = loaded
-      if (faceMeshRef.current) {
+      if (faceMeshRef.current && !face.textures.texture) {
         const mat = faceMeshRef.current.material as THREE.MeshPhysicalMaterial
         mat.map = loaded
         mat.needsUpdate = true
@@ -78,8 +98,12 @@ export default function EffectModel({
     return tex
   }, [artworkUrl])
 
+  const activeFaceMap = faceTextureOverride ?? artworkMap
+
   // Apply design state to artwork texture
   useEffect(() => {
+    if (faceTextureOverride) return
+
     const tex = artworkTexRef.current || artworkMap
     if (!tex) return
     const repeat = 1 / designState.scale
@@ -91,14 +115,17 @@ export default function EffectModel({
     )
     // eslint-disable-next-line react-hooks/immutability
     tex.needsUpdate = true
-  }, [designState, artworkMap])
+  }, [designState, artworkMap, faceTextureOverride])
 
   // FACE material — uses face-specific textures
   const fp = face.params
   const faceMaterial = useMemo(() => {
+    const baseColor = new THREE.Color(fp.color ?? '#ffffff')
+    baseColor.multiplyScalar(fp.colorMultiplier)
+
     return new THREE.MeshPhysicalMaterial({
-      map: artworkMap,
-      color: new THREE.Color(fp.colorMultiplier, fp.colorMultiplier, fp.colorMultiplier),
+      map: activeFaceMap,
+      color: baseColor,
       normalMap: faceNormal,
       normalScale: new THREE.Vector2(fp.normalScale, fp.normalScale),
       bumpMap: faceHeight,
@@ -112,7 +139,7 @@ export default function EffectModel({
       envMapIntensity: fp.envMapIntensity,
       side: THREE.DoubleSide,
     })
-  }, [artworkMap, faceNormal, faceHeight, faceRoughnessTex, fp])
+  }, [activeFaceMap, faceNormal, faceHeight, faceRoughnessTex, fp])
 
   // FRAME material
   const frp = frame.params
@@ -134,6 +161,7 @@ export default function EffectModel({
   const backMaterial = useMemo(
     () =>
       new THREE.MeshPhysicalMaterial({
+        map: backColorMap,
         color: new THREE.Color(bp.color),
         normalMap: backNormal,
         normalScale: new THREE.Vector2(bp.normalScale, bp.normalScale),
@@ -148,7 +176,7 @@ export default function EffectModel({
         envMapIntensity: bp.envMapIntensity,
         side: THREE.DoubleSide,
       }),
-    [backNormal, backHeight, backRoughnessTex, bp]
+    [backColorMap, backNormal, backHeight, backRoughnessTex, bp]
   )
 
   // Override materials and generate planar UVs
@@ -245,10 +273,10 @@ export default function EffectModel({
   useEffect(() => {
     if (faceMeshRef.current) {
       const mat = faceMeshRef.current.material as THREE.MeshPhysicalMaterial
-      mat.map = artworkMap
+      mat.map = activeFaceMap
       mat.needsUpdate = true
     }
-  }, [artworkMap])
+  }, [activeFaceMap])
 
   return (
     <>

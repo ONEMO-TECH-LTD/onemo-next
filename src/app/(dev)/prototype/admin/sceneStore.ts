@@ -94,7 +94,7 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
       modified: now,
       modelPath: '/assets/shapes/effect-70mm-step.glb',
       face: {
-        params: { roughness: 1, metalness: 0, envMapIntensity: 0.1, normalScale: 0.15, bumpScale: 1, sheen: 1, sheenColor: '#1a1a1a', sheenRoughness: 0.8, colorMultiplier: 1 },
+        params: { color: '#ffffff', roughness: 1, metalness: 0, envMapIntensity: 0.1, normalScale: 0.15, bumpScale: 1, sheen: 1, sheenColor: '#1a1a1a', sheenRoughness: 0.8, colorMultiplier: 1 },
         textures: { ...DEFAULT_TEXTURES },
       },
       back: {

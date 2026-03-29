@@ -8,13 +8,8 @@ import EffectViewer, {
 } from '../../../../src/app/(dev)/prototype/core/EffectViewer';
 import type { DesignState, ViewerConfig } from '../../../../src/app/(dev)/prototype/types';
 
-import { createObserverR3FBridge, type SavedScene } from '../adapter/observer-r3f-bridge';
-
-const DEFAULT_TEXTURES = {
-    normal: '/assets/materials/ultrasuede/suede-normal.png',
-    roughness: '/assets/materials/ultrasuede/suede-roughness.jpg',
-    height: '/assets/materials/ultrasuede/suede-height.png'
-};
+import { createObserverR3FBridge } from '../adapter/observer-r3f-bridge';
+import { createDefaultViewerConfig, savedSceneToViewerConfig, type SavedScene } from '../adapter/scene-schema';
 
 const DEFAULT_DESIGN_STATE: DesignState = {
     offsetX: 0,
@@ -22,75 +17,7 @@ const DEFAULT_DESIGN_STATE: DesignState = {
     scale: 1
 };
 
-const DEFAULT_CONFIG: ViewerConfig = {
-    modelPath: '/assets/shapes/effect-70mm-step.glb',
-    face: {
-        params: {
-            roughness: 1,
-            metalness: 0,
-            envMapIntensity: 0.1,
-            normalScale: 0.15,
-            bumpScale: 1,
-            sheen: 1,
-            sheenColor: '#1a1a1a',
-            sheenRoughness: 0.8,
-            colorMultiplier: 1
-        },
-        textures: DEFAULT_TEXTURES
-    },
-    back: {
-        params: {
-            color: '#080808',
-            roughness: 1,
-            envMapIntensity: 0.1,
-            normalScale: 0.15,
-            bumpScale: 1,
-            sheen: 1,
-            sheenColor: '#1a1a1a',
-            sheenRoughness: 0.8
-        },
-        textures: DEFAULT_TEXTURES
-    },
-    frame: {
-        params: {
-            color: '#0f0f0f',
-            roughness: 0.5,
-            metalness: 0,
-            clearcoat: 0.4,
-            clearcoatRoughness: 0.3
-        },
-        textures: {}
-    },
-    scene: {
-        exposure: 0.7,
-        ambientIntensity: 0.5,
-        envIntensity: 1,
-        background: '#ffffff'
-    },
-    colors: {
-        backColor: '#080808',
-        frameColor: '#0f0f0f',
-        bgColor: '#111315'
-    },
-    camera: {
-        fov: 35,
-        distance: 0.2,
-        polarAngle: 90,
-        azimuthAngle: 0,
-        enableDamping: true,
-        dampingFactor: 0.1,
-        autoRotate: false,
-        autoRotateSpeed: 2
-    },
-    environment: {
-        preset: 'studio',
-        customHdri: '/assets/env/studio.exr',
-        envRotation: 0,
-        groundEnabled: false,
-        groundHeight: 0,
-        groundRadius: 20
-    }
-};
+const DEFAULT_CONFIG: ViewerConfig = createDefaultViewerConfig();
 
 const DEFAULT_ARTWORK_URL = '/assets/test-artwork.png';
 const LAST_SCENE_STORAGE_KEY = 'onemo.playcanvas.last-scene';
@@ -432,6 +359,10 @@ export function mountEffectViewer(viewportDom: HTMLElement, canvasDom: HTMLEleme
             throw new Error('Bridge is not ready for scene deserialization');
         }
 
+        const nextConfig = savedSceneToViewerConfig(scene, bridgeConfig);
+        currentViewerConfig = cloneViewerConfig(nextConfig);
+        syncBridgeConfig(nextConfig);
+        renderViewport();
         setLastSceneName(sceneName);
     };
 

@@ -12,8 +12,8 @@ export const createRenderComponentData = (object: THREE.Object3D, materialAssetI
     return {
         ...defaults,
         enabled: true,
-        // Placeholder primitive type — actual geometry comes from the R3F scene, not this field.
-        type: 'box',
+        // Imported meshes are external assets; the bridge does not author primitives here.
+        type: 'asset',
         asset: null,
         castShadows: !!mesh.castShadow,
         castShadowsLightmap: false,
