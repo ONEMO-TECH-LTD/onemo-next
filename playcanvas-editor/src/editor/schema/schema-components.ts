@@ -1,4 +1,4 @@
-import { Color, Curve, CurveSet, Quat, Vec2, Vec3, Vec4 } from 'playcanvas';
+import { Color, Curve, CurveSet, Quat, Vec2, Vec3, Vec4 } from '@/common/playcanvas-compat';
 
 import { deepCopy } from '@/common/utils';
 

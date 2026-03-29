@@ -1,9 +1,9 @@
-import { RenderTarget } from 'playcanvas';
+import { RenderTarget } from '@/common/playcanvas-compat';
 
 import { WorkerClient } from '@/core/worker/worker-client';
 
 // read the pixel data of the given texture face
-const readGPUPixels = (texture: import('playcanvas').Texture, face: number) => {
+const readGPUPixels = (texture: import('@/common/playcanvas-compat').Texture, face: number) => {
     const rt = new RenderTarget({
         name: 'ReadPrefilteredCubemapRT',
         colorBuffer: texture,

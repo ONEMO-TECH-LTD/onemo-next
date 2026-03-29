@@ -1,4 +1,4 @@
-import { guid } from 'playcanvas';
+import { guid } from '@/common/playcanvas-compat';
 
 editor.once('load', () => {
     class NewTemplateData {

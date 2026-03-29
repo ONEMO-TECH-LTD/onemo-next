@@ -1,5 +1,5 @@
 import type { EventHandle, Observer } from '@playcanvas/observer';
-import { Curve, CurveSet } from 'playcanvas';
+import { Curve, CurveSet } from '@/common/playcanvas-compat';
 
 import { LegacyCanvas } from './canvas';
 import { LegacyElement } from './element';

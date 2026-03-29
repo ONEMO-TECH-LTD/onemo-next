@@ -26,8 +26,8 @@ editor.once('load', () => {
     };
 
     const isEsmSupportedInEngine = async (url) => {
-        const pc = await importEngine(url);
-        return !!pc.Script;
+        const engineModule = await importEngine(url);
+        return !!engineModule && (typeof engineModule === 'object' || typeof engineModule === 'function') && Reflect.has(engineModule, 'Script');
     };
 
     const workerClient = new WorkerClient(`${config.url.frontend}js/esm-script.worker.js`);

@@ -1,6 +1,6 @@
 import type { Observer } from '@playcanvas/observer';
 import { InfoBox, LabelGroup } from '@playcanvas/pcui';
-import { CollisionComponent } from 'playcanvas';
+import { CollisionComponent } from '@/common/playcanvas-compat';
 
 import type { EntityObserver } from '@/editor-api';
 

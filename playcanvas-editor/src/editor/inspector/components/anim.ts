@@ -1,6 +1,6 @@
 import type { EventHandle, Observer, ObserverList } from '@playcanvas/observer';
 import { InfoBox, Container, TreeView, TreeViewItem, BooleanInput, Menu, Button, Panel, BindingTwoWay } from '@playcanvas/pcui';
-import type { Entity } from 'playcanvas';
+import type { Entity } from '@/common/playcanvas-compat';
 
 import { AssetInput } from '@/common/pcui/element/element-asset-input';
 import type { EntityObserver } from '@/editor-api';

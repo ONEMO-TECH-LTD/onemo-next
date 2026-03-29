@@ -1,7 +1,7 @@
 import type { Observer, EventHandle } from '@playcanvas/observer';
 import type { Button } from '@playcanvas/pcui';
 import Graph from '@playcanvas/pcui-graph';
-import { ANIM_INTERRUPTION_NONE } from 'playcanvas';
+import { ANIM_INTERRUPTION_NONE } from '@/common/playcanvas-compat';
 
 import { diff } from '@/common/diff';
 

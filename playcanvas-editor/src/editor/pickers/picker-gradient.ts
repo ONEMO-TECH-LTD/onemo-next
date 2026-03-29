@@ -1,5 +1,5 @@
 import { Events } from '@playcanvas/observer';
-import { Curve, CURVE_LINEAR, CURVE_SPLINE, CURVE_STEP, math } from 'playcanvas';
+import { Curve, CURVE_LINEAR, CURVE_SPLINE, CURVE_STEP, math } from '@/common/playcanvas-compat';
 
 import { LegacyButton } from '@/common/ui/button';
 import { LegacyCanvas } from '@/common/ui/canvas';

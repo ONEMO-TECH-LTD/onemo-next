@@ -1,6 +1,6 @@
 import type { Observer, ObserverList, EventHandle } from '@playcanvas/observer';
 import { Panel, Button, type PanelArgs } from '@playcanvas/pcui';
-import { ANIM_EQUAL_TO, ANIM_PARAMETER_BOOLEAN, ANIM_PARAMETER_FLOAT, ANIM_PARAMETER_INTEGER, ANIM_PARAMETER_TRIGGER } from 'playcanvas';
+import { ANIM_EQUAL_TO, ANIM_PARAMETER_BOOLEAN, ANIM_PARAMETER_FLOAT, ANIM_PARAMETER_INTEGER, ANIM_PARAMETER_TRIGGER } from '@/common/playcanvas-compat';
 
 import type { History } from '@/editor-api';
 

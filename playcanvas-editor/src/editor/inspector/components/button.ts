@@ -2,7 +2,7 @@ import { InfoBox } from '@playcanvas/pcui';
 import {
     BUTTON_TRANSITION_MODE_TINT,
     BUTTON_TRANSITION_MODE_SPRITE_CHANGE
-} from 'playcanvas';
+} from '@/common/playcanvas-compat';
 
 import type { EntityObserver } from '@/editor-api';
 

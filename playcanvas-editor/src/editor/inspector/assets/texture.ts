@@ -1,6 +1,6 @@
 import type { EventHandle, Observer } from '@playcanvas/observer';
 import { Panel, Container, Button, InfoBox, Divider, Label, BindingTwoWay, BindingObserversToElement, BindingElementToObservers } from '@playcanvas/pcui';
-import { PIXELFORMAT_DXT1, PIXELFORMAT_DXT5, Texture, TextureUtils } from 'playcanvas';
+import { PIXELFORMAT_DXT1, PIXELFORMAT_DXT5, Texture, TextureUtils } from '@/common/playcanvas-compat';
 
 import { tooltip, tooltipRefItem } from '@/common/tooltips';
 import { bytesToHuman } from '@/common/utils';

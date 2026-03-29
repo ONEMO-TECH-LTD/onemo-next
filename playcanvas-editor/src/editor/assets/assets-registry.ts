@@ -1,4 +1,4 @@
-import { Asset } from 'playcanvas';
+import { Asset } from '@/common/playcanvas-compat';
 
 editor.once('load', () => {
     editor.method('assets:registry:bind', (assetRegistry: { get: (id: number) => { unload: () => void }; add: (asset: Asset) => void; remove: (asset: Asset) => void }, assetTypes: string[] | undefined) => {

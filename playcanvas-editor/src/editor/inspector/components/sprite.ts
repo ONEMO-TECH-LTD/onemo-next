@@ -1,6 +1,6 @@
 import type { ObserverList } from '@playcanvas/observer';
 import { Panel, Container, Button } from '@playcanvas/pcui';
-import { LAYERID_DEPTH, LAYERID_SKYBOX, LAYERID_IMMEDIATE } from 'playcanvas';
+import { LAYERID_DEPTH, LAYERID_SKYBOX, LAYERID_IMMEDIATE } from '@/common/playcanvas-compat';
 
 import { deepCopy } from '@/common/utils';
 import type { EntityObserver } from '@/editor-api';

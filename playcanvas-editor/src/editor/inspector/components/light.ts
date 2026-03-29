@@ -12,7 +12,7 @@ import {
     SHADOW_VSM_32F,
     SHADOWUPDATE_REALTIME,
     SHADOWUPDATE_THISFRAME
-} from 'playcanvas';
+} from '@/common/playcanvas-compat';
 
 import { LegacyTooltip } from '@/common/ui/tooltip';
 import type { EntityObserver } from '@/editor-api';

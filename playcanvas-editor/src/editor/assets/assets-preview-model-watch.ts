@@ -1,4 +1,4 @@
-import { ABSOLUTE_URL } from 'playcanvas';
+import { ABSOLUTE_URL } from '@/common/playcanvas-compat';
 
 import { buildQueryUrl } from '@/common/utils';
 

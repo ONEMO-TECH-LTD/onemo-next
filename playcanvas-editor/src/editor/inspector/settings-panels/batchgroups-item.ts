@@ -1,6 +1,6 @@
 import type { EventHandle } from '@playcanvas/observer';
 import type { SelectInput } from '@playcanvas/pcui';
-import { LAYERID_DEPTH, LAYERID_SKYBOX, LAYERID_IMMEDIATE } from 'playcanvas';
+import { LAYERID_DEPTH, LAYERID_SKYBOX, LAYERID_IMMEDIATE } from '@/common/playcanvas-compat';
 
 import { BaseSettingsPanel, type BaseSettingsPanelArgs } from './base';
 import type { Attribute } from '../attribute.type.d';

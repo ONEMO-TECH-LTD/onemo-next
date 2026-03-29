@@ -1,6 +1,6 @@
 import type { ObserverList } from '@playcanvas/observer';
 import { Label, Container, Button, BindingTwoWay, BindingElementToObservers } from '@playcanvas/pcui';
-import { LAYERID_DEPTH, LAYERID_SKYBOX, LAYERID_IMMEDIATE } from 'playcanvas';
+import { LAYERID_DEPTH, LAYERID_SKYBOX, LAYERID_IMMEDIATE } from '@/common/playcanvas-compat';
 
 import { CLASS_ERROR } from '@/common/pcui/constants';
 import { AssetInput } from '@/common/pcui/element/element-asset-input';
