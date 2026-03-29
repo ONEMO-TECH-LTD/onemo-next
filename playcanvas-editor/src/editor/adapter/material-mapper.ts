@@ -20,6 +20,11 @@ const toRoughness = (shininess = 100) => {
     return THREE.MathUtils.clamp(1 - (shininess / 100), 0, 1);
 };
 
+// Maps inspector gloss slider (0–1) to Three.js roughness; when invert is false, gloss 1 → roughness 0.
+const glossSliderToRoughness = (gloss: number, invert: boolean) => {
+    return THREE.MathUtils.clamp(invert ? gloss : 1 - gloss, 0, 1);
+};
+
 const getMaterialDefaults = (existingData: Record<string, unknown> = {}) => {
     return editor.call('schema:material:getDefaultData', existingData) || {};
 };
@@ -49,6 +54,8 @@ export const createMaterialData = (material: THREE.Material, existingData: Recor
         useMetalness: true,
         diffuse: toObserverColor(physicalMaterial.color),
         metalness: physicalMaterial.metalness ?? defaults.metalness,
+        // Intentional dual authority: roughness (0–1) is canonical for Three.js; shininess (0–100) is the
+        // inspector gloss panel. They stay in sync — editing either path updates the material (see applyMaterialObserverChange).
         roughness: physicalMaterial.roughness ?? defaults.roughness ?? 1,
         shininess: toGlossiness(physicalMaterial.roughness ?? 0),
         glossInvert: false,
@@ -58,15 +65,11 @@ export const createMaterialData = (material: THREE.Material, existingData: Recor
         opacity: physicalMaterial.opacity ?? 1,
         blendType: physicalMaterial.transparent || physicalMaterial.opacity < 1 ? BLEND_NORMAL : BLEND_NONE,
         alphaTest: physicalMaterial.alphaTest ?? defaults.alphaTest,
-        // Both casing variants intentional — legacy schema uses clearCoat, newer schema uses clearcoat.
-        clearcoat: (physicalMaterial as THREE.MeshPhysicalMaterial).clearcoat ?? defaults.clearcoat ?? defaults.clearCoat,
-        clearCoat: (physicalMaterial as THREE.MeshPhysicalMaterial).clearcoat ?? defaults.clearCoat,
-        clearcoatRoughness: (physicalMaterial as THREE.MeshPhysicalMaterial).clearcoatRoughness ?? defaults.clearcoatRoughness ?? 0,
+        // Schema-aligned keys only (see material schema) — avoids duplicate bridge-only names that trigger "Unknown type" warnings.
+        clearCoat: (physicalMaterial as THREE.MeshPhysicalMaterial).clearcoat ?? defaults.clearCoat ?? 0,
         clearCoatGloss: 1 - ((physicalMaterial as THREE.MeshPhysicalMaterial).clearcoatRoughness ?? 0),
-        sheenEnabled: ((physicalMaterial as THREE.MeshPhysicalMaterial).sheen ?? 0) > 0,
         useSheen: ((physicalMaterial as THREE.MeshPhysicalMaterial).sheen ?? 0) > 0,
         sheen: toObserverColor((physicalMaterial as THREE.MeshPhysicalMaterial).sheenColor),
-        sheenRoughness: (physicalMaterial as THREE.MeshPhysicalMaterial).sheenRoughness ?? defaults.sheenRoughness ?? 1,
         sheenGloss: 1 - ((physicalMaterial as THREE.MeshPhysicalMaterial).sheenRoughness ?? 1)
     };
 };
@@ -112,6 +115,14 @@ export const applyMaterialObserverChange = (
         changed = true;
     }
 
+    if (path === 'data.bumpMapFactor' || path === 'data.heightMapFactor') {
+        const value = Number(
+            asset.get('data.bumpMapFactor') ?? asset.get('data.heightMapFactor') ?? physicalMaterial.bumpScale ?? 1
+        );
+        physicalMaterial.bumpScale = value;
+        changed = true;
+    }
+
     if (path === 'data.emissive') {
         const value = asset.get('data.emissive') || [0, 0, 0];
         (physicalMaterial as THREE.MeshPhysicalMaterial).emissive.setRGB(value[0] ?? 0, value[1] ?? 0, value[2] ?? 0);
@@ -138,8 +149,10 @@ export const applyMaterialObserverChange = (
         changed = true;
     }
 
-    if (path === 'data.clearCoatGloss') {
-        (physicalMaterial as THREE.MeshPhysicalMaterial).clearcoatRoughness = THREE.MathUtils.clamp(1 - Number(asset.get('data.clearCoatGloss') ?? 1), 0, 1);
+    if (path === 'data.clearCoatGloss' || path === 'data.clearCoatGlossInvert') {
+        const gloss = Number(asset.get('data.clearCoatGloss') ?? 1);
+        const invert = Boolean(asset.get('data.clearCoatGlossInvert'));
+        (physicalMaterial as THREE.MeshPhysicalMaterial).clearcoatRoughness = glossSliderToRoughness(gloss, invert);
         changed = true;
     }
 
@@ -156,8 +169,10 @@ export const applyMaterialObserverChange = (
         changed = true;
     }
 
-    if (path === 'data.sheenGloss') {
-        (physicalMaterial as THREE.MeshPhysicalMaterial).sheenRoughness = THREE.MathUtils.clamp(1 - Number(asset.get('data.sheenGloss') ?? 1), 0, 1);
+    if (path === 'data.sheenGloss' || path === 'data.sheenGlossInvert') {
+        const gloss = Number(asset.get('data.sheenGloss') ?? 1);
+        const invert = Boolean(asset.get('data.sheenGlossInvert'));
+        (physicalMaterial as THREE.MeshPhysicalMaterial).sheenRoughness = glossSliderToRoughness(gloss, invert);
         changed = true;
     }
 
