@@ -108,7 +108,7 @@ export const THEMES = {
     'night-owl': 'Night Owl',
     'oceanic-next': 'Oceanic Next',
     'pastels-on-dark': 'Pastels on Dark',
-    'playcanvas': 'PlayCanvas',
+    'playcanvas': 'Studio',
     'slush-and-poppies': 'Slush and Poppies',
     'solarized-dark': 'Solarized-dark',
     'solarized-light': 'Solarized-light',

@@ -173,15 +173,15 @@ editor.once('load', () => {
         root.appendChild(links);
         links.appendChild(createLink({
             name: 'Engine Compatibility',
-            url: 'https://developer.playcanvas.com/user-manual/editor/engine-compatibility/'
+            url: '/reference/docs/user-manual/editor/engine-compatibility/'
         }));
         links.appendChild(createLink({
             name: 'Engine Migrations',
-            url: 'https://developer.playcanvas.com/user-manual/engine/migrations/'
+            url: '/reference/docs/user-manual/engine/migrations/'
         }));
         links.appendChild(createLink({
             name: 'Editor Migrations',
-            url: 'https://developer.playcanvas.com/user-manual/editor/editor-migrations/'
+            url: '/reference/docs/user-manual/editor/editor-migrations/'
         }));
 
         root.appendChild(document.createElement('br'));

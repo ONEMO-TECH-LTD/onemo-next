@@ -1,7 +1,7 @@
 import { Events } from '@playcanvas/observer';
 
 /**
- * No-op transport replacing PlayCanvas cloud WebSocket messenger.
+ * No-op transport replacing Studio cloud WebSocket messenger.
  * Collaboration events never fire; api.globals.messenger remains wired for type compatibility.
  */
 class Messenger extends Events {

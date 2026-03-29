@@ -449,7 +449,7 @@ editor.once('load', () => {
 
     // main panel
     const panel = new Panel({
-        headerText: 'PLAYCANVAS',
+        headerText: 'STUDIO',
         class: 'cms-root-panel'
     });
     overlay.append(panel);
@@ -632,7 +632,7 @@ editor.once('load', () => {
     });  // Docs
 
     docsLink.on('click', () => {
-        window.open('https://developer.playcanvas.com/', '_blank');
+        window.open('/reference/docs/', '_blank');
     });
 
     const feedbackLink = new Button({
@@ -642,7 +642,7 @@ editor.once('load', () => {
     });  // Feedback
 
     feedbackLink.on('click', () => {
-        window.open('https://forum.playcanvas.com/t/playcanvas-editor-feedback/616', '_blank');
+        window.open('/reference/forum/t/playcanvas-editor-feedback/616', '_blank');
     });
 
     const githubLink = new Button({

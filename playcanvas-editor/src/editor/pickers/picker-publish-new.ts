@@ -462,11 +462,9 @@ editor.once('load', () => {
 
         editor.api.globals.rest.apps.appCreate(data).on('load', () => {
             jobInProgress = false;
-            editor.call('picker:builds-publish');
         }).on('error', (status) => {
             jobInProgress = false;
             editor.call('status:error', `Error while publishing: ${status}`);
-            editor.call('picker:builds-publish');
         });
     });
 

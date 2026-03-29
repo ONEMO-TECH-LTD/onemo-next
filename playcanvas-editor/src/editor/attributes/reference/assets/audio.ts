@@ -5,11 +5,11 @@ export const fields: AttributeReference[]  = [{
     title: 'pc.Sound',
     subTitle: '{Class}',
     description: 'Audio resource file that is used by Web Audio API.',
-    url: 'https://api.playcanvas.com/engine/classes/Sound.html'
+    url: '/reference/api/engine/classes/Sound.html'
 }, {
     name: 'asset:audio:duration',
     title: 'duration',
     subTitle: '{Number}',
     description: 'Duration of the audio file in seconds.',
-    url: 'https://api.playcanvas.com/engine/classes/Sound.html#duration'
+    url: '/reference/api/engine/classes/Sound.html#duration'
 }];

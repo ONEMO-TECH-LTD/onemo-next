@@ -58,7 +58,7 @@ export const createMaterialData = (material: THREE.Material, existingData: Recor
         opacity: physicalMaterial.opacity ?? 1,
         blendType: physicalMaterial.transparent || physicalMaterial.opacity < 1 ? BLEND_NORMAL : BLEND_NONE,
         alphaTest: physicalMaterial.alphaTest ?? defaults.alphaTest,
-        // Both casing variants intentional — PlayCanvas v1 uses clearCoat, v2 uses clearcoat.
+        // Both casing variants intentional — legacy schema uses clearCoat, newer schema uses clearcoat.
         clearcoat: (physicalMaterial as THREE.MeshPhysicalMaterial).clearcoat ?? defaults.clearcoat ?? defaults.clearCoat,
         clearCoat: (physicalMaterial as THREE.MeshPhysicalMaterial).clearcoat ?? defaults.clearCoat,
         clearcoatRoughness: (physicalMaterial as THREE.MeshPhysicalMaterial).clearcoatRoughness ?? defaults.clearcoatRoughness ?? 0,

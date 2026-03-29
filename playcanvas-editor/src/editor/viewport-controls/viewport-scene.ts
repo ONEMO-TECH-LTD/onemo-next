@@ -58,38 +58,6 @@ editor.once('load', () => {
         settingsButton.class.add('active');
     });
 
-    if (!config.project.settings.useLegacyScripts) {
-        let name = config.self.branch.name;
-        if (name.length > 33) {
-            name = `${name.substring(0, 30)}...`;
-        }
-        const versionControlButton = new Button({
-            class: 'control-strip-btn',
-            icon: 'E399',
-            text: name
-        });
-        panel.append(versionControlButton);
-
-        versionControlButton.on('click', () => {
-            editor.call('picker:versioncontrol');
-        });
-
-        LegacyTooltip.attach({
-            target: versionControlButton.dom,
-            text: 'Version Control',
-            align: 'top',
-            root: root
-        });
-
-        // hide version control picker if we are not part of the team
-        if (!editor.call('permissions:read')) {
-            versionControlButton.hidden = true;
-        }
-        editor.on('permissions:set', () => {
-            versionControlButton.hidden = !editor.call('permissions:read');
-        });
-    }
-
     const scenesButton = new Button({
         class: 'control-strip-btn',
         icon: 'E147'

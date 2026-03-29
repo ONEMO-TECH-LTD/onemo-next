@@ -16,7 +16,7 @@ editor.once('load', () => {
 
     // close button img
     const closeBtn = document.createElement('img');
-    closeBtn.src = 'https://playcanvas.com/static-assets/images/icons/fa/16x16/remove.png';
+    closeBtn.src = '/reference/studio/static-assets/images/icons/fa/16x16/remove.png';
     panel.appendChild(closeBtn);
 
     closeBtn.addEventListener('click', () => {

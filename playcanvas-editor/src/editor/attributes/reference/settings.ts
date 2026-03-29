@@ -62,7 +62,7 @@ editor.once('load', () => {
         description: `Set the gizmo preset in the editor viewport. This affects the transform gizmo's style and interaction behavior.
 <ul>
 <li><b>Default</b>: Modern gizmo style with improved visual feedback.</li>
-<li><b>Classic</b>: Legacy gizmo style matching the original PlayCanvas Editor.</li>
+<li><b>Classic</b>: Legacy gizmo style matching the original Studio Editor.</li>
 </ul>`
     }, {
         name: 'settings:showViewCube',
@@ -101,11 +101,11 @@ editor.once('load', () => {
         title: 'gravity',
         subTitle: '{pc.Vec3}',
         description: 'Gravity is the acceleration applied every frame to all rigid bodies in your scene. By default, it is set to -9.8 meters per second per second, which essentially approximates Earth\'s gravity. If you are making a game in space, you might want to set this to 0, 0, 0 (zero g).',
-        url: 'https://api.playcanvas.com/engine/classes/RigidBodyComponentSystem.html#gravity'
+        url: '/reference/api/engine/classes/RigidBodyComponentSystem.html#gravity'
     }, {
         name: 'settings:ammo',
         title: 'Physics Library',
-        description: 'Add the Ammo asm.js and WebAssembly modules to this project from the PlayCanvas Store.'
+        description: 'Add the Ammo asm.js and WebAssembly modules to this project from the Studio Store.'
     }, {
         name: 'settings:basis',
         title: 'Basis Library',
@@ -123,13 +123,13 @@ editor.once('load', () => {
         title: 'ambientColor',
         subTitle: '{pc.Color}',
         description: 'The color of the scene\'s ambient light, specified in sRGB color space.',
-        url: 'https://api.playcanvas.com/engine/classes/Scene.html#ambientlight'
+        url: '/reference/api/engine/classes/Scene.html#ambientlight'
     }, {
         name: 'settings:skybox',
         title: 'skybox',
         subTitle: '{pc.Texture}',
         description: 'The skybox is a cubemap asset rendered behind your 3D scene. This lets you use a set of six 2D images to display the distant world beyond the 3D models in your scene. To add a skybox, create a cubemap asset and assign it to the cubemap slot in the settings panel. Note: If you are using a prefiltered cubemap, the skybox is used as the default environment map for all physical materials.',
-        url: 'https://api.playcanvas.com/engine/classes/Scene.html#skybox'
+        url: '/reference/api/engine/classes/Scene.html#skybox'
     }, {
         name: 'settings:skyType',
         title: 'Sky Type',
@@ -160,42 +160,42 @@ editor.once('load', () => {
         title: 'skyboxIntensity',
         subTitle: '{Number}',
         description: 'The skybox intensity, used to match exposure levels.',
-        url: 'https://api.playcanvas.com/engine/classes/Scene.html#skyboxintensity'
+        url: '/reference/api/engine/classes/Scene.html#skyboxintensity'
     }, {
         name: 'settings:skyboxMip',
         title: 'skyboxMip',
         subTitle: '{Number}',
         description: 'Mip level of the prefiltered skybox. Higher values select lower-resolution, more prefiltered (blurred) mips.',
-        url: 'https://api.playcanvas.com/engine/classes/Scene.html#skyboxmip'
+        url: '/reference/api/engine/classes/Scene.html#skyboxmip'
     }, {
         name: 'settings:skyDepthWrite',
         title: 'skyDepthWrite',
         subTitle: '{Boolean}',
         description: 'Whether the sky writes to the depth buffer. Disable to allow 3D geometry to render on top of the sky.',
-        url: 'https://api.playcanvas.com/engine/classes/Scene.html#sky'
+        url: '/reference/api/engine/classes/Scene.html#sky'
     }, {
         name: 'settings:skyboxRotation',
         title: 'skyboxRotation',
         description: 'Rotation of the skybox.',
-        url: 'https://api.playcanvas.com/engine/classes/Scene.html#skyboxrotation'
+        url: '/reference/api/engine/classes/Scene.html#skyboxrotation'
     }, {
         name: 'settings:toneMapping',
         title: 'toneMapping',
         subTitle: '{Number}',
         description: 'Tone mapping compresses HDR colors into the displayable range. Options: Linear - scales by exposure; Filmic - soft highlight roll-off; Hejl - filmic-like with stronger contrast; ACES - Academy curve for a filmic look; ACES2 - updated ACES with improved color/contrast; Neutral - minimal tonal shaping.',
-        url: 'https://api.playcanvas.com/engine/classes/Scene.html#tonemapping'
+        url: '/reference/api/engine/classes/Scene.html#tonemapping'
     }, {
         name: 'settings:exposure',
         title: 'exposure',
         subTitle: '{Number}',
         description: 'The exposure value tweaks the overall brightness of the scene.',
-        url: 'https://api.playcanvas.com/engine/classes/Scene.html#exposure'
+        url: '/reference/api/engine/classes/Scene.html#exposure'
     }, {
         name: 'settings:gammaCorrection',
         title: 'gammaCorrection',
         subTitle: '{pc.GAMMA_*}',
         description: 'Computer displays output a perceptually linear (sRGB) signal, not a physically linear one. For correct lighting, color textures should be converted to linear space, and the fully lit image converted back to sRGB. Enabling gamma correction reduces overly saturated highlights and better preserves color after lighting. It is generally recommended to enable this for your scene.',
-        url: 'https://api.playcanvas.com/engine/classes/Scene.html#gammacorrection'
+        url: '/reference/api/engine/classes/Scene.html#gammacorrection'
     }, {
         name: 'settings:fog',
         title: 'fog',
@@ -207,30 +207,30 @@ editor.once('load', () => {
 <li><b>Exponential</b> (<code>pc.FOG_EXP</code>): Fog fades in exponentially based on density.</li>
 <li><b>Exponential Squared</b> (<code>pc.FOG_EXP2</code>): Fog fades in with exponential squared falloff.</li>
 </ul>`,
-        url: 'https://api.playcanvas.com/engine/classes/Scene.html#fog'
+        url: '/reference/api/engine/classes/Scene.html#fog'
     }, {
         name: 'settings:fogDensity',
         title: 'fogDensity',
         subTitle: '{Number}',
         description: 'The fog density controls the rate at which fog fades in for Exp and Exp2 fog types. Larger values cause fog to fade in more quickly. Fog density must be a positive number.',
-        url: 'https://api.playcanvas.com/engine/classes/Scene.html#fogdensity'
+        url: '/reference/api/engine/classes/Scene.html#fogdensity'
     }, {
         name: 'settings:fogDistance',
         title: 'fogStart / fogEnd',
         subTitle: '{Number}',
         description: 'The distances, in scene units, from the viewpoint where fog starts to fade in (start) and where it reaches maximum (end). Objects beyond the maximum distance are rendered with the fog color.',
-        url: 'https://api.playcanvas.com/engine/classes/Scene.html#fogend'
+        url: '/reference/api/engine/classes/Scene.html#fogend'
     }, {
         name: 'settings:fogColor',
         title: 'fogColor',
         subTitle: '{pc.Color}',
         description: 'The color of the fog. This color is blended with a surface\'s color more as the fog fades in.',
-        url: 'https://api.playcanvas.com/engine/classes/Scene.html#fogcolor'
+        url: '/reference/api/engine/classes/Scene.html#fogcolor'
     }, {
         name: 'settings:loadingScreenScript',
         title: 'Loading Screen Script',
         description: 'The name of the script to use for creating the application\'s loading screen. The script must call pc.script.createLoadingScreen.',
-        url: 'https://api.playcanvas.com/engine/functions/script.createLoadingScreen.html'
+        url: '/reference/api/engine/functions/script.createLoadingScreen.html'
     }, {
         name: 'settings:external-scripts',
         title: 'External Scripts',
@@ -463,13 +463,13 @@ editor.once('load', () => {
         title: 'lightmapSizeMultiplier',
         subTitle: '{Number}',
         description: 'The resolution of auto-generated lightmap textures is based on the area of geometry in world space and the size multipliers of the model and scene. Changing this value affects lightmap resolution across the whole scene.',
-        url: 'https://api.playcanvas.com/engine/classes/Scene.html#lightmapsizemultiplier'
+        url: '/reference/api/engine/classes/Scene.html#lightmapsizemultiplier'
     }, {
         name: 'settings:lightmapMaxResolution',
         title: 'lightmapMaxResolution',
         subTitle: '{Number}',
         description: 'Maximum resolution for auto-generated lightmap textures.',
-        url: 'https://api.playcanvas.com/engine/classes/Scene.html#lightmapmaxresolution'
+        url: '/reference/api/engine/classes/Scene.html#lightmapmaxresolution'
     }, {
         name: 'settings:lightmapMode',
         title: 'lightmapMode',
@@ -479,81 +479,81 @@ editor.once('load', () => {
 <li><b>Color Only</b> (<code>pc.BAKE_COLOR</code>): Bakes a single color lightmap.</li>
 <li><b>Color and Direction</b> (<code>pc.BAKE_COLORDIR</code>): Bakes color plus dominant light direction for bump/specular.</li>
 </ul>`,
-        url: 'https://api.playcanvas.com/engine/classes/Scene.html#lightmapmode'
+        url: '/reference/api/engine/classes/Scene.html#lightmapmode'
     }, {
         name: 'settings:project:lightmapFilterEnabled',
         title: 'lightmapFilterEnabled',
         subTitle: 'boolean',
         description: 'Enable a bilateral filter on runtime-baked lightmaps.',
-        url: 'https://api.playcanvas.com/engine/classes/Scene.html#lightmapfilterenabled'
+        url: '/reference/api/engine/classes/Scene.html#lightmapfilterenabled'
     }, {
         name: 'settings:project:lightmapFilterRange',
         title: 'lightmapFilterRange',
         subTitle: 'number',
         description: 'The range parameter of the bilateral filter.',
-        url: 'https://api.playcanvas.com/engine/classes/Scene.html#lightmapfilterrange'
+        url: '/reference/api/engine/classes/Scene.html#lightmapfilterrange'
     }, {
         name: 'settings:project:lightmapFilterSmoothness',
         title: 'lightmapFilterSmoothness',
         subTitle: 'number',
         description: 'The spatial parameter of the bilateral filter.',
-        url: 'https://api.playcanvas.com/engine/classes/Scene.html#lightmapfiltersmoothness'
+        url: '/reference/api/engine/classes/Scene.html#lightmapfiltersmoothness'
     }, {
         name: 'settings:project:ambientBake',
         title: 'ambientBake',
         subTitle: 'boolean',
         description: 'Bake ambient light into lightmaps.',
-        url: 'https://api.playcanvas.com/engine/classes/Scene.html#ambientbake'
+        url: '/reference/api/engine/classes/Scene.html#ambientbake'
     }, {
         name: 'settings:project:ambientBakeNumSamples',
         title: 'ambientBakeNumSamples',
         subTitle: 'number',
         description: 'Number of samples to use when baking ambient light.',
-        url: 'https://api.playcanvas.com/engine/classes/Scene.html#ambientbakenumsamples'
+        url: '/reference/api/engine/classes/Scene.html#ambientbakenumsamples'
     }, {
         name: 'settings:project:ambientBakeSpherePart',
         title: 'ambientBakeSpherePart',
         subTitle: 'number',
         description: 'The portion of the sphere to include when baking ambient light.',
-        url: 'https://api.playcanvas.com/engine/classes/Scene.html#ambientbakespherepart'
+        url: '/reference/api/engine/classes/Scene.html#ambientbakespherepart'
     }, {
         name: 'settings:project:ambientBakeOcclusionBrightness',
         title: 'ambientBakeOcclusionBrightness',
         subTitle: 'number',
         description: 'Brightness of the baked ambient occlusion.',
-        url: 'https://api.playcanvas.com/engine/classes/Scene.html#ambientbakeocclusionbrightness'
+        url: '/reference/api/engine/classes/Scene.html#ambientbakeocclusionbrightness'
     }, {
         name: 'settings:project:ambientBakeOcclusionContrast',
         title: 'ambientBakeOcclusionContrast',
         subTitle: 'number',
         description: 'Contrast of the baked ambient occlusion.',
-        url: 'https://api.playcanvas.com/engine/classes/Scene.html#ambientbakeocclusioncontrast'
+        url: '/reference/api/engine/classes/Scene.html#ambientbakeocclusioncontrast'
     }, {
         name: 'settings:clusteredLightingEnabled',
         title: 'clusteredLightingEnabled',
         subTitle: 'boolean',
         description: 'Enable clustered lighting.',
-        url: 'https://api.playcanvas.com/engine/classes/Scene.html#clusteredlightingenabled'
+        url: '/reference/api/engine/classes/Scene.html#clusteredlightingenabled'
     }, {
         name: 'settings:lightingCells',
         title: 'lightingCells',
         description: 'Number of cells per world-space axis used to subdivide the space containing lights.',
-        url: 'https://api.playcanvas.com/engine/classes/LightingParams.html#cells'
+        url: '/reference/api/engine/classes/LightingParams.html#cells'
     }, {
         name: 'settings:lightingMaxLightsPerCell',
         title: 'lightingMaxLightsPerCell',
         description: 'Maximum number of lights a cell can store.',
-        url: 'https://api.playcanvas.com/engine/classes/LightingParams.html#maxlightspercell'
+        url: '/reference/api/engine/classes/LightingParams.html#maxlightspercell'
     }, {
         name: 'settings:lightingCookieAtlasResolution',
         title: 'lightingCookieAtlasResolution',
         description: 'Resolution of the atlas texture storing all non-directional cookie textures.',
-        url: 'https://api.playcanvas.com/engine/classes/LightingParams.html#cookieatlasresolution'
+        url: '/reference/api/engine/classes/LightingParams.html#cookieatlasresolution'
     }, {
         name: 'settings:lightingShadowAtlasResolution',
         title: 'lightingShadowAtlasResolution',
         description: 'Resolution of the atlas texture storing all non-directional shadow textures.',
-        url: 'https://api.playcanvas.com/engine/classes/LightingParams.html#shadowatlasresolution'
+        url: '/reference/api/engine/classes/LightingParams.html#shadowatlasresolution'
     }, {
         name: 'settings:lightingShadowType',
         title: 'lightingShadowType',
@@ -563,22 +563,22 @@ editor.once('load', () => {
 <li><b>Shadow Map PCF 3x3</b>: Percentage-closer filtering with 3x3 kernel for softer shadows.</li>
 <li><b>Shadow Map PCF 5x5</b>: Percentage-closer filtering with 5x5 kernel for smoother shadows.</li>
 </ul>`,
-        url: 'https://api.playcanvas.com/engine/classes/LightingParams.html#shadowtype'
+        url: '/reference/api/engine/classes/LightingParams.html#shadowtype'
     }, {
         name: 'settings:lightingCookiesEnabled',
         title: 'lightingCookiesEnabled',
         description: 'Clustered lights support cookies.',
-        url: 'https://api.playcanvas.com/engine/classes/LightingParams.html#cookiesenabled'
+        url: '/reference/api/engine/classes/LightingParams.html#cookiesenabled'
     }, {
         name: 'settings:lightingAreaLightsEnabled',
         title: 'lightingAreaLightsEnabled',
         description: 'Clustered lights support area lights.',
-        url: 'https://api.playcanvas.com/engine/classes/LightingParams.html#arealightsenabled'
+        url: '/reference/api/engine/classes/LightingParams.html#arealightsenabled'
     }, {
         name: 'settings:lightingShadowsEnabled',
         title: 'lightingShadowsEnabled',
         description: 'Clustered lights support shadows.',
-        url: 'https://api.playcanvas.com/engine/classes/LightingParams.html#shadowsenabled'
+        url: '/reference/api/engine/classes/LightingParams.html#shadowsenabled'
     }, {
         name: 'settings:batchGroups',
         title: 'Batch Groups',
@@ -612,19 +612,19 @@ editor.once('load', () => {
         title: 'name',
         subTitle: '{String}',
         description: 'The name of the layer.',
-        url: 'https://api.playcanvas.com/engine/classes/Layer.html#name'
+        url: '/reference/api/engine/classes/Layer.html#name'
     }, {
         name: 'settings:layers:opaqueSort',
         title: 'opaqueSortMode',
         subTitle: '{Number}',
         description: 'Defines the method used for sorting opaque mesh instances before rendering.',
-        url: 'https://api.playcanvas.com/engine/classes/Layer.html#opaquesortmode'
+        url: '/reference/api/engine/classes/Layer.html#opaquesortmode'
     }, {
         name: 'settings:layers:transparentSort',
         title: 'transparentSortMode',
         subTitle: '{Number}',
         description: 'Defines the method used for sorting semi-transparent mesh instances before rendering.',
-        url: 'https://api.playcanvas.com/engine/classes/Layer.html#transparentsortmode'
+        url: '/reference/api/engine/classes/Layer.html#transparentsortmode'
     }, {
         name: 'settings:layers:order',
         title: 'Render Order',

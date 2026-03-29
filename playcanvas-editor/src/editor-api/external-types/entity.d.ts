@@ -527,7 +527,7 @@ type ElementComponent = {
      */
     pivot: number[];
     /**
-     * The number of pixels that correspond to one PlayCanvas unit.
+     * The number of pixels that correspond to one Studio unit.
      * @default null
      */
     pixelsPerUnit: number;

@@ -93,7 +93,7 @@ ${className}.prototype.update = function(dt) {
 // ${className}.prototype.swap = function(old) { };
 
 // learn more about scripting here:
-// https://developer.playcanvas.com/user-manual/scripting/
+// /reference/docs/user-manual/scripting/
 `.trim();
 }
 
@@ -102,9 +102,9 @@ function createEsmBoilerplate(className: string, scriptName: string) {
 import { Script } from 'playcanvas';
 
 /**
- * The {@link https://api.playcanvas.com/classes/Engine.Script.html | Script} class is
- * the base class for all PlayCanvas scripts. Learn more about writing scripts in the
- * {@link https://developer.playcanvas.com/user-manual/scripting/ | scripting guide}.
+ * The {@link /reference/api/classes/Engine.Script.html | Script} class is
+ * the base class for all Studio scripts. Learn more about writing scripts in the
+ * {@link /reference/docs/user-manual/scripting/ | scripting guide}.
  */
 export class ${className} extends Script {
 
@@ -132,9 +132,9 @@ function createTsBoilerplate(className: string, scriptName: string) {
 import { Script } from 'playcanvas';
 
 /**
- * The {@link https://api.playcanvas.com/classes/Engine.Script.html | Script} class is
- * the base class for all PlayCanvas scripts. Learn more about writing scripts in the
- * {@link https://developer.playcanvas.com/user-manual/scripting/ | scripting guide}.
+ * The {@link /reference/api/classes/Engine.Script.html | Script} class is
+ * the base class for all Studio scripts. Learn more about writing scripts in the
+ * {@link /reference/docs/user-manual/scripting/ | scripting guide}.
  */
 export class ${className} extends Script {
 

@@ -5,37 +5,37 @@ export const fields: AttributeReference[]  = [{
     title: 'pc.Texture',
     subTitle: '{Class}',
     description: 'Textures assets are image files which are used as part of a material to give a 3D model a realistic appearance.',
-    url: 'https://api.playcanvas.com/engine/classes/Texture.html'
+    url: '/reference/api/engine/classes/Texture.html'
 }, {
     name: 'asset:texture:dimensions',
     title: 'width / height',
     subTitle: '{Number}',
     description: 'The width and height of the texture.',
-    url: 'https://api.playcanvas.com/engine/classes/Texture.html#width'
+    url: '/reference/api/engine/classes/Texture.html#width'
 }, {
     name: 'asset:texture:magFilter',
     title: 'magFilter',
     subTitle: '{pc.FILTER_*}',
     description: 'The magnification filter to be applied to the texture.',
-    url: 'https://api.playcanvas.com/engine/classes/Texture.html#magfilter'
+    url: '/reference/api/engine/classes/Texture.html#magfilter'
 }, {
     name: 'asset:texture:mipFilter',
     title: 'mipFilter',
     subTitle: '{pc.FILTER_*}',
     description: 'The minification mipmap filter to be applied to the texture.',
-    url: 'https://api.playcanvas.com/engine/classes/Texture.html#mipfilter'
+    url: '/reference/api/engine/classes/Texture.html#mipfilter'
 }, {
     name: 'asset:texture:mipmaps',
     title: 'mipmaps',
     subTitle: '{Boolean}',
     description: 'Specifies whether the texture has mipmaps.',
-    url: 'https://api.playcanvas.com/engine/classes/Texture.html#mipmaps'
+    url: '/reference/api/engine/classes/Texture.html#mipmaps'
 }, {
     name: 'asset:texture:minFilter',
     title: 'minFilter',
     subTitle: '{pc.FILTER_*}',
     description: 'The minification filter to be applied to the texture.',
-    url: 'https://api.playcanvas.com/engine/classes/Texture.html#minfilter'
+    url: '/reference/api/engine/classes/Texture.html#minfilter'
 }, {
     name: 'asset:texture:addressU',
     title: 'addressU',
@@ -46,7 +46,7 @@ export const fields: AttributeReference[]  = [{
 <li><b>Clamp</b> (<code>pc.ADDRESS_CLAMP_TO_EDGE</code>): Texture edge pixels are stretched.</li>
 <li><b>Mirror Repeat</b> (<code>pc.ADDRESS_MIRRORED_REPEAT</code>): Texture tiles with alternating mirroring.</li>
 </ul>`,
-    url: 'https://api.playcanvas.com/engine/classes/Texture.html#addressu'
+    url: '/reference/api/engine/classes/Texture.html#addressu'
 }, {
     name: 'asset:texture:addressV',
     title: 'addressV',
@@ -57,25 +57,25 @@ export const fields: AttributeReference[]  = [{
 <li><b>Clamp</b> (<code>pc.ADDRESS_CLAMP_TO_EDGE</code>): Texture edge pixels are stretched.</li>
 <li><b>Mirror Repeat</b> (<code>pc.ADDRESS_MIRRORED_REPEAT</code>): Texture tiles with alternating mirroring.</li>
 </ul>`,
-    url: 'https://api.playcanvas.com/engine/classes/Texture.html#addressv'
+    url: '/reference/api/engine/classes/Texture.html#addressv'
 }, {
     name: 'asset:texture:anisotropy',
     title: 'anisotropy',
     subTitle: '{Number}',
     description: 'Integer value specifying the level of anisotropic to apply to the texture ranging from 1 (no anisotropic filtering) to the pc.GraphicsDevice property maxAnisotropy.',
-    url: 'https://api.playcanvas.com/engine/classes/Texture.html#anisotropy'
+    url: '/reference/api/engine/classes/Texture.html#anisotropy'
 }, {
     name: 'asset:texture:width',
     title: 'width',
     subTitle: '{Number}',
     description: 'The width of the base mip level in pixels.',
-    url: 'https://api.playcanvas.com/engine/classes/Texture.html#width'
+    url: '/reference/api/engine/classes/Texture.html#width'
 }, {
     name: 'asset:texture:height',
     title: 'height',
     subTitle: '{Number}',
     description: 'The height of the base mip level in pixels.',
-    url: 'https://api.playcanvas.com/engine/classes/Texture.html#height'
+    url: '/reference/api/engine/classes/Texture.html#height'
 }, {
     name: 'asset:texture:depth',
     title: 'depth',
@@ -105,7 +105,7 @@ export const fields: AttributeReference[]  = [{
 <li><b>Point</b> (<code>pc.FILTER_NEAREST</code>): No filtering, nearest pixel is used. Sharp pixels, good for retro/pixel art.</li>
 <li><b>Linear</b> (<code>pc.FILTER_LINEAR</code>): Bilinear filtering, smooth interpolation between pixels.</li>
 </ul>`,
-    url: 'https://api.playcanvas.com/engine/classes/Texture.html#magfilter'
+    url: '/reference/api/engine/classes/Texture.html#magfilter'
 }, {
     name: 'asset:texture:compression',
     title: 'Compression',

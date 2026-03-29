@@ -60,7 +60,7 @@ export type AssetProps = {
     id?: number;
 
     /**
-     * `[read-only]` Asset properties that depend on the type of the asset. Meta properties are available in the PlayCanvas Editor but not at runtime.
+     * `[read-only]` Asset properties that depend on the type of the asset. Meta properties are available in the Studio Editor but not at runtime.
      */
     meta?: object;
 
@@ -968,7 +968,7 @@ type ScriptAssetData = {
     loading: boolean;
     /**
      * This allows you to control when this script will be loaded.
-     * The possible values are: 0 (load as a regular Asset), 1 (load before the PlayCanvas engine is loaded), 2 (load right after the PlayCanvas engine has loaded).
+     * The possible values are: 0 (load as a regular Asset), 1 (load before the Studio engine is loaded), 2 (load right after the Studio engine has loaded).
      */
     loadingType: number;
     /**
@@ -1069,7 +1069,7 @@ type ScriptAssetData = {
  */
 type SpriteAssetData = {
     /**
-     * The number of pixels that represent one PlayCanvas unit. You can use this value to change the rendered size of your sprites.
+     * The number of pixels that represent one Studio unit. You can use this value to change the rendered size of your sprites.
      */
     pixelsPerUnit: number;
     /**

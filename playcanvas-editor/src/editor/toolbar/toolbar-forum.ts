@@ -19,6 +19,6 @@ editor.once('load', () => {
     });
 
     contact.on('click', () => {
-        window.open('https://forum.playcanvas.com');
+        window.open('/reference/forum');
     });
 });

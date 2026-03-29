@@ -143,8 +143,7 @@ editor.once('load', () => {
             thumbnailButtons.style.opacity = (currentProject.access_level === 'admin' && currentProject.owner_id === config.self.id) || currentProject.id === config.project.id ? '1' : '0';
 
             menuOptions.scenes.item.hidden = true;
-            if (!IS_EMPTY_STATE) {
-                menuOptions['builds-publish'].item.hidden = true;
+            if (!IS_EMPTY_STATE && menuOptions['version control']) {
                 menuOptions['version control'].item.hidden = true;
             }
 
@@ -172,9 +171,6 @@ editor.once('load', () => {
 
             menuOptions['project-main'].item.hidden = true;
             menuOptions.scenes.item.hidden = true;
-            if (menuOptions['builds-publish']) {
-                menuOptions['builds-publish'].item.hidden = true;
-            }
             if (menuOptions['version control']) {
                 menuOptions['version control'].item.hidden = true;
             }
@@ -201,9 +197,6 @@ editor.once('load', () => {
             menuOptions['project-main'].item.hidden = false;
             menuOptions.scenes.item.hidden = true;
             menuOptions.team.item.hidden = true;
-            if (menuOptions['builds-publish']) {
-                menuOptions['builds-publish'].item.hidden = true;
-            }
             if (menuOptions['version control']) {
                 menuOptions['version control'].item.hidden = true;
             }

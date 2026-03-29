@@ -114,7 +114,7 @@ class AnimComponentInspector extends ComponentInspector {
         const normalizeWeightsField = this._attributesInspector.getField('components.anim.normalizeWeights');
         normalizeWeightsField.parent.parent.appendAfter(this._normalizeWeightsMessage, normalizeWeightsField.parent);
         const normalizeWeightsLink = document.createElement('a');
-        normalizeWeightsLink.setAttribute('href', 'https://forum.playcanvas.com/t/anim-component-layer-blending-update/24557');
+        normalizeWeightsLink.setAttribute('href', '/reference/forum/t/anim-component-layer-blending-update/24557');
         normalizeWeightsLink.setAttribute('target', '_blank');
         normalizeWeightsLink.innerText = 'here.';
         this._normalizeWeightsMessage.dom.children[1].appendChild(normalizeWeightsLink);

@@ -109,7 +109,7 @@ class ComponentInspector extends Panel {
         });
         this._btnHelp.on('click', () => {
             const slug = this._component === 'audiosource' ? 'sound' : this._component;
-            window.open(`https://developer.playcanvas.com/user-manual/editor/scenes/components/${slug}/`, '_blank', 'noopener,noreferrer');
+            window.open(`/reference/docs/user-manual/editor/scenes/components/${slug}/`, '_blank', 'noopener,noreferrer');
         });
         this.header.append(this._btnHelp);
 

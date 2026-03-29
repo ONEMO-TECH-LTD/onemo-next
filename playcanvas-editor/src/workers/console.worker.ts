@@ -141,7 +141,7 @@ workerServer.on('init', async ({ projectId, branchId, legacyLogs }) => {
         const all = await db.logs.toArray();
 
         const lines = [
-            'PlayCanvas Editor Console History',
+            'Studio Editor Console History',
             `Project: ${projectName} (${projectId})`,
             `Branch: ${branchName} (${branchId})`,
             `User Agent: ${navigator.userAgent}`,

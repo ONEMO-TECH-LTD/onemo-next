@@ -459,8 +459,8 @@ editor.once('load', () => {
         return validated;
     };
 
-    // only allow scrpts from playcanvas, code.playcanvas.com and localhost:51000 to be parsed
-    const REGEX_ALLOWED = new RegExp(`^((http(s)?://)((code.playcanvas.com)|(localhost:51000)))|(${config.url.api})`);
+    // Only allow local development and current API origins to be parsed.
+    const REGEX_ALLOWED = new RegExp(`^((http(s)?://)(localhost:51000))|(${config.url.api})`);
 
     /**
      * Starts a web worker which scans the specified URL

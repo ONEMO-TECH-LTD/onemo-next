@@ -5,5 +5,5 @@ export const fields: AttributeReference[]  = [{
     title: 'meshInstances',
     subTitle: '{pc.MeshInstance[]}',
     description: 'An array of meshInstances contained in this model. Materials are defined for each individual Mesh Instance.',
-    url: 'https://api.playcanvas.com/engine/classes/Model.html#meshinstances'
+    url: '/reference/api/engine/classes/Model.html#meshinstances'
 }];

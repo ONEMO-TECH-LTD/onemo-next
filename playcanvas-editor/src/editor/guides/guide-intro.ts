@@ -115,7 +115,7 @@ editor.once('load', () => {
         const bubble = editor.call(
             'guide:bubble',
             'Store',
-            '<img width="424" height="133" src="https://playcanvas.com/static-assets/instructions/asset_library.jpg"/><br/><br/>Click the <strong>STORE</strong> button to open the Store. Add free 3D models and assets from the Store into your scene with a single click.',
+            '<img width="424" height="133" src="/reference/studio/static-assets/instructions/asset_library.jpg"/><br/><br/>Click the <strong>STORE</strong> button to open the Store. Add free 3D models and assets from the Store into your scene with a single click.',
             '95%',
             0,
             'bottom-right',
@@ -130,7 +130,7 @@ editor.once('load', () => {
         const bubble = editor.call(
             'guide:bubble',
             'Main Menu',
-            'The <span style="display:inline-block;background-image:url(\'https://playcanvas.com/static-assets/images/editor_logo.png\');width:18px;height:18px;background-size:36px 18px;background-position:-18px 0;vertical-align:text-bottom;"></span> main menu and toolbar has every command available in the Editor. If you can’t find a button or remember a hot key, you will always find the command in the menu.',
+            'The <span style="display:inline-block;background-image:url(\'/reference/studio/static-assets/images/editor_logo.png\');width:18px;height:18px;background-size:36px 18px;background-position:-18px 0;vertical-align:text-bottom;"></span> main menu and toolbar has every command available in the Editor. If you can’t find a button or remember a hot key, you will always find the command in the menu.',
             18,
             40,
             'top'
@@ -177,7 +177,7 @@ editor.once('load', () => {
         const bubble = editor.call(
             'guide:bubble',
             'Sound Component',
-            'The Sound Component allows the Entity to play sounds. To play a sound you need to create a "slot", give it a name and assign an Audio Asset to it. If you set it to Auto Play the slot will begin playback when the application is loaded. Otherwise play it by script. You can create multiple slots to play different sounds. Check out this <a href="https://developer.playcanvas.com/tutorials/basic-audio/" target="_blank">tutorial</a> for more.',
+            'The Sound Component allows the Entity to play sounds. To play a sound you need to create a "slot", give it a name and assign an Audio Asset to it. If you set it to Auto Play the slot will begin playback when the application is loaded. Otherwise play it by script. You can create multiple slots to play different sounds. Check out this <a href="/reference/docs/tutorials/basic-audio/" target="_blank">tutorial</a> for more.',
             10,
             10,
             'right',
