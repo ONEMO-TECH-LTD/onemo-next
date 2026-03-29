@@ -243,6 +243,7 @@ function EditorViewportOverlay({
   const raycasterRef = useRef(new THREE.Raycaster())
   const selectedLight = selectedObject instanceof THREE.Light ? selectedObject : null
   const transformTarget = selectedLight ?? selectedObject
+  // eslint-disable-next-line react-hooks/refs -- lightProxyRef is a stable Group instance, safe to access during render
   const transformObject = selectedLight ? lightProxyRef.current : selectedObject
 
   useEffect(() => {
