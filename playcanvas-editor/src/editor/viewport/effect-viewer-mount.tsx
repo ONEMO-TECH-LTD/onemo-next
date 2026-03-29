@@ -99,6 +99,11 @@ type SelectableObserver = {
     get: (path: string) => unknown;
 };
 
+type DropTargetHandle = {
+    destroy: () => void;
+    dom: HTMLElement;
+};
+
 type GizmoMode = 'translate' | 'rotate' | 'scale' | 'disabled';
 type GizmoSpace = 'world' | 'local';
 
@@ -222,6 +227,7 @@ export function mountEffectViewer(viewportDom: HTMLElement, canvasDom: HTMLEleme
     const bridge = createObserverR3FBridge(bridgeConfig);
     let currentContext: EffectViewerBridge | null = null;
     let autoLoadAttempted = false;
+    let lastMaterialDropPoint: { x: number; y: number } | null = null;
     const overlay = document.createElement('div');
     overlay.className = 'viewport-r3f-overlay';
     Object.assign(overlay.style, {
@@ -239,11 +245,81 @@ export function mountEffectViewer(viewportDom: HTMLElement, canvasDom: HTMLEleme
 
     viewportDom.insertBefore(overlay, canvasDom.nextSibling);
 
+    const pickMaterialDropTarget = (clientX: number, clientY: number) => {
+        if (!currentContext) {
+            return null;
+        }
+
+        const rect = overlay.getBoundingClientRect();
+        if (!rect.width || !rect.height) {
+            return null;
+        }
+
+        const pointer = new THREE.Vector2(
+            ((clientX - rect.left) / rect.width) * 2 - 1,
+            -((clientY - rect.top) / rect.height) * 2 + 1
+        );
+        const raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera(pointer, currentContext.camera);
+
+        const hit = raycaster
+        .intersectObjects(currentContext.scene.children, true)
+        .find((entry) => !!bridge.getResourceIdForObject(entry.object));
+
+        if (!hit) {
+            return null;
+        }
+
+        const resourceId = bridge.getResourceIdForObject(hit.object);
+        if (!resourceId) {
+            return null;
+        }
+
+        const mesh = hit.object as THREE.Mesh;
+        const materialIndex = Array.isArray(mesh.material)
+            ? ((hit as THREE.Intersection<THREE.Object3D> & { face?: { materialIndex?: number } }).face?.materialIndex ?? 0)
+            : 0;
+
+        return {
+            resourceId,
+            materialIndex
+        };
+    };
+
+    const updateMaterialDropPoint = (event: DragEvent) => {
+        lastMaterialDropPoint = {
+            x: event.clientX,
+            y: event.clientY
+        };
+        event.preventDefault();
+    };
+
     editor.method('r3f:bridge:setHidden', (resourceId: string, hidden: boolean) => {
         bridge.setViewportHidden(resourceId, hidden);
     });
     editor.method('r3f:bridge:isVisible', (resourceId: string) => {
         return !!bridge.getObjectById(resourceId)?.visible;
+    });
+    editor.method('r3f:bridge:isLocalAsset', (assetId: number | string) => {
+        return bridge.isLocalAsset(assetId);
+    });
+    editor.method('r3f:bridge:renameLocalAsset', (assetId: number | string, name: string) => {
+        return bridge.renameLocalAsset(assetId, name);
+    });
+    editor.method('r3f:bridge:dropMaterial', (assetId: number, clientX?: number, clientY?: number) => {
+        const point = clientX !== undefined && clientY !== undefined
+            ? { x: clientX, y: clientY }
+            : lastMaterialDropPoint;
+        if (!point) {
+            return false;
+        }
+
+        const target = pickMaterialDropTarget(point.x, point.y);
+        if (!target) {
+            return false;
+        }
+
+        return bridge.applyMaterialAssetToResource(target.resourceId, assetId, target.materialIndex);
     });
     editor.method('r3f:bridge:openAsset', (assets: SelectableObserver[] = []) => {
         if (!Array.isArray(assets) || assets.length !== 1) {
@@ -293,6 +369,25 @@ export function mountEffectViewer(viewportDom: HTMLElement, canvasDom: HTMLEleme
             }
         };
     });
+
+    const materialDropTarget = editor.call('drop:target', {
+        ref: overlay,
+        type: 'asset.material',
+        hole: true,
+        passThrough: true,
+        drop: (_type: string, data: { id?: string }) => {
+            const assetId = Number(data?.id);
+            if (!Number.isFinite(assetId)) {
+                return false;
+            }
+
+            return editor.call('r3f:bridge:dropMaterial', assetId);
+        },
+        leave: () => {
+            lastMaterialDropPoint = null;
+        }
+    }) as DropTargetHandle;
+    overlay.addEventListener('dragover', updateMaterialDropPoint);
 
     const parseError = async (response: Response) => {
         try {
@@ -498,6 +593,9 @@ export function mountEffectViewer(viewportDom: HTMLElement, canvasDom: HTMLEleme
 
     return () => {
         window.removeEventListener('keydown', handleGlobalKeyDown);
+        overlay.removeEventListener('dragover', updateMaterialDropPoint);
+        materialDropTarget.destroy();
+        lastMaterialDropPoint = null;
         currentContext = null;
         bridge.dispose();
         root.unmount();
