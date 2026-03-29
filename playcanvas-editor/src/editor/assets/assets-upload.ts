@@ -105,6 +105,14 @@ editor.once('load', () => {
         let request;
         if (args.asset) {
             const assetId = args.asset.get('id');
+            if (editor.call('r3f:bridge:isLocalAsset', assetId)) {
+                const error = 'Synthetic bridge materials cannot be overwritten via file upload.';
+                editor.call('status:error', error);
+                if (fn) {
+                    fn(error);
+                }
+                return;
+            }
             request = editor.api.globals.rest.assets.assetUpdate(assetId, args, pipelineOptions());
         } else {
             // default preload scripts to true

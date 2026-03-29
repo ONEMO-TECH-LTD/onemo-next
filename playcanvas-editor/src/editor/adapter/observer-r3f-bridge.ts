@@ -199,6 +199,10 @@ export class ObserverR3FBridge {
 
     private readonly materialIdsByUuid = new Map<string, number>();
 
+    private readonly materialRoleByAssetId = new Map<number, BridgeMaterialRecord['role']>();
+
+    private readonly customMaterialNames = new Map<number, string>();
+
     private readonly entityBindings = new Map<string, EventHandle>();
 
     private readonly materialBindings = new Map<number, EventHandle>();
@@ -406,6 +410,83 @@ export class ObserverR3FBridge {
                 this.applyTransformSnapshot(resourceId, after);
             }
         });
+    }
+
+    isLocalAsset(assetId: number | string) {
+        const numericId = Number(assetId);
+        if (!Number.isFinite(numericId) || numericId < BRIDGE_ASSET_ID_BASE) {
+            return false;
+        }
+
+        const observer = editor.call('assets:get', numericId) as AssetObserver | null;
+        const tags = observer?.get('tags');
+        return Array.isArray(tags) && tags.includes(BRIDGE_ASSET_TAG);
+    }
+
+    renameLocalAsset(assetId: number | string, name: string) {
+        const numericId = Number(assetId);
+        if (!this.isLocalAsset(numericId)) {
+            return false;
+        }
+
+        const observer = editor.call('assets:get', numericId) as AssetObserver | null;
+        const trimmedName = String(name || '').trim();
+        if (!observer || !trimmedName) {
+            return false;
+        }
+
+        this.customMaterialNames.set(numericId, trimmedName);
+        observer.set('name', trimmedName);
+        return true;
+    }
+
+    applyMaterialAssetToResource(resourceId: string, assetId: number, materialIndex = 0) {
+        const observer = editor.call('entities:get', resourceId) as EntityObserver | null;
+        const object = this.objectById.get(resourceId);
+        if (!observer || !(object instanceof THREE.Mesh) || !observer.has('components.render')) {
+            return false;
+        }
+
+        const previous = Array.isArray(observer.get('components.render.materialAssets'))
+            ? [...(observer.get('components.render.materialAssets') as (number | null)[])]
+            : [null];
+        const next = previous.length ? [...previous] : [null];
+        const targetIndex = observer.get('components.render.type') !== 'asset'
+            ? 0
+            : THREE.MathUtils.clamp(materialIndex, 0, Math.max(next.length - 1, 0));
+
+        if (next[targetIndex] === assetId) {
+            return false;
+        }
+
+        next[targetIndex] = assetId;
+
+        const applyMaterialAssets = (values: (number | null)[]) => {
+            const current = editor.call('entities:get', resourceId) as EntityObserver | null;
+            if (!current || !current.has('components.render')) {
+                return;
+            }
+
+            const historyEnabled = current.history.enabled;
+            current.history.enabled = false;
+            current.set('components.render.materialAssets', [...values]);
+            current.history.enabled = historyEnabled;
+        };
+
+        applyMaterialAssets(next);
+
+        editor.api.globals.history.add({
+            name: `entities.${resourceId}.components.render.materialAssets`,
+            combine: false,
+            undo: () => {
+                applyMaterialAssets(previous);
+            },
+            redo: () => {
+                applyMaterialAssets(next);
+            }
+        });
+
+        return true;
     }
 
     isViewportHidden(resourceId: string) {
@@ -734,6 +815,7 @@ export class ObserverR3FBridge {
         this.objectById.clear();
         this.resourceIdByObject = new WeakMap<THREE.Object3D, string>();
         this.materialByAssetId.clear();
+        this.materialRoleByAssetId.clear();
         this.lastSceneSnapshot.clear();
 
         editor.call('selector:clear');
@@ -808,7 +890,7 @@ export class ObserverR3FBridge {
                     materialRecords.set(assetId, {
                         assetId,
                         material,
-                        name: this.getMaterialDisplayName(object, index),
+                        name: this.customMaterialNames.get(assetId) || this.getMaterialDisplayName(object, index),
                         role: this.getMaterialRole(object)
                     });
                 }
@@ -960,6 +1042,7 @@ export class ObserverR3FBridge {
         materialState.materialRecords.forEach((record, assetId) => {
             activeIds.add(assetId);
             this.materialByAssetId.set(assetId, record.material);
+            this.materialRoleByAssetId.set(assetId, record.role);
 
             const existing = editor.api.globals.assets.get(assetId);
             if (existing) {
@@ -997,6 +1080,8 @@ export class ObserverR3FBridge {
             }
 
             if (!activeIds.has(asset.get('id'))) {
+                this.materialRoleByAssetId.delete(asset.get('id'));
+                this.customMaterialNames.delete(asset.get('id'));
                 editor.api.globals.assets.remove(asset);
             }
         });
@@ -1005,6 +1090,8 @@ export class ObserverR3FBridge {
             if (!activeIds.has(assetId)) {
                 this.materialBindings.get(assetId)?.unbind();
                 this.materialBindings.delete(assetId);
+                this.materialRoleByAssetId.delete(assetId);
+                this.customMaterialNames.delete(assetId);
             }
         });
 
@@ -1034,6 +1121,11 @@ export class ObserverR3FBridge {
                     void this.applyTexture(assetId, normalizedPath.replace(/^data\./, ''), textureUrl).catch((err) => {
                         console.warn('[r3f-bridge] texture load failed', err);
                     });
+                    return;
+                }
+
+                if (this.applyTexturePropertyChange(material, normalizedPath, observer)) {
+                    this.sceneDirty = true;
                     return;
                 }
 
@@ -1109,13 +1201,37 @@ export class ObserverR3FBridge {
                 return 'metalnessMap';
             case 'aoMap':
                 return 'aoMap';
+            case 'lightMap':
+                return 'lightMap';
             case 'opacityMap':
                 return 'alphaMap';
             case 'emissiveMap':
                 return 'emissiveMap';
+            case 'clearCoatMap':
+                return 'clearcoatMap';
+            case 'clearCoatGlossMap':
+                return 'clearcoatRoughnessMap';
+            case 'clearCoatNormalMap':
+                return 'clearcoatNormalMap';
             case 'sheenMap':
             case 'sheenColorMap':
                 return 'sheenColorMap';
+            case 'sheenGlossMap':
+                return 'sheenRoughnessMap';
+            case 'refractionMap':
+                return 'transmissionMap';
+            case 'thicknessMap':
+                return 'thicknessMap';
+            case 'iridescenceMap':
+                return 'iridescenceMap';
+            case 'iridescenceThicknessMap':
+                return 'iridescenceThicknessMap';
+            case 'anisotropyMap':
+                return 'anisotropyMap';
+            case 'specularMap':
+                return 'specularColorMap';
+            case 'specularityFactorMap':
+                return 'specularIntensityMap';
             default:
                 return slot;
         }
@@ -1143,19 +1259,67 @@ export class ObserverR3FBridge {
         }
     }
 
+    private applyTexturePropertyChange(material: THREE.Material, path: string, observer: AssetObserver) {
+        const match = path.match(/^data\.(.+Map)(Channel|Uv|Offset|Tiling|Rotation)$/);
+        if (!match) {
+            return false;
+        }
+
+        const slot = match[1];
+        const property = this.materialPropertyForTextureSlot(slot);
+        const suffix = match[2];
+        if (!property || !(property in material)) {
+            return false;
+        }
+
+        const texture = (material as THREE.Material & Record<string, unknown>)[property];
+        if (!(texture instanceof THREE.Texture)) {
+            return true;
+        }
+
+        if (suffix === 'Channel') {
+            texture.userData.playcanvasChannel = observer.get(path);
+        } else if (suffix === 'Uv' && 'channel' in texture) {
+            texture.channel = Number(observer.get(path) ?? texture.channel);
+        } else if (suffix === 'Offset') {
+            const value = observer.get(path) as number[] || [texture.offset.x, texture.offset.y];
+            texture.offset.set(Number(value[0] ?? texture.offset.x), Number(value[1] ?? texture.offset.y));
+        } else if (suffix === 'Tiling') {
+            const value = observer.get(path) as number[] || [texture.repeat.x, texture.repeat.y];
+            texture.repeat.set(Number(value[0] ?? texture.repeat.x), Number(value[1] ?? texture.repeat.y));
+        } else if (suffix === 'Rotation') {
+            texture.center.set(0.5, 0.5);
+            texture.rotation = THREE.MathUtils.degToRad(Number(observer.get(path) ?? THREE.MathUtils.radToDeg(texture.rotation)));
+        }
+
+        texture.needsUpdate = true;
+        material.needsUpdate = true;
+        return true;
+    }
+
     private materialRoleForAsset(assetId: number): 'face' | 'back' | 'frame' | null {
+        const mappedRole = this.materialRoleByAssetId.get(assetId);
+        if (mappedRole && mappedRole !== 'generic') {
+            return mappedRole;
+        }
+
         const observer = editor.call('assets:get', assetId) as AssetObserver | null;
         const name = String(observer?.get('name') || '');
-        const lowerName = name.toLowerCase();
-        if (lowerName === 'face' || lowerName.includes('print_surface') || lowerName.includes('face_material')) {
+        const normalizedName = name
+            .toLowerCase()
+            .replace(/[_-]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+        const strippedName = normalizedName.replace(/\bmaterial\b/g, '').replace(/\s+/g, ' ').trim();
+        if (strippedName === 'face' || normalizedName.includes('print surface') || normalizedName.includes('face material')) {
             return 'face';
         }
 
-        if (lowerName === 'back' || lowerName.includes('back_material')) {
+        if (strippedName === 'back' || normalizedName.includes('back material')) {
             return 'back';
         }
 
-        if (lowerName === 'frame' || lowerName.includes('frame_material')) {
+        if (strippedName === 'frame' || normalizedName.includes('frame material')) {
             return 'frame';
         }
 

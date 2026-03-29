@@ -1,5 +1,37 @@
 import { deepCopy } from '@/common/utils';
 
+const inferTextureFieldType = (fieldName: string) => {
+    if (!fieldName) {
+        return undefined;
+    }
+
+    if (fieldName === 'cubeMapProjection') {
+        return 'number';
+    }
+
+    if (fieldName.startsWith('cubeMapProjectionBox.')) {
+        return 'vec3';
+    }
+
+    if (fieldName.endsWith('Map') || fieldName === 'cubeMap' || fieldName === 'sphereMap') {
+        return 'asset';
+    }
+
+    if (fieldName.endsWith('MapOffset') || fieldName.endsWith('MapTiling')) {
+        return 'vec2';
+    }
+
+    if (fieldName.endsWith('MapRotation') || fieldName.endsWith('MapUv')) {
+        return 'number';
+    }
+
+    if (fieldName.endsWith('MapChannel')) {
+        return 'string';
+    }
+
+    return undefined;
+};
+
 editor.once('load', () => {
     /**
      * Returns a JSON object that contains all of the default material data.
@@ -51,6 +83,11 @@ editor.once('load', () => {
      * @returns The type of the field
      */
     editor.method('schema:material:getType', (fieldName: string): string => {
+        const inferredType = inferTextureFieldType(fieldName);
+        if (inferredType) {
+            return inferredType;
+        }
+
         return editor.call('schema:getTypeForPath', config.schema.materialData, fieldName);
     });
 });

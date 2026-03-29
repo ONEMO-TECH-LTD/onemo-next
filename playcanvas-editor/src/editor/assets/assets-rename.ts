@@ -1,5 +1,13 @@
 editor.once('load', () => {
     const changeName = function (assetId: string | number, assetName: string) {
+        if (editor.call('r3f:bridge:isLocalAsset', assetId)) {
+            const renamed = editor.call('r3f:bridge:renameLocalAsset', assetId, assetName);
+            if (!renamed) {
+                editor.call('status:error', 'Could not rename synthetic bridge material.');
+            }
+            return;
+        }
+
         editor.api.globals.rest.assets.assetUpdate(assetId, { name: assetName })
         .on('error', (err, data) => {
             log.error(err + data);
