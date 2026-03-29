@@ -1,70 +1,23 @@
 import type { Observer } from '@playcanvas/observer';
-import { Application, BoundingBox, Color, Entity, FOG_NONE, StandardMaterial } from 'playcanvas';
 
 import { ThumbnailRenderer } from './thumbnail-renderer';
 
-let sceneInitialized = false;
+declare const editor: any;
+declare const pc: any;
 
-const scene = {
-    cameraEntity: null,
-    cameraOrigin: null,
-    lightEntity: null,
-    material: null,
-    aabb: null,
-    modelPlaceholder: null,
-    previewRoot: null,
-    renderEntity: null
-};
+let previewEntity: any = null;
 
-function initializeScene() {
-    // material
-    scene.material = new StandardMaterial();
-    scene.material.useSkybox = false;
-    scene.material.useFog = false;
+const ensurePreviewEntity = () => {
+    if (previewEntity) {
+        return previewEntity;
+    }
 
-    scene.aabb = new BoundingBox();
-
-    // render entity
-    // don't set rootBone, this renders the mesh without skinning (and does not need the hierarchy)
-    scene.renderEntity = new Entity('previewRenderEntity');
-    scene.renderEntity.addComponent('render', {
+    previewEntity = new pc.Entity('thumbnail-render-renderer');
+    previewEntity.addComponent('render', {
         type: 'asset'
     });
-
-    // light
-    scene.lightEntity = new Entity();
-    scene.lightEntity.addComponent('light', {
-        type: 'directional',
-        layers: []
-    });
-    scene.lightEntity.setLocalEulerAngles(45, 135, 0);
-
-
-    // camera
-    scene.cameraOrigin = new Entity();
-
-    scene.cameraEntity = new Entity();
-    scene.cameraEntity.addComponent('camera', {
-        nearClip: 0.01,
-        farClip: 32,
-        clearColor: new Color(41 / 255, 53 / 255, 56 / 255, 0.0),
-        frustumCulling: false,
-        layers: []
-    });
-    scene.cameraEntity.setLocalPosition(0, 0, 1.35);
-    scene.cameraOrigin.addChild(scene.cameraEntity);
-
-    // All preview objects live under this root
-    scene.previewRoot = new Entity();
-    scene.previewRoot.enabled = true;
-    scene.previewRoot.addChild(scene.renderEntity);
-    scene.previewRoot.addChild(scene.lightEntity);
-    scene.previewRoot.addChild(scene.cameraOrigin);
-    scene.previewRoot.syncHierarchy();
-    scene.previewRoot.enabled = false;
-
-    sceneInitialized = true;
-}
+    return previewEntity;
+};
 
 class RenderThumbnailRenderer extends ThumbnailRenderer {
     _asset: Observer | null;
@@ -90,124 +43,106 @@ class RenderThumbnailRenderer extends ThumbnailRenderer {
 
         this._asset = asset;
         this._canvas = canvas;
-
         this._queueRenderHandler = this.queueRender.bind(this);
-
         this._watch = editor.call('assets:render:watch', {
-            asset: asset,
+            asset,
             autoLoad: true,
             callback: this._queueRenderHandler
         });
-
         this._materialWatches = {};
-
         this._rotationX = -15;
         this._rotationY = 45;
-
         this._queuedRender = false;
-
         this._frameRequest = null;
     }
 
     _watchMaterials() {
-        const app = Application.getApplication();
+        const app = pc.Application.getApplication();
+        const renderAsset = app.assets.get(this._asset.get('id'));
+        if (!renderAsset) {
+            return;
+        }
 
         let containerAssetId;
-        let containerAsset;
-        let containerAssetObserver;
-        let sourceAssetId;
         let containerObserver;
         let materialMappings;
         let model;
 
         try {
             containerAssetId = this._asset.get('data.containerAsset');
-            containerAsset = app.assets.get(containerAssetId);
-            containerAssetObserver = editor.call('assets:get', containerAssetId);
-            sourceAssetId = containerAssetObserver.get('source_asset_id');
+            const containerAssetObserver = editor.call('assets:get', containerAssetId);
+            const sourceAssetId = containerAssetObserver.get('source_asset_id');
             containerObserver = editor.call('assets:get', sourceAssetId);
             materialMappings = containerObserver.get('meta.mappings');
-            // TODO shouldn't rely on the model
-            model = containerAsset.resource.model.resource;
-        } catch (e) {
-            // No source asset associated with this render asset. It was most likely deleted from the project. We can't watch for material changes in this instance.
+            model = app.assets.get(containerAssetId)?.resource?.model?.resource;
+        } catch (_error) {
             this._unwatchMaterials();
-            scene.renderEntity.render.materialAssets = [];
-            if (containerAsset) {
-                containerAsset.once('load', this.queueRender.bind(this));
-            }
             return;
         }
 
-        const firstMeshInstanceIndex = model.meshInstances.findIndex(a => a.node.name === this._asset.get('name'));
-        const meshInstanceCount = this._asset.get('meta.meshInstances');
-        const meshInstanceMaterialMappings = materialMappings.slice(firstMeshInstanceIndex, firstMeshInstanceIndex + meshInstanceCount);
-        const materialAssets = meshInstanceMaterialMappings.map((m: any, i: number) => {
-            // TODO we shouldn't rely on a material having a specific name here. Ideally we'd have access to material id's here
-            const materialName = containerObserver.get(`meta.materials.${m}.name`);
-            const materialObserverResult = editor.call('assets:find', (a: any) => {
-                return a.get('source_asset_id') === containerObserver.get('id').toString() &&
-                    a.get('name') === materialName &&
-                    a.get('type') === 'material';
+        const firstMeshInstanceIndex = model?.meshInstances?.findIndex((entry: any) => entry.node.name === this._asset.get('name')) ?? -1;
+        const meshInstanceCount = Number(this._asset.get('meta.meshInstances') ?? 0);
+        const mappings = firstMeshInstanceIndex >= 0
+            ? materialMappings.slice(firstMeshInstanceIndex, firstMeshInstanceIndex + meshInstanceCount)
+            : [];
+        const materialAssets = mappings.map((mappingIndex: number) => {
+            const materialName = containerObserver.get(`meta.materials.${mappingIndex}.name`);
+            const found = editor.call('assets:find', (asset: any) => {
+                return asset.get('source_asset_id') === containerObserver.get('id').toString() &&
+                    asset.get('name') === materialName &&
+                    asset.get('type') === 'material';
             });
 
-            if (materialObserverResult.length === 0) {
-                return scene.material;
-            }
-            const materialObserver = materialObserverResult[0][1];
-            const materialAsset = app.assets.get(materialObserver.get('id')) || scene.material;
-            return materialAsset;
-        });
+            return found.length ? found[0][1] : null;
+        }).filter(Boolean);
 
-        scene.renderEntity.render.materialAssets = materialAssets;
-
-        for (const id in this._materialWatches) {
-            if (!materialAssets.find(m => parseInt(m.id, 10) === parseInt(id, 10))) {
+        Object.keys(this._materialWatches).forEach((id) => {
+            if (!materialAssets.find((asset: any) => Number(asset.get('id')) === Number(id))) {
                 this._unwatchMaterial(id);
             }
-        }
+        });
 
-        materialAssets.forEach((asset: Observer) => {
-            if (asset === scene.material) {
-                return;
-            }
-
-            if (!this._materialWatches[asset.id]) {
-                this._watchMaterial(asset.id);
+        materialAssets.forEach((asset: any) => {
+            const id = Number(asset.get('id'));
+            if (!this._materialWatches[id]) {
+                this._watchMaterial(id);
             }
         });
     }
 
     _watchMaterial(id: number) {
         const material = editor.call('assets:get', id);
-        if (material) {
-            this._materialWatches[id] = editor.call('assets:material:watch', {
-                asset: material,
-                loadMaterial: true,
-                autoLoad: true,
-                callback: this._queueRenderHandler
-            });
+        if (!material) {
+            return;
         }
+
+        this._materialWatches[id] = editor.call('assets:material:watch', {
+            asset: material,
+            loadMaterial: true,
+            autoLoad: true,
+            callback: this._queueRenderHandler
+        });
     }
 
-    _unwatchMaterial(id: number) {
+    _unwatchMaterial(id: string | number) {
         const material = editor.call('assets:get', id);
-        if (material) {
+        if (material && this._materialWatches[id]) {
             editor.call('assets:material:unwatch', material, this._materialWatches[id]);
         }
         delete this._materialWatches[id];
     }
 
     _unwatchMaterials() {
-        for (const id in this._materialWatches) {
+        Object.keys(this._materialWatches).forEach((id) => {
             this._unwatchMaterial(id);
-        }
+        });
     }
 
     queueRender() {
         if (this._queuedRender) {
             return;
         }
+
         this._queuedRender = true;
         this._frameRequest = requestAnimationFrame(() => {
             this.render(this._rotationX, this._rotationY);
@@ -217,129 +152,47 @@ class RenderThumbnailRenderer extends ThumbnailRenderer {
     render(rotationX: number = -15, rotationY: number = 45) {
         this._queuedRender = false;
 
-        if (!this._asset) {
+        if (!this._asset || !this._canvas) {
             return;
         }
 
-        const data = this._asset.get('data');
-        if (!data) {
-            return;
-        }
-
-        const app = Application.getApplication();
+        const app = pc.Application.getApplication();
         const renderAsset = app.assets.get(this._asset.get('id'));
         if (!renderAsset) {
+            this.clearCanvas(this._canvas);
             return;
-        }
-
-        if (!sceneInitialized) {
-            initializeScene();
         }
 
         this._rotationX = rotationX;
         this._rotationY = rotationY;
-
-        const layerComposition = this.layerComposition;
-        const layer = this.layer;
-
-        let width = this._canvas.width;
-        let height = this._canvas.height;
-
-        if (width > height) {
-            width = height;
-        } else {
-            height = width;
-        }
-
-        const rt = this.getRenderTarget(app.graphicsDevice, width, height);
-
-        scene.previewRoot.enabled = true;
-        scene.previewRoot._notifyHierarchyStateChanged(scene.previewRoot, true);
-
-        scene.cameraEntity.camera.aspectRatio = height / width;
-        scene.cameraEntity.camera.renderTarget = rt;
-
-        scene.renderEntity.render.asset = renderAsset;
-
         this._watchMaterials();
 
-        let first = true;
+        const entity = ensurePreviewEntity();
+        entity.render.asset = renderAsset;
 
-        // generate aabb for render
-        const meshInstances = scene.renderEntity.render.meshInstances;
-        for (let i = 0; i < meshInstances.length; i++) {
-            // initialize any skin instance
-            if (meshInstances[i].skinInstance) {
-                meshInstances[i].skinInstance.updateMatrices(meshInstances[i].node);
+        const meshInstances = entity.render.meshInstances || [];
+        if (!meshInstances.length) {
+            entity.render.asset = null;
+            this.clearCanvas(this._canvas);
+            return;
+        }
+
+        meshInstances.forEach((meshInstance: any) => {
+            if (meshInstance.skinInstance) {
+                meshInstance.skinInstance.updateMatrices(meshInstance.node);
             }
+        });
 
-            if (first) {
-                first = false;
-                scene.aabb.copy(meshInstances[i].aabb);
-            } else {
-                scene.aabb.add(meshInstances[i].aabb);
-            }
-        }
+        const preview = this.createGroupFromMeshInstances(meshInstances);
+        this.renderGroupToCanvas(this._canvas, preview.group, {
+            rotationX,
+            rotationY,
+            clearColor: 0x293538,
+            clearAlpha: 0
+        });
 
-        if (first) {
-            scene.aabb.center.set(0, 0, 0);
-            scene.aabb.halfExtents.set(0.1, 0.1, 0.1);
-        }
-
-        scene.material.update();
-
-        const max = scene.aabb.halfExtents.length();
-        scene.cameraEntity.setLocalPosition(0, 0, max * 2.5);
-
-        scene.cameraOrigin.setLocalPosition(scene.aabb.center);
-        scene.cameraOrigin.setLocalEulerAngles(rotationX, rotationY, 0);
-        scene.cameraOrigin.syncHierarchy();
-
-        scene.lightEntity.setLocalRotation(scene.cameraOrigin.getLocalRotation());
-        scene.lightEntity.rotateLocal(90, 0, 0);
-
-        scene.cameraEntity.camera.farClip = max * 5.0;
-
-        scene.lightEntity.light.intensity = 1.0 / (Math.min(1.0, app.scene.exposure) || 0.01);
-
-        if (meshInstances.length) {
-            layer.addMeshInstances(meshInstances);
-        }
-        layer.addLight(scene.lightEntity.light);
-        layer.addCamera(scene.cameraEntity.camera);
-
-        // add camera to layer
-        const backupLayers = scene.cameraEntity.camera.layers.slice();
-        const newLayers = scene.cameraEntity.camera.layers;
-        newLayers.push(layer.id);
-        scene.cameraEntity.camera.layers = newLayers;
-
-        // disable fog
-        const backupFogType = app.scene.fog.type;
-        app.scene.fog.type = FOG_NONE;
-
-        app.renderComposition(layerComposition);
-
-        // restore fog settings
-        app.scene.fog.type = backupFogType;
-
-        // restore camera layers
-        scene.cameraEntity.camera.layers = backupLayers;
-
-        // read pixels from texture
-        const device = app.graphicsDevice;
-        device.gl.bindFramebuffer(device.gl.FRAMEBUFFER, rt.impl._glFrameBuffer);
-        device.gl.readPixels(0, 0, width, height, device.gl.RGBA, device.gl.UNSIGNED_BYTE, rt.pixels);
-
-        // render to canvas
-        const ctx = this._canvas.getContext('2d');
-        ctx.putImageData(new ImageData(rt.pixelsClamped, width, height), (this._canvas.width - width) / 2, (this._canvas.height - height) / 2);
-
-        layer.removeLight(scene.lightEntity.light);
-        layer.removeCamera(scene.cameraEntity.camera);
-        layer.removeMeshInstances(scene.renderEntity.render.meshInstances);
-        scene.renderEntity.render.asset = null;
-        scene.previewRoot.enabled = false;
+        preview.dispose();
+        entity.render.asset = null;
     }
 
     destroy() {
@@ -350,13 +203,13 @@ class RenderThumbnailRenderer extends ThumbnailRenderer {
 
         this._unwatchMaterials();
 
-        this._asset = null;
-        this._canvas = null;
-
         if (this._frameRequest) {
             cancelAnimationFrame(this._frameRequest);
             this._frameRequest = null;
         }
+
+        this._asset = null;
+        this._canvas = null;
     }
 }
 
