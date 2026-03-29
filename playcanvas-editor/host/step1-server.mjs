@@ -12,7 +12,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const editorRoot = path.resolve(__dirname, '..');
 const distRoot = path.join(editorRoot, 'dist');
-const engineRoot = path.join(editorRoot, 'node_modules', 'playcanvas', 'build');
+const engineRoot = path.join(editorRoot, 'vendor', 'playcanvas');
 const scenesRoot = path.join(editorRoot, 'data', 'scenes');
 const worktreeRoot = path.resolve(editorRoot, '..');
 const publicRoot = path.join(worktreeRoot, 'public');
@@ -527,9 +527,34 @@ async function sendFile(res, filePath) {
 }
 
 async function proxyRemote(res, remotePath, fallbackPaths = []) {
-    void res;
-    void remotePath;
-    void fallbackPaths;
+    const paths = [remotePath, ...fallbackPaths];
+
+    for (const candidate of paths) {
+        const target = new URL(candidate, 'https://playcanvas.com');
+
+        try {
+            const response = await fetch(target);
+            if (!response.ok) {
+                continue;
+            }
+
+            const body = Buffer.from(await response.arrayBuffer());
+            const headers = {};
+            ['content-type', 'content-length', 'cache-control', 'etag', 'last-modified'].forEach((header) => {
+                const value = response.headers.get(header);
+                if (value) {
+                    headers[header] = value;
+                }
+            });
+
+            res.writeHead(200, headers);
+            res.end(body);
+            return true;
+        } catch (_error) {
+            // Try the next fallback path.
+        }
+    }
+
     return false;
 }
 
@@ -1274,6 +1299,7 @@ function buildHtml(config) {
         };
         window.config = ${escapedConfig};
     </script>
+    <script src="/engine/playcanvas.js"></script>
     <script src="/js/editor.js"></script>
 </body>
 </html>`;

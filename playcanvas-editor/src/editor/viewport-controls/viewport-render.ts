@@ -13,7 +13,7 @@ import {
     SHADERPASS_SPECULARITY,
     SHADERPASS_UV0,
     SHADERPASS_WORLDNORMAL
-} from 'playcanvas';
+} from '@/common/playcanvas-compat';
 
 editor.once('viewport:load', (app) => {
     const controls = editor.call('layout.toolbar.launch');

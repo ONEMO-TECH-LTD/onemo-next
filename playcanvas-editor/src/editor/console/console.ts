@@ -1,5 +1,5 @@
 import type { Observer } from '@playcanvas/observer';
-import { version } from 'playcanvas';
+import { version } from '@/common/playcanvas-compat';
 
 import { formatter as f } from '@/common/utils';
 import { WorkerClient } from '@/core/worker/worker-client';

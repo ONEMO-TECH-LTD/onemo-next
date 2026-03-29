@@ -14,6 +14,10 @@ const reservedScriptNames = new Set([
     'worker'
 ]);
 
+export function getReservedScriptNames() {
+    return Array.from(reservedScriptNames);
+}
+
 export function normalizeScriptName(filename: string): null | string {
     filename = filename.trim();
 

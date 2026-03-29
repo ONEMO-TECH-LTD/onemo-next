@@ -1,3 +1,195 @@
-// Centralize remaining runtime/constant dependencies so editor UI folders no longer
-// import the engine package directly while the broader decoupling work continues.
-export * from 'playcanvas';
+// Local runtime shim for the globally loaded PlayCanvas engine.
+// The host injects /engine/playcanvas.js before the editor bundle, so modules can
+// read symbols from global pc without an npm dependency on the engine package.
+
+const runtimePc: Record<string, any> = (globalThis as any).pc || {};
+const fallbackGuid = {
+    create() {
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+            return crypto.randomUUID();
+        }
+
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
+            const rand = Math.random() * 16 | 0;
+            const value = char === 'x' ? rand : ((rand & 0x3) | 0x8);
+            return value.toString(16);
+        });
+    }
+};
+const fallbackMath = {
+    clamp(value: number, min: number, max: number) {
+        return Math.min(max, Math.max(min, value));
+    },
+    lerp(a: number, b: number, alpha: number) {
+        return a + (b - a) * alpha;
+    }
+};
+const read = <T = any>(key: string, fallback?: T): T => {
+    return (runtimePc[key] ?? fallback) as T;
+};
+
+export const version = read('version', '');
+export const ABSOLUTE_URL = read('ABSOLUTE_URL', /^(?:[a-z]+:)?\/\//i);
+export const ADDRESS_CLAMP_TO_EDGE = read('ADDRESS_CLAMP_TO_EDGE');
+export const ADDRESS_REPEAT = read('ADDRESS_REPEAT');
+export const ANIM_EQUAL_TO = read('ANIM_EQUAL_TO');
+export const ANIM_GREATER_THAN = read('ANIM_GREATER_THAN');
+export const ANIM_GREATER_THAN_EQUAL_TO = read('ANIM_GREATER_THAN_EQUAL_TO');
+export const ANIM_INTERRUPTION_NEXT = read('ANIM_INTERRUPTION_NEXT');
+export const ANIM_INTERRUPTION_NEXT_PREV = read('ANIM_INTERRUPTION_NEXT_PREV');
+export const ANIM_INTERRUPTION_NONE = read('ANIM_INTERRUPTION_NONE');
+export const ANIM_INTERRUPTION_PREV = read('ANIM_INTERRUPTION_PREV');
+export const ANIM_INTERRUPTION_PREV_NEXT = read('ANIM_INTERRUPTION_PREV_NEXT');
+export const ANIM_LESS_THAN = read('ANIM_LESS_THAN');
+export const ANIM_LESS_THAN_EQUAL_TO = read('ANIM_LESS_THAN_EQUAL_TO');
+export const ANIM_NOT_EQUAL_TO = read('ANIM_NOT_EQUAL_TO');
+export const ANIM_PARAMETER_BOOLEAN = read('ANIM_PARAMETER_BOOLEAN');
+export const ANIM_PARAMETER_FLOAT = read('ANIM_PARAMETER_FLOAT');
+export const ANIM_PARAMETER_INTEGER = read('ANIM_PARAMETER_INTEGER');
+export const ANIM_PARAMETER_TRIGGER = read('ANIM_PARAMETER_TRIGGER');
+export const AnimTrack = read('AnimTrack');
+export const AppBase = read('AppBase');
+export const Application = read('Application');
+export const Asset = read('Asset');
+export const BLENDEQUATION_ADD = read('BLENDEQUATION_ADD');
+export const BLENDMODE_ONE_MINUS_SRC_ALPHA = read('BLENDMODE_ONE_MINUS_SRC_ALPHA');
+export const BLENDMODE_SRC_ALPHA = read('BLENDMODE_SRC_ALPHA');
+export const BLEND_NONE = read('BLEND_NONE');
+export const BLEND_NORMAL = read('BLEND_NORMAL');
+export const BUFFER_DYNAMIC = read('BUFFER_DYNAMIC');
+export const BUTTON_TRANSITION_MODE_SPRITE_CHANGE = read('BUTTON_TRANSITION_MODE_SPRITE_CHANGE');
+export const BUTTON_TRANSITION_MODE_TINT = read('BUTTON_TRANSITION_MODE_TINT');
+export const BlendState = read('BlendState');
+export const BoundingBox = read('BoundingBox');
+export const BoxGeometry = read('BoxGeometry');
+export const CULLFACE_NONE = read('CULLFACE_NONE');
+export const CURVE_LINEAR = read('CURVE_LINEAR');
+export const CURVE_SPLINE = read('CURVE_SPLINE');
+export const CURVE_STEP = read('CURVE_STEP');
+export const CameraComponent = read('CameraComponent');
+export const CollisionComponent = read('CollisionComponent');
+export const Color = read('Color');
+export const ConeGeometry = read('ConeGeometry');
+export const Curve = read('Curve');
+export const CurveSet = read('CurveSet');
+export const CylinderGeometry = read('CylinderGeometry');
+export const DEVICETYPE_WEBGL2 = read('DEVICETYPE_WEBGL2');
+export const DEVICETYPE_WEBGPU = read('DEVICETYPE_WEBGPU');
+export const EMITTERSHAPE_BOX = read('EMITTERSHAPE_BOX');
+export const EMITTERSHAPE_SPHERE = read('EMITTERSHAPE_SPHERE');
+export const ElementInput = read('ElementInput');
+export const Entity = read('Entity');
+export const EnvLighting = read('EnvLighting');
+export const FITMODE_CONTAIN = read('FITMODE_CONTAIN');
+export const FITMODE_COVER = read('FITMODE_COVER');
+export const FITMODE_STRETCH = read('FITMODE_STRETCH');
+export const FITTING_BOTH = read('FITTING_BOTH');
+export const FITTING_NONE = read('FITTING_NONE');
+export const FITTING_SHRINK = read('FITTING_SHRINK');
+export const FITTING_STRETCH = read('FITTING_STRETCH');
+export const FOG_NONE = read('FOG_NONE');
+export const FILTER_NEAREST = read('FILTER_NEAREST');
+export const GAMMA_NONE = read('GAMMA_NONE');
+export const GAMMA_SRGB = read('GAMMA_SRGB');
+export const FogType = read('FogType');
+export const Geometry = read('Geometry');
+export const Gizmo = read('Gizmo');
+export const GltfExporter = read('GltfExporter');
+export const GraphNode = read('GraphNode');
+export const GraphicsDevice = read('GraphicsDevice');
+export const INDEXFORMAT_UINT16 = read('INDEXFORMAT_UINT16');
+export const IndexBuffer = read('IndexBuffer');
+export const LAYERID_DEPTH = read('LAYERID_DEPTH');
+export const LAYERID_IMMEDIATE = read('LAYERID_IMMEDIATE');
+export const LAYERID_SKYBOX = read('LAYERID_SKYBOX');
+export const LAYERID_UI = read('LAYERID_UI');
+export const LAYERID_WORLD = read('LAYERID_WORLD');
+export const LAYER_GIZMO = read('LAYER_GIZMO');
+export const LIGHTSHAPE_DISK = read('LIGHTSHAPE_DISK');
+export const LIGHTSHAPE_PUNCTUAL = read('LIGHTSHAPE_PUNCTUAL');
+export const LIGHTSHAPE_RECT = read('LIGHTSHAPE_RECT');
+export const LIGHTSHAPE_SPHERE = read('LIGHTSHAPE_SPHERE');
+export const Layer = read('Layer');
+export const LayerComposition = read('LayerComposition');
+export const Mat4 = read('Mat4');
+export const Material = read('Material');
+export const Mesh = read('Mesh');
+export const MeshInstance = read('MeshInstance');
+export const Model = read('Model');
+export const ORIENTATION_HORIZONTAL = read('ORIENTATION_HORIZONTAL');
+export const ORIENTATION_VERTICAL = read('ORIENTATION_VERTICAL');
+export const OutlineRenderer = read('OutlineRenderer');
+export const PIXELFORMAT_DXT1 = read('PIXELFORMAT_DXT1');
+export const PIXELFORMAT_DXT5 = read('PIXELFORMAT_DXT5');
+export const PIXELFORMAT_RGBA8 = read('PIXELFORMAT_RGBA8');
+export const PRIMITIVE_LINES = read('PRIMITIVE_LINES');
+export const PRIMITIVE_TRIANGLES = read('PRIMITIVE_TRIANGLES');
+export const PROJECTION_ORTHOGRAPHIC = read('PROJECTION_ORTHOGRAPHIC');
+export const PROJECTION_PERSPECTIVE = read('PROJECTION_PERSPECTIVE');
+export const Picker = read('Picker');
+export const Quat = read('Quat');
+export const RENDERSTYLE_SOLID = read('RENDERSTYLE_SOLID');
+export const RENDERSTYLE_WIREFRAME = read('RENDERSTYLE_WIREFRAME');
+export const RenderPassPrepass = read('RenderPassPrepass');
+export const RenderTarget = read('RenderTarget');
+export const RotateGizmo = read('RotateGizmo');
+export const SCROLLBAR_VISIBILITY_SHOW_ALWAYS = read('SCROLLBAR_VISIBILITY_SHOW_ALWAYS');
+export const SCROLLBAR_VISIBILITY_SHOW_WHEN_REQUIRED = read('SCROLLBAR_VISIBILITY_SHOW_WHEN_REQUIRED');
+export const SCROLL_MODE_BOUNCE = read('SCROLL_MODE_BOUNCE');
+export const SCROLL_MODE_CLAMP = read('SCROLL_MODE_CLAMP');
+export const SCROLL_MODE_INFINITE = read('SCROLL_MODE_INFINITE');
+export const SEMANTIC_ATTR15 = read('SEMANTIC_ATTR15');
+export const SEMANTIC_COLOR = read('SEMANTIC_COLOR');
+export const SEMANTIC_NORMAL = read('SEMANTIC_NORMAL');
+export const SEMANTIC_POSITION = read('SEMANTIC_POSITION');
+export const SHADERLANGUAGE_GLSL = read('SHADERLANGUAGE_GLSL');
+export const SHADERPASS_ALBEDO = read('SHADERPASS_ALBEDO');
+export const SHADERPASS_AO = read('SHADERPASS_AO');
+export const SHADERPASS_EMISSION = read('SHADERPASS_EMISSION');
+export const SHADERPASS_FORWARD = read('SHADERPASS_FORWARD');
+export const SHADERPASS_GLOSS = read('SHADERPASS_GLOSS');
+export const SHADERPASS_LIGHTING = read('SHADERPASS_LIGHTING');
+export const SHADERPASS_METALNESS = read('SHADERPASS_METALNESS');
+export const SHADERPASS_OPACITY = read('SHADERPASS_OPACITY');
+export const SHADERPASS_SPECULARITY = read('SHADERPASS_SPECULARITY');
+export const SHADERPASS_UV0 = read('SHADERPASS_UV0');
+export const SHADERPASS_WORLDNORMAL = read('SHADERPASS_WORLDNORMAL');
+export const SHADER_FORWARD = read('SHADER_FORWARD');
+export const SHADER_PICK = read('SHADER_PICK');
+export const SHADOWUPDATE_REALTIME = read('SHADOWUPDATE_REALTIME');
+export const SHADOWUPDATE_THISFRAME = read('SHADOWUPDATE_THISFRAME');
+export const SHADOW_PCF1_32F = read('SHADOW_PCF1_32F');
+export const SHADOW_PCF3_32F = read('SHADOW_PCF3_32F');
+export const SHADOW_PCF5_32F = read('SHADOW_PCF5_32F');
+export const SHADOW_PCSS_32F = read('SHADOW_PCSS_32F');
+export const SHADOW_VSM16 = read('SHADOW_VSM16');
+export const SHADOW_VSM_16F = read('SHADOW_VSM_16F');
+export const SHADOW_VSM_32F = read('SHADOW_VSM_32F');
+export const SORTMODE_BACK2FRONT = read('SORTMODE_BACK2FRONT');
+export const SORTMODE_NONE = read('SORTMODE_NONE');
+export const ScaleGizmo = read('ScaleGizmo');
+export const Shader = read('Shader');
+export const ShaderMaterial = read('ShaderMaterial');
+export const SphereGeometry = read('SphereGeometry');
+export const StandardMaterial = read('StandardMaterial');
+export const TEXTURETYPE_RGBM = read('TEXTURETYPE_RGBM');
+export const TYPE_FLOAT32 = read('TYPE_FLOAT32');
+export const TYPE_UINT8 = read('TYPE_UINT8');
+export const Template = read('Template');
+export const Texture = read('Texture');
+export const TextureUtils = read('TextureUtils');
+export const TransformGizmo = read('TransformGizmo');
+export const TranslateGizmo = read('TranslateGizmo');
+export const UsdzExporter = read('UsdzExporter');
+export const Vec2 = read('Vec2');
+export const Vec3 = read('Vec3');
+export const Vec4 = read('Vec4');
+export const VertexBuffer = read('VertexBuffer');
+export const VertexFormat = read('VertexFormat');
+export const VertexIterator = read('VertexIterator');
+export const ViewCube = read('ViewCube');
+export const WasmModule = read('WasmModule');
+export const guid = read('guid', fallbackGuid);
+export const math = read('math', fallbackMath);
+export const reprojectTexture = read('reprojectTexture');
+export const script = read('script', { legacy: false });
