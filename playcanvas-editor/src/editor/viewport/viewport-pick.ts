@@ -1,4 +1,4 @@
-import { Entity, GraphNode, Picker, Vec2 } from 'playcanvas';
+import { Entity, GraphNode, Picker, Vec2 } from './viewport-engine';
 
 import { FORCE_PICK_TAG } from '@/core/constants';
 

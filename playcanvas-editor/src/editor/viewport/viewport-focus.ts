@@ -1,4 +1,4 @@
-import { BoundingBox, Entity, Vec3 } from 'playcanvas';
+import { BoundingBox, Entity, Vec3 } from './viewport-engine';
 
 editor.once('load', () => {
     const app = editor.call('viewport:app');

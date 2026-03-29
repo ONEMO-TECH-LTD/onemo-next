@@ -1,4 +1,4 @@
-import { PROJECTION_PERSPECTIVE, Vec2 } from 'playcanvas';
+import { PROJECTION_PERSPECTIVE, Vec2 } from '../viewport-engine';
 
 editor.once('viewport:load', (app) => {
     // Looking around with right mouse button

@@ -1,4 +1,4 @@
-import { type Application, PROJECTION_ORTHOGRAPHIC, Vec3 } from 'playcanvas';
+import { type Application, PROJECTION_ORTHOGRAPHIC, Vec3 } from '../viewport-engine';
 
 editor.once('viewport:load', (app: Application) => {
     // Focusing on a point and a distance
@@ -58,7 +58,7 @@ editor.once('viewport:load', (app: Application) => {
             if (dist > 0.01) {
                 const speed = Math.min(1.0, Math.min(1.0, flySpeed * ((firstUpdate ? 1 / 60 : dt) / (1 / 60))));
                 vecA.copy(pos).lerp(pos, focusPoint, speed);
-                camera.setPosition(vecA);
+                camera.setPosition(vecA.x, vecA.y, vecA.z);
 
                 if (camera.camera.projection === PROJECTION_ORTHOGRAPHIC) {
                     let orthoHeight = camera.camera.orthoHeight;
@@ -68,7 +68,7 @@ editor.once('viewport:load', (app: Application) => {
 
                 editor.call('viewport:render');
             } else {
-                camera.setPosition(focusPoint);
+                camera.setPosition(focusPoint.x, focusPoint.y, focusPoint.z);
                 if (camera.camera.projection === PROJECTION_ORTHOGRAPHIC) {
                     camera.camera.orthoHeight = focusOrthoHeight;
                 }

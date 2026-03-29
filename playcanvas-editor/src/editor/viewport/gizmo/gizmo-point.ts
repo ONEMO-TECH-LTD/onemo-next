@@ -1,5 +1,5 @@
 import { Events } from '@playcanvas/observer';
-import { Color, CULLFACE_NONE, Entity, math, PROJECTION_PERSPECTIVE, Quat, Vec3 } from 'playcanvas';
+import { Color, CULLFACE_NONE, Entity, math, PROJECTION_PERSPECTIVE, Quat, Vec3 } from '../viewport-engine';
 
 import { assignEvents } from '@/common/utils';
 import { GIZMO_MASK } from '@/core/constants';
@@ -167,7 +167,7 @@ editor.once('viewport:load', (app) => {
                 scale = camera.camera.orthoHeight / 3 * gizmoSize;
             }
             vecA.copy(this.scale).mulScalar(scale);
-            this.entity.setLocalScale(vecA);
+            this.entity.setLocalScale(vecA.x, vecA.y, vecA.z);
         }
 
         set enabled(value: boolean) {

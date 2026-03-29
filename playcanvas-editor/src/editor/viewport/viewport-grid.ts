@@ -1,4 +1,4 @@
-import { type Application, GraphNode, Mesh, MeshInstance, PRIMITIVE_LINES } from 'playcanvas';
+import { type Application, GraphNode, Mesh, MeshInstance, PRIMITIVE_LINES } from './viewport-engine';
 
 import { createColorMaterial } from './viewport-color-material';
 

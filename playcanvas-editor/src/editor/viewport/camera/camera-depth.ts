@@ -1,4 +1,4 @@
-import { RenderPassPrepass } from 'playcanvas';
+import { RenderPassPrepass } from '../viewport-engine';
 
 editor.once('viewport:load', (app) => {
     const scene = app.scene;

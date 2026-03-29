@@ -1,4 +1,4 @@
-import { type CameraComponent, Entity, type Layer, PROJECTION_ORTHOGRAPHIC, PROJECTION_PERSPECTIVE, SHADOWUPDATE_THISFRAME, Vec3 } from 'playcanvas';
+import { type CameraComponent, Entity, type Layer, PROJECTION_ORTHOGRAPHIC, PROJECTION_PERSPECTIVE, SHADOWUPDATE_THISFRAME, Vec3 } from '../viewport-engine';
 
 editor.once('load', () => {
     editor.once('viewport:load', (app) => {
@@ -245,8 +245,8 @@ editor.once('load', () => {
             entity.__editorName = args.name;
             entity.name = args.title;
             entity.className = args.className;
-            entity.setPosition(args.position);
-            entity.setEulerAngles(args.rotation);
+            entity.setPosition(args.position.x, args.position.y, args.position.z);
+            entity.setEulerAngles(args.rotation.x, args.rotation.y, args.rotation.z);
             entity.focus = new Vec3();
 
             editorCameras[args.name] = entity;

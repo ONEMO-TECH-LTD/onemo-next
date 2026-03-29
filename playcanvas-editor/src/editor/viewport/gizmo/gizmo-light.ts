@@ -21,7 +21,7 @@ import {
     type GraphicsDevice,
     type Material,
     Vec3
-} from 'playcanvas';
+} from '../viewport-engine';
 
 import { GIZMO_MASK } from '@/core/constants';
 import type { EntityObserver } from '@/editor-api';

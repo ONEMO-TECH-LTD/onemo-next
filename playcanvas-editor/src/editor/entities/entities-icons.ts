@@ -1,4 +1,4 @@
-import { ADDRESS_CLAMP_TO_EDGE, BLEND_NONE, BLEND_NORMAL, Color, Entity, FILTER_NEAREST, StandardMaterial, Texture } from 'playcanvas';
+import { ADDRESS_CLAMP_TO_EDGE, BLEND_NONE, BLEND_NORMAL, Color, Entity, FILTER_NEAREST, StandardMaterial, Texture } from '../viewport/viewport-engine';
 
 editor.once('load', () => {
     let app;

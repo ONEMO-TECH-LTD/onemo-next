@@ -1,4 +1,4 @@
-import { type Application, PROJECTION_PERSPECTIVE, Vec2, Vec3 } from 'playcanvas';
+import { type Application, PROJECTION_PERSPECTIVE, Vec2, Vec3 } from '../viewport-engine';
 
 import type { ViewportTap } from '../viewport-tap';
 

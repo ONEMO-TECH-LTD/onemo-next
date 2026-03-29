@@ -1,4 +1,4 @@
-import { type Application, PROJECTION_ORTHOGRAPHIC, Vec3 } from 'playcanvas';
+import { type Application, PROJECTION_ORTHOGRAPHIC, Vec3 } from '../viewport-engine';
 
 editor.once('viewport:load', (app: Application) => {
 

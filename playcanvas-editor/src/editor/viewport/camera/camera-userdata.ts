@@ -1,4 +1,4 @@
-import { type Entity, PROJECTION_ORTHOGRAPHIC, Quat } from 'playcanvas';
+import { type Entity, PROJECTION_ORTHOGRAPHIC, Quat } from '../viewport-engine';
 
 editor.once('camera:load', () => {
     const userdata = editor.call('userdata');

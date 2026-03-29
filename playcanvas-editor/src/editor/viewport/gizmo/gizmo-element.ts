@@ -1,4 +1,4 @@
-import { type AppBase, Color, Vec3 } from 'playcanvas';
+import { type AppBase, Color, Vec3 } from '../viewport-engine';
 
 editor.once('load', () => {
     const positions = [];

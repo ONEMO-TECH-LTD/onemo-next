@@ -1,4 +1,4 @@
-import { type Application, PROJECTION_PERSPECTIVE, Quat, Vec2, Vec3 } from 'playcanvas';
+import { type Application, PROJECTION_PERSPECTIVE, Quat, Vec2, Vec3 } from '../viewport-engine';
 
 import type { ViewportTap } from '../viewport-tap';
 
@@ -34,8 +34,8 @@ editor.once('viewport:load', (app: Application) => {
             quat.transformVector(vecA, vecA);
             vecA.add(pivot);
 
-            camera.setPosition(vecA);
-            camera.setRotation(quat);
+            camera.setPosition(vecA.x, vecA.y, vecA.z);
+            camera.setRotation(quat.x, quat.y, quat.z, quat.w);
 
             editor.call('viewport:render');
         }

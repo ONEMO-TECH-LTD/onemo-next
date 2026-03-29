@@ -8,7 +8,7 @@ import {
     ScaleGizmo,
     TransformGizmo,
     TranslateGizmo
-} from 'playcanvas';
+} from '../viewport-engine';
 
 import { Defer } from '@/common/defer';
 import { type EntityObserver } from '@/editor-api';

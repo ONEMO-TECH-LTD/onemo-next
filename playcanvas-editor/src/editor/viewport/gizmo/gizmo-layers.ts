@@ -1,4 +1,4 @@
-import { Layer, type LayerComposition, SORTMODE_BACK2FRONT, SORTMODE_NONE } from 'playcanvas';
+import { Layer, type LayerComposition, SORTMODE_BACK2FRONT, SORTMODE_NONE } from '../viewport-engine';
 
 editor.once('load', () => {
     // holds all layers that are to be added in the beginning of the composition
