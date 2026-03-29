@@ -371,7 +371,7 @@ function EditorViewportOverlay({
       {canTransform ? (
         <TransformControls
           ref={transformControlsRef}
-          object={transformObject}
+          object={transformObject!}
           mode={transformMode}
           space={transformSpace}
           size={0.95}
