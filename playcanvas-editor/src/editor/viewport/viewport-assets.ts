@@ -1,4 +1,4 @@
-import { StandardMaterial, Vec2, Vec4 } from 'playcanvas';
+import { StandardMaterial, Vec2, Vec4 } from './viewport-engine';
 
 editor.once('load', () => {
     const app = editor.call('viewport:app');

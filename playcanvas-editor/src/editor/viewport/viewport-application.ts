@@ -1,4 +1,4 @@
-import { Application, Color, FOG_NONE, math, PROJECTION_PERSPECTIVE, Vec4 } from 'playcanvas';
+import { Application, Color, FOG_NONE, math, PROJECTION_PERSPECTIVE, Vec4 } from './viewport-engine';
 
 let time;
 const rect = new Vec4(0, 0, 1, 1);

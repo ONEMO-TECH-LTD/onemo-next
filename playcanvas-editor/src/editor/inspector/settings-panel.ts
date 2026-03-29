@@ -11,7 +11,6 @@ import { EngineSettingsPanel } from './settings-panels/engine';
 import { ExternalScriptsSettingsPanel } from './settings-panels/external-scripts';
 import { ImportMapSettingsPanel } from './settings-panels/import-map';
 import { InputSettingsPanel } from './settings-panels/input';
-import { LaunchPageSettingsPanel } from './settings-panels/launch-page';
 import { LayersSettingsPanel } from './settings-panels/layers';
 import { LightmappingSettingsPanel } from './settings-panels/lightmapping';
 import { LoadingScreenSettingsPanel } from './settings-panels/loading-screen';
@@ -37,7 +36,6 @@ const SETTINGS_PANELS = [
     LoadingScreenSettingsPanel,
     ImportMapSettingsPanel,
     ExternalScriptsSettingsPanel,
-    LaunchPageSettingsPanel,
     InputSettingsPanel,
     LocalizationSettingsPanel,
     NetworkSettingsPanel,

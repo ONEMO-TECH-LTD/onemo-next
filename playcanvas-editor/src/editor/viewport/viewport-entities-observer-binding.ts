@@ -1,4 +1,4 @@
-import { Entity } from 'playcanvas';
+import { Entity } from './viewport-engine';
 
 editor.once('load', () => {
     const app = editor.call('viewport:app');

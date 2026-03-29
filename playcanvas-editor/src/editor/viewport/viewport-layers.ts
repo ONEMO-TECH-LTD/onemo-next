@@ -1,5 +1,5 @@
 import type { Observer } from '@playcanvas/observer';
-import { Layer, LayerComposition } from 'playcanvas';
+import { Layer, LayerComposition } from './viewport-engine';
 
 editor.once('load', () => {
     const app = editor.call('viewport:app');

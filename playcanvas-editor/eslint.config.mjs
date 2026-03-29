@@ -33,7 +33,6 @@ const coreConfig = {
         'src/core/**/*.ts',
         'src/common/**/*.ts',
         'src/editor/**/*.ts',
-        'src/launch/**/*.ts',
         'src/plugins/**/*.ts'
     ],
     plugins: tsTypeRules.plugins,

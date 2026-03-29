@@ -1,5 +1,5 @@
 import { Canvas } from '@playcanvas/pcui';
-import { LAYERID_DEPTH, Mouse, TouchDevice, WasmModule } from 'playcanvas';
+import { WasmModule, moveViewportDepthLayer } from './viewport-engine';
 
 import { config } from '@/editor/config';
 
@@ -20,12 +20,10 @@ editor.once('load', () => {
     // order to ensure that the generated screenshots are consistent across different GPUs.
     const disableAntiAliasing = /disableAntiAliasing=true/.test(location.search);
 
-    // create playcanvas application
+    // create the minimal editor app shell
     let app;
     try {
         app = new ViewportApplication(canvas.element, {
-            mouse: new Mouse(canvas.element),
-            touch: 'ontouchstart' in window ? new TouchDevice(canvas.element) : null,
             editorSettings: projectUserSettings.json().editor,
             graphicsDeviceOptions: {
                 antialias: !disableAntiAliasing,
@@ -33,11 +31,9 @@ editor.once('load', () => {
             }
         });
 
-        // Depth layer is where the framebuffer is copied to a texture to be used in the following layers.
-        // Move the depth layer to take place after World and Skydome layers, to capture both of them.
-        const depthLayer = app.scene.layers.getLayerById(LAYERID_DEPTH);
-        app.scene.layers.remove(depthLayer);
-        app.scene.layers.insertOpaque(depthLayer, 2);
+        // Pointer handling now lives in viewport-tap.ts and the R3F overlay.
+        // Keep the legacy depth-layer shuffle only for tools still hanging off the app shell.
+        moveViewportDepthLayer(app);
 
         app.enableBundles = false;
 

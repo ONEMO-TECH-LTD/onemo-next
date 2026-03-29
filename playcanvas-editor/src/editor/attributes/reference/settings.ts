@@ -240,14 +240,6 @@ editor.once('load', () => {
         title: 'External Scripts',
         description: 'The URLs of external scripts you would like to include in your application. These URLs are added as <script> tags in the main HTML page of the application before any other script is loaded.'
     }, {
-        name: 'settings:launch-page',
-        title: 'Launch Page',
-        description: 'Settings for the launch page.'
-    }, {
-        name: 'settings:project:enableSharedArrayBuffer',
-        title: 'Enable SharedArrayBuffer',
-        description: 'Adds the required headers on the launch page to enable SharedArrayBuffer.'
-    }, {
         name: 'settings:project',
         title: 'Project Settings',
         description: 'Settings that affect the entire Project and not just this Scene.'

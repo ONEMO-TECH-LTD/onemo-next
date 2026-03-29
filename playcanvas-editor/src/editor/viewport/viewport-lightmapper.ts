@@ -1,4 +1,4 @@
-import { SHADOWUPDATE_THISFRAME } from 'playcanvas';
+import { SHADOWUPDATE_THISFRAME } from './viewport-engine';
 
 editor.once('load', () => {
     const app = editor.call('viewport:app');

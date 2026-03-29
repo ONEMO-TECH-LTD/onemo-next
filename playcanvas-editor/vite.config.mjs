@@ -282,13 +282,6 @@ const PAGE_TARGETS = [
             ...shared.define,
             'import.meta.url': 'undefined' // import.meta not supported in iife
         }
-    },
-    {
-        ...shared,
-        entryPoints: ['src/launch/index.ts'],
-        outfile: 'dist/js/launch.js',
-        format: 'iife',
-        plugins: [...pagePlugins, globalExternalsPlugin({ playcanvas: 'window.pc' })]
     }
 ];
 

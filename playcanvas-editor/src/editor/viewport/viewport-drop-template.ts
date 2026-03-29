@@ -1,4 +1,4 @@
-import { Entity, Vec3 } from 'playcanvas';
+import { Entity, Vec3 } from './viewport-engine';
 
 import { config } from '@/editor/config';
 
