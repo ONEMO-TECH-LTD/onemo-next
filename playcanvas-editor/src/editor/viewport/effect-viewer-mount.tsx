@@ -2,7 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import * as THREE from 'three';
 
-import EffectViewer, { type EffectViewerBridge } from '../../../../src/app/(dev)/prototype/core/EffectViewer';
+import EffectViewer, {
+    type EffectViewerBridge,
+    type EffectViewerTransformSnapshot
+} from '../../../../src/app/(dev)/prototype/core/EffectViewer';
 import type { DesignState, ViewerConfig } from '../../../../src/app/(dev)/prototype/types';
 
 import { createObserverR3FBridge, type SavedScene } from '../adapter/observer-r3f-bridge';
@@ -157,6 +160,28 @@ function BridgeViewportApp({
     const resolveObjectById = useMemo(() => {
         return (resourceId: string) => bridge.getObjectById(resourceId);
     }, [bridge]);
+    const resolveIdByObject = useMemo(() => {
+        return (object: THREE.Object3D) => bridge.getResourceIdForObject(object);
+    }, [bridge]);
+    const handleSelectResourceId = useCallback((resourceId: string) => {
+        const observer = editor.call('entities:get', resourceId) as SelectableObserver | null;
+        if (!observer) {
+            return;
+        }
+
+        editor.call('selector:set', 'entity', [observer]);
+        editor.emit('attributes:inspect[entity]', [observer]);
+    }, []);
+    const handleSceneChange = useCallback(() => {
+        bridge.markSceneDirty();
+    }, [bridge]);
+    const handleTransformCommit = useCallback((payload: {
+        resourceId: string;
+        before: EffectViewerTransformSnapshot;
+        after: EffectViewerTransformSnapshot;
+    }) => {
+        bridge.recordTransformHistory(payload.resourceId, payload.before, payload.after);
+    }, [bridge]);
     const handleBridgeReady = useCallback((context: EffectViewerBridge) => {
         bridge.setContext(context);
         onContextReady?.(context);
@@ -175,6 +200,10 @@ function BridgeViewportApp({
             isEditing={false}
             selectedResourceIds={selectedResourceIds}
             resolveObjectById={resolveObjectById}
+            resolveIdByObject={resolveIdByObject}
+            onSelectResourceId={handleSelectResourceId}
+            onTransformCommit={handleTransformCommit}
+            onSceneChange={handleSceneChange}
             transformMode={gizmoMode}
             transformSpace={gizmoSpace}
             showGizmoHelper

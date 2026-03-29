@@ -85,6 +85,18 @@ type BridgeViewerActions = {
     updateConfig: (updater: (config: ViewerConfig) => void) => void;
 };
 
+type TransformSnapshot = {
+    position: [number, number, number];
+    rotation: [number, number, number];
+    scale: [number, number, number];
+};
+
+type HistoryToggleTarget = {
+    history?: {
+        enabled?: boolean;
+    };
+} | null | undefined;
+
 export type SavedScene = {
     name: string;
     created: string;
@@ -181,6 +193,8 @@ export class ObserverR3FBridge {
 
     private readonly objectById = new Map<string, THREE.Object3D>();
 
+    private resourceIdByObject = new WeakMap<THREE.Object3D, string>();
+
     private readonly materialByAssetId = new Map<number, THREE.Material>();
 
     private readonly materialIdsByUuid = new Map<string, number>();
@@ -262,17 +276,6 @@ export class ObserverR3FBridge {
     }
 
     setContext(context: EffectViewerBridge) {
-        if (
-            this.context &&
-            this.context.scene === context.scene &&
-            this.context.camera === context.camera &&
-            this.context.renderer === context.renderer &&
-            this.context.modelRoot === context.modelRoot &&
-            this.context.keyLight === context.keyLight
-        ) {
-            return;
-        }
-
         this.context = context;
         this.scheduleRebuild();
     }
@@ -365,6 +368,44 @@ export class ObserverR3FBridge {
 
     getObjectById(resourceId: string) {
         return this.objectById.get(resourceId) || null;
+    }
+
+    getResourceIdForObject(object: THREE.Object3D | null) {
+        let current: THREE.Object3D | null = object;
+        while (current) {
+            const resourceId = this.resourceIdByObject.get(current);
+            if (resourceId) {
+                return resourceId;
+            }
+            current = current.parent;
+        }
+
+        return null;
+    }
+
+    markSceneDirty() {
+        this.sceneDirty = true;
+    }
+
+    recordTransformHistory(resourceId: string, before: TransformSnapshot, after: TransformSnapshot) {
+        if (
+            arraysEqual(before.position, after.position) &&
+            arraysEqual(before.rotation, after.rotation) &&
+            arraysEqual(before.scale, after.scale)
+        ) {
+            return;
+        }
+
+        editor.api.globals.history.add({
+            name: 'entities.transform',
+            combine: false,
+            undo: () => {
+                this.applyTransformSnapshot(resourceId, before);
+            },
+            redo: () => {
+                this.applyTransformSnapshot(resourceId, after);
+            }
+        });
     }
 
     isViewportHidden(resourceId: string) {
@@ -622,14 +663,18 @@ export class ObserverR3FBridge {
             }
 
             if (typeof materialData.name === 'string' && materialData.name.trim()) {
-                observer.set('name', materialData.name.trim());
+                this.withSyncGuard(() => {
+                    observer.set('name', materialData.name.trim());
+                }, [observer]);
             }
 
             const data = materialData.data || {};
-            Object.entries(data).forEach(([key, value]) => {
-                observer.set(`data.${key}`, cloneSerializable(value));
-                applyMaterialObserverChange(material, `data.${key}`, observer);
-            });
+            this.withSyncGuard(() => {
+                Object.entries(data).forEach(([key, value]) => {
+                    observer.set(`data.${key}`, cloneSerializable(value));
+                    applyMaterialObserverChange(material, `data.${key}`, observer);
+                });
+            }, [observer]);
             material.needsUpdate = true;
         });
 
@@ -687,6 +732,7 @@ export class ObserverR3FBridge {
 
         this.cleanupBindings();
         this.objectById.clear();
+        this.resourceIdByObject = new WeakMap<THREE.Object3D, string>();
         this.materialByAssetId.clear();
         this.lastSceneSnapshot.clear();
 
@@ -822,7 +868,7 @@ export class ObserverR3FBridge {
                 object,
                 components
             }));
-            this.objectById.set(object.uuid, object);
+            this.registerObjectBinding(object.uuid, object);
 
             object.children.forEach((child) => {
                 if (this.shouldIncludeSceneObject(child)) {
@@ -843,7 +889,7 @@ export class ObserverR3FBridge {
                 camera: createCameraComponentData(ctx.camera, ctx.scene)
             }
         }));
-        this.objectById.set(BRIDGE_CAMERA_ID, ctx.camera);
+        this.registerObjectBinding(BRIDGE_CAMERA_ID, ctx.camera);
 
         if (ctx.keyLight) {
             result.push(createBridgeEntityData({
@@ -856,7 +902,7 @@ export class ObserverR3FBridge {
                     light: createLightComponentData(ctx.keyLight)
                 }
             }));
-            this.objectById.set(BRIDGE_LIGHT_ID, ctx.keyLight);
+            this.registerObjectBinding(BRIDGE_LIGHT_ID, ctx.keyLight);
         }
 
         return result;
@@ -921,7 +967,7 @@ export class ObserverR3FBridge {
                     existing.set('name', record.name);
                     existing.set('data', createMaterialData(record.material, existing.get('data') || {}));
                     existing.set('tags', [BRIDGE_ASSET_TAG]);
-                });
+                }, [existing]);
             } else {
                 const asset = new Asset({
                     id: assetId,
@@ -1145,6 +1191,11 @@ export class ObserverR3FBridge {
         }).join('')}`;
     }
 
+    private registerObjectBinding(resourceId: string, object: THREE.Object3D) {
+        this.objectById.set(resourceId, object);
+        this.resourceIdByObject.set(object, resourceId);
+    }
+
     private bindEntityObserver(observer: EntityObserver) {
         const resourceId = observer.get('resource_id');
         const object = this.objectById.get(resourceId);
@@ -1283,7 +1334,7 @@ export class ObserverR3FBridge {
                     this.setObserverValue(observer, 'components.camera.nearClip', snapshot.camera.nearClip);
                     this.setObserverValue(observer, 'components.camera.farClip', snapshot.camera.farClip);
                 }
-            });
+            }, [observer]);
         });
     }
 
@@ -1351,16 +1402,35 @@ export class ObserverR3FBridge {
         return true;
     }
 
+    private withObserverHistoryDisabled(observer: HistoryToggleTarget, fn: () => void) {
+        const enabled = observer?.history?.enabled;
+        if (!this.syncGuard || enabled === undefined) {
+            fn();
+            return;
+        }
+
+        observer.history.enabled = false;
+        try {
+            fn();
+        } finally {
+            observer.history.enabled = enabled;
+        }
+    }
+
     private setObserverValue(observer: EntityObserver, path: string, value: unknown) {
         if (observer.get(path) !== value) {
-            observer.set(path, value);
+            this.withObserverHistoryDisabled(observer, () => {
+                observer.set(path, value);
+            });
         }
     }
 
     private setObserverArray(observer: EntityObserver, path: string, value: number[]) {
         const current = observer.get(path);
         if (!arraysEqual(current || [], value)) {
-            observer.set(path, cloneArray(value));
+            this.withObserverHistoryDisabled(observer, () => {
+                observer.set(path, cloneArray(value));
+            });
         }
     }
 
@@ -1446,13 +1516,59 @@ export class ObserverR3FBridge {
         }
     }
 
-    private withSyncGuard(fn: () => void) {
+    private withSyncGuard(fn: () => void, historyTargets: HistoryToggleTarget[] = []) {
+        const previousSyncGuard = this.syncGuard;
+        const toggled = historyTargets
+            .filter((target): target is Exclude<HistoryToggleTarget, null | undefined> => !!target)
+            .map((target) => {
+                return {
+                    target,
+                    enabled: target.history?.enabled
+                };
+            });
+
         this.syncGuard = true;
         try {
+            toggled.forEach(({ target, enabled }) => {
+                if (enabled !== undefined) {
+                    target.history.enabled = false;
+                }
+            });
             fn();
         } finally {
-            this.syncGuard = false;
+            toggled.forEach(({ target, enabled }) => {
+                if (enabled !== undefined) {
+                    target.history.enabled = enabled;
+                }
+            });
+            this.syncGuard = previousSyncGuard;
         }
+    }
+
+    private applyTransformSnapshot(resourceId: string, snapshot: TransformSnapshot) {
+        const object = this.objectById.get(resourceId);
+        const observer = editor.call('entities:get', resourceId) as EntityObserver | null;
+        if (!object || !observer) {
+            return;
+        }
+
+        object.position.set(snapshot.position[0], snapshot.position[1], snapshot.position[2]);
+        object.rotation.set(
+            THREE.MathUtils.degToRad(snapshot.rotation[0]),
+            THREE.MathUtils.degToRad(snapshot.rotation[1]),
+            THREE.MathUtils.degToRad(snapshot.rotation[2])
+        );
+        object.scale.set(snapshot.scale[0], snapshot.scale[1], snapshot.scale[2]);
+        object.updateMatrixWorld(true);
+
+        this.withSyncGuard(() => {
+            this.setObserverArray(observer, 'position', snapshot.position);
+            this.setObserverArray(observer, 'rotation', snapshot.rotation);
+            this.setObserverArray(observer, 'scale', snapshot.scale);
+        }, [observer]);
+
+        this.lastSceneSnapshot.set(resourceId, this.createSceneSnapshot(resourceId, object, observer));
+        this.sceneDirty = false;
     }
 
     private applyEffectiveVisibility(resourceId: string, object: THREE.Object3D, observer: EntityObserver) {

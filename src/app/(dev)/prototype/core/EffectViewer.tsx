@@ -19,6 +19,12 @@ export interface EffectViewerBridge {
   keyLight?: THREE.PointLight | null
 }
 
+export interface EffectViewerTransformSnapshot {
+  position: [number, number, number]
+  rotation: [number, number, number]
+  scale: [number, number, number]
+}
+
 interface EffectViewerProps {
   config: ViewerConfig
   artworkUrl?: string
@@ -27,10 +33,38 @@ interface EffectViewerProps {
   onBridgeReady?: (bridge: EffectViewerBridge) => void
   selectedResourceIds?: string[]
   resolveObjectById?: (resourceId: string) => THREE.Object3D | null
+  resolveIdByObject?: (object: THREE.Object3D) => string | null
+  onSelectResourceId?: (resourceId: string) => void
+  onTransformCommit?: (payload: {
+    resourceId: string
+    before: EffectViewerTransformSnapshot
+    after: EffectViewerTransformSnapshot
+  }) => void
+  onSceneChange?: () => void
   transformMode?: 'translate' | 'rotate' | 'scale' | 'disabled'
   transformSpace?: 'world' | 'local'
   showGizmoHelper?: boolean
   enableTransformControls?: boolean
+}
+
+function snapshotObjectTransform(object: THREE.Object3D): EffectViewerTransformSnapshot {
+  return {
+    position: [
+      Number(object.position.x.toFixed(6)),
+      Number(object.position.y.toFixed(6)),
+      Number(object.position.z.toFixed(6)),
+    ],
+    rotation: [
+      Number(THREE.MathUtils.radToDeg(object.rotation.x).toFixed(6)),
+      Number(THREE.MathUtils.radToDeg(object.rotation.y).toFixed(6)),
+      Number(THREE.MathUtils.radToDeg(object.rotation.z).toFixed(6)),
+    ],
+    scale: [
+      Number(object.scale.x.toFixed(6)),
+      Number(object.scale.y.toFixed(6)),
+      Number(object.scale.z.toFixed(6)),
+    ],
+  }
 }
 
 function disposeHelperObject(helper: THREE.Object3D) {
@@ -165,6 +199,10 @@ function SelectionOutline({ target }: { target: THREE.Object3D | null }) {
 function EditorViewportOverlay({
   selectedResourceIds,
   resolveObjectById,
+  resolveIdByObject,
+  onSelectResourceId,
+  onTransformCommit,
+  onSceneChange,
   orbitControlsRef,
   transformMode,
   transformSpace,
@@ -173,12 +211,21 @@ function EditorViewportOverlay({
 }: {
   selectedResourceIds: string[]
   resolveObjectById?: (resourceId: string) => THREE.Object3D | null
+  resolveIdByObject?: (object: THREE.Object3D) => string | null
+  onSelectResourceId?: (resourceId: string) => void
+  onTransformCommit?: (payload: {
+    resourceId: string
+    before: EffectViewerTransformSnapshot
+    after: EffectViewerTransformSnapshot
+  }) => void
+  onSceneChange?: () => void
   orbitControlsRef: RefObject<React.ComponentRef<typeof OrbitControls> | null>
   transformMode: 'translate' | 'rotate' | 'scale' | 'disabled'
   transformSpace: 'world' | 'local'
   showGizmoHelper?: boolean
   enableTransformControls?: boolean
 }) {
+  const { camera, scene, gl } = useThree()
   const selectedObject = useMemo(() => {
     if (!selectedResourceIds.length || !resolveObjectById) {
       return null
@@ -190,8 +237,14 @@ function EditorViewportOverlay({
   const transformControlsRef = useRef<React.ComponentRef<typeof TransformControls>>(null)
   const lightProxyRef = useRef<THREE.Group>(new THREE.Group())
   const isDraggingRef = useRef(false)
+  const dragStartTransformRef = useRef<EffectViewerTransformSnapshot | null>(null)
+  const dragResourceIdRef = useRef<string | null>(null)
+  const pointerRef = useRef(new THREE.Vector2())
+  const raycasterRef = useRef(new THREE.Raycaster())
   const selectedLight = selectedObject instanceof THREE.Light ? selectedObject : null
-  const transformObject = selectedLight ?? selectedObject
+  const transformTarget = selectedLight ?? selectedObject
+  // eslint-disable-next-line react-hooks/refs -- lightProxyRef is a stable Group instance, safe to access during render
+  const transformObject = selectedLight ? lightProxyRef.current : selectedObject
 
   useEffect(() => {
     if (!selectedLight || isDraggingRef.current) {
@@ -215,6 +268,40 @@ function EditorViewportOverlay({
   })
 
   useEffect(() => {
+    const element = gl.domElement
+    const handleClick = (event: MouseEvent) => {
+      if (isDraggingRef.current || !resolveIdByObject || !onSelectResourceId) {
+        return
+      }
+
+      const rect = element.getBoundingClientRect()
+      pointerRef.current.set(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1
+      )
+
+      raycasterRef.current.setFromCamera(pointerRef.current, camera)
+      const intersection = raycasterRef.current
+        .intersectObjects(scene.children, true)
+        .find((entry) => !!resolveIdByObject(entry.object))
+
+      if (!intersection) {
+        return
+      }
+
+      const resourceId = resolveIdByObject(intersection.object)
+      if (resourceId) {
+        onSelectResourceId(resourceId)
+      }
+    }
+
+    element.addEventListener('click', handleClick)
+    return () => {
+      element.removeEventListener('click', handleClick)
+    }
+  }, [camera, gl, onSelectResourceId, resolveIdByObject, scene])
+
+  useEffect(() => {
     const controls = transformControlsRef.current
     const orbitControls = orbitControlsRef.current
     if (!controls) {
@@ -226,15 +313,33 @@ function EditorViewportOverlay({
       if (orbitControls) {
         orbitControls.enabled = !event.value
       }
-    }
 
-    const handleObjectChange = () => {
-      if (!selectedLight) {
+      if (event.value) {
+        dragStartTransformRef.current = transformTarget ? snapshotObjectTransform(transformTarget) : null
+        dragResourceIdRef.current = transformTarget && resolveIdByObject ? resolveIdByObject(transformTarget) : null
         return
       }
 
-      selectedLight.position.copy(lightProxyRef.current.position)
-      selectedLight.updateMatrixWorld(true)
+      const resourceId = dragResourceIdRef.current
+      if (transformTarget && resourceId && dragStartTransformRef.current && onTransformCommit) {
+        onTransformCommit({
+          resourceId,
+          before: dragStartTransformRef.current,
+          after: snapshotObjectTransform(transformTarget),
+        })
+      }
+
+      dragStartTransformRef.current = null
+      dragResourceIdRef.current = null
+    }
+
+    const handleObjectChange = () => {
+      if (selectedLight) {
+        selectedLight.position.copy(lightProxyRef.current.position)
+        selectedLight.updateMatrixWorld(true)
+      }
+
+      onSceneChange?.()
     }
 
     // @ts-expect-error -- TransformControls events exist at runtime but aren't in Object3DEventMap
@@ -248,15 +353,15 @@ function EditorViewportOverlay({
       controls.removeEventListener('objectChange', handleObjectChange)
       isDraggingRef.current = false
     }
-  }, [orbitControlsRef, selectedLight, transformMode])
+  }, [onSceneChange, onTransformCommit, orbitControlsRef, resolveIdByObject, selectedLight, transformMode, transformTarget])
 
   const canTransform =
     !!enableTransformControls &&
-    !!transformObject &&
+    !!transformTarget &&
     transformMode !== 'disabled' &&
-    !(transformObject instanceof THREE.Scene) &&
-    !(transformObject instanceof THREE.Camera) &&
-    (selectedLight ? true : !!transformObject.parent)
+    !(transformTarget instanceof THREE.Scene) &&
+    !(transformTarget instanceof THREE.Camera) &&
+    (selectedLight ? true : !!transformTarget.parent)
 
   return (
     <>
@@ -266,7 +371,7 @@ function EditorViewportOverlay({
       {canTransform ? (
         <TransformControls
           ref={transformControlsRef}
-          object={transformObject}
+          object={transformObject!}
           mode={transformMode}
           space={transformSpace}
           size={0.95}
@@ -289,6 +394,10 @@ export default function EffectViewer({
   onBridgeReady,
   selectedResourceIds = [],
   resolveObjectById,
+  resolveIdByObject,
+  onSelectResourceId,
+  onTransformCommit,
+  onSceneChange,
   transformMode = 'disabled',
   transformSpace = 'local',
   showGizmoHelper = false,
@@ -422,6 +531,10 @@ export default function EffectViewer({
         <EditorViewportOverlay
           selectedResourceIds={selectedResourceIds}
           resolveObjectById={resolveObjectById}
+          resolveIdByObject={resolveIdByObject}
+          onSelectResourceId={onSelectResourceId}
+          onTransformCommit={onTransformCommit}
+          onSceneChange={onSceneChange}
           orbitControlsRef={orbitControlsRef}
           transformMode={transformMode}
           transformSpace={transformSpace}
