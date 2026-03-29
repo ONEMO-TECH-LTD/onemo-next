@@ -1,5 +1,5 @@
 import { Button } from '@playcanvas/pcui';
-import { type Application, type Entity, FOG_NONE, type FogType, Vec4 } from 'playcanvas';
+import { type Application, type Entity, FOG_NONE, type FogType, Vec4 } from '../viewport-engine';
 
 editor.once('load', () => {
 
@@ -59,7 +59,7 @@ editor.once('load', () => {
                 previewCamera = camera;
                 previewCamera.entity.enabled = true;
                 previewCamera.enabled = true;
-                previewCamera.rect = rect;
+                previewCamera.rect.set(rect.x, rect.y, rect.z, rect.w);
                 previewCamera.priority = 99999;
 
                 preRenderEvent = app.scene.on('prerender', (camera) => {

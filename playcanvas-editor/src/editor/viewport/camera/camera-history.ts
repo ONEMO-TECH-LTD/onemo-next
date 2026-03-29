@@ -1,4 +1,4 @@
-import type { Entity } from 'playcanvas';
+import type { Entity } from '../viewport-engine';
 
 editor.once('load', () => {
     let camera;

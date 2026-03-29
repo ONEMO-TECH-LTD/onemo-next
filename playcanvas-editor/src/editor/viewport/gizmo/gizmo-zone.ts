@@ -16,7 +16,7 @@ import {
     Quat,
     type AppBase,
     Vec3
-} from 'playcanvas';
+} from '../viewport-engine';
 
 import { GIZMO_MASK } from '@/core/constants';
 import type { EntityObserver } from '@/editor-api';
@@ -586,55 +586,56 @@ editor.once('load', () => {
             // front
             vecA.set(0, 0, -0.5);
             transform.transformPoint(vecA, vecA);
-            points[0].entity.setLocalPosition(vecA);
-            points[0].entity.setLocalRotation(rotation);
+            points[0].entity.setLocalPosition(vecA.x, vecA.y, vecA.z);
+            points[0].entity.setLocalRotation(rotation.x, rotation.y, rotation.z, rotation.w);
             points[0].update();
 
             // right
             vecA.set(0.5, 0, 0);
             transform.transformPoint(vecA, vecA);
-            points[1].entity.setLocalPosition(vecA);
-            points[1].entity.setLocalRotation(rotation);
+            points[1].entity.setLocalPosition(vecA.x, vecA.y, vecA.z);
+            points[1].entity.setLocalRotation(rotation.x, rotation.y, rotation.z, rotation.w);
             points[1].update();
 
             // back
             vecA.set(0, 0, 0.5);
             transform.transformPoint(vecA, vecA);
-            points[2].entity.setLocalPosition(vecA);
-            points[2].entity.setLocalRotation(rotation);
+            points[2].entity.setLocalPosition(vecA.x, vecA.y, vecA.z);
+            points[2].entity.setLocalRotation(rotation.x, rotation.y, rotation.z, rotation.w);
             points[2].update();
 
             // left
             vecA.set(-0.5, 0, 0);
             transform.transformPoint(vecA, vecA);
-            points[3].entity.setLocalPosition(vecA);
-            points[3].entity.setLocalRotation(rotation);
+            points[3].entity.setLocalPosition(vecA.x, vecA.y, vecA.z);
+            points[3].entity.setLocalRotation(rotation.x, rotation.y, rotation.z, rotation.w);
             points[3].update();
 
             // top
             vecA.set(0, 0.5, 0);
             transform.transformPoint(vecA, vecA);
-            points[4].entity.setLocalPosition(vecA);
-            points[4].entity.setLocalRotation(rotation);
+            points[4].entity.setLocalPosition(vecA.x, vecA.y, vecA.z);
+            points[4].entity.setLocalRotation(rotation.x, rotation.y, rotation.z, rotation.w);
             points[4].update();
 
             // bottom
             vecA.set(0, -0.5, 0);
             transform.transformPoint(vecA, vecA);
-            points[5].entity.setLocalPosition(vecA);
-            points[5].entity.setLocalRotation(rotation);
+            points[5].entity.setLocalPosition(vecA.x, vecA.y, vecA.z);
+            points[5].entity.setLocalRotation(rotation.x, rotation.y, rotation.z, rotation.w);
             points[5].update();
 
             if (hoverPoint) {
                 hoverPoint.rotation.copy(rotation);
                 hoverPoint.position.copy(position);
 
-                plane.setLocalPosition(hoverPoint.entity.getPosition());
+                const hoverPosition = hoverPoint.entity.getPosition();
+                plane.setLocalPosition(hoverPosition.x, hoverPosition.y, hoverPosition.z);
 
                 const angles = eulers[hoverPoint.ind];
                 quatB.setFromEulerAngles(angles[0], angles[1], angles[2]);
                 quatC.copy(rotation).mul(quatB);
-                plane.setLocalRotation(quatC);
+                plane.setLocalRotation(quatC.x, quatC.y, quatC.z, quatC.w);
 
                 const axes = scales[hoverPoint.ind];
                 plane.setLocalScale(scale[axes[0]], 1, scale[axes[1]]);

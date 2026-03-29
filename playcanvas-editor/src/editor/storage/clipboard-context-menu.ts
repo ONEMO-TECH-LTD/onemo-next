@@ -1,5 +1,5 @@
 import { Menu, MenuItem, Label } from '@playcanvas/pcui';
-import { Color } from 'playcanvas';
+import { Color } from '../viewport/viewport-engine';
 
 
 const colorA = new Color();

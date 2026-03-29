@@ -1,4 +1,4 @@
-import { type Entity, PROJECTION_PERSPECTIVE, Quat, Vec3, Vec4, ViewCube } from 'playcanvas';
+import { type Entity, PROJECTION_PERSPECTIVE, Quat, Vec3, Vec4, ViewCube } from '../viewport-engine';
 
 // editor camera entity with dynamic properties added by camera.ts
 type EditorCamera = Entity & { focus?: Vec3; __editorCamera?: boolean };
@@ -87,8 +87,8 @@ editor.once('viewport:load', () => {
 
         // snap previous animation
         if (active) {
-            cam.setPosition(targetPos);
-            cam.setRotation(targetRot);
+            cam.setPosition(targetPos.x, targetPos.y, targetPos.z);
+            cam.setRotation(targetRot.x, targetRot.y, targetRot.z, targetRot.w);
             if (cam.focus) {
                 cam.focus.copy(pivot);
             }
@@ -113,15 +113,16 @@ editor.once('viewport:load', () => {
 
         const sPos = new Vec3().copy(camera.getPosition());
         const sRot = new Quat().copy(camera.getRotation());
-        camera.setPosition(targetPos);
+        camera.setPosition(targetPos.x, targetPos.y, targetPos.z);
         if (Math.abs(face.y) === 1) {
-            camera.lookAt(pivot, face.y > 0 ? Vec3.FORWARD : Vec3.BACK);
+            const up = face.y > 0 ? Vec3.FORWARD : Vec3.BACK;
+            camera.lookAt(pivot.x, pivot.y, pivot.z, up.x, up.y, up.z);
         } else {
-            camera.lookAt(pivot);
+            camera.lookAt(pivot.x, pivot.y, pivot.z);
         }
         targetRot.copy(camera.getRotation());
-        camera.setPosition(sPos);
-        camera.setRotation(sRot);
+        camera.setPosition(sPos.x, sPos.y, sPos.z);
+        camera.setRotation(sRot.x, sRot.y, sRot.z, sRot.w);
 
         editor.call('camera:focus:stop');
         editor.call('camera:history:start', camera);
@@ -161,15 +162,15 @@ editor.once('viewport:load', () => {
 
             // slerp rotation, derive position from pivot
             quatA.copy(rot).slerp(rot, targetRot, t);
-            camera.setRotation(quatA);
+            camera.setRotation(quatA.x, quatA.y, quatA.z, quatA.w);
             vecA.copy(camera.forward).mulScalar(-distance).add(pivot);
-            camera.setPosition(vecA);
+            camera.setPosition(vecA.x, vecA.y, vecA.z);
 
             editor.call('viewport:render');
         } else {
             // snap to final values
-            camera.setPosition(targetPos);
-            camera.setRotation(targetRot);
+            camera.setPosition(targetPos.x, targetPos.y, targetPos.z);
+            camera.setRotation(targetRot.x, targetRot.y, targetRot.z, targetRot.w);
             if (camera.focus) {
                 camera.focus.copy(pivot);
             }

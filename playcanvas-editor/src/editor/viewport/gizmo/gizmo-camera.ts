@@ -1,4 +1,4 @@
-import { type AppBase, Color, Mat4, PROJECTION_PERSPECTIVE, Vec3 } from 'playcanvas';
+import { type AppBase, Color, Mat4, PROJECTION_PERSPECTIVE, Vec3 } from '../viewport-engine';
 
 import type { EntityObserver } from '@/editor-api';
 

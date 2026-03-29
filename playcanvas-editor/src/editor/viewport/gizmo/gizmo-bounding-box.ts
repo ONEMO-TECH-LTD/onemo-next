@@ -1,4 +1,4 @@
-import { type AppBase, BoundingBox, Color, EMITTERSHAPE_BOX, EMITTERSHAPE_SPHERE, Entity, Mat4, Vec3 } from 'playcanvas';
+import { type AppBase, BoundingBox, Color, EMITTERSHAPE_BOX, EMITTERSHAPE_SPHERE, Entity, Mat4, Vec3 } from '../viewport-engine';
 
 editor.once('load', () => {
     let app = null;

@@ -1,4 +1,4 @@
-import { type AppBase, Color, Entity, type GraphNode } from 'playcanvas';
+import { type AppBase, Color, Entity, type GraphNode } from '../viewport-engine';
 
 import type { EntityObserver } from '@/editor-api';
 

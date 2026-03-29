@@ -1,4 +1,4 @@
-import { type AppBase, BlendState, BLENDEQUATION_ADD, BLENDMODE_ONE_MINUS_SRC_ALPHA, BLENDMODE_SRC_ALPHA, Color, Entity, type GraphNode, type Material, math, PROJECTION_PERSPECTIVE, Quat, Vec3 } from 'playcanvas';
+import { type AppBase, BlendState, BLENDEQUATION_ADD, BLENDMODE_ONE_MINUS_SRC_ALPHA, BLENDMODE_SRC_ALPHA, Color, Entity, type GraphNode, type Material, math, PROJECTION_PERSPECTIVE, Quat, Vec3 } from '../viewport-engine';
 
 import { FORCE_PICK_TAG, GIZMO_MASK } from '@/core/constants';
 import type { EntityObserver } from '@/editor-api';
