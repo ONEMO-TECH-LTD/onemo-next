@@ -1,4 +1,4 @@
-import { ORIENTATION_HORIZONTAL, ORIENTATION_VERTICAL } from 'playcanvas';
+import { ORIENTATION_HORIZONTAL, ORIENTATION_VERTICAL } from './viewport-engine';
 
 editor.once('load', () => {
     const events = [];

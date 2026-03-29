@@ -1,4 +1,4 @@
-import { PROJECTION_ORTHOGRAPHIC } from 'playcanvas';
+import { PROJECTION_ORTHOGRAPHIC } from './viewport-engine';
 
 editor.once('load', () => {
     editor.on('userdata:load', (userdata: import('@playcanvas/observer').Observer) => {

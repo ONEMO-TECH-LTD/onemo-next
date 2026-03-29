@@ -42,7 +42,6 @@ type ProjectSettings = {
     layerOrder: { layer: number, transparent: boolean, enabled: boolean }[],
     i18nAssets: number[],
     useLegacyAmmoPhysics: boolean,
-    enableSharedArrayBuffer: boolean,
     plugins?: string[],
     vr: boolean,
     useKeyboard?: boolean,
@@ -92,7 +91,6 @@ type ModelSchema = {
 
 type Url = {
     api: string,
-    launch: string,
     home: string,
     realtime: {
         http: string,

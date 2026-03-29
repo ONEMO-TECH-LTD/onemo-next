@@ -1,4 +1,4 @@
-import { BoundingBox, Entity as PcEntity, Vec3 } from 'playcanvas';
+import { BoundingBox, Entity as PcEntity, Vec3 } from './viewport-engine';
 
 import { config } from '@/editor/config';
 import { Entity } from '@/editor-api';

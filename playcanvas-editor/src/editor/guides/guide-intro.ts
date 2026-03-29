@@ -51,18 +51,6 @@ editor.once('load', () => {
         return bubble;
     };
 
-    const bubbleDemo4 = function () {
-        return editor.call(
-            'guide:bubble',
-            'Complete this level (4 / 4)',
-            'Click <span class=\'font-icon\'>&#57649;</span> <strong>Launch</strong> to play the game. Use the arrow keys to move the ball. The game will open in a new tab so just switch back to the Editor tab when you\'re done.<br/><br/>Any changes you make to the scene will automatically update the launched game.',
-            180,
-            40,
-            'top-right',
-            editor.call('layout.toolbar.launch')
-        );
-    };
-
     const bubbleHierarchy = function () {
         return editor.call(
             'guide:bubble',
@@ -72,18 +60,6 @@ editor.once('load', () => {
             '50%',
             'left',
             editor.call('layout.hierarchy')
-        );
-    };
-
-    const bubbleLaunch = function () {
-        return editor.call(
-            'guide:bubble',
-            'Launch Scene',
-            'Click <span class="font-icon">&#57649;</span> <strong>Launch</strong> to run your scene in a new tab. Any changes you make in the Editor will automatically update the launched scene. You may find it convenient to run the Launch tab side by side with the Editor tab.',
-            180,
-            40,
-            'top-right',
-            editor.call('layout.toolbar.launch')
         );
     };
 
@@ -241,10 +217,6 @@ editor.once('load', () => {
             delay += nextDelay;
         }
 
-        if (showBubble('launch', bubbleLaunch, delay)) {
-            delay += nextDelay;
-        }
-
         if (showBubble('assets', bubbleAssets, delay)) {
             delay += nextDelay;
         }
@@ -338,7 +310,6 @@ editor.once('load', () => {
             'soundComponent',
             'mainMenu',
             'controls',
-            'launch',
             'howdoi'].forEach((tip) => {
             config.self.flags.tips[tip] = false;
         });
@@ -363,12 +334,8 @@ editor.once('load', () => {
                             setTimeout(() => {
                                 bubbleDemo3().on('deactivate', () => {
                                     setTimeout(() => {
-                                        bubbleDemo4().on('deactivate', () => {
-                                            setTimeout(() => {
-                                                showBubbles(0);
-                                            }, 3000);
-                                        });
-                                    }, 2000);
+                                        showBubbles(0);
+                                    }, 3000);
                                 });
                             }, 2000);
                         });

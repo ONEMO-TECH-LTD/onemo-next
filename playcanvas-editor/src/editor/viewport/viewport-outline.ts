@@ -1,4 +1,4 @@
-import { Color, type Entity, OutlineRenderer } from 'playcanvas';
+import { Color, type Entity, OutlineRenderer } from './viewport-engine';
 
 editor.once('load', () => {
     const app = editor.call('viewport:app');

@@ -10,7 +10,7 @@ import {
     MeshInstance,
     PRIMITIVE_LINES,
     Vec3
-} from 'playcanvas';
+} from './viewport-engine';
 
 import { config } from '@/editor/config';
 

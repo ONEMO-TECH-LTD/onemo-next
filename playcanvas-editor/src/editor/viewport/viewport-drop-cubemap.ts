@@ -1,4 +1,4 @@
-import { type Entity, MeshInstance } from 'playcanvas';
+import { type Entity, MeshInstance } from './viewport-engine';
 
 import { config } from '@/editor/config';
 

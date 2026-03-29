@@ -35,7 +35,6 @@ const DEFAULT_TIP_FLAGS = {
     mainMenu: true,
     hierarchy: true,
     dashboard: true,
-    launch: true,
     assets: true,
     store: true,
     controls: true,
@@ -636,7 +635,6 @@ function createSchema() {
             }], [], 'project'),
             i18nAssets: setting(['number'], [], 'project'),
             useLegacyAmmoPhysics: setting('boolean', false, 'project'),
-            enableSharedArrayBuffer: setting('boolean', false, 'project'),
             vr: setting('boolean', false, 'project'),
             useKeyboard: setting('boolean', true, 'project'),
             useMouse: setting('boolean', true, 'project'),
@@ -1100,7 +1098,6 @@ function normalizeProjectSettings(settings = {}) {
         layerOrder: settings.layerOrder ?? [],
         i18nAssets: settings.i18nAssets ?? [],
         useLegacyAmmoPhysics: settings.useLegacyAmmoPhysics ?? false,
-        enableSharedArrayBuffer: settings.enableSharedArrayBuffer ?? false,
         vr: settings.vr ?? false,
         useKeyboard: settings.useKeyboard ?? true,
         useMouse: settings.useMouse ?? true,
@@ -1195,7 +1192,6 @@ function buildConfig(project, schema) {
         },
         url: {
             api: `${ORIGIN}/api`,
-            launch: `${ORIGIN}/launch/`,
             home: ORIGIN,
             realtime: {
                 http: `ws://${HOST}:${PORT}/realtime`

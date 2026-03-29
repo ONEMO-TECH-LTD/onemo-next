@@ -1,7 +1,6 @@
 import { Container, Button } from '@playcanvas/pcui';
 
 import { LegacyTooltip } from '@/common/ui/tooltip';
-import { config } from '@/editor/config';
 
 editor.once('load', () => {
     const root = editor.call('layout.root');
@@ -17,46 +16,15 @@ editor.once('load', () => {
         return panel;
     });
 
-    const launchApp = (deviceOptions: { webgpu?: boolean; webgl2?: boolean; webgl1?: boolean; [key: string]: boolean | undefined } = {}, popup?: boolean) => {
-        let url = config.url.launch + config.scene.id;
-
-        const query = [];
-
-        if (deviceOptions.webgpu) {
-            query.push('device=webgpu');
-        } else if (deviceOptions.webgl2) {
-            query.push('device=webgl2');
-        } else if (deviceOptions.webgl1) {
-            query.push('device=webgl1');
+    let warned = false;
+    editor.method('launch', () => {
+        if (!warned) {
+            console.warn('[editor] Launch page is not available in this build.');
+            warned = true;
         }
 
-        const params = new URLSearchParams(location.search);
-        if (params.has('use_local_engine')) {
-            query.push(`use_local_engine=${params.get('use_local_engine')}`);
-        } else {
-            const engineVersion = editor.call('settings:session').get('engineVersion');
-            if (engineVersion && engineVersion !== 'current') {
-                query.push(`version=${config.engineVersions[engineVersion].version}`);
-            }
-        }
-
-        if (params.has('use_local_frontend')) {
-            query.push(`use_local_frontend=${params.get('use_local_frontend')}`);
-        }
-
-        if (query.length) {
-            url += `?${query.join('&')}`;
-        }
-
-        const features = popup ? 'popup' : undefined;
-        const launcher = window.open('', '_blank', features);
-        if (launcher) {
-            launcher.opener = null;
-            launcher.location = url;
-        }
-    };
-
-    editor.method('launch', launchApp);
+        return null;
+    });
 
     // fullscreen
     const buttonExpand = new Button({

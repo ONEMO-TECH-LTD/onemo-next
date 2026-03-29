@@ -189,9 +189,6 @@ editor.once('load', () => {
         if (settings.get('maxAssetRetries') === null) {
             settings.set('maxAssetRetries', 0);
         }
-        if (!settings.get('enableSharedArrayBuffer')) {
-            settings.set('enableSharedArrayBuffer', false);
-        }
         if (settings.has('useLegacyAudio')) {
             const useLegacyAudio = settings.get('useLegacyAudio');
             settings.unset('useLegacyAudio');

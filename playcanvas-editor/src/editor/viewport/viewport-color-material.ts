@@ -1,4 +1,4 @@
-import { Color, SHADERLANGUAGE_GLSL, StandardMaterial } from 'playcanvas';
+import { Color, SHADERLANGUAGE_GLSL, StandardMaterial } from './viewport-engine';
 
 // Creates an instance of standard material setup to use vertex colors or a single color.
 const createColorMaterial = (useVertexColor?: boolean) => {

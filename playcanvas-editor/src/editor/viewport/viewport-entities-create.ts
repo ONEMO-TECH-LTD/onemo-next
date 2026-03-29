@@ -1,4 +1,4 @@
-import { Entity } from 'playcanvas';
+import { Entity } from './viewport-engine';
 
 import { type EntityObserver } from '@/editor-api';
 

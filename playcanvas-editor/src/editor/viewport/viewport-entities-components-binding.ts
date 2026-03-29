@@ -1,4 +1,4 @@
-import { Application, BoundingBox, Entity, Vec3 } from 'playcanvas';
+import { Application, BoundingBox, Entity, Vec3 } from './viewport-engine';
 
 editor.once('load', () => {
     // converts the data to runtime types
