@@ -10,7 +10,7 @@ type Fix = {
 };
 
 const PLAYCANVAS_ATTRIBUTE_DOCS_URL = {
-    target: 'https://developer.playcanvas.com/user-manual/scripting/fundamentals/script-attributes/esm/#attribute-types',
+    target: '/reference/docs/user-manual/scripting/fundamentals/script-attributes/esm/#attribute-types',
     value: 'Attribute Type Docs'
 };
 

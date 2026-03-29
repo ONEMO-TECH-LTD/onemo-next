@@ -18,10 +18,10 @@ import * as users from './rest/users';
 import * as watch from './rest/watch';
 
 /**
- * The Rest API provides a set of methods for interacting with the PlayCanvas
+ * The Rest API provides a set of methods for interacting with the Studio
  * Editor's RESTful API. This includes methods for managing assets, branches,
  * checkpoints, and other resources. The API is designed to be used in conjunction
- * with the PlayCanvas Editor.
+ * with the Studio Editor.
  *
  * @category Internal
  * @ignore

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 // Returns RGB[3] for light colors. Camera colors use RGBA[4] (camera-mapper.ts).
-// PlayCanvas Observer expects 3-component colors for lights, 4-component for camera clear color.
+// The observer expects 3-component colors for lights, 4-component for camera clear color.
 const toObserverColor = (color: THREE.Color) => {
     return [color.r, color.g, color.b];
 };

@@ -64,8 +64,8 @@ editor.once('load', () => {
     });
     panel.header.append(btnClose);
 
-    const orgNameInput = buildFormGroup('Organization Name', 'e.g. PlayCanvas Ltd');
-    const orgIdInput = buildFormGroup('Organization ID', 'Your organization will be available at https://playcanvas.com/<organization-id>');
+    const orgNameInput = buildFormGroup('Organization Name', 'e.g. Studio Team');
+    const orgIdInput = buildFormGroup('Organization ID', 'Your organization will be available at /reference/studio/<organization-id>');
     const orgEmailInput = buildFormGroup('Email');
 
     orgNameInput.on('change', () => {

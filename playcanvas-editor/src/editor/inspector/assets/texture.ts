@@ -291,7 +291,7 @@ const DOM = parent => [
                         compressionBasisPvrWarning: new InfoBox({
                             icon: 'E218',
                             title: 'Texture dimensions are not square and power of two',
-                            text: 'On devices that only support PVR compression, Basis will transcode this texture to 565 uncompressed format. <strong><a href="https://developer.playcanvas.com/user-manual/optimization/texture-compression/#basis-limitations" target="_blank">Read more</a></strong>',
+                            text: 'On devices that only support PVR compression, Basis will transcode this texture to 565 uncompressed format. <strong><a href="/reference/docs/user-manual/optimization/texture-compression/#basis-limitations" target="_blank">Read more</a></strong>',
                             unsafe: true
                         })
                     },

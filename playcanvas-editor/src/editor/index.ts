@@ -201,18 +201,6 @@ import './templates/is-valid-template-conflict';
 import './templates/is-template';
 import './templates/unlink-template';
 
-// version control
-import './vc/graph/vc-graph';
-import './vc/graph/vc-utils';
-import './vc/graph/vc-colors';
-import './vc/graph/vertical-consistency';
-import './vc/graph/compact-branches';
-import './vc/graph/place-vc-nodes';
-import './vc/graph/split-node-description';
-import './vc/graph/vc-node-menu';
-import './vc/graph/make-hist-graph';
-import './vc/graph/sync-hist-graph';
-
 // images
 import './images/images';
 
@@ -302,6 +290,7 @@ import './pickers/picker-curve';
 import './pickers/picker-entity';
 import './pickers/picker-node';
 import './pickers/picker-project';
+import './pickers/picker-cloud-disabled';
 
 // project management pickers
 import './pickers/project-management/project-management';
@@ -325,24 +314,6 @@ import './pickers/project-management/picker-modal-visibility-confirmation';
 import './pickers/picker-scene';
 import './pickers/picker-script-create';
 
-// version control pickers
-import './pickers/version-control/picker-version-control-side-panel';
-import './pickers/version-control/picker-version-control-progress';
-import './pickers/version-control/picker-version-control-create-checkpoint';
-import './pickers/version-control/picker-version-control-restore-checkpoint';
-import './pickers/version-control/picker-version-control-hard-reset-checkpoint';
-import './pickers/version-control/picker-version-control-create-branch';
-import './pickers/version-control/picker-version-control-close-branch';
-import './pickers/version-control/picker-version-control-delete-branch';
-import './pickers/version-control/picker-version-control-merge-branches';
-import './pickers/version-control/picker-version-control-checkpoints';
-import './pickers/version-control/picker-version-control-diff-checkpoints';
-import './pickers/version-control/picker-version-control';
-import './pickers/version-control/picker-version-control-overlay-message';
-import './pickers/version-control/picker-version-control-messenger';
-import './pickers/version-control/picker-version-control-overlay-merge';
-
-import './pickers/picker-builds-publish';
 import './pickers/picker-publish-new';
 import './pickers/picker-gradient';
 import './pickers/picker-text-input';

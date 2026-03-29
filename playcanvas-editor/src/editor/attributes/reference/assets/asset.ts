@@ -24,19 +24,19 @@ editor.once('load', () => {
             title: 'id',
             subTitle: '{Number}',
             description: 'Unique identifier of an Asset.',
-            url: 'https://api.playcanvas.com/engine/classes/Asset.html'
+            url: '/reference/api/engine/classes/Asset.html'
         }, {
             name: 'asset:name',
             title: 'name',
             subTitle: '{String}',
             description: 'The name of the asset.',
-            url: 'https://api.playcanvas.com/engine/classes/Asset.html#name'
+            url: '/reference/api/engine/classes/Asset.html#name'
         }, {
             name: 'asset:type',
             title: 'type',
             subTitle: '{String}',
             description: 'The type of the asset. One of: animation, audio, image, json, material, model, text, texture.',
-            url: 'https://api.playcanvas.com/engine/classes/Asset.html#type'
+            url: '/reference/api/engine/classes/Asset.html#type'
         }, {
             name: 'asset:size',
             description: 'Size of an asset. Keeping this value as tiny as possible will lead to faster application loading and less bandwidth required to launch the app.'
@@ -57,7 +57,7 @@ editor.once('load', () => {
             title: 'tags',
             subTitle: '{pc.Tags}',
             description: 'Interface for tagging assets. Allows to find assets by tags using app.assets.findByTag method.',
-            url: 'https://api.playcanvas.com/engine/classes/Asset.html#tags'
+            url: '/reference/api/engine/classes/Asset.html#tags'
         }, {
             name: 'asset:runtime',
             description: 'If this asset is runtime-friendly and can be used within the app.'
@@ -71,7 +71,7 @@ editor.once('load', () => {
             title: 'preload',
             subTitle: '{Boolean}',
             description: 'If true the asset will be loaded during the preload phase of application set up.',
-            url: 'https://api.playcanvas.com/engine/classes/Asset.html#preload'
+            url: '/reference/api/engine/classes/Asset.html#preload'
         }, {
             name: 'asset:bundles',
             description: 'If the asset is included in any Asset Bundles then these are listed here. You can also add the asset to an Asset Bundle by using the dropdown.'

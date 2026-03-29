@@ -44,7 +44,7 @@ editor.once('load', () => {
     const text = new Label({
         unsafe: true,
         text: '<p>We identified some template instances with invalid data. These might cause further issues as you continue development if not fixed.</p>' +
-              '<p>Please see <a href="https://forum.playcanvas.com/t/draft-corruption-of-template-instances-please-read/23265" target="_blank">this post</a> for more information.</p>' +
+              '<p>Please see <a href="/reference/forum/t/draft-corruption-of-template-instances-please-read/23265" target="_blank">this post</a> for more information.</p>' +
               '<p>We will need to modify these templates instances but this will mean that some entities in your scene will lose their template connection. Click CANCEL to continue without any modifications or click PROCEED and follow the instructions in the following screens.</p>'
     });
 

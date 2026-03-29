@@ -157,7 +157,7 @@ editor.on('load', () => {
         footer.appendChild(span);
 
         const link = document.createElement('a');
-        link.href = 'https://developer.playcanvas.com/user-manual/graphics/linear-workflow/textures/';
+        link.href = '/reference/docs/user-manual/graphics/linear-workflow/textures/';
         link.target = '_blank';
         link.textContent = 'here';
         footer.appendChild(link);

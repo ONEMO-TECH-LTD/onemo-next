@@ -5,7 +5,7 @@ export const fields: AttributeReference[]  = [{
     title: 'pc.RenderComponent',
     subTitle: '{pc.Component}',
     description: 'Enables an Entity to render a mesh or a primitive shape. This component attaches geometry to the Entity.',
-    url: 'https://api.playcanvas.com/engine/classes/RenderComponent.html'
+    url: '/reference/api/engine/classes/RenderComponent.html'
 }, {
     name: 'render:type',
     title: 'type',
@@ -20,73 +20,73 @@ export const fields: AttributeReference[]  = [{
 <li><b>Cone</b> (<code>"cone"</code>): Render a procedural cone primitive.</li>
 <li><b>Plane</b> (<code>"plane"</code>): Render a procedural plane primitive.</li>
 </ul>`,
-    url: 'https://api.playcanvas.com/engine/classes/RenderComponent.html#type'
+    url: '/reference/api/engine/classes/RenderComponent.html#type'
 }, {
     name: 'render:asset',
     title: 'asset',
     subTitle: '{pc.Asset}',
     description: 'The Render Asset for the Render Component (only applies to type "asset").',
-    url: 'https://api.playcanvas.com/engine/classes/RenderComponent.html#asset'
+    url: '/reference/api/engine/classes/RenderComponent.html#asset'
 }, {
     name: 'render:materialAssets',
     title: 'materialAssets',
     subTitle: '{pc.Asset[]}',
     description: 'The Material Assets that will be used to render the meshes. Each material corresponds to the respective mesh instance.',
-    url: 'https://api.playcanvas.com/engine/classes/RenderComponent.html#materialassets'
+    url: '/reference/api/engine/classes/RenderComponent.html#materialassets'
 }, {
     name: 'render:castShadows',
     title: 'castShadows',
     subTitle: '{Boolean}',
     description: 'If true, attached meshes will cast shadows for lights that have shadow casting enabled.',
-    url: 'https://api.playcanvas.com/engine/classes/RenderComponent.html#castshadows'
+    url: '/reference/api/engine/classes/RenderComponent.html#castshadows'
 }, {
     name: 'render:receiveShadows',
     title: 'receiveShadows',
     subTitle: '{Boolean}',
     description: 'If true, shadows will be cast on attached meshes.',
-    url: 'https://api.playcanvas.com/engine/classes/RenderComponent.html#receiveshadows'
+    url: '/reference/api/engine/classes/RenderComponent.html#receiveshadows'
 }, {
     name: 'render:castShadowsLightmap',
     title: 'castShadowsLightmap',
     subTitle: '{Boolean}',
     description: 'If true, the meshes will cast shadows when rendering lightmaps.',
-    url: 'https://api.playcanvas.com/engine/classes/RenderComponent.html#castshadowslightmap'
+    url: '/reference/api/engine/classes/RenderComponent.html#castshadowslightmap'
 }, {
     name: 'render:lightmapped',
     title: 'lightmapped',
     subTitle: '{Boolean}',
     description: 'If true, the meshes will be lightmapped after using lightmapper.bake().',
-    url: 'https://api.playcanvas.com/engine/classes/RenderComponent.html#lightmapped'
+    url: '/reference/api/engine/classes/RenderComponent.html#lightmapped'
 }, {
     name: 'render:lightmapSizeMultiplier',
     title: 'lightmapSizeMultiplier',
     subTitle: '{Number}',
     description: 'Lightmap resolution multiplier.',
-    url: 'https://api.playcanvas.com/engine/classes/RenderComponent.html#lightmapsizemultiplier'
+    url: '/reference/api/engine/classes/RenderComponent.html#lightmapsizemultiplier'
 }, {
     name: 'render:isStatic',
     title: 'isStatic',
     subTitle: '{Boolean}',
     description: 'Mark meshes as non-movable (optimization).',
-    url: 'https://api.playcanvas.com/engine/classes/RenderComponent.html#isstatic'
+    url: '/reference/api/engine/classes/RenderComponent.html#isstatic'
 }, {
     name: 'render:batchGroupId',
     title: 'batchGroupId',
     subTitle: '{Number}',
     description: 'Assign meshes to a specific batch group.',
-    url: 'https://api.playcanvas.com/engine/classes/RenderComponent.html#batchgroupid'
+    url: '/reference/api/engine/classes/RenderComponent.html#batchgroupid'
 }, {
     name: 'render:layers',
     title: 'layers',
     subTitle: '{Number[]}',
     description: 'The layers to which the meshes should belong.',
-    url: 'https://api.playcanvas.com/engine/classes/RenderComponent.html#layers'
+    url: '/reference/api/engine/classes/RenderComponent.html#layers'
 }, {
     name: 'render:rootBone',
     title: 'rootBone',
     subTitle: '{pc.Entity}',
     description: 'A reference to the entity to be used as the root bone for any skinned meshes that are rendered by this component.',
-    url: 'https://api.playcanvas.com/engine/classes/RenderComponent.html#rootbone'
+    url: '/reference/api/engine/classes/RenderComponent.html#rootbone'
 }, {
     name: 'render:customAabb',
     title: 'Custom AABB',

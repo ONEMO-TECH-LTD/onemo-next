@@ -193,7 +193,7 @@ editor.once('load', () => {
     });
 
     // register panel with project popup
-    editor.call('picker:project:registerMenu', 'team', 'Team', panel);
+    editor.call('picker:project:registerMenu', 'team', 'Members', panel, 'MEMBERS');
 
     // hide button if the user doesn't have the right permissions
     if (!editor.call('permissions:read')) {
@@ -410,7 +410,7 @@ editor.once('load', () => {
                 collaborators.forEach((collaborator) => {
                     if (collaborator.username === result.username) {
                         added = true;
-                        editor.call('picker:project:buildAlert', panel, 'TEAM ERROR: User already exists');
+                        editor.call('picker:project:buildAlert', panel, 'MEMBERS ERROR: User already exists');
                     }
                 });
 

@@ -21,10 +21,7 @@ const assetsRoot = path.join(publicRoot, 'assets');
 const PORT = Number(process.env.PORT || 3487);
 const HOST = process.env.HOST || '127.0.0.1';
 const ORIGIN = `http://${HOST}:${PORT}`;
-const PLAYCANVAS_ORIGIN = 'https://playcanvas.com';
-
-// Local dev fixture values only — references a public PlayCanvas demo project.
-// These are NOT credentials. Safe to commit but should not be used in production.
+// Local dev fixture values only.
 const PROJECT_ID = 917469;
 const OWNER_ID = 171953;
 const BRANCH_ID = '8cfb5a07-1d7e-44af-bee1-68e7a148ae06';
@@ -531,25 +528,9 @@ async function sendFile(res, filePath) {
 }
 
 async function proxyRemote(res, remotePath, fallbackPaths = []) {
-    for (const candidatePath of [remotePath, ...fallbackPaths]) {
-        try {
-            const response = await fetch(`${PLAYCANVAS_ORIGIN}${candidatePath}`);
-            if (!response.ok) {
-                continue;
-            }
-
-            const buffer = Buffer.from(await response.arrayBuffer());
-            res.writeHead(200, {
-                'Content-Type': response.headers.get('content-type') || mimeType(candidatePath),
-                'Cache-Control': 'no-store'
-            });
-            res.end(buffer);
-            return true;
-        } catch {
-            // Try the next candidate path.
-        }
-    }
-
+    void res;
+    void remotePath;
+    void fallbackPaths;
     return false;
 }
 
@@ -1141,21 +1122,7 @@ async function fetchPublicProject() {
         master_branch: BRANCH_ID
     };
 
-    try {
-        const response = await fetch(`https://playcanvas.com/api/projects/${PROJECT_ID}`);
-        if (!response.ok) {
-            return fallback;
-        }
-
-        const data = await response.json();
-        return {
-            ...fallback,
-            ...data,
-            settings: normalizeProjectSettings(data.settings)
-        };
-    } catch {
-        return fallback;
-    }
+    return fallback;
 }
 
 function buildConfig(project, schema) {

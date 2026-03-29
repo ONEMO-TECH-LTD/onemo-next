@@ -19,7 +19,7 @@ editor.once('load', () => {
     };
     const vr = {
         name: 'VR Kit',
-        description: 'An application to get you started quickly creating VR applications in PlayCanvas.',
+        description: 'An application to get you started quickly creating VR applications in Studio.',
         image: '/static/platform/images/home/VR.jpg',
         tags: ['immersive'],
         fork_from: 435780

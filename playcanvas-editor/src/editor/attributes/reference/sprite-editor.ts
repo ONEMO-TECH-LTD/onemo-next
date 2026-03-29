@@ -5,13 +5,13 @@ const fields: AttributeReference[] = [{
     title: 'width',
     subTitle: '{Number}',
     description: 'The width of the texture atlas in pixels.',
-    url: 'https://api.playcanvas.com/engine/classes/Texture.html#width'
+    url: '/reference/api/engine/classes/Texture.html#width'
 }, {
     name: 'spriteeditor:atlas:height',
     title: 'height',
     subTitle: '{Number}',
     description: 'The height of the texture atlas in pixels.',
-    url: 'https://api.playcanvas.com/engine/classes/Texture.html#height'
+    url: '/reference/api/engine/classes/Texture.html#height'
 }, {
     name: 'spriteeditor:atlas:frames',
     title: 'Frames',

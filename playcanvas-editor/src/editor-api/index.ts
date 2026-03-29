@@ -1,10 +1,10 @@
 /**
  * The Editor module provides a comprehensive API for automating and extending
- * the functionality of the PlayCanvas Editor. It allows developers to programmatically
+ * the functionality of the Studio Editor. It allows developers to programmatically
  * interact with the Editor, facilitating tasks such as scene manipulation, asset
  * management, and custom tool integration. This module is essential for developers
  * looking to streamline their workflow, create custom editing tools, or integrate
- * external data and systems into the PlayCanvas Editor environment.
+ * external data and systems into the Studio Editor environment.
  *
  * @module Editor
  */

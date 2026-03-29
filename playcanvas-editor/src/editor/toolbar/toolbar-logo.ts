@@ -324,12 +324,6 @@ editor.once('load', () => {
                 editor.call('entities:shadows:update');
             }
         }, {
-            // Source control
-            text: 'Version Control',
-            icon: 'E399',
-            onIsVisible: () => !legacyScripts && editor.call('permissions:read'),
-            onSelect: () => editor.call('picker:versioncontrol')
-        }, {
             // Configuration
             text: 'Settings',
             icon: 'E134',
