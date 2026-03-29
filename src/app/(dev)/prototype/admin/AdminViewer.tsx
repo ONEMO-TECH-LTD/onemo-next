@@ -59,6 +59,7 @@ function AdminViewerInner({
 
   // ─── Face Material state ──────────────────────────────────
   const [faceParams, setFaceParams] = useState<FaceMaterialConfig>({
+    color: '#ffffff',
     roughness: 1.0, metalness: 0, envMapIntensity: 0.1, normalScale: 0.15,
     bumpScale: 1.0, sheen: 1.0, sheenColor: '#1a1a1a', sheenRoughness: 0.8, colorMultiplier: 1.0,
   })
