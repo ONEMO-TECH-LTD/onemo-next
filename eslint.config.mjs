@@ -15,8 +15,8 @@ const eslintConfig = defineConfig([
     // Non-runtime: backup copies, archives, not linted
     "asset-library/**",
     "?archive/**",
-    // PlayCanvas editor fork — has its own lint config
-    "playcanvas-editor/**",
+    // ONEMO 3D Studio — has its own lint config
+    "studio/**",
   ]),
 ]);
 

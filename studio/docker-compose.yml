@@ -4,9 +4,9 @@ services:
     image: ghcr.io/playcanvas/editor/test:latest
     command: "true"
 
-  playcanvas-editor:
+  studio:
     build: .
-    container_name: playcanvas-editor
+    container_name: studio
     depends_on:
       test-suite:
         condition: service_completed_successfully

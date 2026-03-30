@@ -642,7 +642,7 @@ editor.once('load', () => {
     });  // Feedback
 
     feedbackLink.on('click', () => {
-        window.open('/reference/forum/t/playcanvas-editor-feedback/616', '_blank');
+        window.open('/feedback', '_blank');
     });
 
     const githubLink = new Button({
