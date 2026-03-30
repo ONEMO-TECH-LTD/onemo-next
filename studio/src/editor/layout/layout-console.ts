@@ -4,7 +4,7 @@ import { tooltip, tooltipSimpleItem } from '@/common/tooltips';
 import { countToHuman, frameLimiter } from '@/common/utils';
 import { config } from '@/editor/config';
 
-const LOCALSTORAGE_KEY = 'playcanvas-editor-latest-release-notes';
+const LOCALSTORAGE_KEY = 'studio-latest-release-notes';
 
 const INITIAL_ITEM_COUNT = 1000;
 
