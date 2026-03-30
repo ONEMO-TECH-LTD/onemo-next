@@ -5,7 +5,14 @@ import { config } from '@/editor/config';
 import { Asset, type AssetObserver, type Entity, type EntityObserver } from '@/editor-api';
 
 
+import { applyAnimObserverChange } from './anim-mapper';
+import { applyAnimationObserverChange } from './animation-mapper';
+import { applyAudiolistenerObserverChange } from './audiolistener-mapper';
+import { setBridgeAudioCamera } from './bridge-audio-state';
+import { applyButtonObserverChange } from './button-mapper';
+import { getStoredBridgeComponents, runBridgeUpdaters } from './bridge-utils';
 import { createCameraComponentData, applyCameraObserverChange } from './camera-mapper';
+import { applyCollisionObserverChange } from './collision-mapper';
 import {
     BRIDGE_ASSET_ID_BASE,
     BRIDGE_ASSET_TAG,
@@ -20,10 +27,18 @@ import {
     BRIDGE_ROOT_NAME,
     SCENE_SYNC_EPSILON
 } from './constants';
+import { applyElementObserverChange } from './element-mapper';
 import { createBridgeEntityData, getEntityDisplayName, toObserverEuler, toObserverVec3 } from './entity-mapper';
+import { applyGSplatObserverChange } from './gsplat-mapper';
+import { applyLayoutchildObserverChange } from './layoutchild-mapper';
+import { applyLayoutgroupObserverChange } from './layoutgroup-mapper';
 import { createLightComponentData, applyLightObserverChange } from './light-mapper';
 import { createMaterialData, applyMaterialObserverChange } from './material-mapper';
+import { applyModelObserverChange } from './model-mapper';
+import { applyParticleObserverChange } from './particle-mapper';
 import { createRenderComponentData, applyRenderObserverChange } from './render-mapper';
+import { applyRigidbodyObserverChange } from './rigidbody-mapper';
+import { applyScreenObserverChange } from './screen-mapper';
 import {
     decomposeViewerColor,
     type SavedScene,
@@ -39,6 +54,11 @@ import {
     type SavedSceneTexture,
     type SavedSceneTextureKey
 } from './scene-schema';
+import { applyScriptObserverChange } from './script-mapper';
+import { applyScrollviewObserverChange } from './scrollview-mapper';
+import { applySoundObserverChange } from './sound-mapper';
+import { applySpriteObserverChange } from './sprite-mapper';
+import { applyZoneObserverChange } from './zone-mapper';
 // Monorepo coupling: imports shared types from the prototype viewer.
 // TODO: Extract to a shared types package when the editor is packaged independently.
 import type { EffectViewerBridge } from '../../../../src/app/(dev)/prototype/core/EffectViewer';
@@ -335,6 +355,7 @@ export class ObserverR3FBridge {
 
     setContext(context: EffectViewerBridge) {
         this.context = context;
+        setBridgeAudioCamera(context.camera);
         this.scheduleRebuild();
     }
 
@@ -419,6 +440,7 @@ export class ObserverR3FBridge {
     dispose() {
         this.stopSceneSyncLoop();
         this.cleanupBindings();
+        setBridgeAudioCamera(null);
         this.editorEvents.forEach(event => event.unbind());
         this.editorEvents.length = 0;
         this.viewportHiddenIds.clear();
@@ -777,6 +799,19 @@ export class ObserverR3FBridge {
             }
 
             if (observer) {
+                const extraComponents = Object.entries(components).filter(([componentKey]) => {
+                    return componentKey !== 'render' && componentKey !== 'light' && componentKey !== 'camera';
+                });
+
+                if (extraComponents.length) {
+                    this.withSyncGuard(() => {
+                        extraComponents.forEach(([componentKey, componentValue]) => {
+                            observer.set(`components.${componentKey}`, cloneSerializable(componentValue));
+                        });
+                    }, [observer]);
+                    this.applyMappedEntityComponents(object, observer);
+                }
+
                 this.applyEffectiveVisibility(resourceId, object, observer);
             }
             object.updateMatrixWorld(true);
@@ -835,15 +870,21 @@ export class ObserverR3FBridge {
     }
 
     private startSceneSyncLoop() {
-        const tick = () => {
+        let lastFrameTime = performance.now();
+        const tick = (now: number) => {
+            const delta = Math.min((now - lastFrameTime) / 1000, 0.1);
+            lastFrameTime = now;
             this.sceneSyncFrame = requestAnimationFrame(tick);
+            this.objectById.forEach((object) => {
+                runBridgeUpdaters(object, delta);
+            });
             if (this.sceneDirty) {
                 this.syncObserversFromScene();
                 this.sceneDirty = false;
             }
         };
 
-        tick();
+        tick(lastFrameTime);
     }
 
     private stopSceneSyncLoop() {
@@ -1003,7 +1044,9 @@ export class ObserverR3FBridge {
             .filter(child => this.shouldIncludeSceneObject(child))
             .map(child => child.uuid);
 
-            const components: Record<string, unknown> = {};
+            const components: Record<string, unknown> = {
+                ...getStoredBridgeComponents(object)
+            };
 
             if (object instanceof THREE.Mesh) {
                 components.render = createRenderComponentData(object, materialState.objectMaterialIds.get(object.uuid) || []);
@@ -1035,6 +1078,7 @@ export class ObserverR3FBridge {
             children: [],
             object: ctx.camera,
             components: {
+                ...getStoredBridgeComponents(ctx.camera),
                 camera: createCameraComponentData(ctx.camera, ctx.scene)
             }
         }));
@@ -1048,6 +1092,7 @@ export class ObserverR3FBridge {
                 children: [],
                 object: ctx.keyLight,
                 components: {
+                    ...getStoredBridgeComponents(ctx.keyLight),
                     light: createLightComponentData(ctx.keyLight)
                 }
             }));
@@ -1312,6 +1357,17 @@ export class ObserverR3FBridge {
                 nearClip: camera?.near ?? Number(cameraComponent?.nearClip ?? 0.1),
                 farClip: camera?.far ?? Number(cameraComponent?.farClip ?? 1000)
             } satisfies SavedSceneCameraComponent;
+        }
+
+        if (object) {
+            const storedComponents = getStoredBridgeComponents(object);
+            Object.entries(storedComponents).forEach(([componentKey, value]) => {
+                if (componentKey === 'render' || componentKey === 'light' || componentKey === 'camera') {
+                    return;
+                }
+
+                (result as Record<string, unknown>)[componentKey] = cloneSerializable(value);
+            });
         }
 
         return result;
@@ -1947,6 +2003,193 @@ export class ObserverR3FBridge {
         this.resourceIdByObject.set(object, resourceId);
     }
 
+    private applyMappedEntityPath(object: THREE.Object3D, normalizedPath: string, observer: EntityObserver) {
+        let changed = false;
+
+        if (normalizedPath.startsWith('components.render')) {
+            changed = applyRenderObserverChange(object, normalizedPath, observer) || changed;
+            if (normalizedPath.startsWith('components.render.materialAssets') && object instanceof THREE.Mesh) {
+                changed = this.applyMaterialAssignments(object, observer) || changed;
+            }
+            this.applyEffectiveVisibility(observer.get('resource_id'), object, observer);
+        }
+
+        if (normalizedPath.startsWith('components.light') && object instanceof THREE.Light) {
+            changed = applyLightObserverChange(object, normalizedPath, observer) || changed;
+            this.applyEffectiveVisibility(observer.get('resource_id'), object, observer);
+        }
+
+        if (normalizedPath.startsWith('components.camera') && object === this.context?.camera) {
+            changed = applyCameraObserverChange(this.context.camera, normalizedPath, observer) || changed;
+            this.applyEffectiveVisibility(observer.get('resource_id'), object, observer);
+            this.config.camera = this.config.camera || {
+                fov: 35,
+                distance: 0.2,
+                polarAngle: 90,
+                azimuthAngle: 0,
+                enableDamping: true,
+                dampingFactor: 0.1,
+                autoRotate: false,
+                autoRotateSpeed: 2
+            };
+            this.config.camera.fov = (this.context.camera as THREE.PerspectiveCamera).fov;
+        }
+
+        if (normalizedPath.startsWith('components.animation')) {
+            changed = applyAnimationObserverChange(object, normalizedPath, observer) || changed;
+        }
+
+        if (normalizedPath.startsWith('components.anim')) {
+            changed = applyAnimObserverChange(object, normalizedPath, observer) || changed;
+        }
+
+        if (normalizedPath.startsWith('components.sound')) {
+            changed = applySoundObserverChange(object, normalizedPath, observer) || changed;
+        }
+
+        if (normalizedPath.startsWith('components.audiolistener')) {
+            changed = applyAudiolistenerObserverChange(object, normalizedPath, observer) || changed;
+        }
+
+        if (normalizedPath.startsWith('components.sprite')) {
+            changed = applySpriteObserverChange(object, normalizedPath, observer) || changed;
+        }
+
+        if (normalizedPath.startsWith('components.particlesystem')) {
+            changed = applyParticleObserverChange(object, normalizedPath, observer) || changed;
+        }
+
+        if (normalizedPath.startsWith('components.gsplat')) {
+            changed = applyGSplatObserverChange(object, normalizedPath, observer) || changed;
+        }
+
+        if (normalizedPath.startsWith('components.collision')) {
+            changed = applyCollisionObserverChange(object, normalizedPath, observer) || changed;
+        }
+
+        if (normalizedPath.startsWith('components.rigidbody')) {
+            changed = applyRigidbodyObserverChange(object, normalizedPath, observer) || changed;
+        }
+
+        if (normalizedPath.startsWith('components.element')) {
+            changed = applyElementObserverChange(object, normalizedPath, observer) || changed;
+        }
+
+        if (normalizedPath.startsWith('components.screen')) {
+            changed = applyScreenObserverChange(object, normalizedPath, observer) || changed;
+        }
+
+        if (normalizedPath.startsWith('components.button')) {
+            changed = applyButtonObserverChange(object, normalizedPath, observer) || changed;
+        }
+
+        if (normalizedPath.startsWith('components.layoutgroup')) {
+            changed = applyLayoutgroupObserverChange(object, normalizedPath, observer) || changed;
+        }
+
+        if (normalizedPath.startsWith('components.layoutchild')) {
+            changed = applyLayoutchildObserverChange(object, normalizedPath, observer) || changed;
+        }
+
+        if (normalizedPath.startsWith('components.scrollview') || normalizedPath.startsWith('components.scrollbar')) {
+            changed = applyScrollviewObserverChange(object, normalizedPath, observer) || changed;
+        }
+
+        if (normalizedPath.startsWith('components.script')) {
+            changed = applyScriptObserverChange(object, normalizedPath, observer) || changed;
+        }
+
+        if (normalizedPath.startsWith('components.zone')) {
+            changed = applyZoneObserverChange(object, normalizedPath, observer) || changed;
+        }
+
+        if (normalizedPath.startsWith('components.model')) {
+            if (observer.has('components.render')) {
+                if (normalizedPath === 'components.model' || normalizedPath === 'components.model.enabled') {
+                    this.withSyncGuard(() => {
+                        observer.set('components.render.enabled', !!observer.get('components.model.enabled'));
+                    }, [observer]);
+                    changed = applyRenderObserverChange(object, 'components.render.enabled', observer) || changed;
+                }
+
+                if (normalizedPath === 'components.model' || normalizedPath === 'components.model.castShadows') {
+                    this.withSyncGuard(() => {
+                        observer.set('components.render.castShadows', !!observer.get('components.model.castShadows'));
+                    }, [observer]);
+                    changed = applyRenderObserverChange(object, 'components.render.castShadows', observer) || changed;
+                }
+
+                if (normalizedPath === 'components.model' || normalizedPath === 'components.model.receiveShadows') {
+                    this.withSyncGuard(() => {
+                        observer.set('components.render.receiveShadows', !!observer.get('components.model.receiveShadows'));
+                    }, [observer]);
+                    changed = applyRenderObserverChange(object, 'components.render.receiveShadows', observer) || changed;
+                }
+
+                if (normalizedPath === 'components.model' || normalizedPath === 'components.model.materialAsset') {
+                    const materialAsset = Number(observer.get('components.model.materialAsset'));
+                    this.withSyncGuard(() => {
+                        observer.set('components.render.materialAssets', Number.isFinite(materialAsset) ? [materialAsset] : [null]);
+                    }, [observer]);
+                    if (object instanceof THREE.Mesh) {
+                        changed = this.applyMaterialAssignments(object, observer) || changed;
+                    }
+                }
+
+                if (normalizedPath === 'components.model' || normalizedPath === 'components.model.type') {
+                    this.withSyncGuard(() => {
+                        observer.set('components.render.type', observer.get('components.model.type'));
+                    }, [observer]);
+                }
+
+                if (normalizedPath === 'components.model' || normalizedPath === 'components.model.asset') {
+                    this.withSyncGuard(() => {
+                        observer.set('components.render.asset', observer.get('components.model.asset'));
+                    }, [observer]);
+                }
+            }
+
+            changed = applyModelObserverChange(object, normalizedPath, observer) || changed;
+            this.applyEffectiveVisibility(observer.get('resource_id'), object, observer);
+        }
+
+        return changed;
+    }
+
+    private applyMappedEntityComponents(object: THREE.Object3D, observer: EntityObserver) {
+        let changed = false;
+        [
+            'render',
+            'light',
+            'camera',
+            'animation',
+            'anim',
+            'sound',
+            'audiolistener',
+            'sprite',
+            'particlesystem',
+            'gsplat',
+            'collision',
+            'rigidbody',
+            'element',
+            'screen',
+            'button',
+            'layoutgroup',
+            'layoutchild',
+            'scrollview',
+            'scrollbar',
+            'script',
+            'zone',
+            'model'
+        ].forEach((componentName) => {
+            if (observer.has(`components.${componentName}`)) {
+                changed = this.applyMappedEntityPath(object, `components.${componentName}`, observer) || changed;
+            }
+        });
+
+        return changed;
+    }
+
     private bindEntityObserver(observer: EntityObserver) {
         const resourceId = observer.get('resource_id');
         const object = this.objectById.get(resourceId);
@@ -1955,7 +2198,7 @@ export class ObserverR3FBridge {
             return;
         }
 
-        const handle = observer.on('*:set', (path: string) => {
+        const handlePathChange = (path: string) => {
             if (this.syncGuard) {
                 return;
             }
@@ -1987,43 +2230,31 @@ export class ObserverR3FBridge {
                 changed = true;
             }
 
-            if (normalizedPath.startsWith('components.render')) {
-                changed = applyRenderObserverChange(object, normalizedPath, observer) || changed;
-                if (normalizedPath.startsWith('components.render.materialAssets') && object instanceof THREE.Mesh) {
-                    changed = this.applyMaterialAssignments(object, observer) || changed;
-                }
-                this.applyEffectiveVisibility(resourceId, object, observer);
-            }
-
-            if (normalizedPath.startsWith('components.light') && object instanceof THREE.Light) {
-                changed = applyLightObserverChange(object, normalizedPath, observer) || changed;
-                this.applyEffectiveVisibility(resourceId, object, observer);
-            }
-
-            if (normalizedPath.startsWith('components.camera') && object === this.context?.camera) {
-                changed = applyCameraObserverChange(this.context.camera, normalizedPath, observer) || changed;
-                this.applyEffectiveVisibility(resourceId, object, observer);
-                this.config.camera = this.config.camera || {
-                    fov: 35,
-                    distance: 0.2,
-                    polarAngle: 90,
-                    azimuthAngle: 0,
-                    enableDamping: true,
-                    dampingFactor: 0.1,
-                    autoRotate: false,
-                    autoRotateSpeed: 2
-                };
-                this.config.camera.fov = (this.context.camera as THREE.PerspectiveCamera).fov;
-            }
+            changed = this.applyMappedEntityPath(object, normalizedPath, observer) || changed;
 
             if (changed) {
                 object.updateMatrixWorld(true);
                 this.sceneDirty = true;
             }
-        });
+        };
 
-        this.entityBindings.set(resourceId, handle);
+        const handles = [
+            observer.on('*:set', handlePathChange),
+            observer.on('*:insert', handlePathChange),
+            observer.on('*:remove', handlePathChange),
+            observer.on('*:unset', handlePathChange)
+        ];
+
+        const compositeHandle = {
+            unbind: () => {
+                handles.forEach((handle) => handle.unbind());
+            }
+        } as EventHandle;
+
+        this.entityBindings.set(resourceId, compositeHandle);
+        this.applyMappedEntityComponents(object, observer);
         this.applyEffectiveVisibility(resourceId, object, observer);
+        object.updateMatrixWorld(true);
     }
 
     private applyMaterialAssignments(mesh: THREE.Mesh, observer: EntityObserver) {
@@ -2327,6 +2558,10 @@ export class ObserverR3FBridge {
 
         if (object instanceof THREE.Mesh && observer.has('components.render.enabled')) {
             visible = visible && !!observer.get('components.render.enabled');
+        }
+
+        if (observer.has('components.model.enabled')) {
+            visible = visible && !!observer.get('components.model.enabled');
         }
 
         if (object instanceof THREE.Light && observer.has('components.light.enabled')) {
