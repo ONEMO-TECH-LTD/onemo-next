@@ -25,6 +25,39 @@ export interface EffectViewerTransformSnapshot {
   scale: [number, number, number]
 }
 
+export type ViewerRenderPass =
+  | 'standard'
+  | 'albedo'
+  | 'opacity'
+  | 'worldNormal'
+  | 'specularity'
+  | 'gloss'
+  | 'metalness'
+  | 'ao'
+  | 'emission'
+  | 'lighting'
+  | 'uv0'
+
+export type ViewerCameraPreset =
+  | 'perspective'
+  | 'front'
+  | 'back'
+  | 'left'
+  | 'right'
+  | 'top'
+  | 'bottom'
+
+export type ViewerCameraCommand =
+  | {
+      kind: 'focus'
+      seq: number
+    }
+  | {
+      kind: 'preset'
+      preset: ViewerCameraPreset
+      seq: number
+    }
+
 interface EffectViewerProps {
   config: ViewerConfig
   artworkUrl?: string
@@ -45,6 +78,9 @@ interface EffectViewerProps {
   transformSpace?: 'world' | 'local'
   showGizmoHelper?: boolean
   enableTransformControls?: boolean
+  renderPass?: ViewerRenderPass
+  wireframeEnabled?: boolean
+  cameraCommand?: ViewerCameraCommand | null
 }
 
 function snapshotObjectTransform(object: THREE.Object3D): EffectViewerTransformSnapshot {
@@ -83,6 +119,144 @@ function disposeHelperObject(helper: THREE.Object3D) {
       } else if (material) {
         material.dispose()
       }
+    }
+  })
+}
+
+function flattenMaterials(material: THREE.Material | THREE.Material[]) {
+  return Array.isArray(material) ? material : [material]
+}
+
+function createUvDebugMaterial(source: THREE.Material, wireframe: boolean) {
+  return new THREE.ShaderMaterial({
+    wireframe,
+    side: source.side,
+    transparent: source.transparent,
+    opacity: source.opacity,
+    uniforms: {},
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      varying vec2 vUv;
+      void main() {
+        vec2 tiled = fract(vUv);
+        gl_FragColor = vec4(tiled.x, tiled.y, 0.0, 1.0);
+      }
+    `,
+  })
+}
+
+function createDebugMaterial(source: THREE.Material, renderPass: ViewerRenderPass, wireframe: boolean) {
+  if (renderPass === 'worldNormal') {
+    return new THREE.MeshNormalMaterial({
+      wireframe,
+      side: source.side,
+      transparent: source.transparent,
+      opacity: source.opacity,
+    })
+  }
+
+  if (renderPass === 'uv0') {
+    return createUvDebugMaterial(source, wireframe)
+  }
+
+  if (!(source instanceof THREE.MeshStandardMaterial) && !(source instanceof THREE.MeshPhysicalMaterial)) {
+    return new THREE.MeshBasicMaterial({
+      color: new THREE.Color('#ffffff'),
+      wireframe,
+      side: source.side,
+      transparent: source.transparent,
+      opacity: source.opacity,
+    })
+  }
+
+  if (renderPass === 'lighting') {
+    const clone = source.clone()
+    clone.wireframe = wireframe
+    return clone
+  }
+
+  const baseConfig: THREE.MeshBasicMaterialParameters = {
+    wireframe,
+    side: source.side,
+    transparent: source.transparent,
+    opacity: source.opacity,
+  }
+
+  if (renderPass === 'albedo') {
+    return new THREE.MeshBasicMaterial({
+      ...baseConfig,
+      color: source.color.clone(),
+      map: source.map ?? null,
+    })
+  }
+
+  if (renderPass === 'opacity') {
+    const opacity = source.transparent ? source.opacity : 1
+    return new THREE.MeshBasicMaterial({
+      ...baseConfig,
+      color: new THREE.Color(opacity, opacity, opacity),
+      alphaMap: source.alphaMap ?? null,
+      transparent: true,
+      opacity,
+    })
+  }
+
+  if (renderPass === 'emission') {
+    const emissiveIntensity = source.emissiveIntensity ?? 1
+    return new THREE.MeshBasicMaterial({
+      ...baseConfig,
+      color: source.emissive.clone().multiplyScalar(emissiveIntensity),
+      map: source.emissiveMap ?? null,
+    })
+  }
+
+  if (renderPass === 'specularity') {
+    const meshPhysical = source instanceof THREE.MeshPhysicalMaterial ? source : null
+    const specularColor = meshPhysical?.specularColor?.clone() ?? new THREE.Color(1 - source.roughness, 1 - source.roughness, 1 - source.roughness)
+    const specularIntensity = meshPhysical?.specularIntensity ?? 1
+    return new THREE.MeshBasicMaterial({
+      ...baseConfig,
+      color: specularColor.multiplyScalar(specularIntensity),
+      map: meshPhysical?.specularColorMap ?? null,
+    })
+  }
+
+  if (renderPass === 'gloss') {
+    const gloss = 1 - source.roughness
+    return new THREE.MeshBasicMaterial({
+      ...baseConfig,
+      color: new THREE.Color(gloss, gloss, gloss),
+    })
+  }
+
+  if (renderPass === 'metalness') {
+    return new THREE.MeshBasicMaterial({
+      ...baseConfig,
+      color: new THREE.Color(source.metalness, source.metalness, source.metalness),
+    })
+  }
+
+  if (renderPass === 'ao') {
+    const intensity = source.aoMapIntensity ?? 1
+    return new THREE.MeshBasicMaterial({
+      ...baseConfig,
+      color: new THREE.Color(intensity, intensity, intensity),
+    })
+  }
+
+  return source.clone()
+}
+
+function applyWireframe(material: THREE.Material | THREE.Material[], enabled: boolean) {
+  flattenMaterials(material).forEach((entry) => {
+    if ('wireframe' in entry) {
+      ;(entry as THREE.Material & { wireframe?: boolean }).wireframe = enabled
     }
   })
 }
@@ -386,6 +560,216 @@ function EditorViewportOverlay({
   )
 }
 
+function RenderModeController({
+  renderPass,
+  wireframeEnabled,
+  resolveIdByObject,
+}: {
+  renderPass: ViewerRenderPass
+  wireframeEnabled: boolean
+  resolveIdByObject?: (object: THREE.Object3D) => string | null
+}) {
+  const scene = useThree((state) => state.scene)
+  const originalMaterialsRef = useRef(new WeakMap<THREE.Mesh, THREE.Material | THREE.Material[]>())
+  const originalWireframeRef = useRef(new WeakMap<THREE.Material, boolean>())
+
+  useEffect(() => {
+    const debugMaterials: THREE.Material[] = []
+
+    scene.traverse((child) => {
+      if (!(child instanceof THREE.Mesh) || !resolveIdByObject?.(child)) {
+        return
+      }
+
+      if (!originalMaterialsRef.current.has(child)) {
+        originalMaterialsRef.current.set(child, child.material)
+      }
+
+      const originalMaterial = originalMaterialsRef.current.get(child)!
+      flattenMaterials(originalMaterial).forEach((entry) => {
+        if (!originalWireframeRef.current.has(entry)) {
+          originalWireframeRef.current.set(entry, 'wireframe' in entry ? Boolean((entry as THREE.Material & { wireframe?: boolean }).wireframe) : false)
+        }
+      })
+
+      if (renderPass === 'standard') {
+        child.material = originalMaterial
+        applyWireframe(originalMaterial, wireframeEnabled)
+        return
+      }
+
+      applyWireframe(originalMaterial, false)
+      const nextMaterial = Array.isArray(originalMaterial)
+        ? originalMaterial.map((entry) => createDebugMaterial(entry, renderPass, wireframeEnabled))
+        : createDebugMaterial(originalMaterial, renderPass, wireframeEnabled)
+      child.material = nextMaterial
+      debugMaterials.push(...flattenMaterials(nextMaterial))
+    })
+
+    return () => {
+      scene.traverse((child) => {
+        if (!(child instanceof THREE.Mesh)) {
+          return
+        }
+
+        const originalMaterial = originalMaterialsRef.current.get(child)
+        if (!originalMaterial) {
+          return
+        }
+
+        child.material = originalMaterial
+        flattenMaterials(originalMaterial).forEach((entry) => {
+          const originalWireframe = originalWireframeRef.current.get(entry)
+          if (originalWireframe !== undefined) {
+            applyWireframe(entry, originalWireframe)
+          }
+        })
+      })
+
+      debugMaterials.forEach((entry) => entry.dispose())
+    }
+  }, [renderPass, resolveIdByObject, scene, wireframeEnabled])
+
+  return null
+}
+
+function CameraCommandController({
+  cameraCommand,
+  selectedResourceIds,
+  resolveObjectById,
+  resolveIdByObject,
+  orbitControlsRef,
+  fallbackPerspectivePosition,
+}: {
+  cameraCommand: ViewerCameraCommand | null
+  selectedResourceIds: string[]
+  resolveObjectById?: (resourceId: string) => THREE.Object3D | null
+  resolveIdByObject?: (object: THREE.Object3D) => string | null
+  orbitControlsRef: RefObject<React.ComponentRef<typeof OrbitControls> | null>
+  fallbackPerspectivePosition: [number, number, number]
+}) {
+  const camera = useThree((state) => state.camera)
+  const scene = useThree((state) => state.scene)
+  const animationRef = useRef<{
+    alpha: number
+    fromPosition: THREE.Vector3
+    toPosition: THREE.Vector3
+    fromTarget: THREE.Vector3
+    toTarget: THREE.Vector3
+  } | null>(null)
+
+  useEffect(() => {
+    if (!cameraCommand) {
+      return
+    }
+
+    const bounds = new THREE.Box3()
+    const target = new THREE.Vector3()
+    const visitedIds = new Set<string>()
+
+    if (selectedResourceIds.length > 0 && resolveObjectById) {
+      selectedResourceIds.forEach((resourceId) => {
+        const object = resolveObjectById(resourceId)
+        if (!object || visitedIds.has(resourceId)) {
+          return
+        }
+
+        visitedIds.add(resourceId)
+        bounds.expandByObject(object)
+      })
+    }
+
+    if (bounds.isEmpty()) {
+      scene.traverse((child) => {
+        if (!(child instanceof THREE.Mesh) || !resolveIdByObject) {
+          return
+        }
+
+        const resourceId = resolveIdByObject(child)
+        if (!resourceId) {
+          return
+        }
+
+        bounds.expandByObject(child)
+      })
+    }
+
+    if (bounds.isEmpty()) {
+      bounds.setFromCenterAndSize(new THREE.Vector3(0, 0, 0), new THREE.Vector3(1, 1, 1))
+    }
+
+    bounds.getCenter(target)
+    const size = bounds.getSize(new THREE.Vector3())
+    const radius = Math.max(size.length() * 0.5, 0.5)
+    const controls = orbitControlsRef.current
+    const currentTarget = controls?.target.clone() ?? new THREE.Vector3()
+
+    let direction = camera.position.clone().sub(currentTarget)
+    if (direction.lengthSq() === 0) {
+      direction = new THREE.Vector3(...fallbackPerspectivePosition).normalize()
+    } else {
+      direction.normalize()
+    }
+
+    if (cameraCommand.kind === 'preset') {
+      switch (cameraCommand.preset) {
+        case 'front':
+          direction = new THREE.Vector3(0, 0, 1)
+          break
+        case 'back':
+          direction = new THREE.Vector3(0, 0, -1)
+          break
+        case 'left':
+          direction = new THREE.Vector3(-1, 0, 0)
+          break
+        case 'right':
+          direction = new THREE.Vector3(1, 0, 0)
+          break
+        case 'top':
+          direction = new THREE.Vector3(0, 1, 0)
+          break
+        case 'bottom':
+          direction = new THREE.Vector3(0, -1, 0)
+          break
+        case 'perspective':
+        default:
+          direction = new THREE.Vector3(...fallbackPerspectivePosition).normalize()
+          break
+      }
+    }
+
+    animationRef.current = {
+      alpha: 0,
+      fromPosition: camera.position.clone(),
+      toPosition: target.clone().add(direction.multiplyScalar(radius * 2.6)),
+      fromTarget: currentTarget,
+      toTarget: target.clone(),
+    }
+  }, [camera, cameraCommand, fallbackPerspectivePosition, orbitControlsRef, resolveIdByObject, resolveObjectById, scene, selectedResourceIds])
+
+  useFrame((_, delta) => {
+    const animation = animationRef.current
+    const controls = orbitControlsRef.current
+    if (!animation || !controls) {
+      return
+    }
+
+    animation.alpha = Math.min(1, animation.alpha + delta * 3.5)
+    const eased = 1 - Math.pow(1 - animation.alpha, 3)
+
+    camera.position.lerpVectors(animation.fromPosition, animation.toPosition, eased)
+    controls.target.lerpVectors(animation.fromTarget, animation.toTarget, eased)
+    camera.lookAt(controls.target)
+    controls.update()
+
+    if (animation.alpha >= 1) {
+      animationRef.current = null
+    }
+  })
+
+  return null
+}
+
 export default function EffectViewer({
   config,
   artworkUrl,
@@ -402,6 +786,9 @@ export default function EffectViewer({
   transformSpace = 'local',
   showGizmoHelper = false,
   enableTransformControls = false,
+  renderPass = 'standard',
+  wireframeEnabled = false,
+  cameraCommand = null,
 }: EffectViewerProps) {
   // Preload the model
   useGLTF.preload(config.modelPath)
@@ -540,6 +927,19 @@ export default function EffectViewer({
           transformSpace={transformSpace}
           showGizmoHelper={showGizmoHelper}
           enableTransformControls={enableTransformControls}
+        />
+        <RenderModeController
+          renderPass={renderPass}
+          wireframeEnabled={wireframeEnabled}
+          resolveIdByObject={resolveIdByObject}
+        />
+        <CameraCommandController
+          cameraCommand={cameraCommand}
+          selectedResourceIds={selectedResourceIds}
+          resolveObjectById={resolveObjectById}
+          resolveIdByObject={resolveIdByObject}
+          orbitControlsRef={orbitControlsRef}
+          fallbackPerspectivePosition={cameraPosition}
         />
       </Canvas>
     </div>

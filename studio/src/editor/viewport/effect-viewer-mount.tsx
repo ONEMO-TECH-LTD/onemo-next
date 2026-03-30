@@ -4,7 +4,10 @@ import * as THREE from 'three';
 
 import EffectViewer, {
     type EffectViewerBridge,
-    type EffectViewerTransformSnapshot
+    type EffectViewerTransformSnapshot,
+    type ViewerCameraCommand,
+    type ViewerCameraPreset,
+    type ViewerRenderPass
 } from '../../../../src/app/(dev)/prototype/core/EffectViewer';
 import type { DesignState, ViewerConfig } from '../../../../src/app/(dev)/prototype/types';
 
@@ -46,6 +49,9 @@ function BridgeViewportApp({
     const [selectedResourceIds, setSelectedResourceIds] = useState<string[]>([]);
     const [gizmoMode, setGizmoMode] = useState<GizmoMode>('translate');
     const [gizmoSpace, setGizmoSpace] = useState<GizmoSpace>('local');
+    const [renderPass, setRenderPass] = useState<ViewerRenderPass>('standard');
+    const [wireframeEnabled, setWireframeEnabled] = useState(false);
+    const [cameraCommand, setCameraCommand] = useState<ViewerCameraCommand | null>(null);
 
     useEffect(() => {
         const syncSelection = (type: string | null, items: SelectableObserver[] = []) => {
@@ -71,9 +77,40 @@ function BridgeViewportApp({
             setGizmoSpace(space === 'world' ? 'world' : 'local');
         };
 
+        const syncRenderPass = (mode?: ViewerRenderPass | null) => {
+            setRenderPass(mode || 'standard');
+        };
+
+        const syncWireframe = (enabled?: boolean | null) => {
+            setWireframeEnabled(!!enabled);
+        };
+
+        const focusSelection = () => {
+            setCameraCommand({
+                kind: 'focus',
+                seq: Date.now()
+            });
+        };
+
+        const setCameraPreset = (preset?: ViewerCameraPreset | null) => {
+            if (!preset) {
+                return;
+            }
+
+            setCameraCommand({
+                kind: 'preset',
+                preset,
+                seq: Date.now()
+            });
+        };
+
         const selectionHandle = editor.on('selector:change', syncSelection);
         const gizmoTypeHandle = editor.on('gizmo:type', syncGizmoMode);
         const gizmoSpaceHandle = editor.on('gizmo:coordSystem', syncGizmoSpace);
+        const renderPassHandle = editor.on('r3f:viewer:renderPass', syncRenderPass);
+        const wireframeHandle = editor.on('r3f:viewer:wireframe', syncWireframe);
+        const focusHandle = editor.on('r3f:viewer:focus', focusSelection);
+        const cameraPresetHandle = editor.on('r3f:viewer:cameraPreset', setCameraPreset);
 
         syncSelection(
             editor.call('selector:type') as string | null,
@@ -81,11 +118,17 @@ function BridgeViewportApp({
         );
         syncGizmoMode(editor.call('gizmo:type') as string | null);
         syncGizmoSpace(editor.call('gizmo:coordSystem') as string | null);
+        syncRenderPass('standard');
+        syncWireframe(false);
 
         return () => {
             selectionHandle.unbind();
             gizmoTypeHandle.unbind();
             gizmoSpaceHandle.unbind();
+            renderPassHandle.unbind();
+            wireframeHandle.unbind();
+            focusHandle.unbind();
+            cameraPresetHandle.unbind();
         };
     }, []);
 
@@ -140,6 +183,9 @@ function BridgeViewportApp({
             transformSpace={gizmoSpace}
             showGizmoHelper
             enableTransformControls
+            renderPass={renderPass}
+            wireframeEnabled={wireframeEnabled}
+            cameraCommand={cameraCommand}
             onBridgeReady={handleBridgeReady}
         />
     );

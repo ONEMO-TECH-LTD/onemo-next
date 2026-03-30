@@ -232,7 +232,7 @@ editor.once('load', () => {
                     return (asset: Asset) => {
                         const isFocusedOnEntity = editor.api.globals.selection.items.some(item => item instanceof Entity);
 
-                        // Reason for skipping the selection can be read here: https://github.com/playcanvas/editor/issues/1063
+                        // Skip selection change when user is focused on entity hierarchy to avoid workflow disruption
                         const wouldDisruptWorkflow = isFocusedOnEntity || selectionChanged;
 
                         if (!wouldDisruptWorkflow) {

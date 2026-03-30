@@ -12,7 +12,6 @@ import { ExternalScriptsSettingsPanel } from './settings-panels/external-scripts
 import { ImportMapSettingsPanel } from './settings-panels/import-map';
 import { InputSettingsPanel } from './settings-panels/input';
 import { LayersSettingsPanel } from './settings-panels/layers';
-import { LightmappingSettingsPanel } from './settings-panels/lightmapping';
 import { LoadingScreenSettingsPanel } from './settings-panels/loading-screen';
 import { LocalizationSettingsPanel } from './settings-panels/localization';
 import { NetworkSettingsPanel } from './settings-panels/network';
@@ -31,7 +30,6 @@ const SETTINGS_PANELS = [
     PhysicsSettingsPanel,
     RenderingSettingsPanel,
     LayersSettingsPanel,
-    LightmappingSettingsPanel,
     BatchGroupsSettingsPanel,
     LoadingScreenSettingsPanel,
     ImportMapSettingsPanel,

@@ -50,8 +50,6 @@ class AnimationComponentInspector extends ComponentInspector {
 
         super(args);
 
-        this.headerText += ' (LEGACY)';
-
         this._assets = args.assets;
 
         this._attributesInspector = new AttributesInspector({

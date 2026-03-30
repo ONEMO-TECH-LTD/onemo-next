@@ -356,8 +356,6 @@ import './viewport/viewport-entities-elements';
 import './viewport/viewport-layers';
 import './viewport/viewport-scene-settings';
 import './viewport/viewport-assets';
-import './viewport/viewport-lightmapper';
-import './viewport/viewport-lightmapper-auto';
 import './viewport/viewport-drop-model';
 import './viewport/viewport-drop-material';
 import './viewport/viewport-drop-cubemap';

@@ -1,4 +1,6 @@
 editor.once('load', () => {
+    // Hosted version-control UI is removed in ONEMO Studio. Keep defensive
+    // stubs so legacy callers do not crash when these old entry points fire.
     const noop = () => {};
     const noopFalse = () => false;
     const noopTrue = () => true;

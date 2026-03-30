@@ -245,13 +245,6 @@ const ATTRIBUTES: (Attribute | Divider)[] = [
         type: 'boolean'
     },
     {
-        observer: 'settings',
-        path: 'editor.lightmapperAutoBake',
-        reference: 'settings:lightmapperAutoBake',
-        label: 'Lightmapper Auto Bake',
-        type: 'boolean'
-    },
-    {
         alias: 'divider:3',
         type: 'divider'
     },

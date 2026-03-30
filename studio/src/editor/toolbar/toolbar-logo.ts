@@ -316,14 +316,6 @@ editor.once('load', () => {
                 items: editor.call('menu:entities:template')
             }]
         }, {
-            // Build tools
-            text: 'Bake LightMaps',
-            icon: 'E191',
-            onSelect: () => {
-                editor.call('lightmapper:bake');
-                editor.call('entities:shadows:update');
-            }
-        }, {
             // Configuration
             text: 'Settings',
             icon: 'E134',

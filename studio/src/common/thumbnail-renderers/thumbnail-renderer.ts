@@ -250,7 +250,7 @@ class ThumbnailRenderer extends Observer {
         return ThumbnailRenderer.renderer;
     }
 
-    private createThreeMaterial(sourceMaterial: any) {
+    protected createThreeMaterial(sourceMaterial: any) {
         const diffuse = sourceMaterial?.diffuse;
         const emissive = sourceMaterial?.emissive;
         const color = new THREE.Color(

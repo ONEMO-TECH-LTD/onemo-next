@@ -197,7 +197,6 @@ editor.once('load', () => {
 
     const getFilename = (name: string): string => {
         // Get the filename from a filepath if there's a '/'
-        // https://github.com/playcanvas/editor/issues/784
         const lastSlash = name.lastIndexOf('/');
         if (lastSlash > 0) {
             if (lastSlash < name.length - 1) {

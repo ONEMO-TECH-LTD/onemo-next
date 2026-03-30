@@ -459,8 +459,8 @@ editor.once('load', () => {
         return validated;
     };
 
-    // Only allow local development and current API origins to be parsed.
-    const REGEX_ALLOWED = new RegExp(`^((http(s)?://)(localhost:51000))|(${config.url.api})`);
+    // Only allow the current API origin to be parsed.
+    const REGEX_ALLOWED = new RegExp(`^(${config.url.api})`);
 
     /**
      * Starts a web worker which scans the specified URL

@@ -645,20 +645,9 @@ editor.once('load', () => {
         window.open('/feedback', '_blank');
     });
 
-    const githubLink = new Button({
-        class: 'quick-link',
-        icon: 'E259',
-        text: 'GitHub'
-    });  // GitHub
-
-    githubLink.on('click', () => {
-        window.open('https://github.com/playcanvas/editor', '_blank');
-    });
-
     quickLinksContainer.append(exploreLink);
     quickLinksContainer.append(docsLink);
     quickLinksContainer.append(feedbackLink);
-    quickLinksContainer.append(githubLink);
 
     // upgrade container
     const upgradeContainer = new Element({

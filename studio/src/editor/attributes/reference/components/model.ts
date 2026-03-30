@@ -52,24 +52,6 @@ export const fields: AttributeReference[]  = [{
 </ul>`,
     url: '/reference/api/engine/classes/ModelComponent.html#type'
 }, {
-    name: 'model:castShadowsLightmap',
-    title: 'castShadowsLightmap',
-    subTitle: '{Boolean}',
-    description: 'If true, this model will cast shadows when rendering lightmaps',
-    url: '/reference/api/engine/classes/ModelComponent.html#castshadowslightmap'
-}, {
-    name: 'model:lightmapped',
-    title: 'lightmapped',
-    subTitle: '{Boolean}',
-    description: 'If true, this model will be lightmapped after using lightmapper.bake()',
-    url: '/reference/api/engine/classes/ModelComponent.html#lightmapped'
-}, {
-    name: 'model:lightmapSizeMultiplier',
-    title: 'lightmapSizeMultiplier',
-    subTitle: '{Number}',
-    description: 'Changing this value will affect resolution of lightmaps for this model',
-    url: '/reference/api/engine/classes/ModelComponent.html#lightmapsizemultiplier'
-}, {
     name: 'model:batchGroupId',
     title: 'batchGroupId',
     subTitle: '{Number}',

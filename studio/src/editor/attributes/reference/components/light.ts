@@ -118,18 +118,6 @@ export const fields: AttributeReference[]  = [{
 </ul>`,
     url: '/reference/api/engine/classes/LightComponent.html#type'
 }, {
-    name: 'light:affectDynamic',
-    title: 'affectDynamic',
-    subTitle: '{Boolean}',
-    description: 'If enabled the light will affect non-lightmapped objects.',
-    url: '/reference/api/engine/classes/LightComponent.html#affectdynamic'
-}, {
-    name: 'light:affectLightmapped',
-    title: 'affectLightmapped',
-    subTitle: '{Boolean}',
-    description: 'If enabled the light will affect lightmapped objects.',
-    url: '/reference/api/engine/classes/LightComponent.html#affectlightmapped'
-}, {
     name: 'light:affectSpecularity',
     title: 'affectSpecularity',
     subTitle: '{Boolean}',

@@ -143,9 +143,6 @@ editor.once('load', () => {
             thumbnailButtons.style.opacity = (currentProject.access_level === 'admin' && currentProject.owner_id === config.self.id) || currentProject.id === config.project.id ? '1' : '0';
 
             menuOptions.scenes.item.hidden = true;
-            if (!IS_EMPTY_STATE && menuOptions['version control']) {
-                menuOptions['version control'].item.hidden = true;
-            }
 
             // ensure all reduced view panels are visible
             for (const key in menuOptions) {
@@ -171,9 +168,6 @@ editor.once('load', () => {
 
             menuOptions['project-main'].item.hidden = true;
             menuOptions.scenes.item.hidden = true;
-            if (menuOptions['version control']) {
-                menuOptions['version control'].item.hidden = true;
-            }
 
             // ensure only team management panel is visible
             menuOptions.team.item.hidden = false;
@@ -197,9 +191,6 @@ editor.once('load', () => {
             menuOptions['project-main'].item.hidden = false;
             menuOptions.scenes.item.hidden = true;
             menuOptions.team.item.hidden = true;
-            if (menuOptions['version control']) {
-                menuOptions['version control'].item.hidden = true;
-            }
 
             projectCMSButton.enabled = false;
             projectCMSButton.hidden = true;
@@ -488,9 +479,7 @@ editor.once('load', () => {
         class: 'close'
     });
     btnClose.on('click', () => {
-        if (currentSelection !== 'version control' || editor.call('vcgraph:isHidden')) {
-            overlay.hidden = true;
-        }
+        overlay.hidden = true;
     });
     rightPanel.header.append(btnClose);
 
@@ -660,11 +649,7 @@ editor.once('load', () => {
             });
         });
 
-        if (option === 'version control') {
-            closeCallback = () => editor.call('vcgraph:isHidden');
-        } else {
-            closeCallback = null;
-        }
+        closeCallback = null;
 
         select(option || defaultMenuOption);
     });

@@ -1,24 +1,10 @@
 import { BooleanInput, Button, Container, Label, RadioButton } from '@playcanvas/pcui';
-import {
-    RENDERSTYLE_SOLID,
-    RENDERSTYLE_WIREFRAME,
-    SHADERPASS_ALBEDO,
-    SHADERPASS_AO,
-    SHADERPASS_EMISSION,
-    SHADERPASS_FORWARD,
-    SHADERPASS_GLOSS,
-    SHADERPASS_LIGHTING,
-    SHADERPASS_METALNESS,
-    SHADERPASS_OPACITY,
-    SHADERPASS_SPECULARITY,
-    SHADERPASS_UV0,
-    SHADERPASS_WORLDNORMAL
-} from '@/common/playcanvas-compat';
 
-editor.once('viewport:load', (app) => {
+import type { ViewerRenderPass } from '../../../../src/app/(dev)/prototype/core/EffectViewer';
+
+editor.once('viewport:load', () => {
     const controls = editor.call('layout.toolbar.launch');
 
-    // Render dropdown
     const renderContainer = new Container({
         class: 'render'
     });
@@ -37,29 +23,24 @@ editor.once('viewport:load', (app) => {
     });
     renderContainer.append(renderOptions);
 
-    // Option Fields UI
-    const createCheckbox = (name, callback = (state) => {}) => {
-        // Create UI Panel
+    const createCheckbox = (name, callback = (_state) => {}) => {
         const renderOption = new Container({
             flex: true
         });
         renderOptions.append(renderOption);
 
-        // Create Field
         let state = false;
         const renderOptionRadio = new BooleanInput({
             value: state
         });
         renderOption.append(renderOptionRadio);
 
-        // Listen for radio button clicks
         renderOption.dom.addEventListener('click', () => {
             state = !state;
             renderOptionRadio.value = state;
             callback(state);
         });
 
-        // Create Label
         const label = new Label({
             text: name
         });
@@ -67,14 +48,12 @@ editor.once('viewport:load', (app) => {
     };
 
     const renderRadioOptions = [];
-    const createShaderOption = (name: string, state = false, callback: () => void = () => {}) => {
-        // Create UI Panel
+    const createShaderOption = (name: string, mode: ViewerRenderPass, state = false) => {
         const renderOption = new Container({
             flex: true
         });
         renderOptions.append(renderOption);
 
-        // Create Field
         const renderOptionRadio = new RadioButton({
             value: state
         });
@@ -84,70 +63,43 @@ editor.once('viewport:load', (app) => {
             renderButton.text = name;
         }
 
-        // Listen for radio button clicks
         renderOption.dom.addEventListener('click', () => {
             renderButton.text = name;
             for (let i = 0; i < renderRadioOptions.length; i++) {
                 renderRadioOptions[i].value = false;
             }
             renderOptionRadio.value = true;
-            callback();
+            editor.emit('r3f:viewer:renderPass', mode);
         });
 
-        // Create Label
         const label = new Label({
             text: name
         });
         renderOption.append(label);
     };
 
-    // Wireframe
     createCheckbox('Wireframe', (state) => {
         renderButton.icon = state ? 'E187' : 'E188';
-
-        const renderStyle = state ? RENDERSTYLE_WIREFRAME : RENDERSTYLE_SOLID;
-        const sceneLayers = app.scene.layers.layerList;
-        const gizmoLayers = editor.call('gizmo:layers:list');
-        for (let i = 0; i < sceneLayers.length; i++) {
-            const layer = sceneLayers[i];
-            if (gizmoLayers.some(gizmoLayer => gizmoLayer.id === layer.id)) {
-                continue;
-            }
-            for (let j = 0; j < layer.meshInstances.length; j++) {
-                const meshInstance = layer.meshInstances[j];
-                meshInstance.renderStyle = renderStyle;
-            }
-        }
-        editor.call('viewport:render');
+        editor.emit('r3f:viewer:wireframe', state);
     });
 
-    // Divider UI
     const divider = new Container({
         class: 'divider'
     });
     renderOptions.append(divider);
 
-    // Shader Passes
-    const shaderPassMap = {
-        'Standard': SHADERPASS_FORWARD,
-        'Albedo': SHADERPASS_ALBEDO,
-        'Opacity': SHADERPASS_OPACITY,
-        'World Normal': SHADERPASS_WORLDNORMAL,
-        'Specularity': SHADERPASS_SPECULARITY,
-        'Gloss': SHADERPASS_GLOSS,
-        'Metalness': SHADERPASS_METALNESS,
-        'AO': SHADERPASS_AO,
-        'Emission': SHADERPASS_EMISSION,
-        'Lighting': SHADERPASS_LIGHTING,
-        'UV0': SHADERPASS_UV0
-    };
-    for (const name in shaderPassMap) {
-        createShaderOption(name, name === 'Standard', () => {
-            editor.emit('camera:shader:pass', shaderPassMap[name]);
-        });
-    }
+    createShaderOption('Standard', 'standard', true);
+    createShaderOption('Albedo', 'albedo');
+    createShaderOption('Opacity', 'opacity');
+    createShaderOption('World Normal', 'worldNormal');
+    createShaderOption('Specularity', 'specularity');
+    createShaderOption('Gloss', 'gloss');
+    createShaderOption('Metalness', 'metalness');
+    createShaderOption('AO', 'ao');
+    createShaderOption('Emission', 'emission');
+    createShaderOption('Lighting', 'lighting');
+    createShaderOption('UV0', 'uv0');
 
-    // UI interactions
     let timeout;
     let inOptions = false;
     let inButton = false;

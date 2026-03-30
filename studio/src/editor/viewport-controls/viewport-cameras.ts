@@ -58,7 +58,11 @@ editor.once('viewport:load', (app) => {
         // Listen for field option clicks
         panelCameraOption.dom.addEventListener('click', () => {
             const entity = app.root.findByGuid(guid);
-            editor.call('camera:set', entity);
+            if (entity?.__editorName) {
+                editor.emit('r3f:viewer:cameraPreset', entity.__editorName === 'perspective' ? 'perspective' : entity.__editorName);
+            } else {
+                editor.call('camera:set', entity);
+            }
 
             clearRadioButtons();
 
@@ -86,6 +90,11 @@ editor.once('viewport:load', (app) => {
 
     cameraOptions.on('change', (value) => {
         const entity = app.root.findByGuid(value);
+        if (entity?.__editorName) {
+            editor.emit('r3f:viewer:cameraPreset', entity.__editorName === 'perspective' ? 'perspective' : entity.__editorName);
+            return;
+        }
+
         editor.call('camera:set', entity);
     });
 
