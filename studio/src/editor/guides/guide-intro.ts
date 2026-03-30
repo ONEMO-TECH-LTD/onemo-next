@@ -309,8 +309,7 @@ editor.once('load', () => {
             'entityInspector',
             'soundComponent',
             'mainMenu',
-            'controls',
-            'howdoi'].forEach((tip) => {
+            'controls'].forEach((tip) => {
             config.self.flags.tips[tip] = false;
         });
 

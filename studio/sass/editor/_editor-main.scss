@@ -648,7 +648,7 @@ strong {
                 &::before {
                     display: block;
                     content: ' ';
-                    background-image: url('https://playcanvas.com/static-assets/images/bcg_primary.jpg');
+                    background-image: url('../../static/img/bcg_primary.jpg');
                     background-repeat: no-repeat;
                     background-position: center center;
                     background-size: cover;
@@ -2832,7 +2832,7 @@ strong {
                 align-items: center;
                 background-color: $bcg-darker;
 
-                & > .playcanvas-icon {
+                & > .studio-icon {
                     position: absolute;
                     display: flex;
                     justify-content: center;

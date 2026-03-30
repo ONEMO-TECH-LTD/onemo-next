@@ -1,5 +1,7 @@
 import { Events } from '@playcanvas/observer';
 
+import { STUDIO_NETWORK_OFFLINE } from '../../editor-api/studio-network-offline';
+
 const RELAY_RECONNECT_DELAY = 1000;
 const RELAY_PING_DELAY = 10000;
 const RELAY_PONG_DELAY = 5000;
@@ -78,6 +80,17 @@ class RelayServer extends Events {
             return;
         }
 
+        if (STUDIO_NETWORK_OFFLINE) {
+            this._url = url;
+            this._connected = true;
+            this._connecting = false;
+            this._connectAttempts = 0;
+            queueMicrotask(() => {
+                this.emit('connect');
+            });
+            return;
+        }
+
         this._url = url;
         this._connectAttempts++;
         this._connecting = true;
@@ -97,6 +110,10 @@ class RelayServer extends Events {
      * Reconnects to the server
      */
     reconnect() {
+        if (STUDIO_NETWORK_OFFLINE) {
+            return;
+        }
+
         if (this._connected || this._connecting || !this._url) {
             return;
         }
@@ -281,6 +298,10 @@ class RelayServer extends Events {
      * @param msg - The message data
      */
     send(msg: string | object) {
+        if (STUDIO_NETWORK_OFFLINE) {
+            return;
+        }
+
         if (!this._connected) {
             return;
         }
@@ -295,6 +316,13 @@ class RelayServer extends Events {
      */
     close(args?: CloseArgs) {
         if (!this._connected) {
+            return;
+        }
+
+        if (STUDIO_NETWORK_OFFLINE) {
+            this._connected = false;
+            this._connecting = false;
+            this.emit('disconnect');
             return;
         }
 

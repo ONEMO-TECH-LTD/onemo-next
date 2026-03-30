@@ -23,6 +23,7 @@ const NOOP_OUTPUT = '.noop.js';
 const STATIC_ASSETS = [
     { src: 'static/json', dest: 'dist/static/json' },
     { src: 'static/img', dest: 'dist/static/img' },
+    { src: 'static/fonts', dest: 'dist/static/fonts' },
     { src: 'src/wasm/lodepng', dest: 'dist/wasm/lodepng' },
     { src: 'src/wasm/codecs', dest: 'dist/wasm/codecs' },
     { src: 'node_modules/@playcanvas/attribute-parser/dist/libs.d.ts', dest: 'dist/types/libs.d.ts' }

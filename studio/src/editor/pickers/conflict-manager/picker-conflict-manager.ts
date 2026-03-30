@@ -14,7 +14,7 @@ import {
     MERGE_STATUS_READY_FOR_REVIEW
 } from '@/core/constants';
 
-import { diffCreate } from '../../vc/diff-create';
+import { diffCreate } from './diff-create';
 
 editor.once('load', () => {
     const LAYOUT_NONE = 0;

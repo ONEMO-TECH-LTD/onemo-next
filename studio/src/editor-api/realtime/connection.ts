@@ -6,9 +6,34 @@ share.types.register(type);
 import { Deferred } from '../deferred';
 import { globals as api } from '../globals';
 import { Realtime } from '../realtime';
+import { STUDIO_NETWORK_OFFLINE } from '../studio-network-offline';
 
 const RECONNECT_INTERVAL = 3;
 const MAX_ATTEMPTS = 3;
+
+function createStubShareDbDoc(collection: string, id: string) {
+    const listeners: Record<string, Array<(...args: unknown[]) => void>> = {};
+    const baseData: Record<string, unknown> =
+        collection === 'scenes' ? { item_id: Number(id), entities: {} } : {};
+    const doc = {
+        data: baseData,
+        on(event: string, fn: (...args: unknown[]) => void) {
+            if (!listeners[event]) listeners[event] = [];
+            listeners[event].push(fn);
+        },
+        subscribe() {
+            queueMicrotask(() => {
+                listeners['load']?.forEach((f) => f());
+            });
+        },
+        submitOp(_ops: unknown) {},
+        destroy() {},
+        whenNothingPending(cb: () => void) {
+            cb();
+        }
+    };
+    return doc;
+}
 
 type ShareDb = share.Connection & {
     bindToSocket: (socket: WebSocket) => void;
@@ -43,6 +68,9 @@ class RealtimeConnection extends Events {
     private _domEvtVisibilityChange: () => void;
 
     private _alive: ReturnType<typeof setInterval> | null = null;
+
+    private _stubSharedbWrapper: { get: (collection: string, id: string) => ReturnType<typeof createStubShareDbDoc> } | null =
+        null;
 
     /**
      * Constructor
@@ -149,6 +177,18 @@ class RealtimeConnection extends Events {
      * @param url - The server URL
      */
     connect(url: string) {
+        if (STUDIO_NETWORK_OFFLINE) {
+            this._url = url;
+            this._state = 'connected';
+            this._reconnectAttempts = 0;
+            this._authenticated = true;
+            queueMicrotask(() => {
+                this._realtime.emit('connected');
+                this._realtime.emit('authenticated');
+            });
+            return;
+        }
+
         if (this._state === 'connected') {
             console.warn('already connected to realtime server. Disconnect first before connecting again.');
             return;
@@ -226,6 +266,12 @@ class RealtimeConnection extends Events {
      * Disconnect from the server
      */
     disconnect() {
+        if (STUDIO_NETWORK_OFFLINE) {
+            this._state = 'disconnected';
+            this._authenticated = false;
+            return;
+        }
+
         this._sharedb?.close();
 
         this._socket?.close();
@@ -240,6 +286,9 @@ class RealtimeConnection extends Events {
      * @param data - The message data
      */
     sendMessage(name: string, data: object) {
+        if (STUDIO_NETWORK_OFFLINE) {
+            return;
+        }
         this.send(name + JSON.stringify(data));
     }
 
@@ -249,6 +298,9 @@ class RealtimeConnection extends Events {
      * @param data - The message data
      */
     async send(data: string) {
+        if (STUDIO_NETWORK_OFFLINE) {
+            return;
+        }
         const socket = await this._active.promise;
         socket.send(data);
     }
@@ -261,6 +313,9 @@ class RealtimeConnection extends Events {
      * @returns The sharedb document
      */
     getDocument(collection: string, id: number) {
+        if (STUDIO_NETWORK_OFFLINE) {
+            return createStubShareDbDoc(collection, id.toString());
+        }
         return this._sharedb.get(collection, id.toString());
     }
 
@@ -268,6 +323,9 @@ class RealtimeConnection extends Events {
      * Start bulk subscribing to documents
      */
     startBulkSubscribe() {
+        if (STUDIO_NETWORK_OFFLINE) {
+            return;
+        }
         this._sharedb.startBulk();
     }
 
@@ -275,6 +333,9 @@ class RealtimeConnection extends Events {
      * Stop bulk subscribing to documents
      */
     endBulkSubscribe() {
+        if (STUDIO_NETWORK_OFFLINE) {
+            return;
+        }
         this._sharedb.endBulk();
     }
 
@@ -296,6 +357,14 @@ class RealtimeConnection extends Events {
      * Gets the sharedb instance
      */
     get sharedb() {
+        if (STUDIO_NETWORK_OFFLINE) {
+            if (!this._stubSharedbWrapper) {
+                this._stubSharedbWrapper = {
+                    get: (collection: string, id: string) => createStubShareDbDoc(collection, id)
+                };
+            }
+            return this._stubSharedbWrapper as unknown as ShareDb;
+        }
         return this._sharedb;
     }
 }
