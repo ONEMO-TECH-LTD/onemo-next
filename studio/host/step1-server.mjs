@@ -589,11 +589,12 @@ function sceneNameFromPath(pathname) {
     }
 }
 
-function toSceneFilePath(name) {
+function toSceneFilePaths(name) {
     const safeName = sanitizeSceneName(name);
     return {
         safeName,
-        filePath: path.join(scenesRoot, `${safeName}.json`)
+        onemoPath: path.join(scenesRoot, `${safeName}.onemo`),
+        legacyPath: path.join(scenesRoot, `${safeName}.json`)
     };
 }
 
@@ -625,6 +626,30 @@ async function readJsonBody(req) {
             } catch {
                 reject(new Error('Invalid JSON body'));
             }
+        });
+
+        req.on('error', reject);
+    });
+}
+
+async function readBinaryBody(req) {
+    return new Promise((resolve, reject) => {
+        const chunks = [];
+        let size = 0;
+
+        req.on('data', (chunk) => {
+            size += chunk.length;
+            if (size > 20 * 1024 * 1024) {
+                reject(new Error('Request body exceeds 20MB limit'));
+                req.destroy();
+                return;
+            }
+
+            chunks.push(chunk);
+        });
+
+        req.on('end', () => {
+            resolve(chunks.length ? Buffer.concat(chunks) : null);
         });
 
         req.on('error', reject);
@@ -1612,9 +1637,23 @@ const server = http.createServer(async (req, res) => {
             try {
                 await mkdir(scenesRoot, { recursive: true });
                 const files = await readdir(scenesRoot);
-                const scenes = files
-                .filter(file => file.endsWith('.json'))
-                .map(file => file.slice(0, -5))
+                const preferredScenes = new Map();
+
+                files.forEach((file) => {
+                    if (file.endsWith('.onemo')) {
+                        preferredScenes.set(file.slice(0, -6), 'onemo');
+                        return;
+                    }
+
+                    if (file.endsWith('.json')) {
+                        const sceneName = file.slice(0, -5);
+                        if (!preferredScenes.has(sceneName)) {
+                            preferredScenes.set(sceneName, 'json');
+                        }
+                    }
+                });
+
+                const scenes = Array.from(preferredScenes.keys())
                 .sort((a, b) => a.localeCompare(b));
 
                 json(res, 200, { scenes });
@@ -1627,34 +1666,20 @@ const server = http.createServer(async (req, res) => {
         if (req.method === 'POST') {
             try {
                 await mkdir(scenesRoot, { recursive: true });
-                const body = await readJsonBody(req);
-
-                if (!body || typeof body !== 'object') {
-                    json(res, 400, { error: 'JSON body is required' });
-                    return;
-                }
-
-                const name = typeof body.name === 'string' ? body.name : '';
+                const name = typeof req.headers['x-scene-name'] === 'string' ? req.headers['x-scene-name'] : '';
                 if (!name.trim()) {
                     json(res, 400, { error: 'Scene name is required' });
                     return;
                 }
 
-                if (!body.data || typeof body.data !== 'object') {
-                    json(res, 400, { error: 'Scene data object is required' });
+                const body = await readBinaryBody(req);
+                if (!body || !body.length) {
+                    json(res, 400, { error: 'Binary scene body is required' });
                     return;
                 }
 
-                const { safeName, filePath } = toSceneFilePath(name);
-                const timestamp = new Date().toISOString();
-                const sceneData = {
-                    ...body.data,
-                    name: safeName,
-                    modified: timestamp,
-                    created: typeof body.data.created === 'string' ? body.data.created : timestamp
-                };
-
-                await writeFile(filePath, JSON.stringify(sceneData, null, 2), 'utf8');
+                const { safeName, onemoPath } = toSceneFilePaths(name);
+                await writeFile(onemoPath, body);
                 json(res, 200, { saved: safeName });
             } catch (error) {
                 json(res, 500, { error: String(error) });
@@ -1669,12 +1694,20 @@ const server = http.createServer(async (req, res) => {
 
     const requestSceneName = sceneNameFromPath(pathname);
     if (requestSceneName !== null) {
-        const { safeName, filePath } = toSceneFilePath(requestSceneName);
+        const { safeName, onemoPath, legacyPath } = toSceneFilePaths(requestSceneName);
 
         if (req.method === 'GET') {
             try {
-                const content = await readFile(filePath, 'utf8');
-                json(res, 200, JSON.parse(content));
+                if (existsSync(onemoPath)) {
+                    const content = await readFile(onemoPath);
+                    res.writeHead(200, { 'Content-Type': 'application/zip' });
+                    res.end(content);
+                    return;
+                }
+
+                const content = await readFile(legacyPath, 'utf8');
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(content);
             } catch {
                 json(res, 404, { error: 'Scene not found' });
             }
@@ -1688,7 +1721,21 @@ const server = http.createServer(async (req, res) => {
             }
 
             try {
-                await unlink(filePath);
+                let deleted = false;
+                if (existsSync(onemoPath)) {
+                    await unlink(onemoPath);
+                    deleted = true;
+                }
+                if (existsSync(legacyPath)) {
+                    await unlink(legacyPath);
+                    deleted = true;
+                }
+
+                if (!deleted) {
+                    json(res, 404, { error: 'Scene not found' });
+                    return;
+                }
+
                 json(res, 200, { deleted: safeName });
             } catch {
                 json(res, 404, { error: 'Scene not found' });

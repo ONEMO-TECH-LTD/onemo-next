@@ -5,7 +5,9 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, Environment, GizmoHelper, GizmoViewcube, TransformControls, useGLTF } from '@react-three/drei'
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, type RefObject } from 'react'
 import * as THREE from 'three'
+import { applyOnemoSceneState } from '../../../../../studio/src/editor/adapter/onemo-deserialize'
 import EffectModel from './EffectModel'
+import { loadOnemoTemplate } from './onemo-loader'
 import type { ViewerConfig, DesignState } from '../types'
 
 const DEFAULT_ARTWORK = '/assets/test-artwork.png'
@@ -16,6 +18,7 @@ export interface EffectViewerBridge {
   renderer: THREE.WebGLRenderer
   modelRoot: THREE.Object3D
   materialSlots: Map<string, THREE.Material | THREE.Material[]>
+  orbitControls?: React.ComponentRef<typeof OrbitControls> | null
   keyLight?: THREE.PointLight | null
 }
 
@@ -61,6 +64,7 @@ export type ViewerCameraCommand =
 interface EffectViewerProps {
   config: ViewerConfig
   artworkUrl?: string
+  templateUrl?: string
   designState: DesignState
   isEditing: boolean
   onBridgeReady?: (bridge: EffectViewerBridge) => void
@@ -125,6 +129,56 @@ function disposeHelperObject(helper: THREE.Object3D) {
 
 function flattenMaterials(material: THREE.Material | THREE.Material[]) {
   return Array.isArray(material) ? material : [material]
+}
+
+function collectMaterialSlots(root: THREE.Object3D) {
+  const materialSlots = new Map<string, THREE.Material | THREE.Material[]>()
+
+  root.traverse((child) => {
+    if (child instanceof THREE.Mesh) {
+      materialSlots.set(child.uuid, child.material)
+    }
+  })
+
+  return materialSlots
+}
+
+function applyEditorCameraState(
+  camera: THREE.Camera,
+  orbitControls: React.ComponentRef<typeof OrbitControls> | null,
+  editorCamera: {
+    position: [number, number, number]
+    target: [number, number, number]
+    fov: number
+    near: number
+    far: number
+  }
+) {
+  camera.position.set(...editorCamera.position)
+
+  if ('near' in camera) {
+    ;(camera as THREE.Camera & { near: number }).near = editorCamera.near
+  }
+
+  if ('far' in camera) {
+    ;(camera as THREE.Camera & { far: number }).far = editorCamera.far
+  }
+
+  if (camera instanceof THREE.PerspectiveCamera) {
+    camera.fov = editorCamera.fov
+  }
+
+  if ('updateProjectionMatrix' in camera && typeof camera.updateProjectionMatrix === 'function') {
+    camera.updateProjectionMatrix()
+  }
+
+  const target = new THREE.Vector3(...editorCamera.target)
+  if (orbitControls) {
+    orbitControls.target.copy(target)
+    orbitControls.update()
+  } else {
+    camera.lookAt(target)
+  }
 }
 
 function createUvDebugMaterial(source: THREE.Material, wireframe: boolean) {
@@ -773,6 +827,7 @@ function CameraCommandController({
 export default function EffectViewer({
   config,
   artworkUrl,
+  templateUrl,
   designState,
   isEditing,
   onBridgeReady,
@@ -791,9 +846,12 @@ export default function EffectViewer({
   cameraCommand = null,
 }: EffectViewerProps) {
   // Preload the model
-  useGLTF.preload(config.modelPath)
+  if (!templateUrl && config.modelPath) {
+    useGLTF.preload(config.modelPath)
+  }
 
   const bridgeRef = useRef<Partial<EffectViewerBridge>>({})
+  const loadedTemplateRootRef = useRef<THREE.Group | null>(null)
   const emitBridge = useCallback((patch: Partial<EffectViewerBridge>) => {
     Object.assign(bridgeRef.current, patch)
 
@@ -833,13 +891,49 @@ export default function EffectViewer({
   }, [env])
 
   const orbitControlsRef = useRef<React.ComponentRef<typeof OrbitControls>>(null)
+  useEffect(() => {
+    emitBridge({
+      orbitControls: orbitControlsRef.current ?? null,
+    })
+  }, [emitBridge])
   const handleCreated = useCallback(({ gl, scene, camera }: { gl: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera }) => {
     emitBridge({
       renderer: gl,
       scene,
       camera,
     })
-  }, [emitBridge])
+
+    if (templateUrl) {
+      void loadOnemoTemplate(templateUrl, gl)
+      .then((result) => {
+        scene.clear()
+        applyOnemoSceneState(scene, result.scene)
+        scene.add(result.scene)
+        loadedTemplateRootRef.current = result.scene
+
+        applyEditorCameraState(camera, orbitControlsRef.current, result.studioJson.editorCamera)
+        requestAnimationFrame(() => {
+          applyEditorCameraState(camera, orbitControlsRef.current, result.studioJson.editorCamera)
+        })
+
+        emitBridge({
+          modelRoot: result.scene,
+          materialSlots: collectMaterialSlots(result.scene),
+          orbitControls: orbitControlsRef.current ?? null,
+        })
+      })
+      .catch((error) => {
+        console.error('[effect-viewer] Failed to load .onemo template', error)
+      })
+    }
+  }, [emitBridge, templateUrl])
+  useEffect(() => {
+    return () => {
+      if (loadedTemplateRootRef.current?.parent) {
+        loadedTemplateRootRef.current.parent.remove(loadedTemplateRootRef.current)
+      }
+    }
+  }, [])
   const handleLightRef = useCallback((light: THREE.PointLight | null) => {
     if (light) {
       emitBridge({
@@ -872,37 +966,43 @@ export default function EffectViewer({
         }}
         onCreated={handleCreated}
       >
-        <pointLight
-          ref={handleLightRef}
-          name="Bridge Light"
-          position={[0.02, 0.02, 0.12]}
-          intensity={2.2}
-          distance={0.8}
-          castShadow
-        />
+        {!templateUrl && config.modelPath && (
+          <pointLight
+            ref={handleLightRef}
+            name="Bridge Light"
+            position={[0.02, 0.02, 0.12]}
+            intensity={2.2}
+            distance={0.8}
+            castShadow
+          />
+        )}
         <Suspense fallback={null}>
-          <Environment
-            {...(env?.customHdri
-              ? { files: env.customHdri }
-              : { preset: (env?.preset ?? 'studio') as 'studio' | 'city' | 'sunset' | 'dawn' | 'night' | 'warehouse' | 'forest' | 'apartment' | 'park' | 'lobby' }
-            )}
-            environmentIntensity={config.scene.envIntensity}
-            environmentRotation={envRotation}
-            ground={env?.groundEnabled ? {
-              height: env.groundHeight,
-              radius: env.groundRadius,
-            } : undefined}
-          />
-          <EffectModel
-            modelPath={config.modelPath}
-            artworkUrl={artworkUrl || DEFAULT_ARTWORK}
-            designState={designState}
-            face={config.face}
-            back={config.back}
-            frame={config.frame}
-            scene={config.scene}
-            onReady={handleModelReady}
-          />
+          {!templateUrl && env && (
+            <Environment
+              {...(env.customHdri
+                ? { files: env.customHdri }
+                : { preset: (env.preset ?? 'studio') as 'studio' | 'city' | 'sunset' | 'dawn' | 'night' | 'warehouse' | 'forest' | 'apartment' | 'park' | 'lobby' }
+              )}
+              environmentIntensity={config.scene.envIntensity}
+              environmentRotation={envRotation}
+              ground={env.groundEnabled ? {
+                height: env.groundHeight,
+                radius: env.groundRadius,
+              } : undefined}
+            />
+          )}
+          {!templateUrl && config.modelPath && (
+            <EffectModel
+              modelPath={config.modelPath}
+              artworkUrl={artworkUrl || DEFAULT_ARTWORK}
+              designState={designState}
+              face={config.face}
+              back={config.back}
+              frame={config.frame}
+              scene={config.scene}
+              onReady={handleModelReady}
+            />
+          )}
         </Suspense>
 
         <OrbitControls

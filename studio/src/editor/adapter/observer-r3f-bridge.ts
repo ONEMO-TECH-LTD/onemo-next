@@ -40,7 +40,9 @@ import { createRenderComponentData, applyRenderObserverChange } from './render-m
 import { applyRigidbodyObserverChange } from './rigidbody-mapper';
 import { applyScreenObserverChange } from './screen-mapper';
 import {
+    cloneViewerConfig,
     decomposeViewerColor,
+    savedSceneToViewerConfig,
     type SavedScene,
     type SavedSceneCameraComponent,
     type SavedSceneEntity,
@@ -54,6 +56,9 @@ import {
     type SavedSceneTexture,
     type SavedSceneTextureKey
 } from './scene-schema';
+import { DEFAULT_EDITOR_CAMERA, DEFAULT_PRODUCT_CONFIG } from './onemo-format';
+import { applyOnemoSceneState, deserializeOnemo } from './onemo-deserialize';
+import { serializeOnemo } from './onemo-serialize';
 import { applyScriptObserverChange } from './script-mapper';
 import { applyScrollviewObserverChange } from './scrollview-mapper';
 import { applySoundObserverChange } from './sound-mapper';
@@ -258,6 +263,58 @@ const getLightRange = (light: THREE.Light) => {
     return 0;
 };
 
+const collectMaterialSlots = (root: THREE.Object3D) => {
+    const materialSlots = new Map<string, THREE.Material | THREE.Material[]>();
+
+    root.traverse((object) => {
+        if (object instanceof THREE.Mesh) {
+            materialSlots.set(object.uuid, object.material);
+        }
+    });
+
+    return materialSlots;
+};
+
+const createCameraConfigFromEditorCamera = (
+    editorCamera: {
+        position: [number, number, number];
+        target: [number, number, number];
+        fov: number;
+    },
+    fallback?: ViewerConfig['camera']
+): NonNullable<ViewerConfig['camera']> => {
+    const position = new THREE.Vector3(...editorCamera.position);
+    const target = new THREE.Vector3(...editorCamera.target);
+    const offset = position.clone().sub(target);
+    const spherical = new THREE.Spherical().setFromVector3(offset.lengthSq() > 0 ? offset : new THREE.Vector3(0, 0, DEFAULT_EDITOR_CAMERA.position[2]));
+    const base = fallback || {
+        fov: DEFAULT_EDITOR_CAMERA.fov,
+        distance: 0.2,
+        polarAngle: 90,
+        azimuthAngle: 0,
+        enableDamping: true,
+        dampingFactor: 0.1,
+        autoRotate: false,
+        autoRotateSpeed: 2
+    };
+
+    return {
+        ...base,
+        fov: editorCamera.fov,
+        distance: spherical.radius,
+        polarAngle: THREE.MathUtils.radToDeg(spherical.phi),
+        azimuthAngle: THREE.MathUtils.radToDeg(spherical.theta)
+    };
+};
+
+const isJsonBlob = (blob: Blob) => {
+    return blob.type.toLowerCase().includes('application/json') || blob.type.toLowerCase().includes('text/json');
+};
+
+const isViewerCamera = (camera: THREE.Camera): camera is THREE.PerspectiveCamera | THREE.OrthographicCamera => {
+    return camera instanceof THREE.PerspectiveCamera || camera instanceof THREE.OrthographicCamera;
+};
+
 export class ObserverR3FBridge {
     private readonly config: ViewerConfig;
 
@@ -298,6 +355,10 @@ export class ObserverR3FBridge {
     private sceneSyncFrame: number | null = null;
 
     private sceneDirty = true;
+
+    private environmentHdrBuffer: ArrayBuffer | null = null;
+
+    private environmentObjectUrl: string | null = null;
 
     constructor(configData: ViewerConfig) {
         this.config = configData;
@@ -363,6 +424,25 @@ export class ObserverR3FBridge {
         this.viewerActions = actions;
     }
 
+    private setEnvironmentBuffer(buffer: ArrayBuffer | null, filename = 'environment.hdr') {
+        this.environmentHdrBuffer = buffer;
+
+        if (this.environmentObjectUrl) {
+            URL.revokeObjectURL(this.environmentObjectUrl);
+            this.environmentObjectUrl = null;
+        }
+
+        if (!buffer) {
+            return;
+        }
+
+        const mimeType = filename.toLowerCase().endsWith('.exr')
+            ? 'image/x-exr'
+            : 'image/vnd.radiance';
+
+        this.environmentObjectUrl = URL.createObjectURL(new Blob([buffer], { type: mimeType }));
+    }
+
     loadModel(url: string) {
         const resolvedUrl = this.normalizeAssetUrl(url);
         this.updateViewerConfig((configData) => {
@@ -384,6 +464,21 @@ export class ObserverR3FBridge {
             };
             configData.environment.customHdri = resolvedUrl;
         });
+        if (!resolvedUrl) {
+            this.setEnvironmentBuffer(null);
+        } else {
+            void fetch(resolvedUrl)
+            .then(async (response) => {
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch environment: ${response.status}`);
+                }
+
+                this.setEnvironmentBuffer(await response.arrayBuffer(), resolvedUrl);
+            })
+            .catch(() => {
+                this.setEnvironmentBuffer(null);
+            });
+        }
         this.sceneDirty = true;
     }
 
@@ -441,6 +536,7 @@ export class ObserverR3FBridge {
         this.stopSceneSyncLoop();
         this.cleanupBindings();
         setBridgeAudioCamera(null);
+        this.setEnvironmentBuffer(null);
         this.editorEvents.forEach(event => event.unbind());
         this.editorEvents.length = 0;
         this.viewportHiddenIds.clear();
@@ -586,62 +682,107 @@ export class ObserverR3FBridge {
         }
     }
 
-    serializeScene(name = 'default'): SavedScene {
-        const now = new Date().toISOString();
-        const entities = editor.call('entities:list') as EntityObserver[] || [];
-        const serializedEntities: Record<string, SavedSceneEntity> = {};
+    async serializeScene(name = 'default') {
+        if (!this.context) {
+            throw new Error('Bridge is not ready for scene serialization');
+        }
 
-        entities.forEach((entity) => {
-            const resourceId = entity.get('resource_id');
-            if (!resourceId || typeof resourceId !== 'string') {
-                return;
-            }
+        const orbitTarget = this.context.orbitControls?.target ?? new THREE.Vector3(...DEFAULT_EDITOR_CAMERA.target);
+        const camera = this.context.camera;
+        const perspectiveCamera = camera instanceof THREE.PerspectiveCamera ? camera : null;
 
-            const object = this.objectById.get(resourceId);
-            const observerPosition = entity.get('position') as number[] || [0, 0, 0];
-            const observerRotation = entity.get('rotation') as number[] || [0, 0, 0];
-            const observerScale = entity.get('scale') as number[] || [1, 1, 1];
-            const parent = entity.get('parent');
-            const children = entity.get('children') as string[] || [];
-            const components = entity.get('components') as Record<string, unknown> || {};
-
-            serializedEntities[resourceId] = {
-                name: String(entity.get('name') || object?.name || resourceId),
-                resource_id: resourceId,
-                parent: typeof parent === 'string' ? parent : null,
-                children: Array.isArray(children) ? [...children] : [],
-                enabled: !!entity.get('enabled'),
-                position: this.asVec3Tuple(object ? toObserverVec3(object.position) : observerPosition, [0, 0, 0]),
-                rotation: this.asVec3Tuple(object ? toObserverEuler(object) : observerRotation, [0, 0, 0]),
-                scale: this.asVec3Tuple(object ? toObserverVec3(object.scale) : observerScale, [1, 1, 1]),
-                components: this.serializeEntityComponents(object, components)
-            };
-        });
-
-        const serializedMaterials: Record<string, SavedSceneMaterial> = {};
-        this.materialByAssetId.forEach((material, assetId) => {
-            const observer = editor.call('assets:get', assetId) as AssetObserver | null;
-            const role = this.materialRoleByAssetId.get(assetId) || 'generic';
-
-            serializedMaterials[String(assetId)] = {
-                name: String(observer?.get('name') || `Material ${assetId}`),
-                role: role === 'generic' ? undefined : role,
-                data: this.serializeMaterialData(material, observer)
-            };
-        });
-
-        return {
-            name: this.normalizeSceneName(name),
-            created: now,
-            modified: now,
-            modelPath: this.config.modelPath || '',
-            entities: serializedEntities,
-            materials: serializedMaterials,
-            sceneSettings: this.readSceneSettings()
-        };
+        return serializeOnemo(
+            this.context.scene,
+            this.context.renderer,
+            {
+                position: camera.position.clone(),
+                target: orbitTarget.clone(),
+                fov: perspectiveCamera?.fov ?? DEFAULT_EDITOR_CAMERA.fov,
+                near: isViewerCamera(camera) ? camera.near : DEFAULT_EDITOR_CAMERA.near,
+                far: isViewerCamera(camera) ? camera.far : DEFAULT_EDITOR_CAMERA.far
+            },
+            DEFAULT_PRODUCT_CONFIG,
+            this.environmentHdrBuffer
+        );
     }
 
-    deserializeScene(scene: SavedScene) {
+    async deserializeScene(blob: Blob) {
+        if (!this.context) {
+            return false;
+        }
+
+        if (isJsonBlob(blob)) {
+            try {
+                const legacyScene = JSON.parse(await blob.text()) as SavedScene;
+                const success = this.deserializeLegacyScene(legacyScene);
+
+                if (success) {
+                    const nextConfig = savedSceneToViewerConfig(legacyScene, cloneViewerConfig(this.config));
+                    this.updateViewerConfig((configData) => {
+                        Object.assign(configData, nextConfig);
+                    });
+                }
+
+                return success;
+            } catch {
+                return false;
+            }
+        }
+
+        const result = await deserializeOnemo(blob, this.context.renderer);
+        this.context.scene.clear();
+        applyOnemoSceneState(this.context.scene, result.scene);
+        this.context.scene.add(result.scene);
+        this.context.modelRoot = result.scene;
+        this.context.materialSlots = collectMaterialSlots(result.scene);
+        this.context.keyLight = null;
+
+        this.setEnvironmentBuffer(result.environmentHdr, result.studioJson.environment.file ?? 'environment.hdr');
+
+        const editorCamera = result.studioJson.editorCamera;
+        const camera = this.context.camera;
+        camera.position.set(...editorCamera.position);
+        if (camera instanceof THREE.PerspectiveCamera) {
+            camera.fov = editorCamera.fov;
+        }
+        if (isViewerCamera(camera)) {
+            camera.near = editorCamera.near;
+            camera.far = editorCamera.far;
+            camera.updateProjectionMatrix();
+        }
+        const orbitControls = this.context.orbitControls;
+        if (orbitControls) {
+            orbitControls.target.set(...editorCamera.target);
+            orbitControls.update();
+        } else {
+            camera.lookAt(new THREE.Vector3(...editorCamera.target));
+        }
+
+        const nextEnvironment = {
+            preset: result.studioJson.environment.preset ?? 'studio',
+            customHdri: this.environmentObjectUrl ?? undefined,
+            envRotation: result.studioJson.environment.rotation,
+            groundEnabled: result.studioJson.environment.ground.enabled,
+            groundHeight: result.studioJson.environment.ground.height,
+            groundRadius: result.studioJson.environment.ground.radius
+        };
+
+        this.updateViewerConfig((configData) => {
+            configData.modelPath = '';
+            configData.scene.exposure = result.studioJson.renderer.toneMappingExposure;
+            configData.scene.envIntensity = result.studioJson.environment.intensity;
+            configData.scene.background = result.studioJson.scene.backgroundColor;
+            configData.scene.ambientIntensity = result.studioJson.scene.ambientIntensity;
+            configData.colors.bgColor = result.studioJson.scene.backgroundColor;
+            configData.environment = nextEnvironment;
+            configData.camera = createCameraConfigFromEditorCamera(editorCamera, configData.camera);
+        });
+
+        this.scheduleRebuild();
+        return true;
+    }
+
+    private deserializeLegacyScene(scene: SavedScene) {
         if (!scene || typeof scene !== 'object') {
             return false;
         }
@@ -765,6 +906,7 @@ export class ObserverR3FBridge {
             }
 
             if (object instanceof THREE.Camera && cameraComponent) {
+                const viewerCamera = isViewerCamera(object) ? object : null;
                 if (observer && observer.has('components.camera.enabled') && typeof cameraComponent.enabled === 'boolean') {
                     this.withSyncGuard(() => {
                         this.setObserverValue(observer, 'components.camera.enabled', cameraComponent.enabled);
@@ -779,23 +921,23 @@ export class ObserverR3FBridge {
                         });
                     }
                 }
-                if (typeof cameraComponent.nearClip === 'number') {
-                    object.near = cameraComponent.nearClip;
+                if (viewerCamera && typeof cameraComponent.nearClip === 'number') {
+                    viewerCamera.near = cameraComponent.nearClip;
                     if (observer && observer.has('components.camera.nearClip')) {
                         this.withSyncGuard(() => {
                             this.setObserverValue(observer, 'components.camera.nearClip', cameraComponent.nearClip);
                         });
                     }
                 }
-                if (typeof cameraComponent.farClip === 'number') {
-                    object.far = cameraComponent.farClip;
+                if (viewerCamera && typeof cameraComponent.farClip === 'number') {
+                    viewerCamera.far = cameraComponent.farClip;
                     if (observer && observer.has('components.camera.farClip')) {
                         this.withSyncGuard(() => {
                             this.setObserverValue(observer, 'components.camera.farClip', cameraComponent.farClip);
                         });
                     }
                 }
-                object.updateProjectionMatrix();
+                viewerCamera?.updateProjectionMatrix();
             }
 
             if (observer) {
@@ -1052,6 +1194,14 @@ export class ObserverR3FBridge {
                 components.render = createRenderComponentData(object, materialState.objectMaterialIds.get(object.uuid) || []);
             }
 
+            if (object instanceof THREE.Light) {
+                components.light = createLightComponentData(object);
+            }
+
+            if (isViewerCamera(object)) {
+                components.camera = createCameraComponentData(object, ctx.scene);
+            }
+
             result.push(createBridgeEntityData({
                 resourceId: object.uuid,
                 name: object === ctx.modelRoot ? (object.name || 'Model') : getEntityDisplayName(object),
@@ -1079,7 +1229,10 @@ export class ObserverR3FBridge {
             object: ctx.camera,
             components: {
                 ...getStoredBridgeComponents(ctx.camera),
-                camera: createCameraComponentData(ctx.camera, ctx.scene)
+                camera: createCameraComponentData(
+                    isViewerCamera(ctx.camera) ? ctx.camera : new THREE.PerspectiveCamera(DEFAULT_EDITOR_CAMERA.fov, 1, DEFAULT_EDITOR_CAMERA.near, DEFAULT_EDITOR_CAMERA.far),
+                    ctx.scene
+                )
             }
         }));
         this.registerObjectBinding(BRIDGE_CAMERA_ID, ctx.camera);
@@ -1104,10 +1257,6 @@ export class ObserverR3FBridge {
 
     private shouldIncludeSceneObject(object: THREE.Object3D) {
         if ((object as THREE.Bone).isBone) {
-            return false;
-        }
-
-        if (object instanceof THREE.Light) {
             return false;
         }
 
@@ -1334,7 +1483,7 @@ export class ObserverR3FBridge {
         }
 
         if (object instanceof THREE.Camera || cameraComponent) {
-            const camera = object instanceof THREE.Camera ? object : null;
+            const camera = object instanceof THREE.Camera && isViewerCamera(object) ? object : null;
             const perspectiveCamera = camera instanceof THREE.PerspectiveCamera ? camera : null;
             const orthographicCamera = camera instanceof THREE.OrthographicCamera ? camera : null;
             result.camera = {
@@ -2338,7 +2487,7 @@ export class ObserverR3FBridge {
             };
         }
 
-        if (object instanceof THREE.Camera) {
+        if (isViewerCamera(object)) {
             snapshot.camera = {
                 fov: object instanceof THREE.PerspectiveCamera ? object.fov : 0,
                 nearClip: object.near,
