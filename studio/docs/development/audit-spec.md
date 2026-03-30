@@ -30,11 +30,15 @@ This spec has 4 layers. Each layer is independently auditable.
 
 **Status key:**
 - `WIRED` — Feature exists and is connected to R3F rendering
-- `STUBBED` — UI exists but action is a no-op (intentional)
+- `STUBBED` — UI exists but action is a no-op (intentional, with rationale)
 - `SKIPPED` — Intentionally removed (documented why)
 - `MISSING` — Gap — should exist but doesn't
 - `N/A` — Not applicable to ONEMO (cloud-only, source-editor-specific)
 - `VERIFY` — Needs browser testing to confirm
+
+**Completeness rule:** Every item in this spec MUST resolve to a final status (WIRED, STUBBED, SKIPPED, MISSING, or N/A). VERIFY is a pre-audit state, not a final state. An auditor who leaves an item as VERIFY has not completed the audit. An item marked MISSING requires a follow-up build task — the audit is not PASS while any item is MISSING.
+
+**Bridge coverage rule:** For every component type in Section 12, the R3F bridge (`observer-r3f-bridge.ts`) must have a handling path and a corresponding mapper file. If a component type has inspector UI but no bridge, it is MISSING — not implicitly deferred. Either build the bridge, move to L4 with explicit exclusion rationale, or mark MISSING and create a build task.
 
 ---
 
@@ -272,29 +276,34 @@ This is the largest parity surface. The source editor's Standard Material has 15
 
 ### 12. Entity Components
 
-| # | Component | R3F Equivalent | Expected Status | Audit Check |
-|---|-----------|---------------|----------------|-------------|
-| 12.1 | Render (mesh display) | R3F mesh + geometry + material | WIRED | Entity with render shows mesh |
-| 12.2 | Render — primitive types (Box/Sphere/Cylinder/Cone/Plane/Capsule) | Three.js geometry types | WIRED | Each primitive type renders |
-| 12.3 | Render — render asset | GLTF/GLB loading | WIRED | Assigned render asset displays |
-| 12.4 | Render — cast/receive shadows | mesh.castShadow/receiveShadow | VERIFY | Shadow toggles work |
-| 12.5 | Render — material slots | material array on mesh | WIRED | Per-mesh material assignment |
-| 12.6 | Light | See Section 9 | WIRED | All light types work |
-| 12.7 | Camera | See Section 10 | WIRED | Camera properties work |
-| 12.8 | Script | Script component preserved | VERIFY | Script attachment works |
-| 12.9 | Collision | Physics bridge or stub | VERIFY | Collision shapes configurable |
-| 12.10 | Rigid Body | Physics bridge or stub | VERIFY | RB properties configurable |
-| 12.11 | Anim (animation) | R3F animation system | VERIFY | Anim state graph works |
-| 12.12 | Sound | Web Audio API | VERIFY | Sound component works |
-| 12.13 | Audio Listener | Preserved | VERIFY | Audio listener component exists |
-| 12.14 | Particle System | Custom or Three.js particles | VERIFY | Particles render |
-| 12.15 | Element (UI) | Preserved UI system or React | VERIFY | UI elements render |
-| 12.16 | Sprite | Sprite rendering | VERIFY | Sprite displays |
-| 12.17 | Screen (UI root) | Preserved | VERIFY | Screen component works |
-| 12.18 | GSplat | Three.js splat renderer | VERIFY | Gaussian splat renders |
-| 12.19 | Button | Preserved UI | VERIFY | Button component works |
-| 12.20 | Layout Group/Child | Preserved UI | VERIFY | Auto-layout works |
-| 12.21 | Scroll View/Scrollbar | Preserved UI | VERIFY | Scroll behavior works |
+Every component type listed here MUST have an R3F bridge (mapper file + observer-r3f-bridge.ts routing) or an explicit L4 exclusion. Inspector UI without a bridge is MISSING, not acceptable.
+
+| # | Component | R3F Equivalent | Status | Bridge file | Audit Check |
+|---|-----------|---------------|--------|-------------|-------------|
+| 12.1 | Render (mesh display) | R3F mesh + geometry + material | WIRED | render-mapper.ts | Entity with render shows mesh |
+| 12.2 | Render — primitive types (Box/Sphere/Cylinder/Cone/Plane/Capsule) | Three.js geometry types | WIRED | render-mapper.ts | Each primitive type renders |
+| 12.3 | Render — render asset | GLTF/GLB loading | WIRED | render-mapper.ts | Assigned render asset displays |
+| 12.4 | Render — cast/receive shadows | mesh.castShadow/receiveShadow | WIRED | render-mapper.ts | Shadow toggles work |
+| 12.5 | Render — material slots | material array on mesh | WIRED | render-mapper.ts | Per-mesh material assignment |
+| 12.6 | Light | See Section 9 | WIRED | light-mapper.ts | All light types work |
+| 12.7 | Camera | See Section 10 | WIRED | camera-mapper.ts | Camera properties work |
+| 12.8 | Script | Script lifecycle hooks via React/custom runner | MISSING | — | Script attachment + basic lifecycle |
+| 12.9 | Collision | Visual helpers (wireframe shapes) in R3F | MISSING | — | Collision shapes visible in viewport |
+| 12.10 | Rigid Body | Property storage + visual indicators | MISSING | — | RB properties stored, gravity indicator |
+| 12.11 | Anim (animation state graph) | THREE.AnimationMixer + basic state evaluation | MISSING | — | Animation clips play, transitions work |
+| 12.12 | Animation (legacy) | THREE.AnimationMixer | MISSING | — | Legacy animation clips play |
+| 12.13 | Sound | THREE.PositionalAudio / THREE.Audio | MISSING | — | Sound component plays audio |
+| 12.14 | Audio Listener | THREE.AudioListener | MISSING | — | Listener attached to camera |
+| 12.15 | Particle System | Three.js Points + custom particle sim | MISSING | — | Particles render in viewport |
+| 12.16 | Element (UI text/image) | troika-three-text + THREE.Sprite or HTML overlay | MISSING | — | UI text/images visible |
+| 12.17 | Sprite | THREE.Sprite + THREE.SpriteMaterial | MISSING | — | Sprite displays in viewport |
+| 12.18 | Screen (UI root) | HTML overlay container or viewport indicator | MISSING | — | Screen boundaries visible |
+| 12.19 | GSplat | Three.js gaussian splatting renderer | MISSING | — | Gaussian splat renders |
+| 12.20 | Button | Event handler bridge + visual indicator | MISSING | — | Button component functional |
+| 12.21 | Layout Group/Child | CSS-like layout computation or indicator | MISSING | — | Layout boundaries visible |
+| 12.22 | Scroll View/Scrollbar | Scroll container + visual indicator | MISSING | — | Scroll bounds visible |
+| 12.23 | Zone | Wireframe bounding box in R3F | MISSING | — | Zone volume visible |
+| 12.24 | Model (legacy) | Redirect to render bridge | MISSING | — | Legacy model displays via render path |
 
 ### 13. Asset Types & Pipeline
 
