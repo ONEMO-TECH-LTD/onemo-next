@@ -1,5 +1,6 @@
 import type { EventHandle } from '@playcanvas/observer';
 import { Button } from '@playcanvas/pcui';
+
 import {
     LAYERID_DEPTH,
     LAYERID_SKYBOX,
@@ -362,79 +363,6 @@ const ATTRIBUTES: (Attribute | Divider)[] = [{
         min: 0
     }
 }, {
-    type: 'divider',
-    alias: 'components.light.cookieDivider'
-}, {
-    label: 'Cookie',
-    path: 'components.light.cookieAsset',
-    reference: 'light:cookieAsset',
-    type: 'asset'
-}, {
-    label: 'Cookie Intensity',
-    path: 'components.light.cookieIntensity',
-    reference: 'light:cookieIntensity',
-    type: 'slider',
-    args: {
-        min: 0,
-        max: 1,
-        precision: 3
-    }
-}, {
-    label: 'Cookie Angle',
-    path: 'components.light.cookieAngle',
-    reference: 'light:cookieAngle',
-    type: 'slider',
-    args: {
-        min: 0,
-        max: 360,
-        placeholder: '°',
-        precision: 1
-    }
-}, {
-    label: 'Cookie Offset',
-    path: 'components.light.cookieOffset',
-    reference: 'light:cookieOffset',
-    type: 'vec2',
-    args: {
-        precision: 3,
-        step: 0.01,
-        placeholder: ['U', 'V']
-    }
-}, {
-    label: 'Cookie Scale',
-    path: 'components.light.cookieScale',
-    reference: 'light:cookieScale',
-    type: 'vec2',
-    args: {
-        precision: 3,
-        step: 0.01,
-        placeholder: ['U', 'V']
-    }
-}, {
-    label: 'Cookie Falloff',
-    path: 'components.light.cookieFalloff',
-    reference: 'light:cookieFalloff',
-    type: 'boolean'
-}, {
-    label: 'Cookie Channel',
-    path: 'components.light.cookieChannel',
-    reference: 'light:cookieChannel',
-    type: 'select',
-    args: {
-        type: 'string',
-        options: [{
-            v: 'r', t: 'R'
-        }, {
-            v: 'g', t: 'G'
-        }, {
-            v: 'b', t: 'B'
-        }, {
-            v: 'a', t: 'A'
-        }, {
-            v: 'rgb', t: 'RGB'
-        }]
-    }
-}, {
     type: 'divider'
 }, {
     label: 'Layers',
@@ -474,7 +402,6 @@ class LightComponentInspector extends ComponentInspector {
 
         [
             'type',
-            'cookieAsset',
             'bake',
             'bakeDir',
             'castShadows',
@@ -516,13 +443,8 @@ class LightComponentInspector extends ComponentInspector {
         const isPoint = type === 'point';
         const castShadows = this._field('castShadows').value;
         const shadowType = this._field('shadowType').value;
-        let shadowTypeVsm = shadowType === SHADOW_VSM_16F || shadowType === SHADOW_VSM_32F;
-        const cookie = this._field('cookieAsset').value;
+        const shadowTypeVsm = shadowType === SHADOW_VSM_16F || shadowType === SHADOW_VSM_32F;
         const numCascades = this._field('numCascades').value;
-        const isClustered = editor.call('sceneSettings').get('render.clusteredLightingEnabled') && !isDirectional;
-        if (isClustered) {
-            shadowTypeVsm = false;
-        }
 
         // engine does not support point VSM shadows and drops it to PCF3, update UI to match
         if (isPoint && shadowTypeVsm) {
@@ -561,34 +483,8 @@ class LightComponentInspector extends ComponentInspector {
 
         this._field('affectSpecularity').parent.hidden = !isDirectional;
 
-        [
-            'cookieIntensity',
-            'cookieChannel'
-        ].forEach((field) => {
-            this._field(field).parent.hidden = isDirectional || !cookie;
-        });
-
-        [
-            'cookieAngle',
-            'cookieOffset',
-            'cookieScale'
-        ].forEach((field) => {
-            this._field(field).parent.hidden = isDirectional || isPoint || !cookie || isClustered;
-        });
-
-        this._field('cookieAsset').hidden = isDirectional;
-        this._field('cookieDivider').hidden = this._field('cookieAsset').hidden;
-        this._field('cookieAsset').assetType = (isPoint ? 'cubemap' : 'texture');
-
-        // Update the label to indicate which asset type is needed
-        if (!isDirectional) {
-            this._field('cookieAsset').text = isPoint ? 'Cookie (Cubemap)' : 'Cookie (Texture)';
-        }
-
-        this._field('cookieFalloff').parent.hidden = !isSpot || !cookie || isClustered;
-
-        this._field('shadowResolution').parent.hidden = !castShadows || isClustered;
-        this._field('shadowType').parent.hidden = !castShadows || isClustered;
+        this._field('shadowResolution').parent.hidden = !castShadows;
+        this._field('shadowType').parent.hidden = !castShadows;
         this._field('shadowDistance').parent.hidden = !castShadows;
         this._field('shadowIntensity').parent.hidden = !castShadows;
 
@@ -602,7 +498,7 @@ class LightComponentInspector extends ComponentInspector {
             'vsmBlurSize',
             'vsmBias'
         ].forEach((field) => {
-            this._field(field).parent.hidden = !castShadows || !shadowTypeVsm || isClustered;
+            this._field(field).parent.hidden = !castShadows || !shadowTypeVsm;
         });
 
         [

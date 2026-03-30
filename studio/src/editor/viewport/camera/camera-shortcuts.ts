@@ -1,31 +1,23 @@
 editor.once('load', () => {
-    // Numpad camera preset shortcuts
-    // Numpad 1: Front, Numpad 3: Right, Numpad 7: Top
-    // Ctrl+Numpad 1: Back, Ctrl+Numpad 3: Left, Ctrl+Numpad 7: Bottom
-    // Numpad 5: Toggle Ortho/Perspective
-    // Numpad 0: Reset to Perspective camera
+    // R3F viewport camera preset shortcuts. These drive the visible overlay camera
+    // rather than the hidden legacy engine canvas camera.
 
-    const presetCallback = function (name: string): () => void {
+    const presetCallback = function (name: 'front' | 'back' | 'right' | 'left' | 'top' | 'bottom' | 'perspective'): () => void {
         return function () {
             if (editor.call('picker:isOpen')) {
                 return;
             }
 
-            const camera = editor.call('camera:get', name);
-            if (camera) {
-                editor.call('camera:set', camera);
-            }
+            editor.emit('r3f:viewer:cameraPreset', name);
         };
     };
 
-    // Numpad 1: Front view
     editor.call('hotkey:register', 'camera:front', {
         key: '1',
         numpadOnly: true,
         callback: presetCallback('front')
     });
 
-    // Ctrl + Numpad 1: Back view
     editor.call('hotkey:register', 'camera:back', {
         key: '1',
         ctrl: true,
@@ -33,14 +25,12 @@ editor.once('load', () => {
         callback: presetCallback('back')
     });
 
-    // Numpad 3: Right view
     editor.call('hotkey:register', 'camera:right', {
         key: '3',
         numpadOnly: true,
         callback: presetCallback('right')
     });
 
-    // Ctrl + Numpad 3: Left view
     editor.call('hotkey:register', 'camera:left', {
         key: '3',
         ctrl: true,
@@ -48,14 +38,12 @@ editor.once('load', () => {
         callback: presetCallback('left')
     });
 
-    // Numpad 7: Top view
     editor.call('hotkey:register', 'camera:top', {
         key: '7',
         numpadOnly: true,
         callback: presetCallback('top')
     });
 
-    // Ctrl + Numpad 7: Bottom view
     editor.call('hotkey:register', 'camera:bottom', {
         key: '7',
         ctrl: true,
@@ -63,8 +51,8 @@ editor.once('load', () => {
         callback: presetCallback('bottom')
     });
 
-    // Numpad 5: Toggle between Perspective and last-used orthographic camera
-    let lastOrthoCamera = 'front';
+    let lastOrthoPreset: 'front' | 'back' | 'right' | 'left' | 'top' | 'bottom' = 'front';
+    let inPerspective = true;
 
     editor.call('hotkey:register', 'camera:toggle-projection', {
         key: '5',
@@ -74,34 +62,31 @@ editor.once('load', () => {
                 return;
             }
 
-            const current = editor.call('camera:current');
-            if (!current || !current.__editorCamera) {
-                return;
-            }
-
-            const name: string = current.__editorName;
-
-            if (name === 'perspective') {
-                // Switch to last-used orthographic camera
-                const orthoCamera = editor.call('camera:get', lastOrthoCamera);
-                if (orthoCamera) {
-                    editor.call('camera:set', orthoCamera);
-                }
+            if (inPerspective) {
+                editor.emit('r3f:viewer:cameraPreset', lastOrthoPreset);
             } else {
-                // Remember this ortho camera and switch to perspective
-                lastOrthoCamera = name;
-                const perspCamera = editor.call('camera:get', 'perspective');
-                if (perspCamera) {
-                    editor.call('camera:set', perspCamera);
-                }
+                editor.emit('r3f:viewer:cameraPreset', 'perspective');
             }
+            inPerspective = !inPerspective;
         }
     });
 
-    // Numpad 0: Switch to Perspective camera
     editor.call('hotkey:register', 'camera:perspective', {
         key: '0',
         numpadOnly: true,
-        callback: presetCallback('perspective')
+        callback: function () {
+            if (editor.call('picker:isOpen')) {
+                return;
+            }
+
+            inPerspective = true;
+            editor.emit('r3f:viewer:cameraPreset', 'perspective');
+        }
+    });
+
+    editor.on('r3f:viewer:cameraPreset', (preset: string) => {
+        if (preset === 'front' || preset === 'back' || preset === 'right' || preset === 'left' || preset === 'top' || preset === 'bottom') {
+            lastOrthoPreset = preset;
+        }
     });
 });

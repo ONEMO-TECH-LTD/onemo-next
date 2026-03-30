@@ -1,9 +1,7 @@
 import type { ObserverList } from '@playcanvas/observer';
-import { Label, Container, Button, BindingTwoWay, BindingElementToObservers } from '@playcanvas/pcui';
-import { LAYERID_DEPTH, LAYERID_SKYBOX, LAYERID_IMMEDIATE } from '@/common/playcanvas-compat';
-
-import { CLASS_ERROR } from '@/common/pcui/constants';
+import { Container, Button, BindingTwoWay, BindingElementToObservers } from '@playcanvas/pcui';
 import { AssetInput } from '@/common/pcui/element/element-asset-input';
+import { LAYERID_DEPTH, LAYERID_SKYBOX, LAYERID_IMMEDIATE } from '@/common/playcanvas-compat';
 import type { Assets, EntityObserver } from '@/editor-api';
 
 import { ComponentInspector, type ComponentInspectorArgs } from './component';
@@ -56,11 +54,6 @@ const ATTRIBUTES: Attribute[] = [{
     reference: 'model:castShadows',
     type: 'boolean'
 }, {
-    label: 'Cast Lightmap Shadows',
-    path: 'components.model.castShadowsLightmap',
-    reference: 'model:castShadowsLightmap',
-    type: 'boolean'
-}, {
     label: 'Receive Shadows',
     path: 'components.model.receiveShadows',
     reference: 'model:receiveShadows',
@@ -70,23 +63,6 @@ const ATTRIBUTES: Attribute[] = [{
     path: 'components.model.isStatic',
     reference: 'model:isStatic',
     type: 'boolean'
-}, {
-    label: 'Lightmapped',
-    path: 'components.model.lightmapped',
-    reference: 'model:lightmapped',
-    type: 'boolean'
-}, {
-    label: 'Lightmap Size',
-    alias: 'components.model.lightmapSize',
-    type: 'label'
-}, {
-    label: 'Lightmap Size Multiplier',
-    path: 'components.model.lightmapSizeMultiplier',
-    reference: 'model:lightmapSizeMultiplier',
-    type: 'number',
-    args: {
-        min: 0
-    }
 }, {
     label: 'Custom AABB',
     alias: 'components.model.customAabb',
@@ -279,8 +255,6 @@ class ModelComponentInspector extends ComponentInspector {
 
         super(args);
 
-        this.headerText += ' (LEGACY)';
-
         this._assets = args.assets;
 
         this._attributesInspector = new AttributesInspector({
@@ -291,13 +265,6 @@ class ModelComponentInspector extends ComponentInspector {
             templateOverridesInspector: this._templateOverridesInspector
         });
         this.append(this._attributesInspector);
-
-        this._labelUv1Missing = new Label({
-            text: 'UV1 is missing',
-            class: CLASS_ERROR
-        });
-        this._labelUv1Missing.style.marginLeft = 'auto';
-        this._field('lightmapped').parent.append(this._labelUv1Missing);
 
         this._containerButtons = new Container({
             flex: true,
@@ -331,7 +298,7 @@ class ModelComponentInspector extends ComponentInspector {
         });
         this.append(this._containerMappings);
 
-        ['type', 'asset', 'lightmapped', 'lightmapSizeMultiplier', 'customAabb'].forEach((field) => {
+        ['type', 'asset', 'customAabb'].forEach((field) => {
             this._field(field).on('change', this._toggleFields.bind(this));
         });
 
@@ -556,58 +523,6 @@ class ModelComponentInspector extends ComponentInspector {
         this._toggleFields();
     }
 
-    _getLightmapSize() {
-        const app = editor.call('viewport:app');
-        let value = '?';
-        if (app && this._entities) {
-            const lightmapper = app.lightmapper;
-
-            let min = Infinity;
-            let max = -Infinity;
-            this._entities.forEach((e) => {
-                if (!e.get('components.model.lightmapped') ||
-                    !e.entity || !e.entity.model ||
-                    !e.entity.model.asset && e.entity.model.type === 'asset' ||
-                    e.entity.model.asset && !app.assets.get(e.entity.model.asset)) {
-
-                    return;
-                }
-
-                const size = lightmapper.calculateLightmapSize(e.entity);
-                if (size > max) {
-                    max = size;
-                }
-                if (size < min) {
-                    min = size;
-                }
-            });
-
-            if (min) {
-                value = (min !== max ? `${min} - ${max}` : min);
-            }
-        }
-
-        return value;
-    }
-
-    _isUv1Missing() {
-        for (let i = 0; this._entities && i < this._entities.length; i++) {
-            const e = this._entities[i];
-            if (e.has('components.model') &&
-                e.get('components.model.type') === 'asset') {
-                const assetId = e.get('components.model.asset');
-                const asset = assetId && this._assets.get(assetId);
-                if (asset &&
-                    !asset.has('meta.attributes.texCoord1') &&
-                    !asset.has('meta.attributes.TEXCOORD_1')) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
     _onAssetChange() {
         if (this._suppressAssetChange) {
             return;
@@ -620,16 +535,6 @@ class ModelComponentInspector extends ComponentInspector {
         if (this._suppressToggleFields) {
             return;
         }
-
-        const fieldLightmapSize = this._field('lightmapSize');
-        fieldLightmapSize.parent.hidden = !this._field('lightmapped').value;
-        if (!fieldLightmapSize.parent.hidden) {
-            fieldLightmapSize.value = this._getLightmapSize();
-            this._labelUv1Missing.hidden = !this._isUv1Missing();
-        } else {
-            this._labelUv1Missing.hidden = true;
-        }
-        this._field('lightmapSizeMultiplier').parent.hidden = fieldLightmapSize.parent.hidden;
 
         this._containerButtons.hidden = this._field('type').value !== 'asset' || !this._field('asset').value;
         this._containerMappings.hidden = this._containerButtons.hidden;

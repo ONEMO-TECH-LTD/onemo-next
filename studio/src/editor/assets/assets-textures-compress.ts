@@ -85,7 +85,7 @@ class TextureCompressor {
             }
         }
 
-        // check whether the compressed texture requires flipY due to https://github.com/playcanvas/engine/pull/3335
+        // check whether the compressed texture requires flipY (legacy engine compressed-texture fix)
         if (editor.call('users:hasFlag', 'hasRecompressFlippedTextures') &&
             asset.has(`file.variants.${format}`) &&
             !asset.get(`file.variants.${format}.noFlip`)) {

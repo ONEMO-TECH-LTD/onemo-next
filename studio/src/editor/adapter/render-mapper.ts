@@ -16,11 +16,8 @@ export const createRenderComponentData = (object: THREE.Object3D, materialAssetI
         type: 'asset',
         asset: null,
         castShadows: !!mesh.castShadow,
-        castShadowsLightmap: false,
         receiveShadows: !!mesh.receiveShadow,
         isStatic: false,
-        lightmapped: false,
-        lightmapSizeMultiplier: 1,
         materialAssets: materialAssetIds.length ? materialAssetIds : [null]
     };
 };

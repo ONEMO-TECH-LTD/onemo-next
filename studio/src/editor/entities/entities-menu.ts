@@ -1,5 +1,4 @@
 import { ORIENTATION_HORIZONTAL, ORIENTATION_VERTICAL } from '@/common/playcanvas-compat';
-
 import { formatShortcut } from '@/common/utils';
 import { COMPONENT_LOGOS } from '@/core/constants';
 
@@ -277,20 +276,6 @@ editor.once('load', () => {
                         parent: getParentFn(),
                         components: {
                             gsplat: component
-                        }
-                    });
-                }
-            }, {
-                text: 'Model (legacy)',
-                icon: COMPONENT_LOGOS.model,
-                onSelect: () => {
-                    const component = editor.call('components:getDefault', 'model');
-
-                    editor.call('entities:new', {
-                        name: 'Model',
-                        parent: getParentFn(),
-                        components: {
-                            model: component
                         }
                     });
                 }

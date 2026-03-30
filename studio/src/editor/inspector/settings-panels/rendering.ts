@@ -1,4 +1,4 @@
-import { Button, Label, Overlay } from '@playcanvas/pcui';
+import type { Label } from '@playcanvas/pcui';
 
 import { TONEMAPPING } from '@/core/constants';
 
@@ -149,108 +149,6 @@ const ATTRIBUTES: (Attribute | Divider)[] = [
         path: 'render.skyDepthWrite',
         reference: 'settings:skyDepthWrite',
         type: 'boolean'
-    },
-    {
-        type: 'divider'
-    },
-    {
-        observer: 'sceneSettings',
-        label: 'Clustered Lighting',
-        type: 'boolean',
-        path: 'render.clusteredLightingEnabled',
-        reference: 'settings:clusteredLightingEnabled'
-    },
-    {
-        observer: 'sceneSettings',
-        label: 'Cells',
-        path: 'render.lightingCells',
-        reference: 'settings:lightingCells',
-        type: 'vec3',
-        args: {
-            placeholder: ['X', 'Y', 'Z'],
-            min: 1,
-            max: 255,
-            step: 1,
-            precision: 0
-        }
-    },
-    {
-        observer: 'sceneSettings',
-        label: 'Max Lights Per Cell',
-        path: 'render.lightingMaxLightsPerCell',
-        reference: 'settings:lightingMaxLightsPerCell',
-        type: 'slider',
-        args: {
-            min: 4,
-            max: 255,
-            step: 1,
-            precision: 0
-        }
-    },
-    {
-        observer: 'sceneSettings',
-        label: 'Cookies Enabled',
-        type: 'boolean',
-        path: 'render.lightingCookiesEnabled',
-        reference: 'settings:lightingCookiesEnabled'
-    },
-    {
-        observer: 'sceneSettings',
-        label: 'Cookie Atlas Resolution',
-        path: 'render.lightingCookieAtlasResolution',
-        reference: 'settings:lightingCookieAtlasResolution',
-        type: 'number',
-        args: {
-            min: 16,
-            step: 1,
-            precision: 0
-        }
-    },
-    {
-        observer: 'sceneSettings',
-        label: 'Shadows Enabled',
-        type: 'boolean',
-        path: 'render.lightingShadowsEnabled',
-        reference: 'settings:lightingShadowsEnabled'
-    },
-    {
-        observer: 'sceneSettings',
-        label: 'Shadow Atlas Resolution',
-        path: 'render.lightingShadowAtlasResolution',
-        reference: 'settings:lightingShadowAtlasResolution',
-        type: 'number',
-        args: {
-            min: 16,
-            step: 1,
-            precision: 0
-        }
-    },
-    {
-        observer: 'sceneSettings',
-        label: 'Shadow Type',
-        path: 'render.lightingShadowType',
-        reference: 'settings:lightingShadowType',
-        type: 'select',
-        args: {
-            type: 'number',
-            options: [{
-                v: 5, t: 'Shadow Map PCF 1x1'
-            }, {
-                v: 0, t: 'Shadow Map PCF 3x3'
-            }, {
-                v: 4, t: 'Shadow Map PCF 5x5'
-            }]
-        }
-    },
-    {
-        observer: 'sceneSettings',
-        label: 'Area Lights Enabled',
-        type: 'boolean',
-        path: 'render.lightingAreaLightsEnabled',
-        reference: 'settings:lightingAreaLightsEnabled'
-    },
-    {
-        type: 'divider'
     },
     {
         observer: 'sceneSettings',
@@ -611,17 +509,6 @@ class RenderingSettingsPanel extends BaseSettingsPanel {
             clickDracoEvt.unbind();
         });
 
-        const shadowsEnabled = this._attributesInspector.getField('render.lightingShadowsEnabled');
-        const shadowsResolution = this._attributesInspector.getField('render.lightingShadowAtlasResolution');
-        const shadowType = this._attributesInspector.getField('render.lightingShadowType');
-        const cookiesEnabled = this._attributesInspector.getField('render.lightingCookiesEnabled');
-        const cookieResolution = this._attributesInspector.getField('render.lightingCookieAtlasResolution');
-        const cells = this._attributesInspector.getField('render.lightingCells');
-        const lightsPerCell = this._attributesInspector.getField('render.lightingMaxLightsPerCell');
-        const clusteredEnabled = this._attributesInspector.getField('render.clusteredLightingEnabled');
-
-        const sceneSettings = editor.call('sceneSettings');
-
         const skyType = this._attributesInspector.getField('render.skyType');
         const skyMeshPosition = this._attributesInspector.getField('render.skyMeshPosition');
         const skyMeshRotation = this._attributesInspector.getField('render.skyMeshRotation');
@@ -646,50 +533,6 @@ class RenderingSettingsPanel extends BaseSettingsPanel {
             }
         });
 
-        clusteredEnabled.on('change', (value) => {
-
-            const oldclusteredEnabled = sceneSettings.get('render.clusteredLightingEnabled');
-
-            // if the user changed clusteredLightingEnabled tickbox, reload the Editor
-            if (oldclusteredEnabled !== value) {
-                this.showReloadDialog();
-            }
-
-            // update visibility
-            cells.hidden = !value;
-            cells.parent.hidden = !value;
-            lightsPerCell.hidden = !value;
-            lightsPerCell.parent.hidden = !value;
-
-            const shadows = shadowsEnabled.value && value;
-            shadowsEnabled.hidden = !value;
-            shadowsEnabled.parent.hidden = !value;
-            shadowsResolution.hidden = !shadows;
-            shadowsResolution.parent.hidden = !shadows;
-            shadowType.hidden = !shadows;
-            shadowType.parent.hidden = !shadows;
-
-            const cookies = cookiesEnabled.value && value;
-            cookiesEnabled.hidden = !value;
-            cookiesEnabled.parent.hidden = !value;
-            cookieResolution.hidden = !cookies;
-            cookieResolution.parent.hidden = !cookies;
-        });
-
-        shadowsEnabled.on('change', (value) => {
-            const visible = value && clusteredEnabled.value;
-            shadowsResolution.hidden = !visible;
-            shadowsResolution.parent.hidden = !visible;
-            shadowType.hidden = !visible;
-            shadowType.parent.hidden = !visible;
-        });
-
-        cookiesEnabled.on('change', (value) => {
-            const visible = value && clusteredEnabled.value;
-            cookieResolution.hidden = !visible;
-            cookieResolution.parent.hidden = !visible;
-        });
-
         const deviceOrder = this._attributesInspector.getField('deviceOrder');
 
         const enableWebGpu = this._attributesInspector.getField('enableWebGpu');
@@ -710,33 +553,6 @@ class RenderingSettingsPanel extends BaseSettingsPanel {
 
         this._attributesInspector.getField('render.tonemapping').parent.hidden = editor.projectEngineV2;
         this._attributesInspector.getField('render.gamma_correction').parent.hidden = editor.projectEngineV2;
-    }
-
-    showReloadDialog() {
-        // display a modal window, only allowing the user to reload the Editor
-        const root = editor.call('layout.root');
-
-        const overlay = new Overlay({
-            class: 'rendering-settings-restart-modal',
-            clickable: false
-        });
-        root.append(overlay);
-
-        // label
-        const label = new Label({
-            text: 'When Clustered Lighting is toggled, the Editor needs to reloaded. If you have the Launch page open, please reload that as well.'
-        });
-        overlay.append(label);
-
-        // reload button
-        const btnReload = new Button({
-            text: 'RELOAD'
-        });
-        btnReload.on('click', () => {
-            // reload the page
-            window.location.reload();
-        });
-        overlay.append(btnReload);
     }
 }
 

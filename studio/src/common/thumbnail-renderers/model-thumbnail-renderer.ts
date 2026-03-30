@@ -1,11 +1,14 @@
 import type { EventHandle, Observer } from '@playcanvas/observer';
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 import { ThumbnailRenderer } from './thumbnail-renderer';
 
 declare const editor: any;
-declare const pc: any;
 
 class ModelThumbnailRenderer extends ThumbnailRenderer {
+    private static readonly loader = new GLTFLoader();
+
     _asset: Observer | null;
 
     _canvas: HTMLCanvasElement | null;
@@ -113,9 +116,8 @@ class ModelThumbnailRenderer extends ThumbnailRenderer {
             return;
         }
 
-        const app = pc.Application.getApplication();
-        const modelAsset = app?.assets?.get(this._asset.get('id'));
-        if (!modelAsset) {
+        const modelUrl = this.resolveAssetUrl(this._asset.get('id'));
+        if (!modelUrl || !/\.(?:gltf|glb)(?:$|\?)/i.test(modelUrl)) {
             this.clearCanvas(this._canvas);
             return;
         }
@@ -124,40 +126,87 @@ class ModelThumbnailRenderer extends ThumbnailRenderer {
         this._rotationY = rotationY;
         this._watchMaterials();
 
-        const previewModel = modelAsset._editorPreviewModel ? modelAsset._editorPreviewModel.clone() : null;
-        const meshInstances = previewModel?.meshInstances || [];
-
-        meshInstances.forEach((meshInstance: any, index: number) => {
-            if (meshInstance.skinInstance) {
-                meshInstance.skinInstance.updateMatrices(meshInstance.node);
-            }
-
-            const materialId = this._asset?.get(`data.mapping.${index}.material`);
-            if (!materialId) {
+        ModelThumbnailRenderer.loader.loadAsync(modelUrl).then((gltf) => {
+            if (!this._asset || !this._canvas) {
                 return;
             }
 
-            const materialAsset = app.assets.get(materialId);
-            if (materialAsset?.resource) {
-                meshInstance.material = materialAsset.resource;
+            const previewGroup = new THREE.Group();
+            const sourceRoot = gltf.scene.clone(true);
+            const meshList: THREE.Mesh[] = [];
+
+            sourceRoot.traverse((child) => {
+                if (!(child instanceof THREE.Mesh)) {
+                    return;
+                }
+
+                const geometry = child.geometry.clone();
+                const material = Array.isArray(child.material)
+                    ? child.material.map(entry => entry.clone())
+                    : child.material.clone();
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.position.copy(child.position);
+                mesh.quaternion.copy(child.quaternion);
+                mesh.scale.copy(child.scale);
+                previewGroup.add(mesh);
+                meshList.push(mesh);
+            });
+
+            meshList.forEach((mesh, index) => {
+                const materialId = this._asset?.get(`data.mapping.${index}.material`);
+                if (!materialId) {
+                    return;
+                }
+
+                const materialAsset = editor.call('assets:get', materialId);
+                const materialData = materialAsset?.get('data');
+                if (!materialData) {
+                    return;
+                }
+
+                const overrideMaterial = this.createThreeMaterial(materialData);
+                mesh.material = Array.isArray(mesh.material)
+                    ? mesh.material.map(() => overrideMaterial.clone())
+                    : overrideMaterial;
+            });
+
+            if (!meshList.length) {
+                this.clearCanvas(this._canvas);
+                previewGroup.traverse((child) => {
+                    if (child instanceof THREE.Mesh) {
+                        child.geometry.dispose();
+                        if (Array.isArray(child.material)) {
+                            child.material.forEach(entry => entry.dispose());
+                        } else {
+                            child.material.dispose();
+                        }
+                    }
+                });
+                return;
             }
-        });
 
-        if (!meshInstances.length) {
+            this.renderGroupToCanvas(this._canvas, previewGroup, {
+                rotationX,
+                rotationY,
+                clearColor: 0x293538,
+                clearAlpha: 0
+            });
+
+            previewGroup.traverse((child) => {
+                if (!(child instanceof THREE.Mesh)) {
+                    return;
+                }
+
+                child.geometry.dispose();
+                if (Array.isArray(child.material)) {
+                    child.material.forEach(entry => entry.dispose());
+                } else {
+                    child.material.dispose();
+                }
+            });
+        }).catch(() => {
             this.clearCanvas(this._canvas);
-            return;
-        }
-
-        const preview = this.createGroupFromMeshInstances(meshInstances);
-        this.renderGroupToCanvas(this._canvas, preview.group, {
-            rotationX,
-            rotationY,
-            clearColor: 0x293538,
-            clearAlpha: 0
         });
-
-        preview.dispose();
-        previewModel?.destroy?.();
     }
 
     destroy() {

@@ -2,7 +2,6 @@ editor.once('load', () => {
     const TIMEOUT = 5000;
     const TIMEOUT_OVERLAP = 500;
     let last;
-    const logo = '/reference/studio/static-assets/platform/images/logo/playcanvas-logo-360.jpg';
 
     editor.method('notify:state', () => {
         if (!window.Notification) {
@@ -47,7 +46,7 @@ editor.once('load', () => {
 
             const notification = last = new Notification(args.title, {
                 body: args.body,
-                icon: args.icon || logo
+                icon: args.icon || ''
             });
 
             timeout = setTimeout(() => {

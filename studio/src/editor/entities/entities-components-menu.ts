@@ -35,10 +35,7 @@ editor.once('load', () => {
     };
 
     const makeAddComponentMenuItem = function (key: string, components: Record<string, { $title: string }>, logos: Record<string, string>) {
-        let title = components[key].$title;
-        if (title === 'Model' || title === 'Animation') {
-            title += ' (legacy)';
-        }
+        const title = components[key].$title;
         const data = {
             text: title,
             icon: logos[key],

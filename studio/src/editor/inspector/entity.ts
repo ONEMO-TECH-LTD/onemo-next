@@ -440,10 +440,7 @@ class EntityInspector extends Container {
         const hiddenComponents = new Set(['audiosource']);
 
         components.forEach((component) => {
-            let title = componentsSchema[component].$title;
-            if (title === 'Model' || title === 'Animation') {
-                title += ' (legacy)';
-            }
+            const title = componentsSchema[component].$title;
 
             const submenu = getSubMenu(component);
             let newComponent = null;
@@ -503,10 +500,7 @@ class EntityInspector extends Container {
 
                 const submenu = getSubMenu(components[i]);
                 if (submenu) {
-                    let title = componentsSchema[components[i]].$title;
-                    if (title === 'Model' || title === 'Animation') {
-                        title += ' (legacy)';
-                    }
+                    const title = componentsSchema[components[i]].$title;
                     const index = items[submenu].items.findIndex((object) => {
                         return object.text === title;
                     });

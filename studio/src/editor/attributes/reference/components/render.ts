@@ -46,24 +46,6 @@ export const fields: AttributeReference[]  = [{
     description: 'If true, shadows will be cast on attached meshes.',
     url: '/reference/api/engine/classes/RenderComponent.html#receiveshadows'
 }, {
-    name: 'render:castShadowsLightmap',
-    title: 'castShadowsLightmap',
-    subTitle: '{Boolean}',
-    description: 'If true, the meshes will cast shadows when rendering lightmaps.',
-    url: '/reference/api/engine/classes/RenderComponent.html#castshadowslightmap'
-}, {
-    name: 'render:lightmapped',
-    title: 'lightmapped',
-    subTitle: '{Boolean}',
-    description: 'If true, the meshes will be lightmapped after using lightmapper.bake().',
-    url: '/reference/api/engine/classes/RenderComponent.html#lightmapped'
-}, {
-    name: 'render:lightmapSizeMultiplier',
-    title: 'lightmapSizeMultiplier',
-    subTitle: '{Number}',
-    description: 'Lightmap resolution multiplier.',
-    url: '/reference/api/engine/classes/RenderComponent.html#lightmapsizemultiplier'
-}, {
     name: 'render:isStatic',
     title: 'isStatic',
     subTitle: '{Boolean}',
