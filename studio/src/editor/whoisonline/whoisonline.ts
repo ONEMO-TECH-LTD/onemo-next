@@ -1,5 +1,6 @@
 import { ObserverList } from '@playcanvas/observer';
 
+/** Local-only presence list; no server registration or polling in ONEMO Studio. */
 editor.once('load', () => {
     const whoisonline = new ObserverList();
 

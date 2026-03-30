@@ -15,7 +15,6 @@ editor.once('start', () => {
     });
 
     realtime.on('connected', () => {
-        console.log('realtime connected');
         editor.emit('realtime:connected');
     });
 
@@ -37,7 +36,6 @@ editor.once('start', () => {
     });
 
     realtime.on('disconnect', (reason: string) => {
-        console.log('realtime disconnected', reason);
         editor.emit('realtime:disconnected', reason);
     });
 

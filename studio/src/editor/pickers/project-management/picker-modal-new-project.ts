@@ -286,7 +286,7 @@ editor.once('load', () => {
 
     // playcanvas icon
     const playcanvasIcon = new Element({
-        class: 'playcanvas-icon'
+        class: 'studio-icon'
     });
     panel.header.append(playcanvasIcon);
 

@@ -261,7 +261,6 @@ import './toolbar/toolbar-logo';
 import './toolbar/toolbar-editor-settings';
 import './toolbar/toolbar-gizmos';
 import './toolbar/toolbar-history';
-import './toolbar/toolbar-lightmapper';
 import './toolbar/toolbar-code-editor';
 
 // viewport controls
