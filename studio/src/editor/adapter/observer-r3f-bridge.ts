@@ -1,4 +1,4 @@
-import type { EventHandle } from '@playcanvas/observer';
+import type { EventHandle, Observer } from '@playcanvas/observer';
 import * as THREE from 'three';
 
 import { config } from '@/editor/config';
@@ -315,6 +315,28 @@ const isViewerCamera = (camera: THREE.Camera): camera is THREE.PerspectiveCamera
     return camera instanceof THREE.PerspectiveCamera || camera instanceof THREE.OrthographicCamera;
 };
 
+const DEFAULT_SCENE_BACKGROUND_RGB: [number, number, number] = [0.067, 0.075, 0.082];
+const DEFAULT_FOG_COLOR_RGB: [number, number, number] = [0, 0, 0];
+const DEFAULT_AMBIENT_RGB: [number, number, number] = [0.15, 0.15, 0.15];
+const DEFAULT_FOG_START = 1;
+const DEFAULT_FOG_END = 1000;
+const DEFAULT_FOG_DENSITY = 0.01;
+const DEFAULT_AMBIENT_INTENSITY = 0.5;
+const DEFAULT_ENV_INTENSITY = 1;
+const DEFAULT_ENV_ROTATION = 0;
+
+const findAmbientLight = (scene: THREE.Scene) => {
+    let ambientLight: THREE.AmbientLight | null = null;
+
+    scene.traverse((object) => {
+        if (!ambientLight && object instanceof THREE.AmbientLight) {
+            ambientLight = object;
+        }
+    });
+
+    return ambientLight;
+};
+
 export class ObserverR3FBridge {
     private readonly config: ViewerConfig;
 
@@ -337,6 +359,10 @@ export class ObserverR3FBridge {
     private readonly entityBindings = new Map<string, EventHandle>();
 
     private readonly materialBindings = new Map<number, EventHandle>();
+
+    private sceneSettingsBinding: EventHandle | null = null;
+
+    private sceneSettingsObserver: Observer | null = null;
 
     private readonly editorEvents: EventHandle[] = [];
 
@@ -379,6 +405,10 @@ export class ObserverR3FBridge {
         this.editorEvents.push(editor.on('selector:change', () => {
             this.sceneDirty = true;
         }));
+        this.editorEvents.push(editor.on('sceneSettings:load', (settings: Observer) => {
+            this.bindSceneSettingsObserver(settings);
+            this.syncSceneSettingsObserverFromContext(settings);
+        }));
 
         this.startSceneSyncLoop();
     }
@@ -417,6 +447,9 @@ export class ObserverR3FBridge {
     setContext(context: EffectViewerBridge) {
         this.context = context;
         setBridgeAudioCamera(context.camera);
+        const sceneSettings = editor.call('sceneSettings') as Observer | null;
+        this.bindSceneSettingsObserver(sceneSettings);
+        this.syncSceneSettingsObserverFromContext(sceneSettings);
         this.scheduleRebuild();
     }
 
@@ -535,6 +568,9 @@ export class ObserverR3FBridge {
     dispose() {
         this.stopSceneSyncLoop();
         this.cleanupBindings();
+        this.sceneSettingsBinding?.unbind();
+        this.sceneSettingsBinding = null;
+        this.sceneSettingsObserver = null;
         setBridgeAudioCamera(null);
         this.setEnvironmentBuffer(null);
         this.editorEvents.forEach(event => event.unbind());
@@ -1110,6 +1146,9 @@ export class ObserverR3FBridge {
             }
         }
 
+        const sceneSettings = editor.call('sceneSettings') as Observer | null;
+        this.bindSceneSettingsObserver(sceneSettings);
+        this.syncSceneSettingsObserverFromContext(sceneSettings);
         this.syncObserversFromScene();
         this.sceneDirty = false;
     }
@@ -2469,6 +2508,248 @@ export class ObserverR3FBridge {
         });
     }
 
+    private bindSceneSettingsObserver(sceneSettings: Observer | null) {
+        if (this.sceneSettingsObserver === sceneSettings) {
+            return;
+        }
+
+        this.sceneSettingsBinding?.unbind();
+        this.sceneSettingsBinding = null;
+        this.sceneSettingsObserver = sceneSettings;
+
+        if (!sceneSettings) {
+            return;
+        }
+
+        this.sceneSettingsBinding = sceneSettings.on('*:set', (path: string) => {
+            if (this.syncGuard || !this.context) {
+                return;
+            }
+
+            this.applyLiveSceneSetting(path, sceneSettings);
+        });
+    }
+
+    private syncSceneSettingsObserverFromContext(sceneSettingsInput?: Observer | null) {
+        if (!this.context) {
+            return;
+        }
+
+        const sceneSettings = sceneSettingsInput ?? this.sceneSettingsObserver ?? editor.call('sceneSettings') as Observer | null;
+        if (!sceneSettings) {
+            return;
+        }
+
+        const renderer = this.context.renderer;
+        const scene = this.context.scene;
+        const sceneWithEnvironment = scene as THREE.Scene & {
+            environmentIntensity?: number;
+            environmentRotation?: THREE.Euler;
+        };
+        const ambientLight = findAmbientLight(scene);
+        const backgroundColor = scene.background instanceof THREE.Color
+            ? [scene.background.r, scene.background.g, scene.background.b]
+            : [...DEFAULT_SCENE_BACKGROUND_RGB] as [number, number, number];
+        const fogColor = scene.fog
+            ? [scene.fog.color.r, scene.fog.color.g, scene.fog.color.b]
+            : [...DEFAULT_FOG_COLOR_RGB] as [number, number, number];
+        const fogType = scene.fog instanceof THREE.Fog
+            ? 'linear'
+            : scene.fog instanceof THREE.FogExp2
+                ? 'exponential'
+                : 'none';
+        const outputColorSpace = renderer.outputColorSpace === THREE.LinearSRGBColorSpace
+            ? 'srgb-linear'
+            : 'srgb';
+        const gammaCorrection = renderer.outputColorSpace === THREE.LinearSRGBColorSpace ? 0 : 1;
+        const envIntensity = typeof sceneWithEnvironment.environmentIntensity === 'number'
+            ? sceneWithEnvironment.environmentIntensity
+            : DEFAULT_ENV_INTENSITY;
+        const envRotation = sceneWithEnvironment.environmentRotation instanceof THREE.Euler
+            ? THREE.MathUtils.radToDeg(sceneWithEnvironment.environmentRotation.y)
+            : DEFAULT_ENV_ROTATION;
+
+        this.withSyncGuard(() => {
+            this.setObserverValue(sceneSettings, 'render.exposure', renderer.toneMappingExposure ?? this.config.scene.exposure ?? 1);
+            this.setObserverValue(sceneSettings, 'render.tonemapping', Number(renderer.toneMapping ?? THREE.NoToneMapping));
+            this.setObserverValue(sceneSettings, 'render.gamma_correction', gammaCorrection);
+            this.setObserverValue(sceneSettings, 'render.outputColorSpace', outputColorSpace);
+            this.setObserverValue(sceneSettings, 'render.shadowsEnabled', !!renderer.shadowMap.enabled);
+            this.setObserverValue(sceneSettings, 'render.shadowType', Number(renderer.shadowMap.type));
+            this.setObserverArray(sceneSettings, 'render.backgroundColor', backgroundColor);
+            this.setObserverValue(sceneSettings, 'render.fog', fogType);
+            this.setObserverArray(sceneSettings, 'render.fog_color', fogColor);
+            this.setObserverValue(sceneSettings, 'render.fog_start', scene.fog instanceof THREE.Fog ? scene.fog.near : DEFAULT_FOG_START);
+            this.setObserverValue(sceneSettings, 'render.fog_end', scene.fog instanceof THREE.Fog ? scene.fog.far : DEFAULT_FOG_END);
+            this.setObserverValue(sceneSettings, 'render.fog_density', scene.fog instanceof THREE.FogExp2 ? scene.fog.density : DEFAULT_FOG_DENSITY);
+            this.setObserverArray(
+                sceneSettings,
+                'render.global_ambient',
+                ambientLight
+                    ? [ambientLight.color.r, ambientLight.color.g, ambientLight.color.b]
+                    : [...DEFAULT_AMBIENT_RGB] as [number, number, number]
+            );
+            this.setObserverValue(sceneSettings, 'render.ambientIntensity', ambientLight?.intensity ?? DEFAULT_AMBIENT_INTENSITY);
+            this.setObserverValue(sceneSettings, 'render.envIntensity', envIntensity);
+            this.setObserverValue(sceneSettings, 'render.envRotation', envRotation);
+        }, [sceneSettings]);
+    }
+
+    private applyLiveSceneSetting(
+        path: string,
+        sceneSettings: { get: (path: string) => unknown }
+    ) {
+        if (!this.context) {
+            return;
+        }
+
+        const renderer = this.context.renderer;
+        const scene = this.context.scene;
+
+        if (path === 'render.tonemapping') {
+            renderer.toneMapping = Number(sceneSettings.get('render.tonemapping') ?? renderer.toneMapping) as THREE.ToneMapping;
+            this.sceneDirty = true;
+            return;
+        }
+
+        if (path === 'render.exposure') {
+            renderer.toneMappingExposure = Number(sceneSettings.get('render.exposure') ?? renderer.toneMappingExposure);
+            this.config.scene.exposure = renderer.toneMappingExposure;
+            this.sceneDirty = true;
+            return;
+        }
+
+        if (path === 'render.outputColorSpace') {
+            const value = sceneSettings.get('render.outputColorSpace');
+            renderer.outputColorSpace = value === 'srgb-linear' ? THREE.LinearSRGBColorSpace : THREE.SRGBColorSpace;
+            this.sceneDirty = true;
+            return;
+        }
+
+        if (path === 'render.shadowsEnabled') {
+            renderer.shadowMap.enabled = !!sceneSettings.get('render.shadowsEnabled');
+            renderer.shadowMap.needsUpdate = true;
+            this.sceneDirty = true;
+            return;
+        }
+
+        if (path === 'render.shadowType') {
+            renderer.shadowMap.type = Number(sceneSettings.get('render.shadowType') ?? renderer.shadowMap.type) as THREE.ShadowMapType;
+            renderer.shadowMap.needsUpdate = true;
+            this.sceneDirty = true;
+            return;
+        }
+
+        if (path === 'render.backgroundColor') {
+            const colorValue = sceneSettings.get('render.backgroundColor');
+            let backgroundColor: THREE.Color | null = null;
+
+            if (Array.isArray(colorValue)) {
+                backgroundColor = new THREE.Color(
+                    Number(colorValue[0] ?? 0),
+                    Number(colorValue[1] ?? 0),
+                    Number(colorValue[2] ?? 0)
+                );
+            } else if (typeof colorValue === 'string') {
+                backgroundColor = new THREE.Color(colorValue);
+            }
+
+            if (backgroundColor) {
+                scene.background = backgroundColor;
+                const hex = `#${backgroundColor.getHexString()}`;
+                this.config.scene.background = hex;
+                this.config.colors.bgColor = hex;
+                this.sceneDirty = true;
+            }
+            return;
+        }
+
+        if (
+            path === 'render.fog' ||
+            path === 'render.fog_color' ||
+            path === 'render.fog_start' ||
+            path === 'render.fog_end' ||
+            path === 'render.fog_density'
+        ) {
+            const fogType = String(sceneSettings.get('render.fog') ?? 'none');
+            const fogColorValue = sceneSettings.get('render.fog_color');
+            let fogColor = new THREE.Color(0);
+
+            if (Array.isArray(fogColorValue)) {
+                fogColor = new THREE.Color(
+                    Number(fogColorValue[0] ?? 0),
+                    Number(fogColorValue[1] ?? 0),
+                    Number(fogColorValue[2] ?? 0)
+                );
+            } else if (typeof fogColorValue === 'string') {
+                fogColor = new THREE.Color(fogColorValue);
+            }
+
+            if (fogType === 'linear') {
+                scene.fog = new THREE.Fog(
+                    fogColor,
+                    Number(sceneSettings.get('render.fog_start') ?? DEFAULT_FOG_START),
+                    Number(sceneSettings.get('render.fog_end') ?? DEFAULT_FOG_END)
+                );
+            } else if (fogType === 'exponential' || fogType === 'exp' || fogType === 'exp2') {
+                scene.fog = new THREE.FogExp2(
+                    fogColor,
+                    Number(sceneSettings.get('render.fog_density') ?? DEFAULT_FOG_DENSITY)
+                );
+            } else {
+                scene.fog = null;
+            }
+
+            this.sceneDirty = true;
+            return;
+        }
+
+        if (path === 'render.global_ambient' || path === 'render.ambientIntensity') {
+            const ambientColor = sceneSettings.get('render.global_ambient');
+            const ambientIntensity = Number(sceneSettings.get('render.ambientIntensity') ?? DEFAULT_AMBIENT_INTENSITY);
+            let ambientLight = findAmbientLight(scene);
+
+            if (!ambientLight) {
+                ambientLight = new THREE.AmbientLight();
+                ambientLight.name = '__bridge_ambient_light__';
+                scene.add(ambientLight);
+            }
+
+            if (Array.isArray(ambientColor)) {
+                ambientLight.color.setRGB(
+                    Number(ambientColor[0] ?? ambientLight.color.r),
+                    Number(ambientColor[1] ?? ambientLight.color.g),
+                    Number(ambientColor[2] ?? ambientLight.color.b)
+                );
+            } else if (typeof ambientColor === 'string') {
+                ambientLight.color.set(ambientColor);
+            }
+
+            ambientLight.intensity = ambientIntensity;
+            this.config.scene.ambientIntensity = ambientIntensity;
+            this.sceneDirty = true;
+            return;
+        }
+
+        if (path === 'render.envIntensity') {
+            const sceneWithEnvironment = scene as THREE.Scene & { environmentIntensity?: number };
+            sceneWithEnvironment.environmentIntensity = Number(sceneSettings.get('render.envIntensity') ?? DEFAULT_ENV_INTENSITY);
+            this.config.scene.envIntensity = sceneWithEnvironment.environmentIntensity;
+            this.sceneDirty = true;
+            return;
+        }
+
+        if (path === 'render.envRotation') {
+            const sceneWithEnvironment = scene as THREE.Scene & { environmentRotation?: THREE.Euler };
+            const degrees = Number(sceneSettings.get('render.envRotation') ?? DEFAULT_ENV_ROTATION);
+            sceneWithEnvironment.environmentRotation = new THREE.Euler(0, THREE.MathUtils.degToRad(degrees), 0);
+            if (this.config.environment) {
+                this.config.environment.envRotation = degrees;
+            }
+            this.sceneDirty = true;
+        }
+    }
+
     private createSceneSnapshot(resourceId: string, object: THREE.Object3D, observer: EntityObserver): SceneSnapshot {
         const snapshot: SceneSnapshot = {
             name: object.name || getEntityDisplayName(object),
@@ -2548,7 +2829,7 @@ export class ObserverR3FBridge {
         }
     }
 
-    private setObserverValue(observer: EntityObserver, path: string, value: unknown) {
+    private setObserverValue(observer: Observer, path: string, value: unknown) {
         if (observer.get(path) !== value) {
             this.withObserverHistoryDisabled(observer, () => {
                 observer.set(path, value);
@@ -2556,7 +2837,7 @@ export class ObserverR3FBridge {
         }
     }
 
-    private setObserverArray(observer: EntityObserver, path: string, value: number[]) {
+    private setObserverArray(observer: Observer, path: string, value: number[]) {
         const current = observer.get(path);
         if (!arraysEqual(current || [], value)) {
             this.withObserverHistoryDisabled(observer, () => {
@@ -2590,7 +2871,7 @@ export class ObserverR3FBridge {
         const sceneEnvironmentIntensity = (this.context?.scene as THREE.Scene & { environmentIntensity?: number } | undefined)?.environmentIntensity;
 
         const exposure = Number(sceneSettings?.get('render.exposure') ?? rendererExposure);
-        const skyboxIntensity = Number(sceneSettings?.get('render.skyboxIntensity') ?? sceneEnvironmentIntensity ?? this.config.scene.envIntensity ?? 1);
+        const skyboxIntensity = Number(sceneSettings?.get('render.envIntensity') ?? sceneSettings?.get('render.skyboxIntensity') ?? sceneEnvironmentIntensity ?? this.config.scene.envIntensity ?? 1);
         const tonemapping = Number(sceneSettings?.get('render.tonemapping') ?? rendererToneMapping);
         const gammaCorrection = Number(sceneSettings?.get('render.gamma_correction') ?? rendererGamma);
 
@@ -2634,6 +2915,8 @@ export class ObserverR3FBridge {
 
         this.config.scene.exposure = this.context.renderer.toneMappingExposure;
         this.config.scene.envIntensity = Number.isFinite(skyboxIntensity) ? skyboxIntensity : currentSettings.skyboxIntensity;
+
+        this.syncSceneSettingsObserverFromContext(sceneSettings as Observer | null);
     }
 
     private refreshEntitySelectionInspector() {

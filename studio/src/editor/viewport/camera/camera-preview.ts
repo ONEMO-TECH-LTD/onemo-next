@@ -2,6 +2,9 @@ import { Button } from '@playcanvas/pcui';
 import { type Application, type Entity, FOG_NONE, type FogType, Vec4 } from '../viewport-engine';
 
 editor.once('load', () => {
+    const toPlayCanvasFogType = (value: unknown) => {
+        return value === 'exponential' ? 'exp2' : value;
+    };
 
     let selectedEntity = null; // currently selected entity
     let currentCamera = null;  // current camera rendering to viewport
@@ -65,7 +68,7 @@ editor.once('load', () => {
                 preRenderEvent = app.scene.on('prerender', (camera) => {
                     // the preview camera uses the scene fog settings
                     if (previewCamera === camera) {
-                        app.scene.fog.type = (editor.call('sceneSettings')?.get('render.fog') ?? FOG_NONE) as FogType;
+                        app.scene.fog.type = (toPlayCanvasFogType(editor.call('sceneSettings')?.get('render.fog')) ?? FOG_NONE) as FogType;
                     }
                 });
 

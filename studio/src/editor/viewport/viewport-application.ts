@@ -2,6 +2,9 @@ import { Application, Color, FOG_NONE, math, PROJECTION_PERSPECTIVE, Vec4 } from
 
 let time;
 const rect = new Vec4(0, 0, 1, 1);
+const toPlayCanvasFogType = (value: unknown) => {
+    return value === 'exponential' ? 'exp2' : value;
+};
 
 class ViewportApplication extends Application {
     editorSettings!: Record<string, unknown>;
@@ -47,7 +50,9 @@ class ViewportApplication extends Application {
                 showFog = this.editorSettings.showFog;
             }
 
-            this.scene.fog.type = showFog ? (editor.call('sceneSettings')?.get('render.fog') ?? FOG_NONE) : FOG_NONE;
+            this.scene.fog.type = showFog
+                ? (toPlayCanvasFogType(editor.call('sceneSettings')?.get('render.fog')) ?? FOG_NONE)
+                : FOG_NONE;
             cameraEntity.camera.rect = rect;
         }
 
