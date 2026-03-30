@@ -23,7 +23,7 @@ const AMBIENT_LIGHT_NAME = '__onemo_ambient_light__';
 const FALLBACK_TIMESTAMP = '1970-01-01T00:00:00.000Z';
 const DEFAULT_SCENE_NAME = 'Untitled Scene';
 
-type SceneWithOnemoState = THREE.Group & {
+export type OnemoSceneGroup = THREE.Group & {
     background?: THREE.Color | null;
     fog?: THREE.Fog | THREE.FogExp2 | null;
     environment?: THREE.Texture | null;
@@ -195,6 +195,18 @@ const buildFog = (sceneSettings: OnemoSceneSettings) => {
     return null;
 };
 
+const cloneFog = (fog: THREE.Fog | THREE.FogExp2 | null | undefined) => {
+    if (fog instanceof THREE.Fog) {
+        return new THREE.Fog(fog.color.clone(), fog.near, fog.far);
+    }
+
+    if (fog instanceof THREE.FogExp2) {
+        return new THREE.FogExp2(fog.color.clone(), fog.density);
+    }
+
+    return null;
+};
+
 const loadEnvironmentTexture = (
     buffer: ArrayBuffer,
     filename: string,
@@ -232,13 +244,29 @@ const applySceneSettings = (
     studioJson: OnemoStudioJson,
     environmentTexture: THREE.Texture | null
 ) => {
-    const target = scene as SceneWithOnemoState;
+    const target = scene as OnemoSceneGroup;
 
     target.background = new THREE.Color(studioJson.scene.backgroundColor);
     target.fog = buildFog(studioJson.scene);
     target.environment = environmentTexture;
     target.environmentIntensity = studioJson.environment.intensity;
     target.environmentRotation = new THREE.Euler(0, THREE.MathUtils.degToRad(studioJson.environment.rotation), 0);
+};
+
+export const applyOnemoSceneState = (targetScene: THREE.Scene, sourceScene: THREE.Group) => {
+    const source = sourceScene as OnemoSceneGroup;
+
+    targetScene.background = source.background instanceof THREE.Color ? source.background.clone() : null;
+    targetScene.fog = cloneFog(source.fog);
+    targetScene.environment = source.environment ?? null;
+
+    if (typeof source.environmentIntensity === 'number') {
+        targetScene.environmentIntensity = source.environmentIntensity;
+    }
+
+    if (source.environmentRotation instanceof THREE.Euler) {
+        targetScene.environmentRotation.copy(source.environmentRotation);
+    }
 };
 
 const applyAmbientLight = (scene: THREE.Group, sceneSettings: OnemoSceneSettings) => {

@@ -12,7 +12,7 @@ import EffectViewer, {
 import type { DesignState, ViewerConfig } from '../../../../src/app/(dev)/prototype/types';
 
 import { createObserverR3FBridge } from '../adapter/observer-r3f-bridge';
-import { createDefaultViewerConfig, savedSceneToViewerConfig, type SavedScene } from '../adapter/scene-schema';
+import { createDefaultViewerConfig } from '../adapter/scene-schema';
 
 const DEFAULT_DESIGN_STATE: DesignState = {
     offsetX: 0,
@@ -400,15 +400,10 @@ export function mountEffectViewer(viewportDom: HTMLElement, canvasDom: HTMLEleme
             throw new Error(await parseError(response));
         }
 
-        const scene = await response.json() as SavedScene;
-        if (!bridge.deserializeScene(scene)) {
+        const sceneBlob = await response.blob();
+        if (!(await bridge.deserializeScene(sceneBlob))) {
             throw new Error('Bridge is not ready for scene deserialization');
         }
-
-        const nextConfig = savedSceneToViewerConfig(scene, bridgeConfig);
-        currentViewerConfig = cloneViewerConfig(nextConfig);
-        syncBridgeConfig(nextConfig);
-        renderViewport();
         setLastSceneName(sceneName);
     };
 
@@ -418,16 +413,14 @@ export function mountEffectViewer(viewportDom: HTMLElement, canvasDom: HTMLEleme
             return;
         }
 
-        const payload = bridge.serializeScene(sceneName);
+        const payload = await bridge.serializeScene(sceneName);
         const response = await fetch('/api/onemo/scenes', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/octet-stream',
+                'X-Scene-Name': sceneName
             },
-            body: JSON.stringify({
-                name: sceneName,
-                data: payload
-            })
+            body: payload
         });
 
         if (!response.ok) {
