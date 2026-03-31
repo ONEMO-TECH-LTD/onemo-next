@@ -9,6 +9,10 @@ editor.once('load', () => {
     let sceneSettingsLoaded = false;
     let updating;
 
+    const toPlayCanvasFogType = (value) => {
+        return value === 'exponential' ? 'exp2' : value;
+    };
+
     // apply settings
     const applySettings = function () {
         if (!app) {
@@ -18,7 +22,14 @@ editor.once('load', () => {
         updating = false;
 
         // apply scene settings
-        app.applySceneSettings(sceneSettings.json());
+        const settingsJson = sceneSettings.json();
+        app.applySceneSettings({
+            ...settingsJson,
+            render: {
+                ...settingsJson.render,
+                fog: toPlayCanvasFogType(settingsJson.render?.fog)
+            }
+        });
 
         // apply sky depth write (not yet handled by engine's applySettings)
         const skyDepthWrite = sceneSettings.get('render.skyDepthWrite');

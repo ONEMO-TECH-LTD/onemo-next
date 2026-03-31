@@ -3,42 +3,18 @@ import { Container } from '@playcanvas/pcui';
 
 import type { Attribute } from './attribute.type.d';
 import { AttributesInspector } from './attributes-inspector';
-import { AssetImportSettingsPanel } from './settings-panels/asset-import';
 import type { BaseSettingsPanelArgs } from './settings-panels/base';
-import { BatchGroupsSettingsPanel } from './settings-panels/batchgroups';
 import { EditorSettingsPanel } from './settings-panels/editor';
-import { EngineSettingsPanel } from './settings-panels/engine';
-import { ExternalScriptsSettingsPanel } from './settings-panels/external-scripts';
-import { ImportMapSettingsPanel } from './settings-panels/import-map';
-import { InputSettingsPanel } from './settings-panels/input';
-import { LayersSettingsPanel } from './settings-panels/layers';
-import { LoadingScreenSettingsPanel } from './settings-panels/loading-screen';
-import { LocalizationSettingsPanel } from './settings-panels/localization';
-import { NetworkSettingsPanel } from './settings-panels/network';
 import { PhysicsSettingsPanel } from './settings-panels/physics';
 import { RenderingSettingsPanel } from './settings-panels/rendering';
-import { ScriptsSettingsPanel } from './settings-panels/scripts';
-import { ProjectHistorySettingsPanel } from './settings-panels/settings-history';
 
 
 const CLASS_ROOT = 'settings';
 
 const SETTINGS_PANELS = [
-    EngineSettingsPanel,
     EditorSettingsPanel,
-    AssetImportSettingsPanel,
     PhysicsSettingsPanel,
-    RenderingSettingsPanel,
-    LayersSettingsPanel,
-    BatchGroupsSettingsPanel,
-    LoadingScreenSettingsPanel,
-    ImportMapSettingsPanel,
-    ExternalScriptsSettingsPanel,
-    InputSettingsPanel,
-    LocalizationSettingsPanel,
-    NetworkSettingsPanel,
-    ScriptsSettingsPanel,
-    ProjectHistorySettingsPanel
+    RenderingSettingsPanel
 ];
 
 const ATTRIBUTES: Attribute[] = [
