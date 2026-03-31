@@ -2592,6 +2592,10 @@ export class ObserverR3FBridge {
             this.setObserverValue(sceneSettings, 'render.ambientIntensity', ambientLight?.intensity ?? DEFAULT_AMBIENT_INTENSITY);
             this.setObserverValue(sceneSettings, 'render.envIntensity', envIntensity);
             this.setObserverValue(sceneSettings, 'render.envRotation', envRotation);
+            this.setObserverValue(sceneSettings, 'render.envPreset', this.config.environment?.preset ?? '');
+            this.setObserverValue(sceneSettings, 'render.groundEnabled', !!this.config.environment?.groundEnabled);
+            this.setObserverValue(sceneSettings, 'render.groundHeight', this.config.environment?.groundHeight ?? 0);
+            this.setObserverValue(sceneSettings, 'render.groundRadius', this.config.environment?.groundRadius ?? 20);
         }, [sceneSettings]);
     }
 
@@ -2747,6 +2751,45 @@ export class ObserverR3FBridge {
                 this.config.environment.envRotation = degrees;
             }
             this.sceneDirty = true;
+            return;
+        }
+
+        if (path === 'render.envPreset') {
+            const preset = String(sceneSettings.get('render.envPreset') ?? '');
+            this.updateViewerConfig((configData) => {
+                configData.environment = configData.environment || {
+                    preset: 'studio',
+                    envRotation: 0,
+                    groundEnabled: false,
+                    groundHeight: 0,
+                    groundRadius: 20
+                };
+                configData.environment.preset = preset || undefined;
+                if (preset) {
+                    configData.environment.customHdri = undefined;
+                }
+            });
+            this.scheduleRebuild();
+            return;
+        }
+
+        if (path === 'render.groundEnabled' || path === 'render.groundHeight' || path === 'render.groundRadius') {
+            const groundEnabled = !!sceneSettings.get('render.groundEnabled');
+            const groundHeight = Number(sceneSettings.get('render.groundHeight') ?? 0);
+            const groundRadius = Number(sceneSettings.get('render.groundRadius') ?? 20);
+            this.updateViewerConfig((configData) => {
+                configData.environment = configData.environment || {
+                    preset: 'studio',
+                    envRotation: 0,
+                    groundEnabled: false,
+                    groundHeight: 0,
+                    groundRadius: 20
+                };
+                configData.environment.groundEnabled = groundEnabled;
+                configData.environment.groundHeight = groundHeight;
+                configData.environment.groundRadius = groundRadius;
+            });
+            this.scheduleRebuild();
         }
     }
 

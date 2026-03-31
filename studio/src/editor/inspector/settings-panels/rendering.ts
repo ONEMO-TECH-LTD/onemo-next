@@ -147,6 +147,28 @@ const ATTRIBUTES: (Attribute | Divider)[] = [
     },
     {
         observer: 'sceneSettings',
+        label: 'Environment Preset',
+        path: 'render.envPreset',
+        type: 'select',
+        args: {
+            type: 'string',
+            options: [
+                { v: '', t: 'None (Custom HDR)' },
+                { v: 'studio', t: 'Studio' },
+                { v: 'city', t: 'City' },
+                { v: 'sunset', t: 'Sunset' },
+                { v: 'dawn', t: 'Dawn' },
+                { v: 'warehouse', t: 'Warehouse' },
+                { v: 'forest', t: 'Forest' },
+                { v: 'apartment', t: 'Apartment' },
+                { v: 'lobby', t: 'Lobby' },
+                { v: 'night', t: 'Night' },
+                { v: 'park', t: 'Park' }
+            ]
+        }
+    },
+    {
+        observer: 'sceneSettings',
         label: 'Environment Intensity',
         path: 'render.envIntensity',
         type: 'slider',
@@ -163,6 +185,37 @@ const ATTRIBUTES: (Attribute | Divider)[] = [
         args: {
             min: 0,
             max: 360
+        }
+    },
+    {
+        type: 'divider'
+    },
+    {
+        observer: 'sceneSettings',
+        label: 'Ground Projection',
+        path: 'render.groundEnabled',
+        type: 'boolean'
+    },
+    {
+        observer: 'sceneSettings',
+        label: 'Ground Height',
+        path: 'render.groundHeight',
+        type: 'number',
+        args: {
+            min: -100,
+            max: 100,
+            step: 0.1
+        }
+    },
+    {
+        observer: 'sceneSettings',
+        label: 'Ground Radius',
+        path: 'render.groundRadius',
+        type: 'number',
+        args: {
+            min: 1,
+            max: 1000,
+            step: 1
         }
     }
 ];
@@ -205,6 +258,20 @@ class RenderingSettingsPanel extends BaseSettingsPanel {
             fogChangeEvt.unbind();
         });
         updateFogFieldVisibility(String(fogAttribute.value ?? 'none'));
+
+        const groundAttribute = this._attributesInspector.getField('render.groundEnabled');
+        const updateGroundFieldVisibility = (enabled: boolean) => {
+            this._attributesInspector.getField('render.groundHeight').parent.hidden = !enabled;
+            this._attributesInspector.getField('render.groundRadius').parent.hidden = !enabled;
+        };
+
+        const groundChangeEvt = groundAttribute.on('change', (value) => {
+            updateGroundFieldVisibility(!!value);
+        });
+        this.once('destroy', () => {
+            groundChangeEvt.unbind();
+        });
+        updateGroundFieldVisibility(!!groundAttribute.value);
     }
 }
 
