@@ -153,6 +153,60 @@ const setVector2Pair = (target: THREE.Vector2 | undefined, value: number) => {
     target.set(value, value);
 };
 
+const toThreeTextureSlot = (slot: string) => {
+    switch (slot) {
+        case 'diffuseMap':
+        case 'baseColorMap':
+        case 'colorMap':
+            return 'map';
+        case 'normalMap':
+            return 'normalMap';
+        case 'heightMap':
+        case 'bumpMap':
+            return 'bumpMap';
+        case 'roughnessMap':
+        case 'glossMap':
+            return 'roughnessMap';
+        case 'metalnessMap':
+            return 'metalnessMap';
+        case 'aoMap':
+            return 'aoMap';
+        case 'lightMap':
+            return 'lightMap';
+        case 'opacityMap':
+            return 'alphaMap';
+        case 'emissiveMap':
+            return 'emissiveMap';
+        case 'clearCoatMap':
+            return 'clearcoatMap';
+        case 'clearCoatGlossMap':
+            return 'clearcoatRoughnessMap';
+        case 'clearCoatNormalMap':
+            return 'clearcoatNormalMap';
+        case 'sheenMap':
+        case 'sheenColorMap':
+            return 'sheenColorMap';
+        case 'sheenGlossMap':
+            return 'sheenRoughnessMap';
+        case 'refractionMap':
+            return 'transmissionMap';
+        case 'thicknessMap':
+            return 'thicknessMap';
+        case 'iridescenceMap':
+            return 'iridescenceMap';
+        case 'iridescenceThicknessMap':
+            return 'iridescenceThicknessMap';
+        case 'anisotropyMap':
+            return 'anisotropyMap';
+        case 'specularMap':
+            return 'specularColorMap';
+        case 'specularityFactorMap':
+            return 'specularIntensityMap';
+        default:
+            return slot;
+    }
+};
+
 const setMaterialCullMode = (material: THREE.Material, cull: unknown) => {
     switch (Number(cull)) {
         case 0:
@@ -254,6 +308,7 @@ export const createMaterialData = (material: THREE.Material, existingData: Recor
         glossInvert: false,
         ambient: existingData.ambient ?? defaults.ambient,
         aoIntensity: physicalMaterial.aoMapIntensity ?? defaults.aoIntensity ?? 1,
+        lightMapIntensity: physicalMaterial.lightMapIntensity ?? defaults.lightMapIntensity ?? 1,
         normalStrength: physicalMaterial.normalScale?.x ?? defaults.normalStrength ?? 1,
         bumpMapFactor: physicalMaterial.bumpScale ?? defaults.bumpMapFactor ?? 1,
         heightMapFactor: physicalMaterial.bumpScale ?? defaults.heightMapFactor ?? 1,
@@ -316,6 +371,19 @@ export const applyMaterialObserverChange = (
 
     let changed = false;
 
+    if (path.endsWith('MapUv')) {
+        const slotName = path.replace('data.', '').replace('Uv', '');
+        const threeSlotName = toThreeTextureSlot(slotName);
+        const texture = (physicalMaterial as THREE.MeshStandardMaterial & Record<string, unknown>)[threeSlotName];
+        if (threeSlotName && texture instanceof THREE.Texture) {
+            texture.channel = Number(asset.get(path) ?? 0);
+            texture.needsUpdate = true;
+            physicalMaterial.needsUpdate = true;
+            return true;
+        }
+        return false;
+    }
+
     if (path === 'data.diffuse') {
         setMaterialColor(physicalMaterial.color, asset.get('data.diffuse'), [1, 1, 1]);
         changed = true;
@@ -324,6 +392,12 @@ export const applyMaterialObserverChange = (
     if (path === 'data.aoIntensity') {
         physicalMaterial.aoMapIntensity = clampNumber(asset.get('data.aoIntensity'), physicalMaterial.aoMapIntensity ?? 1, 0, 10);
         changed = true;
+    }
+
+    if (path === 'data.lightMapIntensity') {
+        physicalMaterial.lightMapIntensity = clampNumber(asset.get('data.lightMapIntensity'), physicalMaterial.lightMapIntensity ?? 1, 0, 10);
+        physicalMaterial.needsUpdate = true;
+        return true;
     }
 
     if (path === 'data.useMetalness') {
