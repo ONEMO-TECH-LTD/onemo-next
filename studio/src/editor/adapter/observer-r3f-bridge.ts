@@ -11,7 +11,7 @@ import { applyAudiolistenerObserverChange } from './audiolistener-mapper';
 import { setBridgeAudioCamera } from './bridge-audio-state';
 import { applyButtonObserverChange } from './button-mapper';
 import { getStoredBridgeComponents, runBridgeUpdaters } from './bridge-utils';
-import { createCameraComponentData, applyCameraObserverChange } from './camera-mapper';
+import { createCameraComponentData, createReplacementCameraForProjection, applyCameraObserverChange } from './camera-mapper';
 import { applyCollisionObserverChange } from './collision-mapper';
 import {
     BRIDGE_ASSET_ID_BASE,
@@ -32,7 +32,7 @@ import { createBridgeEntityData, getEntityDisplayName, toObserverEuler, toObserv
 import { applyGSplatObserverChange } from './gsplat-mapper';
 import { applyLayoutchildObserverChange } from './layoutchild-mapper';
 import { applyLayoutgroupObserverChange } from './layoutgroup-mapper';
-import { createLightComponentData, applyLightObserverChange } from './light-mapper';
+import { createLightComponentData, createReplacementLightForShape, applyLightObserverChange } from './light-mapper';
 import { createMaterialData, applyMaterialObserverChange } from './material-mapper';
 import { applyModelObserverChange } from './model-mapper';
 import { applyParticleObserverChange } from './particle-mapper';
@@ -2191,6 +2191,55 @@ export class ObserverR3FBridge {
         this.resourceIdByObject.set(object, resourceId);
     }
 
+    private replaceMappedObject(resourceId: string, currentObject: THREE.Object3D, nextObject: THREE.Object3D, observer: EntityObserver) {
+        const parent = currentObject.parent;
+        if (!parent) {
+            return null;
+        }
+
+        const currentIndex = parent.children.indexOf(currentObject);
+        parent.remove(currentObject);
+        parent.add(nextObject);
+        const insertedIndex = parent.children.indexOf(nextObject);
+        if (currentIndex !== -1 && insertedIndex !== -1 && insertedIndex !== currentIndex) {
+            parent.children.splice(insertedIndex, 1);
+            parent.children.splice(currentIndex, 0, nextObject);
+        }
+
+        this.registerObjectBinding(resourceId, nextObject);
+
+        if (this.context && currentObject === this.context.camera && nextObject instanceof THREE.Camera && isViewerCamera(nextObject)) {
+            this.context.camera = nextObject;
+            setBridgeAudioCamera(nextObject);
+        }
+
+        if (this.context && currentObject === this.context.keyLight && nextObject instanceof THREE.Light) {
+            this.context.keyLight = nextObject as THREE.PointLight;
+        }
+
+        this.applyMappedEntityComponents(nextObject, observer);
+        this.applyEffectiveVisibility(resourceId, nextObject, observer);
+        nextObject.updateMatrixWorld(true);
+        this.sceneDirty = true;
+
+        return nextObject;
+    }
+
+    private applyActiveCameraClearColor(observer: EntityObserver) {
+        if (!this.context) {
+            return;
+        }
+
+        const clearColor = observer.get('components.camera.clearColor');
+        if (!Array.isArray(clearColor)) {
+            return;
+        }
+
+        const nextColor = this.asVec3Tuple(clearColor, [1, 1, 1]);
+        const alpha = THREE.MathUtils.clamp(Number(clearColor[3] ?? 1), 0, 1);
+        this.context.renderer.setClearColor(new THREE.Color(nextColor[0], nextColor[1], nextColor[2]), alpha);
+    }
+
     private applyMappedEntityPath(object: THREE.Object3D, normalizedPath: string, observer: EntityObserver) {
         let changed = false;
 
@@ -2209,6 +2258,9 @@ export class ObserverR3FBridge {
 
         if (normalizedPath.startsWith('components.camera') && object === this.context?.camera) {
             changed = applyCameraObserverChange(this.context.camera, normalizedPath, observer) || changed;
+            if (normalizedPath === 'components.camera.clearColor' || normalizedPath === 'components.camera') {
+                this.applyActiveCameraClearColor(observer);
+            }
             this.applyEffectiveVisibility(observer.get('resource_id'), object, observer);
             this.config.camera = this.config.camera || {
                 fov: 35,
@@ -2220,7 +2272,9 @@ export class ObserverR3FBridge {
                 autoRotate: false,
                 autoRotateSpeed: 2
             };
-            this.config.camera.fov = (this.context.camera as THREE.PerspectiveCamera).fov;
+            if (this.context.camera instanceof THREE.PerspectiveCamera) {
+                this.config.camera.fov = this.context.camera.fov;
+            }
         }
 
         if (normalizedPath.startsWith('components.animation')) {
@@ -2380,7 +2434,7 @@ export class ObserverR3FBridge {
 
     private bindEntityObserver(observer: EntityObserver) {
         const resourceId = observer.get('resource_id');
-        const object = this.objectById.get(resourceId);
+        let object = this.objectById.get(resourceId);
 
         if (!object || this.entityBindings.has(resourceId)) {
             return;
@@ -2416,6 +2470,28 @@ export class ObserverR3FBridge {
             } else if (normalizedPath === 'enabled') {
                 this.applyEffectiveVisibility(resourceId, object, observer);
                 changed = true;
+            }
+
+            if (normalizedPath === 'components.light.shape' && object instanceof THREE.Light) {
+                const replacementLight = createReplacementLightForShape(object, observer);
+                if (replacementLight) {
+                    const nextObject = this.replaceMappedObject(resourceId, object, replacementLight, observer);
+                    if (nextObject) {
+                        object = nextObject;
+                        changed = true;
+                    }
+                }
+            }
+
+            if (normalizedPath === 'components.camera.projection' && isViewerCamera(object)) {
+                const replacementCamera = createReplacementCameraForProjection(object, observer);
+                if (replacementCamera) {
+                    const nextObject = this.replaceMappedObject(resourceId, object, replacementCamera, observer);
+                    if (nextObject && isViewerCamera(nextObject)) {
+                        object = nextObject;
+                        changed = true;
+                    }
+                }
             }
 
             changed = this.applyMappedEntityPath(object, normalizedPath, observer) || changed;

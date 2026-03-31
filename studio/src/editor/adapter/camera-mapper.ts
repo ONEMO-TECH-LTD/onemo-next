@@ -1,10 +1,8 @@
 import * as THREE from 'three';
 
-type ViewerCamera = THREE.PerspectiveCamera | THREE.OrthographicCamera;
+export type ViewerCamera = THREE.PerspectiveCamera | THREE.OrthographicCamera;
 
-const NO_DIRECT_CAMERA_EQUIVALENT_PATHS = new Set([
-    'components.camera.projection'
-]);
+const NO_DIRECT_CAMERA_EQUIVALENT_PATHS = new Set<string>();
 
 const toObserverColor = (color: THREE.Color) => {
     return [color.r, color.g, color.b, 1];
@@ -55,6 +53,47 @@ export const createCameraComponentData = (camera: ViewerCamera, scene: THREE.Sce
     };
 };
 
+export const createReplacementCameraForProjection = (
+    camera: ViewerCamera,
+    observer: import('@/editor-api').EntityObserver
+): ViewerCamera | null => {
+    const projection = Number(observer.get('components.camera.projection') ?? 0);
+
+    if (projection === 0 && !(camera instanceof THREE.PerspectiveCamera)) {
+        const ortho = camera as THREE.OrthographicCamera;
+        const fov = Number(observer.get('components.camera.fov') ?? 45);
+        const aspect = Math.abs(ortho.right - ortho.left) / Math.abs(ortho.top - ortho.bottom) || 1;
+        const persp = new THREE.PerspectiveCamera(fov, aspect, camera.near, camera.far);
+        persp.position.copy(camera.position);
+        persp.rotation.copy(camera.rotation);
+        persp.visible = camera.visible;
+        persp.name = camera.name;
+        persp.userData = { ...camera.userData };
+        persp.updateProjectionMatrix();
+        return persp;
+    }
+
+    if (projection === 1 && !(camera instanceof THREE.OrthographicCamera)) {
+        const persp = camera as THREE.PerspectiveCamera;
+        const height = Number(observer.get('components.camera.orthoHeight') ?? 10);
+        const aspect = persp.aspect || 1;
+        const ortho = new THREE.OrthographicCamera(
+            -height * aspect, height * aspect,
+            height, -height,
+            camera.near, camera.far
+        );
+        ortho.position.copy(camera.position);
+        ortho.rotation.copy(camera.rotation);
+        ortho.visible = camera.visible;
+        ortho.name = camera.name;
+        ortho.userData = { ...camera.userData };
+        ortho.updateProjectionMatrix();
+        return ortho;
+    }
+
+    return null;
+};
+
 export const applyCameraObserverChange = (
     camera: ViewerCamera,
     path: string,
@@ -99,7 +138,9 @@ export const applyCameraObserverChange = (
     }
 
     if (path === 'components.camera.frustumCulling') {
-        camera.userData.frustumCulling = !!observer.get('components.camera.frustumCulling');
+        const value = !!observer.get('components.camera.frustumCulling');
+        camera.userData.frustumCulling = value;
+        camera.frustumCulling = value;
         return true;
     }
 
@@ -136,7 +177,14 @@ export const applyCameraObserverChange = (
     }
 
     if (path === 'components.camera.layers') {
-        camera.userData.layers = observer.get('components.camera.layers');
+        const layerValue = observer.get('components.camera.layers');
+        camera.userData.layers = layerValue;
+        if (Array.isArray(layerValue)) {
+            camera.layers.disableAll();
+            layerValue.forEach((layer: number) => camera.layers.enable(layer));
+        } else if (typeof layerValue === 'number') {
+            camera.layers.mask = layerValue;
+        }
         return true;
     }
 

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
 
 const NO_THREE_EQUIVALENT_LIGHT_PATHS = new Set([
     'components.light.type',
@@ -112,6 +113,46 @@ export const createLightComponentData = (light: THREE.Light) => {
         normalOffsetBias: shadow?.normalBias ?? defaults.normalOffsetBias,
         shadowDistance: shadow?.camera && 'far' in shadow.camera ? (shadow.camera.far ?? defaults.shadowDistance) : defaults.shadowDistance
     };
+};
+
+export const createReplacementLightForShape = (
+    light: THREE.Light,
+    observer: import('@/editor-api').EntityObserver
+): THREE.Light | null => {
+    const shape = Number(observer.get('components.light.shape') ?? 0);
+    const color = light.color.clone();
+    const intensity = light.intensity;
+
+    if (shape === 1 && !(light instanceof THREE.RectAreaLight)) {
+        RectAreaLightUniformsLib.init();
+        const rect = new THREE.RectAreaLight(color, intensity, 1, 1);
+        rect.position.copy(light.position);
+        rect.rotation.copy(light.rotation);
+        rect.visible = light.visible;
+        rect.name = light.name;
+        rect.userData = { ...light.userData };
+        return rect;
+    }
+
+    if (shape === 0 && light instanceof THREE.RectAreaLight) {
+        const lightType = String(observer.get('components.light.type') ?? 'directional');
+        let newLight: THREE.Light;
+        if (lightType === 'spot') {
+            newLight = new THREE.SpotLight(color, intensity);
+        } else if (lightType === 'point') {
+            newLight = new THREE.PointLight(color, intensity);
+        } else {
+            newLight = new THREE.DirectionalLight(color, intensity);
+        }
+        newLight.position.copy(light.position);
+        newLight.rotation.copy(light.rotation);
+        newLight.visible = light.visible;
+        newLight.name = light.name;
+        newLight.userData = { ...light.userData };
+        return newLight;
+    }
+
+    return null;
 };
 
 export const applyLightObserverChange = (
