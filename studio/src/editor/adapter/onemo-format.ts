@@ -232,7 +232,7 @@ export interface OnemoUserConfig {
 // ─── Defaults ────────────────────────────────────────────────────
 
 export const DEFAULT_RENDERER_SETTINGS: OnemoRendererSettings = {
-    toneMapping: 6, // NeutralToneMapping
+    toneMapping: 7, // NeutralToneMapping (THREE.NeutralToneMapping = 7)
     toneMappingExposure: 0.7,
     outputColorSpace: 'srgb',
     shadowsEnabled: true,

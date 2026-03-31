@@ -198,6 +198,7 @@ export function mountEffectViewer(viewportDom: HTMLElement, canvasDom: HTMLEleme
     const bridgeConfig = cloneViewerConfig(DEFAULT_CONFIG);
     let currentViewerConfig = cloneViewerConfig(bridgeConfig);
     const bridge = createObserverR3FBridge(bridgeConfig);
+    let activeBridge: ReturnType<typeof createObserverR3FBridge> | null = bridge;
     let currentContext: EffectViewerBridge | null = null;
     let autoLoadAttempted = false;
     let lastMaterialDropPoint: { x: number; y: number } | null = null;
@@ -217,6 +218,10 @@ export function mountEffectViewer(viewportDom: HTMLElement, canvasDom: HTMLEleme
     canvasDom.style.pointerEvents = 'none';
 
     viewportDom.insertBefore(overlay, canvasDom.nextSibling);
+
+    editor.method('viewport:bridgeAdapter', () => {
+        return activeBridge;
+    });
 
     const pickMaterialDropTarget = (clientX: number, clientY: number) => {
         if (!currentContext) {
@@ -567,6 +572,7 @@ export function mountEffectViewer(viewportDom: HTMLElement, canvasDom: HTMLEleme
         materialDropTarget.destroy();
         lastMaterialDropPoint = null;
         currentContext = null;
+        activeBridge = null;
         bridge.dispose();
         root.unmount();
         overlay.remove();

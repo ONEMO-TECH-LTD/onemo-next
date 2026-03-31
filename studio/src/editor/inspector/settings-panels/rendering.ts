@@ -1,3 +1,6 @@
+import { Button, Container, LabelGroup } from '@playcanvas/pcui';
+
+import type { ObserverR3FBridge } from '../../adapter/observer-r3f-bridge';
 import { BaseSettingsPanel, type BaseSettingsPanelArgs } from './base';
 import type { Attribute, Divider } from '../attribute.type.d';
 
@@ -15,8 +18,8 @@ const ATTRIBUTES: (Attribute | Divider)[] = [
                 { v: 2, t: 'Reinhard' },
                 { v: 3, t: 'Cineon' },
                 { v: 4, t: 'ACES' },
-                { v: 5, t: 'AgX' },
-                { v: 6, t: 'Neutral' }
+                { v: 6, t: 'AgX' },
+                { v: 7, t: 'Neutral' }
             ]
         }
     },
@@ -153,7 +156,6 @@ const ATTRIBUTES: (Attribute | Divider)[] = [
         args: {
             type: 'string',
             options: [
-                { v: '', t: 'None (Custom HDR)' },
                 { v: 'studio', t: 'Studio' },
                 { v: 'city', t: 'City' },
                 { v: 'sunset', t: 'Sunset' },
@@ -163,7 +165,8 @@ const ATTRIBUTES: (Attribute | Divider)[] = [
                 { v: 'apartment', t: 'Apartment' },
                 { v: 'lobby', t: 'Lobby' },
                 { v: 'night', t: 'Night' },
-                { v: 'park', t: 'Park' }
+                { v: 'park', t: 'Park' },
+                { v: '', t: 'None (Custom HDR)' }
             ]
         }
     },
@@ -242,22 +245,17 @@ class RenderingSettingsPanel extends BaseSettingsPanel {
             this._attributesInspector.getField('render.fog_density').parent.hidden = !showExponentialFog;
         };
 
-        const fogChangeEvt = fogAttribute.on('change', (value) => {
-            switch (value) {
-                case 'none':
-                case 'linear':
-                case 'exponential':
-                    updateFogFieldVisibility(value);
-                    break;
-                default:
-                    updateFogFieldVisibility('none');
-                    break;
-            }
-        });
+        const refreshFogFieldVisibility = () => {
+            updateFogFieldVisibility(String(this._sceneSettings?.get('render.fog') ?? fogAttribute.value ?? 'none'));
+        };
+
+        const fogChangeEvt = fogAttribute.on('change', refreshFogFieldVisibility);
+        const fogObserverEvt = this._sceneSettings?.on('render.fog:set', refreshFogFieldVisibility);
         this.once('destroy', () => {
             fogChangeEvt.unbind();
+            fogObserverEvt?.unbind();
         });
-        updateFogFieldVisibility(String(fogAttribute.value ?? 'none'));
+        refreshFogFieldVisibility();
 
         const groundAttribute = this._attributesInspector.getField('render.groundEnabled');
         const updateGroundFieldVisibility = (enabled: boolean) => {
@@ -265,13 +263,129 @@ class RenderingSettingsPanel extends BaseSettingsPanel {
             this._attributesInspector.getField('render.groundRadius').parent.hidden = !enabled;
         };
 
-        const groundChangeEvt = groundAttribute.on('change', (value) => {
-            updateGroundFieldVisibility(!!value);
-        });
+        const refreshGroundFieldVisibility = () => {
+            updateGroundFieldVisibility(!!(this._sceneSettings?.get('render.groundEnabled') ?? groundAttribute.value));
+        };
+
+        const groundChangeEvt = groundAttribute.on('change', refreshGroundFieldVisibility);
+        const groundObserverEvt = this._sceneSettings?.on('render.groundEnabled:set', refreshGroundFieldVisibility);
         this.once('destroy', () => {
             groundChangeEvt.unbind();
+            groundObserverEvt?.unbind();
         });
-        updateGroundFieldVisibility(!!groundAttribute.value);
+        refreshGroundFieldVisibility();
+
+        const environmentPresetField = this._attributesInspector.getField('render.envPreset');
+        const environmentPresetGroup = environmentPresetField.parent;
+        const environmentFileField = new Container({
+            flex: true,
+            flexDirection: 'row'
+        });
+        environmentFileField.dom.style.alignItems = 'center';
+        environmentFileField.dom.style.gap = '8px';
+
+        const environmentFileButton = new Button({
+            text: 'Load HDR/EXR...'
+        });
+        environmentFileButton.dom.style.flexShrink = '0';
+
+        const environmentFileName = document.createElement('span');
+        environmentFileName.className = 'environment-file-name';
+        environmentFileName.textContent = 'Use preset';
+        Object.assign(environmentFileName.style, {
+            flex: '1 1 auto',
+            minWidth: '0',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            opacity: '0.7'
+        });
+
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = '.hdr,.exr';
+        fileInput.hidden = true;
+
+        environmentFileField.append(environmentFileButton);
+        environmentFileField.dom.appendChild(environmentFileName);
+        environmentFileField.dom.appendChild(fileInput);
+
+        const environmentFileGroup = new LabelGroup({
+            text: 'Environment File',
+            field: environmentFileField
+        });
+        this._attributesInspector.append(environmentFileGroup);
+
+        const environmentPresetIndex = Array.from(this._attributesInspector.dom.children)
+            .findIndex((child) => child === environmentPresetGroup.dom);
+        if (environmentPresetIndex >= 0) {
+            this._attributesInspector.move(environmentFileGroup, environmentPresetIndex + 1);
+        }
+
+        let currentEnvironmentFileUrl: string | null = null;
+        const revokeEnvironmentFileUrl = () => {
+            if (!currentEnvironmentFileUrl) {
+                return;
+            }
+
+            URL.revokeObjectURL(currentEnvironmentFileUrl);
+            currentEnvironmentFileUrl = null;
+        };
+
+        const getBridge = () => {
+            const bridge = editor.call('viewport:bridgeAdapter') as ObserverR3FBridge | null;
+            if (bridge) {
+                return bridge;
+            }
+
+            const viewportApp = editor.call('viewport:app') as { bridge?: ObserverR3FBridge } | null;
+            return viewportApp?.bridge ?? null;
+        };
+
+        const environmentPresetChangeEvt = environmentPresetField.on('change', (value) => {
+            if (value) {
+                revokeEnvironmentFileUrl();
+                environmentFileName.textContent = 'Use preset';
+            }
+        });
+
+        const buttonClickEvt = environmentFileButton.on('click', () => {
+            fileInput.click();
+        });
+
+        const onEnvironmentFileChange = () => {
+            const file = fileInput.files?.[0];
+            fileInput.value = '';
+            if (!file) {
+                return;
+            }
+
+            const bridge = getBridge();
+            if (!bridge) {
+                console.warn('[rendering] viewport bridge is not available for environment uploads');
+                return;
+            }
+
+            revokeEnvironmentFileUrl();
+            currentEnvironmentFileUrl = URL.createObjectURL(file);
+            bridge.loadEnvironment(currentEnvironmentFileUrl);
+
+            if (this._sceneSettings) {
+                this._sceneSettings.set('render.envPreset', '');
+            } else {
+                environmentPresetField.value = '';
+            }
+
+            environmentFileName.textContent = file.name;
+        };
+
+        fileInput.addEventListener('change', onEnvironmentFileChange);
+        this.once('destroy', () => {
+            buttonClickEvt.unbind();
+            environmentPresetChangeEvt.unbind();
+            fileInput.removeEventListener('change', onEnvironmentFileChange);
+            revokeEnvironmentFileUrl();
+        });
     }
 }
 

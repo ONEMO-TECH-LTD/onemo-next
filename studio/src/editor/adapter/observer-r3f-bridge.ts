@@ -2937,12 +2937,14 @@ export class ObserverR3FBridge {
         const tonemapping = Number(settings.tonemapping ?? currentSettings.tonemapping);
         const gammaCorrection = Number(settings.gamma_correction ?? currentSettings.gamma_correction);
 
-        const sceneSettings = editor.call('sceneSettings') as { set: (path: string, value: unknown) => void } | null;
+        const sceneSettings = editor.call('sceneSettings') as Observer | null;
         if (sceneSettings) {
-            sceneSettings.set('render.exposure', Number.isFinite(exposure) ? exposure : currentSettings.exposure);
-            sceneSettings.set('render.skyboxIntensity', Number.isFinite(skyboxIntensity) ? skyboxIntensity : currentSettings.skyboxIntensity);
-            sceneSettings.set('render.tonemapping', Number.isFinite(tonemapping) ? tonemapping : currentSettings.tonemapping);
-            sceneSettings.set('render.gamma_correction', Number.isFinite(gammaCorrection) ? gammaCorrection : currentSettings.gamma_correction);
+            this.withSyncGuard(() => {
+                sceneSettings.set('render.exposure', Number.isFinite(exposure) ? exposure : currentSettings.exposure);
+                sceneSettings.set('render.envIntensity', Number.isFinite(skyboxIntensity) ? skyboxIntensity : currentSettings.skyboxIntensity);
+                sceneSettings.set('render.tonemapping', Number.isFinite(tonemapping) ? tonemapping : currentSettings.tonemapping);
+                sceneSettings.set('render.gamma_correction', Number.isFinite(gammaCorrection) ? gammaCorrection : currentSettings.gamma_correction);
+            }, [sceneSettings]);
         }
 
         this.context.renderer.toneMappingExposure = Number.isFinite(exposure) ? exposure : currentSettings.exposure;
