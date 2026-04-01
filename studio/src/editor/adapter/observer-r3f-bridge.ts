@@ -386,6 +386,8 @@ export class ObserverR3FBridge {
 
     private environmentObjectUrl: string | null = null;
 
+    private sceneSettingsSeeded = false;
+
     constructor(configData: ViewerConfig) {
         this.config = configData;
         this.ensureEntityInspectorComponents();
@@ -395,6 +397,7 @@ export class ObserverR3FBridge {
         }));
         this.editorEvents.push(editor.on('scene:unload', () => {
             this.lastSceneSnapshot.clear();
+            this.sceneSettingsSeeded = false;
         }));
         this.editorEvents.push(editor.on('entities:add:entity', (observer: EntityObserver) => {
             if (this.objectById.has(observer.get('resource_id')) && observer.entity) {
@@ -1148,7 +1151,7 @@ export class ObserverR3FBridge {
 
         const sceneSettings = editor.call('sceneSettings') as Observer | null;
         this.bindSceneSettingsObserver(sceneSettings);
-        this.syncSceneSettingsObserverFromContext(sceneSettings);
+        this.applySceneSettingsObserverToContext(sceneSettings);
         this.syncObserversFromScene();
         this.sceneDirty = false;
     }
@@ -2592,6 +2595,7 @@ export class ObserverR3FBridge {
         this.sceneSettingsBinding?.unbind();
         this.sceneSettingsBinding = null;
         this.sceneSettingsObserver = sceneSettings;
+        this.sceneSettingsSeeded = false;
 
         if (!sceneSettings) {
             return;
@@ -2607,7 +2611,7 @@ export class ObserverR3FBridge {
     }
 
     private syncSceneSettingsObserverFromContext(sceneSettingsInput?: Observer | null) {
-        if (!this.context) {
+        if (!this.context || this.sceneSettingsSeeded) {
             return;
         }
 
@@ -2673,6 +2677,40 @@ export class ObserverR3FBridge {
             this.setObserverValue(sceneSettings, 'render.groundHeight', this.config.environment?.groundHeight ?? 0);
             this.setObserverValue(sceneSettings, 'render.groundRadius', this.config.environment?.groundRadius ?? 20);
         }, [sceneSettings]);
+
+        this.sceneSettingsSeeded = true;
+    }
+
+    private applySceneSettingsObserverToContext(sceneSettingsInput?: Observer | null) {
+        if (!this.context) {
+            return;
+        }
+
+        const sceneSettings = sceneSettingsInput ?? this.sceneSettingsObserver ?? editor.call('sceneSettings') as Observer | null;
+        if (!sceneSettings) {
+            return;
+        }
+
+        [
+            'render.tonemapping',
+            'render.exposure',
+            'render.gamma_correction',
+            'render.outputColorSpace',
+            'render.shadowsEnabled',
+            'render.shadowType',
+            'render.backgroundColor',
+            'render.fog',
+            'render.fog_color',
+            'render.fog_start',
+            'render.fog_end',
+            'render.fog_density',
+            'render.global_ambient',
+            'render.ambientIntensity',
+            'render.envIntensity',
+            'render.envRotation'
+        ].forEach((path) => {
+            this.applyLiveSceneSetting(path, sceneSettings);
+        });
     }
 
     private applyLiveSceneSetting(
@@ -3036,8 +3074,6 @@ export class ObserverR3FBridge {
 
         this.config.scene.exposure = this.context.renderer.toneMappingExposure;
         this.config.scene.envIntensity = Number.isFinite(skyboxIntensity) ? skyboxIntensity : currentSettings.skyboxIntensity;
-
-        this.syncSceneSettingsObserverFromContext(sceneSettings as Observer | null);
     }
 
     private refreshEntitySelectionInspector() {
