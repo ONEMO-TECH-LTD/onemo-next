@@ -25,8 +25,13 @@ editor.once('load', () => {
             settings.sync.enabled = false;
         }
 
+        const currentSceneSettings = editor.api.globals.realtime.scenes.current?.data?.settings as {
+            priority_scripts?: unknown;
+        } | undefined;
+
         // remove priority_scripts
-        if (editor.api.globals.realtime.scenes.current.data.settings.priority_scripts === undefined &&
+        if (currentSceneSettings &&
+            currentSceneSettings.priority_scripts === undefined &&
             settings.has('priority_scripts')) {
             settings.unset('priority_scripts');
         }

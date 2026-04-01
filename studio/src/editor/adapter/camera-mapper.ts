@@ -3,6 +3,8 @@ import * as THREE from 'three';
 export type ViewerCamera = THREE.PerspectiveCamera | THREE.OrthographicCamera;
 
 const NO_DIRECT_CAMERA_EQUIVALENT_PATHS = new Set<string>();
+const DEFAULT_CAMERA_RECT = [0, 0, 1, 1] as const;
+const DEFAULT_CAMERA_LAYERS = [0, 1, 2, 3, 4] as const;
 
 const toObserverColor = (color: THREE.Color) => {
     return [color.r, color.g, color.b, 1];
@@ -14,6 +16,26 @@ const getCameraDefaults = () => {
 
 const getCameraUserSetting = <T>(camera: ViewerCamera, key: string, fallback: T): T => {
     return (camera.userData?.[key] ?? fallback) as T;
+};
+
+const normalizeCameraRect = (value: unknown) => {
+    if (!Array.isArray(value) || value.length < 4) {
+        return [...DEFAULT_CAMERA_RECT];
+    }
+
+    return DEFAULT_CAMERA_RECT.map((fallback, index) => {
+        return Number(value[index] ?? fallback);
+    });
+};
+
+const normalizeCameraLayers = (value: unknown) => {
+    if (!Array.isArray(value) || value.length === 0) {
+        return [...DEFAULT_CAMERA_LAYERS];
+    }
+
+    return value
+    .map((entry) => Number(entry))
+    .filter((entry) => Number.isFinite(entry));
 };
 
 const clampNumber = (value: unknown, fallback: number, min: number, max: number) => {
@@ -30,6 +52,8 @@ export const createCameraComponentData = (camera: ViewerCamera, scene: THREE.Sce
     const perspectiveCamera = camera as THREE.PerspectiveCamera;
     const orthographicCamera = camera as THREE.OrthographicCamera;
     const background = scene.background instanceof THREE.Color ? scene.background : new THREE.Color('#ffffff');
+    const defaultRect = normalizeCameraRect(defaults.rect);
+    const defaultLayers = normalizeCameraLayers(defaults.layers);
 
     return {
         ...defaults,
@@ -40,14 +64,14 @@ export const createCameraComponentData = (camera: ViewerCamera, scene: THREE.Sce
         renderSceneDepthMap: getCameraUserSetting(camera, 'renderSceneDepthMap', defaults.renderSceneDepthMap),
         renderSceneColorMap: getCameraUserSetting(camera, 'renderSceneColorMap', defaults.renderSceneColorMap),
         projection: camera instanceof THREE.OrthographicCamera ? 1 : getCameraUserSetting(camera, 'projection', 0),
-        frustumCulling: getCameraUserSetting(camera, 'frustumCulling', defaults.frustumCulling ?? true),
+        frustumCulling: getCameraUserSetting(camera, 'frustumCulling', defaults.frustumCulling ?? false),
         fov: camera instanceof THREE.PerspectiveCamera ? perspectiveCamera.fov : defaults.fov,
         orthoHeight: camera instanceof THREE.OrthographicCamera ? Math.abs(orthographicCamera.top) : defaults.orthoHeight,
         nearClip: camera.near,
         farClip: camera.far,
         priority: getCameraUserSetting(camera, 'priority', defaults.priority ?? 0),
-        rect: getCameraUserSetting(camera, 'rect', defaults.rect),
-        layers: getCameraUserSetting(camera, 'layers', defaults.layers),
+        rect: normalizeCameraRect(getCameraUserSetting(camera, 'rect', defaultRect)),
+        layers: normalizeCameraLayers(getCameraUserSetting(camera, 'layers', defaultLayers)),
         toneMapping: getCameraUserSetting(camera, 'toneMapping', defaults.toneMapping ?? 0),
         gammaCorrection: getCameraUserSetting(camera, 'gammaCorrection', defaults.gammaCorrection ?? 1)
     };

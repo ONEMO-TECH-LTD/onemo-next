@@ -124,6 +124,18 @@ export const fields: AttributeReference[]  = [{
     description: 'If enabled the material specularity will be affected by this light. Affects directional lights only.',
     url: '/reference/api/engine/classes/LightComponent.html#affectspecularity'
 }, {
+    name: 'light:affectLightmapped',
+    title: 'affectLightmapped',
+    subTitle: '{Boolean}',
+    description: 'If enabled the light affects entities that use baked lightmaps.',
+    url: '/reference/api/engine/classes/LightComponent.html#affectlightmapped'
+}, {
+    name: 'light:affectDynamic',
+    title: 'affectDynamic',
+    subTitle: '{Boolean}',
+    description: 'If enabled the light affects dynamically lit entities at runtime.',
+    url: '/reference/api/engine/classes/LightComponent.html#affectdynamic'
+}, {
     name: 'light:bake',
     title: 'bake',
     subTitle: '{Boolean}',

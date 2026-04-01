@@ -2,6 +2,37 @@ import { config } from '@/editor/config';
 
 editor.once('start', () => {
     const realtime = editor.api.globals.realtime;
+    const getRealtimeConnectionAdapter = () => {
+        const sharedb = realtime.connection.sharedb as (Record<string, unknown> & {
+            state?: string;
+            on?: (event: string, callback: (...args: unknown[]) => void) => unknown;
+        }) | null | undefined;
+
+        if (!sharedb) {
+            return null;
+        }
+
+        sharedb.state = realtime.connection.connected ? 'connected' : 'disconnected';
+
+        if (typeof sharedb.on !== 'function') {
+            sharedb.on = (event: string, callback: (...args: unknown[]) => void) => {
+                if (event === 'connected') {
+                    return realtime.on('connected', callback);
+                }
+
+                if (event === 'disconnected') {
+                    return realtime.on('disconnect', callback);
+                }
+
+                return {
+                    unbind() {}
+                };
+            };
+        }
+
+        return sharedb;
+    };
+
     realtime.on('cannotConnect', () => {
         editor.emit('realtime:cannotConnect');
     });
@@ -81,7 +112,7 @@ editor.once('start', () => {
     });
 
     editor.method('realtime:connection', () => {
-        return realtime.connection.sharedb;
+        return getRealtimeConnectionAdapter();
     });
 
     editor.method('realtime:loadScene', (uniqueId: string) => {

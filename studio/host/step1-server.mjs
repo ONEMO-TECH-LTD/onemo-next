@@ -45,6 +45,10 @@ const DEFAULT_TIP_FLAGS = {
 
 const DEFAULT_DISK_ALLOWANCE_BYTES = 10 * 1024 * 1024 * 1024;
 const DEFAULT_UPLOAD_FOLDER = 'uploads';
+const TRANSPARENT_PNG = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+nWb0AAAAASUVORK5CYII=',
+    'base64'
+);
 const ASSET_TYPE_BY_EXTENSION = new Map([
     ['.glb', 'container'],
     ['.gltf', 'container'],
@@ -1474,7 +1478,7 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, ORIGIN);
     const { pathname } = url;
 
-    if (pathname === '/') {
+    if (pathname === '/' || /^\/editor\/scene\/[^/]+$/.test(pathname)) {
         text(res, 200, runtime.html, 'text/html; charset=utf-8');
         return;
     }
@@ -1774,6 +1778,14 @@ const server = http.createServer(async (req, res) => {
         if (await proxyRemote(res, pathname)) {
             return;
         }
+
+        res.writeHead(200, {
+            'Content-Type': 'image/png',
+            'Cache-Control': 'no-store',
+            'Content-Length': TRANSPARENT_PNG.length
+        });
+        res.end(TRANSPARENT_PNG);
+        return;
     }
 
     if (pathname.startsWith('/static/platform/images/')) {
