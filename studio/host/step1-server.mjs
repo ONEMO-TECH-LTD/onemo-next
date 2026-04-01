@@ -27,6 +27,8 @@ const OWNER_ID = 171953;
 const BRANCH_ID = '8cfb5a07-1d7e-44af-bee1-68e7a148ae06';
 const SCENE_ID = '1';
 const SCENE_UNIQUE_ID = '1';
+const JOHN_LEMON_SCENE_ID = '2';
+const JOHN_LEMON_SCENE_UNIQUE_ID = '2';
 const ROOT_ENTITY_ID = '00000000-0000-0000-0000-000000000001';
 
 const USERNAME = 'studio-user';
@@ -963,10 +965,10 @@ function createSchema() {
     };
 }
 
-function createSceneDocument() {
+function createSceneDocument(itemId = Number(SCENE_ID), name = 'Main') {
     return {
-        item_id: Number(SCENE_ID),
-        name: 'Main',
+        item_id: itemId,
+        name,
         settings: {
             physics: {
                 gravity: [0, -9.8, 0]
@@ -1020,6 +1022,15 @@ function createSceneDocument() {
                 components: {}
             }
         }
+    };
+}
+
+function createSceneSummary(id, uniqueId, name) {
+    return {
+        id: Number(id),
+        uniqueId: uniqueId.toString(),
+        name,
+        modified: new Date('2026-04-01T00:00:00.000Z').toISOString()
     };
 }
 
@@ -1338,23 +1349,25 @@ async function createRuntime() {
     const schema = createSchema();
     const project = await fetchPublicProject();
     const config = buildConfig(project, schema);
+    const sceneSummaries = [
+        createSceneSummary(SCENE_ID, SCENE_UNIQUE_ID, 'Main'),
+        createSceneSummary(JOHN_LEMON_SCENE_ID, JOHN_LEMON_SCENE_UNIQUE_ID, 'John Lemon')
+    ];
 
     const connection = backend.connect();
-    await ensureDoc(connection, 'scenes', SCENE_UNIQUE_ID, createSceneDocument());
+    await ensureDoc(connection, 'scenes', SCENE_UNIQUE_ID, createSceneDocument(Number(SCENE_ID), 'Main'));
+    await ensureDoc(connection, 'scenes', JOHN_LEMON_SCENE_UNIQUE_ID, createSceneDocument(Number(JOHN_LEMON_SCENE_ID), 'John Lemon'));
     await ensureDoc(connection, 'settings', `user_${OWNER_ID}`, createUserSettings());
     await ensureDoc(connection, 'settings', `project_${PROJECT_ID}_${OWNER_ID}`, createProjectUserSettings());
     await ensureDoc(connection, 'user_data', `${SCENE_UNIQUE_ID}_${OWNER_ID}`, createUserData());
+    await ensureDoc(connection, 'user_data', `${JOHN_LEMON_SCENE_UNIQUE_ID}_${OWNER_ID}`, createUserData());
     connection.close();
 
     return {
         config,
         html: buildHtml(config),
         project,
-        sceneSummary: {
-            id: Number(SCENE_ID),
-            uniqueId: SCENE_UNIQUE_ID,
-            name: 'Main'
-        },
+        sceneSummaries,
         branchSummary: createBranchSummary(),
         user: {
             id: OWNER_ID,
@@ -1491,7 +1504,7 @@ const server = http.createServer(async (req, res) => {
 
     if (pathname === `/api/projects/${PROJECT_ID}/scenes`) {
         json(res, 200, {
-            result: [runtime.sceneSummary],
+            result: runtime.sceneSummaries,
             pagination: {
                 hasMore: false
             }
@@ -1499,8 +1512,11 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
-    if (pathname === `/api/scenes/${SCENE_ID}`) {
-        json(res, 200, runtime.sceneSummary);
+    const runtimeSceneSummary = runtime.sceneSummaries.find((scene) => {
+        return String(scene.id) === pathname.slice('/api/scenes/'.length);
+    });
+    if (runtimeSceneSummary) {
+        json(res, 200, runtimeSceneSummary);
         return;
     }
 
