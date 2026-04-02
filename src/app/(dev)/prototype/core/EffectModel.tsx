@@ -280,7 +280,10 @@ export default function EffectModel({
 
   return (
     <>
-      <ambientLight intensity={sceneSettings.ambientIntensity} />
+      <ambientLight
+        color={sceneSettings.ambientColor ?? '#262626'}
+        intensity={sceneSettings.ambientIntensity}
+      />
       <Center>
         <primitive object={scene} />
       </Center>

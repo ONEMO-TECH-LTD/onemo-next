@@ -4,6 +4,8 @@ import { BLEND_NONE, BLEND_NORMAL } from './constants';
 
 declare const editor: any;
 
+const BRIDGE_BASE_ENV_MAP_INTENSITY = '__bridgeBaseEnvMapIntensity';
+
 const MATERIAL_VERTEX_COLOR_PATHS = [
     'data.aoVertexColor',
     'data.diffuseVertexColor',
@@ -23,6 +25,35 @@ const MATERIAL_VERTEX_COLOR_PATHS = [
     'data.thicknessVertexColor',
     'data.thicknessVertexColorChannel',
     'data.lightVertexColor'
+] as const;
+
+const OBSERVER_TEXTURE_SLOTS = [
+    'diffuseMap',
+    'baseColorMap',
+    'colorMap',
+    'normalMap',
+    'heightMap',
+    'bumpMap',
+    'roughnessMap',
+    'glossMap',
+    'metalnessMap',
+    'aoMap',
+    'lightMap',
+    'opacityMap',
+    'emissiveMap',
+    'clearCoatMap',
+    'clearCoatGlossMap',
+    'clearCoatNormalMap',
+    'sheenMap',
+    'sheenColorMap',
+    'sheenGlossMap',
+    'refractionMap',
+    'thicknessMap',
+    'iridescenceMap',
+    'iridescenceThicknessMap',
+    'anisotropyMap',
+    'specularMap',
+    'specularityFactorMap'
 ] as const;
 
 const NO_THREE_EQUIVALENT_PATHS = new Set([
@@ -285,6 +316,52 @@ const updateVertexColorMode = (material: THREE.MeshStandardMaterial | THREE.Mesh
     });
 };
 
+const applyTextureTransform = (
+    material: THREE.MeshStandardMaterial | THREE.MeshPhysicalMaterial,
+    slot: string,
+    suffix: 'Channel' | 'Uv' | 'Offset' | 'Tiling' | 'Rotation',
+    value: unknown
+) => {
+    const property = toThreeTextureSlot(slot);
+    const texture = property ? (material as THREE.MeshStandardMaterial & Record<string, unknown>)[property] : null;
+    if (!(texture instanceof THREE.Texture)) {
+        return false;
+    }
+
+    if (suffix === 'Channel') {
+        texture.userData.playcanvasChannel = value;
+    } else if (suffix === 'Uv' && 'channel' in texture) {
+        texture.channel = Number(value ?? texture.channel);
+    } else if (suffix === 'Offset') {
+        const nextValue = Array.isArray(value) ? value : [texture.offset.x, texture.offset.y];
+        texture.offset.set(Number(nextValue[0] ?? texture.offset.x), Number(nextValue[1] ?? texture.offset.y));
+    } else if (suffix === 'Tiling') {
+        const nextValue = Array.isArray(value) ? value : [texture.repeat.x, texture.repeat.y];
+        texture.repeat.set(Number(nextValue[0] ?? texture.repeat.x), Number(nextValue[1] ?? texture.repeat.y));
+    } else if (suffix === 'Rotation') {
+        texture.center.set(0.5, 0.5);
+        texture.rotation = THREE.MathUtils.degToRad(Number(value ?? THREE.MathUtils.radToDeg(texture.rotation)));
+    }
+
+    texture.needsUpdate = true;
+    material.needsUpdate = true;
+    return true;
+};
+
+const applyTextureTransformToAllMaps = (
+    material: THREE.MeshStandardMaterial | THREE.MeshPhysicalMaterial,
+    suffix: 'Offset' | 'Tiling' | 'Rotation',
+    value: unknown
+) => {
+    let changed = false;
+
+    OBSERVER_TEXTURE_SLOTS.forEach((slot) => {
+        changed = applyTextureTransform(material, slot, suffix, value) || changed;
+    });
+
+    return changed;
+};
+
 export const createMaterialData = (material: THREE.Material, existingData: Record<string, unknown> = {}) => {
     const physicalMaterial = getPhysicalMaterial(material);
     const meshPhysicalMaterial = getMeshPhysicalMaterial(material);
@@ -297,7 +374,13 @@ export const createMaterialData = (material: THREE.Material, existingData: Recor
         };
     }
 
-    return {
+    const baseEnvMapIntensity = typeof (material as THREE.Material & {
+        userData?: Record<string, unknown>;
+    }).userData?.[BRIDGE_BASE_ENV_MAP_INTENSITY] === 'number'
+        ? Number((material as THREE.Material & { userData?: Record<string, unknown> }).userData?.[BRIDGE_BASE_ENV_MAP_INTENSITY])
+        : undefined;
+
+    const nextData: Record<string, unknown> = {
         ...defaults,
         ...existingData,
         useMetalness: existingData.useMetalness ?? true,
@@ -343,13 +426,32 @@ export const createMaterialData = (material: THREE.Material, existingData: Recor
         iridescenceThicknessMin: meshPhysicalMaterial?.iridescenceThicknessRange?.[0] ?? defaults.iridescenceThicknessMin ?? 100,
         iridescenceThicknessMax: meshPhysicalMaterial?.iridescenceThicknessRange?.[1] ?? defaults.iridescenceThicknessMax ?? 400,
         iridescenceRefractionIndex: fromThreeIor(meshPhysicalMaterial?.iridescenceIOR, Number(defaults.iridescenceRefractionIndex ?? 0.3)),
-        reflectivity: physicalMaterial.envMapIntensity ?? defaults.reflectivity ?? 1,
+        reflectivity: baseEnvMapIntensity ?? physicalMaterial.envMapIntensity ?? defaults.reflectivity ?? 1,
         depthTest: material.depthTest ?? defaults.depthTest ?? true,
         depthWrite: material.depthWrite ?? defaults.depthWrite ?? true,
         cull: material.side === THREE.DoubleSide ? 0 : material.side === THREE.BackSide ? 2 : 1,
         useFog: material.fog ?? defaults.useFog ?? true,
         useTonemap: material.toneMapped ?? defaults.useTonemap ?? true
     };
+
+    OBSERVER_TEXTURE_SLOTS.forEach((slot) => {
+        const property = toThreeTextureSlot(slot);
+        const texture = property ? (physicalMaterial as THREE.MeshStandardMaterial & Record<string, unknown>)[property] : null;
+        if (!(texture instanceof THREE.Texture)) {
+            return;
+        }
+
+        nextData[`${slot}Uv`] = typeof texture.channel === 'number' ? texture.channel : (defaults[`${slot}Uv`] ?? 0);
+        nextData[`${slot}Offset`] = [texture.offset.x, texture.offset.y];
+        nextData[`${slot}Tiling`] = [texture.repeat.x, texture.repeat.y];
+        nextData[`${slot}Rotation`] = THREE.MathUtils.radToDeg(texture.rotation);
+
+        if (texture.userData?.playcanvasChannel !== undefined) {
+            nextData[`${slot}Channel`] = texture.userData.playcanvasChannel;
+        }
+    });
+
+    return nextData;
 };
 
 export const applyMaterialObserverChange = (
@@ -371,17 +473,18 @@ export const applyMaterialObserverChange = (
 
     let changed = false;
 
-    if (path.endsWith('MapUv')) {
-        const slotName = path.replace('data.', '').replace('Uv', '');
-        const threeSlotName = toThreeTextureSlot(slotName);
-        const texture = (physicalMaterial as THREE.MeshStandardMaterial & Record<string, unknown>)[threeSlotName];
-        if (threeSlotName && texture instanceof THREE.Texture) {
-            texture.channel = Number(asset.get(path) ?? 0);
-            texture.needsUpdate = true;
-            physicalMaterial.needsUpdate = true;
-            return true;
+    const textureTransformMatch = path.match(/^data\.(.+Map)(Channel|Uv|Offset|Tiling|Rotation)$/);
+    if (textureTransformMatch) {
+        const [, slot, suffix] = textureTransformMatch;
+        const applyToAllMaps = Boolean(asset.get('data.applyToAllMaps')) &&
+            (suffix === 'Offset' || suffix === 'Tiling' || suffix === 'Rotation');
+        const nextValue = asset.get(path);
+
+        if (applyToAllMaps) {
+            return applyTextureTransformToAllMaps(physicalMaterial, suffix, nextValue);
         }
-        return false;
+
+        return applyTextureTransform(physicalMaterial, slot, suffix, nextValue);
     }
 
     if (path === 'data.diffuse') {

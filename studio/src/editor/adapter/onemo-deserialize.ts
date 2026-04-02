@@ -25,6 +25,8 @@ const DEFAULT_SCENE_NAME = 'Untitled Scene';
 
 export type OnemoSceneGroup = THREE.Group & {
     background?: THREE.Color | null;
+    backgroundIntensity?: number;
+    backgroundRotation?: THREE.Euler;
     fog?: THREE.Fog | THREE.FogExp2 | null;
     environment?: THREE.Texture | null;
     environmentIntensity?: number;
@@ -247,6 +249,8 @@ const applySceneSettings = (
     const target = scene as OnemoSceneGroup;
 
     target.background = new THREE.Color(studioJson.scene.backgroundColor);
+    target.backgroundIntensity = studioJson.environment.intensity;
+    target.backgroundRotation = new THREE.Euler(0, THREE.MathUtils.degToRad(studioJson.environment.rotation), 0);
     target.fog = buildFog(studioJson.scene);
     target.environment = environmentTexture;
     target.environmentIntensity = studioJson.environment.intensity;
@@ -264,8 +268,16 @@ export const applyOnemoSceneState = (targetScene: THREE.Scene, sourceScene: THRE
         targetScene.environmentIntensity = source.environmentIntensity;
     }
 
+    if (typeof source.backgroundIntensity === 'number') {
+        targetScene.backgroundIntensity = source.backgroundIntensity;
+    }
+
     if (source.environmentRotation instanceof THREE.Euler) {
         targetScene.environmentRotation.copy(source.environmentRotation);
+    }
+
+    if (source.backgroundRotation instanceof THREE.Euler) {
+        targetScene.backgroundRotation.copy(source.backgroundRotation);
     }
 };
 

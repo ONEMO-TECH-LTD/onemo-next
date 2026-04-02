@@ -11,6 +11,7 @@ import {
     ONEMO_FORMAT_VERSION,
     type OnemoEditorCamera,
     type OnemoProductConfig,
+    type OnemoRendererSettings,
     type OnemoSceneSettings,
     type OnemoStudioJson
 } from './onemo-format';
@@ -176,7 +177,8 @@ export async function serializeOnemo(
         far: number;
     },
     productConfig: OnemoProductConfig,
-    environmentHdr?: ArrayBuffer | null
+    environmentHdr?: ArrayBuffer | null,
+    rendererOverrides?: Partial<OnemoRendererSettings>
 ): Promise<Blob> {
     const exporter = new GLTFExporter();
     const glb = await exporter.parseAsync(scene, { binary: true }) as ArrayBuffer;
@@ -192,11 +194,11 @@ export async function serializeOnemo(
         modified: now,
         name: scene.name.trim() || productConfig.productType || DEFAULT_SCENE_NAME,
         renderer: {
-            toneMapping: renderer.toneMapping ?? DEFAULT_RENDERER_SETTINGS.toneMapping,
-            toneMappingExposure: renderer.toneMappingExposure ?? DEFAULT_RENDERER_SETTINGS.toneMappingExposure,
-            outputColorSpace: renderer.outputColorSpace ?? DEFAULT_RENDERER_SETTINGS.outputColorSpace,
-            shadowsEnabled: renderer.shadowMap.enabled ?? DEFAULT_RENDERER_SETTINGS.shadowsEnabled,
-            shadowType: renderer.shadowMap.type ?? DEFAULT_RENDERER_SETTINGS.shadowType
+            toneMapping: rendererOverrides?.toneMapping ?? renderer.toneMapping ?? DEFAULT_RENDERER_SETTINGS.toneMapping,
+            toneMappingExposure: rendererOverrides?.toneMappingExposure ?? renderer.toneMappingExposure ?? DEFAULT_RENDERER_SETTINGS.toneMappingExposure,
+            outputColorSpace: rendererOverrides?.outputColorSpace ?? renderer.outputColorSpace ?? DEFAULT_RENDERER_SETTINGS.outputColorSpace,
+            shadowsEnabled: rendererOverrides?.shadowsEnabled ?? renderer.shadowMap.enabled ?? DEFAULT_RENDERER_SETTINGS.shadowsEnabled,
+            shadowType: rendererOverrides?.shadowType ?? renderer.shadowMap.type ?? DEFAULT_RENDERER_SETTINGS.shadowType
         },
         environment: {
             ...DEFAULT_ENVIRONMENT,

@@ -7,6 +7,7 @@ import EffectViewer, {
     type EffectViewerTransformSnapshot,
     type ViewerCameraCommand,
     type ViewerCameraPreset,
+    type ViewerGridSettings,
     type ViewerRenderPass
 } from '../../../../src/app/(dev)/prototype/core/EffectViewer';
 import type { DesignState, ViewerConfig } from '../../../../src/app/(dev)/prototype/types';
@@ -36,6 +37,10 @@ type DropTargetHandle = {
 
 type GizmoMode = 'translate' | 'rotate' | 'scale' | 'disabled';
 type GizmoSpace = 'world' | 'local';
+type TransformSnapState = {
+    enabled: boolean;
+    increment: number;
+};
 
 function BridgeViewportApp({
     bridge,
@@ -52,6 +57,15 @@ function BridgeViewportApp({
     const [renderPass, setRenderPass] = useState<ViewerRenderPass>('standard');
     const [wireframeEnabled, setWireframeEnabled] = useState(false);
     const [cameraCommand, setCameraCommand] = useState<ViewerCameraCommand | null>(null);
+    const [transformSnap, setTransformSnap] = useState<TransformSnapState>({
+        enabled: false,
+        increment: 1
+    });
+    const [gridSettings, setGridSettings] = useState<ViewerGridSettings>({
+        enabled: true,
+        divisions: 10,
+        cellSize: 0.02
+    });
 
     useEffect(() => {
         const syncSelection = (type: string | null, items: SelectableObserver[] = []) => {
@@ -104,13 +118,37 @@ function BridgeViewportApp({
             });
         };
 
+        const syncSnap = (enabled?: boolean | null, increment?: number | null) => {
+            const projectSettings = editor.call('settings:projectUser') as { get: (path: string) => unknown } | null;
+            const resolvedIncrement = Number(increment ?? projectSettings?.get('editor.snapIncrement') ?? 1);
+            setTransformSnap({
+                enabled: !!enabled,
+                increment: Number.isFinite(resolvedIncrement) && resolvedIncrement > 0 ? resolvedIncrement : 1
+            });
+        };
+
+        const syncGrid = () => {
+            const projectSettings = editor.call('settings:projectUser') as { get: (path: string) => unknown } | null;
+            const divisions = Math.max(0, Math.floor(Number(projectSettings?.get('editor.gridDivisions') ?? 10)));
+            const gridDivisionSize = Number(projectSettings?.get('editor.gridDivisionSize') ?? 1);
+            setGridSettings({
+                enabled: true,
+                divisions: divisions || 10,
+                cellSize: Number.isFinite(gridDivisionSize) && gridDivisionSize > 0 ? gridDivisionSize * 0.02 : 0.02
+            });
+        };
+
         const selectionHandle = editor.on('selector:change', syncSelection);
         const gizmoTypeHandle = editor.on('gizmo:type', syncGizmoMode);
         const gizmoSpaceHandle = editor.on('gizmo:coordSystem', syncGizmoSpace);
+        const gizmoSnapHandle = editor.on('gizmo:snap', syncSnap);
         const renderPassHandle = editor.on('r3f:viewer:renderPass', syncRenderPass);
         const wireframeHandle = editor.on('r3f:viewer:wireframe', syncWireframe);
         const focusHandle = editor.on('r3f:viewer:focus', focusSelection);
         const cameraPresetHandle = editor.on('r3f:viewer:cameraPreset', setCameraPreset);
+        const projectSettings = editor.call('settings:projectUser') as { on: (path: string, callback: () => void) => { unbind: () => void }; get: (path: string) => unknown } | null;
+        const gridDivisionsHandle = projectSettings?.on('editor.gridDivisions:set', syncGrid) ?? null;
+        const gridSizeHandle = projectSettings?.on('editor.gridDivisionSize:set', syncGrid) ?? null;
 
         syncSelection(
             editor.call('selector:type') as string | null,
@@ -118,6 +156,8 @@ function BridgeViewportApp({
         );
         syncGizmoMode(editor.call('gizmo:type') as string | null);
         syncGizmoSpace(editor.call('gizmo:coordSystem') as string | null);
+        syncSnap(false, Number(projectSettings?.get('editor.snapIncrement') ?? 1));
+        syncGrid();
         syncRenderPass('standard');
         syncWireframe(false);
 
@@ -125,10 +165,13 @@ function BridgeViewportApp({
             selectionHandle.unbind();
             gizmoTypeHandle.unbind();
             gizmoSpaceHandle.unbind();
+            gizmoSnapHandle.unbind();
             renderPassHandle.unbind();
             wireframeHandle.unbind();
             focusHandle.unbind();
             cameraPresetHandle.unbind();
+            gridDivisionsHandle?.unbind();
+            gridSizeHandle?.unbind();
         };
     }, []);
 
@@ -139,8 +182,16 @@ function BridgeViewportApp({
         return (object: THREE.Object3D) => bridge.getResourceIdForObject(object);
     }, [bridge]);
     const handleSelectResourceId = useCallback((resourceId: string) => {
+        if (!resourceId) {
+            editor.call('selector:clear');
+            editor.call('attributes:clear');
+            return;
+        }
+
         const observer = editor.call('entities:get', resourceId) as SelectableObserver | null;
         if (!observer) {
+            editor.call('selector:clear');
+            editor.call('attributes:clear');
             return;
         }
 
@@ -185,6 +236,8 @@ function BridgeViewportApp({
             enableTransformControls
             renderPass={renderPass}
             wireframeEnabled={wireframeEnabled}
+            gridSettings={gridSettings}
+            transformSnapSettings={transformSnap}
             cameraCommand={cameraCommand}
             onBridgeReady={handleBridgeReady}
         />

@@ -51,7 +51,7 @@ interface SceneStore {
 const DEFAULT_COLORS: ColorConfig = {
   backColor: '#080808',
   frameColor: '#0f0f0f',
-  bgColor: '#ffffff',
+  bgColor: '#111315',
 }
 
 export const useSceneStore = create<SceneStore>((set, get) => ({
@@ -105,7 +105,13 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
         params: { color: s.colors.frameColor, roughness: 0.5, metalness: 0, clearcoat: 0.4, clearcoatRoughness: 0.3 },
         textures: {},
       },
-      scene: s._values['Scene'] || { exposure: 0.7, ambientIntensity: 0.5, envIntensity: 1.0, background: '#ffffff' },
+      scene: s._values['Scene'] || {
+        exposure: 0.7,
+        ambientColor: '#262626',
+        ambientIntensity: 0.5,
+        envIntensity: 1.0,
+        background: '#111315',
+      },
       colors: { ...s.colors },
     }
   },

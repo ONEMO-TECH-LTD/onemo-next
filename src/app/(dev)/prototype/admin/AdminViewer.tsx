@@ -102,7 +102,7 @@ function AdminViewerInner({
     exposure: { value: 0.7, min: 0.1, max: 3, step: 0.05 },
     ambientIntensity: { value: 0.5, min: 0, max: 2, step: 0.05 },
     envIntensity: { value: 1.0, min: 0, max: 5, step: 0.1 },
-    background: '#ffffff',
+    background: '#111315',
   }))
 
   useLevaHighlight()

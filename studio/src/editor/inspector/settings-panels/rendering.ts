@@ -342,12 +342,28 @@ class RenderingSettingsPanel extends BaseSettingsPanel {
             return viewportApp?.bridge ?? null;
         };
 
+        const keepSettingsPanelSelected = () => {
+            const projectUserSettings = editor.call('settings:projectUser');
+            if (!projectUserSettings) {
+                return;
+            }
+
+            const restoreSelection = () => {
+                editor.call('selector:set', 'editorSettings', [projectUserSettings]);
+                editor.emit('attributes:inspect[editorSettings]');
+            };
+
+            window.setTimeout(restoreSelection, 0);
+            window.setTimeout(restoreSelection, 100);
+        };
+
         const environmentPresetChangeEvt = environmentPresetField.on('change', (value) => {
             if (value) {
                 revokeEnvironmentFileUrl();
                 environmentFileName.textContent = 'Use preset';
             }
         });
+        const environmentPresetObserverEvt = this._sceneSettings?.on('render.envPreset:set', keepSettingsPanelSelected);
 
         const buttonClickEvt = environmentFileButton.on('click', () => {
             fileInput.click();
@@ -383,6 +399,7 @@ class RenderingSettingsPanel extends BaseSettingsPanel {
         this.once('destroy', () => {
             buttonClickEvt.unbind();
             environmentPresetChangeEvt.unbind();
+            environmentPresetObserverEvt?.unbind();
             fileInput.removeEventListener('change', onEnvironmentFileChange);
             revokeEnvironmentFileUrl();
         });
