@@ -1272,6 +1272,46 @@ function CameraCommandController({
   return null
 }
 
+/**
+ * Wrapper that renders the golden EffectModel and fires onReady
+ * when the model group mounts, providing modelRoot + materialSlots
+ * to the bridge. EffectModel itself is untouched.
+ */
+function StudioEffectModelWrapper(props: {
+  modelPath: string
+  artworkUrl: string
+  designState: import('../../../../src/app/(dev)/prototype/types').DesignState
+  face: import('../../../../src/app/(dev)/prototype/types').FaceMaterial
+  back: import('../../../../src/app/(dev)/prototype/types').BackMaterial
+  frame: import('../../../../src/app/(dev)/prototype/types').FrameMaterial
+  scene: import('../../../../src/app/(dev)/prototype/types').SceneSettings
+  onReady?: (payload: { modelRoot: THREE.Object3D; materialSlots: Map<string, THREE.Material | THREE.Material[]> }) => void
+}) {
+  const { onReady, ...modelProps } = props
+  const groupRef = useRef<THREE.Group>(null)
+  const firedRef = useRef(false)
+
+  useEffect(() => {
+    if (firedRef.current || !groupRef.current || !onReady) return
+    // Wait a frame for EffectModel to finish setting up materials
+    const raf = requestAnimationFrame(() => {
+      if (!groupRef.current) return
+      firedRef.current = true
+      onReady({
+        modelRoot: groupRef.current,
+        materialSlots: collectMaterialSlots(groupRef.current),
+      })
+    })
+    return () => cancelAnimationFrame(raf)
+  })
+
+  return (
+    <group ref={groupRef}>
+      <EffectModel {...modelProps} />
+    </group>
+  )
+}
+
 export default function StudioViewport({
   config,
   artworkUrl,
@@ -1446,7 +1486,7 @@ export default function StudioViewport({
               />
             )}
             {!templateUrl && config.modelPath && (
-              <EffectModel
+              <StudioEffectModelWrapper
                 modelPath={config.modelPath}
                 artworkUrl={artworkUrl || DEFAULT_ARTWORK}
                 designState={designState}

@@ -21,7 +21,7 @@ export const ONEMO_FORMAT_VERSION = 1;
  * These are WebGLRenderer-level properties, not scene-level.
  */
 export interface OnemoRendererSettings {
-    /** THREE.ToneMapping enum value. 0=No, 1=Linear, 2=Reinhard, 3=Cineon, 4=ACES, 5=AgX, 6=Neutral */
+    /** THREE.ToneMapping enum value. 0=No, 1=Linear, 2=Reinhard, 3=Cineon, 4=ACES, 6=AgX, 7=Neutral */
     toneMapping: number;
     /** Exposure level for tone mapping. Default 1.0 */
     toneMappingExposure: number;
