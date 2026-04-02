@@ -1270,44 +1270,6 @@ function CameraCommandController({
 }
 
 /**
- * Discovers the model root inside EffectViewer's scene by looking for
- * known mesh names (PRINT_SURFACE_FRONT, BACK, FRAME). Fires onReady
- * once the model is found, providing modelRoot + materialSlots to the bridge.
- */
-function ModelBridgeConnector({ onReady }: {
-  onReady: (payload: { modelRoot: THREE.Object3D; materialSlots: Map<string, THREE.Material | THREE.Material[]> }) => void
-}) {
-  const { scene } = useThree()
-  const readyRef = useRef(false)
-  const lastModelIdRef = useRef<string | null>(null)
-
-  useFrame(() => {
-    let meshParent: THREE.Object3D | null = null
-    scene.traverse((obj) => {
-      if (meshParent) return
-      if (obj instanceof THREE.Mesh && (obj.name === 'PRINT_SURFACE_FRONT' || obj.name === 'BACK' || obj.name === 'FRAME')) {
-        meshParent = obj.parent
-      }
-    })
-
-    if (!meshParent) {
-      readyRef.current = false
-      lastModelIdRef.current = null
-      return
-    }
-
-    const modelId = meshParent.uuid
-    if (readyRef.current && lastModelIdRef.current === modelId) return
-
-    readyRef.current = true
-    lastModelIdRef.current = modelId
-    onReady({ modelRoot: meshParent, materialSlots: collectMaterialSlots(meshParent) })
-  })
-
-  return null
-}
-
-/**
  * Configures OrbitControls for Studio navigation (middle-click pan, right-click rotate).
  */
 function OrbitControlsOverride({ orbitControlsRef }: {
@@ -1356,11 +1318,17 @@ export default function StudioViewport({
       onBridgeReady &&
       bridgeRef.current.scene &&
       bridgeRef.current.camera &&
-      bridgeRef.current.renderer &&
-      bridgeRef.current.modelRoot &&
-      bridgeRef.current.materialSlots
+      bridgeRef.current.renderer
     ) {
-      onBridgeReady(bridgeRef.current as EffectViewerBridge)
+      onBridgeReady({
+        scene: bridgeRef.current.scene,
+        camera: bridgeRef.current.camera,
+        renderer: bridgeRef.current.renderer,
+        modelRoot: bridgeRef.current.modelRoot ?? bridgeRef.current.scene,
+        materialSlots: bridgeRef.current.materialSlots ?? new Map<string, THREE.Material | THREE.Material[]>(),
+        orbitControls: bridgeRef.current.orbitControls ?? null,
+        keyLight: bridgeRef.current.keyLight ?? null,
+      })
     }
   }, [onBridgeReady])
 
@@ -1404,16 +1372,15 @@ export default function StudioViewport({
 
   return (
     <ViewportErrorBoundary background={config.colors.bgColor}>
-      <EffectViewer
-        config={config}
-        artworkUrl={artworkUrl || DEFAULT_ARTWORK}
-        designState={designState}
-        isEditing={isEditing}
-        onCreated={handleCreated}
-        orbitControlsRef={orbitControlsRef}
-      >
-        {/* Bridge connector — discovers model root for bridge wiring */}
-        <ModelBridgeConnector onReady={handleModelReady} />
+        <EffectViewer
+          config={config}
+          artworkUrl={artworkUrl || DEFAULT_ARTWORK}
+          designState={designState}
+          isEditing={isEditing}
+          onCreated={handleCreated}
+          orbitControlsRef={orbitControlsRef}
+          onModelReady={handleModelReady}
+        >
         {/* Studio-specific OrbitControls customization */}
         <OrbitControlsOverride orbitControlsRef={orbitControlsRef} />
         {/* Studio controls — injected into EffectViewer's Canvas */}

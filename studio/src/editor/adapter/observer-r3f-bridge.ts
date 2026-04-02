@@ -865,13 +865,24 @@ export class ObserverR3FBridge {
         this.updateViewerConfig((configData) => {
             configData.modelPath = modelBlobUrl;
             configData.scene.exposure = result.studioJson.renderer.toneMappingExposure;
-            configData.scene.ambientColor = rgbTupleToHex(result.studioJson.scene.ambientColor);
             configData.scene.envIntensity = result.studioJson.environment.intensity;
             configData.scene.background = result.studioJson.scene.backgroundColor;
             configData.scene.ambientIntensity = result.studioJson.scene.ambientIntensity;
             configData.colors.bgColor = result.studioJson.scene.backgroundColor;
             configData.environment = nextEnvironment;
             configData.camera = createCameraConfigFromEditorCamera(editorCamera, configData.camera);
+            configData.product = {
+                productType: result.studioJson.product.productType,
+                materialRoles: result.studioJson.product.materialRoles.map((role) => ({
+                    role: role.role,
+                    meshNames: [...role.meshNames],
+                    configurable: role.configurable,
+                    configurableProperties: role.configurableProperties ? [...role.configurableProperties] : undefined
+                })),
+                artworkSlot: result.studioJson.product.artworkSlot
+                    ? { ...result.studioJson.product.artworkSlot }
+                    : undefined
+            };
         });
 
         this.sceneSettingsSeeded = false;
@@ -2889,7 +2900,7 @@ export class ObserverR3FBridge {
             return;
         }
 
-        if (path === 'render.backgroundColor') {
+        if (path === 'render.backgroundColor' || path.startsWith('render.backgroundColor.')) {
             const colorValue = sceneSettings.get('render.backgroundColor');
             let backgroundColor: THREE.Color | null = null;
 
@@ -2906,10 +2917,13 @@ export class ObserverR3FBridge {
             if (backgroundColor) {
                 // EffectViewer renders background via CSS div, NOT scene.background.
                 // Setting scene.background causes tone-mapping to darken the background.
-                // Only update config — EffectViewer's CSS handles the actual rendering.
+                // Update config through the viewer action path so the React wrapper
+                // re-renders its CSS background immediately.
                 const hex = `#${backgroundColor.getHexString()}`;
-                this.config.scene.background = hex;
-                this.config.colors.bgColor = hex;
+                this.updateViewerConfig((configData) => {
+                    configData.scene.background = hex;
+                    configData.colors.bgColor = hex;
+                });
                 this.sceneDirty = true;
             }
             return;
@@ -2918,6 +2932,7 @@ export class ObserverR3FBridge {
         if (
             path === 'render.fog' ||
             path === 'render.fog_color' ||
+            path.startsWith('render.fog_color.') ||
             path === 'render.fog_start' ||
             path === 'render.fog_end' ||
             path === 'render.fog_density'
@@ -2955,7 +2970,11 @@ export class ObserverR3FBridge {
             return;
         }
 
-        if (path === 'render.global_ambient' || path === 'render.ambientIntensity') {
+        if (
+            path === 'render.global_ambient' ||
+            path.startsWith('render.global_ambient.') ||
+            path === 'render.ambientIntensity'
+        ) {
             // EffectModel manages the ambient light via React — don't create or modify
             // scene lights directly. Update config only; EffectViewer re-renders from it.
             const ambientColor = sceneSettings.get('render.global_ambient');

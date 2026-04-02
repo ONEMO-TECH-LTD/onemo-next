@@ -2,7 +2,7 @@
 // Receives all config as typed props. Both Studio and Create use this.
 // Studio wraps this via children + onCreated for composability.
 
-import { Canvas, type RootState } from '@react-three/fiber'
+import { Canvas, type RootState, useThree } from '@react-three/fiber'
 import { OrbitControls, Environment, useGLTF } from '@react-three/drei'
 import React, { Suspense, useMemo } from 'react'
 import * as THREE from 'three'
@@ -29,6 +29,21 @@ interface EffectViewerProps {
   onCreated?: (bridge: EffectViewerBridge) => void
   /** Studio passes this to control OrbitControls externally (camera commands, navigation). */
   orbitControlsRef?: React.RefObject<React.ComponentRef<typeof OrbitControls> | null>
+  /** Studio receives the loaded model root directly from EffectModel instead of scanning mesh names. */
+  onModelReady?: (payload: {
+    modelRoot: THREE.Object3D
+    materialSlots: Map<string, THREE.Material | THREE.Material[]>
+  }) => void
+}
+
+function RendererBackgroundSync({ color }: { color: string }) {
+  const { gl } = useThree()
+
+  React.useEffect(() => {
+    gl.setClearColor(color, 1)
+  }, [color, gl])
+
+  return null
 }
 
 export default function EffectViewer({
@@ -39,9 +54,12 @@ export default function EffectViewer({
   children,
   onCreated,
   orbitControlsRef,
+  onModelReady,
 }: EffectViewerProps) {
   // Preload the model
-  useGLTF.preload(config.modelPath)
+  if (config.modelPath) {
+    useGLTF.preload(config.modelPath)
+  }
 
   const cam = config.camera
   const env = config.environment
@@ -67,6 +85,7 @@ export default function EffectViewer({
   }, [env])
 
   const handleCreated = (state: RootState) => {
+    state.gl.setClearColor(0x000000, 0)
     onCreated?.({
       scene: state.scene,
       camera: state.camera,
@@ -78,6 +97,7 @@ export default function EffectViewer({
     <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: config.colors.bgColor }}>
       <Canvas
         gl={{
+          alpha: true,
           antialias: true,
           toneMapping: THREE.NeutralToneMapping,
           toneMappingExposure: config.scene.exposure,
@@ -93,6 +113,7 @@ export default function EffectViewer({
         onCreated={handleCreated}
       >
         <Suspense fallback={null}>
+          <RendererBackgroundSync color={config.colors.bgColor} />
           <Environment
             {...(env?.customHdri
               ? { files: env.customHdri }
@@ -105,15 +126,19 @@ export default function EffectViewer({
               radius: env.groundRadius,
             } : undefined}
           />
-          <EffectModel
-            modelPath={config.modelPath}
-            artworkUrl={artworkUrl || DEFAULT_ARTWORK}
-            designState={designState}
-            face={config.face}
-            back={config.back}
-            frame={config.frame}
-            scene={config.scene}
-          />
+          {config.modelPath ? (
+            <EffectModel
+              modelPath={config.modelPath}
+              artworkUrl={artworkUrl || DEFAULT_ARTWORK}
+              designState={designState}
+              face={config.face}
+              back={config.back}
+              frame={config.frame}
+              scene={config.scene}
+              product={config.product}
+              onModelReady={onModelReady}
+            />
+          ) : null}
         </Suspense>
 
         <OrbitControls

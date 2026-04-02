@@ -16,7 +16,7 @@ import type { OnemoStudioJson, OnemoProductConfig, OnemoMaterialRole } from '../
 import type {
     ViewerConfig, CameraConfig, EnvironmentConfig, SceneSettings,
     ColorConfig, FaceMaterial, BackMaterial, FrameMaterial, TexturePaths,
-    FaceMaterialConfig, BackMaterialConfig, FrameMaterialConfig,
+    FaceMaterialConfig, BackMaterialConfig, FrameMaterialConfig, ViewerProductConfig,
 } from '../types';
 
 // ─── Lightweight config extraction (no renderer) ──────────────────
@@ -130,7 +130,20 @@ function studioJsonToViewerConfig(studioJson: OnemoStudioJson, modelBlobUrl: str
         textures: {},
     };
 
-    return { modelPath: modelBlobUrl, face, back, frame, scene, colors, camera, environment };
+    const product: ViewerProductConfig = {
+        productType: studioJson.product.productType,
+        materialRoles: studioJson.product.materialRoles.map((role) => ({
+            role: role.role,
+            meshNames: [...role.meshNames],
+            configurable: role.configurable,
+            configurableProperties: role.configurableProperties ? [...role.configurableProperties] : undefined,
+        })),
+        artworkSlot: studioJson.product.artworkSlot
+            ? { ...studioJson.product.artworkSlot }
+            : undefined,
+    };
+
+    return { modelPath: modelBlobUrl, face, back, frame, scene, colors, camera, environment, product };
 }
 
 /**

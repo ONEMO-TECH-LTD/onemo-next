@@ -10,6 +10,7 @@ import type {
   BackMaterial,
   FrameMaterial,
   SceneSettings,
+  ViewerProductConfig,
 } from '../types'
 
 interface EffectModelProps {
@@ -20,6 +21,36 @@ interface EffectModelProps {
   back: BackMaterial
   frame: FrameMaterial
   scene: SceneSettings
+  product?: ViewerProductConfig
+  onModelReady?: (payload: {
+    modelRoot: THREE.Object3D
+    materialSlots: Map<string, THREE.Material | THREE.Material[]>
+  }) => void
+}
+
+function collectMaterialSlots(root: THREE.Object3D) {
+  const materialSlots = new Map<string, THREE.Material | THREE.Material[]>()
+  root.traverse((child) => {
+    if (child instanceof THREE.Mesh) {
+      materialSlots.set(child.uuid, child.material)
+    }
+  })
+  return materialSlots
+}
+
+function matchesMeshName(meshName: string, patterns: string[]) {
+  const normalizedMeshName = meshName.trim().toLowerCase()
+  return patterns.some((pattern) => {
+    const normalizedPattern = pattern.trim().toLowerCase()
+    if (!normalizedPattern) return false
+    if (normalizedPattern.includes('*')) {
+      const regex = new RegExp(`^${normalizedPattern.split('*').map((part) => {
+        return part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      }).join('.*')}$`)
+      return regex.test(normalizedMeshName)
+    }
+    return normalizedMeshName === normalizedPattern
+  })
 }
 
 export default function EffectModel({
@@ -30,6 +61,8 @@ export default function EffectModel({
   back,
   frame,
   scene: sceneSettings,
+  product,
+  onModelReady,
 }: EffectModelProps) {
   const { scene } = useGLTF(modelPath)
   const faceMeshRef = useRef<THREE.Mesh | null>(null)
@@ -146,14 +179,30 @@ export default function EffectModel({
     [backNormal, backHeight, backRoughnessTex, bp]
   )
 
+  const roleMeshNames = useMemo(() => {
+    const faceRole = product?.materialRoles.find((role) => role.role === 'face')
+    const backRole = product?.materialRoles.find((role) => role.role === 'back')
+    const frameRole = product?.materialRoles.find((role) => role.role === 'frame')
+
+    return {
+      face: faceRole?.meshNames ?? ['PRINT_SURFACE_FRONT', 'Face', 'face'],
+      back: backRole?.meshNames ?? ['BACK', 'Back', 'back'],
+      frame: frameRole?.meshNames ?? ['FRAME', 'Frame', 'frame'],
+      artwork: product?.artworkSlot?.meshName
+        ? [product.artworkSlot.meshName]
+        : faceRole?.meshNames ?? ['PRINT_SURFACE_FRONT', 'Face', 'face'],
+    }
+  }, [product])
+
   // Override materials and generate planar UVs
   useMemo(() => {
     scene.traverse((child) => {
       if (child instanceof THREE.Mesh) {
-        switch (child.name) {
-          case 'PRINT_SURFACE_FRONT': {
+        if (matchesMeshName(child.name, roleMeshNames.face)) {
             child.material = faceMaterial
-            faceMeshRef.current = child
+            if (matchesMeshName(child.name, roleMeshNames.artwork)) {
+              faceMeshRef.current = child
+            }
 
             const geo = child.geometry
             const posAttr = geo.getAttribute('position')
@@ -179,9 +228,7 @@ export default function EffectModel({
 
             geo.deleteAttribute('uv')
             geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
-            break
-          }
-          case 'BACK': {
+        } else if (matchesMeshName(child.name, roleMeshNames.back)) {
             child.material = backMaterial
 
             const backGeo = child.geometry
@@ -208,18 +255,22 @@ export default function EffectModel({
 
             backGeo.deleteAttribute('uv')
             backGeo.setAttribute('uv', new THREE.BufferAttribute(backUvs, 2))
-            break
-          }
-          case 'FRAME':
-            child.material = frameMaterial
-            break
+        } else if (matchesMeshName(child.name, roleMeshNames.frame)) {
+          child.material = frameMaterial
         }
       }
       if (child.name === 'NEW LIGHTS' || child instanceof THREE.Light) {
         child.visible = false
       }
     })
-  }, [scene, faceMaterial, backMaterial, frameMaterial])
+  }, [scene, faceMaterial, backMaterial, frameMaterial, roleMeshNames])
+
+  useEffect(() => {
+    onModelReady?.({
+      modelRoot: scene,
+      materialSlots: collectMaterialSlots(scene),
+    })
+  }, [onModelReady, scene])
 
   useEffect(() => {
     if (faceMeshRef.current) {
