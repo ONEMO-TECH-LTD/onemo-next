@@ -1,4 +1,12 @@
 editor.once('load', () => {
+    const inspectSceneSettings = () => {
+        const editorSettings = editor.call('settings:projectUser');
+        editor.call('selector:set', 'editorSettings', [editorSettings]);
+        editor.emit('attributes:inspect[editorSettings]');
+        editor.call('editorSettings:panel:foldAll');
+        editor.call('editorSettings:panel:unfold', 'rendering');
+    };
+
     // Resolves a picked node (which may be an icon entity) to its entity observer
     const resolveEntityFromNode = (node) => {
         // Handle icon entities
@@ -15,7 +23,7 @@ editor.once('load', () => {
 
     editor.on('viewport:pick:clear', () => {
         if (!editor.call('hotkey:ctrl')) {
-            editor.call('selector:clear');
+            inspectSceneSettings();
         }
     });
 

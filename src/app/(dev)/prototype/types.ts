@@ -109,6 +109,26 @@ export interface EnvironmentConfig {
   groundRadius: number
 }
 
+export interface ViewerMaterialRole {
+  role: string
+  meshNames: string[]
+  configurable: boolean
+  configurableProperties?: string[]
+}
+
+export interface ViewerArtworkSlot {
+  meshName: string
+  role: string
+  defaultUrl?: string
+  textureChannel: string
+}
+
+export interface ViewerProductConfig {
+  productType: string
+  materialRoles: ViewerMaterialRole[]
+  artworkSlot?: ViewerArtworkSlot
+}
+
 // The single config object passed to the core viewer
 export interface ViewerConfig {
   modelPath: string
@@ -119,4 +139,5 @@ export interface ViewerConfig {
   colors: ColorConfig
   camera?: CameraConfig
   environment?: EnvironmentConfig
+  product?: ViewerProductConfig
 }

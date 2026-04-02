@@ -23,6 +23,12 @@ const DEFAULT_DESIGN_STATE: DesignState = {
 
 const DEFAULT_CONFIG: ViewerConfig = createDefaultViewerConfig();
 
+const createStartupViewerConfig = (): ViewerConfig => {
+    const config = createDefaultViewerConfig();
+    config.modelPath = '';
+    return config;
+};
+
 const DEFAULT_ARTWORK_URL = '/assets/test-artwork.png';
 const LAST_SCENE_STORAGE_KEY = 'onemo.playcanvas.last-scene';
 
@@ -182,16 +188,22 @@ function BridgeViewportApp({
         return (object: THREE.Object3D) => bridge.getResourceIdForObject(object);
     }, [bridge]);
     const handleSelectResourceId = useCallback((resourceId: string) => {
+        const inspectSceneSettings = () => {
+            const editorSettings = editor.call('settings:projectUser');
+            editor.call('selector:set', 'editorSettings', [editorSettings]);
+            editor.emit('attributes:inspect[editorSettings]');
+            editor.call('editorSettings:panel:foldAll');
+            editor.call('editorSettings:panel:unfold', 'rendering');
+        };
+
         if (!resourceId) {
-            editor.call('selector:clear');
-            editor.call('attributes:clear');
+            inspectSceneSettings();
             return;
         }
 
         const observer = editor.call('entities:get', resourceId) as SelectableObserver | null;
         if (!observer) {
-            editor.call('selector:clear');
-            editor.call('attributes:clear');
+            inspectSceneSettings();
             return;
         }
 
@@ -248,7 +260,7 @@ export function mountEffectViewer(viewportDom: HTMLElement, canvasDom: HTMLEleme
     const cloneViewerConfig = (value: ViewerConfig): ViewerConfig => {
         return JSON.parse(JSON.stringify(value)) as ViewerConfig;
     };
-    const bridgeConfig = cloneViewerConfig(DEFAULT_CONFIG);
+    const bridgeConfig = cloneViewerConfig(createStartupViewerConfig());
     let currentViewerConfig = cloneViewerConfig(bridgeConfig);
     const bridge = createObserverR3FBridge(bridgeConfig);
     let activeBridge: ReturnType<typeof createObserverR3FBridge> | null = bridge;

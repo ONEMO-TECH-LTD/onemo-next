@@ -1,7 +1,8 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useGesture } from '@use-gesture/react'
 import { useSceneStore } from './admin/sceneStore'
 import { INITIAL_DESIGN } from './user/Toolbar'
@@ -19,13 +20,18 @@ const MAX_SCALE = 4.0
 const DRAG_SENSITIVITY = 0.001
 const SCROLL_SENSITIVITY = 0.002
 
-export default function StudioPage() {
+function PrototypePageInner() {
+  const searchParams = useSearchParams()
   const [artworkUrl, setArtworkUrl] = useState<string | undefined>()
   const [isDragging, setIsDragging] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [designState, setDesignState] = useState<DesignState>(INITIAL_DESIGN)
   const { colors, setBackColor, setFrameColor, setBgColor } = useSceneStore()
   const [showColors, setShowColors] = useState(false)
+  const sceneName = searchParams.get('scene')
+  const templateUrl = sceneName
+    ? `/api/dev/scenes/${encodeURIComponent(sceneName)}`
+    : '/assets/templates/effect-70mm.onemo'
 
   const handleFile = useCallback((file: File) => {
     if (!file.type.startsWith('image/')) return
@@ -91,6 +97,7 @@ export default function StudioPage() {
         designState={designState}
         isEditing={isEditing}
         onTextureChange={setArtworkUrl}
+        templateUrl={templateUrl}
       >
         {(config) => (
           <EffectViewer
@@ -132,5 +139,13 @@ export default function StudioPage() {
         isDragging={isDragging}
       />
     </div>
+  )
+}
+
+export default function StudioPage() {
+  return (
+    <Suspense fallback={null}>
+      <PrototypePageInner />
+    </Suspense>
   )
 }

@@ -391,6 +391,35 @@ export const createDefaultViewerConfig = (): ViewerConfig => {
             groundEnabled: false,
             groundHeight: 0,
             groundRadius: 20
+        },
+        product: {
+            productType: 'effect-70mm',
+            materialRoles: [
+                {
+                    role: 'face',
+                    meshNames: ['PRINT_SURFACE_FRONT', 'Face', 'face'],
+                    configurable: true,
+                    configurableProperties: ['color', 'artwork']
+                },
+                {
+                    role: 'back',
+                    meshNames: ['BACK', 'Back', 'back'],
+                    configurable: true,
+                    configurableProperties: ['color']
+                },
+                {
+                    role: 'frame',
+                    meshNames: ['FRAME', 'Frame', 'frame'],
+                    configurable: true,
+                    configurableProperties: ['color']
+                }
+            ],
+            artworkSlot: {
+                meshName: 'PRINT_SURFACE_FRONT',
+                role: 'face',
+                defaultUrl: '/assets/test-artwork.png',
+                textureChannel: 'map'
+            }
         }
     };
 };

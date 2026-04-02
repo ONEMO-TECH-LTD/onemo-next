@@ -22,10 +22,12 @@ interface AdminViewerProps {
   designState: DesignState
   isEditing: boolean
   onTextureChange?: (path: string) => void
+  templateUrl?: string
   children: (config: ViewerConfig, assetProps: AssetProps, materialPanels: React.ReactNode) => React.ReactNode
 }
 
 export default function AdminViewer({
+  templateUrl = TEMPLATE_URL,
   children,
 }: AdminViewerProps) {
   const colors = useSceneStore((s) => s.colors)
@@ -38,7 +40,7 @@ export default function AdminViewer({
   useEffect(() => {
     let cancelled = false
 
-    parseOnemoConfig(TEMPLATE_URL).then((parsed) => {
+    parseOnemoConfig(templateUrl).then((parsed) => {
       if (cancelled) {
         URL.revokeObjectURL(parsed.modelBlobUrl)
         return
@@ -60,7 +62,7 @@ export default function AdminViewer({
         URL.revokeObjectURL(blobUrlRef.current)
       }
     }
-  }, [setBgColor])
+  }, [setBgColor, templateUrl])
 
   if (error) {
     return <div style={{ color: 'red', padding: 20 }}>Failed to load scene template: {error}</div>
