@@ -1,13 +1,12 @@
 // StudioViewport — Studio-specific viewport wrapper with navigation, grid, gizmos, selection.
-// The prototype uses the golden EffectViewer directly. This is Studio-only.
+// Wraps the golden EffectViewer from prototype. Studio controls are injected as children.
+// The renderer code is EffectViewer — Studio is purely UI/UX.
 
-import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { OrbitControls, Environment, GizmoHelper, GizmoViewcube, TransformControls, useGLTF } from '@react-three/drei'
-import React, { Suspense, useCallback, useEffect, useMemo, useRef, type RefObject } from 'react'
+import { useFrame, useThree } from '@react-three/fiber'
+import { OrbitControls, GizmoHelper, GizmoViewcube, TransformControls } from '@react-three/drei'
+import React, { useCallback, useEffect, useMemo, useRef, type RefObject } from 'react'
 import * as THREE from 'three'
-import { applyOnemoSceneState } from '../adapter/onemo-deserialize'
-import EffectModel from '../../../../src/app/(dev)/prototype/core/EffectModel'
-import { loadOnemoTemplate } from '../../../../src/app/(dev)/prototype/core/onemo-loader'
+import EffectViewer, { type EffectViewerBridge as CoreBridge } from '../../../../src/app/(dev)/prototype/core/EffectViewer'
 import type { ViewerConfig, DesignState } from '../../../../src/app/(dev)/prototype/types'
 
 const DEFAULT_ARTWORK = '/assets/test-artwork.png'
@@ -72,7 +71,6 @@ export interface ViewerTransformSnapSettings {
   increment: number
 }
 
-const DEFAULT_AMBIENT_COLOR = '#262626'
 const LOOK_SENSITIVITY = 0.002
 const ROTATION_SNAP_MULTIPLIER = 5
 
@@ -499,7 +497,6 @@ function ViewportNavigationController({
 interface EffectViewerProps {
   config: ViewerConfig
   artworkUrl?: string
-  templateUrl?: string
   designState: DesignState
   isEditing: boolean
   onBridgeReady?: (bridge: EffectViewerBridge) => void
@@ -1273,49 +1270,65 @@ function CameraCommandController({
 }
 
 /**
- * Wrapper that renders the golden EffectModel and fires onReady
- * when the model group mounts, providing modelRoot + materialSlots
- * to the bridge. EffectModel itself is untouched.
+ * Discovers the model root inside EffectViewer's scene by looking for
+ * known mesh names (PRINT_SURFACE_FRONT, BACK, FRAME). Fires onReady
+ * once the model is found, providing modelRoot + materialSlots to the bridge.
  */
-function StudioEffectModelWrapper(props: {
-  modelPath: string
-  artworkUrl: string
-  designState: import('../../../../src/app/(dev)/prototype/types').DesignState
-  face: import('../../../../src/app/(dev)/prototype/types').FaceMaterial
-  back: import('../../../../src/app/(dev)/prototype/types').BackMaterial
-  frame: import('../../../../src/app/(dev)/prototype/types').FrameMaterial
-  scene: import('../../../../src/app/(dev)/prototype/types').SceneSettings
-  onReady?: (payload: { modelRoot: THREE.Object3D; materialSlots: Map<string, THREE.Material | THREE.Material[]> }) => void
+function ModelBridgeConnector({ onReady }: {
+  onReady: (payload: { modelRoot: THREE.Object3D; materialSlots: Map<string, THREE.Material | THREE.Material[]> }) => void
 }) {
-  const { onReady, ...modelProps } = props
-  const groupRef = useRef<THREE.Group>(null)
-  const firedRef = useRef(false)
+  const { scene } = useThree()
+  const readyRef = useRef(false)
+  const lastModelIdRef = useRef<string | null>(null)
 
-  useEffect(() => {
-    if (firedRef.current || !groupRef.current || !onReady) return
-    // Wait a frame for EffectModel to finish setting up materials
-    const raf = requestAnimationFrame(() => {
-      if (!groupRef.current) return
-      firedRef.current = true
-      onReady({
-        modelRoot: groupRef.current,
-        materialSlots: collectMaterialSlots(groupRef.current),
-      })
+  useFrame(() => {
+    let meshParent: THREE.Object3D | null = null
+    scene.traverse((obj) => {
+      if (meshParent) return
+      if (obj instanceof THREE.Mesh && (obj.name === 'PRINT_SURFACE_FRONT' || obj.name === 'BACK' || obj.name === 'FRAME')) {
+        meshParent = obj.parent
+      }
     })
-    return () => cancelAnimationFrame(raf)
+
+    if (!meshParent) {
+      readyRef.current = false
+      lastModelIdRef.current = null
+      return
+    }
+
+    const modelId = meshParent.uuid
+    if (readyRef.current && lastModelIdRef.current === modelId) return
+
+    readyRef.current = true
+    lastModelIdRef.current = modelId
+    onReady({ modelRoot: meshParent, materialSlots: collectMaterialSlots(meshParent) })
   })
 
-  return (
-    <group ref={groupRef}>
-      <EffectModel {...modelProps} />
-    </group>
-  )
+  return null
+}
+
+/**
+ * Configures OrbitControls for Studio navigation (middle-click pan, right-click rotate).
+ */
+function OrbitControlsOverride({ orbitControlsRef }: {
+  orbitControlsRef: RefObject<React.ComponentRef<typeof OrbitControls> | null>
+}) {
+  useEffect(() => {
+    const controls = orbitControlsRef.current
+    if (!controls) return
+    controls.mouseButtons = {
+      LEFT: THREE.MOUSE.ROTATE,
+      MIDDLE: THREE.MOUSE.PAN,
+      RIGHT: THREE.MOUSE.ROTATE,
+    }
+  }, [orbitControlsRef])
+
+  return null
 }
 
 export default function StudioViewport({
   config,
   artworkUrl,
-  templateUrl,
   designState,
   isEditing,
   onBridgeReady,
@@ -1335,13 +1348,7 @@ export default function StudioViewport({
   transformSnapSettings,
   cameraCommand = null,
 }: EffectViewerProps) {
-  // Preload the model
-  if (!templateUrl && config.modelPath) {
-    useGLTF.preload(config.modelPath)
-  }
-
   const bridgeRef = useRef<Partial<EffectViewerBridge>>({})
-  const loadedTemplateRootRef = useRef<THREE.Group | null>(null)
   const emitBridge = useCallback((patch: Partial<EffectViewerBridge>) => {
     Object.assign(bridgeRef.current, patch)
 
@@ -1358,14 +1365,9 @@ export default function StudioViewport({
   }, [onBridgeReady])
 
   const cam = config.camera
-  const env = config.environment
-  const ambientColor = config.scene.ambientColor ?? DEFAULT_AMBIENT_COLOR
   const gridSize = Math.max(gridSettings.divisions * gridSettings.cellSize, gridSettings.cellSize)
-  const environmentKey = env
-    ? `${env.customHdri ? `file:${env.customHdri}` : `preset:${env.preset ?? 'studio'}`}|ground:${env.groundEnabled ? `${env.groundHeight}:${env.groundRadius}` : 'off'}`
-    : 'none'
 
-  // Camera position from spherical coordinates (distance, polar, azimuth)
+  // Camera position for CameraCommandController fallback
   const cameraPosition = useMemo(() => {
     if (!cam) return [0, 0, 0.2] as [number, number, number]
     const d = cam.distance
@@ -1380,55 +1382,19 @@ export default function StudioViewport({
 
   const orbitControlsRef = useRef<React.ComponentRef<typeof OrbitControls>>(null)
   useEffect(() => {
+    emitBridge({ orbitControls: orbitControlsRef.current ?? null })
+  }, [emitBridge])
+
+  // EffectViewer's onCreated gives us scene, camera, renderer for the bridge
+  const handleCreated = useCallback((bridge: CoreBridge) => {
     emitBridge({
-      orbitControls: orbitControlsRef.current ?? null,
+      renderer: bridge.renderer,
+      scene: bridge.scene,
+      camera: bridge.camera,
     })
   }, [emitBridge])
-  const handleCreated = useCallback(({ gl, scene, camera }: { gl: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera }) => {
-    emitBridge({
-      renderer: gl,
-      scene,
-      camera,
-    })
 
-    if (templateUrl) {
-      void loadOnemoTemplate(templateUrl, gl)
-      .then((result) => {
-        scene.clear()
-        applyOnemoSceneState(scene, result.scene)
-        scene.add(result.scene)
-        loadedTemplateRootRef.current = result.scene
-
-        applyEditorCameraState(camera, orbitControlsRef.current, result.studioJson.editorCamera)
-        requestAnimationFrame(() => {
-          applyEditorCameraState(camera, orbitControlsRef.current, result.studioJson.editorCamera)
-        })
-
-        emitBridge({
-          modelRoot: result.scene,
-          materialSlots: collectMaterialSlots(result.scene),
-          orbitControls: orbitControlsRef.current ?? null,
-        })
-      })
-      .catch((error) => {
-        console.error('[effect-viewer] Failed to load .onemo template', error)
-      })
-    }
-  }, [emitBridge, templateUrl])
-  useEffect(() => {
-    return () => {
-      if (loadedTemplateRootRef.current?.parent) {
-        loadedTemplateRootRef.current.parent.remove(loadedTemplateRootRef.current)
-      }
-    }
-  }, [])
-  const handleLightRef = useCallback((light: THREE.PointLight | null) => {
-    if (light) {
-      emitBridge({
-        keyLight: light,
-      })
-    }
-  }, [emitBridge])
+  // ModelBridgeConnector fires this when EffectModel's meshes appear in the scene
   const handleModelReady = useCallback((payload: {
     modelRoot: THREE.Object3D
     materialSlots: Map<string, THREE.Material | THREE.Material[]>
@@ -1438,118 +1404,56 @@ export default function StudioViewport({
 
   return (
     <ViewportErrorBoundary background={config.colors.bgColor}>
-      <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: config.colors.bgColor }}>
-        <Canvas
-          shadows
-          gl={{
-            antialias: true,
-            toneMapping: THREE.NeutralToneMapping,
-            toneMappingExposure: config.scene.exposure,
-            outputColorSpace: THREE.SRGBColorSpace,
-          }}
-          dpr={[1, 2]}
-          camera={{
-            position: cameraPosition,
-            fov: cam?.fov ?? 35,
-            near: 0.001,
-            far: 100,
-          }}
-          onCreated={handleCreated}
-        >
-          {!templateUrl && config.modelPath && (
-          <pointLight
-            ref={handleLightRef}
-            name="Bridge Light"
-            position={[0.02, 0.02, 0.12]}
-            intensity={0.4}
-            distance={0.8}
-            castShadow
-          />
-          )}
-          <ViewportGridHelper
-            visible={gridSettings.enabled}
-            size={gridSize}
-            divisions={gridSettings.divisions}
-          />
-          <Suspense fallback={null}>
-            {!templateUrl && env && (
-              <Environment
-                key={environmentKey}
-                {...(env.customHdri
-                  ? { files: env.customHdri }
-                  : { preset: (env.preset ?? 'studio') as 'studio' | 'city' | 'sunset' | 'dawn' | 'night' | 'warehouse' | 'forest' | 'apartment' | 'park' | 'lobby' }
-                )}
-                ground={env.groundEnabled ? {
-                  height: env.groundHeight,
-                  radius: env.groundRadius,
-                } : undefined}
-              />
-            )}
-            {!templateUrl && config.modelPath && (
-              <StudioEffectModelWrapper
-                modelPath={config.modelPath}
-                artworkUrl={artworkUrl || DEFAULT_ARTWORK}
-                designState={designState}
-                face={config.face}
-                back={config.back}
-                frame={config.frame}
-                scene={{
-                  ...config.scene,
-                  ambientColor,
-                }}
-                onReady={handleModelReady}
-              />
-            )}
-          </Suspense>
-
-          <OrbitControls
-            ref={orbitControlsRef}
-            makeDefault
-            target={[0, 0, 0]}
-            enableDamping={cam?.enableDamping ?? true}
-            dampingFactor={cam?.dampingFactor ?? 0.1}
-            autoRotate={cam?.autoRotate ?? false}
-            autoRotateSpeed={cam?.autoRotateSpeed ?? 2}
-            mouseButtons={{
-              LEFT: THREE.MOUSE.ROTATE,
-              MIDDLE: THREE.MOUSE.PAN,
-              RIGHT: THREE.MOUSE.ROTATE,
-            }}
-            enabled={!isEditing}
-          />
-          <ViewportNavigationController
-            orbitControlsRef={orbitControlsRef}
-            enabled={!isEditing}
-          />
-          <EditorViewportOverlay
-            selectedResourceIds={selectedResourceIds}
-            resolveObjectById={resolveObjectById}
-            resolveIdByObject={resolveIdByObject}
-            onSelectResourceId={onSelectResourceId}
-            onTransformCommit={onTransformCommit}
-            onSceneChange={onSceneChange}
-            orbitControlsRef={orbitControlsRef}
-            transformMode={transformMode}
-            transformSpace={transformSpace}
-            snapSettings={transformSnapSettings}
-            showGizmoHelper={showGizmoHelper}
-            enableTransformControls={enableTransformControls}
-          />
-          <RenderModeController
-            renderPass={renderPass}
-            wireframeEnabled={wireframeEnabled}
-            resolveIdByObject={resolveIdByObject}
-          />
-          <CameraCommandController
-            cameraCommand={cameraCommand}
-            selectedResourceIds={selectedResourceIds}
-            resolveObjectById={resolveObjectById}
-            resolveIdByObject={resolveIdByObject}
-            orbitControlsRef={orbitControlsRef}
-            fallbackPerspectivePosition={cameraPosition}
-          />
-        </Canvas>
-      </div>
+      <EffectViewer
+        config={config}
+        artworkUrl={artworkUrl || DEFAULT_ARTWORK}
+        designState={designState}
+        isEditing={isEditing}
+        onCreated={handleCreated}
+        orbitControlsRef={orbitControlsRef}
+      >
+        {/* Bridge connector — discovers model root for bridge wiring */}
+        <ModelBridgeConnector onReady={handleModelReady} />
+        {/* Studio-specific OrbitControls customization */}
+        <OrbitControlsOverride orbitControlsRef={orbitControlsRef} />
+        {/* Studio controls — injected into EffectViewer's Canvas */}
+        <ViewportGridHelper
+          visible={gridSettings.enabled}
+          size={gridSize}
+          divisions={gridSettings.divisions}
+        />
+        <ViewportNavigationController
+          orbitControlsRef={orbitControlsRef}
+          enabled={!isEditing}
+        />
+        <EditorViewportOverlay
+          selectedResourceIds={selectedResourceIds}
+          resolveObjectById={resolveObjectById}
+          resolveIdByObject={resolveIdByObject}
+          onSelectResourceId={onSelectResourceId}
+          onTransformCommit={onTransformCommit}
+          onSceneChange={onSceneChange}
+          orbitControlsRef={orbitControlsRef}
+          transformMode={transformMode}
+          transformSpace={transformSpace}
+          snapSettings={transformSnapSettings}
+          showGizmoHelper={showGizmoHelper}
+          enableTransformControls={enableTransformControls}
+        />
+        <RenderModeController
+          renderPass={renderPass}
+          wireframeEnabled={wireframeEnabled}
+          resolveIdByObject={resolveIdByObject}
+        />
+        <CameraCommandController
+          cameraCommand={cameraCommand}
+          selectedResourceIds={selectedResourceIds}
+          resolveObjectById={resolveObjectById}
+          resolveIdByObject={resolveIdByObject}
+          orbitControlsRef={orbitControlsRef}
+          fallbackPerspectivePosition={cameraPosition}
+        />
+      </EffectViewer>
     </ViewportErrorBoundary>
   )
 }

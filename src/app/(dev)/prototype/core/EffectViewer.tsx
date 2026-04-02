@@ -1,20 +1,34 @@
 // Core EffectViewer — pure Canvas wrapper, no Leva, no store
 // Receives all config as typed props. Both Studio and Create use this.
+// Studio wraps this via children + onCreated for composability.
 
-import { Canvas } from '@react-three/fiber'
+import { Canvas, type RootState } from '@react-three/fiber'
 import { OrbitControls, Environment, useGLTF } from '@react-three/drei'
-import { Suspense, useMemo } from 'react'
+import React, { Suspense, useMemo } from 'react'
 import * as THREE from 'three'
 import EffectModel from './EffectModel'
 import type { ViewerConfig, DesignState } from '../types'
 
 const DEFAULT_ARTWORK = '/assets/test-artwork.png'
 
+// Bridge interface — what Studio gets from onCreated to wire the bridge
+export interface EffectViewerBridge {
+  scene: THREE.Scene
+  camera: THREE.Camera
+  renderer: THREE.WebGLRenderer
+}
+
 interface EffectViewerProps {
   config: ViewerConfig
   artworkUrl?: string
   designState: DesignState
   isEditing: boolean
+  /** Studio injects controls (grid, gizmo, selection overlay) as children inside the Canvas */
+  children?: React.ReactNode
+  /** Fires after Canvas + WebGLRenderer are created. Studio uses this to wire the bridge. */
+  onCreated?: (bridge: EffectViewerBridge) => void
+  /** Studio passes this to control OrbitControls externally (camera commands, navigation). */
+  orbitControlsRef?: React.RefObject<React.ComponentRef<typeof OrbitControls> | null>
 }
 
 export default function EffectViewer({
@@ -22,6 +36,9 @@ export default function EffectViewer({
   artworkUrl,
   designState,
   isEditing,
+  children,
+  onCreated,
+  orbitControlsRef,
 }: EffectViewerProps) {
   // Preload the model
   useGLTF.preload(config.modelPath)
@@ -49,6 +66,14 @@ export default function EffectViewer({
     return new THREE.Euler(0, rad, 0)
   }, [env])
 
+  const handleCreated = (state: RootState) => {
+    onCreated?.({
+      scene: state.scene,
+      camera: state.camera,
+      renderer: state.gl,
+    })
+  }
+
   return (
     <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: config.colors.bgColor }}>
       <Canvas
@@ -65,6 +90,7 @@ export default function EffectViewer({
           near: 0.001,
           far: 100,
         }}
+        onCreated={handleCreated}
       >
         <Suspense fallback={null}>
           <Environment
@@ -91,6 +117,8 @@ export default function EffectViewer({
         </Suspense>
 
         <OrbitControls
+          ref={orbitControlsRef}
+          makeDefault
           target={[0, 0, 0]}
           enableDamping={cam?.enableDamping ?? true}
           dampingFactor={cam?.dampingFactor ?? 0.1}
@@ -98,6 +126,8 @@ export default function EffectViewer({
           autoRotateSpeed={cam?.autoRotateSpeed ?? 2}
           enabled={!isEditing}
         />
+
+        {children}
       </Canvas>
     </div>
   )
