@@ -2,14 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import * as THREE from 'three';
 
-import EffectViewer, {
+import StudioViewport, {
     type EffectViewerBridge,
     type EffectViewerTransformSnapshot,
     type ViewerCameraCommand,
     type ViewerCameraPreset,
     type ViewerGridSettings,
     type ViewerRenderPass
-} from '../../../../src/app/(dev)/prototype/core/EffectViewer';
+} from './StudioViewport';
 import type { DesignState, ViewerConfig } from '../../../../src/app/(dev)/prototype/types';
 
 import { createObserverR3FBridge } from '../adapter/observer-r3f-bridge';
@@ -219,7 +219,7 @@ function BridgeViewportApp({
     }, [bridge, onContextReady]);
 
     return (
-        <EffectViewer
+        <StudioViewport
             config={viewerConfig}
             artworkUrl={DEFAULT_ARTWORK_URL}
             designState={DEFAULT_DESIGN_STATE}
