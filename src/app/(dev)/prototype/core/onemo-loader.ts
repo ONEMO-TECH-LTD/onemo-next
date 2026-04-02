@@ -135,6 +135,8 @@ function studioJsonToViewerConfig(studioJson: OnemoStudioJson, modelBlobUrl: str
         materialRoles: studioJson.product.materialRoles.map((role) => ({
             role: role.role,
             meshNames: [...role.meshNames],
+            defaults: role.defaults ? { ...role.defaults } : undefined,
+            textures: role.textures ? { ...role.textures } : undefined,
             configurable: role.configurable,
             configurableProperties: role.configurableProperties ? [...role.configurableProperties] : undefined,
         })),

@@ -2,7 +2,7 @@
 // Receives all config as typed props. Both Studio and Create use this.
 
 import { useMemo, useEffect, useRef } from 'react'
-import { useGLTF, useTexture, Center } from '@react-three/drei'
+import { useGLTF, Center } from '@react-three/drei'
 import * as THREE from 'three'
 import type {
   DesignState,
@@ -10,6 +10,7 @@ import type {
   BackMaterial,
   FrameMaterial,
   SceneSettings,
+  ViewerMaterialRole,
   ViewerProductConfig,
 } from '../types'
 
@@ -53,6 +54,129 @@ function matchesMeshName(meshName: string, patterns: string[]) {
   })
 }
 
+function ensureUvAttribute(geometry: THREE.BufferGeometry) {
+  const uv = geometry.getAttribute('uv')
+  if (uv && uv.count === geometry.getAttribute('position').count) {
+    return
+  }
+
+  const posAttr = geometry.getAttribute('position')
+  const count = posAttr.count
+  let xMin = Infinity
+  let xMax = -Infinity
+  let yMin = Infinity
+  let yMax = -Infinity
+
+  for (let i = 0; i < count; i++) {
+    const x = posAttr.getX(i)
+    const y = posAttr.getY(i)
+    if (x < xMin) xMin = x
+    if (x > xMax) xMax = x
+    if (y < yMin) yMin = y
+    if (y > yMax) yMax = y
+  }
+
+  const xRange = xMax - xMin || 1
+  const yRange = yMax - yMin || 1
+  const uvs = new Float32Array(count * 2)
+
+  for (let i = 0; i < count; i++) {
+    uvs[i * 2] = (posAttr.getX(i) - xMin) / xRange
+    uvs[i * 2 + 1] = (posAttr.getY(i) - yMin) / yRange
+  }
+
+  geometry.deleteAttribute('uv')
+  geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
+}
+
+function forcePlanarUvAttribute(geometry: THREE.BufferGeometry) {
+  const posAttr = geometry.getAttribute('position')
+  const count = posAttr.count
+  let xMin = Infinity
+  let xMax = -Infinity
+  let yMin = Infinity
+  let yMax = -Infinity
+
+  for (let i = 0; i < count; i++) {
+    const x = posAttr.getX(i)
+    const y = posAttr.getY(i)
+    if (x < xMin) xMin = x
+    if (x > xMax) xMax = x
+    if (y < yMin) yMin = y
+    if (y > yMax) yMax = y
+  }
+
+  const xRange = xMax - xMin || 1
+  const yRange = yMax - yMin || 1
+  const uvs = new Float32Array(count * 2)
+
+  for (let i = 0; i < count; i++) {
+    uvs[i * 2] = (posAttr.getX(i) - xMin) / xRange
+    uvs[i * 2 + 1] = (posAttr.getY(i) - yMin) / yRange
+  }
+
+  geometry.deleteAttribute('uv')
+  geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
+}
+
+function loadOptionalTexture(
+  url: string | undefined,
+  {
+    color = false,
+    repeat = false,
+  }: { color?: boolean; repeat?: boolean } = {}
+) {
+  if (!url) {
+    return null
+  }
+
+  const texture = new THREE.TextureLoader().load(url)
+  texture.colorSpace = color ? THREE.SRGBColorSpace : THREE.NoColorSpace
+  texture.wrapS = texture.wrapT = repeat ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping
+  texture.needsUpdate = true
+  return texture
+}
+
+function createRoleMaterial(role: ViewerMaterialRole, artworkMap: THREE.Texture | null) {
+  const defaults = role.defaults ?? {}
+  const textures = role.textures ?? {}
+  const usesArtwork = !!artworkMap
+
+  const colorMultiplier = Number(defaults.colorMultiplier ?? 1)
+  const baseColor = usesArtwork
+    ? new THREE.Color(colorMultiplier, colorMultiplier, colorMultiplier)
+    : new THREE.Color(defaults.color ?? '#ffffff')
+
+  const normalMap = loadOptionalTexture(textures.normalMap, { color: false })
+  const roughnessMap = loadOptionalTexture(textures.roughnessMap, { color: false })
+  const bumpMap = loadOptionalTexture(textures.bumpMap, { color: false })
+  const diffuseMap = usesArtwork
+    ? artworkMap
+    : loadOptionalTexture(textures.map, { color: true })
+
+  return new THREE.MeshPhysicalMaterial({
+    map: diffuseMap,
+    color: baseColor,
+    normalMap,
+    normalScale: new THREE.Vector2(
+      Number(defaults.normalScale ?? 1),
+      Number(defaults.normalScale ?? 1)
+    ),
+    bumpMap,
+    bumpScale: Number(defaults.bumpScale ?? 1),
+    roughnessMap,
+    roughness: Number(defaults.roughness ?? 1),
+    metalness: Number(defaults.metalness ?? 0),
+    sheen: Number(defaults.sheen ?? 0),
+    sheenColor: new THREE.Color(defaults.sheenColor ?? '#000000'),
+    sheenRoughness: Number(defaults.sheenRoughness ?? 1),
+    envMapIntensity: Number(defaults.envMapIntensity ?? 1),
+    clearcoat: Number(defaults.clearcoat ?? 0),
+    clearcoatRoughness: Number(defaults.clearcoatRoughness ?? 0),
+    side: THREE.DoubleSide,
+  })
+}
+
 export default function EffectModel({
   modelPath,
   artworkUrl,
@@ -65,28 +189,8 @@ export default function EffectModel({
   onModelReady,
 }: EffectModelProps) {
   const { scene } = useGLTF(modelPath)
-  const faceMeshRef = useRef<THREE.Mesh | null>(null)
+  const artworkMeshRef = useRef<THREE.Mesh | null>(null)
   const artworkTexRef = useRef<THREE.Texture | null>(null)
-
-  // Load face textures
-  const [faceNormal, faceRoughnessTex, faceHeight] = useTexture([
-    face.textures.normal,
-    face.textures.roughness,
-    face.textures.height,
-  ])
-  ;[faceNormal, faceRoughnessTex, faceHeight].forEach((tex) => {
-    tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping
-  })
-
-  // Load back textures (may differ from face)
-  const [backNormal, backRoughnessTex, backHeight] = useTexture([
-    back.textures.normal,
-    back.textures.roughness,
-    back.textures.height,
-  ])
-  ;[backNormal, backRoughnessTex, backHeight].forEach((tex) => {
-    tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping
-  })
 
   // Load artwork texture dynamically
   const artworkMap = useMemo(() => {
@@ -95,8 +199,8 @@ export default function EffectModel({
       loaded.wrapS = loaded.wrapT = THREE.RepeatWrapping
       loaded.needsUpdate = true
       artworkTexRef.current = loaded
-      if (faceMeshRef.current) {
-        const mat = faceMeshRef.current.material as THREE.MeshPhysicalMaterial
+      if (artworkMeshRef.current) {
+        const mat = artworkMeshRef.current.material as THREE.MeshPhysicalMaterial
         mat.map = loaded
         mat.needsUpdate = true
       }
@@ -121,149 +225,123 @@ export default function EffectModel({
     tex.needsUpdate = true
   }, [designState, artworkMap])
 
-  // FACE material — uses face-specific textures
-  const fp = face.params
-  const faceMaterial = useMemo(() => {
-    return new THREE.MeshPhysicalMaterial({
-      map: artworkMap,
-      color: new THREE.Color(fp.colorMultiplier, fp.colorMultiplier, fp.colorMultiplier),
-      normalMap: faceNormal,
-      normalScale: new THREE.Vector2(fp.normalScale, fp.normalScale),
-      bumpMap: faceHeight,
-      bumpScale: fp.bumpScale,
-      roughnessMap: faceRoughnessTex,
-      roughness: fp.roughness,
-      metalness: fp.metalness,
-      sheen: fp.sheen,
-      sheenColor: new THREE.Color(fp.sheenColor),
-      sheenRoughness: fp.sheenRoughness,
-      envMapIntensity: fp.envMapIntensity,
-      side: THREE.DoubleSide,
-    })
-  }, [artworkMap, faceNormal, faceHeight, faceRoughnessTex, fp])
-
-  // FRAME material
-  const frp = frame.params
-  const frameMaterial = useMemo(
-    () =>
-      new THREE.MeshPhysicalMaterial({
-        color: new THREE.Color(frp.color),
-        roughness: frp.roughness,
-        metalness: frp.metalness,
-        clearcoat: frp.clearcoat,
-        clearcoatRoughness: frp.clearcoatRoughness,
-        side: THREE.DoubleSide,
-      }),
-    [frp]
-  )
-
-  // BACK material — uses back-specific textures
-  const bp = back.params
-  const backMaterial = useMemo(
-    () =>
-      new THREE.MeshPhysicalMaterial({
-        color: new THREE.Color(bp.color),
-        normalMap: backNormal,
-        normalScale: new THREE.Vector2(bp.normalScale, bp.normalScale),
-        bumpMap: backHeight,
-        bumpScale: bp.bumpScale,
-        roughnessMap: backRoughnessTex,
-        roughness: bp.roughness,
-        metalness: 0,
-        sheen: bp.sheen,
-        sheenColor: new THREE.Color(bp.sheenColor),
-        sheenRoughness: bp.sheenRoughness,
-        envMapIntensity: bp.envMapIntensity,
-        side: THREE.DoubleSide,
-      }),
-    [backNormal, backHeight, backRoughnessTex, bp]
-  )
-
-  const roleMeshNames = useMemo(() => {
-    const faceRole = product?.materialRoles.find((role) => role.role === 'face')
-    const backRole = product?.materialRoles.find((role) => role.role === 'back')
-    const frameRole = product?.materialRoles.find((role) => role.role === 'frame')
-
-    return {
-      face: faceRole?.meshNames ?? ['PRINT_SURFACE_FRONT', 'Face', 'face'],
-      back: backRole?.meshNames ?? ['BACK', 'Back', 'back'],
-      frame: frameRole?.meshNames ?? ['FRAME', 'Frame', 'frame'],
-      artwork: product?.artworkSlot?.meshName
-        ? [product.artworkSlot.meshName]
-        : faceRole?.meshNames ?? ['PRINT_SURFACE_FRONT', 'Face', 'face'],
+  const roleEntries = useMemo<ViewerMaterialRole[]>(() => {
+    if (product?.materialRoles?.length) {
+      return product.materialRoles
     }
-  }, [product])
+
+    return [
+      {
+        role: 'face',
+        meshNames: ['PRINT_SURFACE_FRONT', 'Face', 'face'],
+        defaults: {
+          color: face.params.color ?? '#ffffff',
+          colorMultiplier: face.params.colorMultiplier,
+          roughness: face.params.roughness,
+          metalness: face.params.metalness,
+          envMapIntensity: face.params.envMapIntensity,
+          normalScale: face.params.normalScale,
+          bumpScale: face.params.bumpScale,
+          sheen: face.params.sheen,
+          sheenColor: face.params.sheenColor,
+          sheenRoughness: face.params.sheenRoughness,
+        },
+        textures: {
+          normalMap: face.textures.normal,
+          roughnessMap: face.textures.roughness,
+          bumpMap: face.textures.height,
+        },
+        configurable: true,
+        configurableProperties: ['color', 'artwork'],
+      },
+      {
+        role: 'back',
+        meshNames: ['BACK', 'Back', 'back'],
+        defaults: {
+          color: back.params.color,
+          roughness: back.params.roughness,
+          envMapIntensity: back.params.envMapIntensity,
+          normalScale: back.params.normalScale,
+          bumpScale: back.params.bumpScale,
+          sheen: back.params.sheen,
+          sheenColor: back.params.sheenColor,
+          sheenRoughness: back.params.sheenRoughness,
+        },
+        textures: {
+          normalMap: back.textures.normal,
+          roughnessMap: back.textures.roughness,
+          bumpMap: back.textures.height,
+        },
+        configurable: true,
+        configurableProperties: ['color'],
+      },
+      {
+        role: 'frame',
+        meshNames: ['FRAME', 'Frame', 'frame'],
+        defaults: {
+          color: frame.params.color,
+          roughness: frame.params.roughness,
+          metalness: frame.params.metalness,
+          clearcoat: frame.params.clearcoat,
+          clearcoatRoughness: frame.params.clearcoatRoughness,
+        },
+        configurable: true,
+        configurableProperties: ['color'],
+      },
+    ]
+  }, [back, face, frame, product])
+
+  const artworkMeshPatterns = useMemo(() => {
+    if (product?.artworkSlot?.meshName) {
+      return [product.artworkSlot.meshName]
+    }
+    const fallbackFaceRole = roleEntries.find((role) => role.role === 'face')
+    return fallbackFaceRole?.meshNames ?? []
+  }, [product, roleEntries])
+
+  const roleMaterials = useMemo(() => {
+    const materials = new Map<string, THREE.MeshPhysicalMaterial>()
+
+    roleEntries.forEach((role) => {
+      const usesArtwork = product?.artworkSlot?.role === role.role
+      materials.set(role.role, createRoleMaterial(role, usesArtwork ? artworkMap : null))
+    })
+
+    return materials
+  }, [artworkMap, product, roleEntries])
 
   // Override materials and generate planar UVs
   useMemo(() => {
     scene.traverse((child) => {
       if (child instanceof THREE.Mesh) {
-        if (matchesMeshName(child.name, roleMeshNames.face)) {
-            child.material = faceMaterial
-            if (matchesMeshName(child.name, roleMeshNames.artwork)) {
-              faceMeshRef.current = child
-            }
+        const matchedRole = roleEntries.find((role) => matchesMeshName(child.name, role.meshNames))
+        if (matchedRole) {
+          const isArtworkRole = product?.artworkSlot?.role === matchedRole.role
+          const shouldApplyRole =
+            !isArtworkRole || matchesMeshName(child.name, artworkMeshPatterns)
 
-            const geo = child.geometry
-            const posAttr = geo.getAttribute('position')
-            const count = posAttr.count
+          if (!shouldApplyRole) {
+            return
+          }
 
-            let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity
-            for (let i = 0; i < count; i++) {
-              const x = posAttr.getX(i)
-              const y = posAttr.getY(i)
-              if (x < xMin) xMin = x
-              if (x > xMax) xMax = x
-              if (y < yMin) yMin = y
-              if (y > yMax) yMax = y
-            }
+          const material = roleMaterials.get(matchedRole.role)
+          if (material) {
+            child.material = material
+          }
 
-            const xRange = xMax - xMin
-            const yRange = yMax - yMin
-            const uvs = new Float32Array(count * 2)
-            for (let i = 0; i < count; i++) {
-              uvs[i * 2] = (posAttr.getX(i) - xMin) / xRange
-              uvs[i * 2 + 1] = (posAttr.getY(i) - yMin) / yRange
-            }
-
-            geo.deleteAttribute('uv')
-            geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
-        } else if (matchesMeshName(child.name, roleMeshNames.back)) {
-            child.material = backMaterial
-
-            const backGeo = child.geometry
-            const backPos = backGeo.getAttribute('position')
-            const backCount = backPos.count
-
-            let bxMin = Infinity, bxMax = -Infinity, byMin = Infinity, byMax = -Infinity
-            for (let i = 0; i < backCount; i++) {
-              const x = backPos.getX(i)
-              const y = backPos.getY(i)
-              if (x < bxMin) bxMin = x
-              if (x > bxMax) bxMax = x
-              if (y < byMin) byMin = y
-              if (y > byMax) byMax = y
-            }
-
-            const bxRange = bxMax - bxMin
-            const byRange = byMax - byMin
-            const backUvs = new Float32Array(backCount * 2)
-            for (let i = 0; i < backCount; i++) {
-              backUvs[i * 2] = (backPos.getX(i) - bxMin) / bxRange
-              backUvs[i * 2 + 1] = (backPos.getY(i) - byMin) / byRange
-            }
-
-            backGeo.deleteAttribute('uv')
-            backGeo.setAttribute('uv', new THREE.BufferAttribute(backUvs, 2))
-        } else if (matchesMeshName(child.name, roleMeshNames.frame)) {
-          child.material = frameMaterial
+          if (matchesMeshName(child.name, artworkMeshPatterns)) {
+            artworkMeshRef.current = child
+            forcePlanarUvAttribute(child.geometry)
+          } else {
+            ensureUvAttribute(child.geometry)
+          }
         }
       }
-      if (child.name === 'NEW LIGHTS' || child instanceof THREE.Light) {
+      if (child.name === 'NEW LIGHTS') {
         child.visible = false
       }
     })
-  }, [scene, faceMaterial, backMaterial, frameMaterial, roleMeshNames])
+  }, [artworkMeshPatterns, roleEntries, roleMaterials, scene])
 
   useEffect(() => {
     onModelReady?.({
@@ -273,8 +351,8 @@ export default function EffectModel({
   }, [onModelReady, scene])
 
   useEffect(() => {
-    if (faceMeshRef.current) {
-      const mat = faceMeshRef.current.material as THREE.MeshPhysicalMaterial
+    if (artworkMeshRef.current) {
+      const mat = artworkMeshRef.current.material as THREE.MeshPhysicalMaterial
       mat.map = artworkMap
       mat.needsUpdate = true
     }
