@@ -1,4 +1,5 @@
 import type { EventHandle, Observer } from '@playcanvas/observer';
+import JSZip from 'jszip';
 import * as THREE from 'three';
 
 import { config } from '@/editor/config';
@@ -396,6 +397,7 @@ export class ObserverR3FBridge {
     private environmentObjectUrl: string | null = null;
 
     private sceneSettingsSeeded = false;
+    private loadedModelBlobUrl: string | null = null;
 
     constructor(configData: ViewerConfig) {
         this.config = configData;
@@ -596,6 +598,10 @@ export class ObserverR3FBridge {
         this.editorEvents.forEach(event => event.unbind());
         this.editorEvents.length = 0;
         this.viewportHiddenIds.clear();
+        if (this.loadedModelBlobUrl) {
+            URL.revokeObjectURL(this.loadedModelBlobUrl);
+            this.loadedModelBlobUrl = null;
+        }
     }
 
     getObjectById(resourceId: string) {
@@ -793,13 +799,30 @@ export class ObserverR3FBridge {
             }
         }
 
+        // Deserialize the .onemo — applies renderer settings (tonemapping, exposure, shadows)
+        // directly to the WebGLRenderer and parses the studio.json.
         const result = await deserializeOnemo(blob, this.context.renderer);
-        this.context.scene.clear();
-        applyOnemoSceneState(this.context.scene, result.scene);
-        this.context.scene.add(result.scene);
-        this.context.modelRoot = result.scene;
-        this.context.materialSlots = collectMaterialSlots(result.scene);
-        this.context.keyLight = null;
+
+        // Extract the GLB as a blob URL so EffectModel can load it via useGLTF.
+        // This preserves the golden EffectModel rendering path — same lighting,
+        // same material application, same visual output as the prototype.
+        const zipData = await JSZip.loadAsync(await blob.arrayBuffer());
+        const glbFile = zipData.file('scene.glb');
+        const glbBlob = glbFile
+            ? new Blob([await glbFile.async('arraybuffer')], { type: 'model/gltf-binary' })
+            : null;
+
+        // Revoke previous blob URL if any
+        if (this.loadedModelBlobUrl) {
+            URL.revokeObjectURL(this.loadedModelBlobUrl);
+            this.loadedModelBlobUrl = null;
+        }
+
+        const modelBlobUrl = glbBlob ? URL.createObjectURL(glbBlob) : '';
+
+        if (modelBlobUrl) {
+            this.loadedModelBlobUrl = modelBlobUrl;
+        }
 
         this.setEnvironmentBuffer(result.environmentHdr, result.studioJson.environment.file ?? 'environment.hdr');
 
@@ -831,8 +854,11 @@ export class ObserverR3FBridge {
             groundRadius: result.studioJson.environment.ground.radius
         };
 
+        // Update the viewer config — EffectModel re-renders via React with the
+        // golden scene settings. The model loads from the blob URL through the
+        // same useGLTF path as the prototype, ensuring visual parity.
         this.updateViewerConfig((configData) => {
-            configData.modelPath = '';
+            configData.modelPath = modelBlobUrl;
             configData.scene.exposure = result.studioJson.renderer.toneMappingExposure;
             configData.scene.ambientColor = rgbTupleToHex(result.studioJson.scene.ambientColor);
             configData.scene.envIntensity = result.studioJson.environment.intensity;
@@ -1179,6 +1205,7 @@ export class ObserverR3FBridge {
 
         const sceneSettings = editor.call('sceneSettings') as Observer | null;
         this.bindSceneSettingsObserver(sceneSettings);
+        this.syncSceneSettingsObserverFromContext(sceneSettings);
         this.applySceneSettingsObserverToContext(sceneSettings);
         this.syncObserversFromScene();
         this.sceneDirty = false;
