@@ -1,0 +1,107 @@
+{
+  "_meta": {
+    "name": "ONEMO Effect 70mm — Golden Prototype Scene",
+    "description": "Original clean prototype scene recovered from commit c0aacab (PR #110, 2026-03-24). This is the immutable baseline — never modify this file. Use the studio/ working copy for experiments.",
+    "source": "git show c0aacab:scenes/default.json + AdminViewer.tsx camera/env Leva defaults from 83e911b (PR #111)",
+    "recovered": "2026-04-02T01:00Z",
+    "model": "/assets/shapes/effect-70mm-step.glb"
+  },
+  "renderer": {
+    "toneMapping": "NeutralToneMapping",
+    "toneMappingValue": 7,
+    "exposure": 0.7,
+    "outputColorSpace": "srgb",
+    "antialias": true,
+    "dpr": [1, 2]
+  },
+  "camera": {
+    "fov": 35,
+    "position": [0, 0, 0.2],
+    "target": [0, 0, 0],
+    "near": 0.001,
+    "far": 100,
+    "polarAngle": 90,
+    "azimuthAngle": 0,
+    "enableDamping": true,
+    "dampingFactor": 0.1,
+    "autoRotate": false,
+    "autoRotateSpeed": 2
+  },
+  "environment": {
+    "preset": "studio",
+    "intensity": 1.0,
+    "rotation": 0,
+    "ground": {
+      "enabled": false,
+      "height": 0,
+      "radius": 20
+    }
+  },
+  "scene": {
+    "exposure": 0.7,
+    "ambientIntensity": 0.5,
+    "envIntensity": 1.0,
+    "background": "#ffffff"
+  },
+  "colors": {
+    "backColor": "#080808",
+    "frameColor": "#0f0f0f",
+    "bgColor": "#ffffff"
+  },
+  "materials": {
+    "face": {
+      "type": "MeshPhysicalMaterial",
+      "role": "face",
+      "meshNames": ["PRINT_SURFACE_FRONT", "Face", "face"],
+      "params": {
+        "roughness": 1.0,
+        "metalness": 0,
+        "envMapIntensity": 0.1,
+        "normalScale": 0.15,
+        "bumpScale": 1.0,
+        "sheen": 1.0,
+        "sheenColor": "#1a1a1a",
+        "sheenRoughness": 0.8,
+        "colorMultiplier": 1.0
+      },
+      "textures": {
+        "normalMap": "/assets/materials/ultrasuede/suede-normal.png",
+        "roughnessMap": "/assets/materials/ultrasuede/suede-roughness.jpg",
+        "bumpMap": "/assets/materials/ultrasuede/suede-height.png"
+      },
+      "configurable": true
+    },
+    "back": {
+      "type": "MeshPhysicalMaterial",
+      "role": "back",
+      "meshNames": ["Back", "back"],
+      "params": {
+        "color": "#080808",
+        "roughness": 1.0,
+        "envMapIntensity": 0.1,
+        "normalScale": 0.15,
+        "bumpScale": 1.0,
+        "sheen": 1.0,
+        "sheenColor": "#1a1a1a",
+        "sheenRoughness": 0.8
+      },
+      "textures": {
+        "normalMap": "/assets/materials/ultrasuede/suede-normal.png",
+        "roughnessMap": "/assets/materials/ultrasuede/suede-roughness.jpg",
+        "bumpMap": "/assets/materials/ultrasuede/suede-height.png"
+      }
+    },
+    "frame": {
+      "type": "MeshPhysicalMaterial",
+      "role": "frame",
+      "meshNames": ["Frame", "frame"],
+      "params": {
+        "color": "#0f0f0f",
+        "roughness": 0.5,
+        "metalness": 0,
+        "clearcoat": 0.4,
+        "clearcoatRoughness": 0.3
+      }
+    }
+  }
+}

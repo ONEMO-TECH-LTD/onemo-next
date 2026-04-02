@@ -51,7 +51,7 @@ interface SceneStore {
 const DEFAULT_COLORS: ColorConfig = {
   backColor: '#080808',
   frameColor: '#0f0f0f',
-  bgColor: '#111315',
+  bgColor: '#ffffff',
 }
 
 export const useSceneStore = create<SceneStore>((set, get) => ({
@@ -94,7 +94,7 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
       modified: now,
       modelPath: '/assets/shapes/effect-70mm-step.glb',
       face: {
-        params: { color: '#ffffff', roughness: 1, metalness: 0, envMapIntensity: 0.1, normalScale: 0.15, bumpScale: 1, sheen: 1, sheenColor: '#1a1a1a', sheenRoughness: 0.8, colorMultiplier: 1 },
+        params: { roughness: 1, metalness: 0, envMapIntensity: 0.1, normalScale: 0.15, bumpScale: 1, sheen: 1, sheenColor: '#1a1a1a', sheenRoughness: 0.8, colorMultiplier: 1 },
         textures: { ...DEFAULT_TEXTURES },
       },
       back: {
@@ -105,13 +105,7 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
         params: { color: s.colors.frameColor, roughness: 0.5, metalness: 0, clearcoat: 0.4, clearcoatRoughness: 0.3 },
         textures: {},
       },
-      scene: s._values['Scene'] || {
-        exposure: 0.7,
-        ambientColor: '#262626',
-        ambientIntensity: 0.5,
-        envIntensity: 1.0,
-        background: '#111315',
-      },
+      scene: s._values['Scene'] || { exposure: 0.7, ambientIntensity: 0.5, envIntensity: 1.0, background: '#ffffff' },
       colors: { ...s.colors },
     }
   },
