@@ -42,7 +42,6 @@ export interface FrameMaterialConfig {
 
 export interface SceneSettings {
   exposure: number
-  ambientColor?: string
   ambientIntensity: number
   envIntensity: number
   background: string
