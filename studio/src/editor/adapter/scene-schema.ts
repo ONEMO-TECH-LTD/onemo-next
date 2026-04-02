@@ -365,15 +365,14 @@ export const createDefaultViewerConfig = (): ViewerConfig => {
         },
         scene: {
             exposure: 0.7,
-            ambientColor: '#262626',
             ambientIntensity: 0.5,
             envIntensity: 1,
-            background: '#111315'
+            background: '#ffffff'
         },
         colors: {
             backColor: '#080808',
             frameColor: '#0f0f0f',
-            bgColor: '#111315'
+            bgColor: '#ffffff'
         },
         camera: {
             fov: 35,

@@ -1,16 +1,14 @@
-// AdminViewer — manages material state + Leva for camera/env
-// MaterialPanel handles per-part file pickers + sliders
-// Leva only used for Camera + Environment
+// AdminViewer — loads scene config from .onemo template file.
+// No hardcoded defaults. Everything flows from the .onemo file.
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSceneStore } from './sceneStore'
-import { useAssets } from './useAssets'
-import type {
-  DesignState, ViewerConfig, TexturePaths,
-  FaceMaterialConfig, BackMaterialConfig, FrameMaterialConfig,
-} from '../types'
+import { parseOnemoConfig, type ParsedOnemoConfig } from '../core/onemo-loader'
+import type { DesignState, ViewerConfig } from '../types'
+
+const TEMPLATE_URL = '/assets/templates/effect-70mm.onemo'
 
 export interface AssetProps {
   modelPath: string
@@ -27,85 +25,65 @@ interface AdminViewerProps {
   children: (config: ViewerConfig, assetProps: AssetProps, materialPanels: React.ReactNode) => React.ReactNode
 }
 
-const DEFAULT_TEXTURES: TexturePaths = {
-  normal: '/assets/materials/ultrasuede/suede-normal.png',
-  roughness: '/assets/materials/ultrasuede/suede-roughness.jpg',
-  height: '/assets/materials/ultrasuede/suede-height.png',
-}
-
-export default function AdminViewer(props: AdminViewerProps) {
-  const assets = useAssets()
-  if (!assets.loaded) {
-    return <AdminViewerInner {...props} assets={assets} key="loading" />
-  }
-  return <AdminViewerInner {...props} assets={assets} key="loaded" />
-}
-
-function AdminViewerInner({
+export default function AdminViewer({
   children,
-  assets,
-  artworkUrl,
-  onTextureChange,
-}: AdminViewerProps & { assets: ReturnType<typeof useAssets> }) {
+}: AdminViewerProps) {
   const colors = useSceneStore((s) => s.colors)
+  const setBgColor = useSceneStore((s) => s.setBgColor)
+  const [templateConfig, setTemplateConfig] = useState<ParsedOnemoConfig | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const blobUrlRef = useRef<string | null>(null)
 
-  // ─── Model + HDRI paths ───────────────────────────────────
-  const [modelPath, setModelPath] = useState(Object.values(assets.models)[0] || '/assets/shapes/effect-70mm-step.glb')
-  const [hdriPath, setHdriPath] = useState('studio')
+  // Load .onemo template on mount
+  useEffect(() => {
+    let cancelled = false
 
-  // ─── Face Material state ──────────────────────────────────
-  const [faceParams, setFaceParams] = useState<FaceMaterialConfig>({
-    color: '#ffffff',
-    roughness: 1.0, metalness: 0, envMapIntensity: 0.1, normalScale: 0.15,
-    bumpScale: 1.0, sheen: 1.0, sheenColor: '#1a1a1a', sheenRoughness: 0.8, colorMultiplier: 1.0,
-  })
-  const [faceTextures, setFaceTextures] = useState<TexturePaths>({ ...DEFAULT_TEXTURES })
+    parseOnemoConfig(TEMPLATE_URL).then((parsed) => {
+      if (cancelled) {
+        URL.revokeObjectURL(parsed.modelBlobUrl)
+        return
+      }
+      blobUrlRef.current = parsed.modelBlobUrl
+      setTemplateConfig(parsed)
+      // Sync bgColor to the store so the page background matches
+      setBgColor(parsed.config.colors.bgColor)
+    }).catch((err) => {
+      if (!cancelled) {
+        console.error('Failed to load .onemo template:', err)
+        setError(String(err))
+      }
+    })
 
-  // ─── Back Material state ──────────────────────────────────
-  const [backParams, setBackParams] = useState<BackMaterialConfig>({
-    color: colors.backColor, roughness: 1.0, envMapIntensity: 0.1, normalScale: 0.15,
-    bumpScale: 1.0, sheen: 1.0, sheenColor: '#1a1a1a', sheenRoughness: 0.8,
-  })
-  const [backTextures, setBackTextures] = useState<TexturePaths>({ ...DEFAULT_TEXTURES })
+    return () => {
+      cancelled = true
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current)
+      }
+    }
+  }, [setBgColor])
 
-  // ─── Frame Material state ─────────────────────────────────
-  const [frameParams, setFrameParams] = useState<FrameMaterialConfig>({
-    color: colors.frameColor, roughness: 0.5, metalness: 0, clearcoat: 0.4, clearcoatRoughness: 0.3,
-  })
-
-  // ─── Golden scene defaults (from original prototype c0aacab) ───
-  const cameraParams = {
-    fov: 35, distance: 0.2, polarAngle: 90, azimuthAngle: 0,
-    enableDamping: true, dampingFactor: 0.1, autoRotate: false, autoRotateSpeed: 2,
+  if (error) {
+    return <div style={{ color: 'red', padding: 20 }}>Failed to load scene template: {error}</div>
   }
-  const envParams = { envRotation: 0, groundEnabled: false, groundHeight: 0, groundRadius: 20 }
-  const sceneParams = { exposure: 0.7, ambientIntensity: 0.5, envIntensity: 1.0, background: '#ffffff' }
 
-  const isPreset = !hdriPath.startsWith('/assets/')
+  if (!templateConfig) {
+    return <div style={{ color: '#888', padding: 20 }}>Loading scene...</div>
+  }
 
-  // ─── Build config ─────────────────────────────────────────
+  // Override colors from the store (user can change colors via ColorPanel)
   const config: ViewerConfig = {
-    modelPath,
-    face: { params: faceParams, textures: faceTextures },
-    back: { params: backParams, textures: backTextures },
-    frame: { params: frameParams, textures: {} },
-    scene: sceneParams,
-    colors,
-    camera: cameraParams,
-    environment: {
-      preset: isPreset ? hdriPath : 'studio',
-      customHdri: isPreset ? undefined : hdriPath,
-      envRotation: envParams.envRotation,
-      groundEnabled: envParams.groundEnabled,
-      groundHeight: envParams.groundHeight,
-      groundRadius: envParams.groundRadius,
+    ...templateConfig.config,
+    colors: {
+      ...templateConfig.config.colors,
+      ...colors,
     },
   }
 
   const assetProps: AssetProps = {
-    modelPath, hdriPath,
-    onModelChange: setModelPath,
-    onHdriChange: setHdriPath,
+    modelPath: config.modelPath,
+    hdriPath: config.environment?.preset ?? 'studio',
+    onModelChange: () => {},
+    onHdriChange: () => {},
   }
 
   return <>{children(config, assetProps, null)}</>

@@ -235,7 +235,7 @@ export const DEFAULT_RENDERER_SETTINGS: OnemoRendererSettings = {
     toneMapping: 7, // NeutralToneMapping (THREE.NeutralToneMapping = 7)
     toneMappingExposure: 0.7,
     outputColorSpace: 'srgb',
-    shadowsEnabled: true,
+    shadowsEnabled: false,
     shadowType: 2 // PCFSoftShadowMap
 };
 
@@ -252,7 +252,7 @@ export const DEFAULT_ENVIRONMENT: OnemoEnvironmentSettings = {
 };
 
 export const DEFAULT_SCENE_SETTINGS: OnemoSceneSettings = {
-    backgroundColor: '#111315',
+    backgroundColor: '#ffffff',
     fog: 'none',
     fogColor: '#000000',
     fogNear: 1,

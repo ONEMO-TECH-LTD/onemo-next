@@ -467,6 +467,11 @@ export class ObserverR3FBridge {
 
         this.context = context;
         setBridgeAudioCamera(context.camera);
+        // Reset seeded flag so the observer re-syncs from the new context
+        // (fixes KAI-4285: stale observer on EffectViewer re-renders)
+        if (shouldRebuild) {
+            this.sceneSettingsSeeded = false;
+        }
         const sceneSettings = editor.call('sceneSettings') as Observer | null;
         this.bindSceneSettingsObserver(sceneSettings);
         this.syncSceneSettingsObserverFromContext(sceneSettings);
@@ -2745,9 +2750,17 @@ export class ObserverR3FBridge {
             environmentRotation?: THREE.Euler;
         };
         const ambientLight = findAmbientLight(scene);
-        const backgroundColor = scene.background instanceof THREE.Color
-            ? [scene.background.r, scene.background.g, scene.background.b]
-            : [...DEFAULT_SCENE_BACKGROUND_RGB] as [number, number, number];
+        // Use scene.background if set, otherwise derive from config.colors.bgColor
+        // (EffectViewer uses CSS background, not scene.background, so it's often null)
+        let backgroundColor: [number, number, number];
+        if (scene.background instanceof THREE.Color) {
+            backgroundColor = [scene.background.r, scene.background.g, scene.background.b];
+        } else if (this.config.colors.bgColor) {
+            const c = new THREE.Color(this.config.colors.bgColor);
+            backgroundColor = [c.r, c.g, c.b];
+        } else {
+            backgroundColor = [...DEFAULT_SCENE_BACKGROUND_RGB] as [number, number, number];
+        }
         const fogColor = scene.fog
             ? [scene.fog.color.r, scene.fog.color.g, scene.fog.color.b]
             : [...DEFAULT_FOG_COLOR_RGB] as [number, number, number];
@@ -2891,7 +2904,9 @@ export class ObserverR3FBridge {
             }
 
             if (backgroundColor) {
-                scene.background = backgroundColor;
+                // EffectViewer renders background via CSS div, NOT scene.background.
+                // Setting scene.background causes tone-mapping to darken the background.
+                // Only update config — EffectViewer's CSS handles the actual rendering.
                 const hex = `#${backgroundColor.getHexString()}`;
                 this.config.scene.background = hex;
                 this.config.colors.bgColor = hex;
@@ -2941,33 +2956,22 @@ export class ObserverR3FBridge {
         }
 
         if (path === 'render.global_ambient' || path === 'render.ambientIntensity') {
+            // EffectModel manages the ambient light via React — don't create or modify
+            // scene lights directly. Update config only; EffectViewer re-renders from it.
             const ambientColor = sceneSettings.get('render.global_ambient');
             const ambientIntensity = Number(sceneSettings.get('render.ambientIntensity') ?? DEFAULT_AMBIENT_INTENSITY);
-            let ambientLight = findAmbientLight(scene);
 
-            if (!ambientLight) {
-                ambientLight = new THREE.AmbientLight();
-                ambientLight.name = '__bridge_ambient_light__';
-                scene.add(ambientLight);
-            }
-
-            if (Array.isArray(ambientColor)) {
-                ambientLight.color.setRGB(
-                    Number(ambientColor[0] ?? ambientLight.color.r),
-                    Number(ambientColor[1] ?? ambientLight.color.g),
-                    Number(ambientColor[2] ?? ambientLight.color.b)
-                );
-            } else if (typeof ambientColor === 'string') {
-                ambientLight.color.set(ambientColor);
-            }
-
-            ambientLight.intensity = ambientIntensity;
             if (Array.isArray(ambientColor)) {
                 this.config.scene.ambientColor = rgbTupleToHex(ambientColor as number[]);
             } else if (typeof ambientColor === 'string') {
                 this.config.scene.ambientColor = ambientColor;
             }
             this.config.scene.ambientIntensity = ambientIntensity;
+
+            // Trigger EffectViewer re-render with updated ambient intensity
+            this.updateViewerConfig((configData) => {
+                configData.scene.ambientIntensity = ambientIntensity;
+            });
             this.sceneDirty = true;
             return;
         }

@@ -166,6 +166,10 @@ const normalizeMaterialOverrides = (value: unknown) => {
     return Object.keys(result).length > 0 ? result : undefined;
 };
 
+/** Public alias — prototype's onemo-loader reuses this normalization. */
+export const normalizeStudioJsonPublic = (value: unknown, fallbackEnvironmentFile: string | null): OnemoStudioJson =>
+    normalizeStudioJson(value, fallbackEnvironmentFile);
+
 const normalizeStudioJson = (value: unknown, fallbackEnvironmentFile: string | null): OnemoStudioJson => {
     const source = isRecord(value) ? value : {};
 

@@ -510,31 +510,50 @@ export function mountEffectViewer(viewportDom: HTMLElement, canvasDom: HTMLEleme
         await loadSceneByName(selected);
     };
 
+    const loadTemplateFile = async () => {
+        // Load the golden .onemo template — same file the prototype loads.
+        // This is the medium: both prototype and Studio read from the same .onemo.
+        const templateUrl = '/assets/templates/effect-70mm.onemo';
+        try {
+            const response = await fetch(templateUrl);
+            if (!response.ok) {
+                console.warn('[r3f-bridge] Template not found at', templateUrl);
+                return false;
+            }
+
+            const blob = await response.blob();
+            return await bridge.deserializeScene(blob);
+        } catch (error) {
+            console.error('[r3f-bridge] Failed to load template', error);
+            return false;
+        }
+    };
+
     const attemptAutoLoad = async () => {
         if (autoLoadAttempted) {
             return;
         }
 
         autoLoadAttempted = true;
-        const scenes = await fetchSceneList();
-        if (!scenes.length) {
-            return;
-        }
 
-        const preferred = getLastSceneName();
-        const fallback = scenes.includes('default') ? 'default' : null;
-        const initialScene = scenes.includes(preferred) ? preferred : fallback;
-        if (!initialScene) {
-            return;
-        }
-
+        // Try saved scenes first
         try {
-            await loadSceneByName(initialScene);
-        } catch {
-            if (fallback && fallback !== initialScene) {
-                await loadSceneByName(fallback);
+            const scenes = await fetchSceneList();
+            if (scenes.length) {
+                const preferred = getLastSceneName();
+                const fallback = scenes.includes('default') ? 'default' : null;
+                const initialScene = scenes.includes(preferred) ? preferred : fallback;
+                if (initialScene) {
+                    await loadSceneByName(initialScene);
+                    return;
+                }
             }
+        } catch {
+            // Fall through to template
         }
+
+        // No saved scenes — load the .onemo template (the medium between prototype and Studio)
+        await loadTemplateFile();
     };
 
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
