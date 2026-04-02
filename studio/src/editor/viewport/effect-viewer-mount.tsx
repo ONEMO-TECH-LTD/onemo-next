@@ -621,6 +621,7 @@ export function mountEffectViewer(viewportDom: HTMLElement, canvasDom: HTMLEleme
         bridgeConfig.colors = nextConfig.colors;
         bridgeConfig.camera = nextConfig.camera;
         bridgeConfig.environment = nextConfig.environment;
+        bridgeConfig.product = nextConfig.product;
     };
 
     const renderViewport = () => {

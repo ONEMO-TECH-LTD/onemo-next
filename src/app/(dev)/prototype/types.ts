@@ -112,6 +112,28 @@ export interface EnvironmentConfig {
 export interface ViewerMaterialRole {
   role: string
   meshNames: string[]
+  defaults?: {
+    color?: string
+    roughness?: number
+    metalness?: number
+    envMapIntensity?: number
+    normalScale?: number
+    bumpScale?: number
+    sheen?: number
+    sheenColor?: string
+    sheenRoughness?: number
+    clearcoat?: number
+    clearcoatRoughness?: number
+    colorMultiplier?: number
+  }
+  textures?: {
+    map?: string
+    normalMap?: string
+    roughnessMap?: string
+    bumpMap?: string
+    sheenColorMap?: string
+    [key: string]: string | undefined
+  }
   configurable: boolean
   configurableProperties?: string[]
 }

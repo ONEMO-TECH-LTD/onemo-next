@@ -68,7 +68,7 @@ import { applyZoneObserverChange } from './zone-mapper';
 // Monorepo coupling: imports shared types from the prototype viewer.
 // TODO: Extract to a shared types package when the editor is packaged independently.
 import type { EffectViewerBridge } from '../../../../src/app/(dev)/prototype/core/EffectViewer';
-import type { ViewerConfig } from '../../../../src/app/(dev)/prototype/types';
+import type { ViewerConfig, ViewerMaterialRole } from '../../../../src/app/(dev)/prototype/types';
 import { CameraComponentInspector } from '../inspector/components/camera';
 import { LightComponentInspector } from '../inspector/components/light';
 import { RenderComponentInspector } from '../inspector/components/render';
@@ -78,7 +78,7 @@ type BridgeMaterialRecord = {
     assetId: number;
     material: THREE.Material;
     name: string;
-    role: 'face' | 'back' | 'frame' | 'generic';
+    role: string;
 };
 
 type SceneSnapshot = {
@@ -138,6 +138,33 @@ const arraysEqual = (a: number[] = [], b: number[] = []) => {
     }
 
     return true;
+};
+
+const slugifyRole = (value: string) => {
+    return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'material-role';
+};
+
+const matchesMeshName = (meshName: string, patterns: string[] = []) => {
+    const normalizedMeshName = meshName.trim().toLowerCase();
+    return patterns.some((pattern) => {
+        const normalizedPattern = pattern.trim().toLowerCase();
+        if (!normalizedPattern) {
+            return false;
+        }
+
+        if (normalizedPattern.includes('*')) {
+            const regex = new RegExp(`^${normalizedPattern.split('*').map((part) => {
+                return part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            }).join('.*')}$`);
+            return regex.test(normalizedMeshName);
+        }
+
+        return normalizedMeshName === normalizedPattern;
+    });
 };
 
 const normalizeAssetPath = (path: string) => {
@@ -362,7 +389,7 @@ export class ObserverR3FBridge {
 
     private readonly materialIdsByUuid = new Map<string, number>();
 
-    private readonly materialRoleByAssetId = new Map<number, BridgeMaterialRecord['role']>();
+    private readonly materialRoleByAssetId = new Map<number, string>();
 
     private readonly customMaterialNames = new Map<number, string>();
 
@@ -475,6 +502,7 @@ export class ObserverR3FBridge {
         const sceneSettings = editor.call('sceneSettings') as Observer | null;
         this.bindSceneSettingsObserver(sceneSettings);
         this.syncSceneSettingsObserverFromContext(sceneSettings);
+        this.ensureProductRolesForCurrentScene();
         if (shouldRebuild) {
             this.scheduleRebuild();
         }
@@ -507,6 +535,11 @@ export class ObserverR3FBridge {
         const resolvedUrl = this.normalizeAssetUrl(url);
         this.updateViewerConfig((configData) => {
             configData.modelPath = resolvedUrl;
+            configData.product = {
+                productType: 'imported-scene',
+                materialRoles: [],
+                artworkSlot: undefined,
+            };
         });
         this.sceneDirty = true;
     }
@@ -575,11 +608,12 @@ export class ObserverR3FBridge {
         if (role) {
             const configKey = this.textureConfigKeyForSlot(normalizedSlot);
             if (configKey) {
-                this.config[role].textures[configKey] = url || undefined;
+                this.syncProductRoleTexture(role, configKey, url || undefined);
+                this.syncLegacyTextureForRole(role, configKey, url || undefined);
             }
         }
 
-        if (observer && (role === 'frame' || role === 'face' || role === 'back')) {
+        if (observer && role) {
             this.updateViewerConfigMaterial({
                 assetId,
                 material,
@@ -769,7 +803,7 @@ export class ObserverR3FBridge {
                 near: isViewerCamera(camera) ? camera.near : DEFAULT_EDITOR_CAMERA.near,
                 far: isViewerCamera(camera) ? camera.far : DEFAULT_EDITOR_CAMERA.far
             },
-            DEFAULT_PRODUCT_CONFIG,
+            this.config.product ?? DEFAULT_PRODUCT_CONFIG,
             this.environmentHdrBuffer,
             sceneSettings ? {
                 toneMapping: Number(sceneSettings.get('render.tonemapping') ?? this.context.renderer.toneMapping),
@@ -876,6 +910,8 @@ export class ObserverR3FBridge {
                 materialRoles: result.studioJson.product.materialRoles.map((role) => ({
                     role: role.role,
                     meshNames: [...role.meshNames],
+                    defaults: role.defaults ? { ...role.defaults } : undefined,
+                    textures: role.textures ? { ...role.textures } : undefined,
                     configurable: role.configurable,
                     configurableProperties: role.configurableProperties ? [...role.configurableProperties] : undefined
                 })),
@@ -1377,16 +1413,11 @@ export class ObserverR3FBridge {
     }
 
     private getMaterialRole(object: THREE.Object3D) {
-        switch (object.name) {
-            case 'PRINT_SURFACE_FRONT':
-                return 'face';
-            case 'BACK':
-                return 'back';
-            case 'FRAME':
-                return 'frame';
-            default:
-                return 'generic';
-        }
+        const matchedRole = this.config.product?.materialRoles.find((role) => {
+            return matchesMeshName(object.name, role.meshNames);
+        });
+
+        return matchedRole?.role ?? 'generic';
     }
 
     private getMaterialDisplayName(object: THREE.Object3D, index: number) {
@@ -1397,6 +1428,147 @@ export class ObserverR3FBridge {
 
         const suffix = index > 0 ? ` ${index + 1}` : '';
         return `${getEntityDisplayName(object)} Material${suffix}`;
+    }
+
+    private findProductRole(roleName: string) {
+        return this.config.product?.materialRoles.find((role) => role.role === roleName) ?? null;
+    }
+
+    private syncLegacyTextureForRole(roleName: string, key: keyof ViewerConfig['face']['textures'], url: string | undefined) {
+        if (roleName === 'face') {
+            this.config.face.textures[key] = url;
+        } else if (roleName === 'back') {
+            this.config.back.textures[key] = url;
+        } else if (roleName === 'frame') {
+            this.config.frame.textures[key] = url;
+        }
+    }
+
+    private syncProductRoleTexture(roleName: string, key: keyof NonNullable<NonNullable<ViewerConfig['product']>['materialRoles'][number]['textures']>, url: string | undefined) {
+        const role = this.findProductRole(roleName);
+        if (!role) {
+            return;
+        }
+
+        role.textures = role.textures || {};
+        role.textures[key] = url;
+    }
+
+    private syncProductRoleDefaults(roleName: string, values: Record<string, unknown>) {
+        const role = this.findProductRole(roleName);
+        if (!role) {
+            return;
+        }
+
+        role.defaults = {
+            ...(role.defaults || {}),
+            ...values,
+        };
+    }
+
+    private inferMaterialRoleFromMesh(mesh: THREE.Mesh, index: number): ViewerMaterialRole {
+        const material = Array.isArray(mesh.material) ? mesh.material[index] : mesh.material;
+        const materialName = (material?.name || '').trim();
+        const roleName = slugifyRole(materialName || mesh.name || `mesh-${index + 1}`);
+        const textures: NonNullable<ViewerMaterialRole['textures']> = {};
+
+        const setTexture = (key: keyof NonNullable<ViewerMaterialRole['textures']>, texture: THREE.Texture | null | undefined) => {
+            const sourceUrl = texture?.userData?.sourceUrl;
+            if (typeof sourceUrl === 'string' && sourceUrl) {
+                textures[key] = sourceUrl;
+            }
+        };
+
+        if (material instanceof THREE.MeshStandardMaterial) {
+            setTexture('map', material.map);
+            setTexture('normalMap', material.normalMap);
+            setTexture('roughnessMap', material.roughnessMap);
+            setTexture('bumpMap', material.bumpMap);
+        }
+
+        if (material instanceof THREE.MeshPhysicalMaterial) {
+            setTexture('sheenColorMap', material.sheenColorMap);
+        }
+
+        return {
+            role: roleName,
+            meshNames: [mesh.name || roleName],
+            defaults: material instanceof THREE.MeshStandardMaterial
+                ? {
+                    color: this.rgbArrayToHex(toSavedRgbTuple(material.color)),
+                    roughness: material.roughness,
+                    metalness: material.metalness,
+                    envMapIntensity: material.envMapIntensity,
+                    normalScale: material.normalScale?.x,
+                    bumpScale: material.bumpScale,
+                    sheen: material instanceof THREE.MeshPhysicalMaterial ? material.sheen : undefined,
+                    sheenColor: material instanceof THREE.MeshPhysicalMaterial ? this.rgbArrayToHex(toSavedRgbTuple(material.sheenColor)) : undefined,
+                    sheenRoughness: material instanceof THREE.MeshPhysicalMaterial ? material.sheenRoughness : undefined,
+                    clearcoat: material instanceof THREE.MeshPhysicalMaterial ? material.clearcoat : undefined,
+                    clearcoatRoughness: material instanceof THREE.MeshPhysicalMaterial ? material.clearcoatRoughness : undefined,
+                }
+                : undefined,
+            textures: Object.keys(textures).length ? textures : undefined,
+            configurable: true,
+        };
+    }
+
+    private inferGenericProductConfigFromScene() {
+        if (!this.context?.modelRoot) {
+            return null;
+        }
+
+        const roles: ViewerMaterialRole[] = [];
+        this.context.modelRoot.traverse((object) => {
+            if (!(object instanceof THREE.Mesh)) {
+                return;
+            }
+
+            const materials = Array.isArray(object.material) ? object.material : [object.material];
+            materials.forEach((_, index) => {
+                const role = this.inferMaterialRoleFromMesh(object, index);
+                if (!roles.some((entry) => entry.role === role.role)) {
+                    roles.push(role);
+                }
+            });
+        });
+
+        if (!roles.length) {
+            return null;
+        }
+
+        return {
+            productType: this.context.modelRoot.name?.trim() ? slugifyRole(this.context.modelRoot.name) : 'imported-scene',
+            materialRoles: roles,
+            artworkSlot: undefined,
+        };
+    }
+
+    private ensureProductRolesForCurrentScene() {
+        const inferred = this.inferGenericProductConfigFromScene();
+        if (!inferred || !this.context?.modelRoot) {
+            return;
+        }
+
+        const currentMeshNames = new Set<string>();
+        this.context.modelRoot.traverse((object) => {
+            if (object instanceof THREE.Mesh && object.name) {
+                currentMeshNames.add(object.name);
+            }
+        });
+
+        const existingRoles = this.config.product?.materialRoles ?? [];
+        const hasMatchingExistingRole = existingRoles.some((role) => {
+            return role.meshNames.some((meshName) => currentMeshNames.has(meshName));
+        });
+
+        if (existingRoles.length && hasMatchingExistingRole) {
+            return;
+        }
+
+        this.updateViewerConfig((configData) => {
+            configData.product = inferred;
+        });
     }
 
     private getOrCreateMaterialAssetId(materialUuid: string) {
@@ -2082,6 +2254,22 @@ export class ObserverR3FBridge {
             ? material.sheenRoughness ?? Number(asset.get('data.sheenRoughness') ?? (1 - Number(asset.get('data.sheenGloss') ?? 1)))
             : Number(asset.get('data.sheenRoughness') ?? (1 - Number(asset.get('data.sheenGloss') ?? 1)));
 
+        this.syncProductRoleDefaults(record.role, {
+            color: this.rgbArrayToHex(toSavedRgbTuple(physicalMaterial.color)),
+            roughness,
+            metalness: physicalMaterial.metalness ?? Number(asset.get('data.metalness') ?? 0),
+            envMapIntensity,
+            normalScale,
+            bumpScale,
+            sheen: material instanceof THREE.MeshPhysicalMaterial ? material.sheen ?? Number(sheenEnabled) : Number(sheenEnabled),
+            sheenColor,
+            sheenRoughness,
+            clearcoat: material instanceof THREE.MeshPhysicalMaterial ? material.clearcoat ?? Number(asset.get('data.clearcoat') ?? asset.get('data.clearCoat') ?? 0) : undefined,
+            clearcoatRoughness: material instanceof THREE.MeshPhysicalMaterial
+                ? material.clearcoatRoughness ?? Number(asset.get('data.clearcoatRoughness') ?? (1 - Number(asset.get('data.clearCoatGloss') ?? 1)))
+                : undefined,
+        });
+
         if (record.role === 'face') {
             const faceColor = decomposeViewerColor(toSavedRgbTuple(physicalMaterial.color));
             this.config.face.params.color = faceColor.color;
@@ -2262,7 +2450,7 @@ export class ObserverR3FBridge {
         return true;
     }
 
-    private materialRoleForAsset(assetId: number): 'face' | 'back' | 'frame' | null {
+    private materialRoleForAsset(assetId: number): string | null {
         const mappedRole = this.materialRoleByAssetId.get(assetId);
         if (mappedRole && mappedRole !== 'generic') {
             return mappedRole;
@@ -2276,16 +2464,13 @@ export class ObserverR3FBridge {
             .replace(/\s+/g, ' ')
             .trim();
         const strippedName = normalizedName.replace(/\bmaterial\b/g, '').replace(/\s+/g, ' ').trim();
-        if (strippedName === 'face' || normalizedName.includes('print surface') || normalizedName.includes('face material')) {
-            return 'face';
-        }
+        const matchingRole = this.config.product?.materialRoles.find((role) => {
+            const normalizedRole = role.role.trim().toLowerCase();
+            return strippedName === normalizedRole || normalizedName.includes(`${normalizedRole} material`);
+        });
 
-        if (strippedName === 'back' || normalizedName.includes('back material')) {
-            return 'back';
-        }
-
-        if (strippedName === 'frame' || normalizedName.includes('frame material')) {
-            return 'frame';
+        if (matchingRole) {
+            return matchingRole.role;
         }
 
         return null;
