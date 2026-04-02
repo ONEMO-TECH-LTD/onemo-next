@@ -61,6 +61,441 @@ export type ViewerCameraCommand =
       seq: number
     }
 
+export interface ViewerGridSettings {
+  enabled: boolean
+  divisions: number
+  cellSize: number
+}
+
+export interface ViewerTransformSnapSettings {
+  enabled: boolean
+  increment: number
+}
+
+const DEFAULT_AMBIENT_COLOR = '#262626'
+const LOOK_SENSITIVITY = 0.002
+const ROTATION_SNAP_MULTIPLIER = 5
+
+class ViewportErrorBoundary extends React.Component<
+  { background: string; children: React.ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false }
+
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: Error) {
+    console.error('[effect-viewer] Viewport render failed', error)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: this.props.background,
+            color: '#f5f5f5',
+            fontSize: 14,
+            letterSpacing: '0.01em',
+          }}
+        >
+          Viewport error. Check the console.
+        </div>
+      )
+    }
+
+    return this.props.children
+  }
+}
+
+function syncOrbitTargetFromCamera(
+  camera: THREE.Camera,
+  orbitControls: React.ComponentRef<typeof OrbitControls> | null
+) {
+  if (!orbitControls) {
+    return
+  }
+
+  const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion)
+  orbitControls.target.copy(camera.position).add(forward)
+  orbitControls.update()
+}
+
+function ViewportGridHelper({
+  visible,
+  size,
+  divisions,
+}: {
+  visible: boolean
+  size: number
+  divisions: number
+}) {
+  const gridHelper = useMemo(() => {
+    const helper = new THREE.GridHelper(
+      size,
+      Math.max(divisions, 1),
+      new THREE.Color('#909090'),
+      new THREE.Color('#5d5d5d')
+    )
+    helper.position.y = 0
+
+    const materials = Array.isArray(helper.material) ? helper.material : [helper.material]
+    materials.forEach((material) => {
+      material.transparent = true
+      material.opacity = 0.45
+      material.depthWrite = false
+    })
+
+    return helper
+  }, [divisions, size])
+
+  useEffect(() => {
+    return () => {
+      gridHelper.geometry.dispose()
+      const materials = Array.isArray(gridHelper.material) ? gridHelper.material : [gridHelper.material]
+      materials.forEach((material) => material.dispose())
+    }
+  }, [gridHelper])
+
+  if (!visible) {
+    return null
+  }
+
+  return <primitive object={gridHelper} />
+}
+
+function ViewportNavigationController({
+  orbitControlsRef,
+  enabled,
+}: {
+  orbitControlsRef: RefObject<React.ComponentRef<typeof OrbitControls> | null>
+  enabled: boolean
+}) {
+  const { camera, gl } = useThree()
+  const lookActiveRef = useRef(false)
+  const shiftPanActiveRef = useRef(false)
+  const previousOrbitEnabledRef = useRef<boolean | null>(null)
+  const pointerRef = useRef<{ x: number; y: number } | null>(null)
+  const shiftKeyRef = useRef(false)
+  const movementRef = useRef({
+    forward: false,
+    left: false,
+    back: false,
+    right: false,
+    up: false,
+    down: false,
+    fast: false,
+  })
+  const forwardRef = useRef(new THREE.Vector3())
+  const rightRef = useRef(new THREE.Vector3())
+  const moveRef = useRef(new THREE.Vector3())
+  const worldUpRef = useRef(new THREE.Vector3(0, 1, 0))
+
+  useEffect(() => {
+    const element = gl.domElement
+
+    const restoreLeftMouse = () => {
+      const controls = orbitControlsRef.current
+      if (controls) {
+        controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE
+      }
+    }
+
+    const stopLookMode = () => {
+      const controls = orbitControlsRef.current
+      lookActiveRef.current = false
+      pointerRef.current = null
+      movementRef.current = {
+        forward: false,
+        left: false,
+        back: false,
+        right: false,
+        up: false,
+        down: false,
+        fast: false,
+      }
+
+      if (controls) {
+        controls.enabled = previousOrbitEnabledRef.current ?? enabled
+        previousOrbitEnabledRef.current = null
+        syncOrbitTargetFromCamera(camera, controls)
+      }
+
+      restoreLeftMouse()
+    }
+
+    const stopShiftPanMode = () => {
+      const controls = orbitControlsRef.current
+      shiftPanActiveRef.current = false
+      pointerRef.current = null
+
+      if (controls) {
+        controls.enabled = previousOrbitEnabledRef.current ?? enabled
+        previousOrbitEnabledRef.current = null
+        controls.update()
+      }
+
+      restoreLeftMouse()
+    }
+
+    const isInputLike = (target: EventTarget | null) => {
+      return target instanceof HTMLElement && (
+        target.isContentEditable ||
+        /input|textarea|select/i.test(target.tagName)
+      )
+    }
+
+    const setMovement = (code: string, value: boolean) => {
+      switch (code) {
+        case 'ArrowUp':
+        case 'KeyW':
+          movementRef.current.forward = value
+          return true
+        case 'ArrowLeft':
+        case 'KeyA':
+          movementRef.current.left = value
+          return true
+        case 'ArrowDown':
+        case 'KeyS':
+          movementRef.current.back = value
+          return true
+        case 'ArrowRight':
+        case 'KeyD':
+          movementRef.current.right = value
+          return true
+        case 'KeyE':
+        case 'PageUp':
+          movementRef.current.up = value
+          return true
+        case 'KeyQ':
+        case 'PageDown':
+          movementRef.current.down = value
+          return true
+        default:
+          return false
+      }
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const controls = orbitControlsRef.current
+
+      if (event.button === 0 && (event.shiftKey || shiftKeyRef.current)) {
+        event.preventDefault()
+        shiftPanActiveRef.current = true
+        pointerRef.current = { x: event.clientX, y: event.clientY }
+
+        if (controls) {
+          previousOrbitEnabledRef.current = controls.enabled
+          controls.enabled = false
+        }
+
+        return
+      }
+
+      if (!enabled || event.button !== 2) {
+        return
+      }
+
+      event.preventDefault()
+      lookActiveRef.current = true
+      pointerRef.current = { x: event.clientX, y: event.clientY }
+
+      if (controls) {
+        previousOrbitEnabledRef.current = controls.enabled
+        controls.enabled = false
+      }
+    }
+
+    const handlePointerMove = (event: PointerEvent) => {
+      if (shiftPanActiveRef.current) {
+        const previousPointer = pointerRef.current
+        pointerRef.current = { x: event.clientX, y: event.clientY }
+        if (!previousPointer) {
+          return
+        }
+
+        const orbitControls = orbitControlsRef.current
+        const orbitDistance = orbitControls ? orbitControls.target.distanceTo(camera.position) : camera.position.length()
+        const panScale = Math.max(orbitDistance, 0.1) / Math.max(gl.domElement.clientHeight, 1) * 2
+        const right = rightRef.current
+        const pan = moveRef.current.set(0, 0, 0)
+        right.crossVectors(new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion), worldUpRef.current).normalize()
+        pan
+          .addScaledVector(right, -(event.clientX - previousPointer.x) * panScale)
+          .addScaledVector(worldUpRef.current, (event.clientY - previousPointer.y) * panScale)
+
+        camera.position.add(pan)
+        if (orbitControls) {
+          orbitControls.target.add(pan)
+          orbitControls.update()
+        }
+        return
+      }
+
+      if (!lookActiveRef.current) {
+        return
+      }
+
+      const previousPointer = pointerRef.current
+      const movementX = event.movementX || (previousPointer ? event.clientX - previousPointer.x : 0)
+      const movementY = event.movementY || (previousPointer ? event.clientY - previousPointer.y : 0)
+      pointerRef.current = { x: event.clientX, y: event.clientY }
+
+      const nextEuler = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ')
+      nextEuler.y -= movementX * LOOK_SENSITIVITY
+      nextEuler.x = THREE.MathUtils.clamp(
+        nextEuler.x - movementY * LOOK_SENSITIVITY,
+        -Math.PI / 2 + 0.01,
+        Math.PI / 2 - 0.01
+      )
+      camera.quaternion.setFromEuler(nextEuler)
+      syncOrbitTargetFromCamera(camera, orbitControlsRef.current)
+    }
+
+    const handlePointerUp = (event: PointerEvent) => {
+      if (event.button === 0 && shiftPanActiveRef.current) {
+        pointerRef.current = null
+        stopShiftPanMode()
+        return
+      }
+
+      if (event.button === 2) {
+        pointerRef.current = null
+        stopLookMode()
+      }
+    }
+
+    const handleContextMenu = (event: MouseEvent) => {
+      if (lookActiveRef.current || event.button === 2) {
+        event.preventDefault()
+      }
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Shift') {
+        shiftKeyRef.current = true
+        movementRef.current.fast = true
+      }
+
+      if (
+        !lookActiveRef.current ||
+        isInputLike(event.target) ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.altKey
+      ) {
+        return
+      }
+
+      if (setMovement(event.code, true)) {
+        event.preventDefault()
+      }
+    }
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (event.key === 'Shift') {
+        shiftKeyRef.current = false
+        movementRef.current.fast = false
+      }
+
+      if (
+        !lookActiveRef.current ||
+        isInputLike(event.target) ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.altKey
+      ) {
+        return
+      }
+
+      if (setMovement(event.code, false)) {
+        event.preventDefault()
+      }
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        stopLookMode()
+      }
+    }
+
+    element.addEventListener('pointerdown', handlePointerDown, true)
+    element.addEventListener('contextmenu', handleContextMenu)
+    window.addEventListener('pointermove', handlePointerMove, true)
+    window.addEventListener('pointerup', handlePointerUp, true)
+    window.addEventListener('keydown', handleKeyDown, true)
+    window.addEventListener('keyup', handleKeyUp, true)
+    window.addEventListener('blur', stopLookMode)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      element.removeEventListener('pointerdown', handlePointerDown, true)
+      element.removeEventListener('contextmenu', handleContextMenu)
+      window.removeEventListener('pointermove', handlePointerMove, true)
+      window.removeEventListener('pointerup', handlePointerUp, true)
+      window.removeEventListener('keydown', handleKeyDown, true)
+      window.removeEventListener('keyup', handleKeyUp, true)
+      window.removeEventListener('blur', stopLookMode)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      stopLookMode()
+      stopShiftPanMode()
+    }
+  }, [camera, enabled, gl, orbitControlsRef])
+
+  useFrame((_, delta) => {
+    if (!enabled || !lookActiveRef.current) {
+      return
+    }
+
+    const movement = movementRef.current
+    if (
+      !movement.forward &&
+      !movement.left &&
+      !movement.back &&
+      !movement.right &&
+      !movement.up &&
+      !movement.down
+    ) {
+      return
+    }
+
+    const orbitControls = orbitControlsRef.current
+    const orbitDistance = orbitControls ? orbitControls.target.distanceTo(camera.position) : camera.position.length()
+    const speed = Math.max(orbitDistance * 2, 0.1) * (movement.fast ? 2 : 1)
+    const forward = forwardRef.current
+    const right = rightRef.current
+    const move = moveRef.current.set(0, 0, 0)
+
+    camera.getWorldDirection(forward)
+    forward.normalize()
+    right.crossVectors(forward, worldUpRef.current).normalize()
+
+    if (movement.forward) move.add(forward)
+    if (movement.back) move.sub(forward)
+    if (movement.right) move.add(right)
+    if (movement.left) move.sub(right)
+    if (movement.up) move.add(worldUpRef.current)
+    if (movement.down) move.sub(worldUpRef.current)
+
+    if (move.lengthSq() === 0) {
+      return
+    }
+
+    move.normalize().multiplyScalar(speed * delta)
+    camera.position.add(move)
+    syncOrbitTargetFromCamera(camera, orbitControls)
+  })
+
+  return null
+}
+
 interface EffectViewerProps {
   config: ViewerConfig
   artworkUrl?: string
@@ -84,6 +519,8 @@ interface EffectViewerProps {
   enableTransformControls?: boolean
   renderPass?: ViewerRenderPass
   wireframeEnabled?: boolean
+  gridSettings?: ViewerGridSettings
+  transformSnapSettings?: ViewerTransformSnapSettings
   cameraCommand?: ViewerCameraCommand | null
 }
 
@@ -434,6 +871,7 @@ function EditorViewportOverlay({
   orbitControlsRef,
   transformMode,
   transformSpace,
+  snapSettings,
   showGizmoHelper,
   enableTransformControls,
 }: {
@@ -450,6 +888,7 @@ function EditorViewportOverlay({
   orbitControlsRef: RefObject<React.ComponentRef<typeof OrbitControls> | null>
   transformMode: 'translate' | 'rotate' | 'scale' | 'disabled'
   transformSpace: 'world' | 'local'
+  snapSettings?: ViewerTransformSnapSettings
   showGizmoHelper?: boolean
   enableTransformControls?: boolean
 }) {
@@ -514,6 +953,7 @@ function EditorViewportOverlay({
         .find((entry) => !!resolveIdByObject(entry.object))
 
       if (!intersection) {
+        onSelectResourceId('')
         return
       }
 
@@ -590,6 +1030,11 @@ function EditorViewportOverlay({
     !(transformTarget instanceof THREE.Scene) &&
     !(transformTarget instanceof THREE.Camera) &&
     (selectedLight ? true : !!transformTarget.parent)
+  const translationSnap = snapSettings?.enabled ? snapSettings.increment : undefined
+  const rotationSnap = snapSettings?.enabled
+    ? THREE.MathUtils.degToRad(snapSettings.increment * ROTATION_SNAP_MULTIPLIER)
+    : undefined
+  const scaleSnap = snapSettings?.enabled ? snapSettings.increment : undefined
 
   return (
     <>
@@ -603,6 +1048,9 @@ function EditorViewportOverlay({
           mode={transformMode}
           space={transformSpace}
           size={0.95}
+          translationSnap={translationSnap}
+          rotationSnap={rotationSnap}
+          scaleSnap={scaleSnap}
         />
       ) : null}
       {showGizmoHelper ? (
@@ -843,6 +1291,8 @@ export default function EffectViewer({
   enableTransformControls = false,
   renderPass = 'standard',
   wireframeEnabled = false,
+  gridSettings = { enabled: true, divisions: 10, cellSize: 1 },
+  transformSnapSettings,
   cameraCommand = null,
 }: EffectViewerProps) {
   // Preload the model
@@ -869,6 +1319,11 @@ export default function EffectViewer({
 
   const cam = config.camera
   const env = config.environment
+  const ambientColor = config.scene.ambientColor ?? DEFAULT_AMBIENT_COLOR
+  const gridSize = Math.max(gridSettings.divisions * gridSettings.cellSize, gridSettings.cellSize)
+  const environmentKey = env
+    ? `${env.customHdri ? `file:${env.customHdri}` : `preset:${env.preset ?? 'studio'}`}|ground:${env.groundEnabled ? `${env.groundHeight}:${env.groundRadius}` : 'off'}`
+    : 'none'
 
   // Camera position from spherical coordinates (distance, polar, azimuth)
   const cameraPosition = useMemo(() => {
@@ -882,13 +1337,6 @@ export default function EffectViewer({
       d * Math.sin(polar) * Math.cos(azimuth),
     ] as [number, number, number]
   }, [cam])
-
-  // Environment rotation as euler
-  const envRotation = useMemo(() => {
-    if (!env) return undefined
-    const rad = (env.envRotation * Math.PI) / 180
-    return new THREE.Euler(0, rad, 0)
-  }, [env])
 
   const orbitControlsRef = useRef<React.ComponentRef<typeof OrbitControls>>(null)
   useEffect(() => {
@@ -949,100 +1397,119 @@ export default function EffectViewer({
   }, [emitBridge])
 
   return (
-    <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: config.colors.bgColor }}>
-      <Canvas
-        shadows
-        gl={{
-          antialias: true,
-          toneMapping: THREE.NeutralToneMapping,
-          toneMappingExposure: config.scene.exposure,
-          outputColorSpace: THREE.SRGBColorSpace,
-        }}
-        dpr={[1, 2]}
-        camera={{
-          position: cameraPosition,
-          fov: cam?.fov ?? 35,
-          near: 0.001,
-          far: 100,
-        }}
-        onCreated={handleCreated}
-      >
-        {!templateUrl && config.modelPath && (
+    <ViewportErrorBoundary background={config.colors.bgColor}>
+      <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: config.colors.bgColor }}>
+        <Canvas
+          shadows
+          gl={{
+            antialias: true,
+            toneMapping: THREE.NeutralToneMapping,
+            toneMappingExposure: config.scene.exposure,
+            outputColorSpace: THREE.SRGBColorSpace,
+          }}
+          dpr={[1, 2]}
+          camera={{
+            position: cameraPosition,
+            fov: cam?.fov ?? 35,
+            near: 0.001,
+            far: 100,
+          }}
+          onCreated={handleCreated}
+        >
+          {!templateUrl && config.modelPath && (
           <pointLight
             ref={handleLightRef}
             name="Bridge Light"
             position={[0.02, 0.02, 0.12]}
-            intensity={2.2}
+            intensity={0.4}
             distance={0.8}
             castShadow
           />
-        )}
-        <Suspense fallback={null}>
-          {!templateUrl && env && (
-            <Environment
-              {...(env.customHdri
-                ? { files: env.customHdri }
-                : { preset: (env.preset ?? 'studio') as 'studio' | 'city' | 'sunset' | 'dawn' | 'night' | 'warehouse' | 'forest' | 'apartment' | 'park' | 'lobby' }
-              )}
-              environmentIntensity={config.scene.envIntensity}
-              environmentRotation={envRotation}
-              ground={env.groundEnabled ? {
-                height: env.groundHeight,
-                radius: env.groundRadius,
-              } : undefined}
-            />
           )}
-          {!templateUrl && config.modelPath && (
-            <EffectModel
-              modelPath={config.modelPath}
-              artworkUrl={artworkUrl || DEFAULT_ARTWORK}
-              designState={designState}
-              face={config.face}
-              back={config.back}
-              frame={config.frame}
-              scene={config.scene}
-              onReady={handleModelReady}
-            />
-          )}
-        </Suspense>
+          <ViewportGridHelper
+            visible={gridSettings.enabled}
+            size={gridSize}
+            divisions={gridSettings.divisions}
+          />
+          <Suspense fallback={null}>
+            {!templateUrl && env && (
+              <Environment
+                key={environmentKey}
+                {...(env.customHdri
+                  ? { files: env.customHdri }
+                  : { preset: (env.preset ?? 'studio') as 'studio' | 'city' | 'sunset' | 'dawn' | 'night' | 'warehouse' | 'forest' | 'apartment' | 'park' | 'lobby' }
+                )}
+                ground={env.groundEnabled ? {
+                  height: env.groundHeight,
+                  radius: env.groundRadius,
+                } : undefined}
+              />
+            )}
+            {!templateUrl && config.modelPath && (
+              <EffectModel
+                modelPath={config.modelPath}
+                artworkUrl={artworkUrl || DEFAULT_ARTWORK}
+                designState={designState}
+                face={config.face}
+                back={config.back}
+                frame={config.frame}
+                scene={{
+                  ...config.scene,
+                  ambientColor,
+                }}
+                onReady={handleModelReady}
+              />
+            )}
+          </Suspense>
 
-        <OrbitControls
-          ref={orbitControlsRef}
-          makeDefault
-          target={[0, 0, 0]}
-          enableDamping={cam?.enableDamping ?? true}
-          dampingFactor={cam?.dampingFactor ?? 0.1}
-          autoRotate={cam?.autoRotate ?? false}
-          autoRotateSpeed={cam?.autoRotateSpeed ?? 2}
-          enabled={!isEditing}
-        />
-        <EditorViewportOverlay
-          selectedResourceIds={selectedResourceIds}
-          resolveObjectById={resolveObjectById}
-          resolveIdByObject={resolveIdByObject}
-          onSelectResourceId={onSelectResourceId}
-          onTransformCommit={onTransformCommit}
-          onSceneChange={onSceneChange}
-          orbitControlsRef={orbitControlsRef}
-          transformMode={transformMode}
-          transformSpace={transformSpace}
-          showGizmoHelper={showGizmoHelper}
-          enableTransformControls={enableTransformControls}
-        />
-        <RenderModeController
-          renderPass={renderPass}
-          wireframeEnabled={wireframeEnabled}
-          resolveIdByObject={resolveIdByObject}
-        />
-        <CameraCommandController
-          cameraCommand={cameraCommand}
-          selectedResourceIds={selectedResourceIds}
-          resolveObjectById={resolveObjectById}
-          resolveIdByObject={resolveIdByObject}
-          orbitControlsRef={orbitControlsRef}
-          fallbackPerspectivePosition={cameraPosition}
-        />
-      </Canvas>
-    </div>
+          <OrbitControls
+            ref={orbitControlsRef}
+            makeDefault
+            target={[0, 0, 0]}
+            enableDamping={cam?.enableDamping ?? true}
+            dampingFactor={cam?.dampingFactor ?? 0.1}
+            autoRotate={cam?.autoRotate ?? false}
+            autoRotateSpeed={cam?.autoRotateSpeed ?? 2}
+            mouseButtons={{
+              LEFT: THREE.MOUSE.ROTATE,
+              MIDDLE: THREE.MOUSE.PAN,
+              RIGHT: THREE.MOUSE.ROTATE,
+            }}
+            enabled={!isEditing}
+          />
+          <ViewportNavigationController
+            orbitControlsRef={orbitControlsRef}
+            enabled={!isEditing}
+          />
+          <EditorViewportOverlay
+            selectedResourceIds={selectedResourceIds}
+            resolveObjectById={resolveObjectById}
+            resolveIdByObject={resolveIdByObject}
+            onSelectResourceId={onSelectResourceId}
+            onTransformCommit={onTransformCommit}
+            onSceneChange={onSceneChange}
+            orbitControlsRef={orbitControlsRef}
+            transformMode={transformMode}
+            transformSpace={transformSpace}
+            snapSettings={transformSnapSettings}
+            showGizmoHelper={showGizmoHelper}
+            enableTransformControls={enableTransformControls}
+          />
+          <RenderModeController
+            renderPass={renderPass}
+            wireframeEnabled={wireframeEnabled}
+            resolveIdByObject={resolveIdByObject}
+          />
+          <CameraCommandController
+            cameraCommand={cameraCommand}
+            selectedResourceIds={selectedResourceIds}
+            resolveObjectById={resolveObjectById}
+            resolveIdByObject={resolveIdByObject}
+            orbitControlsRef={orbitControlsRef}
+            fallbackPerspectivePosition={cameraPosition}
+          />
+        </Canvas>
+      </div>
+    </ViewportErrorBoundary>
   )
 }

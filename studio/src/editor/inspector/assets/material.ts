@@ -1647,6 +1647,13 @@ class MaterialAssetInspector extends Container {
 
         this._suppressToggleFields = true;
 
+        this._assets.forEach((asset) => {
+            const history = asset.history.enabled;
+            asset.history.enabled = false;
+            asset.set('data.applyToAllMaps', value);
+            asset.history.enabled = history;
+        });
+
         if (value) {
             this._suppressOffsetTilingAndRotationFields = true;
             // initialize global offset and tiling to the first asset's diffuse offset and tiling

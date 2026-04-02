@@ -324,6 +324,15 @@ const DEFAULT_FOG_DENSITY = 0.01;
 const DEFAULT_AMBIENT_INTENSITY = 0.5;
 const DEFAULT_ENV_INTENSITY = 1;
 const DEFAULT_ENV_ROTATION = 0;
+const BRIDGE_BASE_ENV_MAP_INTENSITY = '__bridgeBaseEnvMapIntensity';
+
+const rgbTupleToHex = (value: readonly number[]) => {
+    return `#${new THREE.Color(
+        Number(value[0] ?? DEFAULT_AMBIENT_RGB[0]),
+        Number(value[1] ?? DEFAULT_AMBIENT_RGB[1]),
+        Number(value[2] ?? DEFAULT_AMBIENT_RGB[2])
+    ).getHexString()}`;
+};
 
 const findAmbientLight = (scene: THREE.Scene) => {
     let ambientLight: THREE.AmbientLight | null = null;
@@ -448,12 +457,20 @@ export class ObserverR3FBridge {
     }
 
     setContext(context: EffectViewerBridge) {
+        const shouldRebuild = !this.context ||
+            this.context.scene !== context.scene ||
+            this.context.camera !== context.camera ||
+            this.context.renderer !== context.renderer ||
+            this.context.modelRoot !== context.modelRoot;
+
         this.context = context;
         setBridgeAudioCamera(context.camera);
         const sceneSettings = editor.call('sceneSettings') as Observer | null;
         this.bindSceneSettingsObserver(sceneSettings);
         this.syncSceneSettingsObserverFromContext(sceneSettings);
-        this.scheduleRebuild();
+        if (shouldRebuild) {
+            this.scheduleRebuild();
+        }
     }
 
     setViewerActions(actions: BridgeViewerActions) {
@@ -726,6 +743,7 @@ export class ObserverR3FBridge {
             throw new Error('Bridge is not ready for scene serialization');
         }
 
+        const sceneSettings = editor.call('sceneSettings') as { get: (path: string) => unknown } | null;
         const orbitTarget = this.context.orbitControls?.target ?? new THREE.Vector3(...DEFAULT_EDITOR_CAMERA.target);
         const camera = this.context.camera;
         const perspectiveCamera = camera instanceof THREE.PerspectiveCamera ? camera : null;
@@ -741,7 +759,14 @@ export class ObserverR3FBridge {
                 far: isViewerCamera(camera) ? camera.far : DEFAULT_EDITOR_CAMERA.far
             },
             DEFAULT_PRODUCT_CONFIG,
-            this.environmentHdrBuffer
+            this.environmentHdrBuffer,
+            sceneSettings ? {
+                toneMapping: Number(sceneSettings.get('render.tonemapping') ?? this.context.renderer.toneMapping),
+                toneMappingExposure: Number(sceneSettings.get('render.exposure') ?? this.context.renderer.toneMappingExposure),
+                outputColorSpace: String(sceneSettings.get('render.outputColorSpace') ?? this.context.renderer.outputColorSpace),
+                shadowsEnabled: !!sceneSettings.get('render.shadowsEnabled'),
+                shadowType: Number(sceneSettings.get('render.shadowType') ?? this.context.renderer.shadowMap.type)
+            } : undefined
         );
     }
 
@@ -809,6 +834,7 @@ export class ObserverR3FBridge {
         this.updateViewerConfig((configData) => {
             configData.modelPath = '';
             configData.scene.exposure = result.studioJson.renderer.toneMappingExposure;
+            configData.scene.ambientColor = rgbTupleToHex(result.studioJson.scene.ambientColor);
             configData.scene.envIntensity = result.studioJson.environment.intensity;
             configData.scene.background = result.studioJson.scene.backgroundColor;
             configData.scene.ambientIntensity = result.studioJson.scene.ambientIntensity;
@@ -817,6 +843,8 @@ export class ObserverR3FBridge {
             configData.camera = createCameraConfigFromEditorCamera(editorCamera, configData.camera);
         });
 
+        this.sceneSettingsSeeded = false;
+        this.syncSceneSettingsObserverFromContext();
         this.scheduleRebuild();
         return true;
     }
@@ -1354,6 +1382,11 @@ export class ObserverR3FBridge {
             const existing = editor.api.globals.assets.get(assetId);
             const previousAsset = existing || this.findPreviousBridgeAsset(record, previousBridgeAssets);
             const previousData = previousAsset?.get('data') || {};
+            this.setMaterialBaseEnvMapIntensity(
+                record.material,
+                previousData?.reflectivity ?? (record.material instanceof THREE.MeshPhysicalMaterial || record.material instanceof THREE.MeshStandardMaterial ? record.material.envMapIntensity : 1)
+            );
+            this.applySceneEnvIntensityToMaterial(record.material, previousAsset);
             const previousName = typeof previousAsset?.get('name') === 'string' ? previousAsset.get('name') : record.name;
             if (existing) {
                 this.withSyncGuard(() => {
@@ -1443,6 +1476,10 @@ export class ObserverR3FBridge {
                 }
 
                 applyMaterialObserverChange(material, normalizedPath, observer);
+                if (normalizedPath === 'data.reflectivity') {
+                    this.setMaterialBaseEnvMapIntensity(material, observer.get('data.reflectivity'));
+                    this.applySceneEnvIntensityToMaterial(material, observer);
+                }
                 this.sceneDirty = true;
                 this.updateViewerConfigMaterial(materialState.materialRecords.get(assetId), observer);
             });
@@ -1922,6 +1959,58 @@ export class ObserverR3FBridge {
         return null;
     }
 
+    private getSceneEnvIntensity() {
+        const sceneSettings = editor.call('sceneSettings') as { get: (path: string) => unknown } | null;
+        const value = Number(sceneSettings?.get('render.envIntensity') ?? this.config.scene.envIntensity ?? DEFAULT_ENV_INTENSITY);
+        return Number.isFinite(value) ? value : DEFAULT_ENV_INTENSITY;
+    }
+
+    private setMaterialBaseEnvMapIntensity(material: THREE.Material, value: unknown) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) {
+            return;
+        }
+
+        const target = material as THREE.Material & { userData?: Record<string, unknown> };
+        target.userData = target.userData || {};
+        target.userData[BRIDGE_BASE_ENV_MAP_INTENSITY] = Math.max(0, numeric);
+    }
+
+    private getMaterialBaseEnvMapIntensity(material: THREE.Material, asset?: AssetObserver | null) {
+        const target = material as THREE.Material & { userData?: Record<string, unknown> };
+        const value = target.userData?.[BRIDGE_BASE_ENV_MAP_INTENSITY];
+        if (typeof value === 'number' && Number.isFinite(value)) {
+            return Math.max(0, value);
+        }
+
+        const fallback = asset
+            ? Number(asset.get('data.reflectivity') ?? (material instanceof THREE.MeshPhysicalMaterial || material instanceof THREE.MeshStandardMaterial ? material.envMapIntensity : 1))
+            : (material instanceof THREE.MeshPhysicalMaterial || material instanceof THREE.MeshStandardMaterial ? Number(material.envMapIntensity ?? 1) : 1);
+        const base = Number.isFinite(fallback) ? Math.max(0, fallback) : 1;
+        this.setMaterialBaseEnvMapIntensity(material, base);
+        return base;
+    }
+
+    private applySceneEnvIntensityToMaterial(material: THREE.Material, asset?: AssetObserver | null) {
+        const physicalMaterial = material instanceof THREE.MeshPhysicalMaterial || material instanceof THREE.MeshStandardMaterial
+            ? material
+            : null;
+        if (!physicalMaterial) {
+            return;
+        }
+
+        const base = this.getMaterialBaseEnvMapIntensity(material, asset);
+        physicalMaterial.envMapIntensity = base * this.getSceneEnvIntensity();
+        physicalMaterial.needsUpdate = true;
+    }
+
+    private applySceneEnvIntensityToAllMaterials() {
+        this.materialByAssetId.forEach((material, assetId) => {
+            const asset = editor.call('assets:get', assetId) as AssetObserver | null;
+            this.applySceneEnvIntensityToMaterial(material, asset);
+        });
+    }
+
     private updateViewerConfigMaterial(record: BridgeMaterialRecord | undefined, asset: AssetObserver) {
         if (!record) {
             return;
@@ -1939,7 +2028,7 @@ export class ObserverR3FBridge {
         const roughness = physicalMaterial.roughness ?? Number(asset.get('data.roughness') ?? (1 - Number(asset.get('data.shininess') ?? 100) / 100));
         const normalScale = physicalMaterial.normalScale?.x ?? Number(asset.get('data.normalStrength') ?? 1);
         const bumpScale = physicalMaterial.bumpScale ?? Number(asset.get('data.bumpMapFactor') ?? asset.get('data.heightMapFactor') ?? 1);
-        const envMapIntensity = physicalMaterial.envMapIntensity ?? 0;
+        const envMapIntensity = this.getMaterialBaseEnvMapIntensity(material, asset);
         const sheenEnabled = material instanceof THREE.MeshPhysicalMaterial
             ? (material.sheen ?? 0) > 0
             : !!(asset.get('data.sheenEnabled') ?? asset.get('data.useSheen'));
@@ -2623,6 +2712,8 @@ export class ObserverR3FBridge {
         const renderer = this.context.renderer;
         const scene = this.context.scene;
         const sceneWithEnvironment = scene as THREE.Scene & {
+            backgroundIntensity?: number;
+            backgroundRotation?: THREE.Euler;
             environmentIntensity?: number;
             environmentRotation?: THREE.Euler;
         };
@@ -2844,23 +2935,39 @@ export class ObserverR3FBridge {
             }
 
             ambientLight.intensity = ambientIntensity;
+            if (Array.isArray(ambientColor)) {
+                this.config.scene.ambientColor = rgbTupleToHex(ambientColor as number[]);
+            } else if (typeof ambientColor === 'string') {
+                this.config.scene.ambientColor = ambientColor;
+            }
             this.config.scene.ambientIntensity = ambientIntensity;
             this.sceneDirty = true;
             return;
         }
 
         if (path === 'render.envIntensity') {
-            const sceneWithEnvironment = scene as THREE.Scene & { environmentIntensity?: number };
-            sceneWithEnvironment.environmentIntensity = Number(sceneSettings.get('render.envIntensity') ?? DEFAULT_ENV_INTENSITY);
-            this.config.scene.envIntensity = sceneWithEnvironment.environmentIntensity;
+            const sceneWithEnvironment = scene as THREE.Scene & {
+                backgroundIntensity?: number;
+                environmentIntensity?: number;
+            };
+            const intensity = Number(sceneSettings.get('render.envIntensity') ?? DEFAULT_ENV_INTENSITY);
+            sceneWithEnvironment.environmentIntensity = intensity;
+            sceneWithEnvironment.backgroundIntensity = intensity;
+            this.config.scene.envIntensity = intensity;
+            this.applySceneEnvIntensityToAllMaterials();
             this.sceneDirty = true;
             return;
         }
 
         if (path === 'render.envRotation') {
-            const sceneWithEnvironment = scene as THREE.Scene & { environmentRotation?: THREE.Euler };
+            const sceneWithEnvironment = scene as THREE.Scene & {
+                backgroundRotation?: THREE.Euler;
+                environmentRotation?: THREE.Euler;
+            };
             const degrees = Number(sceneSettings.get('render.envRotation') ?? DEFAULT_ENV_ROTATION);
-            sceneWithEnvironment.environmentRotation = new THREE.Euler(0, THREE.MathUtils.degToRad(degrees), 0);
+            const rotation = new THREE.Euler(0, THREE.MathUtils.degToRad(degrees), 0);
+            sceneWithEnvironment.environmentRotation = rotation;
+            sceneWithEnvironment.backgroundRotation = rotation.clone();
             if (this.config.environment) {
                 this.config.environment.envRotation = degrees;
             }
@@ -2883,7 +2990,6 @@ export class ObserverR3FBridge {
                     configData.environment.customHdri = undefined;
                 }
             });
-            this.scheduleRebuild();
             return;
         }
 
@@ -2903,7 +3009,6 @@ export class ObserverR3FBridge {
                 configData.environment.groundHeight = groundHeight;
                 configData.environment.groundRadius = groundRadius;
             });
-            this.scheduleRebuild();
         }
     }
 
@@ -3067,9 +3172,15 @@ export class ObserverR3FBridge {
             ? THREE.LinearSRGBColorSpace
             : THREE.SRGBColorSpace;
 
-        const sceneWithEnvironment = this.context.scene as THREE.Scene & { environmentIntensity?: number };
+        const sceneWithEnvironment = this.context.scene as THREE.Scene & {
+            backgroundIntensity?: number;
+            environmentIntensity?: number;
+        };
         if ('environmentIntensity' in sceneWithEnvironment) {
             sceneWithEnvironment.environmentIntensity = Number.isFinite(skyboxIntensity) ? skyboxIntensity : currentSettings.skyboxIntensity;
+        }
+        if ('backgroundIntensity' in sceneWithEnvironment) {
+            sceneWithEnvironment.backgroundIntensity = Number.isFinite(skyboxIntensity) ? skyboxIntensity : currentSettings.skyboxIntensity;
         }
 
         this.config.scene.exposure = this.context.renderer.toneMappingExposure;
