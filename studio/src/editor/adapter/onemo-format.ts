@@ -14,6 +14,25 @@
 
 export const ONEMO_FORMAT_VERSION = 1;
 
+export type OnemoColorValue = string | [number, number, number];
+
+const clampColorChannel = (value: number) => {
+    return Math.max(0, Math.min(1, value));
+};
+
+export const onemoColorToHex = (value: OnemoColorValue, fallback = '#000000') => {
+    if (Array.isArray(value)) {
+        return `#${value
+        .slice(0, 3)
+        .map((channel) => {
+            return Math.round(clampColorChannel(Number(channel ?? 0)) * 255).toString(16).padStart(2, '0');
+        })
+        .join('')}`;
+    }
+
+    return typeof value === 'string' && value ? value : fallback;
+};
+
 // ─── studio.json schema ──────────────────────────────────────────
 
 /**
@@ -59,8 +78,8 @@ export interface OnemoEnvironmentSettings {
  * Scene background and atmosphere settings.
  */
 export interface OnemoSceneSettings {
-    /** CSS hex color for viewport/canvas background. e.g., '#111315' */
-    backgroundColor: string;
+    /** CSS hex color or raw float RGB tuple for viewport/canvas background. */
+    backgroundColor: OnemoColorValue;
     /** Fog type: 'none' | 'linear' | 'exponential' */
     fog: 'none' | 'linear' | 'exponential';
     /** Fog color as hex. e.g., '#000000' */

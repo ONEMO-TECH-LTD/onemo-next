@@ -48,6 +48,12 @@ type TransformSnapState = {
     increment: number;
 };
 
+type ViewportCameraEntity = {
+    __editorCamera?: boolean;
+    __editorName?: ViewerCameraPreset;
+    getGuid?: () => string;
+} | null;
+
 function BridgeViewportApp({
     bridge,
     viewerConfig,
@@ -124,6 +130,27 @@ function BridgeViewportApp({
             });
         };
 
+        const syncActiveCamera = (entity?: ViewportCameraEntity) => {
+            if (!entity) {
+                return;
+            }
+
+            if (entity.__editorCamera) {
+                return;
+            }
+
+            const resourceId = typeof entity.getGuid === 'function' ? entity.getGuid() : null;
+            if (!resourceId) {
+                return;
+            }
+
+            setCameraCommand({
+                kind: 'entity',
+                resourceId,
+                seq: Date.now()
+            });
+        };
+
         const syncSnap = (enabled?: boolean | null, increment?: number | null) => {
             const projectSettings = editor.call('settings:projectUser') as { get: (path: string) => unknown } | null;
             const resolvedIncrement = Number(increment ?? projectSettings?.get('editor.snapIncrement') ?? 1);
@@ -152,6 +179,7 @@ function BridgeViewportApp({
         const wireframeHandle = editor.on('r3f:viewer:wireframe', syncWireframe);
         const focusHandle = editor.on('r3f:viewer:focus', focusSelection);
         const cameraPresetHandle = editor.on('r3f:viewer:cameraPreset', setCameraPreset);
+        const cameraChangeHandle = editor.on('camera:change', syncActiveCamera);
         const projectSettings = editor.call('settings:projectUser') as { on: (path: string, callback: () => void) => { unbind: () => void }; get: (path: string) => unknown } | null;
         const gridDivisionsHandle = projectSettings?.on('editor.gridDivisions:set', syncGrid) ?? null;
         const gridSizeHandle = projectSettings?.on('editor.gridDivisionSize:set', syncGrid) ?? null;
@@ -166,6 +194,7 @@ function BridgeViewportApp({
         syncGrid();
         syncRenderPass('standard');
         syncWireframe(false);
+        syncActiveCamera(editor.call('camera:current') as ViewportCameraEntity);
 
         return () => {
             selectionHandle.unbind();
@@ -176,6 +205,7 @@ function BridgeViewportApp({
             wireframeHandle.unbind();
             focusHandle.unbind();
             cameraPresetHandle.unbind();
+            cameraChangeHandle.unbind();
             gridDivisionsHandle?.unbind();
             gridSizeHandle?.unbind();
         };
@@ -192,6 +222,7 @@ function BridgeViewportApp({
             const editorSettings = editor.call('settings:projectUser');
             editor.call('selector:set', 'editorSettings', [editorSettings]);
             editor.emit('attributes:inspect[editorSettings]');
+            editor.call('editorSettings:tab:set', 'rendering');
             editor.call('editorSettings:panel:foldAll');
             editor.call('editorSettings:panel:unfold', 'rendering');
         };
@@ -251,6 +282,9 @@ function BridgeViewportApp({
             gridSettings={gridSettings}
             transformSnapSettings={transformSnap}
             cameraCommand={cameraCommand}
+            onCameraCommandConsumed={() => {
+                setCameraCommand(null);
+            }}
             onBridgeReady={handleBridgeReady}
         />
     );
@@ -529,7 +563,6 @@ export function mountEffectViewer(viewportDom: HTMLElement, canvasDom: HTMLEleme
         try {
             const response = await fetch(templateUrl);
             if (!response.ok) {
-                console.warn('[r3f-bridge] Template not found at', templateUrl);
                 return false;
             }
 
@@ -621,6 +654,7 @@ export function mountEffectViewer(viewportDom: HTMLElement, canvasDom: HTMLEleme
         bridgeConfig.colors = nextConfig.colors;
         bridgeConfig.camera = nextConfig.camera;
         bridgeConfig.environment = nextConfig.environment;
+        bridgeConfig.renderer = nextConfig.renderer;
         bridgeConfig.product = nextConfig.product;
     };
 

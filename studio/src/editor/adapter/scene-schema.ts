@@ -1,4 +1,5 @@
 import type { ViewerConfig } from '../../../../src/app/(dev)/prototype/types';
+import { DEFAULT_RENDERER_SETTINGS } from './onemo-format';
 
 export type SavedSceneMaterialRole = 'face' | 'back' | 'frame' | 'generic';
 
@@ -379,6 +380,7 @@ export const createDefaultViewerConfig = (): ViewerConfig => {
             distance: 0.2,
             polarAngle: 90,
             azimuthAngle: 0,
+            target: [0, 0, 0],
             enableDamping: true,
             dampingFactor: 0.1,
             autoRotate: false,
@@ -391,6 +393,9 @@ export const createDefaultViewerConfig = (): ViewerConfig => {
             groundEnabled: false,
             groundHeight: 0,
             groundRadius: 20
+        },
+        renderer: {
+            ...DEFAULT_RENDERER_SETTINGS
         },
         product: {
             productType: 'effect-70mm',

@@ -80,9 +80,6 @@ editor.once('load', () => {
         name: 'settings:locale',
         description: 'The locale to preview in the editor and when you launch the application. This is only visible to you, not to other team members.'
     }, {
-        name: 'settings:chatNotification',
-        description: 'Receive notifications for in-editor chat messages.'
-    }, {
         name: 'settings:renameDuplicatedEntities',
         description: 'When enabled, duplicated entities are renamed by appending an incrementing number to ensure uniqueness. For example, \'Box\' becomes \'Box2\'.'
     }, {

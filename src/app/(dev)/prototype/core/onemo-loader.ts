@@ -12,7 +12,7 @@ import JSZip from 'jszip';
 import * as THREE from 'three';
 
 import { deserializeOnemo, normalizeStudioJsonPublic, type OnemoDeserializeResult } from '../../../../../studio/src/editor/adapter/onemo-deserialize';
-import type { OnemoStudioJson, OnemoProductConfig, OnemoMaterialRole } from '../../../../../studio/src/editor/adapter/onemo-format';
+import { onemoColorToHex, type OnemoStudioJson, type OnemoProductConfig, type OnemoMaterialRole } from '../../../../../studio/src/editor/adapter/onemo-format';
 import type {
     ViewerConfig, CameraConfig, EnvironmentConfig, SceneSettings,
     ColorConfig, FaceMaterial, BackMaterial, FrameMaterial, TexturePaths,
@@ -64,6 +64,7 @@ function editorCameraToSpherical(pos: [number, number, number], target: [number,
         distance,
         polarAngle,
         azimuthAngle,
+        target,
         enableDamping: true,
         dampingFactor: 0.1,
         autoRotate: false,
@@ -93,13 +94,13 @@ function studioJsonToViewerConfig(studioJson: OnemoStudioJson, modelBlobUrl: str
         exposure: studioJson.renderer.toneMappingExposure,
         ambientIntensity: studioJson.scene.ambientIntensity,
         envIntensity: studioJson.environment.intensity,
-        background: studioJson.scene.backgroundColor,
+        background: onemoColorToHex(studioJson.scene.backgroundColor, '#ffffff'),
     };
 
     const colors: ColorConfig = {
         backColor: (backDefaults.color as string) ?? '#080808',
         frameColor: (frameDefaults.color as string) ?? '#0f0f0f',
-        bgColor: studioJson.scene.backgroundColor,
+        bgColor: onemoColorToHex(studioJson.scene.backgroundColor, '#ffffff'),
     };
 
     const camera = editorCameraToSpherical(
@@ -145,7 +146,20 @@ function studioJsonToViewerConfig(studioJson: OnemoStudioJson, modelBlobUrl: str
             : undefined,
     };
 
-    return { modelPath: modelBlobUrl, face, back, frame, scene, colors, camera, environment, product };
+    return {
+        modelPath: modelBlobUrl,
+        face,
+        back,
+        frame,
+        scene,
+        colors,
+        camera,
+        environment,
+        renderer: {
+            ...studioJson.renderer
+        },
+        product
+    };
 }
 
 /**

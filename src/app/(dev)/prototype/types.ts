@@ -94,6 +94,7 @@ export interface CameraConfig {
   distance: number
   polarAngle: number
   azimuthAngle: number
+  target: [number, number, number]
   enableDamping: boolean
   dampingFactor: number
   autoRotate: boolean
@@ -107,6 +108,14 @@ export interface EnvironmentConfig {
   groundEnabled: boolean
   groundHeight: number
   groundRadius: number
+}
+
+export interface ViewerRendererConfig {
+  toneMapping: number
+  toneMappingExposure: number
+  outputColorSpace: string
+  shadowsEnabled: boolean
+  shadowType: number
 }
 
 export interface ViewerMaterialRole {
@@ -161,5 +170,6 @@ export interface ViewerConfig {
   colors: ColorConfig
   camera?: CameraConfig
   environment?: EnvironmentConfig
+  renderer?: ViewerRendererConfig
   product?: ViewerProductConfig
 }

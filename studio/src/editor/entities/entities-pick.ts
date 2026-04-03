@@ -3,6 +3,7 @@ editor.once('load', () => {
         const editorSettings = editor.call('settings:projectUser');
         editor.call('selector:set', 'editorSettings', [editorSettings]);
         editor.emit('attributes:inspect[editorSettings]');
+        editor.call('editorSettings:tab:set', 'rendering');
         editor.call('editorSettings:panel:foldAll');
         editor.call('editorSettings:panel:unfold', 'rendering');
     };

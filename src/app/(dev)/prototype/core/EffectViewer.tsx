@@ -4,7 +4,7 @@
 
 import { Canvas, type RootState, useThree } from '@react-three/fiber'
 import { OrbitControls, Environment, useGLTF } from '@react-three/drei'
-import React, { Suspense, useMemo } from 'react'
+import React, { Suspense, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import EffectModel from './EffectModel'
 import type { ViewerConfig, DesignState } from '../types'
@@ -46,6 +46,110 @@ function RendererBackgroundSync({ color }: { color: string }) {
   return null
 }
 
+function RendererSettingsSync({ config }: { config: ViewerConfig }) {
+  const { gl } = useThree()
+
+  React.useEffect(() => {
+    const rendererConfig = config.renderer
+    if (!rendererConfig) {
+      return
+    }
+
+    /* eslint-disable react-hooks/immutability -- Three renderer is an imperative runtime object. */
+    gl.toneMapping = rendererConfig.toneMapping as THREE.ToneMapping
+    gl.toneMappingExposure = rendererConfig.toneMappingExposure
+    gl.outputColorSpace = rendererConfig.outputColorSpace === 'srgb-linear'
+      ? THREE.LinearSRGBColorSpace
+      : THREE.SRGBColorSpace
+    gl.shadowMap.enabled = rendererConfig.shadowsEnabled
+    gl.shadowMap.type = rendererConfig.shadowType as THREE.ShadowMapType
+    gl.shadowMap.needsUpdate = true
+    /* eslint-enable react-hooks/immutability */
+  }, [config.renderer, gl])
+
+  return null
+}
+
+function CameraConfigSync({
+  config,
+  orbitControlsRef,
+}: {
+  config: ViewerConfig
+  orbitControlsRef?: React.RefObject<React.ComponentRef<typeof OrbitControls> | null>
+}) {
+  const camera = useThree((state) => state.camera)
+  const appliedSignatureRef = useRef<string | null>(null)
+  const appliedCameraRef = useRef<THREE.Camera | null>(null)
+
+  React.useEffect(() => {
+    const cam = config.camera
+    if (!cam) {
+      return
+    }
+
+    const signature = JSON.stringify({
+      fov: cam.fov,
+      distance: cam.distance,
+      polarAngle: cam.polarAngle,
+      azimuthAngle: cam.azimuthAngle,
+      target: cam.target ?? [0, 0, 0],
+    })
+
+    if (appliedSignatureRef.current === signature && appliedCameraRef.current === camera) {
+      return
+    }
+
+    appliedSignatureRef.current = signature
+    appliedCameraRef.current = camera
+
+    const applyCameraConfig = () => {
+      const polar = (cam.polarAngle * Math.PI) / 180
+      const azimuth = (cam.azimuthAngle * Math.PI) / 180
+      const target = cam.target ?? [0, 0, 0]
+      const nextPosition: [number, number, number] = [
+        target[0] + cam.distance * Math.sin(polar) * Math.sin(azimuth),
+        target[1] + cam.distance * Math.cos(polar),
+        target[2] + cam.distance * Math.sin(polar) * Math.cos(azimuth),
+      ]
+
+      /* eslint-disable react-hooks/immutability -- Three camera and controls are imperative runtime objects. */
+      camera.position.set(...nextPosition)
+
+      if (camera instanceof THREE.PerspectiveCamera) {
+        camera.fov = cam.fov
+      }
+
+      if ('updateProjectionMatrix' in camera && typeof camera.updateProjectionMatrix === 'function') {
+        camera.updateProjectionMatrix()
+      }
+
+      const controls = orbitControlsRef?.current
+      if (controls) {
+        controls.target.set(...target)
+        controls.update()
+        return
+      }
+
+      camera.lookAt(new THREE.Vector3(...target))
+      /* eslint-enable react-hooks/immutability */
+    }
+
+    applyCameraConfig()
+    const timers = [
+      window.setTimeout(applyCameraConfig, 0),
+      window.setTimeout(applyCameraConfig, 50),
+      window.setTimeout(applyCameraConfig, 150),
+      window.setTimeout(applyCameraConfig, 500),
+    ]
+
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer))
+    }
+  }, [camera, config.camera, orbitControlsRef])
+
+  return null
+}
+
 export default function EffectViewer({
   config,
   artworkUrl,
@@ -70,10 +174,11 @@ export default function EffectViewer({
     const d = cam.distance
     const polar = (cam.polarAngle * Math.PI) / 180
     const azimuth = (cam.azimuthAngle * Math.PI) / 180
+    const target = cam.target ?? [0, 0, 0]
     return [
-      d * Math.sin(polar) * Math.sin(azimuth),
-      d * Math.cos(polar),
-      d * Math.sin(polar) * Math.cos(azimuth),
+      target[0] + d * Math.sin(polar) * Math.sin(azimuth),
+      target[1] + d * Math.cos(polar),
+      target[2] + d * Math.sin(polar) * Math.cos(azimuth),
     ] as [number, number, number]
   }, [cam])
 
@@ -83,6 +188,15 @@ export default function EffectViewer({
     const rad = (env.envRotation * Math.PI) / 180
     return new THREE.Euler(0, rad, 0)
   }, [env])
+
+  const canvasCamera = useMemo(() => {
+    return {
+      position: cameraPosition,
+      fov: cam?.fov ?? 35,
+      near: 0.001,
+      far: 100,
+    }
+  }, [cameraPosition, cam?.fov])
 
   const handleCreated = (state: RootState) => {
     state.gl.setClearColor(0x000000, 0)
@@ -99,21 +213,21 @@ export default function EffectViewer({
         gl={{
           alpha: true,
           antialias: true,
-          toneMapping: THREE.NeutralToneMapping,
-          toneMappingExposure: config.scene.exposure,
-          outputColorSpace: THREE.SRGBColorSpace,
+          toneMapping: (config.renderer?.toneMapping ?? THREE.NeutralToneMapping) as THREE.ToneMapping,
+          toneMappingExposure: config.renderer?.toneMappingExposure ?? config.scene.exposure,
+          outputColorSpace: config.renderer?.outputColorSpace === 'srgb-linear'
+            ? THREE.LinearSRGBColorSpace
+            : THREE.SRGBColorSpace,
         }}
+        shadows={config.renderer?.shadowsEnabled ?? false}
         dpr={[1, 2]}
-        camera={{
-          position: cameraPosition,
-          fov: cam?.fov ?? 35,
-          near: 0.001,
-          far: 100,
-        }}
+        camera={canvasCamera}
         onCreated={handleCreated}
       >
         <Suspense fallback={null}>
           <RendererBackgroundSync color={config.colors.bgColor} />
+          <RendererSettingsSync config={config} />
+          <CameraConfigSync config={config} orbitControlsRef={orbitControlsRef} />
           <Environment
             {...(env?.customHdri
               ? { files: env.customHdri }
@@ -144,7 +258,7 @@ export default function EffectViewer({
         <OrbitControls
           ref={orbitControlsRef}
           makeDefault
-          target={[0, 0, 0]}
+          target={cam?.target ?? [0, 0, 0]}
           enableDamping={cam?.enableDamping ?? true}
           dampingFactor={cam?.dampingFactor ?? 0.1}
           autoRotate={cam?.autoRotate ?? false}

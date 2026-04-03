@@ -226,7 +226,7 @@ const ATTRIBUTES: (Attribute | Divider)[] = [
 class RenderingSettingsPanel extends BaseSettingsPanel {
     constructor(args: BaseSettingsPanelArgs) {
         args = Object.assign({}, args);
-        args.headerText = 'RENDERING';
+        args.headerText = 'SCENE ENVIRONMENT';
         args.attributes = ATTRIBUTES;
         args._tooltipReference = 'settings:rendering';
 

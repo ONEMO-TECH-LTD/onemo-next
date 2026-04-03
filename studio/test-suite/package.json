@@ -34,6 +34,7 @@
     "test:debug": "playwright test --debug ",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui",
+    "verify:onemo-roundtrip": "tsx src/verify-onemo-roundtrip.ts",
     "build:types": "tsc -p ../src/editor-api/tsconfig.types.json --noCheck",
     "type:check": "npm run build:types && tsc --declaration --emitDeclarationOnly"
   },

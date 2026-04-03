@@ -57,7 +57,7 @@ import {
     type SavedSceneTexture,
     type SavedSceneTextureKey
 } from './scene-schema';
-import { DEFAULT_EDITOR_CAMERA, DEFAULT_PRODUCT_CONFIG } from './onemo-format';
+import { DEFAULT_EDITOR_CAMERA, DEFAULT_PRODUCT_CONFIG, onemoColorToHex } from './onemo-format';
 import { applyOnemoSceneState, deserializeOnemo } from './onemo-deserialize';
 import { serializeOnemo } from './onemo-serialize';
 import { applyScriptObserverChange } from './script-mapper';
@@ -320,6 +320,7 @@ const createCameraConfigFromEditorCamera = (
         distance: 0.2,
         polarAngle: 90,
         azimuthAngle: 0,
+        target: [...DEFAULT_EDITOR_CAMERA.target] as [number, number, number],
         enableDamping: true,
         dampingFactor: 0.1,
         autoRotate: false,
@@ -331,7 +332,8 @@ const createCameraConfigFromEditorCamera = (
         fov: editorCamera.fov,
         distance: spherical.radius,
         polarAngle: THREE.MathUtils.radToDeg(spherical.phi),
-        azimuthAngle: THREE.MathUtils.radToDeg(spherical.theta)
+        azimuthAngle: THREE.MathUtils.radToDeg(spherical.theta),
+        target: [...editorCamera.target] as [number, number, number]
     };
 };
 
@@ -811,6 +813,32 @@ export class ObserverR3FBridge {
                 outputColorSpace: String(sceneSettings.get('render.outputColorSpace') ?? this.context.renderer.outputColorSpace),
                 shadowsEnabled: !!sceneSettings.get('render.shadowsEnabled'),
                 shadowType: Number(sceneSettings.get('render.shadowType') ?? this.context.renderer.shadowMap.type)
+            } : undefined,
+            sceneSettings ? {
+                backgroundColor: Array.isArray(sceneSettings.get('render.backgroundColor'))
+                    ? this.asVec3Tuple(sceneSettings.get('render.backgroundColor'), DEFAULT_SCENE_BACKGROUND_RGB)
+                    : onemoColorToHex(String(sceneSettings.get('render.backgroundColor') ?? '#ffffff'), '#ffffff'),
+                fog: String(sceneSettings.get('render.fog') ?? 'none') as 'none' | 'linear' | 'exponential',
+                fogColor: this.rgbArrayToHex(this.asVec3Tuple(sceneSettings.get('render.fog_color') as number[] | null, DEFAULT_FOG_COLOR_RGB)),
+                fogNear: Number(sceneSettings.get('render.fog_start') ?? DEFAULT_FOG_START),
+                fogFar: Number(sceneSettings.get('render.fog_end') ?? DEFAULT_FOG_END),
+                fogDensity: Number(sceneSettings.get('render.fog_density') ?? DEFAULT_FOG_DENSITY),
+                ambientColor: this.asVec3Tuple(sceneSettings.get('render.global_ambient') as number[] | null, DEFAULT_AMBIENT_RGB),
+                ambientIntensity: Number(sceneSettings.get('render.ambientIntensity') ?? DEFAULT_AMBIENT_INTENSITY)
+            } : undefined,
+            sceneSettings ? {
+                file: this.environmentHdrBuffer ? 'environment.hdr' : null,
+                preset: (() => {
+                    const preset = String(sceneSettings.get('render.envPreset') ?? this.config.environment?.preset ?? '');
+                    return preset || null;
+                })(),
+                intensity: Number(sceneSettings.get('render.envIntensity') ?? DEFAULT_ENV_INTENSITY),
+                rotation: Number(sceneSettings.get('render.envRotation') ?? DEFAULT_ENV_ROTATION),
+                ground: {
+                    enabled: !!sceneSettings.get('render.groundEnabled'),
+                    height: Number(sceneSettings.get('render.groundHeight') ?? 0),
+                    radius: Number(sceneSettings.get('render.groundRadius') ?? 20)
+                }
             } : undefined
         );
     }
@@ -866,23 +894,40 @@ export class ObserverR3FBridge {
         this.setEnvironmentBuffer(result.environmentHdr, result.studioJson.environment.file ?? 'environment.hdr');
 
         const editorCamera = result.studioJson.editorCamera;
-        const camera = this.context.camera;
-        camera.position.set(...editorCamera.position);
-        if (camera instanceof THREE.PerspectiveCamera) {
-            camera.fov = editorCamera.fov;
-        }
-        if (isViewerCamera(camera)) {
-            camera.near = editorCamera.near;
-            camera.far = editorCamera.far;
-            camera.updateProjectionMatrix();
-        }
-        const orbitControls = this.context.orbitControls;
-        if (orbitControls) {
-            orbitControls.target.set(...editorCamera.target);
-            orbitControls.update();
-        } else {
-            camera.lookAt(new THREE.Vector3(...editorCamera.target));
-        }
+        const applyEditorCameraStateToContext = () => {
+            if (!this.context) {
+                return;
+            }
+
+            const orbitControls = this.context.orbitControls;
+            const controlledCamera = orbitControls?.object;
+            const camera = (controlledCamera && 'position' in controlledCamera ? controlledCamera as THREE.Camera : this.context.camera);
+            this.context.camera = camera;
+            camera.position.set(...editorCamera.position);
+            if (camera instanceof THREE.PerspectiveCamera) {
+                camera.fov = editorCamera.fov;
+            }
+            if (isViewerCamera(camera)) {
+                camera.near = editorCamera.near;
+                camera.far = editorCamera.far;
+                camera.updateProjectionMatrix();
+            }
+            if (orbitControls) {
+                orbitControls.object = camera;
+                orbitControls.target.set(...editorCamera.target);
+                orbitControls.update();
+            } else {
+                camera.lookAt(new THREE.Vector3(...editorCamera.target));
+            }
+        };
+
+        const reapplyEditorCameraConfig = () => {
+            this.updateViewerConfig((configData) => {
+                configData.camera = createCameraConfigFromEditorCamera(editorCamera, configData.camera);
+            });
+        };
+
+        applyEditorCameraStateToContext();
 
         const nextEnvironment = {
             preset: result.studioJson.environment.preset ?? 'studio',
@@ -900,10 +945,13 @@ export class ObserverR3FBridge {
             configData.modelPath = modelBlobUrl;
             configData.scene.exposure = result.studioJson.renderer.toneMappingExposure;
             configData.scene.envIntensity = result.studioJson.environment.intensity;
-            configData.scene.background = result.studioJson.scene.backgroundColor;
+            configData.scene.background = onemoColorToHex(result.studioJson.scene.backgroundColor, '#ffffff');
             configData.scene.ambientIntensity = result.studioJson.scene.ambientIntensity;
-            configData.colors.bgColor = result.studioJson.scene.backgroundColor;
+            configData.colors.bgColor = onemoColorToHex(result.studioJson.scene.backgroundColor, '#ffffff');
             configData.environment = nextEnvironment;
+            configData.renderer = {
+                ...result.studioJson.renderer
+            };
             configData.camera = createCameraConfigFromEditorCamera(editorCamera, configData.camera);
             configData.product = {
                 productType: result.studioJson.product.productType,
@@ -924,6 +972,22 @@ export class ObserverR3FBridge {
         this.sceneSettingsSeeded = false;
         this.syncSceneSettingsObserverFromContext();
         this.scheduleRebuild();
+        window.setTimeout(applyEditorCameraStateToContext, 0);
+        window.setTimeout(applyEditorCameraStateToContext, 100);
+        window.setTimeout(applyEditorCameraStateToContext, 500);
+        window.setTimeout(applyEditorCameraStateToContext, 1000);
+        window.setTimeout(reapplyEditorCameraConfig, 0);
+        window.setTimeout(reapplyEditorCameraConfig, 100);
+        window.setTimeout(reapplyEditorCameraConfig, 500);
+        window.setTimeout(reapplyEditorCameraConfig, 1000);
+        const cameraSettleStartedAt = Date.now();
+        const cameraSettleInterval = window.setInterval(() => {
+            applyEditorCameraStateToContext();
+            reapplyEditorCameraConfig();
+            if (Date.now() - cameraSettleStartedAt >= 5000) {
+                window.clearInterval(cameraSettleInterval);
+            }
+        }, 50);
         return true;
     }
 
@@ -1679,8 +1743,8 @@ export class ObserverR3FBridge {
                 const normalizedPath = normalizeAssetPath(path);
                 if (normalizedPath.startsWith('data.') && normalizedPath.endsWith('Map')) {
                     const textureUrl = this.resolveTextureAssetUrl(observer.get(normalizedPath));
-                    void this.applyTexture(assetId, normalizedPath.replace(/^data\./, ''), textureUrl).catch((err) => {
-                        console.warn('[r3f-bridge] texture load failed', err);
+                    void this.applyTexture(assetId, normalizedPath.replace(/^data\./, ''), textureUrl).catch(() => {
+                        // Keep the bridge resilient when texture assets are missing or mid-import.
                     });
                     return;
                 }
@@ -1728,8 +1792,8 @@ export class ObserverR3FBridge {
                 return;
             }
 
-            void this.applyTexture(assetId, slot, textureUrl).catch((error) => {
-                console.warn('[r3f-bridge] texture load failed', error);
+            void this.applyTexture(assetId, slot, textureUrl).catch(() => {
+                // Keep the bridge resilient when texture assets are missing or mid-import.
             });
         });
     }
@@ -2067,8 +2131,8 @@ export class ObserverR3FBridge {
                     observer.set(`data.${observerSlot}`, null);
                     clearTextureMetadata();
                 }, [observer]);
-                void this.applyTexture(assetId, observerSlot, null).catch((error) => {
-                    console.warn('[r3f-bridge] texture load failed', error);
+                void this.applyTexture(assetId, observerSlot, null).catch(() => {
+                    // Keep the bridge resilient when texture assets are missing or mid-import.
                 });
                 return;
             }
@@ -2150,8 +2214,8 @@ export class ObserverR3FBridge {
                 if (material) {
                     material.needsUpdate = true;
                 }
-            }).catch((error) => {
-                console.warn('[r3f-bridge] texture load failed', error);
+            }).catch(() => {
+                // Keep the bridge resilient when texture assets are missing or mid-import.
             });
         });
     }
@@ -2587,6 +2651,7 @@ export class ObserverR3FBridge {
                 distance: 0.2,
                 polarAngle: 90,
                 azimuthAngle: 0,
+                target: [0, 0, 0],
                 enableDamping: true,
                 dampingFactor: 0.1,
                 autoRotate: false,
@@ -3053,6 +3118,14 @@ export class ObserverR3FBridge {
 
         if (path === 'render.tonemapping') {
             renderer.toneMapping = Number(sceneSettings.get('render.tonemapping') ?? renderer.toneMapping) as THREE.ToneMapping;
+            this.config.renderer = this.config.renderer || {
+                toneMapping: renderer.toneMapping,
+                toneMappingExposure: renderer.toneMappingExposure,
+                outputColorSpace: renderer.outputColorSpace,
+                shadowsEnabled: renderer.shadowMap.enabled,
+                shadowType: renderer.shadowMap.type
+            };
+            this.config.renderer.toneMapping = renderer.toneMapping;
             this.sceneDirty = true;
             return;
         }
@@ -3060,6 +3133,14 @@ export class ObserverR3FBridge {
         if (path === 'render.exposure') {
             renderer.toneMappingExposure = Number(sceneSettings.get('render.exposure') ?? renderer.toneMappingExposure);
             this.config.scene.exposure = renderer.toneMappingExposure;
+            this.config.renderer = this.config.renderer || {
+                toneMapping: renderer.toneMapping,
+                toneMappingExposure: renderer.toneMappingExposure,
+                outputColorSpace: renderer.outputColorSpace,
+                shadowsEnabled: renderer.shadowMap.enabled,
+                shadowType: renderer.shadowMap.type
+            };
+            this.config.renderer.toneMappingExposure = renderer.toneMappingExposure;
             this.sceneDirty = true;
             return;
         }
@@ -3067,6 +3148,14 @@ export class ObserverR3FBridge {
         if (path === 'render.outputColorSpace') {
             const value = sceneSettings.get('render.outputColorSpace');
             renderer.outputColorSpace = value === 'srgb-linear' ? THREE.LinearSRGBColorSpace : THREE.SRGBColorSpace;
+            this.config.renderer = this.config.renderer || {
+                toneMapping: renderer.toneMapping,
+                toneMappingExposure: renderer.toneMappingExposure,
+                outputColorSpace: renderer.outputColorSpace,
+                shadowsEnabled: renderer.shadowMap.enabled,
+                shadowType: renderer.shadowMap.type
+            };
+            this.config.renderer.outputColorSpace = value === 'srgb-linear' ? 'srgb-linear' : 'srgb';
             this.sceneDirty = true;
             return;
         }
@@ -3074,6 +3163,14 @@ export class ObserverR3FBridge {
         if (path === 'render.shadowsEnabled') {
             renderer.shadowMap.enabled = !!sceneSettings.get('render.shadowsEnabled');
             renderer.shadowMap.needsUpdate = true;
+            this.config.renderer = this.config.renderer || {
+                toneMapping: renderer.toneMapping,
+                toneMappingExposure: renderer.toneMappingExposure,
+                outputColorSpace: renderer.outputColorSpace,
+                shadowsEnabled: renderer.shadowMap.enabled,
+                shadowType: renderer.shadowMap.type
+            };
+            this.config.renderer.shadowsEnabled = renderer.shadowMap.enabled;
             this.sceneDirty = true;
             return;
         }
@@ -3081,6 +3178,14 @@ export class ObserverR3FBridge {
         if (path === 'render.shadowType') {
             renderer.shadowMap.type = Number(sceneSettings.get('render.shadowType') ?? renderer.shadowMap.type) as THREE.ShadowMapType;
             renderer.shadowMap.needsUpdate = true;
+            this.config.renderer = this.config.renderer || {
+                toneMapping: renderer.toneMapping,
+                toneMappingExposure: renderer.toneMappingExposure,
+                outputColorSpace: renderer.outputColorSpace,
+                shadowsEnabled: renderer.shadowMap.enabled,
+                shadowType: renderer.shadowMap.type
+            };
+            this.config.renderer.shadowType = renderer.shadowMap.type;
             this.sceneDirty = true;
             return;
         }

@@ -12,6 +12,7 @@ import {
     DEFAULT_SCENE_SETTINGS,
     ONEMO_FORMAT_VERSION,
     type OnemoEditorCamera,
+    type OnemoColorValue,
     type OnemoEnvironmentSettings,
     type OnemoProductConfig,
     type OnemoRendererSettings,
@@ -69,6 +70,30 @@ const readTuple3 = (value: unknown, fallback: readonly number[]) => {
     ] as [number, number, number];
 };
 
+const readColorValue = (value: unknown, fallback: OnemoColorValue) => {
+    if (Array.isArray(value)) {
+        return readTuple3(value, Array.isArray(fallback) ? fallback : [0, 0, 0]);
+    }
+
+    if (typeof value === 'string' && value) {
+        return value;
+    }
+
+    return fallback;
+};
+
+const colorValueToThreeColor = (value: OnemoColorValue, fallback: string) => {
+    if (Array.isArray(value)) {
+        return new THREE.Color(
+            Number(value[0] ?? 0),
+            Number(value[1] ?? 0),
+            Number(value[2] ?? 0)
+        );
+    }
+
+    return new THREE.Color(typeof value === 'string' && value ? value : fallback);
+};
+
 const normalizeEditorCamera = (value: unknown): OnemoEditorCamera => {
     const source = isRecord(value) ? value : {};
 
@@ -117,7 +142,7 @@ const normalizeSceneSettings = (value: unknown): OnemoSceneSettings => {
         : DEFAULT_SCENE_SETTINGS.fog;
 
     return {
-        backgroundColor: readString(source.backgroundColor, DEFAULT_SCENE_SETTINGS.backgroundColor),
+        backgroundColor: readColorValue(source.backgroundColor, DEFAULT_SCENE_SETTINGS.backgroundColor),
         fog,
         fogColor: readString(source.fogColor, DEFAULT_SCENE_SETTINGS.fogColor),
         fogNear: readNumber(source.fogNear, DEFAULT_SCENE_SETTINGS.fogNear),
@@ -188,7 +213,7 @@ const normalizeStudioJson = (value: unknown, fallbackEnvironmentFile: string | n
 };
 
 const buildFog = (sceneSettings: OnemoSceneSettings) => {
-    const fogColor = new THREE.Color(sceneSettings.fogColor);
+    const fogColor = colorValueToThreeColor(sceneSettings.fogColor, DEFAULT_SCENE_SETTINGS.fogColor);
 
     if (sceneSettings.fog === 'linear') {
         return new THREE.Fog(fogColor, sceneSettings.fogNear, sceneSettings.fogFar);
@@ -252,7 +277,7 @@ const applySceneSettings = (
 ) => {
     const target = scene as OnemoSceneGroup;
 
-    target.background = new THREE.Color(studioJson.scene.backgroundColor);
+    target.background = colorValueToThreeColor(studioJson.scene.backgroundColor, DEFAULT_SCENE_SETTINGS.backgroundColor as string);
     target.backgroundIntensity = studioJson.environment.intensity;
     target.backgroundRotation = new THREE.Euler(0, THREE.MathUtils.degToRad(studioJson.environment.rotation), 0);
     target.fog = buildFog(studioJson.scene);

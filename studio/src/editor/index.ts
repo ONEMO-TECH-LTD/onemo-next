@@ -224,7 +224,9 @@ import './viewport/camera/camera-look-around';
 import './viewport/camera/camera-preview';
 import './viewport/camera/camera-shortcuts';
 
-// whoisonline
+// whoisonline compatibility stub
+// Keep the local-only module loaded so realtime hooks can safely no-op without
+// reviving the old collaboration UI surfaces.
 import './whoisonline/whoisonline';
 import './whoisonline/whoisonline-scene';
 

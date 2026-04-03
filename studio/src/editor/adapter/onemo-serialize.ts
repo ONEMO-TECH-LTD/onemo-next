@@ -10,6 +10,7 @@ import {
     DEFAULT_SCENE_SETTINGS,
     ONEMO_FORMAT_VERSION,
     type OnemoEditorCamera,
+    type OnemoEnvironmentSettings,
     type OnemoProductConfig,
     type OnemoRendererSettings,
     type OnemoSceneSettings,
@@ -17,6 +18,29 @@ import {
 } from './onemo-format';
 
 const DEFAULT_SCENE_NAME = 'Untitled Scene';
+const TEXTURE_PROPERTY_KEYS = [
+    'map',
+    'alphaMap',
+    'aoMap',
+    'bumpMap',
+    'clearcoatMap',
+    'clearcoatNormalMap',
+    'clearcoatRoughnessMap',
+    'displacementMap',
+    'emissiveMap',
+    'iridescenceMap',
+    'iridescenceThicknessMap',
+    'lightMap',
+    'metalnessMap',
+    'normalMap',
+    'roughnessMap',
+    'sheenColorMap',
+    'sheenRoughnessMap',
+    'specularColorMap',
+    'specularIntensityMap',
+    'thicknessMap',
+    'transmissionMap'
+] as const;
 
 const toHex = (color: THREE.Color) => {
     return `#${color.getHexString()}`;
@@ -61,7 +85,7 @@ const extractAmbientLight = (scene: THREE.Scene) => {
 const extractSceneSettings = (scene: THREE.Scene): OnemoSceneSettings => {
     const ambientLight = extractAmbientLight(scene);
     const backgroundColor = scene.background instanceof THREE.Color
-        ? toHex(scene.background)
+        ? [scene.background.r, scene.background.g, scene.background.b] as [number, number, number]
         : DEFAULT_SCENE_SETTINGS.backgroundColor;
 
     const sceneSettings: OnemoSceneSettings = {
@@ -124,6 +148,101 @@ const extractMaterialOverrides = (material: THREE.Material): Record<string, unkn
     return Object.keys(overrides).length > 0 ? overrides : null;
 };
 
+const hasValidTextureImageData = (texture: THREE.Texture | null | undefined) => {
+    if (!(texture instanceof THREE.Texture)) {
+        return false;
+    }
+
+    const source = texture.source?.data ?? texture.image;
+    if (!source) {
+        return false;
+    }
+
+    if (typeof ImageBitmap !== 'undefined' && source instanceof ImageBitmap) {
+        return source.width > 0 && source.height > 0;
+    }
+
+    if (typeof HTMLCanvasElement !== 'undefined' && source instanceof HTMLCanvasElement) {
+        return source.width > 0 && source.height > 0;
+    }
+
+    if (typeof HTMLImageElement !== 'undefined' && source instanceof HTMLImageElement) {
+        return (source.naturalWidth || source.width || 0) > 0 && (source.naturalHeight || source.height || 0) > 0;
+    }
+
+    if (typeof OffscreenCanvas !== 'undefined' && source instanceof OffscreenCanvas) {
+        return source.width > 0 && source.height > 0;
+    }
+
+    if (typeof ImageData !== 'undefined' && source instanceof ImageData) {
+        return source.width > 0 && source.height > 0;
+    }
+
+    if (ArrayBuffer.isView(source)) {
+        return source.byteLength > 0;
+    }
+
+    if (typeof source === 'object' && source !== null) {
+        const width = Number((source as { width?: number }).width ?? 0);
+        const height = Number((source as { height?: number }).height ?? 0);
+        if (width > 0 && height > 0) {
+            return true;
+        }
+
+        const data = (source as { data?: ArrayBufferView | ArrayLike<number> | null }).data;
+        if (ArrayBuffer.isView(data)) {
+            return data.byteLength > 0;
+        }
+    }
+
+    return false;
+};
+
+const withExportSafeTextures = async <T>(scene: THREE.Scene, run: (exportScene: THREE.Scene) => Promise<T>) => {
+    const replacements = new Map<THREE.Material, Map<string, THREE.Texture | null>>();
+
+    scene.traverse((object) => {
+        if (!(object instanceof THREE.Mesh)) {
+            return;
+        }
+
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        materials.forEach((material) => {
+            if (!(material instanceof THREE.Material)) {
+                return;
+            }
+
+            TEXTURE_PROPERTY_KEYS.forEach((key) => {
+                const texture = (material as THREE.Material & Record<string, unknown>)[key];
+                if (!(texture instanceof THREE.Texture) || hasValidTextureImageData(texture)) {
+                    return;
+                }
+
+                let materialReplacements = replacements.get(material);
+                if (!materialReplacements) {
+                    materialReplacements = new Map<string, THREE.Texture | null>();
+                    replacements.set(material, materialReplacements);
+                }
+
+                materialReplacements.set(key, texture);
+                (material as THREE.Material & Record<string, unknown>)[key] = null;
+                material.needsUpdate = true;
+            });
+        });
+    });
+
+    try {
+        return await run(scene);
+    } finally {
+        replacements.forEach((entries, material) => {
+            entries.forEach((texture, key) => {
+                (material as THREE.Material & Record<string, unknown>)[key] = texture;
+            });
+            material.needsUpdate = true;
+        });
+    }
+};
+
 const collectMaterialOverrides = (scene: THREE.Scene) => {
     const materialOverrides: Record<string, Record<string, unknown>> = {};
 
@@ -178,14 +297,31 @@ export async function serializeOnemo(
     },
     productConfig: OnemoProductConfig,
     environmentHdr?: ArrayBuffer | null,
-    rendererOverrides?: Partial<OnemoRendererSettings>
+    rendererOverrides?: Partial<OnemoRendererSettings>,
+    sceneOverrides?: Partial<OnemoSceneSettings>,
+    environmentOverrides?: Partial<OnemoEnvironmentSettings>
 ): Promise<Blob> {
     const exporter = new GLTFExporter();
-    const glb = await exporter.parseAsync(scene, { binary: true }) as ArrayBuffer;
+    const glb = await withExportSafeTextures(scene, async (exportScene) => {
+        return exporter.parseAsync(exportScene, { binary: true }) as Promise<ArrayBuffer>;
+    });
     const now = new Date().toISOString();
     const sceneWithEnvironment = scene as THREE.Scene & {
         environmentIntensity?: number;
         environmentRotation?: THREE.Euler;
+    };
+
+    const extractedSceneSettings = extractSceneSettings(scene);
+    const extractedEnvironmentSettings: OnemoEnvironmentSettings = {
+        ...DEFAULT_ENVIRONMENT,
+        file: environmentHdr ? 'environment.hdr' : null,
+        preset: environmentHdr ? null : DEFAULT_ENVIRONMENT.preset,
+        intensity: typeof sceneWithEnvironment.environmentIntensity === 'number'
+            ? sceneWithEnvironment.environmentIntensity
+            : DEFAULT_ENVIRONMENT.intensity,
+        rotation: sceneWithEnvironment.environmentRotation instanceof THREE.Euler
+            ? THREE.MathUtils.radToDeg(sceneWithEnvironment.environmentRotation.y)
+            : DEFAULT_ENVIRONMENT.rotation
     };
 
     const studioJson: OnemoStudioJson = {
@@ -201,16 +337,17 @@ export async function serializeOnemo(
             shadowType: rendererOverrides?.shadowType ?? renderer.shadowMap.type ?? DEFAULT_RENDERER_SETTINGS.shadowType
         },
         environment: {
-            ...DEFAULT_ENVIRONMENT,
-            file: environmentHdr ? 'environment.hdr' : null,
-            intensity: typeof sceneWithEnvironment.environmentIntensity === 'number'
-                ? sceneWithEnvironment.environmentIntensity
-                : DEFAULT_ENVIRONMENT.intensity,
-            rotation: sceneWithEnvironment.environmentRotation instanceof THREE.Euler
-                ? THREE.MathUtils.radToDeg(sceneWithEnvironment.environmentRotation.y)
-                : DEFAULT_ENVIRONMENT.rotation
+            ...extractedEnvironmentSettings,
+            ...environmentOverrides,
+            ground: {
+                ...extractedEnvironmentSettings.ground,
+                ...(environmentOverrides?.ground || {})
+            }
         },
-        scene: extractSceneSettings(scene),
+        scene: {
+            ...extractedSceneSettings,
+            ...sceneOverrides
+        },
         editorCamera: extractEditorCamera(editorCamera),
         product: cloneProductConfig(productConfig),
         materialOverrides: collectMaterialOverrides(scene)
