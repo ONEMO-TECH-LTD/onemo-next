@@ -232,12 +232,6 @@ const ATTRIBUTES: (Attribute | Divider)[] = [
         type: 'string'
     },
     {
-        alias: 'chatNotification',
-        reference: 'settings:chatNotification',
-        label: 'Chat Notification',
-        type: 'boolean'
-    },
-    {
         observer: 'settings',
         path: 'editor.renameDuplicatedEntities',
         reference: 'settings:renameDuplicatedEntities',
@@ -290,49 +284,10 @@ class EditorSettingsPanel extends BaseSettingsPanel {
         fieldShowViewCube.on('change', (value: boolean) => {
             fieldViewCubeSize.parent.hidden = !value;
         });
-
-        const evtPermission = editor.on('notify:permission', this._checkChatNotificationState.bind(this));
-        const evtChatNotifyState = editor.on('chat:notify', this._checkChatNotificationState.bind(this));
-        const fieldChatNotification = this._attributesInspector.getField('chatNotification');
-        this._checkChatNotificationState();
-        fieldChatNotification.on('change', (value) => {
-            if (editor.call('notify:state') !== 'granted') {
-                editor.call('notify:permission');
-            } else {
-                editor.call('localStorage:set', 'editor:notifications:chat', value);
-                editor.emit('chat:notify', value);
-                this._checkChatNotificationState();
-            }
-        });
-        this.once('destroy', () => {
-            evtPermission.unbind();
-            evtChatNotifyState.unbind();
-        });
     }
 
     _field(name: string) {
         return this._attributesInspector.getField(`editor.${name}`);
-    }
-
-    _checkChatNotificationState() {
-        const permission = editor.call('notify:state');
-        const fieldChatNotification = this._attributesInspector.getField('chatNotification');
-
-        fieldChatNotification.enabled = permission !== 'denied';
-
-        if (permission !== 'granted' && permission !== 'denied') {
-            fieldChatNotification.value = null;
-        }
-
-        if (permission === 'granted') {
-            // restore localstorage state
-            const granted = editor.call('localStorage:get', 'editor:notifications:chat');
-            if (granted === null) {
-                fieldChatNotification.value = true;
-            } else {
-                fieldChatNotification.value = granted;
-            }
-        }
     }
 }
 

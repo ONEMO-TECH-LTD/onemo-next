@@ -55,6 +55,11 @@ export type ViewerCameraCommand =
       seq: number
     }
   | {
+      kind: 'entity'
+      resourceId: string
+      seq: number
+    }
+  | {
       kind: 'preset'
       preset: ViewerCameraPreset
       seq: number
@@ -519,6 +524,7 @@ interface EffectViewerProps {
   gridSettings?: ViewerGridSettings
   transformSnapSettings?: ViewerTransformSnapSettings
   cameraCommand?: ViewerCameraCommand | null
+  onCameraCommandConsumed?: () => void
 }
 
 function snapshotObjectTransform(object: THREE.Object3D): EffectViewerTransformSnapshot {
@@ -1139,6 +1145,8 @@ function CameraCommandController({
   resolveIdByObject,
   orbitControlsRef,
   fallbackPerspectivePosition,
+  onCameraReplaced,
+  onCameraCommandConsumed,
 }: {
   cameraCommand: ViewerCameraCommand | null
   selectedResourceIds: string[]
@@ -1146,16 +1154,61 @@ function CameraCommandController({
   resolveIdByObject?: (object: THREE.Object3D) => string | null
   orbitControlsRef: RefObject<React.ComponentRef<typeof OrbitControls> | null>
   fallbackPerspectivePosition: [number, number, number]
+  onCameraReplaced?: (camera: THREE.Camera) => void
+  onCameraCommandConsumed?: () => void
 }) {
   const camera = useThree((state) => state.camera)
   const scene = useThree((state) => state.scene)
-  const animationRef = useRef<{
-    alpha: number
-    fromPosition: THREE.Vector3
-    toPosition: THREE.Vector3
-    fromTarget: THREE.Vector3
-    toTarget: THREE.Vector3
-  } | null>(null)
+  const size = useThree((state) => state.size)
+  const set = useThree((state) => state.set)
+
+  const syncProjectionCamera = useCallback((projection: 'perspective' | 'orthographic', radius: number) => {
+    const aspect = size.width / Math.max(size.height, 1)
+    const near = 'near' in camera ? camera.near : 0.001
+    const far = 'far' in camera ? camera.far : 100
+
+    if (projection === 'perspective') {
+      if (camera instanceof THREE.PerspectiveCamera) {
+        camera.aspect = aspect
+        camera.updateProjectionMatrix()
+        return camera
+      }
+
+      const nextCamera = new THREE.PerspectiveCamera(45, aspect, near, far)
+      nextCamera.position.copy(camera.position)
+      nextCamera.quaternion.copy(camera.quaternion)
+      nextCamera.up.copy(camera.up)
+      set({ camera: nextCamera })
+      onCameraReplaced?.(nextCamera)
+      return nextCamera
+    }
+
+    const orthoHeight = Math.max(radius, 0.5)
+
+    if (camera instanceof THREE.OrthographicCamera) {
+      camera.left = -orthoHeight * aspect
+      camera.right = orthoHeight * aspect
+      camera.top = orthoHeight
+      camera.bottom = -orthoHeight
+      camera.updateProjectionMatrix()
+      return camera
+    }
+
+    const nextCamera = new THREE.OrthographicCamera(
+      -orthoHeight * aspect,
+      orthoHeight * aspect,
+      orthoHeight,
+      -orthoHeight,
+      near,
+      far
+    )
+    nextCamera.position.copy(camera.position)
+    nextCamera.quaternion.copy(camera.quaternion)
+    nextCamera.up.copy(camera.up)
+    set({ camera: nextCamera })
+    onCameraReplaced?.(nextCamera)
+    return nextCamera
+  }, [camera, onCameraReplaced, set, size.height, size.width])
 
   useEffect(() => {
     if (!cameraCommand) {
@@ -1203,6 +1256,57 @@ function CameraCommandController({
     const controls = orbitControlsRef.current
     const currentTarget = controls?.target.clone() ?? new THREE.Vector3()
 
+    const applyCameraTarget = (nextCamera: THREE.Camera, nextTarget: THREE.Vector3) => {
+      if (orbitControlsRef.current) {
+        orbitControlsRef.current.object = nextCamera
+        orbitControlsRef.current.target.copy(nextTarget)
+        orbitControlsRef.current.update()
+      } else {
+        nextCamera.lookAt(nextTarget)
+      }
+    }
+
+    const applySceneCamera = (sourceCamera: THREE.Camera) => {
+      const nextProjection = sourceCamera instanceof THREE.OrthographicCamera ? 'orthographic' : 'perspective'
+      const workingCamera = syncProjectionCamera(
+        nextProjection,
+        sourceCamera instanceof THREE.OrthographicCamera ? Math.abs(sourceCamera.top) : 5
+      )
+      const lookTarget = sourceCamera.position.clone().add(sourceCamera.getWorldDirection(new THREE.Vector3()))
+      const sourceNear = 'near' in sourceCamera ? sourceCamera.near : workingCamera.near
+      const sourceFar = 'far' in sourceCamera ? sourceCamera.far : workingCamera.far
+
+      workingCamera.position.copy(sourceCamera.position)
+      workingCamera.quaternion.copy(sourceCamera.quaternion)
+      workingCamera.near = sourceNear
+      workingCamera.far = sourceFar
+
+      if (workingCamera instanceof THREE.PerspectiveCamera && sourceCamera instanceof THREE.PerspectiveCamera) {
+        workingCamera.fov = sourceCamera.fov
+      }
+
+      if (workingCamera instanceof THREE.OrthographicCamera && sourceCamera instanceof THREE.OrthographicCamera) {
+        const aspect = size.width / Math.max(size.height, 1)
+        const orthoHeight = Math.max(Math.abs(sourceCamera.top), 0.5)
+        workingCamera.left = -orthoHeight * aspect
+        workingCamera.right = orthoHeight * aspect
+        workingCamera.top = orthoHeight
+        workingCamera.bottom = -orthoHeight
+      }
+
+      workingCamera.updateProjectionMatrix()
+      applyCameraTarget(workingCamera, lookTarget)
+    }
+
+    if (cameraCommand.kind === 'entity' && resolveObjectById) {
+      const targetObject = resolveObjectById(cameraCommand.resourceId)
+      if (targetObject instanceof THREE.Camera) {
+        applySceneCamera(targetObject)
+      }
+      onCameraCommandConsumed?.()
+      return
+    }
+
     let direction = camera.position.clone().sub(currentTarget)
     if (direction.lengthSq() === 0) {
       direction = new THREE.Vector3(...fallbackPerspectivePosition).normalize()
@@ -1210,61 +1314,69 @@ function CameraCommandController({
       direction.normalize()
     }
 
+    let projection: 'perspective' | 'orthographic' = camera instanceof THREE.OrthographicCamera ? 'orthographic' : 'perspective'
+
     if (cameraCommand.kind === 'preset') {
       switch (cameraCommand.preset) {
         case 'front':
+          projection = 'orthographic'
           direction = new THREE.Vector3(0, 0, 1)
           break
         case 'back':
+          projection = 'orthographic'
           direction = new THREE.Vector3(0, 0, -1)
           break
         case 'left':
+          projection = 'orthographic'
           direction = new THREE.Vector3(-1, 0, 0)
           break
         case 'right':
+          projection = 'orthographic'
           direction = new THREE.Vector3(1, 0, 0)
           break
         case 'top':
+          projection = 'orthographic'
           direction = new THREE.Vector3(0, 1, 0)
           break
         case 'bottom':
+          projection = 'orthographic'
           direction = new THREE.Vector3(0, -1, 0)
           break
         case 'perspective':
         default:
+          projection = 'perspective'
           direction = new THREE.Vector3(...fallbackPerspectivePosition).normalize()
           break
       }
     }
 
-    animationRef.current = {
-      alpha: 0,
-      fromPosition: camera.position.clone(),
-      toPosition: target.clone().add(direction.multiplyScalar(radius * 2.6)),
-      fromTarget: currentTarget,
-      toTarget: target.clone(),
-    }
-  }, [camera, cameraCommand, fallbackPerspectivePosition, orbitControlsRef, resolveIdByObject, resolveObjectById, scene, selectedResourceIds])
+    const workingCamera = syncProjectionCamera(projection, radius)
+    const distance = projection === 'orthographic' ? Math.max(radius * 4, 2) : radius * 2.6
+    workingCamera.position.copy(target.clone().add(direction.multiplyScalar(distance)))
+    workingCamera.lookAt(target)
+    workingCamera.updateProjectionMatrix()
+    applyCameraTarget(workingCamera, target.clone())
+    onCameraCommandConsumed?.()
+  }, [camera, cameraCommand, fallbackPerspectivePosition, onCameraCommandConsumed, orbitControlsRef, resolveIdByObject, resolveObjectById, scene, selectedResourceIds, size.height, size.width, syncProjectionCamera])
 
-  useFrame((_, delta) => {
-    const animation = animationRef.current
-    const controls = orbitControlsRef.current
-    if (!animation || !controls) {
+  useEffect(() => {
+    const aspect = size.width / Math.max(size.height, 1)
+
+    if (camera instanceof THREE.PerspectiveCamera) {
+      camera.aspect = aspect
+      camera.updateProjectionMatrix()
       return
     }
 
-    animation.alpha = Math.min(1, animation.alpha + delta * 3.5)
-    const eased = 1 - Math.pow(1 - animation.alpha, 3)
-
-    camera.position.lerpVectors(animation.fromPosition, animation.toPosition, eased)
-    controls.target.lerpVectors(animation.fromTarget, animation.toTarget, eased)
-    camera.lookAt(controls.target)
-    controls.update()
-
-    if (animation.alpha >= 1) {
-      animationRef.current = null
+    if (camera instanceof THREE.OrthographicCamera) {
+      const orthoHeight = Math.max(Math.abs(camera.top), 0.5)
+      camera.left = -orthoHeight * aspect
+      camera.right = orthoHeight * aspect
+      camera.top = orthoHeight
+      camera.bottom = -orthoHeight
+      camera.updateProjectionMatrix()
     }
-  })
+  }, [camera, size.height, size.width])
 
   return null
 }
@@ -1284,6 +1396,26 @@ function OrbitControlsOverride({ orbitControlsRef }: {
       RIGHT: THREE.MOUSE.ROTATE,
     }
   }, [orbitControlsRef])
+
+  return null
+}
+
+function BridgeStateSync({
+  onSync,
+}: {
+  onSync: (patch: Partial<EffectViewerBridge>) => void
+}) {
+  const camera = useThree((state) => state.camera)
+  const scene = useThree((state) => state.scene)
+  const renderer = useThree((state) => state.gl)
+
+  useEffect(() => {
+    onSync({
+      camera,
+      scene,
+      renderer,
+    })
+  }, [camera, onSync, renderer, scene])
 
   return null
 }
@@ -1309,6 +1441,7 @@ export default function StudioViewport({
   gridSettings = { enabled: true, divisions: 10, cellSize: 1 },
   transformSnapSettings,
   cameraCommand = null,
+  onCameraCommandConsumed,
 }: EffectViewerProps) {
   const bridgeRef = useRef<Partial<EffectViewerBridge>>({})
   const emitBridge = useCallback((patch: Partial<EffectViewerBridge>) => {
@@ -1341,10 +1474,11 @@ export default function StudioViewport({
     const d = cam.distance
     const polar = (cam.polarAngle * Math.PI) / 180
     const azimuth = (cam.azimuthAngle * Math.PI) / 180
+    const target = cam.target ?? [0, 0, 0]
     return [
-      d * Math.sin(polar) * Math.sin(azimuth),
-      d * Math.cos(polar),
-      d * Math.sin(polar) * Math.cos(azimuth),
+      target[0] + d * Math.sin(polar) * Math.sin(azimuth),
+      target[1] + d * Math.cos(polar),
+      target[2] + d * Math.sin(polar) * Math.cos(azimuth),
     ] as [number, number, number]
   }, [cam])
 
@@ -1381,6 +1515,7 @@ export default function StudioViewport({
           orbitControlsRef={orbitControlsRef}
           onModelReady={handleModelReady}
         >
+        <BridgeStateSync onSync={emitBridge} />
         {/* Studio-specific OrbitControls customization */}
         <OrbitControlsOverride orbitControlsRef={orbitControlsRef} />
         {/* Studio controls — injected into EffectViewer's Canvas */}
@@ -1419,6 +1554,10 @@ export default function StudioViewport({
           resolveIdByObject={resolveIdByObject}
           orbitControlsRef={orbitControlsRef}
           fallbackPerspectivePosition={cameraPosition}
+          onCameraReplaced={(nextCamera) => {
+            emitBridge({ camera: nextCamera })
+          }}
+          onCameraCommandConsumed={onCameraCommandConsumed}
         />
       </EffectViewer>
     </ViewportErrorBoundary>

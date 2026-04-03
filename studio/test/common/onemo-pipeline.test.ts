@@ -11,6 +11,7 @@ import { deserializeOnemo } from '../../src/editor/adapter/onemo-deserialize';
 import {
     DEFAULT_RENDERER_SETTINGS,
     ONEMO_FORMAT_VERSION,
+    onemoColorToHex,
     type OnemoProductConfig
 } from '../../src/editor/adapter/onemo-format';
 import { serializeOnemo } from '../../src/editor/adapter/onemo-serialize';
@@ -129,6 +130,7 @@ describe('onemo serialize/deserialize pipeline', function () {
         const renderer = createRendererStub();
         const productConfig = createProductConfig();
         const environmentBuffer = new TextEncoder().encode('fake hdr').buffer;
+        const expectedBackground = scene.background as THREE.Color;
 
         const blob = await withStubbedExporter(async () => {
             return serializeOnemo(
@@ -169,7 +171,11 @@ describe('onemo serialize/deserialize pipeline', function () {
         expect(studioJson.environment.file).to.equal('environment.hdr');
         expect(studioJson.environment.intensity).to.equal(1.35);
         expect(studioJson.environment.rotation).to.equal(90);
-        expect(studioJson.scene.backgroundColor).to.equal('#123456');
+        expect(studioJson.scene.backgroundColor).to.deep.equal([
+            expectedBackground.r,
+            expectedBackground.g,
+            expectedBackground.b,
+        ]);
         expect(studioJson.scene.fog).to.equal('exponential');
         expect(studioJson.scene.fogColor).to.equal('#654321');
         expect(studioJson.scene.fogDensity).to.equal(0.025);
@@ -193,6 +199,7 @@ describe('onemo serialize/deserialize pipeline', function () {
         const sourceScene = createScene();
         const sourceRenderer = createRendererStub();
         const environmentBuffer = new TextEncoder().encode('fake hdr').buffer;
+        const expectedBackground = sourceScene.background as THREE.Color;
         const blob = await withStubbedExporter(async () => {
             return serializeOnemo(
                 sourceScene,
@@ -268,6 +275,111 @@ describe('onemo serialize/deserialize pipeline', function () {
         expect((restoredMaterial as THREE.MeshStandardMaterial).envMapIntensity).to.equal(0.42);
         expect(result.environmentHdr).to.be.instanceOf(ArrayBuffer);
         expect(result.studioJson.version).to.equal(ONEMO_FORMAT_VERSION);
+        expect(result.studioJson.scene.backgroundColor).to.deep.equal([
+            expectedBackground.r,
+            expectedBackground.g,
+            expectedBackground.b,
+        ]);
+    });
+
+    it('preserves round-trip scene state without collapsing background color to hex precision', async () => {
+        const scene = createScene();
+        scene.background = new THREE.Color(0.9, 0.2, 0.1);
+        scene.fog = new THREE.Fog('#050607', 5, 200);
+        scene.environmentIntensity = 2;
+
+        const renderer = createRendererStub();
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.5;
+
+        const blob = await withStubbedExporter(async () => {
+            return serializeOnemo(
+                scene,
+                renderer,
+                {
+                    position: new THREE.Vector3(1, 2, 8),
+                    target: new THREE.Vector3(0, 1, 0),
+                    fov: 35,
+                    near: 0.25,
+                    far: 250,
+                },
+                createProductConfig()
+            );
+        });
+
+        const loadedScene = new THREE.Group();
+        const loadedMaterial = new THREE.MeshStandardMaterial({ color: '#ffffff' });
+        loadedMaterial.name = 'Frame';
+        loadedScene.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), loadedMaterial));
+
+        const result = await withStubbedLoader(loadedScene, async () => {
+            return deserializeOnemo(blob, createRendererStub());
+        });
+
+        expect(result.studioJson.renderer.toneMapping).to.equal(THREE.ACESFilmicToneMapping);
+        expect(result.studioJson.renderer.toneMappingExposure).to.equal(1.5);
+        expect(result.studioJson.scene.backgroundColor).to.deep.equal([0.9, 0.2, 0.1]);
+        expect(onemoColorToHex(result.studioJson.scene.backgroundColor)).to.equal('#e6331a');
+        expect(result.studioJson.scene.fog).to.equal('linear');
+        expect(result.studioJson.scene.fogNear).to.equal(5);
+        expect(result.studioJson.scene.fogFar).to.equal(200);
+        expect(result.studioJson.environment.intensity).to.equal(2);
+        expect(result.studioJson.editorCamera).to.deep.equal({
+            position: [1, 2, 8],
+            target: [0, 1, 0],
+            fov: 35,
+            near: 0.25,
+            far: 250,
+        });
+    });
+
+    it('keeps backward compatibility with legacy hex background colors', async () => {
+        const zip = new JSZip();
+        zip.file('scene.glb', FAKE_GLB_BUFFER);
+        zip.file('studio.json', JSON.stringify({
+            version: ONEMO_FORMAT_VERSION,
+            created: '2026-01-01T00:00:00.000Z',
+            modified: '2026-01-01T00:00:00.000Z',
+            name: 'Legacy Scene',
+            renderer: DEFAULT_RENDERER_SETTINGS,
+            environment: {
+                file: null,
+                preset: 'studio',
+                intensity: 1,
+                rotation: 0,
+                ground: {
+                    enabled: false,
+                    height: 0,
+                    radius: 20,
+                },
+            },
+            scene: {
+                backgroundColor: '#123456',
+                fog: 'none',
+                fogColor: '#000000',
+                fogNear: 1,
+                fogFar: 1000,
+                fogDensity: 0.01,
+                ambientColor: [1, 1, 1],
+                ambientIntensity: 0.5,
+            },
+            editorCamera: {
+                position: [0, 0, 5],
+                target: [0, 0, 0],
+                fov: 35,
+                near: 0.1,
+                far: 100,
+            },
+            product: createProductConfig(),
+        }));
+
+        const blob = await zip.generateAsync({ type: 'blob' });
+        const result = await withStubbedLoader(new THREE.Group(), async () => {
+            return deserializeOnemo(blob, createRendererStub());
+        });
+
+        expect(onemoColorToHex(result.studioJson.scene.backgroundColor)).to.equal('#123456');
+        expect((result.scene as THREE.Group & { background?: THREE.Color | null }).background?.getHexString()).to.equal('123456');
     });
 
     it('uses defaults when studio.json is missing', async () => {

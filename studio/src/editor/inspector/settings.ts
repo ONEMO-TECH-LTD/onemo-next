@@ -14,6 +14,10 @@ editor.once('load', () => {
 
     const settingsContainer = new SettingsPanel(settingsArgs);
 
+    editor.method('editorSettings:tab:set', (panelId: string) => {
+        settingsContainer.setActivePanel(panelId);
+    });
+
     editor.on('attributes:beforeClear', () => {
         settingsContainer.unlink();
         if (settingsContainer.parent) {
