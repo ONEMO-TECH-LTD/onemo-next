@@ -55,6 +55,7 @@ function RendererSettingsSync({ config }: { config: ViewerConfig }) {
       return
     }
 
+    /* eslint-disable react-hooks/immutability -- Three renderer is an imperative runtime object. */
     gl.toneMapping = rendererConfig.toneMapping as THREE.ToneMapping
     gl.toneMappingExposure = rendererConfig.toneMappingExposure
     gl.outputColorSpace = rendererConfig.outputColorSpace === 'srgb-linear'
@@ -63,6 +64,7 @@ function RendererSettingsSync({ config }: { config: ViewerConfig }) {
     gl.shadowMap.enabled = rendererConfig.shadowsEnabled
     gl.shadowMap.type = rendererConfig.shadowType as THREE.ShadowMapType
     gl.shadowMap.needsUpdate = true
+    /* eslint-enable react-hooks/immutability */
   }, [config.renderer, gl])
 
   return null
@@ -110,6 +112,7 @@ function CameraConfigSync({
         target[2] + cam.distance * Math.sin(polar) * Math.cos(azimuth),
       ]
 
+      /* eslint-disable react-hooks/immutability -- Three camera and controls are imperative runtime objects. */
       camera.position.set(...nextPosition)
 
       if (camera instanceof THREE.PerspectiveCamera) {
@@ -128,6 +131,7 @@ function CameraConfigSync({
       }
 
       camera.lookAt(new THREE.Vector3(...target))
+      /* eslint-enable react-hooks/immutability */
     }
 
     applyCameraConfig()
