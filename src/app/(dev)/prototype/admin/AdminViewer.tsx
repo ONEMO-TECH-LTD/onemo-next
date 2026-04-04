@@ -8,7 +8,7 @@ import { useSceneStore } from './sceneStore'
 import { parseOnemoConfig, type ParsedOnemoConfig } from '../core/onemo-loader'
 import type { DesignState, ViewerConfig } from '../types'
 
-const TEMPLATE_URL = '/assets/templates/effect-70mm.onemo'
+const TEMPLATE_URL = '/api/dev/scenes/golden'
 
 export interface AssetProps {
   modelPath: string

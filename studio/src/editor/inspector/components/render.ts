@@ -353,7 +353,12 @@ class RenderComponentInspector extends ComponentInspector {
             return;
         }
 
-        this._field('asset').hidden = this._field('type').value !== 'asset';
+        const assetField = this._field('asset');
+        const assetTypeSelected = this._field('type').value === 'asset';
+        const hasBoundRenderAsset = (this._entities?.some((entity) => {
+            return entity.get('components.render.type') === 'asset' && !!entity.get('components.render.asset');
+        })) ?? false;
+        assetField.hidden = !assetTypeSelected || !hasBoundRenderAsset;
 
         // Show Root Bone only if all selected entities have a skinned render asset
         const showRootBone = (this._entities?.length > 0 && this._entities.every((e) => {

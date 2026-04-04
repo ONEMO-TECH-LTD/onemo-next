@@ -31,7 +31,7 @@ function PrototypePageInner() {
   const sceneName = searchParams.get('scene')
   const templateUrl = sceneName
     ? `/api/dev/scenes/${encodeURIComponent(sceneName)}`
-    : '/assets/templates/effect-70mm.onemo'
+    : '/api/dev/scenes/golden'
 
   const handleFile = useCallback((file: File) => {
     if (!file.type.startsWith('image/')) return

@@ -118,11 +118,11 @@ export interface OnemoEditorCamera {
  * This is the product-level layer that makes the generic 3D scene into a configurable product.
  *
  * The GLB contains meshes with names (from the GLTF node names).
- * This mapping says: "the mesh named 'PRINT_SURFACE_FRONT' is the 'face' material role."
+ * This mapping says: "these mesh names belong to this material role."
  * The configurator uses roles to know which controls affect which meshes.
  */
 export interface OnemoMaterialRole {
-    /** Role identifier: 'face' | 'back' | 'frame' | custom string */
+    /** Stable material-role identifier, for example 'primary-surface', 'accent', or another domain-specific role */
     role: string;
     /** Mesh name(s) in the GLB that this role applies to. Supports glob patterns. */
     meshNames: string[];
@@ -159,7 +159,7 @@ export interface OnemoMaterialRole {
  * Product configuration — the product-level metadata that sits on top of the 3D scene.
  */
 export interface OnemoProductConfig {
-    /** Product type identifier (e.g., 'effect-70mm', 'effect-100mm') */
+    /** Product or scene archetype identifier used by higher-level tooling */
     productType: string;
     /** Material role mappings */
     materialRoles: OnemoMaterialRole[];
@@ -290,69 +290,7 @@ export const DEFAULT_EDITOR_CAMERA: OnemoEditorCamera = {
 };
 
 export const DEFAULT_PRODUCT_CONFIG: OnemoProductConfig = {
-    productType: 'effect-70mm',
-    materialRoles: [
-        {
-            role: 'face',
-            meshNames: ['PRINT_SURFACE_FRONT', 'Face', 'face'],
-            defaults: {
-                color: '#ffffff',
-                roughness: 1,
-                metalness: 0,
-                envMapIntensity: 0.1,
-                normalScale: 0.15,
-                bumpScale: 1,
-                sheen: 1,
-                sheenColor: '#1a1a1a',
-                sheenRoughness: 0.8
-            },
-            textures: {
-                normalMap: '/assets/materials/ultrasuede/suede-normal.png',
-                roughnessMap: '/assets/materials/ultrasuede/suede-roughness.jpg',
-                bumpMap: '/assets/materials/ultrasuede/suede-height.png'
-            },
-            configurable: true,
-            configurableProperties: ['color', 'artwork']
-        },
-        {
-            role: 'back',
-            meshNames: ['BACK', 'Back', 'back'],
-            defaults: {
-                color: '#080808',
-                roughness: 1,
-                envMapIntensity: 0.1,
-                normalScale: 0.15,
-                bumpScale: 1,
-                sheen: 1,
-                sheenColor: '#1a1a1a',
-                sheenRoughness: 0.8
-            },
-            textures: {
-                normalMap: '/assets/materials/ultrasuede/suede-normal.png',
-                roughnessMap: '/assets/materials/ultrasuede/suede-roughness.jpg',
-                bumpMap: '/assets/materials/ultrasuede/suede-height.png'
-            },
-            configurable: true,
-            configurableProperties: ['color']
-        },
-        {
-            role: 'frame',
-            meshNames: ['FRAME', 'Frame', 'frame'],
-            defaults: {
-                color: '#0f0f0f',
-                roughness: 0.5,
-                metalness: 0,
-                clearcoat: 0.4,
-                clearcoatRoughness: 0.3
-            },
-            configurable: true,
-            configurableProperties: ['color']
-        }
-    ],
-    artworkSlot: {
-        meshName: 'PRINT_SURFACE_FRONT',
-        role: 'face',
-        defaultUrl: '/assets/test-artwork.png',
-        textureChannel: 'map'
-    }
+    productType: 'untitled-scene',
+    materialRoles: [],
+    artworkSlot: undefined
 };

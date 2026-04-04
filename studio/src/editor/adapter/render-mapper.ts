@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 
+import { getStoredBridgeComponentData, setStoredBridgeComponentData } from './bridge-utils';
 
 const getRenderDefaults = () => {
     return editor.call('components:getDefault', 'render') || {};
@@ -7,18 +8,19 @@ const getRenderDefaults = () => {
 
 export const createRenderComponentData = (object: THREE.Object3D, materialAssetIds: number[]) => {
     const defaults = getRenderDefaults();
+    const stored = getStoredBridgeComponentData(object, 'render', defaults);
     const mesh = object as THREE.Mesh;
 
     return {
         ...defaults,
-        enabled: true,
-        // Imported meshes are external assets; the bridge does not author primitives here.
-        type: 'asset',
-        asset: null,
+        ...stored,
+        enabled: typeof stored.enabled === 'boolean' ? stored.enabled : true,
+        type: typeof stored.type === 'string' ? stored.type : 'asset',
+        asset: stored.asset ?? null,
         castShadows: !!mesh.castShadow,
         receiveShadows: !!mesh.receiveShadow,
-        isStatic: false,
-        materialAssets: materialAssetIds.length ? materialAssetIds : [null]
+        isStatic: typeof stored.isStatic === 'boolean' ? stored.isStatic : false,
+        materialAssets: materialAssetIds.length ? materialAssetIds : (Array.isArray(stored.materialAssets) ? stored.materialAssets : [null])
     };
 };
 
@@ -29,6 +31,11 @@ export const applyRenderObserverChange = (
 ) => {
     if (!(object instanceof THREE.Mesh)) {
         return false;
+    }
+
+    const renderData = observer.get('components.render');
+    if (renderData) {
+        setStoredBridgeComponentData(object, 'render', renderData);
     }
 
     if (path === 'components.render.enabled') {

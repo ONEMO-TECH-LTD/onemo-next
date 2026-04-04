@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
 
+declare const editor: any;
+
 type BridgeUpdater = (delta: number) => void;
 
 type BridgeStore = {
@@ -29,7 +31,8 @@ type SpriteFrameTexture = {
     pixelsPerUnit: number;
 };
 
-const STORE_KEY = '__r3fBridgeStore';
+export const BRIDGE_STORE_KEY = '__r3fBridgeStore';
+export const PERSISTED_COMPONENTS_KEY = '__onemoComponents';
 const textureLoader = new THREE.TextureLoader();
 const audioLoader = new THREE.AudioLoader();
 const gltfLoader = new GLTFLoader();
@@ -48,10 +51,64 @@ export const isRecord = (value: unknown): value is Record<string, unknown> => {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
 };
 
+const sanitizeBridgeStore = (value: unknown): BridgeStore | null => {
+    if (!isRecord(value)) {
+        return null;
+    }
+
+    const componentData = isRecord(value.componentData)
+        ? { ...value.componentData }
+        : {};
+    const helpers: Record<string, THREE.Object3D> = {};
+    if (isRecord(value.helpers)) {
+        Object.entries(value.helpers).forEach(([key, helper]) => {
+            if (helper instanceof THREE.Object3D) {
+                helpers[key] = helper;
+            }
+        });
+    }
+
+    const updaters: Record<string, BridgeUpdater> = {};
+    if (isRecord(value.updaters)) {
+        Object.entries(value.updaters).forEach(([key, updater]) => {
+            if (typeof updater === 'function') {
+                updaters[key] = updater as BridgeUpdater;
+            }
+        });
+    }
+
+    return {
+        componentData,
+        helpers,
+        updaters
+    };
+};
+
+const getPersistedComponentsStore = (object: THREE.Object3D) => {
+    const existing = object.userData[PERSISTED_COMPONENTS_KEY];
+    if (isRecord(existing)) {
+        return existing;
+    }
+
+    const created: Record<string, unknown> = {};
+    object.userData[PERSISTED_COMPONENTS_KEY] = created;
+    return created;
+};
+
+const getPersistedComponentData = <T>(object: THREE.Object3D, component: string, fallback: T): T => {
+    const persisted = getPersistedComponentsStore(object)[component];
+    if (persisted === undefined) {
+        return cloneSerializable(fallback);
+    }
+
+    return cloneSerializable(persisted as T);
+};
+
 const getBridgeStore = (object: THREE.Object3D): BridgeStore => {
-    const existing = object.userData[STORE_KEY];
+    const existing = sanitizeBridgeStore(object.userData[BRIDGE_STORE_KEY]);
     if (existing) {
-        return existing as BridgeStore;
+        object.userData[BRIDGE_STORE_KEY] = existing;
+        return existing;
     }
 
     const created: BridgeStore = {
@@ -59,7 +116,7 @@ const getBridgeStore = (object: THREE.Object3D): BridgeStore => {
         helpers: {},
         updaters: {}
     };
-    object.userData[STORE_KEY] = created;
+    object.userData[BRIDGE_STORE_KEY] = created;
     return created;
 };
 
@@ -67,7 +124,7 @@ export const getStoredBridgeComponentData = <T>(object: THREE.Object3D, componen
     const store = getBridgeStore(object);
     const stored = store.componentData[component];
     if (stored === undefined) {
-        return cloneSerializable(fallback);
+        return getPersistedComponentData(object, component, fallback);
     }
 
     return cloneSerializable(stored as T);
@@ -75,14 +132,19 @@ export const getStoredBridgeComponentData = <T>(object: THREE.Object3D, componen
 
 export const setStoredBridgeComponentData = (object: THREE.Object3D, component: string, value: unknown) => {
     getBridgeStore(object).componentData[component] = cloneSerializable(value);
+    getPersistedComponentsStore(object)[component] = cloneSerializable(value);
 };
 
 export const removeStoredBridgeComponentData = (object: THREE.Object3D, component: string) => {
     delete getBridgeStore(object).componentData[component];
+    delete getPersistedComponentsStore(object)[component];
 };
 
 export const getStoredBridgeComponents = (object: THREE.Object3D) => {
-    return cloneSerializable(getBridgeStore(object).componentData);
+    return {
+        ...cloneSerializable(getPersistedComponentsStore(object)),
+        ...cloneSerializable(getBridgeStore(object).componentData)
+    };
 };
 
 export const ensureBridgeHelper = <T extends THREE.Object3D>(
@@ -101,6 +163,7 @@ export const ensureBridgeHelper = <T extends THREE.Object3D>(
     }
 
     const helper = factory();
+    helper.userData.__bridgeHelper = true;
     (parent || object).add(helper);
     store.helpers[key] = helper;
     return helper;
@@ -108,6 +171,76 @@ export const ensureBridgeHelper = <T extends THREE.Object3D>(
 
 export const getBridgeHelper = <T extends THREE.Object3D>(object: THREE.Object3D, key: string) => {
     return (getBridgeStore(object).helpers[key] || null) as T | null;
+};
+
+export const suspendBridgeArtifactsForExport = (root: THREE.Object3D) => {
+    const stores: Array<{ object: THREE.Object3D; store: BridgeStore }> = [];
+    const helperObjects = new Set<THREE.Object3D>();
+
+    root.traverse((object) => {
+        const store = sanitizeBridgeStore(object.userData[BRIDGE_STORE_KEY]);
+        if (!store) {
+            return;
+        }
+
+        stores.push({ object, store });
+        Object.values(store.helpers).forEach((helper) => {
+            helperObjects.add(helper);
+        });
+        delete object.userData[BRIDGE_STORE_KEY];
+    });
+
+    root.traverse((object) => {
+        if (object !== root && object.userData.__bridgeHelper === true) {
+            helperObjects.add(object);
+        }
+    });
+
+    const rootHelpers = Array.from(helperObjects).filter((helper) => {
+        let current = helper.parent;
+        while (current) {
+            if (helperObjects.has(current)) {
+                return false;
+            }
+            current = current.parent;
+        }
+        return true;
+    });
+
+    const detachedHelpers = rootHelpers
+    .map((helper) => {
+        const parent = helper.parent;
+        if (!parent) {
+            return null;
+        }
+
+        return {
+            helper,
+            parent,
+            index: parent.children.indexOf(helper)
+        };
+    })
+    .filter((entry): entry is { helper: THREE.Object3D; parent: THREE.Object3D; index: number } => !!entry);
+
+    detachedHelpers.forEach(({ helper, parent }) => {
+        parent.remove(helper);
+    });
+
+    return () => {
+        stores.forEach(({ object, store }) => {
+            object.userData[BRIDGE_STORE_KEY] = store;
+        });
+
+        detachedHelpers.forEach(({ helper, parent, index }) => {
+            const nextIndex = Math.max(0, Math.min(index, parent.children.length));
+            parent.add(helper);
+            const currentIndex = parent.children.indexOf(helper);
+            if (currentIndex !== -1 && currentIndex !== nextIndex) {
+                parent.children.splice(currentIndex, 1);
+                parent.children.splice(nextIndex, 0, helper);
+            }
+        });
+    };
 };
 
 export const setBridgeUpdater = (object: THREE.Object3D, key: string, updater?: BridgeUpdater) => {
@@ -170,6 +303,7 @@ export const removeBridgeHelper = (object: THREE.Object3D, key: string) => {
 export const clearBridgeComponent = (object: THREE.Object3D, component: string) => {
     const store = getBridgeStore(object);
     delete store.componentData[component];
+    delete getPersistedComponentsStore(object)[component];
 
     Object.keys(store.helpers)
     .filter((key) => key === component || key.startsWith(`${component}:`))

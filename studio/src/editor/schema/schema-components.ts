@@ -3,6 +3,18 @@ import { Color, Curve, CurveSet, Quat, Vec2, Vec3, Vec4 } from '@/common/playcan
 import { deepCopy } from '@/common/utils';
 
 editor.once('load', () => {
+    const SUPPORTED_STUDIO_COMPONENTS = new Set([
+        'render',
+        'model',
+        'light',
+        'camera',
+        'audiolistener',
+        'sound',
+        'particlesystem',
+        'anim',
+        'animation',
+    ]);
+
     const projectSettings = editor.call('settings:project');
 
     const schema = config.schema.scene.entities.$of.components;
@@ -202,7 +214,7 @@ editor.once('load', () => {
             }
         }
 
-        return result;
+        return result.filter((component) => SUPPORTED_STUDIO_COMPONENTS.has(component));
     });
 
     editor.method('components:schema', () => {

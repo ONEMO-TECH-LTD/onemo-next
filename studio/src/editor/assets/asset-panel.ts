@@ -28,7 +28,6 @@ import { TableRow } from '@/common/pcui/element/element-table-row';
 import { type Tooltip } from '@/common/pcui/element/element-tooltip';
 import { LegacyTooltip } from '@/common/ui/tooltip';
 import { bytesToHuman, naturalCompare } from '@/common/utils';
-import { config } from '@/editor/config';
 import { type AssetObserver } from '@/editor-api';
 
 const CLASS_ROOT = 'pcui-asset-panel';
@@ -53,7 +52,6 @@ const CLASS_TASK_RUNNING = `${CLASS_ROOT}-task-running`;
 
 const CLASS_HIDE_ON_COLLAPSE = `${CLASS_ROOT}-hide-on-collapse`;
 const CLASS_BTN_SMALL = `${CLASS_ROOT}-btn-small`;
-const CLASS_BTN_STORE = `${CLASS_ROOT}-btn-store`;
 const CLASS_BTN_CONTAINER = `${CLASS_ROOT}-btn-container`;
 const CLASS_BTN_ACTIVE = `${CLASS_ROOT}-btn-active`;
 const CLASS_BTN_CLEAR_SEARCH = `${CLASS_ROOT}-btn-clear-search`;
@@ -65,48 +63,31 @@ const TYPES = {
     all: 'All',
     animation: 'Animation',
     audio: 'Audio',
-    bundle: 'Asset Bundle',
-    binary: 'Binary',
     container: 'Container',
     cubemap: 'Cubemap',
-    css: 'Css',
-    font: 'Font',
-    fontSource: 'Font (source)',
-    folderSource: 'Folder',
-    gsplat: 'Gaussian Splat',
-    json: 'Json',
-    html: 'Html',
     material: 'Material',
     model: 'Model',
-    sceneSource: 'Model (source)',
     render: 'Render',
-    script: 'Script',
-    shader: 'Shader',
-    sprite: 'Sprite',
-    template: 'Template',
-    text: 'Text',
     texture: 'Texture',
-    textureSource: 'Texture (source)',
-    textureatlas: 'Texture Atlas',
-    textureatlasSource: 'Texture Atlas (source)',
-    wasm: 'Wasm'
 };
+
+const SUPPORTED_FILTER_TYPES = new Set([
+    'all',
+    'animation',
+    'audio',
+    'container',
+    'cubemap',
+    'material',
+    'model',
+    'render',
+    'texture'
+]);
 
 // types of assets that can be double clicked
 const OPENABLE_TYPES = {
     folder: true,
-    css: true,
-    json: true,
-    html: true,
-    script: true,
-    shader: true,
-    sprite: true,
-    text: true,
-    textureatlas: true,
-    animstategraph: true,
     texture: true,
-    container: true,
-    gsplat: true
+    container: true
 };
 
 // types of assets that we can drop stuff over
@@ -131,6 +112,13 @@ const LEGACY_SCRIPTS_FOLDER_ASSET = new Observer({
     name: 'scripts',
     path: []
 });
+
+const shouldHideAssetFromStudioShell = (asset: AssetObserver) => {
+    const type = asset.get('type');
+    const name = String(asset.get('name') || '').toLowerCase();
+
+    return type === 'script' || type === 'template' || (type === 'folder' && name === 'templates');
+};
 
 // returns a random hex color
 function randomColor() {
@@ -555,6 +543,7 @@ class AssetPanel extends Panel {
 
         // asset type dropdown filter
         const dropdownTypeOptions = Object.keys(TYPES)
+        .filter((type: string) => SUPPORTED_FILTER_TYPES.has(type))
         .filter((type: string) => type !== 'bundle' || editor.call('users:hasFlag', 'hasBundles'))
         .map((type: string) => {
             return {
@@ -1134,15 +1123,10 @@ class AssetPanel extends Panel {
         } else if (type === 'css' ||
                     type === 'html' ||
                     type === 'json' ||
-                    type === 'script' ||
                     type === 'shader' ||
                     type === 'text') {
 
-            if (type === 'script' && config.project.settings.useLegacyScripts) {
-                editor.call('assets:edit', asset);
-            } else {
-                editor.call('picker:codeeditor', asset);
-            }
+            editor.call('picker:codeeditor', asset);
         } else if (type === 'animstategraph') {
             editor.call('picker:animstategraph', asset);
         } else {
@@ -1814,6 +1798,10 @@ class AssetPanel extends Panel {
     }
 
     _addAsset(asset: AssetObserver, index: number, addToDetailsView: boolean) {
+        if (shouldHideAssetFromStudioShell(asset)) {
+            return;
+        }
+
         const id = asset.get('id');
 
         // init events
@@ -2330,7 +2318,7 @@ class AssetPanel extends Panel {
                     if (new RegExp(searchQuery.slice(1), 'i').test(name)) {
                         return true;
                     }
-                } catch (ex) {} // swallow exception and continue
+                } catch {} // swallow exception and continue
             }
 
             // check if name includes search query
@@ -2553,15 +2541,7 @@ class AssetPanel extends Panel {
             return;
         }
 
-        const assets = this._assets.array();
-
-        // add legacy scripts too
-        if (config.project.settings.useLegacyScripts) {
-            assets.unshift(LEGACY_SCRIPTS_FOLDER_ASSET); // keep legacy scripts folder on top
-            for (const id in this._legacyScriptsIndex) {
-                assets.push(this._legacyScriptsIndex[id]);
-            }
-        }
+        const assets = this._assets.array().filter(asset => !shouldHideAssetFromStudioShell(asset));
 
         assets.forEach((asset) => {
             this._addAsset(asset);

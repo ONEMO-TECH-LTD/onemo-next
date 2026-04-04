@@ -2,6 +2,8 @@ import JSZip from 'jszip';
 import * as THREE from 'three';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 
+import { suspendBridgeArtifactsForExport } from './bridge-utils';
+
 import {
     DEFAULT_EDITOR_CAMERA,
     DEFAULT_ENVIRONMENT,
@@ -83,7 +85,7 @@ const extractAmbientLight = (scene: THREE.Scene) => {
 };
 
 const extractSceneSettings = (scene: THREE.Scene): OnemoSceneSettings => {
-    const ambientLight = extractAmbientLight(scene);
+    const ambientLight = extractAmbientLight(scene) as THREE.AmbientLight | null;
     const backgroundColor = scene.background instanceof THREE.Color
         ? [scene.background.r, scene.background.g, scene.background.b] as [number, number, number]
         : DEFAULT_SCENE_SETTINGS.backgroundColor;
@@ -302,8 +304,17 @@ export async function serializeOnemo(
     environmentOverrides?: Partial<OnemoEnvironmentSettings>
 ): Promise<Blob> {
     const exporter = new GLTFExporter();
+    const restoreBridgeArtifacts = suspendBridgeArtifactsForExport(scene);
     const glb = await withExportSafeTextures(scene, async (exportScene) => {
-        return exporter.parseAsync(exportScene, { binary: true }) as Promise<ArrayBuffer>;
+        try {
+            const exported = await exporter.parseAsync(exportScene, { binary: true });
+            if (!(exported instanceof ArrayBuffer)) {
+                throw new Error('Expected binary GLB output from GLTFExporter');
+            }
+            return exported;
+        } finally {
+            restoreBridgeArtifacts();
+        }
     });
     const now = new Date().toISOString();
     const sceneWithEnvironment = scene as THREE.Scene & {

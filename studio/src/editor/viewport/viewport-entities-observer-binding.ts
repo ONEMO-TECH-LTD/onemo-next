@@ -41,7 +41,7 @@ editor.once('load', () => {
                 // do this in a timeout to allow the model type to change first
                 setTimeout(() => {
                     const assetId = obj.get('components.model.asset');
-                    if (assetId) {
+                    if (assetId && entity.model) {
                         entity.model.asset = assetId;
                     }
                 });

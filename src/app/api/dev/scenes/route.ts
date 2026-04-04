@@ -15,17 +15,23 @@ async function listSceneNames() {
     readdir(STUDIO_SCENES_DIR),
   ])
 
-  for (const file of studioFiles) {
-    if (file.endsWith('.onemo')) {
-      preferredScenes.set(file.slice(0, -6), 'onemo')
-    } else if (file.endsWith('.json')) {
-      preferredScenes.set(file.slice(0, -5), 'json')
-    }
-  }
-
   for (const file of appFiles) {
     if (file.endsWith('.onemo')) {
       preferredScenes.set(file.slice(0, -6), 'onemo')
+    } else if (file.endsWith('.json')) {
+      const sceneName = file.slice(0, -5)
+      if (!preferredScenes.has(sceneName)) {
+        preferredScenes.set(sceneName, 'json')
+      }
+    }
+  }
+
+  for (const file of studioFiles) {
+    if (file.endsWith('.onemo')) {
+      const sceneName = file.slice(0, -6)
+      if (!preferredScenes.has(sceneName)) {
+        preferredScenes.set(sceneName, 'onemo')
+      }
     } else if (file.endsWith('.json')) {
       const sceneName = file.slice(0, -5)
       if (!preferredScenes.has(sceneName)) {

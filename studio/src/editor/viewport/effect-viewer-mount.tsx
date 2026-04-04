@@ -21,16 +21,18 @@ const DEFAULT_DESIGN_STATE: DesignState = {
     scale: 1
 };
 
-const DEFAULT_CONFIG: ViewerConfig = createDefaultViewerConfig();
-
 const createStartupViewerConfig = (): ViewerConfig => {
     const config = createDefaultViewerConfig();
     config.modelPath = '';
+    config.environment = undefined;
     return config;
 };
 
 const DEFAULT_ARTWORK_URL = '/assets/test-artwork.png';
 const LAST_SCENE_STORAGE_KEY = 'onemo.playcanvas.last-scene';
+const GRID_DIVISIONS_FALLBACK = 10;
+const GRID_SIZE_FALLBACK = 1;
+const GRID_VISIBILITY_STORAGE_KEY = 'onemo.playcanvas.grid-divisions';
 
 type SelectableObserver = {
     get: (path: string) => unknown;
@@ -162,11 +164,12 @@ function BridgeViewportApp({
 
         const syncGrid = () => {
             const projectSettings = editor.call('settings:projectUser') as { get: (path: string) => unknown } | null;
-            const divisions = Math.max(0, Math.floor(Number(projectSettings?.get('editor.gridDivisions') ?? 10)));
-            const gridDivisionSize = Number(projectSettings?.get('editor.gridDivisionSize') ?? 1);
+            const gridVisible = projectSettings?.get('editor.showGrid');
+            const divisions = Math.max(0, Math.floor(Number(projectSettings?.get('editor.gridDivisions') ?? GRID_DIVISIONS_FALLBACK)));
+            const gridDivisionSize = Number(projectSettings?.get('editor.gridDivisionSize') ?? GRID_SIZE_FALLBACK);
             setGridSettings({
-                enabled: true,
-                divisions: divisions || 10,
+                enabled: gridVisible === undefined ? divisions > 0 : !!gridVisible,
+                divisions: divisions || GRID_DIVISIONS_FALLBACK,
                 cellSize: Number.isFinite(gridDivisionSize) && gridDivisionSize > 0 ? gridDivisionSize * 0.02 : 0.02
             });
         };
@@ -181,6 +184,7 @@ function BridgeViewportApp({
         const cameraPresetHandle = editor.on('r3f:viewer:cameraPreset', setCameraPreset);
         const cameraChangeHandle = editor.on('camera:change', syncActiveCamera);
         const projectSettings = editor.call('settings:projectUser') as { on: (path: string, callback: () => void) => { unbind: () => void }; get: (path: string) => unknown } | null;
+        const gridVisibleHandle = projectSettings?.on('editor.showGrid:set', syncGrid) ?? null;
         const gridDivisionsHandle = projectSettings?.on('editor.gridDivisions:set', syncGrid) ?? null;
         const gridSizeHandle = projectSettings?.on('editor.gridDivisionSize:set', syncGrid) ?? null;
 
@@ -206,6 +210,7 @@ function BridgeViewportApp({
             focusHandle.unbind();
             cameraPresetHandle.unbind();
             cameraChangeHandle.unbind();
+            gridVisibleHandle?.unbind();
             gridDivisionsHandle?.unbind();
             gridSizeHandle?.unbind();
         };
@@ -517,6 +522,7 @@ export function mountEffectViewer(viewportDom: HTMLElement, canvasDom: HTMLEleme
             return;
         }
 
+        editor.call('status:text', `Saving scene '${sceneName}'...`);
         const payload = await bridge.serializeScene(sceneName);
         const response = await fetch('/api/onemo/scenes', {
             method: 'POST',
@@ -532,7 +538,19 @@ export function mountEffectViewer(viewportDom: HTMLElement, canvasDom: HTMLEleme
         }
 
         const result = await response.json() as { saved?: string };
-        setLastSceneName(typeof result.saved === 'string' ? result.saved : sceneName);
+        const savedSceneName = typeof result.saved === 'string' ? result.saved : sceneName;
+        setLastSceneName(savedSceneName);
+        editor.call('status:text', `Saved scene '${savedSceneName}'`);
+        console.info('[onemo:scene] saved', {
+            scene: savedSceneName,
+            endpoint: '/api/onemo/scenes'
+        });
+        window.dispatchEvent(new CustomEvent('onemo:scene:saved', {
+            detail: {
+                scene: savedSceneName,
+                endpoint: '/api/onemo/scenes'
+            }
+        }));
     };
 
     const openScenePicker = async () => {
@@ -556,10 +574,14 @@ export function mountEffectViewer(viewportDom: HTMLElement, canvasDom: HTMLEleme
         await loadSceneByName(selected);
     };
 
+    editor.method('r3f:scene:list', fetchSceneList);
+    editor.method('r3f:scene:loadNamed', loadSceneByName);
+    editor.method('r3f:scene:saveNamed', saveSceneByName);
+
     const loadTemplateFile = async () => {
-        // Load the golden .onemo template — same file the prototype loads.
-        // This is the medium: both prototype and Studio read from the same .onemo.
-        const templateUrl = '/assets/templates/effect-70mm.onemo';
+        // Load the canonical golden scene through the same scene API surface
+        // the editor uses for saved scene files.
+        const templateUrl = '/api/onemo/scenes/golden';
         try {
             const response = await fetch(templateUrl);
             if (!response.ok) {
@@ -631,6 +653,40 @@ export function mountEffectViewer(viewportDom: HTMLElement, canvasDom: HTMLEleme
                 window.alert(`Failed to save scene: ${error instanceof Error ? error.message : String(error)}`);
             });
             return;
+        }
+
+        if (key === 'g') {
+            event.preventDefault();
+            const projectSettings = editor.call('settings:projectUser') as { get: (path: string) => unknown; set: (path: string, value: unknown) => void } | null;
+            if (!projectSettings) {
+                return;
+            }
+
+            const currentlyVisible = !!(projectSettings.get('editor.showGrid') ?? true);
+            const currentDivisions = Math.max(0, Math.floor(Number(projectSettings.get('editor.gridDivisions') ?? GRID_DIVISIONS_FALLBACK)));
+
+            if (currentlyVisible) {
+                const persistedDivisions = currentDivisions || GRID_DIVISIONS_FALLBACK;
+                try {
+                    window.localStorage.setItem(GRID_VISIBILITY_STORAGE_KEY, String(persistedDivisions));
+                } catch {
+                    // Ignore storage failures and still hide the grid.
+                }
+                projectSettings.set('editor.showGrid', false);
+                editor.call('status:text', 'Viewport grid hidden');
+            } else {
+                let restoredDivisions = currentDivisions;
+                if (restoredDivisions <= 0) {
+                    try {
+                        restoredDivisions = Math.max(1, Number(window.localStorage.getItem(GRID_VISIBILITY_STORAGE_KEY) ?? GRID_DIVISIONS_FALLBACK));
+                    } catch {
+                        restoredDivisions = GRID_DIVISIONS_FALLBACK;
+                    }
+                    projectSettings.set('editor.gridDivisions', restoredDivisions);
+                }
+                projectSettings.set('editor.showGrid', true);
+                editor.call('status:text', 'Viewport grid shown');
+            }
         }
 
         if (key === 'o') {

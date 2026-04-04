@@ -22,6 +22,9 @@ editor.once('load', () => {
         name: 'settings:snap',
         description: 'Set the increment for gizmo snapping. Hold Shift or use the Snap toggle on the toolbar to enable snapping while using gizmos.'
     }, {
+        name: 'settings:showGrid',
+        description: 'Show or hide the viewport grid without changing the saved grid size settings.'
+    }, {
         name: 'settings:grid',
         description: 'To disable the grid, set Divisions to 0. Divisions specifies the number of grid cells in each horizontal direction. Size specifies the size of a cell.'
     }, {

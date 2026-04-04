@@ -1,6 +1,8 @@
 import { Application, BoundingBox, Entity, Vec3 } from './viewport-engine';
 
 editor.once('load', () => {
+    const SHELL_ONLY_COMPONENTS = new Set(['script', 'model']);
+
     // converts the data to runtime types
     const runtimeComponentData = function (component: string, data: Record<string, unknown>): Record<string, unknown> {
         const result = {};
@@ -108,7 +110,7 @@ editor.once('load', () => {
             const property = parts[2];
 
             // ignore script component
-            if (component === 'script') {
+            if (SHELL_ONLY_COMPONENTS.has(component)) {
                 return;
             }
 
@@ -158,7 +160,7 @@ editor.once('load', () => {
             const property = parts[2];
 
             // ignore script component
-            if (component === 'script') {
+            if (SHELL_ONLY_COMPONENTS.has(component)) {
                 return;
             }
 
@@ -189,7 +191,7 @@ editor.once('load', () => {
             const component = parts[1];
             const property = parts[2];
 
-            if (component === 'script') {
+            if (SHELL_ONLY_COMPONENTS.has(component)) {
                 return;
             }
 

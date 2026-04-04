@@ -1,27 +1,15 @@
-import { LegacyScriptPreviewOverlay } from './legacy-script-preview-overlay';
-
 editor.once('load', () => {
-    const types = new Set(['css', 'html', 'json', 'script', 'shader', 'text']);
+    const types = new Set(['css', 'html', 'json', 'shader', 'text']);
 
     editor.method('assets:edit', async (asset, ide?: string) => {
         const type = asset.get('type');
-        const useLegacyScripts = editor.call('settings:project').get('useLegacyScripts');
 
-        if (type === 'script' && useLegacyScripts) {
-            const filename = asset.get('filename') || asset.get('name');
-            try {
-                const text = await editor.api.globals.rest.projects.projectRepoSourcefile('directory', filename).promisify();
-                const preview = new LegacyScriptPreviewOverlay({
-                    name: filename,
-                    code: text
-                });
-                editor.call('layout.root').append(preview);
-            } catch (error) {
-                console.error('Error fetching script:', error);
-            }
-        } else {
-            editor.call('picker:codeeditor', asset, undefined, undefined, ide);
+        if (type === 'script') {
+            editor.call('status:error', 'Script assets are not part of the ONEMO Studio runtime surface.');
+            return;
         }
+
+        editor.call('picker:codeeditor', asset, undefined, undefined, ide);
     });
 
     const attachDblClickHandler = (key, asset) => {

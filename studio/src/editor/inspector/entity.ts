@@ -24,14 +24,11 @@ import { ParticlesystemComponentInspector } from './components/particlesystem';
 import { RenderComponentInspector } from './components/render';
 import { RigidbodyComponentInspector } from './components/rigidbody';
 import { ScreenComponentInspector } from './components/screen';
-import { ScriptComponentInspector } from './components/script';
 import { ScrollbarComponentInspector } from './components/scrollbar';
 import { ScrollviewComponentInspector } from './components/scrollview';
 import { SoundComponentInspector } from './components/sound';
 import { SpriteComponentInspector } from './components/sprite';
 import { ZoneComponentInspector } from './components/zone';
-import { TemplatesEntityInspector } from '../templates/templates-entity-inspector';
-import { TemplateOverrideInspector } from '../templates/templates-override-inspector';
 
 
 const componentToConstructor: Map<string, new (...args: any[]) => any> = new Map();
@@ -51,7 +48,6 @@ componentToConstructor.set('particlesystem', ParticlesystemComponentInspector);
 componentToConstructor.set('render', RenderComponentInspector);
 componentToConstructor.set('rigidbody', RigidbodyComponentInspector);
 componentToConstructor.set('screen', ScreenComponentInspector);
-componentToConstructor.set('script', ScriptComponentInspector);
 componentToConstructor.set('scrollbar', ScrollbarComponentInspector);
 componentToConstructor.set('scrollview', ScrollviewComponentInspector);
 componentToConstructor.set('sound', SoundComponentInspector);
@@ -196,17 +192,12 @@ type EntityInspectorArgs = {
     projectSettings?: Observer;
     assets?: ObserverList;
     entities?: ObserverList;
-    templateOverridesDiffView?: unknown;
 } & Record<string, unknown>;
 
 class EntityInspector extends Container {
     private _history: History;
 
     private _projectSettings: Observer;
-
-    private _templateInspector: TemplatesEntityInspector;
-
-    private _templateOverridesInspector: TemplateOverrideInspector;
 
     private _attributesInspector: AttributesInspector;
 
@@ -233,26 +224,9 @@ class EntityInspector extends Container {
 
         this._projectSettings = args.projectSettings;
 
-        if (!editor.call('settings:project').get('useLegacyScripts')) {
-            this._templateInspector = new TemplatesEntityInspector({
-                flex: true,
-                assets: args.assets,
-                entities: args.entities,
-                templateOverridesDiffView: args.templateOverridesDiffView,
-                hidden: true
-            });
-
-            this.append(this._templateInspector);
-
-            this._templateOverridesInspector = new TemplateOverrideInspector({
-                entities: args.entities
-            });
-        }
-
         this._attributesInspector = new AttributesInspector({
             history: args.history,
-            attributes: ATTRIBUTES,
-            templateOverridesInspector: this._templateOverridesInspector
+            attributes: ATTRIBUTES
         });
         this.append(this._attributesInspector);
 
@@ -476,7 +450,11 @@ class EntityInspector extends Container {
 
         const menuData = [];
         Object.keys(items).forEach((key) => {
-            menuData.push(items[key]);
+            const item = items[key];
+            if (Array.isArray(item.items) && item.items.length === 0) {
+                return;
+            }
+            menuData.push(item);
         });
 
         menu = new Menu({ items: menuData });
@@ -693,14 +671,6 @@ class EntityInspector extends Container {
 
         this._entities = entities;
 
-        try {
-            if (this._templateInspector) {
-                this._templateInspector.link(entities);
-            }
-        } catch (err) {
-            log.error(err);
-        }
-
         this._attributesInspector.link(entities);
 
         const components = editor.call('components:list');
@@ -733,13 +703,6 @@ class EntityInspector extends Container {
 
         this._disableUiFields();
 
-        try {
-            if (this._templateOverridesInspector) {
-                this._templateOverridesInspector.entity = entities.length === 1 ? entities[0] : null;
-            }
-        } catch (err) {
-            log.error(err);
-        }
     }
 
     unlink() {
@@ -752,14 +715,6 @@ class EntityInspector extends Container {
         this._entities = null;
 
         this._attributesInspector.unlink();
-
-        if (this._templateOverridesInspector) {
-            this._templateOverridesInspector.entity = null;
-        }
-
-        if (this._templateInspector) {
-            this._templateInspector.unlink();
-        }
 
         this._entityEvents.forEach(evt => evt.unbind());
         this._entityEvents.length = 0;

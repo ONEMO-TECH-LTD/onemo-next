@@ -6,9 +6,6 @@ import { useGLTF, Center } from '@react-three/drei'
 import * as THREE from 'three'
 import type {
   DesignState,
-  FaceMaterial,
-  BackMaterial,
-  FrameMaterial,
   SceneSettings,
   ViewerMaterialRole,
   ViewerProductConfig,
@@ -18,9 +15,6 @@ interface EffectModelProps {
   modelPath: string
   artworkUrl: string
   designState: DesignState
-  face: FaceMaterial
-  back: BackMaterial
-  frame: FrameMaterial
   scene: SceneSettings
   product?: ViewerProductConfig
   onModelReady?: (payload: {
@@ -28,6 +22,8 @@ interface EffectModelProps {
     materialSlots: Map<string, THREE.Material | THREE.Material[]>
   }) => void
 }
+
+const textureCache = new Map<string, THREE.Texture>()
 
 function collectMaterialSlots(root: THREE.Object3D) {
   const materialSlots = new Map<string, THREE.Material | THREE.Material[]>()
@@ -89,6 +85,44 @@ function ensureUvAttribute(geometry: THREE.BufferGeometry) {
   geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
 }
 
+function normalizeUvRangeIfNeeded(geometry: THREE.BufferGeometry) {
+  const uv = geometry.getAttribute('uv')
+  if (!uv || uv.count === 0) {
+    return false
+  }
+
+  let uMin = Infinity
+  let uMax = -Infinity
+  let vMin = Infinity
+  let vMax = -Infinity
+
+  for (let i = 0; i < uv.count; i += 1) {
+    const u = uv.getX(i)
+    const v = uv.getY(i)
+    if (u < uMin) uMin = u
+    if (u > uMax) uMax = u
+    if (v < vMin) vMin = v
+    if (v > vMax) vMax = v
+  }
+
+  const uvOutsideUnitRange = uMin < 0 || uMax > 1 || vMin < 0 || vMax > 1
+  if (!uvOutsideUnitRange) {
+    return false
+  }
+
+  const uRange = uMax - uMin || 1
+  const vRange = vMax - vMin || 1
+  const normalized = new Float32Array(uv.count * 2)
+
+  for (let i = 0; i < uv.count; i += 1) {
+    normalized[i * 2] = (uv.getX(i) - uMin) / uRange
+    normalized[i * 2 + 1] = (uv.getY(i) - vMin) / vRange
+  }
+
+  geometry.setAttribute('uv', new THREE.BufferAttribute(normalized, 2))
+  return true
+}
+
 function forcePlanarUvAttribute(geometry: THREE.BufferGeometry) {
   const posAttr = geometry.getAttribute('position')
   const count = posAttr.count
@@ -130,11 +164,54 @@ function loadOptionalTexture(
     return null
   }
 
-  const texture = new THREE.TextureLoader().load(url)
+  const cacheKey = `${url}::${color ? 'color' : 'data'}::${repeat ? 'repeat' : 'clamp'}`
+  const cached = textureCache.get(cacheKey)
+  if (cached) {
+    return cached
+  }
+
+  const texture = new THREE.TextureLoader().load(url, (loaded) => {
+    loaded.colorSpace = color ? THREE.SRGBColorSpace : THREE.NoColorSpace
+    loaded.wrapS = loaded.wrapT = repeat ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping
+    loaded.needsUpdate = true
+  })
   texture.colorSpace = color ? THREE.SRGBColorSpace : THREE.NoColorSpace
   texture.wrapS = texture.wrapT = repeat ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping
-  texture.needsUpdate = true
+  textureCache.set(cacheKey, texture)
   return texture
+}
+
+function hasTextureImageData(texture: THREE.Texture | null | undefined) {
+  if (!(texture instanceof THREE.Texture)) {
+    return false
+  }
+
+  const source = texture.source?.data ?? texture.image
+  if (!source) {
+    return false
+  }
+
+  if (typeof ImageBitmap !== 'undefined' && source instanceof ImageBitmap) {
+    return source.width > 0 && source.height > 0
+  }
+
+  if (typeof HTMLCanvasElement !== 'undefined' && source instanceof HTMLCanvasElement) {
+    return source.width > 0 && source.height > 0
+  }
+
+  if (typeof HTMLImageElement !== 'undefined' && source instanceof HTMLImageElement) {
+    return (source.naturalWidth || source.width || 0) > 0 && (source.naturalHeight || source.height || 0) > 0
+  }
+
+  if (typeof OffscreenCanvas !== 'undefined' && source instanceof OffscreenCanvas) {
+    return source.width > 0 && source.height > 0
+  }
+
+  if (typeof ImageData !== 'undefined' && source instanceof ImageData) {
+    return source.width > 0 && source.height > 0
+  }
+
+  return typeof source === 'object'
 }
 
 function createRoleMaterial(role: ViewerMaterialRole, artworkMap: THREE.Texture | null) {
@@ -181,9 +258,6 @@ export default function EffectModel({
   modelPath,
   artworkUrl,
   designState,
-  face,
-  back,
-  frame,
   scene: sceneSettings,
   product,
   onModelReady,
@@ -194,19 +268,10 @@ export default function EffectModel({
 
   // Load artwork texture dynamically
   const artworkMap = useMemo(() => {
-    const tex = new THREE.TextureLoader().load(artworkUrl, (loaded) => {
-      loaded.colorSpace = THREE.SRGBColorSpace
-      loaded.wrapS = loaded.wrapT = THREE.RepeatWrapping
-      loaded.needsUpdate = true
-      artworkTexRef.current = loaded
-      if (artworkMeshRef.current) {
-        const mat = artworkMeshRef.current.material as THREE.MeshPhysicalMaterial
-        mat.map = loaded
-        mat.needsUpdate = true
-      }
-    })
-    tex.colorSpace = THREE.SRGBColorSpace
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping
+    const tex = loadOptionalTexture(artworkUrl, { color: true, repeat: true })
+    if (tex) {
+      artworkTexRef.current = tex
+    }
     return tex
   }, [artworkUrl])
 
@@ -221,82 +286,21 @@ export default function EffectModel({
       centerOffset - designState.offsetX * repeat,
       centerOffset - designState.offsetY * repeat
     )
-    // eslint-disable-next-line react-hooks/immutability
-    tex.needsUpdate = true
+    if (hasTextureImageData(tex)) {
+      // eslint-disable-next-line react-hooks/immutability
+      tex.needsUpdate = true
+    }
   }, [designState, artworkMap])
 
   const roleEntries = useMemo<ViewerMaterialRole[]>(() => {
-    if (product?.materialRoles?.length) {
-      return product.materialRoles
-    }
-
-    return [
-      {
-        role: 'face',
-        meshNames: ['PRINT_SURFACE_FRONT', 'Face', 'face'],
-        defaults: {
-          color: face.params.color ?? '#ffffff',
-          colorMultiplier: face.params.colorMultiplier,
-          roughness: face.params.roughness,
-          metalness: face.params.metalness,
-          envMapIntensity: face.params.envMapIntensity,
-          normalScale: face.params.normalScale,
-          bumpScale: face.params.bumpScale,
-          sheen: face.params.sheen,
-          sheenColor: face.params.sheenColor,
-          sheenRoughness: face.params.sheenRoughness,
-        },
-        textures: {
-          normalMap: face.textures.normal,
-          roughnessMap: face.textures.roughness,
-          bumpMap: face.textures.height,
-        },
-        configurable: true,
-        configurableProperties: ['color', 'artwork'],
-      },
-      {
-        role: 'back',
-        meshNames: ['BACK', 'Back', 'back'],
-        defaults: {
-          color: back.params.color,
-          roughness: back.params.roughness,
-          envMapIntensity: back.params.envMapIntensity,
-          normalScale: back.params.normalScale,
-          bumpScale: back.params.bumpScale,
-          sheen: back.params.sheen,
-          sheenColor: back.params.sheenColor,
-          sheenRoughness: back.params.sheenRoughness,
-        },
-        textures: {
-          normalMap: back.textures.normal,
-          roughnessMap: back.textures.roughness,
-          bumpMap: back.textures.height,
-        },
-        configurable: true,
-        configurableProperties: ['color'],
-      },
-      {
-        role: 'frame',
-        meshNames: ['FRAME', 'Frame', 'frame'],
-        defaults: {
-          color: frame.params.color,
-          roughness: frame.params.roughness,
-          metalness: frame.params.metalness,
-          clearcoat: frame.params.clearcoat,
-          clearcoatRoughness: frame.params.clearcoatRoughness,
-        },
-        configurable: true,
-        configurableProperties: ['color'],
-      },
-    ]
-  }, [back, face, frame, product])
+    return product?.materialRoles ?? []
+  }, [product])
 
   const artworkMeshPatterns = useMemo(() => {
     if (product?.artworkSlot?.meshName) {
       return [product.artworkSlot.meshName]
     }
-    const fallbackFaceRole = roleEntries.find((role) => role.role === 'face')
-    return fallbackFaceRole?.meshNames ?? []
+    return []
   }, [product, roleEntries])
 
   const roleMaterials = useMemo(() => {
@@ -334,6 +338,7 @@ export default function EffectModel({
             forcePlanarUvAttribute(child.geometry)
           } else {
             ensureUvAttribute(child.geometry)
+            normalizeUvRangeIfNeeded(child.geometry)
           }
         }
       }

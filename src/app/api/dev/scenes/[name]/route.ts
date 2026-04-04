@@ -25,7 +25,7 @@ export async function GET(
     const { name } = await params
     const { appJsonPath, appOnemoPath, studioJsonPath, studioOnemoPath } = toSceneFilePaths(name)
 
-    const onemoPath = [studioOnemoPath, appOnemoPath].find((filePath) => existsSync(filePath))
+    const onemoPath = [appOnemoPath, studioOnemoPath].find((filePath) => existsSync(filePath))
     if (onemoPath) {
       const content = await readFile(onemoPath)
       return new NextResponse(content, {
@@ -36,7 +36,7 @@ export async function GET(
       })
     }
 
-    const jsonPath = [studioJsonPath, appJsonPath].find((filePath) => existsSync(filePath))
+    const jsonPath = [appJsonPath, studioJsonPath].find((filePath) => existsSync(filePath))
     if (jsonPath) {
       const content = await readFile(jsonPath, 'utf-8')
       return NextResponse.json(JSON.parse(content))

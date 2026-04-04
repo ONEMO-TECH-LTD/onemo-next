@@ -21,11 +21,12 @@ editor.once('viewport:load', (app: Application) => {
             meshInstance.destroy();
         }
 
+        const gridVisible = settings.get('editor.showGrid');
         const divisions = Math.floor(settings.get('editor.gridDivisions'));
         const size = settings.get('editor.gridDivisionSize');
         const width = divisions * size;
 
-        if (divisions > 0 && size > 0) {
+        if ((gridVisible === undefined || gridVisible) && divisions > 0 && size > 0) {
             const gridColor = [136, 136, 136, 255];
             const axisColor = [0, 0, 0, 255];
 
@@ -60,6 +61,7 @@ editor.once('viewport:load', (app: Application) => {
         editor.call('viewport:render');
     };
 
+    settings.on('editor.showGrid:set', updateGrid);
     settings.on('editor.gridDivisions:set', updateGrid);
     settings.on('editor.gridDivisionSize:set', updateGrid);
 

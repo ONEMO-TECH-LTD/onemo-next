@@ -643,8 +643,8 @@ async function readBinaryBody(req) {
 
         req.on('data', (chunk) => {
             size += chunk.length;
-            if (size > 20 * 1024 * 1024) {
-                reject(new Error('Request body exceeds 20MB limit'));
+            if (size > 150 * 1024 * 1024) {
+                reject(new Error('Request body exceeds 150MB limit'));
                 req.destroy();
                 return;
             }
@@ -923,28 +923,16 @@ function createSchema() {
             type: {
                 $enum: [
                     'animation',
-                    'animstategraph',
                     'audio',
-                    'binary',
-                    'bundle',
                     'container',
-                    'css',
                     'cubemap',
-                    'font',
                     'folder',
                     'gsplat',
-                    'html',
-                    'json',
                     'material',
                     'model',
                     'render',
-                    'script',
                     'shader',
-                    'sprite',
-                    'template',
-                    'text',
-                    'texture',
-                    'textureatlas'
+                    'texture'
                 ]
             }
         },
@@ -1657,14 +1645,6 @@ const server = http.createServer(async (req, res) => {
                 files.forEach((file) => {
                     if (file.endsWith('.onemo')) {
                         preferredScenes.set(file.slice(0, -6), 'onemo');
-                        return;
-                    }
-
-                    if (file.endsWith('.json')) {
-                        const sceneName = file.slice(0, -5);
-                        if (!preferredScenes.has(sceneName)) {
-                            preferredScenes.set(sceneName, 'json');
-                        }
                     }
                 });
 
@@ -1719,10 +1699,7 @@ const server = http.createServer(async (req, res) => {
                     res.end(content);
                     return;
                 }
-
-                const content = await readFile(legacyPath, 'utf8');
-                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-                res.end(content);
+                json(res, 404, { error: 'Scene not found' });
             } catch {
                 json(res, 404, { error: 'Scene not found' });
             }
