@@ -5,7 +5,6 @@ import type { Attribute } from './attribute.type.d';
 import { AttributesInspector } from './attributes-inspector';
 import type { BaseSettingsPanelArgs } from './settings-panels/base';
 import { EditorSettingsPanel } from './settings-panels/editor';
-import { PhysicsSettingsPanel } from './settings-panels/physics';
 import { RenderingSettingsPanel } from './settings-panels/rendering';
 
 
@@ -21,11 +20,6 @@ const SETTINGS_PANELS = [
         id: 'editor',
         label: 'Editor',
         constructor: EditorSettingsPanel
-    },
-    {
-        id: 'physics',
-        label: 'Physics',
-        constructor: PhysicsSettingsPanel
     }
 ] as const;
 

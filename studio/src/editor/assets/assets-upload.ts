@@ -4,8 +4,6 @@ import { Asset } from '../../editor-api/asset';
 editor.once('load', () => {
     let uploadJobs = 0;
     const projectUserSettings = editor.call('settings:projectUser');
-    const legacyScripts = editor.call('settings:project').get('useLegacyScripts');
-
     const targetExtensions = {
         'jpg': true,
         'jpeg': true,
@@ -103,6 +101,17 @@ editor.once('load', () => {
 
     editor.method('assets:uploadFile', (args, fn) => {
         let request;
+        if (args.type === 'script' || args.type === 'gsplat') {
+            const error = args.type === 'gsplat'
+                ? 'Gaussian splat assets are not part of the ONEMO Studio production surface yet.'
+                : 'Script assets are not part of the ONEMO Studio runtime surface.';
+            editor.call('status:error', error);
+            if (fn) {
+                fn(error);
+            }
+            return;
+        }
+
         if (args.asset) {
             const assetId = args.asset.get('id');
             if (editor.call('r3f:bridge:isLocalAsset', assetId)) {
@@ -115,8 +124,7 @@ editor.once('load', () => {
             }
             request = editor.api.globals.rest.assets.assetUpdate(assetId, args, pipelineOptions());
         } else {
-            // default preload scripts to true
-            args.preloadDefault = args.type === 'script' ? true : projectUserSettings.get('editor.pipeline.defaultAssetPreload');
+            args.preloadDefault = projectUserSettings.get('editor.pipeline.defaultAssetPreload');
             request = editor.api.globals.rest.assets.assetCreate(args, pipelineOptions());
         }
 
@@ -196,8 +204,8 @@ editor.once('load', () => {
 
         ext = ext[ext.length - 1].toLowerCase();
 
-        if (legacyScripts && typeToExt.script.includes(ext)) {
-            editor.call('status:error', 'Cannot upload scripts in this project because it uses a deprecated scripting system that is now read-only.');
+        if (typeToExt.script.includes(ext)) {
+            editor.call('status:error', 'Script assets are not part of the ONEMO Studio runtime surface.');
             return;
         }
 
@@ -358,7 +366,7 @@ editor.once('load', () => {
         }
     });
 
-    editor.method('assets:upload:picker', (args = {}) => {
+    editor.method('assets:upload:picker', (_args = {}) => {
         const fileInput = document.createElement('input');
         fileInput.type = 'file';
         fileInput.multiple = true;

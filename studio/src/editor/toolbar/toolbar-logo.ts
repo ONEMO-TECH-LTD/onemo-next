@@ -309,11 +309,6 @@ editor.once('load', () => {
                 onIsEnabled: () => hasWriteAccess() && isEntitySelected(),
                 onIsVisible: () => shouldShowEnableToggle(true),
                 onSelect: () => setField(getSelectedItems(), 'enabled', false)
-            }, {
-                text: 'Template',
-                onIsEnabled: () => isEntitySelected() && getSelectedItems().length === 1,
-                onIsVisible: () => !legacyScripts,
-                items: editor.call('menu:entities:template')
             }]
         }, {
             // Configuration

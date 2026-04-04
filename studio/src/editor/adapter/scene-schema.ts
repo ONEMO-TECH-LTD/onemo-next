@@ -1,7 +1,7 @@
 import type { ViewerConfig } from '../../../../src/app/(dev)/prototype/types';
 import { DEFAULT_RENDERER_SETTINGS } from './onemo-format';
 
-export type SavedSceneMaterialRole = 'face' | 'back' | 'frame' | 'generic';
+export type SavedSceneMaterialRole = string;
 
 export type SavedSceneTextureKey =
     | 'map'
@@ -123,12 +123,6 @@ export type SavedScene = {
     materials: Record<string, SavedSceneMaterial>;
     sceneSettings: SavedSceneSettings;
 };
-
-const DEFAULT_TEXTURES = {
-    normal: '/assets/materials/ultrasuede/suede-normal.png',
-    roughness: '/assets/materials/ultrasuede/suede-roughness.jpg',
-    height: '/assets/materials/ultrasuede/suede-height.png'
-} as const;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -272,29 +266,73 @@ const readBackgroundColor = (scene: SavedScene) => {
     return null;
 };
 
-const applySharedTextures = (
-    textures: Partial<Record<SavedSceneTextureKey, SavedSceneTexture>>,
-    target: ViewerConfig['face']['textures']
+const getCompatibilityRoles = (config: ViewerConfig) => {
+    const materialRoles = config.product?.materialRoles ?? [];
+    const artworkRole = config.product?.artworkSlot
+        ? materialRoles.find((role) => role.role === config.product?.artworkSlot?.role)
+        : undefined;
+
+    const primaryRole = artworkRole ?? materialRoles[0];
+    const secondaryRole = materialRoles.find((role) => role !== primaryRole) ?? primaryRole;
+    const tertiaryRole = materialRoles.find((role) => role !== primaryRole && role !== secondaryRole) ?? secondaryRole;
+
+    return {
+        primaryRole,
+        secondaryRole,
+        tertiaryRole
+    };
+};
+
+const readRoleColor = (
+    role: ViewerConfig['product']['materialRoles'][number] | undefined,
+    fallback: string
 ) => {
-    if (textures.map?.url) {
-        target.texture = textures.map.url;
+    const value = role?.defaults?.color;
+    return typeof value === 'string' && value.trim() ? value : fallback;
+};
+
+const upsertProductRoleFromSceneMaterial = (
+    config: ViewerConfig,
+    roleName: string,
+    materialName: string,
+    defaults: Record<string, unknown>,
+    textures: Partial<Record<SavedSceneTextureKey, SavedSceneTexture>>
+) => {
+    if (!roleName || roleName === 'generic') {
+        return;
     }
 
-    if (textures.normalMap?.url) {
-        target.normal = textures.normalMap.url;
+    const existingRole = config.product.materialRoles.find((role) => role.role === roleName);
+    const nextTextures: Record<string, string | undefined> = {
+        map: textures.map?.url,
+        normalMap: textures.normalMap?.url,
+        roughnessMap: textures.roughnessMap?.url,
+        bumpMap: textures.bumpMap?.url,
+        sheenColorMap: textures.sheenColorMap?.url
+    };
+
+    if (existingRole) {
+        if (materialName && !existingRole.meshNames.includes(materialName)) {
+            existingRole.meshNames.push(materialName);
+        }
+        existingRole.defaults = {
+            ...(existingRole.defaults || {}),
+            ...defaults
+        };
+        existingRole.textures = {
+            ...(existingRole.textures || {}),
+            ...Object.fromEntries(Object.entries(nextTextures).filter(([, value]) => !!value))
+        };
+        return;
     }
 
-    if (textures.roughnessMap?.url) {
-        target.roughness = textures.roughnessMap.url;
-    }
-
-    if (textures.bumpMap?.url) {
-        target.height = textures.bumpMap.url;
-    }
-
-    if (textures.sheenColorMap?.url) {
-        target.sheenColor = textures.sheenColorMap.url;
-    }
+    config.product.materialRoles.push({
+        role: roleName,
+        meshNames: materialName ? [materialName] : [],
+        defaults: { ...defaults },
+        textures: Object.fromEntries(Object.entries(nextTextures).filter(([, value]) => !!value)),
+        configurable: true
+    });
 };
 
 export const cloneViewerConfig = (value: ViewerConfig): ViewerConfig => {
@@ -305,65 +343,9 @@ export const rgbTupleToHex = (value: [number, number, number]) => {
     return rgbTupleToHexInternal(value);
 };
 
-export const decomposeViewerColor = (value: [number, number, number]) => {
-    const multiplier = Math.max(1, value[0] ?? 0, value[1] ?? 0, value[2] ?? 0);
-    const normalized: [number, number, number] = [
-        clampColorChannel((value[0] ?? 0) / multiplier),
-        clampColorChannel((value[1] ?? 0) / multiplier),
-        clampColorChannel((value[2] ?? 0) / multiplier)
-    ];
-
-    return {
-        color: rgbTupleToHexInternal(normalized),
-        colorMultiplier: multiplier
-    };
-};
-
 export const createDefaultViewerConfig = (): ViewerConfig => {
     return {
-        modelPath: '/assets/shapes/effect-70mm-step.glb',
-        face: {
-            params: {
-                color: '#ffffff',
-                roughness: 1,
-                metalness: 0,
-                envMapIntensity: 0.1,
-                normalScale: 0.15,
-                bumpScale: 1,
-                sheen: 1,
-                sheenColor: '#1a1a1a',
-                sheenRoughness: 0.8,
-                colorMultiplier: 1
-            },
-            textures: {
-                ...DEFAULT_TEXTURES
-            }
-        },
-        back: {
-            params: {
-                color: '#080808',
-                roughness: 1,
-                envMapIntensity: 0.1,
-                normalScale: 0.15,
-                bumpScale: 1,
-                sheen: 1,
-                sheenColor: '#1a1a1a',
-                sheenRoughness: 0.8
-            },
-            textures: {
-                ...DEFAULT_TEXTURES
-            }
-        },
-        frame: {
-            params: {
-                color: '#0f0f0f',
-                roughness: 0.5,
-                metalness: 0,
-                clearcoat: 0.4,
-                clearcoatRoughness: 0.3
-            },
-            textures: {}
-        },
+        modelPath: '',
         scene: {
             exposure: 0.7,
             ambientIntensity: 0.5,
@@ -398,33 +380,9 @@ export const createDefaultViewerConfig = (): ViewerConfig => {
             ...DEFAULT_RENDERER_SETTINGS
         },
         product: {
-            productType: 'effect-70mm',
-            materialRoles: [
-                {
-                    role: 'face',
-                    meshNames: ['PRINT_SURFACE_FRONT', 'Face', 'face'],
-                    configurable: true,
-                    configurableProperties: ['color', 'artwork']
-                },
-                {
-                    role: 'back',
-                    meshNames: ['BACK', 'Back', 'back'],
-                    configurable: true,
-                    configurableProperties: ['color']
-                },
-                {
-                    role: 'frame',
-                    meshNames: ['FRAME', 'Frame', 'frame'],
-                    configurable: true,
-                    configurableProperties: ['color']
-                }
-            ],
-            artworkSlot: {
-                meshName: 'PRINT_SURFACE_FRONT',
-                role: 'face',
-                defaultUrl: '/assets/test-artwork.png',
-                textureChannel: 'map'
-            }
+            productType: 'untitled-scene',
+            materialRoles: [],
+            artworkSlot: undefined
         }
     };
 };
@@ -453,68 +411,25 @@ export const savedSceneToViewerConfig = (
         const textures = readMaterialTextures(data);
         const role = inferMaterialRole(material);
 
-        if (role === 'face') {
-            const faceColor = readColor(data, ['color', 'diffuse'], [1, 1, 1]);
-            const { color, colorMultiplier } = decomposeViewerColor(faceColor);
+        upsertProductRoleFromSceneMaterial(next, role, material.name, {
+            color: rgbTupleToHexInternal(readColor(data, ['color', 'diffuse'], [1, 1, 1])),
+            roughness: readNumber(data, ['roughness'], 1),
+            metalness: readNumber(data, ['metalness'], 0),
+            envMapIntensity: readNumber(data, ['envMapIntensity'], 0.1),
+            normalScale: readNumber(data, ['normalScale', 'normalStrength'], 0.15),
+            bumpScale: readNumber(data, ['bumpScale', 'heightMapFactor', 'bumpMapFactor'], 1),
+            clearcoat: readNumber(data, ['clearcoat', 'clearCoat', 'clearcoatAmount'], 0),
+            clearcoatRoughness: readNumber(data, ['clearcoatRoughness', 'clearcoatGlossiness'], 0),
+            sheen: readNumber(data, ['sheen'], readBoolean(data, ['useSheen', 'sheenEnabled'], false) ? 1 : 0),
+            sheenColor: rgbTupleToHexInternal(readColor(data, ['sheenColor', 'sheen'], [0.1, 0.1, 0.1])),
+            sheenRoughness: readNumber(data, ['sheenRoughness'], 0.8)
+        }, textures);
 
-            next.face.params.color = color;
-            next.face.params.colorMultiplier = readNumber(data, ['colorMultiplier'], colorMultiplier);
-            next.face.params.roughness = readNumber(data, ['roughness'], next.face.params.roughness);
-            next.face.params.metalness = readNumber(data, ['metalness'], next.face.params.metalness);
-            next.face.params.envMapIntensity = readNumber(data, ['envMapIntensity'], next.face.params.envMapIntensity);
-            next.face.params.normalScale = readNumber(data, ['normalScale', 'normalStrength'], next.face.params.normalScale);
-            next.face.params.bumpScale = readNumber(data, ['bumpScale', 'heightMapFactor', 'bumpMapFactor'], next.face.params.bumpScale);
-            next.face.params.sheen = readNumber(
-                data,
-                ['sheen'],
-                readBoolean(data, ['useSheen', 'sheenEnabled'], next.face.params.sheen > 0) ? 1 : 0
-            );
-            next.face.params.sheenColor = rgbTupleToHexInternal(readColor(data, ['sheenColor', 'sheen'], [0.1, 0.1, 0.1]));
-            next.face.params.sheenRoughness = readNumber(
-                data,
-                ['sheenRoughness'],
-                1 - readNumber(data, ['sheenGloss'], 1 - next.face.params.sheenRoughness)
-            );
-            applySharedTextures(textures, next.face.textures);
-            return;
-        }
-
-        if (role === 'back') {
-            next.back.params.color = rgbTupleToHexInternal(readColor(data, ['color', 'diffuse'], [0.031, 0.031, 0.031]));
-            next.back.params.roughness = readNumber(data, ['roughness'], next.back.params.roughness);
-            next.back.params.envMapIntensity = readNumber(data, ['envMapIntensity'], next.back.params.envMapIntensity);
-            next.back.params.normalScale = readNumber(data, ['normalScale', 'normalStrength'], next.back.params.normalScale);
-            next.back.params.bumpScale = readNumber(data, ['bumpScale', 'heightMapFactor', 'bumpMapFactor'], next.back.params.bumpScale);
-            next.back.params.sheen = readNumber(
-                data,
-                ['sheen'],
-                readBoolean(data, ['useSheen', 'sheenEnabled'], next.back.params.sheen > 0) ? 1 : 0
-            );
-            next.back.params.sheenColor = rgbTupleToHexInternal(readColor(data, ['sheenColor', 'sheen'], [0.1, 0.1, 0.1]));
-            next.back.params.sheenRoughness = readNumber(
-                data,
-                ['sheenRoughness'],
-                1 - readNumber(data, ['sheenGloss'], 1 - next.back.params.sheenRoughness)
-            );
-            applySharedTextures(textures, next.back.textures);
-            return;
-        }
-
-        if (role === 'frame') {
-            next.frame.params.color = rgbTupleToHexInternal(readColor(data, ['color', 'diffuse'], [0.06, 0.06, 0.06]));
-            next.frame.params.roughness = readNumber(data, ['roughness'], next.frame.params.roughness);
-            next.frame.params.metalness = readNumber(data, ['metalness'], next.frame.params.metalness);
-            next.frame.params.clearcoat = readNumber(data, ['clearcoat', 'clearCoat', 'clearcoatAmount'], next.frame.params.clearcoat);
-            next.frame.params.clearcoatRoughness = readNumber(
-                data,
-                ['clearcoatRoughness', 'clearcoatGlossiness'],
-                1 - readNumber(data, ['clearCoatGloss'], 1 - next.frame.params.clearcoatRoughness)
-            );
-        }
     });
 
-    next.colors.backColor = next.back.params.color;
-    next.colors.frameColor = next.frame.params.color;
+    const { secondaryRole, tertiaryRole } = getCompatibilityRoles(next);
+    next.colors.backColor = readRoleColor(secondaryRole, next.colors.backColor);
+    next.colors.frameColor = readRoleColor(tertiaryRole, next.colors.frameColor);
     next.colors.bgColor = next.scene.background;
 
     return next;

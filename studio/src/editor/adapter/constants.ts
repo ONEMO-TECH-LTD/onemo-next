@@ -1,5 +1,5 @@
 export const BRIDGE_ROOT_ID = 'r3f-bridge-root';
-export const BRIDGE_ROOT_NAME = 'R3F Scene';
+export const BRIDGE_ROOT_NAME = 'Scene';
 
 export const BRIDGE_CAMERA_ID = 'r3f-bridge-camera';
 export const BRIDGE_CAMERA_NAME = 'Editor Camera';

@@ -101,7 +101,11 @@ editor.once('load', () => {
         const orderedKeys = Object.keys(items).sort();
         const sorted = [];
         for (let i = 0; i < orderedKeys.length; i++) {
-            sorted.push(items[orderedKeys[i]]);
+            const item = items[orderedKeys[i]];
+            if (Array.isArray(item.items) && item.items.length === 0) {
+                continue;
+            }
+            sorted.push(item);
         }
 
         return sorted;

@@ -8,8 +8,6 @@ editor.once('load', () => {
     let items = [];   // the current selection
     const root = editor.call('layout.root');
 
-    const legacyScripts = editor.call('settings:project').get('useLegacyScripts');
-
     // create data for entity menu
     let menu;
 
@@ -113,23 +111,6 @@ editor.once('load', () => {
             onIsVisible: hasWriteAccess,
             items: editor.call('menu:entities:add-component')
         });
-
-        if (!legacyScripts) {
-            menuData.push({
-                text: 'Template',
-                icon: 'E411',
-                onIsEnabled: () => {
-                    if (isOneSelected()) {
-                        return true;
-                    }
-                    // For multi-select, enable if at least one entity is linked to a template
-                    // For instance, allows "Unlink Template" for multiple entity selection.
-                    return items.some(e => e.get('template_id'));
-                },
-                onIsVisible: hasWriteAccess,
-                items: editor.call('menu:entities:template')
-            });
-        }
 
         menuData.push({
             text: 'Enable',

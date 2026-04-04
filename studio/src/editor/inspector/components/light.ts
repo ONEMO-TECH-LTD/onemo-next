@@ -119,46 +119,6 @@ const ATTRIBUTES: (Attribute | Divider)[] = [{
 }, {
     type: 'divider'
 }, {
-    label: 'Static',
-    path: 'components.light.isStatic',
-    reference: 'light:isStatic',
-    type: 'boolean'
-}, {
-    label: 'Bake Lightmap',
-    path: 'components.light.bake',
-    reference: 'light:bake',
-    type: 'boolean'
-}, {
-    label: 'Bake Direction',
-    path: 'components.light.bakeDir',
-    reference: 'light:bakeDir',
-    type: 'boolean'
-}, {
-    label: 'Bake Samples',
-    path: 'components.light.bakeNumSamples',
-    reference: 'light:bakeNumSamples',
-    type: 'number',
-    args: {
-        min: 1,
-        max: 255,
-        step: 1,
-        precision: 0
-    }
-}, {
-    label: 'Bake Area',
-    path: 'components.light.bakeArea',
-    reference: 'light:bakeArea',
-    type: 'slider',
-    args: {
-        min: 0,
-        max: 180
-    }
-}, {
-    label: 'Affect Lightmapped',
-    path: 'components.light.affectLightmapped',
-    reference: 'light:affectLightmapped',
-    type: 'boolean'
-}, {
     label: 'Affect Dynamic',
     path: 'components.light.affectDynamic',
     reference: 'light:affectDynamic',
@@ -175,19 +135,6 @@ const ATTRIBUTES: (Attribute | Divider)[] = [{
     path: 'components.light.castShadows',
     reference: 'light:castShadows',
     type: 'boolean'
-}, {
-    label: 'Shadow Update Mode',
-    path: 'components.light.shadowUpdateMode',
-    reference: 'light:shadowUpdateMode',
-    type: 'select',
-    args: {
-        type: 'number',
-        options: [{
-            v: SHADOWUPDATE_THISFRAME, t: 'Once'
-        }, {
-            v: SHADOWUPDATE_REALTIME, t: 'Realtime'
-        }]
-    }
 }, {
     label: 'Resolution',
     path: 'components.light.shadowResolution',
@@ -216,34 +163,6 @@ const ATTRIBUTES: (Attribute | Divider)[] = [{
         }]
     }
 }, {
-    label: 'Cascades',
-    path: 'components.light.numCascades',
-    reference: 'light:numCascades',
-    type: 'select',
-    args: {
-        type: 'number',
-        options: [{
-            v: 1, t: '1'
-        }, {
-            v: 2, t: '2'
-        }, {
-            v: 3, t: '3'
-        }, {
-            v: 4, t: '4'
-        }]
-    }
-}, {
-    label: 'Cascade Distribution',
-    path: 'components.light.cascadeDistribution',
-    reference: 'light:cascadeDistribution',
-    type: 'number',
-    args: {
-        precision: 2,
-        step: 0.01,
-        min: 0,
-        max: 1
-    }
-}, {
     label: 'Distance',
     path: 'components.light.shadowDistance',
     reference: 'light:shadowDistance',
@@ -252,73 +171,6 @@ const ATTRIBUTES: (Attribute | Divider)[] = [{
         precision: 2,
         step: 1,
         min: 0
-    }
-}, {
-    label: 'Shadow Intensity',
-    path: 'components.light.shadowIntensity',
-    reference: 'light:shadowIntensity',
-    type: 'slider',
-    args: {
-        precision: 2,
-        step: 0.01,
-        min: 0,
-        max: 1
-    }
-}, {
-    label: 'Shadow Type',
-    path: 'components.light.shadowType',
-    reference: 'light:shadowType',
-    type: 'select',
-    args: {
-        type: 'number',
-        options: [{
-            v: SHADOW_PCF1_32F, t: 'Shadow Map PCF 1x1'
-        }, {
-            v: SHADOW_PCF3_32F, t: 'Shadow Map PCF 3x3'
-        }, {
-            v: SHADOW_PCF5_32F, t: 'Shadow Map PCF 5x5'
-        }, {
-            v: SHADOW_VSM_16F, t: 'Variance Shadow Map (16bit)'
-        }, {
-            v: SHADOW_VSM_32F, t: 'Variance Shadow Map (32bit)'
-        }, {
-            v: SHADOW_PCSS_32F, t: 'PCSS (Soft Shadows)'
-        }]
-    }
-}, {
-    label: 'VSM Blur Mode',
-    path: 'components.light.vsmBlurMode',
-    reference: 'light:vsmBlurMode',
-    type: 'select',
-    args: {
-        type: 'number',
-        options: [{
-            v: 0, t: 'Box'
-        }, {
-            v: 1, t: 'Gaussian'
-        }]
-    }
-}, {
-    label: 'VSM Blur Size',
-    path: 'components.light.vsmBlurSize',
-    reference: 'light:vsmBlurSize',
-    type: 'slider',
-    args: {
-        min: 1,
-        max: 25,
-        precision: 0,
-        step: 1
-    }
-}, {
-    label: 'VSM Bias',
-    path: 'components.light.vsmBias',
-    reference: 'light:vsmBias',
-    type: 'number',
-    args: {
-        min: 0,
-        max: 1,
-        precision: 4,
-        step: 0.001
     }
 }, {
     label: 'Shadow Bias',
@@ -402,16 +254,11 @@ class LightComponentInspector extends ComponentInspector {
 
         [
             'type',
-            'bake',
-            'bakeDir',
             'castShadows',
-            'shadowType',
-            'shadowUpdateMode',
             'affectDynamic',
-            'shape',
-            'numCascades'
+            'shape'
         ].forEach((field) => {
-            this._field(field).on('change', this._toggleFields.bind(this));
+            this._field(field)?.on('change', this._toggleFields.bind(this));
         });
 
         // add update shadow button
@@ -419,7 +266,8 @@ class LightComponentInspector extends ComponentInspector {
             size: 'small',
             icon: 'E128'
         });
-        this._field('shadowUpdateMode').parent.append(this._btnUpdateShadow);
+        const shadowResolutionField = this._field('shadowResolution');
+        shadowResolutionField?.parent.append(this._btnUpdateShadow);
 
         const tooltip = LegacyTooltip.attach({
             target: this._btnUpdateShadow.dom,
@@ -441,78 +289,44 @@ class LightComponentInspector extends ComponentInspector {
         const isDirectional = type === 'directional';
         const isSpot = type === 'spot';
         const isPoint = type === 'point';
-        const castShadows = this._field('castShadows').value;
-        const shadowType = this._field('shadowType').value;
-        const shadowTypeVsm = shadowType === SHADOW_VSM_16F || shadowType === SHADOW_VSM_32F;
-        const numCascades = this._field('numCascades').value;
-
-        // engine does not support point VSM shadows and drops it to PCF3, update UI to match
-        if (isPoint && shadowTypeVsm) {
-            this._field('shadowType').value = SHADOW_PCF3_32F;
-        }
+        const castShadows = !!this._field('castShadows')?.value;
 
         const areaEnabled = editor.call('sceneSettings').get('render.lightingAreaLightsEnabled');
-        const shape = this._field('shape').value;
+        const shape = this._field('shape')?.value;
 
-        this._field('shape').parent.hidden = !areaEnabled;
+        if (this._field('shape')) {
+            this._field('shape').parent.hidden = !areaEnabled;
+        }
 
         ['range', 'falloffMode'].forEach((field) => {
-            this._field(field).parent.hidden = isDirectional;
+            this._field(field)?.parent && (this._field(field)!.parent.hidden = isDirectional);
         });
 
         // falloff mode is ignored on area lights
-        if (areaEnabled && shape !== 0) {
-            this._field('falloffMode').parent.hidden = true;
+        if (areaEnabled && shape !== 0 && this._field('falloffMode')?.parent) {
+            this._field('falloffMode')!.parent.hidden = true;
         }
 
         ['innerConeAngle', 'outerConeAngle'].forEach((field) => {
-            this._field(field).parent.hidden = !isSpot;
+            this._field(field)?.parent && (this._field(field)!.parent.hidden = !isSpot);
         });
 
         // Avoid inner cone angle from being larger than outer cone angle
         this._resetInnerConeAngleLimit();
-        this._field('outerConeAngle').on('change', this._resetInnerConeAngleLimit.bind(this));
+        this._field('outerConeAngle')?.on('change', this._resetInnerConeAngleLimit.bind(this));
 
-        const bakeEnabled = this._field('bake').value;
-        const bakeDirEnabled = this._field('bakeDir').value;
+        if (this._field('affectSpecularity')) {
+            this._field('affectSpecularity').parent.hidden = !isDirectional;
+        }
 
-        this._field('bakeDir').parent.disabled = !bakeEnabled;
-        this._field('bakeNumSamples').parent.disabled = !bakeEnabled || bakeDirEnabled;
-        this._field('bakeArea').parent.disabled = !bakeEnabled || bakeDirEnabled;
-        this._field('affectLightmapped').parent.disabled = bakeEnabled;
+        this._field('shadowResolution')?.parent && (this._field('shadowResolution')!.parent.hidden = !castShadows);
+        this._field('shadowDistance')?.parent && (this._field('shadowDistance')!.parent.hidden = !castShadows);
 
-        this._field('affectSpecularity').parent.hidden = !isDirectional;
-
-        this._field('shadowResolution').parent.hidden = !castShadows;
-        this._field('shadowType').parent.hidden = !castShadows;
-        this._field('shadowDistance').parent.hidden = !castShadows;
-        this._field('shadowIntensity').parent.hidden = !castShadows;
-
-        this._field('numCascades').parent.hidden = !(castShadows && isDirectional);
-        this._field('cascadeDistribution').parent.hidden = !(castShadows && isDirectional && numCascades > 1);
-
-        this._field('shadowUpdateMode').parent.hidden = !castShadows || this._field('bake').value && !this._field('affectDynamic').value;
-
-        [
-            'vsmBlurMode',
-            'vsmBlurSize',
-            'vsmBias'
-        ].forEach((field) => {
-            this._field(field).parent.hidden = !castShadows || !shadowTypeVsm;
+        ['shadowBias', 'normalOffsetBias', 'penumbraSize', 'penumbraFalloff'].forEach((field) => {
+            this._field(field)?.parent && (this._field(field)!.parent.hidden = !castShadows);
         });
 
-        [
-            'shadowBias',
-            'normalOffsetBias'
-        ].forEach((field) => {
-            this._field(field).parent.hidden = !castShadows || shadowTypeVsm;
-        });
-
-        const shadowTypePcss = shadowType === SHADOW_PCSS_32F;
-        this._field('penumbraSize').parent.hidden = !castShadows || !shadowTypePcss;
-        this._field('penumbraFalloff').parent.hidden = !castShadows || !shadowTypePcss;
-
-        this._btnUpdateShadow.hidden = this._field('shadowUpdateMode').value !== SHADOWUPDATE_THISFRAME;
+        this._btnUpdateShadow.hidden = !castShadows;
     }
 
     _updateShadows(entities: EntityObserver[]) {

@@ -138,7 +138,7 @@ editor.once('load', () => {
 
         const ctrl = editor.call('hotkey:ctrl:string');
 
-        return [{
+        const items = [{
             // add new entity
             text: 'Entity',
             icon: 'E120',
@@ -591,5 +591,7 @@ editor.once('load', () => {
                 }
             }]
         }];
+
+        return items.filter((item) => item.text !== '2D' && item.text !== 'User Interface');
     });
 });

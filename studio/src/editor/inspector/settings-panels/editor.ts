@@ -6,6 +6,14 @@ import type { Attribute, Divider } from '../attribute.type.d';
 const ATTRIBUTES: (Attribute | Divider)[] = [
     {
         observer: 'settings',
+        label: 'Show Grid',
+        path: 'editor.showGrid',
+        alias: 'showGrid',
+        reference: 'settings:showGrid',
+        type: 'boolean'
+    },
+    {
+        observer: 'settings',
         label: 'Grid Divisions',
         path: 'editor.gridDivisions',
         alias: 'grid',

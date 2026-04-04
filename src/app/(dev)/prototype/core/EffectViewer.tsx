@@ -10,6 +10,21 @@ import EffectModel from './EffectModel'
 import type { ViewerConfig, DesignState } from '../types'
 
 const DEFAULT_ARTWORK = '/assets/test-artwork.png'
+const DEFAULT_ENVIRONMENT_PRESET = 'studio'
+type DreiEnvironmentPreset =
+  | 'studio'
+  | 'city'
+  | 'sunset'
+  | 'dawn'
+  | 'night'
+  | 'warehouse'
+  | 'forest'
+  | 'apartment'
+  | 'park'
+  | 'lobby'
+const LOCAL_ENVIRONMENT_PRESETS: Partial<Record<DreiEnvironmentPreset, string>> = {
+  studio: '/assets/env/studio_small_03_1k.hdr',
+}
 
 // Bridge interface — what Studio gets from onCreated to wire the bridge
 export interface EffectViewerBridge {
@@ -189,6 +204,24 @@ export default function EffectViewer({
     return new THREE.Euler(0, rad, 0)
   }, [env])
 
+  const environmentSource = useMemo(() => {
+    if (!env) {
+      return null
+    }
+
+    if (env.customHdri) {
+      return { files: env.customHdri }
+    }
+
+    const preset = (env.preset ?? DEFAULT_ENVIRONMENT_PRESET) as DreiEnvironmentPreset
+    const localPresetFile = LOCAL_ENVIRONMENT_PRESETS[preset]
+    if (localPresetFile) {
+      return { files: localPresetFile }
+    }
+
+    return { preset }
+  }, [env])
+
   const canvasCamera = useMemo(() => {
     return {
       position: cameraPosition,
@@ -228,26 +261,22 @@ export default function EffectViewer({
           <RendererBackgroundSync color={config.colors.bgColor} />
           <RendererSettingsSync config={config} />
           <CameraConfigSync config={config} orbitControlsRef={orbitControlsRef} />
-          <Environment
-            {...(env?.customHdri
-              ? { files: env.customHdri }
-              : { preset: (env?.preset ?? 'studio') as 'studio' | 'city' | 'sunset' | 'dawn' | 'night' | 'warehouse' | 'forest' | 'apartment' | 'park' | 'lobby' }
-            )}
-            environmentIntensity={config.scene.envIntensity}
-            environmentRotation={envRotation}
-            ground={env?.groundEnabled ? {
-              height: env.groundHeight,
-              radius: env.groundRadius,
-            } : undefined}
-          />
+          {env && environmentSource ? (
+            <Environment
+              {...environmentSource}
+              environmentIntensity={config.scene.envIntensity}
+              environmentRotation={envRotation}
+              ground={env.groundEnabled ? {
+                height: env.groundHeight,
+                radius: env.groundRadius,
+              } : undefined}
+            />
+          ) : null}
           {config.modelPath ? (
             <EffectModel
               modelPath={config.modelPath}
               artworkUrl={artworkUrl || DEFAULT_ARTWORK}
               designState={designState}
-              face={config.face}
-              back={config.back}
-              frame={config.frame}
               scene={config.scene}
               product={config.product}
               onModelReady={onModelReady}

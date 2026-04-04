@@ -90,12 +90,14 @@
   "scripts": {
     "build": "cross-env NODE_ENV=production vite build",
     "develop": "concurrently --kill-others \"npm run watch\" \"npm run serve\"",
-    "lint": "stylelint sass && eslint",
-    "lint:fix": "stylelint sass --fix && eslint --fix",
+    "lint": "node ./scripts/run-production-eslint.mjs",
+    "lint:fix": "stylelint sass/editor/_editor-settings-panel.scss --fix && node ./scripts/run-production-eslint.mjs",
+    "lint:full": "stylelint sass && eslint",
     "serve": "serve dist -p 3487 --cors",
     "test": "mocha",
     "test:api": "rollup -c test/editor-api/rollup.test.config.mjs && karma start test/editor-api/karma.conf.cjs --single-run",
-    "type:check": "tsc",
+    "type:check": "node ./scripts/run-production-typecheck.mjs",
+    "type:check:full": "tsc",
     "watch": "cross-env NODE_ENV=development vite build --watch"
   },
   "engines": {

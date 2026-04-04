@@ -571,56 +571,6 @@ function flattenMaterials(material: THREE.Material | THREE.Material[]) {
   return Array.isArray(material) ? material : [material]
 }
 
-function collectMaterialSlots(root: THREE.Object3D) {
-  const materialSlots = new Map<string, THREE.Material | THREE.Material[]>()
-
-  root.traverse((child) => {
-    if (child instanceof THREE.Mesh) {
-      materialSlots.set(child.uuid, child.material)
-    }
-  })
-
-  return materialSlots
-}
-
-function applyEditorCameraState(
-  camera: THREE.Camera,
-  orbitControls: React.ComponentRef<typeof OrbitControls> | null,
-  editorCamera: {
-    position: [number, number, number]
-    target: [number, number, number]
-    fov: number
-    near: number
-    far: number
-  }
-) {
-  camera.position.set(...editorCamera.position)
-
-  if ('near' in camera) {
-    ;(camera as THREE.Camera & { near: number }).near = editorCamera.near
-  }
-
-  if ('far' in camera) {
-    ;(camera as THREE.Camera & { far: number }).far = editorCamera.far
-  }
-
-  if (camera instanceof THREE.PerspectiveCamera) {
-    camera.fov = editorCamera.fov
-  }
-
-  if ('updateProjectionMatrix' in camera && typeof camera.updateProjectionMatrix === 'function') {
-    camera.updateProjectionMatrix()
-  }
-
-  const target = new THREE.Vector3(...editorCamera.target)
-  if (orbitControls) {
-    orbitControls.target.copy(target)
-    orbitControls.update()
-  } else {
-    camera.lookAt(target)
-  }
-}
-
 function createUvDebugMaterial(source: THREE.Material, wireframe: boolean) {
   return new THREE.ShaderMaterial({
     wireframe,
@@ -913,7 +863,6 @@ function EditorViewportOverlay({
   const raycasterRef = useRef(new THREE.Raycaster())
   const selectedLight = selectedObject instanceof THREE.Light ? selectedObject : null
   const transformTarget = selectedLight ?? selectedObject
-  // eslint-disable-next-line react-hooks/refs -- lightProxyRef is a stable Group instance, safe to access during render
   const transformObject = selectedLight ? lightProxyRef.current : selectedObject
 
   useEffect(() => {
@@ -1041,7 +990,6 @@ function EditorViewportOverlay({
 
   return (
     <>
-      {/* eslint-disable-next-line react-hooks/refs -- lightProxyRef is a stable Group instance, safe to access during render */}
       {selectedLight ? <primitive object={lightProxyRef.current} /> : null}
       <SelectionOutline target={selectedObject} />
       {canTransform ? (

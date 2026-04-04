@@ -2,8 +2,6 @@ import { LegacyButton } from '@/common/ui/button';
 import { LegacyLabel } from '@/common/ui/label';
 
 import { EntityInspector } from '../inspector/entity';
-import { TemplatesEntityInspector } from '../templates/templates-entity-inspector';
-import { TemplateOverridesView } from '../templates/templates-override-panel';
 
 editor.once('load', () => {
     const projectSettings = editor.call('settings:project');
@@ -149,38 +147,11 @@ editor.once('load', () => {
         return panel;
     });
 
-    const templateOverrides = new TemplateOverridesView({
-        flex: true,
-        assets: editor.call('assets:raw'),
-        entities: editor.call('entities:raw'),
-        projectSettings: editor.call('settings:project'),
-        hidden: true
-    });
-    editor.call('layout.root').append(templateOverrides);
-
-    const templateInspector = new TemplatesEntityInspector({ // eslint-disable-line no-unused-vars
-        flex: true,
-        assets: editor.call('assets:raw'),
-        entities: editor.call('entities:raw'),
-        templateOverridesDiffView: templateOverrides,
-        hidden: true
-    });
-
-    // disable attributes panel when overrides diff is open
-    templateOverrides.on('show', () => {
-        editor.call('layout.attributes').enabled = false;
-    });
-
-    templateOverrides.on('hide', () => {
-        editor.call('layout.attributes').enabled = editor.call('permissions:write');
-    });
-
     entityInspector = new EntityInspector({
         assets: editor.call('assets:raw'),
         entities: editor.call('entities:raw'),
         projectSettings: editor.call('settings:project'),
-        history: editor.api.globals.history,
-        templateOverridesDiffView: templateOverrides
+        history: editor.api.globals.history
     });
 
     // before clearing inspector, preserve elements

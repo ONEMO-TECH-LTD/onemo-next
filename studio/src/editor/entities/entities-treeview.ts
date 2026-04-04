@@ -9,15 +9,13 @@ import { getMap, searchItems } from '../search/search-advanced';
 
 const CLASS_ROOT = 'entities-treeview';
 const CLASS_COMPONENT_ICON = 'component-icon-postfix';
-const CLASS_TEMPLATE_INSTANCE = 'template-instance';
-const CLASS_TEMPLATE_INSTANCE_CHILD = `${CLASS_TEMPLATE_INSTANCE}-child`;
 const CLASS_HIGHLIGHT = `${CLASS_ROOT}-highlight`;
 const CLASS_USER_SELECTION_MARKER = `${CLASS_ROOT}-user-marker`;
 const CLASS_USER_SELECTION_MARKER_CONTAINER = `${CLASS_USER_SELECTION_MARKER}-container`;
 const CLASS_FILTERING = 'pcui-treeview-filtering';
 const CLASS_FILTER_RESULT = `${CLASS_FILTERING}-result`;
 
-const DROPPABLE_ASSET_TYPES = new Set(['template', 'model', 'sprite']);
+const DROPPABLE_ASSET_TYPES = new Set(['model', 'sprite']);
 const DROPPABLE_DROP_TYPES = new Set([...DROPPABLE_ASSET_TYPES].map(t => `asset.${t}`));
 
 interface EntityTreeViewItem extends TreeViewItem {
@@ -116,38 +114,6 @@ class EntitiesTreeView extends TreeView {
     };
 
     _onReparent = (reparentedItems: ReparentedItem[]) => {
-        const newParentTemplates: Record<string, Observer> = {};
-
-        for (let i = 0; i < reparentedItems.length; i++) {
-            const item = reparentedItems[i].item as EntityTreeViewItem;
-            const newParent = reparentedItems[i].newParent as EntityTreeViewItem;
-            const templateRoot = editor.call('templates:isTemplateChild', item.entity, this._entities);
-            if (templateRoot) {
-                const newParentId = newParent.entity.get('resource_id');
-                if (!newParentTemplates.hasOwnProperty(newParentId)) {
-                    if (newParent.entity.get('template_id')) {
-                        newParentTemplates[newParentId] = newParent.entity;
-                    } else {
-                        newParentTemplates[newParentId] = editor.call('templates:isTemplateChild', newParent.entity, this._entities);
-                    }
-                }
-
-                if (templateRoot !== newParentTemplates[newParentId]) {
-                    editor.call(
-                        'picker:confirm',
-                        'Entities that are part of a Template cannot be reparented outside the Template.',
-                        () => {},
-                        {
-                            yesText: 'OK',
-                            noText: ''
-                        }
-                    );
-
-                    return;
-                }
-            }
-        }
-
         // preserve transform if we are not pressing Ctrl
         const preserveTransform = !this._pressedCtrl;
 
@@ -481,12 +447,9 @@ class EntitiesTreeView extends TreeView {
                 return;
             }
 
-            const templates: Observer[] = [];
             assets.forEach((asset) => {
                 try {
-                    if (asset.get('type') === 'template') {
-                        templates.push(asset);
-                    } else if (asset.get('type') === 'model') {
+                    if (asset.get('type') === 'model') {
                         newEntityIds!.push(this._instantiateDraggedModelAsset(asset, parent, childIndex));
                     } else if (asset.get('type') === 'sprite') {
                         newEntityIds!.push(this._instantiateDraggedSpriteAsset(asset, parent, childIndex));
@@ -495,15 +458,6 @@ class EntitiesTreeView extends TreeView {
                     log.error(err);
                 }
             });
-
-            if (templates.length) {
-                this._instantiateDraggedTemplateAssets(templates, parent, childIndex, (entityIds) => {
-                    if (newEntityIds) {
-                        newEntityIds = newEntityIds.concat(entityIds);
-                        this._selectEntitiesById(newEntityIds);
-                    }
-                });
-            }
 
             this._selectEntitiesById(newEntityIds!);
         };
@@ -518,20 +472,6 @@ class EntitiesTreeView extends TreeView {
         }
 
         redo();
-    }
-
-    _instantiateDraggedTemplateAssets(assets: Observer[], parentEntity: Observer, childIndex: number | undefined, callback: (entityIds: string[]) => void) {
-        if (childIndex === null || childIndex === undefined) {
-            childIndex = parentEntity.get('children').length;
-        }
-
-        editor.api.globals.assets.instantiateTemplates(assets.map(a => (a as any).apiAsset), (parentEntity as any).apiEntity, {
-            index: childIndex,
-            history: false
-        })
-        .then((newEntities) => {
-            callback(newEntities.map(e => e.get('resource_id')));
-        });
     }
 
     _instantiateDraggedModelAsset(asset: Observer, parentEntity: Observer, childIndex: number) {
@@ -706,20 +646,6 @@ class EntitiesTreeView extends TreeView {
             }));
         });
 
-        if (entity.get('template_id')) {
-            treeViewItem.class.add(CLASS_TEMPLATE_INSTANCE);
-        } else if (editor.call('templates:isTemplateChild', entity, this._entities)) {
-            treeViewItem.class.add(CLASS_TEMPLATE_INSTANCE_CHILD);
-        }
-
-        const resetTemplateIcons = () => {
-            this._resetTemplateIcons(entity);
-        };
-
-        events.push(entity.on('template_ent_ids:set', resetTemplateIcons));
-        events.push(entity.on('template_ent_ids:unset', resetTemplateIcons));
-        events.push(entity.on('parent:set', resetTemplateIcons));
-
         events.push(entity.on('name:set', (name: string) => {
             treeViewItem.text = name;
         }));
@@ -823,35 +749,6 @@ class EntitiesTreeView extends TreeView {
         treeViewItem.content.append(treeViewItem._containerUsers);
 
         return treeViewItem;
-    }
-
-    _resetTemplateIcons(entity: Observer) {
-        const item = this.getTreeItemForEntity(entity.get('resource_id'));
-
-        if (item) {
-            if (entity.get('template_id')) {
-                item.class.remove(CLASS_TEMPLATE_INSTANCE_CHILD);
-                item.class.add(CLASS_TEMPLATE_INSTANCE);
-                entity.emit('isPartOfTemplate', true);
-            } else {
-                item.class.remove(CLASS_TEMPLATE_INSTANCE);
-                if (editor.call('templates:isTemplateChild', entity)) {
-                    item.class.add(CLASS_TEMPLATE_INSTANCE_CHILD);
-                    entity.emit('isPartOfTemplate', true);
-                } else {
-                    item.class.remove(CLASS_TEMPLATE_INSTANCE_CHILD);
-                    entity.emit('isPartOfTemplate', false);
-                }
-            }
-        }
-
-        const children = entity.get('children');
-        for (let i = 0; i < children.length; i++) {
-            const child = this._entities.get(children[i]);
-            if (child) {
-                this._resetTemplateIcons(child);
-            }
-        }
     }
 
     _onRemoveEntity(entity: Observer) {

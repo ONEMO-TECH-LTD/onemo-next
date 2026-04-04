@@ -109,7 +109,7 @@ editor.once('load', () => {
         const components = obj.json().components;
         for (const key in components) {
             if (app.systems[key]) {
-                if (key === 'script') {
+                if (key === 'script' || key === 'model') {
                     continue;
                 }
 

@@ -17,6 +17,29 @@ editor.once('viewport:load', (app: Application) => {
     const vecA = new Vec3();
     const quat = new Quat();
 
+    const syncPivotFromCamera = (camera) => {
+        if (camera.focus) {
+            pivot.copy(camera.focus);
+            distance = Math.max(0.01, vecA.copy(pivot).sub(camera.getPosition()).length());
+            return;
+        }
+
+        const fallbackDistance = Math.max(0.01, distance);
+        pivot.copy(camera.forward).mulScalar(fallbackDistance).add(camera.getPosition());
+        distance = Math.max(0.01, vecA.copy(pivot).sub(camera.getPosition()).length());
+    };
+
+    editor.method('camera:orbit:state', () => {
+        return orbiting;
+    });
+
+    editor.method('camera:orbit:distance', (value?: number) => {
+        if (typeof value === 'number' && Number.isFinite(value)) {
+            distance = Math.max(0.01, value);
+        }
+
+        return distance;
+    });
 
     editor.on('viewport:update', (dt: number) => {
         const camera = editor.call('camera:current');
@@ -25,8 +48,9 @@ editor.once('viewport:load', (app: Application) => {
             return;
         }
 
-        distance = Math.max(0.01, vecA.copy(pivot).sub(camera.getPosition()).length());
-        pivot.copy(camera.forward).mulScalar(distance).add(camera.getPosition());
+        if (!orbiting) {
+            syncPivotFromCamera(camera);
+        }
 
         if (orbiting) {
             quat.setFromEulerAngles(pitch, yaw, 0);
@@ -46,11 +70,12 @@ editor.once('viewport:load', (app: Application) => {
     });
 
     editor.on('camera:change', (camera: { focus?: Vec3 }) => {
-        if (!camera.focus) {
+        if (camera.focus) {
+            pivot.copy(camera.focus);
             return;
         }
 
-        pivot.copy(camera.focus);
+        syncPivotFromCamera(camera);
     });
 
     editor.on('camera:focus', (point: Vec3) => {
@@ -84,6 +109,7 @@ editor.once('viewport:load', (app: Application) => {
 
         if (camera.camera.projection === PROJECTION_PERSPECTIVE) {
             orbiting = true;
+            syncPivotFromCamera(camera);
 
             // disable history
             orbitCamera = camera;

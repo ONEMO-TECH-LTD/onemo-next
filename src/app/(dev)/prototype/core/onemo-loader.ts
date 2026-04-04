@@ -15,8 +15,7 @@ import { deserializeOnemo, normalizeStudioJsonPublic, type OnemoDeserializeResul
 import { onemoColorToHex, type OnemoStudioJson, type OnemoProductConfig, type OnemoMaterialRole } from '../../../../../studio/src/editor/adapter/onemo-format';
 import type {
     ViewerConfig, CameraConfig, EnvironmentConfig, SceneSettings,
-    ColorConfig, FaceMaterial, BackMaterial, FrameMaterial, TexturePaths,
-    FaceMaterialConfig, BackMaterialConfig, FrameMaterialConfig, ViewerProductConfig,
+    ColorConfig, ViewerProductConfig,
 } from '../types';
 
 // ─── Lightweight config extraction (no renderer) ──────────────────
@@ -27,23 +26,25 @@ export interface ParsedOnemoConfig {
     studioJson: OnemoStudioJson;
 }
 
-const DEFAULT_TEXTURES: TexturePaths = {
-    normal: '/assets/materials/ultrasuede/suede-normal.png',
-    roughness: '/assets/materials/ultrasuede/suede-roughness.jpg',
-    height: '/assets/materials/ultrasuede/suede-height.png',
-};
-
 function roleDefaults(role: OnemoMaterialRole | undefined, fallback: Record<string, unknown>) {
     const d = role?.defaults ?? {};
     return { ...fallback, ...d };
 }
 
-function roleTextures(role: OnemoMaterialRole | undefined): TexturePaths {
-    const t = role?.textures;
+function getCompatibilityRoles(product: ViewerProductConfig) {
+    const materialRoles = product.materialRoles;
+    const artworkRole = product.artworkSlot
+        ? materialRoles.find((role) => role.role === product.artworkSlot?.role)
+        : undefined;
+
+    const primaryRole = artworkRole ?? materialRoles[0];
+    const secondaryRole = materialRoles.find((role) => role !== primaryRole) ?? primaryRole;
+    const tertiaryRole = materialRoles.find((role) => role !== primaryRole && role !== secondaryRole) ?? secondaryRole;
+
     return {
-        normal: t?.normalMap ?? DEFAULT_TEXTURES.normal,
-        roughness: t?.roughnessMap ?? DEFAULT_TEXTURES.roughness,
-        height: t?.bumpMap ?? DEFAULT_TEXTURES.height,
+        primaryRole,
+        secondaryRole,
+        tertiaryRole,
     };
 }
 
@@ -73,20 +74,28 @@ function editorCameraToSpherical(pos: [number, number, number], target: [number,
 }
 
 function studioJsonToViewerConfig(studioJson: OnemoStudioJson, modelBlobUrl: string): ViewerConfig {
-    const faceRole = studioJson.product.materialRoles.find((r) => r.role === 'face');
-    const backRole = studioJson.product.materialRoles.find((r) => r.role === 'back');
-    const frameRole = studioJson.product.materialRoles.find((r) => r.role === 'frame');
+    const product: ViewerProductConfig = {
+        productType: studioJson.product.productType,
+        materialRoles: studioJson.product.materialRoles.map((role) => ({
+            role: role.role,
+            meshNames: [...role.meshNames],
+            defaults: role.defaults ? { ...role.defaults } : undefined,
+            textures: role.textures ? { ...role.textures } : undefined,
+            configurable: role.configurable,
+            configurableProperties: role.configurableProperties ? [...role.configurableProperties] : undefined,
+        })),
+        artworkSlot: studioJson.product.artworkSlot
+            ? { ...studioJson.product.artworkSlot }
+            : undefined,
+    };
 
-    const faceDefaults = roleDefaults(faceRole, {
-        color: '#ffffff', roughness: 1, metalness: 0, envMapIntensity: 0.1,
-        normalScale: 0.15, bumpScale: 1, sheen: 1, sheenColor: '#1a1a1a',
-        sheenRoughness: 0.8, colorMultiplier: 1,
-    });
-    const backDefaults = roleDefaults(backRole, {
+    const { secondaryRole, tertiaryRole } = getCompatibilityRoles(product);
+
+    const backDefaults = roleDefaults(secondaryRole, {
         color: '#080808', roughness: 1, envMapIntensity: 0.1, normalScale: 0.15,
         bumpScale: 1, sheen: 1, sheenColor: '#1a1a1a', sheenRoughness: 0.8,
     });
-    const frameDefaults = roleDefaults(frameRole, {
+    const frameDefaults = roleDefaults(tertiaryRole, {
         color: '#0f0f0f', roughness: 0.5, metalness: 0, clearcoat: 0.4, clearcoatRoughness: 0.3,
     });
 
@@ -118,39 +127,8 @@ function studioJsonToViewerConfig(studioJson: OnemoStudioJson, modelBlobUrl: str
         groundRadius: studioJson.environment.ground.radius,
     };
 
-    const face: FaceMaterial = {
-        params: faceDefaults as unknown as FaceMaterialConfig,
-        textures: roleTextures(faceRole),
-    };
-    const back: BackMaterial = {
-        params: backDefaults as unknown as BackMaterialConfig,
-        textures: roleTextures(backRole),
-    };
-    const frame: FrameMaterial = {
-        params: frameDefaults as unknown as FrameMaterialConfig,
-        textures: {},
-    };
-
-    const product: ViewerProductConfig = {
-        productType: studioJson.product.productType,
-        materialRoles: studioJson.product.materialRoles.map((role) => ({
-            role: role.role,
-            meshNames: [...role.meshNames],
-            defaults: role.defaults ? { ...role.defaults } : undefined,
-            textures: role.textures ? { ...role.textures } : undefined,
-            configurable: role.configurable,
-            configurableProperties: role.configurableProperties ? [...role.configurableProperties] : undefined,
-        })),
-        artworkSlot: studioJson.product.artworkSlot
-            ? { ...studioJson.product.artworkSlot }
-            : undefined,
-    };
-
     return {
         modelPath: modelBlobUrl,
-        face,
-        back,
-        frame,
         scene,
         colors,
         camera,

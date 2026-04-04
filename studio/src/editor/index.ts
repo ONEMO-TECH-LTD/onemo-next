@@ -51,7 +51,6 @@ import './settings/session-settings';
 // settings attributes
 import './settings/attributes/settings-attributes-physics';
 import './settings/attributes/settings-attributes-scene';
-import './settings/attributes/settings-attributes-scripts-priority';
 
 // scene settings
 import './scene-settings/scene-settings';
@@ -106,7 +105,6 @@ import './entities/entities-scripts';
 import './entities/entities-hotkeys';
 import './entities/entities-context-menu';
 import './entities/entities-components-menu';
-import './entities/entities-template-menu';
 import './entities/entities-pick';
 import './entities/entities-icons';
 
@@ -160,11 +158,9 @@ import './assets/assets-create-html';
 import './assets/assets-create-css';
 import './assets/assets-create-json';
 import './assets/assets-create-text';
-import './assets/assets-create-script';
 import './assets/assets-create-shader';
 import './assets/assets-create-sprite';
 import './assets/assets-create-i18n';
-import './assets/assets-create-template';
 import './assets/assets-create-anim-state-graph';
 import './assets/assets-unwrap';
 import './assets/assets-used';
@@ -176,27 +172,6 @@ import './assets/assets-bundles';
 import './assets/assets-texture-convert';
 import './assets/assets-mapping-removal';
 import './assets/assets-thumbnail-regen';
-
-// templates
-import './templates/template-pipeline-tasks';
-import './templates/new-template-data';
-import './templates/remap-entity-ids';
-import './templates/template-utils';
-import './templates/deep-equal';
-import './templates/template-node-traversal';
-import './templates/find-template-conflicts';
-import './templates/find-apply-candidates';
-import './templates/revert-overrides';
-import './templates/compute-overrides';
-import './templates/compute-overrides-filter';
-import './templates/filter-overrides/handle-children-conflict';
-import './templates/filter-overrides/handle-script-order-conflict';
-import './templates/filter-overrides/set-reparent-path';
-import './templates/all-entity-paths';
-import './templates/get-script-attributes';
-import './templates/is-valid-template-conflict';
-import './templates/is-template';
-import './templates/unlink-template';
 
 // images
 import './images/images';
@@ -246,7 +221,6 @@ import './attributes/reference/assets/asset';
 
 // attributes entities (legacy)
 import './attributes/attributes-entity';
-import './attributes/attributes-components-script';
 
 // pcui attribute inspectors
 import './inspector/settings';
@@ -310,14 +284,12 @@ import './pickers/project-management/picker-modal-delete-self-confirmation';
 import './pickers/project-management/picker-modal-visibility-confirmation';
 
 import './pickers/picker-scene';
-import './pickers/picker-script-create';
 
 import './pickers/picker-publish-new';
 import './pickers/picker-gradient';
 import './pickers/picker-text-input';
 import './pickers/picker-legacy-scripts';
 import './pickers/picker-recompress-textures';
-import './pickers/picker-fix-corrupted-templates';
 
 // team management picker
 import './pickers/picker-team-management';
@@ -362,8 +334,6 @@ import './viewport/viewport-drop-model';
 import './viewport/viewport-drop-material';
 import './viewport/viewport-drop-cubemap';
 import './viewport/viewport-drop-sprite';
-import './viewport/viewport-drop-template';
-import './viewport/viewport-drop-gsplat';
 import './viewport/viewport-engine-data';
 import './viewport/viewport-userdata';
 import './viewport/viewport-tap';
@@ -386,8 +356,6 @@ import './viewport/viewport-preview-particles';
 import './viewport/viewport-preview-animation';
 
 // help
-// Template migrations
-import './templates/migrations/fix-corrupted-instances';
 
 // plugins
 import './plugins/plugins';

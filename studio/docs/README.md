@@ -4,6 +4,8 @@ The ONEMO 3D Studio is a forked PlayCanvas Editor (v2.20.1) where the rendering 
 
 The studio produces `.onemo` template files that define 3D products. These templates are loaded by the user-facing configurator, where customers can customize colors, artwork, and materials.
 
+Before reading the implementation details, read the [North Star](north-star.md).
+
 ## Launch
 
 ```bash
@@ -30,6 +32,8 @@ studio/
 │   ├── pipeline.md                # scene pipeline: studio → .onemo → viewer
 │   ├── decisions.md               # architectural decision references
 │   └── development/               # audit docs, feature references, build history
+│       ├── audits/                # timestamped historical audit reports
+│       ├── fixes/                 # remediation-locked mirrors / fix reports
 │       ├── audit-spec.md          # source-driven audit checklist
 │       ├── editor-feature-reference.md
 │       ├── r3f-threejs-capabilities.md
@@ -63,6 +67,7 @@ studio/
 ## Related Docs
 
 - [Architecture](architecture.md) — how the studio is built internally
+- [North Star](north-star.md) — purpose, intent, and production-ready success state
 - [.onemo Format](onemo-format.md) — scene file format specification
 - [Pipeline](pipeline.md) — end-to-end scene flow from studio to user viewer
 - [Decisions](decisions.md) — architectural decision references

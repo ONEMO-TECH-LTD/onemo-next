@@ -19,7 +19,7 @@ interface AssetOptions {
 }
 
 const DEFAULT: AssetOptions = {
-  models: { 'Effect 70mm Step': '/assets/shapes/effect-70mm-step.glb' },
+  models: {},
   materialSets: { 'Ultrasuede': 'ultrasuede' },
   materialTextures: {
     ultrasuede: {

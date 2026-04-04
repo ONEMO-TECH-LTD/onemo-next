@@ -7,6 +7,14 @@ import { Asset, Entity, type AssetObserver } from '@/editor-api';
 import { formatShortcut } from '../../common/utils';
 
 editor.once('load', () => {
+    const SUPPORTED_NEW_ASSET_KEYS = new Set([
+        'upload',
+        'folder',
+        'cubemap',
+        'material',
+        'shader'
+    ]);
+
     let currentAsset = null;
     const legacyScripts = editor.call('settings:project').get('useLegacyScripts');
     const projectUserSettings = editor.call('settings:projectUser');
@@ -17,7 +25,7 @@ editor.once('load', () => {
 
     const isModelAsset = (asset: Asset) => {
         const filename = asset.get('file.filename');
-        return (filename && String(filename).match(/\.glb$/) !== null) || (asset.get('type') === 'gsplat');
+        return filename && String(filename).match(/\.glb$/) !== null;
     };
 
     const isTextureAsset = (asset: Asset) => {
@@ -33,28 +41,6 @@ editor.once('load', () => {
     const menuCreate = new Menu();
     if (editor.call('permissions:write')) {
         root.append(menuCreate);
-    }
-
-    // edit
-    const menuItemNewScript = new MenuItem({
-        text: 'New Script',
-        icon: 'E208',
-        onSelect: () => {
-            if (legacyScripts) {
-                return;
-            }
-
-            editor.call('picker:script-create', (filename) => {
-                editor.call('assets:create:script', {
-                    filename: filename
-                }, (asset: Asset) => {
-                    editor.api.globals.selection.set([asset]);
-                });
-            });
-        }
-    });
-    if (editor.call('permissions:write')) {
-        menu.append(menuItemNewScript);
     }
 
     // new asset
@@ -84,7 +70,6 @@ editor.once('load', () => {
         'layers': 'E288',
         'material': 'E195',
         'font': 'E406',
-        'script': 'E208',
         'shader': 'E208',
         'text': 'E208',
         'texture': 'E201',
@@ -123,7 +108,6 @@ editor.once('load', () => {
         'html': 'HTML',
         'json': 'JSON',
         'material': 'Material',
-        'script': 'Script',
         'shader': 'Shader',
         'text': 'Text',
         'animstategraph': 'Anim State Graph'
@@ -136,7 +120,6 @@ editor.once('load', () => {
         'html': 'createHtml',
         'json': 'createJson',
         'material': 'createMaterial',
-        'script': 'createScript',
         'shader': 'createShader',
         'text': 'createText',
         'animstategraph': 'createAnimStateGraph'
@@ -152,10 +135,6 @@ editor.once('load', () => {
     if (editor.call('users:hasFlag', 'hasBundles')) {
         assets.bundle = 'Asset Bundle';
         assetCreateCallback.bundle = 'createBundle';
-    }
-
-    function isCurrentFolderLegacyScripts() {
-        return editor.call('assets:panel:currentFolder') === 'scripts';
     }
 
     const addNewMenuConvertItem = function (menu: Menu, format: string, title: string) {
@@ -201,6 +180,10 @@ editor.once('load', () => {
     };
 
     const addNewMenuItem = function (menu: MenuItem, key: string, title: string) {
+        if (!SUPPORTED_NEW_ASSET_KEYS.has(key)) {
+            return;
+        }
+
         // new folder
         const item = new MenuItem({
             text: title,
@@ -243,17 +226,6 @@ editor.once('load', () => {
 
                 if (key === 'upload') {
                     editor.call('assets:upload:picker', args);
-                } else if (key === 'script') {
-                    if (legacyScripts) {
-                        editor.call('sourcefiles:new');
-                    } else {
-                        editor.call('picker:script-create', (filename) => {
-                            editor.call('assets:create:script', {
-                                filename: filename,
-                                parent: folder
-                            }, selectAsset());
-                        });
-                    }
                 } else {
                     if (assetCreateCallback[key]) {
                         editor.api.globals.assets[assetCreateCallback[key]]({
@@ -270,22 +242,9 @@ editor.once('load', () => {
         });
         menu.append(item);
 
-        if (key === 'script') {
-            editor.on('repositories:load', (repositories) => {
-                if (repositories.get('current') !== 'directory') {
-                    item.disabled = true;
-                }
-            });
-        }
     };
 
     const keys = Object.keys(assets);
-    if (legacyScripts) {
-        const scriptsIdx = keys.indexOf('script');
-        if (scriptsIdx !== -1) {
-            keys.splice(scriptsIdx, 1);
-        }
-    }
     for (let i = 0; i < keys.length; i++) {
         if (!assets.hasOwnProperty(keys[i])) {
             continue;
@@ -302,15 +261,6 @@ editor.once('load', () => {
     });
     menu.append(menuItemReferences);
 
-    // Create Atlas
-    const menuItemTextureToAtlas = new MenuItem({
-        text: 'Create Texture Atlas',
-        icon: ICONS.TEXTURE_ATLAS,
-        onSelect: () => {
-            editor.call('assets:textureToAtlas', currentAsset);
-        }
-    });
-
     // Create Cubemap
     const menuItemTextureToCubemap = new MenuItem({
         text: 'Create Cubemap',
@@ -321,37 +271,7 @@ editor.once('load', () => {
     });
 
     if (editor.call('permissions:write')) {
-        menu.append(menuItemTextureToAtlas);
         menu.append(menuItemTextureToCubemap);
-    }
-
-    // Create Sprite From Atlas
-    const menuItemCreateSprite = new MenuItem({
-        text: 'Create Sprite Asset',
-        icon: ICONS.SPRITE_ASSET,
-        onSelect: () => {
-            editor.call('assets:atlasToSprite', {
-                asset: currentAsset
-            });
-        }
-    });
-    if (editor.call('permissions:write')) {
-        menu.append(menuItemCreateSprite);
-    }
-
-    // Create Sliced Sprite From Atlas
-    const menuItemCreateSlicedSprite = new MenuItem({
-        text: 'Create Sliced Sprite Asset',
-        icon: ICONS.SPRITE_ASSET,
-        onSelect: () => {
-            editor.call('assets:atlasToSprite', {
-                asset: currentAsset,
-                sliced: true
-            });
-        }
-    });
-    if (editor.call('permissions:write')) {
-        menu.append(menuItemCreateSlicedSprite);
     }
 
     // copy
@@ -658,29 +578,11 @@ editor.once('load', () => {
 
     // filter buttons
     menu.on('show', () => {
-        if (currentAsset && currentAsset.get('id') === LEGACY_SCRIPTS_ID) {
-            menuItemNewScript.hidden = false;
-            if (menuItemPaste) {
-                menuItemPaste.hidden = true;
-                menuItemCopy.hidden = true;
-            }
-        } else {
-            menuItemNewScript.hidden = !((currentAsset === null || (currentAsset && currentAsset.get('type') === 'script')) && isCurrentFolderLegacyScripts());
+        menuItemNew.hidden = !editor.call('permissions:write');
 
-            if (menuItemPaste) {
-                menuItemPaste.hidden = false;
-                menuItemCopy.hidden = false;
-            }
-        }
-        menuItemNew.hidden = !menuItemNewScript.hidden;
-
-        if (legacyScripts) {
-            menuItemNewScript.hidden = true;
-        }
-
-        if (menuItemPaste && isCurrentFolderLegacyScripts()) {
-            menuItemPaste.hidden = true;
-            menuItemCopy.hidden = true;
+        if (menuItemPaste) {
+            menuItemPaste.hidden = false;
+            menuItemCopy.hidden = false;
         }
 
         if (menuItemPaste) {
@@ -738,13 +640,8 @@ editor.once('load', () => {
                 menuItemEditCursor.hidden = true;
             }
 
-            // create atlas
-            menuItemTextureToAtlas.hidden = (currentAsset.get('type') !== 'texture' || currentAsset.get('source') || currentAsset.get('task') || !editor.call('permissions:write'));
-            menuItemTextureToCubemap.hidden = menuItemTextureToAtlas.hidden;
-
-            // create sprite
-            menuItemCreateSprite.hidden = (currentAsset.get('type') !== 'textureatlas' || currentAsset.get('source') || currentAsset.get('task') || !editor.call('permissions:write'));
-            menuItemCreateSlicedSprite.hidden = menuItemCreateSprite.hidden;
+            // create cubemap
+            menuItemTextureToCubemap.hidden = (currentAsset.get('type') !== 'texture' || currentAsset.get('source') || currentAsset.get('task') || !editor.call('permissions:write'));
 
             // delete
             menuItemDelete.hidden = (currentAsset && currentAsset.get('id') === LEGACY_SCRIPTS_ID);
@@ -903,10 +800,7 @@ editor.once('load', () => {
             menuItemReferences.hidden = true;
             menuItemReplace.hidden = true;
             menuItemReplaceTextureToSprite.hidden = true;
-            menuItemTextureToAtlas.hidden = true;
             menuItemTextureToCubemap.hidden = true;
-            menuItemCreateSprite.hidden = true;
-            menuItemCreateSlicedSprite.hidden = true;
             menuItemMoveToStore.hidden = true;
             menuItemOpenInViewer.hidden = true;
         }

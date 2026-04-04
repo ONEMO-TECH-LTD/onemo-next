@@ -1,6 +1,7 @@
 import type { EventHandle, Observer } from '@playcanvas/observer';
 import JSZip from 'jszip';
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 import { config } from '@/editor/config';
 import { Asset, type AssetObserver, type Entity, type EntityObserver } from '@/editor-api';
@@ -11,7 +12,7 @@ import { applyAnimationObserverChange } from './animation-mapper';
 import { applyAudiolistenerObserverChange } from './audiolistener-mapper';
 import { setBridgeAudioCamera } from './bridge-audio-state';
 import { applyButtonObserverChange } from './button-mapper';
-import { getStoredBridgeComponents, runBridgeUpdaters } from './bridge-utils';
+import { getStoredBridgeComponents, runBridgeUpdaters, setStoredBridgeComponentData, resolveAssetUrl } from './bridge-utils';
 import { createCameraComponentData, createReplacementCameraForProjection, applyCameraObserverChange } from './camera-mapper';
 import { applyCollisionObserverChange } from './collision-mapper';
 import {
@@ -41,24 +42,18 @@ import { createRenderComponentData, applyRenderObserverChange } from './render-m
 import { applyRigidbodyObserverChange } from './rigidbody-mapper';
 import { applyScreenObserverChange } from './screen-mapper';
 import {
-    cloneViewerConfig,
-    decomposeViewerColor,
-    savedSceneToViewerConfig,
     type SavedScene,
     type SavedSceneCameraComponent,
-    type SavedSceneEntity,
     type SavedSceneEntityComponents,
     type SavedSceneLightComponent,
-    type SavedSceneMaterial,
     type SavedSceneMaterialData,
-    type SavedSceneMaterialRole,
     type SavedSceneRenderComponent,
     type SavedSceneSettings,
     type SavedSceneTexture,
     type SavedSceneTextureKey
 } from './scene-schema';
 import { DEFAULT_EDITOR_CAMERA, DEFAULT_PRODUCT_CONFIG, onemoColorToHex } from './onemo-format';
-import { applyOnemoSceneState, deserializeOnemo } from './onemo-deserialize';
+import { deserializeOnemo } from './onemo-deserialize';
 import { serializeOnemo } from './onemo-serialize';
 import { applyScriptObserverChange } from './script-mapper';
 import { applyScrollviewObserverChange } from './scrollview-mapper';
@@ -247,6 +242,8 @@ const cloneSerializable = <T>(value: T): T => {
     return JSON.parse(JSON.stringify(value));
 };
 
+const modelSceneLoader = new GLTFLoader();
+
 const isRecord = (value: unknown): value is Record<string, unknown> => {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
 };
@@ -291,18 +288,6 @@ const getLightRange = (light: THREE.Light) => {
     return 0;
 };
 
-const collectMaterialSlots = (root: THREE.Object3D) => {
-    const materialSlots = new Map<string, THREE.Material | THREE.Material[]>();
-
-    root.traverse((object) => {
-        if (object instanceof THREE.Mesh) {
-            materialSlots.set(object.uuid, object.material);
-        }
-    });
-
-    return materialSlots;
-};
-
 const createCameraConfigFromEditorCamera = (
     editorCamera: {
         position: [number, number, number];
@@ -335,10 +320,6 @@ const createCameraConfigFromEditorCamera = (
         azimuthAngle: THREE.MathUtils.radToDeg(spherical.theta),
         target: [...editorCamera.target] as [number, number, number]
     };
-};
-
-const isJsonBlob = (blob: Blob) => {
-    return blob.type.toLowerCase().includes('application/json') || blob.type.toLowerCase().includes('text/json');
 };
 
 const isViewerCamera = (camera: THREE.Camera): camera is THREE.PerspectiveCamera | THREE.OrthographicCamera => {
@@ -443,6 +424,22 @@ export class ObserverR3FBridge {
             if (this.objectById.has(observer.get('resource_id')) && observer.entity) {
                 observer.entity.__noIcon = true;
             }
+        }));
+        this.editorEvents.push(editor.on('entities:add', (observer: EntityObserver) => {
+            const resourceId = observer.get('resource_id');
+            if (typeof resourceId !== 'string' || !resourceId || this.objectById.has(resourceId)) {
+                return;
+            }
+
+            this.createSceneObjectForObserver(observer);
+        }));
+        this.editorEvents.push(editor.on('entities:remove', (observer: EntityObserver) => {
+            const resourceId = observer.get('resource_id');
+            if (typeof resourceId !== 'string' || !resourceId) {
+                return;
+            }
+
+            this.removeSceneObjectForResource(resourceId);
         }));
 
         this.editorEvents.push(editor.on('selector:change', () => {
@@ -611,7 +608,6 @@ export class ObserverR3FBridge {
             const configKey = this.textureConfigKeyForSlot(normalizedSlot);
             if (configKey) {
                 this.syncProductRoleTexture(role, configKey, url || undefined);
-                this.syncLegacyTextureForRole(role, configKey, url || undefined);
             }
         }
 
@@ -794,9 +790,28 @@ export class ObserverR3FBridge {
         const orbitTarget = this.context.orbitControls?.target ?? new THREE.Vector3(...DEFAULT_EDITOR_CAMERA.target);
         const camera = this.context.camera;
         const perspectiveCamera = camera instanceof THREE.PerspectiveCamera ? camera : null;
+        const exportScene = new THREE.Scene();
+        const authoredRoot = this.context.modelRoot;
+        authoredRoot.children.forEach((child) => {
+            exportScene.add(child.clone(true));
+        });
+        exportScene.name = authoredRoot.name || name;
+        exportScene.background = this.context.scene.background instanceof THREE.Color
+            ? this.context.scene.background.clone()
+            : this.context.scene.background ?? null;
+        exportScene.fog = this.context.scene.fog?.clone?.() ?? this.context.scene.fog ?? null;
+        exportScene.environment = this.context.scene.environment ?? null;
+        exportScene.environmentIntensity = this.context.scene.environmentIntensity;
+        exportScene.backgroundIntensity = this.context.scene.backgroundIntensity;
+        if (this.context.scene.environmentRotation) {
+            exportScene.environmentRotation = this.context.scene.environmentRotation.clone();
+        }
+        if (this.context.scene.backgroundRotation) {
+            exportScene.backgroundRotation = this.context.scene.backgroundRotation.clone();
+        }
 
         return serializeOnemo(
-            this.context.scene,
+            exportScene,
             this.context.renderer,
             {
                 position: camera.position.clone(),
@@ -846,24 +861,6 @@ export class ObserverR3FBridge {
     async deserializeScene(blob: Blob) {
         if (!this.context) {
             return false;
-        }
-
-        if (isJsonBlob(blob)) {
-            try {
-                const legacyScene = JSON.parse(await blob.text()) as SavedScene;
-                const success = this.deserializeLegacyScene(legacyScene);
-
-                if (success) {
-                    const nextConfig = savedSceneToViewerConfig(legacyScene, cloneViewerConfig(this.config));
-                    this.updateViewerConfig((configData) => {
-                        Object.assign(configData, nextConfig);
-                    });
-                }
-
-                return success;
-            } catch {
-                return false;
-            }
         }
 
         // Deserialize the .onemo — applies renderer settings (tonemapping, exposure, shadows)
@@ -1377,8 +1374,11 @@ export class ObserverR3FBridge {
 
         const ctx = this.context;
         const result = [];
+        const rootObjects = this.shouldIncludeSceneObject(ctx.modelRoot)
+            ? [ctx.modelRoot]
+            : this.getVisibleSceneChildren(ctx.modelRoot);
         const rootChildren = [
-            ctx.modelRoot.uuid,
+            ...rootObjects.map((object) => object.uuid),
             BRIDGE_CAMERA_ID
         ];
 
@@ -1395,9 +1395,8 @@ export class ObserverR3FBridge {
         }));
 
         const appendObject = (object: THREE.Object3D, parentId: string) => {
-            const children = object.children
-            .filter(child => this.shouldIncludeSceneObject(child))
-            .map(child => child.uuid);
+            const visibleChildren = this.getVisibleSceneChildren(object);
+            const children = visibleChildren.map(child => child.uuid);
 
             const components: Record<string, unknown> = {
                 ...getStoredBridgeComponents(object)
@@ -1425,14 +1424,14 @@ export class ObserverR3FBridge {
             }));
             this.registerObjectBinding(object.uuid, object);
 
-            object.children.forEach((child) => {
-                if (this.shouldIncludeSceneObject(child)) {
-                    appendObject(child, object.uuid);
-                }
+            visibleChildren.forEach((child) => {
+                appendObject(child, object.uuid);
             });
         };
 
-        appendObject(ctx.modelRoot, BRIDGE_ROOT_ID);
+        rootObjects.forEach((object) => {
+            appendObject(object, BRIDGE_ROOT_ID);
+        });
 
         result.push(createBridgeEntityData({
             resourceId: BRIDGE_CAMERA_ID,
@@ -1468,8 +1467,61 @@ export class ObserverR3FBridge {
         return result;
     }
 
+    private getVisibleSceneChildren(object: THREE.Object3D): THREE.Object3D[] {
+        const result: THREE.Object3D[] = [];
+
+        object.children.forEach((child) => {
+            if (this.shouldIncludeSceneObject(child)) {
+                result.push(child);
+                return;
+            }
+
+            result.push(...this.getVisibleSceneChildren(child));
+        });
+
+        return result;
+    }
+
     private shouldIncludeSceneObject(object: THREE.Object3D) {
         if ((object as THREE.Bone).isBone) {
+            return false;
+        }
+
+        const storedComponents = getStoredBridgeComponents(object);
+        if (Object.keys(storedComponents).length > 0) {
+            return true;
+        }
+
+        if (object instanceof THREE.Light || isViewerCamera(object)) {
+            return true;
+        }
+
+        if (object instanceof THREE.Mesh) {
+            const normalizedName = object.name.trim().toLowerCase();
+            if (!normalizedName) {
+                return false;
+            }
+
+            if (/^mesh(_\d+.*)?$/.test(normalizedName)) {
+                return false;
+            }
+
+            return true;
+        }
+
+        const normalizedName = object.name.trim().toLowerCase();
+        if (!normalizedName) {
+            return false;
+        }
+
+        if (
+            normalizedName === 'scene' ||
+            normalizedName === 'group' ||
+            normalizedName === 'object3d' ||
+            normalizedName.startsWith('scene_') ||
+            normalizedName.startsWith('group_') ||
+            normalizedName.startsWith('r3f_scene')
+        ) {
             return false;
         }
 
@@ -1496,16 +1548,6 @@ export class ObserverR3FBridge {
 
     private findProductRole(roleName: string) {
         return this.config.product?.materialRoles.find((role) => role.role === roleName) ?? null;
-    }
-
-    private syncLegacyTextureForRole(roleName: string, key: keyof ViewerConfig['face']['textures'], url: string | undefined) {
-        if (roleName === 'face') {
-            this.config.face.textures[key] = url;
-        } else if (roleName === 'back') {
-            this.config.back.textures[key] = url;
-        } else if (roleName === 'frame') {
-            this.config.frame.textures[key] = url;
-        }
     }
 
     private syncProductRoleTexture(roleName: string, key: keyof NonNullable<NonNullable<ViewerConfig['product']>['materialRoles'][number]['textures']>, url: string | undefined) {
@@ -2334,38 +2376,6 @@ export class ObserverR3FBridge {
                 : undefined,
         });
 
-        if (record.role === 'face') {
-            const faceColor = decomposeViewerColor(toSavedRgbTuple(physicalMaterial.color));
-            this.config.face.params.color = faceColor.color;
-            this.config.face.params.colorMultiplier = faceColor.colorMultiplier;
-            this.config.face.params.roughness = roughness;
-            this.config.face.params.metalness = physicalMaterial.metalness ?? Number(asset.get('data.metalness') ?? 0);
-            this.config.face.params.envMapIntensity = envMapIntensity;
-            this.config.face.params.normalScale = normalScale;
-            this.config.face.params.bumpScale = bumpScale;
-            this.config.face.params.sheen = material instanceof THREE.MeshPhysicalMaterial ? material.sheen ?? Number(sheenEnabled) : Number(sheenEnabled);
-            this.config.face.params.sheenColor = sheenColor;
-            this.config.face.params.sheenRoughness = sheenRoughness;
-        }
-
-        if (record.role === 'back') {
-            this.config.back.params.color = this.rgbArrayToHex(toSavedRgbTuple(physicalMaterial.color));
-            this.config.back.params.roughness = roughness;
-            this.config.back.params.envMapIntensity = envMapIntensity;
-            this.config.back.params.normalScale = normalScale;
-            this.config.back.params.bumpScale = bumpScale;
-            this.config.back.params.sheen = material instanceof THREE.MeshPhysicalMaterial ? material.sheen ?? Number(sheenEnabled) : Number(sheenEnabled);
-            this.config.back.params.sheenColor = sheenColor;
-            this.config.back.params.sheenRoughness = sheenRoughness;
-        }
-
-        if (record.role === 'frame' && material instanceof THREE.MeshPhysicalMaterial) {
-            this.config.frame.params.color = this.rgbArrayToHex(toSavedRgbTuple(material.color));
-            this.config.frame.params.roughness = roughness;
-            this.config.frame.params.metalness = material.metalness ?? Number(asset.get('data.metalness') ?? 0);
-            this.config.frame.params.clearcoat = material.clearcoat ?? Number(asset.get('data.clearcoat') ?? asset.get('data.clearCoat') ?? 0);
-            this.config.frame.params.clearcoatRoughness = material.clearcoatRoughness ?? Number(asset.get('data.clearcoatRoughness') ?? (1 - Number(asset.get('data.clearCoatGloss') ?? 1)));
-        }
     }
 
     private updateViewerConfig(updater: (config: ViewerConfig) => void) {
@@ -2454,23 +2464,23 @@ export class ObserverR3FBridge {
         }
     }
 
-    private textureConfigKeyForSlot(slot: string): keyof ViewerConfig['face']['textures'] | null {
+    private textureConfigKeyForSlot(slot: string): keyof NonNullable<NonNullable<ViewerConfig['product']>['materialRoles'][number]['textures']> | null {
         switch (slot) {
             case 'diffuseMap':
             case 'baseColorMap':
             case 'colorMap':
-                return 'texture';
+                return 'map';
             case 'normalMap':
-                return 'normal';
+                return 'normalMap';
             case 'roughnessMap':
             case 'glossMap':
-                return 'roughness';
+                return 'roughnessMap';
             case 'heightMap':
             case 'bumpMap':
-                return 'height';
+                return 'bumpMap';
             case 'sheenMap':
             case 'sheenColorMap':
-                return 'sheenColor';
+                return 'sheenColorMap';
             default:
                 return null;
         }
@@ -2607,6 +2617,162 @@ export class ObserverR3FBridge {
         this.sceneDirty = true;
 
         return nextObject;
+    }
+
+    private getParentObjectForObserver(observer: EntityObserver) {
+        const parentId = observer.get('parent');
+        if (typeof parentId === 'string' && parentId && parentId !== BRIDGE_ROOT_ID) {
+            return this.objectById.get(parentId) ?? this.context?.modelRoot ?? null;
+        }
+
+        return this.context?.modelRoot ?? null;
+    }
+
+    private createPrimitiveObject(type: string) {
+        const material = new THREE.MeshStandardMaterial({
+            color: '#9ca3af',
+            roughness: 0.8,
+            metalness: 0.05
+        });
+
+        switch (type) {
+            case 'box':
+                return new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), material);
+            case 'capsule':
+                return new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 1, 8, 16), material);
+            case 'cone':
+                return new THREE.Mesh(new THREE.ConeGeometry(0.5, 1, 24), material);
+            case 'cylinder':
+                return new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1, 24), material);
+            case 'plane':
+                return new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);
+            case 'sphere':
+                return new THREE.Mesh(new THREE.SphereGeometry(0.5, 24, 16), material);
+            default:
+                return null;
+        }
+    }
+
+    private createLightObject(observer: EntityObserver) {
+        const type = String(observer.get('components.light.type') ?? 'directional');
+        if (type === 'spot') {
+            return new THREE.SpotLight('#ffffff', 1);
+        }
+
+        if (type === 'point') {
+            return new THREE.PointLight('#ffffff', 1);
+        }
+
+        return new THREE.DirectionalLight('#ffffff', 1);
+    }
+
+    private createCameraObject(observer: EntityObserver) {
+        const projection = Number(observer.get('components.camera.projection') ?? 0);
+        if (projection === 1) {
+            return new THREE.OrthographicCamera(-1, 1, 1, -1, DEFAULT_EDITOR_CAMERA.near, DEFAULT_EDITOR_CAMERA.far);
+        }
+
+        return new THREE.PerspectiveCamera(DEFAULT_EDITOR_CAMERA.fov, 1, DEFAULT_EDITOR_CAMERA.near, DEFAULT_EDITOR_CAMERA.far);
+    }
+
+    private async hydrateModelGroupFromObserver(group: THREE.Group, observer: EntityObserver) {
+        const assetId = observer.get('components.model.asset');
+        const url = resolveAssetUrl(assetId);
+        if (!url) {
+            return;
+        }
+
+        try {
+            const gltf = await new Promise<import('three/addons/loaders/GLTFLoader.js').GLTF>((resolve, reject) => {
+                modelSceneLoader.load(url, resolve, undefined, reject);
+            });
+
+            group.clear();
+            const loadedRoot = gltf.scene.clone(true);
+            group.add(loadedRoot);
+            setStoredBridgeComponentData(group, 'model', observer.get('components.model'));
+            group.updateMatrixWorld(true);
+            this.sceneDirty = true;
+        } catch (error) {
+            console.error('[r3f-bridge] Failed to hydrate model entity', error);
+        }
+    }
+
+    private createSceneObjectForObserver(observer: EntityObserver) {
+        if (!this.context) {
+            return null;
+        }
+
+        const resourceId = observer.get('resource_id');
+        if (typeof resourceId !== 'string' || !resourceId || this.objectById.has(resourceId)) {
+            return this.objectById.get(resourceId) ?? null;
+        }
+
+        const parentObject = this.getParentObjectForObserver(observer);
+        if (!parentObject) {
+            return null;
+        }
+
+        let object: THREE.Object3D | null = null;
+
+        if (observer.has('components.camera')) {
+            object = this.createCameraObject(observer);
+        } else if (observer.has('components.light')) {
+            object = this.createLightObject(observer);
+        } else if (observer.has('components.render')) {
+            const renderType = String(observer.get('components.render.type') ?? '');
+            object = this.createPrimitiveObject(renderType);
+            if (object) {
+                setStoredBridgeComponentData(object, 'render', observer.get('components.render'));
+            }
+        } else if (observer.has('components.model')) {
+            object = new THREE.Group();
+            setStoredBridgeComponentData(object, 'model', observer.get('components.model'));
+            void this.hydrateModelGroupFromObserver(object, observer);
+        }
+
+        if (!object) {
+            object = new THREE.Group();
+        }
+
+        object.name = String(observer.get('name') || object.name || 'Entity');
+        const position = observer.get('position') || [0, 0, 0];
+        const rotation = observer.get('rotation') || [0, 0, 0];
+        const scale = observer.get('scale') || [1, 1, 1];
+        object.position.set(position[0] ?? 0, position[1] ?? 0, position[2] ?? 0);
+        object.rotation.set(
+            THREE.MathUtils.degToRad(rotation[0] ?? 0),
+            THREE.MathUtils.degToRad(rotation[1] ?? 0),
+            THREE.MathUtils.degToRad(rotation[2] ?? 0)
+        );
+        object.scale.set(scale[0] ?? 1, scale[1] ?? 1, scale[2] ?? 1);
+
+        parentObject.add(object);
+        this.registerObjectBinding(resourceId, object);
+        this.bindEntityObserver(observer);
+        this.applyMappedEntityComponents(object, observer);
+        this.applyEffectiveVisibility(resourceId, object, observer);
+        object.updateMatrixWorld(true);
+        this.sceneDirty = true;
+        return object;
+    }
+
+    private removeSceneObjectForResource(resourceId: string) {
+        if (resourceId === BRIDGE_ROOT_ID || resourceId === BRIDGE_CAMERA_ID || resourceId === BRIDGE_LIGHT_ID) {
+            return;
+        }
+
+        const object = this.objectById.get(resourceId);
+        if (!object) {
+            return;
+        }
+
+        this.entityBindings.get(resourceId)?.unbind();
+        this.entityBindings.delete(resourceId);
+        this.objectById.delete(resourceId);
+        object.parent?.remove(object);
+        object.updateMatrixWorld(true);
+        this.sceneDirty = true;
     }
 
     private applyActiveCameraClearColor(observer: EntityObserver) {
@@ -2777,6 +2943,10 @@ export class ObserverR3FBridge {
             }
 
             changed = applyModelObserverChange(object, normalizedPath, observer) || changed;
+            if ((normalizedPath === 'components.model.asset' || normalizedPath === 'components.model') && object instanceof THREE.Group) {
+                void this.hydrateModelGroupFromObserver(object, observer);
+                changed = true;
+            }
             this.applyEffectiveVisibility(observer.get('resource_id'), object, observer);
         }
 
