@@ -1687,7 +1687,6 @@ function CameraCommandController({
       nextProjection,
       sourceCamera instanceof THREE.OrthographicCamera ? Math.abs(sourceCamera.top) : 5
     )
-    const lookTarget = sourceCamera.position.clone().add(sourceCamera.getWorldDirection(new THREE.Vector3()))
     const sourceNear = 'near' in sourceCamera ? sourceCamera.near : workingCamera.near
     const sourceFar = 'far' in sourceCamera ? sourceCamera.far : workingCamera.far
 
@@ -1710,14 +1709,26 @@ function CameraCommandController({
       workingCamera.bottom = -orthoHeight
     }
 
-    // Do NOT copy sourceCamera.userData to the working camera.
-    // userData contains rendering overrides (layers, clearColor, rect, etc.)
-    // that ActiveCameraRuntimeSync would apply per-frame, breaking the viewport.
-    // The editor viewport keeps its own rendering defaults.
     workingCamera.updateProjectionMatrix()
-    applyCameraTarget(workingCamera, lookTarget)
+
+    // Compute orbit target at a reasonable distance along the camera's forward
+    // direction — use the scene bounds radius so orbit feels natural, not 1 unit.
+    const sceneBounds = new THREE.Box3()
+    scene.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        sceneBounds.expandByObject(child)
+      }
+    })
+    const sceneCenter = new THREE.Vector3()
+    if (!sceneBounds.isEmpty()) {
+      sceneBounds.getCenter(sceneCenter)
+    }
+    const distanceToCenter = workingCamera.position.distanceTo(sceneCenter)
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(workingCamera.quaternion)
+    const orbitTarget = workingCamera.position.clone().add(forward.multiplyScalar(Math.max(distanceToCenter, 1)))
+    applyCameraTarget(workingCamera, orbitTarget)
     activeSceneCameraSignatureRef.current = getCameraRuntimeSignature(sourceCamera)
-  }, [applyCameraTarget, size.height, size.width, syncProjectionCamera])
+  }, [applyCameraTarget, scene, size.height, size.width, syncProjectionCamera])
 
   useFrame(() => {
     const activeSceneCameraId = activeSceneCameraIdRef.current
@@ -2152,6 +2163,15 @@ function CameraModeIndicator({ activeSceneCameraResourceId }: { activeSceneCamer
     return typeof name === 'string' && name ? name : 'Scene Camera'
   }, [activeSceneCameraResourceId])
 
+  const handleBackToEditor = useCallback(() => {
+    const perspectiveCamera = editor.call('camera:get', 'perspective')
+    if (perspectiveCamera) {
+      editor.call('camera:set', perspectiveCamera)
+    }
+    editor.emit('r3f:viewer:cameraPreset', 'perspective')
+    editor.call('viewport:focus')
+  }, [])
+
   return (
     <div
       style={{
@@ -2166,13 +2186,16 @@ function CameraModeIndicator({ activeSceneCameraResourceId }: { activeSceneCamer
         fontSize: 11,
         fontFamily: 'var(--font-mono, monospace)',
         borderRadius: 3,
-        pointerEvents: 'none',
+        pointerEvents: activeSceneCameraResourceId ? 'auto' : 'none',
         zIndex: 4,
         userSelect: 'none',
+        cursor: activeSceneCameraResourceId ? 'pointer' : 'default',
       }}
+      onClick={activeSceneCameraResourceId ? handleBackToEditor : undefined}
     >
       {activeSceneCameraResourceId ? '\u{1F3A5} ' : '\u{1F441} '}
       {label}
+      {activeSceneCameraResourceId ? ' \u2014 click to return to Editor Camera' : ''}
     </div>
   )
 }
