@@ -13,7 +13,7 @@ import type {
 
 interface EffectModelProps {
   modelPath: string
-  artworkUrl: string
+  artworkUrl?: string
   designState: DesignState
   scene: SceneSettings
   product?: ViewerProductConfig

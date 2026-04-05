@@ -28,11 +28,27 @@ const createStartupViewerConfig = (): ViewerConfig => {
     return config;
 };
 
-const DEFAULT_ARTWORK_URL = '/assets/test-artwork.png';
-const LAST_SCENE_STORAGE_KEY = 'onemo.playcanvas.last-scene';
+const LAST_SCENE_STORAGE_KEY = 'onemo.studio.last-scene';
 const GRID_DIVISIONS_FALLBACK = 10;
 const GRID_SIZE_FALLBACK = 1;
-const GRID_VISIBILITY_STORAGE_KEY = 'onemo.playcanvas.grid-divisions';
+const GRID_VISIBILITY_STORAGE_KEY = 'onemo.studio.grid-divisions';
+
+// Migrate legacy "playcanvas" localStorage keys to "studio" namespace (one-time).
+const LEGACY_KEY_MAP: [string, string][] = [
+    ['onemo.playcanvas.last-scene', LAST_SCENE_STORAGE_KEY],
+    ['onemo.playcanvas.grid-divisions', GRID_VISIBILITY_STORAGE_KEY]
+];
+for (const [oldKey, newKey] of LEGACY_KEY_MAP) {
+    try {
+        const value = localStorage.getItem(oldKey);
+        if (value !== null && localStorage.getItem(newKey) === null) {
+            localStorage.setItem(newKey, value);
+        }
+        localStorage.removeItem(oldKey);
+    } catch {
+        // Ignore storage access errors (e.g. private browsing).
+    }
+}
 
 type SelectableObserver = {
     get: (path: string) => unknown;
@@ -279,7 +295,7 @@ function BridgeViewportApp({
     return (
         <StudioViewport
             config={viewerConfig}
-            artworkUrl={DEFAULT_ARTWORK_URL}
+            artworkUrl={undefined}
             designState={DEFAULT_DESIGN_STATE}
             isEditing={false}
             selectedResourceIds={selectedResourceIds}
@@ -553,10 +569,12 @@ export function mountEffectViewer(viewportDom: HTMLElement, canvasDom: HTMLEleme
         const savedSceneName = typeof result.saved === 'string' ? result.saved : sceneName;
         setLastSceneName(savedSceneName);
         editor.call('status:text', `Saved scene '${savedSceneName}'`);
-        console.info('[onemo:scene] saved', {
-            scene: savedSceneName,
-            endpoint: '/api/onemo/scenes'
-        });
+        if (import.meta.env?.DEV) {
+            console.info('[onemo:scene] saved', {
+                scene: savedSceneName,
+                endpoint: '/api/onemo/scenes'
+            });
+        }
         window.dispatchEvent(new CustomEvent('onemo:scene:saved', {
             detail: {
                 scene: savedSceneName,
