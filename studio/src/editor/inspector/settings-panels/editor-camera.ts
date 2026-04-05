@@ -122,15 +122,24 @@ class EditorCameraSettingsPanel extends BaseSettingsPanel {
 
         super(args);
 
-        // Wire FOV and projection changes to the R3F viewport
+        // Initialize defaults for new fields that don't exist in the scene settings
         const fieldFov = this._field('cameraFov');
+        if (fieldFov && (fieldFov.value === undefined || fieldFov.value === null || fieldFov.value === 0 || fieldFov.value === 1)) {
+            fieldFov.value = 35;
+        }
+
+        const fieldProjection = this._field('cameraProjection');
+        if (fieldProjection && !fieldProjection.value) {
+            fieldProjection.value = 'perspective';
+        }
+
+        // Wire FOV and projection changes to the R3F viewport
         if (fieldFov) {
             fieldFov.on('change', (value: number) => {
                 editor.emit('r3f:viewer:editorCameraFov', value);
             });
         }
 
-        const fieldProjection = this._field('cameraProjection');
         if (fieldProjection) {
             fieldProjection.on('change', (value: string) => {
                 editor.emit('r3f:viewer:editorCameraProjection', value);
