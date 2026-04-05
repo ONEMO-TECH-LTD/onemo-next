@@ -1466,7 +1466,73 @@ function SceneObjectIconSprite({
   )
 }
 
-function SceneCameraPreviewLabel({
+/**
+ * Renders a camera preview as a second render pass inside the main WebGL canvas
+ * using scissor + viewport — no second EffectViewer or WebGL context.
+ */
+function SceneCameraPreviewRenderer({
+  cameraObject,
+}: {
+  cameraObject: THREE.Camera
+}) {
+  const { gl, scene, size } = useThree()
+  const previewCameraRef = useRef<THREE.PerspectiveCamera | THREE.OrthographicCamera | null>(null)
+
+  useEffect(() => {
+    if (cameraObject instanceof THREE.PerspectiveCamera) {
+      previewCameraRef.current = cameraObject.clone() as THREE.PerspectiveCamera
+    } else if (cameraObject instanceof THREE.OrthographicCamera) {
+      previewCameraRef.current = cameraObject.clone() as THREE.OrthographicCamera
+    } else {
+      previewCameraRef.current = new THREE.PerspectiveCamera(35, 256 / 196, 0.001, 100)
+    }
+    return () => { previewCameraRef.current = null }
+  }, [cameraObject])
+
+  useFrame(() => {
+    const previewCamera = previewCameraRef.current
+    if (!previewCamera) return
+
+    // Sync transform from source camera
+    cameraObject.updateMatrixWorld(true)
+    previewCamera.position.copy(cameraObject.position)
+    previewCamera.quaternion.copy(cameraObject.quaternion)
+    if (previewCamera instanceof THREE.PerspectiveCamera && cameraObject instanceof THREE.PerspectiveCamera) {
+      previewCamera.fov = cameraObject.fov
+      previewCamera.near = cameraObject.near
+      previewCamera.far = cameraObject.far
+    }
+
+    const pw = Math.min(256, Math.floor(size.width * 0.25))
+    const ph = Math.round(pw * 196 / 256)
+    const px = 4
+    // R3F/Three.js viewport Y is bottom-up
+    const py = size.height - ph - 40
+
+    if (previewCamera instanceof THREE.PerspectiveCamera) {
+      previewCamera.aspect = pw / ph
+    }
+    previewCamera.updateProjectionMatrix()
+    previewCamera.updateMatrixWorld(true)
+
+    const prevScissorTest = gl.getScissorTest()
+    gl.setScissorTest(true)
+    gl.setViewport(px, py, pw, ph)
+    gl.setScissor(px, py, pw, ph)
+    gl.render(scene, previewCamera)
+
+    // Restore main viewport
+    gl.setScissorTest(prevScissorTest)
+    gl.setViewport(0, 0, size.width, size.height)
+  }, 1) // priority 1 = after main render
+
+  return null
+}
+
+/**
+ * Clickable overlay positioned on top of the preview render area.
+ */
+function SceneCameraPreviewOverlay({
   resourceId,
 }: {
   resourceId: string
@@ -1489,24 +1555,39 @@ function SceneCameraPreviewLabel({
 
   return (
     <div
+      className="camera-preview"
       style={{
+        display: 'block',
         position: 'absolute',
         top: 40,
         left: 4,
-        padding: '6px 12px',
-        background: 'rgba(24,30,32,0.85)',
-        border: '1px solid rgba(255,255,255,0.25)',
-        borderRadius: 4,
-        color: '#fff',
-        fontSize: 12,
-        fontFamily: 'var(--font-mono, monospace)',
-        cursor: 'pointer',
+        width: 256,
+        height: 196,
+        border: '2px solid rgba(255,255,255,0.92)',
+        overflow: 'hidden',
         zIndex: 5,
-        userSelect: 'none',
+        cursor: 'pointer',
+        background: 'transparent',
+        boxSizing: 'border-box',
       }}
       onClick={handleActivate}
     >
-      Click to view through: {name}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          padding: '3px 8px',
+          background: 'rgba(24,30,32,0.75)',
+          color: 'rgba(255,255,255,0.9)',
+          fontSize: 11,
+          fontFamily: 'var(--font-mono, monospace)',
+          pointerEvents: 'none',
+        }}
+      >
+        {name} — click to activate
+      </div>
     </div>
   )
 }
@@ -1930,7 +2011,7 @@ export default function StudioViewport({
   }, [onBridgeReady])
 
   const cam = config.camera
-  const previewCameraResourceId = useMemo(() => {
+  const previewCamera = useMemo(() => {
     if (!resolveObjectById || !selectedResourceIds.length) {
       return null
     }
@@ -1941,7 +2022,7 @@ export default function StudioViewport({
     }
 
     const object = resolveObjectById(resourceId)
-    return object instanceof THREE.Camera ? resourceId : null
+    return object instanceof THREE.Camera ? { object, resourceId } : null
   }, [activeSceneCameraResourceId, resolveObjectById, selectedResourceIds])
   const gridSize = Math.max(gridSettings.divisions * gridSettings.cellSize, gridSettings.cellSize)
 
@@ -2048,12 +2129,13 @@ export default function StudioViewport({
           }}
           onCameraCommandConsumed={onCameraCommandConsumed}
         />
+        {previewCamera ? (
+          <SceneCameraPreviewRenderer cameraObject={previewCamera.object} />
+        ) : null}
       </EffectViewer>
     </ViewportErrorBoundary>
-    {previewCameraResourceId ? (
-      <SceneCameraPreviewLabel
-        resourceId={previewCameraResourceId}
-      />
+    {previewCamera ? (
+      <SceneCameraPreviewOverlay resourceId={previewCamera.resourceId} />
     ) : null}
     <CameraModeIndicator activeSceneCameraResourceId={activeSceneCameraResourceId} />
     </>
