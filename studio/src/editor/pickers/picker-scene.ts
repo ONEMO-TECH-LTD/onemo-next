@@ -379,6 +379,7 @@ editor.once('load', () => {
 
     // on show
     container.on('show', () => {
+        editor.emit('picker:scene:open');
         toggleProgress(true);
 
         // load scenes

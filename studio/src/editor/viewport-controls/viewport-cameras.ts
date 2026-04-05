@@ -2,6 +2,14 @@ import { BooleanInput, Button, Container, Label, RadioButton } from '@playcanvas
 
 editor.once('viewport:load', (app) => {
     const controls = editor.call('layout.toolbar.launch');
+    const openEditorCameraSettings = () => {
+        const projectUserSettings = editor.call('settings:projectUser');
+        editor.call('selector:set', 'editorSettings', [projectUserSettings]);
+        editor.emit('attributes:inspect[editorSettings]');
+        editor.call('editorSettings:tab:set', 'editor');
+        editor.call('editorSettings:panel:foldAll');
+        editor.call('editorSettings:panel:unfold', 'editor');
+    };
 
     const viewportCamera = {
         active: null,
@@ -59,9 +67,16 @@ editor.once('viewport:load', (app) => {
         panelCameraOption.dom.addEventListener('click', () => {
             const entity = app.root.findByGuid(guid);
             if (entity?.__editorName) {
+                editor.call('camera:set', entity);
                 editor.emit('r3f:viewer:cameraPreset', entity.__editorName === 'perspective' ? 'perspective' : entity.__editorName);
+                openEditorCameraSettings();
             } else {
                 editor.call('camera:set', entity);
+                const observer = editor.call('entities:get', guid);
+                if (observer) {
+                    editor.call('selector:set', 'entity', [observer]);
+                    editor.emit('attributes:inspect[entity]', [observer]);
+                }
             }
 
             clearRadioButtons();
@@ -91,11 +106,18 @@ editor.once('viewport:load', (app) => {
     cameraOptions.on('change', (value) => {
         const entity = app.root.findByGuid(value);
         if (entity?.__editorName) {
+            editor.call('camera:set', entity);
             editor.emit('r3f:viewer:cameraPreset', entity.__editorName === 'perspective' ? 'perspective' : entity.__editorName);
+            openEditorCameraSettings();
             return;
         }
 
         editor.call('camera:set', entity);
+        const observer = editor.call('entities:get', value);
+        if (observer) {
+            editor.call('selector:set', 'entity', [observer]);
+            editor.emit('attributes:inspect[entity]', [observer]);
+        }
     });
 
     const buildOptionsUI = () => {

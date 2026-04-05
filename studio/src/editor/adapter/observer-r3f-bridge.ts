@@ -485,24 +485,34 @@ export class ObserverR3FBridge {
     }
 
     setContext(context: EffectViewerBridge) {
-        const shouldRebuild = !this.context ||
+        const sceneGraphChanged = !this.context ||
             this.context.scene !== context.scene ||
-            this.context.camera !== context.camera ||
             this.context.renderer !== context.renderer ||
             this.context.modelRoot !== context.modelRoot;
+        const cameraChanged = !this.context || this.context.camera !== context.camera;
 
         this.context = context;
         setBridgeAudioCamera(context.camera);
         // Reset seeded flag so the observer re-syncs from the new context
         // (fixes KAI-4285: stale observer on EffectViewer re-renders)
-        if (shouldRebuild) {
+        if (sceneGraphChanged) {
             this.sceneSettingsSeeded = false;
         }
         const sceneSettings = editor.call('sceneSettings') as Observer | null;
         this.bindSceneSettingsObserver(sceneSettings);
         this.syncSceneSettingsObserverFromContext(sceneSettings);
         this.ensureProductRolesForCurrentScene();
-        if (shouldRebuild) {
+        if (cameraChanged) {
+            this.registerObjectBinding(BRIDGE_CAMERA_ID, context.camera);
+            const cameraObserver = editor.call('entities:get', BRIDGE_CAMERA_ID) as EntityObserver | null;
+            if (cameraObserver) {
+                this.applyMappedEntityComponents(context.camera, cameraObserver);
+                this.applyEffectiveVisibility(BRIDGE_CAMERA_ID, context.camera, cameraObserver);
+                context.camera.updateMatrixWorld(true);
+            }
+            this.sceneDirty = true;
+        }
+        if (sceneGraphChanged) {
             this.scheduleRebuild();
         }
     }
@@ -2591,6 +2601,16 @@ export class ObserverR3FBridge {
             return null;
         }
 
+        nextObject.name = String(observer.get('name') || currentObject.name || nextObject.name || 'Entity');
+        nextObject.position.copy(currentObject.position);
+        nextObject.quaternion.copy(currentObject.quaternion);
+        nextObject.scale.copy(currentObject.scale);
+        nextObject.visible = currentObject.visible;
+        nextObject.userData = {
+            ...currentObject.userData,
+            ...nextObject.userData
+        };
+
         const currentIndex = parent.children.indexOf(currentObject);
         parent.remove(currentObject);
         parent.add(nextObject);
@@ -2615,6 +2635,7 @@ export class ObserverR3FBridge {
         this.applyEffectiveVisibility(resourceId, nextObject, observer);
         nextObject.updateMatrixWorld(true);
         this.sceneDirty = true;
+        editor.emit('r3f:viewer:sceneObjectChanged', resourceId);
 
         return nextObject;
     }
@@ -2754,6 +2775,7 @@ export class ObserverR3FBridge {
         this.applyEffectiveVisibility(resourceId, object, observer);
         object.updateMatrixWorld(true);
         this.sceneDirty = true;
+        editor.emit('r3f:viewer:sceneObjectChanged', resourceId);
         return object;
     }
 
@@ -2773,6 +2795,7 @@ export class ObserverR3FBridge {
         object.parent?.remove(object);
         object.updateMatrixWorld(true);
         this.sceneDirty = true;
+        editor.emit('r3f:viewer:sceneObjectChanged', resourceId);
     }
 
     private applyActiveCameraClearColor(observer: EntityObserver) {
@@ -2806,25 +2829,29 @@ export class ObserverR3FBridge {
             this.applyEffectiveVisibility(observer.get('resource_id'), object, observer);
         }
 
-        if (normalizedPath.startsWith('components.camera') && object === this.context?.camera) {
-            changed = applyCameraObserverChange(this.context.camera, normalizedPath, observer) || changed;
-            if (normalizedPath === 'components.camera.clearColor' || normalizedPath === 'components.camera') {
-                this.applyActiveCameraClearColor(observer);
-            }
+        if (normalizedPath.startsWith('components.camera') && isViewerCamera(object)) {
+            changed = applyCameraObserverChange(object, normalizedPath, observer) || changed;
             this.applyEffectiveVisibility(observer.get('resource_id'), object, observer);
-            this.config.camera = this.config.camera || {
-                fov: 35,
-                distance: 0.2,
-                polarAngle: 90,
-                azimuthAngle: 0,
-                target: [0, 0, 0],
-                enableDamping: true,
-                dampingFactor: 0.1,
-                autoRotate: false,
-                autoRotateSpeed: 2
-            };
-            if (this.context.camera instanceof THREE.PerspectiveCamera) {
-                this.config.camera.fov = this.context.camera.fov;
+
+            if (object === this.context?.camera) {
+                if (normalizedPath === 'components.camera.clearColor' || normalizedPath === 'components.camera') {
+                    this.applyActiveCameraClearColor(observer);
+                }
+
+                this.config.camera = this.config.camera || {
+                    fov: 35,
+                    distance: 0.2,
+                    polarAngle: 90,
+                    azimuthAngle: 0,
+                    target: [0, 0, 0],
+                    enableDamping: true,
+                    dampingFactor: 0.1,
+                    autoRotate: false,
+                    autoRotateSpeed: 2
+                };
+                if (this.context.camera instanceof THREE.PerspectiveCamera) {
+                    this.config.camera.fov = this.context.camera.fov;
+                }
             }
         }
 
@@ -3022,7 +3049,16 @@ export class ObserverR3FBridge {
                 const scale = observer.get('scale') || [1, 1, 1];
                 object.scale.set(scale[0] ?? 1, scale[1] ?? 1, scale[2] ?? 1);
                 changed = true;
-            } else if (normalizedPath === 'enabled') {
+            }
+
+            // Sync directional light target when position or rotation changes
+            if (changed && object instanceof THREE.DirectionalLight && object.target) {
+                const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(object.quaternion);
+                object.target.position.copy(object.position).add(dir);
+                object.target.updateMatrixWorld(true);
+            }
+
+            if (normalizedPath === 'enabled') {
                 this.applyEffectiveVisibility(resourceId, object, observer);
                 changed = true;
             }
@@ -3031,6 +3067,24 @@ export class ObserverR3FBridge {
                 const replacementLight = createReplacementLightForShape(object, observer);
                 if (replacementLight) {
                     const nextObject = this.replaceMappedObject(resourceId, object, replacementLight, observer);
+                    if (nextObject) {
+                        object = nextObject;
+                        changed = true;
+                    }
+                }
+            }
+
+            if (normalizedPath === 'components.camera') {
+                if (observer.has('components.camera') && !isViewerCamera(object)) {
+                    const replacementCamera = this.createCameraObject(observer);
+                    const nextObject = this.replaceMappedObject(resourceId, object, replacementCamera, observer);
+                    if (nextObject && isViewerCamera(nextObject)) {
+                        object = nextObject;
+                        changed = true;
+                    }
+                } else if (!observer.has('components.camera') && isViewerCamera(object)) {
+                    const replacementGroup = new THREE.Group();
+                    const nextObject = this.replaceMappedObject(resourceId, object, replacementGroup, observer);
                     if (nextObject) {
                         object = nextObject;
                         changed = true;

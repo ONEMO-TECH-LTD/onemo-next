@@ -165,6 +165,10 @@ editor.once('load', () => {
             }
 
             if (property) {
+                if (!entity[component]) {
+                    return;
+                }
+
                 // edit component property
                 value = obj.get(`components.${component}.${property}`);
                 entity[component][property] = editor.call('components:convertValue', component, property, value);

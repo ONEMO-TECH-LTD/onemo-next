@@ -90,6 +90,7 @@ export const createReplacementCameraForProjection = (
         const persp = new THREE.PerspectiveCamera(fov, aspect, camera.near, camera.far);
         persp.position.copy(camera.position);
         persp.rotation.copy(camera.rotation);
+        persp.scale.copy(camera.scale);
         persp.visible = camera.visible;
         persp.name = camera.name;
         persp.userData = { ...camera.userData };
@@ -108,6 +109,7 @@ export const createReplacementCameraForProjection = (
         );
         ortho.position.copy(camera.position);
         ortho.rotation.copy(camera.rotation);
+        ortho.scale.copy(camera.scale);
         ortho.visible = camera.visible;
         ortho.name = camera.name;
         ortho.userData = { ...camera.userData };

@@ -324,12 +324,36 @@ class RenderingSettingsPanel extends BaseSettingsPanel {
 
         let currentEnvironmentFileUrl: string | null = null;
         const revokeEnvironmentFileUrl = () => {
-            if (!currentEnvironmentFileUrl) {
+            if (!currentEnvironmentFileUrl || !currentEnvironmentFileUrl.startsWith('blob:')) {
+                currentEnvironmentFileUrl = null;
                 return;
             }
 
             URL.revokeObjectURL(currentEnvironmentFileUrl);
             currentEnvironmentFileUrl = null;
+        };
+
+        const toEnvironmentDataUrl = (file: File) => {
+            return new Promise<string>((resolve, reject) => {
+                const normalizedName = file.name.toLowerCase();
+                const mimeType = normalizedName.endsWith('.exr') ? 'application/exr' : 'application/hdr';
+                const reader = new FileReader();
+
+                reader.onerror = () => {
+                    reject(reader.error || new Error('Failed to read environment file'));
+                };
+
+                reader.onload = () => {
+                    if (typeof reader.result !== 'string') {
+                        reject(new Error('Environment file could not be encoded'));
+                        return;
+                    }
+
+                    resolve(reader.result);
+                };
+
+                reader.readAsDataURL(new Blob([file], { type: mimeType }));
+            });
         };
 
         const getBridge = () => {
@@ -369,7 +393,7 @@ class RenderingSettingsPanel extends BaseSettingsPanel {
             fileInput.click();
         });
 
-        const onEnvironmentFileChange = () => {
+        const onEnvironmentFileChange = async () => {
             const file = fileInput.files?.[0];
             fileInput.value = '';
             if (!file) {
@@ -383,8 +407,15 @@ class RenderingSettingsPanel extends BaseSettingsPanel {
             }
 
             revokeEnvironmentFileUrl();
-            currentEnvironmentFileUrl = URL.createObjectURL(file);
-            bridge.loadEnvironment(currentEnvironmentFileUrl);
+
+            try {
+                currentEnvironmentFileUrl = await toEnvironmentDataUrl(file);
+                bridge.loadEnvironment(currentEnvironmentFileUrl);
+            } catch (error) {
+                currentEnvironmentFileUrl = null;
+                console.error('[rendering] Failed to read environment file', error);
+                return;
+            }
 
             if (this._sceneSettings) {
                 this._sceneSettings.set('render.envPreset', '');

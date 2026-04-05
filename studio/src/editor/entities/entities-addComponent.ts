@@ -28,6 +28,26 @@ editor.once('load', () => {
 
                 try {
                     e.apiEntity.addComponent(component, componentData);
+                    if (component === 'camera') {
+                        const activateCamera = () => {
+                            const bridge = editor.call('viewport:bridgeAdapter') as { getObjectById?: (resourceId: string) => { parent?: unknown } | null } | null;
+                            const resourceId = e.get('resource_id');
+                            const bridgeObject = typeof resourceId === 'string' && bridge?.getObjectById
+                                ? bridge.getObjectById(resourceId)
+                                : null;
+
+                            if (!e.entity?.camera || !e.entity.camera.camera || !bridgeObject?.parent) {
+                                requestAnimationFrame(activateCamera);
+                                return;
+                            }
+
+                            editor.call('camera:set', e.entity);
+                            editor.call('selector:set', 'entity', [e]);
+                            editor.emit('attributes:inspect[entity]', [e]);
+                        };
+
+                        requestAnimationFrame(activateCamera);
+                    }
                 } catch (err) {
                     console.error(err);
                     editor.call(
