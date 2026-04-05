@@ -6,6 +6,9 @@ editor.once('load', () => {
         return value === 'exponential' ? 'exp2' : value;
     };
 
+    const viewportCanvas = editor.call('viewport:canvas');
+    const canvasDom = (viewportCanvas?.dom || viewportCanvas?.element) as HTMLElement | undefined;
+
     let selectedEntity = null; // currently selected entity
     let currentCamera = null;  // current camera rendering to viewport
     let renderCamera = false;
@@ -22,6 +25,7 @@ editor.once('load', () => {
 
     const cameraPreviewBorder = document.createElement('div');
     cameraPreviewBorder.classList.add('camera-preview');
+    cameraPreviewBorder.style.display = 'none';
     if (editor.call('permissions:write')) {
         cameraPreviewBorder.classList.add('clickable');
     }
@@ -31,6 +35,33 @@ editor.once('load', () => {
         icon: 'E340'
     });
     cameraPreviewBorder.appendChild(btnPin.element);
+
+    const syncCanvasPreviewClip = () => {
+        if (!canvasDom) {
+            return;
+        }
+
+        if (!renderCamera) {
+            canvasDom.style.opacity = '0';
+            canvasDom.style.clipPath = '';
+            canvasDom.style.zIndex = '0';
+            return;
+        }
+
+        const width = viewport.clientWidth || 1;
+        const height = viewport.clientHeight || 1;
+        const left = rect.x * width;
+        const top = (1 - rect.y - rect.w) * height;
+        const right = width - left - (rect.z * width);
+        const bottom = height - top - (rect.w * height);
+
+        canvasDom.style.position = 'absolute';
+        canvasDom.style.inset = '0';
+        canvasDom.style.pointerEvents = 'none';
+        canvasDom.style.opacity = '1';
+        canvasDom.style.zIndex = '2';
+        canvasDom.style.clipPath = `inset(${top}px ${right}px ${bottom}px ${left}px)`;
+    };
 
     const updateCameraState = function () {
         if (pinnedCamera) {
@@ -106,6 +137,8 @@ editor.once('load', () => {
                 lastCamera = null;
             }
         }
+
+        syncCanvasPreviewClip();
     };
 
     let frameRequest = null;
@@ -140,6 +173,8 @@ editor.once('load', () => {
         }
 
         editor.call('camera:set', obj.entity);
+        editor.call('selector:set', 'entity', [obj]);
+        editor.emit('attributes:inspect[entity]', [obj]);
     }, false);
 
     editor.once('viewport:load', (application: Application) => {

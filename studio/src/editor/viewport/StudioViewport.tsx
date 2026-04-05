@@ -127,8 +127,103 @@ function syncOrbitTargetFromCamera(
   }
 
   const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion)
-  orbitControls.target.copy(camera.position).add(forward)
+  const distance = Math.max(
+    orbitControls.target.distanceTo(camera.position),
+    0.001
+  )
+  orbitControls.target.copy(camera.position).add(forward.multiplyScalar(distance))
   orbitControls.update()
+}
+
+function normalizeCameraRect(value: unknown): [number, number, number, number] {
+  if (!Array.isArray(value) || value.length < 4) {
+    return [0, 0, 1, 1]
+  }
+
+  const nextRect = [
+    Number(value[0] ?? 0),
+    Number(value[1] ?? 0),
+    Number(value[2] ?? 1),
+    Number(value[3] ?? 1),
+  ] as [number, number, number, number]
+
+  nextRect[0] = THREE.MathUtils.clamp(nextRect[0], 0, 1)
+  nextRect[1] = THREE.MathUtils.clamp(nextRect[1], 0, 1)
+  nextRect[2] = THREE.MathUtils.clamp(nextRect[2], 0, 1)
+  nextRect[3] = THREE.MathUtils.clamp(nextRect[3], 0, 1)
+
+  if (nextRect[2] <= 0 || nextRect[3] <= 0) {
+    return [0, 0, 1, 1]
+  }
+
+  return nextRect
+}
+
+function normalizeCameraLayers(value: unknown) {
+  if (!Array.isArray(value) || value.length === 0) {
+    return null
+  }
+
+  const nextLayers = value
+    .map((entry) => Number(entry))
+    .filter((entry) => Number.isInteger(entry) && entry >= 0 && entry < 32)
+
+  return nextLayers.length ? nextLayers : null
+}
+
+function getCameraRuntimeSignature(camera: THREE.Camera) {
+  return JSON.stringify({
+    position: camera.position.toArray(),
+    quaternion: camera.quaternion.toArray(),
+    scale: camera.scale.toArray(),
+    projection: camera instanceof THREE.OrthographicCamera ? 'orthographic' : 'perspective',
+    fov: camera instanceof THREE.PerspectiveCamera ? camera.fov : null,
+    orthoHeight: camera instanceof THREE.OrthographicCamera ? Math.abs(camera.top) : null,
+    near: 'near' in camera ? camera.near : null,
+    far: 'far' in camera ? camera.far : null,
+    userData: {
+      clearColor: camera.userData?.clearColor ?? null,
+      clearColorBuffer: camera.userData?.clearColorBuffer ?? null,
+      clearDepthBuffer: camera.userData?.clearDepthBuffer ?? null,
+      rect: camera.userData?.rect ?? null,
+      layers: camera.userData?.layers ?? null,
+      frustumCulling: camera.userData?.frustumCulling ?? null,
+      toneMapping: camera.userData?.toneMapping ?? null,
+      gammaCorrection: camera.userData?.gammaCorrection ?? null,
+    },
+  })
+}
+
+function buildViewerCameraFromSceneCamera(
+  sourceCamera: THREE.Camera,
+  fallback?: ViewerConfig['camera']
+): NonNullable<ViewerConfig['camera']> {
+  const position = sourceCamera.position.clone()
+  const target = position.clone().add(
+    new THREE.Vector3(0, 0, -1).applyQuaternion(sourceCamera.quaternion).normalize()
+  )
+  const offset = position.clone().sub(target)
+  const spherical = new THREE.Spherical().setFromVector3(offset.lengthSq() > 0 ? offset : new THREE.Vector3(0, 0, 1))
+  const base = fallback ?? {
+    fov: 35,
+    distance: 1,
+    polarAngle: 90,
+    azimuthAngle: 0,
+    target: [0, 0, 0] as [number, number, number],
+    enableDamping: true,
+    dampingFactor: 0.1,
+    autoRotate: false,
+    autoRotateSpeed: 2,
+  }
+
+  return {
+    ...base,
+    fov: sourceCamera instanceof THREE.PerspectiveCamera ? sourceCamera.fov : base.fov,
+    distance: spherical.radius,
+    polarAngle: THREE.MathUtils.radToDeg(spherical.phi),
+    azimuthAngle: THREE.MathUtils.radToDeg(spherical.theta),
+    target: [target.x, target.y, target.z],
+  }
 }
 
 function ViewportGridHelper({
@@ -524,6 +619,8 @@ interface EffectViewerProps {
   gridSettings?: ViewerGridSettings
   transformSnapSettings?: ViewerTransformSnapSettings
   cameraCommand?: ViewerCameraCommand | null
+  sceneObjectRevision?: number
+  activeSceneCameraResourceId?: string | null
   onCameraCommandConsumed?: () => void
 }
 
@@ -827,6 +924,7 @@ function EditorViewportOverlay({
   snapSettings,
   showGizmoHelper,
   enableTransformControls,
+  sceneObjectRevision,
 }: {
   selectedResourceIds: string[]
   resolveObjectById?: (resourceId: string) => THREE.Object3D | null
@@ -844,6 +942,7 @@ function EditorViewportOverlay({
   snapSettings?: ViewerTransformSnapSettings
   showGizmoHelper?: boolean
   enableTransformControls?: boolean
+  sceneObjectRevision?: number
 }) {
   const { camera, scene, gl } = useThree()
   const selectedObject = useMemo(() => {
@@ -852,13 +951,14 @@ function EditorViewportOverlay({
     }
 
     return resolveObjectById(selectedResourceIds[0])
-  }, [resolveObjectById, selectedResourceIds])
+  }, [resolveObjectById, sceneObjectRevision, selectedResourceIds])
 
   const transformControlsRef = useRef<React.ComponentRef<typeof TransformControls>>(null)
   const lightProxyRef = useRef<THREE.Group>(new THREE.Group())
   const isDraggingRef = useRef(false)
   const dragStartTransformRef = useRef<EffectViewerTransformSnapshot | null>(null)
   const dragResourceIdRef = useRef<string | null>(null)
+  const ignoreClickUntilRef = useRef(0)
   const pointerRef = useRef(new THREE.Vector2())
   const raycasterRef = useRef(new THREE.Raycaster())
   const selectedLight = selectedObject instanceof THREE.Light ? selectedObject : null
@@ -889,6 +989,10 @@ function EditorViewportOverlay({
   useEffect(() => {
     const element = gl.domElement
     const handleClick = (event: MouseEvent) => {
+      if (Date.now() < ignoreClickUntilRef.current) {
+        return
+      }
+
       if (isDraggingRef.current || !resolveIdByObject || !onSelectResourceId) {
         return
       }
@@ -951,12 +1055,23 @@ function EditorViewportOverlay({
 
       dragStartTransformRef.current = null
       dragResourceIdRef.current = null
+      ignoreClickUntilRef.current = Date.now() + 400
     }
 
     const handleObjectChange = () => {
       if (selectedLight) {
         selectedLight.position.copy(lightProxyRef.current.position)
+        selectedLight.quaternion.copy(lightProxyRef.current.quaternion)
+        selectedLight.scale.copy(lightProxyRef.current.scale)
         selectedLight.updateMatrixWorld(true)
+
+        // Sync directional light target from rotation so the light direction
+        // follows the gizmo orientation instead of always pointing at (0,0,0).
+        if (selectedLight instanceof THREE.DirectionalLight && selectedLight.target) {
+          const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(selectedLight.quaternion)
+          selectedLight.target.position.copy(selectedLight.position).add(dir)
+          selectedLight.target.updateMatrixWorld(true)
+        }
       }
 
       onSceneChange?.()
@@ -980,7 +1095,6 @@ function EditorViewportOverlay({
     !!transformTarget &&
     transformMode !== 'disabled' &&
     !(transformTarget instanceof THREE.Scene) &&
-    !(transformTarget instanceof THREE.Camera) &&
     (selectedLight ? true : !!transformTarget.parent)
   const translationSnap = snapSettings?.enabled ? snapSettings.increment : undefined
   const rotationSnap = snapSettings?.enabled
@@ -994,6 +1108,7 @@ function EditorViewportOverlay({
       <SelectionOutline target={selectedObject} />
       {canTransform ? (
         <TransformControls
+          key={transformObject?.uuid ?? 'transform-target'}
           ref={transformControlsRef}
           object={transformObject!}
           mode={transformMode}
@@ -1086,6 +1201,375 @@ function RenderModeController({
   return null
 }
 
+function ActiveCameraRuntimeSync({
+  config,
+}: {
+  config: ViewerConfig
+}) {
+  const camera = useThree((state) => state.camera)
+  const scene = useThree((state) => state.scene)
+  const gl = useThree((state) => state.gl)
+  const size = useThree((state) => state.size)
+  const signatureRef = useRef<string | null>(null)
+
+  useFrame(() => {
+    const rect = normalizeCameraRect(camera.userData?.rect)
+    const layers = normalizeCameraLayers(camera.userData?.layers)
+    const clearColorBuffer = camera.userData?.clearColorBuffer !== false
+    const clearDepthBuffer = camera.userData?.clearDepthBuffer !== false
+    const clearColor = Array.isArray(camera.userData?.clearColor) && camera.userData.clearColor.length >= 3
+      ? camera.userData.clearColor
+      : null
+    const toneMapping = typeof camera.userData?.toneMapping === 'number'
+      ? camera.userData.toneMapping
+      : config.renderer?.toneMapping
+    const gammaCorrection = typeof camera.userData?.gammaCorrection === 'number'
+      ? camera.userData.gammaCorrection
+      : (config.renderer?.outputColorSpace === 'srgb-linear' ? 0 : 1)
+    const frustumCulling = camera.userData?.frustumCulling !== false
+    const signature = JSON.stringify({
+      rect,
+      layers,
+      clearColorBuffer,
+      clearDepthBuffer,
+      clearColor,
+      toneMapping,
+      gammaCorrection,
+      frustumCulling,
+    })
+
+    if (signature !== signatureRef.current) {
+      signatureRef.current = signature
+
+      if (layers) {
+        camera.layers.disableAll()
+        layers.forEach((layer) => camera.layers.enable(layer))
+      } else {
+        camera.layers.mask = 0xffffffff
+      }
+
+      scene.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          child.frustumCulled = frustumCulling
+        }
+      })
+
+      if (clearColor) {
+        gl.setClearColor(
+          new THREE.Color(
+            Number(clearColor[0] ?? 1),
+            Number(clearColor[1] ?? 1),
+            Number(clearColor[2] ?? 1)
+          ),
+          THREE.MathUtils.clamp(Number(clearColor[3] ?? 1), 0, 1)
+        )
+      } else {
+        gl.setClearColor(config.colors.bgColor, 1)
+      }
+
+      if (typeof toneMapping === 'number') {
+        gl.toneMapping = toneMapping as THREE.ToneMapping
+      }
+
+      gl.outputColorSpace = gammaCorrection === 0
+        ? THREE.LinearSRGBColorSpace
+        : THREE.SRGBColorSpace
+    }
+
+    gl.autoClearColor = clearColorBuffer
+    gl.autoClearDepth = clearDepthBuffer
+
+    const fullRect = rect[0] === 0 && rect[1] === 0 && rect[2] === 1 && rect[3] === 1
+    if (fullRect) {
+      gl.setScissorTest(false)
+      gl.setViewport(0, 0, size.width, size.height)
+      return
+    }
+
+    const x = Math.round(rect[0] * size.width)
+    const y = Math.round(rect[1] * size.height)
+    const width = Math.max(1, Math.round(rect[2] * size.width))
+    const height = Math.max(1, Math.round(rect[3] * size.height))
+
+    gl.setScissorTest(true)
+    gl.setViewport(x, y, width, height)
+    gl.setScissor(x, y, width, height)
+  })
+
+  useEffect(() => {
+    return () => {
+      gl.setScissorTest(false)
+      gl.setViewport(0, 0, size.width, size.height)
+      gl.autoClearColor = true
+      gl.autoClearDepth = true
+      gl.setClearColor(config.colors.bgColor, 1)
+    }
+  }, [config.colors.bgColor, gl, size.height, size.width])
+
+  return null
+}
+
+function resolveSceneIconTextureName(object: THREE.Object3D) {
+  if (object instanceof THREE.DirectionalLight) {
+    return 'light-directional'
+  }
+
+  if (object instanceof THREE.SpotLight) {
+    return 'light-spot'
+  }
+
+  if (object instanceof THREE.PointLight) {
+    return 'light-point'
+  }
+
+  if (object instanceof THREE.Camera) {
+    return 'camera'
+  }
+
+  return 'unknown'
+}
+
+function createSceneIconTexture(kind: 'camera' | 'light') {
+  const canvas = document.createElement('canvas')
+  canvas.width = 128
+  canvas.height = 128
+  const ctx = canvas.getContext('2d')
+  if (!ctx) {
+    return new THREE.Texture()
+  }
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  ctx.beginPath()
+  ctx.arc(64, 64, 34, 0, Math.PI * 2)
+  ctx.fillStyle = kind === 'camera' ? 'rgba(255,255,255,0.94)' : 'rgba(255,156,64,0.94)'
+  ctx.fill()
+
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+
+  if (kind === 'camera') {
+    ctx.fillStyle = '#203040'
+    ctx.fillRect(36, 46, 48, 32)
+    ctx.fillRect(44, 40, 16, 10)
+    ctx.beginPath()
+    ctx.arc(60, 62, 10, 0, Math.PI * 2)
+    ctx.fillStyle = 'rgba(255,255,255,0.9)'
+    ctx.fill()
+  } else {
+    ctx.strokeStyle = '#fff8ef'
+    ctx.lineWidth = 7
+    ctx.beginPath()
+    ctx.arc(64, 58, 13, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.moveTo(64, 72)
+    ctx.lineTo(64, 88)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.moveTo(54, 90)
+    ctx.lineTo(74, 90)
+    ctx.stroke()
+    ;[[40, 40], [88, 40], [40, 78], [88, 78], [64, 28], [64, 102]].forEach(([x, y]) => {
+      ctx.beginPath()
+      ctx.moveTo(64, 64)
+      ctx.lineTo(x, y)
+      ctx.stroke()
+    })
+  }
+
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.needsUpdate = true
+  return texture
+}
+
+function SceneObjectIcons({
+  resolveIdByObject,
+  sceneObjectRevision,
+  activeSceneCameraResourceId,
+}: {
+  resolveIdByObject?: (object: THREE.Object3D) => string | null
+  sceneObjectRevision?: number
+  activeSceneCameraResourceId?: string | null
+}) {
+  const scene = useThree((state) => state.scene)
+  const iconTextures = useMemo(() => {
+    return {
+      camera: createSceneIconTexture('camera'),
+      light: createSceneIconTexture('light'),
+    }
+  }, [])
+
+  const icons = useMemo(() => {
+    const nextIcons: {
+      resourceId: string
+      object: THREE.Object3D
+      texture: THREE.Texture
+      color: string
+    }[] = []
+
+    if (!resolveIdByObject) {
+      return nextIcons
+    }
+
+    scene.traverse((object) => {
+      if (!(object instanceof THREE.Camera) && !(object instanceof THREE.Light)) {
+        return
+      }
+
+      const resourceId = resolveIdByObject(object)
+      if (!resourceId) {
+        return
+      }
+
+      if (object instanceof THREE.Camera && resourceId === activeSceneCameraResourceId) {
+        return
+      }
+
+      const textureName = resolveSceneIconTextureName(object)
+      const texture = textureName === 'camera'
+        ? iconTextures.camera
+        : iconTextures.light
+
+      nextIcons.push({
+        resourceId,
+        object,
+        texture,
+        color: object instanceof THREE.Light ? `#${object.color.getHexString()}` : '#ffffff',
+      })
+    })
+
+    return nextIcons
+  }, [activeSceneCameraResourceId, iconTextures.camera, iconTextures.light, resolveIdByObject, scene, sceneObjectRevision])
+
+  useEffect(() => {
+    return () => {
+      iconTextures.camera.dispose()
+      iconTextures.light.dispose()
+    }
+  }, [iconTextures.camera, iconTextures.light])
+
+  return (
+    <>
+      {icons.map((icon) => (
+        <SceneObjectIconSprite
+          key={icon.resourceId}
+          object={icon.object}
+          texture={icon.texture}
+          color={icon.color}
+        />
+      ))}
+    </>
+  )
+}
+
+function SceneObjectIconSprite({
+  object,
+  texture,
+  color,
+}: {
+  object: THREE.Object3D
+  texture: THREE.Texture
+  color: string
+}) {
+  const spriteRef = useRef<THREE.Sprite>(null)
+
+  useFrame(() => {
+    const sprite = spriteRef.current
+    if (!sprite) {
+      return
+    }
+
+    object.updateWorldMatrix(true, false)
+    object.getWorldPosition(sprite.position)
+    sprite.scale.set(0.025, 0.025, 1)
+  })
+
+  return (
+    <sprite ref={spriteRef} renderOrder={1000}>
+      <spriteMaterial
+        map={texture}
+        color={color}
+        transparent
+        depthTest={false}
+        depthWrite={false}
+      />
+    </sprite>
+  )
+}
+
+function SceneCameraPreview({
+  config,
+  cameraObject,
+  resourceId,
+}: {
+  config: ViewerConfig
+  cameraObject: THREE.Camera
+  resourceId: string
+}) {
+  const previewConfig = useMemo(() => {
+    const nextConfig = JSON.parse(JSON.stringify(config)) as ViewerConfig
+    nextConfig.camera = buildViewerCameraFromSceneCamera(cameraObject, config.camera)
+    return nextConfig
+  }, [cameraObject, config])
+
+  const handleActivate = useCallback(() => {
+    const observer = editor.call('entities:get', resourceId)
+    if (!observer?.entity) {
+      return
+    }
+
+    editor.call('camera:set', observer.entity)
+    editor.call('selector:set', 'entity', [observer])
+    editor.emit('attributes:inspect[entity]', [observer])
+  }, [resourceId])
+
+  return (
+    <div
+      className="camera-preview"
+      style={{
+        display: 'block',
+        position: 'absolute',
+        top: 40,
+        left: 4,
+        width: 256,
+        height: 196,
+        border: '2px solid rgba(255,255,255,0.92)',
+        overflow: 'hidden',
+        zIndex: 5,
+        cursor: 'pointer',
+        background: '#0b0d10',
+      }}
+      onClick={handleActivate}
+    >
+      <EffectViewer
+        config={previewConfig}
+        artworkUrl={DEFAULT_ARTWORK}
+        designState={{ offsetX: 0, offsetY: 0, scale: 1 }}
+        isEditing={false}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          width: 24,
+          height: 24,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'rgba(24,30,32,0.75)',
+          color: 'rgba(255,255,255,0.85)',
+          fontSize: 12,
+          pointerEvents: 'none',
+        }}
+      >
+        {'\u{1F512}'}
+      </div>
+    </div>
+  )
+}
+
 function CameraCommandController({
   cameraCommand,
   selectedResourceIds,
@@ -1109,6 +1593,8 @@ function CameraCommandController({
   const scene = useThree((state) => state.scene)
   const size = useThree((state) => state.size)
   const set = useThree((state) => state.set)
+  const activeSceneCameraIdRef = useRef<string | null>(null)
+  const activeSceneCameraSignatureRef = useRef<string | null>(null)
 
   const syncProjectionCamera = useCallback((projection: 'perspective' | 'orthographic', radius: number) => {
     const aspect = size.width / Math.max(size.height, 1)
@@ -1158,6 +1644,77 @@ function CameraCommandController({
     return nextCamera
   }, [camera, onCameraReplaced, set, size.height, size.width])
 
+  const applyCameraTarget = useCallback((nextCamera: THREE.Camera, nextTarget: THREE.Vector3) => {
+    if (orbitControlsRef.current) {
+      orbitControlsRef.current.object = nextCamera
+      orbitControlsRef.current.target.copy(nextTarget)
+      orbitControlsRef.current.update()
+    } else {
+      nextCamera.lookAt(nextTarget)
+    }
+  }, [orbitControlsRef])
+
+  const resetCameraRuntimeState = useCallback((workingCamera: THREE.Camera) => {
+    workingCamera.userData = {}
+    activeSceneCameraSignatureRef.current = null
+  }, [])
+
+  const applySceneCamera = useCallback((sourceCamera: THREE.Camera) => {
+    const nextProjection = sourceCamera instanceof THREE.OrthographicCamera ? 'orthographic' : 'perspective'
+    const workingCamera = syncProjectionCamera(
+      nextProjection,
+      sourceCamera instanceof THREE.OrthographicCamera ? Math.abs(sourceCamera.top) : 5
+    )
+    const lookTarget = sourceCamera.position.clone().add(sourceCamera.getWorldDirection(new THREE.Vector3()))
+    const sourceNear = 'near' in sourceCamera ? sourceCamera.near : workingCamera.near
+    const sourceFar = 'far' in sourceCamera ? sourceCamera.far : workingCamera.far
+
+    workingCamera.position.copy(sourceCamera.position)
+    workingCamera.quaternion.copy(sourceCamera.quaternion)
+    workingCamera.scale.copy(sourceCamera.scale)
+    workingCamera.near = sourceNear
+    workingCamera.far = sourceFar
+
+    if (workingCamera instanceof THREE.PerspectiveCamera && sourceCamera instanceof THREE.PerspectiveCamera) {
+      workingCamera.fov = sourceCamera.fov
+    }
+
+    if (workingCamera instanceof THREE.OrthographicCamera && sourceCamera instanceof THREE.OrthographicCamera) {
+      const aspect = size.width / Math.max(size.height, 1)
+      const orthoHeight = Math.max(Math.abs(sourceCamera.top), 0.5)
+      workingCamera.left = -orthoHeight * aspect
+      workingCamera.right = orthoHeight * aspect
+      workingCamera.top = orthoHeight
+      workingCamera.bottom = -orthoHeight
+    }
+
+    workingCamera.userData = {
+      ...sourceCamera.userData,
+    }
+    workingCamera.updateProjectionMatrix()
+    applyCameraTarget(workingCamera, lookTarget)
+    activeSceneCameraSignatureRef.current = getCameraRuntimeSignature(sourceCamera)
+  }, [applyCameraTarget, size.height, size.width, syncProjectionCamera])
+
+  useFrame(() => {
+    const activeSceneCameraId = activeSceneCameraIdRef.current
+    if (!activeSceneCameraId || !resolveObjectById) {
+      return
+    }
+
+    const sourceCamera = resolveObjectById(activeSceneCameraId)
+    if (!(sourceCamera instanceof THREE.Camera)) {
+      return
+    }
+
+    const nextSignature = getCameraRuntimeSignature(sourceCamera)
+    if (nextSignature === activeSceneCameraSignatureRef.current) {
+      return
+    }
+
+    applySceneCamera(sourceCamera)
+  })
+
   useEffect(() => {
     if (!cameraCommand) {
       return
@@ -1204,49 +1761,8 @@ function CameraCommandController({
     const controls = orbitControlsRef.current
     const currentTarget = controls?.target.clone() ?? new THREE.Vector3()
 
-    const applyCameraTarget = (nextCamera: THREE.Camera, nextTarget: THREE.Vector3) => {
-      if (orbitControlsRef.current) {
-        orbitControlsRef.current.object = nextCamera
-        orbitControlsRef.current.target.copy(nextTarget)
-        orbitControlsRef.current.update()
-      } else {
-        nextCamera.lookAt(nextTarget)
-      }
-    }
-
-    const applySceneCamera = (sourceCamera: THREE.Camera) => {
-      const nextProjection = sourceCamera instanceof THREE.OrthographicCamera ? 'orthographic' : 'perspective'
-      const workingCamera = syncProjectionCamera(
-        nextProjection,
-        sourceCamera instanceof THREE.OrthographicCamera ? Math.abs(sourceCamera.top) : 5
-      )
-      const lookTarget = sourceCamera.position.clone().add(sourceCamera.getWorldDirection(new THREE.Vector3()))
-      const sourceNear = 'near' in sourceCamera ? sourceCamera.near : workingCamera.near
-      const sourceFar = 'far' in sourceCamera ? sourceCamera.far : workingCamera.far
-
-      workingCamera.position.copy(sourceCamera.position)
-      workingCamera.quaternion.copy(sourceCamera.quaternion)
-      workingCamera.near = sourceNear
-      workingCamera.far = sourceFar
-
-      if (workingCamera instanceof THREE.PerspectiveCamera && sourceCamera instanceof THREE.PerspectiveCamera) {
-        workingCamera.fov = sourceCamera.fov
-      }
-
-      if (workingCamera instanceof THREE.OrthographicCamera && sourceCamera instanceof THREE.OrthographicCamera) {
-        const aspect = size.width / Math.max(size.height, 1)
-        const orthoHeight = Math.max(Math.abs(sourceCamera.top), 0.5)
-        workingCamera.left = -orthoHeight * aspect
-        workingCamera.right = orthoHeight * aspect
-        workingCamera.top = orthoHeight
-        workingCamera.bottom = -orthoHeight
-      }
-
-      workingCamera.updateProjectionMatrix()
-      applyCameraTarget(workingCamera, lookTarget)
-    }
-
     if (cameraCommand.kind === 'entity' && resolveObjectById) {
+      activeSceneCameraIdRef.current = cameraCommand.resourceId
       const targetObject = resolveObjectById(cameraCommand.resourceId)
       if (targetObject instanceof THREE.Camera) {
         applySceneCamera(targetObject)
@@ -1254,6 +1770,8 @@ function CameraCommandController({
       onCameraCommandConsumed?.()
       return
     }
+
+    activeSceneCameraIdRef.current = null
 
     let direction = camera.position.clone().sub(currentTarget)
     if (direction.lengthSq() === 0) {
@@ -1302,10 +1820,11 @@ function CameraCommandController({
     const distance = projection === 'orthographic' ? Math.max(radius * 4, 2) : radius * 2.6
     workingCamera.position.copy(target.clone().add(direction.multiplyScalar(distance)))
     workingCamera.lookAt(target)
+    resetCameraRuntimeState(workingCamera)
     workingCamera.updateProjectionMatrix()
     applyCameraTarget(workingCamera, target.clone())
     onCameraCommandConsumed?.()
-  }, [camera, cameraCommand, fallbackPerspectivePosition, onCameraCommandConsumed, orbitControlsRef, resolveIdByObject, resolveObjectById, scene, selectedResourceIds, size.height, size.width, syncProjectionCamera])
+  }, [applyCameraTarget, applySceneCamera, camera, cameraCommand, fallbackPerspectivePosition, onCameraCommandConsumed, orbitControlsRef, resetCameraRuntimeState, resolveIdByObject, resolveObjectById, scene, selectedResourceIds, syncProjectionCamera])
 
   useEffect(() => {
     const aspect = size.width / Math.max(size.height, 1)
@@ -1331,10 +1850,15 @@ function CameraCommandController({
 
 /**
  * Configures OrbitControls for Studio navigation (middle-click pan, right-click rotate).
+ * Also provides orbit center reset via editor event and keyboard shortcut.
  */
-function OrbitControlsOverride({ orbitControlsRef }: {
+function OrbitControlsOverride({ orbitControlsRef, resolveObjectById, selectedResourceIds }: {
   orbitControlsRef: RefObject<React.ComponentRef<typeof OrbitControls> | null>
+  resolveObjectById?: (resourceId: string) => THREE.Object3D | null
+  selectedResourceIds?: string[]
 }) {
+  const { camera, scene } = useThree()
+
   useEffect(() => {
     const controls = orbitControlsRef.current
     if (!controls) return
@@ -1344,6 +1868,54 @@ function OrbitControlsOverride({ orbitControlsRef }: {
       RIGHT: THREE.MOUSE.ROTATE,
     }
   }, [orbitControlsRef])
+
+  const resetOrbitCenter = useCallback(() => {
+    const controls = orbitControlsRef.current
+    if (!controls) return
+
+    // Try to center on selected object first
+    if (resolveObjectById && selectedResourceIds?.length) {
+      const target = resolveObjectById(selectedResourceIds[0])
+      if (target) {
+        const worldPos = new THREE.Vector3()
+        target.getWorldPosition(worldPos)
+        controls.target.copy(worldPos)
+        controls.update()
+        return
+      }
+    }
+
+    // Fall back to scene center
+    const box = new THREE.Box3().setFromObject(scene)
+    if (!box.isEmpty()) {
+      const center = box.getCenter(new THREE.Vector3())
+      controls.target.copy(center)
+    } else {
+      controls.target.set(0, 0, 0)
+    }
+    controls.update()
+  }, [camera, orbitControlsRef, resolveObjectById, scene, selectedResourceIds])
+
+  useEffect(() => {
+    const handle = editor.on('r3f:viewer:resetOrbit', resetOrbitCenter)
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.code === 'Numpad5' &&
+        !event.ctrlKey && !event.metaKey && !event.altKey &&
+        !(event.target instanceof HTMLElement && (event.target.isContentEditable || /input|textarea|select/i.test(event.target.tagName)))
+      ) {
+        event.preventDefault()
+        resetOrbitCenter()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      handle.unbind()
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [resetOrbitCenter])
 
   return null
 }
@@ -1389,6 +1961,8 @@ export default function StudioViewport({
   gridSettings = { enabled: true, divisions: 10, cellSize: 1 },
   transformSnapSettings,
   cameraCommand = null,
+  sceneObjectRevision = 0,
+  activeSceneCameraResourceId = null,
   onCameraCommandConsumed,
 }: EffectViewerProps) {
   const bridgeRef = useRef<Partial<EffectViewerBridge>>({})
@@ -1414,6 +1988,19 @@ export default function StudioViewport({
   }, [onBridgeReady])
 
   const cam = config.camera
+  const previewCameraObject = useMemo(() => {
+    if (!resolveObjectById || !selectedResourceIds.length) {
+      return null
+    }
+
+    const resourceId = selectedResourceIds[0]
+    if (!resourceId || resourceId === activeSceneCameraResourceId) {
+      return null
+    }
+
+    const object = resolveObjectById(resourceId)
+    return object instanceof THREE.Camera ? { object, resourceId } : null
+  }, [activeSceneCameraResourceId, resolveObjectById, selectedResourceIds])
   const gridSize = Math.max(gridSettings.divisions * gridSettings.cellSize, gridSettings.cellSize)
 
   // Camera position for CameraCommandController fallback
@@ -1453,6 +2040,7 @@ export default function StudioViewport({
   }, [emitBridge])
 
   return (
+    <>
     <ViewportErrorBoundary background={config.colors.bgColor}>
         <EffectViewer
           config={config}
@@ -1465,7 +2053,11 @@ export default function StudioViewport({
         >
         <BridgeStateSync onSync={emitBridge} />
         {/* Studio-specific OrbitControls customization */}
-        <OrbitControlsOverride orbitControlsRef={orbitControlsRef} />
+        <OrbitControlsOverride
+          orbitControlsRef={orbitControlsRef}
+          resolveObjectById={resolveObjectById}
+          selectedResourceIds={selectedResourceIds}
+        />
         {/* Studio controls — injected into EffectViewer's Canvas */}
         <ViewportGridHelper
           visible={gridSettings.enabled}
@@ -1489,11 +2081,18 @@ export default function StudioViewport({
           snapSettings={transformSnapSettings}
           showGizmoHelper={showGizmoHelper}
           enableTransformControls={enableTransformControls}
+          sceneObjectRevision={sceneObjectRevision}
         />
         <RenderModeController
           renderPass={renderPass}
           wireframeEnabled={wireframeEnabled}
           resolveIdByObject={resolveIdByObject}
+        />
+        <ActiveCameraRuntimeSync config={config} />
+        <SceneObjectIcons
+          resolveIdByObject={resolveIdByObject}
+          sceneObjectRevision={sceneObjectRevision}
+          activeSceneCameraResourceId={activeSceneCameraResourceId}
         />
         <CameraCommandController
           cameraCommand={cameraCommand}
@@ -1509,5 +2108,49 @@ export default function StudioViewport({
         />
       </EffectViewer>
     </ViewportErrorBoundary>
+    {previewCameraObject ? (
+      <SceneCameraPreview
+        config={config}
+        cameraObject={previewCameraObject.object}
+        resourceId={previewCameraObject.resourceId}
+      />
+    ) : null}
+    <CameraModeIndicator activeSceneCameraResourceId={activeSceneCameraResourceId} />
+    </>
+  )
+}
+
+function CameraModeIndicator({ activeSceneCameraResourceId }: { activeSceneCameraResourceId?: string | null }) {
+  const label = useMemo(() => {
+    if (!activeSceneCameraResourceId) {
+      return 'Editor Camera'
+    }
+    const observer = editor.call('entities:get', activeSceneCameraResourceId) as { get?: (path: string) => unknown } | null
+    const name = observer?.get?.('name')
+    return typeof name === 'string' && name ? name : 'Scene Camera'
+  }, [activeSceneCameraResourceId])
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        bottom: 6,
+        left: 6,
+        padding: '2px 8px',
+        background: activeSceneCameraResourceId
+          ? 'rgba(60,140,220,0.82)'
+          : 'rgba(40,44,52,0.72)',
+        color: '#fff',
+        fontSize: 11,
+        fontFamily: 'var(--font-mono, monospace)',
+        borderRadius: 3,
+        pointerEvents: 'none',
+        zIndex: 4,
+        userSelect: 'none',
+      }}
+    >
+      {activeSceneCameraResourceId ? '\u{1F3A5} ' : '\u{1F441} '}
+      {label}
+    </div>
   )
 }

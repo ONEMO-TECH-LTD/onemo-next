@@ -1763,6 +1763,12 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname.startsWith('/editor/scene/img/entity-icons/')) {
+        const iconPath = path.normalize(path.join(distRoot, 'static', 'img', 'entity-icons', path.basename(pathname)));
+        if (iconPath.startsWith(path.join(distRoot, 'static', 'img', 'entity-icons')) && existsSync(iconPath)) {
+            await sendFile(res, iconPath);
+            return;
+        }
+
         if (await proxyRemote(res, pathname)) {
             return;
         }

@@ -71,6 +71,8 @@ function BridgeViewportApp({
     const [renderPass, setRenderPass] = useState<ViewerRenderPass>('standard');
     const [wireframeEnabled, setWireframeEnabled] = useState(false);
     const [cameraCommand, setCameraCommand] = useState<ViewerCameraCommand | null>(null);
+    const [sceneObjectRevision, setSceneObjectRevision] = useState(0);
+    const [activeSceneCameraResourceId, setActiveSceneCameraResourceId] = useState<string | null>(null);
     const [transformSnap, setTransformSnap] = useState<TransformSnapState>({
         enabled: false,
         increment: 1
@@ -134,17 +136,21 @@ function BridgeViewportApp({
 
         const syncActiveCamera = (entity?: ViewportCameraEntity) => {
             if (!entity) {
+                setActiveSceneCameraResourceId(null);
                 return;
             }
 
             if (entity.__editorCamera) {
+                setActiveSceneCameraResourceId(null);
                 return;
             }
 
             const resourceId = typeof entity.getGuid === 'function' ? entity.getGuid() : null;
             if (!resourceId) {
+                setActiveSceneCameraResourceId(null);
                 return;
             }
+            setActiveSceneCameraResourceId(resourceId);
 
             setCameraCommand({
                 kind: 'entity',
@@ -183,6 +189,9 @@ function BridgeViewportApp({
         const focusHandle = editor.on('r3f:viewer:focus', focusSelection);
         const cameraPresetHandle = editor.on('r3f:viewer:cameraPreset', setCameraPreset);
         const cameraChangeHandle = editor.on('camera:change', syncActiveCamera);
+        const sceneObjectChangeHandle = editor.on('r3f:viewer:sceneObjectChanged', () => {
+            setSceneObjectRevision((value) => value + 1);
+        });
         const projectSettings = editor.call('settings:projectUser') as { on: (path: string, callback: () => void) => { unbind: () => void }; get: (path: string) => unknown } | null;
         const gridVisibleHandle = projectSettings?.on('editor.showGrid:set', syncGrid) ?? null;
         const gridDivisionsHandle = projectSettings?.on('editor.gridDivisions:set', syncGrid) ?? null;
@@ -210,6 +219,7 @@ function BridgeViewportApp({
             focusHandle.unbind();
             cameraPresetHandle.unbind();
             cameraChangeHandle.unbind();
+            sceneObjectChangeHandle.unbind();
             gridVisibleHandle?.unbind();
             gridDivisionsHandle?.unbind();
             gridSizeHandle?.unbind();
@@ -287,6 +297,8 @@ function BridgeViewportApp({
             gridSettings={gridSettings}
             transformSnapSettings={transformSnap}
             cameraCommand={cameraCommand}
+            sceneObjectRevision={sceneObjectRevision}
+            activeSceneCameraResourceId={activeSceneCameraResourceId}
             onCameraCommandConsumed={() => {
                 setCameraCommand(null);
             }}

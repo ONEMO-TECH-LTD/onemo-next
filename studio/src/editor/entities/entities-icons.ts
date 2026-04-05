@@ -23,10 +23,34 @@ editor.once('load', () => {
     const materials = new Map();
     const materialsBehind = new Map();
     let scale = 0.5;
-    let selectedIds = { };
-
     const ICON_ALPHA_TEST = 0.05;
     const ICON_BEHIND_OPACITY = 0.25;
+
+    const ensureIconForObserver = (obj: import('@playcanvas/observer').Observer | null | undefined) => {
+        if (!obj || !obj.get) {
+            return;
+        }
+
+        const resourceId = obj.get('resource_id');
+        if (!resourceId) {
+            return;
+        }
+
+        const existing = icons.find((icon) => {
+            return icon._link?.get?.('resource_id') === resourceId;
+        });
+        if (existing) {
+            existing.dirty = true;
+            return;
+        }
+
+        let icon = pool.shift();
+        if (!icon) {
+            icon = new ViewportIcon();
+        }
+
+        icon.link(obj);
+    };
 
     const createMaterial = (options) => {
         const material = new StandardMaterial();
@@ -121,7 +145,7 @@ editor.once('load', () => {
             }
 
             // don't render if selected or disabled
-            if (!this._link.entity._enabled || !this._link.entity._enabledInHierarchy || this._link.entity.__noIcon || scale === 0 || selectedIds[this._link.entity.getGuid()]) {
+            if (!this._link.entity._enabled || !this._link.entity._enabledInHierarchy || this._link.entity.__noIcon || scale === 0) {
                 if (this.entity) {
                     this.entityDelete();
                 }
@@ -165,7 +189,8 @@ editor.once('load', () => {
             if (component) {
                 let textureName = component;
                 if (component === 'light') {
-                    textureName += `-${this._link.entity.light.type}`;
+                    const lightType = this._link.entity.light?.type || this._link.get('components.light.type') || 'point';
+                    textureName += `-${lightType}`;
                 }
 
                 let material = materials.get(textureName);
@@ -194,9 +219,19 @@ editor.once('load', () => {
 
                 // Update light color if needed
                 if (component === 'light') {
-                    const lightColor = this._link.entity.light.color;
-                    this.entity.render.meshInstances[0].setParameter('material_emissive', [lightColor.r, lightColor.g, lightColor.b]);
-                    this.behind.render.meshInstances[0].setParameter('material_emissive', [lightColor.r, lightColor.g, lightColor.b]);
+                    const lightColor = this._link.entity.light?.color;
+                    const observerColor = this._link.get('components.light.color');
+                    const emissive = lightColor
+                        ? [lightColor.r, lightColor.g, lightColor.b]
+                        : Array.isArray(observerColor)
+                            ? [
+                                Number(observerColor[0] ?? 1),
+                                Number(observerColor[1] ?? 1),
+                                Number(observerColor[2] ?? 1)
+                            ]
+                            : [1, 1, 1];
+                    this.entity.render.meshInstances[0].setParameter('material_emissive', emissive);
+                    this.behind.render.meshInstances[0].setParameter('material_emissive', emissive);
                 }
 
                 if (this.local !== component) {
@@ -308,26 +343,12 @@ editor.once('load', () => {
             img.src = `/editor/scene/img/entity-icons/${textureName}.png`;
         });
 
-        editor.on('entities:add', (obj) => {
-            let icon = pool.shift();
-            if (!icon) {
-                icon = new ViewportIcon();
-            }
-
-            icon.link(obj);
+        (editor.call('entities:list') || []).forEach((obj) => {
+            ensureIconForObserver(obj);
         });
-    });
 
-    editor.on('selector:change', (type, items) => {
-        selectedIds = { };
-
-        if (type !== 'entity') {
-            return;
-        }
-
-        items.forEach((item) => {
-            selectedIds[item.get('resource_id')] = true;
-        });
+        editor.on('entities:add', ensureIconForObserver);
+        editor.on('entities:add:entity', ensureIconForObserver);
     });
 
     editor.on('viewport:postUpdate', () => {
