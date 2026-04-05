@@ -194,38 +194,6 @@ function getCameraRuntimeSignature(camera: THREE.Camera) {
   })
 }
 
-function buildViewerCameraFromSceneCamera(
-  sourceCamera: THREE.Camera,
-  fallback?: ViewerConfig['camera']
-): NonNullable<ViewerConfig['camera']> {
-  const position = sourceCamera.position.clone()
-  const target = position.clone().add(
-    new THREE.Vector3(0, 0, -1).applyQuaternion(sourceCamera.quaternion).normalize()
-  )
-  const offset = position.clone().sub(target)
-  const spherical = new THREE.Spherical().setFromVector3(offset.lengthSq() > 0 ? offset : new THREE.Vector3(0, 0, 1))
-  const base = fallback ?? {
-    fov: 35,
-    distance: 1,
-    polarAngle: 90,
-    azimuthAngle: 0,
-    target: [0, 0, 0] as [number, number, number],
-    enableDamping: true,
-    dampingFactor: 0.1,
-    autoRotate: false,
-    autoRotateSpeed: 2,
-  }
-
-  return {
-    ...base,
-    fov: sourceCamera instanceof THREE.PerspectiveCamera ? sourceCamera.fov : base.fov,
-    distance: spherical.radius,
-    polarAngle: THREE.MathUtils.radToDeg(spherical.phi),
-    azimuthAngle: THREE.MathUtils.radToDeg(spherical.theta),
-    target: [target.x, target.y, target.z],
-  }
-}
-
 function ViewportGridHelper({
   visible,
   size,
@@ -1498,21 +1466,77 @@ function SceneObjectIconSprite({
   )
 }
 
-function SceneCameraPreview({
-  config,
+/**
+ * Renders a camera preview as a second render pass inside the main WebGL canvas
+ * using scissor + viewport — no second EffectViewer or WebGL context.
+ */
+function SceneCameraPreviewRenderer({
   cameraObject,
+}: {
+  cameraObject: THREE.Camera
+}) {
+  const { gl, scene, size } = useThree()
+  const previewCameraRef = useRef<THREE.PerspectiveCamera | THREE.OrthographicCamera | null>(null)
+
+  useEffect(() => {
+    if (cameraObject instanceof THREE.PerspectiveCamera) {
+      previewCameraRef.current = cameraObject.clone() as THREE.PerspectiveCamera
+    } else if (cameraObject instanceof THREE.OrthographicCamera) {
+      previewCameraRef.current = cameraObject.clone() as THREE.OrthographicCamera
+    } else {
+      previewCameraRef.current = new THREE.PerspectiveCamera(35, 256 / 196, 0.001, 100)
+    }
+    return () => { previewCameraRef.current = null }
+  }, [cameraObject])
+
+  useFrame(() => {
+    const previewCamera = previewCameraRef.current
+    if (!previewCamera) return
+
+    // Sync transform from source camera
+    cameraObject.updateMatrixWorld(true)
+    previewCamera.position.copy(cameraObject.position)
+    previewCamera.quaternion.copy(cameraObject.quaternion)
+    if (previewCamera instanceof THREE.PerspectiveCamera && cameraObject instanceof THREE.PerspectiveCamera) {
+      previewCamera.fov = cameraObject.fov
+      previewCamera.near = cameraObject.near
+      previewCamera.far = cameraObject.far
+    }
+
+    const pw = Math.min(256, Math.floor(size.width * 0.25))
+    const ph = Math.round(pw * 196 / 256)
+    const px = 4
+    // R3F/Three.js viewport Y is bottom-up
+    const py = size.height - ph - 40
+
+    if (previewCamera instanceof THREE.PerspectiveCamera) {
+      previewCamera.aspect = pw / ph
+    }
+    previewCamera.updateProjectionMatrix()
+    previewCamera.updateMatrixWorld(true)
+
+    const prevScissorTest = gl.getScissorTest()
+    gl.setScissorTest(true)
+    gl.setViewport(px, py, pw, ph)
+    gl.setScissor(px, py, pw, ph)
+    gl.render(scene, previewCamera)
+
+    // Restore main viewport
+    gl.setScissorTest(prevScissorTest)
+    gl.setViewport(0, 0, size.width, size.height)
+  }, 1) // priority 1 = after main render
+
+  return null
+}
+
+/**
+ * Clickable overlay positioned on top of the preview render area.
+ */
+function SceneCameraPreviewOverlay({
   resourceId,
 }: {
-  config: ViewerConfig
-  cameraObject: THREE.Camera
   resourceId: string
 }) {
-  const previewConfig = useMemo(() => {
-    const nextConfig = JSON.parse(JSON.stringify(config)) as ViewerConfig
-    nextConfig.camera = buildViewerCameraFromSceneCamera(cameraObject, config.camera)
-    return nextConfig
-  }, [cameraObject, config])
-
   const handleActivate = useCallback(() => {
     const observer = editor.call('entities:get', resourceId)
     if (!observer?.entity) {
@@ -1522,6 +1546,11 @@ function SceneCameraPreview({
     editor.call('camera:set', observer.entity)
     editor.call('selector:set', 'entity', [observer])
     editor.emit('attributes:inspect[entity]', [observer])
+  }, [resourceId])
+
+  const name = useMemo(() => {
+    const observer = editor.call('entities:get', resourceId) as { get?: (path: string) => unknown } | null
+    return String(observer?.get?.('name') || 'Camera')
   }, [resourceId])
 
   return (
@@ -1538,33 +1567,26 @@ function SceneCameraPreview({
         overflow: 'hidden',
         zIndex: 5,
         cursor: 'pointer',
-        background: '#0b0d10',
+        background: 'transparent',
+        boxSizing: 'border-box',
       }}
       onClick={handleActivate}
     >
-      <EffectViewer
-        config={previewConfig}
-        artworkUrl={DEFAULT_ARTWORK}
-        designState={{ offsetX: 0, offsetY: 0, scale: 1 }}
-        isEditing={false}
-      />
       <div
         style={{
           position: 'absolute',
-          top: 0,
+          bottom: 0,
+          left: 0,
           right: 0,
-          width: 24,
-          height: 24,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          padding: '3px 8px',
           background: 'rgba(24,30,32,0.75)',
-          color: 'rgba(255,255,255,0.85)',
-          fontSize: 12,
+          color: 'rgba(255,255,255,0.9)',
+          fontSize: 11,
+          fontFamily: 'var(--font-mono, monospace)',
           pointerEvents: 'none',
         }}
       >
-        {'\u{1F512}'}
+        {name} — click to activate
       </div>
     </div>
   )
@@ -1665,7 +1687,6 @@ function CameraCommandController({
       nextProjection,
       sourceCamera instanceof THREE.OrthographicCamera ? Math.abs(sourceCamera.top) : 5
     )
-    const lookTarget = sourceCamera.position.clone().add(sourceCamera.getWorldDirection(new THREE.Vector3()))
     const sourceNear = 'near' in sourceCamera ? sourceCamera.near : workingCamera.near
     const sourceFar = 'far' in sourceCamera ? sourceCamera.far : workingCamera.far
 
@@ -1688,13 +1709,26 @@ function CameraCommandController({
       workingCamera.bottom = -orthoHeight
     }
 
-    workingCamera.userData = {
-      ...sourceCamera.userData,
-    }
     workingCamera.updateProjectionMatrix()
-    applyCameraTarget(workingCamera, lookTarget)
+
+    // Compute orbit target at a reasonable distance along the camera's forward
+    // direction — use the scene bounds radius so orbit feels natural, not 1 unit.
+    const sceneBounds = new THREE.Box3()
+    scene.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        sceneBounds.expandByObject(child)
+      }
+    })
+    const sceneCenter = new THREE.Vector3()
+    if (!sceneBounds.isEmpty()) {
+      sceneBounds.getCenter(sceneCenter)
+    }
+    const distanceToCenter = workingCamera.position.distanceTo(sceneCenter)
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(workingCamera.quaternion)
+    const orbitTarget = workingCamera.position.clone().add(forward.multiplyScalar(Math.max(distanceToCenter, 1)))
+    applyCameraTarget(workingCamera, orbitTarget)
     activeSceneCameraSignatureRef.current = getCameraRuntimeSignature(sourceCamera)
-  }, [applyCameraTarget, size.height, size.width, syncProjectionCamera])
+  }, [applyCameraTarget, scene, size.height, size.width, syncProjectionCamera])
 
   useFrame(() => {
     const activeSceneCameraId = activeSceneCameraIdRef.current
@@ -1852,10 +1886,11 @@ function CameraCommandController({
  * Configures OrbitControls for Studio navigation (middle-click pan, right-click rotate).
  * Also provides orbit center reset via editor event and keyboard shortcut.
  */
-function OrbitControlsOverride({ orbitControlsRef, resolveObjectById, selectedResourceIds }: {
+function OrbitControlsOverride({ orbitControlsRef, resolveObjectById, selectedResourceIds, activeSceneCameraResourceId }: {
   orbitControlsRef: RefObject<React.ComponentRef<typeof OrbitControls> | null>
   resolveObjectById?: (resourceId: string) => THREE.Object3D | null
   selectedResourceIds?: string[]
+  activeSceneCameraResourceId?: string | null
 }) {
   const { camera, scene } = useThree()
 
@@ -1868,6 +1903,14 @@ function OrbitControlsOverride({ orbitControlsRef, resolveObjectById, selectedRe
       RIGHT: THREE.MOUSE.ROTATE,
     }
   }, [orbitControlsRef])
+
+  // Disable orbit controls when viewing through a scene camera —
+  // the viewport is locked to that camera's view. Re-enable when back on editor camera.
+  useEffect(() => {
+    const controls = orbitControlsRef.current
+    if (!controls) return
+    controls.enabled = !activeSceneCameraResourceId
+  }, [activeSceneCameraResourceId, orbitControlsRef])
 
   const resetOrbitCenter = useCallback(() => {
     const controls = orbitControlsRef.current
@@ -1988,7 +2031,7 @@ export default function StudioViewport({
   }, [onBridgeReady])
 
   const cam = config.camera
-  const previewCameraObject = useMemo(() => {
+  const previewCamera = useMemo(() => {
     if (!resolveObjectById || !selectedResourceIds.length) {
       return null
     }
@@ -2057,6 +2100,7 @@ export default function StudioViewport({
           orbitControlsRef={orbitControlsRef}
           resolveObjectById={resolveObjectById}
           selectedResourceIds={selectedResourceIds}
+          activeSceneCameraResourceId={activeSceneCameraResourceId}
         />
         {/* Studio controls — injected into EffectViewer's Canvas */}
         <ViewportGridHelper
@@ -2106,14 +2150,13 @@ export default function StudioViewport({
           }}
           onCameraCommandConsumed={onCameraCommandConsumed}
         />
+        {previewCamera ? (
+          <SceneCameraPreviewRenderer cameraObject={previewCamera.object} />
+        ) : null}
       </EffectViewer>
     </ViewportErrorBoundary>
-    {previewCameraObject ? (
-      <SceneCameraPreview
-        config={config}
-        cameraObject={previewCameraObject.object}
-        resourceId={previewCameraObject.resourceId}
-      />
+    {previewCamera ? (
+      <SceneCameraPreviewOverlay resourceId={previewCamera.resourceId} />
     ) : null}
     <CameraModeIndicator activeSceneCameraResourceId={activeSceneCameraResourceId} />
     </>
@@ -2130,6 +2173,15 @@ function CameraModeIndicator({ activeSceneCameraResourceId }: { activeSceneCamer
     return typeof name === 'string' && name ? name : 'Scene Camera'
   }, [activeSceneCameraResourceId])
 
+  const handleBackToEditor = useCallback(() => {
+    const perspectiveCamera = editor.call('camera:get', 'perspective')
+    if (perspectiveCamera) {
+      editor.call('camera:set', perspectiveCamera)
+    }
+    editor.emit('r3f:viewer:cameraPreset', 'perspective')
+    editor.call('viewport:focus')
+  }, [])
+
   return (
     <div
       style={{
@@ -2144,13 +2196,16 @@ function CameraModeIndicator({ activeSceneCameraResourceId }: { activeSceneCamer
         fontSize: 11,
         fontFamily: 'var(--font-mono, monospace)',
         borderRadius: 3,
-        pointerEvents: 'none',
+        pointerEvents: activeSceneCameraResourceId ? 'auto' : 'none',
         zIndex: 4,
         userSelect: 'none',
+        cursor: activeSceneCameraResourceId ? 'pointer' : 'default',
       }}
+      onClick={activeSceneCameraResourceId ? handleBackToEditor : undefined}
     >
       {activeSceneCameraResourceId ? '\u{1F3A5} ' : '\u{1F441} '}
       {label}
+      {activeSceneCameraResourceId ? ' \u2014 click to return to Editor Camera' : ''}
     </div>
   )
 }
