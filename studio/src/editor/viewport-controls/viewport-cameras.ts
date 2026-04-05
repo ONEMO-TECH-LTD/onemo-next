@@ -6,9 +6,9 @@ editor.once('viewport:load', (app) => {
         const projectUserSettings = editor.call('settings:projectUser');
         editor.call('selector:set', 'editorSettings', [projectUserSettings]);
         editor.emit('attributes:inspect[editorSettings]');
-        editor.call('editorSettings:tab:set', 'editor');
+        editor.call('editorSettings:tab:set', 'editorCamera');
         editor.call('editorSettings:panel:foldAll');
-        editor.call('editorSettings:panel:unfold', 'editor');
+        editor.call('editorSettings:panel:unfold', 'editorCamera');
     };
 
     const viewportCamera = {

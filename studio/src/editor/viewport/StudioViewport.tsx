@@ -2133,6 +2133,12 @@ export default function StudioViewport({
           resolveIdByObject={resolveIdByObject}
         />
         <ActiveCameraRuntimeSync config={config} />
+        <EditorCameraSettingsSync
+          orbitControlsRef={orbitControlsRef}
+          onCameraReplaced={(nextCamera) => {
+            emitBridge({ camera: nextCamera })
+          }}
+        />
         <SceneObjectIcons
           resolveIdByObject={resolveIdByObject}
           sceneObjectRevision={sceneObjectRevision}
@@ -2161,6 +2167,92 @@ export default function StudioViewport({
     <CameraModeIndicator activeSceneCameraResourceId={activeSceneCameraResourceId} />
     </>
   )
+}
+
+/**
+ * Syncs editor camera settings (FOV, near, far, projection) from the settings panel to the R3F working camera.
+ * Listens for events emitted by the EditorCameraSettingsPanel.
+ */
+function EditorCameraSettingsSync({
+  orbitControlsRef,
+  onCameraReplaced,
+}: {
+  orbitControlsRef: RefObject<React.ComponentRef<typeof OrbitControls> | null>
+  onCameraReplaced: (camera: THREE.Camera) => void
+}) {
+  const { camera, gl, scene, size } = useThree()
+
+  useEffect(() => {
+    const handleFov = (value: number) => {
+      if (camera instanceof THREE.PerspectiveCamera && Number.isFinite(value) && value > 0 && value < 180) {
+        camera.fov = value
+        camera.updateProjectionMatrix()
+      }
+    }
+
+    const handleNear = (value: number) => {
+      if (Number.isFinite(value) && value >= 0) {
+        ;(camera as THREE.PerspectiveCamera).near = value
+        camera.updateProjectionMatrix()
+      }
+    }
+
+    const handleFar = (value: number) => {
+      if (Number.isFinite(value) && value > 0) {
+        ;(camera as THREE.PerspectiveCamera).far = value
+        camera.updateProjectionMatrix()
+      }
+    }
+
+    const handleProjection = (value: string) => {
+      const isPerspective = camera instanceof THREE.PerspectiveCamera
+      if (value === 'perspective' && !isPerspective) {
+        const aspect = size.width / size.height
+        const ortho = camera as THREE.OrthographicCamera
+        const viewHeight = (ortho.top - ortho.bottom)
+        const fov = 2 * Math.atan(viewHeight / (2 * camera.position.distanceTo(orbitControlsRef.current?.target ?? new THREE.Vector3()))) * (180 / Math.PI)
+        const newCamera = new THREE.PerspectiveCamera(
+          Number.isFinite(fov) && fov > 0 && fov < 180 ? fov : 35,
+          aspect,
+          ortho.near,
+          ortho.far
+        )
+        newCamera.position.copy(camera.position)
+        newCamera.quaternion.copy(camera.quaternion)
+        newCamera.updateProjectionMatrix()
+        gl.render(scene, newCamera)
+        onCameraReplaced(newCamera)
+      } else if (value === 'orthographic' && isPerspective) {
+        const persp = camera as THREE.PerspectiveCamera
+        const distance = camera.position.distanceTo(orbitControlsRef.current?.target ?? new THREE.Vector3())
+        const halfHeight = distance * Math.tan(THREE.MathUtils.degToRad(persp.fov / 2))
+        const halfWidth = halfHeight * (size.width / size.height)
+        const newCamera = new THREE.OrthographicCamera(
+          -halfWidth, halfWidth, halfHeight, -halfHeight,
+          persp.near, persp.far
+        )
+        newCamera.position.copy(camera.position)
+        newCamera.quaternion.copy(camera.quaternion)
+        newCamera.updateProjectionMatrix()
+        gl.render(scene, newCamera)
+        onCameraReplaced(newCamera)
+      }
+    }
+
+    const fovHandle = editor.on('r3f:viewer:editorCameraFov', handleFov)
+    const nearHandle = editor.on('r3f:viewer:editorCameraNear', handleNear)
+    const farHandle = editor.on('r3f:viewer:editorCameraFar', handleFar)
+    const projHandle = editor.on('r3f:viewer:editorCameraProjection', handleProjection)
+
+    return () => {
+      fovHandle.unbind()
+      nearHandle.unbind()
+      farHandle.unbind()
+      projHandle.unbind()
+    }
+  }, [camera, gl, scene, size, orbitControlsRef, onCameraReplaced])
+
+  return null
 }
 
 function CameraModeIndicator({ activeSceneCameraResourceId }: { activeSceneCameraResourceId?: string | null }) {
