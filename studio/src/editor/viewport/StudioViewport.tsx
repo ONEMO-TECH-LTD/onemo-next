@@ -1886,10 +1886,11 @@ function CameraCommandController({
  * Configures OrbitControls for Studio navigation (middle-click pan, right-click rotate).
  * Also provides orbit center reset via editor event and keyboard shortcut.
  */
-function OrbitControlsOverride({ orbitControlsRef, resolveObjectById, selectedResourceIds }: {
+function OrbitControlsOverride({ orbitControlsRef, resolveObjectById, selectedResourceIds, activeSceneCameraResourceId }: {
   orbitControlsRef: RefObject<React.ComponentRef<typeof OrbitControls> | null>
   resolveObjectById?: (resourceId: string) => THREE.Object3D | null
   selectedResourceIds?: string[]
+  activeSceneCameraResourceId?: string | null
 }) {
   const { camera, scene } = useThree()
 
@@ -1902,6 +1903,14 @@ function OrbitControlsOverride({ orbitControlsRef, resolveObjectById, selectedRe
       RIGHT: THREE.MOUSE.ROTATE,
     }
   }, [orbitControlsRef])
+
+  // Disable orbit controls when viewing through a scene camera —
+  // the viewport is locked to that camera's view. Re-enable when back on editor camera.
+  useEffect(() => {
+    const controls = orbitControlsRef.current
+    if (!controls) return
+    controls.enabled = !activeSceneCameraResourceId
+  }, [activeSceneCameraResourceId, orbitControlsRef])
 
   const resetOrbitCenter = useCallback(() => {
     const controls = orbitControlsRef.current
@@ -2091,6 +2100,7 @@ export default function StudioViewport({
           orbitControlsRef={orbitControlsRef}
           resolveObjectById={resolveObjectById}
           selectedResourceIds={selectedResourceIds}
+          activeSceneCameraResourceId={activeSceneCameraResourceId}
         />
         {/* Studio controls — injected into EffectViewer's Canvas */}
         <ViewportGridHelper
