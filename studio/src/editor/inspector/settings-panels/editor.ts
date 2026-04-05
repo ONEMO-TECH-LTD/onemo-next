@@ -1,5 +1,3 @@
-import { TONEMAPPING } from '@/core/constants';
-
 import { BaseSettingsPanel, type BaseSettingsPanelArgs } from './base';
 import type { Attribute, Divider } from '../attribute.type.d';
 
@@ -48,22 +46,6 @@ const ATTRIBUTES: (Attribute | Divider)[] = [
             min: 0,
             max: 100,
             placeholder: 'Increment'
-        }
-    },
-    {
-        observer: 'userSettings',
-        label: 'Zoom Sensitivity',
-        type: 'slider',
-        alias: 'zoomSensitivity',
-        reference: 'settings:zoomSensitivity',
-        path: 'editor.zoomSensitivity',
-        args: {
-            value: 1,
-            min: 1,
-            sliderMin: 1,
-            max: 15,
-            sliderMax: 15,
-            step: 1
         }
     },
     {
@@ -124,92 +106,6 @@ const ATTRIBUTES: (Attribute | Divider)[] = [
     },
     {
         alias: 'divider:1',
-        type: 'divider'
-    },
-    {
-        observer: 'settings',
-        label: 'Camera Depth Grabpass',
-        path: 'editor.cameraGrabDepth',
-        alias: 'cameraGrabDepth',
-        reference: 'settings:cameraGrabDepth',
-        type: 'boolean'
-    },
-    {
-        observer: 'settings',
-        label: 'Camera Color Grabpass',
-        path: 'editor.cameraGrabColor',
-        alias: 'cameraGrabColor',
-        reference: 'settings:cameraGrabColor',
-        type: 'boolean'
-    },
-    {
-        observer: 'settings',
-        label: 'Camera Clip Near',
-        alias: 'cameraClip',
-        reference: 'settings:cameraClip',
-        path: 'editor.cameraNearClip',
-        type: 'number',
-        args: {
-            min: 0
-        }
-    },
-    {
-        observer: 'settings',
-        label: 'Camera Clip Far',
-        alias: 'cameraClip',
-        reference: 'settings:cameraClip',
-        path: 'editor.cameraFarClip',
-        type: 'number',
-        args: {
-            min: 0
-        }
-    },
-    {
-        observer: 'settings',
-        label: 'Camera Clear Color',
-        path: 'editor.cameraClearColor',
-        alias: 'clearColor',
-        reference: 'settings:cameraClearColor',
-        type: 'rgba'
-    },
-    {
-        observer: 'settings',
-        label: 'Camera Tonemapping',
-        path: 'editor.cameraToneMapping',
-        reference: 'settings:cameraToneMapping',
-        type: 'select',
-        args: {
-            type: 'number',
-            options: TONEMAPPING.map((v, i) => {
-                return {
-                    v: i,
-                    t: v
-                };
-            })
-        }
-    },
-    {
-        observer: 'settings',
-        label: 'Camera Gamma',
-        path: 'editor.cameraGammaCorrection',
-        reference: 'settings:cameraGammaCorrection',
-        type: 'select',
-        args: {
-            type: 'number',
-            options: [
-                {
-                    v: 0,
-                    t: '1.0'
-                },
-                {
-                    v: 1,
-                    t: '2.2'
-                }
-            ]
-        }
-    },
-    {
-        alias: 'divider:2',
         type: 'divider'
     },
     {
