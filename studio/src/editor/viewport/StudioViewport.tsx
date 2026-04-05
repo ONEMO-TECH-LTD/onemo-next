@@ -194,38 +194,6 @@ function getCameraRuntimeSignature(camera: THREE.Camera) {
   })
 }
 
-function buildViewerCameraFromSceneCamera(
-  sourceCamera: THREE.Camera,
-  fallback?: ViewerConfig['camera']
-): NonNullable<ViewerConfig['camera']> {
-  const position = sourceCamera.position.clone()
-  const target = position.clone().add(
-    new THREE.Vector3(0, 0, -1).applyQuaternion(sourceCamera.quaternion).normalize()
-  )
-  const offset = position.clone().sub(target)
-  const spherical = new THREE.Spherical().setFromVector3(offset.lengthSq() > 0 ? offset : new THREE.Vector3(0, 0, 1))
-  const base = fallback ?? {
-    fov: 35,
-    distance: 1,
-    polarAngle: 90,
-    azimuthAngle: 0,
-    target: [0, 0, 0] as [number, number, number],
-    enableDamping: true,
-    dampingFactor: 0.1,
-    autoRotate: false,
-    autoRotateSpeed: 2,
-  }
-
-  return {
-    ...base,
-    fov: sourceCamera instanceof THREE.PerspectiveCamera ? sourceCamera.fov : base.fov,
-    distance: spherical.radius,
-    polarAngle: THREE.MathUtils.radToDeg(spherical.phi),
-    azimuthAngle: THREE.MathUtils.radToDeg(spherical.theta),
-    target: [target.x, target.y, target.z],
-  }
-}
-
 function ViewportGridHelper({
   visible,
   size,
@@ -1498,21 +1466,11 @@ function SceneObjectIconSprite({
   )
 }
 
-function SceneCameraPreview({
-  config,
-  cameraObject,
+function SceneCameraPreviewLabel({
   resourceId,
 }: {
-  config: ViewerConfig
-  cameraObject: THREE.Camera
   resourceId: string
 }) {
-  const previewConfig = useMemo(() => {
-    const nextConfig = JSON.parse(JSON.stringify(config)) as ViewerConfig
-    nextConfig.camera = buildViewerCameraFromSceneCamera(cameraObject, config.camera)
-    return nextConfig
-  }, [cameraObject, config])
-
   const handleActivate = useCallback(() => {
     const observer = editor.call('entities:get', resourceId)
     if (!observer?.entity) {
@@ -1524,48 +1482,31 @@ function SceneCameraPreview({
     editor.emit('attributes:inspect[entity]', [observer])
   }, [resourceId])
 
+  const name = useMemo(() => {
+    const observer = editor.call('entities:get', resourceId) as { get?: (path: string) => unknown } | null
+    return String(observer?.get?.('name') || 'Camera')
+  }, [resourceId])
+
   return (
     <div
-      className="camera-preview"
       style={{
-        display: 'block',
         position: 'absolute',
         top: 40,
         left: 4,
-        width: 256,
-        height: 196,
-        border: '2px solid rgba(255,255,255,0.92)',
-        overflow: 'hidden',
-        zIndex: 5,
+        padding: '6px 12px',
+        background: 'rgba(24,30,32,0.85)',
+        border: '1px solid rgba(255,255,255,0.25)',
+        borderRadius: 4,
+        color: '#fff',
+        fontSize: 12,
+        fontFamily: 'var(--font-mono, monospace)',
         cursor: 'pointer',
-        background: '#0b0d10',
+        zIndex: 5,
+        userSelect: 'none',
       }}
       onClick={handleActivate}
     >
-      <EffectViewer
-        config={previewConfig}
-        artworkUrl={DEFAULT_ARTWORK}
-        designState={{ offsetX: 0, offsetY: 0, scale: 1 }}
-        isEditing={false}
-      />
-      <div
-        style={{
-          position: 'absolute',
-          top: 0,
-          right: 0,
-          width: 24,
-          height: 24,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'rgba(24,30,32,0.75)',
-          color: 'rgba(255,255,255,0.85)',
-          fontSize: 12,
-          pointerEvents: 'none',
-        }}
-      >
-        {'\u{1F512}'}
-      </div>
+      Click to view through: {name}
     </div>
   )
 }
@@ -1688,9 +1629,10 @@ function CameraCommandController({
       workingCamera.bottom = -orthoHeight
     }
 
-    workingCamera.userData = {
-      ...sourceCamera.userData,
-    }
+    // Do NOT copy sourceCamera.userData to the working camera.
+    // userData contains rendering overrides (layers, clearColor, rect, etc.)
+    // that ActiveCameraRuntimeSync would apply per-frame, breaking the viewport.
+    // The editor viewport keeps its own rendering defaults.
     workingCamera.updateProjectionMatrix()
     applyCameraTarget(workingCamera, lookTarget)
     activeSceneCameraSignatureRef.current = getCameraRuntimeSignature(sourceCamera)
@@ -1988,7 +1930,7 @@ export default function StudioViewport({
   }, [onBridgeReady])
 
   const cam = config.camera
-  const previewCameraObject = useMemo(() => {
+  const previewCameraResourceId = useMemo(() => {
     if (!resolveObjectById || !selectedResourceIds.length) {
       return null
     }
@@ -1999,7 +1941,7 @@ export default function StudioViewport({
     }
 
     const object = resolveObjectById(resourceId)
-    return object instanceof THREE.Camera ? { object, resourceId } : null
+    return object instanceof THREE.Camera ? resourceId : null
   }, [activeSceneCameraResourceId, resolveObjectById, selectedResourceIds])
   const gridSize = Math.max(gridSettings.divisions * gridSettings.cellSize, gridSettings.cellSize)
 
@@ -2108,11 +2050,9 @@ export default function StudioViewport({
         />
       </EffectViewer>
     </ViewportErrorBoundary>
-    {previewCameraObject ? (
-      <SceneCameraPreview
-        config={config}
-        cameraObject={previewCameraObject.object}
-        resourceId={previewCameraObject.resourceId}
+    {previewCameraResourceId ? (
+      <SceneCameraPreviewLabel
+        resourceId={previewCameraResourceId}
       />
     ) : null}
     <CameraModeIndicator activeSceneCameraResourceId={activeSceneCameraResourceId} />
