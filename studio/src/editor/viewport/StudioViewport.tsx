@@ -9,7 +9,8 @@ import * as THREE from 'three'
 import EffectViewer, { type EffectViewerBridge as CoreBridge } from '../../../../src/app/(dev)/prototype/core/EffectViewer'
 import type { ViewerConfig, DesignState } from '../../../../src/app/(dev)/prototype/types'
 
-const DEFAULT_ARTWORK = '/assets/test-artwork.png'
+// Artwork URL is now passed through props — no hardcoded test asset.
+// When undefined, EffectViewer renders with no artwork texture applied.
 
 export interface EffectViewerBridge {
   scene: THREE.Scene
@@ -1222,19 +1223,6 @@ function ActiveCameraRuntimeSync({
         }
       })
 
-      if (clearColor) {
-        gl.setClearColor(
-          new THREE.Color(
-            Number(clearColor[0] ?? 1),
-            Number(clearColor[1] ?? 1),
-            Number(clearColor[2] ?? 1)
-          ),
-          THREE.MathUtils.clamp(Number(clearColor[3] ?? 1), 0, 1)
-        )
-      } else {
-        gl.setClearColor(config.colors.bgColor, 1)
-      }
-
       if (typeof toneMapping === 'number') {
         gl.toneMapping = toneMapping as THREE.ToneMapping
       }
@@ -1242,6 +1230,22 @@ function ActiveCameraRuntimeSync({
       gl.outputColorSpace = gammaCorrection === 0
         ? THREE.LinearSRGBColorSpace
         : THREE.SRGBColorSpace
+    }
+
+    // Apply clear color per-frame so it doesn't persist across render passes.
+    // Camera-specific clear color only applies for this camera's render;
+    // the scene background (config.colors.bgColor) is always the baseline.
+    if (clearColor) {
+      gl.setClearColor(
+        new THREE.Color(
+          Number(clearColor[0] ?? 1),
+          Number(clearColor[1] ?? 1),
+          Number(clearColor[2] ?? 1)
+        ),
+        THREE.MathUtils.clamp(Number(clearColor[3] ?? 1), 0, 1)
+      )
+    } else {
+      gl.setClearColor(config.colors.bgColor, 1)
     }
 
     gl.autoClearColor = clearColorBuffer
@@ -1516,12 +1520,27 @@ function SceneCameraPreviewRenderer({
     previewCamera.updateMatrixWorld(true)
 
     const prevScissorTest = gl.getScissorTest()
+    const prevClearColor = gl.getClearColor(new THREE.Color())
+    const prevClearAlpha = gl.getClearAlpha()
+
+    // Apply preview camera's own clear color if set, otherwise use scene background
+    const camClearColor = Array.isArray(cameraObject.userData?.clearColor) && cameraObject.userData.clearColor.length >= 3
+      ? cameraObject.userData.clearColor
+      : null
+    if (camClearColor) {
+      gl.setClearColor(
+        new THREE.Color(Number(camClearColor[0] ?? 1), Number(camClearColor[1] ?? 1), Number(camClearColor[2] ?? 1)),
+        THREE.MathUtils.clamp(Number(camClearColor[3] ?? 1), 0, 1)
+      )
+    }
+
     gl.setScissorTest(true)
     gl.setViewport(px, py, pw, ph)
     gl.setScissor(px, py, pw, ph)
     gl.render(scene, previewCamera)
 
-    // Restore main viewport
+    // Restore main viewport and clear color
+    gl.setClearColor(prevClearColor, prevClearAlpha)
     gl.setScissorTest(prevScissorTest)
     gl.setViewport(0, 0, size.width, size.height)
   }, 1) // priority 1 = after main render
@@ -2087,7 +2106,7 @@ export default function StudioViewport({
     <ViewportErrorBoundary background={config.colors.bgColor}>
         <EffectViewer
           config={config}
-          artworkUrl={artworkUrl || DEFAULT_ARTWORK}
+          artworkUrl={artworkUrl}
           designState={designState}
           isEditing={isEditing}
           onCreated={handleCreated}

@@ -9,7 +9,6 @@ import * as THREE from 'three'
 import EffectModel from './EffectModel'
 import type { ViewerConfig, DesignState } from '../types'
 
-const DEFAULT_ARTWORK = '/assets/test-artwork.png'
 const DEFAULT_ENVIRONMENT_PRESET = 'studio'
 type DreiEnvironmentPreset =
   | 'studio'
@@ -117,49 +116,34 @@ function CameraConfigSync({
     appliedSignatureRef.current = signature
     appliedCameraRef.current = camera
 
-    const applyCameraConfig = () => {
-      const polar = (cam.polarAngle * Math.PI) / 180
-      const azimuth = (cam.azimuthAngle * Math.PI) / 180
-      const target = cam.target ?? [0, 0, 0]
-      const nextPosition: [number, number, number] = [
-        target[0] + cam.distance * Math.sin(polar) * Math.sin(azimuth),
-        target[1] + cam.distance * Math.cos(polar),
-        target[2] + cam.distance * Math.sin(polar) * Math.cos(azimuth),
-      ]
-
-      /* eslint-disable react-hooks/immutability -- Three camera and controls are imperative runtime objects. */
-      camera.position.set(...nextPosition)
-
-      if (camera instanceof THREE.PerspectiveCamera) {
-        camera.fov = cam.fov
-      }
-
-      if ('updateProjectionMatrix' in camera && typeof camera.updateProjectionMatrix === 'function') {
-        camera.updateProjectionMatrix()
-      }
-
-      const controls = orbitControlsRef?.current
-      if (controls) {
-        controls.target.set(...target)
-        controls.update()
-        return
-      }
-
-      camera.lookAt(new THREE.Vector3(...target))
-      /* eslint-enable react-hooks/immutability */
-    }
-
-    applyCameraConfig()
-    const timers = [
-      window.setTimeout(applyCameraConfig, 0),
-      window.setTimeout(applyCameraConfig, 50),
-      window.setTimeout(applyCameraConfig, 150),
-      window.setTimeout(applyCameraConfig, 500),
+    const polar = (cam.polarAngle * Math.PI) / 180
+    const azimuth = (cam.azimuthAngle * Math.PI) / 180
+    const target = cam.target ?? [0, 0, 0]
+    const nextPosition: [number, number, number] = [
+      target[0] + cam.distance * Math.sin(polar) * Math.sin(azimuth),
+      target[1] + cam.distance * Math.cos(polar),
+      target[2] + cam.distance * Math.sin(polar) * Math.cos(azimuth),
     ]
 
-    return () => {
-      timers.forEach((timer) => window.clearTimeout(timer))
+    /* eslint-disable react-hooks/immutability -- Three camera and controls are imperative runtime objects. */
+    camera.position.set(...nextPosition)
+
+    if (camera instanceof THREE.PerspectiveCamera) {
+      camera.fov = cam.fov
     }
+
+    if ('updateProjectionMatrix' in camera && typeof camera.updateProjectionMatrix === 'function') {
+      camera.updateProjectionMatrix()
+    }
+
+    const controls = orbitControlsRef?.current
+    if (controls) {
+      controls.target.set(...target)
+      controls.update()
+    } else {
+      camera.lookAt(new THREE.Vector3(...target))
+    }
+    /* eslint-enable react-hooks/immutability */
   }, [camera, config.camera, orbitControlsRef])
 
   return null
@@ -275,7 +259,7 @@ export default function EffectViewer({
           {config.modelPath ? (
             <EffectModel
               modelPath={config.modelPath}
-              artworkUrl={artworkUrl || DEFAULT_ARTWORK}
+              artworkUrl={artworkUrl}
               designState={designState}
               scene={config.scene}
               product={config.product}
@@ -287,7 +271,6 @@ export default function EffectViewer({
         <OrbitControls
           ref={orbitControlsRef}
           makeDefault
-          target={cam?.target ?? [0, 0, 0]}
           enableDamping={cam?.enableDamping ?? true}
           dampingFactor={cam?.dampingFactor ?? 0.1}
           autoRotate={cam?.autoRotate ?? false}
