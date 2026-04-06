@@ -1,11 +1,23 @@
 # 10 — Performance Contracts
 
 > Launch budgets, not aspirational targets. Mobile-first constraints.
+> Consolidation: U7 (4-level fallback ladder), U8 (still-first pattern), route budgets from P2.
 > Source: 3D Scene Experience Brief V2.
 
-## Phase: [v1] budgets defined, enforced throughout
+## Phase: [Phase 1] budgets defined, enforced throughout
 
-## Rendering Budget [v1]
+## Route Budgets [Phase 1]
+
+| Budget | Target | Hard stop |
+|--------|--------|-----------|
+| Shell visible (poster still) | **< 2.5s** on 4G mobile | **4s** |
+| First interactive preview | **< 6s** on 4G mobile | **10s** |
+| Autosave round-trip | **< 1s** | **3s** |
+| Review submission to proof | **< 15s** | **30s** |
+
+The still-first pattern (U8) means the user sees their product at 2.5s even if the live 3D takes 6s.
+
+## Rendering Budget [Phase 1]
 
 | Budget item | Target | Hard stop |
 |------------|--------|-----------|
@@ -15,17 +27,94 @@
 | Applied user texture long edge | **1024px** | Do not exceed **1536px** without profiling |
 | Static material maps | **1024 sq** | Review above **2048 sq** per map |
 | Environment map | **1k for mobile** | Avoid large HDRI payloads |
-| Scene startup | Feels fast (no empty frame stare) | Still-first / live-upgrade if conspicuous |
 | Gesture response latency | **< 16ms** (one frame) | Visible lag = trust-breaking |
 
-## Mobile Baseline [v1]
+## Mobile Baseline [Phase 1]
 
 - **375px viewport** is the baseline width (iPhone SE class)
 - All controls must be readable and one-handed at 375px
 - Touch targets: minimum 44x44px
 - No hover-dependent interactions — touch-first
 
-## Asset Requirements [v1]
+## 4-Level Fallback Ladder (U7) [Phase 1]
+
+React-Konva stays dead. The projection fallback is a bounded failure mode, not a second editor.
+
+### Level 1: Still-First (U8)
+
+Every Create entry shows a deterministic poster still immediately. Live WebGL upgrades when ready.
+
+- Poster still from `ScenePreset.fallback_stills[]` — available at ScenePreset publish time
+- Crossfade to live canvas on `onRenderReady`
+- User never stares at an empty frame
+
+### Level 2: Live Upgrade
+
+WebGL loads successfully → full 3D interaction replaces the poster still.
+
+- Full orbit, gesture, material switching
+- Demand-based frame loop (`frameloop="demand"`)
+- This is the normal path on healthy devices
+
+### Level 3: Projection Fallback (D7)
+
+WebGL available but degraded (frame rate below threshold, context lost recovery fails):
+
+```typescript
+// create/core/ProjectionFallbackCanvas.tsx
+// Face-only projected compose preview from canonical print area
+// Numeric controls available for placement adjustment
+// Three-quarter and back views use poster stills
+interface ProjectionFallbackCanvasProps {
+  printArea: PrintArea
+  artwork: ArtworkRef
+  placement: Placement
+  stills: FallbackStill[]            // for non-face views
+  onPlacementChange: (p: Placement) => void
+}
+```
+
+Features:
+- Projects face artwork onto 2D representation of the print area
+- Allows numeric editing (x, y, scale, rotation via input fields)
+- Non-face views (three-quarter, back) rendered as static stills
+- Same design state contract — placements commit to the same DesignSession
+
+### Level 4: Still-Only Review
+
+WebGL completely unavailable (old device, disabled, blocked):
+
+- All views rendered as stills (from ScenePreset.fallback_stills[])
+- Review shows pre-generated proof images
+- User can still complete checkout flow
+- No live editing — directed to resume on a capable device
+
+### Detection and Switching
+
+```typescript
+function useWebGLHealth() {
+  const fpsRef = useRef<number[]>([])
+  const contextLostRef = useRef(false)
+
+  // Monitor frame rate over 3-second window
+  useFrame((_, delta) => {
+    fpsRef.current.push(1 / delta)
+    if (fpsRef.current.length > 180) fpsRef.current.shift()
+  })
+
+  const averageFps = fpsRef.current.length > 0
+    ? fpsRef.current.reduce((a, b) => a + b) / fpsRef.current.length
+    : 60
+
+  // Level 2 → Level 3: sustained low FPS
+  if (averageFps < 20 && fpsRef.current.length > 60) return 'projection_fallback'
+  // Context lost → Level 4
+  if (contextLostRef.current) return 'still_only'
+  return 'live'
+}
+```
+
+## Asset Requirements [Phase 1]
 
 ### GLB / Model
 
@@ -33,6 +122,7 @@
 - Mesh naming and slot structure must be stable and documented
 - Export contract must use `userData.onemo.*` metadata tags
 - Clean material/application boundaries for face, back, frame, hardware
+- Mesh manifest hash validates structure hasn't changed (ScenePackageRef)
 
 ### UV / Texture
 
@@ -52,17 +142,7 @@
 
 Each material = different texture files, not code changes.
 
-## Fallback Strategy [v1]
-
-| Condition | Fallback |
-|-----------|----------|
-| WebGL unavailable | Static fallback stills (4 views minimum) |
-| Scene startup slow | Still-first, live scene upgrade when ready |
-| Texture load fails | Render without artwork, show upload prompt |
-| Environment load fails | Use drei preset fallback |
-| Frame rate drops below 24fps | Reduce texture resolution, disable shadows |
-
-## Demand-Based Frame Loop [v1]
+## Demand-Based Frame Loop [Phase 1]
 
 From prototype: `frameloop="demand"` — only render when scene changes (orbit, material update, gesture).
 
@@ -72,3 +152,15 @@ Invalidation triggers:
 - Artwork texture swap
 - Resize event
 - Camera preset switch
+
+## UX Performance Contracts [Phase 2]
+
+| Interaction | Latency budget | Feedback mechanism |
+|-------------|---------------|-------------------|
+| Color swatch tap | < 100ms | Optimistic material update (Class 2 state) |
+| Artwork drag | < 16ms per frame | Ref-based delta (Class 3 state) |
+| Size switch | < 200ms | Variant axis lookup + rerender |
+| Save indicator | < 2s after last edit | AutosaveController debounce |
+| Review submission | < 500ms response | Action safety envelope blocks double-submit |
+
+See [13-state-management.md](13-state-management.md) for the three-class state model that enforces these budgets.

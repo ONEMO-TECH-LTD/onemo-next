@@ -2,111 +2,90 @@
 
 > Headless browser capture of deterministic previews for product listings, share, and order confirmation.
 > Same renderer as Create — same material/tone-mapping path.
+> Consolidation: D3 (revision in route + fallback route), U1 (captures from immutable snapshot).
 
-## Phase: [v3]
+## Phase: [Phase 3]
 
-## Why Browser Capture [v3]
+## Why Browser Capture [Phase 3]
 
 - Same renderer as Create (R3F / Three.js)
 - Same material and tone-mapping path
 - Same product module
 - Deterministic capture camera contracts from ScenePreset
 - No duplicated shader/material stack
-- One render factory produces: live preview, owner preview, public preview, order preview, catalog imagery
+- One render factory produces: live preview, owner preview, public preview, order preview, catalog imagery, fallback stills
 
-## Architecture [v3]
+## Architecture [Phase 3]
 
 ```
 POST /api/designs/:id/review
-  → Server validates design + enqueues preview job
-  → Worker loads internal render page
-  → Render page loads exact revision + exact published preset
+  → Server validates design (CompatibilityEngine)
+  → Enqueues preview job for current immutable revision
+  → Worker loads internal render page at /render/design/[id]/[revision]/[role]
+  → Render page loads exact revision snapshot + exact published preset
   → Render page emits render-ready signal
   → Worker captures screenshot(s)
   → Upload to Cloudinary with strict folder/naming
   → Update preview URLs in Supabase
 ```
 
-### Render Pages
+### Render Pages (D3: merged routes)
 
 Internal routes under `src/app/render/`:
 
-| Route | Purpose |
-|-------|---------|
-| `/render/design/[designId]/owner` | Owner continuity preview |
-| `/render/design/[designId]/public` | Public/share preview |
-| `/render/design/[designId]/order` | Order confirmation preview |
-| `/render/catalog/[captureSetId]` | Catalog/listing imagery (hero, angles, detail, thumbnail) |
+| Route | Purpose | Source |
+|-------|---------|--------|
+| `/render/design/[designId]/[revision]/[role]` | Revision-specific capture | D3: P1 (revision in path) |
+| `/render/fallback/[scenePresetId]/[context]` | Poster still generation at publish time | D3: P2 (fallback route) |
+| `/render/catalog/[captureSetId]` | Catalog/listing imagery | Original |
+
+**Key change from pre-consolidation:** Render routes include `[revision]` in the path. Immutable capture must reference a specific revision snapshot, not the mutable head.
 
 Each render page:
-1. Loads the exact revision + exact published preset versions
+1. Loads the **immutable revision snapshot** via `DesignRevisionRepository.getByRevision()` + exact published preset versions
 2. Mounts ViewerShell + product module (headless, no user controls)
-3. Applies the DesignSession overrides
+3. Applies the snapshot's design overrides
 4. Positions camera per CapturePreset
 5. Waits for GLB loaded + textures loaded + scene applied + first stable frame
 6. Emits `render-ready` signal via `ViewerShell.onRenderReady`
 
-### Worker
+### Fallback Route [Phase 3]
 
-Playwright/Chromium worker process:
-- Captures screenshots at exact viewport sizes from `ScenePreset.capture_presets`
-- Uploads to Cloudinary: `designs/{designId}/{role}/r{revision}.webp`
-- Updates preview URLs and status in Supabase
+Generates poster stills for the still-first pattern (U8):
 
-### Capture Presets
-
-Defined in ScenePreset:
-
-```typescript
-interface CapturePreset {
-  id: string
-  role: 'owner' | 'public' | 'order' | 'catalog'
-  cameraPresetId: string   // reference to cameras[]
-  widthPx: number
-  heightPx: number
-  pixelRatio: number
-  format: 'png' | 'jpg' | 'webp'
-  quality?: number
-}
+```
+/render/fallback/[scenePresetId]/[context]
+  → Loads published ScenePreset
+  → Renders with default product config (no customer design)
+  → Captures per presentation_context camera + background
+  → Uploads to ScenePreset.fallback_stills[]
 ```
 
-## Fallback Stills [v3]
+This runs when a ScenePreset is published — not per-design. The stills are the "poster" shown before WebGL loads.
 
-If WebGL fails or is unavailable, stills preserve trust:
-- Minimum 4 views: front, three-quarter, side-detail, back
-- Same object/camera family as live scene
-- If only one still in MVP: canonical front proof image
-
-## Catalog Images [v3]
-
-Same render worker, different route:
-- `/render/catalog/[captureSetId]`
-- One `captureSetId` produces hero, angle-left, angle-right, detail, thumbnail variants
-- Used for product listings, collections, social sharing
-
-## Render Page Implementation [v3]
+## Render Page Implementation [Phase 3]
 
 ```typescript
-// app/render/design/[designId]/[role]/page.tsx
-// This is a Server Component that loads data, then hands to a client RenderScene
+// app/render/design/[designId]/[revision]/[role]/page.tsx
 import { createRepositories } from '@/server/repositories'
 
 export default async function RenderPage({
   params,
 }: {
-  params: { designId: string; role: 'owner' | 'public' | 'order' }
+  params: { designId: string; revision: string; role: 'owner' | 'public' | 'order' }
 }) {
   const repos = createRepositories()
-  const session = await repos.designSession.get(params.designId)
-  const preset = await repos.scenePreset.getPublished(session.scenePresetRef.id)
-  const spec = await repos.productSpec.getById(session.productSpecRef.id)
+  const revisionNum = parseInt(params.revision)
 
-  // Find the camera preset for this role
+  // Load from IMMUTABLE snapshot — not mutable head (U1)
+  const snapshot = await repos.designRevision.getByRevision(params.designId, revisionNum)
+  const preset = await repos.scenePreset.getPublished(snapshot.scene_preset_ref.id)
+  const spec = await repos.productSpec.getById(snapshot.product_spec_ref.id)
+
   const cameraPreset = preset.payload.cameras.find(
     c => c.role === `${params.role}_preview`
   ) ?? preset.payload.cameras.find(c => c.role === 'create_default')!
 
-  // Find capture preset for viewport dimensions
   const capturePreset = preset.payload.capture_presets.find(
     c => c.role === params.role
   )
@@ -114,7 +93,7 @@ export default async function RenderPage({
   return (
     <RenderScene
       preset={preset}
-      session={session}
+      session={snapshot.snapshot}
       spec={spec}
       cameraPreset={cameraPreset}
       capturePreset={capturePreset}
@@ -125,7 +104,7 @@ export default async function RenderPage({
 ```
 
 ```typescript
-// app/render/design/[designId]/[role]/_components/RenderScene.tsx
+// app/render/design/[designId]/[revision]/[role]/_components/RenderScene.tsx
 'use client'
 
 import { ViewerShell } from '@create/core'
@@ -146,18 +125,16 @@ export function RenderScene({
         config={config}
         modelUrl={resolveModelUrl(session, spec)}
         onModelReady={(root) => {
-          // Apply surfaces + overrides
           const surfaces = module.discoverSurfaces(root, preset.payload)
           module.applyOverrides(root, surfaces, sessionToOverrides(session))
         }}
         onRenderReady={() => {
-          // Signal to Playwright worker that capture is safe
           window.__ONEMO_RENDER_READY = true
           document.title = 'RENDER_READY'
         }}
       >
         <module.Renderer
-          surfaces={null}  // initialized via onModelReady
+          surfaces={null}
           session={session}
           preset={preset}
         />
@@ -167,7 +144,7 @@ export function RenderScene({
 }
 ```
 
-## Preview Worker [v3]
+## Preview Worker [Phase 3]
 
 ```typescript
 // server/workers/previewWorker.ts
@@ -187,24 +164,20 @@ async function processPreviewJob(job: PreviewJob): Promise<void> {
   try {
     for (const role of job.roles) {
       const page = await browser.newPage()
-      const url = `${process.env.RENDER_BASE_URL}/render/design/${job.designId}/${role}`
+      // Revision in URL — captures from immutable snapshot
+      const url = `${process.env.RENDER_BASE_URL}/render/design/${job.designId}/${job.revision}/${role}`
 
       await page.goto(url)
-
-      // Wait for render-ready signal
       await page.waitForFunction(() => window.__ONEMO_RENDER_READY === true, {
         timeout: 30_000,
       })
-
-      // Allow one extra frame for settling
       await page.waitForTimeout(100)
 
-      // Get capture dimensions from ScenePreset
-      const session = await repos.designSession.get(job.designId)
-      const preset = await repos.scenePreset.getPublished(session.scenePresetRef.id)
+      // Get capture dimensions from snapshot's preset
+      const snapshot = await repos.designRevision.getByRevision(job.designId, job.revision)
+      const preset = await repos.scenePreset.getPublished(snapshot.scene_preset_ref.id)
       const capturePreset = preset.payload.capture_presets.find(c => c.role === role)
 
-      // Capture screenshot
       const screenshot = await page.screenshot({
         type: capturePreset?.format ?? 'webp',
         quality: capturePreset?.quality ?? 90,
@@ -215,7 +188,6 @@ async function processPreviewJob(job: PreviewJob): Promise<void> {
         },
       })
 
-      // Upload to Cloudinary
       const publicId = `${process.env.CLOUDINARY_ENV_PREFIX}/designs/${job.designId}/${role}/r${job.revision}`
       await repos.assets.uploadBuffer(screenshot, {
         publicId,
@@ -223,9 +195,8 @@ async function processPreviewJob(job: PreviewJob): Promise<void> {
         folder: `designs/${job.designId}/${role}`,
       })
 
-      // Update preview URL in Supabase
       const deliveryUrl = repos.assets.getDeliveryUrl(publicId)
-      await repos.designSession.updatePreviewUrls(job.designId, {
+      await repos.designHead.updatePreviewUrls(job.designId, {
         [`${role}PreviewUrl`]: deliveryUrl,
       })
 
@@ -237,10 +208,60 @@ async function processPreviewJob(job: PreviewJob): Promise<void> {
 }
 ```
 
-## Job Queue Integration [v3]
+## Capture Presets [Phase 3]
+
+Defined in ScenePreset:
 
 ```typescript
-// server/use-cases/enqueuePreviewGeneration.ts
+interface CapturePreset {
+  id: string
+  role: 'owner' | 'public' | 'order' | 'catalog'
+  cameraPresetId: string
+  width_px: number
+  height_px: number
+  pixelRatio: number
+  format: 'png' | 'jpg' | 'webp'
+  quality?: number
+}
+```
+
+## Fallback Stills [Phase 1+3]
+
+If WebGL fails or is unavailable, stills preserve trust:
+- Minimum 4 views: front, three-quarter, side-detail, back
+- Generated at ScenePreset publish time via `/render/fallback/` route
+- Same object/camera family as live scene
+- Used by still-first pattern (U8) as poster image before WebGL loads
+
+## Render-Ready Contract [Phase 3]
+
+The render page must wait until ALL of these are true before signaling ready:
+1. GLB loaded and parsed
+2. All textures loaded (artwork, material maps, environment)
+3. ScenePreset applied (materials, lighting, camera)
+4. DesignSession overrides applied (colors, artwork placement)
+5. First stable frame rendered (no pending invalidations)
+
+```typescript
+function useRenderReadySignal(onRenderReady?: () => void) {
+  const modelLoaded = useRef(false)
+  const texturesLoaded = useRef(false)
+  const firstFrameRendered = useRef(false)
+
+  useFrame(() => {
+    if (modelLoaded.current && texturesLoaded.current && !firstFrameRendered.current) {
+      firstFrameRendered.current = true
+      requestAnimationFrame(() => onRenderReady?.())
+    }
+  })
+
+  return { setModelLoaded, setTexturesLoaded }
+}
+```
+
+## Job Queue Integration [Phase 3]
+
+```typescript
 async function enqueuePreviewGeneration(
   repos: Repositories,
   designId: string,
@@ -259,37 +280,5 @@ async function enqueuePreviewGeneration(
     .single()
   if (error) throw error
   return data.id
-}
-
-// Worker polls job_queue for pending preview_generation jobs
-// In dev: runs as a script (`scripts/run-preview-worker.ts`)
-// In production: runs as a separate process or Vercel cron
-```
-
-## Render-Ready Contract [v3]
-
-The render page must wait until ALL of these are true before signaling ready:
-1. GLB loaded and parsed
-2. All textures loaded (artwork, material maps, environment)
-3. ScenePreset applied (materials, lighting, camera)
-4. DesignSession overrides applied (colors, artwork placement)
-5. First stable frame rendered (no pending invalidations)
-
-```typescript
-// Render-ready check inside ViewerShell
-function useRenderReadySignal(onRenderReady?: () => void) {
-  const modelLoaded = useRef(false)
-  const texturesLoaded = useRef(false)
-  const firstFrameRendered = useRef(false)
-
-  useFrame(() => {
-    if (modelLoaded.current && texturesLoaded.current && !firstFrameRendered.current) {
-      firstFrameRendered.current = true
-      // Wait one more frame for settling
-      requestAnimationFrame(() => onRenderReady?.())
-    }
-  })
-
-  return { setModelLoaded, setTexturesLoaded }
 }
 ```

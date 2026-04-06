@@ -1,13 +1,22 @@
 # 05 — Data Layer
 
 > Repository pattern, Supabase/file swap, state ownership.
-> Canonical source: `onemo-ssot-global/5-architecture/baseline/onemo-v3-repositories.ts`
+> Consolidation: D8 — separate DesignHeadRepository + DesignRevisionRepository.
+> New tables: `design_revisions`, `checkout_intents`.
 
-## Phase: [v2]
+## Phase: [Phase 2]
 
-## Repository Pattern [v2]
+## Repository Pattern [Phase 0+]
 
-Every artifact has a repository interface. Dev uses file-backed implementations. Production uses Supabase. Same test suite for both — GPT Pro review confirmed this is mandatory.
+Every domain object has a repository interface. Dev uses file-backed implementations. Production uses Supabase. Same test suite for both — mandatory.
+
+### Split Design Repositories (D8)
+
+The mutable head and immutable revisions are fundamentally different data access patterns:
+- **DesignHeadRepository** — read/write for autosave and resume
+- **DesignRevisionRepository** — write-once/read-many for proof, commerce, manufacturing
+
+Separate interfaces make the mutability boundary explicit and testable.
 
 ```typescript
 interface ProductSpecRepository {
@@ -23,71 +32,103 @@ interface ScenePresetRepository {
   publish(presetId: string): Promise<void>               // Studio only
 }
 
-interface DesignSessionRepository {
+interface DesignHeadRepository {
   create(input: CreateDesignInput): Promise<DesignSession>
   get(id: string): Promise<DesignSession>
-  save(session: DesignSession): Promise<void>
-  listByUser(userId: string): Promise<DesignSessionSummary[]>
+  save(session: DesignSession): Promise<{ revision: number }>
+  listByUser(userId: string, limit?: number): Promise<DesignSessionSummary[]>
+  updateCreateState(id: string, state: CreateState): Promise<void>
+  updatePreviewUrls(id: string, urls: PreviewUrlSet): Promise<void>
+}
+
+interface DesignRevisionRepository {
+  append(designId: string, revision: number, snapshot: DesignSession): Promise<DesignRevisionSnapshot>
+  getByRevision(designId: string, revision: number): Promise<DesignRevisionSnapshot>
+  listRevisions(designId: string, limit?: number): Promise<DesignRevisionSnapshot[]>
+  getLatest(designId: string): Promise<DesignRevisionSnapshot>
+}
+
+interface CheckoutIntentRepository {
+  create(intent: CheckoutIntent): Promise<CheckoutIntent>
+  get(id: string): Promise<CheckoutIntent>
+  getByDesign(designId: string): Promise<CheckoutIntent | null>
+  updateStatus(id: string, status: CheckoutIntent['status']): Promise<void>
 }
 
 interface ManufacturingRepository {
   enqueue(designId: string, revision: number): Promise<string>
   getPackage(id: string): Promise<ManufacturingPackage>
+  getByDesignRevision(designId: string, revision: number): Promise<ManufacturingPackage | null>
 }
 
 interface AssetStore {
   getSignedUploadUrl(params: UploadParams): Promise<SignedUploadUrl>
   getDeliveryUrl(assetId: string, transform?: ImageTransform): string
+  deleteAsset(publicId: string): Promise<void>
 }
 ```
 
-## Implementation Strategy [v2]
+## Implementation Strategy [Phase 2]
 
 | Repository | Dev (file-backed) | Production |
 |-----------|-------------------|------------|
 | ProductSpec | `data/product-specs/effect/*.json` | Supabase `product_specs` |
 | ScenePreset | .onemo files in `data/scene-presets/` | Supabase `scene_presets` |
-| DesignSession | `data/design-sessions/dev-seed/*.json` | Supabase `designs` (existing table) |
+| DesignHead | `data/design-sessions/dev-seed/*.json` | Supabase `designs` (existing table) |
+| DesignRevision | `data/design-revisions/dev-seed/*.json` | Supabase `design_revisions` (new) |
+| CheckoutIntent | `data/checkout-intents/dev-seed/*.json` | Supabase `checkout_intents` (new) |
 | Manufacturing | `data/manufacturing-packages/dev-seed/` | Supabase `manufacturing_packages` |
 | Assets | Local filesystem | Cloudinary |
 
 ### Existing `designs` Table Mapping
 
-`DesignSessionRepository` maps to the existing Supabase `designs` row shape:
-- `design_spec_v2` = canonical DesignSession JSON
+`DesignHeadRepository` maps to the existing Supabase `designs` row shape:
+- `design_spec_v2` = canonical DesignSession JSON (v4 fields added)
 - `editor_state` = restore-only (not canonical)
 - `design_revision` = monotonically increasing
 - `owner_preview_url`, `public_preview_url`, `order_preview_url` = derived outputs
 - `create_state`, `visibility`, `discovery_state` = lifecycle around the artifact
 
-## State Ownership [v2]
+### New `design_revisions` Table (U1)
+
+Each row is an immutable snapshot appended on every save. The mutable head stays in `designs`.
+
+### New `checkout_intents` Table (U4)
+
+Commerce state separated from design truth. One intent per approved design, with lines and grouped contexts.
+
+## State Ownership [Phase 2]
 
 From the UX content models domain (11a):
 
 | State | Owner | Storage |
 |-------|-------|---------|
 | Artwork source + intake | Supabase | Supabase `designs` |
-| Active design draft | Supabase | `designs.design_spec_v2` |
+| Active design draft (mutable head) | Supabase | `designs.design_spec_v2` |
+| Immutable revision snapshots | Supabase | `design_revisions` |
 | Composition workspace | Next.js client | Client state (autosaved to Supabase) |
+| Commerce intent | Supabase | `checkout_intents` |
 | Commerce variant context | Shopify | Shopify product/variant |
 | Preview trust | Next.js client | Client-only UI state |
-| Resume checkpoint | Supabase | `designs` row |
+| Resume checkpoint | Supabase | `designs` row (mutable head) |
 | Private share context | Supabase | `shares` table |
 | Public presentation | Supabase | `presentations` table |
 | Action safety envelope | Next.js client | Client-only guard state |
 
-## Supabase Tables [v2]
+## Supabase Tables [Phase 0+]
 
 Existing:
-- `designs` — stays, maps to DesignSession
+- `designs` — stays, maps to DesignHead (v4 schema in `design_spec_v2`)
 
-New:
+New (Phase 0):
 - `product_specs` (id, family, status, version, slug, payload jsonb, timestamps)
 - `scene_presets` (id, family, status, version, slug, product_spec_id, payload jsonb, timestamps)
-- `manufacturing_packages` (id, design_id, design_revision, method, status, compiler_version, payload jsonb, production_asset_ref, timestamps)
+- `design_revisions` (id, design_id, revision, snapshot jsonb, product_spec_ref jsonb, scene_preset_ref jsonb, scene_package_hash, created_at)
+- `checkout_intents` (id, user_id, primary_design_id, primary_design_revision, lines jsonb, grouped_contexts jsonb, compatibility_snapshot jsonb, approved_at, expires_at, status, created_at)
+- `manufacturing_packages` (id, design_ref jsonb, product_spec_ref jsonb, scene_preset_ref jsonb, method, status, compiler_version, payload jsonb, production_asset_ref, timestamps)
 - `job_queue` — existing, add types: preview_generation, manufacturing_compile, cleanup_orphan_assets, shopify_projection_sync
 
-## Auth Model [v2]
+## Auth Model [Phase 2]
 
 Supabase Auth with anonymous sessions:
 - Visitors get `user_id` immediately — no login required
@@ -95,14 +136,14 @@ Supabase Auth with anonymous sessions:
 - Anonymous session promotes seamlessly to full account
 - Identity mapping to Shopify customer created at first purchase
 
-## File-Backed Dev Rules [v2]
+## File-Backed Dev Rules [Phase 2]
 
 - File-backed repos read/write `data/**` directories
 - NOT a production persistence strategy (Vercel functions have read-only filesystem)
 - Must be identical interface to Supabase repos
 - Repository contract tests run against both implementations
 
-## File-Backed Implementation Detail [v2]
+## File-Backed Implementation Detail [Phase 2]
 
 ```typescript
 // server/repositories/product-spec/file.ts
@@ -157,142 +198,200 @@ export class FileProductSpecRepository implements ProductSpecRepository {
 }
 ```
 
-## Supabase Implementation Detail [v2]
+## DesignRevision Repository — File-Backed [Phase 2]
 
 ```typescript
-// server/repositories/product-spec/supabase.ts
-import { supabaseAdmin } from '@/server/db/supabaseAdmin'
-import { ProductSpecSchema, type ProductSpec } from '@create/domain/product-spec'
+// server/repositories/design-revision/file.ts
+export class FileDesignRevisionRepository implements DesignRevisionRepository {
+  constructor(private dataDir: string = 'data/design-revisions') {}
 
-export class SupabaseProductSpecRepository implements ProductSpecRepository {
-  async getById(id: string): Promise<ProductSpec> {
-    const { data, error } = await supabaseAdmin
-      .from('product_specs')
-      .select('*')
-      .eq('id', id)
-      .single()
-    if (error) throw error
-    return ProductSpecSchema.parse({ ...data, payload: data.payload })
+  async append(designId: string, revision: number, snapshot: DesignSession): Promise<DesignRevisionSnapshot> {
+    const revisionSnapshot: DesignRevisionSnapshot = {
+      id: crypto.randomUUID(),
+      design_id: designId,
+      revision,
+      snapshot,
+      product_spec_ref: snapshot.product_spec_ref,
+      scene_preset_ref: snapshot.scene_preset_ref,
+      scene_package_hash: snapshot.scene_package_hash ?? '',
+      created_at: new Date().toISOString(),
+    }
+    const dir = join(this.dataDir, designId)
+    await mkdir(dir, { recursive: true })
+    await writeFile(join(dir, `r${revision}.json`), JSON.stringify(revisionSnapshot, null, 2))
+    return revisionSnapshot
   }
 
-  async getPublished(family: string): Promise<ProductSpec> {
+  async getByRevision(designId: string, revision: number): Promise<DesignRevisionSnapshot> {
+    const file = join(this.dataDir, designId, `r${revision}.json`)
+    const raw = JSON.parse(await readFile(file, 'utf-8'))
+    return DesignRevisionSnapshotSchema.parse(raw)
+  }
+
+  async getLatest(designId: string): Promise<DesignRevisionSnapshot> {
+    const dir = join(this.dataDir, designId)
+    const entries = await readdir(dir)
+    const revisions = entries
+      .filter(e => e.startsWith('r') && e.endsWith('.json'))
+      .map(e => parseInt(e.slice(1, -5)))
+      .sort((a, b) => b - a)
+    if (revisions.length === 0) throw new Error(`No revisions for design: ${designId}`)
+    return this.getByRevision(designId, revisions[0])
+  }
+
+  async listRevisions(designId: string, limit = 50): Promise<DesignRevisionSnapshot[]> {
+    const dir = join(this.dataDir, designId)
+    const entries = await readdir(dir)
+    const revisions = entries
+      .filter(e => e.startsWith('r') && e.endsWith('.json'))
+      .map(e => parseInt(e.slice(1, -5)))
+      .sort((a, b) => b - a)
+      .slice(0, limit)
+    return Promise.all(revisions.map(r => this.getByRevision(designId, r)))
+  }
+}
+```
+
+## Supabase Implementation Detail [Phase 2]
+
+```typescript
+// server/repositories/design-revision/supabase.ts
+export class SupabaseDesignRevisionRepository implements DesignRevisionRepository {
+  async append(designId: string, revision: number, snapshot: DesignSession): Promise<DesignRevisionSnapshot> {
+    const row = {
+      design_id: designId,
+      revision,
+      snapshot,
+      product_spec_ref: snapshot.product_spec_ref,
+      scene_preset_ref: snapshot.scene_preset_ref,
+      scene_package_hash: snapshot.scene_package_hash ?? '',
+    }
     const { data, error } = await supabaseAdmin
-      .from('product_specs')
+      .from('design_revisions')
+      .insert(row)
+      .select()
+      .single()
+    if (error) throw error
+    return DesignRevisionSnapshotSchema.parse(data)
+  }
+
+  async getByRevision(designId: string, revision: number): Promise<DesignRevisionSnapshot> {
+    const { data, error } = await supabaseAdmin
+      .from('design_revisions')
       .select('*')
-      .eq('status', 'published')
-      .eq('family', family)
-      .order('version', { ascending: false })
+      .eq('design_id', designId)
+      .eq('revision', revision)
+      .single()
+    if (error) throw error
+    return DesignRevisionSnapshotSchema.parse(data)
+  }
+
+  async getLatest(designId: string): Promise<DesignRevisionSnapshot> {
+    const { data, error } = await supabaseAdmin
+      .from('design_revisions')
+      .select('*')
+      .eq('design_id', designId)
+      .order('revision', { ascending: false })
       .limit(1)
       .single()
     if (error) throw error
-    return ProductSpecSchema.parse({ ...data, payload: data.payload })
+    return DesignRevisionSnapshotSchema.parse(data)
   }
 
-  async getByFamily(family: string): Promise<ProductSpec[]> {
+  async listRevisions(designId: string, limit = 50): Promise<DesignRevisionSnapshot[]> {
     const { data, error } = await supabaseAdmin
-      .from('product_specs')
+      .from('design_revisions')
       .select('*')
-      .eq('family', family)
-      .order('version', { ascending: false })
+      .eq('design_id', designId)
+      .order('revision', { ascending: false })
+      .limit(limit)
     if (error) throw error
-    return data.map(row => ProductSpecSchema.parse({ ...row, payload: row.payload }))
+    return data.map(row => DesignRevisionSnapshotSchema.parse(row))
   }
 }
 ```
 
-## DesignSession Repository — Full Contract [v2]
+## Repository Wiring — Dependency Injection [Phase 2]
 
 ```typescript
-interface CreateDesignInput {
-  userId: string
-  templateId: string
-  productSpecId: string
-  productSpecVersion: number
-  scenePresetId: string
-  scenePresetVersion: number
-  effectVariant: {
-    subtype: EffectSubtype
-    constructionMethod: ConstructionMethod
+// server/repositories/index.ts
+import { env } from '@/lib/env'
+
+export function createRepositories() {
+  if (env.USE_FILE_REPOS) {
+    return {
+      productSpec: new FileProductSpecRepository(),
+      scenePreset: new FileScenePresetRepository(),
+      designHead: new FileDesignHeadRepository(),
+      designRevision: new FileDesignRevisionRepository(),
+      checkoutIntent: new FileCheckoutIntentRepository(),
+      manufacturing: new FileManufacturingRepository(),
+      assets: new LocalAssetStore(),
+    }
+  }
+  return {
+    productSpec: new SupabaseProductSpecRepository(),
+    scenePreset: new SupabaseScenePresetRepository(),
+    designHead: new SupabaseDesignHeadRepository(),
+    designRevision: new SupabaseDesignRevisionRepository(),
+    checkoutIntent: new SupabaseCheckoutIntentRepository(),
+    manufacturing: new SupabaseManufacturingRepository(),
+    assets: new CloudinaryAssetStore(),
   }
 }
 
-interface DesignSessionSummary {
-  id: string
-  templateId: string
-  createState: CreateState
-  designRevision: number
-  ownerPreviewUrl?: string
-  modifiedAt: string
-}
-
-interface DesignSessionRepository {
-  create(input: CreateDesignInput): Promise<DesignSession>
-  get(id: string): Promise<DesignSession>
-  getByRevision(id: string, revision: number): Promise<DesignSession>
-  save(session: DesignSession): Promise<{ revision: number }>
-  listByUser(userId: string, limit?: number): Promise<DesignSessionSummary[]>
-  updateCreateState(id: string, state: CreateState): Promise<void>
-  updatePreviewUrls(id: string, urls: PreviewUrlSet): Promise<void>
-}
-
-interface PreviewUrlSet {
-  ownerPreviewUrl?: string
-  publicPreviewUrl?: string
-  orderPreviewUrl?: string
-}
+export type Repositories = ReturnType<typeof createRepositories>
 ```
 
-### Supabase designs Table Mapping
+## Repository Contract Tests [Phase 0]
 
 ```typescript
-// Row shape → DesignSession mapping
-function rowToDesignSession(row: DesignRow): DesignSession {
-  return {
-    id: row.id,
-    userId: row.user_id,
-    templateId: row.template_id,
-    productSpecRef: {
-      id: row.product_spec_id,
-      version: row.product_spec_version,
-    },
-    scenePresetRef: {
-      id: row.scene_preset_id,
-      version: row.scene_preset_version,
-    },
-    designRevision: row.design_revision,
-    createdAt: row.created_at,
-    modifiedAt: row.updated_at,
-    ...row.design_spec_v2,  // canonical DesignSession fields
-  }
+// tests/integration/repositories/design-revision.test.ts
+function testDesignRevisionRepository(repo: DesignRevisionRepository) {
+  it('appends a revision snapshot', async () => {
+    const snapshot = await repo.append('design-1', 1, mockDesignSession)
+    expect(snapshot.revision).toBe(1)
+    expect(snapshot.design_id).toBe('design-1')
+  })
+
+  it('retrieves by exact revision', async () => {
+    await repo.append('design-1', 1, mockDesignSession)
+    await repo.append('design-1', 2, { ...mockDesignSession, design_revision: 2 })
+    const r1 = await repo.getByRevision('design-1', 1)
+    expect(r1.revision).toBe(1)
+  })
+
+  it('returns latest revision', async () => {
+    await repo.append('design-1', 1, mockDesignSession)
+    await repo.append('design-1', 2, { ...mockDesignSession, design_revision: 2 })
+    const latest = await repo.getLatest('design-1')
+    expect(latest.revision).toBe(2)
+  })
+
+  it('throws on unknown revision', async () => {
+    await expect(repo.getByRevision('design-1', 999)).rejects.toThrow()
+  })
 }
 
-function designSessionToRow(session: DesignSession): Partial<DesignRow> {
-  const { id, userId, templateId, productSpecRef, scenePresetRef,
-          designRevision, createdAt, modifiedAt, ...designSpec } = session
-  return {
-    id,
-    user_id: userId,
-    template_id: templateId,
-    product_spec_id: productSpecRef.id,
-    product_spec_version: productSpecRef.version,
-    scene_preset_id: scenePresetRef.id,
-    scene_preset_version: scenePresetRef.version,
-    design_revision: designRevision,
-    design_spec_v2: designSpec,
-  }
-}
+describe('FileDesignRevisionRepository', () => {
+  testDesignRevisionRepository(new FileDesignRevisionRepository('tests/fixtures/design-revisions'))
+})
+
+describe('SupabaseDesignRevisionRepository', () => {
+  testDesignRevisionRepository(new SupabaseDesignRevisionRepository())
+})
 ```
 
-## AssetStore — Cloudinary Contract [v2]
+## AssetStore — Cloudinary Contract [Phase 2]
 
 ```typescript
 interface UploadParams {
-  folder: string                    // e.g. 'designs/{designId}/originals'
-  publicId?: string                 // deterministic naming
+  folder: string
+  publicId?: string
   resourceType: 'image' | 'video'
   allowedFormats?: string[]
   maxFileSize?: number
-  transformation?: string           // e.g. 'c_limit,w_1536'
+  transformation?: string
 }
 
 interface SignedUploadUrl {
@@ -310,81 +409,9 @@ interface ImageTransform {
   quality?: number | 'auto'
   format?: 'webp' | 'png' | 'jpg'
 }
-
-interface AssetStore {
-  getSignedUploadUrl(params: UploadParams): Promise<SignedUploadUrl>
-  getDeliveryUrl(publicId: string, transform?: ImageTransform): string
-  deleteAsset(publicId: string): Promise<void>
-}
-
-// Cloudinary path conventions:
-// CLOUDINARY_ENV_PREFIX/designs/{designId}/originals/{assetId}
-// CLOUDINARY_ENV_PREFIX/designs/{designId}/applied/{revision}
-// CLOUDINARY_ENV_PREFIX/designs/{designId}/owner/r{revision}.webp
-// CLOUDINARY_ENV_PREFIX/designs/{designId}/public/r{revision}.webp
-// CLOUDINARY_ENV_PREFIX/designs/{designId}/order/r{revision}.webp
 ```
 
-## Repository Wiring — Dependency Injection [v2]
-
-```typescript
-// server/repositories/index.ts
-import { env } from '@/lib/env'
-
-export function createRepositories() {
-  if (env.USE_FILE_REPOS) {
-    return {
-      productSpec: new FileProductSpecRepository(),
-      scenePreset: new FileScenePresetRepository(),
-      designSession: new FileDesignSessionRepository(),
-      manufacturing: new FileManufacturingRepository(),
-      assets: new LocalAssetStore(),
-    }
-  }
-  return {
-    productSpec: new SupabaseProductSpecRepository(),
-    scenePreset: new SupabaseScenePresetRepository(),
-    designSession: new SupabaseDesignSessionRepository(),
-    manufacturing: new SupabaseManufacturingRepository(),
-    assets: new CloudinaryAssetStore(),
-  }
-}
-
-export type Repositories = ReturnType<typeof createRepositories>
-```
-
-## Repository Contract Tests [v2]
-
-```typescript
-// tests/integration/repositories/product-spec.test.ts
-function testProductSpecRepository(repo: ProductSpecRepository) {
-  it('returns published spec by family', async () => {
-    const spec = await repo.getPublished('effect')
-    expect(spec.status).toBe('published')
-    expect(spec.payload.family).toBe('effect')
-  })
-
-  it('returns spec by id', async () => {
-    const published = await repo.getPublished('effect')
-    const byId = await repo.getById(published.id)
-    expect(byId.id).toBe(published.id)
-  })
-
-  it('throws on unknown id', async () => {
-    await expect(repo.getById('nonexistent')).rejects.toThrow()
-  })
-}
-
-describe('FileProductSpecRepository', () => {
-  testProductSpecRepository(new FileProductSpecRepository('tests/fixtures/product-specs'))
-})
-
-describe('SupabaseProductSpecRepository', () => {
-  testProductSpecRepository(new SupabaseProductSpecRepository())
-})
-```
-
-## Supabase Schema DDL [v2]
+## Supabase Schema DDL [Phase 0]
 
 ```sql
 -- product_specs table
@@ -418,18 +445,51 @@ CREATE TABLE scene_presets (
   UNIQUE (slug, version)
 );
 
--- manufacturing_packages table
-CREATE TABLE manufacturing_packages (
+-- design_revisions table (U1: immutable snapshots)
+CREATE TABLE design_revisions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   design_id UUID NOT NULL REFERENCES designs(id),
-  design_revision INTEGER NOT NULL,
+  revision INTEGER NOT NULL,
+  snapshot JSONB NOT NULL,
+  product_spec_ref JSONB NOT NULL,
+  scene_preset_ref JSONB NOT NULL,
+  scene_package_hash TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (design_id, revision)
+);
+
+CREATE INDEX idx_design_revisions_design_id ON design_revisions(design_id);
+CREATE INDEX idx_design_revisions_lookup ON design_revisions(design_id, revision);
+
+-- checkout_intents table (U4: separate commerce from design)
+CREATE TABLE checkout_intents (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id TEXT NOT NULL,
+  primary_design_id UUID NOT NULL REFERENCES designs(id),
+  primary_design_revision INTEGER NOT NULL,
+  lines JSONB NOT NULL,
+  grouped_contexts JSONB NOT NULL DEFAULT '[]',
+  compatibility_snapshot JSONB NOT NULL DEFAULT '[]',
+  approved_at TIMESTAMPTZ NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'submitted', 'completed', 'expired')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  FOREIGN KEY (primary_design_id, primary_design_revision) REFERENCES design_revisions(design_id, revision)
+);
+
+-- manufacturing_packages table (v4: structured refs)
+CREATE TABLE manufacturing_packages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  design_ref JSONB NOT NULL,
+  product_spec_ref JSONB NOT NULL,
+  scene_preset_ref JSONB NOT NULL,
   method TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'compiled', 'failed')),
   compiler_version TEXT NOT NULL,
   payload JSONB NOT NULL,
   production_asset_ref TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (design_id, design_revision, method)
+  UNIQUE ((design_ref->>'design_id')::uuid, (design_ref->>'revision')::int, method)
 );
 
 -- job_queue types extension
