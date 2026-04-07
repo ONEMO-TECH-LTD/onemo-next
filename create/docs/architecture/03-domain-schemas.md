@@ -26,7 +26,7 @@ v4 schemas are defined in the Create module's domain layer. They supersede the v
 
 Key v3 → v4 deltas:
 - `DesignSession` adds: `image_source`, `create_context`, `purchase_mode`, `attachment_system`, `pair_context`, `compatibility_snapshot`, `scene_package_hash`
-- `ScenePreset` adds: `scene_package_ref`, `fallback_stills[]`, `gesture_profiles[]`, `presentation_contexts[]`
+- `ScenePreset` adds: `scene_package_ref`, `gesture_profiles[]`, `presentation_contexts[]`
 - New types: `DesignRevisionSnapshot`, `CheckoutIntent`, `CompatibilityResult`, `OnemoSceneBundle`, `ImageSource`
 - `ManufacturingPackage` adds: `design_ref` (replaces flat `design_id` + `design_revision`), `product_spec_ref`, `scene_preset_ref`
 
@@ -103,13 +103,6 @@ const ScenePackageRefSchema = z.object({
   mesh_manifest_hash: z.string(),  // hash of mesh names + slot structure
 })
 
-const FallbackStillSchema = z.object({
-  view: z.enum(['front', 'three_quarter', 'side_detail', 'back']),
-  url: z.string().url(),
-  width_px: z.number().int().positive(),
-  height_px: z.number().int().positive(),
-})
-
 const GestureProfileSchema = z.object({
   gesture: z.enum(['orbit', 'pan', 'pinch', 'drag_artwork']),
   enabled: z.boolean(),
@@ -139,7 +132,6 @@ const ScenePresetSchema = z.object({
     capture_presets: z.array(CapturePresetSchema),
     // v4 additions
     scene_package_ref: ScenePackageRefSchema,
-    fallback_stills: z.array(FallbackStillSchema).min(1),
     gesture_profiles: z.array(GestureProfileSchema).default([]),
     presentation_contexts: z.array(PresentationContextSchema).default([]),
   }),

@@ -2,7 +2,7 @@
 
 > How scenes flow from Studio authoring to Create rendering.
 > The .onemo format is the delivery contract. ScenePackageLoader is the bridge.
-> Consolidation: U2 (.onemo is delivery, not artifact), D4 (ScenePackageRef + bundle schema), U8 (still-first pattern).
+> Consolidation: U2 (.onemo is delivery, not artifact), D4 (ScenePackageRef + bundle schema).
 
 ## Phase: [Phase 1]
 
@@ -139,44 +139,13 @@ async function loadScenePackage(ref: ScenePackageRef): Promise<LoadedScene> {
 | studio.json fails validation | Log warning, attempt load with defaults |
 | HDR missing but referenced | Use drei preset fallback |
 
-## Still-First Live-Upgrade Pattern (U8) [Phase 1]
+## Loading Strategy [Phase 1]
 
-Every Create entry shows a deterministic poster still immediately. Live WebGL upgrades when ready.
+**New design:** Loading state while the 3D scene initializes. No poster — there's nothing to show yet.
 
-```typescript
-function CreateShellEntry({ presetId, designId }: Props) {
-  const [sceneReady, setSceneReady] = useState(false)
-  const preset = useQuery(['scenePreset', presetId], ...)
+**Existing design (resume):** The preview thumbnail from the library remains visible while the 3D engine loads. Once the scene is ready, it replaces the thumbnail. This is not a special system — it's just keeping the image that was already on screen.
 
-  // Poster still is available immediately from ScenePreset.fallback_stills
-  const posterStill = preset.data?.payload.fallback_stills.find(
-    s => s.view === 'front'
-  )
-
-  return (
-    <div className="relative">
-      {/* Poster still — always visible until scene replaces it */}
-      {posterStill && !sceneReady && (
-        <img
-          src={posterStill.url}
-          width={posterStill.width_px}
-          height={posterStill.height_px}
-          className="absolute inset-0"
-          alt="Product preview"
-        />
-      )}
-
-      {/* Live scene — crossfades in when ready */}
-      <div className={sceneReady ? 'opacity-100' : 'opacity-0'} style={{ transition: 'opacity 300ms' }}>
-        <ViewerShell
-          config={...}
-          onRenderReady={() => setSceneReady(true)}
-        />
-      </div>
-    </div>
-  )
-}
-```
+**Fallback when 3D fails:** See [10-performance-contracts.md](10-performance-contracts.md) for the three-level fallback strategy.
 
 ## Studio Save Flow [Phase 1]
 
@@ -188,8 +157,7 @@ Studio saves → .onemo ZIP → CDN → ScenePreset gets `scene_package_ref` →
 4. Compute `package_hash` (SHA-256 of ZIP) and `mesh_manifest_hash` (hash of mesh names)
 5. Output ZIP deployed to CDN
 6. Update ScenePreset with `scene_package_ref` pointing to the new bundle
-7. Generate fallback stills from the published preset (using `/render/fallback/` route)
-8. Create loads the same ZIP at runtime via ScenePackageRef
+7. Create loads the same ZIP at runtime via ScenePackageRef
 
 ### What studio.json Contains
 

@@ -36,7 +36,6 @@ Internal routes under `src/app/render/`:
 | Route | Purpose | Source |
 |-------|---------|--------|
 | `/render/design/[designId]/[revision]/[role]` | Revision-specific capture | D3: P1 (revision in path) |
-| `/render/fallback/[scenePresetId]/[context]` | Poster still generation at publish time | D3: P2 (fallback route) |
 | `/render/catalog/[captureSetId]` | Catalog/listing imagery | Original |
 
 **Key change from pre-consolidation:** Render routes include `[revision]` in the path. Immutable capture must reference a specific revision snapshot, not the mutable head.
@@ -48,20 +47,6 @@ Each render page:
 4. Positions camera per CapturePreset
 5. Waits for GLB loaded + textures loaded + scene applied + first stable frame
 6. Emits `render-ready` signal via `ViewerShell.onRenderReady`
-
-### Fallback Route [Phase 3]
-
-Generates poster stills for the still-first pattern (U8):
-
-```
-/render/fallback/[scenePresetId]/[context]
-  → Loads published ScenePreset
-  → Renders with default product config (no customer design)
-  → Captures per presentation_context camera + background
-  → Uploads to ScenePreset.fallback_stills[]
-```
-
-This runs when a ScenePreset is published — not per-design. The stills are the "poster" shown before WebGL loads.
 
 ## Render Page Implementation [Phase 3]
 
@@ -224,14 +209,6 @@ interface CapturePreset {
   quality?: number
 }
 ```
-
-## Fallback Stills [Phase 1+3]
-
-If WebGL fails or is unavailable, stills preserve trust:
-- Minimum 4 views: front, three-quarter, side-detail, back
-- Generated at ScenePreset publish time via `/render/fallback/` route
-- Same object/camera family as live scene
-- Used by still-first pattern (U8) as poster image before WebGL loads
 
 ## Render-Ready Contract [Phase 3]
 

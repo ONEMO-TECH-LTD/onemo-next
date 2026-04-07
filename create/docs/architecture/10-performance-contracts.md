@@ -10,12 +10,9 @@
 
 | Budget | Target | Hard stop |
 |--------|--------|-----------|
-| Shell visible (poster still) | **< 2.5s** on 4G mobile | **4s** |
-| First interactive preview | **< 6s** on 4G mobile | **10s** |
+| Scene loaded + interactive | **< 6s** on 4G mobile | **10s** |
 | Autosave round-trip | **< 1s** | **3s** |
 | Review submission to proof | **< 15s** | **30s** |
-
-The still-first pattern (U8) means the user sees their product at 2.5s even if the live 3D takes 6s.
 
 ## Rendering Budget [Phase 1]
 
@@ -36,27 +33,15 @@ The still-first pattern (U8) means the user sees their product at 2.5s even if t
 - Touch targets: minimum 44x44px
 - No hover-dependent interactions — touch-first
 
-## 4-Level Fallback Ladder (U7) [Phase 1]
+## Fallback Strategy (U7) [Phase 1]
 
 React-Konva stays dead. The projection fallback is a bounded failure mode, not a second editor.
 
-### Level 1: Still-First (U8)
+### Level 1: Normal
 
-Every Create entry shows a deterministic poster still immediately. Live WebGL upgrades when ready.
+3D scene loads and renders. Full orbit, gesture, material switching. Demand-based frame loop (`frameloop="demand"`). This is the normal path.
 
-- Poster still from `ScenePreset.fallback_stills[]` — available at ScenePreset publish time
-- Crossfade to live canvas on `onRenderReady`
-- User never stares at an empty frame
-
-### Level 2: Live Upgrade
-
-WebGL loads successfully → full 3D interaction replaces the poster still.
-
-- Full orbit, gesture, material switching
-- Demand-based frame loop (`frameloop="demand"`)
-- This is the normal path on healthy devices
-
-### Level 3: Projection Fallback (D7)
+### Level 2: Projection Fallback (D7)
 
 WebGL available but degraded (frame rate below threshold, context lost recovery fails):
 
@@ -80,11 +65,10 @@ Features:
 - Non-face views (three-quarter, back) rendered as static stills
 - Same design state contract — placements commit to the same DesignSession
 
-### Level 4: Still-Only Review
+### Level 3: No 3D
 
 WebGL completely unavailable (old device, disabled, blocked):
 
-- All views rendered as stills (from ScenePreset.fallback_stills[])
 - Review shows pre-generated proof images
 - User can still complete checkout flow
 - No live editing — directed to resume on a capable device
@@ -106,10 +90,10 @@ function useWebGLHealth() {
     ? fpsRef.current.reduce((a, b) => a + b) / fpsRef.current.length
     : 60
 
-  // Level 2 → Level 3: sustained low FPS
+  // Level 1 → Level 2: sustained low FPS
   if (averageFps < 20 && fpsRef.current.length > 60) return 'projection_fallback'
-  // Context lost → Level 4
-  if (contextLostRef.current) return 'still_only'
+  // Context lost → Level 3
+  if (contextLostRef.current) return 'no_3d'
   return 'live'
 }
 ```

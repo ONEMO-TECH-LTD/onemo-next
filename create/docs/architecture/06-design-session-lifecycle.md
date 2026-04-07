@@ -30,8 +30,8 @@
 ## Create Live Flow [Phase 2]
 
 1. Route loads published `ProductSpec` + `ScenePreset`
-2. Still-first: poster still shown immediately from `ScenePreset.fallback_stills` (U8)
-3. Viewer mounts `EffectRenderer` via product registry, crossfades when ready
+2. Loading state while scene initializes
+3. Viewer mounts product renderer via product registry
 4. User uploads original artwork → signed Cloudinary upload
 5. Create initial `DesignSession` draft in Supabase (mutable head)
 6. User drags/scales artwork on 3D surface

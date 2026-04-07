@@ -68,7 +68,7 @@ Every document in this architecture references these domain objects. They are th
 | Object | Authority | Lifecycle | Create's role |
 |--------|-----------|-----------|---------------|
 | **ProductSpec** | What can physically exist | Versioned, publishable | Reads published spec to configure constraints |
-| **ScenePreset** | How the product is rendered | Versioned, publishable. Contains `scene_package_ref` for .onemo delivery. | Reads published preset for viewer config |
+| **ScenePreset** | How the product is rendered | Versioned, publishable. Contains `scene_package_ref` for .onemo delivery | Reads published preset for viewer config |
 | **DesignSession** | What the customer chose (mutable head) | Revisioned, mutable until purchase | Writes and owns the design state |
 | **DesignRevisionSnapshot** | Immutable point-in-time snapshot | Append-only, immutable | Proof, commerce, manufacturing, share all reference snapshots |
 | **CheckoutIntent** | What the customer wants to buy | Derived from approved revision + add-ons | Commerce state separate from design truth |
@@ -91,7 +91,7 @@ The mutable head row (`designs` table) stays for fast resume. On every save, an 
 
 | Input | Source | Format | Phase |
 |-------|--------|--------|-------|
-| Scene package | Studio → CDN | `.onemo` ZIP (GLB + studio.json + HDR), content-addressed | Phase 1 |
+| Scene package | Studio → CDN | `.onemo` ZIP (GLB + studio.json + HDR), content-addressed via ScenePackageRef | Phase 1 |
 | Published ProductSpec | Supabase | JSON (v4 Zod-validated) | Phase 0 |
 | Published ScenePreset | Supabase (with `scene_package_ref`) | JSON (v4 Zod-validated) | Phase 0 |
 | Customer artwork | Upload → Cloudinary | Image (signed upload) | Phase 2 |
@@ -191,5 +191,4 @@ create/
 | Separate design from commerce | U4 | CheckoutIntent owns commerce state. DesignSession owns design truth. |
 | Centralized compatibility | U5 | CompatibilityEngine in domain/rules. One engine, one set of rules. |
 | Phase 0 first | U6 | Contract repair before any UI. Correct schemas prevent rework. |
-| Fallback ladder | U7 | Still-first → live-upgrade → projection fallback → still-only. No revived 2D editor. |
-| Still-first pattern | U8 | Poster still immediately. Live WebGL upgrades when ready. |
+| Fallback strategy | U7 | Normal → projection fallback → no-3D. No revived 2D editor. |

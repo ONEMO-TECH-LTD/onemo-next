@@ -36,10 +36,9 @@ Extract the viewer shell. Wire ScenePackageLoader with hash validation. Still-fi
 2. Create `create/core/ScenePackageLoader.ts` — extract from `prototype/core/onemo-loader.ts`, add ScenePackageRef support with `package_hash` + `mesh_manifest_hash` validation
 3. Create `create/core/ProjectionFallbackCanvas.tsx` — face-only projected compose preview (D7)
 4. Create `create/core/types.ts` — ViewerSceneConfig (generic parts of prototype/types.ts)
-5. Implement still-first live-upgrade pattern: poster still → crossfade to live canvas (U8)
-6. Implement 4-level fallback ladder (U7): still-first → live-upgrade → ProjectionFallbackCanvas → still-only
-7. Visual parity harness: screenshot live Create vs prototype, pixel-diff below threshold
-8. **Verify:** Studio builds after pointing imports to `create/core/`. Fallback ladder degrades gracefully when WebGL is disabled. Visual parity > 98%.
+5. Implement fallback strategy (U7): normal → ProjectionFallbackCanvas → no-3D
+6. Visual parity harness: screenshot live Create vs prototype, pixel-diff below threshold
+7. **Verify:** Studio builds after pointing imports to `create/core/`. Fallback degrades gracefully when WebGL is disabled. Visual parity > 98%.
 
 ### Phase 2: Effect Module + Edit Loop [Phase 2]
 
@@ -68,8 +67,7 @@ Review gate using CompatibilityEngine. Render pages with revision in URL. Playwr
    - `/render/fallback/[scenePresetId]/[context]` — poster still generation at publish time (D3: P2 route)
 3. Implement Playwright capture worker
 4. Wire preview generation to review flow — captures from immutable revision snapshot
-5. Generate fallback stills for published ScenePresets
-6. **Verify:** Review → preview appears in Cloudinary. Fallback stills exist for published presets. Review blocked when CompatibilityEngine returns COMP_BLOCK.
+5. **Verify:** Review → preview appears in Cloudinary. Review blocked when CompatibilityEngine returns COMP_BLOCK.
 
 ### Phase 4: Manufacturing [Phase 4]
 
@@ -147,9 +145,9 @@ Each phase has a verification gate before proceeding:
 | Phase | Gate |
 |-------|------|
 | 0 | v4 schemas parse existing data. Contract tests pass. CompatibilityEngine evaluates correctly. |
-| 1 | Studio builds with create/core imports. Fallback ladder works. Visual parity > 98%. |
+| 1 | Studio builds with create/core imports. Fallback degrades gracefully. Visual parity > 98%. |
 | 2 | /create route loads and renders. Autosave + resume round-trip. Three-class state split verified. |
-| 3 | Controlled preview from revision snapshot. Fallback stills generated. Review gate blocks COMP_BLOCK. |
+| 3 | Controlled preview from revision snapshot. Review gate blocks COMP_BLOCK. |
 | 4 | ManufacturingPackage written from revision snapshot for approved design. |
 | 5 | End-to-end: approved → CheckoutIntent → cart → checkout → order. Expiry enforced. |
 | 6 | Share link resolves. Presentation renders. Remix creates new draft. |
