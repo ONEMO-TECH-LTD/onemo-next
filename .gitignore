@@ -90,3 +90,4 @@ next-env.d.ts
 
 # Codex/agent verification artifacts
 .artifacts/
+.claude/worktrees/
