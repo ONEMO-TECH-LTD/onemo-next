@@ -17,6 +17,7 @@ const eslintConfig = defineConfig([
     "?archive/**",
     // ONEMO 3D Studio — has its own lint config
     "studio/**",
+    "studio-v2/**",
   ]),
 ]);
 
