@@ -3,7 +3,7 @@
 
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useSceneStore } from './sceneStore'
 import { parseOnemoConfig, type ParsedOnemoConfig } from '../core/onemo-loader'
 import type { DesignState, ViewerConfig } from '../types'
@@ -64,21 +64,49 @@ export default function AdminViewer({
     }
   }, [setBgColor, templateUrl])
 
+  const config = useMemo<ViewerConfig | null>(() => {
+    if (!templateConfig) {
+      return null
+    }
+
+    const mergedColors = {
+      ...templateConfig.config.colors,
+      ...colors,
+    }
+
+    return {
+      ...templateConfig.config,
+      colors: mergedColors,
+      product: {
+        ...templateConfig.config.product,
+        materialRoles: templateConfig.config.product.materialRoles.map((role) => {
+          const color =
+            role.role === 'back' ? mergedColors.backColor :
+            role.role === 'frame' ? mergedColors.frameColor :
+            undefined
+
+          if (!color) {
+            return role
+          }
+
+          return {
+            ...role,
+            defaults: {
+              ...role.defaults,
+              color,
+            },
+          }
+        }),
+      },
+    }
+  }, [colors, templateConfig])
+
   if (error) {
     return <div style={{ color: 'red', padding: 20 }}>Failed to load scene template: {error}</div>
   }
 
-  if (!templateConfig) {
+  if (!templateConfig || !config) {
     return <div style={{ color: '#888', padding: 20 }}>Loading scene...</div>
-  }
-
-  // Override colors from the store (user can change colors via ColorPanel)
-  const config: ViewerConfig = {
-    ...templateConfig.config,
-    colors: {
-      ...templateConfig.config.colors,
-      ...colors,
-    },
   }
 
   const assetProps: AssetProps = {
