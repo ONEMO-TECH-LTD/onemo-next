@@ -166,6 +166,7 @@ export default function EffectViewer({
 
   const cam = config.camera
   const env = config.environment
+  const effectiveArtworkUrl = artworkUrl || config.product.artworkSlot?.defaultUrl
 
   // Camera position from spherical coordinates (distance, polar, azimuth)
   const cameraPosition = useMemo(() => {
@@ -259,7 +260,7 @@ export default function EffectViewer({
           {config.modelPath ? (
             <EffectModel
               modelPath={config.modelPath}
-              artworkUrl={artworkUrl}
+              artworkUrl={effectiveArtworkUrl}
               designState={designState}
               scene={config.scene}
               product={config.product}
