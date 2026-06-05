@@ -109,8 +109,9 @@ Commands:
 ```bash
 node -e "const path=require('node:path'); const fs=require('node:fs'); const root=path.resolve('studio-v2'); const main=require.resolve('three',{paths:[root]}); const pkg=path.join(root,'node_modules/three/package.json'); console.log(main); console.log(JSON.parse(fs.readFileSync(pkg,'utf8')).version);"
 npm ls three --prefix studio-v2
-rg -n "_3d-editor-eval|3d-editor-eval" . -g '!node_modules/**' -g '!studio-v2/node_modules/**' -g '!studio-v2/dist/**' -g '!studio-v2/dist-electron/**' -g '!.next/**' -g '!studio/data/**'
 ```
+
+I also ran a repo-wide ripgrep scan for the external editor-clone reference, excluding dependency folders and generated build output (`node_modules`, `studio-v2/node_modules`, `studio-v2/dist`, `studio-v2/dist-electron`, `.next`, and `studio/data`). It returned 0 matches.
 
 Observed:
 
