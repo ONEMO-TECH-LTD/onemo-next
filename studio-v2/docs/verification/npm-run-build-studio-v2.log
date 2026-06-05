@@ -30,31 +30,31 @@ vite v7.3.5 building client environment for production...
 transforming...
 ✓ 308 modules transformed.
 rendering chunks...
-[plugin vite:reporter] 
+[plugin vite:reporter]
 (!) /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/node_modules/three/examples/jsm/loaders/TGALoader.js is dynamically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/libs/ui.three.js but also statically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Loader.js, /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/node_modules/three/examples/jsm/loaders/ColladaLoader.js, dynamic import will not move module into another chunk.
 
-[plugin vite:reporter] 
+[plugin vite:reporter]
 (!) /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/node_modules/three/build/three.webgpu.js is dynamically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/libs/app.js but also statically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Sidebar.Project.Renderer.js, /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Viewport.js, dynamic import will not move module into another chunk.
 
-[plugin vite:reporter] 
+[plugin vite:reporter]
 (!) /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/node_modules/three/examples/jsm/loaders/GLTFLoader.js is dynamically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Loader.js but also statically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Menubar.ONEMO.js, /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/node_modules/three/examples/jsm/webxr/XRControllerModelFactory.js, dynamic import will not move module into another chunk.
 
-[plugin vite:reporter] 
+[plugin vite:reporter]
 (!) /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Sidebar.Geometry.BufferGeometry.js is dynamically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Sidebar.Geometry.js but also statically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Sidebar.Geometry.js, dynamic import will not move module into another chunk.
 
-[plugin vite:reporter] 
+[plugin vite:reporter]
 (!) /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Sidebar.Geometry.Modifiers.js is dynamically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Sidebar.Geometry.js but also statically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Sidebar.Geometry.js, dynamic import will not move module into another chunk.
 
-[plugin vite:reporter] 
+[plugin vite:reporter]
 (!) /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/node_modules/three/examples/jsm/loaders/DRACOLoader.js is dynamically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Loader.js, /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Loader.js but also statically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Menubar.ONEMO.js, dynamic import will not move module into another chunk.
 
-[plugin vite:reporter] 
+[plugin vite:reporter]
 (!) /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/node_modules/three/examples/jsm/libs/meshopt_decoder.module.js is dynamically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Loader.js but also statically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Menubar.ONEMO.js, dynamic import will not move module into another chunk.
 
-[plugin vite:reporter] 
+[plugin vite:reporter]
 (!) /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/node_modules/three/examples/jsm/loaders/HDRLoader.js is dynamically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/libs/ui.three.js but also statically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/node_modules/three/examples/jsm/loaders/RGBELoader.js, dynamic import will not move module into another chunk.
 
-[plugin vite:reporter] 
+[plugin vite:reporter]
 (!) /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/node_modules/three/examples/jsm/loaders/EXRLoader.js is dynamically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/libs/ui.three.js but also statically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Menubar.ONEMO.js, /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/node_modules/three/examples/jsm/loaders/3DMLoader.js, dynamic import will not move module into another chunk.
 
 computing gzip size...
