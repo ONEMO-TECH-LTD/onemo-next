@@ -1,0 +1,126 @@
+
+> @onemo/studio-v2@0.1.0 build
+> npm run build:renderer && electron-builder --mac dir
+
+
+> @onemo/studio-v2@0.1.0 build:renderer
+> vite build
+
+vite v7.3.5 building client environment for production...
+<script src="vendor/three/examples/jsm/libs/draco/draco_encoder.js"> in "/index.html" can't be bundled without type="module" attribute
+<script src="legacy-editor-js/libs/codemirror/codemirror.js"> in "/index.html" can't be bundled without type="module" attribute
+<script src="legacy-editor-js/libs/codemirror/mode/javascript.js"> in "/index.html" can't be bundled without type="module" attribute
+<script src="legacy-editor-js/libs/codemirror/mode/glsl.js"> in "/index.html" can't be bundled without type="module" attribute
+<script src="legacy-editor-js/libs/esprima.js"> in "/index.html" can't be bundled without type="module" attribute
+<script src="legacy-editor-js/libs/jsonlint.js"> in "/index.html" can't be bundled without type="module" attribute
+<script src="legacy-editor-js/libs/codemirror/addon/dialog.js"> in "/index.html" can't be bundled without type="module" attribute
+<script src="legacy-editor-js/libs/codemirror/addon/show-hint.js"> in "/index.html" can't be bundled without type="module" attribute
+<script src="legacy-editor-js/libs/codemirror/addon/tern.js"> in "/index.html" can't be bundled without type="module" attribute
+<script src="legacy-editor-js/libs/acorn/acorn.js"> in "/index.html" can't be bundled without type="module" attribute
+<script src="legacy-editor-js/libs/acorn/acorn_loose.js"> in "/index.html" can't be bundled without type="module" attribute
+<script src="legacy-editor-js/libs/acorn/walk.js"> in "/index.html" can't be bundled without type="module" attribute
+<script src="legacy-editor-js/libs/ternjs/polyfill.js"> in "/index.html" can't be bundled without type="module" attribute
+<script src="legacy-editor-js/libs/ternjs/signal.js"> in "/index.html" can't be bundled without type="module" attribute
+<script src="legacy-editor-js/libs/ternjs/tern.js"> in "/index.html" can't be bundled without type="module" attribute
+<script src="legacy-editor-js/libs/ternjs/def.js"> in "/index.html" can't be bundled without type="module" attribute
+<script src="legacy-editor-js/libs/ternjs/comment.js"> in "/index.html" can't be bundled without type="module" attribute
+<script src="legacy-editor-js/libs/ternjs/infer.js"> in "/index.html" can't be bundled without type="module" attribute
+<script src="legacy-editor-js/libs/ternjs/doc_comment.js"> in "/index.html" can't be bundled without type="module" attribute
+<script src="legacy-editor-js/libs/signals.min.js"> in "/index.html" can't be bundled without type="module" attribute
+transforming...
+✓ 308 modules transformed.
+rendering chunks...
+[plugin vite:reporter] 
+(!) /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/node_modules/three/examples/jsm/loaders/TGALoader.js is dynamically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/libs/ui.three.js but also statically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Loader.js, /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/node_modules/three/examples/jsm/loaders/ColladaLoader.js, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/node_modules/three/build/three.webgpu.js is dynamically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/libs/app.js but also statically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Sidebar.Project.Renderer.js, /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Viewport.js, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/node_modules/three/examples/jsm/loaders/GLTFLoader.js is dynamically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Loader.js but also statically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Menubar.ONEMO.js, /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/node_modules/three/examples/jsm/webxr/XRControllerModelFactory.js, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Sidebar.Geometry.BufferGeometry.js is dynamically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Sidebar.Geometry.js but also statically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Sidebar.Geometry.js, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Sidebar.Geometry.Modifiers.js is dynamically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Sidebar.Geometry.js but also statically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Sidebar.Geometry.js, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/node_modules/three/examples/jsm/loaders/DRACOLoader.js is dynamically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Loader.js, /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Loader.js but also statically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Menubar.ONEMO.js, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/node_modules/three/examples/jsm/libs/meshopt_decoder.module.js is dynamically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Loader.js but also statically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Menubar.ONEMO.js, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/node_modules/three/examples/jsm/loaders/HDRLoader.js is dynamically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/libs/ui.three.js but also statically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/node_modules/three/examples/jsm/loaders/RGBELoader.js, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/node_modules/three/examples/jsm/loaders/EXRLoader.js is dynamically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/libs/ui.three.js but also statically imported by /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/editor-js/Menubar.ONEMO.js, /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/node_modules/three/examples/jsm/loaders/3DMLoader.js, dynamic import will not move module into another chunk.
+
+computing gzip size...
+dist/studio-assets/manifest-DIrwoFtO.json                                 0.24 kB │ gzip:   0.16 kB
+dist/index.html                                                           2.05 kB │ gzip:   0.54 kB
+dist/studio-assets/icon-eDk9eLcP.png                                      7.28 kB
+dist/studio-assets/index-CH55w07g.css                                    21.09 kB │ gzip:   4.81 kB
+dist/studio-assets/Sidebar.Geometry.OctahedronGeometry-oXh0tiZd.js        0.80 kB │ gzip:   0.43 kB │ map:     2.87 kB
+dist/studio-assets/Sidebar.Geometry.IcosahedronGeometry-CY9RniV-.js       0.80 kB │ gzip:   0.43 kB │ map:     2.87 kB
+dist/studio-assets/Sidebar.Geometry.TetrahedronGeometry-C_J_pPFC.js       0.80 kB │ gzip:   0.43 kB │ map:     2.88 kB
+dist/studio-assets/Sidebar.Geometry.DodecahedronGeometry-d9a4fSBf.js      0.80 kB │ gzip:   0.43 kB │ map:     2.88 kB
+dist/studio-assets/Sidebar.Geometry.ShapeGeometry-rH5t7H_C.js             0.85 kB │ gzip:   0.47 kB │ map:     3.11 kB
+dist/studio-assets/XYZLoader-CHK0uQiQ.js                                  0.95 kB │ gzip:   0.53 kB │ map:     5.31 kB
+dist/studio-assets/Sidebar.Geometry.PlaneGeometry-C8E-PRxu.js             1.20 kB │ gzip:   0.50 kB │ map:     4.32 kB
+dist/studio-assets/Sidebar.Geometry.LatheGeometry-CetDpAXE.js             1.24 kB │ gzip:   0.53 kB │ map:     4.47 kB
+dist/studio-assets/KMZLoader-Bom7ATeH.js                                  1.29 kB │ gzip:   0.71 kB │ map:     5.40 kB
+dist/studio-assets/Sidebar.Geometry.CircleGeometry-CoEA8Coy.js            1.30 kB │ gzip:   0.55 kB │ map:     4.60 kB
+dist/studio-assets/Sidebar.Geometry.CapsuleGeometry-BXoA1tFF.js           1.41 kB │ gzip:   0.54 kB │ map:     5.08 kB
+dist/studio-assets/Sidebar.Geometry.TorusGeometry-YwfaYzOt.js             1.43 kB │ gzip:   0.58 kB │ map:     5.10 kB
+dist/studio-assets/Sidebar.Geometry.TorusKnotGeometry-BFtoQQ5n.js         1.56 kB │ gzip:   0.57 kB │ map:     5.46 kB
+dist/studio-assets/Sidebar.Geometry.CylinderGeometry-CwWZyN74.js          1.63 kB │ gzip:   0.59 kB │ map:     5.81 kB
+dist/studio-assets/Sidebar.Geometry.BoxGeometry-C9KfiruI.js               1.64 kB │ gzip:   0.57 kB │ map:     5.79 kB
+dist/studio-assets/STLExporter-C-V5TUak.js                                1.67 kB │ gzip:   0.84 kB │ map:     8.47 kB
+dist/studio-assets/Sidebar.Geometry.RingGeometry-DVZ0MnHo.js              1.72 kB │ gzip:   0.62 kB │ map:     6.15 kB
+dist/studio-assets/Sidebar.Geometry.SphereGeometry-HhbBTSIc.js            2.02 kB │ gzip:   0.66 kB │ map:     7.11 kB
+dist/studio-assets/Sidebar.Geometry.TubeGeometry-Dqtu9qgo.js              2.06 kB │ gzip:   0.73 kB │ map:     6.98 kB
+dist/studio-assets/Sidebar.Geometry.TextGeometry-DgT-1Tok.js              2.08 kB │ gzip:   0.67 kB │ map:     7.23 kB
+dist/studio-assets/OBJExporter-DYi0VA0o.js                                2.12 kB │ gzip:   0.86 kB │ map:    10.78 kB
+dist/studio-assets/DRACOExporter-DZGC3lMu.js                              2.64 kB │ gzip:   1.14 kB │ map:    12.58 kB
+dist/studio-assets/STLLoader-Cpx5fr0e.js                                  2.98 kB │ gzip:   1.45 kB │ map:    17.44 kB
+dist/studio-assets/Sidebar.Geometry.ExtrudeGeometry-CjZHz4oP.js           3.06 kB │ gzip:   0.96 kB │ map:    10.03 kB
+dist/studio-assets/MTLLoader-BRV0R7ZN.js                                  4.32 kB │ gzip:   1.74 kB │ map:    19.29 kB
+dist/studio-assets/PLYExporter-BygXBhX0.js                                4.48 kB │ gzip:   1.60 kB │ map:    22.09 kB
+dist/studio-assets/AMFLoader-DCHmfA3b.js                                  5.00 kB │ gzip:   1.97 kB │ map:    20.14 kB
+dist/studio-assets/PCDLoader-n2rihuFS.js                                  6.68 kB │ gzip:   2.20 kB │ map:    28.82 kB
+dist/studio-assets/PLYLoader-dlHMjQS0.js                                  6.75 kB │ gzip:   2.57 kB │ map:    31.03 kB
+dist/studio-assets/MD2Loader-BUwF0z0V.js                                  6.81 kB │ gzip:   2.00 kB │ map:    23.93 kB
+dist/studio-assets/TDSLoader-1QY3kgqc.js                                  8.08 kB │ gzip:   2.69 kB │ map:    38.50 kB
+dist/studio-assets/OBJLoader-DK4WDXsr.js                                  8.78 kB │ gzip:   2.95 kB │ map:    39.40 kB
+dist/studio-assets/VOXLoader-iUayepyU.js                                  8.85 kB │ gzip:   3.68 kB │ map:    37.40 kB
+dist/studio-assets/3MFLoader-DiYzqTty.js                                 13.71 kB │ gzip:   4.63 kB │ map:    67.96 kB
+dist/studio-assets/USDZExporter-BAVJ52Ck.js                              14.01 kB │ gzip:   4.61 kB │ map:    48.78 kB
+dist/studio-assets/3DMLoader-saB-n3-V.js                                 18.87 kB │ gzip:   6.35 kB │ map:    70.36 kB
+dist/studio-assets/LDrawLoader---TnX4jF.js                               20.44 kB │ gzip:   6.87 kB │ map:    99.77 kB
+dist/studio-assets/SVGLoader-YWej5RPX.js                                 22.55 kB │ gzip:   8.09 kB │ map:   131.16 kB
+dist/studio-assets/GLTFExporter-H3kY9aEf.js                              36.37 kB │ gzip:  10.77 kB │ map:   145.04 kB
+dist/studio-assets/FBXLoader-BjmG70sX.js                                 44.35 kB │ gzip:  14.07 kB │ map:   200.40 kB
+dist/studio-assets/ColladaLoader-BxmKlASM.js                             50.41 kB │ gzip:  13.40 kB │ map:   188.48 kB
+dist/studio-assets/KTX2Loader-DMoT3aiV.js                                59.51 kB │ gzip:  24.30 kB │ map:   133.84 kB
+dist/studio-assets/USDLoader-BJiyPaxz.js                                 60.67 kB │ gzip:  17.77 kB │ map:   279.02 kB
+dist/studio-assets/VRMLLoader-CkT9AIW2.js                               182.70 kB │ gzip:  47.44 kB │ map:   465.42 kB
+dist/studio-assets/index-BKNwXGHL.js                                  2,021.79 kB │ gzip: 550.18 kB │ map: 8,354.58 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 3.20s
+  • electron-builder  version=26.8.1 os=25.5.0
+  • loaded configuration  file=package.json ("build" field)
+  • executing @electron/rebuild  electronVersion=42.3.3 arch=arm64 buildFromSource=false workspaceRoot=/Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2 projectDir=./ appDir=./
+  • installing native dependencies  arch=arm64
+  • completed installing native dependencies
+  • packaging       platform=darwin arch=arm64 electron=42.3.3 appOutDir=dist-electron/mac-arm64
+  • searching for node modules  pm=npm searchDir=/Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2
+(node:61482) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+  • skipped macOS code signing  reason=identity explicitly is set to null
+  • arm64 requires signing, but identity is set to null and signing is being skipped
