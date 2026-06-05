@@ -5,6 +5,7 @@ import { defineConfig } from 'vite';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const productAssetsDir = path.resolve(dirname, '../public/assets');
+const editorImagesDir = path.resolve(dirname, 'images');
 
 function contentTypeFor(filePath: string): string {
 	const ext = path.extname(filePath).toLowerCase();
@@ -55,6 +56,12 @@ function productAssetsPlugin() {
 			const outDir = path.resolve(dirname, 'dist/assets');
 			fs.rmSync(outDir, { recursive: true, force: true });
 			fs.cpSync(productAssetsDir, outDir, { recursive: true });
+
+			if (fs.existsSync(editorImagesDir)) {
+				const imageOutDir = path.resolve(dirname, 'dist/images');
+				fs.rmSync(imageOutDir, { recursive: true, force: true });
+				fs.cpSync(editorImagesDir, imageOutDir, { recursive: true });
+			}
 		}
 	};
 }

@@ -63,6 +63,13 @@ function MenubarONEMO( editor ) {
 
 	options.add( createOption( 'Open .onemo...', function () {
 
+		if ( window.ONEMO_DESKTOP?.openOnemoFile ) {
+
+			openDesktopOnemoFile();
+			return;
+
+		}
+
 		fileInput.click();
 
 	} ) );
@@ -96,6 +103,23 @@ function MenubarONEMO( editor ) {
 			console.error( '[ONEMO] load failed', e );
 			alert( 'Failed to load .onemo: ' + e.message );
 			throw e;
+
+		}
+
+	}
+
+	async function openDesktopOnemoFile() {
+
+		try {
+
+			const file = await window.ONEMO_DESKTOP.openOnemoFile();
+			if ( file === null ) return;
+			await loadOnemoBuffer( file.data, file.path || file.name );
+
+		} catch ( e ) {
+
+			console.error( '[ONEMO] desktop open failed', e );
+			alert( 'Failed to open .onemo: ' + e.message );
 
 		}
 
