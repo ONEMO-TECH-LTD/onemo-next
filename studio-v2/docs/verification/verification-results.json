@@ -1,0 +1,347 @@
+{
+  "generatedAt": "2026-06-05T11:21:39.599Z",
+  "prototypeServer": "http://127.0.0.1:3100/prototype",
+  "prototypeBrowser": "Google Chrome, headful, --use-angle=metal",
+  "prototypeArtworkPath": "public/assets/test-artwork.png uploaded through Toolbar file input",
+  "prototypeScenePath": "existing /prototype?scene=... -> /api/dev/scenes/[name] route",
+  "sideBySideComposition": "base64-embedded PNGs",
+  "templates": {
+    "v0": {
+      "label": "Golden v0 raw",
+      "sceneName": "golden",
+      "sourceFile": "public/assets/templates/effect-70mm.onemo",
+      "studioUrl": "/assets/templates/effect-70mm.onemo",
+      "prototypeScreenshot": "studio-v2/docs/verification/prototype-v0.png",
+      "prototypeFullScreenshot": "studio-v2/docs/verification/prototype-v0-full.png",
+      "studioScreenshot": "studio-v2/docs/verification/studio-app-v0.png",
+      "studioFullScreenshot": "studio-v2/docs/verification/studio-app-v0-full.png",
+      "sideBySideScreenshot": "studio-v2/docs/verification/side-by-side-v0.png",
+      "prototypeState": {
+        "href": "http://127.0.0.1:3100/prototype?scene=golden",
+        "title": "ONEMO",
+        "canvasCount": 1,
+        "canvasSize": {
+          "width": 1280,
+          "height": 900
+        },
+        "toolbarButtons": [
+          "Replace",
+          "Edit",
+          "Colors"
+        ],
+        "normalArtworkPath": "Toolbar input[type=file] -> page.tsx handleFile -> setArtworkUrl -> EffectViewer -> EffectModel",
+        "bodyTextIncludesFailure": false,
+        "failureCheck": "Specific phrases only: Failed to load scene template, Error creating WebGL context"
+      },
+      "studioState": {
+        "href": "onemo-studio://app/index.html",
+        "title": "ONEMO Studio v2",
+        "desktopApi": true,
+        "rootName": "golden-prototype",
+        "source": "/assets/templates/effect-70mm.onemo",
+        "meshNames": [
+          "BACK",
+          "FRAME",
+          "PRINT_SURFACE_FRONT"
+        ],
+        "meshCount": 3,
+        "printHasArtwork": true,
+        "printSide": 0,
+        "printMaterialType": "MeshPhysicalMaterial",
+        "printUvCount": 3612,
+        "backHasSuedeMaps": true,
+        "frameColor": "0f0f0f",
+        "environment": true,
+        "background": "ffffff",
+        "cameraPosition": [
+          0,
+          0,
+          0.2
+        ],
+        "rendererToneMapping": 7,
+        "rendererExposure": 0.7,
+        "rendererShadows": true,
+        "rendererShadowType": 2,
+        "canvasSize": {
+          "width": 1090,
+          "height": 908
+        }
+      },
+      "studioMainState": {
+        "isPackaged": true,
+        "appName": "Studio",
+        "appPath": "/Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/dist-electron/mac-arm64/Studio.app/Contents/Resources/app.asar",
+        "windowTitle": "ONEMO Studio v2",
+        "visible": true,
+        "bounds": {
+          "x": 308,
+          "y": 111,
+          "width": 1440,
+          "height": 980
+        },
+        "applicationMenuNull": true
+      },
+      "telemetry": {
+        "prototype": {
+          "badResponses": [],
+          "consoleErrors": [],
+          "pageErrors": [],
+          "requestFailures": [],
+          "dialogs": []
+        },
+        "studio": {
+          "badResponses": [],
+          "consoleErrors": [],
+          "pageErrors": [],
+          "requestFailures": [],
+          "dialogs": []
+        }
+      }
+    },
+    "v1": {
+      "label": "Golden v1 Draco lossless",
+      "sceneName": "golden-v1",
+      "sourceFile": "public/assets/templates/golden-effect-70mm/v1-draco-lossless.onemo",
+      "studioUrl": "/assets/templates/golden-effect-70mm/v1-draco-lossless.onemo",
+      "prototypeScreenshot": "studio-v2/docs/verification/prototype-v1.png",
+      "prototypeFullScreenshot": "studio-v2/docs/verification/prototype-v1-full.png",
+      "studioScreenshot": "studio-v2/docs/verification/studio-app-v1.png",
+      "studioFullScreenshot": "studio-v2/docs/verification/studio-app-v1-full.png",
+      "sideBySideScreenshot": "studio-v2/docs/verification/side-by-side-v1.png",
+      "prototypeState": {
+        "href": "http://127.0.0.1:3100/prototype?scene=golden-v1",
+        "title": "ONEMO",
+        "canvasCount": 1,
+        "canvasSize": {
+          "width": 1280,
+          "height": 900
+        },
+        "toolbarButtons": [
+          "Replace",
+          "Edit",
+          "Colors"
+        ],
+        "normalArtworkPath": "Toolbar input[type=file] -> page.tsx handleFile -> setArtworkUrl -> EffectViewer -> EffectModel",
+        "bodyTextIncludesFailure": false,
+        "failureCheck": "Specific phrases only: Failed to load scene template, Error creating WebGL context"
+      },
+      "studioState": {
+        "href": "onemo-studio://app/index.html",
+        "title": "ONEMO Studio v2",
+        "desktopApi": true,
+        "rootName": "golden-prototype",
+        "source": "/assets/templates/golden-effect-70mm/v1-draco-lossless.onemo",
+        "meshNames": [
+          "BACK",
+          "FRAME",
+          "PRINT_SURFACE_FRONT"
+        ],
+        "meshCount": 3,
+        "printHasArtwork": true,
+        "printSide": 0,
+        "printMaterialType": "MeshPhysicalMaterial",
+        "printUvCount": 3594,
+        "backHasSuedeMaps": true,
+        "frameColor": "0f0f0f",
+        "environment": true,
+        "background": "ffffff",
+        "cameraPosition": [
+          0,
+          0,
+          0.2
+        ],
+        "rendererToneMapping": 7,
+        "rendererExposure": 0.7,
+        "rendererShadows": true,
+        "rendererShadowType": 2,
+        "canvasSize": {
+          "width": 1090,
+          "height": 908
+        }
+      },
+      "studioMainState": {
+        "isPackaged": true,
+        "appName": "Studio",
+        "appPath": "/Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/dist-electron/mac-arm64/Studio.app/Contents/Resources/app.asar",
+        "windowTitle": "ONEMO Studio v2",
+        "visible": true,
+        "bounds": {
+          "x": 308,
+          "y": 111,
+          "width": 1440,
+          "height": 980
+        },
+        "applicationMenuNull": true
+      },
+      "telemetry": {
+        "prototype": {
+          "badResponses": [],
+          "consoleErrors": [],
+          "pageErrors": [],
+          "requestFailures": [],
+          "dialogs": []
+        },
+        "studio": {
+          "badResponses": [],
+          "consoleErrors": [],
+          "pageErrors": [],
+          "requestFailures": [],
+          "dialogs": []
+        }
+      }
+    },
+    "v2": {
+      "label": "Golden v2 Draco decimated smooth",
+      "sceneName": "golden-v2",
+      "sourceFile": "public/assets/templates/golden-effect-70mm/v2-draco-decimated-smooth.onemo",
+      "studioUrl": "/assets/templates/golden-effect-70mm/v2-draco-decimated-smooth.onemo",
+      "prototypeScreenshot": "studio-v2/docs/verification/prototype-v2.png",
+      "prototypeFullScreenshot": "studio-v2/docs/verification/prototype-v2-full.png",
+      "studioScreenshot": "studio-v2/docs/verification/studio-app-v2.png",
+      "studioFullScreenshot": "studio-v2/docs/verification/studio-app-v2-full.png",
+      "sideBySideScreenshot": "studio-v2/docs/verification/side-by-side-v2.png",
+      "prototypeState": {
+        "href": "http://127.0.0.1:3100/prototype?scene=golden-v2",
+        "title": "ONEMO",
+        "canvasCount": 1,
+        "canvasSize": {
+          "width": 1280,
+          "height": 900
+        },
+        "toolbarButtons": [
+          "Replace",
+          "Edit",
+          "Colors"
+        ],
+        "normalArtworkPath": "Toolbar input[type=file] -> page.tsx handleFile -> setArtworkUrl -> EffectViewer -> EffectModel",
+        "bodyTextIncludesFailure": false,
+        "failureCheck": "Specific phrases only: Failed to load scene template, Error creating WebGL context"
+      },
+      "studioState": {
+        "href": "onemo-studio://app/index.html",
+        "title": "ONEMO Studio v2",
+        "desktopApi": true,
+        "rootName": "golden-prototype",
+        "source": "/assets/templates/golden-effect-70mm/v2-draco-decimated-smooth.onemo",
+        "meshNames": [
+          "BACK",
+          "FRAME",
+          "PRINT_SURFACE_FRONT"
+        ],
+        "meshCount": 3,
+        "printHasArtwork": true,
+        "printSide": 0,
+        "printMaterialType": "MeshPhysicalMaterial",
+        "printUvCount": 2034,
+        "backHasSuedeMaps": true,
+        "frameColor": "0f0f0f",
+        "environment": true,
+        "background": "ffffff",
+        "cameraPosition": [
+          0,
+          0,
+          0.2
+        ],
+        "rendererToneMapping": 7,
+        "rendererExposure": 0.7,
+        "rendererShadows": true,
+        "rendererShadowType": 2,
+        "canvasSize": {
+          "width": 1090,
+          "height": 908
+        }
+      },
+      "studioMainState": {
+        "isPackaged": true,
+        "appName": "Studio",
+        "appPath": "/Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/dist-electron/mac-arm64/Studio.app/Contents/Resources/app.asar",
+        "windowTitle": "ONEMO Studio v2",
+        "visible": true,
+        "bounds": {
+          "x": 308,
+          "y": 111,
+          "width": 1440,
+          "height": 980
+        },
+        "applicationMenuNull": true
+      },
+      "telemetry": {
+        "prototype": {
+          "badResponses": [],
+          "consoleErrors": [],
+          "pageErrors": [],
+          "requestFailures": [],
+          "dialogs": []
+        },
+        "studio": {
+          "badResponses": [],
+          "consoleErrors": [],
+          "pageErrors": [],
+          "requestFailures": [],
+          "dialogs": []
+        }
+      }
+    }
+  },
+  "nativeOpen": {
+    "patchedDialogReturned": "public/assets/templates/golden-effect-70mm/v2-draco-decimated-smooth.onemo",
+    "screenshot": "studio-v2/docs/verification/studio-app-native-open-v2.png",
+    "state": {
+      "href": "onemo-studio://app/index.html",
+      "title": "ONEMO Studio v2",
+      "desktopApi": true,
+      "rootName": "golden-prototype",
+      "source": "/Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/public/assets/templates/golden-effect-70mm/v2-draco-decimated-smooth.onemo",
+      "meshNames": [
+        "BACK",
+        "FRAME",
+        "PRINT_SURFACE_FRONT"
+      ],
+      "meshCount": 3,
+      "printHasArtwork": true,
+      "printSide": 0,
+      "printMaterialType": "MeshPhysicalMaterial",
+      "printUvCount": 2034,
+      "backHasSuedeMaps": true,
+      "frameColor": "0f0f0f",
+      "environment": true,
+      "background": "ffffff",
+      "cameraPosition": [
+        0,
+        0,
+        0.2
+      ],
+      "rendererToneMapping": 7,
+      "rendererExposure": 0.7,
+      "rendererShadows": true,
+      "rendererShadowType": 2,
+      "canvasSize": {
+        "width": 1090,
+        "height": 908
+      }
+    },
+    "telemetry": {
+      "badResponses": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "requestFailures": [],
+      "dialogs": []
+    }
+  },
+  "appBundle": {
+    "isPackaged": true,
+    "appName": "Studio",
+    "appPath": "/Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s56-studio-v2/studio-v2/dist-electron/mac-arm64/Studio.app/Contents/Resources/app.asar",
+    "windowTitle": "ONEMO Studio v2",
+    "visible": true,
+    "bounds": {
+      "x": 308,
+      "y": 111,
+      "width": 1440,
+      "height": 980
+    },
+    "applicationMenuNull": true
+  },
+  "studioRecapturedAfterBuildAt": "2026-06-05T11:25:58.095Z",
+  "appBuildLog": "studio-v2/docs/verification/npm-run-build-studio-v2.log"
+}
