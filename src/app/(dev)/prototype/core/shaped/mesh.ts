@@ -63,7 +63,7 @@ export interface ShapedGeometryResult {
   heightMM: number
 }
 
-interface V { x: number; y: number; z: number; nx: number; ny: number; nz: number }
+interface V { x: number; y: number; z: number; nx: number; ny: number; nz: number; world?: boolean }
 
 export function buildShapedGeometry(contour: Contour, opts: MeshOptions): ShapedGeometryResult {
   const { bodyThicknessMM, edgeThicknessMM, bevelWidthMM, edgeSegments, mmPerPx, imgW, imgH } = opts
@@ -78,22 +78,20 @@ export function buildShapedGeometry(contour: Contour, opts: MeshOptions): Shaped
   const positions: number[] = []
   const normals: number[] = []
   const uvs: number[] = []
-  const uv1: number[] = [] // world-XY suede UV (channel 1) — tiles the suede by physical size so it
-                           // doesn't stretch into lines on the thin rim
-  const SUEDE_TILE_MM = 40
+  const SUEDE_TILE_MM = 30 // physical tile size for world-XY suede on the rim
 
-  // UV (channel 0) from mm → source image [0,1]. Image is loaded y-up; texture.flipY=false.
+  // Caps use image UV (channel 0). The thin RIM uses a world-XY UV (v.world) on the SAME channel 0
+  // so the suede maps tile by physical size and don't stretch into lines on the rim.
   const uvOf = (xmm: number, ymm: number): [number, number] => [xmm / mmPerPx / imgW, ymm / mmPerPx / imgH]
   const pushV = (v: V) => {
     positions.push(v.x - cx, v.y - cy, v.z)
     normals.push(v.nx, v.ny, v.nz)
-    const [u, vv] = uvOf(v.x, v.y)
-    uvs.push(u, vv)
-    uv1.push(v.x / SUEDE_TILE_MM, v.y / SUEDE_TILE_MM)
+    if (v.world) uvs.push(v.x / SUEDE_TILE_MM, v.y / SUEDE_TILE_MM)
+    else { const [u, vv] = uvOf(v.x, v.y); uvs.push(u, vv) }
   }
   // Materials are DoubleSide, so winding is tolerant — normals carry the lighting.
   const quad = (A: V, B: V, C: V, D: V) => { pushV(A); pushV(B); pushV(D); pushV(A); pushV(D); pushV(C) }
-  const mk = (x: number, y: number, z: number, nx: number, ny: number, nz: number): V => ({ x, y, z, nx, ny, nz })
+  const mk = (x: number, y: number, z: number, nx: number, ny: number, nz: number, world = false): V => ({ x, y, z, nx, ny, nz, world })
 
   // thin rim bulge profile: top(+rimHalf, radial 0) → mid(0, radial +rimHalf) → bottom(-rimHalf, 0)
   const segs = Math.max(2, edgeSegments)
@@ -122,29 +120,29 @@ export function buildShapedGeometry(contour: Contour, opts: MeshOptions): Shaped
       if (bevelWidthMM > 1e-4) {
         // front bevel: inner @ +bodyHalf  →  contour @ +rimHalf (slims body→rim)
         quad(
-          mk(IA[0], IA[1], +bodyHalf, NA[0] * nrb, NA[1] * nrb, nzb),
-          mk(IB[0], IB[1], +bodyHalf, NB[0] * nrb, NB[1] * nrb, nzb),
-          mk(A[0], A[1], +rimHalf, NA[0] * nrb, NA[1] * nrb, nzb),
-          mk(B[0], B[1], +rimHalf, NB[0] * nrb, NB[1] * nrb, nzb),
+          mk(IA[0], IA[1], +bodyHalf, NA[0] * nrb, NA[1] * nrb, nzb, true),
+          mk(IB[0], IB[1], +bodyHalf, NB[0] * nrb, NB[1] * nrb, nzb, true),
+          mk(A[0], A[1], +rimHalf, NA[0] * nrb, NA[1] * nrb, nzb, true),
+          mk(B[0], B[1], +rimHalf, NB[0] * nrb, NB[1] * nrb, nzb, true),
         )
       }
       // rounded rim at the contour
       for (let s = 0; s < rim.length - 1; s++) {
         const p0 = rim[s], p1 = rim[s + 1]
         quad(
-          mk(A[0] + NA[0] * p0.radial, A[1] + NA[1] * p0.radial, p0.z, NA[0] * p0.nr, NA[1] * p0.nr, p0.nz),
-          mk(B[0] + NB[0] * p0.radial, B[1] + NB[1] * p0.radial, p0.z, NB[0] * p0.nr, NB[1] * p0.nr, p0.nz),
-          mk(A[0] + NA[0] * p1.radial, A[1] + NA[1] * p1.radial, p1.z, NA[0] * p1.nr, NA[1] * p1.nr, p1.nz),
-          mk(B[0] + NB[0] * p1.radial, B[1] + NB[1] * p1.radial, p1.z, NB[0] * p1.nr, NB[1] * p1.nr, p1.nz),
+          mk(A[0] + NA[0] * p0.radial, A[1] + NA[1] * p0.radial, p0.z, NA[0] * p0.nr, NA[1] * p0.nr, p0.nz, true),
+          mk(B[0] + NB[0] * p0.radial, B[1] + NB[1] * p0.radial, p0.z, NB[0] * p0.nr, NB[1] * p0.nr, p0.nz, true),
+          mk(A[0] + NA[0] * p1.radial, A[1] + NA[1] * p1.radial, p1.z, NA[0] * p1.nr, NA[1] * p1.nr, p1.nz, true),
+          mk(B[0] + NB[0] * p1.radial, B[1] + NB[1] * p1.radial, p1.z, NB[0] * p1.nr, NB[1] * p1.nr, p1.nz, true),
         )
       }
       if (bevelWidthMM > 1e-4) {
         // back bevel: contour @ -rimHalf  →  inner @ -bodyHalf
         quad(
-          mk(A[0], A[1], -rimHalf, NA[0] * nrb, NA[1] * nrb, -nzb),
-          mk(B[0], B[1], -rimHalf, NB[0] * nrb, NB[1] * nrb, -nzb),
-          mk(IA[0], IA[1], -bodyHalf, NA[0] * nrb, NA[1] * nrb, -nzb),
-          mk(IB[0], IB[1], -bodyHalf, NB[0] * nrb, NB[1] * nrb, -nzb),
+          mk(A[0], A[1], -rimHalf, NA[0] * nrb, NA[1] * nrb, -nzb, true),
+          mk(B[0], B[1], -rimHalf, NB[0] * nrb, NB[1] * nrb, -nzb, true),
+          mk(IA[0], IA[1], -bodyHalf, NA[0] * nrb, NA[1] * nrb, -nzb, true),
+          mk(IB[0], IB[1], -bodyHalf, NB[0] * nrb, NB[1] * nrb, -nzb, true),
         )
       }
     }
@@ -174,7 +172,6 @@ export function buildShapedGeometry(contour: Contour, opts: MeshOptions): Shaped
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3))
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
-  geometry.setAttribute('uv1', new THREE.Float32BufferAttribute(uv1, 2)) // suede channel
   geometry.addGroup(edgeCount, frontCount, 0)              // flat top (subject + padding) → image
   geometry.addGroup(0, edgeCount, 1)                       // bevel + rim → edge material
   geometry.addGroup(edgeCount + frontCount, backCount, 2)  // flat bottom → solid
