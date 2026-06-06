@@ -314,6 +314,46 @@ function toShapeMm(points: ShapePoint[], bounds: ReturnType<typeof polygonBounds
   }))
 }
 
+function edgeOutwardNormal(a: ShapePoint, b: ShapePoint, winding: 'ccw' | 'cw') {
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const length = Math.hypot(dx, dy) || 1
+  return winding === 'ccw'
+    ? { x: dy / length, y: -dx / length }
+    : { x: -dy / length, y: dx / length }
+}
+
+function offsetPreviewRing(points: ShapePoint[], distanceMm: number) {
+  if (points.length < 3 || distanceMm === 0) return points
+
+  const winding = polygonArea(points) >= 0 ? 'ccw' : 'cw'
+  return points.map((point, index) => {
+    const previous = points[(index - 1 + points.length) % points.length]
+    const next = points[(index + 1) % points.length]
+    const previousNormal = edgeOutwardNormal(previous, point, winding)
+    const nextNormal = edgeOutwardNormal(point, next, winding)
+    const mx = previousNormal.x + nextNormal.x
+    const my = previousNormal.y + nextNormal.y
+    const miterLength = Math.hypot(mx, my)
+    if (miterLength < EPSILON) {
+      return {
+        x: point.x + nextNormal.x * distanceMm,
+        y: point.y + nextNormal.y * distanceMm,
+      }
+    }
+
+    const nx = mx / miterLength
+    const ny = my / miterLength
+    const alignment = Math.max(0.4, nx * nextNormal.x + ny * nextNormal.y)
+    const scaledDistance = Math.min(Math.abs(distanceMm) / alignment, Math.abs(distanceMm) * 2.5) * Math.sign(distanceMm)
+
+    return {
+      x: point.x + nx * scaledDistance,
+      y: point.y + ny * scaledDistance,
+    }
+  })
+}
+
 function draftHash(parts: Array<string | number>) {
   let hash = 2166136261
   parts.join('|').split('').forEach((char) => {
@@ -422,8 +462,8 @@ export function createShapeSpecDraftFromMask({
     },
     paths_mm: {
       cutline: outerMm,
-      bleed: outerMm,
-      safe: outerMm,
+      bleed: offsetPreviewRing(outerMm, SHAPED_DEFAULTS.edgeRadiusMm),
+      safe: offsetPreviewRing(outerMm, -SHAPED_DEFAULTS.edgeRadiusMm),
     },
     attachment_template: {
       hardware_type: 'magnet',

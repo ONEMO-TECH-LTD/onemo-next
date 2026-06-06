@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createShapeSpecDraftFromMask, type BinaryMask } from './contour'
+import { createShapeSpecDraftFromMask, polygonBounds, type BinaryMask } from './contour'
 import { createRoundedShapeGeometry } from './mesh-builder'
 import { INITIAL_SHAPED_SETTINGS } from './shape-spec'
 
@@ -32,6 +32,12 @@ describe('shaped effect draft pipeline', () => {
     expect(draft.geometry_mm.outer.length).toBeGreaterThanOrEqual(4)
     expect(draft.attachment_template.grid_pitch_mm).toBe(54)
     expect(draft.attachment_template.layout).toBe('silhouette_adaptive')
+
+    const cutlineBounds = polygonBounds(draft.paths_mm.cutline)
+    const bleedBounds = polygonBounds(draft.paths_mm.bleed)
+    const safeBounds = polygonBounds(draft.paths_mm.safe)
+    expect(bleedBounds.maxX - bleedBounds.minX).toBeGreaterThan(cutlineBounds.maxX - cutlineBounds.minX)
+    expect(safeBounds.maxX - safeBounds.minX).toBeLessThan(cutlineBounds.maxX - cutlineBounds.minX)
   })
 
   it('builds a grouped rounded-edge BufferGeometry', () => {
