@@ -88,7 +88,7 @@ export interface ShapedGeometryResult {
   heightMM: number
 }
 
-interface V { x: number; y: number; z: number; nx: number; ny: number; nz: number; iu?: number; iv?: number }
+interface V { x: number; y: number; z: number; nx: number; ny: number; nz: number; iu?: number; iv?: number; cb?: number }
 
 export function buildShapedGeometry(contour: Contour, opts: MeshOptions): ShapedGeometryResult {
   const { thicknessMM, edgeRadiusMM, edgeSegments, mmPerPx, imgW, imgH } = opts
@@ -105,6 +105,7 @@ export function buildShapedGeometry(contour: Contour, opts: MeshOptions): Shaped
   const normals: number[] = []
   const uvs: number[] = []   // channel 0 = IMAGE position (image wraps over the rounding, per-position)
   const uv1: number[] = []   // channel 1 = world-XY (suede tiles by physical size → never stretches)
+  const colors: number[] = [] // vertex brightness — edge fades front-colour → dark toward the back
   const SUEDE_TILE_MM = 30
 
   const uvOf = (xmm: number, ymm: number): [number, number] => [xmm / mmPerPx / imgW, ymm / mmPerPx / imgH]
@@ -114,6 +115,8 @@ export function buildShapedGeometry(contour: Contour, opts: MeshOptions): Shaped
     if (v.iu !== undefined) uvs.push(v.iu, v.iv as number)
     else { const [u, vv] = uvOf(v.x, v.y); uvs.push(u, vv) }
     uv1.push(v.x / SUEDE_TILE_MM, v.y / SUEDE_TILE_MM)
+    const cb = v.cb ?? 1
+    colors.push(cb, cb, cb)
   }
   // Materials are DoubleSide, so winding is tolerant — normals carry the lighting.
   const quad = (A: V, B: V, C: V, D: V) => { pushV(A); pushV(B); pushV(D); pushV(A); pushV(D); pushV(C) }
@@ -123,6 +126,7 @@ export function buildShapedGeometry(contour: Contour, opts: MeshOptions): Shaped
   // px INWARD over the lip (NOT the geometric rim position, NOT exterior/bled, NOT interior art).
   const WRAP_PX = 22 // stronger inward roll (but still narrow — the lip is short)
   const wrapMM = WRAP_PX * mmPerPx
+  const EDGE_DARK = 0.3 // darkest brightness at the back of the lip; 1.0 (front colour) at the cutline
   const insetByR: Pt[][] = []
 
   // ── Edge band: swept fillet profile; image UV bends inward from the cutline over the lip ──
@@ -136,7 +140,8 @@ export function buildShapedGeometry(contour: Contour, opts: MeshOptions): Shaped
     const ev = (P: Pt, Np: Pt, ps: ProfileSample, p: number): V => {
       const inward = r + p * wrapMM // start at the cutline (cap edge), then a few px inward
       const [iu, iv] = uvOf(P[0] - Np[0] * inward, P[1] - Np[1] * inward)
-      return { x: P[0] + Np[0] * ps.radial, y: P[1] + Np[1] * ps.radial, z: ps.z, nx: Np[0] * ps.nr, ny: Np[1] * ps.nr, nz: ps.nz, iu, iv }
+      const cb = 1 - p * (1 - EDGE_DARK) // bright (front colour) at cutline → dark toward the back
+      return { x: P[0] + Np[0] * ps.radial, y: P[1] + Np[1] * ps.radial, z: ps.z, nx: Np[0] * ps.nr, ny: Np[1] * ps.nr, nz: ps.nz, iu, iv, cb }
     }
     for (let i = 0; i < n; i++) {
       const j = (i + 1) % n
@@ -174,6 +179,7 @@ export function buildShapedGeometry(contour: Contour, opts: MeshOptions): Shaped
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3))
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
   geometry.setAttribute('uv1', new THREE.Float32BufferAttribute(uv1, 2)) // suede (channel 1)
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)) // edge fade (vertexColors)
   geometry.addGroup(edgeCount, frontCount, 0)             // front cap → material 0 (front image)
   geometry.addGroup(0, edgeCount, 1)                      // edge lip → material 1 (front image, matte+dark+blur)
   geometry.addGroup(edgeCount + frontCount, backCount, 2) // back cap → material 2 (solid)

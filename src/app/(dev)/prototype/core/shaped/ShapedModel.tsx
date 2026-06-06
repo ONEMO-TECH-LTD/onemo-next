@@ -115,7 +115,8 @@ export default function ShapedModel({
   const edgeMaterial = useMemo(() => {
     return new THREE.MeshPhysicalMaterial({
       map: result?.edgeTexture ?? null,
-      color: new THREE.Color(0x808080), // darken the rolled-over image
+      color: new THREE.Color(0xffffff),
+      vertexColors: true, // per-vertex fade: front colour at the cutline → dark toward the back (no hard line)
       normalMap,
       normalScale: new THREE.Vector2(suede.normalScale, suede.normalScale),
       bumpMap,

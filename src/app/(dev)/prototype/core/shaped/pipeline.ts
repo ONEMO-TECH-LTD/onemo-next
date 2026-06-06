@@ -25,7 +25,7 @@ export const DEFAULT_BUILD_CONFIG: ShapeBuildConfig = {
   longestSideMM: 100,
   thicknessMM: 0.5,          // Dan: 0.5mm
   edgeRadiusMM: 0.15,        // short rounded lip
-  edgeSegments: 8,           // fillet rounding segments
+  edgeSegments: 14,          // fillet rounding segments (smoother rim, fewer facet lines)
   rdpEpsilonMM: 0.4,         // RDP to corner points, THEN Chaikin rounds them → smooth curves
   maxImageDim: 1200,         // mask res (Catmull-Rom provides smoothness, so this can be moderate)
   textureDim: 1600,
