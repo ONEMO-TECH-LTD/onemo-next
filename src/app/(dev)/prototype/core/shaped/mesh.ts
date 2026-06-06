@@ -121,7 +121,7 @@ export function buildShapedGeometry(contour: Contour, opts: MeshOptions): Shaped
 
   // Edge IMAGE wrap: UVs sample the FRONT image starting at the front cutline and moving only a few
   // px INWARD over the lip (NOT the geometric rim position, NOT exterior/bled, NOT interior art).
-  const WRAP_PX = 7
+  const WRAP_PX = 22 // stronger inward roll (but still narrow — the lip is short)
   const wrapMM = WRAP_PX * mmPerPx
   const insetByR: Pt[][] = []
 
@@ -174,9 +174,9 @@ export function buildShapedGeometry(contour: Contour, opts: MeshOptions): Shaped
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3))
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
   geometry.setAttribute('uv1', new THREE.Float32BufferAttribute(uv1, 2)) // suede (channel 1)
-  // edge band + front cap are contiguous and use the SAME front material (image + suede); back = solid
-  geometry.addGroup(0, edgeCount + frontCount, 0) // edge + front → material 0 (front)
-  geometry.addGroup(edgeCount + frontCount, backCount, 1) // back → material 1
+  geometry.addGroup(edgeCount, frontCount, 0)             // front cap → material 0 (front image)
+  geometry.addGroup(0, edgeCount, 1)                      // edge lip → material 1 (front image, matte+dark+blur)
+  geometry.addGroup(edgeCount + frontCount, backCount, 2) // back cap → material 2 (solid)
   geometry.computeBoundingBox()
   geometry.computeBoundingSphere()
 

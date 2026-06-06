@@ -23,8 +23,8 @@ export interface ShapeBuildConfig {
 
 export const DEFAULT_BUILD_CONFIG: ShapeBuildConfig = {
   longestSideMM: 100,
-  thicknessMM: 0.8,          // Dan: 0.8mm
-  edgeRadiusMM: 0.15,        // Dan: short rounded lip
+  thicknessMM: 0.5,          // Dan: 0.5mm
+  edgeRadiusMM: 0.15,        // short rounded lip
   edgeSegments: 8,           // fillet rounding segments
   rdpEpsilonMM: 0.4,         // RDP to corner points, THEN Chaikin rounds them → smooth curves
   maxImageDim: 1200,         // mask res (Catmull-Rom provides smoothness, so this can be moderate)
@@ -35,6 +35,7 @@ export const DEFAULT_BUILD_CONFIG: ShapeBuildConfig = {
 export interface ShapeBuildResult {
   geometry: THREE.BufferGeometry
   texture: THREE.CanvasTexture
+  edgeTexture: THREE.CanvasTexture
   spec: ShapeSpecDraft
   widthMM: number
   heightMM: number
@@ -139,6 +140,20 @@ export async function buildShape(
   texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping
   texture.needsUpdate = true
 
+  // EDGE texture = the front image, BLURRED (kills the small lines on the lip). Same image, not a
+  // separate contour strip. The edge material darkens it + renders matte (reflectivity 0).
+  const edgeCanvas = document.createElement('canvas')
+  edgeCanvas.width = front.width
+  edgeCanvas.height = front.height
+  const ectx = edgeCanvas.getContext('2d')!
+  ectx.filter = `blur(${Math.max(4, Math.round(front.width / 45))}px)`
+  ectx.drawImage(front, 0, 0)
+  const edgeTexture = new THREE.CanvasTexture(edgeCanvas)
+  edgeTexture.colorSpace = THREE.SRGBColorSpace
+  edgeTexture.flipY = false
+  edgeTexture.wrapS = edgeTexture.wrapT = THREE.ClampToEdgeWrapping
+  edgeTexture.needsUpdate = true
+
 
   const spec: ShapeSpecDraft = {
     sourceRef: url,
@@ -161,5 +176,5 @@ export async function buildShape(
     },
   }
 
-  return { geometry, texture, spec, widthMM, heightMM }
+  return { geometry, texture, edgeTexture, spec, widthMM, heightMM }
 }
