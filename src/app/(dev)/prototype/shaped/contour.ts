@@ -20,6 +20,7 @@ interface LoopCandidate {
 }
 
 const EPSILON = 0.000001
+const CONTOUR_RESOLUTION_BOOST = 1.5
 
 export function polygonArea(points: ShapePoint[]) {
   let area = 0
@@ -124,6 +125,44 @@ function smoothClosedRing(points: ShapePoint[], iterations: number) {
     ring = nextRing
   }
   return ring
+}
+
+function resampleClosedRing(points: ShapePoint[], factor: number) {
+  const targetCount = Math.round(points.length * factor)
+  if (points.length < 3 || targetCount <= points.length) return points
+
+  const lengths = points.map((point, index) => {
+    const next = points[(index + 1) % points.length]
+    return Math.hypot(next.x - point.x, next.y - point.y)
+  })
+  const perimeter = lengths.reduce((sum, length) => sum + length, 0)
+  if (perimeter < EPSILON) return points
+
+  const resampled: ShapePoint[] = []
+  let edgeIndex = 0
+  let edgeStartDistance = 0
+
+  for (let index = 0; index < targetCount; index += 1) {
+    const targetDistance = (index / targetCount) * perimeter
+    while (
+      edgeIndex < lengths.length - 1 &&
+      edgeStartDistance + lengths[edgeIndex] < targetDistance
+    ) {
+      edgeStartDistance += lengths[edgeIndex]
+      edgeIndex += 1
+    }
+
+    const a = points[edgeIndex]
+    const b = points[(edgeIndex + 1) % points.length]
+    const localDistance = targetDistance - edgeStartDistance
+    const t = lengths[edgeIndex] > EPSILON ? localDistance / lengths[edgeIndex] : 0
+    resampled.push({
+      x: a.x + (b.x - a.x) * t,
+      y: a.y + (b.y - a.y) * t,
+    })
+  }
+
+  return resampled
 }
 
 function maskAt(mask: BinaryMask, x: number, y: number) {
@@ -409,7 +448,10 @@ export function createShapeSpecDraftFromMask({
   const simplifyPx = settings.simplifyEpsilonMm / pxToMm
   const smoothIterations = componentMask.foregroundMode === 'alpha' ? 2 : 3
 
-  const outerSourceInitial = smoothClosedRing(simplifyRdp(outerSourceRaw, simplifyPx), smoothIterations)
+  const outerSourceInitial = resampleClosedRing(
+    smoothClosedRing(simplifyRdp(outerSourceRaw, simplifyPx), smoothIterations),
+    CONTOUR_RESOLUTION_BOOST
+  )
   const sourceBounds = polygonBounds(outerSourceInitial)
 
   const holeLoops = componentMask.foregroundMode === 'alpha' ? loops.slice(1) : []
@@ -417,7 +459,10 @@ export function createShapeSpecDraftFromMask({
     const sourceLoop = scaleLoopToSource(loop.points, mask, sourceWidth, sourceHeight)
     const c = centroid(sourceLoop)
     if (!pointInPolygon(c, outerSourceInitial)) return []
-    const simplified = smoothClosedRing(simplifyRdp(sourceLoop, simplifyPx), smoothIterations)
+    const simplified = resampleClosedRing(
+      smoothClosedRing(simplifyRdp(sourceLoop, simplifyPx), smoothIterations),
+      CONTOUR_RESOLUTION_BOOST
+    )
     if (simplified.length < 3) return []
     return [orientPairedRings(simplified, toShapeMm(simplified, sourceBounds, pxToMm), 'cw')]
   })
