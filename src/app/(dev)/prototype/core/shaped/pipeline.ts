@@ -4,7 +4,8 @@
 
 import * as THREE from 'three'
 import type { Contour, Pt, ShapeSpecDraft } from './types'
-import { loadImageData, segment, adapterIdFor } from './mask'
+import { loadImageData, segment, adapterIdFor, type MaskResult } from './mask'
+import { segmentML, ML_ADAPTER_ID } from './segment-ml'
 import { buildContour } from './contour'
 import { bleedTexture } from './edge-bleed'
 import { buildShapedGeometry } from './mesh'
@@ -15,7 +16,8 @@ export interface ShapeBuildConfig {
   edgeRadiusMM: number   // ~1.0 rounded (AMEND-8)
   edgeSegments: number
   rdpEpsilonMM: number   // 0.2–0.4
-  maxImageDim: number    // downscale cap for segmentation speed
+  maxImageDim: number    // mask/contour downscale cap (low res is fine for the silhouette)
+  textureDim: number     // front-texture cap (HIGH res so the projected image stays sharp)
 }
 
 export const DEFAULT_BUILD_CONFIG: ShapeBuildConfig = {
@@ -25,6 +27,7 @@ export const DEFAULT_BUILD_CONFIG: ShapeBuildConfig = {
   edgeSegments: 6,
   rdpEpsilonMM: 0.3,
   maxImageDim: 512,
+  textureDim: 1600,
 }
 
 export interface ShapeBuildResult {
@@ -53,8 +56,24 @@ export async function buildShape(
   url: string,
   cfg: ShapeBuildConfig = DEFAULT_BUILD_CONFIG
 ): Promise<ShapeBuildResult> {
-  const img = await loadImageData(url, cfg.maxImageDim)
-  const { mask, width, height } = segment(img)
+  // Default: ML subject segmentation (BEN2-ONNX). Fallback: flood-fill (no-ML) if the model
+  // can't load. Real user images have no alpha + non-uniform backgrounds → ML is the real tool.
+  let seg: MaskResult
+  let adapterId: string
+  let texImage: ImageData, texMask: Uint8Array, texW: number, texH: number
+  try {
+    const r = await segmentML(url, cfg.maxImageDim, cfg.textureDim)
+    seg = r
+    adapterId = ML_ADAPTER_ID
+    texImage = r.texImage; texMask = r.texMask; texW = r.texW; texH = r.texH
+  } catch (e) {
+    console.warn('[shaped] ML segmentation unavailable — falling back to flood-fill:', e)
+    const img = await loadImageData(url, cfg.textureDim)
+    seg = segment(img)
+    adapterId = adapterIdFor(img)
+    texImage = seg.imageData; texMask = seg.mask; texW = seg.width; texH = seg.height
+  }
+  const { mask, width, height } = seg
 
   // px → mm: longest contour side maps to longestSideMM
   // (need a first contour pass in px to know the bbox; epsilon also depends on mmPerPx,
@@ -79,7 +98,7 @@ export async function buildShape(
     imgH: height,
   })
 
-  const canvas = bleedTexture(img, mask, width, height)
+  const canvas = bleedTexture(texImage, texMask, texW, texH)
   const texture = new THREE.CanvasTexture(canvas)
   texture.colorSpace = THREE.SRGBColorSpace
   texture.flipY = false // image is loaded y-up + UV v = py/H → upright without an extra flip
@@ -98,7 +117,7 @@ export async function buildShape(
       widthMM,
       heightMM,
     },
-    generator: { adapter: adapterIdFor(img), lane: 'kai', version: '0.1.0' },
+    generator: { adapter: adapterId, lane: 'kai', version: '0.2.0' },
     diagnostics: {
       rawContourNodes: built.rawNodes,
       simplifiedNodes: built.simplifiedNodes,

@@ -176,11 +176,19 @@ function largestComponent(mask: Uint8Array, w: number, h: number): Uint8Array {
   return out
 }
 
+/** Shared post-process: clean speckles/pinholes + keep the largest component (single-component gate). */
+export function postProcessMask(mask: Uint8Array, w: number, h: number): Uint8Array {
+  return largestComponent(cleanup(mask, w, h), w, h)
+}
+
+/**
+ * Fallback segmentation (NO ML): alpha if present, else border flood-fill.
+ * Real user images have no alpha and often non-uniform backgrounds, so this is a fallback only —
+ * the default path is ML segmentation (segment-ml.ts / BEN2-ONNX).
+ */
 export function segment(img: ImageData): MaskResult {
   const adapter = hasAlpha(img) ? alphaAdapter : bgFloodAdapter
-  let mask = adapter.run(img)
-  mask = cleanup(mask, img.width, img.height)
-  mask = largestComponent(mask, img.width, img.height)
+  const mask = postProcessMask(adapter.run(img), img.width, img.height)
   return { mask, width: img.width, height: img.height, imageData: img }
 }
 

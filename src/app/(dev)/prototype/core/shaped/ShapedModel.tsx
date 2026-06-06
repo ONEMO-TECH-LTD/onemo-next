@@ -15,7 +15,7 @@ interface ShapedModelProps {
   suede: SuedeMaterialParams
   backColor: string
   /** world size (scene units) the cut-out's longest side maps to. Tuned to match golden framing. */
-  fitSize?: number
+  fitSize?: number // see default below
   onSpec?: (spec: ShapeSpecDraft) => void
   onStatus?: (status: 'idle' | 'building' | 'ready' | 'error', message?: string) => void
 }
@@ -38,7 +38,7 @@ export default function ShapedModel({
   scene: sceneSettings,
   suede,
   backColor,
-  fitSize = 0.15,
+  fitSize = 0.09,
   onSpec,
   onStatus,
 }: ShapedModelProps) {
