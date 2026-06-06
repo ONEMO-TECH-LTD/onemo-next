@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import * as THREE from 'three'
 import type { DesignState, SceneSettings, ViewerMaterialRole, ViewerProductConfig } from '../types'
-import { createEdgeBleedCanvas, loadImageElement, segmentImageToMask } from './browser-segmentation'
+import { loadImageElement, segmentImageToMask } from './browser-segmentation'
 import { createShapeSpecDraftFromMask } from './contour'
 import { createRoundedShapeGeometry } from './mesh-builder'
 import type { ShapeSpecDraft, ShapedPreviewSettings } from './shape-spec'
@@ -102,22 +102,22 @@ function createGoldenEdgeSuedeMaterial(role: ViewerMaterialRole | undefined, edg
 
   return new THREE.MeshPhysicalMaterial({
     map: edgeMap,
-    color: new THREE.Color(0.78, 0.78, 0.78),
+    color: new THREE.Color(Number(defaults.colorMultiplier ?? 1), Number(defaults.colorMultiplier ?? 1), Number(defaults.colorMultiplier ?? 1)),
     normalMap: loadMaterialTexture(textures.normalMap, { color: false }),
     normalScale: new THREE.Vector2(
-      Number(defaults.normalScale ?? 0.15) * 0.7,
-      Number(defaults.normalScale ?? 0.15) * 0.7
+      Number(defaults.normalScale ?? 0.15) * 0.35,
+      Number(defaults.normalScale ?? 0.15) * 0.35
     ),
     bumpMap: loadMaterialTexture(textures.bumpMap, { color: false }),
-    bumpScale: Number(defaults.bumpScale ?? 1) * 0.45,
+    bumpScale: Number(defaults.bumpScale ?? 1) * 0.2,
     roughnessMap: loadMaterialTexture(textures.roughnessMap, { color: false }),
-    roughness: Math.max(0.95, Number(defaults.roughness ?? 1)),
+    roughness: 1,
     metalness: 0,
-    specularIntensity: 0.05,
-    sheen: Math.min(0.35, Number(defaults.sheen ?? 0.35)),
+    specularIntensity: 0,
+    sheen: Math.min(0.18, Number(defaults.sheen ?? 0.18)),
     sheenColor: new THREE.Color(defaults.sheenColor ?? '#1a1a1a'),
     sheenRoughness: 1,
-    envMapIntensity: Math.min(0.03, Number(defaults.envMapIntensity ?? 0.03)),
+    envMapIntensity: 0,
     clearcoat: 0,
     clearcoatRoughness: 1,
     side: THREE.DoubleSide,
@@ -151,7 +151,6 @@ export default function ShapedPreview({
 }: ShapedPreviewProps) {
   const [draft, setDraft] = useState<ShapeSpecDraft | null>(null)
   const [frontTexture, setFrontTexture] = useState<THREE.Texture | null>(null)
-  const [edgeTexture, setEdgeTexture] = useState<THREE.Texture | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -172,16 +171,8 @@ export default function ShapedPreview({
         })
         const nextFrontTexture = createArtworkTexture(loaded)
 
-        const bleedCanvas = createEdgeBleedCanvas(loaded, nextDraft.geometry_px.outer)
-        const nextEdgeTexture = new THREE.CanvasTexture(bleedCanvas)
-        nextEdgeTexture.colorSpace = THREE.SRGBColorSpace
-        nextEdgeTexture.wrapS = THREE.RepeatWrapping
-        nextEdgeTexture.wrapT = THREE.ClampToEdgeWrapping
-        nextEdgeTexture.needsUpdate = true
-
         if (cancelled) {
           nextFrontTexture.dispose()
-          nextEdgeTexture.dispose()
           return
         }
 
@@ -191,10 +182,6 @@ export default function ShapedPreview({
         setFrontTexture((prev) => {
           prev?.dispose()
           return nextFrontTexture
-        })
-        setEdgeTexture((prev) => {
-          prev?.dispose()
-          return nextEdgeTexture
         })
         onDraftChange?.(nextDraft)
       } catch (err) {
@@ -218,9 +205,8 @@ export default function ShapedPreview({
   useEffect(() => {
     return () => {
       frontTexture?.dispose()
-      edgeTexture?.dispose()
     }
-  }, [frontTexture, edgeTexture])
+  }, [frontTexture])
 
   const geometry = useMemo(() => {
     if (!draft) return null
@@ -232,7 +218,7 @@ export default function ShapedPreview({
   }, [geometry])
 
   const materials = useMemo(() => {
-    if (!frontTexture || !edgeTexture) return null
+    if (!frontTexture) return null
     const faceRole = product?.artworkSlot
       ? product.materialRoles.find((role) => role.role === product.artworkSlot?.role)
       : product?.materialRoles.find((role) => role.role === 'face') ?? product?.materialRoles[0]
@@ -241,9 +227,9 @@ export default function ShapedPreview({
     return [
       createGoldenFaceMaterial(faceRole, frontTexture),
       createGoldenSolidSuedeMaterial(backRole, String(backRole?.defaults?.color ?? '#080808')),
-      createGoldenEdgeSuedeMaterial(faceRole, edgeTexture),
+      createGoldenEdgeSuedeMaterial(faceRole, frontTexture),
     ]
-  }, [edgeTexture, frontTexture, product])
+  }, [frontTexture, product])
 
   useEffect(() => {
     return () => {

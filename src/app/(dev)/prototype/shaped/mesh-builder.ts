@@ -4,7 +4,8 @@ import * as THREE from 'three'
 import type { ShapePoint, ShapeSpecDraft } from './shape-spec'
 
 const PROFILE_STEPS = 8
-const EDGE_LATERAL_BLEND = 0.16
+const EDGE_LATERAL_BLEND = 0
+const EDGE_WRAP_INSET_PX = 12
 const MM_TO_SCENE = 0.001
 
 interface BuildVertex {
@@ -16,13 +17,6 @@ interface BuildVertex {
   nz: number
   u: number
   v: number
-}
-
-function perimeter(points: ShapePoint[]) {
-  return points.reduce((sum, point, index) => {
-    const next = points[(index + 1) % points.length]
-    return sum + Math.hypot(next.x - point.x, next.y - point.y)
-  }, 0)
 }
 
 function polygonArea(points: ShapePoint[]) {
@@ -62,9 +56,21 @@ function pushVertex(vertices: BuildVertex[], vertex: BuildVertex) {
 
 function sourceUv(point: ShapePoint, draft: ShapeSpecDraft) {
   return {
-    u: point.x / draft.source.width_px,
-    v: 1 - point.y / draft.source.height_px,
+    u: THREE.MathUtils.clamp(point.x / draft.source.width_px, 0, 1),
+    v: THREE.MathUtils.clamp(1 - point.y / draft.source.height_px, 0, 1),
   }
+}
+
+function ringBounds(points: ShapePoint[]) {
+  return points.reduce(
+    (bounds, point) => ({
+      minX: Math.min(bounds.minX, point.x),
+      maxX: Math.max(bounds.maxX, point.x),
+      minY: Math.min(bounds.minY, point.y),
+      maxY: Math.max(bounds.maxY, point.y),
+    }),
+    { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }
+  )
 }
 
 function addSurfaceVertices({
@@ -101,33 +107,50 @@ function addRingEdge({
   vertices,
   indices,
   ringMm,
+  ringPx,
   isHole,
-  startU,
-  totalPerimeter,
   thicknessScene,
   radiusScene,
+  draft,
 }: {
   vertices: BuildVertex[]
   indices: number[]
   ringMm: ShapePoint[]
+  ringPx: ShapePoint[]
   isHole: boolean
-  startU: number
-  totalPerimeter: number
   thicknessScene: number
   radiusScene: number
+  draft: ShapeSpecDraft
 }) {
   const ringIndices: number[][] = []
-  let travelled = startU
+  const bounds = ringBounds(ringPx)
+  const center = {
+    x: (bounds.minX + bounds.maxX) / 2,
+    y: (bounds.minY + bounds.maxY) / 2,
+  }
 
   for (let i = 0; i < ringMm.length; i += 1) {
     const point = ringMm[i]
-    const next = ringMm[(i + 1) % ringMm.length]
+    const pointPx = ringPx[i]
     const normal = pointNormal(ringMm, i, isHole)
-    const u = totalPerimeter ? travelled / totalPerimeter : 0
+    const inward = {
+      x: center.x - pointPx.x,
+      y: center.y - pointPx.y,
+    }
+    const inwardLength = Math.hypot(inward.x, inward.y) || 1
+    const inwardDirection = {
+      x: (inward.x / inwardLength) * (isHole ? -1 : 1),
+      y: (inward.y / inwardLength) * (isHole ? -1 : 1),
+    }
     const profileIndices: number[] = []
 
     for (let step = 0; step <= PROFILE_STEPS; step += 1) {
       const t = step / PROFILE_STEPS
+      const wrapInset = EDGE_WRAP_INSET_PX * Math.pow(t, 0.85)
+      const edgeUv = sourceUv({
+        x: pointPx.x + inwardDirection.x * wrapInset,
+        y: pointPx.y + inwardDirection.y * wrapInset,
+      }, draft)
       const arc = Math.sin(Math.PI * t)
       const zNormal = Math.cos(Math.PI * t)
       const sideNormal = Math.sin(Math.PI * t)
@@ -141,12 +164,11 @@ function addRingEdge({
         nx: nx / nl,
         ny: ny / nl,
         nz: zNormal / nl,
-        u,
-        v: t,
+        u: edgeUv.u,
+        v: edgeUv.v,
       }))
     }
     ringIndices.push(profileIndices)
-    travelled += Math.hypot(next.x - point.x, next.y - point.y)
   }
 
   for (let i = 0; i < ringMm.length; i += 1) {
@@ -222,33 +244,27 @@ export function createRoundedShapeGeometry(draft: ShapeSpecDraft) {
   const backCount = indices.length - backStart
 
   const edgeStart = indices.length
-  const totalPerimeter =
-    perimeter(draft.geometry_mm.outer) +
-    draft.geometry_mm.holes.reduce((sum, hole) => sum + perimeter(hole), 0)
-  let uOffset = 0
   addRingEdge({
     vertices,
     indices,
     ringMm: draft.geometry_mm.outer,
+    ringPx: draft.geometry_px.outer,
     isHole: false,
-    startU: uOffset,
-    totalPerimeter,
     thicknessScene,
     radiusScene,
+    draft,
   })
-  uOffset += perimeter(draft.geometry_mm.outer)
-  draft.geometry_mm.holes.forEach((hole) => {
+  draft.geometry_mm.holes.forEach((hole, index) => {
     addRingEdge({
       vertices,
       indices,
       ringMm: hole,
+      ringPx: draft.geometry_px.holes[index],
       isHole: true,
-      startU: uOffset,
-      totalPerimeter,
       thicknessScene,
       radiusScene,
+      draft,
     })
-    uOffset += perimeter(hole)
   })
   const edgeCount = indices.length - edgeStart
 

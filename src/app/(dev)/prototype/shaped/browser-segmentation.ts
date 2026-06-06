@@ -1,7 +1,7 @@
 'use client'
 
 import type { BinaryMask } from './contour'
-import type { ShapePoint, ShapedPreviewSettings } from './shape-spec'
+import type { ShapedPreviewSettings } from './shape-spec'
 
 interface LoadedImage {
   image: HTMLImageElement
@@ -159,84 +159,4 @@ export function segmentImageToMask(loaded: LoadedImage, settings: ShapedPreviewS
   fillInteriorBackground(mask, width, height)
 
   return { width, height, data: mask, foregroundMode: 'border-background' }
-}
-
-function pointAtLength(points: ShapePoint[], target: number) {
-  let travelled = 0
-  for (let i = 0; i < points.length; i += 1) {
-    const a = points[i]
-    const b = points[(i + 1) % points.length]
-    const length = Math.hypot(b.x - a.x, b.y - a.y)
-    if (travelled + length >= target) {
-      const t = length ? (target - travelled) / length : 0
-      return {
-        point: { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t },
-        tangent: { x: b.x - a.x, y: b.y - a.y },
-      }
-    }
-    travelled += length
-  }
-  return { point: points[0], tangent: { x: 1, y: 0 } }
-}
-
-export function createEdgeBleedCanvas(loaded: LoadedImage, outerPx: ShapePoint[]) {
-  const source = document.createElement('canvas')
-  source.width = loaded.width
-  source.height = loaded.height
-  const sourceCtx = source.getContext('2d')
-  if (!sourceCtx) throw new Error('Canvas is unavailable for edge bleed.')
-  sourceCtx.drawImage(loaded.image, 0, 0, loaded.width, loaded.height)
-  const sourceData = sourceCtx.getImageData(0, 0, loaded.width, loaded.height)
-
-  const bounds = outerPx.reduce(
-    (acc, point) => ({
-      minX: Math.min(acc.minX, point.x),
-      maxX: Math.max(acc.maxX, point.x),
-      minY: Math.min(acc.minY, point.y),
-      maxY: Math.max(acc.maxY, point.y),
-    }),
-    { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }
-  )
-  const center = { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 }
-  const perimeter = outerPx.reduce((sum, point, index) => {
-    const next = outerPx[(index + 1) % outerPx.length]
-    return sum + Math.hypot(next.x - point.x, next.y - point.y)
-  }, 0)
-
-  const bleed = document.createElement('canvas')
-  bleed.width = 512
-  bleed.height = 16
-  const bleedCtx = bleed.getContext('2d')
-  if (!bleedCtx) throw new Error('Canvas is unavailable for edge bleed.')
-  const output = bleedCtx.createImageData(bleed.width, bleed.height)
-
-  for (let x = 0; x < bleed.width; x += 1) {
-    const { point } = pointAtLength(outerPx, (x / bleed.width) * perimeter)
-    const towardCenter = { x: center.x - point.x, y: center.y - point.y }
-    const len = Math.hypot(towardCenter.x, towardCenter.y) || 1
-    const samples = [2, 5, 9, 14]
-    const color = samples.reduce(
-      (acc, distance) => {
-        const sx = Math.max(0, Math.min(loaded.width - 1, Math.round(point.x + (towardCenter.x / len) * distance)))
-        const sy = Math.max(0, Math.min(loaded.height - 1, Math.round(point.y + (towardCenter.y / len) * distance)))
-        const sourceIndex = (sy * loaded.width + sx) * 4
-        return {
-          r: acc.r + sourceData.data[sourceIndex],
-          g: acc.g + sourceData.data[sourceIndex + 1],
-          b: acc.b + sourceData.data[sourceIndex + 2],
-        }
-      },
-      { r: 0, g: 0, b: 0 }
-    )
-    for (let y = 0; y < bleed.height; y += 1) {
-      const outIndex = (y * bleed.width + x) * 4
-      output.data[outIndex] = color.r / samples.length
-      output.data[outIndex + 1] = color.g / samples.length
-      output.data[outIndex + 2] = color.b / samples.length
-      output.data[outIndex + 3] = 255
-    }
-  }
-
-  bleedCtx.putImageData(output, 0, 0)
-  return bleed
 }
