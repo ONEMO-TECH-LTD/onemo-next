@@ -82,6 +82,8 @@ export default function ShapedModel({
   const roughnessMap = useMemo(() => suedeTex(suede.roughnessMap), [suede.roughnessMap])
   const bumpMap = useMemo(() => suedeTex(suede.bumpMap), [suede.bumpMap])
 
+  // MATTE suede (Dan: no glossy light interaction). Kill specular + env reflection; suede shows via
+  // the normal map + diffuse only. Used for the FRONT and the EDGE (edge = same material).
   const frontMaterial = useMemo(() => {
     return new THREE.MeshPhysicalMaterial({
       map: result?.texture ?? null,
@@ -91,12 +93,12 @@ export default function ShapedModel({
       bumpMap,
       bumpScale: suede.bumpScale,
       roughnessMap,
-      roughness: suede.roughness,
-      metalness: suede.metalness,
-      sheen: suede.sheen,
-      sheenColor: new THREE.Color(suede.sheenColor),
-      sheenRoughness: suede.sheenRoughness,
-      envMapIntensity: suede.envMapIntensity,
+      roughness: 1,
+      metalness: 0,
+      specularIntensity: 0, // no specular highlight → matte
+      sheen: 0,
+      clearcoat: 0,
+      envMapIntensity: 0.08, // near-zero env reflection
       side: THREE.DoubleSide,
     })
   }, [result?.texture, normalMap, roughnessMap, bumpMap, suede])
@@ -113,12 +115,12 @@ export default function ShapedModel({
       bumpMap,
       bumpScale: suede.bumpScale,
       roughnessMap,
-      roughness: suede.roughness,
+      roughness: 1,
       metalness: 0,
-      sheen: suede.sheen,
-      sheenColor: new THREE.Color(suede.sheenColor),
-      sheenRoughness: suede.sheenRoughness,
-      envMapIntensity: suede.envMapIntensity,
+      specularIntensity: 0,
+      sheen: 0,
+      clearcoat: 0,
+      envMapIntensity: 0.08,
       side: THREE.DoubleSide,
     })
   }, [backColor, normalMap, roughnessMap, bumpMap, suede])
@@ -137,8 +139,8 @@ export default function ShapedModel({
     }
   }, [designState, result])
 
-  // groups: 0 = front (image+suede), 1 = edge (SAME front material → image wraps + fades), 2 = back
-  const materials = useMemo(() => [frontMaterial, frontMaterial, backMaterial], [frontMaterial, backMaterial])
+  // geometry groups: 0 = edge+front (front material — image wraps inward over the lip), 1 = back
+  const materials = useMemo(() => [frontMaterial, backMaterial], [frontMaterial, backMaterial])
 
   // mm → scene units so the longest side maps to fitSize
   const scale = useMemo(() => {

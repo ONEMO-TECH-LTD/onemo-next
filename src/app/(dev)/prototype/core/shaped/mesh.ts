@@ -12,13 +12,38 @@ import * as THREE from 'three'
 import type { Contour, Pt } from './types'
 
 export interface MeshOptions {
-  bodyThicknessMM: number // flat-top body thickness (~1.0) — the top/padding stays full thickness
-  edgeThicknessMM: number // thin rim thickness (~0.3) — ONLY the perimeter bevel slims to this
-  bevelWidthMM: number    // width of the perimeter bevel that slims body→rim
-  edgeSegments: number    // rounding segments of the thin rim
-  mmPerPx: number         // mm per source pixel (for UV back-projection)
+  thicknessMM: number    // body thickness (~0.8)
+  edgeRadiusMM: number   // SHORT rounded-edge fillet radius (~0.15) — tangent to the flat face
+  edgeSegments: number   // fillet rounding segments
+  mmPerPx: number        // mm per source pixel (for UV back-projection)
   imgW: number
   imgH: number
+}
+
+interface ProfileSample { radial: number; z: number; nr: number; nz: number }
+
+/**
+ * Edge cross-section: flat-face-inset → SHORT top fillet (tangent to face) → straight wall → bottom
+ * fillet → back. radial 0 = the silhouette (wall); caps are inset by r so the fillet eases in with
+ * NO crease/separation line. Small r = short rounding.
+ */
+function buildProfile(t: number, rIn: number, segs: number): ProfileSample[] {
+  const r = Math.min(rIn, t / 2)
+  const half = t / 2
+  const out: ProfileSample[] = []
+  for (let i = 0; i <= segs; i++) { // top fillet: a π/2 → 0 (face → wall), centre (radial -r, z half-r)
+    const a = (Math.PI / 2) * (1 - i / segs)
+    out.push({ radial: -r + r * Math.cos(a), z: (half - r) + r * Math.sin(a), nr: Math.cos(a), nz: Math.sin(a) })
+  }
+  if (half - r > 1e-6) { // straight wall at the silhouette
+    out.push({ radial: 0, z: half - r, nr: 1, nz: 0 })
+    out.push({ radial: 0, z: -(half - r), nr: 1, nz: 0 })
+  }
+  for (let i = 0; i <= segs; i++) { // bottom fillet: a 0 → -π/2 (wall → back)
+    const a = -(Math.PI / 2) * (i / segs)
+    out.push({ radial: -r + r * Math.cos(a), z: -(half - r) + r * Math.sin(a), nr: Math.cos(a), nz: Math.sin(a) })
+  }
+  return out
 }
 
 /** Per-vertex outward normals for a ring (uses ring winding: (dy,-dx) → outward for CCW outer, into-hole for CW holes). */
@@ -63,12 +88,13 @@ export interface ShapedGeometryResult {
   heightMM: number
 }
 
-interface V { x: number; y: number; z: number; nx: number; ny: number; nz: number; world?: boolean }
+interface V { x: number; y: number; z: number; nx: number; ny: number; nz: number; iu?: number; iv?: number }
 
 export function buildShapedGeometry(contour: Contour, opts: MeshOptions): ShapedGeometryResult {
-  const { bodyThicknessMM, edgeThicknessMM, bevelWidthMM, edgeSegments, mmPerPx, imgW, imgH } = opts
-  const bodyHalf = bodyThicknessMM / 2
-  const rimHalf = edgeThicknessMM / 2
+  const { thicknessMM, edgeRadiusMM, edgeSegments, mmPerPx, imgW, imgH } = opts
+  const half = thicknessMM / 2
+  const r = Math.min(edgeRadiusMM, half)
+  const profile = buildProfile(thicknessMM, r, Math.max(2, edgeSegments))
   const rings = [contour.outer, ...contour.holes]
 
   const bb = bbox(contour.outer.pts)
@@ -77,7 +103,7 @@ export function buildShapedGeometry(contour: Contour, opts: MeshOptions): Shaped
 
   const positions: number[] = []
   const normals: number[] = []
-  const uvs: number[] = []   // channel 0 = IMAGE position (image wraps over the rim, per-position)
+  const uvs: number[] = []   // channel 0 = IMAGE position (image wraps over the rounding, per-position)
   const uv1: number[] = []   // channel 1 = world-XY (suede tiles by physical size → never stretches)
   const SUEDE_TILE_MM = 30
 
@@ -85,86 +111,61 @@ export function buildShapedGeometry(contour: Contour, opts: MeshOptions): Shaped
   const pushV = (v: V) => {
     positions.push(v.x - cx, v.y - cy, v.z)
     normals.push(v.nx, v.ny, v.nz)
-    const [u, vv] = uvOf(v.x, v.y)
-    uvs.push(u, vv)
+    if (v.iu !== undefined) uvs.push(v.iu, v.iv as number)
+    else { const [u, vv] = uvOf(v.x, v.y); uvs.push(u, vv) }
     uv1.push(v.x / SUEDE_TILE_MM, v.y / SUEDE_TILE_MM)
   }
   // Materials are DoubleSide, so winding is tolerant — normals carry the lighting.
   const quad = (A: V, B: V, C: V, D: V) => { pushV(A); pushV(B); pushV(D); pushV(A); pushV(D); pushV(C) }
-  const mk = (x: number, y: number, z: number, nx: number, ny: number, nz: number, world = false): V => ({ x, y, z, nx, ny, nz, world })
+  const mk = (x: number, y: number, z: number, nx: number, ny: number, nz: number): V => ({ x, y, z, nx, ny, nz })
 
-  // thin rim bulge profile: top(+rimHalf, radial 0) → mid(0, radial +rimHalf) → bottom(-rimHalf, 0)
-  const segs = Math.max(2, edgeSegments)
-  const rim = Array.from({ length: segs + 1 }, (_, i) => {
-    const a = Math.PI / 2 - Math.PI * (i / segs)
-    return { radial: rimHalf * Math.cos(a), z: rimHalf * Math.sin(a), nr: Math.cos(a), nz: Math.sin(a) }
-  })
+  // Edge IMAGE wrap: UVs sample the FRONT image starting at the front cutline and moving only a few
+  // px INWARD over the lip (NOT the geometric rim position, NOT exterior/bled, NOT interior art).
+  const WRAP_PX = 7
+  const wrapMM = WRAP_PX * mmPerPx
+  const insetByR: Pt[][] = []
 
-  // bevel slope normal in (radial, z): rises (bodyHalf - rimHalf) over run = bevelWidth
-  const drise = bodyHalf - rimHalf
-  const Lb = Math.hypot(drise, bevelWidthMM) || 1
-  const nrb = drise / Lb, nzb = bevelWidthMM / Lb
-
-  const innerByRing: Pt[][] = []
-
-  // ── Perimeter EDGE: front bevel → thin rim → back bevel (slims body→0.3 across the bevel) ──
+  // ── Edge band: swept fillet profile; image UV bends inward from the cutline over the lip ──
   for (const ring of rings) {
     const pts = ring.pts
     const N = ringNormals(pts)
     const n = pts.length
-    const inner: Pt[] = pts.map(([x, y], i) => [x - N[i][0] * bevelWidthMM, y - N[i][1] * bevelWidthMM])
-    innerByRing.push(inner)
+    insetByR.push(pts.map(([x, y], i) => [x - N[i][0] * r, y - N[i][1] * r]))
+    const lastS = profile.length - 1
+    // edge vertex: geometric position from the fillet profile; image UV moved inward by (r + p*wrap)
+    const ev = (P: Pt, Np: Pt, ps: ProfileSample, p: number): V => {
+      const inward = r + p * wrapMM // start at the cutline (cap edge), then a few px inward
+      const [iu, iv] = uvOf(P[0] - Np[0] * inward, P[1] - Np[1] * inward)
+      return { x: P[0] + Np[0] * ps.radial, y: P[1] + Np[1] * ps.radial, z: ps.z, nx: Np[0] * ps.nr, ny: Np[1] * ps.nr, nz: ps.nz, iu, iv }
+    }
     for (let i = 0; i < n; i++) {
       const j = (i + 1) % n
-      const A = pts[i], B = pts[j], IA = inner[i], IB = inner[j], NA = N[i], NB = N[j]
-      if (bevelWidthMM > 1e-4) {
-        // front bevel: inner @ +bodyHalf  →  contour @ +rimHalf (slims body→rim)
-        quad(
-          mk(IA[0], IA[1], +bodyHalf, NA[0] * nrb, NA[1] * nrb, nzb, true),
-          mk(IB[0], IB[1], +bodyHalf, NB[0] * nrb, NB[1] * nrb, nzb, true),
-          mk(A[0], A[1], +rimHalf, NA[0] * nrb, NA[1] * nrb, nzb, true),
-          mk(B[0], B[1], +rimHalf, NB[0] * nrb, NB[1] * nrb, nzb, true),
-        )
-      }
-      // rounded rim at the contour
-      for (let s = 0; s < rim.length - 1; s++) {
-        const p0 = rim[s], p1 = rim[s + 1]
-        quad(
-          mk(A[0] + NA[0] * p0.radial, A[1] + NA[1] * p0.radial, p0.z, NA[0] * p0.nr, NA[1] * p0.nr, p0.nz, true),
-          mk(B[0] + NB[0] * p0.radial, B[1] + NB[1] * p0.radial, p0.z, NB[0] * p0.nr, NB[1] * p0.nr, p0.nz, true),
-          mk(A[0] + NA[0] * p1.radial, A[1] + NA[1] * p1.radial, p1.z, NA[0] * p1.nr, NA[1] * p1.nr, p1.nz, true),
-          mk(B[0] + NB[0] * p1.radial, B[1] + NB[1] * p1.radial, p1.z, NB[0] * p1.nr, NB[1] * p1.nr, p1.nz, true),
-        )
-      }
-      if (bevelWidthMM > 1e-4) {
-        // back bevel: contour @ -rimHalf  →  inner @ -bodyHalf
-        quad(
-          mk(A[0], A[1], -rimHalf, NA[0] * nrb, NA[1] * nrb, -nzb, true),
-          mk(B[0], B[1], -rimHalf, NB[0] * nrb, NB[1] * nrb, -nzb, true),
-          mk(IA[0], IA[1], -bodyHalf, NA[0] * nrb, NA[1] * nrb, -nzb, true),
-          mk(IB[0], IB[1], -bodyHalf, NB[0] * nrb, NB[1] * nrb, -nzb, true),
-        )
+      const A = pts[i], B = pts[j], NA = N[i], NB = N[j]
+      for (let s = 0; s < lastS; s++) {
+        const p0 = profile[s], p1 = profile[s + 1]
+        const pr0 = s / lastS, pr1 = (s + 1) / lastS
+        quad(ev(A, NA, p0, pr0), ev(B, NB, p0, pr0), ev(A, NA, p1, pr1), ev(B, NB, p1, pr1))
       }
     }
   }
   const edgeCount = positions.length / 3
 
-  // ── Flat top cap (FRONT, image) + flat bottom cap (BACK) on the inner rings ──
-  const outerInner = innerByRing[0]
-  const holeInners = innerByRing.slice(1)
+  // ── Flat caps on the inset rings (inset by r → the fillet eases in tangentially, no crease) ──
+  const outerInset = insetByR[0]
+  const holeInsets = insetByR.slice(1)
   const toVec2 = (pts: Pt[]) => pts.map(([x, y]) => new THREE.Vector2(x, y))
-  const faces = THREE.ShapeUtils.triangulateShape(toVec2(outerInner), holeInners.map(toVec2))
-  const allV: Pt[] = [outerInner, ...holeInners].flat()
+  const faces = THREE.ShapeUtils.triangulateShape(toVec2(outerInset), holeInsets.map(toVec2))
+  const allV: Pt[] = [outerInset, ...holeInsets].flat()
 
   for (const [a, b, c] of faces) for (const idx of [a, b, c]) {
     const [x, y] = allV[idx]
-    pushV(mk(x, y, +bodyHalf, 0, 0, 1))
+    pushV(mk(x, y, +half, 0, 0, 1))
   }
   const frontCount = positions.length / 3 - edgeCount
 
   for (const [a, b, c] of faces) for (const idx of [c, b, a]) {
     const [x, y] = allV[idx]
-    pushV(mk(x, y, -bodyHalf, 0, 0, -1))
+    pushV(mk(x, y, -half, 0, 0, -1))
   }
   const backCount = positions.length / 3 - edgeCount - frontCount
 
@@ -173,9 +174,9 @@ export function buildShapedGeometry(contour: Contour, opts: MeshOptions): Shaped
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3))
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
   geometry.setAttribute('uv1', new THREE.Float32BufferAttribute(uv1, 2)) // suede (channel 1)
-  geometry.addGroup(edgeCount, frontCount, 0)              // flat top (subject + padding) → image
-  geometry.addGroup(0, edgeCount, 1)                       // bevel + rim → edge material
-  geometry.addGroup(edgeCount + frontCount, backCount, 2)  // flat bottom → solid
+  // edge band + front cap are contiguous and use the SAME front material (image + suede); back = solid
+  geometry.addGroup(0, edgeCount + frontCount, 0) // edge + front → material 0 (front)
+  geometry.addGroup(edgeCount + frontCount, backCount, 1) // back → material 1
   geometry.computeBoundingBox()
   geometry.computeBoundingSphere()
 

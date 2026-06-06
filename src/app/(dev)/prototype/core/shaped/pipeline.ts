@@ -12,9 +12,8 @@ import { buildShapedGeometry } from './mesh'
 
 export interface ShapeBuildConfig {
   longestSideMM: number   // physical size of the cut-out's longest side (default 100)
-  bodyThicknessMM: number // flat-top thickness (~1.0) — subject + padding stay full thickness
-  edgeThicknessMM: number // thin rim thickness (~0.3) — only the perimeter bevel slims to this
-  bevelWidthMM: number    // width of the slimming bevel at the very perimeter (beyond padding)
+  thicknessMM: number     // body thickness (~0.8)
+  edgeRadiusMM: number    // SHORT rounded-edge fillet radius (~0.15)
   edgeSegments: number
   rdpEpsilonMM: number    // 0.2–0.4
   maxImageDim: number     // mask/contour downscale cap (low res is fine for the silhouette)
@@ -24,12 +23,11 @@ export interface ShapeBuildConfig {
 
 export const DEFAULT_BUILD_CONFIG: ShapeBuildConfig = {
   longestSideMM: 100,
-  bodyThicknessMM: 0.8,      // Dan 2026-06-06: 0.8mm thickness
-  edgeThicknessMM: 0.8,      // uniform thickness, rounded edge (no gradual slim)
-  bevelWidthMM: 0,           // Dan 2026-06-06: gradual bevel removed
-  edgeSegments: 8,           // rounded rim segments
+  thicknessMM: 0.8,          // Dan: 0.8mm
+  edgeRadiusMM: 0.15,        // Dan: short rounded lip
+  edgeSegments: 8,           // fillet rounding segments
   rdpEpsilonMM: 0.4,         // RDP to corner points, THEN Chaikin rounds them → smooth curves
-  maxImageDim: 1600,         // higher-res mask → cleaner staircase before smoothing
+  maxImageDim: 1200,         // mask res (Catmull-Rom provides smoothness, so this can be moderate)
   textureDim: 1600,
   paddingMM: 1.5,            // Dan 2026-06-06: small flat image margin around the subject
 }
@@ -89,7 +87,7 @@ export async function buildShape(
 
   const epsilonPx = cfg.rdpEpsilonMM / mmPerPx
   // expand outward by padding + bevel: flat cap = subject + paddingMM (image), bevel sits beyond
-  const expandMM = cfg.paddingMM + cfg.bevelWidthMM
+  const expandMM = cfg.paddingMM
   const padPx = Math.max(0, Math.round(expandMM / mmPerPx))
   const workMask = padPx > 0 ? dilateMask(mask, width, height, padPx) : mask
   const built = buildContour(workMask, width, height, epsilonPx)
@@ -98,9 +96,8 @@ export async function buildShape(
   const contourMM = contourPxToMM(built.contour, mmPerPx)
 
   const { geometry, widthMM, heightMM } = buildShapedGeometry(contourMM, {
-    bodyThicknessMM: cfg.bodyThicknessMM,
-    edgeThicknessMM: cfg.edgeThicknessMM,
-    bevelWidthMM: cfg.bevelWidthMM,
+    thicknessMM: cfg.thicknessMM,
+    edgeRadiusMM: cfg.edgeRadiusMM,
     edgeSegments: cfg.edgeSegments,
     mmPerPx,
     imgW: width,
@@ -150,8 +147,8 @@ export async function buildShape(
     mmPerPx,
     geometryMM: contourMM,
     dimensions: {
-      thicknessBodyMM: cfg.bodyThicknessMM,
-      edgeRadiusMM: cfg.edgeThicknessMM / 2,
+      thicknessBodyMM: cfg.thicknessMM,
+      edgeRadiusMM: cfg.edgeRadiusMM,
       widthMM,
       heightMM,
     },
