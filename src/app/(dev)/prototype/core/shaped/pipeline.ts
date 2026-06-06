@@ -4,30 +4,36 @@
 
 import * as THREE from 'three'
 import type { Contour, Pt, ShapeSpecDraft } from './types'
-import { loadImageData, segment, adapterIdFor, type MaskResult } from './mask'
+import { loadImageData, segment, adapterIdFor, dilateMask, type MaskResult } from './mask'
 import { segmentML, ML_ADAPTER_ID } from './segment-ml'
 import { buildContour } from './contour'
 import { bleedTexture } from './edge-bleed'
 import { buildShapedGeometry } from './mesh'
 
 export interface ShapeBuildConfig {
-  longestSideMM: number  // physical size of the cut-out's longest side (default 100)
-  thicknessMM: number    // 1.6 locked
-  edgeRadiusMM: number   // ~1.0 rounded (AMEND-8)
+  longestSideMM: number   // physical size of the cut-out's longest side (default 100)
+  bodyThicknessMM: number // interior thickness (~1.0)
+  edgeThicknessMM: number // thin rim thickness (~0.3) — tapers down toward the perimeter
+  taperBandMM: number     // distance over which thickness ramps body→edge
+  capSubdiv: number       // cap subdivision levels (smooth taper)
   edgeSegments: number
-  rdpEpsilonMM: number   // 0.2–0.4
-  maxImageDim: number    // mask/contour downscale cap (low res is fine for the silhouette)
-  textureDim: number     // front-texture cap (HIGH res so the projected image stays sharp)
+  rdpEpsilonMM: number    // 0.2–0.4
+  maxImageDim: number     // mask/contour downscale cap (low res is fine for the silhouette)
+  textureDim: number      // front-texture cap (HIGH res so the projected image stays sharp)
+  paddingMM: number       // expand the silhouette outward by this margin (puffier, less tight/stiff)
 }
 
 export const DEFAULT_BUILD_CONFIG: ShapeBuildConfig = {
   longestSideMM: 100,
-  thicknessMM: 1.0,          // Dan 2026-06-06: 1mm reads better than 1.6
-  edgeRadiusMM: 0.5,         // full bullnose on a 1mm body (clamped to thickness/2)
-  edgeSegments: 8,
+  bodyThicknessMM: 1.0,      // Dan 2026-06-06: ~1mm body
+  edgeThicknessMM: 0.3,      // Dan 2026-06-06: edges taper 1mm → 0.3mm toward the rim
+  taperBandMM: 8,            // gradual taper over 8mm
+  capSubdiv: 2,              // smooth domed taper (4^2 tris/face; balances smoothness vs build time)
+  edgeSegments: 6,
   rdpEpsilonMM: 0.12,        // finer → smooth high-res silhouette (Draco handles size later)
   maxImageDim: 1024,         // higher-res mask → smoother contour
   textureDim: 1600,
+  paddingMM: 1.0,            // Dan 2026-06-06: smaller padding
 }
 
 export interface ShapeBuildResult {
@@ -85,35 +91,64 @@ export async function buildShape(
   const mmPerPx = cfg.longestSideMM / Math.max(bw, bh, 1)
 
   const epsilonPx = cfg.rdpEpsilonMM / mmPerPx
-  const built = buildContour(mask, width, height, epsilonPx)
+  // expand the silhouette outward by paddingMM (puffier + rounds tight corners), then trace
+  const padPx = Math.max(0, Math.round(cfg.paddingMM / mmPerPx))
+  const workMask = padPx > 0 ? dilateMask(mask, width, height, padPx) : mask
+  const built = buildContour(workMask, width, height, epsilonPx)
   if (!built) throw new Error('Contour build failed after simplification.')
 
   const contourMM = contourPxToMM(built.contour, mmPerPx)
 
   const { geometry, widthMM, heightMM } = buildShapedGeometry(contourMM, {
-    thicknessMM: cfg.thicknessMM,
-    edgeRadiusMM: cfg.edgeRadiusMM,
+    bodyThicknessMM: cfg.bodyThicknessMM,
+    edgeThicknessMM: cfg.edgeThicknessMM,
+    taperBandMM: cfg.taperBandMM,
+    capSubdiv: cfg.capSubdiv,
     edgeSegments: cfg.edgeSegments,
     mmPerPx,
     imgW: width,
     imgH: height,
   })
 
-  const canvas = bleedTexture(texImage, texMask, texW, texH)
-  const texture = new THREE.CanvasTexture(canvas)
+  // Texture build:
+  // 1) nearest-interior fill the exterior with subject colour (covers the padded ring; can streak)
+  // 2) BLUR it → a smooth colour halo (no streaks) — the "image-inherited blurred colours"
+  // 3) FRONT = halo + the sharp subject composited on top (interior crisp, padded ring smooth)
+  // 4) EDGE = the smooth halo (darkened later via material) → soft rim, same blurred colours
+  const bleedIters = Math.ceil((cfg.paddingMM / cfg.longestSideMM) * Math.max(texW, texH)) + 24
+  const bled = bleedTexture(texImage, texMask, texW, texH, bleedIters)
+
+  const blurPx = Math.max(6, Math.round(texW / 50))
+  const halo = document.createElement('canvas')
+  halo.width = texW; halo.height = texH
+  const hctx = halo.getContext('2d')!
+  hctx.filter = `blur(${blurPx}px)`
+  hctx.drawImage(bled, 0, 0)
+  hctx.filter = 'none'
+  // darken the halo (Dan 2026-06-06: edge/rim darker) — multiply keeps the inherited hue, deepens it
+  hctx.globalCompositeOperation = 'multiply'
+  hctx.fillStyle = '#6e6e6e'
+  hctx.fillRect(0, 0, halo.width, halo.height)
+  hctx.globalCompositeOperation = 'source-over'
+
+  // sharp subject as a canvas (texImage keeps BEN2's soft alpha matte)
+  const subj = document.createElement('canvas')
+  subj.width = texW; subj.height = texH
+  subj.getContext('2d')!.putImageData(texImage, 0, 0)
+
+  const front = document.createElement('canvas')
+  front.width = texW; front.height = texH
+  const fctx = front.getContext('2d')!
+  fctx.drawImage(halo, 0, 0)   // smooth colour everywhere (incl. padded ring)
+  fctx.drawImage(subj, 0, 0)   // sharp subject on top
+
+  const texture = new THREE.CanvasTexture(front)
   texture.colorSpace = THREE.SRGBColorSpace
   texture.flipY = false // image is loaded y-up + UV v = py/H → upright without an extra flip
   texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping
   texture.needsUpdate = true
 
-  // Edge texture = the picture's colours but BLURRED (soft rim), not the stretched image.
-  const edgeCanvas = document.createElement('canvas')
-  edgeCanvas.width = canvas.width
-  edgeCanvas.height = canvas.height
-  const ectx = edgeCanvas.getContext('2d')!
-  ectx.filter = `blur(${Math.max(3, Math.round(canvas.width / 90))}px)`
-  ectx.drawImage(canvas, 0, 0)
-  const edgeTexture = new THREE.CanvasTexture(edgeCanvas)
+  const edgeTexture = new THREE.CanvasTexture(halo)
   edgeTexture.colorSpace = THREE.SRGBColorSpace
   edgeTexture.flipY = false
   edgeTexture.wrapS = edgeTexture.wrapT = THREE.ClampToEdgeWrapping
@@ -126,8 +161,8 @@ export async function buildShape(
     mmPerPx,
     geometryMM: contourMM,
     dimensions: {
-      thicknessBodyMM: cfg.thicknessMM,
-      edgeRadiusMM: Math.min(cfg.edgeRadiusMM, cfg.thicknessMM / 2),
+      thicknessBodyMM: cfg.bodyThicknessMM,
+      edgeRadiusMM: cfg.edgeThicknessMM / 2,
       widthMM,
       heightMM,
     },

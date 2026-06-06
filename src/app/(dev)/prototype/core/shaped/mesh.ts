@@ -12,10 +12,12 @@ import * as THREE from 'three'
 import type { Contour, Pt } from './types'
 
 export interface MeshOptions {
-  thicknessMM: number   // body thickness (1.6 locked)
-  edgeRadiusMM: number  // rounded edge radius (~1.0); clamped to thickness/2
-  edgeSegments: number  // tessellation of each quarter-round (>=2)
-  mmPerPx: number       // mm per source pixel (for UV back-projection)
+  bodyThicknessMM: number // interior thickness (~1.0)
+  edgeThicknessMM: number // thin rim thickness (~0.3) — caps taper from body→edge toward the rim
+  taperBandMM: number     // distance over which thickness ramps body→edge near the perimeter
+  edgeSegments: number    // tessellation of each quarter-round (>=2)
+  capSubdiv: number       // cap triangle subdivision levels (interior verts for a smooth taper)
+  mmPerPx: number         // mm per source pixel (for UV back-projection)
   imgW: number
   imgH: number
 }
@@ -88,9 +90,9 @@ export interface ShapedGeometryResult {
 }
 
 export function buildShapedGeometry(contour: Contour, opts: MeshOptions): ShapedGeometryResult {
-  const { thicknessMM: t, edgeRadiusMM, edgeSegments, mmPerPx, imgW, imgH } = opts
-  const r = Math.min(edgeRadiusMM, t / 2)
-  const profile = buildProfile(t, r, Math.max(2, edgeSegments))
+  const { bodyThicknessMM, edgeThicknessMM, taperBandMM, edgeSegments, capSubdiv, mmPerPx, imgW, imgH } = opts
+  const r = edgeThicknessMM / 2 // full bullnose on the thin rim
+  const profile = buildProfile(edgeThicknessMM, r, Math.max(2, edgeSegments))
   const rings = [contour.outer, ...contour.holes]
 
   const bb = bbox(contour.outer.pts)
@@ -115,7 +117,35 @@ export function buildShapedGeometry(contour: Contour, opts: MeshOptions): Shaped
     uvs.push(u, v)
   }
 
-  // ── Edge band (group 0) ────────────────────────────────────────────
+  // Distance from a point to the true contour (for the thickness taper).
+  const ringPts = rings.map((rg) => rg.pts)
+  const distToContour = (x: number, y: number): number => {
+    let best = Infinity
+    for (const pts of ringPts) {
+      const n = pts.length
+      for (let i = 0; i < n; i++) {
+        const a = pts[i], b = pts[(i + 1) % n]
+        const dx = b[0] - a[0], dy = b[1] - a[1]
+        const len2 = dx * dx + dy * dy
+        let tt = len2 > 0 ? ((x - a[0]) * dx + (y - a[1]) * dy) / len2 : 0
+        tt = tt < 0 ? 0 : tt > 1 ? 1 : tt
+        const ex = x - (a[0] + tt * dx), ey = y - (a[1] + tt * dy)
+        const d = ex * ex + ey * ey
+        if (d < best) best = d
+      }
+    }
+    return Math.sqrt(best)
+  }
+  const bodyHalf = bodyThicknessMM / 2
+  const edgeHalf = edgeThicknessMM / 2
+  // half-thickness ramps edge→body over taperBand (smoothstep) → thin rim, thicker interior
+  const halfThickAt = (x: number, y: number): number => {
+    let s = Math.min(1, Math.max(0, distToContour(x, y) / taperBandMM))
+    s = s * s * (3 - 2 * s)
+    return edgeHalf + (bodyHalf - edgeHalf) * s
+  }
+
+  // ── Edge band (thin rounded rim) ────────────────────────────────────
   for (const ring of rings) {
     const pts = ring.pts
     const N = ringNormals(pts)
@@ -164,24 +194,27 @@ export function buildShapedGeometry(contour: Contour, opts: MeshOptions): Shaped
 
   const frontEdgeCount = positions.length / 3 // edge band vertex count (group 0 so far)
 
-  const zTop = t / 2
-  const zBot = -t / 2
-  // front cap (normal +z), winding as returned
-  for (const [a, b, c] of faces) {
-    for (const idx of [a, b, c]) {
-      const [x, y] = allV[idx]
-      pushVert(x, y, zTop, 0, 0, 1)
-    }
+  // Subdivide each cap triangle so interior vertices exist for a SMOOTH thickness taper.
+  const mid = (p: Pt, q: Pt): Pt => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2]
+  const emitCapTri = (p0: Pt, p1: Pt, p2: Pt, sign: number) => {
+    const tri = sign > 0 ? [p0, p1, p2] : [p2, p1, p0] // front +z keeps winding; back reverses
+    for (const [x, y] of tri) pushVert(x, y, sign * halfThickAt(x, y), 0, 0, sign)
   }
+  const subdiv = (p0: Pt, p1: Pt, p2: Pt, level: number, sign: number) => {
+    if (level <= 0) { emitCapTri(p0, p1, p2, sign); return }
+    const a = mid(p0, p1), b = mid(p1, p2), c = mid(p2, p0)
+    subdiv(p0, a, c, level - 1, sign)
+    subdiv(a, p1, b, level - 1, sign)
+    subdiv(c, b, p2, level - 1, sign)
+    subdiv(a, b, c, level - 1, sign)
+  }
+  const lvl = Math.max(0, capSubdiv)
+  // front cap (tapered, normal +z)
+  for (const [a, b, c] of faces) subdiv(allV[a], allV[b], allV[c], lvl, +1)
   const group0Count = positions.length / 3 // front+edge → material 0
 
-  // back cap (normal -z), reversed winding
-  for (const [a, b, c] of faces) {
-    for (const idx of [c, b, a]) {
-      const [x, y] = allV[idx]
-      pushVert(x, y, zBot, 0, 0, -1)
-    }
-  }
+  // back cap (tapered, normal -z)
+  for (const [a, b, c] of faces) subdiv(allV[a], allV[b], allV[c], lvl, -1)
   const totalCount = positions.length / 3
 
   const geometry = new THREE.BufferGeometry()

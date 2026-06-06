@@ -102,11 +102,13 @@ export default function ShapedModel({
     })
   }, [result?.texture, normalMap, roughnessMap, bumpMap, suede])
 
-  // Edge = the picture's colour but BLURRED (soft rim), not the stretched image.
+  // Edge = the SAME ultrasuede material (same normal/roughness/bump/sheen maps) as the front,
+  // slightly changed: the picture's colour but BLURRED (soft rim) and DARKER (colour multiplier
+  // preserves the inherited blurred hue, just deepens it). Not the stretched image.
   const edgeMaterial = useMemo(() => {
     return new THREE.MeshPhysicalMaterial({
       map: result?.edgeTexture ?? null,
-      color: new THREE.Color(0xffffff),
+      color: new THREE.Color(0xffffff), // halo texture is already darkened in the pipeline
       normalMap,
       normalScale: new THREE.Vector2(suede.normalScale, suede.normalScale),
       bumpMap,

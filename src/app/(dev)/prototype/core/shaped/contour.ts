@@ -214,7 +214,7 @@ export function buildContour(
   }
 
   // smooth the stair-stepped marching-squares boundary, THEN lightly simplify (keeps smooth + high-res)
-  const SMOOTH_ITER = 2
+  const SMOOTH_ITER = 4
   const outerPts = rdp(chaikin(orient(outerRaw.pts, true), SMOOTH_ITER), epsilonPx)
   const holes: Ring[] = holesRaw.map((hRaw) => ({
     pts: rdp(chaikin(orient(hRaw.pts, false), SMOOTH_ITER), epsilonPx),
