@@ -3,7 +3,8 @@
 import * as THREE from 'three'
 import type { ShapePoint, ShapeSpecDraft } from './shape-spec'
 
-const PROFILE_STEPS = 6
+const PROFILE_STEPS = 8
+const EDGE_LATERAL_BLEND = 0.16
 const MM_TO_SCENE = 0.001
 
 interface BuildVertex {
@@ -134,8 +135,8 @@ function addRingEdge({
       const ny = normal.y * sideNormal
       const nl = Math.hypot(nx, ny, zNormal) || 1
       profileIndices.push(pushVertex(vertices, {
-        x: point.x * MM_TO_SCENE + normal.x * radiusScene * arc * 0.35,
-        y: point.y * MM_TO_SCENE + normal.y * radiusScene * arc * 0.35,
+        x: point.x * MM_TO_SCENE + normal.x * radiusScene * arc * EDGE_LATERAL_BLEND,
+        y: point.y * MM_TO_SCENE + normal.y * radiusScene * arc * EDGE_LATERAL_BLEND,
         z: thicknessScene / 2 - thicknessScene * t,
         nx: nx / nl,
         ny: ny / nl,

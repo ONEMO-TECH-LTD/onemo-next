@@ -96,6 +96,34 @@ function createGoldenSolidSuedeMaterial(role: ViewerMaterialRole | undefined, co
   })
 }
 
+function createGoldenEdgeSuedeMaterial(role: ViewerMaterialRole | undefined, edgeMap: THREE.Texture) {
+  const defaults = role?.defaults ?? {}
+  const textures = role?.textures ?? {}
+
+  return new THREE.MeshPhysicalMaterial({
+    map: edgeMap,
+    color: new THREE.Color(0.78, 0.78, 0.78),
+    normalMap: loadMaterialTexture(textures.normalMap, { color: false }),
+    normalScale: new THREE.Vector2(
+      Number(defaults.normalScale ?? 0.15) * 0.7,
+      Number(defaults.normalScale ?? 0.15) * 0.7
+    ),
+    bumpMap: loadMaterialTexture(textures.bumpMap, { color: false }),
+    bumpScale: Number(defaults.bumpScale ?? 1) * 0.45,
+    roughnessMap: loadMaterialTexture(textures.roughnessMap, { color: false }),
+    roughness: Math.max(0.95, Number(defaults.roughness ?? 1)),
+    metalness: 0,
+    specularIntensity: 0.05,
+    sheen: Math.min(0.35, Number(defaults.sheen ?? 0.35)),
+    sheenColor: new THREE.Color(defaults.sheenColor ?? '#1a1a1a'),
+    sheenRoughness: 1,
+    envMapIntensity: Math.min(0.03, Number(defaults.envMapIntensity ?? 0.03)),
+    clearcoat: 0,
+    clearcoatRoughness: 1,
+    side: THREE.DoubleSide,
+  })
+}
+
 export default function ShapedPreview({
   artworkUrl,
   designState,
@@ -201,17 +229,7 @@ export default function ShapedPreview({
     return [
       createGoldenFaceMaterial(faceRole, frontTexture),
       createGoldenSolidSuedeMaterial(backRole, String(backRole?.defaults?.color ?? '#080808')),
-      new THREE.MeshPhysicalMaterial({
-        map: edgeTexture,
-        roughnessMap: loadMaterialTexture(faceRole?.textures?.roughnessMap, { color: false }),
-        roughness: Number(faceRole?.defaults?.roughness ?? 1),
-        metalness: 0,
-        sheen: Number(faceRole?.defaults?.sheen ?? 1),
-        sheenColor: new THREE.Color(faceRole?.defaults?.sheenColor ?? '#1a1a1a'),
-        sheenRoughness: Number(faceRole?.defaults?.sheenRoughness ?? 0.8),
-        envMapIntensity: Number(faceRole?.defaults?.envMapIntensity ?? 0.1),
-        side: THREE.DoubleSide,
-      }),
+      createGoldenEdgeSuedeMaterial(faceRole, edgeTexture),
     ]
   }, [edgeTexture, frontTexture, product])
 
