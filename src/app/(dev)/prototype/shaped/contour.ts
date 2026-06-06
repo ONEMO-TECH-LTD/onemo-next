@@ -108,6 +108,24 @@ export function simplifyRdp(points: ShapePoint[], epsilon: number): ShapePoint[]
   return simplified.length >= 3 ? simplified : working
 }
 
+function smoothClosedRing(points: ShapePoint[], iterations: number) {
+  let ring = points
+  for (let iteration = 0; iteration < iterations; iteration += 1) {
+    if (ring.length < 3) return ring
+    const nextRing: ShapePoint[] = []
+    for (let index = 0; index < ring.length; index += 1) {
+      const a = ring[index]
+      const b = ring[(index + 1) % ring.length]
+      nextRing.push(
+        { x: a.x * 0.75 + b.x * 0.25, y: a.y * 0.75 + b.y * 0.25 },
+        { x: a.x * 0.25 + b.x * 0.75, y: a.y * 0.25 + b.y * 0.75 }
+      )
+    }
+    ring = nextRing
+  }
+  return ring
+}
+
 function maskAt(mask: BinaryMask, x: number, y: number) {
   if (x < 0 || y < 0 || x >= mask.width || y >= mask.height) return 0
   return mask.data[y * mask.width + x]
@@ -389,15 +407,17 @@ export function createShapeSpecDraftFromMask({
   const minDimensionPx = Math.max(1, Math.min(outerBoundsRaw.maxX - outerBoundsRaw.minX, outerBoundsRaw.maxY - outerBoundsRaw.minY))
   const pxToMm = settings.targetMinDimensionMm / minDimensionPx
   const simplifyPx = settings.simplifyEpsilonMm / pxToMm
+  const smoothIterations = componentMask.foregroundMode === 'alpha' ? 1 : 2
 
-  const outerSourceInitial = simplifyRdp(outerSourceRaw, simplifyPx)
+  const outerSourceInitial = smoothClosedRing(simplifyRdp(outerSourceRaw, simplifyPx), smoothIterations)
   const sourceBounds = polygonBounds(outerSourceInitial)
 
-  const holePairs = loops.slice(1).flatMap((loop) => {
+  const holeLoops = componentMask.foregroundMode === 'alpha' ? loops.slice(1) : []
+  const holePairs = holeLoops.flatMap((loop) => {
     const sourceLoop = scaleLoopToSource(loop.points, mask, sourceWidth, sourceHeight)
     const c = centroid(sourceLoop)
     if (!pointInPolygon(c, outerSourceInitial)) return []
-    const simplified = simplifyRdp(sourceLoop, simplifyPx)
+    const simplified = smoothClosedRing(simplifyRdp(sourceLoop, simplifyPx), smoothIterations)
     if (simplified.length < 3) return []
     return [orientPairedRings(simplified, toShapeMm(simplified, sourceBounds, pxToMm), 'cw')]
   })
@@ -456,6 +476,7 @@ export function createShapeSpecDraftFromMask({
       width: dimensionsWidth,
       height: dimensionsHeight,
       thickness_body: SHAPED_DEFAULTS.bodyThicknessMm,
+      min_feature_width_mm: settings.minFeatureWidthMm,
       edge_profile: 'rounded',
       edge_radius_mm: SHAPED_DEFAULTS.edgeRadiusMm,
       source_px_to_shape_mm: pxToMm,
@@ -486,6 +507,14 @@ export function createShapeSpecDraftFromMask({
         measured: Math.min(dimensionsWidth, dimensionsHeight),
         threshold: settings.targetMinDimensionMm,
         message: `Smallest dimension is locked to ${settings.targetMinDimensionMm}mm for this preview slice.`,
+      },
+      {
+        code: 'MIN_FEATURE_WIDTH',
+        subsystem: 'manufacturing',
+        severity: 'info',
+        measured: settings.minFeatureWidthMm,
+        threshold: settings.minFeatureWidthMm,
+        message: `Opaque auto-cutout uses ${settings.minFeatureWidthMm}mm minimum feature width; thinner details are intentionally excluded or absorbed.`,
       },
     ],
   }

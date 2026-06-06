@@ -25,7 +25,7 @@ const SCROLL_SENSITIVITY = 0.002
 function PrototypePageInner() {
   const searchParams = useSearchParams()
   const shapeParamEnabled = searchParams.get('shape') === '1' || searchParams.get('mode') === 'shaped'
-  const [artworkUrl, setArtworkUrl] = useState<string | undefined>(shapeParamEnabled ? '/assets/shaped-demo.svg' : undefined)
+  const [artworkUrl, setArtworkUrl] = useState<string | undefined>(shapeParamEnabled ? '/assets/effects-art-test/butterfly-blue.jpg' : undefined)
   const [isDragging, setIsDragging] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [designState, setDesignState] = useState<DesignState>(INITIAL_DESIGN)

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import * as THREE from 'three'
-import type { DesignState, SceneSettings } from '../types'
+import type { DesignState, SceneSettings, ViewerMaterialRole, ViewerProductConfig } from '../types'
 import { createEdgeBleedCanvas, loadImageElement, segmentImageToMask } from './browser-segmentation'
 import { createShapeSpecDraftFromMask } from './contour'
 import { createRoundedShapeGeometry } from './mesh-builder'
@@ -12,15 +12,95 @@ interface ShapedPreviewProps {
   artworkUrl: string
   designState: DesignState
   scene: SceneSettings
+  product?: ViewerProductConfig
   settings: ShapedPreviewSettings
   onDraftChange?: (draft: ShapeSpecDraft | null) => void
   onErrorChange?: (message: string | null) => void
+}
+
+const textureCache = new Map<string, THREE.Texture>()
+
+function loadMaterialTexture(
+  url: string | undefined,
+  {
+    color = false,
+    repeat = false,
+  }: { color?: boolean; repeat?: boolean } = {}
+) {
+  if (!url) return null
+
+  const cacheKey = `${url}::${color ? 'color' : 'data'}::${repeat ? 'repeat' : 'clamp'}`
+  const cached = textureCache.get(cacheKey)
+  if (cached) return cached
+
+  const texture = new THREE.TextureLoader().load(url, (loaded) => {
+    loaded.colorSpace = color ? THREE.SRGBColorSpace : THREE.NoColorSpace
+    loaded.wrapS = loaded.wrapT = repeat ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping
+    loaded.needsUpdate = true
+  })
+  texture.colorSpace = color ? THREE.SRGBColorSpace : THREE.NoColorSpace
+  texture.wrapS = texture.wrapT = repeat ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping
+  textureCache.set(cacheKey, texture)
+  return texture
+}
+
+function createGoldenFaceMaterial(role: ViewerMaterialRole | undefined, artworkMap: THREE.Texture) {
+  const defaults = role?.defaults ?? {}
+  const textures = role?.textures ?? {}
+  const colorMultiplier = Number(defaults.colorMultiplier ?? 1)
+
+  return new THREE.MeshPhysicalMaterial({
+    map: artworkMap,
+    color: new THREE.Color(colorMultiplier, colorMultiplier, colorMultiplier),
+    normalMap: loadMaterialTexture(textures.normalMap, { color: false }),
+    normalScale: new THREE.Vector2(
+      Number(defaults.normalScale ?? 0.15),
+      Number(defaults.normalScale ?? 0.15)
+    ),
+    bumpMap: loadMaterialTexture(textures.bumpMap, { color: false }),
+    bumpScale: Number(defaults.bumpScale ?? 1),
+    roughnessMap: loadMaterialTexture(textures.roughnessMap, { color: false }),
+    roughness: Number(defaults.roughness ?? 1),
+    metalness: Number(defaults.metalness ?? 0),
+    sheen: Number(defaults.sheen ?? 1),
+    sheenColor: new THREE.Color(defaults.sheenColor ?? '#1a1a1a'),
+    sheenRoughness: Number(defaults.sheenRoughness ?? 0.8),
+    envMapIntensity: Number(defaults.envMapIntensity ?? 0.1),
+    clearcoat: Number(defaults.clearcoat ?? 0),
+    clearcoatRoughness: Number(defaults.clearcoatRoughness ?? 0),
+    side: THREE.DoubleSide,
+  })
+}
+
+function createGoldenSolidSuedeMaterial(role: ViewerMaterialRole | undefined, color: string) {
+  const defaults = role?.defaults ?? {}
+  const textures = role?.textures ?? {}
+
+  return new THREE.MeshPhysicalMaterial({
+    color: new THREE.Color(color),
+    normalMap: loadMaterialTexture(textures.normalMap, { color: false }),
+    normalScale: new THREE.Vector2(
+      Number(defaults.normalScale ?? 0.15),
+      Number(defaults.normalScale ?? 0.15)
+    ),
+    bumpMap: loadMaterialTexture(textures.bumpMap, { color: false }),
+    bumpScale: Number(defaults.bumpScale ?? 1),
+    roughnessMap: loadMaterialTexture(textures.roughnessMap, { color: false }),
+    roughness: Number(defaults.roughness ?? 1),
+    metalness: Number(defaults.metalness ?? 0),
+    sheen: Number(defaults.sheen ?? 1),
+    sheenColor: new THREE.Color(defaults.sheenColor ?? '#1a1a1a'),
+    sheenRoughness: Number(defaults.sheenRoughness ?? 0.8),
+    envMapIntensity: Number(defaults.envMapIntensity ?? 0.1),
+    side: THREE.DoubleSide,
+  })
 }
 
 export default function ShapedPreview({
   artworkUrl,
   designState,
   scene,
+  product,
   settings,
   onDraftChange,
   onErrorChange,
@@ -46,11 +126,11 @@ export default function ShapedPreview({
           mask,
           settings,
         })
-        const loader = new THREE.TextureLoader()
-        const nextFrontTexture = await loader.loadAsync(artworkUrl)
+        const nextFrontTexture = await new THREE.TextureLoader().loadAsync(artworkUrl)
         nextFrontTexture.colorSpace = THREE.SRGBColorSpace
-        nextFrontTexture.wrapS = THREE.ClampToEdgeWrapping
-        nextFrontTexture.wrapT = THREE.ClampToEdgeWrapping
+        nextFrontTexture.wrapS = THREE.RepeatWrapping
+        nextFrontTexture.wrapT = THREE.RepeatWrapping
+        nextFrontTexture.needsUpdate = true
 
         const bleedCanvas = createEdgeBleedCanvas(loaded, nextDraft.geometry_px.outer)
         const nextEdgeTexture = new THREE.CanvasTexture(bleedCanvas)
@@ -113,36 +193,27 @@ export default function ShapedPreview({
 
   const materials = useMemo(() => {
     if (!frontTexture || !edgeTexture) return null
+    const faceRole = product?.artworkSlot
+      ? product.materialRoles.find((role) => role.role === product.artworkSlot?.role)
+      : product?.materialRoles.find((role) => role.role === 'face') ?? product?.materialRoles[0]
+    const backRole = product?.materialRoles.find((role) => role.role === 'back') ?? faceRole
+
     return [
-      new THREE.MeshPhysicalMaterial({
-        map: frontTexture,
-        roughness: 0.82,
-        metalness: 0,
-        sheen: 0.65,
-        sheenColor: new THREE.Color('#f4efe4'),
-        sheenRoughness: 0.9,
-        side: THREE.DoubleSide,
-      }),
-      new THREE.MeshPhysicalMaterial({
-        color: '#17130f',
-        roughness: 0.94,
-        metalness: 0,
-        sheen: 0.7,
-        sheenColor: new THREE.Color('#30251d'),
-        sheenRoughness: 0.95,
-        side: THREE.DoubleSide,
-      }),
+      createGoldenFaceMaterial(faceRole, frontTexture),
+      createGoldenSolidSuedeMaterial(backRole, String(backRole?.defaults?.color ?? '#080808')),
       new THREE.MeshPhysicalMaterial({
         map: edgeTexture,
-        roughness: 0.88,
+        roughnessMap: loadMaterialTexture(faceRole?.textures?.roughnessMap, { color: false }),
+        roughness: Number(faceRole?.defaults?.roughness ?? 1),
         metalness: 0,
-        sheen: 0.55,
-        sheenColor: new THREE.Color('#eadfce'),
-        sheenRoughness: 0.9,
+        sheen: Number(faceRole?.defaults?.sheen ?? 1),
+        sheenColor: new THREE.Color(faceRole?.defaults?.sheenColor ?? '#1a1a1a'),
+        sheenRoughness: Number(faceRole?.defaults?.sheenRoughness ?? 0.8),
+        envMapIntensity: Number(faceRole?.defaults?.envMapIntensity ?? 0.1),
         side: THREE.DoubleSide,
       }),
     ]
-  }, [edgeTexture, frontTexture])
+  }, [edgeTexture, frontTexture, product])
 
   useEffect(() => {
     return () => {

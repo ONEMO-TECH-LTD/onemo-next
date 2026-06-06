@@ -272,6 +272,7 @@ export default function EffectViewer({
               artworkUrl={effectiveArtworkUrl}
               designState={designState}
               scene={config.scene}
+              product={config.product}
               settings={shapedPreview.settings}
               onDraftChange={shapedPreview.onDraftChange}
               onErrorChange={shapedPreview.onErrorChange}

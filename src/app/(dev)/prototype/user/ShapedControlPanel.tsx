@@ -96,11 +96,24 @@ export default function ShapedControlPanel({
       </label>
       <input
         type="range"
-        min={0.15}
-        max={0.8}
-        step={0.05}
+        min={0.05}
+        max={0.5}
+        step={0.01}
         value={settings.simplifyEpsilonMm}
         onChange={(event) => onSettingsChange({ ...settings, simplifyEpsilonMm: Number(event.target.value) })}
+        style={{ width: '100%' }}
+      />
+
+      <label style={{ display: 'block', fontSize: 11, color: 'rgba(255,255,255,0.7)', margin: '12px 0 6px' }}>
+        Min feature width: {settings.minFeatureWidthMm.toFixed(1)}mm
+      </label>
+      <input
+        type="range"
+        min={1}
+        max={5}
+        step={0.1}
+        value={settings.minFeatureWidthMm}
+        onChange={(event) => onSettingsChange({ ...settings, minFeatureWidthMm: Number(event.target.value) })}
         style={{ width: '100%' }}
       />
 
@@ -124,6 +137,7 @@ export default function ShapedControlPanel({
             <div><strong>Size:</strong> {round(draft.dimensions_mm.width)} x {round(draft.dimensions_mm.height)}mm</div>
             <div><strong>Thickness:</strong> {draft.dimensions_mm.thickness_body}mm</div>
             <div><strong>Edge:</strong> rounded {draft.dimensions_mm.edge_radius_mm}mm, not bevel</div>
+            <div><strong>Min feature:</strong> {draft.dimensions_mm.min_feature_width_mm}mm</div>
             <div><strong>Nodes:</strong> {draft.geometry_mm.outer.length}</div>
             <div><strong>Attachment:</strong> adaptive 54mm grid stub</div>
           </>

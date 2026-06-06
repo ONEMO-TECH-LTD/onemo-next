@@ -55,6 +55,68 @@ function colorDistance(r: number, g: number, b: number, bg: { r: number; g: numb
   return Math.hypot(r - bg.r, g - bg.g, b - bg.b)
 }
 
+function fillInteriorBackground(mask: Uint8Array, width: number, height: number) {
+  const exterior = new Uint8Array(mask.length)
+  const queue: number[] = []
+
+  function enqueue(x: number, y: number) {
+    if (x < 0 || y < 0 || x >= width || y >= height) return
+    const index = y * width + x
+    if (mask[index] || exterior[index]) return
+    exterior[index] = 1
+    queue.push(index)
+  }
+
+  for (let x = 0; x < width; x += 1) {
+    enqueue(x, 0)
+    enqueue(x, height - 1)
+  }
+  for (let y = 0; y < height; y += 1) {
+    enqueue(0, y)
+    enqueue(width - 1, y)
+  }
+
+  while (queue.length) {
+    const current = queue.pop()
+    if (current === undefined) break
+    const x = current % width
+    const y = Math.floor(current / width)
+    enqueue(x - 1, y)
+    enqueue(x + 1, y)
+    enqueue(x, y - 1)
+    enqueue(x, y + 1)
+  }
+
+  for (let index = 0; index < mask.length; index += 1) {
+    if (!mask[index] && !exterior[index]) {
+      mask[index] = 1
+    }
+  }
+}
+
+function dilateMask(mask: Uint8Array, width: number, height: number, radius: number) {
+  const output = new Uint8Array(mask.length)
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      let hit = false
+      for (let dy = -radius; dy <= radius && !hit; dy += 1) {
+        for (let dx = -radius; dx <= radius; dx += 1) {
+          if (dx * dx + dy * dy > radius * radius) continue
+          const nx = x + dx
+          const ny = y + dy
+          if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue
+          if (mask[ny * width + nx]) {
+            hit = true
+            break
+          }
+        }
+      }
+      output[y * width + x] = hit ? 1 : 0
+    }
+  }
+  return output
+}
+
 export function segmentImageToMask(loaded: LoadedImage, settings: ShapedPreviewSettings): BinaryMask {
   const scale = settings.maskResolution / Math.max(loaded.width, loaded.height)
   const width = Math.max(32, Math.round(loaded.width * scale))
@@ -91,6 +153,10 @@ export function segmentImageToMask(loaded: LoadedImage, settings: ShapedPreviewS
     const distance = colorDistance(data[offset], data[offset + 1], data[offset + 2], bg)
     mask[i] = distance >= settings.threshold ? 1 : 0
   }
+  const minFeaturePx = Math.max(1, Math.round((settings.minFeatureWidthMm / settings.targetMinDimensionMm) * Math.min(width, height)))
+  const pruneRadius = Math.max(1, Math.round(minFeaturePx / 2))
+  mask.set(dilateMask(mask, width, height, pruneRadius))
+  fillInteriorBackground(mask, width, height)
 
   return { width, height, data: mask, foregroundMode: 'border-background' }
 }
@@ -148,14 +214,25 @@ export function createEdgeBleedCanvas(loaded: LoadedImage, outerPx: ShapePoint[]
     const { point } = pointAtLength(outerPx, (x / bleed.width) * perimeter)
     const towardCenter = { x: center.x - point.x, y: center.y - point.y }
     const len = Math.hypot(towardCenter.x, towardCenter.y) || 1
-    const sx = Math.max(0, Math.min(loaded.width - 1, Math.round(point.x + (towardCenter.x / len) * 3)))
-    const sy = Math.max(0, Math.min(loaded.height - 1, Math.round(point.y + (towardCenter.y / len) * 3)))
-    const sourceIndex = (sy * loaded.width + sx) * 4
+    const samples = [2, 5, 9, 14]
+    const color = samples.reduce(
+      (acc, distance) => {
+        const sx = Math.max(0, Math.min(loaded.width - 1, Math.round(point.x + (towardCenter.x / len) * distance)))
+        const sy = Math.max(0, Math.min(loaded.height - 1, Math.round(point.y + (towardCenter.y / len) * distance)))
+        const sourceIndex = (sy * loaded.width + sx) * 4
+        return {
+          r: acc.r + sourceData.data[sourceIndex],
+          g: acc.g + sourceData.data[sourceIndex + 1],
+          b: acc.b + sourceData.data[sourceIndex + 2],
+        }
+      },
+      { r: 0, g: 0, b: 0 }
+    )
     for (let y = 0; y < bleed.height; y += 1) {
       const outIndex = (y * bleed.width + x) * 4
-      output.data[outIndex] = sourceData.data[sourceIndex]
-      output.data[outIndex + 1] = sourceData.data[sourceIndex + 1]
-      output.data[outIndex + 2] = sourceData.data[sourceIndex + 2]
+      output.data[outIndex] = color.r / samples.length
+      output.data[outIndex + 1] = color.g / samples.length
+      output.data[outIndex + 2] = color.b / samples.length
       output.data[outIndex + 3] = 255
     }
   }

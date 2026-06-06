@@ -58,6 +58,7 @@ export interface ShapeSpecDraft {
     width: number
     height: number
     thickness_body: number
+    min_feature_width_mm: number
     edge_profile: 'rounded'
     edge_radius_mm: number
     source_px_to_shape_mm: number
@@ -80,6 +81,7 @@ export interface ShapedPreviewSettings {
   threshold: number
   simplifyEpsilonMm: number
   maskResolution: number
+  minFeatureWidthMm: number
 }
 
 export const SHAPED_DEFAULTS = {
@@ -87,9 +89,10 @@ export const SHAPED_DEFAULTS = {
   edgeRadiusMm: 1,
   gridPitchMm: 54,
   targetMinDimensionMm: 70,
-  simplifyEpsilonMm: 0.35,
+  simplifyEpsilonMm: 0.42,
+  minFeatureWidthMm: 2.4,
   threshold: 36,
-  maskResolution: 260,
+  maskResolution: 480,
 } as const
 
 export const INITIAL_SHAPED_SETTINGS: ShapedPreviewSettings = {
@@ -97,4 +100,5 @@ export const INITIAL_SHAPED_SETTINGS: ShapedPreviewSettings = {
   threshold: SHAPED_DEFAULTS.threshold,
   simplifyEpsilonMm: SHAPED_DEFAULTS.simplifyEpsilonMm,
   maskResolution: SHAPED_DEFAULTS.maskResolution,
+  minFeatureWidthMm: SHAPED_DEFAULTS.minFeatureWidthMm,
 }

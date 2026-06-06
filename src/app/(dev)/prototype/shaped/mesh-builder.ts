@@ -144,7 +144,6 @@ function addRingEdge({
         v: t,
       }))
     }
-
     ringIndices.push(profileIndices)
     travelled += Math.hypot(next.x - point.x, next.y - point.y)
   }
