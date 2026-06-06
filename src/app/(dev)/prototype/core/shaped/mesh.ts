@@ -188,11 +188,15 @@ export function buildShapedGeometry(contour: Contour, opts: MeshOptions): Shaped
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3))
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
-  geometry.addGroup(0, group0Count, 0)               // front + edge → artwork/bled suede
-  geometry.addGroup(group0Count, totalCount - group0Count, 1) // back → solid suede
+  // Three material groups: edge (blurred), front (sharp artwork), back (solid)
+  const edgeCount = frontEdgeCount
+  const frontCount = group0Count - frontEdgeCount
+  const backCount = totalCount - group0Count
+  geometry.addGroup(edgeCount, frontCount, 0)        // front → material 0 (sharp artwork)
+  geometry.addGroup(0, edgeCount, 1)                 // edge  → material 1 (blurred picture colour)
+  geometry.addGroup(group0Count, backCount, 2)       // back  → material 2 (solid suede)
   geometry.computeBoundingBox()
   geometry.computeBoundingSphere()
-  void frontEdgeCount
 
   return {
     geometry,

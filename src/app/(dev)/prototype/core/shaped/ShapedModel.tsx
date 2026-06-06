@@ -42,8 +42,9 @@ export default function ShapedModel({
   onSpec,
   onStatus,
 }: ShapedModelProps) {
-  const [result, setResult] = useState<{ geometry: THREE.BufferGeometry; texture: THREE.CanvasTexture; widthMM: number; heightMM: number } | null>(null)
+  const [result, setResult] = useState<{ geometry: THREE.BufferGeometry; texture: THREE.CanvasTexture; edgeTexture: THREE.CanvasTexture; widthMM: number; heightMM: number } | null>(null)
   const artTexRef = useRef<THREE.CanvasTexture | null>(null)
+  const edgeTexRef = useRef<THREE.CanvasTexture | null>(null)
 
   // Run the pipeline whenever the artwork changes
   useEffect(() => {
@@ -51,19 +52,21 @@ export default function ShapedModel({
     if (!artworkUrl) {
       // clear any stale mesh when artwork is removed
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setResult((prev) => { prev?.geometry.dispose(); prev?.texture.dispose(); return null })
+      setResult((prev) => { prev?.geometry.dispose(); prev?.texture.dispose(); prev?.edgeTexture.dispose(); return null })
       return
     }
     onStatus?.('building')
     buildShape(artworkUrl, DEFAULT_BUILD_CONFIG)
       .then((r) => {
-        if (cancelled) { r.geometry.dispose(); r.texture.dispose(); return }
+        if (cancelled) { r.geometry.dispose(); r.texture.dispose(); r.edgeTexture.dispose(); return }
         setResult((prev) => {
           prev?.geometry.dispose()
           prev?.texture.dispose()
+          prev?.edgeTexture.dispose()
           return r
         })
         artTexRef.current = r.texture
+        edgeTexRef.current = r.edgeTexture
         onSpec?.(r.spec)
         onStatus?.('ready')
       })
@@ -99,6 +102,26 @@ export default function ShapedModel({
     })
   }, [result?.texture, normalMap, roughnessMap, bumpMap, suede])
 
+  // Edge = the picture's colour but BLURRED (soft rim), not the stretched image.
+  const edgeMaterial = useMemo(() => {
+    return new THREE.MeshPhysicalMaterial({
+      map: result?.edgeTexture ?? null,
+      color: new THREE.Color(0xffffff),
+      normalMap,
+      normalScale: new THREE.Vector2(suede.normalScale, suede.normalScale),
+      bumpMap,
+      bumpScale: suede.bumpScale,
+      roughnessMap,
+      roughness: suede.roughness,
+      metalness: suede.metalness,
+      sheen: suede.sheen,
+      sheenColor: new THREE.Color(suede.sheenColor),
+      sheenRoughness: suede.sheenRoughness,
+      envMapIntensity: suede.envMapIntensity,
+      side: THREE.DoubleSide,
+    })
+  }, [result?.edgeTexture, normalMap, roughnessMap, bumpMap, suede])
+
   const backMaterial = useMemo(() => {
     return new THREE.MeshPhysicalMaterial({
       color: new THREE.Color(backColor),
@@ -119,19 +142,20 @@ export default function ShapedModel({
 
   // design-state pan/zoom on the front artwork texture (same model as the golden configurator)
   useEffect(() => {
-    const tex = artTexRef.current
-    if (!tex) return
     const repeat = 1 / designState.scale
-    tex.repeat.set(repeat, repeat)
     const centerOffset = (1 - repeat) / 2
-    tex.offset.set(
-      centerOffset + designState.offsetX * repeat,
-      centerOffset + designState.offsetY * repeat
-    )
-    tex.needsUpdate = true
+    const ox = centerOffset + designState.offsetX * repeat
+    const oy = centerOffset + designState.offsetY * repeat
+    for (const tex of [artTexRef.current, edgeTexRef.current]) {
+      if (!tex) continue
+      tex.repeat.set(repeat, repeat)
+      tex.offset.set(ox, oy)
+      tex.needsUpdate = true
+    }
   }, [designState, result])
 
-  const materials = useMemo(() => [frontMaterial, backMaterial], [frontMaterial, backMaterial])
+  // order matches geometry groups: 0 = front (sharp), 1 = edge (blurred), 2 = back (solid)
+  const materials = useMemo(() => [frontMaterial, edgeMaterial, backMaterial], [frontMaterial, edgeMaterial, backMaterial])
 
   // mm → scene units so the longest side maps to fitSize
   const scale = useMemo(() => {

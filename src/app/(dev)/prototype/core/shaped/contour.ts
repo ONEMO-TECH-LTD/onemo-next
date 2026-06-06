@@ -128,6 +128,24 @@ function pointInPoly(p: Pt, poly: Pt[]): boolean {
   return inside
 }
 
+/** Chaikin corner-cutting on a closed ring — turns marching-squares stair-steps into smooth curves. */
+export function chaikin(pts: Pt[], iterations: number): Pt[] {
+  let p = pts
+  for (let k = 0; k < iterations; k++) {
+    const n = p.length
+    if (n < 3) break
+    const out: Pt[] = []
+    for (let i = 0; i < n; i++) {
+      const a = p[i]
+      const b = p[(i + 1) % n]
+      out.push([0.75 * a[0] + 0.25 * b[0], 0.75 * a[1] + 0.25 * b[1]])
+      out.push([0.25 * a[0] + 0.75 * b[0], 0.25 * a[1] + 0.75 * b[1]])
+    }
+    p = out
+  }
+  return p
+}
+
 /** Ramer–Douglas–Peucker, epsilon in the same units as pts. */
 export function rdp(pts: Pt[], epsilon: number): Pt[] {
   if (pts.length < 3) return pts
@@ -195,9 +213,11 @@ export function buildContour(
     return ccw === wantCCW ? pts : [...pts].reverse()
   }
 
-  const outerPts = rdp(orient(outerRaw.pts, true), epsilonPx)
+  // smooth the stair-stepped marching-squares boundary, THEN lightly simplify (keeps smooth + high-res)
+  const SMOOTH_ITER = 2
+  const outerPts = rdp(chaikin(orient(outerRaw.pts, true), SMOOTH_ITER), epsilonPx)
   const holes: Ring[] = holesRaw.map((hRaw) => ({
-    pts: rdp(orient(hRaw.pts, false), epsilonPx),
+    pts: rdp(chaikin(orient(hRaw.pts, false), SMOOTH_ITER), epsilonPx),
   }))
 
   const outer: Ring = { pts: outerPts }

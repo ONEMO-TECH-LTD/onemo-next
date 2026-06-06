@@ -22,17 +22,18 @@ export interface ShapeBuildConfig {
 
 export const DEFAULT_BUILD_CONFIG: ShapeBuildConfig = {
   longestSideMM: 100,
-  thicknessMM: 1.6,
-  edgeRadiusMM: 1.0,
-  edgeSegments: 6,
-  rdpEpsilonMM: 0.3,
-  maxImageDim: 512,
+  thicknessMM: 1.0,          // Dan 2026-06-06: 1mm reads better than 1.6
+  edgeRadiusMM: 0.5,         // full bullnose on a 1mm body (clamped to thickness/2)
+  edgeSegments: 8,
+  rdpEpsilonMM: 0.12,        // finer → smooth high-res silhouette (Draco handles size later)
+  maxImageDim: 1024,         // higher-res mask → smoother contour
   textureDim: 1600,
 }
 
 export interface ShapeBuildResult {
   geometry: THREE.BufferGeometry
   texture: THREE.CanvasTexture
+  edgeTexture: THREE.CanvasTexture
   spec: ShapeSpecDraft
   widthMM: number
   heightMM: number
@@ -105,6 +106,19 @@ export async function buildShape(
   texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping
   texture.needsUpdate = true
 
+  // Edge texture = the picture's colours but BLURRED (soft rim), not the stretched image.
+  const edgeCanvas = document.createElement('canvas')
+  edgeCanvas.width = canvas.width
+  edgeCanvas.height = canvas.height
+  const ectx = edgeCanvas.getContext('2d')!
+  ectx.filter = `blur(${Math.max(3, Math.round(canvas.width / 90))}px)`
+  ectx.drawImage(canvas, 0, 0)
+  const edgeTexture = new THREE.CanvasTexture(edgeCanvas)
+  edgeTexture.colorSpace = THREE.SRGBColorSpace
+  edgeTexture.flipY = false
+  edgeTexture.wrapS = edgeTexture.wrapT = THREE.ClampToEdgeWrapping
+  edgeTexture.needsUpdate = true
+
   const spec: ShapeSpecDraft = {
     sourceRef: url,
     maskWidthPx: width,
@@ -126,5 +140,5 @@ export async function buildShape(
     },
   }
 
-  return { geometry, texture, spec, widthMM, heightMM }
+  return { geometry, texture, edgeTexture, spec, widthMM, heightMM }
 }
