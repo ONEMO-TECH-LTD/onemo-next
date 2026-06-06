@@ -24,9 +24,9 @@ export interface ShapeBuildConfig {
 
 export const DEFAULT_BUILD_CONFIG: ShapeBuildConfig = {
   longestSideMM: 100,
-  bodyThicknessMM: 1.0,      // Dan 2026-06-06: ~1mm flat body (subject + padding)
-  edgeThicknessMM: 0.3,      // Dan 2026-06-06: bevel slims to 0.3mm at the rim
-  bevelWidthMM: 2.0,         // the slimming bevel sits just outside the padding
+  bodyThicknessMM: 1.0,      // Dan 2026-06-06: uniform ~1mm body
+  edgeThicknessMM: 1.0,      // Dan 2026-06-06: no gradual slim — uniform thickness, rounded edge
+  bevelWidthMM: 0,           // Dan 2026-06-06: gradual bevel removed
   edgeSegments: 6,
   rdpEpsilonMM: 0.12,        // finer → smooth high-res silhouette (Draco handles size later)
   maxImageDim: 1024,         // higher-res mask → smoother contour

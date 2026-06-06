@@ -115,14 +115,16 @@ export function buildShapedGeometry(contour: Contour, opts: MeshOptions): Shaped
     for (let i = 0; i < n; i++) {
       const j = (i + 1) % n
       const A = pts[i], B = pts[j], IA = inner[i], IB = inner[j], NA = N[i], NB = N[j]
-      // front bevel: inner @ +bodyHalf  →  contour @ +rimHalf
-      quad(
-        mk(IA[0], IA[1], +bodyHalf, NA[0] * nrb, NA[1] * nrb, nzb),
-        mk(IB[0], IB[1], +bodyHalf, NB[0] * nrb, NB[1] * nrb, nzb),
-        mk(A[0], A[1], +rimHalf, NA[0] * nrb, NA[1] * nrb, nzb),
-        mk(B[0], B[1], +rimHalf, NB[0] * nrb, NB[1] * nrb, nzb),
-      )
-      // thin rounded rim at the contour
+      if (bevelWidthMM > 1e-4) {
+        // front bevel: inner @ +bodyHalf  →  contour @ +rimHalf (slims body→rim)
+        quad(
+          mk(IA[0], IA[1], +bodyHalf, NA[0] * nrb, NA[1] * nrb, nzb),
+          mk(IB[0], IB[1], +bodyHalf, NB[0] * nrb, NB[1] * nrb, nzb),
+          mk(A[0], A[1], +rimHalf, NA[0] * nrb, NA[1] * nrb, nzb),
+          mk(B[0], B[1], +rimHalf, NB[0] * nrb, NB[1] * nrb, nzb),
+        )
+      }
+      // rounded rim at the contour
       for (let s = 0; s < rim.length - 1; s++) {
         const p0 = rim[s], p1 = rim[s + 1]
         quad(
@@ -132,13 +134,15 @@ export function buildShapedGeometry(contour: Contour, opts: MeshOptions): Shaped
           mk(B[0] + NB[0] * p1.radial, B[1] + NB[1] * p1.radial, p1.z, NB[0] * p1.nr, NB[1] * p1.nr, p1.nz),
         )
       }
-      // back bevel: contour @ -rimHalf  →  inner @ -bodyHalf
-      quad(
-        mk(A[0], A[1], -rimHalf, NA[0] * nrb, NA[1] * nrb, -nzb),
-        mk(B[0], B[1], -rimHalf, NB[0] * nrb, NB[1] * nrb, -nzb),
-        mk(IA[0], IA[1], -bodyHalf, NA[0] * nrb, NA[1] * nrb, -nzb),
-        mk(IB[0], IB[1], -bodyHalf, NB[0] * nrb, NB[1] * nrb, -nzb),
-      )
+      if (bevelWidthMM > 1e-4) {
+        // back bevel: contour @ -rimHalf  →  inner @ -bodyHalf
+        quad(
+          mk(A[0], A[1], -rimHalf, NA[0] * nrb, NA[1] * nrb, -nzb),
+          mk(B[0], B[1], -rimHalf, NB[0] * nrb, NB[1] * nrb, -nzb),
+          mk(IA[0], IA[1], -bodyHalf, NA[0] * nrb, NA[1] * nrb, -nzb),
+          mk(IB[0], IB[1], -bodyHalf, NB[0] * nrb, NB[1] * nrb, -nzb),
+        )
+      }
     }
   }
   const edgeCount = positions.length / 3
