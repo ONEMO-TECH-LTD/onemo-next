@@ -85,7 +85,7 @@ export interface ShapedPreviewSettings {
 }
 
 export const SHAPED_DEFAULTS = {
-  bodyThicknessMm: 1.6,
+  bodyThicknessMm: 0.8,
   edgeRadiusMm: 1,
   gridPitchMm: 54,
   targetMinDimensionMm: 70,

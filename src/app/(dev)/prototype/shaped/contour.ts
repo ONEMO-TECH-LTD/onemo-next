@@ -407,7 +407,7 @@ export function createShapeSpecDraftFromMask({
   const minDimensionPx = Math.max(1, Math.min(outerBoundsRaw.maxX - outerBoundsRaw.minX, outerBoundsRaw.maxY - outerBoundsRaw.minY))
   const pxToMm = settings.targetMinDimensionMm / minDimensionPx
   const simplifyPx = settings.simplifyEpsilonMm / pxToMm
-  const smoothIterations = componentMask.foregroundMode === 'alpha' ? 1 : 2
+  const smoothIterations = componentMask.foregroundMode === 'alpha' ? 2 : 3
 
   const outerSourceInitial = smoothClosedRing(simplifyRdp(outerSourceRaw, simplifyPx), smoothIterations)
   const sourceBounds = polygonBounds(outerSourceInitial)

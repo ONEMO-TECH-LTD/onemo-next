@@ -25,7 +25,7 @@ describe('shaped effect draft pipeline', () => {
       settings: INITIAL_SHAPED_SETTINGS,
     })
 
-    expect(draft.dimensions_mm.thickness_body).toBe(1.6)
+    expect(draft.dimensions_mm.thickness_body).toBe(0.8)
     expect(draft.dimensions_mm.edge_profile).toBe('rounded')
     expect(draft.dimensions_mm.edge_radius_mm).toBe(1)
     expect(Math.min(draft.dimensions_mm.width, draft.dimensions_mm.height)).toBeCloseTo(70, 1)
