@@ -124,6 +124,22 @@ function createGoldenEdgeSuedeMaterial(role: ViewerMaterialRole | undefined, edg
   })
 }
 
+function createArtworkTexture(loaded: { image: HTMLImageElement; width: number; height: number }) {
+  const canvas = document.createElement('canvas')
+  canvas.width = loaded.width
+  canvas.height = loaded.height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Canvas is unavailable for artwork texture.')
+  ctx.drawImage(loaded.image, 0, 0, loaded.width, loaded.height)
+
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.wrapS = THREE.RepeatWrapping
+  texture.wrapT = THREE.RepeatWrapping
+  texture.needsUpdate = true
+  return texture
+}
+
 export default function ShapedPreview({
   artworkUrl,
   designState,
@@ -154,11 +170,7 @@ export default function ShapedPreview({
           mask,
           settings,
         })
-        const nextFrontTexture = await new THREE.TextureLoader().loadAsync(artworkUrl)
-        nextFrontTexture.colorSpace = THREE.SRGBColorSpace
-        nextFrontTexture.wrapS = THREE.RepeatWrapping
-        nextFrontTexture.wrapT = THREE.RepeatWrapping
-        nextFrontTexture.needsUpdate = true
+        const nextFrontTexture = createArtworkTexture(loaded)
 
         const bleedCanvas = createEdgeBleedCanvas(loaded, nextDraft.geometry_px.outer)
         const nextEdgeTexture = new THREE.CanvasTexture(bleedCanvas)

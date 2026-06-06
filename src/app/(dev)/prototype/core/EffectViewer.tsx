@@ -227,6 +227,12 @@ export default function EffectViewer({
   }, [cameraPosition, cam?.fov])
 
   const handleCreated = (state: RootState) => {
+    const parentBounds = state.gl.domElement.parentElement?.getBoundingClientRect()
+    const width = Math.max(1, Math.round(parentBounds?.width || window.innerWidth))
+    const height = Math.max(1, Math.round(parentBounds?.height || window.innerHeight))
+    state.gl.domElement.style.width = '100%'
+    state.gl.domElement.style.height = '100%'
+    state.setSize(width, height, 0, 0)
     state.gl.setClearColor(0x000000, 0)
     onCreated?.({
       scene: state.scene,
@@ -238,6 +244,7 @@ export default function EffectViewer({
   return (
     <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: config.colors.bgColor }}>
       <Canvas
+        style={{ width: '100%', height: '100%', display: 'block' }}
         gl={{
           alpha: true,
           antialias: true,
