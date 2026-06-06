@@ -78,14 +78,18 @@ export function buildShapedGeometry(contour: Contour, opts: MeshOptions): Shaped
   const positions: number[] = []
   const normals: number[] = []
   const uvs: number[] = []
+  const uv1: number[] = [] // world-XY suede UV (channel 1) — tiles the suede by physical size so it
+                           // doesn't stretch into lines on the thin rim
+  const SUEDE_TILE_MM = 40
 
-  // UV from mm → source image [0,1]. Image is loaded y-up; texture.flipY=false → v = py/H upright.
+  // UV (channel 0) from mm → source image [0,1]. Image is loaded y-up; texture.flipY=false.
   const uvOf = (xmm: number, ymm: number): [number, number] => [xmm / mmPerPx / imgW, ymm / mmPerPx / imgH]
   const pushV = (v: V) => {
     positions.push(v.x - cx, v.y - cy, v.z)
     normals.push(v.nx, v.ny, v.nz)
     const [u, vv] = uvOf(v.x, v.y)
     uvs.push(u, vv)
+    uv1.push(v.x / SUEDE_TILE_MM, v.y / SUEDE_TILE_MM)
   }
   // Materials are DoubleSide, so winding is tolerant — normals carry the lighting.
   const quad = (A: V, B: V, C: V, D: V) => { pushV(A); pushV(B); pushV(D); pushV(A); pushV(D); pushV(C) }
@@ -170,6 +174,7 @@ export function buildShapedGeometry(contour: Contour, opts: MeshOptions): Shaped
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3))
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
+  geometry.setAttribute('uv1', new THREE.Float32BufferAttribute(uv1, 2)) // suede channel
   geometry.addGroup(edgeCount, frontCount, 0)              // flat top (subject + padding) → image
   geometry.addGroup(0, edgeCount, 1)                       // bevel + rim → edge material
   geometry.addGroup(edgeCount + frontCount, backCount, 2)  // flat bottom → solid

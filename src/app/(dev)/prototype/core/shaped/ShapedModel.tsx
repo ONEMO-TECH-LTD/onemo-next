@@ -102,18 +102,32 @@ export default function ShapedModel({
     })
   }, [result?.texture, normalMap, roughnessMap, bumpMap, suede])
 
-  // Edge = the SAME ultrasuede material (same normal/roughness/bump/sheen maps) as the front,
-  // slightly changed: the picture's colour but BLURRED (soft rim) and DARKER (colour multiplier
-  // preserves the inherited blurred hue, just deepens it). Not the stretched image.
+  // Edge suede maps cloned onto UV channel 1 (world-XY) so the grain tiles by physical size on the
+  // thin rim instead of stretching into lines.
+  const ch1 = (t: THREE.Texture | null) => {
+    if (!t) return null
+    const c = t.clone()
+    c.channel = 1
+    c.wrapS = c.wrapT = THREE.RepeatWrapping
+    c.needsUpdate = true
+    return c
+  }
+  const edgeNormal = useMemo(() => ch1(normalMap), [normalMap])
+  const edgeRough = useMemo(() => ch1(roughnessMap), [roughnessMap])
+  const edgeBump = useMemo(() => ch1(bumpMap), [bumpMap])
+
+  // Edge = the SAME ultrasuede material as the front (suede maps on the world-XY channel),
+  // slightly changed: the picture's colour BLURRED (soft rim) and DARKER (colour multiplier
+  // preserves the inherited hue). map = blurred image (channel 0), suede = world-XY (channel 1).
   const edgeMaterial = useMemo(() => {
     return new THREE.MeshPhysicalMaterial({
       map: result?.edgeTexture ?? null,
-      color: new THREE.Color(0x707070), // darken the bevel/rim (padding flat top stays bright)
-      normalMap,
+      color: new THREE.Color(0x707070), // darken the rim (padding flat top stays bright)
+      normalMap: edgeNormal,
       normalScale: new THREE.Vector2(suede.normalScale, suede.normalScale),
-      bumpMap,
+      bumpMap: edgeBump,
       bumpScale: suede.bumpScale,
-      roughnessMap,
+      roughnessMap: edgeRough,
       roughness: suede.roughness,
       metalness: suede.metalness,
       sheen: suede.sheen,
@@ -122,7 +136,7 @@ export default function ShapedModel({
       envMapIntensity: suede.envMapIntensity,
       side: THREE.DoubleSide,
     })
-  }, [result?.edgeTexture, normalMap, roughnessMap, bumpMap, suede])
+  }, [result?.edgeTexture, edgeNormal, edgeRough, edgeBump, suede])
 
   const backMaterial = useMemo(() => {
     return new THREE.MeshPhysicalMaterial({
