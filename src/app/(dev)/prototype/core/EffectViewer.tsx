@@ -7,6 +7,8 @@ import { OrbitControls, Environment, useGLTF } from '@react-three/drei'
 import React, { Suspense, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import EffectModel from './EffectModel'
+import ShapedPreview from '../shaped/ShapedPreview'
+import type { ShapeSpecDraft, ShapedPreviewSettings } from '../shaped/shape-spec'
 import type { ViewerConfig, DesignState } from '../types'
 
 const DEFAULT_ENVIRONMENT_PRESET = 'studio'
@@ -48,6 +50,12 @@ interface EffectViewerProps {
     modelRoot: THREE.Object3D
     materialSlots: Map<string, THREE.Material | THREE.Material[]>
   }) => void
+  shapedPreview?: {
+    enabled: boolean
+    settings: ShapedPreviewSettings
+    onDraftChange?: (draft: ShapeSpecDraft | null) => void
+    onErrorChange?: (message: string | null) => void
+  }
 }
 
 function RendererBackgroundSync({ color }: { color: string }) {
@@ -158,6 +166,7 @@ export default function EffectViewer({
   onCreated,
   orbitControlsRef,
   onModelReady,
+  shapedPreview,
 }: EffectViewerProps) {
   // Preload the model
   if (config.modelPath) {
@@ -167,6 +176,7 @@ export default function EffectViewer({
   const cam = config.camera
   const env = config.environment
   const effectiveArtworkUrl = artworkUrl || config.product.artworkSlot?.defaultUrl
+  const renderShapedPreview = !!shapedPreview?.enabled && !!effectiveArtworkUrl
 
   // Camera position from spherical coordinates (distance, polar, azimuth)
   const cameraPosition = useMemo(() => {
@@ -257,7 +267,16 @@ export default function EffectViewer({
               } : undefined}
             />
           ) : null}
-          {config.modelPath ? (
+          {renderShapedPreview && effectiveArtworkUrl ? (
+            <ShapedPreview
+              artworkUrl={effectiveArtworkUrl}
+              designState={designState}
+              scene={config.scene}
+              settings={shapedPreview.settings}
+              onDraftChange={shapedPreview.onDraftChange}
+              onErrorChange={shapedPreview.onErrorChange}
+            />
+          ) : config.modelPath ? (
             <EffectModel
               modelPath={config.modelPath}
               artworkUrl={effectiveArtworkUrl}
