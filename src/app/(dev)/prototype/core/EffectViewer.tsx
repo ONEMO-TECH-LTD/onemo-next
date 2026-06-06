@@ -7,7 +7,9 @@ import { OrbitControls, Environment, useGLTF } from '@react-three/drei'
 import React, { Suspense, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import EffectModel from './EffectModel'
+import ShapedModel from './shaped/ShapedModel'
 import type { ViewerConfig, DesignState } from '../types'
+import type { SuedeMaterialParams } from './shaped/types'
 
 const DEFAULT_ENVIRONMENT_PRESET = 'studio'
 type DreiEnvironmentPreset =
@@ -37,6 +39,8 @@ interface EffectViewerProps {
   artworkUrl?: string
   designState: DesignState
   isEditing: boolean
+  /** Shaped-effect mode: replace the GLB object with a generated cut-out mesh (same scene). */
+  shaped?: boolean
   /** Studio injects controls (grid, gizmo, selection overlay) as children inside the Canvas */
   children?: React.ReactNode
   /** Fires after Canvas + WebGLRenderer are created. Studio uses this to wire the bridge. */
@@ -154,19 +158,43 @@ export default function EffectViewer({
   artworkUrl,
   designState,
   isEditing,
+  shaped = false,
   children,
   onCreated,
   orbitControlsRef,
   onModelReady,
 }: EffectViewerProps) {
-  // Preload the model
-  if (config.modelPath) {
+  // Preload the model (skip in shaped mode — no GLB object)
+  if (config.modelPath && !shaped) {
     useGLTF.preload(config.modelPath)
   }
 
   const cam = config.camera
   const env = config.environment
   const effectiveArtworkUrl = artworkUrl || config.product.artworkSlot?.defaultUrl
+
+  // Derive suede material params from the scene's artwork/face role (reused by the shaped mesh)
+  const suede = useMemo<SuedeMaterialParams>(() => {
+    const roles = config.product?.materialRoles ?? []
+    const artRole = config.product?.artworkSlot?.role
+    const role = roles.find((r) => r.role === artRole) ?? roles[0]
+    const d = role?.defaults ?? {}
+    const t = role?.textures ?? {}
+    return {
+      color: d.color ?? '#ffffff',
+      roughness: Number(d.roughness ?? 1),
+      metalness: Number(d.metalness ?? 0),
+      envMapIntensity: Number(d.envMapIntensity ?? 1),
+      normalScale: Number(d.normalScale ?? 1),
+      bumpScale: Number(d.bumpScale ?? 1),
+      sheen: Number(d.sheen ?? 0),
+      sheenColor: d.sheenColor ?? '#000000',
+      sheenRoughness: Number(d.sheenRoughness ?? 1),
+      normalMap: t.normalMap,
+      roughnessMap: t.roughnessMap,
+      bumpMap: t.bumpMap,
+    }
+  }, [config.product])
 
   // Camera position from spherical coordinates (distance, polar, azimuth)
   const cameraPosition = useMemo(() => {
@@ -257,7 +285,15 @@ export default function EffectViewer({
               } : undefined}
             />
           ) : null}
-          {config.modelPath ? (
+          {shaped ? (
+            <ShapedModel
+              artworkUrl={artworkUrl}
+              designState={designState}
+              scene={config.scene}
+              suede={suede}
+              backColor={config.colors.backColor}
+            />
+          ) : config.modelPath ? (
             <EffectModel
               modelPath={config.modelPath}
               artworkUrl={effectiveArtworkUrl}
