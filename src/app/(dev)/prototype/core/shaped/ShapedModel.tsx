@@ -108,7 +108,7 @@ export default function ShapedModel({
   const edgeMaterial = useMemo(() => {
     return new THREE.MeshPhysicalMaterial({
       map: result?.edgeTexture ?? null,
-      color: new THREE.Color(0xffffff), // halo texture is already darkened in the pipeline
+      color: new THREE.Color(0x707070), // darken the bevel/rim (padding flat top stays bright)
       normalMap,
       normalScale: new THREE.Vector2(suede.normalScale, suede.normalScale),
       bumpMap,

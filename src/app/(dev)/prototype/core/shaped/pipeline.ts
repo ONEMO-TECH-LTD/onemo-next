@@ -12,28 +12,26 @@ import { buildShapedGeometry } from './mesh'
 
 export interface ShapeBuildConfig {
   longestSideMM: number   // physical size of the cut-out's longest side (default 100)
-  bodyThicknessMM: number // interior thickness (~1.0)
-  edgeThicknessMM: number // thin rim thickness (~0.3) — tapers down toward the perimeter
-  taperBandMM: number     // distance over which thickness ramps body→edge
-  capSubdiv: number       // cap subdivision levels (smooth taper)
+  bodyThicknessMM: number // flat-top thickness (~1.0) — subject + padding stay full thickness
+  edgeThicknessMM: number // thin rim thickness (~0.3) — only the perimeter bevel slims to this
+  bevelWidthMM: number    // width of the slimming bevel at the very perimeter (beyond padding)
   edgeSegments: number
   rdpEpsilonMM: number    // 0.2–0.4
   maxImageDim: number     // mask/contour downscale cap (low res is fine for the silhouette)
   textureDim: number      // front-texture cap (HIGH res so the projected image stays sharp)
-  paddingMM: number       // expand the silhouette outward by this margin (puffier, less tight/stiff)
+  paddingMM: number       // flat IMAGE margin around the subject (same image, full thickness)
 }
 
 export const DEFAULT_BUILD_CONFIG: ShapeBuildConfig = {
   longestSideMM: 100,
-  bodyThicknessMM: 1.0,      // Dan 2026-06-06: ~1mm body
-  edgeThicknessMM: 0.3,      // Dan 2026-06-06: edges taper 1mm → 0.3mm toward the rim
-  taperBandMM: 8,            // gradual taper over 8mm
-  capSubdiv: 2,              // smooth domed taper (4^2 tris/face; balances smoothness vs build time)
+  bodyThicknessMM: 1.0,      // Dan 2026-06-06: ~1mm flat body (subject + padding)
+  edgeThicknessMM: 0.3,      // Dan 2026-06-06: bevel slims to 0.3mm at the rim
+  bevelWidthMM: 2.0,         // the slimming bevel sits just outside the padding
   edgeSegments: 6,
   rdpEpsilonMM: 0.12,        // finer → smooth high-res silhouette (Draco handles size later)
   maxImageDim: 1024,         // higher-res mask → smoother contour
   textureDim: 1600,
-  paddingMM: 1.0,            // Dan 2026-06-06: smaller padding
+  paddingMM: 1.5,            // Dan 2026-06-06: small flat image margin around the subject
 }
 
 export interface ShapeBuildResult {
@@ -91,8 +89,9 @@ export async function buildShape(
   const mmPerPx = cfg.longestSideMM / Math.max(bw, bh, 1)
 
   const epsilonPx = cfg.rdpEpsilonMM / mmPerPx
-  // expand the silhouette outward by paddingMM (puffier + rounds tight corners), then trace
-  const padPx = Math.max(0, Math.round(cfg.paddingMM / mmPerPx))
+  // expand outward by padding + bevel: flat cap = subject + paddingMM (image), bevel sits beyond
+  const expandMM = cfg.paddingMM + cfg.bevelWidthMM
+  const padPx = Math.max(0, Math.round(expandMM / mmPerPx))
   const workMask = padPx > 0 ? dilateMask(mask, width, height, padPx) : mask
   const built = buildContour(workMask, width, height, epsilonPx)
   if (!built) throw new Error('Contour build failed after simplification.')
@@ -102,8 +101,7 @@ export async function buildShape(
   const { geometry, widthMM, heightMM } = buildShapedGeometry(contourMM, {
     bodyThicknessMM: cfg.bodyThicknessMM,
     edgeThicknessMM: cfg.edgeThicknessMM,
-    taperBandMM: cfg.taperBandMM,
-    capSubdiv: cfg.capSubdiv,
+    bevelWidthMM: cfg.bevelWidthMM,
     edgeSegments: cfg.edgeSegments,
     mmPerPx,
     imgW: width,
@@ -115,7 +113,7 @@ export async function buildShape(
   // 2) BLUR it → a smooth colour halo (no streaks) — the "image-inherited blurred colours"
   // 3) FRONT = halo + the sharp subject composited on top (interior crisp, padded ring smooth)
   // 4) EDGE = the smooth halo (darkened later via material) → soft rim, same blurred colours
-  const bleedIters = Math.ceil((cfg.paddingMM / cfg.longestSideMM) * Math.max(texW, texH)) + 24
+  const bleedIters = Math.ceil((expandMM / cfg.longestSideMM) * Math.max(texW, texH)) + 24
   const bled = bleedTexture(texImage, texMask, texW, texH, bleedIters)
 
   const blurPx = Math.max(6, Math.round(texW / 50))
@@ -125,11 +123,8 @@ export async function buildShape(
   hctx.filter = `blur(${blurPx}px)`
   hctx.drawImage(bled, 0, 0)
   hctx.filter = 'none'
-  // darken the halo (Dan 2026-06-06: edge/rim darker) — multiply keeps the inherited hue, deepens it
-  hctx.globalCompositeOperation = 'multiply'
-  hctx.fillStyle = '#6e6e6e'
-  hctx.fillRect(0, 0, halo.width, halo.height)
-  hctx.globalCompositeOperation = 'source-over'
+  // halo is BRIGHT (padding = the same image, smoothly bled). The bevel/rim darkening is applied
+  // on the edge MATERIAL (ShapedModel), not here — keeps the padded flat top true to the image.
 
   // sharp subject as a canvas (texImage keeps BEN2's soft alpha matte)
   const subj = document.createElement('canvas')
