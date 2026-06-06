@@ -27,9 +27,9 @@ export const DEFAULT_BUILD_CONFIG: ShapeBuildConfig = {
   bodyThicknessMM: 0.8,      // Dan 2026-06-06: 0.8mm thickness
   edgeThicknessMM: 0.8,      // uniform thickness, rounded edge (no gradual slim)
   bevelWidthMM: 0,           // Dan 2026-06-06: gradual bevel removed
-  edgeSegments: 12,          // smoother rounded rim
-  rdpEpsilonMM: 0.08,        // finer → smooth high-res silhouette (Draco handles size later)
-  maxImageDim: 1600,         // higher-res mask → smoother, less choppy contour
+  edgeSegments: 8,           // rounded rim segments
+  rdpEpsilonMM: 0.4,         // RDP to corner points, THEN Chaikin rounds them → smooth curves
+  maxImageDim: 1600,         // higher-res mask → cleaner staircase before smoothing
   textureDim: 1600,
   paddingMM: 1.5,            // Dan 2026-06-06: small flat image margin around the subject
 }
@@ -37,7 +37,6 @@ export const DEFAULT_BUILD_CONFIG: ShapeBuildConfig = {
 export interface ShapeBuildResult {
   geometry: THREE.BufferGeometry
   texture: THREE.CanvasTexture
-  edgeColor: string
   spec: ShapeSpecDraft
   widthMM: number
   heightMM: number
@@ -143,18 +142,6 @@ export async function buildShape(
   texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping
   texture.needsUpdate = true
 
-  // EDGE colour = darkened AVERAGE of the subject → one picture-derived suede tone for the rim.
-  // (Per Dan: the rim must read as matte suede with no stretchmarks — a solid tone avoids the
-  // degenerate-UV stretch that any image map causes on a thin rim.)
-  let ar = 0, ag = 0, ab = 0, acount = 0
-  for (let p = 0, i = 0; p < texMask.length; p++, i += 4) {
-    if (texMask[p]) { ar += texImage.data[i]; ag += texImage.data[i + 1]; ab += texImage.data[i + 2]; acount++ }
-  }
-  const DARKEN = 0.55
-  const hx = (c: number) => Math.round(Math.min(255, Math.max(0, c))).toString(16).padStart(2, '0')
-  const edgeColor = acount
-    ? `#${hx((ar / acount) * DARKEN)}${hx((ag / acount) * DARKEN)}${hx((ab / acount) * DARKEN)}`
-    : '#3a3a3a'
 
   const spec: ShapeSpecDraft = {
     sourceRef: url,
@@ -177,5 +164,5 @@ export async function buildShape(
     },
   }
 
-  return { geometry, texture, edgeColor, spec, widthMM, heightMM }
+  return { geometry, texture, spec, widthMM, heightMM }
 }

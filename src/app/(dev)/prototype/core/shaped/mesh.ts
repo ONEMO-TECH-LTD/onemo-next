@@ -77,17 +77,17 @@ export function buildShapedGeometry(contour: Contour, opts: MeshOptions): Shaped
 
   const positions: number[] = []
   const normals: number[] = []
-  const uvs: number[] = []
-  const SUEDE_TILE_MM = 30 // physical tile size for world-XY suede on the rim
+  const uvs: number[] = []   // channel 0 = IMAGE position (image wraps over the rim, per-position)
+  const uv1: number[] = []   // channel 1 = world-XY (suede tiles by physical size → never stretches)
+  const SUEDE_TILE_MM = 30
 
-  // Caps use image UV (channel 0). The thin RIM uses a world-XY UV (v.world) on the SAME channel 0
-  // so the suede maps tile by physical size and don't stretch into lines on the rim.
   const uvOf = (xmm: number, ymm: number): [number, number] => [xmm / mmPerPx / imgW, ymm / mmPerPx / imgH]
   const pushV = (v: V) => {
     positions.push(v.x - cx, v.y - cy, v.z)
     normals.push(v.nx, v.ny, v.nz)
-    if (v.world) uvs.push(v.x / SUEDE_TILE_MM, v.y / SUEDE_TILE_MM)
-    else { const [u, vv] = uvOf(v.x, v.y); uvs.push(u, vv) }
+    const [u, vv] = uvOf(v.x, v.y)
+    uvs.push(u, vv)
+    uv1.push(v.x / SUEDE_TILE_MM, v.y / SUEDE_TILE_MM)
   }
   // Materials are DoubleSide, so winding is tolerant — normals carry the lighting.
   const quad = (A: V, B: V, C: V, D: V) => { pushV(A); pushV(B); pushV(D); pushV(A); pushV(D); pushV(C) }
@@ -172,6 +172,7 @@ export function buildShapedGeometry(contour: Contour, opts: MeshOptions): Shaped
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3))
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
+  geometry.setAttribute('uv1', new THREE.Float32BufferAttribute(uv1, 2)) // suede (channel 1)
   geometry.addGroup(edgeCount, frontCount, 0)              // flat top (subject + padding) → image
   geometry.addGroup(0, edgeCount, 1)                       // bevel + rim → edge material
   geometry.addGroup(edgeCount + frontCount, backCount, 2)  // flat bottom → solid

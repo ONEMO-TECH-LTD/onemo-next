@@ -42,7 +42,7 @@ export default function ShapedModel({
   onSpec,
   onStatus,
 }: ShapedModelProps) {
-  const [result, setResult] = useState<{ geometry: THREE.BufferGeometry; texture: THREE.CanvasTexture; edgeColor: string; widthMM: number; heightMM: number } | null>(null)
+  const [result, setResult] = useState<{ geometry: THREE.BufferGeometry; texture: THREE.CanvasTexture; widthMM: number; heightMM: number } | null>(null)
   const artTexRef = useRef<THREE.CanvasTexture | null>(null)
 
   // Run the pipeline whenever the artwork changes
@@ -75,10 +75,12 @@ export default function ShapedModel({
     return () => { cancelled = true }
   }, [artworkUrl, onSpec, onStatus])
 
-  // suede texture maps (normal/roughness/bump) — reuse the scene's ultrasuede set
-  const normalMap = useMemo(() => loadTex(suede.normalMap), [suede.normalMap])
-  const roughnessMap = useMemo(() => loadTex(suede.roughnessMap), [suede.roughnessMap])
-  const bumpMap = useMemo(() => loadTex(suede.bumpMap), [suede.bumpMap])
+  // suede texture maps (normal/roughness/bump) on UV CHANNEL 1 (world-XY) → tiles by physical size,
+  // never stretches (on the front OR the rim). The image map stays on channel 0 (position).
+  const suedeTex = (url: string | undefined) => { const t = loadTex(url); if (t) t.channel = 1; return t }
+  const normalMap = useMemo(() => suedeTex(suede.normalMap), [suede.normalMap])
+  const roughnessMap = useMemo(() => suedeTex(suede.roughnessMap), [suede.roughnessMap])
+  const bumpMap = useMemo(() => suedeTex(suede.bumpMap), [suede.bumpMap])
 
   const frontMaterial = useMemo(() => {
     return new THREE.MeshPhysicalMaterial({
@@ -99,26 +101,9 @@ export default function ShapedModel({
     })
   }, [result?.texture, normalMap, roughnessMap, bumpMap, suede])
 
-  // Edge = the SAME ultrasuede maps as the front (shared, channel 0). The rim's vertices carry a
-  // world-XY UV (from the mesh), so the suede tiles by physical size on the rim and does NOT stretch.
-  // Colour = a solid darkened picture-average tone (no image map → no stretchmarks). MATTE (roughness
-  // forced high, no clearcoat/metalness) so it reads as suede, not glossy.
-  const edgeMaterial = useMemo(() => {
-    return new THREE.MeshPhysicalMaterial({
-      color: new THREE.Color(result?.edgeColor ?? '#3a3a3a'),
-      normalMap,
-      normalScale: new THREE.Vector2(suede.normalScale, suede.normalScale),
-      bumpMap,
-      bumpScale: suede.bumpScale,
-      roughnessMap,
-      roughness: Math.max(0.92, suede.roughness),
-      metalness: 0,
-      clearcoat: 0,
-      sheen: 0,
-      envMapIntensity: Math.min(0.3, suede.envMapIntensity),
-      side: THREE.DoubleSide,
-    })
-  }, [result?.edgeColor, normalMap, roughnessMap, bumpMap, suede])
+  // Edge uses the EXACT SAME material as the front (frontMaterial) — see `materials` below.
+  // The rim's image (channel 0 position UV) wraps slightly over the rounded edge and fades into the
+  // bled colour; suede (channel 1 world-XY) doesn't stretch. No separate edge material.
 
   const backMaterial = useMemo(() => {
     return new THREE.MeshPhysicalMaterial({
@@ -152,8 +137,8 @@ export default function ShapedModel({
     }
   }, [designState, result])
 
-  // order matches geometry groups: 0 = front (sharp), 1 = edge (blurred), 2 = back (solid)
-  const materials = useMemo(() => [frontMaterial, edgeMaterial, backMaterial], [frontMaterial, edgeMaterial, backMaterial])
+  // groups: 0 = front (image+suede), 1 = edge (SAME front material → image wraps + fades), 2 = back
+  const materials = useMemo(() => [frontMaterial, frontMaterial, backMaterial], [frontMaterial, backMaterial])
 
   // mm → scene units so the longest side maps to fitSize
   const scale = useMemo(() => {

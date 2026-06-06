@@ -3,6 +3,7 @@
 // Binary mask → midpoint isolines (no subpixel needed for a 0/1 field). OpenCV is the QA oracle
 // (not bundled here). Output is in PIXEL coordinates; the pipeline maps px → mm.
 
+import * as THREE from 'three'
 import type { Pt, Ring, Contour } from './types'
 
 type Seg = { a: Pt; b: Pt }
@@ -128,6 +129,38 @@ function pointInPoly(p: Pt, poly: Pt[]): boolean {
   return inside
 }
 
+/** Remove consecutive duplicate / near-coincident points (incl. the wrap) — avoids spike artifacts. */
+export function dedup(pts: Pt[], eps = 1e-3): Pt[] {
+  const out: Pt[] = []
+  for (const p of pts) {
+    const q = out[out.length - 1]
+    if (!q || Math.hypot(p[0] - q[0], p[1] - q[1]) > eps) out.push(p)
+  }
+  while (out.length > 2 && Math.hypot(out[0][0] - out[out.length - 1][0], out[0][1] - out[out.length - 1][1]) <= eps) out.pop()
+  return out
+}
+
+function perimeter(pts: Pt[]): number {
+  let s = 0
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i], b = pts[(i + 1) % pts.length]
+    s += Math.hypot(b[0] - a[0], b[1] - a[1])
+  }
+  return s
+}
+
+/**
+ * Closed Catmull-Rom resample → genuinely smooth (C1) curve around the WHOLE loop, seam included.
+ * `pts` are key points (RDP); we resample at ~one point per `spacingPx` for a high-res smooth contour.
+ */
+export function smoothClosed(pts: Pt[], spacingPx: number): Pt[] {
+  if (pts.length < 4) return pts
+  const v = pts.map((p) => new THREE.Vector3(p[0], p[1], 0))
+  const curve = new THREE.CatmullRomCurve3(v, true, 'centripetal')
+  const n = Math.max(32, Math.min(3000, Math.round(perimeter(pts) / Math.max(0.5, spacingPx))))
+  return curve.getSpacedPoints(n).map((q) => [q.x, q.y] as Pt)
+}
+
 /** Chaikin corner-cutting on a closed ring — turns marching-squares stair-steps into smooth curves. */
 export function chaikin(pts: Pt[], iterations: number): Pt[] {
   let p = pts
@@ -213,12 +246,14 @@ export function buildContour(
     return ccw === wantCCW ? pts : [...pts].reverse()
   }
 
-  // smooth the stair-stepped marching-squares boundary, THEN lightly simplify (keeps smooth + high-res)
-  const SMOOTH_ITER = 4
-  const outerPts = rdp(chaikin(orient(outerRaw.pts, true), SMOOTH_ITER), epsilonPx)
-  const holes: Ring[] = holesRaw.map((hRaw) => ({
-    pts: rdp(chaikin(orient(hRaw.pts, false), SMOOTH_ITER), epsilonPx),
-  }))
+  // ORDER MATTERS: RDP FIRST (clean the marching-squares staircase to key points), then Chaikin
+  // LAST so the final contour is genuinely smooth curves — NOT straight chords. (Doing RDP after
+  // Chaikin re-polygonised the curve = the choppiness.) Draco handles file size later.
+  // RDP → key points → CLOSED Catmull-Rom resample (uniform, C1 smooth around the whole loop).
+  const spacingPx = Math.max(1.5, epsilonPx * 0.75)
+  const smooth = (pts: Pt[], ccw: boolean) => dedup(smoothClosed(dedup(rdp(orient(pts, ccw), epsilonPx)), spacingPx))
+  const outerPts = smooth(outerRaw.pts, true)
+  const holes: Ring[] = holesRaw.map((hRaw) => ({ pts: smooth(hRaw.pts, false) }))
 
   const outer: Ring = { pts: outerPts }
   const simplifiedNodes = outerPts.length + holes.reduce((s, r) => s + r.pts.length, 0)
