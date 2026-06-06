@@ -42,7 +42,7 @@ export default function ShapedModel({
   onSpec,
   onStatus,
 }: ShapedModelProps) {
-  const [result, setResult] = useState<{ geometry: THREE.BufferGeometry; texture: THREE.CanvasTexture; edgeTexture: THREE.CanvasTexture; widthMM: number; heightMM: number } | null>(null)
+  const [result, setResult] = useState<{ geometry: THREE.BufferGeometry; texture: THREE.CanvasTexture; widthMM: number; heightMM: number } | null>(null)
   const artTexRef = useRef<THREE.CanvasTexture | null>(null)
 
   // Run the pipeline whenever the artwork changes
@@ -51,17 +51,16 @@ export default function ShapedModel({
     if (!artworkUrl) {
       // clear any stale mesh when artwork is removed
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setResult((prev) => { prev?.geometry.dispose(); prev?.texture.dispose(); prev?.edgeTexture.dispose(); return null })
+      setResult((prev) => { prev?.geometry.dispose(); prev?.texture.dispose(); return null })
       return
     }
     onStatus?.('building')
     buildShape(artworkUrl, DEFAULT_BUILD_CONFIG)
       .then((r) => {
-        if (cancelled) { r.geometry.dispose(); r.texture.dispose(); r.edgeTexture.dispose(); return }
+        if (cancelled) { r.geometry.dispose(); r.texture.dispose(); return }
         setResult((prev) => {
           prev?.geometry.dispose()
           prev?.texture.dispose()
-          prev?.edgeTexture.dispose()
           return r
         })
         artTexRef.current = r.texture
@@ -109,28 +108,8 @@ export default function ShapedModel({
   // The rim's image (channel 0 position UV) wraps slightly over the rounded edge and fades into the
   // bled colour; suede (channel 1 world-XY) doesn't stretch. No separate edge material.
 
-  // EDGE = the front image rolling over the lip (edge band UV), but DARKER, BLURRED (edgeTexture)
-  // and fully MATTE / reflectivity 0 (Dan). Same suede maps (channel 1). Standard material, not a
-  // custom shader; map is the front image (blurred), not a generated contour strip.
-  const edgeMaterial = useMemo(() => {
-    return new THREE.MeshPhysicalMaterial({
-      map: result?.edgeTexture ?? null,
-      color: new THREE.Color(0xffffff),
-      vertexColors: true, // per-vertex fade: front colour at the cutline → dark toward the back (no hard line)
-      normalMap,
-      normalScale: new THREE.Vector2(suede.normalScale, suede.normalScale),
-      bumpMap,
-      bumpScale: suede.bumpScale,
-      roughnessMap,
-      roughness: 1,
-      metalness: 0,
-      specularIntensity: 0, // reflectivity 0 → no gloss
-      sheen: 0,
-      clearcoat: 0,
-      envMapIntensity: 0,
-      side: THREE.DoubleSide,
-    })
-  }, [result?.edgeTexture, normalMap, roughnessMap, bumpMap, suede])
+  // EDGE uses the SAME front material (group 0 = edge + front). The image wraps over the lip via
+  // arc-length UV in the mesh → no stretch, no separate rim.
 
   // BACK = same golden suede setup, just the back colour.
   const backMaterial = useMemo(() => {
@@ -166,8 +145,8 @@ export default function ShapedModel({
   }, [designState, result])
 
   // geometry groups: 0 = edge+front (front material — image wraps inward over the lip), 1 = back
-  // geometry groups: 0 = front cap, 1 = edge lip, 2 = back cap
-  const materials = useMemo(() => [frontMaterial, edgeMaterial, backMaterial], [frontMaterial, edgeMaterial, backMaterial])
+  // geometry groups: 0 = edge lip + front cap (shared front material), 1 = back cap
+  const materials = useMemo(() => [frontMaterial, backMaterial], [frontMaterial, backMaterial])
 
   // mm → scene units so the longest side maps to fitSize
   const scale = useMemo(() => {

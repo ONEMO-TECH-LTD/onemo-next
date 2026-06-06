@@ -35,7 +35,6 @@ export const DEFAULT_BUILD_CONFIG: ShapeBuildConfig = {
 export interface ShapeBuildResult {
   geometry: THREE.BufferGeometry
   texture: THREE.CanvasTexture
-  edgeTexture: THREE.CanvasTexture
   spec: ShapeSpecDraft
   widthMM: number
   heightMM: number
@@ -140,20 +139,6 @@ export async function buildShape(
   texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping
   texture.needsUpdate = true
 
-  // EDGE texture = the front image, BLURRED (kills the small lines on the lip). Same image, not a
-  // separate contour strip. The edge material darkens it + renders matte (reflectivity 0).
-  const edgeCanvas = document.createElement('canvas')
-  edgeCanvas.width = front.width
-  edgeCanvas.height = front.height
-  const ectx = edgeCanvas.getContext('2d')!
-  ectx.filter = `blur(${Math.max(4, Math.round(front.width / 45))}px)`
-  ectx.drawImage(front, 0, 0)
-  const edgeTexture = new THREE.CanvasTexture(edgeCanvas)
-  edgeTexture.colorSpace = THREE.SRGBColorSpace
-  edgeTexture.flipY = false
-  edgeTexture.wrapS = edgeTexture.wrapT = THREE.ClampToEdgeWrapping
-  edgeTexture.needsUpdate = true
-
 
   const spec: ShapeSpecDraft = {
     sourceRef: url,
@@ -176,5 +161,5 @@ export async function buildShape(
     },
   }
 
-  return { geometry, texture, edgeTexture, spec, widthMM, heightMM }
+  return { geometry, texture, spec, widthMM, heightMM }
 }
