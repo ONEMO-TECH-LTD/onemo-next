@@ -2,7 +2,7 @@
 
 'use client'
 
-import { useRef, useCallback } from 'react'
+import { useRef } from 'react'
 import type { DesignState } from '../types'
 
 const INITIAL_DESIGN: DesignState = { offsetX: 0, offsetY: 0, scale: 1.0 }
@@ -11,20 +11,24 @@ interface ToolbarProps {
   artworkUrl?: string
   isEditing: boolean
   showColors: boolean
+  isShaped: boolean
   onFile: (file: File) => void
   onToggleEdit: () => void
   onResetDesign: () => void
   onToggleColors: () => void
+  onToggleShaped: () => void
 }
 
 export default function Toolbar({
   artworkUrl,
   isEditing,
   showColors,
+  isShaped,
   onFile,
   onToggleEdit,
   onResetDesign,
   onToggleColors,
+  onToggleShaped,
 }: ToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -61,6 +65,11 @@ export default function Toolbar({
         <button onClick={onToggleColors}
           style={{ padding: '12px 24px', background: showColors ? '#2563eb' : '#444', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
           Colors
+        </button>
+
+        <button onClick={onToggleShaped}
+          style={{ padding: '12px 24px', background: isShaped ? '#047857' : '#444', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+          Shape
         </button>
       </div>
 

@@ -27,3 +27,10 @@
 - Symptoms: `3211` was a built `next-server` serving stale chunks; `3212` was already occupied; `next dev` on `3213` defaulted to Turbopack and rejected the repo webpack config.
 - What worked: identify the serving process with `lsof`/`ps`, then use a separate dev port with `--webpack` and local Supabase placeholder envs before browser verification.
 - Remember: rendered source-change checks for `/prototype?scene=golden` must not trust an existing `next-server`; either rebuild/restart it or use a fresh `next dev --webpack` port.
+
+## S57 shaped-effect visual tuning rollback
+
+- What did not work: repeated material/edge tuning without locking each visually acceptable state as a commit first.
+- Symptoms: edge radius, padding, matte suede response, and contour smoothness drifted after compaction; the in-app browser later showed stale/collapsed canvas states during reload attempts.
+- What worked: roll back source manually to the known pre-compaction defaults, then verify `typecheck`, shaped-engine tests, and DOM panel values before further tuning.
+- Remember: for shaped-effect visual work, commit each acceptable visual checkpoint before experimenting; after source edits, reload the Codex in-app browser and verify rendered panel values plus visual state before continuing.
