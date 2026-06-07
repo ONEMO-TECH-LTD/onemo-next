@@ -2,7 +2,7 @@
 
 'use client'
 
-import { useRef, useCallback } from 'react'
+import { useRef } from 'react'
 import type { DesignState } from '../types'
 
 const INITIAL_DESIGN: DesignState = { offsetX: 0, offsetY: 0, scale: 1.0 }
@@ -11,6 +11,7 @@ interface ToolbarProps {
   artworkUrl?: string
   isEditing: boolean
   showColors: boolean
+  isShapedMode?: boolean
   onFile: (file: File) => void
   onToggleEdit: () => void
   onResetDesign: () => void
@@ -21,6 +22,7 @@ export default function Toolbar({
   artworkUrl,
   isEditing,
   showColors,
+  isShapedMode = false,
   onFile,
   onToggleEdit,
   onResetDesign,
@@ -62,6 +64,11 @@ export default function Toolbar({
           style={{ padding: '12px 24px', background: showColors ? '#2563eb' : '#444', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
           Colors
         </button>
+
+        <a href="/prototype?scene=golden&shape=1&art=pharma"
+          style={{ padding: '12px 24px', background: isShapedMode ? '#087f5b' : '#444', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer', textDecoration: 'none' }}>
+          Shape
+        </a>
       </div>
 
       <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }}

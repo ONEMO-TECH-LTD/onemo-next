@@ -1,12 +1,14 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { useState, useCallback, Suspense } from 'react'
+import { useState, useCallback, Suspense, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useGesture } from '@use-gesture/react'
 import { useSceneStore } from './admin/sceneStore'
 import { INITIAL_DESIGN } from './user/Toolbar'
 import type { DesignState } from './types'
+import type { BinaryMask, ShapeMeshStats } from './shaped/shape-spec'
+import { buildShapedGeometryFromMask } from './shaped/shape-geometry'
 
 // Dynamic imports — no SSR for 3D components
 const EffectViewer = dynamic(() => import('./core/EffectViewer'), { ssr: false })
@@ -14,15 +16,23 @@ const AdminViewer = dynamic(() => import('./admin/AdminViewer'), { ssr: false })
 const ColorPanel = dynamic(() => import('./user/ColorPanel'), { ssr: false })
 const Toolbar = dynamic(() => import('./user/Toolbar'), { ssr: false })
 const EditOverlay = dynamic(() => import('./user/EditOverlay'), { ssr: false })
+const ShapedCutoutPanel = dynamic(() => import('./shaped/ShapedCutoutPanel'), { ssr: false })
 
 const MIN_SCALE = 1.0
 const MAX_SCALE = 4.0
 const DRAG_SENSITIVITY = 0.001
 const SCROLL_SENSITIVITY = 0.002
+const PHARMA_ARTWORK_URL = '/assets/effects-art-test/happy-pharma-frame-1000007923.png'
+const PHARMA_MASK_URL = '/assets/effects-art-test/happy-pharma-frame-1000007923-mask.png'
 
 function PrototypePageInner() {
   const searchParams = useSearchParams()
-  const [artworkUrl, setArtworkUrl] = useState<string | undefined>()
+  const isShapedMode = searchParams.get('shape') === '1'
+  const artParam = searchParams.get('art')
+  const defaultArtworkUrl = isShapedMode && artParam === 'pharma' ? PHARMA_ARTWORK_URL : undefined
+  const [artworkUrl, setArtworkUrl] = useState<string | undefined>(defaultArtworkUrl)
+  const [shapedMask, setShapedMask] = useState<BinaryMask | null>(null)
+  const [shapeMeshStats, setShapeMeshStats] = useState<ShapeMeshStats | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [designState, setDesignState] = useState<DesignState>(INITIAL_DESIGN)
@@ -33,10 +43,22 @@ function PrototypePageInner() {
     ? `/api/dev/scenes/${encodeURIComponent(sceneName)}`
     : '/api/dev/scenes/golden'
 
+  useEffect(() => {
+    if (!isShapedMode || !shapedMask) {
+      setShapeMeshStats(null)
+      return
+    }
+
+    const build = buildShapedGeometryFromMask(shapedMask)
+    setShapeMeshStats(build?.stats ?? null)
+    build?.geometry.dispose()
+  }, [isShapedMode, shapedMask])
+
   const handleFile = useCallback((file: File) => {
     if (!file.type.startsWith('image/')) return
-    if (artworkUrl?.startsWith('blob:')) URL.revokeObjectURL(artworkUrl)
+	    if (artworkUrl?.startsWith('blob:')) URL.revokeObjectURL(artworkUrl)
     setArtworkUrl(URL.createObjectURL(file))
+    setShapedMask(null)
     setDesignState(INITIAL_DESIGN)
   }, [artworkUrl])
 
@@ -103,9 +125,11 @@ function PrototypePageInner() {
           <EffectViewer
             config={config}
             artworkUrl={artworkUrl}
-            designState={designState}
-            isEditing={isEditing}
-          />
+              designState={designState}
+              isEditing={isEditing}
+              shapedMask={isShapedMode ? shapedMask : null}
+              onShapedMeshStats={setShapeMeshStats}
+            />
         )}
       </AdminViewer>
 
@@ -121,11 +145,21 @@ function PrototypePageInner() {
         />
       )}
 
+      {isShapedMode && artworkUrl && (
+        <ShapedCutoutPanel
+          artworkUrl={artworkUrl}
+          seedMaskUrl={artworkUrl === PHARMA_ARTWORK_URL ? PHARMA_MASK_URL : undefined}
+          meshStats={shapeMeshStats}
+          onMaskChange={setShapedMask}
+        />
+      )}
+
       {/* User: toolbar */}
       <Toolbar
         artworkUrl={artworkUrl}
         isEditing={isEditing}
         showColors={showColors}
+        isShapedMode={isShapedMode}
         onFile={handleFile}
         onToggleEdit={() => setIsEditing((prev) => !prev)}
         onResetDesign={() => setDesignState(INITIAL_DESIGN)}

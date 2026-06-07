@@ -7,7 +7,9 @@ import { OrbitControls, Environment, useGLTF } from '@react-three/drei'
 import React, { Suspense, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import EffectModel from './EffectModel'
+import ShapedEffectModel from '../shaped/ShapedEffectModel'
 import type { ViewerConfig, DesignState } from '../types'
+import type { BinaryMask, ShapeMeshStats } from '../shaped/shape-spec'
 
 const DEFAULT_ENVIRONMENT_PRESET = 'studio'
 type DreiEnvironmentPreset =
@@ -37,6 +39,8 @@ interface EffectViewerProps {
   artworkUrl?: string
   designState: DesignState
   isEditing: boolean
+  shapedMask?: BinaryMask | null
+  onShapedMeshStats?: (stats: ShapeMeshStats | null) => void
   /** Studio injects controls (grid, gizmo, selection overlay) as children inside the Canvas */
   children?: React.ReactNode
   /** Fires after Canvas + WebGLRenderer are created. Studio uses this to wire the bridge. */
@@ -154,6 +158,8 @@ export default function EffectViewer({
   artworkUrl,
   designState,
   isEditing,
+  shapedMask,
+  onShapedMeshStats,
   children,
   onCreated,
   orbitControlsRef,
@@ -227,7 +233,17 @@ export default function EffectViewer({
 
   return (
     <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: config.colors.bgColor }}>
+      <style jsx global>{`
+        .prototype-effect-canvas canvas {
+          position: absolute !important;
+          inset: 0 !important;
+          width: 100% !important;
+          height: 100% !important;
+        }
+      `}</style>
       <Canvas
+        className="prototype-effect-canvas"
+        style={{ width: '100%', height: '100%' }}
         gl={{
           alpha: true,
           antialias: true,
@@ -238,7 +254,7 @@ export default function EffectViewer({
             : THREE.SRGBColorSpace,
         }}
         shadows={config.renderer?.shadowsEnabled ?? false}
-        dpr={[1, 2]}
+        dpr={1}
         camera={canvasCamera}
         onCreated={handleCreated}
       >
@@ -257,7 +273,13 @@ export default function EffectViewer({
               } : undefined}
             />
           ) : null}
-          {config.modelPath ? (
+          {shapedMask && effectiveArtworkUrl ? (
+            <ShapedEffectModel
+              artworkUrl={effectiveArtworkUrl}
+              mask={shapedMask}
+              onStats={onShapedMeshStats}
+            />
+          ) : config.modelPath ? (
             <EffectModel
               modelPath={config.modelPath}
               artworkUrl={effectiveArtworkUrl}
