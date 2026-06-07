@@ -66,7 +66,7 @@ export default function ShapedModel({
         artTexRef.current = r.texture
         // debug: prove which build is live (groups: 2 = current edge=front model; uv1 = suede channel)
         ;(window as unknown as { __shapeInfo?: unknown }).__shapeInfo = {
-          build: 'arc-wrap-v1', groups: r.geometry.groups.length,
+          build: 'matte-edge-copy-v2', groups: r.geometry.groups.length,
           uv1: !!r.geometry.attributes.uv1, verts: r.geometry.attributes.position.count, ts: Date.now(),
         }
         onSpec?.(r.spec)
@@ -109,12 +109,27 @@ export default function ShapedModel({
     })
   }, [result?.texture, normalMap, roughnessMap, bumpMap, suede])
 
-  // Edge uses the EXACT SAME material as the front (frontMaterial) — see `materials` below.
-  // The rim's image (channel 0 position UV) wraps slightly over the rounded edge and fades into the
-  // bled colour; suede (channel 1 world-XY) doesn't stretch. No separate edge material.
-
-  // EDGE uses the SAME front material (group 0 = edge + front). The image wraps over the lip via
-  // arc-length UV in the mesh → no stretch, no separate rim.
+  // EDGE = a MATTE COPY of the front: SAME image (arc-length UV → wraps over the lip, no stretch) +
+  // SAME suede maps (channel 1 world-XY → no stretch), but reflectivity KILLED so the curved lip
+  // doesn't catch the sheen/Fresnel highlight the flat front never shows. Dan: "the edge gets a
+  // matte copy is correct." sheen/env/specular = 0 is what makes it read matte at grazing angles.
+  const edgeMaterial = useMemo(() => {
+    return new THREE.MeshPhysicalMaterial({
+      map: result?.texture ?? null,
+      color: new THREE.Color(0xffffff),
+      normalMap,
+      normalScale: new THREE.Vector2(suede.normalScale, suede.normalScale),
+      bumpMap,
+      bumpScale: suede.bumpScale,
+      roughnessMap,
+      roughness: 1,
+      metalness: 0,
+      sheen: 0,
+      envMapIntensity: 0,
+      specularIntensity: 0,
+      side: THREE.DoubleSide,
+    })
+  }, [result?.texture, normalMap, roughnessMap, bumpMap, suede])
 
   // BACK = same golden suede setup, just the back colour.
   const backMaterial = useMemo(() => {
@@ -149,9 +164,12 @@ export default function ShapedModel({
     }
   }, [designState, result])
 
-  // geometry groups: 0 = edge+front (front material — image wraps inward over the lip), 1 = back
-  // geometry groups: 0 = edge lip + front cap (shared front material), 1 = back cap
-  const materials = useMemo(() => [frontMaterial, backMaterial], [frontMaterial, backMaterial])
+  // geometry groups (mesh.ts): 0 = front cap (golden suede, unchanged), 1 = edge lip (matte copy),
+  // 2 = back cap (solid back suede). Order MUST match the addGroup material indices in mesh.ts.
+  const materials = useMemo(
+    () => [frontMaterial, edgeMaterial, backMaterial],
+    [frontMaterial, edgeMaterial, backMaterial],
+  )
 
   // mm → scene units so the longest side maps to fitSize
   const scale = useMemo(() => {

@@ -177,9 +177,9 @@ export function buildShapedGeometry(contour: Contour, opts: MeshOptions): Shaped
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3))
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
   geometry.setAttribute('uv1', new THREE.Float32BufferAttribute(uv1, 2)) // suede (channel 1)
-  // edge + front cap (contiguous) → ONE shared front material; back → solid
-  geometry.addGroup(0, edgeCount + frontCount, 0) // edge lip + front cap → material 0 (front)
-  geometry.addGroup(edgeCount + frontCount, backCount, 1) // back → material 1
+  geometry.addGroup(edgeCount, frontCount, 0)             // front cap → material 0 (golden, unchanged)
+  geometry.addGroup(0, edgeCount, 1)                      // edge lip → material 1 (matte copy, same image)
+  geometry.addGroup(edgeCount + frontCount, backCount, 2) // back cap → material 2
   geometry.computeBoundingBox()
   geometry.computeBoundingSphere()
 
