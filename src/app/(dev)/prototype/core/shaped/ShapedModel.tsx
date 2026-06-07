@@ -67,7 +67,7 @@ export default function ShapedModel({
         artTexRef.current = r.texture
         // debug: prove which build is live (groups: 2 = current edge=front model; uv1 = suede channel)
         ;(window as unknown as { __shapeInfo?: unknown }).__shapeInfo = {
-          build: 'ear-round+hires-v15', groups: r.geometry.groups.length,
+          build: 'masksmooth-v16', groups: r.geometry.groups.length,
           uv1: !!r.geometry.attributes.uv1, verts: r.geometry.attributes.position.count, ts: Date.now(),
         }
         ;(window as unknown as { __shapeSpec?: unknown }).__shapeSpec = r.spec // debug: inspect contour

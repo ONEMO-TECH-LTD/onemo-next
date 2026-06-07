@@ -148,6 +148,38 @@ function cleanup(mask: Uint8Array, w: number, h: number): Uint8Array {
   return erode(dilate(dilate(erode(mask)))) // open then close
 }
 
+/**
+ * Uniform mask smoothing: separable box-blur of the binary mask + 0.5 re-threshold. Rounds small
+ * sharp protrusions/notches (e.g. the marching-squares stair-steps at thin spike tips) the SAME way
+ * everywhere — symmetric, position-independent, any image. radius is in mask pixels (small → only
+ * sub-feature noise is rounded; major shape preserved).
+ */
+export function smoothMask(mask: Uint8Array, w: number, h: number, radius = 3): Uint8Array {
+  const r = Math.max(1, Math.round(radius))
+  const win = 2 * r + 1
+  const cl = (v: number, hi: number) => (v < 0 ? 0 : v > hi ? hi : v)
+  const tmp = new Float32Array(w * h)
+  for (let y = 0; y < h; y++) {
+    const row = y * w
+    let sum = 0
+    for (let k = -r; k <= r; k++) sum += mask[row + cl(k, w - 1)]
+    for (let x = 0; x < w; x++) {
+      tmp[row + x] = sum / win
+      sum += mask[row + cl(x + r + 1, w - 1)] - mask[row + cl(x - r, w - 1)]
+    }
+  }
+  const out = new Uint8Array(w * h)
+  for (let x = 0; x < w; x++) {
+    let sum = 0
+    for (let k = -r; k <= r; k++) sum += tmp[cl(k, h - 1) * w + x]
+    for (let y = 0; y < h; y++) {
+      out[y * w + x] = sum / win >= 0.5 ? 1 : 0
+      sum += tmp[cl(y + r + 1, h - 1) * w + x] - tmp[cl(y - r, h - 1) * w + x]
+    }
+  }
+  return out
+}
+
 /** Keep only the largest 4-connected foreground component (spec v1 single-component gate). */
 function largestComponent(mask: Uint8Array, w: number, h: number): Uint8Array {
   const n = w * h

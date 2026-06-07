@@ -4,7 +4,7 @@
 
 import * as THREE from 'three'
 import type { Contour, Pt, ShapeSpecDraft } from './types'
-import { loadImageData, segment, adapterIdFor, dilateMask, type MaskResult } from './mask'
+import { loadImageData, segment, adapterIdFor, dilateMask, smoothMask, type MaskResult } from './mask'
 import { segmentML, ML_ADAPTER_ID } from './segment-ml'
 import { buildContour } from './contour'
 import { bleedTexture } from './edge-bleed'
@@ -94,7 +94,8 @@ export async function buildShape(
   // expand outward by padding + bevel: flat cap = subject + paddingMM (image), bevel sits beyond
   const expandMM = cfg.paddingMM
   const padPx = Math.max(0, Math.round(expandMM / mmPerPx))
-  const workMask = padPx > 0 ? dilateMask(mask, width, height, padPx) : mask
+  const dilated = padPx > 0 ? dilateMask(mask, width, height, padPx) : mask
+  const workMask = smoothMask(dilated, width, height, 3) // round sub-feature tip/notch noise symmetrically (both ears, any image)
   const cornerRadiusPx = cfg.cornerRadiusMM / mmPerPx
   const built = buildContour(workMask, width, height, epsilonPx, cfg.minCornerAngleDeg, cornerRadiusPx)
   if (!built) throw new Error('Contour build failed after simplification.')
