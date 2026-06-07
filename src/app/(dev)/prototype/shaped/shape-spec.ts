@@ -92,7 +92,7 @@ export const SHAPED_DEFAULTS = {
   simplifyEpsilonMm: 0.42,
   minFeatureWidthMm: 2.4,
   threshold: 36,
-  maskResolution: 480,
+  maskResolution: 720,
 } as const
 
 export const INITIAL_SHAPED_SETTINGS: ShapedPreviewSettings = {

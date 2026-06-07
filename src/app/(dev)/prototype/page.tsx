@@ -21,11 +21,19 @@ const MIN_SCALE = 1.0
 const MAX_SCALE = 4.0
 const DRAG_SENSITIVITY = 0.001
 const SCROLL_SENSITIVITY = 0.002
+const SHAPED_ARTWORKS = {
+  butterfly: '/assets/effects-art-test/butterfly-blue.jpg',
+  pharma: '/assets/effects-art-test/happy-pharma-frame-1000007923.png',
+} as const
+
+function getShapedArtworkUrl(key: string | null) {
+  return key === 'pharma' ? SHAPED_ARTWORKS.pharma : SHAPED_ARTWORKS.butterfly
+}
 
 function PrototypePageInner() {
   const searchParams = useSearchParams()
   const shapeParamEnabled = searchParams.get('shape') === '1' || searchParams.get('mode') === 'shaped'
-  const [artworkUrl, setArtworkUrl] = useState<string | undefined>(shapeParamEnabled ? '/assets/effects-art-test/butterfly-blue.jpg' : undefined)
+  const [artworkUrl, setArtworkUrl] = useState<string | undefined>(shapeParamEnabled ? getShapedArtworkUrl(searchParams.get('art')) : undefined)
   const [isDragging, setIsDragging] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [designState, setDesignState] = useState<DesignState>(INITIAL_DESIGN)

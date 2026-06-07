@@ -96,46 +96,23 @@ function createGoldenSolidSuedeMaterial(role: ViewerMaterialRole | undefined, co
   })
 }
 
-function createGoldenEdgeSuedeMaterial(role: ViewerMaterialRole | undefined, edgeMap: THREE.Texture) {
-  const defaults = role?.defaults ?? {}
-  const textures = role?.textures ?? {}
-
-  return new THREE.MeshPhysicalMaterial({
-    map: edgeMap,
-    color: new THREE.Color(Number(defaults.colorMultiplier ?? 1), Number(defaults.colorMultiplier ?? 1), Number(defaults.colorMultiplier ?? 1)),
-    normalMap: loadMaterialTexture(textures.normalMap, { color: false }),
-    normalScale: new THREE.Vector2(
-      Number(defaults.normalScale ?? 0.15) * 0.35,
-      Number(defaults.normalScale ?? 0.15) * 0.35
-    ),
-    bumpMap: loadMaterialTexture(textures.bumpMap, { color: false }),
-    bumpScale: Number(defaults.bumpScale ?? 1) * 0.2,
-    roughnessMap: loadMaterialTexture(textures.roughnessMap, { color: false }),
-    roughness: 1,
-    metalness: 0,
-    specularIntensity: 0,
-    sheen: Math.min(0.18, Number(defaults.sheen ?? 0.18)),
-    sheenColor: new THREE.Color(defaults.sheenColor ?? '#1a1a1a'),
-    sheenRoughness: 1,
-    envMapIntensity: 0,
-    clearcoat: 0,
-    clearcoatRoughness: 1,
-    side: THREE.DoubleSide,
-  })
-}
-
 function createArtworkTexture(loaded: { image: HTMLImageElement; width: number; height: number }) {
   const canvas = document.createElement('canvas')
   canvas.width = loaded.width
   canvas.height = loaded.height
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Canvas is unavailable for artwork texture.')
+  ctx.imageSmoothingEnabled = false
   ctx.drawImage(loaded.image, 0, 0, loaded.width, loaded.height)
 
   const texture = new THREE.CanvasTexture(canvas)
   texture.colorSpace = THREE.SRGBColorSpace
-  texture.wrapS = THREE.RepeatWrapping
-  texture.wrapT = THREE.RepeatWrapping
+  texture.wrapS = THREE.ClampToEdgeWrapping
+  texture.wrapT = THREE.ClampToEdgeWrapping
+  texture.generateMipmaps = true
+  texture.minFilter = THREE.LinearMipmapLinearFilter
+  texture.magFilter = THREE.LinearFilter
+  texture.anisotropy = 16
   texture.needsUpdate = true
   return texture
 }
@@ -224,16 +201,22 @@ export default function ShapedPreview({
       : product?.materialRoles.find((role) => role.role === 'face') ?? product?.materialRoles[0]
     const backRole = product?.materialRoles.find((role) => role.role === 'back') ?? faceRole
 
+    const frontMaterial = createGoldenFaceMaterial(faceRole, frontTexture)
     return [
-      createGoldenFaceMaterial(faceRole, frontTexture),
+      frontMaterial,
       createGoldenSolidSuedeMaterial(backRole, String(backRole?.defaults?.color ?? '#080808')),
-      createGoldenEdgeSuedeMaterial(faceRole, frontTexture),
+      frontMaterial,
     ]
   }, [frontTexture, product])
 
   useEffect(() => {
     return () => {
-      materials?.forEach((material) => material.dispose())
+      const disposed = new Set<THREE.Material>()
+      materials?.forEach((material) => {
+        if (disposed.has(material)) return
+        disposed.add(material)
+        material.dispose()
+      })
     }
   }, [materials])
 
