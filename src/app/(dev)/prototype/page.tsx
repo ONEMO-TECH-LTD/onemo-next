@@ -29,6 +29,7 @@ function PrototypePageInner() {
   const { colors, setBackColor, setFrameColor, setBgColor } = useSceneStore()
   const [showColors, setShowColors] = useState(false)
   const sceneName = searchParams.get('scene')
+  const shaped = searchParams.get('shape') === '1' || searchParams.get('shape') === 'true'
   const templateUrl = sceneName
     ? `/api/dev/scenes/${encodeURIComponent(sceneName)}`
     : '/api/dev/scenes/golden'
@@ -105,6 +106,7 @@ function PrototypePageInner() {
             artworkUrl={artworkUrl}
             designState={designState}
             isEditing={isEditing}
+            shaped={shaped}
           />
         )}
       </AdminViewer>
