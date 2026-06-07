@@ -119,15 +119,6 @@ export function buildShapedGeometry(contour: Contour, opts: MeshOptions): Shaped
   const quad = (A: V, B: V, C: V, D: V) => { pushV(A); pushV(B); pushV(D); pushV(A); pushV(D); pushV(C) }
   const mk = (x: number, y: number, z: number, nx: number, ny: number, nz: number): V => ({ x, y, z, nx, ny, nz })
 
-  // Cumulative ARC LENGTH along the profile (mm) from the front-face edge. The edge image UV advances
-  // by this arc length so the image WRAPS around the lip at true 1:1 scale (no planar stretch on the
-  // near-vertical wall). UV is continuous with the front cap (inward = r at the top).
-  const profileArc: number[] = [0]
-  for (let s = 1; s < profile.length; s++) {
-    const a = profile[s - 1], b = profile[s]
-    profileArc[s] = profileArc[s - 1] + Math.hypot(b.radial - a.radial, b.z - a.z)
-  }
-
   const insetByR: Pt[][] = []
 
   // ── Edge lip = the SAME front image continuing over the rounding (same material). UV wraps by arc
@@ -139,7 +130,11 @@ export function buildShapedGeometry(contour: Contour, opts: MeshOptions): Shaped
     insetByR.push(pts.map(([x, y], i) => [x - N[i][0] * r, y - N[i][1] * r]))
     const ev = (P: Pt, Np: Pt, s: number): V => {
       const ps = profile[s]
-      const inward = r + profileArc[s] // arc-length wrap → image continues over the lip at 1:1 scale
+      // LOCAL colour roll: every profile sample on this perimeter point samples ONE source pixel just
+      // inside the cutline (constant inward = r). The local edge colour rolls over the rounded lip
+      // WITHOUT smearing image rows across the sub-mm rim — kills the bottom stretch-band striations.
+      // Continuous with the front cap (also inset by r), so no seam line at the front↔edge boundary.
+      const inward = r
       const [iu, iv] = uvOf(P[0] - Np[0] * inward, P[1] - Np[1] * inward)
       return { x: P[0] + Np[0] * ps.radial, y: P[1] + Np[1] * ps.radial, z: ps.z, nx: Np[0] * ps.nr, ny: Np[1] * ps.nr, nz: ps.nz, iu, iv }
     }

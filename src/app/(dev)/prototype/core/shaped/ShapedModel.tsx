@@ -42,7 +42,7 @@ export default function ShapedModel({
   onSpec,
   onStatus,
 }: ShapedModelProps) {
-  const [result, setResult] = useState<{ geometry: THREE.BufferGeometry; texture: THREE.CanvasTexture; widthMM: number; heightMM: number } | null>(null)
+  const [result, setResult] = useState<{ geometry: THREE.BufferGeometry; texture: THREE.CanvasTexture; edgeTexture: THREE.CanvasTexture; widthMM: number; heightMM: number } | null>(null)
   const artTexRef = useRef<THREE.CanvasTexture | null>(null)
 
   // Run the pipeline whenever the artwork changes
@@ -51,24 +51,26 @@ export default function ShapedModel({
     if (!artworkUrl) {
       // clear any stale mesh when artwork is removed
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setResult((prev) => { prev?.geometry.dispose(); prev?.texture.dispose(); return null })
+      setResult((prev) => { prev?.geometry.dispose(); prev?.texture.dispose(); prev?.edgeTexture.dispose(); return null })
       return
     }
     onStatus?.('building')
     buildShape(artworkUrl, DEFAULT_BUILD_CONFIG)
       .then((r) => {
-        if (cancelled) { r.geometry.dispose(); r.texture.dispose(); return }
+        if (cancelled) { r.geometry.dispose(); r.texture.dispose(); r.edgeTexture.dispose(); return }
         setResult((prev) => {
           prev?.geometry.dispose()
           prev?.texture.dispose()
+          prev?.edgeTexture.dispose()
           return r
         })
         artTexRef.current = r.texture
         // debug: prove which build is live (groups: 2 = current edge=front model; uv1 = suede channel)
         ;(window as unknown as { __shapeInfo?: unknown }).__shapeInfo = {
-          build: 'matte-edge-copy-v2', groups: r.geometry.groups.length,
+          build: 'ear-round+hires-v15', groups: r.geometry.groups.length,
           uv1: !!r.geometry.attributes.uv1, verts: r.geometry.attributes.position.count, ts: Date.now(),
         }
+        ;(window as unknown as { __shapeSpec?: unknown }).__shapeSpec = r.spec // debug: inspect contour
         onSpec?.(r.spec)
         onStatus?.('ready')
       })
@@ -115,7 +117,7 @@ export default function ShapedModel({
   // matte copy is correct." sheen/env/specular = 0 is what makes it read matte at grazing angles.
   const edgeMaterial = useMemo(() => {
     return new THREE.MeshPhysicalMaterial({
-      map: result?.texture ?? null,
+      map: result?.edgeTexture ?? null, // STRONGLY blurred → smooth rim colour, no per-pixel bands
       color: new THREE.Color(0xffffff),
       normalMap,
       normalScale: new THREE.Vector2(suede.normalScale, suede.normalScale),
@@ -129,7 +131,7 @@ export default function ShapedModel({
       specularIntensity: 0,
       side: THREE.DoubleSide,
     })
-  }, [result?.texture, normalMap, roughnessMap, bumpMap, suede])
+  }, [result?.edgeTexture, normalMap, roughnessMap, bumpMap, suede])
 
   // BACK = same golden suede setup, just the back colour.
   const backMaterial = useMemo(() => {

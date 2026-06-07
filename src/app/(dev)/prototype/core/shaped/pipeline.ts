@@ -19,6 +19,8 @@ export interface ShapeBuildConfig {
   maxImageDim: number     // mask/contour downscale cap (low res is fine for the silhouette)
   textureDim: number      // front-texture cap (HIGH res so the projected image stays sharp)
   paddingMM: number       // flat IMAGE margin around the subject (same image, full thickness)
+  minCornerAngleDeg: number // round corners sharper than this angle; 0 = off
+  cornerRadiusMM: number    // fillet RADIUS applied to those corners (generous = bigger round)
 }
 
 export const DEFAULT_BUILD_CONFIG: ShapeBuildConfig = {
@@ -28,13 +30,16 @@ export const DEFAULT_BUILD_CONFIG: ShapeBuildConfig = {
   edgeSegments: 14,          // fillet rounding segments (smoother rim, fewer facet lines)
   rdpEpsilonMM: 0.4,         // RDP to corner points, THEN Chaikin rounds them → smooth curves
   maxImageDim: 1200,         // mask res (Catmull-Rom provides smoothness, so this can be moderate)
-  textureDim: 1600,
+  textureDim: 2400,          // front-texture cap raised toward source res (less downscale/pixelation)
   paddingMM: 1.5,            // Dan 2026-06-06: small flat image margin around the subject
+  minCornerAngleDeg: 135,    // round any corner sharper than 135° (catch broad shoulder/bottom corners too)
+  cornerRadiusMM: 24,        // BIG generous fillet radius (Dan's red line ≈ 20%+ of width)
 }
 
 export interface ShapeBuildResult {
   geometry: THREE.BufferGeometry
   texture: THREE.CanvasTexture
+  edgeTexture: THREE.CanvasTexture  // strongly-blurred copy for the rim (no banding)
   spec: ShapeSpecDraft
   widthMM: number
   heightMM: number
@@ -90,7 +95,8 @@ export async function buildShape(
   const expandMM = cfg.paddingMM
   const padPx = Math.max(0, Math.round(expandMM / mmPerPx))
   const workMask = padPx > 0 ? dilateMask(mask, width, height, padPx) : mask
-  const built = buildContour(workMask, width, height, epsilonPx)
+  const cornerRadiusPx = cfg.cornerRadiusMM / mmPerPx
+  const built = buildContour(workMask, width, height, epsilonPx, cfg.minCornerAngleDeg, cornerRadiusPx)
   if (!built) throw new Error('Contour build failed after simplification.')
 
   const contourMM = contourPxToMM(built.contour, mmPerPx)
@@ -139,6 +145,22 @@ export async function buildShape(
   texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping
   texture.needsUpdate = true
 
+  // EDGE texture = a STRONGLY blurred copy of the bled image. The rim samples THIS (not the sharp
+  // front), so adjacent rim columns blend into a smooth colour gradient instead of per-pixel vertical
+  // BANDS. General: blur radius scales with texture size, so it works for any image.
+  const edgeBlurPx = Math.max(16, Math.round(texW / 22))
+  const edgeCanvas = document.createElement('canvas')
+  edgeCanvas.width = texW; edgeCanvas.height = texH
+  const ectx = edgeCanvas.getContext('2d')!
+  ectx.filter = `blur(${edgeBlurPx}px)`
+  ectx.drawImage(bled, 0, 0)
+  ectx.filter = 'none'
+  const edgeTexture = new THREE.CanvasTexture(edgeCanvas)
+  edgeTexture.colorSpace = THREE.SRGBColorSpace
+  edgeTexture.flipY = false
+  edgeTexture.wrapS = edgeTexture.wrapT = THREE.ClampToEdgeWrapping
+  edgeTexture.needsUpdate = true
+
 
   const spec: ShapeSpecDraft = {
     sourceRef: url,
@@ -161,5 +183,5 @@ export async function buildShape(
     },
   }
 
-  return { geometry, texture, spec, widthMM, heightMM }
+  return { geometry, texture, edgeTexture, spec, widthMM, heightMM }
 }

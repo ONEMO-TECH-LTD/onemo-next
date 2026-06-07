@@ -181,21 +181,33 @@ export function postProcessMask(mask: Uint8Array, w: number, h: number): Uint8Ar
   return largestComponent(cleanup(mask, w, h), w, h)
 }
 
-/** Expand the mask outward by N iterations (padding margin around the subject; also rounds corners). */
+/**
+ * Expand the mask outward by N iterations (padding margin around the subject). Uses an OCTAGONAL
+ * structuring element (alternate 4-connected "plus" and 8-connected "square" per iteration), which
+ * approximates a circular brush — so thin sharp spikes (e.g. bat-ear tips) get ROUNDED instead of
+ * squared off into a rectangular stub (a pure 3×3 square dilation was creating that chimney artifact).
+ */
 export function dilateMask(mask: Uint8Array, w: number, h: number, iterations: number): Uint8Array {
   let cur = mask
   for (let it = 0; it < iterations; it++) {
+    const use8 = it % 2 === 1 // alternate plus / square → octagon ≈ circle
     const out = new Uint8Array(w * h)
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         const p = y * w + x
         if (cur[p]) { out[p] = 1; continue }
         let v = 0
-        for (let dy = -1; dy <= 1 && !v; dy++) {
-          for (let dx = -1; dx <= 1 && !v; dx++) {
-            const nx = x + dx, ny = y + dy
-            if (nx >= 0 && ny >= 0 && nx < w && ny < h && cur[ny * w + nx]) v = 1
-          }
+        // 4-connected (plus) always
+        if (x > 0 && cur[p - 1]) v = 1
+        else if (x < w - 1 && cur[p + 1]) v = 1
+        else if (y > 0 && cur[p - w]) v = 1
+        else if (y < h - 1 && cur[p + w]) v = 1
+        // diagonals only on square iterations
+        else if (use8) {
+          if (x > 0 && y > 0 && cur[p - w - 1]) v = 1
+          else if (x < w - 1 && y > 0 && cur[p - w + 1]) v = 1
+          else if (x > 0 && y < h - 1 && cur[p + w - 1]) v = 1
+          else if (x < w - 1 && y < h - 1 && cur[p + w + 1]) v = 1
         }
         out[p] = v
       }
