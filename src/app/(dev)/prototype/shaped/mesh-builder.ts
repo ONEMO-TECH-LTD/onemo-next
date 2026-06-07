@@ -4,11 +4,9 @@ import * as THREE from 'three'
 import type { ShapePoint, ShapeSpecDraft } from './shape-spec'
 
 const PROFILE_STEPS = 8
-const EDGE_LATERAL_BLEND = 0
 const EDGE_WRAP_INSET_MIN_PX = 64
 const EDGE_WRAP_INSET_MAX_PX = 260
 const EDGE_WRAP_INSET_RATIO = 0.1
-const BACK_EDGE_INSET_MM = 0.32
 const MM_TO_SCENE = 0.001
 
 interface BuildVertex {
@@ -156,26 +154,26 @@ function addRingEdge({
       EDGE_WRAP_INSET_MIN_PX,
       EDGE_WRAP_INSET_MAX_PX
     )
-    const backInsetScene = BACK_EDGE_INSET_MM * MM_TO_SCENE * (isHole ? 1 : -1)
+    const crownScene = Math.min(radiusScene, thicknessScene / 2)
 
     for (let step = 0; step <= PROFILE_STEPS; step += 1) {
       const t = step / PROFILE_STEPS
-      const taper = t * t * (3 - 2 * t)
       const wrapInset = sourceAwareInset * Math.pow(t, 0.85)
       const edgeUv = sourceUv({
         x: pointPx.x + inwardDirection.x * wrapInset,
         y: pointPx.y + inwardDirection.y * wrapInset,
       }, draft)
-      const arc = Math.sin(Math.PI * t)
-      const zNormal = Math.cos(Math.PI * t)
-      const sideNormal = Math.sin(Math.PI * t)
+      const z = thicknessScene / 2 - thicknessScene * t
+      const sideOffset = -crownScene + Math.sqrt(Math.max(0, crownScene * crownScene - z * z))
+      const sideNormal = crownScene > 0 ? (sideOffset + crownScene) / crownScene : 0
+      const zNormal = crownScene > 0 ? z / crownScene : 0
       const nx = normal.x * sideNormal
       const ny = normal.y * sideNormal
       const nl = Math.hypot(nx, ny, zNormal) || 1
       profileIndices.push(pushVertex(vertices, {
-        x: point.x * MM_TO_SCENE + normal.x * (radiusScene * arc * EDGE_LATERAL_BLEND + backInsetScene * taper),
-        y: point.y * MM_TO_SCENE + normal.y * (radiusScene * arc * EDGE_LATERAL_BLEND + backInsetScene * taper),
-        z: thicknessScene / 2 - thicknessScene * t,
+        x: point.x * MM_TO_SCENE + normal.x * sideOffset,
+        y: point.y * MM_TO_SCENE + normal.y * sideOffset,
+        z,
         nx: nx / nl,
         ny: ny / nl,
         nz: zNormal / nl,
@@ -208,6 +206,7 @@ export function createRoundedShapeGeometry(draft: ShapeSpecDraft) {
   const frontStart = 0
   const thicknessScene = draft.dimensions_mm.thickness_body * MM_TO_SCENE
   const radiusScene = draft.dimensions_mm.edge_radius_mm * MM_TO_SCENE
+  const crownMm = Math.min(draft.dimensions_mm.edge_radius_mm, draft.dimensions_mm.thickness_body / 2)
 
   const outerFront = addSurfaceVertices({
     vertices,
@@ -216,6 +215,8 @@ export function createRoundedShapeGeometry(draft: ShapeSpecDraft) {
     z: thicknessScene / 2,
     normalZ: 1,
     draft,
+    isHole: false,
+    offsetMm: -crownMm,
   })
   const holesFront = draft.geometry_mm.holes.map((hole, index) => addSurfaceVertices({
     vertices,
@@ -224,6 +225,8 @@ export function createRoundedShapeGeometry(draft: ShapeSpecDraft) {
     z: thicknessScene / 2,
     normalZ: 1,
     draft,
+    isHole: true,
+    offsetMm: -crownMm,
   }))
 
   const vectors = toVector2(draft.geometry_mm.outer)
@@ -244,7 +247,7 @@ export function createRoundedShapeGeometry(draft: ShapeSpecDraft) {
     normalZ: -1,
     draft,
     isHole: false,
-    offsetMm: -BACK_EDGE_INSET_MM,
+    offsetMm: -crownMm,
   })
   const holesBack = draft.geometry_mm.holes.map((hole, index) => addSurfaceVertices({
     vertices,
@@ -254,7 +257,7 @@ export function createRoundedShapeGeometry(draft: ShapeSpecDraft) {
     normalZ: -1,
     draft,
     isHole: true,
-    offsetMm: BACK_EDGE_INSET_MM,
+    offsetMm: -crownMm,
   }))
   const flatBack = outerBack.concat(...holesBack)
   triangulated.forEach((tri) => {

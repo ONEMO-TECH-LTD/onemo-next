@@ -230,6 +230,8 @@ export function segmentImageToMask(loaded: LoadedImage, settings: ShapedPreviewS
   )
   mask.set(closed)
   fillInteriorBackground(mask, width, height)
+  const cutlinePaddingPx = Math.max(1, Math.round(pruneRadius * 0.35))
+  mask.set(dilateMask(mask, width, height, cutlinePaddingPx))
 
   return { width, height, data: mask, foregroundMode: 'border-background' }
 }
