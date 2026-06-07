@@ -54,6 +54,15 @@ interface EffectViewerProps {
   }) => void
 }
 
+// Dev-only: expose camera/controls/renderer so the edge can be inspected from script (shaped QA).
+function DebugExpose() {
+  const three = useThree()
+  React.useEffect(() => {
+    ;(window as unknown as { __r3f?: unknown }).__r3f = three
+  }, [three])
+  return null
+}
+
 function RendererBackgroundSync({ color }: { color: string }) {
   const { gl } = useThree()
 
@@ -271,6 +280,7 @@ export default function EffectViewer({
         onCreated={handleCreated}
       >
         <Suspense fallback={null}>
+          {shaped ? <DebugExpose /> : null}
           <RendererBackgroundSync color={config.colors.bgColor} />
           <RendererSettingsSync config={config} />
           <CameraConfigSync config={config} orbitControlsRef={orbitControlsRef} />

@@ -64,6 +64,11 @@ export default function ShapedModel({
           return r
         })
         artTexRef.current = r.texture
+        // debug: prove which build is live (groups: 2 = current edge=front model; uv1 = suede channel)
+        ;(window as unknown as { __shapeInfo?: unknown }).__shapeInfo = {
+          build: 'arc-wrap-v1', groups: r.geometry.groups.length,
+          uv1: !!r.geometry.attributes.uv1, verts: r.geometry.attributes.position.count, ts: Date.now(),
+        }
         onSpec?.(r.spec)
         onStatus?.('ready')
       })
