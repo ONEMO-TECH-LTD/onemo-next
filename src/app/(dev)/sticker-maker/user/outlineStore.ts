@@ -1,0 +1,34 @@
+'use client'
+
+// Two-way bridge between the 3D engine and the 2D editor (decouples the R3F tree from the DOM
+// editor — no prop threading).
+//   engine → editor : ShapedModel writes the latest cut-out `spec` when BEN2 finishes; OutlineEditor
+//                      reads it to build the editable OutlineDocument from the REAL contour (A1d).
+//   editor → engine : OutlineEditor writes `editedContourMM` (the resolved outline in mm) as the user
+//                      edits; ShapedModel rebuilds the 3D mesh from it (reusing the texture) so the
+//                      object follows the 2D edits and the approved shape is exactly what's shown
+//                      (ADDENDUM D steps 4 + 8 — "the 3D follows" / "what you approve is what's made").
+
+import { create } from 'zustand'
+import type { ShapeSpecDraft, Contour } from '../core/shaped/types'
+import type { OutlineDocument } from '@/lib/outline-core'
+
+interface OutlineStore {
+  spec: ShapeSpecDraft | null
+  setSpec: (spec: ShapeSpecDraft | null) => void
+  editedContourMM: Contour | null
+  setEditedContourMM: (c: Contour | null) => void
+  // The last committed editor document — so reopening "Edit outline" restores edits instead of
+  // re-deriving the original BEN contour (the 3D already reflects edits via editedContourMM).
+  editedDoc: OutlineDocument | null
+  setEditedDoc: (d: OutlineDocument | null) => void
+}
+
+export const useOutlineStore = create<OutlineStore>((set) => ({
+  spec: null,
+  setSpec: (spec) => set({ spec }),
+  editedContourMM: null,
+  setEditedContourMM: (editedContourMM) => set({ editedContourMM }),
+  editedDoc: null,
+  setEditedDoc: (editedDoc) => set({ editedDoc }),
+}))
