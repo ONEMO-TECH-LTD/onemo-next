@@ -50,17 +50,6 @@ function ensureStyle() {
   document.head.appendChild(style)
 }
 
-function findLevaRow(labelText: string): HTMLElement | null {
-  const labels = document.querySelectorAll('label[class*="leva-c-"]')
-  for (const el of labels) {
-    if (el.textContent?.trim() === labelText) {
-      // The row is the grandparent container that holds label + control
-      return el.closest('[class*="leva-c-bDGmTT"]') as HTMLElement | null
-    }
-  }
-  return null
-}
-
 export function useLevaBrowse() {
   useEffect(() => {
     ensureStyle()

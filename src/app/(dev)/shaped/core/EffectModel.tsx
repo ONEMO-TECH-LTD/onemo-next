@@ -301,7 +301,7 @@ export default function EffectModel({
       return [product.artworkSlot.meshName]
     }
     return []
-  }, [product, roleEntries])
+  }, [product])
 
   const roleMaterials = useMemo(() => {
     const materials = new Map<string, THREE.MeshPhysicalMaterial>()
@@ -346,7 +346,7 @@ export default function EffectModel({
         child.visible = false
       }
     })
-  }, [artworkMeshPatterns, roleEntries, roleMaterials, scene])
+  }, [artworkMeshPatterns, roleEntries, roleMaterials, scene, product?.artworkSlot?.role])
 
   useEffect(() => {
     onModelReady?.({

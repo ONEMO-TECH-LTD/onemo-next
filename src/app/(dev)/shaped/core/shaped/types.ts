@@ -13,10 +13,16 @@ export interface Contour {
   holes: Ring[]
 }
 
-/** Real-world dimensions locked by Dan (2026-06-06). */
+/**
+ * Real-world dimensions of the cut-out. This tracing-engine preview ships the CURRENT working
+ * values from DEFAULT_BUILD_CONFIG (thicknessMM 0.5 / edgeRadiusMM 0.15). The thicker ~1.6-2mm
+ * body + slight front-top fillet seen on the physical sample is a DEFERRED conditional add-on
+ * (edge-round), pending Dan's physical-sample thickness lock — not part of this engine ship.
+ * See _team-work/kai-sidekick/real-sample-reflections.md.
+ */
 export interface Dimensions {
-  thicknessBodyMM: number // 1.6 locked
-  edgeRadiusMM: number    // ~1.0 rounded edge (AMEND-8), not a bevel
+  thicknessBodyMM: number // current preview build value (DEFAULT_BUILD_CONFIG.thicknessMM)
+  edgeRadiusMM: number    // current preview build value; rounded-edge profile is the deferred add-on
   widthMM: number
   heightMM: number
 }

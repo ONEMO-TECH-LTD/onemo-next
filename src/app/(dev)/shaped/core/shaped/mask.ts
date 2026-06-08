@@ -1,10 +1,10 @@
 // Segmentation → binary mask (Lane A / Kai)
 //
-// Per FINAL-SPEC the production browser default is BEN2-ONNX via transformers.js behind a
-// `SegmentationAdapter`. For this e2e lane we ship a fast built-in adapter (alpha-channel when
-// present, else border flood-fill background removal) behind the SAME adapter interface, so a
-// BEN2 adapter is a drop-in later. SCOPED DEVIATION (noted): avoids blocking the end-to-end
-// demo on a ~100MB model download; segmentation quality is one pluggable stage.
+// Per FINAL-SPEC the browser default is BEN2-ONNX via transformers.js, behind a
+// `SegmentationAdapter`. That ML adapter (segment-ml.ts) is now the ACTIVE default in
+// pipeline.ts; the fast built-in adapter here (alpha-channel when present, else border
+// flood-fill background removal) is the FALLBACK behind the same interface, used only when
+// the model can't load. Segmentation is one pluggable stage.
 
 export interface MaskResult {
   mask: Uint8Array // 1 = foreground, 0 = background

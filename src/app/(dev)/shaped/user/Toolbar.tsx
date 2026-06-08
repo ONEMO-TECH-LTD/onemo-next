@@ -2,7 +2,7 @@
 
 'use client'
 
-import { useRef, useCallback } from 'react'
+import { useRef } from 'react'
 import type { DesignState } from '../types'
 
 const INITIAL_DESIGN: DesignState = { offsetX: 0, offsetY: 0, scale: 1.0 }

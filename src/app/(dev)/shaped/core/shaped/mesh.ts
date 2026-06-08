@@ -1,8 +1,9 @@
 // Custom shaped-effect BufferGeometry (Lane A / Kai)
 // Per FINAL-SPEC: custom three.js BufferGeometry (NOT ExtrudeGeometry) — front/back caps + a
 // rounded edge band. AMEND-8: the edge is a REAL convex rounded fillet (radius r), NOT a flat
-// angled bevel. Front planar UV ("cut the geometry, not the texture"). Groups: 0 = front+edge
-// (artwork/bled suede), 1 = back (solid back-colour suede).
+// angled bevel. Front planar UV ("cut the geometry, not the texture"). Three material groups:
+// 0 = front cap (artwork/bled suede), 1 = edge lip (matte copy, same image), 2 = back
+// (solid back-colour suede).
 //
 // Coordinates: contour arrives in mm with the image's top-left origin. UV is derived from each
 // vertex's mm position back into the source image [0,1] so the texture stays registered to the
