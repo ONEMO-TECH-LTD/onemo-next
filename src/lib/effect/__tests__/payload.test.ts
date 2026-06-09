@@ -5,7 +5,7 @@
 // and the size band scales the final geometry. Builder is pure → no canvas needed.
 
 import { describe, it, expect } from 'vitest'
-import { applyOutlineCommands, type OutlineDocument, type OutlineNode } from '@/lib/outline-core'
+import { applyOutlineCommands, outlineDocumentHash, type OutlineDocument, type OutlineNode } from '@/lib/outline-core'
 import type { EffectSpecDraft, Contour } from '../types'
 import type { PreparedEffect } from '../prepare-effect'
 import { buildApprovedEffectPayload, assertCuttable, EffectNotCuttableError, canonicalHashBody } from '../payload'
@@ -162,5 +162,23 @@ describe('buildApprovedEffectPayload', () => {
     // fails HERE with its path, instead of silently drifting every saved design's manufacturing identity.
     const out = buildApprovedEffectPayload(prepared(squareDoc(), squareGeomMM), { type: 'standard', size: 's70' })
     expect(nonIntegerNumbers(canonicalHashBody(out))).toEqual([])
+  })
+
+  it('records the chosen attachment {system, result_hash} + rides in the hash (§8.5b/§11)', () => {
+    const p = prepared(squareDoc(), squareGeomMM)
+    const none = buildApprovedEffectPayload(p, { type: 'standard', size: 's140' })
+    const mag = buildApprovedEffectPayload(p, { type: 'standard', size: 's140', attachment: 'magnet' })
+    expect(none.attachment.system).toBe(null)
+    expect(mag.attachment.system).toBe('magnet')
+    expect(mag.attachment.result_hash).toMatch(/^[0-9a-f]{16}$/)
+    expect(mag.payload_hash).not.toBe(none.payload_hash) // attachment rides in the manufacturing hash
+    expect(nonIntegerNumbers(canonicalHashBody(mag))).toEqual([]) // still float-free with attachment recorded
+  })
+
+  it('GOLDEN: pins outlineDocumentHash(square) — the F1 remix↔mfg bond anchor (TD2)', () => {
+    // build.outline_document_hash is what the F1 bond replays against (persistence). Pin it INDEPENDENTLY
+    // of payload_hash so a silent outlineDocumentHash algorithm drift is caught cross-deploy. (TD2 full
+    // closure — real saved-design serialization — is due at §8.7b.)
+    expect(outlineDocumentHash(squareDoc())).toBe('23f76116e9f0969c')
   })
 })

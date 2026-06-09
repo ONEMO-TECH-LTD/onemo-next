@@ -51,6 +51,21 @@ describe('validateAttachment — magnet (54mm grid, §9a)', () => {
     const large = validateAttachment(square(200), 'magnet')
     expect(large.anchors.length).toBeGreaterThan(small.anchors.length)
   })
+
+  it('FAILS the anti-flap gate: a far protrusion >1 pitch from any anchor → edge_too_far + locators (§11-A9)', () => {
+    // A 120×120 body (holds ≥2 grid anchors) with a thin spike up to y=300: the spike vertices sit far
+    // from every CONTAINED (body) anchor → the edge_too_far gate fires and `locators` mark the flap points
+    // — the exact failure data sub-step 2's §11-A9 UI renders, so it must be a TESTED output (QA finding).
+    const spiky: Contour = {
+      outer: { pts: [[0, 0], [120, 0], [120, 120], [60, 120], [60, 300], [40, 300], [40, 120], [0, 120]] },
+      holes: [],
+    }
+    const r = validateAttachment(spiky, 'magnet')
+    expect(r.anchors.length).toBeGreaterThanOrEqual(2) // NOT a too-few-anchors failure — the body grips fine
+    expect(r.ok).toBe(false)
+    expect(r.issues.join(' ')).toContain('edge_too_far')
+    expect(r.locators.length).toBeGreaterThan(0)
+  })
 })
 
 describe('validateAttachment — velcro', () => {

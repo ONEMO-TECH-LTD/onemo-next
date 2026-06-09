@@ -14,6 +14,7 @@ import type { PreparedEffect } from './prepare-effect'
 import { EFFECT_BUILD_CONFIG } from './prepare-effect'
 import type { EffectType } from './effect-types'
 import { EFFECT_SIZES, BASE_LONGEST_SIDE_MM, toFinalPhysicalMm, type EffectSize, type FinalBBox } from './sizes'
+import { validateAttachment, type AttachmentSystem } from './attachment'
 import type { Contour, Pt } from './types'
 import {
   resolveOutlineDocument,
@@ -51,6 +52,7 @@ export interface BuildPayloadOptions {
   size: EffectSize
   trim?: TrimSelection
   appearance?: AppearanceSelection
+  attachment?: AttachmentSystem // §8.5b — magnet | velcro (validated on the final-physical-mm)
 }
 
 // ── feasibility (§1) ───────────────────────────────────────────────────────────
@@ -132,7 +134,7 @@ export interface ApprovedEffectPayload {
     edge_profile: { radiusMm: number }
     trim: TrimSelection
   }
-  attachment: { system: string | null } // placeholder until §8.5b
+  attachment: { system: string | null; template?: string | null; result_hash?: string } // §8.5b
   gates: { profile_hash: string; result_hash: string; blocking: number }
   build: { outline_core_version: string; outline_document_hash: string; config_hash: string; generator: EffectSpecGenerator }
   payload_hash: string
@@ -254,7 +256,13 @@ export function buildApprovedEffectPayload(prepared: PreparedEffect, opts: Build
     trim: opts.trim ?? {},
   }
 
-  const attachment = { system: null as string | null } // §8.5b
+  // §8.5b: validate the chosen attachment on the FINAL-physical-mm (size-dependent, §11-A3) and record
+  // {system, template, result_hash}. The UI gates approval on validateAttachment(...).ok (§11-A9 failure
+  // flow); cuttability stays the separate hard gate. No attachment selected → {system:null} (unchanged).
+  const attachmentResult = opts.attachment ? validateAttachment(final.geometry, opts.attachment) : null
+  const attachment: ApprovedEffectPayload['attachment'] = attachmentResult
+    ? { system: attachmentResult.system, template: null, result_hash: attachmentResult.result_hash }
+    : { system: null }
 
   const gates = {
     profile_hash: contentHash(stableStringify({ flattenTolerancePx: FLATTEN_TOLERANCE_PX, minAreaPx2: MIN_AREA_PX2 })),

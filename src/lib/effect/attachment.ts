@@ -11,6 +11,10 @@
 // velcro, receiver classes) + that a grid exists; the 54mm PITCH is the blueprint's number (§9a). No
 // canonical validator ALGORITHM exists in the SSOT — the gates below (stability: ≥2 grip points; edge-gap:
 // no silhouette vertex >1 pitch from an anchor) are designed per the blueprint requirements + tunable.
+// TECH-DEBT (QA, tracked — physical-coupon confirmation, like the 1mm edge radius): (1) the grid is
+// centered on the EFFECT bbox — i.e. "can this size grip a 54mm grid at BEST-CASE placement", NOT aligned
+// to a fixed garment-grid origin (validating the actual placed-on-garment position is a later step).
+// (2) MIN_MAGNET_ANCHORS + MAX_EDGE_GAP_MM are invented defaults, not gospel — coupon-confirm eventually.
 //
 // PURE: no three / no DOM. The 3D back-cap dot viz (ShapedModel, §8.5b sub-step 2) consumes `anchors`; the
 // failure UI consumes `locators` + `issues`. `result_hash` rides in the ApprovedEffectPayload (§11).
