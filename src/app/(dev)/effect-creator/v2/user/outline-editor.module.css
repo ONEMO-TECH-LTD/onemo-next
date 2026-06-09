@@ -1,4 +1,4 @@
-/* Manual Sticker Maker — 2D outline editor surface (A1b). ONEMO design system via token vars. */
+/* Effect Configurator — 2D outline editor surface (A1b). ONEMO design system via token vars. */
 
 .overlay {
   position: fixed;
@@ -41,7 +41,7 @@
   fill: var(--semantic-bg-error-primary);
   fill-opacity: 0.25;
 }
-/* Border beam — a glowing dash that travels around the outline (Apple-sticker magic trace, edit mode). */
+/* Border beam — a glowing dash that travels around the outline (Apple-style magic trace, edit mode). */
 .beam {
   fill: none;
   stroke: var(--semantic-bg-brand-solid);

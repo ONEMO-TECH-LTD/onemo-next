@@ -9,7 +9,7 @@ import * as THREE from 'three'
 import EffectModel from './EffectModel'
 import ShapedModel from './shaped/ShapedModel'
 import type { ViewerConfig, DesignState } from '../types'
-import type { SuedeMaterialParams } from '@/lib/shaped/types'
+import type { SuedeMaterialParams } from '@/lib/effect/types'
 
 const DEFAULT_ENVIRONMENT_PRESET = 'studio'
 type DreiEnvironmentPreset =

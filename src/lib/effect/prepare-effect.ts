@@ -1,26 +1,27 @@
-// prepare-sticker.ts — the 2D-first, ONE-ENGINE sticker preparation (lean-spec §8.2).
+// prepare-effect.ts — the 2D-first, ONE-ENGINE effect preparation (lean-spec §8.2).
 //
 // PURE 2D: segmentation + contour TRACER + the magic-blend composite, with ALL geometry resolution
 // (simplification, corner-rounding, smoothing, winding, self-intersection) routed through the single
-// deterministic `outline-core` engine — NOT the legacy `contour.ts` fork. Produces a `ShapeSpecDraft`
+// deterministic `outline-core` engine — NOT the legacy `contour.ts` fork. Produces a `EffectSpecDraft`
 // (mm geometry, shape-compatible with the existing draft so the editor/consumers are unchanged) + the
 // composite canvases. There is **no `three` import here**: the 3D half is `buildMeshFromSpec` (Phase B).
 //
-// `prepareSticker(url, 'square')` = the instant flat ONEMO square (full photo, rounded corners via
-// outline-core). `prepareSticker(url, 'cutout')` = BEN subject silhouette. Both collapse the two old
+// `prepareEffect(url, 'standard')` = the instant flat ONEMO square (full photo, rounded corners via
+// outline-core). `prepareEffect(url, 'shaped')` = BEN subject silhouette. Both collapse the two old
 // builders (buildSquareShape / buildShape) into one path that grounds geometry in mm through one engine.
 //
 // NOTE (transitive): this imports the marching-squares tracer from `contour.ts`, which still imports
 // three.js for the legacy smoothClosed fork — so three is in the bundle until §8.2b retires the fork.
 // That is a bundle-size detail only; it mounts no WebGL context (the perf trap is a *mounted* Canvas,
-// removed in §8.2b when Phase A renders via Sticker2D, not EffectViewer).
+// removed in §8.2b when Phase A renders via Effect2D, not EffectViewer).
 
-import type { Contour, Pt, ShapeSpecDraft } from './types'
+import type { Contour, Pt, EffectSpecDraft } from './types'
 import type { ShapeBuildConfig } from './pipeline'
 import { loadImageData, segment, adapterIdFor, dilateMask, smoothMask, type MaskResult } from './mask'
 import { segmentML, ML_ADAPTER_ID } from './segment-ml'
 import { traceContourRaw } from './contour'
 import { composeFront, blurCanvas, imageDataToCanvas } from './composite'
+import type { EffectType } from './effect-types'
 import {
   applyOutlineCommands,
   resolveOutlineDocument,
@@ -39,7 +40,7 @@ import {
  * rounded-lip radius must be re-pinned for the 1mm body; tracked as a §9 follow-up.) minCornerAngleDeg
  * / cornerRadiusMM are unused here (outline-core owns rounding) but kept for type compatibility.
  */
-export const PREPARE_CONFIG: ShapeBuildConfig = {
+export const EFFECT_BUILD_CONFIG: ShapeBuildConfig = {
   longestSideMM: 70, // §9a: 70mm base square
   thicknessMM: 1, // §9: 1mm body (supersedes 0.5)
   edgeRadiusMM: 0.15, // §9 follow-up: re-pin lip radius for the 1mm body
@@ -53,9 +54,9 @@ export const PREPARE_CONFIG: ShapeBuildConfig = {
   squareCornerMM: 8, // ONEMO square 8mm corners
 }
 
-export interface PreparedSticker {
-  /** mm draft spec — shape-compatible with the legacy ShapeSpecDraft (editor/consumers unchanged). */
-  spec: ShapeSpecDraft
+export interface PreparedEffect {
+  /** mm draft spec — shape-compatible with the legacy EffectSpecDraft (editor/consumers unchanged). */
+  spec: EffectSpecDraft
   /** the canonical outline document the geometry was resolved from (provenance; persistence later). */
   outlineDocument: OutlineDocument
   /** the ONE magic-blend front composite (Phase-A hero face = 3D front texture = print artwork). */
@@ -101,11 +102,11 @@ function docFromRawRing(
   H: number,
   sourceHash: string,
   generator: OutlineGenerator,
-  mode: 'square' | 'cutout',
+  type: EffectType,
   radiusPx: number,
   selfCorrect: boolean,
 ): OutlineDocument {
-  const eps = mode === 'cutout' ? Math.max(2, Math.max(W, H) * 0.022) : 1
+  const eps = type === 'shaped' ? Math.max(2, Math.max(W, H) * 0.022) : 1
   const minSpacing = Math.max(3, Math.max(W, H) * 0.008)
   const cleaned = repairSimplePolygon(rdpClosed(ringPx, eps), minSpacing)
   const ctrl = cleaned.length >= 3 ? cleaned : ringPx
@@ -116,7 +117,7 @@ function docFromRawRing(
     corner: { mode: 'inherit' },
   }))
   const image = { widthPx: W, heightPx: H, sourceHash, orientation: 'baked' as const }
-  const env = { image, mode: (mode === 'cutout' ? 'auto' : 'semi_auto') as 'auto' | 'semi_auto' }
+  const env = { image, mode: (type === 'shaped' ? 'auto' : 'semi_auto') as 'auto' | 'semi_auto' }
   const base = (radius: number) => ({
     rings: [{ id: 'r1', role: 'outer' as const, closed: true as const, nodes }],
     style: { globalOutlineCornerRadiusPx: radius, smoothing: 0 },
@@ -128,14 +129,14 @@ function docFromRawRing(
 }
 
 /**
- * Prepare a sticker (2D, one-engine). `mode='square'` = instant flat ONEMO square; `mode='cutout'` =
+ * Prepare an effect (2D, one-engine). `type='standard'` = instant flat ONEMO square; `type='shaped'` =
  * BEN subject silhouette. Returns the mm draft + the composite canvases (NO three).
  */
-export async function prepareSticker(
+export async function prepareEffect(
   url: string,
-  mode: 'square' | 'cutout',
-  cfg: ShapeBuildConfig = PREPARE_CONFIG,
-): Promise<PreparedSticker> {
+  type: EffectType,
+  cfg: ShapeBuildConfig = EFFECT_BUILD_CONFIG,
+): Promise<PreparedEffect> {
   // Full photo (texture res), y-up, for the composite + edge-lip source.
   const orig = await loadImageData(url, cfg.textureDim)
   const fw = orig.width, fh = orig.height
@@ -152,7 +153,7 @@ export async function prepareSticker(
   let selfCorrect: boolean
   let radiusHiPx: number
 
-  if (mode === 'cutout') {
+  if (type === 'shaped') {
     // BEN subject segmentation (fallback: flood-fill). seg.mask is already post-processed.
     let seg: MaskResult
     let texImage: ImageData, texW: number, texH: number
@@ -190,15 +191,15 @@ export async function prepareSticker(
     ringPx = [[0, 0], [fw, 0], [fw, fh], [0, fh]]
     subjCanvas = origCanvas // no matte → blend is a no-op (subj = full photo, blur 0)
     defaultBlurPx = 0
-    generator = { type: 'manual' } // square has no BEN provenance; the SDF-blend generator is wired with Hug later
-    adapterId = 'square'
+    generator = { type: 'manual' } // standard square has no BEN provenance; the SDF-blend generator is wired with Hug later
+    adapterId = 'standard'
     selfCorrect = false
     radiusHiPx = cfg.squareCornerMM / mmPerPx
   }
 
   // ── ONE ENGINE: raw ring → OutlineDocument → resolveOutlineDocument (corners via applyCornerRadii,
   //    NOT contour.filletCorners; policy.downstream_corner_rounding === 'disabled') → flattened mm.
-  const outlineDocument = docFromRawRing(ringPx, W, H, sourceHash, generator, mode, radiusHiPx, selfCorrect)
+  const outlineDocument = docFromRawRing(ringPx, W, H, sourceHash, generator, type, radiusHiPx, selfCorrect)
   const resolved = resolveOutlineDocument(outlineDocument, { flattenTolerancePx: 0.5 })
   const outerFlatPx = resolved.flattenedRingsPx[0] ?? ringPx
   const outerMM: Pt[] = outerFlatPx.map(([x, y]) => [x * mmPerPx, y * mmPerPx] as Pt)
@@ -210,7 +211,7 @@ export async function prepareSticker(
   const composite = composeFront(origCanvas, subjCanvas, defaultBlurPx)
   const edgeComposite = blurCanvas(origCanvas, Math.max(16, Math.round(fw / 22)))
 
-  const spec: ShapeSpecDraft = {
+  const spec: EffectSpecDraft = {
     sourceRef: url,
     maskWidthPx: W,
     maskHeightPx: H,

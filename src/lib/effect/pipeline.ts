@@ -1,18 +1,18 @@
 // Shaped-effect pipeline (Lane A / Kai)
 // image URL → segmentation → contour → simplify → mm → custom rounded-edge mesh + bled texture.
-// Returns a draft geometry + texture + ShapeSpecDraft. Browser/preview only (no canonical/checkout).
+// Returns a draft geometry + texture + EffectSpecDraft. Browser/preview only (no canonical/checkout).
 
 import * as THREE from 'three'
-import type { Contour, Pt, ShapeSpecDraft } from './types'
+import type { Contour, Pt, EffectSpecDraft } from './types'
 import { loadImageData, segment, adapterIdFor, dilateMask, smoothMask, type MaskResult } from './mask'
 import { segmentML, ML_ADAPTER_ID } from './segment-ml'
 import { buildContour } from './contour'
 import { buildShapedGeometry } from './mesh'
 import { composeFront } from './composite'
 
-// composeFront moved to composite.ts (three-free) so the 2D-first prepareSticker can reuse the ONE
+// composeFront moved to composite.ts (three-free) so the 2D-first prepareEffect can reuse the ONE
 // composite primitive without dragging three.js into the WebGL-free creation path. Re-exported here
-// so existing consumers (ShapedModel) keep importing it from `@/lib/shaped/pipeline`.
+// so existing consumers (ShapedModel) keep importing it from `@/lib/effect/pipeline`.
 export { composeFront } from './composite'
 
 export interface ShapeBuildConfig {
@@ -47,7 +47,7 @@ export interface ShapeBuildResult {
   geometry: THREE.BufferGeometry
   texture: THREE.CanvasTexture
   edgeTexture: THREE.CanvasTexture  // strongly-blurred copy for the rim (no banding)
-  spec: ShapeSpecDraft
+  spec: EffectSpecDraft
   widthMM: number
   heightMM: number
   /** Source layers for live re-blur of the front "magic blend" (toggle / intensity) in the editor. */
@@ -85,7 +85,7 @@ function roundedRectRing(W: number, H: number, rPx: number, seg = 8): Pt[] {
 }
 
 /**
- * DEFAULT product: the flat ONEMO square — the full photo on a rounded-rect sticker (8mm corners),
+ * DEFAULT product: the flat ONEMO square — the full photo on a rounded-rect effect (8mm corners),
  * NO segmentation. Instant. Reuses the same mesh + suede material as the cut-out so the Magic-wand
  * upgrade (buildShape → BEN) is a seamless swap. Returns the same shape as buildShape.
  */
@@ -131,7 +131,7 @@ export async function buildSquareShape(
   edgeTexture.wrapS = edgeTexture.wrapT = THREE.ClampToEdgeWrapping
   edgeTexture.needsUpdate = true
 
-  const spec: ShapeSpecDraft = {
+  const spec: EffectSpecDraft = {
     sourceRef: url,
     maskWidthPx: fw,
     maskHeightPx: fh,
@@ -236,7 +236,7 @@ export async function buildShape(
   edgeTexture.needsUpdate = true
 
 
-  const spec: ShapeSpecDraft = {
+  const spec: EffectSpecDraft = {
     sourceRef: url,
     maskWidthPx: width,
     maskHeightPx: height,

@@ -5,9 +5,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Center } from '@react-three/drei'
 import * as THREE from 'three'
 import type { DesignState, SceneSettings } from '../../types'
-import type { SuedeMaterialParams, ShapeSpecDraft } from '@/lib/shaped/types'
-import { buildShape, buildSquareShape, DEFAULT_BUILD_CONFIG, composeFront } from '@/lib/shaped/pipeline'
-import { buildShapedGeometry } from '@/lib/shaped/mesh'
+import type { SuedeMaterialParams, EffectSpecDraft } from '@/lib/effect/types'
+import { buildShape, buildSquareShape, DEFAULT_BUILD_CONFIG, composeFront } from '@/lib/effect/pipeline'
+import { buildShapedGeometry } from '@/lib/effect/mesh'
 import { useOutlineStore } from '../../user/outlineStore'
 
 interface ShapedModelProps {
@@ -20,7 +20,7 @@ interface ShapedModelProps {
   fitSize?: number // see default below
   /** false = the instant flat square (default); true = run BEN to build the subject cut-out (Magic wand). */
   auto?: boolean
-  onSpec?: (spec: ShapeSpecDraft) => void
+  onSpec?: (spec: EffectSpecDraft) => void
   onStatus?: (status: 'idle' | 'building' | 'ready' | 'error', message?: string) => void
 }
 

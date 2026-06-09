@@ -159,7 +159,7 @@ function PrototypePageInner() {
         isDragging={isDragging}
       />
 
-      {/* Manual Sticker Maker: 2D outline editor (A1b) */}
+      {/* Effect Configurator: 2D outline editor (A1b) */}
       <OutlineEditor
         open={editingOutline}
         imageUrl={artworkUrl}

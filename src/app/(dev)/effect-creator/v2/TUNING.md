@@ -1,4 +1,4 @@
-# Manual Sticker Maker — Tuning Sheet
+# Effect Configurator — Tuning Sheet
 
 Every adjustable parameter in the cut-out + 2D editor, with its current value, where it lives, and
 what it controls. Use this to experiment and diff: change a value, note the visual effect here, and

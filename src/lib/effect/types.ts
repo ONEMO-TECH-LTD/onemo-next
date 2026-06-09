@@ -1,5 +1,5 @@
 // Shaped-effect engine — shared types (Lane A / Kai)
-// ShapeSpecDraft = the browser-side draft per FINAL-SPEC §"Canonical artifact".
+// EffectSpecDraft = the browser-side draft per FINAL-SPEC §"Canonical artifact".
 // This lane builds the Draft + preview only (no server canonical / checkout / manufacturing).
 
 export type Pt = [number, number] // [x, y]
@@ -28,7 +28,7 @@ export interface Dimensions {
 }
 
 /** Browser-side draft spec — the routing surface for preview. Not canonical truth. */
-export interface ShapeSpecDraft {
+export interface EffectSpecDraft {
   sourceRef: string            // object URL / hash placeholder
   maskWidthPx: number
   maskHeightPx: number

@@ -1,4 +1,4 @@
-// Manual Sticker Maker — 2D outline editor surface (A1b/A1c/A1d/A2a).
+// Effect Configurator — 2D outline editor surface (A1b/A1c/A1d/A2a).
 // Renders an OutlineDocument over the flat cut-out image: the resolved outline path + draggable
 // anchor handles. outline-core is the single source of truth — every edit is a canonical command
 // (MoveNode / AddNode / DeleteNode / SetGlobalCornerRadius); the rendered path is DERIVED via
@@ -20,7 +20,7 @@ import {
   type ReplayEnv,
   type CostGrid,
 } from '@/lib/outline-core'
-import type { ShapeSpecDraft, Contour } from '@/lib/shaped/types'
+import type { EffectSpecDraft, Contour } from '@/lib/effect/types'
 import { buildEdgeCost } from './edgeCost'
 import { useOutlineStore } from './outlineStore'
 import { UndoIcon, RedoIcon, HugIcon, RoundIcon, SmoothIcon, ScaleIcon, PenIcon, ResetIcon, CheckIcon, CloseIcon, PlusIcon, MinusIcon, AddPointIcon, DeleteIcon, BlendIcon, ShapeIcon, PolygonChip, StarChip, CircleChip, SquareChip, PillChip, SquircleChip, HeartChip, SpeechChip, BadgeChip, ShieldChip, BlobChip, ArchChip, PreviewIcon, PreviewOffIcon } from './icons'
@@ -94,7 +94,7 @@ function maxSafeGlobalRadius(doc: OutlineDocument, hi: number): number {
   return Math.floor(lo)
 }
 
-function docFromSpec(spec: ShapeSpecDraft): OutlineDocument {
+function docFromSpec(spec: EffectSpecDraft): OutlineDocument {
   const W = spec.maskWidthPx, H = spec.maskHeightPx
   const k = spec.mmPerPx || 1
   // Control-node simplification tolerance. Deliberately coarse (RDP is curvature-aware): near-straight
@@ -917,7 +917,7 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
               )}
               <g transform={liveXform}>
                 <path className={`${styles.path} ${hasIssues ? styles.pathError : ''}`} d={pathD} />
-                {/* Apple-sticker "magic trace" — a beam running just inside the border (edit mode) */}
+                {/* Apple-style "magic trace" — a beam running just inside the border (edit mode) */}
                 {!hasIssues && <path className={styles.beam} d={pathD} />}
                 {/* anchors + rotate handle hidden in Preview (clean result) */}
                 {!preview && shown.rings.map((ring) =>

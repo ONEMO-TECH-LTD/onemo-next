@@ -1,9 +1,9 @@
 // build-mesh.ts — the 3D half of the decouple (lean-spec §8.2, Phase B).
 //
 // `buildMeshFromSpec` takes the resolved mm geometry + the 2D composite canvases produced by
-// `prepareSticker` (pure 2D) and builds the three.js mesh + textures — ON DEMAND, only when the
+// `prepareEffect` (pure 2D) and builds the three.js mesh + textures — ON DEMAND, only when the
 // golden scene mounts ("Finish in 3D"). This is the ONLY place three.js touches the shaped pipeline
-// besides mesh.ts; the creation flow (prepareSticker) is three-free. The mesh extrudes the SAME mm
+// besides mesh.ts; the creation flow (prepareEffect) is three-free. The mesh extrudes the SAME mm
 // outline the 2D hero clips to (silhouette parity), and the textures ARE the same composite the 2D
 // hero shows (composite parity) — 3D only adds suede/lighting on top.
 
@@ -31,7 +31,7 @@ function canvasTexture(canvas: HTMLCanvasElement): THREE.CanvasTexture {
 /**
  * Build the shaped mesh + front/edge textures from a resolved mm contour + the 2D composites.
  * `opts` carries the physical build params (thickness/edge/mmPerPx/imgW/imgH). The textures are the
- * front magic-blend composite and the strongly-blurred edge-lip composite from `prepareSticker`.
+ * front magic-blend composite and the strongly-blurred edge-lip composite from `prepareEffect`.
  */
 export function buildMeshFromSpec(
   geometryMM: Contour,

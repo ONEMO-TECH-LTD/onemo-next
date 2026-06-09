@@ -415,7 +415,7 @@ export function buildContour(
 /**
  * TRACER-ONLY (one-engine, §8.2): marching-squares → stitch → largest loop → outer-CCW → RAW pixel
  * ring. NO RDP, NO fillet, NO Catmull-Rom smoothing — unlike `buildContour`, which bakes the fork's
- * rounding/smoothing in. The 2D-first `prepareSticker` consumes this raw ring and routes ALL
+ * rounding/smoothing in. The 2D-first `prepareEffect` consumes this raw ring and routes ALL
  * simplification + corner-rounding + smoothing through `outline-core` (the single deterministic
  * engine), so the screen, the 3D mesh, and the cutline can never disagree. Holes dropped (solid
  * suede cut-out per Dan). Returns null if no silhouette. (§8.2b retires the fork in this file.)

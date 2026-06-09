@@ -19,8 +19,8 @@ Harvest discipline (KEEP-dominant):
   still ONE engine (delete the contour.ts-fillet fork — internal parity).
 - **EXCLUDE** the N/A files (the golden GLB `EffectModel`, the dev-only Leva admin panels) — removing them
   is coupled to rewiring their importers, so it happens as build work, not a raw file-copy.
-- **REBUILD** the wiring: one `prepareSticker` (delete the `contour.ts` fork + the `buildShape` wrappers),
-  `Sticker2D` 2D hero (Phase A), `buildMeshFromSpec` lazy-mounted (Phase B), BEN → Web Worker.
+- **REBUILD** the wiring: one `prepareEffect` (delete the `contour.ts` fork + the `buildShape` wrappers),
+  `Effect2D` 2D hero (Phase A), `buildMeshFromSpec` lazy-mounted (Phase B), BEN → Web Worker.
 
 **POC bar:** the architecture proved + the UX working (2D-first → one engine → on-demand 3D → manufacturing
 payload) — NOT visual polish. QA verifies the harvest/build PR row-by-row against the manifest.

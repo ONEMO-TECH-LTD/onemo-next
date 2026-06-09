@@ -1,9 +1,9 @@
 // Shaped-effect 2D compositing primitives (Lane A / Kai) — PURE 2D canvas, NO three.js.
 //
 // The ONE magic-blend composite lives here so BOTH the (legacy) 3D pipeline and the new 2D-first
-// `prepareSticker` import the SAME composeFront (composite parity, lean-spec §5.2) without dragging
+// `prepareEffect` import the SAME composeFront (composite parity, lean-spec §5.2) without dragging
 // three.js into the Phase-A (WebGL-free) creation path. `pipeline.ts` re-exports composeFront for
-// its existing consumers; `prepare-sticker.ts` imports it here directly.
+// its existing consumers; `prepare-effect.ts` imports it here directly.
 
 /**
  * Compose the front texture: a SHARP subject over a BLURRED copy of the real-photo background.

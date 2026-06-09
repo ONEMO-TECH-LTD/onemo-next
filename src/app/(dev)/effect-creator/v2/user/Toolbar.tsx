@@ -1,4 +1,4 @@
-// Manual Sticker Maker — scene toolbar (ONEMO design system).
+// Effect Configurator — scene toolbar (ONEMO design system).
 // Icon-over-label tools (matches the outline editor's bottom toolbar). The configurator starts on the
 // flat ONEMO square; Magic runs BEN to auto-cut the subject; Edit opens the 2D outline editor; Trim is
 // the appearance panel (edge colour / material / colour).
