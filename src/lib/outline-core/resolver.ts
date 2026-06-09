@@ -232,7 +232,7 @@ export function validateSelfIntersection(ringPx: Vec2Px[], ringId: string): Geom
  * self-intersection until the ring is simple (never below 3 points). Deterministic + pure.
  */
 export function repairSimplePolygon(ptsIn: Vec2Px[], minSpacingPx = 0): Vec2Px[] {
-  let ring = dedup(ptsIn, Math.max(1e-3, minSpacingPx))
+  const ring = dedup(ptsIn, Math.max(1e-3, minSpacingPx))
   for (let pass = 0; pass < ptsIn.length; pass++) {
     const n = ring.length
     if (n < 4) break
