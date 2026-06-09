@@ -54,7 +54,11 @@ const ANGLE_OFFSETS: Record<GalleryAngle, { dTheta: number; dPhi: number }> = {
   threeQuarter: { dTheta: 35, dPhi: 12 },  // swing + tilt toward equator → rounded edge + suede depth read
   back: { dTheta: 180, dPhi: 0 },          // opposite (attachment) face
 }
-const ORDER: GalleryAngle[] = ['front', 'threeQuarter', 'back']
+// Front comes from the 2D FLAT composite (full-detail, orthographic — the canonical printed face), NOT a
+// perspective 3D render (which puts the face nearest the camera, foreshortens it + loses far-detail →
+// MISMATCHES the 2D flat, Dan). The 3D captures are only the angles 2D can't show: three-quarter
+// (edge/suede depth) + back (attachment).
+const ORDER: GalleryAngle[] = ['threeQuarter', 'back']
 const DEG = Math.PI / 180
 const FIT_MARGIN = 1.3 // breathing room around the framed effect
 
@@ -111,6 +115,15 @@ export async function captureGallery(ctx: CaptureContext, opts: CaptureOptions =
   const savedPos = camera.position.clone()
   const savedQuat = camera.quaternion.clone()
 
+  // TRANSPARENT capture (Dan): product images must composite cleanly on ANY background colour (library/
+  // shop tiles), so clear with ALPHA 0 + drop the scene background during capture. Lighting via
+  // scene.environment is untouched, so the suede still lights correctly. All restored after the loop.
+  const savedClear = renderer.getClearColor(new THREE.Color())
+  const savedClearAlpha = renderer.getClearAlpha()
+  const savedBg = scene.background
+  renderer.setClearColor(0x000000, 0)
+  scene.background = null
+
   // Frame to the effect mesh (fit-to-bbox); fall back to origin + the live distance if no mesh is found.
   const bounds = effectMeshBounds(scene)
   const target = bounds ? bounds.center.clone() : new THREE.Vector3(...(opts.target ?? [0, 0, 0]))
@@ -138,7 +151,9 @@ export async function captureGallery(ctx: CaptureContext, opts: CaptureOptions =
     renders.push({ angle, dataUrl, width: size, height: size })
   }
 
-  // restore the live pose + re-render so the visible view is unchanged
+  // restore clear/background + the live pose, then re-render so the on-screen view is unchanged
+  renderer.setClearColor(savedClear, savedClearAlpha)
+  scene.background = savedBg
   camera.position.copy(savedPos)
   camera.quaternion.copy(savedQuat)
   camera.updateMatrixWorld(true)
