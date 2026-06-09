@@ -6,7 +6,7 @@
 // inline icon ("Round corners") covers the single concept Phosphor has no glyph for, matched to the
 // Phosphor regular ~2px stroke so the set stays visually coherent.
 
-import { ArrowArcLeft, ArrowArcRight, CornersIn, WaveSine, PenNib, ArrowClockwise, Check, X, ArrowsOut, Plus, Minus, Trash, PlusCircle, Sparkle, ImageSquare, PencilSimple, BoundingBox, Palette, FloppyDisk, Shapes, Polygon, Circle, Square, Pill, Star, Heart, ChatTeardrop, Seal, Shield, Eye, EyeSlash, MagicWand } from '@phosphor-icons/react'
+import { ArrowArcLeft, ArrowArcRight, CornersIn, WaveSine, PenNib, ArrowClockwise, Check, X, ArrowsOut, Plus, Minus, Trash, PlusCircle, Sparkle, ImageSquare, PencilSimple, BoundingBox, Palette, FloppyDisk, Shapes, Polygon, Circle, Square, Pill, Star, Heart, ChatTeardrop, Seal, Shield, Eye, EyeSlash, MagicWand, Cube, ArrowLeft } from '@phosphor-icons/react'
 
 type P = { className?: string }
 const SZ = 24
@@ -40,6 +40,9 @@ export const OutlineIcon = (p: P) => <BoundingBox size={SZ} className={p.classNa
 export const ColorsIcon = (p: P) => <Palette size={SZ} className={p.className} />
 // Magic wand — runs BEN to auto-generate the subject cut-out from the flat square.
 export const MagicIcon = (p: P) => <MagicWand size={SZ} className={p.className} />
+// Finish in 3D — mounts the golden scene on demand (Phase B); Back returns to the 2D create phase.
+export const CubeIcon = (p: P) => <Cube size={SZ} className={p.className} />
+export const BackIcon = (p: P) => <ArrowLeft size={SZ} className={p.className} />
 
 // Round corners — Phosphor ships no corner-radius glyph; custom inline (Phosphor-coherent 2px stroke).
 export const RoundIcon = (p: P) => (

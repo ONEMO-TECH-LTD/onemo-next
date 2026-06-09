@@ -1,0 +1,19 @@
+/* Effect2D — Phase-A 2D hero. Same neutral brand-grey backdrop + centred sizing as the empty state,
+   so upload → effect is a seamless swap. NO WebGL here (the whole point of Phase A). */
+
+.wrap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  background: radial-gradient(120% 100% at 50% 38%, var(--primitive-color-grey-5), var(--primitive-color-grey-7));
+}
+
+.svg {
+  width: min(62vw, 62vh);
+  height: min(62vw, 62vh);
+  display: block;
+  overflow: visible; /* let the drop shadow render outside the square bounds */
+}
