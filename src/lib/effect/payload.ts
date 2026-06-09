@@ -145,22 +145,40 @@ type EffectSpecGenerator = PreparedEffect['spec']['generator']
  * differs from the full record in two ways, both load-bearing:
  *  • EXCLUDES commerce — `size.price_multiplier` is dropped, so the SAME physical effect at a different
  *    price yields the SAME manufacturing hash (price is not a manufacturing fact).
- *  • NO floats — the residual float ratios (`size.scale`, `artwork.source_px_to_shape_mm`) are quantized
- *    to integer micro-units (§11 "integer microns, no floats"), so sub-micron float drift across a
- *    refactor or platform can't silently change a saved design's identity / the F1 remix↔mfg bond.
- * Geometry is already int-microns. `stableStringify` sorts keys, so field order here is irrelevant.
+ *  • FULLY FLOAT-FREE — EVERY residual mm / unit-ratio is quantized to integer micro-units (§11
+ *    "integer microns, no floats"): `size.{scale, longest_side_mm, final_bbox}`,
+ *    `artwork.source_px_to_shape_mm`, `appearance.{thickness_mm, edge_profile.radiusMm}`. Geometry is
+ *    already int-micron. So sub-micron float drift (a refactor / a non-JS re-hash / a platform) can't
+ *    silently change a saved design's identity or the F1 remix↔mfg bond.
+ * The `payload.test.ts` float-walk asserts every number in this body is an integer, so a FUTURE float
+ * field (e.g. an SDF-blend `t` in a richer generator) is a CAUGHT regression, not a silent identity drift.
+ * `stableStringify` sorts keys, so field order / key names here only need to be STABLE, not pretty.
  */
 export function canonicalHashBody(p: ApprovedEffectPayload) {
-  const { price_multiplier: _omitPrice, scale, ...sizeRest } = p.size
+  const q = (n: number) => Math.round(n * MICRO) // mm / unit-ratio → integer micro-units
+  const { price_multiplier: _omitPrice, scale, longest_side_mm, final_bbox, ...sizeRest } = p.size
   const { source_px_to_shape_mm, ...artworkRest } = p.artwork
+  const { thickness_mm, edge_profile, ...appearanceRest } = p.appearance
   return {
     schema_version: p.schema_version,
     version: p.version,
     source: p.source,
-    geometry: p.geometry,
-    size: { ...sizeRest, scale_micro: Math.round(scale * MICRO) },
-    artwork: { ...artworkRest, source_px_to_shape_mm_micro: Math.round(source_px_to_shape_mm * MICRO) },
-    appearance: p.appearance,
+    geometry: p.geometry, // already int-micron rings
+    size: {
+      ...sizeRest, // base, band_id (strings)
+      longest_side_um: q(longest_side_mm),
+      scale_micro: q(scale),
+      final_bbox_um: {
+        width: q(final_bbox.widthMm), height: q(final_bbox.heightMm),
+        minX: q(final_bbox.minXMm), minY: q(final_bbox.minYMm),
+      },
+    },
+    artwork: { ...artworkRest, source_px_to_shape_mm_micro: q(source_px_to_shape_mm) },
+    appearance: {
+      ...appearanceRest, // material (string) + trim (string fields)
+      thickness_um: q(thickness_mm),
+      edge_profile_um: { radius: q(edge_profile.radiusMm) },
+    },
     attachment: p.attachment,
     gates: p.gates,
     build: p.build,

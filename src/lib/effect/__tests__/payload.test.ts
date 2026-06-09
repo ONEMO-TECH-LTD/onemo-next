@@ -69,6 +69,14 @@ function prepared(doc: OutlineDocument, geometryMM: Contour): PreparedEffect {
   }
 }
 
+/** Walk an object and collect `path=value` for every numeric leaf that is NOT an integer. [] = float-free. */
+function nonIntegerNumbers(obj: unknown, path = ''): string[] {
+  if (typeof obj === 'number') return Number.isInteger(obj) ? [] : [`${path}=${obj}`]
+  if (Array.isArray(obj)) return obj.flatMap((v, i) => nonIntegerNumbers(v, `${path}[${i}]`))
+  if (obj && typeof obj === 'object') return Object.entries(obj).flatMap(([k, v]) => nonIntegerNumbers(v, path ? `${path}.${k}` : k))
+  return []
+}
+
 describe('assertCuttable — mandatory feasibility gate (§1)', () => {
   it('passes a valid square outline', () => {
     expect(assertCuttable(prepared(squareDoc(), squareGeomMM)).ok).toBe(true)
@@ -124,9 +132,11 @@ describe('buildApprovedEffectPayload', () => {
     const out = buildApprovedEffectPayload(prepared(squareDoc(), squareGeomMM), { type: 'standard', size: 's70' })
     // If this literal breaks UNEXPECTEDLY, a refactor silently changed every saved design's manufacturing
     // identity (and the cross-deploy F1 remix↔mfg bond). On an INTENDED schema change: bump SCHEMA_VERSION
-    // in payload.ts and update this golden in the same commit.
+    // in payload.ts + update this golden in the same commit. (Updated by F3: the canonical body is now
+    // fully float-free — quantizing radiusMm/thickness/bbox/longest-side finalized the v1 schema; the
+    // pre-F3 intermediate was QA-rejected as incomplete, nothing persisted at it → v1 stays v1.)
     expect(out.schema_version).toBe(1)
-    expect(out.payload_hash).toBe('71a871783519318c')
+    expect(out.payload_hash).toBe('9327998d985446b0')
   })
 
   it('hash EXCLUDES commerce (price) + quantizes residual floats to int-micro (F3)', () => {
@@ -144,5 +154,13 @@ describe('buildApprovedEffectPayload', () => {
     expect(body.artwork.source_px_to_shape_mm_micro).toBe(700_000) // mmPerPx 0.7 → 700_000
     expect(Number.isInteger(body.size.scale_micro)).toBe(true)
     expect(Number.isInteger(body.artwork.source_px_to_shape_mm_micro)).toBe(true)
+  })
+
+  it('canonical hash body is FULLY FLOAT-FREE — every number is an integer (TD3 test-ENFORCED)', () => {
+    // Walk the ENTIRE canonical body; every numeric leaf must be an integer. This makes "float-free"
+    // ENFORCED, not claimed: a future float field (radiusMm / bbox / an SDF-blend t in a richer generator)
+    // fails HERE with its path, instead of silently drifting every saved design's manufacturing identity.
+    const out = buildApprovedEffectPayload(prepared(squareDoc(), squareGeomMM), { type: 'standard', size: 's70' })
+    expect(nonIntegerNumbers(canonicalHashBody(out))).toEqual([])
   })
 })
