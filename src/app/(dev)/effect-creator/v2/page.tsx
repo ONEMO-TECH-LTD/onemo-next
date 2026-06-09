@@ -75,6 +75,25 @@ function PrototypePageInner() {
 
   const handleStatus = useCallback((s: 'idle' | 'building' | 'ready' | 'error') => setGenerating(s === 'building'), [])
 
+  // Magic wand (Phase A): re-prepare the effect as a SHAPED subject cut-out. BEN runs in the Web
+  // Worker (§8.3) — the main thread stays responsive while the shimmer plays. On success the cut-out
+  // replaces the standard square in the Effect2D hero, and the editor + (on-demand) 3D get the shaped spec.
+  const handleMagic = useCallback(() => {
+    if (!artworkUrl || generating) return
+    setGenerating(true)
+    import('@/lib/effect/prepare-effect')
+      .then(({ prepareEffect }) => prepareEffect(artworkUrl, 'shaped'))
+      .then((p) => {
+        setPrepared(p)
+        const st = useOutlineStore.getState()
+        st.setSpec(p.spec) // hand the shaped outline to the 2D editor + 3D
+        st.setEditedContourMM(null); st.setEditedDoc(null); st.setBgBlur(null); st.setSubjMatteUrl(null) // fresh cut-out → drop prior edits
+        setAutoOutline(true) // Magic active (shaped) state
+        setGenerating(false)
+      })
+      .catch((e) => { console.warn('[effect] prepare (shaped) failed:', e); setGenerating(false) })
+  }, [artworkUrl, generating])
+
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     setIsDragging(false)
@@ -160,8 +179,8 @@ function PrototypePageInner() {
         </>
       )}
 
-      {/* Magic-wand generate shimmer (Phase B BEN loading) */}
-      {generating && autoOutline && phase === 'finish' && <GenerateShimmer />}
+      {/* Magic-wand cut-out shimmer (Phase A, while the BEN worker traces the subject — main thread stays free) */}
+      {generating && phase === 'create' && <GenerateShimmer />}
 
       {/* Appearance panel (Trim) */}
       {showColors && (
@@ -182,7 +201,7 @@ function PrototypePageInner() {
         showColors={showColors}
         phase={phase}
         onFile={handleFile}
-        onGenerate={() => setAutoOutline(true)}
+        onGenerate={handleMagic}
         onToggleColors={() => setShowColors((prev) => !prev)}
         onEditOutline={() => setEditingOutline(true)}
         onFinish={() => setPhase('finish')}
