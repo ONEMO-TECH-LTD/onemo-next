@@ -7,7 +7,7 @@
 
 import { useRef } from 'react'
 import type { DesignState } from '../types'
-import { UploadIcon, MagicIcon, EditIcon, ColorsIcon, CubeIcon, BackIcon } from './icons'
+import { UploadIcon, MagicIcon, EditIcon, ColorsIcon, CubeIcon, BackIcon, GalleryIcon } from './icons'
 import styles from './toolbar.module.css'
 
 const INITIAL_DESIGN: DesignState = { offsetX: 0, offsetY: 0, scale: 1.0 }
@@ -26,6 +26,8 @@ interface ToolbarProps {
   onFinish: () => void
   /** finish → create: back to the 2D creation surface. */
   onBackToCreate: () => void
+  /** finish phase: capture the render-factory gallery (3 angles + flat tile) from the golden scene (§8.8). */
+  onCaptureGallery?: () => void
 }
 
 /** One scene tool: icon over a small label (mobile-first touch target). */
@@ -57,6 +59,7 @@ export default function Toolbar({
   onEditOutline,
   onFinish,
   onBackToCreate,
+  onCaptureGallery,
 }: ToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -68,6 +71,8 @@ export default function Toolbar({
           <>
             <Tool icon={<BackIcon />} label="2D" onClick={onBackToCreate} />
             <Tool icon={<ColorsIcon />} label="Trim" onClick={onToggleColors} active={showColors} />
+            {/* Gallery — capture the 3-angle render-factory set (front/3Q/back) + flat tile from the golden scene (§8.8). */}
+            {onCaptureGallery && <Tool icon={<GalleryIcon />} label="Gallery" onClick={onCaptureGallery} />}
           </>
         ) : (
           // Phase A (2D shape & face): upload, Magic, Edit, then Finish in 3D.

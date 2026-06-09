@@ -82,3 +82,15 @@ export const ArchChip = (p: P) => (
     <path d="M5 21V11a7 7 0 0 1 14 0v10" />
   </svg>
 )
+
+// Gallery — the multi-angle render-factory capture (§8.8). Stacked frames; custom inline (Phosphor has
+// no images-stack glyph in the imported set), Phosphor-coherent ~2px stroke.
+export const GalleryIcon = (p: P) => (
+  <svg className={p.className} width={SZ} height={SZ} viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="3" y="3" width="14" height="14" rx="2" />
+    <path d="M7 21h12a2 2 0 0 0 2-2V9" />
+    <circle cx="8" cy="8" r="1.4" />
+    <path d="m3.5 13.5 3.5-3 4 3.5" />
+  </svg>
+)

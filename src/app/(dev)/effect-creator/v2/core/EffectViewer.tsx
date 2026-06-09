@@ -272,6 +272,10 @@ export default function EffectViewer({
         gl={{
           alpha: true,
           antialias: true,
+          // §8.8: retain the drawing buffer so the render-factory gallery can read the live framebuffer
+          // (toDataURL) for WYSIWYG angle captures. Buffer-retention only — does NOT force continuous
+          // rendering; frameloop stays "demand".
+          preserveDrawingBuffer: true,
           toneMapping: (config.renderer?.toneMapping ?? THREE.NeutralToneMapping) as THREE.ToneMapping,
           toneMappingExposure: config.renderer?.toneMappingExposure ?? config.scene.exposure,
           outputColorSpace: config.renderer?.outputColorSpace === 'srgb-linear'
