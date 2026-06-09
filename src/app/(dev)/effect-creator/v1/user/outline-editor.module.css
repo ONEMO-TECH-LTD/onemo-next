@@ -1,0 +1,380 @@
+/* Manual Sticker Maker — 2D outline editor surface (A1b). ONEMO design system via token vars. */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: var(--semantic-bg-primary);
+  font-family: var(--font-primary);
+}
+
+/* full-bleed canvas; the chrome floats over it as glass */
+.canvas {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--semantic-bg-secondary);
+}
+
+.svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+/* The resolved outline path — brand stroke, faint brand fill. */
+.path {
+  fill: var(--semantic-bg-brand-primary);
+  fill-opacity: 0.18;
+  stroke: var(--semantic-bg-brand-solid);
+  vector-effect: non-scaling-stroke;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+/* Manufacturability guardrail — outline turns error-red when it can't be cut cleanly. */
+.pathError {
+  stroke: var(--semantic-bg-error-solid);
+  fill: var(--semantic-bg-error-primary);
+  fill-opacity: 0.25;
+}
+/* Border beam — a glowing dash that travels around the outline (Apple-sticker magic trace, edit mode). */
+.beam {
+  fill: none;
+  stroke: var(--semantic-bg-brand-solid);
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+  stroke-dasharray: 26 220;
+  opacity: 0.85;
+  pointer-events: none;
+  will-change: stroke-dashoffset;       /* no drop-shadow filter → far cheaper repaint */
+  animation: beam-run 2.6s linear infinite;
+}
+@keyframes beam-run { to { stroke-dashoffset: -246; } }
+
+/* Manual draw — in-progress open polyline (A3a). */
+.drawPath {
+  fill: none;
+  stroke: var(--semantic-bg-brand-solid);
+  vector-effect: non-scaling-stroke;
+  stroke-width: 2;
+  stroke-dasharray: 8 5;
+}
+
+/* Dim everything OUTSIDE the cut outline (even-odd scrim with a hole at the cut), so the kept area
+   pops. Non-interactive so taps pass through to the handles/surface. */
+.scrim {
+  fill: #000;
+  fill-opacity: 0.5;
+  pointer-events: none;
+}
+
+/* Desktop rotate handle — a grip on a short stem above the outline (shown when all corners selected). */
+.rotateStem {
+  stroke: var(--semantic-bg-brand-solid);
+  stroke-opacity: 0.55;
+  vector-effect: non-scaling-stroke;
+  stroke-width: 1.5;
+  stroke-dasharray: 3 3;
+}
+.rotateHandle {
+  fill: var(--semantic-bg-brand-solid);
+  fill-opacity: 0.92;
+  stroke: #fff;
+  stroke-opacity: 0.9;
+  vector-effect: non-scaling-stroke;
+  stroke-width: 1.5;
+  cursor: grab;
+}
+.rotateHandle:active { cursor: grabbing; fill-opacity: 1; }
+
+/* Anchor handles — small, soft, semi-transparent frosted dots; brand-coloured when active/selected. */
+.node {
+  fill: #fff;
+  fill-opacity: 0.28;
+  stroke: #fff;
+  stroke-opacity: 0.85;
+  vector-effect: non-scaling-stroke;
+  stroke-width: 1.5;
+  filter: blur(0.4px);
+  cursor: grab;
+}
+.node:hover { stroke: var(--semantic-bg-brand-solid); stroke-opacity: 1; }
+.nodeActive {
+  fill: var(--semantic-bg-brand-solid);
+  fill-opacity: 0.6;
+  stroke: var(--semantic-bg-brand-solid);
+  stroke-opacity: 1;
+  filter: none;
+  cursor: grabbing;
+}
+/* Selected control point — its corner radius is what the slider edits (A1c per-node). */
+.nodeSelected {
+  fill: var(--semantic-bg-brand-solid);
+  fill-opacity: 0.55;
+  stroke: var(--semantic-bg-brand-solid);
+  stroke-opacity: 1;
+  stroke-width: 2;
+  filter: none;
+}
+
+/* ── Editor chrome — MOBILE-FIRST ───────────────────────────────────────────
+   Full-screen canvas, a minimal top bar (title + close), and a thumb-reachable
+   bottom toolbar of icon tools. Adjustment sliders reveal one-at-a-time (no room
+   for three always-on sliders on a phone). Scales up cleanly on desktop. */
+
+.topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: center;   /* full-width bar; inner content caps + centers like the bottom toolbar */
+  padding: var(--spacing-2xs) var(--spacing-s);
+  padding-top: calc(var(--spacing-2xs) + env(safe-area-inset-top));
+  /* optimised faux-glass strip — NO backdrop-filter (perf) */
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(246, 248, 251, 0.82));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.85);
+}
+
+/* glass dock holding status + sheets + toolbar, floating at the bottom over the canvas */
+.bottomDock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  /* optimised faux-glass strip — NO backdrop-filter (perf) */
+  background: linear-gradient(0deg, rgba(255, 255, 255, 0.94), rgba(246, 248, 251, 0.84));
+  border-top: 1px solid rgba(255, 255, 255, 0.85);
+}
+.topInner {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  width: 100%;
+  max-width: var(--editor-controls-max, 34rem); /* same cap as the bottom controls → one mobile column */
+}
+/* top-bar tools (Close/Undo/Redo/Reset/Done) — icon-over-label mobile style, evenly distributed (no title) */
+.topTool {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: var(--spacing-2xs) 0;
+  border: none;
+  background: transparent;
+  color: var(--semantic-text-primary);
+  border-radius: var(--radius-m);
+  cursor: pointer;
+}
+.topTool:disabled { opacity: 0.3; cursor: not-allowed; }
+.topTool:active:not(:disabled) { background: var(--semantic-bg-secondary); }
+.topToolLabel { font-family: var(--font-body); font-size: 0.625rem; line-height: 1; white-space: nowrap; }
+
+/* Compact status line between canvas and toolbar. */
+.status {
+  text-align: center;
+  font-family: var(--font-body);
+  font-size: var(--text-body-caption);
+  color: var(--semantic-text-secondary);
+  padding: var(--spacing-2xs) var(--spacing-m);
+  min-height: 1.25rem;
+}
+.warn { color: var(--semantic-text-error-primary); font-weight: 500; }
+.approved { color: var(--semantic-text-success-primary); font-weight: 500; }
+
+/* Shared control width — mobile fills the screen, desktop caps + centers so nothing sprawls. */
+.status { max-width: var(--editor-controls-max, 34rem); margin-inline: auto; }
+
+/* Reveal-on-tap adjustment slider, sitting just above the toolbar. */
+.sheet {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-2xs) var(--spacing-l) var(--spacing-xs);
+}
+/* −/+ step buttons that flank the scale slider */
+.stepBtn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: none;
+  background: transparent;
+  color: var(--semantic-text-primary);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+}
+.stepBtn:active { background: var(--semantic-bg-secondary); }
+
+/* On/Off toggle that flanks the magic-blend intensity slider. */
+.toggleBtn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-3xs, 0.25rem);
+  padding: var(--spacing-2xs) var(--spacing-s);
+  border: 1px solid var(--semantic-border-secondary);
+  background: var(--semantic-bg-primary);
+  color: var(--semantic-text-secondary);
+  border-radius: var(--radius-full);
+  font-family: var(--font-body);
+  font-size: var(--text-body-caption);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.toggleBtnOn {
+  border-color: var(--semantic-border-brand);
+  background: var(--semantic-bg-brand-primary);
+  color: var(--semantic-bg-brand-solid);
+}
+
+/* Shape tool sheet — a horizontal chip strip of shapes + (for parametric shapes) inline controls. */
+.shapeSheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+  padding: var(--spacing-2xs) var(--spacing-s) var(--spacing-xs);
+  width: 100%;
+  max-width: var(--editor-controls-max, 34rem);
+  margin-inline: auto;
+}
+/* horizontal carousel of shapes — plain icon + label, no boxed casing */
+.chipRow {
+  display: flex;
+  gap: var(--spacing-m);
+  overflow-x: auto;
+  padding: 2px var(--spacing-2xs);
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+}
+.chipRow::-webkit-scrollbar { display: none; }
+.chip {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: var(--spacing-2xs) 2px;
+  border: none;
+  background: transparent;
+  color: var(--semantic-text-secondary);
+  cursor: pointer;
+  scroll-snap-align: center;
+  transition: color 0.12s ease;
+}
+.chip:active { color: var(--semantic-text-primary); }
+.chipActive { color: var(--semantic-bg-brand-solid); }
+.chipIcon { display: inline-flex; }
+.chipLabel { font-family: var(--font-body); font-size: 0.625rem; line-height: 1; white-space: nowrap; }
+/* parametric controls (sides / points / spikiness / rotate) under the chip strip */
+.shapeControls { display: flex; flex-direction: column; gap: var(--spacing-2xs); }
+.shapeRow { display: flex; align-items: center; gap: var(--spacing-xs); }
+.shapeName {
+  flex: none;
+  width: 4.5rem;
+  font-family: var(--font-body);
+  font-size: var(--text-body-caption);
+  color: var(--semantic-text-secondary);
+}
+.shapeVal {
+  flex: none;
+  min-width: 1.5rem;
+  text-align: center;
+  font-family: var(--font-primary);
+  font-weight: 600;
+  font-size: var(--text-label-l);
+  color: var(--semantic-text-primary);
+}
+.shapeHint {
+  font-family: var(--font-body);
+  font-size: var(--text-body-caption);
+  color: var(--semantic-text-secondary);
+  text-align: center;
+}
+
+/* Contextual anchor actions (add / delete a point) — shown when a single point is selected. */
+.nodeBar {
+  display: flex;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-2xs) var(--spacing-m);
+}
+.nodeAction {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-3xs, 0.25rem);
+  padding: var(--spacing-2xs) var(--spacing-s);
+  border: 1px solid var(--semantic-border-secondary);
+  background: var(--semantic-bg-primary);
+  color: var(--semantic-text-primary);
+  border-radius: var(--radius-full);
+  font-family: var(--font-body);
+  font-size: var(--text-body-caption);
+  cursor: pointer;
+}
+.nodeAction:active { background: var(--semantic-bg-secondary); }
+.slider {
+  width: 100%;
+  max-width: var(--editor-controls-max, 34rem);
+  height: 1.75rem; /* fat touch target */
+  accent-color: var(--semantic-bg-brand-solid);
+  cursor: pointer;
+}
+
+/* Bottom toolbar — full-width bar (divider + background span the screen); content is capped + centered
+   so the icons don't stretch edge-to-edge on desktop. */
+.toolbar {
+  display: flex;
+  justify-content: center;
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  padding-bottom: calc(var(--spacing-2xs) + env(safe-area-inset-bottom));
+  background: transparent; /* the bottom dock provides the glass surface */
+}
+.toolInner {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: var(--spacing-2xs);
+  width: 100%;
+  max-width: var(--editor-controls-max, 34rem);
+}
+.tool {
+  flex: 1 1 0;
+  min-width: 2.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: var(--spacing-2xs) 0;
+  border: none;
+  background: transparent;
+  color: var(--semantic-text-primary);
+  border-radius: var(--radius-m);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+.tool:disabled { opacity: 0.3; cursor: not-allowed; }
+.tool:active:not(:disabled) { background: var(--semantic-bg-secondary); }
+.toolActive { color: var(--semantic-bg-brand-solid); background: var(--semantic-bg-brand-primary); }
+.toolPrimary { color: var(--semantic-bg-brand-solid); }
+.toolIcon { display: inline-flex; }
+.toolLabel {
+  font-family: var(--font-body);
+  font-size: 0.625rem;
+  line-height: 1;
+  white-space: nowrap;
+}
