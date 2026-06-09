@@ -10,6 +10,7 @@ import EffectModel from './EffectModel'
 import ShapedModel from './shaped/ShapedModel'
 import type { ViewerConfig, DesignState } from '../types'
 import type { SuedeMaterialParams } from '@/lib/effect/types'
+import type { PreparedEffect } from '@/lib/effect/prepare-effect'
 
 const DEFAULT_ENVIRONMENT_PRESET = 'studio'
 type DreiEnvironmentPreset =
@@ -39,9 +40,11 @@ interface EffectViewerProps {
   artworkUrl?: string
   designState: DesignState
   isEditing: boolean
-  /** Shaped-effect mode: replace the GLB object with a generated cut-out mesh (same scene). */
+  /** Shaped-effect mode: render the prepared effect mesh (not a GLB object) in the same scene. */
   shaped?: boolean
-  /** Cut-out generation: false = instant flat square (default); true = run BEN for the subject cut-out. */
+  /** The 2D-prepared effect (Phase B consumes the SAME one Phase A showed — parity). */
+  prepared?: PreparedEffect
+  /** @deprecated unused — the cut-out path now flows through `prepared` (§8.4 wires Magic). */
   auto?: boolean
   /** Build status (used to show the generate shimmer / loading while BEN runs). */
   onStatus?: (status: 'idle' | 'building' | 'ready' | 'error', message?: string) => void
@@ -165,7 +168,7 @@ export default function EffectViewer({
   designState,
   isEditing,
   shaped = false,
-  auto = false,
+  prepared,
   onStatus,
   frozen = false,
   children,
@@ -296,15 +299,16 @@ export default function EffectViewer({
             />
           ) : null}
           {shaped ? (
-            <ShapedModel
-              artworkUrl={artworkUrl}
-              designState={designState}
-              scene={config.scene}
-              suede={suede}
-              backColor={config.colors.backColor}
-              auto={auto}
-              onStatus={onStatus}
-            />
+            prepared ? (
+              <ShapedModel
+                prepared={prepared}
+                designState={designState}
+                scene={config.scene}
+                suede={suede}
+                backColor={config.colors.backColor}
+                onStatus={onStatus}
+              />
+            ) : null
           ) : config.modelPath ? (
             <EffectModel
               modelPath={config.modelPath}

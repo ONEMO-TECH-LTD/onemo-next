@@ -10,13 +10,29 @@
 // outline-core). `prepareEffect(url, 'shaped')` = BEN subject silhouette. Both collapse the two old
 // builders (buildSquareShape / buildShape) into one path that grounds geometry in mm through one engine.
 //
-// NOTE (transitive): this imports the marching-squares tracer from `contour.ts`, which still imports
-// three.js for the legacy smoothClosed fork — so three is in the bundle until §8.2b retires the fork.
-// That is a bundle-size detail only; it mounts no WebGL context (the perf trap is a *mounted* Canvas,
-// removed in §8.2b when Phase A renders via Effect2D, not EffectViewer).
+// THREE-FREE: the marching-squares tracer in `contour.ts` is tracer-only (the legacy fork that used
+// three.js — smoothClosed/filletCorners — was retired in §8.2b-2), so the whole creation graph is
+// three-free; the 3D half is `buildMeshFromSpec` (Phase B), the only place three.js is touched.
 
 import type { Contour, Pt, EffectSpecDraft } from './types'
-import type { ShapeBuildConfig } from './pipeline'
+
+/**
+ * Build params for the effect engine (geometry sizing + texture res). `minCornerAngleDeg` /
+ * `cornerRadiusMM` are unused (outline-core owns corner rounding) — kept for shape-API compatibility.
+ */
+export interface ShapeBuildConfig {
+  longestSideMM: number   // physical size of the effect's longest side
+  thicknessMM: number     // body thickness (§9: 1mm)
+  edgeRadiusMM: number    // SHORT rounded-edge fillet radius
+  edgeSegments: number
+  rdpEpsilonMM: number
+  maxImageDim: number     // mask/contour downscale cap
+  textureDim: number      // front-texture cap (high res so the projected image stays sharp)
+  paddingMM: number       // flat image margin around the subject
+  minCornerAngleDeg: number // unused (outline-core owns rounding) — kept for API compat
+  cornerRadiusMM: number    // unused (outline-core owns rounding) — kept for API compat
+  squareCornerMM: number    // corner radius of the standard square
+}
 import { loadImageData, segment, adapterIdFor, dilateMask, smoothMask, type MaskResult } from './mask'
 import { segmentML, ML_ADAPTER_ID } from './segment-ml'
 import { traceContourRaw } from './contour'
@@ -35,7 +51,7 @@ import {
 } from '@/lib/outline-core'
 
 /**
- * Config for the 2D-first path. Carries forward the proven DEFAULT_BUILD_CONFIG values but pins
+ * Config for the 2D-first path. Carries forward the proven build values but pins
  * §9/§9a: 1mm body + 70mm base. (Note §9: edgeRadiusMM 0.15 was tuned for a 0.5mm body — the
  * rounded-lip radius must be re-pinned for the 1mm body; tracked as a §9 follow-up.) minCornerAngleDeg
  * / cornerRadiusMM are unused here (outline-core owns rounding) but kept for type compatibility.

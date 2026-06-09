@@ -59,6 +59,9 @@ function PrototypePageInner() {
     setAutoOutline(false) // new image → the standard square; Magic opts into the cut-out
     setPrepared(null)
     setPhase('create')
+    // fresh image → drop any prior edit/blend so the new effect starts clean
+    const st = useOutlineStore.getState()
+    st.setEditedContourMM(null); st.setEditedDoc(null); st.setBgBlur(null); st.setSubjMatteUrl(null)
     // 2D-first: prepare the STANDARD effect (instant — no BEN) → the Effect2D hero + the editor's spec.
     // Dynamic import keeps the effect engine (+ its transitive deps) out of the initial create bundle.
     import('@/lib/effect/prepare-effect')
@@ -139,7 +142,7 @@ function PrototypePageInner() {
               designState={designState}
               isEditing={isEditing}
               shaped={shaped}
-              auto={autoOutline}
+              prepared={prepared ?? undefined}
               onStatus={handleStatus}
               frozen={editingOutline}
             />

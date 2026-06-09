@@ -83,24 +83,27 @@ git-diff the file to see exactly what moved. Values are the current snapshot.
 | Handle stroke | `stroke-opacity 0.85, width 1.5, blur 0.4px` | Soft frosted look. |
 | Controls max-width | `34rem` | Toolbar/slider cap on desktop (centred). |
 
-## 8. Cut-out engine (BEN2 → mesh)
-`core/shaped/pipeline.ts · DEFAULT_BUILD_CONFIG`
+## 8. Effect engine (BEN2 → mesh)
+`src/lib/effect/prepare-effect.ts · EFFECT_BUILD_CONFIG`
 
 | Parameter | Value | Controls |
 |---|---|---|
-| `longestSideMM` | `100` | Physical size the longest side maps to. |
-| `thicknessMM` | `0.5` | Body thickness (preview value; physical lock pending coupons). |
-| `edgeRadiusMM` | `0.15` | Rounded-edge lip radius. |
+| `longestSideMM` | `70` | §9a: base square is 70mm; the size band scales from here. |
+| `thicknessMM` | `1` | §9: 1mm body (supersedes the old 0.5 preview). |
+| `edgeRadiusMM` | `0.15` | Rounded-edge lip radius (§9 follow-up: re-pin for the 1mm body). |
 | `edgeSegments` | `14` | Rim rounding smoothness. |
 | `rdpEpsilonMM` | `0.4` | Contour simplification (mm). |
 | `maxImageDim` | `1200` | Mask/contour resolution. |
 | `textureDim` | `2400` | Front-texture resolution (sharpness). |
 | `paddingMM` | `1.5` | Flat image margin around the subject. |
-| `minCornerAngleDeg` | `135` | Round contour corners sharper than this. |
-| `cornerRadiusMM` | `24` | Engine-side contour corner fillet. |
+| `minCornerAngleDeg` | `135` | **Unused** — corner rounding is owned by `outline-core` (one engine). Kept for API compat. |
+| `cornerRadiusMM` | `24` | **Unused** — see above. |
 
-`core/shaped/contour.ts`: holes are **suppressed** (`holes: []`) → always a solid cut-out, no interior cut-outs.
-`core/shaped/segment-ml.ts`: model `onnx-community/BEN2-ONNX`, runtime `webgpu → wasm` fallback. Loaded once per session; weights browser-cached. Inference re-runs per upload on the **main thread** (the ~30–60s blank-canvas window).
+Corner rounding/smoothing is NOT done in the effect engine — `prepareEffect` routes the raw traced ring
+through `outline-core` (`applyCornerRadii`), the single deterministic engine, so the 2D hero, the 3D mesh,
+and the cutline can never disagree (no double-round).
+`src/lib/effect/contour.ts`: TRACER-ONLY (marching-squares → raw pixel ring); holes dropped → always a solid effect.
+`src/lib/effect/segment-ml.ts`: model `onnx-community/BEN2-ONNX`, runtime `webgpu → wasm` fallback. BEN runs only on the `shaped` (Magic) path; moving to a Web Worker (§8.3) so it never blocks the main thread.
 
 ---
 

@@ -1,26 +1,29 @@
-// ShapedModel — renders the generated cut-out mesh inside the golden scene (Lane A / Kai).
-// Replaces the GLB object; reuses the scene's suede material params, lighting, camera, env.
+// ShapedModel — renders the prepared effect mesh inside the golden scene (Phase B / Lane A / Kai).
+// ONE ENGINE (§8.2b-2): consumes the SAME `prepared` effect the Phase-A 2D hero (Effect2D) shows —
+// the mesh extrudes the same mm outline (silhouette parity) and the textures ARE the same composite
+// (composite parity). It does NOT build geometry from the image; `prepareEffect` (pure 2D) already did
+// that. Reuses the scene's suede material params, lighting, camera, env.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Center } from '@react-three/drei'
 import * as THREE from 'three'
 import type { DesignState, SceneSettings } from '../../types'
-import type { SuedeMaterialParams, EffectSpecDraft } from '@/lib/effect/types'
-import { buildShape, buildSquareShape, DEFAULT_BUILD_CONFIG, composeFront } from '@/lib/effect/pipeline'
+import type { SuedeMaterialParams } from '@/lib/effect/types'
+import { EFFECT_BUILD_CONFIG, type PreparedEffect } from '@/lib/effect/prepare-effect'
+import { buildMeshFromSpec } from '@/lib/effect/build-mesh'
 import { buildShapedGeometry } from '@/lib/effect/mesh'
+import { composeFront } from '@/lib/effect/composite'
 import { useOutlineStore } from '../../user/outlineStore'
 
 interface ShapedModelProps {
-  artworkUrl?: string
+  /** The 2D-prepared effect (geometry + composites) — the SAME one Effect2D shows (parity). */
+  prepared: PreparedEffect
   designState: DesignState
   scene: SceneSettings
   suede: SuedeMaterialParams
   backColor: string
-  /** world size (scene units) the cut-out's longest side maps to. Tuned to match golden framing. */
-  fitSize?: number // see default below
-  /** false = the instant flat square (default); true = run BEN to build the subject cut-out (Magic wand). */
-  auto?: boolean
-  onSpec?: (spec: EffectSpecDraft) => void
+  /** world size (scene units) the effect's longest side maps to. Tuned to match golden framing. */
+  fitSize?: number
   onStatus?: (status: 'idle' | 'building' | 'ready' | 'error', message?: string) => void
 }
 
@@ -36,15 +39,25 @@ function loadTex(url: string | undefined) {
   return t
 }
 
+/** MeshOptions from the build config + the prepared spec's px↔mm mapping. */
+function meshOpts(prepared: PreparedEffect) {
+  return {
+    thicknessMM: EFFECT_BUILD_CONFIG.thicknessMM,
+    edgeRadiusMM: EFFECT_BUILD_CONFIG.edgeRadiusMM,
+    edgeSegments: EFFECT_BUILD_CONFIG.edgeSegments,
+    mmPerPx: prepared.spec.mmPerPx,
+    imgW: prepared.spec.maskWidthPx,
+    imgH: prepared.spec.maskHeightPx,
+  }
+}
+
 export default function ShapedModel({
-  artworkUrl,
+  prepared,
   designState,
   scene: sceneSettings,
   suede,
   backColor,
   fitSize = 0.09,
-  auto = false,
-  onSpec,
   onStatus,
 }: ShapedModelProps) {
   const [result, setResult] = useState<{ geometry: THREE.BufferGeometry; texture: THREE.CanvasTexture; edgeTexture: THREE.CanvasTexture; widthMM: number; heightMM: number } | null>(null)
@@ -55,59 +68,32 @@ export default function ShapedModel({
   const resultRef = useRef(result)
   useEffect(() => { resultRef.current = result }, [result])
 
-  // Run the pipeline whenever the artwork changes
+  // Build the mesh from the prepared effect (ONE engine — no image build here). If the editor has
+  // already committed an edited outline (Phase A), build from THAT so entering 3D reflects the edit.
   useEffect(() => {
-    let cancelled = false
-    if (!artworkUrl) {
-      // clear any stale mesh when artwork is removed
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setResult((prev) => { prev?.geometry.dispose(); prev?.texture.dispose(); prev?.edgeTexture.dispose(); return null })
-      useOutlineStore.getState().setSpec(null) // clear the 2D editor's outline when artwork is removed
-      useOutlineStore.getState().setEditedContourMM(null) // drop any prior edit
-      useOutlineStore.getState().setEditedDoc(null)
-      useOutlineStore.getState().setBgBlur(null)
-      useOutlineStore.getState().setSubjMatteUrl(null)
-      frontSrcRef.current = null
-      return
-    }
     onStatus?.('building')
-    ;(auto ? buildShape : buildSquareShape)(artworkUrl, DEFAULT_BUILD_CONFIG)
-      .then((r) => {
-        if (cancelled) { r.geometry.dispose(); r.texture.dispose(); r.edgeTexture.dispose(); return }
-        setResult((prev) => {
-          prev?.geometry.dispose()
-          prev?.texture.dispose()
-          prev?.edgeTexture.dispose()
-          return r
-        })
-        artTexRef.current = r.texture
-        frontSrcRef.current = r.frontSrc // source layers for live "magic blend" re-blur
-        // Only the cut-out needs the subject matte (for the editor blend preview). Skip the costly
-        // 2400px toDataURL on the plain square (subjCanvas is just the full photo there → no blend).
-        if (auto) { try { useOutlineStore.getState().setSubjMatteUrl(r.frontSrc.subjCanvas.toDataURL()) } catch { useOutlineStore.getState().setSubjMatteUrl(null) } }
-        else useOutlineStore.getState().setSubjMatteUrl(null)
-        onSpec?.(r.spec)
-        useOutlineStore.getState().setSpec(r.spec) // hand the real contour to the 2D outline editor (A1d)
-        useOutlineStore.getState().setEditedContourMM(null) // fresh cut-out → drop any prior edited outline
-        useOutlineStore.getState().setEditedDoc(null)
-        useOutlineStore.getState().setBgBlur(null) // fresh cut-out → default blend
-        onStatus?.('ready')
+    try {
+      const ed = useOutlineStore.getState().editedContourMM
+      const geom = ed ?? prepared.spec.geometryMM
+      const r = buildMeshFromSpec(geom, meshOpts(prepared), prepared.composite, prepared.edgeComposite)
+      setResult((prev) => {
+        prev?.geometry.dispose(); prev?.texture.dispose(); prev?.edgeTexture.dispose()
+        return r
       })
-      .catch((e) => {
-        if (cancelled) return
-        console.error('[shaped] build failed:', e)
-        onStatus?.('error', e?.message ?? 'build failed')
-      })
-    return () => { cancelled = true }
-    // Build ONLY on artwork/auto change. onSpec/onStatus are callbacks (often inline → unstable identity);
-    // including them re-fired the build every render → buildSquareShape looped (~166ms/frame, the perf collapse).
+      artTexRef.current = r.texture
+      frontSrcRef.current = prepared.frontSrc
+      onStatus?.('ready')
+    } catch (e) {
+      console.error('[effect] mesh build failed:', e)
+      onStatus?.('error', (e as Error)?.message ?? 'build failed')
+    }
+    // Build ONLY on prepared change (onStatus is an unstable inline callback — excluded by design).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [artworkUrl, auto])
+  }, [prepared])
 
   // editor → 3D: when the 2D editor commits an edited outline, rebuild ONLY the mesh geometry from it
   // (px→mm already done in the editor) and swap it in — REUSING the existing front/edge textures (no
-  // re-segmentation). This is what makes the suede object follow the 2D edits and locks the approved
-  // shape as the thing shown (ADDENDUM D steps 4 + 8). Keyed on the committed contour only.
+  // re-segmentation). The suede object follows the 2D edits; the approved shape is exactly what's shown.
   useEffect(() => {
     if (!editedContourMM) return
     const prev = resultRef.current
@@ -116,15 +102,15 @@ export default function ShapedModel({
     let built: { geometry: THREE.BufferGeometry; widthMM: number; heightMM: number }
     try {
       built = buildShapedGeometry(editedContourMM, {
-        thicknessMM: DEFAULT_BUILD_CONFIG.thicknessMM,
-        edgeRadiusMM: DEFAULT_BUILD_CONFIG.edgeRadiusMM,
-        edgeSegments: DEFAULT_BUILD_CONFIG.edgeSegments,
+        thicknessMM: EFFECT_BUILD_CONFIG.thicknessMM,
+        edgeRadiusMM: EFFECT_BUILD_CONFIG.edgeRadiusMM,
+        edgeSegments: EFFECT_BUILD_CONFIG.edgeSegments,
         mmPerPx: sp.mmPerPx,
         imgW: sp.maskWidthPx,
         imgH: sp.maskHeightPx,
       })
     } catch (e) {
-      console.warn('[shaped] edited-outline mesh rebuild failed:', e)
+      console.warn('[effect] edited-outline mesh rebuild failed:', e)
       return
     }
     setResult((p) => {

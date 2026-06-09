@@ -7,9 +7,10 @@
 //     → normalize rings (closure + winding: outer CCW, holes CW)
 //     → self-intersection check → locators
 //
-// Per-node corner radii reuse the engine's `filletCorners` arc math (core/shaped/contour.ts):
-// θ = INTERIOR angle, radiusMax = 0.8·min(L1,L2)·tan(θ/2). v1 = convex corners only (AMEND-C6);
-// concave/near-straight pass through. Pure + deterministic: no DOM, no three.js, no Date.now.
+// Per-node corner radii are applied HERE as true circular arcs — this is THE single corner-rounding
+// engine (there is no separate fork): θ = INTERIOR angle, radiusMax = 0.8·min(L1,L2)·tan(θ/2). v1 =
+// convex corners only (AMEND-C6); concave/near-straight pass through. Pure + deterministic: no DOM,
+// no three.js, no Date.now.
 //
 // SCOPE (A1a): line segments between nodes (the auto/semi-auto polygon case). Curve/livewire
 // segment sampling (cubic/catmull_rom/livewire) + the Catmull-Rom smoothing resample land with
@@ -27,7 +28,7 @@ import type {
 } from './types'
 import { outlineDocumentHash } from './hash'
 
-// ─── geometry helpers (pure ports from core/shaped/contour.ts) ───────────────
+// ─── geometry helpers (pure, deterministic) ───────────────
 
 export function signedArea(pts: Vec2Px[]): number {
   let a = 0
@@ -296,7 +297,7 @@ export function resolveOutlineDocument(doc: OutlineDocument, opts: ResolveOption
   const policy: ResolvedOutlinePolicy = {
     smoothing_applied: doc.style.smoothing > 0,
     corner_radii_applied: anyRadius || doc.style.globalOutlineCornerRadiusPx > 0,
-    // per-node radii are applied here → the engine's global filletCorners must NOT run again
+    // per-node radii are applied here → any downstream global corner-rounding must NOT run again
     downstream_corner_rounding: 'disabled',
   }
 

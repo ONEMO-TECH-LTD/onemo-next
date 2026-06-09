@@ -14,15 +14,12 @@ export interface Contour {
 }
 
 /**
- * Real-world dimensions of the cut-out. This tracing-engine preview ships the CURRENT working
- * values from DEFAULT_BUILD_CONFIG (thicknessMM 0.5 / edgeRadiusMM 0.15). The thicker ~1.6-2mm
- * body + slight front-top fillet seen on the physical sample is a DEFERRED conditional add-on
- * (edge-round), pending Dan's physical-sample thickness lock — not part of this engine ship.
- * See _team-work/kai-sidekick/real-sample-reflections.md.
+ * Real-world dimensions of the effect. Values come from EFFECT_BUILD_CONFIG (§9: 1mm body). The
+ * rounded-lip edge radius is re-pinned for the 1mm body (§9 follow-up, coupon-confirmed).
  */
 export interface Dimensions {
-  thicknessBodyMM: number // current preview build value (DEFAULT_BUILD_CONFIG.thicknessMM)
-  edgeRadiusMM: number    // current preview build value; rounded-edge profile is the deferred add-on
+  thicknessBodyMM: number // physical body thickness (EFFECT_BUILD_CONFIG.thicknessMM = 1mm)
+  edgeRadiusMM: number    // rounded-edge lip radius (re-pinned for the 1mm body, §9)
   widthMM: number
   heightMM: number
 }
