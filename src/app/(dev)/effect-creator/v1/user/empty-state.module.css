@@ -1,0 +1,70 @@
+/* Pre-upload default — a frosted-glass ONEMO square on a neutral brand-grey backdrop, with a centred
+   load control (icon directly on the glass, no ring) and a pronounced specular sweep. */
+
+.wrap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  /* neutral brand-grey backdrop (lit) so the frosted glass reads */
+  background: radial-gradient(120% 100% at 50% 38%, var(--primitive-color-grey-5), var(--primitive-color-grey-7));
+}
+
+.square {
+  position: relative;
+  width: min(62vw, 62vh);
+  height: min(62vw, 62vh);
+  border-radius: 8%;                 /* ~8mm on a 100mm square */
+  cursor: pointer;
+  overflow: hidden;
+  /* optimised faux frosted-glass — translucent over the grey backdrop, NO backdrop-filter (perf) */
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.34) 55%, rgba(255, 255, 255, 0.5));
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow:
+    0 40px 90px rgba(20, 24, 40, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -24px 48px rgba(120, 140, 170, 0.08);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.square:hover { transform: translateY(-2px); box-shadow: 0 48px 110px rgba(20,24,40,0.26), inset 0 1px 0 rgba(255,255,255,0.95); }
+.square:active { transform: translateY(0); }
+
+/* pronounced specular highlight sweeping across the glass */
+.sheen {
+  position: absolute;
+  inset: -60%;
+  background: linear-gradient(118deg, transparent 38%, rgba(255,255,255,0.85) 50%, transparent 62%);
+  transform: translateX(-40%);
+  animation: pearl-sweep 4.5s ease-in-out infinite;
+  pointer-events: none;
+  will-change: transform, opacity;   /* GPU-only animation (no blend mode → no jank) */
+}
+@keyframes pearl-sweep {
+  0%, 100% { transform: translateX(-45%); opacity: 0.4; }
+  50% { transform: translateX(45%); opacity: 1; }
+}
+
+.center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-s, 0.75rem);
+}
+/* icon sits directly on the frosted glass — no ring */
+.iconRing {
+  display: inline-flex;
+  color: var(--color-text-primary, #14182a);
+}
+.iconRing svg { width: 2.75rem; height: 2.75rem; }
+.label {
+  font-family: var(--font-primary, sans-serif);
+  font-weight: 500;
+  font-size: var(--text-label-l, 0.95rem);
+  color: var(--color-text-primary, #14182a);
+  opacity: 0.8;
+}
