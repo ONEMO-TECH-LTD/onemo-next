@@ -10,7 +10,7 @@
 //                      (ADDENDUM D steps 4 + 8 — "the 3D follows" / "what you approve is what's made").
 
 import { create } from 'zustand'
-import type { ShapeSpecDraft, Contour } from '../core/shaped/types'
+import type { ShapeSpecDraft, Contour } from '@/lib/shaped/types'
 import type { OutlineDocument } from '@/lib/outline-core'
 
 interface OutlineStore {

@@ -411,3 +411,23 @@ export function buildContour(
   const simplifiedNodes = outerPts.length + holes.reduce((s, r) => s + r.pts.length, 0)
   return { contour: { outer, holes }, rawNodes, simplifiedNodes }
 }
+
+/**
+ * TRACER-ONLY (one-engine, §8.2): marching-squares → stitch → largest loop → outer-CCW → RAW pixel
+ * ring. NO RDP, NO fillet, NO Catmull-Rom smoothing — unlike `buildContour`, which bakes the fork's
+ * rounding/smoothing in. The 2D-first `prepareSticker` consumes this raw ring and routes ALL
+ * simplification + corner-rounding + smoothing through `outline-core` (the single deterministic
+ * engine), so the screen, the 3D mesh, and the cutline can never disagree. Holes dropped (solid
+ * suede cut-out per Dan). Returns null if no silhouette. (§8.2b retires the fork in this file.)
+ */
+export function traceContourRaw(mask: Uint8Array, w: number, h: number): Pt[] | null {
+  const loops = stitch(segments(mask, w, h)).filter((l) => l.length >= 3)
+  if (!loops.length) return null
+  let best = loops[0], bestArea = Math.abs(signedArea(loops[0]))
+  for (const l of loops) {
+    const a = Math.abs(signedArea(l))
+    if (a > bestArea) { best = l; bestArea = a }
+  }
+  const ccw = signedArea(best) > 0 ? best : [...best].reverse() // normalize outer → CCW
+  return dedup(ccw)
+}

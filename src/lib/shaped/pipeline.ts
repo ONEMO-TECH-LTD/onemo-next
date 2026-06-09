@@ -8,6 +8,12 @@ import { loadImageData, segment, adapterIdFor, dilateMask, smoothMask, type Mask
 import { segmentML, ML_ADAPTER_ID } from './segment-ml'
 import { buildContour } from './contour'
 import { buildShapedGeometry } from './mesh'
+import { composeFront } from './composite'
+
+// composeFront moved to composite.ts (three-free) so the 2D-first prepareSticker can reuse the ONE
+// composite primitive without dragging three.js into the WebGL-free creation path. Re-exported here
+// so existing consumers (ShapedModel) keep importing it from `@/lib/shaped/pipeline`.
+export { composeFront } from './composite'
 
 export interface ShapeBuildConfig {
   longestSideMM: number   // physical size of the cut-out's longest side (default 100)
@@ -60,22 +66,6 @@ function pxBbox(pts: Pt[]) {
     if (y < minY) minY = y; if (y > maxY) maxY = y
   }
   return { w: maxX - minX, h: maxY - minY }
-}
-
-/**
- * Compose the front texture: a SHARP subject over a BLURRED copy of the real-photo background.
- * `bgBlurPx = 0` → no blur (the full sharp original photo = effect OFF). Used for the default build
- * AND for live editor re-blur (toggle / intensity) — same source canvases, no re-segmentation.
- */
-export function composeFront(origCanvas: HTMLCanvasElement, subjCanvas: HTMLCanvasElement, bgBlurPx: number): HTMLCanvasElement {
-  const fw = origCanvas.width, fh = origCanvas.height
-  const front = document.createElement('canvas')
-  front.width = fw; front.height = fh
-  const ctx = front.getContext('2d')!
-  if (bgBlurPx > 0) { ctx.filter = `blur(${bgBlurPx}px)`; ctx.drawImage(origCanvas, 0, 0); ctx.filter = 'none' }
-  else ctx.drawImage(origCanvas, 0, 0)
-  ctx.drawImage(subjCanvas, 0, 0, fw, fh) // sharp subject on top of the (blurred) real background
-  return front
 }
 
 /** A rounded-rect ring (px, clockwise) covering [0,0]→[W,H], corner radius rPx. */

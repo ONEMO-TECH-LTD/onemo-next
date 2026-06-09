@@ -5,9 +5,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Center } from '@react-three/drei'
 import * as THREE from 'three'
 import type { DesignState, SceneSettings } from '../../types'
-import type { SuedeMaterialParams, ShapeSpecDraft } from './types'
-import { buildShape, buildSquareShape, DEFAULT_BUILD_CONFIG, composeFront } from './pipeline'
-import { buildShapedGeometry } from './mesh'
+import type { SuedeMaterialParams, ShapeSpecDraft } from '@/lib/shaped/types'
+import { buildShape, buildSquareShape, DEFAULT_BUILD_CONFIG, composeFront } from '@/lib/shaped/pipeline'
+import { buildShapedGeometry } from '@/lib/shaped/mesh'
 import { useOutlineStore } from '../../user/outlineStore'
 
 interface ShapedModelProps {

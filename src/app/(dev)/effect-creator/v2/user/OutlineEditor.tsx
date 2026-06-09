@@ -20,7 +20,7 @@ import {
   type ReplayEnv,
   type CostGrid,
 } from '@/lib/outline-core'
-import type { ShapeSpecDraft, Contour } from '../core/shaped/types'
+import type { ShapeSpecDraft, Contour } from '@/lib/shaped/types'
 import { buildEdgeCost } from './edgeCost'
 import { useOutlineStore } from './outlineStore'
 import { UndoIcon, RedoIcon, HugIcon, RoundIcon, SmoothIcon, ScaleIcon, PenIcon, ResetIcon, CheckIcon, CloseIcon, PlusIcon, MinusIcon, AddPointIcon, DeleteIcon, BlendIcon, ShapeIcon, PolygonChip, StarChip, CircleChip, SquareChip, PillChip, SquircleChip, HeartChip, SpeechChip, BadgeChip, ShieldChip, BlobChip, ArchChip, PreviewIcon, PreviewOffIcon } from './icons'
