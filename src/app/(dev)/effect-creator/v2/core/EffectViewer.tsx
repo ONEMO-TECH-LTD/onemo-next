@@ -324,7 +324,11 @@ export default function EffectViewer({
         <OrbitControls
           ref={orbitControlsRef}
           makeDefault
-          enableDamping={cam?.enableDamping ?? true}
+          /* perf: damping defaults FALSE. enableDamping=true makes OrbitControls call invalidate()
+             every frame to decay inertia → defeats frameloop="demand" → the idle scene redraws
+             continuously (the confirmed Phase-B perf trap). With it off, idle renders once then
+             stops; spin still works (active drag fires invalidate during interaction). */
+          enableDamping={cam?.enableDamping ?? false}
           dampingFactor={cam?.dampingFactor ?? 0.1}
           autoRotate={false}  /* perf: no continuous spin → idle renders once then stops (frameloop demand) */
           autoRotateSpeed={cam?.autoRotateSpeed ?? 2}

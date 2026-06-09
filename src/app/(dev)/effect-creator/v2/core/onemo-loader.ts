@@ -66,7 +66,10 @@ function editorCameraToSpherical(pos: [number, number, number], target: [number,
         polarAngle,
         azimuthAngle,
         target,
-        enableDamping: true,
+        // perf: damping OFF — true makes OrbitControls invalidate() every frame (inertia decay),
+        // defeating frameloop="demand" so the idle 3D scene redraws continuously. Off = idle renders
+        // once then stops; spin still works on active drag.
+        enableDamping: false,
         dampingFactor: 0.1,
         autoRotate: false,
         autoRotateSpeed: 2,
