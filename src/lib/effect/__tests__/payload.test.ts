@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest'
 import { applyOutlineCommands, type OutlineDocument, type OutlineNode } from '@/lib/outline-core'
 import type { EffectSpecDraft, Contour } from '../types'
 import type { PreparedEffect } from '../prepare-effect'
-import { buildApprovedEffectPayload, assertCuttable, EffectNotCuttableError } from '../payload'
+import { buildApprovedEffectPayload, assertCuttable, EffectNotCuttableError, canonicalHashBody } from '../payload'
 
 function node(id: string, x: number, y: number): OutlineNode {
   return { id, p: [x, y], role: 'corner', corner: { mode: 'inherit' } }
@@ -26,11 +26,17 @@ function squareDoc(): OutlineDocument {
   )
 }
 
-/** A self-intersecting (bowtie) OutlineDocument — NOT cuttable. */
-function bowtieDoc(): OutlineDocument {
+/**
+ * A self-intersecting OutlineDocument — NOT cuttable — with a deliberately POSITIVE absolute area (F2).
+ * The classic symmetric bowtie (0,0)(100,100)(100,0)(0,100) nets to ZERO signed area, so assertCuttable
+ * rejects it via the *degenerate/collapsed* branch — masking the self-intersection path entirely. This
+ * asymmetric crossing — edge n1→n2 crosses edge n3→n4 at ~(90,9) — keeps |signedArea| ≈ 4000px², so it
+ * clears the degenerate gate and genuinely exercises the self-intersection rejection.
+ */
+function selfIntersectDoc(): OutlineDocument {
   return applyOutlineCommands(
     {
-      rings: [{ id: 'r1', role: 'outer', closed: true, nodes: [node('n1', 0, 0), node('n2', 100, 100), node('n3', 100, 0), node('n4', 0, 100)] }],
+      rings: [{ id: 'r1', role: 'outer', closed: true, nodes: [node('n1', 0, 0), node('n2', 100, 10), node('n3', 100, 0), node('n4', 0, 90)] }],
       style: { globalOutlineCornerRadiusPx: 0, smoothing: 0 },
     },
     [],
@@ -67,10 +73,14 @@ describe('assertCuttable — mandatory feasibility gate (§1)', () => {
   it('passes a valid square outline', () => {
     expect(assertCuttable(prepared(squareDoc(), squareGeomMM)).ok).toBe(true)
   })
-  it('rejects a self-intersecting (bowtie) outline with locators', () => {
-    const r = assertCuttable(prepared(bowtieDoc(), squareGeomMM))
+  it('rejects a self-intersecting outline via the self-intersection path (NOT degenerate) with locators', () => {
+    const r = assertCuttable(prepared(selfIntersectDoc(), squareGeomMM))
     expect(r.ok).toBe(false)
     expect(r.locators.length).toBeGreaterThan(0)
+    // F2: positive-area fixture clears the degenerate gate, so the rejection is the self-intersection
+    // path — not 'degenerate/collapsed outline'. (A zero-area bowtie would mask this.)
+    expect(r.reason).not.toBe('degenerate/collapsed outline')
+    expect(r.issues.length).toBeGreaterThan(0)
   })
 })
 
@@ -106,7 +116,33 @@ describe('buildApprovedEffectPayload', () => {
   })
 
   it('THROWS EffectNotCuttableError for an uncuttable shape (never hashes it)', () => {
-    expect(() => buildApprovedEffectPayload(prepared(bowtieDoc(), squareGeomMM), { type: 'standard', size: 's70' }))
+    expect(() => buildApprovedEffectPayload(prepared(selfIntersectDoc(), squareGeomMM), { type: 'standard', size: 's70' }))
       .toThrow(EffectNotCuttableError)
+  })
+
+  it('GOLDEN: pins the manufacturing hash + schema_version so a SILENT schema/serialization drift is caught (F2)', () => {
+    const out = buildApprovedEffectPayload(prepared(squareDoc(), squareGeomMM), { type: 'standard', size: 's70' })
+    // If this literal breaks UNEXPECTEDLY, a refactor silently changed every saved design's manufacturing
+    // identity (and the cross-deploy F1 remix↔mfg bond). On an INTENDED schema change: bump SCHEMA_VERSION
+    // in payload.ts and update this golden in the same commit.
+    expect(out.schema_version).toBe(1)
+    expect(out.payload_hash).toBe('71a871783519318c')
+  })
+
+  it('hash EXCLUDES commerce (price) + quantizes residual floats to int-micro (F3)', () => {
+    const out = buildApprovedEffectPayload(prepared(squareDoc(), squareGeomMM), { type: 'standard', size: 's70' })
+    const body = canonicalHashBody(out)
+    const json = JSON.stringify(body)
+    // price is commerce, never a manufacturing fact → absent from the hashed body…
+    expect(json).not.toContain('price_multiplier')
+    // …but still present on the full record for commerce/display:
+    expect(out.size.price_multiplier).toBe(1)
+    // residual float ratios are quantized to integer micro-units (§11 "integer microns, no floats"):
+    expect('scale' in body.size).toBe(false)
+    expect(body.size.scale_micro).toBe(1_000_000) // scale 1.0 → 1_000_000
+    expect('source_px_to_shape_mm' in body.artwork).toBe(false)
+    expect(body.artwork.source_px_to_shape_mm_micro).toBe(700_000) // mmPerPx 0.7 → 700_000
+    expect(Number.isInteger(body.size.scale_micro)).toBe(true)
+    expect(Number.isInteger(body.artwork.source_px_to_shape_mm_micro)).toBe(true)
   })
 })

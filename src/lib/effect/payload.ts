@@ -27,8 +27,13 @@ import {
 } from '@/lib/outline-core'
 
 const OUTLINE_CORE_VERSION = '1' // OutlineDocument.version (A1a)
+// Canonical-hash schema version. Bump INTENTIONALLY whenever the hashed shape changes (and update the
+// golden-hash test) — that makes a deliberate change explicit and a SILENT one (a refactor quietly
+// altering every saved design's manufacturing identity + the F1 remix↔mfg bond) a caught regression.
+const SCHEMA_VERSION = 1
 const FLATTEN_TOLERANCE_PX = 0.5
 const MIN_AREA_PX2 = 1 // below this the outline is collapsed/degenerate
+const MICRO = 1_000_000 // quantize residual float ratios to integer micro-units for the canonical hash
 
 // ── inputs ───────────────────────────────────────────────────────────────────
 export interface TrimSelection {
@@ -94,6 +99,7 @@ function toMicronRing(pts: ReadonlyArray<Pt>): IntRing {
 // ── the payload schema (§11 — full target) ─────────────────────────────────────
 export interface ApprovedEffectPayload {
   version: 1
+  schema_version: number // canonical-hash schema version (F2) — see SCHEMA_VERSION
   source: { image_hash: string; dims: { widthPx: number; heightPx: number }; color_space: string; exif: 'baked' }
   geometry: {
     base_shape_mm: { outer: IntRing; holes: IntRing[] }
@@ -133,6 +139,33 @@ export interface ApprovedEffectPayload {
 }
 
 type EffectSpecGenerator = PreparedEffect['spec']['generator']
+
+/**
+ * The canonical MANUFACTURING-identity subset that `payload_hash` is computed over (F3). It deliberately
+ * differs from the full record in two ways, both load-bearing:
+ *  • EXCLUDES commerce — `size.price_multiplier` is dropped, so the SAME physical effect at a different
+ *    price yields the SAME manufacturing hash (price is not a manufacturing fact).
+ *  • NO floats — the residual float ratios (`size.scale`, `artwork.source_px_to_shape_mm`) are quantized
+ *    to integer micro-units (§11 "integer microns, no floats"), so sub-micron float drift across a
+ *    refactor or platform can't silently change a saved design's identity / the F1 remix↔mfg bond.
+ * Geometry is already int-microns. `stableStringify` sorts keys, so field order here is irrelevant.
+ */
+export function canonicalHashBody(p: ApprovedEffectPayload) {
+  const { price_multiplier: _omitPrice, scale, ...sizeRest } = p.size
+  const { source_px_to_shape_mm, ...artworkRest } = p.artwork
+  return {
+    schema_version: p.schema_version,
+    version: p.version,
+    source: p.source,
+    geometry: p.geometry,
+    size: { ...sizeRest, scale_micro: Math.round(scale * MICRO) },
+    artwork: { ...artworkRest, source_px_to_shape_mm_micro: Math.round(source_px_to_shape_mm * MICRO) },
+    appearance: p.appearance,
+    attachment: p.attachment,
+    gates: p.gates,
+    build: p.build,
+  }
+}
 
 /**
  * Build the immutable ApprovedEffectPayload (= the LockedPayload). Feasibility-gated (§1): throws
@@ -218,8 +251,12 @@ export function buildApprovedEffectPayload(prepared: PreparedEffect, opts: Build
     generator: spec.generator,
   }
 
-  // Canonical, deterministic content hash over everything except the hash itself.
-  const body = { version: 1 as const, source, geometry, size, artwork, appearance, attachment, gates, build }
-  const payload_hash = contentHash(stableStringify(body))
-  return { ...body, payload_hash }
+  // The full record (commerce + display included). The manufacturing IDENTITY hash, however, is computed
+  // over the CANONICAL subset (canonicalHashBody): commerce excluded + residual floats quantized (F3).
+  const record = { version: 1 as const, schema_version: SCHEMA_VERSION, source, geometry, size, artwork, appearance, attachment, gates, build }
+  // contentHash = cyrb53 → a 16-hex digest. The 16-hex width is INTENTIONAL (F4): deterministic +
+  // cross-platform (no crypto/BigInt), ample space for a per-design identity. An identity/integrity
+  // hash, not a security hash.
+  const payload_hash = contentHash(stableStringify(canonicalHashBody({ ...record, payload_hash: '' })))
+  return { ...record, payload_hash }
 }
