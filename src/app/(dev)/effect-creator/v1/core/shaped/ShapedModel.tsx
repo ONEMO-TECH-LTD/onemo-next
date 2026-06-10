@@ -225,7 +225,10 @@ export default function ShapedModel({
     })
   }, [backColor, normalMap, roughnessMap, bumpMap, suede])
 
-  // design-state pan/zoom on the front artwork texture (same model as the golden configurator)
+  // design-state pan/zoom on the front artwork texture (same model as the golden configurator).
+  // Recovery F4: repeat/offset are texture-MATRIX params — they must NOT set `needsUpdate`, which
+  // forces a full canvas→GPU re-upload (~23 MB at 2400px) per pointer event. needsUpdate is only for
+  // canvas CONTENT changes (the bgBlur recompose path creates a fresh CanvasTexture already).
   useEffect(() => {
     const repeat = 1 / designState.scale
     const centerOffset = (1 - repeat) / 2
@@ -235,7 +238,6 @@ export default function ShapedModel({
     if (tex) {
       tex.repeat.set(repeat, repeat)
       tex.offset.set(ox, oy)
-      tex.needsUpdate = true
     }
   }, [designState, result])
 

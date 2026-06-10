@@ -70,17 +70,29 @@ core/EffectViewer.tsx  → the R3F canvas; mounted ONLY for the 3D preview
 mesh/material is assembled from the spec **only at 3D-preview time** via `buildMeshFromSpec`. The 2D flow
 never instantiates the render loop.
 
-## 4. Performance contract (why the split exists)
+## 4. Performance contract (CORRECTED 2026-06-10 — see ADDENDUM-V1-RECOVERY.md)
 
-Measured: with the R3F canvas mounted and a mesh present, the scene render is a ~166 ms main-thread task
-that, run continuously, starved the event loop to ~12 FPS. The empty scene (no mesh) is 120 FPS.
-**Therefore the canvas must not be mounted during 2D work.** Rules:
+> **⚠ Correction.** The original §4 claimed: *"with the R3F canvas mounted and a mesh present, the scene
+> render is a ~166 ms main-thread task that, run continuously, starved the event loop to ~12 FPS —
+> therefore the canvas must not be mounted during 2D work."* **That attribution was wrong.** The ~166 ms
+> task was the `buildSquareShape` build effect re-firing every render (an unstable-callback effect-deps
+> React bug — diagnosed correctly at the time, then lost when a broken-HMR dev server made every fix-test
+> read 12 FPS regardless). QA's same-day review flagged the misattribution ("NOT an intrinsic scene-render
+> cost; every measurement confounded") and prescribed a confirmation spin-test; the 2026-06-10 audit ran
+> it on this snapshot: **mesh loaded, damping on, continuous orbit = 120 FPS, avg 8.3 ms/frame, zero long
+> tasks.** The scene render costs ~1–2 ms. A mounted canvas during 2D work is an idle-efficiency/battery
+> concern (damping defeats `frameloop="demand"` → continuous cheap renders), not a framerate constraint.
 
-- No R3F canvas mounted outside the 3D preview.
-- No `backdrop-filter` (re-blurs the backdrop every frame — measured identical 12 FPS). Use the
-  **aluminium / faux-glass** treatment (gradient + brushed-noise + machined-edge shimmer) — no per-frame blur.
-- When the 3D preview IS mounted: `frameloop="demand"`, capped DPR, no idle auto-render.
-- Heavy one-shot work (segmentation, `toDataURL`) runs on explicit user action, never on every render.
+Rules (corrected):
+
+- The R3F canvas MAY stay mounted during 2D work; with `frameloop="demand"` it must genuinely idle —
+  disable OrbitControls damping (or stop it settling) so demand mode reaches zero frames at rest.
+- The real per-interaction budget lives in the **2D pipeline**: no full SDF/resolve/mesh rebuild per
+  slider tick (the Hug bug); preview cheap per tick, commit expensive work on release.
+- No `backdrop-filter` over the live canvas (full-screen backdrop blur is a real cost). Aluminium / faux-glass stays.
+- When the 3D canvas is up: `frameloop="demand"`, capped DPR, no idle auto-render. (Already shipped here.)
+- Heavy one-shot work (segmentation, `toDataURL`) runs on explicit user action, never on every render —
+  and segmentation belongs in a worker (the wasm fallback otherwise freezes the main thread).
 
 ## 5. Material / look direction (ONEMO, not Apple)
 

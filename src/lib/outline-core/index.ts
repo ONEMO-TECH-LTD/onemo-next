@@ -32,7 +32,8 @@ export {
 } from './resolver'
 
 // SDF blend (A2b) — 0→100% square↔silhouette morph, same client/server parity.
-export { resolveSdfBlend, type SdfBlendParams } from './sdf'
+// prepareSdfBlend = fields-once evaluator for live sliders (V1-recovery F1).
+export { resolveSdfBlend, prepareSdfBlend, type SdfBlendParams } from './sdf'
 
 // Livewire pathfinder (A3b/c) — magnetic-lasso Dijkstra snap over an edge-cost grid.
 export { livewirePath, type CostGrid } from './livewire'

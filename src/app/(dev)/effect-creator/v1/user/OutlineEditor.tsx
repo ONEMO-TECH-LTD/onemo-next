@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   applyOutlineCommands,
   resolveOutlineDocument,
-  resolveSdfBlend,
+  prepareSdfBlend,
   livewirePath,
   rdpClosed,
   repairSimplePolygon,
@@ -271,6 +271,11 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
   const nodeInteractedRef = useRef(false) // a node tap just happened → suppress the bubbling surface-click (which would re-select all)
   const dragStartRef = useRef<Vec2Px | null>(null) // pointer-down point → distinguish a tap (select) from a drag (move)
   const blendSrc = useRef<{ square: Vec2Px[]; silhouette: Vec2Px[]; domain: { minX: number; minY: number; width: number; height: number }; image: OutlineDocument['image'] } | null>(null)
+  // Hug (recovery F1): SDF fields prepared ONCE per cut-out (hugEvalRef), cheap per-tick preview
+  // (hugPreview, transient), expensive safe-radius + doc apply + 3D push only on release (commitBlend).
+  const hugEvalRef = useRef<((t: number) => Vec2Px[][]) | null>(null)
+  const hugRingRef = useRef<Vec2Px[] | null>(null)
+  const [hugPreview, setHugPreview] = useState<OutlineDocument | null>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const idRef = useRef(0)
   const spec = useOutlineStore((s) => s.spec)
@@ -363,6 +368,7 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
     setActiveAdjust(null)
     setShapeKind(null)
     setShapePreview(null)
+    setHugPreview(null); hugEvalRef.current = null; hugRingRef.current = null // fresh cut-out → new SDF fields (recovery F1)
     setRotateLive(null); rotateLiveRef.current = null; rotateRef.current = null
     setMoveLive(null); moveLiveRef.current = null; moveRef.current = null
     gestureRef.current = null
@@ -390,7 +396,19 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
   const commit = useCallback(
     (cmd: OutlineCommand) => {
       const d = docRef.current
-      applyDoc(applyOutlineCommands(d.baseSnapshot, [...d.commands, cmd], { image: d.image, mode: d.mode }))
+      try {
+        applyDoc(applyOutlineCommands(d.baseSnapshot, [...d.commands, cmd], { image: d.image, mode: d.mode }))
+      } catch (e) {
+        // Replay desync (command/node ids vs baseSnapshot — the V1 silent-edit-loss bug, recovery F2):
+        // self-heal by REBASING — the current rings/style become a fresh baseSnapshot and the new command
+        // applies on top, so the user's edit is never silently discarded.
+        console.warn('[outline-editor] replay desync — rebasing onto current doc:', e)
+        try {
+          applyDoc(applyOutlineCommands({ rings: d.rings, style: d.style, generator: d.generator }, [cmd], { image: d.image, mode: d.mode }))
+        } catch (e2) {
+          console.error('[outline-editor] commit failed even after rebase — edit dropped:', e2)
+        }
+      }
     },
     [applyDoc],
   )
@@ -419,8 +437,8 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
     return d
   }, [doc, drag, radius, selectedNode, smoothing, scale])
 
-  // The shape tool's live morph (shapePreview) supersedes the normal display while dragging a shape slider.
-  const shown = shapePreview ?? displayDoc
+  // Live morphs supersede the normal display: Hug preview (recovery F1) > shape-tool preview > doc.
+  const shown = hugPreview ?? shapePreview ?? displayDoc
   const resolved = useMemo(() => resolveOutlineDocument(shown, { flattenTolerancePx: 0.5 }), [shown])
   const hasIssues = resolved.issues.length > 0 // inline manufacturability guardrail (self-intersection etc.)
 
@@ -680,15 +698,33 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
   }, [spec, applyDoc])
 
   // 0→100% square↔silhouette blend (A2b · SDF morph). 100% = the cut-out silhouette; 0% = the square photo.
+  // Recovery F1 — tick/commit split: per input tick this only blends the PRECOMPUTED SDF fields +
+  // traces the contour (a few ms, transient hugPreview). The safe-radius binary search, the doc apply
+  // (undo entry), and the 3D push run ONCE on release (commitBlend). The old per-tick full pipeline
+  // measured ~525 ms/tick — the editor's worst freeze.
   const onBlend = useCallback((value: number) => {
     setBlend(value)
     const src = blendSrc.current
     if (!src) return
-    const rings = resolveSdfBlend({ fromRings: [src.square], toRings: [src.silhouette], t: value / 100, domain: src.domain, grid: 120 })
+    if (!hugEvalRef.current) {
+      hugEvalRef.current = prepareSdfBlend({ fromRings: [src.square], toRings: [src.silhouette], domain: src.domain, grid: 120 })
+    }
+    const rings = hugEvalRef.current(value / 100)
     const outer = rings[0] ?? src.silhouette
     const eps = Math.max(2, Math.max(src.domain.width, src.domain.height) * 0.01)
     const ring = rdpClosed(outer, eps)
-    // default the blended shape to MAX rounded corners (self-correcting), like the auto outline
+    hugRingRef.current = ring
+    // transient preview at the doc's current rounding — no history churn, no 3D rebuild per tick
+    setHugPreview(docFromRings(ring, src.image, docRef.current.style.globalOutlineCornerRadiusPx))
+  }, [])
+
+  // Hug release: bake the morphed ring — self-correcting max rounding + ONE undoable doc apply (+ 3D push).
+  const commitBlend = useCallback(() => {
+    const src = blendSrc.current
+    const ring = hugRingRef.current
+    setHugPreview(null)
+    if (!src || !ring) return
+    hugRingRef.current = null
     const hi = Math.round(Math.min(src.image.widthPx, src.image.heightPx) * 0.25)
     const safe = maxSafeGlobalRadius(docFromRings(ring, src.image, 0), hi)
     applyDoc(docFromRings(ring, src.image, safe))
@@ -974,7 +1010,7 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
       {!drawing && activeAdjust && activeAdjust !== 'shape' && (
         <div className={styles.sheet}>
           {activeAdjust === 'hug' && (
-            <input className={styles.slider} type="range" min={0} max={100} value={blend} onChange={(e) => onBlend(Number(e.target.value))} aria-label="Hug" />
+            <input className={styles.slider} type="range" min={0} max={100} value={blend} onChange={(e) => onBlend(Number(e.target.value))} onPointerUp={commitBlend} aria-label="Hug" />
           )}
           {activeAdjust === 'round' && (
             <input className={styles.slider} type="range" min={0} max={maxRadius} value={Math.min(radius, maxRadius)} onChange={(e) => setRadius(Number(e.target.value))} onPointerUp={commitRadius} aria-label="Round corners" />
