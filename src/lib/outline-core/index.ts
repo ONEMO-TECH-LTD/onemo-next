@@ -27,6 +27,8 @@ export {
   nodesFromTracedRing,
   fairTracedRing,
   fairingFromDetail,
+  svgPathFromNodes,
+  flattenCubic,
   BEN_DEFAULT_DETAIL,
   catmullRomClosed,
   signedArea,

@@ -43,6 +43,123 @@ const translate = (pts: Vec2Px[], cx: number, cy: number): Vec2Px[] =>
 const scaleNorm = (pts: Vec2Px[], hw: number, hh: number): Vec2Px[] =>
   pts.map(([x, y]) => [x * hw, y * hh] as Vec2Px)
 
+// ── VECTOR CORE (#29): pure-curve shape output — anchors + cubic handles, points on demand ──
+// A curve shape is NOT made of points: the document carries sparse anchors with Bézier handles
+// (corners only where the geometry truly has them); display renders the curves exactly.
+export interface CurveAnchor { p: Vec2Px; c1?: Vec2Px; c2?: Vec2Px; corner?: boolean }
+
+const KAPPA = 0.5522847498307936
+
+/** Exact 4-anchor Bézier circle/ellipse (the canonical minimal set). */
+function circleCurve(rx: number, ry: number): CurveAnchor[] {
+  const k = KAPPA
+  return [
+    { p: [0, -ry], c1: [rx * k, -ry], c2: [rx, -ry * k] },
+    { p: [rx, 0], c1: [rx, ry * k], c2: [rx * k, ry] },
+    { p: [0, ry], c1: [-rx * k, ry], c2: [-rx, ry * k] },
+    { p: [-rx, 0], c1: [-rx, -ry * k], c2: [-rx * k, -ry] },
+  ]
+}
+
+/** Detect true corners on a dense ring (tangent break > `deg`). */
+function denseCorners(ring: Vec2Px[], deg = 40): Set<number> {
+  const n = ring.length
+  const out = new Set<number>()
+  for (let i = 0; i < n; i++) {
+    const a = ring[(i - 1 + n) % n], p = ring[i], b = ring[(i + 1) % n]
+    const ax = p[0] - a[0], ay = p[1] - a[1], bx = b[0] - p[0], by = b[1] - p[1]
+    const la = Math.hypot(ax, ay) || 1e-9, lb = Math.hypot(bx, by) || 1e-9
+    const dot = Math.max(-1, Math.min(1, (ax * bx + ay * by) / (la * lb)))
+    if ((Math.acos(dot) * 180) / Math.PI > deg) out.add(i)
+  }
+  return out
+}
+
+/**
+ * Convert a dense parametric ring into a sparse CURVE chain: anchors every ~`spacing` along the
+ * ring (always exactly ON the curve, cusps pinned as corner anchors), Catmull-Rom tangents become
+ * cubic handles (one-sided at corners so cusps stay crisp). The result is smooth at every zoom —
+ * the faceting class (heart/daisy, Dan 2026-06-10) is structurally gone.
+ */
+function curveChainFromDense(ring: Vec2Px[], anchorsTarget = 28): CurveAnchor[] {
+  const n = ring.length
+  if (n < 8) return ring.map((p) => ({ p: [p[0], p[1]] as Vec2Px }))
+  const corners = denseCorners(ring)
+  // pick anchor indices: corners + evenly spaced fills between them
+  const idx: number[] = [...corners].sort((a, b) => a - b)
+  const spacing = Math.max(4, Math.floor(n / anchorsTarget))
+  if (idx.length === 0) {
+    for (let i = 0; i < n; i += spacing) idx.push(i)
+  } else {
+    const fills: number[] = []
+    for (let k = 0; k < idx.length; k++) {
+      const a = idx[k], b = idx[(k + 1) % idx.length]
+      const span = (b - a + n) % n
+      const steps = Math.max(1, Math.round(span / spacing))
+      for (let t = 1; t < steps; t++) fills.push((a + Math.round((span * t) / steps)) % n)
+    }
+    idx.push(...fills)
+    idx.sort((a, b) => a - b)
+  }
+  const uniq = [...new Set(idx)]
+  const m = uniq.length
+  const anchors: CurveAnchor[] = []
+  for (let k = 0; k < m; k++) {
+    const iPrev = uniq[(k - 1 + m) % m], iCur = uniq[k], iNext = uniq[(k + 1) % m]
+    const pPrev = ring[iPrev], p = ring[iCur], pNext = ring[iNext]
+    const isCorner = corners.has(iCur)
+    const nextIsCorner = corners.has(iNext)
+    // outgoing tangent at the current anchor (one-sided when the anchor is a true corner)
+    const tOutX = isCorner ? pNext[0] - p[0] : (pNext[0] - pPrev[0]) / 2
+    const tOutY = isCorner ? pNext[1] - p[1] : (pNext[1] - pPrev[1]) / 2
+    // incoming tangent at the NEXT anchor
+    const iNext2 = uniq[(k + 2) % m]
+    const pNext2 = ring[iNext2]
+    const tInX = nextIsCorner ? pNext[0] - p[0] : (pNext2[0] - p[0]) / 2
+    const tInY = nextIsCorner ? pNext[1] - p[1] : (pNext2[1] - p[1]) / 2
+    anchors.push({
+      p: [p[0], p[1]],
+      c1: [p[0] + tOutX / 3, p[1] + tOutY / 3],
+      c2: [pNext[0] - tInX / 3, pNext[1] - tInY / 3],
+      corner: isCorner,
+    })
+  }
+  return anchors
+}
+
+const curveOps = {
+  rotate(a: CurveAnchor[], deg: number): CurveAnchor[] {
+    if (!deg) return a
+    const r = (deg * Math.PI) / 180, c = Math.cos(r), s = Math.sin(r)
+    const rp = (p: Vec2Px): Vec2Px => [p[0] * c - p[1] * s, p[0] * s + p[1] * c]
+    return a.map((n) => ({ ...n, p: rp(n.p), c1: n.c1 && rp(n.c1), c2: n.c2 && rp(n.c2) }))
+  },
+  translate(a: CurveAnchor[], cx: number, cy: number): CurveAnchor[] {
+    const tp = (p: Vec2Px): Vec2Px => [p[0] + cx, p[1] + cy]
+    return a.map((n) => ({ ...n, p: tp(n.p), c1: n.c1 && tp(n.c1), c2: n.c2 && tp(n.c2) }))
+  },
+}
+
+/**
+ * VECTOR CORE shape output: returns the pure-curve definition for curved kinds, or null for
+ * polygonal kinds (whose generateShapeRing output IS the exact sparse vertex set — true corners,
+ * straight lines, Radius-ready). One source of geometry truth per kind.
+ */
+export function generateCurveShape(params: ShapeParams, imgW: number, imgH: number): CurveAnchor[] | null {
+  const kind = params.kind
+  // polygonal kinds: exact sparse vertices (lines + corners) — no curves to carry
+  if (kind === 'square' || kind === 'diamond' || kind === 'plus' || kind === 'bolt' || kind === 'polygon' || kind === 'star') return null
+  const S = Math.min(imgW, imgH) * 0.72
+  const h = S / 2
+  const cx = imgW / 2, cy = imgH / 2
+  if (kind === 'circle') return curveOps.translate(circleCurve(h, h), cx, cy)
+  // every other curved kind: dense parametric ring → sparse curve chain (cusps pinned)
+  const ring = generateShapeRing({ ...params, rotateDeg: 0 }, imgW, imgH)
+  // ring is already centered/translated in image space — chain it directly
+  const chain = curveChainFromDense(ring)
+  return params.rotateDeg ? curveOps.rotate(curveOps.translate(chain, -cx, -cy), params.rotateDeg).map((n) => ({ ...n, p: [n.p[0] + cx, n.p[1] + cy] as Vec2Px, c1: n.c1 && ([n.c1[0] + cx, n.c1[1] + cy] as Vec2Px), c2: n.c2 && ([n.c2[0] + cx, n.c2[1] + cy] as Vec2Px) })) : chain
+}
+
 /** Re-fit any ring to [-1,1] preserving aspect (so parametric output always fills its box). */
 function normalize(pts: Vec2Px[]): Vec2Px[] {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity

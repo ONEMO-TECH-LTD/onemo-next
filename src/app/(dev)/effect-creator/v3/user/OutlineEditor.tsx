@@ -22,6 +22,7 @@ import {
   fairTracedRing,
   fairingFromDetail,
   BEN_DEFAULT_DETAIL,
+  svgPathFromNodes,
   type FairTracedRingOpts,
   type OutlineDocument,
   type OutlineCommand,
@@ -35,7 +36,7 @@ import { UndoIcon, RedoIcon, RoundIcon, SmoothIcon, ScaleIcon, PenIcon, ResetIco
 import TickBar from '../ui/TickBar'
 import { toast } from '../ui/Toast'
 import { perfGesture } from '../dev/PerfHUD'
-import { generateShapeRing, resampleClosed, PARAMETRIC, type ShapeKind, type ShapeParams } from './shapes'
+import { generateShapeRing, generateCurveShape, PARAMETRIC, type ShapeKind, type ShapeParams } from './shapes'
 import styles from './outline-editor.module.css'
 
 // Shape chips — Dan's board lineup (Simbolik/LOEWE symbol alphabet) + the two generators.
@@ -574,10 +575,16 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   // visible facets on curves at editor zoom (Dan, 2026-06-10). Flattened stays for mm export.
   const pathD = useMemo(
     () =>
-      resolved.resolvedRingsPx
-        .map((ring) => (ring.length ? `M ${ring.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ')} Z` : ''))
+      shown.rings
+        .map((ring, ri) => {
+          // VECTOR CORE: rings with cubic segments render as TRUE curves (C commands) — the
+          // document is the geometry; zoom can never reveal facets. Others use the resolved ring.
+          if (ring.nodes.some((nd) => nd.segmentToNext?.type === 'cubic')) return svgPathFromNodes(ring.nodes)
+          const r = resolved.resolvedRingsPx[ri]
+          return r?.length ? `M ${r.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ')} Z` : ''
+        })
         .join(' '),
-    [resolved],
+    [shown, resolved],
   )
 
   // Manual draw path: between placed anchors, SNAP to image edges via the livewire when an edge-cost
@@ -1032,9 +1039,22 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   // continuous ones (spikiness/rotate) preview while dragging and bake on release.
   const buildShapeDoc = useCallback((kind: ShapeKind, overrides: Partial<ShapeParams> = {}): OutlineDocument => {
     const img = docRef.current.image
-    // uniform arc-length resample → evenly spaced anchors → vector-true curves (no irregular
-    // merging); tiny minSpacing so the even spacing survives docFromRings' cleanup.
-    const ring = resampleClosed(generateShapeRing({ kind, ...shapeParamsRef.current, ...overrides }, img.widthPx, img.heightPx), Math.max(img.widthPx, img.heightPx) / 220)
+    const params = { kind, ...shapeParamsRef.current, ...overrides }
+    // VECTOR CORE (#29): curved kinds are PURE CURVES — sparse anchors + cubic handles, cusps
+    // pinned as corners; polygonal kinds are their exact vertices. No resampling, no point soup.
+    const curve = generateCurveShape(params, img.widthPx, img.heightPx)
+    if (curve) {
+      const nodes = curve.map((a, i) => ({
+        id: `c${i}`,
+        p: [a.p[0], a.p[1]] as Vec2Px,
+        role: (a.corner ? 'corner' : 'smooth') as 'corner' | 'smooth',
+        corner: { mode: 'inherit' as const },
+        ...(a.c1 && a.c2 ? { segmentToNext: { type: 'cubic' as const, c1: [a.c1[0], a.c1[1]] as Vec2Px, c2: [a.c2[0], a.c2[1]] as Vec2Px } } : {}),
+      }))
+      const base = { rings: [{ id: 'r1', role: 'outer' as const, closed: true as const, nodes }], style: { globalOutlineCornerRadiusPx: 0, smoothing: 0 } }
+      return applyOutlineCommands(base, [], { image: img, mode: 'semi_auto' })
+    }
+    const ring = generateShapeRing(params, img.widthPx, img.heightPx)
     return docFromRings(ring, img, 0, 1.5)
   }, [])
   const pickShape = useCallback((kind: ShapeKind) => {

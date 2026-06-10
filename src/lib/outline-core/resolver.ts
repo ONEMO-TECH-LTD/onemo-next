@@ -632,6 +632,68 @@ function assembleTracedRing(nodes: OutlineNode[]): Vec2Px[] {
   return out
 }
 
+/** Adaptive cubic flattening — recursive De Casteljau subdivision until the control points sit
+ *  within `tol` of the chord. The ONLY place curves become points (display picks its own tol;
+ *  manufacturing flattens at the cutter's tolerance) — the document stays pure curves. */
+export function flattenCubic(p0: Vec2Px, c1: Vec2Px, c2: Vec2Px, p1: Vec2Px, tol: number, out: Vec2Px[], depth = 0): void {
+  // flatness: max distance of the control points from the chord
+  const dx = p1[0] - p0[0], dy = p1[1] - p0[1]
+  const len = Math.hypot(dx, dy) || 1e-9
+  const d1 = Math.abs((c1[0] - p0[0]) * dy - (c1[1] - p0[1]) * dx) / len
+  const d2 = Math.abs((c2[0] - p0[0]) * dy - (c2[1] - p0[1]) * dx) / len
+  if (depth > 16 || Math.max(d1, d2) <= tol) { out.push([p1[0], p1[1]]); return }
+  // de Casteljau split at t = 0.5
+  const m = (a: Vec2Px, b: Vec2Px): Vec2Px => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]
+  const ab = m(p0, c1), bc = m(c1, c2), cd = m(c2, p1)
+  const abbc = m(ab, bc), bccd = m(bc, cd)
+  const mid = m(abbc, bccd)
+  flattenCubic(p0, ab, abbc, mid, tol, out, depth + 1)
+  flattenCubic(mid, bccd, cd, p1, tol, out, depth + 1)
+}
+
+/** Assemble a CURVE ring (vector core): cubic segments flatten adaptively, lines stay lines.
+ *  The document is the truth — anchors + handles; points are derived, never stored. */
+function assembleCurveRing(nodes: OutlineNode[], tol: number): Vec2Px[] {
+  const m = nodes.length
+  const out: Vec2Px[] = []
+  for (let k = 0; k < m; k++) {
+    const node = nodes[k]
+    const next = nodes[(k + 1) % m]
+    out.push([node.p[0], node.p[1]])
+    const seg = node.segmentToNext
+    if (seg?.type === 'cubic') {
+      const tail: Vec2Px[] = []
+      flattenCubic(node.p, seg.c1, seg.c2, next.p, tol, tail)
+      tail.pop() // next anchor opens the next segment
+      out.push(...tail)
+    }
+  }
+  return out
+}
+
+/** TRUE-vector SVG path for a ring: C commands for cubic segments, L for lines, the dense
+ *  polyline for traced segments. What the editor renders IS the curve — no facets at any zoom. */
+export function svgPathFromNodes(nodes: OutlineNode[]): string {
+  if (!nodes.length) return ''
+  const f = (v: number) => (Math.round(v * 100) / 100).toString()
+  let d = `M ${f(nodes[0].p[0])} ${f(nodes[0].p[1])}`
+  const m = nodes.length
+  for (let k = 0; k < m; k++) {
+    const node = nodes[k]
+    const next = nodes[(k + 1) % m]
+    const seg = node.segmentToNext
+    if (seg?.type === 'cubic') {
+      d += ` C ${f(seg.c1[0])} ${f(seg.c1[1])} ${f(seg.c2[0])} ${f(seg.c2[1])} ${f(next.p[0])} ${f(next.p[1])}`
+    } else if (seg?.type === 'livewire' && seg.rawPolyline.length > 1) {
+      for (const [x, y] of seg.rawPolyline.slice(1)) d += ` L ${f(x)} ${f(y)}`
+      d += ` L ${f(next.p[0])} ${f(next.p[1])}`
+    } else {
+      d += ` L ${f(next.p[0])} ${f(next.p[1])}`
+    }
+  }
+  return d + ' Z'
+}
+
 /** Gentle closed-ring Laplacian smoothing — the Smooth control for dense traced rings. */
 function laplacianClosed(pts: Vec2Px[], iterations: number): Vec2Px[] {
   let cur = pts
@@ -670,8 +732,14 @@ export function resolveOutlineDocument(doc: OutlineDocument, opts: ResolveOption
 
   for (const ring of doc.rings) {
     const traced = ring.nodes.some((nd) => nd.segmentToNext?.type === 'livewire')
+    const curved = !traced && ring.nodes.some((nd) => nd.segmentToNext?.type === 'cubic')
     let resolved: Vec2Px[]
-    if (traced) {
+    if (curved) {
+      // VECTOR CORE: the ring is true curves (anchors + cubic handles) — flatten adaptively for
+      // geometry; the editor renders the curves directly (svgPathFromNodes). Radii/smoothing
+      // don't apply: curve shapes are exact by construction.
+      resolved = assembleCurveRing(ring.nodes, 0.1)
+    } else if (traced) {
       // EXACT path: the ring follows its dense traced contour (segment rawPolylines), warped to the
       // current anchor positions. Smooth = Laplacian passes over the dense ring (organic softening
       // that stays on the trace). Corner radii don't apply to traced joints.
