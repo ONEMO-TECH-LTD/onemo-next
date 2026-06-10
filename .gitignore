@@ -91,3 +91,8 @@ next-env.d.ts
 # Codex/agent verification artifacts
 .artifacts/
 .claude/worktrees/
+
+# effect-creator v3 dev artifacts
+.dev-factory-renders/
+# self-hosted BEN2 weights (G5) — mirrored locally, never committed
+public/models/
