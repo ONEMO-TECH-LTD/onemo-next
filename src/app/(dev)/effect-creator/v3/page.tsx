@@ -93,7 +93,6 @@ function PrototypePageInner() {
   const histRef = useRef<{ past: AppSnap[]; future: AppSnap[] }>({ past: [], future: [] })
   const baselineRef = useRef<AppSnap | null>(null)
   const editorPreRef = useRef<AppSnap | null>(null)
-  const posPreRef = useRef<AppSnap | null>(null)
   const trimPreRef = useRef<AppSnap | null>(null)
   const [, bumpHist] = useState(0)
   const snapNow = useCallback((): AppSnap => {
@@ -291,12 +290,34 @@ function PrototypePageInner() {
     }
   )
 
+  // Folded-away Edit (Dan): TAP THE OBJECT to edit — a clean tap on the scene (not a drag, not a
+  // button) opens the outline editor. Orbit drags pass the movement threshold and never trigger it.
+  const tapRef = useRef<{ x: number; y: number; t: number } | null>(null)
+  const onScenePointerDown = useCallback((e: React.PointerEvent) => {
+    if ((e.target as Element).closest('button')) { tapRef.current = null; return }
+    tapRef.current = { x: e.clientX, y: e.clientY, t: performance.now() }
+  }, [])
+  const onScenePointerUp = useCallback((e: React.PointerEvent) => {
+    const t0 = tapRef.current
+    tapRef.current = null
+    if (!t0 || !artworkUrl || editingOutline || generating || showSave || showColors || isEditing) return
+    if ((e.target as Element).closest('button')) return
+    const moved = Math.hypot(e.clientX - t0.x, e.clientY - t0.y)
+    if (moved < 6 && performance.now() - t0.t < 400) {
+      editorPreRef.current = snapNow()
+      setEditorMode(null)
+      setEditingOutline(true)
+    }
+  }, [artworkUrl, editingOutline, generating, showSave, showColors, isEditing, snapNow])
+
   return (
     <div
       style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: colors.bgColor, touchAction: isEditing ? 'none' : 'auto' }}
       onDrop={handleDrop}
       onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
       onDragLeave={() => setIsDragging(false)}
+      onPointerDown={onScenePointerDown}
+      onPointerUp={onScenePointerUp}
       {...(isEditing ? bind() : {})}
     >
       {/* ── THE persistent golden scene — mounted once, never unmounted (§6.1). The object is the
@@ -365,7 +386,6 @@ function PrototypePageInner() {
         artworkUrl={artworkUrl}
         auto={autoOutline}
         showColors={showColors}
-        positioning={isEditing}
         onFile={handleFile}
         onGenerate={handleMagic}
         onToggleColors={() => setShowColors((prev) => {
@@ -378,19 +398,8 @@ function PrototypePageInner() {
           }
           return !prev
         })}
-        onEditOutline={() => { editorPreRef.current = snapNow(); setEditorMode(null); setEditingOutline(true) }}
         onShapes={() => { editorPreRef.current = snapNow(); setEditorMode('shape'); setEditingOutline(true) }}
         onDraw={() => { editorPreRef.current = snapNow(); setEditorMode('draw'); setEditingOutline(true) }}
-        onTogglePosition={() => setIsEditing((v) => {
-          // #23: a Position session = one step (pushed on exit if the photo moved/zoomed)
-          if (!v) posPreRef.current = snapNow()
-          else if (posPreRef.current) {
-            const d = posPreRef.current.designState
-            if (d.offsetX !== designState.offsetX || d.offsetY !== designState.offsetY || d.scale !== designState.scale) pushHistory(posPreRef.current)
-            posPreRef.current = null
-          }
-          return !v
-        })}
         onSave={() => setShowSave((v) => !v)}
       />
 
