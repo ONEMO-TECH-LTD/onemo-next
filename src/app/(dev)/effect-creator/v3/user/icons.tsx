@@ -4,7 +4,7 @@
 // glyphs — chosen over Lucide so the UI doesn't read as generic shadcn/SaaS. `weight="regular"`
 // (default) reads cleanly at 24px on mobile; icons inherit `currentColor` from the button.
 
-import { ArrowArcLeft, ArrowArcRight, ArrowsOutCardinal, BezierCurve, DiceFive, WaveSine, PenNib, ArrowClockwise, Check, X, ArrowsOut, Plus, Minus, Trash, PlusCircle, Sparkle, ImageSquare, PencilSimple, BoundingBox, Palette, FloppyDisk, Shapes, Polygon, Circle, Square, Pill, Star, Heart, ChatTeardrop, Seal, Shield, Eye, EyeSlash, MagicWand } from '@phosphor-icons/react'
+import { ArrowArcLeft, ArrowArcRight, ArrowsOutCardinal, BezierCurve, DiceFive, WaveSine, PenNib, ArrowClockwise, Check, X, ArrowsOut, Plus, Minus, Trash, PlusCircle, Sparkle, ImageSquare, PencilSimple, BoundingBox, Palette, FloppyDisk, Shapes, Polygon, Circle, Square, Pill, Star, Heart, ChatTeardrop, Seal, Shield, Eye, EyeSlash, MagicWand, Faders } from '@phosphor-icons/react'
 
 type P = { className?: string }
 const SZ = 24
@@ -45,6 +45,7 @@ export const MagicIcon = (p: P) => <MagicWand size={SZ} className={p.className} 
 // ── Shape tool + chip icons ─────────────────────────────────────────────────
 export const RoundIcon = (p: P) => <BezierCurve size={SZ} className={p.className} /> // corner-radius control (returned by use, 2026-06-10)
 export const ShapeIcon = (p: P) => <Shapes size={SZ} className={p.className} />
+export const TuneIcon = (p: P) => <Faders size={SZ} className={p.className} /> // BEN runtime tuning dash (Dan, 2026-06-10)
 export const PolygonChip = (p: P) => <Polygon size={SZ} className={p.className} />
 export const StarChip = (p: P) => <Star size={SZ} className={p.className} />
 export const CircleChip = (p: P) => <Circle size={SZ} className={p.className} />

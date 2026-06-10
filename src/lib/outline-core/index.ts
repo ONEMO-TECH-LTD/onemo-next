@@ -26,11 +26,14 @@ export {
   repairSimplePolygon,
   nodesFromTracedRing,
   fairTracedRing,
+  fairingFromDetail,
+  BEN_DEFAULT_DETAIL,
   catmullRomClosed,
   signedArea,
   dedup,
   rdpClosed,
   type ResolveOptions,
+  type FairTracedRingOpts,
 } from './resolver'
 
 // SDF blend (A2b) — 0→100% square↔silhouette morph, same client/server parity.

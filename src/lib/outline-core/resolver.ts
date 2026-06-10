@@ -331,12 +331,43 @@ function turnDeg(prev: Vec2Px, p: Vec2Px, next: Vec2Px): number {
  *     deliberately with the editor, never the tracer.
  * Straight runs are unaffected (smoothing of collinear points is identity), curves stay on-shape.
  */
-export function fairTracedRing(
-  densePts: Vec2Px[],
-  opts: { spacingPx?: number; maxTurnDeg?: number } = {},
-): Vec2Px[] {
+export interface FairTracedRingOpts {
+  /** uniform resample spacing (px). */
+  spacingPx?: number
+  /** hard max-turn guarantee (deg) — the tracer can never emit a sharper angle. */
+  maxTurnDeg?: number
+  /** line-snap band (px) — wobble below this around a straight is treated as noise. */
+  detailPx?: number
+  /** Gaussian low-pass σ (px) — the detail-KILL dial: features smaller than ~σ are erased. */
+  smoothPx?: number
+  /** minimum straight length (px) eligible for line snapping. */
+  minLinePx?: number
+  _debugSpans?: (s: unknown) => void
+}
+
+/** Default DETAIL for BEN cut-outs (Dan, 2026-06-10): patch-like products want the SIMPLEST
+ *  outline — skip the silhouette's small detail; he placed the default in the 10–20% band. */
+export const BEN_DEFAULT_DETAIL = 15
+
+/**
+ * Map the single user-facing DETAIL dial (0 = simplest patch-like outline … 100 = max fidelity)
+ * to fairing params. One mapping for the Magic default AND the editor's runtime BEN tuning dash,
+ * so what Dan tunes is exactly what Magic ships.
+ */
+export function fairingFromDetail(detail: number): FairTracedRingOpts {
+  const d = Math.max(0, Math.min(100, detail)) / 100
+  return {
+    smoothPx: Math.round((2 + (1 - d) * 18) * 10) / 10, // detail 100 → σ2 … detail 0 → σ20
+    detailPx: Math.round((2 + (1 - d) * 8) * 10) / 10, // line-snap band 2 … 10
+    maxTurnDeg: 35,
+    minLinePx: 50,
+  }
+}
+
+export function fairTracedRing(densePts: Vec2Px[], opts: FairTracedRingOpts = {}): Vec2Px[] {
   const spacing = opts.spacingPx ?? 1.5
   const maxTurn = opts.maxTurnDeg ?? 35
+  const detailPx = opts.detailPx ?? 4 // the "sensitivity to detail" dial — wobble below this is noise
   let ring = resampleClosedUniform(dedup(densePts), spacing)
   const smooth121 = (pts: Vec2Px[]): Vec2Px[] => {
     const n = pts.length
@@ -347,7 +378,171 @@ export function fairTracedRing(
     }
     return out
   }
-  for (let i = 0; i < 3; i++) ring = smooth121(ring)
+  // ONE circular Gaussian low-pass (σ ≈ 6 mask px) — the principled "less sensitivity to detail":
+  // raster stairs (λ≈1px) and soft-mask wobble (λ≈15–30px) are attenuated to nothing, while the
+  // SHAPE passes through: straight lines are mathematically INVARIANT under symmetric convolution
+  // (they come out perfectly straight — no snap heuristics), and an arc of radius R shrinks by only
+  // σ²/2R (≈0.1px at R=200). Sharp features round at ≈σ — which is the intent: the tracer never
+  // emits sharp detail; deliberate corners are the user's (Dan, 2026-06-10).
+  const sigma = opts.smoothPx ?? 6
+  {
+    const half = Math.ceil(sigma * 3 / spacing)
+    const kernel: number[] = []
+    let ksum = 0
+    for (let k = -half; k <= half; k++) {
+      const w = Math.exp(-(k * spacing) * (k * spacing) / (2 * sigma * sigma))
+      kernel.push(w); ksum += w
+    }
+    const n = ring.length
+    const out: Vec2Px[] = new Array(n)
+    for (let i = 0; i < n; i++) {
+      let x = 0, y = 0
+      for (let k = -half; k <= half; k++) {
+        const p = ring[((i + k) % n + n) % n]
+        const w = kernel[k + half]
+        x += p[0] * w; y += p[1] * w
+      }
+      out[i] = [x / ksum, y / ksum]
+    }
+    ring = out
+  }
+  // SNAP true straights (Dan: "less sensitivity to details" — straight lines must come out
+  // mathematically straight while curves are NEVER flattened into facets). Mechanism: BAND-GROW —
+  // from a seed, grow a maximal run while every sample stays within ±`detailPx` of the run's
+  // incrementally-refitted least-squares (PCA) line. A wavy straight fits one band end-to-end no
+  // matter the wavelength; an arc bends out of any band within ~√(8R·tol) px of chord. The grown
+  // run must then pass the BOW test vs its own chord: an arc's signed residuals are systematic /
+  // one-sided (mean ≈ ⅔·sagitta) while mask wobble OSCILLATES (mean ≈ 0) — so curves are rejected
+  // and stay Gaussian-faired. (Two prior designs failed measurably here: net-turn windows can't
+  // tell a λ≈100px meander (tangent swings ±8°) from an arc inside any short window, and RDP spans
+  // fragment a wavy straight AT the wobble extremes so each fragment snaps onto its own tilted
+  // line and the long wave survives. The band ignores wobble structure entirely.)
+  // Accepted runs are projected onto their line with blended ends; the max-turn pass below cleans
+  // the line↔curve seams.
+  {
+    const n = ring.length
+    const tol = detailPx
+    const minRunSamples = Math.max(24, Math.round((opts.minLinePx ?? 50) / spacing)) // a true straight
+    const SEED = Math.max(8, Math.round(24 / spacing))
+    if (n >= minRunSamples * 3) {
+      const at = (k: number) => ring[((k % n) + n) % n]
+      const snapped: boolean[] = new Array(n).fill(false)
+      type Fit = { mx: number; my: number; ux: number; uy: number }
+      const sum = { c: 0, sx: 0, sy: 0, sxx: 0, sxy: 0, syy: 0 }
+      const resetSum = () => { sum.c = 0; sum.sx = 0; sum.sy = 0; sum.sxx = 0; sum.sxy = 0; sum.syy = 0 }
+      const addP = (p: Vec2Px) => {
+        sum.c++; sum.sx += p[0]; sum.sy += p[1]
+        sum.sxx += p[0] * p[0]; sum.sxy += p[0] * p[1]; sum.syy += p[1] * p[1]
+      }
+      const fitOf = (): Fit => {
+        const mx = sum.sx / sum.c, my = sum.sy / sum.c
+        const cxx = sum.sxx / sum.c - mx * mx, cxy = sum.sxy / sum.c - mx * my, cyy = sum.syy / sum.c - my * my
+        const theta = 0.5 * Math.atan2(2 * cxy, cxx - cyy)
+        return { mx, my, ux: Math.cos(theta), uy: Math.sin(theta) }
+      }
+      const resOf = (p: Vec2Px, f: Fit) => (p[0] - f.mx) * -f.uy + (p[1] - f.my) * f.ux
+      let i = 0
+      while (i < n) {
+        if (snapped[i]) { i++; continue }
+        // seed: SEED samples that already fit a tight band
+        resetSum()
+        for (let s = 0; s < SEED; s++) addP(at(i + s))
+        let f = fitOf()
+        let seedOk = true
+        for (let s = 0; s < SEED; s++) if (Math.abs(resOf(at(i + s), f)) > tol * 0.75) { seedOk = false; break }
+        if (!seedOk) { i += SEED >> 1; continue }
+        // grow forward, then backward. The band is WIDER than tol during growth (the seed's line
+        // inherits the local wobble slope — up to ~8° — and the refit needs ~a wavelength to
+        // converge; a tight band stops mid-straight and fragments the run). Refit every 4 samples.
+        const tolGrow = tol * 1.5
+        let a = i, b = i + SEED - 1
+        while (b - a + 1 < n - 8 && Math.abs(resOf(at(b + 1), f)) <= tolGrow) {
+          addP(at(b + 1)); b++
+          if (sum.c % 4 === 0) f = fitOf()
+        }
+        f = fitOf()
+        while (b - a + 1 < n - 8 && Math.abs(resOf(at(a - 1), f)) <= tolGrow) {
+          addP(at(a - 1)); a--
+          if (sum.c % 4 === 0) f = fitOf()
+        }
+        f = fitOf()
+        // strict post-growth validation: on a true (wavy) straight the converged fit holds every
+        // sample within ±tol; an arc grown inside the wide band leaves a large fraction outside.
+        {
+          let viol = 0
+          const total = b - a + 1
+          for (let k = a; k <= b; k++) if (Math.abs(resOf(at(k), f)) > tol) viol++
+          if (viol > total * 0.1) { i += SEED >> 1; continue }
+        }
+        // trim run ends that rode off into the neighbouring curve (manufacturing bar: the line
+        // must hand over to the curve within ~1.5px, not drag a flattened tail into it) — then
+        // REFIT on the trimmed run so the creep can't bias the line
+        let guard = 0
+        while (b - a + 1 > minRunSamples && Math.abs(resOf(at(b), f)) > 1.5 && guard++ < 48) b--
+        guard = 0
+        while (b - a + 1 > minRunSamples && Math.abs(resOf(at(a), f)) > 1.5 && guard++ < 48) a++
+        let len = b - a + 1
+        if (len < minRunSamples) { i += SEED >> 1; continue }
+        resetSum()
+        for (let s = 0; s < len; s++) addP(at(a + s))
+        f = fitOf()
+        guard = 0
+        while (len > minRunSamples && Math.abs(resOf(at(b), f)) > 1.2 && guard++ < 24) { b--; len-- }
+        guard = 0
+        while (len > minRunSamples && Math.abs(resOf(at(a), f)) > 1.2 && guard++ < 24) { a++; len-- }
+        if (len < minRunSamples) { i += SEED >> 1; continue }
+        // CURVATURE test on the run INTERIOR (margins excluded: residual creep into the
+        // neighbouring curve lives at the ends and would fake a parabola; a true arc curves
+        // everywhere). Fit interior residuals to a + b·t + c·t² in the PCA frame: an arc carries
+        // a systematic quadratic (c ≈ 1/2R ⇒ sagitta ~2–4px at growth-stop) while wobble's
+        // quadratic component averages to ≈0 at any wavelength/phase. (A chord-endpoint bow test
+        // fails when both endpoints sit on same-side wobble peaks; a whole-run quad test fails on
+        // symmetric end creep — interior-only is immune to both.)
+        const margin = Math.max(12, Math.round(18 / spacing))
+        const ia = a + margin, ib = b - margin
+        if (ib - ia + 1 < minRunSamples) { i += SEED >> 1; continue }
+        resetSum()
+        for (let k = ia; k <= ib; k++) addP(at(k))
+        f = fitOf() // interior-fitted line — creep-free
+        let S1 = 0, S2 = 0, S3 = 0, S4 = 0, T0 = 0, T1 = 0, T2 = 0
+        let tMin = Infinity, tMax = -Infinity
+        const S0 = ib - ia + 1
+        for (let k = ia; k <= ib; k++) {
+          const p = at(k)
+          const t = (p[0] - f.mx) * f.ux + (p[1] - f.my) * f.uy
+          const r = resOf(p, f)
+          if (t < tMin) tMin = t
+          if (t > tMax) tMax = t
+          S1 += t; S2 += t * t; S3 += t * t * t; S4 += t * t * t * t
+          T0 += r; T1 += r * t; T2 += r * t * t
+        }
+        // Cramer's rule on the 3×3 normal equations for [a, b, c]
+        const det =
+          S0 * (S2 * S4 - S3 * S3) - S1 * (S1 * S4 - S3 * S2) + S2 * (S1 * S3 - S2 * S2)
+        const detC =
+          S0 * (S2 * T2 - S3 * T1) - S1 * (S1 * T2 - S3 * T0) + S2 * (S1 * T1 - S2 * T0)
+        const c = det !== 0 ? detC / det : 0
+        const h = (tMax - tMin) / 2
+        const quadSag = Math.abs(c) * h * h // parabola sagitta over the interior — real curvature
+        opts._debugSpans?.({ a, b, len, quadSag: Math.round(quadSag * 100) / 100 })
+        // measured separation at tol 4: wobbly straights ≤ ~0.9 (any phase), arcs at growth-stop
+        // ≥ ~2.9. The threshold SCALES with the snap band — at a wide band (low Detail) the user
+        // has declared bigger wobble to be noise, so its larger quadratic content must still snap
+        // (a fixed cut left an 8px-amplitude shadow meander standing at Snap 9.4 — live finding,
+        // 2026-06-10); arcs at growth-stop measure ≳ 0.7·tol, so 0.35·tol keeps 2× separation.
+        if (quadSag > Math.max(1.2, tol * 0.35)) { i += SEED >> 1; continue } // curving run → leave Gaussian-faired
+        for (let s = 0; s < len; s++) {
+          const idx = ((a + s) % n + n) % n
+          const p = ring[idx]
+          const t = (p[0] - f.mx) * f.ux + (p[1] - f.my) * f.uy
+          const w = Math.min(1, Math.min(s, len - 1 - s) / 8) // blend the seam into the curve
+          ring[idx] = [p[0] + (f.mx + t * f.ux - p[0]) * w, p[1] + (f.my + t * f.uy - p[1]) * w]
+          snapped[idx] = true
+        }
+        i = b + 1
+      }
+    }
+  }
   // hard max-turn: Chaikin corner-cutting over the offender NEIGHBOURHOOD (±2 samples — cutting a
   // lone vertex then resampling just re-sharpens it), with a diffusion pass between iterations.
   for (let pass = 0; pass < 16; pass++) {
@@ -368,7 +563,9 @@ export function fairTracedRing(
     }
     ring = smooth121(resampleClosedUniform(out, spacing))
   }
-  return ring
+  // soften the line↔curve seams for the cutter: [1,2,1] is exactly invariant on straights (snapped
+  // lines cannot re-wobble) and shrinks arcs negligibly — only seam vertices round.
+  return smooth121(smooth121(ring))
 }
 
 /**

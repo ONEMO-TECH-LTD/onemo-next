@@ -37,6 +37,10 @@ export interface EffectSpecDraft {
     lane: 'kai'
     version: string
   }
+  /** RAW dense BEN trace (mask px, y-up, PRE-fairing) — the editor's Tune dash re-fairs this with
+   *  live params so optimal BEN settings are found by testing, not guessed (Dan, 2026-06-10).
+   *  Present on shaped cut-outs only. */
+  rawTracePx?: Pt[]
   diagnostics: {
     rawContourNodes: number
     simplifiedNodes: number

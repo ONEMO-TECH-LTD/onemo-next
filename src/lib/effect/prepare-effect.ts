@@ -45,6 +45,8 @@ import {
   rdpClosed,
   nodesFromTracedRing,
   fairTracedRing,
+  fairingFromDetail,
+  BEN_DEFAULT_DETAIL,
   contentHash,
   type OutlineDocument,
   type OutlineNode,
@@ -129,7 +131,7 @@ function docFromRawRing(
   // resolved/manufactured outline IS the mask's true shape (no RDP/spline approximation — the
   // clipped-corner/wobble class Dan caught 2026-06-10). standard: plain corner ring (4 corners).
   const nodes: OutlineNode[] = type === 'shaped'
-    ? nodesFromTracedRing(fairTracedRing(ringPx), eps)
+    ? nodesFromTracedRing(fairTracedRing(ringPx, fairingFromDetail(BEN_DEFAULT_DETAIL)), eps)
     : repairSimplePolygon(rdpClosed(ringPx, eps), Math.max(3, Math.max(W, H) * 0.008)).map((p, i) => ({
         id: `n${i}`,
         p: [p[0], p[1]] as Vec2Px,
@@ -246,7 +248,8 @@ export async function prepareEffect(
   // ── ONE ENGINE: raw ring → OutlineDocument → resolveOutlineDocument (corners via applyCornerRadii,
   //    NOT contour.filletCorners; policy.downstream_corner_rounding === 'disabled') → flattened mm.
   const outlineDocument = docFromRawRing(ringPx, W, H, sourceHash, generator, type, radiusHiPx, selfCorrect)
-  const resolved = resolveOutlineDocument(outlineDocument, { flattenTolerancePx: 0.5 })
+  // 0.15px flatten: at 0.5px the chord segments were visible as facets on the 3D edge at zoom
+  const resolved = resolveOutlineDocument(outlineDocument, { flattenTolerancePx: 0.15 })
   const outerFlatPx = resolved.flattenedRingsPx[0] ?? ringPx
   const outerMM: Pt[] = outerFlatPx.map(([x, y]) => [x * mmPerPx, y * mmPerPx] as Pt)
   const geometryMM: Contour = { outer: { pts: outerMM }, holes: [] } // solid cut-out (Dan, §9)
@@ -265,6 +268,8 @@ export async function prepareEffect(
     geometryMM,
     dimensions: { thicknessBodyMM: cfg.thicknessMM, edgeRadiusMM: cfg.edgeRadiusMM, widthMM, heightMM },
     generator: { adapter: adapterId, lane: 'kai', version: '0.3.0' },
+    // shaped: the raw PRE-fairing trace rides along so the editor's Tune dash can re-fair it live
+    rawTracePx: adapterId !== 'standard' ? ringPx.map(([x, y]) => [x, y] as Pt) : undefined,
     diagnostics: {
       rawContourNodes: ringPx.length,
       simplifiedNodes: outerFlatPx.length,

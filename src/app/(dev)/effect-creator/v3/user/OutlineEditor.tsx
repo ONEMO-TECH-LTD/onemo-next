@@ -19,6 +19,10 @@ import {
   rdpClosed,
   repairSimplePolygon,
   nodesFromTracedRing,
+  fairTracedRing,
+  fairingFromDetail,
+  BEN_DEFAULT_DETAIL,
+  type FairTracedRingOpts,
   type OutlineDocument,
   type OutlineCommand,
   type Vec2Px,
@@ -27,7 +31,7 @@ import {
 import type { EffectSpecDraft, Contour } from '@/lib/effect/types'
 import { buildEdgeCost } from './edgeCost'
 import { useOutlineStore } from './outlineStore'
-import { UndoIcon, RedoIcon, RoundIcon, SmoothIcon, ScaleIcon, PenIcon, ResetIcon, CheckIcon, CloseIcon, PlusIcon, MinusIcon, AddPointIcon, DeleteIcon, BlendIcon, ShapeIcon, OutlineIcon, DiceIcon, PreviewIcon, PreviewOffIcon } from './icons'
+import { UndoIcon, RedoIcon, RoundIcon, SmoothIcon, ScaleIcon, PenIcon, ResetIcon, CheckIcon, CloseIcon, PlusIcon, MinusIcon, AddPointIcon, DeleteIcon, BlendIcon, ShapeIcon, TuneIcon, OutlineIcon, DiceIcon, PreviewIcon, PreviewOffIcon } from './icons'
 import TickBar from '../ui/TickBar'
 import { toast } from '../ui/Toast'
 import { perfGesture } from '../dev/PerfHUD'
@@ -270,7 +274,7 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
   const [drawPts, setDrawPts] = useState<Vec2Px[] | null>(null) // non-null = Manual draw in progress (A3a)
   const [edgeCost, setEdgeCost] = useState<CostGrid | null>(null) // image edge-cost grid for the livewire (A3b)
   const [selectedNode, setSelectedNode] = useState<{ ringId: string; nodeId: string } | null>(null) // anchor add/delete target
-  const [activeAdjust, setActiveAdjust] = useState<'round' | 'smooth' | 'scale' | 'blend' | 'shape' | null>(null) // which adjustment sheet is revealed (mobile: one at a time)
+  const [activeAdjust, setActiveAdjust] = useState<'round' | 'smooth' | 'scale' | 'blend' | 'shape' | 'tune' | null>(null) // which adjustment sheet is revealed (mobile: one at a time)
   const [blendOn, setBlendOn] = useState(true) // "magic blend" on/off (the soft real-background blur on the 3D front)
   const [blendBlur, setBlendBlur] = useState(50) // magic-blend intensity 0–100 (50 ≈ the build default)
   // Shape tool: pick a preset/parametric shape as the starting outline. shapeKind = the shape currently
@@ -282,6 +286,12 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
   const shapeParamsRef = useRef(shapeParams)
   useEffect(() => { shapeParamsRef.current = shapeParams }, [shapeParams])
   const [shapePreview, setShapePreview] = useState<OutlineDocument | null>(null) // live morph while dragging a shape control
+  // BEN runtime tuning (Dan, 2026-06-10): re-fair the RAW trace with live params so the optimal
+  // settings are found by testing in the run, not guessed. detail = the master 0–100 dial;
+  // fairParams = the advanced per-knob values (master commit re-derives them via fairingFromDetail).
+  const [detail, setDetail] = useState(BEN_DEFAULT_DETAIL)
+  const [fairParams, setFairParams] = useState<FairTracedRingOpts>(() => fairingFromDetail(BEN_DEFAULT_DETAIL))
+  const [tunePreview, setTunePreview] = useState<OutlineDocument | null>(null) // live re-fair while dragging a tune bar
   // Rotation = a whole-outline transform: two-finger twist (mobile) / drag the rotate handle (desktop,
   // shown when all anchors are selected). rotatePreview = the live rotated doc; baked (undoable) on release.
   // Live direct-manipulation transforms — cheap SVG transform during the gesture, baked to the doc on
@@ -396,6 +406,9 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
     setActiveAdjust(null)
     setShapeKind(null)
     setShapePreview(null)
+    setTunePreview(null)
+    setDetail(BEN_DEFAULT_DETAIL)
+    setFairParams(fairingFromDetail(BEN_DEFAULT_DETAIL))
     setRotateLive(null); rotateLiveRef.current = null; rotateRef.current = null
     setMoveLive(null); moveLiveRef.current = null; moveRef.current = null
     pinchRef.current = null; canvasPanRef.current = null
@@ -478,9 +491,9 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
     return d
   }, [doc, drag, radius, selectedNode, smoothing, scale])
 
-  // Live morphs supersede the normal display: shape-tool preview > doc.
-  const shown = shapePreview ?? displayDoc
-  const resolved = useMemo(() => resolveOutlineDocument(shown, { flattenTolerancePx: 0.5 }), [shown])
+  // Live morphs supersede the normal display: tune re-fair > shape-tool preview > doc.
+  const shown = tunePreview ?? shapePreview ?? displayDoc
+  const resolved = useMemo(() => resolveOutlineDocument(shown, { flattenTolerancePx: 0.15 }), [shown])
   const hasIssues = resolved.issues.length > 0 // inline manufacturability guardrail (self-intersection etc.)
 
   // editor → 3D: push the COMMITTED resolved outline (mm) so the 3D suede object follows real edits
@@ -488,7 +501,7 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
   // committed `doc` (not the transient drag), so the 3D updates on commit — 2D leads, 3D lags.
   useEffect(() => {
     if (!open || !spec || !dirtyRef.current) return
-    const res = resolveOutlineDocument(doc, { flattenTolerancePx: 0.5 })
+    const res = resolveOutlineDocument(doc, { flattenTolerancePx: 0.15 })
     if (res.issues.length) return // never push an un-manufacturable (self-intersecting) shape to the 3D
     const k = spec.mmPerPx || 1
     const H = doc.image.heightPx
@@ -507,9 +520,11 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
     setEditedContourMM({ outer: { pts: outer }, holes: holes.map((h) => ({ pts: h })) })
   }, [doc, open, spec, setEditedContourMM])
 
+  // Draw the RESOLVED (unflattened) rings: the manufacturing flatten's chord tolerance read as
+  // visible facets on curves at editor zoom (Dan, 2026-06-10). Flattened stays for mm export.
   const pathD = useMemo(
     () =>
-      resolved.flattenedRingsPx
+      resolved.resolvedRingsPx
         .map((ring) => (ring.length ? `M ${ring.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ')} Z` : ''))
         .join(' '),
     [resolved],
@@ -857,6 +872,41 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
   // store's bgBlur (0 = off/sharp · 0..1 = intensity ·  ShapedModel re-composes the front, no re-segment).
   const writeBlend = useCallback((on: boolean, pct: number) => setBgBlur(on ? pct / 100 : 0), [setBgBlur])
 
+  // Tune (BEN dash): re-run the fairing pipeline on the RAW pre-fairing trace with live params.
+  // Per-tick = preview only; commit on release rebuilds the document (undoable) — §6.3. Re-tracing
+  // replaces any manual anchor edits on the ring (it's a re-derivation of the base outline).
+  const canTune = !!spec?.rawTracePx && spec.rawTracePx.length >= 24
+  const buildTunedDoc = useCallback((params: FairTracedRingOpts): OutlineDocument | null => {
+    const raw = spec?.rawTracePx
+    if (!raw) return null
+    const H = spec.maskHeightPx
+    const rawEditorPx = raw.map(([x, y]) => [x, H - y] as Vec2Px) // y-up mask → y-down editor px
+    const eps = Math.max(2, Math.max(spec.maskWidthPx, H) * 0.022)
+    const nodes = nodesFromTracedRing(fairTracedRing(rawEditorPx, params), eps, 'o')
+    const base = {
+      rings: [{ id: 'r1', role: 'outer' as const, closed: true as const, nodes }],
+      style: { globalOutlineCornerRadiusPx: 0, smoothing: 0 },
+    }
+    return applyOutlineCommands(base, [], { image: docRef.current.image, mode: 'auto' })
+  }, [spec])
+  const previewTune = useCallback((params: FairTracedRingOpts) => {
+    const t0 = performance.now()
+    const d = buildTunedDoc(params)
+    if (d) setTunePreview(d)
+    perfGesture('tune-tick', performance.now() - t0)
+  }, [buildTunedDoc])
+  const commitTune = useCallback((params: FairTracedRingOpts) => {
+    const t0 = performance.now()
+    const d = buildTunedDoc(params)
+    setTunePreview(null)
+    if (!d) return
+    setFairParams(params)
+    applyDoc(d)
+    setSelectedNode(null)
+    setAllSelected(false)
+    perfGesture('tune-commit', performance.now() - t0)
+  }, [buildTunedDoc, applyDoc])
+
   // Shape tool: build a fresh OutlineDocument from a preset/parametric shape's point ring (centered, fit
   // to the image), seeded into our node model so Smooth/Scale/drag all apply (radius 0 — shapes are
   // exact; softening is the Smooth control). Discrete params (sides/points) regenerate immediately; the
@@ -1107,7 +1157,7 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
 
       {/* reveal-on-tap adjustment sheet — every continuous control is the shared TickBar (G12):
           per-tick = transient visual preview only; commit fires once on release (§6.3). */}
-      {!drawing && activeAdjust && activeAdjust !== 'shape' && (
+      {!drawing && activeAdjust && activeAdjust !== 'shape' && activeAdjust !== 'tune' && (
         <div className={styles.sheet}>
           {activeAdjust === 'round' && (
             <TickBar label={selectedNode ? 'Corner' : 'Round'} min={0} max={maxRadius} value={Math.min(radius, maxRadius)} onChange={setRadius} onCommit={commitRadius} format={(v) => `${Math.round((v / Math.max(maxRadius, 1)) * 100)}%`} />
@@ -1145,6 +1195,59 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
               />
             </>
           )}
+        </div>
+      )}
+
+      {/* Tune (BEN dash, Dan 2026-06-10): live fairing params over the raw trace — find the optimal
+          settings by testing in the run. Detail = master (10–20% = patch-simple default); advanced
+          bars expose each engine knob; master commit re-derives the advanced values. */}
+      {!drawing && activeAdjust === 'tune' && canTune && (
+        <div className={styles.shapeSheet}>
+          <div className={styles.shapeRow}>
+            <span className={styles.shapeName}>Detail</span>
+            <TickBar
+              label="Detail" min={0} max={100} value={detail}
+              onChange={(v) => { setDetail(v); previewTune(fairingFromDetail(v)) }}
+              onCommit={(v) => { setDetail(v); commitTune(fairingFromDetail(v)) }}
+              format={(v) => `${Math.round(v)}%`}
+            />
+          </div>
+          <div className={styles.shapeRow}>
+            <span className={styles.shapeName}>Smooth</span>
+            <TickBar
+              label="Smooth strength" min={1} max={30} step={0.5} value={fairParams.smoothPx ?? 6}
+              onChange={(v) => previewTune({ ...fairParams, smoothPx: v })}
+              onCommit={(v) => commitTune({ ...fairParams, smoothPx: v })}
+              format={(v) => `${v.toFixed(1)}px`}
+            />
+          </div>
+          <div className={styles.shapeRow}>
+            <span className={styles.shapeName}>Snap</span>
+            <TickBar
+              label="Line snap band" min={0} max={20} step={0.5} value={fairParams.detailPx ?? 4}
+              onChange={(v) => previewTune({ ...fairParams, detailPx: v })}
+              onCommit={(v) => commitTune({ ...fairParams, detailPx: v })}
+              format={(v) => `${v.toFixed(1)}px`}
+            />
+          </div>
+          <div className={styles.shapeRow}>
+            <span className={styles.shapeName}>Min line</span>
+            <TickBar
+              label="Min line length" min={20} max={200} step={5} value={fairParams.minLinePx ?? 50}
+              onChange={(v) => previewTune({ ...fairParams, minLinePx: v })}
+              onCommit={(v) => commitTune({ ...fairParams, minLinePx: v })}
+              format={(v) => `${Math.round(v)}px`}
+            />
+          </div>
+          <div className={styles.shapeRow}>
+            <span className={styles.shapeName}>Angle</span>
+            <TickBar
+              label="Sharpest angle" min={10} max={90} step={1} value={fairParams.maxTurnDeg ?? 35}
+              onChange={(v) => previewTune({ ...fairParams, maxTurnDeg: v })}
+              onCommit={(v) => commitTune({ ...fairParams, maxTurnDeg: v })}
+              format={(v) => `${Math.round(v)}°`}
+            />
+          </div>
         </div>
       )}
 
@@ -1269,6 +1372,7 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
         ) : (
           <>
             <ToolBtn icon={<ShapeIcon />} label="Shape" onClick={toggleShape} active={activeAdjust === 'shape'} />
+            {canTune && <ToolBtn icon={<TuneIcon />} label="Tune" onClick={() => setActiveAdjust((a) => (a === 'tune' ? null : 'tune'))} active={activeAdjust === 'tune'} />}
             <ToolBtn icon={<RoundIcon />} label={selectedNode ? 'Corner' : 'Round'} onClick={() => setActiveAdjust((a) => (a === 'round' ? null : 'round'))} active={activeAdjust === 'round'} />
             <ToolBtn icon={<SmoothIcon />} label="Smooth" onClick={() => setActiveAdjust((a) => (a === 'smooth' ? null : 'smooth'))} active={activeAdjust === 'smooth'} />
             <ToolBtn icon={<ScaleIcon />} label="Scale" onClick={() => setActiveAdjust((a) => (a === 'scale' ? null : 'scale'))} active={activeAdjust === 'scale'} />
