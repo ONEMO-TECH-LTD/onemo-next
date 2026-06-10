@@ -124,13 +124,20 @@ function resolveNodeRadius(node: OutlineNode, globalRadiusPx: number): number {
 
 /**
  * Apply per-node corner radii to a closed node ring → resolved polyline. Convex corners with a
- * positive resolved radius become true circular arcs (clamped so neighbouring fillets fit);
+ * positive resolved radius become TRUE circular arcs (clamped so neighbouring fillets fit);
  * concave, near-straight, and zero-radius corners pass through as their vertex.
+ *
+ * `smoothing` (0..1) is the Smooth control: it lifts every convex corner toward its MAXIMUM safe
+ * radius — at 1.0 each corner is fully rounded (a square becomes a circle). True arcs, not a spline
+ * resample: the old Catmull-Rom smoothing faceted shapes instead of rounding them (Dan, 2026-06-10).
+ *
+ * Arc resolution is ADAPTIVE (≈2px per segment, 8..72 steps): a fixed 10-step arc read visibly
+ * choppy on large corners (e.g. the default square's corner radius at texture scale).
  */
 export function applyCornerRadii(
   nodes: OutlineNode[],
   globalRadiusPx: number,
-  steps = 10,
+  smoothing = 0,
 ): Vec2Px[] {
   const n = nodes.length
   if (n < 3) return nodes.map((nd) => [nd.p[0], nd.p[1]] as Vec2Px)
@@ -140,7 +147,6 @@ export function applyCornerRadii(
 
   for (let i = 0; i < n; i++) {
     const a = pts[(i - 1 + n) % n], v = pts[i], b = pts[(i + 1) % n]
-    const R = resolveNodeRadius(nodes[i], globalRadiusPx)
     const d1x = a[0] - v[0], d1y = a[1] - v[1]
     const d2x = b[0] - v[0], d2y = b[1] - v[1]
     const l1 = Math.hypot(d1x, d1y) || 1, l2 = Math.hypot(d2x, d2y) || 1
@@ -151,12 +157,16 @@ export function applyCornerRadii(
     // convex iff the turn matches the ring winding (cross sign)
     const cross = d1x * d2y - d1y * d2x // (v→a) × (v→b)
     const convex = cross < 0 === ccw // for CCW, convex corners turn right here
+    const half = Math.acos(cosA) / 2
+    // Clamp so a fillet consumes at most HALF its shorter adjacent edge — two fillets sharing an
+    // edge then MEET exactly (0.5 + 0.5 = 1) and can never overlap. The ε keeps a hair of slack for
+    // float noise. At full Smooth this is what closes a square into a true circle (the old 0.49
+    // margin left visible flat remnants at the corners — 4.8% off-circle, measured).
+    const maxR = (0.5 - 1e-4) * Math.min(l1, l2) * Math.tan(half)
+    // Smooth lifts the corner toward its max safe radius; explicit radii still apply without Smooth.
+    const R = Math.max(resolveNodeRadius(nodes[i], globalRadiusPx), smoothing > 0 ? smoothing * maxR : 0)
     if (R <= 0 || nearStraight || !convex) { out.push([v[0], v[1]]); continue }
 
-    const half = Math.acos(cosA) / 2
-    // Clamp so a fillet consumes at most HALF its shorter adjacent edge — guarantees two fillets sharing
-    // an edge can't overlap (0.5 + 0.5 ≤ 1), so max rounding never self-intersects. (Was 0.8 = could cross.)
-    const maxR = 0.49 * Math.min(l1, l2) * Math.tan(half)
     const Rc = Math.min(R, maxR)
     const t = Rc / Math.tan(half)
     const p1: Vec2Px = [v[0] + u1x * t, v[1] + u1y * t]
@@ -169,6 +179,8 @@ export function applyCornerRadii(
     let da = a2 - a1
     while (da > Math.PI) da -= 2 * Math.PI
     while (da < -Math.PI) da += 2 * Math.PI
+    // adaptive resolution: ≈2px per arc segment (was a fixed 10 → visible facets on big corners)
+    const steps = Math.max(8, Math.min(72, Math.ceil((Rc * Math.abs(da)) / 2)))
     for (let s = 0; s <= steps; s++) {
       const ang = a1 + da * (s / steps)
       out.push([cx + Rc * Math.cos(ang), cy + Rc * Math.sin(ang)])
@@ -271,10 +283,12 @@ export function resolveOutlineDocument(doc: OutlineDocument, opts: ResolveOption
   let anyRadius = false
 
   for (const ring of doc.rings) {
-    const filleted = applyCornerRadii(ring.nodes, doc.style.globalOutlineCornerRadiusPx)
+    // Smooth (0..1) rides the SAME true-arc engine as corner radii — every convex corner lifts
+    // toward its max safe radius (square @ 1.0 → circle). The old Catmull-Rom resample is retired
+    // from this path: it FACETED shapes instead of rounding them (Dan, 2026-06-10).
+    const filleted = applyCornerRadii(ring.nodes, doc.style.globalOutlineCornerRadiusPx, doc.style.smoothing)
     if (filleted.length !== ring.nodes.length) anyRadius = true
-    // Smoothing (A2c): Catmull-Rom resample for a softer outline. samples scale with smoothing 0..1.
-    const resolved = doc.style.smoothing > 0 ? catmullRomClosed(filleted, Math.round(2 + doc.style.smoothing * 8)) : filleted
+    const resolved = filleted
     const flat = normalizeRing(flattenPath(resolved, tol), ring.role)
     resolvedRingsPx.push(resolved)
     flattenedRingsPx.push(flat)

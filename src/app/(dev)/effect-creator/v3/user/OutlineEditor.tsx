@@ -26,7 +26,7 @@ import {
 import type { EffectSpecDraft, Contour } from '@/lib/effect/types'
 import { buildEdgeCost } from './edgeCost'
 import { useOutlineStore } from './outlineStore'
-import { UndoIcon, RedoIcon, SmoothIcon, ScaleIcon, PenIcon, ResetIcon, CheckIcon, CloseIcon, PlusIcon, MinusIcon, AddPointIcon, DeleteIcon, BlendIcon, ShapeIcon, PolygonChip, StarChip, CircleChip, SquareChip, PillChip, SquircleChip, HeartChip, SpeechChip, BadgeChip, ShieldChip, BlobChip, ArchChip, PreviewIcon, PreviewOffIcon } from './icons'
+import { UndoIcon, RedoIcon, SmoothIcon, ScaleIcon, PenIcon, ResetIcon, CheckIcon, CloseIcon, PlusIcon, MinusIcon, AddPointIcon, DeleteIcon, BlendIcon, ShapeIcon, OutlineIcon, PolygonChip, StarChip, CircleChip, SquareChip, PillChip, SquircleChip, HeartChip, SpeechChip, BadgeChip, ShieldChip, BlobChip, ArchChip, PreviewIcon, PreviewOffIcon } from './icons'
 import TickBar from '../ui/TickBar'
 import { toast } from '../ui/Toast'
 import { perfGesture } from '../dev/PerfHUD'
@@ -286,6 +286,9 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
   const setBgBlur = useOutlineStore((s) => s.setBgBlur)
   const subjMatteUrl = useOutlineStore((s) => s.subjMatteUrl)
   const [preview, setPreview] = useState(false) // hide anchors/handles to see the clean result (no exit)
+  // Points toggle (Dan, 2026-06-10): anchors stay ON for free-form outlines but OFF for rigid
+  // parametric shapes — a circle has ~60 vertices; one stray drag spoils it. Toggle in the topbar.
+  const [showAnchors, setShowAnchors] = useState(true)
   const dirtyRef = useRef(false) // true once the user has actually edited (so the 3D follows edits, not the open)
 
   // Undo/redo (A1b): a doc-snapshot history. Covers BOTH command edits (move/add/delete/corner/smooth)
@@ -364,13 +367,26 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
     pointersRef.current.clear(); clientPtsRef.current.clear()
     useOutlineStore.getState().setEditorOpen(true) // §6.3: scene frozen → 3D rebuilds defer to close
     setPreview(false)
+    setShowAnchors(true)
     // sync the magic-blend control to the current 3D state (null = build default ≈ on @ 50%)
     const curBlur = useOutlineStore.getState().bgBlur
     setBlendOn(curBlur == null || curBlur > 0)
     setBlendBlur(curBlur == null ? 50 : curBlur > 0 ? Math.round(curBlur * 100) : 50)
     setEdgeCost(null)
     dirtyRef.current = false // opening is not an edit — don't drive the 3D until the user changes something
-    docRef.current = d
+    // Dan (2026-06-10): entering the editor BEFORE Magic means "choose a shape" — the full-bleed
+    // standard square buries its handles at the image edges. Open the Shape sheet with Square
+    // preselected and show the centered square as the starting selection (NOT dirty — it becomes
+    // real only when the user commits an edit / picks a chip).
+    let opened = d
+    if (!useStored && spec && spec.generator.adapter === 'standard' && !useOutlineStore.getState().editedContourMM) {
+      opened = docFromRings(generateShapeRing({ kind: 'square' }, d.image.widthPx, d.image.heightPx), d.image, 0)
+      setDoc(opened)
+      setActiveAdjust('shape')
+      setShapeKind('square')
+      setShowAnchors(false) // rigid shape default — Points toggle re-enables
+    }
+    docRef.current = opened
     histRef.current = { past: [], future: [] } // fresh undo history per editing session
     if (imageUrl) {
       const prior = spec
@@ -804,7 +820,9 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
     setShapeSides(6); setShapePoints(5); setShapeSpikiness(45)
     setShapePreview(null)
     applyDoc(buildShapeDoc(kind, 6, 5, 45))
-    setSmoothing(0); setScale(100); setSelectedNode(null); setAllSelected(false);  }, [applyDoc, buildShapeDoc])
+    setSmoothing(0); setScale(100); setSelectedNode(null); setAllSelected(false)
+    setShowAnchors(false) // rigid shape: vertex anchors off by default (toggle to edit points)
+  }, [applyDoc, buildShapeDoc])
   const nudgeSides = useCallback((delta: number) => {
     if (!shapeKind) return
     const n = Math.max(3, Math.min(12, shapeSidesRef.current + delta)); shapeSidesRef.current = n; setShapeSides(n)
@@ -912,6 +930,8 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
               <TopTool icon={<ResetIcon />} label="Reset" onClick={onReset} />
               {/* Preview = hide anchors/handles to see the clean result without exiting */}
               <TopTool icon={preview ? <PreviewOffIcon /> : <PreviewIcon />} label={preview ? 'Edit' : 'Preview'} onClick={() => setPreview((v) => !v)} />
+              {/* Points = toggle vertex anchors (rigid shapes start OFF — Dan) */}
+              <TopTool icon={<OutlineIcon />} label="Points" onClick={() => setShowAnchors((v) => !v)} />
             </>
           )}
           <TopTool icon={<CheckIcon />} label="Done" onClick={onDone} />
@@ -967,10 +987,8 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
               )}
               <g transform={liveXform}>
                 <path className={`${styles.path} ${hasIssues ? styles.pathError : ''}`} d={pathD} />
-                {/* Apple-sticker "magic trace" — a beam running just inside the border (edit mode) */}
-                {!hasIssues && <path className={styles.beam} d={pathD} />}
                 {/* anchors + rotate handle hidden in Preview (clean result) */}
-                {!preview && shown.rings.map((ring) =>
+                {!preview && showAnchors && shown.rings.map((ring) =>
                   ring.nodes.map((n) => {
                     const active = drag?.nodeId === n.id
                     return (
@@ -987,7 +1005,7 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
                     )
                   }),
                 )}
-                {!preview && rotHandle && (
+                {!preview && showAnchors && rotHandle && (
                   <g>
                     <line className={styles.rotateStem} x1={rotHandle.bx} y1={rotHandle.by} x2={rotHandle.bx} y2={rotHandle.hy} />
                     {/* grip is larger than the anchors and carries a rotate glyph */}

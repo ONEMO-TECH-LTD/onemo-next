@@ -46,20 +46,6 @@
   fill: var(--semantic-bg-error-primary);
   fill-opacity: 0.25;
 }
-/* Border beam — a glowing dash that travels around the outline (Apple-sticker magic trace, edit mode). */
-.beam {
-  fill: none;
-  stroke: var(--semantic-bg-brand-solid);
-  stroke-width: 3;
-  vector-effect: non-scaling-stroke;
-  stroke-linecap: round;
-  stroke-dasharray: 26 220;
-  opacity: 0.85;
-  pointer-events: none;
-  will-change: stroke-dashoffset;       /* no drop-shadow filter → far cheaper repaint */
-  animation: beam-run 2.6s linear infinite;
-}
-@keyframes beam-run { to { stroke-dashoffset: -246; } }
 
 /* Manual draw — in-progress open polyline (A3a). */
 .drawPath {

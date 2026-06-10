@@ -1,10 +1,11 @@
 // TickBar — G12: the ONE shared measuring tick-bar control that replaces every primitive
 // input[type=range] in the editor (Dan, with visual reference; blueprint §7 G12).
 //
-// A ruler of fine vertical ticks whose height/brightness express the value fill · a large numeric
-// readout · an optional dashed max-limit threshold marker · touch-and-drag ANYWHERE on the bar
-// (no thumb to grab) with a magnification effect around the active notch · a haptic pulse per
-// notch where the platform exposes haptics. Dark-glass instrument look (aluminium direction).
+// A MINIMAL ruler of fine vertical ticks whose height/brightness express the value fill · a quiet
+// numeric readout · an optional dashed max-limit threshold marker · touch-and-drag ANYWHERE on the
+// bar (no thumb to grab) with a magnification effect around the active notch · a haptic pulse per
+// notch where the platform exposes haptics. No panel chrome, no label (Dan, 2026-06-10 — final
+// look pending Dan's reference shots).
 //
 // Mechanics ride the §6.3 editor contract: `onChange` fires per tick and must stay VISUAL-ONLY
 // cheap-preview in the caller; `onCommit` fires once on release — that's where resolves, document
@@ -113,8 +114,8 @@ export default function TickBar({
   const readout = format ? format(value) : `${Math.round(value)}`
 
   return (
-    /* ONE dark instrument panel — label, ruler, and readout all live INSIDE it (the reference
-       design), so legibility never depends on what the panel sits on. */
+    /* MINIMAL ruler (Dan, 2026-06-10): no panel background, no label text, no heavy readout —
+       just the ticks + a quiet value. Awaiting Dan's reference shots for the final look. */
     <div
       role="slider"
       tabIndex={disabled ? -1 : 0}
@@ -128,18 +129,13 @@ export default function TickBar({
       onPointerCancel={finish}
       onKeyDown={onKeyDown}
       style={{
-        position: 'relative', flex: 1, minWidth: 0, height: 52, borderRadius: 13,
+        position: 'relative', flex: 1, minWidth: 0, height: 46,
         cursor: disabled ? 'default' : 'ew-resize',
-        background: 'linear-gradient(180deg, rgba(16,19,30,0.96), rgba(26,30,44,0.96))',
-        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.07), inset 0 -1px 0 rgba(0,0,0,0.5), 0 2px 10px rgba(0,0,0,0.25)',
-        display: 'flex', alignItems: 'center', gap: 12, padding: '0 14px',
-        touchAction: 'none', overflow: 'hidden', userSelect: 'none',
+        display: 'flex', alignItems: 'center', gap: 12, padding: '0 4px',
+        touchAction: 'none', userSelect: 'none',
         opacity: disabled ? 0.45 : 1,
       }}
     >
-      <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: 0.7, textTransform: 'uppercase', color: '#8f96ab', flexShrink: 0, pointerEvents: 'none' }}>
-        {label}
-      </span>
       {/* the ruler — barRef lives HERE so pointer→value maps over the tick area, not the panel */}
       <div ref={barRef} style={{ position: 'relative', flex: 1, minWidth: 0, height: '100%', display: 'flex', alignItems: 'center', pointerEvents: 'none' }}>
         {/* ruler ticks — height/brightness express fill; magnify around the active notch */}
@@ -161,8 +157,8 @@ export default function TickBar({
                   transform: 'translateX(-50%)',
                   borderRadius: 1,
                   background: filled
-                    ? `rgba(${mag > 0.4 ? '255,255,255' : '208,216,238'},${0.55 + 0.45 * Math.min(1, mag + 0.25)})`
-                    : 'rgba(160,168,190,0.22)',
+                    ? `rgba(${mag > 0.4 ? '20,24,40' : '52,60,84'},${0.6 + 0.4 * Math.min(1, mag + 0.25)})`
+                    : 'rgba(20,24,40,0.18)',
                   transition: active ? 'none' : 'height 120ms ease, background 120ms ease',
                 }}
               />
@@ -174,18 +170,17 @@ export default function TickBar({
               aria-hidden
               style={{
                 position: 'absolute', left: `${limitFrac * 100}%`, top: 5, bottom: 5, width: 0,
-                borderLeft: '2px dashed rgba(255,176,107,0.85)', transform: 'translateX(-50%)',
+                borderLeft: '2px dashed rgba(214,118,30,0.8)', transform: 'translateX(-50%)',
               }}
             />
           )}
         </div>
       </div>
-      {/* large numeric readout — inside the dark panel (always legible) */}
+      {/* quiet numeric readout */}
       <span
         style={{
-          fontSize: 21, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: '#eef1f8',
-          minWidth: 58, textAlign: 'right', flexShrink: 0, pointerEvents: 'none',
-          textShadow: '0 1px 2px rgba(0,0,0,0.4)',
+          fontSize: 13, fontWeight: 500, fontVariantNumeric: 'tabular-nums', color: '#3a4156',
+          minWidth: 44, textAlign: 'right', flexShrink: 0, pointerEvents: 'none',
         }}
       >
         {readout}
