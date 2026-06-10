@@ -173,11 +173,13 @@ function segsToAnchors(chains: { segs: CubicSeg[]; startCorner: boolean }[]): VP
  * Fit a CLOSED dense ring into a VPath: corners (turn > angleDeg) become true corner anchors;
  * smooth spans become minimal cubic chains within maxError. Smooth-only rings (no corners) get a
  * seam-free closure: the ring is opened at index 0 with a shared central-difference tangent.
+ * `cornersOverride` supplies domain-detected corner indices (e.g. straw-based on noisy strokes)
+ * in place of the per-sample turning-angle detector.
  */
-export function ringToVPath(ring: Vec2[], angleDeg: number, maxError: number): VPath {
+export function ringToVPath(ring: Vec2[], angleDeg: number, maxError: number, cornersOverride?: number[]): VPath {
   const n = ring.length
   if (n < 3) return { anchors: ring.map((p) => ({ p, corner: true })) }
-  const corners = cornerIndices(ring, angleDeg)
+  const corners = cornersOverride ?? cornerIndices(ring, angleDeg)
   if (corners.length === 0) {
     // seam tangent via central difference at index 0
     const t0 = norm(sub(ring[1], ring[n - 1]))
