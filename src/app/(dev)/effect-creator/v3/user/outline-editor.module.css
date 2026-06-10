@@ -83,6 +83,33 @@
 }
 .rotateHandle:active { cursor: grabbing; fill-opacity: 1; }
 
+/* Crop-style stretch grips (Dan, 2026-06-10 — iOS-crop reference): thick smooth pill/bracket
+   strokes morphing into the shape's lines. White over a soft dark under-stroke so they read on any
+   photo; never angular. */
+.gripUnder {
+  fill: none;
+  stroke: rgba(15, 18, 32, 0.4);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.grip {
+  fill: none;
+  stroke: #fff;
+  stroke-opacity: 0.96;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.gripHit {
+  fill: none;
+  stroke: transparent;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  touch-action: none;
+}
+.gripHit:active { cursor: grabbing; }
+
 /* Anchor handles — small, soft, semi-transparent frosted dots; brand-coloured when active/selected. */
 .node {
   fill: #fff;

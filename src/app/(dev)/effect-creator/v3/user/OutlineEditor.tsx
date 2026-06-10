@@ -203,6 +203,16 @@ function translateDoc(doc: OutlineDocument, dx: number, dy: number): OutlineDocu
   return applyOutlineCommands({ rings, style: doc.style }, [], { image: doc.image, mode: doc.mode })
 }
 
+/** Anisotropic stretch about an anchor point — the crop-grip bake (pull a side: square → rectangle).
+ *  Corner radius SPECS are positions-independent, so a rounded square keeps its rounding. */
+function stretchDoc(doc: OutlineDocument, sx: number, sy: number, ax: number, ay: number): OutlineDocument {
+  const rings = doc.rings.map((r) => ({ ...r, nodes: r.nodes.map((n) => ({ ...n, p: [ax + (n.p[0] - ax) * sx, ay + (n.p[1] - ay) * sy] as Vec2Px })) }))
+  return applyOutlineCommands({ rings, style: doc.style }, [], { image: doc.image, mode: doc.mode })
+}
+
+/** Which crop grip — mid-edges stretch one axis at that edge; corners stretch both adjacent edges. */
+type GripId = 'n' | 's' | 'e' | 'w' | 'nw' | 'ne' | 'sw' | 'se'
+
 /** Outer-ring bbox (px). */
 function outerBbox(doc: OutlineDocument): { minX: number; minY: number; maxX: number; maxY: number } {
   const outer = doc.rings.find((r) => r.role === 'outer')
@@ -301,6 +311,11 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
   const rotateLiveRef = useRef<{ deg: number; cx: number; cy: number } | null>(null)
   const [moveLive, setMoveLive] = useState<{ dx: number; dy: number } | null>(null)
   const moveLiveRef = useRef<{ dx: number; dy: number } | null>(null)
+  // Crop-style stretch (Dan, 2026-06-10): boxy shapes get iOS-crop grips — pull a mid-edge to
+  // stretch at that line (square→rectangle), pull a corner to stretch both adjacent edges. Live
+  // SVG transform during the gesture; baked (undoable) on release.
+  const [stretchLive, setStretchLive] = useState<{ sx: number; sy: number; ax: number; ay: number } | null>(null)
+  const stretchRef = useRef<{ which: GripId; ax: number; ay: number; bbox: { minX: number; minY: number; maxX: number; maxY: number }; sx: number; sy: number } | null>(null)
   const rotateRef = useRef<{ cx: number; cy: number; start: number } | null>(null) // desktop handle drag (rotation lives on the handle; two-finger = canvas pinch, G11)
   const moveRef = useRef<{ start: Vec2Px; bbox: { minX: number; minY: number; maxX: number; maxY: number } } | null>(null) // drag-inside-to-move
   const pointersRef = useRef<Map<number, Vec2Px>>(new Map())
@@ -428,8 +443,17 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
     // real only when the user commits an edit / picks a chip).
     let opened = d
     if (!useStored && spec && spec.generator.adapter === 'standard' && !useOutlineStore.getState().editedContourMM) {
-      opened = docFromRings(generateShapeRing({ kind: 'square' }, d.image.widthPx, d.image.heightPx), d.image, 0)
+      const ring = generateShapeRing({ kind: 'square' }, d.image.widthPx, d.image.heightPx)
+      let mnx = Infinity, mxx = -Infinity, mny = Infinity, mxy = -Infinity
+      for (const [x, y] of ring) { if (x < mnx) mnx = x; if (x > mxx) mxx = x; if (y < mny) mny = y; if (y > mxy) mxy = y }
+      // default rounding lives in the DOC (committed truth, ~8mm-on-70mm product language) — NOT a
+      // slider transient. The old radius-0 seed left the Round slider synced to the discarded
+      // full-bleed doc, so the square RENDERED rounded while the document was sharp (undo exposed
+      // it — caught live 2026-06-10).
+      const defaultR = Math.round(Math.min(mxx - mnx, mxy - mny) * 0.12)
+      opened = docFromRings(ring, d.image, defaultR)
       setDoc(opened)
+      setRadius(defaultR)
       setActiveAdjust('shape')
       setShapeKind('square')
       setShowAnchors(false) // rigid shape default — Points toggle re-enables
@@ -872,6 +896,53 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
   // store's bgBlur (0 = off/sharp · 0..1 = intensity ·  ShapedModel re-composes the front, no re-segment).
   const writeBlend = useCallback((on: boolean, pct: number) => setBgBlur(on ? pct / 100 : 0), [setBgBlur])
 
+  // Crop grips: pointer-captured on the grip element itself — self-contained, never threads
+  // through the surface gesture handlers (stopPropagation keeps move/select-all/pan out).
+  const beginStretch = useCallback((which: GripId) => (e: React.PointerEvent) => {
+    e.stopPropagation()
+    ;(e.target as Element).setPointerCapture?.(e.pointerId)
+    nodeInteractedRef.current = true
+    const b = outerBbox(docRef.current)
+    if (!(b.maxX > b.minX) || !(b.maxY > b.minY)) return
+    const ax = which.includes('w') ? b.maxX : which.includes('e') ? b.minX : (b.minX + b.maxX) / 2
+    const ay = which.includes('n') ? b.maxY : which.includes('s') ? b.minY : (b.minY + b.maxY) / 2
+    stretchRef.current = { which, ax, ay, bbox: b, sx: 1, sy: 1 }
+  }, [])
+  const moveStretch = useCallback((e: React.PointerEvent) => {
+    const st = stretchRef.current
+    if (!st) return
+    const [px, py] = toViewBox(e.clientX, e.clientY)
+    const b = st.bbox
+    const W = docRef.current.image.widthPx, H = docRef.current.image.heightPx
+    const MIN = Math.min(W, H) * 0.06 // smallest the shape may shrink to
+    let sx = 1, sy = 1
+    if (st.which.includes('e')) sx = (px - st.ax) / (b.maxX - st.ax)
+    if (st.which.includes('w')) sx = (st.ax - px) / (st.ax - b.minX)
+    if (st.which.includes('n')) sy = (st.ay - py) / (st.ay - b.minY)
+    if (st.which.includes('s')) sy = (py - st.ay) / (b.maxY - st.ay)
+    // clamps: never invert, never below MIN, moving edge stays inside the image
+    if (st.which.includes('e')) sx = Math.min(sx, (W - st.ax) / (b.maxX - st.ax))
+    if (st.which.includes('w')) sx = Math.min(sx, st.ax / (st.ax - b.minX))
+    if (st.which.includes('n')) sy = Math.min(sy, st.ay / (st.ay - b.minY))
+    if (st.which.includes('s')) sy = Math.min(sy, (H - st.ay) / (b.maxY - st.ay))
+    sx = Math.max(sx, MIN / (b.maxX - b.minX))
+    sy = Math.max(sy, MIN / (b.maxY - b.minY))
+    if (st.which === 'n' || st.which === 's') sx = 1
+    if (st.which === 'e' || st.which === 'w') sy = 1
+    stretchRef.current = { ...st, sx, sy }
+    setStretchLive({ sx, sy, ax: st.ax, ay: st.ay })
+  }, [toViewBox])
+  const endStretch = useCallback(() => {
+    const st = stretchRef.current
+    if (!st) return
+    stretchRef.current = null
+    setStretchLive(null)
+    if (Math.abs(st.sx - 1) < 0.004 && Math.abs(st.sy - 1) < 0.004) return // a tap, not a pull
+    const t0 = performance.now()
+    applyDoc(stretchDoc(docRef.current, st.sx, st.sy, st.ax, st.ay))
+    perfGesture('stretch-commit', performance.now() - t0)
+  }, [applyDoc])
+
   // Tune (BEN dash): re-run the fairing pipeline on the RAW pre-fairing trace with live params.
   // Per-tick = preview only; commit on release rebuilds the document (undoable) — §6.3. Re-tracing
   // replaces any manual anchor edits on the ring (it's a re-derivation of the base outline).
@@ -1025,8 +1096,27 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
     const bx = (minX + maxX) / 2
     rotHandle = { bx, by: minY, hy: minY - nodeR * 4 }
   }
-  // live direct-manipulation transform on the outline group (rotate / move) — real-time, no doc rebuild
-  const liveXform = rotateLive ? `rotate(${rotateLive.deg} ${rotateLive.cx} ${rotateLive.cy})` : moveLive ? `translate(${moveLive.dx} ${moveLive.dy})` : undefined
+  // live direct-manipulation transform on the outline group (stretch / rotate / move) — real-time, no doc rebuild
+  const liveXform = stretchLive
+    ? `translate(${stretchLive.ax} ${stretchLive.ay}) scale(${stretchLive.sx} ${stretchLive.sy}) translate(${-stretchLive.ax} ${-stretchLive.ay})`
+    : rotateLive ? `rotate(${rotateLive.deg} ${rotateLive.cx} ${rotateLive.cy})` : moveLive ? `translate(${moveLive.dx} ${moveLive.dy})` : undefined
+  // Crop grips (Dan: iOS-crop reference) — boxy shapes only; grips track the bbox, including the
+  // live stretch (rendered OUTSIDE the transformed group so the pill strokes never distort).
+  const cropMode = shapeKind === 'square' && !drawing && !preview && !shapePreview && !tunePreview
+  let cropBox: { minX: number; minY: number; maxX: number; maxY: number } | null = null
+  if (cropMode && rotOuterIdx >= 0 && resolved.flattenedRingsPx[rotOuterIdx]?.length) {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    for (const [x, y] of resolved.flattenedRingsPx[rotOuterIdx]) {
+      if (x < minX) minX = x; if (x > maxX) maxX = x
+      if (y < minY) minY = y; if (y > maxY) maxY = y
+    }
+    if (stretchLive) {
+      const m = (v: number, a: number, s: number) => a + (v - a) * s
+      minX = m(minX, stretchLive.ax, stretchLive.sx); maxX = m(maxX, stretchLive.ax, stretchLive.sx)
+      minY = m(minY, stretchLive.ay, stretchLive.sy); maxY = m(maxY, stretchLive.ay, stretchLive.sy)
+    }
+    cropBox = { minX, minY, maxX, maxY }
+  }
   // magic-blend live preview in the canvas: blurred photo + sharp subject overlay; blur reacts to intensity
   const showBlend = blendOn && !!subjMatteUrl && !!imageUrl
   const blendSd = (blendBlur / 100) * (doc.image.widthPx / 25)
@@ -1099,7 +1189,7 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
           ) : (
             <>
               {/* scrim dims outside the cut; hidden during a live transform (its hole would lag the move/rotate) */}
-              {imageUrl && pathD && !rotateLive && !moveLive && (
+              {imageUrl && pathD && !rotateLive && !moveLive && !stretchLive && (
                 <path className={styles.scrim} fillRule="evenodd" d={`M0 0H${doc.image.widthPx}V${doc.image.heightPx}H0Z ${pathD}`} />
               )}
               <g transform={liveXform}>
@@ -1133,6 +1223,47 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
                   </g>
                 )}
               </g>
+              {/* Crop-style stretch grips — OUTSIDE the live-transform group (the pill strokes must
+                  never distort); positions track cropBox, which already includes the live stretch. */}
+              {!preview && cropBox && !rotateLive && !moveLive && (() => {
+                const { minX, minY, maxX, maxY } = cropBox
+                const mx = (minX + maxX) / 2, my = (minY + maxY) / 2
+                const arm = Math.min(nodeR * 3, (maxX - minX) * 0.22, (maxY - minY) * 0.22)
+                const lenH = Math.min(nodeR * 4, (maxX - minX) * 0.3)
+                const lenV = Math.min(nodeR * 4, (maxY - minY) * 0.3)
+                const grips: { id: GripId; d: string; cursor: string }[] = [
+                  { id: 'n', d: `M ${mx - lenH / 2} ${minY} L ${mx + lenH / 2} ${minY}`, cursor: 'ns-resize' },
+                  { id: 's', d: `M ${mx - lenH / 2} ${maxY} L ${mx + lenH / 2} ${maxY}`, cursor: 'ns-resize' },
+                  { id: 'w', d: `M ${minX} ${my - lenV / 2} L ${minX} ${my + lenV / 2}`, cursor: 'ew-resize' },
+                  { id: 'e', d: `M ${maxX} ${my - lenV / 2} L ${maxX} ${my + lenV / 2}`, cursor: 'ew-resize' },
+                  { id: 'nw', d: `M ${minX + arm} ${minY} L ${minX} ${minY} L ${minX} ${minY + arm}`, cursor: 'nwse-resize' },
+                  { id: 'ne', d: `M ${maxX - arm} ${minY} L ${maxX} ${minY} L ${maxX} ${minY + arm}`, cursor: 'nesw-resize' },
+                  { id: 'sw', d: `M ${minX + arm} ${maxY} L ${minX} ${maxY} L ${minX} ${maxY - arm}`, cursor: 'nesw-resize' },
+                  { id: 'se', d: `M ${maxX - arm} ${maxY} L ${maxX} ${maxY} L ${maxX} ${maxY - arm}`, cursor: 'nwse-resize' },
+                ]
+                return (
+                  <g>
+                    {grips.map((g) => (
+                      <g key={g.id}>
+                        <path className={styles.gripUnder} d={g.d} strokeWidth={nodeR * 1.5} />
+                        <path className={styles.grip} d={g.d} strokeWidth={nodeR * 1.1} />
+                        <path
+                          className={styles.gripHit}
+                          d={g.d}
+                          strokeWidth={nodeR * 3.4}
+                          style={{ cursor: g.cursor }}
+                          onPointerDown={beginStretch(g.id)}
+                          onPointerMove={moveStretch}
+                          onPointerUp={endStretch}
+                          onPointerCancel={endStretch}
+                          onClick={(e) => e.stopPropagation()}
+                          onDoubleClick={(e) => e.stopPropagation()}
+                        />
+                      </g>
+                    ))}
+                  </g>
+                )
+              })()}
             </>
           )}
         </svg>
