@@ -43,6 +43,9 @@ import { hasVectorDef, getShape } from '@/lib/shape-library'
 // Run 8 — SVG shape upload: a downloaded/Figma-exported outline becomes a first-class vector
 // shape through the export module's dialect gate (loud rejection outside the v1 boundary).
 import { vshapeFromSVG, fitShapeToBox } from '@/lib/export'
+// Run 10 — image-shape upload: threshold mask → the SAME trace machinery as Magic → fitted vector.
+import { maskFromImageData } from '@/lib/effect/image-shape'
+import { traceContourRaw } from '@/lib/effect/contour'
 
 // Run-3 live generators: dense internal sample → ONE Schneider fit at spawn → vector path out.
 // Segments never leave the generator (blueprint modules/generators.md).
@@ -1420,26 +1423,56 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     shapeParamsRef.current = next; setShapeParams(next)
     applyVec(vecFromGenerator('blob', { seed }), null) // Run 3: the dice rolls a vector
   }, [shapeKind, applyVec, vecFromGenerator])
-  /** Run 8 — SVG upload: parse through the dialect gate, fit into the image box, land as a
-   *  first-class vector shape (its own pristine base, so Radius works from clean corners). */
-  const onUploadSVG = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  /** Land an uploaded shape: fit into the image box, first-class vector. SVG keeps itself as the
+   *  pristine base (clean authored corners); a traced image adopts no base (fitted geometry). */
+  const landUploadedShape = useCallback((raw: VShape, withBase: boolean) => {
+    const img = docRef.current.image
+    const v = fitShapeToBox(raw, img.widthPx, img.heightPx)
+    applyVec(v, withBase ? v : null)
+    setShapeKind(null)
+    setShapePreview(null)
+    setRadius(0); setSmoothing(0); setScale(100); setSelectedNode(null); setAllSelected(false)
+    setShowAnchors(false)
+  }, [applyVec])
+  /** Run 10 — image upload: decode → threshold mask → the Magic trace machinery → ONE Schneider
+   *  fit. Editor-space ring orientation is normalized to the Magic-trace convention (negative
+   *  shoelace in y-down px) so the commit's flip+reverse lands the mesh's expected winding. */
+  const vecFromImageFile = useCallback(async (file: File): Promise<VShape> => {
+    const bmp = await createImageBitmap(file)
+    try {
+      const MAX = 512
+      const k = Math.min(1, MAX / Math.max(bmp.width, bmp.height))
+      const w = Math.max(2, Math.round(bmp.width * k)), h = Math.max(2, Math.round(bmp.height * k))
+      const cv = document.createElement('canvas')
+      cv.width = w; cv.height = h
+      const ctx = cv.getContext('2d')!
+      ctx.drawImage(bmp, 0, 0, w, h)
+      const { mask, width, height } = maskFromImageData(ctx.getImageData(0, 0, w, h))
+      const ring = traceContourRaw(mask, width, height)
+      if (!ring || ring.length < 12) throw new Error('No clear shape found — try an image with a stronger silhouette')
+      const pts = ring.map(([x, y]) => ({ x, y }))
+      let area = 0
+      for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length]; area += a.x * b.y - b.x * a.y }
+      if (area > 0) pts.reverse()
+      const faired = fairTracedRing(pts.map((p) => [p.x, p.y] as Vec2Px), useOutlineStore.getState().fairing?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL))
+      if (faired.length < 3) throw new Error('No clear shape found — try an image with a stronger silhouette')
+      return { paths: [ringToVPath(faired.map(([x, y]) => ({ x, y })), 30, 0.35)] }
+    } finally {
+      bmp.close()
+    }
+  }, [])
+  /** Run 8 + Run 10 — ONE upload entry: SVG outlines import verbatim through the dialect gate;
+   *  images are vectorised under the hood. Failures are loud product language, never a mangle. */
+  const onUploadShape = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = '' // same file can be re-picked
     if (!file) return
-    file.text().then((text) => {
-      try {
-        const img = docRef.current.image
-        const v = fitShapeToBox(vshapeFromSVG(text), img.widthPx, img.heightPx)
-        applyVec(v, v)
-        setShapeKind(null)
-        setShapePreview(null)
-        setRadius(0); setSmoothing(0); setScale(100); setSelectedNode(null); setAllSelected(false)
-        setShowAnchors(false)
-      } catch (err) {
-        toast('error', err instanceof Error ? err.message : 'This SVG could not be read')
-      }
-    }).catch(() => toast('error', 'This file could not be read'))
-  }, [applyVec])
+    const isSVG = file.type.includes('svg') || /\.svg$/i.test(file.name)
+    ;(isSVG
+      ? file.text().then((text) => landUploadedShape(vshapeFromSVG(text), true))
+      : vecFromImageFile(file).then((v) => landUploadedShape(v, false))
+    ).catch((err: unknown) => toast('error', err instanceof Error ? err.message : 'This file could not be read'))
+  }, [landUploadedShape, vecFromImageFile])
 
   const commitShape = useCallback(() => {
     if (shapeKind && hasVectorDef(shapeKind)) {
@@ -1929,12 +1962,12 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
                 <span className={styles.chipLabel}>{label}</span>
               </button>
             ))}
-            {/* Run 8 — upload an SVG outline (Dan's "pre made in figma or downloaded" source);
-                rides the existing chip pattern, no new chrome surface */}
-            <label className={styles.chip} aria-label="Upload an SVG shape">
+            {/* Run 8 + 10 — ONE upload entry (Dan's "pre made in figma or downloaded" + "image
+                shapes vectorised under the hood"); rides the existing chip pattern, no new chrome */}
+            <label className={styles.chip} aria-label="Upload a shape (SVG or image)">
               <span className={styles.chipIcon}><PlusIcon /></span>
               <span className={styles.chipLabel}>Upload</span>
-              <input type="file" accept=".svg,image/svg+xml" style={{ display: 'none' }} onChange={onUploadSVG} />
+              <input type="file" accept=".svg,image/svg+xml,image/png,image/jpeg,image/webp" style={{ display: 'none' }} onChange={onUploadShape} />
             </label>
           </div>
           {shapeKind && PARAMETRIC[shapeKind] && (
