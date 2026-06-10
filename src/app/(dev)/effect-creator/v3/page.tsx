@@ -13,10 +13,11 @@
 // G3: PerfHUD ships in the app. G4: ToastSurface — no swallowed failures. G5: honest Magic progress.
 
 import dynamic from 'next/dynamic'
-import { useState, useCallback, useEffect, Suspense } from 'react'
+import { useState, useCallback, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useGesture } from '@use-gesture/react'
 import { useSceneStore } from './admin/sceneStore'
+import { UndoIcon, RedoIcon, ResetIcon } from './user/icons'
 import { INITIAL_DESIGN } from './user/Toolbar'
 import { useOutlineStore } from './user/outlineStore'
 import type { DesignState } from './types'
@@ -59,10 +60,86 @@ function PrototypePageInner() {
   const [showSave, setShowSave] = useState(false)
   const [library, setLibrary] = useState<LibraryRow[]>([])
   const sceneName = searchParams.get('scene')
+
+  // ── #23 GLOBAL history — one undo/redo/reset for the whole creator (Magic, editor sessions,
+  // trim, position, blend). One user ACTION = one step; the editor keeps its own fine-grained
+  // undo inside a session (Dan: Done = one global step). Reset = back to the fresh standard
+  // square for the current photo (the photo stays).
+  type OutlineSnap = {
+    spec: ReturnType<typeof useOutlineStore.getState>['spec']
+    editedContourMM: ReturnType<typeof useOutlineStore.getState>['editedContourMM']
+    editedDoc: ReturnType<typeof useOutlineStore.getState>['editedDoc']
+    bgBlur: number | null
+    subjMatteUrl: string | null
+  }
+  type AppSnap = {
+    prepared: PreparedEffect | null
+    autoOutline: boolean
+    designState: DesignState
+    outline: OutlineSnap
+    trim: { backColor: string; frameColor: string; bgColor: string }
+  }
   const shaped = true // the golden scene renders the generated effect mesh (not a GLB)
   const templateUrl = sceneName
     ? `/api/dev/scenes/${encodeURIComponent(sceneName)}`
     : '/api/dev/scenes/golden'
+
+  const histRef = useRef<{ past: AppSnap[]; future: AppSnap[] }>({ past: [], future: [] })
+  const baselineRef = useRef<AppSnap | null>(null)
+  const editorPreRef = useRef<AppSnap | null>(null)
+  const posPreRef = useRef<AppSnap | null>(null)
+  const trimPreRef = useRef<AppSnap | null>(null)
+  const [, bumpHist] = useState(0)
+  const snapNow = useCallback((): AppSnap => {
+    const o = useOutlineStore.getState()
+    return {
+      prepared, autoOutline, designState,
+      outline: { spec: o.spec, editedContourMM: o.editedContourMM, editedDoc: o.editedDoc, bgBlur: o.bgBlur, subjMatteUrl: o.subjMatteUrl },
+      trim: { ...useSceneStore.getState().colors },
+    }
+  }, [prepared, autoOutline, designState])
+  const pushHistory = useCallback((snap: AppSnap) => {
+    histRef.current.past.push(snap)
+    if (histRef.current.past.length > 30) histRef.current.past.shift()
+    histRef.current.future = []
+    bumpHist((v) => v + 1)
+  }, [])
+  const restoreSnap = useCallback((sn: AppSnap) => {
+    setPrepared(sn.prepared)
+    setAutoOutline(sn.autoOutline)
+    setDesignState(sn.designState)
+    const o = useOutlineStore.getState()
+    o.setSpec(sn.outline.spec)
+    o.setEditedContourMM(sn.outline.editedContourMM)
+    o.setEditedDoc(sn.outline.editedDoc)
+    o.setBgBlur(sn.outline.bgBlur)
+    o.setSubjMatteUrl(sn.outline.subjMatteUrl)
+    const sc = useSceneStore.getState()
+    sc.setBackColor(sn.trim.backColor)
+    sc.setFrameColor(sn.trim.frameColor)
+    sc.setBgColor(sn.trim.bgColor)
+  }, [])
+  const globalUndo = useCallback(() => {
+    const h = histRef.current
+    if (!h.past.length) return
+    const prev = h.past.pop()!
+    h.future.unshift(snapNow())
+    restoreSnap(prev)
+    bumpHist((v) => v + 1)
+  }, [snapNow, restoreSnap])
+  const globalRedo = useCallback(() => {
+    const h = histRef.current
+    if (!h.future.length) return
+    const next = h.future.shift()!
+    h.past.push(snapNow())
+    restoreSnap(next)
+    bumpHist((v) => v + 1)
+  }, [snapNow, restoreSnap])
+  const globalReset = useCallback(() => {
+    if (!baselineRef.current) return
+    pushHistory(snapNow()) // Reset itself is undoable
+    restoreSnap(baselineRef.current)
+  }, [snapNow, restoreSnap, pushHistory])
 
   useEffect(() => {
     import('./user/SavePanel').then(({ loadLibrary }) => setLibrary(loadLibrary()))
@@ -90,6 +167,14 @@ function PrototypePageInner() {
       .then((p) => {
         setPrepared(p)
         useOutlineStore.getState().setSpec(p.spec) // hand the standard outline to the 2D editor
+        // #23: a new image starts a fresh history; this state is the Reset baseline
+        baselineRef.current = {
+          prepared: p, autoOutline: false, designState: INITIAL_DESIGN,
+          outline: { spec: p.spec, editedContourMM: null, editedDoc: null, bgBlur: null, subjMatteUrl: null },
+          trim: { ...useSceneStore.getState().colors },
+        }
+        histRef.current = { past: [], future: [] }
+        bumpHist((v) => v + 1)
       })
       .catch((e) => {
         console.warn('[effect] prepare (standard) failed:', e)
@@ -105,6 +190,7 @@ function PrototypePageInner() {
   // responsive while the shimmer plays; the object morphs IN PLACE in the same scene (no jump).
   const handleMagic = useCallback(() => {
     if (!artworkUrl || generating) return
+    const preMagic = snapNow() // #23: one Magic = one global undo step (pushed only on success)
     setGenerating(true)
     setGenLabel('Cutting out…')
     import('@/lib/effect/prepare-effect')
@@ -124,6 +210,13 @@ function PrototypePageInner() {
         try { st.setSubjMatteUrl(p.frontSrc.subjCanvas.toDataURL()) } catch { st.setSubjMatteUrl(null) }
         setAutoOutline(true)
         setGenerating(false)
+        pushHistory(preMagic)
+        // #23: the editor session that auto-opens is its own step — stash the post-magic state
+        editorPreRef.current = {
+          prepared: p, autoOutline: true, designState,
+          outline: { spec: p.spec, editedContourMM: null, editedDoc: null, bgBlur: null, subjMatteUrl: useOutlineStore.getState().subjMatteUrl },
+          trim: { ...useSceneStore.getState().colors },
+        }
         setEditingOutline(true) // #26: after generation the editor opens on the generated outline
       })
       .catch((e) => {
@@ -131,7 +224,7 @@ function PrototypePageInner() {
         toast('error', `Magic failed: ${(e as Error)?.message ?? e}`) // G4 — incl. the TD-E watchdog
         setGenerating(false)
       })
-  }, [artworkUrl, generating])
+  }, [artworkUrl, generating, snapNow, pushHistory, designState])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -255,9 +348,27 @@ function PrototypePageInner() {
         positioning={isEditing}
         onFile={handleFile}
         onGenerate={handleMagic}
-        onToggleColors={() => setShowColors((prev) => !prev)}
-        onEditOutline={() => setEditingOutline(true)}
-        onTogglePosition={() => setIsEditing((v) => !v)}
+        onToggleColors={() => setShowColors((prev) => {
+          // #23: a Trim panel session = one step (pushed on close if colors changed)
+          if (!prev) trimPreRef.current = snapNow()
+          else if (trimPreRef.current) {
+            const t = trimPreRef.current.trim, c = useSceneStore.getState().colors
+            if (t.backColor !== c.backColor || t.frameColor !== c.frameColor || t.bgColor !== c.bgColor) pushHistory(trimPreRef.current)
+            trimPreRef.current = null
+          }
+          return !prev
+        })}
+        onEditOutline={() => { editorPreRef.current = snapNow(); setEditingOutline(true) }}
+        onTogglePosition={() => setIsEditing((v) => {
+          // #23: a Position session = one step (pushed on exit if the photo moved/zoomed)
+          if (!v) posPreRef.current = snapNow()
+          else if (posPreRef.current) {
+            const d = posPreRef.current.designState
+            if (d.offsetX !== designState.offsetX || d.offsetY !== designState.offsetY || d.scale !== designState.scale) pushHistory(posPreRef.current)
+            posPreRef.current = null
+          }
+          return !v
+        })}
         onSave={() => setShowSave((v) => !v)}
       />
 
@@ -272,8 +383,41 @@ function PrototypePageInner() {
       <OutlineEditor
         open={editingOutline}
         imageUrl={artworkUrl}
-        onClose={() => setEditingOutline(false)}
+        onClose={() => {
+          setEditingOutline(false)
+          // #23: one editor session (Done with changes) = one global step
+          const pre = editorPreRef.current
+          if (pre) {
+            const o = useOutlineStore.getState()
+            if (o.editedDoc !== pre.outline.editedDoc || o.bgBlur !== pre.outline.bgBlur) pushHistory(pre)
+            editorPreRef.current = null
+          }
+        }}
       />
+
+      {/* #23: global Undo/Redo/Reset — the whole creator, one step per action */}
+      {artworkUrl && !editingOutline && (
+        <div style={{ position: 'fixed', top: 14, right: 14, zIndex: 40, display: 'flex', gap: 4, background: 'rgba(255,255,255,0.82)', backdropFilter: 'blur(14px)', borderRadius: 999, padding: '4px 8px', boxShadow: '0 4px 18px rgba(15,18,32,0.12)' }}>
+          {([
+            { icon: <UndoIcon />, label: 'Undo', fn: globalUndo, off: !histRef.current.past.length },
+            { icon: <RedoIcon />, label: 'Redo', fn: globalRedo, off: !histRef.current.future.length },
+            { icon: <ResetIcon />, label: 'Reset', fn: globalReset, off: !baselineRef.current },
+          ] as const).map((b) => (
+            <button
+              key={b.label}
+              type="button"
+              onClick={b.fn}
+              disabled={b.off}
+              aria-label={b.label}
+              title={b.label}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, border: 'none', background: 'transparent', cursor: b.off ? 'default' : 'pointer', opacity: b.off ? 0.3 : 0.85, padding: '4px 7px', color: '#1c2030', fontSize: 9, fontFamily: 'inherit' }}
+            >
+              {b.icon}
+              <span>{b.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* G4 + G3 — always present */}
       <ToastSurface />
