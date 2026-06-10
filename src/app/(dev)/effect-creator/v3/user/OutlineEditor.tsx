@@ -449,7 +449,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     pointersRef.current.clear(); clientPtsRef.current.clear()
     useOutlineStore.getState().setEditorOpen(true) // §6.3: scene frozen → 3D rebuilds defer to close
     setPreview(false)
-    setShowAnchors(true)
+    // VECTOR doctrine (Dan): points on demand — anchors start HIDDEN everywhere; the Points
+    // toggle reveals them for vertex surgery. No dot swarms on open.
+    setShowAnchors(false)
     // sync the magic-blend control to the current 3D state (null = build default ≈ on @ 50%)
     const curBlur = useOutlineStore.getState().bgBlur
     setBlendOn(curBlur == null || curBlur > 0)
