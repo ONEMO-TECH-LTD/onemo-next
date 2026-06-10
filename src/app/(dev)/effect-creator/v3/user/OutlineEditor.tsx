@@ -26,28 +26,53 @@ import {
 import type { EffectSpecDraft, Contour } from '@/lib/effect/types'
 import { buildEdgeCost } from './edgeCost'
 import { useOutlineStore } from './outlineStore'
-import { UndoIcon, RedoIcon, SmoothIcon, ScaleIcon, PenIcon, ResetIcon, CheckIcon, CloseIcon, PlusIcon, MinusIcon, AddPointIcon, DeleteIcon, BlendIcon, ShapeIcon, OutlineIcon, PolygonChip, StarChip, CircleChip, SquareChip, PillChip, SquircleChip, HeartChip, SpeechChip, BadgeChip, ShieldChip, BlobChip, ArchChip, PreviewIcon, PreviewOffIcon } from './icons'
+import { UndoIcon, RedoIcon, SmoothIcon, ScaleIcon, PenIcon, ResetIcon, CheckIcon, CloseIcon, PlusIcon, MinusIcon, AddPointIcon, DeleteIcon, BlendIcon, ShapeIcon, OutlineIcon, DiceIcon, PreviewIcon, PreviewOffIcon } from './icons'
 import TickBar from '../ui/TickBar'
 import { toast } from '../ui/Toast'
 import { perfGesture } from '../dev/PerfHUD'
-import { generateShapeRing, type ShapeKind } from './shapes'
+import { generateShapeRing, PARAMETRIC, type ShapeKind, type ShapeParams } from './shapes'
 import styles from './outline-editor.module.css'
 
-// Shape chips shown in the Shape tool sheet. Parametric ones (polygon/star) reveal extra controls.
-const SHAPE_CHIPS: { kind: ShapeKind; label: string; Icon: (p: { className?: string }) => React.ReactNode }[] = [
-  { kind: 'polygon', label: 'Polygon', Icon: PolygonChip },
-  { kind: 'star', label: 'Star', Icon: StarChip },
-  { kind: 'circle', label: 'Circle', Icon: CircleChip },
-  { kind: 'square', label: 'Square', Icon: SquareChip },
-  { kind: 'pill', label: 'Pill', Icon: PillChip },
-  { kind: 'squircle', label: 'Squircle', Icon: SquircleChip },
-  { kind: 'heart', label: 'Heart', Icon: HeartChip },
-  { kind: 'speech', label: 'Speech', Icon: SpeechChip },
-  { kind: 'badge', label: 'Badge', Icon: BadgeChip },
-  { kind: 'shield', label: 'Shield', Icon: ShieldChip },
-  { kind: 'blob', label: 'Blob', Icon: BlobChip },
-  { kind: 'arch', label: 'Arch', Icon: ArchChip },
+// Shape chips — Dan's board lineup (Simbolik/LOEWE symbol alphabet) + the two generators.
+// Chip icons render from the REAL generator math, so a chip can never lie about its shape.
+const SHAPE_CHIPS: { kind: ShapeKind; label: string }[] = [
+  { kind: 'pinched', label: 'Pinched' },
+  { kind: 'daisy', label: 'Daisy' },
+  { kind: 'heart', label: 'Heart' },
+  { kind: 'bolt', label: 'Bolt' },
+  { kind: 'sparkle', label: 'Sparkle' },
+  { kind: 'teardrop', label: 'Drop' },
+  { kind: 'leaf', label: 'Leaf' },
+  { kind: 'lens', label: 'Lens' },
+  { kind: 'diamond', label: 'Diamond' },
+  { kind: 'plus', label: 'Plus' },
+  { kind: 'asterisk', label: 'Asterisk' },
+  { kind: 'bowtie', label: 'Bowtie' },
+  { kind: 'pinwheel', label: 'Pinwheel' },
+  { kind: 'pebble', label: 'Pebble' },
+  { kind: 'circle', label: 'Circle' },
+  { kind: 'square', label: 'Square' },
+  { kind: 'squircle', label: 'Squircle' },
+  { kind: 'polygon', label: 'Polygon' },
+  { kind: 'star', label: 'Star' },
+  { kind: 'form', label: 'Form ✦' },
+  { kind: 'blob', label: 'Blob ✦' },
 ]
+
+/** Chip glyph drawn from the SAME ring math as the real shape (24px box, filled). */
+function ShapeChipIcon({ kind }: { kind: ShapeKind }) {
+  const d = useMemo(() => {
+    const ring = generateShapeRing({ kind }, 26, 26)
+    return `M ${ring.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join(' L ')} Z`
+  }, [kind])
+  return <svg width={24} height={24} viewBox="0 0 26 26" aria-hidden><path d={d} fill="currentColor" /></svg>
+}
+
+/** Default generator params (persist across picks within an editor session). */
+const DEFAULT_SHAPE_PARAMS: Required<Omit<ShapeParams, 'kind' | 'rotateDeg'>> = {
+  sides: 6, points: 5, spikiness: 45, lobes: 4, pinch: 50,
+  petals: 8, depth: 55, blades: 5, swirl: 50, waviness: 50, seed: 1,
+}
 
 interface OutlineEditorProps {
   open: boolean
@@ -244,12 +269,12 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
   // Shape tool: pick a preset/parametric shape as the starting outline. shapeKind = the shape currently
   // being tuned (null = none picked this session → only chips show). Params drive live regeneration.
   const [shapeKind, setShapeKind] = useState<ShapeKind | null>(null)
-  const [shapeSides, setShapeSides] = useState(6) // polygon 3..12
-  const [shapePoints, setShapePoints] = useState(5) // star 3..12
-  const [shapeSpikiness, setShapeSpikiness] = useState(45) // star inner-ratio % 5..95
-  const [shapePreview, setShapePreview] = useState<OutlineDocument | null>(null) // live morph while dragging a shape slider
-  // refs mirror the shape params so rapid stepper taps read the latest value (state closures lag)
-  const shapeSidesRef = useRef(6), shapePointsRef = useRef(5), shapeSpikinessRef = useRef(45)
+  // one params object for every parametric shape/generator (ref mirrors it so rapid stepper taps
+  // and tick storms read the latest values — state closures lag)
+  const [shapeParams, setShapeParams] = useState({ ...DEFAULT_SHAPE_PARAMS })
+  const shapeParamsRef = useRef(shapeParams)
+  useEffect(() => { shapeParamsRef.current = shapeParams }, [shapeParams])
+  const [shapePreview, setShapePreview] = useState<OutlineDocument | null>(null) // live morph while dragging a shape control
   // Rotation = a whole-outline transform: two-finger twist (mobile) / drag the rotate handle (desktop,
   // shown when all anchors are selected). rotatePreview = the live rotated doc; baked (undoable) on release.
   // Live direct-manipulation transforms — cheap SVG transform during the gesture, baked to the doc on
@@ -810,34 +835,46 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
   // to the image), seeded into our node model so Smooth/Scale/drag all apply (radius 0 — shapes are
   // exact; softening is the Smooth control). Discrete params (sides/points) regenerate immediately; the
   // continuous ones (spikiness/rotate) preview while dragging and bake on release.
-  const buildShapeDoc = useCallback((kind: ShapeKind, sides: number, points: number, spikiness: number): OutlineDocument => {
+  const buildShapeDoc = useCallback((kind: ShapeKind, overrides: Partial<ShapeParams> = {}): OutlineDocument => {
     const img = docRef.current.image
-    return docFromRings(generateShapeRing({ kind, sides, points, spikiness }, img.widthPx, img.heightPx), img, 0)
+    return docFromRings(generateShapeRing({ kind, ...shapeParamsRef.current, ...overrides }, img.widthPx, img.heightPx), img, 0)
   }, [])
   const pickShape = useCallback((kind: ShapeKind) => {
     setShapeKind(kind)
-    shapeSidesRef.current = 6; shapePointsRef.current = 5; shapeSpikinessRef.current = 45
-    setShapeSides(6); setShapePoints(5); setShapeSpikiness(45)
     setShapePreview(null)
-    applyDoc(buildShapeDoc(kind, 6, 5, 45))
+    const overrides: Partial<ShapeParams> = {}
+    if (kind === 'blob') { // fresh blob per pick; the dice rerolls further
+      overrides.seed = Math.floor(Math.random() * 1e9)
+      const next = { ...shapeParamsRef.current, seed: overrides.seed! }
+      shapeParamsRef.current = next; setShapeParams(next)
+    }
+    applyDoc(buildShapeDoc(kind, overrides))
     setSmoothing(0); setScale(100); setSelectedNode(null); setAllSelected(false)
     setShowAnchors(false) // rigid shape: vertex anchors off by default (toggle to edit points)
   }, [applyDoc, buildShapeDoc])
-  const nudgeSides = useCallback((delta: number) => {
+  /** stepper: ±delta on an integer param, regenerate immediately (undoable). */
+  const nudgeParam = useCallback((key: 'sides' | 'points' | 'lobes' | 'petals' | 'blades', delta: number, min: number, max: number) => {
     if (!shapeKind) return
-    const n = Math.max(3, Math.min(12, shapeSidesRef.current + delta)); shapeSidesRef.current = n; setShapeSides(n)
-    applyDoc(buildShapeDoc(shapeKind, n, shapePointsRef.current, shapeSpikinessRef.current))
+    const n = Math.max(min, Math.min(max, (shapeParamsRef.current[key] ?? min) + delta))
+    const next = { ...shapeParamsRef.current, [key]: n }
+    shapeParamsRef.current = next; setShapeParams(next)
+    applyDoc(buildShapeDoc(shapeKind, { [key]: n }))
   }, [shapeKind, applyDoc, buildShapeDoc])
-  const nudgePoints = useCallback((delta: number) => {
+  /** tick-bar: transient preview per tick (§6.3); commitShape applies on release. */
+  const previewParam = useCallback((key: 'spikiness' | 'pinch' | 'depth' | 'swirl' | 'waviness', v: number) => {
     if (!shapeKind) return
-    const n = Math.max(3, Math.min(12, shapePointsRef.current + delta)); shapePointsRef.current = n; setShapePoints(n)
-    applyDoc(buildShapeDoc(shapeKind, shapeSidesRef.current, n, shapeSpikinessRef.current))
-  }, [shapeKind, applyDoc, buildShapeDoc])
-  const previewSpikiness = useCallback((v: number) => {
-    if (!shapeKind) return
-    shapeSpikinessRef.current = v; setShapeSpikiness(v)
-    setShapePreview(buildShapeDoc(shapeKind, shapeSidesRef.current, shapePointsRef.current, v))
+    const next = { ...shapeParamsRef.current, [key]: v }
+    shapeParamsRef.current = next; setShapeParams(next)
+    setShapePreview(buildShapeDoc(shapeKind, { [key]: v }))
   }, [shapeKind, buildShapeDoc])
+  /** blob dice: reroll the seed, regenerate immediately (undoable). */
+  const rerollBlob = useCallback(() => {
+    if (shapeKind !== 'blob') return
+    const seed = Math.floor(Math.random() * 1e9)
+    const next = { ...shapeParamsRef.current, seed }
+    shapeParamsRef.current = next; setShapeParams(next)
+    applyDoc(buildShapeDoc('blob', { seed }))
+  }, [shapeKind, applyDoc, buildShapeDoc])
   const commitShape = useCallback(() => {
     if (shapePreview) { applyDoc(shapePreview); setShapePreview(null) }
   }, [shapePreview, applyDoc])
@@ -1078,11 +1115,11 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
         </div>
       )}
 
-      {/* Shape tool — pick a preset/parametric shape as the starting outline; parametric ones reveal controls */}
+      {/* Shape tool — Dan's board lineup + the form/blob generators; parametric kinds reveal controls */}
       {!drawing && activeAdjust === 'shape' && (
         <div className={styles.shapeSheet}>
           <div className={styles.chipRow}>
-            {SHAPE_CHIPS.map(({ kind, label, Icon }) => (
+            {SHAPE_CHIPS.map(({ kind, label }) => (
               <button
                 key={kind}
                 type="button"
@@ -1091,31 +1128,82 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
                 aria-pressed={shapeKind === kind}
                 aria-label={label}
               >
-                <span className={styles.chipIcon}><Icon /></span>
+                <span className={styles.chipIcon}><ShapeChipIcon kind={kind} /></span>
                 <span className={styles.chipLabel}>{label}</span>
               </button>
             ))}
           </div>
-          {shapeKind && (
+          {shapeKind && PARAMETRIC[shapeKind] && (
             <div className={styles.shapeControls}>
               {shapeKind === 'polygon' && (
                 <div className={styles.shapeRow}>
                   <span className={styles.shapeName}>Sides</span>
-                  <button type="button" className={styles.stepBtn} onClick={() => nudgeSides(-1)} aria-label="Fewer sides"><MinusIcon /></button>
-                  <span className={styles.shapeVal}>{shapeSides}</span>
-                  <button type="button" className={styles.stepBtn} onClick={() => nudgeSides(1)} aria-label="More sides"><PlusIcon /></button>
+                  <button type="button" className={styles.stepBtn} onClick={() => nudgeParam('sides', -1, 3, 12)} aria-label="Fewer sides"><MinusIcon /></button>
+                  <span className={styles.shapeVal}>{shapeParams.sides}</span>
+                  <button type="button" className={styles.stepBtn} onClick={() => nudgeParam('sides', 1, 3, 12)} aria-label="More sides"><PlusIcon /></button>
                 </div>
               )}
               {shapeKind === 'star' && (
                 <>
                   <div className={styles.shapeRow}>
                     <span className={styles.shapeName}>Points</span>
-                    <button type="button" className={styles.stepBtn} onClick={() => nudgePoints(-1)} aria-label="Fewer points"><MinusIcon /></button>
-                    <span className={styles.shapeVal}>{shapePoints}</span>
-                    <button type="button" className={styles.stepBtn} onClick={() => nudgePoints(1)} aria-label="More points"><PlusIcon /></button>
+                    <button type="button" className={styles.stepBtn} onClick={() => nudgeParam('points', -1, 3, 12)} aria-label="Fewer points"><MinusIcon /></button>
+                    <span className={styles.shapeVal}>{shapeParams.points}</span>
+                    <button type="button" className={styles.stepBtn} onClick={() => nudgeParam('points', 1, 3, 12)} aria-label="More points"><PlusIcon /></button>
                   </div>
                   <div className={styles.shapeRow}>
-                    <TickBar label="Spike" min={5} max={95} value={shapeSpikiness} onChange={previewSpikiness} onCommit={() => commitShape()} format={(v) => `${Math.round(v)}%`} />
+                    <TickBar label="Spike" min={5} max={95} value={shapeParams.spikiness} onChange={(v) => previewParam('spikiness', v)} onCommit={() => commitShape()} format={(v) => `${Math.round(v)}%`} />
+                  </div>
+                </>
+              )}
+              {shapeKind === 'daisy' && (
+                <>
+                  <div className={styles.shapeRow}>
+                    <span className={styles.shapeName}>Petals</span>
+                    <button type="button" className={styles.stepBtn} onClick={() => nudgeParam('petals', -1, 5, 12)} aria-label="Fewer petals"><MinusIcon /></button>
+                    <span className={styles.shapeVal}>{shapeParams.petals}</span>
+                    <button type="button" className={styles.stepBtn} onClick={() => nudgeParam('petals', 1, 5, 12)} aria-label="More petals"><PlusIcon /></button>
+                  </div>
+                  <div className={styles.shapeRow}>
+                    <TickBar label="Depth" min={0} max={100} value={shapeParams.depth} onChange={(v) => previewParam('depth', v)} onCommit={() => commitShape()} format={(v) => `${Math.round(v)}%`} />
+                  </div>
+                </>
+              )}
+              {shapeKind === 'pinwheel' && (
+                <>
+                  <div className={styles.shapeRow}>
+                    <span className={styles.shapeName}>Blades</span>
+                    <button type="button" className={styles.stepBtn} onClick={() => nudgeParam('blades', -1, 3, 8)} aria-label="Fewer blades"><MinusIcon /></button>
+                    <span className={styles.shapeVal}>{shapeParams.blades}</span>
+                    <button type="button" className={styles.stepBtn} onClick={() => nudgeParam('blades', 1, 3, 8)} aria-label="More blades"><PlusIcon /></button>
+                  </div>
+                  <div className={styles.shapeRow}>
+                    <TickBar label="Swirl" min={0} max={100} value={shapeParams.swirl} onChange={(v) => previewParam('swirl', v)} onCommit={() => commitShape()} format={(v) => `${Math.round(v)}%`} />
+                  </div>
+                </>
+              )}
+              {shapeKind === 'form' && (
+                <>
+                  <div className={styles.shapeRow}>
+                    <span className={styles.shapeName}>Lobes</span>
+                    <button type="button" className={styles.stepBtn} onClick={() => nudgeParam('lobes', -1, 3, 8)} aria-label="Fewer lobes"><MinusIcon /></button>
+                    <span className={styles.shapeVal}>{shapeParams.lobes}</span>
+                    <button type="button" className={styles.stepBtn} onClick={() => nudgeParam('lobes', 1, 3, 8)} aria-label="More lobes"><PlusIcon /></button>
+                  </div>
+                  <div className={styles.shapeRow}>
+                    <TickBar label="Pinch" min={0} max={100} value={shapeParams.pinch} onChange={(v) => previewParam('pinch', v)} onCommit={() => commitShape()} format={(v) => `${Math.round(v)}%`} />
+                  </div>
+                </>
+              )}
+              {shapeKind === 'blob' && (
+                <>
+                  <div className={styles.shapeRow}>
+                    <TickBar label="Wavy" min={0} max={100} value={shapeParams.waviness} onChange={(v) => previewParam('waviness', v)} onCommit={() => commitShape()} format={(v) => `${Math.round(v)}%`} />
+                  </div>
+                  <div className={styles.shapeRow}>
+                    <button type="button" className={styles.nodeAction} onClick={rerollBlob}>
+                      <DiceIcon /><span>New blob</span>
+                    </button>
                   </div>
                 </>
               )}
