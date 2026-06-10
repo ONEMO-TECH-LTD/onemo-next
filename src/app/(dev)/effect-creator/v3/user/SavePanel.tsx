@@ -20,6 +20,7 @@ import { EFFECT_SIZES, type EffectSize } from '@/lib/effect/sizes'
 import { toFinalPhysicalMm } from '@/lib/effect/sizes'
 import { validateAttachment, type AttachmentSystem } from '@/lib/effect/attachment'
 import { useOutlineStore } from './outlineStore'
+import { toManufacturingSVG } from '@/lib/export'
 import { useAttachmentStore } from './attachmentStore'
 import { toast } from '../ui/Toast'
 import { perfGesture } from '../dev/PerfHUD'
@@ -193,8 +194,24 @@ export default function SavePanel({
     <div style={panelStyle}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <span style={{ fontSize: 14, fontWeight: 700 }}>Save</span>
-        <button type="button" onClick={onClose} aria-label="Close save panel"
-          style={{ border: 'none', background: 'rgba(255,255,255,0.1)', color: '#fff', width: 24, height: 24, borderRadius: 12, cursor: 'pointer' }}>×</button>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {/* Run 7 — mm-true SVG cutline (true curves, 1 unit = 1 mm, nominal dimensions) */}
+          <button type="button" aria-label="Download SVG cutline"
+            onClick={() => {
+              const st = useOutlineStore.getState()
+              const v = st.editedVShape
+              const sp = st.spec
+              if (!v || !sp) { toast('warn', 'No vector shape to export yet — pick or edit a shape first'); return }
+              const svg = toManufacturingSVG(v, { mmPerPx: sp.mmPerPx || 1, widthPx: sp.maskWidthPx, heightPx: sp.maskHeightPx })
+              const a = document.createElement('a')
+              a.href = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }))
+              a.download = 'onemo-cutline-mm.svg'
+              document.body.appendChild(a); a.click(); a.remove()
+            }}
+            style={{ border: 'none', background: 'rgba(255,255,255,0.1)', color: '#fff', height: 24, padding: '0 10px', borderRadius: 12, cursor: 'pointer', fontSize: 11 }}>SVG</button>
+          <button type="button" onClick={onClose} aria-label="Close save panel"
+            style={{ border: 'none', background: 'rgba(255,255,255,0.1)', color: '#fff', width: 24, height: 24, borderRadius: 12, cursor: 'pointer' }}>×</button>
+        </div>
       </div>
 
       {/* size band (§6.5: customer choice; FINAL physical mm derives from it) */}
