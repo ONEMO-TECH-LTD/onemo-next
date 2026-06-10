@@ -18,7 +18,7 @@ import {
   livewirePath,
   rdpClosed,
   repairSimplePolygon,
-  nodesFromTracedRing,
+  nodesFromFittedRing,
   fairTracedRing,
   fairingFromDetail,
   BEN_DEFAULT_DETAIL,
@@ -148,7 +148,7 @@ function docFromSpec(spec: EffectSpecDraft): OutlineDocument {
   const toEditorPx = (ptsMM: [number, number][]) => ptsMM.map(([x, y]) => [x / k, H - y / k] as Vec2Px)
   const toRing = (ptsMM: [number, number][], prefix: string) =>
     organic
-      ? nodesFromTracedRing(toEditorPx(ptsMM), eps, prefix)
+      ? nodesFromFittedRing(toEditorPx(ptsMM), 0.35, prefix) // VECTOR CORE: true fitted curves
       : repairSimplePolygon(rdpClosed(toEditorPx(ptsMM), eps), minSpacing).map((p, i) => ({
           id: `${prefix}${i}`, p, role: 'corner' as const, corner: { mode: 'inherit' as const },
         }))
@@ -1006,7 +1006,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     const H = spec.maskHeightPx
     const rawEditorPx = raw.map(([x, y]) => [x, H - y] as Vec2Px) // y-up mask → y-down editor px
     const eps = Math.max(2, Math.max(spec.maskWidthPx, H) * 0.022)
-    const nodes = nodesFromTracedRing(fairTracedRing(rawEditorPx, params), eps, 'o')
+    const nodes = nodesFromFittedRing(fairTracedRing(rawEditorPx, params), 0.35, 'o') // VECTOR CORE
     const base = {
       rings: [{ id: 'r1', role: 'outer' as const, closed: true as const, nodes }],
       style: { globalOutlineCornerRadiusPx: 0, smoothing: 0 },

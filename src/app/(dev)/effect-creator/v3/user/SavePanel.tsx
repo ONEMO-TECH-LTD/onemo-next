@@ -20,6 +20,7 @@ import { EFFECT_SIZES, type EffectSize } from '@/lib/effect/sizes'
 import { toFinalPhysicalMm } from '@/lib/effect/sizes'
 import { validateAttachment, type AttachmentSystem } from '@/lib/effect/attachment'
 import { useOutlineStore } from './outlineStore'
+import { svgMMFromRings } from '@/lib/outline-core'
 import { useAttachmentStore } from './attachmentStore'
 import { toast } from '../ui/Toast'
 import { perfGesture } from '../dev/PerfHUD'
@@ -95,6 +96,29 @@ export default function SavePanel({
     () => editedContourMM ?? prepared?.spec.geometryMM ?? null,
     [editedContourMM, prepared],
   )
+
+  // VECTOR CORE stage 4: download the mm-true SVG cutline — curves preserved (C commands),
+  // 1 unit = 1 mm. Edited doc (editor space, y-down) wins; else the prepared doc (y-up → flip).
+  const downloadSvg = useCallback(() => {
+    if (!prepared) return
+    const st = useOutlineStore.getState()
+    const doc = st.editedDoc
+    const k = prepared.spec.mmPerPx || 1
+    const src = doc ?? prepared.outlineDocument
+    const svg = svgMMFromRings(
+      src.rings.map((r) => r.nodes),
+      k,
+      src.image.widthPx,
+      src.image.heightPx,
+      doc ? false : true,
+    )
+    const blob = new Blob([svg], { type: 'image/svg+xml' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = 'onemo-cutline-mm.svg'
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000)
+  }, [prepared])
 
   // Phase 3: validate the chosen attachment on FINAL-physical-mm (size-dependent) and drive the
   // 3D back-cap visualization + the failure flow.
@@ -193,6 +217,8 @@ export default function SavePanel({
     <div style={panelStyle}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <span style={{ fontSize: 14, fontWeight: 700 }}>Save</span>
+        <button type="button" onClick={downloadSvg} aria-label="Download SVG cutline (mm)"
+          style={{ border: 'none', background: 'rgba(255,255,255,0.1)', color: '#fff', height: 24, padding: '0 10px', borderRadius: 12, cursor: 'pointer', fontSize: 11, marginRight: 6 }}>SVG</button>
         <button type="button" onClick={onClose} aria-label="Close save panel"
           style={{ border: 'none', background: 'rgba(255,255,255,0.1)', color: '#fff', width: 24, height: 24, borderRadius: 12, cursor: 'pointer' }}>×</button>
       </div>

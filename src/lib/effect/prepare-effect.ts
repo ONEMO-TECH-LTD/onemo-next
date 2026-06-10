@@ -43,7 +43,7 @@ import {
   resolveOutlineDocument,
   repairSimplePolygon,
   rdpClosed,
-  nodesFromTracedRing,
+  nodesFromFittedRing,
   fairTracedRing,
   fairingFromDetail,
   BEN_DEFAULT_DETAIL,
@@ -133,7 +133,7 @@ function docFromRawRing(
   // resolved/manufactured outline IS the mask's true shape (no RDP/spline approximation — the
   // clipped-corner/wobble class Dan caught 2026-06-10). standard: plain corner ring (4 corners).
   const nodes: OutlineNode[] = type === 'shaped'
-    ? nodesFromTracedRing(fairTracedRing(ringPx, fairing ?? fairingFromDetail(BEN_DEFAULT_DETAIL)), eps)
+    ? nodesFromFittedRing(fairTracedRing(ringPx, fairing ?? fairingFromDetail(BEN_DEFAULT_DETAIL))) // VECTOR CORE: true fitted curves
     : repairSimplePolygon(rdpClosed(ringPx, eps), Math.max(3, Math.max(W, H) * 0.008)).map((p, i) => ({
         id: `n${i}`,
         p: [p[0], p[1]] as Vec2Px,

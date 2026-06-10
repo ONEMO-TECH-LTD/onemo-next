@@ -568,6 +568,124 @@ export function fairTracedRing(densePts: Vec2Px[], opts: FairTracedRingOpts = {}
   return smooth121(smooth121(ring))
 }
 
+// ─── VECTOR CORE stage 3: fit the faired trace into TRUE cubic curves (Schneider, Graphics Gems) ──
+
+type CubicSeg = { endIdx: number; c1: Vec2Px; c2: Vec2Px }
+
+const vSub = (a: Vec2Px, b: Vec2Px): Vec2Px => [a[0] - b[0], a[1] - b[1]]
+const vAdd = (a: Vec2Px, b: Vec2Px): Vec2Px => [a[0] + b[0], a[1] + b[1]]
+const vScale = (a: Vec2Px, k: number): Vec2Px => [a[0] * k, a[1] * k]
+const vDot = (a: Vec2Px, b: Vec2Px) => a[0] * b[0] + a[1] * b[1]
+const vNorm = (a: Vec2Px): Vec2Px => { const l = Math.hypot(a[0], a[1]) || 1e-12; return [a[0] / l, a[1] / l] }
+
+function bezierPoint(p0: Vec2Px, c1: Vec2Px, c2: Vec2Px, p1: Vec2Px, t: number): Vec2Px {
+  const u = 1 - t
+  const b0 = u * u * u, b1 = 3 * u * u * t, b2 = 3 * u * t * t, b3 = t * t * t
+  return [b0 * p0[0] + b1 * c1[0] + b2 * c2[0] + b3 * p1[0], b0 * p0[1] + b1 * c1[1] + b2 * c2[1] + b3 * p1[1]]
+}
+
+/** Least-squares cubic for pts[first..last] with fixed unit end tangents (Schneider's generateBezier). */
+function generateBezier(pts: Vec2Px[], first: number, last: number, uPrime: number[], tHat1: Vec2Px, tHat2: Vec2Px): { c1: Vec2Px; c2: Vec2Px } {
+  const nPts = last - first + 1
+  const p0 = pts[first], p3 = pts[last]
+  let c00 = 0, c01 = 0, c11 = 0, x0 = 0, x1 = 0
+  for (let i = 0; i < nPts; i++) {
+    const u = uPrime[i], b = 1 - u
+    const b0 = b * b * b, b1 = 3 * u * b * b, b2 = 3 * u * u * b, b3 = u * u * u
+    const a1 = vScale(tHat1, b1)
+    const a2 = vScale(tHat2, b2)
+    c00 += vDot(a1, a1); c01 += vDot(a1, a2); c11 += vDot(a2, a2)
+    const tmp = vSub(pts[first + i], vAdd(vScale(p0, b0 + b1), vScale(p3, b2 + b3)))
+    x0 += vDot(a1, tmp); x1 += vDot(a2, tmp)
+  }
+  const det = c00 * c11 - c01 * c01
+  let alpha1 = 0, alpha2 = 0
+  if (Math.abs(det) > 1e-12) {
+    alpha1 = (c11 * x0 - c01 * x1) / det
+    alpha2 = (c00 * x1 - c01 * x0) / det
+  }
+  const segLen = Math.hypot(p3[0] - p0[0], p3[1] - p0[1])
+  const eps = 1e-6 * segLen
+  if (alpha1 < eps || alpha2 < eps) { alpha1 = alpha2 = segLen / 3 } // Wu/Barsky heuristic fallback
+  return { c1: vAdd(p0, vScale(tHat1, alpha1)), c2: vAdd(p3, vScale(tHat2, alpha2)) }
+}
+
+function chordParams(pts: Vec2Px[], first: number, last: number): number[] {
+  const u = [0]
+  for (let i = first + 1; i <= last; i++) u.push(u[u.length - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]))
+  const total = u[u.length - 1] || 1
+  return u.map((v) => v / total)
+}
+
+function maxFitError(pts: Vec2Px[], first: number, last: number, c1: Vec2Px, c2: Vec2Px, u: number[]): { err: number; split: number } {
+  let err = 0, split = (first + last) >> 1
+  for (let i = first + 1; i < last; i++) {
+    const p = bezierPoint(pts[first], c1, c2, pts[last], u[i - first])
+    const d = (p[0] - pts[i][0]) ** 2 + (p[1] - pts[i][1]) ** 2
+    if (d > err) { err = d; split = i }
+  }
+  return { err: Math.sqrt(err), split }
+}
+
+function fitCubicRec(pts: Vec2Px[], first: number, last: number, tHat1: Vec2Px, tHat2: Vec2Px, errorPx: number, out: CubicSeg[], depth: number): void {
+  if (last - first === 1 || depth > 24) {
+    const p0 = pts[first], p3 = pts[last]
+    const segLen = Math.hypot(p3[0] - p0[0], p3[1] - p0[1]) / 3
+    out.push({ endIdx: last, c1: vAdd(p0, vScale(tHat1, segLen)), c2: vAdd(p3, vScale(tHat2, segLen)) })
+    return
+  }
+  const u = chordParams(pts, first, last)
+  let { c1, c2 } = generateBezier(pts, first, last, u, tHat1, tHat2)
+  let best = maxFitError(pts, first, last, c1, c2, u)
+  if (best.err <= errorPx) { out.push({ endIdx: last, c1, c2 }); return }
+  // one cheap reparameterization attempt before splitting
+  if (best.err <= errorPx * 4) {
+    for (let it = 0; it < 2; it++) {
+      const g = generateBezier(pts, first, last, u, tHat1, tHat2)
+      c1 = g.c1; c2 = g.c2
+      best = maxFitError(pts, first, last, c1, c2, u)
+      if (best.err <= errorPx) { out.push({ endIdx: last, c1, c2 }); return }
+    }
+  }
+  const split = Math.max(first + 1, Math.min(last - 1, best.split))
+  const tCenter = vNorm(vSub(pts[split - 1], pts[split + 1]))
+  fitCubicRec(pts, first, split, tHat1, tCenter, errorPx, out, depth + 1)
+  fitCubicRec(pts, split, last, vScale(tCenter, -1), tHat2, errorPx, out, depth + 1)
+}
+
+/**
+ * VECTOR CORE: fit a CLOSED faired trace into true cubic curves → sparse anchor nodes carrying
+ * cubic segments (the Figma-grade vector form of a Magic cut-out — Dan's "trace BEN in vector").
+ * Anchors exist only where the fit demands them (curvature events) — points on demand, not a
+ * point soup. `errorPx` is the max deviation from the faired trace.
+ */
+export function nodesFromFittedRing(densePts: Vec2Px[], errorPx = 0.35, idPrefix = 'v'): OutlineNode[] {
+  const ring = dedup(densePts)
+  const n = ring.length
+  if (n < 8) {
+    return ring.map((p, i) => ({ id: `${idPrefix}${i}`, p: [p[0], p[1]] as Vec2Px, role: 'corner' as const, corner: { mode: 'inherit' as const } }))
+  }
+  // open the ring at index 0 (the fairing leaves no sharp vertices — splits land on curvature)
+  const open: Vec2Px[] = [...ring.map((p) => [p[0], p[1]] as Vec2Px), [ring[0][0], ring[0][1]]]
+  const closureTangent = vNorm(vSub(open[1], open[open.length - 2])) // through the seam — G1-continuous closure
+  const segs: CubicSeg[] = []
+  fitCubicRec(open, 0, open.length - 1, closureTangent, vScale(closureTangent, -1), errorPx, segs, 0)
+  const nodes: OutlineNode[] = []
+  let startIdx = 0
+  for (let k = 0; k < segs.length; k++) {
+    const p = open[startIdx]
+    nodes.push({
+      id: `${idPrefix}${k}`,
+      p: [p[0], p[1]],
+      role: 'smooth',
+      corner: { mode: 'inherit' },
+      segmentToNext: { type: 'cubic', c1: segs[k].c1, c2: segs[k].c2 },
+    })
+    startIdx = segs[k].endIdx
+  }
+  return nodes
+}
+
 /**
  * Build editable nodes from a DENSE traced contour (e.g. the BEN mask trace): sparse anchor nodes
  * picked by RDP, with each segment carrying the EXACT dense polyline between its anchors
@@ -692,6 +810,50 @@ export function svgPathFromNodes(nodes: OutlineNode[]): string {
     }
   }
   return d + ' Z'
+}
+
+/**
+ * VECTOR CORE stage 4 — the manufacturing artefact: a pure, mm-true SVG of the cutline(s).
+ * Curves stay curves (C commands); 1 user unit = 1 mm (width/height carry explicit mm units —
+ * both research passes: SVG-mm is the canonical manufacturing source of truth). `flipY` converts
+ * y-up engine docs; editor docs are already y-down like SVG.
+ */
+export function svgMMFromRings(
+  rings: OutlineNode[][],
+  mmPerPx: number,
+  widthPx: number,
+  heightPx: number,
+  flipY: boolean,
+): string {
+  const k = mmPerPx
+  const map = (p: Vec2Px): Vec2Px => [p[0] * k, (flipY ? heightPx - p[1] : p[1]) * k]
+  const paths = rings
+    .map((nodes) => {
+      const mapped = nodes.map((nd) => {
+        const seg = nd.segmentToNext
+        return {
+          ...nd,
+          p: map(nd.p),
+          segmentToNext:
+            seg?.type === 'cubic'
+              ? { type: 'cubic' as const, c1: map(seg.c1), c2: map(seg.c2) }
+              : seg?.type === 'livewire'
+                ? { ...seg, rawPolyline: seg.rawPolyline.map(map) }
+                : seg,
+        }
+      })
+      return svgPathFromNodes(mapped)
+    })
+    .filter(Boolean)
+  const W = (widthPx * k).toFixed(3)
+  const H = (heightPx * k).toFixed(3)
+  return [
+    `<?xml version="1.0" encoding="UTF-8"?>`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}mm" height="${H}mm" viewBox="0 0 ${W} ${H}">`,
+    `  <path d="${paths.join(' ')}" fill="none" stroke="#000" stroke-width="0.1" fill-rule="evenodd"/>`,
+    `</svg>`,
+    '',
+  ].join('\n')
 }
 
 /** Gentle closed-ring Laplacian smoothing — the Smooth control for dense traced rings. */
