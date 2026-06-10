@@ -123,20 +123,43 @@ export default function ShapedModel({
   // frozen, so rebuilding per commit is wasted work. Track the latest committed contour; when the
   // editor CLOSES (editorOpen flips false) with a pending edit, fire ONE rebuild.
   const pendingContourRef = useRef<typeof editedContourMM>(null)
+  const pendingBaseRef = useRef(false) // a restore-to-UNEDITED arrived while the editor was open
   useEffect(() => {
-    if (!editedContourMM) { pendingContourRef.current = null; return }
+    if (!editedContourMM) {
+      pendingContourRef.current = null
+      // #23 fix: contour → null means a restore to the UNEDITED outline (global undo/redo/reset).
+      // The old early-return here left the edited mesh on screen — history stepped, object didn't.
+      // Rebuild from the spec's base geometry (same Contour type, same rebuild path).
+      if (!resultRef.current) return // nothing built yet (initial mount) — the [prepared] build owns it
+      if (editorOpen) { pendingBaseRef.current = true; return } // defer to the editor boundary
+      pendingBaseRef.current = false
+      rebuildFromBase()
+      return
+    }
+    pendingBaseRef.current = false
     if (editorOpen) { pendingContourRef.current = editedContourMM; return } // defer
     pendingContourRef.current = null
     rebuildFromContour(editedContourMM)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editedContourMM])
   useEffect(() => {
-    if (editorOpen || !pendingContourRef.current) return
-    const c = pendingContourRef.current
-    pendingContourRef.current = null
-    rebuildFromContour(c)
+    if (editorOpen) return
+    if (pendingContourRef.current) {
+      const c = pendingContourRef.current
+      pendingContourRef.current = null
+      rebuildFromContour(c)
+    } else if (pendingBaseRef.current) {
+      pendingBaseRef.current = false
+      rebuildFromBase()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editorOpen])
+
+  function rebuildFromBase() {
+    const sp = useOutlineStore.getState().spec
+    if (!sp) return
+    rebuildFromContour(sp.geometryMM)
+  }
 
   function rebuildFromContour(contour: NonNullable<typeof editedContourMM>) {
     const prev = resultRef.current
