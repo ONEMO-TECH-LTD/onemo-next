@@ -28,14 +28,16 @@ interface ToolbarProps {
 }
 
 /** One scene tool: icon over a small label (mobile-first touch target). */
-function Tool({ icon, label, onClick, active, primary }: {
-  icon: React.ReactNode; label: string; onClick: () => void; active?: boolean; primary?: boolean
+function Tool({ icon, label, onClick, active, primary, disabled }: {
+  icon: React.ReactNode; label: string; onClick: () => void; active?: boolean; primary?: boolean; disabled?: boolean
 }) {
   return (
     <button
       type="button"
       className={`${styles.tool} ${active ? styles.active : ''} ${primary ? styles.primary : ''}`}
       onClick={onClick}
+      disabled={disabled}
+      style={disabled ? { opacity: 0.35, pointerEvents: 'none' } : undefined}
       aria-pressed={active}
       aria-label={label}
     >
@@ -61,20 +63,18 @@ export default function Toolbar({
 
   return (
     <>
+      {/* #22/Q7 (Dan, 2026-06-10): ONE consistent menu from the first screen — the full creator
+          toolbar is always present (tools disabled until an image exists); the upload tool is
+          "Image" (not Upload/Replace), so there's no duplicate lone upload pill pre-image. */}
       <div className={styles.bar}>
-        <Tool icon={<UploadIcon />} label={artworkUrl ? 'Replace' : 'Upload'} onClick={() => fileInputRef.current?.click()} primary={!artworkUrl} />
-
-        {artworkUrl && (
-          <>
-            {/* Magic = auto cut-out (worker BEN). Highlights once the subject cut has been generated. */}
-            <Tool icon={<MagicIcon />} label="Magic" onClick={onGenerate} active={auto} />
-            <Tool icon={<EditIcon />} label="Edit" onClick={onEditOutline} />
-            {/* G1: position the photo WITHIN the shape — the silently-lost tool, restored first-class. */}
-            <Tool icon={<PositionIcon />} label="Position" onClick={onTogglePosition} active={positioning} />
-            <Tool icon={<ColorsIcon />} label="Trim" onClick={onToggleColors} active={showColors} />
-            <Tool icon={<SaveIcon />} label="Save" onClick={onSave} />
-          </>
-        )}
+        <Tool icon={<UploadIcon />} label="Image" onClick={() => fileInputRef.current?.click()} primary={!artworkUrl} />
+        {/* Magic = auto cut-out (worker BEN). Highlights once the subject cut has been generated. */}
+        <Tool icon={<MagicIcon />} label="Magic" onClick={onGenerate} active={auto} disabled={!artworkUrl} />
+        <Tool icon={<EditIcon />} label="Edit" onClick={onEditOutline} disabled={!artworkUrl} />
+        {/* G1: position the photo WITHIN the shape — the silently-lost tool, restored first-class. */}
+        <Tool icon={<PositionIcon />} label="Position" onClick={onTogglePosition} active={positioning} disabled={!artworkUrl} />
+        <Tool icon={<ColorsIcon />} label="Trim" onClick={onToggleColors} active={showColors} disabled={!artworkUrl} />
+        <Tool icon={<SaveIcon />} label="Save" onClick={onSave} disabled={!artworkUrl} />
       </div>
 
       <input

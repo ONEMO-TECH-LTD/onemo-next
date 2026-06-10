@@ -68,6 +68,12 @@ function PrototypePageInner() {
     import('./user/SavePanel').then(({ loadLibrary }) => setLibrary(loadLibrary()))
   }, [])
 
+  // #31: warm BEN silently the moment the creator opens — weights download + session init happen
+  // in the background worker, so the first Magic press starts at full speed.
+  useEffect(() => {
+    import('@/lib/effect/segment-ml').then((m) => m.preloadBen()).catch(() => { /* real run reports */ })
+  }, [])
+
   const handleFile = useCallback((file: File) => {
     if (!file.type.startsWith('image/')) return
     if (artworkUrl?.startsWith('blob:')) URL.revokeObjectURL(artworkUrl)
@@ -106,7 +112,8 @@ function PrototypePageInner() {
         prepareEffect(artworkUrl, 'shaped', undefined, (s) => {
           if (s === 'fallback') toast('warn', 'AI cut-out unavailable — used the simple background cut instead') // G4
           else setGenLabel(s === 'downloading-model' ? 'Downloading the magic… (one-time)' : 'Cutting out…')
-        }),
+          // #21: the tuned BEN settings are the defaults — Magic reads them, never resets them
+        }, useOutlineStore.getState().fairing?.params),
       )
       .then((p) => {
         setPrepared(p)
@@ -117,6 +124,7 @@ function PrototypePageInner() {
         try { st.setSubjMatteUrl(p.frontSrc.subjCanvas.toDataURL()) } catch { st.setSubjMatteUrl(null) }
         setAutoOutline(true)
         setGenerating(false)
+        setEditingOutline(true) // #26: after generation the editor opens on the generated outline
       })
       .catch((e) => {
         console.warn('[effect] prepare (shaped) failed:', e)

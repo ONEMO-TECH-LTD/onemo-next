@@ -300,6 +300,8 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
   // settings are found by testing in the run, not guessed. detail = the master 0–100 dial;
   // fairParams = the advanced per-knob values (master commit re-derives them via fairingFromDetail).
   const [detail, setDetail] = useState(BEN_DEFAULT_DETAIL)
+  const detailRef = useRef(detail)
+  useEffect(() => { detailRef.current = detail }, [detail])
   const [fairParams, setFairParams] = useState<FairTracedRingOpts>(() => fairingFromDetail(BEN_DEFAULT_DETAIL))
   const [tunePreview, setTunePreview] = useState<OutlineDocument | null>(null) // live re-fair while dragging a tune bar
   // Rotation = a whole-outline transform: two-finger twist (mobile) / drag the rotate handle (desktop,
@@ -422,8 +424,12 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
     setShapeKind(null)
     setShapePreview(null)
     setTunePreview(null)
-    setDetail(BEN_DEFAULT_DETAIL)
-    setFairParams(fairingFromDetail(BEN_DEFAULT_DETAIL))
+    {
+      // #21: Dan's tuned settings are the defaults — restore them, never reset to factory
+      const saved = useOutlineStore.getState().fairing
+      setDetail(saved?.detail ?? BEN_DEFAULT_DETAIL)
+      setFairParams(saved?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL))
+    }
     setRotateLive(null); rotateLiveRef.current = null; rotateRef.current = null
     setMoveLive(null); moveLiveRef.current = null; moveRef.current = null
     pinchRef.current = null; canvasPanRef.current = null
@@ -966,7 +972,7 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
     if (d) setTunePreview(d)
     perfGesture('tune-tick', performance.now() - t0)
   }, [buildTunedDoc])
-  const commitTune = useCallback((params: FairTracedRingOpts) => {
+  const commitTune = useCallback((params: FairTracedRingOpts, detailVal?: number) => {
     const t0 = performance.now()
     const d = buildTunedDoc(params)
     setTunePreview(null)
@@ -975,6 +981,8 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
     applyDoc(d)
     setSelectedNode(null)
     setAllSelected(false)
+    // #21: tuned settings become the durable defaults — Magic reads them from the store
+    useOutlineStore.getState().setFairing({ detail: detailVal ?? detailRef.current, params })
     perfGesture('tune-commit', performance.now() - t0)
   }, [buildTunedDoc, applyDoc])
 
@@ -1102,7 +1110,7 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
     : rotateLive ? `rotate(${rotateLive.deg} ${rotateLive.cx} ${rotateLive.cy})` : moveLive ? `translate(${moveLive.dx} ${moveLive.dy})` : undefined
   // Crop grips (Dan: iOS-crop reference) — boxy shapes only; grips track the bbox, including the
   // live stretch (rendered OUTSIDE the transformed group so the pill strokes never distort).
-  const cropMode = shapeKind === 'square' && !drawing && !preview && !shapePreview && !tunePreview
+  const cropMode = shapeKind !== null && !drawing && !preview && !shapePreview && !tunePreview // #32: every preset is reshapeable
   let cropBox: { minX: number; minY: number; maxX: number; maxY: number } | null = null
   if (cropMode && rotOuterIdx >= 0 && resolved.flattenedRingsPx[rotOuterIdx]?.length) {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
@@ -1166,7 +1174,10 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
             <filter id="kaiBgBlur" x="-20%" y="-20%" width="140%" height="140%">
               <feGaussianBlur stdDeviation={blendSd} />
             </filter>
+            {/* #24: Preview clips the photo to the cut outline — the final cut-out, no periphery */}
+            {preview && pathD && <clipPath id="kaiCutPreview"><path d={pathD} /></clipPath>}
           </defs>
+          <g clipPath={preview && pathD ? 'url(#kaiCutPreview)' : undefined}>
           {imageUrl && (showBlend ? (
             // magic blend: blurred full photo + the sharp BEN subject (matte is y-up → flip to editor y-down)
             <>
@@ -1176,6 +1187,7 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
           ) : (
             <image href={imageUrl} x={0} y={0} width={doc.image.widthPx} height={doc.image.heightPx} preserveAspectRatio="xMidYMid slice" />
           ))}
+          </g>
           {drawing ? (
             <>
               {drawPathD && <path className={styles.drawPath} d={drawPathD} />}
@@ -1189,11 +1201,11 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
           ) : (
             <>
               {/* scrim dims outside the cut; hidden during a live transform (its hole would lag the move/rotate) */}
-              {imageUrl && pathD && !rotateLive && !moveLive && !stretchLive && (
+              {imageUrl && pathD && !preview && !rotateLive && !moveLive && !stretchLive && (
                 <path className={styles.scrim} fillRule="evenodd" d={`M0 0H${doc.image.widthPx}V${doc.image.heightPx}H0Z ${pathD}`} />
               )}
               <g transform={liveXform}>
-                <path className={`${styles.path} ${hasIssues ? styles.pathError : ''}`} d={pathD} />
+                {!preview && <path className={`${styles.path} ${hasIssues ? styles.pathError : ''}`} d={pathD} />}
                 {/* anchors + rotate handle hidden in Preview (clean result) */}
                 {!preview && showAnchors && shown.rings.map((ring) =>
                   ring.nodes.map((n) => {
@@ -1291,7 +1303,7 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
       {!drawing && activeAdjust && activeAdjust !== 'shape' && activeAdjust !== 'tune' && (
         <div className={styles.sheet}>
           {activeAdjust === 'round' && (
-            <TickBar label={selectedNode ? 'Corner' : 'Round'} min={0} max={maxRadius} value={Math.min(radius, maxRadius)} onChange={setRadius} onCommit={commitRadius} format={(v) => `${Math.round((v / Math.max(maxRadius, 1)) * 100)}%`} />
+            <TickBar label={selectedNode ? 'Corner' : 'Radius'} min={0} max={maxRadius} value={Math.min(radius, maxRadius)} onChange={setRadius} onCommit={commitRadius} format={(v) => `${Math.round((v / Math.max(maxRadius, 1)) * 100)}%`} />
           )}
           {activeAdjust === 'smooth' && (
             <TickBar label="Smooth" min={0} max={100} value={smoothing} onChange={setSmoothing} onCommit={commitSmoothing} format={(v) => `${Math.round(v)}%`} />
@@ -1339,7 +1351,7 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
             <TickBar
               label="Detail" min={0} max={100} value={detail}
               onChange={(v) => { setDetail(v); previewTune(fairingFromDetail(v)) }}
-              onCommit={(v) => { setDetail(v); commitTune(fairingFromDetail(v)) }}
+              onCommit={(v) => { setDetail(v); commitTune(fairingFromDetail(v), v) }}
               format={(v) => `${Math.round(v)}%`}
             />
           </div>
@@ -1504,7 +1516,7 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
           <>
             <ToolBtn icon={<ShapeIcon />} label="Shape" onClick={toggleShape} active={activeAdjust === 'shape'} />
             {canTune && <ToolBtn icon={<TuneIcon />} label="Tune" onClick={() => setActiveAdjust((a) => (a === 'tune' ? null : 'tune'))} active={activeAdjust === 'tune'} />}
-            <ToolBtn icon={<RoundIcon />} label={selectedNode ? 'Corner' : 'Round'} onClick={() => setActiveAdjust((a) => (a === 'round' ? null : 'round'))} active={activeAdjust === 'round'} />
+            <ToolBtn icon={<RoundIcon />} label={selectedNode ? 'Corner' : 'Radius'} onClick={() => setActiveAdjust((a) => (a === 'round' ? null : 'round'))} active={activeAdjust === 'round'} />
             <ToolBtn icon={<SmoothIcon />} label="Smooth" onClick={() => setActiveAdjust((a) => (a === 'smooth' ? null : 'smooth'))} active={activeAdjust === 'smooth'} />
             <ToolBtn icon={<ScaleIcon />} label="Scale" onClick={() => setActiveAdjust((a) => (a === 'scale' ? null : 'scale'))} active={activeAdjust === 'scale'} />
             <ToolBtn icon={<BlendIcon />} label="Blend" onClick={() => setActiveAdjust((a) => (a === 'blend' ? null : 'blend'))} active={activeAdjust === 'blend'} />

@@ -63,6 +63,7 @@ function getBenWorker(): Worker {
       const p = settle(id)
       if (!p) return
       if (ok && data) p.resolve({ data: new Uint8ClampedArray(data), width: width!, height: height! })
+      else if (ok) p.resolve({ data: new Uint8ClampedArray(0), width: 0, height: 0 }) // preload ack — no matte
       else p.reject(new Error(error || 'BEN worker failed'))
     }
     benWorker.onerror = (e) => {
@@ -86,6 +87,18 @@ function runBenInWorker(
     pending.set(id, { resolve, reject, onProgress, watchdog })
     getBenWorker().postMessage({ id, url })
   })
+}
+
+/**
+ * SHORTLIST #31: silently warm BEN at page load — spins the worker and downloads/initializes the
+ * model (self-hosted weights or hub) with NO inference, so the first Magic press skips the wait.
+ * Fire-and-forget; failures are swallowed (the real Magic run surfaces them honestly).
+ */
+export function preloadBen(): void {
+  const id = ++reqSeq
+  const watchdog = setTimeout(() => { settle(id) }, INFERENCE_WATCHDOG_MS) // quiet cleanup, no reject noise
+  pending.set(id, { resolve: () => {}, reject: () => {}, watchdog })
+  try { getBenWorker().postMessage({ id, preload: true }) } catch { settle(id) }
 }
 
 /** Full-res RGBA buffer (worker output) → a canvas, so rasterize() can downscale it. */

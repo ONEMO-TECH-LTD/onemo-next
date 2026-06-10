@@ -63,8 +63,19 @@ interface RawImageData {
   channels: number
 }
 
-ctx.onmessage = async (e: MessageEvent<{ id: number; url: string }>) => {
+ctx.onmessage = async (e: MessageEvent<{ id: number; url: string; preload?: boolean }>) => {
   const { id, url } = e.data
+  // PRELOAD (SHORTLIST #31): warm the pipeline (weights download + session init) at page load,
+  // silently — no inference. The first real Magic then starts at full speed.
+  if (e.data.preload) {
+    try {
+      await getSegmenter((state) => ctx.postMessage({ id, progress: state }))
+      ctx.postMessage({ id, ok: true, preloaded: true })
+    } catch (err) {
+      ctx.postMessage({ id, ok: false, error: String((err as Error)?.message ?? err) })
+    }
+    return
+  }
   try {
     const segmenter = await getSegmenter((state) => ctx.postMessage({ id, progress: state }))
     ctx.postMessage({ id, progress: 'cutting' })

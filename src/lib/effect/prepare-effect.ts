@@ -48,6 +48,7 @@ import {
   fairingFromDetail,
   BEN_DEFAULT_DETAIL,
   contentHash,
+  type FairTracedRingOpts,
   type OutlineDocument,
   type OutlineNode,
   type OutlineGenerator,
@@ -125,13 +126,14 @@ function docFromRawRing(
   type: EffectType,
   radiusPx: number,
   selfCorrect: boolean,
+  fairing?: FairTracedRingOpts,
 ): OutlineDocument {
   const eps = type === 'shaped' ? Math.max(2, Math.max(W, H) * 0.022) : 1
   // shaped: EXACT traced contour — sparse anchors + the dense trace as segment rawPolylines, so the
   // resolved/manufactured outline IS the mask's true shape (no RDP/spline approximation — the
   // clipped-corner/wobble class Dan caught 2026-06-10). standard: plain corner ring (4 corners).
   const nodes: OutlineNode[] = type === 'shaped'
-    ? nodesFromTracedRing(fairTracedRing(ringPx, fairingFromDetail(BEN_DEFAULT_DETAIL)), eps)
+    ? nodesFromTracedRing(fairTracedRing(ringPx, fairing ?? fairingFromDetail(BEN_DEFAULT_DETAIL)), eps)
     : repairSimplePolygon(rdpClosed(ringPx, eps), Math.max(3, Math.max(W, H) * 0.008)).map((p, i) => ({
         id: `n${i}`,
         p: [p[0], p[1]] as Vec2Px,
@@ -180,6 +182,8 @@ export async function prepareEffect(
   type: EffectType,
   cfg: ShapeBuildConfig = EFFECT_BUILD_CONFIG,
   onProgress?: (s: 'downloading-model' | 'cutting' | 'fallback') => void,
+  // #21: Dan's tuned fairing rides every Magic run — settings are defaults, never reset by Magic.
+  fairing?: FairTracedRingOpts,
 ): Promise<PreparedEffect> {
   // Full photo (texture res), y-up, for the composite + edge-lip source.
   const orig = await loadImageData(url, cfg.textureDim)
@@ -247,7 +251,7 @@ export async function prepareEffect(
 
   // ── ONE ENGINE: raw ring → OutlineDocument → resolveOutlineDocument (corners via applyCornerRadii,
   //    NOT contour.filletCorners; policy.downstream_corner_rounding === 'disabled') → flattened mm.
-  const outlineDocument = docFromRawRing(ringPx, W, H, sourceHash, generator, type, radiusHiPx, selfCorrect)
+  const outlineDocument = docFromRawRing(ringPx, W, H, sourceHash, generator, type, radiusHiPx, selfCorrect, fairing)
   // 0.15px flatten: at 0.5px the chord segments were visible as facets on the 3D edge at zoom
   const resolved = resolveOutlineDocument(outlineDocument, { flattenTolerancePx: 0.15 })
   const outerFlatPx = resolved.flattenedRingsPx[0] ?? ringPx

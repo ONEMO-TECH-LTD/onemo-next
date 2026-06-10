@@ -12,7 +12,19 @@
 
 import { create } from 'zustand'
 import type { EffectSpecDraft, Contour } from '@/lib/effect/types'
-import type { OutlineDocument } from '@/lib/outline-core'
+import type { OutlineDocument, FairTracedRingOpts } from '@/lib/outline-core'
+
+// SHORTLIST #21 (Dan, 2026-06-10): fine-tuned BEN settings ARE the defaults — Magic must not reset
+// them. Durable across reloads (localStorage) until changed again.
+export interface FairingPrefs { detail: number; params: FairTracedRingOpts }
+const FAIRING_KEY = 'kai-ben-fairing-v1'
+function loadFairing(): FairingPrefs | null {
+  try {
+    if (typeof window === 'undefined') return null
+    const raw = window.localStorage.getItem(FAIRING_KEY)
+    return raw ? (JSON.parse(raw) as FairingPrefs) : null
+  } catch { return null }
+}
 
 interface OutlineStore {
   spec: EffectSpecDraft | null
@@ -34,6 +46,9 @@ interface OutlineStore {
   // §6.3: the editor overlay is open → the scene is frozen → 3D rebuilds defer to the close boundary.
   editorOpen: boolean
   setEditorOpen: (v: boolean) => void
+  // #21: Dan's tuned BEN fairing — the Tune dash writes it on commit; Magic reads it as the default.
+  fairing: FairingPrefs | null
+  setFairing: (f: FairingPrefs | null) => void
 }
 
 export const useOutlineStore = create<OutlineStore>((set) => ({
@@ -49,4 +64,14 @@ export const useOutlineStore = create<OutlineStore>((set) => ({
   setSubjMatteUrl: (subjMatteUrl) => set({ subjMatteUrl }),
   editorOpen: false,
   setEditorOpen: (editorOpen) => set({ editorOpen }),
+  fairing: loadFairing(),
+  setFairing: (fairing) => {
+    try {
+      if (typeof window !== 'undefined') {
+        if (fairing) window.localStorage.setItem(FAIRING_KEY, JSON.stringify(fairing))
+        else window.localStorage.removeItem(FAIRING_KEY)
+      }
+    } catch { /* private mode etc. — in-session value still applies */ }
+    set({ fairing })
+  },
 }))
