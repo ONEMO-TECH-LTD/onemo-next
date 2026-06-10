@@ -233,14 +233,14 @@ export default function EffectModel({
   const artworkMeshRef = useRef<THREE.Mesh | null>(null)
   const artworkTexRef = useRef<THREE.Texture | null>(null)
 
-  // Load artwork texture dynamically
-  const artworkMap = useMemo(() => {
-    const tex = loadOptionalTexture(artworkUrl, { color: true, repeat: true })
-    if (tex) {
-      artworkTexRef.current = tex
+  // Load artwork texture dynamically. Ref sync happens in an effect (not during render — F8d).
+  const artworkMap = useMemo(() => loadOptionalTexture(artworkUrl, { color: true, repeat: true }), [artworkUrl])
+
+  useEffect(() => {
+    if (artworkMap) {
+      artworkTexRef.current = artworkMap
     }
-    return tex
-  }, [artworkUrl])
+  }, [artworkMap])
 
   // Apply design state to artwork texture.
   // Recovery F4: repeat/offset are texture-MATRIX params — no `needsUpdate` (it forces a full
@@ -279,8 +279,10 @@ export default function EffectModel({
     return materials
   }, [artworkMap, product, roleEntries])
 
-  // Override materials and generate planar UVs
-  useMemo(() => {
+  // Override materials and generate planar UVs. An effect, not a render-time useMemo: this mutates
+  // the GLB scene + writes artworkMeshRef (F8d — side effects during render broke the lint and is a
+  // StrictMode double-run hazard). EffectModel is the GLB path (unused on the shaped route).
+  useEffect(() => {
     scene.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         const matchedRole = roleEntries.find((role) => matchesMeshName(child.name, role.meshNames))
