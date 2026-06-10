@@ -127,9 +127,9 @@ function resolveNodeRadius(node: OutlineNode, globalRadiusPx: number): number {
  * positive resolved radius become TRUE circular arcs (clamped so neighbouring fillets fit);
  * concave, near-straight, and zero-radius corners pass through as their vertex.
  *
- * `smoothing` (0..1) is the Smooth control: it lifts every convex corner toward its MAXIMUM safe
- * radius — at 1.0 each corner is fully rounded (a square becomes a circle). True arcs, not a spline
- * resample: the old Catmull-Rom smoothing faceted shapes instead of rounding them (Dan, 2026-06-10).
+ * Division of labour (settled by use, Dan 2026-06-10): RADIUS (the Round tool) = these true arcs —
+ * exact corner rounding, square @ max = circle. SMOOTH = the Catmull-Rom spline resample (below in
+ * resolve) — organic softening for BEN/free-form outlines. They are different effects; both ship.
  *
  * Arc resolution is ADAPTIVE (≈2px per segment, 8..72 steps): a fixed 10-step arc read visibly
  * choppy on large corners (e.g. the default square's corner radius at texture scale).
@@ -137,7 +137,6 @@ function resolveNodeRadius(node: OutlineNode, globalRadiusPx: number): number {
 export function applyCornerRadii(
   nodes: OutlineNode[],
   globalRadiusPx: number,
-  smoothing = 0,
 ): Vec2Px[] {
   const n = nodes.length
   if (n < 3) return nodes.map((nd) => [nd.p[0], nd.p[1]] as Vec2Px)
@@ -163,8 +162,7 @@ export function applyCornerRadii(
     // float noise. At full Smooth this is what closes a square into a true circle (the old 0.49
     // margin left visible flat remnants at the corners — 4.8% off-circle, measured).
     const maxR = (0.5 - 1e-4) * Math.min(l1, l2) * Math.tan(half)
-    // Smooth lifts the corner toward its max safe radius; explicit radii still apply without Smooth.
-    const R = Math.max(resolveNodeRadius(nodes[i], globalRadiusPx), smoothing > 0 ? smoothing * maxR : 0)
+    const R = resolveNodeRadius(nodes[i], globalRadiusPx)
     if (R <= 0 || nearStraight || !convex) { out.push([v[0], v[1]]); continue }
 
     const Rc = Math.min(R, maxR)
@@ -191,18 +189,43 @@ export function applyCornerRadii(
 
 // ─── flatten / normalize / validate ──────────────────────────────────────────
 
-/** Centripetal-uniform Catmull-Rom closed resample → smooths a ring (pure, no three.js). */
+/**
+ * CENTRIPETAL Catmull-Rom closed resample (Barry–Goldman) → smooths a ring (pure, no three.js).
+ * Centripetal parameterization (α=0.5) is the load-bearing choice: with UNEVEN anchor spacing the
+ * uniform variant overshoots between close anchor pairs and forms micro self-intersection loops —
+ * exactly what fired SELF_INTERSECTION on smoothed BEN outlines (2026-06-10). Centripetal CR is
+ * guaranteed cusp- and loop-free within segments.
+ */
 export function catmullRomClosed(pts: Vec2Px[], samplesPerSeg = 6): Vec2Px[] {
   const n = pts.length
   if (n < 3 || samplesPerSeg < 2) return pts
   const out: Vec2Px[] = []
+  const ALPHA = 0.5
+  const knot = (a: Vec2Px, b: Vec2Px, prev: number) =>
+    prev + Math.max(Math.pow(Math.hypot(b[0] - a[0], b[1] - a[1]), ALPHA), 1e-6)
   for (let i = 0; i < n; i++) {
     const p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n]
+    const t0 = 0
+    const t1 = knot(p0, p1, t0)
+    const t2 = knot(p1, p2, t1)
+    const t3 = knot(p2, p3, t2)
     for (let s = 0; s < samplesPerSeg; s++) {
-      const t = s / samplesPerSeg, t2 = t * t, t3 = t2 * t
-      const x = 0.5 * (2 * p1[0] + (-p0[0] + p2[0]) * t + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3)
-      const y = 0.5 * (2 * p1[1] + (-p0[1] + p2[1]) * t + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3)
-      out.push([x, y])
+      const t = t1 + ((t2 - t1) * s) / samplesPerSeg
+      // Barry–Goldman pyramid
+      const a1x = ((t1 - t) * p0[0] + (t - t0) * p1[0]) / (t1 - t0)
+      const a1y = ((t1 - t) * p0[1] + (t - t0) * p1[1]) / (t1 - t0)
+      const a2x = ((t2 - t) * p1[0] + (t - t1) * p2[0]) / (t2 - t1)
+      const a2y = ((t2 - t) * p1[1] + (t - t1) * p2[1]) / (t2 - t1)
+      const a3x = ((t3 - t) * p2[0] + (t - t2) * p3[0]) / (t3 - t2)
+      const a3y = ((t3 - t) * p2[1] + (t - t2) * p3[1]) / (t3 - t2)
+      const b1x = ((t2 - t) * a1x + (t - t0) * a2x) / (t2 - t0)
+      const b1y = ((t2 - t) * a1y + (t - t0) * a2y) / (t2 - t0)
+      const b2x = ((t3 - t) * a2x + (t - t1) * a3x) / (t3 - t1)
+      const b2y = ((t3 - t) * a2y + (t - t1) * a3y) / (t3 - t1)
+      out.push([
+        ((t2 - t) * b1x + (t - t1) * b2x) / (t2 - t1),
+        ((t2 - t) * b1y + (t - t1) * b2y) / (t2 - t1),
+      ])
     }
   }
   return out
@@ -283,12 +306,14 @@ export function resolveOutlineDocument(doc: OutlineDocument, opts: ResolveOption
   let anyRadius = false
 
   for (const ring of doc.rings) {
-    // Smooth (0..1) rides the SAME true-arc engine as corner radii — every convex corner lifts
-    // toward its max safe radius (square @ 1.0 → circle). The old Catmull-Rom resample is retired
-    // from this path: it FACETED shapes instead of rounding them (Dan, 2026-06-10).
-    const filleted = applyCornerRadii(ring.nodes, doc.style.globalOutlineCornerRadiusPx, doc.style.smoothing)
+    const filleted = applyCornerRadii(ring.nodes, doc.style.globalOutlineCornerRadiusPx)
     if (filleted.length !== ring.nodes.length) anyRadius = true
-    const resolved = filleted
+    // Smooth (0..1) = Catmull-Rom spline resample over the (filleted) ring — organic softening
+    // that interpolates CURVES between control nodes (kills the chord facets on BEN outlines).
+    // Density scales with the value; Round handles exact corner rounding separately.
+    const resolved = doc.style.smoothing > 0
+      ? catmullRomClosed(filleted, Math.round(4 + doc.style.smoothing * 12))
+      : filleted
     const flat = normalizeRing(flattenPath(resolved, tol), ring.role)
     resolvedRingsPx.push(resolved)
     flattenedRingsPx.push(flat)

@@ -274,6 +274,32 @@ export function generateShapeRing(params: ShapeParams, imgW: number, imgH: numbe
   return translate(rotate(ring, rot), cx, cy)
 }
 
+/** Uniform arc-length resample of a closed ring — evenly spaced points at ~`spacingPx` so curves
+ *  render vector-true (uneven generator spacing + coarse merging read as wobbly lines). */
+export function resampleClosed(pts: Vec2Px[], spacingPx: number): Vec2Px[] {
+  const n = pts.length
+  if (n < 3 || spacingPx <= 0) return pts
+  let perim = 0
+  const segLen: number[] = []
+  for (let i = 0; i < n; i++) {
+    const a = pts[i], b = pts[(i + 1) % n]
+    const l = Math.hypot(b[0] - a[0], b[1] - a[1])
+    segLen.push(l); perim += l
+  }
+  const count = Math.max(24, Math.round(perim / spacingPx))
+  const step = perim / count
+  const out: Vec2Px[] = []
+  let seg = 0, into = 0
+  for (let k = 0; k < count; k++) {
+    const target = k * step
+    while (seg < n && into + segLen[seg] < target) { into += segLen[seg]; seg++ }
+    const a = pts[seg % n], b = pts[(seg + 1) % n]
+    const t = segLen[seg % n] > 0 ? (target - into) / segLen[seg % n] : 0
+    out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t])
+  }
+  return out
+}
+
 /** Shapes that expose live parameter controls (tick-bars/steppers) in the sheet. */
 export const PARAMETRIC: Record<string, boolean> = {
   polygon: true, star: true, daisy: true, pinwheel: true, form: true, blob: true,

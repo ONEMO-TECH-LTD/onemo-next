@@ -136,7 +136,9 @@ function docFromRawRing(
   const env = { image, mode: (type === 'shaped' ? 'auto' : 'semi_auto') as 'auto' | 'semi_auto' }
   const base = (radius: number) => ({
     rings: [{ id: 'r1', role: 'outer' as const, closed: true as const, nodes }],
-    style: { globalOutlineCornerRadiusPx: radius, smoothing: 0 },
+    // shaped (organic) outlines carry default spline smoothing: the sparse control ring renders as
+    // CURVES between anchors instead of chord facets (the choppy-pill bug, Dan 2026-06-10).
+    style: { globalOutlineCornerRadiusPx: radius, smoothing: type === 'shaped' ? 0.55 : 0 },
     generator,
   })
   // self-correct: pick the largest non-self-intersecting radius for the cut-out (square uses its fixed 8mm)

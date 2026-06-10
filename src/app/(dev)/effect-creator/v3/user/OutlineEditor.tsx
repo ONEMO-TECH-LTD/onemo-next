@@ -26,11 +26,11 @@ import {
 import type { EffectSpecDraft, Contour } from '@/lib/effect/types'
 import { buildEdgeCost } from './edgeCost'
 import { useOutlineStore } from './outlineStore'
-import { UndoIcon, RedoIcon, SmoothIcon, ScaleIcon, PenIcon, ResetIcon, CheckIcon, CloseIcon, PlusIcon, MinusIcon, AddPointIcon, DeleteIcon, BlendIcon, ShapeIcon, OutlineIcon, DiceIcon, PreviewIcon, PreviewOffIcon } from './icons'
+import { UndoIcon, RedoIcon, RoundIcon, SmoothIcon, ScaleIcon, PenIcon, ResetIcon, CheckIcon, CloseIcon, PlusIcon, MinusIcon, AddPointIcon, DeleteIcon, BlendIcon, ShapeIcon, OutlineIcon, DiceIcon, PreviewIcon, PreviewOffIcon } from './icons'
 import TickBar from '../ui/TickBar'
 import { toast } from '../ui/Toast'
 import { perfGesture } from '../dev/PerfHUD'
-import { generateShapeRing, PARAMETRIC, type ShapeKind, type ShapeParams } from './shapes'
+import { generateShapeRing, resampleClosed, PARAMETRIC, type ShapeKind, type ShapeParams } from './shapes'
 import styles from './outline-editor.module.css'
 
 // Shape chips — Dan's board lineup (Simbolik/LOEWE symbol alphabet) + the two generators.
@@ -152,13 +152,18 @@ function docFromSpec(spec: EffectSpecDraft): OutlineDocument {
   const env = { image: { widthPx: W, heightPx: H, sourceHash: spec.sourceRef.slice(0, 40), orientation: 'baked' as const }, mode: 'auto' as const }
   const probe = applyOutlineCommands({ rings, style: { globalOutlineCornerRadiusPx: 0, smoothing: 0 } }, [], env)
   const safe = maxSafeGlobalRadius(probe, Math.round(Math.min(W, H) * 0.25))
-  const base = { rings, style: { globalOutlineCornerRadiusPx: safe, smoothing: 0 } }
+  // organic (BEN/flood) outlines keep default spline smoothing so anchors connect as CURVES,
+  // not chord facets (the choppy-pill bug); the exact standard square stays crisp.
+  const smoothing = spec.generator.adapter !== 'standard' ? 0.55 : 0
+  const base = { rings, style: { globalOutlineCornerRadiusPx: safe, smoothing } }
   return applyOutlineCommands(base, [], env)
 }
 
-/** Build an OutlineDocument from a single outer ring of points (used by the SDF blend). */
-function docFromRings(outerPts: Vec2Px[], image: OutlineDocument['image'], defaultRadiusPx = 0): OutlineDocument {
-  const clean = repairSimplePolygon(outerPts, Math.max(3, Math.max(image.widthPx, image.heightPx) * 0.008))
+/** Build an OutlineDocument from a single outer ring of points (shapes / draw). `minSpacingPx`
+ *  controls anchor merging — dense parametric rings pass a SMALL value so points merge EVENLY
+ *  (the default coarse merge ate points irregularly → "slightly uneven curves", Dan 2026-06-10). */
+function docFromRings(outerPts: Vec2Px[], image: OutlineDocument['image'], defaultRadiusPx = 0, minSpacingPx?: number): OutlineDocument {
+  const clean = repairSimplePolygon(outerPts, minSpacingPx ?? Math.max(3, Math.max(image.widthPx, image.heightPx) * 0.008))
   const nodes = (clean.length >= 3 ? clean : outerPts).map((p, i) => ({ id: `b${i}`, p, role: 'corner' as const, corner: { mode: 'inherit' as const } }))
   const base = { rings: [{ id: 'r1', role: 'outer' as const, closed: true as const, nodes }], style: { globalOutlineCornerRadiusPx: defaultRadiusPx, smoothing: 0 } }
   return applyOutlineCommands(base, [], { image, mode: 'semi_auto' })
@@ -258,12 +263,14 @@ function TopTool({ icon, label, onClick, disabled }: {
 export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditorProps) {
   const [doc, setDoc] = useState<OutlineDocument>(() => seedDoc(VIEW_W, VIEW_H))
   const [drag, setDrag] = useState<{ ringId: string; nodeId: string; pos: Vec2Px } | null>(null)
-  const [smoothing, setSmoothing] = useState(0) // 0–100 → style.smoothing 0..1 (Catmull-Rom)
+  const [radius, setRadius] = useState(0)        // Round: global (or selected-corner) radius px
+  const [maxRadius, setMaxRadius] = useState(120) // Round tick-bar range (¼ of the short side)
+  const [smoothing, setSmoothing] = useState(0) // 0–100 → style.smoothing 0..1 (Catmull-Rom spline)
   const [scale, setScale] = useState(100) // 50–150 relative resize of the whole cut-out; bakes on release
   const [drawPts, setDrawPts] = useState<Vec2Px[] | null>(null) // non-null = Manual draw in progress (A3a)
   const [edgeCost, setEdgeCost] = useState<CostGrid | null>(null) // image edge-cost grid for the livewire (A3b)
   const [selectedNode, setSelectedNode] = useState<{ ringId: string; nodeId: string } | null>(null) // anchor add/delete target
-  const [activeAdjust, setActiveAdjust] = useState<'smooth' | 'scale' | 'blend' | 'shape' | null>(null) // which adjustment sheet is revealed (mobile: one at a time)
+  const [activeAdjust, setActiveAdjust] = useState<'round' | 'smooth' | 'scale' | 'blend' | 'shape' | null>(null) // which adjustment sheet is revealed (mobile: one at a time)
   const [blendOn, setBlendOn] = useState(true) // "magic blend" on/off (the soft real-background blur on the 3D front)
   const [blendBlur, setBlendBlur] = useState(50) // magic-blend intensity 0–100 (50 ≈ the build default)
   // Shape tool: pick a preset/parametric shape as the starting outline. shapeKind = the shape currently
@@ -334,6 +341,7 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
     bumpHist((v) => v + 1)
   }, [])
   const syncSlidersTo = useCallback((d: OutlineDocument) => {
+    setRadius(d.style.globalOutlineCornerRadiusPx)
     setSmoothing(Math.round(d.style.smoothing * 100))
     setScale(100)
     setSelectedNode(null)
@@ -376,6 +384,8 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
     const useStored = !!stored && !!spec && stored.image.sourceHash === spec.sourceRef.slice(0, 40)
     const d = useStored ? stored! : spec ? docFromSpec(spec) : seedDoc(VIEW_W, VIEW_H)
     setDoc(d)
+    setRadius(d.style.globalOutlineCornerRadiusPx)
+    setMaxRadius(Math.round(Math.min(d.image.widthPx, d.image.heightPx) * 0.25))
     setSmoothing(Math.round(d.style.smoothing * 100))
     setScale(100)
     setView({ scale: 1, vx: 0, vy: 0 }) // G11: fresh session starts at fit
@@ -444,9 +454,15 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
   )
 
   // Display doc reflects the in-flight drag + live transient controls (instant, §6.3 preview-only).
-  // No radius branch: the Round tool is folded (D5) — rounding is engine-internal default only.
+  // Round is BACK as its own control (use proved it ≠ Smooth): exact arc radius, per-corner when a
+  // node is selected; Smooth = organic spline softening.
   const displayDoc = useMemo(() => {
     let d: OutlineDocument = doc
+    if (selectedNode) {
+      d = { ...doc, rings: doc.rings.map((r) => (r.id !== selectedNode.ringId ? r : { ...r, nodes: r.nodes.map((n) => (n.id === selectedNode.nodeId ? { ...n, corner: { ...n.corner, mode: 'manual' as const, outlineCornerRadiusPx: radius } } : n)) })) }
+    } else if (radius !== doc.style.globalOutlineCornerRadiusPx) {
+      d = { ...doc, style: { ...doc.style, globalOutlineCornerRadiusPx: radius } }
+    }
     // live Smooth control (transient)
     const sm = smoothing / 100
     if (sm !== d.style.smoothing) d = { ...d, style: { ...d.style, smoothing: sm } }
@@ -460,7 +476,7 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
       d = { ...d, rings: d.rings.map((r) => (r.id !== drag.ringId ? r : { ...r, nodes: r.nodes.map((n) => (n.id === drag.nodeId ? { ...n, p: drag.pos } : n)) })) }
     }
     return d
-  }, [doc, drag, smoothing, scale])
+  }, [doc, drag, radius, selectedNode, smoothing, scale])
 
   // Live morphs supersede the normal display: shape-tool preview > doc.
   const shown = shapePreview ?? displayDoc
@@ -574,11 +590,13 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
       nodeInteractedRef.current = true
       setAllSelected(false)
       setSelectedNode({ ringId, nodeId })
+      const node = doc.rings.find((r) => r.id === ringId)?.nodes.find((n) => n.id === nodeId)
+      setRadius(node?.corner.outlineCornerRadiusPx ?? doc.style.globalOutlineCornerRadiusPx)
       const at = toViewBox(e.clientX, e.clientY)
       dragStartRef.current = at
       setDrag({ ringId, nodeId, pos: at })
     },
-    [toViewBox],
+    [toViewBox, doc],
   )
 
   // Surface pointer-down: track active pointers (for the two-finger twist), and start a freehand stroke
@@ -775,6 +793,7 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
   const onReset = useCallback(() => {
     const d = spec ? docFromSpec(spec) : seedDoc(VIEW_W, VIEW_H)
     applyDoc(d) // reset restores the base shape — undoable + pushed back to the 3D
+    setRadius(d.style.globalOutlineCornerRadiusPx)
     setSmoothing(Math.round(d.style.smoothing * 100))
     setScale(100)
     setDrag(null)
@@ -807,6 +826,13 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
     }
   }, [drawPts, doc, resolved, toViewBox, preview])
 
+  const commitRadius = useCallback((v: number) => {
+    setRadius(v)
+    const t0 = performance.now()
+    if (selectedNode) commit({ op: 'SetCorner', ringId: selectedNode.ringId, nodeId: selectedNode.nodeId, corner: { mode: 'manual', outlineCornerRadiusPx: v } })
+    else commit({ op: 'SetGlobalCornerRadius', outlineCornerRadiusPx: v })
+    perfGesture('round-commit', performance.now() - t0)
+  }, [selectedNode, commit])
   const commitSmoothing = useCallback((v: number) => {
     setSmoothing(v)
     const t0 = performance.now()
@@ -837,7 +863,10 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
   // continuous ones (spikiness/rotate) preview while dragging and bake on release.
   const buildShapeDoc = useCallback((kind: ShapeKind, overrides: Partial<ShapeParams> = {}): OutlineDocument => {
     const img = docRef.current.image
-    return docFromRings(generateShapeRing({ kind, ...shapeParamsRef.current, ...overrides }, img.widthPx, img.heightPx), img, 0)
+    // uniform arc-length resample → evenly spaced anchors → vector-true curves (no irregular
+    // merging); tiny minSpacing so the even spacing survives docFromRings' cleanup.
+    const ring = resampleClosed(generateShapeRing({ kind, ...shapeParamsRef.current, ...overrides }, img.widthPx, img.heightPx), Math.max(img.widthPx, img.heightPx) / 220)
+    return docFromRings(ring, img, 0, 1.5)
   }, [])
   const pickShape = useCallback((kind: ShapeKind) => {
     setShapeKind(kind)
@@ -1079,6 +1108,9 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
           per-tick = transient visual preview only; commit fires once on release (§6.3). */}
       {!drawing && activeAdjust && activeAdjust !== 'shape' && (
         <div className={styles.sheet}>
+          {activeAdjust === 'round' && (
+            <TickBar label={selectedNode ? 'Corner' : 'Round'} min={0} max={maxRadius} value={Math.min(radius, maxRadius)} onChange={setRadius} onCommit={commitRadius} format={(v) => `${Math.round((v / Math.max(maxRadius, 1)) * 100)}%`} />
+          )}
           {activeAdjust === 'smooth' && (
             <TickBar label="Smooth" min={0} max={100} value={smoothing} onChange={setSmoothing} onCommit={commitSmoothing} format={(v) => `${Math.round(v)}%`} />
           )}
@@ -1236,6 +1268,7 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
         ) : (
           <>
             <ToolBtn icon={<ShapeIcon />} label="Shape" onClick={toggleShape} active={activeAdjust === 'shape'} />
+            <ToolBtn icon={<RoundIcon />} label={selectedNode ? 'Corner' : 'Round'} onClick={() => setActiveAdjust((a) => (a === 'round' ? null : 'round'))} active={activeAdjust === 'round'} />
             <ToolBtn icon={<SmoothIcon />} label="Smooth" onClick={() => setActiveAdjust((a) => (a === 'smooth' ? null : 'smooth'))} active={activeAdjust === 'smooth'} />
             <ToolBtn icon={<ScaleIcon />} label="Scale" onClick={() => setActiveAdjust((a) => (a === 'scale' ? null : 'scale'))} active={activeAdjust === 'scale'} />
             <ToolBtn icon={<BlendIcon />} label="Blend" onClick={() => setActiveAdjust((a) => (a === 'blend' ? null : 'blend'))} active={activeAdjust === 'blend'} />
