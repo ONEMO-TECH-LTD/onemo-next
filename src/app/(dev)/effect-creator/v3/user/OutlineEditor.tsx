@@ -31,7 +31,7 @@ import {
 import type { EffectSpecDraft, Contour } from '@/lib/effect/types'
 import { buildEdgeCost } from './edgeCost'
 import { useOutlineStore, NEUTRAL_FX, type ImageFx } from './outlineStore'
-import { UndoIcon, RedoIcon, RoundIcon, SmoothIcon, ScaleIcon, PenIcon, ResetIcon, CheckIcon, CloseIcon, PlusIcon, MinusIcon, AddPointIcon, DeleteIcon, BlendIcon, ShapeIcon, TuneIcon, ImageToolIcon, PositionIcon, BrightnessIcon, ContrastIcon, SaturationIcon, WarmthIcon, OutlineIcon, DiceIcon, PreviewIcon, PreviewOffIcon } from './icons'
+import { UndoIcon, RedoIcon, RoundIcon, SmoothIcon, ScaleIcon, PenIcon, ResetIcon, CheckIcon, CloseIcon, PlusIcon, MinusIcon, AddPointIcon, DeleteIcon, BlendIcon, ShapeIcon, TuneIcon, ImageToolIcon, PositionIcon, BrightnessIcon, ContrastIcon, SaturationIcon, WarmthIcon, SnapIcon, MinLineIcon, AngleIcon, OutlineIcon, DiceIcon, PreviewIcon, PreviewOffIcon } from './icons'
 import TickBar from '../ui/TickBar'
 import { toast } from '../ui/Toast'
 import { perfGesture } from '../dev/PerfHUD'
@@ -286,7 +286,10 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   const [drawPts, setDrawPts] = useState<Vec2Px[] | null>(null) // non-null = Manual draw in progress (A3a)
   const [edgeCost, setEdgeCost] = useState<CostGrid | null>(null) // image edge-cost grid for the livewire (A3b)
   const [selectedNode, setSelectedNode] = useState<{ ringId: string; nodeId: string } | null>(null) // anchor add/delete target
-  const [activeAdjust, setActiveAdjust] = useState<'round' | 'smooth' | 'scale' | 'blend' | 'shape' | 'tune' | 'image' | null>(null) // which adjustment sheet is revealed (mobile: one at a time)
+  // #35 Apple layout: the editor's bottom is a MODE pill (Shape · Adjust · Image · Draw); each
+  // mode shows a row of circular sub-tools sharing ONE ruler — no more dock-of-everything.
+  const [activeAdjust, setActiveAdjust] = useState<'shape' | 'adjust' | 'image' | null>(null)
+  const [adjustSub, setAdjustSub] = useState<'radius' | 'curve' | 'scale' | 'blend' | 'detail' | 'smooth' | 'snap' | 'line' | 'angle'>('radius')
   const [blendOn, setBlendOn] = useState(true) // "magic blend" on/off (the soft real-background blur on the 3D front)
   const [blendBlur, setBlendBlur] = useState(50) // magic-blend intensity 0–100 (50 ≈ the build default)
   // Shape tool: pick a preset/parametric shape as the starting outline. shapeKind = the shape currently
@@ -474,11 +477,13 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       setShowAnchors(false) // rigid shape default — Points toggle re-enables
     }
     setImageSub('position')
+    setAdjustSub('radius')
     setFxDraft(useOutlineStore.getState().imageFx ?? NEUTRAL_FX)
     imgPanRef.current = null
-    // #27: toolbar creation modes land in the matching editor mode
+    // #27: toolbar creation modes land in the matching editor mode; default mode = Adjust
     if (openMode === 'shape') setActiveAdjust('shape')
-    else if (openMode === 'draw') { setDrawPts([]); setDrag(null) }
+    else if (openMode === 'draw') { setDrawPts([]); setDrag(null); setActiveAdjust(null) }
+    else setActiveAdjust('adjust')
     docRef.current = opened
     histRef.current = { past: [], future: [] } // fresh undo history per editing session
     if (imageUrl) {
@@ -1351,46 +1356,78 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
                 : 'Tap inside to select all · drag inside to move · drag points · double-tap to add/remove · pinch/scroll to zoom'}
       </div>
 
-      {/* reveal-on-tap adjustment sheet — every continuous control is the shared TickBar (G12):
-          per-tick = transient visual preview only; commit fires once on release (§6.3). */}
-      {!drawing && activeAdjust && activeAdjust !== 'shape' && activeAdjust !== 'tune' && activeAdjust !== 'image' && (
-        <div className={styles.sheet}>
-          {activeAdjust === 'round' && (
-            <TickBar label={selectedNode ? 'Corner' : 'Radius'} min={0} max={maxRadius} value={Math.min(radius, maxRadius)} onChange={setRadius} onCommit={commitRadius} format={(v) => `${Math.round((v / Math.max(maxRadius, 1)) * 100)}%`} />
-          )}
-          {activeAdjust === 'smooth' && (
-            <TickBar label="Curve" min={0} max={100} value={smoothing} onChange={setSmoothing} onCommit={commitSmoothing} format={(v) => `${Math.round(v)}%`} />
-          )}
-          {activeAdjust === 'scale' && (
-            <>
-              <button type="button" className={styles.stepBtn} onClick={() => nudgeScale(-5)} aria-label="Scale down"><MinusIcon /></button>
-              <TickBar label="Scale" min={50} max={150} value={scale} onChange={setScale} onCommit={commitScale} format={(v) => `${Math.round(v)}%`} />
-              <button type="button" className={styles.stepBtn} onClick={() => nudgeScale(5)} aria-label="Scale up"><PlusIcon /></button>
-            </>
-          )}
-          {activeAdjust === 'blend' && (
-            <>
+      {/* #35 ADJUST mode (Apple pattern): circular sub-tools — Radius · Curve · Scale · Blend +
+          Tune's five dials when a Magic trace exists — sharing ONE ruler. Per-tick preview only;
+          commit on release (§6.3). */}
+      {!drawing && activeAdjust === 'adjust' && (
+        <div className={styles.shapeSheet}>
+          <div className={styles.chipRow}>
+            {([
+              { k: 'radius', label: selectedNode ? 'Corner' : 'Radius', icon: <RoundIcon />, show: true },
+              { k: 'curve', label: 'Curve', icon: <SmoothIcon />, show: true },
+              { k: 'scale', label: 'Scale', icon: <ScaleIcon />, show: true },
+              { k: 'blend', label: 'Blend', icon: <BlendIcon />, show: true },
+              { k: 'detail', label: 'Detail', icon: <TuneIcon />, show: canTune },
+              { k: 'smooth', label: 'Smooth', icon: <SnapIcon />, show: canTune },
+              { k: 'snap', label: 'Snap', icon: <MinLineIcon />, show: canTune },
+              { k: 'line', label: 'Min line', icon: <AddPointIcon />, show: canTune },
+              { k: 'angle', label: 'Angle', icon: <AngleIcon />, show: canTune },
+            ] as const).filter((t) => t.show).map((t) => (
               <button
+                key={t.k}
                 type="button"
-                className={`${styles.toggleBtn} ${blendOn ? styles.toggleBtnOn : ''}`}
-                onClick={() => { const next = !blendOn; setBlendOn(next); writeBlend(next, blendBlur) }}
-                aria-pressed={blendOn}
-                aria-label="Toggle magic blend"
+                className={`${styles.chip} ${adjustSub === t.k ? styles.chipActive : ''}`}
+                onClick={() => setAdjustSub(t.k)}
+                aria-pressed={adjustSub === t.k}
+                aria-label={t.label}
               >
-                {blendOn ? 'On' : 'Off'}
+                <span className={styles.chipIcon}>{t.icon}</span>
+                <span className={styles.chipLabel}>{t.label}</span>
               </button>
-              <TickBar
-                label="Blend"
-                min={0}
-                max={100}
-                value={blendBlur}
-                disabled={!blendOn}
-                onChange={setBlendBlur}
-                onCommit={(v) => { setBlendBlur(v); writeBlend(blendOn, v) }}
-                format={(v) => `${Math.round(v)}%`}
-              />
-            </>
-          )}
+            ))}
+          </div>
+          <div className={styles.shapeControls}>
+            <div className={styles.shapeRow}>
+              {adjustSub === 'radius' && (
+                <TickBar label={selectedNode ? 'Corner' : 'Radius'} min={0} max={maxRadius} value={Math.min(radius, maxRadius)} onChange={setRadius} onCommit={commitRadius} format={(v) => `${Math.round((v / Math.max(maxRadius, 1)) * 100)}%`} />
+              )}
+              {adjustSub === 'curve' && (
+                <TickBar label="Curve" min={0} max={100} value={smoothing} onChange={setSmoothing} onCommit={commitSmoothing} format={(v) => `${Math.round(v)}%`} />
+              )}
+              {adjustSub === 'scale' && (
+                <TickBar label="Scale" min={50} max={150} value={scale} onChange={setScale} onCommit={commitScale} format={(v) => `${Math.round(v)}%`} />
+              )}
+              {adjustSub === 'blend' && (
+                <>
+                  <button
+                    type="button"
+                    className={`${styles.toggleBtn} ${blendOn ? styles.toggleBtnOn : ''}`}
+                    onClick={() => { const next = !blendOn; setBlendOn(next); writeBlend(next, blendBlur) }}
+                    aria-pressed={blendOn}
+                    aria-label="Toggle magic blend"
+                  >
+                    {blendOn ? 'On' : 'Off'}
+                  </button>
+                  <TickBar label="Blend" min={0} max={100} value={blendBlur} disabled={!blendOn} onChange={setBlendBlur} onCommit={(v) => { setBlendBlur(v); writeBlend(blendOn, v) }} format={(v) => `${Math.round(v)}%`} />
+                </>
+              )}
+              {adjustSub === 'detail' && (
+                <TickBar label="Detail" min={0} max={100} value={detail} onChange={(v) => { setDetail(v); previewTune(fairingFromDetail(v)) }} onCommit={(v) => { setDetail(v); commitTune(fairingFromDetail(v), v) }} format={(v) => `${Math.round(v)}%`} />
+              )}
+              {adjustSub === 'smooth' && (
+                <TickBar label="Smooth strength" min={1} max={30} step={0.5} value={fairParams.smoothPx ?? 6} onChange={(v) => previewTune({ ...fairParams, smoothPx: v })} onCommit={(v) => commitTune({ ...fairParams, smoothPx: v })} format={(v) => `${v.toFixed(1)}px`} />
+              )}
+              {adjustSub === 'snap' && (
+                <TickBar label="Line snap band" min={0} max={20} step={0.5} value={fairParams.detailPx ?? 4} onChange={(v) => previewTune({ ...fairParams, detailPx: v })} onCommit={(v) => commitTune({ ...fairParams, detailPx: v })} format={(v) => `${v.toFixed(1)}px`} />
+              )}
+              {adjustSub === 'line' && (
+                <TickBar label="Min line length" min={20} max={200} step={5} value={fairParams.minLinePx ?? 50} onChange={(v) => previewTune({ ...fairParams, minLinePx: v })} onCommit={(v) => commitTune({ ...fairParams, minLinePx: v })} format={(v) => `${Math.round(v)}px`} />
+              )}
+              {adjustSub === 'angle' && (
+                <TickBar label="Sharpest angle" min={10} max={90} step={1} value={fairParams.maxTurnDeg ?? 35} onChange={(v) => previewTune({ ...fairParams, maxTurnDeg: v })} onCommit={(v) => commitTune({ ...fairParams, maxTurnDeg: v })} format={(v) => `${Math.round(v)}°`} />
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -1453,59 +1490,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
                 />
               </div>
             )}
-          </div>
-        </div>
-      )}
-
-      {/* Tune (BEN dash, Dan 2026-06-10): live fairing params over the raw trace — find the optimal
-          settings by testing in the run. Detail = master (10–20% = patch-simple default); advanced
-          bars expose each engine knob; master commit re-derives the advanced values. */}
-      {!drawing && activeAdjust === 'tune' && canTune && (
-        <div className={styles.shapeSheet}>
-          <div className={styles.shapeRow}>
-            <span className={styles.shapeName}>Detail</span>
-            <TickBar
-              label="Detail" min={0} max={100} value={detail}
-              onChange={(v) => { setDetail(v); previewTune(fairingFromDetail(v)) }}
-              onCommit={(v) => { setDetail(v); commitTune(fairingFromDetail(v), v) }}
-              format={(v) => `${Math.round(v)}%`}
-            />
-          </div>
-          <div className={styles.shapeRow}>
-            <span className={styles.shapeName}>Smooth</span>
-            <TickBar
-              label="Smooth strength" min={1} max={30} step={0.5} value={fairParams.smoothPx ?? 6}
-              onChange={(v) => previewTune({ ...fairParams, smoothPx: v })}
-              onCommit={(v) => commitTune({ ...fairParams, smoothPx: v })}
-              format={(v) => `${v.toFixed(1)}px`}
-            />
-          </div>
-          <div className={styles.shapeRow}>
-            <span className={styles.shapeName}>Snap</span>
-            <TickBar
-              label="Line snap band" min={0} max={20} step={0.5} value={fairParams.detailPx ?? 4}
-              onChange={(v) => previewTune({ ...fairParams, detailPx: v })}
-              onCommit={(v) => commitTune({ ...fairParams, detailPx: v })}
-              format={(v) => `${v.toFixed(1)}px`}
-            />
-          </div>
-          <div className={styles.shapeRow}>
-            <span className={styles.shapeName}>Min line</span>
-            <TickBar
-              label="Min line length" min={20} max={200} step={5} value={fairParams.minLinePx ?? 50}
-              onChange={(v) => previewTune({ ...fairParams, minLinePx: v })}
-              onCommit={(v) => commitTune({ ...fairParams, minLinePx: v })}
-              format={(v) => `${Math.round(v)}px`}
-            />
-          </div>
-          <div className={styles.shapeRow}>
-            <span className={styles.shapeName}>Angle</span>
-            <TickBar
-              label="Sharpest angle" min={10} max={90} step={1} value={fairParams.maxTurnDeg ?? 35}
-              onChange={(v) => previewTune({ ...fairParams, maxTurnDeg: v })}
-              onCommit={(v) => commitTune({ ...fairParams, maxTurnDeg: v })}
-              format={(v) => `${Math.round(v)}°`}
-            />
           </div>
         </div>
       )}
@@ -1630,12 +1614,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
           </>
         ) : (
           <>
+            {/* #35: the MODE pill — Shape · Adjust · Image · Draw (Apple bottom-pill pattern) */}
             <ToolBtn icon={<ShapeIcon />} label="Shape" onClick={toggleShape} active={activeAdjust === 'shape'} />
-            {canTune && <ToolBtn icon={<TuneIcon />} label="Tune" onClick={() => setActiveAdjust((a) => (a === 'tune' ? null : 'tune'))} active={activeAdjust === 'tune'} />}
-            <ToolBtn icon={<RoundIcon />} label={selectedNode ? 'Corner' : 'Radius'} onClick={() => setActiveAdjust((a) => (a === 'round' ? null : 'round'))} active={activeAdjust === 'round'} />
-            <ToolBtn icon={<SmoothIcon />} label="Curve" onClick={() => setActiveAdjust((a) => (a === 'smooth' ? null : 'smooth'))} active={activeAdjust === 'smooth'} />
-            <ToolBtn icon={<ScaleIcon />} label="Scale" onClick={() => setActiveAdjust((a) => (a === 'scale' ? null : 'scale'))} active={activeAdjust === 'scale'} />
-            <ToolBtn icon={<BlendIcon />} label="Blend" onClick={() => setActiveAdjust((a) => (a === 'blend' ? null : 'blend'))} active={activeAdjust === 'blend'} />
+            <ToolBtn icon={<TuneIcon />} label="Adjust" onClick={() => setActiveAdjust((a) => (a === 'adjust' ? null : 'adjust'))} active={activeAdjust === 'adjust'} />
             <ToolBtn icon={<ImageToolIcon />} label="Image" onClick={() => setActiveAdjust((a) => (a === 'image' ? null : 'image'))} active={activeAdjust === 'image'} />
             <ToolBtn icon={<PenIcon />} label="Draw" onClick={startDraw} />
           </>
