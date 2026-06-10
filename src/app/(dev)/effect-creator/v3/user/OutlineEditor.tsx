@@ -1245,9 +1245,11 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
               {!preview && cropBox && !rotateLive && !moveLive && (() => {
                 const { minX, minY, maxX, maxY } = cropBox
                 const mx = (minX + maxX) / 2, my = (minY + maxY) / 2
-                const arm = Math.min(nodeR * 3, (maxX - minX) * 0.22, (maxY - minY) * 0.22)
-                const lenH = Math.min(nodeR * 4, (maxX - minX) * 0.3)
-                const lenV = Math.min(nodeR * 4, (maxY - minY) * 0.3)
+                // Apple-crop proportions (Dan's reference): delicate thin strokes, modest arms —
+                // the HIT area below keeps the full touch target.
+                const arm = Math.min(nodeR * 2.1, (maxX - minX) * 0.18, (maxY - minY) * 0.18)
+                const lenH = Math.min(nodeR * 2.4, (maxX - minX) * 0.22)
+                const lenV = Math.min(nodeR * 2.4, (maxY - minY) * 0.22)
                 const grips: { id: GripId; d: string; cursor: string }[] = [
                   { id: 'n', d: `M ${mx - lenH / 2} ${minY} L ${mx + lenH / 2} ${minY}`, cursor: 'ns-resize' },
                   { id: 's', d: `M ${mx - lenH / 2} ${maxY} L ${mx + lenH / 2} ${maxY}`, cursor: 'ns-resize' },
@@ -1262,8 +1264,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
                   <g>
                     {grips.map((g) => (
                       <g key={g.id}>
-                        <path className={styles.gripUnder} d={g.d} strokeWidth={nodeR * 1.5} />
-                        <path className={styles.grip} d={g.d} strokeWidth={nodeR * 1.1} />
+                        <path className={styles.gripUnder} d={g.d} strokeWidth={nodeR * 0.8} />
+                        <path className={styles.grip} d={g.d} strokeWidth={nodeR * 0.55} />
                         <path
                           className={styles.gripHit}
                           d={g.d}
