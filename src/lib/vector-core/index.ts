@@ -18,3 +18,6 @@ export {
   signedArea,
   type VSegment,
 } from './path'
+
+// Cubic fitting (Graphics Gems / Schneider) — offline preset baking, generator output, trace.
+export { fitCubicsOpen, ringToVPath, cornerIndices, type CubicSeg } from './fit'

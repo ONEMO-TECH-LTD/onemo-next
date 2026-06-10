@@ -3,7 +3,7 @@
 // Square: lines never subdivide. Flatten: chord error within tolerance. SVG: true C commands.
 
 import { describe, test, expect } from 'vitest'
-import { cubicPoint, flattenPath, toSVGPathD, transformShape, segments, shapeBBox, filletPath } from '../index'
+import { cubicPoint, flattenPath, toSVGPathD, transformShape, segments, shapeBBox, filletPath, ringToVPath } from '../index'
 import { unitShape, getShape } from '@/lib/shape-library'
 
 describe('vector-core kernel', () => {
@@ -108,6 +108,37 @@ describe('vector-core kernel', () => {
     const bb = shapeBBox({ paths: [filleted] }, 0.001)
     expect(bb.minX).toBeCloseTo(-1, 6)
     expect(bb.maxY).toBeCloseTo(1, 6)
+  })
+
+  test('fitter — dense circle ring fits to few smooth anchors within tolerance', () => {
+    const ring = Array.from({ length: 720 }, (_, i) => {
+      const t = (2 * Math.PI * i) / 720
+      return { x: Math.cos(t), y: Math.sin(t) }
+    })
+    const path = ringToVPath(ring, 40, 0.002)
+    expect(path.anchors.length).toBeLessThanOrEqual(10) // minimal anchors, not a point cloud
+    expect(path.anchors.every((a) => !a.corner)).toBe(true) // circle has no corners
+    // every fitted curve point stays within tolerance of the unit circle
+    let maxErr = 0
+    for (const s of segments(path)) {
+      if (!s.c1 || !s.c2) continue
+      for (let i = 0; i <= 100; i++) {
+        const p = cubicPoint(s.a, s.c1, s.c2, s.b, i / 100)
+        maxErr = Math.max(maxErr, Math.abs(Math.hypot(p.x, p.y) - 1))
+      }
+    }
+    expect(maxErr).toBeLessThan(0.004) // tol + parameterization slack
+  })
+
+  test('fitter — square ring keeps 4 corners and exact straight fits', () => {
+    const sq: { x: number; y: number }[] = []
+    const N = 100
+    for (let i = 0; i < N; i++) sq.push({ x: -1 + (2 * i) / N, y: -1 })
+    for (let i = 0; i < N; i++) sq.push({ x: 1, y: -1 + (2 * i) / N })
+    for (let i = 0; i < N; i++) sq.push({ x: 1 - (2 * i) / N, y: 1 })
+    for (let i = 0; i < N; i++) sq.push({ x: -1, y: 1 - (2 * i) / N })
+    const path = ringToVPath(sq, 40, 0.002)
+    expect(path.anchors.filter((a) => a.corner)).toHaveLength(4)
   })
 
   test('transform — affine maps anchors AND handles exactly; getShape centers in the image box', () => {

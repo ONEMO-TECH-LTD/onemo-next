@@ -68,13 +68,15 @@ const SHAPE_CHIPS: { kind: ShapeKind; label: string }[] = [
   { kind: 'blob', label: 'Blob ✦' },
 ]
 
-/** Chip glyph drawn from the SAME ring math as the real shape (24px box, filled). */
+/** Chip glyph drawn from the SAME geometry as the real shape (24px box, filled) — vector kinds
+ *  render their true path data; only the Run-3 generator kinds still rasterize a ring. */
 function ShapeChipIcon({ kind }: { kind: ShapeKind }) {
   const d = useMemo(() => {
+    if (hasVectorDef(kind)) return shapeToSVGPathD(getShape(kind, 26, 26), 1)
     const ring = generateShapeRing({ kind }, 26, 26)
     return `M ${ring.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join(' L ')} Z`
   }, [kind])
-  return <svg width={24} height={24} viewBox="0 0 26 26" aria-hidden><path d={d} fill="currentColor" /></svg>
+  return <svg width={24} height={24} viewBox="0 0 26 26" aria-hidden><path d={d} fill="currentColor" fillRule="evenodd" /></svg>
 }
 
 /** Default generator params (persist across picks within an editor session). */
@@ -1159,7 +1161,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     // zero sampling, zero fitting; the doc becomes a derived shadow for interaction math.
     if (hasVectorDef(kind)) {
       const img = docRef.current.image
-      const base = getShape(kind, img.widthPx, img.heightPx)
+      const sp = shapeParamsRef.current
+      const base = getShape(kind, img.widthPx, img.heightPx, { sides: sp.sides, points: sp.points, spikiness: sp.spikiness })
       applyVec(base, base)
       setRadius(0); setSmoothing(0); setScale(100); setSelectedNode(null); setAllSelected(false)
       setShowAnchors(false)
@@ -1181,13 +1184,21 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     const n = Math.max(min, Math.min(max, (shapeParamsRef.current[key] ?? min) + delta))
     const next = { ...shapeParamsRef.current, [key]: n }
     shapeParamsRef.current = next; setShapeParams(next)
+    // vector kinds (polygon/star) regenerate their exact construction with the new param
+    if (hasVectorDef(shapeKind)) {
+      const img = docRef.current.image
+      const base = getShape(shapeKind, img.widthPx, img.heightPx, { sides: next.sides, points: next.points, spikiness: next.spikiness })
+      applyVec(base, base)
+      return
+    }
     applyDoc(buildShapeDoc(shapeKind, { [key]: n }))
-  }, [shapeKind, applyDoc, buildShapeDoc])
+  }, [shapeKind, applyDoc, applyVec, buildShapeDoc])
   /** tick-bar: transient preview per tick (§6.3); commitShape applies on release. */
   const previewParam = useCallback((key: 'spikiness' | 'pinch' | 'depth' | 'swirl' | 'waviness', v: number) => {
     if (!shapeKind) return
     const next = { ...shapeParamsRef.current, [key]: v }
     shapeParamsRef.current = next; setShapeParams(next)
+    if (hasVectorDef(shapeKind)) return // vector kinds regenerate exactly on release (commitShape)
     setShapePreview(buildShapeDoc(shapeKind, { [key]: v }))
   }, [shapeKind, buildShapeDoc])
   /** blob dice: reroll the seed, regenerate immediately (undoable). */
@@ -1199,8 +1210,14 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     applyDoc(buildShapeDoc('blob', { seed }))
   }, [shapeKind, applyDoc, buildShapeDoc])
   const commitShape = useCallback(() => {
+    if (shapeKind && hasVectorDef(shapeKind)) {
+      const img = docRef.current.image
+      const sp = shapeParamsRef.current
+      applyVec(getShape(shapeKind, img.widthPx, img.heightPx, { sides: sp.sides, points: sp.points, spikiness: sp.spikiness }), null)
+      return
+    }
     if (shapePreview) { applyDoc(shapePreview); setShapePreview(null) }
-  }, [shapePreview, applyDoc])
+  }, [shapeKind, shapePreview, applyDoc, applyVec])
 
   // Rotation handlers — desktop handle + two-finger gesture both drive rotatePreview, baked on release.
   const beginRotateHandle = useCallback((e: React.PointerEvent) => {

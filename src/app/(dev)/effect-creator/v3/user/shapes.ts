@@ -1,13 +1,14 @@
-// Shape generators for the outline editor's "Shape" tool — the V3 lineup from Dan's Figma
-// "shapes library" board (2026-06-10): a bold symbol alphabet (Simbolik/LOEWE language — pinched
-// square, daisy, bolt, sparkle, teardrop, leaf, lens, pebble…) plus TWO live generators:
-//   • form — the superformula family (lobes + pinch): pinched squares, clovers, petals, stars —
-//     one continuous parametric space; the LOEWE pinched square is a preset inside it.
-//   • blob — seeded organic blobs (waviness + dice-reroll): smooth harmonic displacement of a
-//     circle, always closed and simple.
-// Each generator outputs a closed ring of points (Vec2Px, image-pixel space, y-DOWN like the editor
-// SVG) centered in the image and fit to a default box. The ring seeds the OutlineDocument
-// (docFromRings) so every tool — Smooth, Scale, drag, Points — applies on top.
+// Shape generators — REDUCED to the Run-3 PARAMETRIC generators only (vector reset).
+//
+// Every static preset (pinched, heart, bolt, sparkle, teardrop, leaf, lens, diamond, plus,
+// asterisk, bowtie, pebble, circle, square, squircle, polygon, star) now lives in
+// `@/lib/shape-library` as PURE VECTOR DATA — authored/baked Bézier anchors, zero runtime
+// sampling. The ring generators that built them were DELETED with the migration (vector reset
+// Run 2; the corrupted-construction class dies with its code).
+//
+// What remains here, temporarily, are the four LIVE generators whose output still feeds the
+// polyline document — they convert to fit-at-generation vector output in Run 3:
+//   • daisy(petals, depth) · pinwheel(blades, swirl) · form(lobes, pinch) · blob(waviness, seed)
 
 import type { Vec2Px } from '@/lib/outline-core'
 
@@ -19,9 +20,9 @@ export type ShapeKind =
 
 export interface ShapeParams {
   kind: ShapeKind
-  sides?: number      // polygon: 3..12
-  points?: number     // star: 3..12
-  spikiness?: number  // star: 0..100 → inner-radius ratio %
+  sides?: number      // polygon: 3..12 (vector construction — shape-library)
+  points?: number     // star: 3..12 (vector construction — shape-library)
+  spikiness?: number  // star: 0..100 (vector construction — shape-library)
   lobes?: number      // form: 3..8 (superformula symmetry)
   pinch?: number      // form: 0..100 (round → deeply pinched)
   petals?: number     // daisy: 5..12
@@ -52,46 +53,10 @@ function normalize(pts: Vec2Px[]): Vec2Px[] {
   return pts.map(([x, y]) => [(x - cx) * k, (y - cy) * k] as Vec2Px)
 }
 
-// ── parametric primitives (centered at origin) ──────────────────────────────
-function regularPolygon(N: number, rx: number, ry: number): Vec2Px[] {
-  const out: Vec2Px[] = []
-  for (let i = 0; i < N; i++) { const t = (2 * Math.PI * i) / N - Math.PI / 2; out.push([rx * Math.cos(t), ry * Math.sin(t)]) }
-  return out
-}
-function starRing(N: number, R: number, ratio: number): Vec2Px[] {
-  const r = R * ratio, out: Vec2Px[] = []
-  for (let i = 0; i < 2 * N; i++) { const t = (Math.PI * i) / N - Math.PI / 2; const rad = i % 2 === 0 ? R : r; out.push([rad * Math.cos(t), rad * Math.sin(t)]) }
-  return out
-}
-function ellipseRing(rx: number, ry: number, num = 64): Vec2Px[] {
-  const out: Vec2Px[] = []
-  for (let i = 0; i < num; i++) { const t = (2 * Math.PI * i) / num; out.push([rx * Math.cos(t), ry * Math.sin(t)]) }
-  return out
-}
-function superellipse(a: number, b: number, n = 5, num = 72): Vec2Px[] {
-  const e = 2 / n, out: Vec2Px[] = []
-  for (let i = 0; i < num; i++) {
-    const t = (2 * Math.PI * i) / num, ct = Math.cos(t), st = Math.sin(t)
-    out.push([a * Math.sign(ct) * Math.pow(Math.abs(ct), e), b * Math.sign(st) * Math.pow(Math.abs(st), e)])
-  }
-  return out
-}
-function heartRing(W: number, H: number, num = 72): Vec2Px[] {
-  const out: Vec2Px[] = []
-  for (let i = 0; i < num; i++) {
-    const t = (2 * Math.PI * i) / num
-    const rx = 16 * Math.pow(Math.sin(t), 3)
-    const ry = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)
-    out.push([(rx / 16) * (W / 2), -((ry - 2) / 14) * (H / 2)])
-  }
-  return out
-}
-
 /**
  * The "form" generator's engine — the lobed-clover family (LOEWE language): FAT rounded lobes
  * with pinched valleys, r(φ) = (1−d) + d·|cos(m·φ/2)|^p. `m` = lobe count; `d` (from pinch)
- * = how deep the valleys cut; p<1 keeps the lobes fat instead of pointy. (A pure Gielis
- * superformula read as pointy petals here — wrong language for the board.)
+ * = how deep the valleys cut; p<1 keeps the lobes fat instead of pointy.
  */
 function formRing(lobes: number, pinch01: number, num = 192): Vec2Px[] {
   const m = Math.max(3, Math.min(8, lobes))
@@ -159,86 +124,9 @@ function pinwheelRing(blades: number, swirl01: number, num = 192): Vec2Px[] {
   return normalize(out)
 }
 
-/** asterisk: six fat rounded arms (Simbolik totem glyph). */
-function asteriskRing(num = 192): Vec2Px[] {
-  const out: Vec2Px[] = []
-  for (let i = 0; i < num; i++) {
-    const t = (2 * Math.PI * i) / num
-    const r = 0.34 + 0.66 * Math.pow(Math.abs(Math.cos(3 * t)), 1.1)
-    out.push([r * Math.cos(t), r * Math.sin(t)])
-  }
-  return normalize(out)
-}
-
-/** bowtie: two lobes with a pinched waist (Simbolik infinity glyph). */
-function bowtieRing(num = 144): Vec2Px[] {
-  const out: Vec2Px[] = []
-  for (let i = 0; i < num; i++) {
-    const t = (2 * Math.PI * i) / num
-    const r = 0.34 + 0.66 * Math.pow(Math.abs(Math.cos(t)), 1.35)
-    out.push([r * Math.cos(t), r * Math.sin(t)])
-  }
-  return normalize(out)
-}
-
-/** sparkle: astroid (x=cos³t, y=sin³t) — the 4-point star with concave sides. */
-function sparkleRing(num = 128): Vec2Px[] {
-  const out: Vec2Px[] = []
-  for (let i = 0; i < num; i++) {
-    const t = (2 * Math.PI * i) / num
-    out.push([Math.pow(Math.cos(t), 3), Math.pow(Math.sin(t), 3)])
-  }
-  return out
-}
-
-/** teardrop: classic teardrop curve, point up. */
-function teardropRing(num = 96): Vec2Px[] {
-  const out: Vec2Px[] = []
-  for (let i = 0; i < num; i++) {
-    const t = (2 * Math.PI * i) / num
-    const x = Math.sin(t) * Math.pow(Math.sin(t / 2), 2)
-    const y = -Math.cos(t) // cusp at t=0 → the point sits at the top (screen y-down)
-    out.push([x, y])
-  }
-  return normalize(out)
-}
-
-/** leaf: rounded square with ONE sharp corner (board's blue petal/leaf). */
-function leafRing(): Vec2Px[] {
-  const R = 0.72, arc = 18
-  const out: Vec2Px[] = []
-  // sharp corner top-left, then clockwise: TR, BR, BL rounded (y-down screen space)
-  out.push([-1, -1])
-  for (let i = 0; i <= arc; i++) { const a = -Math.PI / 2 + (Math.PI / 2) * (i / arc); out.push([1 - R + R * Math.cos(a), -1 + R + R * Math.sin(a)]) }
-  for (let i = 0; i <= arc; i++) { const a = (Math.PI / 2) * (i / arc); out.push([1 - R + R * Math.cos(a), 1 - R + R * Math.sin(a)]) }
-  for (let i = 0; i <= arc; i++) { const a = Math.PI / 2 + (Math.PI / 2) * (i / arc); out.push([-1 + R + R * Math.cos(a), 1 - R + R * Math.sin(a)]) }
-  return out
-}
-
-/** lens: vesica — two mirrored circular arcs meeting at two points (board's yellow eye). */
-function lensRing(bulge = 0.58, arc = 40): Vec2Px[] {
-  const Rc = (1 + bulge * bulge) / (2 * bulge) // arc through (±1,0) with apex at ±bulge
-  const half = Math.asin(1 / Rc)
-  const out: Vec2Px[] = []
-  for (let i = 0; i <= arc; i++) {
-    const a = -half + (2 * half) * (i / arc)
-    out.push([Rc * Math.sin(a), -(Rc * Math.cos(a) - (Rc - bulge))])
-  }
-  for (let i = 0; i <= arc; i++) {
-    const a = half - (2 * half) * (i / arc)
-    out.push([Rc * Math.sin(a), Rc * Math.cos(a) - (Rc - bulge)])
-  }
-  return out
-}
-
-// static normalized silhouettes ([-1,1], y-down)
-const BOLT: Vec2Px[] = [[-0.12, -1], [0.5, -1], [0.16, -0.22], [0.52, -0.22], [-0.34, 1], [-0.08, 0.1], [-0.5, 0.1]]
-const PLUS: Vec2Px[] = [[-0.36, -1], [0.36, -1], [0.36, -0.36], [1, -0.36], [1, 0.36], [0.36, 0.36], [0.36, 1], [-0.36, 1], [-0.36, 0.36], [-1, 0.36], [-1, -0.36], [-0.36, -0.36]]
-const DIAMOND: Vec2Px[] = [[0, -1], [0.78, 0], [0, 1], [-0.78, 0]]
-
 /**
- * Build a shape's point ring fit to the image, centered, at a sensible default size (~70% of the
- * shorter side). Rotation is a post-transform about the center.
+ * Build a LIVE generator's point ring fit to the image (Run-3 kinds only — every static preset
+ * spawns from `@/lib/shape-library` as pure vector data and never passes through here).
  */
 export function generateShapeRing(params: ShapeParams, imgW: number, imgH: number): Vec2Px[] {
   const cx = imgW / 2, cy = imgH / 2
@@ -248,34 +136,16 @@ export function generateShapeRing(params: ShapeParams, imgW: number, imgH: numbe
   const p01 = (v: number | undefined, dflt: number) => Math.max(0, Math.min(1, (v ?? dflt) / 100))
   let ring: Vec2Px[]
   switch (params.kind) {
-    case 'pinched': ring = rotate(scaleNorm(formRing(4, 0.55), h, h), 45); break // the LOEWE preset — lobes at the corners
     case 'daisy': ring = scaleNorm(daisyRing(Math.max(5, Math.min(12, params.petals ?? 8)), p01(params.depth, 55)), h, h); break
-    case 'heart': ring = heartRing(S, S); break
-    case 'bolt': ring = scaleNorm(BOLT, h, h); break
-    case 'sparkle': ring = scaleNorm(sparkleRing(), h, h); break
-    case 'teardrop': ring = scaleNorm(teardropRing(), h * 0.8, h); break
-    case 'leaf': ring = scaleNorm(leafRing(), h, h); break
-    case 'lens': ring = scaleNorm(lensRing(), h, h * 0.62); break
-    case 'diamond': ring = scaleNorm(DIAMOND, h, h); break
-    case 'plus': ring = scaleNorm(PLUS, h, h); break
-    case 'asterisk': ring = scaleNorm(asteriskRing(), h, h); break
-    case 'bowtie': ring = scaleNorm(bowtieRing(), h, h * 0.9); break
     case 'pinwheel': ring = scaleNorm(pinwheelRing(Math.max(3, Math.min(8, params.blades ?? 5)), p01(params.swirl, 50)), h, h); break
-    case 'pebble': ring = scaleNorm(blobRing(7, 0.3), h, h * 0.92); break
-    case 'circle': ring = ellipseRing(h, h); break
-    case 'square': ring = [[-h, -h], [h, -h], [h, h], [-h, h]]; break
-    case 'squircle': ring = superellipse(h, h, 5); break
-    case 'polygon': ring = regularPolygon(Math.max(3, Math.min(12, params.sides ?? 6)), h, h); break
-    case 'star': ring = starRing(Math.max(3, Math.min(12, params.points ?? 5)), h, Math.max(0.05, Math.min(0.95, (params.spikiness ?? 45) / 100))); break
     case 'form': ring = scaleNorm(formRing(params.lobes ?? 4, p01(params.pinch, 50)), h, h); break
     case 'blob': ring = scaleNorm(blobRing(params.seed ?? 1, p01(params.waviness, 50)), h, h); break
-    default: ring = ellipseRing(h, h)
+    default: ring = scaleNorm(blobRing(1, 0.2), h, h) // unreachable for migrated kinds
   }
   return translate(rotate(ring, rot), cx, cy)
 }
 
-/** Uniform arc-length resample of a closed ring — evenly spaced points at ~`spacingPx` so curves
- *  render vector-true (uneven generator spacing + coarse merging read as wobbly lines). */
+/** Uniform arc-length resample of a closed ring — evenly spaced points at ~`spacingPx`. */
 export function resampleClosed(pts: Vec2Px[], spacingPx: number): Vec2Px[] {
   const n = pts.length
   if (n < 3 || spacingPx <= 0) return pts
