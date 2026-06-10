@@ -52,6 +52,7 @@ const GEN_VECTOR_KINDS = new Set<ShapeKind>(['daisy', 'pinwheel', 'form', 'blob'
 // Run 2 · G6 decomposition — seam 1: pure doc-space geometry; seam 2: chip lineup + glyphs.
 import { SHAPE_CHIPS, ShapeChipIcon, DEFAULT_SHAPE_PARAMS } from './editor/chips'
 import { useEditorHistory } from './editor/useEditorHistory'
+import { useCanvasView } from './editor/useCanvasView'
 import { seedDoc, docFromSpec, docFromRings, outerCenter, scaleDoc, rotateDoc, translateDoc, stretchDoc, outerBbox, pointInPolygon, projectToSeg, type GripId } from './editor/geometry'
 import styles from './outline-editor.module.css'
 
@@ -166,11 +167,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   const nodeInteractedRef = useRef(false) // a node tap just happened → suppress the bubbling surface-click (which would re-select all)
   const dragStartRef = useRef<Vec2Px | null>(null) // pointer-down point → distinguish a tap (select) from a drag (move)
   const svgRef = useRef<SVGSVGElement>(null)
-  // G11 canvas view: zoom + pan expressed AS the viewBox (so getScreenCTM().inverse() keeps every
-  // gesture's px math correct with zero per-handler changes). scale 1 = fit; vx/vy = view origin.
-  const [view, setView] = useState<{ scale: number; vx: number; vy: number }>({ scale: 1, vx: 0, vy: 0 })
-  const viewRef = useRef(view)
-  useEffect(() => { viewRef.current = view }, [view])
+  // Run 2 · seam 4: the G11 view machinery lives in editor/useCanvasView.
+  const { view, setView, viewRef, screenToContent, originPinning, applyZoom, toViewBox } = useCanvasView(svgRef, docRef)
   const pinchRef = useRef<{ d0: number; scale0: number; c0: Vec2Px } | null>(null) // two-finger pinch zoom (client-space)
   const canvasPanRef = useRef<{ startClient: Vec2Px; vx0: number; vy0: number } | null>(null) // drag-outside pan (zoomed)
   const clientPtsRef = useRef<Map<number, Vec2Px>>(new Map()) // pointerId → CLIENT coords (pinch math)
@@ -444,57 +442,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     return out
   }, [drawPts, edgeCost, doc.image])
 
-  // G11 view helpers — the viewBox IS the zoom/pan state: viewBox = `vx vy W/scale H/scale`.
-  // screenToContent mirrors preserveAspectRatio="xMidYMid meet" for an arbitrary scale/origin, so
-  // pinch/wheel math can solve for the new origin that pins a content point under the cursor.
-  const screenToContent = useCallback((clientX: number, clientY: number, v: { scale: number; vx: number; vy: number }): Vec2Px => {
-    const svg = svgRef.current
-    const W = docRef.current.image.widthPx, H = docRef.current.image.heightPx
-    if (!svg) return [0, 0]
-    const rect = svg.getBoundingClientRect()
-    const vbW = W / v.scale, vbH = H / v.scale
-    const k = Math.min(rect.width / vbW, rect.height / vbH) // 'meet'
-    const padX = (rect.width - vbW * k) / 2, padY = (rect.height - vbH * k) / 2
-    return [v.vx + (clientX - rect.left - padX) / k, v.vy + (clientY - rect.top - padY) / k]
-  }, [docRef])
-
-  /** Solve the view origin that places content point c under client point (clientX, clientY) at `scale`. */
-  const originPinning = useCallback((c: Vec2Px, clientX: number, clientY: number, scale: number): { vx: number; vy: number } => {
-    const svg = svgRef.current
-    const W = docRef.current.image.widthPx, H = docRef.current.image.heightPx
-    if (!svg) return { vx: 0, vy: 0 }
-    const rect = svg.getBoundingClientRect()
-    const vbW = W / scale, vbH = H / scale
-    const k = Math.min(rect.width / vbW, rect.height / vbH)
-    const padX = (rect.width - vbW * k) / 2, padY = (rect.height - vbH * k) / 2
-    const vx = c[0] - (clientX - rect.left - padX) / k
-    const vy = c[1] - (clientY - rect.top - padY) / k
-    // clamp so the view window stays on the content
-    return {
-      vx: Math.max(0, Math.min(W - vbW, vx)),
-      vy: Math.max(0, Math.min(H - vbH, vy)),
-    }
-  }, [docRef])
-
-  const applyZoom = useCallback((focusClientX: number, focusClientY: number, newScaleRaw: number, from: { scale: number; vx: number; vy: number }) => {
-    const newScale = Math.max(1, Math.min(6, newScaleRaw))
-    const c = screenToContent(focusClientX, focusClientY, from)
-    const { vx, vy } = originPinning(c, focusClientX, focusClientY, newScale)
-    setView({ scale: newScale, vx: newScale === 1 ? 0 : vx, vy: newScale === 1 ? 0 : vy })
-  }, [screenToContent, originPinning])
-
-  const toViewBox = useCallback((clientX: number, clientY: number): Vec2Px => {
-    const svg = svgRef.current
-    if (!svg) return [0, 0]
-    const pt = svg.createSVGPoint()
-    pt.x = clientX
-    pt.y = clientY
-    const m = svg.getScreenCTM()
-    if (!m) return [0, 0]
-    const loc = pt.matrixTransform(m.inverse())
-    return [loc.x, loc.y]
-  }, [])
-
   // Run 6 — points on demand: build the transient shape for an in-flight anchor/handle drag.
   // Anchor drag translates p + both handles together; a SMOOTH anchor's handle drag mirrors the
   // opposite handle's DIRECTION while preserving its own length (Figma default); a CORNER
@@ -709,7 +656,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
         setFreehandPreview([...freehandRef.current])
       }
     },
-    [drag, drawPts, toViewBox, doc.image, originPinning, vecDragShape, docRef],
+    [drag, drawPts, toViewBox, doc.image, originPinning, vecDragShape, docRef, setView, viewRef],
   )
 
   const commitRotate = useCallback(() => {
