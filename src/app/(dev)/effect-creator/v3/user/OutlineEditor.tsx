@@ -40,6 +40,9 @@ import { generateShapeRing, resampleClosed, PARAMETRIC, type ShapeKind, type Sha
 // the doc stays as the interaction SHADOW (a derived flatten artifact — bbox/hit/grips math only).
 import { shapeToSVGPathD, transformShape, flattenShape, filletShape, filletShapeSmart, filletPathSmart, ringToVPath, nearestOnPath, insertAnchorAt, insertAnchorCentered, deleteAnchorRefit, type VShape, type VAnchor, type Vec2 } from '@/lib/vector-core'
 import { hasVectorDef, getShape } from '@/lib/shape-library'
+// Run 8 — SVG shape upload: a downloaded/Figma-exported outline becomes a first-class vector
+// shape through the export module's dialect gate (loud rejection outside the v1 boundary).
+import { vshapeFromSVG, fitShapeToBox } from '@/lib/export'
 
 // Run-3 live generators: dense internal sample → ONE Schneider fit at spawn → vector path out.
 // Segments never leave the generator (blueprint modules/generators.md).
@@ -1417,6 +1420,27 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     shapeParamsRef.current = next; setShapeParams(next)
     applyVec(vecFromGenerator('blob', { seed }), null) // Run 3: the dice rolls a vector
   }, [shapeKind, applyVec, vecFromGenerator])
+  /** Run 8 — SVG upload: parse through the dialect gate, fit into the image box, land as a
+   *  first-class vector shape (its own pristine base, so Radius works from clean corners). */
+  const onUploadSVG = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = '' // same file can be re-picked
+    if (!file) return
+    file.text().then((text) => {
+      try {
+        const img = docRef.current.image
+        const v = fitShapeToBox(vshapeFromSVG(text), img.widthPx, img.heightPx)
+        applyVec(v, v)
+        setShapeKind(null)
+        setShapePreview(null)
+        setRadius(0); setSmoothing(0); setScale(100); setSelectedNode(null); setAllSelected(false)
+        setShowAnchors(false)
+      } catch (err) {
+        toast('error', err instanceof Error ? err.message : 'This SVG could not be read')
+      }
+    }).catch(() => toast('error', 'This file could not be read'))
+  }, [applyVec])
+
   const commitShape = useCallback(() => {
     if (shapeKind && hasVectorDef(shapeKind)) {
       const img = docRef.current.image
@@ -1905,6 +1929,13 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
                 <span className={styles.chipLabel}>{label}</span>
               </button>
             ))}
+            {/* Run 8 — upload an SVG outline (Dan's "pre made in figma or downloaded" source);
+                rides the existing chip pattern, no new chrome surface */}
+            <label className={styles.chip} aria-label="Upload an SVG shape">
+              <span className={styles.chipIcon}><PlusIcon /></span>
+              <span className={styles.chipLabel}>Upload</span>
+              <input type="file" accept=".svg,image/svg+xml" style={{ display: 'none' }} onChange={onUploadSVG} />
+            </label>
           </div>
           {shapeKind && PARAMETRIC[shapeKind] && (
             <div className={styles.shapeControls}>
