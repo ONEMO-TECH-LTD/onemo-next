@@ -8,7 +8,7 @@
 
 import { useRef } from 'react'
 import type { DesignState } from '../types'
-import { UploadIcon, MagicIcon, EditIcon, ColorsIcon, PositionIcon, SaveIcon } from './icons'
+import { UploadIcon, MagicIcon, EditIcon, ColorsIcon, PositionIcon, SaveIcon, ShapeIcon, PenIcon } from './icons'
 import styles from './toolbar.module.css'
 
 const INITIAL_DESIGN: DesignState = { offsetX: 0, offsetY: 0, scale: 1.0 }
@@ -23,6 +23,9 @@ interface ToolbarProps {
   onGenerate: () => void
   onToggleColors: () => void
   onEditOutline: () => void
+  /** Structure A (#27): creation modes at toolbar level — open the editor in that mode. */
+  onShapes: () => void
+  onDraw: () => void
   onTogglePosition: () => void
   onSave: () => void
 }
@@ -56,6 +59,8 @@ export default function Toolbar({
   onGenerate,
   onToggleColors,
   onEditOutline,
+  onShapes,
+  onDraw,
   onTogglePosition,
   onSave,
 }: ToolbarProps) {
@@ -70,6 +75,9 @@ export default function Toolbar({
         <Tool icon={<UploadIcon />} label="Image" onClick={() => fileInputRef.current?.click()} primary={!artworkUrl} />
         {/* Magic = auto cut-out (worker BEN). Highlights once the subject cut has been generated. */}
         <Tool icon={<MagicIcon />} label="Magic" onClick={onGenerate} active={auto} disabled={!artworkUrl} />
+        {/* #27 structure A: creation modes side by side — each drops into the SAME editor */}
+        <Tool icon={<ShapeIcon />} label="Shapes" onClick={onShapes} disabled={!artworkUrl} />
+        <Tool icon={<PenIcon />} label="Draw" onClick={onDraw} disabled={!artworkUrl} />
         <Tool icon={<EditIcon />} label="Edit" onClick={onEditOutline} disabled={!artworkUrl} />
         {/* G1: position the photo WITHIN the shape — the silently-lost tool, restored first-class. */}
         <Tool icon={<PositionIcon />} label="Position" onClick={onTogglePosition} active={positioning} disabled={!artworkUrl} />

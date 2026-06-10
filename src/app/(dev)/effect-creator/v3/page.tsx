@@ -51,6 +51,7 @@ function PrototypePageInner() {
   const [isDragging, setIsDragging] = useState(false)
   const [isEditing, setIsEditing] = useState(false) // G1 Position mode (restored first-class)
   const [editingOutline, setEditingOutline] = useState(false)
+  const [editorMode, setEditorMode] = useState<'shape' | 'draw' | null>(null) // #27: toolbar creation modes
   const [autoOutline, setAutoOutline] = useState(false) // false = standard square; true = Magic cut-out
   const [generating, setGenerating] = useState(false)
   const [genLabel, setGenLabel] = useState('Cutting out…') // G5 honest progress
@@ -358,7 +359,9 @@ function PrototypePageInner() {
           }
           return !prev
         })}
-        onEditOutline={() => { editorPreRef.current = snapNow(); setEditingOutline(true) }}
+        onEditOutline={() => { editorPreRef.current = snapNow(); setEditorMode(null); setEditingOutline(true) }}
+        onShapes={() => { editorPreRef.current = snapNow(); setEditorMode('shape'); setEditingOutline(true) }}
+        onDraw={() => { editorPreRef.current = snapNow(); setEditorMode('draw'); setEditingOutline(true) }}
         onTogglePosition={() => setIsEditing((v) => {
           // #23: a Position session = one step (pushed on exit if the photo moved/zoomed)
           if (!v) posPreRef.current = snapNow()
@@ -382,6 +385,7 @@ function PrototypePageInner() {
       {/* The 2D outline editor — an overlay; the scene stays mounted (frozen) beneath it */}
       <OutlineEditor
         open={editingOutline}
+        openMode={editorMode}
         imageUrl={artworkUrl}
         onClose={() => {
           setEditingOutline(false)

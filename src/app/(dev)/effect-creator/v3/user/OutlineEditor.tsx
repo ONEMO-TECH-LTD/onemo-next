@@ -83,6 +83,8 @@ interface OutlineEditorProps {
   open: boolean
   imageUrl?: string
   onClose: () => void
+  /** Structure A (#27): the toolbar's creation modes open THIS editor in that mode. */
+  openMode?: 'shape' | 'draw' | null
 }
 
 const VIEW_W = 1000
@@ -274,7 +276,7 @@ function TopTool({ icon, label, onClick, disabled }: {
   )
 }
 
-export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditorProps) {
+export default function OutlineEditor({ open, imageUrl, onClose, openMode }: OutlineEditorProps) {
   const [doc, setDoc] = useState<OutlineDocument>(() => seedDoc(VIEW_W, VIEW_H))
   const [drag, setDrag] = useState<{ ringId: string; nodeId: string; pos: Vec2Px } | null>(null)
   const [radius, setRadius] = useState(0)        // Round: global (or selected-corner) radius px
@@ -464,6 +466,9 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
       setShapeKind('square')
       setShowAnchors(false) // rigid shape default — Points toggle re-enables
     }
+    // #27: toolbar creation modes land in the matching editor mode
+    if (openMode === 'shape') setActiveAdjust('shape')
+    else if (openMode === 'draw') { setDrawPts([]); setDrag(null) }
     docRef.current = opened
     histRef.current = { past: [], future: [] } // fresh undo history per editing session
     if (imageUrl) {
@@ -1306,7 +1311,7 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
             <TickBar label={selectedNode ? 'Corner' : 'Radius'} min={0} max={maxRadius} value={Math.min(radius, maxRadius)} onChange={setRadius} onCommit={commitRadius} format={(v) => `${Math.round((v / Math.max(maxRadius, 1)) * 100)}%`} />
           )}
           {activeAdjust === 'smooth' && (
-            <TickBar label="Smooth" min={0} max={100} value={smoothing} onChange={setSmoothing} onCommit={commitSmoothing} format={(v) => `${Math.round(v)}%`} />
+            <TickBar label="Curve" min={0} max={100} value={smoothing} onChange={setSmoothing} onCommit={commitSmoothing} format={(v) => `${Math.round(v)}%`} />
           )}
           {activeAdjust === 'scale' && (
             <>
@@ -1517,7 +1522,7 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
             <ToolBtn icon={<ShapeIcon />} label="Shape" onClick={toggleShape} active={activeAdjust === 'shape'} />
             {canTune && <ToolBtn icon={<TuneIcon />} label="Tune" onClick={() => setActiveAdjust((a) => (a === 'tune' ? null : 'tune'))} active={activeAdjust === 'tune'} />}
             <ToolBtn icon={<RoundIcon />} label={selectedNode ? 'Corner' : 'Radius'} onClick={() => setActiveAdjust((a) => (a === 'round' ? null : 'round'))} active={activeAdjust === 'round'} />
-            <ToolBtn icon={<SmoothIcon />} label="Smooth" onClick={() => setActiveAdjust((a) => (a === 'smooth' ? null : 'smooth'))} active={activeAdjust === 'smooth'} />
+            <ToolBtn icon={<SmoothIcon />} label="Curve" onClick={() => setActiveAdjust((a) => (a === 'smooth' ? null : 'smooth'))} active={activeAdjust === 'smooth'} />
             <ToolBtn icon={<ScaleIcon />} label="Scale" onClick={() => setActiveAdjust((a) => (a === 'scale' ? null : 'scale'))} active={activeAdjust === 'scale'} />
             <ToolBtn icon={<BlendIcon />} label="Blend" onClick={() => setActiveAdjust((a) => (a === 'blend' ? null : 'blend'))} active={activeAdjust === 'blend'} />
             <ToolBtn icon={<PenIcon />} label="Draw" onClick={startDraw} />
