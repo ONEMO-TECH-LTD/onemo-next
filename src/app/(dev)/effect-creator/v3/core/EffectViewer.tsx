@@ -304,7 +304,9 @@ export default function EffectViewer({
             : THREE.SRGBColorSpace,
         }}
         shadows={config.renderer?.shadowsEnabled ?? false}
-        dpr={[1, 1.5]}  /* cap device-pixel-ratio — pixel count is the dominant GPU cost (perf) */
+        dpr={[1, 2]}  /* DPR ceiling 2: the 1.5 cap rendered ~83% of a 1.8-DPR display (the measured
+                         "pixelated scene" deficit — Run 0 lens diagnosis); 2 covers retina-class
+                         displays at native sharpness while still capping DPR-3 phones (perf) */
         camera={canvasCamera}
         onCreated={handleCreated}
       >
