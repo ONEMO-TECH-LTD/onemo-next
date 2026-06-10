@@ -748,7 +748,7 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
 
   // Manual mode (A3a) — draw the outline by hand: click to place anchors, Finish to close the ring.
   const startDraw = useCallback(() => { setDrawPts([]); setDrag(null) }, [])
-  // Tap the surface (not a node): inside the cut → SELECT ALL corners (edit them together, opens Round);
+  // Tap the surface (not a node): inside the cut → SELECT ALL corners (scale/twist them together);
   // outside → deselect. (Node taps stopPropagation, so they never reach here.)
   const onSurfaceClick = useCallback((e: React.MouseEvent) => {
     if (drawPts !== null || preview) return

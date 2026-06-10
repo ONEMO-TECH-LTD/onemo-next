@@ -51,14 +51,62 @@ export interface FactoryInputs {
   tileSize?: number
 }
 
-const ANGLES: Record<FactoryAngle, { theta: number; phi: number }> = {
-  front: { theta: 0, phi: 90 },          // straight-on
+// §8.8 ruling (standing, from the v2 gallery cycle): the FRONT tile is the 2D-FLAT composite —
+// the canonical printed face, orthographic, full-detail — NOT a perspective 3D render (perspective
+// puts the face nearest the camera, foreshortens it, and mismatches the 2D the customer approved).
+// The 3D captures cover only the angles 2D can't show: three-quarter (edge + suede depth) and back
+// (attachment face).
+const THREE_D_ANGLES: Record<Exclude<FactoryAngle, 'front'>, { theta: number; phi: number }> = {
   threeQuarter: { theta: 35, phi: 78 },  // swing + slight tilt → rounded edge + suede depth read
   back: { theta: 180, phi: 90 },         // attachment face
 }
 const DEG = Math.PI / 180
 const FOV = 35
 const FIT_MARGIN = 1.32 // breathing room — identical for every product/size (G8)
+
+/**
+ * The FRONT tile (§8.8): the 2D-flat composite clipped to the silhouette — the canonical printed
+ * face — fit-framed into a transparent square tile with the same margin as the 3D angles (G8: one
+ * standardized framing). The engine composite is y-up; geometry is y-up mm; both map into y-down
+ * tile space exactly the way the 2D hero does, so this tile IS what the customer approved.
+ */
+function flatFrontTile(
+  prepared: PreparedEffect,
+  editedContourMM: Contour | null,
+  tile: number,
+): FactoryRender {
+  const contour = editedContourMM ?? prepared.spec.geometryMM
+  const { mmPerPx, maskWidthPx: maskW, maskHeightPx: maskH } = prepared.spec
+  const comp = prepared.composite
+  const cw = comp.width, ch = comp.height
+  // upright composite (the in-memory canvas is y-up)
+  const upright = document.createElement('canvas')
+  upright.width = cw; upright.height = ch
+  const ug = upright.getContext('2d')!
+  ug.translate(0, ch); ug.scale(1, -1); ug.drawImage(comp, 0, 0)
+  // silhouette in upright display px (mirror of the 2D hero's mapping)
+  const pts = contour.outer.pts.map(([xmm, ymm]) => [
+    (xmm / mmPerPx) * (cw / maskW),
+    (maskH - ymm / mmPerPx) * (ch / maskH),
+  ] as [number, number])
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const [x, y] of pts) {
+    if (x < minX) minX = x; if (x > maxX) maxX = x
+    if (y < minY) minY = y; if (y > maxY) maxY = y
+  }
+  const longest = Math.max(maxX - minX, maxY - minY) || 1
+  const s = tile / (longest * FIT_MARGIN)
+  const c = document.createElement('canvas')
+  c.width = tile; c.height = tile
+  const g = c.getContext('2d')!
+  g.setTransform(s, 0, 0, s, tile / 2 - s * (minX + maxX) / 2, tile / 2 - s * (minY + maxY) / 2)
+  g.beginPath()
+  pts.forEach(([x, y], i) => (i === 0 ? g.moveTo(x, y) : g.lineTo(x, y)))
+  g.closePath()
+  g.clip()
+  g.drawImage(upright, 0, 0)
+  return { angle: 'front', dataUrl: c.toDataURL('image/png'), width: tile, height: tile }
+}
 
 const texLoader = new THREE.TextureLoader()
 async function loadSuedeTex(url: string | undefined, channel: number): Promise<THREE.Texture | null> {
@@ -167,9 +215,10 @@ export async function renderFactorySet(inputs: FactoryInputs): Promise<FactorySe
     const dist = (radius * FIT_MARGIN) / Math.sin((FOV * DEG) / 2)
     const camera = new THREE.PerspectiveCamera(FOV, 1, dist / 100, dist * 10)
 
-    const renders: FactoryRender[] = []
-    for (const angle of ['front', 'threeQuarter', 'back'] as FactoryAngle[]) {
-      const { theta, phi } = ANGLES[angle]
+    // front = the 2D-flat printed face (§8.8); 3D only for the angles 2D can't show
+    const renders: FactoryRender[] = [flatFrontTile(prepared, editedContourMM, tile)]
+    for (const angle of ['threeQuarter', 'back'] as Array<Exclude<FactoryAngle, 'front'>>) {
+      const { theta, phi } = THREE_D_ANGLES[angle]
       const sph = new THREE.Spherical(dist, phi * DEG, theta * DEG)
       camera.position.setFromSpherical(sph)
       camera.lookAt(0, 0, 0)

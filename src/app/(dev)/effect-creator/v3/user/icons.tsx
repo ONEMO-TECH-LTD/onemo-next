@@ -2,9 +2,7 @@
 
 // Editor toolbar icons. Phosphor Icons (MIT, premium/editorial, SF-Symbols-like) for the standard
 // glyphs — chosen over Lucide so the UI doesn't read as generic shadcn/SaaS. `weight="regular"`
-// (default) reads cleanly at 24px on mobile; icons inherit `currentColor` from the button. One custom
-// inline icon ("Round corners") covers the single concept Phosphor has no glyph for, matched to the
-// Phosphor regular ~2px stroke so the set stays visually coherent.
+// (default) reads cleanly at 24px on mobile; icons inherit `currentColor` from the button.
 
 import { ArrowArcLeft, ArrowArcRight, ArrowsOutCardinal, WaveSine, PenNib, ArrowClockwise, Check, X, ArrowsOut, Plus, Minus, Trash, PlusCircle, Sparkle, ImageSquare, PencilSimple, BoundingBox, Palette, FloppyDisk, Shapes, Polygon, Circle, Square, Pill, Star, Heart, ChatTeardrop, Seal, Shield, Eye, EyeSlash, MagicWand } from '@phosphor-icons/react'
 
@@ -42,12 +40,6 @@ export const ColorsIcon = (p: P) => <Palette size={SZ} className={p.className} /
 export const MagicIcon = (p: P) => <MagicWand size={SZ} className={p.className} />
 
 // Round corners — Phosphor ships no corner-radius glyph; custom inline (Phosphor-coherent 2px stroke).
-export const RoundIcon = (p: P) => (
-  <svg className={p.className} width={SZ} height={SZ} viewBox="0 0 24 24" fill="none"
-    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M5 20v-6a9 9 0 0 1 9-9h6" />
-  </svg>
-)
 
 // ── Shape tool + chip icons ─────────────────────────────────────────────────
 export const ShapeIcon = (p: P) => <Shapes size={SZ} className={p.className} />
