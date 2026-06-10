@@ -38,8 +38,12 @@ import { perfGesture } from '../dev/PerfHUD'
 import { generateShapeRing, resampleClosed, PARAMETRIC, type ShapeKind, type ShapeParams } from './shapes'
 // VECTOR CORE (reset Run 1): vector-native kinds render/commit/transform on a true Bézier VShape;
 // the doc stays as the interaction SHADOW (a derived flatten artifact — bbox/hit/grips math only).
-import { shapeToSVGPathD, transformShape, flattenShape, filletShape, type VShape, type Vec2 } from '@/lib/vector-core'
+import { shapeToSVGPathD, transformShape, flattenShape, filletShape, ringToVPath, type VShape, type Vec2 } from '@/lib/vector-core'
 import { hasVectorDef, getShape } from '@/lib/shape-library'
+
+// Run-3 live generators: dense internal sample → ONE Schneider fit at spawn → vector path out.
+// Segments never leave the generator (blueprint modules/generators.md).
+const GEN_VECTOR_KINDS = new Set<ShapeKind>(['daisy', 'pinwheel', 'form', 'blob'])
 import styles from './outline-editor.module.css'
 
 // Shape chips — Dan's board lineup (Simbolik/LOEWE symbol alphabet) + the two generators.
@@ -1154,6 +1158,13 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     const ring = resampleClosed(generateShapeRing({ kind, ...shapeParamsRef.current, ...overrides }, img.widthPx, img.heightPx), Math.max(img.widthPx, img.heightPx) / 220)
     return docFromRings(ring, img, 0, 1.5)
   }, [])
+  /** Run 3: a live generator's output FITTED ONCE into a true vector path (sub-10ms). */
+  const vecFromGenerator = useCallback((kind: ShapeKind, overrides: Partial<ShapeParams> = {}): VShape => {
+    const img = docRef.current.image
+    const ring = resampleClosed(generateShapeRing({ kind, ...shapeParamsRef.current, ...overrides }, img.widthPx, img.heightPx), Math.max(img.widthPx, img.heightPx) / 600)
+    const path = ringToVPath(ring.map(([x, y]) => ({ x, y })), 60, Math.max(0.4, Math.min(img.widthPx, img.heightPx) / 1600))
+    return { paths: [path] }
+  }, [])
   const pickShape = useCallback((kind: ShapeKind) => {
     setShapeKind(kind)
     setShapePreview(null)
@@ -1174,10 +1185,17 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       const next = { ...shapeParamsRef.current, seed: overrides.seed! }
       shapeParamsRef.current = next; setShapeParams(next)
     }
+    // Run 3: live generators spawn as FITTED vector paths — segments never leave the generator
+    if (GEN_VECTOR_KINDS.has(kind)) {
+      applyVec(vecFromGenerator(kind, overrides), null)
+      setRadius(0); setSmoothing(0); setScale(100); setSelectedNode(null); setAllSelected(false)
+      setShowAnchors(false)
+      return
+    }
     applyDoc(buildShapeDoc(kind, overrides))
     setSmoothing(0); setScale(100); setSelectedNode(null); setAllSelected(false)
     setShowAnchors(false) // rigid shape: vertex anchors off by default (toggle to edit points)
-  }, [applyDoc, applyVec, buildShapeDoc])
+  }, [applyDoc, applyVec, buildShapeDoc, vecFromGenerator])
   /** stepper: ±delta on an integer param, regenerate immediately (undoable). */
   const nudgeParam = useCallback((key: 'sides' | 'points' | 'lobes' | 'petals' | 'blades', delta: number, min: number, max: number) => {
     if (!shapeKind) return
@@ -1191,8 +1209,13 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       applyVec(base, base)
       return
     }
+    // generator kinds re-fit their new construction (petals/blades/lobes steppers)
+    if (GEN_VECTOR_KINDS.has(shapeKind)) {
+      applyVec(vecFromGenerator(shapeKind, { [key]: n }), null)
+      return
+    }
     applyDoc(buildShapeDoc(shapeKind, { [key]: n }))
-  }, [shapeKind, applyDoc, applyVec, buildShapeDoc])
+  }, [shapeKind, applyDoc, applyVec, buildShapeDoc, vecFromGenerator])
   /** tick-bar: transient preview per tick (§6.3); commitShape applies on release. */
   const previewParam = useCallback((key: 'spikiness' | 'pinch' | 'depth' | 'swirl' | 'waviness', v: number) => {
     if (!shapeKind) return
@@ -1207,8 +1230,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     const seed = Math.floor(Math.random() * 1e9)
     const next = { ...shapeParamsRef.current, seed }
     shapeParamsRef.current = next; setShapeParams(next)
-    applyDoc(buildShapeDoc('blob', { seed }))
-  }, [shapeKind, applyDoc, buildShapeDoc])
+    applyVec(vecFromGenerator('blob', { seed }), null) // Run 3: the dice rolls a vector
+  }, [shapeKind, applyVec, vecFromGenerator])
   const commitShape = useCallback(() => {
     if (shapeKind && hasVectorDef(shapeKind)) {
       const img = docRef.current.image
@@ -1216,8 +1239,14 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       applyVec(getShape(shapeKind, img.widthPx, img.heightPx, { sides: sp.sides, points: sp.points, spikiness: sp.spikiness }), null)
       return
     }
+    if (shapeKind && GEN_VECTOR_KINDS.has(shapeKind)) {
+      // release bakes the live doc-morph into ONE fitted vector (§6.3: transient ticks, vector commit)
+      setShapePreview(null)
+      applyVec(vecFromGenerator(shapeKind), null)
+      return
+    }
     if (shapePreview) { applyDoc(shapePreview); setShapePreview(null) }
-  }, [shapeKind, shapePreview, applyDoc, applyVec])
+  }, [shapeKind, shapePreview, applyDoc, applyVec, vecFromGenerator])
 
   // Rotation handlers — desktop handle + two-finger gesture both drive rotatePreview, baked on release.
   const beginRotateHandle = useCallback((e: React.PointerEvent) => {
