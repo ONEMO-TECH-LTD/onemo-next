@@ -38,7 +38,7 @@ import { perfGesture } from '../dev/PerfHUD'
 import { generateShapeRing, resampleClosed, PARAMETRIC, type ShapeKind, type ShapeParams } from './shapes'
 // VECTOR CORE (reset Run 1): vector-native kinds render/commit/transform on a true Bézier VShape;
 // the doc stays as the interaction SHADOW (a derived flatten artifact — bbox/hit/grips math only).
-import { shapeToSVGPathD, transformShape, flattenShape, filletShape, ringToVPath, type VShape, type Vec2 } from '@/lib/vector-core'
+import { shapeToSVGPathD, transformShape, flattenShape, filletShape, filletShapeSmart, ringToVPath, type VShape, type Vec2 } from '@/lib/vector-core'
 import { hasVectorDef, getShape } from '@/lib/shape-library'
 
 // Run-3 live generators: dense internal sample → ONE Schneider fit at spawn → vector path out.
@@ -1027,10 +1027,12 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   const commitRadius = useCallback((v: number) => {
     setRadius(v)
     const t0 = performance.now()
-    // VECTOR CORE: Radius re-fillets the clean BASE with exact arcs (square-class corners now;
-    // curve-corner fillet — heart cusps — arrives with the Radius run).
+    // Run 5 — Radius on EVERY corner class: re-fillets the clean base with the curve-aware
+    // fillet (line-line exact arcs; heart cusps + Magic-trace corners trim-and-arc). A fitted
+    // shape with no pristine base (Magic) adopts its CURRENT geometry as the base on first use.
     if (vshapeRef.current) {
-      if (vBaseRef.current) applyVec(filletShape(vBaseRef.current, v), vBaseRef.current)
+      if (!vBaseRef.current) vBaseRef.current = vshapeRef.current
+      applyVec(filletShapeSmart(vBaseRef.current, v), vBaseRef.current)
       perfGesture('round-commit', performance.now() - t0)
       return
     }

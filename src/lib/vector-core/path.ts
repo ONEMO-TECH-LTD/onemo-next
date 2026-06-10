@@ -135,11 +135,19 @@ export function shapeBBox(shape: VShape, tol = 0.1): { minX: number; minY: numbe
   return { minX, minY, maxX, maxY }
 }
 
+/** General de Casteljau split of a cubic at t — both halves exact. */
+export function splitCubic(a: Vec2, c1: Vec2, c2: Vec2, b: Vec2, t: number): { first: [Vec2, Vec2, Vec2, Vec2]; second: [Vec2, Vec2, Vec2, Vec2] } {
+  const lerp = (p: Vec2, q: Vec2): Vec2 => ({ x: p.x + (q.x - p.x) * t, y: p.y + (q.y - p.y) * t })
+  const ab = lerp(a, c1), bc = lerp(c1, c2), cd = lerp(c2, b)
+  const abbc = lerp(ab, bc), bccd = lerp(bc, cd)
+  const m = lerp(abbc, bccd)
+  return { first: [a, ab, abbc, m], second: [m, bccd, cd, b] }
+}
+
 /**
  * Corner fillet (exact arcs-as-cubics) on CORNER anchors whose BOTH adjacent segments are
- * straight lines (square/polygon corners). Curve-curve corners (e.g. heart cusps) are left
- * untouched here — that general fillet is a later op. radius ≤ each leg's half-length (clamped).
- * 90° corner reproduces the kappa constant exactly (k = 4/3·tan(α/4)·r).
+ * straight lines (square/polygon corners). Curve-aware corners ride filletPathSmart below.
+ * radius ≤ each leg's half-length (clamped). 90° corner reproduces kappa exactly.
  */
 export function filletPath(path: VPath, radius: number): VPath {
   if (radius <= 0) return path
@@ -178,6 +186,108 @@ export function filletPath(path: VPath, radius: number): VPath {
 
 export function filletShape(shape: VShape, radius: number): VShape {
   return { paths: shape.paths.map((p) => filletPath(p, radius)) }
+}
+
+/**
+ * CURVE-AWARE corner fillet (Run 5 — Radius on every corner class): rounds CORNER anchors whose
+ * adjacent segments may be lines OR cubics (heart cusps, Magic-trace corners). Each side is
+ * trimmed back from the corner by ~`radius` (along the segment), and the gap is bridged with one
+ * cubic shaped as a circular arc between the trim tangents (k = 4/3·tan(α/4)·R_eff — exact for
+ * line-line, arc-quality for curves). Falls through to the exact line-line fillet when both
+ * sides are straight.
+ */
+export function filletPathSmart(path: VPath, radius: number): VPath {
+  if (radius <= 0) return path
+  const n = path.anchors.length
+  if (n < 3) return path
+  // Work on explicit segments so trims rewrite handles precisely.
+  const segs = segments(path)
+  type Side = { trimT: number; point: Vec2; tangent: Vec2; seg: VSegment; isLine: boolean }
+  /** walk a segment from one end until ~dist from that end; return trim point + outward tangent */
+  const trim = (seg: VSegment, fromEnd: 'a' | 'b', dist: number): Side | null => {
+    const isLine = !seg.c1 || !seg.c2
+    if (isLine) {
+      const from = fromEnd === 'b' ? seg.b : seg.a
+      const to = fromEnd === 'b' ? seg.a : seg.b
+      const L = Math.hypot(to.x - from.x, to.y - from.y)
+      const d = Math.min(dist, L / 2)
+      const t = d / (L || 1e-12)
+      const point = { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t }
+      const tangent = { x: (to.x - from.x) / (L || 1e-12), y: (to.y - from.y) / (L || 1e-12) }
+      return { trimT: fromEnd === 'b' ? 1 - t : t, point, tangent, seg, isLine }
+    }
+    const c1 = seg.c1!, c2 = seg.c2!
+    const cornerPt = fromEnd === 'b' ? seg.b : seg.a
+    // sample to find the parameter at ~dist from the corner end (capped at half the segment)
+    const S = 48
+    let best: { t: number; p: Vec2 } | null = null
+    for (let i = 1; i <= S / 2; i++) {
+      const t = fromEnd === 'b' ? 1 - i / S : i / S
+      const p = cubicPoint(seg.a, c1, c2, seg.b, t)
+      if (Math.hypot(p.x - cornerPt.x, p.y - cornerPt.y) >= dist) { best = { t, p }; break }
+    }
+    if (!best) {
+      const t = fromEnd === 'b' ? 0.5 : 0.5
+      best = { t, p: cubicPoint(seg.a, c1, c2, seg.b, t) }
+    }
+    // tangent pointing AWAY from the corner
+    const eps = 0.001
+    const t2 = fromEnd === 'b' ? Math.max(0, best.t - eps) : Math.min(1, best.t + eps)
+    const p2 = cubicPoint(seg.a, c1, c2, seg.b, t2)
+    const L = Math.hypot(p2.x - best.p.x, p2.y - best.p.y) || 1e-12
+    return { trimT: best.t, point: best.p, tangent: { x: (p2.x - best.p.x) / L, y: (p2.y - best.p.y) / L }, seg, isLine }
+  }
+  const out: VAnchor[] = []
+  for (let i = 0; i < n; i++) {
+    const B = path.anchors[i]
+    if (!B.corner) { out.push({ ...B }); continue }
+    const inSeg = segs[(i - 1 + n) % n] // ends at B
+    const outSeg = segs[i] // starts at B
+    const sIn = trim(inSeg, 'b', radius)
+    const sOut = trim(outSeg, 'a', radius)
+    if (!sIn || !sOut) { out.push({ ...B }); continue }
+    // arc between the trims: angle between arrival direction (-sIn.tangent) and departure (sOut.tangent)
+    const arrive = { x: -sIn.tangent.x, y: -sIn.tangent.y }
+    const dotv = Math.max(-1, Math.min(1, arrive.x * sOut.tangent.x + arrive.y * sOut.tangent.y))
+    const alpha = Math.acos(dotv) // turn at the (rounded) corner
+    if (alpha < 1e-3) { out.push({ ...B }); continue }
+    const chord = Math.hypot(sOut.point.x - sIn.point.x, sOut.point.y - sIn.point.y)
+    const Reff = chord / (2 * Math.sin(Math.min(Math.PI - 1e-3, alpha) / 2) || 1e-12)
+    const k = (4 / 3) * Math.tan(alpha / 4) * Reff
+    // rewrite the INCOMING segment's tail: previous anchor keeps its handle; trim point becomes P1
+    const prevOut = out.length ? out[out.length - 1] : null
+    if (!sIn.isLine) {
+      const sp = splitCubic(sIn.seg.a, sIn.seg.c1!, sIn.seg.c2!, sIn.seg.b, sIn.trimT)
+      if (prevOut) prevOut.hOut = sp.first[1]
+      out.push({ p: sp.first[3], hIn: sp.first[2], hOut: { x: sIn.point.x + arrive.x * k, y: sIn.point.y + arrive.y * k }, corner: false })
+    } else {
+      out.push({ p: sIn.point, hIn: null, hOut: { x: sIn.point.x + arrive.x * k, y: sIn.point.y + arrive.y * k }, corner: false })
+    }
+    // P2 with the OUTGOING segment's head rewritten
+    if (!sOut.isLine) {
+      const sp = splitCubic(sOut.seg.a, sOut.seg.c1!, sOut.seg.c2!, sOut.seg.b, sOut.trimT)
+      out.push({ p: sp.second[0], hIn: { x: sOut.point.x - sOut.tangent.x * k, y: sOut.point.y - sOut.tangent.y * k }, hOut: sp.second[1], corner: false })
+      // the NEXT anchor's hIn must become the split's c2 — patch when we reach it
+      pendingHInPatch.set((i + 1) % n, sp.second[2])
+    } else {
+      out.push({ p: sOut.point, hIn: { x: sOut.point.x - sOut.tangent.x * k, y: sOut.point.y - sOut.tangent.y * k }, hOut: null, corner: false })
+    }
+  }
+  // apply hIn patches for anchors following a trimmed outgoing cubic
+  for (const [idx, hIn] of pendingHInPatch) {
+    // find the emitted anchor whose position matches the original anchor idx
+    const orig = path.anchors[idx]
+    const hit = out.find((a) => Math.hypot(a.p.x - orig.p.x, a.p.y - orig.p.y) < 1e-9)
+    if (hit && !hit.corner) hit.hIn = hIn
+    else if (hit) hit.hIn = hIn
+  }
+  pendingHInPatch.clear()
+  return { anchors: out }
+}
+const pendingHInPatch = new Map<number, Vec2>()
+
+export function filletShapeSmart(shape: VShape, radius: number): VShape {
+  return { paths: shape.paths.map((p) => filletPathSmart(p, radius)) }
 }
 
 const norm = (v: Vec2): Vec2 => {

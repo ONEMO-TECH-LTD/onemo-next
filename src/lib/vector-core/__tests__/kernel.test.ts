@@ -3,7 +3,7 @@
 // Square: lines never subdivide. Flatten: chord error within tolerance. SVG: true C commands.
 
 import { describe, test, expect } from 'vitest'
-import { cubicPoint, flattenPath, toSVGPathD, transformShape, segments, shapeBBox, filletPath, ringToVPath } from '../index'
+import { cubicPoint, flattenPath, toSVGPathD, transformShape, segments, shapeBBox, filletPath, filletPathSmart, ringToVPath } from '../index'
 import { unitShape, getShape } from '@/lib/shape-library'
 
 describe('vector-core kernel', () => {
@@ -139,6 +139,35 @@ describe('vector-core kernel', () => {
     for (let i = 0; i < N; i++) sq.push({ x: -1, y: 1 - (2 * i) / N })
     const path = ringToVPath(sq, 40, 0.002)
     expect(path.anchors.filter((a) => a.corner)).toHaveLength(4)
+  })
+
+  test('smart fillet — square matches the exact line-line fillet (regression)', () => {
+    const square = unitShape('square')
+    const r = 0.25
+    const exact = filletPath(square.paths[0], r)
+    const smart = filletPathSmart(square.paths[0], r)
+    expect(smart.anchors).toHaveLength(exact.anchors.length)
+    for (let i = 0; i < exact.anchors.length; i++) {
+      expect(smart.anchors[i].p.x).toBeCloseTo(exact.anchors[i].p.x, 6)
+      expect(smart.anchors[i].p.y).toBeCloseTo(exact.anchors[i].p.y, 6)
+    }
+  })
+
+  test('smart fillet — heart cusps round into smooth joins (no corner anchors remain)', () => {
+    const heart = unitShape('heart')
+    const r = 0.12
+    const rounded = filletPathSmart(heart.paths[0], r)
+    expect(rounded.anchors.filter((a) => a.corner)).toHaveLength(0)
+    expect(rounded.anchors.length).toBeGreaterThan(heart.paths[0].anchors.length) // each cusp → 2 trim anchors
+    // the rounded path must stay continuous: every segment's endpoints chain without jumps
+    const segsR = segments(rounded)
+    for (let i = 0; i < segsR.length; i++) {
+      const next = segsR[(i + 1) % segsR.length]
+      expect(Math.hypot(segsR[i].b.x - next.a.x, segsR[i].b.y - next.a.y)).toBeLessThan(1e-9)
+    }
+    // bottom tip (was at y=1) is trimmed upward
+    const bb = shapeBBox({ paths: [rounded] }, 0.005)
+    expect(bb.maxY).toBeLessThan(1 - r * 0.2)
   })
 
   test('transform — affine maps anchors AND handles exactly; getShape centers in the image box', () => {
