@@ -201,6 +201,11 @@
   justify-content: center;
   gap: var(--spacing-xs);
   padding: var(--spacing-2xs) var(--spacing-l) var(--spacing-xs);
+  /* G12: contain the tick-bar — capped + centered exactly like .toolInner, so the control
+     never bleeds across the window (steppers hug the bar; nothing hides under overlays). */
+  width: 100%;
+  max-width: var(--editor-controls-max, 34rem);
+  margin: 0 auto;
 }
 /* −/+ step buttons that flank the scale slider */
 .stepBtn {
@@ -281,7 +286,7 @@
 .chipLabel { font-family: var(--font-body); font-size: 0.625rem; line-height: 1; white-space: nowrap; }
 /* parametric controls (sides / points / spikiness / rotate) under the chip strip */
 .shapeControls { display: flex; flex-direction: column; gap: var(--spacing-2xs); }
-.shapeRow { display: flex; align-items: center; gap: var(--spacing-xs); }
+.shapeRow { display: flex; align-items: center; gap: var(--spacing-xs); width: 100%; max-width: var(--editor-controls-max, 34rem); margin: 0 auto; }
 .shapeName {
   flex: none;
   width: 4.5rem;

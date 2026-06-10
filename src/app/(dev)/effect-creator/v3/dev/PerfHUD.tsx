@@ -75,7 +75,9 @@ export default function PerfHUD() {
   const recent = gestureLog.slice(-6).reverse()
 
   return (
-    <div style={{ position: 'fixed', left: 10, bottom: 10, zIndex: 90, fontFamily: 'ui-monospace, monospace', fontSize: 11, pointerEvents: 'none' }}>
+    /* top-left, below the editor topbar — a dev overlay must never cover interactive chrome
+       (bottom-left collided with the editor dock + sheets) */
+    <div style={{ position: 'fixed', left: 10, top: 'calc(env(safe-area-inset-top) + 76px)', zIndex: 90, fontFamily: 'ui-monospace, monospace', fontSize: 11, pointerEvents: 'none' }}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

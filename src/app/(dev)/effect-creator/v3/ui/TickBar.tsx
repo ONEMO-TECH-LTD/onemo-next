@@ -113,35 +113,35 @@ export default function TickBar({
   const readout = format ? format(value) : `${Math.round(value)}`
 
   return (
+    /* ONE dark instrument panel — label, ruler, and readout all live INSIDE it (the reference
+       design), so legibility never depends on what the panel sits on. */
     <div
+      role="slider"
+      tabIndex={disabled ? -1 : 0}
+      aria-label={label}
+      aria-valuemin={min}
+      aria-valuemax={max}
+      aria-valuenow={value}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={finish}
+      onPointerCancel={finish}
+      onKeyDown={onKeyDown}
       style={{
-        display: 'flex', alignItems: 'center', gap: 14, width: '100%',
-        opacity: disabled ? 0.45 : 1, userSelect: 'none',
+        position: 'relative', flex: 1, minWidth: 0, height: 52, borderRadius: 13,
+        cursor: disabled ? 'default' : 'ew-resize',
+        background: 'linear-gradient(180deg, rgba(16,19,30,0.96), rgba(26,30,44,0.96))',
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.07), inset 0 -1px 0 rgba(0,0,0,0.5), 0 2px 10px rgba(0,0,0,0.25)',
+        display: 'flex', alignItems: 'center', gap: 12, padding: '0 14px',
+        touchAction: 'none', overflow: 'hidden', userSelect: 'none',
+        opacity: disabled ? 0.45 : 1,
       }}
     >
-      <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: 0.6, textTransform: 'uppercase', color: '#9aa1b4', width: 52, flexShrink: 0 }}>
+      <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: 0.7, textTransform: 'uppercase', color: '#8f96ab', flexShrink: 0, pointerEvents: 'none' }}>
         {label}
       </span>
-      <div
-        ref={barRef}
-        role="slider"
-        tabIndex={disabled ? -1 : 0}
-        aria-label={label}
-        aria-valuemin={min}
-        aria-valuemax={max}
-        aria-valuenow={value}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={finish}
-        onPointerCancel={finish}
-        onKeyDown={onKeyDown}
-        style={{
-          position: 'relative', flex: 1, height: 46, borderRadius: 12, cursor: disabled ? 'default' : 'ew-resize',
-          background: 'linear-gradient(180deg, rgba(16,19,30,0.96), rgba(26,30,44,0.96))',
-          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.07), inset 0 -1px 0 rgba(0,0,0,0.5), 0 2px 10px rgba(0,0,0,0.25)',
-          display: 'flex', alignItems: 'center', padding: '0 10px', touchAction: 'none', overflow: 'hidden',
-        }}
-      >
+      {/* the ruler — barRef lives HERE so pointer→value maps over the tick area, not the panel */}
+      <div ref={barRef} style={{ position: 'relative', flex: 1, minWidth: 0, height: '100%', display: 'flex', alignItems: 'center', pointerEvents: 'none' }}>
         {/* ruler ticks — height/brightness express fill; magnify around the active notch */}
         <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center' }}>
           {Array.from({ length: TICK_COUNT }, (_, i) => {
@@ -180,11 +180,12 @@ export default function TickBar({
           )}
         </div>
       </div>
-      {/* large numeric readout */}
+      {/* large numeric readout — inside the dark panel (always legible) */}
       <span
         style={{
           fontSize: 21, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: '#eef1f8',
-          width: 62, textAlign: 'right', flexShrink: 0, textShadow: '0 1px 2px rgba(0,0,0,0.4)',
+          minWidth: 58, textAlign: 'right', flexShrink: 0, pointerEvents: 'none',
+          textShadow: '0 1px 2px rgba(0,0,0,0.4)',
         }}
       >
         {readout}
