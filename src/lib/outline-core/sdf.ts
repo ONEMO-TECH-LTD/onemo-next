@@ -149,13 +149,13 @@ function ringArea(pts: Vec2Px[]): number {
 }
 
 /**
- * Morph between `fromRings` (t=0) and `toRings` (t=1) via SDF blending. Returns the blended rings in
- * SOURCE px (largest loop first). Endpoints bypass the SDF for exactness.
+ * Precompute the two signed-distance fields ONCE and return a cheap per-`t` evaluator. The fields
+ * φ_from / φ_to do not depend on `t` — rasterize + chamfer (the expensive ~95% of a blend) happen
+ * here a single time; each evaluator call only blends the fields + traces the zero contour (a few
+ * ms). This is what makes a live Hug slider affordable per input tick (V1-recovery F1).
  */
-export function resolveSdfBlend(params: SdfBlendParams): Vec2Px[][] {
-  const { fromRings, toRings, t, domain } = params
-  if (t <= 0.0001) return fromRings.map((r) => r.map((p) => [p[0], p[1]] as Vec2Px))
-  if (t >= 0.9999) return toRings.map((r) => r.map((p) => [p[0], p[1]] as Vec2Px))
+export function prepareSdfBlend(params: Omit<SdfBlendParams, 't'>): (t: number) => Vec2Px[][] {
+  const { fromRings, toRings, domain } = params
 
   // Pad the raster domain so neither shape touches the grid edge. A shape that fills the frame
   // (e.g. the full-image "square") otherwise has a degenerate SDF (zero only at the boundary), and
@@ -176,14 +176,26 @@ export function resolveSdfBlend(params: SdfBlendParams): Vec2Px[][] {
   const phiFrom = signedField(rasterize(fromRings, GW, GH, dom), GW, GH)
   const phiTo = signedField(rasterize(toRings, GW, GH, dom), GW, GH)
   const phi = new Float32Array(GW * GH)
-  for (let i = 0; i < phi.length; i++) phi[i] = (1 - t) * phiFrom[i] + t * phiTo[i]
-
-  const loops = marchZero(phi, GW, GH)
-  if (!loops.length) return toRings
-  // grid cell coords → source px
   const sx = dom.width / GW, sy = dom.height / GH
   const toSrc = (ring: Vec2Px[]) => ring.map(([gx, gy]) => [dom.minX + (gx + 0.5) * sx, dom.minY + (gy + 0.5) * sy] as Vec2Px)
-  const rings = loops.map(toSrc)
-  rings.sort((a, b) => ringArea(b) - ringArea(a)) // largest (outer) first
-  return rings
+
+  return (t: number): Vec2Px[][] => {
+    if (t <= 0.0001) return fromRings.map((r) => r.map((p) => [p[0], p[1]] as Vec2Px))
+    if (t >= 0.9999) return toRings.map((r) => r.map((p) => [p[0], p[1]] as Vec2Px))
+    for (let i = 0; i < phi.length; i++) phi[i] = (1 - t) * phiFrom[i] + t * phiTo[i]
+    const loops = marchZero(phi, GW, GH)
+    if (!loops.length) return toRings
+    const rings = loops.map(toSrc)
+    rings.sort((a, b) => ringArea(b) - ringArea(a)) // largest (outer) first
+    return rings
+  }
+}
+
+/**
+ * Morph between `fromRings` (t=0) and `toRings` (t=1) via SDF blending. Returns the blended rings in
+ * SOURCE px (largest loop first). Endpoints bypass the SDF for exactness. One-shot convenience over
+ * `prepareSdfBlend` — for repeated `t` evaluation (a live slider), prepare once and reuse.
+ */
+export function resolveSdfBlend(params: SdfBlendParams): Vec2Px[][] {
+  return prepareSdfBlend(params)(params.t)
 }

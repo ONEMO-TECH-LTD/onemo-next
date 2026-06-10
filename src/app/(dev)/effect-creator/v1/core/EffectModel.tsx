@@ -181,39 +181,6 @@ function loadOptionalTexture(
   return texture
 }
 
-function hasTextureImageData(texture: THREE.Texture | null | undefined) {
-  if (!(texture instanceof THREE.Texture)) {
-    return false
-  }
-
-  const source = texture.source?.data ?? texture.image
-  if (!source) {
-    return false
-  }
-
-  if (typeof ImageBitmap !== 'undefined' && source instanceof ImageBitmap) {
-    return source.width > 0 && source.height > 0
-  }
-
-  if (typeof HTMLCanvasElement !== 'undefined' && source instanceof HTMLCanvasElement) {
-    return source.width > 0 && source.height > 0
-  }
-
-  if (typeof HTMLImageElement !== 'undefined' && source instanceof HTMLImageElement) {
-    return (source.naturalWidth || source.width || 0) > 0 && (source.naturalHeight || source.height || 0) > 0
-  }
-
-  if (typeof OffscreenCanvas !== 'undefined' && source instanceof OffscreenCanvas) {
-    return source.width > 0 && source.height > 0
-  }
-
-  if (typeof ImageData !== 'undefined' && source instanceof ImageData) {
-    return source.width > 0 && source.height > 0
-  }
-
-  return typeof source === 'object'
-}
-
 function createRoleMaterial(role: ViewerMaterialRole, artworkMap: THREE.Texture | null) {
   const defaults = role.defaults ?? {}
   const textures = role.textures ?? {}
@@ -266,16 +233,18 @@ export default function EffectModel({
   const artworkMeshRef = useRef<THREE.Mesh | null>(null)
   const artworkTexRef = useRef<THREE.Texture | null>(null)
 
-  // Load artwork texture dynamically
-  const artworkMap = useMemo(() => {
-    const tex = loadOptionalTexture(artworkUrl, { color: true, repeat: true })
-    if (tex) {
-      artworkTexRef.current = tex
-    }
-    return tex
-  }, [artworkUrl])
+  // Load artwork texture dynamically. Ref sync happens in an effect (not during render — F8d).
+  const artworkMap = useMemo(() => loadOptionalTexture(artworkUrl, { color: true, repeat: true }), [artworkUrl])
 
-  // Apply design state to artwork texture
+  useEffect(() => {
+    if (artworkMap) {
+      artworkTexRef.current = artworkMap
+    }
+  }, [artworkMap])
+
+  // Apply design state to artwork texture.
+  // Recovery F4: repeat/offset are texture-MATRIX params — no `needsUpdate` (it forces a full
+  // image→GPU re-upload per pointer event; the matrix updates automatically each render).
   useEffect(() => {
     const tex = artworkTexRef.current || artworkMap
     if (!tex) return
@@ -286,10 +255,6 @@ export default function EffectModel({
       centerOffset - designState.offsetX * repeat,
       centerOffset - designState.offsetY * repeat
     )
-    if (hasTextureImageData(tex)) {
-      // eslint-disable-next-line react-hooks/immutability
-      tex.needsUpdate = true
-    }
   }, [designState, artworkMap])
 
   const roleEntries = useMemo<ViewerMaterialRole[]>(() => {
@@ -314,8 +279,10 @@ export default function EffectModel({
     return materials
   }, [artworkMap, product, roleEntries])
 
-  // Override materials and generate planar UVs
-  useMemo(() => {
+  // Override materials and generate planar UVs. An effect, not a render-time useMemo: this mutates
+  // the GLB scene + writes artworkMeshRef (F8d — side effects during render broke the lint and is a
+  // StrictMode double-run hazard). EffectModel is the GLB path (unused on the shaped route).
+  useEffect(() => {
     scene.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         const matchedRole = roleEntries.find((role) => matchesMeshName(child.name, role.meshNames))

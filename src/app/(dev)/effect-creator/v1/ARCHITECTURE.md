@@ -1,11 +1,11 @@
 # Shaped-Effect Configurator — Folder Architecture
 
-> **⚠ Authority:** the current build/refactor direction lives in **`BLUEPRINT.md`** (2D-first creation;
-> the millimetre **Sticker Spec** as the single source of truth for the 2D view, the 3D preview, and
-> manufacturing; WebGL mounted only for the on-demand 3D preview). This file documents the **3D engine
-> internals** (segmentation → contour → mesh) that the blueprint's `buildMeshFromSpec` step consumes.
-> Where this file still says "page is hard-wired `shaped=true`" / "3D by default", read the blueprint —
-> that is the legacy model being migrated away from.
+> **⚠ Authority:** `BLUEPRINT.md` (its §4 perf contract **corrected 2026-06-10**) +
+> **`ADDENDUM-V1-RECOVERY.md`** (the corrected diagnosis + the recovery build's target architecture).
+> The original "WebGL mounted only for the on-demand 3D preview" rule derived from a misdiagnosed
+> measurement — the audited scene runs 120 FPS with the mesh loaded; the 3D-always-on model this file
+> documents is **valid and being recovered**, not migrated away from. This file documents the **3D
+> engine internals** (segmentation → contour → mesh).
 
 > Self-contained configurator at route `/shaped`. A copy of the golden `/prototype` whose 3D
 > object is replaced by a **generated cut-out mesh** built from the uploaded image. The golden
