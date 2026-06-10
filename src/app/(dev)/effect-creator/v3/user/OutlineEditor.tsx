@@ -519,6 +519,20 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     // preselected and show the centered square as the starting selection (NOT dirty — it becomes
     // real only when the user commits an edit / picks a chip).
     let opened = d
+    // Run 4 — the vectoriser: a Magic cut-out OPENS as the fitted vector of its faired trace
+    // (display truth = true curves; opening is not an edit — the 3D keeps the prepared geometry
+    // until the user commits a change).
+    if (!useStored && spec && spec.generator.adapter !== 'standard' && spec.rawTracePx && spec.rawTracePx.length >= 24) {
+      const savedF = useOutlineStore.getState().fairing
+      const v0 = vecFromTrace(savedF?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL))
+      if (v0) {
+        opened = shadowDoc(v0, d.image)
+        setDoc(opened)
+        setVShape(v0)
+        vshapeRef.current = v0
+        vBaseRef.current = null
+      }
+    }
     if (!useStored && spec && spec.generator.adapter === 'standard' && !useOutlineStore.getState().editedContourMM) {
       // VECTOR CORE: the starting square is a TRUE vector — 4 corner anchors filleted into exact
       // arcs (kappa-true cubics). Default rounding lives in the SHAPE (committed truth, ~8mm on
@@ -1127,6 +1141,19 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     }
     return applyOutlineCommands(base, [], { image: docRef.current.image, mode: 'auto' })
   }, [spec])
+  /** Run 4 — the vectoriser: faired BEN trace → ONE Schneider fit → true vector path.
+   *  Corners ≤ the fairing's max-turn guarantee read as tight curves (already softened);
+   *  genuinely sharp residuals (>30°) become true corner anchors. */
+  const vecFromTrace = useCallback((params: FairTracedRingOpts): VShape | null => {
+    const raw = spec?.rawTracePx
+    if (!raw || raw.length < 24) return null
+    const H = spec.maskHeightPx
+    const rawEditorPx = raw.map(([x, y]) => [x, H - y] as Vec2Px) // y-up mask → y-down editor px
+    const faired = fairTracedRing(rawEditorPx, params)
+    if (faired.length < 3) return null
+    const path = ringToVPath(faired.map(([x, y]) => ({ x, y })), 30, 0.35)
+    return { paths: [path] }
+  }, [spec])
   const previewTune = useCallback((params: FairTracedRingOpts) => {
     const t0 = performance.now()
     const d = buildTunedDoc(params)
@@ -1135,8 +1162,19 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   }, [buildTunedDoc])
   const commitTune = useCallback((params: FairTracedRingOpts, detailVal?: number) => {
     const t0 = performance.now()
-    const d = buildTunedDoc(params)
     setTunePreview(null)
+    // Run 4: the release FITS the re-faired trace into a true vector path (ticks stay doc-transient)
+    const v = vecFromTrace(params)
+    if (v) {
+      setFairParams(params)
+      applyVec(v, null)
+      setSelectedNode(null)
+      setAllSelected(false)
+      useOutlineStore.getState().setFairing({ detail: detailVal ?? detailRef.current, params })
+      perfGesture('tune-commit', performance.now() - t0)
+      return
+    }
+    const d = buildTunedDoc(params)
     if (!d) return
     setFairParams(params)
     applyDoc(d)
@@ -1145,7 +1183,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     // #21: tuned settings become the durable defaults — Magic reads them from the store
     useOutlineStore.getState().setFairing({ detail: detailVal ?? detailRef.current, params })
     perfGesture('tune-commit', performance.now() - t0)
-  }, [buildTunedDoc, applyDoc])
+  }, [buildTunedDoc, applyDoc, applyVec, vecFromTrace])
 
   // Shape tool: build a fresh OutlineDocument from a preset/parametric shape's point ring (centered, fit
   // to the image), seeded into our node model so Smooth/Scale/drag all apply (radius 0 — shapes are
