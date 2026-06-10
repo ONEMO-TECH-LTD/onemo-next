@@ -14,6 +14,7 @@ import { create } from 'zustand'
 import type { EffectSpecDraft, Contour } from '@/lib/effect/types'
 import type { DesignState } from '../types'
 import type { OutlineDocument, FairTracedRingOpts } from '@/lib/outline-core'
+import type { VShape } from '@/lib/vector-core'
 
 // #28: artwork position (pan/zoom within the shape) — ONE source for the scene's Position mode
 // and the editor's Image tool. Matrix-only downstream (texture repeat/offset).
@@ -45,6 +46,10 @@ interface OutlineStore {
   // the original BEN contour (the 3D already reflects edits via editedContourMM).
   editedDoc: OutlineDocument | null
   setEditedDoc: (d: OutlineDocument | null) => void
+  // VECTOR CORE (reset Run 1): the committed vector-shape truth, persisted ALONGSIDE editedDoc —
+  // reopening a vector-native shape restores true curves, never a polyline re-derivation.
+  editedVShape: VShape | null
+  setEditedVShape: (v: VShape | null) => void
   // "Magic blend" background-blur intensity, edit-mode controllable. null = use the build default (on);
   // 0 = off (sharp full photo); 0..1 = blur amount. ShapedModel re-composes the front texture from it.
   bgBlur: number | null
@@ -73,6 +78,8 @@ export const useOutlineStore = create<OutlineStore>((set) => ({
   setEditedContourMM: (editedContourMM) => set({ editedContourMM }),
   editedDoc: null,
   setEditedDoc: (editedDoc) => set({ editedDoc }),
+  editedVShape: null,
+  setEditedVShape: (editedVShape) => set({ editedVShape }),
   bgBlur: null,
   setBgBlur: (bgBlur) => set({ bgBlur }),
   subjMatteUrl: null,

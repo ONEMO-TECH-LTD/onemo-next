@@ -74,6 +74,7 @@ function PrototypePageInner() {
     spec: ReturnType<typeof useOutlineStore.getState>['spec']
     editedContourMM: ReturnType<typeof useOutlineStore.getState>['editedContourMM']
     editedDoc: ReturnType<typeof useOutlineStore.getState>['editedDoc']
+    editedVShape: ReturnType<typeof useOutlineStore.getState>['editedVShape']
     bgBlur: number | null
     subjMatteUrl: string | null
   }
@@ -100,7 +101,7 @@ function PrototypePageInner() {
     return {
       prepared, autoOutline, designState,
       imageFx: o.imageFx,
-      outline: { spec: o.spec, editedContourMM: o.editedContourMM, editedDoc: o.editedDoc, bgBlur: o.bgBlur, subjMatteUrl: o.subjMatteUrl },
+      outline: { spec: o.spec, editedContourMM: o.editedContourMM, editedDoc: o.editedDoc, editedVShape: o.editedVShape, bgBlur: o.bgBlur, subjMatteUrl: o.subjMatteUrl },
       trim: { ...useSceneStore.getState().colors },
     }
   }, [prepared, autoOutline, designState])
@@ -119,6 +120,7 @@ function PrototypePageInner() {
     o.setSpec(sn.outline.spec)
     o.setEditedContourMM(sn.outline.editedContourMM)
     o.setEditedDoc(sn.outline.editedDoc)
+    o.setEditedVShape(sn.outline.editedVShape)
     o.setBgBlur(sn.outline.bgBlur)
     o.setSubjMatteUrl(sn.outline.subjMatteUrl)
     const sc = useSceneStore.getState()
@@ -179,7 +181,7 @@ function PrototypePageInner() {
     setAutoOutline(false) // new image → the standard square; Magic opts into the cut-out
     // fresh image → drop any prior edit/blend so the new effect starts clean
     const st = useOutlineStore.getState()
-    st.setEditedContourMM(null); st.setEditedDoc(null); st.setBgBlur(null); st.setSubjMatteUrl(null)
+    st.setEditedContourMM(null); st.setEditedDoc(null); st.setEditedVShape(null); st.setBgBlur(null); st.setSubjMatteUrl(null)
     // instant standard square through the ONE engine — the object is real in the scene immediately
     import('@/lib/effect/prepare-effect')
       .then(({ prepareEffect }) => prepareEffect(url, 'standard'))
@@ -189,7 +191,7 @@ function PrototypePageInner() {
         // #23: a new image starts a fresh history; this state is the Reset baseline
         baselineRef.current = {
           prepared: p, autoOutline: false, designState: INITIAL_ARTWORK, imageFx: null,
-          outline: { spec: p.spec, editedContourMM: null, editedDoc: null, bgBlur: null, subjMatteUrl: null },
+          outline: { spec: p.spec, editedContourMM: null, editedDoc: null, editedVShape: null, bgBlur: null, subjMatteUrl: null },
           trim: { ...useSceneStore.getState().colors },
         }
         histRef.current = { past: [], future: [] }
@@ -224,7 +226,7 @@ function PrototypePageInner() {
         setPrepared(p)
         const st = useOutlineStore.getState()
         st.setSpec(p.spec) // hand the shaped outline to the 2D editor + 3D
-        st.setEditedContourMM(null); st.setEditedDoc(null); st.setBgBlur(null) // fresh cut-out → drop prior edits
+        st.setEditedContourMM(null); st.setEditedDoc(null); st.setEditedVShape(null); st.setBgBlur(null) // fresh cut-out → drop prior edits
         // the editor's magic-blend preview needs the sharp subject matte
         try { st.setSubjMatteUrl(p.frontSrc.subjCanvas.toDataURL()) } catch { st.setSubjMatteUrl(null) }
         setAutoOutline(true)
@@ -233,7 +235,7 @@ function PrototypePageInner() {
         // #23: the editor session that auto-opens is its own step — stash the post-magic state
         editorPreRef.current = {
           prepared: p, autoOutline: true, designState, imageFx: useOutlineStore.getState().imageFx,
-          outline: { spec: p.spec, editedContourMM: null, editedDoc: null, bgBlur: null, subjMatteUrl: useOutlineStore.getState().subjMatteUrl },
+          outline: { spec: p.spec, editedContourMM: null, editedDoc: null, editedVShape: null, bgBlur: null, subjMatteUrl: useOutlineStore.getState().subjMatteUrl },
           trim: { ...useSceneStore.getState().colors },
         }
         setEditingOutline(true) // #26: after generation the editor opens on the generated outline

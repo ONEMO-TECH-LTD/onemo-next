@@ -36,6 +36,10 @@ import TickBar from '../ui/TickBar'
 import { toast } from '../ui/Toast'
 import { perfGesture } from '../dev/PerfHUD'
 import { generateShapeRing, resampleClosed, PARAMETRIC, type ShapeKind, type ShapeParams } from './shapes'
+// VECTOR CORE (reset Run 1): vector-native kinds render/commit/transform on a true Bézier VShape;
+// the doc stays as the interaction SHADOW (a derived flatten artifact — bbox/hit/grips math only).
+import { shapeToSVGPathD, transformShape, flattenShape, filletShape, type VShape, type Vec2 } from '@/lib/vector-core'
+import { hasVectorDef, getShape } from '@/lib/shape-library'
 import styles from './outline-editor.module.css'
 
 // Shape chips — Dan's board lineup (Simbolik/LOEWE symbol alphabet) + the two generators.
@@ -334,7 +338,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   const pointersRef = useRef<Map<number, Vec2Px>>(new Map())
   // pre-edit snapshot captured on open → "Close" (✕) discards this session's edits and reverts the 3D;
   // "Done" (✓) keeps them. Holds the 3D contour, the persisted editor doc, and the blend at open time.
-  const preEditRef = useRef<{ contourMM: Contour | null; editedDoc: OutlineDocument | null; bgBlur: number | null }>({ contourMM: null, editedDoc: null, bgBlur: null })
+  const preEditRef = useRef<{ contourMM: Contour | null; editedDoc: OutlineDocument | null; editedVShape: VShape | null; bgBlur: number | null }>({ contourMM: null, editedDoc: null, editedVShape: null, bgBlur: null })
   const [allSelected, setAllSelected] = useState(false) // tap inside the cut → select every corner, edit them together
   const [freehandPreview, setFreehandPreview] = useState<Vec2Px[] | null>(null) // live freehand stroke (A3d)
   const freehandRef = useRef<Vec2Px[] | null>(null)
@@ -361,24 +365,60 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   // parametric shapes — a circle has ~60 vertices; one stray drag spoils it. Toggle in the topbar.
   const [showAnchors, setShowAnchors] = useState(true)
   const dirtyRef = useRef(false) // true once the user has actually edited (so the 3D follows edits, not the open)
+  // VECTOR CORE (Run 1): when set, the VShape IS the geometry truth — pathD renders its true
+  // curves, the commit effect flattens IT for the 3D/payload, transforms apply to it exactly.
+  // vBaseRef = the unfilleted base so Radius re-fillets from clean corners.
+  const [vshape, setVShape] = useState<VShape | null>(null)
+  const vshapeRef = useRef<VShape | null>(null)
+  useEffect(() => { vshapeRef.current = vshape }, [vshape])
+  const vBaseRef = useRef<VShape | null>(null)
 
   // Undo/redo (A1b): a doc-snapshot history. Covers BOTH command edits (move/add/delete/corner/smooth)
   // and whole-doc generator swaps (blend/draw/simplify/reset) uniformly. docRef mirrors the latest doc
   // so the wrapper can snapshot the pre-edit state without stale closures.
   const docRef = useRef(doc)
   useEffect(() => { docRef.current = doc }, [doc])
-  const histRef = useRef<{ past: OutlineDocument[]; future: OutlineDocument[] }>({ past: [], future: [] })
+  // History entries pair the doc with the vshape AT THAT MOMENT — one timeline, no desync when
+  // the session mixes vector ops (vshape) and doc ops (tune/draw/non-vector chips).
+  const histRef = useRef<{ past: Array<{ d: OutlineDocument; v: VShape | null }>; future: Array<{ d: OutlineDocument; v: VShape | null }> }>({ past: [], future: [] })
   const [, bumpHist] = useState(0)
   const applyDoc = useCallback((next: OutlineDocument) => {
-    histRef.current.past.push(docRef.current)
+    histRef.current.past.push({ d: docRef.current, v: vshapeRef.current })
     if (histRef.current.past.length > 50) histRef.current.past.shift()
     histRef.current.future = []
     dirtyRef.current = true
     docRef.current = next
     setDoc(next)
-    useOutlineStore.getState().setEditedDoc(next) // persist so reopening restores edits
+    vshapeRef.current = null // a doc-level edit replaces the geometry → vector mode exits
+    setVShape(null)
+    vBaseRef.current = null
+    const st = useOutlineStore.getState()
+    st.setEditedDoc(next) // persist so reopening restores edits
+    st.setEditedVShape(null)
     bumpHist((v) => v + 1)
   }, [])
+  /** polyline SHADOW of a VShape — feeds the doc-based interaction machinery (bbox/hit/grips). */
+  const shadowDoc = useCallback((v: VShape, image?: OutlineDocument['image']): OutlineDocument => {
+    const ring = flattenShape(v, 0.5)[0].map((p) => [p.x, p.y] as Vec2Px)
+    return docFromRings(ring, image ?? docRef.current.image, 0, 1.5)
+  }, [])
+  /** Apply a vector-shape edit: same history/persistence/3D contract as applyDoc, vshape as truth. */
+  const applyVec = useCallback((nextV: VShape, nextBase?: VShape | null) => {
+    histRef.current.past.push({ d: docRef.current, v: vshapeRef.current })
+    if (histRef.current.past.length > 50) histRef.current.past.shift()
+    histRef.current.future = []
+    dirtyRef.current = true
+    const sd = shadowDoc(nextV)
+    docRef.current = sd
+    setDoc(sd)
+    vshapeRef.current = nextV
+    setVShape(nextV)
+    if (nextBase !== undefined) vBaseRef.current = nextBase
+    const st = useOutlineStore.getState()
+    st.setEditedDoc(sd)
+    st.setEditedVShape(nextV)
+    bumpHist((v) => v + 1)
+  }, [shadowDoc])
   const syncSlidersTo = useCallback((d: OutlineDocument) => {
     setRadius(d.style.globalOutlineCornerRadiusPx)
     setSmoothing(Math.round(d.style.smoothing * 100))
@@ -391,24 +431,32 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     const h = histRef.current
     if (!h.past.length) return
     const prev = h.past.pop()!
-    h.future.unshift(docRef.current)
+    h.future.unshift({ d: docRef.current, v: vshapeRef.current })
     dirtyRef.current = true
-    docRef.current = prev
-    setDoc(prev)
-    useOutlineStore.getState().setEditedDoc(prev)
-    syncSlidersTo(prev)
+    docRef.current = prev.d
+    setDoc(prev.d)
+    vshapeRef.current = prev.v
+    setVShape(prev.v)
+    const st = useOutlineStore.getState()
+    st.setEditedDoc(prev.d)
+    st.setEditedVShape(prev.v)
+    syncSlidersTo(prev.d)
     bumpHist((v) => v + 1)
   }, [syncSlidersTo])
   const redo = useCallback(() => {
     const h = histRef.current
     if (!h.future.length) return
     const next = h.future.shift()!
-    h.past.push(docRef.current)
+    h.past.push({ d: docRef.current, v: vshapeRef.current })
     dirtyRef.current = true
-    docRef.current = next
-    setDoc(next)
-    useOutlineStore.getState().setEditedDoc(next)
-    syncSlidersTo(next)
+    docRef.current = next.d
+    setDoc(next.d)
+    vshapeRef.current = next.v
+    setVShape(next.v)
+    const st = useOutlineStore.getState()
+    st.setEditedDoc(next.d)
+    st.setEditedVShape(next.v)
+    syncSlidersTo(next.d)
     bumpHist((v) => v + 1)
   }, [syncSlidersTo])
 
@@ -417,12 +465,17 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     if (!open) return
     // Snapshot the pre-edit state so ✕ Close can discard this session's edits (revert the 3D + persisted doc).
     const st0 = useOutlineStore.getState()
-    preEditRef.current = { contourMM: st0.editedContourMM ?? (spec ? spec.geometryMM : null), editedDoc: st0.editedDoc, bgBlur: st0.bgBlur }
+    preEditRef.current = { contourMM: st0.editedContourMM ?? (spec ? spec.geometryMM : null), editedDoc: st0.editedDoc, editedVShape: st0.editedVShape, bgBlur: st0.bgBlur }
     // Restore prior edits if they belong to the current cut-out; else derive a fresh editable contour.
     const stored = useOutlineStore.getState().editedDoc
     const useStored = !!stored && !!spec && stored.image.sourceHash === spec.sourceRef.slice(0, 40)
     const d = useStored ? stored! : spec ? docFromSpec(spec) : seedDoc(VIEW_W, VIEW_H)
     setDoc(d)
+    // vector truth travels with the persisted doc — restore the pair together
+    const storedV = useStored ? st0.editedVShape : null
+    setVShape(storedV)
+    vshapeRef.current = storedV
+    vBaseRef.current = null
     setRadius(d.style.globalOutlineCornerRadiusPx)
     setMaxRadius(Math.round(Math.min(d.image.widthPx, d.image.heightPx) * 0.25))
     setSmoothing(Math.round(d.style.smoothing * 100))
@@ -461,16 +514,18 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     // real only when the user commits an edit / picks a chip).
     let opened = d
     if (!useStored && spec && spec.generator.adapter === 'standard' && !useOutlineStore.getState().editedContourMM) {
-      const ring = generateShapeRing({ kind: 'square' }, d.image.widthPx, d.image.heightPx)
-      let mnx = Infinity, mxx = -Infinity, mny = Infinity, mxy = -Infinity
-      for (const [x, y] of ring) { if (x < mnx) mnx = x; if (x > mxx) mxx = x; if (y < mny) mny = y; if (y > mxy) mxy = y }
-      // default rounding lives in the DOC (committed truth, ~8mm-on-70mm product language) — NOT a
-      // slider transient. The old radius-0 seed left the Round slider synced to the discarded
-      // full-bleed doc, so the square RENDERED rounded while the document was sharp (undo exposed
-      // it — caught live 2026-06-10).
-      const defaultR = Math.round(Math.min(mxx - mnx, mxy - mny) * 0.12)
-      opened = docFromRings(ring, d.image, defaultR)
+      // VECTOR CORE: the starting square is a TRUE vector — 4 corner anchors filleted into exact
+      // arcs (kappa-true cubics). Default rounding lives in the SHAPE (committed truth, ~8mm on
+      // the 70mm product), not a slider transient (the radius-0-seed lie was caught live 2026-06-10).
+      const base = getShape('square', d.image.widthPx, d.image.heightPx)
+      const side = Math.min(d.image.widthPx, d.image.heightPx) * 0.72
+      const defaultR = Math.round(side * 0.12)
+      const v0 = filletShape(base, defaultR)
+      opened = shadowDoc(v0, d.image)
       setDoc(opened)
+      setVShape(v0)
+      vshapeRef.current = v0
+      vBaseRef.current = base
       setRadius(defaultR)
       setActiveAdjust('shape')
       setShapeKind('square')
@@ -551,10 +606,21 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   // committed `doc` (not the transient drag), so the 3D updates on commit — 2D leads, 3D lags.
   useEffect(() => {
     if (!open || !spec || !dirtyRef.current) return
-    const res = resolveOutlineDocument(doc, { flattenTolerancePx: 0.15 })
-    if (res.issues.length) return // never push an un-manufacturable (self-intersecting) shape to the 3D
     const k = spec.mmPerPx || 1
     const H = doc.image.heightPx
+    // VECTOR CORE: the VShape is the committed truth — flatten IT at manufacturing tolerance
+    // (0.05 mm in px) and feed the same mm mapping. The doc shadow never reaches the 3D.
+    if (vshape) {
+      const tolPx = Math.max(0.05, 0.05 / k)
+      const ring = flattenShape(vshape, tolPx)[0].map((p) => [p.x, p.y] as Vec2Px)
+      if (ring.length >= 3) {
+        const outer = ring.map(([x, y]) => [x * k, (H - y) * k] as Vec2Px).reverse()
+        setEditedContourMM({ outer: { pts: outer }, holes: [] })
+      }
+      return
+    }
+    const res = resolveOutlineDocument(doc, { flattenTolerancePx: 0.15 })
+    if (res.issues.length) return // never push an un-manufacturable (self-intersecting) shape to the 3D
     // The mesh maps image-top→3D-bottom for GEOMETRY while the texture's flipY keeps the IMAGE upright
     // (invisible on a symmetric shape, but it mirrors an asymmetric EDIT). Feed Y in the engine's
     // upright-geometry space (flip within image height) so an edit at the top of the editor lands at
@@ -568,17 +634,26 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       .map((r, i) => (r.role === 'hole' && res.flattenedRingsPx[i]?.length ? toMM(res.flattenedRingsPx[i]) : null))
       .filter((h): h is Vec2Px[] => h !== null)
     setEditedContourMM({ outer: { pts: outer }, holes: holes.map((h) => ({ pts: h })) })
-  }, [doc, open, spec, setEditedContourMM])
+  }, [doc, vshape, open, spec, setEditedContourMM])
 
   // Draw the RESOLVED (unflattened) rings: the manufacturing flatten's chord tolerance read as
   // visible facets on curves at editor zoom (Dan, 2026-06-10). Flattened stays for mm export.
-  const pathD = useMemo(
-    () =>
-      resolved.resolvedRingsPx
-        .map((ring) => (ring.length ? `M ${ring.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ')} Z` : ''))
-        .join(' '),
-    [resolved],
-  )
+  const pathD = useMemo(() => {
+    // VECTOR CORE: true curves render as true SVG C commands — crisp at ANY zoom, zero chords.
+    // The live Scale preview transforms the vshape exactly (affine on anchors+handles).
+    if (vshape) {
+      let v = vshape
+      if (scale !== 100) {
+        const [cx, cy] = outerCenter(doc)
+        const f = scale / 100
+        v = transformShape(v, (p: Vec2) => ({ x: cx + (p.x - cx) * f, y: cy + (p.y - cy) * f }))
+      }
+      return shapeToSVGPathD(v, 2)
+    }
+    return resolved.resolvedRingsPx
+      .map((ring) => (ring.length ? `M ${ring.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ')} Z` : ''))
+      .join(' ')
+  }, [resolved, vshape, scale, doc])
 
   // Manual draw path: between placed anchors, SNAP to image edges via the livewire when an edge-cost
   // grid is available (A3b magnetic lasso); otherwise straight segments (A3a, e.g. no image).
@@ -787,10 +862,19 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
 
   const commitRotate = useCallback(() => {
     const rl = rotateLiveRef.current
-    if (rl && Math.abs(rl.deg) > 0.01) applyDoc(rotateDoc(docRef.current, rl.deg))
+    if (rl && Math.abs(rl.deg) > 0.01) {
+      if (vshapeRef.current) {
+        // exact rotation on anchors+handles
+        const rad = (rl.deg * Math.PI) / 180, c = Math.cos(rad), s = Math.sin(rad)
+        const t = (p: Vec2) => ({ x: rl.cx + (p.x - rl.cx) * c - (p.y - rl.cy) * s, y: rl.cy + (p.x - rl.cx) * s + (p.y - rl.cy) * c })
+        applyVec(transformShape(vshapeRef.current, t), vBaseRef.current ? transformShape(vBaseRef.current, t) : null)
+      } else {
+        applyDoc(rotateDoc(docRef.current, rl.deg))
+      }
+    }
     rotateLiveRef.current = null; setRotateLive(null)
     nodeInteractedRef.current = true // suppress the click that follows so it doesn't re-select-all
-  }, [applyDoc])
+  }, [applyDoc, applyVec])
 
   const onPointerUp = useCallback((e: React.PointerEvent) => {
     pointersRef.current.delete(e.pointerId)
@@ -802,7 +886,15 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     if (moveRef.current) {
       const ml = moveLiveRef.current
       moveRef.current = null
-      if (ml) { applyDoc(translateDoc(docRef.current, ml.dx, ml.dy)); moveLiveRef.current = null; setMoveLive(null) }
+      if (ml) {
+        if (vshapeRef.current) {
+          const t = (p: Vec2) => ({ x: p.x + ml.dx, y: p.y + ml.dy })
+          applyVec(transformShape(vshapeRef.current, t), vBaseRef.current ? transformShape(vBaseRef.current, t) : null)
+        } else {
+          applyDoc(translateDoc(docRef.current, ml.dx, ml.dy))
+        }
+        moveLiveRef.current = null; setMoveLive(null)
+      }
       return // no move = a tap → onSurfaceClick selects all
     }
     if (drag) {
@@ -825,7 +917,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       }
       freehandMovedRef.current = false
     }
-  }, [drag, drawPts, commit, doc.image, commitRotate, applyDoc])
+  }, [drag, drawPts, commit, doc.image, commitRotate, applyDoc, applyVec])
 
   // Delete a control point (double-click a handle); keep a ring valid (≥3 nodes).
   const onNodeDoubleClick = useCallback(
@@ -840,6 +932,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   // Add a control point on the nearest outer-ring segment (double-click the surface).
   const onSurfaceDoubleClick = useCallback(
     (e: React.MouseEvent) => {
+      if (vshapeRef.current) return // points-on-demand for vector shapes arrives with its own run
       const p = toViewBox(e.clientX, e.clientY)
       const ring = doc.rings.find((r) => r.role === 'outer')
       if (!ring) return
@@ -914,11 +1007,19 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   const commitRadius = useCallback((v: number) => {
     setRadius(v)
     const t0 = performance.now()
+    // VECTOR CORE: Radius re-fillets the clean BASE with exact arcs (square-class corners now;
+    // curve-corner fillet — heart cusps — arrives with the Radius run).
+    if (vshapeRef.current) {
+      if (vBaseRef.current) applyVec(filletShape(vBaseRef.current, v), vBaseRef.current)
+      perfGesture('round-commit', performance.now() - t0)
+      return
+    }
     if (selectedNode) commit({ op: 'SetCorner', ringId: selectedNode.ringId, nodeId: selectedNode.nodeId, corner: { mode: 'manual', outlineCornerRadiusPx: v } })
     else commit({ op: 'SetGlobalCornerRadius', outlineCornerRadiusPx: v })
     perfGesture('round-commit', performance.now() - t0)
-  }, [selectedNode, commit])
+  }, [selectedNode, commit, applyVec])
   const commitSmoothing = useCallback((v: number) => {
+    if (vshapeRef.current) { setSmoothing(0); return } // pure curves need no styling smooth (Curve op returns later)
     setSmoothing(v)
     const t0 = performance.now()
     commit({ op: 'SetSmoothing', smoothing: v / 100 })
@@ -926,17 +1027,25 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   }, [commit])
   // Scale: the slider previews live (displayDoc), then bakes the relative factor on release; the −/+
   // buttons bake a fixed ±5% step. Both resize all node positions about the center, preserving corners.
+  const vecScale = useCallback((f: number) => {
+    const v = vshapeRef.current!
+    const [cx, cy] = outerCenter(docRef.current)
+    const t = (p: Vec2) => ({ x: cx + (p.x - cx) * f, y: cy + (p.y - cy) * f })
+    applyVec(transformShape(v, t), vBaseRef.current ? transformShape(vBaseRef.current, t) : null)
+  }, [applyVec])
   const commitScale = useCallback((v: number) => {
     if (v === 100) { setScale(100); return }
     const t0 = performance.now()
-    applyDoc(scaleDoc(docRef.current, v / 100))
+    if (vshapeRef.current) vecScale(v / 100) // exact affine on anchors+handles
+    else applyDoc(scaleDoc(docRef.current, v / 100))
     setScale(100)
     perfGesture('scale-commit', performance.now() - t0)
-  }, [applyDoc])
+  }, [applyDoc, vecScale])
   const nudgeScale = useCallback((deltaPct: number) => {
+    if (vshapeRef.current) { vecScale((100 + deltaPct) / 100); setScale(100); return }
     applyDoc(scaleDoc(docRef.current, (100 + deltaPct) / 100))
     setScale(100)
-  }, [applyDoc])
+  }, [applyDoc, vecScale])
   // "Magic blend" — the soft real-background blur composited behind the subject on the 3D front
   // texture (the "magic blend" Dan loves). Edit-mode only control; on/off + intensity. Writes the
   // store's bgBlur (0 = off/sharp · 0..1 = intensity ·  ShapedModel re-composes the front, no re-segment).
@@ -985,9 +1094,15 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     setStretchLive(null)
     if (Math.abs(st.sx - 1) < 0.004 && Math.abs(st.sy - 1) < 0.004) return // a tap, not a pull
     const t0 = performance.now()
-    applyDoc(stretchDoc(docRef.current, st.sx, st.sy, st.ax, st.ay))
+    if (vshapeRef.current) {
+      // exact anisotropic Bézier transform — a stretched heart is still perfect curves
+      const t = (p: Vec2) => ({ x: st.ax + (p.x - st.ax) * st.sx, y: st.ay + (p.y - st.ay) * st.sy })
+      applyVec(transformShape(vshapeRef.current, t), vBaseRef.current ? transformShape(vBaseRef.current, t) : null)
+    } else {
+      applyDoc(stretchDoc(docRef.current, st.sx, st.sy, st.ax, st.ay))
+    }
     perfGesture('stretch-commit', performance.now() - t0)
-  }, [applyDoc])
+  }, [applyDoc, applyVec])
 
   // Tune (BEN dash): re-run the fairing pipeline on the RAW pre-fairing trace with live params.
   // Per-tick = preview only; commit on release rebuilds the document (undoable) — §6.3. Re-tracing
@@ -1040,6 +1155,16 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   const pickShape = useCallback((kind: ShapeKind) => {
     setShapeKind(kind)
     setShapePreview(null)
+    // VECTOR CORE: vector-native kinds spawn as TRUE Bézier shapes from the static library —
+    // zero sampling, zero fitting; the doc becomes a derived shadow for interaction math.
+    if (hasVectorDef(kind)) {
+      const img = docRef.current.image
+      const base = getShape(kind, img.widthPx, img.heightPx)
+      applyVec(base, base)
+      setRadius(0); setSmoothing(0); setScale(100); setSelectedNode(null); setAllSelected(false)
+      setShowAnchors(false)
+      return
+    }
     const overrides: Partial<ShapeParams> = {}
     if (kind === 'blob') { // fresh blob per pick; the dice rerolls further
       overrides.seed = Math.floor(Math.random() * 1e9)
@@ -1049,7 +1174,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     applyDoc(buildShapeDoc(kind, overrides))
     setSmoothing(0); setScale(100); setSelectedNode(null); setAllSelected(false)
     setShowAnchors(false) // rigid shape: vertex anchors off by default (toggle to edit points)
-  }, [applyDoc, buildShapeDoc])
+  }, [applyDoc, applyVec, buildShapeDoc])
   /** stepper: ±delta on an integer param, regenerate immediately (undoable). */
   const nudgeParam = useCallback((key: 'sides' | 'points' | 'lobes' | 'petals' | 'blades', delta: number, min: number, max: number) => {
     if (!shapeKind) return
@@ -1119,6 +1244,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     const st = useOutlineStore.getState()
     st.setEditedContourMM(pe.contourMM) // 3D rebuilds the pre-edit shape
     st.setEditedDoc(pe.editedDoc)       // reopening shows the pre-edit outline, not this session's edits
+    st.setEditedVShape(pe.editedVShape) // the vector truth reverts with it
     if (st.bgBlur !== pe.bgBlur) st.setBgBlur(pe.bgBlur != null ? pe.bgBlur : 0.5) // revert blend (null ≈ build default)
     setActiveAdjust(null)
     setSelectedNode(null)
@@ -1191,8 +1317,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
               <TopTool icon={<ResetIcon />} label="Reset" onClick={onReset} />
               {/* Preview = hide anchors/handles to see the clean result without exiting */}
               <TopTool icon={preview ? <PreviewOffIcon /> : <PreviewIcon />} label={preview ? 'Edit' : 'Preview'} onClick={() => setPreview((v) => !v)} />
-              {/* Points = toggle vertex anchors (rigid shapes start OFF — Dan) */}
-              <TopTool icon={<OutlineIcon />} label="Points" onClick={() => setShowAnchors((v) => !v)} />
+              {/* Points = toggle vertex anchors (rigid shapes start OFF — Dan). Hidden for vector
+                  shapes: pure curves carry no pre-created points; add-on-demand is its own run. */}
+              {!vshape && <TopTool icon={<OutlineIcon />} label="Points" onClick={() => setShowAnchors((v) => !v)} />}
             </>
           )}
           <TopTool icon={<CheckIcon />} label="Done" onClick={onDone} />
