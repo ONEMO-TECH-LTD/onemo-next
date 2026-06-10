@@ -285,6 +285,172 @@ export function repairSimplePolygon(ptsIn: Vec2Px[], minSpacingPx = 0): Vec2Px[]
   return ring
 }
 
+// ─── traced rings (exact contours) ───────────────────────────────────────────
+
+/** Uniform arc-length resample of a closed ring (pure; used by the fairing pipeline). */
+function resampleClosedUniform(pts: Vec2Px[], spacingPx: number): Vec2Px[] {
+  const n = pts.length
+  if (n < 3 || spacingPx <= 0) return pts
+  let perim = 0
+  const segLen: number[] = []
+  for (let i = 0; i < n; i++) {
+    const a = pts[i], b = pts[(i + 1) % n]
+    const l = Math.hypot(b[0] - a[0], b[1] - a[1])
+    segLen.push(l); perim += l
+  }
+  const count = Math.max(24, Math.round(perim / spacingPx))
+  const step = perim / count
+  const out: Vec2Px[] = []
+  let seg = 0, into = 0
+  for (let k = 0; k < count; k++) {
+    const target = k * step
+    while (seg < n - 1 && into + segLen[seg] < target) { into += segLen[seg]; seg++ }
+    const a = pts[seg % n], b = pts[(seg + 1) % n]
+    const t = segLen[seg % n] > 0 ? (target - into) / segLen[seg % n] : 0
+    out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t])
+  }
+  return out
+}
+
+/** Per-vertex TURN angle (deg): 0 = straight-through; 180 = full reversal (a spike). */
+function turnDeg(prev: Vec2Px, p: Vec2Px, next: Vec2Px): number {
+  const ax = p[0] - prev[0], ay = p[1] - prev[1]
+  const bx = next[0] - p[0], by = next[1] - p[1]
+  const dot = ax * bx + ay * by
+  const la = Math.hypot(ax, ay) || 1e-9, lb = Math.hypot(bx, by) || 1e-9
+  return (Math.acos(Math.max(-1, Math.min(1, dot / (la * lb)))) * 180) / Math.PI
+}
+
+/**
+ * FAIR a dense raster trace into a vector-quality contour (Dan, 2026-06-10):
+ *  1. uniform resample + small [1,2,1] smoothing — kills the marching-squares stair-steps (the
+ *     "micro steps" a faithful raster trace carries; deviation stays ~1–2 mask px, sub-display-pixel);
+ *  2. HARD max-turn guarantee — any vertex turning sharper than `maxTurnDeg` is corner-cut
+ *     (local Chaikin) and re-faired until none remain: the trace can never present a sharp spike
+ *     or micro-angle. Real corners become small smooth rounds; the USER makes sharp corners
+ *     deliberately with the editor, never the tracer.
+ * Straight runs are unaffected (smoothing of collinear points is identity), curves stay on-shape.
+ */
+export function fairTracedRing(
+  densePts: Vec2Px[],
+  opts: { spacingPx?: number; maxTurnDeg?: number } = {},
+): Vec2Px[] {
+  const spacing = opts.spacingPx ?? 1.5
+  const maxTurn = opts.maxTurnDeg ?? 35
+  let ring = resampleClosedUniform(dedup(densePts), spacing)
+  const smooth121 = (pts: Vec2Px[]): Vec2Px[] => {
+    const n = pts.length
+    const out: Vec2Px[] = new Array(n)
+    for (let i = 0; i < n; i++) {
+      const a = pts[(i - 1 + n) % n], p = pts[i], b = pts[(i + 1) % n]
+      out[i] = [(a[0] + 2 * p[0] + b[0]) / 4, (a[1] + 2 * p[1] + b[1]) / 4]
+    }
+    return out
+  }
+  for (let i = 0; i < 3; i++) ring = smooth121(ring)
+  // hard max-turn: Chaikin corner-cutting over the offender NEIGHBOURHOOD (±2 samples — cutting a
+  // lone vertex then resampling just re-sharpens it), with a diffusion pass between iterations.
+  for (let pass = 0; pass < 16; pass++) {
+    const n = ring.length
+    const sharp = new Set<number>()
+    for (let i = 0; i < n; i++) {
+      if (turnDeg(ring[(i - 1 + n) % n], ring[i], ring[(i + 1) % n]) > maxTurn) {
+        for (let k = -2; k <= 2; k++) sharp.add((i + k + n) % n)
+      }
+    }
+    if (sharp.size === 0) break
+    const out: Vec2Px[] = []
+    for (let i = 0; i < n; i++) {
+      if (!sharp.has(i)) { out.push(ring[i]); continue }
+      const a = ring[(i - 1 + n) % n], p = ring[i], b = ring[(i + 1) % n]
+      out.push([p[0] + (a[0] - p[0]) * 0.25, p[1] + (a[1] - p[1]) * 0.25])
+      out.push([p[0] + (b[0] - p[0]) * 0.25, p[1] + (b[1] - p[1]) * 0.25])
+    }
+    ring = smooth121(resampleClosedUniform(out, spacing))
+  }
+  return ring
+}
+
+/**
+ * Build editable nodes from a DENSE traced contour (e.g. the BEN mask trace): sparse anchor nodes
+ * picked by RDP, with each segment carrying the EXACT dense polyline between its anchors
+ * (`segmentToNext.rawPolyline`). The render/manufacture path then follows the TRUE trace —
+ * pixel-faithful, no approximation — while editing stays sparse-handle. (The lossy alternative —
+ * keep only the anchors and spline between them — clipped corners and wobbled straights: the
+ * "micro imperfections" Dan caught 2026-06-10.)
+ */
+export function nodesFromTracedRing(densePts: Vec2Px[], epsilonPx: number, idPrefix = 'n'): OutlineNode[] {
+  const dense = dedup(densePts)
+  const n = dense.length
+  if (n < 4) {
+    return dense.map((p, i) => ({ id: `${idPrefix}${i}`, p: [p[0], p[1]] as Vec2Px, role: 'corner' as const, corner: { mode: 'inherit' as const } }))
+  }
+  // anchor selection: closed RDP, tracking INDICES into the dense ring
+  const anchors = rdpClosed(dense, epsilonPx)
+  const key = (p: Vec2Px) => `${p[0].toFixed(4)},${p[1].toFixed(4)}`
+  const indexByKey = new Map<string, number>()
+  dense.forEach((p, i) => { if (!indexByKey.has(key(p))) indexByKey.set(key(p), i) })
+  let idx = anchors.map((p) => indexByKey.get(key(p))).filter((i): i is number => i !== undefined)
+  idx = [...new Set(idx)].sort((a, b) => a - b)
+  if (idx.length < 3) idx = [0, Math.floor(n / 3), Math.floor((2 * n) / 3)]
+  const nodes: OutlineNode[] = []
+  for (let k = 0; k < idx.length; k++) {
+    const a = idx[k], b = idx[(k + 1) % idx.length]
+    const slice: Vec2Px[] = []
+    for (let i = a; ; i = (i + 1) % n) { slice.push([dense[i][0], dense[i][1]]); if (i === b) break }
+    nodes.push({
+      id: `${idPrefix}${k}`,
+      p: [dense[a][0], dense[a][1]],
+      role: 'livewire_anchor',
+      corner: { mode: 'inherit' },
+      segmentToNext: { type: 'livewire', rawPolyline: slice },
+    })
+  }
+  return nodes
+}
+
+/**
+ * Assemble a traced ring from its nodes: each segment's exact rawPolyline, WARPED so its endpoints
+ * follow the CURRENT anchor positions (linear-falloff translation along the segment) — an anchor
+ * drag locally reshapes the trace instead of discarding it. Segments without a rawPolyline fall
+ * back to a straight line.
+ */
+function assembleTracedRing(nodes: OutlineNode[]): Vec2Px[] {
+  const m = nodes.length
+  const out: Vec2Px[] = []
+  for (let k = 0; k < m; k++) {
+    const node = nodes[k]
+    const next = nodes[(k + 1) % m]
+    const raw = node.segmentToNext?.type === 'livewire' ? node.segmentToNext.rawPolyline : undefined
+    if (!raw || raw.length < 2) { out.push([node.p[0], node.p[1]]); continue }
+    const a0 = raw[0], b0 = raw[raw.length - 1]
+    const dA: Vec2Px = [node.p[0] - a0[0], node.p[1] - a0[1]]
+    const dB: Vec2Px = [next.p[0] - b0[0], next.p[1] - b0[1]]
+    const L = raw.length - 1
+    for (let i = 0; i < L; i++) { // omit the segment's last point (next segment starts with it)
+      const t = L > 0 ? i / L : 0
+      out.push([raw[i][0] + dA[0] + (dB[0] - dA[0]) * t, raw[i][1] + dA[1] + (dB[1] - dA[1]) * t])
+    }
+  }
+  return out
+}
+
+/** Gentle closed-ring Laplacian smoothing — the Smooth control for dense traced rings. */
+function laplacianClosed(pts: Vec2Px[], iterations: number): Vec2Px[] {
+  let cur = pts
+  const n = pts.length
+  if (n < 5) return pts
+  for (let it = 0; it < iterations; it++) {
+    const next: Vec2Px[] = new Array(n)
+    for (let i = 0; i < n; i++) {
+      const p = cur[i], a = cur[(i - 1 + n) % n], b = cur[(i + 1) % n]
+      next[i] = [(a[0] + 2 * p[0] + b[0]) / 4, (a[1] + 2 * p[1] + b[1]) / 4]
+    }
+    cur = next
+  }
+  return cur
+}
+
 // ─── top-level resolve ───────────────────────────────────────────────────────
 
 export interface ResolveOptions {
@@ -306,14 +472,23 @@ export function resolveOutlineDocument(doc: OutlineDocument, opts: ResolveOption
   let anyRadius = false
 
   for (const ring of doc.rings) {
-    const filleted = applyCornerRadii(ring.nodes, doc.style.globalOutlineCornerRadiusPx)
-    if (filleted.length !== ring.nodes.length) anyRadius = true
-    // Smooth (0..1) = Catmull-Rom spline resample over the (filleted) ring — organic softening
-    // that interpolates CURVES between control nodes (kills the chord facets on BEN outlines).
-    // Density scales with the value; Round handles exact corner rounding separately.
-    const resolved = doc.style.smoothing > 0
-      ? catmullRomClosed(filleted, Math.round(4 + doc.style.smoothing * 12))
-      : filleted
+    const traced = ring.nodes.some((nd) => nd.segmentToNext?.type === 'livewire')
+    let resolved: Vec2Px[]
+    if (traced) {
+      // EXACT path: the ring follows its dense traced contour (segment rawPolylines), warped to the
+      // current anchor positions. Smooth = Laplacian passes over the dense ring (organic softening
+      // that stays on the trace). Corner radii don't apply to traced joints.
+      resolved = assembleTracedRing(ring.nodes)
+      if (doc.style.smoothing > 0) resolved = laplacianClosed(resolved, Math.round(doc.style.smoothing * 10))
+    } else {
+      const filleted = applyCornerRadii(ring.nodes, doc.style.globalOutlineCornerRadiusPx)
+      if (filleted.length !== ring.nodes.length) anyRadius = true
+      // Smooth (0..1) = centripetal Catmull-Rom over the (filleted) ring — curve interpolation
+      // between sparse control nodes; Round handles exact corner rounding separately.
+      resolved = doc.style.smoothing > 0
+        ? catmullRomClosed(filleted, Math.round(4 + doc.style.smoothing * 12))
+        : filleted
+    }
     const flat = normalizeRing(flattenPath(resolved, tol), ring.role)
     resolvedRingsPx.push(resolved)
     flattenedRingsPx.push(flat)

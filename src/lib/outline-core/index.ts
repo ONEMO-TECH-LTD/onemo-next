@@ -24,6 +24,8 @@ export {
   normalizeRing,
   validateSelfIntersection,
   repairSimplePolygon,
+  nodesFromTracedRing,
+  fairTracedRing,
   catmullRomClosed,
   signedArea,
   dedup,

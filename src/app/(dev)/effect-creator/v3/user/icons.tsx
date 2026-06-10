@@ -4,7 +4,7 @@
 // glyphs — chosen over Lucide so the UI doesn't read as generic shadcn/SaaS. `weight="regular"`
 // (default) reads cleanly at 24px on mobile; icons inherit `currentColor` from the button.
 
-import { ArrowArcLeft, ArrowArcRight, ArrowsOutCardinal, DiceFive, WaveSine, PenNib, ArrowClockwise, Check, X, ArrowsOut, Plus, Minus, Trash, PlusCircle, Sparkle, ImageSquare, PencilSimple, BoundingBox, Palette, FloppyDisk, Shapes, Polygon, Circle, Square, Pill, Star, Heart, ChatTeardrop, Seal, Shield, Eye, EyeSlash, MagicWand } from '@phosphor-icons/react'
+import { ArrowArcLeft, ArrowArcRight, ArrowsOutCardinal, BezierCurve, DiceFive, WaveSine, PenNib, ArrowClockwise, Check, X, ArrowsOut, Plus, Minus, Trash, PlusCircle, Sparkle, ImageSquare, PencilSimple, BoundingBox, Palette, FloppyDisk, Shapes, Polygon, Circle, Square, Pill, Star, Heart, ChatTeardrop, Seal, Shield, Eye, EyeSlash, MagicWand } from '@phosphor-icons/react'
 
 type P = { className?: string }
 const SZ = 24
@@ -43,15 +43,7 @@ export const MagicIcon = (p: P) => <MagicWand size={SZ} className={p.className} 
 // Round corners — Phosphor ships no corner-radius glyph; custom inline (Phosphor-coherent 2px stroke).
 
 // ── Shape tool + chip icons ─────────────────────────────────────────────────
-// "Round corners" — custom inline glyph (Phosphor has no corner-radius concept); matched to the
-// Phosphor regular ~2px stroke. RETURNED 2026-06-10: use proved Round (exact arc radius) and
-// Smooth (organic spline) are different effects — both ship.
-export const RoundIcon = (p: P) => (
-  <svg width={SZ} height={SZ} viewBox="0 0 24 24" fill="none" className={p.className} aria-hidden>
-    <path d="M4 20V11C4 7.134 7.134 4 11 4H20" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
-    <path d="M4 4l3 0M4 4l0 3" stroke="currentColor" strokeWidth={2} strokeLinecap="round" opacity={0.45} />
-  </svg>
-)
+export const RoundIcon = (p: P) => <BezierCurve size={SZ} className={p.className} /> // corner-radius control (returned by use, 2026-06-10)
 export const ShapeIcon = (p: P) => <Shapes size={SZ} className={p.className} />
 export const PolygonChip = (p: P) => <Polygon size={SZ} className={p.className} />
 export const StarChip = (p: P) => <Star size={SZ} className={p.className} />

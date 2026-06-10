@@ -43,6 +43,8 @@ import {
   resolveOutlineDocument,
   repairSimplePolygon,
   rdpClosed,
+  nodesFromTracedRing,
+  fairTracedRing,
   contentHash,
   type OutlineDocument,
   type OutlineNode,
@@ -123,26 +125,28 @@ function docFromRawRing(
   selfCorrect: boolean,
 ): OutlineDocument {
   const eps = type === 'shaped' ? Math.max(2, Math.max(W, H) * 0.022) : 1
-  const minSpacing = Math.max(3, Math.max(W, H) * 0.008)
-  const cleaned = repairSimplePolygon(rdpClosed(ringPx, eps), minSpacing)
-  const ctrl = cleaned.length >= 3 ? cleaned : ringPx
-  const nodes: OutlineNode[] = ctrl.map((p, i) => ({
-    id: `n${i}`,
-    p: [p[0], p[1]] as Vec2Px,
-    role: 'corner',
-    corner: { mode: 'inherit' },
-  }))
+  // shaped: EXACT traced contour — sparse anchors + the dense trace as segment rawPolylines, so the
+  // resolved/manufactured outline IS the mask's true shape (no RDP/spline approximation — the
+  // clipped-corner/wobble class Dan caught 2026-06-10). standard: plain corner ring (4 corners).
+  const nodes: OutlineNode[] = type === 'shaped'
+    ? nodesFromTracedRing(fairTracedRing(ringPx), eps)
+    : repairSimplePolygon(rdpClosed(ringPx, eps), Math.max(3, Math.max(W, H) * 0.008)).map((p, i) => ({
+        id: `n${i}`,
+        p: [p[0], p[1]] as Vec2Px,
+        role: 'corner' as const,
+        corner: { mode: 'inherit' as const },
+      }))
   const image = { widthPx: W, heightPx: H, sourceHash, orientation: 'baked' as const }
   const env = { image, mode: (type === 'shaped' ? 'auto' : 'semi_auto') as 'auto' | 'semi_auto' }
   const base = (radius: number) => ({
     rings: [{ id: 'r1', role: 'outer' as const, closed: true as const, nodes }],
-    // shaped (organic) outlines carry default spline smoothing: the sparse control ring renders as
-    // CURVES between anchors instead of chord facets (the choppy-pill bug, Dan 2026-06-10).
-    style: { globalOutlineCornerRadiusPx: radius, smoothing: type === 'shaped' ? 0.55 : 0 },
+    // traced (shaped) rings need no smoothing — they ARE the exact contour; the square stays crisp.
+    style: { globalOutlineCornerRadiusPx: radius, smoothing: 0 },
     generator,
   })
-  // self-correct: pick the largest non-self-intersecting radius for the cut-out (square uses its fixed 8mm)
-  const safe = selfCorrect ? maxSafeGlobalRadius(applyOutlineCommands(base(0), [], env), radiusPx) : radiusPx
+  // self-correct: pick the largest non-self-intersecting radius (square path). Traced shaped rings
+  // bypass corner radii entirely — the exact contour needs no default rounding.
+  const safe = type === 'shaped' ? 0 : selfCorrect ? maxSafeGlobalRadius(applyOutlineCommands(base(0), [], env), radiusPx) : radiusPx
   return applyOutlineCommands(base(safe), [], env)
 }
 

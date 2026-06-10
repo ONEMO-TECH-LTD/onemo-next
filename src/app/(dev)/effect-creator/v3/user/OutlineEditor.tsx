@@ -18,6 +18,7 @@ import {
   livewirePath,
   rdpClosed,
   repairSimplePolygon,
+  nodesFromTracedRing,
   type OutlineDocument,
   type OutlineCommand,
   type Vec2Px,
@@ -128,34 +129,33 @@ function maxSafeGlobalRadius(doc: OutlineDocument, hi: number): number {
 function docFromSpec(spec: EffectSpecDraft): OutlineDocument {
   const W = spec.maskWidthPx, H = spec.maskHeightPx
   const k = spec.mmPerPx || 1
-  // Control-node simplification tolerance. Deliberately coarse (RDP is curvature-aware): near-straight
-  // edges collapse to clean straight lines (few anchors), while curved regions keep the points they need.
-  // This is the EDITABLE handle density only — the manufacturing polygon is re-flattened finer downstream.
+  const organic = spec.generator.adapter !== 'standard'
+  // Control-node simplification tolerance — the EDITABLE handle density only. Organic outlines keep
+  // the EXACT dense contour as segment rawPolylines (traced ring): the rendered/cut shape is the
+  // true trace, not an approximation through the anchors (the clipped-corner/wobble bug).
   const eps = Math.max(2, Math.max(W, H) * 0.022)
   // geometryMM is y-UP (the mask is loaded y-up so the 3D is upright — segment-ml.ts/mask.ts). The
   // editor draws the raw photo y-DOWN via SVG, so flip Y here to overlay the outline right-side-up on
   // the image. The editor→3D feedback re-flips (H − y) back to the engine's y-up space, so they cancel.
-  const minSpacing = Math.max(3, Math.max(W, H) * 0.008) // merge anchors this close (prevents overlapping/crossing)
+  const minSpacing = Math.max(3, Math.max(W, H) * 0.008)
+  const toEditorPx = (ptsMM: [number, number][]) => ptsMM.map(([x, y]) => [x / k, H - y / k] as Vec2Px)
   const toRing = (ptsMM: [number, number][], prefix: string) =>
-    // simplify → REPAIR (merge coincident anchors + remove self-intersections) so the auto outline is clean
-    repairSimplePolygon(rdpClosed(ptsMM.map(([x, y]) => [x / k, H - y / k] as Vec2Px), eps), minSpacing).map((p, i) => ({
-      id: `${prefix}${i}`, p, role: 'corner' as const, corner: { mode: 'inherit' as const },
-    }))
+    organic
+      ? nodesFromTracedRing(toEditorPx(ptsMM), eps, prefix)
+      : repairSimplePolygon(rdpClosed(toEditorPx(ptsMM), eps), minSpacing).map((p, i) => ({
+          id: `${prefix}${i}`, p, role: 'corner' as const, corner: { mode: 'inherit' as const },
+        }))
   const rings: OutlineDocument['rings'] = [
     { id: 'r1', role: 'outer', closed: true, nodes: toRing(spec.geometryMM.outer.pts, 'o') },
   ]
   spec.geometryMM.holes.forEach((h, hi) => {
     rings.push({ id: `h${hi}`, role: 'hole', parentRingId: 'r1', closed: true, nodes: toRing(h.pts, `h${hi}n`) })
   })
-  // Default to MAXIMUM corner rounding, SELF-CORRECTING: round as far as the shape allows, then auto
-  // back off to the largest radius that doesn't self-intersect (per-shape, so it never ships a crossing).
+  // Square path: default to MAXIMUM safe corner rounding. Traced organic rings bypass radii — exact.
   const env = { image: { widthPx: W, heightPx: H, sourceHash: spec.sourceRef.slice(0, 40), orientation: 'baked' as const }, mode: 'auto' as const }
   const probe = applyOutlineCommands({ rings, style: { globalOutlineCornerRadiusPx: 0, smoothing: 0 } }, [], env)
-  const safe = maxSafeGlobalRadius(probe, Math.round(Math.min(W, H) * 0.25))
-  // organic (BEN/flood) outlines keep default spline smoothing so anchors connect as CURVES,
-  // not chord facets (the choppy-pill bug); the exact standard square stays crisp.
-  const smoothing = spec.generator.adapter !== 'standard' ? 0.55 : 0
-  const base = { rings, style: { globalOutlineCornerRadiusPx: safe, smoothing } }
+  const safe = organic ? 0 : maxSafeGlobalRadius(probe, Math.round(Math.min(W, H) * 0.25))
+  const base = { rings, style: { globalOutlineCornerRadiusPx: safe, smoothing: 0 } }
   return applyOutlineCommands(base, [], env)
 }
 
@@ -1010,6 +1010,7 @@ export default function OutlineEditor({ open, imageUrl, onClose }: OutlineEditor
           className={styles.svg}
           viewBox={`${view.vx} ${view.vy} ${doc.image.widthPx / view.scale} ${doc.image.heightPx / view.scale}`}
           preserveAspectRatio="xMidYMid meet"
+          shapeRendering="geometricPrecision"
           onPointerDown={onSurfacePointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
