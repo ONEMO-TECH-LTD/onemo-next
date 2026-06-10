@@ -38,7 +38,7 @@ import { perfGesture } from '../dev/PerfHUD'
 import { generateShapeRing, resampleClosed, PARAMETRIC, type ShapeKind, type ShapeParams } from './shapes'
 // VECTOR CORE (reset Run 1): vector-native kinds render/commit/transform on a true Bézier VShape;
 // the doc stays as the interaction SHADOW (a derived flatten artifact — bbox/hit/grips math only).
-import { shapeToSVGPathD, transformShape, flattenShape, filletShape, filletShapeSmart, ringToVPath, type VShape, type Vec2 } from '@/lib/vector-core'
+import { shapeToSVGPathD, transformShape, flattenShape, filletShape, filletShapeSmart, filletPathSmart, ringToVPath, nearestOnPath, insertAnchorAt, insertAnchorCentered, deleteAnchorRefit, type VShape, type VAnchor, type Vec2 } from '@/lib/vector-core'
 import { hasVectorDef, getShape } from '@/lib/shape-library'
 
 // Run-3 live generators: dense internal sample → ONE Schneider fit at spawn → vector path out.
@@ -378,6 +378,13 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   const vshapeRef = useRef<VShape | null>(null)
   useEffect(() => { vshapeRef.current = vshape }, [vshape])
   const vBaseRef = useRef<VShape | null>(null)
+  // Run 6 — points on demand: selected vector anchor (outer path index), transient drag shape
+  // (per-tick preview only; ONE applyVec on release — §6.3), and the active drag descriptor.
+  const [selVA, setSelVA] = useState<number | null>(null)
+  const [vecLive, setVecLive] = useState<VShape | null>(null)
+  const vecLiveRef = useRef<VShape | null>(null)
+  useEffect(() => { vecLiveRef.current = vecLive }, [vecLive])
+  const vecDragRef = useRef<{ kind: 'p' | 'hIn' | 'hOut'; ai: number; orig: VShape; moved: boolean } | null>(null)
 
   // Undo/redo (A1b): a doc-snapshot history. Covers BOTH command edits (move/add/delete/corner/smooth)
   // and whole-doc generator swaps (blend/draw/simplify/reset) uniformly. docRef mirrors the latest doc
@@ -398,6 +405,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     vshapeRef.current = null // a doc-level edit replaces the geometry → vector mode exits
     setVShape(null)
     vBaseRef.current = null
+    setSelVA(null)
+    setVecLive(null)
     const st = useOutlineStore.getState()
     st.setEditedDoc(next) // persist so reopening restores edits
     st.setEditedVShape(null)
@@ -432,6 +441,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     setSelectedNode(null)
     setAllSelected(false)
     setDrag(null)
+    setSelVA(null)
+    setVecLive(null)
   }, [])
   const undo = useCallback(() => {
     const h = histRef.current
@@ -503,6 +514,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     }
     setRotateLive(null); rotateLiveRef.current = null; rotateRef.current = null
     setMoveLive(null); moveLiveRef.current = null; moveRef.current = null
+    setSelVA(null); setVecLive(null); vecDragRef.current = null
     pinchRef.current = null; canvasPanRef.current = null
     pointersRef.current.clear(); clientPtsRef.current.clear()
     useOutlineStore.getState().setEditorOpen(true) // §6.3: scene frozen → 3D rebuilds defer to close
@@ -656,24 +668,29 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     setEditedContourMM({ outer: { pts: outer }, holes: holes.map((h) => ({ pts: h })) })
   }, [doc, vshape, open, spec, setEditedContourMM])
 
+  // Vector display shape: the in-flight anchor/handle drag (vecLive) supersedes the committed
+  // vshape; the live Scale preview transforms it exactly (affine on anchors+handles). One source
+  // for BOTH the rendered path and the anchor/handle overlay, so they never desync mid-gesture.
+  const vDisplay = useMemo(() => {
+    if (!vshape) return null
+    let v = vecLive ?? vshape
+    if (scale !== 100) {
+      const [cx, cy] = outerCenter(doc)
+      const f = scale / 100
+      v = transformShape(v, (p: Vec2) => ({ x: cx + (p.x - cx) * f, y: cy + (p.y - cy) * f }))
+    }
+    return v
+  }, [vshape, vecLive, scale, doc])
+
   // Draw the RESOLVED (unflattened) rings: the manufacturing flatten's chord tolerance read as
   // visible facets on curves at editor zoom (Dan, 2026-06-10). Flattened stays for mm export.
   const pathD = useMemo(() => {
     // VECTOR CORE: true curves render as true SVG C commands — crisp at ANY zoom, zero chords.
-    // The live Scale preview transforms the vshape exactly (affine on anchors+handles).
-    if (vshape) {
-      let v = vshape
-      if (scale !== 100) {
-        const [cx, cy] = outerCenter(doc)
-        const f = scale / 100
-        v = transformShape(v, (p: Vec2) => ({ x: cx + (p.x - cx) * f, y: cy + (p.y - cy) * f }))
-      }
-      return shapeToSVGPathD(v, 2)
-    }
+    if (vDisplay) return shapeToSVGPathD(vDisplay, 2)
     return resolved.resolvedRingsPx
       .map((ring) => (ring.length ? `M ${ring.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ')} Z` : ''))
       .join(' ')
-  }, [resolved, vshape, scale, doc])
+  }, [resolved, vDisplay])
 
   // Manual draw path: between placed anchors, SNAP to image edges via the livewire when an edge-cost
   // grid is available (A3b magnetic lasso); otherwise straight segments (A3a, e.g. no image).
@@ -743,6 +760,76 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     return [loc.x, loc.y]
   }, [])
 
+  // Run 6 — points on demand: build the transient shape for an in-flight anchor/handle drag.
+  // Anchor drag translates p + both handles together; a SMOOTH anchor's handle drag mirrors the
+  // opposite handle's DIRECTION while preserving its own length (Figma default); a CORNER
+  // anchor's handles move independently.
+  const vecDragShape = useCallback((d: { kind: 'p' | 'hIn' | 'hOut'; ai: number; orig: VShape }, at: Vec2Px): VShape => {
+    const path = d.orig.paths[0]
+    const anchors = path.anchors.map((a) => ({ ...a }))
+    const a = anchors[d.ai]
+    if (!a) return d.orig
+    if (d.kind === 'p') {
+      const dx = at[0] - a.p.x, dy = at[1] - a.p.y
+      anchors[d.ai] = {
+        ...a,
+        p: { x: at[0], y: at[1] },
+        hIn: a.hIn ? { x: a.hIn.x + dx, y: a.hIn.y + dy } : a.hIn,
+        hOut: a.hOut ? { x: a.hOut.x + dx, y: a.hOut.y + dy } : a.hOut,
+      }
+    } else {
+      const h = { x: at[0], y: at[1] }
+      const upd: VAnchor = { ...a, [d.kind === 'hIn' ? 'hIn' : 'hOut']: h }
+      if (!a.corner) {
+        const otherKey = d.kind === 'hIn' ? 'hOut' : 'hIn'
+        const oh = a[otherKey]
+        if (oh) {
+          const dx = a.p.x - h.x, dy = a.p.y - h.y
+          const L = Math.hypot(dx, dy) || 1e-12
+          const ol = Math.hypot(oh.x - a.p.x, oh.y - a.p.y)
+          upd[otherKey] = { x: a.p.x + (dx / L) * ol, y: a.p.y + (dy / L) * ol }
+        }
+      }
+      anchors[d.ai] = upd
+    }
+    return { paths: [{ anchors }, ...d.orig.paths.slice(1)] }
+  }, [])
+
+  const onVAnchorDown = useCallback(
+    (i: number) => (e: React.PointerEvent) => {
+      e.stopPropagation()
+      ;(e.target as Element).setPointerCapture?.(e.pointerId)
+      nodeInteractedRef.current = true
+      setAllSelected(false)
+      setSelectedNode(null)
+      setSelVA(i)
+      dragStartRef.current = toViewBox(e.clientX, e.clientY)
+      if (vshapeRef.current) vecDragRef.current = { kind: 'p', ai: i, orig: vshapeRef.current, moved: false }
+    },
+    [toViewBox],
+  )
+  const onVHandleDown = useCallback(
+    (i: number, kind: 'hIn' | 'hOut') => (e: React.PointerEvent) => {
+      e.stopPropagation()
+      ;(e.target as Element).setPointerCapture?.(e.pointerId)
+      nodeInteractedRef.current = true
+      dragStartRef.current = toViewBox(e.clientX, e.clientY)
+      if (vshapeRef.current) vecDragRef.current = { kind, ai: i, orig: vshapeRef.current, moved: false }
+    },
+    [toViewBox],
+  )
+  // double-tap a vector anchor → delete with re-fit (ring stays valid, ≥3 anchors)
+  const onVAnchorDouble = useCallback(
+    (i: number) => (e: React.MouseEvent) => {
+      e.stopPropagation()
+      const v = vshapeRef.current
+      if (!v || v.paths[0].anchors.length <= 3) return
+      applyVec({ paths: [deleteAnchorRefit(v.paths[0], i), ...v.paths.slice(1)] }, null)
+      setSelVA(null)
+    },
+    [applyVec],
+  )
+
   const onNodeDown = useCallback(
     (ringId: string, nodeId: string) => (e: React.PointerEvent) => {
       e.stopPropagation()
@@ -805,6 +892,16 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     (e: React.PointerEvent) => {
       if (pointersRef.current.has(e.pointerId)) pointersRef.current.set(e.pointerId, toViewBox(e.clientX, e.clientY))
       if (clientPtsRef.current.has(e.pointerId)) clientPtsRef.current.set(e.pointerId, [e.clientX, e.clientY])
+      // Run 6: live vector anchor/handle drag — per-tick transient only, ONE applyVec on release (§6.3)
+      if (vecDragRef.current) {
+        const at = toViewBox(e.clientX, e.clientY)
+        const d = vecDragRef.current
+        const s = dragStartRef.current
+        if (!d.moved && s && Math.hypot(at[0] - s[0], at[1] - s[1]) <= 2) return // tap threshold
+        d.moved = true
+        setVecLive(vecDragShape(d, at))
+        return
+      }
       // #28: live photo pan (Image-Position) — fractions of the texture span, matching the scene's G1
       if (imgPanRef.current) {
         const svg = svgRef.current
@@ -877,7 +974,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
         setFreehandPreview([...freehandRef.current])
       }
     },
-    [drag, drawPts, toViewBox, doc.image, originPinning],
+    [drag, drawPts, toViewBox, doc.image, originPinning, vecDragShape],
   )
 
   const commitRotate = useCallback(() => {
@@ -899,6 +996,16 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   const onPointerUp = useCallback((e: React.PointerEvent) => {
     pointersRef.current.delete(e.pointerId)
     clientPtsRef.current.delete(e.pointerId)
+    // Run 6: release an anchor/handle drag → ONE history entry; a manual point edit invalidates
+    // the pristine fillet base (Radius adopts the current geometry on next use).
+    if (vecDragRef.current) {
+      const d = vecDragRef.current
+      vecDragRef.current = null
+      const live = vecLiveRef.current
+      setVecLive(null)
+      if (d.moved && live) applyVec(live, null)
+      return
+    }
     if (imgPanRef.current) { imgPanRef.current = null; nodeInteractedRef.current = true; return }
     if (pinchRef.current) { if (clientPtsRef.current.size < 2) pinchRef.current = null; return }
     if (canvasPanRef.current) { canvasPanRef.current = null; nodeInteractedRef.current = true; return }
@@ -952,7 +1059,18 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   // Add a control point on the nearest outer-ring segment (double-click the surface).
   const onSurfaceDoubleClick = useCallback(
     (e: React.MouseEvent) => {
-      if (vshapeRef.current) return // points-on-demand for vector shapes arrives with its own run
+      // Run 6 — points on demand: double-tap inserts an anchor exactly there, ON the curve,
+      // geometry-preserving (exact de Casteljau split). Anchors are summoned by the act.
+      if (vshapeRef.current) {
+        const v = vshapeRef.current
+        const pt = toViewBox(e.clientX, e.clientY)
+        const hit = nearestOnPath(v.paths[0], { x: pt[0], y: pt[1] })
+        const t = Math.min(0.98, Math.max(0.02, hit.t)) // avoid degenerate slivers at the ends
+        applyVec({ paths: [insertAnchorAt(v.paths[0], hit.seg, t), ...v.paths.slice(1)] }, null)
+        setSelVA(hit.seg + 1)
+        setShowAnchors(true)
+        return
+      }
       const p = toViewBox(e.clientX, e.clientY)
       const ring = doc.rings.find((r) => r.role === 'outer')
       if (!ring) return
@@ -964,8 +1082,24 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       }
       commit({ op: 'AddNode', ringId: ring.id, afterNodeId: best.afterId, node: { id: `a${idRef.current++}`, p: best.at, role: 'corner', corner: { mode: 'inherit' } } })
     },
-    [doc, commit, toViewBox],
+    [doc, commit, toViewBox, applyVec],
   )
+
+  // Run 6 — explicit vector-anchor actions (the nodeBar): add centered ON the curve after the
+  // selected anchor (Figma "insert between"), or delete with re-fit.
+  const onVAddAfter = useCallback(() => {
+    const v = vshapeRef.current
+    if (!v || selVA === null) return
+    applyVec({ paths: [insertAnchorCentered(v.paths[0], selVA), ...v.paths.slice(1)] }, null)
+    setSelVA(selVA + 1)
+    setShowAnchors(true)
+  }, [selVA, applyVec])
+  const onVDelete = useCallback(() => {
+    const v = vshapeRef.current
+    if (!v || selVA === null) return
+    if (v.paths[0].anchors.length > 3) applyVec({ paths: [deleteAnchorRefit(v.paths[0], selVA), ...v.paths.slice(1)] }, null)
+    setSelVA(null)
+  }, [selVA, applyVec])
 
   // Explicit anchor controls (in addition to double-tap): delete the selected point, or add a new one
   // right after it (at the midpoint to its next neighbour), then select the new point.
@@ -1017,9 +1151,11 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     const ring = outerIdx >= 0 ? resolved.flattenedRingsPx[outerIdx] : null
     if (ring && ring.length >= 3 && pointInPolygon(p, ring)) {
       setSelectedNode(null)
+      setSelVA(null)
       setAllSelected(true)
     } else {
       setSelectedNode(null)
+      setSelVA(null)
       setAllSelected(false)
     }
   }, [drawPts, doc, resolved, toViewBox, preview])
@@ -1031,7 +1167,16 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     // fillet (line-line exact arcs; heart cusps + Magic-trace corners trim-and-arc). A fitted
     // shape with no pristine base (Magic) adopts its CURRENT geometry as the base on first use.
     if (vshapeRef.current) {
-      if (!vBaseRef.current) vBaseRef.current = vshapeRef.current
+      const cur = vshapeRef.current
+      // Run 6 — single-corner Radius: a selected CORNER anchor rounds alone; the result becomes
+      // its own base (whole-shape Radius afterwards rounds the remaining corners from here).
+      if (selVA !== null && cur.paths[0].anchors[selVA]?.corner) {
+        applyVec({ paths: [filletPathSmart(cur.paths[0], v, (ai) => ai === selVA), ...cur.paths.slice(1)] }, null)
+        setSelVA(null)
+        perfGesture('round-commit', performance.now() - t0)
+        return
+      }
+      if (!vBaseRef.current) vBaseRef.current = cur
       applyVec(filletShapeSmart(vBaseRef.current, v), vBaseRef.current)
       perfGesture('round-commit', performance.now() - t0)
       return
@@ -1039,7 +1184,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     if (selectedNode) commit({ op: 'SetCorner', ringId: selectedNode.ringId, nodeId: selectedNode.nodeId, corner: { mode: 'manual', outlineCornerRadiusPx: v } })
     else commit({ op: 'SetGlobalCornerRadius', outlineCornerRadiusPx: v })
     perfGesture('round-commit', performance.now() - t0)
-  }, [selectedNode, commit, applyVec])
+  }, [selectedNode, selVA, commit, applyVec])
   const commitSmoothing = useCallback((v: number) => {
     if (vshapeRef.current) { setSmoothing(0); return } // pure curves need no styling smooth (Curve op returns later)
     setSmoothing(v)
@@ -1403,9 +1548,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
               <TopTool icon={<ResetIcon />} label="Reset" onClick={onReset} />
               {/* Preview = hide anchors/handles to see the clean result without exiting */}
               <TopTool icon={preview ? <PreviewOffIcon /> : <PreviewIcon />} label={preview ? 'Edit' : 'Preview'} onClick={() => setPreview((v) => !v)} />
-              {/* Points = toggle vertex anchors (rigid shapes start OFF — Dan). Hidden for vector
-                  shapes: pure curves carry no pre-created points; add-on-demand is its own run. */}
-              {!vshape && <TopTool icon={<OutlineIcon />} label="Points" onClick={() => setShowAnchors((v) => !v)} />}
+              {/* Points = summon/hide anchors (hidden by default — Dan's doctrine). On vector
+                  shapes this reveals the minimal intentional skeleton (Run 6 points-on-demand). */}
+              <TopTool icon={<OutlineIcon />} label="Points" onClick={() => setShowAnchors((v) => !v)} />
             </>
           )}
           <TopTool icon={<CheckIcon />} label="Done" onClick={onDone} />
@@ -1475,8 +1620,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
               )}
               <g transform={liveXform}>
                 {!preview && <path className={`${styles.path} ${hasIssues ? styles.pathError : ''}`} d={pathD} />}
-                {/* anchors + rotate handle hidden in Preview (clean result) */}
-                {!preview && showAnchors && shown.rings.map((ring) =>
+                {/* anchors + rotate handle hidden in Preview (clean result). The doc-node swarm
+                    never renders in vector mode — the shadow doc is interaction math, not UI. */}
+                {!preview && showAnchors && !vshape && shown.rings.map((ring) =>
                   ring.nodes.map((n) => {
                     const active = drag?.nodeId === n.id
                     return (
@@ -1493,6 +1639,41 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
                     )
                   }),
                 )}
+                {/* Run 6 — the vector skeleton: minimal intentional anchors, summoned on demand.
+                    The selected anchor reveals its Bézier handles; drags are transient until release. */}
+                {!preview && showAnchors && vDisplay && (() => {
+                  const anchors = vDisplay.paths[0].anchors
+                  const sel = selVA !== null ? anchors[selVA] : null
+                  return (
+                    <g>
+                      {sel && (['hIn', 'hOut'] as const).map((k) => {
+                        const h = sel[k]
+                        if (!h) return null
+                        return (
+                          <g key={k}>
+                            <line className={styles.rotateStem} x1={sel.p.x} y1={sel.p.y} x2={h.x} y2={h.y} />
+                            <circle
+                              className={`${styles.node} ${styles.nodeActive}`}
+                              cx={h.x} cy={h.y} r={nodeR * 0.62}
+                              onPointerDown={onVHandleDown(selVA!, k)}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </g>
+                        )
+                      })}
+                      {anchors.map((a, i) => (
+                        <circle
+                          key={`va${i}`}
+                          className={`${styles.node} ${selVA === i ? styles.nodeSelected : ''}`}
+                          cx={a.p.x} cy={a.p.y} r={nodeR}
+                          onPointerDown={onVAnchorDown(i)}
+                          onDoubleClick={onVAnchorDouble(i)}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      ))}
+                    </g>
+                  )
+                })()}
                 {!preview && showAnchors && rotHandle && (
                   <g>
                     <line className={styles.rotateStem} x1={rotHandle.bx} y1={rotHandle.by} x2={rotHandle.bx} y2={rotHandle.hy} />
@@ -1576,7 +1757,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
         <div className={styles.shapeSheet}>
           <div className={styles.chipRow}>
             {([
-              { k: 'radius', label: selectedNode ? 'Corner' : 'Radius', icon: <RoundIcon />, show: true },
+              { k: 'radius', label: selectedNode || (vshape && selVA !== null && vshape.paths[0].anchors[selVA]?.corner) ? 'Corner' : 'Radius', icon: <RoundIcon />, show: true },
               { k: 'curve', label: 'Curve', icon: <SmoothIcon />, show: true },
               { k: 'scale', label: 'Scale', icon: <ScaleIcon />, show: true },
               { k: 'blend', label: 'Blend', icon: <BlendIcon />, show: true },
@@ -1602,7 +1783,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
           <div className={styles.shapeControls}>
             <div className={styles.shapeRow}>
               {adjustSub === 'radius' && (
-                <TickBar label={selectedNode ? 'Corner' : 'Radius'} min={0} max={maxRadius} value={Math.min(radius, maxRadius)} onChange={setRadius} onCommit={commitRadius} format={(v) => `${Math.round((v / Math.max(maxRadius, 1)) * 100)}%`} />
+                <TickBar label={selectedNode || (vshape && selVA !== null && vshape.paths[0].anchors[selVA]?.corner) ? 'Corner' : 'Radius'} min={0} max={maxRadius} value={Math.min(radius, maxRadius)} onChange={setRadius} onCommit={commitRadius} format={(v) => `${Math.round((v / Math.max(maxRadius, 1)) * 100)}%`} />
               )}
               {adjustSub === 'curve' && (
                 <TickBar label="Curve" min={0} max={100} value={smoothing} onChange={setSmoothing} onCommit={commitSmoothing} format={(v) => `${Math.round(v)}%`} />
@@ -1805,13 +1986,13 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
         </div>
       )}
 
-      {/* contextual anchor actions — appear when a single point is selected */}
-      {!drawing && selectedNode && (
+      {/* contextual anchor actions — appear when a single point is selected (doc or vector) */}
+      {!drawing && (selectedNode || (vshape && selVA !== null)) && (
         <div className={styles.nodeBar}>
-          <button type="button" className={styles.nodeAction} onClick={onAddAfterSelected}>
+          <button type="button" className={styles.nodeAction} onClick={vshape && selVA !== null ? onVAddAfter : onAddAfterSelected}>
             <AddPointIcon /><span>Add point</span>
           </button>
-          <button type="button" className={styles.nodeAction} onClick={onDeleteSelected}>
+          <button type="button" className={styles.nodeAction} onClick={vshape && selVA !== null ? onVDelete : onDeleteSelected}>
             <DeleteIcon /><span>Delete point</span>
           </button>
         </div>

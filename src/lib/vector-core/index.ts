@@ -24,3 +24,6 @@ export {
 
 // Cubic fitting (Graphics Gems / Schneider) — offline preset baking, generator output, trace.
 export { fitCubicsOpen, ringToVPath, cornerIndices, type CubicSeg } from './fit'
+
+// Points-on-demand ops (Run 6) — exact insert, nearest-point, delete-with-refit.
+export { nearestOnPath, insertAnchorAt, insertAnchorCentered, deleteAnchorRefit, type PathHit } from './ops'

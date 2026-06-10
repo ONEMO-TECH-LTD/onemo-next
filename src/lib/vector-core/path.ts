@@ -194,9 +194,9 @@ export function filletShape(shape: VShape, radius: number): VShape {
  * trimmed back from the corner by ~`radius` (along the segment), and the gap is bridged with one
  * cubic shaped as a circular arc between the trim tangents (k = 4/3·tan(α/4)·R_eff — exact for
  * line-line, arc-quality for curves). Falls through to the exact line-line fillet when both
- * sides are straight.
+ * sides are straight. `only` filters by anchor index — single-corner Radius (Run 6).
  */
-export function filletPathSmart(path: VPath, radius: number): VPath {
+export function filletPathSmart(path: VPath, radius: number, only?: (anchorIndex: number) => boolean): VPath {
   if (radius <= 0) return path
   const n = path.anchors.length
   if (n < 3) return path
@@ -240,7 +240,7 @@ export function filletPathSmart(path: VPath, radius: number): VPath {
   const out: VAnchor[] = []
   for (let i = 0; i < n; i++) {
     const B = path.anchors[i]
-    if (!B.corner) { out.push({ ...B }); continue }
+    if (!B.corner || (only && !only(i))) { out.push({ ...B }); continue }
     const inSeg = segs[(i - 1 + n) % n] // ends at B
     const outSeg = segs[i] // starts at B
     const sIn = trim(inSeg, 'b', radius)
