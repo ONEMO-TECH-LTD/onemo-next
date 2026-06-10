@@ -78,6 +78,7 @@ export default function ShapedModel({
   const editedContourMM = useOutlineStore((s) => s.editedContourMM)
   const editorOpen = useOutlineStore((s) => s.editorOpen)
   const bgBlur = useOutlineStore((s) => s.bgBlur)
+  const imageFx = useOutlineStore((s) => s.imageFx)
   const attachment = useAttachmentStore((s) => s.result)
   const frontSrcRef = useRef<{ origCanvas: HTMLCanvasElement; subjCanvas: HTMLCanvasElement; defaultBlurPx: number } | null>(null)
   const resultRef = useRef(result)
@@ -168,11 +169,15 @@ export default function ShapedModel({
   // layers (no re-segmentation) when the editor changes the blur. bgBlur null = build default already on.
   // This is a canvas CONTENT change — a fresh CanvasTexture upload is correct here (commit-on-release).
   useEffect(() => {
-    if (bgBlur == null) return
+    if (bgBlur == null && imageFx == null) return
     const fs = frontSrcRef.current
     if (!fs) return
-    const px = bgBlur <= 0 ? 0 : bgBlur * (fs.origCanvas.width / 25) // 0 = off (sharp); ~0.5 ≈ build default
-    const front = composeFront(fs.origCanvas, fs.subjCanvas, px)
+    const blurVal = bgBlur == null ? 0.5 : bgBlur // null = build default (on @ ~50%)
+    const px = blurVal <= 0 ? 0 : blurVal * (fs.origCanvas.width / 25) // 0 = off (sharp); ~0.5 ≈ build default
+    const fx = imageFx
+      ? `brightness(${imageFx.brightness}%) contrast(${imageFx.contrast}%) saturate(${imageFx.saturate}%)${imageFx.warmth > 0 ? ` sepia(${Math.round(imageFx.warmth * 0.45)}%)` : ''}`
+      : ''
+    const front = composeFront(fs.origCanvas, fs.subjCanvas, px, fx)
     const tex = new THREE.CanvasTexture(front)
     tex.colorSpace = THREE.SRGBColorSpace
     tex.flipY = false
@@ -185,7 +190,7 @@ export default function ShapedModel({
       p.texture.dispose() // swap the front texture only
       return { ...p, texture: tex }
     })
-  }, [bgBlur, maxAniso])
+  }, [bgBlur, imageFx, maxAniso])
 
   // suede texture maps (normal/roughness/bump) on UV CHANNEL 1 (world-XY) → tiles by physical size,
   // never stretches (on the front OR the rim). The image map stays on channel 0 (position).

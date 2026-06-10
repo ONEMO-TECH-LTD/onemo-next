@@ -30,8 +30,8 @@ import {
 } from '@/lib/outline-core'
 import type { EffectSpecDraft, Contour } from '@/lib/effect/types'
 import { buildEdgeCost } from './edgeCost'
-import { useOutlineStore } from './outlineStore'
-import { UndoIcon, RedoIcon, RoundIcon, SmoothIcon, ScaleIcon, PenIcon, ResetIcon, CheckIcon, CloseIcon, PlusIcon, MinusIcon, AddPointIcon, DeleteIcon, BlendIcon, ShapeIcon, TuneIcon, OutlineIcon, DiceIcon, PreviewIcon, PreviewOffIcon } from './icons'
+import { useOutlineStore, NEUTRAL_FX, type ImageFx } from './outlineStore'
+import { UndoIcon, RedoIcon, RoundIcon, SmoothIcon, ScaleIcon, PenIcon, ResetIcon, CheckIcon, CloseIcon, PlusIcon, MinusIcon, AddPointIcon, DeleteIcon, BlendIcon, ShapeIcon, TuneIcon, ImageToolIcon, PositionIcon, BrightnessIcon, ContrastIcon, SaturationIcon, WarmthIcon, OutlineIcon, DiceIcon, PreviewIcon, PreviewOffIcon } from './icons'
 import TickBar from '../ui/TickBar'
 import { toast } from '../ui/Toast'
 import { perfGesture } from '../dev/PerfHUD'
@@ -286,7 +286,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   const [drawPts, setDrawPts] = useState<Vec2Px[] | null>(null) // non-null = Manual draw in progress (A3a)
   const [edgeCost, setEdgeCost] = useState<CostGrid | null>(null) // image edge-cost grid for the livewire (A3b)
   const [selectedNode, setSelectedNode] = useState<{ ringId: string; nodeId: string } | null>(null) // anchor add/delete target
-  const [activeAdjust, setActiveAdjust] = useState<'round' | 'smooth' | 'scale' | 'blend' | 'shape' | 'tune' | null>(null) // which adjustment sheet is revealed (mobile: one at a time)
+  const [activeAdjust, setActiveAdjust] = useState<'round' | 'smooth' | 'scale' | 'blend' | 'shape' | 'tune' | 'image' | null>(null) // which adjustment sheet is revealed (mobile: one at a time)
   const [blendOn, setBlendOn] = useState(true) // "magic blend" on/off (the soft real-background blur on the 3D front)
   const [blendBlur, setBlendBlur] = useState(50) // magic-blend intensity 0–100 (50 ≈ the build default)
   // Shape tool: pick a preset/parametric shape as the starting outline. shapeKind = the shape currently
@@ -306,6 +306,12 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   useEffect(() => { detailRef.current = detail }, [detail])
   const [fairParams, setFairParams] = useState<FairTracedRingOpts>(() => fairingFromDetail(BEN_DEFAULT_DETAIL))
   const [tunePreview, setTunePreview] = useState<OutlineDocument | null>(null) // live re-fair while dragging a tune bar
+  // #28 Image tool (Apple-pattern: circular sub-icons + ONE shared ruler). Position pans/zooms the
+  // PHOTO under the fixed cutline (the scene's G1, now inside the editor); adjustments preview live
+  // via CSS filter here and bake into the print composite on commit (one composeFront).
+  const [imageSub, setImageSub] = useState<'position' | 'brightness' | 'contrast' | 'saturate' | 'warmth'>('position')
+  const [fxDraft, setFxDraft] = useState<ImageFx>(NEUTRAL_FX)
+  const imgPanRef = useRef<{ startClient: [number, number]; art0: { offsetX: number; offsetY: number; scale: number } } | null>(null)
   // Rotation = a whole-outline transform: two-finger twist (mobile) / drag the rotate handle (desktop,
   // shown when all anchors are selected). rotatePreview = the live rotated doc; baked (undoable) on release.
   // Live direct-manipulation transforms — cheap SVG transform during the gesture, baked to the doc on
@@ -346,6 +352,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   const setEditedContourMM = useOutlineStore((s) => s.setEditedContourMM)
   const setBgBlur = useOutlineStore((s) => s.setBgBlur)
   const subjMatteUrl = useOutlineStore((s) => s.subjMatteUrl)
+  const art = useOutlineStore((s) => s.artwork) // #28 (hook ABOVE the early return — Rules of Hooks)
   const [preview, setPreview] = useState(false) // hide anchors/handles to see the clean result (no exit)
   // Points toggle (Dan, 2026-06-10): anchors stay ON for free-form outlines but OFF for rigid
   // parametric shapes — a circle has ~60 vertices; one stray drag spoils it. Toggle in the topbar.
@@ -466,6 +473,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       setShapeKind('square')
       setShowAnchors(false) // rigid shape default — Points toggle re-enables
     }
+    setImageSub('position')
+    setFxDraft(useOutlineStore.getState().imageFx ?? NEUTRAL_FX)
+    imgPanRef.current = null
     // #27: toolbar creation modes land in the matching editor mode
     if (openMode === 'shape') setActiveAdjust('shape')
     else if (openMode === 'draw') { setDrawPts([]); setDrag(null) }
@@ -662,6 +672,12 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
         freehandMovedRef.current = false
         return
       }
+      // #28 Image-Position sub-mode: single finger pans the PHOTO under the cutline
+      if (activeAdjust === 'image' && imageSub === 'position' && pointersRef.current.size === 1) {
+        const a = useOutlineStore.getState().artwork
+        imgPanRef.current = { startClient: [e.clientX, e.clientY], art0: { ...a } }
+        return
+      }
       // a second surface finger → PINCH: canvas zoom + pan (G11). Rotation stays on the handle.
       if (pointersRef.current.size === 2 && !drag) {
         moveRef.current = null; setMoveLive(null); moveLiveRef.current = null
@@ -689,6 +705,19 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     (e: React.PointerEvent) => {
       if (pointersRef.current.has(e.pointerId)) pointersRef.current.set(e.pointerId, toViewBox(e.clientX, e.clientY))
       if (clientPtsRef.current.has(e.pointerId)) clientPtsRef.current.set(e.pointerId, [e.clientX, e.clientY])
+      // #28: live photo pan (Image-Position) — fractions of the texture span, matching the scene's G1
+      if (imgPanRef.current) {
+        const svg = svgRef.current
+        if (svg) {
+          const rect = svg.getBoundingClientRect()
+          const { startClient, art0 } = imgPanRef.current
+          const fx = (e.clientX - startClient[0]) / rect.width
+          const fy = (e.clientY - startClient[1]) / rect.height
+          const st = useOutlineStore.getState()
+          st.setArtwork({ ...art0, offsetX: Math.max(-0.5, Math.min(0.5, art0.offsetX + fx)), offsetY: Math.max(-0.5, Math.min(0.5, art0.offsetY - fy)) })
+        }
+        return
+      }
       // two-finger pinch → canvas zoom (G11): pin the start centroid's content point under the live centroid
       if (pinchRef.current && clientPtsRef.current.size >= 2) {
         const cp = [...clientPtsRef.current.values()]
@@ -761,6 +790,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   const onPointerUp = useCallback((e: React.PointerEvent) => {
     pointersRef.current.delete(e.pointerId)
     clientPtsRef.current.delete(e.pointerId)
+    if (imgPanRef.current) { imgPanRef.current = null; nodeInteractedRef.current = true; return }
     if (pinchRef.current) { if (clientPtsRef.current.size < 2) pinchRef.current = null; return }
     if (canvasPanRef.current) { canvasPanRef.current = null; nodeInteractedRef.current = true; return }
     if (rotateRef.current) { rotateRef.current = null; commitRotate(); return }
@@ -1130,6 +1160,13 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     }
     cropBox = { minX, minY, maxX, maxY }
   }
+  // #28: photo pan/zoom preview — mirrors the 3D texture mapping (x = s·X − W(s−1)/2 − ox·W)
+  const artXform = art.scale !== 1 || art.offsetX !== 0 || art.offsetY !== 0
+    ? `translate(${(-doc.image.widthPx * (art.scale - 1)) / 2 - art.offsetX * doc.image.widthPx} ${(-doc.image.heightPx * (art.scale - 1)) / 2 + art.offsetY * doc.image.heightPx}) scale(${art.scale})`
+    : undefined
+  const fxFilter = fxDraft.brightness !== 100 || fxDraft.contrast !== 100 || fxDraft.saturate !== 100 || fxDraft.warmth > 0
+    ? `brightness(${fxDraft.brightness}%) contrast(${fxDraft.contrast}%) saturate(${fxDraft.saturate}%)${fxDraft.warmth > 0 ? ` sepia(${Math.round(fxDraft.warmth * 0.45)}%)` : ''}`
+    : undefined
   // magic-blend live preview in the canvas: blurred photo + sharp subject overlay; blur reacts to intensity
   const showBlend = blendOn && !!subjMatteUrl && !!imageUrl
   const blendSd = (blendBlur / 100) * (doc.image.widthPx / 25)
@@ -1171,6 +1208,13 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
           onClick={onSurfaceClick}
           onDoubleClick={drawing ? undefined : onSurfaceDoubleClick}
           onWheel={(e) => {
+            // #28 Image-Position: scroll zooms the PHOTO within the shape (G1 semantics)
+            if (activeAdjust === 'image' && imageSub === 'position') {
+              const st = useOutlineStore.getState()
+              const a = st.artwork
+              st.setArtwork({ ...a, scale: Math.max(1, Math.min(4, a.scale * Math.exp(-e.deltaY * 0.0022))) })
+              return
+            }
             // G11: scroll/trackpad zoom about the cursor (the viewBox IS the zoom state)
             applyZoom(e.clientX, e.clientY, viewRef.current.scale * Math.exp(-e.deltaY * 0.0022), viewRef.current)
           }}
@@ -1183,6 +1227,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
             {preview && pathD && <clipPath id="kaiCutPreview"><path d={pathD} /></clipPath>}
           </defs>
           <g clipPath={preview && pathD ? 'url(#kaiCutPreview)' : undefined}>
+          <g transform={artXform} style={fxFilter ? { filter: fxFilter } : undefined}>
           {imageUrl && (showBlend ? (
             // magic blend: blurred full photo + the sharp BEN subject (matte is y-up → flip to editor y-down)
             <>
@@ -1192,6 +1237,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
           ) : (
             <image href={imageUrl} x={0} y={0} width={doc.image.widthPx} height={doc.image.heightPx} preserveAspectRatio="xMidYMid slice" />
           ))}
+          </g>
           </g>
           {drawing ? (
             <>
@@ -1307,7 +1353,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
 
       {/* reveal-on-tap adjustment sheet — every continuous control is the shared TickBar (G12):
           per-tick = transient visual preview only; commit fires once on release (§6.3). */}
-      {!drawing && activeAdjust && activeAdjust !== 'shape' && activeAdjust !== 'tune' && (
+      {!drawing && activeAdjust && activeAdjust !== 'shape' && activeAdjust !== 'tune' && activeAdjust !== 'image' && (
         <div className={styles.sheet}>
           {activeAdjust === 'round' && (
             <TickBar label={selectedNode ? 'Corner' : 'Radius'} min={0} max={maxRadius} value={Math.min(radius, maxRadius)} onChange={setRadius} onCommit={commitRadius} format={(v) => `${Math.round((v / Math.max(maxRadius, 1)) * 100)}%`} />
@@ -1345,6 +1391,69 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
               />
             </>
           )}
+        </div>
+      )}
+
+      {/* #28 Image tool — Apple-pattern sheet: circular sub-icons, ONE shared ruler below.
+          Position = pan/zoom the photo under the cutline; adjustments preview live (CSS filter)
+          and bake into the print composite on release (same composeFront → print-faithful). */}
+      {!drawing && activeAdjust === 'image' && (
+        <div className={styles.shapeSheet}>
+          <div className={styles.chipRow}>
+            {([
+              { k: 'position', label: 'Position', icon: <PositionIcon /> },
+              { k: 'brightness', label: 'Bright', icon: <BrightnessIcon /> },
+              { k: 'contrast', label: 'Contrast', icon: <ContrastIcon /> },
+              { k: 'saturate', label: 'Color', icon: <SaturationIcon /> },
+              { k: 'warmth', label: 'Warmth', icon: <WarmthIcon /> },
+            ] as const).map((s) => (
+              <button
+                key={s.k}
+                type="button"
+                className={`${styles.chip} ${imageSub === s.k ? styles.chipActive : ''}`}
+                onClick={() => setImageSub(s.k)}
+                aria-pressed={imageSub === s.k}
+                aria-label={s.label}
+              >
+                <span className={styles.chipIcon}>{s.icon}</span>
+                <span className={styles.chipLabel}>{s.label}</span>
+              </button>
+            ))}
+          </div>
+          <div className={styles.shapeControls}>
+            {imageSub === 'position' ? (
+              <div className={styles.shapeRow}>
+                <span className={styles.shapeName}>Zoom</span>
+                <TickBar
+                  label="Photo zoom" min={100} max={400} step={2}
+                  value={art.scale * 100}
+                  onChange={(v) => { const st = useOutlineStore.getState(); st.setArtwork({ ...st.artwork, scale: v / 100 }) }}
+                  onCommit={(v) => { const st = useOutlineStore.getState(); st.setArtwork({ ...st.artwork, scale: v / 100 }) }}
+                  format={(v) => `${Math.round(v)}%`}
+                />
+              </div>
+            ) : (
+              <div className={styles.shapeRow}>
+                <span className={styles.shapeName}>
+                  {imageSub === 'brightness' ? 'Bright' : imageSub === 'contrast' ? 'Contrast' : imageSub === 'saturate' ? 'Color' : 'Warmth'}
+                </span>
+                <TickBar
+                  label={imageSub}
+                  min={imageSub === 'saturate' ? 0 : imageSub === 'warmth' ? 0 : 50}
+                  max={imageSub === 'saturate' ? 200 : imageSub === 'warmth' ? 100 : 150}
+                  step={1}
+                  value={fxDraft[imageSub]}
+                  onChange={(v) => setFxDraft((d) => ({ ...d, [imageSub]: v }))}
+                  onCommit={(v) => {
+                    const next = { ...fxDraft, [imageSub]: v }
+                    setFxDraft(next)
+                    useOutlineStore.getState().setImageFx(next) // bake → 3D + print recompose
+                  }}
+                  format={(v) => (imageSub === 'warmth' ? `${Math.round(v)}` : `${Math.round(v)}%`)}
+                />
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -1527,6 +1636,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
             <ToolBtn icon={<SmoothIcon />} label="Curve" onClick={() => setActiveAdjust((a) => (a === 'smooth' ? null : 'smooth'))} active={activeAdjust === 'smooth'} />
             <ToolBtn icon={<ScaleIcon />} label="Scale" onClick={() => setActiveAdjust((a) => (a === 'scale' ? null : 'scale'))} active={activeAdjust === 'scale'} />
             <ToolBtn icon={<BlendIcon />} label="Blend" onClick={() => setActiveAdjust((a) => (a === 'blend' ? null : 'blend'))} active={activeAdjust === 'blend'} />
+            <ToolBtn icon={<ImageToolIcon />} label="Image" onClick={() => setActiveAdjust((a) => (a === 'image' ? null : 'image'))} active={activeAdjust === 'image'} />
             <ToolBtn icon={<PenIcon />} label="Draw" onClick={startDraw} />
           </>
         )}

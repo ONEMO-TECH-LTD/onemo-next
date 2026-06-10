@@ -62,8 +62,12 @@ interface EffectViewerProps {
 }
 
 /** §6.1 no-blank-mount: demand frameloop misses content that arrives AFTER the initial frame
- *  (HDR env, suede maps, GLB). Hook the global LoadingManager → invalidate() on every load batch. */
-function InvalidateOnAssetLoad() {
+ *  (HDR env, suede maps, GLB). Hook the global LoadingManager → invalidate() on every load batch.
+ *  PLUS a boot/unfreeze cascade: a deterministic invalidate burst after mount, on prepared-content
+ *  swaps, and whenever the freeze lifts — measured live (2026-06-10): the fully loaded scene sat
+ *  blank ~15s until ANY external invalidate (a click / window resize) because no single async
+ *  arrival path fired post-boot. The burst guarantees first paint regardless of which path misses. */
+function InvalidateOnAssetLoad({ frozen, contentKey }: { frozen?: boolean; contentKey?: unknown }) {
   const invalidate = useThree((s) => s.invalidate)
   React.useEffect(() => {
     const mgr = THREE.DefaultLoadingManager
@@ -71,6 +75,12 @@ function InvalidateOnAssetLoad() {
     mgr.onLoad = () => { prevOnLoad?.(); invalidate() }
     return () => { mgr.onLoad = prevOnLoad }
   }, [invalidate])
+  React.useEffect(() => {
+    if (frozen) return
+    invalidate()
+    const ts = [150, 500, 1000, 1800].map((ms) => setTimeout(() => invalidate(), ms))
+    return () => ts.forEach(clearTimeout)
+  }, [frozen, contentKey, invalidate])
   return null
 }
 
@@ -299,7 +309,7 @@ export default function EffectViewer({
         onCreated={handleCreated}
       >
         <Suspense fallback={null}>
-          <InvalidateOnAssetLoad />
+          <InvalidateOnAssetLoad frozen={frozen} contentKey={prepared} />
           <RendererBackgroundSync color={config.colors.bgColor} />
           <RendererSettingsSync config={config} />
           <CameraConfigSync config={config} orbitControlsRef={orbitControlsRef} />

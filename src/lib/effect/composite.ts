@@ -14,14 +14,20 @@ export function composeFront(
   origCanvas: HTMLCanvasElement,
   subjCanvas: HTMLCanvasElement,
   bgBlurPx: number,
+  // #28: image adjustments baked at compose time — the SAME canvas feeds the 3D texture and the
+  // print artwork, so adjustments are print-faithful by construction. CSS-filter string parts.
+  fxFilter?: string,
 ): HTMLCanvasElement {
   const fw = origCanvas.width, fh = origCanvas.height
   const front = document.createElement('canvas')
   front.width = fw; front.height = fh
   const ctx = front.getContext('2d')!
-  if (bgBlurPx > 0) { ctx.filter = `blur(${bgBlurPx}px)`; ctx.drawImage(origCanvas, 0, 0); ctx.filter = 'none' }
-  else ctx.drawImage(origCanvas, 0, 0)
+  const fx = fxFilter && fxFilter !== 'none' ? fxFilter : ''
+  if (bgBlurPx > 0) { ctx.filter = `${fx} blur(${bgBlurPx}px)`.trim(); ctx.drawImage(origCanvas, 0, 0) }
+  else { if (fx) ctx.filter = fx; ctx.drawImage(origCanvas, 0, 0) }
+  ctx.filter = fx || 'none'
   ctx.drawImage(subjCanvas, 0, 0, fw, fh) // sharp subject on top of the (blurred) real background
+  ctx.filter = 'none'
   return front
 }
 

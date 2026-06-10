@@ -12,7 +12,17 @@
 
 import { create } from 'zustand'
 import type { EffectSpecDraft, Contour } from '@/lib/effect/types'
+import type { DesignState } from '../types'
 import type { OutlineDocument, FairTracedRingOpts } from '@/lib/outline-core'
+
+// #28: artwork position (pan/zoom within the shape) — ONE source for the scene's Position mode
+// and the editor's Image tool. Matrix-only downstream (texture repeat/offset).
+export const INITIAL_ARTWORK: DesignState = { offsetX: 0, offsetY: 0, scale: 1.0 }
+
+// #28: image adjustments — applied identically to the live 3D texture AND the print composite
+// (one composeFront), so what Dan sees is what's printed. 100/100/100/0 = neutral.
+export interface ImageFx { brightness: number; contrast: number; saturate: number; warmth: number }
+export const NEUTRAL_FX: ImageFx = { brightness: 100, contrast: 100, saturate: 100, warmth: 0 }
 
 // SHORTLIST #21 (Dan, 2026-06-10): fine-tuned BEN settings ARE the defaults — Magic must not reset
 // them. Durable across reloads (localStorage) until changed again.
@@ -49,6 +59,11 @@ interface OutlineStore {
   // #21: Dan's tuned BEN fairing — the Tune dash writes it on commit; Magic reads it as the default.
   fairing: FairingPrefs | null
   setFairing: (f: FairingPrefs | null) => void
+  // #28: image adjustments (editor Image tool) — ShapedModel re-composes the front on change.
+  imageFx: ImageFx | null
+  setImageFx: (fx: ImageFx | null) => void
+  artwork: DesignState
+  setArtwork: (d: DesignState) => void
 }
 
 export const useOutlineStore = create<OutlineStore>((set) => ({
@@ -64,6 +79,10 @@ export const useOutlineStore = create<OutlineStore>((set) => ({
   setSubjMatteUrl: (subjMatteUrl) => set({ subjMatteUrl }),
   editorOpen: false,
   setEditorOpen: (editorOpen) => set({ editorOpen }),
+  imageFx: null,
+  setImageFx: (imageFx) => set({ imageFx }),
+  artwork: INITIAL_ARTWORK,
+  setArtwork: (artwork) => set({ artwork }),
   fairing: loadFairing(),
   setFairing: (fairing) => {
     try {

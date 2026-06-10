@@ -18,7 +18,7 @@ import { useSearchParams } from 'next/navigation'
 import { useGesture } from '@use-gesture/react'
 import { useSceneStore } from './admin/sceneStore'
 import { UndoIcon, RedoIcon, ResetIcon } from './user/icons'
-import { INITIAL_DESIGN } from './user/Toolbar'
+import { INITIAL_ARTWORK } from './user/outlineStore'
 import { useOutlineStore } from './user/outlineStore'
 import type { DesignState } from './types'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
@@ -55,7 +55,11 @@ function PrototypePageInner() {
   const [autoOutline, setAutoOutline] = useState(false) // false = standard square; true = Magic cut-out
   const [generating, setGenerating] = useState(false)
   const [genLabel, setGenLabel] = useState('Cutting out…') // G5 honest progress
-  const [designState, setDesignState] = useState<DesignState>(INITIAL_DESIGN)
+  const designState = useOutlineStore((s) => s.artwork) // #28: lifted — scene + editor share it
+  const setDesignState = useCallback((upd: DesignState | ((prev: DesignState) => DesignState)) => {
+    const st = useOutlineStore.getState()
+    st.setArtwork(typeof upd === 'function' ? upd(st.artwork) : upd)
+  }, [])
   const { colors, setBackColor, setFrameColor, setBgColor } = useSceneStore()
   const [showColors, setShowColors] = useState(false)
   const [showSave, setShowSave] = useState(false)
@@ -77,6 +81,7 @@ function PrototypePageInner() {
     prepared: PreparedEffect | null
     autoOutline: boolean
     designState: DesignState
+    imageFx: ReturnType<typeof useOutlineStore.getState>['imageFx']
     outline: OutlineSnap
     trim: { backColor: string; frameColor: string; bgColor: string }
   }
@@ -95,6 +100,7 @@ function PrototypePageInner() {
     const o = useOutlineStore.getState()
     return {
       prepared, autoOutline, designState,
+      imageFx: o.imageFx,
       outline: { spec: o.spec, editedContourMM: o.editedContourMM, editedDoc: o.editedDoc, bgBlur: o.bgBlur, subjMatteUrl: o.subjMatteUrl },
       trim: { ...useSceneStore.getState().colors },
     }
@@ -110,6 +116,7 @@ function PrototypePageInner() {
     setAutoOutline(sn.autoOutline)
     setDesignState(sn.designState)
     const o = useOutlineStore.getState()
+    o.setImageFx(sn.imageFx)
     o.setSpec(sn.outline.spec)
     o.setEditedContourMM(sn.outline.editedContourMM)
     o.setEditedDoc(sn.outline.editedDoc)
@@ -146,18 +153,30 @@ function PrototypePageInner() {
     import('./user/SavePanel').then(({ loadLibrary }) => setLibrary(loadLibrary()))
   }, [])
 
-  // #31: warm BEN silently the moment the creator opens — weights download + session init happen
-  // in the background worker, so the first Magic press starts at full speed.
+  // §6.1 no-blank-mount, page-level guarantee (measured 2026-06-10): after content arrives the
+  // demand-loop scene can sit unpainted until ANY external repaint trigger — a window resize
+  // provably paints it every time. Nudge with a short resize burst whenever the content identity
+  // changes (upload, Magic swap, editor close). Cheap (a few frames), deterministic, frameloop-proof.
   useEffect(() => {
-    import('@/lib/effect/segment-ml').then((m) => m.preloadBen()).catch(() => { /* real run reports */ })
-  }, [])
+    if (!prepared) return
+    const fire = () => window.dispatchEvent(new Event('resize'))
+    fire()
+    const ts = [200, 800, 2000].map((ms) => setTimeout(fire, ms))
+    return () => ts.forEach(clearTimeout)
+  }, [prepared, editingOutline])
+
+  // #31 preload: DISABLED until the weights are self-hosted (research topic F: R2/CDN, immutable
+  // URLs). Measured live: page-load preload (a) dropped the scene's WebGL context at boot via the
+  // webgpu session ("THREE.WebGLRenderer: Context Lost" — Dan's freeze), and (b) even download-only
+  // it pulls 100s of MB from the hub per origin and double-fetches a different dtype than the
+  // pipeline uses. The model loads at the first Magic press (honest shimmer) — proven safe.
 
   const handleFile = useCallback((file: File) => {
     if (!file.type.startsWith('image/')) return
     if (artworkUrl?.startsWith('blob:')) URL.revokeObjectURL(artworkUrl)
     const url = URL.createObjectURL(file)
     setArtworkUrl(url)
-    setDesignState(INITIAL_DESIGN)
+    setDesignState(INITIAL_ARTWORK)
     setAutoOutline(false) // new image → the standard square; Magic opts into the cut-out
     // fresh image → drop any prior edit/blend so the new effect starts clean
     const st = useOutlineStore.getState()
@@ -170,7 +189,7 @@ function PrototypePageInner() {
         useOutlineStore.getState().setSpec(p.spec) // hand the standard outline to the 2D editor
         // #23: a new image starts a fresh history; this state is the Reset baseline
         baselineRef.current = {
-          prepared: p, autoOutline: false, designState: INITIAL_DESIGN,
+          prepared: p, autoOutline: false, designState: INITIAL_ARTWORK, imageFx: null,
           outline: { spec: p.spec, editedContourMM: null, editedDoc: null, bgBlur: null, subjMatteUrl: null },
           trim: { ...useSceneStore.getState().colors },
         }
@@ -214,7 +233,7 @@ function PrototypePageInner() {
         pushHistory(preMagic)
         // #23: the editor session that auto-opens is its own step — stash the post-magic state
         editorPreRef.current = {
-          prepared: p, autoOutline: true, designState,
+          prepared: p, autoOutline: true, designState, imageFx: useOutlineStore.getState().imageFx,
           outline: { spec: p.spec, editedContourMM: null, editedDoc: null, bgBlur: null, subjMatteUrl: useOutlineStore.getState().subjMatteUrl },
           trim: { ...useSceneStore.getState().colors },
         }

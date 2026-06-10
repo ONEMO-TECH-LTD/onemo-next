@@ -65,11 +65,27 @@ interface RawImageData {
 
 ctx.onmessage = async (e: MessageEvent<{ id: number; url: string; preload?: boolean }>) => {
   const { id, url } = e.data
-  // PRELOAD (SHORTLIST #31): warm the pipeline (weights download + session init) at page load,
-  // silently — no inference. The first real Magic then starts at full speed.
+  // PRELOAD (SHORTLIST #31): DOWNLOAD-ONLY warm-up — fetch the weights into the browser cache
+  // with ZERO GPU work. Initializing the webgpu session here drops the golden scene's WebGL
+  // context at page boot ("THREE.WebGLRenderer: Context Lost" — reproduced live, Dan's freeze).
+  // The GPU session still initializes at the first real Magic press (proven safe on a live scene);
+  // by then the files are local, so the wait collapses to session init only.
   if (e.data.preload) {
     try {
-      await getSegmenter((state) => ctx.postMessage({ id, progress: state }))
+      const mod = await import('@huggingface/transformers')
+      mod.env.allowLocalModels = true
+      mod.env.localModelPath = '/models'
+      mod.env.allowRemoteModels = true
+      // from_pretrained on the MODEL (no pipeline, no device session) downloads + caches the
+      // config/tokenizer/onnx weights via transformers.js' own Cache API, then frees the instance.
+      const m = await mod.AutoModel.from_pretrained(MODEL_ID, {
+        progress_callback: (p: { status?: string }) => {
+          if (p.status === 'download' || p.status === 'initiate') ctx.postMessage({ id, progress: 'downloading-model' })
+        },
+        // wasm/cpu device for the throwaway instance — never webgpu at preload
+        device: 'wasm',
+      } as Parameters<typeof mod.AutoModel.from_pretrained>[1])
+      try { await (m as unknown as { dispose?: () => Promise<unknown> }).dispose?.() } catch { /* best-effort free */ }
       ctx.postMessage({ id, ok: true, preloaded: true })
     } catch (err) {
       ctx.postMessage({ id, ok: false, error: String((err as Error)?.message ?? err) })
