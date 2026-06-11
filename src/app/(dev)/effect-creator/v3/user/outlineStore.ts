@@ -45,6 +45,9 @@ interface OutlineStore {
   setEditedContourMM: (c: Contour | null) => void
   // The last committed editor document — so reopening "Edit" restores edits instead of re-deriving
   // the original BEN contour (the 3D already reflects edits via editedContourMM).
+  // KAI-8963 F2: DERIVED, NOT authoritative. For vector edits this is the flatten SHADOW of
+  // editedVShape (interaction math only) — restore rejects it when the paired vector is missing,
+  // and it never reaches the 3D or the manufacturing contour on a vector path.
   editedDoc: OutlineDocument | null
   setEditedDoc: (d: OutlineDocument | null) => void
   // VECTOR CORE (reset Run 1): the committed vector-shape truth, persisted ALONGSIDE editedDoc —

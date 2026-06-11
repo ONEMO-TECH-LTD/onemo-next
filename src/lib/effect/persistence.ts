@@ -16,6 +16,7 @@
 
 import type { OutlineDocument, OutlineGenerator, ReplayEnv } from '@/lib/outline-core'
 import { assertReplayMatchesHash } from '@/lib/outline-core'
+import type { VShape } from '@/lib/vector-core'
 import type { ApprovedEffectPayload } from './payload'
 import type { EffectType } from './effect-types'
 import type { EffectSize } from './sizes'
@@ -24,6 +25,12 @@ import type { EffectSize } from './sizes'
 /** The remix substrate — procedural intent. The OutlineDocument carries baseSnapshot + commands + style. */
 export interface EditableRecipe {
   outlineDocument: OutlineDocument
+  /** KAI-8963 F4: the vector-native geometry truth for designs edited in the vector engine. When
+   *  present, a remix edits THIS (true curves) — the outlineDocument is its derived flatten shadow,
+   *  kept because the F1 bond replays/hashes the doc (`build.outline_document_hash` is a doc hash).
+   *  Additive + optional, and the recipe is NOT a payload-hash input, so SCHEMA_VERSION stays at 2:
+   *  old saves deserialize unchanged, old readers ignore the field. Absent = pre-vector save. */
+  vectorShape?: VShape
   generator?: OutlineGenerator
   uiMeta?: Record<string, unknown>
 }

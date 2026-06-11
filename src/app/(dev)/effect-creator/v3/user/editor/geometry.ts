@@ -49,6 +49,12 @@ export function maxSafeGlobalRadius(doc: OutlineDocument, hi: number): number {
 }
 
 /**
+ * LEGACY DOOR (KAI-8963): the pre-vector doc constructor. Two remaining callers, both in
+ * OutlineEditor: (1) the open-effect bootstrap, where its output is REPLACED by the vector shadow
+ * whenever vector truth exists and survives only as the loud legacy fallback (old saves with no
+ * raw trace — toasted); (2) Reset's equally-loud legacy fallback. It is never authoritative for a
+ * vector-capable source. Do not add new call sites.
+ *
  * Build an editable OutlineDocument from the REAL BEN2 cut-out contour (A1d). The dense smoothed
  * contour is simplified to a control ring (rdpClosed); the rounding is already baked into the
  * points, so the global corner radius starts at 0 (no double-round). Coordinates: mm → mask px.
@@ -86,9 +92,12 @@ export function docFromSpec(spec: EffectSpecDraft): OutlineDocument {
   return applyOutlineCommands(base, [], env)
 }
 
-/** Build an OutlineDocument from a single outer ring of points (shapes / draw). `minSpacingPx`
- *  controls anchor merging — dense parametric rings pass a SMALL value so points merge EVENLY
- *  (the default coarse merge ate points irregularly → "slightly uneven curves", Dan 2026-06-10). */
+/** DERIVED-ONLY (KAI-8963): builds the interaction/preview shadow doc from a point ring — never
+ *  committed geometry. Two callers: the vector shadow (useEditorHistory.shadowDoc — hit-tests and
+ *  interaction math beside the authoritative VShape) and the transient generator tick-preview
+ *  (buildShapeDoc — discarded on release for the fitted vector). Do not add authoritative call
+ *  sites. `minSpacingPx` controls anchor merging — dense parametric rings pass a SMALL value so
+ *  points merge EVENLY (coarse merge ate points irregularly → "uneven curves", Dan 2026-06-10). */
 export function docFromRings(outerPts: Vec2Px[], image: OutlineDocument['image'], defaultRadiusPx = 0, minSpacingPx?: number): OutlineDocument {
   const clean = repairSimplePolygon(outerPts, minSpacingPx ?? Math.max(3, Math.max(image.widthPx, image.heightPx) * 0.008))
   const nodes = (clean.length >= 3 ? clean : outerPts).map((p, i) => ({ id: `b${i}`, p, role: 'corner' as const, corner: { mode: 'inherit' as const } }))

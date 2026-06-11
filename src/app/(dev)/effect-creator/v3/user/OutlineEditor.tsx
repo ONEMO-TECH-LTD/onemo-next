@@ -105,8 +105,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   const [smoothing, setSmoothing] = useState(0) // 0–100 → style.smoothing 0..1 (Catmull-Rom spline)
   const [scale, setScale] = useState(100) // 50–150 relative resize of the whole cut-out; bakes on release
   const [selectedNode, setSelectedNode] = useState<{ ringId: string; nodeId: string } | null>(null) // anchor add/delete target
-  // #35 Apple layout: the editor's bottom is a MODE pill (Shape · Adjust · Image · Draw); each
-  // mode shows a row of circular sub-tools sharing ONE ruler — no more dock-of-everything.
+  // #35 Apple layout: the editor's bottom is a MODE pill (Shape · Adjust · Image); each mode
+  // shows a row of circular sub-tools sharing ONE ruler — no more dock-of-everything.
   const [activeAdjust, setActiveAdjust] = useState<'shape' | 'adjust' | 'image' | null>(null)
   const [adjustSub, setAdjustSub] = useState<'radius' | 'curve' | 'scale' | 'blend' | 'detail' | 'smooth' | 'snap' | 'line' | 'angle'>('radius')
   const [blendOn, setBlendOn] = useState(true) // "magic blend" on/off (the soft real-background blur on the 3D front)
@@ -209,7 +209,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     preEditRef.current = { contourMM: st0.editedContourMM ?? (spec ? spec.geometryMM : null), editedDoc: st0.editedDoc, editedVShape: st0.editedVShape, bgBlur: st0.bgBlur }
     // Restore prior edits if they belong to the current cut-out; else derive a fresh editable contour.
     const stored = useOutlineStore.getState().editedDoc
-    const useStored = !!stored && !!spec && stored.image.sourceHash === spec.sourceRef.slice(0, 40)
+    // KAI-8963 F2: the editedDoc shadow is DERIVED, never authoritative — restoring it without
+    // its paired vector would resurrect the polyline model. Vector missing ⇒ re-derive fresh.
+    const useStored = !!stored && !!st0.editedVShape && !!spec && stored.image.sourceHash === spec.sourceRef.slice(0, 40)
     const d = useStored ? stored! : spec ? docFromSpec(spec) : seedDoc(VIEW_W, VIEW_H)
     setDoc(d)
     // vector truth travels with the persisted doc — restore the pair together
@@ -264,7 +266,13 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
         setVShape(v0)
         vshapeRef.current = v0
         vBaseRef.current = null
+      } else {
+        // KAI-8963 F3: the legacy doc door must never open SILENTLY on a vector-capable source
+        toast('error', 'Trace unavailable — showing the manufacturing outline (legacy)')
       }
+    } else if (!useStored && spec && spec.generator.adapter !== 'standard' && !(spec.rawTracePx && spec.rawTracePx.length >= 24)) {
+      // old shaped saves carry no raw trace — the doc fallback is the only path; say so, loudly
+      toast('error', 'This design predates the vector engine — editing the manufacturing outline')
     }
     if (!useStored && spec && spec.generator.adapter === 'standard' && !useOutlineStore.getState().editedContourMM) {
       // VECTOR CORE: the starting square is a TRUE vector — 4 corner anchors filleted into exact
@@ -364,19 +372,27 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   // editor → 3D: push the COMMITTED resolved outline (mm) so the 3D suede object follows real edits
   // (ADDENDUM D step 4 "the 3D follows" / step 8 "what you approve is what's made"). Keyed on the
   // committed `doc` (not the transient drag), so the 3D updates on commit — 2D leads, 3D lags.
+  // VECTOR CORE: the VShape is the committed truth — flatten IT at manufacturing tolerance
+  // (0.05 mm in px) and feed the same mm mapping. The doc shadow never reaches the 3D.
+  // ONE helper for both writers (the commit effect below + onDone's KAI-8963 F1 commit), so the
+  // close boundary can never leave committed vector truth with null store geometry.
+  const contourFromVShape = useCallback((v: VShape): Contour | null => {
+    if (!spec) return null
+    const k = spec.mmPerPx || 1
+    const H = docRef.current.image.heightPx
+    const tolPx = Math.max(0.05, 0.05 / k)
+    const ring = flattenShape(v, tolPx)[0].map((p) => [p.x, p.y] as Vec2Px)
+    if (ring.length < 3) return null
+    const outer = ring.map(([x, y]) => [x * k, (H - y) * k] as Vec2Px).reverse()
+    return { outer: { pts: outer }, holes: [] }
+  }, [spec, docRef])
   useEffect(() => {
     if (!open || !spec || !dirtyRef.current) return
     const k = spec.mmPerPx || 1
     const H = doc.image.heightPx
-    // VECTOR CORE: the VShape is the committed truth — flatten IT at manufacturing tolerance
-    // (0.05 mm in px) and feed the same mm mapping. The doc shadow never reaches the 3D.
     if (vshape) {
-      const tolPx = Math.max(0.05, 0.05 / k)
-      const ring = flattenShape(vshape, tolPx)[0].map((p) => [p.x, p.y] as Vec2Px)
-      if (ring.length >= 3) {
-        const outer = ring.map(([x, y]) => [x * k, (H - y) * k] as Vec2Px).reverse()
-        setEditedContourMM({ outer: { pts: outer }, holes: [] })
-      }
+      const c = contourFromVShape(vshape)
+      if (c) setEditedContourMM(c)
       return
     }
     const res = resolveOutlineDocument(doc, { flattenTolerancePx: 0.15 })
@@ -394,7 +410,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       .map((r, i) => (r.role === 'hole' && res.flattenedRingsPx[i]?.length ? toMM(res.flattenedRingsPx[i]) : null))
       .filter((h): h is Vec2Px[] => h !== null)
     setEditedContourMM({ outer: { pts: outer }, holes: holes.map((h) => ({ pts: h })) })
-  }, [doc, vshape, open, spec, setEditedContourMM, dirtyRef])
+  }, [doc, vshape, open, spec, setEditedContourMM, dirtyRef, contourFromVShape])
 
   // Vector display shape: the in-flight anchor/handle drag (vecLive) supersedes the committed
   // vshape; the live Scale preview transforms it exactly (affine on anchors+handles). One source
@@ -954,6 +970,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       clearTail()
       return
     }
+    // KAI-8963 F3: only pre-vector saves (shaped, no raw trace) can reach this door — say so, loudly
+    if (spec) toast('error', 'This design predates the vector engine — Reset restored the manufacturing outline')
     const d = spec ? docFromSpec(spec) : seedDoc(VIEW_W, VIEW_H)
     applyDoc(d) // reset restores the base shape — undoable + pushed back to the 3D
     setRadius(d.style.globalOutlineCornerRadiusPx)
@@ -991,10 +1009,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     perfGesture('tune-commit', performance.now() - t0)
   }, [buildTunedDoc, applyDoc, applyVec, vecFromTrace])
 
-  // Shape tool: build a fresh OutlineDocument from a preset/parametric shape's point ring (centered, fit
-  // to the image), seeded into our node model so Smooth/Scale/drag all apply (radius 0 — shapes are
-  // exact; softening is the Smooth control). Discrete params (sides/points) regenerate immediately; the
-  // continuous ones (spikiness/rotate) preview while dragging and bake on release.
+  // TRANSIENT PREVIEW ONLY (KAI-8963): the live doc-morph shown while a generator tick-bar drags
+  // (previewParam → shapePreview). Never committed — commitShape discards it and lands the fitted
+  // vector (vecFromGenerator). The doc fallbacks that once made this authoritative are removed.
   const buildShapeDoc = useCallback((kind: ShapeKind, overrides: Partial<ShapeParams> = {}): OutlineDocument => {
     const img = docRef.current.image
     // uniform arc-length resample → evenly spaced anchors → vector-true curves (no irregular
@@ -1036,10 +1053,10 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       setShowAnchors(false)
       return
     }
-    applyDoc(buildShapeDoc(kind, overrides))
-    setSmoothing(0); setScale(100); setSelectedNode(null); setAllSelected(false)
-    setShowAnchors(false) // rigid shape: vertex anchors off by default (toggle to edit points)
-  }, [applyDoc, applyVec, buildShapeDoc, vecFromGenerator, docRef])
+    // KAI-8963 F3: every ShapeKind is vector-constructed (library def or fitted generator) — the
+    // silent doc fallback is removed; an uncovered kind is a build error, never a polyline.
+    throw new Error(`pickShape: no vector construction for shape "${kind}"`)
+  }, [applyVec, vecFromGenerator, docRef])
   /** stepper: ±delta on an integer param, regenerate immediately (undoable). */
   const nudgeParam = useCallback((key: 'sides' | 'points' | 'lobes' | 'petals' | 'blades', delta: number, min: number, max: number) => {
     if (!shapeKind) return
@@ -1058,8 +1075,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       applyVec(vecFromGenerator(shapeKind, { [key]: n }), null)
       return
     }
-    applyDoc(buildShapeDoc(shapeKind, { [key]: n }))
-  }, [shapeKind, applyDoc, applyVec, buildShapeDoc, vecFromGenerator, docRef])
+    throw new Error(`nudgeParam: no vector construction for shape "${shapeKind}"`) // KAI-8963 F3
+  }, [shapeKind, applyVec, vecFromGenerator, docRef])
   /** tick-bar: transient preview per tick (§6.3); commitShape applies on release. */
   const previewParam = useCallback((key: 'spikiness' | 'pinch' | 'depth' | 'swirl' | 'waviness', v: number) => {
     if (!shapeKind) return
@@ -1140,8 +1157,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       applyVec(vecFromGenerator(shapeKind), null)
       return
     }
-    if (shapePreview) { applyDoc(shapePreview); setShapePreview(null) }
-  }, [shapeKind, shapePreview, applyDoc, applyVec, vecFromGenerator, docRef])
+    // KAI-8963 F3: no doc commit remains — shapePreview only exists while a GEN kind is active,
+    // and that branch clears it above. (No active shape → release is a no-op.)
+  }, [shapeKind, applyVec, vecFromGenerator, docRef])
 
   // Rotation handlers — desktop handle + two-finger gesture both drive rotatePreview, baked on release.
   const beginRotateHandle = useCallback((e: React.PointerEvent) => {
@@ -1160,12 +1178,22 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   // live, and switching tools never resets it. So there's no explicit Save — "Done" just closes back to
   // the scene (the approved shape is already what's shown). It also collapses any open sub-menu first.
   const onDone = useCallback(() => {
+    // KAI-8963 F1 (the Done-zombie): the open effect seeds a LOCAL vector (standard square /
+    // Magic trace) without committing it. Closing in that state left the store geometry null,
+    // and the scene fell back to the legacy spec flatten — the faceted corners returned exactly
+    // on Done. Done now COMMITS the approved on-screen vector if the store has none — contour
+    // included, set here directly: the commit effect can't do it, it re-runs after `open` flips.
+    if (vshapeRef.current && !useOutlineStore.getState().editedVShape) {
+      applyVec(vshapeRef.current, vBaseRef.current)
+      const c = contourFromVShape(vshapeRef.current)
+      if (c) useOutlineStore.getState().setEditedContourMM(c)
+    }
     setActiveAdjust(null)
     setSelectedNode(null)
     setAllSelected(false)
     useOutlineStore.getState().setEditorOpen(false) // §6.3 boundary: the deferred 3D rebuild fires now
     onClose()
-  }, [onClose])
+  }, [onClose, applyVec, contourFromVShape, vshapeRef, vBaseRef])
 
   // ✕ Close = discard this session's edits: revert the 3D contour, the persisted editor doc, and the
   // blend to the pre-edit snapshot, then exit. (Done keeps them; saving during the session was automatic.)

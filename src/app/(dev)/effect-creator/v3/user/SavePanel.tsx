@@ -150,8 +150,14 @@ export default function SavePanel({
         setSaving(false)
         return
       }
+      // KAI-8963 F4: a vector-native design saves its VShape as the recipe's editing truth — the
+      // doc rides beside it only as the F1 replay/hash substrate (a derived flatten shadow).
       const saved = makeSavedEffect(
-        { outlineDocument: effective.outlineDocument, generator: effective.outlineDocument.generator },
+        {
+          outlineDocument: effective.outlineDocument,
+          generator: effective.outlineDocument.generator,
+          ...(st.editedVShape ? { vectorShape: st.editedVShape } : {}),
+        },
         payload,
         { effectType, size, createdAtRef: new Date().toISOString() },
       )
