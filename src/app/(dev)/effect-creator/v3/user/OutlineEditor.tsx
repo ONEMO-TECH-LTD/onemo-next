@@ -102,7 +102,13 @@ function TopTool({ icon, label, onClick, disabled }: {
 }
 
 export default function OutlineEditor({ open, imageUrl, onClose, openMode }: OutlineEditorProps) {
-  const { vshape, vshapeRef, vBaseRef, histRef, applyVec, undoRaw, redoRaw } = useEditorHistory()
+  // KAI-8976/F4: every history entry carries the dial state that produced its shape, so
+  // undo/redo restore a TRUTHFUL readout (the Detail ruler lied at 89% after undo). The source is
+  // the COMMITTED dial state — updated only at seed/commit/reset/undo, never by preview ticks
+  // (the TickBar's onChange moves the live refs DURING the drag, before the commit pushes).
+  const committedDialRef = useRef<{ detail: number; fairParams: FairTracedRingOpts }>({ detail: BEN_DEFAULT_DETAIL, fairParams: fairingFromDetail(BEN_DEFAULT_DETAIL) })
+  const captureDialMeta = useCallback(() => ({ ...committedDialRef.current }), [])
+  const { vshape, vshapeRef, vBaseRef, histRef, applyVec, undoRaw, redoRaw } = useEditorHistory(captureDialMeta)
 
   const [radius, setRadius] = useState(0)        // Round: global (or selected-corner) radius px
 
@@ -131,6 +137,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   const detailRef = useRef(detail)
   useEffect(() => { detailRef.current = detail }, [detail])
   const [fairParams, setFairParams] = useState<FairTracedRingOpts>(() => fairingFromDetail(BEN_DEFAULT_DETAIL))
+  const fairParamsRef = useRef(fairParams)
+  useEffect(() => { fairParamsRef.current = fairParams }, [fairParams])
   const [tunePreview, setTunePreview] = useState<string | null>(null) // live re-fair while dragging a tune bar — display-only `d`
   // #28 Image tool (Apple-pattern: circular sub-icons + ONE shared ruler). Position pans/zooms the
   // PHOTO under the fixed cutline (the scene's G1, now inside the editor); adjustments preview live
@@ -207,8 +215,14 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     setSelVA(null)
     setVecLive(null)
   }, [])
-  const undo = useCallback(() => { if (undoRaw()) syncSlidersTo() }, [undoRaw, syncSlidersTo])
-  const redo = useCallback(() => { if (redoRaw()) syncSlidersTo() }, [redoRaw, syncSlidersTo])
+  const restoreDialMeta = useCallback((e: { meta?: { detail: number; fairParams: FairTracedRingOpts } } | null) => {
+    if (!e) return false
+    syncSlidersTo()
+    if (e.meta) { setDetail(e.meta.detail); setFairParams(e.meta.fairParams); committedDialRef.current = { ...e.meta } }
+    return true
+  }, [syncSlidersTo])
+  const undo = useCallback(() => { restoreDialMeta(undoRaw()) }, [undoRaw, restoreDialMeta])
+  const redo = useCallback(() => { restoreDialMeta(redoRaw()) }, [redoRaw, restoreDialMeta])
 
   // Open the editor FROM the single truth (REBUILD-PLAN-v2 §B3): session = committedShape if one
   // exists, else the design's born vector (Magic re-fit at saved Tune prefs / the centered square
@@ -233,6 +247,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       const saved = st0.fairing
       setDetail(saved?.detail ?? BEN_DEFAULT_DETAIL)
       setFairParams(saved?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL))
+      committedDialRef.current = { detail: saved?.detail ?? BEN_DEFAULT_DETAIL, fairParams: saved?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL) }
     }
     setRotateLive(null); rotateLiveRef.current = null; rotateRef.current = null
     setMoveLive(null); moveLiveRef.current = null; moveRef.current = null
@@ -762,6 +777,10 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       const savedF = useOutlineStore.getState().fairing
       const v = vecFromTrace(savedF?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL)) ?? spec.vectorShape
       applyVec(v, null)
+      // F4 (same readout-truth class): Reset re-derives at the saved defaults — the dial says so
+      setDetail(savedF?.detail ?? BEN_DEFAULT_DETAIL)
+      setFairParams(savedF?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL))
+      committedDialRef.current = { detail: savedF?.detail ?? BEN_DEFAULT_DETAIL, fairParams: savedF?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL) }
       setRadius(0)
       clearTail()
       return
@@ -798,6 +817,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     setFairParams(params)
     applyVec(v, null)
     setAllSelected(false)
+    committedDialRef.current = { detail: detailVal ?? detailRef.current, fairParams: params } // F4: the dial that produced THIS shape
     // #21: tuned settings become the durable defaults — Magic reads them from the store
     useOutlineStore.getState().setFairing({ detail: detailVal ?? detailRef.current, params })
     perfGesture('tune-commit', performance.now() - t0)
