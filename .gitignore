@@ -96,3 +96,6 @@ next-env.d.ts
 .dev-factory-renders/
 # self-hosted BEN2 weights (G5) — mirrored locally, never committed
 public/models/
+
+# preserve-at-ingest originals (dev channel — never in git)
+.dev-originals/

@@ -209,7 +209,7 @@ export function buildApprovedEffectPayload(prepared: PreparedEffect, opts: Build
   })
 
   const source = {
-    image_hash: contentHash(spec.sourceRef), // NOTE: hashes the source ref, not the pixels (prod: hash image bytes)
+    image_hash: spec.sourceBytesSha256 ?? contentHash(spec.sourceRef), // true byte identity when ingest succeeded (ref-hash fallback keeps fixtures pure)
     dims: { widthPx: spec.maskWidthPx, heightPx: spec.maskHeightPx },
     color_space: 'srgb',
     exif: 'baked' as const,

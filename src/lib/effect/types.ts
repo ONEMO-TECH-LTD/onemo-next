@@ -49,6 +49,9 @@ export interface EffectSpecDraft {
    *  live params so optimal BEN settings are found by testing, not guessed (Dan, 2026-06-10).
    *  Present on shaped cut-outs only. */
   rawTracePx?: Pt[]
+  /** SHA-256 of the ORIGINAL uploaded bytes (preserve-at-ingest, §B5) — the manufacturing
+   *  record's true source identity. Absent only if the ingest backup failed. */
+  sourceBytesSha256?: string
   diagnostics: {
     rawContourNodes: number
     simplifiedNodes: number

@@ -19,6 +19,21 @@ export interface SegmentationAdapter {
 }
 
 /** Load an image URL into ImageData, downscaled so max dimension ≤ maxDim (speed). */
+// REBUILD-PLAN-v2 §B5 (Dan: no resolution cap): the only texture limit is the device's physical
+// GPU maximum — probed once. Fallback 4096 covers contexts without WebGL (tests/SSR guards).
+let cachedMaxTextureDim: number | null = null
+export function deviceMaxTextureDim(): number {
+  if (cachedMaxTextureDim) return cachedMaxTextureDim
+  try {
+    const cv = document.createElement('canvas')
+    const gl = (cv.getContext('webgl2') ?? cv.getContext('webgl')) as WebGLRenderingContext | null
+    cachedMaxTextureDim = gl ? (gl.getParameter(gl.MAX_TEXTURE_SIZE) as number) : 4096
+  } catch {
+    cachedMaxTextureDim = 4096
+  }
+  return cachedMaxTextureDim
+}
+
 export async function loadImageData(url: string, maxDim = 512): Promise<ImageData> {
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {
     const el = new Image()

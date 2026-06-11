@@ -181,6 +181,14 @@ function PrototypePageInner() {
     if (!file.type.startsWith('image/')) return
     if (artworkUrl?.startsWith('blob:')) URL.revokeObjectURL(artworkUrl)
     const url = URL.createObjectURL(file)
+    // PRESERVE-AT-INGEST (plan §B5, Dan: original kept untouched in any event): the raw file goes
+    // to disk the moment it enters — content-hash keyed, idempotent, fire-and-forget. The byte
+    // hash lands on the spec so the manufacturing record identifies the REAL source bytes.
+    const fd = new FormData()
+    fd.append('file', file)
+    const ingest = fetch('/api/dev/originals', { method: 'POST', body: fd })
+      .then((r) => r.json() as Promise<{ saved: boolean; sha256?: string }>)
+      .catch(() => ({ saved: false as const, sha256: undefined }))
     setArtworkUrl(url)
     setDesignState(INITIAL_ARTWORK)
     setAutoOutline(false) // new image → the standard square; Magic opts into the cut-out
@@ -190,7 +198,10 @@ function PrototypePageInner() {
     // instant standard square through the ONE engine — the object is real in the scene immediately
     import('@/lib/effect/prepare-effect')
       .then(({ prepareEffect }) => prepareEffect(url, 'standard'))
-      .then((p) => {
+      .then(async (p) => {
+        const ing = await ingest
+        if (ing.saved && ing.sha256) p.spec.sourceBytesSha256 = ing.sha256
+        else toast('warn', 'Original-photo backup failed — the design still works; re-upload to retry')
         setPrepared(p)
         useOutlineStore.getState().setSpec(p.spec) // hand the standard outline to the 2D editor
         // #23: a new image starts a fresh history; this state is the Reset baseline

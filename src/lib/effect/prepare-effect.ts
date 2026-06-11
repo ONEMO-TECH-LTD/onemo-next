@@ -33,7 +33,7 @@ export interface ShapeBuildConfig {
   cornerRadiusMM: number    // unused (outline-core owns rounding) — kept for API compat
   squareCornerMM: number    // corner radius of the standard square
 }
-import { loadImageData, segment, adapterIdFor, dilateMask, smoothMask, type MaskResult } from './mask'
+import { loadImageData, segment, adapterIdFor, dilateMask, smoothMask, deviceMaxTextureDim, type MaskResult } from './mask'
 import { segmentML, ML_ADAPTER_ID } from './segment-ml'
 import { traceContourRaw } from './contour'
 import { composeFront, blurCanvas, imageDataToCanvas } from './composite'
@@ -118,8 +118,11 @@ export async function prepareEffect(
   // #21: Dan's tuned fairing rides every Magic run — settings are defaults, never reset by Magic.
   fairing?: FairTracedRingOpts,
 ): Promise<PreparedEffect> {
-  // Full photo (texture res), y-up, for the composite + edge-lip source.
-  const orig = await loadImageData(url, cfg.textureDim)
+  // Full photo (texture res), y-up, for the composite + edge-lip source. NO policy cap (Dan,
+  // plan v2.1 §B5): the texture carries the source's full resolution up to the device's physical
+  // GPU maximum. (cfg.textureDim remains the config floor for tests/back-compat.)
+  const texDim = Math.max(cfg.textureDim, deviceMaxTextureDim())
+  const orig = await loadImageData(url, texDim)
   const fw = orig.width, fh = orig.height
   const origCanvas = imageDataToCanvas(orig)
 
@@ -137,12 +140,12 @@ export async function prepareEffect(
     let texImage: ImageData
     let mlMatte = false
     try {
-      const r = await segmentML(url, cfg.maxImageDim, cfg.textureDim, onProgress)
+      const r = await segmentML(url, cfg.maxImageDim, texDim, onProgress)
       seg = r; adapterId = ML_ADAPTER_ID; texImage = r.texImage; mlMatte = true
     } catch (e) {
       console.warn('[shaped] ML segmentation unavailable — falling back to flood-fill:', e)
       onProgress?.('fallback') // G4: a degraded cut must never be silent
-      const img = await loadImageData(url, cfg.textureDim)
+      const img = await loadImageData(url, texDim)
       seg = segment(img); adapterId = adapterIdFor(img); texImage = seg.imageData
     }
     const { mask, width, height } = seg
