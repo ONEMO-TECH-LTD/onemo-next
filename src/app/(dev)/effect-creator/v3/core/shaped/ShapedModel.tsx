@@ -41,15 +41,36 @@ interface ShapedModelProps {
 }
 
 const texCache = new Map<string, THREE.Texture>()
+// Dan meta-QA finding 2026-06-11: the suede maps load async — for the first frames the material
+// had no micro-roughness, read glossy, and MIRRORED the (deliberately low-res) HDRI as a
+// pixelated flash. Track per-URL readiness so the mesh defers its FIRST paint until fully dressed.
+const texReady = new Set<string>()
+const texWaiters = new Set<() => void>()
 function loadTex(url: string | undefined) {
   if (!url) return null
   const cached = texCache.get(url)
   if (cached) return cached
-  const t = new THREE.TextureLoader().load(url)
+  const done = () => { texReady.add(url); texWaiters.forEach((w) => w()) }
+  const t = new THREE.TextureLoader().load(url, done, undefined, done) // error counts as done — degraded but visible, never blocked
   t.wrapS = t.wrapT = THREE.RepeatWrapping
   t.colorSpace = THREE.NoColorSpace
   texCache.set(url, t)
   return t
+}
+/** true once every given texture URL has finished loading (failures count — degrade, don't block). */
+function useTexturesReady(urls: (string | undefined)[]) {
+  const defined = urls.filter((u): u is string => !!u)
+  const allReady = defined.every((u) => texReady.has(u))
+  const [, bump] = useState(0)
+  const key = defined.join('|')
+  useEffect(() => {
+    if (defined.every((u) => texReady.has(u))) return
+    const w = () => bump((n) => n + 1)
+    texWaiters.add(w)
+    return () => { texWaiters.delete(w) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key])
+  return allReady
 }
 
 /** MeshOptions from the build config + the prepared spec's px↔mm mapping. */
@@ -221,6 +242,7 @@ export default function ShapedModel({
   const normalMap = useMemo(() => suedeTex(suede.normalMap), [suede.normalMap])
   const roughnessMap = useMemo(() => suedeTex(suede.roughnessMap), [suede.roughnessMap])
   const bumpMap = useMemo(() => suedeTex(suede.bumpMap), [suede.bumpMap])
+  const suedeMapsReady = useTexturesReady([suede.normalMap, suede.roughnessMap, suede.bumpMap])
 
   // FRONT material = EXACTLY the golden-scene suede setup (Dan: do not change it). Used for the
   // FRONT and the EDGE (one shared instance) — the edge is the same printed suede continuing over
@@ -356,7 +378,9 @@ export default function ShapedModel({
     }
   }, [attachment, result])
 
-  if (!result) {
+  if (!result || !suedeMapsReady) {
+    // no naked first paint: until geometry AND the suede skin are ready, light only —
+    // a bare glossy material would mirror the HDRI (Dan's pixelated-flash finding)
     return <ambientLight intensity={sceneSettings.ambientIntensity} />
   }
 
