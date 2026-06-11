@@ -108,7 +108,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   const { doc, setDoc, docRef, vshape, setVShape, vshapeRef, vBaseRef, dirtyRef, histRef, shadowDoc, applyDocRaw, applyVec, undoRaw, redoRaw } = useEditorHistory(() => seedDoc(VIEW_W, VIEW_H))
   const [drag, setDrag] = useState<{ ringId: string; nodeId: string; pos: Vec2Px } | null>(null)
   const [radius, setRadius] = useState(0)        // Round: global (or selected-corner) radius px
-  const [maxRadius, setMaxRadius] = useState(120) // Round tick-bar range (¼ of the short side)
+
   const [smoothing, setSmoothing] = useState(0) // 0–100 → style.smoothing 0..1 (Catmull-Rom spline)
   const [scale, setScale] = useState(100) // 50–150 relative resize of the whole cut-out; bakes on release
   const [drawPts, setDrawPts] = useState<Vec2Px[] | null>(null) // non-null = Manual draw in progress (A3a)
@@ -234,7 +234,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     vshapeRef.current = storedV
     vBaseRef.current = null
     setRadius(d.style.globalOutlineCornerRadiusPx)
-    setMaxRadius(Math.round(Math.min(d.image.widthPx, d.image.heightPx) * 0.25))
     setSmoothing(Math.round(d.style.smoothing * 100))
     setScale(100)
     setView({ scale: 1, vx: 0, vy: 0 }) // G11: fresh session starts at fit
@@ -291,7 +290,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       // the 70mm product), not a slider transient (the radius-0-seed lie was caught live 2026-06-10).
       const base = getShape('square', d.image.widthPx, d.image.heightPx)
       const side = Math.min(d.image.widthPx, d.image.heightPx) * 0.72
-      const defaultR = Math.round(side * 0.12)
+      // default rounding = 8mm ABSOLUTE on the product (KAI-8940) — mm-anchored, never a %,
+      // clamped to the geometric max (half-side = the inscribed circle)
+      const defaultR = Math.min(Math.round(8 / (spec.mmPerPx || 1)), Math.floor(side / 2))
       const v0 = filletShape(base, defaultR)
       opened = shadowDoc(v0, d.image)
       setDoc(opened)
@@ -371,6 +372,18 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   // Live morphs supersede the normal display: tune re-fair > shape-tool preview > doc.
   const shown = tunePreview ?? shapePreview ?? displayDoc
   const resolved = useMemo(() => resolveOutlineDocument(shown, { flattenTolerancePx: 0.15 }), [shown])
+
+  // Radius range = the TRUE geometric max of the CURRENT shape (KAI-8940): half the short side of
+  // its box — 100% on a square IS the inscribed circle. The old ¼-image clamp stopped the slider
+  // at ~69% of the square's real maximum, which is why 100% never made the circle.
+  const maxRadius = useMemo(() => {
+    if (vshape) {
+      const bb = shapeBBox(vshape, 1)
+      return Math.max(1, Math.round(Math.min(bb.maxX - bb.minX, bb.maxY - bb.minY) / 2))
+    }
+    const bb = outerBbox(doc)
+    return Math.max(1, Math.round(Math.min(bb.maxX - bb.minX, bb.maxY - bb.minY) / 2))
+  }, [vshape, doc])
   const hasIssues = resolved.issues.length > 0 // inline manufacturability guardrail (self-intersection etc.)
 
   // editor → 3D: push the COMMITTED resolved outline (mm) so the 3D suede object follows real edits
@@ -997,15 +1010,14 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
         return
       }
     }
-    // standard → the full-image square as a TRUE vector, exact arcs at the doc's safe default radius
+    // standard → the full-image square as a TRUE vector, 8mm-absolute default rounding
     if (spec && spec.generator.adapter === 'standard') {
-      const d = docFromSpec(spec) // carries the self-corrected max-safe rounding default
       const W = spec.maskWidthPx, H = spec.maskHeightPx
       const base: VShape = { paths: [{ anchors: [
         { p: { x: 0, y: 0 }, corner: true }, { p: { x: W, y: 0 }, corner: true },
         { p: { x: W, y: H }, corner: true }, { p: { x: 0, y: H }, corner: true },
       ] }] }
-      const r = d.style.globalOutlineCornerRadiusPx
+      const r = Math.min(Math.round(8 / (spec.mmPerPx || 1)), Math.floor(Math.min(W, H) / 2)) // 8mm absolute default (KAI-8940)
       applyVec(filletShape(base, r), base)
       setRadius(r)
       clearTail()

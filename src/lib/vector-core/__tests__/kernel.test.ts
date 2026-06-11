@@ -270,6 +270,24 @@ describe('vector-core kernel', () => {
     expect(bb.maxY).toBeCloseTo(1, 6)
   })
 
+  test('fillet at HALF-SIDE — a square becomes the inscribed CIRCLE (KAI-8940: 100% radius = circle)', () => {
+    const square = unitShape('square') // side 2, centered at origin
+    const circle = filletPath(square.paths[0], 1) // r = half-side
+    expect(circle.anchors).toHaveLength(8)
+    expect(circle.anchors.every((a) => !a.corner)).toBe(true) // no corners survive
+    let minR = Infinity, maxR = -Infinity
+    for (const s of segments(circle)) {
+      for (let i = 0; i <= 100; i++) {
+        const pt = s.c1 && s.c2 ? cubicPoint(s.a, s.c1, s.c2, s.b, i / 100) : { x: s.a.x + (s.b.x - s.a.x) * (i / 100), y: s.a.y + (s.b.y - s.a.y) * (i / 100) }
+        const r = Math.hypot(pt.x, pt.y)
+        if (r < minR) minR = r
+        if (r > maxR) maxR = r
+      }
+    }
+    expect(maxR - minR).toBeLessThan(0.0006) // kappa-exact circle: radial spread < 0.03% of r
+    expect((minR + maxR) / 2).toBeCloseTo(1, 3)
+  })
+
   test('transform — affine maps anchors AND handles exactly; getShape centers in the image box', () => {
     const shape = getShape('circle', 1200, 900)
     const bb = shapeBBox(shape, 0.01)
