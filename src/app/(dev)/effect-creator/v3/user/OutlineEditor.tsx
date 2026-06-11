@@ -21,6 +21,7 @@ import {
   type Vec2Px,
 } from '@/lib/outline-core'
 import { vectoriseTrace } from '@/lib/effect/geometry-truth'
+import { standardBirthShape } from '@/lib/effect/prepare-effect'
 import { useOutlineStore, NEUTRAL_FX, INITIAL_ARTWORK, type ImageFx } from './outlineStore'
 import type { DesignState } from '../types'
 import { UndoIcon, RedoIcon, ResetIcon, CheckIcon, CloseIcon, AddPointIcon, DeleteIcon, ShapeIcon, TuneIcon, ImageToolIcon, OutlineIcon, PreviewIcon, PreviewOffIcon } from './icons'
@@ -765,16 +766,18 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       clearTail()
       return
     }
-    // standard → the full-image square as a TRUE vector, 8mm-absolute default rounding
+    // standard → THE one birth construction (prepare-effect.standardBirthShape — the same function
+    // product birth uses, so Reset and birth can never diverge again; KAI-8975/P2). The pristine
+    // base for Radius re-fillets stays the sharp full-image rect.
     if (spec && spec.generator.adapter === 'standard') {
       const W = spec.maskWidthPx, H = spec.maskHeightPx
       const base: VShape = { paths: [{ anchors: [
         { p: { x: 0, y: 0 }, corner: true }, { p: { x: W, y: 0 }, corner: true },
         { p: { x: W, y: H }, corner: true }, { p: { x: 0, y: H }, corner: true },
       ] }] }
-      const r = Math.min(Math.round(8 / (spec.mmPerPx || 1)), Math.floor(Math.min(W, H) / 2)) // 8mm absolute default (KAI-8940)
-      applyVec(filletShape(base, r), base)
-      setRadius(r)
+      const birth = standardBirthShape(W, H)
+      applyVec(birth.vectorShape, base)
+      setRadius(birth.radiusPx)
       clearTail()
       return
     }

@@ -77,6 +77,23 @@ export interface PreparedEffect {
   heightMM: number
 }
 
+/**
+ * STANDARD BIRTH (pure, directly testable — KAI-8975/P2): the ONEMO square is the WHOLE photo —
+ * a full-image rectangle with the 8mm corner fillet, true vector from birth. This is THE one
+ * construction: prepareEffect's standard branch AND the editor's Reset both call it (the
+ * shape-library 'square' is the editor's centered 72% seed, NOT product birth — substituting it
+ * shipped a zoomed photo, Dan's 2026-06-11 catch).
+ */
+export function standardBirthShape(widthPx: number, heightPx: number, cfg: ShapeBuildConfig = EFFECT_BUILD_CONFIG): { vectorShape: VShape; mmPerPx: number; radiusPx: number } {
+  const mmPerPx = cfg.longestSideMM / Math.max(widthPx, heightPx, 1)
+  const base: VShape = { paths: [{ anchors: [
+    { p: { x: 0, y: 0 }, corner: true }, { p: { x: widthPx, y: 0 }, corner: true },
+    { p: { x: widthPx, y: heightPx }, corner: true }, { p: { x: 0, y: heightPx }, corner: true },
+  ] }] }
+  const radiusPx = Math.min(Math.round(cfg.squareCornerMM / mmPerPx), Math.floor(Math.min(widthPx, heightPx) / 2))
+  return { vectorShape: filletShape(base, radiusPx), mmPerPx, radiusPx }
+}
+
 function bbox(pts: ReadonlyArray<Pt | Vec2Px>) {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   for (const [x, y] of pts) {
@@ -131,7 +148,6 @@ export async function prepareEffect(
   let subjCanvas: HTMLCanvasElement
   let defaultBlurPx: number
   let adapterId: string
-  let radiusHiPx: number
 
   if (type === 'shaped') {
     // BEN subject segmentation (fallback: flood-fill). seg.mask is already post-processed.
@@ -165,7 +181,6 @@ export async function prepareEffect(
     // (Fallback flood-fill has no alpha matte — its texImage IS the source pixels, used as-is.)
     subjCanvas = mlMatte ? subjectFromOriginal(origCanvas, imageDataToCanvas(texImage)) : imageDataToCanvas(texImage)
     defaultBlurPx = Math.max(6, Math.round(fw / 50))
-    radiusHiPx = Math.round(Math.min(W, H) * 0.25)
   } else {
     // square: the full-image rectangle; outline-core rounds the 8mm corners (one engine, no pre-rounding)
     W = fw; H = fh
@@ -174,7 +189,6 @@ export async function prepareEffect(
     subjCanvas = origCanvas // no matte → blend is a no-op (subj = full photo, blur 0)
     defaultBlurPx = 0
     adapterId = 'standard'
-    radiusHiPx = cfg.squareCornerMM / mmPerPx
   }
 
   // ── ONE PIPELINE (geometry-truth): the design's geometry is born as a VShape; the
@@ -185,16 +199,8 @@ export async function prepareEffect(
     vectorShape = vectoriseTrace(ringPx.map(([x, y]) => [x, y] as Pt), H, fairing ?? fairingFromDetail(BEN_DEFAULT_DETAIL))
     if (!vectorShape) throw new Error('Contour fit failed — try an image with a clearer subject.')
   } else {
-    // standard: the FULL-IMAGE rounded rectangle — the ONEMO square is the whole photo with 8mm
-    // corners (the shape-library 'square' preset is the editor's CENTERED 72% seed, NOT this:
-    // using it here shipped a zoomed-looking photo — texture maps by image position, so a smaller
-    // born shape crops the print. Dan caught it on first real-photo QA, 2026-06-11.)
-    const base: VShape = { paths: [{ anchors: [
-      { p: { x: 0, y: 0 }, corner: true }, { p: { x: W, y: 0 }, corner: true },
-      { p: { x: W, y: H }, corner: true }, { p: { x: 0, y: H }, corner: true },
-    ] }] }
-    const r = Math.min(radiusHiPx, Math.floor(Math.min(W, H) / 2))
-    vectorShape = filletShape(base, r)
+    // standard: THE one birth construction (standardBirthShape above — directly regression-tested)
+    vectorShape = standardBirthShape(W, H, cfg).vectorShape
   }
   const geometryMM = contourFromShape(vectorShape, { mmPerPx, maskHeightPx: H })
   if (!geometryMM) throw new Error('Geometry derivation failed — degenerate outline.')
