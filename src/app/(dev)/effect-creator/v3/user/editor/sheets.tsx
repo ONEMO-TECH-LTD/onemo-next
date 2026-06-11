@@ -276,9 +276,9 @@ export function ShapeSheet({ shapeKind, pickShape, shapeParams, nudgeParam, prev
             <>
               <div className={styles.shapeRow}>
                 <span className={styles.shapeName}>Lobes</span>
-                <button type="button" className={styles.stepBtn} onClick={() => nudgeParam('lobes', -1, 3, 8)} aria-label="Fewer lobes"><MinusIcon /></button>
+                <button type="button" className={styles.stepBtn} onClick={() => nudgeParam('lobes', -1, 1, 8)} aria-label="Fewer lobes"><MinusIcon /></button>
                 <span className={styles.shapeVal}>{shapeParams.lobes}</span>
-                <button type="button" className={styles.stepBtn} onClick={() => nudgeParam('lobes', 1, 3, 8)} aria-label="More lobes"><PlusIcon /></button>
+                <button type="button" className={styles.stepBtn} onClick={() => nudgeParam('lobes', 1, 1, 8)} aria-label="More lobes"><PlusIcon /></button>
               </div>
               <div className={styles.shapeRow}>
                 <TickBar label="Pinch" min={0} max={100} value={shapeParams.pinch} onChange={(v) => previewParam('pinch', v)} onCommit={() => commitShape()} format={(v) => `${Math.round(v)}%`} />

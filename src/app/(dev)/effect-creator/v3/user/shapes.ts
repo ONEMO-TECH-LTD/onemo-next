@@ -23,7 +23,7 @@ export interface ShapeParams {
   sides?: number      // polygon: 3..12 (vector construction — shape-library)
   points?: number     // star: 3..12 (vector construction — shape-library)
   spikiness?: number  // star: 0..100 (vector construction — shape-library)
-  lobes?: number      // form: 3..8 (superformula symmetry)
+  lobes?: number      // form: 1..8 (1 = circle · 2 = merged-circles peanut · 3+ = clover)
   pinch?: number      // form: 0..100 (round → deeply pinched)
   petals?: number     // daisy: 5..12
   depth?: number      // daisy: 0..100 petal depth %
@@ -55,16 +55,30 @@ function normalize(pts: Vec2Px[]): Vec2Px[] {
 
 /**
  * The "form" generator's engine — the lobed-clover family (LOEWE language): FAT rounded lobes
- * with pinched valleys, r(φ) = (1−d) + d·|cos(m·φ/2)|^p. `m` = lobe count; `d` (from pinch)
- * = how deep the valleys cut; p<1 keeps the lobes fat instead of pointy.
+ * with pinched valleys, r(φ) = (1−d) + d·(cos²(m·φ/2) + ε)^0.4. `m` = lobe count; `d` (from
+ * pinch) = how deep the valleys cut. The ε-smoothing is the KAI-8947 fix: the original
+ * |cos|^0.8 has a true CUSP at every valley (exponent < 1 ⇒ infinite slope at the zero), which
+ * the Bézier fit could only render as a kink — valleys are now C¹, true curves at any zoom.
+ * m = 1 degenerates to the perfect circle; m = 2 is the merged-circles peanut (the "8" outline).
  */
-function formRing(lobes: number, pinch01: number, num = 192): Vec2Px[] {
-  const m = Math.max(3, Math.min(8, lobes))
+function formRing(lobes: number, pinch01: number, num = 256): Vec2Px[] {
+  const m = Math.max(1, Math.min(8, Math.round(lobes)))
+  if (m === 1) {
+    // one part = a circle (the family's base — no valley exists to pinch)
+    const out: Vec2Px[] = []
+    for (let i = 0; i < num; i++) {
+      const t = (2 * Math.PI * i) / num
+      out.push([Math.cos(t), Math.sin(t)])
+    }
+    return normalize(out)
+  }
   const d = 0.08 + 0.4 * Math.max(0, Math.min(1, pinch01))
+  const EPS = 0.006 // valley rounding scale — tight pinch, smooth tangent
   const out: Vec2Px[] = []
   for (let i = 0; i < num; i++) {
     const t = (2 * Math.PI * i) / num
-    const r = (1 - d) + d * Math.pow(Math.abs(Math.cos((m * t) / 2)), 0.8)
+    const c = Math.cos((m * t) / 2)
+    const r = (1 - d) + d * Math.pow(c * c + EPS, 0.4)
     out.push([r * Math.cos(t), r * Math.sin(t)])
   }
   return normalize(out)
