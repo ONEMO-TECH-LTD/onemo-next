@@ -412,11 +412,20 @@ function PrototypePageInner() {
         imageUrl={artworkUrl}
         onClose={() => {
           setEditingOutline(false)
-          // #23: one editor session (Done with changes) = one global step
+          // #23: one editor session (Done with changes) = one global step. The change test covers
+          // EVERYTHING a session can commit — shape, blend, image-fx, photo position (KAI-8971/F2:
+          // fx-only sessions pushed no step, so global Undo stayed greyed on a washed-out photo).
           const pre = editorPreRef.current
           if (pre) {
             const o = useOutlineStore.getState()
-            if (o.committedShape !== pre.outline.committedShape || o.bgBlur !== pre.outline.bgBlur) pushHistory(pre)
+            const fxChanged = (a: typeof o.imageFx, b: typeof o.imageFx) => {
+              const av = a ?? { brightness: 100, contrast: 100, saturate: 100, warmth: 0 }
+              const bv = b ?? { brightness: 100, contrast: 100, saturate: 100, warmth: 0 }
+              return av.brightness !== bv.brightness || av.contrast !== bv.contrast || av.saturate !== bv.saturate || av.warmth !== bv.warmth
+            }
+            const art = o.artwork, preArt = pre.designState
+            const artChanged = art.offsetX !== preArt.offsetX || art.offsetY !== preArt.offsetY || art.scale !== preArt.scale
+            if (o.committedShape !== pre.outline.committedShape || o.bgBlur !== pre.outline.bgBlur || fxChanged(o.imageFx, pre.imageFx) || artChanged) pushHistory(pre)
             editorPreRef.current = null
           }
         }}

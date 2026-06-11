@@ -21,7 +21,8 @@ import {
   type Vec2Px,
 } from '@/lib/outline-core'
 import { vectoriseTrace } from '@/lib/effect/geometry-truth'
-import { useOutlineStore, NEUTRAL_FX, type ImageFx } from './outlineStore'
+import { useOutlineStore, NEUTRAL_FX, INITIAL_ARTWORK, type ImageFx } from './outlineStore'
+import type { DesignState } from '../types'
 import { UndoIcon, RedoIcon, ResetIcon, CheckIcon, CloseIcon, AddPointIcon, DeleteIcon, ShapeIcon, TuneIcon, ImageToolIcon, OutlineIcon, PreviewIcon, PreviewOffIcon } from './icons'
 import { toast } from '../ui/Toast'
 import { perfGesture } from '../dev/PerfHUD'
@@ -153,9 +154,11 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   const moveRef = useRef<{ start: Vec2Px; bbox: { minX: number; minY: number; maxX: number; maxY: number } } | null>(null) // drag-inside-to-move
   const pointersRef = useRef<Map<number, Vec2Px>>(new Map())
   // pre-edit snapshot captured on open → "Close" (✕) discards this session's edits and reverts the 3D;
-  // "Done" (✓) keeps them. Holds the 3D contour, the persisted editor doc, and the blend at open time.
-  // pre-edit snapshot (single truth): ✕ Close restores it through commitGeometry; Done keeps.
-  const preEditRef = useRef<{ committedShape: VShape | null; bgBlur: number | null }>({ committedShape: null, bgBlur: null })
+  // "Done" (✓) keeps them. ✕ restores EVERYTHING the session can change in the store: the committed
+  // shape (through commitGeometry), the blend, the image adjustments, and the photo position —
+  // KAI-8971/F2: imageFx+artwork were missing, so a ✕ kept a 129% Bright committed. (Tune/fairing
+  // prefs intentionally survive ✕ — tool calibration, not design state; Dan's #21.)
+  const preEditRef = useRef<{ committedShape: VShape | null; bgBlur: number | null; imageFx: ImageFx | null; artwork: DesignState }>({ committedShape: null, bgBlur: null, imageFx: null, artwork: INITIAL_ARTWORK })
   const [allSelected, setAllSelected] = useState(false) // tap inside the cut → select every corner, edit them together
   const nodeInteractedRef = useRef(false) // a node tap just happened → suppress the bubbling surface-click (which would re-select all)
   const dragStartRef = useRef<Vec2Px | null>(null) // pointer-down point → distinguish a tap (select) from a drag (move)
@@ -213,7 +216,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     if (!open) return
     const st0 = useOutlineStore.getState()
     // snapshot FIRST — ✕ Close restores exactly this through the one writer
-    preEditRef.current = { committedShape: st0.committedShape, bgBlur: st0.bgBlur }
+    preEditRef.current = { committedShape: st0.committedShape, bgBlur: st0.bgBlur, imageFx: st0.imageFx, artwork: st0.artwork }
     st0.setEditorOpen(true) // §6.3: scene frozen → 3D rebuilds defer to close
     // session view/interaction state reset
     setScale(100)
@@ -969,12 +972,15 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   }, [onClose])
 
   // ✕ Close = discard this session's edits: restore the pre-open truth through THE one writer
-  // (shape + contour revert atomically), revert the blend, exit. (Done keeps; commits were live.)
+  // (shape + contour revert atomically), revert blend + image-fx + photo position, exit.
+  // (Done keeps; commits were live.) KAI-8971/F2: fx/artwork revert was missing.
   const onCancel = useCallback(() => {
     const pe = preEditRef.current
     const st = useOutlineStore.getState()
     st.commitGeometry(pe.committedShape) // null → back to the born truth (spec.vectorShape)
     if (st.bgBlur !== pe.bgBlur) st.setBgBlur(pe.bgBlur != null ? pe.bgBlur : 0.5) // revert blend (null ≈ build default)
+    st.setImageFx(pe.imageFx)
+    st.setArtwork(pe.artwork)
     setActiveAdjust(null)
     setSelVA(null)
     setAllSelected(false)
