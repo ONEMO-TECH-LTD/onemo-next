@@ -14,7 +14,7 @@
 // space). Raw traces arrive in mask-px Y-UP (the mask/engine space) — vectoriseTrace owns the
 // flip. Contours leave in MM, Y-UP, outer ring reversed to the mesh's expected winding.
 
-import { fairTracedRing, validateSelfIntersection, signedArea, contentHash, stableStringify, type FairTracedRingOpts, type Vec2Px } from '@/lib/outline-core'
+import { fairTracedRing, rdpClosed, validateSelfIntersection, signedArea, contentHash, stableStringify, type FairTracedRingOpts, type Vec2Px } from '@/lib/outline-core'
 import { flattenShape, ringToVPath, type VShape } from '@/lib/vector-core'
 import type { Contour, Pt } from './types'
 
@@ -27,13 +27,41 @@ export const DISPLAY_TOLERANCE_MM = 0.004
 const FIT_CORNER_ANGLE_DEG = 30
 const FIT_MAX_ERROR_PX = 0.35
 const MIN_RAW_TRACE_POINTS = 24
+// CORNER INTEGRITY (Dan, 2026-06-11): intentional sharp features must survive the cut as TRUE
+// corner anchors — the fairing smooths everything else to optimal, never the corners themselves.
+// Detection runs on the RAW trace structure (RDP skeleton — per-sample angles can't tell jitter
+// from corners; the simplified skeleton's vertices can), then the sharp vertices are pinned
+// through the fit. Turn threshold: features sharper than this are design intent, not noise.
+const CORNER_TURN_DEG = 55
+const CORNER_RDP_EPSILON_PX = 2.5
+const CORNER_MIN_SEPARATION_PX = 6
 // Below this the outline is collapsed/degenerate — same floor the legacy feasibility used.
 const MIN_AREA_PX2 = 1
 // int-micron quantization for the canonical hash (float-free identity, payload.ts convention)
 const MICRO_PER_PX = 1000
 
+/** Sharp-feature detection on the raw ring's RDP skeleton → corner POSITIONS (y-down px). */
+function rawCornerPositions(yDown: Vec2Px[]): Vec2Px[] {
+  const skeleton = rdpClosed(yDown, CORNER_RDP_EPSILON_PX)
+  const n = skeleton.length
+  if (n < 4) return []
+  const out: Vec2Px[] = []
+  const thr = (CORNER_TURN_DEG * Math.PI) / 180
+  for (let i = 0; i < n; i++) {
+    const a = skeleton[(i - 1 + n) % n], p = skeleton[i], b = skeleton[(i + 1) % n]
+    const v1x = p[0] - a[0], v1y = p[1] - a[1], v2x = b[0] - p[0], v2y = b[1] - p[1]
+    const l1 = Math.hypot(v1x, v1y) || 1, l2 = Math.hypot(v2x, v2y) || 1
+    const ang = Math.acos(Math.max(-1, Math.min(1, (v1x * v2x + v1y * v2y) / (l1 * l2))))
+    if (ang > thr) out.push(p)
+  }
+  return out
+}
+
 /**
- * Fit a raw traced ring (mask px, y-up) into the vector truth: fair → ONE Schneider fit.
+ * Fit a raw traced ring (mask px, y-up) into the vector truth: fair → ONE Schneider fit, with
+ * CORNER INTEGRITY — sharp features detected on the raw structure are restored to their exact
+ * positions and pinned as TRUE corner anchors; the fairing smooths everything else (Dan: sharp
+ * corners are design intent; smoothing repeats the silhouette, it never erases corners).
  * Used at Magic GENERATION (truth at birth, §B1) and by the editor's Tune re-fit — the same
  * function, so generation and editor produce identical geometry for identical inputs.
  * Returns null when the trace is too sparse to be a shape (caller fails loud — no silent door).
@@ -41,9 +69,26 @@ const MICRO_PER_PX = 1000
 export function vectoriseTrace(rawMaskPx: ReadonlyArray<Pt>, maskHeightPx: number, fairing: FairTracedRingOpts): VShape | null {
   if (rawMaskPx.length < MIN_RAW_TRACE_POINTS) return null
   const yDown = rawMaskPx.map(([x, y]) => [x, maskHeightPx - y] as Vec2Px)
+  const corners = rawCornerPositions(yDown)
   const faired = fairTracedRing(yDown, fairing)
   if (faired.length < 3) return null
-  return { paths: [ringToVPath(faired.map(([x, y]) => ({ x, y })), FIT_CORNER_ANGLE_DEG, FIT_MAX_ERROR_PX)] }
+  // pin each raw corner: snap the nearest faired point BACK to the exact sharp vertex and mark
+  // its index as a corner for the fit (independent handles meet at the true point)
+  const ring = faired.map(([x, y]) => ({ x, y }))
+  const cornerIdx: number[] = []
+  for (const [cx, cy] of corners) {
+    let best = -1, bd = Infinity
+    for (let i = 0; i < ring.length; i++) {
+      const d = (ring[i].x - cx) ** 2 + (ring[i].y - cy) ** 2
+      if (d < bd) { bd = d; best = i }
+    }
+    if (best >= 0 && !cornerIdx.some((j) => Math.hypot(ring[j].x - cx, ring[j].y - cy) < CORNER_MIN_SEPARATION_PX)) {
+      ring[best] = { x: cx, y: cy }
+      cornerIdx.push(best)
+    }
+  }
+  cornerIdx.sort((a, b) => a - b)
+  return { paths: [ringToVPath(ring, FIT_CORNER_ANGLE_DEG, FIT_MAX_ERROR_PX, cornerIdx.length ? cornerIdx : undefined)] }
 }
 
 /**
