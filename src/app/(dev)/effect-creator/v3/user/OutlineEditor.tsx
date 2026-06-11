@@ -811,19 +811,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     setSelectedNode({ ringId: ring.id, nodeId: newId })
   }, [selectedNode, doc, commit])
 
-  const onReset = useCallback(() => {
-    const d = spec ? docFromSpec(spec) : seedDoc(VIEW_W, VIEW_H)
-    applyDoc(d) // reset restores the base shape — undoable + pushed back to the 3D
-    setRadius(d.style.globalOutlineCornerRadiusPx)
-    setSmoothing(Math.round(d.style.smoothing * 100))
-    setScale(100)
-    setDrag(null)
-    setSelectedNode(null)
-    setAllSelected(false)
-    setShapeKind(null)
-    setShapePreview(null)
-  }, [spec, applyDoc])
-
   // (Hug is PARKED out of core — D4. The engine's fields-once SDF evaluator stays ready in
   // outline-core/prepareSdfBlend for its post-core refinement; no UI tool ships here.)
 
@@ -990,6 +977,46 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     const path = ringToVPath(faired.map(([x, y]) => ({ x, y })), 30, 0.35)
     return { paths: [path] }
   }, [spec])
+
+  const onReset = useCallback(() => {
+    // Dan meta-QA BUG2 (2026-06-11): Reset restored the base shape as a FLATTENED DOC — faceted
+    // corners at zoom. Reset is a geometry entry point like open: it must land TRUE vectors.
+    const clearTail = () => {
+      setSmoothing(0); setScale(100)
+      setDrag(null); setSelectedNode(null); setAllSelected(false)
+      setShapeKind(null); setShapePreview(null)
+    }
+    // Magic cut-out → re-fit the trace at the saved Tune defaults (same as editor-open)
+    if (spec && spec.generator.adapter !== 'standard' && spec.rawTracePx && spec.rawTracePx.length >= 24) {
+      const savedF = useOutlineStore.getState().fairing
+      const v = vecFromTrace(savedF?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL))
+      if (v) {
+        applyVec(v, null)
+        setRadius(0)
+        clearTail()
+        return
+      }
+    }
+    // standard → the full-image square as a TRUE vector, exact arcs at the doc's safe default radius
+    if (spec && spec.generator.adapter === 'standard') {
+      const d = docFromSpec(spec) // carries the self-corrected max-safe rounding default
+      const W = spec.maskWidthPx, H = spec.maskHeightPx
+      const base: VShape = { paths: [{ anchors: [
+        { p: { x: 0, y: 0 }, corner: true }, { p: { x: W, y: 0 }, corner: true },
+        { p: { x: W, y: H }, corner: true }, { p: { x: 0, y: H }, corner: true },
+      ] }] }
+      const r = d.style.globalOutlineCornerRadiusPx
+      applyVec(filletShape(base, r), base)
+      setRadius(r)
+      clearTail()
+      return
+    }
+    const d = spec ? docFromSpec(spec) : seedDoc(VIEW_W, VIEW_H)
+    applyDoc(d) // reset restores the base shape — undoable + pushed back to the 3D
+    setRadius(d.style.globalOutlineCornerRadiusPx)
+    setSmoothing(Math.round(d.style.smoothing * 100))
+    clearTail()
+  }, [spec, applyDoc, applyVec, vecFromTrace])
   const previewTune = useCallback((params: FairTracedRingOpts) => {
     const t0 = performance.now()
     const d = buildTunedDoc(params)
