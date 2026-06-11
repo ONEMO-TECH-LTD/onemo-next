@@ -106,7 +106,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   const [smoothing, setSmoothing] = useState(0) // 0–100 → style.smoothing 0..1 (Catmull-Rom spline)
   const [scale, setScale] = useState(100) // 50–150 relative resize of the whole cut-out; bakes on release
 
-  // #35 Apple layout: the editor's bottom is a MODE pill (Shape · Adjust · Image · Draw); each
+  // #35 Apple layout: the editor's bottom is a MODE pill (Shape · Adjust · Image); each
   // mode shows a row of circular sub-tools sharing ONE ruler — no more dock-of-everything.
   const [activeAdjust, setActiveAdjust] = useState<'shape' | 'adjust' | 'image' | null>(null)
   const [adjustSub, setAdjustSub] = useState<'radius' | 'curve' | 'scale' | 'blend' | 'detail' | 'smooth' | 'snap' | 'line' | 'angle'>('radius')
@@ -312,8 +312,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     return v
   }, [vshape, vecLive, scale])
 
-  // Draw the RESOLVED (unflattened) rings: the manufacturing flatten's chord tolerance read as
-  // visible facets on curves at editor zoom (Dan, 2026-06-10). Flattened stays for mm export.
+  // The rendered path: true SVG curves from the display shape (crisp at any zoom).
   const pathD = useMemo(() => {
     // transient tick morphs (display rings) supersede; else TRUE curves as SVG C commands —
     // crisp at ANY zoom, zero chords. There is no document render path.

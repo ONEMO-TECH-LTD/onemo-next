@@ -47,15 +47,6 @@
   fill-opacity: 0.25;
 }
 
-/* Manual draw — in-progress open polyline (A3a). */
-.drawPath {
-  fill: none;
-  stroke: var(--semantic-bg-brand-solid);
-  vector-effect: non-scaling-stroke;
-  stroke-width: 2;
-  stroke-dasharray: 8 5;
-}
-
 /* Dim everything OUTSIDE the cut outline (even-odd scrim with a hole at the cut), so the kept area
    pops. Non-interactive so taps pass through to the handles/surface. */
 .scrim {

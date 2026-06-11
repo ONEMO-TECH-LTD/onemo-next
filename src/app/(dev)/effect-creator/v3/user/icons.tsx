@@ -4,7 +4,7 @@
 // glyphs — chosen over Lucide so the UI doesn't read as generic shadcn/SaaS. `weight="regular"`
 // (default) reads cleanly at 24px on mobile; icons inherit `currentColor` from the button.
 
-import { ArrowArcLeft, ArrowArcRight, ArrowsOutCardinal, BezierCurve, DiceFive, WaveSine, PenNib, ArrowClockwise, Check, X, ArrowsOut, Plus, Minus, Trash, PlusCircle, Sparkle, ImageSquare, PencilSimple, BoundingBox, Palette, DownloadSimple, Shapes, Polygon, Circle, Square, Pill, Star, Heart, ChatTeardrop, Seal, Shield, Eye, EyeSlash, MagicWand, Faders, Crop, Sun, CircleHalf, Drop, Thermometer, Ruler, LineSegment, Angle } from '@phosphor-icons/react'
+import { ArrowArcLeft, ArrowArcRight, ArrowsOutCardinal, BezierCurve, DiceFive, WaveSine, ArrowClockwise, Check, X, ArrowsOut, Plus, Minus, Trash, PlusCircle, Sparkle, ImageSquare, PencilSimple, BoundingBox, Palette, DownloadSimple, Shapes, Polygon, Circle, Square, Pill, Star, Heart, ChatTeardrop, Seal, Shield, Eye, EyeSlash, MagicWand, Faders, Crop, Sun, CircleHalf, Drop, Thermometer, Ruler, LineSegment, Angle } from '@phosphor-icons/react'
 
 type P = { className?: string }
 const SZ = 24
@@ -15,7 +15,6 @@ export const RedoIcon = (p: P) => <ArrowArcRight size={SZ} className={p.classNam
 export const PositionIcon = (p: P) => <ArrowsOutCardinal size={SZ} className={p.className} /> // G1: pan/zoom the photo within the shape
 export const DiceIcon = (p: P) => <DiceFive size={SZ} className={p.className} /> // blob generator reroll
 export const SmoothIcon = (p: P) => <WaveSine size={SZ} className={p.className} />
-export const PenIcon = (p: P) => <PenNib size={SZ} className={p.className} />
 export const ResetIcon = (p: P) => <ArrowClockwise size={SZ} className={p.className} />
 export const CheckIcon = (p: P) => <Check size={SZ} className={p.className} />
 export const CloseIcon = (p: P) => <X size={SZ} className={p.className} />
