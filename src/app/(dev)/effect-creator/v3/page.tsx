@@ -402,6 +402,7 @@ function PrototypePageInner() {
         })}
         onShapes={() => { editorPreRef.current = snapNow(); setEditorMode('shape'); setEditingOutline(true) }}
         onDraw={() => { editorPreRef.current = snapNow(); setEditorMode('draw'); setEditingOutline(true) }}
+        onEdit={() => { editorPreRef.current = snapNow(); setEditorMode(null); setEditingOutline(true) }}
         onSave={() => setShowSave((v) => !v)}
       />
 

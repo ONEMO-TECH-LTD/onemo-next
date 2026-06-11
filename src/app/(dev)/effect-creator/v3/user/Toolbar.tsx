@@ -8,7 +8,7 @@
 
 import { useRef } from 'react'
 import type { DesignState } from '../types'
-import { UploadIcon, MagicIcon, ColorsIcon, SaveIcon, ShapeIcon, PenIcon } from './icons'
+import { UploadIcon, MagicIcon, ColorsIcon, SaveIcon, ShapeIcon, PenIcon, EditIcon } from './icons'
 import styles from './toolbar.module.css'
 
 const INITIAL_DESIGN: DesignState = { offsetX: 0, offsetY: 0, scale: 1.0 }
@@ -21,10 +21,12 @@ interface ToolbarProps {
   onGenerate: () => void
   onToggleColors: () => void
   /** Structure A (#27): creation modes at toolbar level — each opens the SAME editor in that mode.
-   *  Edit + Position are FOLDED AWAY (Dan): tap the object to edit; Position lives in the editor's
-   *  Image tool. The hero carries only Image · Magic · Shapes · Draw · Trim · Save. */
+   *  Position stays folded into the editor's Image tool. Edit is BACK as a visible tool
+   *  (Dan reversal, KAI-8938: "the edit button must come back" — tap-the-object still works too;
+   *  both re-open the editor on the EXISTING committed shape, zero data loss). */
   onShapes: () => void
   onDraw: () => void
+  onEdit: () => void
   onSave: () => void
 }
 
@@ -57,6 +59,7 @@ export default function Toolbar({
   onToggleColors,
   onShapes,
   onDraw,
+  onEdit,
   onSave,
 }: ToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -73,6 +76,8 @@ export default function Toolbar({
         {/* #27 structure A: creation modes side by side — each drops into the SAME editor */}
         <Tool icon={<ShapeIcon />} label="Shapes" onClick={onShapes} disabled={!artworkUrl} />
         <Tool icon={<PenIcon />} label="Draw" onClick={onDraw} disabled={!artworkUrl} />
+        {/* KAI-8938: the always-available way back into the committed outline (tap-the-object remains) */}
+        <Tool icon={<EditIcon />} label="Edit" onClick={onEdit} disabled={!artworkUrl} />
         <Tool icon={<ColorsIcon />} label="Trim" onClick={onToggleColors} active={showColors} disabled={!artworkUrl} />
         <Tool icon={<SaveIcon />} label="Save" onClick={onSave} disabled={!artworkUrl} />
       </div>
