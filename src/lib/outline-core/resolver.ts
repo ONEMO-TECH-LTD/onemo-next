@@ -539,7 +539,10 @@ export function fairTracedRing(densePts: Vec2Px[], opts: FairTracedRingOpts = {}
           ring[idx] = [p[0] + (f.mx + t * f.ux - p[0]) * w, p[1] + (f.my + t * f.uy - p[1]) * w]
           snapped[idx] = true
         }
-        i = b + 1
+        // FORWARD PROGRESS, always: backward growth + end trims can leave b BEHIND i, and
+        // `i = b + 1` then walked the cursor backwards into an infinite re-seed cycle —
+        // the hard page freeze Dan hit on the Detail dial (2026-06-11, reproduced headlessly).
+        i = Math.max(i + 1, b + 1)
       }
     }
   }
