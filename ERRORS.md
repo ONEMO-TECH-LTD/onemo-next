@@ -27,3 +27,10 @@
 - Symptoms: `3211` was a built `next-server` serving stale chunks; `3212` was already occupied; `next dev` on `3213` defaulted to Turbopack and rejected the repo webpack config.
 - What worked: identify the serving process with `lsof`/`ps`, then use a separate dev port with `--webpack` and local Supabase placeholder envs before browser verification.
 - Remember: rendered source-change checks for `/prototype?scene=golden` must not trust an existing `next-server`; either rebuild/restart it or use a fresh `next dev --webpack` port.
+
+## KAI-8963 F1 — committing editor state at the close boundary
+
+- What did not work: fixing the Done-zombie by committing only the vector (`applyVec`) in `onDone` and trusting the existing commit effect to derive `editedContourMM`.
+- Symptoms: tsc/tests/eslint all green, but the live drive still showed the fallback geometry after Done — the contour-producing `useEffect` is gated on `open`, which has already flipped false in the same close batch, so the effect early-returns and the store geometry stays null.
+- What worked: extracting the vshape→contour flatten into one `contourFromVShape` helper and calling it synchronously inside `onDone` alongside `applyVec`; re-driving live confirmed the committed square lands.
+- Remember: anything that must reach the store AT a close/unmount boundary cannot ride a `useEffect` gated on the open flag — write it synchronously in the boundary handler. And a fix to a state-propagation bug is unproven until the exact failing user drive is repeated live; every static gate passed on the broken version.
