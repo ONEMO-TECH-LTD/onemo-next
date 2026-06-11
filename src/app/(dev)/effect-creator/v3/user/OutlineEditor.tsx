@@ -4,26 +4,23 @@
 // engine-level default rounding stays internal). Continuous controls are TickBars (G12) riding the
 // §6.3 tick/commit contract. The canvas sits in a safe-area layout between the bars with zoom + pan
 // (G11) so every anchor is reachable and the whole image is visible.
-// Renders an OutlineDocument over the flat cut-out image: the resolved outline path + draggable
-// anchor handles. outline-core is the single source of truth — every edit is a canonical command
-// (MoveNode / AddNode / DeleteNode / SetGlobalCornerRadius); the rendered path is DERIVED via
-// resolveOutlineDocument. Styling = ONEMO design system tokens (CSS module). No three.js here.
+// Renders THE vector truth over the flat cut-out image: true SVG curves + on-demand anchors.
+// Every edit is a VShape operation committed through the single writer (commitGeometry) — there
+// is no document model in this editor (REBUILD-PLAN-v2 §B2). Transient tick morphs render as
+// display-only rings. Styling = ONEMO design system tokens (CSS module). No three.js here.
 
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  applyOutlineCommands,
-  resolveOutlineDocument,
-  nodesFromTracedRing,
+  validateSelfIntersection,
   fairTracedRing,
   fairingFromDetail,
   BEN_DEFAULT_DETAIL,
   type FairTracedRingOpts,
-  type OutlineDocument,
-  type OutlineCommand,
   type Vec2Px,
 } from '@/lib/outline-core'
+import { vectoriseTrace } from '@/lib/effect/geometry-truth'
 import { useOutlineStore, NEUTRAL_FX, type ImageFx } from './outlineStore'
 import { UndoIcon, RedoIcon, ResetIcon, CheckIcon, CloseIcon, AddPointIcon, DeleteIcon, ShapeIcon, TuneIcon, ImageToolIcon, OutlineIcon, PreviewIcon, PreviewOffIcon } from './icons'
 import { toast } from '../ui/Toast'
@@ -31,7 +28,7 @@ import { perfGesture } from '../dev/PerfHUD'
 import { generateShapeRing, resampleClosed, type ShapeKind, type ShapeParams } from './shapes'
 // VECTOR CORE (reset Run 1): vector-native kinds render/commit/transform on a true Bézier VShape;
 // the doc stays as the interaction SHADOW (a derived flatten artifact — bbox/hit/grips math only).
-import { shapeToSVGPathD, transformShape, filletShape, filletShapeSmart, filletPathSmart, ringToVPath, nearestOnPath, insertAnchorAt, insertAnchorCentered, deleteAnchorRefit, shapeBBox, type VShape, type VAnchor, type Vec2 } from '@/lib/vector-core'
+import { shapeToSVGPathD, transformShape, flattenShape, filletShape, filletShapeSmart, filletPathSmart, ringToVPath, nearestOnPath, insertAnchorAt, insertAnchorCentered, deleteAnchorRefit, shapeBBox, type VShape, type VAnchor, type Vec2 } from '@/lib/vector-core'
 import { hasVectorDef, getShape } from '@/lib/shape-library'
 // Run 8 — SVG shape upload: a downloaded/Figma-exported outline becomes a first-class vector
 // shape through the export module's dialect gate (loud rejection outside the v1 boundary).
@@ -48,7 +45,7 @@ import { DEFAULT_SHAPE_PARAMS } from './editor/chips'
 import { useEditorHistory } from './editor/useEditorHistory'
 import { useCanvasView } from './editor/useCanvasView'
 import { AdjustSheet, ImageSheet, ShapeSheet } from './editor/sheets'
-import { seedDoc, docFromRings, outerCenter, scaleDoc, rotateDoc, translateDoc, stretchDoc, outerBbox, pointInPolygon, projectToSeg, type GripId } from './editor/geometry'
+import { pointInPolygon, type GripId } from './editor/geometry'
 import styles from './outline-editor.module.css'
 
 interface OutlineEditorProps {
@@ -61,6 +58,11 @@ interface OutlineEditorProps {
 
 const VIEW_W = 1000
 const VIEW_H = 1000
+
+/** display-only ring → SVG polyline `d` (transient previews render rings, never documents). */
+function ringPathD(ring: ReadonlyArray<readonly [number, number]>): string {
+  return ring.length ? `M ${ring.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ')} Z` : ''
+}
 
 // Rotate glyph (Phosphor ArrowClockwise, 256-box) drawn inside the rotate handle — white on the brand grip.
 const ROTATE_GLYPH_D = 'M244,56v48a12,12,0,0,1-12,12H184a12,12,0,1,1,0-24H201.1l-19-17.38c-.13-.12-.26-.24-.38-.37A76,76,0,1,0,127,204h1a75.53,75.53,0,0,0,52.15-20.72,12,12,0,0,1,16.49,17.45A99.45,99.45,0,0,1,128,228h-1.37A100,100,0,1,1,198.51,57.06L220,76.72V56a12,12,0,0,1,24,0Z'
@@ -97,13 +99,13 @@ function TopTool({ icon, label, onClick, disabled }: {
 }
 
 export default function OutlineEditor({ open, imageUrl, onClose, openMode }: OutlineEditorProps) {
-  const { doc, setDoc, docRef, vshape, vshapeRef, vBaseRef, histRef, applyDocRaw, applyVec, undoRaw, redoRaw } = useEditorHistory(() => seedDoc(VIEW_W, VIEW_H))
-  const [drag, setDrag] = useState<{ ringId: string; nodeId: string; pos: Vec2Px } | null>(null)
+  const { vshape, vshapeRef, vBaseRef, histRef, applyVec, undoRaw, redoRaw } = useEditorHistory()
+
   const [radius, setRadius] = useState(0)        // Round: global (or selected-corner) radius px
 
   const [smoothing, setSmoothing] = useState(0) // 0–100 → style.smoothing 0..1 (Catmull-Rom spline)
   const [scale, setScale] = useState(100) // 50–150 relative resize of the whole cut-out; bakes on release
-  const [selectedNode, setSelectedNode] = useState<{ ringId: string; nodeId: string } | null>(null) // anchor add/delete target
+
   // #35 Apple layout: the editor's bottom is a MODE pill (Shape · Adjust · Image · Draw); each
   // mode shows a row of circular sub-tools sharing ONE ruler — no more dock-of-everything.
   const [activeAdjust, setActiveAdjust] = useState<'shape' | 'adjust' | 'image' | null>(null)
@@ -118,7 +120,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   const [shapeParams, setShapeParams] = useState({ ...DEFAULT_SHAPE_PARAMS })
   const shapeParamsRef = useRef(shapeParams)
   useEffect(() => { shapeParamsRef.current = shapeParams }, [shapeParams])
-  const [shapePreview, setShapePreview] = useState<OutlineDocument | null>(null) // live morph while dragging a shape control
+  const [shapePreview, setShapePreview] = useState<string | null>(null) // live morph while dragging a shape control — a display-only SVG `d` ring (never geometry)
   // BEN runtime tuning (Dan, 2026-06-10): re-fair the RAW trace with live params so the optimal
   // settings are found by testing in the run, not guessed. detail = the master 0–100 dial;
   // fairParams = the advanced per-knob values (master commit re-derives them via fairingFromDetail).
@@ -126,7 +128,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   const detailRef = useRef(detail)
   useEffect(() => { detailRef.current = detail }, [detail])
   const [fairParams, setFairParams] = useState<FairTracedRingOpts>(() => fairingFromDetail(BEN_DEFAULT_DETAIL))
-  const [tunePreview, setTunePreview] = useState<OutlineDocument | null>(null) // live re-fair while dragging a tune bar
+  const [tunePreview, setTunePreview] = useState<string | null>(null) // live re-fair while dragging a tune bar — display-only `d`
   // #28 Image tool (Apple-pattern: circular sub-icons + ONE shared ruler). Position pans/zooms the
   // PHOTO under the fixed cutline (the scene's G1, now inside the editor); adjustments preview live
   // via CSS filter here and bake into the print composite on commit (one composeFront).
@@ -173,8 +175,10 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   const pinchRef = useRef<{ d0: number; scale0: number; c0: Vec2Px } | null>(null) // two-finger pinch zoom (client-space)
   const canvasPanRef = useRef<{ startClient: Vec2Px; vx0: number; vy0: number } | null>(null) // drag-outside pan (zoomed)
   const clientPtsRef = useRef<Map<number, Vec2Px>>(new Map()) // pointerId → CLIENT coords (pinch math)
-  const idRef = useRef(0)
   const spec = useOutlineStore((s) => s.spec)
+  // image dims (the canvas space) — from the spec, with the inert pre-image placeholder size
+  const imgW = spec?.maskWidthPx ?? VIEW_W
+  const imgH = spec?.maskHeightPx ?? VIEW_H
   const setBgBlur = useOutlineStore((s) => s.setBgBlur)
   const subjMatteUrl = useOutlineStore((s) => s.subjMatteUrl)
   const art = useOutlineStore((s) => s.artwork)
@@ -190,25 +194,16 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   useEffect(() => { vecLiveRef.current = vecLive }, [vecLive])
   const vecDragRef = useRef<{ kind: 'p' | 'hIn' | 'hOut'; ai: number; orig: VShape; moved: boolean } | null>(null)
 
-  const syncSlidersTo = useCallback((d: OutlineDocument) => {
-    setRadius(d.style.globalOutlineCornerRadiusPx)
-    setSmoothing(Math.round(d.style.smoothing * 100))
+  const syncSlidersTo = useCallback(() => {
+    setRadius(0)
+    setSmoothing(0)
     setScale(100)
-    setSelectedNode(null)
     setAllSelected(false)
-    setDrag(null)
     setSelVA(null)
     setVecLive(null)
   }, [])
-  // Run 2 · seam 3: the history ENGINE lives in editor/useEditorHistory; these wrappers keep
-  // the component-side effects (selection clears, slider sync) visible at the call layer.
-  const applyDoc = useCallback((next: OutlineDocument) => {
-    applyDocRaw(next)
-    setSelVA(null) // a doc-level edit exits vector mode → the vector selection clears with it
-    setVecLive(null)
-  }, [applyDocRaw])
-  const undo = useCallback(() => { const d = undoRaw(); if (d) syncSlidersTo(d) }, [undoRaw, syncSlidersTo])
-  const redo = useCallback(() => { const d = redoRaw(); if (d) syncSlidersTo(d) }, [redoRaw, syncSlidersTo])
+  const undo = useCallback(() => { if (undoRaw()) syncSlidersTo() }, [undoRaw, syncSlidersTo])
+  const redo = useCallback(() => { if (redoRaw()) syncSlidersTo() }, [redoRaw, syncSlidersTo])
 
   // Open the editor FROM the single truth (REBUILD-PLAN-v2 §B3): session = committedShape if one
   // exists, else the design's born vector (Magic re-fit at saved Tune prefs / the centered square
@@ -224,8 +219,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     setScale(100)
     setSmoothing(0)
     setView({ scale: 1, vx: 0, vy: 0 }) // G11: fresh session starts at fit
-    setDrag(null)
-    setSelectedNode(null)
     setAllSelected(false)
     setShapeKind(null)
     setShapePreview(null)
@@ -273,9 +266,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
         setShowAnchors(false) // rigid shape default — Points toggle re-enables
       }
       applyVec(v0, base) // COMMITS the seed (visible = committed); §6.3 defers the 3D to close
-    } else {
-      setDoc(seedDoc(VIEW_W, VIEW_H)) // no image yet — inert placeholder (page gates the editor)
     }
+    // (no spec → nothing to seed; the page gates editor entry on an uploaded image)
     setImageSub('position')
     setAdjustSub('radius')
     setFxDraft(st0.imageFx ?? NEUTRAL_FX)
@@ -287,55 +279,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
-  const commit = useCallback(
-    (cmd: OutlineCommand) => {
-      const d = docRef.current
-      try {
-        applyDoc(applyOutlineCommands(d.baseSnapshot, [...d.commands, cmd], { image: d.image, mode: d.mode }))
-      } catch (e) {
-        // Replay desync (command/node ids vs baseSnapshot — the V1 silent-edit-loss bug):
-        // self-heal by REBASING — the current rings/style become a fresh baseSnapshot and the new command
-        // applies on top, so the user's edit is never silently discarded. G4: failures SPEAK.
-        console.warn('[outline-editor] replay desync — rebasing onto current doc:', e)
-        try {
-          applyDoc(applyOutlineCommands({ rings: d.rings, style: d.style, generator: d.generator }, [cmd], { image: d.image, mode: d.mode }))
-        } catch (e2) {
-          console.error('[outline-editor] commit failed even after rebase — edit dropped:', e2)
-          toast('error', 'That edit could not be applied — nothing was changed')
-        }
-      }
-    },
-    [applyDoc, docRef],
-  )
-
-  // Display doc reflects the in-flight drag + live transient controls (instant, §6.3 preview-only).
-  // Round is BACK as its own control (use proved it ≠ Smooth): exact arc radius, per-corner when a
-  // node is selected; Smooth = organic spline softening.
-  const displayDoc = useMemo(() => {
-    let d: OutlineDocument = doc
-    if (selectedNode) {
-      d = { ...doc, rings: doc.rings.map((r) => (r.id !== selectedNode.ringId ? r : { ...r, nodes: r.nodes.map((n) => (n.id === selectedNode.nodeId ? { ...n, corner: { ...n.corner, mode: 'manual' as const, outlineCornerRadiusPx: radius } } : n)) })) }
-    } else if (radius !== doc.style.globalOutlineCornerRadiusPx) {
-      d = { ...doc, style: { ...doc.style, globalOutlineCornerRadiusPx: radius } }
-    }
-    // live Smooth control (transient)
-    const sm = smoothing / 100
-    if (sm !== d.style.smoothing) d = { ...d, style: { ...d.style, smoothing: sm } }
-    // live scale preview — resize all node positions about the center (bakes on release)
-    if (scale !== 100) {
-      const [cx, cy] = outerCenter(d)
-      const f = scale / 100
-      d = { ...d, rings: d.rings.map((r) => ({ ...r, nodes: r.nodes.map((n) => ({ ...n, p: [cx + (n.p[0] - cx) * f, cy + (n.p[1] - cy) * f] as Vec2Px })) })) }
-    }
-    if (drag) {
-      d = { ...d, rings: d.rings.map((r) => (r.id !== drag.ringId ? r : { ...r, nodes: r.nodes.map((n) => (n.id === drag.nodeId ? { ...n, p: drag.pos } : n)) })) }
-    }
-    return d
-  }, [doc, drag, radius, selectedNode, smoothing, scale])
-
-  // Live morphs supersede the normal display: tune re-fair > shape-tool preview > doc.
-  const shown = tunePreview ?? shapePreview ?? displayDoc
-  const resolved = useMemo(() => resolveOutlineDocument(shown, { flattenTolerancePx: 0.15 }), [shown])
+  // RENDER CORE (single truth): the vector display shape is the ONE render source; transient
+  // tick previews (tune/generator morphs) are display-only `d` strings layered above it.
 
   // Radius range = the TRUE geometric max of the CURRENT shape (KAI-8940): half the short side of
   // its box — 100% on a square IS the inscribed circle. The old ¼-image clamp stopped the slider
@@ -345,10 +290,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       const bb = shapeBBox(vshape, 1)
       return Math.max(1, Math.round(Math.min(bb.maxX - bb.minX, bb.maxY - bb.minY) / 2))
     }
-    const bb = outerBbox(doc)
-    return Math.max(1, Math.round(Math.min(bb.maxX - bb.minX, bb.maxY - bb.minY) / 2))
-  }, [vshape, doc])
-  const hasIssues = resolved.issues.length > 0 // inline manufacturability guardrail (self-intersection etc.)
+    return Math.max(1, Math.round(Math.min(imgW, imgH) / 2))
+  }, [vshape, imgW, imgH])
 
   // (REBUILD-PLAN-v2 §B3: the old editor→3D contour-push effect lived HERE, gated on `open` —
   // the close-boundary bug class. It is gone: commitGeometry derives the contour inside every
@@ -361,22 +304,37 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     if (!vshape) return null
     let v = vecLive ?? vshape
     if (scale !== 100) {
-      const [cx, cy] = outerCenter(doc)
+      const bb = shapeBBox(v, 1)
+      const cx = (bb.minX + bb.maxX) / 2, cy = (bb.minY + bb.maxY) / 2
       const f = scale / 100
       v = transformShape(v, (p: Vec2) => ({ x: cx + (p.x - cx) * f, y: cy + (p.y - cy) * f }))
     }
     return v
-  }, [vshape, vecLive, scale, doc])
+  }, [vshape, vecLive, scale])
 
   // Draw the RESOLVED (unflattened) rings: the manufacturing flatten's chord tolerance read as
   // visible facets on curves at editor zoom (Dan, 2026-06-10). Flattened stays for mm export.
   const pathD = useMemo(() => {
-    // VECTOR CORE: true curves render as true SVG C commands — crisp at ANY zoom, zero chords.
-    if (vDisplay) return shapeToSVGPathD(vDisplay, 2)
-    return resolved.resolvedRingsPx
-      .map((ring) => (ring.length ? `M ${ring.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ')} Z` : ''))
-      .join(' ')
-  }, [resolved, vDisplay])
+    // transient tick morphs (display rings) supersede; else TRUE curves as SVG C commands —
+    // crisp at ANY zoom, zero chords. There is no document render path.
+    if (tunePreview) return tunePreview
+    if (shapePreview) return shapePreview
+    return vDisplay ? shapeToSVGPathD(vDisplay, 2) : ''
+  }, [tunePreview, shapePreview, vDisplay])
+
+  // HIT RING (session adapter, ring math only): the displayed shape flattened once per commit —
+  // feeds inside-tests, bboxes, grips. Never persisted, never geometry.
+  const hitRing = useMemo<Vec2Px[]>(() => {
+    if (!vDisplay) return []
+    try { return flattenShape(vDisplay, 0.5)[0]?.map((pt) => [pt.x, pt.y] as Vec2Px) ?? [] } catch { return [] }
+  }, [vDisplay])
+  const hitBBox = useMemo(() => {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    for (const [x, y] of hitRing) { if (x < minX) minX = x; if (y < minY) minY = y; if (x > maxX) maxX = x; if (y > maxY) maxY = y }
+    return { minX, minY, maxX, maxY }
+  }, [hitRing])
+  // inline manufacturability guardrail — same ring-math verdict class as the engine gate
+  const hasIssues = useMemo(() => hitRing.length >= 4 && validateSelfIntersection(hitRing, 'outer').length > 0, [hitRing])
 
   // Run 6 — points on demand: build the transient shape for an in-flight anchor/handle drag.
   // Anchor drag translates p + both handles together; a SMOOTH anchor's handle drag mirrors the
@@ -419,7 +377,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       ;(e.target as Element).setPointerCapture?.(e.pointerId)
       nodeInteractedRef.current = true
       setAllSelected(false)
-      setSelectedNode(null)
       setSelVA(i)
       dragStartRef.current = toViewBox(e.clientX, e.clientY)
       if (vshapeRef.current) vecDragRef.current = { kind: 'p', ai: i, orig: vshapeRef.current, moved: false }
@@ -448,21 +405,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     [applyVec, vshapeRef],
   )
 
-  const onNodeDown = useCallback(
-    (ringId: string, nodeId: string) => (e: React.PointerEvent) => {
-      e.stopPropagation()
-      ;(e.target as Element).setPointerCapture?.(e.pointerId)
-      nodeInteractedRef.current = true
-      setAllSelected(false)
-      setSelectedNode({ ringId, nodeId })
-      const node = doc.rings.find((r) => r.id === ringId)?.nodes.find((n) => n.id === nodeId)
-      setRadius(node?.corner.outlineCornerRadiusPx ?? doc.style.globalOutlineCornerRadiusPx)
-      const at = toViewBox(e.clientX, e.clientY)
-      dragStartRef.current = at
-      setDrag({ ringId, nodeId, pos: at })
-    },
-    [toViewBox, doc],
-  )
 
   // Surface pointer-down: track active pointers (for the two-finger twist). A second surface
   // pointer (while not dragging a node) arms the rotate gesture.
@@ -479,7 +421,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
         return
       }
       // a second surface finger → PINCH: canvas zoom + pan (G11). Rotation stays on the handle.
-      if (pointersRef.current.size === 2 && !drag) {
+      if (pointersRef.current.size === 2) {
         moveRef.current = null; setMoveLive(null); moveLiveRef.current = null
         canvasPanRef.current = null
         const cp = [...clientPtsRef.current.values()]
@@ -489,16 +431,14 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
         return
       }
       // single finger pressed INSIDE the outline → arm a move (tap vs drag decided by the threshold)
-      const oi = docRef.current.rings.findIndex((r) => r.role === 'outer')
-      const ring = oi >= 0 ? resolved.flattenedRingsPx[oi] : null
-      if (ring && ring.length >= 3 && pointInPolygon(p, ring)) {
-        moveRef.current = { start: p, bbox: outerBbox(docRef.current) }
+      if (hitRing.length >= 3 && pointInPolygon(p, hitRing)) {
+        moveRef.current = { start: p, bbox: hitBBox }
       } else if (viewRef.current.scale > 1.01) {
         // outside the outline while zoomed in → pan the canvas (G11 fine edge work)
         canvasPanRef.current = { startClient: [e.clientX, e.clientY], vx0: viewRef.current.vx, vy0: viewRef.current.vy }
       }
     },
-    [toViewBox, drag, resolved, preview, screenToContent, docRef, viewRef],
+    [toViewBox, hitRing, hitBBox, preview, screenToContent, viewRef],
   )
 
   const onPointerMove = useCallback(
@@ -544,7 +484,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
         const { startClient, vx0, vy0 } = canvasPanRef.current
         const svg = svgRef.current
         if (svg) {
-          const W = docRef.current.image.widthPx, H = docRef.current.image.heightPx
+          const W = imgW, H = imgH
           const v = viewRef.current
           const rect = svg.getBoundingClientRect()
           const vbW = W / v.scale, vbH = H / v.scale
@@ -567,7 +507,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       if (moveRef.current) {
         const at = toViewBox(e.clientX, e.clientY)
         const { start, bbox } = moveRef.current
-        const W = doc.image.widthPx, H = doc.image.heightPx
+        const W = imgW, H = imgH
         let dx = at[0] - start[0], dy = at[1] - start[1]
         dx = Math.max(-bbox.minX, Math.min(W - bbox.maxX, dx))
         dy = Math.max(-bbox.minY, Math.min(H - bbox.maxY, dy))
@@ -578,9 +518,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
         }
         return
       }
-      if (drag) { setDrag({ ...drag, pos: toViewBox(e.clientX, e.clientY) }); return }
     },
-    [drag, toViewBox, doc.image, originPinning, vecDragShape, docRef, setView, viewRef],
+    [toViewBox, imgW, imgH, originPinning, vecDragShape, setView, viewRef],
   )
 
   const commitRotate = useCallback(() => {
@@ -591,13 +530,11 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
         const rad = (rl.deg * Math.PI) / 180, c = Math.cos(rad), s = Math.sin(rad)
         const t = (p: Vec2) => ({ x: rl.cx + (p.x - rl.cx) * c - (p.y - rl.cy) * s, y: rl.cy + (p.x - rl.cx) * s + (p.y - rl.cy) * c })
         applyVec(transformShape(vshapeRef.current, t), vBaseRef.current ? transformShape(vBaseRef.current, t) : null)
-      } else {
-        applyDoc(rotateDoc(docRef.current, rl.deg))
       }
     }
     rotateLiveRef.current = null; setRotateLive(null)
     nodeInteractedRef.current = true // suppress the click that follows so it doesn't re-select-all
-  }, [applyDoc, applyVec, docRef, vBaseRef, vshapeRef])
+  }, [applyVec, vBaseRef, vshapeRef])
 
   const onPointerUp = useCallback((e: React.PointerEvent) => {
     pointersRef.current.delete(e.pointerId)
@@ -623,31 +560,12 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
         if (vshapeRef.current) {
           const t = (p: Vec2) => ({ x: p.x + ml.dx, y: p.y + ml.dy })
           applyVec(transformShape(vshapeRef.current, t), vBaseRef.current ? transformShape(vBaseRef.current, t) : null)
-        } else {
-          applyDoc(translateDoc(docRef.current, ml.dx, ml.dy))
         }
         moveLiveRef.current = null; setMoveLive(null)
       }
       return // no move = a tap → onSurfaceClick selects all
     }
-    if (drag) {
-      const s = dragStartRef.current
-      const moved = !s || Math.hypot(drag.pos[0] - s[0], drag.pos[1] - s[1]) > 2
-      if (moved) commit({ op: 'MoveNode', ringId: drag.ringId, nodeId: drag.nodeId, to: drag.pos }) // a tap (no move) just selects
-      setDrag(null)
-      return
-    }
-  }, [drag, commit, commitRotate, applyDoc, applyVec, docRef, vBaseRef, vshapeRef])
-
-  // Delete a control point (double-click a handle); keep a ring valid (≥3 nodes).
-  const onNodeDoubleClick = useCallback(
-    (ringId: string, nodeId: string) => (e: React.MouseEvent) => {
-      e.stopPropagation()
-      const ring = doc.rings.find((r) => r.id === ringId)
-      if (ring && ring.nodes.length > 3) commit({ op: 'DeleteNode', ringId, nodeId })
-    },
-    [doc, commit],
-  )
+  }, [commitRotate, applyVec, vBaseRef, vshapeRef])
 
   // Add a control point on the nearest outer-ring segment (double-click the surface).
   const onSurfaceDoubleClick = useCallback(
@@ -662,20 +580,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
         applyVec({ paths: [insertAnchorAt(v.paths[0], hit.seg, t), ...v.paths.slice(1)] }, null)
         setSelVA(hit.seg + 1)
         setShowAnchors(true)
-        return
       }
-      const p = toViewBox(e.clientX, e.clientY)
-      const ring = doc.rings.find((r) => r.role === 'outer')
-      if (!ring) return
-      let best = { afterId: ring.nodes[0].id, d2: Infinity, at: p }
-      for (let i = 0; i < ring.nodes.length; i++) {
-        const a = ring.nodes[i].p, b = ring.nodes[(i + 1) % ring.nodes.length].p
-        const { pt, d2 } = projectToSeg(p, a, b)
-        if (d2 < best.d2) best = { afterId: ring.nodes[i].id, d2, at: pt }
-      }
-      commit({ op: 'AddNode', ringId: ring.id, afterNodeId: best.afterId, node: { id: `a${idRef.current++}`, p: best.at, role: 'corner', corner: { mode: 'inherit' } } })
     },
-    [doc, commit, toViewBox, applyVec, vshapeRef],
+    [toViewBox, applyVec, vshapeRef],
   )
 
   // Run 6 — explicit vector-anchor actions (the nodeBar): add centered ON the curve after the
@@ -694,27 +601,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     setSelVA(null)
   }, [selVA, applyVec, vshapeRef])
 
-  // Explicit anchor controls (in addition to double-tap): delete the selected point, or add a new one
-  // right after it (at the midpoint to its next neighbour), then select the new point.
-  const onDeleteSelected = useCallback(() => {
-    if (!selectedNode) return
-    const ring = doc.rings.find((r) => r.id === selectedNode.ringId)
-    if (ring && ring.nodes.length > 3) commit({ op: 'DeleteNode', ringId: selectedNode.ringId, nodeId: selectedNode.nodeId })
-    setSelectedNode(null)
-  }, [selectedNode, doc, commit])
-  const onAddAfterSelected = useCallback(() => {
-    if (!selectedNode) return
-    const ring = doc.rings.find((r) => r.id === selectedNode.ringId)
-    if (!ring) return
-    const i = ring.nodes.findIndex((n) => n.id === selectedNode.nodeId)
-    if (i < 0) return
-    const a = ring.nodes[i].p, b = ring.nodes[(i + 1) % ring.nodes.length].p
-    const mid: Vec2Px = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]
-    const newId = `a${idRef.current++}`
-    commit({ op: 'AddNode', ringId: ring.id, afterNodeId: selectedNode.nodeId, node: { id: newId, p: mid, role: 'corner', corner: { mode: 'inherit' } } })
-    setSelectedNode({ ringId: ring.id, nodeId: newId })
-  }, [selectedNode, doc, commit])
-
   // (Hug is PARKED out of core — D4. The engine's fields-once SDF evaluator stays ready in
   // outline-core/prepareSdfBlend for its post-core refinement; no UI tool ships here.)
 
@@ -725,18 +611,14 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     if (nodeInteractedRef.current) { nodeInteractedRef.current = false; return } // a node tap → keep single selection
     if ((e.target as Element)?.tagName === 'circle') return // tapped a node handle, not the surface
     const p = toViewBox(e.clientX, e.clientY)
-    const outerIdx = doc.rings.findIndex((r) => r.role === 'outer')
-    const ring = outerIdx >= 0 ? resolved.flattenedRingsPx[outerIdx] : null
-    if (ring && ring.length >= 3 && pointInPolygon(p, ring)) {
-      setSelectedNode(null)
+    if (hitRing.length >= 3 && pointInPolygon(p, hitRing)) {
       setSelVA(null)
       setAllSelected(true)
     } else {
-      setSelectedNode(null)
       setSelVA(null)
       setAllSelected(false)
     }
-  }, [doc, resolved, toViewBox, preview])
+  }, [hitRing, toViewBox, preview])
 
   const commitRadius = useCallback((v: number) => {
     setRadius(v)
@@ -759,38 +641,28 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       perfGesture('round-commit', performance.now() - t0)
       return
     }
-    if (selectedNode) commit({ op: 'SetCorner', ringId: selectedNode.ringId, nodeId: selectedNode.nodeId, corner: { mode: 'manual', outlineCornerRadiusPx: v } })
-    else commit({ op: 'SetGlobalCornerRadius', outlineCornerRadiusPx: v })
     perfGesture('round-commit', performance.now() - t0)
-  }, [selectedNode, selVA, commit, applyVec, vBaseRef, vshapeRef])
-  const commitSmoothing = useCallback((v: number) => {
-    if (vshapeRef.current) { setSmoothing(0); return } // pure curves need no styling smooth (Curve op returns later)
-    setSmoothing(v)
-    const t0 = performance.now()
-    commit({ op: 'SetSmoothing', smoothing: v / 100 })
-    perfGesture('smooth-commit', performance.now() - t0)
-  }, [commit, vshapeRef])
+  }, [selVA, applyVec, vBaseRef, vshapeRef])
+  const commitSmoothing = useCallback((_v: number) => {
+    void _v
+    setSmoothing(0) // pure curves need no styling smooth — the universal fine-tune family (D3) supersedes this in the chrome rebuild
+  }, [])
   // Scale: the slider previews live (displayDoc), then bakes the relative factor on release; the −/+
   // buttons bake a fixed ±5% step. Both resize all node positions about the center, preserving corners.
   const vecScale = useCallback((f: number) => {
     const v = vshapeRef.current!
-    const [cx, cy] = outerCenter(docRef.current)
+    const bb = shapeBBox(v, 1)
+    const cx = (bb.minX + bb.maxX) / 2, cy = (bb.minY + bb.maxY) / 2
     const t = (p: Vec2) => ({ x: cx + (p.x - cx) * f, y: cy + (p.y - cy) * f })
     applyVec(transformShape(v, t), vBaseRef.current ? transformShape(vBaseRef.current, t) : null)
-  }, [applyVec, docRef, vBaseRef, vshapeRef])
+  }, [applyVec, vBaseRef, vshapeRef])
   const commitScale = useCallback((v: number) => {
     if (v === 100) { setScale(100); return }
     const t0 = performance.now()
-    if (vshapeRef.current) vecScale(v / 100) // exact affine on anchors+handles
-    else applyDoc(scaleDoc(docRef.current, v / 100))
+    vecScale(v / 100) // exact affine on anchors+handles
     setScale(100)
     perfGesture('scale-commit', performance.now() - t0)
-  }, [applyDoc, vecScale, docRef, vshapeRef])
-  const nudgeScale = useCallback((deltaPct: number) => {
-    if (vshapeRef.current) { vecScale((100 + deltaPct) / 100); setScale(100); return }
-    applyDoc(scaleDoc(docRef.current, (100 + deltaPct) / 100))
-    setScale(100)
-  }, [applyDoc, vecScale, docRef, vshapeRef])
+  }, [vecScale])
   // "Magic blend" — the soft real-background blur composited behind the subject on the 3D front
   // texture (the "magic blend" Dan loves). Edit-mode only control; on/off + intensity. Writes the
   // store's bgBlur (0 = off/sharp · 0..1 = intensity ·  ShapedModel re-composes the front, no re-segment).
@@ -802,18 +674,18 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     e.stopPropagation()
     ;(e.target as Element).setPointerCapture?.(e.pointerId)
     nodeInteractedRef.current = true
-    const b = outerBbox(docRef.current)
+    const b = hitBBox
     if (!(b.maxX > b.minX) || !(b.maxY > b.minY)) return
     const ax = which.includes('w') ? b.maxX : which.includes('e') ? b.minX : (b.minX + b.maxX) / 2
     const ay = which.includes('n') ? b.maxY : which.includes('s') ? b.minY : (b.minY + b.maxY) / 2
     stretchRef.current = { which, ax, ay, bbox: b, sx: 1, sy: 1 }
-  }, [docRef])
+  }, [hitBBox])
   const moveStretch = useCallback((e: React.PointerEvent) => {
     const st = stretchRef.current
     if (!st) return
     const [px, py] = toViewBox(e.clientX, e.clientY)
     const b = st.bbox
-    const W = docRef.current.image.widthPx, H = docRef.current.image.heightPx
+    const W = imgW, H = imgH
     const MIN = Math.min(W, H) * 0.06 // smallest the shape may shrink to
     let sx = 1, sy = 1
     if (st.which.includes('e')) sx = (px - st.ax) / (b.maxX - st.ax)
@@ -831,7 +703,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     if (st.which === 'e' || st.which === 'w') sy = 1
     stretchRef.current = { ...st, sx, sy }
     setStretchLive({ sx, sy, ax: st.ax, ay: st.ay })
-  }, [toViewBox, docRef])
+  }, [toViewBox, imgW, imgH])
   const endStretch = useCallback(() => {
     const st = stretchRef.current
     if (!st) return
@@ -843,41 +715,26 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       // exact anisotropic Bézier transform — a stretched heart is still perfect curves
       const t = (p: Vec2) => ({ x: st.ax + (p.x - st.ax) * st.sx, y: st.ay + (p.y - st.ay) * st.sy })
       applyVec(transformShape(vshapeRef.current, t), vBaseRef.current ? transformShape(vBaseRef.current, t) : null)
-    } else {
-      applyDoc(stretchDoc(docRef.current, st.sx, st.sy, st.ax, st.ay))
     }
     perfGesture('stretch-commit', performance.now() - t0)
-  }, [applyDoc, applyVec, docRef, vBaseRef, vshapeRef])
+  }, [applyVec, vBaseRef, vshapeRef])
 
   // Tune (BEN dash): re-run the fairing pipeline on the RAW pre-fairing trace with live params.
   // Per-tick = preview only; commit on release rebuilds the document (undoable) — §6.3. Re-tracing
   // replaces any manual anchor edits on the ring (it's a re-derivation of the base outline).
   const canTune = !!spec?.rawTracePx && spec.rawTracePx.length >= 24
-  const buildTunedDoc = useCallback((params: FairTracedRingOpts): OutlineDocument | null => {
+  const tunePreviewD = useCallback((params: FairTracedRingOpts): string | null => {
+    // display-only: the re-faired ring as a polyline `d` (the release fits ONCE into a vector)
     const raw = spec?.rawTracePx
     if (!raw) return null
     const H = spec.maskHeightPx
-    const rawEditorPx = raw.map(([x, y]) => [x, H - y] as Vec2Px) // y-up mask → y-down editor px
-    const eps = Math.max(2, Math.max(spec.maskWidthPx, H) * 0.022)
-    const nodes = nodesFromTracedRing(fairTracedRing(rawEditorPx, params), eps, 'o')
-    const base = {
-      rings: [{ id: 'r1', role: 'outer' as const, closed: true as const, nodes }],
-      style: { globalOutlineCornerRadiusPx: 0, smoothing: 0 },
-    }
-    return applyOutlineCommands(base, [], { image: docRef.current.image, mode: 'auto' })
-  }, [spec, docRef])
-  /** Run 4 — the vectoriser: faired BEN trace → ONE Schneider fit → true vector path.
-   *  Corners ≤ the fairing's max-turn guarantee read as tight curves (already softened);
-   *  genuinely sharp residuals (>30°) become true corner anchors. */
+    const faired = fairTracedRing(raw.map(([x, y]) => [x, H - y] as Vec2Px), params)
+    return faired.length >= 3 ? ringPathD(faired) : null
+  }, [spec])
+  /** Run 4 — the vectoriser: THE single-pipeline fit (geometry-truth.vectoriseTrace) — the editor
+   *  and generation share the literal function, so re-Tune ≡ re-generation by construction. */
   const vecFromTrace = useCallback((params: FairTracedRingOpts): VShape | null => {
-    const raw = spec?.rawTracePx
-    if (!raw || raw.length < 24) return null
-    const H = spec.maskHeightPx
-    const rawEditorPx = raw.map(([x, y]) => [x, H - y] as Vec2Px) // y-up mask → y-down editor px
-    const faired = fairTracedRing(rawEditorPx, params)
-    if (faired.length < 3) return null
-    const path = ringToVPath(faired.map(([x, y]) => ({ x, y })), 30, 0.35)
-    return { paths: [path] }
+    return spec?.rawTracePx ? vectoriseTrace(spec.rawTracePx, spec.maskHeightPx, params) : null
   }, [spec])
 
   const onReset = useCallback(() => {
@@ -885,7 +742,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     // corners at zoom. Reset is a geometry entry point like open: it must land TRUE vectors.
     const clearTail = () => {
       setSmoothing(0); setScale(100)
-      setDrag(null); setSelectedNode(null); setAllSelected(false)
+      setAllSelected(false)
       setShapeKind(null); setShapePreview(null)
     }
     // Magic cut-out → re-fit the trace at the saved Tune defaults; the BORN truth is the
@@ -915,64 +772,49 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   }, [spec, applyVec, vecFromTrace])
   const previewTune = useCallback((params: FairTracedRingOpts) => {
     const t0 = performance.now()
-    const d = buildTunedDoc(params)
+    const d = tunePreviewD(params)
     if (d) setTunePreview(d)
     perfGesture('tune-tick', performance.now() - t0)
-  }, [buildTunedDoc])
+  }, [tunePreviewD])
   const commitTune = useCallback((params: FairTracedRingOpts, detailVal?: number) => {
     const t0 = performance.now()
     setTunePreview(null)
     // Run 4: the release FITS the re-faired trace into a true vector path (ticks stay doc-transient)
     const v = vecFromTrace(params)
-    if (v) {
-      setFairParams(params)
-      applyVec(v, null)
-      setSelectedNode(null)
-      setAllSelected(false)
-      useOutlineStore.getState().setFairing({ detail: detailVal ?? detailRef.current, params })
-      perfGesture('tune-commit', performance.now() - t0)
-      return
-    }
-    const d = buildTunedDoc(params)
-    if (!d) return
+    if (!v) { console.error('[tune] re-fit failed — commit skipped (no doc fallback exists)'); return }
     setFairParams(params)
-    applyDoc(d)
-    setSelectedNode(null)
+    applyVec(v, null)
     setAllSelected(false)
     // #21: tuned settings become the durable defaults — Magic reads them from the store
     useOutlineStore.getState().setFairing({ detail: detailVal ?? detailRef.current, params })
     perfGesture('tune-commit', performance.now() - t0)
-  }, [buildTunedDoc, applyDoc, applyVec, vecFromTrace])
+  }, [applyVec, vecFromTrace])
 
-  // Shape tool: build a fresh OutlineDocument from a preset/parametric shape's point ring (centered, fit
-  // to the image), seeded into our node model so Smooth/Scale/drag all apply (radius 0 — shapes are
-  // exact; softening is the Smooth control). Discrete params (sides/points) regenerate immediately; the
-  // continuous ones (spikiness/rotate) preview while dragging and bake on release.
-  const buildShapeDoc = useCallback((kind: ShapeKind, overrides: Partial<ShapeParams> = {}): OutlineDocument => {
-    const img = docRef.current.image
-    // uniform arc-length resample → evenly spaced anchors → vector-true curves (no irregular
-    // merging); tiny minSpacing so the even spacing survives docFromRings' cleanup.
-    const ring = resampleClosed(generateShapeRing({ kind, ...shapeParamsRef.current, ...overrides }, img.widthPx, img.heightPx), Math.max(img.widthPx, img.heightPx) / 220)
-    return docFromRings(ring, img, 0, 1.5)
-  }, [docRef])
+  // TRANSIENT PREVIEW ONLY: the live morph shown while a generator tick-bar drags — a display
+  // ring `d`, never geometry (commitShape fits ONCE into the vector on release).
+  const shapePreviewD = useCallback((kind: ShapeKind, overrides: Partial<ShapeParams> = {}): string => {
+    const { widthPx, heightPx } = dimsRef.current
+    const ring = resampleClosed(generateShapeRing({ kind, ...shapeParamsRef.current, ...overrides }, widthPx, heightPx), Math.max(widthPx, heightPx) / 220)
+    return ringPathD(ring)
+  }, [])
   /** Run 3: a live generator's output FITTED ONCE into a true vector path (sub-10ms). */
   const vecFromGenerator = useCallback((kind: ShapeKind, overrides: Partial<ShapeParams> = {}): VShape => {
-    const img = docRef.current.image
-    const ring = resampleClosed(generateShapeRing({ kind, ...shapeParamsRef.current, ...overrides }, img.widthPx, img.heightPx), Math.max(img.widthPx, img.heightPx) / 600)
-    const path = ringToVPath(ring.map(([x, y]) => ({ x, y })), 60, Math.max(0.4, Math.min(img.widthPx, img.heightPx) / 1600))
+    const { widthPx, heightPx } = dimsRef.current
+    const ring = resampleClosed(generateShapeRing({ kind, ...shapeParamsRef.current, ...overrides }, widthPx, heightPx), Math.max(widthPx, heightPx) / 600)
+    const path = ringToVPath(ring.map(([x, y]) => ({ x, y })), 60, Math.max(0.4, Math.min(widthPx, heightPx) / 1600))
     return { paths: [path] }
-  }, [docRef])
+  }, [])
   const pickShape = useCallback((kind: ShapeKind) => {
     setShapeKind(kind)
     setShapePreview(null)
     // VECTOR CORE: vector-native kinds spawn as TRUE Bézier shapes from the static library —
     // zero sampling, zero fitting; the doc becomes a derived shadow for interaction math.
     if (hasVectorDef(kind)) {
-      const img = docRef.current.image
+      const { widthPx, heightPx } = dimsRef.current
       const sp = shapeParamsRef.current
-      const base = getShape(kind, img.widthPx, img.heightPx, { sides: sp.sides, points: sp.points, spikiness: sp.spikiness })
+      const base = getShape(kind, widthPx, heightPx, { sides: sp.sides, points: sp.points, spikiness: sp.spikiness })
       applyVec(base, base)
-      setRadius(0); setSmoothing(0); setScale(100); setSelectedNode(null); setAllSelected(false)
+      setRadius(0); setSmoothing(0); setScale(100); setAllSelected(false)
       setShowAnchors(false)
       return
     }
@@ -985,14 +827,14 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     // Run 3: live generators spawn as FITTED vector paths — segments never leave the generator
     if (GEN_VECTOR_KINDS.has(kind)) {
       applyVec(vecFromGenerator(kind, overrides), null)
-      setRadius(0); setSmoothing(0); setScale(100); setSelectedNode(null); setAllSelected(false)
+      setRadius(0); setSmoothing(0); setScale(100); setAllSelected(false)
       setShowAnchors(false)
       return
     }
-    applyDoc(buildShapeDoc(kind, overrides))
-    setSmoothing(0); setScale(100); setSelectedNode(null); setAllSelected(false)
-    setShowAnchors(false) // rigid shape: vertex anchors off by default (toggle to edit points)
-  }, [applyDoc, applyVec, buildShapeDoc, vecFromGenerator, docRef])
+    // every ShapeKind is vector-constructed (library def or fitted generator) — an uncovered
+    // kind is a build error, never a polyline (single geometry truth)
+    throw new Error(`pickShape: no vector construction for shape "${kind}"`)
+  }, [applyVec, vecFromGenerator])
   /** stepper: ±delta on an integer param, regenerate immediately (undoable). */
   const nudgeParam = useCallback((key: 'sides' | 'points' | 'lobes' | 'petals' | 'blades', delta: number, min: number, max: number) => {
     if (!shapeKind) return
@@ -1001,8 +843,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     shapeParamsRef.current = next; setShapeParams(next)
     // vector kinds (polygon/star) regenerate their exact construction with the new param
     if (hasVectorDef(shapeKind)) {
-      const img = docRef.current.image
-      const base = getShape(shapeKind, img.widthPx, img.heightPx, { sides: next.sides, points: next.points, spikiness: next.spikiness })
+      const { widthPx, heightPx } = dimsRef.current
+      const base = getShape(shapeKind, widthPx, heightPx, { sides: next.sides, points: next.points, spikiness: next.spikiness })
       applyVec(base, base)
       return
     }
@@ -1011,16 +853,16 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       applyVec(vecFromGenerator(shapeKind, { [key]: n }), null)
       return
     }
-    applyDoc(buildShapeDoc(shapeKind, { [key]: n }))
-  }, [shapeKind, applyDoc, applyVec, buildShapeDoc, vecFromGenerator, docRef])
+    throw new Error(`nudgeParam: no vector construction for shape "${shapeKind}"`)
+  }, [shapeKind, applyVec, vecFromGenerator])
   /** tick-bar: transient preview per tick (§6.3); commitShape applies on release. */
   const previewParam = useCallback((key: 'spikiness' | 'pinch' | 'depth' | 'swirl' | 'waviness', v: number) => {
     if (!shapeKind) return
     const next = { ...shapeParamsRef.current, [key]: v }
     shapeParamsRef.current = next; setShapeParams(next)
     if (hasVectorDef(shapeKind)) return // vector kinds regenerate exactly on release (commitShape)
-    setShapePreview(buildShapeDoc(shapeKind, { [key]: v }))
-  }, [shapeKind, buildShapeDoc])
+    setShapePreview(shapePreviewD(shapeKind, { [key]: v }))
+  }, [shapeKind, shapePreviewD])
   /** blob dice: reroll the seed, regenerate immediately (undoable). */
   const rerollBlob = useCallback(() => {
     if (shapeKind !== 'blob') return
@@ -1032,14 +874,14 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   /** Land an uploaded shape: fit into the image box, first-class vector. SVG keeps itself as the
    *  pristine base (clean authored corners); a traced image adopts no base (fitted geometry). */
   const landUploadedShape = useCallback((raw: VShape, withBase: boolean) => {
-    const img = docRef.current.image
-    const v = fitShapeToBox(raw, img.widthPx, img.heightPx)
+    const { widthPx, heightPx } = dimsRef.current
+    const v = fitShapeToBox(raw, widthPx, heightPx)
     applyVec(v, withBase ? v : null)
     setShapeKind(null)
     setShapePreview(null)
-    setRadius(0); setSmoothing(0); setScale(100); setSelectedNode(null); setAllSelected(false)
+    setRadius(0); setSmoothing(0); setScale(100); setAllSelected(false)
     setShowAnchors(false)
-  }, [applyVec, docRef])
+  }, [applyVec])
   /** Run 10 — image upload: decode → threshold mask → the Magic trace machinery → ONE Schneider
    *  fit. Editor-space ring orientation is normalized to the Magic-trace convention (negative
    *  shoelace in y-down px) so the commit's flip+reverse lands the mesh's expected winding. */
@@ -1082,9 +924,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
 
   const commitShape = useCallback(() => {
     if (shapeKind && hasVectorDef(shapeKind)) {
-      const img = docRef.current.image
+      const { widthPx, heightPx } = dimsRef.current
       const sp = shapeParamsRef.current
-      applyVec(getShape(shapeKind, img.widthPx, img.heightPx, { sides: sp.sides, points: sp.points, spikiness: sp.spikiness }), null)
+      applyVec(getShape(shapeKind, widthPx, heightPx, { sides: sp.sides, points: sp.points, spikiness: sp.spikiness }), null)
       return
     }
     if (shapeKind && GEN_VECTOR_KINDS.has(shapeKind)) {
@@ -1093,28 +935,28 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       applyVec(vecFromGenerator(shapeKind), null)
       return
     }
-    if (shapePreview) { applyDoc(shapePreview); setShapePreview(null) }
-  }, [shapeKind, shapePreview, applyDoc, applyVec, vecFromGenerator, docRef])
+    // no doc commit remains — the preview is a display ring; GEN kinds committed above
+  }, [shapeKind, applyVec, vecFromGenerator])
 
   // Rotation handlers — desktop handle + two-finger gesture both drive rotatePreview, baked on release.
   const beginRotateHandle = useCallback((e: React.PointerEvent) => {
     e.stopPropagation()
     ;(e.target as Element).setPointerCapture?.(e.pointerId)
-    const [cx, cy] = outerCenter(docRef.current)
+    const cx = (hitBBox.minX + hitBBox.maxX) / 2, cy = (hitBBox.minY + hitBBox.maxY) / 2
     const at = toViewBox(e.clientX, e.clientY)
     rotateRef.current = { cx, cy, start: Math.atan2(at[1] - cy, at[0] - cx) }
-  }, [toViewBox, docRef])
+  }, [toViewBox, hitBBox])
   const toggleShape = useCallback(() => {
     setActiveAdjust((a) => (a === 'shape' ? null : 'shape'))
     setShapeKind(null); setShapePreview(null) // open the picker fresh (chips only) — no stale active shape
   }, [])
 
-  // Saving is AUTOMATIC: every edit commits to the doc-history + persists (editedDoc) + drives the 3D
-  // live, and switching tools never resets it. So there's no explicit Save — "Done" just closes back to
-  // the scene (the approved shape is already what's shown). It also collapses any open sub-menu first.
+  // Saving is AUTOMATIC: every edit commits THE truth through the single writer and the 3D follows
+  // at the close boundary. So there's no explicit Save — "Done" just closes back to the scene (the
+  // approved shape is already what's shown). It also collapses any open sub-menu first.
   const onDone = useCallback(() => {
     setActiveAdjust(null)
-    setSelectedNode(null)
+    setSelVA(null)
     setAllSelected(false)
     useOutlineStore.getState().setEditorOpen(false) // §6.3 boundary: the deferred 3D rebuild fires now
     onClose()
@@ -1128,7 +970,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     st.commitGeometry(pe.committedShape) // null → back to the born truth (spec.vectorShape)
     if (st.bgBlur !== pe.bgBlur) st.setBgBlur(pe.bgBlur != null ? pe.bgBlur : 0.5) // revert blend (null ≈ build default)
     setActiveAdjust(null)
-    setSelectedNode(null)
+    setSelVA(null)
     setAllSelected(false)
     st.setEditorOpen(false) // §6.3 boundary
     onClose()
@@ -1138,16 +980,12 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
 
   const canUndo = histRef.current.past.length > 0
   const canRedo = histRef.current.future.length > 0
-  const nodeR = ((doc.image.widthPx / VIEW_W) * 11) / view.scale // constant on-screen size at any zoom (G11)
+  const nodeR = ((imgW / VIEW_W) * 11) / view.scale // constant on-screen size at any zoom (G11)
   // Desktop rotate handle — a grip on a short stem above the outline, shown when all anchors are selected.
-  const rotOuterIdx = doc.rings.findIndex((r) => r.role === 'outer')
-  const rotOuterRing = rotOuterIdx >= 0 ? resolved.flattenedRingsPx[rotOuterIdx] : null
   let rotHandle: { bx: number; by: number; hy: number } | null = null
-  if (allSelected && !preview && rotOuterRing && rotOuterRing.length) {
-    let minX = Infinity, minY = Infinity, maxX = -Infinity
-    for (const [x, y] of rotOuterRing) { if (x < minX) minX = x; if (y < minY) minY = y; if (x > maxX) maxX = x }
-    const bx = (minX + maxX) / 2
-    rotHandle = { bx, by: minY, hy: minY - nodeR * 4 }
+  if (allSelected && !preview && hitRing.length) {
+    const bx = (hitBBox.minX + hitBBox.maxX) / 2
+    rotHandle = { bx, by: hitBBox.minY, hy: hitBBox.minY - nodeR * 4 }
   }
   // live direct-manipulation transform on the outline group (stretch / rotate / move) — real-time, no doc rebuild
   const liveXform = stretchLive
@@ -1157,12 +995,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   // live stretch (rendered OUTSIDE the transformed group so the pill strokes never distort).
   const cropMode = shapeKind !== null && !preview && !shapePreview && !tunePreview // #32: every preset is reshapeable
   let cropBox: { minX: number; minY: number; maxX: number; maxY: number } | null = null
-  if (cropMode && rotOuterIdx >= 0 && resolved.flattenedRingsPx[rotOuterIdx]?.length) {
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-    for (const [x, y] of resolved.flattenedRingsPx[rotOuterIdx]) {
-      if (x < minX) minX = x; if (x > maxX) maxX = x
-      if (y < minY) minY = y; if (y > maxY) maxY = y
-    }
+  if (cropMode && hitRing.length) {
+    let { minX, minY, maxX, maxY } = hitBBox
     if (stretchLive) {
       const m = (v: number, a: number, s: number) => a + (v - a) * s
       minX = m(minX, stretchLive.ax, stretchLive.sx); maxX = m(maxX, stretchLive.ax, stretchLive.sx)
@@ -1172,14 +1006,14 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   }
   // #28: photo pan/zoom preview — mirrors the 3D texture mapping (x = s·X − W(s−1)/2 − ox·W)
   const artXform = art.scale !== 1 || art.offsetX !== 0 || art.offsetY !== 0
-    ? `translate(${(-doc.image.widthPx * (art.scale - 1)) / 2 - art.offsetX * doc.image.widthPx} ${(-doc.image.heightPx * (art.scale - 1)) / 2 + art.offsetY * doc.image.heightPx}) scale(${art.scale})`
+    ? `translate(${(-imgW * (art.scale - 1)) / 2 - art.offsetX * imgW} ${(-imgH * (art.scale - 1)) / 2 + art.offsetY * imgH}) scale(${art.scale})`
     : undefined
   const fxFilter = fxDraft.brightness !== 100 || fxDraft.contrast !== 100 || fxDraft.saturate !== 100 || fxDraft.warmth > 0
     ? `brightness(${fxDraft.brightness}%) contrast(${fxDraft.contrast}%) saturate(${fxDraft.saturate}%)${fxDraft.warmth > 0 ? ` sepia(${Math.round(fxDraft.warmth * 0.45)}%)` : ''}`
     : undefined
   // magic-blend live preview in the canvas: blurred photo + sharp subject overlay; blur reacts to intensity
   const showBlend = blendOn && !!subjMatteUrl && !!imageUrl
-  const blendSd = (blendBlur / 100) * (doc.image.widthPx / 25)
+  const blendSd = (blendBlur / 100) * (imgW / 25)
 
   return (
     <div className={styles.overlay}>
@@ -1209,7 +1043,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
         <svg
           ref={svgRef}
           className={styles.svg}
-          viewBox={`${view.vx} ${view.vy} ${doc.image.widthPx / view.scale} ${doc.image.heightPx / view.scale}`}
+          viewBox={`${view.vx} ${view.vy} ${imgW / view.scale} ${imgH / view.scale}`}
           preserveAspectRatio="xMidYMid meet"
           shapeRendering="geometricPrecision"
           onPointerDown={onSurfacePointerDown}
@@ -1242,11 +1076,11 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
           {imageUrl && (showBlend ? (
             // magic blend: blurred full photo + the sharp BEN subject (matte is y-up → flip to editor y-down)
             <>
-              <image href={imageUrl} x={0} y={0} width={doc.image.widthPx} height={doc.image.heightPx} preserveAspectRatio="xMidYMid slice" filter="url(#kaiBgBlur)" />
-              <image href={subjMatteUrl!} x={0} y={0} width={doc.image.widthPx} height={doc.image.heightPx} preserveAspectRatio="xMidYMid slice" transform={`translate(0 ${doc.image.heightPx}) scale(1 -1)`} />
+              <image href={imageUrl} x={0} y={0} width={imgW} height={imgH} preserveAspectRatio="xMidYMid slice" filter="url(#kaiBgBlur)" />
+              <image href={subjMatteUrl!} x={0} y={0} width={imgW} height={imgH} preserveAspectRatio="xMidYMid slice" transform={`translate(0 ${imgH}) scale(1 -1)`} />
             </>
           ) : (
-            <image href={imageUrl} x={0} y={0} width={doc.image.widthPx} height={doc.image.heightPx} preserveAspectRatio="xMidYMid slice" />
+            <image href={imageUrl} x={0} y={0} width={imgW} height={imgH} preserveAspectRatio="xMidYMid slice" />
           ))}
           </g>
           </g>
@@ -1254,29 +1088,11 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
             <>
               {/* scrim dims outside the cut; hidden during a live transform (its hole would lag the move/rotate) */}
               {imageUrl && pathD && !preview && !rotateLive && !moveLive && !stretchLive && (
-                <path className={styles.scrim} fillRule="evenodd" d={`M0 0H${doc.image.widthPx}V${doc.image.heightPx}H0Z ${pathD}`} />
+                <path className={styles.scrim} fillRule="evenodd" d={`M0 0H${imgW}V${imgH}H0Z ${pathD}`} />
               )}
               <g transform={liveXform}>
                 {!preview && <path className={`${styles.path} ${hasIssues ? styles.pathError : ''}`} d={pathD} />}
-                {/* anchors + rotate handle hidden in Preview (clean result). The doc-node swarm
-                    never renders in vector mode — the shadow doc is interaction math, not UI. */}
-                {!preview && showAnchors && !vshape && shown.rings.map((ring) =>
-                  ring.nodes.map((n) => {
-                    const active = drag?.nodeId === n.id
-                    return (
-                      <circle
-                        key={`${ring.id}:${n.id}`}
-                        className={`${styles.node} ${active ? styles.nodeActive : ''} ${allSelected || selectedNode?.nodeId === n.id ? styles.nodeSelected : ''}`}
-                        cx={n.p[0]}
-                        cy={n.p[1]}
-                        r={nodeR}
-                        onPointerDown={onNodeDown(ring.id, n.id)}
-                        onDoubleClick={onNodeDoubleClick(ring.id, n.id)}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    )
-                  }),
-                )}
+                {/* anchors hidden in Preview (clean result); point work is vector-native below */}
                 {/* Run 6 — the vector skeleton: minimal intentional anchors, summoned on demand.
                     The selected anchor reveals its Bézier handles; drags are transient until release. */}
                 {!preview && showAnchors && vDisplay && (() => {
@@ -1381,7 +1197,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
             ? <span className={styles.warn}>This shape can’t be cut cleanly — fix the crossing</span>
             : allSelected
               ? 'All corners selected — scale or twist them together'
-              : selectedNode
+              : (vshape && selVA !== null)
                 ? 'Drag this point, or add/delete from the bar below'
                 : 'Tap inside to select all · drag inside to move · drag points · double-tap to add/remove · pinch/scroll to zoom'}
       </div>
@@ -1389,7 +1205,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       {/* Run 2 · seam 5: the three tool sheets live in editor/sheets (verbatim moves). */}
       {activeAdjust === 'adjust' && (
         <AdjustSheet
-          cornerMode={!!(selectedNode || (vshape && selVA !== null && vshape.paths[0].anchors[selVA]?.corner))}
+          cornerMode={!!(vshape && selVA !== null && vshape.paths[0].anchors[selVA]?.corner)}
           adjustSub={adjustSub} setAdjustSub={setAdjustSub} canTune={canTune}
           maxRadius={maxRadius} radius={radius} setRadius={setRadius} commitRadius={commitRadius}
           smoothing={smoothing} setSmoothing={setSmoothing} commitSmoothing={commitSmoothing}
@@ -1410,12 +1226,12 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       )}
 
       {/* contextual anchor actions — appear when a single point is selected (doc or vector) */}
-      {(selectedNode || (vshape && selVA !== null)) && (
+      {vshape && selVA !== null && (
         <div className={styles.nodeBar}>
-          <button type="button" className={styles.nodeAction} onClick={vshape && selVA !== null ? onVAddAfter : onAddAfterSelected}>
+          <button type="button" className={styles.nodeAction} onClick={onVAddAfter}>
             <AddPointIcon /><span>Add point</span>
           </button>
-          <button type="button" className={styles.nodeAction} onClick={vshape && selVA !== null ? onVDelete : onDeleteSelected}>
+          <button type="button" className={styles.nodeAction} onClick={onVDelete}>
             <DeleteIcon /><span>Delete point</span>
           </button>
         </div>
