@@ -18,9 +18,13 @@ export type ImageSub = 'position' | 'brightness' | 'contrast' | 'saturate' | 'wa
 
 /* #35 ADJUST mode (Apple pattern): circular sub-tools — Radius · Curve · Scale · Blend +
    Tune's five dials when a Magic trace exists — sharing ONE ruler. */
-export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, canTune, maxRadius, radius, setRadius, commitRadius, smoothing, setSmoothing, commitSmoothing, scale, setScale, commitScale, blendOn, setBlendOn, blendBlur, setBlendBlur, writeBlend, detail, setDetail, previewTune, commitTune, fairParams }: {
+export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, canTune, radiusApplies, maxRadius, radius, setRadius, commitRadius, smoothing, setSmoothing, commitSmoothing, scale, setScale, commitScale, blendOn, setBlendOn, blendBlur, setBlendBlur, writeBlend, detail, setDetail, previewTune, commitTune, fairParams }: {
   cornerMode: boolean
   adjustSub: AdjustSub
+  /** tier-2 availability (Dan's rule: inapplicable tools GREY, never silent no-op): Radius acts on
+   *  corner anchors — an all-curves shape (typical faired Magic cut) has none until one is selected
+   *  or a corner is created. */
+  radiusApplies: boolean
   setAdjustSub: (k: AdjustSub) => void
   canTune: boolean
   maxRadius: number
@@ -73,11 +77,13 @@ export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, canTune, maxR
       </div>
       <div className={styles.shapeControls}>
         <div className={styles.shapeRow}>
-          {adjustSub === 'radius' && (
+          {adjustSub === 'radius' && (radiusApplies || cornerMode ? (
             <TickBar label={cornerMode ? 'Corner' : 'Radius'} min={0} max={maxRadius} value={Math.min(radius, maxRadius)} onChange={setRadius} onCommit={commitRadius} format={(v) => `${Math.round((v / Math.max(maxRadius, 1)) * 100)}%`} />
-          )}
+          ) : (
+            <div className={styles.toolHint}>Radius rounds corners — this shape is all curves. Select a corner point, or sharpen one first.</div>
+          ))}
           {adjustSub === 'curve' && (
-            <TickBar label="Curve" min={0} max={100} value={smoothing} onChange={setSmoothing} onCommit={commitSmoothing} format={(v) => `${Math.round(v)}%`} />
+            <div className={styles.toolHint}>The Curve tool (bend a point, shape a segment) arrives with the new editor controls.</div>
           )}
           {adjustSub === 'scale' && (
             <TickBar label="Scale" min={50} max={150} value={scale} onChange={setScale} onCommit={commitScale} format={(v) => `${Math.round(v)}%`} />

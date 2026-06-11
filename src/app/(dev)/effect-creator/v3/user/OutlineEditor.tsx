@@ -338,6 +338,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   }, [hitRing])
   // inline manufacturability guardrail — same ring-math verdict class as the engine gate
   const hasIssues = useMemo(() => hitRing.length >= 4 && validateSelfIntersection(hitRing, 'outer').length > 0, [hitRing])
+  // tier-2 availability: whole-shape Radius acts on CORNER anchors; a fully-faired Magic cut has
+  // none, so the tool greys with a hint instead of silently doing nothing (Dan's rule)
+  const radiusApplies = useMemo(() => !!vshape && (vshape.paths[0].anchors.some((a) => a.corner) || !!vBaseRef.current), [vshape, vBaseRef])
 
   // Run 6 — points on demand: build the transient shape for an in-flight anchor/handle drag.
   // Anchor drag translates p + both handles together; a SMOOTH anchor's handle drag mirrors the
@@ -1209,6 +1212,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       {activeAdjust === 'adjust' && (
         <AdjustSheet
           cornerMode={!!(vshape && selVA !== null && vshape.paths[0].anchors[selVA]?.corner)}
+          radiusApplies={radiusApplies}
           adjustSub={adjustSub} setAdjustSub={setAdjustSub} canTune={canTune}
           maxRadius={maxRadius} radius={radius} setRadius={setRadius} commitRadius={commitRadius}
           smoothing={smoothing} setSmoothing={setSmoothing} commitSmoothing={commitSmoothing}
