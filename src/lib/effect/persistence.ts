@@ -1,30 +1,33 @@
 // persistence.ts — the saved-effect model: an EditableRecipe + a LockedPayload, bound by F1 (§8.7a / §11).
 //
-// A saved effect is TWO bound artifacts:
-//   • EditableRecipe  — the REMIX substrate: the OutlineDocument (baseSnapshot + canonical commands +
-//                       generator + style) carries the procedural intent a return-visit / shared link edits.
+// REBUILD-PLAN-v2 §B4 — VECTOR-NATIVE. A saved effect is TWO bound artifacts:
+//   • EditableRecipe  — the REMIX substrate: THE vector truth (`vectorShape`) a return-visit /
+//                       shared link edits, plus optional re-derivation inputs in uiMeta.
 //   • LockedPayload   — the manufacturing + proof truth (the ApprovedEffectPayload from §8.6).
 //
-// F1 BOND (§1/§11): resolve(EditableRecipe) MUST equal the manufactured geometry. We assert it at save via
-// outline-core `assertReplayMatchesHash` against the payload's recorded `build.outline_document_hash`, so a
-// remix always edits the design that was ACTUALLY made — never a drifted copy. You can't store only the
-// recipe and derive the payload on demand: that derivation is the re-resolve compiler we deleted. So we
-// store BOTH and F1 binds them.
+// F1 BOND (§1/§11): the recipe's vector truth MUST be the geometry that was manufactured. Asserted
+// at save via canonical identity — vectorShapeHash(recipe.vectorShape) must equal the payload's
+// recorded `build.vector_shape_hash` — so a remix always edits the design that was ACTUALLY made,
+// never a drifted copy. Same fail-closed guarantee as the doc-era replay bond, ONE truth.
 //
-// PURE — no Supabase/Cloudinary at runtime. `toDesignRow` returns a plain object shaped for a `designs`
-// INSERT (it does NOT touch the DB); the actual upload/insert + auth + library/share UI are §8.7b.
+// NOTE (Dan ruling, plan v2.1): the save UI/flow is ERASED this wave — these modules are pure
+// contract code with no surface, kept correct so the future save/library round builds on them.
+//
+// PURE — no Supabase/Cloudinary at runtime. `toDesignRow` returns a plain object shaped for a
+// `designs` INSERT (it does NOT touch the DB); the actual upload/insert + auth + library UI are §8.7b.
 
-import type { OutlineDocument, OutlineGenerator, ReplayEnv } from '@/lib/outline-core'
-import { assertReplayMatchesHash } from '@/lib/outline-core'
+import type { VShape } from '@/lib/vector-core'
+import { vectorShapeHash } from './geometry-truth'
 import type { ApprovedEffectPayload } from './payload'
 import type { EffectType } from './effect-types'
 import type { EffectSize } from './sizes'
 
 // ── model ─────────────────────────────────────────────────────────────────────
-/** The remix substrate — procedural intent. The OutlineDocument carries baseSnapshot + commands + style. */
+/** The remix substrate — procedural intent, vector-native. */
 export interface EditableRecipe {
-  outlineDocument: OutlineDocument
-  generator?: OutlineGenerator
+  /** THE geometry truth a remix edits (mask px, y-down — the editor's space). */
+  vectorShape: VShape
+  /** optional re-derivation inputs (e.g. {fairing, rawTracePx} so a remix can re-Tune). */
   uiMeta?: Record<string, unknown>
 }
 
@@ -43,38 +46,29 @@ export interface SavedEffect {
 // ── F1 bond ─────────────────────────────────────────────────────────────────────
 export class F1MismatchError extends Error {
   expectedHash: string
-  cause?: unknown
-  constructor(expectedHash: string, cause?: unknown) {
+  actualHash: string
+  constructor(expectedHash: string, actualHash: string) {
     super(
-      `F1 bond broken: resolve(EditableRecipe) does not reproduce the LockedPayload geometry ` +
-        `(expected outline_document_hash ${expectedHash}). The recipe and the manufactured shape have ` +
-        `diverged — refusing to save (a remix would edit a design that was never made).`,
+      `F1 bond broken: the recipe's vector truth does not match the LockedPayload geometry ` +
+        `(expected vector_shape_hash ${expectedHash}, recipe hashes to ${actualHash}). The recipe ` +
+        `and the manufactured shape have diverged — refusing to save (a remix would edit a design ` +
+        `that was never made).`,
     )
     this.name = 'F1MismatchError'
     this.expectedHash = expectedHash
-    this.cause = cause
+    this.actualHash = actualHash
   }
 }
 
 /**
- * THE remix↔manufacturing bond (§1/§11). Asserts that replaying the recipe's canonical command log over
- * its base snapshot reconstructs exactly the OutlineDocument that was approved/hashed into the
- * LockedPayload (`build.outline_document_hash`). Throws `F1MismatchError` (fail-closed) on divergence.
- * Call at SAVE time, before persisting.
+ * THE remix↔manufacturing bond (§1/§11), vector-native: the recipe's canonical vector identity must
+ * equal the identity hashed into the LockedPayload (`build.vector_shape_hash`). Throws
+ * `F1MismatchError` (fail-closed) on divergence. Call at SAVE time, before persisting.
  */
 export function bindF1(recipe: EditableRecipe, lockedPayload: ApprovedEffectPayload): void {
-  const doc = recipe.outlineDocument
-  const env: ReplayEnv = {
-    image: doc.image,
-    mode: doc.mode,
-    ...(doc.readonly !== undefined ? { readonly: doc.readonly } : {}),
-  }
-  const expectedHash = lockedPayload.build.outline_document_hash
-  try {
-    assertReplayMatchesHash(doc.baseSnapshot, doc.commands, expectedHash, env)
-  } catch (cause) {
-    throw new F1MismatchError(expectedHash, cause)
-  }
+  const expectedHash = lockedPayload.build.vector_shape_hash
+  const actualHash = vectorShapeHash(recipe.vectorShape)
+  if (actualHash !== expectedHash) throw new F1MismatchError(expectedHash, actualHash)
 }
 
 /** Assemble a SavedEffect, asserting the F1 bond first (never bundle a recipe that doesn't match the payload). */

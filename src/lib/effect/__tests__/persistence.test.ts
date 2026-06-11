@@ -1,14 +1,18 @@
-// persistence golden fixtures (§8.7a) — the F1 remix↔manufacturing bond + save-bundle round-trip.
-// Encodes WHY: (1) F1 binds the EditableRecipe to the LockedPayload — resolve(recipe) must reproduce the
-// manufactured geometry, else a remix edits a design that was never made (fail-closed); (2) a tampered
-// recipe (different commands → different shape) is REJECTED; (3) the save-bundle serializes round-trip;
-// (4) the designs-row mapping is pure (no DB). Builder is pure → no canvas needed.
+// persistence golden fixtures (§8.7a) — the VECTOR F1 remix↔manufacturing bond + save-bundle
+// round-trip. Encodes WHY: (1) F1 binds the EditableRecipe's vector truth to the LockedPayload —
+// the recipe's canonical identity must equal the hashed manufacturing identity, else a remix edits
+// a design that was never made (fail-closed); (2) a tampered recipe (moved anchor → different
+// shape) is REJECTED; (3) the save-bundle serializes round-trip; (4) the designs-row mapping is
+// pure (no DB). NOTE: the save UI is erased this wave (Dan ruling) — this is contract-only code
+// the future save/library round builds on.
 
 import { describe, it, expect } from 'vitest'
-import { applyOutlineCommands, type OutlineDocument, type OutlineNode } from '@/lib/outline-core'
 import type { EffectSpecDraft, Contour } from '../types'
 import type { PreparedEffect } from '../prepare-effect'
 import { buildApprovedEffectPayload } from '../payload'
+import { contourFromShape } from '../geometry-truth'
+import { getShape } from '@/lib/shape-library'
+import type { VShape } from '@/lib/vector-core'
 import {
   bindF1,
   makeSavedEffect,
@@ -20,37 +24,29 @@ import {
   type EditableRecipe,
 } from '../persistence'
 
-function node(id: string, x: number, y: number): OutlineNode {
-  return { id, p: [x, y], role: 'corner', corner: { mode: 'inherit' } }
+const squareShape = () => getShape('square', 100, 100)
+
+/** the same square with ONE anchor nudged — a different design (the tamper fixture). */
+const tamperedShape = (): VShape => {
+  const v = squareShape()
+  return { paths: [{ anchors: v.paths[0].anchors.map((a, i) => (i === 1 ? { ...a, p: { x: a.p.x + 20, y: a.p.y - 10 } } : a)) }] }
 }
 
-const squareBase = () => ({
-  rings: [{ id: 'r1', role: 'outer' as const, closed: true as const, nodes: [node('n1', 0, 0), node('n2', 100, 0), node('n3', 100, 100), node('n4', 0, 100)] }],
-  style: { globalOutlineCornerRadiusPx: 0, smoothing: 0 },
-})
-const env = { image: { widthPx: 100, heightPx: 100, sourceHash: 'src', orientation: 'baked' as const }, mode: 'semi_auto' as const }
-
-/** A valid square OutlineDocument (baseSnapshot + commands replay to itself). */
-function squareDoc(commands = []): OutlineDocument {
-  return applyOutlineCommands(squareBase(), commands, env)
-}
-
-const squareGeomMM: Contour = { outer: { pts: [[0, 0], [70, 0], [70, 70], [0, 70]] }, holes: [] }
-
-function prepared(doc: OutlineDocument): PreparedEffect {
+function prepared(v: VShape): PreparedEffect {
+  const geometryMM = contourFromShape(v, { mmPerPx: 0.7, maskHeightPx: 100 }) as Contour
   const spec: EffectSpecDraft = {
     sourceRef: 'blob:test',
     maskWidthPx: 100,
     maskHeightPx: 100,
     mmPerPx: 0.7,
-    geometryMM: squareGeomMM,
+    vectorShape: v,
+    geometryMM,
     dimensions: { thicknessBodyMM: 1, edgeRadiusMM: 0.15, widthMM: 70, heightMM: 70 },
     generator: { adapter: 'standard', lane: 'kai', version: '0.3.0' },
-    diagnostics: { rawContourNodes: 4, simplifiedNodes: 4, holes: 0, rdpEpsilonMM: 0.4 },
+    diagnostics: { rawContourNodes: 4, simplifiedNodes: geometryMM.outer.pts.length, holes: 0, rdpEpsilonMM: 0.4 },
   }
   return {
     spec,
-    outlineDocument: doc,
     composite: null as unknown as HTMLCanvasElement,
     edgeComposite: null as unknown as HTMLCanvasElement,
     frontSrc: { origCanvas: null as unknown as HTMLCanvasElement, subjCanvas: null as unknown as HTMLCanvasElement, defaultBlurPx: 0 },
@@ -59,45 +55,43 @@ function prepared(doc: OutlineDocument): PreparedEffect {
   }
 }
 
-describe('F1 bond (§1/§11) — bindF1', () => {
-  it('PASSES when the recipe resolves to the payload geometry (same doc that was approved)', () => {
-    const doc = squareDoc()
-    const payload = buildApprovedEffectPayload(prepared(doc), { type: 'standard', size: 's70' })
-    const recipe: EditableRecipe = { outlineDocument: doc }
+describe('vector F1 bond (§1/§11) — bindF1', () => {
+  it('PASSES when the recipe carries the vector truth that was approved', () => {
+    const v = squareShape()
+    const payload = buildApprovedEffectPayload(prepared(v), { type: 'standard', size: 's70' })
+    const recipe: EditableRecipe = { vectorShape: v }
     expect(() => bindF1(recipe, payload)).not.toThrow()
   })
 
-  it('THROWS F1MismatchError when the recipe is tampered (different commands → different shape)', () => {
+  it('THROWS F1MismatchError when the recipe is tampered (moved anchor → different shape)', () => {
     // payload approved from the UNEDITED square…
-    const payload = buildApprovedEffectPayload(prepared(squareDoc()), { type: 'standard', size: 's70' })
-    // …but the recipe carries a MoveNode that changes the shape → replay hash diverges.
-    const tampered: EditableRecipe = {
-      outlineDocument: squareDoc([{ op: 'MoveNode', ringId: 'r1', nodeId: 'n2', to: [120, -10] }] as never),
-    }
+    const payload = buildApprovedEffectPayload(prepared(squareShape()), { type: 'standard', size: 's70' })
+    // …but the recipe carries a nudged anchor → canonical identity diverges.
+    const tampered: EditableRecipe = { vectorShape: tamperedShape() }
     expect(() => bindF1(tampered, payload)).toThrow(F1MismatchError)
   })
 
   it('makeSavedEffect is fail-closed (asserts F1 before bundling)', () => {
-    const payload = buildApprovedEffectPayload(prepared(squareDoc()), { type: 'standard', size: 's70' })
-    const bad: EditableRecipe = { outlineDocument: squareDoc([{ op: 'SetGlobalCornerRadius', outlineCornerRadiusPx: 20 }] as never) }
+    const payload = buildApprovedEffectPayload(prepared(squareShape()), { type: 'standard', size: 's70' })
+    const bad: EditableRecipe = { vectorShape: tamperedShape() }
     expect(() => makeSavedEffect(bad, payload, { effectType: 'standard', size: 's70' })).toThrow(F1MismatchError)
   })
 })
 
 describe('save-bundle round-trip + designs-row mapping (pure)', () => {
   it('serialize → deserialize round-trips a SavedEffect', () => {
-    const doc = squareDoc()
-    const payload = buildApprovedEffectPayload(prepared(doc), { type: 'standard', size: 's70' })
-    const saved = makeSavedEffect({ outlineDocument: doc }, payload, { effectType: 'standard', size: 's70' })
+    const v = squareShape()
+    const payload = buildApprovedEffectPayload(prepared(v), { type: 'standard', size: 's70' })
+    const saved = makeSavedEffect({ vectorShape: v }, payload, { effectType: 'standard', size: 's70' })
     const round = deserializeSavedEffect(serializeSavedEffect(saved))
     expect(round).toEqual(saved)
     expect(round.lockedPayload.payload_hash).toBe(saved.lockedPayload.payload_hash)
   })
 
   it('toDesignRow → fromDesignRow preserves the bundle + shapes the designs columns', () => {
-    const doc = squareDoc()
-    const payload = buildApprovedEffectPayload(prepared(doc), { type: 'standard', size: 's70' })
-    const saved = makeSavedEffect({ outlineDocument: doc }, payload, { effectType: 'standard', size: 's70' })
+    const v = squareShape()
+    const payload = buildApprovedEffectPayload(prepared(v), { type: 'standard', size: 's70' })
+    const saved = makeSavedEffect({ vectorShape: v }, payload, { effectType: 'standard', size: 's70' })
     const row = toDesignRow(saved, { userId: 'u1', title: 'My Effect' })
     expect(row.user_id).toBe('u1')
     expect(row.is_public).toBe(false)

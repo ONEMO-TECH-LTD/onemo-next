@@ -16,26 +16,20 @@ import type { EffectType } from './effect-types'
 import { EFFECT_SIZES, BASE_LONGEST_SIDE_MM, toFinalPhysicalMm, type EffectSize, type FinalBBox } from './sizes'
 import { validateAttachment, type AttachmentSystem } from './attachment'
 import type { Contour, Pt } from './types'
-import {
-  resolveOutlineDocument,
-  outlineDocumentHash,
-  contentHash,
-  stableStringify,
-  signedArea,
-  normalizeRing,
-  type GeometryLocator,
-  type EditorValidationIssue,
-} from '@/lib/outline-core'
+import { contentHash, stableStringify, normalizeRing } from '@/lib/outline-core'
+// REBUILD-PLAN-v2 §B4: feasibility + identity derive from the SINGLE vector truth — the doc model
+// is gone from the save path (no resolve, no outlineDocumentHash).
+import { assertContourCuttable, vectorShapeHash } from './geometry-truth'
 
-const OUTLINE_CORE_VERSION = '1' // OutlineDocument.version (A1a)
+const VECTOR_CORE_VERSION = '1' // vector-core kernel version (the truth's model version)
 // Canonical-hash schema version. Bump INTENTIONALLY whenever the hashed shape changes (and update the
 // golden-hash test) — that makes a deliberate change explicit and a SILENT one (a refactor quietly
 // altering every saved design's manufacturing identity + the F1 remix↔mfg bond) a caught regression.
-// v2 (V3 build): artwork.transform now records the G1 pan/zoom as int-micro
-// (`{pan:{x_micro,y_micro}|null, zoom_micro|null}` replacing the never-populated `{pan:null,zoom:null}`).
-const SCHEMA_VERSION = 2
-const FLATTEN_TOLERANCE_PX = 0.5
-const MIN_AREA_PX2 = 1 // below this the outline is collapsed/degenerate
+// v2 (V3 build): artwork.transform records the G1 pan/zoom as int-micro.
+// v3 (REBUILD-PLAN-v2, single geometry truth): the recipe/payload contract is VECTOR-NATIVE —
+// `build.vector_shape_hash` (canonical VShape identity) replaces `outline_document_hash`;
+// feasibility runs on the truth-derived contour. No OutlineDocument survives in the save path.
+const SCHEMA_VERSION = 3
 const MICRO = 1_000_000 // quantize residual float ratios to integer micro-units for the canonical hash
 
 // ── inputs ───────────────────────────────────────────────────────────────────
@@ -70,38 +64,31 @@ export interface BuildPayloadOptions {
 // ── feasibility (§1) ───────────────────────────────────────────────────────────
 export interface FeasibilityResult {
   ok: boolean
-  issues: EditorValidationIssue[]
-  locators: GeometryLocator[]
   reason?: string
 }
 
 export class EffectNotCuttableError extends Error {
   feasibility: FeasibilityResult
   constructor(feasibility: FeasibilityResult) {
-    super(`Effect not cuttable: ${feasibility.reason ?? feasibility.issues.map((i) => i.code).join(', ')}`)
+    super(`Effect not cuttable: ${feasibility.reason ?? 'feasibility failed'}`)
     this.name = 'EffectNotCuttableError'
     this.feasibility = feasibility
   }
 }
 
 /**
- * MANDATORY client-side feasibility gate (§1). An uncuttable shape (self-intersection / collapse) can
- * never be approved/hashed. Re-resolves the outline through the SAME outline-core engine the editor
- * uses and returns the verdict + GeometryLocators so the UI can highlight the exact fault inline.
- * (v1: self-intersection + non-degenerate area. Min-neck / no-thin-spike is a production add — NOTE.)
+ * MANDATORY client-side feasibility gate (§1). An uncuttable shape (self-intersection / collapse)
+ * can never be approved/hashed. Runs ring-math checks on the SAME manufacturing contour that gets
+ * hashed (`spec.geometryMM`, derived from the vector truth) — one geometry, one verdict.
+ * (Min-neck / no-thin-spike is a production add — NOTE.)
  */
 export function assertCuttable(prepared: PreparedEffect): FeasibilityResult {
-  const resolved = resolveOutlineDocument(prepared.outlineDocument, { flattenTolerancePx: FLATTEN_TOLERANCE_PX })
-  const blocking = resolved.issues.filter((i) => i.severity === 'block')
-  const outer = resolved.flattenedRingsPx[0] ?? []
-  const area = Math.abs(signedArea(outer))
-  if (outer.length < 3 || area < MIN_AREA_PX2) {
-    return { ok: false, issues: blocking, locators: resolved.locators, reason: 'degenerate/collapsed outline' }
+  const { spec } = prepared
+  const verdict = assertContourCuttable(spec.geometryMM, spec.mmPerPx)
+  if (!verdict.ok) {
+    return { ok: false, reason: verdict.reason === 'degenerate' ? 'degenerate/collapsed outline' : 'self-intersection' }
   }
-  if (blocking.length > 0) {
-    return { ok: false, issues: blocking, locators: resolved.locators, reason: blocking.map((i) => i.code).join(', ') }
-  }
-  return { ok: true, issues: [], locators: [] }
+  return { ok: true }
 }
 
 // ── int-micron geometry (no float drift in the canonical hash) ─────────────────
@@ -149,7 +136,7 @@ export interface ApprovedEffectPayload {
   }
   attachment: { system: string | null; template?: string | null; result_hash?: string } // §8.5b
   gates: { profile_hash: string; result_hash: string; blocking: number }
-  build: { outline_core_version: string; outline_document_hash: string; config_hash: string; generator: EffectSpecGenerator }
+  build: { vector_core_version: string; vector_shape_hash: string; config_hash: string; generator: EffectSpecGenerator }
   payload_hash: string
 }
 
@@ -203,7 +190,7 @@ export function canonicalHashBody(p: ApprovedEffectPayload) {
 
 /**
  * Build the immutable ApprovedEffectPayload (= the LockedPayload). Feasibility-gated (§1): throws
- * EffectNotCuttableError (carrying GeometryLocators) for an uncuttable shape, so a beautiful-but-
+ * EffectNotCuttableError for an uncuttable shape, so a beautiful-but-
  * uncuttable effect can never be hashed/approved. Deterministic: identical (prepared, opts) → identical
  * payload_hash (int-micron geometry + canonical sorted-key serialization).
  */
@@ -286,14 +273,15 @@ export function buildApprovedEffectPayload(prepared: PreparedEffect, opts: Build
     : { system: null }
 
   const gates = {
-    profile_hash: contentHash(stableStringify({ flattenTolerancePx: FLATTEN_TOLERANCE_PX, minAreaPx2: MIN_AREA_PX2 })),
+    profile_hash: contentHash(stableStringify({ feasibility: 'geometry-truth/assertContourCuttable@v1' })),
     result_hash: contentHash(stableStringify({ ok: true, blocking: 0 })),
     blocking: 0,
   }
 
   const build = {
-    outline_core_version: OUTLINE_CORE_VERSION,
-    outline_document_hash: outlineDocumentHash(prepared.outlineDocument),
+    vector_core_version: VECTOR_CORE_VERSION,
+    // the vector F1 bond key: canonical identity of THE geometry truth (recipe must match it)
+    vector_shape_hash: vectorShapeHash(spec.vectorShape),
     config_hash: contentHash(stableStringify(EFFECT_BUILD_CONFIG)),
     generator: spec.generator,
   }

@@ -14,7 +14,7 @@
 // three.js — smoothClosed/filletCorners — was retired in §8.2b-2), so the whole creation graph is
 // three-free; the 3D half is `buildMeshFromSpec` (Phase B), the only place three.js is touched.
 
-import type { Contour, Pt, EffectSpecDraft } from './types'
+import type { Pt, EffectSpecDraft } from './types'
 
 /**
  * Build params for the effect engine (geometry sizing + texture res). `minCornerAngleDeg` /
@@ -38,22 +38,12 @@ import { segmentML, ML_ADAPTER_ID } from './segment-ml'
 import { traceContourRaw } from './contour'
 import { composeFront, blurCanvas, imageDataToCanvas } from './composite'
 import type { EffectType } from './effect-types'
-import {
-  applyOutlineCommands,
-  resolveOutlineDocument,
-  repairSimplePolygon,
-  rdpClosed,
-  nodesFromTracedRing,
-  fairTracedRing,
-  fairingFromDetail,
-  BEN_DEFAULT_DETAIL,
-  contentHash,
-  type FairTracedRingOpts,
-  type OutlineDocument,
-  type OutlineNode,
-  type OutlineGenerator,
-  type Vec2Px,
-} from '@/lib/outline-core'
+import { fairingFromDetail, BEN_DEFAULT_DETAIL, type FairTracedRingOpts, type Vec2Px } from '@/lib/outline-core'
+// REBUILD-PLAN-v2 §B1 — truth at birth: geometry is born as ONE VShape through the single
+// pipeline; the manufacturing contour is DERIVED from it. No OutlineDocument exists here.
+import { vectoriseTrace, contourFromShape } from './geometry-truth'
+import { getShape } from '@/lib/shape-library'
+import { filletShape } from '@/lib/vector-core'
 
 /**
  * Config for the 2D-first path. Carries forward the proven build values but pins
@@ -76,10 +66,8 @@ export const EFFECT_BUILD_CONFIG: ShapeBuildConfig = {
 }
 
 export interface PreparedEffect {
-  /** mm draft spec — shape-compatible with the legacy EffectSpecDraft (editor/consumers unchanged). */
+  /** mm draft spec — carries the vector truth (`spec.vectorShape`) + its derived contour. */
   spec: EffectSpecDraft
-  /** the canonical outline document the geometry was resolved from (provenance; persistence later). */
-  outlineDocument: OutlineDocument
   /** the ONE magic-blend front composite (Phase-A hero face = 3D front texture = print artwork). */
   composite: HTMLCanvasElement
   /** strongly-blurred edge-lip composite (smooth rim colour, no banding). */
@@ -97,61 +85,6 @@ function bbox(pts: ReadonlyArray<Pt | Vec2Px>) {
     if (y < minY) minY = y; if (y > maxY) maxY = y
   }
   return { minX, minY, maxX, maxY, w: maxX - minX, h: maxY - minY }
-}
-
-/**
- * Largest global corner radius in [0, hi] that resolves WITHOUT a self-intersection (mirrors the
- * editor's self-correcting default rounding) — binary-searches resolve(doc @ r) so the default round
- * adapts per shape instead of a blind value that might cross on tight geometry.
- */
-function maxSafeGlobalRadius(doc: OutlineDocument, hi: number): number {
-  const clean = (r: number) =>
-    resolveOutlineDocument(
-      { ...doc, style: { ...doc.style, globalOutlineCornerRadiusPx: r } },
-      { flattenTolerancePx: 0.5 },
-    ).issues.length === 0
-  if (clean(hi)) return hi
-  let lo = 0, h = hi
-  for (let i = 0; i < 14 && h - lo > 2; i++) { const m = (lo + h) / 2; if (clean(m)) lo = m; else h = m }
-  return Math.floor(lo)
-}
-
-/** Build an OutlineDocument from a raw pixel ring (clean → control nodes), resolved corners via outline-core. */
-function docFromRawRing(
-  ringPx: Vec2Px[],
-  W: number,
-  H: number,
-  sourceHash: string,
-  generator: OutlineGenerator,
-  type: EffectType,
-  radiusPx: number,
-  selfCorrect: boolean,
-  fairing?: FairTracedRingOpts,
-): OutlineDocument {
-  const eps = type === 'shaped' ? Math.max(2, Math.max(W, H) * 0.022) : 1
-  // shaped: EXACT traced contour — sparse anchors + the dense trace as segment rawPolylines, so the
-  // resolved/manufactured outline IS the mask's true shape (no RDP/spline approximation — the
-  // clipped-corner/wobble class Dan caught 2026-06-10). standard: plain corner ring (4 corners).
-  const nodes: OutlineNode[] = type === 'shaped'
-    ? nodesFromTracedRing(fairTracedRing(ringPx, fairing ?? fairingFromDetail(BEN_DEFAULT_DETAIL)), eps)
-    : repairSimplePolygon(rdpClosed(ringPx, eps), Math.max(3, Math.max(W, H) * 0.008)).map((p, i) => ({
-        id: `n${i}`,
-        p: [p[0], p[1]] as Vec2Px,
-        role: 'corner' as const,
-        corner: { mode: 'inherit' as const },
-      }))
-  const image = { widthPx: W, heightPx: H, sourceHash, orientation: 'baked' as const }
-  const env = { image, mode: (type === 'shaped' ? 'auto' : 'semi_auto') as 'auto' | 'semi_auto' }
-  const base = (radius: number) => ({
-    rings: [{ id: 'r1', role: 'outer' as const, closed: true as const, nodes }],
-    // traced (shaped) rings need no smoothing — they ARE the exact contour; the square stays crisp.
-    style: { globalOutlineCornerRadiusPx: radius, smoothing: 0 },
-    generator,
-  })
-  // self-correct: pick the largest non-self-intersecting radius (square path). Traced shaped rings
-  // bypass corner radii entirely — the exact contour needs no default rounding.
-  const safe = type === 'shaped' ? 0 : selfCorrect ? maxSafeGlobalRadius(applyOutlineCommands(base(0), [], env), radiusPx) : radiusPx
-  return applyOutlineCommands(base(safe), [], env)
 }
 
 /**
@@ -189,16 +122,13 @@ export async function prepareEffect(
   const orig = await loadImageData(url, cfg.textureDim)
   const fw = orig.width, fh = orig.height
   const origCanvas = imageDataToCanvas(orig)
-  const sourceHash = contentHash(url)
 
   let ringPx: Vec2Px[]
   let W: number, H: number
   let mmPerPx: number
   let subjCanvas: HTMLCanvasElement
   let defaultBlurPx: number
-  let generator: OutlineGenerator
   let adapterId: string
-  let selfCorrect: boolean
   let radiusHiPx: number
 
   if (type === 'shaped') {
@@ -233,8 +163,6 @@ export async function prepareEffect(
     // (Fallback flood-fill has no alpha matte — its texImage IS the source pixels, used as-is.)
     subjCanvas = mlMatte ? subjectFromOriginal(origCanvas, imageDataToCanvas(texImage)) : imageDataToCanvas(texImage)
     defaultBlurPx = Math.max(6, Math.round(fw / 50))
-    generator = { type: 'ben2_auto', maskHash: contentHash(`${sourceHash}:${width}x${height}`) }
-    selfCorrect = true
     radiusHiPx = Math.round(Math.min(W, H) * 0.25)
   } else {
     // square: the full-image rectangle; outline-core rounds the 8mm corners (one engine, no pre-rounding)
@@ -243,21 +171,25 @@ export async function prepareEffect(
     ringPx = [[0, 0], [fw, 0], [fw, fh], [0, fh]]
     subjCanvas = origCanvas // no matte → blend is a no-op (subj = full photo, blur 0)
     defaultBlurPx = 0
-    generator = { type: 'manual' } // standard square has no BEN provenance; the SDF-blend generator is wired with Hug later
     adapterId = 'standard'
-    selfCorrect = false
     radiusHiPx = cfg.squareCornerMM / mmPerPx
   }
 
-  // ── ONE ENGINE: raw ring → OutlineDocument → resolveOutlineDocument (corners via applyCornerRadii,
-  //    NOT contour.filletCorners; policy.downstream_corner_rounding === 'disabled') → flattened mm.
-  const outlineDocument = docFromRawRing(ringPx, W, H, sourceHash, generator, type, radiusHiPx, selfCorrect, fairing)
-  // 0.15px flatten: at 0.5px the chord segments were visible as facets on the 3D edge at zoom
-  const resolved = resolveOutlineDocument(outlineDocument, { flattenTolerancePx: 0.15 })
-  const outerFlatPx = resolved.flattenedRingsPx[0] ?? ringPx
-  const outerMM: Pt[] = outerFlatPx.map(([x, y]) => [x * mmPerPx, y * mmPerPx] as Pt)
-  const geometryMM: Contour = { outer: { pts: outerMM }, holes: [] } // solid cut-out (Dan, §9)
-  const bb = bbox(outerMM)
+  // ── ONE PIPELINE (geometry-truth): the design's geometry is born as a VShape; the
+  //    manufacturing contour is DERIVED from it at the named 0.05mm tolerance.
+  let vectorShape
+  if (type === 'shaped') {
+    // the SAME fairing+fit the editor's Tune uses — generation ≡ editor by construction
+    vectorShape = vectoriseTrace(ringPx.map(([x, y]) => [x, y] as Pt), H, fairing ?? fairingFromDetail(BEN_DEFAULT_DETAIL))
+    if (!vectorShape) throw new Error('Contour fit failed — try an image with a clearer subject.')
+  } else {
+    // standard square: kernel-exact rounded rect — 8mm absolute corners, clamped to the inscribable max
+    const r = Math.min(radiusHiPx, Math.floor(Math.min(W, H) / 2))
+    vectorShape = filletShape(getShape('square', W, H), r)
+  }
+  const geometryMM = contourFromShape(vectorShape, { mmPerPx, maskHeightPx: H })
+  if (!geometryMM) throw new Error('Geometry derivation failed — degenerate outline.')
+  const bb = bbox(geometryMM.outer.pts)
   const widthMM = bb.w, heightMM = bb.h
 
   // ── composite (the ONE magic-blend) + edge-lip source (strong blur). Reused, never re-composed per surface.
@@ -269,6 +201,7 @@ export async function prepareEffect(
     maskWidthPx: W,
     maskHeightPx: H,
     mmPerPx,
+    vectorShape,
     geometryMM,
     dimensions: { thicknessBodyMM: cfg.thicknessMM, edgeRadiusMM: cfg.edgeRadiusMM, widthMM, heightMM },
     generator: { adapter: adapterId, lane: 'kai', version: '0.3.0' },
@@ -276,7 +209,7 @@ export async function prepareEffect(
     rawTracePx: adapterId !== 'standard' ? ringPx.map(([x, y]) => [x, y] as Pt) : undefined,
     diagnostics: {
       rawContourNodes: ringPx.length,
-      simplifiedNodes: outerFlatPx.length,
+      simplifiedNodes: geometryMM.outer.pts.length,
       holes: 0,
       rdpEpsilonMM: cfg.rdpEpsilonMM,
     },
@@ -284,7 +217,6 @@ export async function prepareEffect(
 
   return {
     spec,
-    outlineDocument,
     composite,
     edgeComposite,
     frontSrc: { origCanvas, subjCanvas, defaultBlurPx },

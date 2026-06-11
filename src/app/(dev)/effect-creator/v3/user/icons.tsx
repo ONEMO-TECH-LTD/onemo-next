@@ -4,7 +4,7 @@
 // glyphs — chosen over Lucide so the UI doesn't read as generic shadcn/SaaS. `weight="regular"`
 // (default) reads cleanly at 24px on mobile; icons inherit `currentColor` from the button.
 
-import { ArrowArcLeft, ArrowArcRight, ArrowsOutCardinal, BezierCurve, DiceFive, WaveSine, PenNib, ArrowClockwise, Check, X, ArrowsOut, Plus, Minus, Trash, PlusCircle, Sparkle, ImageSquare, PencilSimple, BoundingBox, Palette, FloppyDisk, Shapes, Polygon, Circle, Square, Pill, Star, Heart, ChatTeardrop, Seal, Shield, Eye, EyeSlash, MagicWand, Faders, Crop, Sun, CircleHalf, Drop, Thermometer, Ruler, LineSegment, Angle } from '@phosphor-icons/react'
+import { ArrowArcLeft, ArrowArcRight, ArrowsOutCardinal, BezierCurve, DiceFive, WaveSine, PenNib, ArrowClockwise, Check, X, ArrowsOut, Plus, Minus, Trash, PlusCircle, Sparkle, ImageSquare, PencilSimple, BoundingBox, Palette, DownloadSimple, Shapes, Polygon, Circle, Square, Pill, Star, Heart, ChatTeardrop, Seal, Shield, Eye, EyeSlash, MagicWand, Faders, Crop, Sun, CircleHalf, Drop, Thermometer, Ruler, LineSegment, Angle } from '@phosphor-icons/react'
 
 type P = { className?: string }
 const SZ = 24
@@ -19,8 +19,8 @@ export const PenIcon = (p: P) => <PenNib size={SZ} className={p.className} />
 export const ResetIcon = (p: P) => <ArrowClockwise size={SZ} className={p.className} />
 export const CheckIcon = (p: P) => <Check size={SZ} className={p.className} />
 export const CloseIcon = (p: P) => <X size={SZ} className={p.className} />
-// Save = apply the edit + collapse the open sub-menu (stays in the editor). Done = close the editor (CheckIcon).
-export const SaveIcon = (p: P) => <FloppyDisk size={SZ} className={p.className} />
+// Export — the mm-true SVG cutline download (temporary top-bar home until the save/library round).
+export const ExportIcon = (p: P) => <DownloadSimple size={SZ} className={p.className} />
 // Preview toggle — Eye (show clean result, hide anchors) / EyeSlash (back to editing).
 export const PreviewIcon = (p: P) => <Eye size={SZ} className={p.className} />
 export const PreviewOffIcon = (p: P) => <EyeSlash size={SZ} className={p.className} />

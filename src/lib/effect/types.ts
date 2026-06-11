@@ -2,6 +2,8 @@
 // EffectSpecDraft = the browser-side draft per FINAL-SPEC §"Canonical artifact".
 // This lane builds the Draft + preview only (no server canonical / checkout / manufacturing).
 
+import type { VShape } from '@/lib/vector-core'
+
 export type Pt = [number, number] // [x, y]
 
 export interface Ring {
@@ -30,7 +32,13 @@ export interface EffectSpecDraft {
   maskWidthPx: number
   maskHeightPx: number
   mmPerPx: number              // px → mm mapping used to build geometry
-  geometryMM: Contour          // simplified contour in mm (outer + holes)
+  /** THE geometry truth, born at generation (REBUILD-PLAN-v2 §B1): true vector curves in mask px,
+   *  y-down (the editor's space). Every consumer — editor, 3D, SVG export, manufacturing contour —
+   *  derives from this through `geometry-truth.ts` at its own named tolerance. */
+  vectorShape: VShape
+  /** DERIVED manufacturing contour — `contourFromShape(vectorShape)` at 0.05 mm (mm, y-up). Never
+   *  authored independently of `vectorShape`. */
+  geometryMM: Contour
   dimensions: Dimensions
   generator: {
     adapter: string            // segmentation adapter id

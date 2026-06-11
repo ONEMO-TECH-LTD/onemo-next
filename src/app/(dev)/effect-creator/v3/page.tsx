@@ -17,13 +17,11 @@ import { useState, useCallback, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useGesture } from '@use-gesture/react'
 import { useSceneStore } from './admin/sceneStore'
-import { UndoIcon, RedoIcon, ResetIcon } from './user/icons'
+import { UndoIcon, RedoIcon, ResetIcon, ExportIcon } from './user/icons'
 import { INITIAL_ARTWORK } from './user/outlineStore'
 import { useOutlineStore } from './user/outlineStore'
 import type { DesignState } from './types'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
-import type { LibraryRow } from './user/SavePanel'
-import { deriveSuede } from './core/EffectViewer'
 import { toast } from './ui/Toast'
 
 // Dynamic imports — no SSR for 3D components
@@ -35,7 +33,6 @@ const EditOverlay = dynamic(() => import('./user/EditOverlay'), { ssr: false })
 const OutlineEditor = dynamic(() => import('./user/OutlineEditor'), { ssr: false })
 const EmptyState = dynamic(() => import('./user/EmptyState'), { ssr: false })
 const GenerateShimmer = dynamic(() => import('./user/GenerateShimmer'), { ssr: false })
-const SavePanel = dynamic(() => import('./user/SavePanel'), { ssr: false })
 const ToastSurface = dynamic(() => import('./ui/Toast'), { ssr: false })
 const PerfHUD = dynamic(() => import('./dev/PerfHUD'), { ssr: false })
 
@@ -62,8 +59,6 @@ function PrototypePageInner() {
   }, [])
   const { colors, setBackColor, setFrameColor, setBgColor } = useSceneStore()
   const [showColors, setShowColors] = useState(false)
-  const [showSave, setShowSave] = useState(false)
-  const [library, setLibrary] = useState<LibraryRow[]>([])
   const sceneName = searchParams.get('scene')
 
   // ── #23 GLOBAL history — one undo/redo/reset for the whole creator (Magic, editor sessions,
@@ -150,8 +145,20 @@ function PrototypePageInner() {
     restoreSnap(baselineRef.current)
   }, [snapNow, restoreSnap, pushHistory])
 
-  useEffect(() => {
-    import('./user/SavePanel').then(({ loadLibrary }) => setLibrary(loadLibrary()))
+  // Export — the mm-true SVG cutline from THE vector truth. TEMPORARY top-bar home (plan v2.1
+  // D-SAVE: the Save surface is erased; export rides here until the save/library design round).
+  const onExport = useCallback(() => {
+    const o = useOutlineStore.getState()
+    const v = o.editedVShape ?? o.spec?.vectorShape
+    const sp = o.spec
+    if (!v || !sp) { toast('warn', 'Nothing to export yet — add an image first'); return }
+    import('@/lib/export').then(({ toManufacturingSVG }) => {
+      const svg = toManufacturingSVG(v, { mmPerPx: sp.mmPerPx || 1, widthPx: sp.maskWidthPx, heightPx: sp.maskHeightPx })
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }))
+      a.download = 'onemo-cutline-mm.svg'
+      document.body.appendChild(a); a.click(); a.remove()
+    })
   }, [])
 
   // §6.1 no-blank-mount, page-level guarantee (measured 2026-06-10): after content arrives the
@@ -302,7 +309,7 @@ function PrototypePageInner() {
   const onScenePointerUp = useCallback((e: React.PointerEvent) => {
     const t0 = tapRef.current
     tapRef.current = null
-    if (!t0 || !artworkUrl || editingOutline || generating || showSave || showColors || isEditing) return
+    if (!t0 || !artworkUrl || editingOutline || generating || showColors || isEditing) return
     if ((e.target as Element).closest('button')) return
     const moved = Math.hypot(e.clientX - t0.x, e.clientY - t0.y)
     if (moved < 6 && performance.now() - t0.t < 400) {
@@ -310,7 +317,7 @@ function PrototypePageInner() {
       setEditorMode(null)
       setEditingOutline(true)
     }
-  }, [artworkUrl, editingOutline, generating, showSave, showColors, isEditing, snapNow])
+  }, [artworkUrl, editingOutline, generating, showColors, isEditing, snapNow])
 
   return (
     <div
@@ -343,24 +350,6 @@ function PrototypePageInner() {
               onStatus={handleStatus}
               frozen={editingOutline}
             />
-            {/* Save panel needs the scene's suede/colors for the factory — rendered inside the
-                config render-prop so it shares the same source of truth (G8: one framing/material truth). */}
-            {showSave && (
-              <SavePanel
-                open={showSave}
-                onClose={() => setShowSave(false)}
-                prepared={prepared}
-                effectType={autoOutline ? 'shaped' : 'standard'}
-                designState={designState}
-                suede={deriveSuede(config)}
-                backColor={config.colors.backColor}
-                trim={{ surfaceColor: colors.backColor, edgeColor: colors.frameColor, backgroundColor: colors.bgColor }}
-                sceneSettings={config.scene}
-                onEditShape={() => { setShowSave(false); setEditingOutline(true) }}
-                library={library}
-                onLibraryChange={setLibrary}
-              />
-            )}
           </>
         )}
       </AdminViewer>
@@ -402,7 +391,6 @@ function PrototypePageInner() {
         })}
         onShapes={() => { editorPreRef.current = snapNow(); setEditorMode('shape'); setEditingOutline(true) }}
         onEdit={() => { editorPreRef.current = snapNow(); setEditorMode(null); setEditingOutline(true) }}
-        onSave={() => setShowSave((v) => !v)}
       />
 
       {/* Position-mode banner + drag indicator */}
@@ -436,6 +424,7 @@ function PrototypePageInner() {
             { icon: <UndoIcon />, label: 'Undo', fn: globalUndo, off: !histRef.current.past.length },
             { icon: <RedoIcon />, label: 'Redo', fn: globalRedo, off: !histRef.current.future.length },
             { icon: <ResetIcon />, label: 'Reset', fn: globalReset, off: !baselineRef.current },
+            { icon: <ExportIcon />, label: 'Export', fn: onExport, off: !prepared },
           ] as const).map((b) => (
             <button
               key={b.label}
