@@ -67,9 +67,9 @@ function PrototypePageInner() {
   // square for the current photo (the photo stays).
   type OutlineSnap = {
     spec: ReturnType<typeof useOutlineStore.getState>['spec']
-    editedContourMM: ReturnType<typeof useOutlineStore.getState>['editedContourMM']
-    editedDoc: ReturnType<typeof useOutlineStore.getState>['editedDoc']
-    editedVShape: ReturnType<typeof useOutlineStore.getState>['editedVShape']
+    // SINGLE TRUTH (plan §B): the committed shape is the only geometry in a snapshot — the
+    // contour re-derives inside commitGeometry on restore, so a snapshot can never desync.
+    committedShape: ReturnType<typeof useOutlineStore.getState>['committedShape']
     bgBlur: number | null
     subjMatteUrl: string | null
   }
@@ -96,7 +96,7 @@ function PrototypePageInner() {
     return {
       prepared, autoOutline, designState,
       imageFx: o.imageFx,
-      outline: { spec: o.spec, editedContourMM: o.editedContourMM, editedDoc: o.editedDoc, editedVShape: o.editedVShape, bgBlur: o.bgBlur, subjMatteUrl: o.subjMatteUrl },
+      outline: { spec: o.spec, committedShape: o.committedShape, bgBlur: o.bgBlur, subjMatteUrl: o.subjMatteUrl },
       trim: { ...useSceneStore.getState().colors },
     }
   }, [prepared, autoOutline, designState])
@@ -113,9 +113,7 @@ function PrototypePageInner() {
     const o = useOutlineStore.getState()
     o.setImageFx(sn.imageFx)
     o.setSpec(sn.outline.spec)
-    o.setEditedContourMM(sn.outline.editedContourMM)
-    o.setEditedDoc(sn.outline.editedDoc)
-    o.setEditedVShape(sn.outline.editedVShape)
+    o.commitGeometry(sn.outline.committedShape)
     o.setBgBlur(sn.outline.bgBlur)
     o.setSubjMatteUrl(sn.outline.subjMatteUrl)
     const sc = useSceneStore.getState()
@@ -149,7 +147,7 @@ function PrototypePageInner() {
   // D-SAVE: the Save surface is erased; export rides here until the save/library design round).
   const onExport = useCallback(() => {
     const o = useOutlineStore.getState()
-    const v = o.editedVShape ?? o.spec?.vectorShape
+    const v = o.committedShape ?? o.spec?.vectorShape
     const sp = o.spec
     if (!v || !sp) { toast('warn', 'Nothing to export yet — add an image first'); return }
     import('@/lib/export').then(({ toManufacturingSVG }) => {
@@ -188,7 +186,7 @@ function PrototypePageInner() {
     setAutoOutline(false) // new image → the standard square; Magic opts into the cut-out
     // fresh image → drop any prior edit/blend so the new effect starts clean
     const st = useOutlineStore.getState()
-    st.setEditedContourMM(null); st.setEditedDoc(null); st.setEditedVShape(null); st.setBgBlur(null); st.setSubjMatteUrl(null)
+    st.commitGeometry(null); st.setBgBlur(null); st.setSubjMatteUrl(null)
     // instant standard square through the ONE engine — the object is real in the scene immediately
     import('@/lib/effect/prepare-effect')
       .then(({ prepareEffect }) => prepareEffect(url, 'standard'))
@@ -198,7 +196,7 @@ function PrototypePageInner() {
         // #23: a new image starts a fresh history; this state is the Reset baseline
         baselineRef.current = {
           prepared: p, autoOutline: false, designState: INITIAL_ARTWORK, imageFx: null,
-          outline: { spec: p.spec, editedContourMM: null, editedDoc: null, editedVShape: null, bgBlur: null, subjMatteUrl: null },
+          outline: { spec: p.spec, committedShape: null, bgBlur: null, subjMatteUrl: null },
           trim: { ...useSceneStore.getState().colors },
         }
         histRef.current = { past: [], future: [] }
@@ -233,19 +231,15 @@ function PrototypePageInner() {
         setPrepared(p)
         const st = useOutlineStore.getState()
         st.setSpec(p.spec) // hand the shaped outline to the 2D editor + 3D
-        st.setEditedContourMM(null); st.setEditedDoc(null); st.setEditedVShape(null); st.setBgBlur(null) // fresh cut-out → drop prior edits
+        st.commitGeometry(null); st.setBgBlur(null) // fresh cut-out → drop prior edits
         // the editor's magic-blend preview needs the sharp subject matte
         try { st.setSubjMatteUrl(p.frontSrc.subjCanvas.toDataURL()) } catch { st.setSubjMatteUrl(null) }
         setAutoOutline(true)
         setGenerating(false)
         pushHistory(preMagic)
         // #23: the editor session that auto-opens is its own step — stash the post-magic state
-        editorPreRef.current = {
-          prepared: p, autoOutline: true, designState, imageFx: useOutlineStore.getState().imageFx,
-          outline: { spec: p.spec, editedContourMM: null, editedDoc: null, editedVShape: null, bgBlur: null, subjMatteUrl: useOutlineStore.getState().subjMatteUrl },
-          trim: { ...useSceneStore.getState().colors },
-        }
-        setEditingOutline(true) // #26: after generation the editor opens on the generated outline
+        // Magic is SELF-SUFFICIENT (Dan ruling, plan v2.1 A4): the fine-tuned result lands in 3D —
+        // the editor does NOT open (the old #26 auto-open is dead). Refinement = Edit/double-tap.
       })
       .catch((e) => {
         console.warn('[effect] prepare (shaped) failed:', e)
@@ -411,7 +405,7 @@ function PrototypePageInner() {
           const pre = editorPreRef.current
           if (pre) {
             const o = useOutlineStore.getState()
-            if (o.editedDoc !== pre.outline.editedDoc || o.bgBlur !== pre.outline.bgBlur) pushHistory(pre)
+            if (o.committedShape !== pre.outline.committedShape || o.bgBlur !== pre.outline.bgBlur) pushHistory(pre)
             editorPreRef.current = null
           }
         }}

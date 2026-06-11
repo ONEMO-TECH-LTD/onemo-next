@@ -3,18 +3,19 @@
 // Two-way bridge between the 3D engine and the 2D editor (decouples the R3F tree from the DOM
 // editor — no prop threading).
 //   engine → editor : the page writes the latest `spec` when prepareEffect finishes; OutlineEditor
-//                      reads it to build the editable OutlineDocument from the REAL contour.
-//   editor → engine : OutlineEditor writes `editedContourMM` (the resolved outline in mm) as the user
-//                      commits edits; ShapedModel rebuilds the 3D mesh from it (reusing the texture)
-//                      so the object follows the 2D edits — what you approve is what's shown.
+//                      opens FROM the vector truth (committedShape ?? spec.vectorShape).
+//   editor → engine : every committed edit goes through commitGeometry (THE one writer) — shape +
+//                      derived contour land atomically; ShapedModel rebuilds from the same truth,
+//                      so what you approve is what's shown.
 //   editorOpen      : §6.3 — while the editor overlay is open the scene is frozen, so ShapedModel
 //                      DEFERS mesh rebuilds; ONE rebuild fires at the editor boundary (close).
 
 import { create } from 'zustand'
 import type { EffectSpecDraft, Contour } from '@/lib/effect/types'
 import type { DesignState } from '../types'
-import type { OutlineDocument, FairTracedRingOpts } from '@/lib/outline-core'
+import type { FairTracedRingOpts } from '@/lib/outline-core'
 import type { VShape } from '@/lib/vector-core'
+import { contourFromShape } from '@/lib/effect/geometry-truth'
 
 // #28: artwork position (pan/zoom within the shape) — ONE source for the scene's Position mode
 // and the editor's Image tool. Matrix-only downstream (texture repeat/offset).
@@ -41,16 +42,16 @@ function loadFairing(): FairingPrefs | null {
 interface OutlineStore {
   spec: EffectSpecDraft | null
   setSpec: (spec: EffectSpecDraft | null) => void
-  editedContourMM: Contour | null
-  setEditedContourMM: (c: Contour | null) => void
-  // The last committed editor document — so reopening "Edit" restores edits instead of re-deriving
-  // the original BEN contour (the 3D already reflects edits via editedContourMM).
-  editedDoc: OutlineDocument | null
-  setEditedDoc: (d: OutlineDocument | null) => void
-  // VECTOR CORE (reset Run 1): the committed vector-shape truth, persisted ALONGSIDE editedDoc —
-  // reopening a vector-native shape restores true curves, never a polyline re-derivation.
-  editedVShape: VShape | null
-  setEditedVShape: (v: VShape | null) => void
+  // SINGLE GEOMETRY TRUTH (REBUILD-PLAN-v2 §B): the committed vector shape. null = un-edited —
+  // consumers fall back to spec.vectorShape (the truth born at generation). There is NO second
+  // geometry field to desync from: the contour below is DERIVED inside the one writer.
+  committedShape: VShape | null
+  // DERIVED manufacturing contour of committedShape (0.05mm, mm/y-up) — written ONLY by
+  // commitGeometry, never independently. null ⇔ committedShape null.
+  committedContourMM: Contour | null
+  // THE one writer (single-writer invariant, plan §C-4): sets the shape and derives its contour
+  // atomically. No store write for geometry exists outside this function.
+  commitGeometry: (v: VShape | null) => void
   // "Magic blend" background-blur intensity, edit-mode controllable. null = use the build default (on);
   // 0 = off (sharp full photo); 0..1 = blur amount. ShapedModel re-composes the front texture from it.
   bgBlur: number | null
@@ -72,15 +73,20 @@ interface OutlineStore {
   setArtwork: (d: DesignState) => void
 }
 
-export const useOutlineStore = create<OutlineStore>((set) => ({
+export const useOutlineStore = create<OutlineStore>((set, get) => ({
   spec: null,
   setSpec: (spec) => set({ spec }),
-  editedContourMM: null,
-  setEditedContourMM: (editedContourMM) => set({ editedContourMM }),
-  editedDoc: null,
-  setEditedDoc: (editedDoc) => set({ editedDoc }),
-  editedVShape: null,
-  setEditedVShape: (editedVShape) => set({ editedVShape }),
+  committedShape: null,
+  committedContourMM: null,
+  commitGeometry: (v) => {
+    if (!v) { set({ committedShape: null, committedContourMM: null }); return }
+    const spec = get().spec
+    const contour = spec ? contourFromShape(v, { mmPerPx: spec.mmPerPx, maskHeightPx: spec.maskHeightPx }) : null
+    // a commit that cannot derive a contour is a degenerate edit — refuse it loudly rather than
+    // committing a shape the 3D/manufacturing can't follow (no silent half-commit)
+    if (!contour) { console.error('[geometry-truth] commitGeometry: contour derivation failed — commit refused'); return }
+    set({ committedShape: v, committedContourMM: contour })
+  },
   bgBlur: null,
   setBgBlur: (bgBlur) => set({ bgBlur }),
   subjMatteUrl: null,

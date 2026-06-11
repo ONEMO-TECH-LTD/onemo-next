@@ -12,7 +12,6 @@
 //  • §6.3 deferred rebuilds — while the editor overlay is open (scene frozen) edited-outline mesh
 //    rebuilds are DEFERRED; ONE rebuild fires at the editor-close boundary.
 //  • G2 — anisotropic filtering on the front texture so the full-res artwork stays sharp at angles.
-//  • Phase 3 — back-cap attachment visualization (magnet anchor dots; red flap-risk locators).
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useThree } from '@react-three/fiber'
@@ -20,13 +19,13 @@ import { Center } from '@react-three/drei'
 import * as THREE from 'three'
 import type { DesignState, SceneSettings } from '../../types'
 import type { SuedeMaterialParams, Contour, Pt } from '@/lib/effect/types'
-import { flattenShape } from '@/lib/vector-core'
+import { flattenShape, type VShape } from '@/lib/vector-core'
+import { DISPLAY_TOLERANCE_MM } from '@/lib/effect/geometry-truth'
 import { EFFECT_BUILD_CONFIG, type PreparedEffect } from '@/lib/effect/prepare-effect'
 import { buildMeshFromSpec } from '@/lib/effect/build-mesh'
 import { buildShapedGeometry } from '@/lib/effect/mesh'
 import { composeFront } from '@/lib/effect/composite'
 import { useOutlineStore } from '../../user/outlineStore'
-import { useAttachmentStore } from '../../user/attachmentStore'
 import { perfGesture } from '../../dev/PerfHUD'
 
 interface ShapedModelProps {
@@ -54,17 +53,17 @@ function loadTex(url: string | undefined) {
 }
 
 /**
- * KAI-8951: the 3D silhouette must equal the VECTOR silhouette at any zoom. When the vector
- * truth exists (an edited vector shape), tessellate the mesh geometry FROM IT at display-grade
- * tolerance (0.004 mm chords — adaptive, straights never subdivide), DECOUPLED from the 0.05 mm
- * manufacturing flatten that feeds the payload (Save's serialization unchanged — A2 untouched).
+ * KAI-8951 + REBUILD-PLAN-v2: the 3D silhouette equals the VECTOR silhouette at any zoom — for
+ * EVERY design, not just edited ones (#18: truth is born at generation, so a fresh Magic shape
+ * tessellates from its true curves too). Display-grade 0.004 mm chords (adaptive — straights
+ * never subdivide), decoupled from the 0.05 mm manufacturing flatten.
  */
-function vectorTrueContour(fallback: Contour, sp: { mmPerPx: number; maskHeightPx: number }): Contour {
-  const vs = useOutlineStore.getState().editedVShape
+function vectorTrueContour(fallback: Contour, sp: { vectorShape?: VShape; mmPerPx: number; maskHeightPx: number }): Contour {
+  const vs = useOutlineStore.getState().committedShape ?? sp.vectorShape
   if (!vs) return fallback
   const k = sp.mmPerPx || 1
   try {
-    const ring = flattenShape(vs, Math.max(0.01, 0.004 / k))[0]
+    const ring = flattenShape(vs, Math.max(0.01, DISPLAY_TOLERANCE_MM / k))[0]
     if (!ring || ring.length < 3) return fallback
     const H = sp.maskHeightPx
     return { outer: { pts: ring.map((pt) => [pt.x * k, (H - pt.y) * k] as Pt).reverse() }, holes: [] }
@@ -96,11 +95,10 @@ export default function ShapedModel({
 }: ShapedModelProps) {
   const [result, setResult] = useState<{ geometry: THREE.BufferGeometry; texture: THREE.CanvasTexture; edgeTexture: THREE.CanvasTexture; widthMM: number; heightMM: number } | null>(null)
   const artTexRef = useRef<THREE.CanvasTexture | null>(null)
-  const editedContourMM = useOutlineStore((s) => s.editedContourMM)
+  const committedContourMM = useOutlineStore((s) => s.committedContourMM)
   const editorOpen = useOutlineStore((s) => s.editorOpen)
   const bgBlur = useOutlineStore((s) => s.bgBlur)
   const imageFx = useOutlineStore((s) => s.imageFx)
-  const attachment = useAttachmentStore((s) => s.result)
   const frontSrcRef = useRef<{ origCanvas: HTMLCanvasElement; subjCanvas: HTMLCanvasElement; defaultBlurPx: number } | null>(null)
   const resultRef = useRef(result)
   useEffect(() => { resultRef.current = result }, [result])
@@ -109,7 +107,7 @@ export default function ShapedModel({
   // can sit BLANK until a user interaction invalidates (the V2 blank-on-mount class).
   const invalidate = useThree((s) => s.invalidate)
   const gl = useThree((s) => s.gl)
-  useEffect(() => { invalidate() }, [result, attachment, invalidate])
+  useEffect(() => { invalidate() }, [result, invalidate])
 
   // G2: anisotropic filtering on the front texture (sharp artwork at grazing angles).
   const maxAniso = useMemo(() => Math.min(8, gl.capabilities.getMaxAnisotropy?.() ?? 1), [gl])
@@ -120,7 +118,7 @@ export default function ShapedModel({
     onStatus?.('building')
     const t0 = performance.now()
     try {
-      const ed = useOutlineStore.getState().editedContourMM
+      const ed = useOutlineStore.getState().committedContourMM
       const geom = vectorTrueContour(ed ?? prepared.spec.geometryMM, prepared.spec)
       const r = buildMeshFromSpec(geom, meshOpts(prepared), prepared.composite, prepared.edgeComposite)
       r.texture.anisotropy = maxAniso
@@ -143,10 +141,10 @@ export default function ShapedModel({
   // editor → 3D, DEFERRED to the editor boundary (§6.3): while the overlay is open the scene is
   // frozen, so rebuilding per commit is wasted work. Track the latest committed contour; when the
   // editor CLOSES (editorOpen flips false) with a pending edit, fire ONE rebuild.
-  const pendingContourRef = useRef<typeof editedContourMM>(null)
+  const pendingContourRef = useRef<typeof committedContourMM>(null)
   const pendingBaseRef = useRef(false) // a restore-to-UNEDITED arrived while the editor was open
   useEffect(() => {
-    if (!editedContourMM) {
+    if (!committedContourMM) {
       pendingContourRef.current = null
       // #23 fix: contour → null means a restore to the UNEDITED outline (global undo/redo/reset).
       // The old early-return here left the edited mesh on screen — history stepped, object didn't.
@@ -158,11 +156,11 @@ export default function ShapedModel({
       return
     }
     pendingBaseRef.current = false
-    if (editorOpen) { pendingContourRef.current = editedContourMM; return } // defer
+    if (editorOpen) { pendingContourRef.current = committedContourMM; return } // defer
     pendingContourRef.current = null
-    rebuildFromContour(editedContourMM)
+    rebuildFromContour(committedContourMM)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editedContourMM])
+  }, [committedContourMM])
   useEffect(() => {
     if (editorOpen) return
     if (pendingContourRef.current) {
@@ -182,7 +180,7 @@ export default function ShapedModel({
     rebuildFromContour(sp.geometryMM)
   }
 
-  function rebuildFromContour(contour: NonNullable<typeof editedContourMM>) {
+  function rebuildFromContour(contour: NonNullable<typeof committedContourMM>) {
     const prev = resultRef.current
     const sp = useOutlineStore.getState().spec
     if (!prev || !sp) return
@@ -370,34 +368,6 @@ export default function ShapedModel({
     return fitSize / longest
   }, [result, fitSize])
 
-  // ── Phase 3: attachment visualization — magnet anchors as flush dots on the BACK cap; flap-risk
-  // locators in red on the silhouette. Anchors arrive in FINAL-physical-mm; the mesh is BASE-mm —
-  // map final→base by the inverse size scale, then into this mesh's centred coordinate space.
-  const attachmentViz = useMemo(() => {
-    if (!attachment || !result) return null
-    const sp = useOutlineStore.getState().spec
-    if (!sp) return null
-    const contour = useOutlineStore.getState().editedContourMM ?? sp.geometryMM
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-    for (const [x, y] of contour.outer.pts) {
-      if (x < minX) minX = x; if (x > maxX) maxX = x
-      if (y < minY) minY = y; if (y > maxY) maxY = y
-    }
-    const baseLongest = Math.max(maxX - minX, maxY - minY) || 1
-    // attachment ran on FINAL-physical-mm (base × band scale); invert the uniform band scale to
-    // place dots on this base-mm mesh.
-    const finalLongest = baseLongest * (useAttachmentStore.getState().size === 's140' ? 2 : 1)
-    const s = baseLongest / finalLongest // final mm → base mm
-    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2
-    const zBack = -(EFFECT_BUILD_CONFIG.thicknessMM / 2) - 0.05
-    const toLocal = ([x, y]: [number, number]): [number, number, number] => [x * s - cx, y * s - cy, zBack]
-    return {
-      anchors: attachment.anchors.map(toLocal),
-      locators: attachment.locators.map(toLocal),
-      dotR: Math.max(1.6, baseLongest * 0.025),
-    }
-  }, [attachment, result])
-
   if (!result || !suedeMapsReady) {
     // no naked first paint: until geometry AND the suede skin are ready, light only —
     // a bare glossy material would mirror the HDRI (Dan's pixelated-flash finding)
@@ -410,23 +380,6 @@ export default function ShapedModel({
       <Center>
         <group>
           <mesh geometry={result.geometry} material={materials} scale={scale} castShadow receiveShadow />
-          {attachmentViz && (
-            <group scale={scale}>
-              {attachmentViz.anchors.map(([x, y, z], i) => (
-                /* flush metal disc on the back cap (cylinder axis Y → rotate into the XY plane) */
-                <mesh key={`a${i}`} position={[x, y, z]} rotation={[Math.PI / 2, 0, 0]}>
-                  <cylinderGeometry args={[attachmentViz.dotR, attachmentViz.dotR, 0.4, 24]} />
-                  <meshStandardMaterial color="#8a93ad" metalness={0.85} roughness={0.35} />
-                </mesh>
-              ))}
-              {attachmentViz.locators.map(([x, y, z], i) => (
-                <mesh key={`l${i}`} position={[x, y, z]}>
-                  <sphereGeometry args={[attachmentViz.dotR * 0.8, 16, 16]} />
-                  <meshBasicMaterial color="#ff5a5a" />
-                </mesh>
-              ))}
-            </group>
-          )}
         </group>
       </Center>
     </>

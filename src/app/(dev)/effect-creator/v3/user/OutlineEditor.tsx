@@ -24,7 +24,6 @@ import {
   type OutlineCommand,
   type Vec2Px,
 } from '@/lib/outline-core'
-import type { Contour } from '@/lib/effect/types'
 import { useOutlineStore, NEUTRAL_FX, type ImageFx } from './outlineStore'
 import { UndoIcon, RedoIcon, ResetIcon, CheckIcon, CloseIcon, AddPointIcon, DeleteIcon, ShapeIcon, TuneIcon, ImageToolIcon, OutlineIcon, PreviewIcon, PreviewOffIcon } from './icons'
 import { toast } from '../ui/Toast'
@@ -32,7 +31,7 @@ import { perfGesture } from '../dev/PerfHUD'
 import { generateShapeRing, resampleClosed, type ShapeKind, type ShapeParams } from './shapes'
 // VECTOR CORE (reset Run 1): vector-native kinds render/commit/transform on a true Bézier VShape;
 // the doc stays as the interaction SHADOW (a derived flatten artifact — bbox/hit/grips math only).
-import { shapeToSVGPathD, transformShape, flattenShape, filletShape, filletShapeSmart, filletPathSmart, ringToVPath, nearestOnPath, insertAnchorAt, insertAnchorCentered, deleteAnchorRefit, shapeBBox, type VShape, type VAnchor, type Vec2 } from '@/lib/vector-core'
+import { shapeToSVGPathD, transformShape, filletShape, filletShapeSmart, filletPathSmart, ringToVPath, nearestOnPath, insertAnchorAt, insertAnchorCentered, deleteAnchorRefit, shapeBBox, type VShape, type VAnchor, type Vec2 } from '@/lib/vector-core'
 import { hasVectorDef, getShape } from '@/lib/shape-library'
 // Run 8 — SVG shape upload: a downloaded/Figma-exported outline becomes a first-class vector
 // shape through the export module's dialect gate (loud rejection outside the v1 boundary).
@@ -49,7 +48,7 @@ import { DEFAULT_SHAPE_PARAMS } from './editor/chips'
 import { useEditorHistory } from './editor/useEditorHistory'
 import { useCanvasView } from './editor/useCanvasView'
 import { AdjustSheet, ImageSheet, ShapeSheet } from './editor/sheets'
-import { seedDoc, docFromSpec, docFromRings, outerCenter, scaleDoc, rotateDoc, translateDoc, stretchDoc, outerBbox, pointInPolygon, projectToSeg, type GripId } from './editor/geometry'
+import { seedDoc, docFromRings, outerCenter, scaleDoc, rotateDoc, translateDoc, stretchDoc, outerBbox, pointInPolygon, projectToSeg, type GripId } from './editor/geometry'
 import styles from './outline-editor.module.css'
 
 interface OutlineEditorProps {
@@ -98,7 +97,7 @@ function TopTool({ icon, label, onClick, disabled }: {
 }
 
 export default function OutlineEditor({ open, imageUrl, onClose, openMode }: OutlineEditorProps) {
-  const { doc, setDoc, docRef, vshape, setVShape, vshapeRef, vBaseRef, dirtyRef, histRef, shadowDoc, applyDocRaw, applyVec, undoRaw, redoRaw } = useEditorHistory(() => seedDoc(VIEW_W, VIEW_H))
+  const { doc, setDoc, docRef, vshape, vshapeRef, vBaseRef, histRef, applyDocRaw, applyVec, undoRaw, redoRaw } = useEditorHistory(() => seedDoc(VIEW_W, VIEW_H))
   const [drag, setDrag] = useState<{ ringId: string; nodeId: string; pos: Vec2Px } | null>(null)
   const [radius, setRadius] = useState(0)        // Round: global (or selected-corner) radius px
 
@@ -153,7 +152,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   const pointersRef = useRef<Map<number, Vec2Px>>(new Map())
   // pre-edit snapshot captured on open → "Close" (✕) discards this session's edits and reverts the 3D;
   // "Done" (✓) keeps them. Holds the 3D contour, the persisted editor doc, and the blend at open time.
-  const preEditRef = useRef<{ contourMM: Contour | null; editedDoc: OutlineDocument | null; editedVShape: VShape | null; bgBlur: number | null }>({ contourMM: null, editedDoc: null, editedVShape: null, bgBlur: null })
+  // pre-edit snapshot (single truth): ✕ Close restores it through commitGeometry; Done keeps.
+  const preEditRef = useRef<{ committedShape: VShape | null; bgBlur: number | null }>({ committedShape: null, bgBlur: null })
   const [allSelected, setAllSelected] = useState(false) // tap inside the cut → select every corner, edit them together
   const nodeInteractedRef = useRef(false) // a node tap just happened → suppress the bubbling surface-click (which would re-select all)
   const dragStartRef = useRef<Vec2Px | null>(null) // pointer-down point → distinguish a tap (select) from a drag (move)
@@ -165,7 +165,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   const clientPtsRef = useRef<Map<number, Vec2Px>>(new Map()) // pointerId → CLIENT coords (pinch math)
   const idRef = useRef(0)
   const spec = useOutlineStore((s) => s.spec)
-  const setEditedContourMM = useOutlineStore((s) => s.setEditedContourMM)
   const setBgBlur = useOutlineStore((s) => s.setBgBlur)
   const subjMatteUrl = useOutlineStore((s) => s.subjMatteUrl)
   const art = useOutlineStore((s) => s.artwork)
@@ -201,36 +200,29 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   const undo = useCallback(() => { const d = undoRaw(); if (d) syncSlidersTo(d) }, [undoRaw, syncSlidersTo])
   const redo = useCallback(() => { const d = redoRaw(); if (d) syncSlidersTo(d) }, [redoRaw, syncSlidersTo])
 
-  // Build a fresh edit doc from the current cut-out each time the editor opens (A1d).
+  // Open the editor FROM the single truth (REBUILD-PLAN-v2 §B3): session = committedShape if one
+  // exists, else the design's born vector (Magic re-fit at saved Tune prefs / the centered square
+  // seed pre-Magic). The seed COMMITS — visible = committed at every moment; the §6.3 freeze
+  // defers the 3D rebuild to the close boundary. ✕ Close restores the pre-open snapshot.
   useEffect(() => {
     if (!open) return
-    // Snapshot the pre-edit state so ✕ Close can discard this session's edits (revert the 3D + persisted doc).
     const st0 = useOutlineStore.getState()
-    preEditRef.current = { contourMM: st0.editedContourMM ?? (spec ? spec.geometryMM : null), editedDoc: st0.editedDoc, editedVShape: st0.editedVShape, bgBlur: st0.bgBlur }
-    // Restore prior edits if they belong to the current cut-out; else derive a fresh editable contour.
-    const stored = useOutlineStore.getState().editedDoc
-    const useStored = !!stored && !!spec && stored.image.sourceHash === spec.sourceRef.slice(0, 40)
-    const d = useStored ? stored! : spec ? docFromSpec(spec) : seedDoc(VIEW_W, VIEW_H)
-    setDoc(d)
-    // vector truth travels with the persisted doc — restore the pair together
-    const storedV = useStored ? st0.editedVShape : null
-    setVShape(storedV)
-    vshapeRef.current = storedV
-    vBaseRef.current = null
-    setRadius(d.style.globalOutlineCornerRadiusPx)
-    setSmoothing(Math.round(d.style.smoothing * 100))
+    // snapshot FIRST — ✕ Close restores exactly this through the one writer
+    preEditRef.current = { committedShape: st0.committedShape, bgBlur: st0.bgBlur }
+    st0.setEditorOpen(true) // §6.3: scene frozen → 3D rebuilds defer to close
+    // session view/interaction state reset
     setScale(100)
+    setSmoothing(0)
     setView({ scale: 1, vx: 0, vy: 0 }) // G11: fresh session starts at fit
     setDrag(null)
     setSelectedNode(null)
     setAllSelected(false)
-    setActiveAdjust(null)
     setShapeKind(null)
     setShapePreview(null)
     setTunePreview(null)
     {
       // #21: Dan's tuned settings are the defaults — restore them, never reset to factory
-      const saved = useOutlineStore.getState().fairing
+      const saved = st0.fairing
       setDetail(saved?.detail ?? BEN_DEFAULT_DETAIL)
       setFairParams(saved?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL))
     }
@@ -239,62 +231,49 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     setSelVA(null); setVecLive(null); vecDragRef.current = null
     pinchRef.current = null; canvasPanRef.current = null
     pointersRef.current.clear(); clientPtsRef.current.clear()
-    useOutlineStore.getState().setEditorOpen(true) // §6.3: scene frozen → 3D rebuilds defer to close
     setPreview(false)
     setShowAnchors(true)
     // sync the magic-blend control to the current 3D state (null = build default ≈ on @ 50%)
-    const curBlur = useOutlineStore.getState().bgBlur
-    setBlendOn(curBlur == null || curBlur > 0)
-    setBlendBlur(curBlur == null ? 50 : curBlur > 0 ? Math.round(curBlur * 100) : 50)
-    dirtyRef.current = false // opening is not an edit — don't drive the 3D until the user changes something
-    // Dan (2026-06-10): entering the editor BEFORE Magic means "choose a shape" — the full-bleed
-    // standard square buries its handles at the image edges. Open the Shape sheet with Square
-    // preselected and show the centered square as the starting selection (NOT dirty — it becomes
-    // real only when the user commits an edit / picks a chip).
-    let opened = d
-    // Run 4 — the vectoriser: a Magic cut-out OPENS as the fitted vector of its faired trace
-    // (display truth = true curves; opening is not an edit — the 3D keeps the prepared geometry
-    // until the user commits a change).
-    if (!useStored && spec && spec.generator.adapter !== 'standard' && spec.rawTracePx && spec.rawTracePx.length >= 24) {
-      const savedF = useOutlineStore.getState().fairing
-      const v0 = vecFromTrace(savedF?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL))
-      if (v0) {
-        opened = shadowDoc(v0, d.image)
-        setDoc(opened)
-        setVShape(v0)
-        vshapeRef.current = v0
-        vBaseRef.current = null
+    setBlendOn(st0.bgBlur == null || st0.bgBlur > 0)
+    setBlendBlur(st0.bgBlur == null ? 50 : st0.bgBlur > 0 ? Math.round(st0.bgBlur * 100) : 50)
+    setRadius(0)
+    // ── seed the session truth ──
+    if (spec) {
+      const image = { widthPx: spec.maskWidthPx, heightPx: spec.maskHeightPx, sourceHash: spec.sourceRef.slice(0, 40), orientation: 'baked' as const }
+      let v0: VShape
+      let base: VShape | null = null
+      if (st0.committedShape) {
+        v0 = st0.committedShape // reopening restores TRUE curves — the committed truth itself
+      } else if (spec.generator.adapter !== 'standard') {
+        // Magic: re-fit the trace at the saved Tune prefs (same engine as generation); the born
+        // truth is the always-valid fallback — never a doc, never a polyline
+        const savedF = st0.fairing
+        v0 = vecFromTrace(savedF?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL)) ?? spec.vectorShape
+      } else {
+        // Dan (2026-06-10): entering the editor BEFORE Magic means "choose a shape" — the
+        // full-bleed square buries its handles, so the session starts on the centered square,
+        // exact arcs at the 8mm absolute default (KAI-8940), clamped to the inscribable max
+        base = getShape('square', image.widthPx, image.heightPx)
+        const side = Math.min(image.widthPx, image.heightPx) * 0.72
+        const defaultR = Math.min(Math.round(8 / (spec.mmPerPx || 1)), Math.floor(side / 2))
+        v0 = filletShape(base, defaultR)
+        setRadius(defaultR)
+        setActiveAdjust('shape')
+        setShapeKind('square')
+        setShowAnchors(false) // rigid shape default — Points toggle re-enables
       }
-    }
-    if (!useStored && spec && spec.generator.adapter === 'standard' && !useOutlineStore.getState().editedContourMM) {
-      // VECTOR CORE: the starting square is a TRUE vector — 4 corner anchors filleted into exact
-      // arcs (kappa-true cubics). Default rounding lives in the SHAPE (committed truth, ~8mm on
-      // the 70mm product), not a slider transient (the radius-0-seed lie was caught live 2026-06-10).
-      const base = getShape('square', d.image.widthPx, d.image.heightPx)
-      const side = Math.min(d.image.widthPx, d.image.heightPx) * 0.72
-      // default rounding = 8mm ABSOLUTE on the product (KAI-8940) — mm-anchored, never a %,
-      // clamped to the geometric max (half-side = the inscribed circle)
-      const defaultR = Math.min(Math.round(8 / (spec.mmPerPx || 1)), Math.floor(side / 2))
-      const v0 = filletShape(base, defaultR)
-      opened = shadowDoc(v0, d.image)
-      setDoc(opened)
-      setVShape(v0)
-      vshapeRef.current = v0
-      vBaseRef.current = base
-      setRadius(defaultR)
-      setActiveAdjust('shape')
-      setShapeKind('square')
-      setShowAnchors(false) // rigid shape default — Points toggle re-enables
+      applyVec(v0, base) // COMMITS the seed (visible = committed); §6.3 defers the 3D to close
+    } else {
+      setDoc(seedDoc(VIEW_W, VIEW_H)) // no image yet — inert placeholder (page gates the editor)
     }
     setImageSub('position')
     setAdjustSub('radius')
-    setFxDraft(useOutlineStore.getState().imageFx ?? NEUTRAL_FX)
+    setFxDraft(st0.imageFx ?? NEUTRAL_FX)
     imgPanRef.current = null
     // #27: toolbar creation modes land in the matching editor mode; default mode = Adjust
     if (openMode === 'shape') setActiveAdjust('shape')
-    else setActiveAdjust('adjust')
-    docRef.current = opened
-    histRef.current = { past: [], future: [] } // fresh undo history per editing session
+    else if (spec?.generator.adapter !== 'standard' || useOutlineStore.getState().committedShape) setActiveAdjust('adjust')
+    histRef.current = { past: [], future: [] } // fresh undo history per session (the seed is not undoable)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
@@ -361,40 +340,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   }, [vshape, doc])
   const hasIssues = resolved.issues.length > 0 // inline manufacturability guardrail (self-intersection etc.)
 
-  // editor → 3D: push the COMMITTED resolved outline (mm) so the 3D suede object follows real edits
-  // (ADDENDUM D step 4 "the 3D follows" / step 8 "what you approve is what's made"). Keyed on the
-  // committed `doc` (not the transient drag), so the 3D updates on commit — 2D leads, 3D lags.
-  useEffect(() => {
-    if (!open || !spec || !dirtyRef.current) return
-    const k = spec.mmPerPx || 1
-    const H = doc.image.heightPx
-    // VECTOR CORE: the VShape is the committed truth — flatten IT at manufacturing tolerance
-    // (0.05 mm in px) and feed the same mm mapping. The doc shadow never reaches the 3D.
-    if (vshape) {
-      const tolPx = Math.max(0.05, 0.05 / k)
-      const ring = flattenShape(vshape, tolPx)[0].map((p) => [p.x, p.y] as Vec2Px)
-      if (ring.length >= 3) {
-        const outer = ring.map(([x, y]) => [x * k, (H - y) * k] as Vec2Px).reverse()
-        setEditedContourMM({ outer: { pts: outer }, holes: [] })
-      }
-      return
-    }
-    const res = resolveOutlineDocument(doc, { flattenTolerancePx: 0.15 })
-    if (res.issues.length) return // never push an un-manufacturable (self-intersecting) shape to the 3D
-    // The mesh maps image-top→3D-bottom for GEOMETRY while the texture's flipY keeps the IMAGE upright
-    // (invisible on a symmetric shape, but it mirrors an asymmetric EDIT). Feed Y in the engine's
-    // upright-geometry space (flip within image height) so an edit at the top of the editor lands at
-    // the top of the 3D object — WYSIWYG. The Y-flip reflects the ring → reverse it to keep the
-    // mesh's expected winding (outer CCW / holes CW) so edge normals + inset stay outward.
-    const toMM = (ring: Vec2Px[]): Vec2Px[] => ring.map(([x, y]) => [x * k, (H - y) * k] as Vec2Px).reverse()
-    const outerIdx = doc.rings.findIndex((r) => r.role === 'outer')
-    if (outerIdx < 0 || !res.flattenedRingsPx[outerIdx]?.length) return
-    const outer = toMM(res.flattenedRingsPx[outerIdx])
-    const holes = doc.rings
-      .map((r, i) => (r.role === 'hole' && res.flattenedRingsPx[i]?.length ? toMM(res.flattenedRingsPx[i]) : null))
-      .filter((h): h is Vec2Px[] => h !== null)
-    setEditedContourMM({ outer: { pts: outer }, holes: holes.map((h) => ({ pts: h })) })
-  }, [doc, vshape, open, spec, setEditedContourMM, dirtyRef])
+  // (REBUILD-PLAN-v2 §B3: the old editor→3D contour-push effect lived HERE, gated on `open` —
+  // the close-boundary bug class. It is gone: commitGeometry derives the contour inside every
+  // commit, synchronously. No geometry state rides a React effect.)
 
   // Vector display shape: the in-flight anchor/handle drag (vecLive) supersedes the committed
   // vshape; the live Scale preview transforms it exactly (affine on anchors+handles). One source
@@ -930,16 +878,15 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       setDrag(null); setSelectedNode(null); setAllSelected(false)
       setShapeKind(null); setShapePreview(null)
     }
-    // Magic cut-out → re-fit the trace at the saved Tune defaults (same as editor-open)
-    if (spec && spec.generator.adapter !== 'standard' && spec.rawTracePx && spec.rawTracePx.length >= 24) {
+    // Magic cut-out → re-fit the trace at the saved Tune defaults; the BORN truth is the
+    // always-valid fallback (REBUILD-PLAN-v2: never a doc, never a polyline)
+    if (spec && spec.generator.adapter !== 'standard') {
       const savedF = useOutlineStore.getState().fairing
-      const v = vecFromTrace(savedF?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL))
-      if (v) {
-        applyVec(v, null)
-        setRadius(0)
-        clearTail()
-        return
-      }
+      const v = vecFromTrace(savedF?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL)) ?? spec.vectorShape
+      applyVec(v, null)
+      setRadius(0)
+      clearTail()
+      return
     }
     // standard → the full-image square as a TRUE vector, 8mm-absolute default rounding
     if (spec && spec.generator.adapter === 'standard') {
@@ -954,12 +901,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       clearTail()
       return
     }
-    const d = spec ? docFromSpec(spec) : seedDoc(VIEW_W, VIEW_H)
-    applyDoc(d) // reset restores the base shape — undoable + pushed back to the 3D
-    setRadius(d.style.globalOutlineCornerRadiusPx)
-    setSmoothing(Math.round(d.style.smoothing * 100))
-    clearTail()
-  }, [spec, applyDoc, applyVec, vecFromTrace])
+    // no spec = no design in the editor (the page gates entry) — nothing to reset
+  }, [spec, applyVec, vecFromTrace])
   const previewTune = useCallback((params: FairTracedRingOpts) => {
     const t0 = performance.now()
     const d = buildTunedDoc(params)
@@ -1167,14 +1110,12 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     onClose()
   }, [onClose])
 
-  // ✕ Close = discard this session's edits: revert the 3D contour, the persisted editor doc, and the
-  // blend to the pre-edit snapshot, then exit. (Done keeps them; saving during the session was automatic.)
+  // ✕ Close = discard this session's edits: restore the pre-open truth through THE one writer
+  // (shape + contour revert atomically), revert the blend, exit. (Done keeps; commits were live.)
   const onCancel = useCallback(() => {
     const pe = preEditRef.current
     const st = useOutlineStore.getState()
-    st.setEditedContourMM(pe.contourMM) // 3D rebuilds the pre-edit shape
-    st.setEditedDoc(pe.editedDoc)       // reopening shows the pre-edit outline, not this session's edits
-    st.setEditedVShape(pe.editedVShape) // the vector truth reverts with it
+    st.commitGeometry(pe.committedShape) // null → back to the born truth (spec.vectorShape)
     if (st.bgBlur !== pe.bgBlur) st.setBgBlur(pe.bgBlur != null ? pe.bgBlur : 0.5) // revert blend (null ≈ build default)
     setActiveAdjust(null)
     setSelectedNode(null)

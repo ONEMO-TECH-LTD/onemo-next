@@ -25,7 +25,6 @@ export function useEditorHistory(seed: () => OutlineDocument) {
   const vshapeRef = useRef<VShape | null>(null)
   useEffect(() => { vshapeRef.current = vshape }, [vshape])
   const vBaseRef = useRef<VShape | null>(null)
-  const dirtyRef = useRef(false) // true once the user actually edited (3D follows edits, not the open)
   const histRef = useRef<{ past: HistoryEntry[]; future: HistoryEntry[] }>({ past: [], future: [] })
   const [, bumpHist] = useState(0)
 
@@ -39,47 +38,36 @@ export function useEditorHistory(seed: () => OutlineDocument) {
     histRef.current.past.push({ d: docRef.current, v: vshapeRef.current })
     if (histRef.current.past.length > 50) histRef.current.past.shift()
     histRef.current.future = []
-    dirtyRef.current = true
   }
 
-  /** Doc-level edit: replaces the geometry → vector mode exits (callers clear their selection UI). */
-  const applyDocRaw = useCallback((next: OutlineDocument) => {
-    push()
-    docRef.current = next
-    setDoc(next)
-    vshapeRef.current = null
-    setVShape(null)
-    vBaseRef.current = null
-    const st = useOutlineStore.getState()
-    st.setEditedDoc(next) // persist so reopening restores edits
-    st.setEditedVShape(null)
-    bumpHist((v) => v + 1)
+  /** REBUILD-PLAN-v2 §B2: doc-level edits no longer exist as a truth path. Every session is
+   *  vector-seeded (truth at birth), so this is UNREACHABLE — it fails loud rather than silently
+   *  re-entering the polyline model. Its dead callers are removed with the doc layer in P4. */
+  const applyDocRaw = useCallback((_next: OutlineDocument) => {
+    void _next
+    throw new Error('applyDocRaw: the OutlineDocument edit path was removed (single geometry truth) — a doc-level commit is a bug')
   }, [])
 
-  /** Vector-shape edit: same history/persistence/3D contract as a doc apply, vshape as truth. */
+  /** Vector-shape edit: ONE history entry + ONE store commit through THE single writer
+   *  (commitGeometry derives the contour atomically — visible = committed, always). */
   const applyVec = useCallback((nextV: VShape, nextBase?: VShape | null) => {
     push()
-    const sd = shadowDoc(nextV)
+    const sd = shadowDoc(nextV) // session-local interaction adapter — never persisted
     docRef.current = sd
     setDoc(sd)
     vshapeRef.current = nextV
     setVShape(nextV)
     if (nextBase !== undefined) vBaseRef.current = nextBase
-    const st = useOutlineStore.getState()
-    st.setEditedDoc(sd)
-    st.setEditedVShape(nextV)
+    useOutlineStore.getState().commitGeometry(nextV)
     bumpHist((v) => v + 1)
   }, [shadowDoc])
 
   const restore = (entry: HistoryEntry) => {
-    dirtyRef.current = true
     docRef.current = entry.d
     setDoc(entry.d)
     vshapeRef.current = entry.v
     setVShape(entry.v)
-    const st = useOutlineStore.getState()
-    st.setEditedDoc(entry.d)
-    st.setEditedVShape(entry.v)
+    useOutlineStore.getState().commitGeometry(entry.v)
     bumpHist((v) => v + 1)
   }
 
@@ -103,5 +91,5 @@ export function useEditorHistory(seed: () => OutlineDocument) {
     return next.d
   }, [])
 
-  return { doc, setDoc, docRef, vshape, setVShape, vshapeRef, vBaseRef, dirtyRef, histRef, shadowDoc, applyDocRaw, applyVec, undoRaw, redoRaw }
+  return { doc, setDoc, docRef, vshape, setVShape, vshapeRef, vBaseRef, histRef, shadowDoc, applyDocRaw, applyVec, undoRaw, redoRaw }
 }
