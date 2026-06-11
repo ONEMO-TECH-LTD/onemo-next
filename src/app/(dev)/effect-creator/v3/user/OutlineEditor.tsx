@@ -36,6 +36,7 @@ import { hasVectorDef, getShape } from '@/lib/shape-library'
 import { vshapeFromSVG, fitShapeToBox } from '@/lib/export'
 // Run 10 — image-shape upload: threshold mask → the SAME trace machinery as Magic → fitted vector.
 import { maskFromImageData } from '@/lib/effect/image-shape'
+import { smoothMask } from '@/lib/effect/mask'
 import { traceContourRaw } from '@/lib/effect/contour'
 
 // Run-3 live generators: dense internal sample → ONE Schneider fit at spawn → vector path out.
@@ -891,9 +892,12 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     setRadius(0); setSmoothing(0); setScale(100); setAllSelected(false)
     setShowAnchors(false)
   }, [applyVec])
-  /** Run 10 — image upload: decode → threshold mask → the Magic trace machinery → ONE Schneider
-   *  fit. Editor-space ring orientation is normalized to the Magic-trace convention (negative
-   *  shoelace in y-down px) so the commit's flip+reverse lands the mesh's expected winding. */
+  /** Run 10 — image upload: decode → threshold mask → the Magic trace machinery → THE one fit
+   *  (geometry-truth.vectoriseTrace — KAI-8972/P1a: the inline fairTracedRing+ringToVPath fit with
+   *  copied 30°/0.35px constants was a second pipeline; deleted). Orientation: the canvas mask is
+   *  y-down, so the traced ring is normalized to the commit's winding (negative shoelace in y-down
+   *  px, as before), then flipped to mask y-up — the SAME convention Magic's raw trace arrives in;
+   *  vectoriseTrace owns the flip back. Shared-fit side effect: uploads get corner integrity too. */
   const vecFromImageFile = useCallback(async (file: File): Promise<VShape> => {
     const bmp = await createImageBitmap(file)
     try {
@@ -905,15 +909,17 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       const ctx = cv.getContext('2d')!
       ctx.drawImage(bmp, 0, 0, w, h)
       const { mask, width, height } = maskFromImageData(ctx.getImageData(0, 0, w, h))
-      const ring = traceContourRaw(mask, width, height)
-      if (!ring || ring.length < 12) throw new Error('No clear shape found — try an image with a stronger silhouette')
-      const pts = ring.map(([x, y]) => ({ x, y }))
+      // the SAME mask hygiene Magic's pipeline applies before tracing — Otsu on anti-aliased edges
+      // leaves sub-px boundary jitter that the corner detector reads as sharp features (8 false
+      // corners on an ellipse, pinned in upload-fit-repro.test); true corners survive the smooth
+      const ring = traceContourRaw(smoothMask(mask, width, height, 3), width, height)
+      if (!ring) throw new Error('No clear shape found — try an image with a stronger silhouette')
       let area = 0
-      for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length]; area += a.x * b.y - b.x * a.y }
-      if (area > 0) pts.reverse()
-      const faired = fairTracedRing(pts.map((p) => [p.x, p.y] as Vec2Px), useOutlineStore.getState().fairing?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL))
-      if (faired.length < 3) throw new Error('No clear shape found — try an image with a stronger silhouette')
-      return { paths: [ringToVPath(faired.map(([x, y]) => ({ x, y })), 30, 0.35)] }
+      for (let i = 0; i < ring.length; i++) { const a = ring[i], b = ring[(i + 1) % ring.length]; area += a[0] * b[1] - b[0] * a[1] }
+      const oriented = area > 0 ? [...ring].reverse() : ring
+      const v = vectoriseTrace(oriented.map(([x, y]) => [x, height - y] as [number, number]), height, useOutlineStore.getState().fairing?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL))
+      if (!v) throw new Error('No clear shape found — try an image with a stronger silhouette')
+      return v
     } finally {
       bmp.close()
     }
