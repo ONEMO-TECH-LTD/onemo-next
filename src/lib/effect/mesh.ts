@@ -24,25 +24,29 @@ export interface MeshOptions {
 interface ProfileSample { radial: number; z: number; nr: number; nz: number }
 
 /**
- * Edge cross-section: flat-face-inset → SHORT top fillet (tangent to face) → straight wall → bottom
- * fillet → back. radial 0 = the silhouette (wall); caps are inset by r so the fillet eases in with
- * NO crease/separation line. Small r = short rounding.
+ * Edge cross-section (KAI-8951 — Dan: the rim must be an OUTWARD ROUNDED LIP, convex, rolling
+ * outward — the previous design inset both caps by r and put the wall at the silhouette, so the
+ * face sat inside a crease ring that read as a GROOVE). Now: the caps keep the FULL contour
+ * extent; the lip BULGES OUTWARD by r beyond the silhouette, tangent to both faces (no crease).
+ * radial 0 = the contour (cap edge); +r = the lip's outermost roll at the mid-wall. The nominal
+ * cutline stays the contour — the lip models the material rolling outward; the visual silhouette
+ * grows by a UNIFORM +r (0.15mm), shape unchanged.
  */
 function buildProfile(t: number, rIn: number, segs: number): ProfileSample[] {
-  const r = Math.min(rIn, t / 2)
   const half = t / 2
+  const r = Math.min(rIn, half)
   const out: ProfileSample[] = []
-  for (let i = 0; i <= segs; i++) { // top fillet: a π/2 → 0 (face → wall), centre (radial -r, z half-r)
-    const a = (Math.PI / 2) * (1 - i / segs)
-    out.push({ radial: -r + r * Math.cos(a), z: (half - r) + r * Math.sin(a), nr: Math.cos(a), nz: Math.sin(a) })
+  for (let i = 0; i <= segs; i++) { // top quarter: face edge (flush, tangent) → outermost roll
+    const a = (Math.PI / 2) * (i / segs)
+    out.push({ radial: r * Math.sin(a), z: (half - r) + r * Math.cos(a), nr: Math.sin(a), nz: Math.cos(a) })
   }
-  if (half - r > 1e-6) { // straight wall at the silhouette
-    out.push({ radial: 0, z: half - r, nr: 1, nz: 0 })
-    out.push({ radial: 0, z: -(half - r), nr: 1, nz: 0 })
+  if (half - r > 1e-6) { // outward wall at +r (the lip's crest)
+    out.push({ radial: r, z: half - r, nr: 1, nz: 0 })
+    out.push({ radial: r, z: -(half - r), nr: 1, nz: 0 })
   }
-  for (let i = 0; i <= segs; i++) { // bottom fillet: a 0 → -π/2 (wall → back)
-    const a = -(Math.PI / 2) * (i / segs)
-    out.push({ radial: -r + r * Math.cos(a), z: -(half - r) + r * Math.sin(a), nr: Math.cos(a), nz: Math.sin(a) })
+  for (let i = 0; i <= segs; i++) { // bottom quarter: outermost roll → back edge (flush, tangent)
+    const a = (Math.PI / 2) * (i / segs)
+    out.push({ radial: r * Math.cos(a), z: -(half - r) - r * Math.sin(a), nr: Math.cos(a), nz: -Math.sin(a) })
   }
   return out
 }
@@ -120,7 +124,7 @@ export function buildShapedGeometry(contour: Contour, opts: MeshOptions): Shaped
   const quad = (A: V, B: V, C: V, D: V) => { pushV(A); pushV(B); pushV(D); pushV(A); pushV(D); pushV(C) }
   const mk = (x: number, y: number, z: number, nx: number, ny: number, nz: number): V => ({ x, y, z, nx, ny, nz })
 
-  const insetByR: Pt[][] = []
+  const capRings: Pt[][] = []
 
   // ── Edge lip = the SAME front image continuing over the rounding (same material). UV wraps by arc
   //    length (no stretch), so the printed surface rolls over the lip 1:1. No separate strip/darken.
@@ -128,7 +132,7 @@ export function buildShapedGeometry(contour: Contour, opts: MeshOptions): Shaped
     const pts = ring.pts
     const N = ringNormals(pts)
     const n = pts.length
-    insetByR.push(pts.map(([x, y], i) => [x - N[i][0] * r, y - N[i][1] * r]))
+    capRings.push(pts) // caps keep the FULL contour (KAI-8951 — no inset, no crease ring)
     const ev = (P: Pt, Np: Pt, s: number): V => {
       const ps = profile[s]
       // LOCAL colour roll: every profile sample on this perimeter point samples ONE source pixel just
@@ -149,9 +153,9 @@ export function buildShapedGeometry(contour: Contour, opts: MeshOptions): Shaped
   }
   const edgeCount = positions.length / 3
 
-  // ── Flat caps on the inset rings (inset by r → the fillet eases in tangentially, no crease) ──
-  const outerInset = insetByR[0]
-  const holeInsets = insetByR.slice(1)
+  // ── Flat caps on the FULL rings — the lip departs tangentially from the cap edge ──
+  const outerInset = capRings[0]
+  const holeInsets = capRings.slice(1)
   const toVec2 = (pts: Pt[]) => pts.map(([x, y]) => new THREE.Vector2(x, y))
   const faces = THREE.ShapeUtils.triangulateShape(toVec2(outerInset), holeInsets.map(toVec2))
   const allV: Pt[] = [outerInset, ...holeInsets].flat()

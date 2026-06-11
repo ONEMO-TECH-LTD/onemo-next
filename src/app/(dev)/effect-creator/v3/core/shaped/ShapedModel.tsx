@@ -19,7 +19,8 @@ import { useThree } from '@react-three/fiber'
 import { Center } from '@react-three/drei'
 import * as THREE from 'three'
 import type { DesignState, SceneSettings } from '../../types'
-import type { SuedeMaterialParams } from '@/lib/effect/types'
+import type { SuedeMaterialParams, Contour, Pt } from '@/lib/effect/types'
+import { flattenShape } from '@/lib/vector-core'
 import { EFFECT_BUILD_CONFIG, type PreparedEffect } from '@/lib/effect/prepare-effect'
 import { buildMeshFromSpec } from '@/lib/effect/build-mesh'
 import { buildShapedGeometry } from '@/lib/effect/mesh'
@@ -50,6 +51,26 @@ function loadTex(url: string | undefined) {
   t.colorSpace = THREE.NoColorSpace
   texCache.set(url, t)
   return t
+}
+
+/**
+ * KAI-8951: the 3D silhouette must equal the VECTOR silhouette at any zoom. When the vector
+ * truth exists (an edited vector shape), tessellate the mesh geometry FROM IT at display-grade
+ * tolerance (0.004 mm chords — adaptive, straights never subdivide), DECOUPLED from the 0.05 mm
+ * manufacturing flatten that feeds the payload (Save's serialization unchanged — A2 untouched).
+ */
+function vectorTrueContour(fallback: Contour, sp: { mmPerPx: number; maskHeightPx: number }): Contour {
+  const vs = useOutlineStore.getState().editedVShape
+  if (!vs) return fallback
+  const k = sp.mmPerPx || 1
+  try {
+    const ring = flattenShape(vs, Math.max(0.01, 0.004 / k))[0]
+    if (!ring || ring.length < 3) return fallback
+    const H = sp.maskHeightPx
+    return { outer: { pts: ring.map((pt) => [pt.x * k, (H - pt.y) * k] as Pt).reverse() }, holes: [] }
+  } catch {
+    return fallback
+  }
 }
 
 /** MeshOptions from the build config + the prepared spec's px↔mm mapping. */
@@ -100,7 +121,7 @@ export default function ShapedModel({
     const t0 = performance.now()
     try {
       const ed = useOutlineStore.getState().editedContourMM
-      const geom = ed ?? prepared.spec.geometryMM
+      const geom = vectorTrueContour(ed ?? prepared.spec.geometryMM, prepared.spec)
       const r = buildMeshFromSpec(geom, meshOpts(prepared), prepared.composite, prepared.edgeComposite)
       r.texture.anisotropy = maxAniso
       setResult((prev) => {
@@ -168,7 +189,7 @@ export default function ShapedModel({
     const t0 = performance.now()
     let built: { geometry: THREE.BufferGeometry; widthMM: number; heightMM: number }
     try {
-      built = buildShapedGeometry(contour, {
+      built = buildShapedGeometry(vectorTrueContour(contour, sp), {
         thicknessMM: EFFECT_BUILD_CONFIG.thicknessMM,
         edgeRadiusMM: EFFECT_BUILD_CONFIG.edgeRadiusMM,
         edgeSegments: EFFECT_BUILD_CONFIG.edgeSegments,
