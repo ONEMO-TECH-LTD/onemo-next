@@ -29,16 +29,17 @@ export const NEUTRAL_FX: ImageFx = { brightness: 100, contrast: 100, saturate: 1
 // them. Durable across reloads (localStorage) until changed again.
 export interface FairingPrefs { detail: number; params: FairTracedRingOpts }
 
-// DRAW (Run 9b): the drawn shape's two candidates — the user's hand (faithfully fitted) and the
-// library suggestion — plus which one is currently on the object.
+// DRAW (KAI-8949 — Dan's correction model): one drawing = ONE path with two renderings of the
+// SAME hand — the faithful fit and the BEN-style CORRECTED version (imperfections auto-removed).
+// Snap-to-stock was DROPPED by Dan ("if a shape's in stock the user just picks it perfect").
 export interface DrawRecipe {
   /** the raw accumulated stroke in editor px (the "reset to raw" source of truth) */
   raw: [number, number][]
-  /** keep-raw candidate: the hand, faithfully vectorised */
+  /** the hand, faithfully vectorised (intentional wobble preserved) */
   fitted: VShape
-  /** snap candidate: the matched library shape fitted to the stroke's box (absent = no match) */
-  snapped?: { kind: string; shape: VShape }
-  active: 'raw' | 'snapped'
+  /** the hand, BEN-style corrected — flagrant imperfections removed (absent = correction failed) */
+  corrected?: VShape
+  active: 'raw' | 'corrected'
 }
 const FAIRING_KEY = 'kai-ben-fairing-v1'
 function loadFairing(): FairingPrefs | null {
@@ -62,7 +63,7 @@ interface OutlineStore {
   // reopening a vector-native shape restores true curves, never a polyline re-derivation.
   editedVShape: VShape | null
   setEditedVShape: (v: VShape | null) => void
-  // DRAW (Run 9b): both candidates of a drawn shape live in the recipe while the shape exists —
+  // DRAW: both renderings of the drawn shape live in the recipe while the shape exists —
   // "back to my drawing" is one tap at any time, in either direction (Dan, locked 2026-06-10).
   // Cleared when a different shape SOURCE lands (chip/upload/tune/generator/doc edit/reset);
   // survives transforms and point edits (reset-to-raw is an explicit, loud discard by design).

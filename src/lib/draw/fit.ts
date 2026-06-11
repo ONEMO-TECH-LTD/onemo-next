@@ -5,6 +5,7 @@
 
 import type { Vec2, VShape } from '@/lib/vector-core'
 import { ringToVPath } from '@/lib/vector-core'
+import { fairTracedRing, fairingFromDetail, BEN_DEFAULT_DETAIL, type Vec2Px } from '@/lib/outline-core'
 import { resampleStroke } from './recognizer'
 
 /** Close an open stroke into a ring (drops a trailing point that already returned to the start). */
@@ -81,4 +82,20 @@ function strawCorners(ring: Vec2[], k: number, thresholdDeg: number): number[] {
     if (isMax) out.push(i)
   }
   return out
+}
+
+/**
+ * BEN-style CORRECTION of a drawn stroke (KAI-8949 — Dan's model: take the DRAWN path and
+ * auto-adjust it to remove flagrant imperfections → smooth shapes, not jittery lines; it corrects
+ * what was drawn, it does NOT substitute a stock shape). The exact machinery Magic uses on the AI
+ * trace — the Dan-tuned fairing engine → one Schneider fit — pointed at the hand-drawn ring.
+ */
+export function correctStroke(stroke: Vec2[]): VShape | null {
+  if (stroke.length < 8) return null
+  const ring0 = closeStroke(stroke)
+  if (ring0.length < 8) return null
+  const faired = fairTracedRing(ring0.map((p) => [p.x, p.y] as Vec2Px), fairingFromDetail(BEN_DEFAULT_DETAIL))
+  if (faired.length < 3) return null
+  const path = ringToVPath(faired.map(([x, y]) => ({ x, y })), 30, 0.35)
+  return path.anchors.length >= 3 ? { paths: [path] } : null
 }

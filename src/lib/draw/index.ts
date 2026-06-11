@@ -3,4 +3,4 @@
 
 export { recognizeStroke, normalizeStroke, resampleStroke, cloudDistance, CLOUD_N, type StrokeTemplate, type DrawMatch } from './recognizer'
 export { libraryTemplates } from './templates'
-export { vectoriseStroke } from './fit'
+export { vectoriseStroke, correctStroke } from './fit'

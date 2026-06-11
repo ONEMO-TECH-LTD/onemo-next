@@ -49,9 +49,10 @@ import { traceContourRaw } from '@/lib/effect/contour'
 // Segments never leave the generator (blueprint modules/generators.md).
 const GEN_VECTOR_KINDS = new Set<ShapeKind>(['daisy', 'pinwheel', 'form', 'blob'])
 // Run 2 · G6 decomposition — seam 1: pure doc-space geometry; seam 2: chip lineup + glyphs.
-import { SHAPE_CHIPS, DEFAULT_SHAPE_PARAMS } from './editor/chips'
-// Run 9b — the Draw engine (snap-as-suggestion + keep-raw) and its display-only live ink.
-import { vectoriseStroke, recognizeStroke, libraryTemplates } from '@/lib/draw'
+import { DEFAULT_SHAPE_PARAMS } from './editor/chips'
+// Draw engine (KAI-8949 — Dan's correction model): faithful fit + BEN-style correction of the
+// DRAWN path. Snap-to-stock DROPPED by Dan; display-only live ink stays.
+import { vectoriseStroke, correctStroke } from '@/lib/draw'
 import { getStroke } from 'perfect-freehand'
 import { useEditorHistory } from './editor/useEditorHistory'
 import { useCanvasView } from './editor/useCanvasView'
@@ -112,8 +113,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   const [smoothing, setSmoothing] = useState(0) // 0–100 → style.smoothing 0..1 (Catmull-Rom spline)
   const [scale, setScale] = useState(100) // 50–150 relative resize of the whole cut-out; bakes on release
   const [drawPts, setDrawPts] = useState<Vec2Px[] | null>(null) // non-null = Manual draw in progress (A3a)
-  // Run 9b — the snap SUGGESTION: the matched library candidate, ghost-previewed, never forced
-  const [drawGhost, setDrawGhost] = useState<{ kind: ShapeKind; label: string; shape: VShape } | null>(null)
   const [edgeCost, setEdgeCost] = useState<CostGrid | null>(null) // image edge-cost grid for the livewire (A3b)
   const [selectedNode, setSelectedNode] = useState<{ ringId: string; nodeId: string } | null>(null) // anchor add/delete target
   // #35 Apple layout: the editor's bottom is a MODE pill (Shape · Adjust · Image · Draw); each
@@ -828,7 +827,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   // outline-core/prepareSdfBlend for its post-core refinement; no UI tool ships here.)
 
   // Manual mode (A3a) — draw the outline by hand: click to place anchors, Finish to close the ring.
-  const startDraw = useCallback(() => { setDrawPts([]); setDrag(null); setDrawGhost(null) }, [])
+  const startDraw = useCallback(() => { setDrawPts([]); setDrag(null) }, [])
   // Tap the surface (not a node): inside the cut → SELECT ALL corners (scale/twist them together);
   // outside → deselect. (Node taps stopPropagation, so they never reach here.)
   const onSurfaceClick = useCallback((e: React.MouseEvent) => {
@@ -1230,37 +1229,19 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     setShapeKind(null); setShapePreview(null) // open the picker fresh (chips only) — no stale active shape
   }, [])
 
-  /** Run 9b — fit a library candidate into the STROKE's own box (the ghost overlays the hand). */
-  const fitToStrokeBox = useCallback((shape: VShape, pts: Vec2Px[]): VShape => {
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-    for (const [x, y] of pts) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y }
-    const bb = shapeBBox(shape, 0.1)
-    const w = bb.maxX - bb.minX || 1, h = bb.maxY - bb.minY || 1
-    const S = Math.min((maxX - minX) / w, (maxY - minY) / h) || 1
-    const cx = (bb.minX + bb.maxX) / 2, cy = (bb.minY + bb.maxY) / 2
-    return transformShape(shape, (pt: Vec2) => ({ x: (minX + maxX) / 2 + (pt.x - cx) * S, y: (minY + maxY) / 2 + (pt.y - cy) * S }))
-  }, [])
-  // Run 9b — after each stroke/tap lands, match the accumulated path against OUR library; the
-  // ghost is a suggestion, never forced (draw.md, Dan locked). Runs per drawPts change only.
-  useEffect(() => {
-    if (drawPts === null || drawPath.length < 12) { setDrawGhost(null); return }
-    const match = recognizeStroke(drawPath.map(([x, y]) => ({ x, y })), libraryTemplates())
-    if (!match || !hasVectorDef(match.kind as ShapeKind)) { setDrawGhost(null); return }
-    const kind = match.kind as ShapeKind
-    const img = docRef.current.image
-    const shape = fitToStrokeBox(getShape(kind as Parameters<typeof getShape>[0], img.widthPx, img.heightPx), drawPath)
-    setDrawGhost({ kind, label: SHAPE_CHIPS.find((c) => c.kind === kind)?.label ?? kind, shape })
-  }, [drawPts, drawPath, fitToStrokeBox, docRef])
   const finishDraw = useCallback(() => {
     if (drawPath.length >= 3) {
-      // Run 9b — KEEP-RAW: the hand becomes faithful true curves (intentional wobble preserved);
-      // both candidates enter the recipe so reset-to-raw works in either direction, any time.
-      const v = vectoriseStroke(drawPath.map(([x, y]) => ({ x, y })))
+      // KAI-8949 — Dan's model: ONE drawing = ONE path. The hand is fitted faithfully AND
+      // BEN-style CORRECTED (flagrant imperfections removed); correction is the default rendering,
+      // the raw drawing stays one tap away. No stock-shape substitution — Dan dropped it.
+      const pts = drawPath.map(([x, y]) => ({ x, y }))
+      const v = vectoriseStroke(pts)
       if (v) {
-        applyVec(v, null)
-        useOutlineStore.getState().setDrawRecipe({ raw: drawPath.map(([x, y]) => [x, y] as [number, number]), fitted: v, snapped: drawGhost ? { kind: drawGhost.kind, shape: drawGhost.shape } : undefined, active: 'raw' })
+        const c = correctStroke(pts)
+        applyVec(c ?? v, null)
+        useOutlineStore.getState().setDrawRecipe({ raw: drawPath.map(([x, y]) => [x, y] as [number, number]), fitted: v, corrected: c ?? undefined, active: c ? 'corrected' : 'raw' })
       } else {
-        // stroke too small to fit — the pre-9b polygon path (recipe cleared by applyDoc)
+        // stroke too small to fit — the legacy polygon path (recipe cleared by applyDoc)
         const eps = Math.max(2, Math.max(doc.image.widthPx, doc.image.heightPx) * 0.004)
         applyDoc(docFromRings(rdpClosed(drawPath, eps), doc.image))
       }
@@ -1268,35 +1249,22 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       setShapeKind(null); setShapePreview(null)
     }
     setDrawPts(null)
-    setDrawGhost(null)
-  }, [drawPath, doc.image, applyDoc, applyVec, drawGhost])
-  /** Run 9b — accept the suggestion: the EXACT library shape lands (manufacturing-true), the hand
-   *  stays one tap away in the recipe. */
-  const acceptGhost = useCallback(() => {
-    if (!drawGhost) return
-    const fitted = drawPath.length >= 3 ? vectoriseStroke(drawPath.map(([x, y]) => ({ x, y }))) : null
-    applyVec(drawGhost.shape, drawGhost.shape) // the library candidate is its own pristine base
-    useOutlineStore.getState().setDrawRecipe(fitted ? { raw: drawPath.map(([x, y]) => [x, y] as [number, number]), fitted, snapped: { kind: drawGhost.kind, shape: drawGhost.shape }, active: 'snapped' } : null)
-    setSmoothing(0); setScale(100); setSelectedNode(null); setAllSelected(false)
-    setShapeKind(null); setShapePreview(null)
-    setDrawPts(null)
-    setDrawGhost(null)
-  }, [drawGhost, drawPath, applyVec])
-  /** Run 9b — reset-to-raw, BOTH directions, any time: swap between the recipe's candidates.
-   *  PROVISIONAL surface (TopTool in the existing top bar) — placement options go to Dan in the
-   *  frozen window before the gate closes (QA binding condition). */
+  }, [drawPath, doc.image, applyDoc, applyVec])
+  /** KAI-8949 — the correction TOGGLE: swap the object between the corrected rendering and the
+   *  raw drawing, any time. PROVISIONAL surface (TopTool in the existing top bar) — placement
+   *  options go to Dan with the Draw-controls A/B/C decision. */
   const toggleRecipe = useCallback(() => {
     const r = useOutlineStore.getState().drawRecipe
-    if (!r || !r.snapped) return
-    if (r.active === 'raw') {
-      applyVec(r.snapped.shape, r.snapped.shape)
-      useOutlineStore.getState().setDrawRecipe({ ...r, active: 'snapped' })
-    } else {
+    if (!r || !r.corrected) return
+    if (r.active === 'corrected') {
       applyVec(r.fitted, null)
       useOutlineStore.getState().setDrawRecipe({ ...r, active: 'raw' })
+    } else {
+      applyVec(r.corrected, null)
+      useOutlineStore.getState().setDrawRecipe({ ...r, active: 'corrected' })
     }
   }, [applyVec])
-  const cancelDraw = useCallback(() => { setDrawPts(null); setDrawGhost(null) }, [])
+  const cancelDraw = useCallback(() => setDrawPts(null), [])
 
   // Saving is AUTOMATIC: every edit commits to the doc-history + persists (editedDoc) + drives the 3D
   // live, and switching tools never resets it. So there's no explicit Save — "Done" just closes back to
@@ -1393,8 +1361,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
               {/* Points = summon/hide anchors (hidden by default — Dan's doctrine). On vector
                   shapes this reveals the minimal intentional skeleton (Run 6 points-on-demand). */}
               <TopTool icon={<OutlineIcon />} label="Points" onClick={() => setShowAnchors((v) => !v)} />
-              {/* Run 9b — reset-to-raw both ways. PROVISIONAL placement — options to Dan in the freeze */}
-              {recipe?.snapped && <TopTool icon={<PenIcon />} label={recipe.active === 'raw' ? 'Suggested' : 'My drawing'} onClick={toggleRecipe} />}
+              {/* KAI-8949 — the correction toggle, both ways any time. PROVISIONAL placement (Dan's A/B/C) */}
+              {recipe?.corrected && <TopTool icon={<PenIcon />} label={recipe.active === 'corrected' ? 'My drawing' : 'Corrected'} onClick={toggleRecipe} />}
             </>
           )}
           <TopTool icon={<CheckIcon />} label="Done" onClick={onDone} />
@@ -1449,11 +1417,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
           {drawing ? (
             <>
               {drawPathD && <path className={styles.drawPath} d={drawPathD} />}
-              {/* Run 9b — the snap-suggestion GHOST: offered, never forced (Use button accepts) */}
-              {drawGhost && (
-                <path className={styles.path} style={{ opacity: 0.3, pointerEvents: 'none' }} d={shapeToSVGPathD(drawGhost.shape, 2)} />
-              )}
-              {/* Run 9b — live ink (perfect-freehand): DISPLAY ONLY — raw points stay the geometry */}
+              {/* live ink (perfect-freehand): DISPLAY ONLY — raw points stay the geometry */}
               {freehandPreview && freehandPreview.length > 1 && (
                 <path
                   d={`M ${getStroke(freehandPreview, { size: nodeR * 1.2, thinning: 0.6, smoothing: 0.6, streamline: 0.45 }).map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ')} Z`}
@@ -1643,7 +1607,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
         {drawing ? (
           <>
             <ToolBtn icon={<CloseIcon />} label="Cancel" onClick={cancelDraw} />
-            {drawGhost && <ToolBtn icon={<ShapeIcon />} label={`Use ${drawGhost.label}`} onClick={acceptGhost} />}
             <ToolBtn icon={<CheckIcon />} label={`Finish (${drawPts?.length ?? 0})`} onClick={finishDraw} disabled={(drawPts?.length ?? 0) < 3} primary />
           </>
         ) : (

@@ -2,7 +2,7 @@
 // keep-raw fidelity (the wobble survives as true curves), all headless.
 
 import { describe, test, expect } from 'vitest'
-import { recognizeStroke, normalizeStroke, cloudDistance, libraryTemplates, vectoriseStroke, resampleStroke } from '../index'
+import { recognizeStroke, normalizeStroke, cloudDistance, libraryTemplates, vectoriseStroke, correctStroke, resampleStroke } from '../index'
 import { flattenPath, flattenShape, signedArea, shapeBBox } from '@/lib/vector-core'
 import { getShape } from '@/lib/shape-library'
 import type { Vec2 } from '@/lib/vector-core'
@@ -79,5 +79,27 @@ describe('draw — keep-raw vectorisation', () => {
 
   test('too-short input is rejected, not mangled', () => {
     expect(vectoriseStroke([{ x: 0, y: 0 }, { x: 5, y: 5 }])).toBeNull()
+  })
+})
+
+describe('draw — BEN-style correction (KAI-8949)', () => {
+  test('a jittery hand comes out corrected-smooth: fewer anchors than the faithful fit, no kinks, area kept', () => {
+    const stroke = sloppy('circle', 3.5) // a wobbly drawn circle — the bug-report case
+    const faithful = vectoriseStroke(stroke)!
+    const corrected = correctStroke(stroke)
+    expect(corrected).not.toBeNull()
+    const cAnchors = corrected!.paths[0].anchors
+    expect(cAnchors.length).toBeLessThanOrEqual(faithful.paths[0].anchors.length) // imperfections removed
+    expect(cAnchors.filter((a) => a.corner)).toHaveLength(0) // a circle-ish hand has no true corners
+    const areaC = Math.abs(signedArea(flattenShape(corrected!, 0.1)[0]))
+    const areaF = Math.abs(signedArea(flattenShape(faithful, 0.1)[0]))
+    expect(areaC).toBeGreaterThan(areaF * 0.85) // corrected, not shrunken away
+    expect(areaC).toBeLessThan(areaF * 1.15)
+  })
+
+  test('one drawing = ONE path, in both renderings', () => {
+    const stroke = sloppy('heart', 3)
+    expect(vectoriseStroke(stroke)!.paths).toHaveLength(1)
+    expect(correctStroke(stroke)!.paths).toHaveLength(1)
   })
 })
