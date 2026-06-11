@@ -170,13 +170,137 @@ function segsToAnchors(chains: { segs: CubicSeg[]; startCorner: boolean }[]): VP
 }
 
 /**
+ * ANCHOR COMPACTION (KAI-8974/F3b): Schneider's split-at-max-error recursion never re-merges, so
+ * high-curvature features (petal tips, valleys) collect clusters of near-redundant anchors —
+ * unusable at finger size (fab-qa: ~34 anchors where ~18 carry the shape). Greedy pairwise merging
+ * is structurally too weak here (split points come in PAIRS around each curvature peak; removing
+ * either one bridges across the peak and fails tolerance), so this is DP-MINIMAL SEGMENTATION:
+ * candidate breakpoints = the fit's own anchors (they sit at curvature peaks, where good
+ * breakpoints live); per smooth chain, dynamic programming picks the FEWEST anchors such that
+ * every span re-fits as ONE cubic within `budget` of the SOURCE RING (fidelity measured against
+ * the source — no drift compounding). Tangents are fixed per node a priori (ring central
+ * difference; chain ends keep their one-sided directions), so adjacent spans share tangents —
+ * C1 smooth by construction. Corner anchors are never candidates (corner integrity).
+ */
+function compactRingFit(path: VPath, ring: Vec2[], budget: number): VPath {
+  const n = ring.length
+  const keyOf = (p: Vec2) => `${p.x},${p.y}`
+  const ringIdx = new Map<string, number>()
+  for (let i = 0; i < ring.length; i++) ringIdx.set(keyOf(ring[i]), i)
+  const A = path.anchors
+  const m = A.length
+  if (m <= 4) return path
+  // nodes: every anchor that sits on an exact ring sample. Any anchor we can't locate (e.g. a
+  // corner snapped to a raw-trace position) is immovable, like a corner.
+  const nodeRing: (number | null)[] = A.map((a) => ringIdx.get(keyOf(a.p)) ?? null)
+  const fixed = A.map((a, i) => a.corner || nodeRing[i] === null)
+  // fixed-per-node tangent: ring central difference (smooth nodes); corner/unlocatable nodes use
+  // their existing one-sided handle directions per span side at fit time.
+  const nodeTangent = (i: number): Vec2 | null => {
+    const ri = nodeRing[i]
+    if (ri === null) return null
+    return norm(sub(ring[(ri + 1) % n], ring[(ri - 1 + n) % n]))
+  }
+  /** fit ONE cubic over the ring span between anchor nodes a→b; returns it if within budget */
+  const trySpan = (ia: number, ib: number): CubicSeg | null => {
+    const ra = nodeRing[ia]!, rb = nodeRing[ib] ?? null
+    const span: Vec2[] = [ring[ra]]
+    for (let j = (ra + 1) % n; ; j = (j + 1) % n) {
+      span.push(ring[j])
+      if (rb !== null && j === rb) break
+      if (j === ra) return null // wrapped — degenerate
+      if (span.length > n) return null
+    }
+    if (span.length < 2) return null
+    const t1 = fixed[ia]
+      ? (A[ia].hOut && len(sub(A[ia].hOut!, A[ia].p)) > 1e-9 ? norm(sub(A[ia].hOut!, A[ia].p)) : norm(sub(span[1], span[0])))
+      : nodeTangent(ia)!
+    const t2raw = fixed[ib]
+      ? (A[ib].hIn && len(sub(A[ib].hIn!, A[ib].p)) > 1e-9 ? norm(sub(A[ib].hIn!, A[ib].p)) : norm(sub(span[span.length - 2], span[span.length - 1])))
+      : scale(nodeTangent(ib)!, -1) // incoming direction = reversed forward tangent
+    let u = chordParams(span)
+    let seg = generateBezier(span, u, t1, t2raw)
+    let { err } = maxErrorAt(span, seg, u)
+    for (let r = 0; r < 4 && err >= budget; r++) {
+      u = reparameterize(span, u, seg)
+      seg = generateBezier(span, u, t1, t2raw)
+      err = maxErrorAt(span, seg, u).err
+    }
+    return err < budget ? seg : null
+  }
+  // chains: runs of consecutive anchor nodes between fixed anchors. Smooth-only rings have no
+  // fixed anchor — open the cycle at node 0 (kept; minimal up to the forced seam).
+  const order: number[] = A.map((_, i) => i)
+  const fixedIdxs = order.filter((i) => fixed[i])
+  const chainStarts = fixedIdxs.length ? fixedIdxs : [0]
+  const keep = new Set<number>(chainStarts)
+  const newSegs = new Map<number, CubicSeg>() // keyed by span START anchor index
+  for (let c = 0; c < chainStarts.length; c++) {
+    const s0 = chainStarts[c]
+    const s1 = chainStarts[(c + 1) % chainStarts.length]
+    // the chain's node list s0..s1 (wrapping the anchor array)
+    const nodes: number[] = [s0]
+    for (let i = (s0 + 1) % m; ; i = (i + 1) % m) {
+      nodes.push(i)
+      if (i === s1 && nodes.length > 1) break
+      if (i === s0) break
+    }
+    if (nodes.length <= 2) continue // nothing between the fixed ends
+    const K = nodes.length
+    // DP: minimal cuts from node 0 to node K-1 where each edge is a within-budget single cubic
+    const INF = 1e9
+    const cost = new Array<number>(K).fill(INF)
+    const prev = new Array<number>(K).fill(-1)
+    const edgeSeg = new Map<string, CubicSeg>()
+    cost[0] = 0
+    for (let j = 1; j < K; j++) {
+      for (let i = j - 1; i >= 0; i--) {
+        if (cost[i] === INF) continue
+        if (cost[i] + 1 >= cost[j]) continue // can't improve
+        const adjacentReuse = j === i + 1
+        const seg = adjacentReuse ? ({} as CubicSeg) : trySpan(nodes[i], nodes[j])
+        if (!adjacentReuse && !seg) continue
+        cost[j] = cost[i] + 1
+        prev[j] = i
+        if (!adjacentReuse) edgeSeg.set(`${i}|${j}`, seg as CubicSeg)
+        else edgeSeg.delete(`${i}|${j}`)
+      }
+    }
+    // walk back; mark kept nodes and record refitted spans
+    let j = K - 1
+    while (j > 0) {
+      const i = prev[j]
+      if (i < 0) break // unreachable (shouldn't happen — adjacent edges always exist)
+      keep.add(nodes[i]); keep.add(nodes[j])
+      const seg = edgeSeg.get(`${i}|${j}`)
+      if (seg) newSegs.set(nodes[i], seg)
+      j = i
+    }
+  }
+  if (keep.size >= m) return path
+  // assemble: kept anchors in original order; spans that were re-fitted get the new handles
+  const out: VAnchor[] = []
+  const oldToNew = new Map<number, number>()
+  for (let i = 0; i < m; i++) if (keep.has(i)) { oldToNew.set(i, out.length); out.push({ ...A[i] }) }
+  for (const [startIdx, seg] of newSegs) {
+    const ai = oldToNew.get(startIdx)
+    if (ai === undefined) continue
+    const a = out[ai]
+    const b = out[(ai + 1) % out.length]
+    a.hOut = seg.c1
+    b.hIn = seg.c2
+  }
+  return { anchors: out }
+}
+
+/**
  * Fit a CLOSED dense ring into a VPath: corners (turn > angleDeg) become true corner anchors;
  * smooth spans become minimal cubic chains within maxError. Smooth-only rings (no corners) get a
  * seam-free closure: the ring is opened at index 0 with a shared central-difference tangent.
  * `cornersOverride` supplies domain-detected corner indices (e.g. straw-based on noisy strokes)
  * in place of the per-sample turning-angle detector.
  */
-export function ringToVPath(ring: Vec2[], angleDeg: number, maxError: number, cornersOverride?: number[]): VPath {
+export function ringToVPath(ring: Vec2[], angleDeg: number, maxError: number, cornersOverride?: number[], compactError?: number): VPath {
   const n = ring.length
   if (n < 3) return { anchors: ring.map((p) => ({ p, corner: true })) }
   const corners = cornersOverride ?? cornerIndices(ring, angleDeg)
@@ -189,7 +313,7 @@ export function ringToVPath(ring: Vec2[], angleDeg: number, maxError: number, co
     // merge seam: last implicit anchor == first; give the first anchor its incoming handle
     const lastSeg = segs[segs.length - 1]
     chains.anchors[0].hIn = lastSeg.c2
-    return chains
+    return compactRingFit(chains, ring, compactError ?? maxError)
   }
   const chains: { segs: CubicSeg[]; startCorner: boolean }[] = []
   for (let k = 0; k < corners.length; k++) {
@@ -224,5 +348,5 @@ export function ringToVPath(ring: Vec2[], angleDeg: number, maxError: number, co
     if (path.anchors[base]) path.anchors[base].hIn = lastSeg.c2
     base += chains[k].segs.length
   }
-  return path
+  return compactRingFit(path, ring, compactError ?? maxError)
 }

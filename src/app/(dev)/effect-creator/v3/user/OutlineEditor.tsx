@@ -811,7 +811,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   const vecFromGenerator = useCallback((kind: ShapeKind, overrides: Partial<ShapeParams> = {}): VShape => {
     const { widthPx, heightPx } = dimsRef.current
     const ring = resampleClosed(generateShapeRing({ kind, ...shapeParamsRef.current, ...overrides }, widthPx, heightPx), Math.max(widthPx, heightPx) / 600)
-    const path = ringToVPath(ring.map(([x, y]) => ({ x, y })), 60, Math.max(0.4, Math.min(widthPx, heightPx) / 1600))
+    const tol = Math.max(0.4, Math.min(widthPx, heightPx) / 1600)
+    // compaction budget 2x fit tolerance (KAI-8974/F3b — minimal anchors that carry the shape)
+    const path = ringToVPath(ring.map(([x, y]) => ({ x, y })), 60, tol, undefined, tol * 2)
     return { paths: [path] }
   }, [])
   const pickShape = useCallback((kind: ShapeKind) => {

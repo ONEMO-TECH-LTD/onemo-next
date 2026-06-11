@@ -26,6 +26,10 @@ export const DISPLAY_TOLERANCE_MM = 0.004
 // re-Tune use these; a parameter fork here would be a second pipeline).
 const FIT_CORNER_ANGLE_DEG = 30
 const FIT_MAX_ERROR_PX = 0.35
+// Anchor-compaction budget (KAI-8974/F3b): the minimal-segmentation pass may spend up to 2x the
+// fit tolerance to remove redundant anchors — 0.7px on a typical 1200px mask ≈ 0.04mm at the 70mm
+// base, inside the 0.05mm manufacturing class; C1-preserving, corners never merged.
+const FIT_COMPACT_ERROR_PX = FIT_MAX_ERROR_PX * 2
 const MIN_RAW_TRACE_POINTS = 24
 // CORNER INTEGRITY (Dan, 2026-06-11): intentional sharp features must survive the cut as TRUE
 // corner anchors — the fairing smooths everything else to optimal, never the corners themselves.
@@ -88,7 +92,7 @@ export function vectoriseTrace(rawMaskPx: ReadonlyArray<Pt>, maskHeightPx: numbe
     }
   }
   cornerIdx.sort((a, b) => a - b)
-  return { paths: [ringToVPath(ring, FIT_CORNER_ANGLE_DEG, FIT_MAX_ERROR_PX, cornerIdx.length ? cornerIdx : undefined)] }
+  return { paths: [ringToVPath(ring, FIT_CORNER_ANGLE_DEG, FIT_MAX_ERROR_PX, cornerIdx.length ? cornerIdx : undefined, FIT_COMPACT_ERROR_PX)] }
 }
 
 /**
