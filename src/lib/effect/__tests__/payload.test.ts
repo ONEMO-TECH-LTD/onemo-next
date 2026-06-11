@@ -122,8 +122,24 @@ describe('buildApprovedEffectPayload (schema 3, vector-native)', () => {
     // (schema v3, REBUILD-PLAN-v2: the contract went VECTOR-NATIVE — build.vector_shape_hash replaced
     // outline_document_hash, feasibility moved to the truth-derived contour, the doc model left the
     // save path entirely. Nothing persisted at v2 — the prototype save feature was erased, Dan ruling.)
+    // (re-pinned from 9f0d0b1293193a5e, KAI-8973/P1b: the no-ingest image_hash fallback is now
+    // MARKED `ref-fallback:` so it can't impersonate byte identity — fixtures carry no ingest sha,
+    // so this fixture's source identity moved. Schema shape unchanged; nothing persisted.)
     expect(out.schema_version).toBe(3)
-    expect(out.payload_hash).toBe('9f0d0b1293193a5e')
+    expect(out.payload_hash).toBe('83baac66fe70ae75')
+  })
+
+  it('SOURCE IDENTITY (KAI-8973/P1b): the ingest byte-hash IS image_hash; absence is a MARKED fallback', () => {
+    const p = prepared(squareShape())
+    const noIngest = buildApprovedEffectPayload(p, { type: 'standard', size: 's70' })
+    expect(noIngest.source.image_hash).toMatch(/^ref-fallback:[0-9a-f]{16}$/) // self-describing, never byte-identity-shaped
+    const sha = 'a'.repeat(64)
+    const withIngest = buildApprovedEffectPayload(
+      { ...p, spec: { ...p.spec, sourceBytesSha256: sha } },
+      { type: 'standard', size: 's70' },
+    )
+    expect(withIngest.source.image_hash).toBe(sha) // the preserved original's true byte identity
+    expect(withIngest.payload_hash).not.toBe(noIngest.payload_hash) // identity participates in the manufacturing hash
   })
 
   it('G1: records the artwork pan/zoom transform int-micro + it changes the manufacturing hash', () => {

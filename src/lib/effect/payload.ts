@@ -209,7 +209,10 @@ export function buildApprovedEffectPayload(prepared: PreparedEffect, opts: Build
   })
 
   const source = {
-    image_hash: spec.sourceBytesSha256 ?? contentHash(spec.sourceRef), // true byte identity when ingest succeeded (ref-hash fallback keeps fixtures pure)
+    // true byte identity (preserve-at-ingest, §B5). The no-ingest fallback is MARKED so a ref-hash
+    // can never silently impersonate byte identity in a manufacturing record (KAI-8973/P1b) —
+    // fixtures/dev-only; production fails the save round's own gate before reaching here.
+    image_hash: spec.sourceBytesSha256 ?? `ref-fallback:${contentHash(spec.sourceRef)}`,
     dims: { widthPx: spec.maskWidthPx, heightPx: spec.maskHeightPx },
     color_space: 'srgb',
     exif: 'baked' as const,

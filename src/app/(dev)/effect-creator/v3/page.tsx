@@ -87,6 +87,10 @@ function PrototypePageInner() {
     : '/api/dev/scenes/golden'
 
   const histRef = useRef<{ past: AppSnap[]; future: AppSnap[] }>({ past: [], future: [] })
+  // True byte identity of the CURRENT photo (preserve-at-ingest, §B5) — page-level so EVERY
+  // prepared spec for this file carries it: standard at upload, Magic's shaped replacement, and
+  // any snapshot restores (which inherit stamped specs). KAI-8973/P1b: Magic was dropping it.
+  const sourceShaRef = useRef<string | null>(null)
   const baselineRef = useRef<AppSnap | null>(null)
   const editorPreRef = useRef<AppSnap | null>(null)
   const trimPreRef = useRef<AppSnap | null>(null)
@@ -186,6 +190,7 @@ function PrototypePageInner() {
     // hash lands on the spec so the manufacturing record identifies the REAL source bytes.
     const fd = new FormData()
     fd.append('file', file)
+    sourceShaRef.current = null // new photo → identity unknown until its ingest resolves
     const ingest = fetch('/api/dev/originals', { method: 'POST', body: fd })
       .then((r) => r.json() as Promise<{ saved: boolean; sha256?: string }>)
       .catch(() => ({ saved: false as const, sha256: undefined }))
@@ -200,7 +205,7 @@ function PrototypePageInner() {
       .then(({ prepareEffect }) => prepareEffect(url, 'standard'))
       .then(async (p) => {
         const ing = await ingest
-        if (ing.saved && ing.sha256) p.spec.sourceBytesSha256 = ing.sha256
+        if (ing.saved && ing.sha256) { sourceShaRef.current = ing.sha256; p.spec.sourceBytesSha256 = ing.sha256 }
         else toast('warn', 'Original-photo backup failed — the design still works; re-upload to retry')
         setPrepared(p)
         useOutlineStore.getState().setSpec(p.spec) // hand the standard outline to the 2D editor
@@ -239,6 +244,9 @@ function PrototypePageInner() {
         }, useOutlineStore.getState().fairing?.params),
       )
       .then((p) => {
+        // KAI-8973/P1b: the shaped spec REPLACES the standard one — carry the original's byte
+        // identity forward, or the manufacturing record falls back to a blob-URL hash (§B5)
+        if (sourceShaRef.current) p.spec.sourceBytesSha256 = sourceShaRef.current
         setPrepared(p)
         const st = useOutlineStore.getState()
         st.setSpec(p.spec) // hand the shaped outline to the 2D editor + 3D
