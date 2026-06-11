@@ -158,8 +158,18 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   const nodeInteractedRef = useRef(false) // a node tap just happened → suppress the bubbling surface-click (which would re-select all)
   const dragStartRef = useRef<Vec2Px | null>(null) // pointer-down point → distinguish a tap (select) from a drag (move)
   const svgRef = useRef<SVGSVGElement>(null)
+  // content dims for the G11 view machinery (image space — independent of any document model)
+  const dimsRef = useRef({ widthPx: VIEW_W, heightPx: VIEW_H })
+  useEffect(() => {
+    const sync = () => {
+      const sp = useOutlineStore.getState().spec
+      if (sp) dimsRef.current = { widthPx: sp.maskWidthPx, heightPx: sp.maskHeightPx }
+    }
+    sync()
+    return useOutlineStore.subscribe(sync)
+  }, [])
   // Run 2 · seam 4: the G11 view machinery lives in editor/useCanvasView.
-  const { view, setView, viewRef, screenToContent, originPinning, applyZoom, toViewBox } = useCanvasView(svgRef, docRef)
+  const { view, setView, viewRef, screenToContent, originPinning, applyZoom, toViewBox } = useCanvasView(svgRef, dimsRef)
   const pinchRef = useRef<{ d0: number; scale0: number; c0: Vec2Px } | null>(null) // two-finger pinch zoom (client-space)
   const canvasPanRef = useRef<{ startClient: Vec2Px; vx0: number; vy0: number } | null>(null) // drag-outside pan (zoomed)
   const clientPtsRef = useRef<Map<number, Vec2Px>>(new Map()) // pointerId → CLIENT coords (pinch math)

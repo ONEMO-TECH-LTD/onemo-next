@@ -4,7 +4,7 @@
 // Blueprint: v3/blueprint/modules/editor.md (G11 — zoom is viewBox-true, verified as the lens).
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { OutlineDocument, Vec2Px } from '@/lib/outline-core'
+import type { Vec2Px } from '@/lib/outline-core'
 
 export interface CanvasView {
   scale: number
@@ -14,7 +14,8 @@ export interface CanvasView {
 
 export function useCanvasView(
   svgRef: { current: SVGSVGElement | null },
-  docRef: { current: OutlineDocument },
+  // content dimensions only (the canvas maps the IMAGE space — no document model involved)
+  dimsRef: { current: { widthPx: number; heightPx: number } },
 ) {
   const [view, setView] = useState<CanvasView>({ scale: 1, vx: 0, vy: 0 })
   const viewRef = useRef(view)
@@ -24,7 +25,7 @@ export function useCanvasView(
   // pinch/wheel math can solve for the new origin that pins a content point under the cursor.
   const screenToContent = useCallback((clientX: number, clientY: number, v: CanvasView): Vec2Px => {
     const svg = svgRef.current
-    const W = docRef.current.image.widthPx, H = docRef.current.image.heightPx
+    const W = dimsRef.current.widthPx, H = dimsRef.current.heightPx
     if (!svg) return [0, 0]
     const rect = svg.getBoundingClientRect()
     const vbW = W / v.scale, vbH = H / v.scale
@@ -37,7 +38,7 @@ export function useCanvasView(
   /** Solve the view origin that places content point c under client point (clientX, clientY) at `scale`. */
   const originPinning = useCallback((c: Vec2Px, clientX: number, clientY: number, scale: number): { vx: number; vy: number } => {
     const svg = svgRef.current
-    const W = docRef.current.image.widthPx, H = docRef.current.image.heightPx
+    const W = dimsRef.current.widthPx, H = dimsRef.current.heightPx
     if (!svg) return { vx: 0, vy: 0 }
     const rect = svg.getBoundingClientRect()
     const vbW = W / scale, vbH = H / scale
