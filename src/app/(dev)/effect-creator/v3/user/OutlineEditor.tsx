@@ -272,9 +272,13 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     setAdjustSub('radius')
     setFxDraft(st0.imageFx ?? NEUTRAL_FX)
     imgPanRef.current = null
-    // #27: toolbar creation modes land in the matching editor mode; default mode = Adjust
+    // #27: toolbar creation modes land in the matching editor mode. The decision reads the
+    // PRE-OPEN committed state (preEditRef) — the seed itself commits (visible = committed), so
+    // reading the store here would always say "committed" and kill the choose-a-shape opening
+    // (caught visually: pre-Magic opens were landing in Adjust instead of the Shape sheet).
     if (openMode === 'shape') setActiveAdjust('shape')
-    else if (spec?.generator.adapter !== 'standard' || useOutlineStore.getState().committedShape) setActiveAdjust('adjust')
+    else if (spec?.generator.adapter !== 'standard' || preEditRef.current.committedShape) setActiveAdjust('adjust')
+    else setActiveAdjust('shape') // pre-Magic standard, nothing committed before open: choose a shape (Dan, 2026-06-10)
     histRef.current = { past: [], future: [] } // fresh undo history per session (the seed is not undoable)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
