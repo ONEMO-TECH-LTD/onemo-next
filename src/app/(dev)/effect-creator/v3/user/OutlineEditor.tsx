@@ -1,6 +1,6 @@
 // Effect Creator V3 — 2D outline editor overlay (blueprint §5.3 / §6.3 / G11 / G12).
-// Core toolset per §7a: anchors (drag/add/delete), Smooth, Scale, Shape presets, freehand Draw +
-// magnetic snap, magic-blend toggle. Hug and the Round tool are NOT in core (parked/folded — D4/D5;
+// Core toolset per §7a: anchors (drag/add/delete), Smooth, Scale, Shape presets, magic-blend
+// toggle. (Draw was removed entirely — Dan, KAI-8962.) Hug and the Round tool are NOT in core (parked/folded — D4/D5;
 // engine-level default rounding stays internal). Continuous controls are TickBars (G12) riding the
 // §6.3 tick/commit contract. The canvas sits in a safe-area layout between the bars with zoom + pan
 // (G11) so every anchor is reachable and the whole image is visible.
@@ -15,8 +15,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   applyOutlineCommands,
   resolveOutlineDocument,
-  livewirePath,
-  rdpClosed,
   nodesFromTracedRing,
   fairTracedRing,
   fairingFromDetail,
@@ -25,12 +23,10 @@ import {
   type OutlineDocument,
   type OutlineCommand,
   type Vec2Px,
-  type CostGrid,
 } from '@/lib/outline-core'
 import type { Contour } from '@/lib/effect/types'
-import { buildEdgeCost } from './edgeCost'
 import { useOutlineStore, NEUTRAL_FX, type ImageFx } from './outlineStore'
-import { UndoIcon, RedoIcon, PenIcon, ResetIcon, CheckIcon, CloseIcon, AddPointIcon, DeleteIcon, ShapeIcon, TuneIcon, ImageToolIcon, OutlineIcon, PreviewIcon, PreviewOffIcon } from './icons'
+import { UndoIcon, RedoIcon, ResetIcon, CheckIcon, CloseIcon, AddPointIcon, DeleteIcon, ShapeIcon, TuneIcon, ImageToolIcon, OutlineIcon, PreviewIcon, PreviewOffIcon } from './icons'
 import { toast } from '../ui/Toast'
 import { perfGesture } from '../dev/PerfHUD'
 import { generateShapeRing, resampleClosed, type ShapeKind, type ShapeParams } from './shapes'
@@ -50,10 +46,6 @@ import { traceContourRaw } from '@/lib/effect/contour'
 const GEN_VECTOR_KINDS = new Set<ShapeKind>(['daisy', 'pinwheel', 'form', 'blob'])
 // Run 2 · G6 decomposition — seam 1: pure doc-space geometry; seam 2: chip lineup + glyphs.
 import { DEFAULT_SHAPE_PARAMS } from './editor/chips'
-// Draw engine (KAI-8949 — Dan's correction model): faithful fit + BEN-style correction of the
-// DRAWN path. Snap-to-stock DROPPED by Dan; display-only live ink stays.
-import { vectoriseStroke, correctStroke } from '@/lib/draw'
-import { getStroke } from 'perfect-freehand'
 import { useEditorHistory } from './editor/useEditorHistory'
 import { useCanvasView } from './editor/useCanvasView'
 import { AdjustSheet, ImageSheet, ShapeSheet } from './editor/sheets'
@@ -65,7 +57,7 @@ interface OutlineEditorProps {
   imageUrl?: string
   onClose: () => void
   /** Structure A (#27): the toolbar's creation modes open THIS editor in that mode. */
-  openMode?: 'shape' | 'draw' | null
+  openMode?: 'shape' | null
 }
 
 const VIEW_W = 1000
@@ -112,8 +104,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
 
   const [smoothing, setSmoothing] = useState(0) // 0–100 → style.smoothing 0..1 (Catmull-Rom spline)
   const [scale, setScale] = useState(100) // 50–150 relative resize of the whole cut-out; bakes on release
-  const [drawPts, setDrawPts] = useState<Vec2Px[] | null>(null) // non-null = Manual draw in progress (A3a)
-  const [edgeCost, setEdgeCost] = useState<CostGrid | null>(null) // image edge-cost grid for the livewire (A3b)
   const [selectedNode, setSelectedNode] = useState<{ ringId: string; nodeId: string } | null>(null) // anchor add/delete target
   // #35 Apple layout: the editor's bottom is a MODE pill (Shape · Adjust · Image · Draw); each
   // mode shows a row of circular sub-tools sharing ONE ruler — no more dock-of-everything.
@@ -163,11 +153,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   const pointersRef = useRef<Map<number, Vec2Px>>(new Map())
   // pre-edit snapshot captured on open → "Close" (✕) discards this session's edits and reverts the 3D;
   // "Done" (✓) keeps them. Holds the 3D contour, the persisted editor doc, and the blend at open time.
-  const preEditRef = useRef<{ contourMM: Contour | null; editedDoc: OutlineDocument | null; editedVShape: VShape | null; bgBlur: number | null; drawRecipe: ReturnType<typeof useOutlineStore.getState>['drawRecipe'] }>({ contourMM: null, editedDoc: null, editedVShape: null, bgBlur: null, drawRecipe: null })
+  const preEditRef = useRef<{ contourMM: Contour | null; editedDoc: OutlineDocument | null; editedVShape: VShape | null; bgBlur: number | null }>({ contourMM: null, editedDoc: null, editedVShape: null, bgBlur: null })
   const [allSelected, setAllSelected] = useState(false) // tap inside the cut → select every corner, edit them together
-  const [freehandPreview, setFreehandPreview] = useState<Vec2Px[] | null>(null) // live freehand stroke (A3d)
-  const freehandRef = useRef<Vec2Px[] | null>(null)
-  const freehandMovedRef = useRef(false)
   const nodeInteractedRef = useRef(false) // a node tap just happened → suppress the bubbling surface-click (which would re-select all)
   const dragStartRef = useRef<Vec2Px | null>(null) // pointer-down point → distinguish a tap (select) from a drag (move)
   const svgRef = useRef<SVGSVGElement>(null)
@@ -182,7 +169,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   const setBgBlur = useOutlineStore((s) => s.setBgBlur)
   const subjMatteUrl = useOutlineStore((s) => s.subjMatteUrl)
   const art = useOutlineStore((s) => s.artwork)
-  const recipe = useOutlineStore((s) => s.drawRecipe) // Run 9b — the drawn shape's two candidates // #28 (hook ABOVE the early return — Rules of Hooks)
   const [preview, setPreview] = useState(false) // hide anchors/handles to see the clean result (no exit)
   // Points toggle (Dan, 2026-06-10): anchors stay ON for free-form outlines but OFF for rigid
   // parametric shapes — a circle has ~60 vertices; one stray drag spoils it. Toggle in the topbar.
@@ -211,7 +197,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     applyDocRaw(next)
     setSelVA(null) // a doc-level edit exits vector mode → the vector selection clears with it
     setVecLive(null)
-    useOutlineStore.getState().setDrawRecipe(null) // a different shape source replaces the drawn one
   }, [applyDocRaw])
   const undo = useCallback(() => { const d = undoRaw(); if (d) syncSlidersTo(d) }, [undoRaw, syncSlidersTo])
   const redo = useCallback(() => { const d = redoRaw(); if (d) syncSlidersTo(d) }, [redoRaw, syncSlidersTo])
@@ -221,7 +206,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     if (!open) return
     // Snapshot the pre-edit state so ✕ Close can discard this session's edits (revert the 3D + persisted doc).
     const st0 = useOutlineStore.getState()
-    preEditRef.current = { contourMM: st0.editedContourMM ?? (spec ? spec.geometryMM : null), editedDoc: st0.editedDoc, editedVShape: st0.editedVShape, bgBlur: st0.bgBlur, drawRecipe: st0.drawRecipe }
+    preEditRef.current = { contourMM: st0.editedContourMM ?? (spec ? spec.geometryMM : null), editedDoc: st0.editedDoc, editedVShape: st0.editedVShape, bgBlur: st0.bgBlur }
     // Restore prior edits if they belong to the current cut-out; else derive a fresh editable contour.
     const stored = useOutlineStore.getState().editedDoc
     const useStored = !!stored && !!spec && stored.image.sourceHash === spec.sourceRef.slice(0, 40)
@@ -237,7 +222,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     setScale(100)
     setView({ scale: 1, vx: 0, vy: 0 }) // G11: fresh session starts at fit
     setDrag(null)
-    setDrawPts(null)
     setSelectedNode(null)
     setAllSelected(false)
     setActiveAdjust(null)
@@ -262,7 +246,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     const curBlur = useOutlineStore.getState().bgBlur
     setBlendOn(curBlur == null || curBlur > 0)
     setBlendBlur(curBlur == null ? 50 : curBlur > 0 ? Math.round(curBlur * 100) : 50)
-    setEdgeCost(null)
     dirtyRef.current = false // opening is not an edit — don't drive the 3D until the user changes something
     // Dan (2026-06-10): entering the editor BEFORE Magic means "choose a shape" — the full-bleed
     // standard square buries its handles at the image edges. Open the Shape sheet with Square
@@ -309,16 +292,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     imgPanRef.current = null
     // #27: toolbar creation modes land in the matching editor mode; default mode = Adjust
     if (openMode === 'shape') setActiveAdjust('shape')
-    else if (openMode === 'draw') { setDrawPts([]); setDrag(null); setActiveAdjust(null) }
     else setActiveAdjust('adjust')
     docRef.current = opened
     histRef.current = { past: [], future: [] } // fresh undo history per editing session
-    if (imageUrl) {
-      const prior = spec
-        ? spec.geometryMM.outer.pts.map(([x, y]) => [(x / (spec.mmPerPx || 1)) / spec.maskWidthPx, (y / (spec.mmPerPx || 1)) / spec.maskHeightPx] as [number, number])
-        : undefined
-      buildEdgeCost(imageUrl, 600, prior).then(setEdgeCost).catch(() => setEdgeCost(null))
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
@@ -444,23 +420,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       .join(' ')
   }, [resolved, vDisplay])
 
-  // Manual draw path: between placed anchors, SNAP to image edges via the livewire when an edge-cost
-  // grid is available (A3b magnetic lasso); otherwise straight segments (A3a, e.g. no image).
-  const drawPath = useMemo<Vec2Px[]>(() => {
-    const pts = drawPts
-    if (!pts || pts.length === 0) return []
-    if (!edgeCost || pts.length < 2) return pts
-    const W = doc.image.widthPx, H = doc.image.heightPx, gw = edgeCost.width, gh = edgeCost.height
-    const toGrid = (p: Vec2Px): [number, number] => [(p[0] / W) * gw, (p[1] / H) * gh]
-    const toView = (c: [number, number]): Vec2Px => [((c[0] + 0.5) / gw) * W, ((c[1] + 0.5) / gh) * H]
-    const out: Vec2Px[] = [pts[0]]
-    for (let i = 1; i < pts.length; i++) {
-      const cells = livewirePath(edgeCost, toGrid(pts[i - 1]), toGrid(pts[i]))
-      for (let j = 1; j < cells.length; j++) out.push(toView(cells[j]))
-    }
-    return out
-  }, [drawPts, edgeCost, doc.image])
-
   // Run 6 — points on demand: build the transient shape for an in-flight anchor/handle drag.
   // Anchor drag translates p + both handles together; a SMOOTH anchor's handle drag mirrors the
   // opposite handle's DIRECTION while preserving its own length (Figma default); a CORNER
@@ -547,19 +506,14 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     [toViewBox, doc],
   )
 
-  // Surface pointer-down: track active pointers (for the two-finger twist), and start a freehand stroke
-  // in draw mode. A second surface pointer (while not dragging a node) arms the rotate gesture.
+  // Surface pointer-down: track active pointers (for the two-finger twist). A second surface
+  // pointer (while not dragging a node) arms the rotate gesture.
   const onSurfacePointerDown = useCallback(
     (e: React.PointerEvent) => {
       if (preview) return // view-only
       const p = toViewBox(e.clientX, e.clientY)
       pointersRef.current.set(e.pointerId, p)
       clientPtsRef.current.set(e.pointerId, [e.clientX, e.clientY])
-      if (drawPts !== null) {
-        freehandRef.current = [p]
-        freehandMovedRef.current = false
-        return
-      }
       // #28 Image-Position sub-mode: single finger pans the PHOTO under the cutline
       if (activeAdjust === 'image' && imageSub === 'position' && pointersRef.current.size === 1) {
         const a = useOutlineStore.getState().artwork
@@ -586,7 +540,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
         canvasPanRef.current = { startClient: [e.clientX, e.clientY], vx0: viewRef.current.vx, vy0: viewRef.current.vy }
       }
     },
-    [drawPts, toViewBox, drag, resolved, preview, screenToContent, docRef, viewRef],
+    [toViewBox, drag, resolved, preview, screenToContent, docRef, viewRef],
   )
 
   const onPointerMove = useCallback(
@@ -667,15 +621,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
         return
       }
       if (drag) { setDrag({ ...drag, pos: toViewBox(e.clientX, e.clientY) }); return }
-      if (drawPts !== null && freehandRef.current) {
-        const p = toViewBox(e.clientX, e.clientY)
-        freehandRef.current.push(p)
-        const a = freehandRef.current[0]
-        if (Math.hypot(p[0] - a[0], p[1] - a[1]) > Math.max(doc.image.widthPx, doc.image.heightPx) * 0.02) freehandMovedRef.current = true
-        setFreehandPreview([...freehandRef.current])
-      }
     },
-    [drag, drawPts, toViewBox, doc.image, originPinning, vecDragShape, docRef, setView, viewRef],
+    [drag, toViewBox, doc.image, originPinning, vecDragShape, docRef, setView, viewRef],
   )
 
   const commitRotate = useCallback(() => {
@@ -732,20 +679,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       setDrag(null)
       return
     }
-    if (drawPts !== null && freehandRef.current) {
-      const stroke = freehandRef.current
-      freehandRef.current = null
-      setFreehandPreview(null)
-      if (freehandMovedRef.current && stroke.length > 2) {
-        const eps = Math.max(2, Math.max(doc.image.widthPx, doc.image.heightPx) * 0.01)
-        const simp = rdpClosed(stroke, eps) // freehand → smoothed control nodes (A3d)
-        setDrawPts((prev) => [...(prev ?? []), ...simp])
-      } else {
-        setDrawPts((prev) => [...(prev ?? []), stroke[0]]) // a tap = one anchor
-      }
-      freehandMovedRef.current = false
-    }
-  }, [drag, drawPts, commit, doc.image, commitRotate, applyDoc, applyVec, docRef, vBaseRef, vshapeRef])
+  }, [drag, commit, commitRotate, applyDoc, applyVec, docRef, vBaseRef, vshapeRef])
 
   // Delete a control point (double-click a handle); keep a ring valid (≥3 nodes).
   const onNodeDoubleClick = useCallback(
@@ -826,12 +760,10 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   // (Hug is PARKED out of core — D4. The engine's fields-once SDF evaluator stays ready in
   // outline-core/prepareSdfBlend for its post-core refinement; no UI tool ships here.)
 
-  // Manual mode (A3a) — draw the outline by hand: click to place anchors, Finish to close the ring.
-  const startDraw = useCallback(() => { setDrawPts([]); setDrag(null) }, [])
   // Tap the surface (not a node): inside the cut → SELECT ALL corners (scale/twist them together);
   // outside → deselect. (Node taps stopPropagation, so they never reach here.)
   const onSurfaceClick = useCallback((e: React.MouseEvent) => {
-    if (drawPts !== null || preview) return
+    if (preview) return
     if (nodeInteractedRef.current) { nodeInteractedRef.current = false; return } // a node tap → keep single selection
     if ((e.target as Element)?.tagName === 'circle') return // tapped a node handle, not the surface
     const p = toViewBox(e.clientX, e.clientY)
@@ -846,7 +778,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       setSelVA(null)
       setAllSelected(false)
     }
-  }, [drawPts, doc, resolved, toViewBox, preview])
+  }, [doc, resolved, toViewBox, preview])
 
   const commitRadius = useCallback((v: number) => {
     setRadius(v)
@@ -1037,7 +969,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   const commitTune = useCallback((params: FairTracedRingOpts, detailVal?: number) => {
     const t0 = performance.now()
     setTunePreview(null)
-    useOutlineStore.getState().setDrawRecipe(null) // a re-trace replaces the drawn shape
     // Run 4: the release FITS the re-faired trace into a true vector path (ticks stay doc-transient)
     const v = vecFromTrace(params)
     if (v) {
@@ -1081,7 +1012,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   const pickShape = useCallback((kind: ShapeKind) => {
     setShapeKind(kind)
     setShapePreview(null)
-    useOutlineStore.getState().setDrawRecipe(null) // a picked shape replaces the drawn one
     // VECTOR CORE: vector-native kinds spawn as TRUE Bézier shapes from the static library —
     // zero sampling, zero fitting; the doc becomes a derived shadow for interaction math.
     if (hasVectorDef(kind)) {
@@ -1141,7 +1071,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   /** blob dice: reroll the seed, regenerate immediately (undoable). */
   const rerollBlob = useCallback(() => {
     if (shapeKind !== 'blob') return
-    useOutlineStore.getState().setDrawRecipe(null)
     const seed = Math.floor(Math.random() * 1e9)
     const next = { ...shapeParamsRef.current, seed }
     shapeParamsRef.current = next; setShapeParams(next)
@@ -1150,7 +1079,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   /** Land an uploaded shape: fit into the image box, first-class vector. SVG keeps itself as the
    *  pristine base (clean authored corners); a traced image adopts no base (fitted geometry). */
   const landUploadedShape = useCallback((raw: VShape, withBase: boolean) => {
-    useOutlineStore.getState().setDrawRecipe(null) // an upload replaces the drawn shape
     const img = docRef.current.image
     const v = fitShapeToBox(raw, img.widthPx, img.heightPx)
     applyVec(v, withBase ? v : null)
@@ -1200,7 +1128,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   }, [landUploadedShape, vecFromImageFile])
 
   const commitShape = useCallback(() => {
-    useOutlineStore.getState().setDrawRecipe(null)
     if (shapeKind && hasVectorDef(shapeKind)) {
       const img = docRef.current.image
       const sp = shapeParamsRef.current
@@ -1229,43 +1156,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     setShapeKind(null); setShapePreview(null) // open the picker fresh (chips only) — no stale active shape
   }, [])
 
-  const finishDraw = useCallback(() => {
-    if (drawPath.length >= 3) {
-      // KAI-8949 — Dan's model: ONE drawing = ONE path. The hand is fitted faithfully AND
-      // BEN-style CORRECTED (flagrant imperfections removed); correction is the default rendering,
-      // the raw drawing stays one tap away. No stock-shape substitution — Dan dropped it.
-      const pts = drawPath.map(([x, y]) => ({ x, y }))
-      const v = vectoriseStroke(pts)
-      if (v) {
-        const c = correctStroke(pts)
-        applyVec(c ?? v, null)
-        useOutlineStore.getState().setDrawRecipe({ raw: drawPath.map(([x, y]) => [x, y] as [number, number]), fitted: v, corrected: c ?? undefined, active: c ? 'corrected' : 'raw' })
-      } else {
-        // stroke too small to fit — the legacy polygon path (recipe cleared by applyDoc)
-        const eps = Math.max(2, Math.max(doc.image.widthPx, doc.image.heightPx) * 0.004)
-        applyDoc(docFromRings(rdpClosed(drawPath, eps), doc.image))
-      }
-      setSmoothing(0); setScale(100); setSelectedNode(null); setAllSelected(false)
-      setShapeKind(null); setShapePreview(null)
-    }
-    setDrawPts(null)
-  }, [drawPath, doc.image, applyDoc, applyVec])
-  /** KAI-8949 — the correction TOGGLE: swap the object between the corrected rendering and the
-   *  raw drawing, any time. PROVISIONAL surface (TopTool in the existing top bar) — placement
-   *  options go to Dan with the Draw-controls A/B/C decision. */
-  const toggleRecipe = useCallback(() => {
-    const r = useOutlineStore.getState().drawRecipe
-    if (!r || !r.corrected) return
-    if (r.active === 'corrected') {
-      applyVec(r.fitted, null)
-      useOutlineStore.getState().setDrawRecipe({ ...r, active: 'raw' })
-    } else {
-      applyVec(r.corrected, null)
-      useOutlineStore.getState().setDrawRecipe({ ...r, active: 'corrected' })
-    }
-  }, [applyVec])
-  const cancelDraw = useCallback(() => setDrawPts(null), [])
-
   // Saving is AUTOMATIC: every edit commits to the doc-history + persists (editedDoc) + drives the 3D
   // live, and switching tools never resets it. So there's no explicit Save — "Done" just closes back to
   // the scene (the approved shape is already what's shown). It also collapses any open sub-menu first.
@@ -1285,7 +1175,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     st.setEditedContourMM(pe.contourMM) // 3D rebuilds the pre-edit shape
     st.setEditedDoc(pe.editedDoc)       // reopening shows the pre-edit outline, not this session's edits
     st.setEditedVShape(pe.editedVShape) // the vector truth reverts with it
-    st.setDrawRecipe(pe.drawRecipe)     // the draw recipe reverts with the session too
     if (st.bgBlur !== pe.bgBlur) st.setBgBlur(pe.bgBlur != null ? pe.bgBlur : 0.5) // revert blend (null ≈ build default)
     setActiveAdjust(null)
     setSelectedNode(null)
@@ -1296,16 +1185,14 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
 
   if (!open) return null
 
-  const drawing = drawPts !== null
   const canUndo = histRef.current.past.length > 0
   const canRedo = histRef.current.future.length > 0
   const nodeR = ((doc.image.widthPx / VIEW_W) * 11) / view.scale // constant on-screen size at any zoom (G11)
-  const drawPathD = drawPath.length ? `M ${drawPath.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ')}` : ''
   // Desktop rotate handle — a grip on a short stem above the outline, shown when all anchors are selected.
   const rotOuterIdx = doc.rings.findIndex((r) => r.role === 'outer')
   const rotOuterRing = rotOuterIdx >= 0 ? resolved.flattenedRingsPx[rotOuterIdx] : null
   let rotHandle: { bx: number; by: number; hy: number } | null = null
-  if (allSelected && !drawing && !preview && rotOuterRing && rotOuterRing.length) {
+  if (allSelected && !preview && rotOuterRing && rotOuterRing.length) {
     let minX = Infinity, minY = Infinity, maxX = -Infinity
     for (const [x, y] of rotOuterRing) { if (x < minX) minX = x; if (y < minY) minY = y; if (x > maxX) maxX = x }
     const bx = (minX + maxX) / 2
@@ -1317,7 +1204,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     : rotateLive ? `rotate(${rotateLive.deg} ${rotateLive.cx} ${rotateLive.cy})` : moveLive ? `translate(${moveLive.dx} ${moveLive.dy})` : undefined
   // Crop grips (Dan: iOS-crop reference) — boxy shapes only; grips track the bbox, including the
   // live stretch (rendered OUTSIDE the transformed group so the pill strokes never distort).
-  const cropMode = shapeKind !== null && !drawing && !preview && !shapePreview && !tunePreview // #32: every preset is reshapeable
+  const cropMode = shapeKind !== null && !preview && !shapePreview && !tunePreview // #32: every preset is reshapeable
   let cropBox: { minX: number; minY: number; maxX: number; maxY: number } | null = null
   if (cropMode && rotOuterIdx >= 0 && resolved.flattenedRingsPx[rotOuterIdx]?.length) {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
@@ -1351,7 +1238,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
         <div className={styles.topInner}>
           {/* ✕ Close = discard this session's edits; Done = keep them. Evenly distributed, no title. */}
           <TopTool icon={<CloseIcon />} label="Close" onClick={onCancel} />
-          {!drawing && (
+          {(
             <>
               <TopTool icon={<UndoIcon />} label="Undo" onClick={undo} disabled={!canUndo} />
               <TopTool icon={<RedoIcon />} label="Redo" onClick={redo} disabled={!canRedo} />
@@ -1361,8 +1248,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
               {/* Points = summon/hide anchors (hidden by default — Dan's doctrine). On vector
                   shapes this reveals the minimal intentional skeleton (Run 6 points-on-demand). */}
               <TopTool icon={<OutlineIcon />} label="Points" onClick={() => setShowAnchors((v) => !v)} />
-              {/* KAI-8949 — the correction toggle, both ways any time. PROVISIONAL placement (Dan's A/B/C) */}
-              {recipe?.corrected && <TopTool icon={<PenIcon />} label={recipe.active === 'corrected' ? 'My drawing' : 'Corrected'} onClick={toggleRecipe} />}
             </>
           )}
           <TopTool icon={<CheckIcon />} label="Done" onClick={onDone} />
@@ -1381,7 +1266,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
           onPointerUp={onPointerUp}
           onPointerLeave={onPointerUp}
           onClick={onSurfaceClick}
-          onDoubleClick={drawing ? undefined : onSurfaceDoubleClick}
+          onDoubleClick={onSurfaceDoubleClick}
           onWheel={(e) => {
             // #28 Image-Position: scroll zooms the PHOTO within the shape (G1 semantics)
             if (activeAdjust === 'image' && imageSub === 'position') {
@@ -1414,21 +1299,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
           ))}
           </g>
           </g>
-          {drawing ? (
-            <>
-              {drawPathD && <path className={styles.drawPath} d={drawPathD} />}
-              {/* live ink (perfect-freehand): DISPLAY ONLY — raw points stay the geometry */}
-              {freehandPreview && freehandPreview.length > 1 && (
-                <path
-                  d={`M ${getStroke(freehandPreview, { size: nodeR * 1.2, thinning: 0.6, smoothing: 0.6, streamline: 0.45 }).map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ')} Z`}
-                  style={{ fill: 'var(--semantic-bg-brand-solid)', stroke: 'none' }}
-                />
-              )}
-              {(drawPts ?? []).map((p, i) => (
-                <circle key={`d${i}`} className={styles.node} cx={p[0]} cy={p[1]} r={nodeR} />
-              ))}
-            </>
-          ) : (
+          {(
             <>
               {/* scrim dims outside the cut; hidden during a live transform (its hole would lag the move/rotate) */}
               {imageUrl && pathD && !preview && !rotateLive && !moveLive && !stretchLive && (
@@ -1555,8 +1426,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       <div className={styles.status}>
         {preview
           ? <span className={styles.approved}>Preview — tap Edit to keep editing</span>
-          : drawing
-          ? 'Tap to place points, or drag to draw freehand'
           : hasIssues
             ? <span className={styles.warn}>This shape can’t be cut cleanly — fix the crossing</span>
             : allSelected
@@ -1567,7 +1436,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       </div>
 
       {/* Run 2 · seam 5: the three tool sheets live in editor/sheets (verbatim moves). */}
-      {!drawing && activeAdjust === 'adjust' && (
+      {activeAdjust === 'adjust' && (
         <AdjustSheet
           cornerMode={!!(selectedNode || (vshape && selVA !== null && vshape.paths[0].anchors[selVA]?.corner))}
           adjustSub={adjustSub} setAdjustSub={setAdjustSub} canTune={canTune}
@@ -1578,10 +1447,10 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
           detail={detail} setDetail={setDetail} previewTune={previewTune} commitTune={commitTune} fairParams={fairParams}
         />
       )}
-      {!drawing && activeAdjust === 'image' && (
+      {activeAdjust === 'image' && (
         <ImageSheet imageSub={imageSub} setImageSub={setImageSub} art={art} fxDraft={fxDraft} setFxDraft={setFxDraft} />
       )}
-      {!drawing && activeAdjust === 'shape' && (
+      {activeAdjust === 'shape' && (
         <ShapeSheet
           shapeKind={shapeKind} pickShape={pickShape} shapeParams={shapeParams}
           nudgeParam={nudgeParam} previewParam={previewParam} commitShape={commitShape}
@@ -1590,7 +1459,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       )}
 
       {/* contextual anchor actions — appear when a single point is selected (doc or vector) */}
-      {!drawing && (selectedNode || (vshape && selVA !== null)) && (
+      {(selectedNode || (vshape && selVA !== null)) && (
         <div className={styles.nodeBar}>
           <button type="button" className={styles.nodeAction} onClick={vshape && selVA !== null ? onVAddAfter : onAddAfterSelected}>
             <AddPointIcon /><span>Add point</span>
@@ -1604,18 +1473,12 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       {/* bottom toolbar — thumb-reachable icon tools; full-width bar, content capped + centered on desktop */}
       <div className={styles.toolbar}>
         <div className={styles.toolInner}>
-        {drawing ? (
+        {(
           <>
-            <ToolBtn icon={<CloseIcon />} label="Cancel" onClick={cancelDraw} />
-            <ToolBtn icon={<CheckIcon />} label={`Finish (${drawPts?.length ?? 0})`} onClick={finishDraw} disabled={(drawPts?.length ?? 0) < 3} primary />
-          </>
-        ) : (
-          <>
-            {/* #35: the MODE pill — Shape · Adjust · Image · Draw (Apple bottom-pill pattern) */}
+            {/* #35: the MODE pill — Shape · Adjust · Image (Apple bottom-pill pattern; Draw removed — KAI-8962) */}
             <ToolBtn icon={<ShapeIcon />} label="Shape" onClick={toggleShape} active={activeAdjust === 'shape'} />
             <ToolBtn icon={<TuneIcon />} label="Adjust" onClick={() => setActiveAdjust((a) => (a === 'adjust' ? null : 'adjust'))} active={activeAdjust === 'adjust'} />
             <ToolBtn icon={<ImageToolIcon />} label="Image" onClick={() => setActiveAdjust((a) => (a === 'image' ? null : 'image'))} active={activeAdjust === 'image'} />
-            <ToolBtn icon={<PenIcon />} label="Draw" onClick={startDraw} />
           </>
         )}
         </div>

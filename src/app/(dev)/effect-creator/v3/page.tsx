@@ -51,7 +51,7 @@ function PrototypePageInner() {
   const [isDragging, setIsDragging] = useState(false)
   const [isEditing, setIsEditing] = useState(false) // G1 Position mode (restored first-class)
   const [editingOutline, setEditingOutline] = useState(false)
-  const [editorMode, setEditorMode] = useState<'shape' | 'draw' | null>(null) // #27: toolbar creation modes
+  const [editorMode, setEditorMode] = useState<'shape' | null>(null) // #27: toolbar creation modes
   const [autoOutline, setAutoOutline] = useState(false) // false = standard square; true = Magic cut-out
   const [generating, setGenerating] = useState(false)
   const [genLabel, setGenLabel] = useState('Cutting out…') // G5 honest progress
@@ -401,7 +401,6 @@ function PrototypePageInner() {
           return !prev
         })}
         onShapes={() => { editorPreRef.current = snapNow(); setEditorMode('shape'); setEditingOutline(true) }}
-        onDraw={() => { editorPreRef.current = snapNow(); setEditorMode('draw'); setEditingOutline(true) }}
         onEdit={() => { editorPreRef.current = snapNow(); setEditorMode(null); setEditingOutline(true) }}
         onSave={() => setShowSave((v) => !v)}
       />

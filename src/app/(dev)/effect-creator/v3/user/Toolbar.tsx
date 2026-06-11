@@ -8,7 +8,7 @@
 
 import { useRef } from 'react'
 import type { DesignState } from '../types'
-import { UploadIcon, MagicIcon, ColorsIcon, SaveIcon, ShapeIcon, PenIcon, EditIcon } from './icons'
+import { UploadIcon, MagicIcon, ColorsIcon, SaveIcon, ShapeIcon, EditIcon } from './icons'
 import styles from './toolbar.module.css'
 
 const INITIAL_DESIGN: DesignState = { offsetX: 0, offsetY: 0, scale: 1.0 }
@@ -25,7 +25,6 @@ interface ToolbarProps {
    *  (Dan reversal, KAI-8938: "the edit button must come back" — tap-the-object still works too;
    *  both re-open the editor on the EXISTING committed shape, zero data loss). */
   onShapes: () => void
-  onDraw: () => void
   onEdit: () => void
   onSave: () => void
 }
@@ -58,7 +57,6 @@ export default function Toolbar({
   onGenerate,
   onToggleColors,
   onShapes,
-  onDraw,
   onEdit,
   onSave,
 }: ToolbarProps) {
@@ -75,7 +73,6 @@ export default function Toolbar({
         <Tool icon={<MagicIcon />} label="Magic" onClick={onGenerate} active={auto} disabled={!artworkUrl} />
         {/* #27 structure A: creation modes side by side — each drops into the SAME editor */}
         <Tool icon={<ShapeIcon />} label="Shapes" onClick={onShapes} disabled={!artworkUrl} />
-        <Tool icon={<PenIcon />} label="Draw" onClick={onDraw} disabled={!artworkUrl} />
         {/* KAI-8938: the always-available way back into the committed outline (tap-the-object remains) */}
         <Tool icon={<EditIcon />} label="Edit" onClick={onEdit} disabled={!artworkUrl} />
         <Tool icon={<ColorsIcon />} label="Trim" onClick={onToggleColors} active={showColors} disabled={!artworkUrl} />
