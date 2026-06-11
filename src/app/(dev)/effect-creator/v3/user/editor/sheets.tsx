@@ -4,7 +4,8 @@
 // release (§6.3) is enforced by the handlers the parent passes in.
 // Blueprint: v3/blueprint/modules/editor.md.
 
-import type { Dispatch, SetStateAction, ChangeEvent } from 'react'
+import { useRef } from 'react'
+import type { Dispatch, SetStateAction, ChangeEvent, ReactNode } from 'react'
 import { fairingFromDetail, type FairTracedRingOpts } from '@/lib/outline-core'
 import TickBar from '../../ui/TickBar'
 import { useOutlineStore, type ImageFx } from '../outlineStore'
@@ -14,6 +15,41 @@ import { RoundIcon, SmoothIcon, ScaleIcon, BlendIcon, TuneIcon, SnapIcon, MinLin
 import styles from '../outline-editor.module.css'
 
 export type AdjustSub = 'radius' | 'curve' | 'scale' | 'blend' | 'detail' | 'smooth' | 'snap' | 'line' | 'angle'
+
+/** Chip carousel with mouse drag-to-scroll (KAI-8978/F6): touch scrolls natively, but a desktop
+ *  mouse drag selected label text and the row's tail (… Upload) was unreachable. A drag past the
+ *  tap threshold scrolls the row and swallows the trailing click so chips don't mis-fire. */
+function ChipRow({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const dragRef = useRef<{ x: number; left: number } | null>(null)
+  const movedRef = useRef(false)
+  return (
+    <div
+      ref={ref}
+      className={styles.chipRow}
+      onPointerDown={(e) => {
+        if (e.pointerType !== 'mouse') return // touch scrolls natively
+        dragRef.current = { x: e.clientX, left: ref.current?.scrollLeft ?? 0 }
+        movedRef.current = false
+      }}
+      onPointerMove={(e) => {
+        const d = dragRef.current
+        const el = ref.current
+        if (!d || !el) return
+        const dx = e.clientX - d.x
+        if (Math.abs(dx) > 4) movedRef.current = true
+        if (movedRef.current) el.scrollLeft = d.left - dx
+      }}
+      onPointerUp={() => { dragRef.current = null }}
+      onPointerLeave={() => { dragRef.current = null }}
+      onClickCapture={(e) => {
+        if (movedRef.current) { e.preventDefault(); e.stopPropagation(); movedRef.current = false }
+      }}
+    >
+      {children}
+    </div>
+  )
+}
 export type ImageSub = 'position' | 'brightness' | 'contrast' | 'saturate' | 'warmth'
 
 /* #35 ADJUST mode (Apple pattern): circular sub-tools — Radius · Curve · Scale · Blend +
@@ -50,7 +86,7 @@ export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, canTune, radi
 }) {
   return (
     <div className={styles.shapeSheet}>
-      <div className={styles.chipRow}>
+      <ChipRow>
         {([
           { k: 'radius', label: cornerMode ? 'Corner' : 'Radius', icon: <RoundIcon />, show: true },
           { k: 'curve', label: 'Curve', icon: <SmoothIcon />, show: true },
@@ -74,7 +110,7 @@ export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, canTune, radi
             <span className={styles.chipLabel}>{t.label}</span>
           </button>
         ))}
-      </div>
+      </ChipRow>
       <div className={styles.shapeControls}>
         <div className={styles.shapeRow}>
           {adjustSub === 'radius' && (radiusApplies || cornerMode ? (
@@ -135,7 +171,7 @@ export function ImageSheet({ imageSub, setImageSub, art, fxDraft, setFxDraft }: 
 }) {
   return (
     <div className={styles.shapeSheet}>
-      <div className={styles.chipRow}>
+      <ChipRow>
         {([
           { k: 'position', label: 'Position', icon: <PositionIcon /> },
           { k: 'brightness', label: 'Bright', icon: <BrightnessIcon /> },
@@ -155,7 +191,7 @@ export function ImageSheet({ imageSub, setImageSub, art, fxDraft, setFxDraft }: 
             <span className={styles.chipLabel}>{s.label}</span>
           </button>
         ))}
-      </div>
+      </ChipRow>
       <div className={styles.shapeControls}>
         {imageSub === 'position' ? (
           <div className={styles.shapeRow}>
@@ -207,7 +243,7 @@ export function ShapeSheet({ shapeKind, pickShape, shapeParams, nudgeParam, prev
 }) {
   return (
     <div className={styles.shapeSheet}>
-      <div className={styles.chipRow}>
+      <ChipRow>
         {SHAPE_CHIPS.map(({ kind, label }) => (
           <button
             key={kind}
@@ -228,7 +264,7 @@ export function ShapeSheet({ shapeKind, pickShape, shapeParams, nudgeParam, prev
           <span className={styles.chipLabel}>Upload</span>
           <input type="file" accept=".svg,image/svg+xml,image/png,image/jpeg,image/webp" style={{ display: 'none' }} onChange={onUploadShape} />
         </label>
-      </div>
+      </ChipRow>
       {shapeKind && PARAMETRIC[shapeKind] && (
         <div className={styles.shapeControls}>
           {shapeKind === 'polygon' && (

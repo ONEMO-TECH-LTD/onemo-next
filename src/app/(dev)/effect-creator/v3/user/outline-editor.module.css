@@ -6,6 +6,10 @@
   z-index: 40;
   background: var(--semantic-bg-primary);
   font-family: var(--font-primary);
+  /* KAI-8978/F6: the editor has no text-entry surface — selecting label/hint text is never
+     intentional; drags across chips/canvas were selecting words instead of working */
+  user-select: none;
+  -webkit-user-select: none;
   /* G11 safe-area layout: top bar / canvas / bottom dock are FLEX SIBLINGS — the canvas (and the
      whole image) fits ENTIRELY between the bars; nothing is ever occluded. */
   display: flex;
