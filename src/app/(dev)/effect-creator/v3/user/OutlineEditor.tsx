@@ -1238,11 +1238,15 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
           ? <span className={styles.approved}>Preview — tap Edit to keep editing</span>
           : hasIssues
             ? <span className={styles.warn}>This shape can’t be cut cleanly — fix the crossing</span>
-            : allSelected
-              ? 'All corners selected — scale or twist them together'
-              : (vshape && selVA !== null)
-                ? 'Drag this point, or add/delete from the bar below'
-                : 'Tap inside to select all · drag inside to move · drag points · double-tap to add/remove · pinch/scroll to zoom'}
+            : activeAdjust === 'image'
+              ? (imageSub === 'position' ? 'Drag the photo to position it · scroll to zoom' : 'Drag the ruler — release to apply')
+              : allSelected
+                ? 'All corners selected — scale or twist them together'
+                : (vshape && selVA !== null)
+                  ? 'Drag this point, or add/delete from the bar below'
+                  : activeAdjust === 'shape' && shapeKind
+                    ? '' /* the Shape sheet's own hint covers this state — one hint at a time (F7) */
+                    : 'Tap inside to select all · drag inside to move · drag points · double-tap to add/remove · pinch/scroll to zoom'}
       </div>
 
       {/* Run 2 · seam 5: the three tool sheets live in editor/sheets (verbatim moves). */}
@@ -1289,7 +1293,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
             {/* #35: the MODE pill — Shape · Adjust · Image (Apple bottom-pill pattern; Draw removed — KAI-8962) */}
             <ToolBtn icon={<ShapeIcon />} label="Shape" onClick={toggleShape} active={activeAdjust === 'shape'} />
             <ToolBtn icon={<TuneIcon />} label="Adjust" onClick={() => setActiveAdjust((a) => (a === 'adjust' ? null : 'adjust'))} active={activeAdjust === 'adjust'} />
-            <ToolBtn icon={<ImageToolIcon />} label="Image" onClick={() => setActiveAdjust((a) => (a === 'image' ? null : 'image'))} active={activeAdjust === 'image'} />
+            <ToolBtn icon={<ImageToolIcon />} label="Image" onClick={() => { setActiveAdjust((a) => (a === 'image' ? null : 'image')); setAllSelected(false); setSelVA(null) }} active={activeAdjust === 'image'} />
           </>
         )}
         </div>
