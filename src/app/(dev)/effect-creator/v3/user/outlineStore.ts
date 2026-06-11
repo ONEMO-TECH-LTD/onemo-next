@@ -28,6 +28,18 @@ export const NEUTRAL_FX: ImageFx = { brightness: 100, contrast: 100, saturate: 1
 // SHORTLIST #21 (Dan, 2026-06-10): fine-tuned BEN settings ARE the defaults — Magic must not reset
 // them. Durable across reloads (localStorage) until changed again.
 export interface FairingPrefs { detail: number; params: FairTracedRingOpts }
+
+// DRAW (Run 9b): the drawn shape's two candidates — the user's hand (faithfully fitted) and the
+// library suggestion — plus which one is currently on the object.
+export interface DrawRecipe {
+  /** the raw accumulated stroke in editor px (the "reset to raw" source of truth) */
+  raw: [number, number][]
+  /** keep-raw candidate: the hand, faithfully vectorised */
+  fitted: VShape
+  /** snap candidate: the matched library shape fitted to the stroke's box (absent = no match) */
+  snapped?: { kind: string; shape: VShape }
+  active: 'raw' | 'snapped'
+}
 const FAIRING_KEY = 'kai-ben-fairing-v1'
 function loadFairing(): FairingPrefs | null {
   try {
@@ -50,6 +62,12 @@ interface OutlineStore {
   // reopening a vector-native shape restores true curves, never a polyline re-derivation.
   editedVShape: VShape | null
   setEditedVShape: (v: VShape | null) => void
+  // DRAW (Run 9b): both candidates of a drawn shape live in the recipe while the shape exists —
+  // "back to my drawing" is one tap at any time, in either direction (Dan, locked 2026-06-10).
+  // Cleared when a different shape SOURCE lands (chip/upload/tune/generator/doc edit/reset);
+  // survives transforms and point edits (reset-to-raw is an explicit, loud discard by design).
+  drawRecipe: DrawRecipe | null
+  setDrawRecipe: (r: DrawRecipe | null) => void
   // "Magic blend" background-blur intensity, edit-mode controllable. null = use the build default (on);
   // 0 = off (sharp full photo); 0..1 = blur amount. ShapedModel re-composes the front texture from it.
   bgBlur: number | null
@@ -80,6 +98,8 @@ export const useOutlineStore = create<OutlineStore>((set) => ({
   setEditedDoc: (editedDoc) => set({ editedDoc }),
   editedVShape: null,
   setEditedVShape: (editedVShape) => set({ editedVShape }),
+  drawRecipe: null,
+  setDrawRecipe: (drawRecipe) => set({ drawRecipe }),
   bgBlur: null,
   setBgBlur: (bgBlur) => set({ bgBlur }),
   subjMatteUrl: null,
