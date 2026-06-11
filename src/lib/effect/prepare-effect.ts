@@ -42,8 +42,7 @@ import { fairingFromDetail, BEN_DEFAULT_DETAIL, type FairTracedRingOpts, type Ve
 // REBUILD-PLAN-v2 §B1 — truth at birth: geometry is born as ONE VShape through the single
 // pipeline; the manufacturing contour is DERIVED from it. No OutlineDocument exists here.
 import { vectoriseTrace, contourFromShape } from './geometry-truth'
-import { getShape } from '@/lib/shape-library'
-import { filletShape } from '@/lib/vector-core'
+import { filletShape, type VShape } from '@/lib/vector-core'
 
 /**
  * Config for the 2D-first path. Carries forward the proven build values but pins
@@ -186,9 +185,16 @@ export async function prepareEffect(
     vectorShape = vectoriseTrace(ringPx.map(([x, y]) => [x, y] as Pt), H, fairing ?? fairingFromDetail(BEN_DEFAULT_DETAIL))
     if (!vectorShape) throw new Error('Contour fit failed — try an image with a clearer subject.')
   } else {
-    // standard square: kernel-exact rounded rect — 8mm absolute corners, clamped to the inscribable max
+    // standard: the FULL-IMAGE rounded rectangle — the ONEMO square is the whole photo with 8mm
+    // corners (the shape-library 'square' preset is the editor's CENTERED 72% seed, NOT this:
+    // using it here shipped a zoomed-looking photo — texture maps by image position, so a smaller
+    // born shape crops the print. Dan caught it on first real-photo QA, 2026-06-11.)
+    const base: VShape = { paths: [{ anchors: [
+      { p: { x: 0, y: 0 }, corner: true }, { p: { x: W, y: 0 }, corner: true },
+      { p: { x: W, y: H }, corner: true }, { p: { x: 0, y: H }, corner: true },
+    ] }] }
     const r = Math.min(radiusHiPx, Math.floor(Math.min(W, H) / 2))
-    vectorShape = filletShape(getShape('square', W, H), r)
+    vectorShape = filletShape(base, r)
   }
   const geometryMM = contourFromShape(vectorShape, { mmPerPx, maskHeightPx: H })
   if (!geometryMM) throw new Error('Geometry derivation failed — degenerate outline.')
