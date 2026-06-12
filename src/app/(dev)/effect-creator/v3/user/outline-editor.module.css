@@ -280,6 +280,10 @@
   padding: 2px var(--spacing-2xs);
   scrollbar-width: none;
   scroll-snap-type: x proximity;
+  /* KAI-9016/9029 (Dan): tool/filter rows CENTER when they fit; `safe` falls back to start
+     when the row overflows so the leading chips can never be clipped off-screen */
+  justify-content: safe center;
+  width: 100%;
   -webkit-overflow-scrolling: touch;
 }
 .chipRow::-webkit-scrollbar { display: none; }
