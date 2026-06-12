@@ -53,8 +53,12 @@ import { filletShape, type VShape } from '@/lib/vector-core'
 export const EFFECT_BUILD_CONFIG: ShapeBuildConfig = {
   longestSideMM: 70, // §9a: 70mm base square
   thicknessMM: 1, // §9: 1mm body (supersedes 0.5)
-  edgeRadiusMM: 0.15, // §9 follow-up: re-pin lip radius for the 1mm body
-  edgeSegments: 14,
+  // KAI-9008 (Dan): at 0.15mm the roll was sub-pixel — the edge read as a flat wall with a
+  // crease ('groove') even though the profile is convex (mesh-edge invariants held). 0.5mm on
+  // the 1mm body = a FULL half-round: the edge is one continuous semicircular roll, like real
+  // cut ultrasuede — no wall, no crease, no groove read at any angle.
+  edgeRadiusMM: 0.5,
+  edgeSegments: 18,
   rdpEpsilonMM: 0.4,
   maxImageDim: 1200,
   textureDim: 2400,
