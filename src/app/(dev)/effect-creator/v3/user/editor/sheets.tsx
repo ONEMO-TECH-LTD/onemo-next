@@ -25,6 +25,19 @@ export const linePxToPct = (px: number) => Math.max(0, Math.min(100, (px / 80) *
 export const snapPctToPx = (v: number) => (v / 100) * 20
 export const snapPxToPct = (px: number) => Math.max(0, Math.min(100, (px / 20) * 100))
 
+// KAI-9028 (Dan): every image filter shows ONE uniform 0–100% scale — 0% = the extreme/none end,
+// 100% = full to the limit — regardless of the engine range underneath.
+const FX_RANGE = { brightness: [50, 150], contrast: [50, 150], saturate: [0, 200], warmth: [0, 100] } as const
+type FxKey = keyof typeof FX_RANGE
+export const fxToPct = (k: FxKey, v: number) => {
+  const [lo, hi] = FX_RANGE[k]
+  return Math.max(0, Math.min(100, ((v - lo) / (hi - lo)) * 100))
+}
+export const fxFromPct = (k: FxKey, pct: number) => {
+  const [lo, hi] = FX_RANGE[k]
+  return lo + (pct / 100) * (hi - lo)
+}
+
 import styles from '../outline-editor.module.css'
 
 export type AdjustSub = 'radius' | 'curve' | 'detail' | 'smooth' | 'snap' | 'angle' | 'line'
@@ -226,17 +239,17 @@ export function ImageSheet({ imageSub, setImageSub, fxDraft, setFxDraft, blendBl
             </span>
             <TickBar
               label={imageSub}
-              min={imageSub === 'saturate' ? 0 : imageSub === 'warmth' ? 0 : 50}
-              max={imageSub === 'saturate' ? 200 : imageSub === 'warmth' ? 100 : 150}
+              min={0}
+              max={100}
               step={1}
-              value={fxDraft[imageSub]}
-              onChange={(v) => setFxDraft((d) => ({ ...d, [imageSub]: v }))}
+              value={fxToPct(imageSub, fxDraft[imageSub])}
+              onChange={(v) => setFxDraft((d) => ({ ...d, [imageSub]: fxFromPct(imageSub, v) }))}
               onCommit={(v) => {
-                const next = { ...fxDraft, [imageSub]: v }
+                const next = { ...fxDraft, [imageSub]: fxFromPct(imageSub, v) }
                 setFxDraft(next)
                 useOutlineStore.getState().setImageFx(next) // bake → 3D + print recompose
               }}
-              format={(v) => (imageSub === 'warmth' ? `${Math.round(v)}` : `${Math.round(v)}%`)}
+              format={(v) => `${Math.round(v)}%`}
             />
           </div>
         )}
