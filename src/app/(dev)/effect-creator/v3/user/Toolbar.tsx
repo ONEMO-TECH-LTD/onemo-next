@@ -1,13 +1,12 @@
-// Effect Creator V3 — scene toolbar (ONEMO design system).
-// ONE persistent surface (no phases, no "Finish in 3D" — blueprint §5): the object is live in 3D the
-// whole time. Tools: Upload/Replace · Magic (worker BEN cut-out) · Edit (outline overlay) ·
-// Position (G1 — pan/zoom the photo within the shape, restored first-class) · Trim (appearance) ·
+// Effect Creator V3 — the CREATION row (plan A1: HOME owns creation only). Image (the print) ·
+// Magic (self-sufficient auto cut) · Trim (back material color). Shape/image EDITING entries live
+// in the global top bar (Edit) and the double-tap gesture — never down here.
 
 'use client'
 
 import { useRef } from 'react'
 import type { DesignState } from '../types'
-import { UploadIcon, MagicIcon, ColorsIcon, ShapeIcon, EditIcon } from './icons'
+import { UploadIcon, MagicIcon, ColorsIcon } from './icons'
 import styles from './toolbar.module.css'
 
 const INITIAL_DESIGN: DesignState = { offsetX: 0, offsetY: 0, scale: 1.0 }
@@ -19,12 +18,6 @@ interface ToolbarProps {
   onFile: (file: File) => void
   onGenerate: () => void
   onToggleColors: () => void
-  /** Structure A (#27): creation modes at toolbar level — each opens the SAME editor in that mode.
-   *  Position stays folded into the editor's Image tool. Edit is BACK as a visible tool
-   *  (Dan reversal, KAI-8938: "the edit button must come back" — tap-the-object still works too;
-   *  both re-open the editor on the EXISTING committed shape, zero data loss). */
-  onShapes: () => void
-  onEdit: () => void
 }
 
 /** One scene tool: icon over a small label (mobile-first touch target). */
@@ -54,8 +47,6 @@ export default function Toolbar({
   onFile,
   onGenerate,
   onToggleColors,
-  onShapes,
-  onEdit,
 }: ToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -68,10 +59,8 @@ export default function Toolbar({
         <Tool icon={<UploadIcon />} label="Image" onClick={() => fileInputRef.current?.click()} primary={!artworkUrl} />
         {/* Magic = auto cut-out (worker BEN). Highlights once the subject cut has been generated. */}
         <Tool icon={<MagicIcon />} label="Magic" onClick={onGenerate} active={auto} disabled={!artworkUrl} />
-        {/* #27 structure A: creation modes side by side — each drops into the SAME editor */}
-        <Tool icon={<ShapeIcon />} label="Shapes" onClick={onShapes} disabled={!artworkUrl} />
-        {/* KAI-8938: the always-available way back into the committed outline (tap-the-object remains) */}
-        <Tool icon={<EditIcon />} label="Edit" onClick={onEdit} disabled={!artworkUrl} />
+        {/* Shapes lives INSIDE the editor (plan D4: shape choice = editing); Edit lives in the
+            global top bar + double-tap (KAI-8938's visible entry kept, relocated per D-CHROME) */}
         <Tool icon={<ColorsIcon />} label="Trim" onClick={onToggleColors} active={showColors} disabled={!artworkUrl} />
       </div>
 

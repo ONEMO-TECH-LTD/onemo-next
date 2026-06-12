@@ -15,9 +15,8 @@
 import dynamic from 'next/dynamic'
 import { useState, useCallback, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { useGesture } from '@use-gesture/react'
 import { useSceneStore } from './admin/sceneStore'
-import { UndoIcon, RedoIcon, ResetIcon, ExportIcon } from './user/icons'
+import { UndoIcon, RedoIcon, ResetIcon, ExportIcon, EditIcon } from './user/icons'
 import { INITIAL_ARTWORK } from './user/outlineStore'
 import { useOutlineStore } from './user/outlineStore'
 import type { DesignState } from './types'
@@ -27,7 +26,7 @@ import { toast } from './ui/Toast'
 // Dynamic imports — no SSR for 3D components
 const EffectViewer = dynamic(() => import('./core/EffectViewer'), { ssr: false })
 const AdminViewer = dynamic(() => import('./admin/AdminViewer'), { ssr: false })
-const ColorPanel = dynamic(() => import('./user/ColorPanel'), { ssr: false })
+const TrimCarousel = dynamic(() => import('./user/TrimCarousel'), { ssr: false })
 const Toolbar = dynamic(() => import('./user/Toolbar'), { ssr: false })
 const EditOverlay = dynamic(() => import('./user/EditOverlay'), { ssr: false })
 const OutlineEditor = dynamic(() => import('./user/OutlineEditor'), { ssr: false })
@@ -36,17 +35,11 @@ const GenerateShimmer = dynamic(() => import('./user/GenerateShimmer'), { ssr: f
 const ToastSurface = dynamic(() => import('./ui/Toast'), { ssr: false })
 const PerfHUD = dynamic(() => import('./dev/PerfHUD'), { ssr: false })
 
-const MIN_SCALE = 1.0
-const MAX_SCALE = 4.0
-const DRAG_SENSITIVITY = 0.001
-const SCROLL_SENSITIVITY = 0.002
-
 function PrototypePageInner() {
   const searchParams = useSearchParams()
   const [artworkUrl, setArtworkUrl] = useState<string | undefined>()
   const [prepared, setPrepared] = useState<PreparedEffect | null>(null) // the one engine's output
   const [isDragging, setIsDragging] = useState(false)
-  const [isEditing, setIsEditing] = useState(false) // G1 Position mode (restored first-class)
   const [editingOutline, setEditingOutline] = useState(false)
   const [editorMode, setEditorMode] = useState<'shape' | null>(null) // #27: toolbar creation modes
   const [autoOutline, setAutoOutline] = useState(false) // false = standard square; true = Magic cut-out
@@ -57,7 +50,7 @@ function PrototypePageInner() {
     const st = useOutlineStore.getState()
     st.setArtwork(typeof upd === 'function' ? upd(st.artwork) : upd)
   }, [])
-  const { colors, setBackColor, setFrameColor, setBgColor } = useSceneStore()
+  const { colors, setBackColor } = useSceneStore()
   const [showColors, setShowColors] = useState(false)
   const sceneName = searchParams.get('scene')
 
@@ -274,47 +267,10 @@ function PrototypePageInner() {
     if (file) handleFile(file)
   }, [handleFile])
 
-  // G1 Position mode — pan/zoom the photo WITHIN the shape. Matrix-only transforms downstream
-  // (ShapedModel touches repeat/offset; never a texture re-upload).
-  const bind = useGesture(
-    {
-      onDrag: ({ delta: [dx, dy], event }) => {
-        if (!isEditing) return
-        event.preventDefault()
-        setDesignState((prev) => ({
-          ...prev,
-          offsetX: prev.offsetX + dx * DRAG_SENSITIVITY,
-          offsetY: prev.offsetY - dy * DRAG_SENSITIVITY,
-        }))
-      },
-      onPinch: ({ offset: [scale], event }) => {
-        if (!isEditing) return
-        event.preventDefault()
-        setDesignState((prev) => ({
-          ...prev,
-          scale: Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale)),
-        }))
-      },
-      onWheel: ({ delta: [, dy], event }) => {
-        if (!isEditing) return
-        event.preventDefault()
-        setDesignState((prev) => ({
-          ...prev,
-          scale: Math.max(MIN_SCALE, Math.min(MAX_SCALE, prev.scale - dy * SCROLL_SENSITIVITY)),
-        }))
-      },
-    },
-    {
-      drag: { enabled: isEditing },
-      pinch: { enabled: isEditing, scaleBounds: { min: MIN_SCALE, max: MAX_SCALE } },
-      wheel: { enabled: isEditing },
-      eventOptions: { passive: false },
-    }
-  )
-
-  // Folded-away Edit (Dan): TAP THE OBJECT to edit — a clean tap on the scene (not a drag, not a
-  // button) opens the outline editor. Orbit drags pass the movement threshold and never trigger it.
+  // Editor entry (plan A1, Dan: single-tap hijacked touches): DOUBLE-TAP the object — two clean
+  // taps within 350ms — or the top bar's Edit. Single taps and orbit drags do NOTHING.
   const tapRef = useRef<{ x: number; y: number; t: number } | null>(null)
+  const lastTapRef = useRef<{ x: number; y: number; t: number } | null>(null)
   const onScenePointerDown = useCallback((e: React.PointerEvent) => {
     if ((e.target as Element).closest('button')) { tapRef.current = null; return }
     tapRef.current = { x: e.clientX, y: e.clientY, t: performance.now() }
@@ -322,32 +278,38 @@ function PrototypePageInner() {
   const onScenePointerUp = useCallback((e: React.PointerEvent) => {
     const t0 = tapRef.current
     tapRef.current = null
-    if (!t0 || !artworkUrl || editingOutline || generating || showColors || isEditing) return
+    if (!t0 || !artworkUrl || editingOutline || generating || showColors) return
     if ((e.target as Element).closest('button')) return
     const moved = Math.hypot(e.clientX - t0.x, e.clientY - t0.y)
-    if (moved < 6 && performance.now() - t0.t < 400) {
+    const clean = moved < 6 && performance.now() - t0.t < 400
+    if (!clean) { lastTapRef.current = null; return }
+    const prev = lastTapRef.current
+    const now = performance.now()
+    if (prev && now - prev.t < 350 && Math.hypot(e.clientX - prev.x, e.clientY - prev.y) < 24) {
+      lastTapRef.current = null
       editorPreRef.current = snapNow()
       setEditorMode(null)
       setEditingOutline(true)
+      return
     }
-  }, [artworkUrl, editingOutline, generating, showColors, isEditing, snapNow])
+    lastTapRef.current = { x: e.clientX, y: e.clientY, t: now }
+  }, [artworkUrl, editingOutline, generating, showColors, snapNow])
 
   return (
     <div
-      style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: colors.bgColor, touchAction: isEditing ? 'none' : 'auto' }}
+      style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: colors.bgColor }}
       onDrop={handleDrop}
       onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
       onDragLeave={() => setIsDragging(false)}
       onPointerDown={onScenePointerDown}
       onPointerUp={onScenePointerUp}
-      {...(isEditing ? bind() : {})}
     >
       {/* ── THE persistent golden scene — mounted once, never unmounted (§6.1). The object is the
           hero from upload onward; the editor freezes (frameloop=never) but never unmounts it. ── */}
       <AdminViewer
         artworkUrl={artworkUrl}
         designState={designState}
-        isEditing={isEditing}
+        isEditing={false}
         onTextureChange={setArtworkUrl}
         templateUrl={templateUrl}
       >
@@ -357,7 +319,7 @@ function PrototypePageInner() {
               config={config}
               artworkUrl={artworkUrl}
               designState={designState}
-              isEditing={isEditing}
+              isEditing={false}
               shaped={shaped}
               prepared={prepared ?? undefined}
               onStatus={handleStatus}
@@ -373,42 +335,41 @@ function PrototypePageInner() {
       {/* Magic shimmer — page stays responsive (worker); label = the honest wait state (G5) */}
       {generating && <GenerateShimmer label={genLabel} />}
 
-      {/* Trim (appearance-only — invariant 8: never rebuilds geometry) */}
-      {showColors && (
-        <ColorPanel
+      {/* Trim takeover (D-TRIM): the creation row swaps to the material-color carousel — tap
+          recolors the 3D back LIVE; ✓ keeps (one history step), ✕ reverts to the pre-open color */}
+      {showColors ? (
+        <TrimCarousel
           backColor={colors.backColor}
-          frameColor={colors.frameColor}
-          bgColor={colors.bgColor}
           onBackColor={setBackColor}
-          onFrameColor={setFrameColor}
-          onBgColor={setBgColor}
+          onDone={() => {
+            if (trimPreRef.current) {
+              const t = trimPreRef.current.trim, c = useSceneStore.getState().colors
+              if (t.backColor !== c.backColor) pushHistory(trimPreRef.current)
+              trimPreRef.current = null
+            }
+            setShowColors(false)
+          }}
+          onCancel={() => {
+            if (trimPreRef.current) { setBackColor(trimPreRef.current.trim.backColor); trimPreRef.current = null }
+            setShowColors(false)
+          }}
+        />
+      ) : (
+        /* Creation row (plan A1): Image · Magic · Trim — creation only; editing entries live in
+           the global top bar (Edit) and the double-tap gesture */
+        <Toolbar
+          artworkUrl={artworkUrl}
+          auto={autoOutline}
+          showColors={showColors}
+          onFile={handleFile}
+          onGenerate={handleMagic}
+          onToggleColors={() => { trimPreRef.current = snapNow(); setShowColors(true) }}
         />
       )}
 
-      {/* Toolbar — one persistent surface; no phase switch */}
-      <Toolbar
-        artworkUrl={artworkUrl}
-        auto={autoOutline}
-        showColors={showColors}
-        onFile={handleFile}
-        onGenerate={handleMagic}
-        onToggleColors={() => setShowColors((prev) => {
-          // #23: a Trim panel session = one step (pushed on close if colors changed)
-          if (!prev) trimPreRef.current = snapNow()
-          else if (trimPreRef.current) {
-            const t = trimPreRef.current.trim, c = useSceneStore.getState().colors
-            if (t.backColor !== c.backColor || t.frameColor !== c.frameColor || t.bgColor !== c.bgColor) pushHistory(trimPreRef.current)
-            trimPreRef.current = null
-          }
-          return !prev
-        })}
-        onShapes={() => { editorPreRef.current = snapNow(); setEditorMode('shape'); setEditingOutline(true) }}
-        onEdit={() => { editorPreRef.current = snapNow(); setEditorMode(null); setEditingOutline(true) }}
-      />
-
-      {/* Position-mode banner + drag indicator */}
+      {/* drag-and-drop indicator (upload affordance) */}
       <EditOverlay
-        isEditing={isEditing}
+        isEditing={false}
         scale={designState.scale}
         isDragging={isDragging}
       />
@@ -439,29 +400,43 @@ function PrototypePageInner() {
         }}
       />
 
-      {/* #23: global Undo/Redo/Reset — the whole creator, one step per action */}
+      {/* GLOBAL TOP BAR (plan A1 / D-CHROME, Dan's iPhone Photos anatomy): undo/redo pill always
+          top-LEFT · RESET top-CENTER only-when-dirty (gold, vanishes when clean) · the screen's
+          commit actions top-RIGHT (hero: Edit · Export). ONE anatomy on every screen; the old
+          desktop corner pill is dead. Hidden while the editor owns the screen (same anatomy there). */}
       {artworkUrl && !editingOutline && (
-        <div style={{ position: 'fixed', top: 14, right: 14, zIndex: 40, display: 'flex', gap: 4, background: 'rgba(255,255,255,0.82)', backdropFilter: 'blur(14px)', borderRadius: 999, padding: '4px 8px', boxShadow: '0 4px 18px rgba(15,18,32,0.12)' }}>
-          {([
-            { icon: <UndoIcon />, label: 'Undo', fn: globalUndo, off: !histRef.current.past.length },
-            { icon: <RedoIcon />, label: 'Redo', fn: globalRedo, off: !histRef.current.future.length },
-            { icon: <ResetIcon />, label: 'Reset', fn: globalReset, off: !baselineRef.current },
-            { icon: <ExportIcon />, label: 'Export', fn: onExport, off: !prepared },
-          ] as const).map((b) => (
-            <button
-              key={b.label}
-              type="button"
-              onClick={b.fn}
-              disabled={b.off}
-              aria-label={b.label}
-              title={b.label}
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, border: 'none', background: 'transparent', cursor: b.off ? 'default' : 'pointer', opacity: b.off ? 0.3 : 0.85, padding: '4px 7px', color: '#1c2030', fontSize: 9, fontFamily: 'inherit' }}
-            >
-              {b.icon}
-              <span>{b.label}</span>
+        <>
+          <div style={{ position: 'fixed', top: 14, left: 14, zIndex: 40, display: 'flex', gap: 2, background: 'rgba(255,255,255,0.88)', borderRadius: 999, padding: '4px 8px', boxShadow: '0 4px 18px rgba(15,18,32,0.12)' }}>
+            {([
+              { icon: <UndoIcon />, label: 'Undo', fn: globalUndo, off: !histRef.current.past.length },
+              { icon: <RedoIcon />, label: 'Redo', fn: globalRedo, off: !histRef.current.future.length },
+            ] as const).map((b) => (
+              <button key={b.label} type="button" onClick={b.fn} disabled={b.off} aria-label={b.label} title={b.label}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, border: 'none', background: 'transparent', cursor: b.off ? 'default' : 'pointer', opacity: b.off ? 0.3 : 0.85, padding: '4px 7px', color: '#1c2030', fontSize: 9, fontFamily: 'inherit' }}>
+                {b.icon}
+                <span>{b.label}</span>
+              </button>
+            ))}
+          </div>
+          {histRef.current.past.length > 0 && baselineRef.current && (
+            <button type="button" onClick={globalReset} aria-label="Reset" title="Reset"
+              style={{ position: 'fixed', top: 18, left: '50%', transform: 'translateX(-50%)', zIndex: 40, border: 'none', background: 'transparent', cursor: 'pointer', color: '#c79a2a', fontWeight: 700, fontSize: 13, letterSpacing: 1, fontFamily: 'inherit', padding: '6px 10px' }}>
+              RESET
             </button>
-          ))}
-        </div>
+          )}
+          <div style={{ position: 'fixed', top: 14, right: 14, zIndex: 40, display: 'flex', gap: 2, background: 'rgba(255,255,255,0.88)', borderRadius: 999, padding: '4px 8px', boxShadow: '0 4px 18px rgba(15,18,32,0.12)' }}>
+            {([
+              { icon: <EditIcon />, label: 'Edit', fn: () => { editorPreRef.current = snapNow(); setEditorMode(null); setEditingOutline(true) }, off: !prepared },
+              { icon: <ExportIcon />, label: 'Export', fn: onExport, off: !prepared },
+            ] as const).map((b) => (
+              <button key={b.label} type="button" onClick={b.fn} disabled={b.off} aria-label={b.label} title={b.label}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, border: 'none', background: 'transparent', cursor: b.off ? 'default' : 'pointer', opacity: b.off ? 0.3 : 0.85, padding: '4px 7px', color: '#1c2030', fontSize: 9, fontFamily: 'inherit' }}>
+                {b.icon}
+                <span>{b.label}</span>
+              </button>
+            ))}
+          </div>
+        </>
       )}
 
       {/* G4 + G3 — always present */}
