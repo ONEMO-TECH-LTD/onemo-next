@@ -105,7 +105,17 @@ export function vectoriseTrace(rawMaskPx: ReadonlyArray<Pt>, maskHeightPx: numbe
     const flat = flattenShape(v, 0.75)[0]?.map((pt) => [pt.x, pt.y] as Vec2Px) ?? []
     if (flat.length < 3 || validateSelfIntersection(flat, 'fit').length === 0) return v
     if (attempt === 2) {
-      console.error('[geometry-truth] vectoriseTrace: self-intersecting fit survived smoothing escalation — returning last attempt')
+      // last resort: the crossing only exists in the FITTED curves (e.g. a sub-kerf needle the
+      // raw repair couldn't see). Repair the fit's own flatten and re-fit it as a plain ring —
+      // existing corners survive ringToVPath's own detection; the sliver cannot.
+      const repaired = repairSimplePolygon(flat, 1)
+      if (repaired.length >= 3) {
+        const path = ringToVPath(repaired.map(([x, y]) => ({ x, y })), FIT_CORNER_ANGLE_DEG, FIT_MAX_ERROR_PX, undefined, FIT_COMPACT_ERROR_PX, opts?.minAnchorSepPx)
+        const v2: VShape = { paths: [path] }
+        const flat2 = flattenShape(v2, 0.75)[0]?.map((pt) => [pt.x, pt.y] as Vec2Px) ?? []
+        if (flat2.length >= 3 && validateSelfIntersection(flat2, 'fit').length === 0) return v2
+      }
+      console.error('[geometry-truth] vectoriseTrace: self-intersecting fit survived repair — returning last attempt')
       return v
     }
   }
@@ -117,9 +127,13 @@ function vectoriseTraceOnce(rawMaskPx: ReadonlyArray<Pt>, maskHeightPx: number, 
   const yDown = rawMaskPx.map(([x, y]) => [x, maskHeightPx - y] as Vec2Px)
   const corners = rawCornerPositions(yDown)
   // KAI-9009: kill sliver loops (needle notches whose walls cross) BEFORE the fit — the
-  // existing simple-polygon repair drops the crossing vertices deterministically.
-  const faired = repairSimplePolygon(fairTracedRing(yDown, fairing), 1)
+  // existing simple-polygon repair drops the crossing vertices deterministically. Track WHAT
+  // it removed: a raw corner that lived on a removed sliver must not be pinned back in.
+  const fairedRaw = fairTracedRing(yDown, fairing)
+  const faired = repairSimplePolygon(fairedRaw, 1)
   if (faired.length < 3) return null
+  const kept = new Set(faired.map(([x, y]) => `${x},${y}`))
+  const removedPts = fairedRaw.filter(([x, y]) => !kept.has(`${x},${y}`))
   // pin each raw corner: snap the nearest faired point BACK to the exact sharp vertex and mark
   // its index as a corner for the fit (independent handles meet at the true point)
   const ring = faired.map(([x, y]) => ({ x, y }))
@@ -134,9 +148,11 @@ function vectoriseTraceOnce(rawMaskPx: ReadonlyArray<Pt>, maskHeightPx: number, 
       const d = (ring[i].x - cx) ** 2 + (ring[i].y - cy) ** 2
       if (d < bd) { bd = d; best = i }
     }
-    // KAI-9009: pin only when the faired ring still REPRESENTS the corner (a repaired-away
-    // sliver tip must not be snapped back in as a spike)
-    if (best >= 0 && bd <= CORNER_PIN_MAX_SNAP_PX ** 2 && !cornerIdx.some((j) => Math.hypot(ring[j].x - cx, ring[j].y - cy) < CORNER_MIN_SEPARATION_PX)) {
+    // KAI-9009: a corner whose neighborhood was REMOVED by the sliver repair no longer exists —
+    // pinning it back would re-create the spike. Legit faired corners (however far the smoothing
+    // pulled the ring) pin exactly as before.
+    const onRemovedSliver = removedPts.some(([rx, ry]) => Math.hypot(rx - cx, ry - cy) < CORNER_PIN_MAX_SNAP_PX)
+    if (best >= 0 && !onRemovedSliver && !cornerIdx.some((j) => Math.hypot(ring[j].x - cx, ring[j].y - cy) < CORNER_MIN_SEPARATION_PX)) {
       ring[best] = { x: cx, y: cy }
       cornerIdx.push(best)
       if (turnDeg >= CROP_TURN_MIN_DEG && turnDeg <= CROP_TURN_MAX_DEG && onFrame(cx, cy)) cropIdx.push(best)
