@@ -214,6 +214,8 @@
   z-index: 40;
 }
 .topTool:active:not(:disabled) { background: var(--semantic-bg-secondary); }
+/* mode toggle held ON (e.g. Points) — quiet grey chip, not an accent (Dan: no blue) */
+.topToolActive { background: var(--semantic-bg-secondary); border-radius: var(--radius-m, 10px); color: var(--color-text-primary); }
 .topToolLabel { font-family: var(--font-body); font-size: 0.625rem; line-height: 1; white-space: nowrap; }
 
 /* Compact status line between canvas and toolbar. */

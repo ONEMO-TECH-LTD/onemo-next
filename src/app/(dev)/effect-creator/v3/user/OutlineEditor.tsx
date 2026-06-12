@@ -25,7 +25,7 @@ import { standardBirthShape } from '@/lib/effect/prepare-effect'
 import { useOutlineStore, NEUTRAL_FX, INITIAL_ARTWORK, type ImageFx } from './outlineStore'
 import type { DesignState } from '../types'
 import type { Pt } from '@/lib/effect/types'
-import { UndoIcon, RedoIcon, CheckIcon, CloseIcon, AddPointIcon, DeleteIcon, ShapeIcon, TuneIcon, ImageToolIcon, OutlineIcon, PreviewIcon, PreviewOffIcon } from './icons'
+import { UndoIcon, RedoIcon, CheckIcon, CloseIcon, AddPointIcon, DeleteIcon, ShapeIcon, TuneIcon, ImageToolIcon, OutlineIcon, PreviewIcon, PreviewOffIcon , PointsIcon } from './icons'
 import { toast } from '../ui/Toast'
 import { perfGesture } from '../dev/PerfHUD'
 import { generateShapeRing, resampleClosed, type ShapeKind, type ShapeParams } from './shapes'
@@ -190,7 +190,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   const subjMatteUrl = useOutlineStore((s) => s.subjMatteUrl)
   const art = useOutlineStore((s) => s.artwork)
   const [preview, setPreview] = useState(false) // hide anchors/handles to see the clean result (no exit)
-  // Points state (plan A3): anchors are summoned by double-tapping the shape — never a button.
+  // Points state: entered by the explicit Frame⇄Points mode button (Dan, KAI-9022) OR by
+  // double-tapping the shape body — the gesture alone proved unreachable on Magic cuts.
   const [showAnchors, setShowAnchors] = useState(true)
   // Run 6 — points on demand: selected vector anchor (outer path index), transient drag shape
   // (per-tick preview only; ONE applyVec on release — §6.3), and the active drag descriptor.
@@ -1140,6 +1141,13 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
         onReset={onReset}
         right={(
           <>
+            <TopBarButton
+              icon={<PointsIcon />}
+              label="Points"
+              active={showAnchors}
+              disabled={preview}
+              onClick={() => { setShowAnchors((v) => !v); setSelVA(null); setAllSelected(false) }}
+            />
             <TopBarButton icon={preview ? <PreviewOffIcon /> : <PreviewIcon />} label={preview ? 'Edit' : 'Preview'} onClick={() => setPreview((v) => !v)} />
             <TopBarButton icon={<CheckIcon />} label="Done" onClick={onDone} primary={canUndo} />
           </>

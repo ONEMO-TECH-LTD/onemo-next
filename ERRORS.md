@@ -27,3 +27,10 @@
 - Symptoms: `3211` was a built `next-server` serving stale chunks; `3212` was already occupied; `next dev` on `3213` defaulted to Turbopack and rejected the repo webpack config.
 - What worked: identify the serving process with `lsof`/`ps`, then use a separate dev port with `--webpack` and local Supabase placeholder envs before browser verification.
 - Remember: rendered source-change checks for `/prototype?scene=golden` must not trust an existing `next-server`; either rebuild/restart it or use a fresh `next dev --webpack` port.
+
+## S57 effect-creator node-bar Playwright re-drive
+
+- What did not work: generic selectors during the editor re-drive, specifically `input[type=file][accept="image/*"]` in strict mode and `svg` after entering the editor.
+- Symptoms: the page has both pre-upload and toolbar file inputs, and the editor page contains many icon SVGs plus the actual canvas SVG, so strict Playwright refused to pick one.
+- What worked: select an explicit file input (`first()` or the intended visible control), then target the editor canvas via the CSS-module canvas class (`svg[class*="outline-editor_svg"]`) before double-tapping/selecting anchors.
+- Remember: effect-creator v3 visual probes should use role/label selectors for buttons and CSS-module substrings for the actual editor canvas, never generic `svg`.

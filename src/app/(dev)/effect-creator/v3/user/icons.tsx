@@ -4,7 +4,7 @@
 // glyphs — chosen over Lucide so the UI doesn't read as generic shadcn/SaaS. `weight="regular"`
 // (default) reads cleanly at 24px on mobile; icons inherit `currentColor` from the button.
 
-import { ArrowArcLeft, ArrowArcRight, BezierCurve, DiceFive, WaveSine, Check, X, Plus, Minus, Trash, PlusCircle, Sparkle, ImageSquare, PencilSimple, BoundingBox, Palette, DownloadSimple, Shapes, Eye, EyeSlash, MagicWand, Faders, Crop, Sun, CircleHalf, Drop, Thermometer } from '@phosphor-icons/react'
+import { ArrowArcLeft, ArrowArcRight, BezierCurve, DiceFive, WaveSine, Check, X, Plus, Minus, Trash, PlusCircle, Sparkle, ImageSquare, PencilSimple, BoundingBox, Palette, DownloadSimple, Shapes, Eye, EyeSlash, MagicWand, Faders, Crop, Sun, CircleHalf, Drop, Thermometer, VectorTwo } from '@phosphor-icons/react'
 
 type P = { className?: string }
 const SZ = 24
@@ -21,6 +21,8 @@ export const ExportIcon = (p: P) => <DownloadSimple size={SZ} className={p.class
 export const PreviewIcon = (p: P) => <Eye size={SZ} className={p.className} />
 export const PreviewOffIcon = (p: P) => <EyeSlash size={SZ} className={p.className} />
 export const PlusIcon = (p: P) => <Plus size={SZ} className={p.className} />
+// Frame ⇄ Points mode toggle — explicit button per Dan's ruling (KAI-9022); double-tap stays as the gesture.
+export const PointsIcon = (p: P) => <VectorTwo size={SZ} className={p.className} />
 export const MinusIcon = (p: P) => <Minus size={SZ} className={p.className} />
 export const AddPointIcon = (p: P) => <PlusCircle size={SZ} className={p.className} />
 export const DeleteIcon = (p: P) => <Trash size={SZ} className={p.className} />

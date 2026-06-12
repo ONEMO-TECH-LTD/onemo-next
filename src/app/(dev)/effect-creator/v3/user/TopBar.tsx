@@ -9,11 +9,11 @@
 import type { ReactNode } from 'react'
 import styles from './outline-editor.module.css'
 
-export function TopBarButton({ icon, label, onClick, disabled, primary }: {
-  icon: ReactNode; label: string; onClick: () => void; disabled?: boolean; primary?: boolean
+export function TopBarButton({ icon, label, onClick, disabled, primary, active }: {
+  icon: ReactNode; label: string; onClick: () => void; disabled?: boolean; primary?: boolean; active?: boolean
 }) {
   return (
-    <button type="button" className={`${styles.topTool} ${primary ? styles.topToolPrimary : ''}`} onClick={onClick} disabled={disabled} aria-label={label} title={label}>
+    <button type="button" className={`${styles.topTool} ${primary ? styles.topToolPrimary : ''} ${active ? styles.topToolActive : ''}`} onClick={onClick} disabled={disabled} aria-label={label} aria-pressed={active} title={label}>
       <span className={styles.toolIcon}>{icon}</span>
       <span className={styles.topToolLabel}>{label}</span>
     </button>
