@@ -184,6 +184,22 @@
   cursor: pointer;
 }
 .topTool:disabled { opacity: 0.3; cursor: not-allowed; }
+/* UX-3: the commit action accents when the session is dirty */
+.topToolPrimary { color: var(--color-bg-brand-solid, #1c2030); font-weight: 600; }
+/* RESET appears center ONLY when dirty — gold, like the iPhone Photos crop bar */
+.resetGold {
+  flex: 1 1 0;
+  border: none;
+  background: transparent;
+  color: #c79a2a;
+  font-family: var(--font-primary);
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 1px;
+  cursor: pointer;
+  padding: var(--spacing-2xs) 0;
+}
+.resetSpacer { flex: 1 1 0; }
 .topTool:active:not(:disabled) { background: var(--semantic-bg-secondary); }
 .topToolLabel { font-family: var(--font-body); font-size: 0.625rem; line-height: 1; white-space: nowrap; }
 
@@ -290,6 +306,8 @@
 }
 .chip:active { color: var(--semantic-text-primary); }
 .chipActive { color: var(--semantic-bg-brand-solid); }
+/* the Magic ✦ AUTO chip — visually distinct from shape chips (it runs the cut, not a preset) */
+.chipMagic { color: var(--semantic-bg-brand-solid); font-weight: 600; }
 .chipIcon { display: inline-flex; }
 .chipLabel { font-family: var(--font-body); font-size: 0.625rem; line-height: 1; white-space: nowrap; }
 /* parametric controls (sides / points / spikiness / rotate) under the chip strip */

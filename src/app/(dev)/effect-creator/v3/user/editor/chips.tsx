@@ -7,27 +7,29 @@ import { shapeToSVGPathD } from '@/lib/vector-core'
 import { hasVectorDef, getShape } from '@/lib/shape-library'
 import { generateShapeRing, type ShapeKind, type ShapeParams } from '../shapes'
 
-// Shape chips — Dan's board lineup (Simbolik/LOEWE symbol alphabet) + the two generators.
+// Shape chips — plan A2 lineup (Dan's rulings): BASICS first ("basic should be in the front"),
+// the board's symbol alphabet next, the GENERATIVE group ✦-marked, and Magic ✦ as the distinct
+// auto chip at TRAIL (it already owns the hero shortcut — the in-editor chip is the second door
+// to the SAME pipeline). Pebble is DELETED (Dan: dupe of blob).
 export const SHAPE_CHIPS: { kind: ShapeKind; label: string }[] = [
-  { kind: 'pinched', label: 'Pinched' },
-  { kind: 'daisy', label: 'Daisy' },
-  { kind: 'heart', label: 'Heart' },
-  { kind: 'bolt', label: 'Bolt' },
-  { kind: 'sparkle', label: 'Sparkle' },
-  { kind: 'teardrop', label: 'Drop' },
-  { kind: 'leaf', label: 'Leaf' },
-  { kind: 'lens', label: 'Lens' },
-  { kind: 'diamond', label: 'Diamond' },
-  { kind: 'plus', label: 'Plus' },
-  { kind: 'asterisk', label: 'Asterisk' },
-  { kind: 'bowtie', label: 'Bowtie' },
-  { kind: 'pinwheel', label: 'Pinwheel' },
-  { kind: 'pebble', label: 'Pebble' },
-  { kind: 'circle', label: 'Circle' },
   { kind: 'square', label: 'Square' },
+  { kind: 'circle', label: 'Circle' },
   { kind: 'squircle', label: 'Squircle' },
   { kind: 'polygon', label: 'Polygon' },
   { kind: 'star', label: 'Star' },
+  { kind: 'heart', label: 'Heart' },
+  { kind: 'diamond', label: 'Diamond' },
+  { kind: 'plus', label: 'Plus' },
+  { kind: 'teardrop', label: 'Drop' },
+  { kind: 'leaf', label: 'Leaf' },
+  { kind: 'lens', label: 'Lens' },
+  { kind: 'bolt', label: 'Bolt' },
+  { kind: 'sparkle', label: 'Sparkle' },
+  { kind: 'asterisk', label: 'Asterisk' },
+  { kind: 'bowtie', label: 'Bowtie' },
+  { kind: 'pinched', label: 'Pinched' },
+  { kind: 'daisy', label: 'Daisy ✦' },
+  { kind: 'pinwheel', label: 'Pinwheel ✦' },
   { kind: 'form', label: 'Form ✦' },
   { kind: 'blob', label: 'Blob ✦' },
 ]

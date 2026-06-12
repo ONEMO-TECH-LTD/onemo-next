@@ -16,7 +16,7 @@ import dynamic from 'next/dynamic'
 import { useState, useCallback, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useSceneStore } from './admin/sceneStore'
-import { UndoIcon, RedoIcon, ResetIcon, ExportIcon, EditIcon } from './user/icons'
+import { UndoIcon, RedoIcon, ExportIcon, EditIcon } from './user/icons'
 import { INITIAL_ARTWORK } from './user/outlineStore'
 import { useOutlineStore } from './user/outlineStore'
 import type { DesignState } from './types'
@@ -378,6 +378,7 @@ function PrototypePageInner() {
       <OutlineEditor
         open={editingOutline}
         openMode={editorMode}
+        onMagic={handleMagic}
         imageUrl={artworkUrl}
         onClose={() => {
           setEditingOutline(false)

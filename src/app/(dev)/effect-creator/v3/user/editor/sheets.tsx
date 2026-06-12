@@ -11,10 +11,11 @@ import TickBar from '../../ui/TickBar'
 import { useOutlineStore, type ImageFx } from '../outlineStore'
 import { PARAMETRIC, type ShapeKind } from '../shapes'
 import { SHAPE_CHIPS, ShapeChipIcon, DEFAULT_SHAPE_PARAMS } from './chips'
-import { RoundIcon, SmoothIcon, ScaleIcon, BlendIcon, TuneIcon, SnapIcon, MinLineIcon, AddPointIcon, AngleIcon, PositionIcon, BrightnessIcon, ContrastIcon, SaturationIcon, WarmthIcon, MinusIcon, PlusIcon, DiceIcon } from '../icons'
+import { RoundIcon, SmoothIcon, BlendIcon, TuneIcon, PositionIcon, BrightnessIcon, ContrastIcon, SaturationIcon, WarmthIcon, MinusIcon, PlusIcon, DiceIcon } from '../icons'
 import styles from '../outline-editor.module.css'
 
-export type AdjustSub = 'radius' | 'curve' | 'scale' | 'blend' | 'detail' | 'smooth' | 'snap' | 'line' | 'angle'
+export type AdjustSub = 'radius' | 'curve' | 'tune'
+export type TuneSub = 'detail' | 'smooth' | 'snap'
 
 /** Chip carousel with mouse drag-to-scroll (KAI-8978/F6): touch scrolls natively, but a desktop
  *  mouse drag selected label text and the row's tail (… Upload) was unreachable. A drag past the
@@ -50,34 +51,29 @@ function ChipRow({ children }: { children: ReactNode }) {
     </div>
   )
 }
-export type ImageSub = 'position' | 'brightness' | 'contrast' | 'saturate' | 'warmth'
+export type ImageSub = 'position' | 'brightness' | 'contrast' | 'saturate' | 'warmth' | 'blend'
 
-/* #35 ADJUST mode (Apple pattern): circular sub-tools — Radius · Curve · Scale · Blend +
-   Tune's five dials when a Magic trace exists — sharing ONE ruler. */
-export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, canTune, radiusApplies, maxRadius, radius, setRadius, commitRadius, smoothing, setSmoothing, commitSmoothing, scale, setScale, commitScale, blendOn, setBlendOn, blendBlur, setBlendBlur, writeBlend, detail, setDetail, previewTune, commitTune, fairParams }: {
+/* ADJUST mode (plan A2, Dan's rulings): THREE circles — Radius · Curve · Tune ✦ — one shared
+   ruler. Scale is DELETED (the frame owns it, D5); Blend moved to Image mode (#8). Curve is the
+   REAL bend tool (tension on the selected anchor, D3); Tune ✦ is the universal fine-tune takeover
+   (Detail · Smooth · Snap — Angle/Min-line dropped, D3 round 2) available on EVERY shape class. */
+export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, tuneSub, setTuneSub, radiusApplies, maxRadius, radius, setRadius, commitRadius, curveSelected, curveVal, previewCurve, commitCurve, detail, setDetail, previewTune, commitTune, fairParams }: {
   cornerMode: boolean
   adjustSub: AdjustSub
-  /** tier-2 availability (Dan's rule: inapplicable tools GREY, never silent no-op): Radius acts on
-   *  corner anchors — an all-curves shape (typical faired Magic cut) has none until one is selected
-   *  or a corner is created. */
-  radiusApplies: boolean
   setAdjustSub: (k: AdjustSub) => void
-  canTune: boolean
+  tuneSub: TuneSub
+  setTuneSub: (k: TuneSub) => void
+  /** tier-2 availability (Dan's rule: inapplicable tools GREY with a hint, never silent no-op) */
+  radiusApplies: boolean
   maxRadius: number
   radius: number
   setRadius: (v: number) => void
   commitRadius: (v: number) => void
-  smoothing: number
-  setSmoothing: (v: number) => void
-  commitSmoothing: (v: number) => void
-  scale: number
-  setScale: (v: number) => void
-  commitScale: (v: number) => void
-  blendOn: boolean
-  setBlendOn: Dispatch<SetStateAction<boolean>>
-  blendBlur: number
-  setBlendBlur: Dispatch<SetStateAction<number>>
-  writeBlend: (on: boolean, pct: number) => void
+  /** Curve acts on the SELECTED anchor (tap one in Points — double-tap the shape to enter) */
+  curveSelected: boolean
+  curveVal: number
+  previewCurve: (v: number) => void
+  commitCurve: (v: number) => void
   detail: number
   setDetail: (v: number) => void
   previewTune: (params: FairTracedRingOpts) => void
@@ -88,16 +84,10 @@ export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, canTune, radi
     <div className={styles.shapeSheet}>
       <ChipRow>
         {([
-          { k: 'radius', label: cornerMode ? 'Corner' : 'Radius', icon: <RoundIcon />, show: true },
-          { k: 'curve', label: 'Curve', icon: <SmoothIcon />, show: true },
-          { k: 'scale', label: 'Scale', icon: <ScaleIcon />, show: true },
-          { k: 'blend', label: 'Blend', icon: <BlendIcon />, show: true },
-          { k: 'detail', label: 'Detail', icon: <TuneIcon />, show: canTune },
-          { k: 'smooth', label: 'Smooth', icon: <SnapIcon />, show: canTune },
-          { k: 'snap', label: 'Snap', icon: <MinLineIcon />, show: canTune },
-          { k: 'line', label: 'Min line', icon: <AddPointIcon />, show: canTune },
-          { k: 'angle', label: 'Angle', icon: <AngleIcon />, show: canTune },
-        ] as const).filter((t) => t.show).map((t) => (
+          { k: 'radius', label: cornerMode ? 'Corner' : 'Radius', icon: <RoundIcon /> },
+          { k: 'curve', label: 'Curve', icon: <SmoothIcon /> },
+          { k: 'tune', label: 'Tune \u2726', icon: <TuneIcon /> },
+        ] as const).map((t) => (
           <button
             key={t.k}
             type="button"
@@ -118,42 +108,38 @@ export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, canTune, radi
           ) : (
             <div className={styles.toolHint}>Radius rounds corners — this shape is all curves. Select a corner point, or sharpen one first.</div>
           ))}
-          {adjustSub === 'curve' && (
-            <div className={styles.toolHint}>The Curve tool (bend a point, shape a segment) arrives with the new editor controls.</div>
-          )}
-          {adjustSub === 'scale' && (
-            <TickBar label="Scale" min={50} max={150} value={scale} onChange={setScale} onCommit={commitScale} format={(v) => `${Math.round(v)}%`} />
-          )}
-          {adjustSub === 'blend' && (
-            <>
-              <button
-                type="button"
-                className={`${styles.toggleBtn} ${blendOn ? styles.toggleBtnOn : ''}`}
-                onClick={() => { const next = !blendOn; setBlendOn(next); writeBlend(next, blendBlur) }}
-                aria-pressed={blendOn}
-                aria-label="Toggle magic blend"
-              >
-                {blendOn ? 'On' : 'Off'}
-              </button>
-              <TickBar label="Blend" min={0} max={100} value={blendBlur} disabled={!blendOn} onChange={setBlendBlur} onCommit={(v) => { setBlendBlur(v); writeBlend(blendOn, v) }} format={(v) => `${Math.round(v)}%`} />
-            </>
-          )}
-          {adjustSub === 'detail' && (
-            <TickBar label="Detail" min={0} max={100} value={detail} onChange={(v) => { setDetail(v); previewTune(fairingFromDetail(v)) }} onCommit={(v) => { setDetail(v); commitTune(fairingFromDetail(v), v) }} format={(v) => `${Math.round(v)}%`} />
-          )}
-          {adjustSub === 'smooth' && (
-            <TickBar label="Smooth strength" min={1} max={30} step={0.5} value={fairParams.smoothPx ?? 6} onChange={(v) => previewTune({ ...fairParams, smoothPx: v })} onCommit={(v) => commitTune({ ...fairParams, smoothPx: v })} format={(v) => `${v.toFixed(1)}px`} />
-          )}
-          {adjustSub === 'snap' && (
-            <TickBar label="Line snap band" min={0} max={20} step={0.5} value={fairParams.detailPx ?? 4} onChange={(v) => previewTune({ ...fairParams, detailPx: v })} onCommit={(v) => commitTune({ ...fairParams, detailPx: v })} format={(v) => `${v.toFixed(1)}px`} />
-          )}
-          {adjustSub === 'line' && (
-            <TickBar label="Min line length" min={20} max={200} step={5} value={fairParams.minLinePx ?? 50} onChange={(v) => previewTune({ ...fairParams, minLinePx: v })} onCommit={(v) => commitTune({ ...fairParams, minLinePx: v })} format={(v) => `${Math.round(v)}px`} />
-          )}
-          {adjustSub === 'angle' && (
-            <TickBar label="Sharpest angle" min={10} max={90} step={1} value={fairParams.maxTurnDeg ?? 35} onChange={(v) => previewTune({ ...fairParams, maxTurnDeg: v })} onCommit={(v) => commitTune({ ...fairParams, maxTurnDeg: v })} format={(v) => `${Math.round(v)}°`} />
-          )}
+          {adjustSub === 'curve' && (curveSelected ? (
+            <TickBar label="Curve" min={0} max={100} value={curveVal} onChange={previewCurve} onCommit={commitCurve} format={(v) => `${Math.round(v * 2)}%`} />
+          ) : (
+            <div className={styles.toolHint}>Curve bends the line through a point — double-tap the shape for Points, then tap one.</div>
+          ))}
         </div>
+        {adjustSub === 'tune' && (
+          <>
+            <div className={styles.shapeRow}>
+              {([
+                { k: 'detail', label: 'Detail' },
+                { k: 'smooth', label: 'Smooth' },
+                { k: 'snap', label: 'Snap' },
+              ] as const).map((t) => (
+                <button key={t.k} type="button" className={`${styles.chip} ${tuneSub === t.k ? styles.chipActive : ''}`} onClick={() => setTuneSub(t.k)} aria-pressed={tuneSub === t.k} aria-label={t.label}>
+                  <span className={styles.chipLabel}>{t.label}</span>
+                </button>
+              ))}
+            </div>
+            <div className={styles.shapeRow}>
+              {tuneSub === 'detail' && (
+                <TickBar label="Detail" min={0} max={100} value={detail} onChange={(v) => { setDetail(v); previewTune(fairingFromDetail(v)) }} onCommit={(v) => { setDetail(v); commitTune(fairingFromDetail(v), v) }} format={(v) => `${Math.round(v)}%`} />
+              )}
+              {tuneSub === 'smooth' && (
+                <TickBar label="Smooth strength" min={1} max={30} step={0.5} value={fairParams.smoothPx ?? 6} onChange={(v) => previewTune({ ...fairParams, smoothPx: v })} onCommit={(v) => commitTune({ ...fairParams, smoothPx: v })} format={(v) => `${v.toFixed(1)}px`} />
+              )}
+              {tuneSub === 'snap' && (
+                <TickBar label="Line snap band" min={0} max={20} step={0.5} value={fairParams.detailPx ?? 4} onChange={(v) => previewTune({ ...fairParams, detailPx: v })} onCommit={(v) => commitTune({ ...fairParams, detailPx: v })} format={(v) => `${v.toFixed(1)}px`} />
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
@@ -162,12 +148,16 @@ export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, canTune, radi
 /* #28 Image tool — Apple-pattern sheet: circular sub-icons, ONE shared ruler below.
    Position = pan/zoom the photo under the cutline; adjustments preview live (CSS filter)
    and bake into the print composite on release (same composeFront → print-faithful). */
-export function ImageSheet({ imageSub, setImageSub, art, fxDraft, setFxDraft }: {
+export function ImageSheet({ imageSub, setImageSub, art, fxDraft, setFxDraft, blendBlur, setBlendBlur, writeBlend }: {
   imageSub: ImageSub
   setImageSub: (k: ImageSub) => void
   art: { scale: number }
   fxDraft: ImageFx
   setFxDraft: Dispatch<SetStateAction<ImageFx>>
+  /** Blend (#8 — moved here from Adjust): ruler-from-0 IS the on/off switch, no toggle */
+  blendBlur: number
+  setBlendBlur: Dispatch<SetStateAction<number>>
+  writeBlend: (on: boolean, pct: number) => void
 }) {
   return (
     <div className={styles.shapeSheet}>
@@ -178,6 +168,7 @@ export function ImageSheet({ imageSub, setImageSub, art, fxDraft, setFxDraft }: 
           { k: 'contrast', label: 'Contrast', icon: <ContrastIcon /> },
           { k: 'saturate', label: 'Color', icon: <SaturationIcon /> },
           { k: 'warmth', label: 'Warmth', icon: <WarmthIcon /> },
+          { k: 'blend', label: 'Blend', icon: <BlendIcon /> },
         ] as const).map((s) => (
           <button
             key={s.k}
@@ -193,7 +184,18 @@ export function ImageSheet({ imageSub, setImageSub, art, fxDraft, setFxDraft }: 
         ))}
       </ChipRow>
       <div className={styles.shapeControls}>
-        {imageSub === 'position' ? (
+        {imageSub === 'blend' ? (
+          <div className={styles.shapeRow}>
+            <span className={styles.shapeName}>Blend</span>
+            <TickBar
+              label="Blend" min={0} max={100} step={1}
+              value={blendBlur}
+              onChange={(v) => setBlendBlur(v)}
+              onCommit={(v) => { setBlendBlur(v); writeBlend(v > 0, v) }}
+              format={(v) => (v === 0 ? 'off' : `${Math.round(v)}%`)}
+            />
+          </div>
+        ) : imageSub === 'position' ? (
           <div className={styles.shapeRow}>
             <span className={styles.shapeName}>Zoom</span>
             <TickBar
@@ -231,7 +233,7 @@ export function ImageSheet({ imageSub, setImageSub, art, fxDraft, setFxDraft }: 
 }
 
 /* Shape tool — Dan's board lineup + the form/blob generators; parametric kinds reveal controls */
-export function ShapeSheet({ shapeKind, pickShape, shapeParams, nudgeParam, previewParam, commitShape, rerollBlob, onUploadShape }: {
+export function ShapeSheet({ shapeKind, pickShape, shapeParams, nudgeParam, previewParam, commitShape, rerollBlob, onUploadShape, onMagic }: {
   shapeKind: ShapeKind | null
   pickShape: (kind: ShapeKind) => void
   shapeParams: typeof DEFAULT_SHAPE_PARAMS
@@ -240,6 +242,8 @@ export function ShapeSheet({ shapeKind, pickShape, shapeParams, nudgeParam, prev
   commitShape: () => void
   rerollBlob: () => void
   onUploadShape: (e: ChangeEvent<HTMLInputElement>) => void
+  /** Magic ✦ trail chip (D7): the auto-cut as a shape SOURCE — same pipeline as the hero door */
+  onMagic?: () => void
 }) {
   return (
     <div className={styles.shapeSheet}>
@@ -264,6 +268,12 @@ export function ShapeSheet({ shapeKind, pickShape, shapeParams, nudgeParam, prev
           <span className={styles.chipLabel}>Upload</span>
           <input type="file" accept=".svg,image/svg+xml,image/png,image/jpeg,image/webp" style={{ display: 'none' }} onChange={onUploadShape} />
         </label>
+        {onMagic && (
+          <button type="button" className={`${styles.chip} ${styles.chipMagic}`} onClick={onMagic} aria-label="Magic auto cut">
+            <span className={styles.chipIcon}><TuneIcon /></span>
+            <span className={styles.chipLabel}>Magic ✦</span>
+          </button>
+        )}
       </ChipRow>
       {shapeKind && PARAMETRIC[shapeKind] && (
         <div className={styles.shapeControls}>

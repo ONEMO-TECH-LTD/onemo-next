@@ -24,13 +24,14 @@ import { vectoriseTrace, MIN_ANCHOR_SEPARATION_MM } from '@/lib/effect/geometry-
 import { standardBirthShape } from '@/lib/effect/prepare-effect'
 import { useOutlineStore, NEUTRAL_FX, INITIAL_ARTWORK, type ImageFx } from './outlineStore'
 import type { DesignState } from '../types'
-import { UndoIcon, RedoIcon, ResetIcon, CheckIcon, CloseIcon, AddPointIcon, DeleteIcon, ShapeIcon, TuneIcon, ImageToolIcon, OutlineIcon, PreviewIcon, PreviewOffIcon } from './icons'
+import type { Pt } from '@/lib/effect/types'
+import { UndoIcon, RedoIcon, CheckIcon, CloseIcon, AddPointIcon, DeleteIcon, ShapeIcon, TuneIcon, ImageToolIcon, OutlineIcon, PreviewIcon, PreviewOffIcon } from './icons'
 import { toast } from '../ui/Toast'
 import { perfGesture } from '../dev/PerfHUD'
 import { generateShapeRing, resampleClosed, type ShapeKind, type ShapeParams } from './shapes'
 // VECTOR CORE (reset Run 1): vector-native kinds render/commit/transform on a true Bézier VShape;
 // the doc stays as the interaction SHADOW (a derived flatten artifact — bbox/hit/grips math only).
-import { shapeToSVGPathD, transformShape, flattenShape, filletShape, filletShapeSmart, filletPathSmart, ringToVPath, nearestOnPath, insertAnchorAt, insertAnchorCentered, deleteAnchorRefit, shapeBBox, type VShape, type VAnchor, type Vec2 } from '@/lib/vector-core'
+import { shapeToSVGPathD, transformShape, flattenShape, filletShape, filletShapeSmart, filletPathSmart, ringToVPath, nearestOnPath, insertAnchorCentered, deleteAnchorRefit, scaleAnchorTension, shapeBBox, type VShape, type VAnchor, type Vec2 } from '@/lib/vector-core'
 import { hasVectorDef, getShape } from '@/lib/shape-library'
 // Run 8 — SVG shape upload: a downloaded/Figma-exported outline becomes a first-class vector
 // shape through the export module's dialect gate (loud rejection outside the v1 boundary).
@@ -57,6 +58,9 @@ interface OutlineEditorProps {
   onClose: () => void
   /** Structure A (#27): the toolbar's creation modes open THIS editor in that mode. */
   openMode?: 'shape' | null
+  /** Magic ✦ trail chip (plan A2/D7): runs the SAME auto-cut the hero shortcut runs — one
+   *  pipeline, two doors. Magic is self-sufficient, so the editor closes and the cut lands in 3D. */
+  onMagic?: () => void
 }
 
 const VIEW_W = 1000
@@ -90,18 +94,18 @@ function ToolBtn({ icon, label, onClick, disabled, active, primary }: {
 }
 
 /** Top-bar tool — same icon-over-label mobile style as the bottom tools, fixed width (doesn't stretch). */
-function TopTool({ icon, label, onClick, disabled }: {
-  icon: React.ReactNode; label: string; onClick: () => void; disabled?: boolean
+function TopTool({ icon, label, onClick, disabled, primary }: {
+  icon: React.ReactNode; label: string; onClick: () => void; disabled?: boolean; primary?: boolean
 }) {
   return (
-    <button type="button" className={styles.topTool} onClick={onClick} disabled={disabled} aria-label={label}>
+    <button type="button" className={`${styles.topTool} ${primary ? styles.topToolPrimary : ''}`} onClick={onClick} disabled={disabled} aria-label={label}>
       <span className={styles.toolIcon}>{icon}</span>
       <span className={styles.topToolLabel}>{label}</span>
     </button>
   )
 }
 
-export default function OutlineEditor({ open, imageUrl, onClose, openMode }: OutlineEditorProps) {
+export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMagic }: OutlineEditorProps) {
   // KAI-8976/F4: every history entry carries the dial state that produced its shape, so
   // undo/redo restore a TRUTHFUL readout (the Detail ruler lied at 89% after undo). The source is
   // the COMMITTED dial state — updated only at seed/commit/reset/undo, never by preview ticks
@@ -112,15 +116,14 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
 
   const [radius, setRadius] = useState(0)        // Round: global (or selected-corner) radius px
 
-  const [smoothing, setSmoothing] = useState(0) // 0–100 → style.smoothing 0..1 (Catmull-Rom spline)
-  const [scale, setScale] = useState(100) // 50–150 relative resize of the whole cut-out; bakes on release
-
-  // #35 Apple layout: the editor's bottom is a MODE pill (Shape · Adjust · Image); each
-  // mode shows a row of circular sub-tools sharing ONE ruler — no more dock-of-everything.
+  // Apple layout: the editor's bottom is a MODE pill (Shape · Adjust · Image); each mode shows a
+  // row of circular sub-tools sharing ONE ruler. Adjust = Radius · Curve · Tune ✦ (plan A2 —
+  // Scale DELETED per D5, the frame owns it; Blend lives in Image mode per #8).
   const [activeAdjust, setActiveAdjust] = useState<'shape' | 'adjust' | 'image' | null>(null)
-  const [adjustSub, setAdjustSub] = useState<'radius' | 'curve' | 'scale' | 'blend' | 'detail' | 'smooth' | 'snap' | 'line' | 'angle'>('radius')
-  const [blendOn, setBlendOn] = useState(true) // "magic blend" on/off (the soft real-background blur on the 3D front)
-  const [blendBlur, setBlendBlur] = useState(50) // magic-blend intensity 0–100 (50 ≈ the build default)
+  const [adjustSub, setAdjustSub] = useState<'radius' | 'curve' | 'tune'>('radius')
+  const [tuneSub, setTuneSub] = useState<'detail' | 'smooth' | 'snap'>('detail')
+  const [curveVal, setCurveVal] = useState(50) // Curve ruler: 50 = the point's current tension
+  const [blendBlur, setBlendBlur] = useState(50) // blend intensity 0–100; 0 = off (ruler IS the switch)
   // Shape tool: pick a preset/parametric shape as the starting outline. shapeKind = the shape currently
   // being tuned (null = none picked this session → only chips show). Params drive live regeneration.
   const [shapeKind, setShapeKind] = useState<ShapeKind | null>(null)
@@ -143,7 +146,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   // #28 Image tool (Apple-pattern: circular sub-icons + ONE shared ruler). Position pans/zooms the
   // PHOTO under the fixed cutline (the scene's G1, now inside the editor); adjustments preview live
   // via CSS filter here and bake into the print composite on commit (one composeFront).
-  const [imageSub, setImageSub] = useState<'position' | 'brightness' | 'contrast' | 'saturate' | 'warmth'>('position')
+  const [imageSub, setImageSub] = useState<'position' | 'brightness' | 'contrast' | 'saturate' | 'warmth' | 'blend'>('position')
   const [fxDraft, setFxDraft] = useState<ImageFx>(NEUTRAL_FX)
   const imgPanRef = useRef<{ startClient: [number, number]; art0: { offsetX: number; offsetY: number; scale: number } } | null>(null)
   // Rotation = a whole-outline transform: two-finger twist (mobile) / drag the rotate handle (desktop,
@@ -209,8 +212,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
 
   const syncSlidersTo = useCallback(() => {
     setRadius(0)
-    setSmoothing(0)
-    setScale(100)
+    setCurveVal(50)
     setAllSelected(false)
     setSelVA(null)
     setVecLive(null)
@@ -235,8 +237,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     preEditRef.current = { committedShape: st0.committedShape, bgBlur: st0.bgBlur, imageFx: st0.imageFx, artwork: st0.artwork }
     st0.setEditorOpen(true) // §6.3: scene frozen → 3D rebuilds defer to close
     // session view/interaction state reset
-    setScale(100)
-    setSmoothing(0)
+    setCurveVal(50)
     setView({ scale: 1, vx: 0, vy: 0 }) // G11: fresh session starts at fit
     setAllSelected(false)
     setShapeKind(null)
@@ -255,10 +256,10 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     pinchRef.current = null; canvasPanRef.current = null
     pointersRef.current.clear(); clientPtsRef.current.clear()
     setPreview(false)
-    setShowAnchors(true)
-    // sync the magic-blend control to the current 3D state (null = build default ≈ on @ 50%)
-    setBlendOn(st0.bgBlur == null || st0.bgBlur > 0)
-    setBlendBlur(st0.bgBlur == null ? 50 : st0.bgBlur > 0 ? Math.round(st0.bgBlur * 100) : 50)
+    setConfirmDiscard(false)
+    setShowAnchors(false) // FRAME is the default for every shape (plan A3); double-tap = Points
+    // sync the blend ruler to the current 3D state (null = build default ≈ 50; 0 = off)
+    setBlendBlur(st0.bgBlur == null ? 50 : Math.round(st0.bgBlur * 100))
     setRadius(0)
     // ── seed the session truth ──
     if (spec) {
@@ -330,15 +331,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   // for BOTH the rendered path and the anchor/handle overlay, so they never desync mid-gesture.
   const vDisplay = useMemo(() => {
     if (!vshape) return null
-    let v = vecLive ?? vshape
-    if (scale !== 100) {
-      const bb = shapeBBox(v, 1)
-      const cx = (bb.minX + bb.maxX) / 2, cy = (bb.minY + bb.maxY) / 2
-      const f = scale / 100
-      v = transformShape(v, (p: Vec2) => ({ x: cx + (p.x - cx) * f, y: cy + (p.y - cy) * f }))
-    }
-    return v
-  }, [vshape, vecLive, scale])
+    return vecLive ?? vshape
+  }, [vshape, vecLive])
 
   // The rendered path: true SVG curves from the display shape (crisp at any zoom).
   const pathD = useMemo(() => {
@@ -600,22 +594,20 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     }
   }, [commitRotate, applyVec, vBaseRef, vshapeRef])
 
-  // Add a control point on the nearest outer-ring segment (double-click the surface).
+  // Double-tap the shape body = Frame ⇄ Points (plan A3 gesture grammar: double-tap always means
+  // "go deeper"; point work is NEVER a gesture — add/delete/bend live on the node bar). The old
+  // double-tap-insert died with the conflict (its job moved to the node bar's Add point).
   const onSurfaceDoubleClick = useCallback(
     (e: React.MouseEvent) => {
-      // Run 6 — points on demand: double-tap inserts an anchor exactly there, ON the curve,
-      // geometry-preserving (exact de Casteljau split). Anchors are summoned by the act.
-      if (vshapeRef.current) {
-        const v = vshapeRef.current
-        const pt = toViewBox(e.clientX, e.clientY)
-        const hit = nearestOnPath(v.paths[0], { x: pt[0], y: pt[1] })
-        const t = Math.min(0.98, Math.max(0.02, hit.t)) // avoid degenerate slivers at the ends
-        applyVec({ paths: [insertAnchorAt(v.paths[0], hit.seg, t), ...v.paths.slice(1)] }, null)
-        setSelVA(hit.seg + 1)
-        setShowAnchors(true)
+      if (preview) return
+      const pt = toViewBox(e.clientX, e.clientY)
+      if (hitRing.length >= 3 && pointInPolygon(pt, hitRing)) {
+        setShowAnchors((v) => !v)
+        setSelVA(null)
+        setAllSelected(false)
       }
     },
-    [toViewBox, applyVec, vshapeRef],
+    [toViewBox, hitRing, preview],
   )
 
   // Run 6 — explicit vector-anchor actions (the nodeBar): add centered ON the curve after the
@@ -702,26 +694,23 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     }
     perfGesture('round-commit', performance.now() - t0)
   }, [selVA, applyVec, vBaseRef, vshapeRef])
-  const commitSmoothing = useCallback((_v: number) => {
-    void _v
-    setSmoothing(0) // pure curves need no styling smooth — the universal fine-tune family (D3) supersedes this in the chrome rebuild
-  }, [])
-  // Scale: the slider previews live (displayDoc), then bakes the relative factor on release; the −/+
-  // buttons bake a fixed ±5% step. Both resize all node positions about the center, preserving corners.
-  const vecScale = useCallback((f: number) => {
-    const v = vshapeRef.current!
-    const bb = shapeBBox(v, 1)
-    const cx = (bb.minX + bb.maxX) / 2, cy = (bb.minY + bb.maxY) / 2
-    const t = (p: Vec2) => ({ x: cx + (p.x - cx) * f, y: cy + (p.y - cy) * f })
-    applyVec(transformShape(v, t), vBaseRef.current ? transformShape(vBaseRef.current, t) : null)
-  }, [applyVec, vBaseRef, vshapeRef])
-  const commitScale = useCallback((v: number) => {
-    if (v === 100) { setScale(100); return }
+  // CURVE — the REAL bend tool (plan A2/D3): tension on the SELECTED anchor via the shared ruler.
+  // Ticks preview transiently from the COMMITTED shape (no compounding); release commits ONE op.
+  const previewCurve = useCallback((v: number) => {
+    setCurveVal(v)
+    const cur = vshapeRef.current
+    if (!cur || selVA === null) return
+    setVecLive({ paths: [scaleAnchorTension(cur.paths[0], selVA, v / 50), ...cur.paths.slice(1)] })
+  }, [selVA, vshapeRef])
+  const commitCurve = useCallback((v: number) => {
+    const cur = vshapeRef.current
+    setVecLive(null)
+    if (!cur || selVA === null) { setCurveVal(50); return }
     const t0 = performance.now()
-    vecScale(v / 100) // exact affine on anchors+handles
-    setScale(100)
-    perfGesture('scale-commit', performance.now() - t0)
-  }, [vecScale])
+    if (Math.abs(v - 50) > 0.5) applyVec({ paths: [scaleAnchorTension(cur.paths[0], selVA, v / 50), ...cur.paths.slice(1)] }, null)
+    setCurveVal(50) // the new tension becomes the point's "current" — ruler re-centers
+    perfGesture('curve-commit', performance.now() - t0)
+  }, [selVA, applyVec, vshapeRef])
   // "Magic blend" — the soft real-background blur composited behind the subject on the 3D front
   // texture (the "magic blend" Dan loves). Edit-mode only control; on/off + intensity. Writes the
   // store's bgBlur (0 = off/sharp · 0..1 = intensity ·  ShapedModel re-composes the front, no re-segment).
@@ -781,32 +770,46 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   // Tune (BEN dash): re-run the fairing pipeline on the RAW pre-fairing trace with live params.
   // Per-tick = preview only; commit on release rebuilds the document (undoable) — §6.3. Re-tracing
   // replaces any manual anchor edits on the ring (it's a re-derivation of the base outline).
-  const canTune = !!spec?.rawTracePx && spec.rawTracePx.length >= 24
+  // D3 one-toolset: Tune is UNIVERSAL — trace shapes re-fair their RAW trace (best source);
+  // every other shape fairs from the current path's flatten, both through THE one pipeline.
+  const canTune = !!vshape
+  /** the current shape's flatten as a y-up pseudo-trace — the universal-Tune source for shapes
+   *  born without a raw trace (presets/generators/uploads), through the SAME pipeline (D3) */
+  const flattenAsTrace = useCallback((): Pt[] | null => {
+    const v = vshapeRef.current
+    if (!v || !spec) return null
+    try {
+      const ring = flattenShape(v, 0.75)[0]
+      if (!ring || ring.length < 24) return null
+      const H = spec.maskHeightPx
+      return ring.map((pt) => [pt.x, H - pt.y] as Pt)
+    } catch { return null }
+  }, [spec, vshapeRef])
   const tunePreviewD = useCallback((params: FairTracedRingOpts): string | null => {
     // display-only: the re-faired ring as a polyline `d` (the release fits ONCE into a vector)
-    const raw = spec?.rawTracePx
-    if (!raw) return null
+    const raw = spec?.rawTracePx ?? flattenAsTrace()
+    if (!raw || !spec) return null
     const H = spec.maskHeightPx
     const faired = fairTracedRing(raw.map(([x, y]) => [x, H - y] as Vec2Px), params)
     return faired.length >= 3 ? ringPathD(faired) : null
-  }, [spec])
+  }, [spec, flattenAsTrace])
   /** Run 4 — the vectoriser: THE single-pipeline fit (geometry-truth.vectoriseTrace) — the editor
    *  and generation share the literal function, so re-Tune ≡ re-generation by construction. */
   const vecFromTrace = useCallback((params: FairTracedRingOpts, sharp = false): VShape | null => {
-    if (!spec?.rawTracePx) return null
+    const raw = spec?.rawTracePx ?? flattenAsTrace()
+    if (!raw || !spec) return null
     // re-fit = re-derivation: the crop-corner default re-applies (KAI-8982 D1); sharp=true gives
     // the SHARP fit (no default) — the Radius tool's base, so 0% returns to the raw-sharp truth.
     // The mm-true anchor pair floor (KAI-8974) rides every variant.
     const minAnchorSepPx = MIN_ANCHOR_SEPARATION_MM / (spec.mmPerPx || 1)
     const opts = sharp ? { minAnchorSepPx } : { defaultCornerRadiusPx: 8 / (spec.mmPerPx || 1), maskWidthPx: spec.maskWidthPx, minAnchorSepPx }
-    return vectoriseTrace(spec.rawTracePx, spec.maskHeightPx, params, opts)
-  }, [spec])
+    return vectoriseTrace(raw, spec.maskHeightPx, params, opts)
+  }, [spec, flattenAsTrace])
 
   const onReset = useCallback(() => {
     // Dan meta-QA BUG2 (2026-06-11): Reset restored the base shape as a FLATTENED DOC — faceted
     // corners at zoom. Reset is a geometry entry point like open: it must land TRUE vectors.
     const clearTail = () => {
-      setSmoothing(0); setScale(100)
       setAllSelected(false)
       setShapeKind(null); setShapePreview(null)
     }
@@ -892,7 +895,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
       const sp = shapeParamsRef.current
       const base = getShape(kind, widthPx, heightPx, { sides: sp.sides, points: sp.points, spikiness: sp.spikiness })
       applyVec(base, base)
-      setRadius(0); setSmoothing(0); setScale(100); setAllSelected(false)
+      setRadius(0); setAllSelected(false)
       setShowAnchors(false)
       return
     }
@@ -905,7 +908,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     // Run 3: live generators spawn as FITTED vector paths — segments never leave the generator
     if (GEN_VECTOR_KINDS.has(kind)) {
       applyVec(vecFromGenerator(kind, overrides), null)
-      setRadius(0); setSmoothing(0); setScale(100); setAllSelected(false)
+      setRadius(0); setAllSelected(false)
       setShowAnchors(false)
       return
     }
@@ -957,7 +960,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     applyVec(v, withBase ? v : null)
     setShapeKind(null)
     setShapePreview(null)
-    setRadius(0); setSmoothing(0); setScale(100); setAllSelected(false)
+    setRadius(0); setAllSelected(false)
     setShowAnchors(false)
   }, [applyVec])
   /** Run 10 — image upload: decode → threshold mask → the Magic trace machinery → THE one fit
@@ -1045,10 +1048,14 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     onClose()
   }, [onClose])
 
+  // UX-2 discard protection: a DIRTY ✕ asks once (tap ✕ again to discard) — no native dialog.
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
   // ✕ Close = discard this session's edits: restore the pre-open truth through THE one writer
   // (shape + contour revert atomically), revert blend + image-fx + photo position, exit.
   // (Done keeps; commits were live.) KAI-8971/F2: fx/artwork revert was missing.
   const onCancel = useCallback(() => {
+    if (histRef.current.past.length > 0 && !confirmDiscard) { setConfirmDiscard(true); return }
+    setConfirmDiscard(false)
     const pe = preEditRef.current
     const st = useOutlineStore.getState()
     st.commitGeometry(pe.committedShape) // null → back to the born truth (spec.vectorShape)
@@ -1098,30 +1105,26 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     ? `brightness(${fxDraft.brightness}%) contrast(${fxDraft.contrast}%) saturate(${fxDraft.saturate}%)${fxDraft.warmth > 0 ? ` sepia(${Math.round(fxDraft.warmth * 0.45)}%)` : ''}`
     : undefined
   // magic-blend live preview in the canvas: blurred photo + sharp subject overlay; blur reacts to intensity
-  const showBlend = blendOn && !!subjMatteUrl && !!imageUrl
+  const showBlend = blendBlur > 0 && !!subjMatteUrl && !!imageUrl // 0 = off (the ruler IS the switch)
   const blendSd = (blendBlur / 100) * (imgW / 25)
 
   return (
     <div className={styles.overlay}>
-      {/* Top bar (mobile canon): history on the left, commit/exit on the right; creative tools live
-          at the bottom in the thumb zone. */}
+      {/* Top bar — the ONE global anatomy (plan A2/D-CHROME): ✕ far left · undo/redo pill ·
+          RESET center ONLY when dirty (gold, vanishes clean) · Preview · Done right with the
+          dirty accent (UX-3). Points has no button — double-tap the shape (A3 grammar). */}
       <div className={styles.topbar}>
         <div className={styles.topInner}>
-          {/* ✕ Close = discard this session's edits; Done = keep them. Evenly distributed, no title. */}
-          <TopTool icon={<CloseIcon />} label="Close" onClick={onCancel} />
-          {(
-            <>
-              <TopTool icon={<UndoIcon />} label="Undo" onClick={undo} disabled={!canUndo} />
-              <TopTool icon={<RedoIcon />} label="Redo" onClick={redo} disabled={!canRedo} />
-              <TopTool icon={<ResetIcon />} label="Reset" onClick={onReset} />
-              {/* Preview = hide anchors/handles to see the clean result without exiting */}
-              <TopTool icon={preview ? <PreviewOffIcon /> : <PreviewIcon />} label={preview ? 'Edit' : 'Preview'} onClick={() => setPreview((v) => !v)} />
-              {/* Points = summon/hide anchors (hidden by default — Dan's doctrine). On vector
-                  shapes this reveals the minimal intentional skeleton (Run 6 points-on-demand). */}
-              <TopTool icon={<OutlineIcon />} label="Points" onClick={() => setShowAnchors((v) => !v)} />
-            </>
+          <TopTool icon={<CloseIcon />} label={confirmDiscard ? 'Discard?' : 'Close'} onClick={onCancel} />
+          <TopTool icon={<UndoIcon />} label="Undo" onClick={undo} disabled={!canUndo} />
+          <TopTool icon={<RedoIcon />} label="Redo" onClick={redo} disabled={!canRedo} />
+          {canUndo ? (
+            <button type="button" className={styles.resetGold} onClick={onReset} aria-label="Reset" title="Reset">RESET</button>
+          ) : (
+            <span className={styles.resetSpacer} aria-hidden />
           )}
-          <TopTool icon={<CheckIcon />} label="Done" onClick={onDone} />
+          <TopTool icon={preview ? <PreviewOffIcon /> : <PreviewIcon />} label={preview ? 'Edit' : 'Preview'} onClick={() => setPreview((v) => !v)} />
+          <TopTool icon={<CheckIcon />} label="Done" onClick={onDone} primary={canUndo} />
         </div>
       </div>
 
@@ -1297,22 +1300,22 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
         <AdjustSheet
           cornerMode={!!(vshape && selVA !== null && vshape.paths[0].anchors[selVA]?.corner)}
           radiusApplies={radiusApplies}
-          adjustSub={adjustSub} setAdjustSub={setAdjustSub} canTune={canTune}
+          adjustSub={adjustSub} setAdjustSub={setAdjustSub} tuneSub={tuneSub} setTuneSub={setTuneSub}
           maxRadius={maxRadius} radius={radius} setRadius={setRadius} commitRadius={commitRadius}
-          smoothing={smoothing} setSmoothing={setSmoothing} commitSmoothing={commitSmoothing}
-          scale={scale} setScale={setScale} commitScale={commitScale}
-          blendOn={blendOn} setBlendOn={setBlendOn} blendBlur={blendBlur} setBlendBlur={setBlendBlur} writeBlend={writeBlend}
+          curveSelected={selVA !== null} curveVal={curveVal} previewCurve={previewCurve} commitCurve={commitCurve}
           detail={detail} setDetail={setDetail} previewTune={previewTune} commitTune={commitTune} fairParams={fairParams}
         />
       )}
       {activeAdjust === 'image' && (
-        <ImageSheet imageSub={imageSub} setImageSub={setImageSub} art={art} fxDraft={fxDraft} setFxDraft={setFxDraft} />
+        <ImageSheet imageSub={imageSub} setImageSub={setImageSub} art={art} fxDraft={fxDraft} setFxDraft={setFxDraft}
+          blendBlur={blendBlur} setBlendBlur={setBlendBlur} writeBlend={writeBlend} />
       )}
       {activeAdjust === 'shape' && (
         <ShapeSheet
           shapeKind={shapeKind} pickShape={pickShape} shapeParams={shapeParams}
           nudgeParam={nudgeParam} previewParam={previewParam} commitShape={commitShape}
           rerollBlob={rerollBlob} onUploadShape={onUploadShape}
+          onMagic={onMagic ? () => { onDone(); onMagic() } : undefined}
         />
       )}
 

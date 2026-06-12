@@ -145,3 +145,20 @@ export function deleteAnchorRefit(path: VPath, idx: number, maxError?: number): 
   }
   return { anchors: out }
 }
+
+/**
+ * CURVE tool (plan A2/D3 — the REAL bend tool): scale the selected anchor's handle LENGTHS about
+ * its position, preserving directions. factor 1 = identity; <1 tightens the curve through the
+ * point, >1 relaxes/bows it. Works on smooth and corner anchors alike (both handles scale;
+ * a missing handle stays missing — line joins are unaffected).
+ */
+export function scaleAnchorTension(path: VPath, idx: number, factor: number): VPath {
+  const anchors = path.anchors.map((a) => ({ ...a }))
+  const a = anchors[idx]
+  if (!a) return path
+  const f = Math.max(0.02, factor)
+  const scaleH = (h: Vec2 | null | undefined): Vec2 | null =>
+    h ? { x: a.p.x + (h.x - a.p.x) * f, y: a.p.y + (h.y - a.p.y) * f } : null
+  anchors[idx] = { ...a, hIn: scaleH(a.hIn), hOut: scaleH(a.hOut) }
+  return { anchors }
+}
