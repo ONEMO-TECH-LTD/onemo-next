@@ -11,7 +11,7 @@ import TickBar from '../../ui/TickBar'
 import { useOutlineStore, type ImageFx } from '../outlineStore'
 import { PARAMETRIC, type ShapeKind } from '../shapes'
 import { SHAPE_CHIPS, ShapeChipIcon, DEFAULT_SHAPE_PARAMS } from './chips'
-import { RoundIcon, SmoothIcon, BlendIcon, TuneIcon, PositionIcon, BrightnessIcon, ContrastIcon, SaturationIcon, WarmthIcon, MinusIcon, PlusIcon, DiceIcon } from '../icons'
+import { RoundIcon, SmoothIcon, BlendIcon, TuneIcon, BrightnessIcon, ContrastIcon, SaturationIcon, WarmthIcon, MinusIcon, PlusIcon, DiceIcon } from '../icons'
 import styles from '../outline-editor.module.css'
 
 export type AdjustSub = 'radius' | 'curve' | 'tune'

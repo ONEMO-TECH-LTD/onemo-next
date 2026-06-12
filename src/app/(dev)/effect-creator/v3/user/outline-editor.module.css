@@ -247,28 +247,6 @@
 }
 .stepBtn:active { background: var(--semantic-bg-secondary); }
 
-/* On/Off toggle that flanks the magic-blend intensity slider. */
-.toggleBtn {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--spacing-3xs, 0.25rem);
-  padding: var(--spacing-2xs) var(--spacing-s);
-  border: 1px solid var(--semantic-border-secondary);
-  background: var(--semantic-bg-primary);
-  color: var(--semantic-text-secondary);
-  border-radius: var(--radius-full);
-  font-family: var(--font-body);
-  font-size: var(--text-body-caption);
-  cursor: pointer;
-  white-space: nowrap;
-}
-.toggleBtnOn {
-  border-color: var(--semantic-border-brand);
-  background: var(--semantic-bg-brand-primary);
-  color: var(--semantic-bg-brand-solid);
-}
-
 /* Shape tool sheet — a horizontal chip strip of shapes + (for parametric shapes) inline controls. */
 .shapeSheet {
   display: flex;
