@@ -829,45 +829,26 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   }, [spec, tuneSource])
 
   const onReset = useCallback(() => {
-    // Dan meta-QA BUG2 (2026-06-11): Reset restored the base shape as a FLATTENED DOC — faceted
-    // corners at zoom. Reset is a geometry entry point like open: it must land TRUE vectors.
-    const clearTail = () => {
-      setAllSelected(false)
-      setShapeKind(null); setShapePreview(null)
-    }
-    // Magic cut-out → re-fit the trace at the saved Tune defaults; the BORN truth is the
-    // always-valid fallback (REBUILD-PLAN-v2: never a doc, never a polyline)
-    if (spec && spec.generator.adapter !== 'standard') {
-      const savedF = useOutlineStore.getState().fairing
-      const params = savedF?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL)
-      const v = vecFromTrace(params, false, true) ?? spec.vectorShape
-      const sharpFit = vecFromTrace(params, true, true)
-      applyVec(v, sharpFit?.paths[0].anchors.some((a) => a.corner) ? sharpFit : null, 'trace')
-      // F4 (same readout-truth class): Reset re-derives at the saved defaults — the dial says so
-      setDetail(savedF?.detail ?? BEN_DEFAULT_DETAIL)
-      setFairParams(savedF?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL))
-      committedDialRef.current = { detail: savedF?.detail ?? BEN_DEFAULT_DETAIL, fairParams: savedF?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL) }
-      setRadius(0)
-      clearTail()
-      return
-    }
-    // standard → THE one birth construction (prepare-effect.standardBirthShape — the same function
-    // product birth uses, so Reset and birth can never diverge again; KAI-8975/P2). The pristine
-    // base for Radius re-fillets stays the sharp full-image rect.
-    if (spec && spec.generator.adapter === 'standard') {
-      const W = spec.maskWidthPx, H = spec.maskHeightPx
-      const base: VShape = { paths: [{ anchors: [
-        { p: { x: 0, y: 0 }, corner: true }, { p: { x: W, y: 0 }, corner: true },
-        { p: { x: W, y: H }, corner: true }, { p: { x: 0, y: H }, corner: true },
-      ] }] }
-      const birth = standardBirthShape(W, H)
-      applyVec(birth.vectorShape, base, 'vector')
-      setRadius(birth.radiusPx)
-      clearTail()
-      return
-    }
-    // no spec = no design in the editor (the page gates entry) — nothing to reset
-  }, [spec, applyVec, vecFromTrace])
+    // KAI-9025 (Dan): 'reset must reset to the original state full image with 8mm radius on the
+    // corners' — for EVERY design class, including Magic cuts. THE one birth construction
+    // (prepare-effect.standardBirthShape — the same function product birth uses, so Reset and
+    // birth can never diverge; KAI-8975/P2). Lands TRUE vectors (the BUG2 lesson); the pristine
+    // base for Radius re-fillets is the sharp full-image rect.
+    if (!spec) return // no design in the editor (the page gates entry) — nothing to reset
+    const W = spec.maskWidthPx, H = spec.maskHeightPx
+    const base: VShape = { paths: [{ anchors: [
+      { p: { x: 0, y: 0 }, corner: true }, { p: { x: W, y: 0 }, corner: true },
+      { p: { x: W, y: H }, corner: true }, { p: { x: 0, y: H }, corner: true },
+    ] }] }
+    const birth = standardBirthShape(W, H)
+    applyVec(birth.vectorShape, base, 'vector')
+    setRadius(birth.radiusPx)
+    setDetail(BEN_DEFAULT_DETAIL)
+    setFairParams(fairingFromDetail(BEN_DEFAULT_DETAIL))
+    committedDialRef.current = { detail: BEN_DEFAULT_DETAIL, fairParams: fairingFromDetail(BEN_DEFAULT_DETAIL) }
+    setAllSelected(false)
+    setShapeKind(null); setShapePreview(null)
+  }, [spec, applyVec])
   const previewTune = useCallback((params: FairTracedRingOpts) => {
     const t0 = performance.now()
     const d = tunePreviewD(params)
