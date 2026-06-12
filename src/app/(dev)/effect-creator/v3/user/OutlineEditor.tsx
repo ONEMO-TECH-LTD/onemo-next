@@ -197,6 +197,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   // (per-tick preview only; ONE applyVec on release — §6.3), and the active drag descriptor.
   const [selVA, setSelVA] = useState<number | null>(null)
   const [selSeg, setSelSeg] = useState<number | null>(null) // 6.7: tapped segment (Points) — node bar inserts at ITS midpoint
+  // KAI-9013: pointer-based double-tap detector (350ms/24px — the hero's proven thresholds);
+  // the dblclick event missed real touch/trackpad sequences and was gated to the shape FILL.
+  const lastTapRef = useRef<{ x: number; y: number; t: number } | null>(null)
   const [vecLive, setVecLive] = useState<VShape | null>(null)
   const vecLiveRef = useRef<VShape | null>(null)
   useEffect(() => { vecLiveRef.current = vecLive }, [vecLive])
@@ -431,6 +434,21 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   const onSurfacePointerDown = useCallback(
     (e: React.PointerEvent) => {
       if (preview) return // view-only
+      // KAI-9013: two primary downs within 350ms/24px ANYWHERE on the surface = Frame ⇄ Points
+      // (no fill gate — on a Magic cut most of the canvas is outside the outline). Image mode
+      // keeps its pan gesture untouched.
+      if (e.isPrimary && activeAdjust !== 'image') {
+        const lt = lastTapRef.current
+        const now = performance.now()
+        if (lt && now - lt.t < 350 && Math.hypot(e.clientX - lt.x, e.clientY - lt.y) < 24) {
+          lastTapRef.current = null
+          setShowAnchors((v) => !v)
+          setSelVA(null)
+          setAllSelected(false)
+          return
+        }
+        lastTapRef.current = { x: e.clientX, y: e.clientY, t: now }
+      }
       const p = toViewBox(e.clientX, e.clientY)
       pointersRef.current.set(e.pointerId, p)
       clientPtsRef.current.set(e.pointerId, [e.clientX, e.clientY])
@@ -590,22 +608,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
       return // no move = a tap → onSurfaceClick selects all
     }
   }, [commitRotate, applyVec, vBaseRef, vshapeRef])
-
-  // Double-tap the shape body = Frame ⇄ Points (plan A3 gesture grammar: double-tap always means
-  // "go deeper"; point work is NEVER a gesture — add/delete/bend live on the node bar). The old
-  // double-tap-insert died with the conflict (its job moved to the node bar's Add point).
-  const onSurfaceDoubleClick = useCallback(
-    (e: React.MouseEvent) => {
-      if (preview) return
-      const pt = toViewBox(e.clientX, e.clientY)
-      if (hitRing.length >= 3 && pointInPolygon(pt, hitRing)) {
-        setShowAnchors((v) => !v)
-        setSelVA(null)
-        setAllSelected(false)
-      }
-    },
-    [toViewBox, hitRing, preview],
-  )
 
   // Run 6 — explicit vector-anchor actions (the nodeBar): add centered ON the curve after the
   // selected anchor (Figma "insert between"), or delete with re-fit.
@@ -1177,7 +1179,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
           onPointerUp={onPointerUp}
           onPointerLeave={onPointerUp}
           onClick={onSurfaceClick}
-          onDoubleClick={onSurfaceDoubleClick}
           onWheel={(e) => {
             // Image mode: scroll zooms the PHOTO within the shape (position = gesture, plan A2)
             if (activeAdjust === 'image') {
