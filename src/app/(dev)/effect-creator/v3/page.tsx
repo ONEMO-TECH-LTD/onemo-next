@@ -82,6 +82,9 @@ function PrototypePageInner() {
     ? `/api/dev/scenes/${encodeURIComponent(sceneName)}`
     : '/api/dev/scenes/golden'
 
+  // KAI-9010: internal tooling (Export) is armed by ?internal=1 — never product chrome
+  const [internalTools] = useState(() =>
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('internal') === '1')
   const histRef = useRef<{ past: AppSnap[]; future: AppSnap[] }>({ past: [], future: [] })
   // True byte identity of the CURRENT photo (preserve-at-ingest, §B5) — page-level so EVERY
   // prepared spec for this file carries it: standard at upload, Magic's shaped replacement, and
@@ -421,7 +424,9 @@ function PrototypePageInner() {
             right={(
               <>
                 <TopBarButton icon={<EditIcon />} label="Edit" onClick={() => { editorPreRef.current = snapNow(); setEditorMode(null); setEditingOutline(true) }} disabled={!prepared} />
-                <TopBarButton icon={<ExportIcon />} label="Export" onClick={onExport} disabled={!prepared} />
+                {/* KAI-9010 (Dan): Export is INTERNAL utility — ?internal=1 arms it for us; the
+                    mm-SVG pipeline stays; users never see it. Admin-view/backend = separate track. */}
+                {internalTools && <TopBarButton icon={<ExportIcon />} label="Export" onClick={onExport} disabled={!prepared} />}
               </>
             )}
           />
