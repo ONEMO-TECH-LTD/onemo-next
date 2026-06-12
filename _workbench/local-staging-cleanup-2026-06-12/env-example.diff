@@ -1,0 +1,14 @@
+diff --git a/.env.example b/.env.example
+index 88ffe5e..9124c9f 100644
+--- a/.env.example
++++ b/.env.example
+@@ -31,6 +31,9 @@ NEXT_PUBLIC_APP_URL=               # http://localhost:3000 (DEV) or https://onem
+ # Used by Claude Code, scripts, SDK — NOT by the Next.js app.
+ # =============================================================================
+
++# --- Vercel ---
++VERCEL_API_TOKEN=                  # vercel.com/account/tokens. Read scope sufficient for audit/automation. NOT used by app runtime.
++
+ # --- Figma ---
+ FIGMA_ACCESS_TOKEN=                # Figma -> Settings -> Personal Access Tokens. Expires May 18, 2026. Used by figma-console-mcp.
+ # figma-console-mcp also reads this from ~/.claude.json mcpServers.figma-console.env
