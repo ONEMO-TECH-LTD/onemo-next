@@ -1326,21 +1326,10 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
             <button type="button" className={styles.keepBtn} onClick={() => setConfirmDiscard(false)}>Keep editing</button>
             <button type="button" className={styles.discardBtn} onClick={() => onCancel(true)}>Discard</button>
           </span>
-        ) : preview
-          ? <span className={styles.approved}>Preview — tap Edit to keep editing</span>
-          : hasIssues
-            ? <span className={styles.warn}>This shape can’t be cut cleanly — fix the crossing</span>
-            : activeAdjust === 'image'
-              ? 'Drag the photo to position it · scroll to zoom · drag the ruler to adjust'
-              : allSelected
-                ? 'All corners selected — scale or twist them together'
-                : (vshape && selVA !== null)
-                  ? 'Drag this point, or add/delete from the bar below'
-                  : activeAdjust === 'shape' && shapeKind
-                    ? '' /* the Shape sheet's own hint covers this state — one hint at a time (F7) */
-                    : showAnchors
-                      ? 'Tap a point or the line to edit it · double-tap the shape for Frame'
-                      : 'Drag inside to move · pull the frame to reshape · double-tap the shape for Points'}
+        ) : hasIssues ? (
+          /* a WARNING is sanctioned (failure state) — instructional helper text is not (KAI-9014) */
+          <span className={styles.warn}>This shape can’t be cut cleanly — fix the crossing</span>
+        ) : null}
       </div>
 
       {/* Run 2 · seam 5: the three tool sheets live in editor/sheets (verbatim moves). */}

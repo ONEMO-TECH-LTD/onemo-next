@@ -378,7 +378,6 @@ export function ShapeSheet({ shapeKind, pickShape, shapeParams, nudgeParam, prev
               </div>
             </>
           )}
-          <div className={styles.shapeHint}>Rotate: twist with two fingers, or drag the handle after selecting all corners</div>
         </div>
       )}
     </div>
