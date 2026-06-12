@@ -259,6 +259,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
       const image = { widthPx: spec.maskWidthPx, heightPx: spec.maskHeightPx, sourceHash: spec.sourceRef.slice(0, 40), orientation: 'baked' as const }
       let v0: VShape
       let base: VShape | null = null
+      let lin: 'trace' | 'vector' | undefined // KAI-9032: seed lineage (reopen keeps the store's)
       if (st0.committedShape) {
         v0 = st0.committedShape // reopening restores TRUE curves — the committed truth itself
       } else if (spec.generator.adapter !== 'standard') {
@@ -267,9 +268,10 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
         // the SHARP fit (KAI-8982 D1): crop corners arrive default-rounded, dialing to 0 = sharp.
         const savedF = st0.fairing
         const params = savedF?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL)
-        v0 = vecFromTrace(params) ?? spec.vectorShape
-        const sharpFit = vecFromTrace(params, true)
+        v0 = vecFromTrace(params, false, true) ?? spec.vectorShape
+        const sharpFit = vecFromTrace(params, true, true)
         if (sharpFit?.paths[0].anchors.some((a) => a.corner)) base = sharpFit
+        lin = 'trace'
       } else {
         // Dan (2026-06-10): entering the editor BEFORE Magic means "choose a shape" — the
         // full-bleed square buries its handles, so the session starts on the centered square,
@@ -282,8 +284,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
         setActiveAdjust('shape')
         setShapeKind('square')
         setShowAnchors(false) // rigid shape default — Points toggle re-enables
+        lin = 'vector'
       }
-      applyVec(v0, base) // COMMITS the seed (visible = committed); §6.3 defers the 3D to close
+      applyVec(v0, base, lin) // COMMITS the seed (visible = committed); §6.3 defers the 3D to close
     }
     // (no spec → nothing to seed; the page gates editor entry on an uploaded image)
     setImageSub('brightness')
@@ -791,18 +794,26 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
       return ring.map((pt) => [pt.x, H - pt.y] as Pt)
     } catch { return null }
   }, [spec, vshapeRef])
+  /** KAI-9032: the Tune SOURCE follows the current shape's lineage — only a trace-lineage shape
+   *  (the Magic cut itself) re-fairs the design's raw photo trace; any picked/uploaded/constructed
+   *  vector fairs ITS OWN flatten. Same dials, in-place edit, no identity conversion. */
+  const tuneSource = useCallback((forceTrace = false): Pt[] | null => {
+    const traceClass = forceTrace || useOutlineStore.getState().shapeLineage === 'trace'
+    return traceClass ? (spec?.rawTracePx ?? flattenAsTrace()) : flattenAsTrace()
+  }, [spec, flattenAsTrace])
   const tunePreviewD = useCallback((params: FairTracedRingOpts): string | null => {
     // display-only: the re-faired ring as a polyline `d` (the release fits ONCE into a vector)
-    const raw = spec?.rawTracePx ?? flattenAsTrace()
+    const raw = tuneSource()
     if (!raw || !spec) return null
     const H = spec.maskHeightPx
     const faired = fairTracedRing(raw.map(([x, y]) => [x, H - y] as Vec2Px), params)
     return faired.length >= 3 ? ringPathD(faired) : null
-  }, [spec, flattenAsTrace])
+  }, [spec, tuneSource])
   /** Run 4 — the vectoriser: THE single-pipeline fit (geometry-truth.vectoriseTrace) — the editor
-   *  and generation share the literal function, so re-Tune ≡ re-generation by construction. */
-  const vecFromTrace = useCallback((params: FairTracedRingOpts, sharp = false): VShape | null => {
-    const raw = spec?.rawTracePx ?? flattenAsTrace()
+   *  and generation share the literal function, so re-Tune ≡ re-generation by construction.
+   *  `forceTrace` = seed/Reset re-derivation from the born truth (lineage flips to 'trace'). */
+  const vecFromTrace = useCallback((params: FairTracedRingOpts, sharp = false, forceTrace = false): VShape | null => {
+    const raw = tuneSource(forceTrace)
     if (!raw || !spec) return null
     // re-fit = re-derivation: the crop-corner default re-applies (KAI-8982 D1); sharp=true gives
     // the SHARP fit (no default) — the Radius tool's base, so 0% returns to the raw-sharp truth.
@@ -810,7 +821,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     const minAnchorSepPx = MIN_ANCHOR_SEPARATION_MM / (spec.mmPerPx || 1)
     const opts = sharp ? { minAnchorSepPx } : { defaultCornerRadiusPx: 8 / (spec.mmPerPx || 1), maskWidthPx: spec.maskWidthPx, minAnchorSepPx }
     return vectoriseTrace(raw, spec.maskHeightPx, params, opts)
-  }, [spec, flattenAsTrace])
+  }, [spec, tuneSource])
 
   const onReset = useCallback(() => {
     // Dan meta-QA BUG2 (2026-06-11): Reset restored the base shape as a FLATTENED DOC — faceted
@@ -824,9 +835,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     if (spec && spec.generator.adapter !== 'standard') {
       const savedF = useOutlineStore.getState().fairing
       const params = savedF?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL)
-      const v = vecFromTrace(params) ?? spec.vectorShape
-      const sharpFit = vecFromTrace(params, true)
-      applyVec(v, sharpFit?.paths[0].anchors.some((a) => a.corner) ? sharpFit : null)
+      const v = vecFromTrace(params, false, true) ?? spec.vectorShape
+      const sharpFit = vecFromTrace(params, true, true)
+      applyVec(v, sharpFit?.paths[0].anchors.some((a) => a.corner) ? sharpFit : null, 'trace')
       // F4 (same readout-truth class): Reset re-derives at the saved defaults — the dial says so
       setDetail(savedF?.detail ?? BEN_DEFAULT_DETAIL)
       setFairParams(savedF?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL))
@@ -845,7 +856,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
         { p: { x: W, y: H }, corner: true }, { p: { x: 0, y: H }, corner: true },
       ] }] }
       const birth = standardBirthShape(W, H)
-      applyVec(birth.vectorShape, base)
+      applyVec(birth.vectorShape, base, 'vector')
       setRadius(birth.radiusPx)
       clearTail()
       return
@@ -900,7 +911,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
       const { widthPx, heightPx } = dimsRef.current
       const sp = shapeParamsRef.current
       const base = getShape(kind, widthPx, heightPx, { sides: sp.sides, points: sp.points, spikiness: sp.spikiness })
-      applyVec(base, base)
+      applyVec(base, base, 'vector')
       setRadius(0); setAllSelected(false)
       setShowAnchors(false)
       return
@@ -913,7 +924,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     }
     // Run 3: live generators spawn as FITTED vector paths — segments never leave the generator
     if (GEN_VECTOR_KINDS.has(kind)) {
-      applyVec(vecFromGenerator(kind, overrides), null)
+      applyVec(vecFromGenerator(kind, overrides), null, 'vector')
       setRadius(0); setAllSelected(false)
       setShowAnchors(false)
       return
@@ -932,12 +943,12 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     if (hasVectorDef(shapeKind)) {
       const { widthPx, heightPx } = dimsRef.current
       const base = getShape(shapeKind, widthPx, heightPx, { sides: next.sides, points: next.points, spikiness: next.spikiness })
-      applyVec(base, base)
+      applyVec(base, base, 'vector')
       return
     }
     // generator kinds re-fit their new construction (petals/blades/lobes steppers)
     if (GEN_VECTOR_KINDS.has(shapeKind)) {
-      applyVec(vecFromGenerator(shapeKind, { [key]: n }), null)
+      applyVec(vecFromGenerator(shapeKind, { [key]: n }), null, 'vector')
       return
     }
     throw new Error(`nudgeParam: no vector construction for shape "${shapeKind}"`)
@@ -956,14 +967,14 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     const seed = Math.floor(Math.random() * 1e9)
     const next = { ...shapeParamsRef.current, seed }
     shapeParamsRef.current = next; setShapeParams(next)
-    applyVec(vecFromGenerator('blob', { seed }), null) // Run 3: the dice rolls a vector
+    applyVec(vecFromGenerator('blob', { seed }), null, 'vector') // Run 3: the dice rolls a vector
   }, [shapeKind, applyVec, vecFromGenerator])
   /** Land an uploaded shape: fit into the image box, first-class vector. SVG keeps itself as the
    *  pristine base (clean authored corners); a traced image adopts no base (fitted geometry). */
   const landUploadedShape = useCallback((raw: VShape, withBase: boolean) => {
     const { widthPx, heightPx } = dimsRef.current
     const v = fitShapeToBox(raw, widthPx, heightPx)
-    applyVec(v, withBase ? v : null)
+    applyVec(v, withBase ? v : null, 'vector')
     setShapeKind(null)
     setShapePreview(null)
     setRadius(0); setAllSelected(false)
@@ -1026,13 +1037,13 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     if (shapeKind && hasVectorDef(shapeKind)) {
       const { widthPx, heightPx } = dimsRef.current
       const sp = shapeParamsRef.current
-      applyVec(getShape(shapeKind, widthPx, heightPx, { sides: sp.sides, points: sp.points, spikiness: sp.spikiness }), null)
+      applyVec(getShape(shapeKind, widthPx, heightPx, { sides: sp.sides, points: sp.points, spikiness: sp.spikiness }), null, 'vector')
       return
     }
     if (shapeKind && GEN_VECTOR_KINDS.has(shapeKind)) {
       // release bakes the live doc-morph into ONE fitted vector (§6.3: transient ticks, vector commit)
       setShapePreview(null)
-      applyVec(vecFromGenerator(shapeKind), null)
+      applyVec(vecFromGenerator(shapeKind), null, 'vector')
       return
     }
     // no doc commit remains — the preview is a display ring; GEN kinds committed above

@@ -15,6 +15,8 @@ export interface HistoryMeta { detail: number; fairParams: FairTracedRingOpts }
 export interface HistoryEntry {
   v: VShape
   meta?: HistoryMeta
+  /** the shape's lineage at this point in time (KAI-9032) — restored with the shape */
+  lineage?: 'trace' | 'vector'
 }
 
 export function useEditorHistory(captureMeta?: () => HistoryMeta) {
@@ -31,26 +33,27 @@ export function useEditorHistory(captureMeta?: () => HistoryMeta) {
 
   const push = () => {
     if (vshapeRef.current) {
-      histRef.current.past.push({ v: vshapeRef.current, meta: captureMetaRef.current?.() })
+      histRef.current.past.push({ v: vshapeRef.current, meta: captureMetaRef.current?.(), lineage: useOutlineStore.getState().shapeLineage })
       if (histRef.current.past.length > 50) histRef.current.past.shift()
     }
     histRef.current.future = []
   }
 
-  /** Vector edit: ONE history entry + ONE store commit (shape + derived contour, atomically). */
-  const applyVec = useCallback((nextV: VShape, nextBase?: VShape | null) => {
+  /** Vector edit: ONE history entry + ONE store commit (shape + derived contour, atomically).
+   *  `lineage` marks shape identity changes (seed/pick/upload/reset); omitted = unchanged. */
+  const applyVec = useCallback((nextV: VShape, nextBase?: VShape | null, lineage?: 'trace' | 'vector') => {
     push()
     vshapeRef.current = nextV
     setVShape(nextV)
     if (nextBase !== undefined) vBaseRef.current = nextBase
-    useOutlineStore.getState().commitGeometry(nextV)
+    useOutlineStore.getState().commitGeometry(nextV, lineage)
     bumpHist((n) => n + 1)
   }, [])
 
   const restore = (entry: HistoryEntry) => {
     vshapeRef.current = entry.v
     setVShape(entry.v)
-    useOutlineStore.getState().commitGeometry(entry.v)
+    useOutlineStore.getState().commitGeometry(entry.v, entry.lineage)
     bumpHist((n) => n + 1)
   }
 
@@ -59,7 +62,7 @@ export function useEditorHistory(captureMeta?: () => HistoryMeta) {
     const h = histRef.current
     if (!h.past.length || !vshapeRef.current) return null
     const prev = h.past.pop()!
-    h.future.unshift({ v: vshapeRef.current, meta: captureMetaRef.current?.() })
+    h.future.unshift({ v: vshapeRef.current, meta: captureMetaRef.current?.(), lineage: useOutlineStore.getState().shapeLineage })
     restore(prev)
     return prev
   }, [])
@@ -69,7 +72,7 @@ export function useEditorHistory(captureMeta?: () => HistoryMeta) {
     const h = histRef.current
     if (!h.future.length || !vshapeRef.current) return null
     const next = h.future.shift()!
-    h.past.push({ v: vshapeRef.current, meta: captureMetaRef.current?.() })
+    h.past.push({ v: vshapeRef.current, meta: captureMetaRef.current?.(), lineage: useOutlineStore.getState().shapeLineage })
     restore(next)
     return next
   }, [])

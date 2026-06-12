@@ -65,6 +65,7 @@ function PrototypePageInner() {
     // SINGLE TRUTH (plan §B): the committed shape is the only geometry in a snapshot — the
     // contour re-derives inside commitGeometry on restore, so a snapshot can never desync.
     committedShape: ReturnType<typeof useOutlineStore.getState>['committedShape']
+    shapeLineage: ReturnType<typeof useOutlineStore.getState>['shapeLineage']
     bgBlur: number | null
     subjMatteUrl: string | null
   }
@@ -95,7 +96,7 @@ function PrototypePageInner() {
     return {
       prepared, autoOutline, designState,
       imageFx: o.imageFx,
-      outline: { spec: o.spec, committedShape: o.committedShape, bgBlur: o.bgBlur, subjMatteUrl: o.subjMatteUrl },
+      outline: { spec: o.spec, committedShape: o.committedShape, shapeLineage: o.shapeLineage, bgBlur: o.bgBlur, subjMatteUrl: o.subjMatteUrl },
       trim: { ...useSceneStore.getState().colors },
     }
   }, [prepared, autoOutline, designState])
@@ -112,7 +113,7 @@ function PrototypePageInner() {
     const o = useOutlineStore.getState()
     o.setImageFx(sn.imageFx)
     o.setSpec(sn.outline.spec)
-    o.commitGeometry(sn.outline.committedShape)
+    o.commitGeometry(sn.outline.committedShape, sn.outline.shapeLineage)
     o.setBgBlur(sn.outline.bgBlur)
     o.setSubjMatteUrl(sn.outline.subjMatteUrl)
     const sc = useSceneStore.getState()
@@ -207,7 +208,7 @@ function PrototypePageInner() {
         // #23: a new image starts a fresh history; this state is the Reset baseline
         baselineRef.current = {
           prepared: p, autoOutline: false, designState: INITIAL_ARTWORK, imageFx: null,
-          outline: { spec: p.spec, committedShape: null, bgBlur: null, subjMatteUrl: null },
+          outline: { spec: p.spec, committedShape: null, shapeLineage: 'trace', bgBlur: null, subjMatteUrl: null },
           trim: { ...useSceneStore.getState().colors },
         }
         histRef.current = { past: [], future: [] }

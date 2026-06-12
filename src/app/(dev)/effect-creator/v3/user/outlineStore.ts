@@ -49,9 +49,14 @@ interface OutlineStore {
   // DERIVED manufacturing contour of committedShape (0.05mm, mm/y-up) — written ONLY by
   // commitGeometry, never independently. null ⇔ committedShape null.
   committedContourMM: Contour | null
+  // KAI-9032: the committed shape's lineage — 'trace' = the design's raw-trace fit (Magic cut),
+  // 'vector' = a picked/uploaded/constructed vector. Tune re-fairs the RAW TRACE only for
+  // trace-lineage shapes; vector shapes fair in place (never converted to the Magic cut).
+  shapeLineage: 'trace' | 'vector'
   // THE one writer (single-writer invariant, plan §C-4): sets the shape and derives its contour
-  // atomically. No store write for geometry exists outside this function.
-  commitGeometry: (v: VShape | null) => void
+  // atomically. No store write for geometry exists outside this function. `lineage` marks shape
+  // identity changes (seed/pick/upload/reset); omitted = lineage unchanged.
+  commitGeometry: (v: VShape | null, lineage?: 'trace' | 'vector') => void
   // "Magic blend" background-blur intensity, edit-mode controllable. null = use the build default (on);
   // 0 = off (sharp full photo); 0..1 = blur amount. ShapedModel re-composes the front texture from it.
   bgBlur: number | null
@@ -78,14 +83,15 @@ export const useOutlineStore = create<OutlineStore>((set, get) => ({
   setSpec: (spec) => set({ spec }),
   committedShape: null,
   committedContourMM: null,
-  commitGeometry: (v) => {
+  shapeLineage: 'trace',
+  commitGeometry: (v, lineage) => {
     if (!v) { set({ committedShape: null, committedContourMM: null }); return }
     const spec = get().spec
     const contour = spec ? contourFromShape(v, { mmPerPx: spec.mmPerPx, maskHeightPx: spec.maskHeightPx }) : null
     // a commit that cannot derive a contour is a degenerate edit — refuse it loudly rather than
     // committing a shape the 3D/manufacturing can't follow (no silent half-commit)
     if (!contour) { console.error('[geometry-truth] commitGeometry: contour derivation failed — commit refused'); return }
-    set({ committedShape: v, committedContourMM: contour })
+    set({ committedShape: v, committedContourMM: contour, ...(lineage ? { shapeLineage: lineage } : {}) })
   },
   bgBlur: null,
   setBgBlur: (bgBlur) => set({ bgBlur }),
