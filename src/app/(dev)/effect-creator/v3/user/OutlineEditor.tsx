@@ -110,6 +110,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   // Scale DELETED per D5, the frame owns it; Blend lives in Image mode per #8).
   const [activeAdjust, setActiveAdjust] = useState<'shape' | 'adjust' | 'image' | null>(null)
   const [adjustSub, setAdjustSub] = useState<AdjustSub>('radius')
+  // KAI-9006 (Dan): rings appear ONLY when a dial moved off its session-seed value — captured at
+  // open; undo back to the seed clears the ring again.
+  const dialSeedsRef = useRef<{ radius: number; detail: number; fair: FairTracedRingOpts } | null>(null)
   const [curveVal, setCurveVal] = useState(50) // Curve ruler: 50 = the point's current tension
   const [blendBlur, setBlendBlur] = useState(50) // blend intensity 0–100; 0 = off (ruler IS the switch)
   // Shape tool: pick a preset/parametric shape as the starting outline. shapeKind = the shape currently
@@ -289,6 +292,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
         lin = 'vector'
       }
       applyVec(v0, base, lin) // COMMITS the seed (visible = committed); §6.3 defers the 3D to close
+      dialSeedsRef.current = null // re-captured on first render below (radius state settles this tick)
     }
     // (no spec → nothing to seed; the page gates editor entry on an uploaded image)
     setImageSub('brightness')
@@ -1363,6 +1367,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
         <AdjustSheet
           cornerMode={!!(vshape && selVA !== null && vshape.paths[0].anchors[selVA]?.corner)}
           radiusApplies={radiusApplies}
+          dialSeeds={dialSeedsRef.current ?? (dialSeedsRef.current = { radius, detail, fair: { ...fairParams } })}
           adjustSub={adjustSub} setAdjustSub={setAdjustSub}
           maxRadius={maxRadius} radius={radius} setRadius={setRadius} commitRadius={commitRadius}
           curveSelected={selVA !== null} curveVal={curveVal} previewCurve={previewCurve} commitCurve={commitCurve}

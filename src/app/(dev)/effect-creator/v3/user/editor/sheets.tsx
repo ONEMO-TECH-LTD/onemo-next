@@ -97,12 +97,14 @@ export type ImageSub = 'brightness' | 'contrast' | 'saturate' | 'warmth' | 'blen
    ruler. Scale is DELETED (the frame owns it, D5); Blend moved to Image mode (#8). Curve is the
    REAL bend tool (tension on the selected anchor, D3); Tune ✦ is the universal fine-tune takeover
    (Detail · Smooth · Snap — Angle/Min-line dropped, D3 round 2) available on EVERY shape class. */
-export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, radiusApplies, maxRadius, radius, setRadius, commitRadius, curveSelected, curveVal, previewCurve, commitCurve, detail, setDetail, previewTune, commitTune, fairParams }: {
+export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, radiusApplies, dialSeeds, maxRadius, radius, setRadius, commitRadius, curveSelected, curveVal, previewCurve, commitCurve, detail, setDetail, previewTune, commitTune, fairParams }: {
   cornerMode: boolean
   adjustSub: AdjustSub
   setAdjustSub: (k: AdjustSub) => void
   /** tier-2 availability (Dan's rule: inapplicable tools GREY, never silent no-op) */
   radiusApplies: boolean
+  /** session-seed dial values (KAI-9006) — a ring renders only when a dial left its seed */
+  dialSeeds: { radius: number; detail: number; fair: FairTracedRingOpts }
   maxRadius: number
   radius: number
   setRadius: (v: number) => void
@@ -121,14 +123,19 @@ export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, radiusApplies
   // KAI-9017/9016 (Dan): the FULL vector toolset as icon chips in ONE row — no Tune ✦ submenu.
   // Angle + Line are RESTORED (his 2026-06-12 pin supersedes the earlier drop ruling). Every
   // fairing dial works on every shape class (D3) — in place, per the shape's lineage (KAI-9032).
+  // KAI-9006 (Dan): no ring at rest — a ring renders ONLY on the dial the user changed.
+  // Detail is the master dial (it re-derives the others), so the param dials compare against
+  // what the CURRENT Detail derives — only an explicit override of that dial lights its ring.
+  const moved = (cur: number, seed: number, eps = 0.5) => Math.abs(cur - seed) > eps
+  const derived = fairingFromDetail(detail)
   const dials = [
-    { k: 'radius' as const, label: cornerMode ? 'Corner' : 'Radius', icon: <CornerIcon />, ring: radiusApplies ? radius / Math.max(maxRadius, 1) : 0 },
+    { k: 'radius' as const, label: cornerMode ? 'Corner' : 'Radius', icon: <CornerIcon />, ring: radiusApplies && moved(radius, dialSeeds.radius) ? radius / Math.max(maxRadius, 1) : 0 },
     { k: 'curve' as const, label: 'Curve', icon: <RoundIcon />, ring: 0 }, // BezierCurve glyph = the bend tool
-    { k: 'detail' as const, label: 'Detail', icon: <DetailIcon />, ring: detail / 100 },
-    { k: 'smooth' as const, label: 'Smooth', icon: <SmoothIcon />, ring: smoothPxToPct(fairParams.smoothPx ?? 6) / 100 },
-    { k: 'snap' as const, label: 'Snap', icon: <SnapIcon />, ring: snapPxToPct(fairParams.detailPx ?? 4) / 100 },
-    { k: 'angle' as const, label: 'Angle', icon: <AngleIcon />, ring: angleDegToPct(fairParams.maxTurnDeg ?? 35) / 100 },
-    { k: 'line' as const, label: 'Line', icon: <LineIcon />, ring: linePxToPct(fairParams.minLinePx ?? 50) / 100 },
+    { k: 'detail' as const, label: 'Detail', icon: <DetailIcon />, ring: moved(detail, dialSeeds.detail) ? detail / 100 : 0 },
+    { k: 'smooth' as const, label: 'Smooth', icon: <SmoothIcon />, ring: moved(fairParams.smoothPx ?? 6, derived.smoothPx ?? 6, 0.2) ? smoothPxToPct(fairParams.smoothPx ?? 6) / 100 : 0 },
+    { k: 'snap' as const, label: 'Snap', icon: <SnapIcon />, ring: moved(fairParams.detailPx ?? 4, derived.detailPx ?? 4, 0.2) ? snapPxToPct(fairParams.detailPx ?? 4) / 100 : 0 },
+    { k: 'angle' as const, label: 'Angle', icon: <AngleIcon />, ring: moved(fairParams.maxTurnDeg ?? 35, derived.maxTurnDeg ?? 35) ? angleDegToPct(fairParams.maxTurnDeg ?? 35) / 100 : 0 },
+    { k: 'line' as const, label: 'Line', icon: <LineIcon />, ring: moved(fairParams.minLinePx ?? 50, derived.minLinePx ?? 50) ? linePxToPct(fairParams.minLinePx ?? 50) / 100 : 0 },
   ]
   return (
     <div className={styles.shapeSheet}>
