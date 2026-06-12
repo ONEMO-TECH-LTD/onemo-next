@@ -464,7 +464,10 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
         canvasPanRef.current = { startClient: [e.clientX, e.clientY], vx0: viewRef.current.vx, vy0: viewRef.current.vy }
       }
     },
-    [toViewBox, hitRing, hitBBox, preview, screenToContent, viewRef],
+    // KAI-8984: activeAdjust/imageSub were missing — the svg kept a STALE closure after a mode
+    // switch, so the first drag in Image·Position routed to move-the-outline instead of pan-the-
+    // photo (and silently committed a shape move). The deps make the handler follow the mode.
+    [toViewBox, hitRing, hitBBox, preview, screenToContent, viewRef, activeAdjust, imageSub],
   )
 
   const onPointerMove = useCallback(
