@@ -11,7 +11,7 @@ import TickBar from '../../ui/TickBar'
 import { useOutlineStore, type ImageFx } from '../outlineStore'
 import { PARAMETRIC, type ShapeKind } from '../shapes'
 import { SHAPE_CHIPS, ShapeChipIcon, DEFAULT_SHAPE_PARAMS } from './chips'
-import { RoundIcon, SmoothIcon, BlendIcon, BrightnessIcon, ContrastIcon, SaturationIcon, WarmthIcon, MinusIcon, PlusIcon, DiceIcon, MagicIcon, CornerIcon, DetailIcon, SnapIcon, AngleIcon, LineIcon } from '../icons'
+import { RoundIcon, SmoothIcon, BlendIcon, BrightnessIcon, ContrastIcon, SaturationIcon, WarmthIcon, MinusIcon, PlusIcon, DiceIcon, MagicIcon, BlurIcon, CornerIcon, DetailIcon, SnapIcon, AngleIcon, LineIcon } from '../icons'
 
 // KAI-9033 (v1 recovery): Smooth is the whole-shape SHARP⇄ROUND dial — 0% ≈ the raw trace
 // (sharp/angular, v1's 'straighten' end), 100% = maximally round. Angle/Line expose the corner
@@ -202,7 +202,7 @@ export function ImageSheet({ imageSub, setImageSub, fxDraft, setFxDraft, blendBl
           { k: 'contrast', label: 'Contrast', icon: <ContrastIcon />, ring: Math.abs(fxDraft.contrast - 100) / 50 },
           { k: 'saturate', label: 'Color', icon: <SaturationIcon />, ring: Math.abs(fxDraft.saturate - 100) / 100 },
           { k: 'warmth', label: 'Warmth', icon: <WarmthIcon />, ring: fxDraft.warmth / 100 },
-          { k: 'blend', label: 'Blend', icon: <BlendIcon />, ring: blendBlur / 100 },
+          { k: 'blend', label: 'Blend', icon: <BlurIcon />, ring: blendBlur / 100 }, // KAI-9030: it IS a blur
         ] as const).map((s) => (
           <button
             key={s.k}

@@ -4,7 +4,7 @@
 // glyphs — chosen over Lucide so the UI doesn't read as generic shadcn/SaaS. `weight="regular"`
 // (default) reads cleanly at 24px on mobile; icons inherit `currentColor` from the button.
 
-import { ArrowArcLeft, ArrowArcRight, BezierCurve, DiceFive, WaveSine, Check, X, Plus, Minus, Trash, PlusCircle, Sparkle, ImageSquare, PencilSimple, BoundingBox, Palette, DownloadSimple, Shapes, Eye, EyeSlash, MagicWand, Faders, Crop, Sun, CircleHalf, Drop, Thermometer, VectorTwo, Waveform, Magnet, Angle, LineSegment, CornersOut } from '@phosphor-icons/react'
+import { ArrowArcLeft, ArrowArcRight, BezierCurve, DiceFive, WaveSine, Check, X, Plus, Minus, Trash, PlusCircle, Sparkle, ImageSquare, PencilSimple, BoundingBox, Palette, DownloadSimple, Shapes, Eye, EyeSlash, MagicWand, Faders, Crop, Sun, CircleHalf, Drop, Thermometer, VectorTwo, Waveform, Magnet, Angle, LineSegment, CornersOut, Gradient } from '@phosphor-icons/react'
 
 type P = { className?: string }
 const SZ = 24
@@ -33,6 +33,9 @@ export const LineIcon = (p: P) => <LineSegment size={SZ} className={p.className}
 export const MinusIcon = (p: P) => <Minus size={SZ} className={p.className} />
 export const AddPointIcon = (p: P) => <PlusCircle size={SZ} className={p.className} />
 export const DeleteIcon = (p: P) => <Trash size={SZ} className={p.className} />
+// KAI-9030 (Dan): the Blend effect IS a blur — the soft-gradient glyph reads as one.
+// (Label rename Blend→Blur awaits Dan's word.)
+export const BlurIcon = (p: P) => <Gradient size={SZ} className={p.className} />
 // "Magic blend" — sparkle = the premium soft-background blend (toggle + intensity).
 export const BlendIcon = (p: P) => <Sparkle size={SZ} className={p.className} />
 
