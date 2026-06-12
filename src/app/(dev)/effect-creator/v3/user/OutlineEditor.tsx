@@ -269,9 +269,13 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
         v0 = st0.committedShape // reopening restores TRUE curves — the committed truth itself
       } else if (spec.generator.adapter !== 'standard') {
         // Magic: re-fit the trace at the saved Tune prefs (same engine as generation); the born
-        // truth is the always-valid fallback — never a doc, never a polyline
+        // truth is the always-valid fallback — never a doc, never a polyline. The Radius BASE is
+        // the SHARP fit (KAI-8982 D1): crop corners arrive default-rounded, dialing to 0 = sharp.
         const savedF = st0.fairing
-        v0 = vecFromTrace(savedF?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL)) ?? spec.vectorShape
+        const params = savedF?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL)
+        v0 = vecFromTrace(params) ?? spec.vectorShape
+        const sharpFit = vecFromTrace(params, true)
+        if (sharpFit?.paths[0].anchors.some((a) => a.corner)) base = sharpFit
       } else {
         // Dan (2026-06-10): entering the editor BEFORE Magic means "choose a shape" — the
         // full-bleed square buries its handles, so the session starts on the centered square,
@@ -629,6 +633,32 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     if (v.paths[0].anchors.length > 3) applyVec({ paths: [deleteAnchorRefit(v.paths[0], selVA), ...v.paths.slice(1)] }, null)
     setSelVA(null)
   }, [selVA, applyVec, vshapeRef])
+  // KAI-8982 D2 — sharpen ⇄ smooth the selected anchor (Dan's 06-07 ruling: the user makes sharp
+  // corners deliberately). Sharpen marks the anchor a TRUE corner (handles go independent);
+  // smooth re-mirrors the handles collinear (average tangent, lengths preserved).
+  const onVToggleCorner = useCallback(() => {
+    const v = vshapeRef.current
+    if (!v || selVA === null) return
+    const anchors = v.paths[0].anchors.map((a) => ({ ...a }))
+    const a = anchors[selVA]
+    if (!a) return
+    if (a.corner) {
+      const hIn = a.hIn, hOut = a.hOut
+      if (hIn && hOut) {
+        const inL = Math.hypot(hIn.x - a.p.x, hIn.y - a.p.y)
+        const outL = Math.hypot(hOut.x - a.p.x, hOut.y - a.p.y)
+        let tx = (hOut.x - a.p.x) / (outL || 1) - (hIn.x - a.p.x) / (inL || 1)
+        let ty = (hOut.y - a.p.y) / (outL || 1) - (hIn.y - a.p.y) / (inL || 1)
+        const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl
+        anchors[selVA] = { ...a, corner: false, hIn: { x: a.p.x - tx * inL, y: a.p.y - ty * inL }, hOut: { x: a.p.x + tx * outL, y: a.p.y + ty * outL } }
+      } else {
+        anchors[selVA] = { ...a, corner: false }
+      }
+    } else {
+      anchors[selVA] = { ...a, corner: true } // handles stay where they are — now independent
+    }
+    applyVec({ paths: [{ anchors }, ...v.paths.slice(1)] }, null)
+  }, [selVA, applyVec, vshapeRef])
 
   // (Hug is PARKED out of core — D4. The engine's fields-once SDF evaluator stays ready in
   // outline-core/prepareSdfBlend for its post-core refinement; no UI tool ships here.)
@@ -762,8 +792,12 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   }, [spec])
   /** Run 4 — the vectoriser: THE single-pipeline fit (geometry-truth.vectoriseTrace) — the editor
    *  and generation share the literal function, so re-Tune ≡ re-generation by construction. */
-  const vecFromTrace = useCallback((params: FairTracedRingOpts): VShape | null => {
-    return spec?.rawTracePx ? vectoriseTrace(spec.rawTracePx, spec.maskHeightPx, params) : null
+  const vecFromTrace = useCallback((params: FairTracedRingOpts, sharp = false): VShape | null => {
+    if (!spec?.rawTracePx) return null
+    // re-fit = re-derivation: the crop-corner default re-applies (KAI-8982 D1); sharp=true gives
+    // the SHARP fit (no default) — the Radius tool's base, so 0% returns to the raw-sharp truth
+    const opts = sharp ? undefined : { defaultCornerRadiusPx: 8 / (spec.mmPerPx || 1), maskWidthPx: spec.maskWidthPx }
+    return vectoriseTrace(spec.rawTracePx, spec.maskHeightPx, params, opts)
   }, [spec])
 
   const onReset = useCallback(() => {
@@ -778,8 +812,10 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     // always-valid fallback (REBUILD-PLAN-v2: never a doc, never a polyline)
     if (spec && spec.generator.adapter !== 'standard') {
       const savedF = useOutlineStore.getState().fairing
-      const v = vecFromTrace(savedF?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL)) ?? spec.vectorShape
-      applyVec(v, null)
+      const params = savedF?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL)
+      const v = vecFromTrace(params) ?? spec.vectorShape
+      const sharpFit = vecFromTrace(params, true)
+      applyVec(v, sharpFit?.paths[0].anchors.some((a) => a.corner) ? sharpFit : null)
       // F4 (same readout-truth class): Reset re-derives at the saved defaults — the dial says so
       setDetail(savedF?.detail ?? BEN_DEFAULT_DETAIL)
       setFairParams(savedF?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL))
@@ -1284,6 +1320,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
           </button>
           <button type="button" className={styles.nodeAction} onClick={onVDelete}>
             <DeleteIcon /><span>Delete point</span>
+          </button>
+          <button type="button" className={styles.nodeAction} onClick={onVToggleCorner}>
+            <OutlineIcon /><span>{vshape.paths[0].anchors[selVA]?.corner ? 'Smooth' : 'Sharpen'}</span>
           </button>
         </div>
       )}

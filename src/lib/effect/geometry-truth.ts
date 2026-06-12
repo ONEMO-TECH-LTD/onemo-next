@@ -15,7 +15,7 @@
 // flip. Contours leave in MM, Y-UP, outer ring reversed to the mesh's expected winding.
 
 import { fairTracedRing, rdpClosed, validateSelfIntersection, signedArea, contentHash, stableStringify, type FairTracedRingOpts, type Vec2Px } from '@/lib/outline-core'
-import { flattenShape, ringToVPath, type VShape } from '@/lib/vector-core'
+import { flattenShape, ringToVPath, filletPathSmart, type VShape } from '@/lib/vector-core'
 import type { Contour, Pt } from './types'
 
 /** Manufacturing flatten tolerance — the cut line's fidelity (sub-kerf; kerf is 0.1–0.3 mm). */
@@ -39,24 +39,32 @@ const MIN_RAW_TRACE_POINTS = 24
 const CORNER_TURN_DEG = 55
 const CORNER_RDP_EPSILON_PX = 2.5
 const CORNER_MIN_SEPARATION_PX = 6
+// CROP-CORNER DEFAULT (Dan's 2026-06-07 landing ruling, KAI-8982 D1): a ~90° corner SITTING ON
+// the image frame edge is a crop artifact ("straight sharp crop originally") — it gets the SAME
+// default radius automatically in pass 2. Interior sharp corners (a book, a card, a star spike)
+// are design intent and stay TRUE corner anchors. The discriminator is geometric: frame-edge
+// proximity + the 90° band. The sharp fit remains derivable from the raw (Radius→0 = sharp).
+const CROP_TURN_MIN_DEG = 70
+const CROP_TURN_MAX_DEG = 110
+const CROP_EDGE_EPSILON_PX = 6
 // Below this the outline is collapsed/degenerate — same floor the legacy feasibility used.
 const MIN_AREA_PX2 = 1
 // int-micron quantization for the canonical hash (float-free identity, payload.ts convention)
 const MICRO_PER_PX = 1000
 
-/** Sharp-feature detection on the raw ring's RDP skeleton → corner POSITIONS (y-down px). */
-function rawCornerPositions(yDown: Vec2Px[]): Vec2Px[] {
+/** Sharp-feature detection on the raw ring's RDP skeleton → corner positions + turn (y-down px). */
+function rawCornerPositions(yDown: Vec2Px[]): { p: Vec2Px; turnDeg: number }[] {
   const skeleton = rdpClosed(yDown, CORNER_RDP_EPSILON_PX)
   const n = skeleton.length
   if (n < 4) return []
-  const out: Vec2Px[] = []
+  const out: { p: Vec2Px; turnDeg: number }[] = []
   const thr = (CORNER_TURN_DEG * Math.PI) / 180
   for (let i = 0; i < n; i++) {
     const a = skeleton[(i - 1 + n) % n], p = skeleton[i], b = skeleton[(i + 1) % n]
     const v1x = p[0] - a[0], v1y = p[1] - a[1], v2x = b[0] - p[0], v2y = b[1] - p[1]
     const l1 = Math.hypot(v1x, v1y) || 1, l2 = Math.hypot(v2x, v2y) || 1
     const ang = Math.acos(Math.max(-1, Math.min(1, (v1x * v2x + v1y * v2y) / (l1 * l2))))
-    if (ang > thr) out.push(p)
+    if (ang > thr) out.push({ p, turnDeg: (ang * 180) / Math.PI })
   }
   return out
 }
@@ -70,7 +78,15 @@ function rawCornerPositions(yDown: Vec2Px[]): Vec2Px[] {
  * function, so generation and editor produce identical geometry for identical inputs.
  * Returns null when the trace is too sparse to be a shape (caller fails loud — no silent door).
  */
-export function vectoriseTrace(rawMaskPx: ReadonlyArray<Pt>, maskHeightPx: number, fairing: FairTracedRingOpts): VShape | null {
+export interface VectoriseOpts {
+  /** Crop-corner default (KAI-8982 D1): ~90° corners ON the image frame edge get this radius
+   *  automatically (uniform — "same radii as a default for all 90 degree corners", Dan 06-07).
+   *  Requires maskWidthPx for the frame test. Omit = no default rounding (sharp fit). */
+  defaultCornerRadiusPx?: number
+  maskWidthPx?: number
+}
+
+export function vectoriseTrace(rawMaskPx: ReadonlyArray<Pt>, maskHeightPx: number, fairing: FairTracedRingOpts, opts?: VectoriseOpts): VShape | null {
   if (rawMaskPx.length < MIN_RAW_TRACE_POINTS) return null
   const yDown = rawMaskPx.map(([x, y]) => [x, maskHeightPx - y] as Vec2Px)
   const corners = rawCornerPositions(yDown)
@@ -80,7 +96,11 @@ export function vectoriseTrace(rawMaskPx: ReadonlyArray<Pt>, maskHeightPx: numbe
   // its index as a corner for the fit (independent handles meet at the true point)
   const ring = faired.map(([x, y]) => ({ x, y }))
   const cornerIdx: number[] = []
-  for (const [cx, cy] of corners) {
+  const cropIdx: number[] = [] // ~90° corners ON the frame edge — the crop-artifact class
+  const W = opts?.maskWidthPx ?? 0
+  const onFrame = (x: number, y: number) =>
+    W > 0 && (x <= CROP_EDGE_EPSILON_PX || y <= CROP_EDGE_EPSILON_PX || x >= W - CROP_EDGE_EPSILON_PX || y >= maskHeightPx - CROP_EDGE_EPSILON_PX)
+  for (const { p: [cx, cy], turnDeg } of corners) {
     let best = -1, bd = Infinity
     for (let i = 0; i < ring.length; i++) {
       const d = (ring[i].x - cx) ** 2 + (ring[i].y - cy) ** 2
@@ -89,10 +109,23 @@ export function vectoriseTrace(rawMaskPx: ReadonlyArray<Pt>, maskHeightPx: numbe
     if (best >= 0 && !cornerIdx.some((j) => Math.hypot(ring[j].x - cx, ring[j].y - cy) < CORNER_MIN_SEPARATION_PX)) {
       ring[best] = { x: cx, y: cy }
       cornerIdx.push(best)
+      if (turnDeg >= CROP_TURN_MIN_DEG && turnDeg <= CROP_TURN_MAX_DEG && onFrame(cx, cy)) cropIdx.push(best)
     }
   }
   cornerIdx.sort((a, b) => a - b)
-  return { paths: [ringToVPath(ring, FIT_CORNER_ANGLE_DEG, FIT_MAX_ERROR_PX, cornerIdx.length ? cornerIdx : undefined, FIT_COMPACT_ERROR_PX)] }
+  const path = ringToVPath(ring, FIT_CORNER_ANGLE_DEG, FIT_MAX_ERROR_PX, cornerIdx.length ? cornerIdx : undefined, FIT_COMPACT_ERROR_PX)
+  // pass 2's auto-adjustment (KAI-8982 D1): crop-class corners get the uniform default radius;
+  // interior sharp corners stay TRUE corner anchors. The SHARP fit stays derivable (omit opts).
+  const r = opts?.defaultCornerRadiusPx ?? 0
+  if (r > 0 && cropIdx.length) {
+    const cropPts = cropIdx.map((i) => ring[i])
+    const isCrop = (ai: number) => {
+      const a = path.anchors[ai]
+      return a.corner && cropPts.some((cp) => Math.hypot(a.p.x - cp.x, a.p.y - cp.y) < CORNER_MIN_SEPARATION_PX)
+    }
+    return { paths: [filletPathSmart(path, r, isCrop)] }
+  }
+  return { paths: [path] }
 }
 
 /**

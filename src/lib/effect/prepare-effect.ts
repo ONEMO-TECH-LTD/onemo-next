@@ -195,8 +195,10 @@ export async function prepareEffect(
   //    manufacturing contour is DERIVED from it at the named 0.05mm tolerance.
   let vectorShape
   if (type === 'shaped') {
-    // the SAME fairing+fit the editor's Tune uses — generation ≡ editor by construction
-    vectorShape = vectoriseTrace(ringPx.map(([x, y]) => [x, y] as Pt), H, fairing ?? fairingFromDetail(BEN_DEFAULT_DETAIL))
+    // the SAME fairing+fit the editor's Tune uses — generation ≡ editor by construction.
+    // Pass 2 auto-rule (KAI-8982 D1): ~90° corners ON the frame edge (crop artifacts) get the
+    // uniform 8mm default; interior sharp corners stay true anchors (Dan's 06-07 landing ruling).
+    vectorShape = vectoriseTrace(ringPx.map(([x, y]) => [x, y] as Pt), H, fairing ?? fairingFromDetail(BEN_DEFAULT_DETAIL), { defaultCornerRadiusPx: cfg.squareCornerMM / mmPerPx, maskWidthPx: W })
     if (!vectorShape) throw new Error('Contour fit failed — try an image with a clearer subject.')
   } else {
     // standard: THE one birth construction (standardBirthShape above — directly regression-tested)
