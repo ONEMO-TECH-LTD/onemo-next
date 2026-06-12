@@ -52,8 +52,8 @@
 }
 
 /* Lead action (Upload) — brand-coloured so it reads first. */
-.primary { color: var(--color-bg-brand-solid); }
+.primary { color: var(--color-text-primary, #1c2030); }
 /* Toggled-on (Edit / Colours) — brand-coloured. */
-.active { color: var(--color-bg-brand-solid); }
+.active { color: var(--color-text-primary, #1c2030); }
 
 .hiddenInput { display: none; }

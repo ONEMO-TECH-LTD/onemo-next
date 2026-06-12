@@ -44,7 +44,7 @@
   border: 1px solid rgba(255, 255, 255, 0.85);
   box-shadow: 0 10px 34px rgba(20, 24, 40, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
-.spin { display: inline-flex; color: var(--color-bg-brand-solid, #2563eb); animation: gen-spin 1.4s linear infinite; }
+.spin { display: inline-flex; color: var(--color-text-primary, #1c2030); animation: gen-spin 1.4s linear infinite; }
 .spin svg { width: 1.15rem; height: 1.15rem; }
 .label { white-space: nowrap; }
 @keyframes gen-spin { to { transform: rotate(360deg); } }

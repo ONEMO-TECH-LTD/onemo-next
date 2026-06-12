@@ -39,7 +39,7 @@
 .path {
   fill: var(--semantic-bg-brand-primary);
   fill-opacity: 0.18;
-  stroke: var(--semantic-bg-brand-solid);
+  stroke: var(--color-text-primary, #1c2030);
   vector-effect: non-scaling-stroke;
   stroke-width: 2;
   stroke-linejoin: round;
@@ -61,14 +61,14 @@
 
 /* Desktop rotate handle — a grip on a short stem above the outline (shown when all corners selected). */
 .rotateStem {
-  stroke: var(--semantic-bg-brand-solid);
+  stroke: var(--color-text-primary, #1c2030);
   stroke-opacity: 0.55;
   vector-effect: non-scaling-stroke;
   stroke-width: 1.5;
   stroke-dasharray: 3 3;
 }
 .rotateHandle {
-  fill: var(--semantic-bg-brand-solid);
+  fill: var(--color-text-primary, #1c2030);
   fill-opacity: 0.92;
   stroke: #fff;
   stroke-opacity: 0.9;
@@ -116,20 +116,20 @@
   filter: blur(0.4px);
   cursor: grab;
 }
-.node:hover { stroke: var(--semantic-bg-brand-solid); stroke-opacity: 1; }
+.node:hover { stroke: var(--color-text-primary, #1c2030); stroke-opacity: 1; }
 .nodeActive {
-  fill: var(--semantic-bg-brand-solid);
+  fill: var(--color-text-primary, #1c2030);
   fill-opacity: 0.6;
-  stroke: var(--semantic-bg-brand-solid);
+  stroke: var(--color-text-primary, #1c2030);
   stroke-opacity: 1;
   filter: none;
   cursor: grabbing;
 }
 /* Selected control point — its corner radius is what the slider edits (A1c per-node). */
 .nodeSelected {
-  fill: var(--semantic-bg-brand-solid);
+  fill: var(--color-text-primary, #1c2030);
   fill-opacity: 0.55;
-  stroke: var(--semantic-bg-brand-solid);
+  stroke: var(--color-text-primary, #1c2030);
   stroke-opacity: 1;
   stroke-width: 2;
   filter: none;
@@ -190,7 +190,7 @@
 }
 .topTool:disabled { opacity: 0.3; cursor: not-allowed; }
 /* UX-3: the commit action accents when the session is dirty */
-.topToolPrimary { color: var(--color-bg-brand-solid, #1c2030); font-weight: 600; }
+.topToolPrimary { color: var(--color-text-primary, #1c2030); font-weight: 600; }
 /* KAI-9012: top-bar pills — quiet grouped capsules on the glass strip (no blue) */
 .barPill {
   display: inline-flex;
@@ -298,9 +298,9 @@
   transition: color 0.12s ease;
 }
 .chip:active { color: var(--semantic-text-primary); }
-.chipActive { color: var(--semantic-bg-brand-solid); }
+.chipActive { color: var(--color-text-primary, #1c2030); }
 /* the Magic ✦ AUTO chip — visually distinct from shape chips (it runs the cut, not a preset) */
-.chipMagic { color: var(--semantic-bg-brand-solid); font-weight: 600; }
+.chipMagic { color: var(--color-text-primary, #1c2030); font-weight: 600; }
 .chipIcon { display: inline-flex; }
 .chipLabel { font-family: var(--font-body); font-size: 0.625rem; line-height: 1; white-space: nowrap; }
 /* parametric controls (sides / points / spikiness / rotate) under the chip strip */
@@ -354,7 +354,7 @@
   width: 100%;
   max-width: var(--editor-controls-max, 34rem);
   height: 1.75rem; /* fat touch target */
-  accent-color: var(--semantic-bg-brand-solid);
+  accent-color: var(--color-text-primary, #1c2030);
   cursor: pointer;
 }
 
@@ -392,8 +392,8 @@
 }
 .tool:disabled { opacity: 0.3; cursor: not-allowed; }
 .tool:active:not(:disabled) { background: var(--semantic-bg-secondary); }
-.toolActive { color: var(--semantic-bg-brand-solid); background: var(--semantic-bg-brand-primary); }
-.toolPrimary { color: var(--semantic-bg-brand-solid); }
+.toolActive { color: var(--color-text-primary, #1c2030); background: var(--semantic-bg-brand-primary); }
+.toolPrimary { color: var(--color-text-primary, #1c2030); }
 .toolIcon { display: inline-flex; }
 .toolLabel {
   font-family: var(--font-body);
@@ -407,7 +407,7 @@
 
 /* 6.3: the frame's padlock chip */
 .lockChip {
-  fill: var(--semantic-bg-brand-solid, #2563eb);
+  fill: var(--color-text-primary, #1c2030);
   fill-opacity: 0.92;
   stroke: #fff;
   stroke-opacity: 0.9;

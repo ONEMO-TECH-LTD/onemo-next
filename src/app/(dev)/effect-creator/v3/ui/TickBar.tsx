@@ -183,7 +183,7 @@ export default function TickBar({
       <span
         style={{
           fontSize: 13, fontWeight: 500, fontVariantNumeric: 'tabular-nums',
-          color: atZero ? '#3a4156' : 'var(--color-bg-brand-solid, #2563eb)',
+          color: atZero ? '#3a4156' : 'var(--color-text-primary, #1c2030)',
           minWidth: 44, textAlign: 'right', flexShrink: 0, pointerEvents: 'none',
         }}
       >

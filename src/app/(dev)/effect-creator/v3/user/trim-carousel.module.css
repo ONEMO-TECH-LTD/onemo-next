@@ -48,7 +48,7 @@
 /* AP Filters anatomy: the live selection is enlarged + ringed — the 3D object is the preview */
 .swatchSelected {
   transform: scale(1.22);
-  outline-color: var(--color-bg-brand-solid, #1c2030);
+  outline-color: var(--color-text-primary, #1c2030);
 }
 
 .picker {
@@ -79,7 +79,7 @@
   cursor: pointer;
 }
 .action:hover { opacity: 0.7; }
-.confirm { color: var(--color-bg-brand-solid, #1c2030); }
+.confirm { color: var(--color-text-primary, #1c2030); }
 
 .hiddenInput {
   position: absolute;
