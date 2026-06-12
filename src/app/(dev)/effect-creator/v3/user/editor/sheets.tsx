@@ -116,15 +116,21 @@ export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, tuneSub, setT
       </ChipRow>
       <div className={styles.shapeControls}>
         <div className={styles.shapeRow}>
+          {/* KAI-9019 + Dan's rulings: no helper text, no empty slot — an inapplicable tool shows
+              its ruler GREYED and non-functional until the state makes it real */}
           {adjustSub === 'radius' && (radiusApplies || cornerMode ? (
             <TickBar label={cornerMode ? 'Corner' : 'Radius'} min={0} max={maxRadius} value={Math.min(radius, maxRadius)} onChange={setRadius} onCommit={commitRadius} format={(v) => `${Math.round((v / Math.max(maxRadius, 1)) * 100)}%`} />
           ) : (
-            <div className={styles.toolHint}>Radius rounds corners — this shape is all curves. Select a corner point, or sharpen one first.</div>
+            <div className={styles.disabledControl} aria-disabled="true">
+              <TickBar label="Radius" min={0} max={100} value={0} onChange={() => {}} onCommit={() => {}} format={(v) => `${Math.round(v)}%`} />
+            </div>
           ))}
           {adjustSub === 'curve' && (curveSelected ? (
             <TickBar label="Curve" min={0} max={100} value={curveVal} onChange={previewCurve} onCommit={commitCurve} format={(v) => `${Math.round(v * 2)}%`} />
           ) : (
-            <div className={styles.toolHint}>Curve bends the line through a point — double-tap the shape for Points, then tap one.</div>
+            <div className={styles.disabledControl} aria-disabled="true">
+              <TickBar label="Curve" min={0} max={100} value={50} onChange={() => {}} onCommit={() => {}} format={(v) => `${Math.round(v * 2)}%`} />
+            </div>
           ))}
         </div>
         {adjustSub === 'tune' && (
