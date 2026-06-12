@@ -171,12 +171,13 @@
 }
 /* top-bar tools (Close/Undo/Redo/Reset/Done) — icon-over-label mobile style, evenly distributed (no title) */
 .topTool {
-  flex: 1 1 0;
+  /* KAI-9012: fixed-width tools — the pills group, the spacer centers; buttons never stretch */
+  flex: none;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  padding: var(--spacing-2xs) 0;
+  padding: var(--spacing-2xs) 10px;
   border: none;
   background: transparent;
   color: var(--semantic-text-primary);
@@ -187,6 +188,16 @@
 /* UX-3: the commit action accents when the session is dirty */
 .topToolPrimary { color: var(--color-bg-brand-solid, #1c2030); font-weight: 600; }
 .resetSpacer { flex: 1 1 0; margin: 0 auto; }
+/* KAI-9012: top-bar pills — quiet grouped capsules on the glass strip (no blue) */
+.barPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: var(--semantic-bg-secondary, rgba(20, 24, 40, 0.05));
+}
+.barPill:has(button[title="Reset"]) { flex: none; margin: 0 auto; }
 /* hero variant: the SAME strip, pinned to the top of the scene (the editor's is a flex child) */
 .topbarFixed {
   position: fixed;

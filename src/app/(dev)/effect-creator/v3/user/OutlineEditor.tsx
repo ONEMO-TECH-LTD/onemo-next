@@ -1128,9 +1128,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
       {/* THE shared global top bar (plan A2/D-CHROME) — same component as the hero (KAI-8986);
           per-screen diff is button payloads only. Points has no button — double-tap (A3 grammar). */}
       <TopBar
+        leading={<TopBarButton icon={<CloseIcon />} label="Close" onClick={() => onCancel()} />}
         left={(
           <>
-            <TopBarButton icon={<CloseIcon />} label="Close" onClick={() => onCancel()} />
             <TopBarButton icon={<UndoIcon />} label="Undo" onClick={undo} disabled={!canUndo} />
             <TopBarButton icon={<RedoIcon />} label="Redo" onClick={redo} disabled={!canRedo} />
           </>

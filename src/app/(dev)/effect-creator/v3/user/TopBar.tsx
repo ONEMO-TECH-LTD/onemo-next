@@ -24,17 +24,22 @@ export function ResetButton({ onClick }: { onClick: () => void }) {
   return <TopBarButton icon={<ResetIcon />} label="Reset" onClick={onClick} />
 }
 
-export default function TopBar({ left, dirty, onReset, right }: {
+export default function TopBar({ leading, left, dirty, onReset, right }: {
+  /** screen-specific control ahead of the pills (editor: Close) */
+  leading?: ReactNode
+  /** the Undo/Redo cluster — rendered as its own pill (KAI-9012) */
   left: ReactNode
   dirty: boolean
   onReset?: () => void
   right: ReactNode
 }) {
+  // KAI-9012 (Dan): TWO pills — [Undo·Redo] and a separate [Reset] pill (only when dirty)
   return (
     <div className={styles.topbar}>
       <div className={styles.topInner}>
-        {left}
-        {dirty && onReset ? <ResetButton onClick={onReset} /> : <span className={styles.resetSpacer} aria-hidden />}
+        {leading}
+        <span className={styles.barPill}>{left}</span>
+        {dirty && onReset ? <span className={styles.barPill}><ResetButton onClick={onReset} /></span> : <span className={styles.resetSpacer} aria-hidden />}
         {right}
       </div>
     </div>
