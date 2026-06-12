@@ -1,6 +1,6 @@
 // Effect Creator V3 — 2D outline editor overlay (blueprint §5.3 / §6.3 / G11 / G12).
 // Core toolset per §7a: anchors (drag/add/delete), Smooth, Scale, Shape presets, magic-blend
-// toggle. (Draw was removed entirely — Dan, KAI-8962.) Hug and the Round tool are NOT in core (parked/folded — D4/D5;
+// toggle. Hug and the Round tool are NOT in core (parked/folded — D4/D5;
 // engine-level default rounding stays internal). Continuous controls are TickBars (G12) riding the
 // §6.3 tick/commit contract. The canvas sits in a safe-area layout between the bars with zoom + pan
 // (G11) so every anchor is reachable and the whole image is visible.
@@ -1290,7 +1290,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
         <div className={styles.toolInner}>
         {(
           <>
-            {/* #35: the MODE pill — Shape · Adjust · Image (Apple bottom-pill pattern; Draw removed — KAI-8962) */}
+            {/* #35: the MODE pill — Shape · Adjust · Image (Apple bottom-pill pattern) */}
             <ToolBtn icon={<ShapeIcon />} label="Shape" onClick={toggleShape} active={activeAdjust === 'shape'} />
             <ToolBtn icon={<TuneIcon />} label="Adjust" onClick={() => setActiveAdjust((a) => (a === 'adjust' ? null : 'adjust'))} active={activeAdjust === 'adjust'} />
             <ToolBtn icon={<ImageToolIcon />} label="Image" onClick={() => { setActiveAdjust((a) => (a === 'image' ? null : 'image')); setAllSelected(false); setSelVA(null) }} active={activeAdjust === 'image'} />
