@@ -33,14 +33,17 @@ export default function TopBar({ leading, left, dirty, onReset, right }: {
   onReset?: () => void
   right: ReactNode
 }) {
-  // KAI-9012 (Dan): TWO pills — [Undo·Redo] and a separate [Reset] pill (only when dirty)
+  // KAI-9012 (Dan): TWO pills — [Undo·Redo] and a separate [Reset] pill (only when dirty).
+  // 3-column grid: Reset is TRULY centered regardless of how heavy either side is.
   return (
     <div className={styles.topbar}>
       <div className={styles.topInner}>
-        {leading}
-        <span className={styles.barPill}>{left}</span>
-        {dirty && onReset ? <span className={styles.barPill}><ResetButton onClick={onReset} /></span> : <span className={styles.resetSpacer} aria-hidden />}
-        {right}
+        <div className={styles.barSideLeft}>
+          {leading}
+          <span className={styles.barPill}>{left}</span>
+        </div>
+        {dirty && onReset ? <span className={styles.barPill}><ResetButton onClick={onReset} /></span> : <span aria-hidden />}
+        <div className={styles.barSideRight}>{right}</div>
       </div>
     </div>
   )

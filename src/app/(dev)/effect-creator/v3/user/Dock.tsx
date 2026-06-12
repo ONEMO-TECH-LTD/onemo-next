@@ -22,6 +22,7 @@ export function DockTool({ icon, label, onClick, active, primary, disabled }: {
       style={disabled ? { opacity: 0.35, pointerEvents: 'none' } : undefined}
       aria-pressed={active}
       aria-label={label}
+      title={label}
     >
       <span className={styles.toolIcon}>{icon}</span>
       <span className={styles.toolLabel}>{label}</span>
