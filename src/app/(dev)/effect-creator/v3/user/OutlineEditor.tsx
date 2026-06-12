@@ -25,7 +25,7 @@ import { standardBirthShape } from '@/lib/effect/prepare-effect'
 import { useOutlineStore, NEUTRAL_FX, INITIAL_ARTWORK, type ImageFx } from './outlineStore'
 import type { DesignState } from '../types'
 import type { Pt } from '@/lib/effect/types'
-import { UndoIcon, RedoIcon, CheckIcon, CloseIcon, AddPointIcon, DeleteIcon, ShapeIcon, TuneIcon, ImageToolIcon, OutlineIcon, PreviewIcon, PreviewOffIcon , PointsIcon, MagicIcon } from './icons'
+import { UndoIcon, RedoIcon, CheckIcon, CloseIcon, AddPointIcon, DeleteIcon, ShapeIcon, TuneIcon, OutlineIcon, PreviewIcon, PreviewOffIcon , PointsIcon, MagicIcon } from './icons'
 import { toast } from '../ui/Toast'
 import { perfGesture } from '../dev/PerfHUD'
 import { generateShapeRing, resampleClosed, type ShapeKind, type ShapeParams } from './shapes'
@@ -59,7 +59,7 @@ interface OutlineEditorProps {
   imageUrl?: string
   onClose: () => void
   /** Structure A (#27): the toolbar's creation modes open THIS editor in that mode. */
-  openMode?: 'shape' | null
+  openMode?: 'shape' | 'image' | null
   /** Magic ✦ trail chip (plan A2/D7): runs the SAME auto-cut the hero shortcut runs — one
    *  pipeline, two doors. Magic is self-sufficient, so the editor closes and the cut lands in 3D. */
   onMagic?: () => void
@@ -286,7 +286,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     // PRE-OPEN committed state (preEditRef) — the seed itself commits (visible = committed), so
     // reading the store here would always say "committed" and kill the choose-a-shape opening
     // (caught visually: pre-Magic opens were landing in Adjust instead of the Shape sheet).
-    if (openMode === 'shape') setActiveAdjust('shape')
+    if (openMode === 'image') setActiveAdjust('image') // KAI-9027: the hero Filters entry
+    else if (openMode === 'shape') setActiveAdjust('shape')
     else if (spec?.generator.adapter !== 'standard' || preEditRef.current.committedShape) setActiveAdjust('adjust')
     else setActiveAdjust('shape') // pre-Magic standard, nothing committed before open: choose a shape (Dan, 2026-06-10)
     histRef.current = { past: [], future: [] } // fresh undo history per session (the seed is not undoable)
@@ -1398,7 +1399,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
           if (a !== 'adjust') setShowAnchors(true)
           return a === 'adjust' ? null : 'adjust'
         })} active={activeAdjust === 'adjust'} />
-        <DockTool icon={<ImageToolIcon />} label="Image" onClick={() => { setActiveAdjust((a) => (a === 'image' ? null : 'image')); setAllSelected(false); setSelVA(null); setShowAnchors(false) }} active={activeAdjust === 'image'} />
+        {/* KAI-9027: the Image entry moved to the hero as 'Filters' — image mode still exists,
+            reached from there (and stays active when entered) */}
       </Dock>
     </div>
     </div>

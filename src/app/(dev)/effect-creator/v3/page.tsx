@@ -43,7 +43,7 @@ function PrototypePageInner() {
   const [prepared, setPrepared] = useState<PreparedEffect | null>(null) // the one engine's output
   const [isDragging, setIsDragging] = useState(false)
   const [editingOutline, setEditingOutline] = useState(false)
-  const [editorMode, setEditorMode] = useState<'shape' | null>(null) // #27: toolbar creation modes
+  const [editorMode, setEditorMode] = useState<'shape' | 'image' | null>(null) // #27 + KAI-9027
   const [autoOutline, setAutoOutline] = useState(false) // false = standard square; true = Magic cut-out
   const [generating, setGenerating] = useState(false)
   const [genLabel, setGenLabel] = useState('Cutting out…') // G5 honest progress
@@ -374,6 +374,7 @@ function PrototypePageInner() {
           onFile={handleFile}
           onGenerate={handleMagic}
           onToggleColors={() => { trimPreRef.current = snapNow(); setShowColors(true) }}
+          onFilters={() => { editorPreRef.current = snapNow(); setEditorMode('image'); setEditingOutline(true) }}
           onEditor={() => { editorPreRef.current = snapNow(); setEditorMode(null); setEditingOutline(true) }}
           editorReady={!!prepared}
         />
