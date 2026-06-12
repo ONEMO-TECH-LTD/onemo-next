@@ -186,20 +186,33 @@
 .topTool:disabled { opacity: 0.3; cursor: not-allowed; }
 /* UX-3: the commit action accents when the session is dirty */
 .topToolPrimary { color: var(--color-bg-brand-solid, #1c2030); font-weight: 600; }
-/* RESET appears center ONLY when dirty — gold, like the iPhone Photos crop bar */
-.resetGold {
-  flex: 1 1 0;
-  border: none;
-  background: transparent;
-  color: #c79a2a;
+/* RESET appears center ONLY when dirty — a REAL button (fab-qa F-UX2: bare gold text read as a
+   warning label): gold-tinted pill, border + fill, contrast-safe darker gold ink. */
+.resetBtn {
+  flex: none;
+  align-self: center;
+  margin: 0 auto;
+  border: 1px solid rgba(155, 117, 25, 0.45);
+  background: rgba(199, 154, 42, 0.14);
+  color: #8a6a14;
+  border-radius: var(--radius-full);
   font-family: var(--font-primary);
   font-weight: 700;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   letter-spacing: 1px;
   cursor: pointer;
-  padding: var(--spacing-2xs) 0;
+  padding: 6px 16px;
 }
-.resetSpacer { flex: 1 1 0; }
+.resetBtn:hover { background: rgba(199, 154, 42, 0.24); }
+.resetSpacer { flex: 1 1 0; margin: 0 auto; }
+/* hero variant: the SAME strip, pinned to the top of the scene (the editor's is a flex child) */
+.topbarFixed {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+}
 .topTool:active:not(:disabled) { background: var(--semantic-bg-secondary); }
 .topToolLabel { font-family: var(--font-body); font-size: 0.625rem; line-height: 1; white-space: nowrap; }
 

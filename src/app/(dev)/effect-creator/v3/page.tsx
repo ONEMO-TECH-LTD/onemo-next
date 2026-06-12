@@ -17,6 +17,8 @@ import { useState, useCallback, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useSceneStore } from './admin/sceneStore'
 import { UndoIcon, RedoIcon, ExportIcon, EditIcon } from './user/icons'
+import TopBar, { TopBarButton } from './user/TopBar'
+import edStyles from './user/outline-editor.module.css'
 import { INITIAL_ARTWORK } from './user/outlineStore'
 import { useOutlineStore } from './user/outlineStore'
 import type { DesignState } from './types'
@@ -401,43 +403,28 @@ function PrototypePageInner() {
         }}
       />
 
-      {/* GLOBAL TOP BAR (plan A1 / D-CHROME, Dan's iPhone Photos anatomy): undo/redo pill always
-          top-LEFT · RESET top-CENTER only-when-dirty (gold, vanishes when clean) · the screen's
-          commit actions top-RIGHT (hero: Edit · Export). ONE anatomy on every screen; the old
-          desktop corner pill is dead. Hidden while the editor owns the screen (same anatomy there). */}
+      {/* THE GLOBAL TOP BAR — the SAME strip component identity as the editor's (fab-qa F-UX1):
+          ✕-less hero form = undo/redo LEFT · RESET center only-when-dirty (real button) ·
+          Edit · Export RIGHT. Hidden while the editor owns the screen (it mounts its own). */}
       {artworkUrl && !editingOutline && (
-        <>
-          <div style={{ position: 'fixed', top: 14, left: 14, zIndex: 40, display: 'flex', gap: 2, background: 'rgba(255,255,255,0.88)', borderRadius: 999, padding: '4px 8px', boxShadow: '0 4px 18px rgba(15,18,32,0.12)' }}>
-            {([
-              { icon: <UndoIcon />, label: 'Undo', fn: globalUndo, off: !histRef.current.past.length },
-              { icon: <RedoIcon />, label: 'Redo', fn: globalRedo, off: !histRef.current.future.length },
-            ] as const).map((b) => (
-              <button key={b.label} type="button" onClick={b.fn} disabled={b.off} aria-label={b.label} title={b.label}
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, border: 'none', background: 'transparent', cursor: b.off ? 'default' : 'pointer', opacity: b.off ? 0.3 : 0.85, padding: '4px 7px', color: '#1c2030', fontSize: 9, fontFamily: 'inherit' }}>
-                {b.icon}
-                <span>{b.label}</span>
-              </button>
-            ))}
-          </div>
-          {histRef.current.past.length > 0 && baselineRef.current && (
-            <button type="button" onClick={globalReset} aria-label="Reset" title="Reset"
-              style={{ position: 'fixed', top: 18, left: '50%', transform: 'translateX(-50%)', zIndex: 40, border: 'none', background: 'transparent', cursor: 'pointer', color: '#c79a2a', fontWeight: 700, fontSize: 13, letterSpacing: 1, fontFamily: 'inherit', padding: '6px 10px' }}>
-              RESET
-            </button>
-          )}
-          <div style={{ position: 'fixed', top: 14, right: 14, zIndex: 40, display: 'flex', gap: 2, background: 'rgba(255,255,255,0.88)', borderRadius: 999, padding: '4px 8px', boxShadow: '0 4px 18px rgba(15,18,32,0.12)' }}>
-            {([
-              { icon: <EditIcon />, label: 'Edit', fn: () => { editorPreRef.current = snapNow(); setEditorMode(null); setEditingOutline(true) }, off: !prepared },
-              { icon: <ExportIcon />, label: 'Export', fn: onExport, off: !prepared },
-            ] as const).map((b) => (
-              <button key={b.label} type="button" onClick={b.fn} disabled={b.off} aria-label={b.label} title={b.label}
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, border: 'none', background: 'transparent', cursor: b.off ? 'default' : 'pointer', opacity: b.off ? 0.3 : 0.85, padding: '4px 7px', color: '#1c2030', fontSize: 9, fontFamily: 'inherit' }}>
-                {b.icon}
-                <span>{b.label}</span>
-              </button>
-            ))}
-          </div>
-        </>
+        <div className={`${edStyles.topbarFixed}`}>
+          <TopBar
+            left={(
+              <>
+                <TopBarButton icon={<UndoIcon />} label="Undo" onClick={globalUndo} disabled={!histRef.current.past.length} />
+                <TopBarButton icon={<RedoIcon />} label="Redo" onClick={globalRedo} disabled={!histRef.current.future.length} />
+              </>
+            )}
+            dirty={histRef.current.past.length > 0 && !!baselineRef.current}
+            onReset={globalReset}
+            right={(
+              <>
+                <TopBarButton icon={<EditIcon />} label="Edit" onClick={() => { editorPreRef.current = snapNow(); setEditorMode(null); setEditingOutline(true) }} disabled={!prepared} />
+                <TopBarButton icon={<ExportIcon />} label="Export" onClick={onExport} disabled={!prepared} />
+              </>
+            )}
+          />
+        </div>
       )}
 
       {/* G4 + G3 — always present */}

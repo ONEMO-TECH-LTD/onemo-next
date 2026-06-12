@@ -51,6 +51,7 @@ import { useCanvasView } from './editor/useCanvasView'
 import { AdjustSheet, ImageSheet, ShapeSheet } from './editor/sheets'
 import { pointInPolygon, type GripId } from './editor/geometry'
 import styles from './outline-editor.module.css'
+import { ResetButton } from './TopBar'
 
 interface OutlineEditorProps {
   open: boolean
@@ -1146,7 +1147,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
           <TopTool icon={<UndoIcon />} label="Undo" onClick={undo} disabled={!canUndo} />
           <TopTool icon={<RedoIcon />} label="Redo" onClick={redo} disabled={!canRedo} />
           {canUndo ? (
-            <button type="button" className={styles.resetGold} onClick={onReset} aria-label="Reset" title="Reset">RESET</button>
+            <ResetButton onClick={onReset} />
           ) : (
             <span className={styles.resetSpacer} aria-hidden />
           )}
