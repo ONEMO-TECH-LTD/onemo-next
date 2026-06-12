@@ -4,13 +4,15 @@
 // glyphs — chosen over Lucide so the UI doesn't read as generic shadcn/SaaS. `weight="regular"`
 // (default) reads cleanly at 24px on mobile; icons inherit `currentColor` from the button.
 
-import { ArrowArcLeft, ArrowArcRight, BezierCurve, DiceFive, WaveSine, Check, X, Plus, Minus, Trash, PlusCircle, Sparkle, ImageSquare, PencilSimple, BoundingBox, Palette, DownloadSimple, Shapes, Eye, EyeSlash, MagicWand, Faders, Crop, Sun, CircleHalf, Drop, Thermometer, VectorTwo, Waveform, Magnet, Angle, LineSegment, CornersOut, Gradient } from '@phosphor-icons/react'
+import { ArrowArcLeft, ArrowArcRight, ArrowCounterClockwise, BezierCurve, DiceFive, WaveSine, Check, X, Plus, Minus, Trash, PlusCircle, Sparkle, ImageSquare, PencilSimple, BoundingBox, Palette, DownloadSimple, Shapes, Eye, EyeSlash, MagicWand, Faders, Crop, Sun, CircleHalf, Drop, Thermometer, VectorTwo, Waveform, Magnet, Angle, LineSegment, CornersOut, Gradient } from '@phosphor-icons/react'
 
 type P = { className?: string }
 const SZ = 24
 
 export const UndoIcon = (p: P) => <ArrowArcLeft size={SZ} className={p.className} />
 export const RedoIcon = (p: P) => <ArrowArcRight size={SZ} className={p.className} />
+// KAI-9003 (Dan): RESET is an icon button like its top-bar siblings — not a pill.
+export const ResetIcon = (p: P) => <ArrowCounterClockwise size={SZ} className={p.className} />
 export const DiceIcon = (p: P) => <DiceFive size={SZ} className={p.className} /> // blob generator reroll
 export const SmoothIcon = (p: P) => <WaveSine size={SZ} className={p.className} />
 export const CheckIcon = (p: P) => <Check size={SZ} className={p.className} />

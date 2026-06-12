@@ -1,13 +1,12 @@
-// THE global top bar — ONE component identity on every screen (plan A1/D-CHROME; fab-qa F-UX1:
-// the hero wore floating corner pills while the editor wore a flat strip — same controls, two
-// app identities). Anatomy: ✕/undo-redo LEFT · RESET center ONLY-when-dirty (a real button —
-// fab-qa F-UX2: bare gold text read as a warning label) · the screen's commit actions RIGHT.
-// The editor composes the same classes from outline-editor.module.css; the hero mounts this.
+// THE global top bar — ONE component identity on every screen (plan A1/D-CHROME).
+// Anatomy: left cluster · RESET center ONLY-when-dirty (a Phosphor icon button like its
+// siblings — KAI-9003) · the screen's commit actions RIGHT.
 
 'use client'
 
 import type { ReactNode } from 'react'
 import styles from './outline-editor.module.css'
+import { ResetIcon } from './icons'
 
 export function TopBarButton({ icon, label, onClick, disabled, primary, active }: {
   icon: ReactNode; label: string; onClick: () => void; disabled?: boolean; primary?: boolean; active?: boolean
@@ -20,13 +19,9 @@ export function TopBarButton({ icon, label, onClick, disabled, primary, active }
   )
 }
 
-/** RESET — a real button with affordance, appears only when dirty (UX-3 mechanics unchanged). */
+/** RESET — a Phosphor icon button like its siblings (KAI-9003), appears only when dirty (UX-3). */
 export function ResetButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button type="button" className={styles.resetBtn} onClick={onClick} aria-label="Reset" title="Reset">
-      RESET
-    </button>
-  )
+  return <TopBarButton icon={<ResetIcon />} label="Reset" onClick={onClick} />
 }
 
 export default function TopBar({ left, dirty, onReset, right }: {
