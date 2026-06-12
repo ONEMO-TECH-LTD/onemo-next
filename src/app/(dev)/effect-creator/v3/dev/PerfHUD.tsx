@@ -4,7 +4,8 @@
 // never ship unmeasured again. Budgets (§9): editor tick ≤ 16 ms · no main-thread task > 50 ms per
 // interaction tick · scene idle = 0 frames.
 //
-// Toggle: the ⏱ button (always rendered in dev) or `?perf=1`. Zero cost when collapsed (no rAF loop).
+// Arming: `?perf=1` mounts the HUD (open, with the ⏱ collapse toggle); without it NOTHING renders —
+// the chip is instrumentation, not product chrome (KAI-8999). Zero cost when collapsed (no rAF loop).
 // Gesture markers: call `perfGesture('hug-commit', ms)` from anywhere — the HUD lists the last few
 // with a red flag when a gesture exceeds its budget.
 
@@ -30,7 +31,9 @@ export function perfGesture(label: string, ms: number) {
 const ZERO: FrameStats = { avg: 0, worst: 0, longTasks: 0, worstTask: 0 }
 
 export default function PerfHUD() {
-  // ?perf=1 opens the HUD on load (lazy initializer — client component, window exists)
+  // KAI-8999: armed only via ?perf=1 — un-armed, the component renders nothing at all
+  const [armed] = useState(() =>
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('perf') === '1')
   const [open, setOpen] = useState(() =>
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('perf') === '1')
   const [stats, setStats] = useState<FrameStats>(ZERO)
@@ -74,6 +77,7 @@ export default function PerfHUD() {
 
   const recent = gestureLog.slice(-6).reverse()
 
+  if (!armed) return null
   return (
     /* top-left, below the editor topbar — a dev overlay must never cover interactive chrome
        (bottom-left collided with the editor dock + sheets) */
