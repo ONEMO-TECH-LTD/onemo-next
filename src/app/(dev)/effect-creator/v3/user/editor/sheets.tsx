@@ -46,11 +46,13 @@ export type AdjustSub = 'radius' | 'curve' | 'detail' | 'smooth' | 'snap' | 'ang
 function ChipRing({ frac }: { frac: number }) {
   const f = Math.max(0, Math.min(1, frac))
   if (f <= 0.005) return null
-  const R = 15, C = 2 * Math.PI * R
+  // KAI-9018 (Dan): Apple-like AIR between glyph and ring (24px icon inside a 44px circle),
+  // neutral ink — no blue anywhere on indicators.
+  const R = 20, C = 2 * Math.PI * R
   return (
-    <svg width={34} height={34} viewBox="0 0 34 34" aria-hidden style={{ position: 'absolute', inset: '-5px 0 0 -5px', pointerEvents: 'none' }}>
-      <circle cx={17} cy={17} r={R} fill="none" stroke="var(--semantic-bg-brand-solid, #2563eb)" strokeOpacity={0.85}
-        strokeWidth={2} strokeLinecap="round" strokeDasharray={`${C * f} ${C * (1 - f)}`} transform="rotate(-90 17 17)" />
+    <svg width={44} height={44} viewBox="0 0 44 44" aria-hidden style={{ position: 'absolute', inset: '-10px 0 0 -10px', pointerEvents: 'none' }}>
+      <circle cx={22} cy={22} r={R} fill="none" stroke="var(--color-text-primary, #1c2030)" strokeOpacity={0.55}
+        strokeWidth={1.5} strokeLinecap="round" strokeDasharray={`${C * f} ${C * (1 - f)}`} transform="rotate(-90 22 22)" />
     </svg>
   )
 }
@@ -287,8 +289,6 @@ export function ShapeSheet({ shapeKind, pickShape, shapeParams, nudgeParam, prev
             <span className={styles.chipLabel}>{label}</span>
           </button>
         ))}
-        {/* Run 8 + 10 — ONE upload entry (Dan's "pre made in figma or downloaded" + "image
-            shapes vectorised under the hood"); rides the existing chip pattern, no new chrome */}
         <label className={styles.chip} aria-label="Upload a shape (SVG or image)">
           <span className={styles.chipIcon}><PlusIcon /></span>
           <span className={styles.chipLabel}>Upload</span>

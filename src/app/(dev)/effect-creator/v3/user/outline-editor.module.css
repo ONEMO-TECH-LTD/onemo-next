@@ -292,8 +292,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: var(--spacing-2xs) 2px;
+  gap: 10px; /* KAI-9018: the label breathes below the 44px change-ring (was cramped at 4px) */
+  padding: var(--spacing-xs) 6px;
   border: none;
   background: transparent;
   color: var(--semantic-text-secondary);
