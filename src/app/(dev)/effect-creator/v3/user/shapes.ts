@@ -6,8 +6,8 @@
 // sampling. The ring generators that built them were DELETED with the migration (vector reset
 // Run 2; the corrupted-construction class dies with its code).
 //
-// What remains here, temporarily, are the four LIVE generators whose output still feeds the
-// polyline document — they convert to fit-at-generation vector output in Run 3:
+// The four LIVE generators — their rings are FITTED ONCE into true vector paths at generation
+// (segments never leave this module):
 //   • daisy(petals, depth) · pinwheel(blades, swirl) · form(lobes, pinch) · blob(waviness, seed)
 
 import type { Vec2Px } from '@/lib/outline-core'

@@ -4,18 +4,15 @@
 // glyphs — chosen over Lucide so the UI doesn't read as generic shadcn/SaaS. `weight="regular"`
 // (default) reads cleanly at 24px on mobile; icons inherit `currentColor` from the button.
 
-import { ArrowArcLeft, ArrowArcRight, ArrowsOutCardinal, BezierCurve, DiceFive, WaveSine, ArrowClockwise, Check, X, ArrowsOut, Plus, Minus, Trash, PlusCircle, Sparkle, ImageSquare, PencilSimple, BoundingBox, Palette, DownloadSimple, Shapes, Polygon, Circle, Square, Pill, Star, Heart, ChatTeardrop, Seal, Shield, Eye, EyeSlash, MagicWand, Faders, Crop, Sun, CircleHalf, Drop, Thermometer, Ruler, LineSegment, Angle } from '@phosphor-icons/react'
+import { ArrowArcLeft, ArrowArcRight, BezierCurve, DiceFive, WaveSine, Check, X, Plus, Minus, Trash, PlusCircle, Sparkle, ImageSquare, PencilSimple, BoundingBox, Palette, DownloadSimple, Shapes, Eye, EyeSlash, MagicWand, Faders, Crop, Sun, CircleHalf, Drop, Thermometer } from '@phosphor-icons/react'
 
 type P = { className?: string }
 const SZ = 24
 
 export const UndoIcon = (p: P) => <ArrowArcLeft size={SZ} className={p.className} />
 export const RedoIcon = (p: P) => <ArrowArcRight size={SZ} className={p.className} />
-// "Hug" — corners pulling inward = the cut tightening around the subject.
-export const PositionIcon = (p: P) => <ArrowsOutCardinal size={SZ} className={p.className} /> // G1: pan/zoom the photo within the shape
 export const DiceIcon = (p: P) => <DiceFive size={SZ} className={p.className} /> // blob generator reroll
 export const SmoothIcon = (p: P) => <WaveSine size={SZ} className={p.className} />
-export const ResetIcon = (p: P) => <ArrowClockwise size={SZ} className={p.className} />
 export const CheckIcon = (p: P) => <Check size={SZ} className={p.className} />
 export const CloseIcon = (p: P) => <X size={SZ} className={p.className} />
 // Export — the mm-true SVG cutline download (temporary top-bar home until the save/library round).
@@ -23,7 +20,6 @@ export const ExportIcon = (p: P) => <DownloadSimple size={SZ} className={p.class
 // Preview toggle — Eye (show clean result, hide anchors) / EyeSlash (back to editing).
 export const PreviewIcon = (p: P) => <Eye size={SZ} className={p.className} />
 export const PreviewOffIcon = (p: P) => <EyeSlash size={SZ} className={p.className} />
-export const ScaleIcon = (p: P) => <ArrowsOut size={SZ} className={p.className} />
 export const PlusIcon = (p: P) => <Plus size={SZ} className={p.className} />
 export const MinusIcon = (p: P) => <Minus size={SZ} className={p.className} />
 export const AddPointIcon = (p: P) => <PlusCircle size={SZ} className={p.className} />
@@ -50,34 +46,3 @@ export const BrightnessIcon = (p: P) => <Sun size={SZ} className={p.className} /
 export const ContrastIcon = (p: P) => <CircleHalf size={SZ} className={p.className} />
 export const SaturationIcon = (p: P) => <Drop size={SZ} className={p.className} />
 export const WarmthIcon = (p: P) => <Thermometer size={SZ} className={p.className} />
-export const SnapIcon = (p: P) => <Ruler size={SZ} className={p.className} />
-export const MinLineIcon = (p: P) => <LineSegment size={SZ} className={p.className} />
-export const AngleIcon = (p: P) => <Angle size={SZ} className={p.className} />
-export const PolygonChip = (p: P) => <Polygon size={SZ} className={p.className} />
-export const StarChip = (p: P) => <Star size={SZ} className={p.className} />
-export const CircleChip = (p: P) => <Circle size={SZ} className={p.className} />
-export const SquareChip = (p: P) => <Square size={SZ} className={p.className} />
-export const PillChip = (p: P) => <Pill size={SZ} className={p.className} />
-export const HeartChip = (p: P) => <Heart size={SZ} className={p.className} />
-export const SpeechChip = (p: P) => <ChatTeardrop size={SZ} className={p.className} />
-export const BadgeChip = (p: P) => <Seal size={SZ} className={p.className} />
-export const ShieldChip = (p: P) => <Shield size={SZ} className={p.className} />
-// Phosphor has no squircle / blob / arch glyph — custom inline (Phosphor-coherent ~2px stroke).
-export const SquircleChip = (p: P) => (
-  <svg className={p.className} width={SZ} height={SZ} viewBox="0 0 24 24" fill="none"
-    stroke="currentColor" strokeWidth="2" aria-hidden="true">
-    <path d="M3 12C3 5.5 5.5 3 12 3s9 2.5 9 9-2.5 9-9 9-9-2.5-9-9Z" />
-  </svg>
-)
-export const BlobChip = (p: P) => (
-  <svg className={p.className} width={SZ} height={SZ} viewBox="0 0 24 24" fill="none"
-    stroke="currentColor" strokeWidth="2" aria-hidden="true">
-    <path d="M12 3c3 0 5 1.4 6.5 3.5S21 11 20 13.5 16.5 20 13 20.5 6 20 4 17 2.5 11 4 6 9 3 12 3Z" />
-  </svg>
-)
-export const ArchChip = (p: P) => (
-  <svg className={p.className} width={SZ} height={SZ} viewBox="0 0 24 24" fill="none"
-    stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
-    <path d="M5 21V11a7 7 0 0 1 14 0v10" />
-  </svg>
-)

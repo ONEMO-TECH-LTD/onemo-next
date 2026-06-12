@@ -6,9 +6,9 @@
 // "Finish in 3D", because the customer is in 3D the whole time. Upload builds the standard square
 // instantly (no segmentation on upload); Magic cuts the subject in a worker while the page stays
 // alive; the shape editor opens as an overlay with the scene frozen beneath it; Position (G1)
-// pans/zooms the photo within the shape on matrix-only transforms; Trim recolors the live object;
-// Save runs the feasibility gate and locks the design (recipe + payload, F1-bound), then the
-// offscreen render factory photographs it for the library.
+// pans/zooms the photo within the shape on matrix-only transforms; Trim recolors the live back
+// material. There is NO save surface this wave (erased by ruling — the manufacturing contract
+// modules stay pure + tested underneath for the future save round).
 //
 // G3: PerfHUD ships in the app. G4: ToastSurface — no swallowed failures. G5: honest Magic progress.
 
@@ -372,11 +372,7 @@ function PrototypePageInner() {
       )}
 
       {/* drag-and-drop indicator (upload affordance) */}
-      <EditOverlay
-        isEditing={false}
-        scale={designState.scale}
-        isDragging={isDragging}
-      />
+      <EditOverlay isDragging={isDragging} />
 
       {/* The 2D outline editor — an overlay; the scene stays mounted (frozen) beneath it */}
       <OutlineEditor

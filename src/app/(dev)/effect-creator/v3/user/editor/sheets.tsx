@@ -161,10 +161,9 @@ export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, tuneSub, setT
 /* #28 Image tool — Apple-pattern sheet: circular sub-icons, ONE shared ruler below.
    Position = pan/zoom the photo under the cutline; adjustments preview live (CSS filter)
    and bake into the print composite on release (same composeFront → print-faithful). */
-export function ImageSheet({ imageSub, setImageSub, art, fxDraft, setFxDraft, blendBlur, setBlendBlur, writeBlend }: {
+export function ImageSheet({ imageSub, setImageSub, fxDraft, setFxDraft, blendBlur, setBlendBlur, writeBlend }: {
   imageSub: ImageSub
   setImageSub: (k: ImageSub) => void
-  art: { scale: number }
   fxDraft: ImageFx
   setFxDraft: Dispatch<SetStateAction<ImageFx>>
   /** Blend (#8 — moved here from Adjust): ruler-from-0 IS the on/off switch, no toggle */

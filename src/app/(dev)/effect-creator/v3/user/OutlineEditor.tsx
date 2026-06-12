@@ -1,8 +1,8 @@
-// Effect Creator V3 — 2D outline editor overlay (blueprint §5.3 / §6.3 / G11 / G12).
-// Core toolset per §7a: anchors (drag/add/delete), Smooth, Scale, Shape presets, magic-blend
-// toggle. Hug and the Round tool are NOT in core (parked/folded — D4/D5;
-// engine-level default rounding stays internal). Continuous controls are TickBars (G12) riding the
-// §6.3 tick/commit contract. The canvas sits in a safe-area layout between the bars with zoom + pan
+// Effect Creator V3 — 2D outline editor overlay (REBUILD-PLAN-v2 Layer A).
+// One room for every shape source. Modes: Shape (sources) · Adjust (Radius · Curve · Tune ✦) ·
+// Image (Bright/Contrast/Color/Warmth/Blend + photo-as-gesture). Frame is the default state;
+// double-tap = Points; the node bar owns point work. Continuous controls are TickBars (G12)
+// riding the §6.3 tick/commit contract. The canvas sits in a safe-area layout between the bars with zoom + pan
 // (G11) so every anchor is reachable and the whole image is visible.
 // Renders THE vector truth over the flat cut-out image: true SVG curves + on-demand anchors.
 // Every edit is a VShape operation committed through the single writer (commitGeometry) — there
@@ -201,8 +201,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   const subjMatteUrl = useOutlineStore((s) => s.subjMatteUrl)
   const art = useOutlineStore((s) => s.artwork)
   const [preview, setPreview] = useState(false) // hide anchors/handles to see the clean result (no exit)
-  // Points toggle (Dan, 2026-06-10): anchors stay ON for free-form outlines but OFF for rigid
-  // parametric shapes — a circle has ~60 vertices; one stray drag spoils it. Toggle in the topbar.
+  // Points state (plan A3): anchors are summoned by double-tapping the shape — never a button.
   const [showAnchors, setShowAnchors] = useState(true)
   // Run 6 — points on demand: selected vector anchor (outer path index), transient drag shape
   // (per-tick preview only; ONE applyVec on release — §6.3), and the active drag descriptor.
@@ -790,7 +789,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   // replaces any manual anchor edits on the ring (it's a re-derivation of the base outline).
   // D3 one-toolset: Tune is UNIVERSAL — trace shapes re-fair their RAW trace (best source);
   // every other shape fairs from the current path's flatten, both through THE one pipeline.
-  const canTune = !!vshape
   /** the current shape's flatten as a y-up pseudo-trace — the universal-Tune source for shapes
    *  born without a raw trace (presets/generators/uploads), through the SAME pipeline (D3) */
   const flattenAsTrace = useCallback((): Pt[] | null => {
@@ -1006,7 +1004,15 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
       let area = 0
       for (let i = 0; i < ring.length; i++) { const a = ring[i], b = ring[(i + 1) % ring.length]; area += a[0] * b[1] - b[0] * a[1] }
       const oriented = area > 0 ? [...ring].reverse() : ring
-      const v = vectoriseTrace(oriented.map(([x, y]) => [x, height - y] as [number, number]), height, useOutlineStore.getState().fairing?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL))
+      // the SAME mm-true pair floor as every other source, scaled from image space to this
+      // upload-mask space (the fit result is box-fitted to the image afterwards). The CROP-CORNER
+      // default is intentionally OMITTED here: a logo's frame-touching corners are design intent,
+      // not photo-crop artifacts (pixel-qa F5 — the policy is explicit, not an implicit fork).
+      const { widthPx, heightPx } = dimsRef.current
+      const sp = useOutlineStore.getState().spec
+      const floorImagePx = MIN_ANCHOR_SEPARATION_MM / (sp?.mmPerPx || 70 / Math.max(widthPx, heightPx))
+      const minAnchorSepPx = floorImagePx * (Math.max(width, height) / Math.max(widthPx, heightPx))
+      const v = vectoriseTrace(oriented.map(([x, y]) => [x, height - y] as [number, number]), height, useOutlineStore.getState().fairing?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL), { minAnchorSepPx })
       if (!v) throw new Error('No clear shape found — try an image with a stronger silhouette')
       return v
     } finally {
@@ -1353,7 +1359,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
         />
       )}
       {activeAdjust === 'image' && (
-        <ImageSheet imageSub={imageSub} setImageSub={setImageSub} art={art} fxDraft={fxDraft} setFxDraft={setFxDraft}
+        <ImageSheet imageSub={imageSub} setImageSub={setImageSub} fxDraft={fxDraft} setFxDraft={setFxDraft}
           blendBlur={blendBlur} setBlendBlur={setBlendBlur} writeBlend={writeBlend} />
       )}
       {activeAdjust === 'shape' && (
