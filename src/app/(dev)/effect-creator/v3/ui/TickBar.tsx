@@ -112,6 +112,10 @@ export default function TickBar({
   const activeTick = frac * (TICK_COUNT - 1)
   const limitFrac = maxLimit !== undefined && max > min ? Math.max(0, Math.min(1, (maxLimit - min) / (max - min))) : null
   const readout = format ? format(value) : `${Math.round(value)}`
+  // UX-4: the zero-origin dot marks where "nothing applied" sits; the readout tints accent only
+  // when the value has left zero
+  const zeroFrac = max > min ? Math.max(0, Math.min(1, (0 - min) / (max - min))) : 0
+  const atZero = Math.abs(clamp(value) - Math.max(min, 0)) < step / 2 && min <= 0
 
   return (
     /* MINIMAL ruler (Dan, 2026-06-10): no panel background, no label text, no heavy readout —
@@ -164,6 +168,8 @@ export default function TickBar({
               />
             )
           })}
+          {/* UX-4: zero-origin dot */}
+          <span aria-hidden style={{ position: 'absolute', left: `${zeroFrac * 100}%`, bottom: 2, width: 5, height: 5, borderRadius: '50%', background: 'rgba(20,24,40,0.45)', transform: 'translateX(-50%)' }} />
           {/* dashed max-limit threshold marker */}
           {limitFrac !== null && (
             <span
@@ -176,15 +182,31 @@ export default function TickBar({
           )}
         </div>
       </div>
-      {/* quiet numeric readout */}
+      {/* quiet numeric readout — accent only when the value has left zero (UX-4) */}
       <span
         style={{
-          fontSize: 13, fontWeight: 500, fontVariantNumeric: 'tabular-nums', color: '#3a4156',
+          fontSize: 13, fontWeight: 500, fontVariantNumeric: 'tabular-nums',
+          color: atZero ? '#3a4156' : 'var(--color-bg-brand-solid, #2563eb)',
           minWidth: 44, textAlign: 'right', flexShrink: 0, pointerEvents: 'none',
         }}
       >
         {readout}
       </span>
+      {/* UX-6: transient LARGE readout near the canvas while dragging; idle stays quiet */}
+      {active && (
+        <span
+          aria-hidden
+          style={{
+            position: 'fixed', left: '50%', bottom: 230, transform: 'translateX(-50%)',
+            zIndex: 60, pointerEvents: 'none', whiteSpace: 'nowrap',
+            fontFamily: 'inherit', fontWeight: 600, fontSize: 26, letterSpacing: 0.5,
+            color: '#1c2030', background: 'rgba(255,255,255,0.88)', borderRadius: 14,
+            padding: '6px 18px', boxShadow: '0 8px 28px rgba(15,18,32,0.16)',
+          }}
+        >
+          {label.toUpperCase()} {readout}
+        </span>
+      )}
     </div>
   )
 }

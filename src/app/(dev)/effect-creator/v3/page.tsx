@@ -223,9 +223,11 @@ function PrototypePageInner() {
 
   // Magic: re-prepare as a SHAPED subject cut-out. BEN runs in the Web Worker — the page stays
   // responsive while the shimmer plays; the object morphs IN PLACE in the same scene (no jump).
+  const magicRunRef = useRef(0) // UX-5: cancel bumps the token; a stale run's result is discarded
   const handleMagic = useCallback(() => {
     if (!artworkUrl || generating) return
     const preMagic = snapNow() // #23: one Magic = one global undo step (pushed only on success)
+    const runId = ++magicRunRef.current
     setGenerating(true)
     setGenLabel('Cutting out…')
     import('@/lib/effect/prepare-effect')
@@ -237,6 +239,7 @@ function PrototypePageInner() {
         }, useOutlineStore.getState().fairing?.params),
       )
       .then((p) => {
+        if (magicRunRef.current !== runId) return // cancelled mid-run — prior state stands (UX-5)
         // KAI-8973/P1b: the shaped spec REPLACES the standard one — carry the original's byte
         // identity forward, or the manufacturing record falls back to a blob-URL hash (§B5)
         if (sourceShaRef.current) p.spec.sourceBytesSha256 = sourceShaRef.current
@@ -254,6 +257,7 @@ function PrototypePageInner() {
         // the editor does NOT open (the old #26 auto-open is dead). Refinement = Edit/double-tap.
       })
       .catch((e) => {
+        if (magicRunRef.current !== runId) return // cancelled — stay quiet
         console.warn('[effect] prepare (shaped) failed:', e)
         toast('error', `Magic failed: ${(e as Error)?.message ?? e}`) // G4 — incl. the TD-E watchdog
         setGenerating(false)
@@ -333,7 +337,7 @@ function PrototypePageInner() {
       {!artworkUrl && <EmptyState onFile={handleFile} />}
 
       {/* Magic shimmer — page stays responsive (worker); label = the honest wait state (G5) */}
-      {generating && <GenerateShimmer label={genLabel} />}
+      {generating && <GenerateShimmer label={genLabel} onCancel={() => { magicRunRef.current++; setGenerating(false) }} />}
 
       {/* Trim takeover (D-TRIM): the creation row swaps to the material-color carousel — tap
           recolors the 3D back LIVE; ✓ keeps (one history step), ✕ reverts to the pre-open color */}

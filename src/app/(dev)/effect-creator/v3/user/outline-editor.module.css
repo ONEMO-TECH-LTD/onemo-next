@@ -416,3 +416,26 @@
   color: #8b91a5;
   padding: 10px 22px 6px;
 }
+
+/* 6.3: the frame's padlock chip */
+.lockChip {
+  fill: var(--semantic-bg-brand-solid, #2563eb);
+  fill-opacity: 0.92;
+  stroke: #fff;
+  stroke-opacity: 0.9;
+  vector-effect: non-scaling-stroke;
+  stroke-width: 1.5;
+}
+
+/* 9.2: discard protection — inline confirm, Discard styled destructive */
+.discardBar { display: inline-flex; align-items: center; gap: var(--spacing-xs); font-weight: 500; }
+.keepBtn, .discardBtn {
+  border: 1px solid var(--semantic-border-secondary);
+  background: var(--semantic-bg-primary);
+  border-radius: var(--radius-full);
+  font-family: var(--font-body);
+  font-size: var(--text-body-caption);
+  padding: 2px 12px;
+  cursor: pointer;
+}
+.discardBtn { color: #fff; background: var(--semantic-bg-error-solid, #c0392b); border-color: transparent; }

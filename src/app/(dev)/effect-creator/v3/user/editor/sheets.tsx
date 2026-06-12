@@ -17,6 +17,19 @@ import styles from '../outline-editor.module.css'
 export type AdjustSub = 'radius' | 'curve' | 'tune'
 export type TuneSub = 'detail' | 'smooth' | 'snap'
 
+/** UX-1 progress ring — an arc around a tool circle showing its current value; nothing at zero. */
+function ChipRing({ frac }: { frac: number }) {
+  const f = Math.max(0, Math.min(1, frac))
+  if (f <= 0.005) return null
+  const R = 15, C = 2 * Math.PI * R
+  return (
+    <svg width={34} height={34} viewBox="0 0 34 34" aria-hidden style={{ position: 'absolute', inset: '-5px 0 0 -5px', pointerEvents: 'none' }}>
+      <circle cx={17} cy={17} r={R} fill="none" stroke="var(--semantic-bg-brand-solid, #2563eb)" strokeOpacity={0.85}
+        strokeWidth={2} strokeLinecap="round" strokeDasharray={`${C * f} ${C * (1 - f)}`} transform="rotate(-90 17 17)" />
+    </svg>
+  )
+}
+
 /** Chip carousel with mouse drag-to-scroll (KAI-8978/F6): touch scrolls natively, but a desktop
  *  mouse drag selected label text and the row's tail (… Upload) was unreachable. A drag past the
  *  tap threshold scrolls the row and swallows the trailing click so chips don't mis-fire. */
@@ -84,9 +97,9 @@ export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, tuneSub, setT
     <div className={styles.shapeSheet}>
       <ChipRow>
         {([
-          { k: 'radius', label: cornerMode ? 'Corner' : 'Radius', icon: <RoundIcon /> },
-          { k: 'curve', label: 'Curve', icon: <SmoothIcon /> },
-          { k: 'tune', label: 'Tune \u2726', icon: <TuneIcon /> },
+          { k: 'radius', label: cornerMode ? 'Corner' : 'Radius', icon: <RoundIcon />, ring: radiusApplies ? radius / Math.max(maxRadius, 1) : 0 },
+          { k: 'curve', label: 'Curve', icon: <SmoothIcon />, ring: 0 },
+          { k: 'tune', label: 'Tune \u2726', icon: <TuneIcon />, ring: detail / 100 },
         ] as const).map((t) => (
           <button
             key={t.k}
@@ -96,7 +109,7 @@ export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, tuneSub, setT
             aria-pressed={adjustSub === t.k}
             aria-label={t.label}
           >
-            <span className={styles.chipIcon}>{t.icon}</span>
+            <span className={styles.chipIcon} style={{ position: 'relative' }}>{t.icon}<ChipRing frac={t.ring} /></span>
             <span className={styles.chipLabel}>{t.label}</span>
           </button>
         ))}
@@ -163,11 +176,11 @@ export function ImageSheet({ imageSub, setImageSub, art, fxDraft, setFxDraft, bl
     <div className={styles.shapeSheet}>
       <ChipRow>
         {([
-          { k: 'brightness', label: 'Bright', icon: <BrightnessIcon /> },
-          { k: 'contrast', label: 'Contrast', icon: <ContrastIcon /> },
-          { k: 'saturate', label: 'Color', icon: <SaturationIcon /> },
-          { k: 'warmth', label: 'Warmth', icon: <WarmthIcon /> },
-          { k: 'blend', label: 'Blend', icon: <BlendIcon /> },
+          { k: 'brightness', label: 'Bright', icon: <BrightnessIcon />, ring: Math.abs(fxDraft.brightness - 100) / 50 },
+          { k: 'contrast', label: 'Contrast', icon: <ContrastIcon />, ring: Math.abs(fxDraft.contrast - 100) / 50 },
+          { k: 'saturate', label: 'Color', icon: <SaturationIcon />, ring: Math.abs(fxDraft.saturate - 100) / 100 },
+          { k: 'warmth', label: 'Warmth', icon: <WarmthIcon />, ring: fxDraft.warmth / 100 },
+          { k: 'blend', label: 'Blend', icon: <BlendIcon />, ring: blendBlur / 100 },
         ] as const).map((s) => (
           <button
             key={s.k}
@@ -177,7 +190,7 @@ export function ImageSheet({ imageSub, setImageSub, art, fxDraft, setFxDraft, bl
             aria-pressed={imageSub === s.k}
             aria-label={s.label}
           >
-            <span className={styles.chipIcon}>{s.icon}</span>
+            <span className={styles.chipIcon} style={{ position: 'relative' }}>{s.icon}<ChipRing frac={s.ring} /></span>
             <span className={styles.chipLabel}>{s.label}</span>
           </button>
         ))}

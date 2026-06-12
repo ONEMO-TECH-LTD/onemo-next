@@ -173,8 +173,10 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   // prefs intentionally survive ✕ — tool calibration, not design state; Dan's #21.)
   const preEditRef = useRef<{ committedShape: VShape | null; bgBlur: number | null; imageFx: ImageFx | null; artwork: DesignState }>({ committedShape: null, bgBlur: null, imageFx: null, artwork: INITIAL_ARTWORK })
   const [allSelected, setAllSelected] = useState(false) // tap inside the cut → select every corner, edit them together
+  const [frameLocked, setFrameLocked] = useState(true) // 6.2/6.3: corner pull = SCALE when locked / deform when unlocked
   const nodeInteractedRef = useRef(false) // a node tap just happened → suppress the bubbling surface-click (which would re-select all)
   const dragStartRef = useRef<Vec2Px | null>(null) // pointer-down point → distinguish a tap (select) from a drag (move)
+  const nodeRRef = useRef(11) // current node radius in content px (segment-tap hit tolerance)
   const svgRef = useRef<SVGSVGElement>(null)
   // content dims for the G11 view machinery (image space — independent of any document model)
   const dimsRef = useRef({ widthPx: VIEW_W, heightPx: VIEW_H })
@@ -205,6 +207,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   // Run 6 — points on demand: selected vector anchor (outer path index), transient drag shape
   // (per-tick preview only; ONE applyVec on release — §6.3), and the active drag descriptor.
   const [selVA, setSelVA] = useState<number | null>(null)
+  const [selSeg, setSelSeg] = useState<number | null>(null) // 6.7: tapped segment (Points) — node bar inserts at ITS midpoint
   const [vecLive, setVecLive] = useState<VShape | null>(null)
   const vecLiveRef = useRef<VShape | null>(null)
   useEffect(() => { vecLiveRef.current = vecLive }, [vecLive])
@@ -215,6 +218,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     setCurveVal(50)
     setAllSelected(false)
     setSelVA(null)
+    setSelSeg(null)
     setVecLive(null)
   }, [])
   const restoreDialMeta = useCallback((e: { meta?: { detail: number; fairParams: FairTracedRingOpts } } | null) => {
@@ -663,6 +667,17 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     if (nodeInteractedRef.current) { nodeInteractedRef.current = false; return } // a node tap → keep single selection
     if ((e.target as Element)?.tagName === 'circle') return // tapped a node handle, not the surface
     const p = toViewBox(e.clientX, e.clientY)
+    // 6.7 (Points): a tap ON the line selects that SEGMENT — the node bar's + inserts at its midpoint
+    if (showAnchors && vshapeRef.current) {
+      const hit = nearestOnPath(vshapeRef.current.paths[0], { x: p[0], y: p[1] })
+      if (hit.dist < nodeRRef.current * 1.6) {
+        setSelSeg(hit.seg)
+        setSelVA(null)
+        setAllSelected(false)
+        return
+      }
+    }
+    setSelSeg(null)
     if (hitRing.length >= 3 && pointInPolygon(p, hitRing)) {
       setSelVA(null)
       setAllSelected(true)
@@ -670,7 +685,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
       setSelVA(null)
       setAllSelected(false)
     }
-  }, [hitRing, toViewBox, preview])
+  }, [hitRing, toViewBox, preview, showAnchors, vshapeRef])
 
   const commitRadius = useCallback((v: number) => {
     setRadius(v)
@@ -750,9 +765,11 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     sy = Math.max(sy, MIN / (b.maxY - b.minY))
     if (st.which === 'n' || st.which === 's') sx = 1
     if (st.which === 'e' || st.which === 'w') sy = 1
+    // 6.2: a LOCKED frame scales uniformly on corner pulls (aspect preserved); edges always stretch
+    if (frameLocked && st.which.length === 2) { const u = Math.max(sx, sy); sx = u; sy = u }
     stretchRef.current = { ...st, sx, sy }
     setStretchLive({ sx, sy, ax: st.ax, ay: st.ay })
-  }, [toViewBox, imgW, imgH])
+  }, [toViewBox, imgW, imgH, frameLocked])
   const endStretch = useCallback(() => {
     const st = stretchRef.current
     if (!st) return
@@ -1054,8 +1071,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   // ✕ Close = discard this session's edits: restore the pre-open truth through THE one writer
   // (shape + contour revert atomically), revert blend + image-fx + photo position, exit.
   // (Done keeps; commits were live.) KAI-8971/F2: fx/artwork revert was missing.
-  const onCancel = useCallback(() => {
-    if (histRef.current.past.length > 0 && !confirmDiscard) { setConfirmDiscard(true); return }
+  const onCancel = useCallback((force = false) => {
+    if (histRef.current.past.length > 0 && !confirmDiscard && !force) { setConfirmDiscard(true); return }
     setConfirmDiscard(false)
     const pe = preEditRef.current
     const st = useOutlineStore.getState()
@@ -1075,6 +1092,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   const canUndo = histRef.current.past.length > 0
   const canRedo = histRef.current.future.length > 0
   const nodeR = ((imgW / VIEW_W) * 11) / view.scale // constant on-screen size at any zoom (G11)
+  nodeRRef.current = nodeR
   // Desktop rotate handle — a grip on a short stem above the outline, shown when all anchors are selected.
   let rotHandle: { bx: number; by: number; hy: number } | null = null
   if (allSelected && !preview && hitRing.length) {
@@ -1087,7 +1105,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     : rotateLive ? `rotate(${rotateLive.deg} ${rotateLive.cx} ${rotateLive.cy})` : moveLive ? `translate(${moveLive.dx} ${moveLive.dy})` : undefined
   // Crop grips (Dan: iOS-crop reference) — boxy shapes only; grips track the bbox, including the
   // live stretch (rendered OUTSIDE the transformed group so the pill strokes never distort).
-  const cropMode = shapeKind !== null && !preview && !shapePreview && !tunePreview // #32: every preset is reshapeable
+  // 6.1: FRAME is the default for EVERY shape (Magic, committed, presets) — grips visible unless
+  // Points is active, Preview hides chrome, or a transient morph is mid-flight
+  const cropMode = !!vshape && !showAnchors && !preview && !shapePreview && !tunePreview
   let cropBox: { minX: number; minY: number; maxX: number; maxY: number } | null = null
   if (cropMode && hitRing.length) {
     let { minX, minY, maxX, maxY } = hitBBox
@@ -1116,7 +1136,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
           dirty accent (UX-3). Points has no button — double-tap the shape (A3 grammar). */}
       <div className={styles.topbar}>
         <div className={styles.topInner}>
-          <TopTool icon={<CloseIcon />} label={confirmDiscard ? 'Discard?' : 'Close'} onClick={onCancel} />
+          <TopTool icon={<CloseIcon />} label="Close" onClick={() => onCancel()} />
           <TopTool icon={<UndoIcon />} label="Undo" onClick={undo} disabled={!canUndo} />
           <TopTool icon={<RedoIcon />} label="Redo" onClick={redo} disabled={!canRedo} />
           {canUndo ? (
@@ -1229,6 +1249,23 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
                   </g>
                 )}
               </g>
+              {/* 6.3: the padlock chip rides the frame — corner pulls SCALE locked / DEFORM unlocked */}
+              {!preview && cropBox && !rotateLive && !moveLive && !stretchLive && (
+                <g
+                  transform={`translate(${cropBox.maxX + nodeR * 1.6} ${cropBox.minY - nodeR * 1.6})`}
+                  onPointerDown={(e) => { e.stopPropagation(); nodeInteractedRef.current = true }}
+                  onClick={(e) => { e.stopPropagation(); setFrameLocked((v) => !v) }}
+                  style={{ cursor: 'pointer' }}
+                  aria-label={frameLocked ? 'Frame locked — corner pull scales' : 'Frame unlocked — corner pull deforms'}
+                >
+                  <circle className={styles.lockChip} r={nodeR * 1.5} />
+                  <g transform={`scale(${nodeR * 0.09}) translate(-8 -9)`} style={{ pointerEvents: 'none' }}>
+                    {/* padlock: body + shackle (open when unlocked) */}
+                    <rect x={3} y={8} width={10} height={8} rx={1.6} fill="#fff" />
+                    <path d={frameLocked ? 'M5 8 V5.6 A3 3 0 0 1 11 5.6 V8' : 'M5 8 V5.6 A3 3 0 0 1 11 5.6'} fill="none" stroke="#fff" strokeWidth={1.8} />
+                  </g>
+                </g>
+              )}
               {/* Crop-style stretch grips — OUTSIDE the live-transform group (the pill strokes must
                   never distort); positions track cropBox, which already includes the live stretch. */}
               {!preview && cropBox && !rotateLive && !moveLive && (() => {
@@ -1281,7 +1318,13 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
       <div className={styles.bottomDock}>
       {/* compact status line between canvas and toolbar */}
       <div className={styles.status}>
-        {preview
+        {confirmDiscard ? (
+          <span className={styles.discardBar}>
+            Discard the changes from this session?
+            <button type="button" className={styles.keepBtn} onClick={() => setConfirmDiscard(false)}>Keep editing</button>
+            <button type="button" className={styles.discardBtn} onClick={() => onCancel(true)}>Discard</button>
+          </span>
+        ) : preview
           ? <span className={styles.approved}>Preview — tap Edit to keep editing</span>
           : hasIssues
             ? <span className={styles.warn}>This shape can’t be cut cleanly — fix the crossing</span>
@@ -1293,7 +1336,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
                   ? 'Drag this point, or add/delete from the bar below'
                   : activeAdjust === 'shape' && shapeKind
                     ? '' /* the Shape sheet's own hint covers this state — one hint at a time (F7) */
-                    : 'Tap inside to select all · drag inside to move · drag points · double-tap to add/remove · pinch/scroll to zoom'}
+                    : showAnchors
+                      ? 'Tap a point or the line to edit it · double-tap the shape for Frame'
+                      : 'Drag inside to move · pull the frame to reshape · double-tap the shape for Points'}
       </div>
 
       {/* Run 2 · seam 5: the three tool sheets live in editor/sheets (verbatim moves). */}
@@ -1320,7 +1365,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
         />
       )}
 
-      {/* contextual anchor actions — appear when a single point is selected (doc or vector) */}
+      {/* the NODE BAR (6.6-6.8): a selected ANCHOR gets add-after/delete/sharpen⇄smooth; a
+          selected SEGMENT gets + insert at ITS midpoint (shape-preserving) */}
       {vshape && selVA !== null && (
         <div className={styles.nodeBar}>
           <button type="button" className={styles.nodeAction} onClick={onVAddAfter}>
@@ -1331,6 +1377,19 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
           </button>
           <button type="button" className={styles.nodeAction} onClick={onVToggleCorner}>
             <OutlineIcon /><span>{vshape.paths[0].anchors[selVA]?.corner ? 'Smooth' : 'Sharpen'}</span>
+          </button>
+        </div>
+      )}
+      {vshape && selVA === null && selSeg !== null && showAnchors && (
+        <div className={styles.nodeBar}>
+          <button type="button" className={styles.nodeAction} onClick={() => {
+            const v = vshapeRef.current
+            if (!v || selSeg === null) return
+            applyVec({ paths: [insertAnchorCentered(v.paths[0], selSeg), ...v.paths.slice(1)] }, null)
+            setSelVA(selSeg + 1)
+            setSelSeg(null)
+          }}>
+            <AddPointIcon /><span>Add point here</span>
           </button>
         </div>
       )}
