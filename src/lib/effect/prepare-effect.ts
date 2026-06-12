@@ -41,7 +41,7 @@ import type { EffectType } from './effect-types'
 import { fairingFromDetail, BEN_DEFAULT_DETAIL, type FairTracedRingOpts, type Vec2Px } from '@/lib/outline-core'
 // REBUILD-PLAN-v2 §B1 — truth at birth: geometry is born as ONE VShape through the single
 // pipeline; the manufacturing contour is DERIVED from it. No document model exists here.
-import { vectoriseTrace, contourFromShape } from './geometry-truth'
+import { vectoriseTrace, contourFromShape, MIN_ANCHOR_SEPARATION_MM } from './geometry-truth'
 import { filletShape, type VShape } from '@/lib/vector-core'
 
 /**
@@ -196,7 +196,7 @@ export async function prepareEffect(
   let vectorShape
   if (type === 'shaped') {
     // the SAME fairing+fit the editor's Tune uses — generation ≡ editor by construction
-    vectorShape = vectoriseTrace(ringPx.map(([x, y]) => [x, y] as Pt), H, fairing ?? fairingFromDetail(BEN_DEFAULT_DETAIL))
+    vectorShape = vectoriseTrace(ringPx.map(([x, y]) => [x, y] as Pt), H, fairing ?? fairingFromDetail(BEN_DEFAULT_DETAIL), { minAnchorSepPx: MIN_ANCHOR_SEPARATION_MM / mmPerPx })
     if (!vectorShape) throw new Error('Contour fit failed — try an image with a clearer subject.')
   } else {
     // standard: THE one birth construction (standardBirthShape above — directly regression-tested)

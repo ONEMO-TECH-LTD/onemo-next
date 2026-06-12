@@ -28,8 +28,11 @@ const FIT_CORNER_ANGLE_DEG = 30
 const FIT_MAX_ERROR_PX = 0.35
 // Anchor-compaction budget (KAI-8974/F3b): the minimal-segmentation pass may spend up to 2x the
 // fit tolerance to remove redundant anchors — 0.7px on a typical 1200px mask ≈ 0.04mm at the 70mm
-// base, inside the 0.05mm manufacturing class; C1-preserving, corners never merged.
+// base, inside the 0.05mm manufacturing class; G1/tangent-preserving, corners never merged.
 const FIT_COMPACT_ERROR_PX = FIT_MAX_ERROR_PX * 2
+// Finger-distinct anchor floor (fab-qa re-gate on KAI-8974): two anchors closer than ~1.5mm on
+// the PHYSICAL design are one touch target — the pair-collapse floor is mm-true, not viewport px.
+export const MIN_ANCHOR_SEPARATION_MM = 1.5
 const MIN_RAW_TRACE_POINTS = 24
 // CORNER INTEGRITY (Dan, 2026-06-11): intentional sharp features must survive the cut as TRUE
 // corner anchors — the fairing smooths everything else to optimal, never the corners themselves.
@@ -70,7 +73,13 @@ function rawCornerPositions(yDown: Vec2Px[]): Vec2Px[] {
  * function, so generation and editor produce identical geometry for identical inputs.
  * Returns null when the trace is too sparse to be a shape (caller fails loud — no silent door).
  */
-export function vectoriseTrace(rawMaskPx: ReadonlyArray<Pt>, maskHeightPx: number, fairing: FairTracedRingOpts): VShape | null {
+export interface VectoriseOpts {
+  /** mm-true pair-collapse floor in content px (MIN_ANCHOR_SEPARATION_MM / mmPerPx) — two anchors
+   *  closer than this collapse to one when fidelity allows (finger-distinct targets). */
+  minAnchorSepPx?: number
+}
+
+export function vectoriseTrace(rawMaskPx: ReadonlyArray<Pt>, maskHeightPx: number, fairing: FairTracedRingOpts, opts?: VectoriseOpts): VShape | null {
   if (rawMaskPx.length < MIN_RAW_TRACE_POINTS) return null
   const yDown = rawMaskPx.map(([x, y]) => [x, maskHeightPx - y] as Vec2Px)
   const corners = rawCornerPositions(yDown)
@@ -92,7 +101,7 @@ export function vectoriseTrace(rawMaskPx: ReadonlyArray<Pt>, maskHeightPx: numbe
     }
   }
   cornerIdx.sort((a, b) => a - b)
-  return { paths: [ringToVPath(ring, FIT_CORNER_ANGLE_DEG, FIT_MAX_ERROR_PX, cornerIdx.length ? cornerIdx : undefined, FIT_COMPACT_ERROR_PX)] }
+  return { paths: [ringToVPath(ring, FIT_CORNER_ANGLE_DEG, FIT_MAX_ERROR_PX, cornerIdx.length ? cornerIdx : undefined, FIT_COMPACT_ERROR_PX, opts?.minAnchorSepPx)] }
 }
 
 /**

@@ -20,7 +20,7 @@ import {
   type FairTracedRingOpts,
   type Vec2Px,
 } from '@/lib/outline-core'
-import { vectoriseTrace } from '@/lib/effect/geometry-truth'
+import { vectoriseTrace, MIN_ANCHOR_SEPARATION_MM } from '@/lib/effect/geometry-truth'
 import { standardBirthShape } from '@/lib/effect/prepare-effect'
 import { useOutlineStore, NEUTRAL_FX, INITIAL_ARTWORK, type ImageFx } from './outlineStore'
 import type { DesignState } from '../types'
@@ -763,7 +763,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
   /** Run 4 — the vectoriser: THE single-pipeline fit (geometry-truth.vectoriseTrace) — the editor
    *  and generation share the literal function, so re-Tune ≡ re-generation by construction. */
   const vecFromTrace = useCallback((params: FairTracedRingOpts): VShape | null => {
-    return spec?.rawTracePx ? vectoriseTrace(spec.rawTracePx, spec.maskHeightPx, params) : null
+    if (!spec?.rawTracePx) return null
+    return vectoriseTrace(spec.rawTracePx, spec.maskHeightPx, params, { minAnchorSepPx: MIN_ANCHOR_SEPARATION_MM / (spec.mmPerPx || 1) })
   }, [spec])
 
   const onReset = useCallback(() => {
@@ -838,8 +839,10 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode }: Out
     const { widthPx, heightPx } = dimsRef.current
     const ring = resampleClosed(generateShapeRing({ kind, ...shapeParamsRef.current, ...overrides }, widthPx, heightPx), Math.max(widthPx, heightPx) / 600)
     const tol = Math.max(0.4, Math.min(widthPx, heightPx) / 1600)
-    // compaction budget 2x fit tolerance (KAI-8974/F3b — minimal anchors that carry the shape)
-    const path = ringToVPath(ring.map(([x, y]) => ({ x, y })), 60, tol, undefined, tol * 2)
+    // compaction budget 2x fit tolerance + the mm-true pair floor (KAI-8974 re-gate: the daisy's
+    // 10px valley double survived the relative floor — finger distinctness is a PHYSICAL fact)
+    const minPair = MIN_ANCHOR_SEPARATION_MM / (useOutlineStore.getState().spec?.mmPerPx || 70 / Math.max(widthPx, heightPx))
+    const path = ringToVPath(ring.map(([x, y]) => ({ x, y })), 60, tol, undefined, tol * 2, minPair)
     return { paths: [path] }
   }, [])
   const pickShape = useCallback((kind: ShapeKind) => {

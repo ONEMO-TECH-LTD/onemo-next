@@ -52,18 +52,20 @@ describe('anchor compaction (KAI-8974/F3b)', () => {
   it('daisy-class ring: no redundant clusters — ≤3 anchors per petal lobe, fidelity within tolerance', () => {
     const ring = daisyRing()
     const maxError = 0.625 // the editor generator fit tolerance class (min(W,H)/1600 at 1000px)
-    const path = ringToVPath(ring, 60, maxError, undefined, maxError * 2) // callers' compaction budget
+    const minPair = 1.5 / (70 / 1000) // the callers' mm-true pair floor at this fixture's scale
+    const path = ringToVPath(ring, 60, maxError, undefined, maxError * 2, minPair) // callers' budget + floor
     const anchors = path.anchors.length
     // 8 petals: ~3 anchors per petal carries it (live: 24; the bug emitted 50). 4+/petal = regression
     expect(anchors).toBeLessThanOrEqual(26)
     expect(anchors).toBeGreaterThanOrEqual(8) // sanity: compaction must not gut the shape
     expect(maxDeviation(ring, path, 0.05)).toBeLessThanOrEqual(maxError * 2 + 0.1) // budget + flatten slack
     expect(path.anchors.filter((a) => a.corner).length).toBe(0) // smooth stays smooth
-    // fab-qa returner: no doubled finger targets — adjacent anchors keep real separation
+    // fab-qa re-gate: no doubled finger targets at the PHYSICAL floor (1.5mm in content px) —
+    // unless fidelity genuinely demands the pair (none does on the product daisy)
     const an = path.anchors
     for (let i = 0; i < an.length; i++) {
       const b = an[(i + 1) % an.length]
-      expect(Math.hypot(an[i].p.x - b.p.x, an[i].p.y - b.p.y)).toBeGreaterThan(12)
+      expect(Math.hypot(an[i].p.x - b.p.x, an[i].p.y - b.p.y)).toBeGreaterThan(21)
     }
   })
 

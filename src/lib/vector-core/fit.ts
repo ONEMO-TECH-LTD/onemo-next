@@ -120,7 +120,7 @@ function fitRec(pts: Vec2[], tHat1: Vec2, tHat2: Vec2, maxError: number, depth: 
     }
   }
   if (depth >= 24) { out.push(seg); return } // bounded recursion — accept best effort
-  // split at the worst point; center tangent shared (C1 across the split)
+  // split at the worst point; center unit tangent shared (G1 across the split)
   const centerT = norm(sub(pts[idx - 1] ?? pts[idx], pts[idx + 1] ?? pts[idx]))
   fitRec(pts.slice(0, idx + 1), tHat1, centerT, maxError, depth + 1, out)
   fitRec(pts.slice(idx), scale(centerT, -1), tHat2, maxError, depth + 1, out)
@@ -157,7 +157,7 @@ function segsToAnchors(chains: { segs: CubicSeg[]; startCorner: boolean }[]): VP
       if (i === 0) {
         anchors.push({ p: s.p0, hIn: null, hOut: s.c1, corner: ch.startCorner })
       } else {
-        // join: previous seg's c2 is hIn, this seg's c1 is hOut (C1 by construction at splits)
+        // join: previous seg's c2 is hIn, this seg's c1 is hOut (G1/tangent-continuous at splits)
         anchors[anchors.length - 1].hOut = s.c1
         // (anchor for s.p0 was pushed as previous seg's end below)
       }
@@ -183,7 +183,7 @@ function segsToAnchors(chains: { segs: CubicSeg[]; startCorner: boolean }[]): VP
  * DIRECTIONS — G1 (tangent) continuous by construction; derivative magnitudes are not enforced.
  * Corner anchors are never candidates (corner integrity).
  */
-function compactRingFit(path: VPath, ring: Vec2[], budget: number): VPath {
+function compactRingFit(path: VPath, ring: Vec2[], budget: number, minPairPx = 0): VPath {
   const n = ring.length
   const keyOf = (p: Vec2) => `${p.x},${p.y}`
   const ringIdx = new Map<string, number>()
@@ -301,7 +301,10 @@ function compactRingFit(path: VPath, ring: Vec2[], budget: number): VPath {
       if (p2.x < bbMinX) bbMinX = p2.x; if (p2.x > bbMaxX) bbMaxX = p2.x
       if (p2.y < bbMinY) bbMinY = p2.y; if (p2.y > bbMaxY) bbMaxY = p2.y
     }
-    const sep = 0.02 * Math.hypot(bbMaxX - bbMinX, bbMaxY - bbMinY)
+    // the pair floor: 2% of the ring diagonal, raised by the caller's PHYSICAL floor when known
+    // (fab-qa re-gate: a 10px valley pair survived the relative floor — finger distinctness is a
+    // mm fact, not a viewport fact, so mm-aware callers pass ~1.5mm in content px)
+    const sep = Math.max(0.02 * Math.hypot(bbMaxX - bbMinX, bbMaxY - bbMinY), minPairPx)
     for (let i = 0; i < out.length && out.length > 3; i++) {
       const j = (i + 1) % out.length
       const a = out[i], b = out[j]
@@ -311,13 +314,11 @@ function compactRingFit(path: VPath, ring: Vec2[], budget: number): VPath {
       if (ra === null || rb === null) continue
       const gap = (rb - ra + n) % n
       if (gap === 0) continue
-      const rc = (ra + Math.floor(gap / 2)) % n // arc-midpoint ring sample between the pair
       const prev = out[(i - 1 + out.length) % out.length]
       const next = out[(j + 1) % out.length]
       const rPrev = outRing[(i - 1 + out.length) % out.length]
       const rNext = outRing[(j + 1) % out.length]
       if (rPrev === null || rNext === null) continue
-      const tC = norm(sub(ring[(rc + 1) % n], ring[(rc - 1 + n) % n]))
       const fitSpan = (rFrom: number, rTo: number, t1: Vec2, t2: Vec2): CubicSeg | null => {
         const span: Vec2[] = [ring[rFrom]]
         for (let k = (rFrom + 1) % n; ; k = (k + 1) % n) {
@@ -338,9 +339,20 @@ function compactRingFit(path: VPath, ring: Vec2[], budget: number): VPath {
       }
       const tPrev = prev.hOut && len(sub(prev.hOut, prev.p)) > 1e-9 ? norm(sub(prev.hOut, prev.p)) : norm(sub(ring[(rPrev + 1) % n], ring[rPrev]))
       const tNext = next.hIn && len(sub(next.hIn, next.p)) > 1e-9 ? norm(sub(next.hIn, next.p)) : norm(sub(ring[rNext], ring[(rNext - 1 + n) % n]))
-      const segIn = fitSpan(rPrev, rc, tPrev, scale(tC, -1))
-      const segOut = fitSpan(rc, rNext, tC, tNext)
-      if (!segIn || !segOut) continue
+      // multi-candidate search: the arc-midpoint isn't necessarily the curvature apex — try EVERY
+      // ring sample strictly between the pair; only a pair no candidate can carry is load-bearing
+      let segIn: CubicSeg | null = null, segOut: CubicSeg | null = null, rc = -1
+      for (let step = 1; step < gap; step++) {
+        const cand = (ra + step) % n
+        const tC2 = norm(sub(ring[(cand + 1) % n], ring[(cand - 1 + n) % n]))
+        const sIn = fitSpan(rPrev, cand, tPrev, scale(tC2, -1))
+        if (!sIn) continue
+        const sOut = fitSpan(cand, rNext, tC2, tNext)
+        if (!sOut) continue
+        segIn = sIn; segOut = sOut; rc = cand
+        break
+      }
+      if (!segIn || !segOut || rc < 0) continue
       const merged: VAnchor = { p: { ...ring[rc] }, hIn: segIn.c2, hOut: segOut.c1, corner: false }
       prev.hOut = segIn.c1
       next.hIn = segOut.c2
@@ -360,7 +372,7 @@ function compactRingFit(path: VPath, ring: Vec2[], budget: number): VPath {
  * `cornersOverride` supplies domain-detected corner indices (e.g. straw-based on noisy strokes)
  * in place of the per-sample turning-angle detector.
  */
-export function ringToVPath(ring: Vec2[], angleDeg: number, maxError: number, cornersOverride?: number[], compactError?: number): VPath {
+export function ringToVPath(ring: Vec2[], angleDeg: number, maxError: number, cornersOverride?: number[], compactError?: number, minPairPx?: number): VPath {
   const n = ring.length
   if (n < 3) return { anchors: ring.map((p) => ({ p, corner: true })) }
   const corners = cornersOverride ?? cornerIndices(ring, angleDeg)
@@ -373,7 +385,7 @@ export function ringToVPath(ring: Vec2[], angleDeg: number, maxError: number, co
     // merge seam: last implicit anchor == first; give the first anchor its incoming handle
     const lastSeg = segs[segs.length - 1]
     chains.anchors[0].hIn = lastSeg.c2
-    return compactRingFit(chains, ring, compactError ?? maxError)
+    return compactRingFit(chains, ring, compactError ?? maxError, minPairPx)
   }
   const chains: { segs: CubicSeg[]; startCorner: boolean }[] = []
   for (let k = 0; k < corners.length; k++) {
@@ -408,5 +420,5 @@ export function ringToVPath(ring: Vec2[], angleDeg: number, maxError: number, co
     if (path.anchors[base]) path.anchors[base].hIn = lastSeg.c2
     base += chains[k].segs.length
   }
-  return compactRingFit(path, ring, compactError ?? maxError)
+  return compactRingFit(path, ring, compactError ?? maxError, minPairPx)
 }

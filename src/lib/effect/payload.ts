@@ -18,7 +18,7 @@ import { validateAttachment, type AttachmentSystem } from './attachment'
 import type { Contour, Pt } from './types'
 import { contentHash, stableStringify, normalizeRing } from '@/lib/outline-core'
 // REBUILD-PLAN-v2 §B4: feasibility + identity derive from the SINGLE vector truth — the doc model
-// is gone from the save path (no resolve, no outlineDocumentHash).
+// is gone from the save path (no resolve, no legacy document-hash field).
 import { assertContourCuttable, vectorShapeHash } from './geometry-truth'
 
 const VECTOR_CORE_VERSION = '1' // vector-core kernel version (the truth's model version)
@@ -27,7 +27,7 @@ const VECTOR_CORE_VERSION = '1' // vector-core kernel version (the truth's model
 // altering every saved design's manufacturing identity + the F1 remix↔mfg bond) a caught regression.
 // v2 (V3 build): artwork.transform records the G1 pan/zoom as int-micro.
 // v3 (REBUILD-PLAN-v2, single geometry truth): the recipe/payload contract is VECTOR-NATIVE —
-// `build.vector_shape_hash` (canonical VShape identity) replaces `outline_document_hash`;
+// `build.vector_shape_hash` (canonical VShape identity) replaces the legacy document-hash field;
 // feasibility runs on the truth-derived contour. No document model survives in the save path.
 const SCHEMA_VERSION = 3
 const MICRO = 1_000_000 // quantize residual float ratios to integer micro-units for the canonical hash
