@@ -11,7 +11,7 @@ import TickBar from '../../ui/TickBar'
 import { useOutlineStore, type ImageFx } from '../outlineStore'
 import { PARAMETRIC, type ShapeKind } from '../shapes'
 import { SHAPE_CHIPS, ShapeChipIcon, DEFAULT_SHAPE_PARAMS } from './chips'
-import { RoundIcon, SmoothIcon, BrightnessIcon, ContrastIcon, SaturationIcon, WarmthIcon, MinusIcon, PlusIcon, DiceIcon, MagicIcon, BlurIcon, CornerIcon, DetailIcon, SnapIcon, AngleIcon, LineIcon } from '../icons'
+import { RoundIcon, SmoothIcon, BrightnessIcon, ContrastIcon, SaturationIcon, WarmthIcon, MinusIcon, PlusIcon, DiceIcon, BlurIcon, CornerIcon, DetailIcon, SnapIcon, AngleIcon, LineIcon } from '../icons'
 
 // KAI-9033 (v1 recovery): Smooth is the whole-shape SHARP⇄ROUND dial — 0% ≈ the raw trace
 // (sharp/angular, v1's 'straighten' end), 100% = maximally round. Angle/Line expose the corner
@@ -268,7 +268,7 @@ export function ImageSheet({ imageSub, setImageSub, fxDraft, setFxDraft, blendBl
 }
 
 /* Shape tool — Dan's board lineup + the form/blob generators; parametric kinds reveal controls */
-export function ShapeSheet({ shapeKind, pickShape, shapeParams, nudgeParam, previewParam, commitShape, rerollBlob, onUploadShape, onMagic }: {
+export function ShapeSheet({ shapeKind, pickShape, shapeParams, nudgeParam, previewParam, commitShape, rerollBlob, onUploadShape }: {
   shapeKind: ShapeKind | null
   pickShape: (kind: ShapeKind) => void
   shapeParams: typeof DEFAULT_SHAPE_PARAMS
@@ -303,12 +303,6 @@ export function ShapeSheet({ shapeKind, pickShape, shapeParams, nudgeParam, prev
             <span className={styles.chipLabel}>{label}</span>
           </button>
         ))}
-        {onMagic && (
-          <button type="button" className={`${styles.chip} ${styles.chipMagic}`} onClick={onMagic} aria-label="Magic auto cut">
-            <span className={styles.chipIcon}><MagicIcon /></span>
-            <span className={styles.chipLabel}>Magic ✦</span>
-          </button>
-        )}
       </ChipRow>
       {shapeKind && PARAMETRIC[shapeKind] && (
         <div className={styles.shapeControls}>

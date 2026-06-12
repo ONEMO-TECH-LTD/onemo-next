@@ -25,7 +25,7 @@ import { standardBirthShape } from '@/lib/effect/prepare-effect'
 import { useOutlineStore, NEUTRAL_FX, INITIAL_ARTWORK, type ImageFx } from './outlineStore'
 import type { DesignState } from '../types'
 import type { Pt } from '@/lib/effect/types'
-import { UndoIcon, RedoIcon, CheckIcon, CloseIcon, AddPointIcon, DeleteIcon, ShapeIcon, TuneIcon, ImageToolIcon, OutlineIcon, PreviewIcon, PreviewOffIcon , PointsIcon } from './icons'
+import { UndoIcon, RedoIcon, CheckIcon, CloseIcon, AddPointIcon, DeleteIcon, ShapeIcon, TuneIcon, ImageToolIcon, OutlineIcon, PreviewIcon, PreviewOffIcon , PointsIcon, MagicIcon } from './icons'
 import { toast } from '../ui/Toast'
 import { perfGesture } from '../dev/PerfHUD'
 import { generateShapeRing, resampleClosed, type ShapeKind, type ShapeParams } from './shapes'
@@ -811,6 +811,23 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     return vectoriseTrace(raw, spec.maskHeightPx, params, opts)
   }, [spec, tuneSource])
 
+  // KAI-9023: while the editor is open, a NEW shaped spec (editor-dock Magic completing) lands
+  // in the session — re-seed the truth from the fresh trace, lineage 'trace', session stays open.
+  const lastSpecRef = useRef(spec)
+  useEffect(() => {
+    if (!open) { lastSpecRef.current = spec; return }
+    if (spec === lastSpecRef.current) return
+    lastSpecRef.current = spec
+    if (!spec || spec.generator.adapter === 'standard') return
+    const savedF = useOutlineStore.getState().fairing
+    const params = savedF?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL)
+    const v = vecFromTrace(params, false, true) ?? spec.vectorShape
+    const sharpFit = vecFromTrace(params, true, true)
+    applyVec(v, sharpFit?.paths[0].anchors.some((a) => a.corner) ? sharpFit : null, 'trace')
+    setRadius(0)
+    setSelVA(null); setAllSelected(false)
+  }, [spec, open, applyVec, vecFromTrace])
+
   const onReset = useCallback(() => {
     // KAI-9025 (Dan): 'reset must reset to the original state full image with 8mm radius on the
     // corners' — for EVERY design class, including Magic cuts. THE one birth construction
@@ -1347,7 +1364,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
           shapeKind={shapeKind} pickShape={pickShape} shapeParams={shapeParams}
           nudgeParam={nudgeParam} previewParam={previewParam} commitShape={commitShape}
           rerollBlob={rerollBlob} onUploadShape={onUploadShape}
-          onMagic={onMagic ? () => { onDone(); onMagic() } : undefined}
         />
       )}
 
@@ -1383,6 +1399,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
       {/* KAI-9021: THE pill island — the hero's Dock, same structure, editor tool payloads */}
       <Dock inline>
         <DockTool icon={<ShapeIcon />} label="Shape" onClick={toggleShape} active={activeAdjust === 'shape'} />
+        {/* KAI-9023 (Dan): the hero's Magic, same place in the island — but the editor STAYS OPEN
+            and the fresh cut lands in the 2D session (the spec-change effect below re-seeds) */}
+        {onMagic && <DockTool icon={<MagicIcon />} label="Magic" onClick={onMagic} />}
         <DockTool icon={<TuneIcon />} label="Adjust" onClick={() => setActiveAdjust((a) => {
           // KAI-9020 (Dan): Adjust is point-level work — entering it auto-switches frame → points
           if (a !== 'adjust') setShowAnchors(true)
