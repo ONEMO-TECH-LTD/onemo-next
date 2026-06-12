@@ -1062,6 +1062,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   const toggleShape = useCallback(() => {
     setActiveAdjust((a) => (a === 'shape' ? null : 'shape'))
     setShapeKind(null); setShapePreview(null) // open the picker fresh (chips only) — no stale active shape
+    setShowAnchors(false) // KAI-9020 symmetry: shape picking is frame-level work
   }, [])
 
   // Saving is AUTOMATIC: every edit commits THE truth through the single writer and the 3D follows
@@ -1418,8 +1419,12 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
           <>
             {/* #35: the MODE pill — Shape · Adjust · Image (Apple bottom-pill pattern) */}
             <ToolBtn icon={<ShapeIcon />} label="Shape" onClick={toggleShape} active={activeAdjust === 'shape'} />
-            <ToolBtn icon={<TuneIcon />} label="Adjust" onClick={() => setActiveAdjust((a) => (a === 'adjust' ? null : 'adjust'))} active={activeAdjust === 'adjust'} />
-            <ToolBtn icon={<ImageToolIcon />} label="Image" onClick={() => { setActiveAdjust((a) => (a === 'image' ? null : 'image')); setAllSelected(false); setSelVA(null) }} active={activeAdjust === 'image'} />
+            <ToolBtn icon={<TuneIcon />} label="Adjust" onClick={() => setActiveAdjust((a) => {
+              // KAI-9020 (Dan): Adjust is point-level work — entering it auto-switches frame → points
+              if (a !== 'adjust') setShowAnchors(true)
+              return a === 'adjust' ? null : 'adjust'
+            })} active={activeAdjust === 'adjust'} />
+            <ToolBtn icon={<ImageToolIcon />} label="Image" onClick={() => { setActiveAdjust((a) => (a === 'image' ? null : 'image')); setAllSelected(false); setSelVA(null); setShowAnchors(false) }} active={activeAdjust === 'image'} />
           </>
         )}
         </div>
