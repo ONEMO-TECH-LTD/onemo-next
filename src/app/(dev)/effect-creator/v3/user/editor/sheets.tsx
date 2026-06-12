@@ -12,6 +12,19 @@ import { useOutlineStore, type ImageFx } from '../outlineStore'
 import { PARAMETRIC, type ShapeKind } from '../shapes'
 import { SHAPE_CHIPS, ShapeChipIcon, DEFAULT_SHAPE_PARAMS } from './chips'
 import { RoundIcon, SmoothIcon, BlendIcon, BrightnessIcon, ContrastIcon, SaturationIcon, WarmthIcon, MinusIcon, PlusIcon, DiceIcon, MagicIcon, CornerIcon, DetailIcon, SnapIcon, AngleIcon, LineIcon } from '../icons'
+
+// KAI-9033 (v1 recovery): Smooth is the whole-shape SHARP⇄ROUND dial — 0% ≈ the raw trace
+// (sharp/angular, v1's 'straighten' end), 100% = maximally round. Angle/Line expose the corner
+// and straight-run thresholds on the same 0–100 product scale (KAI-9028: no engine units).
+export const smoothPctToPx = (v: number) => 0.5 + (v / 100) * 23.5
+export const smoothPxToPct = (px: number) => Math.max(0, Math.min(100, ((px - 0.5) / 23.5) * 100))
+export const anglePctToDeg = (v: number) => 15 + (v / 100) * 70
+export const angleDegToPct = (deg: number) => Math.max(0, Math.min(100, ((deg - 15) / 70) * 100))
+export const linePctToPx = (v: number) => (v / 100) * 80
+export const linePxToPct = (px: number) => Math.max(0, Math.min(100, (px / 80) * 100))
+export const snapPctToPx = (v: number) => (v / 100) * 20
+export const snapPxToPct = (px: number) => Math.max(0, Math.min(100, (px / 20) * 100))
+
 import styles from '../outline-editor.module.css'
 
 export type AdjustSub = 'radius' | 'curve' | 'detail' | 'smooth' | 'snap' | 'angle' | 'line'
@@ -97,10 +110,10 @@ export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, radiusApplies
     { k: 'radius' as const, label: cornerMode ? 'Corner' : 'Radius', icon: <CornerIcon />, ring: radiusApplies ? radius / Math.max(maxRadius, 1) : 0 },
     { k: 'curve' as const, label: 'Curve', icon: <RoundIcon />, ring: 0 }, // BezierCurve glyph = the bend tool
     { k: 'detail' as const, label: 'Detail', icon: <DetailIcon />, ring: detail / 100 },
-    { k: 'smooth' as const, label: 'Smooth', icon: <SmoothIcon />, ring: ((fairParams.smoothPx ?? 6) - 1) / 29 },
-    { k: 'snap' as const, label: 'Snap', icon: <SnapIcon />, ring: (fairParams.detailPx ?? 4) / 20 },
-    { k: 'angle' as const, label: 'Angle', icon: <AngleIcon />, ring: ((fairParams.maxTurnDeg ?? 35) - 15) / 70 },
-    { k: 'line' as const, label: 'Line', icon: <LineIcon />, ring: (fairParams.minLinePx ?? 50) / 80 },
+    { k: 'smooth' as const, label: 'Smooth', icon: <SmoothIcon />, ring: smoothPxToPct(fairParams.smoothPx ?? 6) / 100 },
+    { k: 'snap' as const, label: 'Snap', icon: <SnapIcon />, ring: snapPxToPct(fairParams.detailPx ?? 4) / 100 },
+    { k: 'angle' as const, label: 'Angle', icon: <AngleIcon />, ring: angleDegToPct(fairParams.maxTurnDeg ?? 35) / 100 },
+    { k: 'line' as const, label: 'Line', icon: <LineIcon />, ring: linePxToPct(fairParams.minLinePx ?? 50) / 100 },
   ]
   return (
     <div className={styles.shapeSheet}>
@@ -141,16 +154,16 @@ export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, radiusApplies
             <TickBar label="Detail" min={0} max={100} value={detail} onChange={(v) => { setDetail(v); previewTune(fairingFromDetail(v)) }} onCommit={(v) => { setDetail(v); commitTune(fairingFromDetail(v), v) }} format={(v) => `${Math.round(v)}%`} />
           )}
           {adjustSub === 'smooth' && (
-            <TickBar label="Smooth" min={1} max={30} step={0.5} value={fairParams.smoothPx ?? 6} onChange={(v) => previewTune({ ...fairParams, smoothPx: v })} onCommit={(v) => commitTune({ ...fairParams, smoothPx: v })} format={(v) => `${v.toFixed(1)}px`} />
+            <TickBar label="Smooth" min={0} max={100} value={smoothPxToPct(fairParams.smoothPx ?? 6)} onChange={(v) => previewTune({ ...fairParams, smoothPx: smoothPctToPx(v) })} onCommit={(v) => commitTune({ ...fairParams, smoothPx: smoothPctToPx(v) })} format={(v) => `${Math.round(v)}%`} />
           )}
           {adjustSub === 'snap' && (
-            <TickBar label="Snap" min={0} max={20} step={0.5} value={fairParams.detailPx ?? 4} onChange={(v) => previewTune({ ...fairParams, detailPx: v })} onCommit={(v) => commitTune({ ...fairParams, detailPx: v })} format={(v) => `${v.toFixed(1)}px`} />
+            <TickBar label="Snap" min={0} max={100} value={snapPxToPct(fairParams.detailPx ?? 4)} onChange={(v) => previewTune({ ...fairParams, detailPx: snapPctToPx(v) })} onCommit={(v) => commitTune({ ...fairParams, detailPx: snapPctToPx(v) })} format={(v) => `${Math.round(v)}%`} />
           )}
           {adjustSub === 'angle' && (
-            <TickBar label="Angle" min={15} max={85} step={1} value={fairParams.maxTurnDeg ?? 35} onChange={(v) => previewTune({ ...fairParams, maxTurnDeg: v })} onCommit={(v) => commitTune({ ...fairParams, maxTurnDeg: v })} format={(v) => `${Math.round(v)}°`} />
+            <TickBar label="Angle" min={0} max={100} value={angleDegToPct(fairParams.maxTurnDeg ?? 35)} onChange={(v) => previewTune({ ...fairParams, maxTurnDeg: anglePctToDeg(v) })} onCommit={(v) => commitTune({ ...fairParams, maxTurnDeg: anglePctToDeg(v) })} format={(v) => `${Math.round(v)}%`} />
           )}
           {adjustSub === 'line' && (
-            <TickBar label="Line" min={0} max={80} step={1} value={fairParams.minLinePx ?? 50} onChange={(v) => previewTune({ ...fairParams, minLinePx: v })} onCommit={(v) => commitTune({ ...fairParams, minLinePx: v })} format={(v) => `${Math.round(v)}px`} />
+            <TickBar label="Line" min={0} max={100} value={linePxToPct(fairParams.minLinePx ?? 50)} onChange={(v) => previewTune({ ...fairParams, minLinePx: linePctToPx(v) })} onCommit={(v) => commitTune({ ...fairParams, minLinePx: linePctToPx(v) })} format={(v) => `${Math.round(v)}%`} />
           )}
         </div>
       </div>
