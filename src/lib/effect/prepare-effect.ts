@@ -40,7 +40,7 @@ import { composeFront, blurCanvas, imageDataToCanvas } from './composite'
 import type { EffectType } from './effect-types'
 import { fairingFromDetail, BEN_DEFAULT_DETAIL, type FairTracedRingOpts, type Vec2Px } from '@/lib/outline-core'
 // REBUILD-PLAN-v2 §B1 — truth at birth: geometry is born as ONE VShape through the single
-// pipeline; the manufacturing contour is DERIVED from it. No OutlineDocument exists here.
+// pipeline; the manufacturing contour is DERIVED from it. No document model exists here.
 import { vectoriseTrace, contourFromShape } from './geometry-truth'
 import { filletShape, type VShape } from '@/lib/vector-core'
 

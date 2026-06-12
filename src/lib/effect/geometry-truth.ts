@@ -8,7 +8,7 @@
 //   • recipe↔payload identity (the vector F1 bond)               → vectorShapeHash
 //   • trace → vector fitting (Magic at generation, editor Tune)  → vectoriseTrace
 //
-// SOURCE-OF-TRUTH MODULE ONLY: no UI, no adapters, no React, no OutlineDocument — v3's
+// SOURCE-OF-TRUTH MODULE ONLY: no UI, no adapters, no React, no document model — v3's
 // outline-core imports are ring math (fairing + intersection/area), nothing doc-shaped.
 // Spaces (one convention, stated once): vector shapes live in MASK-PX, Y-DOWN (the editor's
 // space). Raw traces arrive in mask-px Y-UP (the mask/engine space) — vectoriseTrace owns the

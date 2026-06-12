@@ -28,7 +28,7 @@ const VECTOR_CORE_VERSION = '1' // vector-core kernel version (the truth's model
 // v2 (V3 build): artwork.transform records the G1 pan/zoom as int-micro.
 // v3 (REBUILD-PLAN-v2, single geometry truth): the recipe/payload contract is VECTOR-NATIVE —
 // `build.vector_shape_hash` (canonical VShape identity) replaces `outline_document_hash`;
-// feasibility runs on the truth-derived contour. No OutlineDocument survives in the save path.
+// feasibility runs on the truth-derived contour. No document model survives in the save path.
 const SCHEMA_VERSION = 3
 const MICRO = 1_000_000 // quantize residual float ratios to integer micro-units for the canonical hash
 

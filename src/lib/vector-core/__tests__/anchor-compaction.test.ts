@@ -59,6 +59,12 @@ describe('anchor compaction (KAI-8974/F3b)', () => {
     expect(anchors).toBeGreaterThanOrEqual(8) // sanity: compaction must not gut the shape
     expect(maxDeviation(ring, path, 0.05)).toBeLessThanOrEqual(maxError * 2 + 0.1) // budget + flatten slack
     expect(path.anchors.filter((a) => a.corner).length).toBe(0) // smooth stays smooth
+    // fab-qa returner: no doubled finger targets — adjacent anchors keep real separation
+    const an = path.anchors
+    for (let i = 0; i < an.length; i++) {
+      const b = an[(i + 1) % an.length]
+      expect(Math.hypot(an[i].p.x - b.p.x, an[i].p.y - b.p.y)).toBeGreaterThan(12)
+    }
   })
 
   it('ellipse: a handful of anchors carries it; fidelity holds', () => {

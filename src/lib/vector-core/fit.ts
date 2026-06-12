@@ -179,8 +179,9 @@ function segsToAnchors(chains: { segs: CubicSeg[]; startCorner: boolean }[]): VP
  * breakpoints live); per smooth chain, dynamic programming picks the FEWEST anchors such that
  * every span re-fits as ONE cubic within `budget` of the SOURCE RING (fidelity measured against
  * the source — no drift compounding). Tangents are fixed per node a priori (ring central
- * difference; chain ends keep their one-sided directions), so adjacent spans share tangents —
- * C1 smooth by construction. Corner anchors are never candidates (corner integrity).
+ * difference; chain ends keep their one-sided directions), so adjacent spans share unit tangent
+ * DIRECTIONS — G1 (tangent) continuous by construction; derivative magnitudes are not enforced.
+ * Corner anchors are never candidates (corner integrity).
  */
 function compactRingFit(path: VPath, ring: Vec2[], budget: number): VPath {
   const n = ring.length
@@ -277,11 +278,11 @@ function compactRingFit(path: VPath, ring: Vec2[], budget: number): VPath {
       j = i
     }
   }
-  if (keep.size >= m) return path
   // assemble: kept anchors in original order; spans that were re-fitted get the new handles
   const out: VAnchor[] = []
+  const outRing: (number | null)[] = [] // each kept anchor's ring index (for the pair-collapse)
   const oldToNew = new Map<number, number>()
-  for (let i = 0; i < m; i++) if (keep.has(i)) { oldToNew.set(i, out.length); out.push({ ...A[i] }) }
+  for (let i = 0; i < m; i++) if (keep.has(i)) { oldToNew.set(i, out.length); outRing.push(nodeRing[i]); out.push({ ...A[i] }) }
   for (const [startIdx, seg] of newSegs) {
     const ai = oldToNew.get(startIdx)
     if (ai === undefined) continue
@@ -290,6 +291,65 @@ function compactRingFit(path: VPath, ring: Vec2[], budget: number): VPath {
     a.hOut = seg.c1
     b.hIn = seg.c2
   }
+  // RESIDUAL PAIR-COLLAPSE (fab-qa returner on KAI-8974): the DP picks among existing candidates,
+  // so a forced node (the smooth-ring seam) can survive a few px from a natural anchor — two
+  // overlapping finger targets. Collapse such a non-corner pair to ONE anchor at the arc-midpoint
+  // ring sample, accepted only if BOTH bridging spans fit one cubic within the same budget.
+  {
+    let bbMinX = Infinity, bbMinY = Infinity, bbMaxX = -Infinity, bbMaxY = -Infinity
+    for (const p2 of ring) {
+      if (p2.x < bbMinX) bbMinX = p2.x; if (p2.x > bbMaxX) bbMaxX = p2.x
+      if (p2.y < bbMinY) bbMinY = p2.y; if (p2.y > bbMaxY) bbMaxY = p2.y
+    }
+    const sep = 0.02 * Math.hypot(bbMaxX - bbMinX, bbMaxY - bbMinY)
+    for (let i = 0; i < out.length && out.length > 3; i++) {
+      const j = (i + 1) % out.length
+      const a = out[i], b = out[j]
+      if (a.corner || b.corner) continue
+      if (Math.hypot(a.p.x - b.p.x, a.p.y - b.p.y) >= sep) continue
+      const ra = outRing[i], rb = outRing[j]
+      if (ra === null || rb === null) continue
+      const gap = (rb - ra + n) % n
+      if (gap === 0) continue
+      const rc = (ra + Math.floor(gap / 2)) % n // arc-midpoint ring sample between the pair
+      const prev = out[(i - 1 + out.length) % out.length]
+      const next = out[(j + 1) % out.length]
+      const rPrev = outRing[(i - 1 + out.length) % out.length]
+      const rNext = outRing[(j + 1) % out.length]
+      if (rPrev === null || rNext === null) continue
+      const tC = norm(sub(ring[(rc + 1) % n], ring[(rc - 1 + n) % n]))
+      const fitSpan = (rFrom: number, rTo: number, t1: Vec2, t2: Vec2): CubicSeg | null => {
+        const span: Vec2[] = [ring[rFrom]]
+        for (let k = (rFrom + 1) % n; ; k = (k + 1) % n) {
+          span.push(ring[k])
+          if (k === rTo) break
+          if (k === rFrom || span.length > n) return null
+        }
+        if (span.length < 2) return null
+        let u = chordParams(span)
+        let seg = generateBezier(span, u, t1, t2)
+        let { err } = maxErrorAt(span, seg, u)
+        for (let r2 = 0; r2 < 4 && err >= budget; r2++) {
+          u = reparameterize(span, u, seg)
+          seg = generateBezier(span, u, t1, t2)
+          err = maxErrorAt(span, seg, u).err
+        }
+        return err < budget ? seg : null
+      }
+      const tPrev = prev.hOut && len(sub(prev.hOut, prev.p)) > 1e-9 ? norm(sub(prev.hOut, prev.p)) : norm(sub(ring[(rPrev + 1) % n], ring[rPrev]))
+      const tNext = next.hIn && len(sub(next.hIn, next.p)) > 1e-9 ? norm(sub(next.hIn, next.p)) : norm(sub(ring[rNext], ring[(rNext - 1 + n) % n]))
+      const segIn = fitSpan(rPrev, rc, tPrev, scale(tC, -1))
+      const segOut = fitSpan(rc, rNext, tC, tNext)
+      if (!segIn || !segOut) continue
+      const merged: VAnchor = { p: { ...ring[rc] }, hIn: segIn.c2, hOut: segOut.c1, corner: false }
+      prev.hOut = segIn.c1
+      next.hIn = segOut.c2
+      if (j > i) { out.splice(j, 1); out.splice(i, 1, merged); outRing.splice(j, 1); outRing.splice(i, 1, rc) }
+      else { out.splice(i, 1, merged); out.splice(j, 1); outRing.splice(i, 1, rc); outRing.splice(j, 1) }
+      i--
+    }
+  }
+  if (out.length >= m && !newSegs.size) return path
   return { anchors: out }
 }
 
