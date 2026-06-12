@@ -1240,7 +1240,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
                     </g>
                   )
                 })()}
-                {!preview && showAnchors && rotHandle && (
+                {/* KAI-9014: the twist handle rides ALL-SELECTED in ANY view — Dan tap-selects in
+                    frame mode (the default); the old showAnchors gate hid it there */}
+                {!preview && rotHandle && (
                   <g>
                     <line className={styles.rotateStem} x1={rotHandle.bx} y1={rotHandle.by} x2={rotHandle.bx} y2={rotHandle.hy} />
                     {/* grip is larger than the anchors and carries a rotate glyph */}
