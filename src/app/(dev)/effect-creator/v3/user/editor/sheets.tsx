@@ -51,7 +51,7 @@ function ChipRow({ children }: { children: ReactNode }) {
     </div>
   )
 }
-export type ImageSub = 'position' | 'brightness' | 'contrast' | 'saturate' | 'warmth' | 'blend'
+export type ImageSub = 'brightness' | 'contrast' | 'saturate' | 'warmth' | 'blend'
 
 /* ADJUST mode (plan A2, Dan's rulings): THREE circles — Radius · Curve · Tune ✦ — one shared
    ruler. Scale is DELETED (the frame owns it, D5); Blend moved to Image mode (#8). Curve is the
@@ -163,7 +163,6 @@ export function ImageSheet({ imageSub, setImageSub, art, fxDraft, setFxDraft, bl
     <div className={styles.shapeSheet}>
       <ChipRow>
         {([
-          { k: 'position', label: 'Position', icon: <PositionIcon /> },
           { k: 'brightness', label: 'Bright', icon: <BrightnessIcon /> },
           { k: 'contrast', label: 'Contrast', icon: <ContrastIcon /> },
           { k: 'saturate', label: 'Color', icon: <SaturationIcon /> },
@@ -183,6 +182,8 @@ export function ImageSheet({ imageSub, setImageSub, art, fxDraft, setFxDraft, bl
           </button>
         ))}
       </ChipRow>
+      {/* Position is a DIRECT GESTURE (plan A2): drag the photo inside the outline, scroll/pinch
+          to zoom — the Position button died with the old crop-tool pattern. */}
       <div className={styles.shapeControls}>
         {imageSub === 'blend' ? (
           <div className={styles.shapeRow}>
@@ -195,21 +196,11 @@ export function ImageSheet({ imageSub, setImageSub, art, fxDraft, setFxDraft, bl
               format={(v) => (v === 0 ? 'off' : `${Math.round(v)}%`)}
             />
           </div>
-        ) : imageSub === 'position' ? (
-          <div className={styles.shapeRow}>
-            <span className={styles.shapeName}>Zoom</span>
-            <TickBar
-              label="Photo zoom" min={100} max={400} step={2}
-              value={art.scale * 100}
-              onChange={(v) => { const st = useOutlineStore.getState(); st.setArtwork({ ...st.artwork, scale: v / 100 }) }}
-              onCommit={(v) => { const st = useOutlineStore.getState(); st.setArtwork({ ...st.artwork, scale: v / 100 }) }}
-              format={(v) => `${Math.round(v)}%`}
-            />
-          </div>
         ) : (
           <div className={styles.shapeRow}>
             <span className={styles.shapeName}>
               {imageSub === 'brightness' ? 'Bright' : imageSub === 'contrast' ? 'Contrast' : imageSub === 'saturate' ? 'Color' : 'Warmth'}
+              {/* the photo itself: drag to position · scroll to zoom (gesture, not a control) */}
             </span>
             <TickBar
               label={imageSub}

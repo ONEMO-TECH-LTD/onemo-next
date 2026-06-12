@@ -146,7 +146,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   // #28 Image tool (Apple-pattern: circular sub-icons + ONE shared ruler). Position pans/zooms the
   // PHOTO under the fixed cutline (the scene's G1, now inside the editor); adjustments preview live
   // via CSS filter here and bake into the print composite on commit (one composeFront).
-  const [imageSub, setImageSub] = useState<'position' | 'brightness' | 'contrast' | 'saturate' | 'warmth' | 'blend'>('position')
+  const [imageSub, setImageSub] = useState<'brightness' | 'contrast' | 'saturate' | 'warmth' | 'blend'>('brightness')
   const [fxDraft, setFxDraft] = useState<ImageFx>(NEUTRAL_FX)
   const imgPanRef = useRef<{ startClient: [number, number]; art0: { offsetX: number; offsetY: number; scale: number } } | null>(null)
   // Rotation = a whole-outline transform: two-finger twist (mobile) / drag the rotate handle (desktop,
@@ -293,7 +293,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
       applyVec(v0, base) // COMMITS the seed (visible = committed); §6.3 defers the 3D to close
     }
     // (no spec → nothing to seed; the page gates editor entry on an uploaded image)
-    setImageSub('position')
+    setImageSub('brightness')
     setAdjustSub('radius')
     setFxDraft(st0.imageFx ?? NEUTRAL_FX)
     imgPanRef.current = null
@@ -438,8 +438,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
       const p = toViewBox(e.clientX, e.clientY)
       pointersRef.current.set(e.pointerId, p)
       clientPtsRef.current.set(e.pointerId, [e.clientX, e.clientY])
-      // #28 Image-Position sub-mode: single finger pans the PHOTO under the cutline
-      if (activeAdjust === 'image' && imageSub === 'position' && pointersRef.current.size === 1) {
+      // Image mode: a single finger inside pans the PHOTO under the cutline (plan A2 — position
+      // is a direct gesture, no Position button; works whichever dial is active)
+      if (activeAdjust === 'image' && pointersRef.current.size === 1) {
         const a = useOutlineStore.getState().artwork
         imgPanRef.current = { startClient: [e.clientX, e.clientY], art0: { ...a } }
         return
@@ -462,10 +463,10 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
         canvasPanRef.current = { startClient: [e.clientX, e.clientY], vx0: viewRef.current.vx, vy0: viewRef.current.vy }
       }
     },
-    // KAI-8984: activeAdjust/imageSub were missing — the svg kept a STALE closure after a mode
-    // switch, so the first drag in Image·Position routed to move-the-outline instead of pan-the-
-    // photo (and silently committed a shape move). The deps make the handler follow the mode.
-    [toViewBox, hitRing, hitBBox, preview, screenToContent, viewRef, activeAdjust, imageSub],
+    // KAI-8984: activeAdjust was missing — the svg kept a STALE closure after a mode switch, so
+    // the first drag in Image mode routed to move-the-outline instead of pan-the-photo (and
+    // silently committed a shape move). The dep makes the handler follow the mode.
+    [toViewBox, hitRing, hitBBox, preview, screenToContent, viewRef, activeAdjust],
   )
 
   const onPointerMove = useCallback(
@@ -1142,8 +1143,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
           onClick={onSurfaceClick}
           onDoubleClick={onSurfaceDoubleClick}
           onWheel={(e) => {
-            // #28 Image-Position: scroll zooms the PHOTO within the shape (G1 semantics)
-            if (activeAdjust === 'image' && imageSub === 'position') {
+            // Image mode: scroll zooms the PHOTO within the shape (position = gesture, plan A2)
+            if (activeAdjust === 'image') {
               const st = useOutlineStore.getState()
               const a = st.artwork
               st.setArtwork({ ...a, scale: Math.max(1, Math.min(4, a.scale * Math.exp(-e.deltaY * 0.0022))) })
@@ -1285,7 +1286,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
           : hasIssues
             ? <span className={styles.warn}>This shape can’t be cut cleanly — fix the crossing</span>
             : activeAdjust === 'image'
-              ? (imageSub === 'position' ? 'Drag the photo to position it · scroll to zoom' : 'Drag the ruler — release to apply')
+              ? 'Drag the photo to position it · scroll to zoom · drag the ruler to adjust'
               : allSelected
                 ? 'All corners selected — scale or twist them together'
                 : (vshape && selVA !== null)
