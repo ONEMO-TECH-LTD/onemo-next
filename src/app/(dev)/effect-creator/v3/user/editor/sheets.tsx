@@ -11,11 +11,10 @@ import TickBar from '../../ui/TickBar'
 import { useOutlineStore, type ImageFx } from '../outlineStore'
 import { PARAMETRIC, type ShapeKind } from '../shapes'
 import { SHAPE_CHIPS, ShapeChipIcon, DEFAULT_SHAPE_PARAMS } from './chips'
-import { RoundIcon, SmoothIcon, BlendIcon, TuneIcon, BrightnessIcon, ContrastIcon, SaturationIcon, WarmthIcon, MinusIcon, PlusIcon, DiceIcon } from '../icons'
+import { RoundIcon, SmoothIcon, BlendIcon, BrightnessIcon, ContrastIcon, SaturationIcon, WarmthIcon, MinusIcon, PlusIcon, DiceIcon, MagicIcon, CornerIcon, DetailIcon, SnapIcon, AngleIcon, LineIcon } from '../icons'
 import styles from '../outline-editor.module.css'
 
-export type AdjustSub = 'radius' | 'curve' | 'tune'
-export type TuneSub = 'detail' | 'smooth' | 'snap'
+export type AdjustSub = 'radius' | 'curve' | 'detail' | 'smooth' | 'snap' | 'angle' | 'line'
 
 /** UX-1 progress ring — an arc around a tool circle showing its current value; nothing at zero. */
 function ChipRing({ frac }: { frac: number }) {
@@ -70,19 +69,17 @@ export type ImageSub = 'brightness' | 'contrast' | 'saturate' | 'warmth' | 'blen
    ruler. Scale is DELETED (the frame owns it, D5); Blend moved to Image mode (#8). Curve is the
    REAL bend tool (tension on the selected anchor, D3); Tune ✦ is the universal fine-tune takeover
    (Detail · Smooth · Snap — Angle/Min-line dropped, D3 round 2) available on EVERY shape class. */
-export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, tuneSub, setTuneSub, radiusApplies, maxRadius, radius, setRadius, commitRadius, curveSelected, curveVal, previewCurve, commitCurve, detail, setDetail, previewTune, commitTune, fairParams }: {
+export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, radiusApplies, maxRadius, radius, setRadius, commitRadius, curveSelected, curveVal, previewCurve, commitCurve, detail, setDetail, previewTune, commitTune, fairParams }: {
   cornerMode: boolean
   adjustSub: AdjustSub
   setAdjustSub: (k: AdjustSub) => void
-  tuneSub: TuneSub
-  setTuneSub: (k: TuneSub) => void
-  /** tier-2 availability (Dan's rule: inapplicable tools GREY with a hint, never silent no-op) */
+  /** tier-2 availability (Dan's rule: inapplicable tools GREY, never silent no-op) */
   radiusApplies: boolean
   maxRadius: number
   radius: number
   setRadius: (v: number) => void
   commitRadius: (v: number) => void
-  /** Curve acts on the SELECTED anchor (tap one in Points — double-tap the shape to enter) */
+  /** Curve acts on the SELECTED anchor (tap one in Points) */
   curveSelected: boolean
   curveVal: number
   previewCurve: (v: number) => void
@@ -93,14 +90,22 @@ export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, tuneSub, setT
   commitTune: (params: FairTracedRingOpts, detailVal?: number) => void
   fairParams: FairTracedRingOpts
 }) {
+  // KAI-9017/9016 (Dan): the FULL vector toolset as icon chips in ONE row — no Tune ✦ submenu.
+  // Angle + Line are RESTORED (his 2026-06-12 pin supersedes the earlier drop ruling). Every
+  // fairing dial works on every shape class (D3) — in place, per the shape's lineage (KAI-9032).
+  const dials = [
+    { k: 'radius' as const, label: cornerMode ? 'Corner' : 'Radius', icon: <CornerIcon />, ring: radiusApplies ? radius / Math.max(maxRadius, 1) : 0 },
+    { k: 'curve' as const, label: 'Curve', icon: <RoundIcon />, ring: 0 }, // BezierCurve glyph = the bend tool
+    { k: 'detail' as const, label: 'Detail', icon: <DetailIcon />, ring: detail / 100 },
+    { k: 'smooth' as const, label: 'Smooth', icon: <SmoothIcon />, ring: ((fairParams.smoothPx ?? 6) - 1) / 29 },
+    { k: 'snap' as const, label: 'Snap', icon: <SnapIcon />, ring: (fairParams.detailPx ?? 4) / 20 },
+    { k: 'angle' as const, label: 'Angle', icon: <AngleIcon />, ring: ((fairParams.maxTurnDeg ?? 35) - 15) / 70 },
+    { k: 'line' as const, label: 'Line', icon: <LineIcon />, ring: (fairParams.minLinePx ?? 50) / 80 },
+  ]
   return (
     <div className={styles.shapeSheet}>
       <ChipRow>
-        {([
-          { k: 'radius', label: cornerMode ? 'Corner' : 'Radius', icon: <RoundIcon />, ring: radiusApplies ? radius / Math.max(maxRadius, 1) : 0 },
-          { k: 'curve', label: 'Curve', icon: <SmoothIcon />, ring: 0 },
-          { k: 'tune', label: 'Tune \u2726', icon: <TuneIcon />, ring: detail / 100 },
-        ] as const).map((t) => (
+        {dials.map((t) => (
           <button
             key={t.k}
             type="button"
@@ -132,41 +137,27 @@ export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, tuneSub, setT
               <TickBar label="Curve" min={0} max={100} value={50} onChange={() => {}} onCommit={() => {}} format={(v) => `${Math.round(v * 2)}%`} />
             </div>
           ))}
+          {adjustSub === 'detail' && (
+            <TickBar label="Detail" min={0} max={100} value={detail} onChange={(v) => { setDetail(v); previewTune(fairingFromDetail(v)) }} onCommit={(v) => { setDetail(v); commitTune(fairingFromDetail(v), v) }} format={(v) => `${Math.round(v)}%`} />
+          )}
+          {adjustSub === 'smooth' && (
+            <TickBar label="Smooth" min={1} max={30} step={0.5} value={fairParams.smoothPx ?? 6} onChange={(v) => previewTune({ ...fairParams, smoothPx: v })} onCommit={(v) => commitTune({ ...fairParams, smoothPx: v })} format={(v) => `${v.toFixed(1)}px`} />
+          )}
+          {adjustSub === 'snap' && (
+            <TickBar label="Snap" min={0} max={20} step={0.5} value={fairParams.detailPx ?? 4} onChange={(v) => previewTune({ ...fairParams, detailPx: v })} onCommit={(v) => commitTune({ ...fairParams, detailPx: v })} format={(v) => `${v.toFixed(1)}px`} />
+          )}
+          {adjustSub === 'angle' && (
+            <TickBar label="Angle" min={15} max={85} step={1} value={fairParams.maxTurnDeg ?? 35} onChange={(v) => previewTune({ ...fairParams, maxTurnDeg: v })} onCommit={(v) => commitTune({ ...fairParams, maxTurnDeg: v })} format={(v) => `${Math.round(v)}°`} />
+          )}
+          {adjustSub === 'line' && (
+            <TickBar label="Line" min={0} max={80} step={1} value={fairParams.minLinePx ?? 50} onChange={(v) => previewTune({ ...fairParams, minLinePx: v })} onCommit={(v) => commitTune({ ...fairParams, minLinePx: v })} format={(v) => `${Math.round(v)}px`} />
+          )}
         </div>
-        {adjustSub === 'tune' && (
-          <>
-            <div className={styles.shapeRow}>
-              {([
-                { k: 'detail', label: 'Detail' },
-                { k: 'smooth', label: 'Smooth' },
-                { k: 'snap', label: 'Snap' },
-              ] as const).map((t) => (
-                <button key={t.k} type="button" className={`${styles.chip} ${tuneSub === t.k ? styles.chipActive : ''}`} onClick={() => setTuneSub(t.k)} aria-pressed={tuneSub === t.k} aria-label={t.label}>
-                  <span className={styles.chipLabel}>{t.label}</span>
-                </button>
-              ))}
-            </div>
-            <div className={styles.shapeRow}>
-              {tuneSub === 'detail' && (
-                <TickBar label="Detail" min={0} max={100} value={detail} onChange={(v) => { setDetail(v); previewTune(fairingFromDetail(v)) }} onCommit={(v) => { setDetail(v); commitTune(fairingFromDetail(v), v) }} format={(v) => `${Math.round(v)}%`} />
-              )}
-              {tuneSub === 'smooth' && (
-                <TickBar label="Smooth strength" min={1} max={30} step={0.5} value={fairParams.smoothPx ?? 6} onChange={(v) => previewTune({ ...fairParams, smoothPx: v })} onCommit={(v) => commitTune({ ...fairParams, smoothPx: v })} format={(v) => `${v.toFixed(1)}px`} />
-              )}
-              {tuneSub === 'snap' && (
-                <TickBar label="Line snap band" min={0} max={20} step={0.5} value={fairParams.detailPx ?? 4} onChange={(v) => previewTune({ ...fairParams, detailPx: v })} onCommit={(v) => commitTune({ ...fairParams, detailPx: v })} format={(v) => `${v.toFixed(1)}px`} />
-              )}
-            </div>
-          </>
-        )}
       </div>
     </div>
   )
 }
 
-/* #28 Image tool — Apple-pattern sheet: circular sub-icons, ONE shared ruler below.
-   Position = pan/zoom the photo under the cutline; adjustments preview live (CSS filter)
-   and bake into the print composite on release (same composeFront → print-faithful). */
 export function ImageSheet({ imageSub, setImageSub, fxDraft, setFxDraft, blendBlur, setBlendBlur, writeBlend }: {
   imageSub: ImageSub
   setImageSub: (k: ImageSub) => void
@@ -279,7 +270,7 @@ export function ShapeSheet({ shapeKind, pickShape, shapeParams, nudgeParam, prev
         </label>
         {onMagic && (
           <button type="button" className={`${styles.chip} ${styles.chipMagic}`} onClick={onMagic} aria-label="Magic auto cut">
-            <span className={styles.chipIcon}><TuneIcon /></span>
+            <span className={styles.chipIcon}><MagicIcon /></span>
             <span className={styles.chipLabel}>Magic ✦</span>
           </button>
         )}

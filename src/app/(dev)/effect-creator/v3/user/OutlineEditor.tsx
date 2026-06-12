@@ -48,7 +48,7 @@ const GEN_VECTOR_KINDS = new Set<ShapeKind>(['daisy', 'pinwheel', 'form', 'blob'
 import { DEFAULT_SHAPE_PARAMS } from './editor/chips'
 import { useEditorHistory } from './editor/useEditorHistory'
 import { useCanvasView } from './editor/useCanvasView'
-import { AdjustSheet, ImageSheet, ShapeSheet } from './editor/sheets'
+import { AdjustSheet, ImageSheet, ShapeSheet, type AdjustSub } from './editor/sheets'
 import { pointInPolygon, type GripId } from './editor/geometry'
 import styles from './outline-editor.module.css'
 import TopBar, { TopBarButton } from './TopBar'
@@ -109,8 +109,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   // row of circular sub-tools sharing ONE ruler. Adjust = Radius · Curve · Tune ✦ (plan A2 —
   // Scale DELETED per D5, the frame owns it; Blend lives in Image mode per #8).
   const [activeAdjust, setActiveAdjust] = useState<'shape' | 'adjust' | 'image' | null>(null)
-  const [adjustSub, setAdjustSub] = useState<'radius' | 'curve' | 'tune'>('radius')
-  const [tuneSub, setTuneSub] = useState<'detail' | 'smooth' | 'snap'>('detail')
+  const [adjustSub, setAdjustSub] = useState<AdjustSub>('radius')
   const [curveVal, setCurveVal] = useState(50) // Curve ruler: 50 = the point's current tension
   const [blendBlur, setBlendBlur] = useState(50) // blend intensity 0–100; 0 = off (ruler IS the switch)
   // Shape tool: pick a preset/parametric shape as the starting outline. shapeKind = the shape currently
@@ -1364,7 +1363,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
         <AdjustSheet
           cornerMode={!!(vshape && selVA !== null && vshape.paths[0].anchors[selVA]?.corner)}
           radiusApplies={radiusApplies}
-          adjustSub={adjustSub} setAdjustSub={setAdjustSub} tuneSub={tuneSub} setTuneSub={setTuneSub}
+          adjustSub={adjustSub} setAdjustSub={setAdjustSub}
           maxRadius={maxRadius} radius={radius} setRadius={setRadius} commitRadius={commitRadius}
           curveSelected={selVA !== null} curveVal={curveVal} previewCurve={previewCurve} commitCurve={commitCurve}
           detail={detail} setDetail={setDetail} previewTune={previewTune} commitTune={commitTune} fairParams={fairParams}

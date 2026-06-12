@@ -4,7 +4,7 @@
 // glyphs — chosen over Lucide so the UI doesn't read as generic shadcn/SaaS. `weight="regular"`
 // (default) reads cleanly at 24px on mobile; icons inherit `currentColor` from the button.
 
-import { ArrowArcLeft, ArrowArcRight, BezierCurve, DiceFive, WaveSine, Check, X, Plus, Minus, Trash, PlusCircle, Sparkle, ImageSquare, PencilSimple, BoundingBox, Palette, DownloadSimple, Shapes, Eye, EyeSlash, MagicWand, Faders, Crop, Sun, CircleHalf, Drop, Thermometer, VectorTwo } from '@phosphor-icons/react'
+import { ArrowArcLeft, ArrowArcRight, BezierCurve, DiceFive, WaveSine, Check, X, Plus, Minus, Trash, PlusCircle, Sparkle, ImageSquare, PencilSimple, BoundingBox, Palette, DownloadSimple, Shapes, Eye, EyeSlash, MagicWand, Faders, Crop, Sun, CircleHalf, Drop, Thermometer, VectorTwo, Waveform, Magnet, Angle, LineSegment, CornersOut } from '@phosphor-icons/react'
 
 type P = { className?: string }
 const SZ = 24
@@ -23,6 +23,13 @@ export const PreviewOffIcon = (p: P) => <EyeSlash size={SZ} className={p.classNa
 export const PlusIcon = (p: P) => <Plus size={SZ} className={p.className} />
 // Frame ⇄ Points mode toggle — explicit button per Dan's ruling (KAI-9022); double-tap stays as the gesture.
 export const PointsIcon = (p: P) => <VectorTwo size={SZ} className={p.className} />
+// KAI-9017: the unified Adjust row — every vector dial is an icon chip (Phosphor-for-now;
+// final icon selection rides sidekick's design-system research track).
+export const CornerIcon = (p: P) => <CornersOut size={SZ} className={p.className} /> // Radius
+export const DetailIcon = (p: P) => <Waveform size={SZ} className={p.className} />
+export const SnapIcon = (p: P) => <Magnet size={SZ} className={p.className} />
+export const AngleIcon = (p: P) => <Angle size={SZ} className={p.className} /> // restored (KAI-9017)
+export const LineIcon = (p: P) => <LineSegment size={SZ} className={p.className} /> // restored (KAI-9017)
 export const MinusIcon = (p: P) => <Minus size={SZ} className={p.className} />
 export const AddPointIcon = (p: P) => <PlusCircle size={SZ} className={p.className} />
 export const DeleteIcon = (p: P) => <Trash size={SZ} className={p.className} />
