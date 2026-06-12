@@ -51,7 +51,7 @@ import { useCanvasView } from './editor/useCanvasView'
 import { AdjustSheet, ImageSheet, ShapeSheet } from './editor/sheets'
 import { pointInPolygon, type GripId } from './editor/geometry'
 import styles from './outline-editor.module.css'
-import { ResetButton } from './TopBar'
+import TopBar, { TopBarButton } from './TopBar'
 
 interface OutlineEditorProps {
   open: boolean
@@ -90,18 +90,6 @@ function ToolBtn({ icon, label, onClick, disabled, active, primary }: {
     >
       <span className={styles.toolIcon}>{icon}</span>
       <span className={styles.toolLabel}>{label}</span>
-    </button>
-  )
-}
-
-/** Top-bar tool — same icon-over-label mobile style as the bottom tools, fixed width (doesn't stretch). */
-function TopTool({ icon, label, onClick, disabled, primary }: {
-  icon: React.ReactNode; label: string; onClick: () => void; disabled?: boolean; primary?: boolean
-}) {
-  return (
-    <button type="button" className={`${styles.topTool} ${primary ? styles.topToolPrimary : ''}`} onClick={onClick} disabled={disabled} aria-label={label}>
-      <span className={styles.toolIcon}>{icon}</span>
-      <span className={styles.topToolLabel}>{label}</span>
     </button>
   )
 }
@@ -1138,23 +1126,25 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
 
   return (
     <div className={styles.overlay}>
-      {/* Top bar — the ONE global anatomy (plan A2/D-CHROME): ✕ far left · undo/redo pill ·
-          RESET center ONLY when dirty (gold, vanishes clean) · Preview · Done right with the
-          dirty accent (UX-3). Points has no button — double-tap the shape (A3 grammar). */}
-      <div className={styles.topbar}>
-        <div className={styles.topInner}>
-          <TopTool icon={<CloseIcon />} label="Close" onClick={() => onCancel()} />
-          <TopTool icon={<UndoIcon />} label="Undo" onClick={undo} disabled={!canUndo} />
-          <TopTool icon={<RedoIcon />} label="Redo" onClick={redo} disabled={!canRedo} />
-          {canUndo ? (
-            <ResetButton onClick={onReset} />
-          ) : (
-            <span className={styles.resetSpacer} aria-hidden />
-          )}
-          <TopTool icon={preview ? <PreviewOffIcon /> : <PreviewIcon />} label={preview ? 'Edit' : 'Preview'} onClick={() => setPreview((v) => !v)} />
-          <TopTool icon={<CheckIcon />} label="Done" onClick={onDone} primary={canUndo} />
-        </div>
-      </div>
+      {/* THE shared global top bar (plan A2/D-CHROME) — same component as the hero (KAI-8986);
+          per-screen diff is button payloads only. Points has no button — double-tap (A3 grammar). */}
+      <TopBar
+        left={(
+          <>
+            <TopBarButton icon={<CloseIcon />} label="Close" onClick={() => onCancel()} />
+            <TopBarButton icon={<UndoIcon />} label="Undo" onClick={undo} disabled={!canUndo} />
+            <TopBarButton icon={<RedoIcon />} label="Redo" onClick={redo} disabled={!canRedo} />
+          </>
+        )}
+        dirty={canUndo}
+        onReset={onReset}
+        right={(
+          <>
+            <TopBarButton icon={preview ? <PreviewOffIcon /> : <PreviewIcon />} label={preview ? 'Edit' : 'Preview'} onClick={() => setPreview((v) => !v)} />
+            <TopBarButton icon={<CheckIcon />} label="Done" onClick={onDone} primary={canUndo} />
+          </>
+        )}
+      />
 
       <div className={styles.canvas}>
         <svg

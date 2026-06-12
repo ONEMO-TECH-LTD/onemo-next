@@ -192,9 +192,9 @@
   flex: none;
   align-self: center;
   margin: 0 auto;
-  border: 1px solid rgba(155, 117, 25, 0.45);
-  background: rgba(199, 154, 42, 0.14);
-  color: #8a6a14;
+  border: 1px solid rgba(140, 104, 18, 0.55);
+  background: rgba(199, 154, 42, 0.18);
+  color: #6f5510; /* contrast-safe dark gold on the glass strip (fab-qa: prior ink read soft) */
   border-radius: var(--radius-full);
   font-family: var(--font-primary);
   font-weight: 700;
@@ -203,7 +203,7 @@
   cursor: pointer;
   padding: 6px 16px;
 }
-.resetBtn:hover { background: rgba(199, 154, 42, 0.24); }
+.resetBtn:hover { background: rgba(199, 154, 42, 0.28); }
 .resetSpacer { flex: 1 1 0; margin: 0 auto; }
 /* hero variant: the SAME strip, pinned to the top of the scene (the editor's is a flex child) */
 .topbarFixed {
