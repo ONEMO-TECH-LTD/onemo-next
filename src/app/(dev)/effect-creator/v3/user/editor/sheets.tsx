@@ -276,6 +276,13 @@ export function ShapeSheet({ shapeKind, pickShape, shapeParams, nudgeParam, prev
   return (
     <div className={styles.shapeSheet}>
       <ChipRow>
+        {/* KAI-9024 (Dan): Upload leads the row — ahead of the presets. ONE upload entry
+            (SVG verbatim, images vectorised under the hood), the existing chip pattern. */}
+        <label className={styles.chip} aria-label="Upload a shape (SVG or image)">
+          <span className={styles.chipIcon}><PlusIcon /></span>
+          <span className={styles.chipLabel}>Upload</span>
+          <input type="file" accept=".svg,image/svg+xml,image/png,image/jpeg,image/webp" style={{ display: 'none' }} onChange={onUploadShape} />
+        </label>
         {SHAPE_CHIPS.map(({ kind, label }) => (
           <button
             key={kind}
@@ -289,11 +296,6 @@ export function ShapeSheet({ shapeKind, pickShape, shapeParams, nudgeParam, prev
             <span className={styles.chipLabel}>{label}</span>
           </button>
         ))}
-        <label className={styles.chip} aria-label="Upload a shape (SVG or image)">
-          <span className={styles.chipIcon}><PlusIcon /></span>
-          <span className={styles.chipLabel}>Upload</span>
-          <input type="file" accept=".svg,image/svg+xml,image/png,image/jpeg,image/webp" style={{ display: 'none' }} onChange={onUploadShape} />
-        </label>
         {onMagic && (
           <button type="button" className={`${styles.chip} ${styles.chipMagic}`} onClick={onMagic} aria-label="Magic auto cut">
             <span className={styles.chipIcon}><MagicIcon /></span>
