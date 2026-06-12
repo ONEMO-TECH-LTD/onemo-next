@@ -14,7 +14,7 @@
 // space). Raw traces arrive in mask-px Y-UP (the mask/engine space) — vectoriseTrace owns the
 // flip. Contours leave in MM, Y-UP, outer ring reversed to the mesh's expected winding.
 
-import { fairTracedRing, rdpClosed, validateSelfIntersection, signedArea, contentHash, stableStringify, type FairTracedRingOpts, type Vec2Px } from '@/lib/outline-core'
+import { fairTracedRing, rdpClosed, validateSelfIntersection, repairSimplePolygon, signedArea, contentHash, stableStringify, type FairTracedRingOpts, type Vec2Px } from '@/lib/outline-core'
 import { flattenShape, ringToVPath, filletPathSmart, type VShape } from '@/lib/vector-core'
 import type { Contour, Pt } from './types'
 
@@ -34,6 +34,7 @@ const FIT_COMPACT_ERROR_PX = FIT_MAX_ERROR_PX * 2
 // the PHYSICAL design are one touch target — the pair-collapse floor is mm-true, not viewport px.
 export const MIN_ANCHOR_SEPARATION_MM = 1.5
 const MIN_RAW_TRACE_POINTS = 24
+const CORNER_PIN_MAX_SNAP_PX = 8 // KAI-9009: a raw corner farther than this from the faired ring no longer exists
 // CORNER INTEGRITY (Dan, 2026-06-11): intentional sharp features must survive the cut as TRUE
 // corner anchors — the fairing smooths everything else to optimal, never the corners themselves.
 // Detection runs on the RAW trace structure (RDP skeleton — per-sample angles can't tell jitter
@@ -93,10 +94,31 @@ export interface VectoriseOpts {
 }
 
 export function vectoriseTrace(rawMaskPx: ReadonlyArray<Pt>, maskHeightPx: number, fairing: FairTracedRingOpts, opts?: VectoriseOpts): VShape | null {
+  // KAI-9009: a noisy mask can fair into a SELF-CROSSING sliver (Dan's crack/spike — a V-notch
+  // whose walls cross; the pair floor can't catch it because the crossing spans wider than the
+  // floor). The fit must be watertight: validate the flatten and, on a crossing, re-derive with
+  // escalated smoothing (trace-noise slivers die under a larger σ). Bounded; loud on exhaustion.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const params = attempt === 0 ? fairing : { ...fairing, smoothPx: (fairing.smoothPx ?? 6) * (1 + attempt * 0.6) }
+    const v = vectoriseTraceOnce(rawMaskPx, maskHeightPx, params, opts)
+    if (!v) return null
+    const flat = flattenShape(v, 0.75)[0]?.map((pt) => [pt.x, pt.y] as Vec2Px) ?? []
+    if (flat.length < 3 || validateSelfIntersection(flat, 'fit').length === 0) return v
+    if (attempt === 2) {
+      console.error('[geometry-truth] vectoriseTrace: self-intersecting fit survived smoothing escalation — returning last attempt')
+      return v
+    }
+  }
+  return null
+}
+
+function vectoriseTraceOnce(rawMaskPx: ReadonlyArray<Pt>, maskHeightPx: number, fairing: FairTracedRingOpts, opts?: VectoriseOpts): VShape | null {
   if (rawMaskPx.length < MIN_RAW_TRACE_POINTS) return null
   const yDown = rawMaskPx.map(([x, y]) => [x, maskHeightPx - y] as Vec2Px)
   const corners = rawCornerPositions(yDown)
-  const faired = fairTracedRing(yDown, fairing)
+  // KAI-9009: kill sliver loops (needle notches whose walls cross) BEFORE the fit — the
+  // existing simple-polygon repair drops the crossing vertices deterministically.
+  const faired = repairSimplePolygon(fairTracedRing(yDown, fairing), 1)
   if (faired.length < 3) return null
   // pin each raw corner: snap the nearest faired point BACK to the exact sharp vertex and mark
   // its index as a corner for the fit (independent handles meet at the true point)
@@ -112,7 +134,9 @@ export function vectoriseTrace(rawMaskPx: ReadonlyArray<Pt>, maskHeightPx: numbe
       const d = (ring[i].x - cx) ** 2 + (ring[i].y - cy) ** 2
       if (d < bd) { bd = d; best = i }
     }
-    if (best >= 0 && !cornerIdx.some((j) => Math.hypot(ring[j].x - cx, ring[j].y - cy) < CORNER_MIN_SEPARATION_PX)) {
+    // KAI-9009: pin only when the faired ring still REPRESENTS the corner (a repaired-away
+    // sliver tip must not be snapped back in as a spike)
+    if (best >= 0 && bd <= CORNER_PIN_MAX_SNAP_PX ** 2 && !cornerIdx.some((j) => Math.hypot(ring[j].x - cx, ring[j].y - cy) < CORNER_MIN_SEPARATION_PX)) {
       ring[best] = { x: cx, y: cy }
       cornerIdx.push(best)
       if (turnDeg >= CROP_TURN_MIN_DEG && turnDeg <= CROP_TURN_MAX_DEG && onFrame(cx, cy)) cropIdx.push(best)
