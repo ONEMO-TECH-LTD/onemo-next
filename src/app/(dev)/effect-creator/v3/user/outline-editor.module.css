@@ -4,7 +4,7 @@
   position: fixed;
   inset: 0;
   z-index: 40;
-  background: var(--semantic-bg-primary);
+  background: var(--primitive-color-grey-2); /* KAI-9034: same token as the upload screen */
   font-family: var(--font-primary);
   /* KAI-8978/F6: the editor has no text-entry surface — selecting label/hint text is never
      intentional; drags across chips/canvas were selecting words instead of working */

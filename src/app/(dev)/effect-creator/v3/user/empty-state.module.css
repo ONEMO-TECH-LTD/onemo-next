@@ -8,8 +8,9 @@
   align-items: center;
   justify-content: center;
   z-index: 5;
-  /* neutral brand-grey backdrop (lit) so the frosted glass reads */
-  background: radial-gradient(120% 100% at 50% 38%, var(--primitive-color-grey-5), var(--primitive-color-grey-7));
+  /* KAI-9034 (Dan): ONE background across upload screen and editor — grey-2 (his named pick;
+     blue-green-1 was the alternate). The editor overlay uses the same token below. */
+  background: var(--primitive-color-grey-2);
 }
 
 .square {
