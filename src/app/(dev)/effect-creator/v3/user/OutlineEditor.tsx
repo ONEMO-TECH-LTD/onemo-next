@@ -52,6 +52,7 @@ import { AdjustSheet, ImageSheet, ShapeSheet, type AdjustSub } from './editor/sh
 import { pointInPolygon, type GripId } from './editor/geometry'
 import styles from './outline-editor.module.css'
 import TopBar, { TopBarButton } from './TopBar'
+import Dock, { DockTool } from './Dock'
 
 interface OutlineEditorProps {
   open: boolean
@@ -75,24 +76,6 @@ function ringPathD(ring: ReadonlyArray<readonly [number, number]>): string {
 // Rotate glyph (Phosphor ArrowClockwise, 256-box) drawn inside the rotate handle — white on the brand grip.
 const ROTATE_GLYPH_D = 'M244,56v48a12,12,0,0,1-12,12H184a12,12,0,1,1,0-24H201.1l-19-17.38c-.13-.12-.26-.24-.38-.37A76,76,0,1,0,127,204h1a75.53,75.53,0,0,0,52.15-20.72,12,12,0,0,1,16.49,17.45A99.45,99.45,0,0,1,128,228h-1.37A100,100,0,1,1,198.51,57.06L220,76.72V56a12,12,0,0,1,24,0Z'
 
-/** A touch-target toolbar button: icon over a tiny label (mobile-first). */
-function ToolBtn({ icon, label, onClick, disabled, active, primary }: {
-  icon: React.ReactNode; label: string; onClick: () => void; disabled?: boolean; active?: boolean; primary?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      className={`${styles.tool} ${active ? styles.toolActive : ''} ${primary ? styles.toolPrimary : ''}`}
-      onClick={onClick}
-      disabled={disabled}
-      aria-pressed={active}
-      aria-label={label}
-    >
-      <span className={styles.toolIcon}>{icon}</span>
-      <span className={styles.toolLabel}>{label}</span>
-    </button>
-  )
-}
 
 export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMagic }: OutlineEditorProps) {
   // KAI-8976/F4: every history entry carries the dial state that produced its shape, so
@@ -1397,24 +1380,17 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
         </div>
       )}
 
-      {/* bottom toolbar — thumb-reachable icon tools; full-width bar, content capped + centered on desktop */}
-      <div className={styles.toolbar}>
-        <div className={styles.toolInner}>
-        {(
-          <>
-            {/* #35: the MODE pill — Shape · Adjust · Image (Apple bottom-pill pattern) */}
-            <ToolBtn icon={<ShapeIcon />} label="Shape" onClick={toggleShape} active={activeAdjust === 'shape'} />
-            <ToolBtn icon={<TuneIcon />} label="Adjust" onClick={() => setActiveAdjust((a) => {
-              // KAI-9020 (Dan): Adjust is point-level work — entering it auto-switches frame → points
-              if (a !== 'adjust') setShowAnchors(true)
-              return a === 'adjust' ? null : 'adjust'
-            })} active={activeAdjust === 'adjust'} />
-            <ToolBtn icon={<ImageToolIcon />} label="Image" onClick={() => { setActiveAdjust((a) => (a === 'image' ? null : 'image')); setAllSelected(false); setSelVA(null); setShowAnchors(false) }} active={activeAdjust === 'image'} />
-          </>
-        )}
-        </div>
-      </div>
-      </div>
+      {/* KAI-9021: THE pill island — the hero's Dock, same structure, editor tool payloads */}
+      <Dock inline>
+        <DockTool icon={<ShapeIcon />} label="Shape" onClick={toggleShape} active={activeAdjust === 'shape'} />
+        <DockTool icon={<TuneIcon />} label="Adjust" onClick={() => setActiveAdjust((a) => {
+          // KAI-9020 (Dan): Adjust is point-level work — entering it auto-switches frame → points
+          if (a !== 'adjust') setShowAnchors(true)
+          return a === 'adjust' ? null : 'adjust'
+        })} active={activeAdjust === 'adjust'} />
+        <DockTool icon={<ImageToolIcon />} label="Image" onClick={() => { setActiveAdjust((a) => (a === 'image' ? null : 'image')); setAllSelected(false); setSelVA(null); setShowAnchors(false) }} active={activeAdjust === 'image'} />
+      </Dock>
+    </div>
     </div>
   )
 }

@@ -7,6 +7,7 @@
 import { useRef } from 'react'
 import type { DesignState } from '../types'
 import { UploadIcon, MagicIcon, ColorsIcon } from './icons'
+import Dock, { DockTool } from './Dock'
 import styles from './toolbar.module.css'
 
 const INITIAL_DESIGN: DesignState = { offsetX: 0, offsetY: 0, scale: 1.0 }
@@ -20,25 +21,6 @@ interface ToolbarProps {
   onToggleColors: () => void
 }
 
-/** One scene tool: icon over a small label (mobile-first touch target). */
-function Tool({ icon, label, onClick, active, primary, disabled }: {
-  icon: React.ReactNode; label: string; onClick: () => void; active?: boolean; primary?: boolean; disabled?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      className={`${styles.tool} ${active ? styles.active : ''} ${primary ? styles.primary : ''}`}
-      onClick={onClick}
-      disabled={disabled}
-      style={disabled ? { opacity: 0.35, pointerEvents: 'none' } : undefined}
-      aria-pressed={active}
-      aria-label={label}
-    >
-      <span className={styles.toolIcon}>{icon}</span>
-      <span className={styles.toolLabel}>{label}</span>
-    </button>
-  )
-}
 
 export default function Toolbar({
   artworkUrl,
@@ -55,14 +37,13 @@ export default function Toolbar({
       {/* #22/Q7 (Dan, 2026-06-10): ONE consistent menu from the first screen — the full creator
           toolbar is always present (tools disabled until an image exists); the upload tool is
           "Image" (not Upload/Replace), so there's no duplicate lone upload pill pre-image. */}
-      <div className={styles.bar}>
-        <Tool icon={<UploadIcon />} label="Image" onClick={() => fileInputRef.current?.click()} primary={!artworkUrl} />
+      <Dock>
+        <DockTool icon={<UploadIcon />} label="Image" onClick={() => fileInputRef.current?.click()} primary={!artworkUrl} />
         {/* Magic = auto cut-out (worker BEN). Highlights once the subject cut has been generated. */}
-        <Tool icon={<MagicIcon />} label="Magic" onClick={onGenerate} active={auto} disabled={!artworkUrl} />
-        {/* Shapes lives INSIDE the editor (plan D4: shape choice = editing); Edit lives in the
-            global top bar + double-tap (KAI-8938's visible entry kept, relocated per D-CHROME) */}
-        <Tool icon={<ColorsIcon />} label="Trim" onClick={onToggleColors} active={showColors} disabled={!artworkUrl} />
-      </div>
+        <DockTool icon={<MagicIcon />} label="Magic" onClick={onGenerate} active={auto} disabled={!artworkUrl} />
+        {/* Shapes lives INSIDE the editor (plan D4: shape choice = editing) */}
+        <DockTool icon={<ColorsIcon />} label="Trim" onClick={onToggleColors} active={showColors} disabled={!artworkUrl} />
+      </Dock>
 
       <input
         ref={fileInputRef}
