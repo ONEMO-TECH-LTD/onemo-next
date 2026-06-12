@@ -1,0 +1,86 @@
+/* Trim carousel — the creation row's takeover (D-TRIM). Same faux-glass pill as the toolbar
+   (NO backdrop-filter — perf), round swatches under the model, selected enlarged + ringed. */
+
+.bar {
+  position: absolute;
+  left: 50%;
+  bottom: var(--spacing-l);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-s);
+  z-index: 10;
+  padding: var(--spacing-xs) var(--spacing-m);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(246, 248, 251, 0.74));
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: var(--radius-full);
+  box-shadow: 0 12px 34px rgba(20, 24, 40, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 2px rgba(150, 160, 180, 0.12);
+  user-select: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-s);
+  max-width: 70vw;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 4px 2px;
+}
+.row::-webkit-scrollbar { display: none; }
+
+.swatch {
+  flex: none;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: var(--radius-full);
+  border: none;
+  cursor: pointer;
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.22), 0 1px 3px rgba(20, 24, 40, 0.18);
+  transition: transform 0.12s ease, outline-color 0.12s ease;
+  outline: 2.5px solid transparent;
+  outline-offset: 2.5px;
+}
+/* AP Filters anatomy: the live selection is enlarged + ringed — the 3D object is the preview */
+.swatchSelected {
+  transform: scale(1.22);
+  outline-color: var(--color-bg-brand-solid, #1c2030);
+}
+
+.picker {
+  background: conic-gradient(#f55, #fc3, #5d5, #4cf, #85f, #f5a, #f55);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.pickerGlyph {
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  line-height: 1;
+}
+
+.action {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+.action:hover { opacity: 0.7; }
+.confirm { color: var(--color-bg-brand-solid, #1c2030); }
+
+.hiddenInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
