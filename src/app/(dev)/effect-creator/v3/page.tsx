@@ -413,7 +413,9 @@ function PrototypePageInner() {
       {/* THE GLOBAL TOP BAR — the SAME strip component identity as the editor's (fab-qa F-UX1):
           ✕-less hero form = undo/redo LEFT · RESET center only-when-dirty (real button) ·
           Edit · Export RIGHT. Hidden while the editor owns the screen (it mounts its own). */}
-      {artworkUrl && !editingOutline && (
+      {/* KAI-9005 (Dan): no gaps — the bar mounts from the EMPTY state too, controls greyed
+          until a design exists (undo/redo disable themselves; RESET stays only-when-dirty) */}
+      {!editingOutline && (
         <div className={`${edStyles.topbarFixed}`}>
           <TopBar
             left={(
