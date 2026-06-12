@@ -6,7 +6,7 @@
 
 import { useRef } from 'react'
 import type { DesignState } from '../types'
-import { UploadIcon, MagicIcon, ColorsIcon } from './icons'
+import { UploadIcon, MagicIcon, ColorsIcon, EditorIcon } from './icons'
 import Dock, { DockTool } from './Dock'
 import styles from './toolbar.module.css'
 
@@ -19,6 +19,10 @@ interface ToolbarProps {
   onFile: (file: File) => void
   onGenerate: () => void
   onToggleColors: () => void
+  /** KAI-9011: the Editor entry lives HERE (right end, next to Trim) — not in the top bar */
+  onEditor: () => void
+  /** the design is prepared — the Editor gate (the old top-bar Edit used the same) */
+  editorReady: boolean
 }
 
 
@@ -29,6 +33,8 @@ export default function Toolbar({
   onFile,
   onGenerate,
   onToggleColors,
+  onEditor,
+  editorReady,
 }: ToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -43,6 +49,8 @@ export default function Toolbar({
         <DockTool icon={<MagicIcon />} label="Magic" onClick={onGenerate} active={auto} disabled={!artworkUrl} />
         {/* Shapes lives INSIDE the editor (plan D4: shape choice = editing) */}
         <DockTool icon={<ColorsIcon />} label="Trim" onClick={onToggleColors} active={showColors} disabled={!artworkUrl} />
+        {/* KAI-9011 (Dan): renamed Edit→Editor, design-tool glyph, relocated from the top bar */}
+        <DockTool icon={<EditorIcon />} label="Editor" onClick={onEditor} disabled={!editorReady} />
       </Dock>
 
       <input

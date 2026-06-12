@@ -374,6 +374,8 @@ function PrototypePageInner() {
           onFile={handleFile}
           onGenerate={handleMagic}
           onToggleColors={() => { trimPreRef.current = snapNow(); setShowColors(true) }}
+          onEditor={() => { editorPreRef.current = snapNow(); setEditorMode(null); setEditingOutline(true) }}
+          editorReady={!!prepared}
         />
       )}
 
@@ -422,12 +424,9 @@ function PrototypePageInner() {
             dirty={histRef.current.past.length > 0 && !!baselineRef.current}
             onReset={globalReset}
             right={(
-              <>
-                <TopBarButton icon={<EditIcon />} label="Edit" onClick={() => { editorPreRef.current = snapNow(); setEditorMode(null); setEditingOutline(true) }} disabled={!prepared} />
-                {/* KAI-9010 (Dan): Export is INTERNAL utility — ?internal=1 arms it for us; the
-                    mm-SVG pipeline stays; users never see it. Admin-view/backend = separate track. */}
-                {internalTools && <TopBarButton icon={<ExportIcon />} label="Export" onClick={onExport} disabled={!prepared} />}
-              </>
+              /* KAI-9011: Edit left the bar (Editor lives in the bottom dock). KAI-9010: Export
+                 is internal-only (?internal=1). The hero bar is pills-first now. */
+              internalTools ? <TopBarButton icon={<ExportIcon />} label="Export" onClick={onExport} disabled={!prepared} /> : null
             )}
           />
         </div>

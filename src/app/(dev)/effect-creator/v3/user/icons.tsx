@@ -4,7 +4,7 @@
 // glyphs — chosen over Lucide so the UI doesn't read as generic shadcn/SaaS. `weight="regular"`
 // (default) reads cleanly at 24px on mobile; icons inherit `currentColor` from the button.
 
-import { ArrowArcLeft, ArrowArcRight, ArrowCounterClockwise, BezierCurve, DiceFive, WaveSine, Check, X, Plus, Minus, Trash, PlusCircle, Sparkle, ImageSquare, PencilSimple, BoundingBox, Palette, DownloadSimple, Shapes, Eye, EyeSlash, MagicWand, Faders, Crop, Sun, CircleHalf, Drop, Thermometer, VectorTwo, Waveform, Magnet, Angle, LineSegment, CornersOut, Gradient } from '@phosphor-icons/react'
+import { ArrowArcLeft, ArrowArcRight, ArrowCounterClockwise, BezierCurve, DiceFive, WaveSine, Check, X, Plus, Minus, Trash, PlusCircle, Sparkle, ImageSquare, PencilSimple, BoundingBox, Palette, DownloadSimple, Shapes, Eye, EyeSlash, MagicWand, Faders, Crop, Sun, CircleHalf, Drop, Thermometer, VectorTwo, Waveform, Magnet, Angle, LineSegment, CornersOut, Gradient, CompassTool } from '@phosphor-icons/react'
 
 type P = { className?: string }
 const SZ = 24
@@ -44,6 +44,9 @@ export const BlendIcon = (p: P) => <Sparkle size={SZ} className={p.className} />
 // First screen (artwork toolbar) icons — paired with the brand pills.
 export const UploadIcon = (p: P) => <ImageSquare size={SZ} className={p.className} />
 export const EditIcon = (p: P) => <PencilSimple size={SZ} className={p.className} />
+// KAI-9011 (Dan): 'Editor' reads like a design tool, not a pencil. CompassTool is the pick-for-now;
+// alternates offered to Dan: PenNib, Blueprint-class, Untitled-UI set if Phosphor stays scarce.
+export const EditorIcon = (p: P) => <CompassTool size={SZ} className={p.className} />
 export const OutlineIcon = (p: P) => <BoundingBox size={SZ} className={p.className} />
 export const ColorsIcon = (p: P) => <Palette size={SZ} className={p.className} />
 // Magic wand — runs BEN to auto-generate the subject cut-out from the flat square.
