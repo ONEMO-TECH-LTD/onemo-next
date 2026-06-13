@@ -1,7 +1,9 @@
-// Reveal transition state — the Magic-generation reveal (and future transitions) play through ONE
-// in-canvas postprocessing pass (RevealComposer). This store is the trigger + the chosen effect.
+// Reveal transition state — every transition plays through ONE in-canvas postprocessing pass
+// (RevealComposer). This store is the trigger + the chosen effect. RIGHT NOW it is a TESTING
+// surface: `start()` is called only by the replay button (RevealFxPicker), NOT by Magic, so every
+// effect can be auditioned on the live object on demand.
 // PRODUCTION SHAPE: when Dan picks the effect, the picker is deleted and `fx` is pinned to the
-// chosen name; `start()` stays, called by Magic completion (and other transition points).
+// chosen name; `start()` is then re-wired into Magic completion (and other transition points).
 import { create } from 'zustand'
 
 export type RevealTransition = { name: string; glsl: string; paramsTypes?: Record<string, string>; defaultParams?: Record<string, unknown> }

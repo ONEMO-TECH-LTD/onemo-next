@@ -22,7 +22,7 @@ export default function RevealFxPicker({ fromUrl }: { fromUrl?: string }) {
       <select value={fx} onChange={(e) => setFx(e.target.value)} style={{ font: 'inherit', maxWidth: 230 }}>
         {names.map((n) => <option key={n} value={n}>{n}</option>)}
       </select>
-      <button type="button" onClick={() => start(fromUrl)} style={{ font: '600 12px inherit', border: 0, borderRadius: 999, padding: '5px 12px', background: '#1c2030', color: '#fff', cursor: 'pointer' }}>▶ replay on object</button>
+      <button type="button" onClick={() => start(fromUrl)} style={{ font: '600 12px inherit', border: 0, borderRadius: 999, padding: '5px 12px', background: '#1c2030', color: '#fff', cursor: 'pointer' }}>▶ play on object</button>
     </div>
   )
 }

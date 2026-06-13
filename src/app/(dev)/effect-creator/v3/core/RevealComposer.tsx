@@ -1,10 +1,14 @@
 'use client'
-// RevealComposer — the Magic-generation reveal as an in-canvas postprocessing pass, wired to the
+// RevealComposer — a transition-TESTING pass as an in-canvas postprocessing pass, wired to the
 // CANONICAL gl-transitions contract (ref: gl-transition runtime, MIT). Mounts as a child INSIDE
 // EffectViewer's <Canvas>, owns the render loop via a priority useFrame:
 //   • idle  → passthrough: render the scene exactly as R3F would (zero behaviour change).
-//   • reveal→ render the live object into an FBO ("to"), then draw a fullscreen quad running the
-//             chosen transition from the flat photo ("from") → the object, advancing progress.
+//   • reveal→ render the live object into an FBO ("to"), render the live scene to screen UNTOUCHED
+//             as the base, then overlay the chosen transition (flat photo "from" → object) CLIPPED
+//             to the object silhouette — so the effect plays ONLY on the 3D object, never the
+//             whole screen. The trigger is the replay button (RevealFxPicker), NOT Magic — this is
+//             an audition surface to see every effect on the object on demand. When Dan pins one,
+//             collapse the picker and re-wire start() into Magic completion + other transitions.
 // Contract (verbatim from the reference runtime): the host provides `from`,`to` samplers +
 // `progress`,`ratio`,`_fromR`,`_toR` uniforms + getFromColor/getToColor (cover-resize); the
 // transition GLSL implements `vec4 transition(vec2 uv)`. Compiled as GLSL ES 1.00 (no glslVersion)
@@ -28,7 +32,10 @@ uniform float progress, ratio, _fromR, _toR;
 vec4 getFromColor(vec2 uv){ return texture2D(from, ${COVER('_fromR')}); }
 vec4 getToColor(vec2 uv){ return texture2D(to, ${COVER('_toR')}); }
 ${glsl}
-void main(){ gl_FragColor = transition(_uv); }`
+// OBJECT-ONLY: clip the transition to the live object's silhouette (the "to" render is the scene
+// on a transparent bg, so its alpha IS the object mask). Output straight alpha → composites over
+// the untouched live scene, so the effect plays only on the 3D object, never the whole screen.
+void main(){ vec4 c = transition(_uv); float mask = getToColor(_uv).a; gl_FragColor = vec4(c.rgb, c.a * mask); }`
 
 const WATERFALL: RevealTransition = { name: '★ waterfall (custom)', glsl: `
 vec4 transition(vec2 uv){ float past=clamp((uv.x-(progress*1.5-.12))/.55,0.,1.);
@@ -50,8 +57,14 @@ function compiles(gl: WebGLRenderingContext, fsSrc: string): boolean {
 }
 
 export default function RevealComposer() {
-  const { gl, scene, camera, size, viewport } = useThree()
+  const { gl, scene, camera, size, viewport, invalidate } = useThree()
   const dpr = viewport.dpr
+  // The Canvas runs frameloop="demand" — an idle scene renders no frames. Pressing play only flips
+  // the store flag, so we must KICK the render loop here when a run starts. useFrame then keeps
+  // itself alive via state.invalidate() until the transition finishes. (This is exactly why
+  // "replay did nothing" on a settled scene — nothing was driving the loop.)
+  const runToken = useRevealStore((s) => s.runToken)
+  useEffect(() => { if (runToken > 0) invalidate() }, [runToken, invalidate])
   const fbo = useFBO(Math.max(2, Math.floor(size.width * dpr)), Math.max(2, Math.floor(size.height * dpr)))
   const quadScene = useMemo(() => new THREE.Scene(), [])
   const quadCam = useMemo(() => new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1), [])
@@ -92,8 +105,9 @@ export default function RevealComposer() {
       progress: { value: 0 }, ratio: { value: ar }, _fromR: { value: fromRRef.current }, _toR: { value: ar },
     }
     if (t.paramsTypes) for (const k in t.paramsTypes) uniforms[k] = { value: (t.defaultParams || {})[k] as number | number[] }
-    // RawShaderMaterial, NO glslVersion → GLSL ES 1.00 (the canonical target)
-    const mat = new THREE.RawShaderMaterial({ vertexShader: VERT, fragmentShader: fragFor(t.glsl), uniforms, depthTest: false, depthWrite: false })
+    // RawShaderMaterial, NO glslVersion → GLSL ES 1.00 (the canonical target).
+    // transparent → the masked quad blends over the live scene base (object-only overlay).
+    const mat = new THREE.RawShaderMaterial({ vertexShader: VERT, fragmentShader: fragFor(t.glsl), uniforms, transparent: true, depthTest: false, depthWrite: false })
     if (meshRef.current) { matRef.current?.dispose(); meshRef.current.material = mat; matRef.current = mat }
   }
 
@@ -121,9 +135,18 @@ export default function RevealComposer() {
     const p = Math.min(1, (performance.now() - r.startedAt) / r.durationMs)
     const ar = size.width / size.height
     mat.uniforms.progress.value = p; mat.uniforms.ratio.value = ar; mat.uniforms._toR.value = ar
-    renderer.setRenderTarget(fbo); renderer.render(scene, camera); renderer.setRenderTarget(null)
+    // 1) live object → FBO (the "to" image + its alpha = the object mask). Force a TRANSPARENT
+    // clear so the area outside the object silhouette has alpha 0 — that's what clips the effect to
+    // the object. (Without this the FBO clears opaque and the mask reads "everywhere" → whole-screen wash.)
+    const prevAlpha = renderer.getClearAlpha()
+    renderer.setClearAlpha(0)
+    renderer.setRenderTarget(fbo); renderer.clear(); renderer.render(scene, camera); renderer.setRenderTarget(null)
+    renderer.setClearAlpha(prevAlpha)
     mat.uniforms.to.value = fbo.texture
-    renderer.render(quadScene, quadCam)
+    // 2) the live scene to screen, untouched (bg + shadow + object stay exactly as normal)
+    renderer.autoClear = true; renderer.render(scene, camera)
+    // 3) overlay the transition, clipped to the object silhouette, on top — nothing else moves
+    renderer.autoClear = false; renderer.render(quadScene, quadCam); renderer.autoClear = true
     if (p < 1) state.invalidate(); else useRevealStore.getState().stop()
   }, 1)
 

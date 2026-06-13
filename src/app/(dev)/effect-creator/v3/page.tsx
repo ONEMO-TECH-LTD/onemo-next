@@ -20,7 +20,6 @@ import { UndoIcon, RedoIcon, ExportIcon } from './user/icons'
 import TopBar, { TopBarButton } from './user/TopBar'
 import RevealComposer from './core/RevealComposer'
 import RevealFxPicker from './user/RevealFxPicker'
-import { useRevealStore } from './user/revealStore'
 import edStyles from './user/outline-editor.module.css'
 import { INITIAL_ARTWORK } from './user/outlineStore'
 import { useOutlineStore } from './user/outlineStore'
@@ -262,8 +261,9 @@ function PrototypePageInner() {
         setAutoOutline(true)
         setGenerating(false)
         pushHistory(preMagic)
-        // the object is now live in the scene — play the reveal transition over it (in-canvas pass)
-        useRevealStore.getState().start(artworkUrl)
+        // NOTE: the reveal is a transition-TESTING surface right now — it is NOT fired by Magic.
+        // The replay button (RevealFxPicker) is the sole trigger so every effect can be auditioned
+        // on the live object on demand. Once Dan pins an effect, re-wire start() here + other points.
         // #23: the editor session that auto-opens is its own step — stash the post-magic state
         // Magic is SELF-SUFFICIENT (Dan ruling, plan v2.1 A4): the fine-tuned result lands in 3D —
         // the editor does NOT open (the old #26 auto-open is dead). Refinement = Edit/double-tap.
