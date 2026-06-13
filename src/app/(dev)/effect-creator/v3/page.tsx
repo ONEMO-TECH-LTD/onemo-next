@@ -18,6 +18,9 @@ import { useSearchParams } from 'next/navigation'
 import { useSceneStore } from './admin/sceneStore'
 import { UndoIcon, RedoIcon, ExportIcon } from './user/icons'
 import TopBar, { TopBarButton } from './user/TopBar'
+import RevealComposer from './core/RevealComposer'
+import RevealFxPicker from './user/RevealFxPicker'
+import { useRevealStore } from './user/revealStore'
 import edStyles from './user/outline-editor.module.css'
 import { INITIAL_ARTWORK } from './user/outlineStore'
 import { useOutlineStore } from './user/outlineStore'
@@ -230,6 +233,7 @@ function PrototypePageInner() {
   // Magic: re-prepare as a SHAPED subject cut-out. BEN runs in the Web Worker — the page stays
   // responsive while the shimmer plays; the object morphs IN PLACE in the same scene (no jump).
   const magicRunRef = useRef(0) // UX-5: cancel bumps the token; a stale run's result is discarded
+
   const handleMagic = useCallback(() => {
     if (!artworkUrl || generating) return
     const preMagic = snapNow() // #23: one Magic = one global undo step (pushed only on success)
@@ -258,6 +262,8 @@ function PrototypePageInner() {
         setAutoOutline(true)
         setGenerating(false)
         pushHistory(preMagic)
+        // the object is now live in the scene — play the reveal transition over it (in-canvas pass)
+        useRevealStore.getState().start(artworkUrl)
         // #23: the editor session that auto-opens is its own step — stash the post-magic state
         // Magic is SELF-SUFFICIENT (Dan ruling, plan v2.1 A4): the fine-tuned result lands in 3D —
         // the editor does NOT open (the old #26 auto-open is dead). Refinement = Edit/double-tap.
@@ -334,10 +340,14 @@ function PrototypePageInner() {
               prepared={prepared ?? undefined}
               onStatus={handleStatus}
               frozen={editingOutline}
-            />
+            >
+              <RevealComposer />
+            </EffectViewer>
           </>
         )}
       </AdminViewer>
+      {artworkUrl && !editingOutline && <RevealFxPicker fromUrl={artworkUrl} />}
+
 
       {/* Pre-upload: pearly-glass ONEMO square + load control (over the warming scene) */}
       {!artworkUrl && <EmptyState onFile={handleFile} />}
