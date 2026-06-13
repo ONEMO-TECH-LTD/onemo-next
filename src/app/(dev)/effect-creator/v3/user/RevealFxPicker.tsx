@@ -3,22 +3,18 @@
 // REMOVE THIS FILE once Dan chooses: delete the import/mount in page.tsx and pin revealStore.fx
 // to the chosen name. The composer + Magic wiring stay; only this picker goes.
 import { useEffect, useState } from 'react'
-import { useRevealStore, type RevealTransition } from './revealStore'
+import { useRevealStore } from './revealStore'
 
 export default function RevealFxPicker({ fromUrl }: { fromUrl?: string }) {
-  const [names, setNames] = useState<string[]>([])
   const fx = useRevealStore((s) => s.fx)
   const setFx = useRevealStore((s) => s.setFx)
   const start = useRevealStore((s) => s.start)
+  const names = useRevealStore((s) => s.validFx) // only transitions that compiled on this driver
 
   useEffect(() => {
-    fetch('/reveal-transitions.json').then((r) => r.json()).then((j: RevealTransition[]) => {
-      const all = ['★ waterfall (custom)', ...j.map((t) => t.name)]
-      setNames(all)
-      const q = new URLSearchParams(location.search).get('fx')
-      if (q && all.includes(q)) setFx(q)
-    }).catch(() => setNames([fx]))
-  }, [fx, setFx])
+    const q = new URLSearchParams(location.search).get('fx')
+    if (q && names.includes(q)) setFx(q)
+  }, [names, setFx])
 
   return (
     <div style={{ position: 'fixed', top: 70, left: 14, zIndex: 50, display: 'flex', gap: 6, alignItems: 'center', background: 'rgba(255,255,255,.92)', borderRadius: 12, padding: '6px 10px', boxShadow: '0 4px 16px rgba(20,24,40,.14)', fontSize: 12, fontFamily: 'inherit' }}>

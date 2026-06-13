@@ -13,19 +13,23 @@ interface RevealState {
   fx: string            // chosen transition name (the production default lives here)
   fromUrl?: string      // the "before" image (the flat photo)
   runToken: number      // bumps each start so the composer re-arms
+  validFx: string[]     // transitions that actually compile on this driver (composer publishes)
   start: (fromUrl?: string) => void
   stop: () => void
   setFx: (name: string) => void
+  setValidFx: (names: string[]) => void
 }
 
 export const useRevealStore = create<RevealState>((set) => ({
   active: false,
   startedAt: 0,
   durationMs: 1300,
-  fx: 'GlitchMemories', // placeholder default until Dan picks; swap to the chosen name to pin
+  fx: '★ waterfall (custom)', // placeholder default until Dan picks; swap to the chosen name to pin
   fromUrl: undefined,
   runToken: 0,
+  validFx: [],
   start: (fromUrl) => set((s) => ({ active: true, startedAt: performance.now(), fromUrl: fromUrl ?? s.fromUrl, runToken: s.runToken + 1 })),
   stop: () => set({ active: false }),
   setFx: (name) => set({ fx: name }),
+  setValidFx: (names) => set({ validFx: names }),
 }))
