@@ -9,6 +9,7 @@ import { useRevealStore } from './revealStore'
 export default function ParticleControls() {
   const setParticle = useRevealStore((s) => s.setParticle)
   const v = useControls('Particle FX', {
+    density: { value: 460, min: 120, max: 560, step: 20, label: 'density (more = denser)' },
     solidSize: { value: 5.0, min: 1, max: 12, step: 0.1, label: 'solid size (tile the model)' },
     fluidSize: { value: 3.4, min: 0.5, max: 8, step: 0.1, label: 'fluid size (dispersed, fine)' },
     chaos: { value: 0.2, min: 0, max: 1.2, step: 0.01, label: 'chaos (spread/turbulence)' },
@@ -17,8 +18,8 @@ export default function ParticleControls() {
   })
 
   useEffect(() => {
-    setParticle({ solidSize: v.solidSize, fluidSize: v.fluidSize, chaos: v.chaos, flowSpeed: v.flowSpeed, durationMs: v.duration })
-  }, [v.solidSize, v.fluidSize, v.chaos, v.flowSpeed, v.duration, setParticle])
+    setParticle({ density: v.density, solidSize: v.solidSize, fluidSize: v.fluidSize, chaos: v.chaos, flowSpeed: v.flowSpeed, durationMs: v.duration })
+  }, [v.density, v.solidSize, v.fluidSize, v.chaos, v.flowSpeed, v.duration, setParticle])
 
   return null
 }

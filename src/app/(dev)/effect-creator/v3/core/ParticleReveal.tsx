@@ -17,8 +17,6 @@ import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { useRevealStore } from '../user/revealStore'
 
-const GRID = 300 // 300² ≈ 90k particles — dense enough to tile into the solid model at home
-
 // Ashima 3D simplex noise (MIT) + curl noise (3 offset potential fields) — the fluid flow field.
 const NOISE = `
 vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}
@@ -98,31 +96,44 @@ export default function ParticleReveal() {
   const particleScene = useMemo(() => new THREE.Scene(), [])
   const orthoCam = useMemo(() => new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1), [])
   const pMatRef = useRef<THREE.ShaderMaterial | null>(null)
+  const ptsRef = useRef<THREE.Points | null>(null)
 
   const runToken = useRevealStore((s) => s.runToken)
+  const density = useRevealStore((s) => s.particle.density) // grid resolution → rebuild the point grid
   useEffect(() => { if (runToken > 0) invalidate() }, [runToken, invalidate])
 
+  // material + Points created once (placeholder geometry; the real grid is built by the density effect)
   useEffect(() => {
     const ar = size.width / size.height
-    const N = GRID
+    const pMat = new THREE.ShaderMaterial({
+      vertexShader: P_VERT, fragmentShader: P_FRAG,
+      uniforms: {
+        uObjectTex: { value: fbo.texture }, uProgress: { value: 0 }, uAspect: { value: ar }, uTime: { value: 0 },
+        uChaos: { value: 0.2 }, uFlowSpeed: { value: 0.55 }, uSolidSize: { value: 5 * dpr }, uFluidSize: { value: 3.4 * dpr },
+      },
+      transparent: true, depthTest: false, depthWrite: false, blending: THREE.NormalBlending, toneMapped: false,
+    })
+    const pts = new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(3), 3)), pMat)
+    pts.frustumCulled = false; particleScene.add(pts); pMatRef.current = pMat; ptsRef.current = pts
+    return () => { particleScene.remove(pts); pts.geometry.dispose(); pMat.dispose(); ptsRef.current = null; pMatRef.current = null }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [particleScene])
+
+  // (re)build the point grid when density changes — swap geometry only (no shader recompile)
+  useEffect(() => {
+    const pts = ptsRef.current
+    if (!pts) return
+    const N = Math.max(8, Math.floor(density))
     const arr = new Float32Array(N * N * 3)
     let k = 0
     for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { arr[k++] = x / (N - 1); arr[k++] = y / (N - 1); arr[k++] = 0 }
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position', new THREE.BufferAttribute(arr, 3))
-    const pMat = new THREE.ShaderMaterial({
-      vertexShader: P_VERT, fragmentShader: P_FRAG,
-      uniforms: {
-        uObjectTex: { value: fbo.texture }, uProgress: { value: 0 }, uAspect: { value: ar }, uTime: { value: 0 },
-        uChaos: { value: 0.4 }, uFlowSpeed: { value: 0.5 }, uSolidSize: { value: 5 * dpr }, uFluidSize: { value: 2.2 * dpr },
-      },
-      transparent: true, depthTest: false, depthWrite: false, blending: THREE.NormalBlending, toneMapped: false,
-    })
-    const pts = new THREE.Points(geo, pMat)
-    pts.frustumCulled = false; particleScene.add(pts); pMatRef.current = pMat
-    return () => { particleScene.remove(pts); geo.dispose(); pMat.dispose() }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [particleScene])
+    const old = pts.geometry
+    pts.geometry = geo
+    if (old) old.dispose()
+    invalidate()
+  }, [density, invalidate])
 
   useFrame(() => {
     const r = useRevealStore.getState()
