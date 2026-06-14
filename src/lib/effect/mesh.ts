@@ -24,29 +24,24 @@ export interface MeshOptions {
 interface ProfileSample { radial: number; z: number; nr: number; nz: number }
 
 /**
- * Edge cross-section (KAI-8951 — Dan: the rim must be an OUTWARD ROUNDED LIP, convex, rolling
- * outward — the previous design inset both caps by r and put the wall at the silhouette, so the
- * face sat inside a crease ring that read as a GROOVE). Now: the caps keep the FULL contour
- * extent; the lip BULGES OUTWARD by r beyond the silhouette, tangent to both faces (no crease).
- * radial 0 = the contour (cap edge); +r = the lip's outermost roll at the mid-wall. The nominal
- * cutline stays the contour — the lip models the material rolling outward; the visual silhouette
- * grows by a UNIFORM +r (0.15mm), shape unchanged.
+ * Edge cross-section (Dan, 2026-06-14): the rim must read as an ALMOST-STRAIGHT wall with SLIGHTLY
+ * rounded corners — NOT a groove (the old inset-crease), NOT an outward lip bulge, NOT a full
+ * rounded bevel. The wall sits AT the contour (radial 0 = silhouette, shape unchanged); the caps
+ * are inset by r and a SMALL convex fillet rolls the corner from cap → wall with no crease. radial
+ * runs [-r, 0]: -r at the cap edge (inset), 0 at the straight wall. The caps are inset by r to meet
+ * the fillet (see buildShapedGeometry) so there is no gap.
  */
 function buildProfile(t: number, rIn: number, segs: number): ProfileSample[] {
   const half = t / 2
   const r = Math.min(rIn, half)
   const out: ProfileSample[] = []
-  for (let i = 0; i <= segs; i++) { // top quarter: face edge (flush, tangent) → outermost roll
-    const a = (Math.PI / 2) * (i / segs)
-    out.push({ radial: r * Math.sin(a), z: (half - r) + r * Math.cos(a), nr: Math.sin(a), nz: Math.cos(a) })
+  for (let i = 0; i <= segs; i++) { // top fillet: cap edge (inset -r) → straight wall top
+    const a = (Math.PI / 2) * (1 - i / segs)
+    out.push({ radial: -r + r * Math.cos(a), z: (half - r) + r * Math.sin(a), nr: Math.cos(a), nz: Math.sin(a) })
   }
-  if (half - r > 1e-6) { // outward wall at +r (the lip's crest)
-    out.push({ radial: r, z: half - r, nr: 1, nz: 0 })
-    out.push({ radial: r, z: -(half - r), nr: 1, nz: 0 })
-  }
-  for (let i = 0; i <= segs; i++) { // bottom quarter: outermost roll → back edge (flush, tangent)
+  for (let i = 0; i <= segs; i++) { // straight wall (radial 0) → bottom fillet → cap edge (inset -r)
     const a = (Math.PI / 2) * (i / segs)
-    out.push({ radial: r * Math.cos(a), z: -(half - r) - r * Math.sin(a), nr: Math.cos(a), nz: -Math.sin(a) })
+    out.push({ radial: -r + r * Math.cos(a), z: -(half - r) - r * Math.sin(a), nr: Math.cos(a), nz: -Math.sin(a) })
   }
   return out
 }
@@ -132,7 +127,9 @@ export function buildShapedGeometry(contour: Contour, opts: MeshOptions): Shaped
     const pts = ring.pts
     const N = ringNormals(pts)
     const n = pts.length
-    capRings.push(pts) // caps keep the FULL contour (KAI-8951 — no inset, no crease ring)
+    // caps inset by r to meet the fillet's cap edge (radial -r) — the straight wall stays AT the
+    // contour (radial 0 = silhouette), so the shape is unchanged; only the sub-mm rounded corner insets
+    capRings.push(pts.map((P, i) => [P[0] - N[i][0] * r, P[1] - N[i][1] * r] as Pt))
     const ev = (P: Pt, Np: Pt, s: number): V => {
       const ps = profile[s]
       // LOCAL colour roll: every profile sample on this perimeter point samples ONE source pixel just
