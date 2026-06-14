@@ -21,6 +21,7 @@ import TopBar, { TopBarButton } from './user/TopBar'
 import ParticleReveal from './core/ParticleReveal'
 import RevealFxPicker from './user/RevealFxPicker'
 import ParticleControls from './user/ParticleControls'
+import { useRevealStore } from './user/revealStore'
 import edStyles from './user/outline-editor.module.css'
 import { INITIAL_ARTWORK } from './user/outlineStore'
 import { useOutlineStore } from './user/outlineStore'
@@ -240,6 +241,9 @@ function PrototypePageInner() {
     const runId = ++magicRunRef.current
     setGenerating(true)
     setGenLabel('Cutting out…')
+    // Magic transition: the current object disperses into pixels NOW and holds (sampling the live
+    // scene) while BEN computes; it reassembles into the new shape when it lands (magicFinish below).
+    useRevealStore.getState().magicStart()
     import('@/lib/effect/prepare-effect')
       .then(({ prepareEffect }) =>
         prepareEffect(artworkUrl, 'shaped', undefined, (s) => {
@@ -262,9 +266,9 @@ function PrototypePageInner() {
         setAutoOutline(true)
         setGenerating(false)
         pushHistory(preMagic)
-        // NOTE: the reveal is a transition-TESTING surface right now — it is NOT fired by Magic.
-        // The replay button (RevealFxPicker) is the sole trigger so every effect can be auditioned
-        // on the live object on demand. Once Dan pins an effect, re-wire start() here + other points.
+        // the new shape is live in the scene — reassemble the dispersed pixels into it (the Magic
+        // transition's second half). The picker's "play on object" button still runs the test cycle.
+        useRevealStore.getState().magicFinish()
         // #23: the editor session that auto-opens is its own step — stash the post-magic state
         // Magic is SELF-SUFFICIENT (Dan ruling, plan v2.1 A4): the fine-tuned result lands in 3D —
         // the editor does NOT open (the old #26 auto-open is dead). Refinement = Edit/double-tap.
@@ -274,6 +278,7 @@ function PrototypePageInner() {
         console.warn('[effect] prepare (shaped) failed:', e)
         toast('error', `Magic failed: ${(e as Error)?.message ?? e}`) // G4 — incl. the TD-E watchdog
         setGenerating(false)
+        useRevealStore.getState().magicFinish() // reassemble back to the current object — don't hang dispersed
       })
   }, [artworkUrl, generating, snapNow, pushHistory, designState])
 
@@ -355,7 +360,7 @@ function PrototypePageInner() {
       {!artworkUrl && <EmptyState onFile={handleFile} />}
 
       {/* Magic shimmer — page stays responsive (worker); label = the honest wait state (G5) */}
-      {generating && <GenerateShimmer label={genLabel} onCancel={() => { magicRunRef.current++; setGenerating(false) }} />}
+      {generating && <GenerateShimmer label={genLabel} onCancel={() => { magicRunRef.current++; setGenerating(false); useRevealStore.getState().magicFinish() }} />}
 
       {/* Trim takeover (D-TRIM): the creation row swaps to the material-color carousel — tap
           recolors the 3D back LIVE; ✓ keeps (one history step), ✕ reverts to the pre-open color */}
