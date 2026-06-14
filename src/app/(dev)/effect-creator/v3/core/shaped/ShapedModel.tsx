@@ -284,26 +284,9 @@ export default function ShapedModel({
     })
   }, [result?.texture, normalMap, roughnessMap, bumpMap, suede])
 
-  // EDGE = a MATTE COPY of the front: SAME image (arc-length UV → wraps over the lip, no stretch) +
-  // SAME suede maps (channel 1 world-XY → no stretch), but reflectivity KILLED so the curved lip
-  // doesn't catch the sheen/Fresnel highlight the flat front never shows.
-  const edgeMaterial = useMemo(() => {
-    return new THREE.MeshPhysicalMaterial({
-      map: result?.edgeTexture ?? null, // STRONGLY blurred → smooth rim colour, no per-pixel bands
-      color: new THREE.Color(0xffffff),
-      normalMap,
-      normalScale: new THREE.Vector2(suede.normalScale, suede.normalScale),
-      bumpMap,
-      bumpScale: suede.bumpScale,
-      roughnessMap,
-      roughness: 1,
-      metalness: 0,
-      sheen: 0,
-      envMapIntensity: 0,
-      specularIntensity: 0,
-      side: THREE.DoubleSide,
-    })
-  }, [result?.edgeTexture, normalMap, roughnessMap, bumpMap, suede])
+  // EDGE = the FRONT material (Dan 2026-06-14): the near-straight wall must read as one continuous
+  // surface with the face — no separate matte/blurred rim, which read as a dark recessed GROOVE.
+  // (The old matte rim existed for the curved outward lip; that lip is gone — the wall is flat now.)
 
   // BACK = same golden suede setup, just the back colour.
   const backMaterial = useMemo(() => {
@@ -327,10 +310,10 @@ export default function ShapedModel({
   // dispose replaced materials (G10 hygiene — replaced MeshPhysicalMaterials leaked before)
   const prevMaterialsRef = useRef<THREE.Material[]>([])
   useEffect(() => {
-    const next: THREE.Material[] = [frontMaterial, edgeMaterial, backMaterial]
+    const next: THREE.Material[] = [frontMaterial, backMaterial]
     for (const m of prevMaterialsRef.current) if (!next.includes(m)) m.dispose()
     prevMaterialsRef.current = next
-  }, [frontMaterial, edgeMaterial, backMaterial])
+  }, [frontMaterial, backMaterial])
 
   // G1 pan/zoom on the front artwork texture — MATRIX-ONLY (repeat/offset; NO needsUpdate, which
   // would force a full ~23 MB canvas→GPU re-upload per pointer event). invalidate() renders the change.
@@ -354,11 +337,11 @@ export default function ShapedModel({
     for (const m of prevMaterialsRef.current) m.dispose()
   }, [])
 
-  // geometry groups (mesh.ts): 0 = front cap (golden suede, unchanged), 1 = edge lip (matte copy),
-  // 2 = back cap (solid back suede). Order MUST match the addGroup material indices in mesh.ts.
+  // geometry groups (mesh.ts): 0 = front cap, 1 = edge wall (now the SAME front material — one
+  // continuous surface, no dark rim), 2 = back cap. Order MUST match the addGroup indices in mesh.ts.
   const materials = useMemo(
-    () => [frontMaterial, edgeMaterial, backMaterial],
-    [frontMaterial, edgeMaterial, backMaterial],
+    () => [frontMaterial, frontMaterial, backMaterial],
+    [frontMaterial, backMaterial],
   )
 
   // mm → scene units so the longest side maps to fitSize
