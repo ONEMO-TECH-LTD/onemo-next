@@ -379,7 +379,7 @@ export default function ShapedModel({
       <ambientLight intensity={sceneSettings.ambientIntensity} />
       <Center>
         <group>
-          <mesh geometry={result.geometry} material={materials} scale={scale} castShadow receiveShadow />
+          <mesh geometry={result.geometry} material={materials} scale={scale} castShadow receiveShadow userData={{ isEffectObject: true }} />
         </group>
       </Center>
     </>

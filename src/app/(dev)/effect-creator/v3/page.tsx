@@ -18,7 +18,7 @@ import { useSearchParams } from 'next/navigation'
 import { useSceneStore } from './admin/sceneStore'
 import { UndoIcon, RedoIcon, ExportIcon } from './user/icons'
 import TopBar, { TopBarButton } from './user/TopBar'
-import ParticleReveal from './core/ParticleReveal'
+import ParticleMorph from './core/ParticleMorph'
 import RevealFxPicker from './user/RevealFxPicker'
 import ParticleControls from './user/ParticleControls'
 import { useRevealStore } from './user/revealStore'
@@ -347,7 +347,7 @@ function PrototypePageInner() {
               onStatus={handleStatus}
               frozen={editingOutline}
             >
-              <ParticleReveal />
+              <ParticleMorph />
             </EffectViewer>
           </>
         )}

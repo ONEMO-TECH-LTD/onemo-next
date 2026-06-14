@@ -10,6 +10,21 @@ export type RevealTransition = { name: string; glsl: string; paramsTypes?: Recor
 
 // Live-tunable particle config (driven by the leva panel — ParticleControls). The model's image IS
 // the particles (no fader): solid → chaotic particle-fluid → reassembled solid, in one cycle.
+// Surface-sampled hologram-style morph config (ref: cortiz2894/hologram-particles). The object's
+// mesh surface is sampled into particles (position+normal+uv); they deform via fractal noise gated by
+// an animated mask, and morph between shapes. Drives ParticleMorph.
+export interface MorphConfig {
+  particleCount: number // surface samples
+  pointSize: number     // particle px size
+  noiseAmp: number      // deform amplitude (world units) along the surface normal
+  noiseScale: number    // deform frequency
+  noiseSpeed: number    // deform time rate
+  maskContrast: number  // dissolve mask contrast (lower = more of the surface lifts off)
+  floatAmp: number      // idle per-particle bob
+  glow: number          // travel-glow scale during a morph
+  durationMs: number    // transition timing
+}
+
 export type MotionPattern = 'scatter' | 'explode' | 'swirl' | 'fluid' | 'wave' | 'fall'
 export interface ParticleConfig {
   pattern: MotionPattern // how the pixels move when they disperse (the motion-pattern library)
@@ -29,6 +44,8 @@ interface RevealState {
   runToken: number      // bumps each start so the composer re-arms
   validFx: string[]     // transitions that actually compile on this driver (composer publishes)
   particle: ParticleConfig
+  morph: MorphConfig
+  setMorph: (patch: Partial<MorphConfig>) => void
   // phase drives the particle dispersion: 'cycle' = test button (timed solid→disperse→reassemble);
   // 'out' = Magic pressed (disperse + HOLD while it computes); 'in' = reassemble into the new shape.
   phase: 'cycle' | 'out' | 'in'
@@ -50,6 +67,8 @@ export const useRevealStore = create<RevealState>((set) => ({
   runToken: 0,
   validFx: [],
   particle: { pattern: 'scatter', density: 520, pixelSize: 1.1, intensity: 0.3, motionSpeed: 0.4, durationMs: 4200 },
+  morph: { particleCount: 50000, pointSize: 2.0, noiseAmp: 0.02, noiseScale: 26, noiseSpeed: 0.3, maskContrast: 1.4, floatAmp: 0.0025, glow: 1.0, durationMs: 3000 },
+  setMorph: (patch) => set((s) => ({ morph: { ...s.morph, ...patch } })),
   phase: 'cycle',
   start: (fromUrl) => set((s) => ({ active: true, phase: 'cycle', startedAt: performance.now(), fromUrl: fromUrl ?? s.fromUrl, runToken: s.runToken + 1 })),
   magicStart: (fromUrl) => set((s) => ({ active: true, phase: 'out', startedAt: performance.now(), fromUrl: fromUrl ?? s.fromUrl, runToken: s.runToken + 1 })),
