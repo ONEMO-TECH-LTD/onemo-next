@@ -1,15 +1,18 @@
 'use client'
 // ParticleMorph — hologram-style surface-sampled particles (technique ref: cortiz2894/hologram-
-// particles, MIT). Instead of a screen-space pixel grid, we SURFACE-SAMPLE the live 3D object's mesh
-// (MeshSurfaceSampler → position + normal + uv per particle) and render those points, coloured by the
-// REAL artwork (sampled from the object's own texture at each particle's uv). Motion = the reference's
-// engine: a tiny idle float-bob + fractal-noise displacement ALONG each particle's surface normal,
-// gated by an animated noise "mask" (so the surface lifts off organically and the silhouette stays
-// readable). The transition deforms outward and reforms (and will morph between shapes — wired next).
+// particles, MIT). We SURFACE-SAMPLE the live 3D object's mesh (MeshSurfaceSampler → position +
+// normal + uv per particle) and render those points, coloured by the REAL artwork (sampled from the
+// object's own texture at each particle's uv). Motion = the reference's engine: an idle float-bob +
+// fractal-noise displacement ALONG each surface normal, gated by an animated noise mask.
 //
-// Mounts as a child of EffectViewer's <Canvas>; it does NOT own the render loop — it adds a Points
-// object to the scene, hides the solid object while active, and lets R3F draw. WebGL2, single pass —
-// mobile-safe (no WebGPU/TSL needed; the reference's WebGPU is a convenience, not a requirement).
+// THE MORPH (the Magic transition): each particle holds a SOURCE position (the old shape) and a
+// TARGET position (the new shape); uProgress lerps every particle from source→target, so the cloud
+// flows ELEGANTLY into the new shape instead of hard-switching. Sequence: deform-out (old shape
+// dissolves + holds while BEN computes) → morph (lerp old→new) → settle (deform back to 0 on the new
+// shape). First Magic (no old sample) falls back to a scatter→shape assemble (still a smooth lerp).
+//
+// Mounts as a child of EffectViewer's <Canvas>; adds a Points object to the scene, hides the solid
+// object while active, and lets R3F draw. WebGL2 single pass — mobile-safe (no WebGPU/TSL needed).
 import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
@@ -50,22 +53,20 @@ varying vec2 vUv; varying float vGlow;
 ${NOISE}
 void main(){
   vUv = aUv;
-  vec3 base = mix(aPos, aPosTarget, uProgress);          // morph source→target (target==source in cycle)
+  vec3 base = mix(aPos, aPosTarget, uProgress);          // morph source→target
   float t = uTime;
-  // animated dissolve mask — which particles lift off, and how much
   float rawMask = snoise(base*uNoiseScale*0.5 + vec3(t*uNoiseSpeed*0.5));
   float mask = pow(clamp(rawMask*0.5+0.5, 0.0, 1.0), uMaskContrast);
-  // fractal-noise displacement ALONG the surface normal, gated by the mask + the run envelope uE
   float n = fbm(base*uNoiseScale + vec3(t*uNoiseSpeed, 0.0, t*uNoiseSpeed*0.7));
-  vec3 deform = aNormal * (n * uNoiseAmp * mask * uE);
-  // idle float bob (always-on subtle life)
+  vec3 deform = aNormal * (n * uNoiseAmp * mask * uE);    // lift off along the surface normal
   float ph = aSeed*6.2831853;
   vec3 bob = vec3(cos(t*1.3+ph)*0.6, sin(t*1.6+ph), sin(t*1.1+ph+1.0)*0.6) * uFloatAmp;
   vec3 pos = base + deform + bob;
-  // travel glow — particles displaced furthest glow during the run
-  vGlow = clamp(length(deform)/max(uNoiseAmp,1e-4), 0.0, 1.0) * uGlow * uE;
+  // travel glow — the particles that move furthest (morph distance) glow brightest mid-morph
+  float travel = length(aPosTarget - aPos);
+  vGlow = clamp(travel*8.0, 0.0, 1.0) * (uProgress*(1.0-uProgress)*4.0) * uGlow + clamp(length(deform)/max(uNoiseAmp,1e-4),0.0,1.0)*uGlow*uE*0.4;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-  gl_PointSize = uPointSize * uDpr;                      // constant screen-px particle size
+  gl_PointSize = uPointSize * uDpr;
 }`
 
 const F = `
@@ -74,11 +75,10 @@ uniform sampler2D uTex; uniform vec3 uGlowColor;
 varying vec2 vUv; varying float vGlow;
 void main(){
   vec2 d = gl_PointCoord - vec2(0.5);
-  if (dot(d,d) > 0.25) discard;                 // round point
+  if (dot(d,d) > 0.25) discard;
   vec4 c = texture2D(uTex, vUv);
-  if (c.a < 0.5) discard;                        // skip transparent texels
-  vec3 col = mix(c.rgb, uGlowColor, vGlow);      // artwork colour, brightened where it travels
-  gl_FragColor = vec4(col, 1.0);
+  if (c.a < 0.5) discard;
+  gl_FragColor = vec4(mix(c.rgb, uGlowColor, clamp(vGlow,0.0,1.0)), 1.0);
 }`
 
 export default function ParticleMorph() {
@@ -86,18 +86,16 @@ export default function ParticleMorph() {
   const ptsRef = useRef<THREE.Points | null>(null)
   const matRef = useRef<THREE.ShaderMaterial | null>(null)
   const objRef = useRef<THREE.Mesh | null>(null)
-  const sampledUuidRef = useRef<string>('')
+  const srcUuidRef = useRef<string>('')   // geometry uuid currently held as SOURCE
+  const tgtUuidRef = useRef<string>('')   // geometry uuid sampled as TARGET this run
+  const haveSourceRef = useRef(false)
   const dpr = useThree((s) => s.viewport.dpr)
-
   const count = useRevealStore((s) => s.morph.particleCount)
 
   const runToken = useRevealStore((s) => s.runToken)
   useEffect(() => { if (runToken > 0) invalidate() }, [runToken, invalidate])
 
-  // build the Points object once (empty geometry; filled by sampling)
   useEffect(() => {
-    const geo = new THREE.BufferGeometry()
-    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(3), 3)) // placeholder
     const mat = new THREE.ShaderMaterial({
       vertexShader: V, fragmentShader: F,
       uniforms: {
@@ -106,91 +104,134 @@ export default function ParticleMorph() {
         uMaskContrast: { value: 1.4 }, uFloatAmp: { value: 0.0025 }, uPointSize: { value: 2 },
         uGlow: { value: 1 }, uDpr: { value: dpr }, uGlowColor: { value: new THREE.Color('#bfe3ff') },
       },
-      transparent: true, depthTest: true, depthWrite: true, toneMapped: false,
+      transparent: false, depthTest: true, depthWrite: true, toneMapped: false,
     })
-    const pts = new THREE.Points(geo, mat)
-    pts.frustumCulled = false
-    pts.visible = false
-    scene.add(pts)
+    const pts = new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(3), 3)), mat)
+    pts.frustumCulled = false; pts.visible = false; scene.add(pts)
     ptsRef.current = pts; matRef.current = mat
-    return () => { scene.remove(pts); geo.dispose(); mat.dispose(); ptsRef.current = null; matRef.current = null }
+    return () => { scene.remove(pts); pts.geometry.dispose(); mat.dispose(); ptsRef.current = null; matRef.current = null }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene])
 
-  // find the effect object mesh + (re)sample its surface when geometry changes
-  const sampleObject = () => {
+  const findObject = (): THREE.Mesh | null => {
     let mesh: THREE.Mesh | null = null
-    scene.traverse((o) => { if ((o as THREE.Mesh).isMesh && o.userData?.isEffectObject) mesh = o as THREE.Mesh })
-    if (!mesh) return false
-    objRef.current = mesh
-    const m = mesh as THREE.Mesh
-    const geom = m.geometry as THREE.BufferGeometry
-    if (!geom.getAttribute('uv')) return false
-    if (sampledUuidRef.current === geom.uuid && ptsRef.current?.geometry.getAttribute('aPos')) return true
-    sampledUuidRef.current = geom.uuid
+    scene.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh && o.userData?.isEffectObject && m.geometry?.getAttribute('uv')) mesh = m })
+    if (mesh) objRef.current = mesh
+    return mesh
+  }
 
+  // sample a mesh surface into world-space position/normal/uv arrays
+  const sampleMesh = (m: THREE.Mesh, N: number) => {
     m.updateWorldMatrix(true, false)
-    const mw = m.matrixWorld
-    const nm = new THREE.Matrix3().getNormalMatrix(mw)
+    const mw = m.matrixWorld, nm = new THREE.Matrix3().getNormalMatrix(mw)
     const sampler = new MeshSurfaceSampler(m).build()
-    const N = count
-    const aPos = new Float32Array(N * 3), aNorm = new Float32Array(N * 3), aUv = new Float32Array(N * 2), aSeed = new Float32Array(N)
-    const p = new THREE.Vector3(), nrm = new THREE.Vector3(), uv = new THREE.Vector2()
+    const pos = new Float32Array(N * 3), nrm = new Float32Array(N * 3), uv = new Float32Array(N * 2)
+    const vp = new THREE.Vector3(), vn = new THREE.Vector3(), vu = new THREE.Vector2()
     for (let i = 0; i < N; i++) {
-      sampler.sample(p, nrm, undefined, uv)
-      p.applyMatrix4(mw); nrm.applyMatrix3(nm).normalize()
-      aPos[i*3] = p.x; aPos[i*3+1] = p.y; aPos[i*3+2] = p.z
-      aNorm[i*3] = nrm.x; aNorm[i*3+1] = nrm.y; aNorm[i*3+2] = nrm.z
-      aUv[i*2] = uv.x; aUv[i*2+1] = uv.y
-      aSeed[i] = Math.random()
+      sampler.sample(vp, vn, undefined, vu)
+      vp.applyMatrix4(mw); vn.applyMatrix3(nm).normalize()
+      pos[i*3]=vp.x; pos[i*3+1]=vp.y; pos[i*3+2]=vp.z
+      nrm[i*3]=vn.x; nrm[i*3+1]=vn.y; nrm[i*3+2]=vn.z
+      uv[i*2]=vu.x; uv[i*2+1]=vu.y
     }
-    const pts = ptsRef.current!
-    const old = pts.geometry
-    const g = new THREE.BufferGeometry()
-    g.setAttribute('position', new THREE.BufferAttribute(aPos, 3)) // also used for frustum/bounds
-    g.setAttribute('aPos', new THREE.BufferAttribute(aPos, 3))
-    g.setAttribute('aPosTarget', new THREE.BufferAttribute(aPos.slice(), 3)) // == source until a morph
-    g.setAttribute('aNormal', new THREE.BufferAttribute(aNorm, 3))
-    g.setAttribute('aUv', new THREE.BufferAttribute(aUv, 2))
-    g.setAttribute('aSeed', new THREE.BufferAttribute(aSeed, 1))
-    pts.geometry = g
-    old.dispose()
-    // artwork texture = the object's front-cap material map
     const mats = m.material as THREE.Material | THREE.Material[]
     const front = Array.isArray(mats) ? mats[0] : mats
     const tex = (front as THREE.MeshStandardMaterial).map as THREE.Texture | null
-    if (tex && matRef.current) matRef.current.uniforms.uTex.value = tex
-    return true
+    return { pos, nrm, uv, tex }
   }
+
+  // SOURCE: rebuild the whole point geometry from a mesh sample (target := source)
+  const setSource = (m: THREE.Mesh) => {
+    const N = count
+    const s = sampleMesh(m, N)
+    const seed = new Float32Array(N); for (let i = 0; i < N; i++) seed[i] = Math.random()
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.BufferAttribute(s.pos, 3))
+    g.setAttribute('aPos', new THREE.BufferAttribute(s.pos, 3))
+    g.setAttribute('aPosTarget', new THREE.BufferAttribute(s.pos.slice(), 3))
+    g.setAttribute('aNormal', new THREE.BufferAttribute(s.nrm, 3))
+    g.setAttribute('aUv', new THREE.BufferAttribute(s.uv, 2))
+    g.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1))
+    const pts = ptsRef.current!; const old = pts.geometry; pts.geometry = g; old.dispose()
+    if (s.tex && matRef.current) matRef.current.uniforms.uTex.value = s.tex
+    srcUuidRef.current = (m.geometry as THREE.BufferGeometry).uuid
+    haveSourceRef.current = true
+  }
+
+  // TARGET: overwrite only aPosTarget on the existing geometry (keep the source as the start)
+  const setTarget = (m: THREE.Mesh) => {
+    const pts = ptsRef.current!; const g = pts.geometry
+    const tgt = g.getAttribute('aPosTarget') as THREE.BufferAttribute | undefined
+    if (!tgt) { setSource(m); return }
+    const N = (g.getAttribute('aPos') as THREE.BufferAttribute).count
+    const s = sampleMesh(m, N)
+    ;(tgt.array as Float32Array).set(s.pos); tgt.needsUpdate = true
+    tgtUuidRef.current = (m.geometry as THREE.BufferGeometry).uuid
+  }
+
+  // FIRST-MAGIC fallback: build from the new shape, then scatter the SOURCE so it assembles in
+  const setScatterInto = (m: THREE.Mesh) => {
+    setSource(m)
+    const g = ptsRef.current!.geometry
+    const src = g.getAttribute('aPos') as THREE.BufferAttribute
+    const tgt = g.getAttribute('aPosTarget') as THREE.BufferAttribute
+    const a = src.array as Float32Array, b = tgt.array as Float32Array
+    for (let i = 0; i < a.length; i += 3) {
+      a[i]   = b[i]   + (Math.random()-0.5)*0.12
+      a[i+1] = b[i+1] + (Math.random()-0.5)*0.12
+      a[i+2] = b[i+2] + (Math.random()-0.5)*0.12
+    }
+    src.needsUpdate = true
+    tgtUuidRef.current = (m.geometry as THREE.BufferGeometry).uuid
+  }
+
+  const finish = () => { useRevealStore.getState().stop(); if (objRef.current) objRef.current.visible = true; if (ptsRef.current) ptsRef.current.visible = false }
 
   useFrame(() => {
     const r = useRevealStore.getState()
     const mat = matRef.current, pts = ptsRef.current
     if (!mat || !pts) return
+    if (!r.active) { if (objRef.current) objRef.current.visible = true; pts.visible = false; tgtUuidRef.current = ''; return }
     const cfg = r.morph
-
-    if (!r.active) {
-      if (objRef.current) objRef.current.visible = true
-      pts.visible = false
-      return
-    }
-    // entering/continuing a run — make sure we have a fresh surface sample of the object
-    if (!sampleObject()) { return }
-
     const now = performance.now()
-    const p = Math.min(1, (now - r.startedAt) / Math.max(1, cfg.durationMs))
-    // dissolve envelope e (deform amount). cycle = plateau; out = ramp&hold; in = ramp down.
+    const elapsed = now - r.startedAt
+    const dur = Math.max(1, cfg.durationMs)
+    const obj = findObject()
     let e = 0, prog = 0
-    if (r.phase === 'in') {
-      e = 1 - ease(Math.min(1, (now - r.startedAt) / (cfg.durationMs * 0.5)))
-      prog = 1
-      if (e <= 0.001) { useRevealStore.getState().stop(); if (objRef.current) objRef.current.visible = true; pts.visible = false; return }
+
+    if (r.phase === 'cycle') {
+      if (obj && srcUuidRef.current !== (obj.geometry as THREE.BufferGeometry).uuid) setSource(obj)
+      if (!haveSourceRef.current) return
+      const p = Math.min(1, elapsed / dur)
+      if (p >= 1) { finish(); return }
+      e = ease(p < 0.34 ? p/0.34 : p < 0.66 ? 1 : 1-(p-0.66)/0.34)
     } else if (r.phase === 'out') {
-      e = ease(Math.min(1, (now - r.startedAt) / (cfg.durationMs * 0.4)))
-    } else {
-      if (p >= 1) { useRevealStore.getState().stop(); if (objRef.current) objRef.current.visible = true; pts.visible = false; return }
-      const raw = p < 0.34 ? p / 0.34 : p < 0.66 ? 1 : 1 - (p - 0.66) / 0.34
-      e = ease(raw)
+      if (obj && srcUuidRef.current !== (obj.geometry as THREE.BufferGeometry).uuid) setSource(obj)
+      e = ease(Math.min(1, elapsed / (dur * 0.4)))   // ramp the dissolve and hold (waits for magicFinish)
+    } else { // 'in' — morph into the new shape
+      // grab the new shape as TARGET once it appears (different geometry than the source)
+      if (obj && (obj.geometry as THREE.BufferGeometry).uuid !== srcUuidRef.current && tgtUuidRef.current !== (obj.geometry as THREE.BufferGeometry).uuid) {
+        if (haveSourceRef.current) setTarget(obj)
+        else setScatterInto(obj)   // first Magic: no old sample → assemble from scatter
+      }
+      const haveTarget = tgtUuidRef.current !== '' || haveSourceRef.current
+      if (!haveTarget) { e = 1; prog = 0 }            // hold the dissolved old cloud until the new shape lands
+      else {
+        const morphDur = dur * 0.55, settleDur = dur * 0.45
+        if (elapsed < morphDur) { prog = ease(elapsed / morphDur); e = 1 }   // fly old→new, fully lifted
+        else {
+          prog = 1
+          e = 1 - ease(Math.min(1, (elapsed - morphDur) / settleDur))        // settle onto the new shape
+          if (elapsed >= morphDur + settleDur) {
+            // bake target as the new source for next time, then finish
+            const g = pts.geometry
+            const src = g.getAttribute('aPos') as THREE.BufferAttribute, tgt = g.getAttribute('aPosTarget') as THREE.BufferAttribute
+            ;(src.array as Float32Array).set(tgt.array as Float32Array); src.needsUpdate = true
+            srcUuidRef.current = tgtUuidRef.current || srcUuidRef.current
+            finish(); return
+          }
+        }
+      }
     }
 
     if (objRef.current) objRef.current.visible = false
