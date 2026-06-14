@@ -41,10 +41,10 @@ float snoise(vec3 v){
   return 42.0*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));
 }
 vec2 flow2(vec2 uv, float t){
-  // two decorrelated samples → a smooth 2D drift vector. Mid frequency: locally coherent (adjacent
-  // pixels move together → no jitter) but different REGIONS drift apart → elegant pixel separation.
-  return vec2(snoise(vec3(uv*3.8, t)), snoise(vec3(uv*3.8 + 31.4, t + 11.2)));
-}`
+  // smooth low-freq drift for a gentle organic sway of the dispersed cloud (not the main motion)
+  return vec2(snoise(vec3(uv*2.0, t)), snoise(vec3(uv*2.0 + 31.4, t + 11.2)));
+}
+vec3 hash33(vec3 p){ p=fract(p*vec3(443.897,441.423,437.195)); p+=dot(p,p.yxz+19.19); return fract((p.xxy+p.yxx)*p.zyx); }`
 
 const P_VERT = `
 uniform sampler2D uObjectTex; uniform float uProgress,uAspect,uTime,uSpread,uFlowSpeed,uPointSize;
@@ -57,11 +57,17 @@ void main(){
   float inside = step(0.08, tex.a);
   // envelope: 0 = solid (tiled), 1 = dispersed. Plateau: drift apart → hold → drift back.
   float p = uProgress;
-  float e = (p < 0.30) ? smoothstep(0.0, 0.30, p) : (p < 0.70) ? 1.0 : (1.0 - smoothstep(0.70, 1.0, p));
-  e = smoothstep(0.0, 1.0, e);                    // ease for elegance
-  // position-only transition (no fade, no shrink): a smooth flow field drifts the pixels apart and
-  // back. Locally coherent → elegant, not jittery; regionally divergent → the pixels visibly separate.
-  vec2 drift = flow2(uv, uTime * uFlowSpeed) * uSpread * e;
+  float e = (p < 0.34) ? smoothstep(0.0, 0.34, p) : (p < 0.66) ? 1.0 : (1.0 - smoothstep(0.66, 1.0, p));
+  e = smoothstep(0.0, 1.0, e);                    // ease for elegance (slow in/out)
+  // position-only transition (no fade, no shrink): each pixel disperses in its OWN direction so gaps
+  // open between them (true dispersal, not a connected bend), eased slowly = elegant. A gentle sway
+  // gives the dispersed cloud organic life. Reassembles as e returns to 0.
+  vec3 h = hash33(vec3(uv * 127.3, 7.3));
+  float ang = h.x * 6.2831853;
+  float dist = (0.35 + 0.65 * h.y) * uSpread;     // varied per-particle distance → uneven gaps
+  vec2 scatter = vec2(cos(ang), sin(ang)) * dist;
+  vec2 sway = flow2(uv, uTime * uFlowSpeed) * uSpread * 0.22;
+  vec2 drift = (scatter + sway) * e;
   drift.x /= uAspect;
   vec2 ndc = uv*2.0 - 1.0;
   gl_Position = vec4(ndc + drift, 0.0, 1.0);

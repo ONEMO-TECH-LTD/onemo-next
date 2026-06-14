@@ -42,7 +42,7 @@ export const useRevealStore = create<RevealState>((set) => ({
   fromUrl: undefined,
   runToken: 0,
   validFx: [],
-  particle: { density: 460, pixelSize: 1.1, spread: 0.3, flowSpeed: 0.15, durationMs: 3600 },
+  particle: { density: 520, pixelSize: 1.1, spread: 0.28, flowSpeed: 0.15, durationMs: 4200 },
   start: (fromUrl) => set((s) => ({ active: true, startedAt: performance.now(), fromUrl: fromUrl ?? s.fromUrl, runToken: s.runToken + 1 })),
   stop: () => set({ active: false }),
   setFx: (name) => set({ fx: name }),

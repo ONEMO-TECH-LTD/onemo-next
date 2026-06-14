@@ -9,11 +9,11 @@ import { useRevealStore } from './revealStore'
 export default function ParticleControls() {
   const setParticle = useRevealStore((s) => s.setParticle)
   const v = useControls('Particle FX', {
-    density: { value: 460, min: 120, max: 640, step: 20, label: 'density (pixel fineness)' },
+    density: { value: 520, min: 120, max: 1000, step: 20, label: 'density (pixel fineness)' },
     pixelSize: { value: 1.1, min: 0.6, max: 2.5, step: 0.05, label: 'pixel size (1=tile, no gaps)' },
-    spread: { value: 0.3, min: 0, max: 0.8, step: 0.01, label: 'drift (dissolve distance)' },
-    flowSpeed: { value: 0.15, min: 0, max: 0.8, step: 0.01, label: 'flow speed (lower=elegant)' },
-    duration: { value: 3600, min: 800, max: 9000, step: 100, label: 'duration ms (bigger=slower)' },
+    spread: { value: 0.28, min: 0, max: 0.9, step: 0.01, label: 'disperse distance (gaps)' },
+    flowSpeed: { value: 0.15, min: 0, max: 0.8, step: 0.01, label: 'sway speed (lower=elegant)' },
+    duration: { value: 4200, min: 800, max: 9000, step: 100, label: 'duration ms (bigger=slower)' },
   })
 
   useEffect(() => {
