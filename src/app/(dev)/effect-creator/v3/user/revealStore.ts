@@ -8,16 +8,14 @@ import { create } from 'zustand'
 
 export type RevealTransition = { name: string; glsl: string; paramsTypes?: Record<string, string>; defaultParams?: Record<string, unknown> }
 
-// Live-tunable particle config (driven by the leva panel — ParticleControls). Defaults = Dan's brief:
-// fine particles, slow, NO swirl, transitioning into the shape (assemble).
-export type ParticleMode = 'assemble' | 'disperse' | 'burst'
+// Live-tunable particle config (driven by the leva panel — ParticleControls). The model's image IS
+// the particles (no fader): solid → chaotic particle-fluid → reassembled solid, in one cycle.
 export interface ParticleConfig {
-  mode: ParticleMode
-  size: number       // particle size in px (small = fine)
-  swirl: number      // curl-noise swirl amount (0 = straight, no swirl)
-  spread: number     // how far particles scatter (the transition distance)
-  speed: number      // swirl animation rate (only matters when swirl > 0)
-  durationMs: number // total transition time (bigger = slower)
+  solidSize: number  // particle size at home — big enough to tile into the solid model
+  fluidSize: number  // particle size when dispersed — fine
+  chaos: number      // turbulence amplitude (how far/wild the fluid spreads)
+  flowSpeed: number  // how fast the fluid churns
+  durationMs: number // total cycle time (bigger = slower)
 }
 
 interface RevealState {
@@ -44,7 +42,7 @@ export const useRevealStore = create<RevealState>((set) => ({
   fromUrl: undefined,
   runToken: 0,
   validFx: [],
-  particle: { mode: 'assemble', size: 2.8, swirl: 0, spread: 0.34, speed: 0.08, durationMs: 2400 },
+  particle: { solidSize: 5.0, fluidSize: 3.4, chaos: 0.2, flowSpeed: 0.55, durationMs: 3200 },
   start: (fromUrl) => set((s) => ({ active: true, startedAt: performance.now(), fromUrl: fromUrl ?? s.fromUrl, runToken: s.runToken + 1 })),
   stop: () => set({ active: false }),
   setFx: (name) => set({ fx: name }),

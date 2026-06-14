@@ -1,29 +1,25 @@
 'use client'
-// ParticleReveal — the "magical particles" effect (ref technique: Maxime Heckel, "The magical world
-// of particles with react-three-fiber and shaders"). The live 3D object is rendered to an FBO, then
-// represented as a cloud of soft particles (one per grid cell, colour + alpha sampled from the
-// object's own render). A transition animates the cloud: ASSEMBLE (scatter → shape), DISPERSE
-// (shape → scatter), or BURST (out and back). Idle = pure passthrough (zero behaviour change).
+// ParticleReveal — the model's own image BECOMES the particles (no fader, no separate solid copy).
+// Ref technique: Maxime Heckel, "The magical world of particles with react-three-fiber and shaders".
 //
-// Live-tunable via the leva panel (ParticleControls) → revealStore.particle: size (fine↔coarse),
-// swirl (0 = straight, no swirl), spread (transition distance), speed (swirl rate), duration.
-//
-// COLOUR FIDELITY: the renderer applies tone-mapping + sRGB to the on-screen object, but an FBO
-// render is raw linear — sampling it naively shifts the colours. We replicate the renderer's exact
-// output (NeutralToneMapping + linear→sRGB, reading gl.toneMapping/Exposure live) so the particles
-// and the faded object quad match the on-screen object exactly — no colour distortion.
-//
-// Single shader pass (displacement in the vertex shader) — no GPGPU / FloatType render targets, so
-// it is iOS-Safari-safe and mobile-cheap (the only mobile-safe path for this effect). GLSL ES 1.00.
+// One honest representation: the live 3D object is rendered to an FBO, then drawn as a grid of points
+// whose colour + alpha are sampled from that render. The SAME points are the model:
+//   • at home (cycle ends) the points are large enough to tile → they read as the solid model.
+//   • mid-cycle they shrink to fine and are advected by a time-evolving, multi-octave CURL field →
+//     a chaotic particle fluid.
+// Cycle envelope (one play): solid → disperse → chaotic fluid hold → reassemble → solid. (Product:
+// disperse on Magic start, hold while Magic computes, reassemble when the shape is ready.)
+// Idle = pure passthrough (the real mesh). Run end snaps back to passthrough so the rest state is the
+// crisp mesh. Single shader pass — no GPGPU / FloatType, so it is iOS-Safari-safe and mobile-cheap.
 import { useFrame, useThree } from '@react-three/fiber'
 import { useFBO } from '@react-three/drei'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { useRevealStore } from '../user/revealStore'
 
-const GRID = 280 // 280² ≈ 78k particles — dense so fine (small) particles still read as the object
+const GRID = 300 // 300² ≈ 90k particles — dense enough to tile into the solid model at home
 
-// Ashima 3D simplex noise (MIT) + curl noise (3 offset potential fields) — the optional swirl source.
+// Ashima 3D simplex noise (MIT) + curl noise (3 offset potential fields) — the fluid flow field.
 const NOISE = `
 vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}
 vec4 mod289(vec4 x){return x-floor(x*(1.0/289.0))*289.0;}
@@ -61,72 +57,53 @@ vec3 curl(vec3 p){
 vec3 hash33(vec3 p){ p=fract(p*vec3(443.897,441.423,437.195)); p+=dot(p,p.yxz+19.19); return fract((p.xxy+p.yxx)*p.zyx); }`
 
 const P_VERT = `
-uniform sampler2D uObjectTex; uniform float uProgress,uAspect,uTime,uSwirl,uSpread,uSize,uSpeed,uMode;
+uniform sampler2D uObjectTex; uniform float uProgress,uAspect,uTime,uChaos,uFlowSpeed,uSolidSize,uFluidSize;
 varying vec3 vColor; varying float vAlpha;
 ${NOISE}
 void main(){
-  vec2 uv = position.xy;                       // grid cell in [0,1] == the object's screen uv
+  vec2 uv = position.xy;                          // grid cell in [0,1] == the object's screen uv
   vec4 tex = texture2D(uObjectTex, uv);
-  vColor = tex.rgb;                            // sampled object colour, passed through unchanged
+  vColor = tex.rgb;                               // sampled model colour — output 1:1, no distortion
   float inside = step(0.08, tex.a);
   float p = uProgress;
-  float w = (uMode<0.5) ? (1.0-p) : (uMode<1.5) ? p : sin(p*3.14159265); // assemble | disperse | burst
-  vec3 rnd = hash33(vec3(uv*7.13, 3.1)) - 0.5;
-  vec2 scatter = rnd.xy * uSpread * w;
-  vec2 swirlV = curl(vec3(uv*2.6, uTime*uSpeed)).xy * (uSwirl*0.3) * w;
-  vec2 disp = scatter + swirlV; disp.x /= uAspect;
+  // envelope e: 0 = solid model, 1 = fully dispersed. Plateau: disperse → hold chaotic → reassemble.
+  float e = (p < 0.30) ? smoothstep(0.0, 0.30, p) : (p < 0.70) ? 1.0 : (1.0 - smoothstep(0.70, 1.0, p));
+  vec3 rnd = hash33(vec3(uv*7.13, 3.1));
+  // time-evolving multi-octave curl → chaotic particle fluid (per-particle phase + magnitude = chaos)
+  float t = uTime * uFlowSpeed;
+  vec3 f1 = curl(vec3(uv*3.0,  t + rnd.z*6.2831));
+  vec3 f2 = curl(vec3(uv*6.3 + 17.0, t*1.7));
+  vec2 flow = f1.xy + 0.5*f2.xy;
+  vec2 disp = flow * uChaos * (0.45 + rnd.x) * e;
+  disp.x /= uAspect;                              // keep the fluid isotropic on a wide viewport
   vec2 ndc = uv*2.0 - 1.0;
   gl_Position = vec4(ndc + disp, 0.0, 1.0);
-  gl_PointSize = uSize * inside;
-  float vis = (uMode<1.5) ? 1.0 : smoothstep(0.0, 0.12, w); // burst fades in/out; assemble/disperse stay
-  vAlpha = tex.a * inside * vis;
+  gl_PointSize = mix(uSolidSize, uFluidSize, e) * inside; // tile-solid at home, fine in the fluid
+  vAlpha = tex.a * inside;
 }`
 
-// The FBO is already display-referred (matches the on-screen object), so the sampled colour is
-// output 1:1 — no tone-map / encode re-applied (that double-processes and washes out darks).
-// toneMapped:false on the materials keeps three from touching it.
 const P_FRAG = `
 varying vec3 vColor; varying float vAlpha;
 void main(){
   float d = distance(gl_PointCoord, vec2(0.5));
   float s = 1.0 - d*2.0; if (s <= 0.0) discard;
-  s = pow(clamp(s,0.0,1.0), 1.4);            // soft round falloff
-  gl_FragColor = vec4(vColor, s*vAlpha);     // exact object colour — no distortion
-}`
-
-// object quad: the live object, cross-faded against the cloud per mode (so it visibly transitions)
-const O_VERT = `varying vec2 vUv; void main(){ vUv = position.xy*0.5+0.5; gl_Position = vec4(position.xy,0.0,1.0); }`
-const O_FRAG = `uniform sampler2D uObjectTex; uniform float uProgress,uMode; varying vec2 vUv;
-void main(){
-  float p=uProgress;
-  float op = (uMode<0.5) ? p : (uMode<1.5) ? (1.0-p) : (1.0-0.92*sin(p*3.14159265));
-  vec4 t=texture2D(uObjectTex,vUv);
-  gl_FragColor=vec4(t.rgb, t.a*op);          // exact object colour — no distortion
+  s = pow(clamp(s,0.0,1.0), 1.3);                 // soft round falloff
+  gl_FragColor = vec4(vColor, s*vAlpha);          // exact model colour — no distortion
 }`
 
 export default function ParticleReveal() {
   const { gl, scene, camera, size, viewport, invalidate } = useThree()
   const dpr = viewport.dpr
   const fbo = useFBO(Math.max(2, Math.floor(size.width * dpr)), Math.max(2, Math.floor(size.height * dpr)))
-  const objectScene = useMemo(() => new THREE.Scene(), [])
   const particleScene = useMemo(() => new THREE.Scene(), [])
   const orthoCam = useMemo(() => new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1), [])
   const pMatRef = useRef<THREE.ShaderMaterial | null>(null)
-  const oMatRef = useRef<THREE.ShaderMaterial | null>(null)
 
   const runToken = useRevealStore((s) => s.runToken)
   useEffect(() => { if (runToken > 0) invalidate() }, [runToken, invalidate])
 
   useEffect(() => {
     const ar = size.width / size.height
-    const oMat = new THREE.ShaderMaterial({
-      vertexShader: O_VERT, fragmentShader: O_FRAG,
-      uniforms: { uObjectTex: { value: fbo.texture }, uProgress: { value: 0 }, uMode: { value: 0 } },
-      transparent: true, depthTest: false, depthWrite: false, toneMapped: false,
-    })
-    const oQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), oMat)
-    oQuad.frustumCulled = false; objectScene.add(oQuad); oMatRef.current = oMat
-
     const N = GRID
     const arr = new Float32Array(N * N * 3)
     let k = 0
@@ -137,53 +114,47 @@ export default function ParticleReveal() {
       vertexShader: P_VERT, fragmentShader: P_FRAG,
       uniforms: {
         uObjectTex: { value: fbo.texture }, uProgress: { value: 0 }, uAspect: { value: ar }, uTime: { value: 0 },
-        uSwirl: { value: 0 }, uSpread: { value: 0.4 }, uSize: { value: 2 * dpr }, uSpeed: { value: 0.08 }, uMode: { value: 0 },
+        uChaos: { value: 0.4 }, uFlowSpeed: { value: 0.5 }, uSolidSize: { value: 5 * dpr }, uFluidSize: { value: 2.2 * dpr },
       },
       transparent: true, depthTest: false, depthWrite: false, blending: THREE.NormalBlending, toneMapped: false,
     })
     const pts = new THREE.Points(geo, pMat)
     pts.frustumCulled = false; particleScene.add(pts); pMatRef.current = pMat
-    return () => {
-      objectScene.remove(oQuad); oQuad.geometry.dispose(); oMat.dispose()
-      particleScene.remove(pts); geo.dispose(); pMat.dispose()
-    }
+    return () => { particleScene.remove(pts); geo.dispose(); pMat.dispose() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [objectScene, particleScene])
+  }, [particleScene])
 
   useFrame(() => {
     const r = useRevealStore.getState()
     const renderer = gl
     if (!r.active) { renderer.setRenderTarget(null); renderer.render(scene, camera); return }
-    const pMat = pMatRef.current, oMat = oMatRef.current
-    if (!pMat || !oMat) { renderer.setRenderTarget(null); renderer.render(scene, camera); return }
+    const pMat = pMatRef.current
+    if (!pMat) { renderer.setRenderTarget(null); renderer.render(scene, camera); return }
 
     const cfg = r.particle
-    const mode = cfg.mode === 'assemble' ? 0 : cfg.mode === 'disperse' ? 1 : 2
     const p = Math.min(1, (performance.now() - r.startedAt) / Math.max(1, cfg.durationMs))
     const ar = size.width / size.height
 
-    // run finished → snap to a clean passthrough (the true object) and stop, so the resting state
-    // is the real object exactly (no held composite, no leftover particles)
+    // run finished → snap to the crisp real mesh and stop (rest state is the true model)
     if (p >= 1) { renderer.setRenderTarget(null); renderer.render(scene, camera); useRevealStore.getState().stop(); return }
 
-    // 1) live object → FBO (transparent clear → alpha = the object silhouette; rgb = scene colour)
+    // 1) live model → FBO (transparent clear → alpha = silhouette, rgb = model colour)
     const prevAlpha = renderer.getClearAlpha()
     renderer.setClearAlpha(0)
     renderer.setRenderTarget(fbo); renderer.clear(); renderer.render(scene, camera); renderer.setRenderTarget(null)
 
-    // 2) screen: clear transparent, then object quad (fading per mode) + the particle cloud
+    // 2) screen: clear transparent, render ONLY the particles (they ARE the model — no fader)
     renderer.clear()
-    oMat.uniforms.uObjectTex.value = fbo.texture; oMat.uniforms.uProgress.value = p; oMat.uniforms.uMode.value = mode
     const pu = pMat.uniforms
     pu.uObjectTex.value = fbo.texture; pu.uProgress.value = p; pu.uAspect.value = ar; pu.uTime.value = performance.now() / 1000
-    pu.uSwirl.value = cfg.swirl; pu.uSpread.value = cfg.spread; pu.uSize.value = cfg.size * dpr; pu.uSpeed.value = cfg.speed; pu.uMode.value = mode
+    pu.uChaos.value = cfg.chaos; pu.uFlowSpeed.value = cfg.flowSpeed
+    pu.uSolidSize.value = cfg.solidSize * dpr; pu.uFluidSize.value = cfg.fluidSize * dpr
     renderer.autoClear = false
-    renderer.render(objectScene, orthoCam)
     renderer.render(particleScene, orthoCam)
     renderer.autoClear = true
     renderer.setClearAlpha(prevAlpha)
 
-    if (p < 1) invalidate(); else useRevealStore.getState().stop()
+    invalidate()
   }, 1)
 
   return null
