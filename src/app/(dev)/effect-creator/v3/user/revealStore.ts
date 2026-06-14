@@ -8,13 +8,14 @@ import { create } from 'zustand'
 export interface MorphConfig {
   particleCount: number // surface samples
   pointSize: number     // particle px size
-  noiseAmp: number      // deform amplitude (world units) along the surface normal
-  noiseScale: number    // deform frequency
-  noiseSpeed: number    // deform time rate
-  maskContrast: number  // dissolve mask contrast (lower = more of the surface lifts off)
-  floatAmp: number      // idle per-particle bob
-  glow: number          // travel-glow scale during a morph
-  durationMs: number    // transition timing
+  noiseAmp: number      // disintegration distance — how far particles fly off the surface
+  noiseScale: number    // swarm detail — noise frequency
+  noiseSpeed: number    // swarm speed — how fast the cloud churns
+  maskContrast: number  // disintegration spread — how much of the surface lifts (lower = more)
+  floatAmp: number      // idle shimmer — tiny per-particle bob
+  glow: number          // travel glow during the morph
+  stagger: number       // puzzle stagger — 0 = all particles move together, 1 = strongly staggered
+  durationMs: number    // total transition time
 }
 
 interface RevealState {
@@ -37,7 +38,7 @@ export const useRevealStore = create<RevealState>((set) => ({
   active: false,
   startedAt: 0,
   runToken: 0,
-  morph: { particleCount: 50000, pointSize: 2.0, noiseAmp: 0.02, noiseScale: 26, noiseSpeed: 0.3, maskContrast: 1.4, floatAmp: 0.0025, glow: 1.0, durationMs: 3000 },
+  morph: { particleCount: 80000, pointSize: 2.0, noiseAmp: 0.02, noiseScale: 26, noiseSpeed: 0.3, maskContrast: 1.4, floatAmp: 0.0025, glow: 1.0, stagger: 0.5, durationMs: 4000 },
   phase: 'cycle',
   start: () => set((s) => ({ active: true, phase: 'cycle', startedAt: performance.now(), runToken: s.runToken + 1 })),
   magicStart: () => set((s) => ({ active: true, phase: 'out', startedAt: performance.now(), runToken: s.runToken + 1 })),

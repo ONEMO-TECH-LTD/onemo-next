@@ -48,23 +48,28 @@ float fbm(vec3 p){ return snoise(p)*0.6 + snoise(p*2.03+11.0)*0.3 + snoise(p*4.0
 
 const V = `
 attribute vec3 aPos; attribute vec3 aPosTarget; attribute vec3 aNormal; attribute vec2 aUv; attribute float aSeed;
-uniform float uE, uProgress, uTime, uNoiseAmp, uNoiseScale, uNoiseSpeed, uMaskContrast, uFloatAmp, uPointSize, uGlow, uDpr;
+uniform float uE, uProgress, uTime, uNoiseAmp, uNoiseScale, uNoiseSpeed, uMaskContrast, uFloatAmp, uPointSize, uGlow, uDpr, uStagger;
 varying vec2 vUv; varying float vGlow;
 ${NOISE}
 void main(){
   vUv = aUv;
-  vec3 base = mix(aPos, aPosTarget, uProgress);          // morph source→target
+  // per-particle STAGGER: each particle starts a bit later (by its seed) so the model disintegrates
+  // as a swarm and the new shape PUZZLES back together piece by piece — not all at once.
+  float delay = aSeed * uStagger;
+  float span = max(1.0 - uStagger, 0.001);
+  float prog = smoothstep(0.0, 1.0, clamp((uProgress - delay) / span, 0.0, 1.0)); // staggered morph
+  float eP   = smoothstep(0.0, 1.0, clamp((uE - delay)        / span, 0.0, 1.0)); // staggered lift-off
+  vec3 base = mix(aPos, aPosTarget, prog);
   float t = uTime;
   float rawMask = snoise(base*uNoiseScale*0.5 + vec3(t*uNoiseSpeed*0.5));
   float mask = pow(clamp(rawMask*0.5+0.5, 0.0, 1.0), uMaskContrast);
   float n = fbm(base*uNoiseScale + vec3(t*uNoiseSpeed, 0.0, t*uNoiseSpeed*0.7));
-  vec3 deform = aNormal * (n * uNoiseAmp * mask * uE);    // lift off along the surface normal
+  vec3 deform = aNormal * (n * uNoiseAmp * mask * eP);    // lift off along the surface normal
   float ph = aSeed*6.2831853;
-  vec3 bob = vec3(cos(t*1.3+ph)*0.6, sin(t*1.6+ph), sin(t*1.1+ph+1.0)*0.6) * uFloatAmp;
+  vec3 bob = vec3(cos(t*1.3+ph)*0.6, sin(t*1.6+ph), sin(t*1.1+ph+1.0)*0.6) * uFloatAmp * eP;
   vec3 pos = base + deform + bob;
-  // travel glow — the particles that move furthest (morph distance) glow brightest mid-morph
   float travel = length(aPosTarget - aPos);
-  vGlow = clamp(travel*8.0, 0.0, 1.0) * (uProgress*(1.0-uProgress)*4.0) * uGlow + clamp(length(deform)/max(uNoiseAmp,1e-4),0.0,1.0)*uGlow*uE*0.4;
+  vGlow = clamp(travel*8.0, 0.0, 1.0) * (prog*(1.0-prog)*4.0) * uGlow + clamp(length(deform)/max(uNoiseAmp,1e-4),0.0,1.0)*uGlow*eP*0.4;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
   gl_PointSize = uPointSize * uDpr;
 }`
@@ -89,6 +94,7 @@ export default function ParticleMorph() {
   const srcUuidRef = useRef<string>('')   // geometry uuid currently held as SOURCE
   const tgtUuidRef = useRef<string>('')   // geometry uuid sampled as TARGET this run
   const haveSourceRef = useRef(false)
+  const sampledCountRef = useRef(0)       // particle count the source was sampled at (re-sample on change)
   const dpr = useThree((s) => s.viewport.dpr)
   const count = useRevealStore((s) => s.morph.particleCount)
 
@@ -102,7 +108,7 @@ export default function ParticleMorph() {
         uTex: { value: null }, uE: { value: 0 }, uProgress: { value: 0 }, uTime: { value: 0 },
         uNoiseAmp: { value: 0.02 }, uNoiseScale: { value: 26 }, uNoiseSpeed: { value: 0.3 },
         uMaskContrast: { value: 1.4 }, uFloatAmp: { value: 0.0025 }, uPointSize: { value: 2 },
-        uGlow: { value: 1 }, uDpr: { value: dpr }, uGlowColor: { value: new THREE.Color('#bfe3ff') },
+        uGlow: { value: 1 }, uDpr: { value: dpr }, uStagger: { value: 0.5 }, uGlowColor: { value: new THREE.Color('#bfe3ff') },
       },
       transparent: false, depthTest: true, depthWrite: true, toneMapped: false,
     })
@@ -155,6 +161,7 @@ export default function ParticleMorph() {
     const pts = ptsRef.current!; const old = pts.geometry; pts.geometry = g; old.dispose()
     if (s.tex && matRef.current) matRef.current.uniforms.uTex.value = s.tex
     srcUuidRef.current = (m.geometry as THREE.BufferGeometry).uuid
+    sampledCountRef.current = N
     haveSourceRef.current = true
   }
 
@@ -200,13 +207,13 @@ export default function ParticleMorph() {
     let e = 0, prog = 0
 
     if (r.phase === 'cycle') {
-      if (obj && srcUuidRef.current !== (obj.geometry as THREE.BufferGeometry).uuid) setSource(obj)
+      if (obj && (srcUuidRef.current !== (obj.geometry as THREE.BufferGeometry).uuid || sampledCountRef.current !== cfg.particleCount)) setSource(obj)
       if (!haveSourceRef.current) return
       const p = Math.min(1, elapsed / dur)
       if (p >= 1) { finish(); return }
       e = ease(p < 0.34 ? p/0.34 : p < 0.66 ? 1 : 1-(p-0.66)/0.34)
     } else if (r.phase === 'out') {
-      if (obj && srcUuidRef.current !== (obj.geometry as THREE.BufferGeometry).uuid) setSource(obj)
+      if (obj && (srcUuidRef.current !== (obj.geometry as THREE.BufferGeometry).uuid || sampledCountRef.current !== cfg.particleCount)) setSource(obj)
       e = ease(Math.min(1, elapsed / (dur * 0.4)))   // ramp the dissolve and hold (waits for magicFinish)
     } else { // 'in' — morph into the new shape
       // grab the new shape as TARGET once it appears (different geometry than the source)
@@ -234,13 +241,15 @@ export default function ParticleMorph() {
       }
     }
 
-    if (objRef.current) objRef.current.visible = false
+    // crossfade the object↔particle swap: while the deform is near zero (start/end) the solid object
+    // stays visible and the on-surface particles overlay it → no abrupt pop in or out.
+    if (objRef.current) objRef.current.visible = e < 0.12
     pts.visible = true
     const u = mat.uniforms
     u.uE.value = e; u.uProgress.value = prog; u.uTime.value = now / 1000
     u.uNoiseAmp.value = cfg.noiseAmp; u.uNoiseScale.value = cfg.noiseScale; u.uNoiseSpeed.value = cfg.noiseSpeed
     u.uMaskContrast.value = cfg.maskContrast; u.uFloatAmp.value = cfg.floatAmp
-    u.uPointSize.value = cfg.pointSize; u.uGlow.value = cfg.glow; u.uDpr.value = dpr
+    u.uPointSize.value = cfg.pointSize; u.uGlow.value = cfg.glow; u.uDpr.value = dpr; u.uStagger.value = cfg.stagger
     invalidate()
   })
 
