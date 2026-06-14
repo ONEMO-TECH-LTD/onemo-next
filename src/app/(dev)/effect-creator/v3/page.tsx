@@ -18,7 +18,7 @@ import { useSearchParams } from 'next/navigation'
 import { useSceneStore } from './admin/sceneStore'
 import { UndoIcon, RedoIcon, ExportIcon } from './user/icons'
 import TopBar, { TopBarButton } from './user/TopBar'
-import RevealComposer from './core/RevealComposer'
+import ParticleReveal from './core/ParticleReveal'
 import RevealFxPicker from './user/RevealFxPicker'
 import edStyles from './user/outline-editor.module.css'
 import { INITIAL_ARTWORK } from './user/outlineStore'
@@ -341,7 +341,7 @@ function PrototypePageInner() {
               onStatus={handleStatus}
               frozen={editingOutline}
             >
-              <RevealComposer />
+              <ParticleReveal />
             </EffectViewer>
           </>
         )}
