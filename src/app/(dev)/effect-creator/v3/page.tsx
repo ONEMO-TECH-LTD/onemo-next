@@ -20,6 +20,7 @@ import { UndoIcon, RedoIcon, ExportIcon } from './user/icons'
 import TopBar, { TopBarButton } from './user/TopBar'
 import ParticleReveal from './core/ParticleReveal'
 import RevealFxPicker from './user/RevealFxPicker'
+import ParticleControls from './user/ParticleControls'
 import edStyles from './user/outline-editor.module.css'
 import { INITIAL_ARTWORK } from './user/outlineStore'
 import { useOutlineStore } from './user/outlineStore'
@@ -347,6 +348,7 @@ function PrototypePageInner() {
         )}
       </AdminViewer>
       {artworkUrl && !editingOutline && <RevealFxPicker fromUrl={artworkUrl} />}
+      {artworkUrl && !editingOutline && <ParticleControls />}
 
 
       {/* Pre-upload: pearly-glass ONEMO square + load control (over the warming scene) */}
