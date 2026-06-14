@@ -88,13 +88,17 @@ void main(){
 
 export default function ParticleMorph() {
   const { scene, invalidate } = useThree()
+  const gl = useThree((s) => s.gl)
+  const camera = useThree((s) => s.camera)
   const ptsRef = useRef<THREE.Points | null>(null)
   const matRef = useRef<THREE.ShaderMaterial | null>(null)
   const objRef = useRef<THREE.Mesh | null>(null)
   const srcUuidRef = useRef<string>('')   // geometry uuid currently held as SOURCE
   const tgtUuidRef = useRef<string>('')   // geometry uuid sampled as TARGET this run
   const haveSourceRef = useRef(false)
-  const sampledCountRef = useRef(0)       // particle count the source was sampled at (re-sample on change)
+  const targetLockedRef = useRef(false)   // target sampled once per run (the shape rebuilds several
+  const morphStartRef = useRef(0)         // when the target locked → morph clock starts here
+  const sampledCountRef = useRef(0)       // times during generation — don't re-sample on each)
   const dpr = useThree((s) => s.viewport.dpr)
   const count = useRevealStore((s) => s.morph.particleCount)
 
@@ -115,6 +119,11 @@ export default function ParticleMorph() {
     const pts = new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(3), 3)), mat)
     pts.frustumCulled = false; pts.visible = false; scene.add(pts)
     ptsRef.current = pts; matRef.current = mat
+    // pre-compile the heavy noise shader off the critical path (KHR_parallel_shader_compile), so the
+    // first run doesn't hang ~600ms compiling it mid-generation
+    const warm = new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(3), 3)), mat)
+    warm.visible = true; scene.add(warm)
+    void (gl.compileAsync ? gl.compileAsync(scene, camera) : Promise.resolve()).then(() => { scene.remove(warm); warm.geometry.dispose() })
     return () => { scene.remove(pts); pts.geometry.dispose(); mat.dispose(); ptsRef.current = null; matRef.current = null }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene])
@@ -198,7 +207,7 @@ export default function ParticleMorph() {
     const r = useRevealStore.getState()
     const mat = matRef.current, pts = ptsRef.current
     if (!mat || !pts) return
-    if (!r.active) { if (objRef.current) objRef.current.visible = true; pts.visible = false; tgtUuidRef.current = ''; return }
+    if (!r.active) { if (objRef.current) objRef.current.visible = true; pts.visible = false; tgtUuidRef.current = ''; targetLockedRef.current = false; return }
     const cfg = r.morph
     const now = performance.now()
     const elapsed = now - r.startedAt
@@ -216,20 +225,22 @@ export default function ParticleMorph() {
       if (obj && (srcUuidRef.current !== (obj.geometry as THREE.BufferGeometry).uuid || sampledCountRef.current !== cfg.particleCount)) setSource(obj)
       e = ease(Math.min(1, elapsed / (dur * 0.4)))   // ramp the dissolve and hold (waits for magicFinish)
     } else { // 'in' — morph into the new shape
-      // grab the new shape as TARGET once it appears (different geometry than the source)
-      if (obj && (obj.geometry as THREE.BufferGeometry).uuid !== srcUuidRef.current && tgtUuidRef.current !== (obj.geometry as THREE.BufferGeometry).uuid) {
+      // grab the new shape as TARGET ONCE (the shape rebuilds several times during generation; sample
+      // only the first new geometry to avoid a 40ms re-sample hitch on every rebuild)
+      if (obj && !targetLockedRef.current && (obj.geometry as THREE.BufferGeometry).uuid !== srcUuidRef.current) {
         if (haveSourceRef.current) setTarget(obj)
         else setScatterInto(obj)   // first Magic: no old sample → assemble from scatter
+        targetLockedRef.current = true; morphStartRef.current = now
       }
-      const haveTarget = tgtUuidRef.current !== '' || haveSourceRef.current
-      if (!haveTarget) { e = 1; prog = 0 }            // hold the dissolved old cloud until the new shape lands
+      if (!targetLockedRef.current) { e = 1; prog = 0 } // hold the dissolved old cloud until the new shape is sampled
       else {
+        const mEl = now - morphStartRef.current        // morph clock starts when the target locked
         const morphDur = dur * 0.55, settleDur = dur * 0.45
-        if (elapsed < morphDur) { prog = ease(elapsed / morphDur); e = 1 }   // fly old→new, fully lifted
+        if (mEl < morphDur) { prog = ease(mEl / morphDur); e = 1 }   // fly old→new, fully lifted
         else {
           prog = 1
-          e = 1 - ease(Math.min(1, (elapsed - morphDur) / settleDur))        // settle onto the new shape
-          if (elapsed >= morphDur + settleDur) {
+          e = 1 - ease(Math.min(1, (mEl - morphDur) / settleDur))        // settle onto the new shape
+          if (mEl >= morphDur + settleDur) {
             // bake target as the new source for next time, then finish
             const g = pts.geometry
             const src = g.getAttribute('aPos') as THREE.BufferAttribute, tgt = g.getAttribute('aPosTarget') as THREE.BufferAttribute
