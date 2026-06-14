@@ -37,7 +37,6 @@ const Toolbar = dynamic(() => import('./user/Toolbar'), { ssr: false })
 const EditOverlay = dynamic(() => import('./user/EditOverlay'), { ssr: false })
 const OutlineEditor = dynamic(() => import('./user/OutlineEditor'), { ssr: false })
 const EmptyState = dynamic(() => import('./user/EmptyState'), { ssr: false })
-const GenerateShimmer = dynamic(() => import('./user/GenerateShimmer'), { ssr: false })
 const ToastSurface = dynamic(() => import('./ui/Toast'), { ssr: false })
 const PerfHUD = dynamic(() => import('./dev/PerfHUD'), { ssr: false })
 
@@ -50,7 +49,6 @@ function PrototypePageInner() {
   const [editorMode, setEditorMode] = useState<'shape' | 'image' | null>(null) // #27 + KAI-9027
   const [autoOutline, setAutoOutline] = useState(false) // false = standard square; true = Magic cut-out
   const [generating, setGenerating] = useState(false)
-  const [genLabel, setGenLabel] = useState('Cutting out…') // G5 honest progress
   const designState = useOutlineStore((s) => s.artwork) // #28: lifted — scene + editor share it
   const setDesignState = useCallback((upd: DesignState | ((prev: DesignState) => DesignState)) => {
     const st = useOutlineStore.getState()
@@ -240,7 +238,6 @@ function PrototypePageInner() {
     const preMagic = snapNow() // #23: one Magic = one global undo step (pushed only on success)
     const runId = ++magicRunRef.current
     setGenerating(true)
-    setGenLabel('Cutting out…')
     // Magic transition: the current object disperses into pixels NOW and holds (sampling the live
     // scene) while BEN computes; it reassembles into the new shape when it lands (magicFinish below).
     useRevealStore.getState().magicStart()
@@ -248,7 +245,6 @@ function PrototypePageInner() {
       .then(({ prepareEffect }) =>
         prepareEffect(artworkUrl, 'shaped', undefined, (s) => {
           if (s === 'fallback') toast('warn', 'AI cut-out unavailable — used the simple background cut instead') // G4
-          else setGenLabel(s === 'downloading-model' ? 'Downloading the magic… (one-time)' : 'Cutting out…')
           // #21: the tuned BEN settings are the defaults — Magic reads them, never resets them
         }, useOutlineStore.getState().fairing?.params),
       )
@@ -352,15 +348,12 @@ function PrototypePageInner() {
           </>
         )}
       </AdminViewer>
-      {artworkUrl && !editingOutline && <RevealFxPicker fromUrl={artworkUrl} />}
+      {artworkUrl && !editingOutline && <RevealFxPicker />}
       {artworkUrl && !editingOutline && <ParticleControls />}
 
 
       {/* Pre-upload: pearly-glass ONEMO square + load control (over the warming scene) */}
       {!artworkUrl && <EmptyState onFile={handleFile} />}
-
-      {/* Magic shimmer — page stays responsive (worker); label = the honest wait state (G5) */}
-      {generating && <GenerateShimmer label={genLabel} onCancel={() => { magicRunRef.current++; setGenerating(false); useRevealStore.getState().magicFinish() }} />}
 
       {/* Trim takeover (D-TRIM): the creation row swaps to the material-color carousel — tap
           recolors the 3D back LIVE; ✓ keeps (one history step), ✕ reverts to the pre-open color */}
