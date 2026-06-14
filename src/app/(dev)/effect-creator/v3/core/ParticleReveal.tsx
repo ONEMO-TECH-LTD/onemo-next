@@ -1,23 +1,22 @@
 'use client'
-// ParticleReveal — the model's own image BECOMES the particles (no fader, no separate solid copy).
-// Ref technique: Maxime Heckel, "The magical world of particles with react-three-fiber and shaders".
+// ParticleReveal — the model's image IS the particles, one square PIXEL per grid cell (no fader, no
+// separate solid copy, no shrink). Ref technique: Maxime Heckel, "The magical world of particles".
 //
-// One honest representation: the live 3D object is rendered to an FBO, then drawn as a grid of points
-// whose colour + alpha are sampled from that render. The SAME points are the model:
-//   • at home (cycle ends) the points are large enough to tile → they read as the solid model.
-//   • mid-cycle they shrink to fine and are advected by a time-evolving, multi-octave CURL field →
-//     a chaotic particle fluid.
-// Cycle envelope (one play): solid → disperse → chaotic fluid hold → reassemble → solid. (Product:
-// disperse on Magic start, hold while Magic computes, reassemble when the shape is ready.)
-// Idle = pure passthrough (the real mesh). Run end snaps back to passthrough so the rest state is the
-// crisp mesh. Single shader pass — no GPGPU / FloatType, so it is iOS-Safari-safe and mobile-cheap.
+// pixel = particle: an aspect-correct grid of SQUARE points, each sized to tile its cell exactly, so
+// at home they reconstruct the image with NO gaps. The transition is PURELY position — a single
+// smooth, coherent flow field drifts the pixels apart and back. No opacity fade, no size change; the
+// "dissolve" is the pixels separating, the "reassemble" is them returning. Motion is one low-frequency
+// simplex field (not per-particle jitter) → elegant flow, not violent chaos.
+// Cycle (one play): solid → pixels drift apart → loose pixel field hold → drift back → solid.
+// Idle = passthrough (real mesh); run end snaps to passthrough. Single shader pass — no GPGPU /
+// FloatType → iOS-Safari-safe, mobile-cheap. GLSL ES 1.00.
 import { useFrame, useThree } from '@react-three/fiber'
 import { useFBO } from '@react-three/drei'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { useRevealStore } from '../user/revealStore'
 
-// Ashima 3D simplex noise (MIT) + curl noise (3 offset potential fields) — the fluid flow field.
+// Ashima 3D simplex noise (MIT) → a smooth vector field for elegant, coherent pixel drift.
 const NOISE = `
 vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}
 vec4 mod289(vec4 x){return x-floor(x*(1.0/289.0))*289.0;}
@@ -41,52 +40,39 @@ float snoise(vec3 v){
   vec4 m=max(0.6-vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)),0.0); m=m*m;
   return 42.0*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));
 }
-vec3 snoiseVec3(vec3 x){return vec3(snoise(x),snoise(vec3(x.y-19.1,x.z+33.4,x.x+47.2)),snoise(vec3(x.z+74.2,x.x-124.5,x.y+99.4)));}
-vec3 curl(vec3 p){
-  const float e=0.1; vec3 dx=vec3(e,0.0,0.0),dy=vec3(0.0,e,0.0),dz=vec3(0.0,0.0,e);
-  vec3 px0=snoiseVec3(p-dx),px1=snoiseVec3(p+dx);
-  vec3 py0=snoiseVec3(p-dy),py1=snoiseVec3(p+dy);
-  vec3 pz0=snoiseVec3(p-dz),pz1=snoiseVec3(p+dz);
-  float x=(py1.z-py0.z)-(pz1.y-pz0.y);
-  float y=(pz1.x-pz0.x)-(px1.z-px0.z);
-  float z=(px1.y-px0.y)-(py1.x-py0.x);
-  return normalize(vec3(x,y,z)/(2.0*e)+1e-6);
-}
-vec3 hash33(vec3 p){ p=fract(p*vec3(443.897,441.423,437.195)); p+=dot(p,p.yxz+19.19); return fract((p.xxy+p.yxx)*p.zyx); }`
+vec2 flow2(vec2 uv, float t){
+  // two decorrelated samples → a smooth 2D drift vector. Mid frequency: locally coherent (adjacent
+  // pixels move together → no jitter) but different REGIONS drift apart → elegant pixel separation.
+  return vec2(snoise(vec3(uv*3.8, t)), snoise(vec3(uv*3.8 + 31.4, t + 11.2)));
+}`
 
 const P_VERT = `
-uniform sampler2D uObjectTex; uniform float uProgress,uAspect,uTime,uChaos,uFlowSpeed,uSolidSize,uFluidSize;
+uniform sampler2D uObjectTex; uniform float uProgress,uAspect,uTime,uSpread,uFlowSpeed,uPointSize;
 varying vec3 vColor; varying float vAlpha;
 ${NOISE}
 void main(){
   vec2 uv = position.xy;                          // grid cell in [0,1] == the object's screen uv
   vec4 tex = texture2D(uObjectTex, uv);
-  vColor = tex.rgb;                               // sampled model colour — output 1:1, no distortion
+  vColor = tex.rgb;                               // exact pixel colour, output 1:1
   float inside = step(0.08, tex.a);
+  // envelope: 0 = solid (tiled), 1 = dispersed. Plateau: drift apart → hold → drift back.
   float p = uProgress;
-  // envelope e: 0 = solid model, 1 = fully dispersed. Plateau: disperse → hold chaotic → reassemble.
   float e = (p < 0.30) ? smoothstep(0.0, 0.30, p) : (p < 0.70) ? 1.0 : (1.0 - smoothstep(0.70, 1.0, p));
-  vec3 rnd = hash33(vec3(uv*7.13, 3.1));
-  // time-evolving multi-octave curl → chaotic particle fluid (per-particle phase + magnitude = chaos)
-  float t = uTime * uFlowSpeed;
-  vec3 f1 = curl(vec3(uv*3.0,  t + rnd.z*6.2831));
-  vec3 f2 = curl(vec3(uv*6.3 + 17.0, t*1.7));
-  vec2 flow = f1.xy + 0.5*f2.xy;
-  vec2 disp = flow * uChaos * (0.45 + rnd.x) * e;
-  disp.x /= uAspect;                              // keep the fluid isotropic on a wide viewport
+  e = smoothstep(0.0, 1.0, e);                    // ease for elegance
+  // position-only transition (no fade, no shrink): a smooth flow field drifts the pixels apart and
+  // back. Locally coherent → elegant, not jittery; regionally divergent → the pixels visibly separate.
+  vec2 drift = flow2(uv, uTime * uFlowSpeed) * uSpread * e;
+  drift.x /= uAspect;
   vec2 ndc = uv*2.0 - 1.0;
-  gl_Position = vec4(ndc + disp, 0.0, 1.0);
-  gl_PointSize = mix(uSolidSize, uFluidSize, e) * inside; // tile-solid at home, fine in the fluid
+  gl_Position = vec4(ndc + drift, 0.0, 1.0);
+  gl_PointSize = uPointSize * inside;            // constant tile size — no shrink, no fade
   vAlpha = tex.a * inside;
 }`
 
 const P_FRAG = `
 varying vec3 vColor; varying float vAlpha;
 void main(){
-  float d = distance(gl_PointCoord, vec2(0.5));
-  float s = 1.0 - d*2.0; if (s <= 0.0) discard;
-  s = pow(clamp(s,0.0,1.0), 1.3);                 // soft round falloff
-  gl_FragColor = vec4(vColor, s*vAlpha);          // exact model colour — no distortion
+  gl_FragColor = vec4(vColor, vAlpha);           // SOLID square pixel (gl.POINTS = square) — no fade
 }`
 
 export default function ParticleReveal() {
@@ -97,19 +83,19 @@ export default function ParticleReveal() {
   const orthoCam = useMemo(() => new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1), [])
   const pMatRef = useRef<THREE.ShaderMaterial | null>(null)
   const ptsRef = useRef<THREE.Points | null>(null)
+  const nxRef = useRef(1) // grid columns → cell size for gap-free tiling
 
   const runToken = useRevealStore((s) => s.runToken)
-  const density = useRevealStore((s) => s.particle.density) // grid resolution → rebuild the point grid
+  const density = useRevealStore((s) => s.particle.density)
   useEffect(() => { if (runToken > 0) invalidate() }, [runToken, invalidate])
 
-  // material + Points created once (placeholder geometry; the real grid is built by the density effect)
+  // material + Points once (placeholder geometry; the density effect builds the real grid)
   useEffect(() => {
-    const ar = size.width / size.height
     const pMat = new THREE.ShaderMaterial({
       vertexShader: P_VERT, fragmentShader: P_FRAG,
       uniforms: {
-        uObjectTex: { value: fbo.texture }, uProgress: { value: 0 }, uAspect: { value: ar }, uTime: { value: 0 },
-        uChaos: { value: 0.2 }, uFlowSpeed: { value: 0.55 }, uSolidSize: { value: 5 * dpr }, uFluidSize: { value: 3.4 * dpr },
+        uObjectTex: { value: fbo.texture }, uProgress: { value: 0 }, uAspect: { value: 1 }, uTime: { value: 0 },
+        uSpread: { value: 0.22 }, uFlowSpeed: { value: 0.15 }, uPointSize: { value: 4 },
       },
       transparent: true, depthTest: false, depthWrite: false, blending: THREE.NormalBlending, toneMapped: false,
     })
@@ -119,20 +105,23 @@ export default function ParticleReveal() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [particleScene])
 
-  // (re)build the point grid when density changes — swap geometry only (no shader recompile)
+  // (re)build the aspect-correct SQUARE-pixel grid on density change (geometry swap, no recompile)
   useEffect(() => {
     const pts = ptsRef.current
     if (!pts) return
-    const N = Math.max(8, Math.floor(density))
-    const arr = new Float32Array(N * N * 3)
+    const Nx = Math.max(8, Math.floor(density))
+    const Ny = Math.max(8, Math.round(Nx * size.height / size.width)) // square cells → square pixels
+    nxRef.current = Nx
+    const arr = new Float32Array(Nx * Ny * 3)
     let k = 0
-    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { arr[k++] = x / (N - 1); arr[k++] = y / (N - 1); arr[k++] = 0 }
+    for (let y = 0; y < Ny; y++) for (let x = 0; x < Nx; x++) { arr[k++] = x / (Nx - 1); arr[k++] = y / (Ny - 1); arr[k++] = 0 }
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position', new THREE.BufferAttribute(arr, 3))
     const old = pts.geometry
     pts.geometry = geo
     if (old) old.dispose()
     invalidate()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [density, invalidate])
 
   useFrame(() => {
@@ -146,7 +135,6 @@ export default function ParticleReveal() {
     const p = Math.min(1, (performance.now() - r.startedAt) / Math.max(1, cfg.durationMs))
     const ar = size.width / size.height
 
-    // run finished → snap to the crisp real mesh and stop (rest state is the true model)
     if (p >= 1) { renderer.setRenderTarget(null); renderer.render(scene, camera); useRevealStore.getState().stop(); return }
 
     // 1) live model → FBO (transparent clear → alpha = silhouette, rgb = model colour)
@@ -154,12 +142,12 @@ export default function ParticleReveal() {
     renderer.setClearAlpha(0)
     renderer.setRenderTarget(fbo); renderer.clear(); renderer.render(scene, camera); renderer.setRenderTarget(null)
 
-    // 2) screen: clear transparent, render ONLY the particles (they ARE the model — no fader)
+    // 2) screen: clear transparent, render ONLY the square-pixel particles (they ARE the model)
     renderer.clear()
+    const cell = (size.width * dpr) / Math.max(1, nxRef.current) // device px per cell → tile size
     const pu = pMat.uniforms
     pu.uObjectTex.value = fbo.texture; pu.uProgress.value = p; pu.uAspect.value = ar; pu.uTime.value = performance.now() / 1000
-    pu.uChaos.value = cfg.chaos; pu.uFlowSpeed.value = cfg.flowSpeed
-    pu.uSolidSize.value = cfg.solidSize * dpr; pu.uFluidSize.value = cfg.fluidSize * dpr
+    pu.uSpread.value = cfg.spread; pu.uFlowSpeed.value = cfg.flowSpeed; pu.uPointSize.value = cell * cfg.pixelSize
     renderer.autoClear = false
     renderer.render(particleScene, orthoCam)
     renderer.autoClear = true

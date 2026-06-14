@@ -11,11 +11,10 @@ export type RevealTransition = { name: string; glsl: string; paramsTypes?: Recor
 // Live-tunable particle config (driven by the leva panel — ParticleControls). The model's image IS
 // the particles (no fader): solid → chaotic particle-fluid → reassembled solid, in one cycle.
 export interface ParticleConfig {
-  density: number    // grid resolution N → N² particles (more = denser, less sparse)
-  solidSize: number  // particle size at home — big enough to tile into the solid model
-  fluidSize: number  // particle size when dispersed — fine
-  chaos: number      // turbulence amplitude (how far/wild the fluid spreads)
-  flowSpeed: number  // how fast the fluid churns
+  density: number    // grid resolution (pixel fineness); square particles auto-tile → gap-free
+  pixelSize: number  // size multiplier on the tile (1.0 = exact tile, no gaps; >1 = chunkier)
+  spread: number     // how far the pixels drift apart (the dissolve distance) — position only
+  flowSpeed: number  // how fast the smooth flow field evolves (lower = more elegant)
   durationMs: number // total cycle time (bigger = slower)
 }
 
@@ -43,7 +42,7 @@ export const useRevealStore = create<RevealState>((set) => ({
   fromUrl: undefined,
   runToken: 0,
   validFx: [],
-  particle: { density: 460, solidSize: 5.0, fluidSize: 3.4, chaos: 0.2, flowSpeed: 0.55, durationMs: 3200 },
+  particle: { density: 460, pixelSize: 1.1, spread: 0.3, flowSpeed: 0.15, durationMs: 3600 },
   start: (fromUrl) => set((s) => ({ active: true, startedAt: performance.now(), fromUrl: fromUrl ?? s.fromUrl, runToken: s.runToken + 1 })),
   stop: () => set({ active: false }),
   setFx: (name) => set({ fx: name }),
