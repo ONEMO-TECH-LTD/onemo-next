@@ -18,45 +18,57 @@
 // wrapper (segment-ml.ts) does the canvas rasterize/downscale + alpha→mask (workers have no DOM).
 // Buffer is transferred (zero-copy hand-off).
 
-// Mobile cut-out: RMBG-1.4 (~88 MB fp16) REPLACES BEN2 (219 MB). BEN2 peaked ~977 MB live and iOS
-// Safari OOM-killed the tab (measured on iPhone, Timelines). The matte-quality drop is irrelevant —
-// the output is squared into a geometric marching-squares outline (fine edges/hair are discarded).
-const MODEL_ID = 'briaai/RMBG-1.4'
+// MODEL COMPARISON HARNESS — every candidate runs through the IDENTICAL pipeline method as BEN2
+// (webgpu → wasm fallback, fp16). The page chooses the model via the `?seg=` URL param (read in
+// segment-ml.ts and forwarded here), so we A/B all candidates on the SAME device under SAME conditions
+// and compare peak memory. Default = BEN2 (the measured baseline ~977 MB). No CPU-forcing here — that's
+// a separate experiment only if every model fails this method.
+// Sizes: BEN2 219 MB (MIT) · RMBG-1.4 88 MB fp16 (PAID/BRIA) · BiRefNet_lite 114 MB (MIT).
+type SegModel = { id: string; dtype: 'fp16' | 'fp32' | 'q8' | 'int8' }
+const MODELS: Record<string, SegModel> = {
+  ben2: { id: 'onnx-community/BEN2-ONNX', dtype: 'fp16' },
+  rmbg: { id: 'briaai/RMBG-1.4', dtype: 'fp16' },
+  birefnet: { id: 'onnx-community/BiRefNet_lite-ONNX', dtype: 'fp16' },
+}
+const DEFAULT_MODEL = MODELS.ben2
+const resolveModel = (key?: string) => (key && MODELS[key]) || DEFAULT_MODEL
 
 // Worker global — typed loosely to avoid DOM/WebWorker lib conflicts in the shared tsconfig.
 const ctx: { onmessage: ((e: MessageEvent) => void) | null; postMessage: (msg: unknown, transfer?: Transferable[]) => void } =
   self as unknown as typeof ctx
 
-// Lazy, cached: one pipeline per worker lifetime (mirrors the old main-thread cache).
-let segmenterPromise: Promise<(input: string[]) => Promise<unknown>> | null = null
-function getSegmenter(onProgress: (state: string) => void) {
-  if (!segmenterPromise) {
-    segmenterPromise = (async () => {
+// Lazy, cached PER MODEL (so switching `?seg=` mid-session re-inits cleanly). Same pipeline method
+// for every model: webgpu first, wasm fallback — identical to the BEN2 baseline.
+const segmenters = new Map<string, Promise<(input: string[]) => Promise<unknown>>>()
+function getSegmenter(onProgress: (state: string) => void, model: SegModel) {
+  let p = segmenters.get(model.id)
+  if (!p) {
+    p = (async () => {
       const mod = await import('@huggingface/transformers')
-      // G5: self-hosted pinned weights first (same-origin /models), hub fallback for unmirrored devs.
+      // self-hosted pinned weights first (same-origin /models), hub fallback when not mirrored.
       mod.env.allowLocalModels = true
       mod.env.localModelPath = '/models'
       mod.env.allowRemoteModels = true
       let downloading = false
-      const progress_callback = (p: { status?: string }) => {
-        // transformers.js emits per-file status events — surface the download state once.
-        if (!downloading && (p.status === 'download' || p.status === 'progress' || p.status === 'initiate')) {
+      const progress_callback = (pr: { status?: string }) => {
+        if (!downloading && (pr.status === 'download' || pr.status === 'progress' || pr.status === 'initiate')) {
           downloading = true
           onProgress('downloading-model')
         }
       }
       let seg
       try {
-        seg = await mod.pipeline('background-removal', MODEL_ID, { device: 'webgpu', dtype: 'fp16', progress_callback })
+        seg = await mod.pipeline('background-removal', model.id, { device: 'webgpu', dtype: model.dtype, progress_callback })
       } catch {
-        seg = await mod.pipeline('background-removal', MODEL_ID, { dtype: 'fp16', progress_callback }) // wasm fallback (same fp16 weights → cache-coherent)
+        seg = await mod.pipeline('background-removal', model.id, { dtype: model.dtype, progress_callback }) // wasm fallback
       }
       return seg as unknown as (input: string[]) => Promise<unknown>
     })()
     // a failed load must not poison every later attempt with the same rejected promise
-    segmenterPromise.catch(() => { segmenterPromise = null })
+    p.catch(() => { segmenters.delete(model.id) })
+    segmenters.set(model.id, p)
   }
-  return segmenterPromise
+  return p
 }
 
 interface RawImageData {
@@ -66,8 +78,9 @@ interface RawImageData {
   channels: number
 }
 
-ctx.onmessage = async (e: MessageEvent<{ id: number; url: string; preload?: boolean }>) => {
+ctx.onmessage = async (e: MessageEvent<{ id: number; url: string; preload?: boolean; seg?: string }>) => {
   const { id, url } = e.data
+  const model = resolveModel(e.data.seg)
   // PRELOAD (SHORTLIST #31): DOWNLOAD-ONLY warm-up — fetch the weights into the browser cache
   // with ZERO GPU work. Initializing the webgpu session here drops the golden scene's WebGL
   // context at page boot ("THREE.WebGLRenderer: Context Lost" — reproduced live, Dan's freeze).
@@ -81,13 +94,13 @@ ctx.onmessage = async (e: MessageEvent<{ id: number; url: string; preload?: bool
       mod.env.allowRemoteModels = true
       // from_pretrained on the MODEL (no pipeline, no device session) downloads + caches the
       // config/tokenizer/onnx weights via transformers.js' own Cache API, then frees the instance.
-      const m = await mod.AutoModel.from_pretrained(MODEL_ID, {
+      const m = await mod.AutoModel.from_pretrained(model.id, {
         progress_callback: (p: { status?: string }) => {
           if (p.status === 'download' || p.status === 'initiate') ctx.postMessage({ id, progress: 'downloading-model' })
         },
         // wasm/cpu device for the throwaway instance — never webgpu at preload
         device: 'wasm',
-        dtype: 'fp16', // match the run variant so the preload-warmed cache is reused (no re-download)
+        dtype: model.dtype, // match the run variant so the preload-warmed cache is reused (no re-download)
       } as Parameters<typeof mod.AutoModel.from_pretrained>[1])
       try { await (m as unknown as { dispose?: () => Promise<unknown> }).dispose?.() } catch { /* best-effort free */ }
       ctx.postMessage({ id, ok: true, preloaded: true })
@@ -97,7 +110,7 @@ ctx.onmessage = async (e: MessageEvent<{ id: number; url: string; preload?: bool
     return
   }
   try {
-    const segmenter = await getSegmenter((state) => ctx.postMessage({ id, progress: state }))
+    const segmenter = await getSegmenter((state) => ctx.postMessage({ id, progress: state }), model)
     ctx.postMessage({ id, progress: 'cutting' })
     const result = (await segmenter([url])) as RawImageData[] | RawImageData
     const raw = (Array.isArray(result) ? result[0] : result) as RawImageData

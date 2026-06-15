@@ -29,6 +29,12 @@ export type SegmentProgress = 'downloading-model' | 'cutting'
 /** TD-E: inference watchdog — a hung worker/model rejects instead of hanging the journey forever. */
 const INFERENCE_WATCHDOG_MS = 90_000
 
+/** Model-comparison harness: `?seg=ben2|rmbg|birefnet` picks the cut-out model (same pipeline method
+ *  for all — see ben.worker.ts). Undefined → worker default (BEN2). */
+function segParam(): string | undefined {
+  try { return new URLSearchParams(location.search).get('seg') || undefined } catch { return undefined }
+}
+
 // ─── BEN web worker (off-main-thread inference) ──────────────────────────────
 // One worker per session (mirrors the old lazy-cached segmenter). The worker runs the transformers
 // pipeline; we post a URL and get back the full-res RGBA matte (alpha = subject) via a Promise.
@@ -85,7 +91,7 @@ function runBenInWorker(
       settle(id)?.reject(new Error(`Magic timed out after ${INFERENCE_WATCHDOG_MS / 1000}s — the cut-out model never responded`))
     }, INFERENCE_WATCHDOG_MS)
     pending.set(id, { resolve, reject, onProgress, watchdog })
-    getBenWorker().postMessage({ id, url })
+    getBenWorker().postMessage({ id, url, seg: segParam() })
   })
 }
 
@@ -98,7 +104,7 @@ export function preloadBen(): void {
   const id = ++reqSeq
   const watchdog = setTimeout(() => { settle(id) }, INFERENCE_WATCHDOG_MS) // quiet cleanup, no reject noise
   pending.set(id, { resolve: () => {}, reject: () => {}, watchdog })
-  try { getBenWorker().postMessage({ id, preload: true }) } catch { settle(id) }
+  try { getBenWorker().postMessage({ id, preload: true, seg: segParam() }) } catch { settle(id) }
 }
 
 /** Full-res RGBA buffer (worker output) → a canvas, so rasterize() can downscale it. */
