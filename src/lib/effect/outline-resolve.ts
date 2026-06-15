@@ -71,10 +71,11 @@ export const ADJUSTMENTS_OFF: OutlineAdjustments = { global: { ...GLOBAL_OFF }, 
  *  rounded the duck's fine silhouette but barely touched a large star's points. 0% = σ0; 100% ≈ 8%
  *  of the diagonal. (The caller passes the flattened ring's diagonal.) */
 export const smoothSigmaPx = (pct: number, diagPx: number) => (pct <= 0 ? 0 : (pct / 100) * Math.max(diagPx * 0.08, 24))
-/** Snap: 0% = band 0 (off), 100% = 20px line-snap band. */
-export const snapBandPx = (pct: number) => (pct <= 0 ? 0 : (pct / 100) * 20)
-/** Angle: 0% = 180° (no cut, OFF), 100% = 30° (aggressive spike cut). */
-export const angleMaxTurnDeg = (pct: number) => (pct <= 0 ? 180 : 180 - (pct / 100) * 150)
+/** Snap: straight-run truing band — SCALES with the shape so it engages at any size. 0% = off. */
+export const snapBandPx = (pct: number, diagPx: number) => (pct <= 0 ? 0 : (pct / 100) * Math.max(diagPx * 0.04, 12))
+/** Angle: max-turn cap. Applied on the SOURCE's real corners (before the fairing densifies, where a
+ *  corner has a true turn angle to cut). 0% = 180° (off), 100% = 10° (aggressively rounds every corner). */
+export const angleMaxTurnDeg = (pct: number) => (pct <= 0 ? 180 : 180 - (pct / 100) * 170)
 /** Line: 0% = 0px, 100% = 80px minimum straight-run length. */
 export const lineMinPx = (pct: number) => (pct / 100) * 80
 /** Detail: SIMPLIFY (RDP) on the smoothed ring — fewer points as detail lowers. 100% = full detail
@@ -122,18 +123,49 @@ function bendAnchorPath(path: VPath, idx: number, factor: number): VPath {
   return { anchors }
 }
 
+// ── corner-cut (the ANGLE tool) ──────────────────────────────────────────────────────────────
+function turnDeg(prev: Vec2Px, p: Vec2Px, next: Vec2Px): number {
+  const ax = p[0] - prev[0], ay = p[1] - prev[1], bx = next[0] - p[0], by = next[1] - p[1]
+  const dot = ax * bx + ay * by, la = Math.hypot(ax, ay) || 1e-9, lb = Math.hypot(bx, by) || 1e-9
+  return (Math.acos(Math.max(-1, Math.min(1, dot / (la * lb)))) * 180) / Math.PI
+}
+/** ANGLE: round every corner whose TURN exceeds maxTurnDeg, via iterated Chaikin corner-cutting on the
+ *  ±1 neighbourhood. Runs on the SOURCE ring (real corners) BEFORE the fairing densifies — a dense ring
+ *  has no per-vertex sharp turns to find, which is why Angle read as dead. Visible on ANY shape. */
+function clampCorners(ring: Vec2Px[], maxTurnDeg: number): Vec2Px[] {
+  if (maxTurnDeg >= 180) return ring
+  let r = ring
+  for (let it = 0; it < 10; it++) {
+    const n = r.length
+    if (n < 4) break
+    const sharp = new Set<number>()
+    for (let i = 0; i < n; i++) if (turnDeg(r[(i - 1 + n) % n], r[i], r[(i + 1) % n]) > maxTurnDeg) for (let k = -1; k <= 1; k++) sharp.add((i + k + n) % n)
+    if (sharp.size === 0) break
+    const out: Vec2Px[] = []
+    for (let i = 0; i < n; i++) {
+      if (!sharp.has(i)) { out.push(r[i]); continue }
+      const a = r[(i - 1 + n) % n], p = r[i], b = r[(i + 1) % n]
+      out.push([p[0] + (a[0] - p[0]) * 0.25, p[1] + (a[1] - p[1]) * 0.25])
+      out.push([p[0] + (b[0] - p[0]) * 0.25, p[1] + (b[1] - p[1]) * 0.25])
+    }
+    r = out
+  }
+  return r
+}
+
 // ── global pass ────────────────────────────────────────────────────────────────────────────
 const FAIR_FLATTEN_TOL = 0.75 // px — dense enough that the fairing sees the true silhouette
 const FAIR_SPACING = 1.5
 
-/** Fairing knobs (blueprint §4 order detail → smooth → snap/line → angle). Detail is applied as a
- *  separate RDP after fairTracedRing (see fairWithGuard) so it thins, not resamples. */
+/** Fairing knobs — Smooth (σ, scale-aware), Snap (truing band, scale-aware), Line (min run). ANGLE is
+ *  NOT here: it's a distinct pre-pass on the source corners, so fairTracedRing's internal max-turn is
+ *  OFF (180) to avoid double-cutting. Detail is a separate RDP after fairing (see fairWithGuard). */
 function fairOpts(g: GlobalAdjustments, diagPx: number): FairTracedRingOpts {
   return {
     spacingPx: FAIR_SPACING,
     smoothPx: smoothSigmaPx(g.smooth, diagPx),
-    detailPx: snapBandPx(g.snap),
-    maxTurnDeg: angleMaxTurnDeg(g.angle),
+    detailPx: snapBandPx(g.snap, diagPx),
+    maxTurnDeg: 180,
     minLinePx: lineMinPx(g.line),
   }
 }
@@ -148,11 +180,13 @@ function fairWithGuard(ring: Vec2Px[], g: GlobalAdjustments): Vec2Px[] {
   // with Snap off) can make the fairing emit NaN — caught here and failed-closed to the source ring,
   // so resolve() NEVER returns unrenderable geometry.
   const valid = (r: Vec2Px[]) => r.length >= 4 && r.every(([x, y]) => Number.isFinite(x) && Number.isFinite(y)) && validateSelfIntersection(r, 'resolve').length === 0
+  // ANGLE first — round the source's sharp corners before fairing densifies (where corners are real).
+  const base = g.angle > 0 ? clampCorners(ring, angleMaxTurnDeg(g.angle)) : ring
   const finish = (opts: FairTracedRingOpts) => {
-    const f = fairTracedRing(ring, opts)
+    const f = fairTracedRing(base, opts)
     return eps > 0 ? rdpClosed(f, eps) : f
   }
-  // σ scales with the shape size — compute the ring's bbox diagonal
+  // smooth/snap scale with the shape size — compute the bbox diagonal
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   for (const [x, y] of ring) { if (x < minX) minX = x; if (y < minY) minY = y; if (x > maxX) maxX = x; if (y > maxY) maxY = y }
   const diag = Math.hypot(maxX - minX, maxY - minY) || 1
@@ -168,8 +202,8 @@ function fairWithGuard(ring: Vec2Px[], g: GlobalAdjustments): Vec2Px[] {
   // terminal: a validated repair, else the source ring itself (simple by construction — fail-closed).
   const repaired = repairSimplePolygon(out, 1)
   if (valid(repaired)) return repaired
-  const base = eps > 0 ? rdpClosed(ring, eps) : ring
-  return valid(base) ? base : (valid(ring) ? ring : repairSimplePolygon(ring, 1))
+  const sourceRing = eps > 0 ? rdpClosed(ring, eps) : ring
+  return valid(sourceRing) ? sourceRing : (valid(ring) ? ring : repairSimplePolygon(ring, 1))
 }
 
 /** Global pass: fair every path's flattened polyline; pin claimed anchors back as identified anchors
