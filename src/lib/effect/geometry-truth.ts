@@ -26,6 +26,38 @@ export const DISPLAY_TOLERANCE_MM = 0.004
 // re-Tune use these; a parameter fork here would be a second pipeline).
 const FIT_CORNER_ANGLE_DEG = 30
 const FIT_MAX_ERROR_PX = 0.35
+// HARD CRACK RULE (restored from v1/v2 contour.ts — the v3 vectoriser rebuild dropped it): no corner
+// may stay sharper than this INTERIOR angle. Tuned LOW so it removes only artifact spikes/V-notches
+// (the cracks/cuts) while legitimate sharp corners (≥ this) survive as raw corners.
+const CRACK_MIN_ANGLE_DEG = 26
+
+/**
+ * Cut any corner whose interior angle is below `minAngleDeg` (a spike/crack), iterated so even very
+ * acute notches are tamed; gentle corners pass through untouched. Ported from v1/v2's clampSharpCorners.
+ */
+function clampSharpCorners(pts: Vec2Px[], minAngleDeg: number, cut = 0.4, iterations = 8): Vec2Px[] {
+  if (minAngleDeg <= 0) return pts
+  const minCos = Math.cos((minAngleDeg * Math.PI) / 180) // interior angle < threshold ⇔ cos > minCos
+  let p = pts
+  for (let it = 0; it < iterations; it++) {
+    const n = p.length
+    if (n < 4) break
+    const out: Vec2Px[] = []
+    let changed = false
+    for (let i = 0; i < n; i++) {
+      const a = p[(i - 1 + n) % n], v = p[i], b = p[(i + 1) % n]
+      const v1x = a[0] - v[0], v1y = a[1] - v[1]
+      const v2x = b[0] - v[0], v2y = b[1] - v[1]
+      const l1 = Math.hypot(v1x, v1y) || 1, l2 = Math.hypot(v2x, v2y) || 1
+      const cos = (v1x * v2x + v1y * v2y) / (l1 * l2) // +1 = acute spike, -1 = straight
+      if (cos > minCos) { out.push([v[0] + cut * v1x, v[1] + cut * v1y]); out.push([v[0] + cut * v2x, v[1] + cut * v2y]); changed = true }
+      else out.push(v)
+    }
+    p = out
+    if (!changed) break
+  }
+  return p
+}
 // Anchor-compaction budget (KAI-8974/F3b): the minimal-segmentation pass may spend up to 2x the
 // fit tolerance to remove redundant anchors — 0.7px on a typical 1200px mask ≈ 0.04mm at the 70mm
 // base, inside the 0.05mm manufacturing class; G1/tangent-preserving, corners never merged.
@@ -130,7 +162,10 @@ function vectoriseTraceOnce(rawMaskPx: ReadonlyArray<Pt>, maskHeightPx: number, 
   // existing simple-polygon repair drops the crossing vertices deterministically. Track WHAT
   // it removed: a raw corner that lived on a removed sliver must not be pinned back in.
   const fairedRaw = fairTracedRing(yDown, fairing)
-  const faired = repairSimplePolygon(fairedRaw, 1)
+  // HARD CRACK RULE: kill artifact spikes/V-notches (acute cracks) AFTER the simple-polygon repair
+  // catches self-crossing ones. removedPts (below) is derived from faired vs fairedRaw, so any apex
+  // clamped here is automatically excluded from corner re-pinning (no re-created spike).
+  const faired = clampSharpCorners(repairSimplePolygon(fairedRaw, 1), CRACK_MIN_ANGLE_DEG)
   if (faired.length < 3) return null
   const kept = new Set(faired.map(([x, y]) => `${x},${y}`))
   const removedPts = fairedRaw.filter(([x, y]) => !kept.has(`${x},${y}`))
