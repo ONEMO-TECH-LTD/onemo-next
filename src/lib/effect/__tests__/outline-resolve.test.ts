@@ -4,7 +4,7 @@
 
 import { describe, test, expect } from 'vitest'
 import {
-  resolve, mintIds, ADJUSTMENTS_OFF, GLOBAL_OFF,
+  resolve, mintIds, GLOBAL_OFF,
   type OutlineSource, type OutlineClass, type OutlineAdjustments, type LocalAdjustment,
 } from '../outline-resolve'
 import { flattenShape, filletShape, type VShape, type VAnchor } from '@/lib/vector-core'
@@ -166,6 +166,40 @@ describe('V4 resolve — NEVER produces NaN/Infinity (renderable geometry)', () 
       for (const radius of [0, 20, 80]) expect(allFinite(resolve(s, { global: { ...GLOBAL_OFF }, local: { [a.id]: { radius } } }))).toBe(true)
       for (const curve of [0, 1, 2]) expect(allFinite(resolve(s, { global: { ...GLOBAL_OFF }, local: { [a.id]: { curve } } }))).toBe(true)
     }
+  })
+})
+
+describe('V4 resolve — F5: Snap/Angle visibly change representative shapes at full range (still simple)', () => {
+  const mk = (x: number, y: number): VAnchor => ({ p: { x, y }, hIn: null, hOut: null, corner: true })
+  const sharpStar = (): VShape => {
+    const a: VAnchor[] = []
+    for (let i = 0; i < 10; i++) { const ang = (2 * Math.PI * i) / 10 - Math.PI / 2; const r = i % 2 === 0 ? 200 : 80; a.push(mk(250 + r * Math.cos(ang), 250 + r * Math.sin(ang))) }
+    return { paths: [{ anchors: a }] }
+  }
+  const noisyWall = (): VShape => {
+    const a: VAnchor[] = [mk(0, 0)]
+    for (let x = 20; x < 400; x += 20) a.push(mk(x, (x / 20) % 2 === 0 ? 0 : 9)) // zigzag noise on a near-straight top edge
+    a.push(mk(400, 0), mk(400, 300), mk(0, 300))
+    return { paths: [{ anchors: a }] }
+  }
+  const simple = (s: VShape) => validateSelfIntersection(flat(s), 't').length === 0
+  test('Angle 100 rounds a sharp star — differs from off AND stays simple', () => {
+    const s = source(sharpStar())
+    const offR = flat(resolve(s, off())); const angR = flat(resolve(s, { global: { ...GLOBAL_OFF, angle: 100 }, local: {} }))
+    expect(simple(resolve(s, { global: { ...GLOBAL_OFF, angle: 100 }, local: {} }))).toBe(true)
+    expect(angR).not.toEqual(offR)
+  })
+  test('Snap 100 straightens a noisy near-straight wall — differs from off AND stays simple', () => {
+    const s = source(noisyWall())
+    const offR = flat(resolve(s, off())); const snR = flat(resolve(s, { global: { ...GLOBAL_OFF, snap: 100 }, local: {} }))
+    expect(simple(resolve(s, { global: { ...GLOBAL_OFF, snap: 100 }, local: {} }))).toBe(true)
+    expect(snR).not.toEqual(offR)
+  })
+  test('Line 100 ALONE (snap off) trues the noisy wall — every tool has a standalone full-range effect', () => {
+    const s = source(noisyWall())
+    const offR = flat(resolve(s, off())); const lnR = flat(resolve(s, { global: { ...GLOBAL_OFF, line: 100 }, local: {} }))
+    expect(simple(resolve(s, { global: { ...GLOBAL_OFF, line: 100 }, local: {} }))).toBe(true)
+    expect(lnR).not.toEqual(offR)
   })
 })
 

@@ -24,7 +24,6 @@ import {
   rdpClosed,
   validateSelfIntersection,
   repairSimplePolygon,
-  type FairTracedRingOpts,
   type Vec2Px,
 } from '@/lib/outline-core'
 import { flattenPath, filletPathSmart, scaleAnchorTension, type VShape, type VPath, type VAnchor } from '@/lib/vector-core'
@@ -71,13 +70,14 @@ export const ADJUSTMENTS_OFF: OutlineAdjustments = { global: { ...GLOBAL_OFF }, 
  *  rounded the duck's fine silhouette but barely touched a large star's points. 0% = σ0; 100% ≈ 8%
  *  of the diagonal. (The caller passes the flattened ring's diagonal.) */
 export const smoothSigmaPx = (pct: number, diagPx: number) => (pct <= 0 ? 0 : (pct / 100) * Math.max(diagPx * 0.08, 24))
-/** Snap: straight-run truing band — SCALES with the shape so it engages at any size. 0% = off. */
-export const snapBandPx = (pct: number, diagPx: number) => (pct <= 0 ? 0 : (pct / 100) * Math.max(diagPx * 0.04, 12))
-/** Angle: max-turn cap. Applied on the SOURCE's real corners (before the fairing densifies, where a
- *  corner has a true turn angle to cut). 0% = 180° (off), 100% = 10° (aggressively rounds every corner). */
+/** Snap: STRAIGHTEN strength — projects each point onto its local best-fit line (a direct op, not the
+ *  fairing's fragile band-grow). 0% = off, 100% = full projection. Reliable + simple on any shape. */
+export const snapStrength = (pct: number) => Math.max(0, Math.min(1, pct / 100))
+/** Angle: max-turn cap (corner-round) — a DIRECT corner-cut on real corners, independent of the fairing.
+ *  0% = 180° (off), 100% = 10° (rounds every sharp corner). */
 export const angleMaxTurnDeg = (pct: number) => (pct <= 0 ? 180 : 180 - (pct / 100) * 170)
-/** Line: 0% = 0px, 100% = 80px minimum straight-run length. */
-export const lineMinPx = (pct: number) => (pct / 100) * 80
+/** Line: Snap's straighten WINDOW (fraction of the ring) — longer = trues longer runs (pairs with Snap). */
+export const lineWindowFrac = (pct: number) => 0.02 + (Math.max(0, Math.min(100, pct)) / 100) * 0.1
 /** Detail: SIMPLIFY (RDP) on the smoothed ring — fewer points as detail lowers. 100% = full detail
  *  (eps 0, OFF — keep everything), 0% = simplest (eps 8px). Applied AFTER smooth so it thins the
  *  smoothed outline rather than introducing its own smoothing (independent axis). */
@@ -153,57 +153,98 @@ function clampCorners(ring: Vec2Px[], maxTurnDeg: number): Vec2Px[] {
   return r
 }
 
+// ── straighten (the SNAP / LINE tool) ─────────────────────────────────────────────────────────
+/** SNAP/LINE: true up near-straight runs. Slides a window (length grows with LINE) along the ring;
+ *  for each window that is already roughly collinear (small PCA residual — a real corner has a large
+ *  one and is skipped), projects its points onto the window's best-fit line. Overlapping windows are
+ *  averaged, then blended by `strength`. A DIRECT op (not fairTracedRing's fragile band-grow), so Snap
+ *  visibly trues a noisy wall on ANY shape without the densify/fold that masked it before (F5). */
+function straighten(ring: Vec2Px[], strength: number, lineFrac: number): Vec2Px[] {
+  const n = ring.length
+  if (n < 6 || strength <= 0) return ring
+  const win = Math.max(5, Math.round(n * lineFrac))
+  const accX = new Array<number>(n).fill(0)
+  const accY = new Array<number>(n).fill(0)
+  const cnt = new Array<number>(n).fill(0)
+  for (let s = 0; s < n; s++) {
+    const idx: number[] = []
+    let mx = 0, my = 0
+    for (let k = 0; k < win; k++) { const i = (s + k) % n; idx.push(i); mx += ring[i][0]; my += ring[i][1] }
+    mx /= win; my /= win
+    let sxx = 0, sxy = 0, syy = 0
+    for (const i of idx) { const dx = ring[i][0] - mx, dy = ring[i][1] - my; sxx += dx * dx; sxy += dx * dy; syy += dy * dy }
+    const tr = sxx + syy
+    const disc = Math.max(0, (tr * tr) / 4 - (sxx * syy - sxy * sxy))
+    const l1 = tr / 2 + Math.sqrt(disc) // variance along the run
+    const l2 = tr / 2 - Math.sqrt(disc) // residual across the run
+    if (l1 < 1e-9 || l2 / l1 > 0.1) continue // empty window or a real corner — leave it
+    const theta = 0.5 * Math.atan2(2 * sxy, sxx - syy)
+    const ux = Math.cos(theta), uy = Math.sin(theta) // principal (best-fit-line) direction
+    for (const i of idx) {
+      const t = (ring[i][0] - mx) * ux + (ring[i][1] - my) * uy
+      accX[i] += mx + t * ux; accY[i] += my + t * uy; cnt[i] += 1
+    }
+  }
+  return ring.map(([x, y], i) => (cnt[i] === 0 ? [x, y] : [x + (accX[i] / cnt[i] - x) * strength, y + (accY[i] / cnt[i] - y) * strength]) as Vec2Px)
+}
+
 // ── global pass ────────────────────────────────────────────────────────────────────────────
 const FAIR_FLATTEN_TOL = 0.75 // px — dense enough that the fairing sees the true silhouette
 const FAIR_SPACING = 1.5
 
-/** Fairing knobs — Smooth (σ, scale-aware), Snap (truing band, scale-aware), Line (min run). ANGLE is
- *  NOT here: it's a distinct pre-pass on the source corners, so fairTracedRing's internal max-turn is
- *  OFF (180) to avoid double-cutting. Detail is a separate RDP after fairing (see fairWithGuard). */
-function fairOpts(g: GlobalAdjustments, diagPx: number): FairTracedRingOpts {
-  return {
-    spacingPx: FAIR_SPACING,
-    smoothPx: smoothSigmaPx(g.smooth, diagPx),
-    detailPx: snapBandPx(g.snap, diagPx),
-    maxTurnDeg: 180,
-    minLinePx: lineMinPx(g.line),
-  }
-}
-
-/** Fair one ring with fold-guard backoff (VD12) — STRUCTURALLY fail-closed: the resolver NEVER returns
- *  a self-crossing ring. The incoming `ring` is the flattened source, which is simple by construction,
- *  so it is the guaranteed-valid terminal fallback. smooth/snap/angle/line via fairTracedRing, then
- *  detail (RDP) thins the result; on a fold, back smooth off; then a validated repair; else the source. */
+/** Fair one ring as a STAGED, fail-closed pipeline (VD12). Each tool is a DIRECT, independent stage;
+ *  every stage is validated and a folded/NaN result is dropped — falling back to the PRIOR valid ring,
+ *  NOT to the raw source. (The old "always run fairTracedRing, else return source" path silently masked
+ *  Angle/Snap on deep stars: with smooth=0 the densify still folded → fell back to source = no-op. F5.)
+ *  Order: angle → snap/line → smooth → detail.
+ *   • ANGLE  = clampCorners (Chaikin corner-cut on real source corners) — simple-preserving.
+ *   • SNAP   = straighten (windowed best-fit-line projection); LINE = the window length.
+ *   • SMOOTH = fairTracedRing (resample + Gaussian σ) — the only densifying op; backs σ off on a fold.
+ *   • DETAIL = rdpClosed — thins the result.
+ *  The incoming `ring` is the flattened source (simple by construction) — the guaranteed terminal. */
 function fairWithGuard(ring: Vec2Px[], g: GlobalAdjustments): Vec2Px[] {
-  const eps = detailEpsPx(g.detail)
-  // valid = finite (no NaN/Infinity) AND simple (no self-cross). A degenerate param combo (e.g. Line
-  // with Snap off) can make the fairing emit NaN — caught here and failed-closed to the source ring,
-  // so resolve() NEVER returns unrenderable geometry.
+  // valid = finite (no NaN/Infinity) AND simple (no self-cross) AND ≥4 pts. Each stage is kept only if
+  // valid, so resolve() NEVER returns unrenderable/folded geometry — fail-closed to the prior ring.
   const valid = (r: Vec2Px[]) => r.length >= 4 && r.every(([x, y]) => Number.isFinite(x) && Number.isFinite(y)) && validateSelfIntersection(r, 'resolve').length === 0
-  // ANGLE first — round the source's sharp corners before fairing densifies (where corners are real).
-  const base = g.angle > 0 ? clampCorners(ring, angleMaxTurnDeg(g.angle)) : ring
-  const finish = (opts: FairTracedRingOpts) => {
-    const f = fairTracedRing(base, opts)
-    return eps > 0 ? rdpClosed(f, eps) : f
-  }
-  // smooth/snap scale with the shape size — compute the bbox diagonal
+  const keep = (next: Vec2Px[], prev: Vec2Px[]) => (valid(next) ? next : prev)
+
+  // smooth scales with the shape size — compute the bbox diagonal
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   for (const [x, y] of ring) { if (x < minX) minX = x; if (y < minY) minY = y; if (x > maxX) maxX = x; if (y > maxY) maxY = y }
   const diag = Math.hypot(maxX - minX, maxY - minY) || 1
-  let opts = fairOpts(g, diag)
-  let out = finish(opts)
-  if (valid(out)) return out
-  let guard = 0
-  while (guard++ < 12 && (opts.smoothPx ?? 0) > 0.5) {
-    opts = { ...opts, smoothPx: Math.max(0, (opts.smoothPx ?? 0) * 0.7) }
-    out = finish(opts)
-    if (valid(out)) return out
+
+  let r = ring
+  // 1. ANGLE — round real corners on the source ring (before any densify, where corners exist).
+  if (g.angle > 0) r = keep(clampCorners(r, angleMaxTurnDeg(g.angle)), r)
+  // 2. SNAP/LINE — true near-straight runs (windowed line projection). Snap = pull strength; Line =
+  // reach (window length) AND a standalone baseline strength, so Line visibly trues straight runs on
+  // its own (Dan: every tool full range), while still pairing with Snap. Both act only where a run is
+  // already near-straight (straighten skips real corners) — a spiky/organic silhouette has little to
+  // true, which is the honest "why" they read flat there.
+  if (g.snap > 0 || g.line > 0) {
+    const strength = Math.max(snapStrength(g.snap), g.line > 0 ? 0.35 + 0.45 * (Math.min(100, g.line) / 100) : 0)
+    r = keep(straighten(r, strength, lineWindowFrac(g.line)), r)
   }
-  // terminal: a validated repair, else the source ring itself (simple by construction — fail-closed).
-  const repaired = repairSimplePolygon(out, 1)
+  // 3. SMOOTH — Gaussian fairing (the only fold-capable op); back σ off until simple.
+  if (g.smooth > 0) {
+    let sigma = smoothSigmaPx(g.smooth, diag)
+    let sm = fairTracedRing(r, { spacingPx: FAIR_SPACING, smoothPx: sigma, maxTurnDeg: 180, detailPx: 0, minLinePx: 0 })
+    let guard = 0
+    while (!valid(sm) && guard++ < 12 && sigma > 0.5) {
+      sigma *= 0.7
+      sm = fairTracedRing(r, { spacingPx: FAIR_SPACING, smoothPx: sigma, maxTurnDeg: 180, detailPx: 0, minLinePx: 0 })
+    }
+    r = keep(sm, r)
+  }
+  // 4. DETAIL — RDP simplify the result (independent axis; applied last).
+  const eps = detailEpsPx(g.detail)
+  if (eps > 0) r = keep(rdpClosed(r, eps), r)
+
+  // terminal: the staged result if valid, else a validated repair, else the (simple) source ring.
+  if (valid(r)) return r
+  const repaired = repairSimplePolygon(r, 1)
   if (valid(repaired)) return repaired
-  const sourceRing = eps > 0 ? rdpClosed(ring, eps) : ring
-  return valid(sourceRing) ? sourceRing : (valid(ring) ? ring : repairSimplePolygon(ring, 1))
+  return valid(ring) ? ring : repairSimplePolygon(ring, 1)
 }
 
 /** Global pass: fair every path's flattened polyline; pin claimed anchors back as identified anchors
