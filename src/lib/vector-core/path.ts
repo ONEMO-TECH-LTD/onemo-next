@@ -105,7 +105,9 @@ export function shapeToSVGPathD(shape: VShape, precision = 3): string {
   return shape.paths.map((p) => toSVGPathD(p, precision)).join(' ')
 }
 
-/** Map every anchor AND its handles through `fn` — exact for affine transforms of Béziers. */
+/** Map every anchor AND its handles through `fn` — exact for affine transforms of Béziers.
+ *  Carries the V4 stable `id` (VD9): a move/rotate/stretch keeps each anchor's identity, so its
+ *  per-anchor adjustments (radius/curve) survive the transform. */
 export function transformPath(path: VPath, fn: (p: Vec2) => Vec2): VPath {
   return {
     anchors: path.anchors.map((a) => ({
@@ -113,6 +115,7 @@ export function transformPath(path: VPath, fn: (p: Vec2) => Vec2): VPath {
       hIn: a.hIn ? fn(a.hIn) : a.hIn,
       hOut: a.hOut ? fn(a.hOut) : a.hOut,
       corner: a.corner,
+      id: a.id,
     })),
   }
 }

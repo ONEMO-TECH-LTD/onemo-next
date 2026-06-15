@@ -22,6 +22,11 @@ export interface VAnchor {
   hOut?: Vec2 | null
   /** true corner (cusp) — handles independent; false = smooth (handles mirror on edit) */
   corner: boolean
+  /** V4 (VD9) STABLE ID — the editor's source+adjustments engine keys per-anchor adjustments
+   *  (radius/curve) and pinning on this. Minted once at OutlineSource creation; PRESERVED through
+   *  transformShape; FRESH on import / new-anchor / insert. Optional: anchors produced by the global
+   *  fairing pass are transient (unclaimed) and need no durable id (V4 blueprint §4). */
+  id?: string
 }
 
 /** One closed loop. Segment i runs anchors[i] → anchors[(i + 1) % n]. */

@@ -14,13 +14,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   validateSelfIntersection,
-  fairTracedRing,
-  fairingFromDetail,
-  BEN_DEFAULT_DETAIL,
-  type FairTracedRingOpts,
+  rdpClosed,
   type Vec2Px,
 } from '@/lib/outline-core'
-import { vectoriseTrace, MIN_ANCHOR_SEPARATION_MM } from '@/lib/effect/geometry-truth'
+import { MIN_ANCHOR_SEPARATION_MM } from '@/lib/effect/geometry-truth'
+// V4 engine (blueprint v4-foundation.md): one impartial resolve(source, adjustments). The editor
+// writes the recipe; the engine owns shape. No corner-pin, no vectoriseTrace, no baked timeline.
+import { mintIds, GLOBAL_OFF, type GlobalAdjustments, type LocalAdjustment } from '@/lib/effect/outline-resolve'
 import { standardBirthShape } from '@/lib/effect/prepare-effect'
 import { useOutlineStore, NEUTRAL_FX, INITIAL_ARTWORK, type ImageFx } from './outlineStore'
 import type { DesignState } from '../types'
@@ -31,7 +31,7 @@ import { perfGesture } from '../dev/PerfHUD'
 import { generateShapeRing, resampleClosed, type ShapeKind, type ShapeParams } from './shapes'
 // VECTOR CORE (reset Run 1): vector-native kinds render/commit/transform on a true Bézier VShape;
 // the doc stays as the interaction SHADOW (a derived flatten artifact — bbox/hit/grips math only).
-import { shapeToSVGPathD, transformShape, flattenShape, filletShape, filletShapeSmart, filletPathSmart, ringToVPath, nearestOnPath, insertAnchorCentered, deleteAnchorRefit, scaleAnchorTension, shapeBBox, type VShape, type VAnchor, type Vec2 } from '@/lib/vector-core'
+import { shapeToSVGPathD, flattenShape, filletShape, ringToVPath, nearestOnPath, insertAnchorCentered, deleteAnchorRefit, shapeBBox, type VShape, type VAnchor, type Vec2 } from '@/lib/vector-core'
 import { hasVectorDef, getShape } from '@/lib/shape-library'
 // Run 8 — SVG shape upload: a downloaded/Figma-exported outline becomes a first-class vector
 // shape through the export module's dialect gate (loud rejection outside the v1 boundary).
@@ -46,7 +46,7 @@ import { traceContourRaw } from '@/lib/effect/contour'
 const GEN_VECTOR_KINDS = new Set<ShapeKind>(['daisy', 'pinwheel', 'form', 'blob'])
 // Run 2 · G6 decomposition — seam 1: pure doc-space geometry; seam 2: chip lineup + glyphs.
 import { DEFAULT_SHAPE_PARAMS } from './editor/chips'
-import { useEditorHistory } from './editor/useEditorHistory'
+import { useOutlineEditing } from './editor/useOutlineEditing'
 import { useCanvasView } from './editor/useCanvasView'
 import { AdjustSheet, ImageSheet, ShapeSheet, type AdjustSub } from './editor/sheets'
 import { pointInPolygon, type GripId } from './editor/geometry'
@@ -82,21 +82,25 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   // undo/redo restore a TRUTHFUL readout (the Detail ruler lied at 89% after undo). The source is
   // the COMMITTED dial state — updated only at seed/commit/reset/undo, never by preview ticks
   // (the TickBar's onChange moves the live refs DURING the drag, before the commit pushes).
-  const committedDialRef = useRef<{ detail: number; fairParams: FairTracedRingOpts }>({ detail: BEN_DEFAULT_DETAIL, fairParams: fairingFromDetail(BEN_DEFAULT_DETAIL) })
-  const captureDialMeta = useCallback(() => ({ ...committedDialRef.current }), [])
-  const { vshape, vshapeRef, vBaseRef, histRef, applyVec, undoRaw, redoRaw } = useEditorHistory(captureDialMeta)
+  // V4: the editor session over the store's source+adjustments truth (resolve = the display shape).
+  const { adjustments, display, displayRef, preview: previewAdj, setPreview: setPreviewAdj, applyAdjustments, seedSource, reBaseline, transformSource, undo: undoEdit, redo: redoEdit, histRef } = useOutlineEditing()
+  // aliases — the gesture/render code reads the RESOLVED display as the working VShape.
+  const vshape = display
+  const vshapeRef = displayRef
+  // every MANUAL op (drag / insert / delete / sharpen / producer pick) RE-BASELINES: the new VShape
+  // becomes a fresh immutable source (adjustments off). Radius / Curve / global tools write adjustments.
+  const applyVec = useCallback((v: VShape, _base?: VShape | null, _lin?: 'trace' | 'vector') => reBaseline(() => v), [reBaseline])
+  // the live global recipe shown by the sliders (preview during a drag, else the committed truth).
+  const liveGlobal = (previewAdj ?? adjustments).global
 
-  const [radius, setRadius] = useState(0)        // Round: global (or selected-corner) radius px
+  const [radius, setRadius] = useState(0)        // Round: selected-corner radius px (local adjustment)
 
   // Apple layout: the editor's bottom is a MODE pill (Shape · Adjust · Image); each mode shows a
   // row of circular sub-tools sharing ONE ruler. Adjust = Radius · Curve · Tune ✦ (plan A2 —
   // Scale DELETED per D5, the frame owns it; Blend lives in Image mode per #8).
   const [activeAdjust, setActiveAdjust] = useState<'shape' | 'adjust' | 'image' | null>(null)
   const [adjustSub, setAdjustSub] = useState<AdjustSub>('radius')
-  // KAI-9006 (Dan): rings appear ONLY when a dial moved off its session-seed value — captured at
-  // open; undo back to the seed clears the ring again.
-  const dialSeedsRef = useRef<{ radius: number; detail: number; fair: FairTracedRingOpts } | null>(null)
-  const [curveVal, setCurveVal] = useState(50) // Curve ruler: 50 = the point's current tension
+  const [curveVal, setCurveVal] = useState(0) // Curve ruler 0..100 — 0 = straight (OFF), reversible
   const [blendBlur, setBlendBlur] = useState(50) // blend intensity 0–100; 0 = off (ruler IS the switch)
   // Shape tool: pick a preset/parametric shape as the starting outline. shapeKind = the shape currently
   // being tuned (null = none picked this session → only chips show). Params drive live regeneration.
@@ -107,16 +111,10 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   const shapeParamsRef = useRef(shapeParams)
   useEffect(() => { shapeParamsRef.current = shapeParams }, [shapeParams])
   const [shapePreview, setShapePreview] = useState<string | null>(null) // live morph while dragging a shape control — a display-only SVG `d` ring (never geometry)
-  // BEN runtime tuning (Dan, 2026-06-10): re-fair the RAW trace with live params so the optimal
-  // settings are found by testing in the run, not guessed. detail = the master 0–100 dial;
-  // fairParams = the advanced per-knob values (master commit re-derives them via fairingFromDetail).
-  const [detail, setDetail] = useState(BEN_DEFAULT_DETAIL)
-  const detailRef = useRef(detail)
-  useEffect(() => { detailRef.current = detail }, [detail])
-  const [fairParams, setFairParams] = useState<FairTracedRingOpts>(() => fairingFromDetail(BEN_DEFAULT_DETAIL))
-  const fairParamsRef = useRef(fairParams)
-  useEffect(() => { fairParamsRef.current = fairParams }, [fairParams])
-  const [tunePreview, setTunePreview] = useState<string | null>(null) // live re-fair while dragging a tune bar — display-only `d`
+  // V4: the global recipe (Detail/Smooth/Snap/Angle/Line) lives in `adjustments.global` — INDEPENDENT
+  // 0..100 axes (no Detail↔Smooth coupling). Slider ticks preview through the editing hook (no commit);
+  // release commits via applyAdjustments. There is no separate `d`-string tune preview — the display
+  // re-resolves from the live recipe.
   // #28 Image tool (Apple-pattern: circular sub-icons + ONE shared ruler). Position pans/zooms the
   // PHOTO under the fixed cutline (the scene's G1, now inside the editor); adjustments preview live
   // via CSS filter here and bake into the print composite on commit (one composeFront).
@@ -192,45 +190,34 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
 
   const syncSlidersTo = useCallback(() => {
     setRadius(0)
-    setCurveVal(50)
+    setCurveVal(0)
     setAllSelected(false)
     setSelVA(null)
     setSelSeg(null)
     setVecLive(null)
   }, [])
-  const restoreDialMeta = useCallback((e: { meta?: { detail: number; fairParams: FairTracedRingOpts } } | null) => {
-    if (!e) return false
-    syncSlidersTo()
-    if (e.meta) { setDetail(e.meta.detail); setFairParams(e.meta.fairParams); committedDialRef.current = { ...e.meta } }
-    return true
-  }, [syncSlidersTo])
-  const undo = useCallback(() => { restoreDialMeta(undoRaw()) }, [undoRaw, restoreDialMeta])
-  const redo = useCallback(() => { restoreDialMeta(redoRaw()) }, [redoRaw, restoreDialMeta])
+  // Undo/redo step the {source, adjustments} history (VD10); the hook restores the store, we just
+  // resync the transient slider/selection UI to the restored state.
+  const undo = useCallback(() => { if (undoEdit()) syncSlidersTo() }, [undoEdit, syncSlidersTo])
+  const redo = useCallback(() => { if (redoEdit()) syncSlidersTo() }, [redoEdit, syncSlidersTo])
 
-  // Open the editor FROM the single truth (REBUILD-PLAN-v2 §B3): session = committedShape if one
-  // exists, else the design's born vector (Magic re-fit at saved Tune prefs / the centered square
-  // seed pre-Magic). The seed COMMITS — visible = committed at every moment; the §6.3 freeze
-  // defers the 3D rebuild to the close boundary. ✕ Close restores the pre-open snapshot.
+  // Open the editor FROM the V4 truth (blueprint §2): the store holds `source + adjustments`. On a
+  // FRESH design (source null) we seed an OutlineSource; on REOPEN the live source+adjustments persist
+  // (resolve = display). The seed is NOT undoable. §6.3 freeze defers the 3D rebuild to close; ✕ Close
+  // restores the pre-open snapshot.
   useEffect(() => {
     if (!open) return
     const st0 = useOutlineStore.getState()
-    // snapshot FIRST — ✕ Close restores exactly this through the one writer
+    // snapshot FIRST — ✕ Close restores exactly this through the one writer (committedShape = resolved)
     preEditRef.current = { committedShape: st0.committedShape, bgBlur: st0.bgBlur, imageFx: st0.imageFx, artwork: st0.artwork }
     st0.setEditorOpen(true) // §6.3: scene frozen → 3D rebuilds defer to close
     // session view/interaction state reset
-    setCurveVal(50)
+    setCurveVal(0)
+    setPreviewAdj(null)
     setView({ scale: 1, vx: 0, vy: 0 }) // G11: fresh session starts at fit
     setAllSelected(false)
     setShapeKind(null)
     setShapePreview(null)
-    setTunePreview(null)
-    {
-      // #21: Dan's tuned settings are the defaults — restore them, never reset to factory
-      const saved = st0.fairing
-      setDetail(saved?.detail ?? BEN_DEFAULT_DETAIL)
-      setFairParams(saved?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL))
-      committedDialRef.current = { detail: saved?.detail ?? BEN_DEFAULT_DETAIL, fairParams: saved?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL) }
-    }
     setRotateLive(null); rotateLiveRef.current = null; rotateRef.current = null
     setMoveLive(null); moveLiveRef.current = null; moveRef.current = null
     setSelVA(null); setVecLive(null); vecDragRef.current = null
@@ -242,38 +229,25 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     // sync the blend ruler to the current 3D state (null = build default ≈ 50; 0 = off)
     setBlendBlur(st0.bgBlur == null ? 50 : Math.round(st0.bgBlur * 100))
     setRadius(0)
-    // ── seed the session truth ──
-    if (spec) {
-      const image = { widthPx: spec.maskWidthPx, heightPx: spec.maskHeightPx, sourceHash: spec.sourceRef.slice(0, 40), orientation: 'baked' as const }
-      let v0: VShape
-      let base: VShape | null = null
-      let lin: 'trace' | 'vector' | undefined // KAI-9032: seed lineage (reopen keeps the store's)
-      if (st0.committedShape) {
-        v0 = st0.committedShape // reopening restores TRUE curves — the committed truth itself
-      } else if (spec.generator.adapter !== 'standard') {
-        // Magic (Dan 2026-06-15): open on the RAW marching-squares straight polygon EXACTLY as
-        // generated — NO re-fair on entry. The old re-fit here is what auto-smoothed the raw on
-        // entry and let Smooth fold cracks. The raw IS the Radius base too, so Radius 0 = raw-
-        // straight, and every tool (Detail / Smooth / Radius) is a manual, reversible op ON the raw.
-        v0 = spec.vectorShape
-        base = spec.vectorShape
-        lin = 'trace'
+    // ── seed the session source (only when there is no live source yet) ──
+    if (spec && !st0.source) {
+      const image = { widthPx: spec.maskWidthPx, heightPx: spec.maskHeightPx }
+      if (spec.generator.adapter !== 'standard') {
+        // Magic (VD11): the immutable source IS the raw marching-squares straight polygon (spec.vectorShape,
+        // RDP-normalized at generation). all-off → this exact polygon. Every tool (Detail / Smooth /
+        // Radius / Curve) is a reversible adjustment ON it — no re-fair, no corner-pin on entry.
+        seedSource({ shape: mintIds(spec.vectorShape), klass: 'generated', mmPerPx: spec.mmPerPx, maskHeightPx: spec.maskHeightPx, rawTracePx: spec.rawTracePx as Pt[] | undefined }, undefined, false)
       } else {
-        // Dan (2026-06-10): entering the editor BEFORE Magic means "choose a shape" — the
-        // full-bleed square buries its handles, so the session starts on the centered square,
-        // exact arcs at the 8mm absolute default (KAI-8940), clamped to the inscribable max
-        base = getShape('square', image.widthPx, image.heightPx)
+        // pre-Magic (Dan, 2026-06-10): "choose a shape" — the centered 72% square with 8mm corners,
+        // as a stock-class source (the rounding lives in the source vector; all-off shows it verbatim).
+        const base = getShape('square', image.widthPx, image.heightPx)
         const side = Math.min(image.widthPx, image.heightPx) * 0.72
         const defaultR = Math.min(Math.round(8 / (spec.mmPerPx || 1)), Math.floor(side / 2))
-        v0 = filletShape(base, defaultR)
-        setRadius(defaultR)
+        seedSource({ shape: mintIds(filletShape(base, defaultR)), klass: 'stock', mmPerPx: spec.mmPerPx, maskHeightPx: spec.maskHeightPx }, undefined, false)
         setActiveAdjust('shape')
         setShapeKind('square')
         setShowAnchors(false) // rigid shape default — Points toggle re-enables
-        lin = 'vector'
       }
-      applyVec(v0, base, lin) // COMMITS the seed (visible = committed); §6.3 defers the 3D to close
-      dialSeedsRef.current = null // re-captured on first render below (radius state settles this tick)
     }
     // (no spec → nothing to seed; the page gates editor entry on an uploaded image)
     setImageSub('brightness')
@@ -320,12 +294,12 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
 
   // The rendered path: true SVG curves from the display shape (crisp at any zoom).
   const pathD = useMemo(() => {
-    // transient tick morphs (display rings) supersede; else TRUE curves as SVG C commands —
-    // crisp at ANY zoom, zero chords. There is no document render path.
-    if (tunePreview) return tunePreview
+    // a producer morph (generator tick) supersedes as a display ring; else the resolved display as
+    // TRUE SVG curves — crisp at ANY zoom. Global/radius/curve ticks re-resolve `vshape` directly,
+    // so there is no separate tune-preview string.
     if (shapePreview) return shapePreview
     return vDisplay ? shapeToSVGPathD(vDisplay, 2) : ''
-  }, [tunePreview, shapePreview, vDisplay])
+  }, [shapePreview, vDisplay])
 
   // HIT RING (session adapter, ring math only): the displayed shape flattened once per commit —
   // feeds inside-tests, bboxes, grips. Never persisted, never geometry.
@@ -340,9 +314,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   }, [hitRing])
   // inline manufacturability guardrail — same ring-math verdict class as the engine gate
   const hasIssues = useMemo(() => hitRing.length >= 4 && validateSelfIntersection(hitRing, 'outer').length > 0, [hitRing])
-  // tier-2 availability: whole-shape Radius acts on CORNER anchors; a fully-faired Magic cut has
-  // none, so the tool greys with a hint instead of silently doing nothing (Dan's rule)
-  const radiusApplies = useMemo(() => !!vshape && (vshape.paths[0].anchors.some((a) => a.corner) || !!vBaseRef.current), [vshape, vBaseRef])
+  // tier-2 availability: Radius is a per-corner fillet (local adjustment) — it needs a CORNER anchor
+  // to round; the tool greys when the shape has none (Dan's rule: inapplicable tools grey, never no-op).
+  const radiusApplies = useMemo(() => !!vshape && vshape.paths[0].anchors.some((a) => a.corner), [vshape])
 
   // Run 6 — points on demand: build the transient shape for an in-flight anchor/handle drag.
   // Anchor drag translates p + both handles together; a SMOOTH anchor's handle drag mirrors the
@@ -552,16 +526,14 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   const commitRotate = useCallback(() => {
     const rl = rotateLiveRef.current
     if (rl && Math.abs(rl.deg) > 0.01) {
-      if (vshapeRef.current) {
-        // exact rotation on anchors+handles
-        const rad = (rl.deg * Math.PI) / 180, c = Math.cos(rad), s = Math.sin(rad)
-        const t = (p: Vec2) => ({ x: rl.cx + (p.x - rl.cx) * c - (p.y - rl.cy) * s, y: rl.cy + (p.x - rl.cx) * s + (p.y - rl.cy) * c })
-        applyVec(transformShape(vshapeRef.current, t), vBaseRef.current ? transformShape(vBaseRef.current, t) : null)
-      }
+      // exact rotation on the SOURCE (ids preserved → per-anchor adjustments survive the transform)
+      const rad = (rl.deg * Math.PI) / 180, c = Math.cos(rad), s = Math.sin(rad)
+      const t = (p: Vec2) => ({ x: rl.cx + (p.x - rl.cx) * c - (p.y - rl.cy) * s, y: rl.cy + (p.x - rl.cx) * s + (p.y - rl.cy) * c })
+      transformSource(t)
     }
     rotateLiveRef.current = null; setRotateLive(null)
     nodeInteractedRef.current = true // suppress the click that follows so it doesn't re-select-all
-  }, [applyVec, vBaseRef, vshapeRef])
+  }, [transformSource])
 
   const onPointerUp = useCallback((e: React.PointerEvent) => {
     pointersRef.current.delete(e.pointerId)
@@ -584,15 +556,13 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
       const ml = moveLiveRef.current
       moveRef.current = null
       if (ml) {
-        if (vshapeRef.current) {
-          const t = (p: Vec2) => ({ x: p.x + ml.dx, y: p.y + ml.dy })
-          applyVec(transformShape(vshapeRef.current, t), vBaseRef.current ? transformShape(vBaseRef.current, t) : null)
-        }
+        const t = (p: Vec2) => ({ x: p.x + ml.dx, y: p.y + ml.dy })
+        transformSource(t)
         moveLiveRef.current = null; setMoveLive(null)
       }
       return // no move = a tap → onSurfaceClick selects all
     }
-  }, [commitRotate, applyVec, vBaseRef, vshapeRef])
+  }, [commitRotate, applyVec, transformSource])
 
   // Run 6 — explicit vector-anchor actions (the nodeBar): add centered ON the curve after the
   // selected anchor (Figma "insert between"), or delete with re-fit.
@@ -666,65 +636,62 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     }
   }, [hitRing, toViewBox, preview, showAnchors, vshapeRef])
 
+  // ── LOCAL adjustments (Radius / Curve) — claimed per anchor by STABLE id (VD2/VD9). A claimed
+  //    source anchor is reversible (off → exact source corner) and PINNED through any global pass.
+  /** the SELECTED display anchor's SOURCE id — present when global is off OR the anchor is pinned. */
+  const selectedSourceId = useCallback((): string | null => {
+    const disp = vshapeRef.current
+    if (!disp || selVA === null) return null
+    const id = disp.paths[0].anchors[selVA]?.id
+    if (!id) return null
+    const src = useOutlineStore.getState().source
+    return src && src.shape.paths.some((p) => p.anchors.some((x) => x.id === id)) ? id : null
+  }, [selVA, vshapeRef])
+  /** live preview a local adjustment (recipe preview) — only when the anchor has a source id. */
+  const previewLocal = useCallback((mut: LocalAdjustment) => {
+    const id = selectedSourceId()
+    if (!id) return
+    const adj = useOutlineStore.getState().adjustments
+    setPreviewAdj({ ...adj, local: { ...adj.local, [id]: { ...adj.local[id], ...mut } } })
+  }, [selectedSourceId, setPreviewAdj])
+  /** commit a local adjustment: claim the source anchor by id (reversible + pinned); or — when the
+   *  selected anchor is a transient faired point (global engaged) — bake the resolved shape into a
+   *  fresh source and claim the same index there. */
+  const commitLocal = useCallback((mut: LocalAdjustment) => {
+    setPreviewAdj(null)
+    const disp = vshapeRef.current
+    if (!disp || selVA === null) return
+    const st = useOutlineStore.getState()
+    const id = selectedSourceId()
+    if (id) {
+      const adj = st.adjustments
+      applyAdjustments({ ...adj, local: { ...adj.local, [id]: { ...adj.local[id], ...mut } } })
+    } else {
+      const baked = mintIds(disp)
+      const newId = baked.paths[0].anchors[selVA]?.id
+      const src = st.source
+      if (!newId || !src) return
+      seedSource({ ...src, shape: baked }, { global: { ...GLOBAL_OFF }, local: { [newId]: mut } })
+    }
+  }, [selVA, selectedSourceId, applyAdjustments, seedSource, vshapeRef])
+
+  // RADIUS — per-corner fillet (local). onChange previews live; release commits. 0 = sharp (off).
+  const previewRadius = useCallback((v: number) => { setRadius(v); previewLocal({ radius: v }) }, [previewLocal])
   const commitRadius = useCallback((v: number) => {
     setRadius(v)
     const t0 = performance.now()
-    // Run 5 — Radius on EVERY corner class: re-fillets the clean base with the curve-aware
-    // fillet (line-line exact arcs; heart cusps + Magic-trace corners trim-and-arc). A fitted
-    // shape with no pristine base (Magic) adopts its CURRENT geometry as the base on first use.
-    if (vshapeRef.current) {
-      const cur = vshapeRef.current
-      // Run 6 — single-corner Radius: a selected CORNER anchor rounds alone; the result becomes
-      // its own base (whole-shape Radius afterwards rounds the remaining corners from here).
-      if (selVA !== null && cur.paths[0].anchors[selVA]?.corner) {
-        applyVec({ paths: [filletPathSmart(cur.paths[0], v, (ai) => ai === selVA), ...cur.paths.slice(1)] }, null)
-        setSelVA(null)
-        perfGesture('round-commit', performance.now() - t0)
-        return
-      }
-      if (!vBaseRef.current) vBaseRef.current = cur
-      applyVec(filletShapeSmart(vBaseRef.current, v), vBaseRef.current)
-      perfGesture('round-commit', performance.now() - t0)
-      return
-    }
+    commitLocal({ radius: v })
     perfGesture('round-commit', performance.now() - t0)
-  }, [selVA, applyVec, vBaseRef, vshapeRef])
-  // CURVE — the REAL bend tool (plan A2/D3): tension on the SELECTED anchor via the shared ruler.
-  // A RAW straight corner has no handles, so scaleAnchorTension was a no-op (Dan 2026-06-15: "curve
-  // not working at all"). bendAnchorPath synthesizes symmetric tangent handles (Catmull-Rom tangent
-  // from the neighbours) scaled by the factor — turning a sharp corner INTO a curve; an already-curved
-  // anchor just re-tensions its existing handles.
-  const bendAnchorPath = useCallback((path: VShape['paths'][number], idx: number, factor: number): VShape['paths'][number] => {
-    const a = path.anchors[idx]
-    if (!a) return path
-    if (a.hIn || a.hOut) return scaleAnchorTension(path, idx, factor)
-    const anchors = path.anchors.map((x) => ({ ...x }))
-    const n = anchors.length
-    const prev = anchors[(idx - 1 + n) % n].p, next = anchors[(idx + 1) % n].p
-    const dx = next.x - prev.x, dy = next.y - prev.y
-    const len = Math.hypot(dx, dy) || 1
-    const ux = dx / len, uy = dy / len
-    const eMin = Math.min(Math.hypot(a.p.x - prev.x, a.p.y - prev.y), Math.hypot(next.x - a.p.x, next.y - a.p.y))
-    const base = 0.33 * eMin * Math.max(0, factor)
-    anchors[idx] = { ...a, corner: false, hIn: { x: a.p.x - ux * base, y: a.p.y - uy * base }, hOut: { x: a.p.x + ux * base, y: a.p.y + uy * base } }
-    return { anchors }
-  }, [])
-  // Ticks preview transiently from the COMMITTED shape (no compounding); release commits ONE op.
-  const previewCurve = useCallback((v: number) => {
-    setCurveVal(v)
-    const cur = vshapeRef.current
-    if (!cur || selVA === null) return
-    setVecLive({ paths: [bendAnchorPath(cur.paths[0], selVA, v / 50), ...cur.paths.slice(1)] })
-  }, [selVA, vshapeRef, bendAnchorPath])
+  }, [commitLocal])
+  // CURVE — the REAL bend tool: tension on the selected anchor. 0 = straight (off), 100 = strong.
+  // The bend math (synthesize handles on a straight corner, re-tension a curved one) lives in resolve.
+  const previewCurve = useCallback((v: number) => { setCurveVal(v); previewLocal({ curve: (v / 100) * 2 }) }, [previewLocal])
   const commitCurve = useCallback((v: number) => {
-    const cur = vshapeRef.current
-    setVecLive(null)
-    if (!cur || selVA === null) { setCurveVal(50); return }
+    setCurveVal(v)
     const t0 = performance.now()
-    if (Math.abs(v - 50) > 0.5) applyVec({ paths: [bendAnchorPath(cur.paths[0], selVA, v / 50), ...cur.paths.slice(1)] }, null)
-    setCurveVal(50) // the new tension becomes the point's "current" — ruler re-centers
+    commitLocal({ curve: (v / 100) * 2 })
     perfGesture('curve-commit', performance.now() - t0)
-  }, [selVA, applyVec, vshapeRef, bendAnchorPath])
+  }, [commitLocal])
   // "Magic blend" — the soft real-background blur composited behind the subject on the 3D front
   // texture (the "magic blend" Dan loves). Edit-mode only control; on/off + intensity. Writes the
   // store's bgBlur (0 = off/sharp · 0..1 = intensity ·  ShapedModel re-composes the front, no re-segment).
@@ -775,133 +742,53 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     setStretchLive(null)
     if (Math.abs(st.sx - 1) < 0.004 && Math.abs(st.sy - 1) < 0.004) return // a tap, not a pull
     const t0 = performance.now()
-    if (vshapeRef.current) {
-      // exact anisotropic Bézier transform — a stretched heart is still perfect curves
+    {
+      // exact anisotropic transform on the SOURCE (ids preserved → per-anchor adjustments survive)
       const t = (p: Vec2) => ({ x: st.ax + (p.x - st.ax) * st.sx, y: st.ay + (p.y - st.ay) * st.sy })
-      applyVec(transformShape(vshapeRef.current, t), vBaseRef.current ? transformShape(vBaseRef.current, t) : null)
+      transformSource(t)
     }
     perfGesture('stretch-commit', performance.now() - t0)
-  }, [applyVec, vBaseRef, vshapeRef])
+  }, [transformSource])
 
-  // Tune (BEN dash): re-run the fairing pipeline on the RAW pre-fairing trace with live params.
-  // Per-tick = preview only; commit on release rebuilds the document (undoable) — §6.3. Re-tracing
-  // replaces any manual anchor edits on the ring (it's a re-derivation of the base outline).
-  // D3 one-toolset: Tune is UNIVERSAL — trace shapes re-fair their RAW trace (best source);
-  // every other shape fairs from the current path's flatten, both through THE one pipeline.
-  /** the current shape's flatten as a y-up pseudo-trace — the universal-Tune source for shapes
-   *  born without a raw trace (presets/generators/uploads), through the SAME pipeline (D3) */
-  const flattenAsTrace = useCallback((): Pt[] | null => {
-    const v = vshapeRef.current
-    if (!v || !spec) return null
-    try {
-      const ring = flattenShape(v, 0.75)[0]
-      if (!ring || ring.length < 24) return null
-      const H = spec.maskHeightPx
-      return ring.map((pt) => [pt.x, H - pt.y] as Pt)
-    } catch { return null }
-  }, [spec, vshapeRef])
-  /** KAI-9032: the Tune SOURCE follows the current shape's lineage — only a trace-lineage shape
-   *  (the Magic cut itself) re-fairs the design's raw photo trace; any picked/uploaded/constructed
-   *  vector fairs ITS OWN flatten. Same dials, in-place edit, no identity conversion. */
-  const tuneSource = useCallback((forceTrace = false): Pt[] | null => {
-    const traceClass = forceTrace || useOutlineStore.getState().shapeLineage === 'trace'
-    return traceClass ? (spec?.rawTracePx ?? flattenAsTrace()) : flattenAsTrace()
-  }, [spec, flattenAsTrace])
-  /** FOLD SCREEN (Dan 2026-06-15): does the FAIRED ring (pre-fit) self-intersect at these params?
-   *  High Smooth pulls a concavity across itself → cracks; commitTune backs smooth down until false. */
-  const tuneFolds = useCallback((params: FairTracedRingOpts): boolean => {
-    const raw = tuneSource(false)
-    if (!raw || !spec) return false
-    try {
-      const H = spec.maskHeightPx
-      const faired = fairTracedRing(raw.map(([x, y]) => [x, H - y] as Vec2Px), params)
-      return faired.length >= 4 && validateSelfIntersection(faired, 'fit').length > 0
-    } catch { return true }
-  }, [spec, tuneSource])
-  const tunePreviewD = useCallback((params: FairTracedRingOpts): string | null => {
-    // display-only: the re-faired ring as a polyline `d` (the release fits ONCE into a vector)
-    const raw = tuneSource()
-    if (!raw || !spec) return null
-    const H = spec.maskHeightPx
-    const faired = fairTracedRing(raw.map(([x, y]) => [x, H - y] as Vec2Px), params)
-    return faired.length >= 3 ? ringPathD(faired) : null
-  }, [spec, tuneSource])
-  /** Run 4 — the vectoriser: THE single-pipeline fit (geometry-truth.vectoriseTrace) — the editor
-   *  and generation share the literal function, so re-Tune ≡ re-generation by construction.
-   *  `forceTrace` = seed/Reset re-derivation from the born truth (lineage flips to 'trace'). */
-  const vecFromTrace = useCallback((params: FairTracedRingOpts, sharp = false, forceTrace = false): VShape | null => {
-    const raw = tuneSource(forceTrace)
-    if (!raw || !spec) return null
-    // re-fit = re-derivation: the crop-corner default re-applies (KAI-8982 D1); sharp=true gives
-    // the SHARP fit (no default) — the Radius tool's base, so 0% returns to the raw-sharp truth.
-    // The mm-true anchor pair floor (KAI-8974) rides every variant.
-    const minAnchorSepPx = MIN_ANCHOR_SEPARATION_MM / (spec.mmPerPx || 1)
-    const opts = sharp ? { minAnchorSepPx } : { defaultCornerRadiusPx: 8 / (spec.mmPerPx || 1), maskWidthPx: spec.maskWidthPx, minAnchorSepPx }
-    return vectoriseTrace(raw, spec.maskHeightPx, params, opts)
-  }, [spec, tuneSource])
+  // ── GLOBAL adjustments (Detail / Smooth / Snap / Angle / Line) — INDEPENDENT 0..100 axes written to
+  //    adjustments.global. Slider ticks PREVIEW (the display re-resolves; no commit, no history);
+  //    release COMMITS via applyAdjustments. The fairing + fold guard live in resolve() (VD12) — the
+  //    editor never fits, fairs, or repairs here. Reversible: every axis OFF → exact source.
+  const previewGlobal = useCallback((g: GlobalAdjustments) => {
+    const t0 = performance.now()
+    setPreviewAdj({ global: g, local: useOutlineStore.getState().adjustments.local })
+    perfGesture('tune-tick', performance.now() - t0)
+  }, [setPreviewAdj])
+  const commitGlobal = useCallback((g: GlobalAdjustments) => {
+    const t0 = performance.now()
+    applyAdjustments({ global: g, local: useOutlineStore.getState().adjustments.local })
+    setAllSelected(false)
+    perfGesture('tune-commit', performance.now() - t0)
+  }, [applyAdjustments])
 
-  // KAI-9023: while the editor is open, a NEW shaped spec (editor-dock Magic completing) lands
-  // in the session — re-seed the truth from the fresh trace, lineage 'trace', session stays open.
+  // KAI-9023: a NEW shaped spec landing mid-session (editor-dock Magic) re-seeds the source from the
+  // fresh raw marching-squares polygon (all-off = raw); the session stays open.
   const lastSpecRef = useRef(spec)
   useEffect(() => {
     if (!open) { lastSpecRef.current = spec; return }
     if (spec === lastSpecRef.current) return
     lastSpecRef.current = spec
     if (!spec || spec.generator.adapter === 'standard') return
-    // Dan 2026-06-15: a fresh Magic landing mid-session seeds the RAW marching-squares straight
-    // polygon EXACTLY — no re-fair override. Raw is its own Radius base (0 = raw-straight).
-    applyVec(spec.vectorShape, spec.vectorShape, 'trace')
-    setRadius(0)
-    setSelVA(null); setAllSelected(false)
-  }, [spec, open, applyVec])
+    seedSource({ shape: mintIds(spec.vectorShape), klass: 'generated', mmPerPx: spec.mmPerPx, maskHeightPx: spec.maskHeightPx, rawTracePx: spec.rawTracePx as Pt[] | undefined })
+    setRadius(0); setCurveVal(0); setSelVA(null); setAllSelected(false)
+  }, [spec, open, seedSource])
 
   const onReset = useCallback(() => {
-    // KAI-9025 (Dan): 'reset must reset to the original state full image with 8mm radius on the
-    // corners' — for EVERY design class, including Magic cuts. THE one birth construction
-    // (prepare-effect.standardBirthShape — the same function product birth uses, so Reset and
-    // birth can never diverge; KAI-8975/P2). Lands TRUE vectors (the BUG2 lesson); the pristine
-    // base for Radius re-fillets is the sharp full-image rect.
+    // KAI-9025 (Dan): Reset → the original full-image square with 8mm corners, for EVERY class. THE one
+    // birth construction (standardBirthShape — product birth uses it too, so they can't diverge), as a
+    // fresh stock-class source with adjustments OFF.
     if (!spec) return // no design in the editor (the page gates entry) — nothing to reset
-    const W = spec.maskWidthPx, H = spec.maskHeightPx
-    const base: VShape = { paths: [{ anchors: [
-      { p: { x: 0, y: 0 }, corner: true }, { p: { x: W, y: 0 }, corner: true },
-      { p: { x: W, y: H }, corner: true }, { p: { x: 0, y: H }, corner: true },
-    ] }] }
-    const birth = standardBirthShape(W, H)
-    applyVec(birth.vectorShape, base, 'vector')
-    setRadius(birth.radiusPx)
-    setDetail(BEN_DEFAULT_DETAIL)
-    setFairParams(fairingFromDetail(BEN_DEFAULT_DETAIL))
-    committedDialRef.current = { detail: BEN_DEFAULT_DETAIL, fairParams: fairingFromDetail(BEN_DEFAULT_DETAIL) }
+    const birth = standardBirthShape(spec.maskWidthPx, spec.maskHeightPx)
+    seedSource({ shape: mintIds(birth.vectorShape), klass: 'stock', mmPerPx: spec.mmPerPx, maskHeightPx: spec.maskHeightPx })
+    setRadius(0); setCurveVal(0)
     setAllSelected(false)
     setShapeKind(null); setShapePreview(null)
-  }, [spec, applyVec])
-  const previewTune = useCallback((params: FairTracedRingOpts) => {
-    const t0 = performance.now()
-    const d = tunePreviewD(params)
-    if (d) setTunePreview(d)
-    perfGesture('tune-tick', performance.now() - t0)
-  }, [tunePreviewD])
-  const commitTune = useCallback((params: FairTracedRingOpts, detailVal?: number) => {
-    const t0 = performance.now()
-    setTunePreview(null)
-    // FOLD SCREEN: back Smooth DOWN until the faired ring no longer self-intersects — never commit a
-    // folded/cracked outline (Dan 2026-06-15). Other params (snap/angle/line/detail) ride along.
-    let p = params, guard = 0
-    while (tuneFolds(p) && (p.smoothPx ?? 6) > 1.0 && guard++ < 12) {
-      p = { ...p, smoothPx: Math.max(1.0, (p.smoothPx ?? 6) * 0.75) }
-    }
-    // Run 4: the release FITS the re-faired trace into a true vector path (ticks stay doc-transient)
-    const v = vecFromTrace(p)
-    if (!v) { console.error('[tune] re-fit failed — commit skipped (no doc fallback exists)'); return }
-    setFairParams(p)
-    applyVec(v, null)
-    setAllSelected(false)
-    committedDialRef.current = { detail: detailVal ?? detailRef.current, fairParams: p } // F4: the dial that produced THIS shape
-    // #21: tuned settings become the durable defaults — Magic reads them from the store
-    useOutlineStore.getState().setFairing({ detail: detailVal ?? detailRef.current, params: p })
-    perfGesture('tune-commit', performance.now() - t0)
-  }, [applyVec, vecFromTrace, tuneFolds])
+  }, [spec, seedSource])
 
   // TRANSIENT PREVIEW ONLY: the live morph shown while a generator tick-bar drags — a display
   // ring `d`, never geometry (commitShape fits ONCE into the vector on release).
@@ -999,12 +886,11 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     setRadius(0); setAllSelected(false)
     setShowAnchors(false)
   }, [applyVec])
-  /** Run 10 — image upload: decode → threshold mask → the Magic trace machinery → THE one fit
-   *  (geometry-truth.vectoriseTrace — KAI-8972/P1a: the inline fairTracedRing+ringToVPath fit with
-   *  copied 30°/0.35px constants was a second pipeline; deleted). Orientation: the canvas mask is
-   *  y-down, so the traced ring is normalized to the commit's winding (negative shoelace in y-down
-   *  px, as before), then flipped to mask y-up — the SAME convention Magic's raw trace arrives in;
-   *  vectoriseTrace owns the flip back. Shared-fit side effect: uploads get corner integrity too. */
+  /** Image upload (V4): decode → threshold mask → the SAME machinery as Magic — smoothMask →
+   *  traceContourRaw → RDP-straight polygon. NO corner-pin, NO fairing: the result is a raw
+   *  marching-squares OutlineSource; the editor's tools shape it (impartial with Magic / stock / drawn).
+   *  Winding is matched to Magic's source (signedArea<0 in y-down editor space) so the mesh edge can
+   *  never invert for an upload. landUploadedShape box-fits it before it becomes the source. */
   const vecFromImageFile = useCallback(async (file: File): Promise<VShape> => {
     const bmp = await createImageBitmap(file)
     try {
@@ -1016,25 +902,15 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
       const ctx = cv.getContext('2d')!
       ctx.drawImage(bmp, 0, 0, w, h)
       const { mask, width, height } = maskFromImageData(ctx.getImageData(0, 0, w, h))
-      // the SAME mask hygiene Magic's pipeline applies before tracing — Otsu on anti-aliased edges
-      // leaves sub-px boundary jitter that the corner detector reads as sharp features (8 false
-      // corners on an ellipse, pinned in upload-fit-repro.test); true corners survive the smooth
+      // mask hygiene Magic applies before tracing — Otsu on anti-aliased edges leaves sub-px jitter.
       const ring = traceContourRaw(smoothMask(mask, width, height, 3), width, height)
       if (!ring) throw new Error('No clear shape found — try an image with a stronger silhouette')
-      let area = 0
-      for (let i = 0; i < ring.length; i++) { const a = ring[i], b = ring[(i + 1) % ring.length]; area += a[0] * b[1] - b[0] * a[1] }
-      const oriented = area > 0 ? [...ring].reverse() : ring
-      // the SAME mm-true pair floor as every other source, scaled from image space to this
-      // upload-mask space (the fit result is box-fitted to the image afterwards). The CROP-CORNER
-      // default is intentionally OMITTED here: a logo's frame-touching corners are design intent,
-      // not photo-crop artifacts (pixel-qa F5 — the policy is explicit, not an implicit fork).
-      const { widthPx, heightPx } = dimsRef.current
-      const sp = useOutlineStore.getState().spec
-      const floorImagePx = MIN_ANCHOR_SEPARATION_MM / (sp?.mmPerPx || 70 / Math.max(widthPx, heightPx))
-      const minAnchorSepPx = floorImagePx * (Math.max(width, height) / Math.max(widthPx, heightPx))
-      const v = vectoriseTrace(oriented.map(([x, y]) => [x, height - y] as [number, number]), height, useOutlineStore.getState().fairing?.params ?? fairingFromDetail(BEN_DEFAULT_DETAIL), { minAnchorSepPx })
-      if (!v) throw new Error('No clear shape found — try an image with a stronger silhouette')
-      return v
+      // canvas coords ARE y-down (= editor space). traceContourRaw normalizes CCW; reverse it so the
+      // upload source matches Magic's source winding (signedArea<0 in y-down) — no edge inversion.
+      const oriented = [...ring].reverse()
+      const straight = rdpClosed(oriented.map(([x, y]) => [x, y] as Vec2Px), 1.0)
+      if (straight.length < 3) throw new Error('No clear shape found — try an image with a stronger silhouette')
+      return { paths: [{ anchors: straight.map(([x, y]) => ({ p: { x, y }, hIn: null, hOut: null, corner: true })) }] }
     } finally {
       bmp.close()
     }
@@ -1134,7 +1010,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   // live stretch (rendered OUTSIDE the transformed group so the pill strokes never distort).
   // 6.1: FRAME is the default for EVERY shape (Magic, committed, presets) — grips visible unless
   // Points is active, Preview hides chrome, or a transient morph is mid-flight
-  const cropMode = !!vshape && !showAnchors && !preview && !shapePreview && !tunePreview
+  const cropMode = !!vshape && !showAnchors && !preview && !shapePreview
   let cropBox: { minX: number; minY: number; maxX: number; maxY: number } | null = null
   if (cropMode && hitRing.length) {
     let { minX, minY, maxX, maxY } = hitBBox
@@ -1372,11 +1248,10 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
         <AdjustSheet
           cornerMode={!!(vshape && selVA !== null && vshape.paths[0].anchors[selVA]?.corner)}
           radiusApplies={radiusApplies}
-          dialSeeds={dialSeedsRef.current ?? (dialSeedsRef.current = { radius, detail, fair: { ...fairParams } })}
           adjustSub={adjustSub} setAdjustSub={setAdjustSub}
-          maxRadius={maxRadius} radius={radius} setRadius={setRadius} commitRadius={commitRadius}
+          maxRadius={maxRadius} radius={radius} previewRadius={previewRadius} commitRadius={commitRadius}
           curveSelected={selVA !== null} curveVal={curveVal} previewCurve={previewCurve} commitCurve={commitCurve}
-          detail={detail} setDetail={setDetail} previewTune={previewTune} commitTune={commitTune} fairParams={fairParams}
+          global={liveGlobal} previewGlobal={previewGlobal} commitGlobal={commitGlobal}
         />
       )}
       {activeAdjust === 'image' && (

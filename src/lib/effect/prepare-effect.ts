@@ -56,12 +56,12 @@ const RAW_TRACE_RDP_PX = 1.0
 export const EFFECT_BUILD_CONFIG: ShapeBuildConfig = {
   longestSideMM: 70, // §9a: 70mm base square
   thicknessMM: 1, // §9: 1mm body (supersedes 0.5)
-  // EDGE PROFILE (Dan, 2026-06-15): "almost straight everywhere with slightly rounded edges — no
-  // groove, no full rounded bevel." On the 1mm body, 0.5mm = r = half = a FULL half-round (the
-  // outward lip Dan rejected); 0.15mm reads sub-pixel (the old crease). 0.2mm = a real ~0.6mm
-  // straight wall + a short 0.2mm soft corner top & bottom = straight cut, softly rounded. The
-  // groove was NOT the radius — it was the post-gen winding inversion, fixed in mesh.ts (canonical CCW).
-  edgeRadiusMM: 0.2,
+  // EDGE PROFILE — PARKED at the outward-lip baseline for the V4 editor rewire (Gate A, blueprint §9).
+  // The straight-wall edge work (edgeRadiusMM 0.2 + mesh.ts inward profile/cap-inset + canonical
+  // winding) lives in git (8f66d17, 72f7ca7) and is revisited in Gate A — decide there: update the
+  // mesh-edge invariant for the straight-wall design + repin the payload golden, OR keep the lip.
+  // Reverted to 0.5 so the rewire starts from a GREEN suite (mesh-edge.test + payload.test golden).
+  edgeRadiusMM: 0.5,
   edgeSegments: 18,
   rdpEpsilonMM: 0.4,
   maxImageDim: 1200,

@@ -6,24 +6,16 @@
 
 import { useRef } from 'react'
 import type { Dispatch, SetStateAction, ChangeEvent, ReactNode } from 'react'
-import { fairingFromDetail, type FairTracedRingOpts } from '@/lib/outline-core'
+import type { GlobalAdjustments } from '@/lib/effect/outline-resolve'
 import TickBar from '../../ui/TickBar'
 import { useOutlineStore, type ImageFx } from '../outlineStore'
 import { PARAMETRIC, type ShapeKind } from '../shapes'
 import { SHAPE_CHIPS, ShapeChipIcon, DEFAULT_SHAPE_PARAMS } from './chips'
 import { RoundIcon, SmoothIcon, BrightnessIcon, ContrastIcon, SaturationIcon, WarmthIcon, MinusIcon, PlusIcon, DiceIcon, BlurIcon, CornerIcon, DetailIcon, SnapIcon, AngleIcon, LineIcon } from '../icons'
 
-// KAI-9033 (v1 recovery): Smooth is the whole-shape SHARP⇄ROUND dial — 0% ≈ the raw trace
-// (sharp/angular, v1's 'straighten' end), 100% = maximally round. Angle/Line expose the corner
-// and straight-run thresholds on the same 0–100 product scale (KAI-9028: no engine units).
-export const smoothPctToPx = (v: number) => 0.5 + (v / 100) * 23.5
-export const smoothPxToPct = (px: number) => Math.max(0, Math.min(100, ((px - 0.5) / 23.5) * 100))
-export const anglePctToDeg = (v: number) => 15 + (v / 100) * 70
-export const angleDegToPct = (deg: number) => Math.max(0, Math.min(100, ((deg - 15) / 70) * 100))
-export const linePctToPx = (v: number) => (v / 100) * 80
-export const linePxToPct = (px: number) => Math.max(0, Math.min(100, (px / 80) * 100))
-export const snapPctToPx = (v: number) => (v / 100) * 20
-export const snapPxToPct = (px: number) => Math.max(0, Math.min(100, (px / 20) * 100))
+// V4: the global Adjust dials are plain 0..100 PRODUCT axes written straight to adjustments.global —
+// the engine (resolve / outline-resolve.ts) owns the pct→engine-unit maps, so there are NO engine
+// units in the UI (KAI-9028). Detail 100 = full detail (OFF); Smooth/Snap/Angle/Line 0 = OFF.
 
 // KAI-9028 (Dan): every image filter shows ONE uniform 0–100% scale — 0% = the extreme/none end,
 // 100% = full to the limit — regardless of the engine range underneath.
@@ -93,49 +85,40 @@ function ChipRow({ children }: { children: ReactNode }) {
 }
 export type ImageSub = 'brightness' | 'contrast' | 'saturate' | 'warmth' | 'blend'
 
-/* ADJUST mode (plan A2, Dan's rulings): THREE circles — Radius · Curve · Tune ✦ — one shared
-   ruler. Scale is DELETED (the frame owns it, D5); Blend moved to Image mode (#8). Curve is the
-   REAL bend tool (tension on the selected anchor, D3); Tune ✦ is the universal fine-tune takeover
-   (Detail · Smooth · Snap — Angle/Min-line dropped, D3 round 2) available on EVERY shape class. */
-export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, radiusApplies, dialSeeds, maxRadius, radius, setRadius, commitRadius, curveSelected, curveVal, previewCurve, commitCurve, detail, setDetail, previewTune, commitTune, fairParams }: {
+/* ADJUST mode (V4): seven dials on ONE shared ruler — Radius · Curve are LOCAL (per selected anchor,
+   reversible to the source corner); Detail · Smooth · Snap · Angle · Line are GLOBAL (independent
+   non-destructive axes, every one OFF → exact source). Each dial is a plain 0..100 product value
+   written straight to the recipe; resolve() owns the engine maps. Inapplicable tools grey (Dan's rule). */
+export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, radiusApplies, maxRadius, radius, previewRadius, commitRadius, curveSelected, curveVal, previewCurve, commitCurve, global, previewGlobal, commitGlobal }: {
   cornerMode: boolean
   adjustSub: AdjustSub
   setAdjustSub: (k: AdjustSub) => void
   /** tier-2 availability (Dan's rule: inapplicable tools GREY, never silent no-op) */
   radiusApplies: boolean
-  /** session-seed dial values (KAI-9006) — a ring renders only when a dial left its seed */
-  dialSeeds: { radius: number; detail: number; fair: FairTracedRingOpts }
   maxRadius: number
   radius: number
-  setRadius: (v: number) => void
+  previewRadius: (v: number) => void
   commitRadius: (v: number) => void
   /** Curve acts on the SELECTED anchor (tap one in Points) */
   curveSelected: boolean
   curveVal: number
   previewCurve: (v: number) => void
   commitCurve: (v: number) => void
-  detail: number
-  setDetail: (v: number) => void
-  previewTune: (params: FairTracedRingOpts) => void
-  commitTune: (params: FairTracedRingOpts, detailVal?: number) => void
-  fairParams: FairTracedRingOpts
+  /** the live global recipe (preview during a drag, else the committed truth) */
+  global: GlobalAdjustments
+  previewGlobal: (g: GlobalAdjustments) => void
+  commitGlobal: (g: GlobalAdjustments) => void
 }) {
-  // KAI-9017/9016 (Dan): the FULL vector toolset as icon chips in ONE row — no Tune ✦ submenu.
-  // Angle + Line are RESTORED (his 2026-06-12 pin supersedes the earlier drop ruling). Every
-  // fairing dial works on every shape class (D3) — in place, per the shape's lineage (KAI-9032).
-  // KAI-9006 (Dan): no ring at rest — a ring renders ONLY on the dial the user changed.
-  // Detail is the master dial (it re-derives the others), so the param dials compare against
-  // what the CURRENT Detail derives — only an explicit override of that dial lights its ring.
-  const moved = (cur: number, seed: number, eps = 0.5) => Math.abs(cur - seed) > eps
-  const derived = fairingFromDetail(detail)
+  // a ring renders only when a dial is engaged (off-state shows nothing). Detail OFF = 100 (full).
+  const setG = (k: keyof GlobalAdjustments, v: number): GlobalAdjustments => ({ ...global, [k]: v })
   const dials = [
-    { k: 'radius' as const, label: cornerMode ? 'Corner' : 'Radius', icon: <CornerIcon />, ring: radiusApplies && moved(radius, dialSeeds.radius) ? radius / Math.max(maxRadius, 1) : 0 },
-    { k: 'curve' as const, label: 'Curve', icon: <RoundIcon />, ring: 0 }, // BezierCurve glyph = the bend tool
-    { k: 'detail' as const, label: 'Detail', icon: <DetailIcon />, ring: moved(detail, dialSeeds.detail) ? detail / 100 : 0 },
-    { k: 'smooth' as const, label: 'Smooth', icon: <SmoothIcon />, ring: moved(fairParams.smoothPx ?? 6, derived.smoothPx ?? 6, 0.2) ? smoothPxToPct(fairParams.smoothPx ?? 6) / 100 : 0 },
-    { k: 'snap' as const, label: 'Snap', icon: <SnapIcon />, ring: moved(fairParams.detailPx ?? 4, derived.detailPx ?? 4, 0.2) ? snapPxToPct(fairParams.detailPx ?? 4) / 100 : 0 },
-    { k: 'angle' as const, label: 'Angle', icon: <AngleIcon />, ring: moved(fairParams.maxTurnDeg ?? 35, derived.maxTurnDeg ?? 35) ? angleDegToPct(fairParams.maxTurnDeg ?? 35) / 100 : 0 },
-    { k: 'line' as const, label: 'Line', icon: <LineIcon />, ring: moved(fairParams.minLinePx ?? 50, derived.minLinePx ?? 50) ? linePxToPct(fairParams.minLinePx ?? 50) / 100 : 0 },
+    { k: 'radius' as const, label: cornerMode ? 'Corner' : 'Radius', icon: <CornerIcon />, ring: radiusApplies && radius > 0 ? radius / Math.max(maxRadius, 1) : 0 },
+    { k: 'curve' as const, label: 'Curve', icon: <RoundIcon />, ring: curveSelected && curveVal > 0 ? curveVal / 100 : 0 },
+    { k: 'detail' as const, label: 'Detail', icon: <DetailIcon />, ring: global.detail < 100 ? (100 - global.detail) / 100 : 0 },
+    { k: 'smooth' as const, label: 'Smooth', icon: <SmoothIcon />, ring: global.smooth / 100 },
+    { k: 'snap' as const, label: 'Snap', icon: <SnapIcon />, ring: global.snap / 100 },
+    { k: 'angle' as const, label: 'Angle', icon: <AngleIcon />, ring: global.angle / 100 },
+    { k: 'line' as const, label: 'Line', icon: <LineIcon />, ring: global.line / 100 },
   ]
   return (
     <div className={styles.shapeSheet}>
@@ -156,36 +139,35 @@ export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, radiusApplies
       </ChipRow>
       <div className={styles.shapeControls}>
         <div className={styles.shapeRow}>
-          {/* KAI-9019 + Dan's rulings: no helper text, no empty slot — an inapplicable tool shows
-              its ruler GREYED and non-functional until the state makes it real */}
+          {/* an inapplicable tool shows its ruler GREYED and non-functional until the state makes it real */}
           {adjustSub === 'radius' && (radiusApplies || cornerMode ? (
-            <TickBar label={cornerMode ? 'Corner' : 'Radius'} min={0} max={maxRadius} value={Math.min(radius, maxRadius)} onChange={setRadius} onCommit={commitRadius} format={(v) => `${Math.round((v / Math.max(maxRadius, 1)) * 100)}%`} />
+            <TickBar label={cornerMode ? 'Corner' : 'Radius'} min={0} max={maxRadius} value={Math.min(radius, maxRadius)} onChange={previewRadius} onCommit={commitRadius} format={(v) => `${Math.round((v / Math.max(maxRadius, 1)) * 100)}%`} />
           ) : (
             <div className={styles.disabledControl} aria-disabled="true">
               <TickBar label="Radius" min={0} max={100} value={0} onChange={() => {}} onCommit={() => {}} format={(v) => `${Math.round(v)}%`} />
             </div>
           ))}
           {adjustSub === 'curve' && (curveSelected ? (
-            <TickBar label="Curve" min={0} max={100} value={curveVal} onChange={previewCurve} onCommit={commitCurve} format={(v) => `${Math.round(v * 2)}%`} />
+            <TickBar label="Curve" min={0} max={100} value={curveVal} onChange={previewCurve} onCommit={commitCurve} format={(v) => `${Math.round(v)}%`} />
           ) : (
             <div className={styles.disabledControl} aria-disabled="true">
-              <TickBar label="Curve" min={0} max={100} value={50} onChange={() => {}} onCommit={() => {}} format={(v) => `${Math.round(v * 2)}%`} />
+              <TickBar label="Curve" min={0} max={100} value={0} onChange={() => {}} onCommit={() => {}} format={(v) => `${Math.round(v)}%`} />
             </div>
           ))}
           {adjustSub === 'detail' && (
-            <TickBar label="Detail" min={0} max={100} value={detail} onChange={(v) => { setDetail(v); previewTune(fairingFromDetail(v)) }} onCommit={(v) => { setDetail(v); commitTune(fairingFromDetail(v), v) }} format={(v) => `${Math.round(v)}%`} />
+            <TickBar label="Detail" min={0} max={100} value={global.detail} onChange={(v) => previewGlobal(setG('detail', v))} onCommit={(v) => commitGlobal(setG('detail', v))} format={(v) => `${Math.round(v)}%`} />
           )}
           {adjustSub === 'smooth' && (
-            <TickBar label="Smooth" min={0} max={100} value={smoothPxToPct(fairParams.smoothPx ?? 6)} onChange={(v) => previewTune({ ...fairParams, smoothPx: smoothPctToPx(v) })} onCommit={(v) => commitTune({ ...fairParams, smoothPx: smoothPctToPx(v) })} format={(v) => `${Math.round(v)}%`} />
+            <TickBar label="Smooth" min={0} max={100} value={global.smooth} onChange={(v) => previewGlobal(setG('smooth', v))} onCommit={(v) => commitGlobal(setG('smooth', v))} format={(v) => `${Math.round(v)}%`} />
           )}
           {adjustSub === 'snap' && (
-            <TickBar label="Snap" min={0} max={100} value={snapPxToPct(fairParams.detailPx ?? 4)} onChange={(v) => previewTune({ ...fairParams, detailPx: snapPctToPx(v) })} onCommit={(v) => commitTune({ ...fairParams, detailPx: snapPctToPx(v) })} format={(v) => `${Math.round(v)}%`} />
+            <TickBar label="Snap" min={0} max={100} value={global.snap} onChange={(v) => previewGlobal(setG('snap', v))} onCommit={(v) => commitGlobal(setG('snap', v))} format={(v) => `${Math.round(v)}%`} />
           )}
           {adjustSub === 'angle' && (
-            <TickBar label="Angle" min={0} max={100} value={angleDegToPct(fairParams.maxTurnDeg ?? 35)} onChange={(v) => previewTune({ ...fairParams, maxTurnDeg: anglePctToDeg(v) })} onCommit={(v) => commitTune({ ...fairParams, maxTurnDeg: anglePctToDeg(v) })} format={(v) => `${Math.round(v)}%`} />
+            <TickBar label="Angle" min={0} max={100} value={global.angle} onChange={(v) => previewGlobal(setG('angle', v))} onCommit={(v) => commitGlobal(setG('angle', v))} format={(v) => `${Math.round(v)}%`} />
           )}
           {adjustSub === 'line' && (
-            <TickBar label="Line" min={0} max={100} value={linePxToPct(fairParams.minLinePx ?? 50)} onChange={(v) => previewTune({ ...fairParams, minLinePx: linePctToPx(v) })} onCommit={(v) => commitTune({ ...fairParams, minLinePx: linePctToPx(v) })} format={(v) => `${Math.round(v)}%`} />
+            <TickBar label="Line" min={0} max={100} value={global.line} onChange={(v) => previewGlobal(setG('line', v))} onCommit={(v) => commitGlobal(setG('line', v))} format={(v) => `${Math.round(v)}%`} />
           )}
         </div>
       </div>

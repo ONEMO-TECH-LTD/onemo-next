@@ -62,10 +62,11 @@ function PrototypePageInner() {
   // square for the current photo (the photo stays).
   type OutlineSnap = {
     spec: ReturnType<typeof useOutlineStore.getState>['spec']
-    // SINGLE TRUTH (plan §B): the committed shape is the only geometry in a snapshot — the
-    // contour re-derives inside commitGeometry on restore, so a snapshot can never desync.
+    // V4: the page-level step stores source + adjustments (the lossless recipe) and the derived
+    // committedShape (for the change-diff at the editor boundary). Restore re-installs source+adjustments.
     committedShape: ReturnType<typeof useOutlineStore.getState>['committedShape']
-    shapeLineage: ReturnType<typeof useOutlineStore.getState>['shapeLineage']
+    source: ReturnType<typeof useOutlineStore.getState>['source']
+    adjustments: ReturnType<typeof useOutlineStore.getState>['adjustments']
     bgBlur: number | null
     subjMatteUrl: string | null
   }
@@ -99,7 +100,7 @@ function PrototypePageInner() {
     return {
       prepared, autoOutline, designState,
       imageFx: o.imageFx,
-      outline: { spec: o.spec, committedShape: o.committedShape, shapeLineage: o.shapeLineage, bgBlur: o.bgBlur, subjMatteUrl: o.subjMatteUrl },
+      outline: { spec: o.spec, committedShape: o.committedShape, source: o.source, adjustments: o.adjustments, bgBlur: o.bgBlur, subjMatteUrl: o.subjMatteUrl },
       trim: { ...useSceneStore.getState().colors },
     }
   }, [prepared, autoOutline, designState])
@@ -116,7 +117,7 @@ function PrototypePageInner() {
     const o = useOutlineStore.getState()
     o.setImageFx(sn.imageFx)
     o.setSpec(sn.outline.spec)
-    o.commitGeometry(sn.outline.committedShape, sn.outline.shapeLineage)
+    o.setSource(sn.outline.source, sn.outline.adjustments)
     o.setBgBlur(sn.outline.bgBlur)
     o.setSubjMatteUrl(sn.outline.subjMatteUrl)
     const sc = useSceneStore.getState()
@@ -211,7 +212,7 @@ function PrototypePageInner() {
         // #23: a new image starts a fresh history; this state is the Reset baseline
         baselineRef.current = {
           prepared: p, autoOutline: false, designState: INITIAL_ARTWORK, imageFx: null,
-          outline: { spec: p.spec, committedShape: null, shapeLineage: 'trace', bgBlur: null, subjMatteUrl: null },
+          outline: { spec: p.spec, committedShape: null, source: null, adjustments: { global: { detail: 100, smooth: 0, snap: 0, angle: 0, line: 0 }, local: {} }, bgBlur: null, subjMatteUrl: null },
           trim: { ...useSceneStore.getState().colors },
         }
         histRef.current = { past: [], future: [] }
@@ -241,8 +242,7 @@ function PrototypePageInner() {
         prepareEffect(artworkUrl, 'shaped', undefined, (s) => {
           if (s === 'fallback') toast('warn', 'AI cut-out unavailable — used the simple background cut instead') // G4
           else setGenLabel(s === 'downloading-model' ? 'Downloading the magic… (one-time)' : 'Cutting out…')
-          // #21: the tuned BEN settings are the defaults — Magic reads them, never resets them
-        }, useOutlineStore.getState().fairing?.params),
+        }),
       )
       .then((p) => {
         if (magicRunRef.current !== runId) return // cancelled mid-run — prior state stands (UX-5)

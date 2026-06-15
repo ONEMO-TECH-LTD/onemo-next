@@ -24,24 +24,29 @@ export interface MeshOptions {
 interface ProfileSample { radial: number; z: number; nr: number; nz: number }
 
 /**
- * Edge cross-section (Dan, 2026-06-14): the rim must read as an ALMOST-STRAIGHT wall with SLIGHTLY
- * rounded corners — NOT a groove (the old inset-crease), NOT an outward lip bulge, NOT a full
- * rounded bevel. The wall sits AT the contour (radial 0 = silhouette, shape unchanged); the caps
- * are inset by r and a SMALL convex fillet rolls the corner from cap → wall with no crease. radial
- * runs [-r, 0]: -r at the cap edge (inset), 0 at the straight wall. The caps are inset by r to meet
- * the fillet (see buildShapedGeometry) so there is no gap.
+ * Edge cross-section (KAI-8951 — Dan: the rim must be an OUTWARD ROUNDED LIP, convex, rolling
+ * outward — the previous design inset both caps by r and put the wall at the silhouette, so the
+ * face sat inside a crease ring that read as a GROOVE). Now: the caps keep the FULL contour
+ * extent; the lip BULGES OUTWARD by r beyond the silhouette, tangent to both faces (no crease).
+ * radial 0 = the contour (cap edge); +r = the lip's outermost roll at the mid-wall. The nominal
+ * cutline stays the contour — the lip models the material rolling outward; the visual silhouette
+ * grows by a UNIFORM +r (0.15mm), shape unchanged.
  */
 function buildProfile(t: number, rIn: number, segs: number): ProfileSample[] {
   const half = t / 2
   const r = Math.min(rIn, half)
   const out: ProfileSample[] = []
-  for (let i = 0; i <= segs; i++) { // top fillet: cap edge (inset -r) → straight wall top
-    const a = (Math.PI / 2) * (1 - i / segs)
-    out.push({ radial: -r + r * Math.cos(a), z: (half - r) + r * Math.sin(a), nr: Math.cos(a), nz: Math.sin(a) })
-  }
-  for (let i = 0; i <= segs; i++) { // straight wall (radial 0) → bottom fillet → cap edge (inset -r)
+  for (let i = 0; i <= segs; i++) { // top quarter: face edge (flush, tangent) → outermost roll
     const a = (Math.PI / 2) * (i / segs)
-    out.push({ radial: -r + r * Math.cos(a), z: -(half - r) - r * Math.sin(a), nr: Math.cos(a), nz: -Math.sin(a) })
+    out.push({ radial: r * Math.sin(a), z: (half - r) + r * Math.cos(a), nr: Math.sin(a), nz: Math.cos(a) })
+  }
+  if (half - r > 1e-6) { // outward wall at +r (the lip's crest)
+    out.push({ radial: r, z: half - r, nr: 1, nz: 0 })
+    out.push({ radial: r, z: -(half - r), nr: 1, nz: 0 })
+  }
+  for (let i = 0; i <= segs; i++) { // bottom quarter: outermost roll → back edge (flush, tangent)
+    const a = (Math.PI / 2) * (i / segs)
+    out.push({ radial: r * Math.cos(a), z: -(half - r) - r * Math.sin(a), nr: Math.cos(a), nz: -Math.sin(a) })
   }
   return out
 }
@@ -82,28 +87,6 @@ function bbox(pts: Pt[]) {
   return { minX, minY, maxX, maxY }
 }
 
-/**
- * Signed area (y-up shoelace): > 0 = CCW. The edge's OUTWARD direction depends on a known winding —
- * ringNormals' (dy,-dx) points outward ONLY for a CCW outer ring. v3's contour producers
- * (contourFromShape / vectorTrueContour) reverse blindly, so the rect (pre-gen) arrives CCW → convex
- * lip, while the trace (post-gen) arrives CW → normals flip → the cap oversizes → a concave GROOVE
- * ("inverse lip"). v1 guaranteed this in buildContour (orient outer CCW always); the rebuild dropped
- * it. Restore the guarantee HERE — the single mesh chokepoint — so EVERY shape gets the same convex
- * edge regardless of which producer (or winding) fed the contour.
- */
-function signedArea(pts: Pt[]): number {
-  let a = 0
-  for (let i = 0; i < pts.length; i++) {
-    const [x1, y1] = pts[i]
-    const [x2, y2] = pts[(i + 1) % pts.length]
-    a += x1 * y2 - x2 * y1
-  }
-  return a / 2
-}
-function orientRing(pts: Pt[], wantCCW: boolean): Pt[] {
-  return (signedArea(pts) > 0) === wantCCW ? pts : [...pts].reverse()
-}
-
 export interface ShapedGeometryResult {
   geometry: THREE.BufferGeometry
   widthMM: number
@@ -117,13 +100,7 @@ export function buildShapedGeometry(contour: Contour, opts: MeshOptions): Shaped
   const half = thicknessMM / 2
   const r = Math.min(edgeRadiusMM, half)
   const profile = buildProfile(thicknessMM, r, Math.max(2, edgeSegments))
-  // CANONICAL WINDING (v1 parity): outer CCW, holes CW → ringNormals always points OUTWARD, so the
-  // edge rolls the same convex way for the rect (pre-gen) and the silhouette (post-gen). Without this
-  // the post-gen trace (CW) inverts the edge into a groove.
-  const rings = [
-    { pts: orientRing(contour.outer.pts, true) },
-    ...contour.holes.map((h) => ({ pts: orientRing(h.pts, false) })),
-  ]
+  const rings = [contour.outer, ...contour.holes]
 
   const bb = bbox(contour.outer.pts)
   const cx = (bb.minX + bb.maxX) / 2
@@ -155,9 +132,7 @@ export function buildShapedGeometry(contour: Contour, opts: MeshOptions): Shaped
     const pts = ring.pts
     const N = ringNormals(pts)
     const n = pts.length
-    // caps inset by r to meet the fillet's cap edge (radial -r) — the straight wall stays AT the
-    // contour (radial 0 = silhouette), so the shape is unchanged; only the sub-mm rounded corner insets
-    capRings.push(pts.map((P, i) => [P[0] - N[i][0] * r, P[1] - N[i][1] * r] as Pt))
+    capRings.push(pts) // caps keep the FULL contour (KAI-8951 — no inset, no crease ring)
     const ev = (P: Pt, Np: Pt, s: number): V => {
       const ps = profile[s]
       // LOCAL colour roll: every profile sample on this perimeter point samples ONE source pixel just
