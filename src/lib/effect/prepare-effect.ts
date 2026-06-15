@@ -38,11 +38,14 @@ import { segmentML, ML_ADAPTER_ID } from './segment-ml'
 import { traceContourRaw } from './contour'
 import { composeFront, blurCanvas, imageDataToCanvas } from './composite'
 import type { EffectType } from './effect-types'
-import { fairingFromDetail, BEN_DEFAULT_DETAIL, type FairTracedRingOpts, type Vec2Px } from '@/lib/outline-core'
-// REBUILD-PLAN-v2 §B1 — truth at birth: geometry is born as ONE VShape through the single
-// pipeline; the manufacturing contour is DERIVED from it. No document model exists here.
-import { vectoriseTrace, contourFromShape, MIN_ANCHOR_SEPARATION_MM } from './geometry-truth'
+import { rdpClosed, type FairTracedRingOpts, type Vec2Px } from '@/lib/outline-core'
+// REBUILD-PLAN-v2 §B1 — truth at birth: geometry is born as ONE VShape; the manufacturing contour
+// is DERIVED from it. Shaped generation emits the RAW marching-squares straight polygon (no Stage B).
+import { contourFromShape } from './geometry-truth'
 import { filletShape, type VShape } from '@/lib/vector-core'
+// RAW-TRACE simplification (Dan 2026-06-15): RDP epsilon that removes ONLY the sub-pixel marching-
+// squares staircase, leaving true straight edges + sharp corners. NOT smoothing — the editor owns that.
+const RAW_TRACE_RDP_PX = 1.0
 
 /**
  * Config for the 2D-first path. Carries forward the proven build values but pins
@@ -53,11 +56,12 @@ import { filletShape, type VShape } from '@/lib/vector-core'
 export const EFFECT_BUILD_CONFIG: ShapeBuildConfig = {
   longestSideMM: 70, // §9a: 70mm base square
   thicknessMM: 1, // §9: 1mm body (supersedes 0.5)
-  // KAI-9008 (Dan): at 0.15mm the roll was sub-pixel — the edge read as a flat wall with a
-  // crease ('groove') even though the profile is convex (mesh-edge invariants held). 0.5mm on
-  // the 1mm body = a FULL half-round: the edge is one continuous semicircular roll, like real
-  // cut ultrasuede — no wall, no crease, no groove read at any angle.
-  edgeRadiusMM: 0.5,
+  // EDGE PROFILE (Dan, 2026-06-15): "almost straight everywhere with slightly rounded edges — no
+  // groove, no full rounded bevel." On the 1mm body, 0.5mm = r = half = a FULL half-round (the
+  // outward lip Dan rejected); 0.15mm reads sub-pixel (the old crease). 0.2mm = a real ~0.6mm
+  // straight wall + a short 0.2mm soft corner top & bottom = straight cut, softly rounded. The
+  // groove was NOT the radius — it was the post-gen winding inversion, fixed in mesh.ts (canonical CCW).
+  edgeRadiusMM: 0.2,
   edgeSegments: 18,
   rdpEpsilonMM: 0.4,
   maxImageDim: 1200,
@@ -197,13 +201,17 @@ export async function prepareEffect(
 
   // ── ONE PIPELINE (geometry-truth): the design's geometry is born as a VShape; the
   //    manufacturing contour is DERIVED from it at the named 0.05mm tolerance.
-  let vectorShape
+  let vectorShape: VShape
   if (type === 'shaped') {
-    // the SAME fairing+fit the editor's Tune uses — generation ≡ editor by construction.
-    // Pass 2 auto-rules: crop-class frame corners get the uniform 8mm default (KAI-8982 D1) and
-    // the mm-true anchor pair floor applies (KAI-8974) — one opts bag, one pipeline.
-    vectorShape = vectoriseTrace(ringPx.map(([x, y]) => [x, y] as Pt), H, fairing ?? fairingFromDetail(BEN_DEFAULT_DETAIL), { defaultCornerRadiusPx: cfg.squareCornerMM / mmPerPx, maskWidthPx: W, minAnchorSepPx: MIN_ANCHOR_SEPARATION_MM / mmPerPx })
-    if (!vectorShape) throw new Error('Contour fit failed — try an image with a clearer subject.')
+    // RAW MARCHING-SQUARES (Dan 2026-06-15): generation hands over the PURE straight-line polygon —
+    // NO fairing, NO corner-pin, NO bezier fit (Stage B). RDP removes only the sub-pixel marching-
+    // squares staircase, so the result is clean straight vector lines with sharp (radius-0) corners.
+    // The editor applies radius / smooth / detail / snap on top — non-destructive, reversible to
+    // straight — and re-derives from spec.rawTracePx (set below). Flip to MASK-PX Y-DOWN (vector space).
+    const yDown = ringPx.map(([x, y]) => [x, H - y] as Vec2Px)
+    const straight = rdpClosed(yDown, RAW_TRACE_RDP_PX)
+    if (straight.length < 3) throw new Error('No silhouette found — try an image with a clearer subject.')
+    vectorShape = { paths: [{ anchors: straight.map(([x, y]) => ({ p: { x, y }, hIn: null, hOut: null, corner: true })) }] }
   } else {
     // standard: THE one birth construction (standardBirthShape above — directly regression-tested)
     vectorShape = standardBirthShape(W, H, cfg).vectorShape
