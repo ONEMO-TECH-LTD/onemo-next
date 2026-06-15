@@ -205,8 +205,9 @@ export async function prepareEffect(
     // RAW MARCHING-SQUARES (Dan 2026-06-15): generation hands over the PURE straight-line polygon —
     // NO fairing, NO corner-pin, NO bezier fit (Stage B). RDP removes only the sub-pixel marching-
     // squares staircase, so the result is clean straight vector lines with sharp (radius-0) corners.
-    // The editor applies radius / smooth / detail / snap on top — non-destructive, reversible to
-    // straight — and re-derives from spec.rawTracePx (set below). Flip to MASK-PX Y-DOWN (vector space).
+    // This polygon becomes the editor's immutable OutlineSource; the editor's tools resolve from IT
+    // (radius/smooth/detail/snap, reversible to straight). It does NOT re-derive from spec.rawTracePx —
+    // that's provenance only (VD3/VD11). Flip to MASK-PX Y-DOWN (vector space).
     const yDown = ringPx.map(([x, y]) => [x, H - y] as Vec2Px)
     const straight = rdpClosed(yDown, RAW_TRACE_RDP_PX)
     if (straight.length < 3) throw new Error('No silhouette found — try an image with a clearer subject.')

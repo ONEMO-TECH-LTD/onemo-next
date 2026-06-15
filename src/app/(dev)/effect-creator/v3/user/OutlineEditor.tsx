@@ -83,7 +83,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   // the COMMITTED dial state — updated only at seed/commit/reset/undo, never by preview ticks
   // (the TickBar's onChange moves the live refs DURING the drag, before the commit pushes).
   // V4: the editor session over the store's source+adjustments truth (resolve = the display shape).
-  const { adjustments, display, displayRef, preview: previewAdj, setPreview: setPreviewAdj, applyAdjustments, seedSource, reBaseline, transformSource, undo: undoEdit, redo: redoEdit, histRef } = useOutlineEditing()
+  const { source, adjustments, display, displayRef, preview: previewAdj, setPreview: setPreviewAdj, applyAdjustments, seedSource, reBaseline, transformSource, undo: undoEdit, redo: redoEdit, histRef } = useOutlineEditing()
   // aliases — the gesture/render code reads the RESOLVED display as the working VShape.
   const vshape = display
   const vshapeRef = displayRef
@@ -314,9 +314,14 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   }, [hitRing])
   // inline manufacturability guardrail — same ring-math verdict class as the engine gate
   const hasIssues = useMemo(() => hitRing.length >= 4 && validateSelfIntersection(hitRing, 'outer').length > 0, [hitRing])
-  // tier-2 availability: Radius is a per-corner fillet (local adjustment) — it needs a CORNER anchor
-  // to round; the tool greys when the shape has none (Dan's rule: inapplicable tools grey, never no-op).
-  const radiusApplies = useMemo(() => !!vshape && vshape.paths[0].anchors.some((a) => a.corner), [vshape])
+  // tier-2 availability: Radius needs a CORNER to round. Keyed off the IMMUTABLE SOURCE (which always
+  // keeps its corners), NOT the resolved display — otherwise rounding every corner removes the display
+  // corners, greys the control, and you can't dial Radius back to 0 (Codex F3 reversibility bug).
+  const radiusApplies = useMemo(
+    () => (!!source && source.shape.paths.some((p) => p.anchors.some((a) => a.corner))) ||
+          (!!vshape && vshape.paths[0].anchors.some((a) => a.corner)),
+    [source, vshape],
+  )
 
   // Run 6 — points on demand: build the transient shape for an in-flight anchor/handle drag.
   // Anchor drag translates p + both handles together; a SMOOTH anchor's handle drag mirrors the

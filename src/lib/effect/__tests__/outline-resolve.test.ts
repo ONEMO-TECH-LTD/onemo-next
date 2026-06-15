@@ -5,7 +5,7 @@
 import { describe, test, expect } from 'vitest'
 import {
   resolve, mintIds, ADJUSTMENTS_OFF, GLOBAL_OFF,
-  type OutlineSource, type OutlineClass, type OutlineAdjustments,
+  type OutlineSource, type OutlineClass, type OutlineAdjustments, type LocalAdjustment,
 } from '../outline-resolve'
 import { flattenShape, filletShape, type VShape, type VAnchor } from '@/lib/vector-core'
 import { validateSelfIntersection, type Vec2Px } from '@/lib/outline-core'
@@ -115,6 +115,17 @@ describe('V4 resolve — F1: local radius keeps the source id reusable (no bake 
     // the fillet replaced the sharp corner with rounded anchors that CARRY the source id — so the
     // editor can re-select and re-adjust that corner without baking or rebasing (Codex F1).
     expect(out.paths[0].anchors.some((a) => a.id === id)).toBe(true)
+  })
+  test('F3: whole-shape radius reverts — round EVERY corner, then radius 0 → exact source', () => {
+    const s = source(notchedSquare())
+    const ids = s.shape.paths[0].anchors.filter((a) => a.corner && a.id).map((a) => a.id!)
+    expect(ids.length).toBeGreaterThan(0)
+    const at = (r: number) => { const m: Record<string, LocalAdjustment> = {}; ids.forEach((id) => (m[id] = { radius: r })); return m }
+    const rounded = resolve(s, { global: { ...GLOBAL_OFF }, local: at(80) })
+    expect(rounded).not.toBe(s.shape) // every corner rounded
+    expect(rounded.paths[0].anchors.every((a) => a.corner)).toBe(false) // display lost its corners (the F3 trap)
+    // radius back to 0 on all corners → exact source (the control must stay usable to do this — UI fix)
+    expect(resolve(s, { global: { ...GLOBAL_OFF }, local: at(0) })).toBe(s.shape)
   })
   test('radius survives a global smooth (claim pinned + re-applied through the global pass)', () => {
     const s = source(notchedSquare())
