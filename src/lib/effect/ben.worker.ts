@@ -18,7 +18,10 @@
 // wrapper (segment-ml.ts) does the canvas rasterize/downscale + alpha→mask (workers have no DOM).
 // Buffer is transferred (zero-copy hand-off).
 
-const MODEL_ID = 'onnx-community/BEN2-ONNX'
+// Mobile cut-out: RMBG-1.4 (~88 MB fp16) REPLACES BEN2 (219 MB). BEN2 peaked ~977 MB live and iOS
+// Safari OOM-killed the tab (measured on iPhone, Timelines). The matte-quality drop is irrelevant —
+// the output is squared into a geometric marching-squares outline (fine edges/hair are discarded).
+const MODEL_ID = 'briaai/RMBG-1.4'
 
 // Worker global — typed loosely to avoid DOM/WebWorker lib conflicts in the shared tsconfig.
 const ctx: { onmessage: ((e: MessageEvent) => void) | null; postMessage: (msg: unknown, transfer?: Transferable[]) => void } =
@@ -44,9 +47,9 @@ function getSegmenter(onProgress: (state: string) => void) {
       }
       let seg
       try {
-        seg = await mod.pipeline('background-removal', MODEL_ID, { device: 'webgpu', progress_callback })
+        seg = await mod.pipeline('background-removal', MODEL_ID, { device: 'webgpu', dtype: 'fp16', progress_callback })
       } catch {
-        seg = await mod.pipeline('background-removal', MODEL_ID, { progress_callback }) // wasm fallback
+        seg = await mod.pipeline('background-removal', MODEL_ID, { dtype: 'fp16', progress_callback }) // wasm fallback (same fp16 weights → cache-coherent)
       }
       return seg as unknown as (input: string[]) => Promise<unknown>
     })()
@@ -84,6 +87,7 @@ ctx.onmessage = async (e: MessageEvent<{ id: number; url: string; preload?: bool
         },
         // wasm/cpu device for the throwaway instance — never webgpu at preload
         device: 'wasm',
+        dtype: 'fp16', // match the run variant so the preload-warmed cache is reused (no re-download)
       } as Parameters<typeof mod.AutoModel.from_pretrained>[1])
       try { await (m as unknown as { dispose?: () => Promise<unknown> }).dispose?.() } catch { /* best-effort free */ }
       ctx.postMessage({ id, ok: true, preloaded: true })
