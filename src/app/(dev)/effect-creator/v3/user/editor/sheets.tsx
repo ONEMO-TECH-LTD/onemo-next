@@ -114,7 +114,7 @@ export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, radiusApplies
   const dials = [
     { k: 'radius' as const, label: cornerMode ? 'Corner' : 'Radius', icon: <CornerIcon />, ring: radiusApplies && radius > 0 ? radius / Math.max(maxRadius, 1) : 0 },
     { k: 'curve' as const, label: 'Curve', icon: <RoundIcon />, ring: curveSelected && curveVal > 0 ? curveVal / 100 : 0 },
-    { k: 'detail' as const, label: 'Detail', icon: <DetailIcon />, ring: global.detail < 100 ? (100 - global.detail) / 100 : 0 },
+    { k: 'detail' as const, label: 'Detail', icon: <DetailIcon />, ring: (100 - global.detail) / 100 },
     { k: 'smooth' as const, label: 'Smooth', icon: <SmoothIcon />, ring: global.smooth / 100 },
     { k: 'snap' as const, label: 'Snap', icon: <SnapIcon />, ring: global.snap / 100 },
     { k: 'angle' as const, label: 'Angle', icon: <AngleIcon />, ring: global.angle / 100 },
@@ -155,7 +155,9 @@ export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, radiusApplies
             </div>
           ))}
           {adjustSub === 'detail' && (
-            <TickBar label="Detail" min={0} max={100} value={global.detail} onChange={(v) => previewGlobal(setG('detail', v))} onCommit={(v) => commitGlobal(setG('detail', v))} format={(v) => `${Math.round(v)}%`} />
+            // Detail reads 0% = OFF (raw, full detail), 100% = max simplify — consistent with every
+            // other dial (0 = off). Engine `detail` is fidelity (100 = full), so slider = 100 - detail.
+            <TickBar label="Detail" min={0} max={100} value={100 - global.detail} onChange={(v) => previewGlobal(setG('detail', 100 - v))} onCommit={(v) => commitGlobal(setG('detail', 100 - v))} format={(v) => `${Math.round(v)}%`} />
           )}
           {adjustSub === 'smooth' && (
             <TickBar label="Smooth" min={0} max={100} value={global.smooth} onChange={(v) => previewGlobal(setG('smooth', v))} onCommit={(v) => commitGlobal(setG('smooth', v))} format={(v) => `${Math.round(v)}%`} />

@@ -20,7 +20,7 @@ import {
 import { MIN_ANCHOR_SEPARATION_MM } from '@/lib/effect/geometry-truth'
 // V4 engine (blueprint v4-foundation.md): one impartial resolve(source, adjustments). The editor
 // writes the recipe; the engine owns shape. No corner-pin, no vectoriseTrace, no baked timeline.
-import { mintIds, GLOBAL_OFF, type GlobalAdjustments, type LocalAdjustment } from '@/lib/effect/outline-resolve'
+import { mintIds, type GlobalAdjustments, type LocalAdjustment } from '@/lib/effect/outline-resolve'
 import { standardBirthShape } from '@/lib/effect/prepare-effect'
 import { useOutlineStore, NEUTRAL_FX, INITIAL_ARTWORK, type ImageFx } from './outlineStore'
 import type { DesignState } from '../types'
@@ -636,62 +636,62 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     }
   }, [hitRing, toViewBox, preview, showAnchors, vshapeRef])
 
-  // ── LOCAL adjustments (Radius / Curve) — claimed per anchor by STABLE id (VD2/VD9). A claimed
-  //    source anchor is reversible (off → exact source corner) and PINNED through any global pass.
-  /** the SELECTED display anchor's SOURCE id — present when global is off OR the anchor is pinned. */
-  const selectedSourceId = useCallback((): string | null => {
+  // ── LOCAL adjustments (Radius / Curve) — keyed by STABLE source id (VD2/VD9), reversible (off →
+  //    exact source corner), PINNED through any global pass. Edits ALWAYS map to a SOURCE id (the
+  //    selected anchor's own id when present — a filleted corner carries its source id (F1) — else the
+  //    NEAREST source anchor). So there is NO bake fallback and globals are never silently reset (F1).
+  const sourceIdForSelection = useCallback((): string | null => {
     const disp = vshapeRef.current
     if (!disp || selVA === null) return null
-    const id = disp.paths[0].anchors[selVA]?.id
-    if (!id) return null
+    const a = disp.paths[0].anchors[selVA]
+    if (!a) return null
     const src = useOutlineStore.getState().source
-    return src && src.shape.paths.some((p) => p.anchors.some((x) => x.id === id)) ? id : null
+    if (!src) return null
+    const ids = new Set<string>()
+    src.shape.paths.forEach((p) => p.anchors.forEach((x) => { if (x.id) ids.add(x.id) }))
+    if (a.id && ids.has(a.id)) return a.id // direct — source anchor, pinned anchor, or filleted carrying its id
+    let best: string | null = null, bd = Infinity // transient faired anchor → nearest source id (stay on recipe)
+    src.shape.paths.forEach((p) => p.anchors.forEach((x) => {
+      if (!x.id) return
+      const d = (x.p.x - a.p.x) ** 2 + (x.p.y - a.p.y) ** 2
+      if (d < bd) { bd = d; best = x.id }
+    }))
+    return best
   }, [selVA, vshapeRef])
-  /** live preview a local adjustment (recipe preview) — only when the anchor has a source id. */
-  const previewLocal = useCallback((mut: LocalAdjustment) => {
-    const id = selectedSourceId()
-    if (!id) return
-    const adj = useOutlineStore.getState().adjustments
-    setPreviewAdj({ ...adj, local: { ...adj.local, [id]: { ...adj.local[id], ...mut } } })
-  }, [selectedSourceId, setPreviewAdj])
-  /** commit a local adjustment: claim the source anchor by id (reversible + pinned); or — when the
-   *  selected anchor is a transient faired point (global engaged) — bake the resolved shape into a
-   *  fresh source and claim the same index there. */
-  const commitLocal = useCallback((mut: LocalAdjustment) => {
-    setPreviewAdj(null)
-    const disp = vshapeRef.current
-    if (!disp || selVA === null) return
-    const st = useOutlineStore.getState()
-    const id = selectedSourceId()
-    if (id) {
-      const adj = st.adjustments
-      applyAdjustments({ ...adj, local: { ...adj.local, [id]: { ...adj.local[id], ...mut } } })
-    } else {
-      const baked = mintIds(disp)
-      const newId = baked.paths[0].anchors[selVA]?.id
-      const src = st.source
-      if (!newId || !src) return
-      seedSource({ ...src, shape: baked }, { global: { ...GLOBAL_OFF }, local: { [newId]: mut } })
-    }
-  }, [selVA, selectedSourceId, applyAdjustments, seedSource, vshapeRef])
 
-  // RADIUS — per-corner fillet (local). onChange previews live; release commits. 0 = sharp (off).
-  const previewRadius = useCallback((v: number) => { setRadius(v); previewLocal({ radius: v }) }, [previewLocal])
+  /** write a local adjustment onto target source ids (preview or commit). */
+  const writeLocal = useCallback((ids: string[], mut: LocalAdjustment, commit: boolean) => {
+    if (!ids.length) return
+    const adj = useOutlineStore.getState().adjustments
+    const local = { ...adj.local }
+    for (const id of ids) local[id] = { ...local[id], ...mut }
+    const next = { global: adj.global, local }
+    if (commit) applyAdjustments(next); else setPreviewAdj(next)
+  }, [applyAdjustments, setPreviewAdj])
+
+  // RADIUS — a SELECTED corner rounds alone; with NO selection it rounds EVERY corner (whole-shape,
+  // like the old build). 0 = sharp (off), reversible. Targets SOURCE corner ids → pinned through global.
+  const radiusTargets = useCallback((): string[] => {
+    const sel = sourceIdForSelection()
+    if (sel) return [sel]
+    const src = useOutlineStore.getState().source
+    return src ? src.shape.paths.flatMap((p) => p.anchors.filter((a) => a.corner && a.id).map((a) => a.id as string)) : []
+  }, [sourceIdForSelection])
+  const previewRadius = useCallback((v: number) => { setRadius(v); writeLocal(radiusTargets(), { radius: v }, false) }, [writeLocal, radiusTargets])
   const commitRadius = useCallback((v: number) => {
     setRadius(v)
     const t0 = performance.now()
-    commitLocal({ radius: v })
+    writeLocal(radiusTargets(), { radius: v }, true)
     perfGesture('round-commit', performance.now() - t0)
-  }, [commitLocal])
-  // CURVE — the REAL bend tool: tension on the selected anchor. 0 = straight (off), 100 = strong.
-  // The bend math (synthesize handles on a straight corner, re-tension a curved one) lives in resolve.
-  const previewCurve = useCallback((v: number) => { setCurveVal(v); previewLocal({ curve: (v / 100) * 2 }) }, [previewLocal])
+  }, [writeLocal, radiusTargets])
+  // CURVE — bend the SELECTED anchor (needs a point selected). 0 = straight (off), 100 = strong.
+  const previewCurve = useCallback((v: number) => { setCurveVal(v); const id = sourceIdForSelection(); if (id) writeLocal([id], { curve: (v / 100) * 2 }, false) }, [writeLocal, sourceIdForSelection])
   const commitCurve = useCallback((v: number) => {
     setCurveVal(v)
     const t0 = performance.now()
-    commitLocal({ curve: (v / 100) * 2 })
+    const id = sourceIdForSelection(); if (id) writeLocal([id], { curve: (v / 100) * 2 }, true)
     perfGesture('curve-commit', performance.now() - t0)
-  }, [commitLocal])
+  }, [writeLocal, sourceIdForSelection])
   // "Magic blend" — the soft real-background blur composited behind the subject on the 3D front
   // texture (the "magic blend" Dan loves). Edit-mode only control; on/off + intensity. Writes the
   // store's bgBlur (0 = off/sharp · 0..1 = intensity ·  ShapedModel re-composes the front, no re-segment).
@@ -1301,11 +1301,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
         {/* KAI-9023 (Dan): the hero's Magic, same place in the island — but the editor STAYS OPEN
             and the fresh cut lands in the 2D session (the spec-change effect below re-seeds) */}
         {onMagic && <DockTool icon={<MagicIcon />} label="Magic" onClick={onMagic} />}
-        <DockTool icon={<TuneIcon />} label="Adjust" onClick={() => setActiveAdjust((a) => {
-          // KAI-9020 (Dan): Adjust is point-level work — entering it auto-switches frame → points
-          if (a !== 'adjust') setShowAnchors(true)
-          return a === 'adjust' ? null : 'adjust'
-        })} active={activeAdjust === 'adjust'} />
+        {/* Dan (2026-06-15): Adjust is the LANDING mode — pressing it just shows the Adjust sheet; it
+            never hides the menu and never flips frame→points. Per-corner work is the Points toggle. */}
+        <DockTool icon={<TuneIcon />} label="Adjust" onClick={() => setActiveAdjust('adjust')} active={activeAdjust === 'adjust'} />
         {/* KAI-9027: the Image entry moved to the hero as 'Filters' — image mode still exists,
             reached from there (and stays active when entered) */}
       </Dock>

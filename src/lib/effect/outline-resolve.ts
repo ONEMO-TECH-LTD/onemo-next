@@ -75,7 +75,9 @@ export const snapBandPx = (pct: number) => (pct <= 0 ? 0 : (pct / 100) * 20)
 export const angleMaxTurnDeg = (pct: number) => (pct <= 0 ? 180 : 180 - (pct / 100) * 150)
 /** Line: 0% = 0px, 100% = 80px minimum straight-run length. */
 export const lineMinPx = (pct: number) => (pct / 100) * 80
-/** Detail: 100% = full detail (eps 0, OFF), 0% = simplest (eps 8px). */
+/** Detail: SIMPLIFY (RDP) on the smoothed ring — fewer points as detail lowers. 100% = full detail
+ *  (eps 0, OFF — keep everything), 0% = simplest (eps 8px). Applied AFTER smooth so it thins the
+ *  smoothed outline rather than introducing its own smoothing (independent axis). */
 export const detailEpsPx = (pct: number) => Math.max(0, (1 - Math.max(0, Math.min(100, pct)) / 100) * 8)
 
 // ── id minting + lookup ─────────────────────────────────────────────────────────────────────
@@ -122,6 +124,8 @@ function bendAnchorPath(path: VPath, idx: number, factor: number): VPath {
 const FAIR_FLATTEN_TOL = 0.75 // px — dense enough that the fairing sees the true silhouette
 const FAIR_SPACING = 1.5
 
+/** Fairing knobs (blueprint §4 order detail → smooth → snap/line → angle). Detail is applied as a
+ *  separate RDP after fairTracedRing (see fairWithGuard) so it thins, not resamples. */
 function fairOpts(g: GlobalAdjustments): FairTracedRingOpts {
   return {
     spacingPx: FAIR_SPACING,
@@ -132,28 +136,31 @@ function fairOpts(g: GlobalAdjustments): FairTracedRingOpts {
   }
 }
 
-/** Fair one ring with fold-guard backoff (VD12): if the faired+RDP'd ring self-intersects, reduce
- *  smooth toward off until it's valid; if it still folds with smooth off, return the repaired ring;
- *  the resolver NEVER returns a self-crossing ring. */
+/** Fair one ring with fold-guard backoff (VD12) — STRUCTURALLY fail-closed: the resolver NEVER returns
+ *  a self-crossing ring. The incoming `ring` is the flattened source, which is simple by construction,
+ *  so it is the guaranteed-valid terminal fallback. smooth/snap/angle/line via fairTracedRing, then
+ *  detail (RDP) thins the result; on a fold, back smooth off; then a validated repair; else the source. */
 function fairWithGuard(ring: Vec2Px[], g: GlobalAdjustments): Vec2Px[] {
   const eps = detailEpsPx(g.detail)
+  const valid = (r: Vec2Px[]) => r.length >= 4 && validateSelfIntersection(r, 'resolve').length === 0
   const finish = (opts: FairTracedRingOpts) => {
-    let f = fairTracedRing(ring, opts)
-    if (eps > 0) f = rdpClosed(f, eps)
-    return f
+    const f = fairTracedRing(ring, opts)
+    return eps > 0 ? rdpClosed(f, eps) : f
   }
   let opts = fairOpts(g)
   let out = finish(opts)
-  if (out.length < 4 || validateSelfIntersection(out, 'resolve').length === 0) return out
-  let last = out, guard = 0
+  if (valid(out)) return out
+  let guard = 0
   while (guard++ < 12 && (opts.smoothPx ?? 0) > 0.5) {
     opts = { ...opts, smoothPx: Math.max(0, (opts.smoothPx ?? 0) * 0.7) }
     out = finish(opts)
-    if (out.length >= 4 && validateSelfIntersection(out, 'resolve').length === 0) return out
-    last = out
+    if (valid(out)) return out
   }
-  const repaired = repairSimplePolygon(last, 1)
-  return repaired.length >= 4 ? repaired : last
+  // terminal: a validated repair, else the source ring itself (simple by construction — fail-closed).
+  const repaired = repairSimplePolygon(out, 1)
+  if (valid(repaired)) return repaired
+  const base = eps > 0 ? rdpClosed(ring, eps) : ring
+  return valid(base) ? base : (valid(ring) ? ring : repairSimplePolygon(ring, 1))
 }
 
 /** Global pass: fair every path's flattened polyline; pin claimed anchors back as identified anchors

@@ -106,3 +106,40 @@ describe('V4 resolve — impartial across classes', () => {
     expect(new Set(counts).size).toBe(1) // identical output point count for every class
   })
 })
+
+describe('V4 resolve — F1: local radius keeps the source id reusable (no bake / no drift)', () => {
+  test('a radiused corner still carries its source id in the resolved output', () => {
+    const s = source(notchedSquare())
+    const id = s.shape.paths[0].anchors[1].id!
+    const out = resolve(s, { global: { ...GLOBAL_OFF }, local: { [id]: { radius: 20 } } })
+    // the fillet replaced the sharp corner with rounded anchors that CARRY the source id — so the
+    // editor can re-select and re-adjust that corner without baking or rebasing (Codex F1).
+    expect(out.paths[0].anchors.some((a) => a.id === id)).toBe(true)
+  })
+  test('radius survives a global smooth (claim pinned + re-applied through the global pass)', () => {
+    const s = source(notchedSquare())
+    const id = s.shape.paths[0].anchors[5].id!
+    const smoothOnly = resolve(s, { global: { ...GLOBAL_OFF, smooth: 60 }, local: {} })
+    const smoothPlusR = resolve(s, { global: { ...GLOBAL_OFF, smooth: 60 }, local: { [id]: { radius: 12 } } })
+    expect(flat(smoothPlusR).length).not.toBe(flat(smoothOnly).length) // the radius claim changes the result
+    expect(smoothPlusR.paths[0].anchors.some((a) => a.id === id)).toBe(true) // and the id survives global
+  })
+})
+
+describe('V4 resolve — F2: fold guard is structurally fail-closed', () => {
+  test('a pathological deep-spike star never resolves to a self-crossing outline at any smooth/detail', () => {
+    const mk = (x: number, y: number): VAnchor => ({ p: { x, y }, hIn: null, hOut: null, corner: true })
+    const anchors: VAnchor[] = []
+    const N = 16
+    for (let i = 0; i < N; i++) {
+      const ang = (2 * Math.PI * i) / N
+      const rad = i % 2 === 0 ? 150 : 18 // deep spikes = fold bait under heavy smooth
+      anchors.push(mk(200 + rad * Math.cos(ang), 200 + rad * Math.sin(ang)))
+    }
+    const s = source({ paths: [{ anchors }] })
+    for (const smooth of [0, 50, 100]) for (const detail of [0, 50, 100]) {
+      const out = resolve(s, { global: { ...GLOBAL_OFF, smooth, detail }, local: {} })
+      expect(validateSelfIntersection(flat(out), 't').length).toBe(0) // never a crack — fail-closed
+    }
+  })
+})

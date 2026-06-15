@@ -38,7 +38,7 @@ import { segmentML, ML_ADAPTER_ID } from './segment-ml'
 import { traceContourRaw } from './contour'
 import { composeFront, blurCanvas, imageDataToCanvas } from './composite'
 import type { EffectType } from './effect-types'
-import { rdpClosed, type FairTracedRingOpts, type Vec2Px } from '@/lib/outline-core'
+import { rdpClosed, type Vec2Px } from '@/lib/outline-core'
 // REBUILD-PLAN-v2 §B1 — truth at birth: geometry is born as ONE VShape; the manufacturing contour
 // is DERIVED from it. Shaped generation emits the RAW marching-squares straight polygon (no Stage B).
 import { contourFromShape } from './geometry-truth'
@@ -56,12 +56,13 @@ const RAW_TRACE_RDP_PX = 1.0
 export const EFFECT_BUILD_CONFIG: ShapeBuildConfig = {
   longestSideMM: 70, // §9a: 70mm base square
   thicknessMM: 1, // §9: 1mm body (supersedes 0.5)
-  // EDGE PROFILE — PARKED at the outward-lip baseline for the V4 editor rewire (Gate A, blueprint §9).
-  // The straight-wall edge work (edgeRadiusMM 0.2 + mesh.ts inward profile/cap-inset + canonical
-  // winding) lives in git (8f66d17, 72f7ca7) and is revisited in Gate A — decide there: update the
-  // mesh-edge invariant for the straight-wall design + repin the payload golden, OR keep the lip.
-  // Reverted to 0.5 so the rewire starts from a GREEN suite (mesh-edge.test + payload.test golden).
-  edgeRadiusMM: 0.5,
+  // EDGE PROFILE (Dan, 2026-06-15 — ACCEPTED fix, kept): "almost straight everywhere with slightly
+  // rounded edges — no groove, no full rounded bevel." On the 1mm body, 0.5mm = r = half = a FULL
+  // half-round (the outward lip Dan rejected). 0.2mm = a real ~0.6mm straight wall + a short 0.2mm
+  // soft corner top & bottom = straight cut, softly rounded. The groove was the post-gen winding
+  // inversion, fixed in mesh.ts (canonical CCW / orientRing). (NOT parked — regressing this is wrong;
+  // the mesh-edge test + payload golden are updated to THIS straight-wall design.)
+  edgeRadiusMM: 0.2,
   edgeSegments: 18,
   rdpEpsilonMM: 0.4,
   maxImageDim: 1200,
@@ -139,8 +140,6 @@ export async function prepareEffect(
   type: EffectType,
   cfg: ShapeBuildConfig = EFFECT_BUILD_CONFIG,
   onProgress?: (s: 'downloading-model' | 'cutting' | 'fallback') => void,
-  // #21: Dan's tuned fairing rides every Magic run — settings are defaults, never reset by Magic.
-  fairing?: FairTracedRingOpts,
 ): Promise<PreparedEffect> {
   // Full photo (texture res), y-up, for the composite + edge-lip source. NO policy cap (Dan,
   // plan v2.1 §B5): the texture carries the source's full resolution up to the device's physical
@@ -234,7 +233,8 @@ export async function prepareEffect(
     geometryMM,
     dimensions: { thicknessBodyMM: cfg.thicknessMM, edgeRadiusMM: cfg.edgeRadiusMM, widthMM, heightMM },
     generator: { adapter: adapterId, lane: 'kai', version: '0.3.0' },
-    // shaped: the raw PRE-fairing trace rides along so the editor's Tune dash can re-fair it live
+    // shaped: the raw marching-squares trace rides along as PROVENANCE/debug only (VD3/VD11) — it is
+    // NOT a resolution path; the editor never re-fairs from it (that was the retired Tune pipeline).
     rawTracePx: adapterId !== 'standard' ? ringPx.map(([x, y]) => [x, y] as Pt) : undefined,
     diagnostics: {
       rawContourNodes: ringPx.length,

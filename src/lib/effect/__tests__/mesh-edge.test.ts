@@ -18,38 +18,42 @@ function circleContour(rMM: number, n = 720): Contour {
   return { outer: { pts }, holes: [] }
 }
 
-describe('mesh — outward rounded lip (KAI-8951)', () => {
+describe('mesh — straight wall + soft corners (Dan 2026-06-15)', () => {
+  // The accepted edge (NOT a lip, NOT a groove, NOT a full bevel): an almost-straight wall AT the
+  // silhouette with a short soft corner top & bottom. The wall sits at the contour (radial 0); the caps
+  // inset by r and a small fillet rolls cap→wall. So the edge band stays in [R-r, R] — never bulges
+  // OUTWARD past the contour (that's the lip Dan rejected) and never dips below R-r (no groove crease).
   const R = 20 // contour radius (mm); geometry is centered, so radial distance is from origin
   const r = OPTS.edgeRadiusMM
   const { geometry } = buildShapedGeometry(circleContour(R), OPTS)
   const pos = geometry.getAttribute('position')
-  const groups = geometry.groups // [front(cap), edge, back] — by addGroup order: edge first in buffer
+  const groups = geometry.groups
   const edgeGroup = groups.find((g) => g.materialIndex === 1)!
   const frontGroup = groups.find((g) => g.materialIndex === 0)!
 
-  test('the lip rolls OUTWARD: edge band stays in [contour, contour + r] — a groove is impossible', () => {
-    let minRad = Infinity, maxRad = -Infinity, crest = -Infinity
+  test('the wall sits AT the contour — no outward lip, no inward groove (edge band ⊂ [R-r, R])', () => {
+    let minRad = Infinity, maxRad = -Infinity, wallRad = -Infinity
     for (let i = edgeGroup.start; i < edgeGroup.start + edgeGroup.count; i++) {
       const rad = Math.hypot(pos.getX(i), pos.getY(i))
       if (rad < minRad) minRad = rad
       if (rad > maxRad) maxRad = rad
-      if (Math.abs(pos.getZ(i)) <= OPTS.thicknessMM / 2 - OPTS.edgeRadiusMM + 1e-6) crest = Math.max(crest, rad) // the wall band
+      if (Math.abs(pos.getZ(i)) <= OPTS.thicknessMM / 2 - r + 1e-6) wallRad = Math.max(wallRad, rad) // the straight wall band
     }
-    expect(minRad).toBeGreaterThanOrEqual(R - 1e-3) // NOTHING dips inside the contour (no groove)
-    expect(maxRad).toBeLessThanOrEqual(R + r + 1e-3) // bulge bounded by the lip radius
-    expect(crest).toBeGreaterThan(R + r * 0.9) // the convex crest exists at mid-wall
+    expect(maxRad).toBeLessThanOrEqual(R + 1e-3)       // NO outward bulge past the silhouette (no lip)
+    expect(minRad).toBeGreaterThanOrEqual(R - r - 1e-3) // inset only by the soft-corner radius (no deeper groove)
+    expect(wallRad).toBeCloseTo(R, 2)                   // the straight wall IS the silhouette (no inward groove dip)
   })
 
-  test('caps keep the FULL contour extent (the old inset crease ring is gone)', () => {
+  test('caps inset by r to meet the fillet (the wall stays at the contour)', () => {
     let maxRad = -Infinity
     for (let i = frontGroup.start; i < frontGroup.start + frontGroup.count; i++) {
       maxRad = Math.max(maxRad, Math.hypot(pos.getX(i), pos.getY(i)))
     }
-    expect(maxRad).toBeGreaterThan(R - 1e-3) // was R − r before (the groove's crease line)
-    expect(maxRad).toBeLessThanOrEqual(R + 1e-3)
+    expect(maxRad).toBeLessThanOrEqual(R - r + 1e-2)   // caps inset by r (the soft-corner meeting point)
+    expect(maxRad).toBeGreaterThanOrEqual(R - r - 1e-2)
   })
 
-  test('the lip is tangent to the faces: edge band z-extent equals the body thickness', () => {
+  test('the edge spans the full body thickness (tangent to both faces)', () => {
     let minZ = Infinity, maxZ = -Infinity
     for (let i = edgeGroup.start; i < edgeGroup.start + edgeGroup.count; i++) {
       minZ = Math.min(minZ, pos.getZ(i)); maxZ = Math.max(maxZ, pos.getZ(i))

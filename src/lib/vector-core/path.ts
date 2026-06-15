@@ -259,21 +259,23 @@ export function filletPathSmart(path: VPath, radius: number, only?: (anchorIndex
     const k = (4 / 3) * Math.tan(alpha / 4) * Reff
     // rewrite the INCOMING segment's tail: previous anchor keeps its handle; trim point becomes P1
     const prevOut = out.length ? out[out.length - 1] : null
+    // V4 (F1): the two fillet anchors carry the rounded corner's stable id, so a rounded corner still
+    // maps back to its source anchor for continued local editing (no bake / no global reset).
     if (!sIn.isLine) {
       const sp = splitCubic(sIn.seg.a, sIn.seg.c1!, sIn.seg.c2!, sIn.seg.b, sIn.trimT)
       if (prevOut) prevOut.hOut = sp.first[1]
-      out.push({ p: sp.first[3], hIn: sp.first[2], hOut: { x: sIn.point.x + arrive.x * k, y: sIn.point.y + arrive.y * k }, corner: false })
+      out.push({ p: sp.first[3], hIn: sp.first[2], hOut: { x: sIn.point.x + arrive.x * k, y: sIn.point.y + arrive.y * k }, corner: false, id: B.id })
     } else {
-      out.push({ p: sIn.point, hIn: null, hOut: { x: sIn.point.x + arrive.x * k, y: sIn.point.y + arrive.y * k }, corner: false })
+      out.push({ p: sIn.point, hIn: null, hOut: { x: sIn.point.x + arrive.x * k, y: sIn.point.y + arrive.y * k }, corner: false, id: B.id })
     }
     // P2 with the OUTGOING segment's head rewritten
     if (!sOut.isLine) {
       const sp = splitCubic(sOut.seg.a, sOut.seg.c1!, sOut.seg.c2!, sOut.seg.b, sOut.trimT)
-      out.push({ p: sp.second[0], hIn: { x: sOut.point.x - sOut.tangent.x * k, y: sOut.point.y - sOut.tangent.y * k }, hOut: sp.second[1], corner: false })
+      out.push({ p: sp.second[0], hIn: { x: sOut.point.x - sOut.tangent.x * k, y: sOut.point.y - sOut.tangent.y * k }, hOut: sp.second[1], corner: false, id: B.id })
       // the NEXT anchor's hIn must become the split's c2 — patch when we reach it
       pendingHInPatch.set((i + 1) % n, sp.second[2])
     } else {
-      out.push({ p: sOut.point, hIn: { x: sOut.point.x - sOut.tangent.x * k, y: sOut.point.y - sOut.tangent.y * k }, hOut: null, corner: false })
+      out.push({ p: sOut.point, hIn: { x: sOut.point.x - sOut.tangent.x * k, y: sOut.point.y - sOut.tangent.y * k }, hOut: null, corner: false, id: B.id })
     }
   }
   // apply hIn patches for anchors following a trimmed outgoing cubic

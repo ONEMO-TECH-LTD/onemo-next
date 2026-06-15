@@ -126,7 +126,7 @@ describe('buildApprovedEffectPayload (schema 3, vector-native)', () => {
     // MARKED `ref-fallback:` so it can't impersonate byte identity — fixtures carry no ingest sha,
     // so this fixture's source identity moved. Schema shape unchanged; nothing persisted.)
     expect(out.schema_version).toBe(3)
-    expect(out.payload_hash).toBe('668a2e533354ef81') // re-pinned: edgeRadiusMM 0.15→0.5 (KAI-9008, intentional config change)
+    expect(out.payload_hash).toBe('fdee1b9b1e808a7c') // re-pinned: edgeRadiusMM 0.5→0.2 (Dan's accepted straight-wall edge, V4 — intentional config change)
   })
 
   it('SOURCE IDENTITY (KAI-8973/P1b): the ingest byte-hash IS image_hash; absence is a MARKED fallback', () => {

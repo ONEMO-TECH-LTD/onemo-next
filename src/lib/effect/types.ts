@@ -45,9 +45,8 @@ export interface EffectSpecDraft {
     lane: 'kai'
     version: string
   }
-  /** RAW dense BEN trace (mask px, y-up, PRE-fairing) — the editor's Tune dash re-fairs this with
-   *  live params so optimal BEN settings are found by testing, not guessed (Dan, 2026-06-10).
-   *  Present on shaped cut-outs only. */
+  /** RAW dense BEN trace (mask px, y-up). V4: PROVENANCE/debug ONLY (VD3/VD11) — NOT a resolution
+   *  path; the editor resolves from the OutlineSource, never re-fairs from this. Shaped cut-outs only. */
   rawTracePx?: Pt[]
   /** SHA-256 of the ORIGINAL uploaded bytes (preserve-at-ingest, §B5) — the manufacturing
    *  record's true source identity. Absent only if the ingest backup failed. */
