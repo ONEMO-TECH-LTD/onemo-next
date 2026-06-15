@@ -67,8 +67,10 @@ export const GLOBAL_OFF: GlobalAdjustments = { detail: 100, smooth: 0, snap: 0, 
 export const ADJUSTMENTS_OFF: OutlineAdjustments = { global: { ...GLOBAL_OFF }, local: {} }
 
 // ── pct → engine-unit maps (the editor sliders write 0..100; OFF maps to a true no-op) ──────────
-/** Smooth: 0% = σ0 (no smoothing), 100% = σ24px. */
-export const smoothSigmaPx = (pct: number) => (pct <= 0 ? 0 : (pct / 100) * 24)
+/** Smooth: σ SCALES with the shape's bbox diagonal, so it rounds visibly at ANY size — a fixed px
+ *  rounded the duck's fine silhouette but barely touched a large star's points. 0% = σ0; 100% ≈ 8%
+ *  of the diagonal. (The caller passes the flattened ring's diagonal.) */
+export const smoothSigmaPx = (pct: number, diagPx: number) => (pct <= 0 ? 0 : (pct / 100) * Math.max(diagPx * 0.08, 24))
 /** Snap: 0% = band 0 (off), 100% = 20px line-snap band. */
 export const snapBandPx = (pct: number) => (pct <= 0 ? 0 : (pct / 100) * 20)
 /** Angle: 0% = 180° (no cut, OFF), 100% = 30° (aggressive spike cut). */
@@ -126,10 +128,10 @@ const FAIR_SPACING = 1.5
 
 /** Fairing knobs (blueprint §4 order detail → smooth → snap/line → angle). Detail is applied as a
  *  separate RDP after fairTracedRing (see fairWithGuard) so it thins, not resamples. */
-function fairOpts(g: GlobalAdjustments): FairTracedRingOpts {
+function fairOpts(g: GlobalAdjustments, diagPx: number): FairTracedRingOpts {
   return {
     spacingPx: FAIR_SPACING,
-    smoothPx: smoothSigmaPx(g.smooth),
+    smoothPx: smoothSigmaPx(g.smooth, diagPx),
     detailPx: snapBandPx(g.snap),
     maxTurnDeg: angleMaxTurnDeg(g.angle),
     minLinePx: lineMinPx(g.line),
@@ -142,12 +144,19 @@ function fairOpts(g: GlobalAdjustments): FairTracedRingOpts {
  *  detail (RDP) thins the result; on a fold, back smooth off; then a validated repair; else the source. */
 function fairWithGuard(ring: Vec2Px[], g: GlobalAdjustments): Vec2Px[] {
   const eps = detailEpsPx(g.detail)
-  const valid = (r: Vec2Px[]) => r.length >= 4 && validateSelfIntersection(r, 'resolve').length === 0
+  // valid = finite (no NaN/Infinity) AND simple (no self-cross). A degenerate param combo (e.g. Line
+  // with Snap off) can make the fairing emit NaN — caught here and failed-closed to the source ring,
+  // so resolve() NEVER returns unrenderable geometry.
+  const valid = (r: Vec2Px[]) => r.length >= 4 && r.every(([x, y]) => Number.isFinite(x) && Number.isFinite(y)) && validateSelfIntersection(r, 'resolve').length === 0
   const finish = (opts: FairTracedRingOpts) => {
     const f = fairTracedRing(ring, opts)
     return eps > 0 ? rdpClosed(f, eps) : f
   }
-  let opts = fairOpts(g)
+  // σ scales with the shape size — compute the ring's bbox diagonal
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const [x, y] of ring) { if (x < minX) minX = x; if (y < minY) minY = y; if (x > maxX) maxX = x; if (y > maxY) maxY = y }
+  const diag = Math.hypot(maxX - minX, maxY - minY) || 1
+  let opts = fairOpts(g, diag)
   let out = finish(opts)
   if (valid(out)) return out
   let guard = 0

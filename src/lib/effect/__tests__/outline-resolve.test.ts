@@ -126,6 +126,38 @@ describe('V4 resolve — F1: local radius keeps the source id reusable (no bake 
   })
 })
 
+describe('V4 resolve — NEVER produces NaN/Infinity (renderable geometry)', () => {
+  const finite = (n: number) => Number.isFinite(n)
+  const allFinite = (s: VShape) => s.paths.every((pa) => pa.anchors.every((a) =>
+    finite(a.p.x) && finite(a.p.y) &&
+    (!a.hIn || (finite(a.hIn.x) && finite(a.hIn.y))) &&
+    (!a.hOut || (finite(a.hOut.x) && finite(a.hOut.y)))))
+  const star = (): VShape => {
+    const mk = (x: number, y: number): VAnchor => ({ p: { x, y }, hIn: null, hOut: null, corner: true })
+    const anchors: VAnchor[] = []
+    for (let i = 0; i < 10; i++) { const ang = (2 * Math.PI * i) / 10; const r = i % 2 === 0 ? 140 : 40; anchors.push(mk(200 + r * Math.cos(ang), 200 + r * Math.sin(ang))) }
+    return { paths: [{ anchors }] }
+  }
+  test('full global param grid on several shapes stays finite (no NaN/Infinity anchors)', () => {
+    const shapes: [string, VShape][] = [['notch', notchedSquare()], ['star', star()], ['rounded', roundedSquare()]]
+    for (const [name, shape] of shapes) {
+      const s = source(shape)
+      for (const detail of [0, 25, 50, 75, 100]) for (const smooth of [0, 50, 100]) for (const snap of [0, 50, 100]) for (const angle of [0, 50, 100]) for (const line of [0, 100]) {
+        const out = resolve(s, { global: { detail, smooth, snap, angle, line }, local: {} })
+        expect(allFinite(out), `${name} detail=${detail} smooth=${smooth} snap=${snap} angle=${angle} line=${line}`).toBe(true)
+      }
+    }
+  })
+  test('local radius/curve across the corner set stays finite', () => {
+    const s = source(star())
+    for (const a of s.shape.paths[0].anchors) {
+      if (!a.id) continue
+      for (const radius of [0, 20, 80]) expect(allFinite(resolve(s, { global: { ...GLOBAL_OFF }, local: { [a.id]: { radius } } }))).toBe(true)
+      for (const curve of [0, 1, 2]) expect(allFinite(resolve(s, { global: { ...GLOBAL_OFF }, local: { [a.id]: { curve } } }))).toBe(true)
+    }
+  })
+})
+
 describe('V4 resolve — F2: fold guard is structurally fail-closed', () => {
   test('a pathological deep-spike star never resolves to a self-crossing outline at any smooth/detail', () => {
     const mk = (x: number, y: number): VAnchor => ({ p: { x, y }, hIn: null, hOut: null, corner: true })
