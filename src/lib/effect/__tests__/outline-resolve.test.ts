@@ -7,7 +7,8 @@ import {
   resolve, mintIds, GLOBAL_OFF,
   type OutlineSource, type OutlineClass, type OutlineAdjustments, type LocalAdjustment,
 } from '../outline-resolve'
-import { flattenShape, filletShape, type VShape, type VAnchor } from '@/lib/vector-core'
+import { flattenShape, type VShape, type VAnchor } from '@/lib/vector-core'
+import { filletShape } from '@/lib/vector-core/path' // KAI-9071: test fixture only (not a public barrel export)
 import { validateSelfIntersection, type Vec2Px } from '@/lib/outline-core'
 
 function source(shape: VShape, klass: OutlineClass = 'generated'): OutlineSource {

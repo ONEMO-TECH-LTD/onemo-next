@@ -3,7 +3,8 @@
 // Square: lines never subdivide. Flatten: chord error within tolerance. SVG: true C commands.
 
 import { describe, test, expect } from 'vitest'
-import { cubicPoint, flattenPath, toSVGPathD, transformShape, segments, shapeBBox, filletPath, ringToVPath, nearestOnPath, insertAnchorAt, insertAnchorCentered, deleteAnchorRefit, signedArea } from '../index'
+import { cubicPoint, flattenPath, toSVGPathD, transformShape, segments, shapeBBox, ringToVPath, nearestOnPath, insertAnchorAt, insertAnchorCentered, deleteAnchorRefit, signedArea } from '../index'
+import { filletPath } from '../path' // KAI-9071: test fixture only — not a public barrel export (one fillet engine)
 import { roundCornersPaper } from '../paper-kernel' // L6: corner-round is the Paper kernel
 import { unitShape, getShape } from '@/lib/shape-library'
 
@@ -176,6 +177,39 @@ describe('vector-core kernel', () => {
     const ends = rounded.anchors.map((a) => Math.hypot(a.p.x - v.x, a.p.y - v.y)).filter((d) => d > 1e-6 && d < r * 2).sort((a, b) => a - b)
     expect(ends.length).toBeGreaterThanOrEqual(2)
     expect(Math.abs(ends[0] - ends[1])).toBeLessThan(2) // symmetric arc ends despite unequal legs
+  })
+
+  // KAI-9085: the prior tests only check arc ENDPOINT symmetry; this asserts the arc BODY is a true
+  // CONSTANT-RADIUS arc. For a 90° axis-aligned corner the fillet is tangent to both legs at distance r,
+  // so the arc centre is analytically (r, r) — every arc-body point must sit at distance ≈ r from it.
+  // A skewed/elliptical "round" (the old hand-roll failure) would show large radial deviation.
+  test('paper-kernel round — arc BODY is a true constant-radius arc (radial fidelity, not just symmetric ends)', () => {
+    const r = 40
+    const square: { anchors: { p: { x: number; y: number }; hIn: null; hOut: null; corner: boolean }[] } = {
+      anchors: [
+        { p: { x: 0, y: 0 }, hIn: null, hOut: null, corner: true },
+        { p: { x: 200, y: 0 }, hIn: null, hOut: null, corner: true },
+        { p: { x: 200, y: 200 }, hIn: null, hOut: null, corner: true },
+        { p: { x: 0, y: 200 }, hIn: null, hOut: null, corner: true },
+      ],
+    }
+    const rounded = roundCornersPaper(square, r, (i) => i === 0)
+    // arc-body points: strictly inside the corner quadrant (off the straight legs at x=0 / y=0)
+    const arc = flattenPath(rounded, 0.01).filter((p) => p.x > 1 && p.y > 1 && p.x < r && p.y < r)
+    expect(arc.length).toBeGreaterThanOrEqual(5)
+    // Kasa least-squares circle fit on the arc points → best-fit centre + radius. A TRUE arc has a
+    // tiny radial residual; a skewed/elliptical "round" (the old hand-roll bug) would not fit a circle.
+    let sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0, sxz = 0, syz = 0, sz = 0
+    for (const p of arc) { const z = p.x * p.x + p.y * p.y; sx += p.x; sy += p.y; sxx += p.x * p.x; syy += p.y * p.y; sxy += p.x * p.y; sxz += p.x * z; syz += p.y * z; sz += z }
+    const det = (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g)
+    const Dt = det(sxx, sxy, sx, sxy, syy, sy, sx, sy, arc.length)
+    const A = det(sxz, sxy, sx, syz, syy, sy, sz, sy, arc.length) / Dt
+    const B = det(sxx, sxz, sx, sxy, syz, sy, sx, sz, arc.length) / Dt
+    const C = det(sxx, sxy, sxz, sxy, syy, syz, sx, sy, sz) / Dt
+    const cx = A / 2, cy = B / 2, rad = Math.sqrt(C + cx * cx + cy * cy)
+    const resid = Math.max(...arc.map((p) => Math.abs(Math.hypot(p.x - cx, p.y - cy) - rad)))
+    expect(resid).toBeLessThan(rad * 0.02)        // constant radius around the best-fit centre → true arc body
+    expect(Math.abs(rad - r)).toBeLessThan(r * 0.25) // fitted radius in the ballpark of the requested r
   })
 
   test('points on demand — insert ON a curve is geometry-IDENTICAL (exact de Casteljau split)', () => {

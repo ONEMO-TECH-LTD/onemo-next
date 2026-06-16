@@ -35,7 +35,7 @@ function interiorBox(W = 512, H = 512): Pt[] {
 
 const corners = (v: NonNullable<ReturnType<typeof vectoriseTrace>>) => v.paths[0].anchors.filter((a) => a.corner).length
 
-describe('crop-corner default (KAI-8982 D1)', () => {
+describe('crop-corner default (KAI-8982 D1) [via legacy/R4 vectoriseTrace fixture — KAI-9084]', () => {
   it('SHARP fit (no opts): the half-disc keeps its two frame corners as TRUE anchors', () => {
     const v = vectoriseTrace(halfDiscTouchingBottom(), 512, FAIR)!
     expect(corners(v)).toBe(2)

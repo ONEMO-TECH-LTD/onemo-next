@@ -7,7 +7,8 @@ import { contourFromShape, assertContourCuttable, vectorShapeHash, MANUFACTURING
 import { vectoriseTrace } from '../geometry-truth.legacy' // R4: retired trace-fit, test-only
 import { fairingFromDetail, BEN_DEFAULT_DETAIL } from '@/lib/outline-core'
 import { getShape } from '@/lib/shape-library'
-import { filletShape, flattenShape, type VShape } from '@/lib/vector-core'
+import { flattenShape, type VShape } from '@/lib/vector-core'
+import { filletShape } from '@/lib/vector-core/path' // KAI-9071: test fixture only (not a public barrel export)
 import type { Pt } from '../types'
 
 const FAIRING = fairingFromDetail(BEN_DEFAULT_DETAIL)
@@ -23,7 +24,7 @@ function blobTrace(n = 600, r = 200, cx = 300, cy = 300): Pt[] {
   return pts
 }
 
-describe('vectoriseTrace — the one trace→vector fit', () => {
+describe('[legacy/R4-quarantined] vectoriseTrace — trace→vector fit (NOT the active pipeline; KAI-9084)', () => {
   it('fits a dense trace into true curves and is deterministic (generation ≡ editor)', () => {
     const v1 = vectoriseTrace(blobTrace(), 600, FAIRING)
     const v2 = vectoriseTrace(blobTrace(), 600, FAIRING)

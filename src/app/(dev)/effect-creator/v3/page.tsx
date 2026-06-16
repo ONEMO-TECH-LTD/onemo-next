@@ -94,6 +94,7 @@ function PrototypePageInner() {
   const baselineRef = useRef<AppSnap | null>(null)
   const editorPreRef = useRef<AppSnap | null>(null)
   const trimPreRef = useRef<AppSnap | null>(null)
+  const magicRunRef = useRef(0) // UX-5 / KAI-9083: cancel OR a new upload bumps the token; a stale Magic run's result is discarded
   const [, bumpHist] = useState(0)
   const snapNow = useCallback((): AppSnap => {
     const o = useOutlineStore.getState()
@@ -201,6 +202,10 @@ function PrototypePageInner() {
     // fresh image → drop any prior edit/blend so the new effect starts clean
     const st = useOutlineStore.getState()
     st.commitGeometry(null); st.setBgBlur(null); st.setSubjMatteUrl(null)
+    // KAI-9083: a new image supersedes any in-flight Magic — bump the run token so a stale Magic
+    // result/error becomes a no-op (can't clobber the new image or fire a false "Magic failed").
+    magicRunRef.current++
+    setGenerating(false)
     // instant standard square through the ONE engine — the object is real in the scene immediately
     import('@/lib/effect/prepare-effect')
       .then(({ prepareEffect }) => prepareEffect(url, 'standard'))
@@ -228,7 +233,6 @@ function PrototypePageInner() {
 
   // Magic: re-prepare as a SHAPED subject cut-out. BEN runs in the Web Worker — the page stays
   // responsive while the shimmer plays; the object morphs IN PLACE in the same scene (no jump).
-  const magicRunRef = useRef(0) // UX-5: cancel bumps the token; a stale run's result is discarded
   const handleMagic = useCallback(() => {
     if (!artworkUrl || generating) return
     const preMagic = snapNow() // #23: one Magic = one global undo step (pushed only on success)

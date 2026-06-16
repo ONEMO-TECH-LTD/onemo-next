@@ -32,14 +32,13 @@
 - `fitSize` 0.09 (ShapedModel) — mm → scene units for golden framing.
 - DPR cap [1, 2] · `frameloop="demand"` · damping OFF (idle truly idles).
 
-## Factory (Phase 2)
-- Tile 1024², fov 35°, fit margin 1.32 — standardized framing from mm dims (G8).
-- Angles: front (0°,90°) · threeQuarter (35°,78°) · back (180°,90°).
-- Output: `.dev-factory-renders/<payload_hash>/<angle>.png` (gitignored).
-
-## Attachment (Phase 3)
-- Magnet grid pitch 54 mm · min anchors 2 · max edge gap 54 mm (`lib/effect/attachment.ts`,
-  invented defaults — coupon-confirm eventually).
+## Manufacturing + Attachment (Phase 2 — re-scoped after Phase 0/1; NOT in the active tree)
+> Per the v5 build-plan, Phase 2 = manufacturing readiness + attachment system. There is **no Phase 3**.
+> The values below are FUTURE intent / dormant — no active implementation exists in this tree yet.
+- Factory render (future, not implemented): tile 1024², fov 35°, fit margin 1.32; angles front (0°,90°) ·
+  threeQuarter (35°,78°) · back (180°,90°); output would be `.dev-factory-renders/<payload_hash>/<angle>.png`.
+- Attachment (dormant `lib/effect/attachment.ts`): magnet grid pitch 54 mm · min anchors 2 · max edge
+  gap 54 mm — invented defaults, coupon-confirm eventually.
 
 ## Editor (G11/G12)
 - Canvas zoom 1–6× (pinch / scroll); pan = drag outside the outline while zoomed, or two-finger.

@@ -26,7 +26,7 @@ function needleTrace(): [number, number][] {
   return pts
 }
 
-describe('vectoriseTrace watertightness (KAI-9009)', () => {
+describe('[legacy/R4-quarantined] vectoriseTrace watertightness (KAI-9009; not active — KAI-9084)', () => {
   it('a needle-slit trace fits to a shape whose flatten has ZERO self-intersections', () => {
     const v = vectoriseTrace(needleTrace(), H, fairingFromDetail(85)) // high detail = weak fairing (the risky end)
     expect(v).not.toBeNull()

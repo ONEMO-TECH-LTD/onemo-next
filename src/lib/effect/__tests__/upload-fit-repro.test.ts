@@ -51,7 +51,7 @@ function fitFromMask(mask: Uint8Array, smooth: boolean) {
 
 const cornerCount = (v: ReturnType<typeof fitFromMask>) => v.paths[0].anchors.filter((a) => a.corner).length
 
-describe('image-upload fit chain (KAI-8972)', () => {
+describe('image-upload fit chain (KAI-8972) [via legacy/R4 vectoriseTrace fixture — KAI-9084]', () => {
   it('REPRO (the bug class): AA-jittered ellipse WITHOUT mask smoothing grows false corners', () => {
     expect(cornerCount(fitFromMask(ellipseMaskAA(), false))).toBeGreaterThan(0)
   })

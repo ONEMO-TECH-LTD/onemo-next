@@ -22,7 +22,7 @@ const corners = (k: 'smooth' | 'boxy' | 'star') => {
   console.log(`[census2] ${k}: ${v.paths[0].anchors.length} anchors, ${c} corners`)
   return c
 }
-describe('corner integrity (Dan directive)', () => {
+describe('corner integrity (Dan directive) [via legacy/R4 vectoriseTrace fixture — KAI-9084]', () => {
   it('a boxy subject keeps its 4 sharp corners as TRUE corner anchors', () => { expect(corners('boxy')).toBe(4) })
   it('a 5-spike star keeps its 10 sharp features', () => { const c = corners('star'); expect(c).toBeGreaterThanOrEqual(8); expect(c).toBeLessThanOrEqual(12) })
   it('a smooth blob stays cornerless (smoothing repeats the silhouette)', () => { expect(corners('smooth')).toBe(0) })

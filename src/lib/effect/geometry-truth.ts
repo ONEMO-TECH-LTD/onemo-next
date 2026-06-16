@@ -43,6 +43,10 @@ export function contourFromShape(v: VShape, ctx: { mmPerPx: number; maskHeightPx
   const k = ctx.mmPerPx || 1
   const tolPx = Math.max(0.05, MANUFACTURING_TOLERANCE_MM / k)
   const rings = flattenShape(v, tolPx)
+  // KAI-9086 (Phase-2 guard): multi-ring shapes (holes / secondary paths) are NOT yet in scope. The mm
+  // contour keeps only the OUTER ring while the SVG exporter serializes ALL paths — a silent divergence
+  // the moment holes/multi-piece shapes are promoted. Surface it loudly (current producers are single-path).
+  if (rings.length > 1) console.warn(`[geometry-truth] contourFromShape: ${rings.length} rings — dropping ${rings.length - 1} secondary path(s)/hole(s); mm contour is single-path until Phase 2 (KAI-9086).`)
   const outerRing = rings[0]
   if (!outerRing || outerRing.length < 3) return null
   const H = ctx.maskHeightPx

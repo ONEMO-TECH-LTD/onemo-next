@@ -12,8 +12,9 @@ export {
   shapeToSVGPathD,
   transformPath,
   transformShape,
-  filletPath,
-  filletShape,
+  // KAI-9071 (invariant 2 — ONE fillet engine): filletPath/filletShape (the old hand-rolled fillet)
+  // are NOT exported from the public barrel — production rounds via the Paper kernel only. They survive
+  // in ./path solely as test fixtures; tests import them from '@/lib/vector-core/path' directly.
   splitCubic,
   shapeBBox,
   signedArea,

@@ -18,6 +18,10 @@
 // wrapper (segment-ml.ts) does the canvas rasterize/downscale + alpha→mask (workers have no DOM).
 // Buffer is transferred (zero-copy hand-off).
 
+// KAI-9087: the rembg cut-out CHAIN composition + matte feasibility live in ./ben-chain — a PURE,
+// unit-tested module (a direct worker import would crash a test on onmessage/self/postMessage).
+import { REMBG, resolveChain, isDegenerateMatte, type RembgSpec } from './ben-chain'
+
 // MODEL COMPARISON HARNESS — every candidate runs through the IDENTICAL pipeline method as BEN2
 // (webgpu → wasm fallback, fp16). The page chooses the model via the `?seg=` URL param (read in
 // segment-ml.ts and forwarded here), so we A/B all candidates on the SAME device under SAME conditions
@@ -43,32 +47,7 @@ const resolveModel = (key?: string) => (key && MODELS[key]) || DEFAULT_MODEL
 // model's documented preprocess (resize + /max + mean/std normalize) and postprocess (saliency →
 // min-max → alpha → full-res RGBA matte). All MIT/Apache (free, commercial-OK). Weights mirrored on HF.
 // `adapter` = the stable model identity reported back on a successful cut (R1 — true telemetry).
-type RembgSpec = { adapter: string; url: string; size: number; mean: [number, number, number]; std: [number, number, number] }
-// PRODUCTION trio weights are SELF-HOSTED same-origin under public/seg-models (committed; served by
-// Vercel /public) — no third-party fetch, works offline, and the silueta fallback loads fast (no
-// cold-CDN timeout → flood-fill). The test-only comparison models (u2net/isnet) stay on the HF CDN.
-const SEG_HOST = '/seg-models'                                              // self-hosted (production)
-const REMBG_HOST = 'https://huggingface.co/tomjackson2023/rembg/resolve/main' // CDN (test harness only)
-const REMBG: Record<string, RembgSpec> = {
-  // U^2-Net family — input 320, ImageNet mean/std
-  silueta: { adapter: 'silueta', url: `${SEG_HOST}/silueta.onnx`,   size: 320, mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }, // self-hosted (fallback)
-  u2netp:  { adapter: 'u2netp',  url: `${SEG_HOST}/u2netp.onnx`,    size: 320, mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }, // self-hosted (primary)
-  u2net:   { adapter: 'u2net',   url: `${REMBG_HOST}/u2net.onnx`,   size: 320, mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }, // harness only
-  // IS-Net (DIS general-use) — input 1024, 0.5/1.0 normalize
-  isnet:   { adapter: 'isnet-general-use', url: `${REMBG_HOST}/isnet-general-use.onnx`, size: 1024, mean: [0.5, 0.5, 0.5], std: [1.0, 1.0, 1.0] },   // harness only
-}
-
-// PRODUCTION CUT-OUT CHAIN (Dan, 2026-06-16). Default (no `?seg=`) runs the free, mobile-fit trio:
-//   u2netp (4 MB primary) → silueta (44 MB fallback) → [throw → prepare-effect flood-fill].
-// Silueta is LAZY: it's only fetched/created when u2netp errors first (the chain loop only calls
-// runRembg(silueta) after runRembg(u2netp) throws), so the 44 MB never lands on the device unless
-// the primary actually fails. `?seg=<model>` overrides with a single model (the comparison harness);
-// ben2 / birefnet (or an unknown key) → null → the transformers.js path (getSegmenter).
-function resolveChain(seg?: string): RembgSpec[] | null {
-  if (!seg) return [REMBG.u2netp, REMBG.silueta] // production default trio
-  if (REMBG[seg]) return [REMBG[seg]]            // explicit single rembg model (test harness)
-  return null                                    // ben2 / birefnet → transformers path
-}
+// (RembgSpec / REMBG / resolveChain extracted to ./ben-chain — imported above — KAI-9087.)
 
 // Worker global — typed loosely to avoid DOM/WebWorker lib conflicts in the shared tsconfig.
 const ctx: { onmessage: ((e: MessageEvent) => void) | null; postMessage: (msg: unknown, transfer?: Transferable[]) => void } =
@@ -191,7 +170,7 @@ async function runRembg(imageUrl: string, spec: RembgSpec, onProgress: (s: strin
   // Degenerate guard: an empty (subject not found) or full-frame matte is not a usable cut — treat as
   // a failure so the chain falls back to the next model (e.g. u2netp → Silueta).
   const frac = subj / (ow * oh)
-  if (frac < 0.005 || frac > 0.995) throw new Error('rembg-degenerate:' + frac.toFixed(3))
+  if (isDegenerateMatte(frac)) throw new Error('rembg-degenerate:' + frac.toFixed(3))
   return { data: rgba, width: ow, height: oh }
 }
 
