@@ -27,7 +27,7 @@ export interface MLResult extends MaskResult {
 export type SegmentProgress = 'downloading-model' | 'cutting'
 
 /** TD-E: inference watchdog — a hung worker/model rejects instead of hanging the journey forever. */
-const INFERENCE_WATCHDOG_MS = 90_000
+const INFERENCE_WATCHDOG_MS = 120_000 // mobile CPU is slower than desktop — give heavy models room before declaring a hang
 
 /** Model-comparison harness: `?seg=ben2|rmbg|birefnet` picks the cut-out model (same pipeline method
  *  for all — see ben.worker.ts). Undefined → worker default (BEN2). */
