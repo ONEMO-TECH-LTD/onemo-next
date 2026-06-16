@@ -18,7 +18,7 @@ import { create } from 'zustand'
 import type { EffectSpecDraft, Contour } from '@/lib/effect/types'
 import type { DesignState } from '../types'
 import type { VShape } from '@/lib/vector-core'
-import { contourFromShape } from '@/lib/effect/geometry-truth'
+import { contourFromShape, assertContourCuttable } from '@/lib/effect/geometry-truth'
 import { resolve, ADJUSTMENTS_OFF, mintIds, type OutlineSource, type OutlineAdjustments, type OutlineClass } from '@/lib/effect/outline-resolve'
 
 // #28: artwork position (pan/zoom within the shape) — ONE source for the scene's Position mode
@@ -78,6 +78,11 @@ function derive(source: OutlineSource, adjustments: OutlineAdjustments): DeriveR
   const shape = resolve(source, adjustments)
   const contour = contourFromShape(shape, { mmPerPx: source.mmPerPx, maskHeightPx: source.maskHeightPx })
   if (!contour) { console.error('[outlineStore] derive: contour derivation failed — refusing commit (R9 fail-closed)'); return null }
+  // KAI-9077: R9 also refuses a NON-CUTTABLE contour (self-intersection / collapsed), not just null.
+  // contourFromShape returns non-null for any >=3-pt ring, so a folded outline would otherwise commit
+  // to the mesh + mfg contour. assertContourCuttable is the same feasibility gate payload.ts uses.
+  const feas = assertContourCuttable(contour, source.mmPerPx)
+  if (!feas.ok) { console.error(`[outlineStore] derive: contour not cuttable (${feas.reason}) — refusing commit (R9 fail-closed)`); return null }
   return { committedShape: shape, committedContourMM: contour }
 }
 

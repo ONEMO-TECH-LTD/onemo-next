@@ -388,11 +388,15 @@ export function useEditorGestures(ctx: GestureCtx) {
     setStretchLive({ sx, sy, ax: st.ax, ay: st.ay })
   }, [])
   const endStretch = useCallback(() => {
-    const { stretchRef, setStretchLive, transformSource } = ctxRef.current
+    const { stretchRef, setStretchLive, transformSource, nodeInteractedRef } = ctxRef.current
     const st = stretchRef.current
     if (!st) return
     stretchRef.current = null
     setStretchLive(null)
+    // KAI-9067: a completed stretch must NOT poison the next surface tap. beginStretch sets
+    // nodeInteractedRef=true and onSurfaceClick swallows one click while it's true — so the user's
+    // re-select-frame tap got eaten and the rotate handle never mounted. Clear it on stretch-end.
+    nodeInteractedRef.current = false
     if (Math.abs(st.sx - 1) < 0.004 && Math.abs(st.sy - 1) < 0.004) return // a tap, not a pull
     const t0 = performance.now()
     {

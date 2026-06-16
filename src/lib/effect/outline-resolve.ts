@@ -287,17 +287,21 @@ function localPass(shape: VShape, local: Record<string, LocalAdjustment>): VShap
   return {
     paths: shape.paths.map((path) => {
       let p = path
+      // FOLD GUARD (KAI-9076): every local op is validated; a bend/round that makes the ring
+      // self-cross is DROPPED (keep the prior valid path) — mirrors fairPath's guard so a local
+      // tool can never emit a folded/cracked outline that commits to display/cut truth.
+      const simple = (vp: VPath) => ringSimple(pathToRing(vp))
       // curve pass (count-stable)
       for (const [id, l] of Object.entries(local)) {
         if (!l || (l.curve ?? 0) === 0) continue
         const idx = p.anchors.findIndex((a) => a.id === id)
-        if (idx >= 0) p = bendAnchorPath(p, idx, l.curve!)
+        if (idx >= 0) { const next = bendAnchorPath(p, idx, l.curve!); if (simple(next)) p = next }
       }
       // radius pass (re-find by id; fillet consumes the corner)
       for (const [id, l] of Object.entries(local)) {
         if (!l || (l.radius ?? 0) <= 0) continue
         const idx = p.anchors.findIndex((a) => a.id === id && a.corner)
-        if (idx >= 0) p = roundCornersPaper(p, l.radius!, (ai) => ai === idx) // L1: true-arc, symmetric
+        if (idx >= 0) { const next = roundCornersPaper(p, l.radius!, (ai) => ai === idx); if (simple(next)) p = next } // L1: true-arc, symmetric
       }
       return p
     }),

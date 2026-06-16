@@ -243,8 +243,10 @@ export default function ShapedModel({
     if (bgBlur == null && imageFx == null) return
     const fs = frontSrcRef.current
     if (!fs) return
-    const blurVal = bgBlur == null ? 0.5 : bgBlur // null = build default (on @ ~50%)
-    const px = blurVal <= 0 ? 0 : blurVal * (fs.origCanvas.width / 25) // 0 = off (sharp); ~0.5 ≈ build default
+    // KAI-9069: null bgBlur = the design's BUILD default (fs.defaultBlurPx, already in px) — NOT a
+    // hardcoded 0.5. The standard square births defaultBlurPx=0 (sharp), so touching an image-fx tool
+    // no longer injects ~50% blur; shaped uses its exact prepared default. A user-set 0..1 bgBlur overrides.
+    const px = bgBlur == null ? fs.defaultBlurPx : (bgBlur <= 0 ? 0 : bgBlur * (fs.origCanvas.width / 25))
     const fx = imageFx
       ? `brightness(${imageFx.brightness}%) contrast(${imageFx.contrast}%) saturate(${imageFx.saturate}%)${imageFx.warmth > 0 ? ` sepia(${Math.round(imageFx.warmth * 0.45)}%)` : ''}`
       : ''

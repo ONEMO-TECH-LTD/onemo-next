@@ -154,7 +154,12 @@ function PrototypePageInner() {
     const v = o.committedShape ?? o.spec?.vectorShape
     const sp = o.spec
     if (!v || !sp) { toast('warn', 'Nothing to export yet — add an image first'); return }
-    import('@/lib/export').then(({ toManufacturingSVG }) => {
+    Promise.all([import('@/lib/export'), import('@/lib/effect/geometry-truth')]).then(([{ toManufacturingSVG }, { contourFromShape, assertContourCuttable }]) => {
+      // KAI-9077 / MFG-1: gate the live cut-line export on feasibility — never write a folded/
+      // uncuttable shape to a cut file (committedShape is gated at derive, but spec.vectorShape isn't).
+      const c = contourFromShape(v, { mmPerPx: sp.mmPerPx || 1, maskHeightPx: sp.maskHeightPx })
+      const feas = c ? assertContourCuttable(c, sp.mmPerPx || 1) : { ok: false as const, reason: 'degenerate' as const }
+      if (!feas.ok) { toast('warn', `Can't export — the outline isn't cleanly cuttable (${feas.reason}). Fix the shape first.`); return }
       const svg = toManufacturingSVG(v, { mmPerPx: sp.mmPerPx || 1, widthPx: sp.maskWidthPx, heightPx: sp.maskHeightPx })
       const a = document.createElement('a')
       a.href = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }))

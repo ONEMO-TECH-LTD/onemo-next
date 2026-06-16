@@ -18,7 +18,7 @@ import {
 } from '@/lib/outline-core/math'
 // V4 engine (blueprint v4-foundation.md): one impartial resolve(source, adjustments). The editor
 // writes the recipe; the engine owns shape. No corner-pin, no vectoriseTrace, no baked timeline.
-import { mintIds } from '@/lib/effect/outline-resolve'
+import { mintIds, type OutlineSource, type OutlineAdjustments } from '@/lib/effect/outline-resolve'
 import { standardBirthShape } from '@/lib/effect/prepare-effect'
 import { useOutlineStore, NEUTRAL_FX, INITIAL_ARTWORK, type ImageFx } from './outlineStore'
 import type { DesignState } from '../types'
@@ -132,7 +132,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   // shape (through commitGeometry), the blend, the image adjustments, and the photo position —
   // KAI-8971/F2: imageFx+artwork were missing, so a ✕ kept a 129% Bright committed. (Tune/fairing
   // prefs intentionally survive ✕ — tool calibration, not design state; Dan's #21.)
-  const preEditRef = useRef<{ committedShape: VShape | null; bgBlur: number | null; imageFx: ImageFx | null; artwork: DesignState }>({ committedShape: null, bgBlur: null, imageFx: null, artwork: INITIAL_ARTWORK })
+  const preEditRef = useRef<{ source: OutlineSource | null; adjustments: OutlineAdjustments | null; committedShape: VShape | null; bgBlur: number | null; imageFx: ImageFx | null; artwork: DesignState }>({ source: null, adjustments: null, committedShape: null, bgBlur: null, imageFx: null, artwork: INITIAL_ARTWORK })
   const [allSelected, setAllSelected] = useState(false) // tap inside the cut → select every corner, edit them together
   const [frameLocked, setFrameLocked] = useState(true) // 6.2/6.3: corner pull = SCALE when locked / deform when unlocked
   const nodeInteractedRef = useRef(false) // a node tap just happened → suppress the bubbling surface-click (which would re-select all)
@@ -197,8 +197,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   useEffect(() => {
     if (!open) return
     const st0 = useOutlineStore.getState()
-    // snapshot FIRST — ✕ Close restores exactly this through the one writer (committedShape = resolved)
-    preEditRef.current = { committedShape: st0.committedShape, bgBlur: st0.bgBlur, imageFx: st0.imageFx, artwork: st0.artwork }
+    // snapshot FIRST — ✕ Close restores exactly this. KAI-9075: capture source+adjustments (the
+    // recipe) so discard restores it losslessly via setSource, not a re-baked resolved shape.
+    preEditRef.current = { source: st0.source, adjustments: st0.adjustments, committedShape: st0.committedShape, bgBlur: st0.bgBlur, imageFx: st0.imageFx, artwork: st0.artwork }
     st0.setEditorOpen(true) // §6.3: scene frozen → 3D rebuilds defer to close
     // session view/interaction state reset
     setCurveVal(0)
@@ -551,8 +552,11 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     setConfirmDiscard(false)
     const pe = preEditRef.current
     const st = useOutlineStore.getState()
-    st.commitGeometry(pe.committedShape) // null → back to the born truth (spec.vectorShape)
-    if (st.bgBlur !== pe.bgBlur) st.setBgBlur(pe.bgBlur != null ? pe.bgBlur : 0.5) // revert blend (null ≈ build default)
+    // KAI-9075: restore the RECIPE losslessly (source + adjustments) via the recipe-aware writer —
+    // NOT commitGeometry(resolvedShape), which re-minted anchor ids + reset adjustments to all-off
+    // (that wiped the editable recipe + reversibility and could spawn phantom history).
+    st.setSource(pe.source, pe.adjustments ?? undefined)
+    if (st.bgBlur !== pe.bgBlur) st.setBgBlur(pe.bgBlur) // KAI-9070: restore the EXACT pre-open blur incl. null (no null→0.5 coercion)
     st.setImageFx(pe.imageFx)
     st.setArtwork(pe.artwork)
     setActiveAdjust(null)
