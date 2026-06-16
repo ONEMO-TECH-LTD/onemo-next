@@ -12,7 +12,10 @@
 // Headless proven in node (no DOM) at L0: the unequal-leg corner the hand-rolled filletPathSmart skews
 // rounds SYMMETRICALLY here (arc ends equidistant from the vertex).
 
-import paper from 'paper'
+// Import the HEADLESS core build, NOT 'paper' (= paper-full): paper-full pulls dist/node/self.js, a
+// Node-only shim webpack can't resolve in the browser bundle (build break). paper-core is the same
+// PaperScope minus PaperScript — all the path math we use — and bundles cleanly client + server.
+import paper from 'paper/dist/paper-core'
 import { PaperRoundCorners } from 'paperjs-round-corners'
 import type { VPath, VAnchor } from './types'
 
