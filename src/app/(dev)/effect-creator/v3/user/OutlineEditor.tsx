@@ -18,7 +18,7 @@ import {
 } from '@/lib/outline-core/math'
 // V4 engine (blueprint v4-foundation.md): one impartial resolve(source, adjustments). The editor
 // writes the recipe; the engine owns shape. No corner-pin, no vectoriseTrace, no baked timeline.
-import { mintIds, type GlobalAdjustments, type LocalAdjustment } from '@/lib/effect/outline-resolve'
+import { mintIds } from '@/lib/effect/outline-resolve'
 import { standardBirthShape } from '@/lib/effect/prepare-effect'
 import { useOutlineStore, NEUTRAL_FX, INITIAL_ARTWORK, type ImageFx } from './outlineStore'
 import type { DesignState } from '../types'
@@ -39,6 +39,8 @@ import { DEFAULT_SHAPE_PARAMS } from './editor/chips'
 // R8 (Creator v5) — seam: PRODUCER ADAPTERS (pure source builders) live in editor/producers.
 import { GEN_VECTOR_KINDS, shapePreviewD, vecFromGenerator, vecFromImageFile } from './editor/producers'
 import { useOutlineEditing } from './editor/useOutlineEditing'
+// R8 (Creator v5) — seam: ADJUSTMENT WRITERS (radius/curve/global/blend) live in useEditorAdjustments.
+import { useEditorAdjustments } from './editor/useEditorAdjustments'
 import { useCanvasView } from './editor/useCanvasView'
 import { AdjustSheet, ImageSheet, ShapeSheet, type AdjustSub } from './editor/sheets'
 import { pointInPolygon, type GripId } from './editor/geometry'
@@ -628,66 +630,14 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     }
   }, [hitRing, toViewBox, preview, showAnchors, vshapeRef])
 
-  // ── LOCAL adjustments (Radius / Curve) — keyed by STABLE source id (VD2/VD9), reversible (off →
-  //    exact source corner), PINNED through any global pass. Edits ALWAYS map to a SOURCE id (the
-  //    selected anchor's own id when present — a filleted corner carries its source id (F1) — else the
-  //    NEAREST source anchor). So there is NO bake fallback and globals are never silently reset (F1).
-  const sourceIdForSelection = useCallback((): string | null => {
-    const disp = vshapeRef.current
-    if (!disp || selVA === null) return null
-    const a = disp.paths[0].anchors[selVA]
-    if (!a) return null
-    const src = useOutlineStore.getState().source
-    if (!src) return null
-    const ids = new Set<string>()
-    src.shape.paths.forEach((p) => p.anchors.forEach((x) => { if (x.id) ids.add(x.id) }))
-    if (a.id && ids.has(a.id)) return a.id // direct — source anchor, pinned anchor, or filleted carrying its id
-    let best: string | null = null, bd = Infinity // transient faired anchor → nearest source id (stay on recipe)
-    src.shape.paths.forEach((p) => p.anchors.forEach((x) => {
-      if (!x.id) return
-      const d = (x.p.x - a.p.x) ** 2 + (x.p.y - a.p.y) ** 2
-      if (d < bd) { bd = d; best = x.id }
-    }))
-    return best
-  }, [selVA, vshapeRef])
-
-  /** write a local adjustment onto target source ids (preview or commit). */
-  const writeLocal = useCallback((ids: string[], mut: LocalAdjustment, commit: boolean) => {
-    if (!ids.length) return
-    const adj = useOutlineStore.getState().adjustments
-    const local = { ...adj.local }
-    for (const id of ids) local[id] = { ...local[id], ...mut }
-    const next = { global: adj.global, local }
-    if (commit) applyAdjustments(next); else setPreviewAdj(next)
-  }, [applyAdjustments, setPreviewAdj])
-
-  // RADIUS — a SELECTED corner rounds alone; with NO selection it rounds EVERY corner (whole-shape,
-  // like the old build). 0 = sharp (off), reversible. Targets SOURCE corner ids → pinned through global.
-  const radiusTargets = useCallback((): string[] => {
-    const sel = sourceIdForSelection()
-    if (sel) return [sel]
-    const src = useOutlineStore.getState().source
-    return src ? src.shape.paths.flatMap((p) => p.anchors.filter((a) => a.corner && a.id).map((a) => a.id as string)) : []
-  }, [sourceIdForSelection])
-  const previewRadius = useCallback((v: number) => { setRadius(v); writeLocal(radiusTargets(), { radius: v }, false) }, [writeLocal, radiusTargets])
-  const commitRadius = useCallback((v: number) => {
-    setRadius(v)
-    const t0 = performance.now()
-    writeLocal(radiusTargets(), { radius: v }, true)
-    perfGesture('round-commit', performance.now() - t0)
-  }, [writeLocal, radiusTargets])
-  // CURVE — bend the SELECTED anchor (needs a point selected). 0 = straight (off), 100 = strong.
-  const previewCurve = useCallback((v: number) => { setCurveVal(v); const id = sourceIdForSelection(); if (id) writeLocal([id], { curve: (v / 100) * 2 }, false) }, [writeLocal, sourceIdForSelection])
-  const commitCurve = useCallback((v: number) => {
-    setCurveVal(v)
-    const t0 = performance.now()
-    const id = sourceIdForSelection(); if (id) writeLocal([id], { curve: (v / 100) * 2 }, true)
-    perfGesture('curve-commit', performance.now() - t0)
-  }, [writeLocal, sourceIdForSelection])
-  // "Magic blend" — the soft real-background blur composited behind the subject on the 3D front
-  // texture (the "magic blend" Dan loves). Edit-mode only control; on/off + intensity. Writes the
-  // store's bgBlur (0 = off/sharp · 0..1 = intensity ·  ShapedModel re-composes the front, no re-segment).
-  const writeBlend = useCallback((on: boolean, pct: number) => setBgBlur(on ? pct / 100 : 0), [setBgBlur])
+  // ── ADJUSTMENT WRITERS (R8 seam 2) — Radius/Curve (local, per stable source id), Detail/Smooth/
+  //    Snap/Angle/Line (global axes), and the magic-blend (bgBlur) live in editor/useEditorAdjustments.
+  //    They write the source+adjustments recipe (the resolver owns shaping); selection + the editing-API
+  //    setters are passed in. Swap-test: replace the hook, the recipe-writing contract is unchanged.
+  const {
+    previewRadius, commitRadius, previewCurve, commitCurve,
+    writeBlend, previewGlobal, commitGlobal,
+  } = useEditorAdjustments({ selVA, vshapeRef, applyAdjustments, setPreviewAdj, setBgBlur, setRadius, setCurveVal, setAllSelected })
 
   // Crop grips: pointer-captured on the grip element itself — self-contained, never threads
   // through the surface gesture handlers (stopPropagation keeps move/select-all/pan out).
@@ -742,21 +692,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     perfGesture('stretch-commit', performance.now() - t0)
   }, [transformSource])
 
-  // ── GLOBAL adjustments (Detail / Smooth / Snap / Angle / Line) — INDEPENDENT 0..100 axes written to
-  //    adjustments.global. Slider ticks PREVIEW (the display re-resolves; no commit, no history);
-  //    release COMMITS via applyAdjustments. The fairing + fold guard live in resolve() (VD12) — the
-  //    editor never fits, fairs, or repairs here. Reversible: every axis OFF → exact source.
-  const previewGlobal = useCallback((g: GlobalAdjustments) => {
-    const t0 = performance.now()
-    setPreviewAdj({ global: g, local: useOutlineStore.getState().adjustments.local })
-    perfGesture('tune-tick', performance.now() - t0)
-  }, [setPreviewAdj])
-  const commitGlobal = useCallback((g: GlobalAdjustments) => {
-    const t0 = performance.now()
-    applyAdjustments({ global: g, local: useOutlineStore.getState().adjustments.local })
-    setAllSelected(false)
-    perfGesture('tune-commit', performance.now() - t0)
-  }, [applyAdjustments])
+  // (Global adjustment writers previewGlobal/commitGlobal moved to useEditorAdjustments — R8 seam 2.)
 
   // KAI-9023: a NEW shaped spec landing mid-session (editor-dock Magic) re-seeds the source from the
   // fresh raw marching-squares polygon (all-off = raw); the session stays open.
