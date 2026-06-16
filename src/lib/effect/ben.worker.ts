@@ -41,14 +41,18 @@ const resolveModel = (key?: string) => (key && MODELS[key]) || DEFAULT_MODEL
 // model's documented preprocess (resize + /max + mean/std normalize) and postprocess (saliency →
 // min-max → alpha → full-res RGBA matte). All MIT/Apache (free, commercial-OK). Weights mirrored on HF.
 type RembgSpec = { url: string; size: number; mean: [number, number, number]; std: [number, number, number] }
-const REMBG_HOST = 'https://huggingface.co/tomjackson2023/rembg/resolve/main'
+// PRODUCTION trio weights are SELF-HOSTED same-origin under public/seg-models (committed; served by
+// Vercel /public) — no third-party fetch, works offline, and the silueta fallback loads fast (no
+// cold-CDN timeout → flood-fill). The test-only comparison models (u2net/isnet) stay on the HF CDN.
+const SEG_HOST = '/seg-models'                                              // self-hosted (production)
+const REMBG_HOST = 'https://huggingface.co/tomjackson2023/rembg/resolve/main' // CDN (test harness only)
 const REMBG: Record<string, RembgSpec> = {
   // U^2-Net family — input 320, ImageNet mean/std
-  silueta: { url: `${REMBG_HOST}/silueta.onnx`, size: 320, mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] },
-  u2netp:  { url: `${REMBG_HOST}/u2netp.onnx`,  size: 320, mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] },
-  u2net:   { url: `${REMBG_HOST}/u2net.onnx`,   size: 320, mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] },
+  silueta: { url: `${SEG_HOST}/silueta.onnx`,   size: 320, mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }, // self-hosted (fallback)
+  u2netp:  { url: `${SEG_HOST}/u2netp.onnx`,    size: 320, mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }, // self-hosted (primary)
+  u2net:   { url: `${REMBG_HOST}/u2net.onnx`,   size: 320, mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }, // harness only
   // IS-Net (DIS general-use) — input 1024, 0.5/1.0 normalize
-  isnet:   { url: `${REMBG_HOST}/isnet-general-use.onnx`, size: 1024, mean: [0.5, 0.5, 0.5], std: [1.0, 1.0, 1.0] },
+  isnet:   { url: `${REMBG_HOST}/isnet-general-use.onnx`, size: 1024, mean: [0.5, 0.5, 0.5], std: [1.0, 1.0, 1.0] },   // harness only
 }
 
 // PRODUCTION CUT-OUT CHAIN (Dan, 2026-06-16). Default (no `?seg=`) runs the free, mobile-fit trio:
@@ -102,19 +106,20 @@ function getSegmenter(onProgress: (state: string) => void, model: SegModel) {
   return p
 }
 
-// ── rembg raw-ONNX inference (CDN-loaded onnxruntime-web, WASM EP) ───────────────────────────────
-// transformers.js bundles a private DEV build of ORT (not exported, not on any CDN, wasm not servable
-// for raw use), so we load a STABLE onnxruntime-web from jsdelivr at runtime (webpackIgnore keeps the
-// bundler out). Its wasm is CDN-served WITH cross-origin-resource-policy, so it passes our COEP. WASM
-// EP only (U^2-Net / IS-Net ops are wasm-safe; avoids the ORT-web WebGPU shader bug BiRefNet hit).
-const ORT_CDN = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/'
+// ── rembg raw-ONNX inference (SELF-HOSTED onnxruntime-web, WASM EP) ───────────────────────────────
+// transformers.js bundles a private DEV build of ORT (not exported, not servable for raw use), so we
+// load a stable onnxruntime-web 1.21.0 that we MIRROR same-origin under public/ort (ort.wasm.min.mjs +
+// ort-wasm-simd-threaded.{mjs,wasm}). webpackIgnore keeps the bundler out of the runtime import. Being
+// same-origin it passes COEP automatically, needs no third-party uptime, and works offline. WASM EP
+// only (U^2-Net / IS-Net ops are wasm-safe; avoids the ORT-web WebGPU shader bug BiRefNet hit).
+const ORT_BASE = '/ort/' // self-hosted, same-origin (public/ort)
 interface OrtSession { inputNames: string[]; outputNames: string[]; run: (feeds: Record<string, unknown>) => Promise<Record<string, { data: Float32Array }>> }
 interface OrtModule { InferenceSession: { create: (b: Uint8Array, o: unknown) => Promise<OrtSession> }; Tensor: new (t: string, d: Float32Array, dims: number[]) => unknown; env: { wasm: { wasmPaths: string; numThreads: number } } }
 let ortMod: Promise<OrtModule> | null = null
 function getOrt(): Promise<OrtModule> {
   if (!ortMod) ortMod = (async () => {
-    const ort = await import(/* webpackIgnore: true */ `${ORT_CDN}ort.wasm.min.mjs`) as unknown as OrtModule
-    ort.env.wasm.wasmPaths = ORT_CDN
+    const ort = await import(/* webpackIgnore: true */ `${ORT_BASE}ort.wasm.min.mjs`) as unknown as OrtModule
+    ort.env.wasm.wasmPaths = ORT_BASE
     // Single-threaded: threaded WASM spawns nested worker-threads which DEADLOCK inside this Web
     // Worker (inference hangs at "Cutting out…"). 1 thread is reliable + still fast for 320² U^2-Net.
     ort.env.wasm.numThreads = 1
