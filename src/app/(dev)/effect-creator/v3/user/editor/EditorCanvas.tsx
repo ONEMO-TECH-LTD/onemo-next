@@ -77,11 +77,26 @@ export function EditorCanvas(props: EditorCanvasProps) {
     onVAnchorDown, onVHandleDown, onVAnchorDouble, beginStretch, moveStretch, endStretch, beginRotateHandle,
   } = props
 
-  // Desktop rotate handle — a grip on a short stem above the outline, shown when all anchors are selected.
+  // Rotate handle — a grip on a short stem off the outline, shown when all anchors are selected.
+  // SAFE-AREA (Pixel QA REWORK): the TopBar + bottom dock float over a full-bleed canvas, so a handle
+  // placed above an outline whose top sits near the viewBox top renders UNDER the top chrome and can't
+  // be grabbed (repro: stretch a tall outline upward, then select-all). Prefer ABOVE; if there's no
+  // chrome-safe room above, FLIP below the outline; always clamp the grip inside the visible viewBox so
+  // it never hides under the top bar or the bottom dock. Rotation is about the bbox centre regardless.
   let rotHandle: { bx: number; by: number; hy: number } | null = null
   if (allSelected && !preview && hitRing.length) {
     const bx = (hitBBox.minX + hitBBox.maxX) / 2
-    rotHandle = { bx, by: hitBBox.minY, hy: hitBBox.minY - nodeR * 4 }
+    const vbTop = view.vy
+    const vbH = imgH / view.scale
+    const guard = Math.max(nodeR * 6, vbH * 0.08) // chrome-safe inset at top/bottom of the visible canvas
+    const aboveHy = hitBBox.minY - nodeR * 4
+    if (aboveHy >= vbTop + guard) {
+      rotHandle = { bx, by: hitBBox.minY, hy: aboveHy } // room above the outline — default
+    } else {
+      // tall/stretched outline near the top: flip the handle below, clamped above the bottom dock
+      const belowHy = Math.min(hitBBox.maxY + nodeR * 4, vbTop + vbH - guard)
+      rotHandle = { bx, by: hitBBox.maxY, hy: belowHy }
+    }
   }
   // live direct-manipulation transform on the outline group (stretch / rotate / move) — real-time, no doc rebuild
   const liveXform = stretchLive
