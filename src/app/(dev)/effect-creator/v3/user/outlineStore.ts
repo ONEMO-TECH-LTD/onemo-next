@@ -69,13 +69,15 @@ interface OutlineStore {
   setArtwork: (d: DesignState) => void
 }
 
-/** Derive the consumer projection from the current truth. The ONE place resolve→contour runs for
- *  the store (a commit that can't derive a contour is refused loudly — no silent half-commit). */
-function derive(source: OutlineSource | null, adjustments: OutlineAdjustments): { committedShape: VShape | null; committedContourMM: Contour | null } {
-  if (!source) return { committedShape: null, committedContourMM: null }
+type DeriveResult = { committedShape: VShape; committedContourMM: Contour }
+/** Derive the consumer projection from a NON-NULL source. Returns null ⇔ the contour can't derive —
+ *  the caller then REFUSES the commit (R9 fail-closed: the editor truth never advances past a null
+ *  projection, so source/adjustments and committedShape/contour can never desync). The "cleared"
+ *  (null source) case is handled explicitly by each writer below, not here. */
+function derive(source: OutlineSource, adjustments: OutlineAdjustments): DeriveResult | null {
   const shape = resolve(source, adjustments)
   const contour = contourFromShape(shape, { mmPerPx: source.mmPerPx, maskHeightPx: source.maskHeightPx })
-  if (!contour) { console.error('[outlineStore] derive: contour derivation failed — refusing commit'); return { committedShape: null, committedContourMM: null } }
+  if (!contour) { console.error('[outlineStore] derive: contour derivation failed — refusing commit (R9 fail-closed)'); return null }
   return { committedShape: shape, committedContourMM: contour }
 }
 
@@ -90,11 +92,17 @@ export const useOutlineStore = create<OutlineStore>((set, get) => ({
 
   setSource: (source, adjustments) => {
     const adj = adjustments ?? { global: { ...ADJUSTMENTS_OFF.global }, local: {} }
-    set({ source, adjustments: adj, ...derive(source, adj) })
+    if (!source) { set({ source: null, adjustments: adj, committedShape: null, committedContourMM: null }); return }
+    const d = derive(source, adj)
+    if (!d) return // R9 fail-closed: a null-contour derive must not advance editor truth
+    set({ source, adjustments: adj, ...d })
   },
   setAdjustments: (adjustments) => {
     const source = get().source
-    set({ adjustments, ...derive(source, adjustments) })
+    if (!source) { set({ adjustments, committedShape: null, committedContourMM: null }); return }
+    const d = derive(source, adjustments)
+    if (!d) return // R9 fail-closed: truth + projection can never desync
+    set({ adjustments, ...d })
   },
   commitGeometry: (v, klass) => {
     if (!v) { set({ source: null, adjustments: { global: { ...ADJUSTMENTS_OFF.global }, local: {} }, committedShape: null, committedContourMM: null }); return }
@@ -102,7 +110,9 @@ export const useOutlineStore = create<OutlineStore>((set, get) => ({
     if (!spec) { console.error('[outlineStore] commitGeometry: no spec — cannot wrap a source'); return }
     const source: OutlineSource = { shape: mintIds(v), klass: klass ?? 'generated', mmPerPx: spec.mmPerPx, maskHeightPx: spec.maskHeightPx }
     const adj = { global: { ...ADJUSTMENTS_OFF.global }, local: {} }
-    set({ source, adjustments: adj, ...derive(source, adj) })
+    const d = derive(source, adj)
+    if (!d) return // R9 fail-closed
+    set({ source, adjustments: adj, ...d })
   },
 
   bgBlur: null,
