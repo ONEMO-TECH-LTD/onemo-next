@@ -26,7 +26,11 @@ import {
   repairSimplePolygon,
   type Vec2Px,
 } from '@/lib/outline-core/math'
-import { flattenPath, filletPathSmart, scaleAnchorTension, type VShape, type VPath, type VAnchor } from '@/lib/vector-core'
+import { flattenPath, scaleAnchorTension, type VShape, type VPath, type VAnchor } from '@/lib/vector-core'
+// L1 (DEC-v5-02): Radius rounds via the Paper.js headless kernel (true constant-radius arc, symmetric
+// on unequal legs) — imported directly (not via the vector-core barrel) so Paper stays in the create
+// bundle only, never the v1/v2/shaped bundles.
+import { roundCornersPaper } from '@/lib/vector-core/paper-kernel'
 import type { Pt } from './types'
 
 export type OutlineClass = 'generated' | 'stock' | 'upload' | 'drawn'
@@ -291,7 +295,7 @@ function localPass(shape: VShape, local: Record<string, LocalAdjustment>): VShap
       for (const [id, l] of Object.entries(local)) {
         if (!l || (l.radius ?? 0) <= 0) continue
         const idx = p.anchors.findIndex((a) => a.id === id && a.corner)
-        if (idx >= 0) p = filletPathSmart(p, l.radius!, (ai) => ai === idx)
+        if (idx >= 0) p = roundCornersPaper(p, l.radius!, (ai) => ai === idx) // L1: true-arc, symmetric
       }
       return p
     }),
