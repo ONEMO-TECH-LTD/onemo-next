@@ -4,6 +4,13 @@
 // extrudes the same mm outline the editor shows and the cutline uses (silhouette parity); the
 // textures ARE the same composite (composite parity). It never builds geometry from the image.
 //
+// (R7 — Creator v5) PROP-PURE: this renders from PROPS ALONE — it no longer reaches into the
+// outlineStore. The editor↔3D bridge (committedShape / committedContourMM / editorOpen / bgBlur /
+// imageFx) is read by <ShapedModelBridge> and handed down as props ("bridge translates, viewer
+// renders"). The geometry derivation (vectorTrueContour) is a pure function — the resolved vector is
+// passed in, never fetched from global state. Swap-test holds: re-implement this contract and nothing
+// else changes (North Star module 8).
+//
 // V3 contracts honoured here:
 //  • §6.1 no blank mount — `invalidate()` fires on every async content arrival (mesh built, texture
 //    swapped), so demand-frameloop renders the object the moment it exists.
@@ -25,7 +32,7 @@ import { EFFECT_BUILD_CONFIG, type PreparedEffect } from '@/lib/effect/prepare-e
 import { buildMeshFromSpec } from '@/lib/effect/build-mesh'
 import { buildShapedGeometry } from '@/lib/effect/mesh'
 import { composeFront } from '@/lib/effect/composite'
-import { useOutlineStore } from '../../user/outlineStore'
+import type { ImageFx } from '../../user/outlineStore'
 import { perfGesture } from '../../dev/PerfHUD'
 
 interface ShapedModelProps {
@@ -38,6 +45,17 @@ interface ShapedModelProps {
   /** world size (scene units) the effect's longest side maps to. Tuned to match golden framing. */
   fitSize?: number
   onStatus?: (status: 'idle' | 'building' | 'ready' | 'error', message?: string) => void
+  // ── editor↔3D bridge inputs (R7: passed in by ShapedModelBridge; this component never reads the store) ──
+  /** = resolve(source, adjustments): the edited display vector, or null when unedited. Tessellated at display grade. */
+  committedShape: VShape | null
+  /** = contourFromShape(committedShape) @ 0.05mm: the edited contour, or null when unedited. */
+  committedContourMM: Contour | null
+  /** while true the editor overlay is open + the scene frozen → mesh rebuilds defer to the close boundary. */
+  editorOpen: boolean
+  /** live magic-blend intensity (null = build default on). */
+  bgBlur: number | null
+  /** live image adjustments (null = neutral). */
+  imageFx: ImageFx | null
 }
 
 const texCache = new Map<string, THREE.Texture>()
@@ -57,9 +75,11 @@ function loadTex(url: string | undefined) {
  * EVERY design, not just edited ones (#18: truth is born at generation, so a fresh Magic shape
  * tessellates from its true curves too). Display-grade 0.004 mm chords (adaptive — straights
  * never subdivide), decoupled from the 0.05 mm manufacturing flatten.
+ *
+ * (R7) PURE: the vector to tessellate (`vs` — the committed edit, else the spec's born vector) is
+ * passed IN by the caller; this helper no longer reads global state.
  */
-function vectorTrueContour(fallback: Contour, sp: { vectorShape?: VShape; mmPerPx: number; maskHeightPx: number }): Contour {
-  const vs = useOutlineStore.getState().committedShape ?? sp.vectorShape
+function vectorTrueContour(fallback: Contour, vs: VShape | null | undefined, sp: { mmPerPx: number; maskHeightPx: number }): Contour {
   if (!vs) return fallback
   const k = sp.mmPerPx || 1
   try {
@@ -92,16 +112,27 @@ export default function ShapedModel({
   backColor,
   fitSize = 0.09,
   onStatus,
+  committedShape,
+  committedContourMM,
+  editorOpen,
+  bgBlur,
+  imageFx,
 }: ShapedModelProps) {
   const [result, setResult] = useState<{ geometry: THREE.BufferGeometry; texture: THREE.CanvasTexture; edgeTexture: THREE.CanvasTexture; widthMM: number; heightMM: number } | null>(null)
   const artTexRef = useRef<THREE.CanvasTexture | null>(null)
-  const committedContourMM = useOutlineStore((s) => s.committedContourMM)
-  const editorOpen = useOutlineStore((s) => s.editorOpen)
-  const bgBlur = useOutlineStore((s) => s.bgBlur)
-  const imageFx = useOutlineStore((s) => s.imageFx)
   const frontSrcRef = useRef<{ origCanvas: HTMLCanvasElement; subjCanvas: HTMLCanvasElement; defaultBlurPx: number } | null>(null)
   const resultRef = useRef(result)
   useEffect(() => { resultRef.current = result }, [result])
+
+  // (R7) Latest-value mirrors of the committed geometry props. The [prepared] build effect runs only
+  // on a prepared change but must use the CURRENT committed edit (e.g. a snapshot restore installs a
+  // new prepared AND a committed shape together) — refs give it the latest value without re-firing on
+  // every edit (the deferred-rebuild effects below own per-edit rebuilds). Replaces the old
+  // getState() reads with prop-sourced refs, preserving the exact timing.
+  const committedShapeRef = useRef(committedShape)
+  useEffect(() => { committedShapeRef.current = committedShape }, [committedShape])
+  const committedContourRef = useRef(committedContourMM)
+  useEffect(() => { committedContourRef.current = committedContourMM }, [committedContourMM])
 
   // §6.1: demand frameloop — force a render whenever the built mesh/texture changes, else the scene
   // can sit BLANK until a user interaction invalidates (the V2 blank-on-mount class).
@@ -112,14 +143,13 @@ export default function ShapedModel({
   // G2: anisotropic filtering on the front texture (sharp artwork at grazing angles).
   const maxAniso = useMemo(() => Math.min(8, gl.capabilities.getMaxAnisotropy?.() ?? 1), [gl])
 
-  // Build the mesh from the prepared effect (ONE engine — no image build here). If the editor has
-  // already committed an edited outline for THIS spec, build from that so the object reflects the edit.
+  // Build the mesh from the prepared effect (ONE engine — no image build here). If a committed edited
+  // outline exists for THIS spec, build from that so the object reflects the edit (refs = latest).
   useEffect(() => {
     onStatus?.('building')
     const t0 = performance.now()
     try {
-      const ed = useOutlineStore.getState().committedContourMM
-      const geom = vectorTrueContour(ed ?? prepared.spec.geometryMM, prepared.spec)
+      const geom = vectorTrueContour(committedContourRef.current ?? prepared.spec.geometryMM, committedShapeRef.current ?? prepared.spec.vectorShape, prepared.spec)
       const r = buildMeshFromSpec(geom, meshOpts(prepared), prepared.composite, prepared.edgeComposite)
       r.texture.anisotropy = maxAniso
       setResult((prev) => {
@@ -134,14 +164,15 @@ export default function ShapedModel({
       console.error('[effect] mesh build failed:', e)
       onStatus?.('error', (e as Error)?.message ?? 'build failed')
     }
-    // Build ONLY on prepared change (onStatus is an unstable inline callback — excluded by design).
+    // Build ONLY on prepared change (onStatus is an unstable inline callback — excluded by design;
+    // committed* are read via refs so edits don't re-fire this build — the deferred effects own that).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prepared])
 
   // editor → 3D, DEFERRED to the editor boundary (§6.3): while the overlay is open the scene is
   // frozen, so rebuilding per commit is wasted work. Track the latest committed contour; when the
   // editor CLOSES (editorOpen flips false) with a pending edit, fire ONE rebuild.
-  const pendingContourRef = useRef<typeof committedContourMM>(null)
+  const pendingContourRef = useRef<Contour | null>(null)
   const pendingBaseRef = useRef(false) // a restore-to-UNEDITED arrived while the editor was open
   useEffect(() => {
     if (!committedContourMM) {
@@ -175,19 +206,17 @@ export default function ShapedModel({
   }, [editorOpen])
 
   function rebuildFromBase() {
-    const sp = useOutlineStore.getState().spec
-    if (!sp) return
-    rebuildFromContour(sp.geometryMM)
+    rebuildFromContour(prepared.spec.geometryMM)
   }
 
-  function rebuildFromContour(contour: NonNullable<typeof committedContourMM>) {
+  function rebuildFromContour(contour: Contour) {
     const prev = resultRef.current
-    const sp = useOutlineStore.getState().spec
-    if (!prev || !sp) return
+    if (!prev) return
+    const sp = prepared.spec
     const t0 = performance.now()
     let built: { geometry: THREE.BufferGeometry; widthMM: number; heightMM: number }
     try {
-      built = buildShapedGeometry(vectorTrueContour(contour, sp), {
+      built = buildShapedGeometry(vectorTrueContour(contour, committedShapeRef.current, sp), {
         thicknessMM: EFFECT_BUILD_CONFIG.thicknessMM,
         edgeRadiusMM: EFFECT_BUILD_CONFIG.edgeRadiusMM,
         edgeSegments: EFFECT_BUILD_CONFIG.edgeSegments,

@@ -7,7 +7,7 @@ import { OrbitControls, Environment, useGLTF } from '@react-three/drei'
 import React, { Suspense, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import EffectModel from './EffectModel'
-import ShapedModel from './shaped/ShapedModel'
+import ShapedModelBridge from './shaped/ShapedModelBridge'
 import type { ViewerConfig, DesignState } from '../types'
 import type { SuedeMaterialParams } from '@/lib/effect/types'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
@@ -328,7 +328,7 @@ export default function EffectViewer({
           ) : null}
           {shaped ? (
             prepared ? (
-              <ShapedModel
+              <ShapedModelBridge
                 prepared={prepared}
                 designState={designState}
                 scene={config.scene}
