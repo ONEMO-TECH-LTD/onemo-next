@@ -46,7 +46,6 @@ function PrototypePageInner() {
   const [editorMode, setEditorMode] = useState<'shape' | 'image' | null>(null) // #27 + KAI-9027
   const [autoOutline, setAutoOutline] = useState(false) // false = standard square; true = Magic cut-out
   const [generating, setGenerating] = useState(false)
-  const [genLabel, setGenLabel] = useState('Cutting out…') // G5 honest progress
   const designState = useOutlineStore((s) => s.artwork) // #28: lifted — scene + editor share it
   const setDesignState = useCallback((upd: DesignState | ((prev: DesignState) => DesignState)) => {
     const st = useOutlineStore.getState()
@@ -229,12 +228,12 @@ function PrototypePageInner() {
     const preMagic = snapNow() // #23: one Magic = one global undo step (pushed only on success)
     const runId = ++magicRunRef.current
     setGenerating(true)
-    setGenLabel('Cutting out…')
     import('@/lib/effect/prepare-effect')
       .then(({ prepareEffect }) =>
+        // Progress text is intentionally silent (Dan, 2026-06-16: no "Downloading…/Cutting out…"
+        // captions). The shimmer animation alone signals work; only the honest fallback still toasts.
         prepareEffect(artworkUrl, 'shaped', undefined, (s) => {
           if (s === 'fallback') toast('warn', 'AI cut-out unavailable — used the simple background cut instead') // G4
-          else setGenLabel(s === 'downloading-model' ? 'Downloading the magic… (one-time)' : 'Cutting out…')
         }),
       )
       .then((p) => {
@@ -336,7 +335,7 @@ function PrototypePageInner() {
       {!artworkUrl && <EmptyState onFile={handleFile} />}
 
       {/* Magic shimmer — page stays responsive (worker); label = the honest wait state (G5) */}
-      {generating && <GenerateShimmer label={genLabel} onCancel={() => { magicRunRef.current++; setGenerating(false) }} />}
+      {generating && <GenerateShimmer onCancel={() => { magicRunRef.current++; setGenerating(false) }} />}
 
       {/* Trim takeover (D-TRIM): the creation row swaps to the material-color carousel — tap
           recolors the 3D back LIVE; ✓ keeps (one history step), ✕ reverts to the pre-open color */}
