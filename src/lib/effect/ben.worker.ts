@@ -51,6 +51,18 @@ const REMBG: Record<string, RembgSpec> = {
   isnet:   { url: `${REMBG_HOST}/isnet-general-use.onnx`, size: 1024, mean: [0.5, 0.5, 0.5], std: [1.0, 1.0, 1.0] },
 }
 
+// PRODUCTION CUT-OUT CHAIN (Dan, 2026-06-16). Default (no `?seg=`) runs the free, mobile-fit trio:
+//   u2netp (4 MB primary) → silueta (44 MB fallback) → [throw → prepare-effect flood-fill].
+// Silueta is LAZY: it's only fetched/created when u2netp errors first (the chain loop only calls
+// runRembg(silueta) after runRembg(u2netp) throws), so the 44 MB never lands on the device unless
+// the primary actually fails. `?seg=<model>` overrides with a single model (the comparison harness);
+// ben2 / birefnet (or an unknown key) → null → the transformers.js path (getSegmenter).
+function resolveChain(seg?: string): RembgSpec[] | null {
+  if (!seg) return [REMBG.u2netp, REMBG.silueta] // production default trio
+  if (REMBG[seg]) return [REMBG[seg]]            // explicit single rembg model (test harness)
+  return null                                    // ben2 / birefnet → transformers path
+}
+
 // Worker global — typed loosely to avoid DOM/WebWorker lib conflicts in the shared tsconfig.
 const ctx: { onmessage: ((e: MessageEvent) => void) | null; postMessage: (msg: unknown, transfer?: Transferable[]) => void } =
   self as unknown as typeof ctx
@@ -166,7 +178,12 @@ async function runRembg(imageUrl: string, spec: RembgSpec, onProgress: (s: strin
   dctx.drawImage(bmp, 0, 0, ow, oh)
   const rgb = dctx.getImageData(0, 0, ow, oh).data
   const rgba = new Uint8ClampedArray(ow * oh * 4)
-  for (let i = 0, n = ow * oh; i < n; i++) { rgba[i * 4] = rgb[i * 4]; rgba[i * 4 + 1] = rgb[i * 4 + 1]; rgba[i * 4 + 2] = rgb[i * 4 + 2]; rgba[i * 4 + 3] = alpha[i * 4 + 3] }
+  let subj = 0
+  for (let i = 0, n = ow * oh; i < n; i++) { rgba[i * 4] = rgb[i * 4]; rgba[i * 4 + 1] = rgb[i * 4 + 1]; rgba[i * 4 + 2] = rgb[i * 4 + 2]; rgba[i * 4 + 3] = alpha[i * 4 + 3]; if (alpha[i * 4 + 3] > 128) subj++ }
+  // Degenerate guard: an empty (subject not found) or full-frame matte is not a usable cut — treat as
+  // a failure so the chain falls back to the next model (e.g. u2netp → Silueta).
+  const frac = subj / (ow * oh)
+  if (frac < 0.005 || frac > 0.995) throw new Error('rembg-degenerate:' + frac.toFixed(3))
   return { data: rgba, width: ow, height: oh }
 }
 
@@ -180,14 +197,21 @@ interface RawImageData {
 ctx.onmessage = async (e: MessageEvent<{ id: number; url: string; preload?: boolean; seg?: string }>) => {
   const { id, url } = e.data
   const model = resolveModel(e.data.seg)
-  const rspec = e.data.seg ? REMBG[e.data.seg] : undefined // rembg raw-ONNX model selected?
+  const chain = resolveChain(e.data.seg) // rembg trio (default) / single rembg model / null → transformers
   // PRELOAD (SHORTLIST #31): DOWNLOAD-ONLY warm-up — fetch the weights into the browser cache
   // with ZERO GPU work. Initializing the webgpu session here drops the golden scene's WebGL
   // context at page boot ("THREE.WebGLRenderer: Context Lost" — reproduced live, Dan's freeze).
   // The GPU session still initializes at the first real Magic press (proven safe on a live scene);
   // by then the files are local, so the wait collapses to session init only.
   if (e.data.preload) {
-    if (rspec) { ctx.postMessage({ id, ok: true, preloaded: true }); return } // rembg models warm on first run
+    if (chain) {
+      // Warm ONLY the primary (chain[0] = u2netp). rembg runs on the WASM EP (no GPU session), so
+      // creating the session here is safe (no WebGL context loss) and makes the first Magic instant.
+      // The fallback (silueta) is deliberately NOT warmed — it stays un-fetched until u2netp errors.
+      try { await getRembgSession(chain[0], (s) => ctx.postMessage({ id, progress: s })) } catch { /* best-effort warm */ }
+      ctx.postMessage({ id, ok: true, preloaded: true })
+      return
+    }
     try {
       const mod = await import('@huggingface/transformers')
       mod.env.allowLocalModels = true
@@ -211,10 +235,22 @@ ctx.onmessage = async (e: MessageEvent<{ id: number; url: string; preload?: bool
     return
   }
   try {
-    if (rspec) {
-      const r = await runRembg(url, rspec, (s) => ctx.postMessage({ id, progress: s }))
-      ctx.postMessage({ id, ok: true, data: r.data.buffer, width: r.width, height: r.height }, [r.data.buffer])
-      return
+    if (chain) {
+      // Run the chain in order; the FIRST model that produces a usable cut wins. A throw (load error
+      // or degenerate matte) falls through to the next model — which is what makes silueta lazy: its
+      // weights are only fetched here, inside runRembg, after u2netp has already failed. If every
+      // model fails we rethrow the last error, and prepare-effect's catch drops to flood-fill.
+      let lastErr: unknown
+      for (const spec of chain) {
+        try {
+          const r = await runRembg(url, spec, (s) => ctx.postMessage({ id, progress: s }))
+          ctx.postMessage({ id, ok: true, data: r.data.buffer, width: r.width, height: r.height }, [r.data.buffer])
+          return
+        } catch (err) {
+          lastErr = err // try the next model in the chain (e.g. u2netp → silueta)
+        }
+      }
+      throw lastErr ?? new Error('rembg-chain-empty')
     }
     const segmenter = await getSegmenter((state) => ctx.postMessage({ id, progress: state }), model)
     ctx.postMessage({ id, progress: 'cutting' })
