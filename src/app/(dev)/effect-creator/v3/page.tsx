@@ -185,15 +185,11 @@ function PrototypePageInner() {
     if (!file.type.startsWith('image/')) return
     if (artworkUrl?.startsWith('blob:')) URL.revokeObjectURL(artworkUrl)
     const url = URL.createObjectURL(file)
-    // PRESERVE-AT-INGEST (plan §B5, Dan: original kept untouched in any event): the raw file goes
-    // to disk the moment it enters — content-hash keyed, idempotent, fire-and-forget. The byte
-    // hash lands on the spec so the manufacturing record identifies the REAL source bytes.
-    const fd = new FormData()
-    fd.append('file', file)
-    sourceShaRef.current = null // new photo → identity unknown until its ingest resolves
-    const ingest = fetch('/api/dev/originals', { method: 'POST', body: fd })
-      .then((r) => r.json() as Promise<{ saved: boolean; sha256?: string }>)
-      .catch(() => ({ saved: false as const, sha256: undefined }))
+    // Source-byte storage is DEFERRED to order / save-for-later (Dan, 2026-06-16: don't store every
+    // uploaded image — privacy + cost). This supersedes the old preserve-at-INGEST (§B5), whose
+    // dev-disk write can't run on Vercel's read-only serverless FS anyway (the "Original-photo backup
+    // failed" banner). The manufacturing record captures the real source bytes + hash at order/save.
+    sourceShaRef.current = null // identity captured later, at order/save
     setArtworkUrl(url)
     setDesignState(INITIAL_ARTWORK)
     setAutoOutline(false) // new image → the standard square; Magic opts into the cut-out
@@ -203,11 +199,8 @@ function PrototypePageInner() {
     // instant standard square through the ONE engine — the object is real in the scene immediately
     import('@/lib/effect/prepare-effect')
       .then(({ prepareEffect }) => prepareEffect(url, 'standard'))
-      .then(async (p) => {
-        const ing = await ingest
-        if (ing.saved && ing.sha256) { sourceShaRef.current = ing.sha256; p.spec.sourceBytesSha256 = ing.sha256 }
-        else toast('warn', 'Original-photo backup failed — the design still works; re-upload to retry')
-        setPrepared(p)
+      .then((p) => {
+        setPrepared(p) // render immediately — no longer gated on a backup round-trip
         useOutlineStore.getState().setSpec(p.spec) // hand the standard outline to the 2D editor
         // #23: a new image starts a fresh history; this state is the Reset baseline
         baselineRef.current = {
