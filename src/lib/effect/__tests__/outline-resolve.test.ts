@@ -85,14 +85,28 @@ describe('V4 resolve — fold guard (VD12): never emits a self-crossing ring', (
   })
 })
 
-describe('V4 resolve — detail and smooth are INDEPENDENT axes', () => {
-  test('changing detail alone leaves smoothing untouched (no coupling)', () => {
+describe('V4 resolve — detail and smooth are INDEPENDENT axes (L2: Paper simplify + catmull)', () => {
+  // L2 (DEC-v5-02): output is now SPARSE CURVES (Paper simplify sets anchor points, catmull sets
+  // handles). The density measure is therefore ANCHOR count, not flattened-point count (a straight-anchor
+  // proxy that's meaningless once Detail emits curves) — Pixel QA-confirmed test update.
+  const nAnchors = (sh: VShape) => sh.paths[0].anchors.length
+  test('detail = sparse anchor density (independent of smooth); no point-explosion', () => {
+    // a curved source flattens dense, so simplify has real range to thin (a straight polygon can't show it)
+    const s = source(roundedSquare(), 'stock')
+    const hi = resolve(s, { global: { ...GLOBAL_OFF, detail: 99, smooth: 0 }, local: {} })
+    const lo = resolve(s, { global: { ...GLOBAL_OFF, detail: 10, smooth: 0 }, local: {} })
+    expect(nAnchors(hi)).toBeGreaterThanOrEqual(nAnchors(lo)) // more detail ⇒ more (or equal) anchors
+    expect(nAnchors(hi)).toBeLessThan(80) // SPARSE curves — never the old 12→900+ dense chain (no explosion)
+  })
+  test('order detail→smooth: smooth sets handle roundness only — no extra anchors (QA-confirmed Paper order)', () => {
     const s = source(notchedSquare())
-    // smooth fixed at 0; detail down → fewer points, but NO gaussian rounding introduced
-    const d100 = resolve(s, { global: { ...GLOBAL_OFF, detail: 100, smooth: 0, snap: 0 }, local: {} })
-    const d40 = resolve(s, { global: { ...GLOBAL_OFF, detail: 40, smooth: 0, snap: 0 }, local: {} })
-    // detail 40 simplifies (≤ the count at full detail), proving detail = density, independent of smooth
-    expect(flat(d40).length).toBeLessThanOrEqual(flat(d100).length)
+    const detailOnly = resolve(s, { global: { ...GLOBAL_OFF, detail: 50, smooth: 0 }, local: {} })
+    const detailSmooth = resolve(s, { global: { ...GLOBAL_OFF, detail: 50, smooth: 100 }, local: {} })
+    // catmull smooth moves HANDLES, never adds points — same sparse anchor set as detail-only
+    expect(nAnchors(detailSmooth)).toBe(nAnchors(detailOnly))
+    // smooth 100 produces real curve handles and visibly changes the rendered outline; detail-only doesn't smooth
+    expect(detailSmooth.paths[0].anchors.some((a) => !!a.hIn || !!a.hOut)).toBe(true)
+    expect(flat(detailSmooth)).not.toEqual(flat(detailOnly))
   })
 })
 

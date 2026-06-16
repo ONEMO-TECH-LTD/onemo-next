@@ -16,21 +16,21 @@
 //     fails closed (backs smooth/detail off, else returns the last valid ring). The resolver never emits
 //     a folded/cracked shape — the old "fair first, repair later" pattern is banned.
 //
-// Reuses outline-core pure math (fairTracedRing/rdpClosed/validateSelfIntersection/repairSimplePolygon)
-// and vector-core ops (flattenPath/filletPathSmart/scaleAnchorTension); does NOT revive OutlineDocument.
+// Reuses outline-core pure math (validateSelfIntersection/repairSimplePolygon) and the Paper.js kernel
+// (simplify/smooth/round — DEC-v5-02) behind vector-core ops (flattenPath/scaleAnchorTension); does NOT
+// revive OutlineDocument. The geometry MATH is bought (Paper); angle/snap/line stay in-house (no kernel op).
 
 import {
-  fairTracedRing,
-  rdpClosed,
   validateSelfIntersection,
   repairSimplePolygon,
   type Vec2Px,
 } from '@/lib/outline-core/math'
-import { flattenPath, scaleAnchorTension, type VShape, type VPath, type VAnchor } from '@/lib/vector-core'
-// L1 (DEC-v5-02): Radius rounds via the Paper.js headless kernel (true constant-radius arc, symmetric
-// on unequal legs) — imported directly (not via the vector-core barrel) so Paper stays in the create
-// bundle only, never the v1/v2/shaped bundles.
-import { roundCornersPaper } from '@/lib/vector-core/paper-kernel'
+import { flattenPath, scaleAnchorTension, type VShape, type VPath } from '@/lib/vector-core'
+// L1/L2 (DEC-v5-02): the geometry MATH is the Paper.js headless kernel — Radius (true constant-radius
+// arc, symmetric on unequal legs), Smooth (catmull-rom handles), Detail (simplify → sparse curves).
+// Imported directly (not via the vector-core barrel) so Paper stays in the create bundle only, never
+// the v1/v2/shaped bundles. ONE engine (invariant 2): no in-house fillet/smooth/simplify remains here.
+import { roundCornersPaper, smoothPaper, simplifyPaper } from '@/lib/vector-core/paper-kernel'
 import type { Pt } from './types'
 
 export type OutlineClass = 'generated' | 'stock' | 'upload' | 'drawn'
@@ -70,10 +70,10 @@ export const GLOBAL_OFF: GlobalAdjustments = { detail: 100, smooth: 0, snap: 0, 
 export const ADJUSTMENTS_OFF: OutlineAdjustments = { global: { ...GLOBAL_OFF }, local: {} }
 
 // ── pct → engine-unit maps (the editor sliders write 0..100; OFF maps to a true no-op) ──────────
-/** Smooth: σ SCALES with the shape's bbox diagonal, so it rounds visibly at ANY size — a fixed px
- *  rounded the duck's fine silhouette but barely touched a large star's points. 0% = σ0; 100% ≈ 8%
- *  of the diagonal. (The caller passes the flattened ring's diagonal.) */
-export const smoothSigmaPx = (pct: number, diagPx: number) => (pct <= 0 ? 0 : (pct / 100) * Math.max(diagPx * 0.08, 24))
+/** Smooth: Paper catmull-rom handle factor (DEC-v5-02). 0% = OFF (no handles introduced); 100% = max
+ *  round. Scale-invariant (catmull tension is relative to anchor spacing), so — unlike the old Gaussian
+ *  σ — it needs no bbox scaling. Applied to the SPARSE simplified anchors, the only place catmull shows. */
+export const smoothFactor = (pct: number) => Math.max(0, Math.min(1, pct / 100))
 /** Snap: STRAIGHTEN strength — projects each point onto its local best-fit line (a direct op, not the
  *  fairing's fragile band-grow). 0% = off, 100% = full projection. Reliable + simple on any shape. */
 export const snapStrength = (pct: number) => Math.max(0, Math.min(1, pct / 100))
@@ -82,10 +82,11 @@ export const snapStrength = (pct: number) => Math.max(0, Math.min(1, pct / 100))
 export const angleMaxTurnDeg = (pct: number) => (pct <= 0 ? 180 : 180 - (pct / 100) * 170)
 /** Line: Snap's straighten WINDOW (fraction of the ring) — longer = trues longer runs (pairs with Snap). */
 export const lineWindowFrac = (pct: number) => 0.02 + (Math.max(0, Math.min(100, pct)) / 100) * 0.1
-/** Detail: SIMPLIFY (RDP) on the smoothed ring — fewer points as detail lowers. 100% = full detail
- *  (eps 0, OFF — keep everything), 0% = simplest (eps 8px). Applied AFTER smooth so it thins the
- *  smoothed outline rather than introducing its own smoothing (independent axis). */
-export const detailEpsPx = (pct: number) => Math.max(0, (1 - Math.max(0, Math.min(100, pct)) / 100) * 8)
+/** Detail: Paper SIMPLIFY tolerance (px) = sparse-curve anchor density (DEC-v5-02). 100% = most detail
+ *  (tight 0.75px fit → most anchors), 0% = simplest (≈8.75px → fewest). The 0.75px floor at 100% recovers
+ *  SPARSE bezier anchors from the internally-densified working ring (flatten + angle/snap densify) — the
+ *  output is never a dense point-chain. Independent of Smooth (which sets handle roundness, not count). */
+export const detailTolPx = (pct: number) => 0.75 + (1 - Math.max(0, Math.min(100, pct)) / 100) * 8
 
 // ── id minting + lookup ─────────────────────────────────────────────────────────────────────
 let _idSeq = 0
@@ -193,88 +194,86 @@ function straighten(ring: Vec2Px[], strength: number, lineFrac: number): Vec2Px[
 }
 
 // ── global pass ────────────────────────────────────────────────────────────────────────────
-const FAIR_FLATTEN_TOL = 0.75 // px — dense enough that the fairing sees the true silhouette
-const FAIR_SPACING = 1.5
+const FAIR_FLATTEN_TOL = 0.75 // px — dense enough that the angle/snap truing sees the true silhouette
 
-/** Fair one ring as a STAGED, fail-closed pipeline (VD12). Each tool is a DIRECT, independent stage;
- *  every stage is validated and a folded/NaN result is dropped — falling back to the PRIOR valid ring,
- *  NOT to the raw source. (The old "always run fairTracedRing, else return source" path silently masked
- *  Angle/Snap on deep stars: with smooth=0 the densify still folded → fell back to source = no-op. F5.)
- *  Order: angle → snap/line → smooth → detail.
- *   • ANGLE  = clampCorners (Chaikin corner-cut on real source corners) — simple-preserving.
- *   • SNAP   = straighten (windowed best-fit-line projection); LINE = the window length.
- *   • SMOOTH = fairTracedRing (resample + Gaussian σ) — the only densifying op; backs σ off on a fold.
- *   • DETAIL = rdpClosed — thins the result.
- *  The incoming `ring` is the flattened source (simple by construction) — the guaranteed terminal. */
-function fairWithGuard(ring: Vec2Px[], g: GlobalAdjustments): Vec2Px[] {
-  // valid = finite (no NaN/Infinity) AND simple (no self-cross) AND ≥4 pts. Each stage is kept only if
-  // valid, so resolve() NEVER returns unrenderable/folded geometry — fail-closed to the prior ring.
-  const valid = (r: Vec2Px[]) => r.length >= 4 && r.every(([x, y]) => Number.isFinite(x) && Number.isFinite(y)) && validateSelfIntersection(r, 'resolve').length === 0
-  const keep = (next: Vec2Px[], prev: Vec2Px[]) => (valid(next) ? next : prev)
+/** A flattened ring → a STRAIGHT-anchor working VPath (the form the Paper ops consume). */
+const ringToStraightPath = (ring: Vec2Px[]): VPath => ({
+  anchors: ring.map(([x, y]) => ({ p: { x, y }, hIn: null, hOut: null, corner: true })),
+})
+/** A VPath → its flattened ring (so a Paper-curved result can be validated / re-measured). */
+const pathToRing = (vp: VPath): Vec2Px[] => flattenPath(vp, FAIR_FLATTEN_TOL).map((p) => [p.x, p.y] as Vec2Px)
+const ringFinite = (r: Vec2Px[]) => r.length >= 4 && r.every(([x, y]) => Number.isFinite(x) && Number.isFinite(y))
+const ringSimple = (r: Vec2Px[]) => ringFinite(r) && validateSelfIntersection(r, 'resolve').length === 0
 
-  // smooth scales with the shape size — compute the bbox diagonal
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-  for (const [x, y] of ring) { if (x < minX) minX = x; if (y < minY) minY = y; if (x > maxX) maxX = x; if (y > maxY) maxY = y }
-  const diag = Math.hypot(maxX - minX, maxY - minY) || 1
+/** Fair one flattened ring into a SPARSE, CURVED VPath — the staged, fail-closed pipeline (VD12).
+ *  Order: angle → snap/line → DETAIL → SMOOTH. The geometry MATH (simplify/smooth) is the Paper kernel
+ *  (DEC-v5-02, invariant 2 — ONE engine, no in-house fillet/smooth/simplify); angle/snap/line are
+ *  product truing ops with no kernel equivalent, kept in-house.
+ *  PAPER-IMPLEMENTATION ORDER CORRECTION (not a v5 scope change; Pixel QA-confirmed from Paper source):
+ *  the old rdp pipeline ran smooth→detail, but Paper's simplify() refits from anchor POINTS via
+ *  PathFitter (discarding handles), so a smooth BEFORE simplify is erased; and catmull-rom smooth is
+ *  only visible on SPARSE anchors. So DETAIL (simplify → sets sparse anchor points + faithful fit) runs
+ *  first, then SMOOTH (catmull → sets handle roundness on those points). The USER CONTRACT is unchanged:
+ *  independent Detail/Smooth axes, off===source, never a folded/cracked shape.
+ *  Each stage is validated; a folded/NaN stage drops to the prior valid one — never to the raw source
+ *  (so earlier stages survive): invalid DETAIL keeps the trued ring; invalid SMOOTH keeps the detail result. */
+function fairPath(ring0: Vec2Px[], g: GlobalAdjustments): VPath {
+  const validPath = (vp: VPath) => ringSimple(pathToRing(vp))
+  const keepRing = (next: Vec2Px[], prev: Vec2Px[]) => (ringSimple(next) ? next : prev)
+  const fallback = (r: Vec2Px[]): VPath => ringToStraightPath(ringSimple(r) ? r : repairSimplePolygon(r, 1))
 
-  let r = ring
-  // 1. ANGLE — round real corners on the source ring (before any densify, where corners exist).
-  if (g.angle > 0) r = keep(clampCorners(r, angleMaxTurnDeg(g.angle)), r)
-  // 2. SNAP/LINE — true near-straight runs (windowed line projection). Snap = pull strength; Line =
-  // reach (window length) AND a standalone baseline strength, so Line visibly trues straight runs on
-  // its own (Dan: every tool full range), while still pairing with Snap. Both act only where a run is
-  // already near-straight (straighten skips real corners) — a spiky/organic silhouette has little to
-  // true, which is the honest "why" they read flat there.
+  let r = ring0
+  // 1. ANGLE — round real corners on the source ring (Chaikin corner-cut), BEFORE the curve fit (a
+  //    dense/curved ring has no per-vertex sharp turns to find — why Angle read as dead pre-v4).
+  if (g.angle > 0) r = keepRing(clampCorners(r, angleMaxTurnDeg(g.angle)), r)
+  // 2. SNAP/LINE — true near-straight runs (windowed best-fit-line projection). Snap = pull strength;
+  //    Line = reach (window length) plus a standalone baseline strength so Line trues runs on its own
+  //    while still pairing with Snap. Both skip real corners (large PCA residual) — a spiky silhouette
+  //    honestly has little to true there.
   if (g.snap > 0 || g.line > 0) {
     const strength = Math.max(snapStrength(g.snap), g.line > 0 ? 0.35 + 0.45 * (Math.min(100, g.line) / 100) : 0)
-    r = keep(straighten(r, strength, lineWindowFrac(g.line)), r)
+    r = keepRing(straighten(r, strength, lineWindowFrac(g.line)), r)
   }
-  // 3. SMOOTH — Gaussian fairing (the only fold-capable op); back σ off until simple.
+  if (!ringSimple(r)) r = ringFinite(r) ? repairSimplePolygon(r, 1) : ring0
+  // 3. DETAIL — Paper simplify the (trued, internally-dense) ring to SPARSE bezier curves: sets the
+  //    anchor POINTS + a faithful fit. The 0.75px floor (detail 100) recovers sparse anchors from our
+  //    own densification (flatten + Chaikin), so the result is never a dense point-chain.
+  let vp = simplifyPaper(ringToStraightPath(r), detailTolPx(g.detail))
+  if (!validPath(vp)) vp = fallback(r) // invalid DETAIL → keep the trued ring (prior valid stage)
+  // 4. SMOOTH — Paper catmull-rom on the SPARSE anchors: sets handle roundness (visible on sparse
+  //    points; invisible on the dense ring). Independent of Detail (factor vs tolerance); back the
+  //    factor off on a fold, fail-closed to the unsmoothed detail result (NOT the raw source).
   if (g.smooth > 0) {
-    let sigma = smoothSigmaPx(g.smooth, diag)
-    let sm = fairTracedRing(r, { spacingPx: FAIR_SPACING, smoothPx: sigma, maxTurnDeg: 180, detailPx: 0, minLinePx: 0 })
+    let factor = smoothFactor(g.smooth)
+    let sm = smoothPaper(vp, factor)
     let guard = 0
-    while (!valid(sm) && guard++ < 12 && sigma > 0.5) {
-      sigma *= 0.7
-      sm = fairTracedRing(r, { spacingPx: FAIR_SPACING, smoothPx: sigma, maxTurnDeg: 180, detailPx: 0, minLinePx: 0 })
-    }
-    r = keep(sm, r)
+    while (!validPath(sm) && guard++ < 12 && factor > 0.04) { factor *= 0.7; sm = smoothPaper(vp, factor) }
+    if (validPath(sm)) vp = sm
   }
-  // 4. DETAIL — RDP simplify the result (independent axis; applied last). L2 (audit: "Smooth densified
-  // with NO re-simplify → 12→900+ pts"): whenever SMOOTH ran, a BASE re-simplify always removes the
-  // fairing's sub-px resample density (even at Detail 100), so Smooth fairs WITHOUT blowup. Off+off
-  // stays byte-exact (no simplify). Detail beyond the base simplifies further (its own axis).
-  const eps = Math.max(detailEpsPx(g.detail), g.smooth > 0 ? 0.6 : 0)
-  if (eps > 0) r = keep(rdpClosed(r, eps), r)
-
-  // terminal: the staged result if valid, else a validated repair, else the (simple) source ring.
-  if (valid(r)) return r
-  const repaired = repairSimplePolygon(r, 1)
-  if (valid(repaired)) return repaired
-  return valid(ring) ? ring : repairSimplePolygon(ring, 1)
+  return validPath(vp) ? vp : fallback(ring0)
 }
 
-/** Global pass: fair every path's flattened polyline; pin claimed anchors back as identified anchors
- *  so the local pass can find them. Output is a STRAIGHT-anchor VShape (corner:true, no handles) — the
- *  raw-marching-squares model, just faired/detailed; local radius/curve add the only curves. */
+/** Global pass: fair every path's flattened polyline into a SPARSE curved VPath, then pin claimed
+ *  anchors back — snap the nearest faired anchor to the exact source position + re-attach its id — so
+ *  the local pass can find them and a claimed point survives the global reshape (VD2). The output is now
+ *  sparse curves (Paper simplify/smooth); local radius/curve still re-key by id through the pin. */
 function globalPass(source: OutlineSource, g: GlobalAdjustments, claimed: Set<string>): VShape {
   const paths = source.shape.paths.map((path) => {
     const ring = flattenPath(path, FAIR_FLATTEN_TOL).map((p) => [p.x, p.y] as Vec2Px)
     if (ring.length < 4) return path // too small to fair — pass through unchanged
-    const faired = fairWithGuard(ring, g)
-    const anchors: VAnchor[] = faired.map(([x, y]) => ({ p: { x, y }, hIn: null, hOut: null, corner: true }))
+    const faired = fairPath(ring, g)
     // PIN each claimed source anchor: snap the nearest faired anchor back to its exact source
     // position and re-attach its id, so global reshaping leaves the claimed point fixed (VD2).
     for (const a of path.anchors) {
       if (!a.id || !claimed.has(a.id)) continue
       let bi = -1, bd = Infinity
-      for (let i = 0; i < anchors.length; i++) {
-        const d = (anchors[i].p.x - a.p.x) ** 2 + (anchors[i].p.y - a.p.y) ** 2
+      for (let i = 0; i < faired.anchors.length; i++) {
+        const d = (faired.anchors[i].p.x - a.p.x) ** 2 + (faired.anchors[i].p.y - a.p.y) ** 2
         if (d < bd) { bd = d; bi = i }
       }
-      if (bi >= 0) anchors[bi] = { p: { x: a.p.x, y: a.p.y }, hIn: null, hOut: null, corner: true, id: a.id }
+      if (bi >= 0) faired.anchors[bi] = { p: { x: a.p.x, y: a.p.y }, hIn: null, hOut: null, corner: true, id: a.id }
     }
-    return { anchors }
+    return faired
   })
   return { paths }
 }

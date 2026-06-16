@@ -156,8 +156,8 @@ export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, radiusApplies
           ))}
           {adjustSub === 'detail' && (
             // L2 (Dan: "Detail 100% has LESS detail than 0 — reversed"). The slider IS the fidelity
-            // value: 100% = MOST detail (full, the off/default — no simplify), lower = simpler. The
-            // earlier `100 - detail` inversion read backwards. Engine detailEpsPx: 100→eps0 (keep all).
+            // value: 100% = MOST detail (tightest Paper-simplify fit → most anchors), lower = simpler. The
+            // earlier `100 - detail` inversion read backwards. Engine detailTolPx: 100→0.75px tight fit.
             <TickBar label="Detail" min={0} max={100} value={global.detail} onChange={(v) => previewGlobal(setG('detail', v))} onCommit={(v) => commitGlobal(setG('detail', v))} format={(v) => `${Math.round(v)}%`} />
           )}
           {adjustSub === 'smooth' && (
