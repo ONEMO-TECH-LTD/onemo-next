@@ -1,3 +1,9 @@
+// ⚠ DORMANT CONTRACT (Creator v5 · R6) — pure + unit-tested, but NOT wired into the active /create
+// flow: nothing in effect-creator/v3 calls buildApprovedEffectPayload (no save/order surface this
+// wave). This is the manufacturing/proof CONTRACT that Phase 2 (manufacturing readiness) will wire to
+// a real save/order → manufacturing pipeline. Foundation, not active product flow — do not cite it as
+// evidence that /create is "manufacturing-ready" (audit §7).
+//
 // payload.ts — the immutable ApprovedEffectPayload / LockedPayload (lean-spec §11).
 //
 // Built at APPROVE: a content-addressed manufacturing + proof record derived from a PreparedEffect +

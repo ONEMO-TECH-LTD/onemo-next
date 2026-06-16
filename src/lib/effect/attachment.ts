@@ -1,3 +1,9 @@
+// ⚠ DORMANT CONTRACT (Creator v5 · R6) — pure + unit-tested, but NOT wired into the active /create
+// flow: validateAttachment has no product caller yet. The attachment system becomes first-class in
+// /create in Phase 2 (attachment system in the creator). Validator defaults below are INVENTED
+// (coupon-pending) — keep out of product claims until physically confirmed. Foundation, not active
+// product flow (audit §7).
+//
 // attachment.ts — §8.5b attachment validators (PURE mm computation; lean-spec §5.5 / §9a / §11-A9).
 //
 // The Phase-B attachment choice (magnet | velcro) is a CUSTOMER decision validated on the FINAL-physical-mm

@@ -1,3 +1,8 @@
+// ⚠ DORMANT CONTRACT (Creator v5 · R6) — pure + unit-tested, but NOT wired into the active /create
+// flow: makeSavedEffect / toDesignRow have no product caller (no save/order surface this wave). This
+// is the saved-effect model (EditableRecipe + LockedPayload, F1-bound) that Phase 2 (manufacturing
+// readiness) will activate. Foundation, not active product flow (audit §7).
+//
 // persistence.ts — the saved-effect model: an EditableRecipe + a LockedPayload, bound by F1 (§8.7a / §11).
 //
 // REBUILD-PLAN-v2 §B4 — VECTOR-NATIVE. A saved effect is TWO bound artifacts:
