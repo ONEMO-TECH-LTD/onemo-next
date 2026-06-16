@@ -15,7 +15,6 @@ export {
   filletPath,
   filletShape,
   filletPathSmart,
-  filletShapeSmart,
   splitCubic,
   shapeBBox,
   signedArea,

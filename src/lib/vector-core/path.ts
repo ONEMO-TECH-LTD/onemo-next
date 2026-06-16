@@ -291,9 +291,9 @@ export function filletPathSmart(path: VPath, radius: number, only?: (anchorIndex
 }
 const pendingHInPatch = new Map<number, Vec2>()
 
-export function filletShapeSmart(shape: VShape, radius: number): VShape {
-  return { paths: shape.paths.map((p) => filletPathSmart(p, radius)) }
-}
+// (L6) filletShapeSmart removed — it was dead (zero callers). The editor's Radius tool rounds via the
+// Paper.js kernel (roundCornersPaper, L1); the remaining in-house filletPath serves the non-skewing
+// standard-square birth, and filletPathSmart is now used only by the R4-quarantined legacy trace-fit.
 
 const norm = (v: Vec2): Vec2 => {
   const l = Math.hypot(v.x, v.y) || 1e-12
