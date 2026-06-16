@@ -240,8 +240,11 @@ function fairWithGuard(ring: Vec2Px[], g: GlobalAdjustments): Vec2Px[] {
     }
     r = keep(sm, r)
   }
-  // 4. DETAIL — RDP simplify the result (independent axis; applied last).
-  const eps = detailEpsPx(g.detail)
+  // 4. DETAIL — RDP simplify the result (independent axis; applied last). L2 (audit: "Smooth densified
+  // with NO re-simplify → 12→900+ pts"): whenever SMOOTH ran, a BASE re-simplify always removes the
+  // fairing's sub-px resample density (even at Detail 100), so Smooth fairs WITHOUT blowup. Off+off
+  // stays byte-exact (no simplify). Detail beyond the base simplifies further (its own axis).
+  const eps = Math.max(detailEpsPx(g.detail), g.smooth > 0 ? 0.6 : 0)
   if (eps > 0) r = keep(rdpClosed(r, eps), r)
 
   // terminal: the staged result if valid, else a validated repair, else the (simple) source ring.
