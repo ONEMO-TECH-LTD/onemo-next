@@ -240,9 +240,14 @@ export default function ShapedModel({
   // layers (no re-segmentation) when the editor changes the blur. bgBlur null = build default already on.
   // This is a canvas CONTENT change — a fresh CanvasTexture upload is correct here (commit-on-release).
   useEffect(() => {
-    if (bgBlur == null && imageFx == null) return
     const fs = frontSrcRef.current
     if (!fs) return
+    // KAI-9066 (QA REWORK): at null/null we must STILL recompose back to the BUILD-DEFAULT texture when a
+    // custom fx/blur was previously applied — else a DISCARDED image-fx edit's bright texture lingers in
+    // 3D (KAI-9070 removed the old null→0.5 coercion that had masked this). artTexRef.current is set once a
+    // custom texture has been composed; skip ONLY the initial / never-edited null/null case.
+    const isDefault = bgBlur == null && imageFx == null
+    if (isDefault && !artTexRef.current) return
     // KAI-9069: null bgBlur = the design's BUILD default (fs.defaultBlurPx, already in px) — NOT a
     // hardcoded 0.5. The standard square births defaultBlurPx=0 (sharp), so touching an image-fx tool
     // no longer injects ~50% blur; shaped uses its exact prepared default. A user-set 0..1 bgBlur overrides.
