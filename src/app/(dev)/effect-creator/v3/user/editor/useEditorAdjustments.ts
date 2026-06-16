@@ -78,14 +78,23 @@ export function useEditorAdjustments(ctx: AdjustmentsCtx) {
     writeLocal(radiusTargets(), { radius: v }, true)
     perfGesture('round-commit', performance.now() - t0)
   }, [writeLocal, radiusTargets, setRadius])
-  // CURVE — bend the SELECTED anchor (needs a point selected). 0 = straight (off), 100 = strong.
-  const previewCurve = useCallback((v: number) => { setCurveVal(v); const id = sourceIdForSelection(); if (id) writeLocal([id], { curve: (v / 100) * 2 }, false) }, [writeLocal, sourceIdForSelection, setCurveVal])
+  // CURVE — bend anchors into tangent curves. L4 (Dan: "Curve is dead"): a SELECTED anchor bends
+  // alone; with NO selection it bends EVERY anchor (whole-shape) — mirroring Radius, so Curve is
+  // usable straight from Adjust without the hidden Points-select gate. 0 = straight (off), reversible.
+  // A folded whole-shape bend can't commit — outlineStore is fail-closed (R9).
+  const curveTargets = useCallback((): string[] => {
+    const sel = sourceIdForSelection()
+    if (sel) return [sel]
+    const src = useOutlineStore.getState().source
+    return src ? src.shape.paths.flatMap((p) => p.anchors.filter((a) => a.id).map((a) => a.id as string)) : []
+  }, [sourceIdForSelection])
+  const previewCurve = useCallback((v: number) => { setCurveVal(v); writeLocal(curveTargets(), { curve: (v / 100) * 2 }, false) }, [writeLocal, curveTargets, setCurveVal])
   const commitCurve = useCallback((v: number) => {
     setCurveVal(v)
     const t0 = performance.now()
-    const id = sourceIdForSelection(); if (id) writeLocal([id], { curve: (v / 100) * 2 }, true)
+    writeLocal(curveTargets(), { curve: (v / 100) * 2 }, true)
     perfGesture('curve-commit', performance.now() - t0)
-  }, [writeLocal, sourceIdForSelection, setCurveVal])
+  }, [writeLocal, curveTargets, setCurveVal])
 
   // "Magic blend" — the soft real-background blur composited behind the subject on the 3D front
   // texture. Edit-mode only; on/off + intensity. Writes bgBlur (0 = off/sharp · 0..1 = intensity).

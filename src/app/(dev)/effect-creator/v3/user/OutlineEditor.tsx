@@ -1134,7 +1134,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
           radiusApplies={radiusApplies}
           adjustSub={adjustSub} setAdjustSub={setAdjustSub}
           maxRadius={maxRadius} radius={radius} previewRadius={previewRadius} commitRadius={commitRadius}
-          curveSelected={selVA !== null} curveVal={curveVal} previewCurve={previewCurve} commitCurve={commitCurve}
+          curveSelected={!!vshape} curveVal={curveVal} previewCurve={previewCurve} commitCurve={commitCurve}
           global={liveGlobal} previewGlobal={previewGlobal} commitGlobal={commitGlobal}
         />
       )}
