@@ -3,7 +3,8 @@
 // ONE pipeline, deterministic, fail-loud nulls, verdict parity with the legacy gate's classes.
 
 import { describe, it, expect } from 'vitest'
-import { vectoriseTrace, contourFromShape, assertContourCuttable, vectorShapeHash, MANUFACTURING_TOLERANCE_MM } from '../geometry-truth'
+import { contourFromShape, assertContourCuttable, vectorShapeHash, MANUFACTURING_TOLERANCE_MM } from '../geometry-truth'
+import { vectoriseTrace } from '../geometry-truth.legacy' // R4: retired trace-fit, test-only
 import { fairingFromDetail, BEN_DEFAULT_DETAIL } from '@/lib/outline-core'
 import { getShape } from '@/lib/shape-library'
 import { filletShape, flattenShape, type VShape } from '@/lib/vector-core'

@@ -1,7 +1,7 @@
 // KAI-9009 — the fit must be WATERTIGHT: a noisy trace with a needle notch (walls that cross
 // after fairing — Dan's crack/spike sliver) must never reach the mesh as a self-intersection.
 import { describe, expect, it } from 'vitest'
-import { vectoriseTrace } from '../geometry-truth'
+import { vectoriseTrace } from '../geometry-truth.legacy' // R4: retired trace-fit, test-only
 import { flattenShape } from '@/lib/vector-core'
 import { validateSelfIntersection, fairingFromDetail, type Vec2Px } from '@/lib/outline-core'
 

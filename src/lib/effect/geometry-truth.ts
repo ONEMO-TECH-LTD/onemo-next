@@ -6,208 +6,33 @@
 //   • 3D display tessellation (ShapedModel)                      → DISPLAY_TOLERANCE_MM (0.004)
 //   • cut-line feasibility                                       → assertContourCuttable
 //   • recipe↔payload identity (the vector F1 bond)               → vectorShapeHash
-//   • trace → vector fitting (Magic at generation, editor Tune)  → vectoriseTrace
 //
-// SOURCE-OF-TRUTH MODULE ONLY: no UI, no adapters, no React, no document model — v3's
-// outline-core imports are ring math (fairing + intersection/area), nothing doc-shaped.
-// Spaces (one convention, stated once): vector shapes live in MASK-PX, Y-DOWN (the editor's
-// space). Raw traces arrive in mask-px Y-UP (the mask/engine space) — vectoriseTrace owns the
-// flip. Contours leave in MM, Y-UP, outer ring reversed to the mesh's expected winding.
+// SOURCE-OF-TRUTH MODULE ONLY: no UI, no adapters, no React, no document model — v3's outline-core
+// imports are ring math (intersection/area/hash), nothing doc-shaped.
+// Spaces (one convention, stated once): vector shapes live in MASK-PX, Y-DOWN (the editor's space).
+// Contours leave in MM, Y-UP, outer ring reversed to the mesh's expected winding.
+//
+// (R4 — Creator v5) The retired v3 trace→vector FIT (`vectoriseTrace`, fair + Schneider) is NOT in
+// the active pipeline: Magic/upload birth a RAW straight OutlineSource (prepare-effect.ts) and the
+// editor's resolve() owns shaping. That dead fit moved to `geometry-truth.legacy.ts` (test-only) so
+// this module's surface can't import it as authority.
 
-import { fairTracedRing, rdpClosed, validateSelfIntersection, repairSimplePolygon, signedArea, contentHash, stableStringify, type FairTracedRingOpts, type Vec2Px } from '@/lib/outline-core'
-import { flattenShape, ringToVPath, filletPathSmart, type VShape } from '@/lib/vector-core'
+import { validateSelfIntersection, signedArea, contentHash, stableStringify, type Vec2Px } from '@/lib/outline-core'
+import { flattenShape, type VShape } from '@/lib/vector-core'
 import type { Contour, Pt } from './types'
 
 /** Manufacturing flatten tolerance — the cut line's fidelity (sub-kerf; kerf is 0.1–0.3 mm). */
 export const MANUFACTURING_TOLERANCE_MM = 0.05
 /** Display flatten tolerance — the 3D silhouette equals the vector at any zoom (KAI-8951). */
 export const DISPLAY_TOLERANCE_MM = 0.004
-// Trace→vector fit parameters — the ONE fit every trace goes through (generation AND editor
-// re-Tune use these; a parameter fork here would be a second pipeline).
-const FIT_CORNER_ANGLE_DEG = 30
-const FIT_MAX_ERROR_PX = 0.35
-// HARD CRACK RULE (restored from v1/v2 contour.ts — the v3 vectoriser rebuild dropped it): no corner
-// may stay sharper than this INTERIOR angle. Tuned LOW so it removes only artifact spikes/V-notches
-// (the cracks/cuts) while legitimate sharp corners (≥ this) survive as raw corners.
-const CRACK_MIN_ANGLE_DEG = 26
-
-/**
- * Cut any corner whose interior angle is below `minAngleDeg` (a spike/crack), iterated so even very
- * acute notches are tamed; gentle corners pass through untouched. Ported from v1/v2's clampSharpCorners.
- */
-function clampSharpCorners(pts: Vec2Px[], minAngleDeg: number, cut = 0.4, iterations = 8): Vec2Px[] {
-  if (minAngleDeg <= 0) return pts
-  const minCos = Math.cos((minAngleDeg * Math.PI) / 180) // interior angle < threshold ⇔ cos > minCos
-  let p = pts
-  for (let it = 0; it < iterations; it++) {
-    const n = p.length
-    if (n < 4) break
-    const out: Vec2Px[] = []
-    let changed = false
-    for (let i = 0; i < n; i++) {
-      const a = p[(i - 1 + n) % n], v = p[i], b = p[(i + 1) % n]
-      const v1x = a[0] - v[0], v1y = a[1] - v[1]
-      const v2x = b[0] - v[0], v2y = b[1] - v[1]
-      const l1 = Math.hypot(v1x, v1y) || 1, l2 = Math.hypot(v2x, v2y) || 1
-      const cos = (v1x * v2x + v1y * v2y) / (l1 * l2) // +1 = acute spike, -1 = straight
-      if (cos > minCos) { out.push([v[0] + cut * v1x, v[1] + cut * v1y]); out.push([v[0] + cut * v2x, v[1] + cut * v2y]); changed = true }
-      else out.push(v)
-    }
-    p = out
-    if (!changed) break
-  }
-  return p
-}
-// Anchor-compaction budget (KAI-8974/F3b): the minimal-segmentation pass may spend up to 2x the
-// fit tolerance to remove redundant anchors — 0.7px on a typical 1200px mask ≈ 0.04mm at the 70mm
-// base, inside the 0.05mm manufacturing class; G1/tangent-preserving, corners never merged.
-const FIT_COMPACT_ERROR_PX = FIT_MAX_ERROR_PX * 2
-// Finger-distinct anchor floor (fab-qa re-gate on KAI-8974): two anchors closer than ~1.5mm on
-// the PHYSICAL design are one touch target — the pair-collapse floor is mm-true, not viewport px.
+// Finger-distinct anchor floor (fab-qa re-gate on KAI-8974): two anchors closer than ~1.5mm on the
+// PHYSICAL design are one touch target — the pair-collapse floor is mm-true, not viewport px. Consumed
+// by the editor's manual-edit pass (OutlineEditor); the resolver/contour math do not need it.
 export const MIN_ANCHOR_SEPARATION_MM = 1.5
-const MIN_RAW_TRACE_POINTS = 24
-const CORNER_PIN_MAX_SNAP_PX = 8 // KAI-9009: a raw corner farther than this from the faired ring no longer exists
-// CORNER INTEGRITY (Dan, 2026-06-11): intentional sharp features must survive the cut as TRUE
-// corner anchors — the fairing smooths everything else to optimal, never the corners themselves.
-// Detection runs on the RAW trace structure (RDP skeleton — per-sample angles can't tell jitter
-// from corners; the simplified skeleton's vertices can), then the sharp vertices are pinned
-// through the fit. Turn threshold: features sharper than this are design intent, not noise.
-const CORNER_TURN_DEG = 55
-const CORNER_RDP_EPSILON_PX = 2.5
-const CORNER_MIN_SEPARATION_PX = 6
-// CROP-CORNER DEFAULT (Dan's 2026-06-07 landing ruling, KAI-8982 D1): a ~90° corner SITTING ON
-// the image frame edge is a crop artifact ("straight sharp crop originally") — it gets the SAME
-// default radius automatically in pass 2. Interior sharp corners (a book, a card, a star spike)
-// are design intent and stay TRUE corner anchors. The discriminator is geometric: frame-edge
-// proximity + the 90° band. The sharp fit remains derivable from the raw (Radius→0 = sharp).
-const CROP_TURN_MIN_DEG = 70
-const CROP_TURN_MAX_DEG = 110
-const CROP_EDGE_EPSILON_PX = 6
 // Below this the outline is collapsed/degenerate — same floor the legacy feasibility used.
 const MIN_AREA_PX2 = 1
 // int-micron quantization for the canonical hash (float-free identity, payload.ts convention)
 const MICRO_PER_PX = 1000
-
-/** Sharp-feature detection on the raw ring's RDP skeleton → corner positions + turn (y-down px). */
-function rawCornerPositions(yDown: Vec2Px[]): { p: Vec2Px; turnDeg: number }[] {
-  const skeleton = rdpClosed(yDown, CORNER_RDP_EPSILON_PX)
-  const n = skeleton.length
-  if (n < 4) return []
-  const out: { p: Vec2Px; turnDeg: number }[] = []
-  const thr = (CORNER_TURN_DEG * Math.PI) / 180
-  for (let i = 0; i < n; i++) {
-    const a = skeleton[(i - 1 + n) % n], p = skeleton[i], b = skeleton[(i + 1) % n]
-    const v1x = p[0] - a[0], v1y = p[1] - a[1], v2x = b[0] - p[0], v2y = b[1] - p[1]
-    const l1 = Math.hypot(v1x, v1y) || 1, l2 = Math.hypot(v2x, v2y) || 1
-    const ang = Math.acos(Math.max(-1, Math.min(1, (v1x * v2x + v1y * v2y) / (l1 * l2))))
-    if (ang > thr) out.push({ p, turnDeg: (ang * 180) / Math.PI })
-  }
-  return out
-}
-
-/**
- * Fit a raw traced ring (mask px, y-up) into the vector truth: fair → ONE Schneider fit, with
- * CORNER INTEGRITY — sharp features detected on the raw structure are restored to their exact
- * positions and pinned as TRUE corner anchors; the fairing smooths everything else (Dan: sharp
- * corners are design intent; smoothing repeats the silhouette, it never erases corners).
- * Used at Magic GENERATION (truth at birth, §B1) and by the editor's Tune re-fit — the same
- * function, so generation and editor produce identical geometry for identical inputs.
- * Returns null when the trace is too sparse to be a shape (caller fails loud — no silent door).
- */
-export interface VectoriseOpts {
-  /** mm-true pair-collapse floor in content px (MIN_ANCHOR_SEPARATION_MM / mmPerPx) — two anchors
-   *  closer than this collapse to one when fidelity allows (finger-distinct targets). */
-  minAnchorSepPx?: number
-  /** Crop-corner default (KAI-8982 D1): ~90° corners ON the image frame edge get this radius
-   *  automatically (uniform — "same radii as a default for all 90 degree corners", Dan 06-07).
-   *  Requires maskWidthPx for the frame test. Omit = no default rounding (sharp fit). */
-  defaultCornerRadiusPx?: number
-  maskWidthPx?: number
-}
-
-export function vectoriseTrace(rawMaskPx: ReadonlyArray<Pt>, maskHeightPx: number, fairing: FairTracedRingOpts, opts?: VectoriseOpts): VShape | null {
-  // KAI-9009: a noisy mask can fair into a SELF-CROSSING sliver (Dan's crack/spike — a V-notch
-  // whose walls cross; the pair floor can't catch it because the crossing spans wider than the
-  // floor). The fit must be watertight: validate the flatten and, on a crossing, re-derive with
-  // escalated smoothing (trace-noise slivers die under a larger σ). Bounded; loud on exhaustion.
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const params = attempt === 0 ? fairing : { ...fairing, smoothPx: (fairing.smoothPx ?? 6) * (1 + attempt * 0.6) }
-    const v = vectoriseTraceOnce(rawMaskPx, maskHeightPx, params, opts)
-    if (!v) return null
-    const flat = flattenShape(v, 0.75)[0]?.map((pt) => [pt.x, pt.y] as Vec2Px) ?? []
-    if (flat.length < 3 || validateSelfIntersection(flat, 'fit').length === 0) return v
-    if (attempt === 2) {
-      // last resort: the crossing only exists in the FITTED curves (e.g. a sub-kerf needle the
-      // raw repair couldn't see). Repair the fit's own flatten and re-fit it as a plain ring —
-      // existing corners survive ringToVPath's own detection; the sliver cannot.
-      const repaired = repairSimplePolygon(flat, 1)
-      if (repaired.length >= 3) {
-        const path = ringToVPath(repaired.map(([x, y]) => ({ x, y })), FIT_CORNER_ANGLE_DEG, FIT_MAX_ERROR_PX, undefined, FIT_COMPACT_ERROR_PX, opts?.minAnchorSepPx)
-        const v2: VShape = { paths: [path] }
-        const flat2 = flattenShape(v2, 0.75)[0]?.map((pt) => [pt.x, pt.y] as Vec2Px) ?? []
-        if (flat2.length >= 3 && validateSelfIntersection(flat2, 'fit').length === 0) return v2
-      }
-      console.error('[geometry-truth] vectoriseTrace: self-intersecting fit survived repair — returning last attempt')
-      return v
-    }
-  }
-  return null
-}
-
-function vectoriseTraceOnce(rawMaskPx: ReadonlyArray<Pt>, maskHeightPx: number, fairing: FairTracedRingOpts, opts?: VectoriseOpts): VShape | null {
-  if (rawMaskPx.length < MIN_RAW_TRACE_POINTS) return null
-  const yDown = rawMaskPx.map(([x, y]) => [x, maskHeightPx - y] as Vec2Px)
-  const corners = rawCornerPositions(yDown)
-  // KAI-9009: kill sliver loops (needle notches whose walls cross) BEFORE the fit — the
-  // existing simple-polygon repair drops the crossing vertices deterministically. Track WHAT
-  // it removed: a raw corner that lived on a removed sliver must not be pinned back in.
-  const fairedRaw = fairTracedRing(yDown, fairing)
-  // HARD CRACK RULE: kill artifact spikes/V-notches (acute cracks) AFTER the simple-polygon repair
-  // catches self-crossing ones. removedPts (below) is derived from faired vs fairedRaw, so any apex
-  // clamped here is automatically excluded from corner re-pinning (no re-created spike).
-  const faired = clampSharpCorners(repairSimplePolygon(fairedRaw, 1), CRACK_MIN_ANGLE_DEG)
-  if (faired.length < 3) return null
-  const kept = new Set(faired.map(([x, y]) => `${x},${y}`))
-  const removedPts = fairedRaw.filter(([x, y]) => !kept.has(`${x},${y}`))
-  // pin each raw corner: snap the nearest faired point BACK to the exact sharp vertex and mark
-  // its index as a corner for the fit (independent handles meet at the true point)
-  const ring = faired.map(([x, y]) => ({ x, y }))
-  const cornerIdx: number[] = []
-  const cropIdx: number[] = [] // ~90° corners ON the frame edge — the crop-artifact class
-  const W = opts?.maskWidthPx ?? 0
-  const onFrame = (x: number, y: number) =>
-    W > 0 && (x <= CROP_EDGE_EPSILON_PX || y <= CROP_EDGE_EPSILON_PX || x >= W - CROP_EDGE_EPSILON_PX || y >= maskHeightPx - CROP_EDGE_EPSILON_PX)
-  for (const { p: [cx, cy], turnDeg } of corners) {
-    let best = -1, bd = Infinity
-    for (let i = 0; i < ring.length; i++) {
-      const d = (ring[i].x - cx) ** 2 + (ring[i].y - cy) ** 2
-      if (d < bd) { bd = d; best = i }
-    }
-    // KAI-9009: a corner whose neighborhood was REMOVED by the sliver repair no longer exists —
-    // pinning it back would re-create the spike. Legit faired corners (however far the smoothing
-    // pulled the ring) pin exactly as before.
-    const onRemovedSliver = removedPts.some(([rx, ry]) => Math.hypot(rx - cx, ry - cy) < CORNER_PIN_MAX_SNAP_PX)
-    if (best >= 0 && !onRemovedSliver && !cornerIdx.some((j) => Math.hypot(ring[j].x - cx, ring[j].y - cy) < CORNER_MIN_SEPARATION_PX)) {
-      ring[best] = { x: cx, y: cy }
-      cornerIdx.push(best)
-      if (turnDeg >= CROP_TURN_MIN_DEG && turnDeg <= CROP_TURN_MAX_DEG && onFrame(cx, cy)) cropIdx.push(best)
-    }
-  }
-  cornerIdx.sort((a, b) => a - b)
-  const path = ringToVPath(ring, FIT_CORNER_ANGLE_DEG, FIT_MAX_ERROR_PX, cornerIdx.length ? cornerIdx : undefined, FIT_COMPACT_ERROR_PX, opts?.minAnchorSepPx)
-  // pass 2's auto-adjustment (KAI-8982 D1): crop-class corners get the uniform default radius;
-  // interior sharp corners stay TRUE corner anchors. The SHARP fit stays derivable (omit opts).
-  const r = opts?.defaultCornerRadiusPx ?? 0
-  if (r > 0 && cropIdx.length) {
-    const cropPts = cropIdx.map((i) => ring[i])
-    const isCrop = (ai: number) => {
-      const a = path.anchors[ai]
-      return a.corner && cropPts.some((cp) => Math.hypot(a.p.x - cp.x, a.p.y - cp.y) < CORNER_MIN_SEPARATION_PX)
-    }
-    return { paths: [filletPathSmart(path, r, isCrop)] }
-  }
-  return { paths: [path] }
-}
 
 /**
  * The ONE producer of a manufacturing Contour from vector truth: flatten the outer path at
