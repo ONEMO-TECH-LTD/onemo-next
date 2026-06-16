@@ -10,7 +10,7 @@ import { generateShapeRing, type ShapeKind, type ShapeParams } from '../shapes'
 // Shape chips — plan A2 lineup (Dan's rulings): BASICS first ("basic should be in the front"),
 // the board's symbol alphabet next, the GENERATIVE group ✦-marked, and Magic ✦ as the distinct
 // auto chip at TRAIL (it already owns the hero shortcut — the in-editor chip is the second door
-// to the SAME pipeline). Pebble is DELETED (Dan: dupe of blob).
+// to the SAME pipeline).
 export const SHAPE_CHIPS: { kind: ShapeKind; label: string }[] = [
   { kind: 'square', label: 'Square' },
   { kind: 'circle', label: 'Circle' },

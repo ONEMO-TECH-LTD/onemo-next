@@ -69,23 +69,6 @@ export const TEARDROP_ANCHORS: VAnchor[] = [
     { p: { x: -0.0337, y: -0.8655 }, hIn: { x: -0.0667, y: -0.7754 }, hOut: { x: -0.0185, y: -0.907 }, corner: false },
 ]
 
-// pebble: 13 anchors (0 corners), tol 0.0015
-export const PEBBLE_ANCHORS: VAnchor[] = [
-    { p: { x: 0.9931, y: -0.0297 }, hIn: { x: 1.0323, y: -0.3178 }, hOut: { x: 0.9799, y: 0.0677 }, corner: false },
-    { p: { x: 0.9323, y: 0.2589 }, hIn: { x: 0.9521, y: 0.1627 }, hOut: { x: 0.883, y: 0.4983 }, corner: false },
-    { p: { x: 0.5944, y: 0.8689 }, hIn: { x: 0.8513, y: 0.7593 }, hOut: { x: 0.3636, y: 0.9673 }, corner: false },
-    { p: { x: -0.0705, y: 0.7565 }, hIn: { x: 0.1358, y: 0.8588 }, hOut: { x: -0.1273, y: 0.7284 }, corner: false },
-    { p: { x: -0.243, y: 0.6768 }, hIn: { x: -0.1846, y: 0.7016 }, hOut: { x: -0.3366, y: 0.6369 }, corner: false },
-    { p: { x: -0.5171, y: 0.5434 }, hIn: { x: -0.4314, y: 0.5991 }, hOut: { x: -0.6691, y: 0.4446 }, corner: false },
-    { p: { x: -0.8817, y: 0.1421 }, hIn: { x: -0.7882, y: 0.2956 }, hOut: { x: -0.9569, y: 0.0186 }, corner: false },
-    { p: { x: -0.9959, y: -0.2727 }, hIn: { x: -1.0165, y: -0.1253 }, hOut: { x: -0.9907, y: -0.3101 }, corner: false },
-    { p: { x: -0.9649, y: -0.3811 }, hIn: { x: -0.9803, y: -0.3466 }, hOut: { x: -0.897, y: -0.5327 }, corner: false },
-    { p: { x: -0.5941, y: -0.6659 }, hIn: { x: -0.7457, y: -0.617 }, hOut: { x: -0.5178, y: -0.6905 }, corner: false },
-    { p: { x: -0.3626, y: -0.7311 }, hIn: { x: -0.4394, y: -0.708 }, hOut: { x: -0.1679, y: -0.7897 }, corner: false },
-    { p: { x: 0.2197, y: -0.9066 }, hIn: { x: 0.0097, y: -0.9118 }, hOut: { x: 0.3964, y: -0.9022 }, corner: false },
-    { p: { x: 0.6776, y: -0.6956 }, hIn: { x: 0.549, y: -0.8101 }, hOut: { x: 0.882, y: -0.5135 }, corner: false },
-]
-
 // squircle: 22 anchors (0 corners), tol 0.0015
 export const SQUIRCLE_ANCHORS: VAnchor[] = [
     { p: { x: 1, y: 0 }, hIn: { x: 1, y: -0.0717 }, hOut: { x: 1, y: 0.0717 }, corner: false },

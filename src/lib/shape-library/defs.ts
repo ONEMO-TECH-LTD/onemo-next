@@ -8,7 +8,7 @@
 
 import type { VAnchor, VShape } from '@/lib/vector-core'
 import {
-  PINCHED_ANCHORS, SPARKLE_ANCHORS, TEARDROP_ANCHORS, PEBBLE_ANCHORS,
+  PINCHED_ANCHORS, SPARKLE_ANCHORS, TEARDROP_ANCHORS,
   SQUIRCLE_ANCHORS, ASTERISK_ANCHORS, BOWTIE_ANCHORS,
 } from './baked'
 
@@ -154,7 +154,7 @@ export type VectorShapeKind =
   | 'circle' | 'square' | 'heart'
   | 'bolt' | 'plus' | 'diamond' | 'polygon' | 'star'
   | 'leaf' | 'lens'
-  | 'pinched' | 'sparkle' | 'teardrop' | 'pebble' | 'squircle' | 'asterisk' | 'bowtie'
+  | 'pinched' | 'sparkle' | 'teardrop' | 'squircle' | 'asterisk' | 'bowtie'
 
 const DEFS: Record<VectorShapeKind, (p: VectorShapeParams) => VShape> = {
   circle: () => circleDef(),
@@ -170,7 +170,6 @@ const DEFS: Record<VectorShapeKind, (p: VectorShapeParams) => VShape> = {
   pinched: fromBaked(PINCHED_ANCHORS),
   sparkle: fromBaked(SPARKLE_ANCHORS),
   teardrop: fromBaked(TEARDROP_ANCHORS),
-  pebble: fromBaked(PEBBLE_ANCHORS),
   squircle: fromBaked(SQUIRCLE_ANCHORS),
   asterisk: fromBaked(ASTERISK_ANCHORS),
   bowtie: fromBaked(BOWTIE_ANCHORS),
@@ -189,5 +188,4 @@ export const SHAPE_ASPECT: Partial<Record<VectorShapeKind, { sx: number; sy: num
   teardrop: { sx: 0.8, sy: 1 },
   lens: { sx: 1, sy: 0.62 },
   bowtie: { sx: 1, sy: 0.9 },
-  pebble: { sx: 1, sy: 0.92 },
 }

@@ -7,19 +7,21 @@
 |---|---|---|
 | `longestSideMM` | 70 | base ONEMO square / size-band reference |
 | `thicknessMM` | 1 | physical ruling (coupon-pending confirm) |
-| `edgeRadiusMM` | 0.15 | **TD-G: tuned for the old 0.5 mm body — re-pin for 1 mm at coupon time** |
-| `edgeSegments` | 14 | lip rounding segments |
+| `edgeRadiusMM` | 0.2 | straight-wall edge on the 1 mm body (Dan 2026-06-15, accepted): ~0.6 mm straight wall + short soft top/bottom corner — not a full half-round |
+| `edgeSegments` | 18 | lip rounding segments |
 | `maxImageDim` | 1200 | mask/contour resolution cap |
 | `textureDim` | 2400 | front-texture cap (G2: colour pixels come from the ORIGINAL at this res) |
 | `paddingMM` | 1.5 | flat margin around the subject |
 | `squareCornerMM` | 8 | standard-square corner radius (engine-internal rounding) |
 
-## Segmentation (G5)
-- Weights self-host path: `public/models/onnx-community/BEN2-ONNX/` (gitignored). Mirror once:
-  `git clone https://huggingface.co/onnx-community/BEN2-ONNX public/models/onnx-community/BEN2-ONNX`
-  (or copy the `onnx/` + config files). With the local copy present the worker loads same-origin —
-  no runtime hub fetch. Absent → hub fallback with a loud "downloading" progress state.
-- Inference watchdog: 90 s (`segment-ml.ts INFERENCE_WATCHDOG_MS`).
+## Segmentation (DEC-v5-01 — self-hosted free trio)
+- Cut-out engine: **u2netp** (4.6 MB, primary, preloaded) → **silueta** (44 MB, LAZY — fetched only
+  when u2netp errors) → **flood-fill** (no-AI last resort). BEN2 retired (219 MB → iPhone OOM).
+- Self-hosted SAME-ORIGIN (no third-party fetch, offline-capable): models in `public/seg-models/`
+  (`u2netp.onnx`, `silueta.onnx`); ONNX runtime in `public/ort/` (`ort.wasm.min.mjs` +
+  `ort-wasm-simd-threaded.{mjs,wasm}`). Runtime = onnxruntime-web, **WASM EP, `numThreads=1`**
+  (threaded WASM deadlocks inside the worker). `?seg=<model>` switches a single model (test harness).
+- Inference watchdog: 120 s (`segment-ml.ts INFERENCE_WATCHDOG_MS`).
 - COOP/COEP headers on `/effect-creator/*` (next.config.ts) → threaded-wasm fallback.
 
 ## Perf budgets (G3 / §9 — enforced at the QA gate, visible in the PerfHUD)
@@ -28,7 +30,7 @@
 
 ## Scene
 - `fitSize` 0.09 (ShapedModel) — mm → scene units for golden framing.
-- DPR cap [1, 1.5] · `frameloop="demand"` · damping OFF (idle truly idles).
+- DPR cap [1, 2] · `frameloop="demand"` · damping OFF (idle truly idles).
 
 ## Factory (Phase 2)
 - Tile 1024², fov 35°, fit margin 1.32 — standardized framing from mm dims (G8).

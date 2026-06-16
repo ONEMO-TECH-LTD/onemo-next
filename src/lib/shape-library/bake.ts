@@ -39,18 +39,6 @@ const SOURCES: Record<string, { ring: Vec2[]; cornerDeg: number }> = {
     ring: normalize(Array.from({ length: N }, (_, i) => { const t = (2 * Math.PI * i) / N; return { x: Math.sin(t) * Math.pow(Math.sin(t / 2), 2), y: -Math.cos(t) } })),
     cornerDeg: 30,
   },
-  pebble: {
-    ring: (() => { // blobRing(seed 7, waviness 0.3) — frozen pebble
-      let a = 7 >>> 0
-      const rnd = () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296 }
-      const w = 0.06 + 0.22 * 0.3
-      const a1 = (0.5 + 0.5 * rnd()) * w, p1 = rnd() * 2 * Math.PI
-      const a2 = (0.4 + 0.6 * rnd()) * w * 0.7, p2 = rnd() * 2 * Math.PI
-      const a3 = (0.3 + 0.7 * rnd()) * w * 0.45, p3 = rnd() * 2 * Math.PI
-      return normalize(polar((t) => 1 + a1 * Math.sin(2 * t + p1) + a2 * Math.sin(3 * t + p2) + a3 * Math.sin(5 * t + p3)).map((p) => ({ x: p.x, y: p.y * 0.92 })))
-    })(),
-    cornerDeg: 60,
-  },
   squircle: {
     ring: (() => { const e = 2 / 5; return Array.from({ length: N }, (_, i) => { const t = (2 * Math.PI * i) / N, ct = Math.cos(t), st = Math.sin(t); return { x: Math.sign(ct) * Math.pow(Math.abs(ct), e), y: Math.sign(st) * Math.pow(Math.abs(st), e) } }) })(),
     cornerDeg: 60,

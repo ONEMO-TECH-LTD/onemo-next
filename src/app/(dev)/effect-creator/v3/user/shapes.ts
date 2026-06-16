@@ -1,7 +1,7 @@
 // Shape generators — REDUCED to the Run-3 PARAMETRIC generators only (vector reset).
 //
 // Every static preset (pinched, heart, bolt, sparkle, teardrop, leaf, lens, diamond, plus,
-// asterisk, bowtie, pebble, circle, square, squircle, polygon, star) now lives in
+// asterisk, bowtie, circle, square, squircle, polygon, star) now lives in
 // `@/lib/shape-library` as PURE VECTOR DATA — authored/baked Bézier anchors, zero runtime
 // sampling. The ring generators that built them were DELETED with the migration (vector reset
 // Run 2; the corrupted-construction class dies with its code).
@@ -14,7 +14,7 @@ import type { Vec2Px } from '@/lib/outline-core'
 
 export type ShapeKind =
   | 'pinched' | 'daisy' | 'heart' | 'bolt' | 'sparkle' | 'teardrop' | 'leaf' | 'lens'
-  | 'diamond' | 'plus' | 'asterisk' | 'bowtie' | 'pinwheel' | 'pebble'
+  | 'diamond' | 'plus' | 'asterisk' | 'bowtie' | 'pinwheel'
   | 'circle' | 'square' | 'squircle' | 'polygon' | 'star'
   | 'form' | 'blob'
 
