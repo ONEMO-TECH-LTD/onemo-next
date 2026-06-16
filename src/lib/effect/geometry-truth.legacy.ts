@@ -12,7 +12,8 @@
 // owns the flip.
 
 import { fairTracedRing, rdpClosed, validateSelfIntersection, repairSimplePolygon, type FairTracedRingOpts, type Vec2Px } from '@/lib/outline-core/math'
-import { flattenShape, ringToVPath, filletPathSmart, type VShape } from '@/lib/vector-core'
+import { flattenShape, ringToVPath, type VShape } from '@/lib/vector-core'
+import { roundCornersPaper } from '@/lib/vector-core/paper-kernel' // L6: one fillet engine (Paper) even in legacy
 import type { Pt } from './types'
 
 // Trace→vector fit parameters — the ONE fit every trace went through (generation AND editor re-Tune).
@@ -149,7 +150,7 @@ function vectoriseTraceOnce(rawMaskPx: ReadonlyArray<Pt>, maskHeightPx: number, 
       const a = path.anchors[ai]
       return a.corner && cropPts.some((cp) => Math.hypot(a.p.x - cp.x, a.p.y - cp.y) < CORNER_MIN_SEPARATION_PX)
     }
-    return { paths: [filletPathSmart(path, r, isCrop)] }
+    return { paths: [roundCornersPaper(path, r, isCrop)] }
   }
   return { paths: [path] }
 }

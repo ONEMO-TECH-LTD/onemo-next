@@ -17,7 +17,7 @@
 // PaperScope minus PaperScript — all the path math we use — and bundles cleanly client + server.
 import paper from 'paper/dist/paper-core'
 import { PaperRoundCorners } from 'paperjs-round-corners'
-import type { VPath, VAnchor } from './types'
+import type { VPath, VAnchor, VShape } from './types'
 
 // paper Segment carries a runtime `.data` bag the bundled types don't declare — typed accessors.
 type SegData = { vid?: string }
@@ -103,6 +103,15 @@ export function roundCornersPaper(path: VPath, radiusPx: number, pick: (i: numbe
   } finally {
     pp.remove() // headless hygiene: no Path accumulates in the project
   }
+}
+
+/**
+ * L6 — round EVERY corner of a shape (the standard-square birth's 8mm corners + any whole-shape
+ * round). One engine: the same Paper true-arc round as the editor's Radius tool, so there is no second
+ * fillet implementation. Replaces the in-house filletShape on the production birth path.
+ */
+export function roundShapePaper(shape: VShape, radiusPx: number): VShape {
+  return { paths: shape.paths.map((p) => roundCornersPaper(p, radiusPx, () => true)) }
 }
 
 /**

@@ -29,7 +29,8 @@ import { perfGesture } from '../dev/PerfHUD'
 import { type ShapeKind, type ShapeParams } from './shapes'
 // VECTOR CORE (reset Run 1): vector-native kinds render/commit/transform on a true Bézier VShape;
 // the doc stays as the interaction SHADOW (a derived flatten artifact — bbox/hit/grips math only).
-import { shapeToSVGPathD, flattenShape, filletShape, nearestOnPath, insertAnchorCentered, deleteAnchorRefit, shapeBBox, type VShape, type VAnchor, type Vec2 } from '@/lib/vector-core'
+import { shapeToSVGPathD, flattenShape, nearestOnPath, insertAnchorCentered, deleteAnchorRefit, shapeBBox, type VShape, type VAnchor, type Vec2 } from '@/lib/vector-core'
+import { roundShapePaper } from '@/lib/vector-core/paper-kernel' // L6: stock-seed 8mm corners via Paper (one engine)
 import { hasVectorDef, getShape } from '@/lib/shape-library'
 // Run 8 — SVG shape upload: a downloaded/Figma-exported outline becomes a first-class vector
 // shape through the export module's dialect gate (loud rejection outside the v1 boundary).
@@ -232,7 +233,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
         const base = getShape('square', image.widthPx, image.heightPx)
         const side = Math.min(image.widthPx, image.heightPx) * 0.72
         const defaultR = Math.min(Math.round(8 / (spec.mmPerPx || 1)), Math.floor(side / 2))
-        seedSource({ shape: mintIds(filletShape(base, defaultR)), klass: 'stock', mmPerPx: spec.mmPerPx, maskHeightPx: spec.maskHeightPx }, undefined, false)
+        seedSource({ shape: mintIds(roundShapePaper(base, defaultR)), klass: 'stock', mmPerPx: spec.mmPerPx, maskHeightPx: spec.maskHeightPx }, undefined, false)
         setActiveAdjust('shape')
         setShapeKind('square')
         setShowAnchors(false) // rigid shape default — Points toggle re-enables

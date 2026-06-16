@@ -42,7 +42,10 @@ import { rdpClosed, type Vec2Px } from '@/lib/outline-core/math'
 // REBUILD-PLAN-v2 §B1 — truth at birth: geometry is born as ONE VShape; the manufacturing contour
 // is DERIVED from it. Shaped generation emits the RAW marching-squares straight polygon (no Stage B).
 import { contourFromShape } from './geometry-truth'
-import { filletShape, type VShape } from '@/lib/vector-core'
+import { type VShape } from '@/lib/vector-core'
+// L6: the standard-square 8mm corners round via the Paper kernel — one fillet engine (same as the
+// editor Radius tool), no in-house duplicate. Imported directly so Paper stays in the create bundle.
+import { roundShapePaper } from '@/lib/vector-core/paper-kernel'
 // RAW-TRACE simplification (Dan 2026-06-15): RDP epsilon that removes ONLY the sub-pixel marching-
 // squares staircase, leaving true straight edges + sharp corners. NOT smoothing — the editor owns that.
 const RAW_TRACE_RDP_PX = 1.0
@@ -100,7 +103,7 @@ export function standardBirthShape(widthPx: number, heightPx: number, cfg: Shape
     { p: { x: widthPx, y: heightPx }, corner: true }, { p: { x: 0, y: heightPx }, corner: true },
   ] }] }
   const radiusPx = Math.min(Math.round(cfg.squareCornerMM / mmPerPx), Math.floor(Math.min(widthPx, heightPx) / 2))
-  return { vectorShape: filletShape(base, radiusPx), mmPerPx, radiusPx }
+  return { vectorShape: roundShapePaper(base, radiusPx), mmPerPx, radiusPx }
 }
 
 function bbox(pts: ReadonlyArray<Pt | Vec2Px>) {

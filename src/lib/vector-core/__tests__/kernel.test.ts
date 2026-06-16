@@ -3,7 +3,8 @@
 // Square: lines never subdivide. Flatten: chord error within tolerance. SVG: true C commands.
 
 import { describe, test, expect } from 'vitest'
-import { cubicPoint, flattenPath, toSVGPathD, transformShape, segments, shapeBBox, filletPath, filletPathSmart, ringToVPath, nearestOnPath, insertAnchorAt, insertAnchorCentered, deleteAnchorRefit, signedArea } from '../index'
+import { cubicPoint, flattenPath, toSVGPathD, transformShape, segments, shapeBBox, filletPath, ringToVPath, nearestOnPath, insertAnchorAt, insertAnchorCentered, deleteAnchorRefit, signedArea } from '../index'
+import { roundCornersPaper } from '../paper-kernel' // L6: corner-round is the Paper kernel
 import { unitShape, getShape } from '@/lib/shape-library'
 
 describe('vector-core kernel', () => {
@@ -141,33 +142,40 @@ describe('vector-core kernel', () => {
     expect(path.anchors.filter((a) => a.corner)).toHaveLength(4)
   })
 
-  test('smart fillet — square matches the exact line-line fillet (regression)', () => {
+  // (L6) filletPathSmart removed — corner-round is the Paper kernel now. These lock the kernel's
+  // selective + SYMMETRIC round (the L1 skew fix) directly; the resolver radius tests cover it in flow.
+  test('paper-kernel round — one corner rounds SYMMETRICALLY to a true arc; others stay sharp', () => {
     const square = unitShape('square')
     const r = 0.25
-    const exact = filletPath(square.paths[0], r)
-    const smart = filletPathSmart(square.paths[0], r)
-    expect(smart.anchors).toHaveLength(exact.anchors.length)
-    for (let i = 0; i < exact.anchors.length; i++) {
-      expect(smart.anchors[i].p.x).toBeCloseTo(exact.anchors[i].p.x, 6)
-      expect(smart.anchors[i].p.y).toBeCloseTo(exact.anchors[i].p.y, 6)
-    }
+    const v = { ...square.paths[0].anchors[0].p } // the corner we round
+    const one = roundCornersPaper(square.paths[0], r, (i) => i === 0)
+    expect(one.anchors.filter((a) => a.corner)).toHaveLength(3) // the other 3 corners stay sharp
+    expect(one.anchors.length).toBe(square.paths[0].anchors.length + 1) // 1 corner → 2 arc anchors
+    // the two arc-end anchors are EQUIDISTANT from the original vertex — a true constant-radius arc,
+    // symmetric on both legs (vs the old per-leg trim that skewed unequal legs).
+    const dists = one.anchors
+      .map((a) => Math.hypot(a.p.x - v.x, a.p.y - v.y))
+      .filter((d) => d > 1e-6 && d < r * 1.5)
+      .sort((a, b) => a - b)
+    expect(dists.length).toBeGreaterThanOrEqual(2)
+    expect(Math.abs(dists[0] - dists[1])).toBeLessThan(r * 0.05)
   })
 
-  test('smart fillet — heart cusps round into smooth joins (no corner anchors remain)', () => {
-    const heart = unitShape('heart')
-    const r = 0.12
-    const rounded = filletPathSmart(heart.paths[0], r)
-    expect(rounded.anchors.filter((a) => a.corner)).toHaveLength(0)
-    expect(rounded.anchors.length).toBeGreaterThan(heart.paths[0].anchors.length) // each cusp → 2 trim anchors
-    // the rounded path must stay continuous: every segment's endpoints chain without jumps
-    const segsR = segments(rounded)
-    for (let i = 0; i < segsR.length; i++) {
-      const next = segsR[(i + 1) % segsR.length]
-      expect(Math.hypot(segsR[i].b.x - next.a.x, segsR[i].b.y - next.a.y)).toBeLessThan(1e-9)
+  test('paper-kernel round — UNEQUAL-leg corner is symmetric (the exact case the hand-roll skewed)', () => {
+    const quad: { paths: { anchors: { p: { x: number; y: number }; hIn: null; hOut: null; corner: boolean }[] }[] } = {
+      paths: [{ anchors: [
+        { p: { x: 60, y: 420 }, hIn: null, hOut: null, corner: true },
+        { p: { x: 120, y: 120 }, hIn: null, hOut: null, corner: true }, // short in-leg, long out-leg
+        { p: { x: 400, y: 140 }, hIn: null, hOut: null, corner: true },
+        { p: { x: 360, y: 430 }, hIn: null, hOut: null, corner: true },
+      ] }],
     }
-    // bottom tip (was at y=1) is trimmed upward
-    const bb = shapeBBox({ paths: [rounded] }, 0.005)
-    expect(bb.maxY).toBeLessThan(1 - r * 0.2)
+    const r = 30
+    const rounded = roundCornersPaper(quad.paths[0], r, (i) => i === 1)
+    const v = { x: 120, y: 120 }
+    const ends = rounded.anchors.map((a) => Math.hypot(a.p.x - v.x, a.p.y - v.y)).filter((d) => d > 1e-6 && d < r * 2).sort((a, b) => a - b)
+    expect(ends.length).toBeGreaterThanOrEqual(2)
+    expect(Math.abs(ends[0] - ends[1])).toBeLessThan(2) // symmetric arc ends despite unequal legs
   })
 
   test('points on demand — insert ON a curve is geometry-IDENTICAL (exact de Casteljau split)', () => {
@@ -248,27 +256,6 @@ describe('vector-core kernel', () => {
     }
   })
 
-  test('single-corner fillet — only the selected square corner rounds; the other three stay sharp', () => {
-    const square = unitShape('square')
-    const r = 0.25
-    const one = filletPathSmart(square.paths[0], r, (i) => i === 0)
-    expect(one.anchors).toHaveLength(5) // 1 corner → 2 trim anchors; 3 corners survive
-    expect(one.anchors.filter((a) => a.corner)).toHaveLength(3)
-    // the bridging arc sits at distance r from the inset center of corner 0 (-1,-1) → (-1+r,-1+r)
-    const center = { x: -1 + r, y: -1 + r }
-    let maxErr = 0
-    for (const s of segments(one)) {
-      if (!s.c1 || !s.c2) continue
-      for (let k = 0; k <= 50; k++) {
-        const p = cubicPoint(s.a, s.c1, s.c2, s.b, k / 50)
-        maxErr = Math.max(maxErr, Math.abs(Math.hypot(p.x - center.x, p.y - center.y) - r))
-      }
-    }
-    expect(maxErr).toBeLessThan(r * 0.001)
-    const bb = shapeBBox({ paths: [one] }, 0.001)
-    expect(bb.maxX).toBeCloseTo(1, 6) // untouched corners hold the bbox
-    expect(bb.maxY).toBeCloseTo(1, 6)
-  })
 
   test('fillet at HALF-SIDE — a square becomes the inscribed CIRCLE (KAI-8940: 100% radius = circle)', () => {
     const square = unitShape('square') // side 2, centered at origin
