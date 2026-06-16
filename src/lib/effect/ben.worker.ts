@@ -24,13 +24,15 @@
 // and compare peak memory. Default = BEN2 (the measured baseline ~977 MB). No CPU-forcing here — that's
 // a separate experiment only if every model fails this method.
 // Sizes: BEN2 219 MB (MIT) · RMBG-1.4 88 MB fp16 (PAID/BRIA) · BiRefNet_lite 114 MB (MIT).
-type SegModel = { id: string; dtype: 'fp16' | 'fp32' | 'q8' | 'int8'; device?: 'webgpu' | 'wasm' }
+// `adapter` is the STABLE identity reported back on a successful cut (R1 — the spec/telemetry records
+// the model that actually ran, not a hard-coded constant). It is a model identity, not the HF repo id.
+type SegModel = { id: string; dtype: 'fp16' | 'fp32' | 'q8' | 'int8'; device?: 'webgpu' | 'wasm'; adapter: string }
 const MODELS: Record<string, SegModel> = {
-  ben2: { id: 'onnx-community/BEN2-ONNX', dtype: 'fp16' }, // webgpu OK (default)
-  rmbg: { id: 'briaai/RMBG-1.4', dtype: 'fp16' },          // paid — not a ship candidate
+  ben2: { id: 'onnx-community/BEN2-ONNX', dtype: 'fp16', adapter: 'ben2-onnx' }, // webgpu OK (default)
+  rmbg: { id: 'briaai/RMBG-1.4', dtype: 'fp16', adapter: 'rmbg-1.4' },          // paid — not a ship candidate
   // BiRefNet's ops fail to compile on the ORT-web WebGPU backend (OrtRun shader_helper error) — it
   // runs correctly on the WASM backend. fp32 (no fp16/q8 perf issues on wasm) for reliability.
-  birefnet: { id: 'onnx-community/BiRefNet_lite-ONNX', dtype: 'fp32', device: 'wasm' },
+  birefnet: { id: 'onnx-community/BiRefNet_lite-ONNX', dtype: 'fp32', device: 'wasm', adapter: 'birefnet-lite' },
 }
 const DEFAULT_MODEL = MODELS.ben2
 const resolveModel = (key?: string) => (key && MODELS[key]) || DEFAULT_MODEL
@@ -40,7 +42,8 @@ const resolveModel = (key?: string) => (key && MODELS[key]) || DEFAULT_MODEL
 // run them via transformers.js's already-bundled+configured onnxruntime-web (wasm EP), with each
 // model's documented preprocess (resize + /max + mean/std normalize) and postprocess (saliency →
 // min-max → alpha → full-res RGBA matte). All MIT/Apache (free, commercial-OK). Weights mirrored on HF.
-type RembgSpec = { url: string; size: number; mean: [number, number, number]; std: [number, number, number] }
+// `adapter` = the stable model identity reported back on a successful cut (R1 — true telemetry).
+type RembgSpec = { adapter: string; url: string; size: number; mean: [number, number, number]; std: [number, number, number] }
 // PRODUCTION trio weights are SELF-HOSTED same-origin under public/seg-models (committed; served by
 // Vercel /public) — no third-party fetch, works offline, and the silueta fallback loads fast (no
 // cold-CDN timeout → flood-fill). The test-only comparison models (u2net/isnet) stay on the HF CDN.
@@ -48,11 +51,11 @@ const SEG_HOST = '/seg-models'                                              // s
 const REMBG_HOST = 'https://huggingface.co/tomjackson2023/rembg/resolve/main' // CDN (test harness only)
 const REMBG: Record<string, RembgSpec> = {
   // U^2-Net family — input 320, ImageNet mean/std
-  silueta: { url: `${SEG_HOST}/silueta.onnx`,   size: 320, mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }, // self-hosted (fallback)
-  u2netp:  { url: `${SEG_HOST}/u2netp.onnx`,    size: 320, mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }, // self-hosted (primary)
-  u2net:   { url: `${REMBG_HOST}/u2net.onnx`,   size: 320, mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }, // harness only
+  silueta: { adapter: 'silueta', url: `${SEG_HOST}/silueta.onnx`,   size: 320, mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }, // self-hosted (fallback)
+  u2netp:  { adapter: 'u2netp',  url: `${SEG_HOST}/u2netp.onnx`,    size: 320, mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }, // self-hosted (primary)
+  u2net:   { adapter: 'u2net',   url: `${REMBG_HOST}/u2net.onnx`,   size: 320, mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }, // harness only
   // IS-Net (DIS general-use) — input 1024, 0.5/1.0 normalize
-  isnet:   { url: `${REMBG_HOST}/isnet-general-use.onnx`, size: 1024, mean: [0.5, 0.5, 0.5], std: [1.0, 1.0, 1.0] },   // harness only
+  isnet:   { adapter: 'isnet-general-use', url: `${REMBG_HOST}/isnet-general-use.onnx`, size: 1024, mean: [0.5, 0.5, 0.5], std: [1.0, 1.0, 1.0] },   // harness only
 }
 
 // PRODUCTION CUT-OUT CHAIN (Dan, 2026-06-16). Default (no `?seg=`) runs the free, mobile-fit trio:
@@ -249,7 +252,7 @@ ctx.onmessage = async (e: MessageEvent<{ id: number; url: string; preload?: bool
       for (const spec of chain) {
         try {
           const r = await runRembg(url, spec, (s) => ctx.postMessage({ id, progress: s }))
-          ctx.postMessage({ id, ok: true, data: r.data.buffer, width: r.width, height: r.height }, [r.data.buffer])
+          ctx.postMessage({ id, ok: true, data: r.data.buffer, width: r.width, height: r.height, adapter: spec.adapter }, [r.data.buffer])
           return
         } catch (err) {
           lastErr = err // try the next model in the chain (e.g. u2netp → silueta)
@@ -271,7 +274,7 @@ ctx.onmessage = async (e: MessageEvent<{ id: number; url: string; preload?: bool
     // Fresh standalone RGBA buffer (so it transfers cleanly).
     const rgba = new Uint8ClampedArray(width * height * 4)
     rgba.set(raw.data)
-    ctx.postMessage({ id, ok: true, data: rgba.buffer, width, height }, [rgba.buffer])
+    ctx.postMessage({ id, ok: true, data: rgba.buffer, width, height, adapter: model.adapter }, [rgba.buffer])
   } catch (err) {
     ctx.postMessage({ id, ok: false, error: String((err as Error)?.message ?? err) })
   }

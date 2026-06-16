@@ -22,6 +22,9 @@ export interface MLResult extends MaskResult {
   texMask: Uint8Array
   texW: number
   texH: number
+  /** the model that actually produced this cut (R1 — true identity for spec/telemetry, e.g. 'u2netp'
+   *  / 'silueta' / 'ben2-onnx'), reported by the worker rather than assumed from a constant. */
+  adapterId: string
 }
 
 export type SegmentProgress = 'downloading-model' | 'cutting'
@@ -44,7 +47,7 @@ let reqSeq = 0
 const pending = new Map<
   number,
   {
-    resolve: (v: { data: Uint8ClampedArray; width: number; height: number }) => void
+    resolve: (v: { data: Uint8ClampedArray; width: number; height: number; adapter?: string }) => void
     reject: (e: Error) => void
     onProgress?: (s: SegmentProgress) => void
     watchdog: ReturnType<typeof setTimeout>
@@ -61,14 +64,14 @@ function getBenWorker(): Worker {
   if (!benWorker) {
     benWorker = new Worker(new URL('./ben.worker.ts', import.meta.url), { type: 'module' })
     benWorker.onmessage = (e: MessageEvent) => {
-      const { id, ok, data, width, height, error, progress } = e.data as {
+      const { id, ok, data, width, height, error, progress, adapter } = e.data as {
         id: number; ok?: boolean; data?: ArrayBuffer; width?: number; height?: number; error?: string
-        progress?: SegmentProgress
+        progress?: SegmentProgress; adapter?: string
       }
       if (progress) { pending.get(id)?.onProgress?.(progress); return } // interim state, not a settle
       const p = settle(id)
       if (!p) return
-      if (ok && data) p.resolve({ data: new Uint8ClampedArray(data), width: width!, height: height! })
+      if (ok && data) p.resolve({ data: new Uint8ClampedArray(data), width: width!, height: height!, adapter })
       else if (ok) p.resolve({ data: new Uint8ClampedArray(0), width: 0, height: 0 }) // preload ack — no matte
       else p.reject(new Error(error || 'BEN worker failed'))
     }
@@ -84,7 +87,7 @@ function getBenWorker(): Worker {
 function runBenInWorker(
   url: string,
   onProgress?: (s: SegmentProgress) => void,
-): Promise<{ data: Uint8ClampedArray; width: number; height: number }> {
+): Promise<{ data: Uint8ClampedArray; width: number; height: number; adapter?: string }> {
   const id = ++reqSeq
   return new Promise((resolve, reject) => {
     const watchdog = setTimeout(() => {
@@ -159,7 +162,12 @@ export async function segmentML(
   return {
     mask, width: lo.w, height: lo.h, imageData: lo.img,
     texImage: hi.img, texMask: hi.m, texW: hi.w, texH: hi.h,
+    // R1: the worker reports which model produced the cut (trio: u2netp/silueta; harness: ben2 etc.).
+    // Fall back to the constant only if a message somehow omits it (never on a real successful cut).
+    adapterId: raw.adapter ?? ML_ADAPTER_ID,
   }
 }
 
+/** Legacy default identity — retained ONLY as the defensive fallback in `segmentML` when the worker
+ *  omits an adapter (never on a real cut). Production telemetry uses the worker-reported id (R1). */
 export const ML_ADAPTER_ID = 'ben2-onnx'

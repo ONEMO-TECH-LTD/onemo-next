@@ -34,7 +34,7 @@ export interface ShapeBuildConfig {
   squareCornerMM: number    // corner radius of the standard square
 }
 import { loadImageData, segment, adapterIdFor, dilateMask, smoothMask, deviceMaxTextureDim, type MaskResult } from './mask'
-import { segmentML, ML_ADAPTER_ID } from './segment-ml'
+import { segmentML } from './segment-ml'
 import { traceContourRaw } from './contour'
 import { composeFront, blurCanvas, imageDataToCanvas } from './composite'
 import type { EffectType } from './effect-types'
@@ -163,7 +163,8 @@ export async function prepareEffect(
     let mlMatte = false
     try {
       const r = await segmentML(url, cfg.maxImageDim, texDim, onProgress)
-      seg = r; adapterId = ML_ADAPTER_ID; texImage = r.texImage; mlMatte = true
+      // R1: record the model that ACTUALLY ran (u2netp/silueta/…), not a hard-coded 'ben2-onnx'.
+      seg = r; adapterId = r.adapterId; texImage = r.texImage; mlMatte = true
     } catch (e) {
       console.warn('[shaped] ML segmentation unavailable — falling back to flood-fill:', e)
       onProgress?.('fallback') // G4: a degraded cut must never be silent
