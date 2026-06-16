@@ -48,8 +48,9 @@ export interface EffectSpecDraft {
   /** RAW dense BEN trace (mask px, y-up). V4: PROVENANCE/debug ONLY (VD3/VD11) — NOT a resolution
    *  path; the editor resolves from the OutlineSource, never re-fairs from this. Shaped cut-outs only. */
   rawTracePx?: Pt[]
-  /** SHA-256 of the ORIGINAL uploaded bytes (preserve-at-ingest, §B5) — the manufacturing
-   *  record's true source identity. Absent only if the ingest backup failed. */
+  /** SHA-256 of the ORIGINAL uploaded bytes — the manufacturing record's true source identity.
+   *  Captured at ORDER / SAVE (Dan 2026-06-16: NOT stored at upload — privacy + cost), so it is
+   *  absent until that flow records it; the payload then uses a MARKED `ref-fallback:` (see payload.ts). */
   sourceBytesSha256?: string
   diagnostics: {
     rawContourNodes: number

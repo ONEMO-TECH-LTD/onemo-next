@@ -209,9 +209,9 @@ export function buildApprovedEffectPayload(prepared: PreparedEffect, opts: Build
   })
 
   const source = {
-    // true byte identity (preserve-at-ingest, §B5). The no-ingest fallback is MARKED so a ref-hash
-    // can never silently impersonate byte identity in a manufacturing record (KAI-8973/P1b) —
-    // fixtures/dev-only; production fails the save round's own gate before reaching here.
+    // true byte identity — captured at ORDER / SAVE (Dan 2026-06-16: not at upload). Until that flow
+    // records it, the fallback is MARKED `ref-fallback:` so a ref-hash can never silently impersonate
+    // byte identity in a manufacturing record (KAI-8973/P1b); the order/save round gates it for real.
     image_hash: spec.sourceBytesSha256 ?? `ref-fallback:${contentHash(spec.sourceRef)}`,
     dims: { widthPx: spec.maskWidthPx, heightPx: spec.maskHeightPx },
     color_space: 'srgb',

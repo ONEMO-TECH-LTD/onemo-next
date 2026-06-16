@@ -86,9 +86,10 @@ function PrototypePageInner() {
   const [internalTools] = useState(() =>
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('internal') === '1')
   const histRef = useRef<{ past: AppSnap[]; future: AppSnap[] }>({ past: [], future: [] })
-  // True byte identity of the CURRENT photo (preserve-at-ingest, §B5) — page-level so EVERY
-  // prepared spec for this file carries it: standard at upload, Magic's shaped replacement, and
-  // any snapshot restores (which inherit stamped specs). KAI-8973/P1b: Magic was dropping it.
+  // True byte identity of the CURRENT photo — captured at ORDER / SAVE (Dan 2026-06-16: NOT at
+  // upload — privacy + cost), so this stays null until that Phase-2 flow records it. Kept page-level
+  // so once it exists EVERY prepared spec for the file can carry it forward (standard, Magic's shaped
+  // replacement, snapshot restores). The old preserve-at-ingest disk write (§B5) is removed.
   const sourceShaRef = useRef<string | null>(null)
   const baselineRef = useRef<AppSnap | null>(null)
   const editorPreRef = useRef<AppSnap | null>(null)
