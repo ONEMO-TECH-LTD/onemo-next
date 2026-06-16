@@ -14,10 +14,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   validateSelfIntersection,
-  rdpClosed,
   type Vec2Px,
 } from '@/lib/outline-core/math'
-import { MIN_ANCHOR_SEPARATION_MM } from '@/lib/effect/geometry-truth'
 // V4 engine (blueprint v4-foundation.md): one impartial resolve(source, adjustments). The editor
 // writes the recipe; the engine owns shape. No corner-pin, no vectoriseTrace, no baked timeline.
 import { mintIds, type GlobalAdjustments, type LocalAdjustment } from '@/lib/effect/outline-resolve'
@@ -28,24 +26,18 @@ import type { Pt } from '@/lib/effect/types'
 import { UndoIcon, RedoIcon, CheckIcon, CloseIcon, AddPointIcon, DeleteIcon, ShapeIcon, TuneIcon, OutlineIcon, PreviewIcon, PreviewOffIcon , PointsIcon, MagicIcon } from './icons'
 import { toast } from '../ui/Toast'
 import { perfGesture } from '../dev/PerfHUD'
-import { generateShapeRing, resampleClosed, type ShapeKind, type ShapeParams } from './shapes'
+import { type ShapeKind, type ShapeParams } from './shapes'
 // VECTOR CORE (reset Run 1): vector-native kinds render/commit/transform on a true Bézier VShape;
 // the doc stays as the interaction SHADOW (a derived flatten artifact — bbox/hit/grips math only).
-import { shapeToSVGPathD, flattenShape, filletShape, ringToVPath, nearestOnPath, insertAnchorCentered, deleteAnchorRefit, shapeBBox, type VShape, type VAnchor, type Vec2 } from '@/lib/vector-core'
+import { shapeToSVGPathD, flattenShape, filletShape, nearestOnPath, insertAnchorCentered, deleteAnchorRefit, shapeBBox, type VShape, type VAnchor, type Vec2 } from '@/lib/vector-core'
 import { hasVectorDef, getShape } from '@/lib/shape-library'
 // Run 8 — SVG shape upload: a downloaded/Figma-exported outline becomes a first-class vector
 // shape through the export module's dialect gate (loud rejection outside the v1 boundary).
 import { vshapeFromSVG, fitShapeToBox } from '@/lib/export'
-// Run 10 — image-shape upload: threshold mask → the SAME trace machinery as Magic → fitted vector.
-import { maskFromImageData } from '@/lib/effect/image-shape'
-import { smoothMask } from '@/lib/effect/mask'
-import { traceContourRaw } from '@/lib/effect/contour'
-
-// Run-3 live generators: dense internal sample → ONE Schneider fit at spawn → vector path out.
-// Segments never leave the generator (blueprint modules/generators.md).
-const GEN_VECTOR_KINDS = new Set<ShapeKind>(['daisy', 'pinwheel', 'form', 'blob'])
 // Run 2 · G6 decomposition — seam 1: pure doc-space geometry; seam 2: chip lineup + glyphs.
 import { DEFAULT_SHAPE_PARAMS } from './editor/chips'
+// R8 (Creator v5) — seam: PRODUCER ADAPTERS (pure source builders) live in editor/producers.
+import { GEN_VECTOR_KINDS, shapePreviewD, vecFromGenerator, vecFromImageFile } from './editor/producers'
 import { useOutlineEditing } from './editor/useOutlineEditing'
 import { useCanvasView } from './editor/useCanvasView'
 import { AdjustSheet, ImageSheet, ShapeSheet, type AdjustSub } from './editor/sheets'
@@ -67,11 +59,6 @@ interface OutlineEditorProps {
 
 const VIEW_W = 1000
 const VIEW_H = 1000
-
-/** display-only ring → SVG polyline `d` (transient previews render rings, never documents). */
-function ringPathD(ring: ReadonlyArray<readonly [number, number]>): string {
-  return ring.length ? `M ${ring.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ')} Z` : ''
-}
 
 // Rotate glyph (Phosphor ArrowClockwise, 256-box) drawn inside the rotate handle — white on the brand grip.
 const ROTATE_GLYPH_D = 'M244,56v48a12,12,0,0,1-12,12H184a12,12,0,1,1,0-24H201.1l-19-17.38c-.13-.12-.26-.24-.38-.37A76,76,0,1,0,127,204h1a75.53,75.53,0,0,0,52.15-20.72,12,12,0,0,1,16.49,17.45A99.45,99.45,0,0,1,128,228h-1.37A100,100,0,1,1,198.51,57.06L220,76.72V56a12,12,0,0,1,24,0Z'
@@ -795,24 +782,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     setShapeKind(null); setShapePreview(null)
   }, [spec, seedSource])
 
-  // TRANSIENT PREVIEW ONLY: the live morph shown while a generator tick-bar drags — a display
-  // ring `d`, never geometry (commitShape fits ONCE into the vector on release).
-  const shapePreviewD = useCallback((kind: ShapeKind, overrides: Partial<ShapeParams> = {}): string => {
-    const { widthPx, heightPx } = dimsRef.current
-    const ring = resampleClosed(generateShapeRing({ kind, ...shapeParamsRef.current, ...overrides }, widthPx, heightPx), Math.max(widthPx, heightPx) / 220)
-    return ringPathD(ring)
-  }, [])
-  /** Run 3: a live generator's output FITTED ONCE into a true vector path (sub-10ms). */
-  const vecFromGenerator = useCallback((kind: ShapeKind, overrides: Partial<ShapeParams> = {}): VShape => {
-    const { widthPx, heightPx } = dimsRef.current
-    const ring = resampleClosed(generateShapeRing({ kind, ...shapeParamsRef.current, ...overrides }, widthPx, heightPx), Math.max(widthPx, heightPx) / 600)
-    const tol = Math.max(0.4, Math.min(widthPx, heightPx) / 1600)
-    // compaction budget 2x fit tolerance + the mm-true pair floor (KAI-8974 re-gate: the daisy's
-    // 10px valley double survived the relative floor — finger distinctness is a PHYSICAL fact)
-    const minPair = MIN_ANCHOR_SEPARATION_MM / (useOutlineStore.getState().spec?.mmPerPx || 70 / Math.max(widthPx, heightPx))
-    const path = ringToVPath(ring.map(([x, y]) => ({ x, y })), 60, tol, undefined, tol * 2, minPair)
-    return { paths: [path] }
-  }, [])
+  // R8: producer geometry (shapePreviewD / vecFromGenerator / vecFromImageFile) lives in
+  // editor/producers (pure, seam 1). The pickers below call them with explicit dims + params.
+  const genMmPerPx = () => useOutlineStore.getState().spec?.mmPerPx
   const pickShape = useCallback((kind: ShapeKind) => {
     setShapeKind(kind)
     setShapePreview(null)
@@ -835,7 +807,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     }
     // Run 3: live generators spawn as FITTED vector paths — segments never leave the generator
     if (GEN_VECTOR_KINDS.has(kind)) {
-      applyVec(vecFromGenerator(kind, overrides), null, 'vector')
+      applyVec(vecFromGenerator(kind, shapeParamsRef.current, dimsRef.current, genMmPerPx()), null, 'vector')
       setRadius(0); setAllSelected(false)
       setShowAnchors(false)
       return
@@ -843,7 +815,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     // every ShapeKind is vector-constructed (library def or fitted generator) — an uncovered
     // kind is a build error, never a polyline (single geometry truth)
     throw new Error(`pickShape: no vector construction for shape "${kind}"`)
-  }, [applyVec, vecFromGenerator])
+  }, [applyVec])
   /** stepper: ±delta on an integer param, regenerate immediately (undoable). */
   const nudgeParam = useCallback((key: 'sides' | 'points' | 'lobes' | 'petals' | 'blades', delta: number, min: number, max: number) => {
     if (!shapeKind) return
@@ -859,27 +831,27 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     }
     // generator kinds re-fit their new construction (petals/blades/lobes steppers)
     if (GEN_VECTOR_KINDS.has(shapeKind)) {
-      applyVec(vecFromGenerator(shapeKind, { [key]: n }), null, 'vector')
+      applyVec(vecFromGenerator(shapeKind, shapeParamsRef.current, dimsRef.current, genMmPerPx()), null, 'vector')
       return
     }
     throw new Error(`nudgeParam: no vector construction for shape "${shapeKind}"`)
-  }, [shapeKind, applyVec, vecFromGenerator])
+  }, [shapeKind, applyVec])
   /** tick-bar: transient preview per tick (§6.3); commitShape applies on release. */
   const previewParam = useCallback((key: 'spikiness' | 'pinch' | 'depth' | 'swirl' | 'waviness', v: number) => {
     if (!shapeKind) return
     const next = { ...shapeParamsRef.current, [key]: v }
     shapeParamsRef.current = next; setShapeParams(next)
     if (hasVectorDef(shapeKind)) return // vector kinds regenerate exactly on release (commitShape)
-    setShapePreview(shapePreviewD(shapeKind, { [key]: v }))
-  }, [shapeKind, shapePreviewD])
+    setShapePreview(shapePreviewD(shapeKind, shapeParamsRef.current, dimsRef.current))
+  }, [shapeKind])
   /** blob dice: reroll the seed, regenerate immediately (undoable). */
   const rerollBlob = useCallback(() => {
     if (shapeKind !== 'blob') return
     const seed = Math.floor(Math.random() * 1e9)
     const next = { ...shapeParamsRef.current, seed }
     shapeParamsRef.current = next; setShapeParams(next)
-    applyVec(vecFromGenerator('blob', { seed }), null, 'vector') // Run 3: the dice rolls a vector
-  }, [shapeKind, applyVec, vecFromGenerator])
+    applyVec(vecFromGenerator('blob', shapeParamsRef.current, dimsRef.current, genMmPerPx()), null, 'vector') // Run 3: the dice rolls a vector
+  }, [shapeKind, applyVec])
   /** Land an uploaded shape: fit into the image box, first-class vector. SVG keeps itself as the
    *  pristine base (clean authored corners); a traced image adopts no base (fitted geometry). */
   const landUploadedShape = useCallback((raw: VShape, withBase: boolean) => {
@@ -891,35 +863,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     setRadius(0); setAllSelected(false)
     setShowAnchors(false)
   }, [applyVec])
-  /** Image upload (V4): decode → threshold mask → the SAME machinery as Magic — smoothMask →
-   *  traceContourRaw → RDP-straight polygon. NO corner-pin, NO fairing: the result is a raw
-   *  marching-squares OutlineSource; the editor's tools shape it (impartial with Magic / stock / drawn).
-   *  Winding is matched to Magic's source (signedArea<0 in y-down editor space) so the mesh edge can
-   *  never invert for an upload. landUploadedShape box-fits it before it becomes the source. */
-  const vecFromImageFile = useCallback(async (file: File): Promise<VShape> => {
-    const bmp = await createImageBitmap(file)
-    try {
-      const MAX = 512
-      const k = Math.min(1, MAX / Math.max(bmp.width, bmp.height))
-      const w = Math.max(2, Math.round(bmp.width * k)), h = Math.max(2, Math.round(bmp.height * k))
-      const cv = document.createElement('canvas')
-      cv.width = w; cv.height = h
-      const ctx = cv.getContext('2d')!
-      ctx.drawImage(bmp, 0, 0, w, h)
-      const { mask, width, height } = maskFromImageData(ctx.getImageData(0, 0, w, h))
-      // mask hygiene Magic applies before tracing — Otsu on anti-aliased edges leaves sub-px jitter.
-      const ring = traceContourRaw(smoothMask(mask, width, height, 3), width, height)
-      if (!ring) throw new Error('No clear shape found — try an image with a stronger silhouette')
-      // canvas coords ARE y-down (= editor space). traceContourRaw normalizes CCW; reverse it so the
-      // upload source matches Magic's source winding (signedArea<0 in y-down) — no edge inversion.
-      const oriented = [...ring].reverse()
-      const straight = rdpClosed(oriented.map(([x, y]) => [x, y] as Vec2Px), 1.0)
-      if (straight.length < 3) throw new Error('No clear shape found — try an image with a stronger silhouette')
-      return { paths: [{ anchors: straight.map(([x, y]) => ({ p: { x, y }, hIn: null, hOut: null, corner: true })) }] }
-    } finally {
-      bmp.close()
-    }
-  }, [])
   /** Run 8 + Run 10 — ONE upload entry: SVG outlines import verbatim through the dialect gate;
    *  images are vectorised under the hood. Failures are loud product language, never a mangle. */
   const onUploadShape = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -931,7 +874,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
       ? file.text().then((text) => landUploadedShape(vshapeFromSVG(text), true))
       : vecFromImageFile(file).then((v) => landUploadedShape(v, false))
     ).catch((err: unknown) => toast('error', err instanceof Error ? err.message : 'This file could not be read'))
-  }, [landUploadedShape, vecFromImageFile])
+  }, [landUploadedShape])
 
   const commitShape = useCallback(() => {
     if (shapeKind && hasVectorDef(shapeKind)) {
@@ -943,11 +886,11 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     if (shapeKind && GEN_VECTOR_KINDS.has(shapeKind)) {
       // release bakes the live doc-morph into ONE fitted vector (§6.3: transient ticks, vector commit)
       setShapePreview(null)
-      applyVec(vecFromGenerator(shapeKind), null, 'vector')
+      applyVec(vecFromGenerator(shapeKind, shapeParamsRef.current, dimsRef.current, genMmPerPx()), null, 'vector')
       return
     }
     // no doc commit remains — the preview is a display ring; GEN kinds committed above
-  }, [shapeKind, applyVec, vecFromGenerator])
+  }, [shapeKind, applyVec])
 
   // Rotation handlers — desktop handle + two-finger gesture both drive rotatePreview, baked on release.
   const beginRotateHandle = useCallback((e: React.PointerEvent) => {
