@@ -25,7 +25,7 @@ import {
   validateSelfIntersection,
   repairSimplePolygon,
   type Vec2Px,
-} from '@/lib/outline-core'
+} from '@/lib/outline-core/math'
 import { flattenPath, filletPathSmart, scaleAnchorTension, type VShape, type VPath, type VAnchor } from '@/lib/vector-core'
 import type { Pt } from './types'
 

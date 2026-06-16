@@ -17,7 +17,7 @@
 // editor's resolve() owns shaping. That dead fit moved to `geometry-truth.legacy.ts` (test-only) so
 // this module's surface can't import it as authority.
 
-import { validateSelfIntersection, signedArea, contentHash, stableStringify, type Vec2Px } from '@/lib/outline-core'
+import { validateSelfIntersection, signedArea, contentHash, stableStringify, type Vec2Px } from '@/lib/outline-core/math'
 import { flattenShape, type VShape } from '@/lib/vector-core'
 import type { Contour, Pt } from './types'
 

@@ -11,7 +11,7 @@
 // Spaces: vector shapes live in MASK-PX, Y-DOWN; raw traces arrive in mask-px Y-UP — vectoriseTrace
 // owns the flip.
 
-import { fairTracedRing, rdpClosed, validateSelfIntersection, repairSimplePolygon, type FairTracedRingOpts, type Vec2Px } from '@/lib/outline-core'
+import { fairTracedRing, rdpClosed, validateSelfIntersection, repairSimplePolygon, type FairTracedRingOpts, type Vec2Px } from '@/lib/outline-core/math'
 import { flattenShape, ringToVPath, filletPathSmart, type VShape } from '@/lib/vector-core'
 import type { Pt } from './types'
 

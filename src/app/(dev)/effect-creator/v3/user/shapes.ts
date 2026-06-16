@@ -10,7 +10,7 @@
 // (segments never leave this module):
 //   • daisy(petals, depth) · pinwheel(blades, swirl) · form(lobes, pinch) · blob(waviness, seed)
 
-import type { Vec2Px } from '@/lib/outline-core'
+import type { Vec2Px } from '@/lib/outline-core/math'
 
 export type ShapeKind =
   | 'pinched' | 'daisy' | 'heart' | 'bolt' | 'sparkle' | 'teardrop' | 'leaf' | 'lens'

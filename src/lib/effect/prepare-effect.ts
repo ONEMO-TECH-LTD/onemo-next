@@ -38,7 +38,7 @@ import { segmentML } from './segment-ml'
 import { traceContourRaw } from './contour'
 import { composeFront, blurCanvas, imageDataToCanvas } from './composite'
 import type { EffectType } from './effect-types'
-import { rdpClosed, type Vec2Px } from '@/lib/outline-core'
+import { rdpClosed, type Vec2Px } from '@/lib/outline-core/math'
 // REBUILD-PLAN-v2 §B1 — truth at birth: geometry is born as ONE VShape; the manufacturing contour
 // is DERIVED from it. Shaped generation emits the RAW marching-squares straight polygon (no Stage B).
 import { contourFromShape } from './geometry-truth'

@@ -19,7 +19,7 @@
 // PURE: no three / no DOM. The 3D back-cap dot viz (ShapedModel, §8.5b sub-step 2) consumes `anchors`; the
 // failure UI consumes `locators` + `issues`. `result_hash` rides in the ApprovedEffectPayload (§11).
 
-import { contentHash, stableStringify } from '@/lib/outline-core'
+import { contentHash, stableStringify } from '@/lib/outline-core/math'
 import type { Contour, Pt } from './types'
 
 export type AttachmentSystem = 'magnet' | 'velcro'

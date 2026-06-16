@@ -2,7 +2,7 @@
 // The editor's geometry truth is a VShape; interaction math (hit-tests, grips) runs on its
 // flattened ring. No document model exists here — these are pure point/ring helpers.
 
-import type { Vec2Px } from '@/lib/outline-core'
+import type { Vec2Px } from '@/lib/outline-core/math'
 
 /** crop-grip identity: 4 corners + 4 mid-edges (iOS-crop pattern). */
 export type GripId = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w'

@@ -16,7 +16,7 @@ import {
   validateSelfIntersection,
   rdpClosed,
   type Vec2Px,
-} from '@/lib/outline-core'
+} from '@/lib/outline-core/math'
 import { MIN_ANCHOR_SEPARATION_MM } from '@/lib/effect/geometry-truth'
 // V4 engine (blueprint v4-foundation.md): one impartial resolve(source, adjustments). The editor
 // writes the recipe; the engine owns shape. No corner-pin, no vectoriseTrace, no baked timeline.

@@ -4,7 +4,7 @@
 // Blueprint: v3/blueprint/modules/editor.md (G11 — zoom is viewBox-true, verified as the lens).
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { Vec2Px } from '@/lib/outline-core'
+import type { Vec2Px } from '@/lib/outline-core/math'
 
 export interface CanvasView {
   scale: number

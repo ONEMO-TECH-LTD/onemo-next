@@ -1,6 +1,11 @@
 // outline-core — public surface (A1a)
 // Deterministic 2D outline foundation, shared by client worker + server compiler + golden tests.
 // Schema lands first (this slice); the resolver/reducer/normalizer functions land next in A1a.
+//
+// (R5 — Creator v5) BOUNDARY: the v4/active Creator (effect-creator/v3 + lib/effect) imports its
+// math from `./math` — the narrow active surface. The DOCUMENT RUNTIME re-exported below (OutlineDocument
+// types, reducer/replayCommands, resolveOutlineDocument, SDF blend, livewire) is DORMANT — retained
+// only for the retired v1/v2 editors. Do NOT import it into v4 code as authority (audit §8).
 
 export * from './types'
 

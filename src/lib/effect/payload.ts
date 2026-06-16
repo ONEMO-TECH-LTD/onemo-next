@@ -16,7 +16,7 @@ import type { EffectType } from './effect-types'
 import { EFFECT_SIZES, BASE_LONGEST_SIDE_MM, toFinalPhysicalMm, type EffectSize, type FinalBBox } from './sizes'
 import { validateAttachment, type AttachmentSystem } from './attachment'
 import type { Contour, Pt } from './types'
-import { contentHash, stableStringify, normalizeRing } from '@/lib/outline-core'
+import { contentHash, stableStringify, normalizeRing } from '@/lib/outline-core/math'
 // REBUILD-PLAN-v2 §B4: feasibility + identity derive from the SINGLE vector truth — the doc model
 // is gone from the save path entirely.
 import { assertContourCuttable, vectorShapeHash } from './geometry-truth'
