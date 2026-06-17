@@ -27,6 +27,7 @@ import { toast } from './ui/Toast'
 import { rdpClosed, repairSimplePolygon, type Vec2Px } from '@/lib/outline-core/math'
 import { simplifyPaper } from '@/lib/vector-core/paper-kernel'
 import { insetRingMM } from '@/lib/effect/offset'
+import { flattenPath } from '@/lib/vector-core'
 import type { VShape, VPath } from '@/lib/vector-core'
 
 // Dynamic imports — no SSR for 3D components
@@ -61,18 +62,20 @@ function buildTrace(rawTracePx: ReadonlyArray<readonly [number, number]>, H: num
   let pts = rdpClosed(yDown, eps)
   pts = repairSimplePolygon(pts, 1)
   if (pts.length < 3) return null
-  // OFFSET (the generation padding, now a tool): Clipper2 outset/inset with round joins. 0 = tight
-  // (the exact matte edge); + = margin/bleed; − = inset. Same engine as the −8mm magnetic inset.
-  if (offsetMM !== 0) {
-    const ringMM = pts.map(([x, y]) => [x * mmPerPx, y * mmPerPx] as [number, number])
-    const off = insetRingMM(ringMM, offsetMM)
-    if (off && off.length >= 3) pts = off.map(([x, y]) => [x / mmPerPx, y / mmPerPx] as Vec2Px)
-  }
+  // DETAIL + SMOOTH define the shape FIRST.
   let path: VPath = { anchors: pts.map(([x, y]) => ({ p: { x, y }, hIn: null, hOut: null, corner: true })) }
   if (smoothPct > 0) {
     const tolPx = (Math.max(0, Math.min(100, smoothPct)) / 100) * SMOOTH_MAX_MM / mmPerPx
     const fit = simplifyPaper(path, tolPx) // Paper curve-fit: fair the pixel staircase into smooth bézier curves
     if (fit.anchors.length >= 3) path = fit // keep the polygon if the fit collapsed (degenerate guard)
+  }
+  // OFFSET LAST (Dan): expand the FINISHED detail+smooth shape uniformly — flatten it, Clipper2 outset
+  // (round joins), and DON'T re-simplify. So offset preserves the shape and just grows it; no dynamic
+  // re-fairing of the offset result (the cowlick keeps its form). Same engine as the −8mm magnetic inset.
+  if (offsetMM > 0) {
+    const ringMM = flattenPath(path, 0.3).map((p) => [p.x * mmPerPx, p.y * mmPerPx] as [number, number])
+    const off = insetRingMM(ringMM, offsetMM)
+    if (off && off.length >= 3) path = { anchors: off.map(([x, y]) => ({ p: { x: x / mmPerPx, y: y / mmPerPx }, hIn: null, hOut: null, corner: true })) }
   }
   return { paths: [path] }
 }
