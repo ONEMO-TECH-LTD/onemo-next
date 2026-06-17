@@ -114,7 +114,7 @@ export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, radiusApplies
   const dials = [
     { k: 'radius' as const, label: cornerMode ? 'Corner' : 'Radius', icon: <CornerIcon />, ring: radiusApplies && radius > 0 ? radius / Math.max(maxRadius, 1) : 0 },
     { k: 'curve' as const, label: 'Curve', icon: <RoundIcon />, ring: curveSelected && curveVal > 0 ? curveVal / 100 : 0 },
-    { k: 'detail' as const, label: 'Detail', icon: <DetailIcon />, ring: (100 - global.detail) / 100 },
+    { k: 'detail' as const, label: 'Detail', icon: <DetailIcon />, ring: global.detail / 100 },
     { k: 'smooth' as const, label: 'Smooth', icon: <SmoothIcon />, ring: global.smooth / 100 },
     { k: 'straighten' as const, label: 'Straighten', icon: <LineIcon />, ring: global.straighten / 100 },
   ]
