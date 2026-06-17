@@ -92,10 +92,19 @@
 .grip {
   fill: none;
   stroke: #fff;
-  stroke-opacity: 0.96;
+  stroke-opacity: 0.25; /* Dan 2026-06-17: 75% transparent */
   stroke-linecap: round;
   stroke-linejoin: round;
   pointer-events: none;
+}
+/* Dan 2026-06-17: active-tool indicator — small colour dot under the live Adjust chip. */
+.activeDot {
+  display: block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  margin: 3px auto 0;
+  background: var(--semantic-bg-brand-primary, #5b8cff);
 }
 .gripHit {
   fill: none;

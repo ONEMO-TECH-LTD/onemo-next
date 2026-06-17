@@ -382,8 +382,12 @@ export function useEditorGestures(ctx: GestureCtx) {
     sy = Math.max(sy, MIN / (b.maxY - b.minY))
     if (st.which === 'n' || st.which === 's') sx = 1
     if (st.which === 'e' || st.which === 'w') sy = 1
-    // 6.2: a LOCKED frame scales uniformly on corner pulls (aspect preserved); edges always stretch
-    if (frameLocked && st.which.length === 2) { const u = Math.max(sx, sy); sx = u; sy = u }
+    // 6.2 (Dan 2026-06-17): a LOCKED frame SCALES uniformly on ANY grip — corners use the dominant axis,
+    // edges use their single active axis — so a locked shape scales (aspect preserved), never deforms.
+    if (frameLocked) {
+      const u = st.which.length === 2 ? Math.max(sx, sy) : (st.which === 'n' || st.which === 's') ? sy : sx
+      sx = u; sy = u
+    }
     stretchRef.current = { ...st, sx, sy }
     setStretchLive({ sx, sy, ax: st.ax, ay: st.ay })
   }, [])

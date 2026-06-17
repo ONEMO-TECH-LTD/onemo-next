@@ -132,6 +132,8 @@ export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, radiusApplies
           >
             <span className={styles.chipIcon} style={{ position: 'relative' }}>{t.icon}<ChipRing frac={t.ring} /></span>
             <span className={styles.chipLabel}>{t.label}</span>
+            {/* Dan 2026-06-17: small colour dot under the ACTIVE tool — marks which tool is live */}
+            {adjustSub === t.k && <span className={styles.activeDot} aria-hidden="true" />}
           </button>
         ))}
       </ChipRow>

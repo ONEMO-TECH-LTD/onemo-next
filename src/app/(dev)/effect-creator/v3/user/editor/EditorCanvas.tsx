@@ -261,8 +261,8 @@ export function EditorCanvas(props: EditorCanvasProps) {
                 <g>
                   {grips.map((g) => (
                     <g key={g.id}>
-                      <path className={styles.gripUnder} d={g.d} strokeWidth={nodeR * 0.8} />
-                      <path className={styles.grip} d={g.d} strokeWidth={nodeR * 0.55} />
+                      {/* Dan 2026-06-17: no backing stroke (gripUnder removed); grip 50% slimmer */}
+                      <path className={styles.grip} d={g.d} strokeWidth={nodeR * 0.275} />
                       <path
                         className={styles.gripHit}
                         d={g.d}
