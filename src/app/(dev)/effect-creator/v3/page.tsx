@@ -24,6 +24,8 @@ import { useOutlineStore } from './user/outlineStore'
 import type { DesignState } from './types'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
 import { toast } from './ui/Toast'
+import { rdpClosed, type Vec2Px } from '@/lib/outline-core/math'
+import type { VShape } from '@/lib/vector-core'
 
 // Dynamic imports — no SSR for 3D components
 const EffectViewer = dynamic(() => import('./core/EffectViewer'), { ssr: false })
@@ -36,6 +38,13 @@ const EmptyState = dynamic(() => import('./user/EmptyState'), { ssr: false })
 const GenerateShimmer = dynamic(() => import('./user/GenerateShimmer'), { ssr: false })
 const ToastSurface = dynamic(() => import('./ui/Toast'), { ssr: false })
 const PerfHUD = dynamic(() => import('./dev/PerfHUD'), { ssr: false })
+
+// POC (Dan 2026-06-17, branch v5poc-detail): post-generation "Detail" — re-simplify the cached AI
+// trace to a chosen detail WITHOUT re-running the AI. 100% = tightest (hugs the silhouette; only the
+// pixel staircase / hair-wobble removed); 0% = coarsest facets. mm-true (scale-invariant). Tunable.
+const DETAIL_TIGHT_MM = 0.3
+const DETAIL_COARSE_MM = 10
+const detailToTraceMm = (pct: number) => { const d = Math.max(0, Math.min(100, pct)) / 100; return DETAIL_COARSE_MM + d * (DETAIL_TIGHT_MM - DETAIL_COARSE_MM) }
 
 function PrototypePageInner() {
   const searchParams = useSearchParams()
@@ -53,10 +62,9 @@ function PrototypePageInner() {
   }, [])
   const { colors, setBackColor } = useSceneStore()
   const [showColors, setShowColors] = useState(false)
-  // DEV TUNING (Dan, 2026-06-17): the Magic-trace manufacturing min-feature floor (mm). Adjust BEFORE
-  // tapping Magic to set how hard the trace simplifies — bigger = fewer facets / no wobble, smaller =
-  // more detail kept. Tap Magic to apply + see. (Tuning affordance; gate/remove before launch.)
-  const [minFeatureMM, setMinFeatureMM] = useState(5)
+  // POC (Dan 2026-06-17, v5poc-detail): post-generation Detail dial (0..100, 100 = tightest). Changing
+  // it re-simplifies the CACHED AI trace live — no AI re-run. Default tight; tune live on device.
+  const [detail, setDetail] = useState(90)
   const sceneName = searchParams.get('scene')
 
   // ── #23 GLOBAL history — one undo/redo/reset for the whole creator (Magic, editor sessions,
@@ -253,7 +261,7 @@ function PrototypePageInner() {
         // Progress text is intentionally silent (Dan, 2026-06-16: no "Downloading…/Cutting out…"
         // captions). The shimmer animation alone signals work; only the honest fallback still toasts.
         // DEV TUNING: feed the chosen manufacturing min-feature floor into the trace simplification.
-        prepareEffect(artworkUrl, 'shaped', { ...EFFECT_BUILD_CONFIG, minFeatureMM }, (s) => {
+        prepareEffect(artworkUrl, 'shaped', { ...EFFECT_BUILD_CONFIG, minFeatureMM: detailToTraceMm(detail) }, (s) => {
           if (s === 'fallback') toast('warn', 'AI cut-out unavailable — used the simple background cut instead') // G4
         }),
       )
@@ -281,7 +289,23 @@ function PrototypePageInner() {
         toast('error', `Magic failed: ${(e as Error)?.message ?? e}`) // G4 — incl. the TD-E watchdog
         setGenerating(false)
       })
-  }, [artworkUrl, generating, snapNow, pushHistory, designState, minFeatureMM])
+  }, [artworkUrl, generating, snapNow, pushHistory, designState, detail])
+
+  // POC: live post-gen Detail — re-simplify the cached AI trace (spec.rawTracePx) at `pct` and push it
+  // to the 3D via the store, WITHOUT re-running the AI. Unified RDP (the same op generation uses).
+  const reTrace = useCallback((pct: number) => {
+    const st = useOutlineStore.getState()
+    const spec = st.spec
+    if (!spec?.rawTracePx?.length) return
+    const H = spec.maskHeightPx
+    const eps = Math.max(1, detailToTraceMm(pct) / spec.mmPerPx)
+    const yDown = spec.rawTracePx.map(([x, y]) => [x, H - y] as Vec2Px)
+    const straight = rdpClosed(yDown, eps)
+    if (straight.length < 3) return
+    const vectorShape: VShape = { paths: [{ anchors: straight.map(([x, y]) => ({ p: { x, y }, hIn: null, hOut: null, corner: true })) }] }
+    st.setSpec({ ...spec, vectorShape })
+    st.commitGeometry(vectorShape)
+  }, [])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -393,16 +417,14 @@ function PrototypePageInner() {
         />
       )}
 
-      {/* DEV TUNING (Dan, 2026-06-17): Magic-trace manufacturing min-feature floor. Adjust, then tap
-          Magic to re-cut + see. Bigger = fewer facets / no wobble; smaller = more detail kept.
-          Tuning affordance only — gate behind ?internal or remove before launch. */}
-      {artworkUrl && !editingOutline && !showColors && (
+      {/* POC (Dan 2026-06-17, v5poc-detail): post-gen Detail dial — re-simplifies the cached AI trace
+          LIVE (no AI re-run). 100% = tightest; lower = coarser facets. Tuning affordance. */}
+      {artworkUrl && autoOutline && !editingOutline && !showColors && (
         <div style={{ position: 'fixed', left: 0, right: 0, top: 76, display: 'flex', justifyContent: 'center', pointerEvents: 'none', zIndex: 50 }}>
           <div style={{ pointerEvents: 'auto', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderRadius: 999, background: 'rgba(20,20,22,0.82)', color: '#f5f5f0', font: '500 13px system-ui, sans-serif', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', boxShadow: '0 4px 16px rgba(0,0,0,0.25)' }}>
-            <span style={{ opacity: 0.75 }}>Detail floor</span>
-            <input type="range" min={0} max={15} step={0.5} value={minFeatureMM} onChange={(e) => setMinFeatureMM(Number(e.target.value))} style={{ width: 140, accentColor: '#c8a23c' }} aria-label="Magic trace detail floor (mm)" />
-            <span style={{ minWidth: 46, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{minFeatureMM} mm</span>
-            <span style={{ opacity: 0.5, fontSize: 11 }}>· tap Magic</span>
+            <span style={{ opacity: 0.75 }}>Detail</span>
+            <input type="range" min={0} max={100} step={1} value={detail} onChange={(e) => { const v = Number(e.target.value); setDetail(v); reTrace(v) }} style={{ width: 160, accentColor: '#c8a23c' }} aria-label="Magic trace detail (post-generation)" />
+            <span style={{ minWidth: 40, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{detail}%</span>
           </div>
         </div>
       )}
