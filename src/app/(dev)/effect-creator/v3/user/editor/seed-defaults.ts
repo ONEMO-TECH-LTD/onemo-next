@@ -17,12 +17,12 @@ export function cornerRadiusAdjustments(shape: VShape, radiusPx: number): Outlin
 }
 
 /** T6 — post-generation AUTO-TUNE: the default recipe applied right after Magic so the cut-out is
- *  organic by default (the user need not touch a slider). detail = sparse, straighten = clean trace
+ *  organic by default (the user need not touch a slider). simplify = sparse, straighten = clean trace
  *  jitter, smooth = the organic round. The raw source stays SHARP underneath — fully reversible (zero
  *  the sliders → the raw trace). Rounding is delivered by global Smooth (catmull): a per-corner Radius
- *  can't target post-straighten/detail anchors (they carry no stable source id). The values are
+ *  can't target post-straighten/simplify anchors (they carry no stable source id). The values are
  *  STARTING tuning constants — Dan tunes them on-device. */
-export const AUTO_TUNE = { detail: 60, straighten: 20, smooth: 45 } as const
+export const AUTO_TUNE = { simplify: 40, straighten: 20, smooth: 45 } as const
 export function autoTuneDefaults(): OutlineAdjustments {
   return { global: { ...GLOBAL_OFF, ...AUTO_TUNE }, local: {} }
 }

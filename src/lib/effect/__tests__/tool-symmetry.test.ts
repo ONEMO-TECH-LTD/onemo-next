@@ -39,7 +39,7 @@ describe('TOOL SYMMETRY — every tool keeps a square 4-fold symmetric (≤3px =
     ['Radius 60', () => resolve(squareSource(), { global: G({}), local: localAll('radius', 60) })],
     ['Curve 100', () => resolve(squareSource(), { global: G({}), local: localAll('curve', 1) })],
     ['Smooth 80', () => resolve(squareSource(), { global: G({ smooth: 80 }), local: {} })],
-    ['Detail 40', () => resolve(squareSource(), { global: G({ detail: 40 }), local: {} })],
+    ['Simplify 60', () => resolve(squareSource(), { global: G({ simplify: 60 }), local: {} })],
     ['Straighten 80', () => resolve(squareSource(), { global: G({ straighten: 80 }), local: {} })],
   ]
   for (const [name, run] of cases) {

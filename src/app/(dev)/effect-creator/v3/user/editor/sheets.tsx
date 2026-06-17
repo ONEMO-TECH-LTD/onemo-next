@@ -15,7 +15,7 @@ import { RoundIcon, SmoothIcon, BrightnessIcon, ContrastIcon, SaturationIcon, Wa
 
 // V4: the global Adjust dials are plain 0..100 PRODUCT axes written straight to adjustments.global —
 // the engine (resolve / outline-resolve.ts) owns the pct→engine-unit maps, so there are NO engine
-// units in the UI (KAI-9028). Detail 100 = full detail (OFF); Smooth/Snap/Angle/Line 0 = OFF.
+// units in the UI (KAI-9028). All tools 0 = OFF (Simplify/Smooth/Straighten global; Radius/Curve per-anchor).
 
 // KAI-9028 (Dan): every image filter shows ONE uniform 0–100% scale — 0% = the extreme/none end,
 // 100% = full to the limit — regardless of the engine range underneath.
@@ -32,7 +32,7 @@ export const fxFromPct = (k: FxKey, pct: number) => {
 
 import styles from '../outline-editor.module.css'
 
-export type AdjustSub = 'radius' | 'curve' | 'detail' | 'smooth' | 'straighten'
+export type AdjustSub = 'radius' | 'curve' | 'simplify' | 'smooth' | 'straighten'
 
 /** UX-1 progress ring — an arc around a tool circle showing its current value; nothing at zero. */
 function ChipRing({ frac }: { frac: number }) {
@@ -114,7 +114,7 @@ export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, radiusApplies
   const dials = [
     { k: 'radius' as const, label: cornerMode ? 'Corner' : 'Radius', icon: <CornerIcon />, ring: radiusApplies && radius > 0 ? radius / Math.max(maxRadius, 1) : 0 },
     { k: 'curve' as const, label: 'Curve', icon: <RoundIcon />, ring: curveSelected && curveVal > 0 ? curveVal / 100 : 0 },
-    { k: 'detail' as const, label: 'Detail', icon: <DetailIcon />, ring: global.detail / 100 },
+    { k: 'simplify' as const, label: 'Simplify', icon: <DetailIcon />, ring: global.simplify / 100 },
     { k: 'smooth' as const, label: 'Smooth', icon: <SmoothIcon />, ring: global.smooth / 100 },
     { k: 'straighten' as const, label: 'Straighten', icon: <LineIcon />, ring: global.straighten / 100 },
   ]
@@ -139,7 +139,9 @@ export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, radiusApplies
         <div className={styles.shapeRow}>
           {/* an inapplicable tool shows its ruler GREYED and non-functional until the state makes it real */}
           {adjustSub === 'radius' && (radiusApplies || cornerMode ? (
-            <TickBar label={cornerMode ? 'Corner' : 'Radius'} min={0} max={maxRadius} value={Math.min(radius, maxRadius)} onChange={previewRadius} onCommit={commitRadius} format={(v) => `${Math.round((v / Math.max(maxRadius, 1)) * 100)}%`} />
+            // 0–100% slider (Dan: all tools %); % is of the shape's geometric max radius (half its short
+            // side), so 50% means the same on any shape size. Converted to px for the engine at the edge.
+            <TickBar label={cornerMode ? 'Corner' : 'Radius'} min={0} max={100} value={Math.round(Math.min(radius, maxRadius) / Math.max(maxRadius, 1) * 100)} onChange={(v) => previewRadius((v / 100) * maxRadius)} onCommit={(v) => commitRadius((v / 100) * maxRadius)} format={(v) => `${Math.round(v)}%`} />
           ) : (
             <div className={styles.disabledControl} aria-disabled="true">
               <TickBar label="Radius" min={0} max={100} value={0} onChange={() => {}} onCommit={() => {}} format={(v) => `${Math.round(v)}%`} />
@@ -152,11 +154,10 @@ export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, radiusApplies
               <TickBar label="Curve" min={0} max={100} value={0} onChange={() => {}} onCommit={() => {}} format={(v) => `${Math.round(v)}%`} />
             </div>
           ))}
-          {adjustSub === 'detail' && (
-            // L2 (Dan: "Detail 100% has LESS detail than 0 — reversed"). The slider IS the fidelity
-            // value: 100% = MOST detail (tightest Paper-simplify fit → most anchors), lower = simpler. The
-            // earlier `100 - detail` inversion read backwards. Engine detailTolPx: 100→0.75px tight fit.
-            <TickBar label="Detail" min={0} max={100} value={global.detail} onChange={(v) => previewGlobal(setG('detail', v))} onCommit={(v) => commitGlobal(setG('detail', v))} format={(v) => `${Math.round(v)}%`} />
+          {adjustSub === 'simplify' && (
+            // Simplify (DEC-v5-03, Dan 2026-06-17): renamed from Detail + reversed — 0% = OFF (full detail),
+            // 100% = max simplify (fewest anchors, roundest Paper curve-fit). Consistent with every tool (0=off).
+            <TickBar label="Simplify" min={0} max={100} value={global.simplify} onChange={(v) => previewGlobal(setG('simplify', v))} onCommit={(v) => commitGlobal(setG('simplify', v))} format={(v) => `${Math.round(v)}%`} />
           )}
           {adjustSub === 'smooth' && (
             <TickBar label="Smooth" min={0} max={100} value={global.smooth} onChange={(v) => previewGlobal(setG('smooth', v))} onCommit={(v) => commitGlobal(setG('smooth', v))} format={(v) => `${Math.round(v)}%`} />

@@ -3,7 +3,7 @@
 // editor/useEditorAdjustments.ts — ADJUSTMENT WRITERS (R8 — Creator v5 monolith split, seam 2).
 //
 // The editor's recipe writers: Radius / Curve (LOCAL, per stable SOURCE-anchor id, reversible, pinned
-// through the global pass) + Detail/Smooth/Straighten (GLOBAL 0..100 axes, DEC-v5-03) + the magic-blend
+// through the global pass) + Simplify/Smooth/Straighten (GLOBAL 0..100 axes, DEC-v5-03) + the magic-blend
 // (bgBlur). Each maps the current selection to SOURCE ids and either PREVIEWS (no commit/history) or
 // COMMITS (applyAdjustments) onto outlineStore's source+adjustments truth — the resolver owns shaping;
 // this hook never fairs/fits/repairs. Swap-test: replace this hook, the recipe-writing contract holds.
@@ -100,7 +100,7 @@ export function useEditorAdjustments(ctx: AdjustmentsCtx) {
   // texture. Edit-mode only; on/off + intensity. Writes bgBlur (0 = off/sharp · 0..1 = intensity).
   const writeBlend = useCallback((on: boolean, pct: number) => setBgBlur(on ? pct / 100 : 0), [setBgBlur])
 
-  // ── GLOBAL adjustments (Detail / Smooth / Straighten) — INDEPENDENT 0..100 axes written to
+  // ── GLOBAL adjustments (Simplify / Smooth / Straighten) — INDEPENDENT 0..100 axes written to
   //    adjustments.global, each a direct library op (DEC-v5-03). Slider ticks PREVIEW (the display
   //    re-resolves; no commit, no history); release COMMITS via applyAdjustments. Fold guard in resolve().
   const previewGlobal = useCallback((g: GlobalAdjustments) => {

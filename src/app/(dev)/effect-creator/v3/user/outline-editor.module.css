@@ -39,7 +39,8 @@
 .path {
   fill: var(--semantic-bg-brand-primary);
   fill-opacity: 0.18;
-  stroke: var(--color-text-primary, #1c2030);
+  stroke: #ffffff; /* Dan 2026-06-17: outline = white @ 50% */
+  stroke-opacity: 0.5;
   vector-effect: non-scaling-stroke;
   stroke-width: 2;
   stroke-linejoin: round;

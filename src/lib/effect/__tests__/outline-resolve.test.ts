@@ -86,42 +86,41 @@ describe('V4 resolve — fold guard (VD12): never emits a self-crossing ring', (
   })
 })
 
-describe('V4 resolve — detail and smooth are INDEPENDENT axes (L2: Paper simplify + catmull)', () => {
-  // L2 (DEC-v5-02): output is now SPARSE CURVES (Paper simplify sets anchor points, catmull sets
-  // handles). The density measure is therefore ANCHOR count, not flattened-point count (a straight-anchor
-  // proxy that's meaningless once Detail emits curves) — Pixel QA-confirmed test update.
+describe('V5 resolve — Simplify and Smooth are INDEPENDENT axes (Paper simplify + catmull)', () => {
+  // Output is SPARSE CURVES (Paper simplify sets anchor points, catmull sets handles). Density = ANCHOR
+  // count. Simplify is 0=off / 100=max (DEC-v5-03): more Simplify ⇒ FEWER anchors.
   const nAnchors = (sh: VShape) => sh.paths[0].anchors.length
-  test('detail = sparse anchor density (independent of smooth); no point-explosion', () => {
+  test('simplify = sparse anchor density (independent of smooth); no point-explosion', () => {
     // a curved source flattens dense, so simplify has real range to thin (a straight polygon can't show it)
     const s = source(roundedSquare(), 'stock')
-    const hi = resolve(s, { global: { ...GLOBAL_OFF, detail: 99, smooth: 0 }, local: {} })
-    const lo = resolve(s, { global: { ...GLOBAL_OFF, detail: 10, smooth: 0 }, local: {} })
-    expect(nAnchors(hi)).toBeGreaterThanOrEqual(nAnchors(lo)) // more detail ⇒ more (or equal) anchors
-    expect(nAnchors(hi)).toBeLessThan(80) // SPARSE curves — never the old 12→900+ dense chain (no explosion)
+    const lite = resolve(s, { global: { ...GLOBAL_OFF, simplify: 1, smooth: 0 }, local: {} })
+    const hard = resolve(s, { global: { ...GLOBAL_OFF, simplify: 90, smooth: 0 }, local: {} })
+    expect(nAnchors(lite)).toBeGreaterThanOrEqual(nAnchors(hard)) // LESS simplify ⇒ more (or equal) anchors
+    expect(nAnchors(lite)).toBeLessThan(80) // SPARSE curves — never the old 12→900+ dense chain (no explosion)
   })
-  test('order detail→smooth: smooth sets handle roundness only — no extra anchors (QA-confirmed Paper order)', () => {
+  test('order simplify→smooth: smooth sets handle roundness only — no extra anchors (QA-confirmed Paper order)', () => {
     const s = source(notchedSquare())
-    const detailOnly = resolve(s, { global: { ...GLOBAL_OFF, detail: 50, smooth: 0 }, local: {} })
-    const detailSmooth = resolve(s, { global: { ...GLOBAL_OFF, detail: 50, smooth: 100 }, local: {} })
-    // catmull smooth moves HANDLES, never adds points — same sparse anchor set as detail-only
-    expect(nAnchors(detailSmooth)).toBe(nAnchors(detailOnly))
-    // smooth 100 produces real curve handles and visibly changes the rendered outline; detail-only doesn't smooth
-    expect(detailSmooth.paths[0].anchors.some((a) => !!a.hIn || !!a.hOut)).toBe(true)
-    expect(flat(detailSmooth)).not.toEqual(flat(detailOnly))
+    const simplifyOnly = resolve(s, { global: { ...GLOBAL_OFF, simplify: 50, smooth: 0 }, local: {} })
+    const simplifySmooth = resolve(s, { global: { ...GLOBAL_OFF, simplify: 50, smooth: 100 }, local: {} })
+    // catmull smooth moves HANDLES, never adds points — same sparse anchor set as simplify-only
+    expect(nAnchors(simplifySmooth)).toBe(nAnchors(simplifyOnly))
+    // smooth 100 produces real curve handles and visibly changes the rendered outline; simplify-only doesn't smooth
+    expect(simplifySmooth.paths[0].anchors.some((a) => !!a.hIn || !!a.hOut)).toBe(true)
+    expect(flat(simplifySmooth)).not.toEqual(flat(simplifyOnly))
   })
-  test('detail REDUCES a dense near-collinear trace (the real use case); a clean polygon is left alone', () => {
-    // a 120-point sampled circle = a dense trace (consecutive points near-collinear) — Detail's real input.
+  test('simplify REDUCES a dense near-collinear trace (the real use case); a clean polygon is left alone', () => {
+    // a 120-point sampled circle = a dense trace (consecutive points near-collinear) — Simplify's real input.
     const mk = (x: number, y: number): VAnchor => ({ p: { x, y }, hIn: null, hOut: null, corner: true })
     const dense: VAnchor[] = []
     for (let i = 0; i < 120; i++) { const t = (2 * Math.PI * i) / 120; dense.push(mk(300 + 200 * Math.cos(t), 300 + 200 * Math.sin(t))) }
     const s = source({ paths: [{ anchors: dense }] }, 'generated')
-    const lo = resolve(s, { global: { ...GLOBAL_OFF, detail: 10, smooth: 0 }, local: {} })
-    const hi = resolve(s, { global: { ...GLOBAL_OFF, detail: 80, smooth: 0 }, local: {} })
-    expect(nAnchors(lo)).toBeLessThan(120) // Detail reduced the dense trace
-    expect(nAnchors(hi)).toBeGreaterThanOrEqual(nAnchors(lo)) // more detail ⇒ more (or equal) anchors
-    // a clean minimal polygon has no redundant vertices → Detail is a no-op (keeps every corner)
+    const hard = resolve(s, { global: { ...GLOBAL_OFF, simplify: 90, smooth: 0 }, local: {} })
+    const lite = resolve(s, { global: { ...GLOBAL_OFF, simplify: 20, smooth: 0 }, local: {} })
+    expect(nAnchors(hard)).toBeLessThan(120) // Simplify reduced the dense trace
+    expect(nAnchors(lite)).toBeGreaterThanOrEqual(nAnchors(hard)) // LESS simplify ⇒ more (or equal) anchors
+    // a clean minimal polygon has no redundant vertices → Simplify is a no-op (keeps every corner)
     const sq = source({ paths: [{ anchors: [mk(0, 0), mk(400, 0), mk(400, 400), mk(0, 400)] }] }, 'stock')
-    expect(nAnchors(resolve(sq, { global: { ...GLOBAL_OFF, detail: 10 }, local: {} }))).toBe(4)
+    expect(nAnchors(resolve(sq, { global: { ...GLOBAL_OFF, simplify: 90 }, local: {} }))).toBe(4)
   })
 })
 
@@ -182,9 +181,9 @@ describe('V4 resolve — NEVER produces NaN/Infinity (renderable geometry)', () 
     const shapes: [string, VShape][] = [['notch', notchedSquare()], ['star', star()], ['rounded', roundedSquare()]]
     for (const [name, shape] of shapes) {
       const s = source(shape)
-      for (const detail of [0, 25, 50, 75, 100]) for (const smooth of [0, 50, 100]) for (const straighten of [0, 50, 100]) {
-        const out = resolve(s, { global: { detail, smooth, straighten }, local: {} })
-        expect(allFinite(out), `${name} detail=${detail} smooth=${smooth} straighten=${straighten}`).toBe(true)
+      for (const simplify of [0, 25, 50, 75, 100]) for (const smooth of [0, 50, 100]) for (const straighten of [0, 50, 100]) {
+        const out = resolve(s, { global: { simplify, smooth, straighten }, local: {} })
+        expect(allFinite(out), `${name} simplify=${simplify} smooth=${smooth} straighten=${straighten}`).toBe(true)
       }
     }
   })
@@ -232,8 +231,8 @@ describe('V4 resolve — F2: fold guard is structurally fail-closed', () => {
       anchors.push(mk(200 + rad * Math.cos(ang), 200 + rad * Math.sin(ang)))
     }
     const s = source({ paths: [{ anchors }] })
-    for (const smooth of [0, 50, 100]) for (const detail of [0, 50, 100]) {
-      const out = resolve(s, { global: { ...GLOBAL_OFF, smooth, detail }, local: {} })
+    for (const smooth of [0, 50, 100]) for (const simplify of [0, 50, 100]) {
+      const out = resolve(s, { global: { ...GLOBAL_OFF, smooth, simplify }, local: {} })
       expect(validateSelfIntersection(flat(out), 't').length).toBe(0) // never a crack — fail-closed
     }
   })

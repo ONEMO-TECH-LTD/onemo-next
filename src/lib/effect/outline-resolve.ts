@@ -7,7 +7,7 @@
 //
 // Contract:
 //   • ALL-OFF  === the exact source (object identity preserved — no flatten/refit, no copy).
-//   • Global tools (detail / smooth / straighten) — each is its LIBRARY op applied DIRECTLY to the
+//   • Global tools (simplify / smooth / straighten) — each is its LIBRARY op applied DIRECTLY to the
 //     model's anchors (DEC-v5-03: no flatten-into-a-dense-ring-and-refit wrapper). A clean geometric
 //     input stays clean (a square keeps its 4-fold symmetry through every tool). Independent axes.
 //   • Local tools (radius/curve) act on CLAIMED anchors keyed by stable id (VD9), PINNED through the
@@ -44,9 +44,9 @@ export interface OutlineSource {
 
 /** Global tools — independent 0..100 axes. OFF = `GLOBAL_OFF` below. */
 export interface GlobalAdjustments {
-  detail: number     // 0..100; 100 = full detail (OFF) — Paper simplify tolerance
+  simplify: number   // 0..100; 0 = OFF (full detail) — Paper simplify strength (curve-fit reduce)
   smooth: number     // 0..100; 0 = OFF — Paper catmull-rom handle factor
-  straighten: number // 0..100; 0 = OFF — Clipper2 RDP collinear-collapse strength
+  straighten: number // 0..100; 0 = OFF — Clipper2 RDP collinear-collapse (stacks ON TOP of simplify)
 }
 export interface LocalAdjustment {
   /** per-anchor fillet radius in source px; 0 = sharp (OFF) */
@@ -60,7 +60,7 @@ export interface OutlineAdjustments {
   local: Record<string, LocalAdjustment>
 }
 
-export const GLOBAL_OFF: GlobalAdjustments = { detail: 100, smooth: 0, straighten: 0 }
+export const GLOBAL_OFF: GlobalAdjustments = { simplify: 0, smooth: 0, straighten: 0 }
 export const ADJUSTMENTS_OFF: OutlineAdjustments = { global: { ...GLOBAL_OFF }, local: {} }
 
 // ── pct → engine-unit maps (the editor sliders write 0..100; OFF maps to a true no-op) ──────────
@@ -72,9 +72,9 @@ export const straightenEpsPx = (pct: number) => (Math.max(0, Math.min(100, pct))
 /** Smooth: Paper catmull-rom handle factor. 0% = OFF (no handles introduced); 100% = max round.
  *  Scale-invariant (catmull tension is relative to anchor spacing), applied directly to the anchors. */
 export const smoothFactor = (pct: number) => Math.max(0, Math.min(1, pct / 100))
-/** Detail: Paper SIMPLIFY tolerance (px) = anchor density. 100% = most detail (tight 0.75px fit → most
- *  anchors), 0% = simplest (≈8.75px → fewest). Applied directly to the anchors; never a dense chain. */
-export const detailTolPx = (pct: number) => 0.75 + (1 - Math.max(0, Math.min(100, pct)) / 100) * 8
+/** Simplify: Paper SIMPLIFY tolerance (px). 0% = OFF (no simplify, full detail); 100% = max simplify
+ *  (≈8.75px fit → fewest anchors, roundest curve-fit). Applied directly to the anchors; never a dense chain. */
+export const simplifyTolPx = (pct: number) => 0.75 + (Math.max(0, Math.min(100, pct)) / 100) * 8
 
 // ── id minting + lookup ─────────────────────────────────────────────────────────────────────
 let _idSeq = 0
@@ -87,7 +87,7 @@ export function mintIds(shape: VShape): VShape {
 
 // ── off-state predicates ─────────────────────────────────────────────────────────────────────
 function isGlobalOff(g: GlobalAdjustments): boolean {
-  return g.detail >= 100 && g.smooth <= 0 && g.straighten <= 0
+  return g.simplify <= 0 && g.smooth <= 0 && g.straighten <= 0
 }
 /** ids whose local adjustment is actually engaged (radius > 0 or curve ≠ 0). */
 function claimedIds(local: Record<string, LocalAdjustment>): Set<string> {
@@ -141,7 +141,7 @@ function hasRedundantVertices(path: VPath, tolPx: number): boolean {
 
 // ── global pass ────────────────────────────────────────────────────────────────────────────
 /** Global pass: each global tool is its LIBRARY op applied DIRECTLY to the path's own anchors (no
- *  flatten-and-refit). Order: straighten (collapse near-collinear) → detail (anchor density) → smooth
+ *  flatten-and-refit). Order: straighten (collapse near-collinear) → simplify (anchor density) → smooth
  *  (handle roundness). Each stage is fold-guarded (a self-crossing result is dropped, keeping the prior
  *  valid path). Then claimed anchors are pinned back — the nearest output anchor is snapped to the exact
  *  source position and re-keyed by id — so a radius/curve point survives the global reshape (VD2). */
@@ -152,10 +152,10 @@ function globalPass(source: OutlineSource, g: GlobalAdjustments, claimed: Set<st
     const guard = (next: VPath): VPath => (ringSimple(pathToRing(next)) ? next : p)
     // 1. STRAIGHTEN — Clipper2 RDP/TrimCollinear: collapse near-collinear runs to true straight edges.
     if (g.straighten > 0) p = guard(straightenPath(p, straightenEpsPx(g.straighten)))
-    // 2. DETAIL — Paper simplify: anchor density (100 = most detail, skipped as OFF). Runs only where
-    //    there are redundant near-collinear vertices to remove (dense traces); a no-op on a clean sparse
-    //    polygon (so a square keeps its corners — never an uneven curve-fit drop). Sparse, never dense.
-    if (g.detail < 100 && hasRedundantVertices(p, detailTolPx(g.detail))) p = guard(simplifyPaper(p, detailTolPx(g.detail)))
+    // 2. SIMPLIFY — Paper simplify (curve-fit): 0 = OFF, higher = fewer anchors + smoother fit. Runs only
+    //    where there are redundant near-collinear vertices to remove (dense traces); a no-op on a clean
+    //    sparse polygon (so a square keeps its corners). Sparse, never dense.
+    if (g.simplify > 0 && hasRedundantVertices(p, simplifyTolPx(g.simplify))) p = guard(simplifyPaper(p, simplifyTolPx(g.simplify)))
     // 3. SMOOTH — Paper catmull-rom: handle roundness on the (sparse) anchors. Back off on a fold.
     if (g.smooth > 0) {
       let factor = smoothFactor(g.smooth)

@@ -39,7 +39,7 @@ describe('T7 — value-reflection (the slider reads the geometry, never a lying 
 describe('T6 — auto-tune defaults (organic by default, reversible)', () => {
   it('exposes the proposed starting values as a tunable constant on the global axes', () => {
     const d = autoTuneDefaults()
-    expect(d.global.detail).toBe(AUTO_TUNE.detail)
+    expect(d.global.simplify).toBe(AUTO_TUNE.simplify)
     expect(d.global.straighten).toBe(AUTO_TUNE.straighten)
     expect(d.global.smooth).toBe(AUTO_TUNE.smooth)
     expect(d.local).toEqual({}) // rounding is delivered by global smooth, not per-corner radius
