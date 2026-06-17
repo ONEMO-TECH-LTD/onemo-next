@@ -42,8 +42,8 @@ const PerfHUD = dynamic(() => import('./dev/PerfHUD'), { ssr: false })
 // POC (Dan 2026-06-17, branch v5poc-detail): post-generation "Detail" — re-simplify the cached AI
 // trace to a chosen detail WITHOUT re-running the AI. 100% = tightest (hugs the silhouette; only the
 // pixel staircase / hair-wobble removed); 0% = coarsest facets. mm-true (scale-invariant). Tunable.
-const DETAIL_TIGHT_MM = 0.3
-const DETAIL_COARSE_MM = 10
+const DETAIL_TIGHT_MM = 0   // detail 100% = RAW exact trace (eps floors to ~1px) = pixel-perfect silhouette
+const DETAIL_COARSE_MM = 10 // detail 0% = coarsest facets
 const detailToTraceMm = (pct: number) => { const d = Math.max(0, Math.min(100, pct)) / 100; return DETAIL_COARSE_MM + d * (DETAIL_TIGHT_MM - DETAIL_COARSE_MM) }
 
 function PrototypePageInner() {
@@ -62,9 +62,10 @@ function PrototypePageInner() {
   }, [])
   const { colors, setBackColor } = useSceneStore()
   const [showColors, setShowColors] = useState(false)
-  // POC (Dan 2026-06-17, v5poc-detail): post-generation Detail dial (0..100, 100 = tightest). Changing
-  // it re-simplifies the CACHED AI trace live — no AI re-run. Default tight; tune live on device.
-  const [detail, setDetail] = useState(90)
+  // POC (Dan 2026-06-17, v5poc-detail): post-generation Detail dial (0..100). 100 = RAW exact trace
+  // (pixel-perfect tight silhouette, like Apple object-lift); lower = simplified/coarser. Live re-simplify
+  // of the cached AI trace — no AI re-run. Default 100 (exact) so the tight silhouette shows first.
+  const [detail, setDetail] = useState(100)
   const sceneName = searchParams.get('scene')
 
   // ── #23 GLOBAL history — one undo/redo/reset for the whole creator (Magic, editor sessions,
@@ -298,9 +299,9 @@ function PrototypePageInner() {
     const spec = st.spec
     if (!spec?.rawTracePx?.length) return
     const H = spec.maskHeightPx
-    const eps = Math.max(1, detailToTraceMm(pct) / spec.mmPerPx)
+    const eps = detailToTraceMm(pct) / spec.mmPerPx // detail 100 → 0 → the RAW exact trace (no reduction)
     const yDown = spec.rawTracePx.map(([x, y]) => [x, H - y] as Vec2Px)
-    const straight = rdpClosed(yDown, eps)
+    const straight = eps < 0.5 ? yDown : rdpClosed(yDown, eps) // <0.5px ⇒ use the full raw trace verbatim
     if (straight.length < 3) return
     const vectorShape: VShape = { paths: [{ anchors: straight.map(([x, y]) => ({ p: { x, y }, hIn: null, hOut: null, corner: true })) }] }
     st.setSpec({ ...spec, vectorShape })
