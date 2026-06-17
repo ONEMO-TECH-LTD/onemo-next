@@ -26,6 +26,7 @@ import type { PreparedEffect } from '@/lib/effect/prepare-effect'
 import { toast } from './ui/Toast'
 import { rdpClosed, repairSimplePolygon, type Vec2Px } from '@/lib/outline-core/math'
 import { simplifyPaper } from '@/lib/vector-core/paper-kernel'
+import { insetRingMM } from '@/lib/effect/offset'
 import type { VShape, VPath } from '@/lib/vector-core'
 
 // Dynamic imports — no SSR for 3D components
@@ -51,13 +52,20 @@ const detailToTraceMm = (pct: number) => { const d = Math.max(0, Math.min(100, p
 // POC: build the editor source from the cached AI trace at a Detail (RDP) + Smooth (catmull) level —
 // the unified RDP/Paper engines, no AI re-run. RDP+repair = tight, de-degenerate polygon (no mesh
 // tears); smoothPaper then fairs the pixel staircase into clean curves. Returns null if degenerate.
-function buildTrace(rawTracePx: ReadonlyArray<readonly [number, number]>, H: number, mmPerPx: number, detailPct: number, smoothPct: number): VShape | null {
+function buildTrace(rawTracePx: ReadonlyArray<readonly [number, number]>, H: number, mmPerPx: number, detailPct: number, smoothPct: number, offsetMM: number): VShape | null {
   if (!rawTracePx.length) return null
   const eps = Math.max(1, detailToTraceMm(detailPct) / mmPerPx)
   const yDown = rawTracePx.map(([x, y]) => [x, H - y] as Vec2Px)
   let pts = rdpClosed(yDown, eps)
   pts = repairSimplePolygon(pts, 1)
   if (pts.length < 3) return null
+  // OFFSET (the generation padding, now a tool): Clipper2 outset/inset with round joins. 0 = tight
+  // (the exact matte edge); + = margin/bleed; − = inset. Same engine as the −8mm magnetic inset.
+  if (offsetMM !== 0) {
+    const ringMM = pts.map(([x, y]) => [x * mmPerPx, y * mmPerPx] as [number, number])
+    const off = insetRingMM(ringMM, offsetMM)
+    if (off && off.length >= 3) pts = off.map(([x, y]) => [x / mmPerPx, y / mmPerPx] as Vec2Px)
+  }
   let path: VPath = { anchors: pts.map(([x, y]) => ({ p: { x, y }, hIn: null, hOut: null, corner: true })) }
   if (smoothPct > 0) {
     const tolPx = (Math.max(0, Math.min(100, smoothPct)) / 100) * SMOOTH_MAX_MM / mmPerPx
@@ -87,7 +95,8 @@ function PrototypePageInner() {
   // (pixel-perfect tight silhouette, like Apple object-lift); lower = simplified/coarser. Live re-simplify
   // of the cached AI trace — no AI re-run. Default 100 (exact) so the tight silhouette shows first.
   const [detail, setDetail] = useState(100)
-  const [smooth, setSmooth] = useState(50) // POC: fair the pixel staircase into curves (Paper catmull)
+  const [smooth, setSmooth] = useState(50) // POC: fair the pixel staircase into curves (Paper simplify)
+  const [offset, setOffset] = useState(0)  // POC: the generation padding as a tool (Clipper inset/outset, mm). 0 = tight
   const sceneName = searchParams.get('scene')
 
   // ── #23 GLOBAL history — one undo/redo/reset for the whole creator (Magic, editor sessions,
@@ -298,7 +307,7 @@ function PrototypePageInner() {
         st.setSpec(p.spec) // hand the shaped outline to the 2D editor + 3D
         st.setBgBlur(null) // fresh cut-out → drop prior edits
         // POC: build the editor source from the raw trace at the current Detail + Smooth (no AI re-run)
-        const vs0 = p.spec.rawTracePx?.length ? buildTrace(p.spec.rawTracePx, p.spec.maskHeightPx, p.spec.mmPerPx, detail, smooth) : null
+        const vs0 = p.spec.rawTracePx?.length ? buildTrace(p.spec.rawTracePx, p.spec.maskHeightPx, p.spec.mmPerPx, detail, smooth, offset) : null
         if (vs0) { st.setSpec({ ...p.spec, vectorShape: vs0 }); st.commitGeometry(vs0) } else st.commitGeometry(null)
         // the editor's magic-blend preview needs the sharp subject matte
         try { st.setSubjMatteUrl(p.frontSrc.subjCanvas.toDataURL()) } catch { st.setSubjMatteUrl(null) }
@@ -315,15 +324,15 @@ function PrototypePageInner() {
         toast('error', `Magic failed: ${(e as Error)?.message ?? e}`) // G4 — incl. the TD-E watchdog
         setGenerating(false)
       })
-  }, [artworkUrl, generating, snapNow, pushHistory, designState, detail, smooth])
+  }, [artworkUrl, generating, snapNow, pushHistory, designState, detail, smooth, offset])
 
-  // POC: live post-gen re-trace — rebuild the source from the cached AI trace at Detail `d` + Smooth `s`
-  // and push it to the 3D via the store, WITHOUT re-running the AI. Unified RDP + Paper engines.
-  const reTrace = useCallback((d: number, s: number) => {
+  // POC: live post-gen re-trace — rebuild the source from the cached AI trace at Detail `d`, Smooth `s`,
+  // Offset `o` and push it to the 3D via the store, WITHOUT re-running the AI. Unified RDP/Paper/Clipper.
+  const reTrace = useCallback((d: number, s: number, o: number) => {
     const st = useOutlineStore.getState()
     const spec = st.spec
     if (!spec?.rawTracePx?.length) return
-    const vs = buildTrace(spec.rawTracePx, spec.maskHeightPx, spec.mmPerPx, d, s)
+    const vs = buildTrace(spec.rawTracePx, spec.maskHeightPx, spec.mmPerPx, d, s, o)
     if (!vs) return
     st.setSpec({ ...spec, vectorShape: vs })
     st.commitGeometry(vs)
@@ -446,13 +455,18 @@ function PrototypePageInner() {
           <div style={{ pointerEvents: 'auto', display: 'flex', flexDirection: 'column', gap: 6, padding: '10px 14px', borderRadius: 16, background: 'rgba(20,20,22,0.82)', color: '#f5f5f0', font: '500 13px system-ui, sans-serif', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', boxShadow: '0 4px 16px rgba(0,0,0,0.25)' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ opacity: 0.75, minWidth: 50 }}>Detail</span>
-              <input type="range" min={0} max={100} step={1} value={detail} onChange={(e) => { const v = Number(e.target.value); setDetail(v); reTrace(v, smooth) }} style={{ width: 160, accentColor: '#c8a23c' }} aria-label="Magic trace detail (post-generation)" />
-              <span style={{ minWidth: 40, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{detail}%</span>
+              <input type="range" min={0} max={100} step={1} value={detail} onChange={(e) => { const v = Number(e.target.value); setDetail(v); reTrace(v, smooth, offset) }} style={{ width: 160, accentColor: '#c8a23c' }} aria-label="Magic trace detail (post-generation)" />
+              <span style={{ minWidth: 48, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{detail}%</span>
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ opacity: 0.75, minWidth: 50 }}>Smooth</span>
-              <input type="range" min={0} max={100} step={1} value={smooth} onChange={(e) => { const v = Number(e.target.value); setSmooth(v); reTrace(detail, v) }} style={{ width: 160, accentColor: '#c8a23c' }} aria-label="Magic trace smooth (staircase fairing)" />
-              <span style={{ minWidth: 40, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{smooth}%</span>
+              <input type="range" min={0} max={100} step={1} value={smooth} onChange={(e) => { const v = Number(e.target.value); setSmooth(v); reTrace(detail, v, offset) }} style={{ width: 160, accentColor: '#c8a23c' }} aria-label="Magic trace smooth (staircase fairing)" />
+              <span style={{ minWidth: 48, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{smooth}%</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ opacity: 0.75, minWidth: 50 }}>Offset</span>
+              <input type="range" min={-5} max={10} step={0.5} value={offset} onChange={(e) => { const v = Number(e.target.value); setOffset(v); reTrace(detail, smooth, v) }} style={{ width: 160, accentColor: '#c8a23c' }} aria-label="Magic trace offset (mm)" />
+              <span style={{ minWidth: 48, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{offset} mm</span>
             </label>
           </div>
         </div>
