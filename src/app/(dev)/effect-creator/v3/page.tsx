@@ -74,7 +74,7 @@ function buildTrace(rawTracePx: ReadonlyArray<readonly [number, number]>, H: num
   // re-fairing of the offset result (the cowlick keeps its form). Same engine as the −8mm magnetic inset.
   if (offsetMM > 0) {
     const ringMM = flattenPath(path, 0.3).map((p) => [p.x * mmPerPx, p.y * mmPerPx] as [number, number])
-    const off = insetRingMM(ringMM, offsetMM)
+    const off = insetRingMM(ringMM, offsetMM, true) // MITER joins: expand + KEEP corners sharp (don't round)
     if (off && off.length >= 3) path = { anchors: off.map(([x, y]) => ({ p: { x: x / mmPerPx, y: y / mmPerPx }, hIn: null, hOut: null, corner: true })) }
   }
   return { paths: [path] }
