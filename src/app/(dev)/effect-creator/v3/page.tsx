@@ -24,7 +24,7 @@ import { useOutlineStore } from './user/outlineStore'
 import type { DesignState } from './types'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
 import { toast } from './ui/Toast'
-import { rdpClosed, type Vec2Px } from '@/lib/outline-core/math'
+import { rdpClosed, repairSimplePolygon, type Vec2Px } from '@/lib/outline-core/math'
 import type { VShape } from '@/lib/vector-core'
 
 // Dynamic imports — no SSR for 3D components
@@ -262,7 +262,7 @@ function PrototypePageInner() {
         // Progress text is intentionally silent (Dan, 2026-06-16: no "Downloading…/Cutting out…"
         // captions). The shimmer animation alone signals work; only the honest fallback still toasts.
         // DEV TUNING: feed the chosen manufacturing min-feature floor into the trace simplification.
-        prepareEffect(artworkUrl, 'shaped', { ...EFFECT_BUILD_CONFIG, minFeatureMM: detailToTraceMm(detail) }, (s) => {
+        prepareEffect(artworkUrl, 'shaped', { ...EFFECT_BUILD_CONFIG, minFeatureMM: detailToTraceMm(detail), paddingMM: 0 }, (s) => {
           if (s === 'fallback') toast('warn', 'AI cut-out unavailable — used the simple background cut instead') // G4
         }),
       )
@@ -299,9 +299,12 @@ function PrototypePageInner() {
     const spec = st.spec
     if (!spec?.rawTracePx?.length) return
     const H = spec.maskHeightPx
-    const eps = detailToTraceMm(pct) / spec.mmPerPx // detail 100 → 0 → the RAW exact trace (no reduction)
+    // Floor at 1px even at detail 100: kills the sub-pixel staircase + the degenerate/near-coincident
+    // points that tear the 3D mesh into holes (the verbatim-raw self-touch). 1px ≈ pixel-tight.
+    const eps = Math.max(1, detailToTraceMm(pct) / spec.mmPerPx)
     const yDown = spec.rawTracePx.map(([x, y]) => [x, H - y] as Vec2Px)
-    const straight = eps < 0.5 ? yDown : rdpClosed(yDown, eps) // <0.5px ⇒ use the full raw trace verbatim
+    let straight = rdpClosed(yDown, eps)
+    straight = repairSimplePolygon(straight, 1) // fix any self-touch so a thin neck never gashes the mesh
     if (straight.length < 3) return
     const vectorShape: VShape = { paths: [{ anchors: straight.map(([x, y]) => ({ p: { x, y }, hIn: null, hOut: null, corner: true })) }] }
     st.setSpec({ ...spec, vectorShape })
