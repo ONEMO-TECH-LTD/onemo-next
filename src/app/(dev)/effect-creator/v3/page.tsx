@@ -221,7 +221,7 @@ function PrototypePageInner() {
         // #23: a new image starts a fresh history; this state is the Reset baseline
         baselineRef.current = {
           prepared: p, autoOutline: false, designState: INITIAL_ARTWORK, imageFx: null,
-          outline: { spec: p.spec, committedShape: null, source: null, adjustments: { global: { detail: 100, smooth: 0, snap: 0, angle: 0, line: 0 }, local: {} }, bgBlur: null, subjMatteUrl: null },
+          outline: { spec: p.spec, committedShape: null, source: null, adjustments: { global: { detail: 100, smooth: 0, straighten: 0 }, local: {} }, bgBlur: null, subjMatteUrl: null },
           trim: { ...useSceneStore.getState().colors },
         }
         histRef.current = { past: [], future: [] }

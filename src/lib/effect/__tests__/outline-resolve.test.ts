@@ -109,6 +109,20 @@ describe('V4 resolve — detail and smooth are INDEPENDENT axes (L2: Paper simpl
     expect(detailSmooth.paths[0].anchors.some((a) => !!a.hIn || !!a.hOut)).toBe(true)
     expect(flat(detailSmooth)).not.toEqual(flat(detailOnly))
   })
+  test('detail REDUCES a dense near-collinear trace (the real use case); a clean polygon is left alone', () => {
+    // a 120-point sampled circle = a dense trace (consecutive points near-collinear) — Detail's real input.
+    const mk = (x: number, y: number): VAnchor => ({ p: { x, y }, hIn: null, hOut: null, corner: true })
+    const dense: VAnchor[] = []
+    for (let i = 0; i < 120; i++) { const t = (2 * Math.PI * i) / 120; dense.push(mk(300 + 200 * Math.cos(t), 300 + 200 * Math.sin(t))) }
+    const s = source({ paths: [{ anchors: dense }] }, 'generated')
+    const lo = resolve(s, { global: { ...GLOBAL_OFF, detail: 10, smooth: 0 }, local: {} })
+    const hi = resolve(s, { global: { ...GLOBAL_OFF, detail: 80, smooth: 0 }, local: {} })
+    expect(nAnchors(lo)).toBeLessThan(120) // Detail reduced the dense trace
+    expect(nAnchors(hi)).toBeGreaterThanOrEqual(nAnchors(lo)) // more detail ⇒ more (or equal) anchors
+    // a clean minimal polygon has no redundant vertices → Detail is a no-op (keeps every corner)
+    const sq = source({ paths: [{ anchors: [mk(0, 0), mk(400, 0), mk(400, 400), mk(0, 400)] }] }, 'stock')
+    expect(nAnchors(resolve(sq, { global: { ...GLOBAL_OFF, detail: 10 }, local: {} }))).toBe(4)
+  })
 })
 
 describe('V4 resolve — impartial across classes', () => {
@@ -168,9 +182,9 @@ describe('V4 resolve — NEVER produces NaN/Infinity (renderable geometry)', () 
     const shapes: [string, VShape][] = [['notch', notchedSquare()], ['star', star()], ['rounded', roundedSquare()]]
     for (const [name, shape] of shapes) {
       const s = source(shape)
-      for (const detail of [0, 25, 50, 75, 100]) for (const smooth of [0, 50, 100]) for (const snap of [0, 50, 100]) for (const angle of [0, 50, 100]) for (const line of [0, 100]) {
-        const out = resolve(s, { global: { detail, smooth, snap, angle, line }, local: {} })
-        expect(allFinite(out), `${name} detail=${detail} smooth=${smooth} snap=${snap} angle=${angle} line=${line}`).toBe(true)
+      for (const detail of [0, 25, 50, 75, 100]) for (const smooth of [0, 50, 100]) for (const straighten of [0, 50, 100]) {
+        const out = resolve(s, { global: { detail, smooth, straighten }, local: {} })
+        expect(allFinite(out), `${name} detail=${detail} smooth=${smooth} straighten=${straighten}`).toBe(true)
       }
     }
   })
@@ -184,13 +198,8 @@ describe('V4 resolve — NEVER produces NaN/Infinity (renderable geometry)', () 
   })
 })
 
-describe('V4 resolve — F5: Snap/Angle visibly change representative shapes at full range (still simple)', () => {
+describe('V5 resolve — Straighten (Clipper2 RDP) trues a noisy wall + reverses exactly (DEC-v5-03)', () => {
   const mk = (x: number, y: number): VAnchor => ({ p: { x, y }, hIn: null, hOut: null, corner: true })
-  const sharpStar = (): VShape => {
-    const a: VAnchor[] = []
-    for (let i = 0; i < 10; i++) { const ang = (2 * Math.PI * i) / 10 - Math.PI / 2; const r = i % 2 === 0 ? 200 : 80; a.push(mk(250 + r * Math.cos(ang), 250 + r * Math.sin(ang))) }
-    return { paths: [{ anchors: a }] }
-  }
   const noisyWall = (): VShape => {
     const a: VAnchor[] = [mk(0, 0)]
     for (let x = 20; x < 400; x += 20) a.push(mk(x, (x / 20) % 2 === 0 ? 0 : 9)) // zigzag noise on a near-straight top edge
@@ -198,23 +207,17 @@ describe('V4 resolve — F5: Snap/Angle visibly change representative shapes at 
     return { paths: [{ anchors: a }] }
   }
   const simple = (s: VShape) => validateSelfIntersection(flat(s), 't').length === 0
-  test('Angle 100 rounds a sharp star — differs from off AND stays simple', () => {
-    const s = source(sharpStar())
-    const offR = flat(resolve(s, off())); const angR = flat(resolve(s, { global: { ...GLOBAL_OFF, angle: 100 }, local: {} }))
-    expect(simple(resolve(s, { global: { ...GLOBAL_OFF, angle: 100 }, local: {} }))).toBe(true)
-    expect(angR).not.toEqual(offR)
-  })
-  test('Snap 100 straightens a noisy near-straight wall — differs from off AND stays simple', () => {
+  test('Straighten 100 collapses the noisy near-straight wall — fewer anchors, differs from off, stays simple', () => {
     const s = source(noisyWall())
-    const offR = flat(resolve(s, off())); const snR = flat(resolve(s, { global: { ...GLOBAL_OFF, snap: 100 }, local: {} }))
-    expect(simple(resolve(s, { global: { ...GLOBAL_OFF, snap: 100 }, local: {} }))).toBe(true)
-    expect(snR).not.toEqual(offR)
+    const offR = flat(resolve(s, off()))
+    const strR = resolve(s, { global: { ...GLOBAL_OFF, straighten: 100 }, local: {} })
+    expect(simple(strR)).toBe(true)
+    expect(flat(strR)).not.toEqual(offR) // the zigzag is trued
+    expect(strR.paths[0].anchors.length).toBeLessThan(s.shape.paths[0].anchors.length) // near-collinear run collapsed
   })
-  test('Line 100 ALONE (snap off) trues the noisy wall — every tool has a standalone full-range effect', () => {
+  test('Straighten OFF returns the source exactly (reversible)', () => {
     const s = source(noisyWall())
-    const offR = flat(resolve(s, off())); const lnR = flat(resolve(s, { global: { ...GLOBAL_OFF, line: 100 }, local: {} }))
-    expect(simple(resolve(s, { global: { ...GLOBAL_OFF, line: 100 }, local: {} }))).toBe(true)
-    expect(lnR).not.toEqual(offR)
+    expect(resolve(s, { global: { ...GLOBAL_OFF, straighten: 0 }, local: {} })).toBe(s.shape)
   })
 })
 

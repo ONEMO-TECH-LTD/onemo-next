@@ -11,7 +11,7 @@ import TickBar from '../../ui/TickBar'
 import { useOutlineStore, type ImageFx } from '../outlineStore'
 import { PARAMETRIC, type ShapeKind } from '../shapes'
 import { SHAPE_CHIPS, ShapeChipIcon, DEFAULT_SHAPE_PARAMS } from './chips'
-import { RoundIcon, SmoothIcon, BrightnessIcon, ContrastIcon, SaturationIcon, WarmthIcon, MinusIcon, PlusIcon, DiceIcon, BlurIcon, CornerIcon, DetailIcon, SnapIcon, AngleIcon, LineIcon } from '../icons'
+import { RoundIcon, SmoothIcon, BrightnessIcon, ContrastIcon, SaturationIcon, WarmthIcon, MinusIcon, PlusIcon, DiceIcon, BlurIcon, CornerIcon, DetailIcon, LineIcon } from '../icons'
 
 // V4: the global Adjust dials are plain 0..100 PRODUCT axes written straight to adjustments.global —
 // the engine (resolve / outline-resolve.ts) owns the pct→engine-unit maps, so there are NO engine
@@ -32,7 +32,7 @@ export const fxFromPct = (k: FxKey, pct: number) => {
 
 import styles from '../outline-editor.module.css'
 
-export type AdjustSub = 'radius' | 'curve' | 'detail' | 'smooth' | 'snap' | 'angle' | 'line'
+export type AdjustSub = 'radius' | 'curve' | 'detail' | 'smooth' | 'straighten'
 
 /** UX-1 progress ring — an arc around a tool circle showing its current value; nothing at zero. */
 function ChipRing({ frac }: { frac: number }) {
@@ -116,9 +116,7 @@ export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, radiusApplies
     { k: 'curve' as const, label: 'Curve', icon: <RoundIcon />, ring: curveSelected && curveVal > 0 ? curveVal / 100 : 0 },
     { k: 'detail' as const, label: 'Detail', icon: <DetailIcon />, ring: (100 - global.detail) / 100 },
     { k: 'smooth' as const, label: 'Smooth', icon: <SmoothIcon />, ring: global.smooth / 100 },
-    { k: 'snap' as const, label: 'Snap', icon: <SnapIcon />, ring: global.snap / 100 },
-    { k: 'angle' as const, label: 'Angle', icon: <AngleIcon />, ring: global.angle / 100 },
-    { k: 'line' as const, label: 'Line', icon: <LineIcon />, ring: global.line / 100 },
+    { k: 'straighten' as const, label: 'Straighten', icon: <LineIcon />, ring: global.straighten / 100 },
   ]
   return (
     <div className={styles.shapeSheet}>
@@ -163,14 +161,10 @@ export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, radiusApplies
           {adjustSub === 'smooth' && (
             <TickBar label="Smooth" min={0} max={100} value={global.smooth} onChange={(v) => previewGlobal(setG('smooth', v))} onCommit={(v) => commitGlobal(setG('smooth', v))} format={(v) => `${Math.round(v)}%`} />
           )}
-          {adjustSub === 'snap' && (
-            <TickBar label="Snap" min={0} max={100} value={global.snap} onChange={(v) => previewGlobal(setG('snap', v))} onCommit={(v) => commitGlobal(setG('snap', v))} format={(v) => `${Math.round(v)}%`} />
-          )}
-          {adjustSub === 'angle' && (
-            <TickBar label="Angle" min={0} max={100} value={global.angle} onChange={(v) => previewGlobal(setG('angle', v))} onCommit={(v) => commitGlobal(setG('angle', v))} format={(v) => `${Math.round(v)}%`} />
-          )}
-          {adjustSub === 'line' && (
-            <TickBar label="Line" min={0} max={100} value={global.line} onChange={(v) => previewGlobal(setG('line', v))} onCommit={(v) => commitGlobal(setG('line', v))} format={(v) => `${Math.round(v)}%`} />
+          {adjustSub === 'straighten' && (
+            // Straighten (DEC-v5-03): Snap + Line merged into one Clipper2 RDP/TrimCollinear op. Collapses
+            // near-collinear runs to true straight edges; real corners are kept. 0 = off, reversible.
+            <TickBar label="Straighten" min={0} max={100} value={global.straighten} onChange={(v) => previewGlobal(setG('straighten', v))} onCommit={(v) => commitGlobal(setG('straighten', v))} format={(v) => `${Math.round(v)}%`} />
           )}
         </div>
       </div>
