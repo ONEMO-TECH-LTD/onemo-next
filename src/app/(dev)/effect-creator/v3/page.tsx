@@ -53,6 +53,10 @@ function PrototypePageInner() {
   }, [])
   const { colors, setBackColor } = useSceneStore()
   const [showColors, setShowColors] = useState(false)
+  // DEV TUNING (Dan, 2026-06-17): the Magic-trace manufacturing min-feature floor (mm). Adjust BEFORE
+  // tapping Magic to set how hard the trace simplifies — bigger = fewer facets / no wobble, smaller =
+  // more detail kept. Tap Magic to apply + see. (Tuning affordance; gate/remove before launch.)
+  const [minFeatureMM, setMinFeatureMM] = useState(5)
   const sceneName = searchParams.get('scene')
 
   // ── #23 GLOBAL history — one undo/redo/reset for the whole creator (Magic, editor sessions,
@@ -245,10 +249,11 @@ function PrototypePageInner() {
     const runId = ++magicRunRef.current
     setGenerating(true)
     import('@/lib/effect/prepare-effect')
-      .then(({ prepareEffect }) =>
+      .then(({ prepareEffect, EFFECT_BUILD_CONFIG }) =>
         // Progress text is intentionally silent (Dan, 2026-06-16: no "Downloading…/Cutting out…"
         // captions). The shimmer animation alone signals work; only the honest fallback still toasts.
-        prepareEffect(artworkUrl, 'shaped', undefined, (s) => {
+        // DEV TUNING: feed the chosen manufacturing min-feature floor into the trace simplification.
+        prepareEffect(artworkUrl, 'shaped', { ...EFFECT_BUILD_CONFIG, minFeatureMM }, (s) => {
           if (s === 'fallback') toast('warn', 'AI cut-out unavailable — used the simple background cut instead') // G4
         }),
       )
@@ -276,7 +281,7 @@ function PrototypePageInner() {
         toast('error', `Magic failed: ${(e as Error)?.message ?? e}`) // G4 — incl. the TD-E watchdog
         setGenerating(false)
       })
-  }, [artworkUrl, generating, snapNow, pushHistory, designState])
+  }, [artworkUrl, generating, snapNow, pushHistory, designState, minFeatureMM])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -386,6 +391,20 @@ function PrototypePageInner() {
           onEditor={() => { editorPreRef.current = snapNow(); setEditorMode(null); setEditingOutline(true) }}
           editorReady={!!prepared}
         />
+      )}
+
+      {/* DEV TUNING (Dan, 2026-06-17): Magic-trace manufacturing min-feature floor. Adjust, then tap
+          Magic to re-cut + see. Bigger = fewer facets / no wobble; smaller = more detail kept.
+          Tuning affordance only — gate behind ?internal or remove before launch. */}
+      {artworkUrl && !editingOutline && !showColors && (
+        <div style={{ position: 'fixed', left: 0, right: 0, bottom: 104, display: 'flex', justifyContent: 'center', pointerEvents: 'none', zIndex: 50 }}>
+          <div style={{ pointerEvents: 'auto', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderRadius: 999, background: 'rgba(20,20,22,0.82)', color: '#f5f5f0', font: '500 13px system-ui, sans-serif', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', boxShadow: '0 4px 16px rgba(0,0,0,0.25)' }}>
+            <span style={{ opacity: 0.75 }}>Detail floor</span>
+            <input type="range" min={0} max={15} step={0.5} value={minFeatureMM} onChange={(e) => setMinFeatureMM(Number(e.target.value))} style={{ width: 140, accentColor: '#c8a23c' }} aria-label="Magic trace detail floor (mm)" />
+            <span style={{ minWidth: 46, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{minFeatureMM} mm</span>
+            <span style={{ opacity: 0.5, fontSize: 11 }}>· tap Magic</span>
+          </div>
+        </div>
       )}
 
       {/* drag-and-drop indicator (upload affordance) */}

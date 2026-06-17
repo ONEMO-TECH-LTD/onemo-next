@@ -26,6 +26,7 @@ export interface ShapeBuildConfig {
   edgeRadiusMM: number    // SHORT rounded-edge fillet radius
   edgeSegments: number
   rdpEpsilonMM: number
+  minFeatureMM?: number   // manufacturing min-feature floor for the Magic trace (overrides MIN_FEATURE_MM); tunable
   maxImageDim: number     // mask/contour downscale cap
   textureDim: number      // front-texture cap (high res so the projected image stays sharp)
   paddingMM: number       // flat image margin around the subject
@@ -41,13 +42,16 @@ import type { EffectType } from './effect-types'
 import { rdpClosed, type Vec2Px } from '@/lib/outline-core/math'
 // REBUILD-PLAN-v2 §B1 — truth at birth: geometry is born as ONE VShape; the manufacturing contour
 // is DERIVED from it. Shaped generation emits the RAW marching-squares straight polygon (no Stage B).
-import { contourFromShape } from './geometry-truth'
+import { contourFromShape, MIN_FEATURE_MM } from './geometry-truth'
 import { type VShape } from '@/lib/vector-core'
 // L6: the standard-square 8mm corners round via the Paper kernel — one fillet engine (same as the
 // editor Radius tool), no in-house duplicate. Imported directly so Paper stays in the create bundle.
 import { roundShapePaper } from '@/lib/vector-core/paper-kernel'
-// RAW-TRACE simplification (Dan 2026-06-15): RDP epsilon that removes ONLY the sub-pixel marching-
-// squares staircase, leaving true straight edges + sharp corners. NOT smoothing — the editor owns that.
+// RAW-TRACE simplification floor (Dan 2026-06-15): the sub-pixel marching-squares-staircase floor.
+// The ACTUAL trace simplification is mm-floored to the manufacturing minimum-feature size
+// (MIN_FEATURE_MM, see geometry-truth) so a clean object traces as a clean straight-faceted polygon;
+// this px value is only the lower bound so the epsilon never drops below the sampling grid. NOT
+// smoothing — fewer facets, sharp corners kept; the editor owns shaping post-generation.
 const RAW_TRACE_RDP_PX = 1.0
 
 /**
@@ -68,6 +72,7 @@ export const EFFECT_BUILD_CONFIG: ShapeBuildConfig = {
   edgeRadiusMM: 0.2,
   edgeSegments: 18,
   rdpEpsilonMM: 0.4,
+  minFeatureMM: MIN_FEATURE_MM, // Magic-trace simplification floor (Dan-tunable; see geometry-truth)
   maxImageDim: 1200,
   textureDim: 2400,
   paddingMM: 1.5,
@@ -213,7 +218,12 @@ export async function prepareEffect(
     // (radius/smooth/detail/snap, reversible to straight). It does NOT re-derive from spec.rawTracePx —
     // that's provenance only (VD3/VD11). Flip to MASK-PX Y-DOWN (vector space).
     const yDown = ringPx.map(([x, y]) => [x, H - y] as Vec2Px)
-    const straight = rdpClosed(yDown, RAW_TRACE_RDP_PX)
+    // mm-floored simplification (Dan 2026-06-17): collapse sub-feature wobble / marching-squares
+    // staircase to the manufacturing minimum-feature size, so a clean object traces as a clean
+    // straight-faceted polygon (sharp corners kept) — fewer facets, NOT a curve fit. The editor's
+    // tools + auto-tune own shaping on top. mm-true so the same physical floor holds at any image size.
+    const rdpEpsPx = Math.max(RAW_TRACE_RDP_PX, (cfg.minFeatureMM ?? MIN_FEATURE_MM) / mmPerPx)
+    const straight = rdpClosed(yDown, rdpEpsPx)
     if (straight.length < 3) throw new Error('No silhouette found — try an image with a clearer subject.')
     vectorShape = { paths: [{ anchors: straight.map(([x, y]) => ({ p: { x, y }, hIn: null, hOut: null, corner: true })) }] }
   } else {
@@ -245,7 +255,7 @@ export async function prepareEffect(
       rawContourNodes: ringPx.length,
       simplifiedNodes: geometryMM.outer.pts.length,
       holes: 0,
-      rdpEpsilonMM: cfg.rdpEpsilonMM,
+      rdpEpsilonMM: type === 'shaped' ? (cfg.minFeatureMM ?? MIN_FEATURE_MM) : cfg.rdpEpsilonMM,
     },
   }
 

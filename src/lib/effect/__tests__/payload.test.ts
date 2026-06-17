@@ -126,7 +126,7 @@ describe('buildApprovedEffectPayload (schema 3, vector-native)', () => {
     // MARKED `ref-fallback:` so it can't impersonate byte identity — fixtures carry no ingest sha,
     // so this fixture's source identity moved. Schema shape unchanged; nothing persisted.)
     expect(out.schema_version).toBe(3)
-    expect(out.payload_hash).toBe('fdee1b9b1e808a7c') // re-pinned: edgeRadiusMM 0.5→0.2 (Dan's accepted straight-wall edge, V4 — intentional config change)
+    expect(out.payload_hash).toBe('10c7ecbb4623739c') // re-pinned: edgeRadiusMM 0.5→0.2 (V4); + minFeatureMM trace-simplification floor added to build config (Dan 2026-06-17) — intentional config change, so config_hash (and thus payload_hash) shifts. No persisted designs (save erased).
   })
 
   it('SOURCE IDENTITY (KAI-8973/P1b): the ingest byte-hash IS image_hash; absence is a MARKED fallback', () => {

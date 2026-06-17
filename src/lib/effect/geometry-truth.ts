@@ -29,6 +29,14 @@ export const DISPLAY_TOLERANCE_MM = 0.004
 // PHYSICAL design are one touch target — the pair-collapse floor is mm-true, not viewport px. Consumed
 // by the editor's manual-edit pass (OutlineEditor); the resolver/contour math do not need it.
 export const MIN_ANCHOR_SEPARATION_MM = 1.5
+// Manufacturing minimum-feature floor (Dan, 2026-06-17): the cut process (laser / die) cannot render
+// detail finer than this, and the product is a "sticker-like" APPROXIMATION of the rough shape — not a
+// hair-accurate trace. So the Magic trace SIMPLIFIES to this floor: sub-feature wobble / marching-squares
+// staircase is collapsed to true straight edges (sharp corners kept), yielding a clean straight-faceted
+// source the editor's tools then refine. This is SIMPLIFICATION (fewer facets), NOT curve-smoothing —
+// the editor owns shaping post-generation. mm-true / scale-invariant: RDP epsilon = MIN_FEATURE_MM /
+// mmPerPx. Tunable (Dan calibrates on-device, same as the auto-tune values).
+export const MIN_FEATURE_MM = 5
 // Below this the outline is collapsed/degenerate — same floor the legacy feasibility used.
 const MIN_AREA_PX2 = 1
 // int-micron quantization for the canonical hash (float-free identity, payload.ts convention)
