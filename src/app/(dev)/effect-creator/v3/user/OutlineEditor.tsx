@@ -28,7 +28,7 @@ import { type ShapeKind, type ShapeParams } from './shapes'
 // VECTOR CORE (reset Run 1): vector-native kinds render/commit/transform on a true Bézier VShape;
 // the doc stays as the interaction SHADOW (a derived flatten artifact — bbox/hit/grips math only).
 import { shapeToSVGPathD, flattenShape, insertAnchorCentered, deleteAnchorRefit, shapeBBox, type VShape } from '@/lib/vector-core'
-import { cornerRadiusAdjustments, autoTuneDefaults, representativeLocal } from './editor/seed-defaults'
+import { cornerRadiusAdjustments, representativeLocal } from './editor/seed-defaults'
 import { hasVectorDef, getShape } from '@/lib/shape-library'
 // Run 8 — SVG shape upload: a downloaded/Figma-exported outline becomes a first-class vector
 // shape through the export module's dialect gate (loud rejection outside the v1 boundary).
@@ -225,10 +225,11 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
       const image = { widthPx: spec.maskWidthPx, heightPx: spec.maskHeightPx }
       if (spec.generator.adapter !== 'standard') {
         // Magic (VD11): the immutable source IS the raw marching-squares SHARP polygon (spec.vectorShape,
-        // RDP-normalized at generation). T6 — a post-gen AUTO-TUNE recipe (detail/straighten/smooth) is
-        // applied as the DEFAULT adjustments so the cut is organic by default; the raw source stays sharp
-        // and it is fully reversible (zero the sliders → this exact polygon). No re-fair, no corner-pin.
-        seedSource({ shape: mintIds(spec.vectorShape), klass: 'generated', mmPerPx: spec.mmPerPx, maskHeightPx: spec.maskHeightPx, rawTracePx: spec.rawTracePx as Pt[] | undefined }, autoTuneDefaults(), false)
+        // RDP-normalized at generation). AUTO-TUNE PAUSED (Dan, 2026-06-17): Magic opens RAW + all tools
+        // OFF so Dan can dial each tool manually per shape and identify the optimal settings — the
+        // calibrated (and adaptive) auto-tune is wired back from that feedback. autoTuneDefaults() stays
+        // dormant in editor/seed-defaults.ts.
+        seedSource({ shape: mintIds(spec.vectorShape), klass: 'generated', mmPerPx: spec.mmPerPx, maskHeightPx: spec.maskHeightPx, rawTracePx: spec.rawTracePx as Pt[] | undefined }, undefined, false)
       } else {
         // pre-Magic (Dan, 2026-06-10): "choose a shape" — the centered 72% square, seeded SHARP (T5) with
         // the default 8mm rounding as a reversible Radius ADJUSTMENT (not baked into the source), so Radius
@@ -433,7 +434,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     if (spec === lastSpecRef.current) return
     lastSpecRef.current = spec
     if (!spec || spec.generator.adapter === 'standard') return
-    seedSource({ shape: mintIds(spec.vectorShape), klass: 'generated', mmPerPx: spec.mmPerPx, maskHeightPx: spec.maskHeightPx, rawTracePx: spec.rawTracePx as Pt[] | undefined }, autoTuneDefaults())
+    seedSource({ shape: mintIds(spec.vectorShape), klass: 'generated', mmPerPx: spec.mmPerPx, maskHeightPx: spec.maskHeightPx, rawTracePx: spec.rawTracePx as Pt[] | undefined }) // AUTO-TUNE PAUSED (Dan) — raw + off for manual testing
     setRadius(0); setCurveVal(0); setSelVA(null); setAllSelected(false)
     const cur = useOutlineStore.getState()
     entryRef.current = { source: cur.source, adjustments: cur.adjustments }
