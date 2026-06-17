@@ -12,7 +12,7 @@
 // ids — this hook owns interaction, never the recipe or the geometry math. Swap-test: replace this
 // hook, the handler contract (same inputs → same store/recipe writes) is unchanged.
 
-import { useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import type { Dispatch, SetStateAction, PointerEvent as ReactPointerEvent, MouseEvent as ReactMouseEvent, WheelEvent as ReactWheelEvent } from 'react'
 import { useOutlineStore } from '../outlineStore'
 import { perfGesture } from '../../dev/PerfHUD'
@@ -112,7 +112,10 @@ interface GestureCtx { // KAI-9066: module-internal (the consumer passes a struc
 export function useEditorGestures(ctx: GestureCtx) {
   // latest-ref: handlers are created once (stable) but always read the freshest ctx — no stale closures.
   const ctxRef = useRef(ctx)
-  ctxRef.current = ctx
+  // Write the latest ctx in an effect (NOT during render) — gesture handlers fire after commit, so they
+  // always read the freshest ctx; satisfies the react-compiler "no ref access during render" rule with
+  // identical behaviour (the ref is never read during render — every read is inside a pointer handler).
+  useEffect(() => { ctxRef.current = ctx })
 
   // ── vector anchor / handle pointer-down (Points mode) ──
   const onVAnchorDown = useCallback(
