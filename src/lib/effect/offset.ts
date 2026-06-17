@@ -16,14 +16,14 @@ const SCALE = 1000
  * Inset (deltaMM < 0) or outset (deltaMM > 0) a closed mm ring. Returns the largest resulting ring — a
  * simple polygon inset yields one ring; an over-inset (delta beyond the shape's inradius) collapses to
  * nothing → null. The −8mm magnetic inset is `insetRingMM(outer, -8)`; a small positive delta is the cut
- * bleed. Joins default to ROUND (manufacturing); pass `sharpCorners` for MITER joins (the editor Offset
- * tool — expand the shape and KEEP its corners sharp instead of rounding them).
+ * bleed. `joinStyle` picks the corner join: 'round' (default, manufacturing), 'sharp' (Miter — keep
+ * corners), or 'bevel' (chamfer). The editor Offset tool passes the user's choice.
  */
-export function insetRingMM(ringMM: ReadonlyArray<Pt>, deltaMM: number, sharpCorners = false): Pt[] | null {
+export function insetRingMM(ringMM: ReadonlyArray<Pt>, deltaMM: number, joinStyle: 'round' | 'sharp' | 'bevel' = 'round'): Pt[] | null {
   if (ringMM.length < 3) return null
   const flat: number[] = []
   for (const [x, y] of ringMM) flat.push(Math.round(x * SCALE), Math.round(y * SCALE))
-  const join = sharpCorners ? JoinType.Miter : JoinType.Round
+  const join = joinStyle === 'sharp' ? JoinType.Miter : joinStyle === 'bevel' ? JoinType.Bevel : JoinType.Round
   const sol = Clipper.inflatePaths([Clipper.makePath(flat)], deltaMM * SCALE, join, EndType.Polygon)
   if (!sol || sol.length === 0) return null
   // keep the largest ring (guards against an offset that splits a concave shape into slivers)
