@@ -397,7 +397,7 @@ function PrototypePageInner() {
           Magic to re-cut + see. Bigger = fewer facets / no wobble; smaller = more detail kept.
           Tuning affordance only — gate behind ?internal or remove before launch. */}
       {artworkUrl && !editingOutline && !showColors && (
-        <div style={{ position: 'fixed', left: 0, right: 0, bottom: 104, display: 'flex', justifyContent: 'center', pointerEvents: 'none', zIndex: 50 }}>
+        <div style={{ position: 'fixed', left: 0, right: 0, top: 76, display: 'flex', justifyContent: 'center', pointerEvents: 'none', zIndex: 50 }}>
           <div style={{ pointerEvents: 'auto', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderRadius: 999, background: 'rgba(20,20,22,0.82)', color: '#f5f5f0', font: '500 13px system-ui, sans-serif', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', boxShadow: '0 4px 16px rgba(0,0,0,0.25)' }}>
             <span style={{ opacity: 0.75 }}>Detail floor</span>
             <input type="range" min={0} max={15} step={0.5} value={minFeatureMM} onChange={(e) => setMinFeatureMM(Number(e.target.value))} style={{ width: 140, accentColor: '#c8a23c' }} aria-label="Magic trace detail floor (mm)" />
