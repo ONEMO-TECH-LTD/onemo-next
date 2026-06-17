@@ -73,10 +73,28 @@ function fromPaperPath(p: paper.Path): VPath {
  */
 export function roundCornersPaper(path: VPath, radiusPx: number, pick: (i: number) => boolean): VPath {
   if (radiusPx <= 0) return path
+  const N = path.anchors.length
+  const want: boolean[] = []
+  let count = 0
+  for (let i = 0; i < N; i++) { want[i] = pick(i); if (want[i]) count++ }
+  if (!count) return path
+  // SEAM FIX (Dan: "one corner always stays straight" — the top-right seam): PaperRoundCorners
+  // mis-rounds a target at index 0 of a CLOSED path — it rounds the NEXT vertex, leaving the seam
+  // corner sharp (round(seg[0]) and round(seg[1]) both hit vertex 1; vertex 0 is unreachable). A closed
+  // ring's start is arbitrary, so rotate a NON-target to index 0 before rounding (ids ride along → the
+  // exact same shape + F1 bond). When EVERY corner is a target there is no lone seam — the high→low
+  // multi pass rounds index 0 correctly last — so no rotation is needed.
+  let anchors = path.anchors
+  let want2 = want
+  if (want[0] && count < N) {
+    let k = 1
+    while (k < N && want[k]) k++ // first non-target → rotate it to index 0
+    anchors = [...path.anchors.slice(k), ...path.anchors.slice(0, k)]
+    want2 = [...want.slice(k), ...want.slice(0, k)]
+  }
   const targets: number[] = []
-  for (let i = 0; i < path.anchors.length; i++) if (pick(i)) targets.push(i)
-  if (!targets.length) return path
-  const pp = toPaperPath(path)
+  for (let i = 0; i < anchors.length; i++) if (want2[i]) targets.push(i)
+  const pp = toPaperPath({ anchors })
   try {
     // Round HIGH→LOW so each round's inserted segments don't shift the still-pending lower indices.
     for (const i of targets.sort((a, b) => b - a)) {
