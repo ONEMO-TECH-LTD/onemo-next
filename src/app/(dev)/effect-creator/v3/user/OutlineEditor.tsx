@@ -19,7 +19,6 @@ import {
 // V4 engine (blueprint v4-foundation.md): one impartial resolve(source, adjustments). The editor
 // writes the recipe; the engine owns shape. No corner-pin, no vectoriseTrace, no baked timeline.
 import { mintIds, type OutlineSource, type OutlineAdjustments } from '@/lib/effect/outline-resolve'
-import { standardBirthShape } from '@/lib/effect/prepare-effect'
 import { useOutlineStore, NEUTRAL_FX, INITIAL_ARTWORK, type ImageFx } from './outlineStore'
 import type { DesignState } from '../types'
 import type { Pt } from '@/lib/effect/types'
@@ -29,7 +28,7 @@ import { type ShapeKind, type ShapeParams } from './shapes'
 // VECTOR CORE (reset Run 1): vector-native kinds render/commit/transform on a true Bézier VShape;
 // the doc stays as the interaction SHADOW (a derived flatten artifact — bbox/hit/grips math only).
 import { shapeToSVGPathD, flattenShape, insertAnchorCentered, deleteAnchorRefit, shapeBBox, type VShape } from '@/lib/vector-core'
-import { roundShapePaper } from '@/lib/vector-core/paper-kernel' // L6: stock-seed 8mm corners via Paper (one engine)
+import { cornerRadiusAdjustments, autoTuneDefaults, representativeLocal } from './editor/seed-defaults'
 import { hasVectorDef, getShape } from '@/lib/shape-library'
 // Run 8 — SVG shape upload: a downloaded/Figma-exported outline becomes a first-class vector
 // shape through the export module's dialect gate (loud rejection outside the v1 boundary).
@@ -133,6 +132,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   // KAI-8971/F2: imageFx+artwork were missing, so a ✕ kept a 129% Bright committed. (Tune/fairing
   // prefs intentionally survive ✕ — tool calibration, not design state; Dan's #21.)
   const preEditRef = useRef<{ source: OutlineSource | null; adjustments: OutlineAdjustments | null; committedShape: VShape | null; bgBlur: number | null; imageFx: ImageFx | null; artwork: DesignState }>({ source: null, adjustments: null, committedShape: null, bgBlur: null, imageFx: null, artwork: INITIAL_ARTWORK })
+  // T5: the shape the user ENTERED the editor with (sharp source + its default recipe) — Reset restores this.
+  const entryRef = useRef<{ source: OutlineSource | null; adjustments: OutlineAdjustments | null }>({ source: null, adjustments: null })
   const [allSelected, setAllSelected] = useState(false) // tap inside the cut → select every corner, edit them together
   const [frameLocked, setFrameLocked] = useState(true) // 6.2/6.3: corner pull = SCALE when locked / deform when unlocked
   const nodeInteractedRef = useRef(false) // a node tap just happened → suppress the bubbling surface-click (which would re-select all)
@@ -223,21 +224,33 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     if (spec && !st0.source) {
       const image = { widthPx: spec.maskWidthPx, heightPx: spec.maskHeightPx }
       if (spec.generator.adapter !== 'standard') {
-        // Magic (VD11): the immutable source IS the raw marching-squares straight polygon (spec.vectorShape,
-        // RDP-normalized at generation). all-off → this exact polygon. Every tool (Detail / Smooth /
-        // Radius / Curve) is a reversible adjustment ON it — no re-fair, no corner-pin on entry.
-        seedSource({ shape: mintIds(spec.vectorShape), klass: 'generated', mmPerPx: spec.mmPerPx, maskHeightPx: spec.maskHeightPx, rawTracePx: spec.rawTracePx as Pt[] | undefined }, undefined, false)
+        // Magic (VD11): the immutable source IS the raw marching-squares SHARP polygon (spec.vectorShape,
+        // RDP-normalized at generation). T6 — a post-gen AUTO-TUNE recipe (detail/straighten/smooth) is
+        // applied as the DEFAULT adjustments so the cut is organic by default; the raw source stays sharp
+        // and it is fully reversible (zero the sliders → this exact polygon). No re-fair, no corner-pin.
+        seedSource({ shape: mintIds(spec.vectorShape), klass: 'generated', mmPerPx: spec.mmPerPx, maskHeightPx: spec.maskHeightPx, rawTracePx: spec.rawTracePx as Pt[] | undefined }, autoTuneDefaults(), false)
       } else {
-        // pre-Magic (Dan, 2026-06-10): "choose a shape" — the centered 72% square with 8mm corners,
-        // as a stock-class source (the rounding lives in the source vector; all-off shows it verbatim).
-        const base = getShape('square', image.widthPx, image.heightPx)
+        // pre-Magic (Dan, 2026-06-10): "choose a shape" — the centered 72% square, seeded SHARP (T5) with
+        // the default 8mm rounding as a reversible Radius ADJUSTMENT (not baked into the source), so Radius
+        // is live on it and the slider reflects its real value.
+        const base = mintIds(getShape('square', image.widthPx, image.heightPx))
         const side = Math.min(image.widthPx, image.heightPx) * 0.72
         const defaultR = Math.min(Math.round(8 / (spec.mmPerPx || 1)), Math.floor(side / 2))
-        seedSource({ shape: mintIds(roundShapePaper(base, defaultR)), klass: 'stock', mmPerPx: spec.mmPerPx, maskHeightPx: spec.maskHeightPx }, undefined, false)
+        seedSource({ shape: base, klass: 'stock', mmPerPx: spec.mmPerPx, maskHeightPx: spec.maskHeightPx }, cornerRadiusAdjustments(base, defaultR), false)
         setActiveAdjust('shape')
         setShapeKind('square')
         setShowAnchors(false) // rigid shape default — Points toggle re-enables
       }
+    }
+    // T7 value-reflection + T5 entry capture: the Radius/Curve sliders reflect the seeded/live recipe
+    // (global sliders bind to adjustments.global directly); Reset restores this entry shape.
+    {
+      const cur = useOutlineStore.getState()
+      if (cur.source) {
+        setRadius(representativeLocal(cur.adjustments, cur.source.shape, 'radius'))
+        setCurveVal(representativeLocal(cur.adjustments, cur.source.shape, 'curve') * 50) // factor(0..2) → 0..100
+      }
+      entryRef.current = { source: cur.source, adjustments: cur.adjustments }
     }
     // (no spec → nothing to seed; the page gates editor entry on an uploaded image)
     setImageSub('brightness')
@@ -391,29 +404,33 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
 
   // (Global adjustment writers previewGlobal/commitGlobal moved to useEditorAdjustments — R8 seam 2.)
 
-  // KAI-9023: a NEW shaped spec landing mid-session (editor-dock Magic) re-seeds the source from the
-  // fresh raw marching-squares polygon (all-off = raw); the session stays open.
+  // KAI-9023: a NEW shaped spec landing mid-session (editor-dock Magic) re-seeds the SHARP source from
+  // the fresh raw marching-squares polygon + the T6 auto-tune default recipe (organic by default); the
+  // session stays open and this becomes the new entry shape (Reset returns here).
   const lastSpecRef = useRef(spec)
   useEffect(() => {
     if (!open) { lastSpecRef.current = spec; return }
     if (spec === lastSpecRef.current) return
     lastSpecRef.current = spec
     if (!spec || spec.generator.adapter === 'standard') return
-    seedSource({ shape: mintIds(spec.vectorShape), klass: 'generated', mmPerPx: spec.mmPerPx, maskHeightPx: spec.maskHeightPx, rawTracePx: spec.rawTracePx as Pt[] | undefined })
+    seedSource({ shape: mintIds(spec.vectorShape), klass: 'generated', mmPerPx: spec.mmPerPx, maskHeightPx: spec.maskHeightPx, rawTracePx: spec.rawTracePx as Pt[] | undefined }, autoTuneDefaults())
     setRadius(0); setCurveVal(0); setSelVA(null); setAllSelected(false)
+    const cur = useOutlineStore.getState()
+    entryRef.current = { source: cur.source, adjustments: cur.adjustments }
   }, [spec, open, seedSource])
 
   const onReset = useCallback(() => {
-    // KAI-9025 (Dan): Reset → the original full-image square with 8mm corners, for EVERY class. THE one
-    // birth construction (standardBirthShape — product birth uses it too, so they can't diverge), as a
-    // fresh stock-class source with adjustments OFF.
-    if (!spec) return // no design in the editor (the page gates entry) — nothing to reset
-    const birth = standardBirthShape(spec.maskWidthPx, spec.maskHeightPx)
-    seedSource({ shape: mintIds(birth.vectorShape), klass: 'stock', mmPerPx: spec.mmPerPx, maskHeightPx: spec.maskHeightPx })
-    setRadius(0); setCurveVal(0)
+    // T5 (Dan): Reset → the shape the user ENTERED the editor with (sharp source + its default recipe),
+    // fully tool-controllable — NOT a hard-coded full-stretch rounded square. Radius/Curve sliders reflect
+    // the restored recipe (T7); global sliders bind to adjustments.global directly.
+    const e = entryRef.current
+    if (!e.source) return // nothing to reset to (the page gates entry on an uploaded image)
+    seedSource(e.source, e.adjustments ?? undefined)
+    setRadius(e.adjustments ? representativeLocal(e.adjustments, e.source.shape, 'radius') : 0)
+    setCurveVal(e.adjustments ? representativeLocal(e.adjustments, e.source.shape, 'curve') * 50 : 0)
     setAllSelected(false)
     setShapeKind(null); setShapePreview(null)
-  }, [spec, seedSource])
+  }, [seedSource])
 
   // R8: producer geometry (shapePreviewD / vecFromGenerator / vecFromImageFile) lives in
   // editor/producers (pure, seam 1). The pickers below call them with explicit dims + params.
