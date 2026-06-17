@@ -47,7 +47,9 @@ const PerfHUD = dynamic(() => import('./dev/PerfHUD'), { ssr: false })
 const DETAIL_TIGHT_MM = 0   // detail 100% = RAW exact trace (eps floors to ~1px) = pixel-perfect silhouette
 const DETAIL_COARSE_MM = 10 // detail 0% = coarsest facets
 const SMOOTH_MAX_MM = 0.8   // smooth 100% = curve-fit tolerance 0.8mm (fairs the pixel staircase away; safe < fold)
+const OFFSET_MAX_MM = 10    // offset 100% = 10mm OUTSET (margin/bleed). Outset-only — no inset (Dan).
 const detailToTraceMm = (pct: number) => { const d = Math.max(0, Math.min(100, pct)) / 100; return DETAIL_COARSE_MM + d * (DETAIL_TIGHT_MM - DETAIL_COARSE_MM) }
+const offsetToMm = (pct: number) => (Math.max(0, Math.min(100, pct)) / 100) * OFFSET_MAX_MM
 
 // POC: build the editor source from the cached AI trace at a Detail (RDP) + Smooth (catmull) level —
 // the unified RDP/Paper engines, no AI re-run. RDP+repair = tight, de-degenerate polygon (no mesh
@@ -96,7 +98,7 @@ function PrototypePageInner() {
   // of the cached AI trace — no AI re-run. Default 100 (exact) so the tight silhouette shows first.
   const [detail, setDetail] = useState(100)
   const [smooth, setSmooth] = useState(50) // POC: fair the pixel staircase into curves (Paper simplify)
-  const [offset, setOffset] = useState(0)  // POC: the generation padding as a tool (Clipper inset/outset, mm). 0 = tight
+  const [offset, setOffset] = useState(0)  // POC: the generation padding as a tool (Clipper outset, 0..100%). 0 = tight
   const sceneName = searchParams.get('scene')
 
   // ── #23 GLOBAL history — one undo/redo/reset for the whole creator (Magic, editor sessions,
@@ -307,7 +309,7 @@ function PrototypePageInner() {
         st.setSpec(p.spec) // hand the shaped outline to the 2D editor + 3D
         st.setBgBlur(null) // fresh cut-out → drop prior edits
         // POC: build the editor source from the raw trace at the current Detail + Smooth (no AI re-run)
-        const vs0 = p.spec.rawTracePx?.length ? buildTrace(p.spec.rawTracePx, p.spec.maskHeightPx, p.spec.mmPerPx, detail, smooth, offset) : null
+        const vs0 = p.spec.rawTracePx?.length ? buildTrace(p.spec.rawTracePx, p.spec.maskHeightPx, p.spec.mmPerPx, detail, smooth, offsetToMm(offset)) : null
         if (vs0) { st.setSpec({ ...p.spec, vectorShape: vs0 }); st.commitGeometry(vs0) } else st.commitGeometry(null)
         // the editor's magic-blend preview needs the sharp subject matte
         try { st.setSubjMatteUrl(p.frontSrc.subjCanvas.toDataURL()) } catch { st.setSubjMatteUrl(null) }
@@ -332,7 +334,7 @@ function PrototypePageInner() {
     const st = useOutlineStore.getState()
     const spec = st.spec
     if (!spec?.rawTracePx?.length) return
-    const vs = buildTrace(spec.rawTracePx, spec.maskHeightPx, spec.mmPerPx, d, s, o)
+    const vs = buildTrace(spec.rawTracePx, spec.maskHeightPx, spec.mmPerPx, d, s, offsetToMm(o))
     if (!vs) return
     st.setSpec({ ...spec, vectorShape: vs })
     st.commitGeometry(vs)
@@ -465,8 +467,8 @@ function PrototypePageInner() {
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ opacity: 0.75, minWidth: 50 }}>Offset</span>
-              <input type="range" min={-5} max={10} step={0.5} value={offset} onChange={(e) => { const v = Number(e.target.value); setOffset(v); reTrace(detail, smooth, v) }} style={{ width: 160, accentColor: '#c8a23c' }} aria-label="Magic trace offset (mm)" />
-              <span style={{ minWidth: 48, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{offset} mm</span>
+              <input type="range" min={0} max={100} step={1} value={offset} onChange={(e) => { const v = Number(e.target.value); setOffset(v); reTrace(detail, smooth, v) }} style={{ width: 160, accentColor: '#c8a23c' }} aria-label="Magic trace offset (outset)" />
+              <span style={{ minWidth: 48, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{offset}%</span>
             </label>
           </div>
         </div>
