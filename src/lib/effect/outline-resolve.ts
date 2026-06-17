@@ -64,17 +64,21 @@ export const GLOBAL_OFF: GlobalAdjustments = { simplify: 0, smooth: 0, straighte
 export const ADJUSTMENTS_OFF: OutlineAdjustments = { global: { ...GLOBAL_OFF }, local: {} }
 
 // ── pct → engine-unit maps (the editor sliders write 0..100; OFF maps to a true no-op) ──────────
-/** Straighten: Clipper2 RDP epsilon (px) — how far a near-collinear run may deviate and still collapse
- *  to one straight edge. 0% = OFF; 100% = the max below. Real corners deviate far more and are kept.
- *  STRAIGHTEN_MAX_EPS_PX is a tuning constant (the auto-tune default values are Dan-tuned). */
-const STRAIGHTEN_MAX_EPS_PX = 8
-export const straightenEpsPx = (pct: number) => (Math.max(0, Math.min(100, pct)) / 100) * STRAIGHTEN_MAX_EPS_PX
+// SCALE-RELATIVE (Dan 2026-06-17: every tool is % scale-relative): a tool's 100% = MAX_FRAC of the
+// shape's short side, so "50%" behaves identically on any shape size — no fixed-px magic numbers. The
+// MAX_FRACs are STARTING tuning constants (Dan-tuned). (Smooth is already scale-relative — catmull
+// tension is relative to anchor spacing; Radius = % of half the short side; Curve scales with each
+// anchor's neighbour legs — so all five tools are scale-relative.)
+const STRAIGHTEN_MAX_FRAC = 0.02 // 100% straightens runs deviating up to 2% of the short side
+const SIMPLIFY_MAX_FRAC = 0.025 // 100% simplify tolerance = 2.5% of the short side
+/** Straighten: Clipper2 RDP epsilon = pct × MAX_FRAC × shape short side (px). 0% = OFF. */
+export const straightenEpsPx = (pct: number, scalePx: number) => (Math.max(0, Math.min(100, pct)) / 100) * STRAIGHTEN_MAX_FRAC * scalePx
 /** Smooth: Paper catmull-rom handle factor. 0% = OFF (no handles introduced); 100% = max round.
- *  Scale-invariant (catmull tension is relative to anchor spacing), applied directly to the anchors. */
+ *  Already scale-invariant (catmull tension is relative to anchor spacing). */
 export const smoothFactor = (pct: number) => Math.max(0, Math.min(1, pct / 100))
-/** Simplify: Paper SIMPLIFY tolerance (px). 0% = OFF (no simplify, full detail); 100% = max simplify
- *  (≈8.75px fit → fewest anchors, roundest curve-fit). Applied directly to the anchors; never a dense chain. */
-export const simplifyTolPx = (pct: number) => 0.75 + (Math.max(0, Math.min(100, pct)) / 100) * 8
+/** Simplify: Paper SIMPLIFY tolerance = pct × MAX_FRAC × shape short side (px). 0% = OFF; higher =
+ *  fewer anchors + rounder curve-fit. Applied directly to the anchors; never a dense chain. */
+export const simplifyTolPx = (pct: number, scalePx: number) => (Math.max(0, Math.min(100, pct)) / 100) * SIMPLIFY_MAX_FRAC * scalePx
 
 // ── id minting + lookup ─────────────────────────────────────────────────────────────────────
 let _idSeq = 0
@@ -117,7 +121,10 @@ function bendAnchorPath(path: VPath, idx: number, factor: number): VPath {
 }
 
 // ── fold-guard validation (flatten ONLY to check self-intersection — not a processing wrapper) ──
-const VALIDATE_FLATTEN_TOL = 0.75 // px — dense enough to detect a real self-cross
+// 0.5 MATCHES the editor's display ring (EditorCanvas hitRing = flattenShape(.,0.5)): the fold-guard
+// must reject exactly what the display would flag red, or a borderline result (e.g. tiny Smooth at 1%)
+// passes the coarser guard yet shows a red outline. Same tolerance → guard and red-flag agree.
+const VALIDATE_FLATTEN_TOL = 0.5 // px — matches the display ring so guard ⇔ red-flag agree
 const pathToRing = (vp: VPath): Vec2Px[] => flattenPath(vp, VALIDATE_FLATTEN_TOL).map((p) => [p.x, p.y] as Vec2Px)
 const ringFinite = (r: Vec2Px[]) => r.length >= 4 && r.every(([x, y]) => Number.isFinite(x) && Number.isFinite(y))
 const ringSimple = (r: Vec2Px[]) => ringFinite(r) && validateSelfIntersection(r, 'resolve').length === 0
@@ -139,6 +146,13 @@ function hasRedundantVertices(path: VPath, tolPx: number): boolean {
   return false
 }
 
+/** The shape's short side (px) — the scale reference for the scale-relative tools (straighten/simplify). */
+function shortSidePx(path: VPath): number {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const a of path.anchors) { if (a.p.x < minX) minX = a.p.x; if (a.p.y < minY) minY = a.p.y; if (a.p.x > maxX) maxX = a.p.x; if (a.p.y > maxY) maxY = a.p.y }
+  return Math.max(1, Math.min(maxX - minX, maxY - minY))
+}
+
 // ── global pass ────────────────────────────────────────────────────────────────────────────
 /** Global pass: each global tool is its LIBRARY op applied DIRECTLY to the path's own anchors (no
  *  flatten-and-refit). Order: straighten (collapse near-collinear) → simplify (anchor density) → smooth
@@ -149,19 +163,22 @@ function globalPass(source: OutlineSource, g: GlobalAdjustments, claimed: Set<st
   const paths = source.shape.paths.map((path) => {
     if (path.anchors.length < 3) return path // too small to reshape — pass through unchanged
     let p: VPath = path
+    const scalePx = shortSidePx(path) // scale reference for the scale-relative tools (straighten/simplify)
     const guard = (next: VPath): VPath => (ringSimple(pathToRing(next)) ? next : p)
     // 1. STRAIGHTEN — Clipper2 RDP/TrimCollinear: collapse near-collinear runs to true straight edges.
-    if (g.straighten > 0) p = guard(straightenPath(p, straightenEpsPx(g.straighten)))
+    if (g.straighten > 0) p = guard(straightenPath(p, straightenEpsPx(g.straighten, scalePx)))
     // 2. SIMPLIFY — Paper simplify (curve-fit): 0 = OFF, higher = fewer anchors + smoother fit. Runs only
     //    where there are redundant near-collinear vertices to remove (dense traces); a no-op on a clean
     //    sparse polygon (so a square keeps its corners). Sparse, never dense.
-    if (g.simplify > 0 && hasRedundantVertices(p, simplifyTolPx(g.simplify))) p = guard(simplifyPaper(p, simplifyTolPx(g.simplify)))
-    // 3. SMOOTH — Paper catmull-rom: handle roundness on the (sparse) anchors. Back off on a fold.
+    if (g.simplify > 0) { const tol = simplifyTolPx(g.simplify, scalePx); if (hasRedundantVertices(p, tol)) p = guard(simplifyPaper(p, tol)) }
+    // 3. SMOOTH — Paper catmull-rom: handle roundness on the (sparse) anchors. Back off (to any factor)
+    //    on a fold — at tiny smooth the floor must be low enough to retreat to a clean result, else the
+    //    1% case slips a borderline self-touch past the guard and shows a red outline.
     if (g.smooth > 0) {
       let factor = smoothFactor(g.smooth)
       let sm = smoothPaper(p, factor)
       let n = 0
-      while (!ringSimple(pathToRing(sm)) && n++ < 12 && factor > 0.04) { factor *= 0.7; sm = smoothPaper(p, factor) }
+      while (!ringSimple(pathToRing(sm)) && n++ < 12 && factor > 0.004) { factor *= 0.7; sm = smoothPaper(p, factor) }
       if (ringSimple(pathToRing(sm))) p = sm
     }
     // PIN claimed source anchors back (fresh anchors array — never mutate the source path).
