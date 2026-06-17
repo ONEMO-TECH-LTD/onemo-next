@@ -8,10 +8,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  applyOutlineCommands,
-  resolveOutlineDocument,
-  resolveSdfBlend,
-  livewirePath,
   rdpClosed,
   repairSimplePolygon,
   type OutlineDocument,
@@ -20,6 +16,11 @@ import {
   type ReplayEnv,
   type CostGrid,
 } from '@/lib/outline-core'
+// KAI-9073: dormant document-runtime functions import from their submodules (no longer the public barrel)
+import { applyOutlineCommands } from '@/lib/outline-core/reducer'
+import { resolveOutlineDocument } from '@/lib/outline-core/resolver'
+import { resolveSdfBlend } from '@/lib/outline-core/sdf'
+import { livewirePath } from '@/lib/outline-core/livewire'
 import type { ShapeSpecDraft, Contour } from '../core/shaped/types'
 import { buildEdgeCost } from './edgeCost'
 import { useOutlineStore } from './outlineStore'

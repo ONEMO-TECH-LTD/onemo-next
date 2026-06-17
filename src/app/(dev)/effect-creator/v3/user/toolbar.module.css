@@ -1,0 +1,59 @@
+/* Manual Sticker Maker — scene toolbar. Icon-over-label tools (matches the outline editor's
+   bottom toolbar), on the ONEMO design system tokens. Chillax labels, brand ink, brand-coloured
+   for the lead action (Upload) and toggled-on states (Edit / Colours). */
+
+.bar {
+  position: absolute;
+  left: 50%;
+  bottom: var(--spacing-l);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-m);
+  z-index: 10;
+  padding: var(--spacing-2xs) var(--spacing-l);
+  /* optimised faux-glass — frosted-looking translucent pill, NO backdrop-filter (that tanked FPS to ~12) */
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(246, 248, 251, 0.74));
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: var(--radius-full);
+  box-shadow: 0 12px 34px rgba(20, 24, 40, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 2px rgba(150, 160, 180, 0.12);
+}
+
+/* KAI-9021: the editor hosts the SAME island in its bottom flex slot — un-absolute it there */
+.dockSlot { display: flex; justify-content: center; padding: var(--spacing-2xs) 0 var(--spacing-s); }
+.barInline { position: static; transform: none; }
+
+.tool {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  min-width: 3rem;
+  border: none;
+  background: transparent;
+  color: var(--color-text-primary);
+  font-family: var(--font-primary);
+  cursor: pointer;
+  padding: var(--spacing-2xs);
+  border-radius: var(--radius-m);
+  user-select: none;
+  transition: color 0.15s ease, opacity 0.15s ease;
+}
+.tool:hover { opacity: 0.7; }
+
+.toolIcon { display: inline-flex; }
+.toolIcon svg { width: 1.6rem; height: 1.6rem; }
+
+.toolLabel {
+  font-size: var(--text-label-s, 0.75rem);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Lead action (Upload) — brand-coloured so it reads first. */
+.primary { color: var(--color-text-primary, #1c2030); }
+/* Toggled-on (Edit / Colours) — brand-coloured. */
+.active { color: var(--color-text-primary, #1c2030); }
+
+.hiddenInput { display: none; }
