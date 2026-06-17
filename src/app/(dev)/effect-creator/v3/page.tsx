@@ -83,8 +83,14 @@ function PrototypePageInner() {
     : '/api/dev/scenes/golden'
 
   // KAI-9010: internal tooling (Export) is armed by ?internal=1 — never product chrome
-  const [internalTools] = useState(() =>
-    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('internal') === '1')
+  // KAI-9066 cleanup: read ?internal=1 AFTER mount, not in the useState initializer. Reading window in
+  // the initializer made the SSR/initial-client render internalTools=false but the hydrated client true
+  // → a React hydration mismatch around the client-only Export button. Default false (SSR-safe); flip
+  // on after hydration (the internal Export tool appears one tick post-mount — dev-only, fine).
+  const [internalTools, setInternalTools] = useState(false)
+  useEffect(() => {
+    setInternalTools(new URLSearchParams(window.location.search).get('internal') === '1')
+  }, [])
   const histRef = useRef<{ past: AppSnap[]; future: AppSnap[] }>({ past: [], future: [] })
   // True byte identity of the CURRENT photo — captured at ORDER / SAVE (Dan 2026-06-16: NOT at
   // upload — privacy + cost), so this stays null until that Phase-2 flow records it. Kept page-level

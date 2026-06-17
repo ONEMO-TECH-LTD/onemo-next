@@ -59,7 +59,7 @@ function vecDragShape(d: { kind: 'p' | 'hIn' | 'hOut'; ai: number; orig: VShape 
   return { paths: [{ anchors }, ...d.orig.paths.slice(1)] }
 }
 
-export interface GestureCtx {
+interface GestureCtx { // KAI-9066: module-internal (the consumer passes a structural object literal; no external import)
   // ── refs (stable identity; read/mutated at call time, never reassigned to defeat the latest-ref) ──
   svgRef: { readonly current: SVGSVGElement | null }
   viewRef: { readonly current: CanvasView }

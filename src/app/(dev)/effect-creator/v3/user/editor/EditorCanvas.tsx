@@ -24,7 +24,7 @@ type BBox = { minX: number; minY: number; maxX: number; maxY: number }
 // Rotate glyph (Phosphor ArrowClockwise, 256-box) drawn inside the rotate handle — white on the brand grip.
 const ROTATE_GLYPH_D = 'M244,56v48a12,12,0,0,1-12,12H184a12,12,0,1,1,0-24H201.1l-19-17.38c-.13-.12-.26-.24-.38-.37A76,76,0,1,0,127,204h1a75.53,75.53,0,0,0,52.15-20.72,12,12,0,0,1,16.49,17.45A99.45,99.45,0,0,1,128,228h-1.37A100,100,0,1,1,198.51,57.06L220,76.72V56a12,12,0,0,1,24,0Z'
 
-export interface EditorCanvasProps {
+interface EditorCanvasProps { // KAI-9066: module-internal (the consumer passes props structurally; no external import)
   svgRef: { readonly current: SVGSVGElement | null }
   view: CanvasView
   imgW: number

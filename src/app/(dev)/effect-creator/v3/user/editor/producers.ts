@@ -25,7 +25,7 @@ export type Dims = { widthPx: number; heightPx: number }
 export const GEN_VECTOR_KINDS = new Set<ShapeKind>(['daisy', 'pinwheel', 'form', 'blob'])
 
 /** display-only ring → SVG polyline `d` (transient previews render rings, never documents). */
-export function ringPathD(ring: ReadonlyArray<readonly [number, number]>): string {
+function ringPathD(ring: ReadonlyArray<readonly [number, number]>): string { // KAI-9066: module-internal (only shapePreviewD uses it; no external consumer)
   return ring.length ? `M ${ring.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ')} Z` : ''
 }
 
