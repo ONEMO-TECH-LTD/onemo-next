@@ -5,6 +5,7 @@
 // that. Reuses the scene's suede material params, lighting, camera, env.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useThree } from '@react-three/fiber'
 import { Center } from '@react-three/drei'
 import * as THREE from 'three'
 import type { DesignState, SceneSettings } from '../../types'
@@ -67,6 +68,11 @@ export default function ShapedModel({
   const frontSrcRef = useRef<{ origCanvas: HTMLCanvasElement; subjCanvas: HTMLCanvasElement; defaultBlurPx: number } | null>(null)
   const resultRef = useRef(result)
   useEffect(() => { resultRef.current = result }, [result])
+
+  // demand frameloop: force a render whenever the built mesh/texture changes — else the scene mounts BLANK
+  // (the initial demand frame fires before the async mesh build finishes) until a user interaction invalidates.
+  const invalidate = useThree((s) => s.invalidate)
+  useEffect(() => { invalidate() }, [result, invalidate])
 
   // Build the mesh from the prepared effect (ONE engine — no image build here). If the editor has
   // already committed an edited outline (Phase A), build from THAT so entering 3D reflects the edit.
@@ -223,7 +229,8 @@ export default function ShapedModel({
       tex.offset.set(ox, oy)
       tex.needsUpdate = true
     }
-  }, [designState, result])
+    invalidate() // demand frameloop: re-render on pan/zoom change
+  }, [designState, result, invalidate])
 
   // geometry groups (mesh.ts): 0 = front cap (golden suede, unchanged), 1 = edge lip (matte copy),
   // 2 = back cap (solid back suede). Order MUST match the addGroup material indices in mesh.ts.
