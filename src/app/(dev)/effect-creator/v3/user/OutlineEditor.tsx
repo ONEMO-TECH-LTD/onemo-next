@@ -398,9 +398,29 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   //    They write the source+adjustments recipe (the resolver owns shaping); selection + the editing-API
   //    setters are passed in. Swap-test: replace the hook, the recipe-writing contract is unchanged.
   const {
-    previewRadius, commitRadius, previewCurve, commitCurve,
+    sourceIdForSelection, previewRadius, commitRadius, previewCurve, commitCurve,
     writeBlend, previewGlobal, commitGlobal,
   } = useEditorAdjustments({ selVA, vshapeRef, applyAdjustments, setPreviewAdj, setBgBlur, setRadius, setCurveVal, setAllSelected })
+
+  // T7 value-reflection on SELECTION (DEC-v5-03): selecting an anchor shows ITS stored Radius/Curve
+  // (never a lying 0); deselecting restores the whole-shape value. Global sliders bind to
+  // adjustments.global directly, so they reflect automatically. Fires on selection change only —
+  // not during a slider drag/commit (selVA is stable then), so it never fights the writers.
+  useEffect(() => {
+    if (!open) return
+    const st = useOutlineStore.getState()
+    if (!st.source) return
+    if (selVA === null) {
+      setRadius(representativeLocal(st.adjustments, st.source.shape, 'radius'))
+      setCurveVal(representativeLocal(st.adjustments, st.source.shape, 'curve') * 50)
+      return
+    }
+    const id = sourceIdForSelection()
+    const l = id ? st.adjustments.local[id] : undefined
+    setRadius(l?.radius ?? 0)
+    setCurveVal((l?.curve ?? 0) * 50)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selVA, open])
 
   // (Global adjustment writers previewGlobal/commitGlobal moved to useEditorAdjustments — R8 seam 2.)
 
