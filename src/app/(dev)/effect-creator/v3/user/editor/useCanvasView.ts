@@ -46,19 +46,26 @@ export function useCanvasView(
     const padX = (rect.width - vbW * k) / 2, padY = (rect.height - vbH * k) / 2
     const vx = c[0] - (clientX - rect.left - padX) / k
     const vy = c[1] - (clientY - rect.top - padY) / k
-    // clamp so the view window stays on the content
+    // v5.3·P5 (KAI-9150): INFINITE background — allow the view to pan/zoom PAST the photo's real edges
+    // (the blurred surround fills the gap → no hard edge). A generous margin replaces the hard
+    // stay-on-content clamp; the symmetric clamp also handles zoom-OUT (when vbW > W, lo/hi flip).
+    const mx = W * 0.75, my = H * 0.75
+    const clamp = (v: number, a: number, b: number) => Math.max(Math.min(a, b), Math.min(Math.max(a, b), v))
     return {
-      vx: Math.max(0, Math.min(W - vbW, vx)),
-      vy: Math.max(0, Math.min(H - vbH, vy)),
+      vx: clamp(vx, -mx, W - vbW + mx),
+      vy: clamp(vy, -my, H - vbH + my),
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const applyZoom = useCallback((focusClientX: number, focusClientY: number, newScaleRaw: number, from: CanvasView) => {
-    const newScale = Math.max(1, Math.min(6, newScaleRaw))
+    // v5.3·P5 (KAI-9150): allow zoom-OUT below fit (0.45) to reveal the infinite blurred surround — the
+    // clamp still stops you "zooming into nothing" (max 6×). Keep the pinned origin at ANY scale so you
+    // can pan freely (incl. past the photo edges); the old scale===1 snap-to-centre is retired.
+    const newScale = Math.max(0.45, Math.min(6, newScaleRaw))
     const c = screenToContent(focusClientX, focusClientY, from)
     const { vx, vy } = originPinning(c, focusClientX, focusClientY, newScale)
-    setView({ scale: newScale, vx: newScale === 1 ? 0 : vx, vy: newScale === 1 ? 0 : vy })
+    setView({ scale: newScale, vx, vy })
   }, [screenToContent, originPinning])
 
   const toViewBox = useCallback((clientX: number, clientY: number): Vec2Px => {

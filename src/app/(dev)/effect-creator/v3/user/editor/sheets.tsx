@@ -85,6 +85,9 @@ function ChipRow({ children }: { children: ReactNode }) {
   )
 }
 export type ImageSub = 'brightness' | 'contrast' | 'saturate' | 'warmth' | 'blend'
+// v5.3·P5 (KAI-9150): BlendMode is owned by the store (durable recipe field); imported for use here + re-exported.
+import type { BlendMode } from '../outlineStore'
+export type { BlendMode }
 
 /* ADJUST mode (V4): seven dials on ONE shared ruler — Radius · Curve are LOCAL (per selected anchor,
    reversible to the source corner); Detail · Smooth · Snap · Angle · Line are GLOBAL (independent
@@ -218,7 +221,7 @@ export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, radiusApplies
   )
 }
 
-export function ImageSheet({ imageSub, setImageSub, fxDraft, setFxDraft, blendBlur, setBlendBlur, writeBlend }: {
+export function ImageSheet({ imageSub, setImageSub, fxDraft, setFxDraft, blendBlur, setBlendBlur, writeBlend, blendMode, setBlendMode }: {
   imageSub: ImageSub
   setImageSub: (k: ImageSub) => void
   fxDraft: ImageFx
@@ -227,6 +230,9 @@ export function ImageSheet({ imageSub, setImageSub, fxDraft, setFxDraft, blendBl
   blendBlur: number
   setBlendBlur: Dispatch<SetStateAction<number>>
   writeBlend: (on: boolean, pct: number) => void
+  /** v5.3·P5: the active Blend mode (Halo / Offset / Full-bg). */
+  blendMode: BlendMode
+  setBlendMode: (m: BlendMode) => void
 }) {
   return (
     <div className={styles.shapeSheet}>
@@ -258,16 +264,30 @@ export function ImageSheet({ imageSub, setImageSub, fxDraft, setFxDraft, blendBl
           to zoom — the Position button died with the old crop-tool pattern. */}
       <div className={styles.shapeControls}>
         {imageSub === 'blend' ? (
-          <div className={styles.shapeRow}>
-            <span className={styles.shapeName}>Blend</span>
-            <TickBar
-              label="Blend" min={0} max={100} step={1}
-              value={blendBlur}
-              onChange={(v) => setBlendBlur(v)}
-              onCommit={(v) => { setBlendBlur(v); writeBlend(v > 0, v) }}
-              format={(v) => (v === 0 ? 'off' : `${Math.round(v)}%`)}
-            />
-          </div>
+          <>
+            {/* v5.3·P5 (KAI-9150): the 3 Blend modes — each fills the shape's surround/glow differently. */}
+            <div className={styles.shapeRow} style={{ justifyContent: 'center', gap: 'var(--spacing-2xs)' }}>
+              {([['halo', 'Halo'], ['offset', 'Offset'], ['fullbg', 'Full BG']] as const).map(([m, label]) => (
+                <button
+                  key={m}
+                  type="button"
+                  className={`${styles.nodeAction} ${blendMode === m ? styles.chipActive : ''}`}
+                  aria-pressed={blendMode === m}
+                  onClick={() => setBlendMode(m)}
+                >{label}</button>
+              ))}
+            </div>
+            <div className={styles.shapeRow}>
+              <span className={styles.shapeName}>Blend</span>
+              <TickBar
+                label="Blend" min={0} max={100} step={1}
+                value={blendBlur}
+                onChange={(v) => setBlendBlur(v)}
+                onCommit={(v) => { setBlendBlur(v); writeBlend(v > 0, v) }}
+                format={(v) => (v === 0 ? 'off' : `${Math.round(v)}%`)}
+              />
+            </div>
+          </>
         ) : (
           <div className={styles.shapeRow}>
             <span className={styles.shapeName}>

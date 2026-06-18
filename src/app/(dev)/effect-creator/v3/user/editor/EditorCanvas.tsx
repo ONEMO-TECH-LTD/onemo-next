@@ -18,6 +18,7 @@ import type { CanvasView } from './useCanvasView'
 import type { GripId } from './geometry'
 import type { ImageFx } from '../outlineStore'
 import type { DesignState } from '../../types'
+import type { BlendMode } from './sheets'
 import styles from '../outline-editor.module.css'
 
 type BBox = { minX: number; minY: number; maxX: number; maxY: number }
@@ -35,6 +36,7 @@ interface EditorCanvasProps { // KAI-9066: module-internal (the consumer passes 
   art: DesignState
   fxDraft: ImageFx
   blendBlur: number
+  blendMode: BlendMode
   vshape: VShape | null
   vDisplay: VShape | null
   pathD: string
@@ -43,6 +45,7 @@ interface EditorCanvasProps { // KAI-9066: module-internal (the consumer passes 
   hasIssues: boolean
   nodeR: number
   preview: boolean
+  editing: boolean
   showAnchors: boolean
   selVA: number | null
   allSelected: boolean
@@ -71,9 +74,9 @@ interface EditorCanvasProps { // KAI-9066: module-internal (the consumer passes 
 
 function EditorCanvasInner(props: EditorCanvasProps) {
   const {
-    svgRef, view, imgW, imgH, imageUrl, subjMatteUrl, art, fxDraft, blendBlur,
+    svgRef, view, imgW, imgH, imageUrl, subjMatteUrl, art, fxDraft, blendBlur, blendMode,
     vshape, vDisplay, pathD, hitRing, hitBBox, hasIssues, nodeR,
-    preview, showAnchors, selVA, allSelected, frameLocked, rotateLive, moveLive, stretchLive, pinching, shapePreview,
+    preview, editing, showAnchors, selVA, allSelected, frameLocked, rotateLive, moveLive, stretchLive, pinching, shapePreview,
     nodeInteractedRef, setFrameLocked,
     onSurfacePointerDown, onPointerMove, onPointerUp, onSurfaceClick, onSurfaceWheel,
     onVAnchorDown, onVHandleDown, onVAnchorDouble, beginStretch, moveStretch, endStretch, beginRotateHandle,
@@ -106,9 +109,9 @@ function EditorCanvasInner(props: EditorCanvasProps) {
     : rotateLive ? `rotate(${rotateLive.deg} ${rotateLive.cx} ${rotateLive.cy})` : moveLive ? `translate(${moveLive.dx} ${moveLive.dy})` : undefined
   // Crop grips (Dan: iOS-crop reference) — boxy shapes only; grips track the bbox, including the
   // live stretch (rendered OUTSIDE the transformed group so the pill strokes never distort).
-  // 6.1: FRAME is the default for EVERY shape (Magic, committed, presets) — grips visible unless
-  // Points is active, Preview hides chrome, or a transient morph is mid-flight
-  const cropMode = !!vshape && !showAnchors && !preview && !shapePreview
+  // 6.1: FRAME grips show only while EDITING (v5.3·P3 — Dan's mask-display rule: clean by default).
+  // Points is active, Preview hides chrome, or a transient morph is mid-flight all suppress them too.
+  const cropMode = editing && !!vshape && !showAnchors && !preview && !shapePreview
   let cropBox: { minX: number; minY: number; maxX: number; maxY: number } | null = null
   if (cropMode && hitRing.length) {
     let { minX, minY, maxX, maxY } = hitBBox
@@ -126,9 +129,15 @@ function EditorCanvasInner(props: EditorCanvasProps) {
   const fxFilter = fxDraft.brightness !== 100 || fxDraft.contrast !== 100 || fxDraft.saturate !== 100 || fxDraft.warmth > 0
     ? `brightness(${fxDraft.brightness}%) contrast(${fxDraft.contrast}%) saturate(${fxDraft.saturate}%)${fxDraft.warmth > 0 ? ` sepia(${Math.round(fxDraft.warmth * 0.45)}%)` : ''}`
     : undefined
-  // magic-blend live preview in the canvas: blurred photo + sharp subject overlay; blur reacts to intensity
-  const showBlend = blendBlur > 0 && !!subjMatteUrl && !!imageUrl // 0 = off (the ruler IS the switch)
+  // v5.3·P5 (KAI-9150): blend on when the ruler > 0. Only FULL-BG needs the AI cut-out matte (sharp
+  // subject over blurred bg); Halo / Offset are NO-AI (per spec) → they run on any image without a matte.
+  const showBlend = blendBlur > 0 && !!imageUrl && (blendMode !== 'fullbg' || !!subjMatteUrl)
   const blendSd = (blendBlur / 100) * (imgW / 25)
+  // v5.3·P5 (KAI-9150): the 3 modes differ clearly in the SURROUND fill —
+  //   Offset  = barely blurred → the photo BLEEDS out recognisably past its edges;
+  //   Full-bg = a strong uniform soft wash of the photo;
+  //   Halo    = a strong wash PLUS a bright radial bloom (below) → the shape glows.
+  const surroundSd = blendMode === 'offset' ? Math.max(blendSd * 0.35, imgW / 64) : Math.max(blendSd * 2.4, imgW / 12)
 
   // KAI-9116 perf: memoize the on-demand anchor skeleton so a pure PAN (viewBox vx/vy change) or a
   // tool-tab switch doesn't re-render the (potentially hundreds of) anchor circles — only an actual
@@ -187,16 +196,43 @@ function EditorCanvasInner(props: EditorCanvasProps) {
           <filter id="kaiBgBlur" x="-20%" y="-20%" width="140%" height="140%">
             <feGaussianBlur stdDeviation={blendSd} />
           </filter>
-          {/* #24: Preview clips the photo to the cut outline — the final cut-out, no periphery */}
-          {preview && pathD && <clipPath id="kaiCutPreview"><path d={pathD} /></clipPath>}
+          {/* v5.3·P5 (KAI-9150): the INFINITE surround glow — a blurred wash of the photo filling well
+              past its edges (shape floats on its own colour, no hard edge). Mode-driven: Offset = lighter
+              blur (photo bleeds recognisably); Halo = strong blur + a brightness lift (a glowing halo). */}
+          <filter id="kaiSurround" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation={surroundSd} />
+          </filter>
+          {/* v5.3·P5: Halo's bright bloom — a soft radial glow emanating from the shape's centre,
+              screen-blended over the surround so the shape literally glows (distinct from Full-bg/Offset). */}
+          {blendMode === 'halo' && (
+            <radialGradient id="kaiHalo" cx="50%" cy="50%" r="65%">
+              <stop offset="0%" stopColor="#fff" stopOpacity="0.5" />
+              <stop offset="55%" stopColor="#fff" stopOpacity="0.18" />
+              <stop offset="100%" stopColor="#fff" stopOpacity="0" />
+            </radialGradient>
+          )}
+          {/* v5.3·P3/P5 (Dan + QA finding): the cut clip applies to the in-bounds image whenever NOT
+              actively editing (clean landing + Preview) → ONLY the shape's content shows (shape-only twin
+              of the 3D, no raw rectangular periphery). While editing (a tool open / Points) it's unclipped
+              so you can see the whole image to reshape/reposition. The blurred surround renders unclipped. */}
+          {pathD && <clipPath id="kaiCut"><path d={pathD} /></clipPath>}
         </defs>
-        <g clipPath={preview && pathD ? 'url(#kaiCutPreview)' : undefined}>
+        {/* the INFINITE blurred SURROUND glow — UNclipped, fills the canvas around the shape; only when
+            blend is on and not previewing the final cut. */}
+        {imageUrl && showBlend && !preview && (
+          <g transform={artXform} style={fxFilter ? { filter: fxFilter } : undefined}>
+            <image href={imageUrl} x={-imgW * 0.75} y={-imgH * 0.75} width={imgW * 2.5} height={imgH * 2.5} preserveAspectRatio="xMidYMid slice" filter="url(#kaiSurround)" />
+            {blendMode === 'halo' && <rect x={-imgW * 0.75} y={-imgH * 0.75} width={imgW * 2.5} height={imgH * 2.5} fill="url(#kaiHalo)" style={{ mixBlendMode: 'screen' }} />}
+          </g>
+        )}
+        {/* the shape's CONTENT — clipped to the cut (shape-only) on the clean landing / Preview. Full-bg =
+            blurred photo + sharp subject (needs the AI matte); Halo / Offset = the sharp photo (no AI). */}
+        <g clipPath={pathD && (!editing || preview) ? 'url(#kaiCut)' : undefined}>
         <g transform={artXform} style={fxFilter ? { filter: fxFilter } : undefined}>
-        {imageUrl && (showBlend ? (
-          // magic blend: blurred full photo + the sharp BEN subject (matte is y-up → flip to editor y-down)
+        {imageUrl && (showBlend && blendMode === 'fullbg' && subjMatteUrl ? (
           <>
             <image href={imageUrl} x={0} y={0} width={imgW} height={imgH} preserveAspectRatio="xMidYMid slice" filter="url(#kaiBgBlur)" />
-            <image href={subjMatteUrl!} x={0} y={0} width={imgW} height={imgH} preserveAspectRatio="xMidYMid slice" transform={`translate(0 ${imgH}) scale(1 -1)`} />
+            <image href={subjMatteUrl} x={0} y={0} width={imgW} height={imgH} preserveAspectRatio="xMidYMid slice" transform={`translate(0 ${imgH}) scale(1 -1)`} />
           </>
         ) : (
           <image href={imageUrl} x={0} y={0} width={imgW} height={imgH} preserveAspectRatio="xMidYMid slice" />
@@ -205,13 +241,14 @@ function EditorCanvasInner(props: EditorCanvasProps) {
         </g>
         {(
           <>
-            {/* scrim dims outside the cut; hidden during a live transform (its hole would lag the move/rotate)
-                and during a pinch (KAI-9116: the even-odd full-canvas fill is the dominant per-zoom-frame raster) */}
-            {imageUrl && pathD && !preview && !rotateLive && !moveLive && !stretchLive && !pinching && (
-              <path className={styles.scrim} fillRule="evenodd" d={`M0 0H${imgW}V${imgH}H0Z ${pathD}`} />
-            )}
+            {/* v5.3·P3 (KAI-9148) — mask-display rule (Dan): NO visible image-mask / solid block by
+                default. A masked cut already sits on white, so the default editing view shows the image
+                CLEAN (just the outline + handles) — the dimming scrim that framed the cut is gone. The
+                masked cut-out preview appears ONLY on Preview (the eye), via the #kaiCutPreview clip above. */}
             <g transform={liveXform}>
-              {!preview && <path className={`${styles.path} ${hasIssues ? styles.pathError : ''}`} d={pathD} />}
+              {/* v5.3·P3: the cut outline shows only while EDITING (or it's the error state) — the
+                  default landing is a clean masked image; the cut preview is the eye (Preview clip). */}
+              {!preview && (editing || hasIssues) && <path className={`${styles.path} ${hasIssues ? styles.pathError : ''}`} d={pathD} />}
               {/* anchors hidden in Preview (clean result); point work is vector-native below */}
               {/* Run 6 — the vector skeleton: minimal intentional anchors, summoned on demand.
                   The selected anchor reveals its Bézier handles; drags are transient until release. */}
@@ -249,7 +286,10 @@ function EditorCanvasInner(props: EditorCanvasProps) {
             {/* Crop-style stretch grips — OUTSIDE the live-transform group (the pill strokes must
                 never distort); positions track cropBox, which already includes the live stretch. */}
             {!preview && cropBox && !rotateLive && !moveLive && !pinching && (() => {
-              const { minX, minY, maxX, maxY } = cropBox
+              // v5.3·P3 (Dan): iOS-crop handles sit slightly OFF the body (offset outward), never on the
+              // edge — so they read clearly and never conflict with the shape/content.
+              const gm = nodeR * 1.4
+              const minX = cropBox.minX - gm, minY = cropBox.minY - gm, maxX = cropBox.maxX + gm, maxY = cropBox.maxY + gm
               const mx = (minX + maxX) / 2, my = (minY + maxY) / 2
               // Apple-crop proportions (Dan's reference): delicate thin strokes, modest arms —
               // the HIT area below keeps the full touch target.

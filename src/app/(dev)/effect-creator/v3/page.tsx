@@ -26,6 +26,7 @@ import { useOutlineStore } from './user/outlineStore'
 import { detailToFloorMm } from './user/editor/producers'
 import type { DesignState } from './types'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
+import type { MLResult } from '@/lib/effect/segment-ml'
 import { toast } from './ui/Toast'
 
 // Dynamic imports — no SSR for 3D components
@@ -81,6 +82,7 @@ function PrototypePageInner() {
     designState: DesignState
     imageFx: ReturnType<typeof useOutlineStore.getState>['imageFx']
     wrapTile: boolean
+    blendMode: ReturnType<typeof useOutlineStore.getState>['blendMode'] // v5.3·P5: durable in history
     outline: OutlineSnap
     trim: { backColor: string; frameColor: string; bgColor: string }
   }
@@ -104,6 +106,11 @@ function PrototypePageInner() {
   // so once it exists EVERY prepared spec for the file can carry it forward (standard, Magic's shaped
   // replacement, snapshot restores). The old preserve-at-ingest disk write (§B5) is removed.
   const sourceShaRef = useRef<string | null>(null)
+  // v5.3·P1 (KAI-9146): the subject cut-out computed in the BACKGROUND at upload, cached per image so
+  // Magic reuses it (instant, no AI re-run) and the matte lights up Blend on any shape. `uploadSeqRef`
+  // invalidates a stale in-flight cut when a newer image is uploaded.
+  const cutCacheRef = useRef<{ url: string; promise: Promise<MLResult> } | null>(null)
+  const uploadSeqRef = useRef(0)
   const baselineRef = useRef<AppSnap | null>(null)
   const editorPreRef = useRef<AppSnap | null>(null)
   const trimPreRef = useRef<AppSnap | null>(null)
@@ -116,6 +123,7 @@ function PrototypePageInner() {
       prepared, autoOutline, designState,
       imageFx: o.imageFx,
       wrapTile: o.wrapTile,
+      blendMode: o.blendMode,
       outline: { spec: o.spec, committedShape: o.committedShape, source: o.source, adjustments: o.adjustments, bgBlur: o.bgBlur, subjMatteUrl: o.subjMatteUrl },
       trim: { ...useSceneStore.getState().colors },
     }
@@ -133,6 +141,7 @@ function PrototypePageInner() {
     const o = useOutlineStore.getState()
     o.setImageFx(sn.imageFx)
     o.setWrapTile(sn.wrapTile)
+    o.setBlendMode(sn.blendMode)
     o.setSpec(sn.outline.spec)
     o.setSource(sn.outline.source, sn.outline.adjustments)
     o.setBgBlur(sn.outline.bgBlur)
@@ -203,6 +212,44 @@ function PrototypePageInner() {
   // it pulls 100s of MB from the hub per origin and double-fetches a different dtype than the
   // pipeline uses. The model loads at the first Magic press (honest shimmer) — proven safe.
 
+  // v5.3·P1 (KAI-9146): run the subject cut-out in the BACKGROUND once the instant square is up —
+  // off the main thread (default = rembg trio on the WASM EP, which inits NO webgpu session, so it
+  // can't drop the live scene's WebGL context — verified in ben.worker.ts; the disabled #31 boot
+  // preload's freeze was the webgpu path). Non-blocking: upload→first-paint is untouched. The
+  // segmentation is cached per image so Magic awaits the SAME promise (instant, no AI re-run), and the
+  // matte is published so the 2D editor's Blend preview works on ANY shape (incl. the standard square).
+  const startBackgroundCutout = useCallback((url: string, standard: PreparedEffect, seq: number) => {
+    // v5.3·P1 (QA finding): the upload-time cut-out runs ONLY on the default path (rembg trio / WASM EP —
+    // no webgpu session, can't drop the scene's WebGL context). A `?seg=` harness override can select the
+    // WebGPU transformers path (the disabled #31 boot-preload freeze class), so when ANY ?seg is present
+    // we SKIP the background run — Magic runs the cut on demand instead (the safe original behaviour).
+    // Product URLs carry no ?seg.
+    try { if (new URLSearchParams(window.location.search).get('seg')) return } catch { /* SSR/no-window */ }
+    const segPromise = (async () => {
+      const [{ segmentML }, { deviceMaxTextureDim }, pe] = await Promise.all([
+        import('@/lib/effect/segment-ml'),
+        import('@/lib/effect/mask'),
+        import('@/lib/effect/prepare-effect'),
+      ])
+      const cfg = pe.EFFECT_BUILD_CONFIG
+      const texDim = Math.max(cfg.textureDim, deviceMaxTextureDim()) // SAME dims Magic uses → reusable
+      const seg = await segmentML(url, cfg.maxImageDim, texDim)
+      if (uploadSeqRef.current === seq) { // still the active image — publish the matte for Blend
+        try {
+          const matte = pe.subjectMatteFromSeg(standard.frontSrc.origCanvas, seg)
+          useOutlineStore.getState().setSubjMatteUrl(matte.toDataURL())
+        } catch (err) { console.warn('[effect] P1 matte publish failed:', err) }
+      }
+      return seg
+    })()
+    cutCacheRef.current = { url, promise: segPromise }
+    // best-effort: a failed background cut just means Magic re-runs segmentML on demand (no user error)
+    segPromise.catch((e) => {
+      console.warn('[effect] background cut-out failed (Magic re-runs on demand):', e)
+      if (cutCacheRef.current?.url === url) cutCacheRef.current = null
+    })
+  }, [])
+
   const handleFile = useCallback((file: File) => {
     if (!file.type.startsWith('image/')) return
     if (artworkUrl?.startsWith('blob:')) URL.revokeObjectURL(artworkUrl)
@@ -218,6 +265,9 @@ function PrototypePageInner() {
     // fresh image → drop any prior edit/blend so the new effect starts clean
     const st = useOutlineStore.getState()
     st.commitGeometry(null); st.setBgBlur(null); st.setSubjMatteUrl(null)
+    // v5.3·P1: a new image invalidates any in-flight / cached background cut-out
+    const seq = ++uploadSeqRef.current
+    cutCacheRef.current = null
     // KAI-9083: a new image supersedes any in-flight Magic — bump the run token so a stale Magic
     // result/error becomes a no-op (can't clobber the new image or fire a false "Magic failed").
     magicRunRef.current++
@@ -230,18 +280,21 @@ function PrototypePageInner() {
         useOutlineStore.getState().setSpec(p.spec) // hand the standard outline to the 2D editor
         // #23: a new image starts a fresh history; this state is the Reset baseline
         baselineRef.current = {
-          prepared: p, autoOutline: false, designState: INITIAL_ARTWORK, imageFx: null, wrapTile: false,
+          prepared: p, autoOutline: false, designState: INITIAL_ARTWORK, imageFx: null, wrapTile: false, blendMode: 'fullbg',
           outline: { spec: p.spec, committedShape: null, source: null, adjustments: { global: { simplify: 0, smooth: 0, straighten: 0, radius: 0 }, local: {} }, bgBlur: null, subjMatteUrl: null },
           trim: { ...useSceneStore.getState().colors },
         }
         histRef.current = { past: [], future: [] }
         bumpHist((v) => v + 1)
+        // v5.3·P1 (KAI-9146): square is up + painted — now kick the subject cut-out in the background
+        // → cached for instant Magic + matte for Blend on any shape (non-blocking, off-main-thread).
+        startBackgroundCutout(url, p, seq)
       })
       .catch((e) => {
         console.warn('[effect] prepare (standard) failed:', e)
         toast('error', `Couldn't build the square: ${(e as Error)?.message ?? e}`)
       })
-  }, [artworkUrl])
+  }, [artworkUrl, startBackgroundCutout])
 
   const handleStatus = useCallback((s: 'idle' | 'building' | 'ready' | 'error', message?: string) => {
     if (s === 'error') toast('error', `3D build failed: ${message ?? 'unknown error'}`) // G4
@@ -255,15 +308,23 @@ function PrototypePageInner() {
     const runId = ++magicRunRef.current
     setGenerating(true)
     import('@/lib/effect/prepare-effect')
-      .then(({ prepareEffect, EFFECT_BUILD_CONFIG }) =>
+      .then(async ({ prepareEffect, EFFECT_BUILD_CONFIG }) => {
+        // v5.3·P1 (KAI-9146): reuse the cut-out computed in the background at upload — await the SAME
+        // in-flight promise (no double inference, instant when it already finished). On cache miss /
+        // failure `preseg` stays undefined and prepareEffect runs segmentML inline (unchanged behaviour).
+        let preseg: MLResult | undefined
+        const cache = cutCacheRef.current
+        if (cache && cache.url === artworkUrl) {
+          try { preseg = await cache.promise } catch { preseg = undefined }
+        }
         // Progress text is intentionally silent (Dan, 2026-06-16: no "Downloading…/Cutting out…"
         // captions). The shimmer animation alone signals work; only the honest fallback still toasts.
         // Birth at Detail 100% (tightest pixel-true) + no baked padding — the editor's Detail/Offset
         // tools re-derive from the cached trace (DEC-v5-04; POC params). Detail 100 → ~1px RDP floor.
-        prepareEffect(artworkUrl, 'shaped', { ...EFFECT_BUILD_CONFIG, minFeatureMM: detailToFloorMm(100), paddingMM: 0 }, (s) => {
+        return prepareEffect(artworkUrl, 'shaped', { ...EFFECT_BUILD_CONFIG, minFeatureMM: detailToFloorMm(100), paddingMM: 0 }, (s) => {
           if (s === 'fallback') toast('warn', 'AI cut-out unavailable — used the simple background cut instead') // G4
-        }),
-      )
+        }, preseg)
+      })
       .then((p) => {
         if (magicRunRef.current !== runId) return // cancelled mid-run — prior state stands (UX-5)
         // KAI-8973/P1b: the shaped spec REPLACES the standard one — carry the original's byte
@@ -392,7 +453,7 @@ function PrototypePageInner() {
             const pre = filterPreRef.current
             if (pre) {
               const o = useOutlineStore.getState()
-              if (o.imageFx !== pre.imageFx || o.bgBlur !== pre.outline.bgBlur || o.wrapTile !== pre.wrapTile) pushHistory(pre)
+              if (o.imageFx !== pre.imageFx || o.bgBlur !== pre.outline.bgBlur || o.wrapTile !== pre.wrapTile || o.blendMode !== pre.blendMode) pushHistory(pre)
               filterPreRef.current = null
             }
             setShowFilters(false)
@@ -424,6 +485,8 @@ function PrototypePageInner() {
         openMode={editorMode}
         onMagic={handleMagic}
         imageUrl={artworkUrl}
+        // v5.3·P3 (KAI-9148): the 2D editor matches the 3D hero's backdrop → reads as the same world
+        backdropColor={colors.bgColor}
         // KAI-9122: the editor's magic-blend preview must seed from the design's REAL default blur (what
         // the 3D shows when bgBlur is untouched/null) — 0 for the sharp standard square, ~50 for a shaped
         // subject. Relative blur = 2500·defaultBlurPx/origWidth. The old hardcoded 50 made the 2D editor
@@ -444,7 +507,7 @@ function PrototypePageInner() {
             }
             const art = o.artwork, preArt = pre.designState
             const artChanged = art.offsetX !== preArt.offsetX || art.offsetY !== preArt.offsetY || art.scale !== preArt.scale
-            if (o.committedShape !== pre.outline.committedShape || o.bgBlur !== pre.outline.bgBlur || fxChanged(o.imageFx, pre.imageFx) || artChanged) pushHistory(pre)
+            if (o.committedShape !== pre.outline.committedShape || o.bgBlur !== pre.outline.bgBlur || fxChanged(o.imageFx, pre.imageFx) || o.blendMode !== pre.blendMode || artChanged) pushHistory(pre)
             editorPreRef.current = null
           }
         }}

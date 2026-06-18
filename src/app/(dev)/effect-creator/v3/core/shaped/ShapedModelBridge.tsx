@@ -31,6 +31,7 @@ export default function ShapedModelBridge(props: ShapedModelBridgeProps) {
   const bgBlur = useOutlineStore((s) => s.bgBlur)
   const imageFx = useOutlineStore((s) => s.imageFx)
   const wrapTile = useOutlineStore((s) => s.wrapTile)
+  const blendMode = useOutlineStore((s) => s.blendMode) // v5.3·P5: durable mode → the 3D
   return (
     <ShapedModel
       {...props}
@@ -40,6 +41,7 @@ export default function ShapedModelBridge(props: ShapedModelBridgeProps) {
       bgBlur={bgBlur}
       imageFx={imageFx}
       wrapTile={wrapTile}
+      blendMode={blendMode}
     />
   )
 }

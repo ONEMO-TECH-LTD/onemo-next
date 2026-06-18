@@ -2,12 +2,24 @@
 //
 // The ONE magic-blend composite lives here so BOTH the (legacy) 3D pipeline and the new 2D-first
 // `prepareEffect` import the SAME composeFront (composite parity, lean-spec §5.2) without dragging
-// three.js into the Phase-A (WebGL-free) creation path. `pipeline.ts` re-exports composeFront for
-// its existing consumers; `prepare-effect.ts` imports it here directly.
+// three.js into the Phase-A (WebGL-free) creation path. `prepare-effect.ts` imports it here directly.
+//
+// ── v5.3·P2 (KAI-9147) — CROSS-BROWSER SVG-FILTER ENGINE ─────────────────────────────────────────
+// The image bake now runs through an SVG <filter> (feGaussianBlur + feColorMatrix/feComponentTransfer)
+// rasterised to a canvas via a **Blob URL**. This replaces (a) the old `ctx.filter` colour bake — a
+// silent no-op on Safari's 2D canvas (`'filter' in ctx === false`) — and (b) the interim jsBlur box
+// blur (c5fa505). One mechanism, every engine incl. WebKit / iOS Safari.
+//   • The OUTER svg is loaded via a Blob URL — a *data-URL* svg renders EMPTY on WebKit (the verified
+//     gotcha); the inner source <image> is a data-URL, which is fine.
+//   • The CSS-filter SHORTHAND interface is unchanged: callers still pass a CSS string
+//     (`brightness(110%) contrast(105%) …` / the presets). composeFront PARSES it into the spec-exact
+//     SVG primitives (W3C Filter Effects §filter-function reference), so the baked look matches both
+//     the live 2D-editor preview (which already uses SVG feGaussianBlur + CSS style.filter) AND is
+//     identical on every engine. Colour runs in sRGB (matches CSS filter), blur in linearRGB (matches
+//     the editor's <feGaussianBlur>).
 
-// ── Filters v2 (KAI-9125) — one-tap PRESETS: named canvas `ctx.filter` recipes layered ahead of the
-//    manual image-fx. ctx.filter on a 2D canvas supports grayscale/sepia/contrast/brightness/saturate/
-//    hue-rotate, so these are cheap + print-faithful (the SAME composite feeds 3D + print). ──
+// ── Filters v2 (KAI-9125) — one-tap PRESETS: named CSS-filter recipes (the interface; baked via the
+//    SVG engine below, no longer `ctx.filter`). The SAME composite feeds 3D + print (parity). ──
 export type PresetKey = 'none' | 'bw' | 'noir' | 'sepia' | 'vivid' | 'fade' | 'cool' | 'warm' | 'duotone'
 export const PRESET_LABELS: Record<PresetKey, string> = {
   none: 'None', bw: 'B&W', noir: 'Noir', sepia: 'Sepia', vivid: 'Vivid', fade: 'Fade', cool: 'Cool', warm: 'Warm', duotone: 'Duotone',
@@ -25,60 +37,82 @@ const PRESET_FILTER: Record<PresetKey, string> = {
 }
 export const presetFilter = (key: PresetKey | undefined): string => PRESET_FILTER[key ?? 'none'] ?? ''
 
-// ── Safari-safe blur (KAI-9122) ─────────────────────────────────────────────────────────────────
-// Safari's 2D canvas has NO `ctx.filter` (verified: WebKit `'filter' in ctx === false`), so the
-// magic-blend / offset-fill blur — baked via `ctx.filter='blur()'` — silently no-ops on iOS while the
-// SVG-filter editor preview shows it. This is the CORE effect, so it gets a real JS blur: a separable
-// running-sum box blur, 3 passes ≈ Gaussian, O(w·h) regardless of radius. Works on every engine.
-function boxBlurAxis(px: Uint8ClampedArray, w: number, h: number, r: number, vertical: boolean) {
-  const win = 2 * r + 1
-  const outerN = vertical ? w : h          // number of lines (columns if vertical, rows if not)
-  const innerN = vertical ? h : w          // length of each line
-  const innerStride = (vertical ? w : 1) * 4
-  const outerStride = vertical ? 4 : w * 4
-  const line = new Float32Array(innerN * 4)
-  for (let o = 0; o < outerN; o++) {
-    const base = o * outerStride
-    let sr = 0, sg = 0, sb = 0, sa = 0
-    for (let k = -r; k <= r; k++) {
-      const idx = base + Math.min(innerN - 1, Math.max(0, k)) * innerStride
-      sr += px[idx]; sg += px[idx + 1]; sb += px[idx + 2]; sa += px[idx + 3]
-    }
-    for (let i = 0; i < innerN; i++) {
-      const li = i * 4
-      line[li] = sr / win; line[li + 1] = sg / win; line[li + 2] = sb / win; line[li + 3] = sa / win
-      const addI = base + Math.min(innerN - 1, Math.max(0, i + r + 1)) * innerStride
-      const subI = base + Math.min(innerN - 1, Math.max(0, i - r)) * innerStride
-      sr += px[addI] - px[subI]; sg += px[addI + 1] - px[subI + 1]; sb += px[addI + 2] - px[subI + 2]; sa += px[addI + 3] - px[subI + 3]
-    }
-    for (let i = 0; i < innerN; i++) {
-      const idx = base + i * innerStride, li = i * 4
-      px[idx] = line[li]; px[idx + 1] = line[li + 1]; px[idx + 2] = line[li + 2]; px[idx + 3] = line[li + 3]
+// ── CSS filter shorthand → SVG filter primitives (W3C Filter Effects §filter functions) ───────────
+// The CSS shorthands are DEFINED as these exact SVG primitives, so a faithful translation is identical
+// to the CSS filter on any engine. Blur is handled separately (bgBlurPx) — any blur() here is ignored.
+function sepiaMatrix(a: number): string {
+  const inv = 1 - a // a=0 → identity, a=1 → full sepia
+  const r = [0.393 + 0.607 * inv, 0.769 - 0.769 * inv, 0.189 - 0.189 * inv, 0, 0]
+  const g = [0.349 - 0.349 * inv, 0.686 + 0.314 * inv, 0.168 - 0.168 * inv, 0, 0]
+  const b = [0.272 - 0.272 * inv, 0.534 - 0.534 * inv, 0.131 + 0.869 * inv, 0, 0]
+  return [...r, ...g, ...b, 0, 0, 0, 1, 0].join(' ')
+}
+function linFuncs(slope: number, intercept: number): string {
+  const f = (ch: string) => `<feFunc${ch} type="linear" slope="${slope}" intercept="${intercept}"/>`
+  return f('R') + f('G') + f('B')
+}
+/** Parse a CSS filter string into the equivalent SVG <filter> body (colour primitives only). */
+export function cssColorFilterToSvg(filter?: string | null): string {
+  if (!filter || filter === 'none') return ''
+  const out: string[] = []
+  const re = /([\w-]+)\(([^)]*)\)/g
+  let m: RegExpExecArray | null
+  const num = (s: string) => (s.trim().endsWith('%') ? parseFloat(s) / 100 : parseFloat(s)) || 0
+  while ((m = re.exec(filter)) !== null) {
+    const fn = m[1], raw = m[2].trim()
+    switch (fn) {
+      case 'grayscale': { const a = Math.min(1, Math.max(0, num(raw))); out.push(`<feColorMatrix type="saturate" values="${1 - a}"/>`); break }
+      case 'saturate': { out.push(`<feColorMatrix type="saturate" values="${Math.max(0, num(raw))}"/>`); break }
+      case 'sepia': { out.push(`<feColorMatrix type="matrix" values="${sepiaMatrix(Math.min(1, Math.max(0, num(raw))))}"/>`); break }
+      case 'hue-rotate': { out.push(`<feColorMatrix type="hueRotate" values="${parseFloat(raw) || 0}"/>`); break }
+      case 'brightness': { out.push(`<feComponentTransfer>${linFuncs(Math.max(0, num(raw)), 0)}</feComponentTransfer>`); break }
+      case 'contrast': { const a = Math.max(0, num(raw)); out.push(`<feComponentTransfer>${linFuncs(a, (1 - a) * 0.5)}</feComponentTransfer>`); break }
+      default: break // blur() etc. handled elsewhere
     }
   }
+  return out.join('')
 }
 
-/** A blurred copy of a canvas — Safari-safe (no ctx.filter). radiusPx 0 → an untouched copy.
- *  Blur is low-frequency, so we blur a downscaled (≤640px) copy and upscale — visually identical to a
- *  full-res blur, ~10× faster, so a live blend drag stays smooth even on a multi-megapixel photo. */
-export function jsBlur(src: HTMLCanvasElement, radiusPx: number): HTMLCanvasElement {
+function loadImg(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const im = new Image()
+    im.onload = () => resolve(im)
+    im.onerror = () => reject(new Error('[composite] SVG-filter image failed to load'))
+    im.src = url
+  })
+}
+
+/**
+ * Rasterise `src` through an SVG <filter> body — cross-browser, incl. WebKit/Safari (the OUTER svg
+ * loads via a Blob URL; a data-URL svg renders empty on WebKit). `colorSpace` sets
+ * color-interpolation-filters (sRGB for colour to match CSS filter; linearRGB for blur to match the
+ * editor's <feGaussianBlur>). Returns a NEW canvas the size of `src`. Async (Image onload).
+ */
+async function svgFilterBake(src: HTMLCanvasElement, filterBody: string, colorSpace: 'sRGB' | 'linearRGB'): Promise<HTMLCanvasElement> {
   const w = src.width, h = src.height
   const out = document.createElement('canvas'); out.width = w; out.height = h
-  const octx = out.getContext('2d')!; octx.imageSmoothingEnabled = true
-  const r = Math.max(0, Math.round(radiusPx))
-  if (r === 0 || w === 0 || h === 0) { octx.drawImage(src, 0, 0); return out }
-  const MAX = 640
-  const k = Math.min(1, MAX / Math.max(w, h))
-  const sw = Math.max(1, Math.round(w * k)), sh = Math.max(1, Math.round(h * k))
-  const small = document.createElement('canvas'); small.width = sw; small.height = sh
-  const sctx = small.getContext('2d')!; sctx.imageSmoothingEnabled = true
-  sctx.drawImage(src, 0, 0, sw, sh) // downscale
-  const img = sctx.getImageData(0, 0, sw, sh)
-  const rr = Math.min(Math.max(1, Math.round(r * k)), Math.floor((Math.min(sw, sh) - 1) / 2)) || 1
-  for (let pass = 0; pass < 3; pass++) { boxBlurAxis(img.data, sw, sh, rr, false); boxBlurAxis(img.data, sw, sh, rr, true) }
-  sctx.putImageData(img, 0, 0)
-  octx.drawImage(small, 0, 0, w, h) // upscale back to full res (bilinear smooths the box steps)
+  const octx = out.getContext('2d')!
+  if (!filterBody || w === 0 || h === 0) { octx.drawImage(src, 0, 0); return out }
+  const href = src.toDataURL()
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${w}" height="${h}">` +
+    `<filter id="f" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="${colorSpace}">${filterBody}</filter>` +
+    `<image href="${href}" xlink:href="${href}" x="0" y="0" width="${w}" height="${h}" filter="url(#f)" preserveAspectRatio="none"/>` +
+    `</svg>`
+  const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }))
+  try {
+    octx.drawImage(await loadImg(url), 0, 0, w, h)
+  } finally {
+    URL.revokeObjectURL(url)
+  }
   return out
+}
+
+/** Plain (filter-free) copy of a canvas. */
+function copyCanvas(src: HTMLCanvasElement): HTMLCanvasElement {
+  const c = document.createElement('canvas'); c.width = src.width; c.height = src.height
+  c.getContext('2d')!.drawImage(src, 0, 0)
+  return c
 }
 
 /**
@@ -86,9 +120,10 @@ export function jsBlur(src: HTMLCanvasElement, radiusPx: number): HTMLCanvasElem
  * `bgBlurPx = 0` → no blur (the full sharp original photo = effect OFF). Used for the default build
  * AND for live editor re-blur (toggle / intensity) — same source canvases, no re-segmentation.
  * Filters v2: `vignette` (0..1) darkens the corners; `tint` (css color | null) washes the whole
- * composite — both image-stage appearance, baked so 3D == print.
+ * composite. v5.3·P2: blur + colour bake through the cross-browser SVG engine (so 3D == print AND it
+ * renders on every engine incl. Safari). ASYNC (SVG Image onload).
  */
-export function composeFront(
+export async function composeFront(
   origCanvas: HTMLCanvasElement,
   subjCanvas: HTMLCanvasElement,
   bgBlurPx: number,
@@ -97,35 +132,35 @@ export function composeFront(
   fxFilter?: string,
   vignette = 0,
   tint: string | null = null,
-): HTMLCanvasElement {
+): Promise<HTMLCanvasElement> {
   const fw = origCanvas.width, fh = origCanvas.height
-  const front = document.createElement('canvas')
-  front.width = fw; front.height = fh
-  const ctx = front.getContext('2d')!
-  const fx = fxFilter && fxFilter !== 'none' ? fxFilter : ''
-  // BACKGROUND: the blur is the CORE effect (magic-blend + offset-fill). Bake it with a JS blur — NOT
-  // ctx.filter, which is a no-op on Safari's 2D canvas — so it renders on iOS, not just Chromium.
-  // (Colour fx below still rides ctx.filter; that's Chrome-only but secondary per the product brief.)
-  const bg = bgBlurPx > 0 ? jsBlur(origCanvas, bgBlurPx) : origCanvas
-  if (fx) ctx.filter = fx
-  ctx.drawImage(bg, 0, 0)
-  ctx.filter = fx || 'none'
-  ctx.drawImage(subjCanvas, 0, 0, fw, fh) // sharp subject on top of the (blurred) real background
-  ctx.filter = 'none'
+  // BACKGROUND: the blur is the CORE effect (magic-blend + offset-fill). Bake it with the SVG engine
+  // (feGaussianBlur, linearRGB — matches the editor preview), cross-browser incl. Safari.
+  const bg = bgBlurPx > 0 ? await svgFilterBake(origCanvas, `<feGaussianBlur stdDeviation="${bgBlurPx}" />`, 'linearRGB') : origCanvas
+  // composite: blurred bg + the sharp subject on top
+  let composed = document.createElement('canvas')
+  composed.width = fw; composed.height = fh
+  composed.getContext('2d')!.drawImage(bg, 0, 0)
+  composed.getContext('2d')!.drawImage(subjCanvas, 0, 0, fw, fh)
+  // COLOUR fx over the finished composite — spec-exact SVG primitives (sRGB → matches CSS filter).
+  const colourBody = cssColorFilterToSvg(fxFilter)
+  if (colourBody) composed = await svgFilterBake(composed, colourBody, 'sRGB')
   // Filters v2 composite effects (applied over the finished composite):
+  const ctx = composed.getContext('2d')!
   if (tint) { ctx.save(); ctx.globalAlpha = 0.22; ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = tint; ctx.fillRect(0, 0, fw, fh); ctx.restore() }
   if (vignette > 0) {
     const g = ctx.createRadialGradient(fw / 2, fh / 2, Math.min(fw, fh) * 0.32, fw / 2, fh / 2, Math.max(fw, fh) * 0.72)
     g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${Math.max(0, Math.min(1, vignette)) * 0.72})`)
     ctx.save(); ctx.fillStyle = g; ctx.fillRect(0, 0, fw, fh); ctx.restore()
   }
-  return front
+  return composed
 }
 
 /** A strongly-blurred copy of a canvas — the edge-lip texture source (smooth rim colour, no banding).
- *  Safari-safe: was `ctx.filter='blur()'`, a no-op on iOS that left the rim sharp/banded. */
-export function blurCanvas(src: HTMLCanvasElement, blurPx: number): HTMLCanvasElement {
-  return jsBlur(src, blurPx)
+ *  v5.3·P2: cross-browser SVG feGaussianBlur (was the interim jsBlur; before that a no-op ctx.filter). */
+export async function blurCanvas(src: HTMLCanvasElement, blurPx: number): Promise<HTMLCanvasElement> {
+  if (blurPx <= 0) return copyCanvas(src)
+  return svgFilterBake(src, `<feGaussianBlur stdDeviation="${blurPx}" />`, 'linearRGB')
 }
 
 /** ImageData → a canvas (for the BEN subject matte + the full-photo source layer). */

@@ -4,28 +4,27 @@
   position: fixed;
   inset: 0;
   z-index: 40;
-  background: var(--primitive-color-grey-2); /* KAI-9034: same token as the upload screen */
+  /* v5.3·P3 (KAI-9148): clean white surface — a masked cut already sits on white; no grey periphery. */
+  background: var(--semantic-bg-primary, #ffffff);
   font-family: var(--font-primary);
   /* KAI-8978/F6: the editor has no text-entry surface — selecting label/hint text is never
      intentional; drags across chips/canvas were selecting words instead of working */
   user-select: none;
   -webkit-user-select: none;
-  /* G11 safe-area layout: top bar / canvas / bottom dock are FLEX SIBLINGS — the canvas (and the
-     whole image) fits ENTIRELY between the bars; nothing is ever occluded. */
-  display: flex;
-  flex-direction: column;
 }
 
-/* the working canvas occupies exactly the space between the bars (G11) */
+/* v5.3·P3 (KAI-9148): the editor is a TWIN of the 3D hero viewer — the canvas is FULL-BLEED
+   (position:absolute, inset:0) so its size NEVER depends on the bars. Toggling shape-param rows can no
+   longer resize it → no Safari reflow → no ghost/stale strip. The TopBar + bottom dock float over it as
+   transparent overlays (below). */
 .canvas {
-  position: relative;
-  flex: 1;
-  min-height: 0;
+  position: absolute;
+  inset: 0;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--semantic-bg-secondary);
+  background: transparent; /* clean — shows the white overlay; no grey block */
 }
 
 .svg {
@@ -151,26 +150,32 @@
    for three always-on sliders on a phone). Scales up cleanly on desktop. */
 
 .topbar {
-  position: relative;   /* G11: a flex sibling above the canvas, not an overlay on it */
+  /* v5.3·P3 (KAI-9148): a transparent overlay FLOATING over the full-bleed canvas (was an opaque,
+     space-reserving flex sibling — half of the ghost mechanism). */
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
   z-index: 2;
   display: flex;
   justify-content: center;   /* full-width bar; inner content caps + centers like the bottom toolbar */
   padding: var(--spacing-2xs) var(--spacing-s);
   padding-top: calc(var(--spacing-2xs) + env(safe-area-inset-top));
-  /* optimised faux-glass strip — NO backdrop-filter (perf) */
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(246, 248, 251, 0.82));
-  border-bottom: 1px solid rgba(255, 255, 255, 0.85);
+  background: transparent;   /* transparent floating UI (the controls carry their own pill backing) */
 }
 
-/* glass dock holding status + sheets + toolbar — a flex sibling BELOW the canvas (G11) */
+/* v5.3·P3 (KAI-9148): the dock (status + sheets + toolbar) FLOATS over the full-bleed canvas as a
+   transparent overlay — was an opaque, space-reserving flex sibling whose height changes resized the
+   canvas (the ghost). Now its height never touches the canvas. */
 .bottomDock {
-  position: relative;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
   z-index: 2;
   display: flex;
   flex-direction: column;
-  /* optimised faux-glass strip — NO backdrop-filter (perf) */
-  background: linear-gradient(0deg, rgba(255, 255, 255, 0.94), rgba(246, 248, 251, 0.84));
-  border-top: 1px solid rgba(255, 255, 255, 0.85);
+  background: transparent;
 }
 .topInner {
   /* KAI-9012: 3-column grid — the Reset pill is truly centered whatever each side holds */

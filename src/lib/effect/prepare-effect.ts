@@ -35,7 +35,7 @@ export interface ShapeBuildConfig {
   squareCornerMM: number    // corner radius of the standard square
 }
 import { loadImageData, segment, adapterIdFor, dilateMask, smoothMask, deviceMaxTextureDim, type MaskResult } from './mask'
-import { segmentML } from './segment-ml'
+import { segmentML, type MLResult } from './segment-ml'
 import { traceContourRaw } from './contour'
 import { composeFront, blurCanvas, imageDataToCanvas } from './composite'
 import type { EffectType } from './effect-types'
@@ -139,15 +139,29 @@ function subjectFromOriginal(origCanvas: HTMLCanvasElement, matteCanvas: HTMLCan
 }
 
 /**
+ * v5.3·P1 (KAI-9146): the subject matte canvas (subject pixels on transparent, y-up) from a cached
+ * segmentation + the original full-photo canvas. Lets the upload-time background cut-out publish a
+ * matte for the 2D editor's blend preview on ANY shape (incl. the standard square) without re-running
+ * the AI — the SAME derivation the shaped branch uses internally (subjectFromOriginal over the hi-res
+ * matte texImage).
+ */
+export function subjectMatteFromSeg(origCanvas: HTMLCanvasElement, seg: MLResult): HTMLCanvasElement {
+  return subjectFromOriginal(origCanvas, imageDataToCanvas(seg.texImage))
+}
+
+/**
  * Prepare an effect (2D, one-engine). `type='standard'` = instant flat ONEMO square; `type='shaped'` =
  * BEN subject silhouette. Returns the mm draft + the composite canvases (NO three).
  * `onProgress` surfaces the shaped path's honest wait states (G5: download vs inference).
+ * v5.3·P1: `preseg` reuses a segmentation already computed in the background at upload (no AI re-run →
+ * instant Magic); when absent the shaped path runs `segmentML` inline exactly as before.
  */
 export async function prepareEffect(
   url: string,
   type: EffectType,
   cfg: ShapeBuildConfig = EFFECT_BUILD_CONFIG,
   onProgress?: (s: 'downloading-model' | 'cutting' | 'fallback') => void,
+  preseg?: MLResult,
 ): Promise<PreparedEffect> {
   // Full photo (texture res), y-up, for the composite + edge-lip source. NO policy cap (Dan,
   // plan v2.1 §B5): the texture carries the source's full resolution up to the device's physical
@@ -170,7 +184,10 @@ export async function prepareEffect(
     let texImage: ImageData
     let mlMatte = false
     try {
-      const r = await segmentML(url, cfg.maxImageDim, texDim, onProgress)
+      // v5.3·P1 (KAI-9146): reuse the cut-out computed in the background at upload — no AI re-run, so
+      // Magic is instant. `preseg` is the cached segmentML result (same mask/tex dims as this cfg);
+      // when absent (direct call / cache miss) we run segmentML inline exactly as before.
+      const r = preseg ?? await segmentML(url, cfg.maxImageDim, texDim, onProgress)
       // R1: record the model that ACTUALLY ran (u2netp/silueta/…), not a hard-coded 'ben2-onnx'.
       seg = r; adapterId = r.adapterId; texImage = r.texImage; mlMatte = true
     } catch (e) {
@@ -236,8 +253,12 @@ export async function prepareEffect(
   const widthMM = bb.w, heightMM = bb.h
 
   // ── composite (the ONE magic-blend) + edge-lip source (strong blur). Reused, never re-composed per surface.
-  const composite = composeFront(origCanvas, subjCanvas, defaultBlurPx)
-  const edgeComposite = blurCanvas(origCanvas, Math.max(16, Math.round(fw / 22)))
+  // v5.3·P2 (KAI-9147): composeFront / blurCanvas now bake through the cross-browser SVG-filter engine
+  // (async — SVG Image onload). Run both in parallel.
+  const [composite, edgeComposite] = await Promise.all([
+    composeFront(origCanvas, subjCanvas, defaultBlurPx),
+    blurCanvas(origCanvas, Math.max(16, Math.round(fw / 22))),
+  ])
 
   const spec: EffectSpecDraft = {
     sourceRef: url,

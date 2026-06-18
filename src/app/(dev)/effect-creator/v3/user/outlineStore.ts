@@ -33,6 +33,10 @@ export const INITIAL_ARTWORK: DesignState = { offsetX: 0, offsetY: 0, scale: 1.0
 export interface ImageFx { brightness: number; contrast: number; saturate: number; warmth: number; preset?: PresetKey; vignette?: number; tint?: string | null }
 export const NEUTRAL_FX: ImageFx = { brightness: 100, contrast: 100, saturate: 100, warmth: 0, preset: 'none', vignette: 0, tint: null }
 
+// v5.3·P5 (KAI-9150): the Blend mode is a DURABLE recipe field (in the store, history, and the 3D
+// bridge) — not editor-local — so Done/reopen/3D/manufacturing all know Halo vs Offset vs Full-bg.
+export type BlendMode = 'fullbg' | 'halo' | 'offset'
+
 interface OutlineStore {
   spec: EffectSpecDraft | null
   setSpec: (spec: EffectSpecDraft | null) => void
@@ -72,6 +76,9 @@ interface OutlineStore {
    *  (RepeatWrapping = the no-AI "fill") vs CLAMP the edge. false = clamp (default). */
   wrapTile: boolean
   setWrapTile: (v: boolean) => void
+  /** v5.3·P5: the active Blend mode (Halo / Offset / Full-bg) — durable in the recipe. */
+  blendMode: BlendMode
+  setBlendMode: (m: BlendMode) => void
   artwork: DesignState
   setArtwork: (d: DesignState) => void
 }
@@ -137,6 +144,8 @@ export const useOutlineStore = create<OutlineStore>((set, get) => ({
   setImageFx: (imageFx) => set({ imageFx }),
   wrapTile: false,
   setWrapTile: (wrapTile) => set({ wrapTile }),
+  blendMode: 'fullbg',
+  setBlendMode: (blendMode) => set({ blendMode }),
   artwork: INITIAL_ARTWORK,
   setArtwork: (artwork) => set({ artwork }),
 }))
