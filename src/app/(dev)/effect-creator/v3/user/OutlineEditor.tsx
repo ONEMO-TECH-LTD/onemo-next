@@ -36,7 +36,11 @@ import { vshapeFromSVG, fitShapeToBox } from '@/lib/export'
 // Run 2 · G6 decomposition — seam 1: pure doc-space geometry; seam 2: chip lineup + glyphs.
 import { DEFAULT_SHAPE_PARAMS } from './editor/chips'
 // R8 (Creator v5) — seam: PRODUCER ADAPTERS (pure source builders) live in editor/producers.
-import { GEN_VECTOR_KINDS, shapePreviewD, vecFromGenerator, vecFromImageFile } from './editor/producers'
+import { GEN_VECTOR_KINDS, shapePreviewD, vecFromGenerator, vecFromImageFile, traceSourceFromRaw, offsetPctToMm } from './editor/producers'
+// A (KAI-9127/9128): the generation Detail/Offset controls re-derive the SHARP source from the cached raw
+// AI trace (no AI re-run). Detail 100% = tightest pixel-true silhouette (Dan-confirmed default; POC-validated);
+// lower = coarser straight facets. Manufacturing cuttability is a separate export gate, NOT a Detail cap.
+import { type OffsetJoin } from '@/lib/effect/offset'
 import { useOutlineEditing } from './editor/useOutlineEditing'
 // R8 (Creator v5) — seam: ADJUSTMENT WRITERS (radius/curve/global/blend) live in useEditorAdjustments.
 import { useEditorAdjustments } from './editor/useEditorAdjustments'
@@ -89,6 +93,13 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   const [activeAdjust, setActiveAdjust] = useState<'shape' | 'adjust' | 'image' | null>(null)
   const [adjustSub, setAdjustSub] = useState<AdjustSub>('radius')
   const [curveVal, setCurveVal] = useState(0) // Curve ruler 0..100 — 0 = straight (OFF), reversible
+  // A (KAI-9127/9128): GENERATION controls — Detail (trace tightness) + Offset (expand). Editor-local
+  // (they re-derive the SOURCE from the cached raw trace, not the adjustments recipe). Detail defaults to
+  // the %-that-reflects the born trace's mm-floor (value-reflection); Offset starts at 0 (= the born cut).
+  const [detail, setDetail] = useState(100) // Detail 100% = tightest pixel-true trace (Dan-confirmed); lower = coarser facets
+  const [offset, setOffset] = useState(0)
+  const [offsetJoin, setOffsetJoin] = useState<OffsetJoin>('sharp')
+  const traceDragRef = useRef<{ source: OutlineSource | null; adjustments: OutlineAdjustments } | null>(null) // pre-drag snapshot for ONE undo step across a Detail/Offset drag
   const [blendBlur, setBlendBlur] = useState(50) // blend intensity 0–100; 0 = off (ruler IS the switch)
   // Shape tool: pick a preset/parametric shape as the starting outline. shapeKind = the shape currently
   // being tuned (null = none picked this session → only chips show). Params drive live regeneration.
@@ -206,6 +217,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     setCurveVal(0)
     setPreviewAdj(null)
     setView({ scale: 1, vx: 0, vy: 0 }) // G11: fresh session starts at fit
+    setDetail(100); setOffset(0); setOffsetJoin('sharp') // A: generation dials default — Detail 100 = born tight, no offset
     setAllSelected(false)
     setShapeKind(null)
     setShapePreview(null)
@@ -248,7 +260,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     {
       const cur = useOutlineStore.getState()
       if (cur.source) {
-        setRadius(representativeLocal(cur.adjustments, cur.source.shape, 'radius'))
+        // whole-shape Radius reflects the GLOBAL radius axis (dual-engine); falls back to a uniform
+        // per-corner value for legacy/per-corner recipes — never a lying 0.
+        setRadius(cur.adjustments.global.radius || representativeLocal(cur.adjustments, cur.source.shape, 'radius'))
         setCurveVal(representativeLocal(cur.adjustments, cur.source.shape, 'curve') * 50) // factor(0..2) → 0..100
       }
       entryRef.current = { source: cur.source, adjustments: cur.adjustments }
@@ -326,6 +340,46 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
           (!!vshape && vshape.paths[0].anchors.some((a) => a.corner)),
     [source, vshape],
   )
+
+  // A (KAI-9127/9128): Detail/Offset apply only to a GENERATED source with a cached raw trace (a stock
+  // pick / upload has none) — gated/greyed like Radius. They re-derive the SHARP source from that trace,
+  // no AI re-run.
+  const detailApplies = !!source && source.klass === 'generated' && (spec?.rawTracePx as Pt[] | undefined ?? []).length > 0
+
+  // Re-derive the source from the cached raw trace at (detail, offset, join). previewTrace = LIVE per-tick
+  // (no history); commitTrace = ONE undo step (snapshots the pre-drag state at drag start). Whole-shape
+  // adjustments (Simplify/Smooth/Straighten/Radius) are preserved; per-anchor local edits are dropped
+  // (their source ids no longer exist after a re-trace).
+  const buildTraceSource = useCallback((d: number, o: number, join: OffsetJoin): OutlineSource | null => {
+    const sp = useOutlineStore.getState().spec
+    const raw = sp?.rawTracePx as Pt[] | undefined
+    if (!sp || !raw?.length) return null
+    const offMaxMm = Math.max(sp.maskWidthPx, sp.maskHeightPx) * sp.mmPerPx
+    const shape = traceSourceFromRaw(raw, sp.maskHeightPx, sp.mmPerPx, d, offsetPctToMm(o, offMaxMm), join)
+    if (!shape) return null
+    return { shape: mintIds(shape), klass: 'generated', mmPerPx: sp.mmPerPx, maskHeightPx: sp.maskHeightPx, rawTracePx: raw }
+  }, [])
+  const previewTrace = useCallback((d: number, o: number, join: OffsetJoin) => {
+    const st = useOutlineStore.getState()
+    if (!traceDragRef.current) traceDragRef.current = { source: st.source, adjustments: st.adjustments }
+    const next = buildTraceSource(d, o, join)
+    if (next) st.setSource(next, { global: { ...st.adjustments.global }, local: {} }) // transient — no history
+    setSelVA(null); setAllSelected(false)
+  }, [buildTraceSource])
+  const commitTrace = useCallback((d: number, o: number, join: OffsetJoin) => {
+    const st = useOutlineStore.getState()
+    const pre = traceDragRef.current ?? { source: st.source, adjustments: st.adjustments }
+    traceDragRef.current = null
+    const next = buildTraceSource(d, o, join)
+    if (!next) return
+    if (pre.source) { // ONE undo step for the whole drag
+      histRef.current.past.push({ source: pre.source, adjustments: pre.adjustments })
+      if (histRef.current.past.length > 50) histRef.current.past.shift()
+      histRef.current.future = []
+    }
+    st.setSource(next, { global: { ...st.adjustments.global }, local: {} })
+    setSelVA(null); setAllSelected(false)
+  }, [buildTraceSource])
 
   // ── GESTURE TRANSFORMS (R8 seam 3) — every pointer/touch interaction on the canvas (anchor/handle
   //    drag, double-tap Points, pan/zoom/pinch/wheel, move-inside, crop stretch, rotate, tap-select)
@@ -412,7 +466,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     const st = useOutlineStore.getState()
     if (!st.source) return
     if (selVA === null) {
-      setRadius(representativeLocal(st.adjustments, st.source.shape, 'radius'))
+      // no selection → the slider is the WHOLE-SHAPE Radius (global axis); reflect its real value.
+      setRadius(st.adjustments.global.radius || representativeLocal(st.adjustments, st.source.shape, 'radius'))
       setCurveVal(representativeLocal(st.adjustments, st.source.shape, 'curve') * 50)
       return
     }
@@ -436,6 +491,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     if (!spec || spec.generator.adapter === 'standard') return
     seedSource({ shape: mintIds(spec.vectorShape), klass: 'generated', mmPerPx: spec.mmPerPx, maskHeightPx: spec.maskHeightPx, rawTracePx: spec.rawTracePx as Pt[] | undefined }) // AUTO-TUNE PAUSED (Dan) — raw + off for manual testing
     setRadius(0); setCurveVal(0); setSelVA(null); setAllSelected(false)
+    setDetail(100); setOffset(0) // A: fresh Magic cut → generation dials back to born-tight defaults
     const cur = useOutlineStore.getState()
     entryRef.current = { source: cur.source, adjustments: cur.adjustments }
   }, [spec, open, seedSource])
@@ -459,6 +515,33 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   const pickShape = useCallback((kind: ShapeKind) => {
     setShapeKind(kind)
     setShapePreview(null)
+    // KAI-9129: simple shapes are MATH-DERIVED — squircle = a sharp SQUARE + a whole-shape Radius recipe;
+    // pill = a sharp 2:1 RECTANGLE + Radius = half the short side (stadium). Sharp source, the rounding is
+    // a reversible adjustment (dial Radius to 0 → the primitive), and the slider reflects the real value.
+    if (kind === 'squircle' || kind === 'pill') {
+      const { widthPx, heightPx } = dimsRef.current
+      const st = useOutlineStore.getState()
+      const mmPerPx = st.source?.mmPerPx ?? st.spec?.mmPerPx ?? 1
+      const maskHeightPx = st.source?.maskHeightPx ?? st.spec?.maskHeightPx ?? heightPx
+      let base: VShape
+      if (kind === 'squircle') base = mintIds(getShape('square', widthPx, heightPx))
+      else { // pill: a centered 2:1 sharp rectangle
+        const long = Math.min(widthPx, heightPx) * 0.72, hw = long / 2, hh = (long * 0.5) / 2
+        const cx = widthPx / 2, cy = heightPx / 2
+        base = mintIds({ paths: [{ anchors: [
+          { p: { x: cx - hw, y: cy - hh }, hIn: null, hOut: null, corner: true },
+          { p: { x: cx + hw, y: cy - hh }, hIn: null, hOut: null, corner: true },
+          { p: { x: cx + hw, y: cy + hh }, hIn: null, hOut: null, corner: true },
+          { p: { x: cx - hw, y: cy + hh }, hIn: null, hOut: null, corner: true },
+        ] }] })
+      }
+      const bb = shapeBBox(base, 1)
+      const half = Math.min(bb.maxX - bb.minX, bb.maxY - bb.minY) / 2
+      const r = kind === 'squircle' ? Math.round(half * 0.42) : Math.round(half) // pill: full round of the short ends → stadium
+      seedSource({ shape: base, klass: 'stock', mmPerPx, maskHeightPx }, cornerRadiusAdjustments(base, r))
+      setRadius(r); setAllSelected(false); setShowAnchors(false)
+      return
+    }
     // VECTOR CORE: vector-native kinds spawn as TRUE Bézier shapes from the static library —
     // zero sampling, zero fitting; the doc becomes a derived shadow for interaction math.
     if (hasVectorDef(kind)) {
@@ -486,7 +569,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     // every ShapeKind is vector-constructed (library def or fitted generator) — an uncovered
     // kind is a build error, never a polyline (single geometry truth)
     throw new Error(`pickShape: no vector construction for shape "${kind}"`)
-  }, [applyVec])
+  }, [applyVec, seedSource])
   /** stepper: ±delta on an integer param, regenerate immediately (undoable). */
   const nudgeParam = useCallback((key: 'sides' | 'points' | 'lobes' | 'petals' | 'blades', delta: number, min: number, max: number) => {
     if (!shapeKind) return
@@ -683,15 +766,10 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
 
       {/* bottom dock — status + sheets + toolbar, floating as glass over the full-bleed canvas */}
       <div className={styles.bottomDock}>
-      {/* compact status line between canvas and toolbar */}
+      {/* compact status line between canvas and toolbar (KAI-9120: the discard confirm is no longer an
+          inline bar stacked under the canvas — it's a centered modal at the overlay root, below) */}
       <div className={styles.status}>
-        {confirmDiscard ? (
-          <span className={styles.discardBar}>
-            Discard the changes from this session?
-            <button type="button" className={styles.keepBtn} onClick={() => setConfirmDiscard(false)}>Keep editing</button>
-            <button type="button" className={styles.discardBtn} onClick={() => onCancel(true)}>Discard</button>
-          </span>
-        ) : hasIssues ? (
+        {hasIssues ? (
           /* a WARNING is sanctioned (failure state) — instructional helper text is not (KAI-9014) */
           <span className={styles.warn}>This shape can’t be cut cleanly — fix the crossing</span>
         ) : null}
@@ -706,6 +784,15 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
           maxRadius={maxRadius} radius={radius} previewRadius={previewRadius} commitRadius={commitRadius}
           curveSelected={!!vshape} curveVal={curveVal} previewCurve={previewCurve} commitCurve={commitCurve}
           global={liveGlobal} previewGlobal={previewGlobal} commitGlobal={commitGlobal}
+          detailApplies={detailApplies}
+          detail={detail}
+          onDetail={(v) => { setDetail(v); previewTrace(v, offset, offsetJoin) }}
+          onDetailCommit={(v) => { setDetail(v); commitTrace(v, offset, offsetJoin) }}
+          offset={offset}
+          onOffset={(v) => { setOffset(v); previewTrace(detail, v, offsetJoin) }}
+          onOffsetCommit={(v) => { setOffset(v); commitTrace(detail, v, offsetJoin) }}
+          offsetJoin={offsetJoin}
+          onOffsetJoin={(j) => { setOffsetJoin(j); commitTrace(detail, offset, j) }}
         />
       )}
       {activeAdjust === 'image' && (
@@ -762,6 +849,30 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
             reached from there (and stays active when entered) */}
       </Dock>
     </div>
+
+      {/* KAI-9120: discard confirm = a CENTERED MODAL over the whole overlay (not an inline bar stacked
+          under the canvas, which made the image jump). Backdrop click or "Keep editing" dismisses. */}
+      {confirmDiscard && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Discard changes"
+          onClick={() => setConfirmDiscard(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(8,9,12,0.55)', backdropFilter: 'blur(2px)', WebkitBackdropFilter: 'blur(2px)' }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: 'min(86vw, 320px)', borderRadius: 18, padding: '20px 20px 14px', background: 'var(--color-surface, #fbfbfd)', color: 'var(--color-text-primary, #1c2030)', boxShadow: '0 18px 60px rgba(0,0,0,0.35)', textAlign: 'center', font: '500 15px system-ui, -apple-system, sans-serif' }}
+          >
+            <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Discard changes?</div>
+            <div style={{ opacity: 0.7, fontSize: 13.5, lineHeight: 1.4, marginBottom: 18 }}>This will undo every edit from this session.</div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button type="button" onClick={() => setConfirmDiscard(false)} style={{ flex: 1, padding: '11px 0', borderRadius: 12, border: 'none', cursor: 'pointer', font: '600 14px system-ui, sans-serif', background: 'rgba(120,124,140,0.16)', color: 'inherit' }}>Keep editing</button>
+              <button type="button" onClick={() => onCancel(true)} style={{ flex: 1, padding: '11px 0', borderRadius: 12, border: 'none', cursor: 'pointer', font: '600 14px system-ui, sans-serif', background: '#e5484d', color: '#fff' }}>Discard</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -11,7 +11,8 @@ import TickBar from '../../ui/TickBar'
 import { useOutlineStore, type ImageFx } from '../outlineStore'
 import { PARAMETRIC, type ShapeKind } from '../shapes'
 import { SHAPE_CHIPS, ShapeChipIcon, DEFAULT_SHAPE_PARAMS } from './chips'
-import { RoundIcon, SmoothIcon, BrightnessIcon, ContrastIcon, SaturationIcon, WarmthIcon, MinusIcon, PlusIcon, DiceIcon, BlurIcon, CornerIcon, DetailIcon, LineIcon } from '../icons'
+import { RoundIcon, SmoothIcon, BrightnessIcon, ContrastIcon, SaturationIcon, WarmthIcon, MinusIcon, PlusIcon, DiceIcon, BlurIcon, CornerIcon, DetailIcon, LineIcon, TraceDetailIcon, OffsetIcon } from '../icons'
+import type { OffsetJoin } from '@/lib/effect/offset'
 
 // V4: the global Adjust dials are plain 0..100 PRODUCT axes written straight to adjustments.global —
 // the engine (resolve / outline-resolve.ts) owns the pct→engine-unit maps, so there are NO engine
@@ -32,7 +33,7 @@ export const fxFromPct = (k: FxKey, pct: number) => {
 
 import styles from '../outline-editor.module.css'
 
-export type AdjustSub = 'radius' | 'curve' | 'simplify' | 'smooth' | 'straighten'
+export type AdjustSub = 'detail' | 'offset' | 'radius' | 'curve' | 'simplify' | 'smooth' | 'straighten'
 
 /** UX-1 progress ring — an arc around a tool circle showing its current value; nothing at zero. */
 function ChipRing({ frac }: { frac: number }) {
@@ -89,7 +90,7 @@ export type ImageSub = 'brightness' | 'contrast' | 'saturate' | 'warmth' | 'blen
    reversible to the source corner); Detail · Smooth · Snap · Angle · Line are GLOBAL (independent
    non-destructive axes, every one OFF → exact source). Each dial is a plain 0..100 product value
    written straight to the recipe; resolve() owns the engine maps. Inapplicable tools grey (Dan's rule). */
-export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, radiusApplies, maxRadius, radius, previewRadius, commitRadius, curveSelected, curveVal, previewCurve, commitCurve, global, previewGlobal, commitGlobal }: {
+export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, radiusApplies, maxRadius, radius, previewRadius, commitRadius, curveSelected, curveVal, previewCurve, commitCurve, global, previewGlobal, commitGlobal, detailApplies, detail, onDetail, onDetailCommit, offset, onOffset, onOffsetCommit, offsetJoin, onOffsetJoin }: {
   cornerMode: boolean
   adjustSub: AdjustSub
   setAdjustSub: (k: AdjustSub) => void
@@ -108,10 +109,26 @@ export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, radiusApplies
   global: GlobalAdjustments
   previewGlobal: (g: GlobalAdjustments) => void
   commitGlobal: (g: GlobalAdjustments) => void
+  /** A (KAI-9127/9128) — GENERATION controls (Detail/Offset re-derive the source from the cached raw
+   *  trace; gated to a Magic-generated source — a stock pick/upload has no trace). */
+  detailApplies: boolean
+  detail: number
+  onDetail: (v: number) => void
+  onDetailCommit: (v: number) => void
+  offset: number
+  onOffset: (v: number) => void
+  onOffsetCommit: (v: number) => void
+  offsetJoin: OffsetJoin
+  onOffsetJoin: (j: OffsetJoin) => void
 }) {
-  // a ring renders only when a dial is engaged (off-state shows nothing). Detail OFF = 100 (full).
+  // a ring renders only when a dial is engaged (off-state shows nothing).
   const setG = (k: keyof GlobalAdjustments, v: number): GlobalAdjustments => ({ ...global, [k]: v })
   const dials = [
+    // GENERATION controls first (Magic only): Detail = trace tightness (100 = pixel-true), Offset = expand.
+    ...(detailApplies ? [
+      { k: 'detail' as const, label: 'Detail', icon: <TraceDetailIcon />, ring: detail / 100 },
+      { k: 'offset' as const, label: 'Offset', icon: <OffsetIcon />, ring: offset / 100 },
+    ] : []),
     { k: 'radius' as const, label: cornerMode ? 'Corner' : 'Radius', icon: <CornerIcon />, ring: radiusApplies && radius > 0 ? radius / Math.max(maxRadius, 1) : 0 },
     { k: 'curve' as const, label: 'Curve', icon: <RoundIcon />, ring: curveSelected && curveVal > 0 ? curveVal / 100 : 0 },
     { k: 'simplify' as const, label: 'Simplify', icon: <DetailIcon />, ring: global.simplify / 100 },
@@ -139,6 +156,14 @@ export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, radiusApplies
       </ChipRow>
       <div className={styles.shapeControls}>
         <div className={styles.shapeRow}>
+          {/* GENERATION controls (Magic): Detail re-traces the cached cut (100% = tightest pixel-true,
+              lower = coarser facets); Offset expands the finished shape (join chosen below). Both live. */}
+          {adjustSub === 'detail' && (
+            <TickBar label="Detail" min={0} max={100} value={detail} onChange={onDetail} onCommit={onDetailCommit} format={(v) => `${Math.round(v)}%`} />
+          )}
+          {adjustSub === 'offset' && (
+            <TickBar label="Offset" min={0} max={100} value={offset} onChange={onOffset} onCommit={onOffsetCommit} format={(v) => `${Math.round(v)}%`} />
+          )}
           {/* an inapplicable tool shows its ruler GREYED and non-functional until the state makes it real */}
           {adjustSub === 'radius' && (radiusApplies || cornerMode ? (
             // 0–100% slider (Dan: all tools %); % is of the shape's geometric max radius (half its short
@@ -170,6 +195,24 @@ export function AdjustSheet({ cornerMode, adjustSub, setAdjustSub, radiusApplies
             <TickBar label="Straighten" min={0} max={100} value={global.straighten} onChange={(v) => previewGlobal(setG('straighten', v))} onCommit={(v) => commitGlobal(setG('straighten', v))} format={(v) => `${Math.round(v)}%`} />
           )}
         </div>
+        {/* Offset corner join — round (soft macro outline) · sharp (Miter, keep corners) · bevel (chamfer) */}
+        {adjustSub === 'offset' && (
+          <div className={styles.shapeRow} style={{ justifyContent: 'center', gap: 8 }}>
+            {(['round', 'sharp', 'bevel'] as const).map((j) => (
+              <button
+                key={j}
+                type="button"
+                className={styles.stepBtn}
+                onClick={() => onOffsetJoin(j)}
+                aria-pressed={offsetJoin === j}
+                aria-label={`Offset join: ${j}`}
+                style={{ width: 'auto', padding: '4px 14px', borderRadius: 999, fontSize: 12, textTransform: 'capitalize', background: offsetJoin === j ? 'var(--color-text-primary, #1c2030)' : 'transparent', color: offsetJoin === j ? 'var(--color-bg, #fff)' : 'inherit', opacity: offsetJoin === j ? 1 : 0.55 }}
+              >
+                {j}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -188,11 +231,14 @@ export function ImageSheet({ imageSub, setImageSub, fxDraft, setFxDraft, blendBl
   return (
     <div className={styles.shapeSheet}>
       <ChipRow>
+        {/* KAI-9123: the chip ring must use the SAME 0–100% mapping as the slider (fxToPct) — the old
+            distance-from-neutral (|fx−100|/50) disagreed with the ruler (empty at the slider's 50% neutral,
+            full at both ends), so the reading looked inverted/miscalibrated. Now ring === slider value. */}
         {([
-          { k: 'brightness', label: 'Bright', icon: <BrightnessIcon />, ring: Math.abs(fxDraft.brightness - 100) / 50 },
-          { k: 'contrast', label: 'Contrast', icon: <ContrastIcon />, ring: Math.abs(fxDraft.contrast - 100) / 50 },
-          { k: 'saturate', label: 'Color', icon: <SaturationIcon />, ring: Math.abs(fxDraft.saturate - 100) / 100 },
-          { k: 'warmth', label: 'Warmth', icon: <WarmthIcon />, ring: fxDraft.warmth / 100 },
+          { k: 'brightness', label: 'Bright', icon: <BrightnessIcon />, ring: fxToPct('brightness', fxDraft.brightness) / 100 },
+          { k: 'contrast', label: 'Contrast', icon: <ContrastIcon />, ring: fxToPct('contrast', fxDraft.contrast) / 100 },
+          { k: 'saturate', label: 'Color', icon: <SaturationIcon />, ring: fxToPct('saturate', fxDraft.saturate) / 100 },
+          { k: 'warmth', label: 'Warmth', icon: <WarmthIcon />, ring: fxToPct('warmth', fxDraft.warmth) / 100 },
           { k: 'blend', label: 'Blend', icon: <BlurIcon />, ring: blendBlur / 100 }, // KAI-9030: it IS a blur
         ] as const).map((s) => (
           <button

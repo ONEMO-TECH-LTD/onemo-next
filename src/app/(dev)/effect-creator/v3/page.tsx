@@ -21,6 +21,9 @@ import TopBar, { TopBarButton } from './user/TopBar'
 import edStyles from './user/outline-editor.module.css'
 import { INITIAL_ARTWORK } from './user/outlineStore'
 import { useOutlineStore } from './user/outlineStore'
+// C/A: Magic births the trace at Detail 100% (tightest pixel-true) + no baked padding — the editor's
+// Detail/Offset tools own re-derivation from the cached cut (DEC-v5-04; POC v5poc-detail params).
+import { detailToFloorMm } from './user/editor/producers'
 import type { DesignState } from './types'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
 import { toast } from './ui/Toast'
@@ -30,6 +33,8 @@ const EffectViewer = dynamic(() => import('./core/EffectViewer'), { ssr: false }
 const AdminViewer = dynamic(() => import('./admin/AdminViewer'), { ssr: false })
 const TrimCarousel = dynamic(() => import('./user/TrimCarousel'), { ssr: false })
 const Toolbar = dynamic(() => import('./user/Toolbar'), { ssr: false })
+// KAI-9124: Filters is a STANDALONE hero surface over the live 3D (no longer the 2D editor).
+const FiltersSurface = dynamic(() => import('./user/FiltersSurface'), { ssr: false })
 const EditOverlay = dynamic(() => import('./user/EditOverlay'), { ssr: false })
 const OutlineEditor = dynamic(() => import('./user/OutlineEditor'), { ssr: false })
 const EmptyState = dynamic(() => import('./user/EmptyState'), { ssr: false })
@@ -53,10 +58,7 @@ function PrototypePageInner() {
   }, [])
   const { colors, setBackColor } = useSceneStore()
   const [showColors, setShowColors] = useState(false)
-  // DEV TUNING (Dan, 2026-06-17): the Magic-trace manufacturing min-feature floor (mm). Adjust BEFORE
-  // tapping Magic to set how hard the trace simplifies — bigger = fewer facets / no wobble, smaller =
-  // more detail kept. Tap Magic to apply + see. (Tuning affordance; gate/remove before launch.)
-  const [minFeatureMM, setMinFeatureMM] = useState(5)
+  const [showFilters, setShowFilters] = useState(false) // KAI-9124: standalone Filters takeover (live 3D)
   const sceneName = searchParams.get('scene')
 
   // ── #23 GLOBAL history — one undo/redo/reset for the whole creator (Magic, editor sessions,
@@ -78,6 +80,7 @@ function PrototypePageInner() {
     autoOutline: boolean
     designState: DesignState
     imageFx: ReturnType<typeof useOutlineStore.getState>['imageFx']
+    wrapTile: boolean
     outline: OutlineSnap
     trim: { backColor: string; frameColor: string; bgColor: string }
   }
@@ -104,6 +107,7 @@ function PrototypePageInner() {
   const baselineRef = useRef<AppSnap | null>(null)
   const editorPreRef = useRef<AppSnap | null>(null)
   const trimPreRef = useRef<AppSnap | null>(null)
+  const filterPreRef = useRef<AppSnap | null>(null) // KAI-9124: pre-Filters snapshot (one global undo step on keep)
   const magicRunRef = useRef(0) // UX-5 / KAI-9083: cancel OR a new upload bumps the token; a stale Magic run's result is discarded
   const [, bumpHist] = useState(0)
   const snapNow = useCallback((): AppSnap => {
@@ -111,6 +115,7 @@ function PrototypePageInner() {
     return {
       prepared, autoOutline, designState,
       imageFx: o.imageFx,
+      wrapTile: o.wrapTile,
       outline: { spec: o.spec, committedShape: o.committedShape, source: o.source, adjustments: o.adjustments, bgBlur: o.bgBlur, subjMatteUrl: o.subjMatteUrl },
       trim: { ...useSceneStore.getState().colors },
     }
@@ -127,6 +132,7 @@ function PrototypePageInner() {
     setDesignState(sn.designState)
     const o = useOutlineStore.getState()
     o.setImageFx(sn.imageFx)
+    o.setWrapTile(sn.wrapTile)
     o.setSpec(sn.outline.spec)
     o.setSource(sn.outline.source, sn.outline.adjustments)
     o.setBgBlur(sn.outline.bgBlur)
@@ -224,8 +230,8 @@ function PrototypePageInner() {
         useOutlineStore.getState().setSpec(p.spec) // hand the standard outline to the 2D editor
         // #23: a new image starts a fresh history; this state is the Reset baseline
         baselineRef.current = {
-          prepared: p, autoOutline: false, designState: INITIAL_ARTWORK, imageFx: null,
-          outline: { spec: p.spec, committedShape: null, source: null, adjustments: { global: { simplify: 0, smooth: 0, straighten: 0 }, local: {} }, bgBlur: null, subjMatteUrl: null },
+          prepared: p, autoOutline: false, designState: INITIAL_ARTWORK, imageFx: null, wrapTile: false,
+          outline: { spec: p.spec, committedShape: null, source: null, adjustments: { global: { simplify: 0, smooth: 0, straighten: 0, radius: 0 }, local: {} }, bgBlur: null, subjMatteUrl: null },
           trim: { ...useSceneStore.getState().colors },
         }
         histRef.current = { past: [], future: [] }
@@ -252,8 +258,9 @@ function PrototypePageInner() {
       .then(({ prepareEffect, EFFECT_BUILD_CONFIG }) =>
         // Progress text is intentionally silent (Dan, 2026-06-16: no "Downloading…/Cutting out…"
         // captions). The shimmer animation alone signals work; only the honest fallback still toasts.
-        // DEV TUNING: feed the chosen manufacturing min-feature floor into the trace simplification.
-        prepareEffect(artworkUrl, 'shaped', { ...EFFECT_BUILD_CONFIG, minFeatureMM }, (s) => {
+        // Birth at Detail 100% (tightest pixel-true) + no baked padding — the editor's Detail/Offset
+        // tools re-derive from the cached trace (DEC-v5-04; POC params). Detail 100 → ~1px RDP floor.
+        prepareEffect(artworkUrl, 'shaped', { ...EFFECT_BUILD_CONFIG, minFeatureMM: detailToFloorMm(100), paddingMM: 0 }, (s) => {
           if (s === 'fallback') toast('warn', 'AI cut-out unavailable — used the simple background cut instead') // G4
         }),
       )
@@ -281,7 +288,7 @@ function PrototypePageInner() {
         toast('error', `Magic failed: ${(e as Error)?.message ?? e}`) // G4 — incl. the TD-E watchdog
         setGenerating(false)
       })
-  }, [artworkUrl, generating, snapNow, pushHistory, designState, minFeatureMM])
+  }, [artworkUrl, generating, snapNow, pushHistory, designState])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -301,7 +308,7 @@ function PrototypePageInner() {
   const onScenePointerUp = useCallback((e: React.PointerEvent) => {
     const t0 = tapRef.current
     tapRef.current = null
-    if (!t0 || !artworkUrl || editingOutline || generating || showColors) return
+    if (!t0 || !artworkUrl || editingOutline || generating || showColors || showFilters) return
     if ((e.target as Element).closest('button')) return
     const moved = Math.hypot(e.clientX - t0.x, e.clientY - t0.y)
     const clean = moved < 6 && performance.now() - t0.t < 400
@@ -316,7 +323,7 @@ function PrototypePageInner() {
       return
     }
     lastTapRef.current = { x: e.clientX, y: e.clientY, t: now }
-  }, [artworkUrl, editingOutline, generating, showColors, snapNow])
+  }, [artworkUrl, editingOutline, generating, showColors, showFilters, snapNow])
 
   return (
     <div
@@ -377,6 +384,21 @@ function PrototypePageInner() {
             setShowColors(false)
           }}
         />
+      ) : showFilters ? (
+        /* KAI-9124: the standalone Filters hero surface — over the LIVE 3D (scene not frozen), applies
+           image-fx/presets/effects/blend/fill directly to the object; ✓ keeps (one global step), ✕ reverts */
+        <FiltersSurface
+          onDone={() => {
+            const pre = filterPreRef.current
+            if (pre) {
+              const o = useOutlineStore.getState()
+              if (o.imageFx !== pre.imageFx || o.bgBlur !== pre.outline.bgBlur || o.wrapTile !== pre.wrapTile) pushHistory(pre)
+              filterPreRef.current = null
+            }
+            setShowFilters(false)
+          }}
+          onCancel={() => { filterPreRef.current = null; setShowFilters(false) }}
+        />
       ) : (
         /* Creation row (plan A1): Image · Magic · Trim — creation only; editing entries live in
            the global top bar (Edit) and the double-tap gesture */
@@ -387,24 +409,10 @@ function PrototypePageInner() {
           onFile={handleFile}
           onGenerate={handleMagic}
           onToggleColors={() => { trimPreRef.current = snapNow(); setShowColors(true) }}
-          onFilters={() => { editorPreRef.current = snapNow(); setEditorMode('image'); setEditingOutline(true) }}
+          onFilters={() => { filterPreRef.current = snapNow(); setShowFilters(true) }}
           onEditor={() => { editorPreRef.current = snapNow(); setEditorMode(null); setEditingOutline(true) }}
           editorReady={!!prepared}
         />
-      )}
-
-      {/* DEV TUNING (Dan, 2026-06-17): Magic-trace manufacturing min-feature floor. Adjust, then tap
-          Magic to re-cut + see. Bigger = fewer facets / no wobble; smaller = more detail kept.
-          Tuning affordance only — gate behind ?internal or remove before launch. */}
-      {artworkUrl && !editingOutline && !showColors && (
-        <div style={{ position: 'fixed', left: 0, right: 0, top: 76, display: 'flex', justifyContent: 'center', pointerEvents: 'none', zIndex: 50 }}>
-          <div style={{ pointerEvents: 'auto', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderRadius: 999, background: 'rgba(20,20,22,0.82)', color: '#f5f5f0', font: '500 13px system-ui, sans-serif', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', boxShadow: '0 4px 16px rgba(0,0,0,0.25)' }}>
-            <span style={{ opacity: 0.75 }}>Detail floor</span>
-            <input type="range" min={0} max={15} step={0.5} value={minFeatureMM} onChange={(e) => setMinFeatureMM(Number(e.target.value))} style={{ width: 140, accentColor: '#c8a23c' }} aria-label="Magic trace detail floor (mm)" />
-            <span style={{ minWidth: 46, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{minFeatureMM} mm</span>
-            <span style={{ opacity: 0.5, fontSize: 11 }}>· tap Magic</span>
-          </div>
-        </div>
       )}
 
       {/* drag-and-drop indicator (upload affordance) */}

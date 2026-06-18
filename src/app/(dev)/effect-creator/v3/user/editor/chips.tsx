@@ -7,26 +7,22 @@ import { shapeToSVGPathD } from '@/lib/vector-core'
 import { hasVectorDef, getShape } from '@/lib/shape-library'
 import { generateShapeRing, type ShapeKind, type ShapeParams } from '../shapes'
 
-// Shape chips — plan A2 lineup (Dan's rulings): BASICS first ("basic should be in the front"),
-// the board's symbol alphabet next, the GENERATIVE group ✦-marked, and Magic ✦ as the distinct
-// auto chip at TRAIL (it already owns the hero shortcut — the in-editor chip is the second door
-// to the SAME pipeline).
+// Shape chips — KAI-9129 CURATED launch set (16→10, Dan 2026-06-17). BASICS first. Simple shapes are
+// math-derived (square/circle/diamond/polygon/star; squircle = square + Radius; pill = rect + Radius —
+// sharp source + reversible recipe). Artistic = as-is/baked, no precision guarantee (heart/sparkle/
+// pinched). PARKED for launch — manufacturability / magnetic-attachment uncertain (kept in defs, off the
+// picker): plus · teardrop(drop) · leaf · lens · bolt · asterisk · bowtie. The ✦ generative forms are
+// not stock library shapes.
 export const SHAPE_CHIPS: { kind: ShapeKind; label: string }[] = [
   { kind: 'square', label: 'Square' },
   { kind: 'circle', label: 'Circle' },
   { kind: 'squircle', label: 'Squircle' },
+  { kind: 'pill', label: 'Pill' },
   { kind: 'polygon', label: 'Polygon' },
   { kind: 'star', label: 'Star' },
-  { kind: 'heart', label: 'Heart' },
   { kind: 'diamond', label: 'Diamond' },
-  { kind: 'plus', label: 'Plus' },
-  { kind: 'teardrop', label: 'Drop' },
-  { kind: 'leaf', label: 'Leaf' },
-  { kind: 'lens', label: 'Lens' },
-  { kind: 'bolt', label: 'Bolt' },
+  { kind: 'heart', label: 'Heart' },
   { kind: 'sparkle', label: 'Sparkle' },
-  { kind: 'asterisk', label: 'Asterisk' },
-  { kind: 'bowtie', label: 'Bowtie' },
   { kind: 'pinched', label: 'Pinched' },
   { kind: 'daisy', label: 'Daisy ✦' },
   { kind: 'pinwheel', label: 'Pinwheel ✦' },

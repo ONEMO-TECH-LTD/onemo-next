@@ -4,7 +4,7 @@
 // glyphs — chosen over Lucide so the UI doesn't read as generic shadcn/SaaS. `weight="regular"`
 // (default) reads cleanly at 24px on mobile; icons inherit `currentColor` from the button.
 
-import { ArrowArcLeft, ArrowArcRight, ArrowCounterClockwise, BezierCurve, DiceFive, WaveSine, Check, X, Plus, Minus, Trash, PlusCircle, Sparkle, ImageSquare, PencilSimple, BoundingBox, Palette, DownloadSimple, Shapes, Eye, EyeSlash, MagicWand, Faders, Crop, Sun, CircleHalf, Drop, Thermometer, VectorTwo, Waveform, LineSegment, CornersOut, Gradient, CompassTool, IntersectThree } from '@phosphor-icons/react'
+import { ArrowArcLeft, ArrowArcRight, ArrowCounterClockwise, BezierCurve, DiceFive, WaveSine, Check, X, Plus, Minus, Trash, PlusCircle, Sparkle, ImageSquare, PencilSimple, BoundingBox, Palette, DownloadSimple, Shapes, Eye, EyeSlash, MagicWand, Faders, Crop, Sun, CircleHalf, Drop, Thermometer, VectorTwo, Waveform, LineSegment, CornersOut, Gradient, CompassTool, IntersectThree, Crosshair, ArrowsOut } from '@phosphor-icons/react'
 
 type P = { className?: string }
 const SZ = 24
@@ -31,6 +31,9 @@ export const CornerIcon = (p: P) => <CornersOut size={SZ} className={p.className
 export const DetailIcon = (p: P) => <Waveform size={SZ} className={p.className} />
 // Straighten (DEC-v5-03 — merged Snap+Line): a straight line segment reads as "true up to straight".
 export const LineIcon = (p: P) => <LineSegment size={SZ} className={p.className} />
+// A (KAI-9127/9128) — generation controls: Detail = trace tightness (precision → Crosshair); Offset = expand (ArrowsOut).
+export const TraceDetailIcon = (p: P) => <Crosshair size={SZ} className={p.className} />
+export const OffsetIcon = (p: P) => <ArrowsOut size={SZ} className={p.className} />
 export const MinusIcon = (p: P) => <Minus size={SZ} className={p.className} />
 export const AddPointIcon = (p: P) => <PlusCircle size={SZ} className={p.className} />
 export const DeleteIcon = (p: P) => <Trash size={SZ} className={p.className} />

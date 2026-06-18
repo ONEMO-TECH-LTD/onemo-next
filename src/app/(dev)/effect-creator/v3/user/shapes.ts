@@ -15,7 +15,7 @@ import type { Vec2Px } from '@/lib/outline-core/math'
 export type ShapeKind =
   | 'pinched' | 'daisy' | 'heart' | 'bolt' | 'sparkle' | 'teardrop' | 'leaf' | 'lens'
   | 'diamond' | 'plus' | 'asterisk' | 'bowtie' | 'pinwheel'
-  | 'circle' | 'square' | 'squircle' | 'polygon' | 'star'
+  | 'circle' | 'square' | 'squircle' | 'pill' | 'polygon' | 'star'
   | 'form' | 'blob'
 
 export interface ShapeParams {

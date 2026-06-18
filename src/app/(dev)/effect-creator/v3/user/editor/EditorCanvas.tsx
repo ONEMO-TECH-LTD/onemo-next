@@ -10,6 +10,7 @@
 // all the live-transform / crop-box / filter strings are pure derivations of its props. Swap-test:
 // replace this component, the editor renders the same pixels from the same props.
 
+import { memo, useMemo } from 'react'
 import type { Dispatch, SetStateAction, PointerEvent as ReactPointerEvent, MouseEvent as ReactMouseEvent, WheelEvent as ReactWheelEvent } from 'react'
 import type { VShape } from '@/lib/vector-core'
 import type { Vec2Px } from '@/lib/outline-core/math'
@@ -67,7 +68,7 @@ interface EditorCanvasProps { // KAI-9066: module-internal (the consumer passes 
   beginRotateHandle: (e: ReactPointerEvent) => void
 }
 
-export function EditorCanvas(props: EditorCanvasProps) {
+function EditorCanvasInner(props: EditorCanvasProps) {
   const {
     svgRef, view, imgW, imgH, imageUrl, subjMatteUrl, art, fxDraft, blendBlur,
     vshape, vDisplay, pathD, hitRing, hitBBox, hasIssues, nodeR,
@@ -128,6 +129,44 @@ export function EditorCanvas(props: EditorCanvasProps) {
   const showBlend = blendBlur > 0 && !!subjMatteUrl && !!imageUrl // 0 = off (the ruler IS the switch)
   const blendSd = (blendBlur / 100) * (imgW / 25)
 
+  // KAI-9116 perf: memoize the on-demand anchor skeleton so a pure PAN (viewBox vx/vy change) or a
+  // tool-tab switch doesn't re-render the (potentially hundreds of) anchor circles — only an actual
+  // anchor / selection / zoom(nodeR) change rebuilds it. The dense-Magic-trace gesture lag was this subtree.
+  const anchorGroup = useMemo(() => {
+    if (preview || !showAnchors || !vDisplay) return null
+    const anchors = vDisplay.paths[0].anchors
+    const sel = selVA !== null ? anchors[selVA] : null
+    return (
+      <g>
+        {sel && (['hIn', 'hOut'] as const).map((k) => {
+          const h = sel[k]
+          if (!h) return null
+          return (
+            <g key={k}>
+              <line className={styles.rotateStem} x1={sel.p.x} y1={sel.p.y} x2={h.x} y2={h.y} />
+              <circle
+                className={`${styles.node} ${styles.nodeActive}`}
+                cx={h.x} cy={h.y} r={nodeR * 0.62}
+                onPointerDown={onVHandleDown(selVA!, k)}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </g>
+          )
+        })}
+        {anchors.map((a, i) => (
+          <circle
+            key={`va${i}`}
+            className={`${styles.node} ${selVA === i ? styles.nodeSelected : ''}`}
+            cx={a.p.x} cy={a.p.y} r={nodeR}
+            onPointerDown={onVAnchorDown(i)}
+            onDoubleClick={onVAnchorDouble(i)}
+            onClick={(e) => e.stopPropagation()}
+          />
+        ))}
+      </g>
+    )
+  }, [preview, showAnchors, vDisplay, selVA, nodeR, onVAnchorDown, onVHandleDown, onVAnchorDouble])
+
   return (
     <div className={styles.canvas}>
       <svg
@@ -174,39 +213,7 @@ export function EditorCanvas(props: EditorCanvasProps) {
               {/* anchors hidden in Preview (clean result); point work is vector-native below */}
               {/* Run 6 — the vector skeleton: minimal intentional anchors, summoned on demand.
                   The selected anchor reveals its Bézier handles; drags are transient until release. */}
-              {!preview && showAnchors && vDisplay && (() => {
-                const anchors = vDisplay.paths[0].anchors
-                const sel = selVA !== null ? anchors[selVA] : null
-                return (
-                  <g>
-                    {sel && (['hIn', 'hOut'] as const).map((k) => {
-                      const h = sel[k]
-                      if (!h) return null
-                      return (
-                        <g key={k}>
-                          <line className={styles.rotateStem} x1={sel.p.x} y1={sel.p.y} x2={h.x} y2={h.y} />
-                          <circle
-                            className={`${styles.node} ${styles.nodeActive}`}
-                            cx={h.x} cy={h.y} r={nodeR * 0.62}
-                            onPointerDown={onVHandleDown(selVA!, k)}
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        </g>
-                      )
-                    })}
-                    {anchors.map((a, i) => (
-                      <circle
-                        key={`va${i}`}
-                        className={`${styles.node} ${selVA === i ? styles.nodeSelected : ''}`}
-                        cx={a.p.x} cy={a.p.y} r={nodeR}
-                        onPointerDown={onVAnchorDown(i)}
-                        onDoubleClick={onVAnchorDouble(i)}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    ))}
-                  </g>
-                )
-              })()}
+              {anchorGroup}
               {/* KAI-9014: the twist handle rides ALL-SELECTED in ANY view — Dan tap-selects in
                   frame mode (the default); the old showAnchors gate hid it there */}
               {!preview && rotHandle && (
@@ -286,3 +293,8 @@ export function EditorCanvas(props: EditorCanvasProps) {
     </div>
   )
 }
+
+// KAI-9116: memo the canvas overlay so an unrelated parent re-render (e.g. a slider-only state change in
+// OutlineEditor) doesn't re-render the whole SVG + anchor tree; the props that actually change
+// (vshape/view/flags/handlers) still update it normally.
+export const EditorCanvas = memo(EditorCanvasInner)

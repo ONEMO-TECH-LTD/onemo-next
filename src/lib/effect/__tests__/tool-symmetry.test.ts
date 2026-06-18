@@ -36,7 +36,8 @@ const localAll = (key: 'radius' | 'curve', v: number) => ({ c0: { [key]: v }, c1
 
 describe('TOOL SYMMETRY — every tool keeps a square 4-fold symmetric (≤3px = applied equally)', () => {
   const cases: [string, () => ReturnType<typeof resolve>][] = [
-    ['Radius 60', () => resolve(squareSource(), { global: G({}), local: localAll('radius', 60) })],
+    ['Radius 60 (per-corner)', () => resolve(squareSource(), { global: G({}), local: localAll('radius', 60) })],
+    ['Radius 199 whole-shape (→circle)', () => resolve(squareSource(), { global: G({ radius: 199 }), local: {} })],
     ['Curve 100', () => resolve(squareSource(), { global: G({}), local: localAll('curve', 1) })],
     ['Smooth 80', () => resolve(squareSource(), { global: G({ smooth: 80 }), local: {} })],
     ['Simplify 60', () => resolve(squareSource(), { global: G({ simplify: 60 }), local: {} })],

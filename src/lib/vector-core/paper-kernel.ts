@@ -133,18 +133,38 @@ export function roundShapePaper(shape: VShape, radiusPx: number): VShape {
 }
 
 /**
- * L2 — SMOOTH the whole path via Paper's native catmull-rom smoothing (no point explosion). Returns a
- * faired copy; OFF (no call) leaves the source. `type`/`factor` map the 0..100 Smooth axis.
+ * L2 — SMOOTH the whole path via Paper's native catmull-rom smoothing (no point explosion), as a TRUE
+ * 0..1 GRADATION (KAI-9115). Paper's catmull `factor` is the PARAMETERIZATION (uniform/centripetal/
+ * chordal), NOT a smoothing amount — so calling it raw is binary (1% looks like 100%). We compute the
+ * fully-smoothed handles at the STABLE centripetal parameterization (0.5 — loop-free on uneven anchor
+ * spacing) and BLEND each handle from the original toward smoothed by `amount`, so the slider grades
+ * smoothly. OFF (amount<=0) leaves the source; catmull only sets handles (never adds/moves points), so
+ * the blend is a clean per-anchor handle lerp.
  */
-export function smoothPaper(path: VPath, factor: number): VPath {
-  if (factor <= 0) return path
+export function smoothPaper(path: VPath, amount: number): VPath {
+  const t = Math.max(0, Math.min(1, amount))
+  if (t <= 0) return path
+  let smoothed: VPath
   const pp = toPaperPath(path)
   try {
-    pp.smooth({ type: 'catmull-rom', factor: Math.max(0, Math.min(1, factor)) })
-    return fromPaperPath(pp)
+    pp.smooth({ type: 'catmull-rom', factor: 0.5 })
+    smoothed = fromPaperPath(pp)
   } finally {
     pp.remove()
   }
+  if (t >= 1) return smoothed // full smooth — no blend
+  const anchors: VAnchor[] = path.anchors.map((a, i) => {
+    const s = smoothed.anchors[i] // same count + position (catmull sets handles only)
+    if (!s) return { ...a }
+    const lerpH = (orig: VAnchor['hIn'], sm: VAnchor['hIn']) => {
+      const o = orig ?? a.p, m = sm ?? a.p
+      const x = o.x + (m.x - o.x) * t, y = o.y + (m.y - o.y) * t
+      return Math.abs(x - a.p.x) < 1e-6 && Math.abs(y - a.p.y) < 1e-6 ? null : { x, y }
+    }
+    const hIn = lerpH(a.hIn, s.hIn), hOut = lerpH(a.hOut, s.hOut)
+    return { ...a, hIn, hOut, corner: !hIn && !hOut }
+  })
+  return { anchors }
 }
 
 /**

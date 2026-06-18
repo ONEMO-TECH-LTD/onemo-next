@@ -31,7 +31,7 @@ import { DISPLAY_TOLERANCE_MM } from '@/lib/effect/geometry-truth'
 import { EFFECT_BUILD_CONFIG, type PreparedEffect } from '@/lib/effect/prepare-effect'
 import { buildMeshFromSpec } from '@/lib/effect/build-mesh'
 import { buildShapedGeometry } from '@/lib/effect/mesh'
-import { composeFront } from '@/lib/effect/composite'
+import { composeFront, presetFilter } from '@/lib/effect/composite'
 import type { ImageFx } from '../../user/outlineStore'
 import { perfGesture } from '../../dev/PerfHUD'
 
@@ -56,6 +56,8 @@ interface ShapedModelProps {
   bgBlur: number | null
   /** live image adjustments (null = neutral). */
   imageFx: ImageFx | null
+  /** Filters v2 (KAI-9125): when an Offset expands the cut past the photo, TILE it vs clamp the edge. */
+  wrapTile: boolean
 }
 
 const texCache = new Map<string, THREE.Texture>()
@@ -117,6 +119,7 @@ export default function ShapedModel({
   editorOpen,
   bgBlur,
   imageFx,
+  wrapTile,
 }: ShapedModelProps) {
   const [result, setResult] = useState<{ geometry: THREE.BufferGeometry; texture: THREE.CanvasTexture; edgeTexture: THREE.CanvasTexture; widthMM: number; heightMM: number } | null>(null)
   const artTexRef = useRef<THREE.CanvasTexture | null>(null)
@@ -246,20 +249,24 @@ export default function ShapedModel({
     // custom fx/blur was previously applied — else a DISCARDED image-fx edit's bright texture lingers in
     // 3D (KAI-9070 removed the old null→0.5 coercion that had masked this). artTexRef.current is set once a
     // custom texture has been composed; skip ONLY the initial / never-edited null/null case.
-    const isDefault = bgBlur == null && imageFx == null
+    const isDefault = bgBlur == null && imageFx == null && !wrapTile // wrapTile alone still needs a recompose
     if (isDefault && !artTexRef.current) return
     // KAI-9069: null bgBlur = the design's BUILD default (fs.defaultBlurPx, already in px) — NOT a
     // hardcoded 0.5. The standard square births defaultBlurPx=0 (sharp), so touching an image-fx tool
     // no longer injects ~50% blur; shaped uses its exact prepared default. A user-set 0..1 bgBlur overrides.
     const px = bgBlur == null ? fs.defaultBlurPx : (bgBlur <= 0 ? 0 : bgBlur * (fs.origCanvas.width / 25))
+    // Filters v2 (KAI-9125): a one-tap PRESET filter is layered ahead of the manual image-fx; vignette/
+    // tint are composite effects baked over the result. Same composite feeds 3D + print (parity).
     const fx = imageFx
-      ? `brightness(${imageFx.brightness}%) contrast(${imageFx.contrast}%) saturate(${imageFx.saturate}%)${imageFx.warmth > 0 ? ` sepia(${Math.round(imageFx.warmth * 0.45)}%)` : ''}`
+      ? `${presetFilter(imageFx.preset)} brightness(${imageFx.brightness}%) contrast(${imageFx.contrast}%) saturate(${imageFx.saturate}%)${imageFx.warmth > 0 ? ` sepia(${Math.round(imageFx.warmth * 0.45)}%)` : ''}`.trim()
       : ''
-    const front = composeFront(fs.origCanvas, fs.subjCanvas, px, fx)
+    const front = composeFront(fs.origCanvas, fs.subjCanvas, px, fx, imageFx?.vignette ?? 0, imageFx?.tint ?? null)
     const tex = new THREE.CanvasTexture(front)
     tex.colorSpace = THREE.SRGBColorSpace
     tex.flipY = false
-    tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping
+    // KAI-9125 fill/tile: tiling lets an Offset that expands past the photo REPEAT it (the no-AI fill);
+    // clamp (default) stretches the edge pixel.
+    tex.wrapS = tex.wrapT = wrapTile ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping
     tex.anisotropy = maxAniso
     tex.needsUpdate = true
     artTexRef.current = tex
@@ -268,7 +275,7 @@ export default function ShapedModel({
       p.texture.dispose() // swap the front texture only
       return { ...p, texture: tex }
     })
-  }, [bgBlur, imageFx, maxAniso])
+  }, [bgBlur, imageFx, wrapTile, maxAniso])
 
   // suede texture maps (normal/roughness/bump) on UV CHANNEL 1 (world-XY) → tiles by physical size,
   // never stretches (on the front OR the rim). The image map stays on channel 0 (position).

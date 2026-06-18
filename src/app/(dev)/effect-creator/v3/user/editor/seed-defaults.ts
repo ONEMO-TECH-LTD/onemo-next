@@ -8,12 +8,13 @@
 import { GLOBAL_OFF, type OutlineAdjustments } from '@/lib/effect/outline-resolve'
 import type { VShape } from '@/lib/vector-core'
 
-/** T5 — whole-shape Radius as an ADJUSTMENT on every sharp source corner (sharp-wired stock seeding):
- *  the source stays sharp, the rounding is reversible, and the Radius slider reflects `radiusPx`. */
-export function cornerRadiusAdjustments(shape: VShape, radiusPx: number): OutlineAdjustments {
-  const local: Record<string, { radius: number }> = {}
-  if (radiusPx > 0) for (const p of shape.paths) for (const a of p.anchors) if (a.corner && a.id) local[a.id] = { radius: radiusPx }
-  return { global: { ...GLOBAL_OFF }, local }
+/** T5 — whole-shape Radius as an ADJUSTMENT on the sharp source (sharp-wired stock seeding): the source
+ *  stays sharp, the rounding is reversible, and the Radius slider reflects `radiusPx`. DEC-v5-03/04
+ *  dual-engine: the default whole-shape rounding is the GLOBAL radius axis (Clipper2 offset-round,
+ *  symmetric), not a per-corner local edit — so dragging Radius (no selection) updates THIS value and
+ *  there is no double-round. A per-corner override (selecting a corner) layers on top via Paper. */
+export function cornerRadiusAdjustments(_shape: VShape, radiusPx: number): OutlineAdjustments {
+  return { global: { ...GLOBAL_OFF, radius: Math.max(0, radiusPx) }, local: {} }
 }
 
 /** T6 — post-generation AUTO-TUNE: the default recipe applied right after Magic so the cut-out is

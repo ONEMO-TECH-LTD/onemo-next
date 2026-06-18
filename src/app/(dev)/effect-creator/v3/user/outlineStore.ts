@@ -20,6 +20,7 @@ import type { DesignState } from '../types'
 import type { VShape } from '@/lib/vector-core'
 import { contourFromShape, assertContourCuttable } from '@/lib/effect/geometry-truth'
 import { resolve, ADJUSTMENTS_OFF, mintIds, type OutlineSource, type OutlineAdjustments, type OutlineClass } from '@/lib/effect/outline-resolve'
+import type { PresetKey } from '@/lib/effect/composite'
 
 // #28: artwork position (pan/zoom within the shape) — ONE source for the scene's Position mode
 // and the editor's Image tool. Matrix-only downstream (texture repeat/offset).
@@ -27,8 +28,10 @@ export const INITIAL_ARTWORK: DesignState = { offsetX: 0, offsetY: 0, scale: 1.0
 
 // #28: image adjustments — applied identically to the live 3D texture AND the print composite
 // (one composeFront), so what Dan sees is what's printed. 100/100/100/0 = neutral.
-export interface ImageFx { brightness: number; contrast: number; saturate: number; warmth: number }
-export const NEUTRAL_FX: ImageFx = { brightness: 100, contrast: 100, saturate: 100, warmth: 0 }
+// Filters v2 (KAI-9125): preset = a one-tap look; vignette/tint = composite effects. All image-stage
+// appearance, baked into the one composite (3D == print). Optional so existing 100/100/100/0 stays neutral.
+export interface ImageFx { brightness: number; contrast: number; saturate: number; warmth: number; preset?: PresetKey; vignette?: number; tint?: string | null }
+export const NEUTRAL_FX: ImageFx = { brightness: 100, contrast: 100, saturate: 100, warmth: 0, preset: 'none', vignette: 0, tint: null }
 
 interface OutlineStore {
   spec: EffectSpecDraft | null
@@ -65,6 +68,10 @@ interface OutlineStore {
   setEditorOpen: (v: boolean) => void
   imageFx: ImageFx | null
   setImageFx: (fx: ImageFx | null) => void
+  /** Filters v2 (KAI-9125) fill/tile: when the Offset cut expands past the photo, TILE the photo
+   *  (RepeatWrapping = the no-AI "fill") vs CLAMP the edge. false = clamp (default). */
+  wrapTile: boolean
+  setWrapTile: (v: boolean) => void
   artwork: DesignState
   setArtwork: (d: DesignState) => void
 }
@@ -128,6 +135,8 @@ export const useOutlineStore = create<OutlineStore>((set, get) => ({
   setEditorOpen: (editorOpen) => set({ editorOpen }),
   imageFx: null,
   setImageFx: (imageFx) => set({ imageFx }),
+  wrapTile: false,
+  setWrapTile: (wrapTile) => set({ wrapTile }),
   artwork: INITIAL_ARTWORK,
   setArtwork: (artwork) => set({ artwork }),
 }))

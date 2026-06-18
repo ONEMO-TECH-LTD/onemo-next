@@ -63,21 +63,30 @@ export function useEditorAdjustments(ctx: AdjustmentsCtx) {
     if (commit) applyAdjustments(next); else setPreviewAdj(next)
   }, [applyAdjustments, setPreviewAdj])
 
-  // RADIUS — a SELECTED corner rounds alone; with NO selection it rounds EVERY corner (whole-shape).
-  // 0 = sharp (off), reversible. Targets SOURCE corner ids → pinned through global.
-  const radiusTargets = useCallback((): string[] => {
+  // RADIUS — DEC-v5-03/04 DUAL-ENGINE, selection-routed. A SELECTED corner rounds alone via the Paper
+  // single-segment plugin (LocalAdjustment.radius, pinned through the global pass). With NO selection the
+  // WHOLE shape rounds via Clipper2 offset-round (the GLOBAL radius axis) — symmetric by construction, a
+  // square at 100% → a circle (retires the old per-corner-orchestrated whole-shape round that left the
+  // seam/right corner straight). 0 = sharp (off), reversible either way.
+  const writeGlobalRadius = useCallback((v: number, commit: boolean) => {
+    const adj = useOutlineStore.getState().adjustments
+    const next = { global: { ...adj.global, radius: Math.max(0, v) }, local: adj.local }
+    if (commit) applyAdjustments(next); else setPreviewAdj(next)
+  }, [applyAdjustments, setPreviewAdj])
+  const previewRadius = useCallback((v: number) => {
+    setRadius(v)
     const sel = sourceIdForSelection()
-    if (sel) return [sel]
-    const src = useOutlineStore.getState().source
-    return src ? src.shape.paths.flatMap((p) => p.anchors.filter((a) => a.corner && a.id).map((a) => a.id as string)) : []
-  }, [sourceIdForSelection])
-  const previewRadius = useCallback((v: number) => { setRadius(v); writeLocal(radiusTargets(), { radius: v }, false) }, [writeLocal, radiusTargets, setRadius])
+    if (sel) writeLocal([sel], { radius: v }, false) // per-corner → Paper
+    else writeGlobalRadius(v, false)                 // whole-shape → Clipper offset-round
+  }, [writeLocal, writeGlobalRadius, sourceIdForSelection, setRadius])
   const commitRadius = useCallback((v: number) => {
     setRadius(v)
     const t0 = performance.now()
-    writeLocal(radiusTargets(), { radius: v }, true)
+    const sel = sourceIdForSelection()
+    if (sel) writeLocal([sel], { radius: v }, true)
+    else writeGlobalRadius(v, true)
     perfGesture('round-commit', performance.now() - t0)
-  }, [writeLocal, radiusTargets, setRadius])
+  }, [writeLocal, writeGlobalRadius, sourceIdForSelection, setRadius])
   // CURVE — bend anchors into tangent curves. L4 (Dan: "Curve is dead"): a SELECTED anchor bends
   // alone; with NO selection it bends EVERY anchor (whole-shape) — mirroring Radius, so Curve is
   // usable straight from Adjust without the hidden Points-select gate. 0 = straight (off), reversible.
@@ -115,5 +124,5 @@ export function useEditorAdjustments(ctx: AdjustmentsCtx) {
     perfGesture('tune-commit', performance.now() - t0)
   }, [applyAdjustments, setAllSelected])
 
-  return { sourceIdForSelection, writeLocal, radiusTargets, previewRadius, commitRadius, previewCurve, commitCurve, writeBlend, previewGlobal, commitGlobal }
+  return { sourceIdForSelection, writeLocal, previewRadius, commitRadius, previewCurve, commitCurve, writeBlend, previewGlobal, commitGlobal }
 }

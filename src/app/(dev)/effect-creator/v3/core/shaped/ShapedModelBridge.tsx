@@ -30,6 +30,7 @@ export default function ShapedModelBridge(props: ShapedModelBridgeProps) {
   const editorOpen = useOutlineStore((s) => s.editorOpen)
   const bgBlur = useOutlineStore((s) => s.bgBlur)
   const imageFx = useOutlineStore((s) => s.imageFx)
+  const wrapTile = useOutlineStore((s) => s.wrapTile)
   return (
     <ShapedModel
       {...props}
@@ -38,6 +39,7 @@ export default function ShapedModelBridge(props: ShapedModelBridgeProps) {
       editorOpen={editorOpen}
       bgBlur={bgBlur}
       imageFx={imageFx}
+      wrapTile={wrapTile}
     />
   )
 }
