@@ -64,12 +64,16 @@ interface OutlineEditorProps {
   /** Magic ✦ trail chip (plan A2/D7): runs the SAME auto-cut the hero shortcut runs — one
    *  pipeline, two doors. Magic is self-sufficient, so the editor closes and the cut lands in 3D. */
   onMagic?: () => void
+  /** KAI-9122: the design's REAL default magic-blend as a 0–100%, mirroring what the 3D shows when
+   *  bgBlur is null (0 for the sharp square, ~50 for a shaped subject). Seeds the blend ruler so the 2D
+   *  preview matches the 3D instead of always defaulting to 50%. */
+  defaultBlurPct?: number
 }
 
 const VIEW_W = 1000
 const VIEW_H = 1000
 
-export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMagic }: OutlineEditorProps) {
+export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMagic, defaultBlurPct = 0 }: OutlineEditorProps) {
   // KAI-8976/F4: every history entry carries the dial state that produced its shape, so
   // undo/redo restore a TRUTHFUL readout (the Detail ruler lied at 89% after undo). The source is
   // the COMMITTED dial state — updated only at seed/commit/reset/undo, never by preview ticks
@@ -134,6 +138,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   // SVG transform during the gesture; baked (undoable) on release.
   const [stretchLive, setStretchLive] = useState<{ sx: number; sy: number; ax: number; ay: number } | null>(null)
   const stretchRef = useRef<{ which: GripId; ax: number; ay: number; bbox: { minX: number; minY: number; maxX: number; maxY: number }; sx: number; sy: number } | null>(null)
+  // KAI-9116: true ONLY while two fingers are actively pinch-zooming — the canvas drops its scrim /
+  // anchors / crop grips so every zoom frame repaints just the image + outline (smooth zoom on a dense trace).
+  const [pinching, setPinching] = useState(false)
   const rotateRef = useRef<{ cx: number; cy: number; start: number } | null>(null) // desktop handle drag (rotation lives on the handle; two-finger = canvas pinch, G11)
   const moveRef = useRef<{ start: Vec2Px; bbox: { minX: number; minY: number; maxX: number; maxY: number } } | null>(null) // drag-inside-to-move
   const pointersRef = useRef<Map<number, Vec2Px>>(new Map())
@@ -224,13 +231,13 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     setRotateLive(null); rotateLiveRef.current = null; rotateRef.current = null
     setMoveLive(null); moveLiveRef.current = null; moveRef.current = null
     setSelVA(null); setVecLive(null); vecDragRef.current = null
-    pinchRef.current = null; canvasPanRef.current = null
+    pinchRef.current = null; canvasPanRef.current = null; setPinching(false)
     pointersRef.current.clear(); clientPtsRef.current.clear()
     setPreview(false)
     setConfirmDiscard(false)
     setShowAnchors(false) // FRAME is the default for every shape (plan A3); double-tap = Points
     // sync the blend ruler to the current 3D state (null = build default ≈ 50; 0 = off)
-    setBlendBlur(st0.bgBlur == null ? 50 : Math.round(st0.bgBlur * 100))
+    setBlendBlur(st0.bgBlur == null ? defaultBlurPct : Math.round(st0.bgBlur * 100)) // KAI-9122: match the 3D default, not a constant 50
     setRadius(0)
     // ── seed the session source (only when there is no live source yet) ──
     if (spec && !st0.source) {
@@ -397,7 +404,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     pinchRef, canvasPanRef, imgPanRef, vecDragRef, rotateRef, rotateLiveRef, moveRef, moveLiveRef, stretchRef,
     toViewBox, screenToContent, originPinning, applyZoom, setView,
     transformSource, applyVec,
-    setVecLive, setMoveLive, setRotateLive, setStretchLive, setAllSelected, setSelVA, setSelSeg, setShowAnchors,
+    setVecLive, setMoveLive, setRotateLive, setStretchLive, setPinching, setAllSelected, setSelVA, setSelSeg, setShowAnchors,
     preview, activeAdjust, showAnchors, frameLocked, imgW, imgH, hitRing, hitBBox,
   })
 
@@ -747,6 +754,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
         rotateLive={rotateLive}
         moveLive={moveLive}
         stretchLive={stretchLive}
+        pinching={pinching}
         shapePreview={shapePreview}
         nodeInteractedRef={nodeInteractedRef}
         setFrameLocked={setFrameLocked}

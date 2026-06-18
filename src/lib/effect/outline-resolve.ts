@@ -218,11 +218,21 @@ function localPass(shape: VShape, local: Record<string, LocalAdjustment>): VShap
       // FOLD GUARD: every local op is validated; a bend/round that makes the ring self-cross is
       // DROPPED (keep the prior valid path) — so a local tool can never emit a folded/cracked outline.
       const simple = (vp: VPath) => ringSimple(pathToRing(vp))
-      // curve pass (count-stable)
-      for (const [id, l] of Object.entries(local)) {
-        if (!l || (l.curve ?? 0) === 0) continue
-        const idx = p.anchors.findIndex((a) => a.id === id)
-        if (idx >= 0) { const next = bendAnchorPath(p, idx, l.curve!); if (simple(next)) p = next }
+      // curve pass (count-stable) — BATCH the bends, ONE fold-check. KAI-9116: a WHOLE-SHAPE curve
+      // claims every anchor; validating each bend with an O(n²) self-intersection scan made this O(n³),
+      // which froze the editor on a dense Magic trace (hundreds of anchors). A single tangent bend
+      // virtually never self-crosses, so apply them all, validate once, and fall back to the pre-curve
+      // path if the batch folds. The id→index map also drops the per-anchor O(n) findIndex (count-stable
+      // bends keep indices valid across the batch).
+      const curveEntries = Object.entries(local).filter(([, l]) => l && (l.curve ?? 0) !== 0)
+      if (curveEntries.length) {
+        const idxById = new Map(p.anchors.map((a, i) => [a.id, i] as const))
+        let q = p
+        for (const [id, l] of curveEntries) {
+          const idx = idxById.get(id)
+          if (idx !== undefined && idx >= 0) q = bendAnchorPath(q, idx, l!.curve!)
+        }
+        if (simple(q)) p = q
       }
       // radius pass (re-find by id; fillet consumes the corner)
       for (const [id, l] of Object.entries(local)) {

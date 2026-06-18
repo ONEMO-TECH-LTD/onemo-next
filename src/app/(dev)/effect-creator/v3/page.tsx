@@ -424,6 +424,11 @@ function PrototypePageInner() {
         openMode={editorMode}
         onMagic={handleMagic}
         imageUrl={artworkUrl}
+        // KAI-9122: the editor's magic-blend preview must seed from the design's REAL default blur (what
+        // the 3D shows when bgBlur is untouched/null) — 0 for the sharp standard square, ~50 for a shaped
+        // subject. Relative blur = 2500·defaultBlurPx/origWidth. The old hardcoded 50 made the 2D editor
+        // preview blurred+duller while the 3D stayed sharp+full-colour (the "2D unlinked from 3D" report).
+        defaultBlurPct={prepared ? Math.round((2500 * prepared.frontSrc.defaultBlurPx) / prepared.frontSrc.origCanvas.width) : 0}
         onClose={() => {
           setEditingOutline(false)
           // #23: one editor session (Done with changes) = one global step. The change test covers

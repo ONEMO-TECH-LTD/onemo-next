@@ -94,6 +94,7 @@ interface GestureCtx { // KAI-9066: module-internal (the consumer passes a struc
   setMoveLive: (v: { dx: number; dy: number } | null) => void
   setRotateLive: (v: { deg: number; cx: number; cy: number } | null) => void
   setStretchLive: (v: { sx: number; sy: number; ax: number; ay: number } | null) => void
+  setPinching: (v: boolean) => void // KAI-9116: drop the heavy paint (scrim/anchors/grips) DURING a pinch
   setAllSelected: (v: boolean) => void
   setSelVA: (v: number | null) => void
   setSelSeg: (v: number | null) => void
@@ -157,7 +158,7 @@ export function useEditorGestures(ctx: GestureCtx) {
 
   // ── surface pointer-down: double-tap Points toggle · image-pan · pinch · move-inside · canvas-pan ──
   const onSurfacePointerDown = useCallback((e: ReactPointerEvent) => {
-    const { preview, activeAdjust, lastTapRef, setShowAnchors, setSelVA, setAllSelected, toViewBox, pointersRef, clientPtsRef, imgPanRef, moveRef, setMoveLive, moveLiveRef, canvasPanRef, viewRef, screenToContent, pinchRef, hitRing, hitBBox } = ctxRef.current
+    const { preview, activeAdjust, lastTapRef, setShowAnchors, setSelVA, setAllSelected, toViewBox, pointersRef, clientPtsRef, imgPanRef, moveRef, setMoveLive, moveLiveRef, canvasPanRef, viewRef, screenToContent, pinchRef, setPinching, hitRing, hitBBox } = ctxRef.current
     if (preview) return // view-only
     // KAI-9013: two primary downs within 350ms/24px ANYWHERE on the surface = Frame ⇄ Points (no fill
     // gate — on a Magic cut most of the canvas is outside the outline). Image mode keeps its pan gesture.
@@ -190,6 +191,7 @@ export function useEditorGestures(ctx: GestureCtx) {
       const d0 = Math.hypot(cp[1][0] - cp[0][0], cp[1][1] - cp[0][1]) || 1
       const cMid: Vec2Px = [(cp[0][0] + cp[1][0]) / 2, (cp[0][1] + cp[1][1]) / 2]
       pinchRef.current = { d0, scale0: viewRef.current.scale, c0: screenToContent(cMid[0], cMid[1], viewRef.current) }
+      setPinching(true) // suppress scrim/anchors/grips so each zoom frame only repaints image + outline
       return
     }
     // single finger pressed INSIDE the outline → arm a move (tap vs drag decided by the threshold)
@@ -294,7 +296,7 @@ export function useEditorGestures(ctx: GestureCtx) {
   }, [])
 
   const onPointerUp = useCallback((e: ReactPointerEvent) => {
-    const { pointersRef, clientPtsRef, vecDragRef, vecLiveRef, setVecLive, applyVec, imgPanRef, nodeInteractedRef, pinchRef, canvasPanRef, rotateRef, moveRef, moveLiveRef, transformSource, setMoveLive } = ctxRef.current
+    const { pointersRef, clientPtsRef, vecDragRef, vecLiveRef, setVecLive, applyVec, imgPanRef, nodeInteractedRef, pinchRef, setPinching, canvasPanRef, rotateRef, moveRef, moveLiveRef, transformSource, setMoveLive } = ctxRef.current
     pointersRef.current.delete(e.pointerId)
     clientPtsRef.current.delete(e.pointerId)
     // Run 6: release an anchor/handle drag → ONE history entry; a manual point edit invalidates the
@@ -308,7 +310,7 @@ export function useEditorGestures(ctx: GestureCtx) {
       return
     }
     if (imgPanRef.current) { imgPanRef.current = null; nodeInteractedRef.current = true; return }
-    if (pinchRef.current) { if (clientPtsRef.current.size < 2) pinchRef.current = null; return }
+    if (pinchRef.current) { if (clientPtsRef.current.size < 2) { pinchRef.current = null; setPinching(false) } return }
     if (canvasPanRef.current) { canvasPanRef.current = null; nodeInteractedRef.current = true; return }
     if (rotateRef.current) { rotateRef.current = null; commitRotate(); return }
     if (moveRef.current) {

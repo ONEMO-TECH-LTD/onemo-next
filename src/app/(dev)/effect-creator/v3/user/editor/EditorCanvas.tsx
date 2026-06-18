@@ -50,6 +50,7 @@ interface EditorCanvasProps { // KAI-9066: module-internal (the consumer passes 
   rotateLive: { deg: number; cx: number; cy: number } | null
   moveLive: { dx: number; dy: number } | null
   stretchLive: { sx: number; sy: number; ax: number; ay: number } | null
+  pinching: boolean
   shapePreview: string | null
   nodeInteractedRef: { current: boolean }
   setFrameLocked: Dispatch<SetStateAction<boolean>>
@@ -72,7 +73,7 @@ function EditorCanvasInner(props: EditorCanvasProps) {
   const {
     svgRef, view, imgW, imgH, imageUrl, subjMatteUrl, art, fxDraft, blendBlur,
     vshape, vDisplay, pathD, hitRing, hitBBox, hasIssues, nodeR,
-    preview, showAnchors, selVA, allSelected, frameLocked, rotateLive, moveLive, stretchLive, shapePreview,
+    preview, showAnchors, selVA, allSelected, frameLocked, rotateLive, moveLive, stretchLive, pinching, shapePreview,
     nodeInteractedRef, setFrameLocked,
     onSurfacePointerDown, onPointerMove, onPointerUp, onSurfaceClick, onSurfaceWheel,
     onVAnchorDown, onVHandleDown, onVAnchorDouble, beginStretch, moveStretch, endStretch, beginRotateHandle,
@@ -204,8 +205,9 @@ function EditorCanvasInner(props: EditorCanvasProps) {
         </g>
         {(
           <>
-            {/* scrim dims outside the cut; hidden during a live transform (its hole would lag the move/rotate) */}
-            {imageUrl && pathD && !preview && !rotateLive && !moveLive && !stretchLive && (
+            {/* scrim dims outside the cut; hidden during a live transform (its hole would lag the move/rotate)
+                and during a pinch (KAI-9116: the even-odd full-canvas fill is the dominant per-zoom-frame raster) */}
+            {imageUrl && pathD && !preview && !rotateLive && !moveLive && !stretchLive && !pinching && (
               <path className={styles.scrim} fillRule="evenodd" d={`M0 0H${imgW}V${imgH}H0Z ${pathD}`} />
             )}
             <g transform={liveXform}>
@@ -213,10 +215,10 @@ function EditorCanvasInner(props: EditorCanvasProps) {
               {/* anchors hidden in Preview (clean result); point work is vector-native below */}
               {/* Run 6 — the vector skeleton: minimal intentional anchors, summoned on demand.
                   The selected anchor reveals its Bézier handles; drags are transient until release. */}
-              {anchorGroup}
+              {!pinching && anchorGroup}
               {/* KAI-9014: the twist handle rides ALL-SELECTED in ANY view — Dan tap-selects in
                   frame mode (the default); the old showAnchors gate hid it there */}
-              {!preview && rotHandle && (
+              {!preview && rotHandle && !pinching && (
                 <g>
                   <line className={styles.rotateStem} x1={rotHandle.bx} y1={rotHandle.by} x2={rotHandle.bx} y2={rotHandle.hy} />
                   {/* grip is larger than the anchors and carries a rotate glyph */}
@@ -228,7 +230,7 @@ function EditorCanvasInner(props: EditorCanvasProps) {
               )}
             </g>
             {/* 6.3: the padlock chip rides the frame — corner pulls SCALE locked / DEFORM unlocked */}
-            {!preview && cropBox && !rotateLive && !moveLive && !stretchLive && (
+            {!preview && cropBox && !rotateLive && !moveLive && !stretchLive && !pinching && (
               <g
                 transform={`translate(${cropBox.maxX + nodeR * 1.6} ${cropBox.minY - nodeR * 1.6})`}
                 onPointerDown={(e) => { e.stopPropagation(); nodeInteractedRef.current = true }}
@@ -246,7 +248,7 @@ function EditorCanvasInner(props: EditorCanvasProps) {
             )}
             {/* Crop-style stretch grips — OUTSIDE the live-transform group (the pill strokes must
                 never distort); positions track cropBox, which already includes the live stretch. */}
-            {!preview && cropBox && !rotateLive && !moveLive && (() => {
+            {!preview && cropBox && !rotateLive && !moveLive && !pinching && (() => {
               const { minX, minY, maxX, maxY } = cropBox
               const mx = (minX + maxX) / 2, my = (minY + maxY) / 2
               // Apple-crop proportions (Dan's reference): delicate thin strokes, modest arms —
