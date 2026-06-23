@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // DEV-ONLY (lead2, v53 version A/B testing): per-instance build dir so v1/v2/v3 can each run
+  // on their own port without fighting over .next/dev/lock. Defaults to .next. Revert after testing.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   // Effect-creator G5: cross-origin isolation so onnxruntime-web's wasm fallback can run
   // MULTI-THREADED (SharedArrayBuffer needs COOP+COEP). Without these headers a device without
   // WebGPU falls back to SINGLE-threaded wasm — historically a 30–60 s page freeze per Magic run.

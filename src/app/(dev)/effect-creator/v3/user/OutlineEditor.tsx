@@ -19,10 +19,10 @@ import {
 // V4 engine (blueprint v4-foundation.md): one impartial resolve(source, adjustments). The editor
 // writes the recipe; the engine owns shape. No corner-pin, no vectoriseTrace, no baked timeline.
 import { mintIds, type OutlineSource, type OutlineAdjustments } from '@/lib/effect/outline-resolve'
-import { useOutlineStore, NEUTRAL_FX, INITIAL_ARTWORK, type ImageFx, type BlendMode } from './outlineStore'
+import { useOutlineStore, NEUTRAL_FX, INITIAL_ARTWORK, type ImageFx } from './outlineStore'
 import type { DesignState } from '../types'
 import type { Pt } from '@/lib/effect/types'
-import { UndoIcon, RedoIcon, CheckIcon, CloseIcon, AddPointIcon, DeleteIcon, ShapeIcon, TuneIcon, OutlineIcon, PreviewIcon, PreviewOffIcon , PointsIcon, MagicIcon, BlendIcon } from './icons'
+import { UndoIcon, RedoIcon, CheckIcon, CloseIcon, AddPointIcon, DeleteIcon, ShapeIcon, TuneIcon, OutlineIcon, PreviewIcon, PreviewOffIcon , PointsIcon, MagicIcon } from './icons'
 import { toast } from '../ui/Toast'
 import { type ShapeKind, type ShapeParams } from './shapes'
 // VECTOR CORE (reset Run 1): vector-native kinds render/commit/transform on a true Bézier VShape;
@@ -68,15 +68,12 @@ interface OutlineEditorProps {
    *  bgBlur is null (0 for the sharp square, ~50 for a shaped subject). Seeds the blend ruler so the 2D
    *  preview matches the 3D instead of always defaulting to 50%. */
   defaultBlurPct?: number
-  /** v5.3·P3 (KAI-9148): the 3D hero scene's backdrop colour — the 2D editor matches it so it reads as
-   *  the same world (the editor is a TWIN of the 3D viewer). */
-  backdropColor?: string
 }
 
 const VIEW_W = 1000
 const VIEW_H = 1000
 
-export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMagic, defaultBlurPct = 0, backdropColor }: OutlineEditorProps) {
+export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMagic, defaultBlurPct = 0 }: OutlineEditorProps) {
   // KAI-8976/F4: every history entry carries the dial state that produced its shape, so
   // undo/redo restore a TRUTHFUL readout (the Detail ruler lied at 89% after undo). The source is
   // the COMMITTED dial state — updated only at seed/commit/reset/undo, never by preview ticks
@@ -108,10 +105,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   const [offsetJoin, setOffsetJoin] = useState<OffsetJoin>('sharp')
   const traceDragRef = useRef<{ source: OutlineSource | null; adjustments: OutlineAdjustments } | null>(null) // pre-drag snapshot for ONE undo step across a Detail/Offset drag
   const [blendBlur, setBlendBlur] = useState(50) // blend intensity 0–100; 0 = off (ruler IS the switch)
-  // v5.3·P5 (KAI-9150): Blend mode lives in the STORE (durable recipe field — reopen/3D/manufacturing
-  // all see it), not editor-local state.
-  const blendMode = useOutlineStore((s) => s.blendMode)
-  const setBlendMode = useOutlineStore((s) => s.setBlendMode)
   // Shape tool: pick a preset/parametric shape as the starting outline. shapeKind = the shape currently
   // being tuned (null = none picked this session → only chips show). Params drive live regeneration.
   const [shapeKind, setShapeKind] = useState<ShapeKind | null>(null)
@@ -156,7 +149,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   // shape (through commitGeometry), the blend, the image adjustments, and the photo position —
   // KAI-8971/F2: imageFx+artwork were missing, so a ✕ kept a 129% Bright committed. (Tune/fairing
   // prefs intentionally survive ✕ — tool calibration, not design state; Dan's #21.)
-  const preEditRef = useRef<{ source: OutlineSource | null; adjustments: OutlineAdjustments | null; committedShape: VShape | null; bgBlur: number | null; imageFx: ImageFx | null; blendMode: BlendMode; artwork: DesignState }>({ source: null, adjustments: null, committedShape: null, bgBlur: null, imageFx: null, blendMode: 'fullbg', artwork: INITIAL_ARTWORK })
+  const preEditRef = useRef<{ source: OutlineSource | null; adjustments: OutlineAdjustments | null; committedShape: VShape | null; bgBlur: number | null; imageFx: ImageFx | null; artwork: DesignState }>({ source: null, adjustments: null, committedShape: null, bgBlur: null, imageFx: null, artwork: INITIAL_ARTWORK })
   // T5: the shape the user ENTERED the editor with (sharp source + its default recipe) — Reset restores this.
   const entryRef = useRef<{ source: OutlineSource | null; adjustments: OutlineAdjustments | null }>({ source: null, adjustments: null })
   const [allSelected, setAllSelected] = useState(false) // tap inside the cut → select every corner, edit them together
@@ -225,7 +218,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     const st0 = useOutlineStore.getState()
     // snapshot FIRST — ✕ Close restores exactly this. KAI-9075: capture source+adjustments (the
     // recipe) so discard restores it losslessly via setSource, not a re-baked resolved shape.
-    preEditRef.current = { source: st0.source, adjustments: st0.adjustments, committedShape: st0.committedShape, bgBlur: st0.bgBlur, imageFx: st0.imageFx, blendMode: st0.blendMode, artwork: st0.artwork }
+    preEditRef.current = { source: st0.source, adjustments: st0.adjustments, committedShape: st0.committedShape, bgBlur: st0.bgBlur, imageFx: st0.imageFx, artwork: st0.artwork }
     st0.setEditorOpen(true) // §6.3: scene frozen → 3D rebuilds defer to close
     // session view/interaction state reset
     setCurveVal(0)
@@ -290,13 +283,10 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     // PRE-OPEN committed state (preEditRef) — the seed itself commits (visible = committed), so
     // reading the store here would always say "committed" and kill the choose-a-shape opening
     // (caught visually: pre-Magic opens were landing in Adjust instead of the Shape sheet).
-    // v5.3·P3 (KAI-9148, Dan): the EDITOR LANDS CLEAN — an EXPLICIT mode entry (the hero Filters/Image
-    // or Shape door) still opens that sheet, but the default entry (double-tap / Edit) opens to the clean
-    // masked image with NO sheet and NO outline; the user taps Shape/Adjust/Points to edit. This
-    // supersedes the 2026-06-10 "auto choose-a-shape / Adjust on open" behaviour (the mask-display rule).
     if (openMode === 'image') setActiveAdjust('image') // KAI-9027: the hero Filters entry
     else if (openMode === 'shape') setActiveAdjust('shape')
-    else setActiveAdjust(null) // default entry: land clean (tap a tool to edit)
+    else if (spec?.generator.adapter !== 'standard' || preEditRef.current.committedShape) setActiveAdjust('adjust')
+    else setActiveAdjust('shape') // pre-Magic standard, nothing committed before open: choose a shape (Dan, 2026-06-10)
     histRef.current = { past: [], future: [] } // fresh undo history per session (the seed is not undoable)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
@@ -696,7 +686,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     st.setSource(pe.source, pe.adjustments ?? undefined)
     if (st.bgBlur !== pe.bgBlur) st.setBgBlur(pe.bgBlur) // KAI-9070: restore the EXACT pre-open blur incl. null (no null→0.5 coercion)
     st.setImageFx(pe.imageFx)
-    if (st.blendMode !== pe.blendMode) st.setBlendMode(pe.blendMode) // v5.3·P5: discard restores the pre-edit Blend mode too
     st.setArtwork(pe.artwork)
     setActiveAdjust(null)
     setSelVA(null)
@@ -711,12 +700,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   const canRedo = histRef.current.future.length > 0
   const nodeR = ((imgW / VIEW_W) * 11) / view.scale // constant on-screen size at any zoom (G11)
   nodeRRef.current = nodeR
-  // v5.3·P3 (KAI-9148): outline + handles show ONLY while editing (a tool sheet open or Points) or
-  // Preview — the default landing shows the masked image CLEAN (Dan's mask-display rule). The 3D-scene
-  // backdrop colour is applied to the overlay so the editor reads as the same world as the 3D hero.
-  const editing = activeAdjust !== null || showAnchors
   return (
-    <div className={styles.overlay} style={backdropColor ? { background: backdropColor } : undefined}>
+    <div className={styles.overlay}>
       {/* THE shared global top bar (plan A2/D-CHROME) — same component as the hero (KAI-8986);
           per-screen diff is button payloads only. Points has no button — double-tap (A3 grammar). */}
       <TopBar
@@ -754,7 +739,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
         art={art}
         fxDraft={fxDraft}
         blendBlur={blendBlur}
-        blendMode={blendMode}
         vshape={vshape}
         vDisplay={vDisplay}
         pathD={pathD}
@@ -763,7 +747,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
         hasIssues={hasIssues}
         nodeR={nodeR}
         preview={preview}
-        editing={editing}
         showAnchors={showAnchors}
         selVA={selVA}
         allSelected={allSelected}
@@ -822,8 +805,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
       )}
       {activeAdjust === 'image' && (
         <ImageSheet imageSub={imageSub} setImageSub={setImageSub} fxDraft={fxDraft} setFxDraft={setFxDraft}
-          blendBlur={blendBlur} setBlendBlur={setBlendBlur} writeBlend={writeBlend}
-          blendMode={blendMode} setBlendMode={setBlendMode} />
+          blendBlur={blendBlur} setBlendBlur={setBlendBlur} writeBlend={writeBlend} />
       )}
       {activeAdjust === 'shape' && (
         <ShapeSheet
@@ -871,9 +853,6 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
         {/* Dan (2026-06-15): Adjust is the LANDING mode — pressing it just shows the Adjust sheet; it
             never hides the menu and never flips frame→points. Per-corner work is the Points toggle. */}
         <DockTool icon={<TuneIcon />} label="Adjust" onClick={() => setActiveAdjust('adjust')} active={activeAdjust === 'adjust'} />
-        {/* v5.3·P5 (KAI-9150): Blend — the 3 modes (Halo / Offset / Full-bg) + intensity, reachable from
-            the editor dock (proper Adjust-sub-tool placement is a UI-fidelity tuning detail). */}
-        <DockTool icon={<BlendIcon />} label="Blend" onClick={() => { setActiveAdjust('image'); setImageSub('blend') }} active={activeAdjust === 'image'} />
         {/* KAI-9027: the Image entry moved to the hero as 'Filters' — image mode still exists,
             reached from there (and stays active when entered) */}
       </Dock>

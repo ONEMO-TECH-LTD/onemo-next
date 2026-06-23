@@ -48,3 +48,10 @@
 - Symptoms: the grip was attached and interactive, but Playwright marked it hidden; the DOM rect could be zero-height because SVG path geometry excludes the large stroke hit area.
 - What worked: compute the grip center from SVG `getBBox()` plus `getScreenCTM()`, then expand the synthetic hit box by the path stroke width before driving `page.mouse`.
 - Remember: SVG path hit areas in the creator editor can be stroke-only; Playwright visibility/layout boxes are not reliable for those gesture handles.
+
+## S57 file-read batching with macOS `nl`
+
+- What did not work: passing multiple file paths to `nl -ba` during parallel source hydration.
+- Symptoms: macOS `nl` returned usage text instead of file contents; three parallel read commands failed the same way.
+- What worked: run `nl -ba` one file at a time, or use a shell loop only when explicit per-file headers are needed.
+- Remember: for full-read hydration, do not batch multiple file operands into `nl`; one file per command keeps coverage auditable.

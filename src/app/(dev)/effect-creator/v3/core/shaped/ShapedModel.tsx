@@ -31,8 +31,8 @@ import { DISPLAY_TOLERANCE_MM } from '@/lib/effect/geometry-truth'
 import { EFFECT_BUILD_CONFIG, type PreparedEffect } from '@/lib/effect/prepare-effect'
 import { buildMeshFromSpec } from '@/lib/effect/build-mesh'
 import { buildShapedGeometry } from '@/lib/effect/mesh'
-import { composeFront, blurCanvas, presetFilter } from '@/lib/effect/composite'
-import type { ImageFx, BlendMode } from '../../user/outlineStore'
+import { composeFront, presetFilter } from '@/lib/effect/composite'
+import type { ImageFx } from '../../user/outlineStore'
 import { perfGesture } from '../../dev/PerfHUD'
 
 interface ShapedModelProps {
@@ -58,8 +58,6 @@ interface ShapedModelProps {
   imageFx: ImageFx | null
   /** Filters v2 (KAI-9125): when an Offset expands the cut past the photo, TILE it vs clamp the edge. */
   wrapTile: boolean
-  /** v5.3·P5 (KAI-9150): the durable Blend mode — drives the 3D backdrop glow's look. */
-  blendMode: BlendMode
 }
 
 const texCache = new Map<string, THREE.Texture>()
@@ -122,12 +120,9 @@ export default function ShapedModel({
   bgBlur,
   imageFx,
   wrapTile,
-  blendMode,
 }: ShapedModelProps) {
   const [result, setResult] = useState<{ geometry: THREE.BufferGeometry; texture: THREE.CanvasTexture; edgeTexture: THREE.CanvasTexture; widthMM: number; heightMM: number } | null>(null)
   const artTexRef = useRef<THREE.CanvasTexture | null>(null)
-  // v5.3·P5 (KAI-9150): the 3D backdrop glow texture (the shape floats on its blurred photo in 3D too).
-  const backdropTexRef = useRef<THREE.Texture | null>(null)
   const frontSrcRef = useRef<{ origCanvas: HTMLCanvasElement; subjCanvas: HTMLCanvasElement; defaultBlurPx: number } | null>(null)
   const resultRef = useRef(result)
   useEffect(() => { resultRef.current = result }, [result])
@@ -146,7 +141,6 @@ export default function ShapedModel({
   // can sit BLANK until a user interaction invalidates (the V2 blank-on-mount class).
   const invalidate = useThree((s) => s.invalidate)
   const gl = useThree((s) => s.gl)
-  const scene = useThree((s) => s.scene)
   useEffect(() => { invalidate() }, [result, invalidate])
 
   // G2: anisotropic filtering on the front texture (sharp artwork at grazing angles).
@@ -299,39 +293,6 @@ export default function ShapedModel({
     // v5.3·P4: editorOpen is a dep so the deferred bake fires when the editor CLOSES (Done).
   }, [bgBlur, imageFx, wrapTile, maxAniso, invalidate, editorOpen])
 
-  // v5.3·P5 (KAI-9150): the 3D BACKDROP GLOW — the shape floats on a blurred-photo backdrop in the 3D
-  // too whenever blend is on (the effective blur px > 0, incl. a fresh shaped cut's build default —
-  // hence its OWN effect, not gated by the front recompose's isDefault skip). Cleared back to the scene
-  // colour when blend is off. Deferred while the editor is open → freezes to the final on Done (like P4).
-  useEffect(() => {
-    const fs = frontSrcRef.current
-    if (!fs || editorOpen) return
-    const px = bgBlur == null ? fs.defaultBlurPx : (bgBlur <= 0 ? 0 : bgBlur * (fs.origCanvas.width / 25))
-    let cancelled = false
-    // v5.3·P5: mode-aware backdrop — Offset bleeds the photo recognisably (lighter blur); Halo/Full-bg
-    // a strong soft wash (matches the editor surround). The durable blendMode drives it.
-    const bdSd = blendMode === 'offset' ? Math.max(px * 0.7, fs.origCanvas.width / 40) : Math.max(px * 2, fs.origCanvas.width / 14)
-    if (px > 0) {
-      blurCanvas(fs.origCanvas, bdSd)
-        .then((bd) => {
-          if (cancelled) return
-          const t = new THREE.CanvasTexture(bd)
-          t.colorSpace = THREE.SRGBColorSpace
-          backdropTexRef.current?.dispose()
-          backdropTexRef.current = t
-          scene.background = t
-          invalidate()
-        })
-        .catch(() => {})
-    } else if (backdropTexRef.current) {
-      scene.background = null
-      backdropTexRef.current.dispose()
-      backdropTexRef.current = null
-      invalidate()
-    }
-    return () => { cancelled = true }
-  }, [prepared, bgBlur, imageFx, editorOpen, scene, invalidate, blendMode])
-
   // suede texture maps (normal/roughness/bump) on UV CHANNEL 1 (world-XY) → tiles by physical size,
   // never stretches (on the front OR the rim). The image map stays on channel 0 (position).
   const suedeTex = (url: string | undefined) => { const t = loadTex(url); if (t) t.channel = 1; return t }
@@ -450,9 +411,7 @@ export default function ShapedModel({
     const r = resultRef.current
     r?.geometry.dispose(); r?.texture.dispose(); r?.edgeTexture.dispose()
     for (const m of prevMaterialsRef.current) m.dispose()
-    // v5.3·P5: drop the 3D backdrop glow we set on the scene
-    if (backdropTexRef.current) { scene.background = null; backdropTexRef.current.dispose(); backdropTexRef.current = null }
-  }, [scene])
+  }, [])
 
   // geometry groups (mesh.ts): 0 = front cap (golden suede, unchanged), 1 = edge lip (matte copy),
   // 2 = back cap (solid back suede). Order MUST match the addGroup material indices in mesh.ts.

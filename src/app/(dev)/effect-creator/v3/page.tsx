@@ -82,7 +82,6 @@ function PrototypePageInner() {
     designState: DesignState
     imageFx: ReturnType<typeof useOutlineStore.getState>['imageFx']
     wrapTile: boolean
-    blendMode: ReturnType<typeof useOutlineStore.getState>['blendMode'] // v5.3·P5: durable in history
     outline: OutlineSnap
     trim: { backColor: string; frameColor: string; bgColor: string }
   }
@@ -123,7 +122,6 @@ function PrototypePageInner() {
       prepared, autoOutline, designState,
       imageFx: o.imageFx,
       wrapTile: o.wrapTile,
-      blendMode: o.blendMode,
       outline: { spec: o.spec, committedShape: o.committedShape, source: o.source, adjustments: o.adjustments, bgBlur: o.bgBlur, subjMatteUrl: o.subjMatteUrl },
       trim: { ...useSceneStore.getState().colors },
     }
@@ -141,7 +139,6 @@ function PrototypePageInner() {
     const o = useOutlineStore.getState()
     o.setImageFx(sn.imageFx)
     o.setWrapTile(sn.wrapTile)
-    o.setBlendMode(sn.blendMode)
     o.setSpec(sn.outline.spec)
     o.setSource(sn.outline.source, sn.outline.adjustments)
     o.setBgBlur(sn.outline.bgBlur)
@@ -280,7 +277,7 @@ function PrototypePageInner() {
         useOutlineStore.getState().setSpec(p.spec) // hand the standard outline to the 2D editor
         // #23: a new image starts a fresh history; this state is the Reset baseline
         baselineRef.current = {
-          prepared: p, autoOutline: false, designState: INITIAL_ARTWORK, imageFx: null, wrapTile: false, blendMode: 'fullbg',
+          prepared: p, autoOutline: false, designState: INITIAL_ARTWORK, imageFx: null, wrapTile: false,
           outline: { spec: p.spec, committedShape: null, source: null, adjustments: { global: { simplify: 0, smooth: 0, straighten: 0, radius: 0 }, local: {} }, bgBlur: null, subjMatteUrl: null },
           trim: { ...useSceneStore.getState().colors },
         }
@@ -453,7 +450,7 @@ function PrototypePageInner() {
             const pre = filterPreRef.current
             if (pre) {
               const o = useOutlineStore.getState()
-              if (o.imageFx !== pre.imageFx || o.bgBlur !== pre.outline.bgBlur || o.wrapTile !== pre.wrapTile || o.blendMode !== pre.blendMode) pushHistory(pre)
+              if (o.imageFx !== pre.imageFx || o.bgBlur !== pre.outline.bgBlur || o.wrapTile !== pre.wrapTile) pushHistory(pre)
               filterPreRef.current = null
             }
             setShowFilters(false)
@@ -485,8 +482,6 @@ function PrototypePageInner() {
         openMode={editorMode}
         onMagic={handleMagic}
         imageUrl={artworkUrl}
-        // v5.3·P3 (KAI-9148): the 2D editor matches the 3D hero's backdrop → reads as the same world
-        backdropColor={colors.bgColor}
         // KAI-9122: the editor's magic-blend preview must seed from the design's REAL default blur (what
         // the 3D shows when bgBlur is untouched/null) — 0 for the sharp standard square, ~50 for a shaped
         // subject. Relative blur = 2500·defaultBlurPx/origWidth. The old hardcoded 50 made the 2D editor
@@ -507,7 +502,7 @@ function PrototypePageInner() {
             }
             const art = o.artwork, preArt = pre.designState
             const artChanged = art.offsetX !== preArt.offsetX || art.offsetY !== preArt.offsetY || art.scale !== preArt.scale
-            if (o.committedShape !== pre.outline.committedShape || o.bgBlur !== pre.outline.bgBlur || fxChanged(o.imageFx, pre.imageFx) || o.blendMode !== pre.blendMode || artChanged) pushHistory(pre)
+            if (o.committedShape !== pre.outline.committedShape || o.bgBlur !== pre.outline.bgBlur || fxChanged(o.imageFx, pre.imageFx) || artChanged) pushHistory(pre)
             editorPreRef.current = null
           }
         }}

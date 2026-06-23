@@ -99,3 +99,6 @@ public/models/
 
 # preserve-at-ingest originals (dev channel — never in git)
 .dev-originals/
+
+# parallel-build caches (v1/v2/v3 dev dirs)
+.next-v*/
