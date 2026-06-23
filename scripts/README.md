@@ -2,19 +2,7 @@
 
 Build tools and utilities. Not runtime code — these run during development or CI.
 
-## tokens/
-Design token pipeline — reads Figma Variables JSON, generates CSS.
-
-| Script | Purpose |
-|---|---|
-| `build-tokens.mjs` | Main pipeline: Figma JSON → 4 CSS files in `src/app/tokens/` |
-| `tokens.config.mjs` | Pipeline configuration |
-| `test-build-tokens.mjs` | Pipeline tests |
-| `validate-tokens.mjs` | Token validation checks |
-| `generate-token-mapping.mjs` | Generates token mapping reference |
-| `blueprint-validator.mjs` | DS blueprint validation |
-| `token-mapping.json` | Token mapping data (generated) |
-| `token-mapping.md` | Token mapping docs (generated) |
+> Note: the in-repo `tokens/` pipeline (build-tokens.mjs et al.) was retired in the v5.3.1 cleanup. The design-system token pipeline is now DS-V2.1 in `onemo-ssot-global/11-design-system/`; the generated `src/app/tokens/*.css` are kept until v5.4 adopts it.
 
 ## shopify/
 Shopify API integration tools.

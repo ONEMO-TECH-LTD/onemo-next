@@ -3,35 +3,16 @@ import { mkdir, readdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 const APP_SCENES_DIR = join(process.cwd(), 'data', 'scenes')
-const STUDIO_SCENES_DIR = join(process.cwd(), 'studio', 'data', 'scenes')
 
 async function listSceneNames() {
   await mkdir(APP_SCENES_DIR, { recursive: true })
-  await mkdir(STUDIO_SCENES_DIR, { recursive: true })
 
   const preferredScenes = new Map<string, 'onemo' | 'json'>()
-  const [appFiles, studioFiles] = await Promise.all([
-    readdir(APP_SCENES_DIR),
-    readdir(STUDIO_SCENES_DIR),
-  ])
+  const appFiles = await readdir(APP_SCENES_DIR)
 
   for (const file of appFiles) {
     if (file.endsWith('.onemo')) {
       preferredScenes.set(file.slice(0, -6), 'onemo')
-    } else if (file.endsWith('.json')) {
-      const sceneName = file.slice(0, -5)
-      if (!preferredScenes.has(sceneName)) {
-        preferredScenes.set(sceneName, 'json')
-      }
-    }
-  }
-
-  for (const file of studioFiles) {
-    if (file.endsWith('.onemo')) {
-      const sceneName = file.slice(0, -6)
-      if (!preferredScenes.has(sceneName)) {
-        preferredScenes.set(sceneName, 'onemo')
-      }
     } else if (file.endsWith('.json')) {
       const sceneName = file.slice(0, -5)
       if (!preferredScenes.has(sceneName)) {
@@ -55,7 +36,6 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     await mkdir(APP_SCENES_DIR, { recursive: true })
-    await mkdir(STUDIO_SCENES_DIR, { recursive: true })
 
     const name = req.headers.get('x-scene-name')?.trim()
     const contentType = req.headers.get('content-type') ?? ''
@@ -71,7 +51,7 @@ export async function POST(req: Request) {
       }
 
       const safeName = name.replace(/[^a-zA-Z0-9_-]/g, '-')
-      const filePath = join(STUDIO_SCENES_DIR, `${safeName}.onemo`)
+      const filePath = join(APP_SCENES_DIR, `${safeName}.onemo`)
       await writeFile(filePath, body)
       return NextResponse.json({ saved: safeName })
     }

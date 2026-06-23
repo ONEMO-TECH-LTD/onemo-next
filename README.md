@@ -22,7 +22,7 @@ onemo-next/
 │   ├── app/                    ← Next.js app router
 │   │   ├── (store)/            ← product pages (create, library, community, design)
 │   │   ├── (admin)/            ← admin pages (moderation)
-│   │   ├── (dev)/              ← dev tools (prototype, token dashboard)
+│   │   ├── (dev)/              ← dev tools (the effect-creator/v5.3.1 Creator + dev API routes)
 │   │   ├── api/                ← API routes (cart, designs, shopify, uploads)
 │   │   └── tokens/             ← generated CSS token files (do not edit)
 │   ├── components/             ← shared UI components
@@ -62,29 +62,21 @@ Open http://localhost:3000
 |---|---|
 | `npm run dev` | Start dev server |
 | `npm run build` | Production build |
-| `npm run build-tokens` | Regenerate CSS tokens from Figma JSON |
-| `npm run validate-tokens` | Validate token pipeline |
 | `npm run test` | Run tests |
 | `npm run typecheck` | TypeScript check |
 | `npm run lint` | ESLint |
 
 ## Design Tokens
 
-Tokens are auto-generated from the SSOT Figma Variables export. Never edit `src/app/tokens/*.css` directly.
+`src/app/tokens/*.css` are the token outputs the app renders from. The in-repo `scripts/tokens` generator was retired in the v5.3.1 cleanup; the current pipeline is **DS-V2.1** in `onemo-ssot-global/11-design-system/` (the app adopts it at v5.4). Don't hand-edit the CSS — it's generated output.
 
-```bash
-# Source: onemo-ssot-global/11-design-system/artifacts/
-# Pipeline: scripts/tokens/build-tokens.mjs
-# Output: src/app/tokens/{primitives,aliases,semantic,semantic-inline}.css
-npm run build-tokens
-```
+## Creator
 
-## Prototype
-
-The 3D Effect configurator prototype lives at `/prototype` (route group: `(dev)`).
+The 3D Effect Creator lives at `/effect-creator/v5.3.1` (route group: `(dev)`).
 
 ```
-src/app/(dev)/prototype/
-├── page.tsx              ← entry point
-└── EffectViewer.tsx      ← R3F 3D viewer with suede PBR materials
+src/app/(dev)/effect-creator/v5.3.1/
+├── page.tsx              ← composition root (the one persistent 3D scene)
+├── core/                 ← 3D (EffectViewer, ShapedModel) + scene-format/ (.onemo loader)
+└── user/                 ← the 2D editor overlay
 ```

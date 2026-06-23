@@ -8,10 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest",
-    "build-tokens": "node scripts/tokens/build-tokens.mjs --validate",
-    "validate-tokens": "node scripts/tokens/build-tokens.mjs --validate",
-    "test-tokens": "node scripts/tokens/test-build-tokens.mjs"
+    "test": "vitest"
   },
   "dependencies": {
     "@countertype/clipper2-ts": "^1.5.4",

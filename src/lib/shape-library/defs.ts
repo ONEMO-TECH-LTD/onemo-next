@@ -142,6 +142,28 @@ function lensDef(bulge = 0.58): VShape {
   return { paths: [{ anchors }] }
 }
 
+/** pill / stadium (KAI-9129) — a horizontal capsule: two semicircular ends + straight top/bottom, all
+ *  smooth. Used for the chip glyph; the PICKED pill is math-derived (a sharp rectangle + a whole-shape
+ *  Radius recipe = half the short side), fully reversible to a rectangle. */
+function pillDef(): VShape {
+  const R = 0.5
+  const right = arcAnchors(0.5, 0, R, -Math.PI / 2, Math.PI / 2)       // top → right → bottom
+  const left = arcAnchors(-0.5, 0, R, Math.PI / 2, (3 * Math.PI) / 2)  // bottom → left → top
+  const anchors: VAnchor[] = []
+  const push = (chain: VAnchor[]) => {
+    for (const an of chain) {
+      const prev = anchors[anchors.length - 1]
+      if (prev && Math.hypot(prev.p.x - an.p.x, prev.p.y - an.p.y) < 1e-9) prev.hOut = an.hOut
+      else anchors.push(an)
+    }
+  }
+  push(right)
+  push(left)
+  const first = anchors[0], last = anchors[anchors.length - 1]
+  if (Math.hypot(first.p.x - last.p.x, first.p.y - last.p.y) < 1e-9) { first.hIn = last.hIn; anchors.pop() }
+  return { paths: [{ anchors }] }
+}
+
 const fromBaked = (anchors: VAnchor[]) => (): VShape => ({ paths: [{ anchors: anchors.map((a) => ({ ...a, p: { ...a.p }, hIn: a.hIn ? { ...a.hIn } : a.hIn, hOut: a.hOut ? { ...a.hOut } : a.hOut })) }] })
 
 export interface VectorShapeParams {
@@ -151,7 +173,7 @@ export interface VectorShapeParams {
 }
 
 export type VectorShapeKind =
-  | 'circle' | 'square' | 'heart'
+  | 'circle' | 'square' | 'pill' | 'heart'
   | 'bolt' | 'plus' | 'diamond' | 'polygon' | 'star'
   | 'leaf' | 'lens'
   | 'pinched' | 'sparkle' | 'teardrop' | 'squircle' | 'asterisk' | 'bowtie'
@@ -159,6 +181,7 @@ export type VectorShapeKind =
 const DEFS: Record<VectorShapeKind, (p: VectorShapeParams) => VShape> = {
   circle: () => circleDef(),
   square: () => squareDef(),
+  pill: () => pillDef(),
   heart: () => heartDef(),
   bolt: () => boltDef(),
   plus: () => plusDef(),

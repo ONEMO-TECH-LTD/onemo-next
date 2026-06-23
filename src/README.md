@@ -18,6 +18,6 @@ Route groups `(name)` organize pages without affecting URLs:
 |---|---|---|
 | `(store)` | `/create`, `/library`, `/community`, `/design/[slug]` | Customer-facing product pages |
 | `(admin)` | `/admin/moderation` | Admin tools |
-| `(dev)` | `/prototype`, `/dev/tokens` | Development tools and prototypes |
+| `(dev)` | `/effect-creator/v5.3.1` | The 3D Effect Creator + dev API routes |
 | `api/` | `/api/cart`, `/api/designs`, `/api/shopify/*`, `/api/upload-permission` | API endpoints |
 | `tokens/` | — | Auto-generated CSS token files (not a route — imported by globals.css) |

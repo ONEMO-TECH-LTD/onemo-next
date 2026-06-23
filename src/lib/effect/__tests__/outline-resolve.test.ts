@@ -165,6 +165,69 @@ describe('V4 resolve — F1: local radius keeps the source id reusable (no bake 
   })
 })
 
+describe('V5 resolve — whole-shape Radius dual-engine (Clipper2 offset-round, DEC-v5-04)', () => {
+  const mk = (x: number, y: number): VAnchor => ({ p: { x, y }, hIn: null, hOut: null, corner: true })
+  const squareShape = (): VShape => ({ paths: [{ anchors: [mk(0, 0), mk(400, 0), mk(400, 400), mk(0, 400)] }] })
+  /** max/min radius from the centroid — ≈1 ⇒ a circle. */
+  const circularity = (pts: Vec2Px[]) => {
+    let cx = 0, cy = 0; for (const [x, y] of pts) { cx += x; cy += y }; cx /= pts.length; cy /= pts.length
+    let mn = Infinity, mx = 0; for (const [x, y] of pts) { const d = Math.hypot(x - cx, y - cy); if (d < mn) mn = d; if (d > mx) mx = d }
+    return mx / mn
+  }
+  test('whole-shape radius rounds the square; radius 0 → exact source (reversible)', () => {
+    const s = source(squareShape(), 'stock')
+    const rounded = resolve(s, { global: { ...GLOBAL_OFF, radius: 60 }, local: {} })
+    expect(rounded).not.toBe(s.shape)
+    expect(flat(rounded).length).toBeGreaterThan(4) // corners became arcs
+    expect(validateSelfIntersection(flat(rounded), 't').length).toBe(0) // simple, no fold
+    expect(resolve(s, { global: { ...GLOBAL_OFF, radius: 0 }, local: {} })).toBe(s.shape) // OFF === source
+  })
+  test('square at ~half-short-side radius → a circle (symmetric by construction, circularity ≈ 1)', () => {
+    const s = source(squareShape(), 'stock')
+    const circle = resolve(s, { global: { ...GLOBAL_OFF, radius: 200 }, local: {} }) // 200 = half the 400px side
+    const c = circularity(flat(circle))
+    expect(c, `square@radius=½-side should be a circle (max/min radius ${c.toFixed(3)})`).toBeLessThan(1.06)
+  })
+  test('whole-shape radius composes with a per-corner override (selected corner pinned through)', () => {
+    const s = source(squareShape(), 'stock')
+    const id = s.shape.paths[0].anchors[0].id!
+    const out = resolve(s, { global: { ...GLOBAL_OFF, radius: 50 }, local: { [id]: { radius: 0 } } })
+    expect(validateSelfIntersection(flat(out), 't').length).toBe(0) // both engines compose without folding
+  })
+})
+
+describe('V5 resolve — Smooth is a true gradation (KAI-9115: blend, not binary catmull)', () => {
+  const totalHandleLen = (sh: VShape) => {
+    let L = 0
+    for (const a of sh.paths[0].anchors) {
+      if (a.hIn) L += Math.hypot(a.hIn.x - a.p.x, a.hIn.y - a.p.y)
+      if (a.hOut) L += Math.hypot(a.hOut.x - a.p.x, a.hOut.y - a.p.y)
+    }
+    return L
+  }
+  test('more Smooth = more handle (rounder): a low % is visibly gentler than a high % — not the old binary', () => {
+    const s = source(notchedSquare())
+    const lo = resolve(s, { global: { ...GLOBAL_OFF, smooth: 20 }, local: {} })
+    const hi = resolve(s, { global: { ...GLOBAL_OFF, smooth: 90 }, local: {} })
+    const llo = totalHandleLen(lo), lhi = totalHandleLen(hi)
+    expect(llo, 'smooth 20% already introduces some handle').toBeGreaterThan(0)
+    expect(lhi, `smooth 90% (${lhi.toFixed(0)}) must be substantially rounder than 20% (${llo.toFixed(0)})`).toBeGreaterThan(llo * 1.5)
+  })
+})
+
+describe('V5 resolve — Straighten follows a CURVED input, never breaks it (KAI-9118)', () => {
+  test('straighten on a curved (filleted) shape stays simple + keeps the silhouette (no fold/collapse)', () => {
+    const s = source(roundedSquare(), 'stock')
+    for (const straighten of [20, 60, 100]) {
+      const str = resolve(s, { global: { ...GLOBAL_OFF, straighten }, local: {} })
+      const ring = flat(str)
+      expect(validateSelfIntersection(ring, 't').length, `straighten ${straighten} must not fold`).toBe(0)
+      const xs = ring.map((p) => p[0]); const w = Math.max(...xs) - Math.min(...xs)
+      expect(w, `straighten ${straighten} must track the curve, not collapse it (width ${w.toFixed(0)})`).toBeGreaterThan(180)
+    }
+  })
+})
+
 describe('V4 resolve — NEVER produces NaN/Infinity (renderable geometry)', () => {
   const finite = (n: number) => Number.isFinite(n)
   const allFinite = (s: VShape) => s.paths.every((pa) => pa.anchors.every((a) =>
@@ -182,7 +245,7 @@ describe('V4 resolve — NEVER produces NaN/Infinity (renderable geometry)', () 
     for (const [name, shape] of shapes) {
       const s = source(shape)
       for (const simplify of [0, 25, 50, 75, 100]) for (const smooth of [0, 50, 100]) for (const straighten of [0, 50, 100]) {
-        const out = resolve(s, { global: { simplify, smooth, straighten }, local: {} })
+        const out = resolve(s, { global: { simplify, smooth, straighten, radius: 0 }, local: {} })
         expect(allFinite(out), `${name} simplify=${simplify} smooth=${smooth} straighten=${straighten}`).toBe(true)
       }
     }

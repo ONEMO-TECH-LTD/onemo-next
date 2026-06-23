@@ -7,7 +7,7 @@ The ONEMO Next.js application follows a layered structure:
 1. **`src/`** — All runtime source code (app router, components, libraries, tests)
 2. **`public/`** — Static assets served at runtime (models, textures, images)
 3. **`asset-library/`** — Non-runtime asset container (reserved copies, alternatives, presets)
-4. **`scripts/`** — Build tools and utilities (token pipeline, Shopify integration, 3D conversion)
+4. **`scripts/`** — Build tools and utilities (Shopify integration, 3D conversion)
 5. **`supabase/`** — Database migrations
 6. **`docs/`** — This documentation
 
@@ -20,7 +20,7 @@ Next.js route groups `(name)` organize pages without affecting URLs:
 - `(dev)` — development tools and prototypes
 
 ### Tokens
-CSS design tokens are auto-generated. Never edit `src/app/tokens/*.css` directly. Regenerate with `npm run build-tokens`. Source lives in `onemo-ssot-global/11-design-system/artifacts/`.
+CSS design tokens are auto-generated. Never edit `src/app/tokens/*.css` directly. Regenerate via the DS-V2.1 pipeline in `onemo-ssot-global/11-design-system/`.
 
 ### Assets
 - **In use** → `public/` (served by Next.js)
@@ -28,7 +28,7 @@ CSS design tokens are auto-generated. Never edit `src/app/tokens/*.css` directly
 - **Archived/historical** → deleted or in git history
 
 ### Scripts
-Organized by domain: `scripts/tokens/`, `scripts/shopify/`, `scripts/3d/`. Each has its own context. See `scripts/README.md` for the full index.
+Organized by domain: `scripts/shopify/`, `scripts/3d/`. Each has its own context. See `scripts/README.md` for the full index.
 
 ## External Dependencies
 

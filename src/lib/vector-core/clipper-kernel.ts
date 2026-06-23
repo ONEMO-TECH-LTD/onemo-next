@@ -8,8 +8,12 @@
 //
 // (The same library also backs the manufacturing offset — see lib/effect/offset.ts. ONE engine.)
 
-import { Clipper } from '@countertype/clipper2-ts'
+import { Clipper, JoinType, EndType } from '@countertype/clipper2-ts'
 import type { VPath } from './types'
+import { flattenPath } from './path'
+
+// px → centi-px integers for Clipper64 (integer-robust; 100 = 0.01px precision, far below display tol).
+const ROUND_SCALE = 100
 
 /**
  * STRAIGHTEN — collapse near-collinear runs to true straight edges, via Clipper2 Ramer-Douglas-Peucker
@@ -21,11 +25,49 @@ import type { VPath } from './types'
  */
 export function straightenPath(path: VPath, epsPx: number): VPath {
   if (epsPx <= 0 || path.anchors.length < 4) return path
+  // Operate on the FLATTENED outline (KAI-9118 — tools adjust curved input gracefully): on a polygon
+  // flatten() returns the anchor points unchanged (straights never subdivide), so noisy-trace behaviour
+  // is identical; on a CURVED input (stock/Magic curves) it samples the TRUE curve so RDP follows the
+  // shape, not a handful of control points (which would mangle the curve into a coarse facet polygon).
+  const ring = flattenPath(path, 0.5)
+  if (ring.length < 4) return path
   const flat: number[] = []
-  for (const a of path.anchors) flat.push(a.p.x, a.p.y)
+  for (const p of ring) flat.push(p.x, p.y)
   const pd = Clipper.makePathD(flat)
   let out = Clipper.ramerDouglasPeuckerD(pd, epsPx) // collapse near-collinear runs (keeps real corners)
   out = Clipper.trimCollinearD(out, 3, false) // drop any exactly-collinear vertices (closed path, 3dp)
   if (out.length < 3) return path // collapsed past a triangle — leave the source untouched
   return { anchors: out.map((p) => ({ p: { x: p.x, y: p.y }, hIn: null, hOut: null, corner: true })) }
+}
+
+/**
+ * WHOLE-SHAPE RADIUS — round every convex corner uniformly via Clipper2 morphological OPENING (erode −r
+ * then dilate +r, ROUND joins), the standard CAD whole-shape round (blueprint v5.2 §4 / DEC-v5-03,04).
+ * Symmetric BY CONSTRUCTION (no per-corner orchestration, no seam): a square at r = ½ short-side → a
+ * circle. This replaces the per-corner Paper plugin for the WHOLE-SHAPE (no-selection) Radius case — the
+ * Paper plugin (single-segment) stays for the per-corner case. `radiusPx` is clamped to just under ½ the
+ * ring's short side so the erosion never fully collapses (which would lose the shape, not round it).
+ * OFF (radiusPx<=0) returns the source. Runs on the FLATTENED outline (handles curved input too) and
+ * returns a dense smooth point-ring (corner:false); the resolver fold-guards the result.
+ */
+export function roundWholeShapePx(path: VPath, radiusPx: number): VPath {
+  if (radiusPx <= 0 || path.anchors.length < 3) return path
+  const ring = flattenPath(path, 0.25) // true outline (curves included)
+  if (ring.length < 3) return path
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const p of ring) { if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x; if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y }
+  const shortSide = Math.min(maxX - minX, maxY - minY)
+  const r = Math.min(radiusPx, 0.499 * shortSide) // < ½ short side → erosion leaves a (tiny) core to round
+  if (r <= 0) return path
+  const flat: number[] = []
+  for (const p of ring) flat.push(Math.round(p.x * ROUND_SCALE), Math.round(p.y * ROUND_SCALE))
+  const subj = [Clipper.makePath(flat)]
+  const eroded = Clipper.inflatePaths(subj, -r * ROUND_SCALE, JoinType.Round, EndType.Polygon)
+  if (!eroded || eroded.length === 0) return path // over-eroded at this r — no round possible
+  const dilated = Clipper.inflatePaths(eroded, r * ROUND_SCALE, JoinType.Round, EndType.Polygon)
+  if (!dilated || dilated.length === 0) return path
+  let best = dilated[0]
+  for (const rg of dilated) if (Math.abs(Clipper.area(rg)) > Math.abs(Clipper.area(best))) best = rg
+  if (!best || best.length < 3) return path
+  return { anchors: best.map((p) => ({ p: { x: p.x / ROUND_SCALE, y: p.y / ROUND_SCALE }, hIn: null, hOut: null, corner: false })) }
 }

@@ -26,7 +26,7 @@ import { flattenPath, scaleAnchorTension, type VShape, type VPath } from '@/lib/
 // The geometry kernels, imported directly (not via the vector-core barrel) so Paper/Clipper stay in the
 // create bundle only, never the v1/v2/shaped bundles.
 import { roundCornersPaper, smoothPaper, simplifyPaper } from '@/lib/vector-core/paper-kernel'
-import { straightenPath } from '@/lib/vector-core/clipper-kernel'
+import { straightenPath, roundWholeShapePx } from '@/lib/vector-core/clipper-kernel'
 import type { Pt } from './types'
 
 export type OutlineClass = 'generated' | 'stock' | 'upload' | 'drawn'
@@ -42,11 +42,16 @@ export interface OutlineSource {
   rawTracePx?: Pt[]
 }
 
-/** Global tools — independent 0..100 axes. OFF = `GLOBAL_OFF` below. */
+/** Global tools — independent axes. OFF = `GLOBAL_OFF` below. */
 export interface GlobalAdjustments {
   simplify: number   // 0..100; 0 = OFF (full detail) — Paper simplify strength (curve-fit reduce)
   smooth: number     // 0..100; 0 = OFF — Paper catmull-rom handle factor
   straighten: number // 0..100; 0 = OFF — Clipper2 RDP collinear-collapse (stacks ON TOP of simplify)
+  // WHOLE-SHAPE Radius (DEC-v5-03/04 dual-engine): source px (0 = OFF), NOT a pct — same unit as
+  // LocalAdjustment.radius so value-reflection + the %-of-maxRadius slider are identical for whole-shape
+  // and per-corner. Whole-shape (no anchor selected) routes here → Clipper2 offset-round (symmetric,
+  // square → circle); a SELECTED corner routes to LocalAdjustment.radius → Paper single-segment instead.
+  radius: number     // source px; 0 = OFF — Clipper2 whole-shape offset-round
 }
 export interface LocalAdjustment {
   /** per-anchor fillet radius in source px; 0 = sharp (OFF) */
@@ -60,7 +65,7 @@ export interface OutlineAdjustments {
   local: Record<string, LocalAdjustment>
 }
 
-export const GLOBAL_OFF: GlobalAdjustments = { simplify: 0, smooth: 0, straighten: 0 }
+export const GLOBAL_OFF: GlobalAdjustments = { simplify: 0, smooth: 0, straighten: 0, radius: 0 }
 export const ADJUSTMENTS_OFF: OutlineAdjustments = { global: { ...GLOBAL_OFF }, local: {} }
 
 // ── pct → engine-unit maps (the editor sliders write 0..100; OFF maps to a true no-op) ──────────
@@ -91,7 +96,7 @@ export function mintIds(shape: VShape): VShape {
 
 // ── off-state predicates ─────────────────────────────────────────────────────────────────────
 function isGlobalOff(g: GlobalAdjustments): boolean {
-  return g.simplify <= 0 && g.smooth <= 0 && g.straighten <= 0
+  return g.simplify <= 0 && g.smooth <= 0 && g.straighten <= 0 && g.radius <= 0
 }
 /** ids whose local adjustment is actually engaged (radius > 0 or curve ≠ 0). */
 function claimedIds(local: Record<string, LocalAdjustment>): Set<string> {
@@ -181,6 +186,10 @@ function globalPass(source: OutlineSource, g: GlobalAdjustments, claimed: Set<st
       while (!ringSimple(pathToRing(sm)) && n++ < 12 && factor > 0.004) { factor *= 0.7; sm = smoothPaper(p, factor) }
       if (ringSimple(pathToRing(sm))) p = sm
     }
+    // 4. RADIUS (whole-shape) — Clipper2 offset-round: round EVERY convex corner uniformly, symmetric by
+    //    construction (square @ ½ short-side → circle). This is the no-selection Radius path; a SELECTED
+    //    corner rounds per-corner via Paper in the local pass instead. Fold-guarded like every stage.
+    if (g.radius > 0) p = guard(roundWholeShapePx(p, g.radius))
     // PIN claimed source anchors back (fresh anchors array — never mutate the source path).
     const out = p.anchors.map((a) => ({ ...a }))
     for (const a of path.anchors) {
@@ -209,11 +218,21 @@ function localPass(shape: VShape, local: Record<string, LocalAdjustment>): VShap
       // FOLD GUARD: every local op is validated; a bend/round that makes the ring self-cross is
       // DROPPED (keep the prior valid path) — so a local tool can never emit a folded/cracked outline.
       const simple = (vp: VPath) => ringSimple(pathToRing(vp))
-      // curve pass (count-stable)
-      for (const [id, l] of Object.entries(local)) {
-        if (!l || (l.curve ?? 0) === 0) continue
-        const idx = p.anchors.findIndex((a) => a.id === id)
-        if (idx >= 0) { const next = bendAnchorPath(p, idx, l.curve!); if (simple(next)) p = next }
+      // curve pass (count-stable) — BATCH the bends, ONE fold-check. KAI-9116: a WHOLE-SHAPE curve
+      // claims every anchor; validating each bend with an O(n²) self-intersection scan made this O(n³),
+      // which froze the editor on a dense Magic trace (hundreds of anchors). A single tangent bend
+      // virtually never self-crosses, so apply them all, validate once, and fall back to the pre-curve
+      // path if the batch folds. The id→index map also drops the per-anchor O(n) findIndex (count-stable
+      // bends keep indices valid across the batch).
+      const curveEntries = Object.entries(local).filter(([, l]) => l && (l.curve ?? 0) !== 0)
+      if (curveEntries.length) {
+        const idxById = new Map(p.anchors.map((a, i) => [a.id, i] as const))
+        let q = p
+        for (const [id, l] of curveEntries) {
+          const idx = idxById.get(id)
+          if (idx !== undefined && idx >= 0) q = bendAnchorPath(q, idx, l!.curve!)
+        }
+        if (simple(q)) p = q
       }
       // radius pass (re-find by id; fillet consumes the corner)
       for (const [id, l] of Object.entries(local)) {

@@ -1,6 +1,6 @@
 // outline-core/math.ts — the NARROW active geometry-math surface (R5 — Creator v5).
 //
-// The v4/active Creator (effect-creator/v3 + lib/effect) imports its outline-core math from HERE,
+// The v4/active Creator (effect-creator/v5.3.1 + lib/effect) imports its outline-core math from HERE,
 // NOT from the full `./index` barrel — so the dormant document runtime (OutlineDocument, reducer,
 // resolveOutlineDocument, SDF blend, livewire) is never one import away from active code (audit §8,
 // the worst entanglement). This barrel re-exports ONLY pure ring/curve math, canonical hashing, and
