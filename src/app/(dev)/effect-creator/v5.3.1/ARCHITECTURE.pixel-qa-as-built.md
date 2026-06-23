@@ -14,7 +14,7 @@ This document describes the code as read in the current worktree. It is not a bl
 
 Fully read source areas:
 
-- `src/app/(dev)/effect-creator/v3`
+- `src/app/(dev)/effect-creator/v5.3.1`
 - `src/lib/effect`
 - `src/lib/vector-core`
 - `src/lib/shape-library`
@@ -187,7 +187,7 @@ Not found as active runtime:
 
 ## Dormant / Dead-Code Register
 
-- `src/app/(dev)/effect-creator/v3/ARCHITECTURE.md`: existing untracked architecture doc, not edited by this QA artifact.
+- `src/app/(dev)/effect-creator/v5.3.1/ARCHITECTURE.md`: existing untracked architecture doc, not edited by this QA artifact.
 - `EffectModel.tsx`: older GLB/material flow, still exported but not primary in the current shaped page route.
 - `ImageSheet` in `sheets.tsx`: implemented, but no visible editor dock entry currently opens it.
 - `payload.ts`, `persistence.ts`, `attachment.ts`: pure tested contracts, dormant from the v3 page.

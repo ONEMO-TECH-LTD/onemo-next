@@ -2,7 +2,7 @@
 
 **Status:** As-built (what the code *is*, not the blueprint's intent)
 **Version:** v5.2.1 — v5.2 baseline + the v5.3 residue that survived the revert (see §8)
-**Scope:** `src/app/(dev)/effect-creator/v3/` + `src/lib/effect/` + the kernels (`vector-core`, `outline-core` live half, `shape-library`, `export`). Logic/architecture only — `.module.css` styling files are excluded.
+**Scope:** `src/app/(dev)/effect-creator/v5.3.1/` + `src/lib/effect/` + the kernels (`vector-core`, `outline-core` live half, `shape-library`, `export`). Logic/architecture only — `.module.css` styling files are excluded.
 **Provenance:** branch `session57-task/creator-v5.3`, working tree (HEAD `f135954` + the P3/P5 revert). Excludes dev-only scaffolding (`next.config.ts` distDir, `tsconfig.json`, `.next-v*`).
 **Companion:** the forward blueprint lives at `onemo-ssot-global/_ssot-workbench/v5/` — that is *to-be*; this is *as-is*. On conflict, the code (and this doc) win.
 

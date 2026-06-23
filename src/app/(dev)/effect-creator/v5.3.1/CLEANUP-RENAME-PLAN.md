@@ -22,7 +22,7 @@ After each commit, before the next:
 | scene-format adapter `studio/src/editor/adapter/{onemo-deserialize,onemo-format}` | imported by `v3/core/onemo-loader.ts:14-15` (the live `.onemo` 3D loader); deps = jszip + three (npm). **Extract into the Creator — don't lose.** |
 | `lib/outline-core/index.ts` barrel + `math.ts` + ring-math in `resolver.ts` | 7 live tests + the engine import `fairingFromDetail`/`validateSelfIntersection` through it. |
 | live lib `lib/{effect, vector-core, shape-library, export}` + `outline-core/{math,hash}` | imported by v3 (36/12/4/2 refs). |
-| `effect-creator/v3` → renamed `v5.3.1` | the live build. |
+| `effect-creator/v5.3.1` → renamed `v5.3.1` | the live build. |
 | generated `src/app/tokens/*.css` | the live app renders from it until v5.4 adopts DS-V2.1. **Keep even though the `/dev/tokens` tool is being retired.** |
 
 ## CODE-VERIFIED KILL — 0 external refs (re-trace at delete-time)

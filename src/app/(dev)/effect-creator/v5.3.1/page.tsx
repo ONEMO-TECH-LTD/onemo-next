@@ -540,7 +540,7 @@ function PrototypePageInner() {
   )
 }
 
-export default function EffectCreatorV3Page() {
+export default function EffectCreatorV531Page() {
   return (
     <Suspense fallback={null}>
       <PrototypePageInner />

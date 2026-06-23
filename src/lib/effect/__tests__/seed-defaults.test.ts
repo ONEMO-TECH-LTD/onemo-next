@@ -1,6 +1,6 @@
 // seed-defaults.test.ts — sharp-wired seeding + auto-tune + value-reflection (DEC-v5-03 T5/T6/T7).
 import { describe, it, expect } from 'vitest'
-import { cornerRadiusAdjustments, autoTuneDefaults, representativeLocal, AUTO_TUNE } from '@/app/(dev)/effect-creator/v3/user/editor/seed-defaults'
+import { cornerRadiusAdjustments, autoTuneDefaults, representativeLocal, AUTO_TUNE } from '@/app/(dev)/effect-creator/v5.3.1/user/editor/seed-defaults'
 import { resolve, mintIds, GLOBAL_OFF, type OutlineSource } from '@/lib/effect/outline-resolve'
 import type { VShape } from '@/lib/vector-core'
 
