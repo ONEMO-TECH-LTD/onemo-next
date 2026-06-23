@@ -1,1 +1,0 @@
-editor.once('load', () => {});
