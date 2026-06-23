@@ -68,7 +68,7 @@ Export (?internal=1): committedShape → contourFromShape → assertContourCutta
 | `core/shaped/ShapedModelBridge.tsx` (45) | TRANSLATE half. Subscribes `outlineStore` (committedShape/committedContourMM/editorOpen/bgBlur/imageFx/wrapTile) → props. | "Bridge translates, viewer renders." Keeps store reads local to the 3D subtree. |
 | `core/shaped/ShapedModel.tsx` (446) | RENDER half (R7 prop-pure, reads NO store). Builds mesh + 3 materials; owns the **version-bridge defer** and the **texture rebake**. | `vectorTrueContour` tessellates at `DISPLAY_TOLERANCE_MM` (0.004). Mesh rebuild + texture rebake both `if (editorOpen) return` → fire on close. Pan/zoom = matrix-only (no `needsUpdate`). |
 | `core/EffectModel.tsx` (341) | GLB material path. **Not used by /create** (`shaped=true`); Studio/admin only. | `useGLTF` + role-material override. |
-| `core/onemo-loader.ts` (232) | Loads the golden scene `.onemo` (zip: `scene.glb` + `studio.json`) → `ViewerConfig`. | `parseOnemoConfig(url)`. Imports from `studio/src/editor/adapter`. |
+| `core/onemo-loader.ts` (232) | Loads the golden scene `.onemo` (zip: `scene.glb` + `studio.json`) → `ViewerConfig`. | `parseOnemoConfig(url)`. Imports from `./scene-format` (extracted from the old studio). |
 
 ### 3.3 Scene config — `v3/admin/`
 

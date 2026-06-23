@@ -11,8 +11,8 @@
 import JSZip from 'jszip';
 import * as THREE from 'three';
 
-import { deserializeOnemo, normalizeStudioJsonPublic, type OnemoDeserializeResult } from '../../../../../../studio/src/editor/adapter/onemo-deserialize';
-import { onemoColorToHex, type OnemoStudioJson, type OnemoProductConfig, type OnemoMaterialRole } from '../../../../../../studio/src/editor/adapter/onemo-format';
+import { deserializeOnemo, normalizeStudioJsonPublic, type OnemoDeserializeResult } from './scene-format/onemo-deserialize';
+import { onemoColorToHex, type OnemoStudioJson, type OnemoProductConfig, type OnemoMaterialRole } from './scene-format/onemo-format';
 import type {
     ViewerConfig, CameraConfig, EnvironmentConfig, SceneSettings,
     ColorConfig, ViewerProductConfig,
