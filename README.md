@@ -22,7 +22,7 @@ onemo-next/
 │   ├── app/                    ← Next.js app router
 │   │   ├── (store)/            ← product pages (create, library, community, design)
 │   │   ├── (admin)/            ← admin pages (moderation)
-│   │   ├── (dev)/              ← dev tools (prototype, token dashboard)
+│   │   ├── (dev)/              ← dev tools (the effect-creator/v5.3.1 Creator + dev API routes)
 │   │   ├── api/                ← API routes (cart, designs, shopify, uploads)
 │   │   └── tokens/             ← generated CSS token files (do not edit)
 │   ├── components/             ← shared UI components

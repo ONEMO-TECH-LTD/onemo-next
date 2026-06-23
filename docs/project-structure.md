@@ -7,7 +7,7 @@ The ONEMO Next.js application follows a layered structure:
 1. **`src/`** — All runtime source code (app router, components, libraries, tests)
 2. **`public/`** — Static assets served at runtime (models, textures, images)
 3. **`asset-library/`** — Non-runtime asset container (reserved copies, alternatives, presets)
-4. **`scripts/`** — Build tools and utilities (token pipeline, Shopify integration, 3D conversion)
+4. **`scripts/`** — Build tools and utilities (Shopify integration, 3D conversion)
 5. **`supabase/`** — Database migrations
 6. **`docs/`** — This documentation
 
