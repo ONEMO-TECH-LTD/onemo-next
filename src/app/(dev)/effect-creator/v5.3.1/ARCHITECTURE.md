@@ -1,9 +1,9 @@
 # Creator — As-Built Technical Architecture
 
 **Status:** As-built (what the code *is*, not the blueprint's intent)
-**Version:** v5.2.1 — v5.2 baseline + the v5.3 residue that survived the revert (see §8)
+**Version:** v5.3.1 — the v5.3 line with the drift removed: v1/v2, the `(dev)` prototype/shaped/studio routes, old `studio/` (26M), the `/dev/tokens` pipeline, and the dev A/B scaffolding are all deleted; the scene-format adapter is extracted into the Creator (see §8/§9)
 **Scope:** `src/app/(dev)/effect-creator/v5.3.1/` + `src/lib/effect/` + the kernels (`vector-core`, `outline-core` live half, `shape-library`, `export`). Logic/architecture only — `.module.css` styling files are excluded.
-**Provenance:** branch `session57-task/creator-v5.3`, working tree (HEAD `f135954` + the P3/P5 revert). Excludes dev-only scaffolding (`next.config.ts` distDir, `tsconfig.json`, `.next-v*`).
+**Provenance:** branch `session57-task/creator-v5.3.1`, the v5.3.1 cleanup off snapshot `798b191`. The dev A/B scaffolding (`next.config.ts` distDir, `tsconfig.json` `.next-v*`) is now deleted, not excluded.
 **Companion:** the forward blueprint lives at `onemo-ssot-global/_ssot-workbench/v5/` — that is *to-be*; this is *as-is*. On conflict, the code (and this doc) win.
 
 ---
@@ -52,7 +52,7 @@ Export (?internal=1): committedShape → contourFromShape → assertContourCutta
 
 ## 3. Module map
 
-### 3.1 Composition & state — `v3/`
+### 3.1 Composition & state — `v5.3.1/`
 
 | File | Role | Key contract |
 |---|---|---|
@@ -60,7 +60,7 @@ Export (?internal=1): committedShape → contourFromShape → assertContourCutta
 | `types.ts` (112) | Shared viewer/scene config types. | `ViewerConfig`, `DesignState`(offsetX/offsetY/scale), `ColorConfig`, material roles. No duplicates elsewhere. |
 | `user/outlineStore.ts` (142) | The state bridge (zustand). | See §4. |
 
-### 3.2 3D — `v3/core/` + `core/shaped/`
+### 3.2 3D — `v5.3.1/core/` + `core/shaped/`
 
 | File | Role | Key contract |
 |---|---|---|
@@ -70,14 +70,14 @@ Export (?internal=1): committedShape → contourFromShape → assertContourCutta
 | `core/EffectModel.tsx` (341) | GLB material path. **Not used by /create** (`shaped=true`); Studio/admin only. | `useGLTF` + role-material override. |
 | `core/onemo-loader.ts` (232) | Loads the golden scene `.onemo` (zip: `scene.glb` + `studio.json`) → `ViewerConfig`. | `parseOnemoConfig(url)`. Imports from `./scene-format` (extracted from the old studio). |
 
-### 3.3 Scene config — `v3/admin/`
+### 3.3 Scene config — `v5.3.1/admin/`
 
 | File | Role | Key contract |
 |---|---|---|
 | `AdminViewer.tsx` (120) | Loads `/api/dev/scenes/golden` via `onemo-loader`, merges trim colors, provides `ViewerConfig` to `EffectViewer`. | No hardcoded scene defaults — all from the `.onemo`. |
 | `sceneStore.ts` (34) | Trim colors (back/frame/bg). | Defaults `#080808`/`#0f0f0f`/`#ffffff`. |
 
-### 3.4 The 2D editor — `v3/user/` + `user/editor/`
+### 3.4 The 2D editor — `v5.3.1/user/` + `user/editor/`
 
 | File | Role | Key contract |
 |---|---|---|
@@ -93,7 +93,7 @@ Export (?internal=1): committedShape → contourFromShape → assertContourCutta
 | `editor/seed-defaults.ts` (40) | `cornerRadiusAdjustments` (T5), `AUTO_TUNE` (T6 — **dormant, paused 2026-06-17**), `representativeLocal` (T7 value-reflection). | Magic seeds raw + tools OFF for manual calibration. |
 | `editor/geometry.ts` (20) | Editor ring math: `pointInPolygon`, `GripId`. | |
 
-### 3.5 Surfaces & chrome — `v3/user/`, `v3/ui/`, `v3/dev/`
+### 3.5 Surfaces & chrome — `v5.3.1/user/`, `v5.3.1/ui/`, `v5.3.1/dev/`
 
 | File | Role |
 |---|---|
@@ -213,9 +213,9 @@ The full contract exists, is pure + unit-tested, and is **not wired** to /create
 
 The only live manufacturing output is `page.onExport` (`?internal=1`): mm-true SVG cutline via `toManufacturingSVG` (laser profile by default — red 0.1mm stroke, kerf applied by the cutter), feasibility-gated by `contourFromShape` + `assertContourCuttable`. Wiring the save/order flow + the 4 artifacts is the open manufacturing work.
 
-## 8. v5.2.1 delta — what v5.3 left behind
+## 8. v5.3.1 delta — what v5.3 left behind
 
-v5.3 ran two sprints on this branch; the build broke and was reverted to working state. What **survived** into v5.2.1:
+v5.3 ran two sprints on this branch; the build broke and was reverted to working state. What **survived** into v5.3.1:
 
 - **P1 — background cut-out at upload** (KAI-9146): `page.startBackgroundCutout` + `prepareEffect` `preseg` + `subjectMatteFromSeg`. Magic reuses the cached cut; Blend works on any shape.
 - **P2 — cross-browser SVG composite engine** (KAI-9147): `composite.ts` `composeFront`/`blurCanvas` now bake via Blob-URL SVG filters (async). Zero `ctx.filter`. The validated Safari fix.
@@ -223,17 +223,16 @@ v5.3 ran two sprints on this branch; the build broke and was reverted to working
 - **Filters v2 surface** (KAI-9124/9125): the hero `FiltersSurface` (presets/tint/vignette/fill) + `imageFx` preset/vignette/tint fields + `wrapTile`.
 - **Sprint-1 features** (7b92abc): Radius dual-engine (Paper per-corner + Clipper whole-shape), Detail/Offset re-derive tools, curated stock chips.
 
-What was **reverted** (P3/P5): the full-bleed canvas effects, surround-glow / 3D-backdrop, and editing-unclip — the effect layers no longer fill the screen. (The editor *overlay* is itself full-screen — `OutlineEditor` renders `styles.overlay` = `position:fixed; inset:0` with a 100%-size SVG canvas; the revert removed the full-bleed effect surfaces, not the overlay. No "~300px contained" model size exists in v3 code — that was a hero-model target, not an as-built fact.)
+What was **reverted** (P3/P5): the full-bleed canvas effects, surround-glow / 3D-backdrop, and editing-unclip — the effect layers no longer fill the screen. (The editor *overlay* is itself full-screen — `OutlineEditor` renders `styles.overlay` = `position:fixed; inset:0` with a 100%-size SVG canvas; the revert removed the full-bleed effect surfaces, not the overlay. No "~300px contained" model size exists in v5.3.1 code — that was a hero-model target, not an as-built fact.)
 
 ## 9. Dead-code register
 
-In the tree, not used by v5.2.1:
-- `effect-creator/v1/` + `v2/` — superseded by v3.
-- `outline-core` document-runtime: `resolver.ts`'s `resolveOutlineDocument` half, `sdf.ts` (201), `livewire.ts` (108), `reducer.ts` (161), `types.ts` `OutlineDocument`, the full `index.ts` barrel — **not on the v5.2.1 runtime path** (imported only by the v1/v2 editors + the test suite; the v5.2.1 runtime imports the narrow `outline-core/math` surface).
-- `geometry-truth.legacy.ts` — retired trace fit (test-only).
-- `EffectModel.tsx` — the GLB material path; not on the shaped (/create) route (the in-file comment confirms "unused on the shaped route"). **`onemo-loader.ts` is NOT dead** — its `parseOnemoConfig` loads the golden scene through `AdminViewer` (live on /create); only its `loadOnemoTemplate` full-deserialize is Studio-only.
+**Removed in the v5.3.1 cleanup** (off snapshot `798b191`): `effect-creator/v1` + `v2`, the `(dev)/prototype`/`shaped`/`studio` routes, old `studio/` (the 26M PlayCanvas-fork editor — superseded by studio-v2, which is untouched), the `/dev/tokens` old-token pipeline, and the dev A/B build scaffolding. The scene-format adapter (`onemo-deserialize`/`onemo-format`) was extracted from old `studio/` into `core/scene-format/`, so the Creator owns its `.onemo` reader.
 
-Rough scale: the v1+v2 app trees are ~6,000+ lines; the `outline-core` doc-runtime ~1,200. Removal is safe for /create but touches v1/v2 — scope before deleting.
+Still present, **deferred to a surgical test-aware pass** (NOT a folder delete):
+- `outline-core` document-runtime: `resolver.ts`'s `resolveOutlineDocument` half, `sdf.ts`, `livewire.ts`, `reducer.ts`, `types.ts` `OutlineDocument` — not on the runtime path (the runtime imports the narrow `outline-core/math` surface). The `index.ts` **barrel + ring-math are LIVE** (7 tests + the engine import `fairingFromDetail`/`validateSelfIntersection` through it), so removal is surgical, not a folder cut.
+- `geometry-truth.legacy.ts` — retired trace fit (test-only).
+- `EffectModel.tsx` — the GLB material path; not on the shaped (/create) route. **`onemo-loader.ts` is NOT dead** — `parseOnemoConfig` loads the golden scene through `AdminViewer` (live on /create); `loadOnemoTemplate` is the Studio-only path.
 
 ## 10. Known drift / debt
 
@@ -248,6 +247,6 @@ Rough scale: the v1+v2 app trees are ~6,000+ lines; the `outline-core` doc-runti
 This doc is **as-built** — it is only true if it tracks the code. Two mechanisms (decided 2026-06-19):
 
 1. **Same-PR rule.** Any Creator PR that changes architecture (a module's role/contract, the data flow, the state model, an engine, a surface, or the dead-code/drift state) MUST update this doc in the same PR. Precedent: SSOT `5.1-system-architecture.md` already binds its contract sources this way.
-2. **Version-bump re-audit.** At each version bump (v5.2.1 → next), re-derive this doc from a full code read to catch anything that slipped the same-PR rule. Bump the version + provenance header.
+2. **Version-bump re-audit.** At each version bump (v5.3.1 → next), re-derive this doc from a full code read to catch anything that slipped the same-PR rule. Bump the version + provenance header.
 
 Canonical copy: `onemo-ssot-global/5-architecture/5.4-creator-as-built-architecture.md`. This repo copy is the working copy kept in lockstep by rule 1.

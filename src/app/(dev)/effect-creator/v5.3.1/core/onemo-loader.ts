@@ -1,11 +1,12 @@
 /**
- * .onemo loader — shared between prototype and Studio.
+ * .onemo scene-format loader — the Creator's own reader (adapter extracted from the
+ * old studio/ into ./scene-format/ during the v5.3.1 cleanup).
  *
  * Two modes:
  * 1. parseOnemoConfig() — lightweight, no renderer needed. Extracts ViewerConfig
- *    from studio.json + GLB as blob URL. Used by prototype on mount.
+ *    from studio.json + GLB as blob URL. Loads the golden scene via AdminViewer (live on /create).
  * 2. loadOnemoTemplate() — full deserialization including renderer settings, env
- *    texture, scene graph. Used by Studio bridge.
+ *    texture, scene graph (Studio-only path).
  */
 
 import JSZip from 'jszip';
