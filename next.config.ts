@@ -41,9 +41,9 @@ const nextConfig: NextConfig = {
       config.resolve.alias["paper/dist/paper-core$"] = false;
       // scripts/**/*.mjs files are invoked via child_process.spawn() at runtime —
       // they are NOT webpack module imports. @vercel/nft static analysis traces
-      // join(process.cwd(), 'scripts/tokens/build-tokens.mjs') as if it were a module
+      // join(process.cwd(), 'scripts/<name>.mjs') as if it were a module
       // reference, causing:
-      //   Module not found: Can't resolve './ROOT/scripts/tokens/build-tokens.mjs'
+      //   Module not found: Can't resolve './ROOT/scripts/<name>.mjs'
       // IgnorePlugin prevents webpack from trying to resolve these paths.
       config.plugins.push(
         new webpack.IgnorePlugin({
