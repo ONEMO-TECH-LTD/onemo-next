@@ -54,7 +54,8 @@ function PrototypePageInner() {
 
   // ── THE creation/page socket — { state, actions }. Notifications + URL params are the injected
   //    UI-side adapters (blueprint §4); the socket never reaches toast/window itself.
-  const { state, actions } = useCreator({ notify: (kind, msg) => toast(kind, msg), segPresent })
+  const notify = useCallback((kind: 'warn' | 'error' | 'info', message: string) => { toast(kind, message) }, [])
+  const { state, actions } = useCreator({ notify, segPresent })
   const {
     artworkUrl, prepared, editingOutline, editorMode, autoOutline, generating,
     showColors, showFilters, designState, colors,

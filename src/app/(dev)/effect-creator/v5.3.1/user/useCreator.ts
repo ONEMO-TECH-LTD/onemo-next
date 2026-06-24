@@ -15,9 +15,14 @@
 //   • editor-entry gesture → the socket exposes `enterEditor()`; the UI owns the double-tap
 //   • first-paint resize nudge → the viewer adapter's concern, kept out of orchestration
 //
-// v5.4 Phase-1 sub-step 2a: a behaviour-IDENTICAL lift — the history machine is moved verbatim. The
-// F25 recipe-history (leg 2) reworks this history next; the F25 texture cap (leg 1) already landed in
-// the engine (effectiveTextureDim). Nothing here changes runtime behaviour vs page.tsx.
+// F25 RECIPE-HISTORY (leg 2, blueprint invariant 19/20): the history NEVER retains canvas-backed
+// PreparedEffect snapshots, the full-res subject-matte data-URL, or the raw trace ×N. Each snapshot
+// holds a lightweight RECIPE (a generation id + the re-derive inputs); the heavy `prepared` (+ its
+// matte) live in a BOUNDED LRU keyed by generation id, so only the last few distinct generations are
+// resident and the rest are GC-released. Restore pulls the prepared from the LRU, or RE-DERIVES it
+// from the recipe (re-using a cached segmentation so a shaped re-derive skips the ML step). The
+// geometry truth is the lightweight source/adjustments — unchanged; re-derive only rebuilds canvases.
+// (The F25 texture cap, leg 1, already landed in the engine via effectiveTextureDim — 262963a.)
 
 import { useState, useCallback, useRef } from 'react'
 import { useSceneStore } from '../admin/sceneStore'
@@ -37,17 +42,27 @@ export interface CreatorAdapters {
   segPresent: boolean
 }
 
-// ── #23 GLOBAL history snapshot shapes (lifted verbatim from page.tsx) ──────────────────────────
+/** Re-derive inputs for a prepared generation (F25: stored in history instead of the canvases). */
+type Recipe = { url: string; mode: 'standard' | 'shaped' }
+
+/** How many DISTINCT prepared generations stay resident (instant undo); older ones re-derive on restore. */
+const KEEP_GENERATIONS = 6
+/** How many resolved segmentations to cache (one per uploaded url) so a shaped re-derive skips ML.
+ *  Bounded so the F25 memory fix doesn't itself leak — evicting a seg only makes that re-derive re-segment. */
+const SEG_CACHE_CAP = 12
+
+// ── #23 GLOBAL history snapshot shapes — lightweight (F25 leg 2: NO prepared object, NO matte URL) ──
 type OutlineSnap = {
+  // spec is stored WITHOUT rawTracePx (provenance/debug only — never read on restore; F25).
   spec: ReturnType<typeof useOutlineStore.getState>['spec']
   committedShape: ReturnType<typeof useOutlineStore.getState>['committedShape']
   source: ReturnType<typeof useOutlineStore.getState>['source']
   adjustments: ReturnType<typeof useOutlineStore.getState>['adjustments']
   bgBlur: number | null
-  subjMatteUrl: string | null
 }
 type AppSnap = {
-  prepared: PreparedEffect | null
+  genId: number          // → prepared LRU; -1 = no prepared yet
+  recipe: Recipe | null  // re-derive inputs if this generation has been evicted from the LRU
   autoOutline: boolean
   designState: DesignState
   imageFx: ReturnType<typeof useOutlineStore.getState>['imageFx']
@@ -56,11 +71,18 @@ type AppSnap = {
   trim: { backColor: string; frameColor: string; bgColor: string }
 }
 
+/** Strip rawTracePx from a spec for history storage (provenance only — never resolved from; F25 leg 2). */
+function liteSpec(spec: ReturnType<typeof useOutlineStore.getState>['spec']) {
+  if (!spec) return spec
+  if (spec.rawTracePx === undefined) return spec
+  return { ...spec, rawTracePx: undefined }
+}
+
 export function useCreator(adapters: CreatorAdapters) {
   const { notify, segPresent } = adapters
 
   const [artworkUrl, setArtworkUrl] = useState<string | undefined>()
-  const [prepared, setPrepared] = useState<PreparedEffect | null>(null) // the one engine's output
+  const [prepared, setPrepared] = useState<PreparedEffect | null>(null) // the one engine's output (live)
   const [editingOutline, setEditingOutline] = useState(false)
   const [editorMode, setEditorMode] = useState<'shape' | 'image' | null>(null) // #27 + KAI-9027
   const [autoOutline, setAutoOutline] = useState(false) // false = standard square; true = Magic cut-out
@@ -75,7 +97,7 @@ export function useCreator(adapters: CreatorAdapters) {
   }, [])
   const { colors, setBackColor } = useSceneStore()
 
-  // refs — lifted verbatim (history, cut-out cache, run tokens, per-session pre-snapshots)
+  // refs — cut-out cache, run tokens, per-session pre-snapshots
   const sourceShaRef = useRef<string | null>(null)
   const cutCacheRef = useRef<{ url: string; promise: Promise<MLResult> } | null>(null)
   const uploadSeqRef = useRef(0)
@@ -85,18 +107,66 @@ export function useCreator(adapters: CreatorAdapters) {
   const trimPreRef = useRef<AppSnap | null>(null)
   const filterPreRef = useRef<AppSnap | null>(null) // KAI-9124 pre-Filters snapshot
   const magicRunRef = useRef(0) // UX-5 / KAI-9083 cancel/new-upload token
+
+  // F25 leg 2 — the prepared generation registry (bounded LRU) + the current-generation pointers.
+  const genRef = useRef(0)
+  const curGenRef = useRef(-1)
+  const curRecipeRef = useRef<Recipe | null>(null)
+  const lruRef = useRef<Map<number, { prepared: PreparedEffect; matteUrl: string | null }>>(new Map())
+  const segCacheRef = useRef<Map<string, MLResult>>(new Map()) // resolved seg per url → shaped re-derive skips ML
+  const restoringRef = useRef(false) // re-entrancy lock: a re-derive in flight blocks a racing undo/redo
   const [, bumpHist] = useState(0)
+
+  /** Mark genId most-recently-used and evict the oldest beyond KEEP_GENERATIONS (releases their canvases). */
+  const touchGen = useCallback((genId: number) => {
+    const lru = lruRef.current
+    const e = lru.get(genId)
+    if (e) { lru.delete(genId); lru.set(genId, e) } // move to newest
+    while (lru.size > KEEP_GENERATIONS) { const oldest = lru.keys().next().value as number; lru.delete(oldest) }
+  }, [])
+
+  /** Register a freshly-built prepared as the CURRENT generation; returns its id. */
+  const registerGeneration = useCallback((p: PreparedEffect, recipe: Recipe, matteUrl: string | null): number => {
+    const genId = ++genRef.current
+    lruRef.current.set(genId, { prepared: p, matteUrl })
+    touchGen(genId)
+    curGenRef.current = genId
+    curRecipeRef.current = recipe
+    return genId
+  }, [touchGen])
+
+  /** Re-derive the matte data-URL for a (re-derived) prepared — shaped from its subject canvas, standard
+   *  from the cached segmentation (null if the cut-out never ran / isn't cached). */
+  const matteFor = useCallback(async (p: PreparedEffect, recipe: Recipe): Promise<string | null> => {
+    try {
+      if (recipe.mode === 'shaped') return p.frontSrc.subjCanvas.toDataURL()
+      const seg = segCacheRef.current.get(recipe.url)
+      if (!seg) return null
+      const pe = await import('@/lib/effect/prepare-effect')
+      return pe.subjectMatteFromSeg(p.frontSrc.origCanvas, seg).toDataURL()
+    } catch { return null }
+  }, [])
+
+  /** Re-derive a prepared from its recipe (LRU miss on restore). Reuses a cached seg so shaped skips ML. */
+  const reDerive = useCallback(async (recipe: Recipe): Promise<PreparedEffect> => {
+    const { prepareEffect, EFFECT_BUILD_CONFIG } = await import('@/lib/effect/prepare-effect')
+    if (recipe.mode === 'standard') return prepareEffect(recipe.url, 'standard')
+    const preseg = segCacheRef.current.get(recipe.url)
+    return prepareEffect(recipe.url, 'shaped', { ...EFFECT_BUILD_CONFIG, minFeatureMM: detailToFloorMm(100), paddingMM: 0 }, undefined, preseg)
+  }, [])
 
   const snapNow = useCallback((): AppSnap => {
     const o = useOutlineStore.getState()
     return {
-      prepared, autoOutline, designState,
+      genId: curGenRef.current,
+      recipe: curRecipeRef.current,
+      autoOutline, designState,
       imageFx: o.imageFx,
       wrapTile: o.wrapTile,
-      outline: { spec: o.spec, committedShape: o.committedShape, source: o.source, adjustments: o.adjustments, bgBlur: o.bgBlur, subjMatteUrl: o.subjMatteUrl },
+      outline: { spec: liteSpec(o.spec), committedShape: o.committedShape, source: o.source, adjustments: o.adjustments, bgBlur: o.bgBlur },
       trim: { ...useSceneStore.getState().colors },
     }
-  }, [prepared, autoOutline, designState])
+  }, [autoOutline, designState])
 
   const pushHistory = useCallback((snap: AppSnap) => {
     histRef.current.past.push(snap)
@@ -105,8 +175,28 @@ export function useCreator(adapters: CreatorAdapters) {
     bumpHist((v) => v + 1)
   }, [])
 
-  const restoreSnap = useCallback((sn: AppSnap) => {
-    setPrepared(sn.prepared)
+  /** Restore a lightweight snapshot — resolves its prepared from the LRU or RE-DERIVES it (F25 leg 2). */
+  const restoreSnap = useCallback(async (sn: AppSnap) => {
+    // resolve the heavy prepared (+ matte) for this generation
+    let resolvedPrepared: PreparedEffect | null = null
+    let matteUrl: string | null = null
+    if (sn.genId >= 0) {
+      const entry = lruRef.current.get(sn.genId)
+      if (entry) {
+        resolvedPrepared = entry.prepared; matteUrl = entry.matteUrl
+      } else if (sn.recipe) {
+        resolvedPrepared = await reDerive(sn.recipe)
+        matteUrl = await matteFor(resolvedPrepared, sn.recipe)
+        lruRef.current.set(sn.genId, { prepared: resolvedPrepared, matteUrl })
+      }
+      curGenRef.current = sn.genId
+      curRecipeRef.current = sn.recipe
+      touchGen(sn.genId)
+    } else {
+      curGenRef.current = -1
+      curRecipeRef.current = null
+    }
+    setPrepared(resolvedPrepared)
     setAutoOutline(sn.autoOutline)
     setDesignState(sn.designState)
     const o = useOutlineStore.getState()
@@ -115,35 +205,40 @@ export function useCreator(adapters: CreatorAdapters) {
     o.setSpec(sn.outline.spec)
     o.setSource(sn.outline.source, sn.outline.adjustments)
     o.setBgBlur(sn.outline.bgBlur)
-    o.setSubjMatteUrl(sn.outline.subjMatteUrl)
+    o.setSubjMatteUrl(matteUrl)
     const sc = useSceneStore.getState()
     sc.setBackColor(sn.trim.backColor)
     sc.setFrameColor(sn.trim.frameColor)
     sc.setBgColor(sn.trim.bgColor)
-  }, [setDesignState])
+  }, [reDerive, matteFor, touchGen, setDesignState])
 
-  const undo = useCallback(() => {
+  const undo = useCallback(async () => {
+    if (restoringRef.current) return
     const h = histRef.current
     if (!h.past.length) return
+    restoringRef.current = true
     const prev = h.past.pop()!
     h.future.unshift(snapNow())
-    restoreSnap(prev)
     bumpHist((v) => v + 1)
+    try { await restoreSnap(prev) } finally { restoringRef.current = false; bumpHist((v) => v + 1) }
   }, [snapNow, restoreSnap])
 
-  const redo = useCallback(() => {
+  const redo = useCallback(async () => {
+    if (restoringRef.current) return
     const h = histRef.current
     if (!h.future.length) return
+    restoringRef.current = true
     const next = h.future.shift()!
     h.past.push(snapNow())
-    restoreSnap(next)
     bumpHist((v) => v + 1)
+    try { await restoreSnap(next) } finally { restoringRef.current = false; bumpHist((v) => v + 1) }
   }, [snapNow, restoreSnap])
 
-  const reset = useCallback(() => {
-    if (!baselineRef.current) return
+  const reset = useCallback(async () => {
+    if (restoringRef.current || !baselineRef.current) return
+    restoringRef.current = true
     pushHistory(snapNow()) // Reset itself is undoable
-    restoreSnap(baselineRef.current)
+    try { await restoreSnap(baselineRef.current) } finally { restoringRef.current = false; bumpHist((v) => v + 1) }
   }, [snapNow, restoreSnap, pushHistory])
 
   // Export — the mm-true SVG cutline from THE vector truth. The socket returns the STRING; the UI
@@ -166,7 +261,9 @@ export function useCreator(adapters: CreatorAdapters) {
   // v5.3·P1 (KAI-9146): subject cut-out in the BACKGROUND once the instant square is up — cached per
   // image so Magic reuses it (instant), and the matte lights up Blend on any shape. `segPresent` (an
   // injected ?seg) selects the harness WebGPU path, so we SKIP the background run (Magic cuts on demand).
-  const startBackgroundCutout = useCallback((url: string, standard: PreparedEffect, seq: number) => {
+  // F25: the resolved seg is cached per url (segCacheRef) so a later shaped RE-DERIVE skips the ML step,
+  // and the published matte is patched onto the standard generation's LRU entry (so undo restores it).
+  const startBackgroundCutout = useCallback((url: string, standard: PreparedEffect, seq: number, genId: number) => {
     if (segPresent) return
     const segPromise = (async () => {
       const [{ segmentML }, { effectiveTextureDim }, pe] = await Promise.all([
@@ -177,10 +274,14 @@ export function useCreator(adapters: CreatorAdapters) {
       const cfg = pe.EFFECT_BUILD_CONFIG
       const texDim = effectiveTextureDim() // F25: capped working res; SAME helper Magic uses → reusable
       const seg = await segmentML(url, cfg.maxImageDim, texDim)
+      segCacheRef.current.set(url, seg) // F25: cache for instant shaped re-derive on undo
+      while (segCacheRef.current.size > SEG_CACHE_CAP) { const k = segCacheRef.current.keys().next().value as string; segCacheRef.current.delete(k) }
       if (uploadSeqRef.current === seq) { // still the active image — publish the matte for Blend
         try {
-          const matte = pe.subjectMatteFromSeg(standard.frontSrc.origCanvas, seg)
-          useOutlineStore.getState().setSubjMatteUrl(matte.toDataURL())
+          const matteUrl = pe.subjectMatteFromSeg(standard.frontSrc.origCanvas, seg).toDataURL()
+          useOutlineStore.getState().setSubjMatteUrl(matteUrl)
+          const entry = lruRef.current.get(genId)
+          if (entry) entry.matteUrl = matteUrl // so a later undo back to this standard generation restores it
         } catch (err) { console.warn('[effect] P1 matte publish failed:', err) }
       }
       return seg
@@ -211,20 +312,22 @@ export function useCreator(adapters: CreatorAdapters) {
       .then((p) => {
         setPrepared(p)
         useOutlineStore.getState().setSpec(p.spec)
+        const genId = registerGeneration(p, { url, mode: 'standard' }, null)
         baselineRef.current = {
-          prepared: p, autoOutline: false, designState: INITIAL_ARTWORK, imageFx: null, wrapTile: false,
-          outline: { spec: p.spec, committedShape: null, source: null, adjustments: { global: { simplify: 0, smooth: 0, straighten: 0, radius: 0 }, local: {} }, bgBlur: null, subjMatteUrl: null },
+          genId, recipe: { url, mode: 'standard' }, autoOutline: false, designState: INITIAL_ARTWORK,
+          imageFx: null, wrapTile: false,
+          outline: { spec: liteSpec(p.spec), committedShape: null, source: null, adjustments: { global: { simplify: 0, smooth: 0, straighten: 0, radius: 0 }, local: {} }, bgBlur: null },
           trim: { ...useSceneStore.getState().colors },
         }
         histRef.current = { past: [], future: [] }
         bumpHist((v) => v + 1)
-        startBackgroundCutout(url, p, seq)
+        startBackgroundCutout(url, p, seq, genId)
       })
       .catch((e) => {
         console.warn('[effect] prepare (standard) failed:', e)
         notify('error', `Couldn't build the square: ${(e as Error)?.message ?? e}`)
       })
-  }, [artworkUrl, startBackgroundCutout, setDesignState, notify])
+  }, [artworkUrl, startBackgroundCutout, registerGeneration, setDesignState, notify])
 
   const handleStatus = useCallback((s: 'idle' | 'building' | 'ready' | 'error', message?: string) => {
     if (s === 'error') notify('error', `3D build failed: ${message ?? 'unknown error'}`) // G4
@@ -243,6 +346,7 @@ export function useCreator(adapters: CreatorAdapters) {
         if (cache && cache.url === artworkUrl) {
           try { preseg = await cache.promise } catch { preseg = undefined }
         }
+        if (!preseg) preseg = segCacheRef.current.get(artworkUrl) // F25: fall back to the resolved-seg cache
         return prepareEffect(artworkUrl, 'shaped', { ...EFFECT_BUILD_CONFIG, minFeatureMM: detailToFloorMm(100), paddingMM: 0 }, (s) => {
           if (s === 'fallback') notify('warn', 'AI cut-out unavailable — used the simple background cut instead') // G4
         }, preseg)
@@ -254,7 +358,10 @@ export function useCreator(adapters: CreatorAdapters) {
         const st = useOutlineStore.getState()
         st.setSpec(p.spec)
         st.commitGeometry(null); st.setBgBlur(null) // fresh cut-out → drop prior edits
-        try { st.setSubjMatteUrl(p.frontSrc.subjCanvas.toDataURL()) } catch { st.setSubjMatteUrl(null) }
+        let matteUrl: string | null = null
+        try { matteUrl = p.frontSrc.subjCanvas.toDataURL() } catch { matteUrl = null }
+        st.setSubjMatteUrl(matteUrl)
+        registerGeneration(p, { url: artworkUrl, mode: 'shaped' }, matteUrl)
         setAutoOutline(true)
         setGenerating(false)
         pushHistory(preMagic)
@@ -265,7 +372,7 @@ export function useCreator(adapters: CreatorAdapters) {
         notify('error', `Magic failed: ${(e as Error)?.message ?? e}`) // G4
         setGenerating(false)
       })
-  }, [artworkUrl, generating, snapNow, pushHistory, notify])
+  }, [artworkUrl, generating, snapNow, pushHistory, registerGeneration, notify])
 
   /** Cancel an in-flight Magic (UX-5): bump the token so a stale result/error is a no-op. */
   const cancelMagic = useCallback(() => { magicRunRef.current++; setGenerating(false) }, [])
