@@ -223,13 +223,13 @@ function PrototypePageInner() {
     // Product URLs carry no ?seg.
     try { if (new URLSearchParams(window.location.search).get('seg')) return } catch { /* SSR/no-window */ }
     const segPromise = (async () => {
-      const [{ segmentML }, { deviceMaxTextureDim }, pe] = await Promise.all([
+      const [{ segmentML }, { effectiveTextureDim }, pe] = await Promise.all([
         import('@/lib/effect/segment-ml'),
         import('@/lib/effect/mask'),
         import('@/lib/effect/prepare-effect'),
       ])
       const cfg = pe.EFFECT_BUILD_CONFIG
-      const texDim = Math.max(cfg.textureDim, deviceMaxTextureDim()) // SAME dims Magic uses → reusable
+      const texDim = effectiveTextureDim() // F25: capped working res; SAME helper Magic uses → reusable
       const seg = await segmentML(url, cfg.maxImageDim, texDim)
       if (uploadSeqRef.current === seq) { // still the active image — publish the matte for Blend
         try {

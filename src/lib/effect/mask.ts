@@ -34,6 +34,17 @@ export function deviceMaxTextureDim(): number {
   return cachedMaxTextureDim
 }
 
+/** F25 (mobile OOM): the working texture/decode dimension. Capped to a mobile memory budget so a
+ *  48-MP photo never allocates multi-GB canvases, and never above the device's actual GPU max. BOTH
+ *  prepareEffect and the upload-time background cut-out resolve texDim through THIS one helper —
+ *  capping a single call site would leave the OOM leak half-open (blueprint invariant 19). The
+ *  full-resolution original is re-baked separately for manufacturing at save/order, so the screen
+ *  texture cap never touches print quality. */
+export const MOBILE_TEXTURE_DIM_CAP = 4096
+export function effectiveTextureDim(): number {
+  return Math.min(deviceMaxTextureDim(), MOBILE_TEXTURE_DIM_CAP)
+}
+
 export async function loadImageData(url: string, maxDim = 512): Promise<ImageData> {
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {
     const el = new Image()
