@@ -53,7 +53,8 @@ const SEG_CACHE_CAP = 12
 
 // ── #23 GLOBAL history snapshot shapes — lightweight (F25 leg 2: NO prepared object, NO matte URL) ──
 type OutlineSnap = {
-  // spec is stored WITHOUT rawTracePx (provenance/debug only — never read on restore; F25).
+  // spec is stored stripped of rawTracePx (memory); restore RE-ATTACHES the full spec from the prepared,
+  // because the editor's Detail/Offset re-derivation reads spec.rawTracePx (OutlineEditor:354,362) — F25.
   spec: ReturnType<typeof useOutlineStore.getState>['spec']
   committedShape: ReturnType<typeof useOutlineStore.getState>['committedShape']
   source: ReturnType<typeof useOutlineStore.getState>['source']
@@ -71,11 +72,19 @@ type AppSnap = {
   trim: { backColor: string; frameColor: string; bgColor: string }
 }
 
-/** Strip rawTracePx from a spec for history storage (provenance only — never resolved from; F25 leg 2). */
+/** Strip rawTracePx from a STORED spec (memory win). Restore re-attaches the full spec from the prepared,
+ *  so the editor's Detail/Offset (which read spec.rawTracePx) survive undo/redo/reset (F25 leg 2). */
 function liteSpec(spec: ReturnType<typeof useOutlineStore.getState>['spec']) {
   if (!spec) return spec
   if (spec.rawTracePx === undefined) return spec
   return { ...spec, rawTracePx: undefined }
+}
+
+/** Strip rawTracePx from a STORED source — it is write-only provenance (no reader; verified by grep), so
+ *  dropping it from each snapshot is zero-behaviour + stops the raw trace being retained ×N history (F25 leg 2). */
+function liteSource(source: ReturnType<typeof useOutlineStore.getState>['source']) {
+  if (!source || source.rawTracePx === undefined) return source
+  return { ...source, rawTracePx: undefined }
 }
 
 export function useCreator(adapters: CreatorAdapters) {
@@ -163,7 +172,7 @@ export function useCreator(adapters: CreatorAdapters) {
       autoOutline, designState,
       imageFx: o.imageFx,
       wrapTile: o.wrapTile,
-      outline: { spec: liteSpec(o.spec), committedShape: o.committedShape, source: o.source, adjustments: o.adjustments, bgBlur: o.bgBlur },
+      outline: { spec: liteSpec(o.spec), committedShape: o.committedShape, source: liteSource(o.source), adjustments: o.adjustments, bgBlur: o.bgBlur },
       trim: { ...useSceneStore.getState().colors },
     }
   }, [autoOutline, designState])
@@ -202,7 +211,10 @@ export function useCreator(adapters: CreatorAdapters) {
     const o = useOutlineStore.getState()
     o.setImageFx(sn.imageFx)
     o.setWrapTile(sn.wrapTile)
-    o.setSpec(sn.outline.spec)
+    // F25 finding-1: re-attach the FULL spec (with rawTracePx) from the resolved prepared, so the editor's
+    // Detail/Offset re-derivation (which reads spec.rawTracePx) survives undo. resolvedPrepared.spec ≡ the
+    // stored lite spec + rawTracePx (spec is never edited post-generation). Lite spec is the fallback.
+    o.setSpec(resolvedPrepared?.spec ?? sn.outline.spec)
     o.setSource(sn.outline.source, sn.outline.adjustments)
     o.setBgBlur(sn.outline.bgBlur)
     o.setSubjMatteUrl(matteUrl)
@@ -212,34 +224,54 @@ export function useCreator(adapters: CreatorAdapters) {
     sc.setBgColor(sn.trim.bgColor)
   }, [reDerive, matteFor, touchGen, setDesignState])
 
+  // F25 finding-2: snapshot the move target + current, restore FIRST, and commit the stack mutation ONLY
+  // on success — a re-derive throw then leaves the history + UI consistent (no desync) and notifies, vs the
+  // old "mutate-then-await" which popped before a possible throw. restoreSnap's re-derive (the only throw
+  // point) runs before any state setter, so a failure leaves on-screen state untouched.
   const undo = useCallback(async () => {
     if (restoringRef.current) return
     const h = histRef.current
     if (!h.past.length) return
     restoringRef.current = true
-    const prev = h.past.pop()!
-    h.future.unshift(snapNow())
-    bumpHist((v) => v + 1)
-    try { await restoreSnap(prev) } finally { restoringRef.current = false; bumpHist((v) => v + 1) }
-  }, [snapNow, restoreSnap])
+    const prev = h.past[h.past.length - 1]
+    const cur = snapNow()
+    try {
+      await restoreSnap(prev)
+      h.past.pop(); h.future.unshift(cur)
+    } catch (e) {
+      console.warn('[effect] undo restore failed:', e)
+      notify('error', `Undo failed: ${(e as Error)?.message ?? e}`)
+    } finally { restoringRef.current = false; bumpHist((v) => v + 1) }
+  }, [snapNow, restoreSnap, notify])
 
   const redo = useCallback(async () => {
     if (restoringRef.current) return
     const h = histRef.current
     if (!h.future.length) return
     restoringRef.current = true
-    const next = h.future.shift()!
-    h.past.push(snapNow())
-    bumpHist((v) => v + 1)
-    try { await restoreSnap(next) } finally { restoringRef.current = false; bumpHist((v) => v + 1) }
-  }, [snapNow, restoreSnap])
+    const next = h.future[0]
+    const cur = snapNow()
+    try {
+      await restoreSnap(next)
+      h.future.shift(); h.past.push(cur)
+    } catch (e) {
+      console.warn('[effect] redo restore failed:', e)
+      notify('error', `Redo failed: ${(e as Error)?.message ?? e}`)
+    } finally { restoringRef.current = false; bumpHist((v) => v + 1) }
+  }, [snapNow, restoreSnap, notify])
 
   const reset = useCallback(async () => {
     if (restoringRef.current || !baselineRef.current) return
     restoringRef.current = true
-    pushHistory(snapNow()) // Reset itself is undoable
-    try { await restoreSnap(baselineRef.current) } finally { restoringRef.current = false; bumpHist((v) => v + 1) }
-  }, [snapNow, restoreSnap, pushHistory])
+    const cur = snapNow()
+    try {
+      await restoreSnap(baselineRef.current)
+      pushHistory(cur) // Reset itself is undoable — push only after a successful restore
+    } catch (e) {
+      console.warn('[effect] reset restore failed:', e)
+      notify('error', `Reset failed: ${(e as Error)?.message ?? e}`)
+    } finally { restoringRef.current = false; bumpHist((v) => v + 1) }
+  }, [snapNow, restoreSnap, pushHistory, notify])
 
   // Export — the mm-true SVG cutline from THE vector truth. The socket returns the STRING; the UI
   // performs the download (the injected export adapter). null = nothing/not-feasible (already notified).
