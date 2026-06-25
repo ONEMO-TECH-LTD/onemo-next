@@ -232,7 +232,7 @@ What was **reverted** (P3/P5): the full-bleed canvas effects, surround-glow / 3D
 Still present, **deferred to a surgical test-aware pass** (NOT a folder delete):
 - `outline-core` document-runtime: `resolver.ts`'s `resolveOutlineDocument` half, `sdf.ts`, `livewire.ts`, `reducer.ts`, `types.ts` `OutlineDocument` — not on the runtime path (the runtime imports the narrow `outline-core/math` surface). The `index.ts` **barrel + ring-math are LIVE** (7 tests + the engine import `fairingFromDetail`/`validateSelfIntersection` through it), so removal is surgical, not a folder cut.
 - `geometry-truth.legacy.ts` — retired trace fit, **relocated to `src/lib/effect/__tests__/geometry-truth.legacy.ts`** (test-only fixture, moved out of the production lib in the v5.5.1 de-slop).
-- `EffectModel.tsx` — the GLB material path; not on the shaped (/create) route. **`onemo-loader.ts` is NOT dead** — `parseOnemoConfig` loads the golden scene through `AdminViewer` (live on /create); `loadOnemoTemplate` is the Studio-only path.
+- `EffectModel.tsx` — the GLB material path; not on the shaped (/create) route. **`onemo-loader.ts` is NOT dead** — `parseOnemoConfig` loads the golden scene through `AdminViewer` (live on /create). (The Studio-only `loadOnemoTemplate` path was removed in the v5.5.1 de-slop.)
 
 ## 10. Known drift / debt
 

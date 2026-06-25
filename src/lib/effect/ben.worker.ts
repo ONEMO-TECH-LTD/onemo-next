@@ -1,7 +1,8 @@
-// BEN2-ONNX background-removal — Web Worker (V3 · blueprint §6.2 + G5)
+// Cut-out background-removal — Web Worker (V3 · blueprint §6.2 + G5)
 //
-// The ML inference (BEN2-ONNX via transformers.js, webgpu→wasm) is the 30–60s blocking step.
-// It runs HERE, off the main thread, so the UI stays responsive.
+// Production default = the self-hosted trio (u2netp -> silueta -> flood-fill) on the WASM EP
+// (no WebGPU → Safari-safe); BEN2 (transformers.js, webgpu→wasm) is opt-in only via ?seg=ben2.
+// The ML inference is the blocking step — it runs HERE, off the main thread, so the UI stays responsive.
 //
 // G5 hardening (blueprint §7):
 //  • SELF-HOSTED weights first: `env.localModelPath = '/models'` — pin the model under

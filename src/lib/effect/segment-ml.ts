@@ -1,7 +1,8 @@
-// ML segmentation adapter — BEN2-ONNX via transformers.js (V3 · blueprint §6.2 + G5)
-// Browser default = onnx-community/BEN2-ONNX (MIT) via transformers.js. REAL user images have NO
-// alpha and often non-uniform backgrounds, so subject isolation needs an ML matting model — not
-// alpha or flood-fill. This is the default path.
+// ML segmentation adapter — main-thread wrapper over the cut-out worker (ben.worker.ts · G5)
+// Production default = the self-hosted trio (u2netp -> silueta -> flood-fill), WASM EP; BEN2 was
+// retired (219 MB -> iPhone OOM) and is opt-in only via ?seg=ben2. REAL user images have NO alpha
+// and often non-uniform backgrounds, so subject isolation needs an ML matting model — not alpha
+// or flood-fill. This is the default path.
 //
 // The heavy ML inference runs in a WEB WORKER (ben.worker.ts) so the main thread stays responsive.
 // The worker returns the full-res RGBA matte; THIS module does the (cheap, DOM-bound) canvas

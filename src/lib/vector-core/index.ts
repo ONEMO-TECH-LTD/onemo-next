@@ -25,4 +25,5 @@ export {
 export { fitCubicsOpen, ringToVPath, cornerIndices, type CubicSeg } from './fit'
 
 // Points-on-demand ops (Run 6) — exact insert, nearest-point, delete-with-refit.
-export { nearestOnPath, insertAnchorAt, insertAnchorCentered, deleteAnchorRefit, scaleAnchorTension, type PathHit } from './ops'
+// insertAnchorAt is live-internal (insertAnchorCentered calls it) but NOT a public API — tests import it from './ops' directly.
+export { nearestOnPath, insertAnchorCentered, deleteAnchorRefit, scaleAnchorTension, type PathHit } from './ops'

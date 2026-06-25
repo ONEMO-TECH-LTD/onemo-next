@@ -8,7 +8,7 @@ import { vectoriseTrace } from './geometry-truth.legacy' // R4: retired trace-fi
 import { fairingFromDetail, BEN_DEFAULT_DETAIL } from '@/lib/outline-core'
 import { getShape } from '@/lib/shape-library'
 import { flattenShape, type VShape } from '@/lib/vector-core'
-import { filletShape } from '@/lib/vector-core/path' // KAI-9071: test fixture only (not a public barrel export)
+import { filletShape } from '@/lib/vector-core/__tests__/fillet-fixtures' // test fixture (moved out of production path.ts)
 import type { Pt } from '../types'
 
 const FAIRING = fairingFromDetail(BEN_DEFAULT_DETAIL)

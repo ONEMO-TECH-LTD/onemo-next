@@ -2,11 +2,9 @@
  * .onemo scene-format loader — the Creator's own reader (adapter extracted from the
  * old studio/ into ./scene-format/ during the v5.3.1 cleanup).
  *
- * Two modes:
- * 1. parseOnemoConfig() — lightweight, no renderer needed. Extracts ViewerConfig
- *    from studio.json + GLB as blob URL. Loads the golden scene via AdminViewer (live on /create).
- * 2. loadOnemoTemplate() — full deserialization including renderer settings, env
- *    texture, scene graph (Studio-only path).
+ * parseOnemoConfig() — lightweight, no renderer needed. Extracts ViewerConfig from studio.json
+ * + GLB as a blob URL. Loads the golden scene via AdminViewer (live on /create). The Studio-only
+ * full-deserialization path (loadOnemoTemplate) was removed in the v5.5.1 de-slop (dead leftover).
  */
 
 import JSZip from 'jszip';
