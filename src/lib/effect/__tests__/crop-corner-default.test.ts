@@ -3,7 +3,7 @@
 // SAME default radius automatically, while interior sharp corners (design intent) stay TRUE
 // corner anchors. The sharp fit stays derivable by omitting the opts (Radius→0 = sharp).
 import { describe, it, expect } from 'vitest'
-import { vectoriseTrace } from '../geometry-truth.legacy' // R4: retired trace-fit, test-only
+import { vectoriseTrace } from './geometry-truth.legacy' // R4: retired trace-fit, test-only
 import { fairingFromDetail } from '@/lib/outline-core'
 import type { Pt } from '../types'
 

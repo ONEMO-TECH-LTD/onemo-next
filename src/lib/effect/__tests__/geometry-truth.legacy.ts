@@ -14,7 +14,7 @@
 import { fairTracedRing, rdpClosed, validateSelfIntersection, repairSimplePolygon, type FairTracedRingOpts, type Vec2Px } from '@/lib/outline-core/math'
 import { flattenShape, ringToVPath, type VShape } from '@/lib/vector-core'
 import { roundCornersPaper } from '@/lib/vector-core/paper-kernel' // L6: one fillet engine (Paper) even in legacy
-import type { Pt } from './types'
+import type { Pt } from '../types'
 
 // Trace→vector fit parameters — the ONE fit every trace went through (generation AND editor re-Tune).
 const FIT_CORNER_ANGLE_DEG = 30

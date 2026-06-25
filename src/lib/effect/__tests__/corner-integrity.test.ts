@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { vectoriseTrace } from '@/lib/effect/geometry-truth.legacy' // R4: retired trace-fit, test-only
+import { vectoriseTrace } from './geometry-truth.legacy' // R4: retired trace-fit, test-only
 import { fairingFromDetail, BEN_DEFAULT_DETAIL } from '@/lib/outline-core'
 import type { Pt } from '@/lib/effect/types'
 
