@@ -34,7 +34,7 @@ export interface ShapeBuildConfig {
   cornerRadiusMM: number    // unused (outline-core owns rounding) — kept for API compat
   squareCornerMM: number    // corner radius of the standard square
 }
-import { loadImageData, segment, adapterIdFor, dilateMask, smoothMask, deviceMaxTextureDim, type MaskResult } from './mask'
+import { loadImageData, segment, adapterIdFor, dilateMask, smoothMask, effectiveTextureDim, type MaskResult } from './mask'
 import { segmentML, type MLResult } from './segment-ml'
 import { traceContourRaw } from './contour'
 import { composeFront, blurCanvas, imageDataToCanvas } from './composite'
@@ -163,10 +163,11 @@ export async function prepareEffect(
   onProgress?: (s: 'downloading-model' | 'cutting' | 'fallback') => void,
   preseg?: MLResult,
 ): Promise<PreparedEffect> {
-  // Full photo (texture res), y-up, for the composite + edge-lip source. NO policy cap (Dan,
-  // plan v2.1 §B5): the texture carries the source's full resolution up to the device's physical
-  // GPU maximum. (cfg.textureDim remains the config floor for tests/back-compat.)
-  const texDim = Math.max(cfg.textureDim, deviceMaxTextureDim())
+  // Full photo (texture res), y-up, for the composite + edge-lip source. F25 (mobile OOM): the
+  // working/decode resolution is capped to a mobile memory budget via effectiveTextureDim — never the
+  // raw device GPU max, which let a 48-MP photo allocate multi-GB canvases (blueprint invariant 19).
+  // The upload-time background cut-out (page.tsx) resolves texDim through the SAME helper.
+  const texDim = effectiveTextureDim()
   const orig = await loadImageData(url, texDim)
   const fw = orig.width, fh = orig.height
   const origCanvas = imageDataToCanvas(orig)

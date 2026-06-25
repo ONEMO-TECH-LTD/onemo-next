@@ -14,7 +14,7 @@
 //
 // (R4 — Creator v5) The retired v3 trace→vector FIT (`vectoriseTrace`, fair + Schneider) is NOT in
 // the active pipeline: Magic/upload birth a RAW straight OutlineSource (prepare-effect.ts) and the
-// editor's resolve() owns shaping. That dead fit moved to `geometry-truth.legacy.ts` (test-only) so
+// editor's resolve() owns shaping. That dead fit moved to `__tests__/geometry-truth.legacy.ts` (test-only fixture) so
 // this module's surface can't import it as authority.
 
 import { validateSelfIntersection, signedArea, contentHash, stableStringify, type Vec2Px } from '@/lib/outline-core/math'

@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest'
 import { smoothMask } from '../mask'
 import { traceContourRaw } from '../contour'
-import { vectoriseTrace } from '../geometry-truth.legacy' // R4: retired trace-fit, test-only
+import { vectoriseTrace } from './geometry-truth.legacy' // R4: retired trace-fit, test-only
 import { fairingFromDetail, BEN_DEFAULT_DETAIL } from '@/lib/outline-core'
 
 const W = 512, H = 512

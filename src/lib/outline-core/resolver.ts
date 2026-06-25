@@ -1,31 +1,16 @@
-// outline-core/resolver.ts — deterministic OutlineDocument → resolved + flattened cut polygon (A1a)
+// outline-core/resolver.ts — live ring/curve geometry math (the narrow active surface, re-exported
+// via ./math + ./index). Pure + deterministic (no DOM, no three.js, no Date.now): RDP simplification,
+// closed-ring fairing (Detail), centripetal Catmull-Rom smoothing, winding normalization (outer CCW,
+// holes CW), self-intersection detection + repair.
 //
-// Chain (AMEND-C2/F2 — resolve BEFORE flatten):
-//   OutlineDocument
-//     → resolve  (per-node corner radii applied as true arcs; line segments between nodes)
-//     → flatten  (RDP at the manufacturing-profile tolerance)
-//     → normalize rings (closure + winding: outer CCW, holes CW)
-//     → self-intersection check → locators
-//
-// Per-node corner radii reuse the engine's `filletCorners` arc math (core/shaped/contour.ts):
-// θ = INTERIOR angle, radiusMax = 0.8·min(L1,L2)·tan(θ/2). v1 = convex corners only (AMEND-C6);
-// concave/near-straight pass through. Pure + deterministic: no DOM, no three.js, no Date.now.
-//
-// SCOPE (A1a): line segments between nodes (the auto/semi-auto polygon case). Curve/livewire
-// segment sampling (cubic/catmull_rom/livewire) + the Catmull-Rom smoothing resample land with
-// A2/A3 when those segment types are produced; `policy.smoothing_applied` reports honestly.
+// The OutlineDocument document-runtime this file used to resolve was removed in the v5.5.1 de-slop —
+// VShape is the source of truth (DEC-v5-02 / DEC-v5-03); the kernel direction is Paper.js/Clipper2.
 
 import type {
-  OutlineDocument,
   OutlineRing,
-  OutlineNode,
   Vec2Px,
-  ResolvedOutline,
-  ResolvedOutlinePolicy,
   GeometryLocator,
-  EditorValidationIssue,
 } from './types'
-import { outlineDocumentHash } from './hash'
 
 // ─── geometry helpers (pure ports from core/shaped/contour.ts) ───────────────
 
@@ -109,83 +94,6 @@ function segmentsProperlyIntersect(p1: Vec2Px, p2: Vec2Px, p3: Vec2Px, p4: Vec2P
   return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))
 }
 
-// ─── per-node corner radius (reuses engine filletCorners arc math) ───────────
-
-/** Resolve a node's effective corner radius from its CornerSpec + the global default. */
-function resolveNodeRadius(node: OutlineNode, globalRadiusPx: number): number {
-  const c = node.corner
-  switch (c.mode) {
-    case 'sharp': return 0
-    case 'smooth': return 0 // spline smoothing (A2) — not a hard arc radius
-    case 'manual': return c.outlineCornerRadiusPx ?? 0
-    case 'inherit': return c.locked ? 0 : globalRadiusPx // locked corners ignore "round all"
-  }
-}
-
-/**
- * Apply per-node corner radii to a closed node ring → resolved polyline. Convex corners with a
- * positive resolved radius become TRUE circular arcs (clamped so neighbouring fillets fit);
- * concave, near-straight, and zero-radius corners pass through as their vertex.
- *
- * Division of labour (settled by use, Dan 2026-06-10): RADIUS (the Round tool) = these true arcs —
- * exact corner rounding, square @ max = circle. SMOOTH = the Catmull-Rom spline resample (below in
- * resolve) — organic softening for BEN/free-form outlines. They are different effects; both ship.
- *
- * Arc resolution is ADAPTIVE (≈2px per segment, 8..72 steps): a fixed 10-step arc read visibly
- * choppy on large corners (e.g. the default square's corner radius at texture scale).
- */
-export function applyCornerRadii(
-  nodes: OutlineNode[],
-  globalRadiusPx: number,
-): Vec2Px[] {
-  const n = nodes.length
-  if (n < 3) return nodes.map((nd) => [nd.p[0], nd.p[1]] as Vec2Px)
-  const pts = nodes.map((nd) => nd.p)
-  const ccw = signedArea(pts) > 0
-  const out: Vec2Px[] = []
-
-  for (let i = 0; i < n; i++) {
-    const a = pts[(i - 1 + n) % n], v = pts[i], b = pts[(i + 1) % n]
-    const d1x = a[0] - v[0], d1y = a[1] - v[1]
-    const d2x = b[0] - v[0], d2y = b[1] - v[1]
-    const l1 = Math.hypot(d1x, d1y) || 1, l2 = Math.hypot(d2x, d2y) || 1
-    const u1x = d1x / l1, u1y = d1y / l1, u2x = d2x / l2, u2y = d2y / l2
-    const cosA = Math.max(-1, Math.min(1, u1x * u2x + u1y * u2y))
-    // near-straight (interior ≈ 180°) → no fillet handle
-    const nearStraight = cosA < -0.999
-    // convex iff the turn matches the ring winding (cross sign)
-    const cross = d1x * d2y - d1y * d2x // (v→a) × (v→b)
-    const convex = cross < 0 === ccw // for CCW, convex corners turn right here
-    const half = Math.acos(cosA) / 2
-    // Clamp so a fillet consumes at most HALF its shorter adjacent edge — two fillets sharing an
-    // edge then MEET exactly (0.5 + 0.5 = 1) and can never overlap. The ε keeps a hair of slack for
-    // float noise. At full Smooth this is what closes a square into a true circle (the old 0.49
-    // margin left visible flat remnants at the corners — 4.8% off-circle, measured).
-    const maxR = (0.5 - 1e-4) * Math.min(l1, l2) * Math.tan(half)
-    const R = resolveNodeRadius(nodes[i], globalRadiusPx)
-    if (R <= 0 || nearStraight || !convex) { out.push([v[0], v[1]]); continue }
-
-    const Rc = Math.min(R, maxR)
-    const t = Rc / Math.tan(half)
-    const p1: Vec2Px = [v[0] + u1x * t, v[1] + u1y * t]
-    const p2: Vec2Px = [v[0] + u2x * t, v[1] + u2y * t]
-    let bx = u1x + u2x, by = u1y + u2y
-    const bl = Math.hypot(bx, by) || 1; bx /= bl; by /= bl
-    const cx = v[0] + bx * (Rc / Math.sin(half)), cy = v[1] + by * (Rc / Math.sin(half))
-    const a1 = Math.atan2(p1[1] - cy, p1[0] - cx)
-    const a2 = Math.atan2(p2[1] - cy, p2[0] - cx)
-    let da = a2 - a1
-    while (da > Math.PI) da -= 2 * Math.PI
-    while (da < -Math.PI) da += 2 * Math.PI
-    // adaptive resolution: ≈2px per arc segment (was a fixed 10 → visible facets on big corners)
-    const steps = Math.max(8, Math.min(72, Math.ceil((Rc * Math.abs(da)) / 2)))
-    for (let s = 0; s <= steps; s++) {
-      const ang = a1 + da * (s / steps)
-      out.push([cx + Rc * Math.cos(ang), cy + Rc * Math.sin(ang)])
-    }
-  }
-  return out
-}
 
 // ─── flatten / normalize / validate ──────────────────────────────────────────
 
@@ -569,158 +477,4 @@ export function fairTracedRing(densePts: Vec2Px[], opts: FairTracedRingOpts = {}
   // soften the line↔curve seams for the cutter: [1,2,1] is exactly invariant on straights (snapped
   // lines cannot re-wobble) and shrinks arcs negligibly — only seam vertices round.
   return smooth121(smooth121(ring))
-}
-
-/**
- * Build editable nodes from a DENSE traced contour (e.g. the BEN mask trace): sparse anchor nodes
- * picked by RDP, with each segment carrying the EXACT dense polyline between its anchors
- * (`segmentToNext.rawPolyline`). The render/manufacture path then follows the TRUE trace —
- * pixel-faithful, no approximation — while editing stays sparse-handle. (The lossy alternative —
- * keep only the anchors and spline between them — clipped corners and wobbled straights: the
- * "micro imperfections" Dan caught 2026-06-10.)
- */
-export function nodesFromTracedRing(densePts: Vec2Px[], epsilonPx: number, idPrefix = 'n'): OutlineNode[] {
-  const dense = dedup(densePts)
-  const n = dense.length
-  if (n < 4) {
-    return dense.map((p, i) => ({ id: `${idPrefix}${i}`, p: [p[0], p[1]] as Vec2Px, role: 'corner' as const, corner: { mode: 'inherit' as const } }))
-  }
-  // anchor selection: closed RDP, tracking INDICES into the dense ring
-  const anchors = rdpClosed(dense, epsilonPx)
-  const key = (p: Vec2Px) => `${p[0].toFixed(4)},${p[1].toFixed(4)}`
-  const indexByKey = new Map<string, number>()
-  dense.forEach((p, i) => { if (!indexByKey.has(key(p))) indexByKey.set(key(p), i) })
-  let idx = anchors.map((p) => indexByKey.get(key(p))).filter((i): i is number => i !== undefined)
-  idx = [...new Set(idx)].sort((a, b) => a - b)
-  if (idx.length < 3) idx = [0, Math.floor(n / 3), Math.floor((2 * n) / 3)]
-  const nodes: OutlineNode[] = []
-  for (let k = 0; k < idx.length; k++) {
-    const a = idx[k], b = idx[(k + 1) % idx.length]
-    const slice: Vec2Px[] = []
-    for (let i = a; ; i = (i + 1) % n) { slice.push([dense[i][0], dense[i][1]]); if (i === b) break }
-    nodes.push({
-      id: `${idPrefix}${k}`,
-      p: [dense[a][0], dense[a][1]],
-      role: 'livewire_anchor',
-      corner: { mode: 'inherit' },
-      segmentToNext: { type: 'livewire', rawPolyline: slice },
-    })
-  }
-  return nodes
-}
-
-/**
- * Assemble a traced ring from its nodes: each segment's exact rawPolyline, WARPED so its endpoints
- * follow the CURRENT anchor positions (linear-falloff translation along the segment) — an anchor
- * drag locally reshapes the trace instead of discarding it. Segments without a rawPolyline fall
- * back to a straight line.
- */
-function assembleTracedRing(nodes: OutlineNode[]): Vec2Px[] {
-  const m = nodes.length
-  const out: Vec2Px[] = []
-  for (let k = 0; k < m; k++) {
-    const node = nodes[k]
-    const next = nodes[(k + 1) % m]
-    const raw = node.segmentToNext?.type === 'livewire' ? node.segmentToNext.rawPolyline : undefined
-    if (!raw || raw.length < 2) { out.push([node.p[0], node.p[1]]); continue }
-    const a0 = raw[0], b0 = raw[raw.length - 1]
-    const dA: Vec2Px = [node.p[0] - a0[0], node.p[1] - a0[1]]
-    const dB: Vec2Px = [next.p[0] - b0[0], next.p[1] - b0[1]]
-    const L = raw.length - 1
-    for (let i = 0; i < L; i++) { // omit the segment's last point (next segment starts with it)
-      const t = L > 0 ? i / L : 0
-      out.push([raw[i][0] + dA[0] + (dB[0] - dA[0]) * t, raw[i][1] + dA[1] + (dB[1] - dA[1]) * t])
-    }
-  }
-  return out
-}
-
-/** Gentle closed-ring Laplacian smoothing — the Smooth control for dense traced rings. */
-function laplacianClosed(pts: Vec2Px[], iterations: number): Vec2Px[] {
-  let cur = pts
-  const n = pts.length
-  if (n < 5) return pts
-  for (let it = 0; it < iterations; it++) {
-    const next: Vec2Px[] = new Array(n)
-    for (let i = 0; i < n; i++) {
-      const p = cur[i], a = cur[(i - 1 + n) % n], b = cur[(i + 1) % n]
-      next[i] = [(a[0] + 2 * p[0] + b[0]) / 4, (a[1] + 2 * p[1] + b[1]) / 4]
-    }
-    cur = next
-  }
-  return cur
-}
-
-// ─── top-level resolve ───────────────────────────────────────────────────────
-
-export interface ResolveOptions {
-  /** Manufacturing-profile flatten tolerance in source px (NEVER screen zoom). */
-  flattenTolerancePx: number
-}
-
-/**
- * Resolve an OutlineDocument into resolved + flattened, normalized cut polygons (px), with
- * self-intersection locators. The deterministic core shared by the client worker, the (future)
- * server canonical compiler, and the golden tests (AMEND-C9).
- */
-export function resolveOutlineDocument(doc: OutlineDocument, opts: ResolveOptions): ResolvedOutline {
-  const tol = opts.flattenTolerancePx
-  const resolvedRingsPx: Vec2Px[][] = []
-  const flattenedRingsPx: Vec2Px[][] = []
-  const issues: EditorValidationIssue[] = []
-  const locators: GeometryLocator[] = []
-  let anyRadius = false
-
-  for (const ring of doc.rings) {
-    const traced = ring.nodes.some((nd) => nd.segmentToNext?.type === 'livewire')
-    let resolved: Vec2Px[]
-    if (traced) {
-      // EXACT path: the ring follows its dense traced contour (segment rawPolylines), warped to the
-      // current anchor positions. Smooth = Laplacian passes over the dense ring (organic softening
-      // that stays on the trace). Corner radii don't apply to traced joints.
-      resolved = assembleTracedRing(ring.nodes)
-      if (doc.style.smoothing > 0) resolved = laplacianClosed(resolved, Math.round(doc.style.smoothing * 10))
-    } else {
-      const filleted = applyCornerRadii(ring.nodes, doc.style.globalOutlineCornerRadiusPx)
-      if (filleted.length !== ring.nodes.length) anyRadius = true
-      // Smooth (0..1) = centripetal Catmull-Rom over the (filleted) ring — curve interpolation
-      // between sparse control nodes; Round handles exact corner rounding separately.
-      resolved = doc.style.smoothing > 0
-        ? catmullRomClosed(filleted, Math.round(4 + doc.style.smoothing * 12))
-        : filleted
-    }
-    const flat = normalizeRing(flattenPath(resolved, tol), ring.role)
-    resolvedRingsPx.push(resolved)
-    flattenedRingsPx.push(flat)
-
-    const selfHits = validateSelfIntersection(flat, ring.id)
-    if (selfHits.length) {
-      locators.push(...selfHits)
-      issues.push({
-        code: 'SELF_INTERSECTION',
-        subsystem: 'outline-core',
-        severity: 'block',
-        repairability: 'manual',
-        locators: selfHits,
-        source: 'client_preview',
-      })
-    }
-  }
-
-  const policy: ResolvedOutlinePolicy = {
-    smoothing_applied: doc.style.smoothing > 0,
-    corner_radii_applied: anyRadius || doc.style.globalOutlineCornerRadiusPx > 0,
-    // per-node radii are applied here → the engine's global filletCorners must NOT run again
-    downstream_corner_rounding: 'disabled',
-  }
-
-  return {
-    outlineDocumentHash: outlineDocumentHash(doc),
-    resolvedRingsPx,
-    flattenedRingsPx,
-    flattenTolerancePx: tol,
-    policy,
-    locators,
-    issues,
-  }
 }

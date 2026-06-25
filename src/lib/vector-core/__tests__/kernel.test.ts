@@ -3,8 +3,9 @@
 // Square: lines never subdivide. Flatten: chord error within tolerance. SVG: true C commands.
 
 import { describe, test, expect } from 'vitest'
-import { cubicPoint, flattenPath, toSVGPathD, transformShape, segments, shapeBBox, ringToVPath, nearestOnPath, insertAnchorAt, insertAnchorCentered, deleteAnchorRefit, signedArea } from '../index'
-import { filletPath } from '../path' // KAI-9071: test fixture only — not a public barrel export (one fillet engine)
+import { cubicPoint, flattenPath, toSVGPathD, transformShape, segments, shapeBBox, ringToVPath, nearestOnPath, insertAnchorCentered, deleteAnchorRefit, signedArea } from '../index'
+import { insertAnchorAt } from '../ops' // live-internal, not a public barrel export
+import { filletPath } from './fillet-fixtures' // test fixture (moved out of production path.ts)
 import { roundCornersPaper } from '../paper-kernel' // L6: corner-round is the Paper kernel
 import { unitShape, getShape } from '@/lib/shape-library'
 

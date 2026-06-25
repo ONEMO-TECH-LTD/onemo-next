@@ -84,6 +84,26 @@ function InvalidateOnAssetLoad({ frozen, contentKey }: { frozen?: boolean; conte
   return null
 }
 
+/** Invariant 24 (F32): a lost WebGL context must never leave a permanently blank scene. preventDefault on
+ *  'webglcontextlost' lets the browser restore the context; on 'webglcontextrestored' we invalidate + signal
+ *  a full model rebuild (re-uploads geometry + textures). F25 memory pressure raises context-loss odds on mobile. */
+function ContextLossHandler({ onRestored }: { onRestored: () => void }) {
+  const gl = useThree((s) => s.gl)
+  const invalidate = useThree((s) => s.invalidate)
+  React.useEffect(() => {
+    const canvas = gl.domElement
+    const onLost = (e: Event) => { e.preventDefault() }
+    const onRestoredEvt = () => { invalidate(); onRestored() }
+    canvas.addEventListener('webglcontextlost', onLost, false)
+    canvas.addEventListener('webglcontextrestored', onRestoredEvt, false)
+    return () => {
+      canvas.removeEventListener('webglcontextlost', onLost)
+      canvas.removeEventListener('webglcontextrestored', onRestoredEvt)
+    }
+  }, [gl, invalidate, onRestored])
+  return null
+}
+
 function RendererBackgroundSync({ color }: { color: string }) {
   const { gl } = useThree()
 
@@ -226,6 +246,10 @@ export default function EffectViewer({
     useGLTF.preload(config.modelPath)
   }
 
+  // F32 invariant 24: bump on WebGL context restore to force a full model rebuild (re-upload textures/geometry).
+  const [ctxEpoch, setCtxEpoch] = React.useState(0)
+  const onContextRestored = React.useCallback(() => setCtxEpoch((e) => e + 1), [])
+
   const cam = config.camera
   const env = config.environment
   const effectiveArtworkUrl = artworkUrl || config.product.artworkSlot?.defaultUrl
@@ -312,6 +336,7 @@ export default function EffectViewer({
       >
         <Suspense fallback={null}>
           <InvalidateOnAssetLoad frozen={frozen} contentKey={prepared} />
+          <ContextLossHandler onRestored={onContextRestored} />
           <RendererBackgroundSync color={config.colors.bgColor} />
           <RendererSettingsSync config={config} />
           <CameraConfigSync config={config} orbitControlsRef={orbitControlsRef} />
@@ -329,6 +354,7 @@ export default function EffectViewer({
           {shaped ? (
             prepared ? (
               <ShapedModelBridge
+                key={ctxEpoch}
                 prepared={prepared}
                 designState={designState}
                 scene={config.scene}
@@ -339,6 +365,7 @@ export default function EffectViewer({
             ) : null
           ) : config.modelPath ? (
             <EffectModel
+              key={ctxEpoch}
               modelPath={config.modelPath}
               artworkUrl={effectiveArtworkUrl}
               designState={designState}

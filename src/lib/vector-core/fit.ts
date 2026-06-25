@@ -3,9 +3,9 @@
 // P. J. Schneider — chord-length parameterization, least-squares control points along fixed
 // unit end-tangents, Newton–Raphson reparameterization, split-at-max-error recursion).
 //
-// Used OFFLINE to bake organic preset definitions (shape-library) and at GENERATION time by
-// the parametric generators; the Magic trace (Run 4) rides the same fitter. Never used to
-// "fix" library shapes at runtime — presets are static data.
+// Used OFFLINE to bake organic preset definitions (shape-library) and at GENERATION time by the
+// parametric generators + the editor's ring producers (ringToVPath). Never used to "fix" library
+// shapes at runtime — presets are static data.
 
 import type { Vec2, VAnchor, VPath } from './types'
 

@@ -1,8 +1,8 @@
 // Segmentation → binary mask (Lane A / Kai)
 //
-// Per FINAL-SPEC the browser default is BEN2-ONNX via transformers.js, behind a
-// `SegmentationAdapter`. That ML adapter (segment-ml.ts) is now the ACTIVE default in
-// pipeline.ts; the fast built-in adapter here (alpha-channel when present, else border
+// The production default is the self-hosted trio (u2netp -> silueta -> flood-fill) in the
+// cut-out worker (ben.worker.ts / ben-chain.ts); BEN2 was retired (iPhone OOM). The ML worker
+// (segment-ml.ts) is the active default; the fast built-in adapter here (alpha-channel when present, else border
 // flood-fill background removal) is the FALLBACK behind the same interface, used only when
 // the model can't load. Segmentation is one pluggable stage.
 
@@ -19,8 +19,9 @@ export interface SegmentationAdapter {
 }
 
 /** Load an image URL into ImageData, downscaled so max dimension ≤ maxDim (speed). */
-// REBUILD-PLAN-v2 §B5 (Dan: no resolution cap): the only texture limit is the device's physical
-// GPU maximum — probed once. Fallback 4096 covers contexts without WebGL (tests/SSR guards).
+// deviceMaxTextureDim probes the device's physical GPU maximum (fallback 4096 for no-WebGL —
+// tests/SSR). NOTE: v5.5 adds a separate working-res cap (~1536, worker + display) for the
+// iPhone upload OOM (MOBILE_TEXTURE_DIM_CAP below); full-res original kept for manufacturing.
 let cachedMaxTextureDim: number | null = null
 export function deviceMaxTextureDim(): number {
   if (cachedMaxTextureDim) return cachedMaxTextureDim
@@ -32,6 +33,18 @@ export function deviceMaxTextureDim(): number {
     cachedMaxTextureDim = 4096
   }
   return cachedMaxTextureDim
+}
+
+/** F25 / v5.5 inv 19 (mobile OOM): the working DISPLAY texture/decode dimension — capped to a display
+ *  budget (the screen shows ~1200px; 1536 is visually-neutral) so the square + the SVG-filter bake never
+ *  allocate multi-GB canvases, and never above the device's GPU max. This caps the DISPLAY side
+ *  (prepareEffect's texDim + the segment-ml rasterize); the cut-out WORKER's own full-res post-process is
+ *  capped SEPARATELY inside `ben.worker.runRembg` (texDim does NOT reach the worker — it rasterizes only
+ *  AFTER the worker returns, the expert's must-fix). The full-resolution original is re-baked for
+ *  manufacturing at save/order, so this cap never touches print quality. */
+export const MOBILE_TEXTURE_DIM_CAP = 1536
+export function effectiveTextureDim(): number {
+  return Math.min(deviceMaxTextureDim(), MOBILE_TEXTURE_DIM_CAP)
 }
 
 export async function loadImageData(url: string, maxDim = 512): Promise<ImageData> {
@@ -267,7 +280,7 @@ export function dilateMask(mask: Uint8Array, w: number, h: number, iterations: n
 /**
  * Fallback segmentation (NO ML): alpha if present, else border flood-fill.
  * Real user images have no alpha and often non-uniform backgrounds, so this is a fallback only —
- * the default path is ML segmentation (segment-ml.ts / BEN2-ONNX).
+ * the default path is the ML trio (segment-ml.ts -> u2netp / silueta).
  */
 export function segment(img: ImageData): MaskResult {
   const adapter = hasAlpha(img) ? alphaAdapter : bgFloodAdapter
