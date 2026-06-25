@@ -34,13 +34,14 @@ export function deviceMaxTextureDim(): number {
   return cachedMaxTextureDim
 }
 
-/** F25 (mobile OOM): the working texture/decode dimension. Capped to a mobile memory budget so a
- *  48-MP photo never allocates multi-GB canvases, and never above the device's actual GPU max. BOTH
- *  prepareEffect and the upload-time background cut-out resolve texDim through THIS one helper —
- *  capping a single call site would leave the OOM leak half-open (blueprint invariant 19). The
- *  full-resolution original is re-baked separately for manufacturing at save/order, so the screen
- *  texture cap never touches print quality. */
-export const MOBILE_TEXTURE_DIM_CAP = 4096
+/** F25 / v5.5 inv 19 (mobile OOM): the working DISPLAY texture/decode dimension — capped to a display
+ *  budget (the screen shows ~1200px; 1536 is visually-neutral) so the square + the SVG-filter bake never
+ *  allocate multi-GB canvases, and never above the device's GPU max. This caps the DISPLAY side
+ *  (prepareEffect's texDim + the segment-ml rasterize); the cut-out WORKER's own full-res post-process is
+ *  capped SEPARATELY inside `ben.worker.runRembg` (texDim does NOT reach the worker — it rasterizes only
+ *  AFTER the worker returns, the expert's must-fix). The full-resolution original is re-baked for
+ *  manufacturing at save/order, so this cap never touches print quality. */
+export const MOBILE_TEXTURE_DIM_CAP = 1536
 export function effectiveTextureDim(): number {
   return Math.min(deviceMaxTextureDim(), MOBILE_TEXTURE_DIM_CAP)
 }

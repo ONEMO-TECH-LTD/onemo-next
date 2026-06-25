@@ -134,7 +134,14 @@ async function runRembg(imageUrl: string, spec: RembgSpec, onProgress: (s: strin
   onProgress('cutting')
   const blob = await withTimeout(fetch(imageUrl).then((r) => r.blob()), 15000, 'fetch-img')
   const bmp = await withTimeout(createImageBitmap(blob), 15000, 'bitmap')
-  const ow = bmp.width, oh = bmp.height, S = spec.size, plane = S * S
+  // v5.5 inv 19 — cap the WORKER's post-process resolution. ow×oh drives the full-res alpha/rgb/rgba
+  // buffers below (the upload-OOM +2GB half; texDim does NOT reach here — segment-ml rasterizes only AFTER).
+  // The cut-LINE is re-traced at maskDim (1200), so a ~1536 matte is sub-pixel at the outline
+  // (visually-neutral); the texImage is sourced from the original at texDim separately. Original untouched.
+  const WORKER_DIM_CAP = 1536
+  const _bw = bmp.width, _bh = bmp.height
+  const _wscale = Math.min(1, WORKER_DIM_CAP / Math.max(_bw, _bh))
+  const ow = Math.round(_bw * _wscale), oh = Math.round(_bh * _wscale), S = spec.size, plane = S * S
   // preprocess: resize SxS, scale by max, mean/std normalize → CHW float32
   const pc = new OffscreenCanvas(S, S); const pctx = pc.getContext('2d') as OffscreenCanvasRenderingContext2D
   pctx.drawImage(bmp, 0, 0, S, S)
@@ -163,6 +170,7 @@ async function runRembg(imageUrl: string, spec: RembgSpec, onProgress: (s: strin
   const alpha = actx.getImageData(0, 0, ow, oh).data
   const dc = new OffscreenCanvas(ow, oh); const dctx = dc.getContext('2d') as OffscreenCanvasRenderingContext2D
   dctx.drawImage(bmp, 0, 0, ow, oh)
+  bmp.close() // v5.5 inv 27: free the decoded bitmap (was never closed — a retained-memory leak)
   const rgb = dctx.getImageData(0, 0, ow, oh).data
   const rgba = new Uint8ClampedArray(ow * oh * 4)
   let subj = 0
