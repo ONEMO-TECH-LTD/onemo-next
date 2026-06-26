@@ -4,7 +4,7 @@
 //
 // The stateful seam between the engine output and the 3D viewer. It owns `prepared-for-3D` — the
 // PreparedEffect the EffectViewer renders — kept SEPARATE from `prepared-for-editing` (the 2D editor's
-// spec + frontSrc, held in useCreator). 3D is built ON CALL via `publishToViewer`, never on the mere
+// spec + frontSrc, held in v53Flow). 3D is built ON CALL via `publishToViewer`, never on the mere
 // presence of an editing-prepared (inv 26: a flow may run a live 2D editor with NO 3D mounted — the
 // twoDFirstFlow enabler). The split is in WHAT/ WHEN we hand the viewer, not in EffectViewer itself.
 //
@@ -15,7 +15,7 @@
 import { useState, useCallback } from 'react'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
 
-/** UI-side notification sink (same contract as useCreator's injected adapter — blueprint §4). */
+/** UI-side notification sink (same contract as v53Flow's injected adapter — blueprint §4). */
 type Notify = (kind: 'warn' | 'error' | 'info', message: string) => void
 
 export function useViewerAdapter(notify: Notify) {

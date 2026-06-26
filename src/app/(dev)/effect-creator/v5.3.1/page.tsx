@@ -2,11 +2,12 @@
 
 // Effect Creator V3 — composition root. ONE SCENE, ONE ENGINE (blueprint §1).
 //
-// v5.4: this page is now a THIN Layer-3 adapter over the creation socket `useCreator()` (user/useCreator.ts).
-// All orchestration — upload, background cut-out, Magic, the global undo/redo/reset history, editor entry,
-// trim/filter sessions, the mm-SVG export string — lives in the socket. The page owns ONLY the UI-side
-// concerns the socket injects: notifications (toast), the URL/route params, the double-tap editor-entry
-// gesture, the export file-download, and the first-paint resize nudge (a viewer concern).
+// v5.5: this page is a THIN Layer-3 adapter over the v53 FLOW `useV53Flow()` (flows/v53Flow.ts) — it binds
+// only to the flow's `CreatorFlow` { state, actions } (blueprint §5). All orchestration — upload, background
+// cut-out, Magic, the global undo/redo/reset history, editor entry, trim/filter sessions, the mm-SVG export
+// string — lives in the flow. The page owns ONLY the UI-side concerns the flow injects: notifications
+// (toast), the URL/route params, the double-tap editor-entry gesture, the export file-download, and the
+// first-paint resize nudge (a viewer concern). (Phase 5 introduces the flow-selector; v53Flow is bound direct.)
 //
 // The golden scene mounts ONCE per session and STAYS MOUNTED (§6.1) — no phases, no "Finish in 3D".
 // Upload builds the standard square instantly; Magic cuts the subject in a worker while the page stays
@@ -20,7 +21,7 @@ import { UndoIcon, RedoIcon, ExportIcon } from './user/icons'
 import TopBar, { TopBarButton } from './user/TopBar'
 import edStyles from './user/outline-editor.module.css'
 import { toast } from './ui/Toast'
-import { useCreator } from './user/useCreator'
+import { useV53Flow } from './flows/v53Flow'
 
 // Dynamic imports — no SSR for 3D components
 const EffectViewer = dynamic(() => import('./core/EffectViewer'), { ssr: false })
@@ -52,10 +53,10 @@ function PrototypePageInner() {
   // (the original useEffect+window dance was for that; unnecessary under this Suspense boundary).
   const internalTools = searchParams.get('internal') === '1'
 
-  // ── THE creation/page socket — { state, actions }. Notifications + URL params are the injected
-  //    UI-side adapters (blueprint §4); the socket never reaches toast/window itself.
+  // ── THE v53 flow — { state, actions } (CreatorFlow). Notifications + URL params are the injected
+  //    UI-side adapters (blueprint §4); the flow never reaches toast/window itself.
   const notify = useCallback((kind: 'warn' | 'error' | 'info', message: string) => { toast(kind, message) }, [])
-  const { state, actions } = useCreator({ notify, segPresent })
+  const { state, actions } = useV53Flow({ notify, segPresent })
   const {
     artworkUrl, prepared, preparedFor3D, editingOutline, editorMode, autoOutline, generating,
     showColors, showFilters, designState, colors,
