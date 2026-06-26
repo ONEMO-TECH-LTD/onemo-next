@@ -1,8 +1,20 @@
 import { describe, it, expect } from 'vitest'
-import { liteSpec, liteSource } from '../transactions'
+import { liteSpec, liteSource, imageFxChanged, editorSessionChanged, filterSessionChanged } from '../transactions'
+import type { AppSnap } from '../transactions'
 import type { EffectSpecDraft } from '@/lib/effect/types'
 
 type SourceArg = Parameters<typeof liteSource>[0]
+
+const DEFAULT_FX = { brightness: 100, contrast: 100, saturate: 100, warmth: 0 }
+// Minimal pre-snapshot for the change-detection predicates (only the read fields matter).
+const snap = (over: Record<string, unknown> = {}): AppSnap => ({
+  genId: 0, recipe: null, autoOutline: false,
+  designState: { offsetX: 0, offsetY: 0, scale: 1 },
+  imageFx: null, wrapTile: false,
+  outline: { spec: null, committedShape: null, source: null, adjustments: {}, bgBlur: null },
+  trim: { backColor: '#000', frameColor: '#000', bgColor: '#000' },
+  ...over,
+}) as unknown as AppSnap
 
 // Phase-2 KAI-9223 — the dep-free, pure part of the history transaction: the F25 memory strip.
 // (The hook behaviour — undo/redo/restore, generation cancel, sessions — is covered by the live A/B +
@@ -44,5 +56,54 @@ describe('history transaction — liteSource (F25 memory strip, inv 20)', () => 
 
   it('passes null through', () => {
     expect(liteSource(null)).toBeNull()
+  })
+})
+
+describe('sessions — imageFxChanged (null→default normalization, KAI-8971/F2)', () => {
+  it('treats null vs the explicit {100/100/100/0} default as NO change (the edge the live A/B misses)', () => {
+    expect(imageFxChanged(null, DEFAULT_FX as never)).toBe(false)
+    expect(imageFxChanged(DEFAULT_FX as never, null)).toBe(false)
+    expect(imageFxChanged(null, null)).toBe(false)
+  })
+  it('reports a genuine value change', () => {
+    expect(imageFxChanged(null, { brightness: 120, contrast: 100, saturate: 100, warmth: 0 } as never)).toBe(true)
+    expect(imageFxChanged({ ...DEFAULT_FX, warmth: 10 } as never, DEFAULT_FX as never)).toBe(true)
+  })
+})
+
+describe('sessions — editorSessionChanged (commit one step iff something changed)', () => {
+  type EditorCur = Parameters<typeof editorSessionChanged>[0]
+  const baseCur = { committedShape: null, bgBlur: null, imageFx: null, artwork: { offsetX: 0, offsetY: 0, scale: 1 } }
+  const cur = (over: Record<string, unknown> = {}) => ({ ...baseCur, ...over }) as unknown as EditorCur
+  it('no change → false (no spurious history step on a no-op close)', () => {
+    expect(editorSessionChanged(cur(), snap())).toBe(false)
+  })
+  it('a null imageFx vs a default-fx snapshot is still NO change (value compare)', () => {
+    expect(editorSessionChanged(cur(), snap({ imageFx: DEFAULT_FX }))).toBe(false)
+  })
+  it('shape change → true', () => {
+    expect(editorSessionChanged(cur({ committedShape: { id: 'x' } }), snap())).toBe(true)
+  })
+  it('blur change → true', () => {
+    expect(editorSessionChanged(cur({ bgBlur: 50 }), snap())).toBe(true)
+  })
+  it('photo-position change → true', () => {
+    expect(editorSessionChanged(cur({ artwork: { offsetX: 5, offsetY: 0, scale: 1 } }), snap())).toBe(true)
+  })
+})
+
+describe('sessions — filterSessionChanged (imageFx by REFERENCE — verbatim with the inline test)', () => {
+  const fx = { ...DEFAULT_FX }
+  it('same imageFx ref + same blur/tile → false', () => {
+    expect(filterSessionChanged({ imageFx: fx, bgBlur: null, wrapTile: false } as never, snap({ imageFx: fx }))).toBe(false)
+  })
+  it('a DIFFERENT imageFx object (same values) → true (reference compare, by design)', () => {
+    expect(filterSessionChanged({ imageFx: { ...DEFAULT_FX }, bgBlur: null, wrapTile: false } as never, snap({ imageFx: { ...DEFAULT_FX } }))).toBe(true)
+  })
+  it('blur change → true', () => {
+    expect(filterSessionChanged({ imageFx: fx, bgBlur: 30, wrapTile: false } as never, snap({ imageFx: fx }))).toBe(true)
+  })
+  it('wrapTile change → true', () => {
+    expect(filterSessionChanged({ imageFx: fx, bgBlur: null, wrapTile: true } as never, snap({ imageFx: fx }))).toBe(true)
   })
 })

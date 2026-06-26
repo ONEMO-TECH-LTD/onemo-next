@@ -306,6 +306,40 @@ export function useUploadPublish(patchGenMatte: (genId: number, matteUrl: string
   return { nextUploadSeq, publishCutoutResult }
 }
 
+// ── Session change-detection predicates (KAI-9223 +C) — PURE so they're unit-testable without the
+//    hook/DOM (the build-plan's "session commit semantics" acceptance). They catch the bug class the live
+//    A/B misses by eye: a spurious OR missed history step on a no-op session close. Behaviour-IDENTICAL to
+//    the old inline tests — note the deliberate asymmetry kept verbatim: the EDITOR compares imageFx by
+//    VALUE (null = the {100/100/100/0} default), the FILTER compares imageFx by REFERENCE.
+type StoreImageFx = ReturnType<typeof useOutlineStore.getState>['imageFx']
+type StoreArtwork = ReturnType<typeof useOutlineStore.getState>['artwork']
+type StoreShape = ReturnType<typeof useOutlineStore.getState>['committedShape']
+
+/** Value-compare imageFx with the null→default {100/100/100/0} normalization: an untouched null reads as
+ *  NO change vs the explicit default (the editor's change-test, KAI-8971/F2). */
+export function imageFxChanged(a: StoreImageFx, b: StoreImageFx): boolean {
+  const av = a ?? { brightness: 100, contrast: 100, saturate: 100, warmth: 0 }
+  const bv = b ?? { brightness: 100, contrast: 100, saturate: 100, warmth: 0 }
+  return av.brightness !== bv.brightness || av.contrast !== bv.contrast || av.saturate !== bv.saturate || av.warmth !== bv.warmth
+}
+
+/** Did the EDITOR session change anything commit-worthy? shape · blur · image-fx (VALUE) · photo position. */
+export function editorSessionChanged(
+  cur: { committedShape: StoreShape; bgBlur: number | null; imageFx: StoreImageFx; artwork: StoreArtwork },
+  pre: AppSnap,
+): boolean {
+  const artChanged = cur.artwork.offsetX !== pre.designState.offsetX || cur.artwork.offsetY !== pre.designState.offsetY || cur.artwork.scale !== pre.designState.scale
+  return cur.committedShape !== pre.outline.committedShape || cur.bgBlur !== pre.outline.bgBlur || imageFxChanged(cur.imageFx, pre.imageFx) || artChanged
+}
+
+/** Did the FILTER session change anything? imageFx (REFERENCE — matches the existing inline test) · blur · tile. */
+export function filterSessionChanged(
+  cur: { imageFx: StoreImageFx; bgBlur: number | null; wrapTile: boolean },
+  pre: AppSnap,
+): boolean {
+  return cur.imageFx !== pre.imageFx || cur.bgBlur !== pre.outline.bgBlur || cur.wrapTile !== pre.wrapTile
+}
+
 /** Editor / Trim / Filter SESSIONS — begin (snapshot) / commit (push one history step on a real change) /
  *  revert. Owns the overlay flags + the pre-snapshots; composes the history (snapNow/pushHistory). The
  *  change-test on commit covers EVERYTHING a session can touch (shape · blend · image-fx · photo position —
@@ -340,14 +374,7 @@ export function useSessions(args: {
     const pre = editorPreRef.current
     if (pre) {
       const o = useOutlineStore.getState()
-      const fxChanged = (a: typeof o.imageFx, b: typeof o.imageFx) => {
-        const av = a ?? { brightness: 100, contrast: 100, saturate: 100, warmth: 0 }
-        const bv = b ?? { brightness: 100, contrast: 100, saturate: 100, warmth: 0 }
-        return av.brightness !== bv.brightness || av.contrast !== bv.contrast || av.saturate !== bv.saturate || av.warmth !== bv.warmth
-      }
-      const art = o.artwork, preArt = pre.designState
-      const artChanged = art.offsetX !== preArt.offsetX || art.offsetY !== preArt.offsetY || art.scale !== preArt.scale
-      if (o.committedShape !== pre.outline.committedShape || o.bgBlur !== pre.outline.bgBlur || fxChanged(o.imageFx, pre.imageFx) || artChanged) pushHistory(pre)
+      if (editorSessionChanged({ committedShape: o.committedShape, bgBlur: o.bgBlur, imageFx: o.imageFx, artwork: o.artwork }, pre)) pushHistory(pre)
       editorPreRef.current = null
     }
   }, [pushHistory])
@@ -373,7 +400,7 @@ export function useSessions(args: {
     const pre = filterPreRef.current
     if (pre) {
       const o = useOutlineStore.getState()
-      if (o.imageFx !== pre.imageFx || o.bgBlur !== pre.outline.bgBlur || o.wrapTile !== pre.wrapTile) pushHistory(pre)
+      if (filterSessionChanged({ imageFx: o.imageFx, bgBlur: o.bgBlur, wrapTile: o.wrapTile }, pre)) pushHistory(pre)
       filterPreRef.current = null
     }
     setShowFilters(false)

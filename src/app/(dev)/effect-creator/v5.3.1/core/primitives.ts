@@ -8,10 +8,10 @@
 // per op — inv 2 — until v53Flow replaces the macro's composition in Phase 3).
 //
 // Lifted verbatim (behaviour-neutral) from useCreator.ts's macro:
-//   loadImage      ← upload :329-331          prepareStandard ← upload :342-343
-//   runCutout      ← startBackgroundCutout :300-310 (segmentation ONLY; the seq-guard + matte
-//                    publish + caches are the publishCutoutResult / history transactions — NOT here)
-//   prepareShaped  ← magic :382-385           exportCutlineSvg ← exportSvg :278-291
+//   loadImage      ← upload                   prepareStandard ← upload
+//   runCutout      ← startBackgroundCutout (segmentation ONLY; the seq-guard + matte publish + caches
+//                    are the publishCutoutResult / history transactions — NOT here)
+//   prepareShaped  ← magic                    exportCutlineSvg ← exportSvg
 //
 // NOT here: publishToViewer + handleStatus = the stateful VIEWER-ADAPTER (inv 26 2D/3D split);
 // the 4 transaction services (history / publishCutoutResult / generation / sessions). Those own
