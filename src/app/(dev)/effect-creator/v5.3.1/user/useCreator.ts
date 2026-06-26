@@ -29,7 +29,7 @@ import { useSceneStore } from '../admin/sceneStore'
 import { INITIAL_ARTWORK, useOutlineStore } from './outlineStore'
 import { loadImage, prepareStandard, runCutout, prepareShaped, exportCutlineSvg } from '../core/primitives'
 import { useViewerAdapter } from '../core/viewer-adapter'
-import { useHistoryTransaction, liteSpec, type AppSnap } from '../core/transactions'
+import { useHistoryTransaction, useGenerationTask, useUploadPublish, useSessions, liteSpec } from '../core/transactions'
 import type { DesignState } from '../types'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
 import type { MLResult } from '@/lib/effect/segment-ml'
@@ -52,12 +52,9 @@ export function useCreator(adapters: CreatorAdapters) {
 
   const [artworkUrl, setArtworkUrl] = useState<string | undefined>()
   const [prepared, setPrepared] = useState<PreparedEffect | null>(null) // prepared-for-editing (2D side)
-  const [editingOutline, setEditingOutline] = useState(false)
-  const [editorMode, setEditorMode] = useState<'shape' | 'image' | null>(null) // #27 + KAI-9027
   const [autoOutline, setAutoOutline] = useState(false) // false = standard square; true = Magic cut-out
   const [generating, setGenerating] = useState(false)
-  const [showColors, setShowColors] = useState(false)
-  const [showFilters, setShowFilters] = useState(false) // KAI-9124: standalone Filters takeover
+  // editingOutline / editorMode / showColors / showFilters are owned by the sessions transaction (below).
 
   const designState = useOutlineStore((s) => s.artwork) // #28: scene + editor share it
   const setDesignState = useCallback((upd: DesignState | ((prev: DesignState) => DesignState)) => {
@@ -69,11 +66,6 @@ export function useCreator(adapters: CreatorAdapters) {
   // refs — the flow-timing state the macro still owns (cut-out cache, upload/cancel tokens, session snaps).
   const sourceShaRef = useRef<string | null>(null)
   const cutCacheRef = useRef<{ url: string; promise: Promise<MLResult> } | null>(null)
-  const uploadSeqRef = useRef(0)
-  const editorPreRef = useRef<AppSnap | null>(null)
-  const trimPreRef = useRef<AppSnap | null>(null)
-  const filterPreRef = useRef<AppSnap | null>(null) // KAI-9124 pre-Filters snapshot
-  const magicRunRef = useRef(0) // UX-5 / KAI-9083 cancel/new-upload token
 
   // Layer-2b history transaction (KAI-9222): the global undo/redo/reset machine + the F25 recipe/LRU/seg
   // caches — flow-timing state, NOT a primitive (inv 20). The macro COMPOSES it; restore drives the
@@ -82,6 +74,16 @@ export function useCreator(adapters: CreatorAdapters) {
     canUndo, canRedo, dirty, undo, redo, reset,
     snapNow, pushHistory, setBaseline, registerGeneration, cacheSeg, getCachedSeg, patchGenMatte,
   } = useHistoryTransaction({ notify, autoOutline, designState, setPrepared, setAutoOutline, setDesignState, publishToViewer })
+
+  // Layer-2b generation-cancel token (UX-5/KAI-9083) + the upload-publish seq-guard (publishCutoutResult)
+  // — flow-timing services; publishCutoutResult composes the history's patchGenMatte.
+  const { beginRun, isCurrent, cancel: cancelGeneration } = useGenerationTask()
+  const { nextUploadSeq, publishCutoutResult } = useUploadPublish(patchGenMatte)
+  // Layer-2b sessions (editor/trim/filter begin/commit/revert) — owns the overlay flags + pre-snapshots.
+  const {
+    editingOutline, editorMode, showColors, showFilters,
+    enterEditor, closeEditor, openTrim, closeTrim, cancelTrim, openFilters, closeFilters, cancelFilters,
+  } = useSessions({ snapNow, pushHistory, setBackColor })
 
   // Export — the mm-true SVG cutline from THE vector truth. The socket returns the STRING; the UI
   // performs the download (the injected export adapter). null = nothing/not-feasible (already notified).
@@ -108,14 +110,7 @@ export function useCreator(adapters: CreatorAdapters) {
     const segPromise = (async () => {
       const seg = await runCutout(url) // Layer-2a primitive: segmentation at the working-res cap (inv 19)
       cacheSeg(url, seg) // F25: cache for instant shaped re-derive on undo (history transaction owns the cache)
-      if (uploadSeqRef.current === seq) { // still the active image — publish the matte for Blend (publishCutoutResult)
-        try {
-          const { subjectMatteFromSeg } = await import('@/lib/effect/prepare-effect')
-          const matteUrl = subjectMatteFromSeg(standard.frontSrc.origCanvas, seg).toDataURL()
-          useOutlineStore.getState().setSubjMatteUrl(matteUrl)
-          patchGenMatte(genId, matteUrl) // so a later undo back to this standard generation restores it
-        } catch (err) { console.warn('[effect] P1 matte publish failed:', err) }
-      }
+      await publishCutoutResult(seq, standard, genId, seg) // seq-guard at PUBLICATION: write the matte iff still active
       return seg
     })()
     cutCacheRef.current = { url, promise: segPromise }
@@ -123,7 +118,7 @@ export function useCreator(adapters: CreatorAdapters) {
       console.warn('[effect] background cut-out failed (Magic re-runs on demand):', e)
       if (cutCacheRef.current?.url === url) cutCacheRef.current = null
     })
-  }, [segPresent, cacheSeg, patchGenMatte])
+  }, [segPresent, cacheSeg, publishCutoutResult])
 
   const upload = useCallback((file: File) => {
     // Layer-2a `loadImage` = validate + blob lifecycle ONLY (flow-blind). The app-state new-image reset
@@ -137,9 +132,9 @@ export function useCreator(adapters: CreatorAdapters) {
     setAutoOutline(false) // new image → the standard square; Magic opts into the cut-out
     const st = useOutlineStore.getState()
     st.commitGeometry(null); st.setBgBlur(null); st.setSubjMatteUrl(null)
-    const seq = ++uploadSeqRef.current
+    const seq = nextUploadSeq()
     cutCacheRef.current = null
-    magicRunRef.current++ // KAI-9083: a new image supersedes any in-flight Magic
+    cancelGeneration() // KAI-9083: a new image supersedes any in-flight Magic
     setGenerating(false)
     prepareStandard(url) // Layer-2a primitive: the instant square at the display cap (no 3D, no cut-out)
       .then((p) => {
@@ -159,7 +154,7 @@ export function useCreator(adapters: CreatorAdapters) {
         console.warn('[effect] prepare (standard) failed:', e)
         notify('error', `Couldn't build the square: ${(e as Error)?.message ?? e}`)
       })
-  }, [artworkUrl, startBackgroundCutout, registerGeneration, setBaseline, setDesignState, notify, publishToViewer])
+  }, [artworkUrl, startBackgroundCutout, registerGeneration, setBaseline, setDesignState, notify, publishToViewer, nextUploadSeq, cancelGeneration])
 
   // handleStatus now lives in the viewer-adapter (the 3D status/error channel — inv 26 split).
 
@@ -167,7 +162,7 @@ export function useCreator(adapters: CreatorAdapters) {
   const magic = useCallback(() => {
     if (!artworkUrl || generating) return
     const preMagic = snapNow() // #23: one Magic = one global undo step (pushed only on success)
-    const runId = ++magicRunRef.current
+    const runId = beginRun()
     setGenerating(true)
     ;(async (): Promise<PreparedEffect> => {
       // preseg resolution is flow-timing (cutCache/segCache are flow caches, not primitive state): reuse
@@ -184,7 +179,7 @@ export function useCreator(adapters: CreatorAdapters) {
       })
     })()
       .then((p) => {
-        if (magicRunRef.current !== runId) return // cancelled mid-run — prior state stands (UX-5)
+        if (!isCurrent(runId)) return // cancelled mid-run — prior state stands (UX-5)
         if (sourceShaRef.current) p.spec.sourceBytesSha256 = sourceShaRef.current
         setPrepared(p)
         publishToViewer(p)
@@ -200,69 +195,18 @@ export function useCreator(adapters: CreatorAdapters) {
         pushHistory(preMagic)
       })
       .catch((e) => {
-        if (magicRunRef.current !== runId) return // cancelled — stay quiet
+        if (!isCurrent(runId)) return // cancelled — stay quiet
         console.warn('[effect] prepare (shaped) failed:', e)
         notify('error', `Magic failed: ${(e as Error)?.message ?? e}`) // G4
         setGenerating(false)
       })
-  }, [artworkUrl, generating, snapNow, pushHistory, registerGeneration, getCachedSeg, notify, publishToViewer])
+  }, [artworkUrl, generating, snapNow, pushHistory, registerGeneration, getCachedSeg, beginRun, isCurrent, notify, publishToViewer])
 
-  /** Cancel an in-flight Magic (UX-5): bump the token so a stale result/error is a no-op. */
-  const cancelMagic = useCallback(() => { magicRunRef.current++; setGenerating(false) }, [])
+  /** Cancel an in-flight Magic (UX-5): bump the generation token so a stale result/error is a no-op. */
+  const cancelMagic = useCallback(() => { cancelGeneration(); setGenerating(false) }, [cancelGeneration])
 
-  // Editor entry — the socket action; the UI owns the double-tap gesture / Edit button that calls it.
-  const enterEditor = useCallback((mode: 'shape' | 'image' | null) => {
-    editorPreRef.current = snapNow()
-    setEditorMode(mode)
-    setEditingOutline(true)
-  }, [snapNow])
-
-  // Editor close — one editor session (Done with changes) = one global step. The change test covers
-  // EVERYTHING a session can commit — shape, blend, image-fx, photo position (KAI-8971/F2).
-  const closeEditor = useCallback(() => {
-    setEditingOutline(false)
-    const pre = editorPreRef.current
-    if (pre) {
-      const o = useOutlineStore.getState()
-      const fxChanged = (a: typeof o.imageFx, b: typeof o.imageFx) => {
-        const av = a ?? { brightness: 100, contrast: 100, saturate: 100, warmth: 0 }
-        const bv = b ?? { brightness: 100, contrast: 100, saturate: 100, warmth: 0 }
-        return av.brightness !== bv.brightness || av.contrast !== bv.contrast || av.saturate !== bv.saturate || av.warmth !== bv.warmth
-      }
-      const art = o.artwork, preArt = pre.designState
-      const artChanged = art.offsetX !== preArt.offsetX || art.offsetY !== preArt.offsetY || art.scale !== preArt.scale
-      if (o.committedShape !== pre.outline.committedShape || o.bgBlur !== pre.outline.bgBlur || fxChanged(o.imageFx, pre.imageFx) || artChanged) pushHistory(pre)
-      editorPreRef.current = null
-    }
-  }, [pushHistory])
-
-  // Trim (D-TRIM) session — tap recolors the 3D back LIVE; ✓ keeps (one step), ✕ reverts.
-  const openTrim = useCallback(() => { trimPreRef.current = snapNow(); setShowColors(true) }, [snapNow])
-  const closeTrim = useCallback(() => {
-    if (trimPreRef.current) {
-      const t = trimPreRef.current.trim, c = useSceneStore.getState().colors
-      if (t.backColor !== c.backColor) pushHistory(trimPreRef.current)
-      trimPreRef.current = null
-    }
-    setShowColors(false)
-  }, [pushHistory])
-  const cancelTrim = useCallback(() => {
-    if (trimPreRef.current) { setBackColor(trimPreRef.current.trim.backColor); trimPreRef.current = null }
-    setShowColors(false)
-  }, [setBackColor])
-
-  // Filters (KAI-9124) session — over the LIVE 3D; ✓ keeps (one global step), ✕ reverts.
-  const openFilters = useCallback(() => { filterPreRef.current = snapNow(); setShowFilters(true) }, [snapNow])
-  const closeFilters = useCallback(() => {
-    const pre = filterPreRef.current
-    if (pre) {
-      const o = useOutlineStore.getState()
-      if (o.imageFx !== pre.imageFx || o.bgBlur !== pre.outline.bgBlur || o.wrapTile !== pre.wrapTile) pushHistory(pre)
-      filterPreRef.current = null
-    }
-    setShowFilters(false)
-  }, [pushHistory])
-  const cancelFilters = useCallback(() => { filterPreRef.current = null; setShowFilters(false) }, [])
+  // Editor / Trim / Filter SESSIONS (enterEditor/closeEditor, open/close/cancel Trim + Filters) are owned
+  // by the sessions transaction (useSessions, above) — destructured into { state, actions } below.
 
   return {
     state: {

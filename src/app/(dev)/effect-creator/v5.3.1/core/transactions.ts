@@ -276,3 +276,113 @@ export function useHistoryTransaction(args: HistoryTransactionArgs) {
     cacheSeg, getCachedSeg, patchGenMatte,
   }
 }
+
+/** Generation-cancel token (UX-5 / KAI-9083): a new image OR an explicit cancel supersedes an in-flight
+ *  Magic; a stale/cancelled result is a no-op. Flow-timing state — owned by the flow, NOT a primitive. */
+export function useGenerationTask() {
+  const runRef = useRef(0)
+  const beginRun = useCallback(() => ++runRef.current, []) // start a run; returns its id
+  const isCurrent = useCallback((runId: number) => runRef.current === runId, []) // false ⇒ superseded/cancelled
+  const cancel = useCallback(() => { runRef.current++ }, []) // bump so any in-flight result is a no-op
+  return { beginRun, isCurrent, cancel }
+}
+
+/** Upload-publish seq-guard (blueprint §4: the guard is at PUBLICATION, not segmentation). A new image bumps
+ *  the seq; publishCutoutResult writes the matte ONLY if its seq is still the active image — then patches it
+ *  onto the generation's LRU entry (composes the history transaction) so an undo back to it restores the matte. */
+export function useUploadPublish(patchGenMatte: (genId: number, matteUrl: string) => void) {
+  const uploadSeqRef = useRef(0)
+  const nextUploadSeq = useCallback(() => ++uploadSeqRef.current, [])
+  const publishCutoutResult = useCallback(async (seq: number, standard: PreparedEffect, genId: number, seg: MLResult) => {
+    if (uploadSeqRef.current !== seq) return // superseded by a newer image — no-op
+    try {
+      const { subjectMatteFromSeg } = await import('@/lib/effect/prepare-effect')
+      const matteUrl = subjectMatteFromSeg(standard.frontSrc.origCanvas, seg).toDataURL()
+      useOutlineStore.getState().setSubjMatteUrl(matteUrl)
+      patchGenMatte(genId, matteUrl)
+    } catch (err) { console.warn('[effect] P1 matte publish failed:', err) }
+  }, [patchGenMatte])
+  return { nextUploadSeq, publishCutoutResult }
+}
+
+/** Editor / Trim / Filter SESSIONS — begin (snapshot) / commit (push one history step on a real change) /
+ *  revert. Owns the overlay flags + the pre-snapshots; composes the history (snapNow/pushHistory). The
+ *  change-test on commit covers EVERYTHING a session can touch (shape · blend · image-fx · photo position —
+ *  KAI-8971/F2). Phase-2 Option A: cancelFilters is close-only; the real imageFx/bgBlur/wrapTile revert
+ *  still lives in FiltersSurface (Layer-3) until Phase 6 re-authors it onto this session's revert action by
+ *  construction (tracked). trim's revert (cancelTrim) lifts cleanly now; the editor's discard is Phase 4. */
+export function useSessions(args: {
+  snapNow: () => AppSnap
+  pushHistory: (s: AppSnap) => void
+  setBackColor: (c: string) => void
+}) {
+  const { snapNow, pushHistory, setBackColor } = args
+  const [editingOutline, setEditingOutline] = useState(false)
+  const [editorMode, setEditorMode] = useState<'shape' | 'image' | null>(null) // #27 + KAI-9027
+  const [showColors, setShowColors] = useState(false)
+  const [showFilters, setShowFilters] = useState(false) // KAI-9124: standalone Filters takeover
+  const editorPreRef = useRef<AppSnap | null>(null)
+  const trimPreRef = useRef<AppSnap | null>(null)
+  const filterPreRef = useRef<AppSnap | null>(null)
+
+  // Editor entry — the socket action; the UI owns the double-tap gesture / Edit button that calls it.
+  const enterEditor = useCallback((mode: 'shape' | 'image' | null) => {
+    editorPreRef.current = snapNow()
+    setEditorMode(mode)
+    setEditingOutline(true)
+  }, [snapNow])
+
+  // Editor close — one editor session (Done with changes) = one global step. The change test covers
+  // EVERYTHING a session can commit — shape, blend, image-fx, photo position (KAI-8971/F2).
+  const closeEditor = useCallback(() => {
+    setEditingOutline(false)
+    const pre = editorPreRef.current
+    if (pre) {
+      const o = useOutlineStore.getState()
+      const fxChanged = (a: typeof o.imageFx, b: typeof o.imageFx) => {
+        const av = a ?? { brightness: 100, contrast: 100, saturate: 100, warmth: 0 }
+        const bv = b ?? { brightness: 100, contrast: 100, saturate: 100, warmth: 0 }
+        return av.brightness !== bv.brightness || av.contrast !== bv.contrast || av.saturate !== bv.saturate || av.warmth !== bv.warmth
+      }
+      const art = o.artwork, preArt = pre.designState
+      const artChanged = art.offsetX !== preArt.offsetX || art.offsetY !== preArt.offsetY || art.scale !== preArt.scale
+      if (o.committedShape !== pre.outline.committedShape || o.bgBlur !== pre.outline.bgBlur || fxChanged(o.imageFx, pre.imageFx) || artChanged) pushHistory(pre)
+      editorPreRef.current = null
+    }
+  }, [pushHistory])
+
+  // Trim (D-TRIM) session — tap recolors the 3D back LIVE; ✓ keeps (one step), ✕ reverts.
+  const openTrim = useCallback(() => { trimPreRef.current = snapNow(); setShowColors(true) }, [snapNow])
+  const closeTrim = useCallback(() => {
+    if (trimPreRef.current) {
+      const t = trimPreRef.current.trim, c = useSceneStore.getState().colors
+      if (t.backColor !== c.backColor) pushHistory(trimPreRef.current)
+      trimPreRef.current = null
+    }
+    setShowColors(false)
+  }, [pushHistory])
+  const cancelTrim = useCallback(() => {
+    if (trimPreRef.current) { setBackColor(trimPreRef.current.trim.backColor); trimPreRef.current = null }
+    setShowColors(false)
+  }, [setBackColor])
+
+  // Filters (KAI-9124) session — over the LIVE 3D; ✓ keeps (one global step), ✕ reverts.
+  const openFilters = useCallback(() => { filterPreRef.current = snapNow(); setShowFilters(true) }, [snapNow])
+  const closeFilters = useCallback(() => {
+    const pre = filterPreRef.current
+    if (pre) {
+      const o = useOutlineStore.getState()
+      if (o.imageFx !== pre.imageFx || o.bgBlur !== pre.outline.bgBlur || o.wrapTile !== pre.wrapTile) pushHistory(pre)
+      filterPreRef.current = null
+    }
+    setShowFilters(false)
+  }, [pushHistory])
+  // Phase-2 Option A: close-only. The imageFx/bgBlur/wrapTile revert lives in FiltersSurface (Layer-3)
+  // until Phase 6 binds the new UI to this session's revert (a behaviour relocation deferred with a live A/B).
+  const cancelFilters = useCallback(() => { filterPreRef.current = null; setShowFilters(false) }, [])
+
+  return {
+    editingOutline, editorMode, showColors, showFilters,
+    enterEditor, closeEditor, openTrim, closeTrim, cancelTrim, openFilters, closeFilters, cancelFilters,
+  }
+}
