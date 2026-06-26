@@ -64,8 +64,9 @@ export function liteSpec(spec: ReturnType<typeof useOutlineStore.getState>['spec
 }
 
 /** Strip rawTracePx from a STORED source — it is write-only provenance (no reader; verified by grep), so
- *  dropping it from each snapshot is zero-behaviour + stops the raw trace being retained ×N history (F25 leg 2). */
-function liteSource(source: ReturnType<typeof useOutlineStore.getState>['source']) {
+ *  dropping it from each snapshot is zero-behaviour + stops the raw trace being retained ×N history (F25 leg 2).
+ *  Exported for the KAI-9223 unit test (the dep-free F25 coverage). */
+export function liteSource(source: ReturnType<typeof useOutlineStore.getState>['source']) {
   if (!source || source.rawTracePx === undefined) return source
   return { ...source, rawTracePx: undefined }
 }
