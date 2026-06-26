@@ -28,6 +28,7 @@ import { useState, useCallback, useRef } from 'react'
 import { useSceneStore } from '../admin/sceneStore'
 import { INITIAL_ARTWORK, useOutlineStore } from './outlineStore'
 import { detailToFloorMm } from './editor/producers'
+import { loadImage, prepareStandard, runCutout, exportCutlineSvg } from '../core/primitives'
 import type { DesignState } from '../types'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
 import type { MLResult } from '@/lib/effect/segment-ml'
@@ -280,14 +281,12 @@ export function useCreator(adapters: CreatorAdapters) {
     const v = o.committedShape ?? o.spec?.vectorShape
     const sp = o.spec
     if (!v || !sp) { notify('warn', 'Nothing to export yet — add an image first'); return null }
-    const [{ toManufacturingSVG }, { contourFromShape, assertContourCuttable }] = await Promise.all([
-      import('@/lib/export'), import('@/lib/effect/geometry-truth'),
-    ])
-    // KAI-9077 / MFG-1: gate the live cut-line export on feasibility — never emit a folded/uncuttable shape.
-    const c = contourFromShape(v, { mmPerPx: sp.mmPerPx || 1, maskHeightPx: sp.maskHeightPx })
-    const feas = c ? assertContourCuttable(c, sp.mmPerPx || 1) : { ok: false as const, reason: 'degenerate' as const }
-    if (!feas.ok) { notify('warn', `Can't export — the outline isn't cleanly cuttable (${feas.reason}). Fix the shape first.`); return null }
-    return toManufacturingSVG(v, { mmPerPx: sp.mmPerPx || 1, widthPx: sp.maskWidthPx, heightPx: sp.maskHeightPx })
+    // Layer-2a `exportCutlineSvg` owns the feasibility gate + the mm-SVG (KAI-9077/MFG-1: never emit a
+    // folded/uncuttable shape); the flow keeps the nothing-to-export check + notify (the injected adapter —
+    // never inside a primitive, blueprint §4 / F4).
+    const res = await exportCutlineSvg(v, { mmPerPx: sp.mmPerPx || 1, maskWidthPx: sp.maskWidthPx, maskHeightPx: sp.maskHeightPx })
+    if (!res.ok) { notify('warn', `Can't export — the outline isn't cleanly cuttable (${res.detail}). Fix the shape first.`); return null }
+    return res.svg
   }, [notify])
 
   // v5.3·P1 (KAI-9146): subject cut-out in the BACKGROUND once the instant square is up — cached per
@@ -298,19 +297,13 @@ export function useCreator(adapters: CreatorAdapters) {
   const startBackgroundCutout = useCallback((url: string, standard: PreparedEffect, seq: number, genId: number) => {
     if (segPresent) return
     const segPromise = (async () => {
-      const [{ segmentML }, { effectiveTextureDim }, pe] = await Promise.all([
-        import('@/lib/effect/segment-ml'),
-        import('@/lib/effect/mask'),
-        import('@/lib/effect/prepare-effect'),
-      ])
-      const cfg = pe.EFFECT_BUILD_CONFIG
-      const texDim = effectiveTextureDim() // F25: capped working res; SAME helper Magic uses → reusable
-      const seg = await segmentML(url, cfg.maxImageDim, texDim)
-      segCacheRef.current.set(url, seg) // F25: cache for instant shaped re-derive on undo
+      const seg = await runCutout(url) // Layer-2a primitive: segmentation at the working-res cap (inv 19)
+      segCacheRef.current.set(url, seg) // F25: cache for instant shaped re-derive on undo (→ history transaction)
       while (segCacheRef.current.size > SEG_CACHE_CAP) { const k = segCacheRef.current.keys().next().value as string; segCacheRef.current.delete(k) }
-      if (uploadSeqRef.current === seq) { // still the active image — publish the matte for Blend
+      if (uploadSeqRef.current === seq) { // still the active image — publish the matte for Blend (→ publishCutoutResult transaction)
         try {
-          const matteUrl = pe.subjectMatteFromSeg(standard.frontSrc.origCanvas, seg).toDataURL()
+          const { subjectMatteFromSeg } = await import('@/lib/effect/prepare-effect')
+          const matteUrl = subjectMatteFromSeg(standard.frontSrc.origCanvas, seg).toDataURL()
           useOutlineStore.getState().setSubjMatteUrl(matteUrl)
           const entry = lruRef.current.get(genId)
           if (entry) entry.matteUrl = matteUrl // so a later undo back to this standard generation restores it
@@ -326,9 +319,11 @@ export function useCreator(adapters: CreatorAdapters) {
   }, [segPresent])
 
   const upload = useCallback((file: File) => {
-    if (!file.type.startsWith('image/')) return
-    if (artworkUrl?.startsWith('blob:')) URL.revokeObjectURL(artworkUrl)
-    const url = URL.createObjectURL(file)
+    // Layer-2a `loadImage` = validate + blob lifecycle ONLY (flow-blind). The app-state new-image reset
+    // below stays in the flow (it sequences the stores/tokens — not a primitive's job).
+    const loaded = loadImage(file, artworkUrl)
+    if (!loaded) return
+    const { url } = loaded
     sourceShaRef.current = null // identity captured later, at order/save
     setArtworkUrl(url)
     setDesignState(INITIAL_ARTWORK)
@@ -339,8 +334,7 @@ export function useCreator(adapters: CreatorAdapters) {
     cutCacheRef.current = null
     magicRunRef.current++ // KAI-9083: a new image supersedes any in-flight Magic
     setGenerating(false)
-    import('@/lib/effect/prepare-effect')
-      .then(({ prepareEffect }) => prepareEffect(url, 'standard'))
+    prepareStandard(url) // Layer-2a primitive: the instant square at the display cap (no 3D, no cut-out)
       .then((p) => {
         setPrepared(p)
         useOutlineStore.getState().setSpec(p.spec)
