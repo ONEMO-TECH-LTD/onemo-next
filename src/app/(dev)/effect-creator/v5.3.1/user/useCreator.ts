@@ -28,7 +28,8 @@ import { useState, useCallback, useRef } from 'react'
 import { useSceneStore } from '../admin/sceneStore'
 import { INITIAL_ARTWORK, useOutlineStore } from './outlineStore'
 import { detailToFloorMm } from './editor/producers'
-import { loadImage, prepareStandard, runCutout, exportCutlineSvg } from '../core/primitives'
+import { loadImage, prepareStandard, runCutout, prepareShaped, exportCutlineSvg } from '../core/primitives'
+import { useViewerAdapter } from '../core/viewer-adapter'
 import type { DesignState } from '../types'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
 import type { MLResult } from '@/lib/effect/segment-ml'
@@ -90,9 +91,12 @@ function liteSource(source: ReturnType<typeof useOutlineStore.getState>['source'
 
 export function useCreator(adapters: CreatorAdapters) {
   const { notify, segPresent } = adapters
+  // Layer-2a viewer adapter (inv 26): prepared-for-3D + publishToViewer + handleStatus live here, SPLIT
+  // from prepared-for-editing (the `prepared` state below — drives the 2D editor + hasArtwork, never the 3D).
+  const { preparedFor3D, publishToViewer, handleStatus } = useViewerAdapter(notify)
 
   const [artworkUrl, setArtworkUrl] = useState<string | undefined>()
-  const [prepared, setPrepared] = useState<PreparedEffect | null>(null) // the one engine's output (live)
+  const [prepared, setPrepared] = useState<PreparedEffect | null>(null) // prepared-for-editing (2D side)
   const [editingOutline, setEditingOutline] = useState(false)
   const [editorMode, setEditorMode] = useState<'shape' | 'image' | null>(null) // #27 + KAI-9027
   const [autoOutline, setAutoOutline] = useState(false) // false = standard square; true = Magic cut-out
@@ -207,6 +211,7 @@ export function useCreator(adapters: CreatorAdapters) {
       curRecipeRef.current = null
     }
     setPrepared(resolvedPrepared)
+    publishToViewer(resolvedPrepared) // restore the 3D for this generation (null clears it) — v53 parity
     setAutoOutline(sn.autoOutline)
     setDesignState(sn.designState)
     const o = useOutlineStore.getState()
@@ -223,7 +228,7 @@ export function useCreator(adapters: CreatorAdapters) {
     sc.setBackColor(sn.trim.backColor)
     sc.setFrameColor(sn.trim.frameColor)
     sc.setBgColor(sn.trim.bgColor)
-  }, [reDerive, matteFor, touchGen, setDesignState])
+  }, [reDerive, matteFor, touchGen, setDesignState, publishToViewer])
 
   // F25 finding-2: snapshot the move target + current, restore FIRST, and commit the stack mutation ONLY
   // on success — a re-derive throw then leaves the history + UI consistent (no desync) and notifies, vs the
@@ -337,6 +342,7 @@ export function useCreator(adapters: CreatorAdapters) {
     prepareStandard(url) // Layer-2a primitive: the instant square at the display cap (no 3D, no cut-out)
       .then((p) => {
         setPrepared(p)
+        publishToViewer(p) // v53Flow publishes 3D immediately; twoDFirstFlow would defer this to editor SAVE
         useOutlineStore.getState().setSpec(p.spec)
         const genId = registerGeneration(p, { url, mode: 'standard' }, null)
         baselineRef.current = {
@@ -353,11 +359,9 @@ export function useCreator(adapters: CreatorAdapters) {
         console.warn('[effect] prepare (standard) failed:', e)
         notify('error', `Couldn't build the square: ${(e as Error)?.message ?? e}`)
       })
-  }, [artworkUrl, startBackgroundCutout, registerGeneration, setDesignState, notify])
+  }, [artworkUrl, startBackgroundCutout, registerGeneration, setDesignState, notify, publishToViewer])
 
-  const handleStatus = useCallback((s: 'idle' | 'building' | 'ready' | 'error', message?: string) => {
-    if (s === 'error') notify('error', `3D build failed: ${message ?? 'unknown error'}`) // G4
-  }, [notify])
+  // handleStatus now lives in the viewer-adapter (the 3D status/error channel — inv 26 split).
 
   // Magic — re-prepare as a SHAPED subject cut-out (BEN in the worker; morphs in place, no jump).
   const magic = useCallback(() => {
@@ -365,22 +369,25 @@ export function useCreator(adapters: CreatorAdapters) {
     const preMagic = snapNow() // #23: one Magic = one global undo step (pushed only on success)
     const runId = ++magicRunRef.current
     setGenerating(true)
-    import('@/lib/effect/prepare-effect')
-      .then(async ({ prepareEffect, EFFECT_BUILD_CONFIG }) => {
-        let preseg: MLResult | undefined
-        const cache = cutCacheRef.current
-        if (cache && cache.url === artworkUrl) {
-          try { preseg = await cache.promise } catch { preseg = undefined }
-        }
-        if (!preseg) preseg = segCacheRef.current.get(artworkUrl) // F25: fall back to the resolved-seg cache
-        return prepareEffect(artworkUrl, 'shaped', { ...EFFECT_BUILD_CONFIG, minFeatureMM: detailToFloorMm(100), paddingMM: 0 }, (s) => {
-          if (s === 'fallback') notify('warn', 'AI cut-out unavailable — used the simple background cut instead') // G4
-        }, preseg)
+    ;(async (): Promise<PreparedEffect> => {
+      // preseg resolution is flow-timing (cutCache/segCache are flow caches, not primitive state): reuse
+      // the upload-time background cut (instant Magic), else the resolved-seg cache; else prepareShaped
+      // segments internally at the cap with the G4 flood-fill fallback (Option A — behaviour-identical).
+      let preseg: MLResult | undefined
+      const cache = cutCacheRef.current
+      if (cache && cache.url === artworkUrl) {
+        try { preseg = await cache.promise } catch { preseg = undefined }
+      }
+      if (!preseg) preseg = segCacheRef.current.get(artworkUrl)
+      return prepareShaped(artworkUrl, preseg, (s) => {
+        if (s === 'fallback') notify('warn', 'AI cut-out unavailable — used the simple background cut instead') // G4
       })
+    })()
       .then((p) => {
         if (magicRunRef.current !== runId) return // cancelled mid-run — prior state stands (UX-5)
         if (sourceShaRef.current) p.spec.sourceBytesSha256 = sourceShaRef.current
         setPrepared(p)
+        publishToViewer(p)
         const st = useOutlineStore.getState()
         st.setSpec(p.spec)
         st.commitGeometry(null); st.setBgBlur(null) // fresh cut-out → drop prior edits
@@ -398,7 +405,7 @@ export function useCreator(adapters: CreatorAdapters) {
         notify('error', `Magic failed: ${(e as Error)?.message ?? e}`) // G4
         setGenerating(false)
       })
-  }, [artworkUrl, generating, snapNow, pushHistory, registerGeneration, notify])
+  }, [artworkUrl, generating, snapNow, pushHistory, registerGeneration, notify, publishToViewer])
 
   /** Cancel an in-flight Magic (UX-5): bump the token so a stale result/error is a no-op. */
   const cancelMagic = useCallback(() => { magicRunRef.current++; setGenerating(false) }, [])
@@ -459,7 +466,7 @@ export function useCreator(adapters: CreatorAdapters) {
 
   return {
     state: {
-      artworkUrl, prepared, editingOutline, editorMode, autoOutline, generating,
+      artworkUrl, prepared, preparedFor3D, editingOutline, editorMode, autoOutline, generating,
       showColors, showFilters, designState, colors,
       canUndo: histRef.current.past.length > 0,
       canRedo: histRef.current.future.length > 0,

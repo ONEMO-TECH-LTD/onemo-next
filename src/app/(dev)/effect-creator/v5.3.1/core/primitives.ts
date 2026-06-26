@@ -53,14 +53,16 @@ export async function runCutout(url: string, onProgress?: (s: SegmentProgress) =
   return segmentML(url, EFFECT_BUILD_CONFIG.maxImageDim, effectiveTextureDim(), onProgress)
 }
 
-/** prepareShaped(url, preseg) → prepared — Magic's shaped subject from a REQUIRED pre-segmentation
- *  (inv 28, bypass-proof: the cap can never be skipped by an internal cache-miss segmentation). The flow
- *  supplies preseg by calling runCutout first on a cache-miss. Behaviour-neutral: the same cfg the macro
- *  used (Detail 100 floor, paddingMM 0). (prepare-effect.ts:191's internal segmentML fallback becomes
- *  product-unused once the flow always injects preseg — left in place; engine untouched this phase.) */
+/** prepareShaped(url, preseg?) → prepared — Magic's shaped subject. preseg is OPTIONAL pass-through
+ *  (Phase-2 Option A, expert source-verified): when supplied (the cache-hit path) the AI is not re-run;
+ *  when absent, prepareEffect segments internally AT THE CAP and keeps the G4 flood-fill fallback
+ *  (prepare-effect.ts:191/:194-199 — both already capped, no crash bypass). Behaviour-IDENTICAL to the
+ *  macro, same cfg (Detail 100 floor, paddingMM 0). inv-28's literal required-preseg (one segmentation
+ *  entry) is DEFERRED to a flagged hardening that MUST relocate the flood-fill + 'fallback' notify, not
+ *  drop it (G4 "a degraded cut is never silent"). */
 export async function prepareShaped(
   url: string,
-  preseg: MLResult,
+  preseg?: MLResult,
   onProgress?: (s: 'downloading-model' | 'cutting' | 'fallback') => void,
 ): Promise<PreparedEffect> {
   const { prepareEffect, EFFECT_BUILD_CONFIG } = await import('@/lib/effect/prepare-effect')
