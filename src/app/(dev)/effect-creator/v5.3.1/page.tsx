@@ -57,7 +57,7 @@ function PrototypePageInner() {
   const notify = useCallback((kind: 'warn' | 'error' | 'info', message: string) => { toast(kind, message) }, [])
   const { state, actions } = useCreator({ notify, segPresent })
   const {
-    artworkUrl, prepared, editingOutline, editorMode, autoOutline, generating,
+    artworkUrl, prepared, preparedFor3D, editingOutline, editorMode, autoOutline, generating,
     showColors, showFilters, designState, colors,
   } = state
 
@@ -69,12 +69,12 @@ function PrototypePageInner() {
   // concern kept in the page shell over the scene (NOT socket orchestration); it folds into the viewer
   // adapter with the F32 context-loss work.
   useEffect(() => {
-    if (!prepared) return
+    if (!preparedFor3D) return // the nudge is the 3D-paint concern → key on the published-to-viewer state
     const fire = () => window.dispatchEvent(new Event('resize'))
     fire()
     const ts = [200, 800, 2000].map((ms) => setTimeout(fire, ms))
     return () => ts.forEach(clearTimeout)
-  }, [prepared, editingOutline])
+  }, [preparedFor3D, editingOutline])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -144,7 +144,7 @@ function PrototypePageInner() {
               designState={designState}
               isEditing={false}
               shaped={shaped}
-              prepared={prepared ?? undefined}
+              prepared={preparedFor3D ?? undefined}
               onStatus={actions.handleStatus}
               frozen={editingOutline}
             />
