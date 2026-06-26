@@ -11,8 +11,9 @@
 // the primitives (prepareStandard/prepareShaped) instead of importing prepareEffect directly — same call,
 // same cfg, behaviour-identical (the expert-noted right layering).
 //
-// Still in the macro (extracted next): the publishCutoutResult seq-guard, the generation-cancel token, and
-// the editor/trim/filter sessions. They COMPOSE this history (snapNow/pushHistory).
+// This module also holds the other Layer-2b transaction services that COMPOSE this history (snapNow/
+// pushHistory): the publishCutoutResult seq-guard, the generation-cancel token, and the editor/trim/filter
+// sessions — all below.
 
 import { useState, useCallback, useRef } from 'react'
 import { useSceneStore } from '../admin/sceneStore'
@@ -295,9 +296,14 @@ export function useUploadPublish(patchGenMatte: (genId: number, matteUrl: string
   const uploadSeqRef = useRef(0)
   const nextUploadSeq = useCallback(() => ++uploadSeqRef.current, [])
   const publishCutoutResult = useCallback(async (seq: number, standard: PreparedEffect, genId: number, seg: MLResult) => {
-    if (uploadSeqRef.current !== seq) return // superseded by a newer image — no-op
+    if (uploadSeqRef.current !== seq) return // fast-return: already superseded by a newer image
     try {
       const { subjectMatteFromSeg } = await import('@/lib/effect/prepare-effect')
+      // RE-CHECK after the await, immediately before the mutation — the macro published the matte
+      // SYNCHRONOUSLY right after its guard (pe already imported), so the guard sat immediately before the
+      // write. Extracting moved the import inside, opening an async gap; this second check restores the
+      // "stale cannot mutate" guarantee (KAI-9222/9223 acceptance · pixel-2 F1). Behaviour-neutral.
+      if (uploadSeqRef.current !== seq) return
       const matteUrl = subjectMatteFromSeg(standard.frontSrc.origCanvas, seg).toDataURL()
       useOutlineStore.getState().setSubjMatteUrl(matteUrl)
       patchGenMatte(genId, matteUrl)
