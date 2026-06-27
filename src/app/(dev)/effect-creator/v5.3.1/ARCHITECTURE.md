@@ -124,18 +124,18 @@ its matte feeds the editor's Blend preview on any shape.
 
 | File | Role | Key contract |
 |---|---|---|
-| `prepare-effect.ts` (291) | The ONE 2D engine. `standardBirthShape` (full rect + 8mm corners via Paper). `prepareEffect(url, type, cfg, onProgress, preseg)`. | `EFFECT_BUILD_CONFIG`: 70mm base, 1mm body, edgeRadius 0.2mm, padding 1.5mm, texDim 2400. Shaped = raw marching-squares + RDP at `minFeatureMM` (5mm floor), NO fairing/fit. `frontSrc` = re-bake source. |
+| `prepare-effect.ts` (292) | The ONE 2D engine. `standardBirthShape` (full rect + 8mm corners via Paper). `prepareEffect(url, type, cfg, onProgress, preseg)`. | `EFFECT_BUILD_CONFIG`: 70mm base, 1mm body, edgeRadius 0.2mm, padding 1.5mm, texDim 2400. Shaped = raw marching-squares + RDP at `minFeatureMM` (5mm floor), NO fairing/fit. `frontSrc` = re-bake source. |
 | `composite.ts` (172) | The image bake (P2 cross-browser SVG engine). `composeFront(orig, subj, blurPx, fxFilter?, vignette, tint)` async. `svgFilterBake` via `URL.createObjectURL(Blob)` (Safari-safe; data-URL renders empty on WebKit). `cssColorFilterToSvg`. `PRESET_FILTER`/`presetFilter`/`PRESET_LABELS`. | One bake feeds 3D + print. Zero `ctx.filter`. |
 | `outline-resolve.ts` (263) | The shape engine. `resolve(source, adjustments)→VShape`: all-off=exact source; globalPass (straighten→simplify→smooth→radius) + localPass (curve+per-corner radius), fold-guarded. | Kernels: Paper (smooth/simplify/per-corner radius) + Clipper2 (straighten/whole radius) + in-house curve. |
 | `geometry-truth.ts` (106) | The single geometry pipeline. `contourFromShape(v)` @ `MANUFACTURING_TOLERANCE_MM` (0.05). `assertContourCuttable`. `vectorShapeHash`. | Tolerances: mfg 0.05, display 0.004, min-feature 5mm, anchor-sep 1.5mm. |
 | `mesh.ts` (212) | `buildShapedGeometry(contour, opts)` — custom BufferGeometry: front cap + rounded edge lip + back cap. 3 material groups (0 front / 1 edge / 2 back). UV0=image, UV1=world-XY suede. Canonical winding (outer CCW / holes CW). | Edge = same front image rolled over the lip. |
 | `build-mesh.ts` (46) | `buildMeshFromSpec(geometryMM, opts, composite, edgeComposite)` → geometry + 2 CanvasTextures. | The only three.js touch besides mesh.ts. |
-| `mask.ts` (280) | Image load (`loadImageData`, y-up), `deviceMaxTextureDim`, the **fallback** segmentation (`segment` = alpha-channel else border flood-fill), `postProcessMask`/`smoothMask`/`dilateMask`. | Header comment claims "default = BEN2" — **stale** (§10); the default is the trio. |
+| `mask.ts` (293) | Image load (`loadImageData`, y-up), `deviceMaxTextureDim`, the **fallback** segmentation (`segment` = alpha-channel else border flood-fill), `postProcessMask`/`smoothMask`/`dilateMask`. | Header corrected post-de-slop (BEN2 retired; default = the trio). |
 | `image-shape.ts` (53) | `maskFromImageData` (Otsu) for image-upload-as-shape. | |
 | `contour.ts` (151) | `traceContourRaw`: marching-squares → stitch → largest loop → CCW raw ring. No RDP/fillet/smoothing (those route through outline-core). | |
-| `ben.worker.ts` (262) | Cut-out worker. Default = rembg trio (`resolveChain`) on **WASM EP** (no WebGPU). `?seg=ben2` = transformers/WebGPU (opt-in). Degenerate-matte guard. | Posts RGBA matte (alpha=subject). |
+| `ben.worker.ts` (271) | Cut-out worker. Default = rembg trio (`resolveChain`) on **WASM EP** (no WebGPU). `?seg=ben2` = transformers/WebGPU (opt-in). Degenerate-matte guard. | Posts RGBA matte (alpha=subject). |
 | `ben-chain.ts` (37) | `resolveChain(seg)`: no seg → `[u2netp, silueta]` (production trio); single rembg model; else null→transformers. `REMBG` specs (self-hosted `/seg-models`). `isDegenerateMatte`. | The truth of which model runs. |
-| `segment-ml.ts` (173) | Main-thread worker wrapper. `segmentML(url, maskDim, texDim)` → low-res mask + hi-res texture + `adapterId`. 120s watchdog. `preloadBen` (disabled at boot). | Header comment claims "default = BEN2" — **stale** (§10). |
+| `segment-ml.ts` (174) | Main-thread worker wrapper. `segmentML(url, maskDim, texDim)` → low-res mask + hi-res texture + `adapterId`. 120s watchdog. `preloadBen` (disabled at boot). | Header corrected; residual BEN2 NAMING remains lower (segParam comment, the downscale/run comments, `ML_ADAPTER_ID='ben2-onnx'`) — naming-only; the router runs the trio (§10). |
 | `payload.ts` (306) | **DORMANT** manufacturing contract. `buildApprovedEffectPayload` (content-addressed, int-micron). Not wired to /create (§7). | |
 | `persistence.ts` (167) | **DORMANT** saved-effect model (EditableRecipe + LockedPayload, F1 bond). No save surface. | |
 | `attachment.ts` (149) | **DORMANT** `validateAttachment` (magnet 54mm grid / velcro). Invented defaults. | |
@@ -149,14 +149,14 @@ its matte feeds the editor's Blend preview on any shape.
 | File | Role |
 |---|---|
 | `vector-core/types.ts` (40) | `VAnchor`(p/hIn/hOut/corner/id) / `VPath` / `VShape`. SVG-path-native; stable per-anchor id (VD9). |
-| `vector-core/path.ts` (211) | `segmentAt`/`cubicPoint`/`flattenPath`/`flattenShape`/`toSVGPathD`/`transformShape`/`splitCubic`/`signedArea`. `filletPath` = test-only. |
+| `vector-core/path.ts` (157) | `segmentAt`/`cubicPoint`/`flattenPath`/`flattenShape`/`toSVGPathD`/`transformShape`/`splitCubic`/`signedArea`. `filletPath` = test-only. |
 | `vector-core/ops.ts` (164) | `nearestOnPath`/`insertAnchorCentered`/`deleteAnchorRefit`/`scaleAnchorTension` (Curve). |
 | `vector-core/fit.ts` (424) | Schneider cubic Bézier fit (`ringToVPath`) + DP anchor-compaction (KAI-8974) + pair-collapse. |
 | `vector-core/paper-kernel.ts` (183) | Paper.js headless: `roundCornersPaper`/`roundShapePaper`/`smoothPaper`/`simplifyPaper`. |
 | `vector-core/clipper-kernel.ts` (73) | Clipper2: `straightenPath`/`roundWholeShapePx`. |
-| `outline-core/math.ts` (24) | Narrow barrel — re-exports the LIVE ring-math from `./resolver` + `contentHash`/`stableStringify`. |
-| `outline-core/resolver.ts` (726) | MIXED. **Live** (via math barrel): `rdpClosed`, `validateSelfIntersection`, `repairSimplePolygon`, `normalizeRing`, `fairTracedRing`, `catmullRomClosed`, `applyCornerRadii`, `signedArea`. **Dead** (v1/v2 doc-runtime): `resolveOutlineDocument`, `nodesFromTracedRing`, `assembleTracedRing`. |
-| `outline-core/hash.ts` (110) | `contentHash` (cyrb53) + `stableStringify` live; `outlineDocumentHash`/projections dead. |
+| `outline-core/math.ts` (21) | Narrow barrel — re-exports the LIVE ring-math from `./resolver` + `contentHash`/`stableStringify`. |
+| `outline-core/resolver.ts` (480) | **All live ring/curve math** (via the math barrel): `signedArea`/`rdpClosed`/`catmullRomClosed`/`normalizeRing`/`validateSelfIntersection`/`repairSimplePolygon`/`fairTracedRing`/`fairingFromDetail`/`flattenPath`. The v1/v2 doc-runtime (`resolveOutlineDocument`/`nodesFromTracedRing`/`assembleTracedRing`) was **removed in the v5.5.1 de-slop** (DEC-v5-07) — no longer MIXED. |
+| `outline-core/hash.ts` (36) | `contentHash` (cyrb53) + `stableStringify` — all live; the dead `outlineDocumentHash`/projections were removed in the de-slop. |
 | `shape-library/defs.ts` (214) | 14 stock shapes as pure vector data — analytic (circle/square/polygon/star/heart/leaf/lens/pill) + baked organic (pinched/sparkle/teardrop/squircle/asterisk/bowtie). |
 | `shape-library/baked.ts` (175) | Frozen anchor literals (data; generated by `bake.ts`). |
 | `shape-library/index.ts` (19) | `getShape(kind, imgW, imgH)` — place in image box (0.72). |
@@ -242,7 +242,7 @@ What was **reverted** (P3/P5): the full-bleed canvas effects, surround-glow / 3D
 **Removed in the v5.3.1 cleanup** (off snapshot `798b191`): `effect-creator/v1` + `v2`, the `(dev)/prototype`/`shaped`/`studio` routes, old `studio/` (the 26M PlayCanvas-fork editor — superseded by studio-v2, which is untouched), the `/dev/tokens` old-token pipeline, and the dev A/B build scaffolding. The scene-format adapter (`onemo-deserialize`/`onemo-format`) was extracted from old `studio/` into `core/scene-format/`, so the Creator owns its `.onemo` reader.
 
 **Removed since the v5.3.1 doc was written** (v5.5.1 de-slop DEC-v5-07 + Phase-3 o-deslop KAI-9268) — verified against the tree 2026-06-27:
-- `outline-core` document-runtime: `sdf.ts`, `livewire.ts`, `reducer.ts` **DELETED**, and `resolver.ts`'s `resolveOutlineDocument` half **DELETED** (0 refs). `outline-core/` is now `hash/index/math/resolver/types`; the `index.ts` **barrel + ring-math are LIVE** (engine imports `fairingFromDetail`/`validateSelfIntersection` through `outline-core/math`). **Lone remnant:** a dead `OutlineDocument` type in `outline-core/types.ts` (1 ref, no runtime consumer) — a type-only surgical leftover.
+- `outline-core` document-runtime: `sdf.ts`, `livewire.ts`, `reducer.ts` **DELETED**, and `resolver.ts`'s `resolveOutlineDocument`/`nodesFromTracedRing`/`assembleTracedRing` half **DELETED** (0 refs; resolver 726→480L). `outline-core/` is now `hash/index/math/resolver/types`; the `index.ts` **barrel + ring-math are LIVE** (engine imports `fairingFromDetail`/`validateSelfIntersection` through `outline-core/math`). **Cleanup complete — no remnant:** `outline-core/types.ts` (100L) carries only a *comment* noting the `OutlineDocument` model was removed; no `OutlineDocument` type or doc-runtime symbol remains (verified `rg`).
 - The 3 route barrels `v5.3.1/{user,core,admin}/index.ts` — **DELETED** (Phase-3 o-deslop, KAI-9268; 0 static+dynamic importers, triple-verified).
 - `geometry-truth.legacy.ts` — retired trace fit, **relocated to `src/lib/effect/__tests__/`** (test-only fixture).
 
@@ -252,7 +252,7 @@ Still present (clarified, NOT dead):
 ## 10. Known drift / debt
 
 - **Orphaned editor Image path.** `ImageSheet` + EditorCanvas image preview + `setImageFx` are fully built and wired, but the editor dock (`OutlineEditor.tsx:848`) doesn't expose Image and page never passes `openMode='image'` — so the only image-fx entry is the hero `FiltersSurface`, which bakes the 3D live (the iPhone lag/reset path). Re-exposing the editor's Image entry routes image-fx through the version-bridge (deferred bake). The plumbing already exists.
-- **Stale "default = BEN2" comments** in `segment-ml.ts` (header, `segParam`, `ML_ADAPTER_ID`) and `mask.ts` (header). The router (`ben-chain.ts`) runs the trio by default; these comments describe the old world.
+- **Residual BEN2 naming** (cosmetic, not behaviour). The `mask.ts` + `segment-ml.ts` HEADERS are corrected (BEN2 retired; default = the trio). Residual BEN2 wording remains LOWER in `segment-ml.ts` only — the `segParam` default comment, the downscale/run comments, and `ML_ADAPTER_ID = 'ben2-onnx'`. The router (`ben-chain.ts`) runs the trio by default; the names are naming debt.
 - **AUTO_TUNE dormant.** `seed-defaults.ts` `AUTO_TUNE` (T6) is built but paused (Dan, 2026-06-17) — Magic seeds raw + tools OFF for manual calibration.
 - **`edgeRadiusMM` re-pin TODO.** `prepare-effect.ts:66` notes 0.15 was tuned for a 0.5mm body; current 0.2 on the 1mm body is the accepted straight-wall value but flagged as a §9 follow-up.
 - **Multi-ring drop.** `geometry-truth.contourFromShape` keeps only the outer ring while the SVG exporter serializes all paths — a silent divergence the moment holes/multi-piece shapes ship (KAI-9086 guard logs it).
