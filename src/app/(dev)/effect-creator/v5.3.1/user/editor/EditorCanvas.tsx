@@ -183,6 +183,7 @@ function EditorCanvasInner(props: EditorCanvasProps) {
         onPointerUp={onPointerUp}
         onPointerLeave={onPointerUp}
         onPointerCancel={onPointerCancel}
+        onLostPointerCapture={onPointerCancel}
         onClick={onSurfaceClick}
         onWheel={onSurfaceWheel}
       >
