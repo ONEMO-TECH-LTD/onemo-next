@@ -58,6 +58,7 @@ interface EditorCanvasProps { // KAI-9066: module-internal (the consumer passes 
   onSurfacePointerDown: (e: ReactPointerEvent) => void
   onPointerMove: (e: ReactPointerEvent) => void
   onPointerUp: (e: ReactPointerEvent) => void
+  onPointerCancel: (e: ReactPointerEvent) => void
   onSurfaceClick: (e: ReactMouseEvent) => void
   onSurfaceWheel: (e: ReactWheelEvent) => void
   onVAnchorDown: (i: number) => (e: ReactPointerEvent) => void
@@ -66,6 +67,7 @@ interface EditorCanvasProps { // KAI-9066: module-internal (the consumer passes 
   beginStretch: (which: GripId) => (e: ReactPointerEvent) => void
   moveStretch: (e: ReactPointerEvent) => void
   endStretch: () => void
+  cancelStretch: () => void
   beginRotateHandle: (e: ReactPointerEvent) => void
 }
 
@@ -75,8 +77,8 @@ function EditorCanvasInner(props: EditorCanvasProps) {
     vshape, vDisplay, pathD, hitRing, hitBBox, hasIssues, nodeR,
     preview, showAnchors, selVA, allSelected, frameLocked, rotateLive, moveLive, stretchLive, pinching, shapePreview,
     nodeInteractedRef, setFrameLocked,
-    onSurfacePointerDown, onPointerMove, onPointerUp, onSurfaceClick, onSurfaceWheel,
-    onVAnchorDown, onVHandleDown, onVAnchorDouble, beginStretch, moveStretch, endStretch, beginRotateHandle,
+    onSurfacePointerDown, onPointerMove, onPointerUp, onPointerCancel, onSurfaceClick, onSurfaceWheel,
+    onVAnchorDown, onVHandleDown, onVAnchorDouble, beginStretch, moveStretch, endStretch, cancelStretch, beginRotateHandle,
   } = props
 
   // Rotate handle — a grip on a short stem off the outline, shown when all anchors are selected.
@@ -180,6 +182,8 @@ function EditorCanvasInner(props: EditorCanvasProps) {
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerLeave={onPointerUp}
+        onPointerCancel={onPointerCancel}
+        onLostPointerCapture={onPointerCancel}
         onClick={onSurfaceClick}
         onWheel={onSurfaceWheel}
       >
@@ -280,7 +284,8 @@ function EditorCanvasInner(props: EditorCanvasProps) {
                         onPointerDown={beginStretch(g.id)}
                         onPointerMove={moveStretch}
                         onPointerUp={endStretch}
-                        onPointerCancel={endStretch}
+                        onPointerCancel={cancelStretch}
+                        onLostPointerCapture={cancelStretch}
                         onClick={(e) => e.stopPropagation()}
                         onDoubleClick={(e) => e.stopPropagation()}
                       />
