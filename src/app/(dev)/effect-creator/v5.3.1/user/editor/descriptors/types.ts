@@ -56,6 +56,11 @@ export interface EditorCtx {
    *  Removing the detail OR offset descriptor leaves this binding intact for the other (the bundling test). */
   getGenParams: () => { detail: number; offset: number; offsetJoin: OffsetJoin }
   reDeriveTrace: (params: { detail?: number; offset?: number; offsetJoin?: OffsetJoin }, commit: boolean) => CommitResult
+  /** SHARED source-install (shape-pick + upload/magic) — install a NEW source (+ optional default adjustments)
+   *  and re-derive. commit=false = transient (no history); commit=true = one editor-local undo step. F8:
+   *  history / selection-clear / control advance ONLY on {ok:true}; a refused install = no advance + rollback.
+   *  Re-homed from useOutlineEditing.seedSource; the picker-SPECIFIC shape-build stays IN the descriptor. */
+  installSource: (source: OutlineSource, adjustments: OutlineAdjustments | undefined, commit: boolean) => CommitResult
   /** injected notification sink (the descriptor never imports toast — blueprint §4). */
   notify: (kind: 'warn' | 'error' | 'info', message: string) => void
 }
@@ -88,3 +93,49 @@ export type ToolEnabled = (id: string) => boolean
  *  over `any` value; the per-tool descriptor files keep their precise `V`. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AnyToolDescriptor = ToolDescriptor<any>
+
+// ── PICKER descriptor (shape-pick) — a DISTINCT kind: a source-PRODUCER + multi-action picker, not a
+//    value+preview/commit slider (lead call 2026-06-27, design doc §10; expert+pixel cleared). Kept the
+//    value ToolDescriptor pristine; the registry is a discriminated union the composer narrows on `kind`.
+//    Forward-compatible for the full-loop dock's Add/Effect outlets (also pickers). §0.7 lightweight: a
+//    union + a narrow, no framework. The picker's SPECIFIC logic is self-contained here; only the SHARED
+//    EditorCtx.installSource is the engine binding → drop the descriptor = the Shape outlet vanishes.
+
+/** A picker param control (DATA the picker client renders), e.g. polygon Sides / star Spike. */
+export interface PickerParamSpec {
+  key: string
+  label: string
+  control: 'stepper' | 'slider'
+  min: number
+  max: number
+}
+
+export type PickerParams = Record<string, number>
+
+export interface PickerDescriptor {
+  kind: 'picker'
+  id: string
+  outlet: ToolOutlet
+  label: string
+  icon: string
+  /** the chip lineup (DATA the Shape-outlet client renders). */
+  chips: { id: string; label: string }[]
+  /** per shape-kind parametric controls (DATA); absent/empty kinds show only the chip. */
+  paramSpecs: (kind: string) => PickerParamSpec[]
+  /** install a picked kind's geometry at the current params (one undo step). */
+  apply: (kind: string, params: PickerParams, ctx: EditorCtx) => CommitResult
+  /** transient generator preview ring `d` while a param tick drags (generator kinds only; else null). */
+  previewRing: (kind: string, params: PickerParams, ctx: EditorCtx) => string | null
+  /** blob dice — reroll the seed + re-apply. Returns the new params (the client updates its state) + result. */
+  reroll: (kind: string, params: PickerParams, ctx: EditorCtx) => { params: PickerParams; result: CommitResult }
+  /** upload an SVG/image as a shape (async; loud product-language failure via notify). */
+  uploadShape: (file: File, ctx: EditorCtx) => Promise<CommitResult>
+}
+
+/** The heterogeneous registry: value tools + the picker. */
+export type Descriptor = AnyToolDescriptor | PickerDescriptor
+
+/** INTENTIONAL narrowing (NOT a direct discriminant — the 7 value ToolDescriptors carry NO `kind`, staying
+ *  pristine; only PickerDescriptor has `kind`). `'kind' in d` narrows the union; the composer uses this guard
+ *  and never forces picker fields onto the value tools. */
+export const isPickerDescriptor = (d: Descriptor): d is PickerDescriptor => 'kind' in d
