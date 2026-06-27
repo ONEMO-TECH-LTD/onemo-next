@@ -1,11 +1,13 @@
 'use client'
 
-// editor/tool-sheet.tsx — the GENERIC descriptor-driven tool sheets (Phase 4 step 6c · inv 30 / §0.4).
+// editor/tool-sheet.tsx — the descriptor-driven tool sheets (Phase 4 step 6c · inv 30 / §0.4).
 //
-// ONE pair of sheets renders ANY outlet's tools from `state.tools` DATA — the UI is a thin CLIENT of the
-// descriptors: it reads {control, value, available} + calls previewTool/commitTool BY ID; it knows NO tool.
-// Replaces the per-tool hardcoded AdjustSheet/ImageSheet/ShapeSheet (deleted at 6c-3). A new tool appears here
-// with ZERO edit (just another `tools` entry); the Layer boundary holds (only DATA, never a descriptor object).
+// ToolSheet is the GENERIC value-tool client: it renders ANY value tool from `state.tools` DATA by control.KIND
+// (slider/slider-enum/swatches/toggle) — a NEW value tool of an existing kind renders with ZERO edit, just
+// another `tools` entry. PickerSheet is the SHAPE-outlet picker client: it renders the picker's DATA (chips/
+// params/preview) but legitimately knows shape-specific PRESENTATION (the shape glyphs, the blob dice) — a UI
+// client may know its own outlet. Both consume DATA + call actions BY ID; neither receives a descriptor object
+// or ctx (the Layer boundary). Replaces the per-tool hardcoded AdjustSheet/ImageSheet/ShapeSheet (deleted 6c-3).
 
 import { useRef } from 'react'
 import type { ReactNode } from 'react'
@@ -21,10 +23,11 @@ import type { CommitResult } from '../outlineStore'
 import styles from '../outline-editor.module.css'
 
 // icon KEY → glyph: the descriptor carries a UI-agnostic key; the skeleton maps it here (no JSX in descriptors).
+// keyed by the EXACT icon string each descriptor emits (grep-verified against descriptors/*; F1 pixel).
 const ICONS: Record<string, ReactNode> = {
-  'trace-detail': <TraceDetailIcon />, offset: <OffsetIcon />, corner: <CornerIcon />, curve: <RoundIcon />,
-  simplify: <DetailIcon />, smooth: <SmoothIcon />, straighten: <LineIcon />,
-  brightness: <BrightnessIcon />, contrast: <ContrastIcon />, saturate: <SaturationIcon />, warmth: <WarmthIcon />,
+  'trace-detail': <TraceDetailIcon />, offset: <OffsetIcon />, corner: <CornerIcon />, round: <RoundIcon />,
+  detail: <DetailIcon />, smooth: <SmoothIcon />, line: <LineIcon />,
+  brightness: <BrightnessIcon />, contrast: <ContrastIcon />, saturation: <SaturationIcon />, warmth: <WarmthIcon />,
   preset: <BrightnessIcon />, tint: <SaturationIcon />, vignette: <BlurIcon />, blur: <BlurIcon />, fill: <OffsetIcon />,
   shape: <ShapeIcon />,
 }
@@ -175,7 +178,9 @@ export function ToolSheet({ tools, activeId, setActiveId, actions }: { tools: To
   )
 }
 
-/** The shape PICKER sheet: Upload + the shape chips, then the active kind's parametric controls (+ blob dice). */
+/** The SHAPE-outlet picker client: Upload + the shape chips, then the active kind's parametric controls (+ the
+ *  blob dice). Renders the picker's DATA + calls the picker actions BY VERB; shape-specific presentation (the
+ *  shape glyphs, the blob affordance) is this client's job — NOT leaked into the descriptor. */
 export function PickerSheet({ tool, actions }: { tool: ToolRecord; actions: ToolActions }) {
   const p = tool.picker
   if (!p) return null
