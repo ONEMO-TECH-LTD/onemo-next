@@ -5,8 +5,7 @@
 // live image composer useImageFilters), so removing/disabling an image tool removes it from BOTH surfaces (the
 // bundling test spans the hero). Live over the 3D scene: every change previews on the real object. ✓ keeps, ✕ reverts.
 
-import { useRef, useState } from 'react'
-import { useOutlineStore } from './outlineStore'
+import { useState } from 'react'
 import { useImageFilters } from './editor/useImageFilters'
 import TickBar from '../ui/TickBar'
 import { CheckIcon, CloseIcon, BrightnessIcon, ContrastIcon, SaturationIcon, WarmthIcon, BlurIcon } from './icons'
@@ -22,18 +21,10 @@ const SUBS: { id: string; icon: React.ReactNode }[] = [
 ]
 
 export default function FiltersSurface({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
-  // snapshot the pre-open appearance so ✕ reverts losslessly (the flow-revert KAI-9244 supersedes this in 6d-2).
-  const preRef = useRef({ fx: useOutlineStore.getState().imageFx, blur: useOutlineStore.getState().bgBlur, tile: useOutlineStore.getState().wrapTile })
+  // KAI-9244: ✕ = onCancel (the flow session reverts imageFx/bgBlur/wrapTile from its pre-open snap); ✓ = onDone
+  //  (keeps, one global step). No private revert here — FiltersSurface is a pure descriptor client, store-free (§11.3).
   const { imageTool, previewTool, commitTool } = useImageFilters() // composer: subscribes + drives the image descriptors
   const [sub, setSub] = useState('brightness')
-
-  const onKeep = () => onDone()
-  const onRevert = () => {
-    const p = preRef.current
-    const st = useOutlineStore.getState()
-    st.setImageFx(p.fx); st.setBgBlur(p.blur); st.setWrapTile(p.tile)
-    onCancel()
-  }
 
   const preset = imageTool('preset')
   const tint = imageTool('tint')
@@ -49,9 +40,9 @@ export default function FiltersSurface({ onDone, onCancel }: { onDone: () => voi
       <div style={{ ...glass, width: 'min(100%, 520px)', paddingBottom: 'calc(14px + env(safe-area-inset-bottom))' }} role="dialog" aria-label="Filters">
         {/* header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px' }}>
-          <button type="button" onClick={onRevert} aria-label="Cancel filters" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', display: 'flex' }}><CloseIcon /></button>
+          <button type="button" onClick={onCancel} aria-label="Cancel filters" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', display: 'flex' }}><CloseIcon /></button>
           <span style={{ font: '600 15px system-ui, sans-serif' }}>Filters</span>
-          <button type="button" onClick={onKeep} aria-label="Apply filters" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#1c8a52', display: 'flex' }}><CheckIcon /></button>
+          <button type="button" onClick={onDone} aria-label="Apply filters" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#1c8a52', display: 'flex' }}><CheckIcon /></button>
         </div>
 
         {/* PRESETS (one-tap looks) — the preset descriptor's swatch options */}

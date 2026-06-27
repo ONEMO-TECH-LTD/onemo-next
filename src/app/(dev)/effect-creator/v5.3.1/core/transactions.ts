@@ -349,9 +349,9 @@ export function filterSessionChanged(
 /** Editor / Trim / Filter SESSIONS — begin (snapshot) / commit (push one history step on a real change) /
  *  revert. Owns the overlay flags + the pre-snapshots; composes the history (snapNow/pushHistory). The
  *  change-test on commit covers EVERYTHING a session can touch (shape · blend · image-fx · photo position —
- *  KAI-8971/F2). Phase-2 Option A: cancelFilters is close-only; the real imageFx/bgBlur/wrapTile revert
- *  still lives in FiltersSurface (Layer-3) until Phase 6 re-authors it onto this session's revert action by
- *  construction (tracked). trim's revert (cancelTrim) lifts cleanly now; the editor's discard is Phase 4. */
+ *  KAI-8971/F2). Phase 4 (KAI-9244): cancelFilters does the REAL imageFx/bgBlur/wrapTile revert from the
+ *  pre-open snap (FiltersSurface's Layer-3 revert removed); trim's revert (cancelTrim) lifts cleanly; the
+ *  editor's discard is the composer's onCancel (useEditor). */
 export function useSessions(args: {
   snapNow: () => AppSnap
   pushHistory: (s: AppSnap) => void
@@ -411,9 +411,19 @@ export function useSessions(args: {
     }
     setShowFilters(false)
   }, [pushHistory])
-  // Phase-2 Option A: close-only. The imageFx/bgBlur/wrapTile revert lives in FiltersSurface (Layer-3)
-  // until Phase 6 binds the new UI to this session's revert (a behaviour relocation deferred with a live A/B).
-  const cancelFilters = useCallback(() => { filterPreRef.current = null; setShowFilters(false) }, [])
+  // KAI-9244 (Phase 4): the REAL filter revert lives on the flow session now — restore imageFx/bgBlur/wrapTile
+  // from the pre-open snap (superseding the Phase-2 close-only); FiltersSurface dropped its private Layer-3 revert.
+  const cancelFilters = useCallback(() => {
+    const pre = filterPreRef.current
+    if (pre) {
+      const o = useOutlineStore.getState()
+      o.setImageFx(pre.imageFx)
+      o.setBgBlur(pre.outline.bgBlur)
+      o.setWrapTile(pre.wrapTile)
+      filterPreRef.current = null
+    }
+    setShowFilters(false)
+  }, [])
 
   return {
     editingOutline, editorMode, showColors, showFilters,
