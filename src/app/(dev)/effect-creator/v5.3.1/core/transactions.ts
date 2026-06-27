@@ -7,7 +7,7 @@
 // inv 20): snapshot the whole app state as a lightweight re-derivable recipe (NEVER canvas snapshots), and
 // restore by pulling the prepared from the LRU or RE-DERIVING it via the Layer-2a primitives.
 //
-// Lifted verbatim (behaviour-neutral) from useCreator.ts's macro. The ONLY change: reDerive now COMPOSES
+// Lifted verbatim (behaviour-neutral) from the Creator macro (now flows/v53Flow.ts). The ONLY change: reDerive now COMPOSES
 // the primitives (prepareStandard/prepareShaped) instead of importing prepareEffect directly — same call,
 // same cfg, behaviour-identical (the expert-noted right layering).
 //

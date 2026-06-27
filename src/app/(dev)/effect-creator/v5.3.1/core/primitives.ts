@@ -7,7 +7,7 @@
 // (Layer 2b) composes them; the macro temporarily calls them during the Phase-2 cut-over (one impl
 // per op — inv 2 — until v53Flow replaces the macro's composition in Phase 3).
 //
-// Lifted verbatim (behaviour-neutral) from useCreator.ts's macro:
+// Lifted verbatim (behaviour-neutral) from the Creator macro (now flows/v53Flow.ts):
 //   loadImage      ← upload                   prepareStandard ← upload
 //   runCutout      ← startBackgroundCutout (segmentation ONLY; the seq-guard + matte publish + caches
 //                    are the publishCutoutResult / history transactions — NOT here)

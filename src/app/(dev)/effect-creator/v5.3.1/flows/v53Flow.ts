@@ -1,14 +1,16 @@
 'use client'
 
-// useCreator() — the creation/page socket (Creator v5.4 · blueprint §4 · DEC-v5-06).
+// flows/v53Flow.ts — useV53Flow(): THE v53 FLOW (Creator v5.5 · blueprint §6 · inv 18 · KAI-9205).
 //
-// The headless orchestration core, lifted OUT of page.tsx (the Layer-2 seam): the upload sequence,
-// the background cut-out cache, the Magic pipeline, the GLOBAL undo/redo/reset history machine,
-// editor entry, the trim + filter sessions, and the mm-SVG export string. The UI binds to
-// { state, actions } and nothing else.
+// The current product behaviour as a thin COMPOSITION of the Layer-2 primitives + transaction services:
+// upload → loadImage → prepareStandard → publishToViewer + runCutout(bg) → publishCutoutResult; Magic →
+// prepareShaped(cached preseg) → publishToViewer → history.commit (blueprint §6). Formalized from the
+// Phase-2 `useCreator` macro — the macro identity is retired; this IS the named, swappable flow. Returns the
+// `CreatorFlow` surface (flow-contract.ts) the Layer-3 page binds to. A second flow (twoDFirstFlow) is a
+// sibling compose-function in Phase 5 — "a new pipeline is a new compose-function, not a socket rewrite."
 //
 // THE SPLIT (not a clean lift) — the concerns that straddle the seam are INJECTED by the UI, never
-// reached from inside the socket (blueprint §4, the five injected adapters):
+// reached from inside the flow (blueprint §4, the five injected adapters):
 //   • notifications     → `adapters.notify` (the socket never imports toast)
 //   • URL/route params  → injected (`adapters.segPresent`; ?scene / ?internal stay UI-side config)
 //   • export download   → the socket RETURNS the SVG string; the UI writes the file
@@ -26,25 +28,18 @@
 
 import { useState, useCallback, useRef } from 'react'
 import { useSceneStore } from '../admin/sceneStore'
-import { INITIAL_ARTWORK, useOutlineStore } from './outlineStore'
+import { INITIAL_ARTWORK, useOutlineStore } from '../user/outlineStore'
 import { loadImage, prepareStandard, runCutout, prepareShaped, exportCutlineSvg } from '../core/primitives'
 import { useViewerAdapter } from '../core/viewer-adapter'
 import { useHistoryTransaction, useGenerationTask, useUploadPublish, useSessions, liteSpec } from '../core/transactions'
+import type { CreatorAdapters, CreatorFlow } from './flow-contract'
 import type { DesignState } from '../types'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
 import type { MLResult } from '@/lib/effect/segment-ml'
 
-/** UI-side notification sink — the socket emits, the UI binds it to toast() (blueprint §4 adapter). */
-export type Notify = (kind: 'warn' | 'error' | 'info', message: string) => void
+// Notify + CreatorAdapters now live in flow-contract.ts (the named seam); the page imports them there.
 
-export interface CreatorAdapters {
-  notify: Notify
-  /** Injected URL/route param: ?seg present → skip the upload-time background cut-out (harness override).
-   *  Product URLs carry no ?seg. Read by the UI from window.location, never inside the socket. */
-  segPresent: boolean
-}
-
-export function useCreator(adapters: CreatorAdapters) {
+export function useV53Flow(adapters: CreatorAdapters): CreatorFlow {
   const { notify, segPresent } = adapters
   // Layer-2a viewer adapter (inv 26): prepared-for-3D + publishToViewer + handleStatus live here, SPLIT
   // from prepared-for-editing (the `prepared` state below — drives the 2D editor + hasArtwork, never the 3D).
