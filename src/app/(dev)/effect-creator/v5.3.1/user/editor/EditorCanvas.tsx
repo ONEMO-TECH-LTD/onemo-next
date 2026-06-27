@@ -284,6 +284,7 @@ function EditorCanvasInner(props: EditorCanvasProps) {
                         onPointerMove={moveStretch}
                         onPointerUp={endStretch}
                         onPointerCancel={cancelStretch}
+                        onLostPointerCapture={cancelStretch}
                         onClick={(e) => e.stopPropagation()}
                         onDoubleClick={(e) => e.stopPropagation()}
                       />
