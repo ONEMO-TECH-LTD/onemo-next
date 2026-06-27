@@ -18,18 +18,10 @@ import type { OffsetJoin } from '@/lib/effect/offset'
 // the engine (resolve / outline-resolve.ts) owns the pct→engine-unit maps, so there are NO engine
 // units in the UI (KAI-9028). All tools 0 = OFF (Simplify/Smooth/Straighten global; Radius/Curve per-anchor).
 
-// KAI-9028 (Dan): every image filter shows ONE uniform 0–100% scale — 0% = the extreme/none end,
-// 100% = full to the limit — regardless of the engine range underneath.
-const FX_RANGE = { brightness: [50, 150], contrast: [50, 150], saturate: [0, 200], warmth: [0, 100] } as const
-type FxKey = keyof typeof FX_RANGE
-export const fxToPct = (k: FxKey, v: number) => {
-  const [lo, hi] = FX_RANGE[k]
-  return Math.max(0, Math.min(100, ((v - lo) / (hi - lo)) * 100))
-}
-export const fxFromPct = (k: FxKey, pct: number) => {
-  const [lo, hi] = FX_RANGE[k]
-  return lo + (pct / 100) * (hi - lo)
-}
+// KAI-9028 image-fx 0–100% conversions now live in the pure ./image-presets data module (so the Layer-2
+// descriptors import them without this React module). Imported here for ImageSheet + re-exported for UI consumers.
+import { fxToPct, fxFromPct } from './image-presets'
+export { fxToPct, fxFromPct }
 
 import styles from '../outline-editor.module.css'
 

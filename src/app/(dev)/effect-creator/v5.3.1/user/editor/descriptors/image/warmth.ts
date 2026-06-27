@@ -2,7 +2,7 @@
 // surface-agnostic (editor draft + hero live), 0–100% via fxToPct/fxFromPct. Remove = delete this file + its line.
 
 import type { ToolDescriptor, EditorCtx } from '../types'
-import { fxToPct, fxFromPct } from '../../sheets'
+import { fxToPct, fxFromPct } from '../../image-presets'
 
 export const warmthDescriptor: ToolDescriptor<number> = {
   id: 'warmth',
