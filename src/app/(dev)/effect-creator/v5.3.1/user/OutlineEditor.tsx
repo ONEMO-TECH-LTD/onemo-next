@@ -1,15 +1,13 @@
-// Effect Creator — 2D outline editor overlay. Phase 4 (blueprint §0.4 / inv 30): a THIN CLIENT. ALL editor
-// CONTROLLER logic (the source+adjustments session, the per-tool descriptors, the F8/F12/F16 folds) lives in
-// the composer `useEditor`; this component owns ONLY the canvas-interaction layer (gestures / points /
-// transforms / view) + binds the composer's {state, actions} + renders the descriptor-driven sheets
-// (ToolSheet / PickerSheet). The tools ARE descriptors (editor/descriptors/*); the UI is a swappable client
-// of the composer's bridge — old client unplugs, new plugs in, no reskin. No tool logic lives here.
+// Effect Creator — 2D outline editor overlay. Phase 4 (blueprint §0.4 / inv 30 / §11.3): a THIN CLIENT. ALL
+// editor CONTROLLER logic (the source+adjustments session, the per-tool descriptors, the F8/F12/F16 folds) +
+// ALL store access live in the composer `useEditor`; this component binds ONLY `{state, actions}` (never the
+// raw store) + owns the canvas-interaction layer (gestures / points / transforms / view) + renders the
+// descriptor-driven sheets (ToolSheet / PickerSheet). The UI is a swappable client of the composer's bridge.
 
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { validateSelfIntersection, type Vec2Px } from '@/lib/outline-core/math'
-import { useOutlineStore } from './outlineStore'
 import { toast } from '../ui/Toast'
 import { shapeToSVGPathD, flattenShape, insertAnchorCentered, deleteAnchorRefit, type VShape } from '@/lib/vector-core'
 import { useCanvasView } from './editor/useCanvasView'
@@ -32,7 +30,7 @@ interface OutlineEditorProps {
   openMode?: 'shape' | 'image' | null
   /** Magic ✦ trail chip — runs the SAME auto-cut the hero shortcut runs; the editor stays open + re-seeds. */
   onMagic?: () => void
-  /** KAI-9122: the design's REAL default magic-blend (0–100%) — seeds the blend preview so the 2D matches the 3D. */
+  /** KAI-9122: the design's REAL default magic-blend (0–100%) — passed to the composer for the blend preview. */
   defaultBlurPct?: number
 }
 
@@ -42,11 +40,15 @@ const VIEW_H = 1000
 const EDITOR_IMAGE_IDS = new Set(['brightness', 'contrast', 'saturate', 'warmth', 'blend'])
 
 export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMagic, defaultBlurPct = 0 }: OutlineEditorProps) {
-  // ── THE COMPOSER: the editor controller + the descriptor-driven {state, actions}; notify = injected toast ──
-  const { state, actions } = useEditor({ open, defaultBlurPct, onClose, notify: toast })
-  const { display, selVA, shapePreview, fxDraft, confirmDiscard, canUndo, canRedo } = state
+  // ── THE COMPOSER: editor controller + descriptor-driven {state, actions}. toolEnabled = the §5 runtime source
+  //    (the page provides it; the composer returns state.tools). notify = the injected toast sink. ──
+  const toolEnabled = useMemo(() => toolEnabledFromSearch(typeof window !== 'undefined' ? window.location.search : ''), [])
+  const { state, actions } = useEditor({ open, defaultBlurPct, onClose, notify: toast, toolEnabled })
+  const { display, selVA, shapePreview, fxDraft, confirmDiscard, canUndo, canRedo,
+          tools, spec, imgW, imgH, subjMatteUrl, art, blendBlur, hadCommittedOnOpen } = state
   const setSelVA = actions.setSelVA
   const applyVec = actions.applyVec
+  const toolActions: ToolActions = actions
 
   // the resolved display IS the working VShape for the gesture/render layer.
   const vshape = display
@@ -85,6 +87,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   const nodeRRef = useRef(11)
   const svgRef = useRef<SVGSVGElement>(null)
   const dimsRef = useRef({ widthPx: VIEW_W, heightPx: VIEW_H })
+  useEffect(() => { dimsRef.current = { widthPx: imgW, heightPx: imgH } }, [imgW, imgH])
   const pinchRef = useRef<{ d0: number; scale0: number; c0: Vec2Px } | null>(null)
   const canvasPanRef = useRef<{ startClient: Vec2Px; vx0: number; vy0: number } | null>(null)
   const clientPtsRef = useRef<Map<number, Vec2Px>>(new Map())
@@ -92,29 +95,9 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   const lastTapRef = useRef<{ x: number; y: number; t: number } | null>(null)
   const vecDragRef = useRef<{ kind: 'p' | 'hIn' | 'hOut'; ai: number; orig: VShape; moved: boolean } | null>(null)
 
-  useEffect(() => {
-    const sync = () => {
-      const sp = useOutlineStore.getState().spec
-      if (sp) dimsRef.current = { widthPx: sp.maskWidthPx, heightPx: sp.maskHeightPx }
-    }
-    sync()
-    return useOutlineStore.subscribe(sync)
-  }, [])
-
   const { view, setView, viewRef, screenToContent, originPinning, applyZoom, toViewBox } = useCanvasView(svgRef, dimsRef)
-  const spec = useOutlineStore((s) => s.spec)
-  const imgW = spec?.maskWidthPx ?? VIEW_W
-  const imgH = spec?.maskHeightPx ?? VIEW_H
-  const subjMatteUrl = useOutlineStore((s) => s.subjMatteUrl)
-  const art = useOutlineStore((s) => s.artwork)
-  const bgBlur = useOutlineStore((s) => s.bgBlur)
-  // KAI-9122: the canvas blur preview = the live bgBlur as %, or the design's default when null (match the 3D).
-  const blendBlur = bgBlur != null ? Math.round(bgBlur * 100) : defaultBlurPct
 
-  // ── tools (runtime-filtered by toolEnabled) + the outlet subsets each sheet renders ──
-  const toolEnabled = useMemo(() => toolEnabledFromSearch(typeof window !== 'undefined' ? window.location.search : ''), [])
-  const tools = actions.buildTools(toolEnabled)
-  const toolActions: ToolActions = actions
+  // ── the descriptor-driven sheets' tool subsets (from state.tools — no store reach) ──
   const adjustTools = tools.filter((t) => t.outlet === 'adjust')
   const imageTools = tools.filter((t) => t.outlet === 'image' && EDITOR_IMAGE_IDS.has(t.id))
   const pickerTool = tools.find((t) => t.kind === 'picker' && t.outlet === 'shape')
@@ -136,17 +119,18 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   }, [hitRing])
   const hasIssues = useMemo(() => hitRing.length >= 4 && validateSelfIntersection(hitRing, 'outer').length > 0, [hitRing])
 
-  // ── GESTURE TRANSFORMS (R8 seam 3) — wired with the composer's editing verbs (transformSource/applyVec/setSelVA) ──
+  // ── GESTURE TRANSFORMS (R8 seam 3) — wired with the composer's editing verbs + artwork actions (no store reach) ──
   const {
     onVAnchorDown, onVHandleDown, onVAnchorDouble,
     onSurfacePointerDown, onPointerMove, onPointerUp, onPointerCancel, onSurfaceClick, onSurfaceWheel,
-    beginStretch, moveStretch, endStretch, beginRotateHandle,
+    beginStretch, moveStretch, endStretch, cancelStretch, beginRotateHandle,
   } = useEditorGestures({
     svgRef, viewRef, vshapeRef, nodeRRef, vecLiveRef,
     pointersRef, clientPtsRef, dragStartRef, nodeInteractedRef, lastTapRef,
     pinchRef, canvasPanRef, imgPanRef, vecDragRef, rotateRef, rotateLiveRef, moveRef, moveLiveRef, stretchRef,
     toViewBox, screenToContent, originPinning, applyZoom, setView,
     transformSource: actions.transformSource, applyVec,
+    getArtwork: actions.getArtwork, setArtwork: actions.setArtwork,
     setVecLive, setMoveLive, setRotateLive, setStretchLive, setPinching, setAllSelected, setSelVA, setSelSeg, setShowAnchors,
     preview, activeAdjust, showAnchors, frameLocked, imgW, imgH, hitRing, hitBBox,
   })
@@ -189,13 +173,8 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     applyVec({ paths: [{ anchors }, ...v.paths.slice(1)] })
   }, [selVA, applyVec])
 
-  // ── activeAdjust open-mode (UI): capture the PRE-open committed fact in RENDER (before the composer's seed
-  //    effect runs), then the open effect picks the landing sheet — #27 toolbar modes + the choose-a-shape opening. ──
-  const prevOpenRef = useRef(false)
-  const hadCommittedRef = useRef(false)
-  if (open && !prevOpenRef.current) hadCommittedRef.current = !!useOutlineStore.getState().committedShape
-  prevOpenRef.current = open
-
+  // ── activeAdjust open-mode (UI): the composer captured the pre-open committed fact (state.hadCommittedOnOpen);
+  //    the open effect picks the landing sheet — #27 toolbar modes + the choose-a-shape opening. ──
   useEffect(() => {
     if (!open) return
     // canvas/UI session reset (the composer resets the source + tool state)
@@ -210,10 +189,10 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
     imgPanRef.current = null
     setSelSeg(null)
     setAdjustActiveId('radius'); setImageActiveId('brightness')
-    const isMagic = useOutlineStore.getState().spec?.generator.adapter !== 'standard'
+    const isMagic = spec?.generator.adapter !== 'standard'
     if (openMode === 'image') setActiveAdjust('image')
     else if (openMode === 'shape') setActiveAdjust('shape')
-    else if (isMagic || hadCommittedRef.current) setActiveAdjust('adjust')
+    else if (isMagic || hadCommittedOnOpen) setActiveAdjust('adjust')
     else setActiveAdjust('shape') // pre-Magic standard, nothing committed before open: choose a shape (Dan, 2026-06-10)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
@@ -285,6 +264,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
         beginStretch={beginStretch}
         moveStretch={moveStretch}
         endStretch={endStretch}
+        cancelStretch={cancelStretch}
         beginRotateHandle={beginRotateHandle}
       />
 

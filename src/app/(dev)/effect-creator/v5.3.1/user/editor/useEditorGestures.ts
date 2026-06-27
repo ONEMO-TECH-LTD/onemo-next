@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useRef } from 'react'
 import type { Dispatch, SetStateAction, PointerEvent as ReactPointerEvent, MouseEvent as ReactMouseEvent, WheelEvent as ReactWheelEvent } from 'react'
-import { useOutlineStore } from '../outlineStore'
+import type { DesignState } from '../../types'
 import { perfGesture } from '../../dev/PerfHUD'
 import { pointInPolygon, type GripId } from './geometry'
 import type { CanvasView } from './useCanvasView'
@@ -89,6 +89,9 @@ interface GestureCtx { // KAI-9066: module-internal (the consumer passes a struc
   // ── editing API (useOutlineEditing) ──
   transformSource: (fn: (p: Vec2) => Vec2) => void
   applyVec: (v: VShape, base?: VShape | null, lin?: 'trace' | 'vector') => void
+  // ── image-pan scene access (B2-c §11.3): the composer's artwork getter/setter, so this hook NEVER reaches the store ──
+  getArtwork: () => DesignState
+  setArtwork: (a: DesignState) => void
   // ── transient-state setters ──
   setVecLive: (v: VShape | null) => void
   setMoveLive: (v: { dx: number; dy: number } | null) => void
@@ -179,7 +182,7 @@ export function useEditorGestures(ctx: GestureCtx) {
     clientPtsRef.current.set(e.pointerId, [e.clientX, e.clientY])
     // Image mode: a single finger inside pans the PHOTO under the cutline (plan A2)
     if (activeAdjust === 'image' && pointersRef.current.size === 1) {
-      const a = useOutlineStore.getState().artwork
+      const a = ctxRef.current.getArtwork()
       imgPanRef.current = { startClient: [e.clientX, e.clientY], art0: { ...a } }
       return
     }
@@ -225,8 +228,7 @@ export function useEditorGestures(ctx: GestureCtx) {
         const { startClient, art0 } = imgPanRef.current
         const fx = (e.clientX - startClient[0]) / rect.width
         const fy = (e.clientY - startClient[1]) / rect.height
-        const st = useOutlineStore.getState()
-        st.setArtwork({ ...art0, offsetX: Math.max(-0.5, Math.min(0.5, art0.offsetX + fx)), offsetY: Math.max(-0.5, Math.min(0.5, art0.offsetY - fy)) })
+        ctxRef.current.setArtwork({ ...art0, offsetX: Math.max(-0.5, Math.min(0.5, art0.offsetX + fx)), offsetY: Math.max(-0.5, Math.min(0.5, art0.offsetY - fy)) })
       }
       return
     }
@@ -433,6 +435,17 @@ export function useEditorGestures(ctx: GestureCtx) {
     perfGesture('stretch-commit', performance.now() - t0)
   }, [])
 
+  // F16 (pixel B1): a browser/OS cancel on a crop grip must NOT commit (endStretch writes geometry via
+  // transformSource). cancelStretch tears the grip down WITHOUT committing — the no-commit-on-cancel contract;
+  // wired to the grip's onPointerCancel (EditorCanvas) instead of endStretch.
+  const cancelStretch = useCallback(() => {
+    const { stretchRef, setStretchLive, nodeInteractedRef } = ctxRef.current
+    if (!stretchRef.current) return
+    stretchRef.current = null
+    setStretchLive(null)
+    nodeInteractedRef.current = false
+  }, [])
+
   // Rotation handle (desktop) — drives rotateLive, baked on release (commitRotate via pointer-up).
   const beginRotateHandle = useCallback((e: ReactPointerEvent) => {
     const { hitBBox, toViewBox, rotateRef } = ctxRef.current
@@ -447,9 +460,8 @@ export function useEditorGestures(ctx: GestureCtx) {
   const onSurfaceWheel = useCallback((e: ReactWheelEvent) => {
     const { activeAdjust, applyZoom, viewRef } = ctxRef.current
     if (activeAdjust === 'image') {
-      const st = useOutlineStore.getState()
-      const a = st.artwork
-      st.setArtwork({ ...a, scale: Math.max(1, Math.min(4, a.scale * Math.exp(-e.deltaY * 0.0022))) })
+      const a = ctxRef.current.getArtwork()
+      ctxRef.current.setArtwork({ ...a, scale: Math.max(1, Math.min(4, a.scale * Math.exp(-e.deltaY * 0.0022))) })
       return
     }
     applyZoom(e.clientX, e.clientY, viewRef.current.scale * Math.exp(-e.deltaY * 0.0022), viewRef.current)
@@ -458,6 +470,6 @@ export function useEditorGestures(ctx: GestureCtx) {
   return {
     onVAnchorDown, onVHandleDown, onVAnchorDouble,
     onSurfacePointerDown, onPointerMove, onPointerUp, onPointerCancel, onSurfaceClick, onSurfaceWheel,
-    beginStretch, moveStretch, endStretch, beginRotateHandle,
+    beginStretch, moveStretch, endStretch, cancelStretch, beginRotateHandle,
   }
 }

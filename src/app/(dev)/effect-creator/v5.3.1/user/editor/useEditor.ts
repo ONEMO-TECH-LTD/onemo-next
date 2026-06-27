@@ -35,6 +35,9 @@ export interface UseEditorArgs {
   open: boolean
   defaultBlurPct?: number
   onClose: () => void
+  /** runtime tool-enable predicate (§5/§11.4) — injected from the page's runtime source (URL ?disable= / config);
+   *  the composer returns state.tools = the present set. NEVER an edited source const (§0a). */
+  toolEnabled: ToolEnabled
   /** injected notification sink (the composer/descriptors never import toast — blueprint §4). */
   notify: (kind: 'warn' | 'error' | 'info', message: string) => void
 }
@@ -43,7 +46,7 @@ export interface UseEditorArgs {
  *  drops its key — no hardcoded per-tool field on the composer. `generation` is shared by detail+offset. */
 interface GenParams { detail: number; offset: number; offsetJoin: OffsetJoin }
 
-export function useEditor({ open, defaultBlurPct = 0, onClose, notify }: UseEditorArgs) {
+export function useEditor({ open, defaultBlurPct = 0, onClose, notify, toolEnabled }: UseEditorArgs) {
   const ed = useOutlineEditing()
   const { source, adjustments, display, displayRef, setPreview: setPreviewAdj, applyAdjustments, seedSource, reBaseline, transformSource, undo: undoEdit, redo: redoEdit, histRef } = ed
 
@@ -51,6 +54,19 @@ export function useEditor({ open, defaultBlurPct = 0, onClose, notify }: UseEdit
   const setBgBlur = useOutlineStore((s) => s.setBgBlur)
   const setImageFx = useOutlineStore((s) => s.setImageFx)
   const setWrapTile = useOutlineStore((s) => s.setWrapTile)
+  // canvas scene inputs the UI client renders — exposed via state so the client never reaches the store (§11.3).
+  const subjMatteUrl = useOutlineStore((s) => s.subjMatteUrl)
+  const art = useOutlineStore((s) => s.artwork)
+  const bgBlur = useOutlineStore((s) => s.bgBlur)
+  const imgW = spec?.maskWidthPx ?? 1000
+  const imgH = spec?.maskHeightPx ?? 1000
+  const blendBlur = bgBlur != null ? Math.round(bgBlur * 100) : defaultBlurPct // KAI-9122: bgBlur% or the design default
+  // pre-open committed fact (the client's activeAdjust decision) — captured in RENDER, BEFORE the open-seed effect
+  // runs (so it reflects the pre-seed store); exposed in state so the client reads it without a store reach.
+  const prevOpenRef = useRef(false)
+  const hadCommittedRef = useRef(false)
+  if (open && !prevOpenRef.current) hadCommittedRef.current = !!useOutlineStore.getState().committedShape
+  prevOpenRef.current = open
 
   // ── interaction + per-tool session state (generic; the descriptors read truth via read(), these hold the
   //    bits NOT derivable from the store) ──
@@ -304,18 +320,24 @@ export function useEditor({ open, defaultBlurPct = 0, onClose, notify }: UseEdit
 
   // The UI client receives ONLY state + actions — never the raw EditorCtx or a descriptor object (Layer-2
   //  boundary, inv 14/16; pixel 6b). previewTool/commitTool/pickShape resolve the descriptor by id internally.
+  const tools = buildTools(toolEnabled) // §5/§11.4: the composer returns the present set; the UI never calls buildTools
   return {
     state: {
       source, adjustments, display, selVA, gen, shapeParams, shapeKind, shapePreview, fxDraft, confirmDiscard,
       canUndo, canRedo, defaultBlurPct,
+      // the descriptor-driven tool list + the canvas scene inputs — the UI binds ONLY these (no store reach, §11.3)
+      tools, spec, imgW, imgH, subjMatteUrl, art, bgBlur, blendBlur, hadCommittedOnOpen: hadCommittedRef.current,
     },
     actions: {
-      buildTools, previewTool, commitTool,
+      previewTool, commitTool,
       pickShape, applyShapeParam, previewShapeParam, commitShapeParam, rerollShape, uploadShape,
       undo, redo, onReset, onDone, onCancel,
       setSelVA, setConfirmDiscard, setFxDraft, setShapeParams,
       // editor-op verbs the gesture/canvas client wires into useEditorGestures (Layer-2 editor actions, not raw ctx)
       reBaseline, transformSource, applyVec: (v: VShape) => reBaseline(() => v),
+      // image-pan scene writers the gesture client uses, so it never reaches the store directly (§11.3 / B2-c)
+      getArtwork: () => useOutlineStore.getState().artwork,
+      setArtwork: (a: DesignState) => useOutlineStore.getState().setArtwork(a),
     },
   }
 }

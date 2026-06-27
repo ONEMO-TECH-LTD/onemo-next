@@ -67,6 +67,7 @@ interface EditorCanvasProps { // KAI-9066: module-internal (the consumer passes 
   beginStretch: (which: GripId) => (e: ReactPointerEvent) => void
   moveStretch: (e: ReactPointerEvent) => void
   endStretch: () => void
+  cancelStretch: () => void
   beginRotateHandle: (e: ReactPointerEvent) => void
 }
 
@@ -77,7 +78,7 @@ function EditorCanvasInner(props: EditorCanvasProps) {
     preview, showAnchors, selVA, allSelected, frameLocked, rotateLive, moveLive, stretchLive, pinching, shapePreview,
     nodeInteractedRef, setFrameLocked,
     onSurfacePointerDown, onPointerMove, onPointerUp, onPointerCancel, onSurfaceClick, onSurfaceWheel,
-    onVAnchorDown, onVHandleDown, onVAnchorDouble, beginStretch, moveStretch, endStretch, beginRotateHandle,
+    onVAnchorDown, onVHandleDown, onVAnchorDouble, beginStretch, moveStretch, endStretch, cancelStretch, beginRotateHandle,
   } = props
 
   // Rotate handle — a grip on a short stem off the outline, shown when all anchors are selected.
@@ -282,7 +283,7 @@ function EditorCanvasInner(props: EditorCanvasProps) {
                         onPointerDown={beginStretch(g.id)}
                         onPointerMove={moveStretch}
                         onPointerUp={endStretch}
-                        onPointerCancel={endStretch}
+                        onPointerCancel={cancelStretch}
                         onClick={(e) => e.stopPropagation()}
                         onDoubleClick={(e) => e.stopPropagation()}
                       />
