@@ -59,6 +59,9 @@ export function useEditor({ open, defaultBlurPct = 0, onClose, notify }: UseEdit
   const genRef = useRef(gen); useEffect(() => { genRef.current = gen }, [gen])
   const [shapeParams, setShapeParams] = useState<PickerParams>({ ...DEFAULT_SHAPE_PARAMS })
   const shapeParamsRef = useRef(shapeParams); useEffect(() => { shapeParamsRef.current = shapeParams }, [shapeParams])
+  const [shapeKind, setShapeKind] = useState<string | null>(null) // active picker chip (null = chips only)
+  const [shapePreview, setShapePreview] = useState<string | null>(null) // generator morph ring `d` while a param ticks
+  const picker = useMemo(() => TOOL_REGISTRY.find(isPickerDescriptor) ?? null, [])
   const [fxDraft, setFxDraft] = useState<ImageFx>(NEUTRAL_FX)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const confirmDiscardRef = useRef(confirmDiscard); useEffect(() => { confirmDiscardRef.current = confirmDiscard }, [confirmDiscard]) // F12: read fresh
@@ -158,10 +161,17 @@ export function useEditor({ open, defaultBlurPct = 0, onClose, notify }: UseEdit
   // ── the descriptor-driven tool list (the runtime-disable filter + applies/read) ──
   const buildTools = useCallback((toolEnabled: ToolEnabled) =>
     TOOL_REGISTRY.filter((d) => toolEnabled(d.id)).map((d) => {
-      const available = isPickerDescriptor(d) ? true : (d.applies ? d.applies(ctx) : true)
-      const value = isPickerDescriptor(d) ? undefined : (d.read ? d.read(ctx) : undefined)
-      return { id: d.id, outlet: d.outlet, label: d.label, icon: d.icon, kind: isPickerDescriptor(d) ? 'picker' as const : 'value' as const, control: isPickerDescriptor(d) ? undefined : d.control, available, value }
-    }), [ctx])
+      if (isPickerDescriptor(d)) {
+        // the picker entry carries DATA the Shape-outlet client renders (chips + the active kind's param specs +
+        // the live params + the preview ring) — never the descriptor object (value-opaque; pixel 6b boundary).
+        return {
+          id: d.id, outlet: d.outlet, label: d.label, icon: d.icon, kind: 'picker' as const,
+          available: true, control: undefined, value: undefined,
+          picker: { chips: d.chips, activeKind: shapeKind, paramSpecs: shapeKind ? d.paramSpecs(shapeKind) : [], params: shapeParams, preview: shapePreview },
+        }
+      }
+      return { id: d.id, outlet: d.outlet, label: d.label, icon: d.icon, kind: 'value' as const, control: d.control, available: d.applies ? d.applies(ctx) : true, value: d.read ? d.read(ctx) : undefined, picker: undefined }
+    }), [ctx, shapeKind, shapeParams, shapePreview])
 
   // ── per-descriptor preview/commit (value tools) — the UI calls these by id; rollback on {ok:false} is the
   //    composer's job (re-resolve to truth → the next render's read() shows the rolled-back value). ──
@@ -178,14 +188,45 @@ export function useEditor({ open, defaultBlurPct = 0, onClose, notify }: UseEdit
     return r
   }, [ctx, setPreviewAdj])
 
-  // ── picker actions (shape-pick) ──
+  // ── picker actions (shape-pick) — drive the PickerDescriptor's interface; the picker owns the shape-build,
+  //    the composer owns the session state (activeKind/params/preview) + the calls. Graceful if no picker
+  //    (returns no-picker) so dropping shape-pick needs ZERO composer edit (the bundling test). ──
   const pickShape = useCallback((kind: string): CommitResult => {
-    const picker = TOOL_REGISTRY.find(isPickerDescriptor)
     if (!picker) return { ok: false, reason: 'no-picker' }
     const { params, result } = picker.pick(kind, shapeParamsRef.current, ctx)
+    setShapeParams(params); setShapeKind(kind); setShapePreview(null)
+    return result
+  }, [ctx, picker])
+  /** stepper / slider-release: re-apply at an absolute param value (the client clamps per the spec). */
+  const applyShapeParam = useCallback((key: string, value: number): CommitResult => {
+    if (!picker || !shapeKind) return { ok: false, reason: 'no-picker' }
+    const next = { ...shapeParamsRef.current, [key]: value }
+    setShapeParams(next); setShapePreview(null)
+    return picker.apply(shapeKind, next, ctx)
+  }, [ctx, picker, shapeKind])
+  /** slider tick: transient generator morph ring (no commit/history); commitShapeParam bakes on release. */
+  const previewShapeParam = useCallback((key: string, value: number) => {
+    if (!picker || !shapeKind) return
+    const next = { ...shapeParamsRef.current, [key]: value }
+    setShapeParams(next); setShapePreview(picker.previewRing(shapeKind, next, ctx))
+  }, [ctx, picker, shapeKind])
+  const commitShapeParam = useCallback((): CommitResult => {
+    if (!picker || !shapeKind) return { ok: false, reason: 'no-picker' }
+    setShapePreview(null)
+    return picker.apply(shapeKind, shapeParamsRef.current, ctx)
+  }, [ctx, picker, shapeKind])
+  const rerollShape = useCallback((): CommitResult => {
+    if (!picker || !shapeKind) return { ok: false, reason: 'no-picker' }
+    const { params, result } = picker.reroll(shapeKind, shapeParamsRef.current, ctx)
     setShapeParams(params)
     return result
-  }, [ctx])
+  }, [ctx, picker, shapeKind])
+  const uploadShape = useCallback(async (file: File): Promise<CommitResult> => {
+    if (!picker) return { ok: false, reason: 'no-picker' }
+    const r = await picker.uploadShape(file, ctx)
+    if (r.ok) { setShapeKind(null); setShapePreview(null) }
+    return r
+  }, [ctx, picker])
 
   // ── undo/redo: step the editor-local history, then resync the transient UI ──
   const syncSlidersTo = useCallback(() => { setSelVA(null) }, [])
@@ -198,7 +239,7 @@ export function useEditor({ open, defaultBlurPct = 0, onClose, notify }: UseEdit
     const st0 = useOutlineStore.getState()
     preEditRef.current = { source: st0.source, adjustments: st0.adjustments, bgBlur: st0.bgBlur, imageFx: st0.imageFx, wrapTile: st0.wrapTile, artwork: st0.artwork }
     st0.setEditorOpen(true)
-    setSelVA(null); setGen({ detail: 100, offset: 0, offsetJoin: 'sharp' }); setConfirmDiscard(false)
+    setSelVA(null); setGen({ detail: 100, offset: 0, offsetJoin: 'sharp' }); setConfirmDiscard(false); setShapeKind(null); setShapePreview(null)
     setFxDraft(st0.imageFx ?? NEUTRAL_FX)
     if (spec && !st0.source) {
       if (spec.generator.adapter !== 'standard') {
@@ -224,7 +265,7 @@ export function useEditor({ open, defaultBlurPct = 0, onClose, notify }: UseEdit
     lastSpecRef.current = spec
     if (!spec || spec.generator.adapter === 'standard') return
     seedSource({ shape: mintIds(spec.vectorShape), klass: 'generated', mmPerPx: spec.mmPerPx, maskHeightPx: spec.maskHeightPx, rawTracePx: spec.rawTracePx as Pt[] | undefined })
-    setSelVA(null); setGen({ detail: 100, offset: 0, offsetJoin: 'sharp' })
+    setSelVA(null); setGen({ detail: 100, offset: 0, offsetJoin: 'sharp' }); setShapePreview(null)
     const cur = useOutlineStore.getState()
     entryRef.current = { source: cur.source, adjustments: cur.adjustments }
   }, [spec, open, seedSource])
@@ -233,7 +274,7 @@ export function useEditor({ open, defaultBlurPct = 0, onClose, notify }: UseEdit
     const e = entryRef.current
     if (!e.source) return
     seedSource(e.source, e.adjustments ?? undefined)
-    setSelVA(null)
+    setSelVA(null); setShapeKind(null); setShapePreview(null)
   }, [seedSource])
 
   const onDone = useCallback(() => {
@@ -265,11 +306,12 @@ export function useEditor({ open, defaultBlurPct = 0, onClose, notify }: UseEdit
   //  boundary, inv 14/16; pixel 6b). previewTool/commitTool/pickShape resolve the descriptor by id internally.
   return {
     state: {
-      source, adjustments, display, selVA, gen, shapeParams, fxDraft, confirmDiscard,
+      source, adjustments, display, selVA, gen, shapeParams, shapeKind, shapePreview, fxDraft, confirmDiscard,
       canUndo, canRedo, defaultBlurPct,
     },
     actions: {
-      buildTools, previewTool, commitTool, pickShape,
+      buildTools, previewTool, commitTool,
+      pickShape, applyShapeParam, previewShapeParam, commitShapeParam, rerollShape, uploadShape,
       undo, redo, onReset, onDone, onCancel,
       setSelVA, setConfirmDiscard, setFxDraft, setShapeParams,
       // editor-op verbs the gesture/canvas client wires into useEditorGestures (Layer-2 editor actions, not raw ctx)
