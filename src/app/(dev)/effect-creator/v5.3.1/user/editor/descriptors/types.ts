@@ -45,8 +45,13 @@ export interface EditorCtx {
    *  commit = applies + returns the F8 CommitResult; the composer pushes history ONLY on {ok:true}. */
   preview: (adj: OutlineAdjustments | null) => void
   commitAdjustments: (adj: OutlineAdjustments) => CommitResult
-  /** image-fx / blend / fill writers (the image-tool engine-binding). */
-  setImageFx: (next: import('../../outlineStore').ImageFx) => void
+  /** image-fx engine-binding — surface-agnostic so ONE image descriptor set drives BOTH the editor's Image
+   *  mode (preview → draft/CSS, commit → setImageFx baked on Done via the version-bridge) AND the hero
+   *  FiltersSurface (preview = commit = live setImageFx). The surface wires these on its composer. */
+  getImageFx: () => import('../../outlineStore').ImageFx
+  previewImageFx: (next: import('../../outlineStore').ImageFx) => void
+  commitImageFx: (next: import('../../outlineStore').ImageFx) => void
+  /** blend (bgBlur) + fill (wrapTile) writers — live in both surfaces. */
   setBgBlur: (v: number | null) => void
   setWrapTile: (v: boolean) => void
   /** GENERATION (detail/offset) — the no-AI trace re-derive, SHARED by both descriptors (parameterized by

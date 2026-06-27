@@ -14,6 +14,10 @@ import { curveDescriptor } from './shape/curve'
 import { simplifyDescriptor } from './shape/simplify'
 import { smoothDescriptor } from './shape/smooth'
 import { straightenDescriptor } from './shape/straighten'
+import { brightnessDescriptor } from './image/brightness'
+import { contrastDescriptor } from './image/contrast'
+import { saturateDescriptor } from './image/saturate'
+import { warmthDescriptor } from './image/warmth'
 
 export const TOOL_REGISTRY: Descriptor[] = [
   // step 4: shape-pick (the PickerDescriptor — Shape outlet)
@@ -26,6 +30,9 @@ export const TOOL_REGISTRY: Descriptor[] = [
   simplifyDescriptor,
   smoothDescriptor,
   straightenDescriptor,
-  // step 4: shape-pick
-  // step 5: image tools (brightness · contrast · saturation · warmth · preset · tint · vignette · blend · fill)
+  // step 5: image tools — fx sliders (preset · tint · vignette · blend · fill land step5b)
+  brightnessDescriptor,
+  contrastDescriptor,
+  saturateDescriptor,
+  warmthDescriptor,
 ]
