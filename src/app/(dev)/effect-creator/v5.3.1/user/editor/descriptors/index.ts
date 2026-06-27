@@ -6,12 +6,16 @@
 // (shape tools, shape-pick, image tools).
 
 import type { ToolDescriptor } from './types'
+import { radiusDescriptor } from './shape/radius'
+import { curveDescriptor } from './shape/curve'
 import { simplifyDescriptor } from './shape/simplify'
 import { smoothDescriptor } from './shape/smooth'
 import { straightenDescriptor } from './shape/straighten'
 
 export const TOOL_REGISTRY: ToolDescriptor[] = [
-  // step 3: shape/adjust tools — global axes (radius · curve · detail · offset still to land this step)
+  // step 3: shape/adjust tools (detail · offset — the trace re-derive — land next, step3c)
+  radiusDescriptor,
+  curveDescriptor,
   simplifyDescriptor,
   smoothDescriptor,
   straightenDescriptor,
