@@ -101,7 +101,7 @@ export type AnyToolDescriptor = ToolDescriptor<any>
 
 // ── PICKER descriptor (shape-pick) — a DISTINCT kind: a source-PRODUCER + multi-action picker, not a
 //    value+preview/commit slider (lead call 2026-06-27, design doc §10; expert+pixel cleared). Kept the
-//    value ToolDescriptor pristine; the registry is a discriminated union the composer narrows on `kind`.
+//    value ToolDescriptor pristine; the registry is a union narrowed via the isPickerDescriptor guard ('kind' in d).
 //    Forward-compatible for the full-loop dock's Add/Effect outlets (also pickers). §0.7 lightweight: a
 //    union + a narrow, no framework. The picker's SPECIFIC logic is self-contained here; only the SHARED
 //    EditorCtx.installSource is the engine binding → drop the descriptor = the Shape outlet vanishes.
@@ -127,7 +127,10 @@ export interface PickerDescriptor {
   chips: { id: string; label: string }[]
   /** per shape-kind parametric controls (DATA); absent/empty kinds show only the chip. */
   paramSpecs: (kind: string) => PickerParamSpec[]
-  /** install a picked kind's geometry at the current params (one undo step). */
+  /** pick a chip — compute the kind's effective default params (blob → a FRESH seed), install (one undo step),
+   *  and RETURN the params so the client adopts them (descriptor-owned blob-on-pick seed; pixel F2). */
+  pick: (kind: string, ctx: EditorCtx) => { params: PickerParams; result: CommitResult }
+  /** re-apply at the given params (steppers / ticks — keeps the seed). */
   apply: (kind: string, params: PickerParams, ctx: EditorCtx) => CommitResult
   /** transient generator preview ring `d` while a param tick drags (generator kinds only; else null). */
   previewRing: (kind: string, params: PickerParams, ctx: EditorCtx) => string | null

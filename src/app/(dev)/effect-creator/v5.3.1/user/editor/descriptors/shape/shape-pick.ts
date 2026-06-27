@@ -13,7 +13,7 @@ import { getShape, hasVectorDef } from '@/lib/shape-library'
 import { vshapeFromSVG, fitShapeToBox } from '@/lib/export'
 import { GEN_VECTOR_KINDS, vecFromGenerator, vecFromImageFile, shapePreviewD } from '../../producers'
 import { cornerRadiusAdjustments } from '../../seed-defaults'
-import { SHAPE_CHIPS } from '../../chips'
+import { SHAPE_CHIPS, DEFAULT_SHAPE_PARAMS } from '../../shape-chips'
 import { type ShapeKind } from '../../../shapes'
 
 type Dims = { widthPx: number; heightPx: number; mmPerPx: number; maskHeightPx: number }
@@ -85,6 +85,13 @@ export const shapePickDescriptor: PickerDescriptor = {
       case 'blob': return [{ key: 'waviness', label: 'Wavy', control: 'slider', min: 0, max: 100 }]
       default: return []
     }
+  },
+  pick: (kind, ctx) => {
+    const params: PickerParams = { ...DEFAULT_SHAPE_PARAMS }
+    if (kind === 'blob') params.seed = Math.floor(Math.random() * 1e9) // fresh blob on every pick (matches old pickShape)
+    const built = buildSource(kind as ShapeKind, params, dimsOf(ctx))
+    if (!built) return { params, result: { ok: false, reason: `no vector construction for "${kind}"` } }
+    return { params, result: ctx.installSource(built.source, built.adjustments, true) }
   },
   apply: (kind, params, ctx): CommitResult => {
     const built = buildSource(kind as ShapeKind, params, dimsOf(ctx))
