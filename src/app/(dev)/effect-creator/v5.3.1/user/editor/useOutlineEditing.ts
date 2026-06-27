@@ -16,6 +16,7 @@ import type { VShape } from '@/lib/vector-core'
 import { transformShape, type Vec2 } from '@/lib/vector-core'
 import { useOutlineStore } from '../outlineStore'
 import { resolve, mintIds, ADJUSTMENTS_OFF, type OutlineAdjustments, type OutlineSource } from '@/lib/effect/outline-resolve'
+import type { CommitResult } from '../outlineStore'
 
 export interface EditSnapshot { source: OutlineSource; adjustments: OutlineAdjustments }
 
@@ -35,54 +36,56 @@ export function useOutlineEditing() {
   const displayRef = useRef<VShape | null>(display)
   useEffect(() => { displayRef.current = display }, [display])
 
-  const pushHistory = useCallback(() => {
+  /** F8 (inv 21): snapshot the PRE-change state, run the store commit (returns CommitResult), and push the
+   *  snapshot to history ONLY on {ok:true}. A refused commit leaves history untouched (no phantom entry) and
+   *  returns the reason — the caller rolls the control back. Replaces the old push-BEFORE-commit ordering. */
+  const commitWithHistory = useCallback((commit: () => CommitResult, pushPrior = true): CommitResult => {
     const st = useOutlineStore.getState()
-    if (st.source) {
-      histRef.current.past.push({ source: st.source, adjustments: st.adjustments })
-      if (histRef.current.past.length > 50) histRef.current.past.shift()
+    const pre: EditSnapshot | null = st.source ? { source: st.source, adjustments: st.adjustments } : null
+    const r = commit()
+    if (r.ok) {
+      if (pushPrior && pre) {
+        histRef.current.past.push(pre)
+        if (histRef.current.past.length > 50) histRef.current.past.shift()
+        histRef.current.future = []
+      }
+      bump((n) => n + 1)
     }
-    histRef.current.future = []
+    return r
   }, [])
 
   /** Set the transient preview (slider/handle tick) — display re-resolves, store untouched. */
   const setPreview = useCallback((adj: OutlineAdjustments | null) => setPreviewState(adj), [])
 
-  /** TOOL edit: commit new adjustments on the current source (push history + store). */
-  const applyAdjustments = useCallback((adj: OutlineAdjustments) => {
+  /** TOOL edit: commit new adjustments on the current source. F8: history pushes only if the store accepts. */
+  const applyAdjustments = useCallback((adj: OutlineAdjustments): CommitResult => {
     setPreviewState(null)
-    pushHistory()
-    useOutlineStore.getState().setAdjustments(adj)
-    bump((n) => n + 1)
-  }, [pushHistory])
+    return commitWithHistory(() => useOutlineStore.getState().setAdjustments(adj))
+  }, [commitWithHistory])
 
   /** PRODUCER: install a brand-new source (Magic seed / stock / upload / drawn / Reset). adjustments
    *  default OFF (a fresh source shows verbatim). `pushPrior` = false for the session seed (not undoable). */
-  const seedSource = useCallback((src: OutlineSource, adj?: OutlineAdjustments, pushPrior = true) => {
-    if (pushPrior) pushHistory()
-    useOutlineStore.getState().setSource(src, adj ?? offAdj())
-    bump((n) => n + 1)
-  }, [pushHistory])
+  const seedSource = useCallback((src: OutlineSource, adj?: OutlineAdjustments, pushPrior = true): CommitResult => {
+    return commitWithHistory(() => useOutlineStore.getState().setSource(src, adj ?? offAdj()), pushPrior)
+  }, [commitWithHistory])
 
   /** MANUAL op: bake the current resolved display through `op`, install it as a fresh source (mintIds),
    *  adjustments OFF. Use for drag / insert / delete / sharpen — anything that changes anchor topology. */
-  const reBaseline = useCallback((op: (resolved: VShape) => VShape) => {
+  const reBaseline = useCallback((op: (resolved: VShape) => VShape): CommitResult => {
     const st = useOutlineStore.getState()
-    if (!st.source) return
-    const resolved = resolve(st.source, st.adjustments)
-    const next = mintIds(op(resolved))
-    pushHistory()
-    st.setSource({ ...st.source, shape: next }, offAdj())
-    bump((n) => n + 1)
-  }, [pushHistory])
+    if (!st.source) return { ok: false, reason: 'no-source' }
+    const base = st.source
+    const next = mintIds(op(resolve(base, st.adjustments)))
+    return commitWithHistory(() => useOutlineStore.getState().setSource({ ...base, shape: next }, offAdj()))
+  }, [commitWithHistory])
 
   /** MOVE / ROTATE / STRETCH: affine-transform the source (ids preserved → adjustments survive). */
-  const transformSource = useCallback((fn: (p: Vec2) => Vec2) => {
+  const transformSource = useCallback((fn: (p: Vec2) => Vec2): CommitResult => {
     const st = useOutlineStore.getState()
-    if (!st.source) return
-    pushHistory()
-    st.setSource({ ...st.source, shape: transformShape(st.source.shape, fn) }, st.adjustments)
-    bump((n) => n + 1)
-  }, [pushHistory])
+    if (!st.source) return { ok: false, reason: 'no-source' }
+    const base = st.source, adj = st.adjustments
+    return commitWithHistory(() => useOutlineStore.getState().setSource({ ...base, shape: transformShape(base.shape, fn) }, adj))
+  }, [commitWithHistory])
 
   const restore = (snap: EditSnapshot) => {
     useOutlineStore.getState().setSource(snap.source, snap.adjustments)
