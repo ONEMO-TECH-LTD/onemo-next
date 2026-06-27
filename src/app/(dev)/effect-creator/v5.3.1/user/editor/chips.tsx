@@ -21,4 +21,3 @@ export function ShapeChipIcon({ kind }: { kind: ShapeKind }) {
   }, [kind])
   return <svg width={24} height={24} viewBox="0 0 26 26" aria-hidden><path d={d} fill="currentColor" fillRule="evenodd" /></svg>
 }
-

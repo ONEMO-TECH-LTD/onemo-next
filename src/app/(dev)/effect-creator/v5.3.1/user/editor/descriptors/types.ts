@@ -127,9 +127,10 @@ export interface PickerDescriptor {
   chips: { id: string; label: string }[]
   /** per shape-kind parametric controls (DATA); absent/empty kinds show only the chip. */
   paramSpecs: (kind: string) => PickerParamSpec[]
-  /** pick a chip — compute the kind's effective default params (blob → a FRESH seed), install (one undo step),
-   *  and RETURN the params so the client adopts them (descriptor-owned blob-on-pick seed; pixel F2). */
-  pick: (kind: string, ctx: EditorCtx) => { params: PickerParams; result: CommitResult }
+  /** pick a chip — use the CURRENT session params (they persist across picks; blob → a FRESH seed merged in),
+   *  install (one undo step), and RETURN the (possibly seed-updated) params so the client adopts them
+   *  (descriptor-owned blob-on-pick seed + params-persistence preserved; pixel F2). */
+  pick: (kind: string, params: PickerParams, ctx: EditorCtx) => { params: PickerParams; result: CommitResult }
   /** re-apply at the given params (steppers / ticks — keeps the seed). */
   apply: (kind: string, params: PickerParams, ctx: EditorCtx) => CommitResult
   /** transient generator preview ring `d` while a param tick drags (generator kinds only; else null). */
