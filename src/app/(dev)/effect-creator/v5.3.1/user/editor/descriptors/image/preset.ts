@@ -11,7 +11,7 @@ export const presetDescriptor: ToolDescriptor<string> = {
   outlet: 'image',
   label: 'Preset',
   icon: 'preset',
-  control: { kind: 'swatches', options: PRESETS.map((p) => ({ id: p, label: PRESET_LABELS[p], value: null })) },
+  control: { kind: 'swatches', options: PRESETS.map((p) => ({ id: p, label: PRESET_LABELS[p] })) }, // text chips (id = preset key)
   read: (ctx) => ctx.getImageFx().preset ?? 'none',
   preview: (v, ctx) => ctx.previewImageFx({ ...ctx.getImageFx(), preset: v as PresetKey }),
   commit: (v, ctx) => { ctx.commitImageFx({ ...ctx.getImageFx(), preset: v as PresetKey }); return { ok: true } },

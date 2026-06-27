@@ -28,6 +28,7 @@ export const offsetDescriptor: ToolDescriptor<OffsetValue> = {
     options: [{ id: 'round', label: 'Round' }, { id: 'sharp', label: 'Sharp' }, { id: 'bevel', label: 'Bevel' }],
   },
   applies: traceApplies,
+  hideWhenUnavailable: true, // generation tool: hidden on a non-Magic source (parity with the old conditional chip)
   read: (ctx) => ({ pct: ctx.getGenParams().offset, join: ctx.getGenParams().offsetJoin }),
   preview: (v, ctx) => { ctx.reDeriveTrace({ offset: v.pct, offsetJoin: v.join }, false) },
   commit: (v, ctx) => ctx.reDeriveTrace({ offset: v.pct, offsetJoin: v.join }, true),

@@ -170,7 +170,7 @@ export function useEditor({ open, defaultBlurPct = 0, onClose, notify }: UseEdit
           picker: { chips: d.chips, activeKind: shapeKind, paramSpecs: shapeKind ? d.paramSpecs(shapeKind) : [], params: shapeParams, preview: shapePreview },
         }
       }
-      return { id: d.id, outlet: d.outlet, label: d.label, icon: d.icon, kind: 'value' as const, control: d.control, available: d.applies ? d.applies(ctx) : true, value: d.read ? d.read(ctx) : undefined, picker: undefined }
+      return { id: d.id, outlet: d.outlet, label: d.label, icon: d.icon, kind: 'value' as const, control: d.control, available: d.applies ? d.applies(ctx) : true, value: d.read ? d.read(ctx) : undefined, hideWhenUnavailable: d.hideWhenUnavailable, picker: undefined }
     }), [ctx, shapeKind, shapeParams, shapePreview])
 
   // ── per-descriptor preview/commit (value tools) — the UI calls these by id; rollback on {ok:false} is the

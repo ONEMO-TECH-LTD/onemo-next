@@ -20,6 +20,7 @@ export const detailDescriptor: ToolDescriptor<number> = {
   icon: 'trace-detail',
   control: { kind: 'slider', min: 0, max: 100, format: (v) => `${Math.round(v)}%` },
   applies: traceApplies,
+  hideWhenUnavailable: true, // generation tool: hidden on a non-Magic source (parity with the old conditional chip)
   read: (ctx) => ctx.getGenParams().detail,
   preview: (v, ctx) => { ctx.reDeriveTrace({ detail: v }, false) },
   commit: (v, ctx) => ctx.reDeriveTrace({ detail: v }, true),

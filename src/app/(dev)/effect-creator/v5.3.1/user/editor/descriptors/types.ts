@@ -19,7 +19,8 @@ export type ToolControl =
   | { kind: 'slider'; min: number; max: number; step?: number; format: (v: number) => string }
   // a primary slider + a small enum selector (e.g. Offset's round/sharp/bevel join) — the tool's value is {pct,enum}.
   | { kind: 'slider-enum'; min: number; max: number; step?: number; format: (v: number) => string; options: { id: string; label: string }[] }
-  | { kind: 'swatches'; options: { id: string; label: string; value: string | null }[] }
+  // a swatch row: option `id` IS the value sent to commit; `swatch` (optional) is a colour dot to render (else a text chip).
+  | { kind: 'swatches'; options: { id: string; label: string; swatch?: string | null }[] }
   | { kind: 'stepper'; min: number; max: number }
   | { kind: 'actions'; actions: { id: string; label: string }[] }
   | { kind: 'toggle'; onLabel: string; offLabel: string }
@@ -83,6 +84,9 @@ export interface ToolDescriptor<V = number> {
   control: ToolControl
   /** greys when inapplicable (Dan's rule); default = always applies. */
   applies?: (ctx: EditorCtx) => boolean
+  /** when unavailable: HIDE the chip (generation tools — Detail/Offset on a non-Magic source) vs the default
+   *  GREY (edit tools — Radius/Curve always show, the control greys). Preserves the editor's exact current UX. */
+  hideWhenUnavailable?: boolean
   /** value-reflection — the control shows the tool's REAL current value (never a lying 0). */
   read?: (ctx: EditorCtx) => V
   /** transient preview (slider tick) — display re-resolves; NO commit, NO history. */
