@@ -33,7 +33,6 @@ import type { DesignState } from '../../types'
 
 export interface UseEditorArgs {
   open: boolean
-  openMode?: 'shape' | 'image' | null
   defaultBlurPct?: number
   onClose: () => void
   /** injected notification sink (the composer/descriptors never import toast — blueprint §4). */
@@ -44,7 +43,7 @@ export interface UseEditorArgs {
  *  drops its key — no hardcoded per-tool field on the composer. `generation` is shared by detail+offset. */
 interface GenParams { detail: number; offset: number; offsetJoin: OffsetJoin }
 
-export function useEditor({ open, openMode, defaultBlurPct = 0, onClose, notify }: UseEditorArgs) {
+export function useEditor({ open, defaultBlurPct = 0, onClose, notify }: UseEditorArgs) {
   const ed = useOutlineEditing()
   const { source, adjustments, display, displayRef, setPreview: setPreviewAdj, applyAdjustments, seedSource, reBaseline, transformSource, undo: undoEdit, redo: redoEdit, histRef } = ed
 
@@ -65,7 +64,7 @@ export function useEditor({ open, openMode, defaultBlurPct = 0, onClose, notify 
   const confirmDiscardRef = useRef(confirmDiscard); useEffect(() => { confirmDiscardRef.current = confirmDiscard }, [confirmDiscard]) // F12: read fresh
 
   // session snapshots (re-homed from OutlineEditor)
-  const preEditRef = useRef<{ source: OutlineSource | null; adjustments: OutlineAdjustments | null; bgBlur: number | null; imageFx: ImageFx | null; artwork: DesignState }>({ source: null, adjustments: null, bgBlur: null, imageFx: null, artwork: INITIAL_ARTWORK })
+  const preEditRef = useRef<{ source: OutlineSource | null; adjustments: OutlineAdjustments | null; bgBlur: number | null; imageFx: ImageFx | null; wrapTile: boolean; artwork: DesignState }>({ source: null, adjustments: null, bgBlur: null, imageFx: null, wrapTile: false, artwork: INITIAL_ARTWORK })
   const entryRef = useRef<{ source: OutlineSource | null; adjustments: OutlineAdjustments | null }>({ source: null, adjustments: null })
   const traceDragRef = useRef<{ source: OutlineSource | null; adjustments: OutlineAdjustments } | null>(null)
 
@@ -197,7 +196,7 @@ export function useEditor({ open, openMode, defaultBlurPct = 0, onClose, notify 
   useEffect(() => {
     if (!open) return
     const st0 = useOutlineStore.getState()
-    preEditRef.current = { source: st0.source, adjustments: st0.adjustments, bgBlur: st0.bgBlur, imageFx: st0.imageFx, artwork: st0.artwork }
+    preEditRef.current = { source: st0.source, adjustments: st0.adjustments, bgBlur: st0.bgBlur, imageFx: st0.imageFx, wrapTile: st0.wrapTile, artwork: st0.artwork }
     st0.setEditorOpen(true)
     setSelVA(null); setGen({ detail: 100, offset: 0, offsetJoin: 'sharp' }); setConfirmDiscard(false)
     setFxDraft(st0.imageFx ?? NEUTRAL_FX)
@@ -252,6 +251,7 @@ export function useEditor({ open, openMode, defaultBlurPct = 0, onClose, notify 
     st.setSource(pe.source, pe.adjustments ?? undefined)
     if (st.bgBlur !== pe.bgBlur) st.setBgBlur(pe.bgBlur)
     st.setImageFx(pe.imageFx)
+    if (st.wrapTile !== pe.wrapTile) st.setWrapTile(pe.wrapTile) // F3 (pixel): discard reverts Fill too
     st.setArtwork(pe.artwork)
     setSelVA(null)
     st.setEditorOpen(false)
