@@ -46,3 +46,5 @@ export const TOOL_REGISTRY: Descriptor[] = [
   blendDescriptor,
   fillDescriptor,
 ]
+
+export { isPickerDescriptor } from './types'
