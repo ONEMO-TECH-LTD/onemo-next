@@ -36,13 +36,15 @@ export interface UseEditorArgs {
   openMode?: 'shape' | 'image' | null
   defaultBlurPct?: number
   onClose: () => void
+  /** injected notification sink (the composer/descriptors never import toast — blueprint §4). */
+  notify: (kind: 'warn' | 'error' | 'info', message: string) => void
 }
 
 /** Generic per-tool/group session state (expert §11.1): one record, keyed by a stable key. Removing a tool
  *  drops its key — no hardcoded per-tool field on the composer. `generation` is shared by detail+offset. */
 interface GenParams { detail: number; offset: number; offsetJoin: OffsetJoin }
 
-export function useEditor({ open, openMode, defaultBlurPct = 0, onClose }: UseEditorArgs) {
+export function useEditor({ open, openMode, defaultBlurPct = 0, onClose, notify }: UseEditorArgs) {
   const ed = useOutlineEditing()
   const { source, adjustments, display, displayRef, setPreview: setPreviewAdj, applyAdjustments, seedSource, reBaseline, transformSource, undo: undoEdit, redo: redoEdit, histRef } = ed
 
@@ -151,15 +153,15 @@ export function useEditor({ open, openMode, defaultBlurPct = 0, onClose }: UseEd
     getGenParams: () => genRef.current,
     reDeriveTrace,
     installSource,
-    notify: (kind, message) => { void kind; void message }, // injected by the client (set below)
-  }), [selVA, sourceIdForSelection, setPreviewAdj, applyAdjustments, setImageFx, setBgBlur, setWrapTile, reDeriveTrace, installSource, displayRef])
+    notify: (kind, message) => notify(kind, message),
+  }), [selVA, sourceIdForSelection, setPreviewAdj, applyAdjustments, setImageFx, setBgBlur, setWrapTile, reDeriveTrace, installSource, displayRef, notify])
 
   // ── the descriptor-driven tool list (the runtime-disable filter + applies/read) ──
   const buildTools = useCallback((toolEnabled: ToolEnabled) =>
     TOOL_REGISTRY.filter((d) => toolEnabled(d.id)).map((d) => {
       const available = isPickerDescriptor(d) ? true : (d.applies ? d.applies(ctx) : true)
       const value = isPickerDescriptor(d) ? undefined : (d.read ? d.read(ctx) : undefined)
-      return { id: d.id, outlet: d.outlet, label: d.label, icon: d.icon, kind: isPickerDescriptor(d) ? 'picker' as const : 'value' as const, control: isPickerDescriptor(d) ? undefined : d.control, available, value, descriptor: d }
+      return { id: d.id, outlet: d.outlet, label: d.label, icon: d.icon, kind: isPickerDescriptor(d) ? 'picker' as const : 'value' as const, control: isPickerDescriptor(d) ? undefined : d.control, available, value }
     }), [ctx])
 
   // ── per-descriptor preview/commit (value tools) — the UI calls these by id; rollback on {ok:false} is the
@@ -259,18 +261,19 @@ export function useEditor({ open, openMode, defaultBlurPct = 0, onClose }: UseEd
   const canUndo = histRef.current.past.length > 0
   const canRedo = histRef.current.future.length > 0
 
+  // The UI client receives ONLY state + actions — never the raw EditorCtx or a descriptor object (Layer-2
+  //  boundary, inv 14/16; pixel 6b). previewTool/commitTool/pickShape resolve the descriptor by id internally.
   return {
-    ctx, // the client injects notify + wires the gesture layer's editing verbs through this
     state: {
       source, adjustments, display, selVA, gen, shapeParams, fxDraft, confirmDiscard,
       canUndo, canRedo, defaultBlurPct,
     },
-    // editing verbs the gesture/canvas client needs (Layer-2; the client binds useEditorGestures with these)
-    editing: { reBaseline, transformSource, applyVec: (v: VShape) => reBaseline(() => v) },
     actions: {
       buildTools, previewTool, commitTool, pickShape,
       undo, redo, onReset, onDone, onCancel,
       setSelVA, setConfirmDiscard, setFxDraft, setShapeParams,
+      // editor-op verbs the gesture/canvas client wires into useEditorGestures (Layer-2 editor actions, not raw ctx)
+      reBaseline, transformSource, applyVec: (v: VShape) => reBaseline(() => v),
     },
   }
 }
