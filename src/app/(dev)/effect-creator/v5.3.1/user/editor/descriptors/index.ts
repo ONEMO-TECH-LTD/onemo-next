@@ -18,6 +18,11 @@ import { brightnessDescriptor } from './image/brightness'
 import { contrastDescriptor } from './image/contrast'
 import { saturateDescriptor } from './image/saturate'
 import { warmthDescriptor } from './image/warmth'
+import { presetDescriptor } from './image/preset'
+import { tintDescriptor } from './image/tint'
+import { vignetteDescriptor } from './image/vignette'
+import { blendDescriptor } from './image/blend'
+import { fillDescriptor } from './image/fill'
 
 export const TOOL_REGISTRY: Descriptor[] = [
   // step 4: shape-pick (the PickerDescriptor — Shape outlet)
@@ -30,9 +35,14 @@ export const TOOL_REGISTRY: Descriptor[] = [
   simplifyDescriptor,
   smoothDescriptor,
   straightenDescriptor,
-  // step 5: image tools — fx sliders (preset · tint · vignette · blend · fill land step5b)
+  // step 5: image tools (image outlet — editor Image mode + hero FiltersSurface both render these)
   brightnessDescriptor,
   contrastDescriptor,
   saturateDescriptor,
   warmthDescriptor,
+  presetDescriptor,
+  tintDescriptor,
+  vignetteDescriptor,
+  blendDescriptor,
+  fillDescriptor,
 ]

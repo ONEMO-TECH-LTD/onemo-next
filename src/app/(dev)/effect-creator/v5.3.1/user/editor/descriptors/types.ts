@@ -22,6 +22,7 @@ export type ToolControl =
   | { kind: 'swatches'; options: { id: string; label: string; value: string | null }[] }
   | { kind: 'stepper'; min: number; max: number }
   | { kind: 'actions'; actions: { id: string; label: string }[] }
+  | { kind: 'toggle'; onLabel: string; offLabel: string }
 
 /** The current editor dock outlet a tool lives under. Phase 4 = today's editor modes; the full-loop
  *  Create Studio dock (Add·Shape·Effect·Adjust·Edit) is the Phase-6 client over the SAME descriptors. */
@@ -51,8 +52,10 @@ export interface EditorCtx {
   getImageFx: () => import('../../outlineStore').ImageFx
   previewImageFx: (next: import('../../outlineStore').ImageFx) => void
   commitImageFx: (next: import('../../outlineStore').ImageFx) => void
-  /** blend (bgBlur) + fill (wrapTile) writers — live in both surfaces. */
+  /** blend (bgBlur) + fill (wrapTile) — reads for value-reflection + live writers (both surfaces). */
+  getBgBlur: () => number | null
   setBgBlur: (v: number | null) => void
+  getWrapTile: () => boolean
   setWrapTile: (v: boolean) => void
   /** GENERATION (detail/offset) — the no-AI trace re-derive, SHARED by both descriptors (parameterized by
    *  detail+offset+join together). The gen-params live in the editor controller; `reDeriveTrace` merges the
