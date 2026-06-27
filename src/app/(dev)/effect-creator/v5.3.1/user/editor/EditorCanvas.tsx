@@ -58,6 +58,7 @@ interface EditorCanvasProps { // KAI-9066: module-internal (the consumer passes 
   onSurfacePointerDown: (e: ReactPointerEvent) => void
   onPointerMove: (e: ReactPointerEvent) => void
   onPointerUp: (e: ReactPointerEvent) => void
+  onPointerCancel: (e: ReactPointerEvent) => void
   onSurfaceClick: (e: ReactMouseEvent) => void
   onSurfaceWheel: (e: ReactWheelEvent) => void
   onVAnchorDown: (i: number) => (e: ReactPointerEvent) => void
@@ -75,7 +76,7 @@ function EditorCanvasInner(props: EditorCanvasProps) {
     vshape, vDisplay, pathD, hitRing, hitBBox, hasIssues, nodeR,
     preview, showAnchors, selVA, allSelected, frameLocked, rotateLive, moveLive, stretchLive, pinching, shapePreview,
     nodeInteractedRef, setFrameLocked,
-    onSurfacePointerDown, onPointerMove, onPointerUp, onSurfaceClick, onSurfaceWheel,
+    onSurfacePointerDown, onPointerMove, onPointerUp, onPointerCancel, onSurfaceClick, onSurfaceWheel,
     onVAnchorDown, onVHandleDown, onVAnchorDouble, beginStretch, moveStretch, endStretch, beginRotateHandle,
   } = props
 
@@ -180,6 +181,7 @@ function EditorCanvasInner(props: EditorCanvasProps) {
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerLeave={onPointerUp}
+        onPointerCancel={onPointerCancel}
         onClick={onSurfaceClick}
         onWheel={onSurfaceWheel}
       >

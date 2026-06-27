@@ -325,6 +325,23 @@ export function useEditorGestures(ctx: GestureCtx) {
     }
   }, [commitRotate])
 
+  // F16: the OS/browser CANCELLED the gesture (palm rejection, system/edge gesture, focus loss) — tear the
+  // in-flight drag DOWN WITHOUT committing (drop the live preview + clear EVERY transient ref) so the next
+  // pointer starts clean. The monolith had no pointercancel handler, so a cancelled drag left vecLive + the
+  // drag refs stuck (a ghost preview / a dead first tap afterward).
+  const onPointerCancel = useCallback((e: ReactPointerEvent) => {
+    const { pointersRef, clientPtsRef, vecDragRef, setVecLive, imgPanRef, pinchRef, setPinching, canvasPanRef, rotateRef, rotateLiveRef, setRotateLive, moveRef, moveLiveRef, setMoveLive, stretchRef, setStretchLive } = ctxRef.current
+    pointersRef.current.delete(e.pointerId)
+    clientPtsRef.current.delete(e.pointerId)
+    vecDragRef.current = null; setVecLive(null)
+    imgPanRef.current = null
+    pinchRef.current = null; setPinching(false)
+    canvasPanRef.current = null
+    rotateRef.current = null; rotateLiveRef.current = null; setRotateLive(null)
+    moveRef.current = null; moveLiveRef.current = null; setMoveLive(null)
+    stretchRef.current = null; setStretchLive(null)
+  }, [])
+
   // Tap the surface (not a node): inside the cut → SELECT ALL corners (scale/twist them together);
   // outside → deselect. (Node taps stopPropagation, so they never reach here.)
   const onSurfaceClick = useCallback((e: ReactMouseEvent) => {
@@ -440,7 +457,7 @@ export function useEditorGestures(ctx: GestureCtx) {
 
   return {
     onVAnchorDown, onVHandleDown, onVAnchorDouble,
-    onSurfacePointerDown, onPointerMove, onPointerUp, onSurfaceClick, onSurfaceWheel,
+    onSurfacePointerDown, onPointerMove, onPointerUp, onPointerCancel, onSurfaceClick, onSurfaceWheel,
     beginStretch, moveStretch, endStretch, beginRotateHandle,
   }
 }

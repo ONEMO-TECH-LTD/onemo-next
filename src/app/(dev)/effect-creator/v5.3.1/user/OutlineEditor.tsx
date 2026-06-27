@@ -139,7 +139,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
   // ── GESTURE TRANSFORMS (R8 seam 3) — wired with the composer's editing verbs (transformSource/applyVec/setSelVA) ──
   const {
     onVAnchorDown, onVHandleDown, onVAnchorDouble,
-    onSurfacePointerDown, onPointerMove, onPointerUp, onSurfaceClick, onSurfaceWheel,
+    onSurfacePointerDown, onPointerMove, onPointerUp, onPointerCancel, onSurfaceClick, onSurfaceWheel,
     beginStretch, moveStretch, endStretch, beginRotateHandle,
   } = useEditorGestures({
     svgRef, viewRef, vshapeRef, nodeRRef, vecLiveRef,
@@ -276,6 +276,7 @@ export default function OutlineEditor({ open, imageUrl, onClose, openMode, onMag
         onSurfacePointerDown={onSurfacePointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
         onSurfaceClick={onSurfaceClick}
         onSurfaceWheel={onSurfaceWheel}
         onVAnchorDown={onVAnchorDown}
