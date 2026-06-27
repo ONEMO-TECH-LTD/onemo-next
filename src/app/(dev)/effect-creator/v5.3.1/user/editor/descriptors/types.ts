@@ -9,6 +9,7 @@
 import type { OutlineAdjustments, OutlineSource } from '@/lib/effect/outline-resolve'
 import type { VShape } from '@/lib/vector-core'
 import type { EffectSpecDraft } from '@/lib/effect/types'
+import type { OffsetJoin } from '@/lib/effect/offset'
 import type { CommitResult } from '../../outlineStore'
 
 export type { CommitResult }
@@ -16,6 +17,8 @@ export type { CommitResult }
 /** The UI-skeleton-fill a descriptor declares — DATA the constant skeleton renders (no per-tool JSX). */
 export type ToolControl =
   | { kind: 'slider'; min: number; max: number; step?: number; format: (v: number) => string }
+  // a primary slider + a small enum selector (e.g. Offset's round/sharp/bevel join) — the tool's value is {pct,enum}.
+  | { kind: 'slider-enum'; min: number; max: number; step?: number; format: (v: number) => string; options: { id: string; label: string }[] }
   | { kind: 'swatches'; options: { id: string; label: string; value: string | null }[] }
   | { kind: 'stepper'; min: number; max: number }
   | { kind: 'actions'; actions: { id: string; label: string }[] }
@@ -46,6 +49,13 @@ export interface EditorCtx {
   setImageFx: (next: import('../../outlineStore').ImageFx) => void
   setBgBlur: (v: number | null) => void
   setWrapTile: (v: boolean) => void
+  /** GENERATION (detail/offset) — the no-AI trace re-derive, SHARED by both descriptors (parameterized by
+   *  detail+offset+join together). The gen-params live in the editor controller; `reDeriveTrace` merges the
+   *  given slice, rebuilds the SOURCE from `spec.rawTracePx` (producers.traceSourceFromRaw), and previews
+   *  (transient setSource, no history) or commits (one editor-local undo step), returning the inv-21 result.
+   *  Removing the detail OR offset descriptor leaves this binding intact for the other (the bundling test). */
+  getGenParams: () => { detail: number; offset: number; offsetJoin: OffsetJoin }
+  reDeriveTrace: (params: { detail?: number; offset?: number; offsetJoin?: OffsetJoin }, commit: boolean) => CommitResult
   /** injected notification sink (the descriptor never imports toast — blueprint §4). */
   notify: (kind: 'warn' | 'error' | 'info', message: string) => void
 }
@@ -72,3 +82,9 @@ export interface ToolDescriptor<V = number> {
 /** Runtime enable/disable (inv 30): the composer reads this to include/skip a descriptor LIVE. Sourced from
  *  a RUNTIME channel (URL flag / product config), NEVER an edited source const — disable = no code change. */
 export type ToolEnabled = (id: string) => boolean
+
+/** The registry is heterogeneous — each tool's value type differs (number, OffsetValue, …). The composer
+ *  treats values opaquely (reads `state.tools[].value`, passes it back to `commit`), so the registry is typed
+ *  over `any` value; the per-tool descriptor files keep their precise `V`. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type AnyToolDescriptor = ToolDescriptor<any>

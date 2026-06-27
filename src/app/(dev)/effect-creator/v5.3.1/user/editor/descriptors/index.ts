@@ -5,15 +5,19 @@
 // predicate, so a runtime-disabled tool is skipped LIVE with no code change. Populated in steps 3–5
 // (shape tools, shape-pick, image tools).
 
-import type { ToolDescriptor } from './types'
+import type { AnyToolDescriptor } from './types'
+import { detailDescriptor } from './shape/detail'
+import { offsetDescriptor } from './shape/offset'
 import { radiusDescriptor } from './shape/radius'
 import { curveDescriptor } from './shape/curve'
 import { simplifyDescriptor } from './shape/simplify'
 import { smoothDescriptor } from './shape/smooth'
 import { straightenDescriptor } from './shape/straighten'
 
-export const TOOL_REGISTRY: ToolDescriptor[] = [
-  // step 3: shape/adjust tools (detail · offset — the trace re-derive — land next, step3c)
+export const TOOL_REGISTRY: AnyToolDescriptor[] = [
+  // step 3: shape/adjust tools (7) — generation: detail · offset; edit: radius · curve; global: simplify · smooth · straighten
+  detailDescriptor,
+  offsetDescriptor,
   radiusDescriptor,
   curveDescriptor,
   simplifyDescriptor,
