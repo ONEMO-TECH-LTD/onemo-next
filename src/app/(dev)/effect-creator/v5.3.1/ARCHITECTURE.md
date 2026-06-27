@@ -1,9 +1,9 @@
 # Creator — As-Built Technical Architecture
 
 **Status:** As-built (what the code *is*, not the blueprint's intent)
-**Version:** v5.3.1 — the v5.3 line with the drift removed: v1/v2, the `(dev)` prototype/shaped/studio routes, old `studio/` (26M), the `/dev/tokens` pipeline, and the dev A/B scaffolding are all deleted; the scene-format adapter is extracted into the Creator (see §8/§9)
+**Version:** v5.5 (foundation Phases 2–3) — the v5.3.1 baseline re-cut into the **UI-agnostic Layer-2 seam**: the `useCreator` macro is decomposed into flow-blind **primitives** + flow-owned **transaction services** (Phase 2) and formalized as the named, swappable **`v53Flow`** behind the **`CreatorFlow`** contract (Phase 3). The engine (Layer 1) + the `lib/effect` internals are **UNCHANGED** — only the orchestration seam + the page binding changed (behaviour-neutral re-cut). (v5.3.1 drift already removed: v1/v2, the prototype/shaped/studio routes, old `studio/`, `/dev/tokens`, the A/B scaffolding; the scene-format is the **live** studio-v2 → Creator `.onemo` bridge — DEC-v5-08, §8/§9.)
 **Scope:** `src/app/(dev)/effect-creator/v5.3.1/` + `src/lib/effect/` + the kernels (`vector-core`, `outline-core` live half, `shape-library`, `export`). Logic/architecture only — `.module.css` styling files are excluded.
-**Provenance:** branch `session57-task/creator-v5.3.1`, the v5.3.1 cleanup off snapshot `798b191`. The dev A/B scaffolding (`next.config.ts` distDir, `tsconfig.json` `.next-v*`) is now deleted, not excluded.
+**Provenance:** branch `session58-task/kai-9205-creator-v53flow` off `origin/staging` (Phase 2 merged @ `b60e52f`; Phase 3 `v53Flow` @ `2deda75`; dead route barrels killed @ `7e0b1c0`). Re-derived from a full code read per §11 rule-2 (KAI-9266).
 **Companion:** the forward blueprint lives at `onemo-ssot-global/_ssot-workbench/v5/` — that is *to-be*; this is *as-is*. On conflict, the code (and this doc) win.
 
 ---
@@ -14,7 +14,8 @@ The Creator turns a user photo into a 3D-previewed, manufacturable suede effect.
 
 Invariants the code actually enforces:
 
-- **One persistent scene.** The golden scene mounts once and never unmounts (`page.tsx:397` `AdminViewer`→`EffectViewer`). No "phases", no "Finish in 3D". The 2D editor is an *overlay* that freezes the scene (`frameloop="never"`), never a separate route.
+- **One flow seam (v5.5).** The page is a thin Layer-3 adapter binding ONLY a flow's `CreatorFlow` `{ state, actions }` (`page.tsx` → `useV53Flow`). All orchestration lives in the flow (`flows/v53Flow.ts`), composed from Layer-2 primitives + transaction services; the UI never imports an engine lib or reads a store directly. A new pipeline is a new compose-function, not a socket rewrite (blueprint inv 18).
+- **One persistent scene.** The golden scene mounts once and never unmounts (`page.tsx` `AdminViewer`→`EffectViewer`). No "phases", no "Finish in 3D". The 2D editor is an *overlay* that freezes the scene (`frameloop="never"`), never a separate route.
 - **One 2D engine.** `prepareEffect` (`lib/effect/prepare-effect.ts`) is the only producer of geometry + textures. It is **three-free**; the 3D half is `buildMeshFromSpec`.
 - **One shape truth.** `resolve(source, adjustments)` (`lib/effect/outline-resolve.ts`) is the only path from edit-recipe to display/cut shape. All-off ⇒ exact source.
 - **One image bake.** `composeFront` (`lib/effect/composite.ts`) bakes the front texture used by **both** the 3D model and print — 3D == print parity.
@@ -23,40 +24,51 @@ Invariants the code actually enforces:
 
 ## 2. End-to-end data flow
 
+The page binds `useV53Flow` and renders from `state` / calls `actions`. **v53Flow** (`flows/v53Flow.ts`) COMPOSES the Layer-2 primitives (`core/primitives.ts`) + transaction services (`core/transactions.ts`) + the viewer adapter (`core/viewer-adapter.ts`). The engine (`lib/effect`) is unchanged from v5.3.1 — the macro was retired, the orchestration moved into the flow (Phases 2–3).
+
 ```
-upload (File)
-  → page.handleFile: prepareEffect(url, 'standard')
+upload (File) → v53Flow.upload:
+  → loadImage(file) [blob lifecycle] → prepareStandard(url): prepareEffect(url,'standard')
       → PreparedEffect { spec, composite, edgeComposite, frontSrc }
-      → store.setSpec(spec); setPrepared; baseline snapshot
-      → startBackgroundCutout (P1): segmentML in worker (rembg trio/WASM), cache + publish subjMatteUrl
-  → 3D: EffectViewer → ShapedModelBridge → ShapedModel
+      → store.setSpec(spec); setPrepared (prepared-for-EDITING); publishToViewer(p) (prepared-for-3D, inv 26)
+      → history.setBaseline (the history transaction owns the AppSnap stack + clears it)
+  → startBackgroundCutout: runCutout(url) [segmentML, working-res cap inv 19] → cacheSeg
+      → publishCutoutResult(seq,…) [the seq-guard at PUBLICATION; matte written iff still the active image]
+  → 3D: EffectViewer(prepared-for-3D) → ShapedModelBridge → ShapedModel   (engine, unchanged)
         mesh = buildShapedGeometry( vectorTrueContour(committedContour ?? spec.geometryMM) )
         texture = composeFront(frontSrc.origCanvas, frontSrc.subjCanvas, blur, fx, vignette, tint)
 
-Magic (handleMagic): prepareEffect(url, 'shaped', …, preseg)   [reuses P1 cut — no AI re-run]
-  → shaped spec REPLACES standard; subject silhouette; setSubjMatteUrl; autoOutline=true
+Magic → v53Flow.magic: prepareShaped(url, preseg from cache) [reuses the bg cut — no AI re-run]
+  → if isCurrent(runId): setPrepared + publishToViewer; shaped spec REPLACES standard; setSubjMatteUrl;
+    autoOutline=true; history.pushHistory(preMagic) [one Magic = one undo step]. cancelMagic bumps the token.
 
-Editor (double-tap / Editor dock): OutlineEditor overlay opens
-  → store.setEditorOpen(true)  [scene frozen; 3D bakes DEFER]
-  → seeds OutlineSource from spec.vectorShape (Magic = raw polygon; pre-Magic = square + 8mm radius)
-  → every edit → setSource/setAdjustments → derive → committedShape + committedContourMM
-  → Done: setEditorOpen(false) → ONE deferred mesh rebuild + ONE texture rebake fire
+Editor / Trim / Filter SESSIONS (useSessions): begin = snapNow; commit = pushHistory on a real change; revert.
+  Editor overlay: store.setEditorOpen(true) [scene frozen; 3D bakes DEFER]; seeds OutlineSource from
+  spec.vectorShape (Magic = raw polygon; pre-Magic = square + 8mm radius); edits → setSource/setAdjustments →
+  derive → committedShape + committedContourMM; Done → setEditorOpen(false) → ONE deferred mesh rebuild +
+  ONE texture rebake. (cancelFilters is close-only — the imageFx/bgBlur/wrapTile revert still lives in
+  FiltersSurface until Phase 6 by construction, Option A.)
 
-Filters (hero, KAI-9124): FiltersSurface over the LIVE scene (editorOpen=false)
-  → setImageFx / setBgBlur / setWrapTile → ShapedModel rebakes IMMEDIATELY (live)
-
-Export (?internal=1): committedShape → contourFromShape → assertContourCuttable → toManufacturingSVG (mm)
+Filters (hero, KAI-9124): FiltersSurface over the LIVE scene → setImageFx/setBgBlur/setWrapTile → rebakes live.
+Export (?internal=1): actions.exportSvg → exportCutlineSvg(shape, geom) [feasibility gate + mm-SVG]; UI writes file.
 ```
 
-`spec` (engine→editor) and `committedShape`/`committedContourMM` (editor→3D) are the two bridge contracts. The cut-out runs in a worker; its matte feeds the editor's Blend preview on any shape.
+`spec` (engine→editor) and `committedShape`/`committedContourMM` (editor→3D) are the two bridge contracts;
+`prepared-for-editing` (2D) is split from `prepared-for-3D` (the viewer, inv 26). The cut-out runs in a worker;
+its matte feeds the editor's Blend preview on any shape.
 
 ## 3. Module map
 
-### 3.1 Composition & state — `v5.3.1/`
+### 3.1 Composition, flow & state — `v5.3.1/`
 
 | File | Role | Key contract |
 |---|---|---|
-| `page.tsx` (549) | Composition root. Mounts the one scene; owns surface routing + the **global undo/redo/reset** (AppSnap history, 30 deep); `handleFile`/`handleMagic`; double-tap editor entry; `onExport`. | Surfaces are mutually exclusive: `showColors`→Trim, `showFilters`→Filters, else Toolbar. Editor is a separate overlay. One user action = one `pushHistory`. |
+| `page.tsx` (240) | **Thin Layer-3 composition root.** Mounts the one scene; binds `useV53Flow` → renders from `state`, calls `actions`. Owns ONLY the injected UI-side adapters: notify (toast), URL/route params, the double-tap editor-entry gesture, the export file-download, the first-paint resize nudge. **No orchestration** — that's the flow. | Surfaces mutually exclusive: `showColors`→Trim, `showFilters`→Filters, else Toolbar; editor is a separate overlay. |
+| `flows/v53Flow.ts` (219) | **THE v53 flow** — `useV53Flow(adapters): CreatorFlow`. Today's behaviour as a thin COMPOSITION of the primitives + transaction services + viewer adapter (blueprint §6); returns `{ state, actions }`. | Formalized from the Phase-2 `useCreator` macro (retired); body byte-identical. twoDFirstFlow is a sibling compose-fn in Phase 5. |
+| `flows/flow-contract.ts` (78) | The `CreatorFlow` `{ state, actions }` contract + `CreatorAdapters`/`Notify` — the named Layer-3 seam. | DESCRIPTIVE: v53Flow's current surface named, NOT a guaranteed shared contract (inv 18; conformance = Phase-5 finding). |
+| `core/primitives.ts` (93) | **Layer-2a flow-blind primitives** — one engine op each, zero sequencing: `loadImage` · `prepareStandard` · `runCutout` (working-res cap, inv 19) · `prepareShaped` (Option-A preseg) · `exportCutlineSvg` (feasibility-gated result). | No history, no seq-guard, no cache, no notify (blueprint inv 15). |
+| `core/viewer-adapter.ts` (36) | **Layer-2a viewer adapter** — owns `prepared-for-3D`; `publishToViewer` builds 3D ON CALL (inv 26 2D/3D split); `handleStatus` (G4). | The flow decides WHEN to publish; split from prepared-for-editing. |
+| `core/transactions.ts` (422) | **Layer-2b flow-owned transaction services**: `useHistoryTransaction` (snap/restore/undo/redo/reset + F25 recipe/LRU/seg-cache, inv 20) · `useGenerationTask` (Magic-cancel token) · `useUploadPublish` (publishCutoutResult seq-guard at publication) · `useSessions` (editor/trim/filter begin/commit/revert). Pure helpers (unit-tested): liteSpec/liteSource + the session change-detection predicates. | Flow-timing state — NOT primitives. |
 | `types.ts` (112) | Shared viewer/scene config types. | `ViewerConfig`, `DesignState`(offsetX/offsetY/scale), `ColorConfig`, material roles. No duplicates elsewhere. |
 | `user/outlineStore.ts` (142) | The state bridge (zustand). | See §4. |
 
@@ -229,10 +241,13 @@ What was **reverted** (P3/P5): the full-bleed canvas effects, surround-glow / 3D
 
 **Removed in the v5.3.1 cleanup** (off snapshot `798b191`): `effect-creator/v1` + `v2`, the `(dev)/prototype`/`shaped`/`studio` routes, old `studio/` (the 26M PlayCanvas-fork editor — superseded by studio-v2, which is untouched), the `/dev/tokens` old-token pipeline, and the dev A/B build scaffolding. The scene-format adapter (`onemo-deserialize`/`onemo-format`) was extracted from old `studio/` into `core/scene-format/`, so the Creator owns its `.onemo` reader.
 
-Still present, **deferred to a surgical test-aware pass** (NOT a folder delete):
-- `outline-core` document-runtime: `resolver.ts`'s `resolveOutlineDocument` half, `sdf.ts`, `livewire.ts`, `reducer.ts`, `types.ts` `OutlineDocument` — not on the runtime path (the runtime imports the narrow `outline-core/math` surface). The `index.ts` **barrel + ring-math are LIVE** (7 tests + the engine import `fairingFromDetail`/`validateSelfIntersection` through it), so removal is surgical, not a folder cut.
-- `geometry-truth.legacy.ts` — retired trace fit, **relocated to `src/lib/effect/__tests__/geometry-truth.legacy.ts`** (test-only fixture, moved out of the production lib in the v5.5.1 de-slop).
-- `EffectModel.tsx` — the GLB material path; not on the shaped (/create) route. **`onemo-loader.ts` is NOT dead** — `parseOnemoConfig` loads the golden scene through `AdminViewer` (live on /create). (The Studio-only `loadOnemoTemplate` path was removed in the v5.5.1 de-slop.)
+**Removed since the v5.3.1 doc was written** (v5.5.1 de-slop DEC-v5-07 + Phase-3 o-deslop KAI-9268) — verified against the tree 2026-06-27:
+- `outline-core` document-runtime: `sdf.ts`, `livewire.ts`, `reducer.ts` **DELETED**, and `resolver.ts`'s `resolveOutlineDocument` half **DELETED** (0 refs). `outline-core/` is now `hash/index/math/resolver/types`; the `index.ts` **barrel + ring-math are LIVE** (engine imports `fairingFromDetail`/`validateSelfIntersection` through `outline-core/math`). **Lone remnant:** a dead `OutlineDocument` type in `outline-core/types.ts` (1 ref, no runtime consumer) — a type-only surgical leftover.
+- The 3 route barrels `v5.3.1/{user,core,admin}/index.ts` — **DELETED** (Phase-3 o-deslop, KAI-9268; 0 static+dynamic importers, triple-verified).
+- `geometry-truth.legacy.ts` — retired trace fit, **relocated to `src/lib/effect/__tests__/`** (test-only fixture).
+
+Still present (clarified, NOT dead):
+- `EffectModel.tsx` — the GLB material path; not on the shaped (/create) route, used by Studio/admin. **`onemo-loader.ts` is LIVE** — `parseOnemoConfig` loads the golden scene through `AdminViewer` (live on /create). Per **DEC-v5-08**, the scene-format (`core/scene-format/`) is the **live studio-v2 → Creator `.onemo` single-source bridge**, not a dead one-time extraction.
 
 ## 10. Known drift / debt
 
