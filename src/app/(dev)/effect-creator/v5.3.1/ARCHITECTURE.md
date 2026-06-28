@@ -48,8 +48,8 @@ Editor / Trim / Filter SESSIONS (useSessions): begin = snapNow; commit = pushHis
   Editor overlay: store.setEditorOpen(true) [scene frozen; 3D bakes DEFER]; seeds OutlineSource from
   spec.vectorShape (Magic = raw polygon; pre-Magic = square + 8mm radius); edits → setSource/setAdjustments →
   derive → committedShape + committedContourMM; Done → setEditorOpen(false) → ONE deferred mesh rebuild +
-  ONE texture rebake. (cancelFilters is close-only — the imageFx/bgBlur/wrapTile revert still lives in
-  FiltersSurface until Phase 6 by construction, Option A.)
+  ONE texture rebake. (Phase 4/KAI-9244 + 4.1/D1: `revertSession('filter')` does the REAL imageFx/bgBlur/wrapTile
+  revert from the pre-open snap on the flow session — `transactions.ts useSessions`; FiltersSurface is a store-free client.)
 
 Filters (hero, KAI-9124): FiltersSurface over the LIVE scene → setImageFx/setBgBlur/setWrapTile → rebakes live.
 Export (?internal=1): actions.exportSvg → exportCutlineSvg(shape, geom) [feasibility gate + mm-SVG]; UI writes file.
@@ -65,7 +65,7 @@ its matte feeds the editor's Blend preview on any shape.
 
 | File | Role | Key contract |
 |---|---|---|
-| `page.tsx` (240) | **Thin Layer-3 composition root.** Mounts the one scene; binds `useV53Flow` → renders from `state`, calls `actions`. Owns ONLY the injected UI-side adapters: notify (toast), URL/route params, the double-tap editor-entry gesture, the export file-download, the first-paint resize nudge. **No orchestration** — that's the flow. | Surfaces mutually exclusive: `showColors`→Trim, `showFilters`→Filters, else Toolbar; editor is a separate overlay. |
+| `page.tsx` (240) | **Thin Layer-3 composition root.** Mounts the one scene; binds `useV53Flow` → renders from `state`, calls `actions`. Owns ONLY the injected UI-side adapters: notify (toast), URL/route params, the double-tap editor-entry gesture, the export file-download, the first-paint resize nudge. **No orchestration** — that's the flow. | Surfaces mutually exclusive: `sessions.trim`→Trim, `sessions.filter`→Filters, else Toolbar; `sessions.editor` is a separate overlay (keyed sessions, DEC-v5-09). |
 | `flows/v53Flow.ts` (219) | **THE v53 flow** — `useV53Flow(adapters): CreatorFlow`. Today's behaviour as a thin COMPOSITION of the primitives + transaction services + viewer adapter (blueprint §6); returns `{ state, actions }`. | Formalized from the Phase-2 `useCreator` macro (retired); body byte-identical. twoDFirstFlow is a sibling compose-fn in Phase 5. |
 | `flows/flow-contract.ts` (78) | The `CreatorFlow` `{ state, actions }` contract + `CreatorAdapters`/`Notify` — the named Layer-3 seam. | DESCRIPTIVE: v53Flow's current surface named, NOT a guaranteed shared contract (inv 18; conformance = Phase-5 finding). |
 | `core/primitives.ts` (93) | **Layer-2a flow-blind primitives** — one engine op each, zero sequencing: `loadImage` · `prepareStandard` · `runCutout` (working-res cap, inv 19) · `prepareShaped` (Option-A preseg) · `exportCutlineSvg` (feasibility-gated result). | No history, no seq-guard, no cache, no notify (blueprint inv 15). |
@@ -212,9 +212,9 @@ Product default = lightweight trio **u2netp (4MB) → silueta (44MB, lazy) → f
 
 Over the live scene, mutually exclusive (page routing):
 - **Toolbar** (default): Image · Magic · Trim · Filters · Editor.
-- **TrimCarousel** (`showColors`): back-material color, live.
-- **FiltersSurface** (`showFilters`): image-fx, live over the unfrozen scene.
-- **OutlineEditor** (`editingOutline`): separate overlay, scene frozen. Dock = Shape · Magic · Adjust.
+- **TrimCarousel** (`sessions.trim`): back-material color, live.
+- **FiltersSurface** (`sessions.filter`): image-fx, live over the unfrozen scene.
+- **OutlineEditor** (`sessions.editor`): separate overlay, scene frozen. Dock = Shape · Magic · Adjust.
 
 Editor entry: double-tap the object (two clean taps <350ms) or the Editor dock tool. Magic is self-sufficient — it lands in 3D and does **not** auto-open the editor.
 

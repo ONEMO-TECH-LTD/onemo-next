@@ -58,9 +58,12 @@ function PrototypePageInner() {
   const notify = useCallback((kind: 'warn' | 'error' | 'info', message: string) => { toast(kind, message) }, [])
   const { state, actions } = useV53Flow({ notify, segPresent })
   const {
-    artworkUrl, prepared, preparedFor3D, editingOutline, editorMode, autoOutline, generating,
-    showColors, showFilters, designState, colors,
+    artworkUrl, prepared, preparedFor3D, sessions, editorMode, autoOutline, generating,
+    designState, colors,
   } = state
+  // DEC-v5-09: the contract exposes keyed `sessions`; the UI (this client) owns its panel vocabulary,
+  // derived here from the UX-semantic session ids (editor/trim/filter).
+  const { editor: editingOutline, trim: showColors, filter: showFilters } = sessions
 
   const [isDragging, setIsDragging] = useState(false)
 
@@ -85,7 +88,7 @@ function PrototypePageInner() {
   }, [actions])
 
   // Editor entry (plan A1): DOUBLE-TAP the object — two clean taps within 350ms. The UI owns the gesture;
-  // the socket exposes enterEditor(). Single taps and orbit drags do NOTHING.
+  // the socket exposes beginSession('editor'). Single taps and orbit drags do NOTHING.
   const tapRef = useRef<{ x: number; y: number; t: number } | null>(null)
   const lastTapRef = useRef<{ x: number; y: number; t: number } | null>(null)
   const onScenePointerDown = useCallback((e: React.PointerEvent) => {
@@ -104,7 +107,7 @@ function PrototypePageInner() {
     const now = performance.now()
     if (prev && now - prev.t < 350 && Math.hypot(e.clientX - prev.x, e.clientY - prev.y) < 24) {
       lastTapRef.current = null
-      actions.enterEditor(null)
+      actions.beginSession('editor', null)
       return
     }
     lastTapRef.current = { x: e.clientX, y: e.clientY, t: now }
@@ -164,14 +167,14 @@ function PrototypePageInner() {
         <TrimCarousel
           backColor={colors.backColor}
           onBackColor={actions.setBackColor}
-          onDone={actions.closeTrim}
-          onCancel={actions.cancelTrim}
+          onDone={() => actions.commitSession('trim')}
+          onCancel={() => actions.revertSession('trim')}
         />
       ) : showFilters ? (
         /* KAI-9124: the standalone Filters hero surface — over the LIVE 3D; ✓ keeps (one step), ✕ reverts */
         <FiltersSurface
-          onDone={actions.closeFilters}
-          onCancel={actions.cancelFilters}
+          onDone={() => actions.commitSession('filter')}
+          onCancel={() => actions.revertSession('filter')}
         />
       ) : (
         /* Creation row (plan A1): Image · Magic · Trim — editing entries live in the top bar + double-tap */
@@ -181,9 +184,9 @@ function PrototypePageInner() {
           showColors={showColors}
           onFile={actions.upload}
           onGenerate={actions.magic}
-          onToggleColors={actions.openTrim}
-          onFilters={actions.openFilters}
-          onEditor={() => actions.enterEditor(null)}
+          onToggleColors={() => actions.beginSession('trim')}
+          onFilters={() => actions.beginSession('filter')}
+          onEditor={() => actions.beginSession('editor', null)}
           editorReady={!!prepared}
         />
       )}
@@ -200,7 +203,7 @@ function PrototypePageInner() {
         // KAI-9122: the editor's magic-blend preview seeds from the design's REAL default blur (what the
         // 3D shows when bgBlur is untouched) — 0 for the sharp standard square, ~50 for a shaped subject.
         defaultBlurPct={prepared ? Math.round((2500 * prepared.frontSrc.defaultBlurPx) / prepared.frontSrc.origCanvas.width) : 0}
-        onClose={actions.closeEditor}
+        onClose={() => actions.commitSession('editor')}
       />
 
       {/* THE GLOBAL TOP BAR — undo/redo LEFT · RESET center only-when-dirty · Export RIGHT (internal only).

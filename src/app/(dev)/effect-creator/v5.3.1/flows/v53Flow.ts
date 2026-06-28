@@ -14,7 +14,7 @@
 //   • notifications     → `adapters.notify` (the socket never imports toast)
 //   • URL/route params  → injected (`adapters.segPresent`; ?scene / ?internal stay UI-side config)
 //   • export download   → the socket RETURNS the SVG string; the UI writes the file
-//   • editor-entry gesture → the socket exposes `enterEditor()`; the UI owns the double-tap
+//   • editor-entry gesture → the socket exposes `beginSession('editor')`; the UI owns the double-tap
 //   • first-paint resize nudge → the viewer adapter's concern, kept out of orchestration
 //
 // F25 RECIPE-HISTORY (leg 2, blueprint invariant 19/20): the history NEVER retains canvas-backed
@@ -49,7 +49,7 @@ export function useV53Flow(adapters: CreatorAdapters): CreatorFlow {
   const [prepared, setPrepared] = useState<PreparedEffect | null>(null) // prepared-for-editing (2D side)
   const [autoOutline, setAutoOutline] = useState(false) // false = standard square; true = Magic cut-out
   const [generating, setGenerating] = useState(false)
-  // editingOutline / editorMode / showColors / showFilters are owned by the sessions transaction (below).
+  // the keyed `sessions` (editor/trim/filter) + editorMode are owned by the sessions transaction (below).
 
   const designState = useOutlineStore((s) => s.artwork) // #28: scene + editor share it
   const setDesignState = useCallback((upd: DesignState | ((prev: DesignState) => DesignState)) => {
@@ -74,11 +74,8 @@ export function useV53Flow(adapters: CreatorAdapters): CreatorFlow {
   // — flow-timing services; publishCutoutResult composes the history's patchGenMatte.
   const { beginRun, isCurrent, cancel: cancelGeneration } = useGenerationTask()
   const { nextUploadSeq, publishCutoutResult } = useUploadPublish(patchGenMatte)
-  // Layer-2b sessions (editor/trim/filter begin/commit/revert) — owns the overlay flags + pre-snapshots.
-  const {
-    editingOutline, editorMode, showColors, showFilters,
-    enterEditor, closeEditor, openTrim, closeTrim, cancelTrim, openFilters, closeFilters, cancelFilters,
-  } = useSessions({ snapNow, pushHistory, setBackColor })
+  // Layer-2b sessions — generic begin/commit/revert by id over a keyed active map (DEC-v5-09).
+  const { sessions, editorMode, beginSession, commitSession, revertSession } = useSessions({ snapNow, pushHistory, setBackColor })
 
   // Export — the mm-true SVG cutline from THE vector truth. The socket returns the STRING; the UI
   // performs the download (the injected export adapter). null = nothing/not-feasible (already notified).
@@ -200,20 +197,20 @@ export function useV53Flow(adapters: CreatorAdapters): CreatorFlow {
   /** Cancel an in-flight Magic (UX-5): bump the generation token so a stale result/error is a no-op. */
   const cancelMagic = useCallback(() => { cancelGeneration(); setGenerating(false) }, [cancelGeneration])
 
-  // Editor / Trim / Filter SESSIONS (enterEditor/closeEditor, open/close/cancel Trim + Filters) are owned
+  // Editor / Trim / Filter SESSIONS (generic begin/commit/revert by id, DEC-v5-09) are owned
   // by the sessions transaction (useSessions, above) — destructured into { state, actions } below.
 
   return {
     state: {
-      artworkUrl, prepared, preparedFor3D, editingOutline, editorMode, autoOutline, generating,
-      showColors, showFilters, designState, colors,
+      artworkUrl, prepared, preparedFor3D, sessions, editorMode, autoOutline, generating,
+      designState, colors,
       canUndo, canRedo, dirty,
       hasArtwork: !!prepared,
     },
     actions: {
       upload, magic, cancelMagic, undo, redo, reset,
-      enterEditor, closeEditor, exportSvg, handleStatus,
-      setBackColor, openTrim, closeTrim, cancelTrim, openFilters, closeFilters, cancelFilters,
+      beginSession, commitSession, revertSession, exportSvg, handleStatus,
+      setBackColor,
     },
   }
 }
