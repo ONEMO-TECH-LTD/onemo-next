@@ -163,8 +163,14 @@ export function useTwoDFirstFlow(adapters: CreatorAdapters): TwoDFirstFlow {
         // silent broken whole-image blur; reset the control so there's no latent nonzero blur. (finger-trace
         // assist + the precise model-unavailable distinction are parked — Dan: "this can be done later".)
         console.warn('[effect] first-blur cut-out failed:', e)
+        // stale-current guard on the REJECT path too (pixel QA): a superseded run (Magic/undo/reset/new upload,
+        // or a fresh blur attempt) must NOT warn or reset the CURRENT generation's blur. Re-read live state;
+        // only warn/reset if THIS run is still the current, matte-less, blur-on generation. No await before setBgBlur.
+        const cur = snapNow()
+        const st = useOutlineStore.getState()
+        if (cur.genId !== genId || st.subjMatteUrl || st.bgBlur == null || st.bgBlur <= 0) return // superseded — stay silent
         notify('warn', 'No clear subject found — turn blur off, or try an image with a clearer subject.')
-        useOutlineStore.getState().setBgBlur(0)
+        st.setBgBlur(0)
       } finally {
         firstBlurRunningRef.current = false
       }
