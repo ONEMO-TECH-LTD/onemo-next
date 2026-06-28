@@ -19,9 +19,12 @@
 // session verbs by id, never UI panel names (the UI owns panel naming/visibility).
 
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
-import type { SessionId } from '../core/transactions'
 import type { DesignState } from '../types'
 import type { useSceneStore } from '../admin/sceneStore'
+
+/** A SESSION id — UX-semantic, NOT a UI panel name (the UI owns panel names; DEC-v5-09). The CONTRACT owns
+ *  this type; the flow service (`core/transactions` useSessions) imports it from here (deps point impl→contract). */
+export type SessionId = 'editor' | 'trim' | 'filter'
 
 /** UI-side notification sink — the flow emits, the UI binds it to toast() (blueprint §4 adapter). */
 export type Notify = (kind: 'warn' | 'error' | 'info', message: string) => void

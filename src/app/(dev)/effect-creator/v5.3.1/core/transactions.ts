@@ -22,6 +22,7 @@ import { prepareStandard, prepareShaped } from './primitives'
 import type { DesignState } from '../types'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
 import type { MLResult } from '@/lib/effect/segment-ml'
+import type { SessionId } from '../flows/flow-contract'
 
 /** UI-side notification sink (the injected adapter — blueprint §4). */
 type Notify = (kind: 'warn' | 'error' | 'info', message: string) => void
@@ -345,9 +346,6 @@ export function filterSessionChanged(
 ): boolean {
   return cur.imageFx !== pre.imageFx || cur.bgBlur !== pre.outline.bgBlur || cur.wrapTile !== pre.wrapTile
 }
-
-/** A SESSION id — UX-semantic, NOT a UI panel name (the UI owns panel names; DEC-v5-09). */
-export type SessionId = 'editor' | 'trim' | 'filter'
 
 /** SESSIONS — generic begin/commit/revert BY ID over a KEYED active map (Phase 4.1/D1, DEC-v5-09).
  *  The three sessions are INDEPENDENT + can co-exist → a keyed record, NEVER a single active id. This is a
