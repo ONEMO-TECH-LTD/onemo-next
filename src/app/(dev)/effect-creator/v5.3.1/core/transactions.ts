@@ -346,87 +346,65 @@ export function filterSessionChanged(
   return cur.imageFx !== pre.imageFx || cur.bgBlur !== pre.outline.bgBlur || cur.wrapTile !== pre.wrapTile
 }
 
-/** Editor / Trim / Filter SESSIONS — begin (snapshot) / commit (push one history step on a real change) /
- *  revert. Owns the overlay flags + the pre-snapshots; composes the history (snapNow/pushHistory). The
- *  change-test on commit covers EVERYTHING a session can touch (shape · blend · image-fx · photo position —
- *  KAI-8971/F2). Phase 4 (KAI-9244): cancelFilters does the REAL imageFx/bgBlur/wrapTile revert from the
- *  pre-open snap (FiltersSurface's Layer-3 revert removed); trim's revert (cancelTrim) lifts cleanly; the
- *  editor's discard is the composer's onCancel (useEditor). */
+/** A SESSION id — UX-semantic, NOT a UI panel name (the UI owns panel names; DEC-v5-09). */
+export type SessionId = 'editor' | 'trim' | 'filter'
+
+/** SESSIONS — generic begin/commit/revert BY ID over a KEYED active map (Phase 4.1/D1, DEC-v5-09).
+ *  The three sessions are INDEPENDENT + can co-exist → a keyed record, NEVER a single active id. This is a
+ *  behaviour-IDENTICAL rename + keyed DISPATCH (NOT a uniform collapse): each id keeps its OWN commit
+ *  change-test + revert —
+ *    • trim   — commit: backColor changed → push; revert: setBackColor(pre).
+ *    • filter — commit: filterSessionChanged → push; revert: restore imageFx/bgBlur/wrapTile (the KAI-9244 real revert).
+ *    • editor — commit: editorSessionChanged → push; **revert is EXTERNALIZED** (the composer's onCancel, useEditor) — no revert here.
+ *  Owns the keyed active flags + per-id pre-snapshots; composes the history (snapNow/pushHistory). The UI
+ *  (Layer-3) names its panels ("Trim"/"Filters"/"Editor") and maps them to these UX-semantic session ids. */
 export function useSessions(args: {
   snapNow: () => AppSnap
   pushHistory: (s: AppSnap) => void
   setBackColor: (c: string) => void
 }) {
   const { snapNow, pushHistory, setBackColor } = args
-  const [editingOutline, setEditingOutline] = useState(false)
-  const [editorMode, setEditorMode] = useState<'shape' | 'image' | null>(null) // #27 + KAI-9027
-  const [showColors, setShowColors] = useState(false)
-  const [showFilters, setShowFilters] = useState(false) // KAI-9124: standalone Filters takeover
-  const editorPreRef = useRef<AppSnap | null>(null)
-  const trimPreRef = useRef<AppSnap | null>(null)
-  const filterPreRef = useRef<AppSnap | null>(null)
+  const [sessions, setSessions] = useState<Record<SessionId, boolean>>({ editor: false, trim: false, filter: false })
+  const [editorMode, setEditorMode] = useState<'shape' | 'image' | null>(null) // #27 + KAI-9027 (editor payload, not a panel flag)
+  const preRef = useRef<Record<SessionId, AppSnap | null>>({ editor: null, trim: null, filter: null })
+  const setActive = useCallback((id: SessionId, on: boolean) => setSessions((s) => ({ ...s, [id]: on })), [])
 
-  // Editor entry — the socket action; the UI owns the double-tap gesture / Edit button that calls it.
-  const enterEditor = useCallback((mode: 'shape' | 'image' | null) => {
-    editorPreRef.current = snapNow()
-    setEditorMode(mode)
-    setEditingOutline(true)
-  }, [snapNow])
+  /** begin — snapshot the pre-open state + open the session. Editor carries a mode payload (shape/image). */
+  const beginSession = useCallback((id: SessionId, mode: 'shape' | 'image' | null = null) => {
+    preRef.current[id] = snapNow()
+    if (id === 'editor') setEditorMode(mode)
+    setActive(id, true)
+  }, [snapNow, setActive])
 
-  // Editor close — one editor session (Done with changes) = one global step. The change test covers
-  // EVERYTHING a session can commit — shape, blend, image-fx, photo position (KAI-8971/F2).
-  const closeEditor = useCallback(() => {
-    setEditingOutline(false)
-    const pre = editorPreRef.current
+  /** commit (Done) — close + push ONE history step iff THIS session's own change-test fired. */
+  const commitSession = useCallback((id: SessionId) => {
+    setActive(id, false)
+    const pre = preRef.current[id]
+    if (!pre) return
+    const o = useOutlineStore.getState()
+    let changed = false
+    if (id === 'editor') changed = editorSessionChanged({ committedShape: o.committedShape, bgBlur: o.bgBlur, imageFx: o.imageFx, artwork: o.artwork }, pre)
+    else if (id === 'filter') changed = filterSessionChanged({ imageFx: o.imageFx, bgBlur: o.bgBlur, wrapTile: o.wrapTile }, pre)
+    else if (id === 'trim') changed = pre.trim.backColor !== useSceneStore.getState().colors.backColor
+    if (changed) pushHistory(pre)
+    preRef.current[id] = null
+  }, [pushHistory])
+
+  /** revert (✕) — restore from the pre-open snap. trim/filter only; the EDITOR's revert is externalized in
+   *  the composer's onCancel (useEditor) — revertSession('editor') is a no-op restore (KAI-9244 / DEC-v5-09). */
+  const revertSession = useCallback((id: SessionId) => {
+    const pre = preRef.current[id]
     if (pre) {
-      const o = useOutlineStore.getState()
-      if (editorSessionChanged({ committedShape: o.committedShape, bgBlur: o.bgBlur, imageFx: o.imageFx, artwork: o.artwork }, pre)) pushHistory(pre)
-      editorPreRef.current = null
+      if (id === 'trim') setBackColor(pre.trim.backColor)
+      else if (id === 'filter') {
+        const o = useOutlineStore.getState()
+        o.setImageFx(pre.imageFx); o.setBgBlur(pre.outline.bgBlur); o.setWrapTile(pre.wrapTile)
+      }
+      // 'editor': discard is the composer's onCancel (useEditor) — no store restore here.
+      preRef.current[id] = null
     }
-  }, [pushHistory])
-
-  // Trim (D-TRIM) session — tap recolors the 3D back LIVE; ✓ keeps (one step), ✕ reverts.
-  const openTrim = useCallback(() => { trimPreRef.current = snapNow(); setShowColors(true) }, [snapNow])
-  const closeTrim = useCallback(() => {
-    if (trimPreRef.current) {
-      const t = trimPreRef.current.trim, c = useSceneStore.getState().colors
-      if (t.backColor !== c.backColor) pushHistory(trimPreRef.current)
-      trimPreRef.current = null
-    }
-    setShowColors(false)
-  }, [pushHistory])
-  const cancelTrim = useCallback(() => {
-    if (trimPreRef.current) { setBackColor(trimPreRef.current.trim.backColor); trimPreRef.current = null }
-    setShowColors(false)
+    setActive(id, false)
   }, [setBackColor])
 
-  // Filters (KAI-9124) session — over the LIVE 3D; ✓ keeps (one global step), ✕ reverts.
-  const openFilters = useCallback(() => { filterPreRef.current = snapNow(); setShowFilters(true) }, [snapNow])
-  const closeFilters = useCallback(() => {
-    const pre = filterPreRef.current
-    if (pre) {
-      const o = useOutlineStore.getState()
-      if (filterSessionChanged({ imageFx: o.imageFx, bgBlur: o.bgBlur, wrapTile: o.wrapTile }, pre)) pushHistory(pre)
-      filterPreRef.current = null
-    }
-    setShowFilters(false)
-  }, [pushHistory])
-  // KAI-9244 (Phase 4): the REAL filter revert lives on the flow session now — restore imageFx/bgBlur/wrapTile
-  // from the pre-open snap (superseding the Phase-2 close-only); FiltersSurface dropped its private Layer-3 revert.
-  const cancelFilters = useCallback(() => {
-    const pre = filterPreRef.current
-    if (pre) {
-      const o = useOutlineStore.getState()
-      o.setImageFx(pre.imageFx)
-      o.setBgBlur(pre.outline.bgBlur)
-      o.setWrapTile(pre.wrapTile)
-      filterPreRef.current = null
-    }
-    setShowFilters(false)
-  }, [])
-
-  return {
-    editingOutline, editorMode, showColors, showFilters,
-    enterEditor, closeEditor, openTrim, closeTrim, cancelTrim, openFilters, closeFilters, cancelFilters,
-  }
+  return { sessions, editorMode, beginSession, commitSession, revertSession }
 }
