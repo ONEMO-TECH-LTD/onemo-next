@@ -11,8 +11,8 @@
 //             editor; Dan 2026-06-28).
 //   • cut-out DEFERRED, under the hood:
 //       – Magic       → prepareShaped (reshape, drops edits) — same as v53 MINUS its publishToViewer.
-//       – first-blur  → runCutout → cacheSeg → publishCutoutResult (MATTE ONLY; background blur; current
-//                       shape PRESERVED; ADR-BLEND-01). A bgBlur watcher fires it once (latch on the matte).
+//       – first-blur  → runCutout → cacheSeg → a stale-guarded matte write (MATTE ONLY; background blur;
+//                       current shape PRESERVED; ADR-BLEND-01). A bgBlur watcher fires it once (latch on the matte).
 //   • editor Done = commitSession('editor') = save + stay 2D — NO publish (Done never mounts 3D).
 //   • previewIn3D() = the SOLE 3D publish — publishToViewer(prepared) on a deliberate preview; exitPreview()
 //                     tears it down (modal; not kept warm). 3D is NOT history-driven → a NO-OP publisher is
@@ -28,7 +28,7 @@ import { useSceneStore } from '../admin/sceneStore'
 import { INITIAL_ARTWORK, useOutlineStore } from '../user/outlineStore'
 import { loadImage, prepareStandard, runCutout, prepareShaped, exportCutlineSvg } from '../core/primitives'
 import { useViewerAdapter } from '../core/viewer-adapter'
-import { useHistoryTransaction, useGenerationTask, useUploadPublish, useSessions, liteSpec } from '../core/transactions'
+import { useHistoryTransaction, useGenerationTask, useSessions, liteSpec } from '../core/transactions'
 import type { CreatorAdapters, CreatorFlowState, CreatorFlowActions } from './flow-contract'
 import type { DesignState } from '../types'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
@@ -66,7 +66,6 @@ export function useTwoDFirstFlow(adapters: CreatorAdapters): TwoDFirstFlow {
   const { colors, setBackColor } = useSceneStore()
 
   const sourceShaRef = useRef<string | null>(null)
-  const lastUploadSeqRef = useRef(0)        // the per-upload seq for the deferred first-blur publish (stable; undo-safe)
   const firstBlurRunningRef = useRef(false) // in-flight guard for the deferred matte cut-out
 
   // Layer-2b history transaction. 2D-first injects a NO-OP publisher (restoreSnap:202 → no-op): 3D is NOT
@@ -78,7 +77,6 @@ export function useTwoDFirstFlow(adapters: CreatorAdapters): TwoDFirstFlow {
   } = useHistoryTransaction({ notify, autoOutline, designState, setPrepared, setAutoOutline, setDesignState, publishToViewer: noopPublish })
 
   const { beginRun, isCurrent, cancel: cancelGeneration } = useGenerationTask()
-  const { nextUploadSeq, publishCutoutResult } = useUploadPublish(patchGenMatte)
   const { sessions, editorMode, beginSession, commitSession, revertSession } = useSessions({ snapNow, pushHistory, setBackColor })
 
   // Export — identical to v53 (the socket returns the SVG string; the UI writes the file).
@@ -104,7 +102,6 @@ export function useTwoDFirstFlow(adapters: CreatorAdapters): TwoDFirstFlow {
     setAutoOutline(false)
     const st = useOutlineStore.getState()
     st.commitGeometry(null); st.setBgBlur(null); st.setSubjMatteUrl(null)
-    lastUploadSeqRef.current = nextUploadSeq() // the seq the deferred first-blur publish guards against
     firstBlurRunningRef.current = false
     cancelGeneration()
     setGenerating(false)
@@ -129,7 +126,7 @@ export function useTwoDFirstFlow(adapters: CreatorAdapters): TwoDFirstFlow {
         console.warn('[effect] prepare (standard) failed:', e)
         notify('error', `Couldn't build the square: ${(e as Error)?.message ?? e}`)
       })
-  }, [artworkUrl, registerGeneration, setBaseline, setDesignState, notify, nextUploadSeq, cancelGeneration, beginSession, previewing3D, publishToViewer])
+  }, [artworkUrl, registerGeneration, setBaseline, setDesignState, notify, cancelGeneration, beginSession, previewing3D, publishToViewer])
 
   // first-blur matte watcher (ADR-BLEND-01) — Blend is a BACKGROUND blur: it needs the subject matte to hold
   // the front sharp. The descriptors are flow-blind (blend.ts only setBgBlur), so the FLOW produces the matte:
@@ -142,15 +139,25 @@ export function useTwoDFirstFlow(adapters: CreatorAdapters): TwoDFirstFlow {
     if (firstBlurRunningRef.current) return
     const snap = snapNow()
     if (snap.genId < 0) return // no generation yet (pixel impl-watch: gate on snapNow().genId, not a flow ref)
-    const seq = lastUploadSeqRef.current
     const genId = snap.genId
     const std = prepared
     firstBlurRunningRef.current = true
     ;(async () => {
       try {
-        const seg = await runCutout(artworkUrl)        // Layer-2a primitive — AI cut at the working-res cap
-        cacheSeg(artworkUrl, seg)                       // mirror v53: cache the seg BEFORE publishing (undo/rederive)
-        await publishCutoutResult(seq, std, genId, seg) // seq-guarded matte-only publish (writes subjMatteUrl)
+        const seg = await runCutout(artworkUrl) // Layer-2a primitive — AI cut at the working-res cap (seconds)
+        cacheSeg(artworkUrl, seg)               // mirror v53: cache the seg (undo/rederive); valid for this url regardless
+        // matte-only publish, GUARDED immediately before the mutation (pixel QA — stale-current). The long
+        // runCutout await — and the dynamic import below — may have been superseded by Magic/undo/reset/blur-off;
+        // build the matte, then re-read LIVE state with NO await before setSubjMatteUrl. A genId change also
+        // covers a new upload (registerGeneration bumps it). Mirrors publishCutoutResult (transactions.ts:299-312)
+        // but adds the current-gen/latch/blur guard the seq-only service guard lacks — net-new flow, no service edit.
+        const { subjectMatteFromSeg } = await import('@/lib/effect/prepare-effect')
+        const matteUrl = subjectMatteFromSeg(std.frontSrc.origCanvas, seg).toDataURL()
+        const cur = snapNow()
+        const st = useOutlineStore.getState()
+        if (cur.genId !== genId || st.subjMatteUrl || st.bgBlur == null || st.bgBlur <= 0) return // superseded — drop
+        st.setSubjMatteUrl(matteUrl)   // matte ONLY — shape/spec/source untouched (ADR-S58-CREATE-BLEND-01)
+        patchGenMatte(genId, matteUrl) // patch onto the (still-current) generation's LRU so undo restores it
       } catch (e) {
         // ADR-BLEND-01: no clear subject (degenerate matte throws the worker chain) → loud message, never a
         // silent broken whole-image blur; reset the control so there's no latent nonzero blur. (finger-trace
@@ -162,7 +169,7 @@ export function useTwoDFirstFlow(adapters: CreatorAdapters): TwoDFirstFlow {
         firstBlurRunningRef.current = false
       }
     })()
-  }, [bgBlur, subjMatteUrl, artworkUrl, prepared, segPresent, snapNow, cacheSeg, publishCutoutResult, notify])
+  }, [bgBlur, subjMatteUrl, artworkUrl, prepared, segPresent, snapNow, cacheSeg, patchGenMatte, notify])
 
   // Magic — re-prepare as a SHAPED subject cut-out (reshape + drops edits). Same as v53 MINUS publishToViewer
   // (Magic reshapes the 2D; it never mounts 3D in 2D-first).
