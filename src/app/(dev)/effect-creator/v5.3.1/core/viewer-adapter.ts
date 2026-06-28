@@ -10,7 +10,7 @@
 //
 // Why a hook (not a pure primitive): it holds flow-timing STATE (the published 3D slot). The FLOW decides
 // WHEN to publish — v53Flow publishes immediately on upload/magic (3D shows at once); twoDFirstFlow
-// publishes only on editor SAVE (no 3D until then). (F1 — reclassified out of the pure-primitive set.)
+// publishes ONLY on previewIn3D() (no 3D otherwise — ADR-S58-CREATE-3D-02). (F1 — reclassified out of the pure-primitive set.)
 
 import { useState, useCallback } from 'react'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
