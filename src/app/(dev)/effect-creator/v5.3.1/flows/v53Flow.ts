@@ -131,7 +131,7 @@ export function useV53Flow(adapters: CreatorAdapters): CreatorFlow {
     prepareStandard(url) // Layer-2a primitive: the instant square at the display cap (no 3D, no cut-out)
       .then((p) => {
         setPrepared(p)
-        publishToViewer(p) // v53Flow publishes 3D immediately; twoDFirstFlow would defer this to editor SAVE
+        publishToViewer(p) // v53Flow publishes 3D immediately; twoDFirstFlow defers 3D to previewIn3D() (ADR-S58-CREATE-3D-02)
         useOutlineStore.getState().setSpec(p.spec)
         const genId = registerGeneration(p, { url, mode: 'standard' }, null)
         setBaseline({ // installs the baseline + clears history (the history transaction owns the stack)
