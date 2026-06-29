@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Storybook build output (gitignored bundles, not source)
+    "storybook-static/**",
     // Non-runtime: backup copies, archives, not linted
     "asset-library/**",
     "?archive/**",

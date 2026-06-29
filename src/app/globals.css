@@ -4,14 +4,14 @@
    Without this, dark:bg-* uses prefers-color-scheme instead of data attribute. */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
-/* Token layers — order matters: primitives first, then aliases, then semantic */
-@import "./tokens/primitives.css";
-@import "./tokens/aliases.css";
-@import "./tokens/semantic.css";
-@import "./tokens/semantic-inline.css";
+/* DS v2.3 tokens (single source, auto-synced from SSOT tools/ds-pipeline).
+   tokens.tailwind.css = @theme → Tailwind v4 utilities + :root + [data-theme="dark"].
+   tokens.css adds the [data-fluid="container"] cqi container variant + full :root cascade. */
+@import "./tokens/tokens.tailwind.css";
+@import "./tokens/tokens.css";
 
 body {
-  background: var(--color-bg-primary);
-  color: var(--color-text-primary);
-  font-family: var(--font-primary);
+  background: var(--sem-col-bg-primary);
+  color: var(--sem-col-text-primary);
+  font-family: var(--al-type-family-primary);
 }
