@@ -1,4 +1,4 @@
-# SKYLRK + Suede Studio
+# s58 — SKYLRK + Suede Studio
 
 Standalone Vite prototypes for the ONEMO surface/material direction. No build step in the app — run independently.
 

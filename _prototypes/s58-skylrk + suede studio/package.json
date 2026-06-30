@@ -1,14 +1,13 @@
 {
-  "name": "skylrk-surface-sandbox",
+  "name": "s58-skylrk-suede-studio",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --host",
+    "dev": "vite --host --port 5188",
     "build": "vite build",
-    "preview": "vite preview --host"
+    "preview": "vite preview --host --port 5188"
   },
   "devDependencies": {
-    "playwright": "^1.61.1",
     "vite": "^6.0.0"
   },
   "dependencies": {
