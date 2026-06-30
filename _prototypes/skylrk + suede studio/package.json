@@ -1,0 +1,18 @@
+{
+  "name": "skylrk-surface-sandbox",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host"
+  },
+  "devDependencies": {
+    "playwright": "^1.61.1",
+    "vite": "^6.0.0"
+  },
+  "dependencies": {
+    "@paper-design/shaders": "^0.0.46",
+    "stats.js": "^0.17.0"
+  }
+}
