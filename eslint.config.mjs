@@ -17,6 +17,8 @@ const eslintConfig = defineConfig([
     // Non-runtime: backup copies, archives, not linted
     "asset-library/**",
     "?archive/**",
+    // Standalone prototype labs (dc.html/Babel runtimes, Vite apps) — not Next app source
+    "_prototypes/**",
     // ONEMO 3D Studio — has its own lint config
     "studio/**",
     "studio-v2/**",
