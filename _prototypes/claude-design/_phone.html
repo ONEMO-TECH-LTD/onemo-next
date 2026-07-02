@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style data-omelette-injected>html,body{background:transparent}</style><script data-omelette-injected>(()=>{var j=[];var x=false;var S=30000;var f=3000;document.addEventListener("DOMContentLoaded",()=>{const H=window.Babel;const G="om-src-id";if(H&&H.registerPlugin&&!(H.availablePlugins&&H.availablePlugins[G])){H.registerPlugin(G,({types:Y})=>({visitor:{JSXOpeningElement(U,Q){const J=U.node;if(J.name&&J.name.type==="JSXMemberExpression")return;for(let V=0;V<J.attributes.length;V++){const L=J.attributes[V];if(L.type==="JSXAttribute"&&L.name&&L.name.name==="data-om-id")return}const W=Q.file&&Q.file.opts&&Q.file.opts.filename||"?";const Z=J.loc&&J.loc.start;const z=`jsx:${W}:${J.start??0}:${Z?Z.line:0}:${Z?Z.column+1:0}`;J.attributes.push(Y.jsxAttribute(Y.jsxIdentifier("data-om-id"),Y.stringLiteral(z)))}}}))}const k="om-text-extract";let A=false;if(x&&H&&H.registerPlugin&&!(H.availablePlugins&&H.availablePlugins[k])){const Y=window.React;if(Y&&Y.useSyncExternalStore&&Y.createElement){A=true;const U={};const Q=new Set;let J=0;window.__omTextO=U;window.__omTextSet=(z)=>{for(const V in z){const L=z[V];if(L==null)delete U[V];else U[V]=L}J++;Q.forEach((V)=>V())};const W=(z)=>{Q.add(z);return()=>Q.delete(z)};const Z=()=>J;window.__OmT=function z(V){Y.useSyncExternalStore(W,Z,Z);return Y.createElement("span",{"data-om-text":V.i,className:"__om-t"},V.i in U?U[V.i]:V.children)};H.registerPlugin(k,({types:z})=>{const V={style:1,script:1,noscript:1,textarea:1,title:1,option:1,text:1,tspan:1,textPath:1};const L={placeholder:1,alt:1,title:1,label:1,"aria-label":1,"aria-description":1,"aria-placeholder":1};const _=($,C)=>z.logicalExpression("??",z.memberExpression(z.logicalExpression("||",z.memberExpression(z.identifier("window"),z.identifier("__omTextO")),z.objectExpression([])),z.stringLiteral($),true),C);const E=($)=>$.file&&$.file.opts&&$.file.opts.filename||"?";const B=($)=>$.file&&$.file.code||"";const b=($,C)=>{const X=(F)=>F&&F.start!=null&&F.end!=null&&(F.type==="StringLiteral"||F.type==="TemplateLiteral"&&F.expressions.length===0)?[F.start,F.end]:null;const N=X(C);if(N)return N;if(C&&C.type==="Identifier"){const F=$.scope.getBinding(C.name);if(F&&F.constant&&F.path.node.type==="VariableDeclarator"){return X(F.path.node.init)}}return null};const M=($,C,X)=>{const N=$.node;let F=false;const w=(K,q)=>{F=true;return z.jsxElement(z.jsxOpeningElement(z.jsxIdentifier("__OmT"),[z.jsxAttribute(z.jsxIdentifier("i"),z.stringLiteral(K))],false),z.jsxClosingElement(z.jsxIdentifier("__OmT")),[q],false)};const D=N.children.map((K)=>{if(K.type==="JSXText"){if(K.start==null||K.end==null)return K;const q=X.slice(K.start,K.end);const R=q.length-q.trimStart().length;const m=q.length-q.trimEnd().length;if(R+m>=q.length)return K;return w(`txt:${C}:${K.start+R}:${K.end-m}`,K)}if(K.type==="JSXExpressionContainer"){const q=b($,K.expression);if(q)return w(`str:${C}:${q[0]}:${q[1]}`,K)}return K});if(F)N.children=D};return{visitor:{JSXOpeningElement($,C){const X=$.node;const N=E(C);const F={};for(let w=0;w<X.attributes.length;w++){const D=X.attributes[w];if(D.type!=="JSXAttribute"||!D.name)continue;const K=D.name.name;if(!L[K])continue;if(!D.value||D.value.type!=="StringLiteral")continue;if(D.value.start==null||D.value.end==null)continue;const q=`txt:${N}:${D.value.start}:${D.value.end}`;F[K]=q;D.value=z.jsxExpressionContainer(_(q,z.stringLiteral(D.value.value)))}if(Object.keys(F).length){X.attributes.push(z.jsxAttribute(z.jsxIdentifier("data-om-text-attrs"),z.stringLiteral(JSON.stringify(F))))}},JSXElement($,C){const X=$.node.openingElement;const N=X&&X.name&&X.name.name;if(N==="__OmT")return;if(typeof N==="string"&&V[N])return;M($,E(C),B(C))},JSXFragment($,C){M($,E(C),B(C))}}}})}}const u=A?["transform-react-jsx-source",G,k]:["transform-react-jsx-source",G];document.querySelectorAll('script[type="text/babel"],script[type="text/jsx"]').forEach((Y,U)=>{const Q=Y.getAttribute("data-plugins")||"";const J=u.filter((W)=>Q.indexOf(W)<0);if(J.length){Y.setAttribute("data-plugins",Q?`${Q},${J.join(",")}`:J.join(","))}if(!Y.hasAttribute("data-filename")){Y.setAttribute("data-filename",Y.getAttribute("src")||`inline-${U}`)}})});var y=window.parent;if(y&&y!==window){const H=(Q,J)=>{try{y.postMessage({__omelette_log:true,type:Q,data:J},"*")}catch{}};["log","warn","error"].forEach((Q)=>{const J=console[Q];console[Q]=(...W)=>{const Z=W.map((z)=>{try{return typeof z==="object"?JSON.stringify(z):String(z)}catch{try{return String(z)}catch{return"[unstringifiable]"}}}).join(" ");H(Q,Z);J.apply(console,W)}});window.addEventListener("error",(Q)=>{const J=Q.target;if(J&&J!==window&&J.tagName){const W=J.src||J.href||"";H("resource_error",`${J.tagName} failed to load: ${W}`)}else{H("error",`${Q.message||"Unknown error"} at ${Q.filename||"?"}:${Q.lineno||0}:${Q.colno||0}`)}},true);window.addEventListener("unhandledrejection",(Q)=>{const J=Q.reason;const W=J instanceof Error?`${J.message} ${J.stack}`:String(J);H("error",`Unhandled rejection: ${W}`)});const G=()=>{try{y.postMessage({type:"omelette:height",height:document.documentElement.scrollHeight},"*")}catch{}};if(document.readyState==="complete")G();else window.addEventListener("load",G);if(window.ResizeObserver)new ResizeObserver(G).observe(document.documentElement);const k={};let A=0;window.claude={complete(Q){return new Promise((J,W)=>{if(!j.length){W(new Error("claude.complete: no parent origin"));return}const Z=`c${++A}`;const z=()=>setTimeout(()=>{delete k[Z];W(new Error(`claude.complete: no data for ${S/1000}s`))},S);const V=z();k[Z]={resolve:J,reject:W,text:"",t:V,arm:z};try{for(const L of j){y.postMessage({__om_api:true,id:Z,body:Q},L)}}catch(L){clearTimeout(V);delete k[Z];W(L)}})}};const u={};let Y=0;window.omelette={writeFile:(Q,J)=>new Promise((W,Z)=>{if(!j.length){W();return}const z=`f${++Y}`;const V=setTimeout(()=>{delete u[z];W()},f);u[z]={resolve:W,reject:Z,t:V};try{for(const L of j){y.postMessage({__om_file:true,id:z,op:"write",path:Q,content:J},L)}}catch{clearTimeout(V);delete u[z];W()}})};const U=(Q)=>{try{return JSON.stringify(Q)}catch{return JSON.stringify(String(Q))}};window.addEventListener("message",(Q)=>{if(j.indexOf(Q.origin)<0)return;if(Q.source!==y)return;const J=Q.data;if(!J)return;if(J.type==="omelette-preview-refresh"){if(typeof J.token!=="string"||!/^[0-9a-f.-]+(\.(rc|pr-[0-9]+))?(\.[0-9]+\.[0-9a-f]{16})?$/.test(J.token))return;const z=Math.max(1,Math.floor((J.expiresAt||0)-Date.now()/1000));document.cookie="__Host-omelette-preview="+J.token+"; Path=/; Secure; SameSite=None; Partitioned; Max-Age="+z;return}if(J.__om_file_r){const z=u[J.id];if(!z)return;clearTimeout(z.t);delete u[J.id];if(J.ok)z.resolve();else z.reject(new Error(J.error||"write failed"));return}if(J.__om_api_r){const z=k[J.id];if(!z)return;if(J.error!=null){clearTimeout(z.t);delete k[J.id];z.reject(new Error(J.error));return}if(J.chunk!=null){clearTimeout(z.t);z.t=z.arm();z.text+=J.chunk;return}if(J.done){clearTimeout(z.t);delete k[J.id];z.resolve(J.text!=null?J.text:z.text);return}return}if(!J.__om_eval)return;const W=J;const Z=(z)=>{Q.source.postMessage({...z,__om_eval_r:1,id:W.id},Q.origin)};try{const z=(0,eval)(W.code);if(z&&typeof z.then==="function"){z.then((V)=>Z({ok:1,v:U(V)}),(V)=>Z({ok:0,e:String(V)}))}else{Z({ok:1,v:U(z)})}}catch(z){Z({ok:0,e:String(z)})}})}})();
+</script>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script src="./support.js"></script>
+<!-- Spotify-parity: theme-color MATCHES the surface top colour, so the launch-state opaque status bar reads as the surface (seamless); on scroll iOS makes it truly transparent and the real surface shows through. Sampled top-strip = #eff1f3..#f4f5f6 -> #f1f3f5. -->
+<meta name="theme-color" content="#f1f3f5">
+<style id="_phonefix">
+/* Safari 26 (per spec): viewport-fit=cover + a REAL background on BOTH html AND body. A transparent body makes Safari draw a white/black fallback bar under the chrome — that was the "not filling / padded" bug. theme-color is IGNORED in Safari 26, so the surface itself must carry the look. Root background = canvas-fixed (fills under bars, doesn't scroll). */
+html{margin:0!important;min-height:100%!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch!important;touch-action:pan-x!important;overscroll-behavior:none!important;background-color:#edeff1!important;background-image:url(assets/grain1x.png),radial-gradient(140% 95% at 50% 0%,rgba(255,255,255,.55),rgba(255,255,255,0) 62%),linear-gradient(180deg,#e7eaed 0%,#edeff1 45%,#f3f4f6 100%)!important;background-size:207px 207px,100% 100lvh,100% 100lvh!important;background-repeat:repeat,no-repeat,no-repeat!important;background-position:0 0,top center,top center!important;background-blend-mode:overlay,normal,normal!important;image-rendering:pixelated!important;}
+body{margin:0!important;min-height:calc(100lvh + 140px)!important;touch-action:pan-x!important;overscroll-behavior:none!important;background-color:#edeff1!important;background-image:url(assets/grain1x.png)!important;background-size:207px 207px!important;background-repeat:repeat!important;background-blend-mode:overlay!important;image-rendering:pixelated!important;}
+/* Editor in NORMAL FLOW (NOT position:fixed). Safari 26 Liquid Glass: a fixed/sticky element near the bottom turns the toolbar into an opaque frosted panel; with no fixed element, content scrolls under and the bottom bar stays CLEAR. So the editor must not be fixed — it micro-scrolls instead. */
+#dc-root{height:100lvh!important;margin-top:140px!important;}
+#dc-root>.sc-host,.sc-host{height:100%!important;min-height:100%!important;}
+[data-theme]{height:100%!important;}
+/* SURFACE lives ONLY on the fixed html background (background-attachment:fixed → static, full-screen, never scrolls). The app's own surface + grain are zeroed so the noise can't be part of the scrollable content and tear at the bottom. */
+[data-anat="screen surface"]{background:transparent!important;}
+[data-anat="grain"]{display:none!important;}
+[data-anat="top-section"]{padding-top:env(safe-area-inset-top,0px)!important;}
+[data-anat="dock"]{margin-bottom:calc(env(safe-area-inset-bottom,0px) + 60px)!important;}
+[data-anat="dial"] svg{width:100%!important;height:100%!important;}
+[data-anat="bottom-section"]{height:auto!important;}
+[data-anat="tool-box"]{padding-left:calc(50% - var(--sem-dim-fluid-big-m)/2)!important;padding-right:calc(50% - var(--sem-dim-fluid-big-m)/2)!important;}
+[data-anat="content-col"]{max-width:clamp(560px,194px + 47.6cqi,880px)!important;margin-inline:auto!important;padding:0!important;}
+[data-anat="tab-bar"]{width:auto!important;gap:12px!important;padding-left:12px!important;padding-right:12px!important;}
+[data-anat="tab-bar"] button{width:auto!important;min-width:0!important;flex:none!important;padding-left:6px!important;padding-right:6px!important;}
+[data-anat="Effect"]{width:clamp(320px,242.5px + 19.27cqi,520px)!important;height:clamp(320px,242.5px + 19.27cqi,520px)!important;}
+@container (max-width:402px){[data-anat="Effect"]{width:clamp(258px,-275.4px + 148.1cqi,320px)!important;height:clamp(258px,-275.4px + 148.1cqi,320px)!important;}}
+</style>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://api.fontshare.com">
+<link href="https://api.fontshare.com/v2/css?f[]=chillax@400,500,600&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="tokens-v2/tokens.css">
+<link rel="stylesheet" href="tokens-v2/onemo-app-vars.css">
+<style>
+  *{box-sizing:border-box;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
+  html,body{margin:0;padding:0;}
+  button{font-family:inherit;}
+  .om-scroll::-webkit-scrollbar{display:none;}
+  i[class*="ph-"]{line-height:1;display:block;}
+  @keyframes titleIn{from{opacity:0;transform:translateY(5px);}to{opacity:1;transform:translateY(0);}}
+
+  /* Responsive: phone = full-bleed single column; tablet/desktop = stage full-bleed + centered capped column */
+  @container (min-width:768px){
+    [data-anat="content-col"]{ max-width:var(--sem-container-md); margin-inline:auto; }
+    [data-anat="status-bar"]{ display:none !important; }
+  }
+
+
+  /* ── ONEMO DS token application (NORMALISED) ──────────────────────────────
+     ✓ = real DS token (auto theme-flips). GAP = DS silent → documented on Storybook. */
+  :root{
+    --editor-stage-bg: radial-gradient(140% 95% at 50% 0%,rgba(255,255,255,.55),rgba(255,255,255,0) 62%),linear-gradient(180deg,#e7eaed 0%,#edeff1 45%,#f3f4f6 100%); /* GAP aluminium-stage */
+    --editor-grain-opacity: .5;                                          /* GAP noise */
+    --editor-fg-strong: var(--sem-col-text-primary);                /* ✓ brand-black */
+    --editor-fg: var(--sem-col-fg-secondary);               /* ✓ control-ink → semantic-fg-secondary (grey-11, neutral, auto-flips) */
+    --editor-fg-disabled: var(--sem-col-text-disabled);          /* ✓ →semantic-text-disabled (grey-8, auto-flips) */
+    --editor-accent: var(--sem-col-fg-brand-secondary);          /* ✓ →semantic-fg-brand-secondary (blue-green-9) · ruler notch */
+    --editor-accent-ring: var(--sem-col-border-brand);           /* ✓ →semantic-border-brand (blue-green-8) · dial arc, active tab text */
+    --editor-accent-value: var(--sem-col-border-brand-alt);      /* ✓ →semantic-border-brand-alt (blue-green-7) · dial number */
+    --editor-tool-ink: var(--sem-col-fg-primary);                /* ✓ →semantic-fg-primary (brand-black, auto-flips) */
+    --editor-tool-ink-muted: var(--sem-col-fg-secondary);        /* ✓ →semantic-fg-secondary (grey-11, auto-flips) */
+    --editor-dock-ink: var(--sem-col-fg-white);                  /* ✓ →semantic-fg-white (constant — dock stays dark both themes) */
+    --editor-dock-ink-muted: rgba(250,250,250,.55);               /* GAP dock-ink-muted */
+    --editor-tick: rgba(10,13,18,.3);                             /* GAP ruler-tick */
+    --editor-elevation-stage: 0 28px 54px -18px rgba(10,13,18,.5),inset 0 0 0 1px rgba(255,255,255,.06); /* GAP stage-elevation */
+    --editor-glass-bg: rgba(255,255,255,.62);                    /* GAP glass-surface */
+    --editor-glass-border: rgba(10,13,18,.07);                     /* GAP glass-hairline */
+    --editor-circle-bg: rgba(255,255,255,.6);                    /* GAP glass-control */
+    --editor-bezel-bg: #20252b;                                       /* GAP stage-bezel */
+    --editor-viewer-bg: radial-gradient(125% 120% at 50% 14%,#5d6c79 0%,#46535f 44%,#2f3a44 100%); /* GAP viewer-material */
+    --editor-tool-track: rgba(10,13,18,.12);                       /* GAP dial-track */
+    --editor-dock-bg: #071013;                                   /* GAP dock */
+    --editor-dock-border: linear-gradient(160deg,rgba(255,255,255,.55),rgba(120,130,140,.12) 42%,rgba(10,13,18,.65)); /* GAP metallic-border */
+    --editor-swatch-shadow: inset 0 1px 1px rgba(255,255,255,.3),inset 0 0 0 1px rgba(10,13,18,.12),0 1px 2px rgba(10,13,18,.14); /* GAP swatch-elevation */
+    --editor-track-bg: rgba(10,13,18,.05);                        /* GAP segmented-track */
+    --editor-elevation-1: 0 1px 2px rgba(10,13,18,.12);           /* GAP raised-control */
+  }
+  [data-theme="dark"]{
+    /* Only NON-semantic component tokens need dark overrides; fg / fg-disabled / tool-ink(-muted) / accents auto-flip via their semantic source. */
+    --editor-stage-bg: radial-gradient(140% 95% at 50% 0%,rgba(120,140,160,.16),rgba(255,255,255,0) 60%),linear-gradient(180deg,#23272c 0%,#1c2024 45%,#15181b 100%);
+    --editor-grain-opacity: .6;
+    --editor-glass-bg: rgba(255,255,255,.08); --editor-glass-border: rgba(255,255,255,.1);
+    --editor-circle-bg: rgba(255,255,255,.1); --editor-tool-track: rgba(255,255,255,.14);
+    --editor-dock-bg: rgba(255,255,255,.08);
+    --editor-tick: rgba(255,255,255,.3);
+    --editor-swatch-shadow: inset 0 1px 1px rgba(255,255,255,.18),inset 0 0 0 1px rgba(0,0,0,.45),0 2px 5px rgba(0,0,0,.5);
+    --editor-track-bg: rgba(255,255,255,.06);
+    --editor-elevation-1: 0 1px 2px rgba(0,0,0,.5);
+  }
+</style>
+</helmet>
+
+<div data-theme="{{ themeAttr }}" style="display:flex;align-items:stretch;justify-content:center;width:100%;height:100%;font-family:var(--font-body);{{ accentVars }}">
+<div data-anat="creator studio" data-fluid="container" style="position:relative;width:100%;height:100%;container-type:inline-size;overflow:hidden;">
+
+    <div data-anat="screen surface" style="position:absolute;inset:0;background:var(--editor-stage-bg);">
+      <div data-anat="grain" style="position:absolute;inset:0;pointer-events:none;mix-blend-mode:overlay;opacity:var(--editor-grain-opacity);background-image:url(assets/grain1x.png);background-size:207px 207px;image-rendering:pixelated;"></div>
+    </div>
+
+    <div data-anat="content-col" style="position:relative;height:100%;display:flex;flex-direction:column;box-sizing:border-box;padding:var(--sem-dim-fluid-standard-xl) var(--sem-dim-fluid-standard-m);">
+
+      <!-- top nav: undo/redo · title · done/more -->
+      <div data-anat="top-section" style="flex:none;position:relative;display:flex;align-items:center;justify-content:space-between;gap:var(--sem-dim-fluid-nano-xl);padding:var(--sem-dim-fluid-none);">
+        <span data-anat="title" style="position:absolute;left:0;right:0;top:0;bottom:0;display:flex;align-items:center;justify-content:center;pointer-events:none;">{{ titleEl }}</span>
+        <div data-anat="history" style="display:flex;align-items:center;gap:var(--sem-dim-fluid-nano-xl);">
+        <div data-anat="undo-redo" style="display:flex;align-items:center;gap:var(--sem-dim-fluid-standard-s);padding:var(--sem-dim-fluid-nano-xl) var(--sem-dim-fluid-standard-s);border-radius:var(--sem-radii-full);background:var(--editor-glass-bg);box-shadow:inset 0 0 0 1px var(--editor-glass-border);">
+          <button onClick="{{ noop }}" style="appearance:none;border:0;background:transparent;cursor:pointer;padding:0;color:var(--editor-fg);display:block;" data-anat="undo"><i class="ph ph-arrow-arc-left" style="font-size:var(--sem-dim-fluid-standard-l);"></i></button>
+          <button onClick="{{ noop }}" style="appearance:none;border:0;background:transparent;cursor:pointer;padding:0;color:var(--editor-fg-disabled);display:block;" data-anat="redo"><i class="ph ph-arrow-arc-right" style="font-size:var(--sem-dim-fluid-standard-l);"></i></button>
+        </div>
+        </div>
+        
+        <div style="display:flex;align-items:center;gap:var(--sem-dim-fluid-nano-xl);">
+          <dc-import name="RoundButton" icon="perspective" surface="glass" tone="neutral" anat="view-toggle" on-click="{{ noop }}" hint-size="40px,40px"></dc-import>
+          <dc-import name="RoundButton" icon="dots-three" surface="glass" tone="neutral" anat="menu" on-click="{{ noop }}" hint-size="40px,40px"></dc-import>
+        </div>
+      </div>
+
+      <!-- stage window -->
+      <div data-anat="canvas-section" style="flex:1;display:flex;align-items:center;justify-content:center;padding:var(--sem-dim-fluid-none);">
+        <div data-anat="Effect" style="position:relative;width:var(--sem-container-xxs);height:var(--sem-container-xxs);border-radius:38px;padding:var(--sem-dim-fluid-nano-xl);background:var(--editor-bezel-bg);box-shadow:var(--editor-elevation-stage);">
+          <div data-anat="frame" style="position:relative;width:100%;height:100%;border-radius:30px;overflow:hidden;background:var(--editor-viewer-bg);">
+            <img data-anat="image" src="assets/effect-default.png" alt="Effect" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;" />
+          </div>
+        </div>
+      </div>
+
+      <!-- bottom control cluster (fixed height so the stage above never shifts) -->
+      <div data-anat="bottom-section" style="flex:none;height:var(--prim-dim-256);display:flex;flex-direction:column;justify-content:flex-end;padding:var(--sem-dim-fluid-none);">
+        <div data-anat="toolbar" style="display:flex;align-items:center;justify-content:space-between;padding:var(--sem-dim-fluid-none) var(--sem-dim-fluid-none) var(--sem-dim-fluid-nano-2xl);"><dc-import name="RoundButton" icon="x" surface="solid" tone="neutral" anat="close" on-click="{{ noop }}" hint-size="40px,40px"></dc-import><sc-if value="{{ isAdjust }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:var(--sem-dim-fluid-nano-s);" data-anat="tune-switch">
+                <sc-for list="{{ tuneModes }}" as="m" hint-placeholder-count="3"><button data-anat="segment" onClick="{{ m.onClick }}" style="appearance:none;border:0;cursor:pointer;padding:var(--sem-dim-fluid-nano-xl) var(--sem-dim-fluid-nano-2xl);border-radius:var(--sem-radii-full);background:{{ m.pillBg }};box-shadow:{{ m.pillShadow }};font-family:var(--font-primary);font-size:var(--sem-type-fluid-label-s-size);line-height:1;font-weight:{{ m.weight }};letter-spacing:var(--sem-type-fluid-label-s-letter-spacing);color:{{ m.txt }};transition:background .2s ease,color .2s ease;">{{ m.label }}</button></sc-for></div></sc-if><dc-import name="RoundButton" icon="check" surface="solid" tone="brand" anat="confirm" on-click="{{ noop }}" hint-size="40px,40px"></dc-import></div>
+
+
+        <sc-if value="{{ isMaterial }}" hint-placeholder-val="{{ false }}">
+          <div data-anat="swatch-row" style="display:flex;justify-content:center;align-items:flex-start;gap:var(--sem-dim-fluid-standard-s);padding:var(--sem-dim-fluid-standard-l) var(--sem-dim-fluid-standard-s) 0;">
+            <sc-for list="{{ swatches }}" as="sw" hint-placeholder-count="5">
+              <button data-anat="swatch" onClick="{{ sw.onClick }}" style="appearance:none;border:0;background:transparent;cursor:pointer;padding:var(--sem-dim-fluid-nano-s);position:relative;width:var(--sem-dim-fluid-big-m);height:var(--sem-dim-fluid-big-m);flex:none;display:grid;place-items:center;">
+                <span style="width:var(--sem-dim-fluid-big-xs);height:var(--sem-dim-fluid-big-xs);border-radius:50%;background:{{ sw.color }};box-shadow:var(--editor-swatch-shadow);"></span>
+                <sc-if value="{{ sw.active }}" hint-placeholder-val="{{ false }}">
+                  <span style="position:absolute;width:var(--sem-dim-fluid-big-s);height:var(--sem-dim-fluid-big-s);border-radius:50%;border:var(--sem-border-s) solid var(--editor-fg);"></span>
+                </sc-if>
+              </button>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ showTools }}" hint-placeholder-val="{{ true }}">
+        <div data-anat="tool-box" class="om-scroll" onScroll="{{ onToolScroll }}" onPointerDown="{{ onToolDown }}" onPointerMove="{{ onToolMove }}" onPointerUp="{{ onToolUp }}" onPointerCancel="{{ onToolUp }}" style="display:flex;align-items:flex-start;gap:var(--sem-dim-fluid-standard-s);overflow-x:auto;overflow-y:hidden;margin-inline:calc(-1 * var(--sem-dim-fluid-standard-m));padding:var(--sem-dim-fluid-nano-xl) calc(50% - var(--prim-dim-24)) var(--sem-dim-fluid-nano-xl);-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 18%,#000 82%,transparent 100%);mask-image:linear-gradient(90deg,transparent 0,#000 18%,#000 82%,transparent 100%);scrollbar-width:none;">
+            <sc-for list="{{ toolItems }}" as="t" hint-placeholder-count="6">
+              <button data-anat="dial" data-key="{{ t.key }}" onClick="{{ t.onClick }}" style="appearance:none;border:0;background:transparent;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:var(--sem-dim-fluid-nano-xl);padding:var(--sem-dim-fluid-nano-s);width:var(--sem-dim-fluid-big-m);flex:none;">
+                <span style="position:relative;width:var(--sem-dim-fluid-big-m);height:var(--sem-dim-fluid-big-m);border-radius:50%;display:grid;place-items:center;background:{{ t.bg }};">
+                  <svg width="48" height="48" viewBox="0 0 48 48" style="position:absolute;inset:0;overflow:visible;">
+                    <circle cx="24" cy="24" r="21" fill="none" stroke="var(--editor-tool-track)" stroke-width="2"></circle>
+                    <circle cx="24" cy="24" r="21" fill="none" stroke="var(--editor-accent-ring)" stroke-width="{{ t.arcW }}" stroke-linecap="butt" stroke-dasharray="{{ t.arc }} 999" transform="rotate(-90 24 24)"></circle>
+                  </svg>
+                  <sc-if value="{{ t.notNum }}" hint-placeholder-val="{{ true }}">
+                    <i class="ph ph-{{ t.ph }}" style="font-size:var(--sem-dim-fluid-standard-l);color:{{ t.iconCol }};"></i>
+                  </sc-if>
+                  <sc-if value="{{ t.showNum }}" hint-placeholder-val="{{ false }}">
+                    <span style="font-family:var(--font-primary);font-size:var(--sem-type-fluid-label-m-size);line-height:1;font-weight:500;letter-spacing:var(--sem-type-fluid-label-m-letter-spacing);color:var(--editor-accent-value);">{{ t.num }}</span>
+                  </sc-if>
+                </span>
+              </button>
+            </sc-for>
+        </div>
+        </sc-if>
+
+        <div data-anat="ruler" style="overflow:hidden;height:{{ rulerH }};opacity:{{ rulerOpacity }};transition:height .45s cubic-bezier(.4,0,.2,1),opacity .35s ease;">
+          <div style="padding:var(--sem-dim-fluid-standard-s) var(--sem-dim-fluid-standard-s) 0;">
+          <div data-anat="ruler-track" style="position:relative;width:100%;height:var(--sem-dim-fluid-big-xs);overflow:hidden;pointer-events:{{ rulerPE }};">
+              <div data-anat="ruler-ticks" style="position:absolute;top:0;bottom:0;left:-50%;width:200%;display:flex;align-items:flex-end;justify-content:center;gap:var(--sem-dim-fluid-nano-xl);padding-bottom:var(--sem-dim-fluid-nano-m);-webkit-mask-image:linear-gradient(90deg,transparent,#000 16%,#000 84%,transparent);mask-image:linear-gradient(90deg,transparent,#000 16%,#000 84%,transparent);transform:translateX({{ tickShift }});transition:{{ rulerGlide }};pointer-events:none;">
+                <sc-for list="{{ ticks }}" as="tk" hint-placeholder-count="40">
+                  <span style="{{ tk.style }}"></span>
+                </sc-for>
+              </div>
+              <div data-anat="ruler-hit" onPointerDown="{{ onRulerDown }}" onPointerMove="{{ onRulerMove }}" onPointerUp="{{ onRulerUp }}" onPointerCancel="{{ onRulerUp }}" style="position:absolute;inset:0;z-index:3;cursor:ew-resize;touch-action:none;"></div>
+          </div>
+        </div>
+        </div>
+
+        <div data-anat="dock" style="display:flex;justify-content:center;padding:var(--sem-dim-fluid-standard-m) 0 0;">
+          <div data-anat="rim" style="border-radius:var(--sem-radii-full);padding:var(--sem-dim-fluid-nano-s);background:var(--editor-dock-border);">
+            <div data-anat="tab-bar" style="display:flex;align-items:center;gap:var(--sem-dim-fluid-nano-s);height:var(--sem-dim-fluid-big-l);padding:0 var(--sem-dim-fluid-nano-2xl);border-radius:var(--sem-radii-full);background:var(--editor-dock-bg);">
+              <button data-anat="tab" onClick="{{ dk.add.onClick }}" style="appearance:none;border:0;background:transparent;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--sem-dim-fluid-nano-l);padding:0 var(--sem-dim-fluid-nano-xl);min-width:var(--sem-dim-fluid-big-m);">
+                <img data-anat="icon" src="assets/glass/DuplicatePlus.svg" alt="" style="width:var(--sem-dim-fluid-standard-xl);height:var(--sem-dim-fluid-standard-xl);display:block;opacity:{{ dk.add.op }};filter:{{ dk.add.fil }};" />
+                <span style="font:500 var(--sem-type-fluid-label-xs-size)/1 var(--font-primary);letter-spacing:.01em;color:{{ dk.add.col }};">Add</span>
+              </button>
+              <button data-anat="tab-2" onClick="{{ dk.shape.onClick }}" style="appearance:none;border:0;background:transparent;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--sem-dim-fluid-nano-l);padding:0 var(--sem-dim-fluid-nano-xl);min-width:var(--sem-dim-fluid-big-m);">
+                <img src="assets/glass/Shapes.svg" alt="" style="width:var(--sem-dim-fluid-standard-xl);height:var(--sem-dim-fluid-standard-xl);display:block;opacity:{{ dk.shape.op }};filter:{{ dk.shape.fil }};" />
+                <span style="font:500 var(--sem-type-fluid-label-xs-size)/1 var(--font-primary);letter-spacing:.01em;color:{{ dk.shape.col }};">Shape</span>
+              </button>
+              <button data-anat="tab-3" onClick="{{ dk.material.onClick }}" style="appearance:none;border:0;background:transparent;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--sem-dim-fluid-nano-l);padding:0 var(--sem-dim-fluid-nano-xl);min-width:var(--sem-dim-fluid-big-m);">
+                <img src="assets/glass/Sparkle.svg" alt="" style="width:var(--sem-dim-fluid-standard-xl);height:var(--sem-dim-fluid-standard-xl);display:block;opacity:{{ dk.material.op }};filter:{{ dk.material.fil }};" />
+                <span style="font:500 var(--sem-type-fluid-label-xs-size)/1 var(--font-primary);letter-spacing:.01em;color:{{ dk.material.col }};">Effect</span>
+              </button>
+              <button data-anat="tab-4" onClick="{{ dk.adjust.onClick }}" style="appearance:none;border:0;background:transparent;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--sem-dim-fluid-nano-l);padding:0 var(--sem-dim-fluid-nano-xl);min-width:var(--sem-dim-fluid-big-m);">
+                <img src="assets/glass/Image.svg" alt="" style="width:var(--sem-dim-fluid-standard-xl);height:var(--sem-dim-fluid-standard-xl);display:block;opacity:{{ dk.adjust.op }};filter:{{ dk.adjust.fil }};" />
+                <span style="font:500 var(--sem-type-fluid-label-xs-size)/1 var(--font-primary);letter-spacing:.01em;color:{{ dk.adjust.col }};">Tune</span>
+              </button>
+              <button data-anat="tab-5" onClick="{{ dk.edit.onClick }}" style="appearance:none;border:0;background:transparent;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--sem-dim-fluid-nano-l);padding:0 var(--sem-dim-fluid-nano-xl);min-width:var(--sem-dim-fluid-big-m);">
+                <img src="assets/glass/Dial.svg" alt="" style="width:var(--sem-dim-fluid-standard-xl);height:var(--sem-dim-fluid-standard-xl);display:block;opacity:{{ dk.edit.op }};filter:{{ dk.edit.fil }};" />
+                <span style="font:500 var(--sem-type-fluid-label-xs-size)/1 var(--font-primary);letter-spacing:.01em;color:{{ dk.edit.col }};">Edit</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:446,&quot;height&quot;:900},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;},&quot;accent&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Blue-green&quot;,&quot;Lime moss&quot;,&quot;Raspberry plum&quot;,&quot;Indigo bloom&quot;,&quot;Persian blue&quot;],&quot;default&quot;:&quot;Blue-green&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;startMode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;add&quot;,&quot;shape&quot;,&quot;effect&quot;,&quot;tune&quot;,&quot;edit&quot;],&quot;default&quot;:&quot;edit&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  state = {
+    dock:'edit', tool:'radius', material:'#2b3a55', scrubbing:false,
+    tuneMode:'basic', scrollX:0,
+    vals:{ radius:53,offset:50,simplify:0,curve:0,detail:40,smooth:0,snap:0,angle:0,bright:50,contrast:50,color:50,warmth:50,vignette:0,blend:30,clamp:0,bw:0,noir:0,sepia:0,vivid:0,fade:0,cool:0,warm:0,duotone:0 }
+  };
+
+  TOOLSETS = {
+    add:   [ {key:'upload',label:'Upload',ph:'upload-simple'},{key:'photos',label:'Photos',ph:'image'},{key:'camera',label:'Camera',ph:'camera'},{key:'paste',label:'Paste',ph:'clipboard'},{key:'generate',label:'Generate',ph:'sparkle'} ],
+    shape: [ {key:'magic',label:'Magic Shape',ph:'magic-wand'},{key:'vector',label:'Upload',ph:'upload-simple'},{key:'square',label:'Square',ph:'square'},{key:'circle',label:'Circle',ph:'circle'},{key:'squircle',label:'Squircle',ph:'app-window'},{key:'polygon',label:'Polygon',ph:'polygon'},{key:'star',label:'Star',ph:'star'} ],
+    adjust:[ {key:'bright',label:'Bright',ph:'sun'},{key:'contrast',label:'Contrast',ph:'circle-half'},{key:'color',label:'Color',ph:'drop'},{key:'warmth',label:'Warmth',ph:'thermometer-simple'},{key:'blend',label:'Blend',ph:'intersect'} ],
+    edit:  [ {key:'radius',label:'Radius',ph:'bounding-box'},{key:'offset',label:'Offset',ph:'arrows-out-cardinal'},{key:'simplify',label:'Simplify',ph:'path'},{key:'curve',label:'Curve',ph:'bezier-curve'},{key:'detail',label:'Detail',ph:'dots-nine'},{key:'smooth',label:'Smooth',ph:'wave-sine'},{key:'snap',label:'Snap',ph:'magnet'},{key:'angle',label:'Straighten',ph:'angle'} ]
+  };
+  SWATCHES = ['#7a4a3a','#2b3a55','#c9b48d','#3f7d52','#1b2024'];
+  TUNE = {
+    basic: [ {key:'bright',label:'Bright',ph:'sun'},{key:'contrast',label:'Contrast',ph:'circle-half'},{key:'color',label:'Color',ph:'drop'},{key:'warmth',label:'Warmth',ph:'thermometer-simple'} ],
+    blend: [ {key:'vignette',label:'Vignette',ph:'circle'},{key:'blend',label:'Blend',ph:'intersect'},{key:'clamp',label:'Clamp',ph:'arrows-in-line-horizontal'} ],
+    filter:[ {key:'bw',label:'B&W',ph:'circle-half'},{key:'noir',label:'Noir',ph:'moon'},{key:'sepia',label:'Sepia',ph:'sun-dim'},{key:'vivid',label:'Vivid',ph:'sparkle'},{key:'fade',label:'Fade',ph:'cloud'},{key:'cool',label:'Cool',ph:'snowflake'},{key:'warm',label:'Warm',ph:'thermometer-simple'},{key:'duotone',label:'Duotone',ph:'circles-three'} ]
+  };
+  FILTERS = ['None','B&W','Noir','Sepia','Vivid','Fade','Cool','Warm','Duotone'];
+  TINTS = ['none','#E8732B','#E84A7F','#3B82E8','#1F9E6B','#7C8794'];
+  TUNEMODES = [ {k:'filter',label:'Filter'},{k:'basic',label:'Basic'},{k:'blend',label:'Blend'} ];
+  setTuneMode = (m) => { const first = (this.TUNE[m]&&this.TUNE[m][0])?this.TUNE[m][0].key:this.state.tool; this.setState({ tuneMode:m, tool:first }); };
+
+  ACCENTS = { 'Blue-green':['blue-green-9','blue-green-8','blue-green-7'], 'Lime moss':['lime-moss-9','lime-moss-8','lime-moss-7'], 'Raspberry plum':['raspberry-plum-9','raspberry-plum-8','raspberry-plum-7'], 'Indigo bloom':['indigo-bloom-9','indigo-bloom-8','indigo-bloom-7'], 'Persian blue':['persian-blue-9','persian-blue-8','persian-blue-7'] };
+
+  accentVars(){ const a=this.ACCENTS[this.props.accent]||this.ACCENTS['Blue-green']; return `--editor-accent:var(--prim-col-${a[0]});--editor-accent-ring:var(--prim-col-${a[1]});--editor-accent-value:var(--prim-col-${a[2]});`; }
+  componentDidMount(){ const m={add:'add',shape:'shape',effect:'material',tune:'adjust',edit:'edit'}; const k=m[this.props.startMode]; if(k && k!==this.state.dock) this.setDock(k); this.centerTools(); }
+  centerTools(){ const tb=document.querySelector('[data-anat="tool-box"]'); if(tb&&tb.scrollWidth>tb.clientWidth) tb.scrollLeft=(tb.scrollWidth-tb.clientWidth)/2; }
+  setDock = (key) => { const first=this.TOOLSETS[key]?this.TOOLSETS[key][0].key:null; this.setState({dock:key,tool:first||this.state.tool}, ()=>this.centerTools()); };
+  setMaterial = (c) => this.setState({material:c});
+  onRulerDown = (e) => { this._drag={x:e.clientX}; this.setState({scrubbing:true}); try{e.currentTarget.setPointerCapture(e.pointerId);}catch(_){} };
+  onRulerMove = (e) => { if(!this._drag)return; const dx=e.clientX-this._drag.x; this._drag.x=e.clientX; this.setState(s=>{ const cur=s.vals[s.tool]??0; const nv=Math.max(0,Math.min(100,Math.round(cur-dx/3))); return { scrollX:s.scrollX+dx, vals:{...s.vals,[s.tool]:nv} }; }); };
+  onRulerUp = () => { this._drag=null; this.setState({scrubbing:false, scrollX:0}); };
+  selectTool = (key,e) => { cancelAnimationFrame(this._raf); const btn=e&&e.currentTarget; const el=btn&&btn.parentElement; this.setState({tool:key}); if(el&&el.scrollWidth>el.clientWidth){ this._busy=true; const to=Math.max(0,Math.min(el.scrollWidth-el.clientWidth, btn.offsetLeft-(el.clientWidth-btn.offsetWidth)/2)); this._snapTween(el,to); } };
+  _setActive = (el) => { if(this.state.dock==='material')return; const center=el.scrollLeft+el.clientWidth/2; const btns=[...el.querySelectorAll('button')]; let best=0,bd=1e9; btns.forEach((b,i)=>{const cc=b.offsetLeft+b.offsetWidth/2;const d=Math.abs(cc-center);if(d<bd){bd=d;best=i;}}); const ts=this.TOOLSETS[this.state.dock]; if(ts&&ts[best]&&ts[best].key!==this.state.tool)this.setState({tool:ts[best].key}); };
+  onToolScroll = (e) => { if(this._busy)return; this._setActive(e.currentTarget); };
+  onToolDown = (e) => { cancelAnimationFrame(this._raf); this._busy=true; const el=e.currentTarget; const now=performance.now(); this._tp={x:e.clientX,sl:el.scrollLeft,el,hist:[[now,el.scrollLeft]]}; try{el.setPointerCapture(e.pointerId);}catch(_){} };
+  onToolMove = (e) => { if(!this._tp)return; if(Math.abs(e.clientX-this._tp.x)>4)this._tp.moved=true; const now=performance.now(); const newSL=this._tp.sl-(e.clientX-this._tp.x); this._tp.el.scrollLeft=newSL; const h=this._tp.hist; h.push([now,newSL]); while(h.length>2 && now-h[0][0]>90)h.shift(); };
+  onToolUp = (e) => { if(!this._tp)return; const moved=this._tp.moved; const el=this._tp.el; const h=this._tp.hist; this._tp=null; if(!moved){ const x=e.clientX; let hit=null; el.querySelectorAll('[data-anat="dial"]').forEach(b=>{const r=b.getBoundingClientRect(); if(x>=r.left&&x<=r.right)hit=b;}); if(hit){ const key=hit.getAttribute('data-key'); cancelAnimationFrame(this._raf); this._busy=true; if(key)this.setState({tool:key}); const to=Math.max(0,Math.min(el.scrollWidth-el.clientWidth, hit.offsetLeft-(el.clientWidth-hit.offsetWidth)/2)); this._snapTween(el,to); } else { this._busy=false; } return; } const a=h[0],b=h[h.length-1],dtv=b[0]-a[0]; let v=dtv>0?((b[1]-a[1])/dtv)*16:0; const max=el.scrollWidth-el.clientWidth; const loop=()=>{ if(this._tp)return; el.scrollLeft+=v; v*=0.96; if(Math.abs(v)>0.4 && el.scrollLeft>0 && el.scrollLeft<max) this._raf=requestAnimationFrame(loop); else this._snapTween(el,this._nearestCenter(el)); }; if(Math.abs(v)>0.4) this._raf=requestAnimationFrame(loop); else this._snapTween(el,this._nearestCenter(el)); };
+  _nearestCenter = (el) => { const c=el.scrollLeft+el.clientWidth/2; let best=null,bd=1e9; el.querySelectorAll('button').forEach(b=>{const bc=b.offsetLeft+b.offsetWidth/2,d=Math.abs(bc-c); if(d<bd){bd=d;best=b;}}); return best?Math.max(0,Math.min(el.scrollWidth-el.clientWidth,best.offsetLeft-(el.clientWidth-best.offsetWidth)/2)):el.scrollLeft; };
+  _snapTween = (el,to) => { const from=el.scrollLeft,d=to-from,t0=performance.now(),ease=x=>1-Math.pow(1-x,3); const step=(t)=>{ if(this._tp)return; const k=Math.min(1,(t-t0)/280); el.scrollLeft=from+d*ease(k); if(k<1)this._raf=requestAnimationFrame(step); else { this._busy=false; this._setActive(el); } }; this._raf=requestAnimationFrame(step); };
+  noop = () => {};
+
+  renderVals(){
+    const {dock,tool,vals,material}=this.state;
+    const isAdjust=dock==='adjust';
+    const tuneMode=this.state.tuneMode;
+    const list = isAdjust ? (this.TUNE[tuneMode]||[]) : (this.TOOLSETS[dock]||[]);
+    const sliderTool = dock==='edit' || isAdjust;
+    const pct=sliderTool?(vals[tool]??0):0;
+    const curTool=list.find(t=>t.key===tool);
+    const activeLabel=(dock==='material')?'Effect':(isAdjust&&tuneMode==='filter'?'Filter':(curTool?curTool.label:''));
+    const mk=(key)=>({ col:key===dock?'var(--editor-dock-ink)':'var(--editor-dock-ink-muted)', op:key===dock?'1':'.8', fil:key===dock?'brightness(1.5) drop-shadow(0 0 6px rgba(180,205,230,.55))':'brightness(1.8)', onClick:()=>this.setDock(key) });
+    const dk={add:mk('add'),shape:mk('shape'),material:mk('material'),adjust:mk('adjust'),edit:mk('edit')};
+    const toolItems=list.map(t=>{ const showNum=(t.key===tool)&&sliderTool; return { ...t, active:t.key===tool, arc:(((vals[t.key]??0)/100)*131.9).toFixed(1), arcW:(vals[t.key]??0)>0?'2':'0', iconCol:t.key===tool?'var(--editor-tool-ink)':'var(--editor-tool-ink-muted)', bg:'transparent', showNum, notNum:!showNum, num:String(vals[t.key]??0), onClick:(e)=>this.selectTool(t.key,e) }; });
+    const swatches=this.SWATCHES.map(c=>({ color:c, active:c===material, onClick:()=>this.setMaterial(c) }));
+    const tuneModes = this.TUNEMODES.map(m=>{ const a=m.k===tuneMode; return { ...m, pillBg:a?'var(--editor-glass-bg)':'transparent', pillShadow:a?'var(--editor-elevation-1)':'none', txt:a?'var(--editor-accent-ring)':'var(--editor-fg-disabled)', weight:'500', onClick:()=>this.setTuneMode(m.k) }; });
+    return {
+      noop:this.noop,
+      themeAttr:this.props.theme||'light', accentVars:this.accentVars(),
+      titleEl: React.createElement('span',{key:activeLabel,style:{display:'inline-block',font:'500 var(--prim-dim-20)/1 var(--font-primary)',color:'var(--editor-fg)',letterSpacing:'var(--prim-track-pos-0-6)',animation:'titleIn .22s ease'}},activeLabel),
+      dk, isMaterial:dock==='material', showTools:dock!=='material', toolItems, swatches,
+      isAdjust, tuneModes,
+      rulerH:sliderTool?'56px':'0px', rulerOpacity:sliderTool?'1':'0', rulerPE:sliderTool?'auto':'none',
+      tuneSwitchH: isAdjust?'58px':'0px',
+      rulerGlide: this.state.scrubbing?'none':'transform .35s cubic-bezier(.33,1,.68,1)',
+      pct, tickShift:this.state.scrollX.toFixed(1)+'px', ticks:this.buildTicks(this.state.scrollX,this.state.scrubbing),
+      onToolScroll:this.onToolScroll, onToolDown:this.onToolDown, onToolMove:this.onToolMove, onToolUp:this.onToolUp, onRulerDown:this.onRulerDown, onRulerMove:this.onRulerMove, onRulerUp:this.onRulerUp
+    };
+  }
+
+  buildTicks(shift,scrubbing){
+    const N=121, mid=60, pitch=11;
+    const shSig=scrubbing?12:3.2, cSig=scrubbing?7:2.6; const out=[];
+    for(let i=0;i<N;i++){
+      const off=(i-mid)*pitch+shift; const a=Math.abs(off);
+      const gh=Math.exp(-(a*a)/(2*shSig*shSig));
+      const isC=a<pitch*0.5;
+      const h=(13+13*gh).toFixed(1);
+      const w=isC?'4':'2.5';
+      const bg=isC?'var(--editor-accent)':'var(--editor-tick)';
+      out.push({ style:`flex:none;border-radius:999px;width:${w}px;height:${h}px;background:${bg};` });
+    }
+    return out;
+  }
+}
+</script>
+<script>
+/* Safari 26 scroll-runway lock: the editor is offset down 70px and the page is 70px taller.
+   We scroll up by exactly 70px → the offset cancels visually (editor looks unmoved) but the
+   scroll position is non-zero → Safari composites real page pixels → BOTH bars go transparent.
+   Then we park/lock the scroll at 70 so the editor can't actually move. */
+(function(){
+  var OFFSET = 140;
+  function park(){ if (Math.abs(window.scrollY - OFFSET) > 0.5) window.scrollTo(0, OFFSET); }
+  function settle(){ park(); setTimeout(park, 50); setTimeout(park, 200); setTimeout(park, 600); }
+  if (document.readyState === 'complete') settle();
+  else window.addEventListener('load', settle);
+  document.addEventListener('DOMContentLoaded', settle);
+  // lock: snap back to the offset instantly on any scroll (backup to touch-action:pan-x)
+  var ticking=false;
+  window.addEventListener('scroll', function(){ if(!ticking){ ticking=true; requestAnimationFrame(function(){ park(); ticking=false; }); } }, {passive:true});
+  window.addEventListener('resize', settle);
+  window.addEventListener('orientationchange', settle);
+})();
+</script>
+</body>
+</html>

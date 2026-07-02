@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ONEMO glass — your design, gyro dials</title>
+<style>
+  @property --angle{ syntax:'<angle>'; initial-value:0deg; inherits:true; }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;font-family:-apple-system,system-ui,sans-serif;color:#111;
+    background:linear-gradient(90deg,#333 0 12.5%,#4d4d4d 0 25%,#6a6a6a 0 37.5%,#888 0 50%,#a6a6a6 0 62.5%,#c4c4c4 0 75%,#e0e0e0 0 87.5%,#f5f5f5 0 100%) fixed;overflow-x:hidden}
+  .cap{position:fixed;top:14px;left:16px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#000;opacity:.5;font-weight:600}
+  .gyro{position:fixed;top:12px;right:14px;font-size:11px;color:#000;opacity:.55;font-variant-numeric:tabular-nums}
+  .stage{min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:40px;padding:64px 20px 150px}
+  .row{display:flex;gap:30px;align-items:center;justify-content:center;flex-wrap:wrap}
+
+  /* container: icon FIXED + fixed ground contact shadow (gravity, does NOT turn) */
+  .glass{position:relative;display:grid;place-items:center;--angle:38deg;
+    filter:drop-shadow(0 3px 5px rgba(0,0,0,.16));}
+  .glass.g96{width:96px;height:96px}
+  .glass.g64{width:64px;height:64px}
+  .glass.g44{width:44px;height:44px}
+
+  /* BASE that turns with the gyro — carries all the reflections/edge shadows */
+  .base{position:absolute;inset:0;border-radius:50%;transform:rotate(var(--angle));
+    background:rgba(255,255,255,.05);
+    box-shadow:
+      /* diagonal WHITE highlights — TL + BR, crisp + thin (your look) */
+      inset -1.4px -1.4px .8px rgba(255,255,255,.95),
+      inset  1.1px  1.1px .4px rgba(255,255,255,.9),
+      -1.4px -1.4px 1.4px rgba(255,255,255,.45),
+       1.4px  1.4px 1.4px rgba(255,255,255,.45),
+      /* DARK contact/edge layer — directional, the "tiny border" that a uniform stroke can't give */
+      inset 1px 1.6px 2px rgba(0,0,0,.12),
+      inset -.6px -.8px 1px rgba(0,0,0,.05),
+      /* micro CHROMATIC aberration — almost invisible red/cyan rim split */
+      inset 2px 0 1px rgba(255,60,60,.06),
+      inset -2px 0 1px rgba(40,180,255,.06);}
+
+  /* REFRACTION — clear centre, blurred rim, DOUBLED at the outer edge */
+  .base::before,.base::after{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none}
+  .base::before{ -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);
+    -webkit-mask:radial-gradient(closest-side,transparent 56%,rgba(0,0,0,.5) 80%,#000 100%);
+            mask:radial-gradient(closest-side,transparent 56%,rgba(0,0,0,.5) 80%,#000 100%);}
+  .base::after{ -webkit-backdrop-filter:blur(7px);backdrop-filter:blur(7px);   /* the x2 outer-edge blur */
+    -webkit-mask:radial-gradient(closest-side,transparent 80%,#000 100%);
+            mask:radial-gradient(closest-side,transparent 80%,#000 100%);}
+
+  .glyph{position:relative;z-index:2;color:#111;pointer-events:none}
+  .g96 .glyph{font-size:30px;opacity:.82}
+  .g64 .glyph{font-size:22px;opacity:.82}
+  .g44 .glyph{font-size:16px;opacity:.82}
+
+  .idle .base{animation:turn 7s linear infinite}
+  @keyframes turn{from{--angle:0deg}to{--angle:360deg}}
+  .glass:active .base{filter:brightness(1.25)}
+  .glass:active{transform:scale(.96);transition:transform .12s cubic-bezier(.2,0,0,1)}
+
+  .panel{position:static;width:max-content;margin:14px auto 20px;
+    background:rgba(250,250,250,.85);backdrop-filter:blur(20px) saturate(150%);-webkit-backdrop-filter:blur(20px) saturate(150%);
+    border:1px solid rgba(0,0,0,.08);border-radius:20px;padding:12px 14px;
+    display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;font-size:13px;box-shadow:0 8px 30px rgba(0,0,0,.18)}
+  .panel button{font:inherit;padding:9px 16px;border-radius:12px;border:1px solid rgba(0,0,0,.12);background:#fff;color:#111;font-weight:600}
+  .panel button.on{background:#111;color:#fff;border-color:#111}
+</style>
+</head>
+<body>
+  <div class="cap">ONEMO glass · your design</div>
+  <div class="gyro" id="gyro">gyro: off</div>
+  <div class="stage">
+    <div class="row">
+      <div class="glass g96 idle"><div class="base"></div><div class="glyph">✦</div></div>
+      <div class="glass g96 idle"><div class="base"></div><div class="glyph">◐</div></div>
+    </div>
+    <div class="row">
+      <div class="glass g64 idle"><div class="base"></div><div class="glyph">＋</div></div>
+      <div class="glass g64 idle"><div class="base"></div><div class="glyph">⚙</div></div>
+      <div class="glass g44 idle"><div class="base"></div><div class="glyph">◇</div></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <button id="b_gyro">Enable tilt (gyro)</button>
+    <button id="b_idle" class="on">Idle spin</button>
+  </div>
+
+<script>
+const glasses=[...document.querySelectorAll('.glass')];
+const gyroEl=document.getElementById('gyro');
+const bGyro=document.getElementById('b_gyro'), bIdle=document.getElementById('b_idle');
+
+function idleOn(){glasses.forEach(g=>g.classList.add('idle'));bIdle.classList.add('on');bGyro.classList.remove('on');}
+function idleOff(){glasses.forEach(g=>g.classList.remove('idle'));bIdle.classList.remove('on');bGyro.classList.add('on');}
+bIdle.onclick=idleOn;
+
+function onOrient(e){
+  const g=e.gamma||0, b=e.beta||0;
+  const angle=Math.atan2(g, b)*180/Math.PI;   // tilt direction → dial angle
+  glasses.forEach(el=>el.style.setProperty('--angle',angle.toFixed(1)+'deg'));
+  gyroEl.textContent='gyro: '+angle.toFixed(0)+'°';
+}
+bGyro.onclick=async()=>{
+  try{
+    if(typeof DeviceOrientationEvent!=='undefined' && DeviceOrientationEvent.requestPermission){
+      const p=await DeviceOrientationEvent.requestPermission();
+      if(p!=='granted'){gyroEl.textContent='gyro: denied';return;}
+    }
+    window.addEventListener('deviceorientation',onOrient);
+    idleOff(); gyroEl.textContent='gyro: on — tilt me';
+  }catch(err){gyroEl.textContent='gyro: '+err.message;}
+};
+</script>
+</body>
+</html>

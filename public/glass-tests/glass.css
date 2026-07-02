@@ -1,0 +1,57 @@
+/* ============================================================================
+   ONEMO Glass — effect component
+   Markup:  <button class="glass round"><span class="base"></span><span class="glyph">✕</span></button>
+   - .glass  : container, holds the glyph FIXED + fixed ground contact shadow
+   - .base   : the turning surface — reflections / dark contact / refraction (rotates with --angle)
+   - .glyph  : icon, stays upright
+   Light source = one shared --angle (set on :root; driven by gyro or idle spin).
+   Variants: .round (circle) · .pill (rounded rect, no geometry rotation)
+   ============================================================================ */
+:root{ --angle:38deg; }
+@property --angle{ syntax:'<angle>'; initial-value:38deg; inherits:true; }
+
+.glass{position:relative;display:grid;place-items:center;isolation:isolate;
+  filter:drop-shadow(0 3px 5px rgba(0,0,0,.16));}          /* ground contact (gravity-fixed) */
+
+.glass .base{position:absolute;inset:0;border-radius:inherit;background:rgba(255,255,255,.05);
+  box-shadow:
+    /* diagonal WHITE highlights — TL + BR, crisp + thin */
+    inset -1.4px -1.4px .8px rgba(255,255,255,.95),
+    inset  1.1px  1.1px .4px rgba(255,255,255,.9),
+    -1.4px -1.4px 1.4px rgba(255,255,255,.45),
+     1.4px  1.4px 1.4px rgba(255,255,255,.45),
+    /* DARK contact/edge layer — directional "tiny border" */
+    inset 1px 1.6px 2px rgba(0,0,0,.12),
+    inset -.6px -.8px 1px rgba(0,0,0,.05),
+    /* micro CHROMATIC aberration — almost invisible */
+    inset 2px 0 1px rgba(255,60,60,.06),
+    inset -2px 0 1px rgba(40,180,255,.06);}
+
+/* REFRACTION — clear centre, blurred rim, DOUBLED at outer edge */
+.glass .base::before,.glass .base::after{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none}
+.glass .base::before{-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);
+  -webkit-mask:radial-gradient(closest-side,transparent 56%,rgba(0,0,0,.5) 80%,#000 100%);
+          mask:radial-gradient(closest-side,transparent 56%,rgba(0,0,0,.5) 80%,#000 100%);}
+.glass .base::after{-webkit-backdrop-filter:blur(7px);backdrop-filter:blur(7px);
+  -webkit-mask:radial-gradient(closest-side,transparent 80%,#000 100%);
+          mask:radial-gradient(closest-side,transparent 80%,#000 100%);}
+
+.glass .glyph{position:relative;z-index:2;color:#111;opacity:.82;pointer-events:none;
+  display:grid;place-items:center;width:100%;height:100%}
+
+/* round buttons: base geometry rotates with the light (dial) */
+.glass.round{border-radius:50%}
+.glass.round .base{transform:rotate(var(--angle))}
+
+/* pills / rects: keep geometry static (rotating would distort) — rims stay put */
+.glass.pill{border-radius:var(--r,28px)}
+.glass.pill .base::before{-webkit-mask:radial-gradient(ellipse closest-side,transparent 62%,#000 100%);mask:radial-gradient(ellipse closest-side,transparent 62%,#000 100%)}
+.glass.pill .base::after{-webkit-mask:radial-gradient(ellipse closest-side,transparent 84%,#000 100%);mask:radial-gradient(ellipse closest-side,transparent 84%,#000 100%)}
+
+/* pressed = brighten + squeeze (Apple) */
+.glass:active .base{filter:brightness(1.25)}
+.glass:active{transform:scale(.96);transition:transform .12s cubic-bezier(.2,0,0,1)}
+
+/* idle animation fallback (when gyro is off) */
+.idle .glass.round .base{animation:glass-turn 7s linear infinite}
+@keyframes glass-turn{from{--angle:0deg}to{--angle:360deg}}

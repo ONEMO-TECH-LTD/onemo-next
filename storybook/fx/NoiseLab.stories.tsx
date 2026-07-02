@@ -4,10 +4,10 @@ import type { Meta, StoryObj } from '@storybook/nextjs';
  * FX / Suede Noise Lab.
  *
  * The suede noise generator is a standalone Vite module app (@paper-design/shaders)
- * that lives at `storybook/fx/noise-gen/` and runs on its own dev server. This story
+ * that lives at `_prototypes/suede-engine/` and runs on its own dev server. This story
  * embeds the LIVE lab so it surfaces inside the FX section of the storybook.
  *
- * Run the lab:  cd storybook/fx/noise-gen && npm install && npm run dev   → :5188
+ * Run the lab:  cd _prototypes/suede-engine && npm install && npm run dev   → :5188
  */
 const SuedeNoiseLab = () => (
   <iframe
