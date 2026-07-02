@@ -118,7 +118,7 @@
       <div class="panel" id="panel-material">
         <div class="pisland frost" data-tab="material">
           <button data-p="noise" class="on">noise</button><button data-p="density">density</button><button data-p="scale">size</button>
-          <button data-p="nap">nap</button><button data-p="oct">detail</button>
+          <button data-p="nap">nap</button><button data-p="wash">wash</button><button data-p="oct">detail</button>
           <button data-p="seed">seed</button><button data-p="res">res</button><button data-p="finish">finish</button>
         </div>
         <div class="parm frost on" data-p="noise">
@@ -132,6 +132,7 @@
         <div class="parm frost" data-p="density"><input id="density" type="range" min="1" max="40" step="1" value="5"><output class="val" id="densityV">5</output></div>
         <div class="parm frost" data-p="scale"><input id="scale" type="range" min="0.2" max="4" step="0.05" value="1"><output class="val" id="scaleV">1.00</output></div>
         <div class="parm frost" data-p="nap"><input id="nap_s" type="range" min="0" max="100" value="52"><output class="val" id="napV">52%</output></div>
+        <div class="parm frost" data-p="wash"><input id="wash" type="range" min="0" max="40" step="1" value="14"><output class="val" id="washV">14</output></div>
         <div class="parm frost" data-p="oct"><input id="oct" type="range" min="1" max="8" value="2"><output class="val" id="octV">2</output></div>
         <div class="parm frost" data-p="seed"><input id="seed" type="range" min="0" max="40" value="7"><output class="val" id="seedV">7</output></div>
         <div class="parm frost" data-p="res"><input id="bakeRes" type="range" min="256" max="2048" step="64" value="1024"><output class="val" id="bakeResV">1024px</output></div>
@@ -217,9 +218,9 @@ const $=id=>document.getElementById(id);
 const SVG_TYPES=new Set(['fractal','turbulent']);   // procedural in SVG · the rest are baked (labelled)
 const NOISES=['hash','fractal','turbulent','simplex','voronoi'];
 // PER-TYPE keys — each noise type remembers its own tuning (for fair like-for-like comparison)
-const PER=['density','scale','nap','oct','seed','finish','az','el','relief','sheen'];
-const DEF={ density:5, scale:1, nap:0.52, oct:2, seed:7, finish:'lit', az:235, el:60, relief:1.4, sheen:0.14 };
-const state={ variant:'framed', noise:'fractal', ...DEF, bakeRes:1024,
+const PER=['density','scale','nap','oct','seed','finish','wash','az','el','relief','sheen'];
+const DEF={ density:5, scale:1, nap:0.52, oct:2, seed:7, finish:'lit', wash:14, az:235, el:60, relief:1.4, sheen:0.14 };
+const state={ variant:'framed', noise:'fractal', ...DEF, bakeRes:1536,
   frame:'#2a2f37', backColor:'#6c5544', tintColor:'#b87333', tintAmt:0, blend:'overlay',
   hue:0, tone:100, sat:100, frontImg:null, sweep:false, flipped:false, axis:'y', dur:0.7 };
 // per-type buckets seeded from defaults; populated/overridden by persistence
@@ -276,13 +277,25 @@ const bakeGL=(()=>{ const c=$('bake'); const gl=c.getContext('webgl'); if(!gl) r
        two-face 3D flip's backface-visibility works on Safari. GL types bake via WebGL; the procedural
        feTurbulence types bake via SVG→canvas (verified renders on WebKit, no taint). ---- */
 const napCache={};
-const napKey=()=>[state.noise,state.finish,state.density,state.scale,state.oct,state.relief,state.az,state.el,state.seed,state.bakeRes].join(':');
-function applyNap(url){ const n=$('nap'); if(!n)return; n.style.backgroundImage=`url("${url}")`; n.style.backgroundSize='cover'; n.style.imageRendering='pixelated'; n.style.opacity=state.nap; n.style.mixBlendMode=state.blend; }
+const napKey=()=>[state.noise,state.finish,state.density,state.scale,state.oct,state.relief,state.az,state.el,state.seed,state.wash,state.bakeRes].join(':');
+function applyNap(url){ const n=$('nap'); if(!n)return; n.style.backgroundImage=`url("${url}")`; n.style.backgroundSize='cover'; n.style.imageRendering='auto'; n.style.opacity=state.nap; n.style.mixBlendMode=state.blend; }
 function bakeSVG(k){ const R=state.bakeRes, type=state.noise==='turbulent'?'turbulence':'fractalNoise';
-  const bf=Math.min(1.6,Math.max(0.01,grainFreq()*0.06));
-  const inner = state.finish==='lit'
-    ? `<feTurbulence type="${type}" baseFrequency="${bf.toFixed(3)}" numOctaves="${state.oct}" seed="${state.seed}" stitchTiles="stitch" result="n"/><feDiffuseLighting in="n" surfaceScale="${state.relief}" diffuseConstant="1" lighting-color="#fff"><feDistantLight azimuth="${state.az}" elevation="${state.el}"/></feDiffuseLighting>`
-    : `<feTurbulence type="${type}" baseFrequency="${bf.toFixed(3)}" numOctaves="${state.oct}" seed="${state.seed}" stitchTiles="stitch"/><feComponentTransfer><feFuncR type="table" tableValues="0.35 0.85"/><feFuncG type="table" tableValues="0.35 0.85"/><feFuncB type="table" tableValues="0.35 0.85"/></feComponentTransfer>`;
+  // FREQUENCY: density drives a fine grain across the WHOLE range (no harsh 1.6 cap that killed density reaction); finer = sharper.
+  const bf=Math.max(0.06,Math.min(0.8,grainFreq()*0.028)).toFixed(3);
+  // WASH SCALE: BIG soft brush-strokes — much lower freq than the nap (refs show ~⅓-surface strokes). Independent of density.
+  const washBf=Math.max(0.0015,Math.min(0.006,0.004/Math.max(0.4,state.scale))).toFixed(4);
+  const occK=(state.wash/40*0.7);   // wash depth 0..0.7
+  // NAP = soft fine grayscale fibre grain: desaturate the turbulence → GENTLE contrast → slight blur so it's a soft
+  // velvety nap (not harsh digital speckle), visible at any light angle.
+  const napGrain=`<feTurbulence type="${type}" baseFrequency="${bf}" numOctaves="${state.oct}" seed="${state.seed}" stitchTiles="stitch" result="t"/><feColorMatrix in="t" type="matrix" values="0 0 0 1 0  0 0 0 1 0  0 0 0 1 0  0 0 0 0 1" result="g"/><feComponentTransfer in="g" result="gc"><feFuncR type="gamma" amplitude="1.18" exponent="1" offset="-0.09"/><feFuncG type="gamma" amplitude="1.18" exponent="1" offset="-0.09"/><feFuncB type="gamma" amplitude="1.18" exponent="1" offset="-0.09"/></feComponentTransfer><feGaussianBlur in="gc" stdDeviation="${(R*0.0009).toFixed(2)}" result="grain"/>`;
+  const surf = state.finish==='lit'
+    ? `${napGrain}<feDiffuseLighting in="t" surfaceScale="${(+state.relief).toFixed(2)}" diffuseConstant="1.1" lighting-color="#fff" result="lit"><feDistantLight azimuth="${state.az}" elevation="${state.el}"/></feDiffuseLighting><feBlend mode="multiply" in="grain" in2="lit" result="surf"/>`
+    : napGrain.replace('result="grain"','result="surf"');
+  // WASH: big soft blurred black/white blobs, blended as darker/lighter patches (morphed edges via blur).
+  const occ = state.wash>0
+    ? `<feTurbulence type="fractalNoise" baseFrequency="${washBf}" numOctaves="2" seed="${state.seed+11}" stitchTiles="stitch" result="cl"/><feColorMatrix in="cl" type="matrix" values="0 0 0 1 0  0 0 0 1 0  0 0 0 1 0  0 0 0 0 1" result="clg"/><feGaussianBlur in="clg" stdDeviation="${(R*0.004).toFixed(1)}" result="clb"/><feComponentTransfer in="clb" result="occ"><feFuncR type="linear" slope="${(occK*2).toFixed(3)}" intercept="${(1-occK).toFixed(3)}"/><feFuncG type="linear" slope="${(occK*2).toFixed(3)}" intercept="${(1-occK).toFixed(3)}"/><feFuncB type="linear" slope="${(occK*2).toFixed(3)}" intercept="${(1-occK).toFixed(3)}"/><feFuncA type="linear" slope="0" intercept="1"/></feComponentTransfer><feBlend mode="multiply" in="surf" in2="occ"/>`
+    : '';
+  const inner = `${surf}${occ}`;
   const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${R}" height="${R}"><filter id="f" x="0" y="0" width="100%" height="100%">${inner}</filter><rect width="${R}" height="${R}" filter="url(#f)"/></svg>`;
   const img=new Image(); img.onload=()=>{ try{ const c=document.createElement('canvas'); c.width=c.height=R; c.getContext('2d').drawImage(img,0,0);
     const url=c.toDataURL('image/png'); napCache[k]=url; if(napKey()===k) applyNap(url); }catch(_){ } };
@@ -312,7 +325,7 @@ function render(){
 }
 
 /* ---- persistence: per-type buckets + global settings + uploaded image, across reloads ---- */
-const LS='suede-studio-v2';
+const LS='suede-studio-v3';   // bumped: discard stale saved state (e.g. density 40 / wash 0) so the washed high-res defaults take effect
 const GLOB=['variant','noise','bakeRes','frame','backColor','tintColor','tintAmt','blend','hue','tone','sat','frontImg','sweep','flipped','axis','dur'];
 function persist(){ buckets[state.noise]=snap();
   try{ localStorage.setItem(LS, JSON.stringify({ g:Object.fromEntries(GLOB.map(k=>[k,state[k]])), buckets })); }catch(_){ } }
@@ -327,6 +340,7 @@ function hydrate(){
   setR('density',state.density,'densityV',v=>v);
   setR('scale',state.scale,'scaleV',v=>(+v).toFixed(2));
   setR('nap_s',Math.round(state.nap*100),'napV',v=>v+'%');
+  setR('wash',state.wash,'washV',v=>v);
   setR('oct',state.oct,'octV',v=>v);
   setR('seed',state.seed,'seedV',v=>v);
   setR('bakeRes',state.bakeRes,'bakeResV',v=>v+'px');
@@ -360,6 +374,7 @@ const rng=(id,vid,fmt,set)=>{ const e=$(id); if(!e)return; e.oninput=ev=>{ set(+
 rng('density','densityV',v=>v,v=>state.density=v);
 rng('scale','scaleV',v=>v.toFixed(2),v=>state.scale=v);
 rng('nap_s','napV',v=>v+'%',v=>state.nap=v/100);
+rng('wash','washV',v=>v,v=>state.wash=v);
 rng('oct','octV',v=>v,v=>state.oct=v);
 rng('seed','seedV',v=>v,v=>state.seed=v);
 rng('bakeRes','bakeResV',v=>v+'px',v=>state.bakeRes=v);

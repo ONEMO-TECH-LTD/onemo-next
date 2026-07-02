@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"/>
+<title>Suede Engine — live procedural (no bake)</title>
+<style>
+  :root{ --mono:ui-monospace,"SF Mono",Menlo,monospace; --ink:#16191d; --mut:#8a929b; --line:rgba(0,0,0,.12); }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ height:100vh; overflow:hidden; background:#e9ebee; color:var(--ink); font-family:var(--mono);
+        display:flex; flex-direction:row; }
+  .side{ width:300px; flex:none; height:100vh; overflow-y:auto; background:#fbfbfc; display:flex; flex-direction:column; }
+  .side[style*="order:1"]{ border-right:1px solid #dfe2e7; }
+  .side[style*="order:3"]{ border-left:1px solid #dfe2e7; }
+  .center{ flex:1; height:100vh; min-width:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; }
+  @media (max-width:980px){ body{ height:auto; min-height:100vh; overflow:auto; flex-direction:column; }
+    .side{ width:100%; height:auto; overflow:visible; } .center{ order:-1; height:68vh; min-height:360px; } }
+
+  /* ----- ORIGINAL Effect Frame model (vault-exact rim / well / edge) ----- */
+  .rim{ position:relative; --z:1; width:calc(300px*var(--z)); height:calc(300px*var(--z)); border-radius:calc(52px*var(--z)); padding:calc(8px*var(--z)); --pr:calc(44px*var(--z));
+    box-shadow:0 26px 50px -18px rgba(10,13,18,.55),0 0 0 1px rgba(255,255,255,.22),
+      inset 0 2px 1px -1px rgba(255,255,255,.32),inset 2px 0 1px -1px rgba(255,255,255,.2),
+      inset -2px 0 1px -1px rgba(255,255,255,.18),inset 0 -2px 1px -1px rgba(255,255,255,.24),
+      inset 5px -5px 3px -3px rgba(255,255,255,.28),inset -4px 4px 3px -3px rgba(255,255,255,.1),
+      inset 4px 4px 3px -3px rgba(255,255,255,.1),inset 0 -3px 4px -3px rgba(0,0,0,.28); }
+  .well{ position:relative; z-index:1; width:100%; height:100%; border-radius:var(--pr); overflow:hidden;
+    box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.14),inset 0 2px 4px rgba(0,0,0,.55),inset 0 -2px 4px rgba(0,0,0,.45); }
+  .edge{ position:absolute; inset:0; border-radius:var(--pr); pointer-events:none;
+    box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.14),inset 0 2px 4px rgba(0,0,0,.55),inset 0 -2px 4px rgba(0,0,0,.45); }
+  .layer{ position:absolute; inset:0; }
+  /* the live procedural suede layers — filters generate at SCREEN resolution (no raster bake) */
+  #photo{ background-size:cover; background-position:center; }
+  #nap{ filter:url(#napFilter); mix-blend-mode:soft-light; }
+  /* wash sits in its own oversized layer so it can rotate/scale without revealing corners (well clips it) */
+  #washWrap{ position:absolute; left:50%; top:50%; width:200%; height:200%; transform-origin:center;
+    transform:translate(-50%,-50%); mix-blend-mode:multiply; }
+  #wash{ position:absolute; inset:0; filter:url(#washFilter); }
+
+  /* ----- controls ----- */
+  .panel{ width:100%; background:transparent; border-radius:0; padding:14px 16px; border-bottom:1px solid #ebedf0;
+    display:flex; flex-direction:column; gap:10px; }
+  .panel .grid{ grid-template-columns:1fr; gap:10px; }
+  .sect{ font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--mut); border-bottom:1px solid var(--line); padding-bottom:6px; }
+  .grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px 18px; }
+  .ctrl{ display:flex; flex-direction:column; gap:6px; }
+  .ctrl label{ font-size:11px; color:var(--mut); display:flex; justify-content:space-between; }
+  .ctrl input[type=range]{ width:100%; accent-color:#1170A1; }
+  .numin{ width:70px; text-align:right; font-family:var(--mono); font-size:11px; color:var(--ink); background:transparent; border:1px solid transparent; border-radius:4px; padding:1px 4px; -moz-appearance:textfield; }
+  .numin:hover,.numin:focus{ border-color:var(--line); background:#fff; outline:none; }
+  .seg{ display:flex; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  .seg button{ flex:1; appearance:none; border:0; background:#fff; padding:8px 6px; font-family:var(--mono); font-size:11px; text-transform:uppercase; cursor:pointer; }
+  .seg button.on{ background:var(--ink); color:#fff; }
+  .row{ display:flex; gap:8px; align-items:center; }
+  select{ font-family:var(--mono); font-size:12px; padding:7px 8px; border:1px solid var(--line); border-radius:8px; background:#fff; }
+  input[type=color]{ width:42px; height:32px; border:1px solid var(--line); border-radius:8px; background:none; padding:0; cursor:pointer; }
+  .btn{ font-family:var(--mono); font-size:11px; text-transform:uppercase; padding:8px 12px; border:1px solid var(--line); border-radius:8px; background:#fff; cursor:pointer; }
+  .up{ display:inline-flex; align-items:center; gap:6px; background:var(--ink); color:#fff; border-radius:999px; padding:8px 14px; font-size:11px; text-transform:uppercase; cursor:pointer; }
+</style>
+</head>
+<body>
+  <div class="center" style="order:2;">
+  <div class="rim" id="rim">
+    <div class="well" id="well">
+      <div class="layer" id="photo"></div>
+      <div class="layer" id="nap"></div>
+      <div id="washWrap"><div id="wash"></div></div>
+      <div class="layer" id="sheen"></div>
+      <div class="edge"></div>
+    </div>
+  </div>
+  </div><!-- /center -->
+
+  <div class="side" style="order:1;">
+  <!-- MATERIAL / NAP -->
+  <div class="panel">
+    <div class="sect">Nap</div>
+    <div class="seg" id="noiseTypeSeg" style="margin-bottom:2px;"><button data-v="perlin" class="on">perlin (svg)</button><button data-v="simplex">simplex</button><button data-v="anisotropic">aniso</button></div>
+    <div class="grid">
+      <div class="ctrl"><label>size (grain) <output id="napSizeV">20</output></label><input id="napSize" type="range" min="1" max="100" step="0.5" value="20"></div>
+      <div class="ctrl"><label>detail (octaves) <output id="octV">2</output></label><input id="oct" type="range" min="1" max="12" step="1" value="2"></div>
+      <div class="ctrl"><label>roughness (octave gain · simplex/aniso) <output id="napGainV">0.5</output></label><input id="napGain" type="range" min="0.1" max="0.95" step="0.01" value="0.5"></div>
+      <div class="ctrl"><label>smoothing (soften grid) <output id="napSmoothV">0.0</output></label><input id="napSmooth" type="range" min="0" max="4" step="0.05" value="0"></div>
+      <div class="ctrl"><label>contrast <output id="napCV">0.12</output></label><input id="napC" type="range" min="0" max="4" step="0.01" value="0.12"></div>
+      <div class="ctrl"><label>strength <output id="napSV">70%</output></label><input id="napS" type="range" min="0" max="100" step="1" value="70"></div>
+      <div class="ctrl"><label>blend</label>
+        <select id="napBlend"><option>soft-light</option><option>overlay</option><option>multiply</option><option>screen</option><option>hard-light</option><option>luminosity</option><option>normal</option></select></div>
+      <div class="ctrl"><label>seed <output id="napSeedV">7</output></label><input id="napSeed" type="range" min="0" max="9999" step="1" value="7"></div>
+      <div class="ctrl" id="row-aniso" style="display:none"><label>aniso stretch <output id="anisoV">6</output></label><input id="aniso" type="range" min="1" max="40" step="0.5" value="6"></div>
+      <div class="ctrl" id="row-anisoRot" style="display:none"><label>aniso angle <output id="anisoRotV">0°</output></label><input id="anisoRot" type="range" min="0" max="180" step="1" value="0"></div>
+    </div>
+  </div>
+  </div><!-- /leftSide -->
+
+  <div class="side" style="order:3;">
+  <!-- VIEW -->
+  <div class="panel">
+    <div class="sect">View</div>
+    <div class="grid">
+      <div class="ctrl"><label>face</label>
+        <div class="seg" id="faceSeg"><button data-v="front" class="on">front · image</button><button data-v="back">back · colour</button></div></div>
+      <div class="ctrl"><label>zoom <output id="zoomV">1.0×</output></label><input id="zoom" type="range" min="0.5" max="6" step="0.1" value="1"></div>
+      <div class="ctrl"><label>preset (settings file)</label>
+        <div class="row"><button class="btn" id="presetSave">⬇ save .json</button><label class="btn" style="cursor:pointer">⬆ load<input id="presetLoad" type="file" accept="application/json,.json" hidden></label></div></div>
+    </div>
+  </div>
+
+  <!-- WASH -->
+  <div class="panel">
+    <div class="sect" style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+      <span>Wash <span id="washFaceLabel" style="color:var(--mut);font-weight:normal"></span></span>
+      <div class="seg" id="washToggle" style="width:130px;flex:none;"><button data-v="on" class="on">on</button><button data-v="off">off</button></div>
+    </div>
+    <div class="grid">
+      <div class="ctrl"><label>scale (stroke size) <output id="washScaleV">1.3</output></label><input id="washScale" type="range" min="0.05" max="12" step="0.05" value="1.3"></div>
+      <div class="ctrl"><label>rotation <output id="washRotV">0°</output></label><input id="washRot" type="range" min="0" max="360" step="1" value="0"></div>
+      <div class="ctrl"><label>softness (blur) <output id="washBlurV">4.0</output></label><input id="washBlur" type="range" min="0" max="50" step="0.1" value="4"></div>
+      <div class="ctrl"><label>strength <output id="washSV">30%</output></label><input id="washS" type="range" min="0" max="100" step="1" value="30"></div>
+      <div class="ctrl"><label>blend</label>
+        <select id="washBlend"><option>multiply</option><option>soft-light</option><option>overlay</option><option>screen</option><option>normal</option></select></div>
+      <div class="ctrl"><label>randomiser (seed) <output id="washSeedV">13</output></label>
+        <div class="row"><input id="washSeed" type="range" min="0" max="9999" step="1" value="13" style="flex:1"><button class="btn" id="washRand">🎲</button></div></div>
+    </div>
+  </div>
+
+  <!-- SURFACE / FRAME -->
+  <div class="panel">
+    <div class="sect">Surface</div>
+    <div class="grid">
+      <div class="ctrl"><label>sheen <output id="sheenV">14%</output></label><input id="sheen" type="range" min="0" max="100" step="1" value="14"></div>
+      <div class="ctrl"><label>frame colour</label><input id="frame" type="color" value="#2a2f37"></div>
+      <div class="ctrl"><label>suede colour (back)</label><input id="backColor" type="color" value="#6c5544"></div>
+      <div class="ctrl"><label>front fill</label>
+        <div class="seg" id="frontModeSeg"><button data-v="image" class="on">image</button><button data-v="colour">colour</button></div></div>
+      <div class="ctrl"><label>front colour</label><input id="frontColor" type="color" value="#8a7a63"></div>
+      <div class="ctrl"><label>front image</label><label class="up">⬆ upload<input id="upload" type="file" accept="image/*" hidden></label></div>
+    </div>
+  </div>
+  </div><!-- /rightSide -->
+
+  <!-- ===== live procedural suede filters (generate at display resolution) ===== -->
+  <svg width="0" height="0" aria-hidden="true">
+    <filter id="napFilter" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence id="napTurb" type="fractalNoise" baseFrequency="0.22" numOctaves="2" seed="7" stitchTiles="stitch" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="0 0 0 1 0  0 0 0 1 0  0 0 0 1 0  0 0 0 0 1" result="g"/>
+      <feComponentTransfer in="g">
+        <feFuncR id="napFR" type="gamma" amplitude="1.3" exponent="1" offset="-0.15"/>
+        <feFuncG id="napFG" type="gamma" amplitude="1.3" exponent="1" offset="-0.15"/>
+        <feFuncB id="napFB" type="gamma" amplitude="1.3" exponent="1" offset="-0.15"/>
+      </feComponentTransfer>
+      <feGaussianBlur id="napSmoothF" stdDeviation="0"/>
+    </filter>
+    <filter id="washFilter" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence id="washTurb" type="fractalNoise" baseFrequency="0.012" numOctaves="3" seed="13" stitchTiles="stitch" result="w"/>
+      <feColorMatrix in="w" type="matrix" values="0 0 0 1 0  0 0 0 1 0  0 0 0 1 0  0 0 0 0 1" result="wg"/>
+      <feGaussianBlur id="washBlurF" in="wg" stdDeviation="2.5" result="wb"/>
+      <feComponentTransfer in="wb">
+        <feFuncR type="gamma" amplitude="1.8" exponent="1" offset="-0.4"/>
+        <feFuncG type="gamma" amplitude="1.8" exponent="1" offset="-0.4"/>
+        <feFuncB type="gamma" amplitude="1.8" exponent="1" offset="-0.4"/>
+      </feComponentTransfer>
+    </filter>
+  </svg>
+
+<script type="module">
+const $=id=>document.getElementById(id);
+const state={ face:'front', zoom:1, noiseType:'perlin', aniso:6, anisoRot:0, napSize:20, oct:2, napGain:0.5, napSmooth:0, napC:0.12, napS:0.7, napBlend:'soft-light', napSeed:7,
+  washFace:{ front:{scale:1.3,rot:0,blur:4,s:0.3,blend:'multiply',seed:13,on:true},
+             back: {scale:1.3,rot:0,blur:4,s:0.3,blend:'multiply',seed:13,on:true} },
+  sheen:0.14, frame:'#2a2f37', backColor:'#6c5544', frontMode:'image', frontColor:'#8a7a63', frontImg:null };
+const w=()=>state.washFace[state.face];   // current face's wash (front & back independent)
+
+// density → fine-grain baseFrequency (linear, NO cap → reacts across the whole range; finer = sharper)
+const napFreq=()=> (4.0/state.napSize/state.zoom).toFixed(4);   // size ↑ = bigger grain (lower freq)
+// wash scale → big-blob baseFrequency (low; bigger scale slider = bigger strokes = lower freq). /zoom → pattern magnifies losslessly with the object
+const washFreq=()=> (0.012/w().scale/state.zoom).toFixed(5);
+const sheenStyle=s=>`radial-gradient(120% 100% at 24% 20%, rgba(255,255,255,${s}), transparent 56%)`;
+const frameStyle=c=>`linear-gradient(155deg,rgba(255,255,255,.22),rgba(255,255,255,0) 40%,rgba(0,0,0,.55)), ${c}`;
+
+// ---- JS noise (true simplex + anisotropic) → generated to a canvas → fed as the nap image (regenerated at display res, stays crisp) ----
+function makeSimplex(seed){
+  const perm=new Uint8Array(512), pmod=new Uint8Array(512), p=new Uint8Array(256);
+  for(let i=0;i<256;i++)p[i]=i;
+  let n=(seed>>>0)||1;
+  for(let i=255;i>0;i--){ n=(n*1664525+1013904223)>>>0; const j=n%(i+1); const t=p[i];p[i]=p[j];p[j]=t; }
+  for(let i=0;i<512;i++){ perm[i]=p[i&255]; pmod[i]=perm[i]%12; }
+  const g=new Float32Array([1,1,-1,1,1,-1,-1,-1,1,0,-1,0,1,0,-1,0,0,1,0,-1,0,1,0,-1]);
+  const F2=0.366025403784439, G2=0.211324865405187;
+  return (xin,yin)=>{
+    const s=(xin+yin)*F2, i=Math.floor(xin+s), j=Math.floor(yin+s);
+    const t=(i+j)*G2, x0=xin-(i-t), y0=yin-(j-t);
+    let i1,j1; if(x0>y0){i1=1;j1=0;}else{i1=0;j1=1;}
+    const x1=x0-i1+G2,y1=y0-j1+G2,x2=x0-1+2*G2,y2=y0-1+2*G2, ii=i&255,jj=j&255;
+    const a=pmod[ii+perm[jj]]*2, b=pmod[ii+i1+perm[jj+j1]]*2, c=pmod[ii+1+perm[jj+1]]*2;
+    let n0=0,n1=0,n2=0;
+    let t0=0.5-x0*x0-y0*y0; if(t0>0){t0*=t0; n0=t0*t0*(g[a]*x0+g[a+1]*y0);}
+    let t1=0.5-x1*x1-y1*y1; if(t1>0){t1*=t1; n1=t1*t1*(g[b]*x1+g[b+1]*y1);}
+    let t2=0.5-x2*x2-y2*y2; if(t2>0){t2*=t2; n2=t2*t2*(g[c]*x2+g[c+1]*y2);}
+    return 70*(n0+n1+n2);
+  };
+}
+function genNoiseCanvas(o){
+  const c=document.createElement('canvas'); c.width=c.height=o.res;
+  const ctx=c.getContext('2d'), im=ctx.createImageData(o.res,o.res), d=im.data, sn=makeSimplex(o.seed);
+  const cs=Math.cos(o.rot), si=Math.sin(o.rot), cMul=0.5+o.contrast*2.5;
+  for(let y=0;y<o.res;y++){ const ny=y/o.res;
+    for(let x=0;x<o.res;x++){ const nx=x/o.res;
+      const rx=(nx*cs-ny*si)*o.freq*o.ax, ry=(nx*si+ny*cs)*o.freq*o.ay;
+      let amp=0.5,sum=0,norm=0,f=1;
+      for(let k=0;k<o.octaves;k++){ sum+=amp*sn(rx*f,ry*f); norm+=amp; f*=2; amp*=o.gain; }
+      let v=0.5+(sum/norm)*cMul; v=v<0?0:v>1?1:v;
+      const gg=(v*255)|0, idx=(y*o.res+x)<<2; d[idx]=d[idx+1]=d[idx+2]=gg; d[idx+3]=255;
+    }
+  }
+  ctx.putImageData(im,0,0); return c.toDataURL();
+}
+const _napC={}; let _napHi=0;
+function applyNap(){
+  const nap=$('nap'); nap.style.opacity=state.napS; nap.style.mixBlendMode=state.napBlend;
+  if(state.noiseType==='perlin'){
+    nap.style.backgroundImage='none'; nap.style.filter='url(#napFilter)';
+    $('napTurb').setAttribute('baseFrequency', napFreq());
+    $('napTurb').setAttribute('numOctaves', state.oct);
+    $('napTurb').setAttribute('seed', state.napSeed);
+    for(const f of ['napFR','napFG','napFB']){ $(f).setAttribute('amplitude',(1+state.napC*1.4).toFixed(2)); $(f).setAttribute('offset',(-state.napC*0.6).toFixed(3)); }
+    $('napSmoothF').setAttribute('stdDeviation', state.napSmooth);   // manual grid-smoothing (live blur)
+  } else {
+    nap.style.filter = state.napSmooth>0 ? `blur(${state.napSmooth}px)` : 'none';   // manual grid-smoothing on the JS noise
+    const aniso=state.noiseType==='anisotropic';
+    // res is ZOOM-INDEPENDENT (unzoomed size × dpr × headroom) → zoom is a pure CSS scale of the SAME canvas: no regen, no pop.
+    const baseW=(nap.offsetWidth||300)/Math.max(1,state.zoom);
+    const fullRes=Math.min(1800, Math.max(256, Math.round(baseW*Math.min(devicePixelRatio||1,2)*2.6)));
+    const sig=[state.noiseType,state.napSize,state.oct,state.napC,state.napSeed,state.aniso,state.anisoRot,state.napGain].join(':');
+    const gen=(r)=>{ _napC.res=r;
+      _napC.url=genNoiseCanvas({ res:r, freq:Math.max(2, 1200/state.napSize), octaves:state.oct, contrast:state.napC, seed:state.napSeed, gain:state.napGain,
+        ax:1, ay: aniso? 1/Math.max(1,state.aniso) : 1, rot: aniso? state.anisoRot*Math.PI/180 : 0 });
+      nap.style.backgroundImage=`url("${_napC.url}")`; nap.style.backgroundSize='cover'; nap.style.imageRendering='auto'; };
+    if(_napC.sig===sig && _napC.res>=fullRes && nap.style.backgroundImage){ /* params unchanged (zoom only) → keep the baked canvas, CSS scales it */ }
+    else {
+      _napC.sig=sig;
+      const heavy=fullRes>720;                            // only proxy when the full bake is expensive
+      clearTimeout(_napHi);
+      gen(heavy ? 480 : fullRes);                         // fast draft while dragging a noise param
+      if(heavy) _napHi=setTimeout(()=>gen(fullRes), 200); // snap to full res once you stop
+    }
+  }
+}
+function syncNoiseUI(){ const a=state.noiseType==='anisotropic'; $('row-aniso').style.display=a?'':'none'; $('row-anisoRot').style.display=a?'':'none'; }
+
+let _raf=0;
+function render(){ if(_raf) return; _raf=requestAnimationFrame(()=>{ _raf=0; renderNow(); }); }
+function renderNow(){
+  $('rim').style.setProperty('--z', state.zoom);
+  $('rim').style.background=frameStyle(state.frame);
+  // base of the well: front = image, back = solid suede colour
+  const ph=$('photo'), well=$('well');
+  if(state.face==='back'){ ph.style.display='none'; well.style.background=state.backColor; }
+  else if(state.frontMode==='colour'){ ph.style.display='none'; well.style.background=state.frontColor; }
+  else { ph.style.display='block'; well.style.background=state.frontColor;
+    ph.style.backgroundImage = state.frontImg ? `url("${state.frontImg}")` : 'linear-gradient(135deg,#c9d3dc,#7b8794 60%,#525c66)'; }
+
+  // NAP — perlin (live feTurbulence filter) OR simplex/anisotropic (JS-generated image, regenerated at display res)
+  applyNap();
+
+  // WASH filter + layer (live) — its own scale (freq), rotation, blur, blend, strength, seed
+  const wv=w();
+  $('washTurb').setAttribute('baseFrequency', washFreq());
+  $('washTurb').setAttribute('seed', wv.seed);
+  $('washBlurF').setAttribute('stdDeviation', wv.blur);
+  $('washWrap').style.transform=`translate(-50%,-50%) rotate(${wv.rot}deg)`;
+  $('washWrap').style.display = wv.on ? '' : 'none';
+  const wash=$('wash'); wash.style.opacity=wv.s; $('washWrap').style.mixBlendMode=wv.blend;
+
+  $('sheen').style.background=sheenStyle(state.sheen);
+}
+
+/* ---- controls: data-driven so wiring / sync / save-load share ONE definition ---- */
+const CTRL=[
+  {id:'napSize',vid:'napSizeV',fmt:v=>v.toFixed(1),set:v=>state.napSize=v,get:()=>state.napSize},
+  {id:'oct',vid:'octV',fmt:v=>v,set:v=>state.oct=v,get:()=>state.oct},
+  {id:'napGain',vid:'napGainV',fmt:v=>v.toFixed(2),set:v=>state.napGain=v,get:()=>state.napGain},
+  {id:'napSmooth',vid:'napSmoothV',fmt:v=>v.toFixed(2),set:v=>state.napSmooth=v,get:()=>state.napSmooth},
+  {id:'napC',vid:'napCV',fmt:v=>v.toFixed(2),set:v=>state.napC=v,get:()=>state.napC},
+  {id:'napS',vid:'napSV',fmt:v=>v+'%',set:v=>state.napS=v/100,get:()=>Math.round(state.napS*100)},
+  {id:'napSeed',vid:'napSeedV',fmt:v=>v,set:v=>state.napSeed=v,get:()=>state.napSeed},
+  {id:'aniso',vid:'anisoV',fmt:v=>v,set:v=>state.aniso=v,get:()=>state.aniso},
+  {id:'anisoRot',vid:'anisoRotV',fmt:v=>v+'°',set:v=>state.anisoRot=v,get:()=>state.anisoRot},
+  {id:'washScale',vid:'washScaleV',fmt:v=>v.toFixed(2),set:v=>w().scale=v,get:()=>w().scale},
+  {id:'washRot',vid:'washRotV',fmt:v=>v+'°',set:v=>w().rot=v,get:()=>w().rot},
+  {id:'washBlur',vid:'washBlurV',fmt:v=>v.toFixed(1),set:v=>w().blur=v,get:()=>w().blur},
+  {id:'washS',vid:'washSV',fmt:v=>v+'%',set:v=>w().s=v/100,get:()=>Math.round(w().s*100)},
+  {id:'washSeed',vid:'washSeedV',fmt:v=>v,set:v=>w().seed=v,get:()=>w().seed},
+  {id:'sheen',vid:'sheenV',fmt:v=>v+'%',set:v=>state.sheen=v/100,get:()=>Math.round(state.sheen*100)},
+  {id:'zoom',vid:'zoomV',fmt:v=>v.toFixed(1)+'×',set:v=>state.zoom=v,get:()=>state.zoom},
+];
+CTRL.forEach(c=>{
+  const e=$(c.id); if(!e) return;
+  // turn the read-only value display into an EDITABLE number field (type exact values)
+  if(c.vid){ const out=$(c.vid); if(out && out.tagName!=='INPUT'){ const ni=document.createElement('input');
+    ni.type='number'; ni.id=c.vid; ni.className='numin'; ni.min=e.min; ni.max=e.max; ni.step=e.step; ni.value=c.get(); out.replaceWith(ni);
+    ni.oninput=ev=>{ const v=+ev.target.value; if(ev.target.value===''||isNaN(v))return; c.set(v); e.value=v; save(); render(); }; } }
+  e.oninput=ev=>{ c.set(+ev.target.value); if(c.vid&&$(c.vid))$(c.vid).value=+ev.target.value; save(); render(); };
+});
+$('napBlend').onchange=e=>{ state.napBlend=e.target.value; save(); render(); };
+$('washBlend').onchange=e=>{ w().blend=e.target.value; save(); render(); };
+$('noiseTypeSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{ state.noiseType=b.dataset.v; $('noiseTypeSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); syncNoiseUI(); save(); render(); });
+$('washToggle').querySelectorAll('button').forEach(b=>b.onclick=()=>{ w().on=b.dataset.v==='on'; $('washToggle').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); save(); render(); });
+$('faceSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{ state.face=b.dataset.v; syncUI(); save(); render(); });
+$('washRand').onclick=()=>{ w().seed=Math.floor(Math.random()*10000); $('washSeed').value=w().seed; if($('washSeedV'))$('washSeedV').value=w().seed; save(); render(); };
+$('frame').oninput=e=>{ state.frame=e.target.value; save(); render(); };
+$('backColor').oninput=e=>{ state.backColor=e.target.value; save(); render(); };
+$('frontColor').oninput=e=>{ state.frontColor=e.target.value; save(); render(); };
+$('frontModeSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{ state.frontMode=b.dataset.v; $('frontModeSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); save(); render(); });
+$('upload').onchange=e=>{ const f=e.target.files&&e.target.files[0]; if(f){ const r=new FileReader(); r.onload=()=>{ state.frontImg=r.result; state.frontMode='image'; syncUI(); save(); render(); }; r.readAsDataURL(f); } };
+
+// push full state → every control (used after load / init)
+function syncUI(){
+  CTRL.forEach(c=>{ const e=$(c.id); if(e){ e.value=c.get(); const o=$(c.vid); if(o) o.value=c.get(); } });
+  $('napBlend').value=state.napBlend; $('washBlend').value=w().blend;
+  $('frame').value=state.frame; $('backColor').value=state.backColor; $('frontColor').value=state.frontColor;
+  $('noiseTypeSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===state.noiseType));
+  $('washToggle').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===(w().on?'on':'off')));
+  $('faceSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===state.face));
+  $('frontModeSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===state.frontMode));
+  if($('washFaceLabel'))$('washFaceLabel').textContent='· '+state.face;
+  syncNoiseUI();
+}
+
+/* ---- persistence: localStorage auto-save (survives reload) + JSON file export/import ---- */
+const LS='suede-engine-v1'; let _saveT=0;
+function save(){ clearTimeout(_saveT); _saveT=setTimeout(()=>{ try{ localStorage.setItem(LS, JSON.stringify(state)); }catch(_){}}, 300); }
+function load(){ try{ const j=localStorage.getItem(LS); if(!j) return; const o=JSON.parse(j);
+  if(!o.washFace && o.washScale!==undefined){   // migrate old flat wash → per-face (kept on the saved face)
+    const legacy={scale:o.washScale,rot:o.washRot,blur:o.washBlur,s:o.washS,blend:o.washBlend,seed:o.washSeed,on:o.washOn};
+    o.washFace={ front:{...state.washFace.front}, back:{...state.washFace.back} }; o.washFace[o.face==='back'?'back':'front']=legacy;
+    ['washScale','washRot','washBlur','washS','washBlend','washSeed','washOn'].forEach(k=>delete o[k]);
+  }
+  if(o.napSize===undefined && o.density!==undefined){ o.napSize=Math.min(100,Math.max(1, 4/(o.density*0.011))); delete o.density; }   // old density → grain size (preserves look)
+  Object.assign(state, o); }catch(_){} }
+$('presetSave').onclick=()=>{ const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='suede-preset.json'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); };
+$('presetLoad').onchange=e=>{ const f=e.target.files&&e.target.files[0]; if(!f)return; const r=new FileReader();
+  r.onload=()=>{ try{ Object.assign(state, JSON.parse(r.result)); syncUI(); save(); render(); }catch(err){ alert('Bad preset file'); } }; r.readAsText(f); e.target.value=''; };
+
+// wheel over the canvas = lossless zoom of the effect object (page itself never zooms)
+document.querySelector('.center').addEventListener('wheel',e=>{ e.preventDefault();
+  state.zoom=Math.round(Math.max(0.5,Math.min(6, state.zoom+(e.deltaY<0?0.12:-0.12)))*100)/100;
+  $('zoom').value=state.zoom; if($('zoomV'))$('zoomV').value=state.zoom; save(); render(); },{passive:false});
+
+window.__state=state; window.__render=render; window.__renderNow=renderNow;
+load(); syncUI(); render();
+</script>
+</body>
+</html>
