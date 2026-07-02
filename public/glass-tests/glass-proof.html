@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ONEMO liquid glass — Figma-faithful (squircle refraction · dispersion · rim light)</title>
+<style>
+  :root{
+    --refraction: 44;   /* feDisplacementMap scale — Figma "refraction" */
+    --depth: 22;         /* bevel band width px — Figma "depth" */
+    --dispersion: 6;     /* chromatic split px — Figma "dispersion" */
+    --light-angle: 315;  /* Figma "lightAngle" */
+    --light: 0.9;        /* Figma "lightIntensity" */
+    --tint: 0.06;        /* faint white fill (no frost) */
+    --frost: 0;          /* blur px — 0 = no frost */
+    /* technical Apple test surface: stepped grayscale vertical bars */
+    --bars: linear-gradient(90deg,
+      #333 0 12.5%, #4d4d4d 0 25%, #6a6a6a 0 37.5%, #888 0 50%,
+      #a6a6a6 0 62.5%, #c4c4c4 0 75%, #e0e0e0 0 87.5%, #f5f5f5 0 100%);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;font-family:-apple-system,system-ui,sans-serif;color:#111}
+  body{min-height:100dvh;background:var(--bars) fixed;overflow-x:hidden}
+  .stage{position:relative;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:30px;padding:40px 20px 220px}
+  .row{display:flex;gap:22px;align-items:center;justify-content:center;flex-wrap:wrap}
+  .cap{position:fixed;top:14px;left:16px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#000;opacity:.5;font-weight:600}
+
+  /* ── glass control ─────────────────────────────────────────────── */
+  .glass{position:relative;overflow:hidden;isolation:isolate;background:rgba(255,255,255,var(--tint));
+    /* depth: crisp top-edge light + soft bottom + gentle lift (subtle, Apple-like) */
+    box-shadow:
+      inset 0 1px 1.5px rgba(255,255,255,calc(var(--light))),
+      inset 0 -1px 2px rgba(0,0,0,.14),
+      inset 0 0 0 .5px rgba(255,255,255,.28),
+      0 6px 18px rgba(0,0,0,.22);
+    transition:transform .13s cubic-bezier(.2,0,0,1)}
+  .glass.round{width:116px;height:116px;border-radius:50%}
+  .glass.small{width:62px;height:62px;border-radius:50%}
+  .glass.pill{width:230px;height:60px;border-radius:30px}
+  .glass.card{width:min(86vw,320px);height:120px;border-radius:34px}
+
+  /* backdrop mirror — refracted via filter:url (Safari-safe) */
+  .lens{position:absolute;inset:0;background:var(--bars);background-repeat:no-repeat}
+  /* rim-light sheen: soft directional, NOT a hotspot */
+  .spec{position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+    background:linear-gradient(var(--light-angle,315)deg,
+      rgba(255,255,255,calc(var(--light)*0.5)) 0%,
+      rgba(255,255,255,0) 34%,
+      rgba(255,255,255,0) 66%,
+      rgba(255,255,255,calc(var(--light)*0.14)) 100%);
+    mix-blend-mode:soft-light}
+  .glyph{position:absolute;inset:0;display:grid;place-content:center;pointer-events:none;color:#111;font-size:30px;opacity:.85}
+  .pill .glyph,.card .glyph{font-size:16px;font-weight:600;letter-spacing:.01em}
+
+  /* pressed = glass brightens (Apple) */
+  .glass:active{transform:scale(.965)}
+  .glass:active{background:rgba(255,255,255,calc(var(--tint) + .16))}
+  .glass:active .spec{background:linear-gradient(var(--light-angle,315)deg,rgba(255,255,255,.9),rgba(255,255,255,.15) 45%,rgba(255,255,255,.4))}
+
+  /* ── tuner ─────────────────────────────────────────────────────── */
+  .panel{position:fixed;left:10px;right:10px;bottom:10px;z-index:9;
+    background:rgba(250,250,250,.82);backdrop-filter:blur(20px) saturate(150%);-webkit-backdrop-filter:blur(20px) saturate(150%);
+    border:1px solid rgba(0,0,0,.08);border-radius:20px;padding:11px 13px 12px;color:#111;
+    display:grid;grid-template-columns:auto 1fr auto;gap:7px 12px;align-items:center;font-size:12px;box-shadow:0 8px 30px rgba(0,0,0,.18)}
+  .panel h4{grid-column:1/-1;margin:0 0 2px;font-size:10px;letter-spacing:.16em;text-transform:uppercase;opacity:.55}
+  .panel label{opacity:.75;white-space:nowrap}
+  .panel input[type=range]{width:100%}
+  .panel .val{font-variant-numeric:tabular-nums;opacity:.85;min-width:40px;text-align:right}
+</style>
+</head>
+<body>
+  <div class="cap">ONEMO glass · Figma-faithful</div>
+  <div class="stage">
+    <div class="row">
+      <div class="glass round"><div class="lens"></div><div class="spec"></div><div class="glyph">✦</div></div>
+      <div class="glass round"><div class="lens"></div><div class="spec"></div><div class="glyph">◐</div></div>
+    </div>
+    <div class="row">
+      <div class="glass small"><div class="lens"></div><div class="spec"></div><div class="glyph">＋</div></div>
+      <div class="glass small"><div class="lens"></div><div class="spec"></div><div class="glyph">⚙</div></div>
+      <div class="glass small"><div class="lens"></div><div class="spec"></div><div class="glyph">◇</div></div>
+    </div>
+    <div class="row"><div class="glass pill"><div class="lens"></div><div class="spec"></div><div class="glyph">Continue</div></div></div>
+    <div class="row"><div class="glass card"><div class="lens"></div><div class="spec"></div><div class="glyph">Medium UI · Light</div></div></div>
+  </div>
+
+  <div class="panel" id="panel">
+    <h4>Figma GLASS params — tune on device, read back to Kai</h4>
+    <label>Refraction</label><input id="s_ref" type="range" min="0" max="120" value="44"><span class="val" id="v_ref">44</span>
+    <label>Depth</label><input id="s_dep" type="range" min="4" max="48" value="22"><span class="val" id="v_dep">22</span>
+    <label>Dispersion</label><input id="s_dis" type="range" min="0" max="24" value="6"><span class="val" id="v_dis">6</span>
+    <label>Light angle</label><input id="s_la" type="range" min="0" max="360" value="315"><span class="val" id="v_la">315°</span>
+    <label>Light int</label><input id="s_li" type="range" min="0" max="100" value="90"><span class="val" id="v_li">.90</span>
+    <label>Tint</label><input id="s_ti" type="range" min="0" max="40" value="6"><span class="val" id="v_ti">.06</span>
+    <label>Frost</label><input id="s_fr" type="range" min="0" max="16" value="0"><span class="val" id="v_fr">0</span>
+  </div>
+
+  <!-- one <filter> per glass element (built in JS with its own squircle displacement map) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs id="filterDefs"></defs></svg>
+
+<script>
+const root=document.documentElement, defs=document.getElementById('filterDefs');
+const glasses=[...document.querySelectorAll('.glass')];
+
+/* squircle-SDF displacement map: edge-concentrated refraction, clear centre.
+   encodes inward normal * edge-weighted magnitude → convex lens rim bend. */
+function buildMap(w,h,radius,bevel){
+  const s=2; // supersample for smoothness
+  const W=Math.max(2,Math.round(w*s)), H=Math.max(2,Math.round(h*s));
+  const c=document.createElement('canvas');c.width=W;c.height=H;
+  const ctx=c.getContext('2d');const img=ctx.createImageData(W,H);const d=img.data;
+  const hw=W/2, hh=H/2, r=radius*s, bev=bevel*s;
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    const i=(y*W+x)*4;
+    const px=x-hw+.5, py=y-hh+.5;
+    const qx=Math.abs(px)-(hw-r), qy=Math.abs(py)-(hh-r);
+    const ax=Math.max(qx,0), ay=Math.max(qy,0);
+    const outside=Math.hypot(ax,ay);
+    const inside=Math.min(Math.max(qx,qy),0);
+    const sdf=outside+inside-r;              // <0 inside, 0 at edge
+    let nx=0,ny=0,mag=0,a=0;
+    if(sdf<=0){ a=255;
+      if(sdf>-bev){
+        const tt=1+sdf/bev;                  // 0 at inner edge of bevel, 1 at rim
+        mag=Math.pow(tt,1.6);                // edge-concentrated (squircle-like)
+        if(qx>0||qy>0){ let gx=Math.sign(px)*ax, gy=Math.sign(py)*ay; const l=Math.hypot(gx,gy)||1; nx=gx/l; ny=gy/l; }
+        else if(qx>qy){ nx=Math.sign(px); ny=0; } else { nx=0; ny=Math.sign(py); }
+      }
+    }
+    // displace inward (toward centre) → magnify backdrop at rim
+    d[i]=128 - nx*mag*127;
+    d[i+1]=128 - ny*mag*127;
+    d[i+2]=128; d[i+3]=a;
+  }
+  ctx.putImageData(img,0,0);
+  return c.toDataURL();
+}
+
+let uid=0;
+function buildFilter(el){
+  const rect=el.getBoundingClientRect();
+  const w=Math.round(rect.width), h=Math.round(rect.height);
+  const cs=getComputedStyle(el);
+  let radius=parseFloat(cs.borderTopLeftRadius)||0;
+  if(el.classList.contains('round')||el.classList.contains('small')) radius=Math.min(w,h)/2;
+  const bevel=+getComputedStyle(root).getPropertyValue('--depth');
+  const scale=+getComputedStyle(root).getPropertyValue('--refraction');
+  const disp=+getComputedStyle(root).getPropertyValue('--dispersion');
+  const map=buildMap(w,h,radius,bevel);
+  const id='glass'+(el.dataset.fid||(el.dataset.fid=++uid));
+  // 3-pass chromatic dispersion (R/G/B at offset scales) → screen blend
+  const SVGNS='http://www.w3.org/2000/svg';
+  let f=document.getElementById(id);
+  if(f) f.remove();
+  f=document.createElementNS(SVGNS,'filter');
+  f.setAttribute('id',id);f.setAttribute('color-interpolation-filters','sRGB');
+  f.setAttribute('x','-20%');f.setAttribute('y','-20%');f.setAttribute('width','140%');f.setAttribute('height','140%');
+  const feImg=document.createElementNS(SVGNS,'feImage');
+  feImg.setAttribute('href',map);feImg.setAttributeNS('http://www.w3.org/1999/xlink','href',map);
+  feImg.setAttribute('x','0');feImg.setAttribute('y','0');feImg.setAttribute('width',w);feImg.setAttribute('height',h);
+  feImg.setAttribute('preserveAspectRatio','none');feImg.setAttribute('result','map');
+  f.appendChild(feImg);
+  const chans=[['R',scale+disp],['G',scale],['B',scale-disp]];
+  const keep={R:'1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0',
+              G:'0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0',
+              B:'0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0'};
+  const results=[];
+  for(const [ch,sc] of chans){
+    const dm=document.createElementNS(SVGNS,'feDisplacementMap');
+    dm.setAttribute('in','SourceGraphic');dm.setAttribute('in2','map');
+    dm.setAttribute('scale',sc);dm.setAttribute('xChannelSelector','R');dm.setAttribute('yChannelSelector','G');
+    dm.setAttribute('result','d'+ch);f.appendChild(dm);
+    const cm=document.createElementNS(SVGNS,'feColorMatrix');
+    cm.setAttribute('in','d'+ch);cm.setAttribute('type','matrix');cm.setAttribute('values',keep[ch]);
+    cm.setAttribute('result','c'+ch);f.appendChild(cm);
+    results.push('c'+ch);
+  }
+  // screen-blend the three channels back together
+  let prev=results[0];
+  for(let k=1;k<results.length;k++){
+    const b=document.createElementNS(SVGNS,'feBlend');
+    b.setAttribute('in',prev);b.setAttribute('in2',results[k]);b.setAttribute('mode','screen');
+    b.setAttribute('result','b'+k);f.appendChild(b);prev='b'+k;
+  }
+  defs.appendChild(f);
+  const lens=el.querySelector('.lens');
+  const frost=+getComputedStyle(root).getPropertyValue('--frost');
+  lens.style.filter=`url(#${id})`+(frost>0?` blur(${frost}px)`:'');
+}
+
+/* align each mirror to the real backdrop */
+function place(){
+  const vw=window.innerWidth, vh=window.innerHeight;
+  for(const el of glasses){
+    const g=el.getBoundingClientRect();
+    const lens=el.querySelector('.lens');
+    lens.style.backgroundSize=vw+'px '+vh+'px';
+    lens.style.backgroundPosition=(-g.left)+'px '+(-g.top)+'px';
+  }
+}
+function rebuildAll(){ glasses.forEach(buildFilter); place(); }
+addEventListener('scroll',place,{passive:true});
+addEventListener('resize',rebuildAll);
+
+/* sliders */
+const bind=(id,cssVar,fmt,rebuild)=>{const s=document.getElementById('s_'+id),v=document.getElementById('v_'+id);
+  const on=()=>{const n=+s.value; let out=n;
+    if(cssVar==='--light') out=n/100; else if(cssVar==='--tint') out=n/100;
+    root.style.setProperty(cssVar,String(out)); v.textContent=fmt(n);
+    if(rebuild) rebuildAll();};
+  s.addEventListener('input',on);on();};
+bind('ref','--refraction',n=>n,true);
+bind('dep','--depth',n=>n,true);
+bind('dis','--dispersion',n=>n,true);
+bind('la','--light-angle',n=>n+'°',false);
+bind('li','--light',n=>(n/100).toFixed(2),false);
+bind('ti','--tint',n=>(n/100).toFixed(2),false);
+bind('fr','--frost',n=>n,true);
+
+/* initial build after layout settles */
+requestAnimationFrame(()=>requestAnimationFrame(rebuildAll));
+</script>
+</body>
+</html>

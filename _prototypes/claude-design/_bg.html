@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BG only — full bleed test</title>
+<style>
+  /* NO app, NO dc-runtime, NO iframe. Just the brand surface on the page root. */
+  html{
+    margin:0;
+    min-height:100lvh;                 /* large viewport = under the bars */
+    background-color:#edeff1;
+    background-image:
+      url(assets/grain1x.png),
+      radial-gradient(140% 95% at 50% 0%, rgba(255,255,255,.55), rgba(255,255,255,0) 62%),
+      linear-gradient(180deg, #e7eaed 0%, #edeff1 45%, #f3f4f6 100%);
+    background-size:207px 207px, 100% 100%, 100% 100%;
+    background-repeat:repeat, no-repeat, no-repeat;
+    background-position:0 0, center, center;
+    background-blend-mode:overlay, normal, normal;
+    background-attachment:fixed;        /* pin surface to the viewport so it covers under bars */
+    image-rendering:pixelated;
+  }
+  body{
+    margin:0;
+    min-height:220vh;                   /* taller than screen so it SCROLLS — proves under-bar fill */
+    background:transparent;
+    font:600 16px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;
+    color:#46535f;
+  }
+  .mark{position:absolute;left:50%;transform:translateX(-50%);white-space:nowrap;letter-spacing:.02em}
+  .top{top:8px}            /* should tuck UNDER the status bar when at top of scroll */
+  .mid{top:50%;transform:translate(-50%,-50%)}
+  .bot{bottom:8px}         /* should tuck UNDER the address bar */
+  .mid b{display:block;font-size:22px;color:#20252b;text-align:center}
+  .mid span{display:block;font-size:13px;opacity:.7;text-align:center;margin-top:6px}
+</style>
+</head>
+<body>
+  <div class="mark top">⬆ this line should sit UNDER the status bar</div>
+  <div class="mark mid">
+    <b>background only — full bleed</b>
+    <span>no app · just grey + noise on the page root · scroll me</span>
+  </div>
+  <div class="mark bot">⬇ this line should sit UNDER the address bar</div>
+</body>
+</html>

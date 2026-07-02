@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
+  <title>Surface compare — skylrk vs mattdesl vs paper</title>
+  <style>
+    :root { --font-mono: ui-monospace, "SF Mono", Menlo, monospace; --glass: rgba(251,251,251,0.16); --glassActive: rgba(251,251,251,0.92); --bd: rgba(251,251,251,0.28);
+      /* contrast halo — keeps white text legible over light / mid-grey / dark gradient (difference-blend fails on mid-grey) */
+      --halo: 0 0 1px rgba(0,0,0,0.95), 0 0 3px rgba(0,0,0,0.85), 0 1px 4px rgba(0,0,0,0.55); }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html, body { width:100%; height:100%; background:#000; color:#fff; font-family:var(--font-mono); overflow:hidden; }
+    #stage { position:fixed; inset:0; overflow:hidden; }
+    #surface, #paperParent { position:absolute; inset:0; width:100%; height:100dvh; display:block; }
+    #paperParent { display:none; }
+    /* matte frosted glass directly on every panel (halo text no longer needs the ::before isolation workaround) */
+    .frost { position:relative; border:1px solid var(--bd); background:var(--glass);
+      -webkit-backdrop-filter:blur(16px) saturate(150%); backdrop-filter:blur(16px) saturate(150%); }
+    /* glass panel (skylrk #glass-distortion) */
+    .glass { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); width:min(320px,80vw); padding:22px; border-radius:28px; z-index:3;
+      background:rgba(251,251,251,0.18); border:1px solid rgba(251,251,251,0.25); backdrop-filter:blur(8px) saturate(150%); -webkit-backdrop-filter:blur(8px) saturate(150%);
+      box-shadow:0 8px 40px rgba(0,0,0,.25); font-size:13px; letter-spacing:.04em; text-transform:uppercase; line-height:1.7; display:none; }
+    .glass::before { content:""; position:absolute; inset:0; border-radius:28px; z-index:-1; backdrop-filter:url(#glass-distortion); -webkit-backdrop-filter:url(#glass-distortion); }
+
+    /* ===== TOP BAR: source tabs + upload ===== */
+    #topbar { position:absolute; top:calc(10px + env(safe-area-inset-top)); left:0; right:0; margin-inline:auto;
+      display:flex; flex-direction:column; align-items:center; gap:8px; width:min(640px,94vw); }
+    #fps { position:fixed; right:8px; top:calc(8px + env(safe-area-inset-top)); z-index:6; }
+    .tabs { display:flex; gap:6px; padding:5px; border-radius:999px; }
+    .tabs button { font-family:var(--font-mono); font-size:12px; letter-spacing:.04em; text-transform:uppercase; color:#fff;
+      background:transparent; border:0; border-radius:999px; padding:8px 16px; cursor:pointer; }
+    .tabs button.active { background:var(--glassActive); color:#000; }
+    #uploadRow { display:flex; gap:8px; align-items:center; }
+    #uploadBtn { font-family:var(--font-mono); font-size:12px; letter-spacing:.04em; text-transform:uppercase; color:#fff; border-radius:999px; padding:8px 16px; cursor:pointer; }
+    #labNav { display:flex; gap:6px; }
+    #labNav a { font-family:var(--font-mono); font-size:11px; letter-spacing:.04em; text-transform:uppercase; color:#fff; text-decoration:none; border-radius:999px; padding:7px 13px; }
+    .prod { width:40px; height:40px; object-fit:contain; border-radius:12px; padding:5px; }
+
+    /* ===== BOTTOM DOCK: category tabs + stacked controls ===== */
+    #dock { position:absolute; left:0; right:0; bottom:calc(14px + env(safe-area-inset-bottom)); margin-inline:auto;
+      display:flex; flex-direction:column; align-items:stretch; gap:10px; width:min(440px,94vw); }
+    /* category tabs: self-contained frosted chips that wrap into clean balanced rows (no enclosing pill → no orphaned tab) */
+    #catTabs { align-self:center; flex-wrap:wrap; justify-content:center; gap:8px; padding:0; max-width:280px; }
+    #catTabs button, #glassToggle { border:1px solid var(--bd); background:var(--glass); border-radius:999px;
+      -webkit-backdrop-filter:blur(14px) saturate(140%); backdrop-filter:blur(14px) saturate(140%); padding:9px 16px; }
+    #catTabs button.active, #glassToggle.on { background:var(--glassActive); color:#000; border-color:transparent; text-shadow:none; -webkit-text-stroke:0; }
+    .panel { display:flex; flex-direction:column; gap:8px; }
+    .ctl { display:flex; align-items:center; justify-content:space-between; gap:14px; border-radius:14px; padding:10px 16px; }
+    .ctl span { font-size:12px; letter-spacing:.05em; text-transform:uppercase; color:#fff; white-space:normal; min-width:0; }
+    .ctl input[type=range] { flex:1; min-width:100px; max-width:200px; accent-color:#fff; }
+    /* stacked control: label + value on top row, full-width slider/button below (prevents long-label overflow) */
+    .ctl.stack { display:grid; grid-template-columns:1fr auto; column-gap:10px; row-gap:8px; align-items:center; }
+    .ctl.stack > span { grid-column:1; grid-row:1; white-space:normal; }
+    .ctl.stack > output.val { grid-column:2; grid-row:1; }
+    .ctl.stack > input[type=range], .ctl.stack > button, .ctl.stack > select { grid-column:1 / -1; grid-row:2; max-width:none; width:100%; }
+    .ctl input:disabled, .ctl select:disabled, .ctl button:disabled { opacity:.3; }
+    .ctl .optbtn { font-family:var(--font-mono); font-size:12px; text-transform:uppercase; color:#fff; background:var(--glass); border:1px solid var(--bd); border-radius:999px; padding:6px 16px; cursor:pointer; text-shadow:var(--halo); }
+    .ctl .optbtn.on { background:var(--glassActive); color:#000; border-color:transparent; text-shadow:none; }
+    .ctl output.val { font-size:11px; letter-spacing:.03em; color:#fff; min-width:42px; text-align:right; font-variant-numeric:tabular-nums; }
+    .ctl input[type=color] { width:30px; height:24px; border:none; background:none; padding:0; cursor:pointer; }
+    .ctl select { font-family:var(--font-mono); font-size:12px; text-transform:uppercase; color:#000; background:rgba(251,251,251,0.9); border:0; border-radius:8px; padding:5px 8px; cursor:pointer; }
+    .ctl .na-note, #patternNote { font-size:10px; opacity:.7; text-transform:none; letter-spacing:0; margin-left:8px; text-shadow:var(--halo); }
+    /* hide-on-swipe: clear the chrome to preview the surface full-screen (swipe down to hide, up / tap handle to show) */
+    #topbar, #dock { transition:transform .35s ease, opacity .3s ease; }
+    #stage.ui-hidden #topbar { transform:translateY(-170%); opacity:0; pointer-events:none; }
+    #stage.ui-hidden #dock { transform:translateY(170%); opacity:0; pointer-events:none; }
+    #uiHandle { position:absolute; left:0; right:0; margin-inline:auto; width:max-content; bottom:calc(12px + env(safe-area-inset-bottom)); z-index:5;
+      display:none; border:1px solid var(--bd); background:var(--glass); -webkit-backdrop-filter:blur(14px) saturate(140%); backdrop-filter:blur(14px) saturate(140%);
+      border-radius:999px; padding:8px 16px; color:#fff; font-family:var(--font-mono); font-size:11px; letter-spacing:.05em; text-transform:uppercase; cursor:pointer; text-shadow:var(--halo); }
+    #stage.ui-hidden #uiHandle { display:block; }
+    #glassToggle { font-family:var(--font-mono); font-size:12px; letter-spacing:.04em; text-transform:uppercase; color:#fff; background:transparent; border:0; border-radius:999px; padding:8px 16px; cursor:pointer; }
+    #glassToggle.on { background:var(--glassActive); color:#000; }
+    /* contrast halo on all floating (non-pill) text — legible over any gradient luminance */
+    .tabs button, #uploadBtn, .ctl span, .ctl output.val, #glassToggle { text-shadow:var(--halo); -webkit-text-stroke:0.35px rgba(0,0,0,0.4); paint-order:stroke fill; }
+    .tabs button.active, #glassToggle.on { text-shadow:none; -webkit-text-stroke:0; }
+  </style>
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <filter id="glass-distortion" x="0%" y="0%" width="100%" height="100%" filterUnits="objectBoundingBox">
+      <feTurbulence type="fractalNoise" baseFrequency="0.01 0.01" numOctaves="1" seed="5" result="turbulence"/>
+      <feComponentTransfer in="turbulence" result="mapped"><feFuncR type="gamma" amplitude="1" exponent="10" offset="0.5"/><feFuncG type="gamma" amplitude="0" exponent="1" offset="0"/><feFuncB type="gamma" amplitude="0" exponent="1" offset="0.5"/></feComponentTransfer>
+      <feGaussianBlur in="turbulence" stdDeviation="3" result="softMap"/>
+      <feSpecularLighting in="softMap" surfaceScale="5" specularConstant="1" specularExponent="100" lighting-color="white" result="specLight"><fePointLight x="-200" y="-200" z="300"/></feSpecularLighting>
+      <feComposite in="specLight" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" result="litImage"/>
+      <feDisplacementMap in="SourceGraphic" in2="softMap" scale="150" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </svg>
+
+  <!-- one stacking context so text mix-blend-mode:difference blends against the live canvas -->
+  <div id="stage">
+  <canvas id="surface"></canvas>
+  <div id="paperParent"></div>
+
+  <div id="fps"></div>
+
+  <!-- TOP: source tabs + upload -->
+  <div id="topbar">
+    <div class="tabs frost" id="sourceTabs">
+      <button data-mode="skylrk" class="active">skylrk</button>
+      <button data-mode="mattdesl">mattdesl</button>
+      <button data-mode="paper">paper</button>
+    </div>
+    <div id="uploadRow">
+      <label id="uploadBtn" class="frost">↑ upload image<input type="file" id="imgUpload" accept="image/*" hidden></label>
+      <img class="prod frost" id="uploadPreview" alt="uploaded" style="display:none">
+    </div>
+    <nav id="labNav">
+      <a href="/suede-studio.html" class="frost">suede studio →</a>
+    </nav>
+  </div>
+
+  <div class="glass" id="glassPanel">[ painter pant ]<br>color [ copper ]<br>size [ 28 ]<br>— glass via #glass-distortion</div>
+
+  <!-- BOTTOM: category tabs + stacked controls -->
+  <div id="dock">
+    <div class="tabs" id="catTabs">
+      <button data-cat="colour" class="active">colour</button>
+      <button data-cat="gradient">gradient</button>
+      <button data-cat="noise">noise</button>
+      <button data-cat="perf">perf</button>
+      <button id="glassToggle">glass</button>
+    </div>
+    <div class="panel" id="panel-colour">
+      <div class="ctl frost"><span>top</span><input type="color" id="cTop" value="#f2f2f5"></div>
+      <div class="ctl frost"><span>accent</span><input type="color" id="cAccent" value="#738ca6"></div>
+      <div class="ctl frost"><span>bottom</span><input type="color" id="cBottom" value="#808085"></div>
+      <div class="ctl frost"><span>dark</span><input type="color" id="cDark" value="#0f0f12"></div>
+    </div>
+    <div class="panel" id="panel-gradient" style="display:none">
+      <div class="ctl frost stack"><span>pattern <small id="patternNote"></small></span><select id="pattern">
+        <option value="0">lava-lamp (skylrk)</option><option value="1">wave</option><option value="2">dots</option><option value="3">truchet</option><option value="4">corners</option><option value="5">ripple</option><option value="6">blob</option><option value="7">sphere</option><option value="8">mesh-gradient (paper)</option><option value="9">metaballs (paper)</option>
+      </select></div>
+      <div class="ctl frost"><span>scale</span><input type="range" id="gradScale" min="0.1" max="8" step="0.05" value="1"></div>
+      <div class="ctl frost"><span>rotation</span><input type="range" id="gradRot" min="0" max="360" step="1" value="0"></div>
+      <div class="ctl frost"><span>offset x</span><input type="range" id="gradOffX" min="-1.5" max="1.5" step="0.01" value="0"></div>
+      <div class="ctl frost"><span>offset y</span><input type="range" id="gradOffY" min="-1.5" max="1.5" step="0.01" value="0"></div>
+      <div class="ctl frost" id="row-softness"><span>softness</span><input type="range" id="softness" min="0" max="3" step="0.02" value="0.85"></div>
+      <div class="ctl frost"><span>speed</span><input type="range" id="gradSpeed" min="0" max="8" step="0.02" value="1"></div>
+    </div>
+    <div class="panel" id="panel-noise" style="display:none">
+      <div class="ctl frost" id="row-grain"><span>grain</span><input type="range" id="intensity" min="0" max="1" step="0.005" value="0.05"></div>
+      <div class="ctl frost" id="row-size"><span>grain size</span><input type="range" id="size" min="1" max="40" step="0.5" value="1.5"></div>
+      <div class="ctl frost" id="row-grainSpeed"><span>noise speed</span><input type="range" id="grainSpeed" min="0" max="8" step="0.02" value="1"></div>
+      <div class="ctl frost" id="row-grainMotion"><span>grain motion</span><select id="grainAnim"><option value="1">animated</option><option value="0">static</option><option value="2">jittered</option></select></div>
+      <div class="ctl frost" id="row-colorSafe"><span>colour-safe <small style="opacity:.6">zero-mean</small></span><button id="colorSafeToggle" class="optbtn">off</button></div>
+      <div class="ctl frost" id="row-lumaOnly"><span>luma-only <small style="opacity:.6">hue lock</small></span><button id="lumaToggle" class="optbtn">off</button></div>
+    </div>
+    <div class="panel" id="panel-perf" style="display:none">
+      <div class="ctl frost stack"><span>render dpr <small id="dprInfo"></small></span><button id="dprToggle" style="font-family:var(--font-mono);font-size:12px;text-transform:uppercase;color:#fff;background:var(--glass);border:1px solid var(--bd);border-radius:10px;padding:8px 12px;cursor:pointer;text-shadow:var(--halo)">×2 · skylrk-match</button></div>
+      <div class="ctl frost stack"><span>gpu load <small id="loadInfo"></small></span><input type="range" id="load" min="1" max="32" step="1" value="1"></div>
+      <div class="ctl frost stack"><span>measure <small id="measInfo"></small></span><button id="measureBtn" style="font-family:var(--font-mono);font-size:12px;text-transform:uppercase;color:#fff;background:var(--glass);border:1px solid var(--bd);border-radius:10px;padding:8px 12px;cursor:pointer;text-shadow:var(--halo)">skylrk vs mattdesl</button></div>
+    </div>
+  </div>
+  <button id="uiHandle" aria-label="show controls">▴ controls</button>
+  </div><!-- /#stage -->
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

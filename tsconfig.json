@@ -41,6 +41,8 @@
     "asset-library",
     "?archive",
     "studio",
-    "studio-v2"
+    "studio-v2",
+    "storybook",
+    "_prototypes"
   ]
 }

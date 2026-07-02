@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import type { Meta, StoryObj } from '@storybook/nextjs';
-import { RoundButton } from './RoundButton';
+import { RoundButton } from '../../../src/components/ds/RoundButton';
 
 // 20px Phosphor-light-style glyphs (stroke 1.5, currentColor → inherits the tone ink token).
 const s = {
@@ -23,7 +23,7 @@ const Stage = ({ children }: { children: ReactNode }) => (
 );
 
 const meta = {
-  title: 'DS/Atoms/RoundButton',
+  title: 'Design System/Components/RoundButton',
   component: RoundButton,
   args: { icon: Close, 'aria-label': 'Close', surface: 'solid', tone: 'neutral' },
   argTypes: {

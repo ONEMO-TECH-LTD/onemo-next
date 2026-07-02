@@ -1,0 +1,7 @@
+/* ONEMO app + component vars — sit ON TOP of tokens-v2/tokens.css. Author component tokens here (v2 has no comp tier). */
+:root{
+  --font-primary: 'Chillax', sans-serif;   /* display/headings/labels/CTA/nav */
+  --font-body: 'Satoshi', sans-serif;      /* body */
+  /* component token — round button = semantic size l (40px) */
+  --size-round-button: var(--sem-dim-fluid-l);
+}
