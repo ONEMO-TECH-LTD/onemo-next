@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
+<title>Suede Studio — Effect Frame · procedural</title>
+<style>
+  :root { --font-mono: ui-monospace,"SF Mono",Menlo,monospace; --glass: rgba(255,255,255,0.9); --glassActive:#16191d; --bd: rgba(0,0,0,0.14); --ink:#16191d; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { width:100%; height:100%; color:var(--ink); font-family:var(--font-mono); overflow:hidden;
+    background:radial-gradient(130% 120% at 50% 30%, #eef0f2, #d7dbdf 82%); }
+  #stage { position:fixed; inset:0; overflow:hidden; }
+  .frost { border:1px solid var(--bd); background:var(--glass); }
+
+  /* top bar */
+  #topbar { position:absolute; top:calc(10px + env(safe-area-inset-top)); left:0; right:0; margin-inline:auto;
+    display:flex; flex-direction:column; align-items:center; gap:8px; width:min(640px,94vw); z-index:4; }
+  .island { display:flex; gap:4px; padding:5px; border-radius:999px; flex-wrap:wrap; justify-content:center; }
+  .island button { font-family:var(--font-mono); font-size:12px; letter-spacing:.03em; text-transform:uppercase; color:var(--ink);
+    background:transparent; border:0; border-radius:999px; padding:8px 15px; cursor:pointer; white-space:nowrap; }
+  .island button.on { background:var(--glassActive); color:#fff; }
+  #labNav a { font-family:var(--font-mono); font-size:11px; letter-spacing:.04em; text-transform:uppercase; color:var(--ink); text-decoration:none; }
+
+  /* model */
+  #modelWrap { position:absolute; left:50%; top:42%; --zoom:1; transform:translate(-50%,-50%) scale(var(--zoom));
+    width:300px; height:300px; z-index:1; transition:top .3s ease; touch-action:none; perspective:1400px; }
+  /* the rotating card — two faces, real 3D turn (original Effect Frame 3D mechanics) */
+  #model { position:relative; width:100%; height:100%; transform-origin:center; cursor:pointer; will-change:transform; transform-style:preserve-3d; }
+  .face { position:absolute; inset:0; backface-visibility:hidden; -webkit-backface-visibility:hidden; display:grid; place-items:center; }
+  #turnBtn { position:absolute; top:calc(12px + env(safe-area-inset-top)); right:14px; z-index:6; width:46px; height:46px; border-radius:50%;
+    display:grid; place-items:center; border:1px solid var(--bd); background:var(--glass); color:var(--ink); cursor:pointer; }
+  #turnBtn svg { width:22px; height:22px; } #turnBtn:active { background:var(--glassActive); color:#fff; }
+  .rim { position:relative; width:300px; height:300px; border-radius:52px; padding:8px; --pr:44px;
+    box-shadow:0 26px 50px -18px rgba(10,13,18,.55),0 0 0 1px rgba(255,255,255,.22),
+      inset 0 2px 1px -1px rgba(255,255,255,.32),inset 2px 0 1px -1px rgba(255,255,255,.2),
+      inset -2px 0 1px -1px rgba(255,255,255,.18),inset 0 -2px 1px -1px rgba(255,255,255,.24),
+      inset 5px -5px 3px -3px rgba(255,255,255,.28),inset -4px 4px 3px -3px rgba(255,255,255,.1),
+      inset 4px 4px 3px -3px rgba(255,255,255,.1),inset 0 -3px 4px -3px rgba(0,0,0,.28); }
+  .well { position:relative; z-index:1; width:100%; height:100%; border-radius:var(--pr); overflow:hidden; }
+  /* recessed cavity: frame lip casts a real inward shadow — dark crease at the join, strong at top/sides, faint floor. NO highlight ring (that reads as raised). */
+  .edge { position:absolute; inset:0; border-radius:var(--pr); pointer-events:none;
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.42),
+      inset 0 7px 11px -5px rgba(0,0,0,.62),
+      inset 4px 0 9px -6px rgba(0,0,0,.42),
+      inset -4px 0 9px -6px rgba(0,0,0,.42),
+      inset 0 -4px 9px -5px rgba(0,0,0,.26); }
+  .photo { position:absolute; inset:0; background-size:cover; background-position:center; background-image:linear-gradient(135deg,#c9d3dc,#7b8794 60%,#525c66); }
+  .layer { position:absolute; inset:0; }
+  #model.slim .rim, #model.shaped .rim { padding:0; box-shadow:0 26px 50px -18px rgba(10,13,18,.55); }
+  #model.slim .rim, #model.slim .well, #model.slim .edge { border-radius:34px; }
+  #model.shaped .rim, #model.shaped .well, #model.shaped .edge { border-radius:42% 58% 45% 55% / 52% 44% 56% 48%; }
+  #model.slim .well, #model.shaped .well { box-shadow:none; }
+  #model.slim .edge, #model.shaped .edge { box-shadow:inset 0 0 0 1px rgba(0,0,0,.4),inset 0 6px 10px -5px rgba(0,0,0,.58),inset 0 -3px 8px -5px rgba(0,0,0,.24); }
+  @property --sweep{syntax:'<angle>';inherits:false;initial-value:0deg;}
+  @keyframes drift{to{--sweep:360deg;}}
+  .sweep { position:absolute; inset:0; border-radius:52px; z-index:0; pointer-events:none; }
+
+  /* dock — compact: tab bar + ONE expanding panel (param island + single active control = 2 rows) */
+  #dock { position:absolute; left:0; right:0; bottom:0; margin-inline:auto; z-index:4;
+    display:flex; flex-direction:column; align-items:center; gap:8px; width:min(460px,96vw);
+    padding-bottom:calc(12px + env(safe-area-inset-bottom)); }
+  #sheet { width:100%; display:flex; flex-direction:column; gap:8px; }
+  .panel { display:none; flex-direction:column; gap:8px; }
+  /* param island (the pill switcher inside a panel) */
+  .pisland { display:flex; gap:4px; padding:5px; border-radius:999px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+  .pisland::-webkit-scrollbar{ display:none; }
+  .pisland button { font-family:var(--font-mono); font-size:11px; letter-spacing:.02em; text-transform:uppercase; color:var(--ink);
+    background:transparent; border:0; border-radius:999px; padding:8px 13px; cursor:pointer; white-space:nowrap; flex:0 0 auto; }
+  .pisland button.on { background:var(--glassActive); color:#fff; }
+  .parm { display:none; align-items:center; gap:10px; border-radius:14px; padding:10px 12px; }
+  .parm.on { display:flex; }
+  .parm input[type=range] { flex:1; min-width:80px; accent-color:var(--ink); }
+  .parm output.val { font-size:11px; color:var(--ink); min-width:40px; text-align:right; font-variant-numeric:tabular-nums; }
+  .parm input[type=color] { width:40px; height:30px; border:none; background:none; padding:0; cursor:pointer; }
+  .parm > .seg { flex:1; }
+  .seg { display:flex; border:1px solid var(--bd); border-radius:999px; overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+  .seg::-webkit-scrollbar { display:none; }
+  .seg button { flex:0 0 auto; background:transparent; color:var(--ink); border:0; padding:8px 14px; font-family:var(--font-mono); font-size:11px; text-transform:uppercase; cursor:pointer; white-space:nowrap; }
+  .seg button.on { background:var(--glassActive); color:#fff; }
+  .tag { font-size:9px; opacity:.6; text-transform:none; }
+  .star { font-size:8px; vertical-align:top; opacity:.7; margin-left:2px; font-style:normal; }
+  .up { display:inline-flex; align-items:center; gap:6px; font-family:var(--font-mono); font-size:11px; text-transform:uppercase; color:#fff; background:var(--glassActive); border-radius:999px; padding:7px 14px; cursor:pointer; }
+  /* bottom tab bar */
+  #catTabs { display:flex; gap:5px; }
+  #catTabs button { border:1px solid var(--bd); background:var(--glass); border-radius:999px; padding:10px 15px;
+    font-family:var(--font-mono); font-size:11px; letter-spacing:.03em; text-transform:uppercase; color:var(--ink); cursor:pointer; }
+  #catTabs button.active { background:var(--glassActive); color:#fff; border-color:transparent; }
+
+  #topbar, #dock { transition:transform .35s ease, opacity .3s ease; }
+  #stage.ui-hidden #topbar { transform:translateY(-180%); opacity:0; pointer-events:none; }
+  #stage.ui-hidden #dock { transform:translateY(180%); opacity:0; pointer-events:none; }
+  #uiHandle { position:absolute; left:0; right:0; margin-inline:auto; width:max-content; bottom:calc(12px + env(safe-area-inset-bottom)); z-index:5;
+    display:none; border:1px solid var(--bd); background:var(--glass); border-radius:999px; padding:8px 16px; color:var(--ink); font-family:var(--font-mono); font-size:11px; text-transform:uppercase; cursor:pointer; }
+  #stage.ui-hidden #uiHandle { display:block; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="modelWrap">
+    <div id="model" class="framed"><div class="rim"><div class="sweep" id="sw"></div>
+      <div class="well" id="well"><div class="photo" id="photo"></div><div class="layer" id="tint"></div><div class="layer" id="nap"></div><div class="layer" id="sheen"></div><div class="edge"></div></div>
+    </div></div>
+  </div>
+  <button id="turnBtn" aria-label="Flip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button>
+
+  <div id="topbar">
+    <div class="island frost" id="variantTabs">
+      <button data-variant="framed" class="on">framed</button>
+      <button data-variant="slim">slim</button>
+      <button data-variant="shaped">shaped</button>
+    </div>
+    <nav id="labNav"><a href="/">← skylrk</a></nav>
+  </div>
+
+  <div id="dock">
+    <div id="sheet">
+      <!-- MATERIAL -->
+      <div class="panel" id="panel-material">
+        <div class="pisland frost" data-tab="material">
+          <button data-p="noise" class="on">noise</button><button data-p="density">density</button><button data-p="scale">size</button>
+          <button data-p="nap">nap</button><button data-p="wash">wash</button><button data-p="oct">detail</button>
+          <button data-p="seed">seed</button><button data-p="res">res</button><button data-p="finish">finish</button>
+        </div>
+        <div class="parm frost on" data-p="noise">
+          <div class="seg" id="noiseSeg">
+            <button data-v="hash">hash</button>
+            <button data-v="fractal" class="on">fractal<i class="star">★</i></button>
+            <button data-v="turbulent">turbulent<i class="star">★</i></button>
+            <button data-v="simplex">simplex</button>
+            <button data-v="voronoi">voronoi</button>
+          </div></div>
+        <div class="parm frost" data-p="density"><input id="density" type="range" min="1" max="40" step="1" value="5"><output class="val" id="densityV">5</output></div>
+        <div class="parm frost" data-p="scale"><input id="scale" type="range" min="0.2" max="4" step="0.05" value="1"><output class="val" id="scaleV">1.00</output></div>
+        <div class="parm frost" data-p="nap"><input id="nap_s" type="range" min="0" max="100" value="52"><output class="val" id="napV">52%</output></div>
+        <div class="parm frost" data-p="wash"><input id="wash" type="range" min="0" max="40" step="1" value="14"><output class="val" id="washV">14</output></div>
+        <div class="parm frost" data-p="oct"><input id="oct" type="range" min="1" max="8" value="2"><output class="val" id="octV">2</output></div>
+        <div class="parm frost" data-p="seed"><input id="seed" type="range" min="0" max="40" value="7"><output class="val" id="seedV">7</output></div>
+        <div class="parm frost" data-p="res"><input id="bakeRes" type="range" min="256" max="2048" step="64" value="1024"><output class="val" id="bakeResV">1024px</output></div>
+        <div class="parm frost" data-p="finish">
+          <div class="seg" id="finishSeg"><button data-v="lit" class="on">lit nap</button><button data-v="flat">flat grain</button></div></div>
+      </div>
+
+      <!-- LIGHT -->
+      <div class="panel" id="panel-light">
+        <div class="pisland frost" data-tab="light">
+          <button data-p="angle" class="on">angle</button><button data-p="height">height</button>
+          <button data-p="relief">relief</button><button data-p="sheen">sheen</button>
+        </div>
+        <div class="parm frost on" data-p="angle"><input id="az" type="range" min="0" max="360" value="235"><output class="val" id="azV">235°</output></div>
+        <div class="parm frost" data-p="height"><input id="el" type="range" min="5" max="90" value="60"><output class="val" id="elV">60°</output></div>
+        <div class="parm frost" data-p="relief"><input id="relief" type="range" min="0" max="8" step="0.1" value="1.4"><output class="val" id="reliefV">1.4</output></div>
+        <div class="parm frost" data-p="sheen"><input id="sheen_s" type="range" min="0" max="100" value="14"><output class="val" id="sheenV">14%</output></div>
+      </div>
+
+      <!-- COLOUR / BLEND -->
+      <div class="panel" id="panel-colour">
+        <div class="pisland frost" data-tab="colour">
+          <button data-p="tint" data-side="front" class="on">tint</button><button data-p="blend" data-side="front">blend</button>
+          <button data-p="hue" data-side="front">hue</button><button data-p="tone" data-side="front">tone</button>
+          <button data-p="sat" data-side="front">sat</button><button data-p="back" data-side="back">colour</button>
+        </div>
+        <div class="parm frost" data-p="back"><input id="backColor" type="color" value="#6c5544"></div>
+        <div class="parm frost on" data-p="tint"><input id="tintColor" type="color" value="#b87333"><input id="tintAmt" type="range" min="0" max="100" value="0"><output class="val" id="tintV">0%</output></div>
+        <div class="parm frost" data-p="blend">
+          <div class="seg" id="blendSeg"><button data-v="multiply">mult</button><button data-v="overlay" class="on">over</button><button data-v="soft-light">soft</button><button data-v="screen">scrn</button><button data-v="color">color</button></div></div>
+        <div class="parm frost" data-p="hue"><input id="hue" type="range" min="-180" max="180" value="0"><output class="val" id="hueV">0°</output></div>
+        <div class="parm frost" data-p="tone"><input id="tone" type="range" min="50" max="160" value="100"><output class="val" id="toneV">100%</output></div>
+        <div class="parm frost" data-p="sat"><input id="sat" type="range" min="0" max="220" value="100"><output class="val" id="satV">100%</output></div>
+      </div>
+
+      <!-- FRAME -->
+      <div class="panel" id="panel-frame">
+        <div class="pisland frost" data-tab="frame">
+          <button data-p="frameC" class="on">frame</button><button data-p="sweep">sweep</button><button data-p="image">image</button>
+        </div>
+        <div class="parm frost on" data-p="frameC"><input id="frame" type="color" value="#2a2f37"></div>
+        <div class="parm frost" data-p="sweep"><div class="seg" id="sweepSeg"><button data-v="off" class="on">off</button><button data-v="on">on</button></div></div>
+        <div class="parm frost" data-p="image"><label class="up">⬆ upload<input id="upload" type="file" accept="image/*" hidden></label></div>
+      </div>
+
+      <!-- FLIP -->
+      <div class="panel" id="panel-flip">
+        <div class="pisland frost" data-tab="flip">
+          <button data-p="axis" class="on">axis</button><button data-p="dur">duration</button>
+        </div>
+        <div class="parm frost on" data-p="axis"><div class="seg" id="axisSeg"><button data-v="y" class="on">Y axis</button><button data-v="x">X axis</button><button data-v="coin">coin</button></div></div>
+        <div class="parm frost" data-p="dur"><input id="dur" type="range" min="3" max="16" value="7"><output class="val" id="durV">0.7s</output></div>
+      </div>
+    </div>
+
+    <div id="catTabs">
+      <button data-cat="material">material</button>
+      <button data-cat="light">light</button>
+      <button data-cat="colour">colour</button>
+      <button data-cat="frame">frame</button>
+      <button data-cat="flip">flip</button>
+    </div>
+  </div>
+
+  <button id="uiHandle">▴ controls</button>
+</div>
+
+<!-- procedural SVG suede (Perlin / feTurbulence) -->
+<svg width="0" height="0" style="position:absolute">
+  <filter id="suedeLit" x="-5%" y="-5%" width="110%" height="110%">
+    <feTurbulence id="ftLit" type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7" stitchTiles="stitch" result="n"/>
+    <feDiffuseLighting id="fdLit" in="n" surfaceScale="1.4" diffuseConstant="1" lighting-color="#fff"><feDistantLight id="flLit" azimuth="235" elevation="60"/></feDiffuseLighting>
+  </filter>
+  <filter id="suedeFlat" x="-5%" y="-5%" width="110%" height="110%">
+    <feTurbulence id="ftFlat" type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7" stitchTiles="stitch"/>
+    <feComponentTransfer><feFuncR type="table" tableValues="0.35 0.85"/><feFuncG type="table" tableValues="0.35 0.85"/><feFuncB type="table" tableValues="0.35 0.85"/></feComponentTransfer>
+  </filter>
+</svg>
+<canvas id="bake" width="768" height="768" style="display:none"></canvas>
+
+<script type="module">
+const $=id=>document.getElementById(id);
+const SVG_TYPES=new Set(['fractal','turbulent']);   // procedural in SVG · the rest are baked (labelled)
+const NOISES=['hash','fractal','turbulent','simplex','voronoi'];
+// PER-TYPE keys — each noise type remembers its own tuning (for fair like-for-like comparison)
+const PER=['density','scale','nap','oct','seed','finish','wash','az','el','relief','sheen'];
+const DEF={ density:5, scale:1, nap:0.52, oct:2, seed:7, finish:'lit', wash:14, az:235, el:60, relief:1.4, sheen:0.14 };
+const state={ variant:'framed', noise:'fractal', ...DEF, bakeRes:1536,
+  frame:'#2a2f37', backColor:'#6c5544', tintColor:'#b87333', tintAmt:0, blend:'overlay',
+  hue:0, tone:100, sat:100, frontImg:null, sweep:false, flipped:false, axis:'y', dur:0.7 };
+// per-type buckets seeded from defaults; populated/overridden by persistence
+const buckets={}; NOISES.forEach(n=>buckets[n]=Object.fromEntries(PER.map(k=>[k,DEF[k]])));
+const snap=()=>Object.fromEntries(PER.map(k=>[k,state[k]]));
+
+const frameStyle=c=>`linear-gradient(155deg,rgba(255,255,255,.2),rgba(255,255,255,0) 38%,rgba(0,0,0,.6)), ${c}`;
+const sheenStyle=s=>`radial-gradient(120% 100% at 22% 22%, rgba(255,255,255,${s}), transparent 55%)`;
+const backStyle=c=>`radial-gradient(120% 120% at 50% 22%, ${c}, ${c})`;
+const sweepCss=on=>{ const g=`conic-gradient(from var(--sweep),rgba(210,220,230,.32) 0deg,transparent 55deg,transparent 65deg,rgba(210,220,230,.3) 120deg,transparent 175deg,transparent 185deg,rgba(210,220,230,.31) 240deg,transparent 295deg,transparent 305deg,rgba(210,220,230,.32) 360deg)`;
+  return `position:absolute;inset:0;border-radius:52px;z-index:0;pointer-events:none;background:${g};animation:${on?'drift 34s linear infinite':'none'};opacity:${on?1:0};transition:opacity .4s ease;`; };
+
+// density = grain count (finer/denser) · size = grain size (bigger/coarser) → independent feel, one frequency
+const grainFreq=()=>state.density/state.scale;
+
+/* ---- procedural noise baker (WebGL, renders ONCE per change → static texture; for the non-SVG types) ---- */
+const bakeGL=(()=>{ const c=$('bake'); const gl=c.getContext('webgl'); if(!gl) return null;
+  const FS=`precision highp float;varying vec2 v;uniform int T;uniform float SC,AZ,EL,RAW,SEED,OCT,RELIEF;
+  float white(vec2 p){return fract(sin(dot(p+SEED,vec2(12.9898,78.233)))*43758.5453);}
+  vec2 h2(vec2 p){p=vec2(dot(p,vec2(127.1,311.7)),dot(p,vec2(269.5,183.3)));return fract(sin(p+SEED)*43758.5453);}
+  vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}vec2 mod289(vec2 x){return x-floor(x*(1.0/289.0))*289.0;}
+  vec3 permute(vec3 x){return mod289(((x*34.0)+1.0)*x);}
+  float snoise(vec2 v0){const vec4 C=vec4(0.211324865405187,0.366025403784439,-0.577350269189626,0.024390243902439);
+    vec2 i=floor(v0+dot(v0,C.yy));vec2 x0=v0-i+dot(i,C.xx);vec2 i1=(x0.x>x0.y)?vec2(1.0,0.0):vec2(0.0,1.0);
+    vec4 x12=x0.xyxy+C.xxzz;x12.xy-=i1;i=mod289(i);
+    vec3 p=permute(permute(i.y+vec3(0.0,i1.y,1.0))+i.x+vec3(0.0,i1.x,1.0));
+    vec3 m=max(0.5-vec3(dot(x0,x0),dot(x12.xy,x12.xy),dot(x12.zw,x12.zw)),0.0);m=m*m;m=m*m;
+    vec3 x=2.0*fract(p*C.www)-1.0;vec3 hh=abs(x)-0.5;vec3 ox=floor(x+0.5);vec3 a0=x-ox;
+    m*=1.79284291400159-0.85373472095314*(a0*a0+hh*hh);vec3 g;g.x=a0.x*x0.x+hh.x*x0.y;g.yz=a0.yz*x12.xz+hh.yz*x12.yw;return 130.0*dot(m,g);}
+  float voro(vec2 x){vec2 n=floor(x),f=fract(x);float md=8.0;
+    for(int j=-1;j<=1;j++)for(int i=-1;i<=1;i++){vec2 g=vec2(float(i),float(j));vec2 o=h2(n+g);vec2 r=g+o-f;md=min(md,dot(r,r));}return sqrt(md);}
+  float nval(vec2 p){ if(T==0)return white(p); if(T==1)return snoise(p)*0.5+0.5; return clamp(voro(p),0.0,1.0); }
+  float nap(vec2 p){float a=0.5,s=0.0,nn=0.0;for(int o=0;o<8;o++){float on=(float(o)<OCT)?1.0:0.0;s+=a*nval(p)*on;nn+=a*on;p*=2.0;a*=0.5;}return s/max(nn,1e-4);}
+  void main(){vec2 p=v*SC;float hgt=nap(p);
+    if(RAW>0.5){gl_FragColor=vec4(vec3(hgt),1.0);return;}
+    float e=0.02;float hx=nap(p+vec2(e,0.0)),hy=nap(p+vec2(0.0,e));
+    vec3 N=normalize(vec3((hgt-hx)*RELIEF*40.0,(hgt-hy)*RELIEF*40.0,1.0));
+    float az=radians(AZ),el=radians(EL);vec3 L=normalize(vec3(cos(az)*cos(el),sin(az)*cos(el),sin(el)));
+    float d=clamp(dot(N,L),0.0,1.0);gl_FragColor=vec4(vec3(0.32+0.85*d),1.0);}`;
+  const sh=(t,s)=>{const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);return o;};
+  const pr=gl.createProgram();gl.attachShader(pr,sh(gl.VERTEX_SHADER,'attribute vec2 a;varying vec2 v;void main(){v=a*0.5+0.5;gl_Position=vec4(a,0.,1.);}'));
+  gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,FS));gl.linkProgram(pr);gl.useProgram(pr);
+  const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+  const a=gl.getAttribLocation(pr,'a');gl.enableVertexAttribArray(a);gl.vertexAttribPointer(a,2,gl.FLOAT,false,0,0);
+  const U=n=>gl.getUniformLocation(pr,n);const u={T:U('T'),SC:U('SC'),AZ:U('AZ'),EL:U('EL'),RAW:U('RAW'),SEED:U('SEED'),OCT:U('OCT'),RELIEF:U('RELIEF')};
+  const TYPE={hash:0,simplex:1,voronoi:2};
+  return (type)=>{ const R=state.bakeRes; if(c.width!==R){ c.width=c.height=R; } gl.viewport(0,0,R,R);
+    const sc=Math.min(R,Math.max(4,grainFreq()*24));   // density can reach 1 grain/pixel at the chosen resolution
+    gl.uniform1i(u.T,TYPE[type]); gl.uniform1f(u.SC,sc); gl.uniform1f(u.AZ,state.az); gl.uniform1f(u.EL,state.el);
+    gl.uniform1f(u.RAW,state.finish==='flat'?1:0); gl.uniform1f(u.SEED,state.seed); gl.uniform1f(u.OCT,state.oct); gl.uniform1f(u.RELIEF,state.relief);
+    gl.drawArrays(gl.TRIANGLES,0,3); return c.toDataURL(); };
+})();
+/* ---- unified suede texture: ALWAYS a baked raster (like the original's grain PNG) so the real
+       two-face 3D flip's backface-visibility works on Safari. GL types bake via WebGL; the procedural
+       feTurbulence types bake via SVG→canvas (verified renders on WebKit, no taint). ---- */
+const napCache={};
+const napKey=()=>[state.noise,state.finish,state.density,state.scale,state.oct,state.relief,state.az,state.el,state.seed,state.wash,state.bakeRes].join(':');
+function applyNap(url){ const n=$('nap'); if(!n)return; n.style.backgroundImage=`url("${url}")`; n.style.backgroundSize='cover'; n.style.imageRendering='auto'; n.style.opacity=state.nap; n.style.mixBlendMode=state.blend; }
+function bakeSVG(k){ const R=state.bakeRes, type=state.noise==='turbulent'?'turbulence':'fractalNoise';
+  // FREQUENCY: density drives a fine grain across the WHOLE range (no harsh 1.6 cap that killed density reaction); finer = sharper.
+  const bf=Math.max(0.06,Math.min(0.8,grainFreq()*0.028)).toFixed(3);
+  // WASH SCALE: BIG soft brush-strokes — much lower freq than the nap (refs show ~⅓-surface strokes). Independent of density.
+  const washBf=Math.max(0.0015,Math.min(0.006,0.004/Math.max(0.4,state.scale))).toFixed(4);
+  const occK=(state.wash/40*0.7);   // wash depth 0..0.7
+  // NAP = soft fine grayscale fibre grain: desaturate the turbulence → GENTLE contrast → slight blur so it's a soft
+  // velvety nap (not harsh digital speckle), visible at any light angle.
+  const napGrain=`<feTurbulence type="${type}" baseFrequency="${bf}" numOctaves="${state.oct}" seed="${state.seed}" stitchTiles="stitch" result="t"/><feColorMatrix in="t" type="matrix" values="0 0 0 1 0  0 0 0 1 0  0 0 0 1 0  0 0 0 0 1" result="g"/><feComponentTransfer in="g" result="gc"><feFuncR type="gamma" amplitude="1.18" exponent="1" offset="-0.09"/><feFuncG type="gamma" amplitude="1.18" exponent="1" offset="-0.09"/><feFuncB type="gamma" amplitude="1.18" exponent="1" offset="-0.09"/></feComponentTransfer><feGaussianBlur in="gc" stdDeviation="${(R*0.0009).toFixed(2)}" result="grain"/>`;
+  const surf = state.finish==='lit'
+    ? `${napGrain}<feDiffuseLighting in="t" surfaceScale="${(+state.relief).toFixed(2)}" diffuseConstant="1.1" lighting-color="#fff" result="lit"><feDistantLight azimuth="${state.az}" elevation="${state.el}"/></feDiffuseLighting><feBlend mode="multiply" in="grain" in2="lit" result="surf"/>`
+    : napGrain.replace('result="grain"','result="surf"');
+  // WASH: big soft blurred black/white blobs, blended as darker/lighter patches (morphed edges via blur).
+  const occ = state.wash>0
+    ? `<feTurbulence type="fractalNoise" baseFrequency="${washBf}" numOctaves="2" seed="${state.seed+11}" stitchTiles="stitch" result="cl"/><feColorMatrix in="cl" type="matrix" values="0 0 0 1 0  0 0 0 1 0  0 0 0 1 0  0 0 0 0 1" result="clg"/><feGaussianBlur in="clg" stdDeviation="${(R*0.004).toFixed(1)}" result="clb"/><feComponentTransfer in="clb" result="occ"><feFuncR type="linear" slope="${(occK*2).toFixed(3)}" intercept="${(1-occK).toFixed(3)}"/><feFuncG type="linear" slope="${(occK*2).toFixed(3)}" intercept="${(1-occK).toFixed(3)}"/><feFuncB type="linear" slope="${(occK*2).toFixed(3)}" intercept="${(1-occK).toFixed(3)}"/><feFuncA type="linear" slope="0" intercept="1"/></feComponentTransfer><feBlend mode="multiply" in="surf" in2="occ"/>`
+    : '';
+  const inner = `${surf}${occ}`;
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${R}" height="${R}"><filter id="f" x="0" y="0" width="100%" height="100%">${inner}</filter><rect width="${R}" height="${R}" filter="url(#f)"/></svg>`;
+  const img=new Image(); img.onload=()=>{ try{ const c=document.createElement('canvas'); c.width=c.height=R; c.getContext('2d').drawImage(img,0,0);
+    const url=c.toDataURL('image/png'); napCache[k]=url; if(napKey()===k) applyNap(url); }catch(_){ } };
+  img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg); }
+function ensureNap(){ const k=napKey();
+  if(napCache[k]){ applyNap(napCache[k]); return; }
+  if(SVG_TYPES.has(state.noise)){ bakeSVG(k); }                  // async → applies when ready
+  else { const u=bakeGL?bakeGL(state.noise):''; napCache[k]=u; applyNap(u); } }
+
+function render(){
+  $('model').className=state.variant;
+  document.querySelector('.rim').style.background=frameStyle(state.frame);
+  // front (showing) = image (hue/tone/sat) + tint ; back (showing) = solid colour. Content swaps at the flip midpoint.
+  const ph=$('photo'), tn=$('tint');
+  if(state.flipped){ $('well').style.background=backStyle(state.backColor); ph.style.display='none'; tn.style.display='none'; }
+  else {
+    $('well').style.background='transparent'; ph.style.display='block';
+    ph.style.backgroundImage = state.frontImg ? `url("${state.frontImg}")` : 'linear-gradient(135deg,#c9d3dc,#7b8794 60%,#525c66)';
+    ph.style.filter=`hue-rotate(${state.hue}deg) brightness(${state.tone/100}) saturate(${state.sat/100})`;
+    tn.style.display='block'; tn.style.background=state.tintColor; tn.style.mixBlendMode=state.blend; tn.style.opacity=state.tintAmt/100;
+  }
+  ensureNap();                                        // baked raster suede on the single well
+  $('sheen').style.background=sheenStyle(state.sheen);
+  $('sw').style.cssText=sweepCss(state.sweep);
+  if(!flipping) applyFlipTransform(false);            // hold current side at rest (also restores a persisted flipped state)
+  persist();
+}
+
+/* ---- persistence: per-type buckets + global settings + uploaded image, across reloads ---- */
+const LS='suede-studio-v3';   // bumped: discard stale saved state (e.g. density 40 / wash 0) so the washed high-res defaults take effect
+const GLOB=['variant','noise','bakeRes','frame','backColor','tintColor','tintAmt','blend','hue','tone','sat','frontImg','sweep','flipped','axis','dur'];
+function persist(){ buckets[state.noise]=snap();
+  try{ localStorage.setItem(LS, JSON.stringify({ g:Object.fromEntries(GLOB.map(k=>[k,state[k]])), buckets })); }catch(_){ } }
+function restore(){ try{ const d=JSON.parse(localStorage.getItem(LS)||'null'); if(!d)return;
+  Object.assign(state, d.g||{}); if(d.buckets) NOISES.forEach(n=>{ if(d.buckets[n]) buckets[n]={...buckets[n],...d.buckets[n]}; });
+  Object.assign(state, buckets[state.noise]); }catch(_){ } }
+
+/* ---- hydrate every control from current state (after restore / type switch) ---- */
+const setR=(id,val,vid,fmt)=>{ const e=$(id); if(e)e.value=val; if(vid&&$(vid))$(vid).textContent=fmt(val); };
+const setSeg=(id,val)=>{ const s=$(id); if(s)s.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===val)); };
+function hydrate(){
+  setR('density',state.density,'densityV',v=>v);
+  setR('scale',state.scale,'scaleV',v=>(+v).toFixed(2));
+  setR('nap_s',Math.round(state.nap*100),'napV',v=>v+'%');
+  setR('wash',state.wash,'washV',v=>v);
+  setR('oct',state.oct,'octV',v=>v);
+  setR('seed',state.seed,'seedV',v=>v);
+  setR('bakeRes',state.bakeRes,'bakeResV',v=>v+'px');
+  setR('az',state.az,'azV',v=>v+'°');
+  setR('el',state.el,'elV',v=>v+'°');
+  setR('relief',state.relief,'reliefV',v=>(+v).toFixed(1));
+  setR('sheen_s',Math.round(state.sheen*100),'sheenV',v=>v+'%');
+  setR('tintAmt',state.tintAmt,'tintV',v=>v+'%');
+  setR('hue',state.hue,'hueV',v=>v+'°');
+  setR('tone',state.tone,'toneV',v=>v+'%');
+  setR('sat',state.sat,'satV',v=>v+'%');
+  setR('dur',Math.round(state.dur*10),'durV',v=>(v/10).toFixed(1)+'s');
+  $('frame').value=state.frame; $('backColor').value=state.backColor; $('tintColor').value=state.tintColor;
+  setSeg('noiseSeg',state.noise); setSeg('finishSeg',state.finish); setSeg('blendSeg',state.blend); setSeg('axisSeg',state.axis); setSeg('sweepSeg',state.sweep?'on':'off');
+  $('variantTabs').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.variant===state.variant));
+  syncColourSide();
+}
+
+/* ---- colour tab follows the visible side: front = image controls · back = solid colour ---- */
+function syncColourSide(){
+  const back=state.flipped, isl=document.querySelector('#panel-colour .pisland'); let firstVis=null;
+  isl.querySelectorAll('button').forEach(b=>{ const show=(b.dataset.side==='back')===back; b.style.display=show?'':'none'; if(show&&!firstVis)firstVis=b; });
+  const active=isl.querySelector('button.on');
+  if((!active||active.style.display==='none')&&firstVis){
+    isl.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===firstVis));
+    $('panel-colour').querySelectorAll('.parm').forEach(p=>p.classList.toggle('on',p.dataset.p===firstVis.dataset.p)); }
+}
+
+/* ---- controls ---- */
+const rng=(id,vid,fmt,set)=>{ const e=$(id); if(!e)return; e.oninput=ev=>{ set(+ev.target.value); if(vid)$(vid).textContent=fmt(+ev.target.value); render(); }; };
+rng('density','densityV',v=>v,v=>state.density=v);
+rng('scale','scaleV',v=>v.toFixed(2),v=>state.scale=v);
+rng('nap_s','napV',v=>v+'%',v=>state.nap=v/100);
+rng('wash','washV',v=>v,v=>state.wash=v);
+rng('oct','octV',v=>v,v=>state.oct=v);
+rng('seed','seedV',v=>v,v=>state.seed=v);
+rng('bakeRes','bakeResV',v=>v+'px',v=>state.bakeRes=v);
+rng('az','azV',v=>v+'°',v=>state.az=v);
+rng('el','elV',v=>v+'°',v=>state.el=v);
+rng('relief','reliefV',v=>v.toFixed(1),v=>state.relief=v);
+rng('sheen_s','sheenV',v=>v+'%',v=>state.sheen=v/100);
+rng('tintAmt','tintV',v=>v+'%',v=>state.tintAmt=v);
+rng('hue','hueV',v=>v+'°',v=>state.hue=v);
+rng('tone','toneV',v=>v+'%',v=>state.tone=v);
+rng('sat','satV',v=>v+'%',v=>state.sat=v);
+rng('dur','durV',v=>(v/10).toFixed(1)+'s',v=>state.dur=v/10);
+// noise type switch — save outgoing type's tuning, load incoming type's tuning, refresh controls
+$('noiseSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+  buckets[state.noise]=snap(); state.noise=b.dataset.v; Object.assign(state, buckets[state.noise]); hydrate(); render(); });
+const segWire=(id,key)=>{ const seg=$(id); seg.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+  seg.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); state[key]=b.dataset.v; render(); }); };
+segWire('finishSeg','finish');
+segWire('blendSeg','blend');
+segWire('axisSeg','axis');
+$('sweepSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{ $('sweepSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); state.sweep=b.dataset.v==='on'; render(); });
+$('frame').oninput=e=>{ state.frame=e.target.value; render(); };
+$('backColor').oninput=e=>{ state.backColor=e.target.value; render(); };
+$('tintColor').oninput=e=>{ state.tintColor=e.target.value; render(); };
+// upload → downscale to a small JPEG data-URL so it persists across reloads (blob URLs don't)
+$('upload').onchange=e=>{ const f=e.target.files&&e.target.files[0]; if(!f)return;
+  const img=new Image(); img.onload=()=>{ const m=1000,r=Math.min(1,m/Math.max(img.width,img.height));
+    const cv=document.createElement('canvas'); cv.width=Math.round(img.width*r); cv.height=Math.round(img.height*r);
+    cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+    try{ state.frontImg=cv.toDataURL('image/jpeg',0.85); }catch(_){ state.frontImg=null; }
+    URL.revokeObjectURL(img.src); render(); };
+  img.src=URL.createObjectURL(f); };
+
+// param islands: switch which single control shows (collapses a panel to 2 rows)
+document.querySelectorAll('.pisland').forEach(island=>{ const panel=island.closest('.panel');
+  island.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    island.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
+    panel.querySelectorAll('.parm').forEach(p=>p.classList.toggle('on', p.dataset.p===b.dataset.p)); }); });
+
+// variant island
+$('variantTabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+  $('variantTabs').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); state.variant=b.dataset.variant; render(); });
+
+// flip — REAL 3D turn like the original: the card rotates a CONTINUOUS 180° on the chosen axis (perspective →
+//        near edge grows, far shrinks, edge-on sliver at 90°). One face only + content swapped at the edge-on
+//        midpoint, so no backface-visibility is needed → immune to the Safari filter/blend-mode flatten bug.
+//        (Back = solid colour + symmetric noise, so the 180° mirror is invisible.)
+let flipping=false;
+// perspective() in the card's OWN transform (the parent perspective property gets flattened by the wrapper's
+// translate/scale) → real depth: near edge grows, far edge shrinks, instead of a flat width-squash.
+const PERSP='perspective(1200px)';   // calmer depth than 820 → near-edge stretch is gentler, still a real 3D turn
+function flipCss(ang){ const ax=state.axis==='x'?'X':'Y'; return `${PERSP} rotate${ax}(${ang}deg)`; }
+function applyFlipTransform(){ const m=$('model'); m.style.transition='none'; m.style.transform=flipCss(state.flipped?180:0); }
+const easeQuad=t=>t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+const easeCubic=t=>t<0.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;   // snappier — coin
+// CHEAP content toggle at the swap — front(image+tint) ↔ back(solid colour). No ensureNap/sheen/persist (the nap
+// texture is identical on both sides), so the swap frame does ~no work → no hitch. Heavy persist() runs after.
+function swapFace(){ state.flipped=!state.flipped; const ph=$('photo'), tn=$('tint');
+  if(state.flipped){ $('well').style.background=backStyle(state.backColor); ph.style.display='none'; tn.style.display='none'; }
+  else { $('well').style.background='transparent'; ph.style.display='block'; tn.style.display='block'; }
+  syncColourSide(); }
+// rAF-driven. The swap is PINNED to exactly 90° (the card is edge-on → projects to a zero-width line → the content
+// change is physically invisible). Previously the swap landed on whatever frame first crossed e≥0.5 (~88–93°, a
+// ~10px visible sliver) AND ran a full render() there → visible flicker + a frame hitch. Both gone now.
+function doFlip(){ if(flipping)return; flipping=true;
+  const from=state.flipped?180:0, to=state.flipped?0:180, mid=(from+to)/2, m=$('model'),
+        dur=Math.max(120,state.dur*1000), ease=state.axis==='coin'?easeCubic:easeQuad, t0=performance.now();
+  let swapped=false; m.style.transition='none';
+  function frame(now){ const t=Math.min(1,(now-t0)/dur), e=ease(t); let ang=from+(to-from)*e;
+    if(!swapped && e>=0.5){ swapped=true; ang=mid; swapFace(); }   // pin THIS frame to exact edge-on; swap while invisible
+    m.style.transform=flipCss(ang);
+    if(t<1) requestAnimationFrame(frame); else { flipping=false; persist(); } }
+  requestAnimationFrame(frame); }
+$('turnBtn').onclick=doFlip; $('model').onclick=doFlip;
+
+// collapsing dock
+const stageEl=$('stage'); let dockOpen=false, activeCat='material';
+function syncDock(){ document.querySelectorAll('#catTabs button').forEach(b=>b.classList.toggle('active', dockOpen&&b.dataset.cat===activeCat));
+  ['material','light','colour','frame','flip'].forEach(p=>$('panel-'+p).style.display=(dockOpen&&p===activeCat)?'flex':'none'); stageEl.classList.toggle('dock-open',dockOpen); }
+document.querySelectorAll('#catTabs button').forEach(b=>b.onclick=()=>{ if(dockOpen&&activeCat===b.dataset.cat)dockOpen=false; else{dockOpen=true;activeCat=b.dataset.cat;} syncDock(); });
+
+// swipe-to-hide + pinch-to-zoom
+let _swipeY=null, pinch0=null, zoom0=1, zoom=1;
+const setUI=s=>stageEl.classList.toggle('ui-hidden',!s);
+const dist=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);
+const setZoom=z=>{ zoom=Math.max(0.6,Math.min(3.5,z)); $('modelWrap').style.setProperty('--zoom',zoom.toFixed(3)); };
+stageEl.addEventListener('touchstart',e=>{ if(e.touches.length===2){pinch0=dist(e.touches);zoom0=zoom;_swipeY=null;return;}
+  _swipeY=e.target.closest('#dock,#topbar,#uiHandle,#turnBtn,#model')?null:e.touches[0].clientY; },{passive:true});
+stageEl.addEventListener('touchmove',e=>{ if(e.touches.length===2&&pinch0){ e.preventDefault(); setZoom(zoom0*dist(e.touches)/pinch0); return;}
+  if(_swipeY==null)return; const dy=e.touches[0].clientY-_swipeY; if(dy>45){setUI(false);_swipeY=null;}else if(dy<-45){setUI(true);_swipeY=null;} },{passive:false});
+stageEl.addEventListener('touchend',e=>{ if(e.touches.length<2)pinch0=null; },{passive:true});
+// block Safari's native page pinch-zoom (it fights the effect zoom) — these fire ONLY for pinch, so scrolling is untouched
+['gesturestart','gesturechange','gestureend'].forEach(ev=>document.addEventListener(ev,e=>e.preventDefault(),{passive:false}));
+document.addEventListener('dblclick',e=>e.preventDefault(),{passive:false});   // stop double-tap page zoom
+addEventListener('wheel',e=>{ if(e.ctrlKey){ e.preventDefault(); setZoom(zoom*(1-e.deltaY*0.01)); } else if(Math.abs(e.deltaY)>6)setUI(e.deltaY<0); },{passive:false});
+$('uiHandle').onclick=()=>setUI(true);
+
+// force any persisted page pinch-zoom back to 1:1 (clamp min=max=1, then re-assert after layout)
+(function resetPageZoom(){ const vp=document.querySelector('meta[name=viewport]'); if(!vp)return;
+  const lock='width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover';
+  vp.setAttribute('content',lock); window.scrollTo(0,0);
+  setTimeout(()=>{ vp.setAttribute('content',lock); window.scrollTo(0,0); },300); })();
+
+window.__state=state; window.__render=render; window.__flipCss=flipCss; window.__doFlip=doFlip;
+restore(); hydrate(); syncDock(); render();
+</script>
+</body>
+</html>

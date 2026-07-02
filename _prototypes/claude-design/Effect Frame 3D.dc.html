@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style data-omelette-injected>html,body{background:transparent}</style><script data-omelette-injected>(()=>{var j=[];var x=false;var S=30000;var f=3000;document.addEventListener("DOMContentLoaded",()=>{const H=window.Babel;const G="om-src-id";if(H&&H.registerPlugin&&!(H.availablePlugins&&H.availablePlugins[G])){H.registerPlugin(G,({types:Y})=>({visitor:{JSXOpeningElement(U,Q){const J=U.node;if(J.name&&J.name.type==="JSXMemberExpression")return;for(let V=0;V<J.attributes.length;V++){const L=J.attributes[V];if(L.type==="JSXAttribute"&&L.name&&L.name.name==="data-om-id")return}const W=Q.file&&Q.file.opts&&Q.file.opts.filename||"?";const Z=J.loc&&J.loc.start;const z=`jsx:${W}:${J.start??0}:${Z?Z.line:0}:${Z?Z.column+1:0}`;J.attributes.push(Y.jsxAttribute(Y.jsxIdentifier("data-om-id"),Y.stringLiteral(z)))}}}))}const k="om-text-extract";let A=false;if(x&&H&&H.registerPlugin&&!(H.availablePlugins&&H.availablePlugins[k])){const Y=window.React;if(Y&&Y.useSyncExternalStore&&Y.createElement){A=true;const U={};const Q=new Set;let J=0;window.__omTextO=U;window.__omTextSet=(z)=>{for(const V in z){const L=z[V];if(L==null)delete U[V];else U[V]=L}J++;Q.forEach((V)=>V())};const W=(z)=>{Q.add(z);return()=>Q.delete(z)};const Z=()=>J;window.__OmT=function z(V){Y.useSyncExternalStore(W,Z,Z);return Y.createElement("span",{"data-om-text":V.i,className:"__om-t"},V.i in U?U[V.i]:V.children)};H.registerPlugin(k,({types:z})=>{const V={style:1,script:1,noscript:1,textarea:1,title:1,option:1,text:1,tspan:1,textPath:1};const L={placeholder:1,alt:1,title:1,label:1,"aria-label":1,"aria-description":1,"aria-placeholder":1};const _=($,C)=>z.logicalExpression("??",z.memberExpression(z.logicalExpression("||",z.memberExpression(z.identifier("window"),z.identifier("__omTextO")),z.objectExpression([])),z.stringLiteral($),true),C);const E=($)=>$.file&&$.file.opts&&$.file.opts.filename||"?";const B=($)=>$.file&&$.file.code||"";const b=($,C)=>{const X=(F)=>F&&F.start!=null&&F.end!=null&&(F.type==="StringLiteral"||F.type==="TemplateLiteral"&&F.expressions.length===0)?[F.start,F.end]:null;const N=X(C);if(N)return N;if(C&&C.type==="Identifier"){const F=$.scope.getBinding(C.name);if(F&&F.constant&&F.path.node.type==="VariableDeclarator"){return X(F.path.node.init)}}return null};const M=($,C,X)=>{const N=$.node;let F=false;const w=(K,q)=>{F=true;return z.jsxElement(z.jsxOpeningElement(z.jsxIdentifier("__OmT"),[z.jsxAttribute(z.jsxIdentifier("i"),z.stringLiteral(K))],false),z.jsxClosingElement(z.jsxIdentifier("__OmT")),[q],false)};const D=N.children.map((K)=>{if(K.type==="JSXText"){if(K.start==null||K.end==null)return K;const q=X.slice(K.start,K.end);const R=q.length-q.trimStart().length;const m=q.length-q.trimEnd().length;if(R+m>=q.length)return K;return w(`txt:${C}:${K.start+R}:${K.end-m}`,K)}if(K.type==="JSXExpressionContainer"){const q=b($,K.expression);if(q)return w(`str:${C}:${q[0]}:${q[1]}`,K)}return K});if(F)N.children=D};return{visitor:{JSXOpeningElement($,C){const X=$.node;const N=E(C);const F={};for(let w=0;w<X.attributes.length;w++){const D=X.attributes[w];if(D.type!=="JSXAttribute"||!D.name)continue;const K=D.name.name;if(!L[K])continue;if(!D.value||D.value.type!=="StringLiteral")continue;if(D.value.start==null||D.value.end==null)continue;const q=`txt:${N}:${D.value.start}:${D.value.end}`;F[K]=q;D.value=z.jsxExpressionContainer(_(q,z.stringLiteral(D.value.value)))}if(Object.keys(F).length){X.attributes.push(z.jsxAttribute(z.jsxIdentifier("data-om-text-attrs"),z.stringLiteral(JSON.stringify(F))))}},JSXElement($,C){const X=$.node.openingElement;const N=X&&X.name&&X.name.name;if(N==="__OmT")return;if(typeof N==="string"&&V[N])return;M($,E(C),B(C))},JSXFragment($,C){M($,E(C),B(C))}}}})}}const u=A?["transform-react-jsx-source",G,k]:["transform-react-jsx-source",G];document.querySelectorAll('script[type="text/babel"],script[type="text/jsx"]').forEach((Y,U)=>{const Q=Y.getAttribute("data-plugins")||"";const J=u.filter((W)=>Q.indexOf(W)<0);if(J.length){Y.setAttribute("data-plugins",Q?`${Q},${J.join(",")}`:J.join(","))}if(!Y.hasAttribute("data-filename")){Y.setAttribute("data-filename",Y.getAttribute("src")||`inline-${U}`)}})});var y=window.parent;if(y&&y!==window){const H=(Q,J)=>{try{y.postMessage({__omelette_log:true,type:Q,data:J},"*")}catch{}};["log","warn","error"].forEach((Q)=>{const J=console[Q];console[Q]=(...W)=>{const Z=W.map((z)=>{try{return typeof z==="object"?JSON.stringify(z):String(z)}catch{try{return String(z)}catch{return"[unstringifiable]"}}}).join(" ");H(Q,Z);J.apply(console,W)}});window.addEventListener("error",(Q)=>{const J=Q.target;if(J&&J!==window&&J.tagName){const W=J.src||J.href||"";H("resource_error",`${J.tagName} failed to load: ${W}`)}else{H("error",`${Q.message||"Unknown error"} at ${Q.filename||"?"}:${Q.lineno||0}:${Q.colno||0}`)}},true);window.addEventListener("unhandledrejection",(Q)=>{const J=Q.reason;const W=J instanceof Error?`${J.message} ${J.stack}`:String(J);H("error",`Unhandled rejection: ${W}`)});const G=()=>{try{y.postMessage({type:"omelette:height",height:document.documentElement.scrollHeight},"*")}catch{}};if(document.readyState==="complete")G();else window.addEventListener("load",G);if(window.ResizeObserver)new ResizeObserver(G).observe(document.documentElement);const k={};let A=0;window.claude={complete(Q){return new Promise((J,W)=>{if(!j.length){W(new Error("claude.complete: no parent origin"));return}const Z=`c${++A}`;const z=()=>setTimeout(()=>{delete k[Z];W(new Error(`claude.complete: no data for ${S/1000}s`))},S);const V=z();k[Z]={resolve:J,reject:W,text:"",t:V,arm:z};try{for(const L of j){y.postMessage({__om_api:true,id:Z,body:Q},L)}}catch(L){clearTimeout(V);delete k[Z];W(L)}})}};const u={};let Y=0;window.omelette={writeFile:(Q,J)=>new Promise((W,Z)=>{if(!j.length){W();return}const z=`f${++Y}`;const V=setTimeout(()=>{delete u[z];W()},f);u[z]={resolve:W,reject:Z,t:V};try{for(const L of j){y.postMessage({__om_file:true,id:z,op:"write",path:Q,content:J},L)}}catch{clearTimeout(V);delete u[z];W()}})};const U=(Q)=>{try{return JSON.stringify(Q)}catch{return JSON.stringify(String(Q))}};window.addEventListener("message",(Q)=>{if(j.indexOf(Q.origin)<0)return;if(Q.source!==y)return;const J=Q.data;if(!J)return;if(J.type==="omelette-preview-refresh"){if(typeof J.token!=="string"||!/^[0-9a-f.-]+(\.(rc|pr-[0-9]+))?(\.[0-9]+\.[0-9a-f]{16})?$/.test(J.token))return;const z=Math.max(1,Math.floor((J.expiresAt||0)-Date.now()/1000));document.cookie="__Host-omelette-preview="+J.token+"; Path=/; Secure; SameSite=None; Partitioned; Max-Age="+z;return}if(J.__om_file_r){const z=u[J.id];if(!z)return;clearTimeout(z.t);delete u[J.id];if(J.ok)z.resolve();else z.reject(new Error(J.error||"write failed"));return}if(J.__om_api_r){const z=k[J.id];if(!z)return;if(J.error!=null){clearTimeout(z.t);delete k[J.id];z.reject(new Error(J.error));return}if(J.chunk!=null){clearTimeout(z.t);z.t=z.arm();z.text+=J.chunk;return}if(J.done){clearTimeout(z.t);delete k[J.id];z.resolve(J.text!=null?J.text:z.text);return}return}if(!J.__om_eval)return;const W=J;const Z=(z)=>{Q.source.postMessage({...z,__om_eval_r:1,id:W.id},Q.origin)};try{const z=(0,eval)(W.code);if(z&&typeof z.then==="function"){z.then((V)=>Z({ok:1,v:U(V)}),(V)=>Z({ok:0,e:String(V)}))}else{Z({ok:1,v:U(z)})}}catch(z){Z({ok:0,e:String(z)})}})}})();
+</script>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://api.fontshare.com">
+<link href="https://api.fontshare.com/v2/css?f[]=chillax@400,500,600&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens-v2/tokens.css">
+<link rel="stylesheet" href="tokens-v2/onemo-app-vars.css">
+<style>
+  *{box-sizing:border-box;-webkit-font-smoothing:antialiased;}
+  html,body{margin:0;padding:0;}
+  .mono{font-family:ui-monospace,Menlo,monospace;}
+  .rim{position:relative;width:300px;height:300px;border-radius:52px;padding:8px;--pr:44px;
+       box-shadow:0 26px 50px -18px rgba(10,13,18,.55),0 0 0 1px rgba(255,255,255,.22),
+         inset 0 2px 1px -1px rgba(255,255,255,.32),inset 2px 0 1px -1px rgba(255,255,255,.2),
+         inset -2px 0 1px -1px rgba(255,255,255,.18),inset 0 -2px 1px -1px rgba(255,255,255,.24),
+         inset 5px -5px 3px -3px rgba(255,255,255,.28),inset -4px 4px 3px -3px rgba(255,255,255,.1),
+         inset 4px 4px 3px -3px rgba(255,255,255,.1),inset 0 -3px 4px -3px rgba(0,0,0,.28);}
+  .well{position:relative;z-index:1;width:100%;height:100%;border-radius:var(--pr);overflow:hidden;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.14),inset 0 2px 4px rgba(0,0,0,.55),inset 0 -2px 4px rgba(0,0,0,.45);}
+  .edge{position:absolute;inset:0;border-radius:var(--pr);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.14),inset 0 2px 4px rgba(0,0,0,.55),inset 0 -2px 4px rgba(0,0,0,.45);pointer-events:none;}
+  @property --sweep{syntax:'<angle>';inherits:false;initial-value:0deg;}
+  .sweep{position:absolute;inset:0;border-radius:52px;z-index:0;pointer-events:none;}
+  @keyframes drift{to{--sweep:360deg;}}
+  .ctrl{display:flex;flex-direction:column;gap:7px;}
+  .ctrl > span{font:600 11px/1 var(--font-primary);letter-spacing:.05em;text-transform:uppercase;color:#8a929b;}
+  input[type=range]{width:190px;accent-color:#1170A1;}
+  select{font:500 12px/1 var(--font-body);padding:8px 10px;border-radius:8px;border:1px solid #d4d8dc;background:#fff;}
+  .seg{display:flex;border-radius:9px;overflow:hidden;box-shadow:inset 0 0 0 1px #d4d8dc;}
+  .seg button{appearance:none;border:0;padding:8px 16px;font:600 12px/1 var(--font-primary);cursor:pointer;}
+</style>
+</helmet>
+
+<div style="min-height:100vh;background:#e9ebee;padding:48px;font-family:var(--font-body);color:#16191d;display:flex;flex-direction:column;align-items:center;">
+  <div style="max-width:780px;text-align:center;margin-bottom:36px;">
+    <div style="font:600 13px/1 var(--font-primary);letter-spacing:.14em;text-transform:uppercase;color:#8a929b;margin-bottom:8px;">Experiment · interactive · per-face</div>
+    <h1 style="margin:0 0 10px;font:600 34px/1.05 var(--font-primary);letter-spacing:-.01em;">Effect · both sides + controls</h1>
+    <p style="margin:0;font:400 15px/1.5 var(--font-body);color:#5b626c;">Toggle which face you're editing. Material (grain · nap · sheen · blend) is independent per side, so a light front image won't be darkened by the back's settings.</p>
+  </div>
+
+  <div style="display:flex;gap:56px;flex-wrap:wrap;justify-content:center;margin-bottom:36px;">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:14px;">
+      <div class="rim" style="background:{{ frameStyle }};{{ frontRing }}"><div class="sweep" style="{{ sweepStyle }}"></div>
+        <div class="well">
+          {{ frontImgEl }}
+          <div style="position:absolute;inset:0;mix-blend-mode:{{ f.blend }};opacity:{{ f.nap }};background-image:url(assets/grain1x.png);background-size:{{ f.grain }}px;image-rendering:pixelated;"></div>
+          <div style="position:absolute;inset:0;mix-blend-mode:multiply;opacity:{{ f.depth }};background-image:url(assets/grain1x.png);background-size:{{ f.grain }}px;image-rendering:pixelated;"></div>
+          <div style="position:absolute;inset:0;background:{{ f.sheenStyle }};"></div>
+          <div class="edge"></div>
+        </div>
+      </div>
+      <button onClick="{{ pickFront }}" class="mono" style="appearance:none;border:0;background:none;cursor:pointer;font-size:11px;color:{{ frontLabel }};">Front · image on suede</button>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:14px;">
+      <div class="rim" style="background:{{ frameStyle }};{{ backRing }}"><div class="sweep" style="{{ sweepStyle }}"></div>
+        <div class="well" style="background:{{ backStyle }};">
+          <div style="position:absolute;inset:0;mix-blend-mode:{{ b.blend }};opacity:{{ b.nap }};background-image:url(assets/grain1x.png);background-size:{{ b.grain }}px;image-rendering:pixelated;"></div>
+          <div style="position:absolute;inset:0;background:{{ b.sheenStyle }};"></div>
+          <div class="edge"></div>
+        </div>
+      </div>
+      <button onClick="{{ pickBack }}" class="mono" style="appearance:none;border:0;background:none;cursor:pointer;font-size:11px;color:{{ backLabel }};">Back · solid colour suede</button>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:32px;flex-wrap:wrap;justify-content:center;align-items:flex-start;background:#fff;border-radius:16px;padding:24px 32px;box-shadow:0 1px 3px rgba(10,13,18,.08);max-width:920px;">
+    <div class="ctrl">
+      <span>Editing</span>
+      <div class="seg">
+        <button onClick="{{ pickFront }}" style="background:{{ frontBtnBg }};color:{{ frontBtnFg }};">Front</button>
+        <button onClick="{{ pickBack }}" style="background:{{ backBtnBg }};color:{{ backBtnFg }};">Back</button>
+      </div>
+    </div>
+    <div class="ctrl"><span>Grain scale · {{ a.grain }}px</span><input type="range" min="40" max="260" value="{{ a.grain }}" onInput="{{ onGrain }}" /></div>
+    <div class="ctrl"><span>Nap · {{ a.napPct }}</span><input type="range" min="0" max="100" value="{{ a.napVal }}" onInput="{{ onNap }}" /></div>
+    <div class="ctrl"><span>Depth · {{ a.depthPct }}</span><input type="range" min="0" max="100" value="{{ a.depthVal }}" onInput="{{ onDepth }}" /></div>
+    <div class="ctrl"><span>Sheen · {{ a.sheenPct }}</span><input type="range" min="0" max="60" value="{{ a.sheenVal }}" onInput="{{ onSheen }}" /></div>
+    <div class="ctrl"><span>Blend mode</span>
+      <select onChange="{{ onBlend }}">
+        <sc-for list="{{ blendOpts }}" as="o" hint-placeholder-count="7"><option value="{{ o.v }}" selected="{{ o.sel }}">{{ o.v }}</option></sc-for>
+      </select>
+    </div>
+    <div class="ctrl"><span>Frame colour</span><input type="color" value="{{ frame }}" onInput="{{ onFrame }}" style="width:60px;height:36px;border:0;border-radius:8px;background:none;cursor:pointer;" /></div>
+    <div class="ctrl"><span>Back colour</span><input type="color" value="{{ backColor }}" onInput="{{ onBackColor }}" style="width:60px;height:36px;border:0;border-radius:8px;background:none;cursor:pointer;" /></div>
+    <div class="ctrl"><span>Front image</span>
+      <label style="display:inline-flex;align-items:center;gap:8px;padding:9px 14px;border-radius:999px;background:#16191d;color:#fff;font:500 12px/1 var(--font-primary);cursor:pointer;"><i class="ph ph-upload-simple" style="font-size:15px;"></i>Upload<input type="file" accept="image/*" onChange="{{ onUpload }}" style="display:none;" /></label>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:32px;flex-wrap:wrap;justify-content:center;align-items:center;background:#fff;border-radius:16px;padding:18px 32px;box-shadow:0 1px 3px rgba(10,13,18,.08);max-width:920px;margin-top:16px;">
+    <div class="ctrl">
+      <span>Highlight sweep</span>
+      <div class="seg">
+        <button onClick="{{ hlOn }}" style="background:{{ hlOnBg }};color:{{ hlOnFg }};">On</button>
+        <button onClick="{{ hlOff }}" style="background:{{ hlOffBg }};color:{{ hlOffFg }};">Off</button>
+      </div>
+    </div>
+    <div class="ctrl"><span>Highlight colour</span><input type="color" value="{{ hlColor }}" onInput="{{ onHlColor }}" style="width:60px;height:36px;border:0;border-radius:8px;background:none;cursor:pointer;" /></div>
+    <div class="ctrl"><span>Sweep speed · {{ hlSpeed }}s</span><input type="range" min="6" max="60" value="{{ hlSpeed }}" onInput="{{ onHlSpeed }}" /></div>
+  </div>
+
+  <div style="max-width:720px;width:100%;margin-top:32px;">
+    <details style="background:#fff;border-radius:14px;padding:4px 4px;box-shadow:0 1px 3px rgba(10,13,18,.08);">
+      <summary style="cursor:pointer;list-style:none;padding:18px 22px;font:600 15px/1 var(--font-primary);color:#16191d;display:flex;align-items:center;gap:10px;"><i class="ph ph-book-open" style="font-size:18px;color:#1170A1;"></i>How this is built</summary>
+      <div style="padding:4px 24px 24px;font:400 14px/1.65 var(--font-body);color:#3a4048;">
+
+        <h3 style="font:600 13px/1 var(--font-primary);letter-spacing:.04em;text-transform:uppercase;color:#8a929b;margin:18px 0 8px;">Structure</h3>
+        <p style="margin:0 0 6px;">Each Effect face is three nested layers: an outer <b>rim</b> (the brushed-metal frame), an inner <b>well</b> (the recessed cavity, clipped with <span class="mono">overflow:hidden</span>), and the content (image on the front, solid colour on the back). No 3D engine — the depth is pure CSS.</p>
+
+        <h3 style="font:600 13px/1 var(--font-primary);letter-spacing:.04em;text-transform:uppercase;color:#8a929b;margin:18px 0 8px;">The metal frame illusion</h3>
+        <p style="margin:0 0 6px;">The rim's roundness + dimensionality is a stack of layered <span class="mono">inset box-shadow</span>s: bright top/left insets read as light hitting a bevel, dark bottom insets read as the shadowed underside. A diagonal <span class="mono">linear-gradient</span> over the base colour gives the anodised sheen. The well repeats the trick inverted (dark top inset, light bottom) so it reads as carved <i>into</i> the surface.</p>
+
+        <h3 style="font:600 13px/1 var(--font-primary);letter-spacing:.04em;text-transform:uppercase;color:#8a929b;margin:18px 0 8px;">Suede / nap material</h3>
+        <p style="margin:0 0 6px;">A single tiled noise PNG (<span class="mono">grain1x.png</span>) is overlaid twice on each face:</p>
+        <ul style="margin:0 0 6px;padding-left:20px;">
+          <li><b>Nap</b> — the grain at the chosen <i>blend mode</i> (soft-light by default): lightens & darkens per-pixel for the velvety tooth.</li>
+          <li><b>Depth</b> — the same grain again in <span class="mono">multiply</span>, darkening only, so it reads as printed <i>into</i> the texture (front only).</li>
+        </ul>
+        <p style="margin:0 0 6px;"><b>Grain scale</b> changes the tile <span class="mono">background-size</span> (fine suede → coarse canvas). <b>Sheen</b> is a soft top-left <span class="mono">radial-gradient</span> highlight.</p>
+
+        <h3 style="font:600 13px/1 var(--font-primary);letter-spacing:.04em;text-transform:uppercase;color:#8a929b;margin:18px 0 8px;">Per-face independence</h3>
+        <p style="margin:0 0 6px;">Front and back hold <i>separate</i> material state ({nap, depth, sheen, grain, blend}). The <b>Editing</b> toggle just points the sliders at one object or the other — so a light front image keeps its own settings and isn't darkened by the back's. The active face shows a blue selection ring.</p>
+
+        <h3 style="font:600 13px/1 var(--font-primary);letter-spacing:.04em;text-transform:uppercase;color:#8a929b;margin:18px 0 8px;">The drifting highlight</h3>
+        <p style="margin:0 0 6px;">A <span class="mono">conic-gradient</span> of three soft arcs sits behind the rim. A registered <span class="mono">@property --sweep</span> (an <span class="mono">&lt;angle&gt;</span>) is animated 0→360°, and the gradient reads <span class="mono">from var(--sweep)</span> — so the light rotates around the frame. Colour, speed, and on/off are state-driven; turning it off sets <span class="mono">animation:none</span>.</p>
+
+        <h3 style="font:600 13px/1 var(--font-primary);letter-spacing:.04em;text-transform:uppercase;color:#8a929b;margin:18px 0 8px;">Performance note</h3>
+        <p style="margin:0;">The continuously-animating conic and the stacked <span class="mono">mix-blend-mode</span> layers are the heaviest parts (they repaint every frame / force compositing). On mobile, ship with the sweep paused-when-idle and consider baking the grain into a static texture rather than two live blend layers.</p>
+      </div>
+    </details>
+  </div>
+
+  <div style="max-width:720px;width:100%;margin-top:32px;display:flex;flex-direction:column;align-items:center;">
+    <div style="font:600 13px/1 var(--font-primary);letter-spacing:.14em;text-transform:uppercase;color:#8a929b;margin-bottom:8px;">Flip transition · experiment</div>
+    <p style="margin:0 0 22px;font:400 14px/1.5 var(--font-body);color:#5b626c;text-align:center;max-width:520px;">In the editor, switching Front ↔ Back flips the model with a fake-3D rotation. Tap the flip button and try the animation types.</p>
+
+    <div style="perspective:1400px;width:316px;height:316px;">
+      <div style="position:relative;width:100%;height:100%;transform-style:preserve-3d;transform:{{ flipTransform }};transition:{{ flipTransition }};">
+        <div style="position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;display:grid;place-items:center;">
+          <div class="rim" style="background:{{ frameStyle }};"><div class="sweep" style="{{ sweepStyle }}"></div>
+            <div class="well">
+              {{ flipFrontImgEl }}
+              <div style="position:absolute;inset:0;mix-blend-mode:{{ f.blend }};opacity:{{ f.nap }};background-image:url(assets/grain1x.png);background-size:{{ f.grain }}px;image-rendering:pixelated;"></div>
+              <div style="position:absolute;inset:0;background:{{ f.sheenStyle }};"></div>
+              <div class="edge"></div>
+            </div>
+          </div>
+        </div>
+        <div style="position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;transform:{{ backFaceTransform }};display:grid;place-items:center;">
+          <div class="rim" style="background:{{ frameStyle }};"><div class="sweep" style="{{ sweepStyle }}"></div>
+            <div class="well" style="background:{{ backStyle }};">
+              <div style="position:absolute;inset:0;mix-blend-mode:{{ b.blend }};opacity:{{ b.nap }};background-image:url(assets/grain1x.png);background-size:{{ b.grain }}px;image-rendering:pixelated;"></div>
+              <div style="position:absolute;inset:0;background:{{ b.sheenStyle }};"></div>
+              <div class="edge"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:24px;align-items:flex-end;margin-top:24px;background:#fff;border-radius:16px;padding:18px 28px;box-shadow:0 1px 3px rgba(10,13,18,.08);">
+      <div class="ctrl" style="align-items:center;"><span>{{ flipFaceLabel }}</span>
+        <button onClick="{{ doFlip }}" style="appearance:none;border:0;width:56px;height:56px;border-radius:50%;background:#16191d;color:#fff;cursor:pointer;display:grid;place-items:center;"><i class="ph ph-arrows-counter-clockwise" style="font-size:24px;"></i></button>
+      </div>
+      <div class="ctrl"><span>Animation</span>
+        <select onChange="{{ onFlipMode }}">
+          <sc-for list="{{ flipModes }}" as="o" hint-placeholder-count="3"><option value="{{ o.v }}" selected="{{ o.sel }}">{{ o.label }}</option></sc-for>
+        </select>
+      </div>
+      <div class="ctrl"><span>Duration · {{ flipDur }}s</span><input type="range" min="3" max="16" value="{{ flipDurVal }}" onInput="{{ onFlipDur }}" /></div>
+    </div>
+  </div>
+
+  <div style="max-width:760px;width:100%;margin-top:32px;display:flex;flex-direction:column;align-items:center;">
+    <div style="font:600 13px/1 var(--font-primary);letter-spacing:.14em;text-transform:uppercase;color:#8a929b;margin-bottom:8px;">Frameless variants</div>
+    <p style="margin:0 0 26px;font:400 14px/1.5 var(--font-body);color:#5b626c;text-align:center;max-width:520px;">Same per-face material controls and front/back flip as the framed piece — no metal rim, so the material fills edge to edge. Thickness is faked with the shared cast shadow.</p>
+    <div style="display:flex;gap:64px;flex-wrap:wrap;justify-content:center;align-items:flex-start;">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:18px;">
+        <div style="perspective:1400px;width:300px;height:300px;">
+          <div style="position:relative;width:100%;height:100%;transform-style:preserve-3d;transform:{{ flipSlimTransform }};transition:{{ flipTransition }};">
+            <div style="position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:34px;box-shadow:0 26px 50px -18px rgba(10,13,18,.55);">
+              <div style="position:absolute;inset:0;border-radius:34px;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),inset 0 2px 5px rgba(0,0,0,.5),inset 0 -2px 5px rgba(0,0,0,.4);">
+                {{ frontImgEl }}
+                <div style="position:absolute;inset:0;mix-blend-mode:{{ f.blend }};opacity:{{ f.nap }};background-image:url(assets/grain1x.png);background-size:{{ f.grain }}px;image-rendering:pixelated;"></div>
+                <div style="position:absolute;inset:0;background:{{ f.sheenStyle }};"></div>
+              </div>
+            </div>
+            <div style="position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;transform:{{ backFaceTransform }};border-radius:34px;box-shadow:0 26px 50px -18px rgba(10,13,18,.55);">
+              <div style="position:absolute;inset:0;border-radius:34px;overflow:hidden;background:{{ backStyle }};box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),inset 0 2px 5px rgba(0,0,0,.5),inset 0 -2px 5px rgba(0,0,0,.4);">
+                <div style="position:absolute;inset:0;mix-blend-mode:{{ b.blend }};opacity:{{ b.nap }};background-image:url(assets/grain1x.png);background-size:{{ b.grain }}px;image-rendering:pixelated;"></div>
+                <div style="position:absolute;inset:0;background:{{ b.sheenStyle }};"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;"><button onClick="{{ flipSlimT }}" style="appearance:none;border:0;width:42px;height:42px;border-radius:50%;background:#16191d;color:#fff;cursor:pointer;display:grid;place-items:center;"><i class="ph ph-arrows-counter-clockwise" style="font-size:19px;"></i></button><span class="mono" style="font-size:11px;color:#8a929b;">Slim · {{ slimFace }}</span></div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:18px;">
+        <div style="perspective:1400px;width:300px;height:300px;">
+          <div style="position:relative;width:100%;height:100%;transform-style:preserve-3d;transform:{{ flipShapedTransform }};transition:{{ flipTransition }};">
+            <div style="position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:42% 58% 45% 55% / 52% 44% 56% 48%;box-shadow:0 26px 50px -18px rgba(10,13,18,.55);">
+              <div style="position:absolute;inset:0;border-radius:42% 58% 45% 55% / 52% 44% 56% 48%;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),inset 0 2px 5px rgba(0,0,0,.5),inset 0 -2px 5px rgba(0,0,0,.4);">
+                {{ frontImgEl }}
+                <div style="position:absolute;inset:0;mix-blend-mode:{{ f.blend }};opacity:{{ f.nap }};background-image:url(assets/grain1x.png);background-size:{{ f.grain }}px;image-rendering:pixelated;"></div>
+                <div style="position:absolute;inset:0;background:{{ f.sheenStyle }};"></div>
+              </div>
+            </div>
+            <div style="position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;transform:{{ backFaceTransform }};border-radius:42% 58% 45% 55% / 52% 44% 56% 48%;box-shadow:0 26px 50px -18px rgba(10,13,18,.55);">
+              <div style="position:absolute;inset:0;border-radius:42% 58% 45% 55% / 52% 44% 56% 48%;overflow:hidden;background:{{ backStyle }};box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),inset 0 2px 5px rgba(0,0,0,.5),inset 0 -2px 5px rgba(0,0,0,.4);">
+                <div style="position:absolute;inset:0;mix-blend-mode:{{ b.blend }};opacity:{{ b.nap }};background-image:url(assets/grain1x.png);background-size:{{ b.grain }}px;image-rendering:pixelated;"></div>
+                <div style="position:absolute;inset:0;background:{{ b.sheenStyle }};"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;"><button onClick="{{ flipShapedT }}" style="appearance:none;border:0;width:42px;height:42px;border-radius:50%;background:#16191d;color:#fff;cursor:pointer;display:grid;place-items:center;"><i class="ph ph-arrows-counter-clockwise" style="font-size:19px;"></i></button><span class="mono" style="font-size:11px;color:#8a929b;">Shaped · blob · {{ shapedFace }}</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    target: 'front',
+    frame: '#2a2f37', backColor: '#3a4654', frontImg: 'assets/effect-default.png',
+    front: { nap:0.7, depth:0.25, sheen:0.12, grain:120, blend:'soft-light' },
+    back:  { nap:0.5, depth:0,    sheen:0.12, grain:160, blend:'soft-light' },
+    hl: { on:true, color:'#b2bdc9', speed:34 },
+    flipped:false, flipMode:'y', flipDur:0.7,
+    flipSlim:false, flipShaped:false
+  };
+  BLENDS = ['soft-light','overlay','multiply','screen','normal','hard-light','color-burn'];
+  upd(patch){ const t=this.state.target; this.setState(s=>({ [t]: { ...s[t], ...patch } })); }
+  pickFront = () => this.setState({ target:'front' });
+  pickBack = () => this.setState({ target:'back' });
+  onGrain = (e)=> this.upd({ grain:+e.target.value });
+  onNap = (e)=> this.upd({ nap:+e.target.value/100 });
+  onDepth = (e)=> this.upd({ depth:+e.target.value/100 });
+  onSheen = (e)=> this.upd({ sheen:+e.target.value/100 });
+  onBlend = (e)=> this.upd({ blend:e.target.value });
+  onFrame = (e)=> this.setState({ frame:e.target.value });
+  onBackColor = (e)=> this.setState({ backColor:e.target.value });
+  onUpload = (e)=>{ const f=e.target.files&&e.target.files[0]; if(f) this.setState({ frontImg:URL.createObjectURL(f) }); };
+  hlOn = ()=> this.setState(s=>({ hl:{...s.hl,on:true} }));
+  hlOff = ()=> this.setState(s=>({ hl:{...s.hl,on:false} }));
+  onHlColor = (e)=> this.setState(s=>({ hl:{...s.hl,color:e.target.value} }));
+  onHlSpeed = (e)=> this.setState(s=>({ hl:{...s.hl,speed:+e.target.value} }));
+  FLIPMODES = [{v:'y',label:'Flip · Y axis'},{v:'x',label:'Flip · X axis'},{v:'coin',label:'Coin spin'}];
+  doFlip = ()=> this.setState(s=>({ flipped:!s.flipped }));
+  flipSlimT = ()=> this.setState(s=>({ flipSlim:!s.flipSlim }));
+  flipShapedT = ()=> this.setState(s=>({ flipShaped:!s.flipShaped }));
+  onFlipMode = (e)=> this.setState({ flipMode:e.target.value });
+  onFlipDur = (e)=> this.setState({ flipDur:+e.target.value/10 });
+  hexRgb(h){ const n=parseInt(h.slice(1),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+  sweepStyle(hl){
+    const [r,g,b]=this.hexRgb(hl.color);
+    const c=(a)=>`rgba(${r},${g},${b},${a})`;
+    const grad=`conic-gradient(from var(--sweep),${c(.32)} 0deg,transparent 55deg,transparent 65deg,${c(.3)} 120deg,transparent 175deg,transparent 185deg,${c(.31)} 240deg,transparent 295deg,transparent 305deg,${c(.32)} 360deg)`;
+    const anim = hl.on ? `drift ${hl.speed}s linear infinite` : 'none';
+    return `background:${grad};animation:${anim};opacity:${hl.on?1:0};transition:opacity .4s ease;`;
+  }
+  faceFrame(frame){ return `linear-gradient(155deg,rgba(255,255,255,.2),rgba(255,255,255,0) 38%,rgba(0,0,0,.6)), ${frame}`; }
+  sheenStyle(s){ return `radial-gradient(120% 100% at 22% 22%, rgba(255,255,255,${s.sheen}), transparent 55%)`; }
+  faceVals(s){ return { nap:s.nap.toFixed(2), depth:s.depth.toFixed(2), grain:s.grain, blend:s.blend, sheenStyle:this.sheenStyle(s) }; }
+  renderVals(){
+    const { target, frame, backColor, frontImg, front, back } = this.state;
+    const act = this.state[target];
+    const isF = target==='front';
+    const hl = this.state.hl;
+    return {
+      f: this.faceVals(front), b: this.faceVals(back),
+      frame, backColor,
+      frameStyle: `linear-gradient(155deg,rgba(255,255,255,.2),rgba(255,255,255,0) 38%,rgba(0,0,0,.6)), ${frame}`,
+      backStyle: `radial-gradient(120% 120% at 50% 22%, ${backColor}, ${backColor})`,
+      frontImgEl: React.createElement('img',{src:frontImg,alt:'',style:{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover'}}),
+      frontImgSrc: frontImg,
+      a: { grain:act.grain, napVal:Math.round(act.nap*100), napPct:Math.round(act.nap*100)+'%', depthVal:Math.round(act.depth*100), depthPct:Math.round(act.depth*100)+'%', sheenVal:Math.round(act.sheen*100), sheenPct:Math.round(act.sheen*100)+'%' },
+      blendOpts: this.BLENDS.map(v=>({ v, sel: v===act.blend })),
+      frontRing: isF?'outline:3px solid #1170A1;outline-offset:6px;':'', backRing: !isF?'outline:3px solid #1170A1;outline-offset:6px;':'',
+      frontLabel: isF?'#1170A1':'#8a929b', backLabel: !isF?'#1170A1':'#8a929b',
+      frontBtnBg: isF?'#16191d':'#fff', frontBtnFg: isF?'#fff':'#16191d', backBtnBg: !isF?'#16191d':'#fff', backBtnFg: !isF?'#fff':'#16191d',
+      pickFront:this.pickFront, pickBack:this.pickBack,
+      onGrain:this.onGrain, onNap:this.onNap, onDepth:this.onDepth, onSheen:this.onSheen, onBlend:this.onBlend,
+      onFrame:this.onFrame, onBackColor:this.onBackColor, onUpload:this.onUpload,
+      sweepStyle: this.sweepStyle(hl),
+      hlColor: hl.color, hlSpeed: hl.speed,
+      hlOn:this.hlOn, hlOff:this.hlOff, onHlColor:this.onHlColor, onHlSpeed:this.onHlSpeed,
+      hlOnBg: hl.on?'#16191d':'#fff', hlOnFg: hl.on?'#fff':'#16191d',
+      hlOffBg: !hl.on?'#16191d':'#fff', hlOffFg: !hl.on?'#fff':'#16191d',
+      flipFrontImgEl: React.createElement('img',{src:frontImg,alt:'',style:{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover'}}),
+      flipTransform: `rotate${this.state.flipMode==='x'?'X':'Y'}(${this.state.flipped?180:0}deg)`,
+      backFaceTransform: `rotate${this.state.flipMode==='x'?'X':'Y'}(180deg)`,
+      flipTransition: `transform ${this.state.flipDur}s ${this.state.flipMode==='coin'?'cubic-bezier(.45,0,.55,1)':'ease-in-out'}`,
+      flipModes: this.FLIPMODES.map(o=>({ ...o, sel:o.v===this.state.flipMode })),
+      flipDur: this.state.flipDur.toFixed(1), flipDurVal: Math.round(this.state.flipDur*10),
+      flipFaceLabel: this.state.flipped?'Back':'Front',
+      doFlip:this.doFlip, onFlipMode:this.onFlipMode, onFlipDur:this.onFlipDur,
+      flipSlimTransform: `rotate${this.state.flipMode==='x'?'X':'Y'}(${this.state.flipSlim?180:0}deg)`,
+      flipShapedTransform: `rotate${this.state.flipMode==='x'?'X':'Y'}(${this.state.flipShaped?180:0}deg)`,
+      slimFace: this.state.flipSlim?'Back':'Front', shapedFace: this.state.flipShaped?'Back':'Front',
+      flipSlimT:this.flipSlimT, flipShapedT:this.flipShapedT
+    };
+  }
+}
+</script>
+</body>
+</html>

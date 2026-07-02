@@ -1,0 +1,258 @@
+diff --git a/src/app/(dev)/prototype/core/EffectViewer.tsx b/src/app/(dev)/prototype/core/EffectViewer.tsx
+index c32312b..88fd570 100644
+--- a/src/app/(dev)/prototype/core/EffectViewer.tsx
++++ b/src/app/(dev)/prototype/core/EffectViewer.tsx
+@@ -37,6 +37,7 @@ interface EffectViewerProps {
+   artworkUrl?: string
+   designState: DesignState
+   isEditing: boolean
++  modelOverride?: React.ReactNode
+   /** Studio injects controls (grid, gizmo, selection overlay) as children inside the Canvas */
+   children?: React.ReactNode
+   /** Fires after Canvas + WebGLRenderer are created. Studio uses this to wire the bridge. */
+@@ -154,6 +155,7 @@ export default function EffectViewer({
+   artworkUrl,
+   designState,
+   isEditing,
++  modelOverride,
+   children,
+   onCreated,
+   orbitControlsRef,
+@@ -257,7 +259,7 @@ export default function EffectViewer({
+               } : undefined}
+             />
+           ) : null}
+-          {config.modelPath ? (
++          {modelOverride ?? (config.modelPath ? (
+             <EffectModel
+               modelPath={config.modelPath}
+               artworkUrl={effectiveArtworkUrl}
+@@ -266,7 +268,7 @@ export default function EffectViewer({
+               product={config.product}
+               onModelReady={onModelReady}
+             />
+-          ) : null}
++          ) : null)}
+         </Suspense>
+ 
+         <OrbitControls
+diff --git a/src/app/(dev)/prototype/page.tsx b/src/app/(dev)/prototype/page.tsx
+index 5013a21..39db920 100644
+--- a/src/app/(dev)/prototype/page.tsx
++++ b/src/app/(dev)/prototype/page.tsx
+@@ -6,7 +6,10 @@ import { useSearchParams } from 'next/navigation'
+ import { useGesture } from '@use-gesture/react'
+ import { useSceneStore } from './admin/sceneStore'
+ import { INITIAL_DESIGN } from './user/Toolbar'
+-import type { DesignState } from './types'
++import ShapedCutoutPanel from './user/ShapedCutoutPanel'
++import ShapedEffectModel from './core/ShapedEffectModel'
++import { createShapeProfile, DEFAULT_SHAPE_POINTS } from './core/shaped-geometry'
++import type { DesignState, ShapeProfile } from './types'
+ 
+ // Dynamic imports — no SSR for 3D components
+ const EffectViewer = dynamic(() => import('./core/EffectViewer'), { ssr: false })
+@@ -19,6 +22,7 @@ const MIN_SCALE = 1.0
+ const MAX_SCALE = 4.0
+ const DRAG_SENSITIVITY = 0.001
+ const SCROLL_SENSITIVITY = 0.002
++const SHAPED_PROTOTYPE_ARTWORK_URL = '/assets/test-artwork.png'
+ 
+ function PrototypePageInner() {
+   const searchParams = useSearchParams()
+@@ -26,11 +30,13 @@ function PrototypePageInner() {
+   const [isDragging, setIsDragging] = useState(false)
+   const [isEditing, setIsEditing] = useState(false)
+   const [designState, setDesignState] = useState<DesignState>(INITIAL_DESIGN)
++  const [shapeProfile, setShapeProfile] = useState<ShapeProfile>(() => createShapeProfile(DEFAULT_SHAPE_POINTS, 'preset'))
+   const { colors, setBackColor, setFrameColor, setBgColor } = useSceneStore()
+   const [showColors, setShowColors] = useState(false)
+   const sceneName = searchParams.get('scene')
++  const shapeMode = searchParams.get('shape') === '1' || sceneName === 'shaped'
+   const templateUrl = sceneName
+-    ? `/api/dev/scenes/${encodeURIComponent(sceneName)}`
++    ? `/api/dev/scenes/${encodeURIComponent(shapeMode ? 'golden' : sceneName)}`
+     : '/api/dev/scenes/golden'
+ 
+   const handleFile = useCallback((file: File) => {
+@@ -99,16 +105,69 @@ function PrototypePageInner() {
+         onTextureChange={setArtworkUrl}
+         templateUrl={templateUrl}
+       >
+-        {(config) => (
+-          <EffectViewer
+-            config={config}
+-            artworkUrl={artworkUrl}
+-            designState={designState}
+-            isEditing={isEditing}
+-          />
+-        )}
++        {(config) => {
++          const shapedArtworkUrl = artworkUrl || config.product.artworkSlot?.defaultUrl || SHAPED_PROTOTYPE_ARTWORK_URL
++
++          return (
++            <>
++              <EffectViewer
++                config={config}
++                artworkUrl={artworkUrl}
++                designState={designState}
++                isEditing={shapeMode ? false : isEditing}
++                modelOverride={shapeMode ? (
++                  <ShapedEffectModel
++                    artworkUrl={shapedArtworkUrl}
++                    profile={shapeProfile}
++                    scene={config.scene}
++                    colors={config.colors}
++                  />
++                ) : undefined}
++              />
++              {shapeMode && (
++                <ShapedCutoutPanel
++                  artworkUrl={shapedArtworkUrl}
++                  profile={shapeProfile}
++                  onProfileChange={setShapeProfile}
++                />
++              )}
++            </>
++          )
++        }}
+       </AdminViewer>
+ 
++      <div style={{
++        position: 'absolute',
++        top: 24,
++        right: 24,
++        zIndex: 14,
++        display: 'flex',
++        gap: 8,
++        padding: 6,
++        borderRadius: 999,
++        background: 'rgba(0,0,0,0.42)',
++        backdropFilter: 'blur(12px)',
++      }}>
++        <a href="/prototype?scene=golden" style={{
++          padding: '8px 14px',
++          borderRadius: 999,
++          color: shapeMode ? 'rgba(255,255,255,0.72)' : '#111',
++          background: shapeMode ? 'transparent' : '#fff',
++          textDecoration: 'none',
++          fontSize: 12,
++          fontWeight: 700,
++        }}>Standard</a>
++        <a href="/prototype?scene=golden&shape=1" style={{
++          padding: '8px 14px',
++          borderRadius: 999,
++          color: shapeMode ? '#111' : 'rgba(255,255,255,0.72)',
++          background: shapeMode ? '#f5cf7e' : 'transparent',
++          textDecoration: 'none',
++          fontSize: 12,
++          fontWeight: 700,
++        }}>Shaped</a>
++      </div>
++
+       {/* User: color panel */}
+       {showColors && (
+         <ColorPanel
+@@ -123,9 +182,10 @@ function PrototypePageInner() {
+ 
+       {/* User: toolbar */}
+       <Toolbar
+-        artworkUrl={artworkUrl}
+-        isEditing={isEditing}
++        artworkUrl={shapeMode ? (artworkUrl || SHAPED_PROTOTYPE_ARTWORK_URL) : artworkUrl}
++        isEditing={shapeMode ? false : isEditing}
+         showColors={showColors}
++        canEdit={!shapeMode}
+         onFile={handleFile}
+         onToggleEdit={() => setIsEditing((prev) => !prev)}
+         onResetDesign={() => setDesignState(INITIAL_DESIGN)}
+@@ -133,11 +193,13 @@ function PrototypePageInner() {
+       />
+ 
+       {/* User: edit mode overlay + drag indicator */}
+-      <EditOverlay
+-        isEditing={isEditing}
+-        scale={designState.scale}
+-        isDragging={isDragging}
+-      />
++      {!shapeMode && (
++        <EditOverlay
++          isEditing={isEditing}
++          scale={designState.scale}
++          isDragging={isDragging}
++        />
++      )}
+     </div>
+   )
+ }
+diff --git a/src/app/(dev)/prototype/types.ts b/src/app/(dev)/prototype/types.ts
+index 96fef33..407807c 100644
+--- a/src/app/(dev)/prototype/types.ts
++++ b/src/app/(dev)/prototype/types.ts
+@@ -8,6 +8,20 @@ export interface DesignState {
+   scale: number
+ }
+ 
++export interface ShapePoint {
++  x: number
++  y: number
++}
++
++export type ShapeProfileSource = 'manual' | 'auto' | 'preset'
++
++export interface ShapeProfile {
++  points: ShapePoint[]
++  edgeColors: string[]
++  source: ShapeProfileSource
++  updatedAt: string
++}
++
+ export interface SceneSettings {
+   exposure: number
+   ambientIntensity: number
+diff --git a/src/app/(dev)/prototype/user/Toolbar.tsx b/src/app/(dev)/prototype/user/Toolbar.tsx
+index ba939d2..547dff5 100644
+--- a/src/app/(dev)/prototype/user/Toolbar.tsx
++++ b/src/app/(dev)/prototype/user/Toolbar.tsx
+@@ -2,7 +2,7 @@
+ 
+ 'use client'
+ 
+-import { useRef, useCallback } from 'react'
++import { useRef } from 'react'
+ import type { DesignState } from '../types'
+ 
+ const INITIAL_DESIGN: DesignState = { offsetX: 0, offsetY: 0, scale: 1.0 }
+@@ -11,6 +11,7 @@ interface ToolbarProps {
+   artworkUrl?: string
+   isEditing: boolean
+   showColors: boolean
++  canEdit?: boolean
+   onFile: (file: File) => void
+   onToggleEdit: () => void
+   onResetDesign: () => void
+@@ -21,6 +22,7 @@ export default function Toolbar({
+   artworkUrl,
+   isEditing,
+   showColors,
++  canEdit = true,
+   onFile,
+   onToggleEdit,
+   onResetDesign,
+@@ -44,14 +46,14 @@ export default function Toolbar({
+           {artworkUrl ? 'Replace' : 'Upload'}
+         </button>
+ 
+-        {artworkUrl && (
++        {artworkUrl && canEdit && (
+           <button onClick={onToggleEdit}
+             style={{ padding: '12px 24px', background: isEditing ? '#2563eb' : '#444', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+             {isEditing ? 'Done' : 'Edit'}
+           </button>
+         )}
+ 
+-        {isEditing && (
++        {isEditing && canEdit && (
+           <button onClick={onResetDesign}
+             style={{ padding: '12px 24px', background: '#666', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+             Reset
