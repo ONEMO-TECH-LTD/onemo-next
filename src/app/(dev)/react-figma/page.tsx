@@ -792,6 +792,34 @@ function MoreActionsMenu({ onDuplicate, onDelete }: { onDuplicate: () => void; o
   )
 }
 
+/* E3.6 — Type settings popover: text-decoration + text-transform (real CSS analogs). */
+function TypeSettingsMenu({ onApply }: { onApply: (field: string, value: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
+  const seg = (label: string, field: string, opts: [string, string][]) => (
+    <div style={{ padding: '6px 12px' }}>
+      <div style={{ font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)', marginBottom: 4 }}>{label}</div>
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+        {opts.map(([lbl, val]) => (
+          <button key={val} type="button" onClick={() => onApply(field, val)}
+            style={{ appearance: 'none', border: `1px solid ${LINE}`, background: '#fff', height: 24, padding: '0 8px', borderRadius: 5, cursor: 'pointer', font: `400 11px/1 ${FONT}`, color: INK }}>{lbl}</button>
+        ))}
+      </div>
+    </div>
+  )
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <UiIB name="overflowDots" title="Type settings" active={open} on={() => setOpen((v) => !v)} />
+      {open && (
+        <div data-figma-floating-root="true" role="menu" style={{ position: 'absolute', right: 0, top: 28, zIndex: 130, width: 200, padding: '6px 0', borderRadius: 8, background: '#fff', boxShadow: 'rgba(0,0,0,0.15) 0px 2px 5px 0px, rgba(0,0,0,0.12) 0px 10px 16px 0px, rgba(0,0,0,0.12) 0px 0px 0.5px 0px' }}>
+          {seg('Decoration', 'textDecoration', [['None', 'none'], ['Underline', 'underline'], ['Strikethrough', 'line-through']])}
+          {seg('Case', 'textTransform', [['Original', 'none'], ['UPPER', 'uppercase'], ['lower', 'lowercase'], ['Title', 'capitalize']])}
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* Paint/effect rows are cloned from the live Figma inspector DOM. */
 function normalizeHex(value: string) {
   return value.replace(/[^0-9a-f]/gi, '').slice(0, 6).toUpperCase()
@@ -1618,6 +1646,8 @@ export default function ReactFigmaPage() {
       : field === 'lineHeight' ? [['line-height', n === 'Auto' ? 'normal' : withUnit]]
       : field === 'letterSpacing' ? [['letter-spacing', parseFloat(n) === 0 ? 'normal' : withUnit]]
       : field === 'textAlign' ? [['text-align', n]]
+      : field === 'textDecoration' ? [['text-decoration', n]]
+      : field === 'textTransform' ? [['text-transform', n]]
       : field === 'fillOpacity' ? [['opacity', String((parseFloat(n) || 0) / 100)]]
       : field === 'strokeWidth0' ? [['border-width', '0']]
       : field === 'strokePosition' ? (n === 'Inside' ? [['box-sizing', 'border-box']] : n === 'Outside' ? [['box-sizing', 'content-box']] : [])
@@ -2241,7 +2271,7 @@ export default function ReactFigmaPage() {
           {/* E2.2 Text section — Figma canon (FIGMA-SPEC-text.md): present only for text-bearing
               elements; unbound Typography form (individual controls) reading the element's real type. */}
           {typo && (
-            <Sec title="Text" actionWidth={24} action={<UiIB name="overflowDots" title="Type settings" />} bodyGap={0} bodyPadding="0">
+            <Sec title="Text" actionWidth={24} action={<TypeSettingsMenu onApply={applyOverride} />} bodyGap={0} bodyPadding="0">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 8px 8px 16px' }}>
                 <AutoValueField label="Aa" value={typo.family} ariaLabel="Font family" width={232} />
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
