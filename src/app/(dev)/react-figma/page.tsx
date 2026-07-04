@@ -1895,6 +1895,13 @@ export default function ReactFigmaPage() {
       <aside style={{ width: rightW, flex: 'none', position: 'relative', borderLeft: `1px solid ${LINE}`, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div onPointerDown={startResize('r')} style={handleStyle('left')} />
         <div style={{ height: 48, display: 'flex', alignItems: 'center', padding: '0 8px 0 11px', flex: 'none' }}>
+          {/* E2.5 (Dan-approved): Save to code · N — neutral toolbar button, shows when dirty; commits all overrides */}
+          {ovVersion >= 0 && ov.current!.dirty().filter((o) => !o.stale).length > 0 && (
+            <button type="button" disabled={committing} onClick={() => void commitOverrides()}
+              style={{ appearance: 'none', border: `1px solid ${LINE}`, background: '#fff', color: committing ? MUTE : INK, height: 28, borderRadius: 6, padding: '0 10px', cursor: committing ? 'default' : 'pointer', font: `500 11px/16px ${FONT}`, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <UiIcon name="devCode" size={14} />{committing ? 'Saving…' : `Save to code · ${ov.current!.dirty().filter((o) => !o.stale).length}`}
+            </button>
+          )}
           <div style={{ marginLeft: 'auto', width: 107.5, display: 'flex', alignItems: 'center', gap: 1, height: 32 }}>
             <button type="button" aria-label="Present" style={{ appearance: 'none', border: 0, background: 'transparent', width: 32, height: 32, borderRadius: '5px 0 0 5px', display: 'grid', gridTemplateColumns: '24px', placeItems: 'center', padding: '0 4px', cursor: 'pointer', color: INK }}><UiIcon name="present" /></button>
             <button type="button" aria-label="Prototype view" style={{ appearance: 'none', border: 0, background: 'transparent', width: 16, height: 32, borderRadius: '0 5px 5px 0', display: 'grid', gridTemplateColumns: '20px', placeItems: 'center', padding: 0, cursor: 'pointer', color: INK }}><UiIcon name="caret24" /></button>
