@@ -9,9 +9,9 @@
  *  · icon rail: File · Agents · Assets · Tools · Variables  (rail switches the left panel)
  *  · left/File: file selector + Drafts · Pages (search/add) · Layers tree (type glyphs · lock · select)
  *  · left/Assets & Variables: expandable side panels
- *  · center: infinite pan/zoom canvas, device frame floating in a dotted field
+ *  · center: bottom insert island + infinite pan/zoom canvas, device frame floating in a dotted field
  *  · right: Frame preset + Position (CSS position/z-index extension) · Auto layout
- *           · Appearance · Fill · Stroke · Effects · Selection colors · Layout guide · Export
+ *           · Appearance · Fill · Stroke · Effects · Selection colors · Layout guide
  *  Spec: Inter 11px; headers 550/~0.5px near-black; fields 24px/5px radius; every value field raw-OR-token (◆).
  */
 
@@ -92,6 +92,15 @@ const UI_ICON = {
   railAssets: { viewBox: '0 0 24 24', paths: ['M18 12a6 6 0 1 1-12 0 6 6 0 0 1 12 0m1 0a7 7 0 1 1-14 0 7 7 0 0 1 14 0m-6.5-2.5a.5.5 0 0 0-1 0v2h-2a.5.5 0 0 0 0 1h2v2a.5.5 0 0 0 1 0v-2h2a.5.5 0 0 0 0-1h-2z'] },
   railTools: { viewBox: '0 0 24 24', paths: ['M13.5 5A1.5 1.5 0 0 1 15 6.5V7h1.086a1.5 1.5 0 0 1 1.06.44l1.414 1.414a1.5 1.5 0 0 1 .44 1.06V16.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 16.5V9.914c0-.398.158-.78.44-1.06l1.413-1.415A1.5 1.5 0 0 1 7.913 7H9v-.5A1.5 1.5 0 0 1 10.5 5zM6 16.5a.5.5 0 0 0 .5.5h11a.5.5 0 0 0 .5-.5V13h-3v1a.5.5 0 0 1-1 0v-1h-4v1a.5.5 0 0 1-1 0v-1H6zM7.914 8a.5.5 0 0 0-.354.146L6.146 9.561A.5.5 0 0 0 6 9.914V12h3v-1a.5.5 0 0 1 1 0v1h4v-1a.5.5 0 0 1 1 0v1h3V9.914a.5.5 0 0 0-.147-.353L16.44 8.146A.5.5 0 0 0 16.086 8zM10.5 6a.5.5 0 0 0-.5.5V7h4v-.5a.5.5 0 0 0-.5-.5z'] },
   railVariables: { viewBox: '0 0 24 24', paths: ['M11.117 5.586A2 2 0 0 1 13 5.649l4 2.31.113.07A2 2 0 0 1 18 9.69v4.62a2 2 0 0 1-.887 1.66l-.113.072-4 2.309a2 2 0 0 1-1.883.063L11 18.351l-4-2.309a2 2 0 0 1-1-1.732V9.69a2 2 0 0 1 1-1.73l4-2.31zm1.383.93a1 1 0 0 0-1 0l-4 2.308-.11.074A1 1 0 0 0 7 9.69v4.62l.009.132c.04.305.22.578.491.734l4 2.31c.27.155.597.175.88.058l.12-.059 4-2.31a1 1 0 0 0 .491-.733L17 14.31V9.69a1 1 0 0 0-.39-.792l-.11-.074zM12 10a2 2 0 1 1 0 4 2 2 0 0 1 0-4m0 1a1 1 0 1 0 0 2 1 1 0 0 0 0-2'] },
+  insertPointer: { viewBox: '0 0 24 24', paths: ['M4.586 4.586a2 2 0 0 1 2.005-.497l.14.05 13 5.107a2 2 0 0 1 1.267 1.779v.159a2 2 0 0 1-1.26 1.782l-.15.053-5.024 1.545-1.545 5.024a2 2 0 0 1-1.677 1.398l-.158.012a2 2 0 0 1-1.938-1.267l-5.107-13a2 2 0 0 1 .447-2.145m1.78.484a1 1 0 0 0-1.073.223l-.097.112a1 1 0 0 0-.127.96l5.108 13a1 1 0 0 0 .811.628l.158.006a1 1 0 0 0 .859-.558l.058-.147 1.7-5.53 5.531-1.701a1 1 0 0 0 .687-.76l.018-.157a1 1 0 0 0-.492-.9l-.142-.069z'] },
+  insertFrame: { viewBox: '0 0 24 24', paths: ['M7.5 4a.5.5 0 0 0-.5.5V7H4.5a.5.5 0 0 0 0 1H7v8H4.5a.5.5 0 0 0 0 1H7v2.5a.5.5 0 0 0 1 0V17h8v2.5a.5.5 0 0 0 1 0V17h2.5a.5.5 0 0 0 0-1H17V8h2.5a.5.5 0 0 0 0-1H17V4.5a.5.5 0 0 0-1 0V7H8V4.5a.5.5 0 0 0-.5-.5M16 8H8v8h8z'] },
+  insertText: { viewBox: '0 0 24 24', paths: ['M19.5 4a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1 0V5h-6.5v14H15a.5.5 0 0 1 0 1H9a.5.5 0 0 1 0-1h2.5V5H5v2.5a.5.5 0 0 1-1 0v-3a.5.5 0 0 1 .5-.5z'] },
+  insertComment: { viewBox: '0 0 24 24', paths: ['M12.5 3a8.5 8.5 0 0 1 0 17H7.09c-.89 0-1.39 0-1.767-.121l-.154-.06a2 2 0 0 1-.906-.828l-.082-.16c-.136-.297-.17-.657-.178-1.248L4 16.909V11.5A8.5 8.5 0 0 1 12.5 3m0 1A7.5 7.5 0 0 0 5 11.5v5.41c0 .523 0 .861.02 1.12.018.247.05.34.07.385a1 1 0 0 0 .495.494c.045.02.138.053.386.072.258.019.596.019 1.12.019H12.5a7.5 7.5 0 0 0 0-15'] },
+  insertActions: { viewBox: '0 0 24 24', paths: ['M9 13a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2zm7.5 0a.5.5 0 0 1 .5.5V16h2.5a.5.5 0 0 1 0 1H17v2.5a.5.5 0 0 1-1 0V17h-2.5a.5.5 0 0 1 0-1H16v-2.5a.5.5 0 0 1 .5-.5M6 14a1 1 0 0 0-1 1v3a1 1 0 0 0 .897.995L6 19h3a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1zm.87-10.275a1 1 0 0 1 1.337.068l3 3a1 1 0 0 1 0 1.414l-3 3a1 1 0 0 1-1.414 0l-3-3a1 1 0 0 1 0-1.414l3-3zM16.5 4a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7m-12 3.5 3 3 3-3-3-3zm12-2.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5'] },
+  modeDraw: { viewBox: '0 0 24 24', paths: ['M13.407 5.06c.61-.123 1.227-.079 1.657.343l.135.15c.277.361.316.79.208 1.204-.115.44-.397.887-.734 1.314-.68.86-1.74 1.829-2.748 2.76-1.031.952-2.01 1.867-2.606 2.662-.3.4-.466.724-.517.97-.044.21-.003.34.12.46l.065.052c.072.044.167.062.313.039.217-.034.505-.155.866-.378.72-.445 1.561-1.183 2.445-1.966.862-.763 1.768-1.571 2.57-2.076.4-.252.817-.457 1.221-.527.427-.074.87.002 1.223.346l.102.112c.22.271.296.593.266.918-.032.344-.183.684-.364.993-.363.617-.963 1.296-1.515 1.922-.574.651-1.1 1.251-1.403 1.767-.151.257-.218.449-.23.581-.01.106.012.163.072.22l.054.04c.074.038.214.062.474-.031.356-.128.853-.456 1.465-1.1a.5.5 0 0 1 .725.687c-.666.702-1.291 1.153-1.853 1.354-.535.192-1.08.173-1.485-.163l-.08-.071a1.23 1.23 0 0 1-.369-1.03c.033-.344.183-.684.364-.993.363-.617.964-1.297 1.516-1.923.574-.651 1.1-1.25 1.402-1.766.152-.258.22-.449.232-.581.007-.08-.004-.132-.035-.177l-.038-.045c-.07-.068-.162-.108-.353-.075-.213.037-.5.161-.858.388-.717.451-1.555 1.194-2.44 1.978-.862.764-1.774 1.57-2.584 2.07-.404.249-.826.45-1.237.514-.38.06-.767 0-1.095-.247l-.136-.118c-.402-.394-.502-.887-.399-1.38.097-.46.367-.923.696-1.363.663-.885 1.718-1.865 2.728-2.798 1.033-.954 2.023-1.862 2.642-2.645.31-.393.489-.71.55-.946.04-.152.028-.246-.017-.32l-.057-.069c-.082-.08-.284-.172-.76-.076-.468.094-1.091.352-1.863.803-1.537.898-3.552 2.496-5.893 4.786a.5.5 0 0 1-.699-.715c2.37-2.319 4.45-3.98 6.087-4.935.815-.476 1.55-.794 2.17-.92'] },
+  modeDesign: { viewBox: '0 0 24 24', paths: ['M12.11 13.956c-.44-1.121.618-2.23 1.738-1.885l.108.038 4.15 1.63.115.051c1.136.556 1.027 2.254-.218 2.637l-1.205.372-.37 1.205c-.397 1.29-2.196 1.356-2.689.102zm1.48-.916a.425.425 0 0 0-.55.55l1.63 4.15c.138.35.618.356.775.038l.027-.068.526-1.711 1.711-.527a.425.425 0 0 0 .031-.802zM16.5 6A1.5 1.5 0 0 1 18 7.5v1a1.5 1.5 0 0 1-1.5 1.5H10v6.5A1.5 1.5 0 0 1 8.5 18h-1A1.5 1.5 0 0 1 6 16.5v-9A1.5 1.5 0 0 1 7.5 6zM7 16.5a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5V15h-.5a.5.5 0 0 1 0-1H9v-1h-.5a.5.5 0 0 1 0-1H9v-2H7zM7.5 7a.5.5 0 0 0-.5.5V9h2V7zM10 9h2v-.5a.5.5 0 0 1 1 0V9h1v-.5a.5.5 0 0 1 1 0V9h1.5a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5H10z'] },
+  modeMotion: { viewBox: '0 0 24 24', paths: ['M10.94 5.44a1.5 1.5 0 0 1 2.12 0l5.502 5.5a1.5 1.5 0 0 1 0 2.121l-5.501 5.502a1.5 1.5 0 0 1-2.121 0l-5.502-5.502a1.5 1.5 0 0 1 0-2.121zm1.414.706a.5.5 0 0 0-.707 0l-5.501 5.501a.5.5 0 0 0 0 .707l5.5 5.502a.5.5 0 0 0 .707 0l5.502-5.502a.5.5 0 0 0 0-.707zm-1.207 2.001a.5.5 0 0 1 .707 0l3.5 3.5a.5.5 0 0 1 0 .707l-3.5 3.5a.5.5 0 1 1-.707-.707l3.146-3.146-3.146-3.147a.5.5 0 0 1 0-.707m-2 2a.5.5 0 0 1 .707 0l1.5 1.5a.5.5 0 0 1 0 .707l-1.5 1.5a.5.5 0 1 1-.707-.707l1.146-1.146-1.146-1.147a.5.5 0 0 1 0-.707'] },
+  modeDev: { viewBox: '0 0 24 24', paths: ['M13.631 6.018a.5.5 0 0 1 .367.513l-.016.1-3 11-.036.095a.5.5 0 0 1-.93-.358l3-11 .037-.095a.5.5 0 0 1 .578-.255M8.224 8.582a.501.501 0 0 1 .693.693l-.064.079L6.206 12l2.647 2.646a.5.5 0 1 1-.707.707l-3-3a.5.5 0 0 1 0-.707l3-3zm6.922.064a.5.5 0 0 1 .707 0l3 3a.5.5 0 0 1 0 .707l-3 3-.078.065a.5.5 0 0 1-.694-.693l.065-.079L17.792 12l-2.646-2.646a.5.5 0 0 1 0-.707'] },
   minimizeUI: { viewBox: '0 0 24 24', paths: ['M17.653 7.008A1.5 1.5 0 0 1 19 8.5v7a1.5 1.5 0 0 1-1.347 1.492L17.5 17h-11a1.5 1.5 0 0 1-1.492-1.347L5 15.5v-7A1.5 1.5 0 0 1 6.5 7h11zM6.5 8a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5H9V8zm3.5 8h7.5a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5H10z'] },
   find: { viewBox: '0 0 24 24', paths: ['M11.5 6a5.5 5.5 0 0 1 4.226 9.019l2.127 2.127a.5.5 0 1 1-.707.707l-2.127-2.127A5.5 5.5 0 1 1 11.5 6m0 1a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9'] },
   collapseLayers: { viewBox: '0 0 24 24', paths: ['M6.5 7a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1zm0 3a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1zM6 13.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5m.5 2.5a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1zm6.646.146 2-2a.5.5 0 0 1 .708 0l2 2a.5.5 0 0 1-.708.708L15.5 15.207l-1.646 1.647a.5.5 0 0 1-.708-.708m2.708-6.292a.5.5 0 0 1-.708 0l-2-2a.5.5 0 0 1 .708-.708L15.5 8.793l1.646-1.647a.5.5 0 0 1 .708.708z'] },
@@ -451,6 +460,72 @@ function LayoutGuideRow({ size }: { size: string }) {
     </div>
   )
 }
+const FRAME_INSERT_OPTIONS = [
+  { label: 'Frame', target: 'div', detail: 'freeform container' },
+  { label: 'Section', target: 'section', detail: 'semantic block' },
+  { label: 'Stack', target: 'div', detail: 'display: flex' },
+  { label: 'Grid', target: 'div', detail: 'display: grid' },
+]
+function InsertIsland() {
+  const [open, setOpen] = useState(false)
+  return (
+    <div aria-label="Insert tools" onPointerDown={e => e.stopPropagation()}
+      style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 25, height: 48, display: 'flex', alignItems: 'center', gap: 8, padding: '0 10px', borderRadius: 14, background: '#fff', boxShadow: '0 10px 30px rgba(0,0,0,.16), 0 0 0 1px rgba(0,0,0,.08)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 32 }}>
+        <div role="group" aria-label="Move" style={{ display: 'grid', gridTemplateColumns: '32px 16px', width: 49, height: 32 }}>
+          <button type="button" title="Move" aria-label="Move" style={{ appearance: 'none', border: 0, width: 32, height: 32, borderRadius: 7, background: SEL, color: '#fff', display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
+            <UiIcon name="insertPointer" />
+          </button>
+          <button type="button" title="Move tools" aria-label="Move tools" style={{ appearance: 'none', border: 0, width: 16, height: 32, background: '#fff', color: FAINT, opacity: 0.55, display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
+            <UiIcon name="caret24" />
+          </button>
+        </div>
+        <div role="group" aria-label="Frame" style={{ position: 'relative', display: 'grid', gridTemplateColumns: '32px 16px', width: 49, height: 32 }}>
+          <button type="button" aria-label="Frame" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(v => !v)}
+            style={{ appearance: 'none', border: 0, width: 32, height: 32, borderRadius: 7, background: open ? FIELD : '#fff', color: INK, display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
+            <UiIcon name="insertFrame" />
+          </button>
+          <button type="button" title="Region tools" aria-label="Region tools" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(v => !v)}
+            style={{ appearance: 'none', border: 0, width: 16, height: 32, background: '#fff', color: FAINT, opacity: 0.55, display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
+            <UiIcon name="caret24" />
+          </button>
+          {open && (
+            <div role="menu" aria-label="React container types"
+              style={{ position: 'absolute', bottom: 40, left: -6, width: 184, padding: 6, borderRadius: 12, background: '#1f1f1f', color: '#fff', boxShadow: '0 16px 36px rgba(0,0,0,.22)' }}>
+              {FRAME_INSERT_OPTIONS.map(item => (
+                <button key={item.label} type="button" role="menuitem" onClick={() => setOpen(false)}
+                  style={{ appearance: 'none', border: 0, width: '100%', height: 34, borderRadius: 7, background: 'transparent', color: '#fff', display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: 8, padding: '0 9px', cursor: 'pointer', textAlign: 'left' }}>
+                  <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <span style={{ font: `500 11px/12px ${FONT}` }}>{item.label}</span>
+                    <span style={{ font: `400 9px/10px ${FONT}`, color: 'rgba(255,255,255,.58)' }}>{item.detail}</span>
+                  </span>
+                  <span style={{ font: `450 10px/12px ${FONT}`, color: 'rgba(255,255,255,.72)' }}>{item.target}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div role="group" aria-label="Text" style={{ display: 'grid', gridTemplateColumns: '32px 16px', width: 49, height: 32 }}>
+          <button type="button" title="Text" aria-label="Text" style={{ appearance: 'none', border: 0, width: 32, height: 32, borderRadius: 7, background: '#fff', color: INK, display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
+            <UiIcon name="insertText" />
+          </button>
+          <button type="button" title="Type tools" aria-label="Type tools" style={{ appearance: 'none', border: 0, width: 16, height: 32, background: '#fff', color: FAINT, opacity: 0.55, display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
+            <UiIcon name="caret24" />
+          </button>
+        </div>
+      </div>
+      <span style={{ width: 1, height: 32, background: LINE }} />
+      <div aria-label="Mode tools" style={{ display: 'flex', alignItems: 'center', gap: 2, height: 32, padding: '0 2px', borderRadius: 9, background: FIELD, color: MUTE }}>
+        <button type="button" title="Design mode" aria-label="Design mode" style={{ appearance: 'none', border: '1px solid #dadde1', width: 32, height: 32, borderRadius: 7, background: '#fff', color: SEL, display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
+          <UiIcon name="modeDesign" />
+        </button>
+        <button type="button" title="Code mode" aria-label="Code mode" style={{ appearance: 'none', border: 0, width: 32, height: 32, borderRadius: 7, background: 'transparent', color: MUTE, display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
+          <UiIcon name="modeDev" />
+        </button>
+      </div>
+    </div>
+  )
+}
 
 /* ⚠️ MOCK section content — DATA (read from the selected element's props via the reader later), NOT hardcoded UI.
    Empty array → the section renders its EMPTY state (header + Add only); non-empty → the content state. */
@@ -571,6 +646,7 @@ export default function ReactFigmaPage() {
       {/* ░░ INFINITE CANVAS ░░ */}
       <main ref={canvasRef} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
         style={{ flex: 1, minWidth: 0, background: '#f0f0f0', position: 'relative', overflow: 'hidden', cursor: isPanning ? 'grabbing' : 'default' }}>
+        <InsertIsland />
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle, rgba(0,0,0,.09) 1px, transparent 1px)', backgroundSize: `${24 * view.z}px ${24 * view.z}px`, backgroundPosition: `${view.x}px ${view.y}px` }} />
         <div style={{ position: 'absolute', left: 0, top: 0, transform: `translate(${view.x}px,${view.y}px) scale(${view.z})`, transformOrigin: '0 0' }}>
           <div style={{ font: `550 10px/1 ${FONT}`, color: SEL, marginBottom: 8, marginLeft: 2 }}>Editor 402 · 402 × 871</div>
@@ -589,10 +665,6 @@ export default function ReactFigmaPage() {
       <aside style={{ width: rightW, flex: 'none', position: 'relative', borderLeft: `1px solid ${LINE}`, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div onPointerDown={startResize('r')} style={handleStyle('left')} />
         <div style={{ height: 48, display: 'flex', alignItems: 'center', padding: '0 8px 0 11px', flex: 'none' }}>
-          <button type="button" aria-label="Follow" style={{ appearance: 'none', border: 0, background: 'transparent', width: 24, height: 24, borderRadius: '50%', padding: 0, cursor: 'pointer' }}>
-            <span style={{ display: 'block', width: 24, height: 24, borderRadius: '50%', background: '#667799' }} />
-          </button>
-          <button type="button" aria-label="Multiplayer tools" style={{ appearance: 'none', border: 0, background: 'transparent', height: 24, width: 42, marginLeft: -1, borderRadius: 50, padding: '0 2px 0 0', cursor: 'pointer' }} />
           <div style={{ marginLeft: 'auto', width: 107.5, display: 'flex', alignItems: 'center', gap: 1, height: 32 }}>
             <button type="button" aria-label="Present" style={{ appearance: 'none', border: 0, background: 'transparent', width: 32, height: 32, borderRadius: '5px 0 0 5px', display: 'grid', gridTemplateColumns: '24px', placeItems: 'center', padding: '0 4px', cursor: 'pointer', color: INK }}><UiIcon name="present" /></button>
             <button type="button" aria-label="Prototype view" style={{ appearance: 'none', border: 0, background: 'transparent', width: 16, height: 32, borderRadius: '0 5px 5px 0', display: 'grid', gridTemplateColumns: '20px', placeItems: 'center', padding: 0, cursor: 'pointer', color: INK }}><UiIcon name="caret24" /></button>
@@ -650,7 +722,7 @@ export default function ReactFigmaPage() {
             </CompactInspectorRow>
           </Sec>
 
-          <Sec title="Auto layout" action={<UiIB name="autoLayoutToggle" title="Toggle auto layout" active />} bodyGap={0} bodyPadding="0">
+          <Sec title="Auto layout" bodyGap={0} bodyPadding="0">
             <InspectorRow label="Flow">
               <AutoFlowGroup />
               <span />
@@ -675,7 +747,21 @@ export default function ReactFigmaPage() {
               <AutoValueField icon="paddingVertical" value="0" caret={false} />
               <UiIB name="paddingIndividual" title="Individual padding" />
             </InspectorRow>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, height: 32, padding: '0 8px 0 16px', font: `400 11px/1 ${FONT}`, cursor: 'pointer' }}><input type="checkbox" style={{ width: 12, height: 12, accentColor: SEL }} /> Clip content</label>
+            <div data-react-figma-clip-row style={{ height: 32, padding: '0 8px 0 16px', display: 'grid', gridTemplateColumns: '216px', alignItems: 'center' }}>
+              <style>{'[data-react-figma-clip-row] input:not(:checked) + [data-react-figma-clip-box] svg{display:none}'}</style>
+              <label style={{ position: 'relative', display: 'grid', gridTemplateColumns: '16px 200px', width: 216, height: 24, cursor: 'pointer', color: INK }}>
+                <input type="checkbox" aria-label="Clip content" style={{ position: 'absolute', left: 0, top: 4, width: 16, height: 16, margin: 0, opacity: 0, pointerEvents: 'none' }} />
+                <span data-react-figma-clip-box aria-hidden style={{ position: 'relative', width: 16, height: 16, margin: '4px 0', border: '1px solid rgba(0,0,0,0.2)', borderRadius: 2, background: FIELD, boxSizing: 'border-box', display: 'grid', color: INK }}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden style={{ position: 'absolute', left: -1, top: -1 }}>
+                    <path d="M5.00012 8.5L7.5 11L11.5 5" stroke="rgba(0,0,0,0)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" shapeRendering="geometricPrecision" />
+                  </svg>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden style={{ position: 'relative', left: -1, top: -1 }}>
+                    <path d="M5.00012 8.5L7.5 11L11.5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" shapeRendering="geometricPrecision" />
+                  </svg>
+                </span>
+                <span data-react-figma-clip-text style={{ height: 20, margin: '4px 0 0', padding: '0 0 0 8px', font: `400 11px/16px ${FONT}`, color: INK }}>Clip content</span>
+              </label>
+            </div>
           </Sec>
 
           <Sec title="Appearance" actionWidth={53} action={<><UiIB name="visibility" title="Hide" /><UiIB name="blendMode" title="Apply blend mode" /></>} bodyGap={0} bodyPadding="0">
@@ -710,7 +796,6 @@ export default function ReactFigmaPage() {
           <Sec title="Layout guide" actionWidth={52} action={<><UiIB name="styleDots" title="Layout guide, Apply styles" /><UiIB name="plus" title="Add layout guide" /></>} bodyGap={0} bodyPadding="0">
             {MOCK.layoutGuides.map((g, i) => <LayoutGuideRow key={i} size={g.size} />)}
           </Sec>
-          <Sec title="Export" action={<UiIB name="plus" title="Add export settings" />} />
         </div>
       </aside>
       </>)}
