@@ -153,11 +153,11 @@ function UiIcon({ name, size = 24 }: { name: keyof typeof UI_ICON; size?: number
     </svg>
   )
 }
-function UiIB({ name, title, active, size = 24 }: { name: keyof typeof UI_ICON; title?: string; active?: boolean; size?: number }) {
+function UiIB({ name, title, active, size = 24, on }: { name: keyof typeof UI_ICON; title?: string; active?: boolean; size?: number; on?: () => void }) {
   const [h, setH] = useState(false)
   return (
-    <button type="button" title={title} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
-      style={{ appearance: 'none', border: 0, cursor: 'pointer', width: 24, height: 24, borderRadius: 5, display: 'grid', placeItems: 'center', flex: 'none', background: active ? '#e5f4ff' : h ? '#f0f1f3' : 'transparent', color: INK }}>
+    <button type="button" title={title} onClick={on} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
+      style={{ appearance: 'none', border: 0, cursor: 'pointer', width: 24, height: 24, borderRadius: 5, display: 'grid', placeItems: 'center', flex: 'none', background: active ? '#e5f4ff' : h ? '#f0f1f3' : 'transparent', color: active ? SEL : INK }}>
       <UiIcon name={name} size={size} />
     </button>
   )
@@ -190,21 +190,25 @@ function InspectorRow({ label, height = 48, top = 20, columns = '88px 88px 24px'
     </div>
   )
 }
-function AutoFlowGroup() {
-  const icons: [keyof typeof UI_ICON, string, boolean][] = [
-    ['autoLayoutFreeform', 'Freeform', false],
-    ['autoLayoutVertical', 'Vertical', true],
-    ['autoLayoutHorizontal', 'Horizontal', false],
-    ['autoLayoutGrid', 'Grid', false],
+type AutoFlow = 'freeform' | 'vertical' | 'horizontal' | 'grid'
+function AutoFlowGroup({ value, onChange }: { value: AutoFlow; onChange: (value: AutoFlow) => void }) {
+  const icons: [keyof typeof UI_ICON, string, AutoFlow][] = [
+    ['autoLayoutFreeform', 'Freeform', 'freeform'],
+    ['autoLayoutVertical', 'Vertical', 'vertical'],
+    ['autoLayoutHorizontal', 'Horizontal', 'horizontal'],
+    ['autoLayoutGrid', 'Grid', 'grid'],
   ]
   return (
     <div style={{ width: 184, height: 24, borderRadius: 5, background: FIELD, display: 'flex', overflow: 'hidden' }}>
-      {icons.map(([name, title, active]) => (
-        <button key={name} type="button" title={title}
+      {icons.map(([name, title, key]) => {
+        const active = key === value
+        return (
+        <button key={name} type="button" title={title} aria-pressed={active} onClick={() => onChange(key)}
           style={{ appearance: 'none', border: 0, cursor: 'pointer', width: 46, height: 24, borderRadius: active ? 5 : 0, display: 'grid', placeItems: 'center', background: active ? '#fff' : 'transparent', color: INK }}>
           <UiIcon name={name} />
         </button>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -214,6 +218,70 @@ function AutoValueField({ icon, label, value, mode, caret = true }: { icon?: key
       <span style={{ width: 24, height: 24, flex: 'none', display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)', font: `450 11px/24px ${FONT}` }}>{icon ? <UiIcon name={icon} /> : label}</span>
       <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</span>
       {mode ? <span style={{ flex: 'none', marginRight: 7, color: INK }}>{mode}</span> : caret && <span style={{ width: 24, height: 24, flex: 'none', display: 'grid', placeItems: 'center', color: FAINT }}><UiIcon name="caret24" /></span>}
+    </div>
+  )
+}
+type ResizeMode = 'Fixed' | 'Hug' | 'Fill'
+const menuDivider = <span style={{ display: 'block', height: 1, margin: '6px 8px', background: 'rgba(255,255,255,0.16)' }} />
+function MenuCheck() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden style={{ display: 'block' }}>
+      <path d="M5.00012 8.5L7.5 11L11.5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" shapeRendering="geometricPrecision" />
+    </svg>
+  )
+}
+function MenuOptionButton({ children, checked, onClick }: { children: React.ReactNode; checked?: boolean; onClick: () => void }) {
+  return (
+    <button type="button" role="menuitemradio" aria-checked={checked} onClick={onClick}
+      style={{ appearance: 'none', border: 0, width: '100%', height: 32, borderRadius: 7, background: checked ? SEL : 'transparent', color: '#fff', display: 'grid', gridTemplateColumns: '20px 1fr', alignItems: 'center', gap: 8, padding: '0 9px', cursor: 'pointer', textAlign: 'left', font: `400 11px/16px ${FONT}` }}>
+      <span style={{ width: 20, display: 'grid', placeItems: 'center' }}>{checked && <MenuCheck />}</span>
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{children}</span>
+    </button>
+  )
+}
+function ResizeDropdownField({ axis, value, mode, onMode }: { axis: 'W' | 'H'; value: string; mode: ResizeMode; onMode: (mode: ResizeMode) => void }) {
+  const [open, setOpen] = useState(false)
+  const axisLabel = axis === 'W' ? 'width' : 'height'
+  const selectMode = (next: ResizeMode) => { onMode(next); setOpen(false) }
+  return (
+    <div style={{ position: 'relative', width: 88, height: 24 }}>
+      <button type="button" aria-label={`${axisLabel} resizing: ${mode}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(v => !v)}
+        style={{ appearance: 'none', border: 0, padding: 0, width: 88, height: 24, background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
+        <AutoValueField icon={axis === 'W' ? 'resizeW' : undefined} label={axis === 'H' ? 'H' : undefined} value={value} mode={mode} caret={false} />
+      </button>
+      {open && (
+        <div role="menu" aria-label={`${axisLabel} resizing options`} style={{ position: 'absolute', zIndex: 90, top: 28, left: 0, width: 184, padding: 6, borderRadius: 12, background: '#1f1f1f', color: '#fff', boxShadow: '0 18px 38px rgba(0,0,0,.24)' }}>
+          <MenuOptionButton checked={mode === 'Fixed'} onClick={() => selectMode('Fixed')}>Fixed {axisLabel}</MenuOptionButton>
+          <MenuOptionButton checked={mode === 'Hug'} onClick={() => selectMode('Hug')}>Hug contents</MenuOptionButton>
+          <MenuOptionButton checked={mode === 'Fill'} onClick={() => selectMode('Fill')}>Fill container</MenuOptionButton>
+          {menuDivider}
+          <MenuOptionButton onClick={() => setOpen(false)}>Add min {axisLabel}...</MenuOptionButton>
+          <MenuOptionButton onClick={() => setOpen(false)}>Max {axisLabel}: 640</MenuOptionButton>
+          {menuDivider}
+          <MenuOptionButton onClick={() => setOpen(false)}>Remove max</MenuOptionButton>
+          {menuDivider}
+          <MenuOptionButton onClick={() => setOpen(false)}>Apply variable...</MenuOptionButton>
+        </div>
+      )}
+    </div>
+  )
+}
+function GapDropdownField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const values = ['0', '4', '8', '10', '12', '16', '24', '32', 'Auto']
+  return (
+    <div style={{ position: 'relative', width: 88, height: 24 }}>
+      <button type="button" aria-label={`Gap: ${value}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(v => !v)}
+        style={{ appearance: 'none', border: 0, padding: 0, width: 88, height: 24, background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
+        <AutoValueField icon="gapVertical" value={value} />
+      </button>
+      {open && (
+        <div role="menu" aria-label="Gap options" style={{ position: 'absolute', zIndex: 90, top: 28, left: 0, width: 104, padding: 6, borderRadius: 12, background: '#1f1f1f', color: '#fff', boxShadow: '0 18px 38px rgba(0,0,0,.24)' }}>
+          {values.map(item => (
+            <MenuOptionButton key={item} checked={item === value} onClick={() => { onChange(item); setOpen(false) }}>{item}</MenuOptionButton>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -543,6 +611,12 @@ export default function ReactFigmaPage() {
   const [tab, setTab] = useState<'design' | 'prototype'>('design')
   const [view, setView] = useState({ x: 300, y: 70, z: 0.6 })
   const [cssPosition, setCssPosition] = useState(2)
+  const [autoFlow, setAutoFlow] = useState<AutoFlow>('horizontal')
+  const [autoWrap, setAutoWrap] = useState(false)
+  const [widthResize, setWidthResize] = useState<ResizeMode>('Fill')
+  const [heightResize, setHeightResize] = useState<ResizeMode>('Fill')
+  const [gapValue, setGapValue] = useState('0')
+  const [clipContent, setClipContent] = useState(false)
   const canvasRef = useRef<HTMLDivElement>(null)
   const pan = useRef<{ x: number; y: number; vx: number; vy: number } | null>(null)
   const [isPanning, setIsPanning] = useState(false)
@@ -723,13 +797,13 @@ export default function ReactFigmaPage() {
 
           <Sec title="Auto layout" bodyGap={0} bodyPadding="0">
             <InspectorRow label="Flow">
-              <AutoFlowGroup />
+              <AutoFlowGroup value={autoFlow} onChange={setAutoFlow} />
               <span />
-              <UiIB name="autoLayoutWrap" title="Wrap" size={16} />
+              <UiIB name="autoLayoutWrap" title="Wrap" size={16} active={autoWrap} on={() => setAutoWrap(v => !v)} />
             </InspectorRow>
             <InspectorRow label="Resizing">
-              <AutoValueField icon="resizeW" value="402" mode="Fill" />
-              <AutoValueField label="H" value="427" mode="Fill" />
+              <ResizeDropdownField axis="W" value="402" mode={widthResize} onMode={setWidthResize} />
+              <ResizeDropdownField axis="H" value="427" mode={heightResize} onMode={setHeightResize} />
               <UiIB name="lockAspect" title="Lock aspect ratio" />
             </InspectorRow>
             <div style={{ position: 'relative', height: 82, width: '100%' }}>
@@ -737,7 +811,7 @@ export default function ReactFigmaPage() {
               <span style={{ position: 'absolute', left: 112, top: 3.5, width: 88, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Gap</span>
               <div style={{ position: 'absolute', left: 16, right: 8, top: 22, display: 'grid', gridTemplateColumns: '88px 88px 24px', gap: 8, alignItems: 'start' }}>
                 <AlignGrid sel={4} />
-                <AutoValueField icon="gapVertical" value="0" />
+                <GapDropdownField value={gapValue} onChange={setGapValue} />
                 <UiIB name="autoLayoutSettings" title="Auto layout settings" />
               </div>
             </div>
@@ -749,7 +823,7 @@ export default function ReactFigmaPage() {
             <div data-react-figma-clip-row style={{ height: 32, padding: '0 8px 0 16px', display: 'grid', gridTemplateColumns: '216px', alignItems: 'center' }}>
               <style>{'[data-react-figma-clip-row] input:not(:checked) + [data-react-figma-clip-box] svg{display:none}'}</style>
               <label style={{ position: 'relative', display: 'grid', gridTemplateColumns: '16px 200px', width: 216, height: 24, cursor: 'pointer', color: INK }}>
-                <input type="checkbox" aria-label="Clip content" style={{ position: 'absolute', left: 0, top: 4, width: 16, height: 16, margin: 0, opacity: 0, pointerEvents: 'none' }} />
+                <input type="checkbox" aria-label="Clip content" checked={clipContent} onChange={e => setClipContent(e.currentTarget.checked)} style={{ position: 'absolute', left: 0, top: 4, width: 16, height: 16, margin: 0, opacity: 0, pointerEvents: 'none' }} />
                 <span data-react-figma-clip-box aria-hidden style={{ position: 'relative', width: 16, height: 16, margin: '4px 0', border: '1px solid rgba(0,0,0,0.2)', borderRadius: 2, background: FIELD, boxSizing: 'border-box', display: 'grid', color: INK }}>
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden style={{ position: 'absolute', left: -1, top: -1 }}>
                     <path d="M5.00012 8.5L7.5 11L11.5 5" stroke="rgba(0,0,0,0)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" shapeRendering="geometricPrecision" />
