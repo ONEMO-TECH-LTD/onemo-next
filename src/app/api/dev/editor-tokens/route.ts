@@ -10,10 +10,36 @@ import { NextResponse } from 'next/server'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-const TOKENS_CSS = join(process.cwd(), 'src', 'app', 'tokens', 'tokens.css')
+const TOKENS_DIR = join(process.cwd(), 'src', 'app', 'tokens')
+const TOKENS_CSS = join(TOKENS_DIR, 'tokens.css')
+const TOKENS_TS = join(TOKENS_DIR, 'tokens.ts')
 
 export type TokenKind = 'color' | 'dimension' | 'other'
-export type Token = { cssVar: string; value: string; group: string; kind: TokenKind }
+export type Token = { cssVar: string; value: string; group: string; kind: TokenKind; path?: string }
+
+/** Build cssVar → structural path from the converter's own tokens.ts (authoritative, 100% coverage).
+ *  The nested path (e.g. primCol.base.white) is the design-system name; the css var is the CSS name —
+ *  showing both = full traceability. Returns {} if tokens.ts is missing/unparseable (degrade gracefully). */
+async function pathByCssVar(): Promise<Record<string, string>> {
+  try {
+    const ts = await readFile(TOKENS_TS, 'utf8')
+    const body = ts.replace(/^[\s\S]*?export const tokens\s*=\s*/, '').replace(/(;|\s+as const\s*;?)\s*$/, '').trim()
+    const obj = JSON.parse(body) as Record<string, unknown>
+    const out: Record<string, string> = {}
+    const walk = (node: Record<string, unknown>, path: string[]) => {
+      for (const [k, v] of Object.entries(node)) {
+        if (typeof v === 'string') {
+          const m = v.match(/var\((--[a-z0-9-]+)\)/i)
+          if (m) out[m[1]] = path.concat(k).join(' / ')
+        } else if (v && typeof v === 'object') walk(v as Record<string, unknown>, path.concat(k))
+      }
+    }
+    walk(obj, [])
+    return out
+  } catch {
+    return {}
+  }
+}
 
 function classify(name: string, value: string): TokenKind {
   if (/^(oklch|oklab|rgb|hsl|lab|lch|hwb|#)/i.test(value) || /-col(-|$)|color/.test(name)) return 'color'
@@ -26,7 +52,7 @@ export async function GET() {
     return NextResponse.json({ error: 'dev-only' }, { status: 403 })
   }
   try {
-    const css = await readFile(TOKENS_CSS, 'utf8')
+    const [css, paths] = await Promise.all([readFile(TOKENS_CSS, 'utf8'), pathByCssVar()])
     const seen = new Set<string>()
     const tokens: Token[] = []
     // match `--name: value;` declarations (top-level custom properties)
@@ -38,7 +64,7 @@ export async function GET() {
       seen.add(cssVar)
       const segs = cssVar.replace(/^--/, '').split('-')
       const group = segs.slice(0, 2).join('-') || 'other'
-      tokens.push({ cssVar, value, group, kind: classify(cssVar, value) })
+      tokens.push({ cssVar, value, group, kind: classify(cssVar, value), path: paths[cssVar] })
     }
     return NextResponse.json({ tokens, count: tokens.length })
   } catch (e) {

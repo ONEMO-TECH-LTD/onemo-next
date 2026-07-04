@@ -19,7 +19,7 @@ import { Fragment, useState, useRef, useEffect, useCallback } from 'react'
 import { buildLayerTree, readStyles, colorToHex, hexToRgba, boxSlots, gapSlots, editSlot, tokenOf, Overrides, parseEffects, parseShadow, formatShadow, splitTopLevel, alignToIndex, alignFromIndex, collectSelectionColors, type LiveNode, type OverrideOp } from './engine'
 import { createPortal } from 'react-dom'
 import {
-  ListDashes, MagnifyingGlass, Plus, Minus, Sidebar, CaretDown, GearSix, Palette,
+  MagnifyingGlass, Plus, Minus, Sidebar, CaretDown,
   type Icon as PIcon,
 } from '@phosphor-icons/react'
 
@@ -201,7 +201,7 @@ function useCloseOnOutside<T extends HTMLElement>(open: boolean, close: () => vo
 // E3.3 — real DS tokens from the converter output (/api/dev/editor-tokens), fetched once and
 // cached, feeding the ⬡ variable picker. The var name IS the token path (DEC-locked), so it
 // doubles as the Figma-style label; the resolved value shows alongside for traceability.
-type DsToken = { cssVar: string; value: string; group: string; kind: 'color' | 'dimension' | 'other' }
+type DsToken = { cssVar: string; value: string; group: string; kind: 'color' | 'dimension' | 'other'; path?: string }
 let _dsTokenCache: DsToken[] | null = null
 function useDsTokens(): DsToken[] {
   const [toks, setToks] = useState<DsToken[]>(_dsTokenCache ?? [])
@@ -679,72 +679,72 @@ function LayerRow({ n, on, onToggle }: { n: Node; on?: () => void; onToggle?: ()
 }
 
 /* ── Variables library (full-page, opened by the Variables rail item) ──
-   Collections + counts are the REAL DS token collections (read live from Figma's variables editor). */
-const COLLECTIONS: [string, number][] = [
-  ['.0-Branding-Col', 600], ['.1.0-Prim-Col', 131], ['.1.1-Prim-Dim', 45], ['.1.2-Prim-Type', 28], ['.1.3-Prim-Track', 34], ['.1.4-Prim-Ratios', 21],
-  ['.2.0-Al-Col', 79], ['.2.1-Al-Dim', 23], ['.2.2-Al-Type', 95], ['.2.3-Al-Radii', 11], ['.2.4-Al-Container', 12], ['.2.5-Al-Breakpoints', 8],
-  ['3.0-Sem-Col', 86], ['3.1-Sem-Dim-Fluid', 23], ['3.2-Sem-Dim-Static', 23], ['3.3-Sem-Type-Fluid', 156], ['3.4-Sem-Border', 5], ['3.5-Sem-Radii', 11], ['3.6-Sem-Container', 13], ['3.7-Sem-Breakpoints', 8],
-  ['5.0-Effects', 21], ['4.0-Com', 4],
-]
-const VGROUPS: [string, number, number][] = [['All', 600, 0], ['DUSTY', 288, 0], ['Royal Plum', 12, 1], ['Velvet Orchid', 12, 1], ['Blackberry Cream', 12, 1]]
-const RAMPS: { group: string; rows: [number, string][] }[] = [
-  { group: 'Royal Plum', rows: [[1, 'ED84D2'], [2, 'E869C7'], [3, 'E24EBB'], [4, 'DB33AF'], [5, 'C8259D'], [6, 'AB2286'], [7, '8E1E70'], [8, '72195A'], [9, '5F154B'], [10, '4D123C'], [11, '3A0E2D'], [12, '280A1F']] },
-  { group: 'Velvet Orchid', rows: [[1, 'D4A8E2'], [2, 'C790D9'], [3, 'BB79CF'], [4, 'AE63C5'], [5, 'A14CBA'], [6, '8D41A4']] },
-]
+   E3.4 traceability: every token shows its structural Name (the converter's own path, the
+   DS/Figma-side name) ↔ CSS variable ↔ resolved value — so it's always clear what token is
+   showing and how it maps to code. Real tokens from the converter output, no mock. */
 function VariablesLibrary() {
+  const tokens = useDsTokens()
   const [colSel, setColSel] = useState(0)
+  const [q, setQ] = useState('')
+  const collOf = (t: DsToken) => t.path?.split(' / ')[0] ?? t.group
+  const collections: [string, number][] = []
+  for (const t of tokens) {
+    const c = collOf(t)
+    const hit = collections.find((x) => x[0] === c)
+    if (hit) hit[1]++
+    else collections.push([c, 1])
+  }
+  const activeCol = collections[colSel]?.[0] ?? ''
+  const ql = q.trim().toLowerCase()
+  const rows = tokens.filter((t) => collOf(t) === activeCol)
+    .filter((t) => !ql || (t.path ?? '').toLowerCase().includes(ql) || t.cssVar.toLowerCase().includes(ql) || t.value.toLowerCase().includes(ql))
   return (
     <div style={{ flex: 1, minWidth: 0, display: 'flex', overflow: 'hidden' }}>
-      {/* collections + groups */}
-      <div style={{ width: 300, flex: 'none', borderRight: `1px solid ${LINE}`, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {/* collections */}
+      <div style={{ width: 260, flex: 'none', borderRight: `1px solid ${LINE}`, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ height: 40, borderBottom: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', gap: 6, padding: '0 12px' }}>
-          <span style={{ flex: 1, minWidth: 0, font: `550 12px/1 ${FONT}`, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>ONEMO DS v2.3.1 - 1 July +</span>
+          <span style={{ flex: 1, minWidth: 0, font: `550 12px/1 ${FONT}`, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>ONEMO DS · {tokens.length} tokens</span>
           <IB I={Sidebar} title="Toggle panel" s={15} />
         </div>
-        <div style={{ padding: '10px 12px 4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={hdr}>Collections</span><IB I={Plus} title="Create collection" s={14} /></div>
+        <div style={{ padding: '10px 12px 4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={hdr}>Collections</span></div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 6px' }}>
-          {COLLECTIONS.map(([n, c], i) => (
+          {collections.map(([n, c], i) => (
             <button key={n} type="button" onClick={() => setColSel(i)} style={{ appearance: 'none', border: 0, cursor: 'pointer', width: '100%', height: 30, display: 'flex', alignItems: 'center', gap: 8, padding: '0 8px', borderRadius: 5, background: i === colSel ? '#f0f1f3' : 'transparent', color: INK }}>
               <span style={{ flex: 1, minWidth: 0, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', font: `${i === colSel ? 550 : 400} 11px/1 ${FONT}` }}>{n}</span>
               <span style={{ flex: 'none', color: MUTE, font: `400 11px/1 ${FONT}` }}>{c}</span>
             </button>
           ))}
         </div>
-        <div style={{ padding: '8px 12px 4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: `1px solid ${LINE}` }}><span style={hdr}>Groups</span><IB I={ListDashes} title="Sort" s={14} /></div>
-        <div style={{ maxHeight: 150, overflowY: 'auto', padding: '0 6px 8px' }}>
-          {VGROUPS.map(([n, c, d], i) => (
-            <div key={n + i} style={{ height: 28, display: 'flex', alignItems: 'center', padding: `0 8px 0 ${8 + d * 16}px`, borderRadius: 5, background: i === 0 ? '#e5f4ff' : 'transparent', font: `${i === 0 ? 600 : 400} 11px/1 ${FONT}` }}>
-              <span style={{ flex: 1, minWidth: 0 }}>{n}</span><span style={{ color: MUTE, fontWeight: 400 }}>{c}</span>
-            </div>
-          ))}
-        </div>
       </div>
-      {/* table */}
+      {/* traceability table: Name (structural path) · CSS variable · Value */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ height: 40, borderBottom: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', gap: 12, padding: '0 16px' }}>
-          <span style={{ font: `550 12px/1 ${FONT}` }}>{COLLECTIONS[colSel][0]}</span>
+          <span style={{ font: `550 12px/1 ${FONT}` }}>{activeCol}</span>
+          <span style={{ color: MUTE, font: `400 11px/1 ${FONT}` }}>{rows.length}</span>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ width: 200, height: 26, background: FIELD, borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', color: MUTE, font: `400 11px/1 ${FONT}` }}><MagnifyingGlass size={13} /> Search</div>
-            <IB I={GearSix} title="Filter" s={14} /><IB I={Plus} title="New mode" s={14} />
+            <div style={{ width: 200, height: 26, background: FIELD, borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', color: MUTE, font: `400 11px/1 ${FONT}` }}>
+              <MagnifyingGlass size={13} />
+              <input value={q} onChange={(e) => setQ(e.currentTarget.value)} placeholder="Search name / var / value" style={{ flex: 1, minWidth: 0, border: 0, outline: 0, background: 'transparent', color: INK, font: `400 11px/1 ${FONT}` }} />
+            </div>
           </div>
         </div>
-        <div style={{ height: 32, borderBottom: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', font: `400 11px/1 ${FONT}`, color: MUTE }}>
-          <span style={{ width: 280, padding: '0 16px' }}>Name</span><span style={{ flex: 1, padding: '0 16px' }}>Light</span><span style={{ flex: 'none', width: 40, display: 'grid', placeItems: 'center' }}><Plus size={13} color={MUTE} /></span>
+        <div style={{ height: 32, borderBottom: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', font: `550 11px/1 ${FONT}`, color: MUTE }}>
+          <span style={{ width: 300, padding: '0 16px' }}>Name</span><span style={{ width: 260, padding: '0 12px' }}>CSS variable</span><span style={{ flex: 1, padding: '0 12px' }}>Value</span>
         </div>
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          {RAMPS.map(r => (
-            <div key={r.group}>
-              <div style={{ padding: '12px 16px 6px', font: `400 11px/1 ${FONT}`, color: MUTE }}>DUSTY / <span style={{ color: INK, fontWeight: 600 }}>{r.group}</span></div>
-              {r.rows.map(([num, hex]) => (
-                <div key={num} style={{ height: 36, borderBottom: '1px solid #f2f2f3', display: 'flex', alignItems: 'center' }}>
-                  <span style={{ width: 280, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 10, font: `400 11px/1 ${FONT}` }}><Palette size={14} color={MUTE} /> {num}</span>
-                  <span style={{ flex: 1, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 8, font: `400 11px/1 ${FONT}` }}><span style={{ width: 14, height: 14, borderRadius: 3, background: '#' + hex, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.12)' }} /> {hex}</span>
-                  <span style={{ width: 40 }} />
-                </div>
-              ))}
+          {rows.map((t) => (
+            <div key={t.cssVar} style={{ height: 34, borderBottom: '1px solid #f2f2f3', display: 'flex', alignItems: 'center', font: `400 11px/1 ${FONT}` }}>
+              <span style={{ width: 300, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                {t.kind === 'color'
+                  ? <span style={{ flex: 'none', width: 14, height: 14, borderRadius: 3, background: t.value, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.12)' }} />
+                  : <VariableHashIcon />}
+                <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(t.path ?? t.cssVar).replace(/^[^/]+ \/ /, '')}</span>
+              </span>
+              <span style={{ width: 260, padding: '0 12px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: MUTE }}>{t.cssVar}</span>
+              <span style={{ flex: 1, padding: '0 12px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.value}</span>
             </div>
           ))}
-          <div style={{ height: 44, display: 'flex', alignItems: 'center', gap: 8, padding: '0 16px', color: MUTE, font: `400 11px/1 ${FONT}`, cursor: 'pointer' }}><Plus size={14} /> Create variable</div>
+          {rows.length === 0 && <div style={{ padding: '16px', color: MUTE, font: `400 11px/1 ${FONT}` }}>No tokens match.</div>}
         </div>
       </div>
     </div>
