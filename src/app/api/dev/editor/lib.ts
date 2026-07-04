@@ -266,11 +266,23 @@ async function setJsxStyle(op: Extract<WriteOp, { kind: 'set-jsx-style' }>): Pro
   const isNumericPx = /^-?\d+(\.\d+)?px$/.test(op.value)
   const bareNum = op.value.replace(/px$/, '')
 
+  // Shorthand alias: a color longhand should update an existing shorthand key when it holds a
+  // plain color (background-color ↔ background). Prevents inserting a competing key next to it.
+  const isColorLiteral = (s: string) => /^(['"]?)#[0-9a-f]{3,8}\1$|^(['"]).*(rgb|hsl|oklch)\(/i.test(s.trim())
+  const aliasKeys: Record<string, string> = { backgroundColor: 'background' }
+  const nameOf = (p: ts.ObjectLiteralElementLike) => (ts.isPropertyAssignment(p) ? p.name.getText(sf).replace(/['"]/g, '') : '')
   const matches = obj.properties.filter(
-    (p): p is ts.PropertyAssignment => ts.isPropertyAssignment(p) && (p.name.getText(sf).replace(/['"]/g, '') === key),
+    (p): p is ts.PropertyAssignment => ts.isPropertyAssignment(p) && nameOf(p) === key,
   )
   if (matches.length > 1) throw Object.assign(new Error(`duplicate style key "${key}" — ambiguous (F6)`), { status: 422 })
-  const existing = matches[0]
+  let existing = matches[0]
+  // no direct match, but the aliased shorthand exists and currently holds a color → target it
+  if (!existing && aliasKeys[key]) {
+    const shorthand = obj.properties.find(
+      (p): p is ts.PropertyAssignment => ts.isPropertyAssignment(p) && nameOf(p) === aliasKeys[key] && isColorLiteral(p.initializer.getText(sf)),
+    )
+    if (shorthand) existing = shorthand
+  }
   if (existing) {
     const init = existing.initializer
     // F1 (s58-lead): only replace a LITERAL initializer — never clobber a dynamic expression
