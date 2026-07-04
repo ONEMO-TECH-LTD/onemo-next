@@ -10,7 +10,9 @@ import { writeFile, mkdir, access } from 'node:fs/promises'
 import { join, extname, basename } from 'node:path'
 
 const UPLOAD_DIR = join(process.cwd(), 'public', 'uploads', 'react-figma')
-const OK_EXT = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.avif'])
+// Raster only. .svg is deliberately excluded — an uploaded SVG served same-origin from public/
+// is a stored-XSS vector (can carry <script>); supporting it safely needs server-side sanitization.
+const OK_EXT = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif'])
 
 export async function POST(req: Request) {
   if (process.env.NODE_ENV !== 'development') {
