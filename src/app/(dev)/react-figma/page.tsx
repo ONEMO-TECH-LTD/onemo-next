@@ -285,6 +285,32 @@ function GapDropdownField({ value, onChange }: { value: string; onChange: (value
     </div>
   )
 }
+function InlineValueInput({ icon, value, onChange, suffix, ariaLabel }: { icon: keyof typeof UI_ICON; value: string; onChange: (value: string) => void; suffix?: string; ariaLabel: string }) {
+  return (
+    <div style={{ height: 24, width: 88, borderRadius: 5, background: FIELD, display: 'grid', gridTemplateColumns: suffix ? '24px 1fr 14px' : '24px 1fr', alignItems: 'center', overflow: 'hidden', font: `450 11px/16px ${FONT}`, color: INK }}>
+      <span style={{ width: 24, height: 24, flex: 'none', display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)' }}><UiIcon name={icon} /></span>
+      <input aria-label={ariaLabel} value={value} onChange={e => onChange(e.currentTarget.value)}
+        style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: INK, font: `450 11px/16px ${FONT}` }} />
+      {suffix && <span style={{ color: MUTE }}>{suffix}</span>}
+    </div>
+  )
+}
+function BlendModeMenu({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const modes = ['Pass through', 'Normal', 'Multiply', 'Screen', 'Overlay']
+  return (
+    <div style={{ position: 'relative', width: 24, height: 24 }}>
+      <UiIB name="blendMode" title={`Blend mode: ${value}`} active={open || value !== 'Pass through'} on={() => setOpen(v => !v)} />
+      {open && (
+        <div role="menu" aria-label="Blend mode options" style={{ position: 'absolute', zIndex: 95, top: 28, right: 0, width: 136, padding: 6, borderRadius: 12, background: '#1f1f1f', color: '#fff', boxShadow: '0 18px 38px rgba(0,0,0,.24)' }}>
+          {modes.map(mode => (
+            <MenuOptionButton key={mode} checked={mode === value} onClick={() => { onChange(mode); setOpen(false) }}>{mode}</MenuOptionButton>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 function TextSegGroup({ items, active = 0, width = 184, onSelect, ariaLabel }: { items: string[]; active?: number; width?: number | string; onSelect?: (index: number) => void; ariaLabel?: string }) {
   return (
     <div role="radiogroup" aria-label={ariaLabel} style={{ width, height: 24, borderRadius: 5, background: FIELD, display: 'flex', overflow: 'hidden' }}>
@@ -617,6 +643,11 @@ export default function ReactFigmaPage() {
   const [heightResize, setHeightResize] = useState<ResizeMode>('Fill')
   const [gapValue, setGapValue] = useState('0')
   const [clipContent, setClipContent] = useState(false)
+  const [appearanceVisible, setAppearanceVisible] = useState(true)
+  const [blendMode, setBlendMode] = useState('Pass through')
+  const [opacityValue, setOpacityValue] = useState('100')
+  const [cornerRadiusValue, setCornerRadiusValue] = useState('0')
+  const [individualCorners, setIndividualCorners] = useState(false)
   const canvasRef = useRef<HTMLDivElement>(null)
   const pan = useRef<{ x: number; y: number; vx: number; vy: number } | null>(null)
   const [isPanning, setIsPanning] = useState(false)
@@ -837,14 +868,14 @@ export default function ReactFigmaPage() {
             </div>
           </Sec>
 
-          <Sec title="Appearance" actionWidth={53} action={<><UiIB name="visibility" title="Hide" /><UiIB name="blendMode" title="Apply blend mode" /></>} bodyGap={0} bodyPadding="0">
+          <Sec title="Appearance" actionWidth={53} action={<><UiIB name="visibility" title={appearanceVisible ? 'Hide' : 'Show'} active={!appearanceVisible} on={() => setAppearanceVisible(v => !v)} /><BlendModeMenu value={blendMode} onChange={setBlendMode} /></>} bodyGap={0} bodyPadding="0">
             <div style={{ position: 'relative', height: 50, width: '100%' }}>
               <span style={{ position: 'absolute', left: 16, top: 3.5, width: 88, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Opacity</span>
               <span style={{ position: 'absolute', left: 112, top: 3.5, width: 120, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Corner radius</span>
               <div style={{ position: 'absolute', left: 16, right: 8, top: 22, display: 'grid', gridTemplateColumns: '88px 88px 24px', gap: 8, alignItems: 'start' }}>
-                <AutoValueField icon="opacity" value="100%" caret={false} />
-                <AutoValueField icon="cornerRadius" value="0" caret={false} />
-                <UiIB name="cornerRadius" title="Individual corners" />
+                <InlineValueInput icon="opacity" value={opacityValue} onChange={setOpacityValue} suffix="%" ariaLabel="Opacity" />
+                <InlineValueInput icon="cornerRadius" value={cornerRadiusValue} onChange={setCornerRadiusValue} ariaLabel="Corner radius" />
+                <UiIB name="cornerRadius" title="Individual corners" active={individualCorners} on={() => setIndividualCorners(v => !v)} />
               </div>
             </div>
           </Sec>
