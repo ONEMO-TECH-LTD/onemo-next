@@ -771,6 +771,28 @@ function VariablesLibrary() {
   )
 }
 
+/* E3.6 — Advanced stroke settings: border-style (Solid/Dashed/Dotted) — the CSS-analog subset. */
+function StrokeSettingsMenu({ onStyle }: { onStyle: (value: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <UiIB name="autoLayoutSettings" title="Advanced stroke settings" active={open} on={() => setOpen((v) => !v)} />
+      {open && (
+        <div data-figma-floating-root="true" role="menu" style={{ position: 'absolute', right: 0, top: 28, zIndex: 130, width: 180, padding: '6px 12px', borderRadius: 8, background: '#fff', boxShadow: 'rgba(0,0,0,0.15) 0px 2px 5px 0px, rgba(0,0,0,0.12) 0px 10px 16px 0px, rgba(0,0,0,0.12) 0px 0px 0.5px 0px' }}>
+          <div style={{ font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)', marginBottom: 4 }}>Style</div>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {(['solid', 'dashed', 'dotted'] as const).map((s) => (
+              <button key={s} type="button" onClick={() => onStyle(s)}
+                style={{ appearance: 'none', border: `1px solid ${LINE}`, background: '#fff', height: 24, padding: '0 8px', borderRadius: 5, cursor: 'pointer', font: `400 11px/1 ${FONT}`, color: INK, textTransform: 'capitalize' }}>{s}</button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* E3.6 — More-actions menu (Duplicate / Delete the selected element → structural source edits). */
 function MoreActionsMenu({ onDuplicate, onDelete }: { onDuplicate: () => void; onDelete: () => void }) {
   const [open, setOpen] = useState(false)
@@ -1049,7 +1071,7 @@ function StrokeDetailRow({ position, weight, onWeight, onPosition, onSide }: { p
         <span />
         <AutoValueField icon="strokeWeight" value={weightValue} caret={false} ariaLabel="Stroke weight" onChange={(v) => { setWeightValue(v); onWeight?.(v) }} width={72} />
         <span />
-        <UiIB name="autoLayoutSettings" title="Advanced stroke settings" />
+        <StrokeSettingsMenu onStyle={(v) => onSide?.('strokeStyle', v)} />
         <span />
         <UiIB name="individualStroke" title="Individual strokes" active={individual} on={() => setIndividual((v) => !v)} />
       </div>
@@ -1636,6 +1658,7 @@ export default function ReactFigmaPage() {
       : field === 'strokeRight' ? [['border-right-width', withUnit]]
       : field === 'strokeBottom' ? [['border-bottom-width', withUnit]]
       : field === 'strokeLeft' ? [['border-left-width', withUnit]]
+      : field === 'strokeStyle' ? [['border-style', n]]
       : field === 'strokeColor' ? [['border-color', n]]
       : field === 'fillBg' ? [['background-color', n]]
       : field === 'fillColor' ? [['color', n]]
