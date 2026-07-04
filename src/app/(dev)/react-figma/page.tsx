@@ -235,8 +235,15 @@ function FigmaVariablePicker({ fieldLabel, anchorRef, onPick, onClose }: { field
       window.removeEventListener('scroll', update, true)
     }
   }, [anchorRef])
+  // E3.4 — filter to the field's token type (Figma shows only same-type variables). Inferred from
+  // the field label; only filters when confident, otherwise shows all so nothing is wrongly hidden.
+  const kind: DsToken['kind'] | null =
+    /fill|stroke|colou?r|paint|background/i.test(fieldLabel) ? 'color'
+    : /gap|pad|radi|corner|size|width|height|spac|inset|weight/i.test(fieldLabel) ? 'dimension'
+    : null
+  const pool = kind ? tokens.filter((t) => t.kind === kind) : tokens
   const q = query.trim().toLowerCase()
-  const filtered = tokens.filter((t) => !q || t.cssVar.toLowerCase().includes(q) || t.value.toLowerCase().includes(q))
+  const filtered = pool.filter((t) => !q || t.cssVar.toLowerCase().includes(q) || t.value.toLowerCase().includes(q))
   // group into header + item rows in file order (tokens.css is organised by collection)
   const rows: { kind: 'header' | 'item'; label: string; value?: string; bind?: string }[] = []
   let lastGroup = ''
