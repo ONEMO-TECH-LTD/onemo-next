@@ -1,0 +1,228 @@
+[     687ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[     994ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[    1021ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[    1141ms] [LOG] [engine] canvas wired — contentDocument reachable (COEP smoke PASS) @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[   45145ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[   45404ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[   45426ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[   45494ms] [LOG] [engine] canvas wired — contentDocument reachable (COEP smoke PASS) @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[   47523ms] [LOG] [engine] select {file: src/app/(dev)/effect-creator/v5.3.1/user/Dock.tsx, line: 41, col: 5, tag: div, classes: Array(1)} {computed: Object, defined: Object} @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[   47860ms] [LOG] [engine] select {file: src/app/(dev)/effect-creator/v5.3.1/user/Dock.tsx, line: 41, col: 5, tag: div, classes: Array(1)} {computed: Object, defined: Object} @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[   48203ms] [LOG] [engine] select {file: src/app/(dev)/effect-creator/v5.3.1/user/EmptyState.tsx, line: 14, col: 7, tag: button, classes: Array(1)} {computed: Object, defined: Object} @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[   48550ms] [LOG] [engine] select {file: src/app/(dev)/effect-creator/v5.3.1/user/Dock.tsx, line: 28, col: 7, tag: span, classes: Array(1)} {computed: Object, defined: Object} @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[   48893ms] [LOG] [engine] select {file: src/app/(dev)/effect-creator/v5.3.1/user/Dock.tsx, line: 28, col: 7, tag: span, classes: Array(1)} {computed: Object, defined: Object} @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[   88101ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[   88357ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[   88388ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[   88459ms] [LOG] [engine] canvas wired — contentDocument reachable (COEP smoke PASS) @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[   90472ms] [LOG] [engine] select {file: src/qa-cssom.tsx, line: 1, col: 1, tag: div, classes: Array(2)} {computed: Object, defined: Object} @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[   90820ms] [LOG] [engine] select {file: src/qa-cssom.tsx, line: 1, col: 1, tag: div, classes: Array(2)} {computed: Object, defined: Object} @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[   90879ms] [LOG] [engine] select {file: src/qa-cssom.tsx, line: 1, col: 1, tag: div, classes: Array(2)} {computed: Object, defined: Object} @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[   91160ms] [LOG] [engine] select {file: src/qa-cssom.tsx, line: 1, col: 1, tag: div, classes: Array(2)} {computed: Object, defined: Object} @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[   91504ms] [LOG] [engine] select {file: src/qa-cssom.tsx, line: 1, col: 1, tag: div, classes: Array(1)} {computed: Object, defined: Object} @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[   91851ms] [LOG] [engine] select {file: src/qa-cssom.tsx, line: 1, col: 1, tag: div, classes: Array(1)} {computed: Object, defined: Object} @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[   92192ms] [LOG] [engine] select {file: src/qa-cssom.tsx, line: 1, col: 1, tag: div, classes: Array(1)} {computed: Object, defined: Object} @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[   92536ms] [LOG] [engine] select {file: src/qa-cssom.tsx, line: 1, col: 1, tag: div, classes: Array(1)} {computed: Object, defined: Object} @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  111156ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  111449ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  111482ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  111572ms] [LOG] [engine] canvas wired — contentDocument reachable (COEP smoke PASS) @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  114279ms] [LOG] [engine] select {file: src/qa-live.tsx, line: 2, col: 3, tag: div, classes: Array(1)} {computed: Object, defined: Object} @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  234563ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  234565ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  235598ms] [LOG] [Fast Refresh] done in 1036ms @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  235599ms] [LOG] [Fast Refresh] done in 1036ms @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  235601ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  235601ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  236261ms] [LOG] [Fast Refresh] done in 661ms @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  236262ms] [LOG] [Fast Refresh] done in 661ms @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  263119ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  263126ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  264034ms] [LOG] [Fast Refresh] done in 909ms @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  264114ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  264114ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  264167ms] [LOG] [Fast Refresh] done in 54ms @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  264974ms] [LOG] [Fast Refresh] done in 861ms @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  264975ms] [LOG] [Fast Refresh] done in 861ms @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  266458ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  266458ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  267289ms] [LOG] [Fast Refresh] done in 830ms @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  267378ms] [LOG] [Fast Refresh] done in 920ms @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  268162ms] [LOG] [engine] canvas wired — contentDocument reachable (COEP smoke PASS) @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  268166ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  268912ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  269188ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  269215ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  269303ms] [LOG] [engine] canvas wired — contentDocument reachable (COEP smoke PASS) @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  283989ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  283989ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  284520ms] [LOG] [Fast Refresh] done in 530ms @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  284565ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  284565ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  284621ms] [LOG] [Fast Refresh] done in 56ms @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  285228ms] [LOG] [Fast Refresh] done in 663ms @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  285260ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  285671ms] [LOG] [Fast Refresh] done in 411ms @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  286144ms] [LOG] [engine] canvas wired — contentDocument reachable (COEP smoke PASS) @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  286468ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  286513ms] [ERROR] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+%s%s https://react.dev/link/hydration-mismatch 
+
+  ...
+    <InnerScrollAndFocusHandler segmentPath={[...]} focusAndScrollRef={{apply:false, ...}}>
+      <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+        <LoadingBoundary name="2d/" loading={null}>
+          <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>
+            <RedirectBoundary>
+              <RedirectErrorBoundary router={{...}}>
+                <InnerLayoutRouter url="/effect-cr..." tree={[...]} params={{}} cacheNode={{rsc:<Fragment>, ...}} ...>
+                  <SegmentViewNode type="page" pagePath="(dev)/effe...">
+                    <SegmentTrieNode>
+                    <ClientPageRoot Component={function EffectCreatorV531TwoDFirstPage} serverProvidedParams={{...}}>
+                      <EffectCreatorV531TwoDFirstPage params={Promise} searchParams={Promise}>
+                        <Suspense fallback={null}>
+                          <TwoDFirstPageInner>
+                            <div
+                              data-src="src/app/(dev)/effect-creator/v5.3.1/2d/page.tsx:87:5"
+                              style={{position:"fixed",top:0,left:0,width:"100%",height:"100%",background:"#ffffff"}}
+                              onDrop={function TwoDFirstPageInner.useCallback[handleDrop]}
+                              onDragOver={function onDragOver}
+                              onDragLeave={function onDragLeave}
+-                             data-eng-id="e39"
+                            >
+                              <LoadableComponent>
+                              <LoadableComponent>
+                              <LoadableComponent>
+                              <LoadableComponent>
+                              <div
+                                data-src="src/app/(dev)/effect-creator/v5.3.1/2d/page.tsx:171:13"
+                                className="outline-editor_topbarFixed__SbC_e"
+-                               data-eng-id="e40"
+                              >
+                                <TopBar left={<Fragment>} dirty={false} ...>
+                                  <div
+                                    data-src="src/app/(dev)/effect-creator/v5.3.1/user/TopBar.tsx:39:5"
+                                    className="outline-editor_topbar__ACCYu"
+-                                   data-eng-id="e41"
+                                  >
+                                    <div
+                                      data-src="src/app/(dev)/effect-creator/v5.3.1/user/TopBar.tsx:40:7"
+                                      className="outline-editor_topInner__q4UsD"
+-                                     data-eng-id="e42"
+                                    >
+                                      <div
+                                        data-src="src/app/(dev)/effect-creator/v5.3.1/user/TopBar.tsx:41:9"
+                                        className="outline-editor_barSideLeft__6NV_Q"
+-                                       data-eng-id="e43"
+                                      >
+                                        <span
+                                          data-src="src/app/(dev)/effect-creator/v5.3.1/user/TopBar.tsx:43:11"
+                                          className="outline-editor_barPill__Yznet"
+-                                         data-eng-id="e44"
+                                        >
+                                          <TopBarButton icon={<UndoIcon>} label="Undo" ...>
+                                            <button
+                                              data-src="src/app/(dev)/effect-creator/v5.3.1/user/TopBar.tsx:15:5"
+                                              type="button"
+                                              className={"outline-editor_topTool__s9WSn  "}
+                                              onClick={function useHistoryTransaction.useCallback[undo]}
+                                              disabled={true}
+                                              aria-label="Undo"
+                                              aria-pressed={undefined}
+                                              title="Undo"
+-                                             data-eng-id="e45"
+                                            >
+                                              <span
+                                                data-src="src/app/(dev)/effect-creator/v5.3.1/user/TopBar.tsx:16:7"
+                                                className="outline-editor_toolIcon__TF_uY"
+-                                               data-eng-id="e46"
+                                              >
+                                              <span
+                                                data-src="src/app/(dev)/effect-creator/v5.3.1/user/TopBar.tsx:17:7"
+                                                className="outline-editor_topToolLabel__Opagv"
+-                                               data-eng-id="e47"
+                                              >
++                                               Undo
+                                          <TopBarButton icon={<RedoIcon>} label="Redo" ...>
+                                            <button
+                                              data-src="src/app/(dev)/effect-creator/v5.3.1/user/TopBar.tsx:15:5"
+                                              type="button"
+                                              className={"outline-editor_topTool__s9WSn  "}
+                                              onClick={function useHistoryTransaction.useCallback[redo]}
+                                              disabled={true}
+                                              aria-label="Redo"
+                                              aria-pressed={undefined}
+                                              title="Redo"
+-                                             data-eng-id="e48"
+                                            >
+                                              <span
+                                                data-src="src/app/(dev)/effect-creator/v5.3.1/user/TopBar.tsx:16:7"
+                                                className="outline-editor_toolIcon__TF_uY"
+-                                               data-eng-id="e49"
+                                              >
+                                              <span
+                                                data-src="src/app/(dev)/effect-creator/v5.3.1/user/TopBar.tsx:17:7"
+                                                className="outline-editor_topToolLabel__Opagv"
+-                                               data-eng-id="e50"
+                                              >
++                                               Redo
+                                      <span
+                                        data-src="src/app/(dev)/effect-creator/v5.3.1/user/TopBar.tsx:45:105"
+                                        aria-hidden={true}
+-                                       data-eng-id="e51"
+                                      >
+                                      <div
+                                        data-src="src/app/(dev)/effect-creator/v5.3.1/user/TopBar.tsx:46:9"
+                                        className="outline-editor_barSideRight__hFOF3"
+-                                       data-eng-id="e52"
+                                      >
+                              ...
+                  ...
+                ...
+      ...
+ @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:51
+[  287121ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  287383ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  287409ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  287487ms] [LOG] [engine] canvas wired — contentDocument reachable (COEP smoke PASS) @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  297101ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  297101ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  298293ms] [LOG] [Fast Refresh] done in 1193ms @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  298359ms] [LOG] [Fast Refresh] done in 1258ms @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  301025ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  301025ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  301535ms] [LOG] [Fast Refresh] done in 511ms @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  301565ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  301565ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  301613ms] [LOG] [Fast Refresh] done in 48ms @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  302049ms] [LOG] [Fast Refresh] done in 484ms @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  302050ms] [LOG] [Fast Refresh] done in 484ms @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  304624ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  304625ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  305241ms] [LOG] [Fast Refresh] done in 617ms @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  305251ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  305251ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  305523ms] [LOG] [Fast Refresh] done in 272ms @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  305982ms] [LOG] [Fast Refresh] done in 731ms @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  305982ms] [LOG] [Fast Refresh] done in 731ms @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  307519ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  307519ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  308427ms] [LOG] [Fast Refresh] done in 907ms @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  308603ms] [LOG] [Fast Refresh] done in 1083ms @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  326887ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  326887ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  327927ms] [LOG] [Fast Refresh] done in 1041ms @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  327998ms] [LOG] [Fast Refresh] done in 1111ms @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  359464ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  359746ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  359773ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[  359863ms] [LOG] [engine] canvas wired — contentDocument reachable (COEP smoke PASS) @ webpack-internal:///(app-pages-browser)/../../../node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27

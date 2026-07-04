@@ -68,6 +68,16 @@ export function jailComponent(rel: string): string {
   return abs
 }
 
+/** WRITE jail for JSX ops (F3, s58-lead): .tsx ONLY — never .ts (no JSX to write there anyway,
+ *  and it keeps non-component sources like lib.ts unwritable even though they pass the read jail). */
+function jailComponentWrite(rel: string): string {
+  const abs = path.resolve(ROOT, rel)
+  if (!COMPONENT_ROOTS.some((r) => abs.startsWith(r + path.sep)) || !abs.endsWith('.tsx')) {
+    throw Object.assign(new Error(`outside JSX write jail (.tsx only): ${rel}`), { status: 403 })
+  }
+  return abs
+}
+
 // ─── shorthand slot logic (mirrors client engine.ts, server-side authority) ──
 
 const BOX_SIDE_TO_INDEX: Record<string, (n: number) => number> = {
@@ -237,8 +247,10 @@ function findJsxAt(sf: ts.SourceFile, line: number, col: number): ts.JsxOpeningE
 }
 
 async function setJsxStyle(op: Extract<WriteOp, { kind: 'set-jsx-style' }>): Promise<{ ok: true; file: string; newValueText: string }> {
-  const abs = jailComponent(op.file)
-  const source = await fs.readFile(abs, 'utf8')
+  const abs = jailComponentWrite(op.file) // F3: .tsx-only write jail
+  // F2/F5 (s58-lead): ONE read — parse AND splice the SAME buffer (no TOCTOU re-read window).
+  const buf = await fs.readFile(abs)
+  const source = buf.toString('utf8')
   const sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
   const el = findJsxAt(sf, op.line, op.col)
   if (!el) throw Object.assign(new Error(`no JSX element at ${op.line}:${op.col}`), { status: 404 })
@@ -254,20 +266,25 @@ async function setJsxStyle(op: Extract<WriteOp, { kind: 'set-jsx-style' }>): Pro
   const isNumericPx = /^-?\d+(\.\d+)?px$/.test(op.value)
   const bareNum = op.value.replace(/px$/, '')
 
-  const existing = obj.properties.find(
+  const matches = obj.properties.filter(
     (p): p is ts.PropertyAssignment => ts.isPropertyAssignment(p) && (p.name.getText(sf).replace(/['"]/g, '') === key),
   )
+  if (matches.length > 1) throw Object.assign(new Error(`duplicate style key "${key}" — ambiguous (F6)`), { status: 422 })
+  const existing = matches[0]
   if (existing) {
     const init = existing.initializer
+    // F1 (s58-lead): only replace a LITERAL initializer — never clobber a dynamic expression
+    // (`{dyn}`, `T.full`, a call) which is a live binding, not a paintable value.
+    if (!ts.isNumericLiteral(init) && !ts.isStringLiteral(init)) {
+      throw Object.assign(new Error('style value is a dynamic expression, not a literal — refusing (would destroy a binding)'), { status: 422 })
+    }
     const start = init.getStart(sf), end = init.getEnd()
     const currentRaw = source.slice(start, end)
     if (op.expectRaw !== undefined && currentRaw !== op.expectRaw) {
       throw Object.assign(new Error(`stale JSX value: expected ${JSON.stringify(op.expectRaw)}, found ${JSON.stringify(currentRaw)}`), { status: 409 })
     }
-    // numeric literal stays numeric; anything else becomes a single-quoted string
     const replacement = isNumericPx && ts.isNumericLiteral(init) ? bareNum : `'${op.value.replace(/'/g, "\\'")}'`
     const bStart = byteLen(source.slice(0, start)), bEnd = byteLen(source.slice(0, end))
-    const buf = await fs.readFile(abs)
     const next = Buffer.concat([buf.subarray(0, bStart), Buffer.from(replacement, 'utf8'), buf.subarray(bEnd)])
     await fs.writeFile(abs, next)
     return { ok: true, file: op.file, newValueText: replacement }
@@ -279,7 +296,6 @@ async function setJsxStyle(op: Extract<WriteOp, { kind: 'set-jsx-style' }>): Pro
   const literal = isNumericPx ? bareNum : `'${op.value.replace(/'/g, "\\'")}'`
   const insert = `\n${indent}${key}: ${literal},`
   const bOff = byteLen(source.slice(0, braceOffset))
-  const buf = await fs.readFile(abs)
   const next = Buffer.concat([buf.subarray(0, bOff), Buffer.from(insert, 'utf8'), buf.subarray(bOff)])
   await fs.writeFile(abs, next)
   return { ok: true, file: op.file, newValueText: literal }
@@ -323,8 +339,9 @@ async function setTokenValue(op: Extract<WriteOp, { kind: 'set-token-value' }>):
 
 /** Text-content edit (E2.4): splice the single JSXText child of the element at line:col. */
 async function setJsxText(op: Extract<WriteOp, { kind: 'set-jsx-text' }>): Promise<{ ok: true; file: string; newValueText: string }> {
-  const abs = jailComponent(op.file)
-  const source = await fs.readFile(abs, 'utf8')
+  const abs = jailComponentWrite(op.file) // F3
+  const buf = await fs.readFile(abs) // F5: one buffer, parse + splice
+  const source = buf.toString('utf8')
   const sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
   const opening = findJsxAt(sf, op.line, op.col)
   if (!opening) throw Object.assign(new Error(`no JSX element at ${op.line}:${op.col}`), { status: 404 })
@@ -346,7 +363,6 @@ async function setJsxText(op: Extract<WriteOp, { kind: 'set-jsx-text' }>): Promi
   // JSX text can't contain raw { } < > — reject rather than corrupt (expression-child edits are later scope)
   if (/[{}<>]/.test(op.newText)) throw Object.assign(new Error('text contains JSX-reserved characters ({ } < >) — not a plain-text child'), { status: 422 })
   const bStart = byteLen(source.slice(0, start)), bEnd = byteLen(source.slice(0, end))
-  const buf = await fs.readFile(abs)
   const next = Buffer.concat([buf.subarray(0, bStart), Buffer.from(op.newText, 'utf8'), buf.subarray(bEnd)])
   await fs.writeFile(abs, next)
   return { ok: true, file: op.file, newValueText: op.newText }

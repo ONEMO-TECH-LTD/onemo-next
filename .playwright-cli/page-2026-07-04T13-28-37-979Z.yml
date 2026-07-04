@@ -1,0 +1,443 @@
+- generic [active]:
+  - generic [ref=e1]:
+    - navigation [ref=e2]:
+      - button "File" [ref=e3] [cursor=pointer]:
+        - img [ref=e5]
+        - generic [ref=e7]: File
+      - button "Agents" [ref=e8] [cursor=pointer]:
+        - img [ref=e10]
+        - generic [ref=e12]: Agents
+      - button "Assets" [ref=e13] [cursor=pointer]:
+        - img [ref=e15]
+        - generic [ref=e17]: Assets
+      - button "Tools" [ref=e18] [cursor=pointer]:
+        - img [ref=e20]
+        - generic [ref=e22]: Tools
+      - button "Variables" [ref=e23] [cursor=pointer]:
+        - img [ref=e25]
+        - generic [ref=e27]: Variables
+    - complementary [ref=e28]:
+      - generic [ref=e29]:
+        - button "ONEMO DS v2.3.1 - 1 July +, file name" [ref=e30] [cursor=pointer]: ONEMO DS v2.3.1 - 1 July +
+        - button "Edit file menu" [ref=e31] [cursor=pointer]:
+          - img [ref=e32]
+        - button "Minimize UI" [ref=e34] [cursor=pointer]:
+          - img [ref=e35]
+      - generic [ref=e37]: Drafts ›
+      - generic [ref=e38]:
+        - generic [ref=e39]: Pages
+        - generic [ref=e40]:
+          - button "Find" [ref=e41] [cursor=pointer]:
+            - img [ref=e42]
+          - button "Add new page" [ref=e44] [cursor=pointer]:
+            - img [ref=e45]
+      - generic [ref=e47]:
+        - generic [ref=e49]: _DS Reference Components
+        - generic [ref=e51]: DESIGN SYSTEM - full (current)
+        - generic [ref=e53]: ONEMO BRAND IDENTITY
+        - generic [ref=e55]: PROTOTYPING
+        - generic [ref=e57]: Components +
+        - generic [ref=e59]: ICONS
+      - generic [ref=e60]:
+        - generic [ref=e61]: Layers
+        - button "Collapse layers" [ref=e62] [cursor=pointer]:
+          - img [ref=e63]
+      - generic [ref=e65]:
+        - generic [ref=e66] [cursor=pointer]:
+          - img [ref=e68]
+          - img [ref=e71]
+          - generic [ref=e73]: LOCKED OPTIONS
+        - generic [ref=e74] [cursor=pointer]:
+          - img [ref=e77]
+          - generic [ref=e79]: onemo-surface-bg-430×932@3× 1
+        - generic [ref=e80] [cursor=pointer]:
+          - img [ref=e83]
+          - generic [ref=e85]: onemo-surface-bg-430×932@2× 1
+        - generic [ref=e86] [cursor=pointer]:
+          - img [ref=e88]
+          - img [ref=e91]
+          - generic [ref=e93]: CANDIDATES
+        - generic [ref=e94] [cursor=pointer]:
+          - img [ref=e96]
+          - img [ref=e99]
+          - generic [ref=e101]: Editor 402 iphone
+        - generic [ref=e102] [cursor=pointer]:
+          - img [ref=e104]
+          - img [ref=e107]
+          - generic [ref=e109]: Top Section
+        - generic [ref=e110] [cursor=pointer]:
+          - img [ref=e112]
+          - img [ref=e115]
+          - generic [ref=e117]: Editor 402 iphone - apple blur glass
+        - generic [ref=e118] [cursor=pointer]:
+          - img [ref=e120]
+          - img [ref=e123]
+          - generic [ref=e125]: Editor 402 iphone - apple blur glass
+        - generic [ref=e126] [cursor=pointer]:
+          - img [ref=e129]
+          - generic [ref=e131]: Status bar
+          - generic [ref=e132]:
+            - img [ref=e133]
+            - img [ref=e135]
+        - generic [ref=e137] [cursor=pointer]:
+          - img [ref=e139]
+          - img [ref=e142]
+          - generic [ref=e144]: Top Section
+        - generic [ref=e145] [cursor=pointer]:
+          - img [ref=e147]
+          - img [ref=e150]
+          - generic [ref=e152]: Canvas
+        - generic [ref=e153] [cursor=pointer]:
+          - img [ref=e155]
+          - img [ref=e158]
+          - generic [ref=e160]: Bottom Section
+        - generic [ref=e161] [cursor=pointer]:
+          - img [ref=e163]
+          - img [ref=e166]
+          - generic [ref=e168]: Toolbar - Bottom - Safari
+          - generic [ref=e169]:
+            - img [ref=e170]
+            - img [ref=e172]
+    - main [ref=e175]:
+      - generic "Insert tools" [ref=e176]:
+        - generic [ref=e177]:
+          - group "Move" [ref=e178]:
+            - button "Move" [ref=e179] [cursor=pointer]:
+              - img [ref=e180]
+            - button "Move tools" [ref=e182] [cursor=pointer]:
+              - img [ref=e183]
+          - group "Frame" [ref=e185]:
+            - button "Frame" [ref=e186] [cursor=pointer]:
+              - img [ref=e187]
+            - button "Region tools" [ref=e189] [cursor=pointer]:
+              - img [ref=e190]
+          - group "Text" [ref=e192]:
+            - button "Text" [ref=e193] [cursor=pointer]:
+              - img [ref=e194]
+            - button "Type tools" [ref=e196] [cursor=pointer]:
+              - img [ref=e197]
+        - generic "Mode tools" [ref=e200]:
+          - button "Design mode" [ref=e201] [cursor=pointer]:
+            - img [ref=e202]
+          - button "Code mode" [ref=e204] [cursor=pointer]:
+            - img [ref=e205]
+      - generic [ref=e208]:
+        - generic [ref=e209]: Editor 402 · 402 × 871
+        - iframe [ref=e211]:
+          - generic [active]:
+            - generic [ref=f1e6]:
+              - button "Undo" [disabled] [ref=f1e7]:
+                - img [ref=f1e9]
+                - generic [ref=f1e11]: Undo
+              - button "Redo" [disabled] [ref=f1e12]:
+                - img [ref=f1e14]
+                - generic [ref=f1e16]: Redo
+            - button "Open Next.js Dev Tools" [ref=f1e22] [cursor=pointer]:
+              - img [ref=f1e23]
+            - alert [ref=f1e26]
+      - generic [ref=e212]:
+        - button "Zoom out" [ref=e213] [cursor=pointer]:
+          - img [ref=e214]
+        - generic [ref=e216]: 60%
+        - button "Zoom in" [ref=e217] [cursor=pointer]:
+          - img [ref=e218]
+    - complementary [ref=e220]:
+      - generic [ref=e223]:
+        - button "Present" [ref=e224] [cursor=pointer]:
+          - img [ref=e225]
+        - button "Prototype view" [ref=e227] [cursor=pointer]:
+          - img [ref=e228]
+        - button "Publish" [ref=e230] [cursor=pointer]
+      - generic [ref=e231]:
+        - tablist [ref=e232]:
+          - button "Design" [ref=e233] [cursor=pointer]
+          - button "Prototype" [ref=e234] [cursor=pointer]
+        - button "92%" [ref=e235] [cursor=pointer]:
+          - generic [ref=e236]: 92%
+          - img [ref=e237]
+      - generic [ref=e239]:
+        - generic [ref=e240]:
+          - button "Frame, Frame Dimension Presets, iPhone 17, 402 × 874" [ref=e242] [cursor=pointer]:
+            - text: Frame
+            - img [ref=e243]
+          - generic [ref=e245]:
+            - img [ref=e247]
+            - button "Create component" [ref=e249] [cursor=pointer]:
+              - img [ref=e250]
+            - button "More actions" [ref=e252] [cursor=pointer]:
+              - img [ref=e253]
+        - generic [ref=e255]:
+          - generic [ref=e257]: Position
+          - generic [ref=e258]:
+            - generic [ref=e259]:
+              - generic [ref=e260]: Alignment
+              - generic [ref=e261]:
+                - generic [ref=e262]:
+                  - button "Align left" [ref=e263] [cursor=pointer]:
+                    - img [ref=e264]
+                  - button "Align horizontal centers" [ref=e267] [cursor=pointer]:
+                    - img [ref=e268]
+                  - button "Align right" [ref=e271] [cursor=pointer]:
+                    - img [ref=e272]
+                - generic [ref=e275]:
+                  - button "Align top" [ref=e276] [cursor=pointer]:
+                    - img [ref=e277]
+                  - button "Align vertical centers" [ref=e280] [cursor=pointer]:
+                    - img [ref=e281]
+                  - button "Align bottom" [ref=e284] [cursor=pointer]:
+                    - img [ref=e285]
+                - button "More actions" [ref=e288] [cursor=pointer]:
+                  - img [ref=e289]
+            - generic [ref=e292]:
+              - generic [ref=e293]: Position
+              - generic [ref=e294]:
+                - generic [ref=e295]:
+                  - generic [ref=e296]: X
+                  - spinbutton "X-position" [ref=e297]: "0"
+                  - button "Apply variable to X-position" [ref=e298] [cursor=pointer]:
+                    - img [ref=e299]
+                - generic [ref=e301]:
+                  - generic [ref=e302]: "Y"
+                  - spinbutton "Y-position" [ref=e303]: "122"
+                  - button "Apply variable to Y-position" [ref=e304] [cursor=pointer]:
+                    - img [ref=e305]
+            - generic [ref=e307]:
+              - generic [ref=e308]: Rotation
+              - generic [ref=e309]:
+                - generic [ref=e310]:
+                  - img [ref=e312]
+                  - spinbutton "Rotation" [ref=e314]: 0°
+                  - button "Apply variable to Rotation" [ref=e315] [cursor=pointer]:
+                    - img [ref=e316]
+                - generic [ref=e318]:
+                  - button "Rotate 90° right" [ref=e319] [cursor=pointer]:
+                    - img [ref=e320]
+                  - button "Flip horizontal" [ref=e322] [cursor=pointer]:
+                    - img [ref=e323]
+                  - button "Flip vertical" [ref=e325] [cursor=pointer]:
+                    - img [ref=e326]
+            - generic [ref=e328]:
+              - generic [ref=e329]: CSS position
+              - radiogroup "CSS position" [ref=e331]:
+                - radio "Auto" [ref=e332] [cursor=pointer]
+                - radio "Rel" [ref=e333] [cursor=pointer]
+                - radio "Abs" [checked] [ref=e334] [cursor=pointer]
+                - radio "Fix" [ref=e335] [cursor=pointer]
+                - radio "Sticky" [ref=e336] [cursor=pointer]
+            - generic [ref=e337]:
+              - generic [ref=e338]: Inset / z-index
+              - generic [ref=e339]:
+                - generic [ref=e340]:
+                  - generic [ref=e341]: T
+                  - spinbutton "Top inset" [ref=e342]: auto
+                  - button "Apply variable to Top inset" [ref=e343] [cursor=pointer]:
+                    - img [ref=e344]
+                - generic [ref=e346]:
+                  - generic [ref=e347]: L
+                  - spinbutton "Left inset" [ref=e348]: auto
+                  - button "Apply variable to Left inset" [ref=e349] [cursor=pointer]:
+                    - img [ref=e350]
+                - generic [ref=e352]:
+                  - generic [ref=e353]: Z
+                  - spinbutton "z-index" [ref=e354]: "1"
+                  - button "Apply variable to z-index" [ref=e355] [cursor=pointer]:
+                    - img [ref=e356]
+        - generic [ref=e358]:
+          - generic [ref=e360]: Auto layout
+          - generic [ref=e361]:
+            - generic [ref=e362]:
+              - generic [ref=e363]: Flow
+              - generic [ref=e364]:
+                - generic [ref=e365]:
+                  - button "Freeform" [ref=e366] [cursor=pointer]:
+                    - img [ref=e367]
+                  - button "Vertical" [ref=e369] [cursor=pointer]:
+                    - img [ref=e370]
+                  - button "Horizontal" [pressed] [ref=e372] [cursor=pointer]:
+                    - img [ref=e373]
+                  - button "Grid" [ref=e375] [cursor=pointer]:
+                    - img [ref=e376]
+                - button "Wrap" [ref=e378] [cursor=pointer]:
+                  - img [ref=e379]
+            - generic [ref=e381]:
+              - generic [ref=e382]: Resizing
+              - generic [ref=e383]:
+                - generic [ref=e385]:
+                  - img [ref=e387]
+                  - spinbutton "width value" [ref=e389]: "402"
+                  - 'button "width resizing: Fill" [ref=e390] [cursor=pointer]': Fill
+                - generic [ref=e392]:
+                  - generic [ref=e393]: H
+                  - spinbutton "height value" [ref=e394]: "427"
+                  - 'button "height resizing: Fill" [ref=e395] [cursor=pointer]': Fill
+                - button "Lock aspect ratio" [ref=e396] [cursor=pointer]:
+                  - img [ref=e397]
+            - generic [ref=e399]:
+              - generic [ref=e400]: Alignment
+              - generic [ref=e401]: Gap
+              - generic [ref=e402]:
+                - generic [ref=e403]:
+                  - button "Auto layout alignment 1" [ref=e404] [cursor=pointer]
+                  - button "Auto layout alignment 2" [ref=e406] [cursor=pointer]
+                  - button "Auto layout alignment 3" [ref=e408] [cursor=pointer]
+                  - button "Auto layout alignment 4" [ref=e410] [cursor=pointer]
+                  - button "Auto layout alignment 5" [pressed] [ref=e412] [cursor=pointer]
+                  - button "Auto layout alignment 6" [ref=e414] [cursor=pointer]
+                  - button "Auto layout alignment 7" [ref=e416] [cursor=pointer]
+                  - button "Auto layout alignment 8" [ref=e418] [cursor=pointer]
+                  - button "Auto layout alignment 9" [ref=e420] [cursor=pointer]
+                - generic [ref=e423]:
+                  - img [ref=e425]
+                  - spinbutton "Gap value" [ref=e427]: "10"
+                  - 'button "Gap options: 10" [ref=e428] [cursor=pointer]':
+                    - img [ref=e429]
+                - button "Auto layout settings" [ref=e431] [cursor=pointer]:
+                  - img [ref=e432]
+            - generic [ref=e434]:
+              - generic [ref=e435]: Padding
+              - generic [ref=e436]:
+                - generic [ref=e437]:
+                  - img [ref=e439]
+                  - spinbutton "Horizontal padding" [ref=e441]: "0"
+                  - button "Apply variable to Horizontal padding" [ref=e442] [cursor=pointer]:
+                    - img [ref=e443]
+                - generic [ref=e445]:
+                  - img [ref=e447]
+                  - spinbutton "Vertical padding" [ref=e449]: "0"
+                  - button "Apply variable to Vertical padding" [ref=e450] [cursor=pointer]:
+                    - img [ref=e451]
+                - button "Individual padding" [ref=e453] [cursor=pointer]:
+                  - img [ref=e454]
+            - generic [ref=e457] [cursor=pointer]:
+              - checkbox "Clip content"
+              - generic [ref=e459]: Clip content
+        - generic [ref=e460]:
+          - generic [ref=e461]:
+            - generic [ref=e462]: Appearance
+            - generic [ref=e463]:
+              - button "Hide" [ref=e464] [cursor=pointer]:
+                - img [ref=e465]
+              - 'button "Blend mode: Pass through" [ref=e468] [cursor=pointer]':
+                - img [ref=e469]
+          - generic [ref=e472]:
+            - generic [ref=e473]: Opacity
+            - generic [ref=e474]: Corner radius
+            - generic [ref=e475]:
+              - generic [ref=e476]:
+                - img [ref=e478]
+                - textbox "Opacity" [ref=e480]: "100"
+                - generic [ref=e481]: "%"
+                - button "Apply variable to Opacity" [ref=e482] [cursor=pointer]:
+                  - img [ref=e483]
+              - generic [ref=e485]:
+                - img [ref=e487]
+                - textbox "Corner radius" [ref=e489]: "0"
+                - button "Apply variable to Corner radius" [ref=e490] [cursor=pointer]:
+                  - img [ref=e491]
+              - button "Individual corners" [ref=e493] [cursor=pointer]:
+                - img [ref=e494]
+        - generic [ref=e496]:
+          - generic [ref=e497]:
+            - generic [ref=e498]: Fill
+            - generic [ref=e499]:
+              - button "Fill, Apply styles and variables" [ref=e500] [cursor=pointer]:
+                - img [ref=e501]
+              - button "Add fill" [ref=e503] [cursor=pointer]:
+                - img [ref=e504]
+          - generic [ref=e507]:
+            - generic [ref=e508]:
+              - 'button "Solid color hex: FFFFFF" [ref=e509] [cursor=pointer]'
+              - generic [ref=e510]: FFFFFF
+              - generic [ref=e511]: "100"
+              - generic [ref=e512]: "%"
+            - button "Toggle visibility" [ref=e513] [cursor=pointer]:
+              - img [ref=e514]
+            - button "Remove" [ref=e516] [cursor=pointer]:
+              - img [ref=e517]
+        - generic [ref=e519]:
+          - generic [ref=e520]:
+            - generic [ref=e521]: Stroke
+            - generic [ref=e522]:
+              - button "Stroke, Apply styles and variables" [ref=e523] [cursor=pointer]:
+                - img [ref=e524]
+              - button "Add stroke fill" [ref=e526] [cursor=pointer]:
+                - img [ref=e527]
+          - generic [ref=e530]:
+            - generic [ref=e531]:
+              - generic [ref=e532]:
+                - 'button "Solid color hex: 000000" [ref=e533] [cursor=pointer]'
+                - generic [ref=e534]: "000000"
+                - generic [ref=e535]: "100"
+                - generic [ref=e536]: "%"
+              - button "Toggle visibility" [ref=e537] [cursor=pointer]:
+                - img [ref=e538]
+              - button "Remove" [ref=e540] [cursor=pointer]:
+                - img [ref=e541]
+            - generic [ref=e543]:
+              - generic [ref=e544]: Position
+              - generic [ref=e545]: Weight
+              - generic [ref=e546]:
+                - combobox [ref=e547] [cursor=pointer]:
+                  - generic [ref=e548]: Inside
+                  - img [ref=e550]
+                - generic "Stroke weight" [ref=e552]:
+                  - img [ref=e554]
+                  - generic [ref=e556]: "1"
+                - button "Advanced stroke settings" [ref=e557] [cursor=pointer]:
+                  - img [ref=e558]
+                - button "Individual strokes" [ref=e560] [cursor=pointer]:
+                  - img [ref=e561]
+        - generic [ref=e563]:
+          - generic [ref=e564]:
+            - generic [ref=e565]: Effects
+            - generic [ref=e566]:
+              - button "Effects, Apply styles" [ref=e567] [cursor=pointer]:
+                - img [ref=e568]
+              - button "Add effect" [ref=e570] [cursor=pointer]:
+                - img [ref=e571]
+          - generic [ref=e574]:
+            - button "Drop shadow" [ref=e575] [cursor=pointer]:
+              - img [ref=e577]
+              - generic [ref=e580]: Drop shadow
+            - button "Toggle visibility" [ref=e581] [cursor=pointer]:
+              - img [ref=e582]
+            - button "Remove" [ref=e584] [cursor=pointer]:
+              - img [ref=e585]
+        - generic [ref=e587]:
+          - generic [ref=e589]: Selection colors
+          - generic [ref=e590]:
+            - generic [ref=e592]:
+              - generic "Linear gradient" [ref=e593]
+              - generic [ref=e594]: Linear
+              - generic [ref=e595]: "100"
+              - generic [ref=e596]: "%"
+            - generic [ref=e598]:
+              - 'button "Solid color hex: 000000" [ref=e599] [cursor=pointer]'
+              - generic [ref=e600]: "000000"
+              - generic [ref=e601]: "100"
+              - generic [ref=e602]: "%"
+            - generic [ref=e604]:
+              - 'button "Solid color hex: FFFFFF" [ref=e605] [cursor=pointer]'
+              - generic [ref=e606]: FFFFFF
+              - generic [ref=e607]: "100"
+              - generic [ref=e608]: "%"
+        - generic [ref=e609]:
+          - generic [ref=e610]:
+            - generic [ref=e611]: Layout guide
+            - generic [ref=e612]:
+              - button "Layout guide, Apply styles" [ref=e613] [cursor=pointer]:
+                - img [ref=e614]
+              - button "Add layout guide" [ref=e616] [cursor=pointer]:
+                - img [ref=e617]
+          - generic [ref=e620]:
+            - button "Layout guide settings" [ref=e621] [cursor=pointer]:
+              - img [ref=e622]
+            - combobox [ref=e624] [cursor=pointer]:
+              - generic [ref=e625]: Grid 10px
+              - img [ref=e627]
+            - button "Toggle visibility" [ref=e629] [cursor=pointer]:
+              - img [ref=e630]
+            - button "Remove layout guide" [ref=e632] [cursor=pointer]:
+              - img [ref=e633]
+  - button "Open Next.js Dev Tools" [ref=e640] [cursor=pointer]:
+    - img [ref=e641]

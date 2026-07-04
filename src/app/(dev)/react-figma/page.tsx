@@ -411,7 +411,7 @@ function AutoValueField({ icon, label, value, mode, caret = true, ariaLabel, onC
   const fieldRef = useCloseOnOutside<HTMLDivElement>(varOpen, () => setVarOpen(false))
   const fieldLabel = ariaLabel ?? label ?? 'value'
   return (
-    <div ref={fieldRef} style={{ position: 'relative', height: 24, width, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'flex', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
+    <div ref={fieldRef} title={token /* E2.5 opt-A: token name on hover, no visible chip (Figma-exact) */} style={{ position: 'relative', height: 24, width, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'flex', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
       <span style={{ width: 24, height: 24, flex: 'none', display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)', font: `450 11px/24px ${FONT}` }}>{icon ? <UiIcon name={icon} /> : label}</span>
       {onChange ? (
         <input aria-label={fieldLabel} role="spinbutton" value={value} onChange={e => onChange(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
@@ -534,7 +534,7 @@ function GapDropdownField({ value, onChange, token }: { value: string; onChange:
   const menuRef = useCloseOnOutside<HTMLDivElement>(open || varOpen, () => { setOpen(false); setVarOpen(false) })
   const applyVariable = () => { setOpen(false); setVarOpen(true) }
   return (
-    <div ref={menuRef} style={{ position: 'relative', width: 88, height: 24 }}>
+    <div ref={menuRef} title={token} style={{ position: 'relative', width: 88, height: 24 }}>
       <div style={{ width: 88, height: 24, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: '24px 1fr 24px', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
         <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)' }}><UiIcon name="gapVertical" /></span>
         <input aria-label="Gap value" role="spinbutton" value={value} onChange={e => onChange(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
@@ -560,7 +560,7 @@ function InlineValueInput({ icon, value, onChange, suffix, ariaLabel, token }: {
   const [varOpen, setVarOpen] = useState(false)
   const fieldRef = useCloseOnOutside<HTMLDivElement>(varOpen, () => setVarOpen(false))
   return (
-    <div ref={fieldRef} style={{ position: 'relative', height: 24, width: 88, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: suffix ? '24px 1fr 14px 16px' : '24px 1fr 16px', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
+    <div ref={fieldRef} title={token} style={{ position: 'relative', height: 24, width: 88, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: suffix ? '24px 1fr 14px 16px' : '24px 1fr 16px', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
       <span style={{ width: 24, height: 24, flex: 'none', display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)' }}><UiIcon name={icon} /></span>
       <input aria-label={ariaLabel} value={value} onChange={e => onChange(e.currentTarget.value)}
         style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: INK, font: `450 11px/16px ${FONT}` }} />
@@ -1374,10 +1374,12 @@ export default function ReactFigmaPage() {
   const [opacityValue, setOpacityValue] = useState('100')
   const [cornerRadiusValue, setCornerRadiusValue] = useState('0')
   const [individualCorners, setIndividualCorners] = useState(false)
-  const [fills, setFills] = useState(() => MOCK.fills.map((fill, id) => ({ ...fill, id: id + 1 })))
-  const [strokes, setStrokes] = useState(() => MOCK.strokes.map((stroke, id) => ({ ...stroke, id: id + 1 })))
-  const [effects, setEffects] = useState(() => MOCK.effects.map((effect, id) => ({ ...effect, id: id + 1 })))
-  const [layoutGuides, setLayoutGuides] = useState(() => MOCK.layoutGuides.map((guide, id) => ({ ...guide, id: id + 1 })))
+  // F4 (s58-lead): default to EMPTY — no fake rows on fresh load (Dan's no-fake-values law).
+  // These hold user-added rows in the shell no-selection state; live selections drive live* instead.
+  const [fills, setFills] = useState<{ id: number; hex: string; op: number }[]>([])
+  const [strokes, setStrokes] = useState<{ id: number; hex: string; op: number; position: string; weight: number }[]>([])
+  const [effects, setEffects] = useState<{ id: number; type: string }[]>([])
+  const [layoutGuides, setLayoutGuides] = useState<{ id: number; size: string }[]>([])
   const canvasRef = useRef<HTMLDivElement>(null)
   const pan = useRef<{ x: number; y: number; vx: number; vy: number } | null>(null)
   const [isPanning, setIsPanning] = useState(false)
@@ -2075,9 +2077,7 @@ export default function ReactFigmaPage() {
               : effects.map(e => <FigmaEffectRow key={e.id} type={e.type} onRemove={() => setEffects(rows => rows.filter(row => row.id !== e.id))} />)}
           </Sec>
           <Sec title="Selection colors" bodyGap={0} bodyPadding="0">
-            {liveSelColors
-              ? liveSelColors.map((c, i) => <SelectionColorRow key={`live-${i}`} hex={c.hex} op={c.op} />)
-              : MOCK.selectionColors.map((c, i) => <SelectionColorRow key={i} hex={c.hex} name={c.name} op={c.op} grad={c.grad} />)}
+            {(liveSelColors ?? []).map((c, i) => <SelectionColorRow key={`live-${i}`} hex={c.hex} op={c.op} />)}
           </Sec>
           <Sec title="Layout guide" actionWidth={52} action={<><StyleApplyButton label="Layout guide" title="Layout guide, Apply styles" /><UiIB name="plus" title="Add layout guide" on={() => setLayoutGuides(rows => [...rows, { id: nextRowId(rows), size: 'Grid 10px' }])} /></>} bodyGap={0} bodyPadding="0">
             {layoutGuides.map(g => <LayoutGuideRow key={g.id} size={g.size} onRemove={() => setLayoutGuides(rows => rows.filter(row => row.id !== g.id))} />)}
