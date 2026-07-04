@@ -282,6 +282,67 @@ function FigmaVariablePicker({ fieldLabel, anchorRef, onPick, onClose }: { field
     document.body
   )
 }
+const STYLE_VARIABLE_ROWS = ['fg', 'white', 'primary', 'secondary', 'secondary-hover', 'tertiary', 'tertiary-hover', 'quaternary', 'quaternary-hover', 'disabled', 'disabled-subtle', 'brand-primary', 'brand-primary-hover']
+function StyleApplyButton({ label, title }: { label: string; title: string }) {
+  const [open, setOpen] = useState(false)
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
+  const [activeTab, setActiveTab] = useState<'custom' | 'libraries'>('custom')
+  const [selected, setSelected] = useState('primary')
+  const anchorRef = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
+  const optionListId = `${label.toLowerCase().replace(/\s+/g, '-')}-style-variable-options`
+  useEffect(() => {
+    if (!open) return
+    const update = () => setAnchorRect(anchorRef.current?.getBoundingClientRect() ?? null)
+    update()
+    window.addEventListener('resize', update)
+    window.addEventListener('scroll', update, true)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.removeEventListener('scroll', update, true)
+    }
+  }, [anchorRef, open])
+  return (
+    <div ref={anchorRef} style={{ position: 'relative', width: 24, height: 24 }}>
+      <UiIB name="styleDots" title={title} active={open} on={() => setOpen(v => !v)} />
+      {open && anchorRect && createPortal(
+        <div data-figma-floating-root="true" role="dialog" aria-label={`${label} styles and variables`}
+          style={{ position: 'fixed', zIndex: 1220, left: Math.max(8, anchorRect.left - 420), top: Math.max(8, anchorRect.top - 8), width: 240, height: 427, borderRadius: 13, background: '#fff', color: INK, boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px', overflow: 'hidden', font: `400 11px/16px ${FONT}` }}>
+          <div style={{ height: 40, display: 'grid', gridTemplateColumns: '1fr 28px 24px', alignItems: 'center', padding: '0 8px', boxSizing: 'border-box' }}>
+            <div role="tablist" style={{ display: 'flex', gap: 4, width: 124, height: 24 }}>
+              {(['custom', 'libraries'] as const).map(tabName => (
+                <button key={tabName} type="button" role="tab" aria-selected={activeTab === tabName} onClick={() => setActiveTab(tabName)}
+                  style={{ appearance: 'none', border: 0, background: activeTab === tabName ? FIELD : '#fff', borderRadius: 5, height: 24, width: tabName === 'custom' ? 58 : 62, cursor: 'pointer', color: activeTab === tabName ? INK : MUTE, font: `${activeTab === tabName ? 550 : 400} 11px/16px ${FONT}` }}>
+                  {tabName === 'custom' ? 'Custom' : 'Libraries'}
+                </button>
+              ))}
+            </div>
+            <button type="button" aria-label="New style or variable" style={{ appearance: 'none', border: 0, background: '#fff', width: 24, height: 24, display: 'grid', placeItems: 'center', cursor: 'pointer', color: INK }}><PickerSvgIcon name="plus" /></button>
+            <button type="button" aria-label="Close" onClick={() => setOpen(false)} style={{ appearance: 'none', border: 0, background: '#fff', width: 24, height: 24, display: 'grid', placeItems: 'center', cursor: 'pointer', color: INK }}><PickerSvgIcon name="close" /></button>
+          </div>
+          <div role="tabpanel" style={{ height: 387, borderTop: `1px solid ${LINE}`, background: '#fff' }}>
+            <div style={{ height: 42, borderBottom: `1px solid ${LINE}`, display: 'grid', gridTemplateColumns: '1fr 32px', alignItems: 'center', padding: '0 8px', boxSizing: 'border-box' }}>
+              <button type="button" role="combobox" aria-label="Variable set" aria-controls={optionListId} aria-expanded={false}
+                style={{ appearance: 'none', border: `1px solid ${LINE}`, background: '#fff', height: 24, width: 92, borderRadius: 5, padding: '0 8px', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', font: `400 11px/16px ${FONT}`, color: INK }}>
+                <span>All libraries</span><CaretDown size={10} />
+              </button>
+            </div>
+            <div id={optionListId} role="listbox" style={{ height: 345, overflowY: 'auto', paddingTop: 8 }}>
+              <div style={{ height: 32, display: 'flex', alignItems: 'center', padding: '0 16px', boxSizing: 'border-box', font: `550 11px/16px ${FONT}`, color: INK }}>3.0-Sem-Col</div>
+              {STYLE_VARIABLE_ROWS.map(row => (
+                <button key={row} type="button" role="option" aria-selected={selected === row} onClick={() => { setSelected(row); setOpen(false) }}
+                  style={{ appearance: 'none', border: 0, width: 240, height: 32, background: selected === row ? '#f5f5f5' : '#fff', display: 'grid', gridTemplateColumns: '40px 1fr', alignItems: 'center', padding: 0, cursor: 'pointer', color: INK, font: `400 11px/16px ${FONT}`, textAlign: 'left' }}>
+                  <span style={{ width: 14, height: 14, marginLeft: 17, borderRadius: 3, background: row === 'white' ? '#fff' : row.includes('disabled') ? '#d8d9dd' : row.includes('brand') ? SEL : '#111', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.15)' }} />
+                  <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  )
+}
 
 function InspectorField({ label, icon, value, bound, input, dimValue, ariaLabel, onChange }: { label?: string; icon?: keyof typeof UI_ICON; value: string; bound?: boolean; input?: boolean; dimValue?: boolean; ariaLabel?: string; onChange?: (value: string) => void }) {
   const [h, setH] = useState(false)
@@ -1548,10 +1609,10 @@ export default function ReactFigmaPage() {
             </div>
           </Sec>
 
-          <Sec title="Fill" actionWidth={52} action={<><UiIB name="styleDots" title="Fill, Apply styles and variables" /><UiIB name="plus" title="Add fill" on={() => setFills(rows => [...rows, { id: nextRowId(rows), hex: 'FFFFFF', op: 100 }])} /></>} bodyGap={0} bodyPadding="0">
+          <Sec title="Fill" actionWidth={52} action={<><StyleApplyButton label="Fill" title="Fill, Apply styles and variables" /><UiIB name="plus" title="Add fill" on={() => setFills(rows => [...rows, { id: nextRowId(rows), hex: 'FFFFFF', op: 100 }])} /></>} bodyGap={0} bodyPadding="0">
             {fills.map(f => <FigmaPaintRow key={f.id} hex={f.hex} op={f.op} label="Fill" onRemove={() => setFills(rows => rows.filter(row => row.id !== f.id))} />)}
           </Sec>
-          <Sec title="Stroke" actionWidth={52} action={<><UiIB name="styleDots" title="Stroke, Apply styles and variables" /><UiIB name="plus" title="Add stroke fill" on={() => setStrokes(rows => [...rows, { id: nextRowId(rows), hex: '000000', op: 100, position: 'Inside', weight: 1 }])} /></>} bodyGap={0} bodyPadding="0">
+          <Sec title="Stroke" actionWidth={52} action={<><StyleApplyButton label="Stroke" title="Stroke, Apply styles and variables" /><UiIB name="plus" title="Add stroke fill" on={() => setStrokes(rows => [...rows, { id: nextRowId(rows), hex: '000000', op: 100, position: 'Inside', weight: 1 }])} /></>} bodyGap={0} bodyPadding="0">
             {strokes.map(s => (
               <div key={s.id}>
                 <FigmaPaintRow hex={s.hex} op={s.op} label="Stroke" onRemove={() => setStrokes(rows => rows.filter(row => row.id !== s.id))} />
@@ -1559,13 +1620,13 @@ export default function ReactFigmaPage() {
               </div>
             ))}
           </Sec>
-          <Sec title="Effects" actionWidth={52} action={<><UiIB name="styleDots" title="Effects, Apply styles" /><UiIB name="plus" title="Add effect" on={() => setEffects(rows => [...rows, { id: nextRowId(rows), type: 'Drop shadow' }])} /></>} bodyGap={0} bodyPadding="0">
+          <Sec title="Effects" actionWidth={52} action={<><StyleApplyButton label="Effects" title="Effects, Apply styles" /><UiIB name="plus" title="Add effect" on={() => setEffects(rows => [...rows, { id: nextRowId(rows), type: 'Drop shadow' }])} /></>} bodyGap={0} bodyPadding="0">
             {effects.map(e => <FigmaEffectRow key={e.id} type={e.type} onRemove={() => setEffects(rows => rows.filter(row => row.id !== e.id))} />)}
           </Sec>
           <Sec title="Selection colors" bodyGap={0} bodyPadding="0">
             {MOCK.selectionColors.map((c, i) => <SelectionColorRow key={i} hex={c.hex} name={c.name} op={c.op} grad={c.grad} />)}
           </Sec>
-          <Sec title="Layout guide" actionWidth={52} action={<><UiIB name="styleDots" title="Layout guide, Apply styles" /><UiIB name="plus" title="Add layout guide" on={() => setLayoutGuides(rows => [...rows, { id: nextRowId(rows), size: 'Grid 10px' }])} /></>} bodyGap={0} bodyPadding="0">
+          <Sec title="Layout guide" actionWidth={52} action={<><StyleApplyButton label="Layout guide" title="Layout guide, Apply styles" /><UiIB name="plus" title="Add layout guide" on={() => setLayoutGuides(rows => [...rows, { id: nextRowId(rows), size: 'Grid 10px' }])} /></>} bodyGap={0} bodyPadding="0">
             {layoutGuides.map(g => <LayoutGuideRow key={g.id} size={g.size} onRemove={() => setLayoutGuides(rows => rows.filter(row => row.id !== g.id))} />)}
           </Sec>
         </div>
