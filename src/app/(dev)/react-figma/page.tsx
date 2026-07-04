@@ -834,16 +834,34 @@ function FigmaPaintRow({ hex, op, label = 'Paint' }: { hex: string; op: number; 
   )
 }
 function StrokeDetailRow({ position, weight }: { position: string; weight: number }) {
+  const [positionValue, setPositionValue] = useState(position)
   const [weightValue, setWeightValue] = useState(String(weight))
+  const [positionOpen, setPositionOpen] = useState(false)
+  const positionRef = useCloseOnOutside<HTMLDivElement>(positionOpen, () => setPositionOpen(false))
+  const positionOptions = ['Center', 'Inside', 'Outside']
   return (
     <div style={{ position: 'relative', height: 50, width: '100%' }}>
       <span style={{ position: 'absolute', left: 16, top: 3.5, width: 84, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Position</span>
       <span style={{ position: 'absolute', left: 100, top: 3.5, width: 80, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Weight</span>
       <div style={{ position: 'absolute', left: 16, right: 8, top: 22, display: 'grid', gridTemplateColumns: '76px 8px 72px 8px 24px 4px 24px', alignItems: 'center' }}>
-        <button type="button" role="combobox" aria-controls="stroke-position-options" aria-expanded={false} style={{ appearance: 'none', border: '1px solid #e6e6e6', background: '#fff', width: 76, height: 24, borderRadius: 5, padding: '0 0 0 9px', display: 'grid', gridTemplateColumns: '1fr 24px', alignItems: 'center', cursor: 'pointer', font: `450 11px/16px ${FONT}`, color: INK }}>
-          <span style={{ textAlign: 'left' }}>{position}</span>
-          <span style={{ color: FAINT, display: 'grid', placeItems: 'center' }}><UiIcon name="caret24" /></span>
-        </button>
+        <div ref={positionRef} style={{ position: 'relative', width: 76, height: 24 }}>
+          <button type="button" role="combobox" aria-controls="stroke-position-options" aria-expanded={positionOpen} onClick={() => setPositionOpen(v => !v)}
+            style={{ appearance: 'none', border: '1px solid #e6e6e6', background: '#fff', width: 76, height: 24, borderRadius: 5, padding: '0 0 0 9px', display: 'grid', gridTemplateColumns: '1fr 24px', alignItems: 'center', cursor: 'pointer', font: `450 11px/16px ${FONT}`, color: INK }}>
+            <span style={{ textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{positionValue}</span>
+            <span style={{ color: FAINT, display: 'grid', placeItems: 'center' }}><UiIcon name="caret24" /></span>
+          </button>
+          {positionOpen && (
+            <ul id="stroke-position-options" role="listbox" data-figma-floating-root="true"
+              style={{ position: 'absolute', zIndex: 125, left: -8, top: -32, width: 105, height: 88, margin: 0, padding: '8px 0', listStyle: 'none', borderRadius: 6, background: '#fff', boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px', boxSizing: 'border-box', overflow: 'hidden' }}>
+              {positionOptions.map(option => (
+                <li key={option} role="option" aria-selected={positionValue === option} onClick={() => { setPositionValue(option); setPositionOpen(false) }}
+                  style={{ height: 24, display: 'grid', alignItems: 'center', padding: '0 0 0 32px', color: INK, cursor: 'pointer', font: `400 11px/16px ${FONT}` }}>
+                  {option}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
         <span />
         <AutoValueField icon="strokeWeight" value={weightValue} caret={false} ariaLabel="Stroke weight" onChange={setWeightValue} width={72} />
         <span />
