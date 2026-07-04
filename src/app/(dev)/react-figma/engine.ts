@@ -18,15 +18,73 @@ export const INHERITABLE = [
   'letter-spacing', 'text-align', 'text-transform', 'visibility', 'cursor',
 ] as const
 
-/** Computed props the panel sections read (Position / Auto layout / Appearance / Fill). */
+/** Computed props the panel sections read (Position / Auto layout / Appearance / Fill / Stroke / Effects). */
 const PROPS = [
   'width', 'height', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
-  'gap', 'row-gap', 'column-gap', 'display', 'flex-direction', 'flex-wrap',
+  'gap', 'row-gap', 'column-gap', 'display', 'flex-direction', 'flex-wrap', 'flex-grow',
   'align-items', 'justify-content', 'opacity', 'border-radius', 'mix-blend-mode',
   'background-color', 'color', 'font-family', 'font-size', 'font-weight', 'line-height',
   'position', 'top', 'left', 'z-index', 'overflow',
-  'box-shadow', 'border-top-width', 'border-top-color', 'border-top-style',
+  'box-shadow', 'backdrop-filter', 'filter',
+  'border-top-width', 'border-top-color', 'border-top-style',
+  'border-top-left-radius', 'border-top-right-radius', 'border-bottom-left-radius', 'border-bottom-right-radius',
 ]
+
+/** Split on a separator at paren depth 0 (shadow lists, font stacks…). */
+export function splitTopLevel(value: string, sep: string): string[] {
+  const out: string[] = []
+  let depth = 0, cur = ''
+  for (const ch of value) {
+    if (ch === '(') depth++
+    else if (ch === ')') depth--
+    if (ch === sep && depth === 0) { out.push(cur.trim()); cur = '' } else cur += ch
+  }
+  if (cur.trim()) out.push(cur.trim())
+  return out
+}
+
+/** Effects rows from computed shadow/filter values (Figma vocabulary). */
+export function parseEffects(c: Record<string, string>): { type: string; detail: string }[] {
+  const out: { type: string; detail: string }[] = []
+  if (c['box-shadow'] && c['box-shadow'] !== 'none') {
+    for (const part of splitTopLevel(c['box-shadow'], ',')) {
+      out.push({ type: part.includes('inset') ? 'Inner shadow' : 'Drop shadow', detail: part })
+    }
+  }
+  if (c['backdrop-filter'] && c['backdrop-filter'] !== 'none') out.push({ type: 'Background blur', detail: c['backdrop-filter'] })
+  if (c['filter'] && c['filter'] !== 'none' && c['filter'].includes('blur')) out.push({ type: 'Layer blur', detail: c['filter'] })
+  return out
+}
+
+/** AlignGrid 3×3 row-major index ↔ (align-items, justify-content). */
+const AXIS = ['flex-start', 'center', 'flex-end'] as const
+export function alignToIndex(c: Record<string, string>): number {
+  const norm = (v: string, dflt: number) => v.includes('start') ? 0 : v.includes('center') ? 1 : v.includes('end') ? 2 : dflt
+  const row = norm(c['align-items'] ?? '', 0)
+  const col = norm(c['justify-content'] ?? '', 0) // space-* families read as packed-start (v1 note)
+  return row * 3 + col
+}
+export function alignFromIndex(i: number): { alignItems: string; justifyContent: string } {
+  return { alignItems: AXIS[Math.floor(i / 3)] ?? 'flex-start', justifyContent: AXIS[i % 3] ?? 'flex-start' }
+}
+
+/** Aggregate unique colors used across the selected element's tagged subtree (Selection colors). */
+export function collectSelectionColors(el: HTMLElement, doc: Document, max = 8): { hex: string; op: number }[] {
+  const seen = new Map<string, { hex: string; op: number }>()
+  const consider = (val: string) => {
+    const p = colorToHex(val, doc)
+    if (p) seen.set(`${p.hex}/${p.op}`, p)
+  }
+  const nodes: HTMLElement[] = [el, ...(Array.from(el.querySelectorAll('[data-src]')) as HTMLElement[])]
+  for (const n of nodes.slice(0, 200)) {
+    const cs = doc.defaultView!.getComputedStyle(n)
+    consider(cs.getPropertyValue('background-color'))
+    consider(cs.getPropertyValue('color'))
+    if (parseFloat(cs.getPropertyValue('border-top-width')) > 0) consider(cs.getPropertyValue('border-top-color'))
+    if (seen.size >= max) break
+  }
+  return [...seen.values()].slice(0, max)
+}
 
 const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'LINK', 'META', 'TEMPLATE', 'NEXT-ROUTE-ANNOUNCER', 'NEXTJS-PORTAL'])
 

@@ -16,7 +16,7 @@
  */
 
 import { Fragment, useState, useRef, useEffect, useCallback } from 'react'
-import { buildLayerTree, readStyles, colorToHex, boxSlots, gapSlots, editSlot, tokenOf, Overrides, type LiveNode, type OverrideOp } from './engine'
+import { buildLayerTree, readStyles, colorToHex, boxSlots, gapSlots, editSlot, tokenOf, Overrides, parseEffects, alignToIndex, alignFromIndex, collectSelectionColors, type LiveNode, type OverrideOp } from './engine'
 import { createPortal } from 'react-dom'
 import {
   ListDashes, MagnifyingGlass, Plus, Minus, Sidebar, CaretDown, GearSix, Palette,
@@ -923,7 +923,7 @@ function FigmaColorPicker({ anchorRef, hex, opacity, onHex, onOpacity, onClose }
     document.body
   )
 }
-function FigmaPaintRow({ hex, op, label = 'Paint', onRemove, origin }: { hex: string; op: number; label?: string; onRemove?: () => void; origin?: string }) {
+function FigmaPaintRow({ hex, op, label = 'Paint', onRemove, origin, onHexEdit }: { hex: string; op: number; label?: string; onRemove?: () => void; origin?: string; onHexEdit?: (hex: string) => void }) {
   const [hexValue, setHexValue] = useState(hex)
   const [opacityValue, setOpacityValue] = useState(String(op))
   const [varOpen, setVarOpen] = useState(false)
@@ -937,7 +937,7 @@ function FigmaPaintRow({ hex, op, label = 'Paint', onRemove, origin }: { hex: st
       <div ref={fieldRef} style={{ position: 'relative', height: 24, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen || pickerOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: '24px 1fr 28px 14px 16px', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
         <button type="button" aria-label={`Solid color hex: ${hexValue}`} aria-haspopup="dialog" aria-expanded={pickerOpen} onClick={event => { event.stopPropagation(); setVarOpen(false); setPickerOpen(v => !v) }}
           style={{ appearance: 'none', border: 0, width: 14, height: 14, justifySelf: 'center', borderRadius: 2, background: `#${normalizeHex(hexValue) || 'FFFFFF'}`, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.15)', padding: 0, cursor: 'pointer' }} />
-        <input aria-label={`${label} hex`} value={hexValue} onChange={e => setHexValue(normalizeHex(e.currentTarget.value))}
+        <input aria-label={`${label} hex`} value={hexValue} onChange={e => { const nv = normalizeHex(e.currentTarget.value); setHexValue(nv); if (nv.length === 6) onHexEdit?.(nv) }}
           style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: INK, font: `450 11px/16px ${FONT}` }} />
         <input aria-label={`${label} opacity`} role="spinbutton" value={opacityValue} onChange={e => setOpacityValue(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
           style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: '0 3px 0 0', background: 'transparent', color: INK, font: `450 11px/16px ${FONT}`, textAlign: 'right' }} />
@@ -947,7 +947,7 @@ function FigmaPaintRow({ hex, op, label = 'Paint', onRemove, origin }: { hex: st
           <UiIcon name="variable" size={12} />
         </button>
         {varOpen && <FigmaVariablePicker fieldLabel={`${label} opacity`} anchorRef={fieldRef} onPick={setOpacityValue} onClose={() => setVarOpen(false)} />}
-        {pickerOpen && <FigmaColorPicker anchorRef={fieldRef} hex={hexValue} opacity={opacityValue} onHex={setHexValue} onOpacity={setOpacityValue} onClose={() => setPickerOpen(false)} />}
+        {pickerOpen && <FigmaColorPicker anchorRef={fieldRef} hex={hexValue} opacity={opacityValue} onHex={(hx) => { setHexValue(hx); const nv = normalizeHex(hx); if (nv.length === 6) onHexEdit?.(nv) }} onOpacity={setOpacityValue} onClose={() => setPickerOpen(false)} />}
       </div>
       <span />
       <UiIB name="visibility" title="Toggle visibility" active={!visible} on={() => setVisible(v => !v)} />
@@ -956,7 +956,7 @@ function FigmaPaintRow({ hex, op, label = 'Paint', onRemove, origin }: { hex: st
     </div>
   )
 }
-function StrokeDetailRow({ position, weight }: { position: string; weight: number }) {
+function StrokeDetailRow({ position, weight, onWeight }: { position: string; weight: number; onWeight?: (value: string) => void }) {
   const [positionValue, setPositionValue] = useState(position)
   const [weightValue, setWeightValue] = useState(String(weight))
   const [positionOpen, setPositionOpen] = useState(false)
@@ -986,7 +986,7 @@ function StrokeDetailRow({ position, weight }: { position: string; weight: numbe
           )}
         </div>
         <span />
-        <AutoValueField icon="strokeWeight" value={weightValue} caret={false} ariaLabel="Stroke weight" onChange={setWeightValue} width={72} />
+        <AutoValueField icon="strokeWeight" value={weightValue} caret={false} ariaLabel="Stroke weight" onChange={(v) => { setWeightValue(v); onWeight?.(v) }} width={72} />
         <span />
         <UiIB name="autoLayoutSettings" title="Advanced stroke settings" />
         <span />
@@ -1430,7 +1430,10 @@ export default function ReactFigmaPage() {
     setCanvas({ name, route }); setLayers(null); setSel(null); setSelRect(null); setHoverRect(null); setLiveFills(null); setCollapsed(new Set()); selIdRef.current = null
   }
   const [fieldTokens, setFieldTokens] = useState<Record<string, string | undefined>>({})
-  const [liveFills, setLiveFills] = useState<{ hex: string; op: number; origin?: string }[] | null>(null)
+  const [liveFills, setLiveFills] = useState<{ hex: string; op: number; origin?: string; prop: string }[] | null>(null)
+  const [liveStrokes, setLiveStrokes] = useState<{ hex: string; op: number; weight: number; position: string }[] | null>(null)
+  const [liveEffects, setLiveEffects] = useState<{ type: string; detail: string }[] | null>(null)
+  const [liveSelColors, setLiveSelColors] = useState<{ hex: string; op: number }[] | null>(null)
   const selIdRef = useRef<string | null>(null)
   const ov = useRef<Overrides | null>(null)
   if (!ov.current) ov.current = new Overrides()
@@ -1484,14 +1487,26 @@ export default function ReactFigmaPage() {
       radius: d['border-radius']?.token,
     })
     // Fill: element background; text elements with transparent bg → text color (Figma text fill)
-    const fills: { hex: string; op: number; origin?: string }[] = []
+    const fills: { hex: string; op: number; origin?: string; prop: string }[] = []
     const bg = colorToHex(c['background-color'], doc)
-    if (bg) fills.push({ ...bg, origin: d['background-color']?.token ? `◈ ${d['background-color'].token}` : undefined })
+    if (bg) fills.push({ ...bg, prop: 'background-color', origin: d['background-color']?.token ? `◈ ${d['background-color'].token}` : undefined })
     else if ([...el.childNodes].some((n) => n.nodeType === 3 && n.textContent?.trim())) {
       const fg = colorToHex(c['color'], doc)
-      if (fg) fills.push({ ...fg, origin: d['color']?.inheritedFrom ? `↑ inherited from ${d['color'].inheritedFrom.name}` : d['color']?.token ? `◈ ${d['color'].token}` : undefined })
+      if (fg) fills.push({ ...fg, prop: 'color', origin: d['color']?.inheritedFrom ? `↑ inherited from ${d['color'].inheritedFrom.name}` : d['color']?.token ? `◈ ${d['color'].token}` : undefined })
     }
     setLiveFills(fills.length ? fills : null)
+    // Stroke: uniform border read (top edge as representative)
+    const bw = parseFloat(c['border-top-width'] || '0')
+    const bc = bw > 0 ? colorToHex(c['border-top-color'], doc) : null
+    setLiveStrokes(bc ? [{ ...bc, weight: Math.round(bw * 100) / 100, position: 'Inside' }] : [])
+    // Effects: shadows + blurs in Figma vocabulary
+    setLiveEffects(parseEffects(c))
+    // Selection colors: unique colors across the tagged subtree
+    setLiveSelColors(collectSelectionColors(el, doc))
+    // Auto-layout alignment grid + resize modes
+    setAutoAlign(alignToIndex(c))
+    setWidthResize(parseFloat(c['flex-grow'] || '0') > 0 ? 'Fill' : d['width'] ? 'Fixed' : 'Hug')
+    setHeightResize(d['height'] ? 'Fixed' : 'Hug')
     console.log('[engine] select', payload, rep)
   }, [setXValue, setYValue, setInsetTop, setInsetLeft, setZIndexValue, setCssPosition, setAutoFlow, setAutoWrap, setWidthValue, setHeightValue, setGapValue, setPaddingXValue, setPaddingYValue, setClipContent, setOpacityValue, setCornerRadiusValue, setBlendMode])
 
@@ -1505,6 +1520,7 @@ export default function ReactFigmaPage() {
     const n = raw.trim() === '' ? '0' : raw.trim()
     const withUnit = /^-?\d+(\.\d+)?$/.test(n) ? `${n}px` : n
     const t0 = performance.now()
+    const positioned = cs.getPropertyValue('position') !== 'static'
     const decls: [string, string][] =
       field === 'gap' ? [['column-gap', withUnit], ['row-gap', withUnit]]
       : field === 'paddingX' ? [['padding-left', withUnit], ['padding-right', withUnit]]
@@ -1513,7 +1529,19 @@ export default function ReactFigmaPage() {
       : field === 'radius' ? [['border-radius', withUnit]]
       : field === 'width' ? [['width', withUnit]]
       : field === 'height' ? [['height', withUnit]]
+      : field === 'x' ? (positioned ? [['left', withUnit]] : [])
+      : field === 'y' ? (positioned ? [['top', withUnit]] : [])
+      : field === 'insetT' ? (positioned ? [['top', withUnit]] : [])
+      : field === 'insetL' ? (positioned ? [['left', withUnit]] : [])
+      : field === 'zIndex' ? [['z-index', n]]
+      : field === 'strokeWeight' ? [['border-width', withUnit]]
+      : field === 'strokeColor' ? [['border-color', n]]
+      : field === 'fillBg' ? [['background-color', n]]
+      : field === 'fillColor' ? [['color', n]]
+      : field === 'alignItems' ? [['align-items', n]]
+      : field === 'justify' ? [['justify-content', n]]
       : []
+    if ((field === 'x' || field === 'y') && !positioned) { console.warn('[engine] X/Y on a static-position element has no CSS analog — no-op'); return }
     for (const [prop, value] of decls) ov.current!.set(id, prop, value, cs.getPropertyValue(prop))
     setOvVersion((v) => v + 1)
     setSelRect(rectOf(el))
@@ -1889,8 +1917,8 @@ export default function ReactFigmaPage() {
               <FIB name="more" title="More actions" />
             </PositionRow>
             <PositionRow label="Position">
-              <InspectorField label="X" value={xValue} input dimValue ariaLabel="X-position" onChange={setXValue} />
-              <InspectorField label="Y" value={yValue} input dimValue ariaLabel="Y-position" onChange={setYValue} />
+              <InspectorField label="X" value={xValue} input dimValue ariaLabel="X-position" onChange={(v) => { setXValue(v); applyOverride('x', v) }} />
+              <InspectorField label="Y" value={yValue} input dimValue ariaLabel="Y-position" onChange={(v) => { setYValue(v); applyOverride('y', v) }} />
               <span />
             </PositionRow>
             <PositionRow label="Rotation">
@@ -1902,9 +1930,9 @@ export default function ReactFigmaPage() {
               <TextSegGroup items={['Auto', 'Rel', 'Abs', 'Fix', 'Sticky']} active={cssPosition} onSelect={setCssPosition} width="100%" ariaLabel="CSS position" />
             </InspectorRow>
             <CompactInspectorRow label="Inset / z-index">
-              <InspectorField label="T" value={insetTop} ariaLabel="Top inset" onChange={setInsetTop} />
-              <InspectorField label="L" value={insetLeft} ariaLabel="Left inset" onChange={setInsetLeft} />
-              <InspectorField label="Z" value={zIndexValue} ariaLabel="z-index" onChange={setZIndexValue} />
+              <InspectorField label="T" value={insetTop} ariaLabel="Top inset" onChange={(v) => { setInsetTop(v); applyOverride('insetT', v) }} />
+              <InspectorField label="L" value={insetLeft} ariaLabel="Left inset" onChange={(v) => { setInsetLeft(v); applyOverride('insetL', v) }} />
+              <InspectorField label="Z" value={zIndexValue} ariaLabel="z-index" onChange={(v) => { setZIndexValue(v); applyOverride('zIndex', v) }} />
             </CompactInspectorRow>
           </Sec>
 
@@ -1923,7 +1951,7 @@ export default function ReactFigmaPage() {
               <span style={{ position: 'absolute', left: 16, top: 3.5, width: 88, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Alignment</span>
               <span style={{ position: 'absolute', left: 112, top: 3.5, width: 88, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Gap</span>
               <div style={{ position: 'absolute', left: 16, right: 8, top: 22, display: 'grid', gridTemplateColumns: '88px 88px 24px', gap: 8, alignItems: 'start' }}>
-                <AlignGrid sel={autoAlign} onSelect={setAutoAlign} />
+                <AlignGrid sel={autoAlign} onSelect={(i) => { setAutoAlign(i); const a = alignFromIndex(i); applyOverride('alignItems', a.alignItems); applyOverride('justify', a.justifyContent) }} />
                 <GapDropdownField value={gapValue} onChange={(v) => { setGapValue(v); applyOverride('gap', v) }} token={fieldTokens.gap} />
                 <UiIB name="autoLayoutSettings" title="Auto layout settings" />
               </div>
@@ -1964,22 +1992,33 @@ export default function ReactFigmaPage() {
 
           <Sec title="Fill" actionWidth={52} action={<><StyleApplyButton label="Fill" title="Fill, Apply styles and variables" /><UiIB name="plus" title="Add fill" on={() => setFills(rows => [...rows, { id: nextRowId(rows), hex: 'FFFFFF', op: 100 }])} /></>} bodyGap={0} bodyPadding="0">
             {liveFills
-              ? liveFills.map((f, i) => <FigmaPaintRow key={`live-${i}`} hex={f.hex} op={f.op} label="Fill" origin={f.origin} />)
+              ? liveFills.map((f, i) => <FigmaPaintRow key={`live-${i}`} hex={f.hex} op={f.op} label="Fill" origin={f.origin} onHexEdit={(hx) => applyOverride(f.prop === 'color' ? 'fillColor' : 'fillBg', `#${hx}`)} />)
               : fills.map(f => <FigmaPaintRow key={f.id} hex={f.hex} op={f.op} label="Fill" onRemove={() => setFills(rows => rows.filter(row => row.id !== f.id))} />)}
           </Sec>
           <Sec title="Stroke" actionWidth={52} action={<><StyleApplyButton label="Stroke" title="Stroke, Apply styles and variables" /><UiIB name="plus" title="Add stroke fill" on={() => setStrokes(rows => [...rows, { id: nextRowId(rows), hex: '000000', op: 100, position: 'Inside', weight: 1 }])} /></>} bodyGap={0} bodyPadding="0">
-            {strokes.map(s => (
-              <div key={s.id}>
-                <FigmaPaintRow hex={s.hex} op={s.op} label="Stroke" onRemove={() => setStrokes(rows => rows.filter(row => row.id !== s.id))} />
-                <StrokeDetailRow position={s.position} weight={s.weight} />
-              </div>
-            ))}
+            {liveStrokes
+              ? liveStrokes.map((s, i) => (
+                  <div key={`live-${i}`}>
+                    <FigmaPaintRow hex={s.hex} op={s.op} label="Stroke" onHexEdit={(hx) => applyOverride('strokeColor', `#${hx}`)} />
+                    <StrokeDetailRow position={s.position} weight={s.weight} onWeight={(v) => applyOverride('strokeWeight', v)} />
+                  </div>
+                ))
+              : strokes.map(s => (
+                  <div key={s.id}>
+                    <FigmaPaintRow hex={s.hex} op={s.op} label="Stroke" onRemove={() => setStrokes(rows => rows.filter(row => row.id !== s.id))} />
+                    <StrokeDetailRow position={s.position} weight={s.weight} />
+                  </div>
+                ))}
           </Sec>
           <Sec title="Effects" actionWidth={52} action={<><StyleApplyButton label="Effects" title="Effects, Apply styles" /><UiIB name="plus" title="Add effect" on={() => setEffects(rows => [...rows, { id: nextRowId(rows), type: 'Drop shadow' }])} /></>} bodyGap={0} bodyPadding="0">
-            {effects.map(e => <FigmaEffectRow key={e.id} type={e.type} onRemove={() => setEffects(rows => rows.filter(row => row.id !== e.id))} />)}
+            {liveEffects
+              ? liveEffects.map((e, i) => <FigmaEffectRow key={`live-${i}`} type={e.type} />)
+              : effects.map(e => <FigmaEffectRow key={e.id} type={e.type} onRemove={() => setEffects(rows => rows.filter(row => row.id !== e.id))} />)}
           </Sec>
           <Sec title="Selection colors" bodyGap={0} bodyPadding="0">
-            {MOCK.selectionColors.map((c, i) => <SelectionColorRow key={i} hex={c.hex} name={c.name} op={c.op} grad={c.grad} />)}
+            {liveSelColors
+              ? liveSelColors.map((c, i) => <SelectionColorRow key={`live-${i}`} hex={c.hex} op={c.op} />)
+              : MOCK.selectionColors.map((c, i) => <SelectionColorRow key={i} hex={c.hex} name={c.name} op={c.op} grad={c.grad} />)}
           </Sec>
           <Sec title="Layout guide" actionWidth={52} action={<><StyleApplyButton label="Layout guide" title="Layout guide, Apply styles" /><UiIB name="plus" title="Add layout guide" on={() => setLayoutGuides(rows => [...rows, { id: nextRowId(rows), size: 'Grid 10px' }])} /></>} bodyGap={0} bodyPadding="0">
             {layoutGuides.map(g => <LayoutGuideRow key={g.id} size={g.size} onRemove={() => setLayoutGuides(rows => rows.filter(row => row.id !== g.id))} />)}
