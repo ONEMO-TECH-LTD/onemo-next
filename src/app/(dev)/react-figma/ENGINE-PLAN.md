@@ -141,6 +141,7 @@ type WriteOp =
 | Global (non-module) CSS owner | Read + provenance shown; write blocked by whitelist in v1 (globals are shared blast radius). |
 | tokens var chain (`var(--a, var(--b))`) | Token pill shows the outermost var; chain display deferred. |
 | Styled via `tokens.tailwind.css` utilities | Same as global CSS: visible, not writable v1. |
+| Token-file HMR after a converter run — **discovered live (E1.4)**: webpack's persistent cache does NOT invalidate when tailwind-v4-inlined `@import "./tokens/tokens.css"` changes on disk (survives touch of the importer AND server restarts) | Workaround: clear `.next` + restart to pick up converter output (verified: canvas then computes the new value). Real fix belongs to the token-foundation work (KAI-9288): serve tokens outside the tailwind inline path (runtime `<link>`) or land the upstream dependency registration. Documented, not silently patched. |
 | COOP/COEP on the canvas route — `next.config.ts:8-24` sets COOP+COEP on `/effect-creator/:path*` and COEP on `/_next/*` | COOP is top-level-only so same-origin iframing *should* work — but this is an **explicit E1.2 AC, not an assumption**: verify iframe load, `contentDocument` access, and subresource loading under these exact headers before any M2 code builds on it. Documented fallback if it fails: dev-only header exemption for the editor-embedded variant of the route (config change, PR'd). |
 
 ## 6 · Non-goals v1 (explicit)

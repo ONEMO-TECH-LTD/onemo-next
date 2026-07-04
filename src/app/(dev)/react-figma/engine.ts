@@ -110,6 +110,37 @@ export function gapSlots(value: string): { row: string; column: string } {
 }
 
 /**
+ * Slot-preserving shorthand edit (plan §5): expand minimally (1→2→4), set the
+ * edited side, re-minimize by TEXT equality — untouched slots keep their
+ * original text verbatim (a var() slot is never converted to px).
+ */
+export function editSlot(shorthandProp: string, slots: string[], longhand: string, newVal: string): string[] {
+  if (shorthandProp === 'gap') {
+    const row = slots[0] ?? '0', col = slots[1] ?? slots[0] ?? '0'
+    const next: [string, string] = longhand === 'row-gap' ? [newVal, col] : [row, newVal]
+    return next[0] === next[1] ? [next[0]] : [next[0], next[1]]
+  }
+  const [a, b, c, d] = slots
+  const four: string[] =
+    slots.length === 1 ? [a!, a!, a!, a!]
+    : slots.length === 2 ? [a!, b!, a!, b!]
+    : slots.length === 3 ? [a!, b!, c!, b!]
+    : [a!, b!, c!, d!]
+  const SIDE: Record<string, number> = {
+    'padding-top': 0, 'margin-top': 0, 'padding-right': 1, 'margin-right': 1,
+    'padding-bottom': 2, 'margin-bottom': 2, 'padding-left': 3, 'margin-left': 3,
+  }
+  const idx = SIDE[longhand]
+  if (idx === undefined) return slots
+  four[idx] = newVal
+  const [T, R, B, L] = four as [string, string, string, string]
+  if (T === R && R === B && B === L) return [T]
+  if (T === B && R === L) return [T, R]
+  if (R === L) return [T, R, B]
+  return [T, R, B, L]
+}
+
+/**
  * Selector specificity for provenance owner-resolution (a·1e6 + b·1e3 + c).
  * For grouped selectors the caller passes the single matching part.
  */

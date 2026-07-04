@@ -16,7 +16,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { buildLayerTree, readStyles, colorToHex, boxSlots, gapSlots, tokenOf, Overrides, type LiveNode, type OverrideOp } from './engine'
+import { buildLayerTree, readStyles, colorToHex, boxSlots, gapSlots, editSlot, tokenOf, Overrides, type LiveNode, type OverrideOp } from './engine'
 import { createPortal } from 'react-dom'
 import {
   ListDashes, MagnifyingGlass, Plus, Minus, Sidebar, CaretDown, GearSix, Palette,
@@ -1038,6 +1038,72 @@ export default function ReactFigmaPage() {
     if (el) applySelection(el) // re-read truth into the fields
   }, [applySelection])
 
+  /* M4 (E1.4): commit staged overrides to SOURCE — resolve DeclRefs server-side,
+     merge shorthand slot edits, surgical writes; 409 = re-select and retry. */
+  const [committing, setCommitting] = useState(false)
+  const commitOverrides = useCallback(async () => {
+    const doc = iframeRef.current?.contentDocument
+    if (!doc || committing) return
+    setCommitting(true)
+    try {
+      const dirty = ov.current!.dirty().filter((op) => !op.stale)
+      const byEl = new Map<string, OverrideOp[]>()
+      for (const op of dirty) { const a = byEl.get(op.domId) ?? []; a.push(op); byEl.set(op.domId, a) }
+      for (const [domId, ops] of byEl) {
+        const el = doc.querySelector(`[data-eng-id="${domId}"]`) as HTMLElement | null
+        const src = el?.getAttribute('data-src')
+        if (!el || !src) continue
+        const file = src.replace(/:\d+:\d+$/, '')
+        const res = await fetch('/api/dev/editor-resolve', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ file, classes: [...el.classList], props: ops.map((o) => o.prop) }),
+        })
+        if (!res.ok) { console.warn('[engine] resolve failed', await res.text()); continue }
+        const resolved = (await res.json()) as {
+          props: Record<string, { decl?: unknown & { prop: string; valueRange: { start: number }; file: string }; shorthand?: { slots: string[]; slotIndex: number } }>
+          fallbackRule?: { file: string; insertOffset: number; indent: string }
+        }
+        type AnyWrite = Record<string, unknown>
+        const writes: AnyWrite[] = []
+        const shMerge = new Map<string, { decl: NonNullable<(typeof resolved.props)[string]['decl']>; slots: string[] }>()
+        let addUsed = false
+        for (const op of ops) {
+          const r = resolved.props[op.prop]
+          if (r?.decl && r.shorthand) {
+            const key = `${r.decl.file}:${r.decl.valueRange.start}`
+            let m = shMerge.get(key)
+            if (!m) { m = { decl: r.decl, slots: [...r.shorthand.slots] }; shMerge.set(key, m) }
+            m.slots = editSlot(r.decl.prop, m.slots, op.prop, op.value)
+          } else if (r?.decl) {
+            writes.push({ kind: 'set-declaration', decl: r.decl, newValueText: op.value })
+          } else if (resolved.fallbackRule && !addUsed) {
+            // one add per commit round — offsets shift after an insert; further adds need re-resolve
+            addUsed = true
+            writes.push({ kind: 'add-declaration', file: resolved.fallbackRule.file, insertOffset: resolved.fallbackRule.insertOffset, indent: resolved.fallbackRule.indent, prop: op.prop, valueText: op.value })
+          } else {
+            console.warn('[engine] no writable owner for', op.prop, '— skipped')
+          }
+        }
+        for (const m of shMerge.values()) writes.push({ kind: 'set-shorthand-slots', decl: m.decl, slots: m.slots })
+        // BOTTOM-UP: apply in descending byte offset so an earlier splice never
+        // shifts a later target's valueRange (409 otherwise — same-file multi-write).
+        const startOf = (w: AnyWrite) => ((w as { decl?: { valueRange: { start: number } } }).decl?.valueRange.start ?? (w as { insertOffset?: number }).insertOffset ?? 0)
+        writes.sort((x, y) => startOf(y) - startOf(x))
+        let allOk = true
+        for (const w of writes) {
+          const wr = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(w) })
+          if (wr.status === 409) { allOk = false; console.warn('[engine] 409 stale DeclRef — file changed underneath; re-select to re-resolve', await wr.json()); continue }
+          if (!wr.ok) { allOk = false; console.warn('[engine] write failed', await wr.text()); continue }
+          console.log('[engine] committed', (w as { kind: string }).kind, await wr.json())
+        }
+        if (allOk) ov.current!.discard(domId) // staging dissolves — HMR re-renders build truth
+      }
+    } finally {
+      setCommitting(false)
+      setOvVersion((v) => v + 1)
+    }
+  }, [committing])
+
   const wireCanvas = useCallback(() => {
     const doc = iframeRef.current?.contentDocument
     if (!doc) { console.warn('[engine] contentDocument unreachable (COEP smoke FAIL?)'); return }
@@ -1247,7 +1313,10 @@ export default function ReactFigmaPage() {
             <div style={{ margin: '8px 8px 0 16px', padding: '6px 8px', borderRadius: 6, background: '#fff8f0', border: '1px solid #f5d9b8', font: `450 10px/16px ${FONT}`, color: INK }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
                 <span style={{ font: `550 10px/16px ${FONT}`, color: '#9a5b16' }}>Unsaved overrides · {ov.current!.dirty().length}</span>
-                <button type="button" onClick={() => discardOverride()} style={{ appearance: 'none', border: 0, background: 'transparent', cursor: 'pointer', font: `550 10px/16px ${FONT}`, color: SEL, padding: 0 }}>Discard all</button>
+                <span style={{ display: 'flex', gap: 8 }}>
+                  <button type="button" disabled={committing} onClick={() => void commitOverrides()} style={{ appearance: 'none', border: 0, background: 'transparent', cursor: 'pointer', font: `550 10px/16px ${FONT}`, color: committing ? MUTE : '#1a7f37', padding: 0 }}>{committing ? 'Saving…' : 'Save to code'}</button>
+                  <button type="button" onClick={() => discardOverride()} style={{ appearance: 'none', border: 0, background: 'transparent', cursor: 'pointer', font: `550 10px/16px ${FONT}`, color: SEL, padding: 0 }}>Discard all</button>
+                </span>
               </div>
               {ov.current!.dirty().map((op) => (
                 <div key={`${op.domId}:${op.prop}`} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
