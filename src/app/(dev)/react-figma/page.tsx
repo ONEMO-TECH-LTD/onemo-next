@@ -77,10 +77,10 @@ function FSegBtn({ name, pos, active, title, fill, on }: { name: keyof typeof FI
   )
 }
 /* bare 24×24 icon button carrying a Figma-exact icon (e.g. More actions) */
-function FIB({ name, title }: { name: keyof typeof FI; title?: string }) {
+function FIB({ name, title, on }: { name: keyof typeof FI; title?: string; on?: () => void }) {
   const [h, setH] = useState(false)
   return (
-    <button type="button" title={title} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
+    <button type="button" title={title} onClick={on} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
       style={{ appearance: 'none', border: 0, cursor: 'pointer', width: 24, height: 24, borderRadius: 5, display: 'grid', placeItems: 'center', flex: 'none', background: h ? '#f0f1f3' : 'transparent' }}>
       <FIcon name={name} />
     </button>
@@ -786,6 +786,26 @@ function StrokeSettingsMenu({ onStyle }: { onStyle: (value: string) => void }) {
                 style={{ appearance: 'none', border: `1px solid ${LINE}`, background: '#fff', height: 24, padding: '0 8px', borderRadius: 5, cursor: 'pointer', font: `400 11px/1 ${FONT}`, color: INK, textTransform: 'capitalize' }}>{s}</button>
             ))}
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* E4-G5 — Distribute menu (Position "more"): distribute the element's children along the main axis
+   → justify-content space-between/around/evenly (real analog when the element is a flex container). */
+function DistributeMenu({ onApply }: { onApply: (value: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <FIB name="more" title="Distribute" on={() => setOpen((v) => !v)} />
+      {open && (
+        <div data-figma-floating-root="true" role="menu" style={{ position: 'absolute', right: 0, top: 26, zIndex: 130, minWidth: 150, padding: '6px 0', borderRadius: 8, background: '#fff', boxShadow: 'rgba(0,0,0,0.15) 0px 2px 5px 0px, rgba(0,0,0,0.12) 0px 10px 16px 0px, rgba(0,0,0,0.12) 0px 0px 0.5px 0px' }}>
+          {([['Space between', 'space-between'], ['Space around', 'space-around'], ['Space evenly', 'space-evenly']] as const).map(([lbl, val]) => (
+            <button key={val} type="button" role="menuitem" onClick={() => { setOpen(false); onApply(val) }}
+              style={{ appearance: 'none', border: 0, background: 'transparent', width: '100%', height: 30, padding: '0 12px', display: 'flex', alignItems: 'center', cursor: 'pointer', color: INK, font: `400 12px/1 ${FONT}`, textAlign: 'left' }}>{lbl}</button>
+          ))}
         </div>
       )}
     </div>
@@ -2356,7 +2376,7 @@ export default function ReactFigmaPage() {
             <PositionRow label="Alignment">
               <Seg fill><FSegBtn name="alignLeft" pos="l" fill title="Align left" on={() => applyOverride('selfAlign', 'left')} /><FSegBtn name="alignCenterH" pos="m" fill title="Align horizontal centers" on={() => applyOverride('selfAlign', 'hcenter')} /><FSegBtn name="alignRight" pos="r" fill title="Align right" on={() => applyOverride('selfAlign', 'right')} /></Seg>
               <Seg fill><FSegBtn name="alignTop" pos="l" fill title="Align top" on={() => applyOverride('selfAlign', 'top')} /><FSegBtn name="alignCenterV" pos="m" fill title="Align vertical centers" on={() => applyOverride('selfAlign', 'vcenter')} /><FSegBtn name="alignBottom" pos="r" fill title="Align bottom" on={() => applyOverride('selfAlign', 'bottom')} /></Seg>
-              <FIB name="more" title="More actions" />
+              <DistributeMenu onApply={(v) => applyOverride('justify', v)} />
             </PositionRow>
             <PositionRow label="Position">
               <InspectorField label="X" value={xValue} input dimValue ariaLabel="X-position" onChange={(v) => { setXValue(v); applyOverride('x', v) }} />
