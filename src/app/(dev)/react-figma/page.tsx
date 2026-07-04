@@ -813,6 +813,64 @@ function MoreActionsMenu({ onDuplicate, onDelete }: { onDuplicate: () => void; o
   )
 }
 
+/* E4-G1 — Font family picker: portable font stacks + optional live machine-font list (Local Font
+   Access, like Figma). System-safe stacks emit clean; a picked machine font emits with a generic
+   fallback + a note it needs a webfont upload for production portability (woff2 tier = follow-on). */
+const SAFE_FONT_STACKS: [string, string][] = [
+  ['System', 'system-ui, -apple-system, "Segoe UI", sans-serif'],
+  ['SF Pro', '"SF Pro", system-ui, -apple-system, sans-serif'],
+  ['Inter', 'Inter, system-ui, sans-serif'],
+  ['Helvetica', 'Helvetica, Arial, sans-serif'],
+  ['Arial', 'Arial, Helvetica, sans-serif'],
+  ['Georgia', 'Georgia, "Times New Roman", serif'],
+  ['Times', '"Times New Roman", Times, serif'],
+  ['Monospace', 'ui-monospace, "SF Mono", Menlo, monospace'],
+]
+function FontPickerField({ value, onPick }: { value: string; onPick: (stack: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const [local, setLocal] = useState<string[] | null>(null)
+  const ref = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
+  const loadLocal = async () => {
+    try {
+      const q = (window as unknown as { queryLocalFonts?: () => Promise<{ family: string }[]> }).queryLocalFonts
+      if (!q) { notify('Local Font Access not supported in this browser', 'error'); return }
+      const fonts = await q()
+      setLocal([...new Set(fonts.map((f) => f.family))].sort())
+    } catch { notify('Local font access denied', 'error') }
+  }
+  const pickLocal = (fam: string) => {
+    onPick(`"${fam}", system-ui, sans-serif`)
+    notify(`"${fam}" applied — upload a webfont for production portability`)
+    setOpen(false)
+  }
+  return (
+    <div ref={ref} style={{ position: 'relative', width: 232 }}>
+      <button type="button" aria-label="Font family" aria-expanded={open} onClick={() => setOpen((v) => !v)}
+        style={{ appearance: 'none', border: `1px solid ${LINE}`, background: FIELD, width: 232, height: 32, borderRadius: 5, padding: '0 8px', display: 'grid', gridTemplateColumns: '20px 1fr 16px', alignItems: 'center', gap: 6, cursor: 'pointer', font: `400 11px/1 ${FONT}`, color: INK }}>
+        <span style={{ color: MUTE }}>Aa</span>
+        <span style={{ textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value?.replace(/["']/g, '').split(',')[0] || 'System'}</span>
+        <CaretDown size={10} />
+      </button>
+      {open && createPortal(
+        <div data-figma-floating-root="true" role="listbox" style={{ position: 'fixed', zIndex: 1240, left: ref.current?.getBoundingClientRect().left ?? 0, top: (ref.current?.getBoundingClientRect().bottom ?? 0) + 4, width: 232, maxHeight: 320, overflowY: 'auto', borderRadius: 8, background: '#fff', boxShadow: 'rgba(0,0,0,0.15) 0px 2px 5px 0px, rgba(0,0,0,0.12) 0px 10px 16px 0px, rgba(0,0,0,0.12) 0px 0px 0.5px 0px', padding: '6px 0' }}>
+          {SAFE_FONT_STACKS.map(([label, stack]) => (
+            <button key={label} type="button" role="option" onClick={() => { onPick(stack); setOpen(false) }}
+              style={{ appearance: 'none', border: 0, background: 'transparent', width: '100%', height: 30, padding: '0 12px', display: 'flex', alignItems: 'center', cursor: 'pointer', color: INK, font: `400 12px/1 ${label}`, textAlign: 'left' }}>{label}</button>
+          ))}
+          <div style={{ borderTop: `1px solid ${LINE}`, margin: '6px 0' }} />
+          {local === null
+            ? <button type="button" onClick={() => void loadLocal()} style={{ appearance: 'none', border: 0, background: 'transparent', width: '100%', height: 30, padding: '0 12px', display: 'flex', alignItems: 'center', cursor: 'pointer', color: SEL, font: `500 11px/1 ${FONT}`, textAlign: 'left' }}>Load system fonts…</button>
+            : local.map((fam) => (
+                <button key={fam} type="button" role="option" onClick={() => pickLocal(fam)}
+                  style={{ appearance: 'none', border: 0, background: 'transparent', width: '100%', height: 28, padding: '0 12px', display: 'flex', alignItems: 'center', cursor: 'pointer', color: INK, font: `400 12px/1 ${FONT}`, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fam}</button>
+              ))}
+        </div>,
+        document.body,
+      )}
+    </div>
+  )
+}
+
 /* E3.6 production — toast bus: write ops surface success/failure visibly instead of silent console.
    Module-level notify() so handlers don't thread a prop; Toaster (rendered once) listens. */
 type ToastKind = 'ok' | 'error'
@@ -1745,6 +1803,7 @@ export default function ReactFigmaPage() {
       : field === 'lineHeight' ? [['line-height', n === 'Auto' ? 'normal' : withUnit]]
       : field === 'letterSpacing' ? [['letter-spacing', parseFloat(n) === 0 ? 'normal' : withUnit]]
       : field === 'textAlign' ? [['text-align', n]]
+      : field === 'fontFamily' ? [['font-family', n]]
       : field === 'textDecoration' ? [['text-decoration', n]]
       : field === 'textTransform' ? [['text-transform', n]]
       : field === 'fillOpacity' ? [['opacity', String((parseFloat(n) || 0) / 100)]]
@@ -2398,7 +2457,7 @@ export default function ReactFigmaPage() {
           {typo && (
             <Sec title="Text" actionWidth={24} action={<TypeSettingsMenu onApply={applyOverride} />} bodyGap={0} bodyPadding="0">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 8px 8px 16px' }}>
-                <AutoValueField label="Aa" value={typo.family} ariaLabel="Font family" width={232} />
+                <FontPickerField value={typo.family} onPick={(stack) => { setTypo(t => t && { ...t, family: stack }); applyOverride('fontFamily', stack) }} />
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                   <AutoValueField label="W" value={typo.weight} ariaLabel="Font weight" width={112} onChange={(v) => { setTypo(t => t && { ...t, weight: v }); applyOverride('fontWeight', v) }} />
                   <AutoValueField label="S" value={typo.size} ariaLabel="Font size" width={112} onChange={(v) => { setTypo(t => t && { ...t, size: v }); applyOverride('fontSize', v) }} />
