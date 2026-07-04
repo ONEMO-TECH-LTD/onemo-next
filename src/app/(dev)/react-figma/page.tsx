@@ -201,7 +201,7 @@ function useCloseOnOutside<T extends HTMLElement>(open: boolean, close: () => vo
 // E3.3 — real DS tokens from the converter output (/api/dev/editor-tokens), fetched once and
 // cached, feeding the ⬡ variable picker. The var name IS the token path (DEC-locked), so it
 // doubles as the Figma-style label; the resolved value shows alongside for traceability.
-type DsToken = { cssVar: string; value: string; group: string; kind: 'color' | 'dimension' | 'other'; path?: string }
+type DsToken = { cssVar: string; value: string; dark?: string; group: string; kind: 'color' | 'dimension' | 'other'; path?: string }
 let _dsTokenCache: DsToken[] | null = null
 function useDsTokens(): DsToken[] {
   const [toks, setToks] = useState<DsToken[]>(_dsTokenCache ?? [])
@@ -716,7 +716,7 @@ function VariablesLibrary() {
           ))}
         </div>
       </div>
-      {/* traceability table: Name (structural path) · CSS variable · Value */}
+      {/* traceability table: Name · CSS variable · Light · Dark — grouped like Figma's variables editor */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ height: 40, borderBottom: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', gap: 12, padding: '0 16px' }}>
           <span style={{ font: `550 12px/1 ${FONT}` }}>{activeCol}</span>
@@ -729,21 +729,41 @@ function VariablesLibrary() {
           </div>
         </div>
         <div style={{ height: 32, borderBottom: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', font: `550 11px/1 ${FONT}`, color: MUTE }}>
-          <span style={{ width: 300, padding: '0 16px' }}>Name</span><span style={{ width: 260, padding: '0 12px' }}>CSS variable</span><span style={{ flex: 1, padding: '0 12px' }}>Value</span>
+          <span style={{ width: 220, padding: '0 16px' }}>Name</span><span style={{ width: 220, padding: '0 12px' }}>CSS variable</span><span style={{ flex: 1, padding: '0 12px' }}>Light</span><span style={{ flex: 1, padding: '0 12px' }}>Dark</span>
         </div>
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          {rows.map((t) => (
-            <div key={t.cssVar} style={{ height: 34, borderBottom: '1px solid #f2f2f3', display: 'flex', alignItems: 'center', font: `400 11px/1 ${FONT}` }}>
-              <span style={{ width: 300, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                {t.kind === 'color'
-                  ? <span style={{ flex: 'none', width: 14, height: 14, borderRadius: 3, background: t.value, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.12)' }} />
-                  : <VariableHashIcon />}
-                <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(t.path ?? t.cssVar).replace(/^[^/]+ \/ /, '')}</span>
+          {(() => {
+            const valCell = (val: string, isColor: boolean) => (
+              <span style={{ flex: 1, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                {isColor && <span style={{ flex: 'none', width: 14, height: 14, borderRadius: 3, background: val, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.12)' }} />}
+                <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{val}</span>
               </span>
-              <span style={{ width: 260, padding: '0 12px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: MUTE }}>{t.cssVar}</span>
-              <span style={{ flex: 1, padding: '0 12px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.value}</span>
-            </div>
-          ))}
+            )
+            const out: React.ReactNode[] = []
+            let lastGroup: string | null = null
+            for (const t of rows) {
+              const parts = (t.path ?? t.cssVar).split(' / ')
+              const grp = parts.length > 2 ? parts[1] : ''
+              if (grp !== lastGroup) {
+                lastGroup = grp
+                if (grp) out.push(<div key={`h-${grp}`} style={{ padding: '12px 16px 6px', font: `600 11px/1 ${FONT}`, color: INK }}>{grp}</div>)
+              }
+              const name = (parts.length > 2 ? parts.slice(2) : parts.slice(1)).join(' / ')
+              const isColor = t.kind === 'color'
+              out.push(
+                <div key={t.cssVar} style={{ minHeight: 34, borderBottom: '1px solid #f2f2f3', display: 'flex', alignItems: 'center', font: `400 11px/1 ${FONT}` }}>
+                  <span style={{ width: 220, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                    {isColor ? <span style={{ flex: 'none', width: 14, height: 14, borderRadius: 3, background: t.value, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.12)' }} /> : <VariableHashIcon />}
+                    <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+                  </span>
+                  <span style={{ width: 220, padding: '0 12px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: MUTE }}>{t.cssVar}</span>
+                  {valCell(t.value, isColor)}
+                  {valCell(t.dark ?? t.value, isColor)}
+                </div>,
+              )
+            }
+            return out
+          })()}
           {rows.length === 0 && <div style={{ padding: '16px', color: MUTE, font: `400 11px/1 ${FONT}` }}>No tokens match.</div>}
         </div>
       </div>

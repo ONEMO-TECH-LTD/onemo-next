@@ -15,7 +15,7 @@ const TOKENS_CSS = join(TOKENS_DIR, 'tokens.css')
 const TOKENS_TS = join(TOKENS_DIR, 'tokens.ts')
 
 export type TokenKind = 'color' | 'dimension' | 'other'
-export type Token = { cssVar: string; value: string; group: string; kind: TokenKind; path?: string }
+export type Token = { cssVar: string; value: string; dark?: string; group: string; kind: TokenKind; path?: string }
 
 /** Build cssVar → structural path from the converter's own tokens.ts (authoritative, 100% coverage).
  *  The nested path (e.g. primCol.base.white) is the design-system name; the css var is the CSS name —
@@ -53,19 +53,24 @@ export async function GET() {
   }
   try {
     const [css, paths] = await Promise.all([readFile(TOKENS_CSS, 'utf8'), pathByCssVar()])
-    const seen = new Set<string>()
-    const tokens: Token[] = []
-    // match `--name: value;` declarations (top-level custom properties)
-    const re = /(--[a-z0-9-]+)\s*:\s*([^;]+);/gi
-    let m: RegExpExecArray | null
-    while ((m = re.exec(css))) {
-      const cssVar = m[1], value = m[2].trim()
-      if (seen.has(cssVar)) continue // first occurrence (:root default) wins
-      seen.add(cssVar)
+    // Two theme modes: :root (Light) and [data-theme="dark"] (Dark override). Split so Light is the
+    // primary value and Dark is captured where a token overrides it (else it's identical to Light).
+    const declRe = (s: string) => {
+      const out: Record<string, string> = {}
+      const re = /(--[a-z0-9-]+)\s*:\s*([^;]+);/gi
+      let m: RegExpExecArray | null
+      while ((m = re.exec(s))) if (!(m[1] in out)) out[m[1]] = m[2].trim() // first occurrence wins
+      return out
+    }
+    const darkIdx = css.indexOf('[data-theme="dark"]')
+    const light = declRe(darkIdx >= 0 ? css.slice(0, darkIdx) : css)
+    const dark = darkIdx >= 0 ? declRe(css.slice(darkIdx)) : {}
+    const tokens: Token[] = Object.entries(light).map(([cssVar, value]) => {
       const segs = cssVar.replace(/^--/, '').split('-')
       const group = segs.slice(0, 2).join('-') || 'other'
-      tokens.push({ cssVar, value, group, kind: classify(cssVar, value), path: paths[cssVar] })
-    }
+      const darkVal = dark[cssVar]
+      return { cssVar, value, ...(darkVal && darkVal !== value ? { dark: darkVal } : {}), group, kind: classify(cssVar, value), path: paths[cssVar] }
+    })
     return NextResponse.json({ tokens, count: tokens.length })
   } catch (e) {
     const err = e as Error & { status?: number }
