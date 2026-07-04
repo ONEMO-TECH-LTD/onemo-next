@@ -66,11 +66,11 @@ function FIcon({ name, active, size = 24 }: { name: keyof typeof FI; active?: bo
   )
 }
 /* segmented button carrying a Figma-exact icon (align/flip): 31×24 · grey #f5f5f5 · per-position radii */
-function FSegBtn({ name, pos, active, title, fill }: { name: keyof typeof FI; pos: 'l' | 'm' | 'r'; active?: boolean; title?: string; fill?: boolean }) {
+function FSegBtn({ name, pos, active, title, fill, on }: { name: keyof typeof FI; pos: 'l' | 'm' | 'r'; active?: boolean; title?: string; fill?: boolean; on?: () => void }) {
   const [h, setH] = useState(false)
   const radius = pos === 'l' ? '5px 0 0 5px' : pos === 'r' ? '0 5px 5px 0' : '0'
   return (
-    <button type="button" title={title} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
+    <button type="button" title={title} onClick={on} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
       style={{ appearance: 'none', border: 0, cursor: 'pointer', width: fill ? 'auto' : 31, height: 24, borderRadius: radius, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: fill ? '1 1 0' : 'none', background: h ? '#ededed' : FIELD }}>
       <FIcon name={name} active={active} />
     </button>
@@ -1415,6 +1415,8 @@ export default function ReactFigmaPage() {
   const [liveStrokes, setLiveStrokes] = useState<{ hex: string; op: number; weight: number; position: string }[] | null>(null)
   const [liveEffects, setLiveEffects] = useState<{ type: string; detail: string }[] | null>(null)
   const [liveSelColors, setLiveSelColors] = useState<{ hex: string; op: number }[] | null>(null)
+  // E2.2 Text section — present only for text-bearing elements (Figma canon)
+  const [typo, setTypo] = useState<{ family: string; weight: string; size: string; lineHeight: string; letterSpacing: string; align: string } | null>(null)
   const selIdRef = useRef<string | null>(null)
   const ov = useRef<Overrides | null>(null)
   if (!ov.current) ov.current = new Overrides()
@@ -1492,6 +1494,20 @@ export default function ReactFigmaPage() {
     setAutoAlign(alignToIndex(c))
     setWidthResize(parseFloat(c['flex-grow'] || '0') > 0 ? 'Fill' : d['width'] ? 'Fixed' : 'Hug')
     setHeightResize(d['height'] ? 'Fixed' : 'Hug')
+    // Typography — only when the element directly holds text (Figma shows Text section for text nodes)
+    const hasText = [...el.childNodes].some((nn) => nn.nodeType === 3 && nn.textContent?.trim())
+    if (hasText) {
+      const fam = (c['font-family'] || '').split(',')[0].replace(/["']/g, '').trim()
+      const lh = c['line-height']; const lhNum = parseFloat(lh)
+      setTypo({
+        family: fam,
+        weight: c['font-weight'],
+        size: px(c['font-size']),
+        lineHeight: lh === 'normal' || !Number.isFinite(lhNum) ? 'Auto' : String(Math.round(lhNum)),
+        letterSpacing: c['letter-spacing'] === 'normal' ? '0' : px(c['letter-spacing']),
+        align: c['text-align'] || 'left',
+      })
+    } else setTypo(null)
     console.log('[engine] select', payload, rep)
   }, [setXValue, setYValue, setInsetTop, setInsetLeft, setZIndexValue, setCssPosition, setAutoFlow, setAutoWrap, setWidthValue, setHeightValue, setGapValue, setPaddingXValue, setPaddingYValue, setClipContent, setOpacityValue, setCornerRadiusValue, setBlendMode])
 
@@ -1525,6 +1541,11 @@ export default function ReactFigmaPage() {
       : field === 'fillColor' ? [['color', n]]
       : field === 'alignItems' ? [['align-items', n]]
       : field === 'justify' ? [['justify-content', n]]
+      : field === 'fontSize' ? [['font-size', withUnit]]
+      : field === 'fontWeight' ? [['font-weight', n]]
+      : field === 'lineHeight' ? [['line-height', n === 'Auto' ? 'normal' : withUnit]]
+      : field === 'letterSpacing' ? [['letter-spacing', parseFloat(n) === 0 ? 'normal' : withUnit]]
+      : field === 'textAlign' ? [['text-align', n]]
       : []
     if ((field === 'x' || field === 'y') && !positioned) { console.warn('[engine] X/Y on a static-position element has no CSS analog — no-op'); return }
     for (const [prop, value] of decls) ov.current!.set(id, prop, value, cs.getPropertyValue(prop))
@@ -1974,6 +1995,29 @@ export default function ReactFigmaPage() {
               </div>
             </div>
           </Sec>
+
+          {/* E2.2 Text section — Figma canon (FIGMA-SPEC-text.md): present only for text-bearing
+              elements; unbound Typography form (individual controls) reading the element's real type. */}
+          {typo && (
+            <Sec title="Text" actionWidth={24} action={<UiIB name="overflowDots" title="Type settings" />} bodyGap={0} bodyPadding="0">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 8px 8px 16px' }}>
+                <AutoValueField label="Aa" value={typo.family} ariaLabel="Font family" width={232} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <AutoValueField label="W" value={typo.weight} ariaLabel="Font weight" width={112} onChange={(v) => { setTypo(t => t && { ...t, weight: v }); applyOverride('fontWeight', v) }} />
+                  <AutoValueField label="S" value={typo.size} ariaLabel="Font size" width={112} onChange={(v) => { setTypo(t => t && { ...t, size: v }); applyOverride('fontSize', v) }} />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <AutoValueField label="↕" value={typo.lineHeight} ariaLabel="Line height" width={112} onChange={(v) => { setTypo(t => t && { ...t, lineHeight: v }); applyOverride('lineHeight', v) }} />
+                  <AutoValueField label="↔" value={typo.letterSpacing} ariaLabel="Letter spacing" width={112} onChange={(v) => { setTypo(t => t && { ...t, letterSpacing: v }); applyOverride('letterSpacing', v) }} />
+                </div>
+                <Seg fill>
+                  {(['left', 'center', 'right', 'justify'] as const).map((a, i) => (
+                    <FSegBtn key={a} name={a === 'left' ? 'alignLeft' : a === 'center' ? 'alignCenterH' : a === 'right' ? 'alignRight' : 'alignLeft'} pos={i === 0 ? 'l' : i === 3 ? 'r' : 'm'} fill active={typo.align === a || (a === 'left' && typo.align === 'start')} title={`Text align ${a}`} on={() => { setTypo(t => t && { ...t, align: a }); applyOverride('textAlign', a) }} />
+                  ))}
+                </Seg>
+              </div>
+            </Sec>
+          )}
 
           <Sec title="Fill" actionWidth={52} action={<><StyleApplyButton label="Fill" title="Fill, Apply styles and variables" /><UiIB name="plus" title="Add fill" on={() => setFills(rows => [...rows, { id: nextRowId(rows), hex: 'FFFFFF', op: 100 }])} /></>} bodyGap={0} bodyPadding="0">
             {liveFills
