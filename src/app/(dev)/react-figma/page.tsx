@@ -1361,6 +1361,8 @@ export default function ReactFigmaPage() {
   const [autoFlow, setAutoFlow] = useState<AutoFlow>('horizontal')
   const [autoWrap, setAutoWrap] = useState(false)
   const [aspectLocked, setAspectLocked] = useState(false)
+  const [flipH, setFlipH] = useState(false)
+  const [flipV, setFlipV] = useState(false)
   const [widthValue, setWidthValue] = useState('402')
   const [heightValue, setHeightValue] = useState('427')
   const [widthResize, setWidthResize] = useState<ResizeMode>('Fill')
@@ -1555,6 +1557,10 @@ export default function ReactFigmaPage() {
       : field === 'aspectRatio' ? [['aspect-ratio', n]]
       : field === 'flexWrap' ? [['flex-wrap', n]]
       : field === 'clip' ? [['overflow', n]]
+      : field === 'transform' ? [['transform', n]]
+      : field === 'cssPosition' ? [['position', n]]
+      : field === 'blend' ? [['mix-blend-mode', n]]
+      : field === 'appearanceVisible' ? [['visibility', n]]
       : []
     // Stroke position "Center" has no clean CSS analog (border is inside, outline is outside) — no-op, honest.
     if (field === 'strokePosition' && n !== 'Inside' && n !== 'Outside') { console.warn('[engine] stroke position', n, '— no clean CSS analog (border=Inside, outline=Outside); no-op'); return }
@@ -1575,6 +1581,16 @@ export default function ReactFigmaPage() {
     const el = selIdRef.current && doc ? (doc.querySelector(`[data-eng-id="${selIdRef.current}"]`) as HTMLElement | null) : null
     if (el) applySelection(el) // re-read truth into the fields
   }, [applySelection])
+
+  // Compose the single `transform` prop from rotation + both flips (they'd clobber each other otherwise).
+  const pushTransform = useCallback((rot: string, fh: boolean, fv: boolean) => {
+    const deg = parseFloat(rot) || 0
+    const parts: string[] = []
+    if (deg) parts.push(`rotate(${deg}deg)`)
+    if (fh) parts.push('scaleX(-1)')
+    if (fv) parts.push('scaleY(-1)')
+    applyOverride('transform', parts.length ? parts.join(' ') : 'none')
+  }, [applyOverride])
 
   /* M4 (E1.4): commit staged overrides to SOURCE — resolve DeclRefs server-side,
      merge shorthand slot edits, surgical writes; 409 = re-select and retry. */
@@ -1975,12 +1991,16 @@ export default function ReactFigmaPage() {
               <span />
             </PositionRow>
             <PositionRow label="Rotation">
-              <InspectorField icon="rotationField" value={rotationValue} ariaLabel="Rotation" onChange={setRotationValue} />
-              <div style={{ display: 'flex', gap: 1, width: '100%' }}><FSegBtn name="rotate" pos="l" fill title="Rotate 90° right" /><FSegBtn name="flipH" pos="m" fill title="Flip horizontal" /><FSegBtn name="flipV" pos="r" fill title="Flip vertical" /></div>
+              <InspectorField icon="rotationField" value={rotationValue} ariaLabel="Rotation" onChange={(v) => { setRotationValue(v); pushTransform(v, flipH, flipV) }} />
+              <div style={{ display: 'flex', gap: 1, width: '100%' }}>
+                <FSegBtn name="rotate" pos="l" fill title="Rotate 90° right" on={() => { const next = String(((parseFloat(rotationValue) || 0) + 90) % 360) + '°'; setRotationValue(next); pushTransform(next, flipH, flipV) }} />
+                <FSegBtn name="flipH" pos="m" fill active={flipH} title="Flip horizontal" on={() => { const nv = !flipH; setFlipH(nv); pushTransform(rotationValue, nv, flipV) }} />
+                <FSegBtn name="flipV" pos="r" fill active={flipV} title="Flip vertical" on={() => { const nv = !flipV; setFlipV(nv); pushTransform(rotationValue, flipH, nv) }} />
+              </div>
               <span />
             </PositionRow>
             <InspectorRow label="CSS position" columns="1fr">
-              <TextSegGroup items={['Auto', 'Rel', 'Abs', 'Fix', 'Sticky']} active={cssPosition} onSelect={setCssPosition} width="100%" ariaLabel="CSS position" />
+              <TextSegGroup items={['Auto', 'Rel', 'Abs', 'Fix', 'Sticky']} active={cssPosition} onSelect={(i) => { setCssPosition(i); applyOverride('cssPosition', ['static', 'relative', 'absolute', 'fixed', 'sticky'][i]) }} width="100%" ariaLabel="CSS position" />
             </InspectorRow>
             <CompactInspectorRow label="Inset / z-index">
               <InspectorField label="T" value={insetTop} ariaLabel="Top inset" onChange={(v) => { setInsetTop(v); applyOverride('insetT', v) }} />
@@ -2031,7 +2051,7 @@ export default function ReactFigmaPage() {
             </div>
           </Sec>
 
-          <Sec title="Appearance" actionWidth={53} action={<><UiIB name="visibility" title={appearanceVisible ? 'Hide' : 'Show'} active={!appearanceVisible} on={() => setAppearanceVisible(v => !v)} /><BlendModeMenu value={blendMode} onChange={setBlendMode} /></>} bodyGap={0} bodyPadding="0">
+          <Sec title="Appearance" actionWidth={53} action={<><UiIB name="visibility" title={appearanceVisible ? 'Hide' : 'Show'} active={!appearanceVisible} on={() => { const nv = !appearanceVisible; setAppearanceVisible(nv); applyOverride('appearanceVisible', nv ? 'visible' : 'hidden') }} /><BlendModeMenu value={blendMode} onChange={(v) => { setBlendMode(v); applyOverride('blend', v === 'Pass through' ? 'normal' : v.toLowerCase()) }} /></>} bodyGap={0} bodyPadding="0">
             <div style={{ position: 'relative', height: 50, width: '100%' }}>
               <span style={{ position: 'absolute', left: 16, top: 3.5, width: 88, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Opacity</span>
               <span style={{ position: 'absolute', left: 112, top: 3.5, width: 120, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Corner radius</span>
