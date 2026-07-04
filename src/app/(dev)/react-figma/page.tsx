@@ -1635,6 +1635,17 @@ export default function ReactFigmaPage() {
     await insertSnippet(snippet)
   }, [sel, insertImage, insertSnippet])
 
+  // E3.5 creation: extract the selected element into its own component file + instance
+  const makeComponent = useCallback(async () => {
+    if (!sel) { console.warn('[engine] make component: select an element first'); return }
+    const r = await fetch('/api/dev/editor-write', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ kind: 'make-component', file: sel.file, line: sel.line, col: sel.col }),
+    })
+    if (!r.ok) { console.warn('[engine] make component failed', await r.text()); return }
+    console.log('[engine] component extracted', await r.json())
+  }, [sel])
+
   // E3.5 creation: add a new page route (real folder + page.tsx scaffold), then load it
   const addPage = useCallback(async () => {
     const r = await fetch('/api/dev/editor-write', {
@@ -2047,7 +2058,7 @@ export default function ReactFigmaPage() {
                 shell exactly (Dan, 2026-07-04); sel payload still logged + in state */}
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
               <span aria-hidden style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', flex: 'none', color: INK }}><UiIcon name="devCode" /></span>
-              <UiIB name="createComponent" title="Create component" />
+              <UiIB name="createComponent" title="Create component" on={() => void makeComponent()} />
               <UiIB name="overflowDots" title="More actions" />
             </div>
           </div>

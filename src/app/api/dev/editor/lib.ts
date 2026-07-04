@@ -228,6 +228,7 @@ export type WriteOp =
   | { kind: 'set-jsx-text'; file: string; line: number; col: number; newText: string; expectRaw?: string }
   | { kind: 'insert-jsx-child'; file: string; line: number; col: number; snippet: string }
   | { kind: 'create-page'; slugBase?: string; width?: number; height?: number }
+  | { kind: 'make-component'; file: string; line: number; col: number; name?: string }
 
 // ─── JSX inline-style write (E2.4, ENGINE-PLAN-E2.4.md) ──────────────────────
 
@@ -438,7 +439,93 @@ async function createPage(op: Extract<WriteOp, { kind: 'create-page' }>): Promis
   return { ok: true, file: `src/app/(dev)/react-figma-pages/${slug}/page.tsx`, newValueText: slug, route: `/react-figma-pages/${slug}` }
 }
 
-export async function applyWrite(op: WriteOp): Promise<{ ok: true; file: string; newValueText: string; route?: string }> {
+/**
+ * Extract the selected JSX subtree into its own component file + replace it with an instance (E3.5).
+ * SAFE v1: only proceeds when every FREE identifier the subtree references is a top-level import of
+ * the source file (those imports are copied into the new file). Any reference to local scope
+ * (props/state/local const) → refuse 422. Guarantees the extracted component compiles; errs toward
+ * refusal, never toward broken output. Zero-prop extraction — the subtree is inlined verbatim.
+ */
+async function makeComponent(op: Extract<WriteOp, { kind: 'make-component' }>): Promise<{ ok: true; file: string; newValueText: string; componentFile: string }> {
+  const abs = jailComponentWrite(op.file)
+  const buf = await fs.readFile(abs)
+  const source = buf.toString('utf8')
+  const sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
+  const opening = findJsxAt(sf, op.line, op.col)
+  if (!opening) throw Object.assign(new Error(`no JSX element at ${op.line}:${op.col}`), { status: 404 })
+  const el: ts.Node = ts.isJsxSelfClosingElement(opening) ? opening : opening.parent
+  if (!ts.isJsxElement(el) && !ts.isJsxSelfClosingElement(el)) {
+    throw Object.assign(new Error('could not resolve the full element subtree'), { status: 422 })
+  }
+
+  // top-level imports: imported name → full import statement text
+  const importByName = new Map<string, string>()
+  for (const st of sf.statements) {
+    if (!ts.isImportDeclaration(st) || !st.importClause) continue
+    const text = st.getText(sf), clause = st.importClause
+    if (clause.name) importByName.set(clause.name.text, text)
+    const nb = clause.namedBindings
+    if (nb && ts.isNamedImports(nb)) for (const e of nb.elements) importByName.set(e.name.text, text)
+    if (nb && ts.isNamespaceImport(nb)) importByName.set(nb.name.text, text)
+  }
+
+  // free-identifier analysis over the subtree — references NOT bound inside it, excluding JSX prop
+  // names, object keys, member names, and lowercase intrinsic tag names (host strings like div/span).
+  const bound = new Set<string>(), free = new Set<string>()
+  const collectBinding = (n: ts.BindingName) => {
+    if (ts.isIdentifier(n)) bound.add(n.text)
+    else n.elements.forEach((e) => { if (ts.isBindingElement(e)) collectBinding(e.name) })
+  }
+  const walk = (node: ts.Node) => {
+    if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) node.parameters.forEach((p) => collectBinding(p.name))
+    if (ts.isVariableDeclaration(node)) collectBinding(node.name)
+    if (ts.isIdentifier(node)) {
+      const p = node.parent
+      const isPropKey = ts.isPropertyAssignment(p) && p.name === node
+      const isMember = ts.isPropertyAccessExpression(p) && p.name === node
+      const isJsxAttrName = ts.isJsxAttribute(p) && p.name === node
+      const isBindingDecl = (ts.isParameter(p) || ts.isBindingElement(p) || ts.isVariableDeclaration(p)) && (p as { name?: ts.Node }).name === node
+      const isJsxTag = (ts.isJsxOpeningElement(p) || ts.isJsxSelfClosingElement(p) || ts.isJsxClosingElement(p)) && p.tagName === node
+      const isIntrinsicTag = isJsxTag && /^[a-z]/.test(node.text)
+      if (!isPropKey && !isMember && !isJsxAttrName && !isBindingDecl && !isIntrinsicTag) free.add(node.text)
+    }
+    ts.forEachChild(node, walk)
+  }
+  walk(el)
+  const trulyFree = [...free].filter((n) => !bound.has(n))
+  const missing = trulyFree.filter((n) => !importByName.has(n))
+  if (missing.length) {
+    throw Object.assign(new Error(`selection references local scope (${missing.join(', ')}) — extract a self-contained subtree (v1 supports only imported components/values)`), { status: 422 })
+  }
+  const neededImports = [...new Set(trulyFree.map((n) => importByName.get(n)!))]
+
+  // create the component file (collision-safe), inlining the subtree verbatim
+  const rawBase = (op.name ?? 'Component').replace(/[^a-z0-9]/gi, '') || 'Component'
+  const nameBase = rawBase[0].toUpperCase() + rawBase.slice(1)
+  const compDir = path.join(ROOT, 'src/app/(dev)/react-figma-components')
+  await fs.mkdir(compDir, { recursive: true })
+  let name = nameBase, i = 1
+  while (true) { try { await fs.access(path.join(compDir, `${name}.tsx`)); name = `${nameBase}${++i}` } catch { break } }
+  const subtree = el.getText(sf)
+  const compSource = `${neededImports.length ? neededImports.join('\n') + '\n\n' : ''}export function ${name}() {\n  return (\n    ${subtree}\n  )\n}\n`
+  await fs.writeFile(path.join(compDir, `${name}.tsx`), compSource, 'utf8')
+
+  // replace subtree with <Name /> and add the import — bottom-up splice (subtree offset > import offset)
+  const elStart = el.getStart(sf), elEnd = el.getEnd()
+  const lastImport = [...sf.statements].reverse().find(ts.isImportDeclaration)
+  const importPos = lastImport ? lastImport.getEnd() : 0
+  const importText = `import { ${name} } from '@/app/(dev)/react-figma-components/${name}'`
+  const bElStart = byteLen(source.slice(0, elStart)), bElEnd = byteLen(source.slice(0, elEnd))
+  const bImp = byteLen(source.slice(0, importPos))
+  let next = Buffer.concat([buf.subarray(0, bElStart), Buffer.from(`<${name} />`, 'utf8'), buf.subarray(bElEnd)])
+  const importInsert = importPos === 0 ? `${importText}\n` : `\n${importText}`
+  next = Buffer.concat([next.subarray(0, bImp), Buffer.from(importInsert, 'utf8'), next.subarray(bImp)])
+  await fs.writeFile(abs, next)
+  return { ok: true, file: op.file, newValueText: `<${name} />`, componentFile: `src/app/(dev)/react-figma-components/${name}.tsx` }
+}
+
+export async function applyWrite(op: WriteOp): Promise<{ ok: true; file: string; newValueText: string; route?: string; componentFile?: string }> {
+  if (op.kind === 'make-component') return makeComponent(op)
   if (op.kind === 'create-page') return createPage(op)
   if (op.kind === 'set-token-value') return setTokenValue(op)
   if (op.kind === 'set-jsx-style') return setJsxStyle(op)
