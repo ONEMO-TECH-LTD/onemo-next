@@ -904,7 +904,7 @@ function FigmaColorPicker({ anchorRef, hex, opacity, onHex, onOpacity, onClose }
     document.body
   )
 }
-function FigmaPaintRow({ hex, op, label = 'Paint', onRemove, origin, onHexEdit, onOpacityEdit }: { hex: string; op: number; label?: string; onRemove?: () => void; origin?: string; onHexEdit?: (hex: string) => void; onOpacityEdit?: (hex: string, opPct: number) => void }) {
+function FigmaPaintRow({ hex, op, label = 'Paint', onRemove, origin, onHexEdit, onOpacityEdit, onVisibleToggle }: { hex: string; op: number; label?: string; onRemove?: () => void; origin?: string; onHexEdit?: (hex: string) => void; onOpacityEdit?: (hex: string, opPct: number) => void; onVisibleToggle?: (visible: boolean, hex: string) => void }) {
   const [hexValue, setHexValue] = useState(hex)
   const [opacityValue, setOpacityValue] = useState(String(op))
   const [varOpen, setVarOpen] = useState(false)
@@ -931,13 +931,13 @@ function FigmaPaintRow({ hex, op, label = 'Paint', onRemove, origin, onHexEdit, 
         {pickerOpen && <FigmaColorPicker anchorRef={fieldRef} hex={hexValue} opacity={opacityValue} onHex={(hx) => { setHexValue(hx); const nv = normalizeHex(hx); if (nv.length === 6) onHexEdit?.(nv) }} onOpacity={setOpacityValue} onClose={() => setPickerOpen(false)} />}
       </div>
       <span />
-      <UiIB name="visibility" title="Toggle visibility" active={!visible} on={() => setVisible(v => !v)} />
+      <UiIB name="visibility" title="Toggle visibility" active={!visible} on={() => { const nv = !visible; setVisible(nv); onVisibleToggle?.(nv, normalizeHex(hexValue)) }} />
       <span />
       <UiIB name="minus" title="Remove" on={onRemove} />
     </div>
   )
 }
-function StrokeDetailRow({ position, weight, onWeight }: { position: string; weight: number; onWeight?: (value: string) => void }) {
+function StrokeDetailRow({ position, weight, onWeight, onPosition }: { position: string; weight: number; onWeight?: (value: string) => void; onPosition?: (value: string) => void }) {
   const [positionValue, setPositionValue] = useState(position)
   const [weightValue, setWeightValue] = useState(String(weight))
   const [positionOpen, setPositionOpen] = useState(false)
@@ -958,7 +958,7 @@ function StrokeDetailRow({ position, weight, onWeight }: { position: string; wei
             <ul id="stroke-position-options" role="listbox" data-figma-floating-root="true"
               style={{ position: 'absolute', zIndex: 125, left: -8, top: -32, width: 105, height: 88, margin: 0, padding: '8px 0', listStyle: 'none', borderRadius: 6, background: '#fff', boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px', boxSizing: 'border-box', overflow: 'hidden' }}>
               {positionOptions.map(option => (
-                <li key={option} role="option" aria-selected={positionValue === option} onClick={() => { setPositionValue(option); setPositionOpen(false) }}
+                <li key={option} role="option" aria-selected={positionValue === option} onClick={() => { setPositionValue(option); setPositionOpen(false); onPosition?.(option) }}
                   style={{ height: 24, display: 'grid', alignItems: 'center', padding: '0 0 0 32px', color: INK, cursor: 'pointer', font: `400 11px/16px ${FONT}` }}>
                   {option}
                 </li>
@@ -1360,6 +1360,7 @@ export default function ReactFigmaPage() {
   const [zIndexValue, setZIndexValue] = useState('1')
   const [autoFlow, setAutoFlow] = useState<AutoFlow>('horizontal')
   const [autoWrap, setAutoWrap] = useState(false)
+  const [aspectLocked, setAspectLocked] = useState(false)
   const [widthValue, setWidthValue] = useState('402')
   const [heightValue, setHeightValue] = useState('427')
   const [widthResize, setWidthResize] = useState<ResizeMode>('Fill')
@@ -1549,7 +1550,14 @@ export default function ReactFigmaPage() {
       : field === 'letterSpacing' ? [['letter-spacing', parseFloat(n) === 0 ? 'normal' : withUnit]]
       : field === 'textAlign' ? [['text-align', n]]
       : field === 'fillOpacity' ? [['opacity', String((parseFloat(n) || 0) / 100)]]
+      : field === 'strokeWidth0' ? [['border-width', '0']]
+      : field === 'strokePosition' ? (n === 'Inside' ? [['box-sizing', 'border-box']] : n === 'Outside' ? [['box-sizing', 'content-box']] : [])
+      : field === 'aspectRatio' ? [['aspect-ratio', n]]
+      : field === 'flexWrap' ? [['flex-wrap', n]]
+      : field === 'clip' ? [['overflow', n]]
       : []
+    // Stroke position "Center" has no clean CSS analog (border is inside, outline is outside) — no-op, honest.
+    if (field === 'strokePosition' && n !== 'Inside' && n !== 'Outside') { console.warn('[engine] stroke position', n, '— no clean CSS analog (border=Inside, outline=Outside); no-op'); return }
     if ((field === 'x' || field === 'y') && !positioned) { console.warn('[engine] X/Y on a static-position element has no CSS analog — no-op'); return }
     for (const [prop, value] of decls) ov.current!.set(id, prop, value, cs.getPropertyValue(prop))
     setOvVersion((v) => v + 1)
@@ -1985,12 +1993,12 @@ export default function ReactFigmaPage() {
             <InspectorRow label="Flow">
               <AutoFlowGroup value={autoFlow} onChange={setAutoFlow} />
               <span />
-              <UiIB name="autoLayoutWrap" title="Wrap" size={16} active={autoWrap} on={() => setAutoWrap(v => !v)} />
+              <UiIB name="autoLayoutWrap" title="Wrap" size={16} active={autoWrap} on={() => { const nv = !autoWrap; setAutoWrap(nv); applyOverride('flexWrap', nv ? 'wrap' : 'nowrap') }} />
             </InspectorRow>
             <InspectorRow label="Resizing">
               <ResizeDropdownField axis="W" value={widthValue} mode={widthResize} onValue={(v) => { setWidthValue(v); applyOverride('width', v) }} onMode={setWidthResize} />
               <ResizeDropdownField axis="H" value={heightValue} mode={heightResize} onValue={(v) => { setHeightValue(v); applyOverride('height', v) }} onMode={setHeightResize} />
-              <UiIB name="lockAspect" title="Lock aspect ratio" />
+              <UiIB name="lockAspect" title="Lock aspect ratio" active={aspectLocked} on={() => { const nv = !aspectLocked; setAspectLocked(nv); const w = parseFloat(widthValue), h = parseFloat(heightValue); applyOverride('aspectRatio', nv && w > 0 && h > 0 ? `${w} / ${h}` : 'auto') }} />
             </InspectorRow>
             <div style={{ position: 'relative', height: 82, width: '100%' }}>
               <span style={{ position: 'absolute', left: 16, top: 3.5, width: 88, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Alignment</span>
@@ -2009,7 +2017,7 @@ export default function ReactFigmaPage() {
             <div data-react-figma-clip-row style={{ height: 32, padding: '0 8px 0 16px', display: 'grid', gridTemplateColumns: '216px', alignItems: 'center' }}>
               <style>{'[data-react-figma-clip-row] input:not(:checked) + [data-react-figma-clip-box] svg{display:none}'}</style>
               <label style={{ position: 'relative', display: 'grid', gridTemplateColumns: '16px 200px', width: 216, height: 24, cursor: 'pointer', color: INK }}>
-                <input type="checkbox" aria-label="Clip content" checked={clipContent} onChange={e => setClipContent(e.currentTarget.checked)} style={{ position: 'absolute', left: 0, top: 4, width: 16, height: 16, margin: 0, opacity: 0, pointerEvents: 'none' }} />
+                <input type="checkbox" aria-label="Clip content" checked={clipContent} onChange={e => { const c = e.currentTarget.checked; setClipContent(c); applyOverride('clip', c ? 'hidden' : 'visible') }} style={{ position: 'absolute', left: 0, top: 4, width: 16, height: 16, margin: 0, opacity: 0, pointerEvents: 'none' }} />
                 <span data-react-figma-clip-box aria-hidden style={{ position: 'relative', width: 16, height: 16, margin: '4px 0', border: '1px solid rgba(0,0,0,0.2)', borderRadius: 2, background: FIELD, boxSizing: 'border-box', display: 'grid', color: INK }}>
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden style={{ position: 'absolute', left: -1, top: -1 }}>
                     <path d="M5.00012 8.5L7.5 11L11.5 5" stroke="rgba(0,0,0,0)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" shapeRendering="geometricPrecision" />
@@ -2060,9 +2068,11 @@ export default function ReactFigmaPage() {
 
           <Sec title="Fill" actionWidth={52} action={<><StyleApplyButton label="Fill" title="Fill, Apply styles and variables" /><UiIB name="plus" title="Add fill" on={() => setFills(rows => [...rows, { id: nextRowId(rows), hex: 'FFFFFF', op: 100 }])} /></>} bodyGap={0} bodyPadding="0">
             {liveFills
-              ? liveFills.map((f, i) => <FigmaPaintRow key={`live-${i}`} hex={f.hex} op={f.op} label="Fill" origin={f.origin}
-                  onHexEdit={(hx) => applyOverride(f.prop === 'color' ? 'fillColor' : 'fillBg', `#${hx}`)}
-                  onOpacityEdit={(hx, opPct) => applyOverride(f.prop === 'color' ? 'fillColor' : 'fillBg', hexToRgba(hx, opPct))} />)
+              ? liveFills.map((f, i) => { const fld = f.prop === 'color' ? 'fillColor' : 'fillBg'; return <FigmaPaintRow key={`live-${i}`} hex={f.hex} op={f.op} label="Fill" origin={f.origin}
+                  onHexEdit={(hx) => applyOverride(fld, `#${hx}`)}
+                  onOpacityEdit={(hx, opPct) => applyOverride(fld, hexToRgba(hx, opPct))}
+                  onVisibleToggle={(vis, hx) => applyOverride(fld, vis ? `#${hx}` : 'transparent')}
+                  onRemove={() => applyOverride(fld, 'transparent')} /> })
               : fills.map(f => <FigmaPaintRow key={f.id} hex={f.hex} op={f.op} label="Fill" onRemove={() => setFills(rows => rows.filter(row => row.id !== f.id))} />)}
           </Sec>
           <Sec title="Stroke" actionWidth={52} action={<><StyleApplyButton label="Stroke" title="Stroke, Apply styles and variables" /><UiIB name="plus" title="Add stroke fill" on={() => setStrokes(rows => [...rows, { id: nextRowId(rows), hex: '000000', op: 100, position: 'Inside', weight: 1 }])} /></>} bodyGap={0} bodyPadding="0">
@@ -2071,8 +2081,10 @@ export default function ReactFigmaPage() {
                   <div key={`live-${i}`}>
                     <FigmaPaintRow hex={s.hex} op={s.op} label="Stroke"
                       onHexEdit={(hx) => applyOverride('strokeColor', `#${hx}`)}
-                      onOpacityEdit={(hx, opPct) => applyOverride('strokeColor', hexToRgba(hx, opPct))} />
-                    <StrokeDetailRow position={s.position} weight={s.weight} onWeight={(v) => applyOverride('strokeWeight', v)} />
+                      onOpacityEdit={(hx, opPct) => applyOverride('strokeColor', hexToRgba(hx, opPct))}
+                      onVisibleToggle={(vis, hx) => applyOverride(vis ? 'strokeColor' : 'strokeWidth0', vis ? `#${hx}` : '0')}
+                      onRemove={() => applyOverride('strokeWidth0', '0')} />
+                    <StrokeDetailRow position={s.position} weight={s.weight} onWeight={(v) => applyOverride('strokeWeight', v)} onPosition={(p) => applyOverride('strokePosition', p)} />
                   </div>
                 ))
               : strokes.map(s => (
