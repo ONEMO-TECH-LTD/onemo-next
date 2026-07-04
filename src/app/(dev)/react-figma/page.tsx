@@ -10,8 +10,8 @@
  *  · left/File: file selector + Drafts · Pages (search/add) · Layers tree (type glyphs · lock · select)
  *  · left/Assets & Variables: expandable side panels
  *  · center: infinite pan/zoom canvas, device frame floating in a dotted field
- *  · right: Frame preset + Element · Position · Auto layout/CSS layout · Size · Interactions
- *           · Web styles · Accessibility · Code · Appearance · Fill · Stroke · Effects · Selection colors · Layout guide · Export
+ *  · right: Frame preset + Position (CSS position/z-index extension) · Auto layout
+ *           · Appearance · Fill · Stroke · Effects · Selection colors · Layout guide · Export
  *  Spec: Inter 11px; headers 550/~0.5px near-black; fields 24px/5px radius; every value field raw-OR-token (◆).
  */
 
@@ -228,14 +228,6 @@ function CompactInspectorRow({ label, children, height = 48 }: { label: string; 
     </div>
   )
 }
-function CodePreview() {
-  return (
-    <div style={{ margin: '0 8px 0 16px', padding: '8px 9px', borderRadius: 5, background: '#f7f7f7', color: 'rgba(0,0,0,0.72)', font: `450 10px/15px ui-monospace, SFMono-Regular, Menlo, monospace`, whiteSpace: 'pre-wrap', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.04)' }}>
-      {'<section className="onemo-card" />'}
-    </div>
-  )
-}
-
 function Sec({ title, action, children, caret, bodyGap = 8, bodyPadding = '0 8px 0 16px', actionWidth = 24 }: { title: string; action?: React.ReactNode; children?: React.ReactNode; first?: boolean; caret?: boolean; bodyGap?: number; bodyPadding?: React.CSSProperties['padding']; actionWidth?: number }) {
   return (
     <div style={{ borderTop: `1px solid ${LINE}`, padding: '0 0 12px' }}>
@@ -630,19 +622,6 @@ export default function ReactFigmaPage() {
             </div>
           </div>
 
-          <Sec title="Element" action={<UiIB name="devCode" title="React element" />} bodyGap={0} bodyPadding="0">
-            <InspectorRow label="Tag">
-              <InspectorField label="<>" value="section" />
-              <InspectorField label="C" value="HeroCard" />
-              <span />
-            </InspectorRow>
-            <InspectorRow label="Semantic">
-              <InspectorField label="R" value="region" />
-              <InspectorField label="A" value="Effect canvas" />
-              <span />
-            </InspectorRow>
-          </Sec>
-
           <Sec title="Position" first bodyGap={0} bodyPadding="0">
             <PositionRow label="Alignment">
               <Seg fill><FSegBtn name="alignLeft" pos="l" fill title="Align left" /><FSegBtn name="alignCenterH" pos="m" fill title="Align horizontal centers" /><FSegBtn name="alignRight" pos="r" fill title="Align right" /></Seg>
@@ -697,105 +676,6 @@ export default function ReactFigmaPage() {
               <UiIB name="paddingIndividual" title="Individual padding" />
             </InspectorRow>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, height: 32, padding: '0 8px 0 16px', font: `400 11px/1 ${FONT}`, cursor: 'pointer' }}><input type="checkbox" style={{ width: 12, height: 12, accentColor: SEL }} /> Clip content</label>
-          </Sec>
-
-          <Sec title="CSS Layout" bodyGap={0} bodyPadding="0">
-            <InspectorRow label="Type">
-              <TextSegGroup items={['Stack', 'Grid']} active={0} />
-              <span />
-              <span />
-            </InspectorRow>
-            <InspectorRow label="Direction">
-              <TextSegGroup items={['Horizontal', 'Vertical']} active={1} />
-              <span />
-              <span />
-            </InspectorRow>
-            <InspectorRow label="Distribute">
-              <TextSegGroup items={['Start', 'Center', 'End']} active={1} />
-              <span />
-              <span />
-            </InspectorRow>
-            <InspectorRow label="Wrap">
-              <TextSegGroup items={['No', 'Yes']} active={0} />
-              <span />
-              <span />
-            </InspectorRow>
-          </Sec>
-
-          <Sec title="Size" bodyGap={0} bodyPadding="0">
-            <InspectorRow label="Width">
-              <TextSegGroup items={['Fixed', 'Rel', 'Fill', 'Fit']} active={2} />
-              <span />
-              <span />
-            </InspectorRow>
-            <InspectorRow label="Height">
-              <TextSegGroup items={['Fixed', 'Rel', 'Fill', 'View']} active={2} />
-              <span />
-              <span />
-            </InspectorRow>
-            <CompactInspectorRow label="Min / max">
-              <InspectorField label="Min" value="0" />
-              <InspectorField label="Max" value="640" />
-              <InspectorField label="%" value="100" />
-            </CompactInspectorRow>
-          </Sec>
-
-          <Sec title="Interactions" action={<UiIB name="plus" title="Add interaction" />} bodyGap={0} bodyPadding="0">
-            <InspectorRow label="Link">
-              <InspectorField label="To" value="/effect" />
-              <InspectorField label="Act" value="open" />
-              <span />
-            </InspectorRow>
-            <InspectorRow label="State">
-              <TextSegGroup items={['Base', 'Hover', 'Press', 'Focus']} active={0} />
-              <span />
-              <span />
-            </InspectorRow>
-            <InspectorRow label="Overlay">
-              <InspectorField label="O" value="None" />
-              <InspectorField label="T" value="Spring" />
-              <span />
-            </InspectorRow>
-          </Sec>
-
-          <Sec title="Web styles" bodyGap={0} bodyPadding="0">
-            <InspectorRow label="Overflow">
-              <TextSegGroup items={['Visible', 'Hidden', 'Scroll']} active={0} />
-              <span />
-              <span />
-            </InspectorRow>
-            <InspectorRow label="Cursor">
-              <InspectorField label="C" value="Pointer" />
-              <InspectorField label="V" value="Visible" />
-              <span />
-            </InspectorRow>
-            <InspectorRow label="Transition">
-              <InspectorField label="T" value="Spring" />
-              <InspectorField label="D" value="200ms" />
-              <span />
-            </InspectorRow>
-          </Sec>
-
-          <Sec title="Accessibility" bodyGap={0} bodyPadding="0">
-            <InspectorRow label="ARIA">
-              <InspectorField label="R" value="region" />
-              <InspectorField label="A" value="Effect canvas" />
-              <span />
-            </InspectorRow>
-            <CompactInspectorRow label="Keyboard">
-              <InspectorField label="Tab" value="0" />
-              <InspectorField label="Focus" value="Auto" />
-              <InspectorField label="Live" value="Off" />
-            </CompactInspectorRow>
-          </Sec>
-
-          <Sec title="Code" action={<UiIB name="devCode" title="Code overrides" />} bodyGap={8} bodyPadding="0">
-            <InspectorRow label="Override">
-              <InspectorField label="P" value="props" />
-              <InspectorField label="Cls" value="onemo-card" />
-              <span />
-            </InspectorRow>
-            <CodePreview />
           </Sec>
 
           <Sec title="Appearance" actionWidth={53} action={<><UiIB name="visibility" title="Hide" /><UiIB name="blendMode" title="Apply blend mode" /></>} bodyGap={0} bodyPadding="0">
