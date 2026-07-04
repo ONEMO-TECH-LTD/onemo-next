@@ -396,13 +396,14 @@ function MenuCheck() {
     </svg>
   )
 }
-function MenuOptionButton({ children, checked, onClick }: { children: React.ReactNode; checked?: boolean; onClick: () => void }) {
+function BlendMenuRow({ mode, checked, onClick }: { mode: string; checked?: boolean; onClick: () => void }) {
+  const [h, setH] = useState(false)
   return (
-    <button type="button" role="menuitemradio" aria-checked={checked} onClick={onClick}
-      style={{ appearance: 'none', border: 0, width: '100%', height: 32, borderRadius: 7, background: checked ? SEL : 'transparent', color: '#fff', display: 'grid', gridTemplateColumns: '20px 1fr', alignItems: 'center', gap: 8, padding: '0 9px', cursor: 'pointer', textAlign: 'left', font: `400 11px/16px ${FONT}` }}>
-      <span style={{ width: 20, display: 'grid', placeItems: 'center' }}>{checked && <MenuCheck />}</span>
-      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{children}</span>
-    </button>
+    <li role="menuitemcheckbox" aria-checked={checked} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)} onClick={onClick}
+      style={{ width: 118, height: 24, display: 'grid', gridTemplateColumns: '24px 1fr', alignItems: 'center', padding: '0 8px', boxSizing: 'border-box', cursor: 'pointer', color: '#fff', background: h ? 'rgba(255,255,255,0.08)' : 'transparent', font: `400 11px/24px ${FONT}` }}>
+      <span style={{ width: 16, height: 16, display: 'grid', placeItems: 'center', visibility: checked ? 'visible' : 'hidden' }}><MenuCheck /></span>
+      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mode}</span>
+    </li>
   )
 }
 function FigmaMenuSeparator() {
@@ -500,18 +501,31 @@ function InlineValueInput({ icon, value, onChange, suffix, ariaLabel }: { icon: 
     </div>
   )
 }
+const BLEND_MODE_GROUPS = [
+  ['Pass through', 'Normal'],
+  ['Darken', 'Multiply', 'Plus darker', 'Color burn'],
+  ['Lighten', 'Screen', 'Plus lighter', 'Color dodge'],
+  ['Overlay', 'Soft light', 'Hard light'],
+  ['Difference', 'Exclusion'],
+  ['Hue', 'Saturation', 'Color', 'Luminosity'],
+]
 function BlendModeMenu({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const [open, setOpen] = useState(false)
   const menuRef = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
-  const modes = ['Pass through', 'Normal', 'Multiply', 'Screen', 'Overlay']
   return (
     <div ref={menuRef} style={{ position: 'relative', width: 24, height: 24 }}>
       <UiIB name="blendMode" title={`Blend mode: ${value}`} active={open || value !== 'Pass through'} on={() => setOpen(v => !v)} />
       {open && (
-        <div role="menu" aria-label="Blend mode options" style={{ position: 'absolute', zIndex: 95, top: 28, right: 0, width: 136, padding: 6, borderRadius: 12, background: '#1f1f1f', color: '#fff', boxShadow: '0 18px 38px rgba(0,0,0,.24)' }}>
-          {modes.map(mode => (
-            <MenuOptionButton key={mode} checked={mode === value} onClick={() => { onChange(mode); setOpen(false) }}>{mode}</MenuOptionButton>
-          ))}
+        <div role="presentation" data-figma-floating-root="true" style={{ position: 'absolute', zIndex: 125, top: 28, right: -1, width: 118, padding: '8px 0', borderRadius: 13, background: '#1e1e1e', color: '#fff', boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px' }}>
+          <ul role="menu" aria-label="Blend mode options" style={{ width: 118, margin: 0, padding: 0, listStyle: 'none' }}>
+            {BLEND_MODE_GROUPS.map((group, index) => (
+              <li key={group.join(':')} role="none" style={{ width: 118, margin: index === BLEND_MODE_GROUPS.length - 1 ? 0 : '0 0 7px', padding: index === BLEND_MODE_GROUPS.length - 1 ? 0 : '0 0 7px', borderBottom: index === BLEND_MODE_GROUPS.length - 1 ? '0 none transparent' : '1px solid rgb(56,56,56)', listStyle: 'none' }}>
+                <ul role="none" style={{ width: 118, margin: 0, padding: 0, listStyle: 'none' }}>
+                  {group.map(mode => <BlendMenuRow key={mode} mode={mode} checked={mode === value} onClick={() => { onChange(mode); setOpen(false) }} />)}
+                </ul>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>
