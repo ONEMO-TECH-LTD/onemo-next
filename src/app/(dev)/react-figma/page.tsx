@@ -1352,12 +1352,13 @@ const nextRowId = <T extends { id: number }>(rows: T[]) => rows.reduce((max, row
    Hover outline + click-to-select; payload → panel header + console. */
 type SelPayload = { file: string; line: number; col: number; tag: string; classes: string[] }
 type OutlineRect = { x: number; y: number; w: number; h: number }
-/* Build sources — the canvas registry (left panel: source selector + page structure).
-   Each source = one screen of the real build the editor can load. */
-const CANVAS_SOURCES = [
-  { key: 'editor-402', name: 'Editor 402 — apple blur glass', route: '/react-figma/canvas' },
-  { key: 'creator-2d', name: 'Effect Creator — 2D', route: '/effect-creator/v5.3.1/2d' },
-] as const
+/* Build sources — the canvas explorer (left panel: source selector + page structure).
+   Fetched from /api/dev/editor-sources: every real route of the build (page.tsx walk)
+   + storybook screens that have a same-origin host. Fallback until fetch resolves. */
+type BuildSource = { key: string; name: string; route: string; group: string }
+const CANVAS_FALLBACK: BuildSource[] = [
+  { key: 'editor-402', name: 'Editor 402 — apple blur glass', route: '/react-figma/canvas', group: 'storybook/create-studio' },
+]
 /* M3 dirty-ledger UI: OFF until a Dan-approved Figma-canon treatment exists —
    the right panel must match Codex's shell exactly. Commit path stays callable. */
 const SHOW_LEDGER = false
@@ -1407,11 +1408,15 @@ export default function ReactFigmaPage() {
   const [selRect, setSelRect] = useState<OutlineRect | null>(null)
   const [layers, setLayers] = useState<LiveNode[] | null>(null)
   const [layerSelId, setLayerSelId] = useState<string | null>(null)
-  const [canvasKey, setCanvasKey] = useState<(typeof CANVAS_SOURCES)[number]['key']>('editor-402')
+  const [canvasKey, setCanvasKey] = useState<string>('editor-402')
   const [sourceMenuOpen, setSourceMenuOpen] = useState(false)
-  const canvasSource = CANVAS_SOURCES.find((s) => s.key === canvasKey)!
+  const [buildSources, setBuildSources] = useState<BuildSource[]>(CANVAS_FALLBACK)
+  useEffect(() => { // build explorer — real routes + hosted storybook screens
+    fetch('/api/dev/editor-sources').then((r) => r.json()).then((d) => { if (Array.isArray(d.sources) && d.sources.length) setBuildSources(d.sources) }).catch(() => {})
+  }, [])
+  const canvasSource = buildSources.find((s) => s.key === canvasKey) ?? buildSources[0] ?? CANVAS_FALLBACK[0]
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
-  const switchCanvas = (key: (typeof CANVAS_SOURCES)[number]['key']) => {
+  const switchCanvas = (key: string) => {
     if (key === canvasKey) return
     setCanvasKey(key); setLayers(null); setSel(null); setSelRect(null); setHoverRect(null); setLiveFills(null); setCollapsed(new Set()); selIdRef.current = null
   }
@@ -1697,9 +1702,14 @@ export default function ReactFigmaPage() {
           <UiIB name="minimizeUI" title="Minimize UI" />
           {sourceMenuOpen && (
             <div role="presentation" style={{ position: 'absolute', zIndex: 120, top: 38, left: 8, width: 224, padding: '0 8px', borderRadius: 13, background: '#1e1e1e', color: '#fff', boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px' }}>
-              <ul role="menu" aria-label="Build sources" style={{ width: 208, margin: 0, padding: '8px 0 6px', listStyle: 'none' }}>
-                {CANVAS_SOURCES.map((s) => (
-                  <FigmaMenuRow key={s.key} checked={s.key === canvasKey} onClick={() => { switchCanvas(s.key); setSourceMenuOpen(false) }}>{s.name}</FigmaMenuRow>
+              <ul role="menu" aria-label="Build sources" style={{ width: 208, margin: 0, padding: '8px 0 6px', listStyle: 'none', maxHeight: 420, overflowY: 'auto' }}>
+                {Object.entries(buildSources.reduce<Record<string, BuildSource[]>>((acc, s) => { (acc[s.group] ??= []).push(s); return acc }, {})).map(([group, items], gi) => (
+                  <Fragment key={group}>
+                    {gi > 0 && <FigmaMenuSeparator />}
+                    {items.map((s) => (
+                      <FigmaMenuRow key={s.key} checked={s.key === canvasKey} onClick={() => { switchCanvas(s.key); setSourceMenuOpen(false) }}>{group === '(root)' ? s.name : `${group}/${s.name}`}</FigmaMenuRow>
+                    ))}
+                  </Fragment>
                 ))}
               </ul>
             </div>
@@ -1713,12 +1723,17 @@ export default function ReactFigmaPage() {
               <span style={hdr}>Pages</span>
               <span style={{ display: 'flex', gap: 4, color: MUTE }}><UiIB name="find" title="Find" /><UiIB name="plus" title="Add new page" /></span>
             </div>
-            <div style={{ padding: '0 8px' }}>
-              {/* page structure = the build's registered screens; active = the canvas */}
-              {CANVAS_SOURCES.map((s) => (
-                <div key={s.key} onClick={() => switchCanvas(s.key)} style={{ height: 32, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', borderRadius: 5, background: s.key === canvasKey ? '#f0f1f3' : 'transparent', font: `400 11px/16px ${FONT}`, color: INK, cursor: 'pointer' }}>
-                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
-                </div>
+            <div style={{ padding: '0 8px', maxHeight: 260, overflowY: 'auto' }}>
+              {/* page structure = the build's REAL folders/screens (walked from src/app + storybook hosts) */}
+              {Object.entries(buildSources.reduce<Record<string, BuildSource[]>>((acc, s) => { (acc[s.group] ??= []).push(s); return acc }, {})).map(([group, items]) => (
+                <Fragment key={group}>
+                  <div style={{ height: 22, display: 'flex', alignItems: 'center', padding: '0 8px', font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{group}</div>
+                  {items.map((s) => (
+                    <div key={s.key} onClick={() => switchCanvas(s.key)} style={{ height: 32, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px 0 16px', borderRadius: 5, background: s.key === canvasKey ? '#f0f1f3' : 'transparent', font: `400 11px/16px ${FONT}`, color: INK, cursor: 'pointer' }}>
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
+                    </div>
+                  ))}
+                </Fragment>
               ))}
             </div>
             <div style={{ height: 49, padding: '9px 8px 0 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: `1px solid ${LINE}` }}>
