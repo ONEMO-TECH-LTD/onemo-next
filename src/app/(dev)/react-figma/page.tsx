@@ -1256,7 +1256,7 @@ const FRAME_INSERT_OPTIONS = [
   { label: 'Stack', target: 'div', detail: 'display: flex' },
   { label: 'Grid', target: 'div', detail: 'display: grid' },
 ]
-function InsertIsland() {
+function InsertIsland({ onInsert }: { onInsert?: (tag: string, display?: string) => void }) {
   const [open, setOpen] = useState(false)
   const frameMenuRef = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
   return (
@@ -1284,7 +1284,7 @@ function InsertIsland() {
             <div role="menu" aria-label="React container types"
               style={{ position: 'absolute', bottom: 40, left: -6, width: 184, padding: 6, borderRadius: 12, background: '#1f1f1f', color: '#fff', boxShadow: '0 16px 36px rgba(0,0,0,.22)' }}>
               {FRAME_INSERT_OPTIONS.map(item => (
-                <button key={item.label} type="button" role="menuitem" onClick={() => setOpen(false)}
+                <button key={item.label} type="button" role="menuitem" onClick={() => { setOpen(false); onInsert?.(item.target, item.label === 'Stack' ? 'flex' : item.label === 'Grid' ? 'grid' : undefined) }}
                   style={{ appearance: 'none', border: 0, width: '100%', height: 34, borderRadius: 7, background: 'transparent', color: '#fff', display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: 8, padding: '0 9px', cursor: 'pointer', textAlign: 'left' }}>
                   <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <span style={{ font: `500 11px/12px ${FONT}` }}>{item.label}</span>
@@ -1598,6 +1598,18 @@ export default function ReactFigmaPage() {
   }, [applySelection])
 
   // Compose the single `transform` prop from rotation + both flips (they'd clobber each other otherwise).
+  // E3.5 creation: insert a real JSX child into the SELECTED container (source write → HMR → selectable)
+  const insertChild = useCallback(async (tag: string, display?: string) => {
+    if (!sel) { console.warn('[engine] insert: select a container element first'); return }
+    const st = display === 'flex' || display === 'grid' ? ` display: '${display}',` : ''
+    const snippet = `<${tag} style={{${st} minWidth: 40, minHeight: 40, background: 'rgba(0,0,0,0.06)', borderRadius: 4 }} />`
+    const r = await fetch('/api/dev/editor-write', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ kind: 'insert-jsx-child', file: sel.file, line: sel.line, col: sel.col, snippet }),
+    })
+    console.log('[engine] insert', tag, r.ok ? await r.json() : await r.text())
+  }, [sel])
+
   const pushTransform = useCallback((rot: string, fh: boolean, fv: boolean) => {
     const deg = parseFloat(rot) || 0
     const parts: string[] = []
@@ -1916,7 +1928,7 @@ export default function ReactFigmaPage() {
       {/* ░░ INFINITE CANVAS ░░ */}
       <main ref={canvasRef} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
         style={{ flex: 1, minWidth: 0, background: '#f0f0f0', position: 'relative', overflow: 'hidden', cursor: isPanning ? 'grabbing' : 'default' }}>
-        <InsertIsland />
+        <InsertIsland onInsert={insertChild} />
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle, rgba(0,0,0,.09) 1px, transparent 1px)', backgroundSize: `${24 * view.z}px ${24 * view.z}px`, backgroundPosition: `${view.x}px ${view.y}px` }} />
         <div style={{ position: 'absolute', left: 0, top: 0, transform: `translate(${view.x}px,${view.y}px) scale(${view.z})`, transformOrigin: '0 0' }}>
           <div style={{ font: `550 10px/1 ${FONT}`, color: SEL, marginBottom: 8, marginLeft: 2 }}>Editor 402 · 402 × 871</div>

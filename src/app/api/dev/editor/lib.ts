@@ -226,6 +226,7 @@ export type WriteOp =
   | { kind: 'set-token-value'; tokenPath: string; theme?: string; value: string | number }
   | { kind: 'set-jsx-style'; file: string; line: number; col: number; prop: string; value: string; expectRaw?: string }
   | { kind: 'set-jsx-text'; file: string; line: number; col: number; newText: string; expectRaw?: string }
+  | { kind: 'insert-jsx-child'; file: string; line: number; col: number; snippet: string }
 
 // ─── JSX inline-style write (E2.4, ENGINE-PLAN-E2.4.md) ──────────────────────
 
@@ -380,10 +381,33 @@ async function setJsxText(op: Extract<WriteOp, { kind: 'set-jsx-text' }>): Promi
   return { ok: true, file: op.file, newValueText: op.newText }
 }
 
+/** Insert a JSX child (E3.5 creation): splice `snippet` before the element's closing tag. */
+async function insertJsxChild(op: Extract<WriteOp, { kind: 'insert-jsx-child' }>): Promise<{ ok: true; file: string; newValueText: string }> {
+  const abs = jailComponentWrite(op.file)
+  const buf = await fs.readFile(abs)
+  const source = buf.toString('utf8')
+  const sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
+  const opening = findJsxAt(sf, op.line, op.col)
+  if (!opening) throw Object.assign(new Error(`no JSX element at ${op.line}:${op.col}`), { status: 404 })
+  const parent = opening.parent
+  if (!ts.isJsxElement(parent)) throw Object.assign(new Error('self-closing element cannot hold children — select a container'), { status: 422 })
+  const closeStart = parent.closingElement!.getStart(sf) // '<' of </tag>
+  const lineStart = source.lastIndexOf('\n', parent.getStart(sf)) + 1
+  const parentIndent = source.slice(lineStart).match(/^[ \t]*/)?.[0] ?? ''
+  // the source already has `\n<parentIndent>` before the closing tag; add 2 to reach child indent,
+  // then re-establish parentIndent for the closing tag → clean, aligned diff.
+  const insert = `  ${op.snippet}\n${parentIndent}`
+  const bOff = byteLen(source.slice(0, closeStart))
+  const next = Buffer.concat([buf.subarray(0, bOff), Buffer.from(insert, 'utf8'), buf.subarray(bOff)])
+  await fs.writeFile(abs, next)
+  return { ok: true, file: op.file, newValueText: op.snippet }
+}
+
 export async function applyWrite(op: WriteOp): Promise<{ ok: true; file: string; newValueText: string }> {
   if (op.kind === 'set-token-value') return setTokenValue(op)
   if (op.kind === 'set-jsx-style') return setJsxStyle(op)
   if (op.kind === 'set-jsx-text') return setJsxText(op)
+  if (op.kind === 'insert-jsx-child') return insertJsxChild(op)
   if (op.kind === 'add-declaration') {
     const abs = jailModuleCss(op.file)
     const buf = await fs.readFile(abs)
