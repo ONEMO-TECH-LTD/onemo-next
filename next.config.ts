@@ -34,7 +34,8 @@ const nextConfig: NextConfig = {
       const nodePath = require("node:path");
       config.module.rules.unshift({
         test: /\.tsx$/,
-        include: nodePath.join(process.cwd(), "src"),
+        // storybook/ included so screens hosted on the canvas route (Editor402) carry data-src too
+        include: [nodePath.join(process.cwd(), "src"), nodePath.join(process.cwd(), "storybook")],
         enforce: "pre",
         use: [{ loader: nodePath.resolve(process.cwd(), "editor-engine/tagging-loader.cjs") }],
       });

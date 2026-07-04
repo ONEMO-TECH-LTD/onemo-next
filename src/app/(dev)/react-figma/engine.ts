@@ -8,7 +8,7 @@
  * lands with the write engine (E1.4) that consumes it.
  */
 
-export type LiveNode = { id: string; tag: string; name: string; depth: number; kids: boolean; srcFile?: string }
+export type LiveNode = { id: string; tag: string; name: string; depth: number; kids: boolean; srcFile?: string; parentId?: string }
 export type DefEntry = { value: string; token?: string; inheritedFrom?: { tag: string; name: string } }
 export type StyleReport = { computed: Record<string, string>; defined: Record<string, DefEntry> }
 
@@ -60,19 +60,20 @@ export function layerLabel(el: HTMLElement): string {
 /** Flatten the canvas DOM into layer rows — data-src-tagged elements only; untagged wrappers pass through. */
 export function buildLayerTree(doc: Document): LiveNode[] {
   const out: LiveNode[] = []
-  const walk = (parent: Element, depth: number) => {
+  const walk = (parent: Element, depth: number, parentId?: string) => {
     for (const child of Array.from(parent.children)) {
       if (SKIP_TAGS.has(child.tagName) || child.namespaceURI?.endsWith('/svg')) continue
       const el = child as HTMLElement
       const src = el.getAttribute('data-src')
       if (src) {
+        const id = ensureId(el)
         out.push({
-          id: ensureId(el), tag: el.tagName.toLowerCase(), name: layerLabel(el),
-          depth, kids: el.children.length > 0, srcFile: src.split(':')[0],
+          id, tag: el.tagName.toLowerCase(), name: layerLabel(el),
+          depth, kids: el.children.length > 0, srcFile: src.split(':')[0], parentId,
         })
-        walk(el, depth + 1)
+        walk(el, depth + 1, id)
       } else {
-        walk(el, depth) // untagged wrapper (3rd-party / portal) — children stay reachable
+        walk(el, depth, parentId) // untagged wrapper (3rd-party / portal) — children stay reachable
       }
     }
   }

@@ -668,13 +668,13 @@ const TREE: Node[] = [
   { name: 'Bottom Section', icon: 'auto', depth: 2, kids: true },
   { name: 'Toolbar - Bottom - Safari', icon: 'toolbar', depth: 2, kids: true, locked: true, visible: true },
 ]
-function LayerRow({ n, on }: { n: Node; on?: () => void }) {
+function LayerRow({ n, on, onToggle }: { n: Node; on?: () => void; onToggle?: () => void }) {
   const [h, setH] = useState(false)
   const iconName: keyof typeof UI_ICON = n.icon === 'image' ? 'layerImage' : n.icon === 'auto' ? 'layerAuto' : n.icon === 'section' ? 'layerSection' : n.icon === 'toolbar' ? 'layerToolbar' : n.icon === 'component' ? 'layerComponent' : 'layerFrame'
   return (
     <div onClick={on} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
       style={{ display: 'grid', gridTemplateColumns: `${16 + n.depth * 24}px 16px minmax(0,1fr) 40px`, alignItems: 'center', height: 32, paddingRight: 8, background: n.sel ? '#dff3ff' : h ? '#f4f5f6' : 'transparent', cursor: 'pointer' }}>
-      <span style={{ width: 16, height: 16, marginLeft: n.depth * 24, display: 'grid', placeItems: 'center', color: INK }}>{n.kids && <UiIcon name={n.open ? 'caret16' : 'caretRight16'} size={16} />}</span>
+      <span onClick={onToggle ? (e) => { e.stopPropagation(); onToggle() } : undefined} style={{ width: 16, height: 16, marginLeft: n.depth * 24, display: 'grid', placeItems: 'center', color: INK, cursor: onToggle ? 'pointer' : undefined }}>{n.kids && <UiIcon name={n.open ? 'caret16' : 'caretRight16'} size={16} />}</span>
       <span style={{ width: 16, height: 16, display: 'grid', placeItems: 'center', color: n.comp ? TOKEN : 'rgba(0,0,0,0.65)' }}><UiIcon name={iconName} size={16} /></span>
       <span style={{ minWidth: 0, paddingLeft: 8, font: `400 11px/16px ${FONT}`, color: n.comp ? TOKEN : INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.name}</span>
       <span style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 4, color: FAINT }}>
@@ -1352,7 +1352,12 @@ const nextRowId = <T extends { id: number }>(rows: T[]) => rows.reduce((max, row
    Hover outline + click-to-select; payload → panel header + console. */
 type SelPayload = { file: string; line: number; col: number; tag: string; classes: string[] }
 type OutlineRect = { x: number; y: number; w: number; h: number }
-const CANVAS_ROUTE = '/effect-creator/v5.3.1/2d'
+/* Build sources — the canvas registry (left panel: source selector + page structure).
+   Each source = one screen of the real build the editor can load. */
+const CANVAS_SOURCES = [
+  { key: 'editor-402', name: 'Editor 402 — apple blur glass', route: '/react-figma/canvas' },
+  { key: 'creator-2d', name: 'Effect Creator — 2D', route: '/effect-creator/v5.3.1/2d' },
+] as const
 /* M3 dirty-ledger UI: OFF until a Dan-approved Figma-canon treatment exists —
    the right panel must match Codex's shell exactly. Commit path stays callable. */
 const SHOW_LEDGER = false
@@ -1402,6 +1407,14 @@ export default function ReactFigmaPage() {
   const [selRect, setSelRect] = useState<OutlineRect | null>(null)
   const [layers, setLayers] = useState<LiveNode[] | null>(null)
   const [layerSelId, setLayerSelId] = useState<string | null>(null)
+  const [canvasKey, setCanvasKey] = useState<(typeof CANVAS_SOURCES)[number]['key']>('editor-402')
+  const [sourceMenuOpen, setSourceMenuOpen] = useState(false)
+  const canvasSource = CANVAS_SOURCES.find((s) => s.key === canvasKey)!
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const switchCanvas = (key: (typeof CANVAS_SOURCES)[number]['key']) => {
+    if (key === canvasKey) return
+    setCanvasKey(key); setLayers(null); setSel(null); setSelRect(null); setHoverRect(null); setLiveFills(null); setCollapsed(new Set()); selIdRef.current = null
+  }
   const [fieldTokens, setFieldTokens] = useState<Record<string, string | undefined>>({})
   const [liveFills, setLiveFills] = useState<{ hex: string; op: number; origin?: string }[] | null>(null)
   const selIdRef = useRef<string | null>(null)
@@ -1676,11 +1689,21 @@ export default function ReactFigmaPage() {
       {rail === 'variables' ? <VariablesLibrary /> : (<>
       {/* ░░ LEFT PANEL (rail-switched) ░░ */}
       <aside style={{ width: leftW, flex: 'none', position: 'relative', borderRight: `1px solid ${LINE}`, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        {/* file selector */}
-        <div style={{ height: 40, borderBottom: `1px solid ${LINE}`, display: 'grid', gridTemplateColumns: '1fr 24px 32px', alignItems: 'center', gap: 4, padding: '0 8px 0 16px', flex: 'none' }}>
-          <button type="button" aria-label="ONEMO DS v2.3.1 - 1 July +, file name" style={{ appearance: 'none', border: 0, background: 'transparent', cursor: 'pointer', minWidth: 0, padding: 0, textAlign: 'left', font: `550 12px/16px ${FONT}`, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>ONEMO DS v2.3.1 - 1 July +</button>
-          <UiIB name="caret16" title="Edit file menu" />
+        {/* build-source selector (Figma file-selector slot; menu = the shell's own dark menu chrome) */}
+        <div style={{ position: 'relative', height: 40, borderBottom: `1px solid ${LINE}`, display: 'grid', gridTemplateColumns: '1fr 24px 32px', alignItems: 'center', gap: 4, padding: '0 8px 0 16px', flex: 'none' }}>
+          <button type="button" aria-label={`${canvasSource.name}, build source`} aria-haspopup="menu" aria-expanded={sourceMenuOpen} onClick={() => setSourceMenuOpen((v) => !v)}
+            style={{ appearance: 'none', border: 0, background: 'transparent', cursor: 'pointer', minWidth: 0, padding: 0, textAlign: 'left', font: `550 12px/16px ${FONT}`, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{canvasSource.name}</button>
+          <UiIB name="caret16" title="Select build source" on={() => setSourceMenuOpen((v) => !v)} />
           <UiIB name="minimizeUI" title="Minimize UI" />
+          {sourceMenuOpen && (
+            <div role="presentation" style={{ position: 'absolute', zIndex: 120, top: 38, left: 8, width: 224, padding: '0 8px', borderRadius: 13, background: '#1e1e1e', color: '#fff', boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px' }}>
+              <ul role="menu" aria-label="Build sources" style={{ width: 208, margin: 0, padding: '8px 0 6px', listStyle: 'none' }}>
+                {CANVAS_SOURCES.map((s) => (
+                  <FigmaMenuRow key={s.key} checked={s.key === canvasKey} onClick={() => { switchCanvas(s.key); setSourceMenuOpen(false) }}>{s.name}</FigmaMenuRow>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
         {rail === 'file' && (
@@ -1691,9 +1714,10 @@ export default function ReactFigmaPage() {
               <span style={{ display: 'flex', gap: 4, color: MUTE }}><UiIB name="find" title="Find" /><UiIB name="plus" title="Add new page" /></span>
             </div>
             <div style={{ padding: '0 8px' }}>
-              {PAGES.map((p, i) => (
-                <div key={p} style={{ height: 32, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', borderRadius: 5, background: i === 4 ? '#f0f1f3' : 'transparent', font: `400 11px/16px ${FONT}`, color: INK }}>
-                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p}</span>
+              {/* page structure = the build's registered screens; active = the canvas */}
+              {CANVAS_SOURCES.map((s) => (
+                <div key={s.key} onClick={() => switchCanvas(s.key)} style={{ height: 32, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', borderRadius: 5, background: s.key === canvasKey ? '#f0f1f3' : 'transparent', font: `400 11px/16px ${FONT}`, color: INK, cursor: 'pointer' }}>
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
                 </div>
               ))}
             </div>
@@ -1703,10 +1727,16 @@ export default function ReactFigmaPage() {
             </div>
             <div style={{ flex: 1, overflowY: 'auto' }}>
               {layers
-                ? layers.map((ln) => (
+                ? layers.filter((ln) => {
+                    // hide rows under any collapsed ancestor
+                    let p = ln.parentId
+                    while (p) { if (collapsed.has(p)) return false; p = layers.find((x) => x.id === p)?.parentId }
+                    return true
+                  }).map((ln) => (
                     <LayerRow key={ln.id}
-                      n={{ name: ln.name, icon: ln.tag === 'img' ? 'image' : ln.tag === 'section' ? 'section' : ln.tag === 'button' ? 'component' : 'auto', depth: Math.min(ln.depth, 7), kids: ln.kids, open: true, sel: ln.id === layerSelId, comp: ln.tag === 'button' }}
-                      on={() => { const el = iframeRef.current?.contentDocument?.querySelector(`[data-eng-id="${ln.id}"]`); if (el) applySelection(el as HTMLElement) }} />
+                      n={{ name: ln.name, icon: ln.tag === 'img' ? 'image' : ln.tag === 'section' ? 'section' : ln.tag === 'button' ? 'component' : 'auto', depth: Math.min(ln.depth, 7), kids: ln.kids, open: !collapsed.has(ln.id), sel: ln.id === layerSelId, comp: ln.tag === 'button' }}
+                      on={() => { const el = iframeRef.current?.contentDocument?.querySelector(`[data-eng-id="${ln.id}"]`); if (el) applySelection(el as HTMLElement) }}
+                      onToggle={ln.kids ? () => setCollapsed((prev) => { const next = new Set(prev); if (next.has(ln.id)) next.delete(ln.id); else next.add(ln.id); return next }) : undefined} />
                   ))
                 : TREE.map((n, i) => <LayerRow key={i} n={n} />)}
             </div>
@@ -1734,7 +1764,7 @@ export default function ReactFigmaPage() {
         <div style={{ position: 'absolute', left: 0, top: 0, transform: `translate(${view.x}px,${view.y}px) scale(${view.z})`, transformOrigin: '0 0' }}>
           <div style={{ font: `550 10px/1 ${FONT}`, color: SEL, marginBottom: 8, marginLeft: 2 }}>Editor 402 · 402 × 871</div>
           <div data-screen-host style={{ position: 'relative', width: 402, height: 871, background: '#fff', borderRadius: 4, boxShadow: '0 0 0 1px rgba(0,0,0,.06), 0 12px 40px -8px rgba(0,0,0,.25)' }}>
-            <iframe ref={iframeRef} src={CANVAS_ROUTE} onLoad={wireCanvas} title="Canvas — real build"
+            <iframe key={canvasKey} ref={iframeRef} src={canvasSource.route} onLoad={wireCanvas} title="Canvas — real build"
               style={{ width: 402, height: 871, border: 0, display: 'block', borderRadius: 4 }} />
             {hoverRect && (
               <div style={{ position: 'absolute', left: hoverRect.x, top: hoverRect.y, width: hoverRect.w, height: hoverRect.h, outline: `${1.5 / view.z}px solid ${SEL}`, pointerEvents: 'none' }} />
