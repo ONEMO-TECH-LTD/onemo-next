@@ -872,12 +872,117 @@ function StrokeDetailRow({ position, weight }: { position: string; weight: numbe
     </div>
   )
 }
+function EffectSettingInput({ label, prefix, value, onChange }: { label: string; prefix?: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <div style={{ height: 32, display: 'grid', gridTemplateColumns: '64px 8px 136px', alignItems: 'center', padding: '0 16px', boxSizing: 'border-box' }}>
+      <span style={{ color: INK, font: `400 11px/16px ${FONT}` }}>{label}</span>
+      <span />
+      <div style={{ width: 136, height: 24, borderRadius: 5, background: FIELD, display: 'grid', gridTemplateColumns: prefix ? '24px 1fr' : '1fr', alignItems: 'center', overflow: 'hidden' }}>
+        {prefix && <span style={{ width: 24, color: 'rgba(0,0,0,0.5)', textAlign: 'center', font: `400 11px/16px ${FONT}` }}>{prefix}</span>}
+        <input aria-label={label} value={value} onChange={e => onChange(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
+          style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, background: 'transparent', padding: prefix ? 0 : '0 8px', color: INK, font: `450 11px/16px ${FONT}` }} />
+      </div>
+    </div>
+  )
+}
+function EffectColorInput({ hex, opacity, onHex, onOpacity }: { hex: string; opacity: string; onHex: (value: string) => void; onOpacity: (value: string) => void }) {
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const ref = useCloseOnOutside<HTMLDivElement>(pickerOpen, () => setPickerOpen(false))
+  const activeHex = normalizeHex(hex) || '000000'
+  return (
+    <div style={{ height: 32, display: 'grid', gridTemplateColumns: '64px 8px 136px', alignItems: 'center', padding: '0 16px', boxSizing: 'border-box' }}>
+      <span style={{ color: INK, font: `400 11px/16px ${FONT}` }}>Color</span>
+      <span />
+      <div ref={ref} style={{ position: 'relative', width: 136, height: 24, borderRadius: 5, background: FIELD, border: `1px solid ${pickerOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: '24px 58px 37px 14px', alignItems: 'center', overflow: 'visible' }}>
+        <button type="button" aria-label={`Solid color hex: ${activeHex}`} aria-haspopup="dialog" aria-expanded={pickerOpen} onClick={event => { event.stopPropagation(); setPickerOpen(v => !v) }}
+          style={{ appearance: 'none', border: 0, width: 14, height: 14, justifySelf: 'center', borderRadius: 2, background: `#${activeHex}`, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.15)', padding: 0, cursor: 'pointer' }} />
+        <input aria-label="Color" value={activeHex} onChange={e => onHex(normalizeHex(e.currentTarget.value))}
+          style={{ minWidth: 0, width: 58, height: 24, border: 0, outline: 0, background: 'transparent', padding: 0, color: INK, font: `450 11px/16px ${FONT}` }} />
+        <input aria-label="Opacity" value={opacity} onChange={e => onOpacity(e.currentTarget.value.replace(/[^0-9]/g, '').slice(0, 3))}
+          style={{ minWidth: 0, width: 37, height: 24, border: 0, outline: 0, background: 'transparent', padding: '0 3px 0 0', color: INK, textAlign: 'right', font: `450 11px/16px ${FONT}` }} />
+        <span style={{ color: MUTE, font: `400 11px/16px ${FONT}` }}>%</span>
+        {pickerOpen && <FigmaColorPicker anchorRef={ref} hex={activeHex} opacity={opacity} onHex={onHex} onOpacity={onOpacity} onClose={() => setPickerOpen(false)} />}
+      </div>
+    </div>
+  )
+}
+function FigmaEffectSettingsPopover({ anchorRef, type, onType, onClose }: { anchorRef: { current: HTMLElement | null }; type: string; onType: (value: string) => void; onClose: () => void }) {
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
+  const [typeOpen, setTypeOpen] = useState(false)
+  const [xValue, setXValue] = useState('0')
+  const [yValue, setYValue] = useState('4')
+  const [blurValue, setBlurValue] = useState('4')
+  const [spreadValue, setSpreadValue] = useState('0')
+  const [colorValue, setColorValue] = useState('000000')
+  const [opacityValue, setOpacityValue] = useState('25')
+  const [showBehind, setShowBehind] = useState(false)
+  useEffect(() => {
+    const update = () => setAnchorRect(anchorRef.current?.getBoundingClientRect() ?? null)
+    update()
+    window.addEventListener('resize', update)
+    window.addEventListener('scroll', update, true)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.removeEventListener('scroll', update, true)
+    }
+  }, [anchorRef])
+  if (!anchorRect) return null
+  const width = 240
+  const height = 273
+  const left = Math.max(8, Math.min(anchorRect.left - 257, window.innerWidth - width - 8))
+  const top = Math.max(8, Math.min(anchorRect.top - 3, window.innerHeight - height - 8))
+  const effectTypes = ['Inner shadow', 'Drop shadow', 'Layer blur', 'Background blur', 'Noise', 'Texture', 'Glass']
+  return createPortal(
+    <div data-figma-floating-root="true" data-figma-effect-popover="true" role="dialog" aria-label="Effect settings" onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()}
+      style={{ position: 'fixed', zIndex: 1200, left, top, width, height, borderRadius: 13, background: '#fff', color: INK, boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px', overflow: 'hidden', font: `400 11px/16px ${FONT}` }}>
+      <div style={{ height: 40, display: 'grid', gridTemplateColumns: '1fr 24px 24px', alignItems: 'center', padding: '0 8px', boxSizing: 'border-box' }}>
+        <div style={{ position: 'relative', width: 200, height: 24 }}>
+          <button type="button" aria-label="Effect settings" aria-haspopup="listbox" aria-expanded={typeOpen} onClick={() => setTypeOpen(v => !v)}
+            style={{ appearance: 'none', border: 0, background: '#fff', width: 117, height: 24, borderRadius: 5, display: 'grid', gridTemplateColumns: '24px 1fr 24px', alignItems: 'center', cursor: 'pointer', color: INK, font: `450 11px/16px ${FONT}` }}>
+            <UiIcon name="dropShadow" />
+            <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>{type}</span>
+            <UiIcon name="caret24" />
+          </button>
+          {typeOpen && (
+            <ul role="listbox" data-figma-floating-root="true" style={{ position: 'absolute', zIndex: 1220, top: 28, left: 0, width: 150, margin: 0, padding: '8px 0', listStyle: 'none', borderRadius: 6, background: '#fff', boxShadow: 'rgba(0,0,0,.15) 0 2px 5px, rgba(0,0,0,.12) 0 10px 16px', overflow: 'hidden' }}>
+              {effectTypes.map(effectType => (
+                <li key={effectType} role="option" aria-selected={type === effectType} onClick={() => { onType(effectType); setTypeOpen(false) }}
+                  style={{ height: 24, display: 'grid', alignItems: 'center', padding: '0 12px', cursor: 'pointer', color: INK, background: type === effectType ? FIELD : '#fff', font: `400 11px/16px ${FONT}` }}>{effectType}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <button type="button" aria-label="Blend mode" style={{ appearance: 'none', border: 0, background: '#fff', width: 24, height: 24, display: 'grid', placeItems: 'center', cursor: 'pointer', color: INK }}><UiIcon name="blendMode" /></button>
+        <button type="button" aria-label="Close" onClick={onClose} style={{ appearance: 'none', border: 0, background: '#fff', width: 24, height: 24, display: 'grid', placeItems: 'center', cursor: 'pointer', color: INK }}><PickerSvgIcon name="close" /></button>
+      </div>
+      <div style={{ paddingTop: 12 }}>
+        <EffectSettingInput label="Position" prefix="X" value={xValue} onChange={setXValue} />
+        <EffectSettingInput label="" prefix="Y" value={yValue} onChange={setYValue} />
+        <EffectSettingInput label="Blur" value={blurValue} onChange={setBlurValue} />
+        <EffectSettingInput label="Spread" value={spreadValue} onChange={setSpreadValue} />
+        <EffectColorInput hex={colorValue} opacity={opacityValue} onHex={setColorValue} onOpacity={setOpacityValue} />
+      </div>
+      <div style={{ height: 41, borderTop: `1px solid ${LINE}`, marginTop: 8, padding: '8px 16px 0 12px', boxSizing: 'border-box' }}>
+        <label style={{ display: 'grid', gridTemplateColumns: '16px 1fr', gap: 8, alignItems: 'center', height: 24, cursor: 'pointer', font: `400 11px/16px ${FONT}`, color: INK }}>
+          <input type="checkbox" checked={showBehind} onChange={event => setShowBehind(event.currentTarget.checked)} aria-label="Show behind transparent areas" style={{ width: 16, height: 16, margin: 0, accentColor: SEL }} />
+          <span>Show behind transparent areas</span>
+        </label>
+      </div>
+    </div>,
+    document.body
+  )
+}
 function FigmaEffectRow({ type }: { type: string }) {
+  const [effectType, setEffectType] = useState(type)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const rowRef = useCloseOnOutside<HTMLButtonElement>(settingsOpen, () => setSettingsOpen(false))
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '156px 8px 24px 4px 24px', alignItems: 'center', height: 32, padding: '0 8px 0 16px' }}>
-      <button type="button" style={{ appearance: 'none', border: '1px solid #e6e6e6', background: '#fff', width: 156, height: 26, borderRadius: 5, padding: 0, display: 'grid', gridTemplateColumns: '24px 1fr', alignItems: 'center', cursor: 'pointer', font: `450 11px/16px ${FONT}`, color: INK }}>
+      <button ref={rowRef} type="button" aria-label="Effect settings" aria-haspopup="dialog" aria-expanded={settingsOpen} onClick={() => setSettingsOpen(v => !v)}
+        style={{ position: 'relative', appearance: 'none', border: '1px solid #e6e6e6', background: '#fff', width: 156, height: 26, borderRadius: 5, padding: 0, display: 'grid', gridTemplateColumns: '24px 1fr', alignItems: 'center', cursor: 'pointer', font: `450 11px/16px ${FONT}`, color: INK }}>
         <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center' }}><UiIcon name="dropShadow" /></span>
-        <span style={{ textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{type}</span>
+        <span style={{ textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{effectType}</span>
+        {settingsOpen && <FigmaEffectSettingsPopover anchorRef={rowRef} type={effectType} onType={setEffectType} onClose={() => setSettingsOpen(false)} />}
       </button>
       <span />
       <UiIB name="visibility" title="Toggle visibility" />
