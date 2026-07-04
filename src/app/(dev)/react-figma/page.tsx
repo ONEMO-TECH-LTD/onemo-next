@@ -814,6 +814,37 @@ function MoreActionsMenu({ onDuplicate, onDelete }: { onDuplicate: () => void; o
   )
 }
 
+/* E3.6 production — toast bus: write ops surface success/failure visibly instead of silent console.
+   Module-level notify() so handlers don't thread a prop; Toaster (rendered once) listens. */
+type ToastKind = 'ok' | 'error'
+let _toastSeq = 0
+function notify(message: string, kind: ToastKind = 'ok') {
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('rf-toast', { detail: { id: ++_toastSeq, message, kind } }))
+}
+function Toaster() {
+  const [mounted, setMounted] = useState(false)
+  const [toasts, setToasts] = useState<{ id: number; message: string; kind: ToastKind }[]>([])
+  useEffect(() => {
+    setMounted(true) // portal only client-side — document is undefined during SSR
+    const on = (e: Event) => {
+      const { id, message, kind } = (e as CustomEvent).detail as { id: number; message: string; kind: ToastKind }
+      setToasts((t) => [...t, { id, message, kind }])
+      setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3200)
+    }
+    window.addEventListener('rf-toast', on)
+    return () => window.removeEventListener('rf-toast', on)
+  }, [])
+  if (!mounted) return null
+  return createPortal(
+    <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 2000, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center', pointerEvents: 'none' }}>
+      {toasts.map((t) => (
+        <div key={t.id} style={{ padding: '8px 14px', borderRadius: 8, background: t.kind === 'error' ? '#d93025' : '#1a7f37', color: '#fff', font: `500 12px/1.4 ${FONT}`, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', maxWidth: 460 }}>{t.message}</div>
+      ))}
+    </div>,
+    document.body,
+  )
+}
+
 /* E3.6 — Auto layout settings: direction + distribution (the CSS-flexbox analogs). */
 function AutoLayoutSettingsMenu({ onApply }: { onApply: (field: string, value: string) => void }) {
   const [open, setOpen] = useState(false)
@@ -1763,25 +1794,26 @@ export default function ReactFigmaPage() {
   // Compose the single `transform` prop from rotation + both flips (they'd clobber each other otherwise).
   // E3.5 creation: insert a real JSX child into the SELECTED container (source write → HMR → selectable)
   const insertSnippet = useCallback(async (snippet: string) => {
-    if (!sel) { console.warn('[engine] insert: select a container element first'); return }
+    if (!sel) { notify('Select a container element first', 'error'); return }
     const r = await fetch('/api/dev/editor-write', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ kind: 'insert-jsx-child', file: sel.file, line: sel.line, col: sel.col, snippet }),
     })
-    console.log('[engine] insert', r.ok ? await r.json() : await r.text())
+    if (r.ok) notify('Inserted'); else notify(`Insert failed: ${await r.text()}`, 'error')
+    console.log('[engine] insert', r.ok)
   }, [sel])
 
   // E3.5 creation: Image insert uploads a real asset first, then splices <img src=path>.
   // Self-contained file picker (no shell change) → dev upload route → insert.
   const insertImage = useCallback(async () => {
-    if (!sel) { console.warn('[engine] insert image: select a container element first'); return }
+    if (!sel) { notify('Select a container element first', 'error'); return }
     const input = document.createElement('input')
     input.type = 'file'; input.accept = 'image/*'
     input.onchange = async () => {
       const file = input.files?.[0]; if (!file) return
       const fd = new FormData(); fd.append('file', file)
       const up = await fetch('/api/dev/editor-image', { method: 'POST', body: fd })
-      if (!up.ok) { console.warn('[engine] image upload failed', await up.text()); return }
+      if (!up.ok) { notify(`Image upload failed: ${await up.text()}`, 'error'); return }
       const { path } = await up.json() as { path: string }
       await insertSnippet(`<img src="${path}" alt="" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 4 }} />`)
     }
@@ -1790,7 +1822,7 @@ export default function ReactFigmaPage() {
 
   const insertChild = useCallback(async (tag: string, display?: string) => {
     if (tag === 'img') { void insertImage(); return }
-    if (!sel) { console.warn('[engine] insert: select a container element first'); return }
+    if (!sel) { notify('Select a container element first', 'error'); return }
     const st = display === 'flex' || display === 'grid' ? ` display: '${display}',` : ''
     const snippet =
       tag === 'text' ? `<span style={{ fontSize: 14, color: '#000' }}>Text</span>`
@@ -1800,25 +1832,26 @@ export default function ReactFigmaPage() {
 
   // E3.6 More-actions: duplicate / delete the selected element (structural source edits)
   const duplicateEl = useCallback(async () => {
-    if (!sel) { console.warn('[engine] duplicate: select an element first'); return }
+    if (!sel) { notify('Select an element first', 'error'); return }
     const r = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'duplicate-jsx', file: sel.file, line: sel.line, col: sel.col }) })
-    console.log('[engine] duplicate', r.ok ? await r.json() : await r.text())
+    if (r.ok) notify('Duplicated'); else notify(`Duplicate failed: ${await r.text()}`, 'error')
   }, [sel])
   const deleteEl = useCallback(async () => {
-    if (!sel) { console.warn('[engine] delete: select an element first'); return }
+    if (!sel) { notify('Select an element first', 'error'); return }
     const r = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'delete-jsx', file: sel.file, line: sel.line, col: sel.col }) })
-    console.log('[engine] delete', r.ok ? await r.json() : await r.text())
+    if (r.ok) notify('Deleted'); else notify(`Delete failed: ${await r.text()}`, 'error')
   }, [sel])
 
   // E3.5 creation: extract the selected element into its own component file + instance
   const makeComponent = useCallback(async () => {
-    if (!sel) { console.warn('[engine] make component: select an element first'); return }
+    if (!sel) { notify('Select an element first', 'error'); return }
     const r = await fetch('/api/dev/editor-write', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ kind: 'make-component', file: sel.file, line: sel.line, col: sel.col }),
     })
-    if (!r.ok) { console.warn('[engine] make component failed', await r.text()); return }
-    console.log('[engine] component extracted', await r.json())
+    if (!r.ok) { notify(`Extract failed: ${await r.text()}`, 'error'); return }
+    const res = await r.json() as { componentFile?: string }
+    notify(`Component created${res.componentFile ? ` · ${res.componentFile.split('/').pop()}` : ''}`)
   }, [sel])
 
   // E3.5 creation: add a new page route (real folder + page.tsx scaffold), then load it
@@ -1827,8 +1860,9 @@ export default function ReactFigmaPage() {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ kind: 'create-page' }),
     })
-    if (!r.ok) { console.warn('[engine] add page failed', await r.text()); return }
+    if (!r.ok) { notify(`Add page failed: ${await r.text()}`, 'error'); return }
     const res = await r.json() as { route: string; newValueText: string }
+    notify(`Page created · ${res.newValueText}`)
     console.log('[engine] page created', res)
     setBuildSources((s) => [...s, { key: res.route, name: res.newValueText, route: res.route, group: 'react-figma-pages' }])
     setTimeout(() => switchCanvas(res.newValueText, res.route), 600) // give the route a beat to compile
@@ -1850,6 +1884,7 @@ export default function ReactFigmaPage() {
     const doc = iframeRef.current?.contentDocument
     if (!doc || committing) return
     setCommitting(true)
+    let committed = 0, anyFail = false
     try {
       const dirty = ov.current!.dirty().filter((op) => !op.stale)
       const byEl = new Map<string, OverrideOp[]>()
@@ -1900,16 +1935,22 @@ export default function ReactFigmaPage() {
         let allOk = true
         for (const w of writes) {
           const wr = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(w) })
-          if (wr.status === 409) { allOk = false; console.warn('[engine] 409 stale DeclRef — file changed underneath; re-select to re-resolve', await wr.json()); continue }
-          if (!wr.ok) { allOk = false; console.warn('[engine] write failed', await wr.text()); continue }
-          console.log('[engine] committed', (w as { kind: string }).kind, await wr.json())
+          if (wr.status === 409) { allOk = false; anyFail = true; console.warn('[engine] 409 stale DeclRef — file changed underneath; re-select to re-resolve', await wr.json()); continue }
+          if (!wr.ok) { allOk = false; anyFail = true; console.warn('[engine] write failed', await wr.text()); continue }
+          committed++
+          console.log('[engine] committed', (w as { kind: string }).kind)
         }
         if (allOk) ov.current!.discard(domId) // staging dissolves — HMR re-renders build truth
       }
+    } catch (e) {
+      anyFail = true
+      notify(`Save error: ${(e as Error).message}`, 'error')
     } finally {
       setCommitting(false)
       setOvVersion((v) => v + 1)
     }
+    if (anyFail) notify(committed ? `Saved ${committed}, some failed — re-select & retry` : 'Save failed — re-select & retry', 'error')
+    else if (committed) notify(`Saved ${committed} change${committed > 1 ? 's' : ''} to code`)
   }, [committing])
 
   const wireCanvas = useCallback(() => {
@@ -2411,6 +2452,7 @@ export default function ReactFigmaPage() {
         </div>
       </aside>
       </>)}
+      <Toaster />
     </div>
   )
 }
