@@ -1019,14 +1019,32 @@ function SelectionColorRow({ hex, name, op, grad }: { hex?: string; name?: strin
   )
 }
 function LayoutGuideRow({ size }: { size: string }) {
+  const [guideValue, setGuideValue] = useState(size)
+  const [open, setOpen] = useState(false)
+  const guideRef = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
+  const options = ['Grid', 'Columns', 'Rows']
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '24px 8px 124px 8px 24px 4px 24px', alignItems: 'center', height: 32, padding: '0 8px 0 16px' }}>
       <UiIB name="layoutGrid" title="Layout guide settings" />
       <span />
-      <button type="button" role="combobox" aria-controls="layout-guide-options" aria-expanded={false} style={{ appearance: 'none', border: '1px solid #e6e6e6', background: '#fff', width: 124, height: 24, borderRadius: 5, padding: '0 0 0 9px', display: 'grid', gridTemplateColumns: '1fr 24px', alignItems: 'center', cursor: 'pointer', font: `450 11px/16px ${FONT}`, color: INK }}>
-        <span style={{ textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{size}</span>
-        <span style={{ color: FAINT, display: 'grid', placeItems: 'center' }}><UiIcon name="caret24" /></span>
-      </button>
+      <div ref={guideRef} style={{ position: 'relative', width: 124, height: 24 }}>
+        <button type="button" role="combobox" aria-controls="layout-guide-options" aria-expanded={open} onClick={() => setOpen(v => !v)}
+          style={{ appearance: 'none', border: '1px solid #e6e6e6', background: '#fff', width: 124, height: 24, borderRadius: 5, padding: '0 0 0 9px', display: 'grid', gridTemplateColumns: '1fr 24px', alignItems: 'center', cursor: 'pointer', font: `450 11px/16px ${FONT}`, color: INK }}>
+          <span style={{ textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{guideValue}</span>
+          <span style={{ color: FAINT, display: 'grid', placeItems: 'center' }}><UiIcon name="caret24" /></span>
+        </button>
+        {open && (
+          <ul id="layout-guide-options" role="listbox" data-figma-floating-root="true"
+            style={{ position: 'absolute', zIndex: 125, left: -8, top: -8, width: 140, height: 88, margin: 0, padding: '8px 0', listStyle: 'none', borderRadius: 6, background: '#fff', boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px', boxSizing: 'border-box', overflow: 'hidden' }}>
+            {options.map(option => (
+              <li key={option} role="option" aria-selected={guideValue.startsWith(option)} onClick={() => { setGuideValue(option === 'Grid' ? size : option); setOpen(false) }}
+                style={{ height: 24, display: 'grid', alignItems: 'center', padding: '0 0 0 32px', color: INK, cursor: 'pointer', font: `400 11px/16px ${FONT}` }}>
+                {option}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
       <span />
       <UiIB name="visibility" title="Toggle visibility" />
       <span />
