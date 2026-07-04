@@ -1028,8 +1028,9 @@ export default function ReactFigmaPage() {
   }, [])
 
   const discardOverride = useCallback((op?: OverrideOp) => {
+    // no-arg = 'Discard all' = GLOBAL clear across every dirty element (QA KAI-9306 finding 1);
+    // per-element discard stays available on the Overrides API for E1.4.
     if (op) ov.current!.discard(op.domId, op.prop)
-    else if (selIdRef.current) ov.current!.discard(selIdRef.current)
     else ov.current!.clear()
     setOvVersion((v) => v + 1)
     const doc = iframeRef.current?.contentDocument
