@@ -215,6 +215,7 @@ export type WriteOp =
   | { kind: 'add-declaration'; file: string; insertOffset: number; indent: string; prop: string; valueText: string }
   | { kind: 'set-token-value'; tokenPath: string; theme?: string; value: string | number }
   | { kind: 'set-jsx-style'; file: string; line: number; col: number; prop: string; value: string; expectRaw?: string }
+  | { kind: 'set-jsx-text'; file: string; line: number; col: number; newText: string; expectRaw?: string }
 
 // ─── JSX inline-style write (E2.4, ENGINE-PLAN-E2.4.md) ──────────────────────
 
@@ -320,9 +321,41 @@ async function setTokenValue(op: Extract<WriteOp, { kind: 'set-token-value' }>):
   return { ok: true, file: `${op.tokenPath} → converter: ${stdout.trim().split('\n').slice(-3).join(' · ')}`, newValueText: String(op.value) }
 }
 
+/** Text-content edit (E2.4): splice the single JSXText child of the element at line:col. */
+async function setJsxText(op: Extract<WriteOp, { kind: 'set-jsx-text' }>): Promise<{ ok: true; file: string; newValueText: string }> {
+  const abs = jailComponent(op.file)
+  const source = await fs.readFile(abs, 'utf8')
+  const sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
+  const opening = findJsxAt(sf, op.line, op.col)
+  if (!opening) throw Object.assign(new Error(`no JSX element at ${op.line}:${op.col}`), { status: 404 })
+  // opening element → its parent JsxElement → children
+  const parent = opening.parent
+  if (!ts.isJsxElement(parent)) throw Object.assign(new Error('self-closing or non-container element has no text child'), { status: 422 })
+  const textKids = parent.children.filter(ts.isJsxText).filter((t) => t.getText(sf).trim().length > 0)
+  if (textKids.length !== 1) throw Object.assign(new Error(`element has ${textKids.length} text children (need exactly 1 for v1)`), { status: 422 })
+  const node = textKids[0]!
+  // preserve the node's surrounding whitespace; replace only the trimmed content span
+  const raw = node.getText(sf)
+  const lead = raw.length - raw.trimStart().length
+  const trail = raw.length - raw.trimEnd().length
+  const start = node.getStart(sf) + lead, end = node.getEnd() - trail
+  const current = source.slice(start, end)
+  if (op.expectRaw !== undefined && current !== op.expectRaw) {
+    throw Object.assign(new Error(`stale text: expected ${JSON.stringify(op.expectRaw)}, found ${JSON.stringify(current)}`), { status: 409 })
+  }
+  // JSX text can't contain raw { } < > — reject rather than corrupt (expression-child edits are later scope)
+  if (/[{}<>]/.test(op.newText)) throw Object.assign(new Error('text contains JSX-reserved characters ({ } < >) — not a plain-text child'), { status: 422 })
+  const bStart = byteLen(source.slice(0, start)), bEnd = byteLen(source.slice(0, end))
+  const buf = await fs.readFile(abs)
+  const next = Buffer.concat([buf.subarray(0, bStart), Buffer.from(op.newText, 'utf8'), buf.subarray(bEnd)])
+  await fs.writeFile(abs, next)
+  return { ok: true, file: op.file, newValueText: op.newText }
+}
+
 export async function applyWrite(op: WriteOp): Promise<{ ok: true; file: string; newValueText: string }> {
   if (op.kind === 'set-token-value') return setTokenValue(op)
   if (op.kind === 'set-jsx-style') return setJsxStyle(op)
+  if (op.kind === 'set-jsx-text') return setJsxText(op)
   if (op.kind === 'add-declaration') {
     const abs = jailModuleCss(op.file)
     const buf = await fs.readFile(abs)

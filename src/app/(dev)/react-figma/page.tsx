@@ -1653,6 +1653,32 @@ export default function ReactFigmaPage() {
       e.preventDefault(); e.stopPropagation()
       applySelection(el)
     }, true)
+    // E2.4 text-content editing (Figma canon: double-click text → inline edit → commit set-jsx-text)
+    doc.addEventListener('dblclick', (e) => {
+      const el = findTagged(e.target)
+      if (!el) return
+      const kids = [...el.childNodes]
+      const textKids = kids.filter((nn) => nn.nodeType === 3 && nn.textContent?.trim())
+      if (textKids.length !== 1) return // only plain single-text elements are inline-editable
+      e.preventDefault(); e.stopPropagation()
+      const src = el.getAttribute('data-src') ?? ''
+      const before = el.textContent ?? ''
+      el.setAttribute('contenteditable', 'plaintext-only')
+      ;(el as HTMLElement).focus()
+      const finish = () => {
+        el.removeAttribute('contenteditable')
+        const after = (el.textContent ?? '').trim()
+        el.removeEventListener('blur', finish)
+        if (after === before.trim() || !after) { el.textContent = before; return }
+        const m = src.match(/^(.*):(\d+):(\d+)$/)
+        if (!m) return
+        fetch('/api/dev/editor-write', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ kind: 'set-jsx-text', file: m[1], line: +m[2], col: +m[3], newText: after, expectRaw: before.trim() }),
+        }).then((r) => r.json()).then((res) => console.log('[engine] text commit', res)).catch((err) => console.warn('[engine] text commit failed', err))
+      }
+      el.addEventListener('blur', finish)
+    }, true)
     // M2: live layer tree + HMR/mutation re-read (AC2, AC6)
     setLayers(buildLayerTree(doc))
     let t: ReturnType<typeof setTimeout> | undefined
