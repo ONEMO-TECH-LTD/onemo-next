@@ -116,6 +116,7 @@ const UI_ICON = {
   autoLayoutVertical: { viewBox: '0 0 24 24', paths: ['M9.654 13.008A1.5 1.5 0 0 1 11 14.5v2l-.008.153a1.5 1.5 0 0 1-1.338 1.34L9.5 18h-2l-.153-.008a1.5 1.5 0 0 1-1.339-1.339L6 16.5v-2a1.5 1.5 0 0 1 1.347-1.492L7.5 13h2zM15.5 6a.5.5 0 0 1 .49.4l.01.1v9.794l1.146-1.146a.501.501 0 0 1 .708.707l-2 2a.5.5 0 0 1-.707 0l-2-2a.5.5 0 0 1 .707-.707L15 16.294V6.5l.01-.1a.5.5 0 0 1 .49-.4m-8 8a.5.5 0 0 0-.5.5v2a.5.5 0 0 0 .5.5h2a.5.5 0 0 0 .5-.5v-2a.5.5 0 0 0-.5-.5zm2.154-7.992A1.5 1.5 0 0 1 11 7.5v2l-.008.153a1.5 1.5 0 0 1-1.338 1.34L9.5 11h-2l-.153-.008a1.5 1.5 0 0 1-1.339-1.339L6 9.5v-2a1.5 1.5 0 0 1 1.347-1.492L7.5 6h2zM7.5 7a.5.5 0 0 0-.5.5v2a.5.5 0 0 0 .5.5h2a.5.5 0 0 0 .5-.5v-2a.5.5 0 0 0-.5-.5z'] },
   autoLayoutHorizontal: { viewBox: '0 0 24 24', paths: ['M15.147 13.147a.5.5 0 0 1 .707 0l2 2a.5.5 0 0 1 0 .707l-2 2a.5.5 0 0 1-.707-.707L16.293 16H6.5l-.101-.01a.5.5 0 0 1 0-.98L6.5 15h9.793l-1.146-1.146a.5.5 0 0 1 0-.707m-5.493-7.14A1.5 1.5 0 0 1 11 7.5v2l-.007.153a1.5 1.5 0 0 1-1.34 1.34L9.5 11h-2l-.153-.008a1.5 1.5 0 0 1-1.339-1.339L6 9.5v-2a1.5 1.5 0 0 1 1.347-1.492L7.5 6h2zm7 0A1.5 1.5 0 0 1 18 7.5v2l-.007.153a1.5 1.5 0 0 1-1.34 1.34L16.5 11h-2l-.153-.008a1.5 1.5 0 0 1-1.339-1.339L13 9.5v-2a1.5 1.5 0 0 1 1.347-1.492L14.5 6h2zM14.5 7a.5.5 0 0 0-.5.5v2a.5.5 0 0 0 .5.5h2a.5.5 0 0 0 .5-.5v-2a.5.5 0 0 0-.5-.5zm-7 0a.5.5 0 0 0-.5.5v2a.5.5 0 0 0 .5.5h2a.5.5 0 0 0 .5-.5v-2a.5.5 0 0 0-.5-.5z'] },
   autoLayoutGrid: { viewBox: '0 0 24 24', paths: ['M9.653 13.008A1.5 1.5 0 0 1 11 14.5v2l-.008.153a1.5 1.5 0 0 1-1.339 1.34L9.5 18h-2a1.5 1.5 0 0 1-1.492-1.347L6 16.5v-2A1.5 1.5 0 0 1 7.5 13h2zm7 0A1.5 1.5 0 0 1 18 14.5v2l-.008.153a1.5 1.5 0 0 1-1.339 1.34L16.5 18h-2a1.5 1.5 0 0 1-1.492-1.347L13 16.5v-2a1.5 1.5 0 0 1 1.5-1.5h2zM7.5 14a.5.5 0 0 0-.5.5v2a.5.5 0 0 0 .5.5h2a.5.5 0 0 0 .5-.5v-2a.5.5 0 0 0-.5-.5zm7 0a.5.5 0 0 0-.5.5v2a.5.5 0 0 0 .5.5h2a.5.5 0 0 0 .5-.5v-2a.5.5 0 0 0-.5-.5zM9.653 6.008A1.5 1.5 0 0 1 11 7.5v2l-.008.153a1.5 1.5 0 0 1-1.339 1.34L9.5 11h-2a1.5 1.5 0 0 1-1.492-1.347L6 9.5v-2A1.5 1.5 0 0 1 7.5 6h2zm7 0A1.5 1.5 0 0 1 18 7.5v2l-.008.153a1.5 1.5 0 0 1-1.339 1.34L16.5 11h-2a1.5 1.5 0 0 1-1.492-1.347L13 9.5v-2A1.5 1.5 0 0 1 14.5 6h2zM7.5 7a.5.5 0 0 0-.5.5v2a.5.5 0 0 0 .5.5h2a.5.5 0 0 0 .5-.5v-2a.5.5 0 0 0-.5-.5zm7 0a.5.5 0 0 0-.5.5v2a.5.5 0 0 0 .5.5h2a.5.5 0 0 0 .5-.5v-2a.5.5 0 0 0-.5-.5z'] },
+  autoLayoutWrap: { viewBox: '0 0 16 16', paths: ['M8 3h2c1.933 0 3.5 1.567 3.5 3.5 0 1.933-1.567 3.5-3.5 3.5H4.707l2.147 2.146-.708.708-3-3-.353-.354.353-.354 3-3 .708.708L4.707 9H10c1.38 0 2.5-1.12 2.5-2.5C12.5 5.12 11.38 4 10 4H8z'] },
   resizeW: { viewBox: '0 0 24 24', paths: ['M5.5 18a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 1 0v11a.5.5 0 0 1-.5.5m13 0a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 1 0v11a.5.5 0 0 1-.5.5M7.604 8l1.882 8h1.03L12 10.062 13.485 16h1.029l1.882-8h-1.027l-1.384 5.88L12.515 8h-1.03l-1.47 5.88L8.63 8z'] },
   lockAspect: { viewBox: '0 0 24 24', paths: ['M7.5 7h9a.5.5 0 0 1 .5.5v9a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5M6 7.5A1.5 1.5 0 0 1 7.5 6h9A1.5 1.5 0 0 1 18 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 16.5zM9.5 9a.5.5 0 0 0-.5.5v2a.5.5 0 0 0 1 0V10h1.5a.5.5 0 0 0 0-1zm5.5 3.5a.5.5 0 0 0-1 0V14h-1.5a.5.5 0 0 0 0 1h2a.5.5 0 0 0 .5-.5z'] },
   gapVertical: { viewBox: '0 0 24 24', paths: ['M15.5 15a1.5 1.5 0 0 1 1.5 1.5.5.5 0 0 1-.99.1l-.02-.2a.5.5 0 0 0-.49-.4h-7a.5.5 0 0 0-.49.4l-.02.2a.5.5 0 0 1-.99-.1A1.5 1.5 0 0 1 8.5 15zM12 11a1 1 0 1 1 0 2 1 1 0 0 1 0-2m4.5-4a.5.5 0 0 1 .5.5A1.5 1.5 0 0 1 15.5 9h-7A1.5 1.5 0 0 1 7 7.5a.5.5 0 0 1 .99-.1l.02.2a.5.5 0 0 0 .49.4h7a.5.5 0 0 0 .49-.4l.02-.2a.5.5 0 0 1 .49-.4'] },
@@ -143,12 +144,12 @@ function UiIcon({ name, size = 24 }: { name: keyof typeof UI_ICON; size?: number
     </svg>
   )
 }
-function UiIB({ name, title, active }: { name: keyof typeof UI_ICON; title?: string; active?: boolean }) {
+function UiIB({ name, title, active, size = 24 }: { name: keyof typeof UI_ICON; title?: string; active?: boolean; size?: number }) {
   const [h, setH] = useState(false)
   return (
     <button type="button" title={title} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
       style={{ appearance: 'none', border: 0, cursor: 'pointer', width: 24, height: 24, borderRadius: 5, display: 'grid', placeItems: 'center', flex: 'none', background: active ? '#e5f4ff' : h ? '#f0f1f3' : 'transparent', color: INK }}>
-      <UiIcon name={name} />
+      <UiIcon name={name} size={size} />
     </button>
   )
 }
@@ -642,7 +643,7 @@ export default function ReactFigmaPage() {
             </InspectorRow>
           </Sec>
 
-          <Sec title="Position" first action={<UiIB name="absolutePosition" title="Absolute position" />} bodyGap={0} bodyPadding="0">
+          <Sec title="Position" first bodyGap={0} bodyPadding="0">
             <PositionRow label="Alignment">
               <Seg fill><FSegBtn name="alignLeft" pos="l" fill title="Align left" /><FSegBtn name="alignCenterH" pos="m" fill title="Align horizontal centers" /><FSegBtn name="alignRight" pos="r" fill title="Align right" /></Seg>
               <Seg fill><FSegBtn name="alignTop" pos="l" fill title="Align top" /><FSegBtn name="alignCenterV" pos="m" fill title="Align vertical centers" /><FSegBtn name="alignBottom" pos="r" fill title="Align bottom" /></Seg>
@@ -674,7 +675,7 @@ export default function ReactFigmaPage() {
             <InspectorRow label="Flow">
               <AutoFlowGroup />
               <span />
-              <span />
+              <UiIB name="autoLayoutWrap" title="Wrap" size={16} />
             </InspectorRow>
             <InspectorRow label="Resizing">
               <AutoValueField icon="resizeW" value="402" mode="Fill" />
