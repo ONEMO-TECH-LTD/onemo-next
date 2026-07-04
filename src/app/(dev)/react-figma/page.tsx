@@ -198,28 +198,22 @@ function useCloseOnOutside<T extends HTMLElement>(open: boolean, close: () => vo
   }, [open, close])
   return ref
 }
-const VARIABLE_ROWS: { kind: 'header' | 'item'; label: string; value?: string; selected?: boolean }[] = [
-  { kind: 'header', label: '3.1-Sem-Dim-Fluid' },
-  { kind: 'item', label: 'none', value: '0', selected: true },
-  { kind: 'header', label: 'nano' },
-  { kind: 'item', label: 'xs', value: '1' },
-  { kind: 'item', label: 's', value: '2' },
-  { kind: 'item', label: 'm', value: '4' },
-  { kind: 'item', label: 'l', value: '6' },
-  { kind: 'item', label: 'xl', value: '8' },
-  { kind: 'item', label: '2xl', value: '10' },
-  { kind: 'header', label: 'standard' },
-  { kind: 'item', label: 'xs', value: '12' },
-  { kind: 'item', label: 's', value: '14' },
-  { kind: 'item', label: 'm', value: '16' },
-  { kind: 'item', label: 'l', value: '20' },
-  { kind: 'item', label: 'xl', value: '24' },
-  { kind: 'header', label: 'big' },
-  { kind: 'item', label: 'xs', value: '32' },
-  { kind: 'item', label: 's', value: '40' },
-  { kind: 'item', label: 'm', value: '48' },
-  { kind: 'item', label: 'l', value: '56' },
-]
+// E3.3 — real DS tokens from the converter output (/api/dev/editor-tokens), fetched once and
+// cached, feeding the ⬡ variable picker. The var name IS the token path (DEC-locked), so it
+// doubles as the Figma-style label; the resolved value shows alongside for traceability.
+type DsToken = { cssVar: string; value: string; group: string; kind: 'color' | 'dimension' | 'other' }
+let _dsTokenCache: DsToken[] | null = null
+function useDsTokens(): DsToken[] {
+  const [toks, setToks] = useState<DsToken[]>(_dsTokenCache ?? [])
+  useEffect(() => {
+    if (_dsTokenCache) return
+    fetch('/api/dev/editor-tokens')
+      .then((r) => (r.ok ? r.json() : { tokens: [] }))
+      .then((d: { tokens: DsToken[] }) => { _dsTokenCache = d.tokens; setToks(d.tokens) })
+      .catch(() => {})
+  }, [])
+  return toks
+}
 function VariableHashIcon() {
   return (
     <svg width="24" height="24" fill="none" viewBox="0 0 24 24" aria-hidden style={{ display: 'block' }}>
@@ -230,6 +224,7 @@ function VariableHashIcon() {
 function FigmaVariablePicker({ fieldLabel, anchorRef, onPick, onClose }: { fieldLabel: string; anchorRef: { current: HTMLElement | null }; onPick?: (value: string) => void; onClose: () => void }) {
   const [query, setQuery] = useState('')
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
+  const tokens = useDsTokens()
   useEffect(() => {
     const update = () => setAnchorRect(anchorRef.current?.getBoundingClientRect() ?? null)
     update()
@@ -240,7 +235,15 @@ function FigmaVariablePicker({ fieldLabel, anchorRef, onPick, onClose }: { field
       window.removeEventListener('scroll', update, true)
     }
   }, [anchorRef])
-  const rows = VARIABLE_ROWS.filter(row => row.kind === 'header' || row.label.toLowerCase().includes(query.trim().toLowerCase()))
+  const q = query.trim().toLowerCase()
+  const filtered = tokens.filter((t) => !q || t.cssVar.toLowerCase().includes(q) || t.value.toLowerCase().includes(q))
+  // group into header + item rows in file order (tokens.css is organised by collection)
+  const rows: { kind: 'header' | 'item'; label: string; value?: string; bind?: string }[] = []
+  let lastGroup = ''
+  for (const t of filtered) {
+    if (t.group !== lastGroup) { rows.push({ kind: 'header', label: t.group }); lastGroup = t.group }
+    rows.push({ kind: 'item', label: t.cssVar.replace(/^--/, ''), value: t.value, bind: `var(${t.cssVar})` })
+  }
   if (!anchorRect) return null
   const width = 216
   const height = 387
@@ -271,8 +274,8 @@ function FigmaVariablePicker({ fieldLabel, anchorRef, onPick, onClose }: { field
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.label}</span>
           </div>
         ) : (
-          <button key={`${row.label}-${row.value}-${index}`} type="button" onClick={() => { if (row.value) onPick?.(row.value); onClose() }}
-            style={{ appearance: 'none', border: 0, width: 216, height: 32, background: row.selected ? '#f5f5f5' : '#fff', display: 'grid', gridTemplateColumns: '40px 1fr 32px', alignItems: 'center', padding: 0, cursor: 'pointer', color: INK, font: `400 11px/16px ${FONT}`, textAlign: 'left' }}>
+          <button key={`${row.label}-${row.value}-${index}`} type="button" onClick={() => { if (row.bind) onPick?.(row.bind); onClose() }}
+            style={{ appearance: 'none', border: 0, width: 216, height: 32, background: '#fff', display: 'grid', gridTemplateColumns: '40px 1fr 32px', alignItems: 'center', padding: 0, cursor: 'pointer', color: INK, font: `400 11px/16px ${FONT}`, textAlign: 'left' }}>
             <span style={{ width: 24, height: 24, marginLeft: 16, display: 'grid', placeItems: 'center', color: INK }}><VariableHashIcon /></span>
             <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.label}</span>
             <span style={{ color: 'rgba(0,0,0,0.3)', textAlign: 'right', paddingRight: 16 }}>{row.value}</span>
