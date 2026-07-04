@@ -947,14 +947,15 @@ function FigmaPaintRow({ hex, op, label = 'Paint', onRemove, origin, onHexEdit, 
     </div>
   )
 }
-function StrokeDetailRow({ position, weight, onWeight, onPosition }: { position: string; weight: number; onWeight?: (value: string) => void; onPosition?: (value: string) => void }) {
+function StrokeDetailRow({ position, weight, onWeight, onPosition, onSide }: { position: string; weight: number; onWeight?: (value: string) => void; onPosition?: (value: string) => void; onSide?: (field: string, value: string) => void }) {
   const [positionValue, setPositionValue] = useState(position)
   const [weightValue, setWeightValue] = useState(String(weight))
   const [positionOpen, setPositionOpen] = useState(false)
+  const [individual, setIndividual] = useState(false)
   const positionRef = useCloseOnOutside<HTMLDivElement>(positionOpen, () => setPositionOpen(false))
   const positionOptions = ['Center', 'Inside', 'Outside']
   return (
-    <div style={{ position: 'relative', height: 50, width: '100%' }}>
+    <div style={{ position: 'relative', height: individual ? 84 : 50, width: '100%' }}>
       <span style={{ position: 'absolute', left: 16, top: 3.5, width: 84, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Position</span>
       <span style={{ position: 'absolute', left: 100, top: 3.5, width: 80, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Weight</span>
       <div style={{ position: 'absolute', left: 16, right: 8, top: 22, display: 'grid', gridTemplateColumns: '76px 8px 72px 8px 24px 4px 24px', alignItems: 'center' }}>
@@ -981,8 +982,15 @@ function StrokeDetailRow({ position, weight, onWeight, onPosition }: { position:
         <span />
         <UiIB name="autoLayoutSettings" title="Advanced stroke settings" />
         <span />
-        <UiIB name="individualStroke" title="Individual strokes" />
+        <UiIB name="individualStroke" title="Individual strokes" active={individual} on={() => setIndividual((v) => !v)} />
       </div>
+      {individual && (
+        <div style={{ position: 'absolute', left: 16, right: 8, top: 52, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
+          {(['Top', 'Right', 'Bottom', 'Left'] as const).map((side) => (
+            <AutoValueField key={side} icon="strokeWeight" value={String(weight)} caret={false} ariaLabel={`${side} stroke weight`} onChange={(v) => onSide?.(`stroke${side}`, v)} width={56} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -1555,6 +1563,10 @@ export default function ReactFigmaPage() {
       : field === 'insetL' ? (positioned ? [['left', withUnit]] : [])
       : field === 'zIndex' ? [['z-index', n]]
       : field === 'strokeWeight' ? [['border-width', withUnit]]
+      : field === 'strokeTop' ? [['border-top-width', withUnit]]
+      : field === 'strokeRight' ? [['border-right-width', withUnit]]
+      : field === 'strokeBottom' ? [['border-bottom-width', withUnit]]
+      : field === 'strokeLeft' ? [['border-left-width', withUnit]]
       : field === 'strokeColor' ? [['border-color', n]]
       : field === 'fillBg' ? [['background-color', n]]
       : field === 'fillColor' ? [['color', n]]
@@ -2214,7 +2226,7 @@ export default function ReactFigmaPage() {
                       onOpacityEdit={(hx, opPct) => applyOverride('strokeColor', hexToRgba(hx, opPct))}
                       onVisibleToggle={(vis, hx) => applyOverride(vis ? 'strokeColor' : 'strokeWidth0', vis ? `#${hx}` : '0')}
                       onRemove={() => applyOverride('strokeWidth0', '0')} />
-                    <StrokeDetailRow position={s.position} weight={s.weight} onWeight={(v) => applyOverride('strokeWeight', v)} onPosition={(p) => applyOverride('strokePosition', p)} />
+                    <StrokeDetailRow position={s.position} weight={s.weight} onWeight={(v) => applyOverride('strokeWeight', v)} onPosition={(p) => applyOverride('strokePosition', p)} onSide={(field, v) => applyOverride(field, v)} />
                   </div>
                 ))
               : strokes.map(s => (
