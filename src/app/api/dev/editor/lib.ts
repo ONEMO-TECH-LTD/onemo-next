@@ -237,6 +237,20 @@ export type WriteOp =
 const cssToJsKey = (p: string) => p.replace(/-([a-z])/g, (_, c) => c.toUpperCase())
 
 /** Find the JSX opening element whose 1-based start line/col matches the tag (data-src position). */
+/**
+ * F1 (s58-lead HIGH): structural ops (insert/delete/duplicate/make-component) splice raw text and
+ * must not write invalid code. Re-parse the OUTPUT; if it has any parse diagnostics, refuse (422)
+ * without writing — e.g. duplicate on a sole-return → adjacent JSX, delete of a returned root →
+ * empty return(). The style/CSS ops are literal-guarded already; this covers the text-splice ops.
+ */
+function assertValidTsx(fileName: string, source: string): void {
+  const sf = ts.createSourceFile(fileName, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
+  const diags = (sf as unknown as { parseDiagnostics?: readonly ts.Diagnostic[] }).parseDiagnostics ?? []
+  if (diags.length) {
+    throw Object.assign(new Error(`refused — the edit would produce invalid code (${diags.length} parse error${diags.length > 1 ? 's' : ''}); select a different target`), { status: 422 })
+  }
+}
+
 function findJsxAt(sf: ts.SourceFile, line: number, col: number): ts.JsxOpeningElement | ts.JsxSelfClosingElement | null {
   let found: ts.JsxOpeningElement | ts.JsxSelfClosingElement | null = null
   const visit = (node: ts.Node) => {
@@ -413,6 +427,7 @@ async function insertJsxChild(op: Extract<WriteOp, { kind: 'insert-jsx-child' }>
   const insert = `  ${op.snippet}\n${parentIndent}`
   const bOff = byteLen(source.slice(0, closeStart))
   const next = Buffer.concat([buf.subarray(0, bOff), Buffer.from(insert, 'utf8'), buf.subarray(bOff)])
+  assertValidTsx(abs, next.toString('utf8'))
   await fs.writeFile(abs, next)
   return { ok: true, file: op.file, newValueText: op.snippet }
 }
@@ -514,7 +529,7 @@ async function makeComponent(op: Extract<WriteOp, { kind: 'make-component' }>): 
   while (true) { try { await fs.access(path.join(compDir, `${name}.tsx`)); name = `${nameBase}${++i}` } catch { break } }
   const subtree = el.getText(sf)
   const compSource = `${neededImports.length ? neededImports.join('\n') + '\n\n' : ''}export function ${name}() {\n  return (\n    ${subtree}\n  )\n}\n`
-  await fs.writeFile(path.join(compDir, `${name}.tsx`), compSource, 'utf8')
+  const compAbs = path.join(compDir, `${name}.tsx`)
 
   // replace subtree with <Name /> and add the import — bottom-up splice (subtree offset > import offset)
   const elStart = el.getStart(sf), elEnd = el.getEnd()
@@ -526,6 +541,10 @@ async function makeComponent(op: Extract<WriteOp, { kind: 'make-component' }>): 
   let next = Buffer.concat([buf.subarray(0, bElStart), Buffer.from(`<${name} />`, 'utf8'), buf.subarray(bElEnd)])
   const importInsert = importPos === 0 ? `${importText}\n` : `\n${importText}`
   next = Buffer.concat([next.subarray(0, bImp), Buffer.from(importInsert, 'utf8'), next.subarray(bImp)])
+  // F1: validate BOTH outputs before writing EITHER — no half-written state on refusal
+  assertValidTsx(compAbs, compSource)
+  assertValidTsx(abs, next.toString('utf8'))
+  await fs.writeFile(compAbs, compSource, 'utf8')
   await fs.writeFile(abs, next)
   return { ok: true, file: op.file, newValueText: `<${name} />`, componentFile: `src/app/(dev)/react-figma-components/${name}.tsx` }
 }
@@ -552,6 +571,7 @@ async function deleteJsx(op: Extract<WriteOp, { kind: 'delete-jsx' }>): Promise<
   const cut = lineStart >= 0 ? lineStart : el.getStart(sf) // eat the leading newline+indent, else from element start
   const bStart = byteLen(source.slice(0, cut)), bEnd = byteLen(source.slice(0, el.getEnd()))
   const next = Buffer.concat([buf.subarray(0, bStart), buf.subarray(bEnd)])
+  assertValidTsx(abs, next.toString('utf8'))
   await fs.writeFile(abs, next)
   return { ok: true, file: op.file, newValueText: '' }
 }
@@ -569,6 +589,7 @@ async function duplicateJsx(op: Extract<WriteOp, { kind: 'duplicate-jsx' }>): Pr
   const insert = `\n${indent}${subtree}`
   const bOff = byteLen(source.slice(0, el.getEnd()))
   const next = Buffer.concat([buf.subarray(0, bOff), Buffer.from(insert, 'utf8'), buf.subarray(bOff)])
+  assertValidTsx(abs, next.toString('utf8'))
   await fs.writeFile(abs, next)
   return { ok: true, file: op.file, newValueText: subtree }
 }
