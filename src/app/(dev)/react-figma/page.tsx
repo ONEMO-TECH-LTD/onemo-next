@@ -16,7 +16,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { buildLayerTree, readStyles, colorToHex, type LiveNode } from './engine'
+import { buildLayerTree, readStyles, colorToHex, boxSlots, gapSlots, tokenOf, type LiveNode } from './engine'
 import { createPortal } from 'react-dom'
 import {
   ListDashes, MagnifyingGlass, Plus, Minus, Sidebar, CaretDown, GearSix, Palette,
@@ -975,12 +975,15 @@ export default function ReactFigmaPage() {
     setOpacityValue(String(Math.round(parseFloat(c['opacity'] || '1') * 100)))
     setCornerRadiusValue(px(c['border-radius']))
     setBlendMode(c['mix-blend-mode'] === 'normal' ? 'Pass through' : c['mix-blend-mode'])
-    // Token provenance per field (var name = token path; pills render purple)
+    // Token provenance per field — SLOT-accurate for shorthands (plan §5):
+    // `padding: var(--a) var(--b)` → paddingY slot = --a (top), paddingX slot = --b (left).
     const d = rep.defined
+    const padBox = d['padding'] ? boxSlots(d['padding'].value) : null
+    const gapPair = d['gap'] ? gapSlots(d['gap'].value) : null
     setFieldTokens({
-      gap: d['gap']?.token ?? d['column-gap']?.token,
-      paddingX: d['padding-left']?.token ?? d['padding']?.token,
-      paddingY: d['padding-top']?.token ?? d['padding']?.token,
+      gap: d['column-gap']?.token ?? (gapPair ? tokenOf(gapPair.column) : undefined),
+      paddingX: d['padding-left']?.token ?? (padBox ? tokenOf(padBox.left) : undefined),
+      paddingY: d['padding-top']?.token ?? (padBox ? tokenOf(padBox.top) : undefined),
       opacity: d['opacity']?.token,
       radius: d['border-radius']?.token,
     })

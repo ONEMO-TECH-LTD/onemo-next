@@ -77,7 +77,48 @@ export function buildLayerTree(doc: Document): LiveNode[] {
   return out
 }
 
-const tokenOf = (value: string): string | undefined => value.match(/var\(\s*(--[a-zA-Z0-9-]+)/)?.[1]
+export const tokenOf = (value: string): string | undefined => value.match(/var\(\s*(--[a-zA-Z0-9-]+)/)?.[1]
+
+/** Split a shorthand value into top-level slots — var()/calc() parens respected. */
+export function splitSlots(value: string): string[] {
+  const slots: string[] = []
+  let depth = 0, cur = ''
+  for (const ch of value) {
+    if (ch === '(') depth++
+    else if (ch === ')') depth--
+    if (/\s/.test(ch) && depth === 0) { if (cur) { slots.push(cur); cur = '' } }
+    else cur += ch
+  }
+  if (cur) slots.push(cur)
+  return slots
+}
+
+/** CSS box shorthand slot mapping (padding/margin): 1→all · 2→[Y,X] · 3→[T,X,B] · 4→[T,R,B,L]. */
+export function boxSlots(value: string): { top: string; right: string; bottom: string; left: string } | null {
+  const s = splitSlots(value)
+  if (s.length === 1) return { top: s[0]!, right: s[0]!, bottom: s[0]!, left: s[0]! }
+  if (s.length === 2) return { top: s[0]!, right: s[1]!, bottom: s[0]!, left: s[1]! }
+  if (s.length === 3) return { top: s[0]!, right: s[1]!, bottom: s[2]!, left: s[1]! }
+  if (s.length === 4) return { top: s[0]!, right: s[1]!, bottom: s[2]!, left: s[3]! }
+  return null
+}
+
+/** gap shorthand: [row, column] (single slot = both). */
+export function gapSlots(value: string): { row: string; column: string } {
+  const s = splitSlots(value)
+  return { row: s[0] ?? value, column: s[1] ?? s[0] ?? value }
+}
+
+/**
+ * Selector specificity for provenance owner-resolution (a·1e6 + b·1e3 + c).
+ * For grouped selectors the caller passes the single matching part.
+ */
+function specificity(sel: string): number {
+  const ids = (sel.match(/#[\w-]+/g) ?? []).length
+  const classes = (sel.match(/(\.[\w-]+|\[[^\]]*\]|:(?!:)[\w-]+(\([^)]*\))?)/g) ?? []).length
+  const types = (sel.match(/(^|[\s>+~])[a-zA-Z][\w-]*/g) ?? []).length + (sel.match(/::[\w-]+/g) ?? []).length
+  return ids * 1e6 + classes * 1e3 + types
+}
 
 /**
  * Matched declarations for el across the doc's stylesheets, cascade-ordered by
@@ -86,9 +127,32 @@ const tokenOf = (value: string): string | undefined => value.match(/var\(\s*(--[
  * the token/raw provenance (plan §3 M2).
  */
 function collectDefined(el: HTMLElement, doc: Document): Record<string, DefEntry> {
-  const into: Record<string, DefEntry> = {}
+  // True cascade owner-resolution (plan §3 M2 pin): importance → specificity → source order.
+  type Cand = DefEntry & { imp: boolean; spec: number; order: number }
+  const best: Record<string, Cand> = {}
   const win = doc.defaultView
-  if (!win) return into
+  if (!win) return {}
+  let order = 0
+  const offer = (prop: string, c: Cand) => {
+    const b = best[prop]
+    if (!b) { best[prop] = c; return }
+    if (c.imp !== b.imp) { if (c.imp) best[prop] = c; return }
+    if (c.spec !== b.spec) { if (c.spec > b.spec) best[prop] = c; return }
+    if (c.order >= b.order) best[prop] = c
+  }
+  const takeRule = (rule: CSSStyleRule, spec: number) => {
+    order++
+    for (const prop of Array.from(rule.style)) {
+      const value = rule.style.getPropertyValue(prop).trim()
+      if (!value) continue // Chrome iterates var() shorthands as EMPTY longhands — skip
+      offer(prop, { value, token: tokenOf(value), imp: rule.style.getPropertyPriority(prop) === 'important', spec, order })
+    }
+    // pending-substitution var() text lives on the SHORTHAND — probe directly.
+    for (const sh of SHORTHANDS) {
+      const value = rule.style.getPropertyValue(sh).trim()
+      if (value) offer(sh, { value, token: tokenOf(value), imp: rule.style.getPropertyPriority(sh) === 'important', spec, order })
+    }
+  }
   const visit = (rules: CSSRuleList) => {
     for (const rule of Array.from(rules)) {
       if (rule instanceof win.CSSMediaRule) {
@@ -96,33 +160,29 @@ function collectDefined(el: HTMLElement, doc: Document): Record<string, DefEntry
       } else if (rule instanceof win.CSSSupportsRule) {
         visit(rule.cssRules)
       } else if (rule instanceof win.CSSStyleRule) {
-        let matches = false
-        try { matches = el.matches(rule.selectorText) } catch { /* :has()/vendor selector — skip */ }
-        if (!matches) continue
-        for (const prop of Array.from(rule.style)) {
-          const value = rule.style.getPropertyValue(prop).trim()
-          if (value) into[prop] = { value, token: tokenOf(value) } // later match wins (source order)
+        // grouped selectors: specificity of the MOST specific part that actually matches
+        let spec = -1
+        for (const part of rule.selectorText.split(',')) {
+          try { if (el.matches(part.trim())) spec = Math.max(spec, specificity(part)) } catch { /* skip */ }
         }
-        // Chrome iterates var() SHORTHANDS as empty longhands (pending substitution
-        // lives on the shorthand) — probe shorthands directly for the var() text.
-        for (const sh of SHORTHANDS) {
-          const value = rule.style.getPropertyValue(sh).trim()
-          if (value) into[sh] = { value, token: tokenOf(value) }
-        }
+        if (spec >= 0) takeRule(rule, spec)
       }
     }
   }
   for (const sheet of Array.from(doc.styleSheets)) {
     try { if (sheet.cssRules) visit(sheet.cssRules) } catch { /* cross-origin sheet */ }
   }
-  for (const prop of Array.from(el.style)) { // inline wins the cascade
+  // inline style: beats any non-important rule; important inline beats all.
+  order++
+  const offerInline = (prop: string) => {
     const value = el.style.getPropertyValue(prop).trim()
-    if (value) into[prop] = { value, token: tokenOf(value) }
+    if (value) offer(prop, { value, token: tokenOf(value), imp: el.style.getPropertyPriority(prop) === 'important', spec: Number.MAX_SAFE_INTEGER, order })
   }
-  for (const sh of SHORTHANDS) {
-    const value = el.style.getPropertyValue(sh).trim()
-    if (value) into[sh] = { value, token: tokenOf(value) }
-  }
+  for (const prop of Array.from(el.style)) offerInline(prop)
+  for (const sh of SHORTHANDS) offerInline(sh)
+
+  const into: Record<string, DefEntry> = {}
+  for (const [prop, { value, token, inheritedFrom }] of Object.entries(best)) into[prop] = { value, token, inheritedFrom }
   return into
 }
 
