@@ -293,12 +293,12 @@ function FigmaVariablePicker({ fieldLabel, anchorRef, onPick, onClose }: { field
     document.body
   )
 }
-const STYLE_VARIABLE_ROWS = ['fg', 'white', 'primary', 'secondary', 'secondary-hover', 'tertiary', 'tertiary-hover', 'quaternary', 'quaternary-hover', 'disabled', 'disabled-subtle', 'brand-primary', 'brand-primary-hover']
-function StyleApplyButton({ label, title }: { label: string; title: string }) {
+function StyleApplyButton({ label, title, onApply }: { label: string; title: string; onApply?: (tokenVar: string) => void }) {
   const [open, setOpen] = useState(false)
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
   const [activeTab, setActiveTab] = useState<'custom' | 'libraries'>('custom')
-  const [selected, setSelected] = useState('primary')
+  const [selected, setSelected] = useState('')
+  const tokens = useDsTokens().filter((t) => t.kind === 'color')
   const anchorRef = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
   const optionListId = `${label.toLowerCase().replace(/\s+/g, '-')}-style-variable-options`
   useEffect(() => {
@@ -338,12 +338,11 @@ function StyleApplyButton({ label, title }: { label: string; title: string }) {
               </button>
             </div>
             <div id={optionListId} role="listbox" style={{ height: 345, overflowY: 'auto', paddingTop: 8 }}>
-              <div style={{ height: 32, display: 'flex', alignItems: 'center', padding: '0 16px', boxSizing: 'border-box', font: `550 11px/16px ${FONT}`, color: INK }}>3.0-Sem-Col</div>
-              {STYLE_VARIABLE_ROWS.map(row => (
-                <button key={row} type="button" role="option" aria-selected={selected === row} onClick={() => { setSelected(row); setOpen(false) }}
-                  style={{ appearance: 'none', border: 0, width: 240, height: 32, background: selected === row ? '#f5f5f5' : '#fff', display: 'grid', gridTemplateColumns: '40px 1fr', alignItems: 'center', padding: 0, cursor: 'pointer', color: INK, font: `400 11px/16px ${FONT}`, textAlign: 'left' }}>
-                  <span style={{ width: 14, height: 14, marginLeft: 17, borderRadius: 3, background: row === 'white' ? '#fff' : row.includes('disabled') ? '#d8d9dd' : row.includes('brand') ? SEL : '#111', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.15)' }} />
-                  <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row}</span>
+              {tokens.map((t) => (
+                <button key={t.cssVar} type="button" role="option" aria-selected={selected === t.cssVar} onClick={() => { setSelected(t.cssVar); onApply?.(`var(${t.cssVar})`); setOpen(false) }}
+                  style={{ appearance: 'none', border: 0, width: 240, height: 32, background: selected === t.cssVar ? '#f5f5f5' : '#fff', display: 'grid', gridTemplateColumns: '40px 1fr', alignItems: 'center', padding: 0, cursor: 'pointer', color: INK, font: `400 11px/16px ${FONT}`, textAlign: 'left' }}>
+                  <span style={{ width: 14, height: 14, marginLeft: 17, borderRadius: 3, background: t.value, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.15)' }} />
+                  <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(t.path ?? t.cssVar).replace(/^[^/]+ \/ /, '')}</span>
                 </button>
               ))}
             </div>
@@ -1754,6 +1753,12 @@ export default function ReactFigmaPage() {
       : field === 'aspectRatio' ? [['aspect-ratio', n]]
       : field === 'flexWrap' ? [['flex-wrap', n]]
       : field === 'flexDirection' ? [['flex-direction', n]]
+      : field === 'flow' ? (
+          n === 'horizontal' ? [['display', 'flex'], ['flex-direction', 'row']]
+          : n === 'vertical' ? [['display', 'flex'], ['flex-direction', 'column']]
+          : n === 'grid' ? [['display', 'grid']]
+          : [['display', 'block']] // freeform — no auto-layout
+        )
       : field === 'clip' ? [['overflow', n]]
       : field === 'transform' ? [['transform', n]]
       : field === 'cssPosition' ? [['position', n]]
@@ -1993,7 +1998,7 @@ export default function ReactFigmaPage() {
         fetch('/api/dev/editor-write', {
           method: 'POST', headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ kind: 'set-jsx-text', file: m[1], line: +m[2], col: +m[3], newText: after, expectRaw: before.trim() }),
-        }).then((r) => r.json()).then((res) => console.log('[engine] text commit', res)).catch((err) => console.warn('[engine] text commit failed', err))
+        }).then(async (r) => { if (r.ok) { notify('Text saved to code'); console.log('[engine] text commit', await r.json()) } else notify(`Text save failed: ${await r.text()}`, 'error') }).catch((err) => notify(`Text save failed: ${err.message}`, 'error'))
       }
       el.addEventListener('blur', finish)
     }, true)
@@ -2311,7 +2316,7 @@ export default function ReactFigmaPage() {
 
           <Sec title="Auto layout" bodyGap={0} bodyPadding="0">
             <InspectorRow label="Flow">
-              <AutoFlowGroup value={autoFlow} onChange={setAutoFlow} />
+              <AutoFlowGroup value={autoFlow} onChange={(v) => { setAutoFlow(v); applyOverride('flow', v) }} />
               <span />
               <UiIB name="autoLayoutWrap" title="Wrap" size={16} active={autoWrap} on={() => { const nv = !autoWrap; setAutoWrap(nv); applyOverride('flexWrap', nv ? 'wrap' : 'nowrap') }} />
             </InspectorRow>
@@ -2402,7 +2407,7 @@ export default function ReactFigmaPage() {
             </Sec>
           )}
 
-          <Sec title="Fill" actionWidth={52} action={<><StyleApplyButton label="Fill" title="Fill, Apply styles and variables" /><UiIB name="plus" title="Add fill" on={() => setFills(rows => [...rows, { id: nextRowId(rows), hex: 'FFFFFF', op: 100 }])} /></>} bodyGap={0} bodyPadding="0">
+          <Sec title="Fill" actionWidth={52} action={<><StyleApplyButton label="Fill" title="Fill, Apply styles and variables" onApply={(v) => applyOverride('fillBg', v)} /><UiIB name="plus" title="Add fill" on={() => setFills(rows => [...rows, { id: nextRowId(rows), hex: 'FFFFFF', op: 100 }])} /></>} bodyGap={0} bodyPadding="0">
             {liveFills
               ? liveFills.map((f, i) => { const fld = f.prop === 'color' ? 'fillColor' : 'fillBg'; return <FigmaPaintRow key={`live-${i}`} hex={f.hex} op={f.op} label="Fill" origin={f.origin}
                   onHexEdit={(hx) => applyOverride(fld, `#${hx}`)}
@@ -2411,7 +2416,7 @@ export default function ReactFigmaPage() {
                   onRemove={() => applyOverride(fld, 'transparent')} /> })
               : fills.map(f => <FigmaPaintRow key={f.id} hex={f.hex} op={f.op} label="Fill" onRemove={() => setFills(rows => rows.filter(row => row.id !== f.id))} />)}
           </Sec>
-          <Sec title="Stroke" actionWidth={52} action={<><StyleApplyButton label="Stroke" title="Stroke, Apply styles and variables" /><UiIB name="plus" title="Add stroke fill" on={() => setStrokes(rows => [...rows, { id: nextRowId(rows), hex: '000000', op: 100, position: 'Inside', weight: 1 }])} /></>} bodyGap={0} bodyPadding="0">
+          <Sec title="Stroke" actionWidth={52} action={<><StyleApplyButton label="Stroke" title="Stroke, Apply styles and variables" onApply={(v) => applyOverride('strokeColor', v)} /><UiIB name="plus" title="Add stroke fill" on={() => setStrokes(rows => [...rows, { id: nextRowId(rows), hex: '000000', op: 100, position: 'Inside', weight: 1 }])} /></>} bodyGap={0} bodyPadding="0">
             {liveStrokes
               ? liveStrokes.map((s, i) => (
                   <div key={`live-${i}`}>
@@ -2430,7 +2435,7 @@ export default function ReactFigmaPage() {
                   </div>
                 ))}
           </Sec>
-          <Sec title="Effects" actionWidth={52} action={<><StyleApplyButton label="Effects" title="Effects, Apply styles" /><UiIB name="plus" title="Add effect" on={() => setEffects(rows => [...rows, { id: nextRowId(rows), type: 'Drop shadow' }])} /></>} bodyGap={0} bodyPadding="0">
+          <Sec title="Effects" actionWidth={52} action={<><StyleApplyButton label="Effects" title="Effects, Apply styles" onApply={(v) => applyOverride('boxShadow', `0 2px 8px ${v}`)} /><UiIB name="plus" title="Add effect" on={() => setEffects(rows => [...rows, { id: nextRowId(rows), type: 'Drop shadow' }])} /></>} bodyGap={0} bodyPadding="0">
             {liveEffects
               ? (() => { let si = -1; return liveEffects.map((e, i) => {
                   const isShadow = e.type.toLowerCase().includes('shadow')
