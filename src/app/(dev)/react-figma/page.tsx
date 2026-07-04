@@ -803,11 +803,12 @@ function FigmaColorPicker({ anchorRef, hex, opacity, onHex, onOpacity, onClose }
     document.body
   )
 }
-function FigmaPaintRow({ hex, op, label = 'Paint' }: { hex: string; op: number; label?: string }) {
+function FigmaPaintRow({ hex, op, label = 'Paint', onRemove }: { hex: string; op: number; label?: string; onRemove?: () => void }) {
   const [hexValue, setHexValue] = useState(hex)
   const [opacityValue, setOpacityValue] = useState(String(op))
   const [varOpen, setVarOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [visible, setVisible] = useState(true)
   const fieldRef = useCloseOnOutside<HTMLDivElement>(varOpen || pickerOpen, () => { setVarOpen(false); setPickerOpen(false) })
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '156px 8px 24px 4px 24px', alignItems: 'center', height: 32, padding: '0 8px 0 16px' }}>
@@ -827,9 +828,9 @@ function FigmaPaintRow({ hex, op, label = 'Paint' }: { hex: string; op: number; 
         {pickerOpen && <FigmaColorPicker anchorRef={fieldRef} hex={hexValue} opacity={opacityValue} onHex={setHexValue} onOpacity={setOpacityValue} onClose={() => setPickerOpen(false)} />}
       </div>
       <span />
-      <UiIB name="visibility" title="Toggle visibility" />
+      <UiIB name="visibility" title="Toggle visibility" active={!visible} on={() => setVisible(v => !v)} />
       <span />
-      <UiIB name="minus" title="Remove" />
+      <UiIB name="minus" title="Remove" on={onRemove} />
     </div>
   )
 }
@@ -972,9 +973,10 @@ function FigmaEffectSettingsPopover({ anchorRef, type, onType, onClose }: { anch
     document.body
   )
 }
-function FigmaEffectRow({ type }: { type: string }) {
+function FigmaEffectRow({ type, onRemove }: { type: string; onRemove?: () => void }) {
   const [effectType, setEffectType] = useState(type)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [visible, setVisible] = useState(true)
   const rowRef = useCloseOnOutside<HTMLButtonElement>(settingsOpen, () => setSettingsOpen(false))
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '156px 8px 24px 4px 24px', alignItems: 'center', height: 32, padding: '0 8px 0 16px' }}>
@@ -985,9 +987,9 @@ function FigmaEffectRow({ type }: { type: string }) {
         {settingsOpen && <FigmaEffectSettingsPopover anchorRef={rowRef} type={effectType} onType={setEffectType} onClose={() => setSettingsOpen(false)} />}
       </button>
       <span />
-      <UiIB name="visibility" title="Toggle visibility" />
+      <UiIB name="visibility" title="Toggle visibility" active={!visible} on={() => setVisible(v => !v)} />
       <span />
-      <UiIB name="minus" title="Remove" />
+      <UiIB name="minus" title="Remove" on={onRemove} />
     </div>
   )
 }
@@ -1018,9 +1020,10 @@ function SelectionColorRow({ hex, name, op, grad }: { hex?: string; name?: strin
     </div>
   )
 }
-function LayoutGuideRow({ size }: { size: string }) {
+function LayoutGuideRow({ size, onRemove }: { size: string; onRemove?: () => void }) {
   const [guideValue, setGuideValue] = useState(size)
   const [open, setOpen] = useState(false)
+  const [visible, setVisible] = useState(true)
   const guideRef = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
   const options = ['Grid', 'Columns', 'Rows']
   return (
@@ -1046,9 +1049,9 @@ function LayoutGuideRow({ size }: { size: string }) {
         )}
       </div>
       <span />
-      <UiIB name="visibility" title="Toggle visibility" />
+      <UiIB name="visibility" title="Toggle visibility" active={!visible} on={() => setVisible(v => !v)} />
       <span />
-      <UiIB name="minus" title="Remove layout guide" />
+      <UiIB name="minus" title="Remove layout guide" on={onRemove} />
     </div>
   )
 }
@@ -1219,6 +1222,7 @@ const MOCK = {
   selectionColors: [{ name: 'Linear', op: 100, grad: true }, { hex: '000000', op: 100 }, { hex: 'FFFFFF', op: 100 }],
   layoutGuides: [{ size: 'Grid 10px' }],
 }
+const nextRowId = <T extends { id: number }>(rows: T[]) => rows.reduce((max, row) => Math.max(max, row.id), 0) + 1
 
 export default function ReactFigmaPage() {
   type Rail = 'file' | 'assets' | 'variables'
@@ -1250,6 +1254,10 @@ export default function ReactFigmaPage() {
   const [opacityValue, setOpacityValue] = useState('100')
   const [cornerRadiusValue, setCornerRadiusValue] = useState('0')
   const [individualCorners, setIndividualCorners] = useState(false)
+  const [fills, setFills] = useState(() => MOCK.fills.map((fill, id) => ({ ...fill, id: id + 1 })))
+  const [strokes, setStrokes] = useState(() => MOCK.strokes.map((stroke, id) => ({ ...stroke, id: id + 1 })))
+  const [effects, setEffects] = useState(() => MOCK.effects.map((effect, id) => ({ ...effect, id: id + 1 })))
+  const [layoutGuides, setLayoutGuides] = useState(() => MOCK.layoutGuides.map((guide, id) => ({ ...guide, id: id + 1 })))
   const canvasRef = useRef<HTMLDivElement>(null)
   const pan = useRef<{ x: number; y: number; vx: number; vy: number } | null>(null)
   const [isPanning, setIsPanning] = useState(false)
@@ -1482,25 +1490,25 @@ export default function ReactFigmaPage() {
             </div>
           </Sec>
 
-          <Sec title="Fill" actionWidth={52} action={<><UiIB name="styleDots" title="Fill, Apply styles and variables" /><UiIB name="plus" title="Add fill" /></>} bodyGap={0} bodyPadding="0">
-            {MOCK.fills.map((f, i) => <FigmaPaintRow key={i} hex={f.hex} op={f.op} label="Fill" />)}
+          <Sec title="Fill" actionWidth={52} action={<><UiIB name="styleDots" title="Fill, Apply styles and variables" /><UiIB name="plus" title="Add fill" on={() => setFills(rows => [...rows, { id: nextRowId(rows), hex: 'FFFFFF', op: 100 }])} /></>} bodyGap={0} bodyPadding="0">
+            {fills.map(f => <FigmaPaintRow key={f.id} hex={f.hex} op={f.op} label="Fill" onRemove={() => setFills(rows => rows.filter(row => row.id !== f.id))} />)}
           </Sec>
-          <Sec title="Stroke" actionWidth={52} action={<><UiIB name="styleDots" title="Stroke, Apply styles and variables" /><UiIB name="plus" title="Add stroke fill" /></>} bodyGap={0} bodyPadding="0">
-            {MOCK.strokes.map((s, i) => (
-              <div key={i}>
-                <FigmaPaintRow hex={s.hex} op={s.op} label="Stroke" />
+          <Sec title="Stroke" actionWidth={52} action={<><UiIB name="styleDots" title="Stroke, Apply styles and variables" /><UiIB name="plus" title="Add stroke fill" on={() => setStrokes(rows => [...rows, { id: nextRowId(rows), hex: '000000', op: 100, position: 'Inside', weight: 1 }])} /></>} bodyGap={0} bodyPadding="0">
+            {strokes.map(s => (
+              <div key={s.id}>
+                <FigmaPaintRow hex={s.hex} op={s.op} label="Stroke" onRemove={() => setStrokes(rows => rows.filter(row => row.id !== s.id))} />
                 <StrokeDetailRow position={s.position} weight={s.weight} />
               </div>
             ))}
           </Sec>
-          <Sec title="Effects" actionWidth={52} action={<><UiIB name="styleDots" title="Effects, Apply styles" /><UiIB name="plus" title="Add effect" /></>} bodyGap={0} bodyPadding="0">
-            {MOCK.effects.map((e, i) => <FigmaEffectRow key={i} type={e.type} />)}
+          <Sec title="Effects" actionWidth={52} action={<><UiIB name="styleDots" title="Effects, Apply styles" /><UiIB name="plus" title="Add effect" on={() => setEffects(rows => [...rows, { id: nextRowId(rows), type: 'Drop shadow' }])} /></>} bodyGap={0} bodyPadding="0">
+            {effects.map(e => <FigmaEffectRow key={e.id} type={e.type} onRemove={() => setEffects(rows => rows.filter(row => row.id !== e.id))} />)}
           </Sec>
           <Sec title="Selection colors" bodyGap={0} bodyPadding="0">
             {MOCK.selectionColors.map((c, i) => <SelectionColorRow key={i} hex={c.hex} name={c.name} op={c.op} grad={c.grad} />)}
           </Sec>
-          <Sec title="Layout guide" actionWidth={52} action={<><UiIB name="styleDots" title="Layout guide, Apply styles" /><UiIB name="plus" title="Add layout guide" /></>} bodyGap={0} bodyPadding="0">
-            {MOCK.layoutGuides.map((g, i) => <LayoutGuideRow key={i} size={g.size} />)}
+          <Sec title="Layout guide" actionWidth={52} action={<><UiIB name="styleDots" title="Layout guide, Apply styles" /><UiIB name="plus" title="Add layout guide" on={() => setLayoutGuides(rows => [...rows, { id: nextRowId(rows), size: 'Grid 10px' }])} /></>} bodyGap={0} bodyPadding="0">
+            {layoutGuides.map(g => <LayoutGuideRow key={g.id} size={g.size} onRemove={() => setLayoutGuides(rows => rows.filter(row => row.id !== g.id))} />)}
           </Sec>
         </div>
       </aside>
