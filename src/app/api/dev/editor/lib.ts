@@ -227,6 +227,7 @@ export type WriteOp =
   | { kind: 'set-jsx-style'; file: string; line: number; col: number; prop: string; value: string; expectRaw?: string }
   | { kind: 'set-jsx-text'; file: string; line: number; col: number; newText: string; expectRaw?: string }
   | { kind: 'insert-jsx-child'; file: string; line: number; col: number; snippet: string }
+  | { kind: 'create-page'; slugBase?: string; width?: number; height?: number }
 
 // ─── JSX inline-style write (E2.4, ENGINE-PLAN-E2.4.md) ──────────────────────
 
@@ -269,7 +270,13 @@ async function setJsxStyle(op: Extract<WriteOp, { kind: 'set-jsx-style' }>): Pro
 
   // Shorthand alias: a color longhand should update an existing shorthand key when it holds a
   // plain color (background-color ↔ background). Prevents inserting a competing key next to it.
-  const isColorLiteral = (s: string) => /^(['"]?)#[0-9a-f]{3,8}\1$|^(['"]).*(rgb|hsl|oklch)\(/i.test(s.trim())
+  // F1 (s58-lead): the value must be a WHOLE bare color — a hex or a single color-function call,
+  // anchored ^…$. A gradient/url/multi-layer shorthand merely CONTAINS rgb()/hsl() and must NOT
+  // match, or the alias would overwrite (destroy) the gradient. Strip wrapping quotes, then anchor.
+  const isColorLiteral = (s: string) => {
+    const t = s.trim().replace(/^['"]|['"]$/g, '').trim()
+    return /^#[0-9a-f]{3,8}$/i.test(t) || /^(rgb|hsl|oklch|oklab|lab|lch|hwb|color)a?\([^)]*\)$/i.test(t)
+  }
   const aliasKeys: Record<string, string> = { backgroundColor: 'background' }
   const nameOf = (p: ts.ObjectLiteralElementLike) => (ts.isPropertyAssignment(p) ? p.name.getText(sf).replace(/['"]/g, '') : '')
   const matches = obj.properties.filter(
@@ -391,6 +398,10 @@ async function insertJsxChild(op: Extract<WriteOp, { kind: 'insert-jsx-child' }>
   if (!opening) throw Object.assign(new Error(`no JSX element at ${op.line}:${op.col}`), { status: 404 })
   const parent = opening.parent
   if (!ts.isJsxElement(parent)) throw Object.assign(new Error('self-closing element cannot hold children — select a container'), { status: 422 })
+  // F2 (s58-lead): refuse a text-bearing container — inserting an element beside a text child
+  // produces invalid mixed content (`<span>text <div/></span>`). Mirror setJsxText's detector.
+  const hasText = parent.children.filter(ts.isJsxText).some((t) => t.getText(sf).trim().length > 0)
+  if (hasText) throw Object.assign(new Error('container holds text content — insert into an element-only container'), { status: 422 })
   const closeStart = parent.closingElement!.getStart(sf) // '<' of </tag>
   const lineStart = source.lastIndexOf('\n', parent.getStart(sf)) + 1
   const parentIndent = source.slice(lineStart).match(/^[ \t]*/)?.[0] ?? ''
@@ -403,7 +414,32 @@ async function insertJsxChild(op: Extract<WriteOp, { kind: 'insert-jsx-child' }>
   return { ok: true, file: op.file, newValueText: op.snippet }
 }
 
-export async function applyWrite(op: WriteOp): Promise<{ ok: true; file: string; newValueText: string }> {
+/** Create a new page route (E3.5): src/app/(dev)/react-figma-pages/<slug>/page.tsx scaffold. */
+async function createPage(op: Extract<WriteOp, { kind: 'create-page' }>): Promise<{ ok: true; file: string; newValueText: string; route: string }> {
+  const base = (op.slugBase ?? 'new-page').replace(/[^a-z0-9-]/gi, '-').toLowerCase()
+  const parent = path.join(ROOT, 'src/app/(dev)/react-figma-pages')
+  await fs.mkdir(parent, { recursive: true })
+  let slug = base, n = 1
+  while (true) {
+    try { await fs.access(path.join(parent, slug)); slug = `${base}-${++n}` } catch { break }
+  }
+  const w = op.width ?? 402, h = op.height ?? 871
+  const dir = path.join(parent, slug)
+  await fs.mkdir(dir, { recursive: true })
+  const componentName = 'Page' + slug.replace(/(^|-)([a-z])/g, (_, __, c) => c.toUpperCase())
+  const scaffold = `export default function ${componentName}() {
+  return (
+    <div style={{ width: ${w}, height: ${h}, display: 'flex', flexDirection: 'column', background: '#fff', overflow: 'hidden' }}>
+    </div>
+  )
+}
+`
+  await fs.writeFile(path.join(dir, 'page.tsx'), scaffold, 'utf8')
+  return { ok: true, file: `src/app/(dev)/react-figma-pages/${slug}/page.tsx`, newValueText: slug, route: `/react-figma-pages/${slug}` }
+}
+
+export async function applyWrite(op: WriteOp): Promise<{ ok: true; file: string; newValueText: string; route?: string }> {
+  if (op.kind === 'create-page') return createPage(op)
   if (op.kind === 'set-token-value') return setTokenValue(op)
   if (op.kind === 'set-jsx-style') return setJsxStyle(op)
   if (op.kind === 'set-jsx-text') return setJsxText(op)

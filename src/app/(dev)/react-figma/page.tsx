@@ -1613,6 +1613,19 @@ export default function ReactFigmaPage() {
     console.log('[engine] insert', tag, r.ok ? await r.json() : await r.text())
   }, [sel])
 
+  // E3.5 creation: add a new page route (real folder + page.tsx scaffold), then load it
+  const addPage = useCallback(async () => {
+    const r = await fetch('/api/dev/editor-write', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ kind: 'create-page' }),
+    })
+    if (!r.ok) { console.warn('[engine] add page failed', await r.text()); return }
+    const res = await r.json() as { route: string; newValueText: string }
+    console.log('[engine] page created', res)
+    setBuildSources((s) => [...s, { key: res.route, name: res.newValueText, route: res.route, group: 'react-figma-pages' }])
+    setTimeout(() => switchCanvas(res.newValueText, res.route), 600) // give the route a beat to compile
+  }, [])
+
   const pushTransform = useCallback((rot: string, fh: boolean, fv: boolean) => {
     const deg = parseFloat(rot) || 0
     const parts: string[] = []
@@ -1850,7 +1863,7 @@ export default function ReactFigmaPage() {
             <div style={{ height: 25, display: 'flex', alignItems: 'center', padding: '0 16px', font: `400 11px/16px ${FONT}`, color: MUTE }}>Drafts ›</div>
             <div style={{ height: 40, padding: '0 8px 0 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={hdr}>Pages</span>
-              <span style={{ display: 'flex', gap: 4, color: MUTE }}><UiIB name="find" title="Find" active={layerQuery !== null} on={() => setLayerQuery(q => q === null ? '' : null)} /><UiIB name="plus" title="Add new page" /></span>
+              <span style={{ display: 'flex', gap: 4, color: MUTE }}><UiIB name="find" title="Find" active={layerQuery !== null} on={() => setLayerQuery(q => q === null ? '' : null)} /><UiIB name="plus" title="Add new page" on={() => void addPage()} /></span>
             </div>
             <div style={{ padding: '0 8px', maxHeight: 280, overflowY: 'auto' }}>
               {/* LOCAL FOLDER BROWSER — navigable filesystem under the dev root.
