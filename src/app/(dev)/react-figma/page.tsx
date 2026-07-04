@@ -1609,7 +1609,10 @@ export default function ReactFigmaPage() {
             addUsed = true
             writes.push({ kind: 'add-declaration', file: resolved.fallbackRule.file, insertOffset: resolved.fallbackRule.insertOffset, indent: resolved.fallbackRule.indent, prop: op.prop, valueText: op.value })
           } else {
-            console.warn('[engine] no writable owner for', op.prop, '— skipped')
+            // no CSS-module owner → inline-styled element (glass screen): JSX write (E2.4).
+            const m = src.match(/^(.*):(\d+):(\d+)$/)
+            if (m) writes.push({ kind: 'set-jsx-style', file, line: +m[2], col: +m[3], prop: op.prop, value: op.value })
+            else console.warn('[engine] no writable owner for', op.prop, '— skipped')
           }
         }
         for (const m of shMerge.values()) writes.push({ kind: 'set-shorthand-slots', decl: m.decl, slots: m.slots })

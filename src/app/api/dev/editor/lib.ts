@@ -16,6 +16,7 @@ import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import postcss, { type Declaration, type Rule, type AtRule } from 'postcss'
+import * as ts from 'typescript'
 
 const execFileP = promisify(execFile)
 
@@ -57,9 +58,11 @@ export function jailModuleCss(rel: string): string {
   return abs
 }
 
+// component jail = src/ (routes) + storybook/ (hosted canvas screens, e.g. Editor402)
+const COMPONENT_ROOTS = [path.join(ROOT, 'src'), path.join(ROOT, 'storybook')]
 export function jailComponent(rel: string): string {
   const abs = path.resolve(ROOT, rel)
-  if (!abs.startsWith(path.join(ROOT, 'src') + path.sep) || !/\.(tsx|ts)$/.test(abs)) {
+  if (!COMPONENT_ROOTS.some((r) => abs.startsWith(r + path.sep)) || !/\.(tsx|ts)$/.test(abs)) {
     throw Object.assign(new Error(`outside read jail: ${rel}`), { status: 403 })
   }
   return abs
@@ -211,6 +214,75 @@ export type WriteOp =
   | { kind: 'bind-token'; decl: DeclRef; token: string }
   | { kind: 'add-declaration'; file: string; insertOffset: number; indent: string; prop: string; valueText: string }
   | { kind: 'set-token-value'; tokenPath: string; theme?: string; value: string | number }
+  | { kind: 'set-jsx-style'; file: string; line: number; col: number; prop: string; value: string; expectRaw?: string }
+
+// ─── JSX inline-style write (E2.4, ENGINE-PLAN-E2.4.md) ──────────────────────
+
+const cssToJsKey = (p: string) => p.replace(/-([a-z])/g, (_, c) => c.toUpperCase())
+
+/** Find the JSX opening element whose 1-based start line/col matches the tag (data-src position). */
+function findJsxAt(sf: ts.SourceFile, line: number, col: number): ts.JsxOpeningElement | ts.JsxSelfClosingElement | null {
+  let found: ts.JsxOpeningElement | ts.JsxSelfClosingElement | null = null
+  const visit = (node: ts.Node) => {
+    if (found) return
+    if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+      const lc = sf.getLineAndCharacterOfPosition(node.getStart(sf))
+      if (lc.line + 1 === line && lc.character + 1 === col) { found = node; return }
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(sf)
+  return found
+}
+
+async function setJsxStyle(op: Extract<WriteOp, { kind: 'set-jsx-style' }>): Promise<{ ok: true; file: string; newValueText: string }> {
+  const abs = jailComponent(op.file)
+  const source = await fs.readFile(abs, 'utf8')
+  const sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
+  const el = findJsxAt(sf, op.line, op.col)
+  if (!el) throw Object.assign(new Error(`no JSX element at ${op.line}:${op.col}`), { status: 404 })
+  const styleAttr = el.attributes.properties.find(
+    (p): p is ts.JsxAttribute => ts.isJsxAttribute(p) && p.name.getText(sf) === 'style',
+  )
+  const init0 = styleAttr?.initializer
+  if (!init0 || !ts.isJsxExpression(init0) || !init0.expression || !ts.isObjectLiteralExpression(init0.expression)) {
+    throw Object.assign(new Error('element has no inline style object (attribute insertion out of v1 scope)'), { status: 422 })
+  }
+  const obj = init0.expression
+  const key = cssToJsKey(op.prop)
+  const isNumericPx = /^-?\d+(\.\d+)?px$/.test(op.value)
+  const bareNum = op.value.replace(/px$/, '')
+
+  const existing = obj.properties.find(
+    (p): p is ts.PropertyAssignment => ts.isPropertyAssignment(p) && (p.name.getText(sf).replace(/['"]/g, '') === key),
+  )
+  if (existing) {
+    const init = existing.initializer
+    const start = init.getStart(sf), end = init.getEnd()
+    const currentRaw = source.slice(start, end)
+    if (op.expectRaw !== undefined && currentRaw !== op.expectRaw) {
+      throw Object.assign(new Error(`stale JSX value: expected ${JSON.stringify(op.expectRaw)}, found ${JSON.stringify(currentRaw)}`), { status: 409 })
+    }
+    // numeric literal stays numeric; anything else becomes a single-quoted string
+    const replacement = isNumericPx && ts.isNumericLiteral(init) ? bareNum : `'${op.value.replace(/'/g, "\\'")}'`
+    const bStart = byteLen(source.slice(0, start)), bEnd = byteLen(source.slice(0, end))
+    const buf = await fs.readFile(abs)
+    const next = Buffer.concat([buf.subarray(0, bStart), Buffer.from(replacement, 'utf8'), buf.subarray(bEnd)])
+    await fs.writeFile(abs, next)
+    return { ok: true, file: op.file, newValueText: replacement }
+  }
+  // insert `key: value,` right after the object's `{`
+  const braceOffset = obj.getStart(sf) + 1
+  const lineStart = source.lastIndexOf('\n', obj.getStart(sf)) + 1
+  const indent = (source.slice(lineStart).match(/^[ \t]*/)?.[0] ?? '') + '  '
+  const literal = isNumericPx ? bareNum : `'${op.value.replace(/'/g, "\\'")}'`
+  const insert = `\n${indent}${key}: ${literal},`
+  const bOff = byteLen(source.slice(0, braceOffset))
+  const buf = await fs.readFile(abs)
+  const next = Buffer.concat([buf.subarray(0, bOff), Buffer.from(insert, 'utf8'), buf.subarray(bOff)])
+  await fs.writeFile(abs, next)
+  return { ok: true, file: op.file, newValueText: literal }
+}
 
 /**
  * Token value edit — the OWNED converter loop (plan §4, tokens.config.mjs verified):
@@ -250,6 +322,7 @@ async function setTokenValue(op: Extract<WriteOp, { kind: 'set-token-value' }>):
 
 export async function applyWrite(op: WriteOp): Promise<{ ok: true; file: string; newValueText: string }> {
   if (op.kind === 'set-token-value') return setTokenValue(op)
+  if (op.kind === 'set-jsx-style') return setJsxStyle(op)
   if (op.kind === 'add-declaration') {
     const abs = jailModuleCss(op.file)
     const buf = await fs.readFile(abs)
