@@ -16,7 +16,7 @@
  */
 
 import { Fragment, useState, useRef, useEffect, useCallback } from 'react'
-import { buildLayerTree, readStyles, colorToHex, boxSlots, gapSlots, editSlot, tokenOf, Overrides, parseEffects, alignToIndex, alignFromIndex, collectSelectionColors, type LiveNode, type OverrideOp } from './engine'
+import { buildLayerTree, readStyles, colorToHex, hexToRgba, boxSlots, gapSlots, editSlot, tokenOf, Overrides, parseEffects, alignToIndex, alignFromIndex, collectSelectionColors, type LiveNode, type OverrideOp } from './engine'
 import { createPortal } from 'react-dom'
 import {
   ListDashes, MagnifyingGlass, Plus, Minus, Sidebar, CaretDown, GearSix, Palette,
@@ -904,7 +904,7 @@ function FigmaColorPicker({ anchorRef, hex, opacity, onHex, onOpacity, onClose }
     document.body
   )
 }
-function FigmaPaintRow({ hex, op, label = 'Paint', onRemove, origin, onHexEdit }: { hex: string; op: number; label?: string; onRemove?: () => void; origin?: string; onHexEdit?: (hex: string) => void }) {
+function FigmaPaintRow({ hex, op, label = 'Paint', onRemove, origin, onHexEdit, onOpacityEdit }: { hex: string; op: number; label?: string; onRemove?: () => void; origin?: string; onHexEdit?: (hex: string) => void; onOpacityEdit?: (hex: string, opPct: number) => void }) {
   const [hexValue, setHexValue] = useState(hex)
   const [opacityValue, setOpacityValue] = useState(String(op))
   const [varOpen, setVarOpen] = useState(false)
@@ -920,7 +920,7 @@ function FigmaPaintRow({ hex, op, label = 'Paint', onRemove, origin, onHexEdit }
           style={{ appearance: 'none', border: 0, width: 14, height: 14, justifySelf: 'center', borderRadius: 2, background: `#${normalizeHex(hexValue) || 'FFFFFF'}`, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.15)', padding: 0, cursor: 'pointer' }} />
         <input aria-label={`${label} hex`} value={hexValue} onChange={e => { const nv = normalizeHex(e.currentTarget.value); setHexValue(nv); if (nv.length === 6) onHexEdit?.(nv) }}
           style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: INK, font: `450 11px/16px ${FONT}` }} />
-        <input aria-label={`${label} opacity`} role="spinbutton" value={opacityValue} onChange={e => setOpacityValue(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
+        <input aria-label={`${label} opacity`} role="spinbutton" value={opacityValue} onChange={e => { const v = e.currentTarget.value; setOpacityValue(v); const n = parseFloat(v); if (Number.isFinite(n) && normalizeHex(hexValue).length === 6) onOpacityEdit?.(normalizeHex(hexValue), Math.max(0, Math.min(100, n))) }} onFocus={e => e.currentTarget.select()}
           style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: '0 3px 0 0', background: 'transparent', color: INK, font: `450 11px/16px ${FONT}`, textAlign: 'right' }} />
         <span style={{ color: 'rgba(0,0,0,0.5)' }}>%</span>
         <button type="button" title="Apply variable" aria-label={`Apply variable to ${label} opacity`} aria-haspopup="menu" aria-expanded={varOpen} onClick={event => { event.stopPropagation(); setPickerOpen(false); setVarOpen(v => !v) }}
@@ -2060,14 +2060,18 @@ export default function ReactFigmaPage() {
 
           <Sec title="Fill" actionWidth={52} action={<><StyleApplyButton label="Fill" title="Fill, Apply styles and variables" /><UiIB name="plus" title="Add fill" on={() => setFills(rows => [...rows, { id: nextRowId(rows), hex: 'FFFFFF', op: 100 }])} /></>} bodyGap={0} bodyPadding="0">
             {liveFills
-              ? liveFills.map((f, i) => <FigmaPaintRow key={`live-${i}`} hex={f.hex} op={f.op} label="Fill" origin={f.origin} onHexEdit={(hx) => applyOverride(f.prop === 'color' ? 'fillColor' : 'fillBg', `#${hx}`)} />)
+              ? liveFills.map((f, i) => <FigmaPaintRow key={`live-${i}`} hex={f.hex} op={f.op} label="Fill" origin={f.origin}
+                  onHexEdit={(hx) => applyOverride(f.prop === 'color' ? 'fillColor' : 'fillBg', `#${hx}`)}
+                  onOpacityEdit={(hx, opPct) => applyOverride(f.prop === 'color' ? 'fillColor' : 'fillBg', hexToRgba(hx, opPct))} />)
               : fills.map(f => <FigmaPaintRow key={f.id} hex={f.hex} op={f.op} label="Fill" onRemove={() => setFills(rows => rows.filter(row => row.id !== f.id))} />)}
           </Sec>
           <Sec title="Stroke" actionWidth={52} action={<><StyleApplyButton label="Stroke" title="Stroke, Apply styles and variables" /><UiIB name="plus" title="Add stroke fill" on={() => setStrokes(rows => [...rows, { id: nextRowId(rows), hex: '000000', op: 100, position: 'Inside', weight: 1 }])} /></>} bodyGap={0} bodyPadding="0">
             {liveStrokes
               ? liveStrokes.map((s, i) => (
                   <div key={`live-${i}`}>
-                    <FigmaPaintRow hex={s.hex} op={s.op} label="Stroke" onHexEdit={(hx) => applyOverride('strokeColor', `#${hx}`)} />
+                    <FigmaPaintRow hex={s.hex} op={s.op} label="Stroke"
+                      onHexEdit={(hx) => applyOverride('strokeColor', `#${hx}`)}
+                      onOpacityEdit={(hx, opPct) => applyOverride('strokeColor', hexToRgba(hx, opPct))} />
                     <StrokeDetailRow position={s.position} weight={s.weight} onWeight={(v) => applyOverride('strokeWeight', v)} />
                   </div>
                 ))

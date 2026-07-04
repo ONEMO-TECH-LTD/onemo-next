@@ -387,6 +387,14 @@ export class Overrides {
   }
 }
 
+/** #RRGGBB + opacity% → rgb()/rgba() (paint-opacity edits: alpha lives on the color, not the element). */
+export function hexToRgba(hex: string, opPct: number): string {
+  const h = hex.replace('#', '')
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16)
+  const a = Math.max(0, Math.min(100, opPct)) / 100
+  return a >= 1 ? `rgb(${r}, ${g}, ${b})` : `rgba(${r}, ${g}, ${b}, ${+a.toFixed(3)})`
+}
+
 let _ctx: CanvasRenderingContext2D | null = null
 /** Any CSS color (rgb/oklch/color()/named) → {hex, op%}; null for transparent/none. */
 export function colorToHex(c: string, doc: Document): { hex: string; op: number } | null {
