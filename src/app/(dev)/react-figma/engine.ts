@@ -30,6 +30,9 @@ const PROPS = [
 
 const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'LINK', 'META', 'TEMPLATE', 'NEXT-ROUTE-ANNOUNCER', 'NEXTJS-PORTAL'])
 
+/** Shorthands whose var() text is invisible to CSSOM longhand iteration (probed directly). */
+const SHORTHANDS = ['gap', 'padding', 'margin', 'border-radius', 'background', 'border', 'inset', 'font', 'flex']
+
 let seq = 0
 /** Runtime element address for layers↔canvas sync — DOM attribute only, never source. */
 export function ensureId(el: HTMLElement): string {
@@ -98,7 +101,13 @@ function collectDefined(el: HTMLElement, doc: Document): Record<string, DefEntry
         if (!matches) continue
         for (const prop of Array.from(rule.style)) {
           const value = rule.style.getPropertyValue(prop).trim()
-          into[prop] = { value, token: tokenOf(value) } // later match wins (source order)
+          if (value) into[prop] = { value, token: tokenOf(value) } // later match wins (source order)
+        }
+        // Chrome iterates var() SHORTHANDS as empty longhands (pending substitution
+        // lives on the shorthand) — probe shorthands directly for the var() text.
+        for (const sh of SHORTHANDS) {
+          const value = rule.style.getPropertyValue(sh).trim()
+          if (value) into[sh] = { value, token: tokenOf(value) }
         }
       }
     }
@@ -108,7 +117,11 @@ function collectDefined(el: HTMLElement, doc: Document): Record<string, DefEntry
   }
   for (const prop of Array.from(el.style)) { // inline wins the cascade
     const value = el.style.getPropertyValue(prop).trim()
-    into[prop] = { value, token: tokenOf(value) }
+    if (value) into[prop] = { value, token: tokenOf(value) }
+  }
+  for (const sh of SHORTHANDS) {
+    const value = el.style.getPropertyValue(sh).trim()
+    if (value) into[sh] = { value, token: tokenOf(value) }
   }
   return into
 }
