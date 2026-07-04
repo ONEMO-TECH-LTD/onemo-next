@@ -229,6 +229,8 @@ export type WriteOp =
   | { kind: 'insert-jsx-child'; file: string; line: number; col: number; snippet: string }
   | { kind: 'create-page'; slugBase?: string; width?: number; height?: number }
   | { kind: 'make-component'; file: string; line: number; col: number; name?: string }
+  | { kind: 'delete-jsx'; file: string; line: number; col: number }
+  | { kind: 'duplicate-jsx'; file: string; line: number; col: number }
 
 // ─── JSX inline-style write (E2.4, ENGINE-PLAN-E2.4.md) ──────────────────────
 
@@ -524,7 +526,52 @@ async function makeComponent(op: Extract<WriteOp, { kind: 'make-component' }>): 
   return { ok: true, file: op.file, newValueText: `<${name} />`, componentFile: `src/app/(dev)/react-figma-components/${name}.tsx` }
 }
 
+/** Resolve the full element node (self-closing, or the opening's parent JsxElement) at line:col. */
+function elementAt(sf: ts.SourceFile, line: number, col: number): ts.JsxElement | ts.JsxSelfClosingElement {
+  const opening = findJsxAt(sf, line, col)
+  if (!opening) throw Object.assign(new Error(`no JSX element at ${line}:${col}`), { status: 404 })
+  const el = ts.isJsxSelfClosingElement(opening) ? opening : opening.parent
+  if (!ts.isJsxElement(el) && !ts.isJsxSelfClosingElement(el)) {
+    throw Object.assign(new Error('could not resolve the full element subtree'), { status: 422 })
+  }
+  return el
+}
+
+/** Delete the selected element (E3.6 More-actions): remove its whole line-span, leaving no blank line. */
+async function deleteJsx(op: Extract<WriteOp, { kind: 'delete-jsx' }>): Promise<{ ok: true; file: string; newValueText: string }> {
+  const abs = jailComponentWrite(op.file)
+  const buf = await fs.readFile(abs)
+  const source = buf.toString('utf8')
+  const sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
+  const el = elementAt(sf, op.line, op.col)
+  const lineStart = source.lastIndexOf('\n', el.getStart(sf)) // the newline before the element's line
+  const cut = lineStart >= 0 ? lineStart : el.getStart(sf) // eat the leading newline+indent, else from element start
+  const bStart = byteLen(source.slice(0, cut)), bEnd = byteLen(source.slice(0, el.getEnd()))
+  const next = Buffer.concat([buf.subarray(0, bStart), buf.subarray(bEnd)])
+  await fs.writeFile(abs, next)
+  return { ok: true, file: op.file, newValueText: '' }
+}
+
+/** Duplicate the selected element (E3.6 More-actions): insert a verbatim copy right after it. */
+async function duplicateJsx(op: Extract<WriteOp, { kind: 'duplicate-jsx' }>): Promise<{ ok: true; file: string; newValueText: string }> {
+  const abs = jailComponentWrite(op.file)
+  const buf = await fs.readFile(abs)
+  const source = buf.toString('utf8')
+  const sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
+  const el = elementAt(sf, op.line, op.col)
+  const lineStart = source.lastIndexOf('\n', el.getStart(sf)) + 1
+  const indent = source.slice(lineStart).match(/^[ \t]*/)?.[0] ?? ''
+  const subtree = el.getText(sf)
+  const insert = `\n${indent}${subtree}`
+  const bOff = byteLen(source.slice(0, el.getEnd()))
+  const next = Buffer.concat([buf.subarray(0, bOff), Buffer.from(insert, 'utf8'), buf.subarray(bOff)])
+  await fs.writeFile(abs, next)
+  return { ok: true, file: op.file, newValueText: subtree }
+}
+
 export async function applyWrite(op: WriteOp): Promise<{ ok: true; file: string; newValueText: string; route?: string; componentFile?: string }> {
+  if (op.kind === 'delete-jsx') return deleteJsx(op)
+  if (op.kind === 'duplicate-jsx') return duplicateJsx(op)
   if (op.kind === 'make-component') return makeComponent(op)
   if (op.kind === 'create-page') return createPage(op)
   if (op.kind === 'set-token-value') return setTokenValue(op)

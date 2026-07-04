@@ -771,6 +771,27 @@ function VariablesLibrary() {
   )
 }
 
+/* E3.6 — More-actions menu (Duplicate / Delete the selected element → structural source edits). */
+function MoreActionsMenu({ onDuplicate, onDelete }: { onDuplicate: () => void; onDelete: () => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
+  const item = (label: string, onClick: () => void, danger?: boolean) => (
+    <button type="button" role="menuitem" onClick={() => { setOpen(false); onClick() }}
+      style={{ appearance: 'none', border: 0, background: 'transparent', width: '100%', height: 30, padding: '0 12px', display: 'flex', alignItems: 'center', cursor: 'pointer', color: danger ? '#d93025' : INK, font: `400 12px/1 ${FONT}`, textAlign: 'left' }}>{label}</button>
+  )
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <UiIB name="overflowDots" title="More actions" active={open} on={() => setOpen((v) => !v)} />
+      {open && (
+        <div data-figma-floating-root="true" role="menu" style={{ position: 'absolute', right: 0, top: 28, zIndex: 130, minWidth: 140, padding: '6px 0', borderRadius: 8, background: '#fff', boxShadow: 'rgba(0,0,0,0.15) 0px 2px 5px 0px, rgba(0,0,0,0.12) 0px 10px 16px 0px, rgba(0,0,0,0.12) 0px 0px 0.5px 0px' }}>
+          {item('Duplicate', onDuplicate)}
+          {item('Delete', onDelete, true)}
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* Paint/effect rows are cloned from the live Figma inspector DOM. */
 function normalizeHex(value: string) {
   return value.replace(/[^0-9a-f]/gi, '').slice(0, 6).toUpperCase()
@@ -1677,6 +1698,18 @@ export default function ReactFigmaPage() {
     await insertSnippet(snippet)
   }, [sel, insertImage, insertSnippet])
 
+  // E3.6 More-actions: duplicate / delete the selected element (structural source edits)
+  const duplicateEl = useCallback(async () => {
+    if (!sel) { console.warn('[engine] duplicate: select an element first'); return }
+    const r = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'duplicate-jsx', file: sel.file, line: sel.line, col: sel.col }) })
+    console.log('[engine] duplicate', r.ok ? await r.json() : await r.text())
+  }, [sel])
+  const deleteEl = useCallback(async () => {
+    if (!sel) { console.warn('[engine] delete: select an element first'); return }
+    const r = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'delete-jsx', file: sel.file, line: sel.line, col: sel.col }) })
+    console.log('[engine] delete', r.ok ? await r.json() : await r.text())
+  }, [sel])
+
   // E3.5 creation: extract the selected element into its own component file + instance
   const makeComponent = useCallback(async () => {
     if (!sel) { console.warn('[engine] make component: select an element first'); return }
@@ -2101,7 +2134,7 @@ export default function ReactFigmaPage() {
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
               <span aria-hidden style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', flex: 'none', color: INK }}><UiIcon name="devCode" /></span>
               <UiIB name="createComponent" title="Create component" on={() => void makeComponent()} />
-              <UiIB name="overflowDots" title="More actions" />
+              <MoreActionsMenu onDuplicate={() => void duplicateEl()} onDelete={() => void deleteEl()} />
             </div>
           </div>
 
