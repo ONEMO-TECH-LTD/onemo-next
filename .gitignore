@@ -103,3 +103,4 @@ public/models/
 # parallel-build caches (v1/v2/v3 dev dirs)
 .next-v*/
 storybook-static
+.playwright-cli/
