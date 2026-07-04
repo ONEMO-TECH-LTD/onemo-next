@@ -24,7 +24,21 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  webpack(config, { isServer, webpack }) {
+  webpack(config, { isServer, webpack, dev }) {
+    // react-figma engine M1 (KAI-9304): dev-only IN-MEMORY data-src tagging of host JSX
+    // elements — selection identity for the editor, zero bytes written to the repo. Runs on
+    // BOTH compilations so SSR + client HTML agree (no hydration mismatch). NB: requires
+    // `next dev --webpack` — bare `next dev` is Turbopack and skips webpack loaders entirely.
+    // See src/app/(dev)/react-figma/ENGINE-PLAN.md (M1).
+    if (dev) {
+      const nodePath = require("node:path");
+      config.module.rules.unshift({
+        test: /\.tsx$/,
+        include: nodePath.join(process.cwd(), "src"),
+        enforce: "pre",
+        use: [{ loader: nodePath.resolve(process.cwd(), "editor-engine/tagging-loader.cjs") }],
+      });
+    }
     // Creator v5 (DEC-v5-02): force ALL `paper` imports — ours (vector-core/paper-kernel) AND
     // paperjs-round-corners' internal one — to the HEADLESS core build. The default `paper`
     // (= paper-full) pulls dist/node/self.js + jsdom, which webpack can't bundle for the browser

@@ -631,6 +631,14 @@ const MOCK = {
   layoutGuides: [{ size: 'Grid 10px' }],
 }
 
+/* ── engine M1 · selection-core (KAI-9304) ─────────────────────────────────────
+   Canvas = same-origin iframe of the real route; elements carry data-src
+   ("file:line:col") stamped in-memory by editor-engine/tagging-loader.cjs.
+   Hover outline + click-to-select; payload → panel header + console. */
+type SelPayload = { file: string; line: number; col: number; tag: string; classes: string[] }
+type OutlineRect = { x: number; y: number; w: number; h: number }
+const CANVAS_ROUTE = '/effect-creator/v5.3.1/2d'
+
 export default function ReactFigmaPage() {
   type Rail = 'file' | 'assets' | 'variables'
   const [rail, setRail] = useState<Rail>('file')
@@ -651,6 +659,56 @@ export default function ReactFigmaPage() {
   const canvasRef = useRef<HTMLDivElement>(null)
   const pan = useRef<{ x: number; y: number; vx: number; vy: number } | null>(null)
   const [isPanning, setIsPanning] = useState(false)
+
+  // engine M1 — selection state
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+  const [sel, setSel] = useState<SelPayload | null>(null)
+  const [hoverRect, setHoverRect] = useState<OutlineRect | null>(null)
+  const [selRect, setSelRect] = useState<OutlineRect | null>(null)
+  const wireCanvas = useCallback(() => {
+    const doc = iframeRef.current?.contentDocument
+    if (!doc) { console.warn('[engine] contentDocument unreachable (COEP smoke FAIL?)'); return }
+    const findTagged = (t: EventTarget | null) =>
+      ((t as HTMLElement | null)?.closest?.('[data-src]') ?? null) as HTMLElement | null
+    const rectOf = (el: HTMLElement): OutlineRect => {
+      const r = el.getBoundingClientRect()
+      return { x: r.left, y: r.top, w: r.width, h: r.height }
+    }
+    doc.addEventListener('mousemove', (e) => {
+      const el = findTagged(e.target)
+      setHoverRect(el ? rectOf(el) : null)
+    }, true)
+    doc.addEventListener('mouseleave', () => setHoverRect(null), true)
+    doc.addEventListener('click', (e) => {
+      const el = findTagged(e.target)
+      if (!el) return
+      e.preventDefault(); e.stopPropagation()
+      const m = (el.getAttribute('data-src') ?? '').match(/^(.*):(\d+):(\d+)$/)
+      if (!m) return
+      const payload: SelPayload = { file: m[1], line: +m[2], col: +m[3], tag: el.tagName.toLowerCase(), classes: [...el.classList] }
+      console.log('[engine] select', payload)
+      setSel(payload)
+      setSelRect(rectOf(el))
+    }, true)
+    console.log('[engine] canvas wired — contentDocument reachable (COEP smoke PASS)')
+  }, [])
+  // onLoad alone misses the race where the iframe finishes loading BEFORE React hydrates
+  // (listener attached after the load event already fired) — wire eagerly + on every load.
+  useEffect(() => {
+    const f = iframeRef.current
+    if (!f) return
+    const tryWire = () => {
+      const doc = f.contentDocument as (Document & { __engineWired?: boolean }) | null
+      if (!doc || doc.readyState === 'loading' || doc.__engineWired) return
+      if (!doc.body || doc.body.childElementCount === 0) return
+      doc.__engineWired = true
+      wireCanvas()
+    }
+    tryWire()
+    f.addEventListener('load', tryWire)
+    const poll = setInterval(tryWire, 500) // covers HMR doc swaps; no-ops once wired
+    return () => { f.removeEventListener('load', tryWire); clearInterval(poll) }
+  }, [wireCanvas])
 
   useEffect(() => {
     const el = canvasRef.current; if (!el) return
@@ -756,8 +814,15 @@ export default function ReactFigmaPage() {
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle, rgba(0,0,0,.09) 1px, transparent 1px)', backgroundSize: `${24 * view.z}px ${24 * view.z}px`, backgroundPosition: `${view.x}px ${view.y}px` }} />
         <div style={{ position: 'absolute', left: 0, top: 0, transform: `translate(${view.x}px,${view.y}px) scale(${view.z})`, transformOrigin: '0 0' }}>
           <div style={{ font: `550 10px/1 ${FONT}`, color: SEL, marginBottom: 8, marginLeft: 2 }}>Editor 402 · 402 × 871</div>
-          <div data-screen-host style={{ width: 402, height: 871, background: '#fff', borderRadius: 4, boxShadow: '0 0 0 1px rgba(0,0,0,.06), 0 12px 40px -8px rgba(0,0,0,.25)', display: 'grid', placeItems: 'center', color: FAINT, font: `400 12px/1.6 ${FONT}`, textAlign: 'center', padding: 24 }}>
-            The real engine-connected Screen<br />mounts here — after the shell.
+          <div data-screen-host style={{ position: 'relative', width: 402, height: 871, background: '#fff', borderRadius: 4, boxShadow: '0 0 0 1px rgba(0,0,0,.06), 0 12px 40px -8px rgba(0,0,0,.25)' }}>
+            <iframe ref={iframeRef} src={CANVAS_ROUTE} onLoad={wireCanvas} title="Canvas — real build"
+              style={{ width: 402, height: 871, border: 0, display: 'block', borderRadius: 4 }} />
+            {hoverRect && (
+              <div style={{ position: 'absolute', left: hoverRect.x, top: hoverRect.y, width: hoverRect.w, height: hoverRect.h, outline: `${1.5 / view.z}px solid ${SEL}`, pointerEvents: 'none' }} />
+            )}
+            {selRect && (
+              <div style={{ position: 'absolute', left: selRect.x, top: selRect.y, width: selRect.w, height: selRect.h, outline: `${2 / view.z}px solid ${SEL}`, pointerEvents: 'none' }} />
+            )}
           </div>
         </div>
         <div style={{ position: 'absolute', left: 12, bottom: 12, height: 28, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', background: '#fff', borderRadius: 6, boxShadow: '0 2px 8px rgba(0,0,0,.14)', font: `450 11px/1 ${FONT}` }}>
@@ -792,7 +857,7 @@ export default function ReactFigmaPage() {
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {/* Frame preset + actions */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 48, padding: '4px 8px' }}>
-            <button type="button" aria-label="Frame, Frame Dimension Presets" style={{ appearance: 'none', border: 0, background: 'transparent', cursor: 'pointer', width: 72, height: 24, display: 'flex', alignItems: 'center', gap: 1, font: `550 13px/22px ${FONT}`, letterSpacing: '-0.032px', color: '#000', padding: '0 0 0 7px' }}>Frame <UiIcon name="caret24" /></button>
+            <button type="button" aria-label="Frame, Frame Dimension Presets" title={sel ? `${sel.file}:${sel.line}:${sel.col}` : undefined} style={{ appearance: 'none', border: 0, background: 'transparent', cursor: 'pointer', minWidth: 72, maxWidth: 150, height: 24, display: 'flex', alignItems: 'center', gap: 1, font: `550 13px/22px ${FONT}`, letterSpacing: '-0.032px', color: '#000', padding: '0 0 0 7px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{sel ? `${sel.tag} · ${sel.file.split('/').pop()}:${sel.line}` : 'Frame'} <UiIcon name="caret24" /></button>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
               <span aria-hidden style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', flex: 'none', color: INK }}><UiIcon name="devCode" /></span>
               <UiIB name="createComponent" title="Create component" />
