@@ -1472,7 +1472,11 @@ export default function ReactFigmaPage() {
     setClipContent(c['overflow'] !== 'visible')
     // Appearance
     setOpacityValue(String(Math.round(parseFloat(c['opacity'] || '1') * 100)))
-    setCornerRadiusValue(px(c['border-radius']))
+    // Mixed corners (Figma canon, E2.1 rule 2): unequal radii → 'Mixed' + individual toggle on
+    const cornerVals = ['border-top-left-radius', 'border-top-right-radius', 'border-bottom-right-radius', 'border-bottom-left-radius'].map((p) => c[p])
+    const cornersEqual = cornerVals.every((v) => v === cornerVals[0])
+    setCornerRadiusValue(cornersEqual ? px(c['border-radius']) : 'Mixed')
+    setIndividualCorners(!cornersEqual)
     setBlendMode(c['mix-blend-mode'] === 'normal' ? 'Pass through' : c['mix-blend-mode'])
     // Token provenance per field — SLOT-accurate for shorthands (plan §5):
     // `padding: var(--a) var(--b)` → paddingY slot = --a (top), paddingX slot = --b (left).
@@ -1494,7 +1498,7 @@ export default function ReactFigmaPage() {
       const fg = colorToHex(c['color'], doc)
       if (fg) fills.push({ ...fg, prop: 'color', origin: d['color']?.inheritedFrom ? `↑ inherited from ${d['color'].inheritedFrom.name}` : d['color']?.token ? `◈ ${d['color'].token}` : undefined })
     }
-    setLiveFills(fills.length ? fills : null)
+    setLiveFills(fills) // [] = selected-but-no-fill → Figma empty section, never mock rows (E2.1 rule 1)
     // Stroke: uniform border read (top edge as representative)
     const bw = parseFloat(c['border-top-width'] || '0')
     const bc = bw > 0 ? colorToHex(c['border-top-color'], doc) : null
