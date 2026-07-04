@@ -992,18 +992,28 @@ function FigmaEffectRow({ type }: { type: string }) {
   )
 }
 function SelectionColorRow({ hex, name, op, grad }: { hex?: string; name?: string; op: number; grad?: boolean }) {
-  const label = name || hex || ''
+  const [hexValue, setHexValue] = useState(hex || '000000')
+  const [labelValue, setLabelValue] = useState(name || hex || '')
+  const [opacityValue, setOpacityValue] = useState(String(op))
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const rowRef = useCloseOnOutside<HTMLDivElement>(pickerOpen, () => setPickerOpen(false))
+  const activeHex = normalizeHex(hexValue) || '000000'
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '156px', alignItems: 'center', height: 32, padding: '0 8px 0 16px' }}>
-      <div style={{ width: 156, height: 24, borderRadius: 5, background: FIELD, display: 'grid', gridTemplateColumns: '24px 1fr 38px 14px', alignItems: 'center', overflow: 'hidden', font: `450 11px/16px ${FONT}`, color: INK }}>
+      <div ref={rowRef} style={{ position: 'relative', width: 156, height: 24, borderRadius: 5, background: FIELD, border: `1px solid ${pickerOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: '24px 1fr 38px 14px', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
         {grad ? (
-          <span aria-label="Linear gradient" style={{ width: 14, height: 14, justifySelf: 'center', borderRadius: 2, background: 'linear-gradient(0deg, #000 0%, #666 100%)', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.15)' }} />
+          <button type="button" aria-label="Linear gradient" aria-haspopup="dialog" aria-expanded={pickerOpen} onClick={event => { event.stopPropagation(); setPickerOpen(v => !v) }}
+            style={{ appearance: 'none', border: 0, width: 14, height: 14, justifySelf: 'center', borderRadius: 2, background: 'linear-gradient(0deg, #000 0%, #666 100%)', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.15)', padding: 0, cursor: 'pointer' }} />
         ) : (
-          <button type="button" aria-label={`Solid color hex: ${hex}`} style={{ appearance: 'none', border: 0, width: 14, height: 14, justifySelf: 'center', borderRadius: 2, background: `#${hex}`, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.15)', padding: 0, cursor: 'pointer' }} />
+          <button type="button" aria-label={`Solid color hex: ${activeHex}`} aria-haspopup="dialog" aria-expanded={pickerOpen} onClick={event => { event.stopPropagation(); setPickerOpen(v => !v) }}
+            style={{ appearance: 'none', border: 0, width: 14, height: 14, justifySelf: 'center', borderRadius: 2, background: `#${activeHex}`, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.15)', padding: 0, cursor: 'pointer' }} />
         )}
-        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
-        <span style={{ textAlign: 'right', paddingRight: 7 }}>{op}</span>
+        <input aria-label={grad ? 'Selection gradient' : 'Selection color'} value={grad ? labelValue : activeHex} onChange={e => grad ? setLabelValue(e.currentTarget.value) : setHexValue(normalizeHex(e.currentTarget.value))}
+          style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, background: 'transparent', padding: 0, color: INK, font: `450 11px/16px ${FONT}` }} />
+        <input aria-label="Selection color opacity" role="spinbutton" value={opacityValue} onChange={e => setOpacityValue(e.currentTarget.value.replace(/[^0-9]/g, '').slice(0, 3))}
+          style={{ minWidth: 0, width: 38, height: 24, border: 0, outline: 0, background: 'transparent', padding: '0 7px 0 0', color: INK, textAlign: 'right', font: `450 11px/16px ${FONT}` }} />
         <span style={{ color: 'rgba(0,0,0,0.5)' }}>%</span>
+        {pickerOpen && <FigmaColorPicker anchorRef={rowRef} hex={activeHex} opacity={opacityValue} onHex={value => { setHexValue(value); if (!grad) setLabelValue(value) }} onOpacity={setOpacityValue} onClose={() => setPickerOpen(false)} />}
       </div>
     </div>
   )
