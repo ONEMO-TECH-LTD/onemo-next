@@ -43,6 +43,22 @@ export function splitTopLevel(value: string, sep: string): string[] {
   return out
 }
 
+export type ShadowParams = { x: number; y: number; blur: number; spread: number; color: string; inset: boolean }
+
+/** Parse one box-shadow → params (color may lead or trail). */
+export function parseShadow(value: string): ShadowParams {
+  const inset = /\binset\b/.test(value)
+  let s = value.replace(/\binset\b/, '').trim()
+  const colorM = s.match(/(rgba?\([^)]*\)|#[0-9a-f]{3,8})/i)
+  const color = colorM ? colorM[0].trim() : 'rgba(0,0,0,0.25)'
+  s = s.replace(color, '').trim()
+  const nums = (s.match(/-?\d+(\.\d+)?px/g) ?? []).map((n) => parseFloat(n))
+  return { x: nums[0] ?? 0, y: nums[1] ?? 0, blur: nums[2] ?? 0, spread: nums[3] ?? 0, color, inset }
+}
+export function formatShadow(p: ShadowParams): string {
+  return `${p.inset ? 'inset ' : ''}${p.x}px ${p.y}px ${p.blur}px ${p.spread}px ${p.color}`
+}
+
 /** Effects rows from computed shadow/filter values (Figma vocabulary). */
 export function parseEffects(c: Record<string, string>): { type: string; detail: string }[] {
   const out: { type: string; detail: string }[] = []

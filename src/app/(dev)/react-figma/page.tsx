@@ -16,7 +16,7 @@
  */
 
 import { Fragment, useState, useRef, useEffect, useCallback } from 'react'
-import { buildLayerTree, readStyles, colorToHex, hexToRgba, boxSlots, gapSlots, editSlot, tokenOf, Overrides, parseEffects, alignToIndex, alignFromIndex, collectSelectionColors, type LiveNode, type OverrideOp } from './engine'
+import { buildLayerTree, readStyles, colorToHex, hexToRgba, boxSlots, gapSlots, editSlot, tokenOf, Overrides, parseEffects, parseShadow, formatShadow, splitTopLevel, alignToIndex, alignFromIndex, collectSelectionColors, type LiveNode, type OverrideOp } from './engine'
 import { createPortal } from 'react-dom'
 import {
   ListDashes, MagnifyingGlass, Plus, Minus, Sidebar, CaretDown, GearSix, Palette,
@@ -1010,13 +1010,15 @@ function EffectColorInput({ hex, opacity, onHex, onOpacity }: { hex: string; opa
     </div>
   )
 }
-function FigmaEffectSettingsPopover({ anchorRef, type, onType, onClose }: { anchorRef: { current: HTMLElement | null }; type: string; onType: (value: string) => void; onClose: () => void }) {
+function FigmaEffectSettingsPopover({ anchorRef, type, onType, onClose, initial, onParams }: { anchorRef: { current: HTMLElement | null }; type: string; onType: (value: string) => void; onClose: () => void; initial?: { x: number; y: number; blur: number; spread: number }; onParams?: (p: { x: number; y: number; blur: number; spread: number }) => void }) {
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
   const [typeOpen, setTypeOpen] = useState(false)
-  const [xValue, setXValue] = useState('0')
-  const [yValue, setYValue] = useState('4')
-  const [blurValue, setBlurValue] = useState('4')
-  const [spreadValue, setSpreadValue] = useState('0')
+  const [xValue, setXValue] = useState(String(initial?.x ?? 0))
+  const [yValue, setYValue] = useState(String(initial?.y ?? 4))
+  const [blurValue, setBlurValue] = useState(String(initial?.blur ?? 4))
+  const [spreadValue, setSpreadValue] = useState(String(initial?.spread ?? 0))
+  const fire = (over: Partial<{ x: string; y: string; blur: string; spread: string }>) =>
+    onParams?.({ x: parseFloat(over.x ?? xValue) || 0, y: parseFloat(over.y ?? yValue) || 0, blur: parseFloat(over.blur ?? blurValue) || 0, spread: parseFloat(over.spread ?? spreadValue) || 0 })
   const [colorValue, setColorValue] = useState('000000')
   const [opacityValue, setOpacityValue] = useState('25')
   const [showBehind, setShowBehind] = useState(false)
@@ -1060,10 +1062,10 @@ function FigmaEffectSettingsPopover({ anchorRef, type, onType, onClose }: { anch
         <button type="button" aria-label="Close" onClick={onClose} style={{ appearance: 'none', border: 0, background: '#fff', width: 24, height: 24, display: 'grid', placeItems: 'center', cursor: 'pointer', color: INK }}><PickerSvgIcon name="close" /></button>
       </div>
       <div style={{ paddingTop: 12 }}>
-        <EffectSettingInput label="Position" prefix="X" value={xValue} onChange={setXValue} />
-        <EffectSettingInput label="" prefix="Y" value={yValue} onChange={setYValue} />
-        <EffectSettingInput label="Blur" value={blurValue} onChange={setBlurValue} />
-        <EffectSettingInput label="Spread" value={spreadValue} onChange={setSpreadValue} />
+        <EffectSettingInput label="Position" prefix="X" value={xValue} onChange={(v) => { setXValue(v); fire({ x: v }) }} />
+        <EffectSettingInput label="" prefix="Y" value={yValue} onChange={(v) => { setYValue(v); fire({ y: v }) }} />
+        <EffectSettingInput label="Blur" value={blurValue} onChange={(v) => { setBlurValue(v); fire({ blur: v }) }} />
+        <EffectSettingInput label="Spread" value={spreadValue} onChange={(v) => { setSpreadValue(v); fire({ spread: v }) }} />
         <EffectColorInput hex={colorValue} opacity={opacityValue} onHex={setColorValue} onOpacity={setOpacityValue} />
       </div>
       <div style={{ height: 41, borderTop: `1px solid ${LINE}`, marginTop: 8, padding: '8px 16px 0 12px', boxSizing: 'border-box' }}>
@@ -1076,7 +1078,7 @@ function FigmaEffectSettingsPopover({ anchorRef, type, onType, onClose }: { anch
     document.body
   )
 }
-function FigmaEffectRow({ type, onRemove }: { type: string; onRemove?: () => void }) {
+function FigmaEffectRow({ type, onRemove, initial, onParams }: { type: string; onRemove?: () => void; initial?: { x: number; y: number; blur: number; spread: number }; onParams?: (p: { x: number; y: number; blur: number; spread: number }) => void }) {
   const [effectType, setEffectType] = useState(type)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [visible, setVisible] = useState(true)
@@ -1087,7 +1089,7 @@ function FigmaEffectRow({ type, onRemove }: { type: string; onRemove?: () => voi
         style={{ position: 'relative', appearance: 'none', border: '1px solid #e6e6e6', background: '#fff', width: 156, height: 26, borderRadius: 5, padding: 0, display: 'grid', gridTemplateColumns: '24px 1fr', alignItems: 'center', cursor: 'pointer', font: `450 11px/16px ${FONT}`, color: INK }}>
         <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center' }}><UiIcon name="dropShadow" /></span>
         <span style={{ textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{effectType}</span>
-        {settingsOpen && <FigmaEffectSettingsPopover anchorRef={rowRef} type={effectType} onType={setEffectType} onClose={() => setSettingsOpen(false)} />}
+        {settingsOpen && <FigmaEffectSettingsPopover anchorRef={rowRef} type={effectType} onType={setEffectType} onClose={() => setSettingsOpen(false)} initial={initial} onParams={onParams} />}
       </button>
       <span />
       <UiIB name="visibility" title="Toggle visibility" active={!visible} on={() => setVisible(v => !v)} />
@@ -1413,6 +1415,7 @@ export default function ReactFigmaPage() {
   const [liveFills, setLiveFills] = useState<{ hex: string; op: number; origin?: string; prop: string }[] | null>(null)
   const [liveStrokes, setLiveStrokes] = useState<{ hex: string; op: number; weight: number; position: string }[] | null>(null)
   const [liveEffects, setLiveEffects] = useState<{ type: string; detail: string }[] | null>(null)
+  const liveShadowsRef = useRef<ReturnType<typeof parseShadow>[]>([])
   const [liveSelColors, setLiveSelColors] = useState<{ hex: string; op: number }[] | null>(null)
   // E2.2 Text section — present only for text-bearing elements (Figma canon)
   const [typo, setTypo] = useState<{ family: string; weight: string; size: string; lineHeight: string; letterSpacing: string; align: string } | null>(null)
@@ -1489,8 +1492,9 @@ export default function ReactFigmaPage() {
     const bw = parseFloat(c['border-top-width'] || '0')
     const bc = bw > 0 ? colorToHex(c['border-top-color'], doc) : null
     setLiveStrokes(bc ? [{ ...bc, weight: Math.round(bw * 100) / 100, position: 'Inside' }] : [])
-    // Effects: shadows + blurs in Figma vocabulary
+    // Effects: shadows + blurs in Figma vocabulary; keep full shadow list for index-safe editing
     setLiveEffects(parseEffects(c))
+    liveShadowsRef.current = c['box-shadow'] && c['box-shadow'] !== 'none' ? splitTopLevel(c['box-shadow'], ',').map(parseShadow) : []
     // Selection colors: unique colors across the tagged subtree
     setLiveSelColors(collectSelectionColors(el, doc))
     // Auto-layout alignment grid + resize modes
@@ -1569,6 +1573,7 @@ export default function ReactFigmaPage() {
       : field === 'cornerTR' ? [['border-top-right-radius', withUnit]]
       : field === 'cornerBR' ? [['border-bottom-right-radius', withUnit]]
       : field === 'cornerBL' ? [['border-bottom-left-radius', withUnit]]
+      : field === 'boxShadow' ? [['box-shadow', n]]
       : []
     // Stroke position "Center" has no clean CSS analog (border is inside, outline is outside) — no-op, honest.
     if (field === 'strokePosition' && n !== 'Inside' && n !== 'Outside') { console.warn('[engine] stroke position', n, '— no clean CSS analog (border=Inside, outline=Outside); no-op'); return }
@@ -2140,7 +2145,15 @@ export default function ReactFigmaPage() {
           </Sec>
           <Sec title="Effects" actionWidth={52} action={<><StyleApplyButton label="Effects" title="Effects, Apply styles" /><UiIB name="plus" title="Add effect" on={() => setEffects(rows => [...rows, { id: nextRowId(rows), type: 'Drop shadow' }])} /></>} bodyGap={0} bodyPadding="0">
             {liveEffects
-              ? liveEffects.map((e, i) => <FigmaEffectRow key={`live-${i}`} type={e.type} />)
+              ? (() => { let si = -1; return liveEffects.map((e, i) => {
+                  const isShadow = e.type.toLowerCase().includes('shadow')
+                  if (isShadow) si++
+                  const idx = si
+                  const sh = isShadow ? liveShadowsRef.current[idx] : undefined
+                  return <FigmaEffectRow key={`live-${i}`} type={e.type}
+                    initial={sh ? { x: sh.x, y: sh.y, blur: sh.blur, spread: sh.spread } : undefined}
+                    onParams={sh ? (p) => { const list = liveShadowsRef.current.map((s, k) => k === idx ? { ...s, ...p } : s); applyOverride('boxShadow', list.map(formatShadow).join(', ')) } : undefined} />
+                }) })()
               : effects.map(e => <FigmaEffectRow key={e.id} type={e.type} onRemove={() => setEffects(rows => rows.filter(row => row.id !== e.id))} />)}
           </Sec>
           <Sec title="Selection colors" bodyGap={0} bodyPadding="0">
