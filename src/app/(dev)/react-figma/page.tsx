@@ -1546,6 +1546,7 @@ export default function ReactFigmaPage() {
       : field === 'lineHeight' ? [['line-height', n === 'Auto' ? 'normal' : withUnit]]
       : field === 'letterSpacing' ? [['letter-spacing', parseFloat(n) === 0 ? 'normal' : withUnit]]
       : field === 'textAlign' ? [['text-align', n]]
+      : field === 'fillOpacity' ? [['opacity', String((parseFloat(n) || 0) / 100)]]
       : []
     if ((field === 'x' || field === 'y') && !positioned) { console.warn('[engine] X/Y on a static-position element has no CSS analog — no-op'); return }
     for (const [prop, value] of decls) ov.current!.set(id, prop, value, cs.getPropertyValue(prop))
