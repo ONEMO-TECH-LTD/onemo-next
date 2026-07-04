@@ -41,7 +41,10 @@ export function ensureId(el: HTMLElement): string {
   return id
 }
 
-/** Dev css-module class `file_local__hash` → `local`; '' when none. */
+/** Dev css-module class `file_local__hash` → `local`; '' when none.
+ *  ⚠ COUPLED to Next's dev getCssModuleLocalIdent format (file_local__hash) —
+ *  a css-loader localIdentName config change silently breaks layer labels
+ *  (and the resolver's `_local__` matching in api/dev/editor/lib.ts). */
 function localName(el: HTMLElement): string {
   for (const c of Array.from(el.classList)) {
     const m = c.match(/^[a-zA-Z0-9$-]+?_(.+?)__[a-zA-Z0-9_-]+$/)
@@ -142,13 +145,37 @@ export function editSlot(shorthandProp: string, slots: string[], longhand: strin
 
 /**
  * Selector specificity for provenance owner-resolution (a·1e6 + b·1e3 + c).
+ * Spec-correct for functional pseudo-classes (s58-expert review finding 1):
+ * `:where(…)` contributes 0; `:not(…)`/`:is(…)`/`:has(…)` contribute the
+ * specificity of their MOST-specific argument (resolved recursively).
  * For grouped selectors the caller passes the single matching part.
  */
 function specificity(sel: string): number {
-  const ids = (sel.match(/#[\w-]+/g) ?? []).length
-  const classes = (sel.match(/(\.[\w-]+|\[[^\]]*\]|:(?!:)[\w-]+(\([^)]*\))?)/g) ?? []).length
-  const types = (sel.match(/(^|[\s>+~])[a-zA-Z][\w-]*/g) ?? []).length + (sel.match(/::[\w-]+/g) ?? []).length
-  return ids * 1e6 + classes * 1e3 + types
+  let total = 0
+  // pseudo-ELEMENTS count as type (c) — take them out before scanning
+  let s = sel.replace(/::[\w-]+/g, () => { total += 1; return ' ' })
+  let rest = ''
+  for (let i = 0; i < s.length; i++) {
+    const m = /^:(not|is|has|where)\(/i.exec(s.slice(i))
+    if (m) {
+      let depth = 0, j = i + m[0].length - 1 // at '('
+      for (; j < s.length; j++) {
+        if (s[j] === '(') depth++
+        else if (s[j] === ')') { depth--; if (depth === 0) break }
+      }
+      if (m[1]!.toLowerCase() !== 'where') {
+        const inner = s.slice(i + m[0].length, j)
+        total += Math.max(0, ...inner.split(',').map((x) => specificity(x.trim())))
+      }
+      i = j
+      continue
+    }
+    rest += s[i]
+  }
+  total += (rest.match(/#[\w-]+/g) ?? []).length * 1e6
+  total += ((rest.match(/(\.[\w-]+|\[[^\]]*\]|:(?!:)[\w-]+)/g) ?? []).length) * 1e3
+  total += (rest.match(/(^|[\s>+~(])[a-zA-Z][\w-]*/g) ?? []).length
+  return total
 }
 
 /**

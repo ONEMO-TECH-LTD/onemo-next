@@ -71,7 +71,7 @@ const BOX_SIDE_TO_INDEX: Record<string, (n: number) => number> = {
   // slot index for a side given the slot count (CSS box shorthand semantics)
   top: (n) => 0,
   right: (n) => (n === 1 ? 0 : 1),
-  bottom: (n) => (n <= 2 ? (n === 1 ? 0 : 0) : 2),
+  bottom: (n) => (n <= 2 ? 0 : 2),
   left: (n) => (n === 1 ? 0 : n === 4 ? 3 : 1),
 }
 
