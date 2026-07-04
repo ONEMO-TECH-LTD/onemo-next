@@ -1297,7 +1297,7 @@ function InsertIsland({ onInsert }: { onInsert?: (tag: string, display?: string)
           )}
         </div>
         <div role="group" aria-label="Text" style={{ display: 'grid', gridTemplateColumns: '32px 16px', width: 49, height: 32 }}>
-          <button type="button" title="Text" aria-label="Text" style={{ appearance: 'none', border: 0, width: 32, height: 32, borderRadius: 7, background: '#fff', color: INK, display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
+          <button type="button" title="Text" aria-label="Text" onClick={() => onInsert?.('text')} style={{ appearance: 'none', border: 0, width: 32, height: 32, borderRadius: 7, background: '#fff', color: INK, display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
             <UiIcon name="insertText" />
           </button>
           <button type="button" title="Type tools" aria-label="Type tools" style={{ appearance: 'none', border: 0, width: 16, height: 32, background: '#fff', color: FAINT, opacity: 0.55, display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
@@ -1602,7 +1602,10 @@ export default function ReactFigmaPage() {
   const insertChild = useCallback(async (tag: string, display?: string) => {
     if (!sel) { console.warn('[engine] insert: select a container element first'); return }
     const st = display === 'flex' || display === 'grid' ? ` display: '${display}',` : ''
-    const snippet = `<${tag} style={{${st} minWidth: 40, minHeight: 40, background: 'rgba(0,0,0,0.06)', borderRadius: 4 }} />`
+    const snippet =
+      tag === 'text' ? `<span style={{ fontSize: 14, color: '#000' }}>Text</span>`
+      : tag === 'img' ? `<img src="/screen/placeholder.svg" alt="" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 4 }} />`
+      : `<${tag} style={{${st} minWidth: 40, minHeight: 40, background: 'rgba(0,0,0,0.06)', borderRadius: 4 }} />`
     const r = await fetch('/api/dev/editor-write', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ kind: 'insert-jsx-child', file: sel.file, line: sel.line, col: sel.col, snippet }),
