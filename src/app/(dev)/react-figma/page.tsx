@@ -15,7 +15,7 @@
  *  Spec: Inter 11px; headers 550/~0.5px near-black; fields 24px/5px radius; every value field raw-OR-token (◆).
  */
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { Fragment, useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import {
   ListDashes, MagnifyingGlass, Plus, Minus, Sidebar, CaretDown, GearSix, Palette,
@@ -419,6 +419,16 @@ function FigmaMenuRow({ children, checked, onClick }: { children: React.ReactNod
     </li>
   )
 }
+function PickerMenuOption({ value, width, checked, onClick }: { value: string; width: number; checked?: boolean; onClick: () => void }) {
+  const [h, setH] = useState(false)
+  return (
+    <li role="option" aria-selected={checked} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)} onPointerDown={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); onClick() }}
+      style={{ width, height: 24, display: 'grid', gridTemplateColumns: '24px 1fr', alignItems: 'center', padding: '0 8px', boxSizing: 'border-box', cursor: 'pointer', color: '#fff', background: checked ? SEL : h ? 'rgba(255,255,255,0.08)' : 'transparent', font: `400 11px/24px ${FONT}` }}>
+      <span style={{ width: 16, height: 16, display: 'grid', placeItems: 'center', visibility: checked ? 'visible' : 'hidden' }}><MenuCheck /></span>
+      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</span>
+    </li>
+  )
+}
 function ResizeDropdownField({ axis, value, mode, onValue, onMode }: { axis: 'W' | 'H'; value: string; mode: ResizeMode; onValue: (value: string) => void; onMode: (mode: ResizeMode) => void }) {
   const [open, setOpen] = useState(false)
   const [varOpen, setVarOpen] = useState(false)
@@ -703,6 +713,10 @@ function FigmaColorPicker({ anchorRef, hex, opacity, onHex, onOpacity, onClose }
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
   const [activeTab, setActiveTab] = useState<'custom' | 'libraries'>('custom')
   const [paintType, setPaintType] = useState<keyof typeof COLOR_PICKER_ICON>('solid')
+  const [formatValue, setFormatValue] = useState('Hex')
+  const [formatOpen, setFormatOpen] = useState(false)
+  const [swatchSet, setSwatchSet] = useState('On this page')
+  const [swatchOpen, setSwatchOpen] = useState(false)
   const [hue, setHue] = useState(0)
   const [reticle, setReticle] = useState(() => ({ x: normalizeHex(hex) === '000000' ? 0 : 0, y: normalizeHex(hex) === '000000' ? 208 : 0 }))
   useEffect(() => {
@@ -740,9 +754,18 @@ function FigmaColorPicker({ anchorRef, hex, opacity, onHex, onOpacity, onClose }
   const opacityNumber = Math.max(0, Math.min(100, Number.parseInt(opacity || '0', 10) || 0))
   const activeHex = normalizeHex(hex) || 'FFFFFF'
   const paintTypes: (keyof typeof COLOR_PICKER_ICON)[] = ['solid', 'gradient', 'pattern', 'image', 'video', 'shader']
+  const formatOptions = ['Hex', 'RGB', 'CSS', 'HSL', 'HSB']
+  const swatchOptions = ['On this page', 'Created in this file', 'iOS 18 and iPadOS 18', 'iOS and iPadOS 26', 'macOS 26', 'Material 3 Design Kit', 'Simple Design System', 'visionOS 26', 'watchOS 26']
+  const closeInnerMenus = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!(event.target instanceof Element)) return
+    if (event.target.closest('[data-color-picker-menu-root="true"]')) return
+    if (event.target.closest('[data-color-picker-menu-button="true"]')) return
+    setFormatOpen(false)
+    setSwatchOpen(false)
+  }
   return createPortal(
-    <div data-figma-floating-root="true" data-figma-color-picker="true" role="dialog" aria-label="Color picker"
-      style={{ position: 'fixed', zIndex: 1200, left, top, width, height, borderRadius: 13, background: '#fff', color: INK, boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px', overflow: 'hidden', font: `400 11px/16px ${FONT}` }}>
+    <div data-figma-floating-root="true" data-figma-color-picker="true" role="dialog" aria-label="Color picker" onPointerDown={closeInnerMenus}
+      style={{ position: 'fixed', zIndex: 1200, left, top, width, height, borderRadius: 13, background: '#fff', color: INK, boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px', overflow: 'visible', font: `400 11px/16px ${FONT}` }}>
       <div style={{ height: 40, display: 'grid', gridTemplateColumns: '1fr 28px 24px', alignItems: 'center', padding: '0 8px', boxSizing: 'border-box' }}>
         <div role="tablist" style={{ display: 'flex', gap: 4, width: 124, height: 24 }}>
           {(['custom', 'libraries'] as const).map(tabName => (
@@ -795,9 +818,16 @@ function FigmaColorPicker({ anchorRef, hex, opacity, onHex, onOpacity, onClose }
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '55px 8px 89px 1px 54px', height: 24, padding: '0 16px', alignItems: 'center', boxSizing: 'border-box' }}>
-        <button type="button" role="combobox" aria-label="Color format" aria-controls="figma-color-format-options" aria-expanded={false} style={{ appearance: 'none', border: `1px solid ${LINE}`, background: '#fff', borderRadius: 5, width: 55, height: 24, display: 'grid', gridTemplateColumns: '1fr 24px', alignItems: 'center', padding: '0 0 0 9px', cursor: 'pointer', color: INK, font: `400 11px/16px ${FONT}` }}>
-          <span>Hex</span><PickerSvgIcon name="caret" />
-        </button>
+        <div style={{ position: 'relative', width: 55, height: 24 }}>
+          <button type="button" data-color-picker-menu-button="true" role="combobox" aria-label="Color format" aria-controls="figma-color-format-options" aria-expanded={formatOpen} onClick={() => { setSwatchOpen(false); setFormatOpen(v => !v) }} style={{ appearance: 'none', border: `1px solid ${LINE}`, background: '#fff', borderRadius: 5, width: 55, height: 24, display: 'grid', gridTemplateColumns: '1fr 24px', alignItems: 'center', padding: '0 0 0 9px', cursor: 'pointer', color: INK, font: `400 11px/16px ${FONT}` }}>
+            <span>{formatValue}</span><PickerSvgIcon name="caret" />
+          </button>
+          {formatOpen && (
+            <ul id="figma-color-format-options" data-figma-floating-root="true" data-color-picker-menu-root="true" role="listbox" style={{ position: 'absolute', zIndex: 1300, left: -8, top: -8, width: 87, margin: 0, padding: '8px 0', listStyle: 'none', borderRadius: 7, background: '#1e1e1e', boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px' }}>
+              {formatOptions.map(option => <PickerMenuOption key={option} value={option} width={87} checked={formatValue === option} onClick={() => { setFormatValue(option); setFormatOpen(false) }} />)}
+            </ul>
+          )}
+        </div>
         <span />
         <input aria-label="Color" role="spinbutton" value={activeHex} onChange={e => onHex(normalizeHex(e.currentTarget.value))}
           style={{ width: 89, height: 24, border: 0, outline: 0, background: FIELD, borderRadius: 5, padding: '0 8px', boxSizing: 'border-box', color: INK, font: `450 11px/16px ${FONT}` }} />
@@ -809,9 +839,23 @@ function FigmaColorPicker({ anchorRef, hex, opacity, onHex, onOpacity, onClose }
         </div>
       </div>
       <div style={{ padding: '28px 16px 0', boxSizing: 'border-box' }}>
-        <button type="button" role="combobox" aria-label="Color swatch set selector" aria-controls="figma-color-swatch-set-options" aria-expanded={false} style={{ appearance: 'none', border: `1px solid ${LINE}`, background: '#fff', borderRadius: 5, width: 208, height: 24, display: 'grid', gridTemplateColumns: '1fr 24px', alignItems: 'center', padding: '0 0 0 9px', cursor: 'pointer', color: INK, font: `400 11px/16px ${FONT}` }}>
-          <span style={{ textAlign: 'left' }}>On this page</span><PickerSvgIcon name="caret" />
-        </button>
+        <div style={{ position: 'relative', width: 208, height: 24 }}>
+          <button type="button" data-color-picker-menu-button="true" role="combobox" aria-label="Color swatch set selector" aria-controls="figma-color-swatch-set-options" aria-expanded={swatchOpen} onClick={() => { setFormatOpen(false); setSwatchOpen(v => !v) }} style={{ appearance: 'none', border: `1px solid ${LINE}`, background: '#fff', borderRadius: 5, width: 208, height: 24, display: 'grid', gridTemplateColumns: '1fr 24px', alignItems: 'center', padding: '0 0 0 9px', cursor: 'pointer', color: INK, font: `400 11px/16px ${FONT}` }}>
+            <span style={{ textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{swatchSet}</span><PickerSvgIcon name="caret" />
+          </button>
+          {swatchOpen && (
+            <div data-figma-floating-root="true" data-color-picker-menu-root="true" style={{ position: 'absolute', zIndex: 1300, left: -8, top: -8, width: 224, maxHeight: 228, overflowY: 'auto', margin: 0, padding: '8px 0', borderRadius: 13, background: '#1e1e1e', boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px' }}>
+              <ul id="figma-color-swatch-set-options" role="listbox" style={{ width: 224, margin: 0, padding: 0, listStyle: 'none' }}>
+                {swatchOptions.map((option, index) => (
+                  <Fragment key={option}>
+                    <PickerMenuOption value={option} width={224} checked={swatchSet === option} onClick={() => { setSwatchSet(option); setSwatchOpen(false) }} />
+                    {index === 1 && <li role="separator" style={{ height: 15, padding: '7px 0', boxSizing: 'border-box' }}><span style={{ display: 'block', height: 1, background: 'rgb(56,56,56)' }} /></li>}
+                  </Fragment>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
       </div>
     </div>,
     document.body
