@@ -182,11 +182,11 @@ function PositionRow({ label, children }: { label: string; children: React.React
     </div>
   )
 }
-function InspectorRow({ label, height = 48, top = 20, children }: { label: string; height?: number; top?: number; children: React.ReactNode }) {
+function InspectorRow({ label, height = 48, top = 20, columns = '88px 88px 24px', gap = 8, children }: { label: string; height?: number; top?: number; columns?: string; gap?: number; children: React.ReactNode }) {
   return (
     <div style={{ position: 'relative', height, width: '100%' }}>
       <span style={{ position: 'absolute', left: 16, top: 3.5, width: 88, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>{label}</span>
-      <div style={{ position: 'absolute', left: 16, right: 8, top, display: 'grid', gridTemplateColumns: '88px 88px 24px', gap: 8, alignItems: 'start' }}>{children}</div>
+      <div style={{ position: 'absolute', left: 16, right: 8, top, display: 'grid', gridTemplateColumns: columns, gap, alignItems: 'start' }}>{children}</div>
     </div>
   )
 }
@@ -217,12 +217,12 @@ function AutoValueField({ icon, label, value, mode, caret = true }: { icon?: key
     </div>
   )
 }
-function TextSegGroup({ items, active = 0, width = 184 }: { items: string[]; active?: number; width?: number }) {
+function TextSegGroup({ items, active = 0, width = 184, onSelect, ariaLabel }: { items: string[]; active?: number; width?: number | string; onSelect?: (index: number) => void; ariaLabel?: string }) {
   return (
-    <div style={{ width, height: 24, borderRadius: 5, background: FIELD, display: 'flex', overflow: 'hidden' }}>
+    <div role="radiogroup" aria-label={ariaLabel} style={{ width, height: 24, borderRadius: 5, background: FIELD, display: 'flex', overflow: 'hidden' }}>
       {items.map((item, i) => (
-        <button key={item} type="button" title={item}
-          style={{ appearance: 'none', border: 0, cursor: 'pointer', flex: '1 1 0', minWidth: 0, height: 24, borderRadius: i === active ? 5 : 0, display: 'grid', placeItems: 'center', background: i === active ? '#fff' : 'transparent', color: i === active ? INK : MUTE, font: `${i === active ? 550 : 450} 10px/14px ${FONT}`, padding: '0 5px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <button key={item} type="button" role="radio" aria-checked={i === active} title={item} onClick={() => onSelect?.(i)}
+          style={{ appearance: 'none', border: 0, cursor: 'pointer', flex: '1 1 0', minWidth: 0, height: 24, borderRadius: i === active ? 5 : 0, display: 'grid', placeItems: 'center', background: i === active ? '#fff' : 'transparent', color: i === active ? INK : MUTE, font: `${i === active ? 550 : 450} 10px/14px ${FONT}`, padding: '0 4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {item}
         </button>
       ))}
@@ -542,6 +542,7 @@ export default function ReactFigmaPage() {
   const [rail, setRail] = useState<Rail>('file')
   const [tab, setTab] = useState<'design' | 'prototype'>('design')
   const [view, setView] = useState({ x: 300, y: 70, z: 0.6 })
+  const [cssPosition, setCssPosition] = useState(2)
   const canvasRef = useRef<HTMLDivElement>(null)
   const pan = useRef<{ x: number; y: number; vx: number; vy: number } | null>(null)
   const [isPanning, setIsPanning] = useState(false)
@@ -710,10 +711,8 @@ export default function ReactFigmaPage() {
               <div style={{ display: 'flex', gap: 1, width: '100%' }}><FSegBtn name="rotate" pos="l" fill title="Rotate 90° right" /><FSegBtn name="flipH" pos="m" fill title="Flip horizontal" /><FSegBtn name="flipV" pos="r" fill title="Flip vertical" /></div>
               <span />
             </PositionRow>
-            <InspectorRow label="CSS position">
-              <TextSegGroup items={['Auto', 'Rel', 'Abs', 'Fix', 'Sticky']} active={2} />
-              <span />
-              <span />
+            <InspectorRow label="CSS position" columns="1fr">
+              <TextSegGroup items={['Auto', 'Rel', 'Abs', 'Fix', 'Sticky']} active={cssPosition} onSelect={setCssPosition} width="100%" ariaLabel="CSS position" />
             </InspectorRow>
             <CompactInspectorRow label="Inset / z-index">
               <InspectorField label="T" value="auto" />
