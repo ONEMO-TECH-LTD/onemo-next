@@ -1841,7 +1841,7 @@ export default function ReactFigmaPage() {
             </div>
             <div style={{ height: 49, padding: '9px 8px 0 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: `1px solid ${LINE}` }}>
               <span style={hdr}>Layers</span>
-              <UiIB name="collapseLayers" title="Collapse layers" />
+              <UiIB name="collapseLayers" title="Collapse layers" on={() => { const ids = (layers ?? []).filter((n) => n.kids).map((n) => n.id); setCollapsed((prev) => prev.size >= ids.length ? new Set() : new Set(ids)) }} />
             </div>
             <div style={{ flex: 1, overflowY: 'auto' }}>
               {layers
