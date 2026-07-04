@@ -814,6 +814,34 @@ function MoreActionsMenu({ onDuplicate, onDelete }: { onDuplicate: () => void; o
   )
 }
 
+/* E3.6 — Auto layout settings: direction + distribution (the CSS-flexbox analogs). */
+function AutoLayoutSettingsMenu({ onApply }: { onApply: (field: string, value: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
+  const seg = (label: string, field: string, opts: [string, string][]) => (
+    <div style={{ padding: '6px 12px' }}>
+      <div style={{ font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)', marginBottom: 4 }}>{label}</div>
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+        {opts.map(([lbl, val]) => (
+          <button key={val} type="button" onClick={() => onApply(field, val)}
+            style={{ appearance: 'none', border: `1px solid ${LINE}`, background: '#fff', height: 24, padding: '0 8px', borderRadius: 5, cursor: 'pointer', font: `400 11px/1 ${FONT}`, color: INK }}>{lbl}</button>
+        ))}
+      </div>
+    </div>
+  )
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <UiIB name="autoLayoutSettings" title="Auto layout settings" active={open} on={() => setOpen((v) => !v)} />
+      {open && (
+        <div data-figma-floating-root="true" role="menu" style={{ position: 'absolute', right: 0, top: 28, zIndex: 130, width: 220, padding: '6px 0', borderRadius: 8, background: '#fff', boxShadow: 'rgba(0,0,0,0.15) 0px 2px 5px 0px, rgba(0,0,0,0.12) 0px 10px 16px 0px, rgba(0,0,0,0.12) 0px 0px 0.5px 0px' }}>
+          {seg('Direction', 'flexDirection', [['Row', 'row'], ['Column', 'column'], ['Row reverse', 'row-reverse'], ['Col reverse', 'column-reverse']])}
+          {seg('Distribute', 'justify', [['Packed', 'flex-start'], ['Space between', 'space-between']])}
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* E3.6 — Type settings popover: text-decoration + text-transform (real CSS analogs). */
 function TypeSettingsMenu({ onApply }: { onApply: (field: string, value: string) => void }) {
   const [open, setOpen] = useState(false)
@@ -1238,11 +1266,29 @@ function LayoutGuideRow({ size, onRemove }: { size: string; onRemove?: () => voi
   const [guideValue, setGuideValue] = useState(size)
   const [open, setOpen] = useState(false)
   const [visible, setVisible] = useState(true)
+  const [stgOpen, setStgOpen] = useState(false)
+  const [count, setCount] = useState('5')
+  const [gutter, setGutter] = useState('16')
   const guideRef = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
+  const stgRef = useCloseOnOutside<HTMLDivElement>(stgOpen, () => setStgOpen(false))
   const options = ['Grid', 'Columns', 'Rows']
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '24px 8px 124px 8px 24px 4px 24px', alignItems: 'center', height: 32, padding: '0 8px 0 16px' }}>
-      <UiIB name="layoutGrid" title="Layout guide settings" />
+      {/* Layout guides are an editor-visual design aid (canvas overlay) — Figma-native, no build/CSS
+          analog, so params live in editor state and never write to source (Dan's no-invented rule). */}
+      <div ref={stgRef} style={{ position: 'relative', width: 24, height: 24 }}>
+        <UiIB name="layoutGrid" title="Layout guide settings" active={stgOpen} on={() => setStgOpen((v) => !v)} />
+        {stgOpen && (
+          <div data-figma-floating-root="true" role="menu" style={{ position: 'absolute', left: 0, top: 28, zIndex: 130, width: 168, padding: '8px 12px', borderRadius: 8, background: '#fff', boxShadow: 'rgba(0,0,0,0.15) 0px 2px 5px 0px, rgba(0,0,0,0.12) 0px 10px 16px 0px, rgba(0,0,0,0.12) 0px 0px 0.5px 0px', display: 'grid', gap: 8 }}>
+            {([['Count', count, setCount], ['Gutter', gutter, setGutter]] as const).map(([lbl, val, set]) => (
+              <label key={lbl} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', font: `400 11px/1 ${FONT}`, color: INK }}>
+                {lbl}
+                <input value={val} onChange={(e) => set(e.currentTarget.value)} style={{ width: 56, height: 24, border: `1px solid ${LINE}`, borderRadius: 5, padding: '0 8px', outline: 0, font: `400 11px/1 ${FONT}`, color: INK, textAlign: 'right' }} />
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
       <span />
       <div ref={guideRef} style={{ position: 'relative', width: 124, height: 24 }}>
         <button type="button" role="combobox" aria-controls="layout-guide-options" aria-expanded={open} onClick={() => setOpen(v => !v)}
@@ -1676,6 +1722,7 @@ export default function ReactFigmaPage() {
       : field === 'strokePosition' ? (n === 'Inside' ? [['box-sizing', 'border-box']] : n === 'Outside' ? [['box-sizing', 'content-box']] : [])
       : field === 'aspectRatio' ? [['aspect-ratio', n]]
       : field === 'flexWrap' ? [['flex-wrap', n]]
+      : field === 'flexDirection' ? [['flex-direction', n]]
       : field === 'clip' ? [['overflow', n]]
       : field === 'transform' ? [['transform', n]]
       : field === 'cssPosition' ? [['position', n]]
@@ -2238,7 +2285,7 @@ export default function ReactFigmaPage() {
               <div style={{ position: 'absolute', left: 16, right: 8, top: 22, display: 'grid', gridTemplateColumns: '88px 88px 24px', gap: 8, alignItems: 'start' }}>
                 <AlignGrid sel={autoAlign} onSelect={(i) => { setAutoAlign(i); const a = alignFromIndex(i); applyOverride('alignItems', a.alignItems); applyOverride('justify', a.justifyContent) }} />
                 <GapDropdownField value={gapValue} onChange={(v) => { setGapValue(v); applyOverride('gap', v) }} token={fieldTokens.gap} />
-                <UiIB name="autoLayoutSettings" title="Auto layout settings" />
+                <AutoLayoutSettingsMenu onApply={applyOverride} />
               </div>
             </div>
             <InspectorRow label="Padding" height={50}>
