@@ -16,6 +16,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import {
   ListDashes, MagnifyingGlass, Plus, Minus, Sidebar, CaretDown, GearSix, Palette,
   type Icon as PIcon,
@@ -162,15 +163,126 @@ function UiIB({ name, title, active, size = 24, on }: { name: keyof typeof UI_IC
     </button>
   )
 }
-
-function InspectorField({ label, icon, value, bound, input, dimValue }: { label?: string; icon?: keyof typeof UI_ICON; value: string; bound?: boolean; input?: boolean; dimValue?: boolean }) {
-  const [h, setH] = useState(false)
+function useCloseOnOutside<T extends HTMLElement>(open: boolean, close: () => void) {
+  const ref = useRef<T>(null)
+  useEffect(() => {
+    if (!open) return
+    const onPointerDown = (event: PointerEvent) => {
+      if (!(event.target instanceof Element)) return
+      if (event.target.closest('[data-figma-floating-root="true"]')) return
+      if (!ref.current?.contains(event.target)) close()
+    }
+    document.addEventListener('pointerdown', onPointerDown, true)
+    return () => document.removeEventListener('pointerdown', onPointerDown, true)
+  }, [open, close])
+  return ref
+}
+const VARIABLE_ROWS: { kind: 'header' | 'item'; label: string; value?: string; selected?: boolean }[] = [
+  { kind: 'header', label: '3.1-Sem-Dim-Fluid' },
+  { kind: 'item', label: 'none', value: '0', selected: true },
+  { kind: 'header', label: 'nano' },
+  { kind: 'item', label: 'xs', value: '1' },
+  { kind: 'item', label: 's', value: '2' },
+  { kind: 'item', label: 'm', value: '4' },
+  { kind: 'item', label: 'l', value: '6' },
+  { kind: 'item', label: 'xl', value: '8' },
+  { kind: 'item', label: '2xl', value: '10' },
+  { kind: 'header', label: 'standard' },
+  { kind: 'item', label: 'xs', value: '12' },
+  { kind: 'item', label: 's', value: '14' },
+  { kind: 'item', label: 'm', value: '16' },
+  { kind: 'item', label: 'l', value: '20' },
+  { kind: 'item', label: 'xl', value: '24' },
+  { kind: 'header', label: 'big' },
+  { kind: 'item', label: 'xs', value: '32' },
+  { kind: 'item', label: 's', value: '40' },
+  { kind: 'item', label: 'm', value: '48' },
+  { kind: 'item', label: 'l', value: '56' },
+]
+function VariableHashIcon() {
   return (
-    <div onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
-      style={{ minWidth: 0, height: 24, borderRadius: 5, background: h ? '#ededed' : input ? '#fff' : FIELD, border: `1px solid ${input ? '#e6e6e6' : 'transparent'}`, display: 'flex', alignItems: 'center', overflow: 'hidden', font: `450 11px/16px ${FONT}`, color: INK }}>
+    <svg width="24" height="24" fill="none" viewBox="0 0 24 24" aria-hidden style={{ display: 'block' }}>
+      <path fill="currentColor" d="M16 6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zM8 7a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1zm3.05 2.002a.5.5 0 0 1 .448.547l-.045.452h1.495l.055-.55a.5.5 0 0 1 .995.098l-.045.452h.547a.5.5 0 1 1 0 1h-.648l-.199 2h.847a.5.5 0 1 1 0 1h-.948l-.054.548a.501.501 0 0 1-.995-.098l.044-.45h-1.495l-.054.548a.501.501 0 0 1-.995-.098l.044-.45H9.5a.5.5 0 0 1 0-1h.647l.2-2H9.5a.5.5 0 0 1 0-1h.948l.055-.55a.5.5 0 0 1 .546-.449m.302 1.999-.199 2h1.494l.2-2z" />
+    </svg>
+  )
+}
+function FigmaVariablePicker({ fieldLabel, anchorRef, onPick, onClose }: { fieldLabel: string; anchorRef: { current: HTMLElement | null }; onPick?: (value: string) => void; onClose: () => void }) {
+  const [query, setQuery] = useState('')
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
+  useEffect(() => {
+    const update = () => setAnchorRect(anchorRef.current?.getBoundingClientRect() ?? null)
+    update()
+    window.addEventListener('resize', update)
+    window.addEventListener('scroll', update, true)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.removeEventListener('scroll', update, true)
+    }
+  }, [anchorRef])
+  const rows = VARIABLE_ROWS.filter(row => row.kind === 'header' || row.label.toLowerCase().includes(query.trim().toLowerCase()))
+  if (!anchorRect) return null
+  const width = 216
+  const height = 387
+  const left = Math.max(8, Math.min(anchorRect.left, window.innerWidth - width - 8))
+  const top = Math.max(8, Math.min(anchorRect.top - 4, window.innerHeight - height - 8))
+  return createPortal(
+    <div data-figma-floating-root="true" role="dialog" aria-label={`${fieldLabel} variable set`}
+      style={{ position: 'fixed', zIndex: 1000, left, top, width, height, borderRadius: 13, background: '#fff', color: INK, boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px', overflow: 'hidden', font: `400 11px/16px ${FONT}` }}>
+      <div style={{ height: 41, borderBottom: `1px solid ${LINE}`, display: 'grid', gridTemplateColumns: '32px 1fr 32px', alignItems: 'center' }}>
+        <span style={{ width: 32, height: 40, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.8)' }}><MagnifyingGlass size={13} weight="regular" /></span>
+        <input placeholder="Search" value={query} onChange={e => setQuery(e.currentTarget.value)}
+          style={{ width: '100%', minWidth: 0, height: 24, border: 0, outline: 0, background: 'transparent', padding: 0, color: INK, font: `400 11px/16px ${FONT}` }} />
+        <button type="button" aria-label="Close variable picker" onClick={onClose}
+          style={{ appearance: 'none', border: 0, background: 'transparent', width: 32, height: 40, display: 'grid', placeItems: 'center', cursor: 'pointer', color: 'rgba(0,0,0,0.8)', font: `400 18px/18px ${FONT}` }}>×</button>
+      </div>
+      <div style={{ height: 42, borderBottom: `1px solid ${LINE}`, display: 'grid', gridTemplateColumns: '1fr 32px', alignItems: 'center', padding: '0 8px', boxSizing: 'border-box' }}>
+        <button type="button" role="combobox" aria-controls="figma-variable-library-list" aria-expanded={false}
+          style={{ appearance: 'none', border: `1px solid ${LINE}`, background: '#fff', height: 24, width: 92.3, borderRadius: 5, padding: '0 8px', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', font: `400 11px/16px ${FONT}`, color: INK }}>
+          <span>All libraries</span><CaretDown size={10} />
+        </button>
+        <button type="button" aria-label="New variable" style={{ appearance: 'none', border: 0, background: 'transparent', width: 24, height: 24, justifySelf: 'end', display: 'grid', placeItems: 'center', cursor: 'pointer', color: INK }}>
+          <Plus size={13} />
+        </button>
+      </div>
+      <div style={{ height: 304, overflowY: 'auto', background: '#fff', paddingTop: 8 }}>
+        {rows.map((row, index) => row.kind === 'header' ? (
+          <div key={`${row.label}-${index}`} style={{ height: 32, display: 'flex', alignItems: 'center', padding: '0 16px', boxSizing: 'border-box', font: `550 11px/16px ${FONT}`, color: INK }}>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.label}</span>
+          </div>
+        ) : (
+          <button key={`${row.label}-${row.value}-${index}`} type="button" onClick={() => { if (row.value) onPick?.(row.value); onClose() }}
+            style={{ appearance: 'none', border: 0, width: 216, height: 32, background: row.selected ? '#f5f5f5' : '#fff', display: 'grid', gridTemplateColumns: '40px 1fr 32px', alignItems: 'center', padding: 0, cursor: 'pointer', color: INK, font: `400 11px/16px ${FONT}`, textAlign: 'left' }}>
+            <span style={{ width: 24, height: 24, marginLeft: 16, display: 'grid', placeItems: 'center', color: INK }}><VariableHashIcon /></span>
+            <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.label}</span>
+            <span style={{ color: 'rgba(0,0,0,0.3)', textAlign: 'right', paddingRight: 16 }}>{row.value}</span>
+          </button>
+        ))}
+      </div>
+    </div>,
+    document.body
+  )
+}
+
+function InspectorField({ label, icon, value, bound, input, dimValue, ariaLabel, onChange }: { label?: string; icon?: keyof typeof UI_ICON; value: string; bound?: boolean; input?: boolean; dimValue?: boolean; ariaLabel?: string; onChange?: (value: string) => void }) {
+  const [h, setH] = useState(false)
+  const [varOpen, setVarOpen] = useState(false)
+  const fieldRef = useCloseOnOutside<HTMLDivElement>(varOpen, () => setVarOpen(false))
+  const fieldLabel = ariaLabel ?? label ?? 'value'
+  return (
+    <div ref={fieldRef} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
+      style={{ position: 'relative', minWidth: 0, height: 24, borderRadius: 5, background: h ? '#ededed' : input ? '#fff' : FIELD, border: `1px solid ${varOpen ? SEL : input ? '#e6e6e6' : 'transparent'}`, display: 'flex', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
       <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', flex: 'none', color: input ? INK : 'rgba(0,0,0,0.5)', font: `400 11px/24px ${FONT}` }}>{icon ? <UiIcon name={icon} /> : label}</span>
-      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: bound ? TOKEN : dimValue ? MUTE : INK }}>{value}</span>
-      <span title="Apply variable" style={{ width: 16, height: 24, display: 'grid', placeItems: 'center', flex: 'none', color: bound ? TOKEN : FAINT, opacity: bound ? 1 : h ? 0.75 : 0 }}><UiIcon name="variable" size={12} /></span>
+      {onChange ? (
+        <input aria-label={fieldLabel} role="spinbutton" value={value} onChange={e => onChange(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
+          style={{ flex: 1, minWidth: 0, height: 24, border: 0, outline: 0, padding: '0 8px 0 0', background: 'transparent', color: bound ? TOKEN : dimValue ? MUTE : INK, font: `450 11px/16px ${FONT}` }} />
+      ) : (
+        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: bound ? TOKEN : dimValue ? MUTE : INK }}>{value}</span>
+      )}
+      <button type="button" title="Apply variable" aria-label={`Apply variable to ${fieldLabel}`} aria-haspopup="menu" aria-expanded={varOpen} onClick={event => { event.stopPropagation(); setVarOpen(v => !v) }}
+        style={{ appearance: 'none', border: 0, padding: 0, width: 16, height: 24, display: 'grid', placeItems: 'center', flex: 'none', background: 'transparent', cursor: 'pointer', color: bound ? TOKEN : FAINT, opacity: bound || h || varOpen ? 1 : 0.55 }}>
+        <UiIcon name="variable" size={12} />
+      </button>
+      {varOpen && <FigmaVariablePicker fieldLabel={fieldLabel} anchorRef={fieldRef} onPick={onChange} onClose={() => setVarOpen(false)} />}
     </div>
   )
 }
@@ -212,17 +324,33 @@ function AutoFlowGroup({ value, onChange }: { value: AutoFlow; onChange: (value:
     </div>
   )
 }
-function AutoValueField({ icon, label, value, mode, caret = true }: { icon?: keyof typeof UI_ICON; label?: string; value: string; mode?: string; caret?: boolean }) {
+function AutoValueField({ icon, label, value, mode, caret = true, ariaLabel, onChange }: { icon?: keyof typeof UI_ICON; label?: string; value: string; mode?: string; caret?: boolean; ariaLabel?: string; onChange?: (value: string) => void }) {
+  const [varOpen, setVarOpen] = useState(false)
+  const fieldRef = useCloseOnOutside<HTMLDivElement>(varOpen, () => setVarOpen(false))
+  const fieldLabel = ariaLabel ?? label ?? 'value'
   return (
-    <div style={{ height: 24, width: 88, borderRadius: 5, background: FIELD, display: 'flex', alignItems: 'center', overflow: 'hidden', font: `450 11px/16px ${FONT}`, color: INK }}>
+    <div ref={fieldRef} style={{ position: 'relative', height: 24, width: 88, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'flex', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
       <span style={{ width: 24, height: 24, flex: 'none', display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)', font: `450 11px/24px ${FONT}` }}>{icon ? <UiIcon name={icon} /> : label}</span>
-      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</span>
+      {onChange ? (
+        <input aria-label={fieldLabel} role="spinbutton" value={value} onChange={e => onChange(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
+          style={{ flex: 1, minWidth: 0, width: 1, height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: INK, font: `450 11px/16px ${FONT}` }} />
+      ) : (
+        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</span>
+      )}
       {mode ? <span style={{ flex: 'none', marginRight: 7, color: INK }}>{mode}</span> : caret && <span style={{ width: 24, height: 24, flex: 'none', display: 'grid', placeItems: 'center', color: FAINT }}><UiIcon name="caret24" /></span>}
+      {onChange && (
+        <>
+          <button type="button" title="Apply variable" aria-label={`Apply variable to ${fieldLabel}`} aria-haspopup="menu" aria-expanded={varOpen} onClick={event => { event.stopPropagation(); setVarOpen(v => !v) }}
+            style={{ appearance: 'none', border: 0, padding: 0, width: 16, height: 24, display: 'grid', placeItems: 'center', flex: 'none', background: 'transparent', cursor: 'pointer', color: FAINT }}>
+            <UiIcon name="variable" size={12} />
+          </button>
+          {varOpen && <FigmaVariablePicker fieldLabel={fieldLabel} anchorRef={fieldRef} onPick={onChange} onClose={() => setVarOpen(false)} />}
+        </>
+      )}
     </div>
   )
 }
 type ResizeMode = 'Fixed' | 'Hug' | 'Fill'
-const menuDivider = <span style={{ display: 'block', height: 1, margin: '6px 8px', background: 'rgba(255,255,255,0.16)' }} />
 function MenuCheck() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden style={{ display: 'block' }}>
@@ -239,28 +367,47 @@ function MenuOptionButton({ children, checked, onClick }: { children: React.Reac
     </button>
   )
 }
-function ResizeDropdownField({ axis, value, mode, onMode }: { axis: 'W' | 'H'; value: string; mode: ResizeMode; onMode: (mode: ResizeMode) => void }) {
+function FigmaMenuSeparator() {
+  return <li role="separator" style={{ height: 17, padding: '8px 0', boxSizing: 'border-box' }}><span style={{ display: 'block', height: 1, background: 'rgb(56,56,56)' }} /></li>
+}
+function FigmaMenuRow({ children, checked, onClick }: { children: React.ReactNode; checked?: boolean; onClick: () => void }) {
+  const [h, setH] = useState(false)
+  return (
+    <li role="menuitemradio" aria-checked={checked} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)} onClick={onClick}
+      style={{ width: '100%', height: 24, borderRadius: 5, background: checked ? SEL : h ? 'rgba(255,255,255,0.08)' : 'transparent', color: '#fff', display: 'grid', gridTemplateColumns: '24px 1fr', alignItems: 'center', cursor: 'pointer', font: `400 11px/24px ${FONT}` }}>
+      <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', visibility: checked ? 'visible' : 'hidden' }}><MenuCheck /></span>
+      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{children}</span>
+    </li>
+  )
+}
+function ResizeDropdownField({ axis, value, mode, onValue, onMode }: { axis: 'W' | 'H'; value: string; mode: ResizeMode; onValue: (value: string) => void; onMode: (mode: ResizeMode) => void }) {
   const [open, setOpen] = useState(false)
+  const menuRef = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
   const axisLabel = axis === 'W' ? 'width' : 'height'
   const selectMode = (next: ResizeMode) => { onMode(next); setOpen(false) }
+  const applyOnly = () => setOpen(false)
   return (
-    <div style={{ position: 'relative', width: 88, height: 24 }}>
-      <button type="button" aria-label={`${axisLabel} resizing: ${mode}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(v => !v)}
-        style={{ appearance: 'none', border: 0, padding: 0, width: 88, height: 24, background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
-        <AutoValueField icon={axis === 'W' ? 'resizeW' : undefined} label={axis === 'H' ? 'H' : undefined} value={value} mode={mode} caret={false} />
-      </button>
+    <div ref={menuRef} style={{ position: 'relative', width: 88, height: 24 }}>
+      <div style={{ width: 88, height: 24, borderRadius: 5, background: FIELD, display: 'grid', gridTemplateColumns: '24px 1fr 32px', alignItems: 'center', overflow: 'hidden', font: `450 11px/16px ${FONT}`, color: INK }}>
+        <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)', font: `450 11px/24px ${FONT}` }}>{axis === 'W' ? <UiIcon name="resizeW" /> : 'H'}</span>
+        <input aria-label={`${axisLabel} value`} role="spinbutton" value={value} onChange={e => onValue(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
+          style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: INK, font: `450 11px/16px ${FONT}` }} />
+        <button type="button" aria-label={`${axisLabel} resizing: ${mode}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(v => !v)}
+          style={{ appearance: 'none', border: 0, padding: 0, width: 32, height: 24, background: 'transparent', color: INK, cursor: 'pointer', font: `450 11px/16px ${FONT}` }}>{mode}</button>
+      </div>
       {open && (
-        <div role="menu" aria-label={`${axisLabel} resizing options`} style={{ position: 'absolute', zIndex: 90, top: 28, left: 0, width: 184, padding: 6, borderRadius: 12, background: '#1f1f1f', color: '#fff', boxShadow: '0 18px 38px rgba(0,0,0,.24)' }}>
-          <MenuOptionButton checked={mode === 'Fixed'} onClick={() => selectMode('Fixed')}>Fixed {axisLabel}</MenuOptionButton>
-          <MenuOptionButton checked={mode === 'Hug'} onClick={() => selectMode('Hug')}>Hug contents</MenuOptionButton>
-          <MenuOptionButton checked={mode === 'Fill'} onClick={() => selectMode('Fill')}>Fill container</MenuOptionButton>
-          {menuDivider}
-          <MenuOptionButton onClick={() => setOpen(false)}>Add min {axisLabel}...</MenuOptionButton>
-          <MenuOptionButton onClick={() => setOpen(false)}>Max {axisLabel}: 640</MenuOptionButton>
-          {menuDivider}
-          <MenuOptionButton onClick={() => setOpen(false)}>Remove max</MenuOptionButton>
-          {menuDivider}
-          <MenuOptionButton onClick={() => setOpen(false)}>Apply variable...</MenuOptionButton>
+        <div role="presentation" style={{ position: 'absolute', zIndex: 110, top: 28, left: 0, width: axis === 'W' ? 165 : 168, padding: '0 8px', borderRadius: 13, background: '#1e1e1e', color: '#fff', boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px' }}>
+          <ul role="menu" aria-label={`${axisLabel} resizing options`} style={{ width: axis === 'W' ? 149 : 152, margin: 0, padding: '8px 0 6px', listStyle: 'none' }}>
+            <FigmaMenuRow checked={mode === 'Fixed'} onClick={() => selectMode('Fixed')}>Fixed {axisLabel} ({value})</FigmaMenuRow>
+            <FigmaMenuRow checked={mode === 'Hug'} onClick={() => selectMode('Hug')}>Hug contents</FigmaMenuRow>
+            <FigmaMenuRow checked={mode === 'Fill'} onClick={() => selectMode('Fill')}>Fill container</FigmaMenuRow>
+            <FigmaMenuSeparator />
+            <FigmaMenuRow onClick={applyOnly}>Add min {axisLabel}...</FigmaMenuRow>
+            <FigmaMenuRow onClick={applyOnly}>{axis === 'W' ? `Max ${axisLabel}: 640` : `Add max ${axisLabel}...`}</FigmaMenuRow>
+            {axis === 'W' && <><FigmaMenuSeparator /><FigmaMenuRow onClick={applyOnly}>Remove max</FigmaMenuRow></>}
+            <FigmaMenuSeparator />
+            <FigmaMenuRow onClick={applyOnly}>Apply variable...</FigmaMenuRow>
+          </ul>
         </div>
       )}
     </div>
@@ -268,38 +415,52 @@ function ResizeDropdownField({ axis, value, mode, onMode }: { axis: 'W' | 'H'; v
 }
 function GapDropdownField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const [open, setOpen] = useState(false)
-  const values = ['0', '4', '8', '10', '12', '16', '24', '32', 'Auto']
+  const menuRef = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
   return (
-    <div style={{ position: 'relative', width: 88, height: 24 }}>
-      <button type="button" aria-label={`Gap: ${value}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(v => !v)}
-        style={{ appearance: 'none', border: 0, padding: 0, width: 88, height: 24, background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
-        <AutoValueField icon="gapVertical" value={value} />
-      </button>
+    <div ref={menuRef} style={{ position: 'relative', width: 88, height: 24 }}>
+      <div style={{ width: 88, height: 24, borderRadius: 5, background: FIELD, display: 'grid', gridTemplateColumns: '24px 1fr 24px', alignItems: 'center', overflow: 'hidden', font: `450 11px/16px ${FONT}`, color: INK }}>
+        <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)' }}><UiIcon name="gapVertical" /></span>
+        <input aria-label="Gap value" role="spinbutton" value={value} onChange={e => onChange(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
+          style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: INK, font: `450 11px/16px ${FONT}` }} />
+        <button type="button" aria-label={`Gap options: ${value}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(v => !v)}
+          style={{ appearance: 'none', border: 0, padding: 0, width: 24, height: 24, display: 'grid', placeItems: 'center', background: 'transparent', color: FAINT, cursor: 'pointer' }}><UiIcon name="caret24" /></button>
+      </div>
       {open && (
-        <div role="menu" aria-label="Gap options" style={{ position: 'absolute', zIndex: 90, top: 28, left: 0, width: 104, padding: 6, borderRadius: 12, background: '#1f1f1f', color: '#fff', boxShadow: '0 18px 38px rgba(0,0,0,.24)' }}>
-          {values.map(item => (
-            <MenuOptionButton key={item} checked={item === value} onClick={() => { onChange(item); setOpen(false) }}>{item}</MenuOptionButton>
-          ))}
+        <div role="presentation" style={{ position: 'absolute', zIndex: 110, top: 28, left: 0, width: 156, padding: '0 8px', borderRadius: 13, background: '#1e1e1e', color: '#fff', boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px' }}>
+          <ul role="menu" aria-label="Gap options" style={{ width: 140, margin: 0, padding: '8px 0 6px', listStyle: 'none' }}>
+            <FigmaMenuRow checked={value === '10'} onClick={() => { onChange('10'); setOpen(false) }}>10</FigmaMenuRow>
+            <FigmaMenuRow checked={value === 'Auto'} onClick={() => { onChange('Auto'); setOpen(false) }}>Auto</FigmaMenuRow>
+            <FigmaMenuSeparator />
+            <FigmaMenuRow onClick={() => setOpen(false)}>Apply variable...</FigmaMenuRow>
+          </ul>
         </div>
       )}
     </div>
   )
 }
 function InlineValueInput({ icon, value, onChange, suffix, ariaLabel }: { icon: keyof typeof UI_ICON; value: string; onChange: (value: string) => void; suffix?: string; ariaLabel: string }) {
+  const [varOpen, setVarOpen] = useState(false)
+  const fieldRef = useCloseOnOutside<HTMLDivElement>(varOpen, () => setVarOpen(false))
   return (
-    <div style={{ height: 24, width: 88, borderRadius: 5, background: FIELD, display: 'grid', gridTemplateColumns: suffix ? '24px 1fr 14px' : '24px 1fr', alignItems: 'center', overflow: 'hidden', font: `450 11px/16px ${FONT}`, color: INK }}>
+    <div ref={fieldRef} style={{ position: 'relative', height: 24, width: 88, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: suffix ? '24px 1fr 14px 16px' : '24px 1fr 16px', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
       <span style={{ width: 24, height: 24, flex: 'none', display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)' }}><UiIcon name={icon} /></span>
       <input aria-label={ariaLabel} value={value} onChange={e => onChange(e.currentTarget.value)}
         style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: INK, font: `450 11px/16px ${FONT}` }} />
       {suffix && <span style={{ color: MUTE }}>{suffix}</span>}
+      <button type="button" title="Apply variable" aria-label={`Apply variable to ${ariaLabel}`} aria-haspopup="menu" aria-expanded={varOpen} onClick={event => { event.stopPropagation(); setVarOpen(v => !v) }}
+        style={{ appearance: 'none', border: 0, padding: 0, width: 16, height: 24, display: 'grid', placeItems: 'center', background: 'transparent', cursor: 'pointer', color: FAINT }}>
+        <UiIcon name="variable" size={12} />
+      </button>
+      {varOpen && <FigmaVariablePicker fieldLabel={ariaLabel} anchorRef={fieldRef} onPick={onChange} onClose={() => setVarOpen(false)} />}
     </div>
   )
 }
 function BlendModeMenu({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const [open, setOpen] = useState(false)
+  const menuRef = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
   const modes = ['Pass through', 'Normal', 'Multiply', 'Screen', 'Overlay']
   return (
-    <div style={{ position: 'relative', width: 24, height: 24 }}>
+    <div ref={menuRef} style={{ position: 'relative', width: 24, height: 24 }}>
       <UiIB name="blendMode" title={`Blend mode: ${value}`} active={open || value !== 'Pass through'} on={() => setOpen(v => !v)} />
       {open && (
         <div role="menu" aria-label="Blend mode options" style={{ position: 'absolute', zIndex: 95, top: 28, right: 0, width: 136, padding: 6, borderRadius: 12, background: '#1f1f1f', color: '#fff', boxShadow: '0 18px 38px rgba(0,0,0,.24)' }}>
@@ -342,13 +503,14 @@ function Sec({ title, action, children, caret, bodyGap = 8, bodyPadding = '0 8px
     </div>
   )
 }
-function AlignGrid({ sel = 1 }: { sel?: number }) {
+function AlignGrid({ sel = 1, onSelect }: { sel?: number; onSelect?: (index: number) => void }) {
   return (
     <div style={{ flex: 'none', width: 88, height: 56, background: FIELD, borderRadius: 5, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', padding: '5px 1px' }}>
       {Array.from({ length: 9 }).map((_, i) => (
-        <div key={i} style={{ display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
+        <button key={i} type="button" aria-label={`Auto layout alignment ${i + 1}`} aria-pressed={i === sel} onClick={() => onSelect?.(i)}
+          style={{ appearance: 'none', border: 0, background: 'transparent', padding: 0, display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
           <span style={{ width: i === sel ? 9 : 3, height: 2, borderRadius: 2, background: i === sel ? SEL : FAINT }} />
-        </div>
+        </button>
       ))}
     </div>
   )
@@ -554,6 +716,96 @@ function LayoutGuideRow({ size }: { size: string }) {
     </div>
   )
 }
+type FrameKind = 'Section' | 'Frame' | 'Group'
+type FramePreset = { label: string; size: string }
+const FRAME_KIND_OPTIONS: { label: FrameKind; disabled?: boolean }[] = [
+  { label: 'Section', disabled: true },
+  { label: 'Frame' },
+  { label: 'Group' },
+]
+const FRAME_PRESET_GROUPS: { label: string; items: FramePreset[] }[] = [
+  { label: 'Phone Presets', items: [
+    { label: 'iPhone 17', size: '402 × 874' }, { label: 'iPhone 16 & 17 Pro', size: '402 × 874' }, { label: 'iPhone 16', size: '393 × 852' }, { label: 'iPhone 16 & 17 Pro Max', size: '440 × 956' },
+    { label: 'iPhone 16 Plus', size: '430 × 932' }, { label: 'iPhone Air', size: '420 × 912' }, { label: 'iPhone 14 & 15 Pro Max', size: '430 × 932' }, { label: 'iPhone 14 & 15 Pro', size: '393 × 852' },
+    { label: 'iPhone 13 & 14', size: '390 × 844' }, { label: 'iPhone 14 Plus', size: '428 × 926' }, { label: 'Android Compact', size: '412 × 917' }, { label: 'Android Medium', size: '700 × 840' },
+  ] },
+  { label: 'Tablet Presets', items: [
+    { label: 'iPad mini 8.3', size: '744 × 1133' }, { label: 'Surface Pro 8', size: '1440 × 960' }, { label: 'iPad Pro 11"', size: '834 × 1194' }, { label: 'iPad Pro 12.9"', size: '1024 × 1366' }, { label: 'Android Expanded', size: '1280 × 800' },
+  ] },
+  { label: 'Desktop Presets', items: [
+    { label: 'MacBook Air', size: '1280 × 832' }, { label: 'MacBook Pro 14"', size: '1512 × 982' }, { label: 'MacBook Pro 16"', size: '1728 × 1117' }, { label: 'Desktop', size: '1440 × 1024' }, { label: 'Wireframes', size: '1440 × 1024' }, { label: 'TV', size: '1280 × 720' },
+  ] },
+  { label: 'Presentation Presets', items: [
+    { label: 'Slide 16:9', size: '1920 × 1080' }, { label: 'Slide 4:3', size: '1024 × 768' },
+  ] },
+  { label: 'Watch Presets', items: [
+    { label: 'Apple Watch Series 10 42mm', size: '187 × 223' }, { label: 'Apple Watch Series 10 46mm', size: '208 × 248' }, { label: 'Apple Watch 41mm', size: '176 × 215' }, { label: 'Apple Watch 45mm', size: '198 × 242' }, { label: 'Apple Watch 44mm', size: '184 × 224' }, { label: 'Apple Watch 40mm', size: '162 × 197' },
+  ] },
+  { label: 'Paper Presets', items: [
+    { label: 'A4', size: '595 × 842' }, { label: 'A5', size: '420 × 595' }, { label: 'A6', size: '297 × 420' }, { label: 'Letter', size: '612 × 792' }, { label: 'Tabloid', size: '792 × 1224' },
+  ] },
+  { label: 'Social Media Presets', items: [
+    { label: 'Twitter post', size: '1200 × 675' }, { label: 'Twitter header', size: '1500 × 500' }, { label: 'Facebook post', size: '1200 × 630' }, { label: 'Facebook cover', size: '820 × 312' }, { label: 'Instagram post', size: '1080 × 1350' },
+    { label: 'Instagram story', size: '1080 × 1920' }, { label: 'Dribbble shot', size: '400 × 300' }, { label: 'Dribbble shot HD', size: '800 × 600' }, { label: 'LinkedIn cover', size: '1584 × 396' },
+  ] },
+  { label: 'Figma Presets', items: [
+    { label: 'Plugin icon', size: '128 × 128' }, { label: 'Profile banner', size: '1680 × 240' }, { label: 'Plugin / file cover', size: '1920 × 1080' },
+  ] },
+  { label: 'Archived Presets', items: [
+    { label: 'iPhone 13 mini', size: '375 × 812' }, { label: 'iPhone SE', size: '320 × 568' }, { label: 'iPhone 13 Pro Max', size: '428 × 926' }, { label: 'iPhone 13 / 13 Pro', size: '390 × 844' },
+    { label: 'iPhone 11 Pro Max', size: '414 × 896' }, { label: 'iPhone 11 Pro / X', size: '375 × 812' }, { label: 'iPhone 8 Plus', size: '414 × 736' }, { label: 'iPhone 8', size: '375 × 667' },
+    { label: 'Android Small', size: '360 × 640' }, { label: 'Android Large', size: '360 × 800' }, { label: 'Google Pixel 2', size: '411 × 731' }, { label: 'Google Pixel 2 XL', size: '411 × 823' },
+    { label: 'iPad mini 5', size: '768 × 1024' }, { label: 'Surface Pro 4', size: '1368 × 912' }, { label: 'MacBook', size: '1152 × 700' }, { label: 'MacBook Pro', size: '1440 × 900' },
+    { label: 'Surface Book', size: '1500 × 1000' }, { label: 'Apple Watch 42mm', size: '156 × 195' }, { label: 'Apple Watch 38mm', size: '136 × 170' }, { label: 'iMac', size: '1280 × 720' }, { label: 'Macintosh 128k', size: '512 × 342' },
+  ] },
+]
+function FrameMenuItem({ role, label, size, checked, disabled, onClick }: { role: 'menuitemradio' | 'menuitemcheckbox'; label: string; size?: string; checked?: boolean; disabled?: boolean; onClick: () => void }) {
+  const [h, setH] = useState(false)
+  return (
+    <li role={role} aria-checked={checked} aria-disabled={disabled} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
+      onClick={() => { if (!disabled) onClick() }}
+      style={{ width: 222, height: 24, display: 'flex', alignItems: 'center', padding: '0 8px', boxSizing: 'border-box', cursor: disabled ? 'default' : 'pointer', color: disabled ? 'rgba(255,255,255,0.4)' : '#fff', background: 'transparent', font: `400 11px/16px ${FONT}` }}>
+      <span style={{ width: 206, height: 24, borderRadius: 5, padding: '4px 8px 4px 4px', boxSizing: 'border-box', display: 'flex', alignItems: 'center', background: h && !disabled ? 'rgba(255,255,255,0.08)' : 'transparent' }}>
+        <span style={{ width: 16, height: 16, margin: '-4px 4px -4px 0', display: 'grid', placeItems: 'center', visibility: checked ? 'visible' : 'hidden', color: '#fff', flex: 'none' }}><MenuCheck /></span>
+        {size ? (
+          <span style={{ width: 174, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+            <span style={{ flex: 'none' }}>{size}</span>
+          </span>
+        ) : (
+          <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+        )}
+      </span>
+    </li>
+  )
+}
+function FramePresetDropdown({ kind, preset, onKind, onPreset }: { kind: FrameKind; preset: FramePreset; onKind: (kind: FrameKind) => void; onPreset: (preset: FramePreset) => void }) {
+  const [open, setOpen] = useState(false)
+  const menuRef = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
+  return (
+    <div ref={menuRef} style={{ position: 'relative', width: 72, height: 24, flex: 'none' }}>
+      <button type="button" aria-label={`${kind}, Frame Dimension Presets, ${preset.label}, ${preset.size}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(v => !v)}
+        style={{ appearance: 'none', border: '1px solid rgba(0,0,0,0)', background: 'transparent', cursor: 'pointer', width: 72, height: 24, borderRadius: 5, display: 'flex', alignItems: 'center', gap: 1, font: `550 13px/22px ${FONT}`, letterSpacing: '-0.032px', color: '#000', padding: '0 0 0 7px' }}>
+        {kind} <UiIcon name="caret24" />
+      </button>
+      {open && (
+        <div role="presentation" style={{ position: 'absolute', zIndex: 110, top: 28, left: 0, width: 222, maxHeight: 'calc(100vh - 121px)', overflowY: 'auto', borderRadius: 13, background: '#1e1e1e', padding: '8px 0', boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px' }}>
+          <ul role="menu" aria-label="Frame Dimension Presets" style={{ width: 222, margin: 0, padding: 0, listStyle: 'none' }}>
+            <ul role="group" aria-label="Frame Layout Options" style={{ width: 222, margin: '0 0 7px', padding: '0 0 7px', borderBottom: '1px solid rgb(56, 56, 56)', listStyle: 'none' }}>
+              {FRAME_KIND_OPTIONS.map(item => <FrameMenuItem key={item.label} role="menuitemradio" label={item.label} checked={kind === item.label} disabled={item.disabled} onClick={() => { onKind(item.label); setOpen(false) }} />)}
+            </ul>
+            {FRAME_PRESET_GROUPS.map((group, i) => (
+              <ul key={group.label} role="group" aria-label={group.label} style={{ width: 222, margin: i === FRAME_PRESET_GROUPS.length - 1 ? 0 : '0 0 7px', padding: i === FRAME_PRESET_GROUPS.length - 1 ? 0 : '0 0 7px', borderBottom: i === FRAME_PRESET_GROUPS.length - 1 ? '0 none transparent' : '1px solid rgb(56, 56, 56)', listStyle: 'none' }}>
+                <span style={{ position: 'absolute', width: 1, height: 1, margin: -1, padding: 0, overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', border: 0 }}>{group.label}</span>
+                {group.items.map(item => <FrameMenuItem key={`${group.label}:${item.label}:${item.size}`} role="menuitemcheckbox" label={item.label} size={item.size} checked={preset.label === item.label && preset.size === item.size} onClick={() => { onPreset(item); setOpen(false) }} />)}
+              </ul>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
 const FRAME_INSERT_OPTIONS = [
   { label: 'Frame', target: 'div', detail: 'freeform container' },
   { label: 'Section', target: 'section', detail: 'semantic block' },
@@ -562,6 +814,7 @@ const FRAME_INSERT_OPTIONS = [
 ]
 function InsertIsland() {
   const [open, setOpen] = useState(false)
+  const frameMenuRef = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
   return (
     <div aria-label="Insert tools" onPointerDown={e => e.stopPropagation()}
       style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 25, height: 48, display: 'flex', alignItems: 'center', gap: 8, padding: '0 10px', borderRadius: 14, background: '#fff', boxShadow: '0 10px 30px rgba(0,0,0,.16), 0 0 0 1px rgba(0,0,0,.08)' }}>
@@ -574,7 +827,7 @@ function InsertIsland() {
             <UiIcon name="caret24" />
           </button>
         </div>
-        <div role="group" aria-label="Frame" style={{ position: 'relative', display: 'grid', gridTemplateColumns: '32px 16px', width: 49, height: 32 }}>
+        <div ref={frameMenuRef} role="group" aria-label="Frame" style={{ position: 'relative', display: 'grid', gridTemplateColumns: '32px 16px', width: 49, height: 32 }}>
           <button type="button" aria-label="Frame" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(v => !v)}
             style={{ appearance: 'none', border: 0, width: 32, height: 32, borderRadius: 7, background: open ? FIELD : '#fff', color: INK, display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
             <UiIcon name="insertFrame" />
@@ -644,12 +897,25 @@ export default function ReactFigmaPage() {
   const [rail, setRail] = useState<Rail>('file')
   const [tab, setTab] = useState<'design' | 'prototype'>('design')
   const [view, setView] = useState({ x: 300, y: 70, z: 0.6 })
+  const [frameKind, setFrameKind] = useState<FrameKind>('Frame')
+  const [framePreset, setFramePreset] = useState<FramePreset>({ label: 'iPhone 17', size: '402 × 874' })
+  const [xValue, setXValue] = useState('0')
+  const [yValue, setYValue] = useState('122')
+  const [rotationValue, setRotationValue] = useState('0°')
   const [cssPosition, setCssPosition] = useState(2)
+  const [insetTop, setInsetTop] = useState('auto')
+  const [insetLeft, setInsetLeft] = useState('auto')
+  const [zIndexValue, setZIndexValue] = useState('1')
   const [autoFlow, setAutoFlow] = useState<AutoFlow>('horizontal')
   const [autoWrap, setAutoWrap] = useState(false)
+  const [widthValue, setWidthValue] = useState('402')
+  const [heightValue, setHeightValue] = useState('427')
   const [widthResize, setWidthResize] = useState<ResizeMode>('Fill')
   const [heightResize, setHeightResize] = useState<ResizeMode>('Fill')
-  const [gapValue, setGapValue] = useState('0')
+  const [autoAlign, setAutoAlign] = useState(4)
+  const [gapValue, setGapValue] = useState('10')
+  const [paddingXValue, setPaddingXValue] = useState('0')
+  const [paddingYValue, setPaddingYValue] = useState('0')
   const [clipContent, setClipContent] = useState(false)
   const [appearanceVisible, setAppearanceVisible] = useState(true)
   const [blendMode, setBlendMode] = useState('Pass through')
@@ -857,7 +1123,12 @@ export default function ReactFigmaPage() {
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {/* Frame preset + actions */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 48, padding: '4px 8px' }}>
-            <button type="button" aria-label="Frame, Frame Dimension Presets" title={sel ? `${sel.file}:${sel.line}:${sel.col}` : undefined} style={{ appearance: 'none', border: 0, background: 'transparent', cursor: 'pointer', minWidth: 72, maxWidth: 150, height: 24, display: 'flex', alignItems: 'center', gap: 1, font: `550 13px/22px ${FONT}`, letterSpacing: '-0.032px', color: '#000', padding: '0 0 0 7px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{sel ? `${sel.tag} · ${sel.file.split('/').pop()}:${sel.line}` : 'Frame'} <UiIcon name="caret24" /></button>
+            <FramePresetDropdown kind={frameKind} preset={framePreset} onKind={setFrameKind} onPreset={setFramePreset} />
+            {sel && (
+              <span title={`${sel.file}:${sel.line}:${sel.col}`} style={{ font: `450 10px/14px ${FONT}`, color: MUTE, maxWidth: 96, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                {sel.tag} · {sel.file.split('/').pop()}:{sel.line}
+              </span>
+            )}
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
               <span aria-hidden style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', flex: 'none', color: INK }}><UiIcon name="devCode" /></span>
               <UiIB name="createComponent" title="Create component" />
@@ -872,12 +1143,12 @@ export default function ReactFigmaPage() {
               <FIB name="more" title="More actions" />
             </PositionRow>
             <PositionRow label="Position">
-              <InspectorField label="X" value="0" input dimValue />
-              <InspectorField label="Y" value="122" input dimValue />
+              <InspectorField label="X" value={xValue} input dimValue ariaLabel="X-position" onChange={setXValue} />
+              <InspectorField label="Y" value={yValue} input dimValue ariaLabel="Y-position" onChange={setYValue} />
               <span />
             </PositionRow>
             <PositionRow label="Rotation">
-              <InspectorField icon="rotationField" value="0°" />
+              <InspectorField icon="rotationField" value={rotationValue} ariaLabel="Rotation" onChange={setRotationValue} />
               <div style={{ display: 'flex', gap: 1, width: '100%' }}><FSegBtn name="rotate" pos="l" fill title="Rotate 90° right" /><FSegBtn name="flipH" pos="m" fill title="Flip horizontal" /><FSegBtn name="flipV" pos="r" fill title="Flip vertical" /></div>
               <span />
             </PositionRow>
@@ -885,9 +1156,9 @@ export default function ReactFigmaPage() {
               <TextSegGroup items={['Auto', 'Rel', 'Abs', 'Fix', 'Sticky']} active={cssPosition} onSelect={setCssPosition} width="100%" ariaLabel="CSS position" />
             </InspectorRow>
             <CompactInspectorRow label="Inset / z-index">
-              <InspectorField label="T" value="auto" />
-              <InspectorField label="L" value="auto" />
-              <InspectorField label="Z" value="1" />
+              <InspectorField label="T" value={insetTop} ariaLabel="Top inset" onChange={setInsetTop} />
+              <InspectorField label="L" value={insetLeft} ariaLabel="Left inset" onChange={setInsetLeft} />
+              <InspectorField label="Z" value={zIndexValue} ariaLabel="z-index" onChange={setZIndexValue} />
             </CompactInspectorRow>
           </Sec>
 
@@ -898,22 +1169,22 @@ export default function ReactFigmaPage() {
               <UiIB name="autoLayoutWrap" title="Wrap" size={16} active={autoWrap} on={() => setAutoWrap(v => !v)} />
             </InspectorRow>
             <InspectorRow label="Resizing">
-              <ResizeDropdownField axis="W" value="402" mode={widthResize} onMode={setWidthResize} />
-              <ResizeDropdownField axis="H" value="427" mode={heightResize} onMode={setHeightResize} />
+              <ResizeDropdownField axis="W" value={widthValue} mode={widthResize} onValue={setWidthValue} onMode={setWidthResize} />
+              <ResizeDropdownField axis="H" value={heightValue} mode={heightResize} onValue={setHeightValue} onMode={setHeightResize} />
               <UiIB name="lockAspect" title="Lock aspect ratio" />
             </InspectorRow>
             <div style={{ position: 'relative', height: 82, width: '100%' }}>
               <span style={{ position: 'absolute', left: 16, top: 3.5, width: 88, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Alignment</span>
               <span style={{ position: 'absolute', left: 112, top: 3.5, width: 88, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Gap</span>
               <div style={{ position: 'absolute', left: 16, right: 8, top: 22, display: 'grid', gridTemplateColumns: '88px 88px 24px', gap: 8, alignItems: 'start' }}>
-                <AlignGrid sel={4} />
+                <AlignGrid sel={autoAlign} onSelect={setAutoAlign} />
                 <GapDropdownField value={gapValue} onChange={setGapValue} />
                 <UiIB name="autoLayoutSettings" title="Auto layout settings" />
               </div>
             </div>
             <InspectorRow label="Padding" height={50}>
-              <AutoValueField icon="paddingHorizontal" value="0" caret={false} />
-              <AutoValueField icon="paddingVertical" value="0" caret={false} />
+              <AutoValueField icon="paddingHorizontal" value={paddingXValue} caret={false} ariaLabel="Horizontal padding" onChange={setPaddingXValue} />
+              <AutoValueField icon="paddingVertical" value={paddingYValue} caret={false} ariaLabel="Vertical padding" onChange={setPaddingYValue} />
               <UiIB name="paddingIndividual" title="Individual padding" />
             </InspectorRow>
             <div data-react-figma-clip-row style={{ height: 32, padding: '0 8px 0 16px', display: 'grid', gridTemplateColumns: '216px', alignItems: 'center' }}>
