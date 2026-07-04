@@ -1316,15 +1316,6 @@ function InsertIsland() {
   )
 }
 
-/* ⚠️ MOCK section content — DATA (read from the selected element's props via the reader later), NOT hardcoded UI.
-   Empty array → the section renders its EMPTY state (header + Add only); non-empty → the content state. */
-const MOCK = {
-  fills: [{ hex: 'FFFFFF', op: 100 }],
-  strokes: [{ hex: '000000', op: 100, position: 'Inside', weight: 1 }],
-  effects: [{ type: 'Drop shadow' }],
-  selectionColors: [{ name: 'Linear', op: 100, grad: true }, { hex: '000000', op: 100 }, { hex: 'FFFFFF', op: 100 }],
-  layoutGuides: [{ size: 'Grid 10px' }],
-}
 const nextRowId = <T extends { id: number }>(rows: T[]) => rows.reduce((max, row) => Math.max(max, row.id), 0) + 1
 
 /* ── engine M1 · selection-core (KAI-9304) ─────────────────────────────────────
@@ -1561,6 +1552,8 @@ export default function ReactFigmaPage() {
       : field === 'cssPosition' ? [['position', n]]
       : field === 'blend' ? [['mix-blend-mode', n]]
       : field === 'appearanceVisible' ? [['visibility', n]]
+      : field === 'widthMode' ? [['width', n]]
+      : field === 'heightMode' ? [['height', n]]
       : []
     // Stroke position "Center" has no clean CSS analog (border is inside, outline is outside) — no-op, honest.
     if (field === 'strokePosition' && n !== 'Inside' && n !== 'Outside') { console.warn('[engine] stroke position', n, '— no clean CSS analog (border=Inside, outline=Outside); no-op'); return }
@@ -2016,8 +2009,8 @@ export default function ReactFigmaPage() {
               <UiIB name="autoLayoutWrap" title="Wrap" size={16} active={autoWrap} on={() => { const nv = !autoWrap; setAutoWrap(nv); applyOverride('flexWrap', nv ? 'wrap' : 'nowrap') }} />
             </InspectorRow>
             <InspectorRow label="Resizing">
-              <ResizeDropdownField axis="W" value={widthValue} mode={widthResize} onValue={(v) => { setWidthValue(v); applyOverride('width', v) }} onMode={setWidthResize} />
-              <ResizeDropdownField axis="H" value={heightValue} mode={heightResize} onValue={(v) => { setHeightValue(v); applyOverride('height', v) }} onMode={setHeightResize} />
+              <ResizeDropdownField axis="W" value={widthValue} mode={widthResize} onValue={(v) => { setWidthValue(v); applyOverride('width', v) }} onMode={(m) => { setWidthResize(m); applyOverride('widthMode', m === 'Fixed' ? `${parseFloat(widthValue) || 0}px` : m === 'Hug' ? 'fit-content' : '100%') }} />
+              <ResizeDropdownField axis="H" value={heightValue} mode={heightResize} onValue={(v) => { setHeightValue(v); applyOverride('height', v) }} onMode={(m) => { setHeightResize(m); applyOverride('heightMode', m === 'Fixed' ? `${parseFloat(heightValue) || 0}px` : m === 'Hug' ? 'fit-content' : '100%') }} />
               <UiIB name="lockAspect" title="Lock aspect ratio" active={aspectLocked} on={() => { const nv = !aspectLocked; setAspectLocked(nv); const w = parseFloat(widthValue), h = parseFloat(heightValue); applyOverride('aspectRatio', nv && w > 0 && h > 0 ? `${w} / ${h}` : 'auto') }} />
             </InspectorRow>
             <div style={{ position: 'relative', height: 82, width: '100%' }}>
