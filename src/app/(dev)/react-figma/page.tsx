@@ -1368,6 +1368,9 @@ export default function ReactFigmaPage() {
   const [opacityValue, setOpacityValue] = useState('100')
   const [cornerRadiusValue, setCornerRadiusValue] = useState('0')
   const [individualCorners, setIndividualCorners] = useState(false)
+  const [paddingIndividual, setPaddingIndividual] = useState(false)
+  const [padSides, setPadSides] = useState({ t: '0', r: '0', b: '0', l: '0' })
+  const [corners, setCorners] = useState({ tl: '0', tr: '0', br: '0', bl: '0' })
   // F4 (s58-lead): default to EMPTY — no fake rows on fresh load (Dan's no-fake-values law).
   // These hold user-added rows in the shell no-selection state; live selections drive live* instead.
   const [fills, setFills] = useState<{ id: number; hex: string; op: number }[]>([])
@@ -1456,6 +1459,10 @@ export default function ReactFigmaPage() {
     const cornersEqual = cornerVals.every((v) => v === cornerVals[0])
     setCornerRadiusValue(cornersEqual ? px(c['border-radius']) : 'Mixed')
     setIndividualCorners(!cornersEqual)
+    setCorners({ tl: px(c['border-top-left-radius']), tr: px(c['border-top-right-radius']), br: px(c['border-bottom-right-radius']), bl: px(c['border-bottom-left-radius']) })
+    const padEqual = c['padding-top'] === c['padding-right'] && c['padding-right'] === c['padding-bottom'] && c['padding-bottom'] === c['padding-left']
+    setPaddingIndividual(!padEqual)
+    setPadSides({ t: px(c['padding-top']), r: px(c['padding-right']), b: px(c['padding-bottom']), l: px(c['padding-left']) })
     setBlendMode(c['mix-blend-mode'] === 'normal' ? 'Pass through' : c['mix-blend-mode'])
     // Token provenance per field — SLOT-accurate for shorthands (plan §5):
     // `padding: var(--a) var(--b)` → paddingY slot = --a (top), paddingX slot = --b (left).
@@ -1554,6 +1561,14 @@ export default function ReactFigmaPage() {
       : field === 'appearanceVisible' ? [['visibility', n]]
       : field === 'widthMode' ? [['width', n]]
       : field === 'heightMode' ? [['height', n]]
+      : field === 'padT' ? [['padding-top', withUnit]]
+      : field === 'padR' ? [['padding-right', withUnit]]
+      : field === 'padB' ? [['padding-bottom', withUnit]]
+      : field === 'padL' ? [['padding-left', withUnit]]
+      : field === 'cornerTL' ? [['border-top-left-radius', withUnit]]
+      : field === 'cornerTR' ? [['border-top-right-radius', withUnit]]
+      : field === 'cornerBR' ? [['border-bottom-right-radius', withUnit]]
+      : field === 'cornerBL' ? [['border-bottom-left-radius', withUnit]]
       : []
     // Stroke position "Center" has no clean CSS analog (border is inside, outline is outside) — no-op, honest.
     if (field === 'strokePosition' && n !== 'Inside' && n !== 'Outside') { console.warn('[engine] stroke position', n, '— no clean CSS analog (border=Inside, outline=Outside); no-op'); return }
@@ -2025,8 +2040,16 @@ export default function ReactFigmaPage() {
             <InspectorRow label="Padding" height={50}>
               <AutoValueField icon="paddingHorizontal" value={paddingXValue} caret={false} ariaLabel="Horizontal padding" onChange={(v) => { setPaddingXValue(v); applyOverride('paddingX', v) }} token={fieldTokens.paddingX} />
               <AutoValueField icon="paddingVertical" value={paddingYValue} caret={false} ariaLabel="Vertical padding" onChange={(v) => { setPaddingYValue(v); applyOverride('paddingY', v) }} token={fieldTokens.paddingY} />
-              <UiIB name="paddingIndividual" title="Individual padding" />
+              <UiIB name="paddingIndividual" title="Individual padding" active={paddingIndividual} on={() => setPaddingIndividual(v => !v)} />
             </InspectorRow>
+            {paddingIndividual && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8, padding: '0 8px 8px 16px' }}>
+                <AutoValueField label="T" value={padSides.t} ariaLabel="Padding top" width={44} onChange={(v) => { setPadSides(s => ({ ...s, t: v })); applyOverride('padT', v) }} />
+                <AutoValueField label="R" value={padSides.r} ariaLabel="Padding right" width={44} onChange={(v) => { setPadSides(s => ({ ...s, r: v })); applyOverride('padR', v) }} />
+                <AutoValueField label="B" value={padSides.b} ariaLabel="Padding bottom" width={44} onChange={(v) => { setPadSides(s => ({ ...s, b: v })); applyOverride('padB', v) }} />
+                <AutoValueField label="L" value={padSides.l} ariaLabel="Padding left" width={44} onChange={(v) => { setPadSides(s => ({ ...s, l: v })); applyOverride('padL', v) }} />
+              </div>
+            )}
             <div data-react-figma-clip-row style={{ height: 32, padding: '0 8px 0 16px', display: 'grid', gridTemplateColumns: '216px', alignItems: 'center' }}>
               <style>{'[data-react-figma-clip-row] input:not(:checked) + [data-react-figma-clip-box] svg{display:none}'}</style>
               <label style={{ position: 'relative', display: 'grid', gridTemplateColumns: '16px 200px', width: 216, height: 24, cursor: 'pointer', color: INK }}>
@@ -2054,6 +2077,14 @@ export default function ReactFigmaPage() {
                 <UiIB name="cornerRadius" title="Individual corners" active={individualCorners} on={() => setIndividualCorners(v => !v)} />
               </div>
             </div>
+            {individualCorners && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8, padding: '0 8px 8px 16px' }}>
+                <AutoValueField label="◜" value={corners.tl} ariaLabel="Corner top-left" width={44} onChange={(v) => { setCorners(s => ({ ...s, tl: v })); applyOverride('cornerTL', v) }} />
+                <AutoValueField label="◝" value={corners.tr} ariaLabel="Corner top-right" width={44} onChange={(v) => { setCorners(s => ({ ...s, tr: v })); applyOverride('cornerTR', v) }} />
+                <AutoValueField label="◞" value={corners.br} ariaLabel="Corner bottom-right" width={44} onChange={(v) => { setCorners(s => ({ ...s, br: v })); applyOverride('cornerBR', v) }} />
+                <AutoValueField label="◟" value={corners.bl} ariaLabel="Corner bottom-left" width={44} onChange={(v) => { setCorners(s => ({ ...s, bl: v })); applyOverride('cornerBL', v) }} />
+              </div>
+            )}
           </Sec>
 
           {/* E2.2 Text section — Figma canon (FIGMA-SPEC-text.md): present only for text-bearing
