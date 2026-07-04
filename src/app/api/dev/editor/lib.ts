@@ -501,8 +501,12 @@ async function makeComponent(op: Extract<WriteOp, { kind: 'make-component' }>): 
   }
   const neededImports = [...new Set(trulyFree.map((n) => importByName.get(n)!))]
 
-  // create the component file (collision-safe), inlining the subtree verbatim
-  const rawBase = (op.name ?? 'Component').replace(/[^a-z0-9]/gi, '') || 'Component'
+  // create the component file (collision-safe), inlining the subtree verbatim.
+  // Name must be a VALID JS identifier: strip non-alphanumerics, and a JS identifier cannot start
+  // with a digit — prefix a letter if it would (e.g. "123box" → "C123box"), else `export function
+  // 123box()` is a syntax error (peer-review finding).
+  let rawBase = (op.name ?? 'Component').replace(/[^a-z0-9]/gi, '') || 'Component'
+  if (!/^[a-z]/i.test(rawBase)) rawBase = 'C' + rawBase
   const nameBase = rawBase[0].toUpperCase() + rawBase.slice(1)
   const compDir = path.join(ROOT, 'src/app/(dev)/react-figma-components')
   await fs.mkdir(compDir, { recursive: true })
