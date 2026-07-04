@@ -16,6 +16,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import {
   ListDashes, MagnifyingGlass, Plus, Minus, Sidebar, CaretDown, GearSix, Palette,
   type Icon as PIcon,
@@ -168,12 +169,98 @@ function useCloseOnOutside<T extends HTMLElement>(open: boolean, close: () => vo
     if (!open) return
     const onPointerDown = (event: PointerEvent) => {
       if (!(event.target instanceof Element)) return
+      if (event.target.closest('[data-figma-floating-root="true"]')) return
       if (!ref.current?.contains(event.target)) close()
     }
     document.addEventListener('pointerdown', onPointerDown, true)
     return () => document.removeEventListener('pointerdown', onPointerDown, true)
   }, [open, close])
   return ref
+}
+const VARIABLE_ROWS: { kind: 'header' | 'item'; label: string; value?: string; selected?: boolean }[] = [
+  { kind: 'header', label: '3.1-Sem-Dim-Fluid' },
+  { kind: 'item', label: 'none', value: '0', selected: true },
+  { kind: 'header', label: 'nano' },
+  { kind: 'item', label: 'xs', value: '1' },
+  { kind: 'item', label: 's', value: '2' },
+  { kind: 'item', label: 'm', value: '4' },
+  { kind: 'item', label: 'l', value: '6' },
+  { kind: 'item', label: 'xl', value: '8' },
+  { kind: 'item', label: '2xl', value: '10' },
+  { kind: 'header', label: 'standard' },
+  { kind: 'item', label: 'xs', value: '12' },
+  { kind: 'item', label: 's', value: '14' },
+  { kind: 'item', label: 'm', value: '16' },
+  { kind: 'item', label: 'l', value: '20' },
+  { kind: 'item', label: 'xl', value: '24' },
+  { kind: 'header', label: 'big' },
+  { kind: 'item', label: 'xs', value: '32' },
+  { kind: 'item', label: 's', value: '40' },
+  { kind: 'item', label: 'm', value: '48' },
+  { kind: 'item', label: 'l', value: '56' },
+]
+function VariableHashIcon() {
+  return (
+    <svg width="24" height="24" fill="none" viewBox="0 0 24 24" aria-hidden style={{ display: 'block' }}>
+      <path fill="currentColor" d="M16 6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zM8 7a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1zm3.05 2.002a.5.5 0 0 1 .448.547l-.045.452h1.495l.055-.55a.5.5 0 0 1 .995.098l-.045.452h.547a.5.5 0 1 1 0 1h-.648l-.199 2h.847a.5.5 0 1 1 0 1h-.948l-.054.548a.501.501 0 0 1-.995-.098l.044-.45h-1.495l-.054.548a.501.501 0 0 1-.995-.098l.044-.45H9.5a.5.5 0 0 1 0-1h.647l.2-2H9.5a.5.5 0 0 1 0-1h.948l.055-.55a.5.5 0 0 1 .546-.449m.302 1.999-.199 2h1.494l.2-2z" />
+    </svg>
+  )
+}
+function FigmaVariablePicker({ fieldLabel, anchorRef, onPick, onClose }: { fieldLabel: string; anchorRef: { current: HTMLElement | null }; onPick?: (value: string) => void; onClose: () => void }) {
+  const [query, setQuery] = useState('')
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
+  useEffect(() => {
+    const update = () => setAnchorRect(anchorRef.current?.getBoundingClientRect() ?? null)
+    update()
+    window.addEventListener('resize', update)
+    window.addEventListener('scroll', update, true)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.removeEventListener('scroll', update, true)
+    }
+  }, [anchorRef])
+  const rows = VARIABLE_ROWS.filter(row => row.kind === 'header' || row.label.toLowerCase().includes(query.trim().toLowerCase()))
+  if (!anchorRect) return null
+  const width = 216
+  const height = 387
+  const left = Math.max(8, Math.min(anchorRect.left, window.innerWidth - width - 8))
+  const top = Math.max(8, Math.min(anchorRect.top - 4, window.innerHeight - height - 8))
+  return createPortal(
+    <div data-figma-floating-root="true" role="dialog" aria-label={`${fieldLabel} variable set`}
+      style={{ position: 'fixed', zIndex: 1000, left, top, width, height, borderRadius: 13, background: '#fff', color: INK, boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px', overflow: 'hidden', font: `400 11px/16px ${FONT}` }}>
+      <div style={{ height: 41, borderBottom: `1px solid ${LINE}`, display: 'grid', gridTemplateColumns: '32px 1fr 32px', alignItems: 'center' }}>
+        <span style={{ width: 32, height: 40, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.8)' }}><MagnifyingGlass size={13} weight="regular" /></span>
+        <input placeholder="Search" value={query} onChange={e => setQuery(e.currentTarget.value)}
+          style={{ width: '100%', minWidth: 0, height: 24, border: 0, outline: 0, background: 'transparent', padding: 0, color: INK, font: `400 11px/16px ${FONT}` }} />
+        <button type="button" aria-label="Close variable picker" onClick={onClose}
+          style={{ appearance: 'none', border: 0, background: 'transparent', width: 32, height: 40, display: 'grid', placeItems: 'center', cursor: 'pointer', color: 'rgba(0,0,0,0.8)', font: `400 18px/18px ${FONT}` }}>×</button>
+      </div>
+      <div style={{ height: 42, borderBottom: `1px solid ${LINE}`, display: 'grid', gridTemplateColumns: '1fr 32px', alignItems: 'center', padding: '0 8px', boxSizing: 'border-box' }}>
+        <button type="button" role="combobox" aria-controls="figma-variable-library-list" aria-expanded={false}
+          style={{ appearance: 'none', border: `1px solid ${LINE}`, background: '#fff', height: 24, width: 92.3, borderRadius: 5, padding: '0 8px', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', font: `400 11px/16px ${FONT}`, color: INK }}>
+          <span>All libraries</span><CaretDown size={10} />
+        </button>
+        <button type="button" aria-label="New variable" style={{ appearance: 'none', border: 0, background: 'transparent', width: 24, height: 24, justifySelf: 'end', display: 'grid', placeItems: 'center', cursor: 'pointer', color: INK }}>
+          <Plus size={13} />
+        </button>
+      </div>
+      <div style={{ height: 304, overflowY: 'auto', background: '#fff', paddingTop: 8 }}>
+        {rows.map((row, index) => row.kind === 'header' ? (
+          <div key={`${row.label}-${index}`} style={{ height: 32, display: 'flex', alignItems: 'center', padding: '0 16px', boxSizing: 'border-box', font: `550 11px/16px ${FONT}`, color: INK }}>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.label}</span>
+          </div>
+        ) : (
+          <button key={`${row.label}-${row.value}-${index}`} type="button" onClick={() => { if (row.value) onPick?.(row.value); onClose() }}
+            style={{ appearance: 'none', border: 0, width: 216, height: 32, background: row.selected ? '#f5f5f5' : '#fff', display: 'grid', gridTemplateColumns: '40px 1fr 32px', alignItems: 'center', padding: 0, cursor: 'pointer', color: INK, font: `400 11px/16px ${FONT}`, textAlign: 'left' }}>
+            <span style={{ width: 24, height: 24, marginLeft: 16, display: 'grid', placeItems: 'center', color: INK }}><VariableHashIcon /></span>
+            <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.label}</span>
+            <span style={{ color: 'rgba(0,0,0,0.3)', textAlign: 'right', paddingRight: 16 }}>{row.value}</span>
+          </button>
+        ))}
+      </div>
+    </div>,
+    document.body
+  )
 }
 
 function InspectorField({ label, icon, value, bound, input, dimValue, ariaLabel, onChange }: { label?: string; icon?: keyof typeof UI_ICON; value: string; bound?: boolean; input?: boolean; dimValue?: boolean; ariaLabel?: string; onChange?: (value: string) => void }) {
@@ -183,7 +270,7 @@ function InspectorField({ label, icon, value, bound, input, dimValue, ariaLabel,
   const fieldLabel = ariaLabel ?? label ?? 'value'
   return (
     <div ref={fieldRef} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
-      style={{ position: 'relative', minWidth: 0, height: 24, borderRadius: 5, background: h ? '#ededed' : input ? '#fff' : FIELD, border: `1px solid ${input ? '#e6e6e6' : 'transparent'}`, display: 'flex', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
+      style={{ position: 'relative', minWidth: 0, height: 24, borderRadius: 5, background: h ? '#ededed' : input ? '#fff' : FIELD, border: `1px solid ${varOpen ? SEL : input ? '#e6e6e6' : 'transparent'}`, display: 'flex', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
       <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', flex: 'none', color: input ? INK : 'rgba(0,0,0,0.5)', font: `400 11px/24px ${FONT}` }}>{icon ? <UiIcon name={icon} /> : label}</span>
       {onChange ? (
         <input aria-label={fieldLabel} role="spinbutton" value={value} onChange={e => onChange(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
@@ -195,13 +282,7 @@ function InspectorField({ label, icon, value, bound, input, dimValue, ariaLabel,
         style={{ appearance: 'none', border: 0, padding: 0, width: 16, height: 24, display: 'grid', placeItems: 'center', flex: 'none', background: 'transparent', cursor: 'pointer', color: bound ? TOKEN : FAINT, opacity: bound || h || varOpen ? 1 : 0.55 }}>
         <UiIcon name="variable" size={12} />
       </button>
-      {varOpen && (
-        <div role="presentation" style={{ position: 'absolute', zIndex: 120, top: 28, right: 0, width: 156, padding: '0 8px', borderRadius: 13, background: '#1e1e1e', color: '#fff', boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px' }}>
-          <ul role="menu" aria-label={`${fieldLabel} variable options`} style={{ width: 140, margin: 0, padding: '8px 0 6px', listStyle: 'none' }}>
-            <FigmaMenuRow onClick={() => setVarOpen(false)}>Apply variable...</FigmaMenuRow>
-          </ul>
-        </div>
-      )}
+      {varOpen && <FigmaVariablePicker fieldLabel={fieldLabel} anchorRef={fieldRef} onPick={onChange} onClose={() => setVarOpen(false)} />}
     </div>
   )
 }
@@ -244,16 +325,28 @@ function AutoFlowGroup({ value, onChange }: { value: AutoFlow; onChange: (value:
   )
 }
 function AutoValueField({ icon, label, value, mode, caret = true, ariaLabel, onChange }: { icon?: keyof typeof UI_ICON; label?: string; value: string; mode?: string; caret?: boolean; ariaLabel?: string; onChange?: (value: string) => void }) {
+  const [varOpen, setVarOpen] = useState(false)
+  const fieldRef = useCloseOnOutside<HTMLDivElement>(varOpen, () => setVarOpen(false))
+  const fieldLabel = ariaLabel ?? label ?? 'value'
   return (
-    <div style={{ height: 24, width: 88, borderRadius: 5, background: FIELD, display: 'flex', alignItems: 'center', overflow: 'hidden', font: `450 11px/16px ${FONT}`, color: INK }}>
+    <div ref={fieldRef} style={{ position: 'relative', height: 24, width: 88, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'flex', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
       <span style={{ width: 24, height: 24, flex: 'none', display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)', font: `450 11px/24px ${FONT}` }}>{icon ? <UiIcon name={icon} /> : label}</span>
       {onChange ? (
-        <input aria-label={ariaLabel} role="spinbutton" value={value} onChange={e => onChange(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
+        <input aria-label={fieldLabel} role="spinbutton" value={value} onChange={e => onChange(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
           style={{ flex: 1, minWidth: 0, width: 1, height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: INK, font: `450 11px/16px ${FONT}` }} />
       ) : (
         <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</span>
       )}
       {mode ? <span style={{ flex: 'none', marginRight: 7, color: INK }}>{mode}</span> : caret && <span style={{ width: 24, height: 24, flex: 'none', display: 'grid', placeItems: 'center', color: FAINT }}><UiIcon name="caret24" /></span>}
+      {onChange && (
+        <>
+          <button type="button" title="Apply variable" aria-label={`Apply variable to ${fieldLabel}`} aria-haspopup="menu" aria-expanded={varOpen} onClick={event => { event.stopPropagation(); setVarOpen(v => !v) }}
+            style={{ appearance: 'none', border: 0, padding: 0, width: 16, height: 24, display: 'grid', placeItems: 'center', flex: 'none', background: 'transparent', cursor: 'pointer', color: FAINT }}>
+            <UiIcon name="variable" size={12} />
+          </button>
+          {varOpen && <FigmaVariablePicker fieldLabel={fieldLabel} anchorRef={fieldRef} onPick={onChange} onClose={() => setVarOpen(false)} />}
+        </>
+      )}
     </div>
   )
 }
@@ -346,12 +439,19 @@ function GapDropdownField({ value, onChange }: { value: string; onChange: (value
   )
 }
 function InlineValueInput({ icon, value, onChange, suffix, ariaLabel }: { icon: keyof typeof UI_ICON; value: string; onChange: (value: string) => void; suffix?: string; ariaLabel: string }) {
+  const [varOpen, setVarOpen] = useState(false)
+  const fieldRef = useCloseOnOutside<HTMLDivElement>(varOpen, () => setVarOpen(false))
   return (
-    <div style={{ height: 24, width: 88, borderRadius: 5, background: FIELD, display: 'grid', gridTemplateColumns: suffix ? '24px 1fr 14px' : '24px 1fr', alignItems: 'center', overflow: 'hidden', font: `450 11px/16px ${FONT}`, color: INK }}>
+    <div ref={fieldRef} style={{ position: 'relative', height: 24, width: 88, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: suffix ? '24px 1fr 14px 16px' : '24px 1fr 16px', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
       <span style={{ width: 24, height: 24, flex: 'none', display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)' }}><UiIcon name={icon} /></span>
       <input aria-label={ariaLabel} value={value} onChange={e => onChange(e.currentTarget.value)}
         style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: INK, font: `450 11px/16px ${FONT}` }} />
       {suffix && <span style={{ color: MUTE }}>{suffix}</span>}
+      <button type="button" title="Apply variable" aria-label={`Apply variable to ${ariaLabel}`} aria-haspopup="menu" aria-expanded={varOpen} onClick={event => { event.stopPropagation(); setVarOpen(v => !v) }}
+        style={{ appearance: 'none', border: 0, padding: 0, width: 16, height: 24, display: 'grid', placeItems: 'center', background: 'transparent', cursor: 'pointer', color: FAINT }}>
+        <UiIcon name="variable" size={12} />
+      </button>
+      {varOpen && <FigmaVariablePicker fieldLabel={ariaLabel} anchorRef={fieldRef} onPick={onChange} onClose={() => setVarOpen(false)} />}
     </div>
   )
 }
