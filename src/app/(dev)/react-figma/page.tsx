@@ -15,7 +15,7 @@
  *  Spec: Inter 11px; headers 550/~0.5px near-black; fields 24px/5px radius; every value field raw-OR-token (◆).
  */
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { Fragment, useState, useRef, useEffect, useCallback } from 'react'
 import { buildLayerTree, readStyles, colorToHex, boxSlots, gapSlots, editSlot, tokenOf, Overrides, type LiveNode, type OverrideOp } from './engine'
 import { createPortal } from 'react-dom'
 import {
@@ -164,6 +164,26 @@ function UiIB({ name, title, active, size = 24, on }: { name: keyof typeof UI_IC
     </button>
   )
 }
+const COLOR_PICKER_ICON = {
+  plus: ['M11.5 6a.5.5 0 0 1 .5.5V11h4.5a.5.5 0 0 1 0 1H12v4.5a.5.5 0 0 1-1 0V12H6.5a.5.5 0 0 1 0-1H11V6.5a.5.5 0 0 1 .5-.5'],
+  close: ['M16.854 7.146a.5.5 0 0 1 0 .707L12.707 12l4.147 4.146a.5.5 0 0 1-.708.707L12 12.708l-4.146 4.147a.5.5 0 1 1-.708-.708L11.293 12 7.146 7.854a.5.5 0 0 1 .708-.708L12 11.293l4.146-4.147a.5.5 0 0 1 .708 0'],
+  solid: ['M9 9h6v6H9z', 'M8 7h8a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1M6 8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2zm3 7V9h6v6zM8 8.5a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-.5.5h-7a.5.5 0 0 1-.5-.5z'],
+  gradient: ['M8 7h8a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1M6 8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2zm3.75.875a.875.875 0 1 1-1.75 0 .875.875 0 0 1 1.75 0m3.791.625a.625.625 0 1 0 0-1.25.625.625 0 0 0 0 1.25m-1.458.875a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0m0 3.12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0m1.458 2.245a.625.625 0 1 0 0-1.25.625.625 0 0 0 0 1.25m.625-3.865a.625.625 0 1 1-1.25 0 .625.625 0 0 1 1.25 0M8.875 15.99a.875.875 0 1 0 0-1.75.875.875 0 0 0 0 1.75m.875-4.115a.875.875 0 1 1-1.75 0 .875.875 0 0 1 1.75 0m5.75-1a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1m.5 2.623a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0'],
+  pattern: ['M12.5 7H16a1 1 0 0 1 1 1v1h-4.5zm-1 0H8a1 1 0 0 0-1 1v1h4.5zM7 10v4h2v-4h1v4h4v-4h1v4h2v-4zm10 5h-4.5v2H16a1 1 0 0 0 1-1zm-5.5 2v-2H7v1a1 1 0 0 0 1 1zM6 8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z'],
+  image: ['M16 6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zM8 7a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1zm2.225 4.082a.5.5 0 0 1 .629.064l4 4a.5.5 0 1 1-.707.707L10.5 12.208l-1.646 1.646a.5.5 0 1 1-.708-.707l2-2zM14.5 8a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3m0 1a.5.5 0 1 0 0 1 .5.5 0 0 0 0-1'],
+  video: ['M8 7h8a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1M6 8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2zm4.996 1.132A1 1 0 0 0 9.5 10v4a1 1 0 0 0 1.496.868l3.5-2a1 1 0 0 0 0-1.736zm.504 4.297-1 .571v-4l1 .571 1.492.853L14 12l-1.008.576z'],
+  shader: ['M16 6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zM8 7a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1zm6.585 6.723a.5.5 0 0 1 .831.554l-.153.23a2.23 2.23 0 0 1-2.851.758l-1.27-.635a1.23 1.23 0 0 0-1.572.417l-.154.23a.5.5 0 0 1-.832-.554l.154-.23a2.23 2.23 0 0 1 2.851-.758l1.27.635a1.23 1.23 0 0 0 1.572-.417zm0-2.5a.5.5 0 0 1 .831.554l-.153.23a2.23 2.23 0 0 1-2.851.758l-1.27-.635a1.23 1.23 0 0 0-1.572.417l-.154.23a.5.5 0 0 1-.832-.554l.154-.23a2.23 2.23 0 0 1 2.851-.758l1.27.635a1.23 1.23 0 0 0 1.572-.417zm0-2.5a.5.5 0 0 1 .831.554l-.153.23a2.23 2.23 0 0 1-2.851.758l-1.27-.635a1.23 1.23 0 0 0-1.572.417l-.154.23a.5.5 0 0 1-.832-.554l.154-.23a2.23 2.23 0 0 1 2.851-.758l1.27.635a1.23 1.23 0 0 0 1.572-.417z'],
+  contrast: ['M18 12q0 .2-.013.396a1 1 0 0 0-.024.102C17.743 13.942 16.585 15 15.25 15c-.836 0-1.602-.414-2.112-1.079-.202-.263-.602-.336-.836-.101a.44.44 0 0 0-.064.563c.678.975 1.764 1.617 3.012 1.617a3.5 3.5 0 0 0 1.497-.33A5.99 5.99 0 0 1 12 18a6 6 0 0 1-2.701-.641.54.54 0 0 0-.626.09c-.23.23-.189.614.1.764a7 7 0 0 0 9.44-9.44c-.15-.289-.534-.33-.764-.1a.54.54 0 0 0-.09.626c.41.812.641 1.73.641 2.701M5.787 15.227c.15.289.534.33.764.1a.54.54 0 0 0 .09-.626 6 6 0 0 1-.628-3.097 1 1 0 0 0 .024-.102C6.257 10.058 7.415 9 8.75 9c.836 0 1.602.414 2.112 1.079.202.263.602.336.836.101a.44.44 0 0 0 .064-.563C11.084 8.642 9.998 8 8.75 8a3.5 3.5 0 0 0-1.497.33A5.99 5.99 0 0 1 12 6c.972 0 1.89.231 2.701.641a.54.54 0 0 0 .626-.09c.23-.23.189-.614-.1-.764a7 7 0 0 0-9.44 9.44m12.067-8.373a.5.5 0 0 0-.708-.708l-11 11a.5.5 0 0 0 .708.708z'],
+  dropper: ['M15.16 5.658a2.25 2.25 0 0 1 3.18.001l.155.17a2.25 2.25 0 0 1 0 2.84l-.154.172-1.696 1.692a1.5 1.5 0 0 1 .02 1.913l-.104.114a1.5 1.5 0 0 1-2.007.103l-.02-.018-4.443 4.447a2.24 2.24 0 0 1-1.716.65l-.814.815a1.5 1.5 0 0 1-2.121-2.121l.816-.818a2.25 2.25 0 0 1 .653-1.708l4.443-4.446a1.5 1.5 0 0 1 .088-2.025l.114-.103a1.5 1.5 0 0 1 1.91.015zm-7.544 8.959a1.25 1.25 0 0 0-.358 1.021c.021.197-.014.406-.154.546l-.958.96a.5.5 0 0 0 .708.706l.955-.956c.14-.14.352-.176.55-.153.364.042.745-.077 1.025-.356l4.438-4.442-1.767-1.767zm10.018-8.251a1.25 1.25 0 0 0-1.768 0l-1.782 1.78-.065.06a.87.87 0 0 1-1.165-.06.5.5 0 0 0-.707.707l3 3a.5.5 0 0 0 .628.064l.079-.064a.5.5 0 0 0 0-.707l-.004-.004a.873.873 0 0 1 .004-1.23l1.78-1.778a1.25 1.25 0 0 0 0-1.768'],
+  caret: ['M9.146 11.146a.5.5 0 0 1 .708 0l1.646 1.647 1.646-1.647a.5.5 0 0 1 .708.708l-2 2a.5.5 0 0 1-.708 0l-2-2a.5.5 0 0 1 0-.708'],
+} as const
+function PickerSvgIcon({ name, active }: { name: keyof typeof COLOR_PICKER_ICON; active?: boolean }) {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden style={{ display: 'block' }}>
+      {COLOR_PICKER_ICON[name].map((d, i) => <path key={i} d={d} fill="currentColor" fillOpacity={active || name !== 'solid' || i !== 0 ? 1 : 0.35} fillRule="evenodd" clipRule="evenodd" />)}
+    </svg>
+  )
+}
 function useCloseOnOutside<T extends HTMLElement>(open: boolean, close: () => void) {
   const ref = useRef<T>(null)
   useEffect(() => {
@@ -263,6 +283,67 @@ function FigmaVariablePicker({ fieldLabel, anchorRef, onPick, onClose }: { field
     document.body
   )
 }
+const STYLE_VARIABLE_ROWS = ['fg', 'white', 'primary', 'secondary', 'secondary-hover', 'tertiary', 'tertiary-hover', 'quaternary', 'quaternary-hover', 'disabled', 'disabled-subtle', 'brand-primary', 'brand-primary-hover']
+function StyleApplyButton({ label, title }: { label: string; title: string }) {
+  const [open, setOpen] = useState(false)
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
+  const [activeTab, setActiveTab] = useState<'custom' | 'libraries'>('custom')
+  const [selected, setSelected] = useState('primary')
+  const anchorRef = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
+  const optionListId = `${label.toLowerCase().replace(/\s+/g, '-')}-style-variable-options`
+  useEffect(() => {
+    if (!open) return
+    const update = () => setAnchorRect(anchorRef.current?.getBoundingClientRect() ?? null)
+    update()
+    window.addEventListener('resize', update)
+    window.addEventListener('scroll', update, true)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.removeEventListener('scroll', update, true)
+    }
+  }, [anchorRef, open])
+  return (
+    <div ref={anchorRef} style={{ position: 'relative', width: 24, height: 24 }}>
+      <UiIB name="styleDots" title={title} active={open} on={() => setOpen(v => !v)} />
+      {open && anchorRect && createPortal(
+        <div data-figma-floating-root="true" role="dialog" aria-label={`${label} styles and variables`}
+          style={{ position: 'fixed', zIndex: 1220, left: Math.max(8, anchorRect.left - 420), top: Math.max(8, anchorRect.top - 8), width: 240, height: 427, borderRadius: 13, background: '#fff', color: INK, boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px', overflow: 'hidden', font: `400 11px/16px ${FONT}` }}>
+          <div style={{ height: 40, display: 'grid', gridTemplateColumns: '1fr 28px 24px', alignItems: 'center', padding: '0 8px', boxSizing: 'border-box' }}>
+            <div role="tablist" style={{ display: 'flex', gap: 4, width: 124, height: 24 }}>
+              {(['custom', 'libraries'] as const).map(tabName => (
+                <button key={tabName} type="button" role="tab" aria-selected={activeTab === tabName} onClick={() => setActiveTab(tabName)}
+                  style={{ appearance: 'none', border: 0, background: activeTab === tabName ? FIELD : '#fff', borderRadius: 5, height: 24, width: tabName === 'custom' ? 58 : 62, cursor: 'pointer', color: activeTab === tabName ? INK : MUTE, font: `${activeTab === tabName ? 550 : 400} 11px/16px ${FONT}` }}>
+                  {tabName === 'custom' ? 'Custom' : 'Libraries'}
+                </button>
+              ))}
+            </div>
+            <button type="button" aria-label="New style or variable" style={{ appearance: 'none', border: 0, background: '#fff', width: 24, height: 24, display: 'grid', placeItems: 'center', cursor: 'pointer', color: INK }}><PickerSvgIcon name="plus" /></button>
+            <button type="button" aria-label="Close" onClick={() => setOpen(false)} style={{ appearance: 'none', border: 0, background: '#fff', width: 24, height: 24, display: 'grid', placeItems: 'center', cursor: 'pointer', color: INK }}><PickerSvgIcon name="close" /></button>
+          </div>
+          <div role="tabpanel" style={{ height: 387, borderTop: `1px solid ${LINE}`, background: '#fff' }}>
+            <div style={{ height: 42, borderBottom: `1px solid ${LINE}`, display: 'grid', gridTemplateColumns: '1fr 32px', alignItems: 'center', padding: '0 8px', boxSizing: 'border-box' }}>
+              <button type="button" role="combobox" aria-label="Variable set" aria-controls={optionListId} aria-expanded={false}
+                style={{ appearance: 'none', border: `1px solid ${LINE}`, background: '#fff', height: 24, width: 92, borderRadius: 5, padding: '0 8px', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', font: `400 11px/16px ${FONT}`, color: INK }}>
+                <span>All libraries</span><CaretDown size={10} />
+              </button>
+            </div>
+            <div id={optionListId} role="listbox" style={{ height: 345, overflowY: 'auto', paddingTop: 8 }}>
+              <div style={{ height: 32, display: 'flex', alignItems: 'center', padding: '0 16px', boxSizing: 'border-box', font: `550 11px/16px ${FONT}`, color: INK }}>3.0-Sem-Col</div>
+              {STYLE_VARIABLE_ROWS.map(row => (
+                <button key={row} type="button" role="option" aria-selected={selected === row} onClick={() => { setSelected(row); setOpen(false) }}
+                  style={{ appearance: 'none', border: 0, width: 240, height: 32, background: selected === row ? '#f5f5f5' : '#fff', display: 'grid', gridTemplateColumns: '40px 1fr', alignItems: 'center', padding: 0, cursor: 'pointer', color: INK, font: `400 11px/16px ${FONT}`, textAlign: 'left' }}>
+                  <span style={{ width: 14, height: 14, marginLeft: 17, borderRadius: 3, background: row === 'white' ? '#fff' : row.includes('disabled') ? '#d8d9dd' : row.includes('brand') ? SEL : '#111', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.15)' }} />
+                  <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  )
+}
 
 function InspectorField({ label, icon, value, bound, input, dimValue, ariaLabel, onChange }: { label?: string; icon?: keyof typeof UI_ICON; value: string; bound?: boolean; input?: boolean; dimValue?: boolean; ariaLabel?: string; onChange?: (value: string) => void }) {
   const [h, setH] = useState(false)
@@ -325,12 +406,12 @@ function AutoFlowGroup({ value, onChange }: { value: AutoFlow; onChange: (value:
     </div>
   )
 }
-function AutoValueField({ icon, label, value, mode, caret = true, ariaLabel, onChange, token }: { icon?: keyof typeof UI_ICON; label?: string; value: string; mode?: string; caret?: boolean; ariaLabel?: string; onChange?: (value: string) => void; token?: string }) {
+function AutoValueField({ icon, label, value, mode, caret = true, ariaLabel, onChange, token, width = 88 }: { icon?: keyof typeof UI_ICON; label?: string; value: string; mode?: string; caret?: boolean; ariaLabel?: string; onChange?: (value: string) => void; token?: string; width?: number }) {
   const [varOpen, setVarOpen] = useState(false)
   const fieldRef = useCloseOnOutside<HTMLDivElement>(varOpen, () => setVarOpen(false))
   const fieldLabel = ariaLabel ?? label ?? 'value'
   return (
-    <div ref={fieldRef} title={token} style={{ position: 'relative', height: 24, width: 88, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'flex', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: token ? TOKEN : INK }}>
+    <div ref={fieldRef} title={token} style={{ position: 'relative', height: 24, width, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'flex', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: token ? TOKEN : INK }}>
       <span style={{ width: 24, height: 24, flex: 'none', display: 'grid', placeItems: 'center', color: token ? TOKEN : 'rgba(0,0,0,0.5)', font: `450 11px/24px ${FONT}` }}>{token ? <UiIcon name="variable" /> : icon ? <UiIcon name={icon} /> : label}</span>
       {onChange ? (
         <input aria-label={fieldLabel} role="spinbutton" value={value} onChange={e => onChange(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
@@ -352,6 +433,24 @@ function AutoValueField({ icon, label, value, mode, caret = true, ariaLabel, onC
   )
 }
 type ResizeMode = 'Fixed' | 'Hug' | 'Fill'
+function ResizeModeGlyph({ axis, mode }: { axis: 'W' | 'H'; mode: ResizeMode }) {
+  if (mode === 'Fixed') {
+    return <span style={{ font: `450 11px/24px ${FONT}`, letterSpacing: '0.055px' }}>{axis}</span>
+  }
+  const horizontal = axis === 'W'
+  const d = mode === 'Fill'
+    ? horizontal
+      ? 'M6 12h12M8.5 9.5 6 12l2.5 2.5M15.5 9.5 18 12l-2.5 2.5'
+      : 'M12 6v12M9.5 8.5 12 6l2.5 2.5M9.5 15.5 12 18l2.5-2.5'
+    : horizontal
+      ? 'M5.5 12h5M8.5 9.5 11 12l-2.5 2.5M18.5 12h-5M15.5 9.5 13 12l2.5 2.5'
+      : 'M12 5.5v5M9.5 8.5 12 11l2.5-2.5M12 18.5v-5M9.5 15.5 12 13l2.5 2.5'
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden style={{ display: 'block' }}>
+      <path d={d} stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
 function MenuCheck() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden style={{ display: 'block' }}>
@@ -359,13 +458,14 @@ function MenuCheck() {
     </svg>
   )
 }
-function MenuOptionButton({ children, checked, onClick }: { children: React.ReactNode; checked?: boolean; onClick: () => void }) {
+function BlendMenuRow({ mode, checked, onClick }: { mode: string; checked?: boolean; onClick: () => void }) {
+  const [h, setH] = useState(false)
   return (
-    <button type="button" role="menuitemradio" aria-checked={checked} onClick={onClick}
-      style={{ appearance: 'none', border: 0, width: '100%', height: 32, borderRadius: 7, background: checked ? SEL : 'transparent', color: '#fff', display: 'grid', gridTemplateColumns: '20px 1fr', alignItems: 'center', gap: 8, padding: '0 9px', cursor: 'pointer', textAlign: 'left', font: `400 11px/16px ${FONT}` }}>
-      <span style={{ width: 20, display: 'grid', placeItems: 'center' }}>{checked && <MenuCheck />}</span>
-      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{children}</span>
-    </button>
+    <li role="menuitemcheckbox" aria-checked={checked} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)} onClick={onClick}
+      style={{ width: 118, height: 24, display: 'grid', gridTemplateColumns: '24px 1fr', alignItems: 'center', padding: '0 8px', boxSizing: 'border-box', cursor: 'pointer', color: '#fff', background: h ? 'rgba(255,255,255,0.08)' : 'transparent', font: `400 11px/24px ${FONT}` }}>
+      <span style={{ width: 16, height: 16, display: 'grid', placeItems: 'center', visibility: checked ? 'visible' : 'hidden' }}><MenuCheck /></span>
+      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mode}</span>
+    </li>
   )
 }
 function FigmaMenuSeparator() {
@@ -381,19 +481,32 @@ function FigmaMenuRow({ children, checked, onClick }: { children: React.ReactNod
     </li>
   )
 }
+function PickerMenuOption({ value, width, checked, onClick }: { value: string; width: number; checked?: boolean; onClick: () => void }) {
+  const [h, setH] = useState(false)
+  return (
+    <li role="option" aria-selected={checked} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)} onPointerDown={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); onClick() }}
+      style={{ width, height: 24, display: 'grid', gridTemplateColumns: '24px 1fr', alignItems: 'center', padding: '0 8px', boxSizing: 'border-box', cursor: 'pointer', color: '#fff', background: checked ? SEL : h ? 'rgba(255,255,255,0.08)' : 'transparent', font: `400 11px/24px ${FONT}` }}>
+      <span style={{ width: 16, height: 16, display: 'grid', placeItems: 'center', visibility: checked ? 'visible' : 'hidden' }}><MenuCheck /></span>
+      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</span>
+    </li>
+  )
+}
 function ResizeDropdownField({ axis, value, mode, onValue, onMode }: { axis: 'W' | 'H'; value: string; mode: ResizeMode; onValue: (value: string) => void; onMode: (mode: ResizeMode) => void }) {
   const [open, setOpen] = useState(false)
-  const menuRef = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
+  const [varOpen, setVarOpen] = useState(false)
+  const menuRef = useCloseOnOutside<HTMLDivElement>(open || varOpen, () => { setOpen(false); setVarOpen(false) })
   const axisLabel = axis === 'W' ? 'width' : 'height'
+  const fieldLabel = `${axis === 'W' ? 'Horizontal' : 'Vertical'} resizing${mode === 'Fill' && axis === 'W' ? ' + max width' : ''}: ${mode}`
   const selectMode = (next: ResizeMode) => { onMode(next); setOpen(false) }
   const applyOnly = () => setOpen(false)
+  const applyVariable = () => { setOpen(false); setVarOpen(true) }
   return (
-    <div ref={menuRef} style={{ position: 'relative', width: 88, height: 24 }}>
-      <div style={{ width: 88, height: 24, borderRadius: 5, background: FIELD, display: 'grid', gridTemplateColumns: '24px 1fr 32px', alignItems: 'center', overflow: 'hidden', font: `450 11px/16px ${FONT}`, color: INK }}>
-        <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)', font: `450 11px/24px ${FONT}` }}>{axis === 'W' ? <UiIcon name="resizeW" /> : 'H'}</span>
+    <div ref={menuRef} aria-label={fieldLabel} title={fieldLabel} data-resize-axis={axis} data-resize-mode={mode} style={{ position: 'relative', width: 88, height: 24 }}>
+      <div style={{ width: 88, height: 24, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: '24px 1fr 32px', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
+        <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)' }}><ResizeModeGlyph axis={axis} mode={mode} /></span>
         <input aria-label={`${axisLabel} value`} role="spinbutton" value={value} onChange={e => onValue(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
           style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: INK, font: `450 11px/16px ${FONT}` }} />
-        <button type="button" aria-label={`${axisLabel} resizing: ${mode}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(v => !v)}
+        <button type="button" aria-label={`${axisLabel} resizing: ${mode}`} aria-haspopup="menu" aria-expanded={open} onClick={() => { setVarOpen(false); setOpen(v => !v) }}
           style={{ appearance: 'none', border: 0, padding: 0, width: 32, height: 24, background: 'transparent', color: INK, cursor: 'pointer', font: `450 11px/16px ${FONT}` }}>{mode}</button>
       </div>
       {open && (
@@ -407,23 +520,26 @@ function ResizeDropdownField({ axis, value, mode, onValue, onMode }: { axis: 'W'
             <FigmaMenuRow onClick={applyOnly}>{axis === 'W' ? `Max ${axisLabel}: 640` : `Add max ${axisLabel}...`}</FigmaMenuRow>
             {axis === 'W' && <><FigmaMenuSeparator /><FigmaMenuRow onClick={applyOnly}>Remove max</FigmaMenuRow></>}
             <FigmaMenuSeparator />
-            <FigmaMenuRow onClick={applyOnly}>Apply variable...</FigmaMenuRow>
+            <FigmaMenuRow onClick={applyVariable}>Apply variable...</FigmaMenuRow>
           </ul>
         </div>
       )}
+      {varOpen && <FigmaVariablePicker fieldLabel={`${axisLabel} value`} anchorRef={menuRef} onPick={onValue} onClose={() => setVarOpen(false)} />}
     </div>
   )
 }
 function GapDropdownField({ value, onChange, token }: { value: string; onChange: (value: string) => void; token?: string }) {
   const [open, setOpen] = useState(false)
-  const menuRef = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
+  const [varOpen, setVarOpen] = useState(false)
+  const menuRef = useCloseOnOutside<HTMLDivElement>(open || varOpen, () => { setOpen(false); setVarOpen(false) })
+  const applyVariable = () => { setOpen(false); setVarOpen(true) }
   return (
     <div ref={menuRef} title={token} style={{ position: 'relative', width: 88, height: 24 }}>
-      <div style={{ width: 88, height: 24, borderRadius: 5, background: FIELD, display: 'grid', gridTemplateColumns: '24px 1fr 24px', alignItems: 'center', overflow: 'hidden', font: `450 11px/16px ${FONT}`, color: token ? TOKEN : INK }}>
+      <div style={{ width: 88, height: 24, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: '24px 1fr 24px', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: token ? TOKEN : INK }}>
         <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', color: token ? TOKEN : 'rgba(0,0,0,0.5)' }}><UiIcon name={token ? 'variable' : 'gapVertical'} /></span>
         <input aria-label="Gap value" role="spinbutton" value={value} onChange={e => onChange(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
           style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: INK, font: `450 11px/16px ${FONT}` }} />
-        <button type="button" aria-label={`Gap options: ${value}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(v => !v)}
+        <button type="button" aria-label={`Gap options: ${value}`} aria-haspopup="menu" aria-expanded={open} onClick={() => { setVarOpen(false); setOpen(v => !v) }}
           style={{ appearance: 'none', border: 0, padding: 0, width: 24, height: 24, display: 'grid', placeItems: 'center', background: 'transparent', color: FAINT, cursor: 'pointer' }}><UiIcon name="caret24" /></button>
       </div>
       {open && (
@@ -432,10 +548,11 @@ function GapDropdownField({ value, onChange, token }: { value: string; onChange:
             <FigmaMenuRow checked={value === '10'} onClick={() => { onChange('10'); setOpen(false) }}>10</FigmaMenuRow>
             <FigmaMenuRow checked={value === 'Auto'} onClick={() => { onChange('Auto'); setOpen(false) }}>Auto</FigmaMenuRow>
             <FigmaMenuSeparator />
-            <FigmaMenuRow onClick={() => setOpen(false)}>Apply variable...</FigmaMenuRow>
+            <FigmaMenuRow onClick={applyVariable}>Apply variable...</FigmaMenuRow>
           </ul>
         </div>
       )}
+      {varOpen && <FigmaVariablePicker fieldLabel="Gap value" anchorRef={menuRef} onPick={onChange} onClose={() => setVarOpen(false)} />}
     </div>
   )
 }
@@ -456,18 +573,31 @@ function InlineValueInput({ icon, value, onChange, suffix, ariaLabel, token }: {
     </div>
   )
 }
+const BLEND_MODE_GROUPS = [
+  ['Pass through', 'Normal'],
+  ['Darken', 'Multiply', 'Plus darker', 'Color burn'],
+  ['Lighten', 'Screen', 'Plus lighter', 'Color dodge'],
+  ['Overlay', 'Soft light', 'Hard light'],
+  ['Difference', 'Exclusion'],
+  ['Hue', 'Saturation', 'Color', 'Luminosity'],
+]
 function BlendModeMenu({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const [open, setOpen] = useState(false)
   const menuRef = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
-  const modes = ['Pass through', 'Normal', 'Multiply', 'Screen', 'Overlay']
   return (
     <div ref={menuRef} style={{ position: 'relative', width: 24, height: 24 }}>
       <UiIB name="blendMode" title={`Blend mode: ${value}`} active={open || value !== 'Pass through'} on={() => setOpen(v => !v)} />
       {open && (
-        <div role="menu" aria-label="Blend mode options" style={{ position: 'absolute', zIndex: 95, top: 28, right: 0, width: 136, padding: 6, borderRadius: 12, background: '#1f1f1f', color: '#fff', boxShadow: '0 18px 38px rgba(0,0,0,.24)' }}>
-          {modes.map(mode => (
-            <MenuOptionButton key={mode} checked={mode === value} onClick={() => { onChange(mode); setOpen(false) }}>{mode}</MenuOptionButton>
-          ))}
+        <div role="presentation" data-figma-floating-root="true" style={{ position: 'absolute', zIndex: 125, top: 28, right: -1, width: 118, padding: '8px 0', borderRadius: 13, background: '#1e1e1e', color: '#fff', boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px' }}>
+          <ul role="menu" aria-label="Blend mode options" style={{ width: 118, margin: 0, padding: 0, listStyle: 'none' }}>
+            {BLEND_MODE_GROUPS.map((group, index) => (
+              <li key={group.join(':')} role="none" style={{ width: 118, margin: index === BLEND_MODE_GROUPS.length - 1 ? 0 : '0 0 7px', padding: index === BLEND_MODE_GROUPS.length - 1 ? 0 : '0 0 7px', borderBottom: index === BLEND_MODE_GROUPS.length - 1 ? '0 none transparent' : '1px solid rgb(56,56,56)', listStyle: 'none' }}>
+                <ul role="none" style={{ width: 118, margin: 0, padding: 0, listStyle: 'none' }}>
+                  {group.map(mode => <BlendMenuRow key={mode} mode={mode} checked={mode === value} onClick={() => { onChange(mode); setOpen(false) }} />)}
+                </ul>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>
@@ -631,39 +761,237 @@ function VariablesLibrary() {
 }
 
 /* Paint/effect rows are cloned from the live Figma inspector DOM. */
-function FigmaPaintRow({ hex, op, origin }: { hex: string; op: number; origin?: string }) {
+function normalizeHex(value: string) {
+  return value.replace(/[^0-9a-f]/gi, '').slice(0, 6).toUpperCase()
+}
+function hsvToHex(h: number, s: number, v: number) {
+  const f = (n: number) => {
+    const k = (n + h / 60) % 6
+    return Math.round((v - v * s * Math.max(Math.min(k, 4 - k, 1), 0)) * 255)
+  }
+  return [f(5), f(3), f(1)].map(n => n.toString(16).padStart(2, '0')).join('').toUpperCase()
+}
+function FigmaColorPicker({ anchorRef, hex, opacity, onHex, onOpacity, onClose }: { anchorRef: { current: HTMLElement | null }; hex: string; opacity: string; onHex: (value: string) => void; onOpacity: (value: string) => void; onClose: () => void }) {
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
+  const [activeTab, setActiveTab] = useState<'custom' | 'libraries'>('custom')
+  const [paintType, setPaintType] = useState<keyof typeof COLOR_PICKER_ICON>('solid')
+  const [formatValue, setFormatValue] = useState('Hex')
+  const [formatOpen, setFormatOpen] = useState(false)
+  const [swatchSet, setSwatchSet] = useState('On this page')
+  const [swatchOpen, setSwatchOpen] = useState(false)
+  const [hue, setHue] = useState(0)
+  const [reticle, setReticle] = useState(() => ({ x: normalizeHex(hex) === '000000' ? 0 : 0, y: normalizeHex(hex) === '000000' ? 208 : 0 }))
+  useEffect(() => {
+    const update = () => setAnchorRect(anchorRef.current?.getBoundingClientRect() ?? null)
+    update()
+    window.addEventListener('resize', update)
+    window.addEventListener('scroll', update, true)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.removeEventListener('scroll', update, true)
+    }
+  }, [anchorRef])
+  if (!anchorRect) return null
+  const width = 240
+  const height = 456
+  const left = Math.max(8, Math.min(anchorRect.left - 254, window.innerWidth - width - 8))
+  const top = Math.max(8, Math.min(anchorRect.top - 4, window.innerHeight - height - 8))
+  const pickColor = (event: React.PointerEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect()
+    const x = Math.max(0, Math.min(208, event.clientX - rect.left))
+    const y = Math.max(0, Math.min(208, event.clientY - rect.top))
+    setReticle({ x, y })
+    onHex(hsvToHex(hue, x / 208, 1 - y / 208))
+  }
+  const pickHue = (event: React.PointerEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect()
+    const x = Math.max(0, Math.min(172, event.clientX - rect.left))
+    setHue(Math.round((x / 172) * 360))
+  }
+  const pickOpacity = (event: React.PointerEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect()
+    const x = Math.max(0, Math.min(172, event.clientX - rect.left))
+    onOpacity(String(Math.round((x / 172) * 100)))
+  }
+  const opacityNumber = Math.max(0, Math.min(100, Number.parseInt(opacity || '0', 10) || 0))
+  const activeHex = normalizeHex(hex) || 'FFFFFF'
+  const paintTypes: (keyof typeof COLOR_PICKER_ICON)[] = ['solid', 'gradient', 'pattern', 'image', 'video', 'shader']
+  const formatOptions = ['Hex', 'RGB', 'CSS', 'HSL', 'HSB']
+  const swatchOptions = ['On this page', 'Created in this file', 'iOS 18 and iPadOS 18', 'iOS and iPadOS 26', 'macOS 26', 'Material 3 Design Kit', 'Simple Design System', 'visionOS 26', 'watchOS 26']
+  const closeInnerMenus = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!(event.target instanceof Element)) return
+    if (event.target.closest('[data-color-picker-menu-root="true"]')) return
+    if (event.target.closest('[data-color-picker-menu-button="true"]')) return
+    setFormatOpen(false)
+    setSwatchOpen(false)
+  }
+  return createPortal(
+    <div data-figma-floating-root="true" data-figma-color-picker="true" role="dialog" aria-label="Color picker" onPointerDown={closeInnerMenus}
+      style={{ position: 'fixed', zIndex: 1200, left, top, width, height, borderRadius: 13, background: '#fff', color: INK, boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px', overflow: 'visible', font: `400 11px/16px ${FONT}` }}>
+      <div style={{ height: 40, display: 'grid', gridTemplateColumns: '1fr 28px 24px', alignItems: 'center', padding: '0 8px', boxSizing: 'border-box' }}>
+        <div role="tablist" style={{ display: 'flex', gap: 4, width: 124, height: 24 }}>
+          {(['custom', 'libraries'] as const).map(tabName => (
+            <button key={tabName} type="button" role="tab" aria-selected={activeTab === tabName} onClick={() => setActiveTab(tabName)}
+              style={{ appearance: 'none', border: 0, background: activeTab === tabName ? FIELD : '#fff', borderRadius: 5, height: 24, width: tabName === 'custom' ? 58 : 62, cursor: 'pointer', color: activeTab === tabName ? INK : MUTE, font: `${activeTab === tabName ? 550 : 400} 11px/16px ${FONT}` }}>
+              {tabName === 'custom' ? 'Custom' : 'Libraries'}
+            </button>
+          ))}
+        </div>
+        <button type="button" aria-label="New style or variable" style={{ appearance: 'none', border: 0, background: '#fff', width: 24, height: 24, display: 'grid', placeItems: 'center', cursor: 'pointer', color: INK }}>
+          <PickerSvgIcon name="plus" />
+        </button>
+        <button type="button" aria-label="Close" onClick={onClose} style={{ appearance: 'none', border: 0, background: '#fff', width: 24, height: 24, display: 'grid', placeItems: 'center', cursor: 'pointer', color: INK }}>
+          <PickerSvgIcon name="close" />
+        </button>
+      </div>
+      <div style={{ height: 40, display: 'grid', gridTemplateColumns: '164px 1fr 52px', alignItems: 'center', padding: '0 8px', boxSizing: 'border-box' }}>
+        <fieldset role="radiogroup" aria-label="Paint type" style={{ display: 'flex', gap: 4, width: 164, height: 24, border: 0, margin: 0, padding: 0 }}>
+          {paintTypes.map(name => (
+            <button key={name} type="button" aria-label={name} aria-pressed={paintType === name} onClick={() => setPaintType(name)}
+              style={{ appearance: 'none', border: 0, background: paintType === name ? FIELD : '#fff', borderRadius: 5, width: 24, height: 24, display: 'grid', placeItems: 'center', cursor: 'pointer', color: paintType === name ? INK : MUTE }}>
+              <PickerSvgIcon name={name} active={paintType === name} />
+            </button>
+          ))}
+        </fieldset>
+        <span />
+        <div style={{ display: 'flex', width: 52, height: 24, gap: 4 }}>
+          <button type="button" aria-label="Blend mode" style={{ appearance: 'none', border: 0, background: '#fff', width: 24, height: 24, display: 'grid', placeItems: 'center', cursor: 'pointer', color: INK }}><UiIcon name="blendMode" /></button>
+          <button type="button" aria-label="Check color contrast" style={{ appearance: 'none', border: 0, background: '#fff', width: 24, height: 24, display: 'grid', placeItems: 'center', cursor: 'pointer', color: INK }}><PickerSvgIcon name="contrast" /></button>
+        </div>
+      </div>
+      <div style={{ padding: '9px 16px 0', boxSizing: 'border-box' }}>
+        <div role="slider" aria-label="Color picker area" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round((1 - reticle.y / 208) * 100)} onPointerDown={pickColor}
+          style={{ position: 'relative', width: 208, height: 208, borderRadius: 4, cursor: 'crosshair', background: `linear-gradient(to top, #000 0%, rgba(0,0,0,0) 100%), linear-gradient(to right, #fff 0%, hsl(${hue}, 100%, 50%) 100%)`, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.12)', overflow: 'visible' }}>
+          <span aria-label="Color picker reticle" style={{ position: 'absolute', left: reticle.x - 8, top: reticle.y - 8, width: 16, height: 16, borderRadius: 999, border: '2px solid #fff', boxShadow: '0 0 0 1px rgba(0,0,0,0.35)', boxSizing: 'border-box' }} />
+        </div>
+      </div>
+      <div style={{ height: 60, display: 'grid', gridTemplateColumns: '24px 8px 180px', gridTemplateRows: '24px 4px 24px', padding: '8px 16px 0', boxSizing: 'border-box' }}>
+        <button type="button" aria-label="Sample color" style={{ appearance: 'none', border: 0, background: '#fff', width: 24, height: 24, gridRow: '1 / span 3', alignSelf: 'center', display: 'grid', placeItems: 'center', cursor: 'pointer', color: INK }}><PickerSvgIcon name="dropper" /></button>
+        <span />
+        <div role="slider" aria-label="Hue" aria-valuemin={0} aria-valuemax={360} aria-valuenow={hue} onPointerDown={pickHue} style={{ position: 'relative', width: 180, height: 24, gridColumn: 3, cursor: 'default' }}>
+          <span style={{ position: 'absolute', left: 4, right: 4, top: 4, height: 16, borderRadius: 999, background: 'linear-gradient(90deg, red, #ff0, #0f0, #0ff, #00f, #f0f, red)' }} />
+          <span style={{ position: 'absolute', left: Math.max(4, Math.min(168, (hue / 360) * 172 + 4)), top: 4, width: 16, height: 16, borderRadius: 999, background: '#fff', boxShadow: '0 0 0 1px rgba(0,0,0,0.25)' }} />
+        </div>
+        <span style={{ gridColumn: 2 }} />
+        <div role="slider" aria-label="Opacity" aria-valuemin={0} aria-valuemax={100} aria-valuenow={opacityNumber} onPointerDown={pickOpacity} style={{ position: 'relative', width: 180, height: 24, gridColumn: 3, gridRow: 3, cursor: 'default' }}>
+          <span style={{ position: 'absolute', left: 4, right: 4, top: 4, height: 16, borderRadius: 999, backgroundColor: '#fff', backgroundImage: 'linear-gradient(45deg,#ddd 25%,transparent 25%),linear-gradient(-45deg,#ddd 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#ddd 75%),linear-gradient(-45deg,transparent 75%,#ddd 75%)', backgroundSize: '8px 8px', backgroundPosition: '0 0,0 4px,4px -4px,-4px 0' }} />
+          <span style={{ position: 'absolute', left: 4, right: 4, top: 4, height: 16, borderRadius: 999, background: `linear-gradient(90deg, rgba(${Number.parseInt(activeHex.slice(0, 2), 16)},${Number.parseInt(activeHex.slice(2, 4), 16)},${Number.parseInt(activeHex.slice(4, 6), 16)},0), #${activeHex})` }} />
+          <span style={{ position: 'absolute', left: Math.max(4, Math.min(168, (opacityNumber / 100) * 172 + 4)), top: 4, width: 16, height: 16, borderRadius: 999, background: '#fff', boxShadow: '0 0 0 1px rgba(0,0,0,0.25)' }} />
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '55px 8px 89px 1px 54px', height: 24, padding: '0 16px', alignItems: 'center', boxSizing: 'border-box' }}>
+        <div style={{ position: 'relative', width: 55, height: 24 }}>
+          <button type="button" data-color-picker-menu-button="true" role="combobox" aria-label="Color format" aria-controls="figma-color-format-options" aria-expanded={formatOpen} onClick={() => { setSwatchOpen(false); setFormatOpen(v => !v) }} style={{ appearance: 'none', border: `1px solid ${LINE}`, background: '#fff', borderRadius: 5, width: 55, height: 24, display: 'grid', gridTemplateColumns: '1fr 24px', alignItems: 'center', padding: '0 0 0 9px', cursor: 'pointer', color: INK, font: `400 11px/16px ${FONT}` }}>
+            <span>{formatValue}</span><PickerSvgIcon name="caret" />
+          </button>
+          {formatOpen && (
+            <ul id="figma-color-format-options" data-figma-floating-root="true" data-color-picker-menu-root="true" role="listbox" style={{ position: 'absolute', zIndex: 1300, left: -8, top: -8, width: 87, margin: 0, padding: '8px 0', listStyle: 'none', borderRadius: 7, background: '#1e1e1e', boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px' }}>
+              {formatOptions.map(option => <PickerMenuOption key={option} value={option} width={87} checked={formatValue === option} onClick={() => { setFormatValue(option); setFormatOpen(false) }} />)}
+            </ul>
+          )}
+        </div>
+        <span />
+        <input aria-label="Color" role="spinbutton" value={activeHex} onChange={e => onHex(normalizeHex(e.currentTarget.value))}
+          style={{ width: 89, height: 24, border: 0, outline: 0, background: FIELD, borderRadius: 5, padding: '0 8px', boxSizing: 'border-box', color: INK, font: `450 11px/16px ${FONT}` }} />
+        <span />
+        <div style={{ width: 54, height: 24, borderRadius: 5, background: FIELD, display: 'grid', gridTemplateColumns: '1fr 14px', alignItems: 'center', overflow: 'hidden' }}>
+          <input aria-label="Opacity" role="spinbutton" value={opacity} onChange={e => onOpacity(e.currentTarget.value.replace(/[^0-9]/g, '').slice(0, 3))}
+            style={{ minWidth: 0, width: 40, height: 24, border: 0, outline: 0, background: 'transparent', padding: '0 3px 0 0', textAlign: 'right', color: INK, font: `450 11px/16px ${FONT}` }} />
+          <span style={{ color: MUTE }}>%</span>
+        </div>
+      </div>
+      <div style={{ padding: '28px 16px 0', boxSizing: 'border-box' }}>
+        <div style={{ position: 'relative', width: 208, height: 24 }}>
+          <button type="button" data-color-picker-menu-button="true" role="combobox" aria-label="Color swatch set selector" aria-controls="figma-color-swatch-set-options" aria-expanded={swatchOpen} onClick={() => { setFormatOpen(false); setSwatchOpen(v => !v) }} style={{ appearance: 'none', border: `1px solid ${LINE}`, background: '#fff', borderRadius: 5, width: 208, height: 24, display: 'grid', gridTemplateColumns: '1fr 24px', alignItems: 'center', padding: '0 0 0 9px', cursor: 'pointer', color: INK, font: `400 11px/16px ${FONT}` }}>
+            <span style={{ textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{swatchSet}</span><PickerSvgIcon name="caret" />
+          </button>
+          {swatchOpen && (
+            <div data-figma-floating-root="true" data-color-picker-menu-root="true" style={{ position: 'absolute', zIndex: 1300, left: -8, top: -8, width: 224, maxHeight: 228, overflowY: 'auto', margin: 0, padding: '8px 0', borderRadius: 13, background: '#1e1e1e', boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px' }}>
+              <ul id="figma-color-swatch-set-options" role="listbox" style={{ width: 224, margin: 0, padding: 0, listStyle: 'none' }}>
+                {swatchOptions.map((option, index) => (
+                  <Fragment key={option}>
+                    <PickerMenuOption value={option} width={224} checked={swatchSet === option} onClick={() => { setSwatchSet(option); setSwatchOpen(false) }} />
+                    {index === 1 && <li role="separator" style={{ height: 15, padding: '7px 0', boxSizing: 'border-box' }}><span style={{ display: 'block', height: 1, background: 'rgb(56,56,56)' }} /></li>}
+                  </Fragment>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
+function FigmaPaintRow({ hex, op, label = 'Paint', onRemove, origin }: { hex: string; op: number; label?: string; onRemove?: () => void; origin?: string }) {
+  const [hexValue, setHexValue] = useState(hex)
+  const [opacityValue, setOpacityValue] = useState(String(op))
+  const [varOpen, setVarOpen] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [visible, setVisible] = useState(true)
+  const fieldRef = useCloseOnOutside<HTMLDivElement>(varOpen || pickerOpen, () => { setVarOpen(false); setPickerOpen(false) })
+  // engine read-bridge: live selections re-render with new paint props — sync local edit state
+  useEffect(() => { setHexValue(hex); setOpacityValue(String(op)) }, [hex, op])
   const inherited = origin?.startsWith('↑')
   const tokenBound = origin?.startsWith('◈')
   return (
     <div title={origin} style={{ display: 'grid', gridTemplateColumns: '156px 8px 24px 4px 24px', alignItems: 'center', height: 32, padding: '0 8px 0 16px' }}>
-      <div style={{ height: 24, borderRadius: 5, background: FIELD, display: 'grid', gridTemplateColumns: '24px 1fr 38px 14px', alignItems: 'center', overflow: 'hidden', font: `450 11px/16px ${FONT}`, color: tokenBound ? TOKEN : INK }}>
-        <button type="button" aria-label={`Solid color hex: ${hex}${origin ? ` (${origin})` : ''}`} style={{ appearance: 'none', border: 0, width: 14, height: 14, justifySelf: 'center', borderRadius: 2, background: `#${hex}`, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.15)', padding: 0, cursor: 'pointer' }} />
-        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{hex}{inherited && <span style={{ color: MUTE, marginLeft: 4, font: `450 9px/16px ${FONT}` }}>↑ {origin!.replace('↑ inherited from ', '')}</span>}</span>
-        <span style={{ textAlign: 'right', paddingRight: 7 }}>{op}</span>
+      <div ref={fieldRef} style={{ position: 'relative', height: 24, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen || pickerOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: '24px 1fr 28px 14px 16px', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: tokenBound ? TOKEN : INK }}>
+        <button type="button" aria-label={`Solid color hex: ${hexValue}${origin ? ` (${origin})` : ''}`} aria-haspopup="dialog" aria-expanded={pickerOpen} onClick={event => { event.stopPropagation(); setVarOpen(false); setPickerOpen(v => !v) }}
+          style={{ appearance: 'none', border: 0, width: 14, height: 14, justifySelf: 'center', borderRadius: 2, background: `#${normalizeHex(hexValue) || 'FFFFFF'}`, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.15)', padding: 0, cursor: 'pointer' }} />
+        <span style={{ position: 'relative', minWidth: 0, display: 'flex', alignItems: 'center' }}>
+          <input aria-label={`${label} hex`} value={hexValue} onChange={e => setHexValue(normalizeHex(e.currentTarget.value))}
+            style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: 'inherit', font: `450 11px/16px ${FONT}` }} />
+          {inherited && <span style={{ flex: 'none', color: MUTE, marginLeft: 2, font: `450 9px/16px ${FONT}`, whiteSpace: 'nowrap' }}>↑ {origin!.replace('↑ inherited from ', '')}</span>}
+        </span>
+        <input aria-label={`${label} opacity`} role="spinbutton" value={opacityValue} onChange={e => setOpacityValue(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
+          style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: '0 3px 0 0', background: 'transparent', color: INK, font: `450 11px/16px ${FONT}`, textAlign: 'right' }} />
         <span style={{ color: 'rgba(0,0,0,0.5)' }}>%</span>
+        <button type="button" title="Apply variable" aria-label={`Apply variable to ${label} opacity`} aria-haspopup="menu" aria-expanded={varOpen} onClick={event => { event.stopPropagation(); setPickerOpen(false); setVarOpen(v => !v) }}
+          style={{ appearance: 'none', border: 0, padding: 0, width: 16, height: 24, display: 'grid', placeItems: 'center', background: 'transparent', cursor: 'pointer', color: FAINT }}>
+          <UiIcon name="variable" size={12} />
+        </button>
+        {varOpen && <FigmaVariablePicker fieldLabel={`${label} opacity`} anchorRef={fieldRef} onPick={setOpacityValue} onClose={() => setVarOpen(false)} />}
+        {pickerOpen && <FigmaColorPicker anchorRef={fieldRef} hex={hexValue} opacity={opacityValue} onHex={setHexValue} onOpacity={setOpacityValue} onClose={() => setPickerOpen(false)} />}
       </div>
       <span />
-      <UiIB name="visibility" title="Toggle visibility" />
+      <UiIB name="visibility" title="Toggle visibility" active={!visible} on={() => setVisible(v => !v)} />
       <span />
-      <UiIB name="minus" title="Remove" />
+      <UiIB name="minus" title="Remove" on={onRemove} />
     </div>
   )
 }
 function StrokeDetailRow({ position, weight }: { position: string; weight: number }) {
+  const [positionValue, setPositionValue] = useState(position)
+  const [weightValue, setWeightValue] = useState(String(weight))
+  const [positionOpen, setPositionOpen] = useState(false)
+  const positionRef = useCloseOnOutside<HTMLDivElement>(positionOpen, () => setPositionOpen(false))
+  const positionOptions = ['Center', 'Inside', 'Outside']
   return (
     <div style={{ position: 'relative', height: 50, width: '100%' }}>
       <span style={{ position: 'absolute', left: 16, top: 3.5, width: 84, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Position</span>
       <span style={{ position: 'absolute', left: 100, top: 3.5, width: 80, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Weight</span>
       <div style={{ position: 'absolute', left: 16, right: 8, top: 22, display: 'grid', gridTemplateColumns: '76px 8px 72px 8px 24px 4px 24px', alignItems: 'center' }}>
-        <button type="button" role="combobox" aria-controls="stroke-position-options" aria-expanded={false} style={{ appearance: 'none', border: '1px solid #e6e6e6', background: '#fff', width: 76, height: 24, borderRadius: 5, padding: '0 0 0 9px', display: 'grid', gridTemplateColumns: '1fr 24px', alignItems: 'center', cursor: 'pointer', font: `450 11px/16px ${FONT}`, color: INK }}>
-          <span style={{ textAlign: 'left' }}>{position}</span>
-          <span style={{ color: FAINT, display: 'grid', placeItems: 'center' }}><UiIcon name="caret24" /></span>
-        </button>
-        <span />
-        <div aria-label="Stroke weight" style={{ width: 72, height: 24, borderRadius: 5, background: FIELD, display: 'grid', gridTemplateColumns: '24px 1fr', alignItems: 'center', font: `450 11px/16px ${FONT}`, color: INK }}>
-          <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)' }}><UiIcon name="strokeWeight" /></span>
-          <span>{weight}</span>
+        <div ref={positionRef} style={{ position: 'relative', width: 76, height: 24 }}>
+          <button type="button" role="combobox" aria-controls="stroke-position-options" aria-expanded={positionOpen} onClick={() => setPositionOpen(v => !v)}
+            style={{ appearance: 'none', border: '1px solid #e6e6e6', background: '#fff', width: 76, height: 24, borderRadius: 5, padding: '0 0 0 9px', display: 'grid', gridTemplateColumns: '1fr 24px', alignItems: 'center', cursor: 'pointer', font: `450 11px/16px ${FONT}`, color: INK }}>
+            <span style={{ textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{positionValue}</span>
+            <span style={{ color: FAINT, display: 'grid', placeItems: 'center' }}><UiIcon name="caret24" /></span>
+          </button>
+          {positionOpen && (
+            <ul id="stroke-position-options" role="listbox" data-figma-floating-root="true"
+              style={{ position: 'absolute', zIndex: 125, left: -8, top: -32, width: 105, height: 88, margin: 0, padding: '8px 0', listStyle: 'none', borderRadius: 6, background: '#fff', boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px', boxSizing: 'border-box', overflow: 'hidden' }}>
+              {positionOptions.map(option => (
+                <li key={option} role="option" aria-selected={positionValue === option} onClick={() => { setPositionValue(option); setPositionOpen(false) }}
+                  style={{ height: 24, display: 'grid', alignItems: 'center', padding: '0 0 0 32px', color: INK, cursor: 'pointer', font: `400 11px/16px ${FONT}` }}>
+                  {option}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
+        <span />
+        <AutoValueField icon="strokeWeight" value={weightValue} caret={false} ariaLabel="Stroke weight" onChange={setWeightValue} width={72} />
         <span />
         <UiIB name="autoLayoutSettings" title="Advanced stroke settings" />
         <span />
@@ -672,50 +1000,185 @@ function StrokeDetailRow({ position, weight }: { position: string; weight: numbe
     </div>
   )
 }
-function FigmaEffectRow({ type }: { type: string }) {
+function EffectSettingInput({ label, prefix, value, onChange }: { label: string; prefix?: string; value: string; onChange: (value: string) => void }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '156px 8px 24px 4px 24px', alignItems: 'center', height: 32, padding: '0 8px 0 16px' }}>
-      <button type="button" style={{ appearance: 'none', border: '1px solid #e6e6e6', background: '#fff', width: 156, height: 26, borderRadius: 5, padding: 0, display: 'grid', gridTemplateColumns: '24px 1fr', alignItems: 'center', cursor: 'pointer', font: `450 11px/16px ${FONT}`, color: INK }}>
-        <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center' }}><UiIcon name="dropShadow" /></span>
-        <span style={{ textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{type}</span>
-      </button>
+    <div style={{ height: 32, display: 'grid', gridTemplateColumns: '64px 8px 136px', alignItems: 'center', padding: '0 16px', boxSizing: 'border-box' }}>
+      <span style={{ color: INK, font: `400 11px/16px ${FONT}` }}>{label}</span>
       <span />
-      <UiIB name="visibility" title="Toggle visibility" />
-      <span />
-      <UiIB name="minus" title="Remove" />
-    </div>
-  )
-}
-function SelectionColorRow({ hex, name, op, grad }: { hex?: string; name?: string; op: number; grad?: boolean }) {
-  const label = name || hex || ''
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: '156px', alignItems: 'center', height: 32, padding: '0 8px 0 16px' }}>
-      <div style={{ width: 156, height: 24, borderRadius: 5, background: FIELD, display: 'grid', gridTemplateColumns: '24px 1fr 38px 14px', alignItems: 'center', overflow: 'hidden', font: `450 11px/16px ${FONT}`, color: INK }}>
-        {grad ? (
-          <span aria-label="Linear gradient" style={{ width: 14, height: 14, justifySelf: 'center', borderRadius: 2, background: 'linear-gradient(0deg, #000 0%, #666 100%)', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.15)' }} />
-        ) : (
-          <button type="button" aria-label={`Solid color hex: ${hex}`} style={{ appearance: 'none', border: 0, width: 14, height: 14, justifySelf: 'center', borderRadius: 2, background: `#${hex}`, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.15)', padding: 0, cursor: 'pointer' }} />
-        )}
-        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
-        <span style={{ textAlign: 'right', paddingRight: 7 }}>{op}</span>
-        <span style={{ color: 'rgba(0,0,0,0.5)' }}>%</span>
+      <div style={{ width: 136, height: 24, borderRadius: 5, background: FIELD, display: 'grid', gridTemplateColumns: prefix ? '24px 1fr' : '1fr', alignItems: 'center', overflow: 'hidden' }}>
+        {prefix && <span style={{ width: 24, color: 'rgba(0,0,0,0.5)', textAlign: 'center', font: `400 11px/16px ${FONT}` }}>{prefix}</span>}
+        <input aria-label={label} value={value} onChange={e => onChange(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
+          style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, background: 'transparent', padding: prefix ? 0 : '0 8px', color: INK, font: `450 11px/16px ${FONT}` }} />
       </div>
     </div>
   )
 }
-function LayoutGuideRow({ size }: { size: string }) {
+function EffectColorInput({ hex, opacity, onHex, onOpacity }: { hex: string; opacity: string; onHex: (value: string) => void; onOpacity: (value: string) => void }) {
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const ref = useCloseOnOutside<HTMLDivElement>(pickerOpen, () => setPickerOpen(false))
+  const activeHex = normalizeHex(hex) || '000000'
+  return (
+    <div style={{ height: 32, display: 'grid', gridTemplateColumns: '64px 8px 136px', alignItems: 'center', padding: '0 16px', boxSizing: 'border-box' }}>
+      <span style={{ color: INK, font: `400 11px/16px ${FONT}` }}>Color</span>
+      <span />
+      <div ref={ref} style={{ position: 'relative', width: 136, height: 24, borderRadius: 5, background: FIELD, border: `1px solid ${pickerOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: '24px 58px 37px 14px', alignItems: 'center', overflow: 'visible' }}>
+        <button type="button" aria-label={`Solid color hex: ${activeHex}`} aria-haspopup="dialog" aria-expanded={pickerOpen} onClick={event => { event.stopPropagation(); setPickerOpen(v => !v) }}
+          style={{ appearance: 'none', border: 0, width: 14, height: 14, justifySelf: 'center', borderRadius: 2, background: `#${activeHex}`, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.15)', padding: 0, cursor: 'pointer' }} />
+        <input aria-label="Color" value={activeHex} onChange={e => onHex(normalizeHex(e.currentTarget.value))}
+          style={{ minWidth: 0, width: 58, height: 24, border: 0, outline: 0, background: 'transparent', padding: 0, color: INK, font: `450 11px/16px ${FONT}` }} />
+        <input aria-label="Opacity" value={opacity} onChange={e => onOpacity(e.currentTarget.value.replace(/[^0-9]/g, '').slice(0, 3))}
+          style={{ minWidth: 0, width: 37, height: 24, border: 0, outline: 0, background: 'transparent', padding: '0 3px 0 0', color: INK, textAlign: 'right', font: `450 11px/16px ${FONT}` }} />
+        <span style={{ color: MUTE, font: `400 11px/16px ${FONT}` }}>%</span>
+        {pickerOpen && <FigmaColorPicker anchorRef={ref} hex={activeHex} opacity={opacity} onHex={onHex} onOpacity={onOpacity} onClose={() => setPickerOpen(false)} />}
+      </div>
+    </div>
+  )
+}
+function FigmaEffectSettingsPopover({ anchorRef, type, onType, onClose }: { anchorRef: { current: HTMLElement | null }; type: string; onType: (value: string) => void; onClose: () => void }) {
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
+  const [typeOpen, setTypeOpen] = useState(false)
+  const [xValue, setXValue] = useState('0')
+  const [yValue, setYValue] = useState('4')
+  const [blurValue, setBlurValue] = useState('4')
+  const [spreadValue, setSpreadValue] = useState('0')
+  const [colorValue, setColorValue] = useState('000000')
+  const [opacityValue, setOpacityValue] = useState('25')
+  const [showBehind, setShowBehind] = useState(false)
+  useEffect(() => {
+    const update = () => setAnchorRect(anchorRef.current?.getBoundingClientRect() ?? null)
+    update()
+    window.addEventListener('resize', update)
+    window.addEventListener('scroll', update, true)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.removeEventListener('scroll', update, true)
+    }
+  }, [anchorRef])
+  if (!anchorRect) return null
+  const width = 240
+  const height = 273
+  const left = Math.max(8, Math.min(anchorRect.left - 257, window.innerWidth - width - 8))
+  const top = Math.max(8, Math.min(anchorRect.top - 3, window.innerHeight - height - 8))
+  const effectTypes = ['Inner shadow', 'Drop shadow', 'Layer blur', 'Background blur', 'Noise', 'Texture', 'Glass']
+  return createPortal(
+    <div data-figma-floating-root="true" data-figma-effect-popover="true" role="dialog" aria-label="Effect settings" onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()}
+      style={{ position: 'fixed', zIndex: 1200, left, top, width, height, borderRadius: 13, background: '#fff', color: INK, boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px', overflow: 'hidden', font: `400 11px/16px ${FONT}` }}>
+      <div style={{ height: 40, display: 'grid', gridTemplateColumns: '1fr 24px 24px', alignItems: 'center', padding: '0 8px', boxSizing: 'border-box' }}>
+        <div style={{ position: 'relative', width: 200, height: 24 }}>
+          <button type="button" aria-label="Effect settings" aria-haspopup="listbox" aria-expanded={typeOpen} onClick={() => setTypeOpen(v => !v)}
+            style={{ appearance: 'none', border: 0, background: '#fff', width: 117, height: 24, borderRadius: 5, display: 'grid', gridTemplateColumns: '24px 1fr 24px', alignItems: 'center', cursor: 'pointer', color: INK, font: `450 11px/16px ${FONT}` }}>
+            <UiIcon name="dropShadow" />
+            <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>{type}</span>
+            <UiIcon name="caret24" />
+          </button>
+          {typeOpen && (
+            <ul role="listbox" data-figma-floating-root="true" style={{ position: 'absolute', zIndex: 1220, top: 28, left: 0, width: 150, margin: 0, padding: '8px 0', listStyle: 'none', borderRadius: 6, background: '#fff', boxShadow: 'rgba(0,0,0,.15) 0 2px 5px, rgba(0,0,0,.12) 0 10px 16px', overflow: 'hidden' }}>
+              {effectTypes.map(effectType => (
+                <li key={effectType} role="option" aria-selected={type === effectType} onClick={() => { onType(effectType); setTypeOpen(false) }}
+                  style={{ height: 24, display: 'grid', alignItems: 'center', padding: '0 12px', cursor: 'pointer', color: INK, background: type === effectType ? FIELD : '#fff', font: `400 11px/16px ${FONT}` }}>{effectType}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <button type="button" aria-label="Blend mode" style={{ appearance: 'none', border: 0, background: '#fff', width: 24, height: 24, display: 'grid', placeItems: 'center', cursor: 'pointer', color: INK }}><UiIcon name="blendMode" /></button>
+        <button type="button" aria-label="Close" onClick={onClose} style={{ appearance: 'none', border: 0, background: '#fff', width: 24, height: 24, display: 'grid', placeItems: 'center', cursor: 'pointer', color: INK }}><PickerSvgIcon name="close" /></button>
+      </div>
+      <div style={{ paddingTop: 12 }}>
+        <EffectSettingInput label="Position" prefix="X" value={xValue} onChange={setXValue} />
+        <EffectSettingInput label="" prefix="Y" value={yValue} onChange={setYValue} />
+        <EffectSettingInput label="Blur" value={blurValue} onChange={setBlurValue} />
+        <EffectSettingInput label="Spread" value={spreadValue} onChange={setSpreadValue} />
+        <EffectColorInput hex={colorValue} opacity={opacityValue} onHex={setColorValue} onOpacity={setOpacityValue} />
+      </div>
+      <div style={{ height: 41, borderTop: `1px solid ${LINE}`, marginTop: 8, padding: '8px 16px 0 12px', boxSizing: 'border-box' }}>
+        <label style={{ display: 'grid', gridTemplateColumns: '16px 1fr', gap: 8, alignItems: 'center', height: 24, cursor: 'pointer', font: `400 11px/16px ${FONT}`, color: INK }}>
+          <input type="checkbox" checked={showBehind} onChange={event => setShowBehind(event.currentTarget.checked)} aria-label="Show behind transparent areas" style={{ width: 16, height: 16, margin: 0, accentColor: SEL }} />
+          <span>Show behind transparent areas</span>
+        </label>
+      </div>
+    </div>,
+    document.body
+  )
+}
+function FigmaEffectRow({ type, onRemove }: { type: string; onRemove?: () => void }) {
+  const [effectType, setEffectType] = useState(type)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [visible, setVisible] = useState(true)
+  const rowRef = useCloseOnOutside<HTMLButtonElement>(settingsOpen, () => setSettingsOpen(false))
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '156px 8px 24px 4px 24px', alignItems: 'center', height: 32, padding: '0 8px 0 16px' }}>
+      <button ref={rowRef} type="button" aria-label="Effect settings" aria-haspopup="dialog" aria-expanded={settingsOpen} onClick={() => setSettingsOpen(v => !v)}
+        style={{ position: 'relative', appearance: 'none', border: '1px solid #e6e6e6', background: '#fff', width: 156, height: 26, borderRadius: 5, padding: 0, display: 'grid', gridTemplateColumns: '24px 1fr', alignItems: 'center', cursor: 'pointer', font: `450 11px/16px ${FONT}`, color: INK }}>
+        <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center' }}><UiIcon name="dropShadow" /></span>
+        <span style={{ textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{effectType}</span>
+        {settingsOpen && <FigmaEffectSettingsPopover anchorRef={rowRef} type={effectType} onType={setEffectType} onClose={() => setSettingsOpen(false)} />}
+      </button>
+      <span />
+      <UiIB name="visibility" title="Toggle visibility" active={!visible} on={() => setVisible(v => !v)} />
+      <span />
+      <UiIB name="minus" title="Remove" on={onRemove} />
+    </div>
+  )
+}
+function SelectionColorRow({ hex, name, op, grad }: { hex?: string; name?: string; op: number; grad?: boolean }) {
+  const [hexValue, setHexValue] = useState(hex || '000000')
+  const [labelValue, setLabelValue] = useState(name || hex || '')
+  const [opacityValue, setOpacityValue] = useState(String(op))
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const rowRef = useCloseOnOutside<HTMLDivElement>(pickerOpen, () => setPickerOpen(false))
+  const activeHex = normalizeHex(hexValue) || '000000'
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '156px', alignItems: 'center', height: 32, padding: '0 8px 0 16px' }}>
+      <div ref={rowRef} style={{ position: 'relative', width: 156, height: 24, borderRadius: 5, background: FIELD, border: `1px solid ${pickerOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: '24px 1fr 38px 14px', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
+        {grad ? (
+          <button type="button" aria-label="Linear gradient" aria-haspopup="dialog" aria-expanded={pickerOpen} onClick={event => { event.stopPropagation(); setPickerOpen(v => !v) }}
+            style={{ appearance: 'none', border: 0, width: 14, height: 14, justifySelf: 'center', borderRadius: 2, background: 'linear-gradient(0deg, #000 0%, #666 100%)', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.15)', padding: 0, cursor: 'pointer' }} />
+        ) : (
+          <button type="button" aria-label={`Solid color hex: ${activeHex}`} aria-haspopup="dialog" aria-expanded={pickerOpen} onClick={event => { event.stopPropagation(); setPickerOpen(v => !v) }}
+            style={{ appearance: 'none', border: 0, width: 14, height: 14, justifySelf: 'center', borderRadius: 2, background: `#${activeHex}`, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.15)', padding: 0, cursor: 'pointer' }} />
+        )}
+        <input aria-label={grad ? 'Selection gradient' : 'Selection color'} value={grad ? labelValue : activeHex} onChange={e => grad ? setLabelValue(e.currentTarget.value) : setHexValue(normalizeHex(e.currentTarget.value))}
+          style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, background: 'transparent', padding: 0, color: INK, font: `450 11px/16px ${FONT}` }} />
+        <input aria-label="Selection color opacity" role="spinbutton" value={opacityValue} onChange={e => setOpacityValue(e.currentTarget.value.replace(/[^0-9]/g, '').slice(0, 3))}
+          style={{ minWidth: 0, width: 38, height: 24, border: 0, outline: 0, background: 'transparent', padding: '0 7px 0 0', color: INK, textAlign: 'right', font: `450 11px/16px ${FONT}` }} />
+        <span style={{ color: 'rgba(0,0,0,0.5)' }}>%</span>
+        {pickerOpen && <FigmaColorPicker anchorRef={rowRef} hex={activeHex} opacity={opacityValue} onHex={value => { setHexValue(value); if (!grad) setLabelValue(value) }} onOpacity={setOpacityValue} onClose={() => setPickerOpen(false)} />}
+      </div>
+    </div>
+  )
+}
+function LayoutGuideRow({ size, onRemove }: { size: string; onRemove?: () => void }) {
+  const [guideValue, setGuideValue] = useState(size)
+  const [open, setOpen] = useState(false)
+  const [visible, setVisible] = useState(true)
+  const guideRef = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
+  const options = ['Grid', 'Columns', 'Rows']
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '24px 8px 124px 8px 24px 4px 24px', alignItems: 'center', height: 32, padding: '0 8px 0 16px' }}>
       <UiIB name="layoutGrid" title="Layout guide settings" />
       <span />
-      <button type="button" role="combobox" aria-controls="layout-guide-options" aria-expanded={false} style={{ appearance: 'none', border: '1px solid #e6e6e6', background: '#fff', width: 124, height: 24, borderRadius: 5, padding: '0 0 0 9px', display: 'grid', gridTemplateColumns: '1fr 24px', alignItems: 'center', cursor: 'pointer', font: `450 11px/16px ${FONT}`, color: INK }}>
-        <span style={{ textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{size}</span>
-        <span style={{ color: FAINT, display: 'grid', placeItems: 'center' }}><UiIcon name="caret24" /></span>
-      </button>
+      <div ref={guideRef} style={{ position: 'relative', width: 124, height: 24 }}>
+        <button type="button" role="combobox" aria-controls="layout-guide-options" aria-expanded={open} onClick={() => setOpen(v => !v)}
+          style={{ appearance: 'none', border: '1px solid #e6e6e6', background: '#fff', width: 124, height: 24, borderRadius: 5, padding: '0 0 0 9px', display: 'grid', gridTemplateColumns: '1fr 24px', alignItems: 'center', cursor: 'pointer', font: `450 11px/16px ${FONT}`, color: INK }}>
+          <span style={{ textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{guideValue}</span>
+          <span style={{ color: FAINT, display: 'grid', placeItems: 'center' }}><UiIcon name="caret24" /></span>
+        </button>
+        {open && (
+          <ul id="layout-guide-options" role="listbox" data-figma-floating-root="true"
+            style={{ position: 'absolute', zIndex: 125, left: -8, top: -8, width: 140, height: 88, margin: 0, padding: '8px 0', listStyle: 'none', borderRadius: 6, background: '#fff', boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px', boxSizing: 'border-box', overflow: 'hidden' }}>
+            {options.map(option => (
+              <li key={option} role="option" aria-selected={guideValue.startsWith(option)} onClick={() => { setGuideValue(option === 'Grid' ? size : option); setOpen(false) }}
+                style={{ height: 24, display: 'grid', alignItems: 'center', padding: '0 0 0 32px', color: INK, cursor: 'pointer', font: `400 11px/16px ${FONT}` }}>
+                {option}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
       <span />
-      <UiIB name="visibility" title="Toggle visibility" />
+      <UiIB name="visibility" title="Toggle visibility" active={!visible} on={() => setVisible(v => !v)} />
       <span />
-      <UiIB name="minus" title="Remove layout guide" />
+      <UiIB name="minus" title="Remove layout guide" on={onRemove} />
     </div>
   )
 }
@@ -886,6 +1349,7 @@ const MOCK = {
   selectionColors: [{ name: 'Linear', op: 100, grad: true }, { hex: '000000', op: 100 }, { hex: 'FFFFFF', op: 100 }],
   layoutGuides: [{ size: 'Grid 10px' }],
 }
+const nextRowId = <T extends { id: number }>(rows: T[]) => rows.reduce((max, row) => Math.max(max, row.id), 0) + 1
 
 /* ── engine M1 · selection-core (KAI-9304) ─────────────────────────────────────
    Canvas = same-origin iframe of the real route; elements carry data-src
@@ -925,6 +1389,10 @@ export default function ReactFigmaPage() {
   const [opacityValue, setOpacityValue] = useState('100')
   const [cornerRadiusValue, setCornerRadiusValue] = useState('0')
   const [individualCorners, setIndividualCorners] = useState(false)
+  const [fills, setFills] = useState(() => MOCK.fills.map((fill, id) => ({ ...fill, id: id + 1 })))
+  const [strokes, setStrokes] = useState(() => MOCK.strokes.map((stroke, id) => ({ ...stroke, id: id + 1 })))
+  const [effects, setEffects] = useState(() => MOCK.effects.map((effect, id) => ({ ...effect, id: id + 1 })))
+  const [layoutGuides, setLayoutGuides] = useState(() => MOCK.layoutGuides.map((guide, id) => ({ ...guide, id: id + 1 })))
   const canvasRef = useRef<HTMLDivElement>(null)
   const pan = useRef<{ x: number; y: number; vx: number; vy: number } | null>(null)
   const [isPanning, setIsPanning] = useState(false)
@@ -1423,25 +1891,27 @@ export default function ReactFigmaPage() {
             </div>
           </Sec>
 
-          <Sec title="Fill" actionWidth={52} action={<><UiIB name="styleDots" title="Fill, Apply styles and variables" /><UiIB name="plus" title="Add fill" /></>} bodyGap={0} bodyPadding="0">
-            {(liveFills ?? MOCK.fills).map((f, i) => <FigmaPaintRow key={i} hex={f.hex} op={f.op} origin={(f as { origin?: string }).origin} />)}
+          <Sec title="Fill" actionWidth={52} action={<><StyleApplyButton label="Fill" title="Fill, Apply styles and variables" /><UiIB name="plus" title="Add fill" on={() => setFills(rows => [...rows, { id: nextRowId(rows), hex: 'FFFFFF', op: 100 }])} /></>} bodyGap={0} bodyPadding="0">
+            {liveFills
+              ? liveFills.map((f, i) => <FigmaPaintRow key={`live-${i}`} hex={f.hex} op={f.op} label="Fill" origin={f.origin} />)
+              : fills.map(f => <FigmaPaintRow key={f.id} hex={f.hex} op={f.op} label="Fill" onRemove={() => setFills(rows => rows.filter(row => row.id !== f.id))} />)}
           </Sec>
-          <Sec title="Stroke" actionWidth={52} action={<><UiIB name="styleDots" title="Stroke, Apply styles and variables" /><UiIB name="plus" title="Add stroke fill" /></>} bodyGap={0} bodyPadding="0">
-            {MOCK.strokes.map((s, i) => (
-              <div key={i}>
-                <FigmaPaintRow hex={s.hex} op={s.op} />
+          <Sec title="Stroke" actionWidth={52} action={<><StyleApplyButton label="Stroke" title="Stroke, Apply styles and variables" /><UiIB name="plus" title="Add stroke fill" on={() => setStrokes(rows => [...rows, { id: nextRowId(rows), hex: '000000', op: 100, position: 'Inside', weight: 1 }])} /></>} bodyGap={0} bodyPadding="0">
+            {strokes.map(s => (
+              <div key={s.id}>
+                <FigmaPaintRow hex={s.hex} op={s.op} label="Stroke" onRemove={() => setStrokes(rows => rows.filter(row => row.id !== s.id))} />
                 <StrokeDetailRow position={s.position} weight={s.weight} />
               </div>
             ))}
           </Sec>
-          <Sec title="Effects" actionWidth={52} action={<><UiIB name="styleDots" title="Effects, Apply styles" /><UiIB name="plus" title="Add effect" /></>} bodyGap={0} bodyPadding="0">
-            {MOCK.effects.map((e, i) => <FigmaEffectRow key={i} type={e.type} />)}
+          <Sec title="Effects" actionWidth={52} action={<><StyleApplyButton label="Effects" title="Effects, Apply styles" /><UiIB name="plus" title="Add effect" on={() => setEffects(rows => [...rows, { id: nextRowId(rows), type: 'Drop shadow' }])} /></>} bodyGap={0} bodyPadding="0">
+            {effects.map(e => <FigmaEffectRow key={e.id} type={e.type} onRemove={() => setEffects(rows => rows.filter(row => row.id !== e.id))} />)}
           </Sec>
           <Sec title="Selection colors" bodyGap={0} bodyPadding="0">
             {MOCK.selectionColors.map((c, i) => <SelectionColorRow key={i} hex={c.hex} name={c.name} op={c.op} grad={c.grad} />)}
           </Sec>
-          <Sec title="Layout guide" actionWidth={52} action={<><UiIB name="styleDots" title="Layout guide, Apply styles" /><UiIB name="plus" title="Add layout guide" /></>} bodyGap={0} bodyPadding="0">
-            {MOCK.layoutGuides.map((g, i) => <LayoutGuideRow key={i} size={g.size} />)}
+          <Sec title="Layout guide" actionWidth={52} action={<><StyleApplyButton label="Layout guide" title="Layout guide, Apply styles" /><UiIB name="plus" title="Add layout guide" on={() => setLayoutGuides(rows => [...rows, { id: nextRowId(rows), size: 'Grid 10px' }])} /></>} bodyGap={0} bodyPadding="0">
+            {layoutGuides.map(g => <LayoutGuideRow key={g.id} size={g.size} onRemove={() => setLayoutGuides(rows => rows.filter(row => row.id !== g.id))} />)}
           </Sec>
         </div>
       </aside>
