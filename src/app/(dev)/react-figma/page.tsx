@@ -351,6 +351,24 @@ function AutoValueField({ icon, label, value, mode, caret = true, ariaLabel, onC
   )
 }
 type ResizeMode = 'Fixed' | 'Hug' | 'Fill'
+function ResizeModeGlyph({ axis, mode }: { axis: 'W' | 'H'; mode: ResizeMode }) {
+  if (mode === 'Fixed') {
+    return <span style={{ font: `450 11px/24px ${FONT}`, letterSpacing: '0.055px' }}>{axis}</span>
+  }
+  const horizontal = axis === 'W'
+  const d = mode === 'Fill'
+    ? horizontal
+      ? 'M6 12h12M8.5 9.5 6 12l2.5 2.5M15.5 9.5 18 12l-2.5 2.5'
+      : 'M12 6v12M9.5 8.5 12 6l2.5 2.5M9.5 15.5 12 18l2.5-2.5'
+    : horizontal
+      ? 'M5.5 12h5M8.5 9.5 11 12l-2.5 2.5M18.5 12h-5M15.5 9.5 13 12l2.5 2.5'
+      : 'M12 5.5v5M9.5 8.5 12 11l2.5-2.5M12 18.5v-5M9.5 15.5 12 13l2.5 2.5'
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden style={{ display: 'block' }}>
+      <path d={d} stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
 function MenuCheck() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden style={{ display: 'block' }}>
@@ -385,13 +403,14 @@ function ResizeDropdownField({ axis, value, mode, onValue, onMode }: { axis: 'W'
   const [varOpen, setVarOpen] = useState(false)
   const menuRef = useCloseOnOutside<HTMLDivElement>(open || varOpen, () => { setOpen(false); setVarOpen(false) })
   const axisLabel = axis === 'W' ? 'width' : 'height'
+  const fieldLabel = `${axis === 'W' ? 'Horizontal' : 'Vertical'} resizing${mode === 'Fill' && axis === 'W' ? ' + max width' : ''}: ${mode}`
   const selectMode = (next: ResizeMode) => { onMode(next); setOpen(false) }
   const applyOnly = () => setOpen(false)
   const applyVariable = () => { setOpen(false); setVarOpen(true) }
   return (
-    <div ref={menuRef} style={{ position: 'relative', width: 88, height: 24 }}>
+    <div ref={menuRef} aria-label={fieldLabel} title={fieldLabel} data-resize-axis={axis} data-resize-mode={mode} style={{ position: 'relative', width: 88, height: 24 }}>
       <div style={{ width: 88, height: 24, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: '24px 1fr 32px', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
-        <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)', font: `450 11px/24px ${FONT}` }}>{axis === 'W' ? <UiIcon name="resizeW" /> : 'H'}</span>
+        <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)' }}><ResizeModeGlyph axis={axis} mode={mode} /></span>
         <input aria-label={`${axisLabel} value`} role="spinbutton" value={value} onChange={e => onValue(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
           style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: INK, font: `450 11px/16px ${FONT}` }} />
         <button type="button" aria-label={`${axisLabel} resizing: ${mode}`} aria-haspopup="menu" aria-expanded={open} onClick={() => { setVarOpen(false); setOpen(v => !v) }}
