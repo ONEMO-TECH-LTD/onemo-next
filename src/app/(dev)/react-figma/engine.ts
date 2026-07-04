@@ -209,6 +209,67 @@ export function readStyles(el: HTMLElement): StyleReport {
   return { computed, defined }
 }
 
+// ─── M3 override-engine (KAI-9306) ──────────────────────────────────────────
+// Instant preview staging: ONE <style> element in the canvas doc, one rule per
+// element (runtime data-eng-id address). Every declaration carries !important —
+// the staging layer must beat any specificity incl. inline (plan §3 M3).
+// Zero disk writes by construction; HMR doc swap drops the sheet (build truth
+// wins) while the ledger persists parent-side for dirty re-report.
+
+export type OverrideOp = { domId: string; prop: string; value: string; original: string; stale?: boolean }
+
+const OV_STYLE_ID = 'engine-overrides'
+
+export class Overrides {
+  private doc: Document | null = null
+  private map = new Map<string, Map<string, OverrideOp>>() // domId → prop → op
+
+  attach(doc: Document): void {
+    this.doc = doc
+    // fresh doc after HMR/reload: overrides are NOT re-applied (truth wins);
+    // surviving ledger entries become stale until discarded or re-edited.
+    if (this.map.size) for (const props of this.map.values()) for (const op of props.values()) op.stale = true
+    this.render()
+  }
+
+  set(domId: string, prop: string, value: string, original: string): void {
+    let props = this.map.get(domId)
+    if (!props) { props = new Map(); this.map.set(domId, props) }
+    const existing = props.get(prop)
+    // keep the FIRST original (true pre-edit value), refresh the value
+    props.set(prop, { domId, prop, value, original: existing?.original ?? original, stale: false })
+    this.render()
+  }
+
+  discard(domId: string, prop?: string): void {
+    if (prop) { this.map.get(domId)?.delete(prop); if (this.map.get(domId)?.size === 0) this.map.delete(domId) }
+    else this.map.delete(domId)
+    this.render()
+  }
+
+  clear(): void { this.map.clear(); this.render() }
+
+  dirty(): OverrideOp[] {
+    const out: OverrideOp[] = []
+    for (const props of this.map.values()) out.push(...props.values())
+    return out
+  }
+
+  private render(): void {
+    const doc = this.doc
+    if (!doc) return
+    let el = doc.getElementById(OV_STYLE_ID) as HTMLStyleElement | null
+    if (!el) { el = doc.createElement('style'); el.id = OV_STYLE_ID; doc.head.appendChild(el) }
+    let css = ''
+    for (const [domId, props] of this.map) {
+      const decls = [...props.values()].filter((op) => !op.stale)
+        .map((op) => `${op.prop}: ${op.value} !important;`).join(' ')
+      if (decls) css += `[data-eng-id="${domId}"] { ${decls} }\n`
+    }
+    el.textContent = css
+  }
+}
+
 let _ctx: CanvasRenderingContext2D | null = null
 /** Any CSS color (rgb/oklch/color()/named) → {hex, op%}; null for transparent/none. */
 export function colorToHex(c: string, doc: Document): { hex: string; op: number } | null {

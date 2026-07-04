@@ -16,7 +16,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { buildLayerTree, readStyles, colorToHex, boxSlots, gapSlots, tokenOf, type LiveNode } from './engine'
+import { buildLayerTree, readStyles, colorToHex, boxSlots, gapSlots, tokenOf, Overrides, type LiveNode, type OverrideOp } from './engine'
 import { createPortal } from 'react-dom'
 import {
   ListDashes, MagnifyingGlass, Plus, Minus, Sidebar, CaretDown, GearSix, Palette,
@@ -939,6 +939,9 @@ export default function ReactFigmaPage() {
   const [fieldTokens, setFieldTokens] = useState<Record<string, string | undefined>>({})
   const [liveFills, setLiveFills] = useState<{ hex: string; op: number; origin?: string }[] | null>(null)
   const selIdRef = useRef<string | null>(null)
+  const ov = useRef<Overrides | null>(null)
+  if (!ov.current) ov.current = new Overrides()
+  const [ovVersion, setOvVersion] = useState(0) // bump → DirtyBar re-render
 
   const rectOf = (el: HTMLElement): OutlineRect => {
     const r = el.getBoundingClientRect()
@@ -999,9 +1002,46 @@ export default function ReactFigmaPage() {
     console.log('[engine] select', payload, rep)
   }, [setXValue, setYValue, setInsetTop, setInsetLeft, setZIndexValue, setCssPosition, setAutoFlow, setAutoWrap, setWidthValue, setHeightValue, setGapValue, setPaddingXValue, setPaddingYValue, setClipContent, setOpacityValue, setCornerRadiusValue, setBlendMode])
 
+  /* M3: panel edit → instant canvas override (staging only — zero disk writes). */
+  const applyOverride = useCallback((field: string, raw: string) => {
+    const id = selIdRef.current
+    const doc = iframeRef.current?.contentDocument
+    const el = id && doc ? (doc.querySelector(`[data-eng-id="${id}"]`) as HTMLElement | null) : null
+    if (!el || !doc || !id) return
+    const cs = doc.defaultView!.getComputedStyle(el)
+    const n = raw.trim() === '' ? '0' : raw.trim()
+    const withUnit = /^-?\d+(\.\d+)?$/.test(n) ? `${n}px` : n
+    const t0 = performance.now()
+    const decls: [string, string][] =
+      field === 'gap' ? [['column-gap', withUnit], ['row-gap', withUnit]]
+      : field === 'paddingX' ? [['padding-left', withUnit], ['padding-right', withUnit]]
+      : field === 'paddingY' ? [['padding-top', withUnit], ['padding-bottom', withUnit]]
+      : field === 'opacity' ? [['opacity', String((parseFloat(n) || 0) / 100)]]
+      : field === 'radius' ? [['border-radius', withUnit]]
+      : field === 'width' ? [['width', withUnit]]
+      : field === 'height' ? [['height', withUnit]]
+      : []
+    for (const [prop, value] of decls) ov.current!.set(id, prop, value, cs.getPropertyValue(prop))
+    setOvVersion((v) => v + 1)
+    setSelRect(rectOf(el))
+    console.log('[engine] override', field, '→', withUnit, `${(performance.now() - t0).toFixed(1)}ms`)
+  }, [])
+
+  const discardOverride = useCallback((op?: OverrideOp) => {
+    if (op) ov.current!.discard(op.domId, op.prop)
+    else if (selIdRef.current) ov.current!.discard(selIdRef.current)
+    else ov.current!.clear()
+    setOvVersion((v) => v + 1)
+    const doc = iframeRef.current?.contentDocument
+    const el = selIdRef.current && doc ? (doc.querySelector(`[data-eng-id="${selIdRef.current}"]`) as HTMLElement | null) : null
+    if (el) applySelection(el) // re-read truth into the fields
+  }, [applySelection])
+
   const wireCanvas = useCallback(() => {
     const doc = iframeRef.current?.contentDocument
     if (!doc) { console.warn('[engine] contentDocument unreachable (COEP smoke FAIL?)'); return }
+    ov.current!.attach(doc) // HMR/reload: sheet is fresh, ledger persists as stale (dirty re-report)
+    if (ov.current!.dirty().length) { setOvVersion((v) => v + 1); console.log('[engine] overrides dropped by reload — ledger re-reported', ov.current!.dirty()) }
     const findTagged = (t: EventTarget | null) =>
       ((t as HTMLElement | null)?.closest?.('[data-src]') ?? null) as HTMLElement | null
     doc.addEventListener('mousemove', (e) => {
@@ -1201,6 +1241,23 @@ export default function ReactFigmaPage() {
           <button type="button" style={{ appearance: 'none', border: 0, background: '#fff', borderRadius: 5, marginLeft: 'auto', width: 54.5, height: 24, padding: '4px 4px 4px 12px', color: '#000', cursor: 'pointer', font: `400 11px/16px ${FONT}`, display: 'flex', alignItems: 'center' }}><span style={{ flex: 1 }}>92%</span><UiIcon name="caret16" size={16} /></button>
         </div>
         <div style={{ flex: 1, overflowY: 'auto' }}>
+          {/* M3: dirty ledger — unsaved canvas overrides (staging; E1.4 commits from here) */}
+          {ovVersion >= 0 && ov.current!.dirty().length > 0 && (
+            <div style={{ margin: '8px 8px 0 16px', padding: '6px 8px', borderRadius: 6, background: '#fff8f0', border: '1px solid #f5d9b8', font: `450 10px/16px ${FONT}`, color: INK }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                <span style={{ font: `550 10px/16px ${FONT}`, color: '#9a5b16' }}>Unsaved overrides · {ov.current!.dirty().length}</span>
+                <button type="button" onClick={() => discardOverride()} style={{ appearance: 'none', border: 0, background: 'transparent', cursor: 'pointer', font: `550 10px/16px ${FONT}`, color: SEL, padding: 0 }}>Discard all</button>
+              </div>
+              {ov.current!.dirty().map((op) => (
+                <div key={`${op.domId}:${op.prop}`} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: op.stale ? MUTE : INK }}>
+                    {op.prop}: {op.value}{op.stale ? ' — dropped by reload' : ''}
+                  </span>
+                  <button type="button" title="Discard" onClick={() => discardOverride(op)} style={{ appearance: 'none', border: 0, background: 'transparent', cursor: 'pointer', color: MUTE, font: `450 10px/16px ${FONT}`, padding: 0 }}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
           {/* Frame preset + actions */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 48, padding: '4px 8px' }}>
             <FramePresetDropdown kind={frameKind} preset={framePreset} onKind={setFrameKind} onPreset={setFramePreset} />
@@ -1249,8 +1306,8 @@ export default function ReactFigmaPage() {
               <UiIB name="autoLayoutWrap" title="Wrap" size={16} active={autoWrap} on={() => setAutoWrap(v => !v)} />
             </InspectorRow>
             <InspectorRow label="Resizing">
-              <ResizeDropdownField axis="W" value={widthValue} mode={widthResize} onValue={setWidthValue} onMode={setWidthResize} />
-              <ResizeDropdownField axis="H" value={heightValue} mode={heightResize} onValue={setHeightValue} onMode={setHeightResize} />
+              <ResizeDropdownField axis="W" value={widthValue} mode={widthResize} onValue={(v) => { setWidthValue(v); applyOverride('width', v) }} onMode={setWidthResize} />
+              <ResizeDropdownField axis="H" value={heightValue} mode={heightResize} onValue={(v) => { setHeightValue(v); applyOverride('height', v) }} onMode={setHeightResize} />
               <UiIB name="lockAspect" title="Lock aspect ratio" />
             </InspectorRow>
             <div style={{ position: 'relative', height: 82, width: '100%' }}>
@@ -1258,13 +1315,13 @@ export default function ReactFigmaPage() {
               <span style={{ position: 'absolute', left: 112, top: 3.5, width: 88, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Gap</span>
               <div style={{ position: 'absolute', left: 16, right: 8, top: 22, display: 'grid', gridTemplateColumns: '88px 88px 24px', gap: 8, alignItems: 'start' }}>
                 <AlignGrid sel={autoAlign} onSelect={setAutoAlign} />
-                <GapDropdownField value={gapValue} onChange={setGapValue} token={fieldTokens.gap} />
+                <GapDropdownField value={gapValue} onChange={(v) => { setGapValue(v); applyOverride('gap', v) }} token={fieldTokens.gap} />
                 <UiIB name="autoLayoutSettings" title="Auto layout settings" />
               </div>
             </div>
             <InspectorRow label="Padding" height={50}>
-              <AutoValueField icon="paddingHorizontal" value={paddingXValue} caret={false} ariaLabel="Horizontal padding" onChange={setPaddingXValue} token={fieldTokens.paddingX} />
-              <AutoValueField icon="paddingVertical" value={paddingYValue} caret={false} ariaLabel="Vertical padding" onChange={setPaddingYValue} token={fieldTokens.paddingY} />
+              <AutoValueField icon="paddingHorizontal" value={paddingXValue} caret={false} ariaLabel="Horizontal padding" onChange={(v) => { setPaddingXValue(v); applyOverride('paddingX', v) }} token={fieldTokens.paddingX} />
+              <AutoValueField icon="paddingVertical" value={paddingYValue} caret={false} ariaLabel="Vertical padding" onChange={(v) => { setPaddingYValue(v); applyOverride('paddingY', v) }} token={fieldTokens.paddingY} />
               <UiIB name="paddingIndividual" title="Individual padding" />
             </InspectorRow>
             <div data-react-figma-clip-row style={{ height: 32, padding: '0 8px 0 16px', display: 'grid', gridTemplateColumns: '216px', alignItems: 'center' }}>
@@ -1289,8 +1346,8 @@ export default function ReactFigmaPage() {
               <span style={{ position: 'absolute', left: 16, top: 3.5, width: 88, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Opacity</span>
               <span style={{ position: 'absolute', left: 112, top: 3.5, width: 120, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Corner radius</span>
               <div style={{ position: 'absolute', left: 16, right: 8, top: 22, display: 'grid', gridTemplateColumns: '88px 88px 24px', gap: 8, alignItems: 'start' }}>
-                <InlineValueInput icon="opacity" value={opacityValue} onChange={setOpacityValue} suffix="%" ariaLabel="Opacity" token={fieldTokens.opacity} />
-                <InlineValueInput icon="cornerRadius" value={cornerRadiusValue} onChange={setCornerRadiusValue} ariaLabel="Corner radius" token={fieldTokens.radius} />
+                <InlineValueInput icon="opacity" value={opacityValue} onChange={(v) => { setOpacityValue(v); applyOverride('opacity', v) }} suffix="%" ariaLabel="Opacity" token={fieldTokens.opacity} />
+                <InlineValueInput icon="cornerRadius" value={cornerRadiusValue} onChange={(v) => { setCornerRadiusValue(v); applyOverride('radius', v) }} ariaLabel="Corner radius" token={fieldTokens.radius} />
                 <UiIB name="cornerRadius" title="Individual corners" active={individualCorners} on={() => setIndividualCorners(v => !v)} />
               </div>
             </div>
