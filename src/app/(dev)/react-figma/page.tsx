@@ -163,13 +163,18 @@ function UiIB({ name, title, active, size = 24, on }: { name: keyof typeof UI_IC
   )
 }
 
-function InspectorField({ label, icon, value, bound, input, dimValue }: { label?: string; icon?: keyof typeof UI_ICON; value: string; bound?: boolean; input?: boolean; dimValue?: boolean }) {
+function InspectorField({ label, icon, value, bound, input, dimValue, ariaLabel, onChange }: { label?: string; icon?: keyof typeof UI_ICON; value: string; bound?: boolean; input?: boolean; dimValue?: boolean; ariaLabel?: string; onChange?: (value: string) => void }) {
   const [h, setH] = useState(false)
   return (
     <div onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
       style={{ minWidth: 0, height: 24, borderRadius: 5, background: h ? '#ededed' : input ? '#fff' : FIELD, border: `1px solid ${input ? '#e6e6e6' : 'transparent'}`, display: 'flex', alignItems: 'center', overflow: 'hidden', font: `450 11px/16px ${FONT}`, color: INK }}>
       <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', flex: 'none', color: input ? INK : 'rgba(0,0,0,0.5)', font: `400 11px/24px ${FONT}` }}>{icon ? <UiIcon name={icon} /> : label}</span>
-      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: bound ? TOKEN : dimValue ? MUTE : INK }}>{value}</span>
+      {onChange ? (
+        <input aria-label={ariaLabel ?? label} role="spinbutton" value={value} onChange={e => onChange(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
+          style={{ flex: 1, minWidth: 0, height: 24, border: 0, outline: 0, padding: '0 8px 0 0', background: 'transparent', color: bound ? TOKEN : dimValue ? MUTE : INK, font: `450 11px/16px ${FONT}` }} />
+      ) : (
+        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: bound ? TOKEN : dimValue ? MUTE : INK }}>{value}</span>
+      )}
       <span title="Apply variable" style={{ width: 16, height: 24, display: 'grid', placeItems: 'center', flex: 'none', color: bound ? TOKEN : FAINT, opacity: bound ? 1 : h ? 0.75 : 0 }}><UiIcon name="variable" size={12} /></span>
     </div>
   )
@@ -554,6 +559,95 @@ function LayoutGuideRow({ size }: { size: string }) {
     </div>
   )
 }
+type FrameKind = 'Section' | 'Frame' | 'Group'
+type FramePreset = { label: string; size: string }
+const FRAME_KIND_OPTIONS: { label: FrameKind; disabled?: boolean }[] = [
+  { label: 'Section', disabled: true },
+  { label: 'Frame' },
+  { label: 'Group' },
+]
+const FRAME_PRESET_GROUPS: { label: string; items: FramePreset[] }[] = [
+  { label: 'Phone Presets', items: [
+    { label: 'iPhone 17', size: '402 × 874' }, { label: 'iPhone 16 & 17 Pro', size: '402 × 874' }, { label: 'iPhone 16', size: '393 × 852' }, { label: 'iPhone 16 & 17 Pro Max', size: '440 × 956' },
+    { label: 'iPhone 16 Plus', size: '430 × 932' }, { label: 'iPhone Air', size: '420 × 912' }, { label: 'iPhone 14 & 15 Pro Max', size: '430 × 932' }, { label: 'iPhone 14 & 15 Pro', size: '393 × 852' },
+    { label: 'iPhone 13 & 14', size: '390 × 844' }, { label: 'iPhone 14 Plus', size: '428 × 926' }, { label: 'Android Compact', size: '412 × 917' }, { label: 'Android Medium', size: '700 × 840' },
+  ] },
+  { label: 'Tablet Presets', items: [
+    { label: 'iPad mini 8.3', size: '744 × 1133' }, { label: 'Surface Pro 8', size: '1440 × 960' }, { label: 'iPad Pro 11"', size: '834 × 1194' }, { label: 'iPad Pro 12.9"', size: '1024 × 1366' }, { label: 'Android Expanded', size: '1280 × 800' },
+  ] },
+  { label: 'Desktop Presets', items: [
+    { label: 'MacBook Air', size: '1280 × 832' }, { label: 'MacBook Pro 14"', size: '1512 × 982' }, { label: 'MacBook Pro 16"', size: '1728 × 1117' }, { label: 'Desktop', size: '1440 × 1024' }, { label: 'Wireframes', size: '1440 × 1024' }, { label: 'TV', size: '1280 × 720' },
+  ] },
+  { label: 'Presentation Presets', items: [
+    { label: 'Slide 16:9', size: '1920 × 1080' }, { label: 'Slide 4:3', size: '1024 × 768' },
+  ] },
+  { label: 'Watch Presets', items: [
+    { label: 'Apple Watch Series 10 42mm', size: '187 × 223' }, { label: 'Apple Watch Series 10 46mm', size: '208 × 248' }, { label: 'Apple Watch 41mm', size: '176 × 215' }, { label: 'Apple Watch 45mm', size: '198 × 242' }, { label: 'Apple Watch 44mm', size: '184 × 224' }, { label: 'Apple Watch 40mm', size: '162 × 197' },
+  ] },
+  { label: 'Paper Presets', items: [
+    { label: 'A4', size: '595 × 842' }, { label: 'A5', size: '420 × 595' }, { label: 'A6', size: '297 × 420' }, { label: 'Letter', size: '612 × 792' }, { label: 'Tabloid', size: '792 × 1224' },
+  ] },
+  { label: 'Social Media Presets', items: [
+    { label: 'Twitter post', size: '1200 × 675' }, { label: 'Twitter header', size: '1500 × 500' }, { label: 'Facebook post', size: '1200 × 630' }, { label: 'Facebook cover', size: '820 × 312' }, { label: 'Instagram post', size: '1080 × 1350' },
+    { label: 'Instagram story', size: '1080 × 1920' }, { label: 'Dribbble shot', size: '400 × 300' }, { label: 'Dribbble shot HD', size: '800 × 600' }, { label: 'LinkedIn cover', size: '1584 × 396' },
+  ] },
+  { label: 'Figma Presets', items: [
+    { label: 'Plugin icon', size: '128 × 128' }, { label: 'Profile banner', size: '1680 × 240' }, { label: 'Plugin / file cover', size: '1920 × 1080' },
+  ] },
+  { label: 'Archived Presets', items: [
+    { label: 'iPhone 13 mini', size: '375 × 812' }, { label: 'iPhone SE', size: '320 × 568' }, { label: 'iPhone 13 Pro Max', size: '428 × 926' }, { label: 'iPhone 13 / 13 Pro', size: '390 × 844' },
+    { label: 'iPhone 11 Pro Max', size: '414 × 896' }, { label: 'iPhone 11 Pro / X', size: '375 × 812' }, { label: 'iPhone 8 Plus', size: '414 × 736' }, { label: 'iPhone 8', size: '375 × 667' },
+    { label: 'Android Small', size: '360 × 640' }, { label: 'Android Large', size: '360 × 800' }, { label: 'Google Pixel 2', size: '411 × 731' }, { label: 'Google Pixel 2 XL', size: '411 × 823' },
+    { label: 'iPad mini 5', size: '768 × 1024' }, { label: 'Surface Pro 4', size: '1368 × 912' }, { label: 'MacBook', size: '1152 × 700' }, { label: 'MacBook Pro', size: '1440 × 900' },
+    { label: 'Surface Book', size: '1500 × 1000' }, { label: 'Apple Watch 42mm', size: '156 × 195' }, { label: 'Apple Watch 38mm', size: '136 × 170' }, { label: 'iMac', size: '1280 × 720' }, { label: 'Macintosh 128k', size: '512 × 342' },
+  ] },
+]
+function FrameMenuItem({ role, label, size, checked, disabled, onClick }: { role: 'menuitemradio' | 'menuitemcheckbox'; label: string; size?: string; checked?: boolean; disabled?: boolean; onClick: () => void }) {
+  const [h, setH] = useState(false)
+  return (
+    <li role={role} aria-checked={checked} aria-disabled={disabled} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
+      onClick={() => { if (!disabled) onClick() }}
+      style={{ width: 222, height: 24, display: 'flex', alignItems: 'center', padding: '0 8px', boxSizing: 'border-box', cursor: disabled ? 'default' : 'pointer', color: disabled ? 'rgba(255,255,255,0.4)' : '#fff', background: 'transparent', font: `400 11px/16px ${FONT}` }}>
+      <span style={{ width: 206, height: 24, borderRadius: 5, padding: '4px 8px 4px 4px', boxSizing: 'border-box', display: 'flex', alignItems: 'center', background: h && !disabled ? 'rgba(255,255,255,0.08)' : 'transparent' }}>
+        <span style={{ width: 16, height: 16, margin: '-4px 4px -4px 0', display: 'grid', placeItems: 'center', visibility: checked ? 'visible' : 'hidden', color: '#fff', flex: 'none' }}><MenuCheck /></span>
+        {size ? (
+          <span style={{ width: 174, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+            <span style={{ flex: 'none' }}>{size}</span>
+          </span>
+        ) : (
+          <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+        )}
+      </span>
+    </li>
+  )
+}
+function FramePresetDropdown({ kind, preset, onKind, onPreset }: { kind: FrameKind; preset: FramePreset; onKind: (kind: FrameKind) => void; onPreset: (preset: FramePreset) => void }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div style={{ position: 'relative', width: 72, height: 24, flex: 'none' }}>
+      <button type="button" aria-label={`${kind}, Frame Dimension Presets, ${preset.label}, ${preset.size}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(v => !v)}
+        style={{ appearance: 'none', border: '1px solid rgba(0,0,0,0)', background: 'transparent', cursor: 'pointer', width: 72, height: 24, borderRadius: 5, display: 'flex', alignItems: 'center', gap: 1, font: `550 13px/22px ${FONT}`, letterSpacing: '-0.032px', color: '#000', padding: '0 0 0 7px' }}>
+        {kind} <UiIcon name="caret24" />
+      </button>
+      {open && (
+        <div role="presentation" style={{ position: 'absolute', zIndex: 110, top: 28, left: 0, width: 222, maxHeight: 'calc(100vh - 121px)', overflowY: 'auto', borderRadius: 13, background: '#1e1e1e', padding: '8px 0', boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px' }}>
+          <ul role="menu" aria-label="Frame Dimension Presets" style={{ width: 222, margin: 0, padding: 0, listStyle: 'none' }}>
+            <ul role="group" aria-label="Frame Layout Options" style={{ width: 222, margin: '0 0 7px', padding: '0 0 7px', borderBottom: '1px solid rgb(56, 56, 56)', listStyle: 'none' }}>
+              {FRAME_KIND_OPTIONS.map(item => <FrameMenuItem key={item.label} role="menuitemradio" label={item.label} checked={kind === item.label} disabled={item.disabled} onClick={() => { onKind(item.label); setOpen(false) }} />)}
+            </ul>
+            {FRAME_PRESET_GROUPS.map((group, i) => (
+              <ul key={group.label} role="group" aria-label={group.label} style={{ width: 222, margin: i === FRAME_PRESET_GROUPS.length - 1 ? 0 : '0 0 7px', padding: i === FRAME_PRESET_GROUPS.length - 1 ? 0 : '0 0 7px', borderBottom: i === FRAME_PRESET_GROUPS.length - 1 ? '0 none transparent' : '1px solid rgb(56, 56, 56)', listStyle: 'none' }}>
+                <span style={{ position: 'absolute', width: 1, height: 1, margin: -1, padding: 0, overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', border: 0 }}>{group.label}</span>
+                {group.items.map(item => <FrameMenuItem key={`${group.label}:${item.label}:${item.size}`} role="menuitemcheckbox" label={item.label} size={item.size} checked={preset.label === item.label && preset.size === item.size} onClick={() => { onPreset(item); setOpen(false) }} />)}
+              </ul>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
 const FRAME_INSERT_OPTIONS = [
   { label: 'Frame', target: 'div', detail: 'freeform container' },
   { label: 'Section', target: 'section', detail: 'semantic block' },
@@ -636,7 +730,15 @@ export default function ReactFigmaPage() {
   const [rail, setRail] = useState<Rail>('file')
   const [tab, setTab] = useState<'design' | 'prototype'>('design')
   const [view, setView] = useState({ x: 300, y: 70, z: 0.6 })
+  const [frameKind, setFrameKind] = useState<FrameKind>('Frame')
+  const [framePreset, setFramePreset] = useState<FramePreset>({ label: 'iPhone 17', size: '402 × 874' })
+  const [xValue, setXValue] = useState('0')
+  const [yValue, setYValue] = useState('122')
+  const [rotationValue, setRotationValue] = useState('0°')
   const [cssPosition, setCssPosition] = useState(2)
+  const [insetTop, setInsetTop] = useState('auto')
+  const [insetLeft, setInsetLeft] = useState('auto')
+  const [zIndexValue, setZIndexValue] = useState('1')
   const [autoFlow, setAutoFlow] = useState<AutoFlow>('horizontal')
   const [autoWrap, setAutoWrap] = useState(false)
   const [widthResize, setWidthResize] = useState<ResizeMode>('Fill')
@@ -792,7 +894,7 @@ export default function ReactFigmaPage() {
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {/* Frame preset + actions */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 48, padding: '4px 8px' }}>
-            <button type="button" aria-label="Frame, Frame Dimension Presets" style={{ appearance: 'none', border: 0, background: 'transparent', cursor: 'pointer', width: 72, height: 24, display: 'flex', alignItems: 'center', gap: 1, font: `550 13px/22px ${FONT}`, letterSpacing: '-0.032px', color: '#000', padding: '0 0 0 7px' }}>Frame <UiIcon name="caret24" /></button>
+            <FramePresetDropdown kind={frameKind} preset={framePreset} onKind={setFrameKind} onPreset={setFramePreset} />
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
               <span aria-hidden style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', flex: 'none', color: INK }}><UiIcon name="devCode" /></span>
               <UiIB name="createComponent" title="Create component" />
@@ -807,12 +909,12 @@ export default function ReactFigmaPage() {
               <FIB name="more" title="More actions" />
             </PositionRow>
             <PositionRow label="Position">
-              <InspectorField label="X" value="0" input dimValue />
-              <InspectorField label="Y" value="122" input dimValue />
+              <InspectorField label="X" value={xValue} input dimValue ariaLabel="X-position" onChange={setXValue} />
+              <InspectorField label="Y" value={yValue} input dimValue ariaLabel="Y-position" onChange={setYValue} />
               <span />
             </PositionRow>
             <PositionRow label="Rotation">
-              <InspectorField icon="rotationField" value="0°" />
+              <InspectorField icon="rotationField" value={rotationValue} ariaLabel="Rotation" onChange={setRotationValue} />
               <div style={{ display: 'flex', gap: 1, width: '100%' }}><FSegBtn name="rotate" pos="l" fill title="Rotate 90° right" /><FSegBtn name="flipH" pos="m" fill title="Flip horizontal" /><FSegBtn name="flipV" pos="r" fill title="Flip vertical" /></div>
               <span />
             </PositionRow>
@@ -820,9 +922,9 @@ export default function ReactFigmaPage() {
               <TextSegGroup items={['Auto', 'Rel', 'Abs', 'Fix', 'Sticky']} active={cssPosition} onSelect={setCssPosition} width="100%" ariaLabel="CSS position" />
             </InspectorRow>
             <CompactInspectorRow label="Inset / z-index">
-              <InspectorField label="T" value="auto" />
-              <InspectorField label="L" value="auto" />
-              <InspectorField label="Z" value="1" />
+              <InspectorField label="T" value={insetTop} ariaLabel="Top inset" onChange={setInsetTop} />
+              <InspectorField label="L" value={insetLeft} ariaLabel="Left inset" onChange={setInsetLeft} />
+              <InspectorField label="Z" value={zIndexValue} ariaLabel="z-index" onChange={setZIndexValue} />
             </CompactInspectorRow>
           </Sec>
 
