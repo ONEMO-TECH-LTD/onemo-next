@@ -1759,6 +1759,15 @@ export default function ReactFigmaPage() {
           : n === 'grid' ? [['display', 'grid']]
           : [['display', 'block']] // freeform — no auto-layout
         )
+      : field === 'selfAlign' ? ( // align the element within its parent — directional margin:auto (flex-item + block analog)
+          n === 'left' ? [['margin-left', '0'], ['margin-right', 'auto']]
+          : n === 'hcenter' ? [['margin-left', 'auto'], ['margin-right', 'auto']]
+          : n === 'right' ? [['margin-left', 'auto'], ['margin-right', '0']]
+          : n === 'top' ? [['margin-top', '0'], ['margin-bottom', 'auto']]
+          : n === 'vcenter' ? [['margin-top', 'auto'], ['margin-bottom', 'auto']]
+          : n === 'bottom' ? [['margin-top', 'auto'], ['margin-bottom', '0']]
+          : []
+        )
       : field === 'clip' ? [['overflow', n]]
       : field === 'transform' ? [['transform', n]]
       : field === 'cssPosition' ? [['position', n]]
@@ -2286,8 +2295,8 @@ export default function ReactFigmaPage() {
 
           <Sec title="Position" first bodyGap={0} bodyPadding="0">
             <PositionRow label="Alignment">
-              <Seg fill><FSegBtn name="alignLeft" pos="l" fill title="Align left" /><FSegBtn name="alignCenterH" pos="m" fill title="Align horizontal centers" /><FSegBtn name="alignRight" pos="r" fill title="Align right" /></Seg>
-              <Seg fill><FSegBtn name="alignTop" pos="l" fill title="Align top" /><FSegBtn name="alignCenterV" pos="m" fill title="Align vertical centers" /><FSegBtn name="alignBottom" pos="r" fill title="Align bottom" /></Seg>
+              <Seg fill><FSegBtn name="alignLeft" pos="l" fill title="Align left" on={() => applyOverride('selfAlign', 'left')} /><FSegBtn name="alignCenterH" pos="m" fill title="Align horizontal centers" on={() => applyOverride('selfAlign', 'hcenter')} /><FSegBtn name="alignRight" pos="r" fill title="Align right" on={() => applyOverride('selfAlign', 'right')} /></Seg>
+              <Seg fill><FSegBtn name="alignTop" pos="l" fill title="Align top" on={() => applyOverride('selfAlign', 'top')} /><FSegBtn name="alignCenterV" pos="m" fill title="Align vertical centers" on={() => applyOverride('selfAlign', 'vcenter')} /><FSegBtn name="alignBottom" pos="r" fill title="Align bottom" on={() => applyOverride('selfAlign', 'bottom')} /></Seg>
               <FIB name="more" title="More actions" />
             </PositionRow>
             <PositionRow label="Position">
