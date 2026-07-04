@@ -163,6 +163,26 @@ function UiIB({ name, title, active, size = 24, on }: { name: keyof typeof UI_IC
     </button>
   )
 }
+const COLOR_PICKER_ICON = {
+  plus: ['M11.5 6a.5.5 0 0 1 .5.5V11h4.5a.5.5 0 0 1 0 1H12v4.5a.5.5 0 0 1-1 0V12H6.5a.5.5 0 0 1 0-1H11V6.5a.5.5 0 0 1 .5-.5'],
+  close: ['M16.854 7.146a.5.5 0 0 1 0 .707L12.707 12l4.147 4.146a.5.5 0 0 1-.708.707L12 12.708l-4.146 4.147a.5.5 0 1 1-.708-.708L11.293 12 7.146 7.854a.5.5 0 0 1 .708-.708L12 11.293l4.146-4.147a.5.5 0 0 1 .708 0'],
+  solid: ['M9 9h6v6H9z', 'M8 7h8a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1M6 8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2zm3 7V9h6v6zM8 8.5a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-.5.5h-7a.5.5 0 0 1-.5-.5z'],
+  gradient: ['M8 7h8a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1M6 8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2zm3.75.875a.875.875 0 1 1-1.75 0 .875.875 0 0 1 1.75 0m3.791.625a.625.625 0 1 0 0-1.25.625.625 0 0 0 0 1.25m-1.458.875a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0m0 3.12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0m1.458 2.245a.625.625 0 1 0 0-1.25.625.625 0 0 0 0 1.25m.625-3.865a.625.625 0 1 1-1.25 0 .625.625 0 0 1 1.25 0M8.875 15.99a.875.875 0 1 0 0-1.75.875.875 0 0 0 0 1.75m.875-4.115a.875.875 0 1 1-1.75 0 .875.875 0 0 1 1.75 0m5.75-1a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1m.5 2.623a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0'],
+  pattern: ['M12.5 7H16a1 1 0 0 1 1 1v1h-4.5zm-1 0H8a1 1 0 0 0-1 1v1h4.5zM7 10v4h2v-4h1v4h4v-4h1v4h2v-4zm10 5h-4.5v2H16a1 1 0 0 0 1-1zm-5.5 2v-2H7v1a1 1 0 0 0 1 1zM6 8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z'],
+  image: ['M16 6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zM8 7a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1zm2.225 4.082a.5.5 0 0 1 .629.064l4 4a.5.5 0 1 1-.707.707L10.5 12.208l-1.646 1.646a.5.5 0 1 1-.708-.707l2-2zM14.5 8a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3m0 1a.5.5 0 1 0 0 1 .5.5 0 0 0 0-1'],
+  video: ['M8 7h8a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1M6 8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2zm4.996 1.132A1 1 0 0 0 9.5 10v4a1 1 0 0 0 1.496.868l3.5-2a1 1 0 0 0 0-1.736zm.504 4.297-1 .571v-4l1 .571 1.492.853L14 12l-1.008.576z'],
+  shader: ['M16 6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zM8 7a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1zm6.585 6.723a.5.5 0 0 1 .831.554l-.153.23a2.23 2.23 0 0 1-2.851.758l-1.27-.635a1.23 1.23 0 0 0-1.572.417l-.154.23a.5.5 0 0 1-.832-.554l.154-.23a2.23 2.23 0 0 1 2.851-.758l1.27.635a1.23 1.23 0 0 0 1.572-.417zm0-2.5a.5.5 0 0 1 .831.554l-.153.23a2.23 2.23 0 0 1-2.851.758l-1.27-.635a1.23 1.23 0 0 0-1.572.417l-.154.23a.5.5 0 0 1-.832-.554l.154-.23a2.23 2.23 0 0 1 2.851-.758l1.27.635a1.23 1.23 0 0 0 1.572-.417zm0-2.5a.5.5 0 0 1 .831.554l-.153.23a2.23 2.23 0 0 1-2.851.758l-1.27-.635a1.23 1.23 0 0 0-1.572.417l-.154.23a.5.5 0 0 1-.832-.554l.154-.23a2.23 2.23 0 0 1 2.851-.758l1.27.635a1.23 1.23 0 0 0 1.572-.417z'],
+  contrast: ['M18 12q0 .2-.013.396a1 1 0 0 0-.024.102C17.743 13.942 16.585 15 15.25 15c-.836 0-1.602-.414-2.112-1.079-.202-.263-.602-.336-.836-.101a.44.44 0 0 0-.064.563c.678.975 1.764 1.617 3.012 1.617a3.5 3.5 0 0 0 1.497-.33A5.99 5.99 0 0 1 12 18a6 6 0 0 1-2.701-.641.54.54 0 0 0-.626.09c-.23.23-.189.614.1.764a7 7 0 0 0 9.44-9.44c-.15-.289-.534-.33-.764-.1a.54.54 0 0 0-.09.626c.41.812.641 1.73.641 2.701M5.787 15.227c.15.289.534.33.764.1a.54.54 0 0 0 .09-.626 6 6 0 0 1-.628-3.097 1 1 0 0 0 .024-.102C6.257 10.058 7.415 9 8.75 9c.836 0 1.602.414 2.112 1.079.202.263.602.336.836.101a.44.44 0 0 0 .064-.563C11.084 8.642 9.998 8 8.75 8a3.5 3.5 0 0 0-1.497.33A5.99 5.99 0 0 1 12 6c.972 0 1.89.231 2.701.641a.54.54 0 0 0 .626-.09c.23-.23.189-.614-.1-.764a7 7 0 0 0-9.44 9.44m12.067-8.373a.5.5 0 0 0-.708-.708l-11 11a.5.5 0 0 0 .708.708z'],
+  dropper: ['M15.16 5.658a2.25 2.25 0 0 1 3.18.001l.155.17a2.25 2.25 0 0 1 0 2.84l-.154.172-1.696 1.692a1.5 1.5 0 0 1 .02 1.913l-.104.114a1.5 1.5 0 0 1-2.007.103l-.02-.018-4.443 4.447a2.24 2.24 0 0 1-1.716.65l-.814.815a1.5 1.5 0 0 1-2.121-2.121l.816-.818a2.25 2.25 0 0 1 .653-1.708l4.443-4.446a1.5 1.5 0 0 1 .088-2.025l.114-.103a1.5 1.5 0 0 1 1.91.015zm-7.544 8.959a1.25 1.25 0 0 0-.358 1.021c.021.197-.014.406-.154.546l-.958.96a.5.5 0 0 0 .708.706l.955-.956c.14-.14.352-.176.55-.153.364.042.745-.077 1.025-.356l4.438-4.442-1.767-1.767zm10.018-8.251a1.25 1.25 0 0 0-1.768 0l-1.782 1.78-.065.06a.87.87 0 0 1-1.165-.06.5.5 0 0 0-.707.707l3 3a.5.5 0 0 0 .628.064l.079-.064a.5.5 0 0 0 0-.707l-.004-.004a.873.873 0 0 1 .004-1.23l1.78-1.778a1.25 1.25 0 0 0 0-1.768'],
+  caret: ['M9.146 11.146a.5.5 0 0 1 .708 0l1.646 1.647 1.646-1.647a.5.5 0 0 1 .708.708l-2 2a.5.5 0 0 1-.708 0l-2-2a.5.5 0 0 1 0-.708'],
+} as const
+function PickerSvgIcon({ name, active }: { name: keyof typeof COLOR_PICKER_ICON; active?: boolean }) {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden style={{ display: 'block' }}>
+      {COLOR_PICKER_ICON[name].map((d, i) => <path key={i} d={d} fill="currentColor" fillOpacity={active || name !== 'solid' || i !== 0 ? 1 : 0.35} fillRule="evenodd" clipRule="evenodd" />)}
+    </svg>
+  )
+}
 function useCloseOnOutside<T extends HTMLElement>(open: boolean, close: () => void) {
   const ref = useRef<T>(null)
   useEffect(() => {
@@ -655,25 +675,156 @@ function VariablesLibrary() {
 }
 
 /* Paint/effect rows are cloned from the live Figma inspector DOM. */
+function normalizeHex(value: string) {
+  return value.replace(/[^0-9a-f]/gi, '').slice(0, 6).toUpperCase()
+}
+function hsvToHex(h: number, s: number, v: number) {
+  const f = (n: number) => {
+    const k = (n + h / 60) % 6
+    return Math.round((v - v * s * Math.max(Math.min(k, 4 - k, 1), 0)) * 255)
+  }
+  return [f(5), f(3), f(1)].map(n => n.toString(16).padStart(2, '0')).join('').toUpperCase()
+}
+function FigmaColorPicker({ anchorRef, hex, opacity, onHex, onOpacity, onClose }: { anchorRef: { current: HTMLElement | null }; hex: string; opacity: string; onHex: (value: string) => void; onOpacity: (value: string) => void; onClose: () => void }) {
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
+  const [activeTab, setActiveTab] = useState<'custom' | 'libraries'>('custom')
+  const [paintType, setPaintType] = useState<keyof typeof COLOR_PICKER_ICON>('solid')
+  const [hue, setHue] = useState(0)
+  const [reticle, setReticle] = useState(() => ({ x: normalizeHex(hex) === '000000' ? 0 : 0, y: normalizeHex(hex) === '000000' ? 208 : 0 }))
+  useEffect(() => {
+    const update = () => setAnchorRect(anchorRef.current?.getBoundingClientRect() ?? null)
+    update()
+    window.addEventListener('resize', update)
+    window.addEventListener('scroll', update, true)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.removeEventListener('scroll', update, true)
+    }
+  }, [anchorRef])
+  if (!anchorRect) return null
+  const width = 240
+  const height = 456
+  const left = Math.max(8, Math.min(anchorRect.left - 254, window.innerWidth - width - 8))
+  const top = Math.max(8, Math.min(anchorRect.top - 4, window.innerHeight - height - 8))
+  const pickColor = (event: React.PointerEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect()
+    const x = Math.max(0, Math.min(208, event.clientX - rect.left))
+    const y = Math.max(0, Math.min(208, event.clientY - rect.top))
+    setReticle({ x, y })
+    onHex(hsvToHex(hue, x / 208, 1 - y / 208))
+  }
+  const pickHue = (event: React.PointerEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect()
+    const x = Math.max(0, Math.min(172, event.clientX - rect.left))
+    setHue(Math.round((x / 172) * 360))
+  }
+  const pickOpacity = (event: React.PointerEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect()
+    const x = Math.max(0, Math.min(172, event.clientX - rect.left))
+    onOpacity(String(Math.round((x / 172) * 100)))
+  }
+  const opacityNumber = Math.max(0, Math.min(100, Number.parseInt(opacity || '0', 10) || 0))
+  const activeHex = normalizeHex(hex) || 'FFFFFF'
+  const paintTypes: (keyof typeof COLOR_PICKER_ICON)[] = ['solid', 'gradient', 'pattern', 'image', 'video', 'shader']
+  return createPortal(
+    <div data-figma-floating-root="true" data-figma-color-picker="true" role="dialog" aria-label="Color picker"
+      style={{ position: 'fixed', zIndex: 1200, left, top, width, height, borderRadius: 13, background: '#fff', color: INK, boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px', overflow: 'hidden', font: `400 11px/16px ${FONT}` }}>
+      <div style={{ height: 40, display: 'grid', gridTemplateColumns: '1fr 28px 24px', alignItems: 'center', padding: '0 8px', boxSizing: 'border-box' }}>
+        <div role="tablist" style={{ display: 'flex', gap: 4, width: 124, height: 24 }}>
+          {(['custom', 'libraries'] as const).map(tabName => (
+            <button key={tabName} type="button" role="tab" aria-selected={activeTab === tabName} onClick={() => setActiveTab(tabName)}
+              style={{ appearance: 'none', border: 0, background: activeTab === tabName ? FIELD : '#fff', borderRadius: 5, height: 24, width: tabName === 'custom' ? 58 : 62, cursor: 'pointer', color: activeTab === tabName ? INK : MUTE, font: `${activeTab === tabName ? 550 : 400} 11px/16px ${FONT}` }}>
+              {tabName === 'custom' ? 'Custom' : 'Libraries'}
+            </button>
+          ))}
+        </div>
+        <button type="button" aria-label="New style or variable" style={{ appearance: 'none', border: 0, background: '#fff', width: 24, height: 24, display: 'grid', placeItems: 'center', cursor: 'pointer', color: INK }}>
+          <PickerSvgIcon name="plus" />
+        </button>
+        <button type="button" aria-label="Close" onClick={onClose} style={{ appearance: 'none', border: 0, background: '#fff', width: 24, height: 24, display: 'grid', placeItems: 'center', cursor: 'pointer', color: INK }}>
+          <PickerSvgIcon name="close" />
+        </button>
+      </div>
+      <div style={{ height: 40, display: 'grid', gridTemplateColumns: '164px 1fr 52px', alignItems: 'center', padding: '0 8px', boxSizing: 'border-box' }}>
+        <fieldset role="radiogroup" aria-label="Paint type" style={{ display: 'flex', gap: 4, width: 164, height: 24, border: 0, margin: 0, padding: 0 }}>
+          {paintTypes.map(name => (
+            <button key={name} type="button" aria-label={name} aria-pressed={paintType === name} onClick={() => setPaintType(name)}
+              style={{ appearance: 'none', border: 0, background: paintType === name ? FIELD : '#fff', borderRadius: 5, width: 24, height: 24, display: 'grid', placeItems: 'center', cursor: 'pointer', color: paintType === name ? INK : MUTE }}>
+              <PickerSvgIcon name={name} active={paintType === name} />
+            </button>
+          ))}
+        </fieldset>
+        <span />
+        <div style={{ display: 'flex', width: 52, height: 24, gap: 4 }}>
+          <button type="button" aria-label="Blend mode" style={{ appearance: 'none', border: 0, background: '#fff', width: 24, height: 24, display: 'grid', placeItems: 'center', cursor: 'pointer', color: INK }}><UiIcon name="blendMode" /></button>
+          <button type="button" aria-label="Check color contrast" style={{ appearance: 'none', border: 0, background: '#fff', width: 24, height: 24, display: 'grid', placeItems: 'center', cursor: 'pointer', color: INK }}><PickerSvgIcon name="contrast" /></button>
+        </div>
+      </div>
+      <div style={{ padding: '9px 16px 0', boxSizing: 'border-box' }}>
+        <div role="slider" aria-label="Color picker area" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round((1 - reticle.y / 208) * 100)} onPointerDown={pickColor}
+          style={{ position: 'relative', width: 208, height: 208, borderRadius: 4, cursor: 'crosshair', background: `linear-gradient(to top, #000 0%, rgba(0,0,0,0) 100%), linear-gradient(to right, #fff 0%, hsl(${hue}, 100%, 50%) 100%)`, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.12)', overflow: 'visible' }}>
+          <span aria-label="Color picker reticle" style={{ position: 'absolute', left: reticle.x - 8, top: reticle.y - 8, width: 16, height: 16, borderRadius: 999, border: '2px solid #fff', boxShadow: '0 0 0 1px rgba(0,0,0,0.35)', boxSizing: 'border-box' }} />
+        </div>
+      </div>
+      <div style={{ height: 60, display: 'grid', gridTemplateColumns: '24px 8px 180px', gridTemplateRows: '24px 4px 24px', padding: '8px 16px 0', boxSizing: 'border-box' }}>
+        <button type="button" aria-label="Sample color" style={{ appearance: 'none', border: 0, background: '#fff', width: 24, height: 24, gridRow: '1 / span 3', alignSelf: 'center', display: 'grid', placeItems: 'center', cursor: 'pointer', color: INK }}><PickerSvgIcon name="dropper" /></button>
+        <span />
+        <div role="slider" aria-label="Hue" aria-valuemin={0} aria-valuemax={360} aria-valuenow={hue} onPointerDown={pickHue} style={{ position: 'relative', width: 180, height: 24, gridColumn: 3, cursor: 'default' }}>
+          <span style={{ position: 'absolute', left: 4, right: 4, top: 4, height: 16, borderRadius: 999, background: 'linear-gradient(90deg, red, #ff0, #0f0, #0ff, #00f, #f0f, red)' }} />
+          <span style={{ position: 'absolute', left: Math.max(4, Math.min(168, (hue / 360) * 172 + 4)), top: 4, width: 16, height: 16, borderRadius: 999, background: '#fff', boxShadow: '0 0 0 1px rgba(0,0,0,0.25)' }} />
+        </div>
+        <span style={{ gridColumn: 2 }} />
+        <div role="slider" aria-label="Opacity" aria-valuemin={0} aria-valuemax={100} aria-valuenow={opacityNumber} onPointerDown={pickOpacity} style={{ position: 'relative', width: 180, height: 24, gridColumn: 3, gridRow: 3, cursor: 'default' }}>
+          <span style={{ position: 'absolute', left: 4, right: 4, top: 4, height: 16, borderRadius: 999, backgroundColor: '#fff', backgroundImage: 'linear-gradient(45deg,#ddd 25%,transparent 25%),linear-gradient(-45deg,#ddd 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#ddd 75%),linear-gradient(-45deg,transparent 75%,#ddd 75%)', backgroundSize: '8px 8px', backgroundPosition: '0 0,0 4px,4px -4px,-4px 0' }} />
+          <span style={{ position: 'absolute', left: 4, right: 4, top: 4, height: 16, borderRadius: 999, background: `linear-gradient(90deg, rgba(${Number.parseInt(activeHex.slice(0, 2), 16)},${Number.parseInt(activeHex.slice(2, 4), 16)},${Number.parseInt(activeHex.slice(4, 6), 16)},0), #${activeHex})` }} />
+          <span style={{ position: 'absolute', left: Math.max(4, Math.min(168, (opacityNumber / 100) * 172 + 4)), top: 4, width: 16, height: 16, borderRadius: 999, background: '#fff', boxShadow: '0 0 0 1px rgba(0,0,0,0.25)' }} />
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '55px 8px 89px 1px 54px', height: 24, padding: '0 16px', alignItems: 'center', boxSizing: 'border-box' }}>
+        <button type="button" role="combobox" aria-label="Color format" aria-controls="figma-color-format-options" aria-expanded={false} style={{ appearance: 'none', border: `1px solid ${LINE}`, background: '#fff', borderRadius: 5, width: 55, height: 24, display: 'grid', gridTemplateColumns: '1fr 24px', alignItems: 'center', padding: '0 0 0 9px', cursor: 'pointer', color: INK, font: `400 11px/16px ${FONT}` }}>
+          <span>Hex</span><PickerSvgIcon name="caret" />
+        </button>
+        <span />
+        <input aria-label="Color" role="spinbutton" value={activeHex} onChange={e => onHex(normalizeHex(e.currentTarget.value))}
+          style={{ width: 89, height: 24, border: 0, outline: 0, background: FIELD, borderRadius: 5, padding: '0 8px', boxSizing: 'border-box', color: INK, font: `450 11px/16px ${FONT}` }} />
+        <span />
+        <div style={{ width: 54, height: 24, borderRadius: 5, background: FIELD, display: 'grid', gridTemplateColumns: '1fr 14px', alignItems: 'center', overflow: 'hidden' }}>
+          <input aria-label="Opacity" role="spinbutton" value={opacity} onChange={e => onOpacity(e.currentTarget.value.replace(/[^0-9]/g, '').slice(0, 3))}
+            style={{ minWidth: 0, width: 40, height: 24, border: 0, outline: 0, background: 'transparent', padding: '0 3px 0 0', textAlign: 'right', color: INK, font: `450 11px/16px ${FONT}` }} />
+          <span style={{ color: MUTE }}>%</span>
+        </div>
+      </div>
+      <div style={{ padding: '28px 16px 0', boxSizing: 'border-box' }}>
+        <button type="button" role="combobox" aria-label="Color swatch set selector" aria-controls="figma-color-swatch-set-options" aria-expanded={false} style={{ appearance: 'none', border: `1px solid ${LINE}`, background: '#fff', borderRadius: 5, width: 208, height: 24, display: 'grid', gridTemplateColumns: '1fr 24px', alignItems: 'center', padding: '0 0 0 9px', cursor: 'pointer', color: INK, font: `400 11px/16px ${FONT}` }}>
+          <span style={{ textAlign: 'left' }}>On this page</span><PickerSvgIcon name="caret" />
+        </button>
+      </div>
+    </div>,
+    document.body
+  )
+}
 function FigmaPaintRow({ hex, op, label = 'Paint' }: { hex: string; op: number; label?: string }) {
   const [hexValue, setHexValue] = useState(hex)
   const [opacityValue, setOpacityValue] = useState(String(op))
   const [varOpen, setVarOpen] = useState(false)
-  const fieldRef = useCloseOnOutside<HTMLDivElement>(varOpen, () => setVarOpen(false))
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const fieldRef = useCloseOnOutside<HTMLDivElement>(varOpen || pickerOpen, () => { setVarOpen(false); setPickerOpen(false) })
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '156px 8px 24px 4px 24px', alignItems: 'center', height: 32, padding: '0 8px 0 16px' }}>
-      <div ref={fieldRef} style={{ position: 'relative', height: 24, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: '24px 1fr 28px 14px 16px', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
-        <button type="button" aria-label={`Solid color hex: ${hexValue}`} style={{ appearance: 'none', border: 0, width: 14, height: 14, justifySelf: 'center', borderRadius: 2, background: `#${hexValue}`, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.15)', padding: 0, cursor: 'pointer' }} />
-        <input aria-label={`${label} hex`} value={hexValue} onChange={e => setHexValue(e.currentTarget.value.replace(/^#/, '').toUpperCase())}
+      <div ref={fieldRef} style={{ position: 'relative', height: 24, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen || pickerOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: '24px 1fr 28px 14px 16px', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
+        <button type="button" aria-label={`Solid color hex: ${hexValue}`} aria-haspopup="dialog" aria-expanded={pickerOpen} onClick={event => { event.stopPropagation(); setVarOpen(false); setPickerOpen(v => !v) }}
+          style={{ appearance: 'none', border: 0, width: 14, height: 14, justifySelf: 'center', borderRadius: 2, background: `#${normalizeHex(hexValue) || 'FFFFFF'}`, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.15)', padding: 0, cursor: 'pointer' }} />
+        <input aria-label={`${label} hex`} value={hexValue} onChange={e => setHexValue(normalizeHex(e.currentTarget.value))}
           style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: INK, font: `450 11px/16px ${FONT}` }} />
         <input aria-label={`${label} opacity`} role="spinbutton" value={opacityValue} onChange={e => setOpacityValue(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
           style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: '0 3px 0 0', background: 'transparent', color: INK, font: `450 11px/16px ${FONT}`, textAlign: 'right' }} />
         <span style={{ color: 'rgba(0,0,0,0.5)' }}>%</span>
-        <button type="button" title="Apply variable" aria-label={`Apply variable to ${label} opacity`} aria-haspopup="menu" aria-expanded={varOpen} onClick={event => { event.stopPropagation(); setVarOpen(v => !v) }}
+        <button type="button" title="Apply variable" aria-label={`Apply variable to ${label} opacity`} aria-haspopup="menu" aria-expanded={varOpen} onClick={event => { event.stopPropagation(); setPickerOpen(false); setVarOpen(v => !v) }}
           style={{ appearance: 'none', border: 0, padding: 0, width: 16, height: 24, display: 'grid', placeItems: 'center', background: 'transparent', cursor: 'pointer', color: FAINT }}>
           <UiIcon name="variable" size={12} />
         </button>
         {varOpen && <FigmaVariablePicker fieldLabel={`${label} opacity`} anchorRef={fieldRef} onPick={setOpacityValue} onClose={() => setVarOpen(false)} />}
+        {pickerOpen && <FigmaColorPicker anchorRef={fieldRef} hex={hexValue} opacity={opacityValue} onHex={setHexValue} onOpacity={setOpacityValue} onClose={() => setPickerOpen(false)} />}
       </div>
       <span />
       <UiIB name="visibility" title="Toggle visibility" />
