@@ -647,27 +647,10 @@ function AlignGrid({ sel = 1, onSelect }: { sel?: number; onSelect?: (index: num
   )
 }
 
-/* ── ⚠️ MOCK CONTENT (layers · pages · variable collections/values) ──
-   These lists are DATA, not UI — placeholders only. Wired live from the build next:
-   layers ← the Screen's data-anat DOM (readWired) · pages ← app screens · variables ← the DS token graph. */
-/* layers tree — MOCK */
+/* Layers rows — fed exclusively by the live canvas DOM (buildLayerTree);
+   mock tree removed in the E2.1 deslop pass (no fake values — Dan's law). */
 type LayerIcon = 'frame' | 'image' | 'auto' | 'section' | 'toolbar' | 'component'
 type Node = { name: string; icon: LayerIcon; depth: number; kids?: boolean; open?: boolean; locked?: boolean; visible?: boolean; sel?: boolean; comp?: boolean }
-const TREE: Node[] = [
-  { name: 'LOCKED OPTIONS', icon: 'frame', depth: 0, kids: true },
-  { name: 'onemo-surface-bg-430×932@3× 1', icon: 'image', depth: 0 },
-  { name: 'onemo-surface-bg-430×932@2× 1', icon: 'image', depth: 0 },
-  { name: 'CANDIDATES', icon: 'frame', depth: 0, kids: true, open: true },
-  { name: 'Editor 402 iphone', icon: 'auto', depth: 1, kids: true },
-  { name: 'Top Section', icon: 'section', depth: 1, kids: true },
-  { name: 'Editor 402 iphone - apple blur glass', icon: 'auto', depth: 1, kids: true },
-  { name: 'Editor 402 iphone - apple blur glass', icon: 'auto', depth: 1, kids: true, open: true },
-  { name: 'Status bar', icon: 'component', depth: 2, comp: true, locked: true, visible: true },
-  { name: 'Top Section', icon: 'section', depth: 2, kids: true },
-  { name: 'Canvas', icon: 'auto', depth: 2, kids: true, sel: true },
-  { name: 'Bottom Section', icon: 'auto', depth: 2, kids: true },
-  { name: 'Toolbar - Bottom - Safari', icon: 'toolbar', depth: 2, kids: true, locked: true, visible: true },
-]
 function LayerRow({ n, on, onToggle }: { n: Node; on?: () => void; onToggle?: () => void }) {
   const [h, setH] = useState(false)
   const iconName: keyof typeof UI_ICON = n.icon === 'image' ? 'layerImage' : n.icon === 'auto' ? 'layerAuto' : n.icon === 'section' ? 'layerSection' : n.icon === 'toolbar' ? 'layerToolbar' : n.icon === 'component' ? 'layerComponent' : 'layerFrame'
@@ -684,8 +667,6 @@ function LayerRow({ n, on, onToggle }: { n: Node; on?: () => void; onToggle?: ()
     </div>
   )
 }
-
-const PAGES = ['_DS Reference Components', 'DESIGN SYSTEM - full (current)', 'ONEMO BRAND IDENTITY', 'PROTOTYPING', 'Components +', 'ICONS']
 
 /* ── Variables library (full-page, opened by the Variables rail item) ──
    Collections + counts are the REAL DS token collections (read live from Figma's variables editor). */
@@ -1814,7 +1795,7 @@ export default function ReactFigmaPage() {
                       on={() => { const el = iframeRef.current?.contentDocument?.querySelector(`[data-eng-id="${ln.id}"]`); if (el) applySelection(el as HTMLElement) }}
                       onToggle={ln.kids ? () => setCollapsed((prev) => { const next = new Set(prev); if (next.has(ln.id)) next.delete(ln.id); else next.add(ln.id); return next }) : undefined} />
                   ))
-                : TREE.map((n, i) => <LayerRow key={i} n={n} />)}
+                : null /* live DOM only — empty until the canvas wires (E2.1 deslop) */}
             </div>
           </>
         )}
