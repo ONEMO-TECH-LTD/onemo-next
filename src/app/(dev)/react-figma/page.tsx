@@ -1408,17 +1408,26 @@ export default function ReactFigmaPage() {
   const [selRect, setSelRect] = useState<OutlineRect | null>(null)
   const [layers, setLayers] = useState<LiveNode[] | null>(null)
   const [layerSelId, setLayerSelId] = useState<string | null>(null)
-  const [canvasKey, setCanvasKey] = useState<string>('editor-402')
+  const [canvas, setCanvas] = useState<{ name: string; route: string }>({ name: 'Editor 402 — apple blur glass', route: '/react-figma/canvas' })
   const [sourceMenuOpen, setSourceMenuOpen] = useState(false)
   const [buildSources, setBuildSources] = useState<BuildSource[]>(CANVAS_FALLBACK)
-  useEffect(() => { // build explorer — real routes + hosted storybook screens
+  useEffect(() => { // quick list for the top selector menu — known loadable screens
     fetch('/api/dev/editor-sources').then((r) => r.json()).then((d) => { if (Array.isArray(d.sources) && d.sources.length) setBuildSources(d.sources) }).catch(() => {})
   }, [])
-  const canvasSource = buildSources.find((s) => s.key === canvasKey) ?? buildSources[0] ?? CANVAS_FALLBACK[0]
+  // local folder browser (Pages panel) — navigable filesystem under the dev root
+  type FsData = { root: string; path: string; parent: string | null; appStart: string; dirs: { name: string; route?: string }[]; files: { name: string; route?: string }[] }
+  const [fsPath, setFsPath] = useState<string | null>(null)
+  const [fsData, setFsData] = useState<FsData | null>(null)
+  useEffect(() => {
+    fetch(`/api/dev/editor-fs?path=${encodeURIComponent(fsPath ?? '')}`).then((r) => r.json()).then((d: FsData) => {
+      if (fsPath === null && d.appStart) { setFsPath(d.appStart); return } // first load → jump to this app's src/app
+      setFsData(d)
+    }).catch(() => {})
+  }, [fsPath])
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
-  const switchCanvas = (key: string) => {
-    if (key === canvasKey) return
-    setCanvasKey(key); setLayers(null); setSel(null); setSelRect(null); setHoverRect(null); setLiveFills(null); setCollapsed(new Set()); selIdRef.current = null
+  const switchCanvas = (name: string, route: string) => {
+    if (route === canvas.route) return
+    setCanvas({ name, route }); setLayers(null); setSel(null); setSelRect(null); setHoverRect(null); setLiveFills(null); setCollapsed(new Set()); selIdRef.current = null
   }
   const [fieldTokens, setFieldTokens] = useState<Record<string, string | undefined>>({})
   const [liveFills, setLiveFills] = useState<{ hex: string; op: number; origin?: string }[] | null>(null)
@@ -1696,8 +1705,8 @@ export default function ReactFigmaPage() {
       <aside style={{ width: leftW, flex: 'none', position: 'relative', borderRight: `1px solid ${LINE}`, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* build-source selector (Figma file-selector slot; menu = the shell's own dark menu chrome) */}
         <div style={{ position: 'relative', height: 40, borderBottom: `1px solid ${LINE}`, display: 'grid', gridTemplateColumns: '1fr 24px 32px', alignItems: 'center', gap: 4, padding: '0 8px 0 16px', flex: 'none' }}>
-          <button type="button" aria-label={`${canvasSource.name}, build source`} aria-haspopup="menu" aria-expanded={sourceMenuOpen} onClick={() => setSourceMenuOpen((v) => !v)}
-            style={{ appearance: 'none', border: 0, background: 'transparent', cursor: 'pointer', minWidth: 0, padding: 0, textAlign: 'left', font: `550 12px/16px ${FONT}`, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{canvasSource.name}</button>
+          <button type="button" aria-label={`${canvas.name}, build source`} aria-haspopup="menu" aria-expanded={sourceMenuOpen} onClick={() => setSourceMenuOpen((v) => !v)}
+            style={{ appearance: 'none', border: 0, background: 'transparent', cursor: 'pointer', minWidth: 0, padding: 0, textAlign: 'left', font: `550 12px/16px ${FONT}`, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{canvas.name}</button>
           <UiIB name="caret16" title="Select build source" on={() => setSourceMenuOpen((v) => !v)} />
           <UiIB name="minimizeUI" title="Minimize UI" />
           {sourceMenuOpen && (
@@ -1707,7 +1716,7 @@ export default function ReactFigmaPage() {
                   <Fragment key={group}>
                     {gi > 0 && <FigmaMenuSeparator />}
                     {items.map((s) => (
-                      <FigmaMenuRow key={s.key} checked={s.key === canvasKey} onClick={() => { switchCanvas(s.key); setSourceMenuOpen(false) }}>{group === '(root)' ? s.name : `${group}/${s.name}`}</FigmaMenuRow>
+                      <FigmaMenuRow key={s.key} checked={s.route === canvas.route} onClick={() => { switchCanvas(s.name, s.route); setSourceMenuOpen(false) }}>{group === '(root)' ? s.name : `${group}/${s.name}`}</FigmaMenuRow>
                     ))}
                   </Fragment>
                 ))}
@@ -1723,18 +1732,38 @@ export default function ReactFigmaPage() {
               <span style={hdr}>Pages</span>
               <span style={{ display: 'flex', gap: 4, color: MUTE }}><UiIB name="find" title="Find" /><UiIB name="plus" title="Add new page" /></span>
             </div>
-            <div style={{ padding: '0 8px', maxHeight: 260, overflowY: 'auto' }}>
-              {/* page structure = the build's REAL folders/screens (walked from src/app + storybook hosts) */}
-              {Object.entries(buildSources.reduce<Record<string, BuildSource[]>>((acc, s) => { (acc[s.group] ??= []).push(s); return acc }, {})).map(([group, items]) => (
-                <Fragment key={group}>
-                  <div style={{ height: 22, display: 'flex', alignItems: 'center', padding: '0 8px', font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{group}</div>
-                  {items.map((s) => (
-                    <div key={s.key} onClick={() => switchCanvas(s.key)} style={{ height: 32, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px 0 16px', borderRadius: 5, background: s.key === canvasKey ? '#f0f1f3' : 'transparent', font: `400 11px/16px ${FONT}`, color: INK, cursor: 'pointer' }}>
-                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
+            <div style={{ padding: '0 8px', maxHeight: 280, overflowY: 'auto' }}>
+              {/* LOCAL FOLDER BROWSER — navigable filesystem under the dev root.
+                  Row click: loadable screen → load in canvas; plain folder → enter.
+                  Caret always enters; '..' goes up. */}
+              {fsData && (
+                <>
+                  <div title={`${fsData.root}/${fsData.path}`} style={{ height: 22, display: 'flex', alignItems: 'center', padding: '0 8px', font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', direction: 'rtl', textAlign: 'left' }}>{fsData.root}/{fsData.path}</div>
+                  {fsData.parent !== null && (
+                    <div onClick={() => setFsPath(fsData.parent ?? '')} style={{ height: 28, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', borderRadius: 5, font: `400 11px/16px ${FONT}`, color: MUTE, cursor: 'pointer' }}>
+                      <span style={{ width: 16, textAlign: 'center' }}>‹</span><span>..</span>
+                    </div>
+                  )}
+                  {fsData.dirs.map((d) => {
+                    const rel = fsData.path ? `${fsData.path}/${d.name}` : d.name
+                    return (
+                      <div key={d.name} onClick={() => (d.route ? switchCanvas(d.name, d.route) : setFsPath(rel))}
+                        style={{ height: 28, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', borderRadius: 5, background: d.route && d.route === canvas.route ? '#f0f1f3' : 'transparent', font: `400 11px/16px ${FONT}`, color: INK, cursor: 'pointer' }}>
+                        <span onClick={(e) => { e.stopPropagation(); setFsPath(rel) }} style={{ width: 16, height: 16, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)' }}><UiIcon name="caretRight16" size={16} /></span>
+                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', font: d.route ? `550 11px/16px ${FONT}` : `400 11px/16px ${FONT}` }}>{d.name}</span>
+                        {d.route && <span style={{ color: MUTE, font: `400 9px/16px ${FONT}` }}>screen</span>}
+                      </div>
+                    )
+                  })}
+                  {fsData.files.map((f) => (
+                    <div key={f.name} onClick={f.route ? () => switchCanvas(f.name.replace(/\.stories\.tsx$/, ''), f.route!) : undefined}
+                      style={{ height: 28, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px 0 30px', borderRadius: 5, background: f.route && f.route === canvas.route ? '#f0f1f3' : 'transparent', font: `400 11px/16px ${FONT}`, color: f.route ? INK : FAINT, cursor: f.route ? 'pointer' : 'default' }}>
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                      {f.route && <span style={{ color: MUTE, font: `400 9px/16px ${FONT}` }}>screen</span>}
                     </div>
                   ))}
-                </Fragment>
-              ))}
+                </>
+              )}
             </div>
             <div style={{ height: 49, padding: '9px 8px 0 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: `1px solid ${LINE}` }}>
               <span style={hdr}>Layers</span>
@@ -1779,7 +1808,7 @@ export default function ReactFigmaPage() {
         <div style={{ position: 'absolute', left: 0, top: 0, transform: `translate(${view.x}px,${view.y}px) scale(${view.z})`, transformOrigin: '0 0' }}>
           <div style={{ font: `550 10px/1 ${FONT}`, color: SEL, marginBottom: 8, marginLeft: 2 }}>Editor 402 · 402 × 871</div>
           <div data-screen-host style={{ position: 'relative', width: 402, height: 871, background: '#fff', borderRadius: 4, boxShadow: '0 0 0 1px rgba(0,0,0,.06), 0 12px 40px -8px rgba(0,0,0,.25)' }}>
-            <iframe key={canvasKey} ref={iframeRef} src={canvasSource.route} onLoad={wireCanvas} title="Canvas — real build"
+            <iframe key={canvas.route} ref={iframeRef} src={canvas.route} onLoad={wireCanvas} title="Canvas — real build"
               style={{ width: 402, height: 871, border: 0, display: 'block', borderRadius: 4 }} />
             {hoverRect && (
               <div style={{ position: 'absolute', left: hoverRect.x, top: hoverRect.y, width: hoverRect.w, height: hoverRect.h, outline: `${1.5 / view.z}px solid ${SEL}`, pointerEvents: 'none' }} />
