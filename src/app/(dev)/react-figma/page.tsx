@@ -1599,19 +1599,41 @@ export default function ReactFigmaPage() {
 
   // Compose the single `transform` prop from rotation + both flips (they'd clobber each other otherwise).
   // E3.5 creation: insert a real JSX child into the SELECTED container (source write → HMR → selectable)
-  const insertChild = useCallback(async (tag: string, display?: string) => {
+  const insertSnippet = useCallback(async (snippet: string) => {
     if (!sel) { console.warn('[engine] insert: select a container element first'); return }
-    const st = display === 'flex' || display === 'grid' ? ` display: '${display}',` : ''
-    const snippet =
-      tag === 'text' ? `<span style={{ fontSize: 14, color: '#000' }}>Text</span>`
-      : tag === 'img' ? `<img src="/screen/placeholder.svg" alt="" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 4 }} />`
-      : `<${tag} style={{${st} minWidth: 40, minHeight: 40, background: 'rgba(0,0,0,0.06)', borderRadius: 4 }} />`
     const r = await fetch('/api/dev/editor-write', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ kind: 'insert-jsx-child', file: sel.file, line: sel.line, col: sel.col, snippet }),
     })
-    console.log('[engine] insert', tag, r.ok ? await r.json() : await r.text())
+    console.log('[engine] insert', r.ok ? await r.json() : await r.text())
   }, [sel])
+
+  // E3.5 creation: Image insert uploads a real asset first, then splices <img src=path>.
+  // Self-contained file picker (no shell change) → dev upload route → insert.
+  const insertImage = useCallback(async () => {
+    if (!sel) { console.warn('[engine] insert image: select a container element first'); return }
+    const input = document.createElement('input')
+    input.type = 'file'; input.accept = 'image/*'
+    input.onchange = async () => {
+      const file = input.files?.[0]; if (!file) return
+      const fd = new FormData(); fd.append('file', file)
+      const up = await fetch('/api/dev/editor-image', { method: 'POST', body: fd })
+      if (!up.ok) { console.warn('[engine] image upload failed', await up.text()); return }
+      const { path } = await up.json() as { path: string }
+      await insertSnippet(`<img src="${path}" alt="" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 4 }} />`)
+    }
+    input.click()
+  }, [sel, insertSnippet])
+
+  const insertChild = useCallback(async (tag: string, display?: string) => {
+    if (tag === 'img') { void insertImage(); return }
+    if (!sel) { console.warn('[engine] insert: select a container element first'); return }
+    const st = display === 'flex' || display === 'grid' ? ` display: '${display}',` : ''
+    const snippet =
+      tag === 'text' ? `<span style={{ fontSize: 14, color: '#000' }}>Text</span>`
+      : `<${tag} style={{${st} minWidth: 40, minHeight: 40, background: 'rgba(0,0,0,0.06)', borderRadius: 4 }} />`
+    await insertSnippet(snippet)
+  }, [sel, insertImage, insertSnippet])
 
   // E3.5 creation: add a new page route (real folder + page.tsx scaffold), then load it
   const addPage = useCallback(async () => {
