@@ -9,9 +9,9 @@
   transform: translateX(-50%);
   display: flex;
   align-items: flex-start;
-  gap: var(--spacing-m);
+  gap: 20px;
   z-index: 10;
-  padding: var(--spacing-2xs) var(--spacing-l);
+  padding: var(--spacing-2xs) 16px;
   /* optimised faux-glass — frosted-looking translucent pill, NO backdrop-filter (that tanked FPS to ~12) */
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(246, 248, 251, 0.74));
   border: 1px solid rgba(255, 255, 255, 0.9);
