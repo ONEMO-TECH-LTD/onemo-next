@@ -1340,6 +1340,8 @@ const SHOW_LEDGER = false
 export default function ReactFigmaPage() {
   type Rail = 'file' | 'assets' | 'variables'
   const [rail, setRail] = useState<Rail>('file')
+  const [layerQuery, setLayerQuery] = useState<string | null>(null) // null = search closed; '' = open, empty
+  const [uiMinimized, setUiMinimized] = useState(false)
   const [tab, setTab] = useState<'design' | 'prototype'>('design')
   const [view, setView] = useState({ x: 300, y: 70, z: 0.6 })
   const [frameKind, setFrameKind] = useState<FrameKind>('Frame')
@@ -1811,7 +1813,7 @@ export default function ReactFigmaPage() {
           <button type="button" aria-label={`${canvas.name}, build source`} aria-haspopup="menu" aria-expanded={sourceMenuOpen} onClick={() => setSourceMenuOpen((v) => !v)}
             style={{ appearance: 'none', border: 0, background: 'transparent', cursor: 'pointer', minWidth: 0, padding: 0, textAlign: 'left', font: `550 12px/16px ${FONT}`, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{canvas.name}</button>
           <UiIB name="caret16" title="Select build source" on={() => setSourceMenuOpen((v) => !v)} />
-          <UiIB name="minimizeUI" title="Minimize UI" />
+          <UiIB name="minimizeUI" title={uiMinimized ? 'Expand UI' : 'Minimize UI'} active={uiMinimized} on={() => setUiMinimized(v => !v)} />
           {sourceMenuOpen && (
             <div role="presentation" style={{ position: 'absolute', zIndex: 120, top: 38, left: 8, width: 224, padding: '0 8px', borderRadius: 13, background: '#1e1e1e', color: '#fff', boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px' }}>
               <ul role="menu" aria-label="Build sources" style={{ width: 208, margin: 0, padding: '8px 0 6px', listStyle: 'none', maxHeight: 420, overflowY: 'auto' }}>
@@ -1833,7 +1835,7 @@ export default function ReactFigmaPage() {
             <div style={{ height: 25, display: 'flex', alignItems: 'center', padding: '0 16px', font: `400 11px/16px ${FONT}`, color: MUTE }}>Drafts ›</div>
             <div style={{ height: 40, padding: '0 8px 0 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={hdr}>Pages</span>
-              <span style={{ display: 'flex', gap: 4, color: MUTE }}><UiIB name="find" title="Find" /><UiIB name="plus" title="Add new page" /></span>
+              <span style={{ display: 'flex', gap: 4, color: MUTE }}><UiIB name="find" title="Find" active={layerQuery !== null} on={() => setLayerQuery(q => q === null ? '' : null)} /><UiIB name="plus" title="Add new page" /></span>
             </div>
             <div style={{ padding: '0 8px', maxHeight: 280, overflowY: 'auto' }}>
               {/* LOCAL FOLDER BROWSER — navigable filesystem under the dev root.
@@ -1872,9 +1874,17 @@ export default function ReactFigmaPage() {
               <span style={hdr}>Layers</span>
               <UiIB name="collapseLayers" title="Collapse layers" on={() => { const ids = (layers ?? []).filter((n) => n.kids).map((n) => n.id); setCollapsed((prev) => prev.size >= ids.length ? new Set() : new Set(ids)) }} />
             </div>
+            {layerQuery !== null && (
+              <div style={{ padding: '0 8px 6px 16px' }}>
+                <input autoFocus aria-label="Find layer" placeholder="Find layers…" value={layerQuery} onChange={(e) => setLayerQuery(e.currentTarget.value)}
+                  style={{ width: '100%', height: 28, borderRadius: 6, border: 0, background: FIELD, padding: '0 8px', font: `400 11px/1 ${FONT}`, color: INK, outline: 0 }} />
+              </div>
+            )}
             <div style={{ flex: 1, overflowY: 'auto' }}>
               {layers
                 ? layers.filter((ln) => {
+                    const q = layerQuery?.trim().toLowerCase()
+                    if (q) return ln.name.toLowerCase().includes(q) || (ln.srcFile ?? '').toLowerCase().includes(q) // search = flat filter by name/file
                     // hide rows under any collapsed ancestor
                     let p = ln.parentId
                     while (p) { if (collapsed.has(p)) return false; p = layers.find((x) => x.id === p)?.parentId }
@@ -1929,7 +1939,7 @@ export default function ReactFigmaPage() {
       </main>
 
       {/* ░░ RIGHT — Design inspector ░░ */}
-      <aside style={{ width: rightW, flex: 'none', position: 'relative', borderLeft: `1px solid ${LINE}`, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <aside style={{ width: rightW, flex: 'none', position: 'relative', borderLeft: `1px solid ${LINE}`, display: uiMinimized ? 'none' : 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div onPointerDown={startResize('r')} style={handleStyle('left')} />
         <div style={{ height: 48, display: 'flex', alignItems: 'center', padding: '0 8px 0 11px', flex: 'none' }}>
           {/* E2.5 (Dan-approved): Save to code · N — neutral toolbar button, shows when dirty; commits all overrides */}
