@@ -16,6 +16,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { buildLayerTree, readStyles, colorToHex, type LiveNode } from './engine'
 import { createPortal } from 'react-dom'
 import {
   ListDashes, MagnifyingGlass, Plus, Minus, Sidebar, CaretDown, GearSix, Palette,
@@ -324,13 +325,13 @@ function AutoFlowGroup({ value, onChange }: { value: AutoFlow; onChange: (value:
     </div>
   )
 }
-function AutoValueField({ icon, label, value, mode, caret = true, ariaLabel, onChange }: { icon?: keyof typeof UI_ICON; label?: string; value: string; mode?: string; caret?: boolean; ariaLabel?: string; onChange?: (value: string) => void }) {
+function AutoValueField({ icon, label, value, mode, caret = true, ariaLabel, onChange, token }: { icon?: keyof typeof UI_ICON; label?: string; value: string; mode?: string; caret?: boolean; ariaLabel?: string; onChange?: (value: string) => void; token?: string }) {
   const [varOpen, setVarOpen] = useState(false)
   const fieldRef = useCloseOnOutside<HTMLDivElement>(varOpen, () => setVarOpen(false))
   const fieldLabel = ariaLabel ?? label ?? 'value'
   return (
-    <div ref={fieldRef} style={{ position: 'relative', height: 24, width: 88, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'flex', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
-      <span style={{ width: 24, height: 24, flex: 'none', display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)', font: `450 11px/24px ${FONT}` }}>{icon ? <UiIcon name={icon} /> : label}</span>
+    <div ref={fieldRef} title={token} style={{ position: 'relative', height: 24, width: 88, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'flex', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: token ? TOKEN : INK }}>
+      <span style={{ width: 24, height: 24, flex: 'none', display: 'grid', placeItems: 'center', color: token ? TOKEN : 'rgba(0,0,0,0.5)', font: `450 11px/24px ${FONT}` }}>{token ? <UiIcon name="variable" /> : icon ? <UiIcon name={icon} /> : label}</span>
       {onChange ? (
         <input aria-label={fieldLabel} role="spinbutton" value={value} onChange={e => onChange(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
           style={{ flex: 1, minWidth: 0, width: 1, height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: INK, font: `450 11px/16px ${FONT}` }} />
@@ -413,13 +414,13 @@ function ResizeDropdownField({ axis, value, mode, onValue, onMode }: { axis: 'W'
     </div>
   )
 }
-function GapDropdownField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+function GapDropdownField({ value, onChange, token }: { value: string; onChange: (value: string) => void; token?: string }) {
   const [open, setOpen] = useState(false)
   const menuRef = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
   return (
-    <div ref={menuRef} style={{ position: 'relative', width: 88, height: 24 }}>
-      <div style={{ width: 88, height: 24, borderRadius: 5, background: FIELD, display: 'grid', gridTemplateColumns: '24px 1fr 24px', alignItems: 'center', overflow: 'hidden', font: `450 11px/16px ${FONT}`, color: INK }}>
-        <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)' }}><UiIcon name="gapVertical" /></span>
+    <div ref={menuRef} title={token} style={{ position: 'relative', width: 88, height: 24 }}>
+      <div style={{ width: 88, height: 24, borderRadius: 5, background: FIELD, display: 'grid', gridTemplateColumns: '24px 1fr 24px', alignItems: 'center', overflow: 'hidden', font: `450 11px/16px ${FONT}`, color: token ? TOKEN : INK }}>
+        <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', color: token ? TOKEN : 'rgba(0,0,0,0.5)' }}><UiIcon name={token ? 'variable' : 'gapVertical'} /></span>
         <input aria-label="Gap value" role="spinbutton" value={value} onChange={e => onChange(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
           style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: INK, font: `450 11px/16px ${FONT}` }} />
         <button type="button" aria-label={`Gap options: ${value}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(v => !v)}
@@ -438,12 +439,12 @@ function GapDropdownField({ value, onChange }: { value: string; onChange: (value
     </div>
   )
 }
-function InlineValueInput({ icon, value, onChange, suffix, ariaLabel }: { icon: keyof typeof UI_ICON; value: string; onChange: (value: string) => void; suffix?: string; ariaLabel: string }) {
+function InlineValueInput({ icon, value, onChange, suffix, ariaLabel, token }: { icon: keyof typeof UI_ICON; value: string; onChange: (value: string) => void; suffix?: string; ariaLabel: string; token?: string }) {
   const [varOpen, setVarOpen] = useState(false)
   const fieldRef = useCloseOnOutside<HTMLDivElement>(varOpen, () => setVarOpen(false))
   return (
-    <div ref={fieldRef} style={{ position: 'relative', height: 24, width: 88, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: suffix ? '24px 1fr 14px 16px' : '24px 1fr 16px', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
-      <span style={{ width: 24, height: 24, flex: 'none', display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)' }}><UiIcon name={icon} /></span>
+    <div ref={fieldRef} title={token} style={{ position: 'relative', height: 24, width: 88, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: suffix ? '24px 1fr 14px 16px' : '24px 1fr 16px', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: token ? TOKEN : INK }}>
+      <span style={{ width: 24, height: 24, flex: 'none', display: 'grid', placeItems: 'center', color: token ? TOKEN : 'rgba(0,0,0,0.5)' }}><UiIcon name={token ? 'variable' : icon} /></span>
       <input aria-label={ariaLabel} value={value} onChange={e => onChange(e.currentTarget.value)}
         style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: INK, font: `450 11px/16px ${FONT}` }} />
       {suffix && <span style={{ color: MUTE }}>{suffix}</span>}
@@ -537,11 +538,11 @@ const TREE: Node[] = [
   { name: 'Bottom Section', icon: 'auto', depth: 2, kids: true },
   { name: 'Toolbar - Bottom - Safari', icon: 'toolbar', depth: 2, kids: true, locked: true, visible: true },
 ]
-function LayerRow({ n }: { n: Node }) {
+function LayerRow({ n, on }: { n: Node; on?: () => void }) {
   const [h, setH] = useState(false)
   const iconName: keyof typeof UI_ICON = n.icon === 'image' ? 'layerImage' : n.icon === 'auto' ? 'layerAuto' : n.icon === 'section' ? 'layerSection' : n.icon === 'toolbar' ? 'layerToolbar' : n.icon === 'component' ? 'layerComponent' : 'layerFrame'
   return (
-    <div onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
+    <div onClick={on} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
       style={{ display: 'grid', gridTemplateColumns: `${16 + n.depth * 24}px 16px minmax(0,1fr) 40px`, alignItems: 'center', height: 32, paddingRight: 8, background: n.sel ? '#dff3ff' : h ? '#f4f5f6' : 'transparent', cursor: 'pointer' }}>
       <span style={{ width: 16, height: 16, marginLeft: n.depth * 24, display: 'grid', placeItems: 'center', color: INK }}>{n.kids && <UiIcon name={n.open ? 'caret16' : 'caretRight16'} size={16} />}</span>
       <span style={{ width: 16, height: 16, display: 'grid', placeItems: 'center', color: n.comp ? TOKEN : 'rgba(0,0,0,0.65)' }}><UiIcon name={iconName} size={16} /></span>
@@ -630,12 +631,14 @@ function VariablesLibrary() {
 }
 
 /* Paint/effect rows are cloned from the live Figma inspector DOM. */
-function FigmaPaintRow({ hex, op }: { hex: string; op: number }) {
+function FigmaPaintRow({ hex, op, origin }: { hex: string; op: number; origin?: string }) {
+  const inherited = origin?.startsWith('↑')
+  const tokenBound = origin?.startsWith('◈')
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '156px 8px 24px 4px 24px', alignItems: 'center', height: 32, padding: '0 8px 0 16px' }}>
-      <div style={{ height: 24, borderRadius: 5, background: FIELD, display: 'grid', gridTemplateColumns: '24px 1fr 38px 14px', alignItems: 'center', overflow: 'hidden', font: `450 11px/16px ${FONT}`, color: INK }}>
-        <button type="button" aria-label={`Solid color hex: ${hex}`} style={{ appearance: 'none', border: 0, width: 14, height: 14, justifySelf: 'center', borderRadius: 2, background: `#${hex}`, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.15)', padding: 0, cursor: 'pointer' }} />
-        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{hex}</span>
+    <div title={origin} style={{ display: 'grid', gridTemplateColumns: '156px 8px 24px 4px 24px', alignItems: 'center', height: 32, padding: '0 8px 0 16px' }}>
+      <div style={{ height: 24, borderRadius: 5, background: FIELD, display: 'grid', gridTemplateColumns: '24px 1fr 38px 14px', alignItems: 'center', overflow: 'hidden', font: `450 11px/16px ${FONT}`, color: tokenBound ? TOKEN : INK }}>
+        <button type="button" aria-label={`Solid color hex: ${hex}${origin ? ` (${origin})` : ''}`} style={{ appearance: 'none', border: 0, width: 14, height: 14, justifySelf: 'center', borderRadius: 2, background: `#${hex}`, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.15)', padding: 0, cursor: 'pointer' }} />
+        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{hex}{inherited && <span style={{ color: MUTE, marginLeft: 4, font: `450 9px/16px ${FONT}` }}>↑ {origin!.replace('↑ inherited from ', '')}</span>}</span>
         <span style={{ textAlign: 'right', paddingRight: 7 }}>{op}</span>
         <span style={{ color: 'rgba(0,0,0,0.5)' }}>%</span>
       </div>
@@ -926,20 +929,78 @@ export default function ReactFigmaPage() {
   const pan = useRef<{ x: number; y: number; vx: number; vy: number } | null>(null)
   const [isPanning, setIsPanning] = useState(false)
 
-  // engine M1 — selection state
+  // engine M1+M2 — selection + read-bridge state
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [sel, setSel] = useState<SelPayload | null>(null)
   const [hoverRect, setHoverRect] = useState<OutlineRect | null>(null)
   const [selRect, setSelRect] = useState<OutlineRect | null>(null)
+  const [layers, setLayers] = useState<LiveNode[] | null>(null)
+  const [layerSelId, setLayerSelId] = useState<string | null>(null)
+  const [fieldTokens, setFieldTokens] = useState<Record<string, string | undefined>>({})
+  const [liveFills, setLiveFills] = useState<{ hex: string; op: number; origin?: string }[] | null>(null)
+  const selIdRef = useRef<string | null>(null)
+
+  const rectOf = (el: HTMLElement): OutlineRect => {
+    const r = el.getBoundingClientRect()
+    return { x: r.left, y: r.top, w: r.width, h: r.height }
+  }
+
+  /* M2: one central pipeline — element → SelectionPayload + StyleReport → every panel field. */
+  const applySelection = useCallback((el: HTMLElement) => {
+    const m = (el.getAttribute('data-src') ?? '').match(/^(.*):(\d+):(\d+)$/)
+    if (!m) return
+    const payload: SelPayload = { file: m[1], line: +m[2], col: +m[3], tag: el.tagName.toLowerCase(), classes: [...el.classList] }
+    const id = el.getAttribute('data-eng-id') ?? (el.setAttribute('data-eng-id', `sel-${Date.now()}`), el.getAttribute('data-eng-id')!)
+    selIdRef.current = id
+    setSel(payload); setLayerSelId(id); setSelRect(rectOf(el))
+
+    const rep = readStyles(el)
+    const doc = el.ownerDocument
+    const px = (v?: string) => { const n = parseFloat(v ?? ''); return Number.isFinite(n) ? String(Math.round(n)) : '0' }
+    const r = el.getBoundingClientRect()
+    const c = rep.computed
+    // Position
+    setXValue(px(String(r.left))); setYValue(px(String(r.top)))
+    setInsetTop(c['top'] === 'auto' ? 'auto' : px(c['top'])); setInsetLeft(c['left'] === 'auto' ? 'auto' : px(c['left']))
+    setZIndexValue(c['z-index'] === 'auto' ? '0' : c['z-index'])
+    setCssPosition(({ static: 0, relative: 1, absolute: 2, fixed: 3, sticky: 4 } as Record<string, number>)[c['position']] ?? 0)
+    // Auto layout
+    setAutoFlow(c['display'].includes('flex') ? (c['flex-direction'].startsWith('column') ? 'vertical' : 'horizontal') : c['display'].includes('grid') ? 'grid' : 'freeform')
+    setAutoWrap(c['flex-wrap'] === 'wrap')
+    setWidthValue(px(c['width'])); setHeightValue(px(c['height']))
+    setGapValue(px(c['column-gap'] === 'normal' ? '0' : c['column-gap']))
+    setPaddingXValue(px(c['padding-left'])); setPaddingYValue(px(c['padding-top']))
+    setClipContent(c['overflow'] !== 'visible')
+    // Appearance
+    setOpacityValue(String(Math.round(parseFloat(c['opacity'] || '1') * 100)))
+    setCornerRadiusValue(px(c['border-radius']))
+    setBlendMode(c['mix-blend-mode'] === 'normal' ? 'Pass through' : c['mix-blend-mode'])
+    // Token provenance per field (var name = token path; pills render purple)
+    const d = rep.defined
+    setFieldTokens({
+      gap: d['gap']?.token ?? d['column-gap']?.token,
+      paddingX: d['padding-left']?.token ?? d['padding']?.token,
+      paddingY: d['padding-top']?.token ?? d['padding']?.token,
+      opacity: d['opacity']?.token,
+      radius: d['border-radius']?.token,
+    })
+    // Fill: element background; text elements with transparent bg → text color (Figma text fill)
+    const fills: { hex: string; op: number; origin?: string }[] = []
+    const bg = colorToHex(c['background-color'], doc)
+    if (bg) fills.push({ ...bg, origin: d['background-color']?.token ? `◈ ${d['background-color'].token}` : undefined })
+    else if ([...el.childNodes].some((n) => n.nodeType === 3 && n.textContent?.trim())) {
+      const fg = colorToHex(c['color'], doc)
+      if (fg) fills.push({ ...fg, origin: d['color']?.inheritedFrom ? `↑ inherited from ${d['color'].inheritedFrom.name}` : d['color']?.token ? `◈ ${d['color'].token}` : undefined })
+    }
+    setLiveFills(fills.length ? fills : null)
+    console.log('[engine] select', payload, rep)
+  }, [setXValue, setYValue, setInsetTop, setInsetLeft, setZIndexValue, setCssPosition, setAutoFlow, setAutoWrap, setWidthValue, setHeightValue, setGapValue, setPaddingXValue, setPaddingYValue, setClipContent, setOpacityValue, setCornerRadiusValue, setBlendMode])
+
   const wireCanvas = useCallback(() => {
     const doc = iframeRef.current?.contentDocument
     if (!doc) { console.warn('[engine] contentDocument unreachable (COEP smoke FAIL?)'); return }
     const findTagged = (t: EventTarget | null) =>
       ((t as HTMLElement | null)?.closest?.('[data-src]') ?? null) as HTMLElement | null
-    const rectOf = (el: HTMLElement): OutlineRect => {
-      const r = el.getBoundingClientRect()
-      return { x: r.left, y: r.top, w: r.width, h: r.height }
-    }
     doc.addEventListener('mousemove', (e) => {
       const el = findTagged(e.target)
       setHoverRect(el ? rectOf(el) : null)
@@ -949,15 +1010,23 @@ export default function ReactFigmaPage() {
       const el = findTagged(e.target)
       if (!el) return
       e.preventDefault(); e.stopPropagation()
-      const m = (el.getAttribute('data-src') ?? '').match(/^(.*):(\d+):(\d+)$/)
-      if (!m) return
-      const payload: SelPayload = { file: m[1], line: +m[2], col: +m[3], tag: el.tagName.toLowerCase(), classes: [...el.classList] }
-      console.log('[engine] select', payload)
-      setSel(payload)
-      setSelRect(rectOf(el))
+      applySelection(el)
     }, true)
+    // M2: live layer tree + HMR/mutation re-read (AC2, AC6)
+    setLayers(buildLayerTree(doc))
+    let t: ReturnType<typeof setTimeout> | undefined
+    const mo = new MutationObserver(() => {
+      clearTimeout(t)
+      t = setTimeout(() => {
+        setLayers(buildLayerTree(doc))
+        const cur = selIdRef.current && doc.querySelector(`[data-eng-id="${selIdRef.current}"]`)
+        if (cur) applySelection(cur as HTMLElement)
+        else if (selIdRef.current) { selIdRef.current = null; setSel(null); setSelRect(null); setLiveFills(null) }
+      }, 400)
+    })
+    mo.observe(doc.body, { childList: true, subtree: true })
     console.log('[engine] canvas wired — contentDocument reachable (COEP smoke PASS)')
-  }, [])
+  }, [applySelection])
   // onLoad alone misses the race where the iframe finishes loading BEFORE React hydrates
   // (listener attached after the load event already fired) — wire eagerly + on every load.
   useEffect(() => {
@@ -1056,7 +1125,15 @@ export default function ReactFigmaPage() {
               <span style={hdr}>Layers</span>
               <UiIB name="collapseLayers" title="Collapse layers" />
             </div>
-            <div style={{ flex: 1, overflowY: 'auto' }}>{TREE.map((n, i) => <LayerRow key={i} n={n} />)}</div>
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              {layers
+                ? layers.map((ln) => (
+                    <LayerRow key={ln.id}
+                      n={{ name: ln.name, icon: ln.tag === 'img' ? 'image' : ln.tag === 'section' ? 'section' : ln.tag === 'button' ? 'component' : 'auto', depth: Math.min(ln.depth, 7), kids: ln.kids, open: true, sel: ln.id === layerSelId, comp: ln.tag === 'button' }}
+                      on={() => { const el = iframeRef.current?.contentDocument?.querySelector(`[data-eng-id="${ln.id}"]`); if (el) applySelection(el as HTMLElement) }} />
+                  ))
+                : TREE.map((n, i) => <LayerRow key={i} n={n} />)}
+            </div>
           </>
         )}
         {rail === 'assets' && (
@@ -1178,13 +1255,13 @@ export default function ReactFigmaPage() {
               <span style={{ position: 'absolute', left: 112, top: 3.5, width: 88, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Gap</span>
               <div style={{ position: 'absolute', left: 16, right: 8, top: 22, display: 'grid', gridTemplateColumns: '88px 88px 24px', gap: 8, alignItems: 'start' }}>
                 <AlignGrid sel={autoAlign} onSelect={setAutoAlign} />
-                <GapDropdownField value={gapValue} onChange={setGapValue} />
+                <GapDropdownField value={gapValue} onChange={setGapValue} token={fieldTokens.gap} />
                 <UiIB name="autoLayoutSettings" title="Auto layout settings" />
               </div>
             </div>
             <InspectorRow label="Padding" height={50}>
-              <AutoValueField icon="paddingHorizontal" value={paddingXValue} caret={false} ariaLabel="Horizontal padding" onChange={setPaddingXValue} />
-              <AutoValueField icon="paddingVertical" value={paddingYValue} caret={false} ariaLabel="Vertical padding" onChange={setPaddingYValue} />
+              <AutoValueField icon="paddingHorizontal" value={paddingXValue} caret={false} ariaLabel="Horizontal padding" onChange={setPaddingXValue} token={fieldTokens.paddingX} />
+              <AutoValueField icon="paddingVertical" value={paddingYValue} caret={false} ariaLabel="Vertical padding" onChange={setPaddingYValue} token={fieldTokens.paddingY} />
               <UiIB name="paddingIndividual" title="Individual padding" />
             </InspectorRow>
             <div data-react-figma-clip-row style={{ height: 32, padding: '0 8px 0 16px', display: 'grid', gridTemplateColumns: '216px', alignItems: 'center' }}>
@@ -1209,15 +1286,15 @@ export default function ReactFigmaPage() {
               <span style={{ position: 'absolute', left: 16, top: 3.5, width: 88, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Opacity</span>
               <span style={{ position: 'absolute', left: 112, top: 3.5, width: 120, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Corner radius</span>
               <div style={{ position: 'absolute', left: 16, right: 8, top: 22, display: 'grid', gridTemplateColumns: '88px 88px 24px', gap: 8, alignItems: 'start' }}>
-                <InlineValueInput icon="opacity" value={opacityValue} onChange={setOpacityValue} suffix="%" ariaLabel="Opacity" />
-                <InlineValueInput icon="cornerRadius" value={cornerRadiusValue} onChange={setCornerRadiusValue} ariaLabel="Corner radius" />
+                <InlineValueInput icon="opacity" value={opacityValue} onChange={setOpacityValue} suffix="%" ariaLabel="Opacity" token={fieldTokens.opacity} />
+                <InlineValueInput icon="cornerRadius" value={cornerRadiusValue} onChange={setCornerRadiusValue} ariaLabel="Corner radius" token={fieldTokens.radius} />
                 <UiIB name="cornerRadius" title="Individual corners" active={individualCorners} on={() => setIndividualCorners(v => !v)} />
               </div>
             </div>
           </Sec>
 
           <Sec title="Fill" actionWidth={52} action={<><UiIB name="styleDots" title="Fill, Apply styles and variables" /><UiIB name="plus" title="Add fill" /></>} bodyGap={0} bodyPadding="0">
-            {MOCK.fills.map((f, i) => <FigmaPaintRow key={i} hex={f.hex} op={f.op} />)}
+            {(liveFills ?? MOCK.fills).map((f, i) => <FigmaPaintRow key={i} hex={f.hex} op={f.op} origin={(f as { origin?: string }).origin} />)}
           </Sec>
           <Sec title="Stroke" actionWidth={52} action={<><UiIB name="styleDots" title="Stroke, Apply styles and variables" /><UiIB name="plus" title="Add stroke fill" /></>} bodyGap={0} bodyPadding="0">
             {MOCK.strokes.map((s, i) => (
