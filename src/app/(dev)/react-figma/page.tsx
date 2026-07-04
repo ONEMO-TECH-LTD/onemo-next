@@ -411,8 +411,8 @@ function AutoValueField({ icon, label, value, mode, caret = true, ariaLabel, onC
   const fieldRef = useCloseOnOutside<HTMLDivElement>(varOpen, () => setVarOpen(false))
   const fieldLabel = ariaLabel ?? label ?? 'value'
   return (
-    <div ref={fieldRef} title={token} style={{ position: 'relative', height: 24, width, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'flex', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: token ? TOKEN : INK }}>
-      <span style={{ width: 24, height: 24, flex: 'none', display: 'grid', placeItems: 'center', color: token ? TOKEN : 'rgba(0,0,0,0.5)', font: `450 11px/24px ${FONT}` }}>{token ? <UiIcon name="variable" /> : icon ? <UiIcon name={icon} /> : label}</span>
+    <div ref={fieldRef} style={{ position: 'relative', height: 24, width, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'flex', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
+      <span style={{ width: 24, height: 24, flex: 'none', display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)', font: `450 11px/24px ${FONT}` }}>{icon ? <UiIcon name={icon} /> : label}</span>
       {onChange ? (
         <input aria-label={fieldLabel} role="spinbutton" value={value} onChange={e => onChange(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
           style={{ flex: 1, minWidth: 0, width: 1, height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: INK, font: `450 11px/16px ${FONT}` }} />
@@ -534,9 +534,9 @@ function GapDropdownField({ value, onChange, token }: { value: string; onChange:
   const menuRef = useCloseOnOutside<HTMLDivElement>(open || varOpen, () => { setOpen(false); setVarOpen(false) })
   const applyVariable = () => { setOpen(false); setVarOpen(true) }
   return (
-    <div ref={menuRef} title={token} style={{ position: 'relative', width: 88, height: 24 }}>
-      <div style={{ width: 88, height: 24, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: '24px 1fr 24px', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: token ? TOKEN : INK }}>
-        <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', color: token ? TOKEN : 'rgba(0,0,0,0.5)' }}><UiIcon name={token ? 'variable' : 'gapVertical'} /></span>
+    <div ref={menuRef} style={{ position: 'relative', width: 88, height: 24 }}>
+      <div style={{ width: 88, height: 24, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: '24px 1fr 24px', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
+        <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)' }}><UiIcon name="gapVertical" /></span>
         <input aria-label="Gap value" role="spinbutton" value={value} onChange={e => onChange(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
           style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: INK, font: `450 11px/16px ${FONT}` }} />
         <button type="button" aria-label={`Gap options: ${value}`} aria-haspopup="menu" aria-expanded={open} onClick={() => { setVarOpen(false); setOpen(v => !v) }}
@@ -560,8 +560,8 @@ function InlineValueInput({ icon, value, onChange, suffix, ariaLabel, token }: {
   const [varOpen, setVarOpen] = useState(false)
   const fieldRef = useCloseOnOutside<HTMLDivElement>(varOpen, () => setVarOpen(false))
   return (
-    <div ref={fieldRef} title={token} style={{ position: 'relative', height: 24, width: 88, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: suffix ? '24px 1fr 14px 16px' : '24px 1fr 16px', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: token ? TOKEN : INK }}>
-      <span style={{ width: 24, height: 24, flex: 'none', display: 'grid', placeItems: 'center', color: token ? TOKEN : 'rgba(0,0,0,0.5)' }}><UiIcon name={token ? 'variable' : icon} /></span>
+    <div ref={fieldRef} style={{ position: 'relative', height: 24, width: 88, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: suffix ? '24px 1fr 14px 16px' : '24px 1fr 16px', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
+      <span style={{ width: 24, height: 24, flex: 'none', display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)' }}><UiIcon name={icon} /></span>
       <input aria-label={ariaLabel} value={value} onChange={e => onChange(e.currentTarget.value)}
         style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: INK, font: `450 11px/16px ${FONT}` }} />
       {suffix && <span style={{ color: MUTE }}>{suffix}</span>}
@@ -932,18 +932,13 @@ function FigmaPaintRow({ hex, op, label = 'Paint', onRemove, origin }: { hex: st
   const fieldRef = useCloseOnOutside<HTMLDivElement>(varOpen || pickerOpen, () => { setVarOpen(false); setPickerOpen(false) })
   // engine read-bridge: live selections re-render with new paint props — sync local edit state
   useEffect(() => { setHexValue(hex); setOpacityValue(String(op)) }, [hex, op])
-  const inherited = origin?.startsWith('↑')
-  const tokenBound = origin?.startsWith('◈')
   return (
-    <div title={origin} style={{ display: 'grid', gridTemplateColumns: '156px 8px 24px 4px 24px', alignItems: 'center', height: 32, padding: '0 8px 0 16px' }}>
-      <div ref={fieldRef} style={{ position: 'relative', height: 24, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen || pickerOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: '24px 1fr 28px 14px 16px', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: tokenBound ? TOKEN : INK }}>
-        <button type="button" aria-label={`Solid color hex: ${hexValue}${origin ? ` (${origin})` : ''}`} aria-haspopup="dialog" aria-expanded={pickerOpen} onClick={event => { event.stopPropagation(); setVarOpen(false); setPickerOpen(v => !v) }}
+    <div style={{ display: 'grid', gridTemplateColumns: '156px 8px 24px 4px 24px', alignItems: 'center', height: 32, padding: '0 8px 0 16px' }}>
+      <div ref={fieldRef} style={{ position: 'relative', height: 24, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen || pickerOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: '24px 1fr 28px 14px 16px', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
+        <button type="button" aria-label={`Solid color hex: ${hexValue}`} aria-haspopup="dialog" aria-expanded={pickerOpen} onClick={event => { event.stopPropagation(); setVarOpen(false); setPickerOpen(v => !v) }}
           style={{ appearance: 'none', border: 0, width: 14, height: 14, justifySelf: 'center', borderRadius: 2, background: `#${normalizeHex(hexValue) || 'FFFFFF'}`, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.15)', padding: 0, cursor: 'pointer' }} />
-        <span style={{ position: 'relative', minWidth: 0, display: 'flex', alignItems: 'center' }}>
-          <input aria-label={`${label} hex`} value={hexValue} onChange={e => setHexValue(normalizeHex(e.currentTarget.value))}
-            style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: 'inherit', font: `450 11px/16px ${FONT}` }} />
-          {inherited && <span style={{ flex: 'none', color: MUTE, marginLeft: 2, font: `450 9px/16px ${FONT}`, whiteSpace: 'nowrap' }}>↑ {origin!.replace('↑ inherited from ', '')}</span>}
-        </span>
+        <input aria-label={`${label} hex`} value={hexValue} onChange={e => setHexValue(normalizeHex(e.currentTarget.value))}
+          style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: INK, font: `450 11px/16px ${FONT}` }} />
         <input aria-label={`${label} opacity`} role="spinbutton" value={opacityValue} onChange={e => setOpacityValue(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
           style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: '0 3px 0 0', background: 'transparent', color: INK, font: `450 11px/16px ${FONT}`, textAlign: 'right' }} />
         <span style={{ color: 'rgba(0,0,0,0.5)' }}>%</span>
@@ -1358,6 +1353,9 @@ const nextRowId = <T extends { id: number }>(rows: T[]) => rows.reduce((max, row
 type SelPayload = { file: string; line: number; col: number; tag: string; classes: string[] }
 type OutlineRect = { x: number; y: number; w: number; h: number }
 const CANVAS_ROUTE = '/effect-creator/v5.3.1/2d'
+/* M3 dirty-ledger UI: OFF until a Dan-approved Figma-canon treatment exists —
+   the right panel must match Codex's shell exactly. Commit path stays callable. */
+const SHOW_LEDGER = false
 
 export default function ReactFigmaPage() {
   type Rail = 'file' | 'assets' | 'variables'
@@ -1776,8 +1774,10 @@ export default function ReactFigmaPage() {
           <button type="button" style={{ appearance: 'none', border: 0, background: '#fff', borderRadius: 5, marginLeft: 'auto', width: 54.5, height: 24, padding: '4px 4px 4px 12px', color: '#000', cursor: 'pointer', font: `400 11px/16px ${FONT}`, display: 'flex', alignItems: 'center' }}><span style={{ flex: 1 }}>92%</span><UiIcon name="caret16" size={16} /></button>
         </div>
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          {/* M3: dirty ledger — unsaved canvas overrides (staging; E1.4 commits from here) */}
-          {ovVersion >= 0 && ov.current!.dirty().length > 0 && (
+          {/* M3: dirty ledger — unsaved canvas overrides (staging; E1.4 commits from here).
+              RENDER OFF until Dan approves a Figma-canon treatment — the right panel must
+              match Codex's shell exactly (Dan, 2026-07-04). Logic + commit API stay intact. */}
+          {SHOW_LEDGER && ovVersion >= 0 && ov.current!.dirty().length > 0 && (
             <div style={{ margin: '8px 8px 0 16px', padding: '6px 8px', borderRadius: 6, background: '#fff8f0', border: '1px solid #f5d9b8', font: `450 10px/16px ${FONT}`, color: INK }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
                 <span style={{ font: `550 10px/16px ${FONT}`, color: '#9a5b16' }}>Unsaved overrides · {ov.current!.dirty().length}</span>
@@ -1799,11 +1799,8 @@ export default function ReactFigmaPage() {
           {/* Frame preset + actions */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 48, padding: '4px 8px' }}>
             <FramePresetDropdown kind={frameKind} preset={framePreset} onKind={setFrameKind} onPreset={setFramePreset} />
-            {sel && (
-              <span title={`${sel.file}:${sel.line}:${sel.col}`} style={{ font: `450 10px/14px ${FONT}`, color: MUTE, maxWidth: 96, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
-                {sel.tag} · {sel.file.split('/').pop()}:{sel.line}
-              </span>
-            )}
+            {/* selection identity label removed from render — right panel matches Codex's
+                shell exactly (Dan, 2026-07-04); sel payload still logged + in state */}
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
               <span aria-hidden style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', flex: 'none', color: INK }}><UiIcon name="devCode" /></span>
               <UiIB name="createComponent" title="Create component" />
