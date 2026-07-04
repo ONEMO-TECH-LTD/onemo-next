@@ -324,12 +324,12 @@ function AutoFlowGroup({ value, onChange }: { value: AutoFlow; onChange: (value:
     </div>
   )
 }
-function AutoValueField({ icon, label, value, mode, caret = true, ariaLabel, onChange }: { icon?: keyof typeof UI_ICON; label?: string; value: string; mode?: string; caret?: boolean; ariaLabel?: string; onChange?: (value: string) => void }) {
+function AutoValueField({ icon, label, value, mode, caret = true, ariaLabel, onChange, width = 88 }: { icon?: keyof typeof UI_ICON; label?: string; value: string; mode?: string; caret?: boolean; ariaLabel?: string; onChange?: (value: string) => void; width?: number }) {
   const [varOpen, setVarOpen] = useState(false)
   const fieldRef = useCloseOnOutside<HTMLDivElement>(varOpen, () => setVarOpen(false))
   const fieldLabel = ariaLabel ?? label ?? 'value'
   return (
-    <div ref={fieldRef} style={{ position: 'relative', height: 24, width: 88, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'flex', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
+    <div ref={fieldRef} style={{ position: 'relative', height: 24, width, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'flex', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
       <span style={{ width: 24, height: 24, flex: 'none', display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)', font: `450 11px/24px ${FONT}` }}>{icon ? <UiIcon name={icon} /> : label}</span>
       {onChange ? (
         <input aria-label={fieldLabel} role="spinbutton" value={value} onChange={e => onChange(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
@@ -382,17 +382,19 @@ function FigmaMenuRow({ children, checked, onClick }: { children: React.ReactNod
 }
 function ResizeDropdownField({ axis, value, mode, onValue, onMode }: { axis: 'W' | 'H'; value: string; mode: ResizeMode; onValue: (value: string) => void; onMode: (mode: ResizeMode) => void }) {
   const [open, setOpen] = useState(false)
-  const menuRef = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
+  const [varOpen, setVarOpen] = useState(false)
+  const menuRef = useCloseOnOutside<HTMLDivElement>(open || varOpen, () => { setOpen(false); setVarOpen(false) })
   const axisLabel = axis === 'W' ? 'width' : 'height'
   const selectMode = (next: ResizeMode) => { onMode(next); setOpen(false) }
   const applyOnly = () => setOpen(false)
+  const applyVariable = () => { setOpen(false); setVarOpen(true) }
   return (
     <div ref={menuRef} style={{ position: 'relative', width: 88, height: 24 }}>
-      <div style={{ width: 88, height: 24, borderRadius: 5, background: FIELD, display: 'grid', gridTemplateColumns: '24px 1fr 32px', alignItems: 'center', overflow: 'hidden', font: `450 11px/16px ${FONT}`, color: INK }}>
+      <div style={{ width: 88, height: 24, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: '24px 1fr 32px', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
         <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)', font: `450 11px/24px ${FONT}` }}>{axis === 'W' ? <UiIcon name="resizeW" /> : 'H'}</span>
         <input aria-label={`${axisLabel} value`} role="spinbutton" value={value} onChange={e => onValue(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
           style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: INK, font: `450 11px/16px ${FONT}` }} />
-        <button type="button" aria-label={`${axisLabel} resizing: ${mode}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(v => !v)}
+        <button type="button" aria-label={`${axisLabel} resizing: ${mode}`} aria-haspopup="menu" aria-expanded={open} onClick={() => { setVarOpen(false); setOpen(v => !v) }}
           style={{ appearance: 'none', border: 0, padding: 0, width: 32, height: 24, background: 'transparent', color: INK, cursor: 'pointer', font: `450 11px/16px ${FONT}` }}>{mode}</button>
       </div>
       {open && (
@@ -406,23 +408,26 @@ function ResizeDropdownField({ axis, value, mode, onValue, onMode }: { axis: 'W'
             <FigmaMenuRow onClick={applyOnly}>{axis === 'W' ? `Max ${axisLabel}: 640` : `Add max ${axisLabel}...`}</FigmaMenuRow>
             {axis === 'W' && <><FigmaMenuSeparator /><FigmaMenuRow onClick={applyOnly}>Remove max</FigmaMenuRow></>}
             <FigmaMenuSeparator />
-            <FigmaMenuRow onClick={applyOnly}>Apply variable...</FigmaMenuRow>
+            <FigmaMenuRow onClick={applyVariable}>Apply variable...</FigmaMenuRow>
           </ul>
         </div>
       )}
+      {varOpen && <FigmaVariablePicker fieldLabel={`${axisLabel} value`} anchorRef={menuRef} onPick={onValue} onClose={() => setVarOpen(false)} />}
     </div>
   )
 }
 function GapDropdownField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const [open, setOpen] = useState(false)
-  const menuRef = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
+  const [varOpen, setVarOpen] = useState(false)
+  const menuRef = useCloseOnOutside<HTMLDivElement>(open || varOpen, () => { setOpen(false); setVarOpen(false) })
+  const applyVariable = () => { setOpen(false); setVarOpen(true) }
   return (
     <div ref={menuRef} style={{ position: 'relative', width: 88, height: 24 }}>
-      <div style={{ width: 88, height: 24, borderRadius: 5, background: FIELD, display: 'grid', gridTemplateColumns: '24px 1fr 24px', alignItems: 'center', overflow: 'hidden', font: `450 11px/16px ${FONT}`, color: INK }}>
+      <div style={{ width: 88, height: 24, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: '24px 1fr 24px', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
         <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)' }}><UiIcon name="gapVertical" /></span>
         <input aria-label="Gap value" role="spinbutton" value={value} onChange={e => onChange(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
           style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: INK, font: `450 11px/16px ${FONT}` }} />
-        <button type="button" aria-label={`Gap options: ${value}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(v => !v)}
+        <button type="button" aria-label={`Gap options: ${value}`} aria-haspopup="menu" aria-expanded={open} onClick={() => { setVarOpen(false); setOpen(v => !v) }}
           style={{ appearance: 'none', border: 0, padding: 0, width: 24, height: 24, display: 'grid', placeItems: 'center', background: 'transparent', color: FAINT, cursor: 'pointer' }}><UiIcon name="caret24" /></button>
       </div>
       {open && (
@@ -431,10 +436,11 @@ function GapDropdownField({ value, onChange }: { value: string; onChange: (value
             <FigmaMenuRow checked={value === '10'} onClick={() => { onChange('10'); setOpen(false) }}>10</FigmaMenuRow>
             <FigmaMenuRow checked={value === 'Auto'} onClick={() => { onChange('Auto'); setOpen(false) }}>Auto</FigmaMenuRow>
             <FigmaMenuSeparator />
-            <FigmaMenuRow onClick={() => setOpen(false)}>Apply variable...</FigmaMenuRow>
+            <FigmaMenuRow onClick={applyVariable}>Apply variable...</FigmaMenuRow>
           </ul>
         </div>
       )}
+      {varOpen && <FigmaVariablePicker fieldLabel="Gap value" anchorRef={menuRef} onPick={onChange} onClose={() => setVarOpen(false)} />}
     </div>
   )
 }
@@ -630,14 +636,25 @@ function VariablesLibrary() {
 }
 
 /* Paint/effect rows are cloned from the live Figma inspector DOM. */
-function FigmaPaintRow({ hex, op }: { hex: string; op: number }) {
+function FigmaPaintRow({ hex, op, label = 'Paint' }: { hex: string; op: number; label?: string }) {
+  const [hexValue, setHexValue] = useState(hex)
+  const [opacityValue, setOpacityValue] = useState(String(op))
+  const [varOpen, setVarOpen] = useState(false)
+  const fieldRef = useCloseOnOutside<HTMLDivElement>(varOpen, () => setVarOpen(false))
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '156px 8px 24px 4px 24px', alignItems: 'center', height: 32, padding: '0 8px 0 16px' }}>
-      <div style={{ height: 24, borderRadius: 5, background: FIELD, display: 'grid', gridTemplateColumns: '24px 1fr 38px 14px', alignItems: 'center', overflow: 'hidden', font: `450 11px/16px ${FONT}`, color: INK }}>
-        <button type="button" aria-label={`Solid color hex: ${hex}`} style={{ appearance: 'none', border: 0, width: 14, height: 14, justifySelf: 'center', borderRadius: 2, background: `#${hex}`, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.15)', padding: 0, cursor: 'pointer' }} />
-        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{hex}</span>
-        <span style={{ textAlign: 'right', paddingRight: 7 }}>{op}</span>
+      <div ref={fieldRef} style={{ position: 'relative', height: 24, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: '24px 1fr 28px 14px 16px', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
+        <button type="button" aria-label={`Solid color hex: ${hexValue}`} style={{ appearance: 'none', border: 0, width: 14, height: 14, justifySelf: 'center', borderRadius: 2, background: `#${hexValue}`, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.15)', padding: 0, cursor: 'pointer' }} />
+        <input aria-label={`${label} hex`} value={hexValue} onChange={e => setHexValue(e.currentTarget.value.replace(/^#/, '').toUpperCase())}
+          style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: INK, font: `450 11px/16px ${FONT}` }} />
+        <input aria-label={`${label} opacity`} role="spinbutton" value={opacityValue} onChange={e => setOpacityValue(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
+          style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: '0 3px 0 0', background: 'transparent', color: INK, font: `450 11px/16px ${FONT}`, textAlign: 'right' }} />
         <span style={{ color: 'rgba(0,0,0,0.5)' }}>%</span>
+        <button type="button" title="Apply variable" aria-label={`Apply variable to ${label} opacity`} aria-haspopup="menu" aria-expanded={varOpen} onClick={event => { event.stopPropagation(); setVarOpen(v => !v) }}
+          style={{ appearance: 'none', border: 0, padding: 0, width: 16, height: 24, display: 'grid', placeItems: 'center', background: 'transparent', cursor: 'pointer', color: FAINT }}>
+          <UiIcon name="variable" size={12} />
+        </button>
+        {varOpen && <FigmaVariablePicker fieldLabel={`${label} opacity`} anchorRef={fieldRef} onPick={setOpacityValue} onClose={() => setVarOpen(false)} />}
       </div>
       <span />
       <UiIB name="visibility" title="Toggle visibility" />
@@ -647,6 +664,7 @@ function FigmaPaintRow({ hex, op }: { hex: string; op: number }) {
   )
 }
 function StrokeDetailRow({ position, weight }: { position: string; weight: number }) {
+  const [weightValue, setWeightValue] = useState(String(weight))
   return (
     <div style={{ position: 'relative', height: 50, width: '100%' }}>
       <span style={{ position: 'absolute', left: 16, top: 3.5, width: 84, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Position</span>
@@ -657,10 +675,7 @@ function StrokeDetailRow({ position, weight }: { position: string; weight: numbe
           <span style={{ color: FAINT, display: 'grid', placeItems: 'center' }}><UiIcon name="caret24" /></span>
         </button>
         <span />
-        <div aria-label="Stroke weight" style={{ width: 72, height: 24, borderRadius: 5, background: FIELD, display: 'grid', gridTemplateColumns: '24px 1fr', alignItems: 'center', font: `450 11px/16px ${FONT}`, color: INK }}>
-          <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)' }}><UiIcon name="strokeWeight" /></span>
-          <span>{weight}</span>
-        </div>
+        <AutoValueField icon="strokeWeight" value={weightValue} caret={false} ariaLabel="Stroke weight" onChange={setWeightValue} width={72} />
         <span />
         <UiIB name="autoLayoutSettings" title="Advanced stroke settings" />
         <span />
@@ -1147,12 +1162,12 @@ export default function ReactFigmaPage() {
           </Sec>
 
           <Sec title="Fill" actionWidth={52} action={<><UiIB name="styleDots" title="Fill, Apply styles and variables" /><UiIB name="plus" title="Add fill" /></>} bodyGap={0} bodyPadding="0">
-            {MOCK.fills.map((f, i) => <FigmaPaintRow key={i} hex={f.hex} op={f.op} />)}
+            {MOCK.fills.map((f, i) => <FigmaPaintRow key={i} hex={f.hex} op={f.op} label="Fill" />)}
           </Sec>
           <Sec title="Stroke" actionWidth={52} action={<><UiIB name="styleDots" title="Stroke, Apply styles and variables" /><UiIB name="plus" title="Add stroke fill" /></>} bodyGap={0} bodyPadding="0">
             {MOCK.strokes.map((s, i) => (
               <div key={i}>
-                <FigmaPaintRow hex={s.hex} op={s.op} />
+                <FigmaPaintRow hex={s.hex} op={s.op} label="Stroke" />
                 <StrokeDetailRow position={s.position} weight={s.weight} />
               </div>
             ))}
