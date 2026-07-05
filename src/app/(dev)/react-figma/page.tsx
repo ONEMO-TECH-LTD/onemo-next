@@ -1851,10 +1851,10 @@ export default function ReactFigmaPage() {
       : field === 'radius' ? [['border-radius', withUnit]]
       : field === 'width' ? [['width', withUnit]]
       : field === 'height' ? [['height', withUnit]]
-      : field === 'x' ? (positioned ? [['left', withUnit]] : [])
-      : field === 'y' ? (positioned ? [['top', withUnit]] : [])
-      : field === 'insetT' ? (positioned ? [['top', withUnit]] : [])
-      : field === 'insetL' ? (positioned ? [['left', withUnit]] : [])
+      : field === 'x' ? (positioned ? [['left', withUnit]] : [['position', 'relative'], ['left', withUnit]])
+      : field === 'y' ? (positioned ? [['top', withUnit]] : [['position', 'relative'], ['top', withUnit]])
+      : field === 'insetT' ? (positioned ? [['top', withUnit]] : [['position', 'relative'], ['top', withUnit]])
+      : field === 'insetL' ? (positioned ? [['left', withUnit]] : [['position', 'relative'], ['left', withUnit]])
       : field === 'zIndex' ? [['z-index', n]]
       : field === 'strokeWeight' ? [['border-width', withUnit]]
       : field === 'strokeTop' ? [['border-top-width', withUnit]]
@@ -1915,7 +1915,6 @@ export default function ReactFigmaPage() {
       : []
     // Stroke position "Center" has no clean CSS analog (border is inside, outline is outside) — no-op, honest.
     if (field === 'strokePosition' && n !== 'Inside' && n !== 'Outside') { console.warn('[engine] stroke position', n, '— no clean CSS analog (border=Inside, outline=Outside); no-op'); return }
-    if ((field === 'x' || field === 'y') && !positioned) { console.warn('[engine] X/Y on a static-position element has no CSS analog — no-op'); return }
     for (const [prop, value] of decls) ov.current!.set(id, prop, value, cs.getPropertyValue(prop))
     setOvVersion((v) => v + 1)
     setSelRect(rectOf(el))
