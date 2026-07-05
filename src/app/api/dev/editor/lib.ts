@@ -598,6 +598,16 @@ async function duplicateJsx(op: Extract<WriteOp, { kind: 'duplicate-jsx' }>): Pr
 /** Insert a component instance (E4-G4 Assets): splice `<Name />` into the selected container +
  *  add its import if absent. Same guards as insert-jsx-child + parse-check on the output. */
 async function insertComponent(op: Extract<WriteOp, { kind: 'insert-component' }>): Promise<{ ok: true; file: string; newValueText: string }> {
+  // F1 (s58-lead HIGH): name/importPath are spliced RAW into a JSX tag + import statement, and
+  // assertValidTsx validates SYNTAX not intent — a comment-terminated payload (e.g. importPath
+  // `x'; export const X=1 //`) is syntactically valid and injects executable code. Validate both
+  // as strict identifiers/paths (no quotes/semicolons/whitespace) → refuse 422 before any splice.
+  if (!/^[A-Z][A-Za-z0-9]*$/.test(op.name)) {
+    throw Object.assign(new Error('invalid component name — must be a PascalCase identifier'), { status: 422 })
+  }
+  if (!/^[@\w./()-]+$/.test(op.importPath)) {
+    throw Object.assign(new Error('invalid import path — only @ word / . ( ) - characters allowed'), { status: 422 })
+  }
   const abs = jailComponentWrite(op.file)
   const buf = await fs.readFile(abs)
   const source = buf.toString('utf8')
