@@ -439,7 +439,7 @@ function TokenPill({ token }: { token: string }) {
     </span>
   )
 }
-function AutoValueField({ icon, label, value, mode, caret = true, ariaLabel, onChange, token, width = 88 }: { icon?: keyof typeof UI_ICON; label?: string; value: string; mode?: string; caret?: boolean; ariaLabel?: string; onChange?: (value: string) => void; token?: string; width?: number }) {
+function AutoValueField({ icon, label, value, mode, caret = true, ariaLabel, onChange, token, width = 88 }: { icon?: keyof typeof UI_ICON; label?: string; value: string; mode?: string; caret?: boolean; ariaLabel?: string; onChange?: (value: string) => void; token?: string; width?: number | string }) {
   const [varOpen, setVarOpen] = useState(false)
   const fieldRef = useCloseOnOutside<HTMLDivElement>(varOpen, () => setVarOpen(false))
   const fieldLabel = ariaLabel ?? label ?? 'value'
@@ -1312,9 +1312,9 @@ function FigmaPaintRow({ hex, op, label = 'Paint', onRemove, origin, onHexEdit, 
    value and write — so T/R/B/L (or ◜◝◞◟) edit independently, matching Figma. */
 function SideInputs({ sides, style }: { sides: { label: string; value: string; ariaLabel: string; onChange: (v: string) => void }[]; style?: React.CSSProperties }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8, padding: '0 8px 8px 16px', ...style }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '0 8px 8px 16px', ...style }}>
       {sides.map((s) => (
-        <AutoValueField key={s.ariaLabel} label={s.label} value={s.value} ariaLabel={s.ariaLabel} width={44} onChange={s.onChange} />
+        <AutoValueField key={s.ariaLabel} label={s.label} value={s.value} ariaLabel={s.ariaLabel} width="100%" onChange={s.onChange} />
       ))}
     </div>
   )
@@ -1327,7 +1327,7 @@ function StrokeDetailRow({ position, weight, sides, onWeight, onPosition, onSide
   const positionRef = useCloseOnOutside<HTMLDivElement>(positionOpen, () => setPositionOpen(false))
   const positionOptions = ['Center', 'Inside', 'Outside']
   return (
-    <div style={{ position: 'relative', height: individual ? 84 : 50, width: '100%' }}>
+    <div style={{ position: 'relative', height: individual ? 112 : 50, width: '100%' }}>
       <span style={{ position: 'absolute', left: 16, top: 3.5, width: 84, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Position</span>
       <span style={{ position: 'absolute', left: 100, top: 3.5, width: 80, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Weight</span>
       <div style={{ position: 'absolute', left: 16, right: 8, top: 22, display: 'grid', gridTemplateColumns: '76px 8px 72px 8px 24px 4px 24px', alignItems: 'center' }}>
@@ -1807,10 +1807,6 @@ export default function ReactFigmaPage() {
   const [yValue, setYValue] = useState('122')
   const [rotationValue, setRotationValue] = useState('0°')
   const [cssPosition, setCssPosition] = useState(2)
-  const [insetTop, setInsetTop] = useState('auto')
-  const [insetRight, setInsetRight] = useState('auto')
-  const [insetBottom, setInsetBottom] = useState('auto')
-  const [insetLeft, setInsetLeft] = useState('auto')
   const [zIndexValue, setZIndexValue] = useState('1')
   const [autoFlow, setAutoFlow] = useState<AutoFlow>('horizontal')
   const [autoWrap, setAutoWrap] = useState(false)
@@ -1910,8 +1906,6 @@ export default function ReactFigmaPage() {
     const frameRoot = doc.querySelector('body [data-src]')
     const fr = frameRoot ? frameRoot.getBoundingClientRect() : { left: 0, top: 0 }
     setXValue(px(String(r.left - fr.left))); setYValue(px(String(r.top - fr.top)))
-    const inset = (p: string) => c[p] === 'auto' ? 'auto' : px(c[p])
-    setInsetTop(inset('top')); setInsetRight(inset('right')); setInsetBottom(inset('bottom')); setInsetLeft(inset('left'))
     setZIndexValue(c['z-index'] === 'auto' ? '0' : c['z-index'])
     setCssPosition(({ static: 0, relative: 1, absolute: 2, fixed: 3, sticky: 4 } as Record<string, number>)[c['position']] ?? 0)
     // Auto layout
@@ -1984,7 +1978,7 @@ export default function ReactFigmaPage() {
       })
     } else setTypo(null)
     console.log('[engine] select', payload, rep)
-  }, [setXValue, setYValue, setInsetTop, setInsetRight, setInsetBottom, setInsetLeft, setZIndexValue, setCssPosition, setAutoFlow, setAutoWrap, setWidthValue, setHeightValue, setGapValue, setPaddingXValue, setPaddingYValue, setClipContent, setOpacityValue, setCornerRadiusValue, setBlendMode])
+  }, [setXValue, setYValue, setZIndexValue, setCssPosition, setAutoFlow, setAutoWrap, setWidthValue, setHeightValue, setGapValue, setPaddingXValue, setPaddingYValue, setClipContent, setOpacityValue, setCornerRadiusValue, setBlendMode])
 
   /* M3: panel edit → instant canvas override (staging only — zero disk writes). */
   const applyOverride = useCallback((field: string, raw: string) => {
@@ -2011,10 +2005,6 @@ export default function ReactFigmaPage() {
       : field === 'height' ? [['height', withUnit]]
       : field === 'x' ? (positioned ? [['left', withUnit]] : [['position', 'relative'], ['left', withUnit]])
       : field === 'y' ? (positioned ? [['top', withUnit]] : [['position', 'relative'], ['top', withUnit]])
-      : field === 'insetT' ? (positioned ? [['top', withUnit]] : [['position', 'relative'], ['top', withUnit]])
-      : field === 'insetR' ? (positioned ? [['right', withUnit]] : [['position', 'relative'], ['right', withUnit]])
-      : field === 'insetB' ? (positioned ? [['bottom', withUnit]] : [['position', 'relative'], ['bottom', withUnit]])
-      : field === 'insetL' ? (positioned ? [['left', withUnit]] : [['position', 'relative'], ['left', withUnit]])
       : field === 'zIndex' ? [['z-index', n]]
       : field === 'strokeWeight' ? [['border-width', withUnit]]
       : field === 'strokeTop' ? [['border-top-width', withUnit]]
@@ -2861,15 +2851,19 @@ export default function ReactFigmaPage() {
           {(() => {
             const dirty = ovVersion >= 0 ? ov.current!.dirty().filter((o) => !o.stale) : []
             const n = dirty.length
+            const publishDisabled = committing || n === 0
+            const publishBg = publishDisabled ? '#D9D9D9' : SEL
+            const publishFg = publishDisabled ? 'rgba(0,0,0,0.3)' : '#fff'
+            const publishSeparator = publishDisabled ? '#E6E6E6' : 'rgba(255,255,255,0.3)'
             return (
               <div ref={pubMenuRef} style={{ flex: 1, minWidth: 0, position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <button type="button" disabled={committing || n === 0} onClick={() => void commitOverrides()} title="Publish — save all changes to code"
-                  style={{ appearance: 'none', border: 0, background: SEL, color: '#fff', height: 32, flex: 1, minWidth: 0, borderRadius: '5px 0 0 5px', padding: '0 12px', cursor: committing || n === 0 ? 'default' : 'pointer', font: `450 11px/16px ${FONT}`, letterSpacing: '0.055px', opacity: committing || n === 0 ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                <button type="button" disabled={publishDisabled} onClick={() => void commitOverrides()} title="Publish — save all changes to code"
+                  style={{ appearance: 'none', border: publishDisabled ? `1px solid #E6E6E6` : 0, borderRight: 0, boxSizing: 'border-box', background: publishBg, color: publishFg, height: 32, flex: 1, minWidth: 0, borderRadius: '5px 0 0 5px', padding: '0 12px', cursor: publishDisabled ? 'default' : 'pointer', font: `450 11px/16px ${FONT}`, letterSpacing: '0.055px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                   {committing ? 'Publishing…' : 'Publish'}
                   {n > 0 && !committing && <span style={{ minWidth: 16, height: 16, borderRadius: 8, background: 'rgba(255,255,255,0.28)', display: 'grid', placeItems: 'center', padding: '0 4px', font: `550 10px/16px ${FONT}` }}>{n}</span>}
                 </button>
-                <button type="button" title="Show changes" aria-haspopup="menu" aria-expanded={pubMenuOpen} onClick={() => setPubMenuOpen(v => !v)}
-                  style={{ appearance: 'none', border: 0, borderLeft: '1px solid rgba(255,255,255,0.3)', background: SEL, color: '#fff', height: 32, width: 24, borderRadius: '0 5px 5px 0', display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
+                <button type="button" disabled={publishDisabled} title="Show changes" aria-haspopup="menu" aria-expanded={pubMenuOpen} onClick={() => setPubMenuOpen(v => !v)}
+                  style={{ appearance: 'none', border: publishDisabled ? `1px solid #E6E6E6` : 0, borderLeft: `1px solid ${publishSeparator}`, boxSizing: 'border-box', background: publishBg, color: publishFg, height: 32, width: 24, borderRadius: '0 5px 5px 0', display: 'grid', placeItems: 'center', cursor: publishDisabled ? 'default' : 'pointer' }}>
                   <UiIcon name="caret16" size={16} />
                 </button>
                 {pubMenuOpen && (
@@ -2975,12 +2969,6 @@ export default function ReactFigmaPage() {
             </PositionRow>
             <InspectorRow label="CSS position" columns="1fr">
               <TextSegGroup items={['Auto', 'Rel', 'Abs', 'Fix', 'Sticky']} active={cssPosition} onSelect={(i) => { setCssPosition(i); applyOverride('cssPosition', ['static', 'relative', 'absolute', 'fixed', 'sticky'][i]) }} width="100%" ariaLabel="CSS position" />
-            </InspectorRow>
-            <InspectorRow label="Inset" columns="1fr 1fr 1fr 1fr">
-              <InspectorField label="T" value={insetTop} ariaLabel="Top inset" onChange={(v) => { setInsetTop(v); applyOverride('insetT', v) }} />
-              <InspectorField label="R" value={insetRight} ariaLabel="Right inset" onChange={(v) => { setInsetRight(v); applyOverride('insetR', v) }} />
-              <InspectorField label="B" value={insetBottom} ariaLabel="Bottom inset" onChange={(v) => { setInsetBottom(v); applyOverride('insetB', v) }} />
-              <InspectorField label="L" value={insetLeft} ariaLabel="Left inset" onChange={(v) => { setInsetLeft(v); applyOverride('insetL', v) }} />
             </InspectorRow>
             <CompactInspectorRow label="z-index">
               <InspectorField label="Z" value={zIndexValue} ariaLabel="z-index" onChange={(v) => { setZIndexValue(v); applyOverride('zIndex', v) }} />
