@@ -681,11 +681,11 @@ function AlignGrid({ sel = 1, onSelect }: { sel?: number; onSelect?: (index: num
    mock tree removed in the E2.1 deslop pass (no fake values — Dan's law). */
 type LayerIcon = 'frame' | 'image' | 'auto' | 'section' | 'toolbar' | 'component'
 type Node = { name: string; icon: LayerIcon; depth: number; kids?: boolean; open?: boolean; locked?: boolean; visible?: boolean; sel?: boolean; comp?: boolean }
-function LayerRow({ n, on, onToggle }: { n: Node; on?: () => void; onToggle?: () => void }) {
+function LayerRow({ n, on, onToggle, rowId }: { n: Node; on?: () => void; onToggle?: () => void; rowId?: string }) {
   const [h, setH] = useState(false)
   const iconName: keyof typeof UI_ICON = n.icon === 'image' ? 'layerImage' : n.icon === 'auto' ? 'layerAuto' : n.icon === 'section' ? 'layerSection' : n.icon === 'toolbar' ? 'layerToolbar' : n.icon === 'component' ? 'layerComponent' : 'layerFrame'
   return (
-    <div onClick={on} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
+    <div data-layer-row={rowId} onClick={on} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
       style={{ display: 'grid', gridTemplateColumns: `${16 + n.depth * 24}px 16px minmax(0,1fr) 40px`, alignItems: 'center', height: 32, paddingRight: 8, background: n.sel ? '#dff3ff' : h ? '#f4f5f6' : 'transparent', cursor: 'pointer' }}>
       <span onClick={onToggle ? (e) => { e.stopPropagation(); onToggle() } : undefined} style={{ width: 16, height: 16, marginLeft: n.depth * 24, display: 'grid', placeItems: 'center', color: INK, cursor: onToggle ? 'pointer' : undefined }}>{n.kids && <UiIcon name={n.open ? 'caret16' : 'caretRight16'} size={16} />}</span>
       <span style={{ width: 16, height: 16, display: 'grid', placeItems: 'center', color: n.comp ? TOKEN : 'rgba(0,0,0,0.65)' }}><UiIcon name={iconName} size={16} /></span>
@@ -2306,6 +2306,15 @@ export default function ReactFigmaPage() {
         clientX: fr.left + e.clientX * z, clientY: fr.top + e.clientY * z,
       }))
     }, { passive: false, capture: true })
+    // Keyboard zoom must also work while focus sits INSIDE the iframe — forward zoom keys up.
+    doc.addEventListener('keydown', (e) => {
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+      if (['+', '=', '-', '_', '0'].includes(e.key)) {
+        e.preventDefault()
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: e.key }))
+      }
+    }, true)
     doc.addEventListener('click', (e) => {
       const el = findTagged(e.target)
       if (!el) return
@@ -2396,6 +2405,46 @@ export default function ReactFigmaPage() {
   }, [])
   // E4 vibe #4: the device-frame size follows the frame preset (was hardcoded 402×871)
   const frameDims = (() => { const m = framePreset.size.match(/(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)/); return m ? { w: Math.round(+m[1]), h: Math.round(+m[2]) } : { w: 402, h: 871 } })()
+  const [zoomMenuOpen, setZoomMenuOpen] = useState(false)
+  const zoomMenuRef = useCloseOnOutside<HTMLDivElement>(zoomMenuOpen, () => setZoomMenuOpen(false))
+  // Zoom to fit — fit the frame into the visible canvas, centered (Figma ⇧1 behavior).
+  const zoomToFit = useCallback(() => {
+    const r = canvasRef.current?.getBoundingClientRect()
+    if (!r) return
+    const z = Math.min(4, Math.max(0.05, Math.min((r.width - 120) / frameDims.w, (r.height - 140) / frameDims.h)))
+    setView({ z, x: (r.width - frameDims.w * z) / 2, y: (r.height - frameDims.h * z) / 2 })
+  }, [frameDims.w, frameDims.h])
+  // Dan live-QA ("no reaction to pressing + or -"): Figma zooms from the KEYBOARD — +/= in, - out,
+  // 0 = 100% (with or without ⌘/Ctrl). Skip when typing in a field.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+      if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomStep(1.25) }
+      else if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomStep(1 / 1.25) }
+      else if (e.key === '0') { e.preventDefault(); setView(v => { const el = canvasRef.current; const r = el?.getBoundingClientRect(); const cx = (r?.width ?? 800) / 2, cy = (r?.height ?? 600) / 2; const k = 1 / v.z; return { z: 1, x: cx - (cx - v.x) * k, y: cy - (cy - v.y) * k } }) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [zoomStep])
+  // Dan live-QA: selecting on canvas must FOCUS the Layers panel on that layer (highlight existed,
+  // but off-screen rows never scrolled into view).
+  useEffect(() => {
+    if (!layerSelId) return
+    document.querySelector(`[data-layer-row="${layerSelId}"]`)?.scrollIntoView({ block: 'nearest' })
+  }, [layerSelId])
+  // Dan live-QA: after a frame-preset resize the selection outline kept the OLD rect. Re-measure the
+  // selected element once layout settles at the new frame size.
+  useEffect(() => {
+    const id = selIdRef.current
+    if (!id) return
+    const t = setTimeout(() => {
+      const el = iframeRef.current?.contentDocument?.querySelector(`[data-eng-id="${id}"]`) as HTMLElement | null
+      if (el) setSelRect(rectOf(el))
+      setHoverRect(null)
+    }, 180)
+    return () => clearTimeout(t)
+  }, [frameDims.w, frameDims.h])
   // E4 vibe #3: click the frame label/border → select the frame's root element in the canvas
   const selectFrameRoot = useCallback(() => {
     const doc = iframeRef.current?.contentDocument, win = iframeRef.current?.contentWindow
@@ -2605,7 +2654,7 @@ export default function ReactFigmaPage() {
                     while (p) { if (collapsed.has(p)) return false; p = layers.find((x) => x.id === p)?.parentId }
                     return true
                   }).map((ln) => (
-                    <LayerRow key={ln.id}
+                    <LayerRow key={ln.id} rowId={ln.id}
                       n={{ name: ln.name, icon: ln.tag === 'img' ? 'image' : ln.tag === 'section' ? 'section' : ln.tag === 'button' ? 'component' : 'auto', depth: Math.min(ln.depth, 7), kids: ln.kids, open: !collapsed.has(ln.id), sel: ln.id === layerSelId, comp: ln.tag === 'button' }}
                       on={() => { const el = iframeRef.current?.contentDocument?.querySelector(`[data-eng-id="${ln.id}"]`); if (el) applySelection(el as HTMLElement) }}
                       onToggle={ln.kids ? () => setCollapsed((prev) => { const next = new Set(prev); if (next.has(ln.id)) next.delete(ln.id); else next.add(ln.id); return next }) : undefined} />
@@ -2666,7 +2715,7 @@ export default function ReactFigmaPage() {
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle, rgba(0,0,0,.09) 1px, transparent 1px)', backgroundSize: `${24 * view.z}px ${24 * view.z}px`, backgroundPosition: `${view.x}px ${view.y}px` }} />
         <div style={{ position: 'absolute', left: 0, top: 0, transform: `translate(${view.x}px,${view.y}px) scale(${view.z})`, transformOrigin: '0 0' }}>
           <button type="button" onClick={selectFrameRoot} title="Select frame" style={{ appearance: 'none', border: 0, background: 'transparent', font: `550 10px/1 ${FONT}`, color: SEL, marginBottom: 8, marginLeft: 2, cursor: 'pointer', padding: 0 }}>{canvas.name} · {frameDims.w} × {frameDims.h}</button>
-          <div data-screen-host style={{ position: 'relative', width: frameDims.w, height: frameDims.h, background: '#fff', borderRadius: 4, boxShadow: '0 0 0 1px rgba(0,0,0,.06), 0 12px 40px -8px rgba(0,0,0,.25)' }}>
+          <div data-screen-host onClick={selectFrameRoot} style={{ position: 'relative', width: frameDims.w, height: frameDims.h, background: '#fff', borderRadius: 4, boxShadow: '0 0 0 1px rgba(0,0,0,.06), 0 12px 40px -8px rgba(0,0,0,.25)' }}>
             <iframe key={canvas.route} ref={iframeRef} src={canvas.route} onLoad={wireCanvas} title="Canvas — real build"
               style={{ width: frameDims.w, height: frameDims.h, border: 0, display: 'block', borderRadius: 4 }} />
             {hoverRect && (
@@ -2690,13 +2739,14 @@ export default function ReactFigmaPage() {
       <aside style={{ width: rightW, flex: 'none', position: 'relative', borderLeft: `1px solid ${LINE}`, display: uiMinimized ? 'none' : 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div onPointerDown={startResize('r')} style={handleStyle('left')} />
         <div style={{ height: 48, display: 'flex', alignItems: 'center', padding: '0 8px 0 11px', flex: 'none' }}>
-          {/* E2.5 (Dan-approved): Save to code · N — neutral toolbar button, shows when dirty; commits all overrides */}
-          {ovVersion >= 0 && ov.current!.dirty().filter((o) => !o.stale).length > 0 && (
-            <button type="button" disabled={committing} onClick={() => void commitOverrides()}
-              style={{ appearance: 'none', border: `1px solid ${LINE}`, background: '#fff', color: committing ? MUTE : INK, height: 28, borderRadius: 6, padding: '0 10px', cursor: committing ? 'default' : 'pointer', font: `500 11px/16px ${FONT}`, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <UiIcon name="devCode" size={14} />{committing ? 'Saving…' : `Save to code · ${ov.current!.dirty().filter((o) => !o.stale).length}`}
+          {/* E2.5 + Dan live-QA ("why no save to code"): always visible — disabled at 0 instead of
+              hidden, so the function is discoverable when the tree is clean. */}
+          {(() => { const dirtyN = ovVersion >= 0 ? ov.current!.dirty().filter((o) => !o.stale).length : 0; return (
+            <button type="button" disabled={committing || dirtyN === 0} onClick={() => void commitOverrides()}
+              style={{ appearance: 'none', border: `1px solid ${LINE}`, background: '#fff', color: committing || dirtyN === 0 ? MUTE : INK, height: 28, borderRadius: 6, padding: '0 10px', cursor: committing || dirtyN === 0 ? 'default' : 'pointer', font: `500 11px/16px ${FONT}`, display: 'flex', alignItems: 'center', gap: 6, opacity: dirtyN === 0 ? 0.6 : 1 }}>
+              <UiIcon name="devCode" size={14} />{committing ? 'Saving…' : `Save to code · ${dirtyN}`}
             </button>
-          )}
+          ) })()}
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 1, height: 32 }}>
             {/* #7/#8: dead Present / Prototype-preview chrome removed (no analog in this editor);
                 Publish was a dead button — now commits all staged overrides to source. */}
@@ -2706,7 +2756,27 @@ export default function ReactFigmaPage() {
         </div>
         <div style={{ height: 33, borderBottom: `1px solid ${LINE}`, display: 'flex', alignItems: 'flex-start', padding: '0 8px', flex: 'none' }}>
           {/* Design/Prototype tabs removed (no prototype mode in this editor — Dan vibe). */}
-          <button type="button" title="Zoom — click to reset to 100%" onClick={() => zoomStep(1 / view.z)} style={{ appearance: 'none', border: 0, background: '#fff', borderRadius: 5, marginLeft: 'auto', minWidth: 54.5, height: 24, padding: '4px 4px 4px 12px', color: '#000', cursor: 'pointer', font: `400 11px/16px ${FONT}`, display: 'flex', alignItems: 'center' }}><span style={{ flex: 1 }}>{Math.round(view.z * 100)}%</span><UiIcon name="caret16" size={16} /></button>
+          {/* Dan live-QA: side-panel zoom is a Figma-style dropdown menu, not a bare reset button. */}
+          <div ref={zoomMenuRef} style={{ position: 'relative', marginLeft: 'auto' }}>
+            <button type="button" title="Zoom options" aria-haspopup="menu" aria-expanded={zoomMenuOpen} onClick={() => setZoomMenuOpen(v => !v)} style={{ appearance: 'none', border: 0, background: '#fff', borderRadius: 5, minWidth: 54.5, height: 24, padding: '4px 4px 4px 12px', color: '#000', cursor: 'pointer', font: `400 11px/16px ${FONT}`, display: 'flex', alignItems: 'center' }}><span style={{ flex: 1 }}>{Math.round(view.z * 100)}%</span><UiIcon name="caret16" size={16} /></button>
+            {zoomMenuOpen && (
+              <div data-figma-floating-root="true" role="menu" style={{ position: 'absolute', right: 0, top: 28, zIndex: 130, width: 168, padding: '8px 0', borderRadius: 13, background: '#1e1e1e', color: '#fff', boxShadow: 'rgba(0,0,0,0.15) 0px 2px 5px 0px, rgba(0,0,0,0.12) 0px 10px 16px 0px, rgba(0,0,0,0.12) 0px 0px 0.5px 0px' }}>
+                {([
+                  ['Zoom in', '+', () => zoomStep(1.25)],
+                  ['Zoom out', '−', () => zoomStep(1 / 1.25)],
+                  ['Zoom to fit', '', zoomToFit],
+                  ['Zoom to 50%', '', () => zoomStep(0.5 / view.z)],
+                  ['Zoom to 100%', '0', () => zoomStep(1 / view.z)],
+                  ['Zoom to 200%', '', () => zoomStep(2 / view.z)],
+                ] as [string, string, () => void][]).map(([label, key, run]) => (
+                  <button key={label} type="button" role="menuitem" onClick={() => { run(); setZoomMenuOpen(false) }}
+                    style={{ appearance: 'none', border: 0, width: '100%', height: 24, background: 'transparent', color: '#fff', display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', padding: '0 16px', cursor: 'pointer', font: `400 11px/24px ${FONT}`, textAlign: 'left' }}>
+                    <span>{label}</span><span style={{ color: 'rgba(255,255,255,0.45)' }}>{key}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {/* M3: dirty ledger — unsaved canvas overrides (staging; E1.4 commits from here).
