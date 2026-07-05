@@ -2114,7 +2114,7 @@ export default function ReactFigmaPage() {
     const parentIsFlex = pcs ? pcs.display.includes('flex') : false
     const parentIsRow = pcs ? !pcs.flexDirection.startsWith('column') : true
     const decls: [string, string][] =
-      field === 'gap' ? [['column-gap', withUnit], ['row-gap', withUnit]]
+      field === 'gap' ? (n === 'Auto' ? [['column-gap', 'normal'], ['row-gap', 'normal']] : [['column-gap', withUnit], ['row-gap', withUnit]])
       : field === 'paddingX' ? [['padding-left', withUnit], ['padding-right', withUnit]]
       : field === 'paddingY' ? [['padding-top', withUnit], ['padding-bottom', withUnit]]
       : field === 'opacity' ? [['opacity', String((parseFloat(n) || 0) / 100)]]
@@ -3071,12 +3071,12 @@ export default function ReactFigmaPage() {
             return (
               <div ref={pubMenuRef} style={{ flex: 1, minWidth: 0, position: 'relative', display: 'flex', alignItems: 'center' }}>
                 <button type="button" disabled={publishDisabled} onClick={() => void commitOverrides()} title="Publish — save all changes to code"
-                  style={{ appearance: 'none', border: publishDisabled ? `1px solid #E6E6E6` : 0, borderRight: 0, boxSizing: 'border-box', background: publishBg, color: publishFg, height: 32, flex: 1, minWidth: 0, borderRadius: '5px 0 0 5px', padding: '0 12px', cursor: publishDisabled ? 'default' : 'pointer', font: `450 11px/16px ${FONT}`, letterSpacing: '0.055px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  style={{ appearance: 'none', borderStyle: 'solid', borderColor: '#E6E6E6', borderWidth: publishDisabled ? '1px 0 1px 1px' : 0, boxSizing: 'border-box', background: publishBg, color: publishFg, height: 32, flex: 1, minWidth: 0, borderRadius: '5px 0 0 5px', padding: '0 12px', cursor: publishDisabled ? 'default' : 'pointer', font: `450 11px/16px ${FONT}`, letterSpacing: '0.055px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                   {committing ? 'Publishing…' : 'Publish'}
                   {n > 0 && !committing && <span style={{ minWidth: 16, height: 16, borderRadius: 8, background: 'rgba(255,255,255,0.28)', display: 'grid', placeItems: 'center', padding: '0 4px', font: `550 10px/16px ${FONT}` }}>{n}</span>}
                 </button>
                 <button type="button" disabled={publishDisabled} title="Show changes" aria-haspopup="menu" aria-expanded={pubMenuOpen} onClick={() => setPubMenuOpen(v => !v)}
-                  style={{ appearance: 'none', border: publishDisabled ? `1px solid #E6E6E6` : 0, borderLeft: `1px solid ${publishSeparator}`, boxSizing: 'border-box', background: publishBg, color: publishFg, height: 32, width: 24, borderRadius: '0 5px 5px 0', display: 'grid', placeItems: 'center', cursor: publishDisabled ? 'default' : 'pointer' }}>
+                  style={{ appearance: 'none', borderStyle: 'solid', borderColor: publishDisabled ? `#E6E6E6 #E6E6E6 #E6E6E6 ${publishSeparator}` : publishSeparator, borderWidth: publishDisabled ? '1px 1px 1px 1px' : '0 0 0 1px', boxSizing: 'border-box', background: publishBg, color: publishFg, height: 32, width: 24, borderRadius: '0 5px 5px 0', display: 'grid', placeItems: 'center', cursor: publishDisabled ? 'default' : 'pointer' }}>
                   <UiIcon name="caret16" size={16} />
                 </button>
                 {pubMenuOpen && (
