@@ -696,6 +696,21 @@ function VariablesLibrary() {
   const tokens = useDsTokens()
   const [colSel, setColSel] = useState(0)
   const [q, setQ] = useState('')
+  // #32: resizable Name / CSS-variable columns (Light/Dark absorb the remainder). Handle is an
+  // absolute overlay at the cell's right edge so it consumes no layout width — header and rows stay
+  // aligned by the shared width value alone.
+  const [colW, setColW] = useState({ name: 220, css: 220 })
+  const dragCol = (key: 'name' | 'css') => (e: React.PointerEvent) => {
+    e.preventDefault()
+    const startX = e.clientX, startW = colW[key]
+    const onMove = (ev: PointerEvent) => setColW((w) => ({ ...w, [key]: Math.max(120, Math.min(480, startW + (ev.clientX - startX))) }))
+    const onUp = () => { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp) }
+    window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp)
+  }
+  const colHandle = (key: 'name' | 'css') => (
+    <span role="separator" aria-label={`Resize ${key} column`} onPointerDown={dragCol(key)}
+      style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 9, cursor: 'col-resize', zIndex: 1 }} />
+  )
   const collOf = (t: DsToken) => t.path?.split(' / ')[0] ?? t.group
   const collections: [string, number][] = []
   for (const t of tokens) {
@@ -739,7 +754,7 @@ function VariablesLibrary() {
           </div>
         </div>
         <div style={{ height: 32, borderBottom: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', font: `550 11px/1 ${FONT}`, color: MUTE }}>
-          <span style={{ width: 220, padding: '0 16px' }}>Name</span><span style={{ width: 220, padding: '0 12px' }}>CSS variable</span><span style={{ flex: 1, padding: '0 12px' }}>Light</span><span style={{ flex: 1, padding: '0 12px' }}>Dark</span>
+          <span style={{ width: colW.name, padding: '0 16px', position: 'relative' }}>Name{colHandle('name')}</span><span style={{ width: colW.css, padding: '0 12px', position: 'relative' }}>CSS variable{colHandle('css')}</span><span style={{ flex: 1, padding: '0 12px' }}>Light</span><span style={{ flex: 1, padding: '0 12px' }}>Dark</span>
         </div>
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {(() => {
@@ -762,11 +777,11 @@ function VariablesLibrary() {
               const isColor = t.kind === 'color'
               out.push(
                 <div key={t.cssVar} style={{ minHeight: 34, borderBottom: '1px solid #f2f2f3', display: 'flex', alignItems: 'center', font: `400 11px/1 ${FONT}` }}>
-                  <span style={{ width: 220, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                  <span style={{ width: colW.name, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                     {isColor ? <span style={{ flex: 'none', width: 14, height: 14, borderRadius: 3, background: t.value, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.12)' }} /> : <VariableHashIcon />}
                     <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
                   </span>
-                  <span style={{ width: 220, padding: '0 12px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: MUTE }}>{t.cssVar}</span>
+                  <span style={{ width: colW.css, padding: '0 12px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: MUTE }}>{t.cssVar}</span>
                   {valCell(t.value, isColor)}
                   {valCell(t.dark ?? t.value, isColor)}
                 </div>,
