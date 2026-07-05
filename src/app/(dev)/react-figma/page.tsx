@@ -2372,6 +2372,13 @@ export default function ReactFigmaPage() {
     }
     if (anyFail) notify(committed ? `Saved ${committed}, some failed — re-select & retry` : 'Save failed — re-select & retry', 'error')
     else if (committed) notify(`Saved ${committed} change${committed > 1 ? 's' : ''} to code`)
+    // E6.9 time capsule: every publish is a version checkpoint annotated with what changed
+    if (committed) {
+      void fetch('/api/dev/editor-sandbox', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'snapshot', label: `publish — ${committed} change${committed > 1 ? 's' : ''}` }),
+      }).catch(() => null)
+    }
   }, [committing])
 
   const wireCanvas = useCallback(() => {
