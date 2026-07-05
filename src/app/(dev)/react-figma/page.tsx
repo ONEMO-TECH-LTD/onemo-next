@@ -2206,13 +2206,23 @@ export default function ReactFigmaPage() {
     return () => { f.removeEventListener('load', tryWire); clearInterval(poll) }
   }, [wireCanvas])
 
+  // zoom to a point (cx,cy in canvas coords), keeping that point fixed under the cursor
+  const zoomAt = useCallback((nextZ: number, cx: number, cy: number) => {
+    setView(v => { const nz = Math.min(4, Math.max(0.05, nextZ)); const k = nz / v.z; return { z: nz, x: cx - (cx - v.x) * k, y: cy - (cy - v.y) * k } })
+  }, [])
+  // zoom by a multiplicative factor toward the canvas centre (used by the +/- buttons)
+  const zoomStep = useCallback((factor: number) => {
+    const el = canvasRef.current; const r = el?.getBoundingClientRect()
+    setView(v => { const nz = Math.min(4, Math.max(0.05, v.z * factor)); const cx = (r?.width ?? 800) / 2, cy = (r?.height ?? 600) / 2; const k = nz / v.z; return { z: nz, x: cx - (cx - v.x) * k, y: cy - (cy - v.y) * k } })
+  }, [])
   useEffect(() => {
     const el = canvasRef.current; if (!el) return
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
       if (e.ctrlKey || e.metaKey) {
+        // pinch / ctrl-wheel → exponential zoom-to-cursor (responsive; linear 0.0016 was far too weak)
         const r = el.getBoundingClientRect(), cx = e.clientX - r.left, cy = e.clientY - r.top
-        setView(v => { const nz = Math.min(4, Math.max(0.05, v.z * (1 - e.deltaY * 0.0016))); const k = nz / v.z; return { z: nz, x: cx - (cx - v.x) * k, y: cy - (cy - v.y) * k } })
+        setView(v => { const nz = Math.min(4, Math.max(0.05, v.z * Math.exp(-e.deltaY * 0.01))); const k = nz / v.z; return { z: nz, x: cx - (cx - v.x) * k, y: cy - (cy - v.y) * k } })
       } else setView(v => ({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY }))
     }
     el.addEventListener('wheel', onWheel, { passive: false })
@@ -2391,9 +2401,9 @@ export default function ReactFigmaPage() {
           </div>
         </div>
         <div style={{ position: 'absolute', left: 12, bottom: 12, height: 28, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', background: '#fff', borderRadius: 6, boxShadow: '0 2px 8px rgba(0,0,0,.14)', font: `450 11px/1 ${FONT}` }}>
-          <IB I={Minus} title="Zoom out" s={13} on={() => setView(v => ({ ...v, z: Math.max(0.05, v.z - 0.1) }))} />
-          <span style={{ minWidth: 34, textAlign: 'center' }}>{Math.round(view.z * 100)}%</span>
-          <IB I={Plus} title="Zoom in" s={13} on={() => setView(v => ({ ...v, z: Math.min(4, v.z + 0.1) }))} />
+          <IB I={Minus} title="Zoom out" s={13} on={() => zoomStep(1 / 1.25)} />
+          <button type="button" title="Reset to 100%" onClick={() => zoomStep(1 / view.z)} style={{ appearance: 'none', border: 0, background: 'transparent', cursor: 'pointer', minWidth: 40, textAlign: 'center', font: 'inherit', color: 'inherit', padding: 0 }}>{Math.round(view.z * 100)}%</button>
+          <IB I={Plus} title="Zoom in" s={13} on={() => zoomStep(1.25)} />
         </div>
       </main>
 
