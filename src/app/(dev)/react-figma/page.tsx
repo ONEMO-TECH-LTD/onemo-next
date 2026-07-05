@@ -1447,28 +1447,27 @@ function SelectionColorRow({ hex, name, op, grad, onRecolor }: { hex?: string; n
     </div>
   )
 }
-function LayoutGuideRow({ size, onRemove }: { size: string; onRemove?: () => void }) {
-  const [guideValue, setGuideValue] = useState(size)
+type LayoutGuide = { id: number; type: 'Grid' | 'Columns' | 'Rows'; count: number; gutter: number; visible: boolean }
+/* Layout guides are an editor-visual design aid — a Figma-native canvas overlay (no build/CSS
+   analog), so the config lives in editor state and renders over the frame (LayoutGuideOverlay);
+   it never writes to source (Dan's no-invented rule). #25: this row is now controlled so the
+   overlay actually renders + updates live. */
+function LayoutGuideRow({ guide, onChange, onRemove }: { guide: LayoutGuide; onChange: (patch: Partial<LayoutGuide>) => void; onRemove?: () => void }) {
   const [open, setOpen] = useState(false)
-  const [visible, setVisible] = useState(true)
   const [stgOpen, setStgOpen] = useState(false)
-  const [count, setCount] = useState('5')
-  const [gutter, setGutter] = useState('16')
   const guideRef = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
   const stgRef = useCloseOnOutside<HTMLDivElement>(stgOpen, () => setStgOpen(false))
-  const options = ['Grid', 'Columns', 'Rows']
+  const options: LayoutGuide['type'][] = ['Grid', 'Columns', 'Rows']
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '24px 8px 124px 8px 24px 4px 24px', alignItems: 'center', height: 32, padding: '0 8px 0 16px' }}>
-      {/* Layout guides are an editor-visual design aid (canvas overlay) — Figma-native, no build/CSS
-          analog, so params live in editor state and never write to source (Dan's no-invented rule). */}
       <div ref={stgRef} style={{ position: 'relative', width: 24, height: 24 }}>
         <UiIB name="layoutGrid" title="Layout guide settings" active={stgOpen} on={() => setStgOpen((v) => !v)} />
         {stgOpen && (
           <div data-figma-floating-root="true" role="menu" style={{ position: 'absolute', left: 0, top: 28, zIndex: 130, width: 168, padding: '8px 12px', borderRadius: 8, background: '#fff', boxShadow: 'rgba(0,0,0,0.15) 0px 2px 5px 0px, rgba(0,0,0,0.12) 0px 10px 16px 0px, rgba(0,0,0,0.12) 0px 0px 0.5px 0px', display: 'grid', gap: 8 }}>
-            {([['Count', count, setCount], ['Gutter', gutter, setGutter]] as const).map(([lbl, val, set]) => (
+            {([['Count', guide.count, 'count'], ['Gutter', guide.gutter, 'gutter']] as const).map(([lbl, val, key]) => (
               <label key={lbl} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', font: `400 11px/1 ${FONT}`, color: INK }}>
                 {lbl}
-                <input value={val} onChange={(e) => set(e.currentTarget.value)} style={{ width: 56, height: 24, border: `1px solid ${LINE}`, borderRadius: 5, padding: '0 8px', outline: 0, font: `400 11px/1 ${FONT}`, color: INK, textAlign: 'right' }} />
+                <input value={String(val)} inputMode="numeric" onChange={(e) => onChange({ [key]: Math.max(1, parseInt(e.currentTarget.value, 10) || 0) })} style={{ width: 56, height: 24, border: `1px solid ${LINE}`, borderRadius: 5, padding: '0 8px', outline: 0, font: `400 11px/1 ${FONT}`, color: INK, textAlign: 'right' }} />
               </label>
             ))}
           </div>
@@ -1478,14 +1477,14 @@ function LayoutGuideRow({ size, onRemove }: { size: string; onRemove?: () => voi
       <div ref={guideRef} style={{ position: 'relative', width: 124, height: 24 }}>
         <button type="button" role="combobox" aria-controls="layout-guide-options" aria-expanded={open} onClick={() => setOpen(v => !v)}
           style={{ appearance: 'none', border: '1px solid #e6e6e6', background: '#fff', width: 124, height: 24, borderRadius: 5, padding: '0 0 0 9px', display: 'grid', gridTemplateColumns: '1fr 24px', alignItems: 'center', cursor: 'pointer', font: `450 11px/16px ${FONT}`, color: INK }}>
-          <span style={{ textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{guideValue}</span>
+          <span style={{ textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{guide.type}</span>
           <span style={{ color: FAINT, display: 'grid', placeItems: 'center' }}><UiIcon name="caret24" /></span>
         </button>
         {open && (
           <ul id="layout-guide-options" role="listbox" data-figma-floating-root="true"
             style={{ position: 'absolute', zIndex: 125, left: -8, top: -8, width: 140, height: 88, margin: 0, padding: '8px 0', listStyle: 'none', borderRadius: 6, background: '#fff', boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px', boxSizing: 'border-box', overflow: 'hidden' }}>
             {options.map(option => (
-              <li key={option} role="option" aria-selected={guideValue.startsWith(option)} onClick={() => { setGuideValue(option === 'Grid' ? size : option); setOpen(false) }}
+              <li key={option} role="option" aria-selected={guide.type === option} onClick={() => { onChange({ type: option }); setOpen(false) }}
                 style={{ height: 24, display: 'grid', alignItems: 'center', padding: '0 0 0 32px', color: INK, cursor: 'pointer', font: `400 11px/16px ${FONT}` }}>
                 {option}
               </li>
@@ -1494,9 +1493,32 @@ function LayoutGuideRow({ size, onRemove }: { size: string; onRemove?: () => voi
         )}
       </div>
       <span />
-      <UiIB name="visibility" title="Toggle visibility" active={!visible} on={() => setVisible(v => !v)} />
+      <UiIB name="visibility" title="Toggle visibility" active={!guide.visible} on={() => onChange({ visible: !guide.visible })} />
       <span />
       <UiIB name="minus" title="Remove layout guide" on={onRemove} />
+    </div>
+  )
+}
+/* #25 — the canvas overlay the layout-guide config drives. Renders columns / rows / grid over the
+   frame (frame coordinates, scaled with the canvas transform), Figma layout-grid red, non-interactive. */
+function LayoutGuideOverlay({ guides, w, h }: { guides: LayoutGuide[]; w: number; h: number }) {
+  const RED = 'rgba(255,45,85,0.12)'
+  return (
+    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden', borderRadius: 4 }}>
+      {guides.filter((g) => g.visible).map((g) => {
+        const n = Math.max(1, g.count | 0), gut = Math.max(0, g.gutter | 0)
+        if (g.type === 'Grid') {
+          const cell = Math.max(4, gut || 10)
+          return <div key={g.id} style={{ position: 'absolute', inset: 0, backgroundImage: `linear-gradient(${RED} 1px, transparent 1px), linear-gradient(90deg, ${RED} 1px, transparent 1px)`, backgroundSize: `${cell}px ${cell}px` }} />
+        }
+        const horiz = g.type === 'Columns'
+        const band = ((horiz ? w : h) - gut * (n - 1)) / n
+        return (
+          <div key={g.id} style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: horiz ? 'row' : 'column', gap: gut }}>
+            {Array.from({ length: n }).map((_, i) => <div key={i} style={{ [horiz ? 'width' : 'height']: Math.max(0, band), background: RED }} />)}
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -1722,7 +1744,7 @@ export default function ReactFigmaPage() {
   const [fills, setFills] = useState<{ id: number; hex: string; op: number }[]>([])
   const [strokes, setStrokes] = useState<{ id: number; hex: string; op: number; position: string; weight: number }[]>([])
   const [effects, setEffects] = useState<{ id: number; type: string }[]>([])
-  const [layoutGuides, setLayoutGuides] = useState<{ id: number; size: string }[]>([])
+  const [layoutGuides, setLayoutGuides] = useState<LayoutGuide[]>([])
   const canvasRef = useRef<HTMLDivElement>(null)
   const pan = useRef<{ x: number; y: number; vx: number; vy: number } | null>(null)
   const [isPanning, setIsPanning] = useState(false)
@@ -2464,6 +2486,7 @@ export default function ReactFigmaPage() {
             {selRect && (
               <div style={{ position: 'absolute', left: selRect.x, top: selRect.y, width: selRect.w, height: selRect.h, outline: `${2 / view.z}px solid ${SEL}`, pointerEvents: 'none' }} />
             )}
+            {layoutGuides.length > 0 && <LayoutGuideOverlay guides={layoutGuides} w={frameDims.w} h={frameDims.h} />}
           </div>
         </div>
         <div style={{ position: 'absolute', left: 12, bottom: 12, height: 28, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', background: '#fff', borderRadius: 6, boxShadow: '0 2px 8px rgba(0,0,0,.14)', font: `450 11px/1 ${FONT}` }}>
@@ -2700,8 +2723,8 @@ export default function ReactFigmaPage() {
           <Sec title="Selection colors" bodyGap={0} bodyPadding="0">
             {(liveSelColors ?? []).map((c, i) => <SelectionColorRow key={`live-${i}`} hex={c.hex} op={c.op} onRecolor={recolorSelection} />)}
           </Sec>
-          <Sec title="Layout guide" actionWidth={52} action={<><StyleApplyButton label="Layout guide" title="Layout guide, Apply styles" /><UiIB name="plus" title="Add layout guide" on={() => setLayoutGuides(rows => [...rows, { id: nextRowId(rows), size: 'Grid 10px' }])} /></>} bodyGap={0} bodyPadding="0">
-            {layoutGuides.map(g => <LayoutGuideRow key={g.id} size={g.size} onRemove={() => setLayoutGuides(rows => rows.filter(row => row.id !== g.id))} />)}
+          <Sec title="Layout guide" actionWidth={52} action={<><StyleApplyButton label="Layout guide" title="Layout guide, Apply styles" /><UiIB name="plus" title="Add layout guide" on={() => setLayoutGuides(rows => [...rows, { id: nextRowId(rows), type: 'Columns', count: 5, gutter: 16, visible: true }])} /></>} bodyGap={0} bodyPadding="0">
+            {layoutGuides.map(g => <LayoutGuideRow key={g.id} guide={g} onChange={(patch) => setLayoutGuides(rows => rows.map(r => r.id === g.id ? { ...r, ...patch } : r))} onRemove={() => setLayoutGuides(rows => rows.filter(row => row.id !== g.id))} />)}
           </Sec>
         </div>
       </aside>
