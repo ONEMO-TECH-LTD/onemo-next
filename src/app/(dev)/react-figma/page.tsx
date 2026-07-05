@@ -1892,8 +1892,10 @@ export default function ReactFigmaPage() {
     const px = (v?: string) => { const n = parseFloat(v ?? ''); return Number.isFinite(n) ? String(Math.round(n)) : '0' }
     const r = el.getBoundingClientRect()
     const c = rep.computed
-    // Position
-    setXValue(px(String(r.left))); setYValue(px(String(r.top)))
+    // Position — FRAME-relative like Figma (Dan live-QA: viewport-absolute read showed 'wrong values')
+    const frameRoot = doc.querySelector('body [data-src]')
+    const fr = frameRoot ? frameRoot.getBoundingClientRect() : { left: 0, top: 0 }
+    setXValue(px(String(r.left - fr.left))); setYValue(px(String(r.top - fr.top)))
     const inset = (p: string) => c[p] === 'auto' ? 'auto' : px(c[p])
     setInsetTop(inset('top')); setInsetRight(inset('right')); setInsetBottom(inset('bottom')); setInsetLeft(inset('left'))
     setZIndexValue(c['z-index'] === 'auto' ? '0' : c['z-index'])
@@ -2077,6 +2079,14 @@ export default function ReactFigmaPage() {
       : []
     // Stroke position "Center" has no clean CSS analog (border is inside, outline is outside) — no-op, honest.
     if (field === 'strokePosition' && n !== 'Inside' && n !== 'Outside') { console.warn('[engine] stroke position', n, '— no clean CSS analog (border=Inside, outline=Outside); no-op'); return }
+    // Undo/redo (Dan live-QA): record each edit as one history step; before=null means the prop had
+    // no override yet (undo → discard it entirely).
+    if (decls.length) {
+      const live = ov.current!.dirty()
+      historyRef.current.push(decls.map(([prop, value]) => ({ id, prop, before: live.find((o) => o.domId === id && o.prop === prop && !o.stale)?.value ?? null, after: value })))
+      if (historyRef.current.length > 200) historyRef.current.shift()
+      redoRef.current = []
+    }
     for (const [prop, value] of decls) ov.current!.set(id, prop, value, cs.getPropertyValue(prop))
     setOvVersion((v) => v + 1)
     setSelRect(rectOf(el))
@@ -2310,9 +2320,9 @@ export default function ReactFigmaPage() {
     doc.addEventListener('keydown', (e) => {
       const t = e.target as HTMLElement | null
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
-      if (['+', '=', '-', '_', '0'].includes(e.key)) {
+      if (['+', '=', '-', '_', '0'].includes(e.key) || ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z')) {
         e.preventDefault()
-        window.dispatchEvent(new KeyboardEvent('keydown', { key: e.key }))
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: e.key, metaKey: e.metaKey, ctrlKey: e.ctrlKey, shiftKey: e.shiftKey }))
       }
     }, true)
     doc.addEventListener('click', (e) => {
@@ -2405,6 +2415,41 @@ export default function ReactFigmaPage() {
   }, [])
   // E4 vibe #4: the device-frame size follows the frame preset (was hardcoded 402×871)
   const frameDims = (() => { const m = framePreset.size.match(/(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)/); return m ? { w: Math.round(+m[1]), h: Math.round(+m[2]) } : { w: 402, h: 871 } })()
+  // Undo/redo over canvas edits (Dan live-QA "there must be undo/redo"). Versioning of committed
+  // code = git (every Save-to-code is a tracked source edit); this stack covers staged overrides.
+  const historyRef = useRef<{ id: string; prop: string; before: string | null; after: string }[][]>([])
+  const redoRef = useRef<{ id: string; prop: string; before: string | null; after: string }[][]>([])
+  const undoEdit = useCallback(() => {
+    const step = historyRef.current.pop()
+    if (!step) { notify('Nothing to undo'); return }
+    for (const c of step) { if (c.before === null) ov.current!.discard(c.id, c.prop); else ov.current!.set(c.id, c.prop, c.before, c.before) }
+    redoRef.current.push(step)
+    setOvVersion((v) => v + 1)
+    const el = selIdRef.current ? iframeRef.current?.contentDocument?.querySelector(`[data-eng-id="${selIdRef.current}"]`) as HTMLElement | null : null
+    if (el) { setSelRect(rectOf(el)); applySelection(el) }
+    notify('Undo')
+  }, [])
+  const redoEdit = useCallback(() => {
+    const step = redoRef.current.pop()
+    if (!step) { notify('Nothing to redo'); return }
+    for (const c of step) ov.current!.set(c.id, c.prop, c.after, c.after)
+    historyRef.current.push(step)
+    setOvVersion((v) => v + 1)
+    const el = selIdRef.current ? iframeRef.current?.contentDocument?.querySelector(`[data-eng-id="${selIdRef.current}"]`) as HTMLElement | null : null
+    if (el) { setSelRect(rectOf(el)); applySelection(el) }
+    notify('Redo')
+  }, [])
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z') return
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+      e.preventDefault()
+      if (e.shiftKey) redoEdit(); else undoEdit()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [undoEdit, redoEdit])
   const [zoomMenuOpen, setZoomMenuOpen] = useState(false)
   const zoomMenuRef = useCloseOnOutside<HTMLDivElement>(zoomMenuOpen, () => setZoomMenuOpen(false))
   // Zoom to fit — fit the frame into the visible canvas, centered (Figma ⇧1 behavior).
@@ -2756,8 +2801,11 @@ export default function ReactFigmaPage() {
         </div>
         <div style={{ height: 33, borderBottom: `1px solid ${LINE}`, display: 'flex', alignItems: 'flex-start', padding: '0 8px', flex: 'none' }}>
           {/* Design/Prototype tabs removed (no prototype mode in this editor — Dan vibe). */}
+          {/* Dan live-QA: undo/redo of staged edits (⌘Z / ⇧⌘Z; committed code is versioned by git). */}
+          <button type="button" title="Undo (⌘Z)" onClick={undoEdit} style={{ appearance: 'none', border: 0, background: 'transparent', width: 24, height: 24, marginLeft: 'auto', borderRadius: 5, cursor: 'pointer', color: INK, font: `400 13px/24px ${FONT}` }}>↶</button>
+          <button type="button" title="Redo (⇧⌘Z)" onClick={redoEdit} style={{ appearance: 'none', border: 0, background: 'transparent', width: 24, height: 24, borderRadius: 5, cursor: 'pointer', color: INK, font: `400 13px/24px ${FONT}` }}>↷</button>
           {/* Dan live-QA: side-panel zoom is a Figma-style dropdown menu, not a bare reset button. */}
-          <div ref={zoomMenuRef} style={{ position: 'relative', marginLeft: 'auto' }}>
+          <div ref={zoomMenuRef} style={{ position: 'relative' }}>
             <button type="button" title="Zoom options" aria-haspopup="menu" aria-expanded={zoomMenuOpen} onClick={() => setZoomMenuOpen(v => !v)} style={{ appearance: 'none', border: 0, background: '#fff', borderRadius: 5, minWidth: 54.5, height: 24, padding: '4px 4px 4px 12px', color: '#000', cursor: 'pointer', font: `400 11px/16px ${FONT}`, display: 'flex', alignItems: 'center' }}><span style={{ flex: 1 }}>{Math.round(view.z * 100)}%</span><UiIcon name="caret16" size={16} /></button>
             {zoomMenuOpen && (
               <div data-figma-floating-root="true" role="menu" style={{ position: 'absolute', right: 0, top: 28, zIndex: 130, width: 168, padding: '8px 0', borderRadius: 13, background: '#1e1e1e', color: '#fff', boxShadow: 'rgba(0,0,0,0.15) 0px 2px 5px 0px, rgba(0,0,0,0.12) 0px 10px 16px 0px, rgba(0,0,0,0.12) 0px 0px 0.5px 0px' }}>
