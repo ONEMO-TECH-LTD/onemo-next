@@ -198,7 +198,23 @@ function useCloseOnOutside<T extends HTMLElement>(open: boolean, close: () => vo
 // E3.3 — real DS tokens from the converter output (/api/dev/editor-tokens), fetched once and
 // cached, feeding the ⬡ variable picker. The var name IS the token path (DEC-locked), so it
 // doubles as the Figma-style label; the resolved value shows alongside for traceability.
-type DsToken = { cssVar: string; value: string; dark?: string; group: string; kind: 'color' | 'dimension' | 'other'; path?: string }
+type DsToken = { cssVar: string; value: string; dark?: string; group: string; kind: 'color' | 'dimension' | 'other'; path?: string; scopes?: string[]; original?: Record<string, string> }
+// E6.13 — field → Figma's OWN scope model (the $scopes carried by the SSOT export; Dan: "we cannot
+// have scopes for font showing dimensions"). Unmapped fields keep the kind filter only.
+const fieldScopes = (label: string): string[] | null =>
+  /font family/i.test(label) ? ['FONT_FAMILY']
+  : /font size|text size/i.test(label) ? ['FONT_SIZE']
+  : /weight/i.test(label) && /font|text/i.test(label) ? ['FONT_WEIGHT']
+  : /letter/i.test(label) ? ['LETTER_SPACING']
+  : /line height/i.test(label) ? ['LINE_HEIGHT']
+  : /gap|padding/i.test(label) ? ['GAP']
+  : /radius|corner/i.test(label) ? ['CORNER_RADIUS']
+  : /width|height/i.test(label) ? ['WIDTH_HEIGHT']
+  : /opacity/i.test(label) ? ['OPACITY']
+  : /stroke.*(weight|width)/i.test(label) ? ['STROKE_FLOAT']
+  : /stroke|border/i.test(label) ? ['STROKE_COLOR', 'ALL_FILLS']
+  : /fill|background|paint|colou?r/i.test(label) ? ['ALL_FILLS', 'FRAME_FILL', 'SHAPE_FILL', 'TEXT_FILL']
+  : null
 let _dsTokenCache: DsToken[] | null = null
 /* E4-G4 — real components available to insert (extracted-in-editor), for the Assets panel. */
 type DsComponent = { name: string; importPath: string }
@@ -249,7 +265,11 @@ function FigmaVariablePicker({ fieldLabel, anchorRef, onPick, onClose }: { field
   // other field → dimension tokens. No show-all fallback — that leaked colour tokens onto X-position.
   const kind: DsToken['kind'] =
     /fill|stroke|colou?r|paint|background/i.test(fieldLabel) ? 'color' : 'dimension'
+  // E6.13 — Figma's own $scopes narrow further: a token scoped FONT_SIZE never appears on a gap
+  // field. ALL_SCOPES and scope-less (unjoined) tokens pass through the kind filter as before.
+  const want = fieldScopes(fieldLabel)
   const pool = tokens.filter((t) => t.kind === kind)
+    .filter((t) => !want || !t.scopes || t.scopes.includes('ALL_SCOPES') || t.scopes.some((s) => want.includes(s)))
   const q = query.trim().toLowerCase()
   const filtered = pool.filter((t) => !q || t.cssVar.toLowerCase().includes(q) || t.value.toLowerCase().includes(q))
   // group into header + item rows in file order (tokens.css is organised by collection)

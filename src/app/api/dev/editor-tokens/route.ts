@@ -15,7 +15,42 @@ const TOKENS_CSS = join(TOKENS_DIR, 'tokens.css')
 const TOKENS_TS = join(TOKENS_DIR, 'tokens.ts')
 
 export type TokenKind = 'color' | 'dimension' | 'other'
-export type Token = { cssVar: string; value: string; dark?: string; group: string; kind: TokenKind; path?: string }
+export type Token = { cssVar: string; value: string; dark?: string; group: string; kind: TokenKind; path?: string; scopes?: string[]; original?: Record<string, string> }
+
+const FIGMA_EXPORT = join(process.cwd(), 'storybook', 'design-system', 'variables', 'figma-export.json')
+/** E6.13 — join Figma's OWN `$scopes` + original values from the SSOT export (variables2json shape:
+ *  `[{ "<coll>": { modes: { "<Mode>": { <group…>: { <leaf>: {$type,$value,$scopes} } } } } }]`).
+ *  Path key matches the converter's structural path: collection "1.0-Prim-Col" → "primCol". */
+const collCamel = (n: string) => n.replace(/^[\d.]+-/, '').split(/[-_\s]+/).filter(Boolean)
+  .map((w, i) => (i === 0 ? w.toLowerCase() : w[0].toUpperCase() + w.slice(1).toLowerCase())).join('')
+async function figmaMeta(): Promise<Record<string, { scopes?: string[]; original: Record<string, string> }>> {
+  try {
+    const raw = JSON.parse(await readFile(FIGMA_EXPORT, 'utf8')) as Record<string, { modes?: Record<string, unknown> }>[]
+    if (!Array.isArray(raw)) return {}
+    const out: Record<string, { scopes?: string[]; original: Record<string, string> }> = {}
+    for (const item of raw) {
+      const coll = Object.keys(item)[0]
+      if (!coll) continue
+      const modes = item[coll]?.modes ?? {}
+      for (const [mode, tree] of Object.entries(modes)) {
+        const walk = (node: unknown, path: string[]) => {
+          if (!node || typeof node !== 'object') return
+          const rec = node as Record<string, unknown> & { $value?: unknown; $scopes?: string[] }
+          if ('$value' in rec) {
+            const key = [collCamel(coll), ...path].join(' / ')
+            const entry = (out[key] ??= { original: {} })
+            entry.original[mode] = String(rec.$value)
+            if (Array.isArray(rec.$scopes)) entry.scopes = rec.$scopes as string[]
+            return
+          }
+          for (const [k, v] of Object.entries(rec)) if (!k.startsWith('$')) walk(v, path.concat(k))
+        }
+        walk(tree, [])
+      }
+    }
+    return out
+  } catch { return {} } // export missing/unparseable → tokens still serve without scopes
+}
 
 /** Build cssVar → structural path from the converter's own tokens.ts (authoritative, 100% coverage).
  *  The nested path (e.g. primCol.base.white) is the design-system name; the css var is the CSS name —
@@ -52,7 +87,7 @@ export async function GET() {
     return NextResponse.json({ error: 'dev-only' }, { status: 403 })
   }
   try {
-    const [css, paths] = await Promise.all([readFile(TOKENS_CSS, 'utf8'), pathByCssVar()])
+    const [css, paths, meta] = await Promise.all([readFile(TOKENS_CSS, 'utf8'), pathByCssVar(), figmaMeta()])
     // Two theme modes: :root (Light) and [data-theme="dark"] (Dark override). Split so Light is the
     // primary value and Dark is captured where a token overrides it (else it's identical to Light).
     const declRe = (s: string) => {
@@ -69,7 +104,8 @@ export async function GET() {
       const segs = cssVar.replace(/^--/, '').split('-')
       const group = segs.slice(0, 2).join('-') || 'other'
       const darkVal = dark[cssVar]
-      return { cssVar, value, ...(darkVal && darkVal !== value ? { dark: darkVal } : {}), group, kind: classify(cssVar, value), path: paths[cssVar] }
+      const m = paths[cssVar] ? meta[paths[cssVar]] : undefined
+      return { cssVar, value, ...(darkVal && darkVal !== value ? { dark: darkVal } : {}), group, kind: classify(cssVar, value), path: paths[cssVar], ...(m?.scopes ? { scopes: m.scopes } : {}), ...(m?.original ? { original: m.original } : {}) }
     })
     return NextResponse.json({ tokens, count: tokens.length })
   } catch (e) {
