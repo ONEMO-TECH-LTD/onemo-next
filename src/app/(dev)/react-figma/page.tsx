@@ -440,6 +440,8 @@ function TokenPill({ token }: { token: string }) {
     </span>
   )
 }
+/* Sentinel mode value: render the caret icon instead of a text mode label. */
+const MODE_CARET = '__caret__'
 /* E6.4 — FigmaField: THE standardized value field. Anatomy measured from Figma UI3 (Dan's
    authenticated Figma tab, 2026-07-05): 24px container, radius 5, FIELD bg, no rest border,
    24px leading glyph cell (icon or letter at 50% ink), transparent borderless inner input at
@@ -448,8 +450,8 @@ function TokenPill({ token }: { token: string }) {
    the trailing edge. Every prior field variant (InspectorField / AutoValueField /
    InlineValueInput) is a thin wrapper over this — one anatomy, one implementation (Dan:
    "make a component and reuse, not vibe-code each"). */
-function FigmaField({ icon, letter, value, onChange, token, suffix, ariaLabel, mode, modeOptions, onMode, picker = true, width, whiteBg, dim, title }: {
-  icon?: keyof typeof UI_ICON; letter?: string; value: string; onChange?: (value: string) => void
+function FigmaField({ icon, letter, glyph, value, onChange, token, suffix, ariaLabel, mode, modeOptions, onMode, picker = true, width, whiteBg, dim, title }: {
+  icon?: keyof typeof UI_ICON; letter?: string; glyph?: React.ReactNode; value: string; onChange?: (value: string) => void
   token?: string; suffix?: string; ariaLabel: string
   mode?: string; modeOptions?: [string, string][]; onMode?: (value: string) => void
   picker?: boolean; width?: number | string; whiteBg?: boolean; dim?: boolean; title?: string
@@ -463,7 +465,7 @@ function FigmaField({ icon, letter, value, onChange, token, suffix, ariaLabel, m
   return (
     <div ref={fieldRef} title={title ?? token} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
       style={{ position: 'relative', minWidth: 0, width, height: 24, borderRadius: 5, background: whiteBg ? (h ? '#ededed' : '#fff') : FIELD, border: `1px solid ${varOpen || modeOpen ? SEL : whiteBg ? '#e6e6e6' : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: cols, alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
-      <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)', font: `450 11px/24px ${FONT}` }}>{icon ? <UiIcon name={icon} /> : letter}</span>
+      <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)', font: `450 11px/24px ${FONT}` }}>{icon ? <UiIcon name={icon} /> : glyph ?? letter}</span>
       {bound ? (
         <TokenPill token={token ?? value} />
       ) : onChange ? (
@@ -476,7 +478,7 @@ function FigmaField({ icon, letter, value, onChange, token, suffix, ariaLabel, m
       {mode && (
         <button type="button" aria-label={`${ariaLabel} mode`} aria-haspopup={modeOptions ? 'menu' : undefined} aria-expanded={modeOptions ? modeOpen : undefined}
           onClick={modeOptions ? () => setModeOpen(v => !v) : undefined}
-          style={{ appearance: 'none', border: 0, background: 'transparent', height: 24, padding: '0 7px', color: INK, cursor: modeOptions ? 'pointer' : 'default', font: `450 11px/24px ${FONT}` }}>{mode}</button>
+          style={{ appearance: 'none', border: 0, background: 'transparent', height: 24, padding: mode === MODE_CARET ? 0 : '0 7px', width: mode === MODE_CARET ? 24 : undefined, display: mode === MODE_CARET ? 'grid' : undefined, placeItems: mode === MODE_CARET ? 'center' : undefined, color: mode === MODE_CARET ? FAINT : INK, cursor: modeOptions ? 'pointer' : 'default', font: `450 11px/24px ${FONT}` }}>{mode === MODE_CARET ? <UiIcon name="caret24" /> : mode}</button>
       )}
       {picker && onChange && (
         <button type="button" title="Apply variable" aria-label={`Apply variable to ${ariaLabel}`} aria-haspopup="menu" aria-expanded={varOpen} onClick={event => { event.stopPropagation(); setVarOpen(v => !v) }}
@@ -487,9 +489,9 @@ function FigmaField({ icon, letter, value, onChange, token, suffix, ariaLabel, m
       {modeOpen && modeOptions && (
         <div role="presentation" data-figma-floating-root="true" style={{ position: 'absolute', zIndex: 130, top: 28, right: 0, minWidth: 140, padding: '8px 0 6px', borderRadius: 13, background: '#1e1e1e', color: '#fff', boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px' }}>
           {modeOptions.map(([label, v]) => (
-            <button key={label} type="button" role="menuitemradio" aria-checked={mode === label} onClick={() => { onMode?.(v); setModeOpen(false) }}
+            <button key={label} type="button" role="menuitemradio" aria-checked={mode === label || mode === v} onClick={() => { onMode?.(v); setModeOpen(false) }}
               style={{ appearance: 'none', border: 0, width: '100%', height: 24, background: 'transparent', color: '#fff', display: 'grid', gridTemplateColumns: '24px 1fr', alignItems: 'center', padding: '0 8px', cursor: 'pointer', font: `400 11px/24px ${FONT}`, textAlign: 'left' }}>
-              <span style={{ display: 'grid', placeItems: 'center' }}>{mode === label && <MenuCheck />}</span><span>{label}</span>
+              <span style={{ display: 'grid', placeItems: 'center' }}>{(mode === label || mode === v) && <MenuCheck />}</span><span>{label}</span>
             </button>
           ))}
         </div>
@@ -561,69 +563,27 @@ function PickerMenuOption({ value, width, checked, onClick }: { value: string; w
     </li>
   )
 }
+/* Thin wrapper over FigmaField — E6.4. Resize glyph + Fix/Fill/Hug mode-in-field
+   (Figma Resizing anatomy: value + mode label INSIDE the field). */
 function ResizeDropdownField({ axis, value, mode, onValue, onMode }: { axis: 'W' | 'H'; value: string; mode: ResizeMode; onValue: (value: string) => void; onMode: (mode: ResizeMode) => void }) {
-  const [open, setOpen] = useState(false)
-  const [varOpen, setVarOpen] = useState(false)
-  const menuRef = useCloseOnOutside<HTMLDivElement>(open || varOpen, () => { setOpen(false); setVarOpen(false) })
   const axisLabel = axis === 'W' ? 'width' : 'height'
-  const fieldLabel = `${axis === 'W' ? 'Horizontal' : 'Vertical'} resizing${mode === 'Fill' && axis === 'W' ? ' + max width' : ''}: ${mode}`
-  const selectMode = (next: ResizeMode) => { onMode(next); setOpen(false) }
-  const applyOnly = () => setOpen(false)
-  const applyVariable = () => { setOpen(false); setVarOpen(true) }
   return (
-    <div ref={menuRef} aria-label={fieldLabel} title={fieldLabel} data-resize-axis={axis} data-resize-mode={mode} style={{ position: 'relative', width: 88, height: 24 }}>
-      <div style={{ width: 88, height: 24, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: '24px 1fr 32px', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
-        <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)' }}><ResizeModeGlyph axis={axis} mode={mode} /></span>
-        <input aria-label={`${axisLabel} value`} role="spinbutton" value={value} onChange={e => onValue(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
-          style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: INK, font: `450 11px/16px ${FONT}` }} />
-        <button type="button" aria-label={`${axisLabel} resizing: ${mode}`} aria-haspopup="menu" aria-expanded={open} onClick={() => { setVarOpen(false); setOpen(v => !v) }}
-          style={{ appearance: 'none', border: 0, padding: 0, width: 32, height: 24, background: 'transparent', color: INK, cursor: 'pointer', font: `450 11px/16px ${FONT}` }}>{mode}</button>
-      </div>
-      {open && (
-        <div role="presentation" style={{ position: 'absolute', zIndex: 110, top: 28, left: 0, width: axis === 'W' ? 165 : 168, padding: '0 8px', borderRadius: 13, background: '#1e1e1e', color: '#fff', boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px' }}>
-          <ul role="menu" aria-label={`${axisLabel} resizing options`} style={{ width: axis === 'W' ? 149 : 152, margin: 0, padding: '8px 0 6px', listStyle: 'none' }}>
-            <FigmaMenuRow checked={mode === 'Fixed'} onClick={() => selectMode('Fixed')}>Fixed {axisLabel} ({value})</FigmaMenuRow>
-            <FigmaMenuRow checked={mode === 'Hug'} onClick={() => selectMode('Hug')}>Hug contents</FigmaMenuRow>
-            <FigmaMenuRow checked={mode === 'Fill'} onClick={() => selectMode('Fill')}>Fill container</FigmaMenuRow>
-            <FigmaMenuSeparator />
-            <FigmaMenuRow onClick={applyOnly}>Add min {axisLabel}...</FigmaMenuRow>
-            <FigmaMenuRow onClick={applyOnly}>{axis === 'W' ? `Max ${axisLabel}: 640` : `Add max ${axisLabel}...`}</FigmaMenuRow>
-            {axis === 'W' && <><FigmaMenuSeparator /><FigmaMenuRow onClick={applyOnly}>Remove max</FigmaMenuRow></>}
-            <FigmaMenuSeparator />
-            <FigmaMenuRow onClick={applyVariable}>Apply variable...</FigmaMenuRow>
-          </ul>
-        </div>
-      )}
-      {varOpen && <FigmaVariablePicker fieldLabel={`${axisLabel} value`} anchorRef={menuRef} onPick={onValue} onClose={() => setVarOpen(false)} />}
-    </div>
+    <span data-resize-axis={axis} data-resize-mode={mode} style={{ display: 'contents' }}>
+      <FigmaField glyph={<ResizeModeGlyph axis={axis} mode={mode} />} value={value} onChange={onValue} ariaLabel={`${axisLabel} value`}
+        title={`${axis === 'W' ? 'Horizontal' : 'Vertical'} resizing: ${mode}`} width={88}
+        mode={mode} onMode={next => onMode(next as ResizeMode)}
+        modeOptions={[[`Fixed ${axisLabel} (${value})`, 'Fixed'], ['Hug contents', 'Hug'], ['Fill container', 'Fill']]} />
+    </span>
   )
 }
+/* Thin wrapper over FigmaField — E6.4. Gap value with Auto selectable via the mode dropdown
+   (Dan: "auto can go as value if auto is selected - and auto mode must be selectable in
+   drop down like gap input"). */
 function GapDropdownField({ value, onChange, token }: { value: string; onChange: (value: string) => void; token?: string }) {
-  const [open, setOpen] = useState(false)
-  const [varOpen, setVarOpen] = useState(false)
-  const menuRef = useCloseOnOutside<HTMLDivElement>(open || varOpen, () => { setOpen(false); setVarOpen(false) })
-  const applyVariable = () => { setOpen(false); setVarOpen(true) }
   return (
-    <div ref={menuRef} title={token} style={{ position: 'relative', width: 88, height: 24 }}>
-      <div style={{ width: 88, height: 24, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: '24px 1fr 24px', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
-        <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)' }}><UiIcon name="gapVertical" /></span>
-        <input aria-label="Gap value" role="spinbutton" value={value} onChange={e => onChange(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
-          style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: INK, font: `450 11px/16px ${FONT}` }} />
-        <button type="button" aria-label={`Gap options: ${value}`} aria-haspopup="menu" aria-expanded={open} onClick={() => { setVarOpen(false); setOpen(v => !v) }}
-          style={{ appearance: 'none', border: 0, padding: 0, width: 24, height: 24, display: 'grid', placeItems: 'center', background: 'transparent', color: FAINT, cursor: 'pointer' }}><UiIcon name="caret24" /></button>
-      </div>
-      {open && (
-        <div role="presentation" style={{ position: 'absolute', zIndex: 110, top: 28, left: 0, width: 156, padding: '0 8px', borderRadius: 13, background: '#1e1e1e', color: '#fff', boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px' }}>
-          <ul role="menu" aria-label="Gap options" style={{ width: 140, margin: 0, padding: '8px 0 6px', listStyle: 'none' }}>
-            <FigmaMenuRow checked={value === '10'} onClick={() => { onChange('10'); setOpen(false) }}>10</FigmaMenuRow>
-            <FigmaMenuRow checked={value === 'Auto'} onClick={() => { onChange('Auto'); setOpen(false) }}>Auto</FigmaMenuRow>
-            <FigmaMenuSeparator />
-            <FigmaMenuRow onClick={applyVariable}>Apply variable...</FigmaMenuRow>
-          </ul>
-        </div>
-      )}
-      {varOpen && <FigmaVariablePicker fieldLabel="Gap value" anchorRef={menuRef} onPick={onChange} onClose={() => setVarOpen(false)} />}
-    </div>
+    <FigmaField glyph={<UiIcon name="gapVertical" />} value={value} onChange={onChange} ariaLabel="Gap value" token={token} width={88}
+      mode={value === 'Auto' ? 'Auto' : MODE_CARET} onMode={v => onChange(v)}
+      modeOptions={[['10', '10'], ['Auto', 'Auto']]} />
   )
 }
 /* Thin wrapper (legacy signature) over FigmaField — E6.4. */
