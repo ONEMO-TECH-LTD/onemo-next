@@ -2801,9 +2801,9 @@ export default function ReactFigmaPage() {
             const dirty = ovVersion >= 0 ? ov.current!.dirty().filter((o) => !o.stale) : []
             const n = dirty.length
             return (
-              <div ref={pubMenuRef} style={{ marginLeft: 'auto', position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <div ref={pubMenuRef} style={{ flex: 1, minWidth: 0, position: 'relative', display: 'flex', alignItems: 'center' }}>
                 <button type="button" disabled={committing || n === 0} onClick={() => void commitOverrides()} title="Publish — save all changes to code"
-                  style={{ appearance: 'none', border: 0, background: SEL, color: '#fff', height: 32, borderRadius: '5px 0 0 5px', padding: '0 12px', cursor: committing || n === 0 ? 'default' : 'pointer', font: `450 11px/16px ${FONT}`, letterSpacing: '0.055px', opacity: committing || n === 0 ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  style={{ appearance: 'none', border: 0, background: SEL, color: '#fff', height: 32, flex: 1, minWidth: 0, borderRadius: '5px 0 0 5px', padding: '0 12px', cursor: committing || n === 0 ? 'default' : 'pointer', font: `450 11px/16px ${FONT}`, letterSpacing: '0.055px', opacity: committing || n === 0 ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                   {committing ? 'Publishing…' : 'Publish'}
                   {n > 0 && !committing && <span style={{ minWidth: 16, height: 16, borderRadius: 8, background: 'rgba(255,255,255,0.28)', display: 'grid', placeItems: 'center', padding: '0 4px', font: `550 10px/16px ${FONT}` }}>{n}</span>}
                 </button>
