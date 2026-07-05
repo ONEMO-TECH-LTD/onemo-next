@@ -174,6 +174,39 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, restored: ref, checkpoint: hash })
     }
 
+    if (action === 'rename-sandbox') {
+      const next = (body.label ?? '').trim()
+      if (!/^[a-z0-9][a-z0-9-]{0,40}$/.test(next)) return NextResponse.json({ error: 'invalid new name' }, { status: 422 })
+      const registry = await readRegistry()
+      const entry = registry.find((e) => e.name === body.name)
+      if (!entry) return NextResponse.json({ error: 'unknown sandbox' }, { status: 404 })
+      if (!entry.path.includes('--sandbox-')) return NextResponse.json({ error: 'not a sandbox — original builds cannot be renamed here' }, { status: 403 })
+      // rename = registry identity only; the folder keeps its slug (a running dev server holds cwd)
+      await writeRegistry(registry.map((e) => (e.name === body.name ? { ...e, name: next } : e)))
+      return NextResponse.json({ ok: true, renamed: next })
+    }
+
+    if (action === 'trash-sandbox') {
+      const registry = await readRegistry()
+      const entry = registry.find((e) => e.name === body.name)
+      if (!entry) return NextResponse.json({ error: 'unknown sandbox' }, { status: 404 })
+      if (!entry.path.includes('--sandbox-')) return NextResponse.json({ error: 'not a sandbox — the original build cannot be trashed' }, { status: 403 })
+      if (alive(entry.pid)) { try { process.kill(-entry.pid) } catch { process.kill(entry.pid) } }
+      // macOS Trash, not rm — recoverable, matching Figma's "Move to trash"
+      await run('osascript', ['-e', `tell application "Finder" to delete POSIX file "${entry.path}"`]).catch(async () => {
+        await rm(entry.path, { recursive: true, force: true }) // non-mac fallback
+      })
+      await writeRegistry(registry.filter((e) => e.name !== body.name))
+      return NextResponse.json({ ok: true, trashed: entry.name })
+    }
+
+    if (action === 'pick-folder') {
+      // native Finder folder picker (Dan: "selectable on local disc via finder")
+      const { stdout } = await run('osascript', ['-e', 'POSIX path of (choose folder with prompt "Select a build folder")'], { timeout: 120_000 })
+        .catch((e) => { throw Object.assign(new Error(/-128/.test(String(e)) ? 'cancelled' : 'picker failed'), { status: /-128/.test(String(e)) ? 409 : 500 }) })
+      return NextResponse.json({ ok: true, path: stdout.trim() })
+    }
+
     return NextResponse.json({ error: `unknown action: ${action}` }, { status: 400 })
   } catch (e) {
     const err = e as Error & { status?: number }
