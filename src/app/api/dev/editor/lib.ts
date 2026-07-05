@@ -236,6 +236,7 @@ export type WriteOp =
   | { kind: 'delete-page'; slug: string }
   | { kind: 'rename-page'; slug: string; newSlug: string }
   | { kind: 'set-layer-name'; file: string; line: number; col: number; name: string }
+  | { kind: 'rename-component'; name: string; newName: string }
 
 // ─── JSX inline-style write (E2.4, ENGINE-PLAN-E2.4.md) ──────────────────────
 
@@ -485,6 +486,93 @@ async function setLayerName(op: Extract<WriteOp, { kind: 'set-layer-name' }>): P
   assertValidTsx(abs, next.toString('utf8'))
   await fs.writeFile(abs, next)
   return { ok: true, file: op.file, newValueText: name }
+}
+
+/* E6.8 — TRUE component rename (Dan-approved analog for component layers): rename the component
+   file + the export function + every consumer's import specifier, import binding and JSX tags.
+   AST-exact (only nodes bound to THIS import are touched — no string collisions), and ALL outputs
+   are parse-validated BEFORE ANY file is written (the makeComponent F1 discipline). */
+async function renameComponentOp(op: Extract<WriteOp, { kind: 'rename-component' }>): Promise<{ ok: true; file: string; newValueText: string; updatedFiles: string[] }> {
+  if (!/^[A-Za-z][A-Za-z0-9]*$/.test(op.name) || !/^[A-Za-z][A-Za-z0-9]*$/.test(op.newName)) {
+    throw Object.assign(new Error('component names must be PascalCase identifiers'), { status: 422 })
+  }
+  const newName = op.newName[0].toUpperCase() + op.newName.slice(1)
+  const compDir = path.join(ROOT, 'src/app/(dev)/react-figma-components')
+  const fromAbs = path.join(compDir, `${op.name}.tsx`)
+  const toAbs = path.join(compDir, `${newName}.tsx`)
+  try { await fs.access(fromAbs) } catch { throw Object.assign(new Error(`component "${op.name}" not found`), { status: 404 }) }
+  try { await fs.access(toAbs); throw Object.assign(new Error(`"${newName}" already exists`), { status: 409 }) } catch (e) { if ((e as { status?: number }).status === 409) throw e }
+
+  const oldSpec = `@/app/(dev)/react-figma-components/${op.name}`
+  const newSpec = `@/app/(dev)/react-figma-components/${newName}`
+  const pending: { abs: string; rel: string; next: string }[] = []
+
+  // 1) the component file itself — rename the exported function identifier(s)
+  {
+    const source = await fs.readFile(fromAbs, 'utf8')
+    const sf = ts.createSourceFile(fromAbs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
+    const edits: [number, number][] = []
+    const visit = (node: ts.Node) => {
+      if (ts.isFunctionDeclaration(node) && node.name?.text === op.name) edits.push([node.name.getStart(sf), node.name.getEnd()])
+      ts.forEachChild(node, visit)
+    }
+    visit(sf)
+    if (!edits.length) throw Object.assign(new Error(`no exported function ${op.name} in the component file`), { status: 422 })
+    let next = source
+    for (const [s, e] of edits.sort((a, b) => b[0] - a[0])) next = next.slice(0, s) + newName + next.slice(e)
+    pending.push({ abs: toAbs, rel: `src/app/(dev)/react-figma-components/${newName}.tsx`, next })
+  }
+
+  // 2) consumers — bounded walk over src/ .tsx files containing the import specifier
+  const consumers: string[] = []
+  const walkDir = async (dir: string): Promise<void> => {
+    for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
+      if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue
+      const p = path.join(dir, entry.name)
+      if (entry.isDirectory()) await walkDir(p)
+      else if (entry.name.endsWith('.tsx') && p !== fromAbs) {
+        const s = await fs.readFile(p, 'utf8')
+        if (s.includes(oldSpec)) consumers.push(p)
+      }
+    }
+  }
+  await walkDir(path.join(ROOT, 'src'))
+  for (const abs of consumers) {
+    const source = await fs.readFile(abs, 'utf8')
+    const sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
+    const edits: { s: number; e: number; text: string }[] = []
+    let localName: string | null = null
+    for (const st of sf.statements) {
+      if (!ts.isImportDeclaration(st) || !ts.isStringLiteral(st.moduleSpecifier) || st.moduleSpecifier.text !== oldSpec) continue
+      edits.push({ s: st.moduleSpecifier.getStart(sf) + 1, e: st.moduleSpecifier.getEnd() - 1, text: newSpec })
+      const named = st.importClause?.namedBindings
+      if (named && ts.isNamedImports(named)) for (const spec of named.elements) {
+        if ((spec.propertyName ?? spec.name).text === op.name) {
+          edits.push({ s: (spec.propertyName ?? spec.name).getStart(sf), e: (spec.propertyName ?? spec.name).getEnd(), text: newName })
+          if (!spec.propertyName) localName = spec.name.text // unaliased → JSX tags use the same name
+        }
+      }
+    }
+    if (localName) {
+      const tagVisit = (node: ts.Node) => {
+        const tag = ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxClosingElement(node) ? node.tagName : null
+        if (tag && ts.isIdentifier(tag) && tag.text === localName) edits.push({ s: tag.getStart(sf), e: tag.getEnd(), text: newName })
+        ts.forEachChild(node, tagVisit)
+      }
+      tagVisit(sf)
+    }
+    let next = source
+    for (const ed of edits.sort((a, b) => b.s - a.s)) next = next.slice(0, ed.s) + ed.text + next.slice(ed.e)
+    pending.push({ abs, rel: path.relative(ROOT, abs), next })
+  }
+
+  // validate EVERY output before writing ANY (no half-renamed state)
+  for (const p of pending) assertValidTsx(p.abs, p.next)
+  for (const p of pending) if (p.abs !== toAbs) await fs.writeFile(p.abs, p.next, 'utf8')
+  await fs.writeFile(toAbs, pending[0].next, 'utf8')
+  await fs.rm(fromAbs)
+  await dropPageTypeStubs('') // no-op guard for pages; component stubs live elsewhere and regenerate
+  return { ok: true, file: `src/app/(dev)/react-figma-components/${newName}.tsx`, newValueText: newName, updatedFiles: pending.map((p) => p.rel) }
 }
 
 /* E6.8 — page delete/rename. HARD JAIL: only simple slugs, only direct children of the editor's own
@@ -740,6 +828,7 @@ export async function applyWrite(op: WriteOp): Promise<{ ok: true; file: string;
   if (op.kind === 'delete-page') return deletePage(op)
   if (op.kind === 'rename-page') return renamePage(op)
   if (op.kind === 'set-layer-name') return setLayerName(op)
+  if (op.kind === 'rename-component') return renameComponentOp(op)
   if (op.kind === 'make-component') return makeComponent(op)
   if (op.kind === 'create-page') return createPage(op)
   if (op.kind === 'set-token-value') return setTokenValue(op)
