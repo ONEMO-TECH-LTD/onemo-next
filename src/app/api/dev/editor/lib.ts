@@ -237,6 +237,7 @@ export type WriteOp =
   | { kind: 'rename-page'; slug: string; newSlug: string }
   | { kind: 'set-layer-name'; file: string; line: number; col: number; name: string }
   | { kind: 'rename-component'; name: string; newName: string }
+  | { kind: 'wrap-jsx-link'; file: string; line: number; col: number; href: string; newTab?: boolean }
 
 // ─── JSX inline-style write (E2.4, ENGINE-PLAN-E2.4.md) ──────────────────────
 
@@ -486,6 +487,53 @@ async function setLayerName(op: Extract<WriteOp, { kind: 'set-layer-name' }>): P
   assertValidTsx(abs, next.toString('utf8'))
   await fs.writeFile(abs, next)
   return { ok: true, file: op.file, newValueText: name }
+}
+
+/* E6.10 — link application (engineer contract, Framer-equivalent behavior):
+   · element already an <a>/<Link>: update/insert href (+ target/rel for new-tab) in place;
+   · anything else: wrap the subtree in <a href … style={{ display: 'contents' }}> — display:contents
+     removes the wrapper from layout, so linking never shifts geometry (real CSS, no invention).
+   href sanitized (http/https//-relative/#/mailto/tel only — no javascript: injection). Parse-guarded. */
+async function wrapJsxLink(op: Extract<WriteOp, { kind: 'wrap-jsx-link' }>): Promise<{ ok: true; file: string; newValueText: string }> {
+  const href = op.href.trim()
+  if (!href || href.length > 500 || !/^(https?:\/\/|\/|#|mailto:|tel:)/i.test(href) || /["<>]/.test(href)) {
+    throw Object.assign(new Error('invalid href (http(s)://, /route, #anchor, mailto:, tel: only)'), { status: 422 })
+  }
+  const abs = jailComponentWrite(op.file)
+  const buf = await fs.readFile(abs)
+  const source = buf.toString('utf8')
+  const sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
+  const opening = findJsxAt(sf, op.line, op.col)
+  if (!opening) throw Object.assign(new Error(`no JSX element at ${op.line}:${op.col}`), { status: 404 })
+  const tabAttrs = op.newTab ? ` target="_blank" rel="noreferrer"` : ''
+  const tagName = opening.tagName.getText(sf)
+  let next: Buffer
+  if (tagName === 'a' || tagName === 'Link') {
+    // update-in-place: replace existing href/target/rel attrs, or insert after the tag name
+    const drop = opening.attributes.properties.filter(
+      (p): p is ts.JsxAttribute => ts.isJsxAttribute(p) && ['href', 'target', 'rel'].includes(p.name.getText(sf)),
+    ).sort((a, b) => b.getStart(sf) - a.getStart(sf))
+    let text = source
+    for (const a of drop) text = text.slice(0, a.getStart(sf)).replace(/\s+$/, '') + text.slice(a.getEnd())
+    // attrs removed bottom-up (desc offsets stay valid); re-parse the edited string to find the
+    // shifted tag position, then insert the fresh href/target/rel after the tag name
+    const sf2 = ts.createSourceFile(abs, text, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
+    const opening2 = findJsxAt(sf2, op.line, op.col)
+    if (!opening2) throw Object.assign(new Error('element lost during attr rewrite'), { status: 422 })
+    const at = opening2.tagName.getEnd()
+    const out = text.slice(0, at) + ` href="${href}"${tabAttrs}` + text.slice(at)
+    next = Buffer.from(out, 'utf8')
+  } else {
+    const el: ts.Node = ts.isJsxSelfClosingElement(opening) ? opening : opening.parent
+    if (!ts.isJsxElement(el) && !ts.isJsxSelfClosingElement(el)) throw Object.assign(new Error('could not resolve the element subtree'), { status: 422 })
+    const s = el.getStart(sf), e = el.getEnd()
+    const bs = byteLen(source.slice(0, s)), be = byteLen(source.slice(0, e))
+    const openTxt = `<a href="${href}"${tabAttrs} style={{ display: 'contents' }}>`
+    next = Buffer.concat([buf.subarray(0, bs), Buffer.from(openTxt, 'utf8'), buf.subarray(bs, be), Buffer.from('</a>', 'utf8'), buf.subarray(be)])
+  }
+  assertValidTsx(abs, next.toString('utf8'))
+  await fs.writeFile(abs, next)
+  return { ok: true, file: op.file, newValueText: href }
 }
 
 /* E6.8 — TRUE component rename (Dan-approved analog for component layers): rename the component
@@ -829,6 +877,7 @@ export async function applyWrite(op: WriteOp): Promise<{ ok: true; file: string;
   if (op.kind === 'rename-page') return renamePage(op)
   if (op.kind === 'set-layer-name') return setLayerName(op)
   if (op.kind === 'rename-component') return renameComponentOp(op)
+  if (op.kind === 'wrap-jsx-link') return wrapJsxLink(op)
   if (op.kind === 'make-component') return makeComponent(op)
   if (op.kind === 'create-page') return createPage(op)
   if (op.kind === 'set-token-value') return setTokenValue(op)
