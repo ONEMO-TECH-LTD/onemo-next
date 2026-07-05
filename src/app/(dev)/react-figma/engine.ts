@@ -13,7 +13,7 @@ export type DefEntry = { value: string; token?: string; inheritedFrom?: { tag: s
 export type StyleReport = { computed: Record<string, string>; defined: Record<string, DefEntry> }
 
 /** CSS-inheritable subset the panel surfaces (plan §5 — enumerated, not guessed). */
-export const INHERITABLE = [
+const INHERITABLE = [
   'color', 'font-family', 'font-size', 'font-weight', 'font-style', 'line-height',
   'letter-spacing', 'text-align', 'text-transform', 'visibility', 'cursor',
 ] as const
@@ -127,7 +127,7 @@ function localName(el: HTMLElement): string {
   return ''
 }
 
-export function layerLabel(el: HTMLElement): string {
+function layerLabel(el: HTMLElement): string {
   return localName(el) || el.tagName.toLowerCase()
 }
 
@@ -158,7 +158,7 @@ export function buildLayerTree(doc: Document): LiveNode[] {
 export const tokenOf = (value: string): string | undefined => value.match(/var\(\s*(--[a-zA-Z0-9-]+)/)?.[1]
 
 /** Split a shorthand value into top-level slots — var()/calc() parens respected. */
-export function splitSlots(value: string): string[] {
+function splitSlots(value: string): string[] {
   const slots: string[] = []
   let depth = 0, cur = ''
   for (const ch of value) {
