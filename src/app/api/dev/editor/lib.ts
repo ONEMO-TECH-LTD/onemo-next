@@ -233,6 +233,8 @@ export type WriteOp =
   | { kind: 'duplicate-jsx'; file: string; line: number; col: number }
   | { kind: 'insert-component'; file: string; line: number; col: number; name: string; importPath: string }
   | { kind: 'create-component'; name: string }
+  | { kind: 'delete-page'; slug: string }
+  | { kind: 'rename-page'; slug: string; newSlug: string }
 
 // ─── JSX inline-style write (E2.4, ENGINE-PLAN-E2.4.md) ──────────────────────
 
@@ -458,6 +460,29 @@ async function createPage(op: Extract<WriteOp, { kind: 'create-page' }>): Promis
   return { ok: true, file: `src/app/(dev)/react-figma-pages/${slug}/page.tsx`, newValueText: slug, route: `/react-figma-pages/${slug}` }
 }
 
+/* E6.8 — page delete/rename. HARD JAIL: only simple slugs, only direct children of the editor's own
+   react-figma-pages sandbox (the dir create-page writes) — nothing else in the tree is deletable. */
+const PAGES_DIR = path.join(ROOT, 'src/app/(dev)/react-figma-pages')
+function jailPageSlug(slug: string): string {
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) throw Object.assign(new Error('invalid page slug'), { status: 422 })
+  return path.join(PAGES_DIR, slug)
+}
+async function deletePage(op: Extract<WriteOp, { kind: 'delete-page' }>): Promise<{ ok: true; file: string; newValueText: string }> {
+  const dir = jailPageSlug(op.slug)
+  try { await fs.access(path.join(dir, 'page.tsx')) } catch { throw Object.assign(new Error('page not found'), { status: 404 }) }
+  await fs.rm(dir, { recursive: true })
+  return { ok: true, file: `src/app/(dev)/react-figma-pages/${op.slug}`, newValueText: '(deleted)' }
+}
+async function renamePage(op: Extract<WriteOp, { kind: 'rename-page' }>): Promise<{ ok: true; file: string; newValueText: string; route: string }> {
+  const from = jailPageSlug(op.slug)
+  const base = op.newSlug.replace(/[^a-z0-9-]/gi, '-').toLowerCase().replace(/^-+|-+$/g, '')
+  if (!base) throw Object.assign(new Error('invalid new name'), { status: 422 })
+  let slug = base, n = 1
+  while (slug !== op.slug) { try { await fs.access(path.join(PAGES_DIR, slug)); slug = `${base}-${++n}` } catch { break } }
+  await fs.rename(from, path.join(PAGES_DIR, slug))
+  return { ok: true, file: `src/app/(dev)/react-figma-pages/${slug}/page.tsx`, newValueText: slug, route: `/react-figma-pages/${slug}` }
+}
+
 /**
  * Extract the selected JSX subtree into its own component file + replace it with an instance (E3.5).
  * SAFE v1: only proceeds when every FREE identifier the subtree references is a top-level import of
@@ -674,6 +699,8 @@ export async function applyWrite(op: WriteOp): Promise<{ ok: true; file: string;
   if (op.kind === 'delete-jsx') return deleteJsx(op)
   if (op.kind === 'duplicate-jsx') return duplicateJsx(op)
   if (op.kind === 'create-component') return createComponent(op)
+  if (op.kind === 'delete-page') return deletePage(op)
+  if (op.kind === 'rename-page') return renamePage(op)
   if (op.kind === 'make-component') return makeComponent(op)
   if (op.kind === 'create-page') return createPage(op)
   if (op.kind === 'set-token-value') return setTokenValue(op)

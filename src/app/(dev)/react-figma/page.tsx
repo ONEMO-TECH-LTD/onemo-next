@@ -1951,12 +1951,13 @@ export default function ReactFigmaPage() {
   type FsData = { root: string; path: string; parent: string | null; appStart: string; dirs: { name: string; route?: string }[]; files: { name: string; route?: string }[] }
   const [fsPath, setFsPath] = useState<string | null>(null)
   const [fsData, setFsData] = useState<FsData | null>(null)
+  const [fsNonce, setFsNonce] = useState(0) // bump to refresh after page create/delete/rename (E6.8)
   useEffect(() => {
     fetch(`/api/dev/editor-fs?path=${encodeURIComponent(fsPath ?? '')}`).then((r) => r.json()).then((d: FsData) => {
       if (fsPath === null && d.appStart) { setFsPath(d.appStart); return } // first load → jump to this app's src/app
       setFsData(d)
     }).catch(() => {})
-  }, [fsPath])
+  }, [fsPath, fsNonce])
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const switchCanvas = (name: string, route: string) => {
     if (route === canvas.route) return
@@ -2298,7 +2299,20 @@ export default function ReactFigmaPage() {
     notify(`Page created · ${res.newValueText}`)
     console.log('[engine] page created', res)
     setBuildSources((s) => [...s, { key: res.route, name: res.newValueText, route: res.route, group: 'react-figma-pages' }])
+    setFsNonce((n) => n + 1)
     setTimeout(() => switchCanvas(res.newValueText, res.route), 600) // give the route a beat to compile
+  }, [])
+  // E6.8 — delete/rename editor pages (jailed server ops; only the editor's own pages sandbox).
+  const deletePage = useCallback(async (slug: string) => {
+    if (!window.confirm(`Delete page “${slug}”? This removes its source file.`)) return
+    const r = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'delete-page', slug }) })
+    if (r.ok) { notify(`Page deleted · ${slug}`); setFsNonce((n) => n + 1) } else notify(`Delete failed: ${await r.text()}`, 'error')
+  }, [])
+  const renamePage = useCallback(async (slug: string) => {
+    const next = window.prompt('Rename page', slug)
+    if (!next || next === slug) return
+    const r = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'rename-page', slug, newSlug: next }) })
+    if (r.ok) { const d = await r.json() as { newValueText: string }; notify(`Renamed · ${d.newValueText}`); setFsNonce((n) => n + 1) } else notify(`Rename failed: ${await r.text()}`, 'error')
   }, [])
 
   const pushTransform = useCallback((rot: string, fh: boolean, fv: boolean) => {
@@ -2781,11 +2795,14 @@ export default function ReactFigmaPage() {
                   )}
                   {fsData.dirs.map((d) => {
                     const rel = fsData.path ? `${fsData.path}/${d.name}` : d.name
+                    const editorPage = d.route?.startsWith('/react-figma-pages/') // E6.8: only editor-created pages are mutable
                     return (
                       <div key={d.name} onClick={() => (d.route ? switchCanvas(d.name, d.route) : setFsPath(rel))}
+                        onDoubleClick={editorPage ? (e) => { e.stopPropagation(); void renamePage(d.name) } : undefined}
                         style={{ height: 28, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', borderRadius: 5, background: d.route && d.route === canvas.route ? '#f0f1f3' : 'transparent', font: `400 11px/16px ${FONT}`, color: INK, cursor: 'pointer' }}>
                         <span onClick={(e) => { e.stopPropagation(); setFsPath(rel) }} style={{ width: 16, height: 16, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)' }}><UiIcon name="caretRight16" size={16} /></span>
                         <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', font: d.route ? `550 11px/16px ${FONT}` : `400 11px/16px ${FONT}` }}>{d.name}</span>
+                        {editorPage && <span onClick={(e) => e.stopPropagation()} style={{ display: 'flex' }}><UiIB name="minus" title="Delete page" on={() => void deletePage(d.name)} /></span>}
                         {d.route && <span style={{ color: MUTE, font: `400 9px/16px ${FONT}` }}>screen</span>}
                       </div>
                     )
