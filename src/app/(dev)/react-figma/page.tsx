@@ -88,7 +88,6 @@ function FIB({ name, title, on }: { name: keyof typeof FI; title?: string; on?: 
 }
 
 const UI_ICON = {
-  present: { viewBox: '0 0 24 24', paths: ['M6 5.903C6 4.43 7.604 3.517 8.87 4.269l10.15 6.028c1.307.776 1.305 2.669-.003 3.442l-10.15 5.995c-1.228.724-2.768-.11-2.863-1.5L6 18.098zm1 12.195a.9.9 0 0 0 1.357.774l10.152-5.995a1 1 0 0 0 .002-1.72L8.359 5.129A.9.9 0 0 0 7 5.903z'] },
   railFile: { viewBox: '0 0 24 24', paths: ['M12.598 5.01a.5.5 0 0 1 .255.136l4 4A.5.5 0 0 1 16.5 10h-4a.5.5 0 0 1-.5-.5V6H8.5a.5.5 0 0 0-.5.5v11a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5v-6a.5.5 0 0 1 1 0v6a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 7 17.5v-11A1.5 1.5 0 0 1 8.5 5h4zM13 9h2.293L13 6.707z'] },
   railAssets: { viewBox: '0 0 24 24', paths: ['M18 12a6 6 0 1 1-12 0 6 6 0 0 1 12 0m1 0a7 7 0 1 1-14 0 7 7 0 0 1 14 0m-6.5-2.5a.5.5 0 0 0-1 0v2h-2a.5.5 0 0 0 0 1h2v2a.5.5 0 0 0 1 0v-2h2a.5.5 0 0 0 0-1h-2z'] },
   railVariables: { viewBox: '0 0 24 24', paths: ['M11.117 5.586A2 2 0 0 1 13 5.649l4 2.31.113.07A2 2 0 0 1 18 9.69v4.62a2 2 0 0 1-.887 1.66l-.113.072-4 2.309a2 2 0 0 1-1.883.063L11 18.351l-4-2.309a2 2 0 0 1-1-1.732V9.69a2 2 0 0 1 1-1.73l4-2.31zm1.383.93a1 1 0 0 0-1 0l-4 2.308-.11.074A1 1 0 0 0 7 9.69v4.62l.009.132c.04.305.22.578.491.734l4 2.31c.27.155.597.175.88.058l.12-.059 4-2.31a1 1 0 0 0 .491-.733L17 14.31V9.69a1 1 0 0 0-.39-.792l-.11-.074zM12 10a2 2 0 1 1 0 4 2 2 0 0 1 0-4m0 1a1 1 0 1 0 0 2 1 1 0 0 0 0-2'] },
@@ -2505,10 +2504,11 @@ export default function ReactFigmaPage() {
               <UiIcon name="devCode" size={14} />{committing ? 'Saving…' : `Save to code · ${ov.current!.dirty().filter((o) => !o.stale).length}`}
             </button>
           )}
-          <div style={{ marginLeft: 'auto', width: 107.5, display: 'flex', alignItems: 'center', gap: 1, height: 32 }}>
-            <button type="button" aria-label="Present" style={{ appearance: 'none', border: 0, background: 'transparent', width: 32, height: 32, borderRadius: '5px 0 0 5px', display: 'grid', gridTemplateColumns: '24px', placeItems: 'center', padding: '0 4px', cursor: 'pointer', color: INK }}><UiIcon name="present" /></button>
-            <button type="button" aria-label="Prototype view" style={{ appearance: 'none', border: 0, background: 'transparent', width: 16, height: 32, borderRadius: '0 5px 5px 0', display: 'grid', gridTemplateColumns: '20px', placeItems: 'center', padding: 0, cursor: 'pointer', color: INK }}><UiIcon name="caret24" /></button>
-            <button type="button" style={{ appearance: 'none', border: 0, background: SEL, color: '#fff', height: 32, marginLeft: 3, borderRadius: 5, padding: '0 12px', cursor: 'pointer', font: `450 11px/16px ${FONT}`, letterSpacing: '0.055px' }}>Publish</button>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 1, height: 32 }}>
+            {/* #7/#8: dead Present / Prototype-preview chrome removed (no analog in this editor);
+                Publish was a dead button — now commits all staged overrides to source. */}
+            <button type="button" disabled={committing || !(ovVersion >= 0 && ov.current!.dirty().filter((o) => !o.stale).length > 0)} onClick={() => void commitOverrides()} title="Publish — save all changes to code"
+              style={{ appearance: 'none', border: 0, background: SEL, color: '#fff', height: 32, borderRadius: 5, padding: '0 12px', cursor: committing ? 'default' : 'pointer', font: `450 11px/16px ${FONT}`, letterSpacing: '0.055px', opacity: (committing || !(ovVersion >= 0 && ov.current!.dirty().filter((o) => !o.stale).length > 0)) ? 0.5 : 1 }}>{committing ? 'Publishing…' : 'Publish'}</button>
           </div>
         </div>
         <div style={{ height: 33, borderBottom: `1px solid ${LINE}`, display: 'flex', alignItems: 'flex-start', padding: '0 8px', flex: 'none' }}>
