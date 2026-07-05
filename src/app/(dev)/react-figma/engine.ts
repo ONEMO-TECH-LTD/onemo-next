@@ -429,12 +429,24 @@ export function colorToHex(c: string, doc: Document): { hex: string; op: number 
   if (!_ctx) return null
   _ctx.fillStyle = '#000000'
   try { _ctx.fillStyle = c } catch { return null }
-  const s = _ctx.fillStyle as string // normalized '#rrggbb' | 'rgba(r, g, b, a)' | 'color(...)'
+  const s = _ctx.fillStyle as string // normalized '#rrggbb' | 'rgba(r, g, b, a)' | 'color(...)' | 'oklch(...)'
   if (s.startsWith('#')) return { hex: s.slice(1).toUpperCase(), op: 100 }
-  const m = s.match(/rgba\((\d+), (\d+), (\d+), ([\d.]+)\)/)
-  if (!m) return null
-  const a = parseFloat(m[4]!)
-  if (a === 0) return null
-  const hex = [m[1], m[2], m[3]].map((n) => (+n!).toString(16).padStart(2, '0').toUpperCase()).join('')
-  return { hex, op: Math.round(a * 100) }
+  const m = s.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/)
+  if (m) {
+    const a = m[4] !== undefined ? parseFloat(m[4]) : 1
+    if (a === 0) return null
+    const hex = [m[1], m[2], m[3]].map((n) => (+n!).toString(16).padStart(2, '0').toUpperCase()).join('')
+    return { hex, op: Math.round(a * 100) }
+  }
+  // Modern color spaces (oklch / color() / lab / …) — the DS tokens use these, and the canvas
+  // serializes them to color(srgb …) rather than rgba, so parsing the string fails. Render the
+  // colour and read the pixel back — resolves any format the browser can paint.
+  try {
+    _ctx.clearRect(0, 0, 1, 1)
+    _ctx.fillRect(0, 0, 1, 1)
+    const p = _ctx.getImageData(0, 0, 1, 1).data
+    if (p[3] === 0) return null
+    const hex = [p[0]!, p[1]!, p[2]!].map((n) => n.toString(16).padStart(2, '0').toUpperCase()).join('')
+    return { hex, op: Math.round((p[3]! / 255) * 100) }
+  } catch { return null }
 }
