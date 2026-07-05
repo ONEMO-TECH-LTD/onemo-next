@@ -450,11 +450,12 @@ const MODE_CARET = '__caret__'
    the trailing edge. Every prior field variant (InspectorField / AutoValueField /
    InlineValueInput) is a thin wrapper over this — one anatomy, one implementation (Dan:
    "make a component and reuse, not vibe-code each"). */
-function FigmaField({ icon, letter, glyph, value, onChange, token, suffix, ariaLabel, mode, modeOptions, onMode, picker = true, width, whiteBg, dim, title }: {
+function FigmaField({ icon, letter, glyph, value, onChange, onCommit, token, suffix, ariaLabel, mode, modeOptions, onMode, picker = true, width, whiteBg, dim, title, placeholder, inputRole = 'spinbutton' }: {
   icon?: keyof typeof UI_ICON; letter?: string; glyph?: React.ReactNode; value: string; onChange?: (value: string) => void
+  onCommit?: (value: string) => void
   token?: string; suffix?: string; ariaLabel: string
   mode?: string; modeOptions?: [string, string][]; onMode?: (value: string) => void
-  picker?: boolean; width?: number | string; whiteBg?: boolean; dim?: boolean; title?: string
+  picker?: boolean; width?: number | string; whiteBg?: boolean; dim?: boolean; title?: string; placeholder?: string; inputRole?: 'spinbutton' | 'textbox'
 }) {
   const [varOpen, setVarOpen] = useState(false)
   const [modeOpen, setModeOpen] = useState(false)
@@ -469,7 +470,9 @@ function FigmaField({ icon, letter, glyph, value, onChange, token, suffix, ariaL
       {bound ? (
         <TokenPill token={token ?? value} />
       ) : onChange ? (
-        <input aria-label={ariaLabel} role="spinbutton" value={value} onChange={e => onChange(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
+        <input aria-label={ariaLabel} role={inputRole} value={value} placeholder={placeholder} onChange={e => onChange(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
+          onBlur={e => onCommit?.(e.currentTarget.value)}
+          onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
           style={{ minWidth: 0, width: '100%', height: 22, border: 0, outline: 0, padding: 0, background: 'transparent', color: dim ? MUTE : INK, font: `450 11px/16px ${FONT}` }} />
       ) : (
         <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: dim ? MUTE : INK }}>{value}</span>
@@ -551,6 +554,39 @@ function FigmaMenuRow({ children, checked, onClick }: { children: React.ReactNod
       <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', visibility: checked ? 'visible' : 'hidden' }}><MenuCheck /></span>
       <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{children}</span>
     </li>
+  )
+}
+function FileMenuRow({ label, shortcut, checked, disabled, title, onClick }: { label: string; shortcut?: string; checked?: boolean; disabled?: boolean; title?: string; onClick?: () => void }) {
+  const [h, setH] = useState(false)
+  return (
+    <li role={checked ? 'menuitemradio' : 'menuitem'} aria-checked={checked} aria-disabled={disabled} title={title}
+      onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
+      onClick={() => { if (!disabled) onClick?.() }}
+      style={{ width: 200, height: 24, display: 'grid', gridTemplateColumns: '16px minmax(0,1fr) auto', alignItems: 'center', padding: '0 8px', boxSizing: 'border-box', cursor: disabled ? 'default' : 'pointer', color: disabled ? 'rgba(255,255,255,0.35)' : '#fff', background: h && !disabled ? 'rgba(255,255,255,0.08)' : 'transparent', font: `400 11px/24px ${FONT}` }}>
+      <span style={{ width: 16, height: 16, display: 'grid', placeItems: 'center', visibility: checked ? 'visible' : 'hidden' }}><MenuCheck /></span>
+      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+      {shortcut && <span style={{ paddingLeft: 12, color: disabled ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.45)', whiteSpace: 'nowrap' }}>{shortcut}</span>}
+    </li>
+  )
+}
+function LinkTargetField({ value, options, onChange, onCommit }: { value: string; options: { label: string; href: string }[]; onChange: (value: string) => void; onCommit: (value: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
+  const shown = options.slice(0, 12)
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'grid', gridTemplateColumns: '1fr 24px', gap: 4, minWidth: 0 }}>
+      <FigmaField value={value} ariaLabel="Link target" placeholder="Page or URL…" onChange={onChange} onCommit={onCommit} picker={false} width="100%" inputRole="textbox" />
+      <UiIB name="caret16" title="Page suggestions" size={16} active={open} on={() => setOpen(v => !v)} />
+      {open && shown.length > 0 && (
+        <div role="presentation" data-figma-floating-root="true" style={{ position: 'absolute', zIndex: 130, top: 28, right: 0, width: 200, padding: '8px 0 6px', borderRadius: 13, background: '#1e1e1e', color: '#fff', boxShadow: 'rgba(0,0,0,0.15) 0px 2px 5px 0px, rgba(0,0,0,0.12) 0px 10px 16px 0px, rgba(0,0,0,0.12) 0px 0px 0.5px 0px' }}>
+          <ul role="menu" aria-label="Link target pages" style={{ width: 200, margin: 0, padding: 0, listStyle: 'none', maxHeight: 288, overflowY: 'auto' }}>
+            {shown.map(option => (
+              <FileMenuRow key={option.href} label={option.label} checked={value === option.href} onClick={() => { onChange(option.href); onCommit(option.href); setOpen(false) }} />
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
   )
 }
 function PickerMenuOption({ value, width, checked, onClick }: { value: string; width: number; checked?: boolean; onClick: () => void }) {
@@ -1827,6 +1863,8 @@ type CanvasIconAsset = { kind: 'svg' | 'image'; value: string }
 const CANVAS_FALLBACK: BuildSource[] = [
   { key: 'editor-402', name: 'Editor 402 — apple blur glass', route: '/react-figma/canvas', group: 'storybook/create-studio' },
 ]
+const RECENT_BUILDS_KEY = 'react-figma:recent-builds'
+const MAX_RECENT_BUILDS = 8
 /* M3 dirty-ledger UI: OFF until a Dan-approved Figma-canon treatment exists —
    the right panel must match Codex's shell exactly. Commit path stays callable. */
 const SHOW_LEDGER = false
@@ -1904,8 +1942,16 @@ export default function ReactFigmaPage() {
   const [canvas, setCanvas] = useState<{ name: string; route: string }>({ name: 'Editor 402 — apple blur glass', route: '/react-figma/canvas' })
   const [sourceMenuOpen, setSourceMenuOpen] = useState(false)
   const [buildSources, setBuildSources] = useState<BuildSource[]>(CANVAS_FALLBACK)
+  const [recentBuilds, setRecentBuilds] = useState<BuildSource[]>([])
+  const folderPickerRef = useRef<HTMLInputElement>(null)
   useEffect(() => { // quick list for the top selector menu — known loadable screens
     fetch('/api/dev/editor-sources').then((r) => r.json()).then((d) => { if (Array.isArray(d.sources) && d.sources.length) setBuildSources(d.sources) }).catch(() => {})
+  }, [])
+  useEffect(() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(RECENT_BUILDS_KEY) ?? '[]') as BuildSource[]
+      if (Array.isArray(parsed)) setRecentBuilds(parsed.filter((s) => s && typeof s.route === 'string' && typeof s.name === 'string').slice(0, MAX_RECENT_BUILDS))
+    } catch { /* ignore corrupt local recents */ }
   }, [])
   // local folder browser (Pages panel) — navigable filesystem under the dev root
   type FsData = { root: string; path: string; parent: string | null; appStart: string; dirs: { name: string; route?: string }[]; files: { name: string; route?: string }[] }
@@ -1919,16 +1965,29 @@ export default function ReactFigmaPage() {
     }).catch(() => {})
   }, [fsPath, fsNonce])
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
-  const switchCanvas = (name: string, route: string) => {
+  const rememberBuildSource = useCallback((source: BuildSource) => {
+    setRecentBuilds((prev) => {
+      const next = [source, ...prev.filter((s) => s.route !== source.route)].slice(0, MAX_RECENT_BUILDS)
+      try { localStorage.setItem(RECENT_BUILDS_KEY, JSON.stringify(next)) } catch { /* storage unavailable */ }
+      return next
+    })
+  }, [])
+  const switchCanvas = useCallback((name: string, route: string) => {
     if (route === canvas.route) return
+    const source = buildSources.find((s) => s.route === route) ?? recentBuilds.find((s) => s.route === route) ?? { key: route, name, route, group: 'connected-builds' }
+    rememberBuildSource(source)
     setCanvas({ name, route }); setLayers(null); setSel(null); setSelRect(null); setHoverRect(null); setLiveFills(null); setCollapsed(new Set()); selIdRef.current = null
-  }
+    setLinkHref(''); setLinkNewTab(false); setLinkTarget(null)
+  }, [buildSources, canvas.route, recentBuilds, rememberBuildSource])
   const [fieldTokens, setFieldTokens] = useState<Record<string, string | undefined>>({})
   const [liveFills, setLiveFills] = useState<{ hex: string; op: number; origin?: string; prop: string }[] | null>(null)
   const [liveStrokes, setLiveStrokes] = useState<{ hex: string; op: number; weight: number; position: string; sides?: { top: number; right: number; bottom: number; left: number } }[] | null>(null)
   const [liveEffects, setLiveEffects] = useState<{ type: string; detail: string }[] | null>(null)
   const liveShadowsRef = useRef<ReturnType<typeof parseShadow>[]>([])
   const [liveSelColors, setLiveSelColors] = useState<{ hex: string; op: number }[] | null>(null)
+  const [linkHref, setLinkHref] = useState('')
+  const [linkNewTab, setLinkNewTab] = useState(false)
+  const [linkTarget, setLinkTarget] = useState<SelPayload | null>(null)
   // E2.2 Text section — present only for text-bearing elements (Figma canon)
   const [typo, setTypo] = useState<{ family: string; weight: string; size: string; lineHeight: string; letterSpacing: string; align: string } | null>(null)
   const selIdRef = useRef<string | null>(null)
@@ -1949,6 +2008,12 @@ export default function ReactFigmaPage() {
     const id = el.getAttribute('data-eng-id') ?? (el.setAttribute('data-eng-id', `sel-${Date.now()}`), el.getAttribute('data-eng-id')!)
     selIdRef.current = id
     setSel(payload); setLayerSelId(id); setSelRect(rectOf(el))
+    const linkEl = (el.tagName.toLowerCase() === 'a' ? el : el.closest('a')) as HTMLElement | null
+    const linkSrc = linkEl?.getAttribute('data-src') ?? ''
+    const linkMatch = linkSrc.match(/^(.*):(\d+):(\d+)$/)
+    setLinkHref(linkEl?.getAttribute('href') ?? '')
+    setLinkNewTab(linkEl?.getAttribute('target') === '_blank')
+    setLinkTarget(linkEl && linkMatch ? { file: linkMatch[1], line: +linkMatch[2], col: +linkMatch[3], tag: linkEl.tagName.toLowerCase(), classes: [...linkEl.classList] } : null)
 
     const rep = readStyles(el)
     const doc = el.ownerDocument
@@ -2191,6 +2256,39 @@ export default function ReactFigmaPage() {
     input.click()
   }, [sel, insertSnippet])
 
+  const applyLink = useCallback(async (hrefValue = linkHref, newTabValue = linkNewTab) => {
+    const target = linkTarget ?? sel
+    const href = hrefValue.trim()
+    if (!target) { notify('Select an element first', 'error'); return }
+    if (!href) { notify('Enter a page or URL', 'error'); return }
+    const r = await fetch('/api/dev/editor-write', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ kind: 'wrap-jsx-link', file: target.file, line: target.line, col: target.col, href, newTab: newTabValue }),
+    })
+    if (r.ok) {
+      setLinkHref(href); setLinkNewTab(newTabValue)
+      notify(`Linked to ${href}`)
+    } else notify(`Link failed: ${await r.text()}`, 'error')
+  }, [linkHref, linkNewTab, linkTarget, sel])
+
+  const openBuildFolderPicker = useCallback(() => {
+    const input = folderPickerRef.current
+    if (!input) return
+    input.setAttribute('webkitdirectory', '')
+    input.setAttribute('directory', '')
+    input.click()
+  }, [])
+  const onBuildFolderPicked = useCallback((files: FileList | null) => {
+    const picked = Array.from(files ?? [])
+    if (!picked.length) return
+    const hasApp = picked.some((file) => {
+      const p = file.webkitRelativePath || file.name
+      return p === 'src/app/page.tsx' || p.includes('/src/app/') || p.startsWith('src/app/')
+    })
+    if (hasApp) notify('Build folder selected — connect route is E6.9 backend')
+    else notify('Folder selected, but no src/app route tree found', 'error')
+  }, [])
+
   // E4-G2 Selection colors: recolor every occurrence of a color across the selected subtree
   // (multi-element override; commitOverrides already saves all dirty elements).
   const recolorSelection = useCallback((oldHex: string, newHex: string, newOp: number) => {
@@ -2261,7 +2359,7 @@ export default function ReactFigmaPage() {
     setBuildSources((s) => [...s, { key: res.route, name: res.newValueText, route: res.route, group: 'react-figma-pages' }])
     setFsNonce((n) => n + 1)
     setTimeout(() => switchCanvas(res.newValueText, res.route), 600) // give the route a beat to compile
-  }, [])
+  }, [switchCanvas])
   // E6.8 — delete/rename editor pages (jailed server ops; only the editor's own pages sandbox).
   const deletePage = useCallback(async (slug: string) => {
     if (!window.confirm(`Delete page “${slug}”? This removes its source file.`)) return
@@ -2707,6 +2805,22 @@ export default function ReactFigmaPage() {
     try { return new URL(src, window.location.origin).toString() }
     catch { return src }
   }
+  const connectedBuilds = useMemo(() => {
+    const byRoute = new Map<string, BuildSource>()
+    for (const s of [buildSources.find((b) => b.route === canvas.route) ?? { key: canvas.route, name: canvas.name, route: canvas.route, group: 'current' }, ...recentBuilds, ...buildSources]) {
+      if (!byRoute.has(s.route)) byRoute.set(s.route, s)
+    }
+    return [...byRoute.values()].slice(0, MAX_RECENT_BUILDS)
+  }, [buildSources, canvas.name, canvas.route, recentBuilds])
+  const linkTargetOptions = useMemo(() => {
+    const byHref = new Map<string, { label: string; href: string }>()
+    for (const s of [...buildSources, ...recentBuilds]) if (s.route.startsWith('/')) byHref.set(s.route, { label: s.name, href: s.route })
+    for (const d of fsData?.dirs ?? []) if (d.route) byHref.set(d.route, { label: d.name, href: d.route })
+    for (const f of fsData?.files ?? []) if (f.route) byHref.set(f.route, { label: f.name.replace(/\.stories\.tsx$/, ''), href: f.route })
+    return [...byHref.values()]
+  }, [buildSources, fsData, recentBuilds])
+  const fileMenuDirty = ovVersion >= 0 ? ov.current!.dirty().filter((o) => !o.stale).length : 0
+  const canMenuPublish = fileMenuDirty > 0 && !committing
 
   // E5 #29/#30: Agents + Tools were dead nav buttons (null → no panel, click did nothing). Removed
   // rather than invent panels — same disposition as the "useless" Design/Prototype tablist.
@@ -2739,17 +2853,25 @@ export default function ReactFigmaPage() {
             style={{ appearance: 'none', border: 0, background: 'transparent', cursor: 'pointer', minWidth: 0, padding: 0, textAlign: 'left', font: `550 12px/16px ${FONT}`, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{canvas.name}</button>
           <UiIB name="caret16" title="Select build source" on={() => setSourceMenuOpen((v) => !v)} />
           <UiIB name="minimizeUI" title={uiMinimized ? 'Expand UI' : 'Minimize UI'} active={uiMinimized} on={() => setUiMinimized(v => !v)} />
+          <input ref={folderPickerRef} type="file" multiple hidden onChange={(e) => { onBuildFolderPicked(e.currentTarget.files); e.currentTarget.value = '' }} />
           {sourceMenuOpen && (
-            <div role="presentation" style={{ position: 'absolute', zIndex: 120, top: 38, left: 8, width: 224, padding: '0 8px', borderRadius: 13, background: '#1e1e1e', color: '#fff', boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px' }}>
-              <ul role="menu" aria-label="Build sources" style={{ width: 208, margin: 0, padding: '8px 0 6px', listStyle: 'none', maxHeight: 420, overflowY: 'auto' }}>
-                {Object.entries(buildSources.reduce<Record<string, BuildSource[]>>((acc, s) => { (acc[s.group] ??= []).push(s); return acc }, {})).map(([group, items], gi) => (
-                  <Fragment key={group}>
-                    {gi > 0 && <FigmaMenuSeparator />}
-                    {items.map((s) => (
-                      <FigmaMenuRow key={s.key} checked={s.route === canvas.route} onClick={() => { switchCanvas(s.name, s.route); setSourceMenuOpen(false) }}>{group === '(root)' ? s.name : `${group}/${s.name}`}</FigmaMenuRow>
-                    ))}
-                  </Fragment>
+            <div role="presentation" style={{ position: 'absolute', zIndex: 120, top: 38, left: 8, width: 200, padding: '8px 0 6px', borderRadius: 13, background: '#1e1e1e', color: '#fff', boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px' }}>
+              <ul role="menu" aria-label="File menu" style={{ width: 200, margin: 0, padding: 0, listStyle: 'none', maxHeight: 420, overflowY: 'auto' }}>
+                {connectedBuilds.map((s) => (
+                  <FileMenuRow key={s.route} label={s.name} checked={s.route === canvas.route} onClick={() => { switchCanvas(s.name, s.route); setSourceMenuOpen(false) }} />
                 ))}
+                <FileMenuRow label="Open build folder…" onClick={() => { setSourceMenuOpen(false); openBuildFolderPicker() }} />
+                <FigmaMenuSeparator />
+                <FileMenuRow label="Show version history" disabled title="wired in E6.9 backend" />
+                <FileMenuRow label="Publish library…" disabled={!canMenuPublish} title={canMenuPublish ? 'Publish staged changes' : 'No changes to publish'} onClick={() => { setSourceMenuOpen(false); void commitOverrides() }} />
+                <FileMenuRow label="Export…" shortcut="⇧⌘E" disabled title="wired in E6.9 backend" />
+                <FileMenuRow label="Add to sidebar" disabled title="wired in E6.9 backend" />
+                <FileMenuRow label="Create branch…" disabled title="wired in E6.9 backend" />
+                <FileMenuRow label="File color profile" disabled title="wired in E6.9 backend" />
+                <FileMenuRow label="Duplicate" disabled title="wired in E6.9 backend" />
+                <FileMenuRow label="Rename" disabled title="wired in E6.9 backend" />
+                <FileMenuRow label="Move file…" disabled title="wired in E6.9 backend" />
+                <FileMenuRow label="Move to trash" disabled title="wired in E6.9 backend" />
               </ul>
             </div>
           )}
@@ -2768,7 +2890,6 @@ export default function ReactFigmaPage() {
                   Caret always enters; '..' goes up. */}
               {fsData && (
                 <>
-                  <div title={`${fsData.root}/${fsData.path}`} style={{ height: 22, display: 'flex', alignItems: 'center', padding: '0 8px', font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', direction: 'rtl', textAlign: 'left' }}>{fsData.root}/{fsData.path}</div>
                   {fsData.parent !== null && (
                     <div onClick={() => setFsPath(fsData.parent ?? '')} style={{ height: 28, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', borderRadius: 5, font: `400 11px/16px ${FONT}`, color: MUTE, cursor: 'pointer' }}>
                       <span style={{ width: 16, textAlign: 'center' }}>‹</span><span>..</span>
@@ -3134,6 +3255,17 @@ export default function ReactFigmaPage() {
                 { label: '◞', value: corners.br, ariaLabel: 'Corner bottom-right', onChange: (v) => { setCorners(s => ({ ...s, br: v })); applyOverride('cornerBR', v) } },
                 { label: '◟', value: corners.bl, ariaLabel: 'Corner bottom-left', onChange: (v) => { setCorners(s => ({ ...s, bl: v })); applyOverride('cornerBL', v) } },
               ]} />
+            )}
+          </Sec>
+
+          <Sec title="Link" actionWidth={24} action={<UiIB name={linkTarget ? 'minus' : 'plus'} title={linkTarget ? 'Remove link (wired in E6.9 backend)' : 'Apply link'} on={() => { if (linkTarget) notify('Remove link is E6.9 backend', 'error'); else void applyLink() }} />} bodyGap={0} bodyPadding="0">
+            <InspectorRow label="Link To" columns="1fr" height={48}>
+              <LinkTargetField value={linkHref} options={linkTargetOptions} onChange={setLinkHref} onCommit={(href) => void applyLink(href)} />
+            </InspectorRow>
+            {linkHref.trim() && (
+              <InspectorRow label="Open in new tab" columns="1fr" height={48}>
+                <TextSegGroup items={['No', 'Yes']} active={linkNewTab ? 1 : 0} onSelect={(i) => { const next = i === 1; setLinkNewTab(next); void applyLink(linkHref, next) }} width="100%" ariaLabel="Open link in new tab" />
+              </InspectorRow>
             )}
           </Sec>
 
