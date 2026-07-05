@@ -467,10 +467,20 @@ function jailPageSlug(slug: string): string {
   if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) throw Object.assign(new Error('invalid page slug'), { status: 422 })
   return path.join(PAGES_DIR, slug)
 }
+/* Next dev generates type stubs per route (.next/dev/types/app/…); they linger after the source
+   dir is removed and turn the typecheck gate red (meta-qa E6 batch-2 HIGH). Clearing the GENERATED
+   stub is safe — it's cache, regenerated on demand. */
+async function dropPageTypeStubs(slug: string): Promise<void> {
+  for (const p of [
+    path.join(ROOT, '.next', 'dev', 'types', 'app', '(dev)', 'react-figma-pages', slug),
+    path.join(ROOT, '.next', 'types', 'app', '(dev)', 'react-figma-pages', slug),
+  ]) { try { await fs.rm(p, { recursive: true, force: true }) } catch { /* cache layout differs — fine */ } }
+}
 async function deletePage(op: Extract<WriteOp, { kind: 'delete-page' }>): Promise<{ ok: true; file: string; newValueText: string }> {
   const dir = jailPageSlug(op.slug)
   try { await fs.access(path.join(dir, 'page.tsx')) } catch { throw Object.assign(new Error('page not found'), { status: 404 }) }
   await fs.rm(dir, { recursive: true })
+  await dropPageTypeStubs(op.slug)
   return { ok: true, file: `src/app/(dev)/react-figma-pages/${op.slug}`, newValueText: '(deleted)' }
 }
 async function renamePage(op: Extract<WriteOp, { kind: 'rename-page' }>): Promise<{ ok: true; file: string; newValueText: string; route: string }> {
@@ -480,6 +490,7 @@ async function renamePage(op: Extract<WriteOp, { kind: 'rename-page' }>): Promis
   let slug = base, n = 1
   while (slug !== op.slug) { try { await fs.access(path.join(PAGES_DIR, slug)); slug = `${base}-${++n}` } catch { break } }
   await fs.rename(from, path.join(PAGES_DIR, slug))
+  await dropPageTypeStubs(op.slug) // the OLD slug's generated type stub would go stale
   return { ok: true, file: `src/app/(dev)/react-figma-pages/${slug}/page.tsx`, newValueText: slug, route: `/react-figma-pages/${slug}` }
 }
 
