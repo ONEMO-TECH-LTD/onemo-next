@@ -15,7 +15,7 @@
  *  Spec: Inter 11px; headers 550/~0.5px near-black; fields 24px/5px radius; every value field raw-OR-token (◆).
  */
 
-import { Fragment, useState, useRef, useEffect, useCallback } from 'react'
+import { Fragment, useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { buildLayerTree, readStyles, colorToHex, hexToRgba, boxSlots, gapSlots, editSlot, tokenOf, Overrides, parseEffects, parseShadow, formatShadow, splitTopLevel, alignToIndex, alignFromIndex, collectSelectionColors, ensureId, type LiveNode, type OverrideOp } from './engine'
 import { createPortal } from 'react-dom'
 import {
@@ -730,9 +730,41 @@ function LayerRow({ n, on, onToggle, rowId }: { n: Node; on?: () => void; onTogg
 /* #31 — parse a Figma variables JSON export into collections → variables → mode values. Handles the
    documented Figma shape ({ meta?: { variableCollections, variables } } or top-level), converting
    COLOR {r,g,b,a} (0–1) to hex. Returns null if it doesn't look like a Figma variables export. */
-type ImportedVar = { name: string; type: string; values: string[] }
+type ImportedVar = { name: string; type: string; values: string[]; scopes?: string[]; path?: string }
 type ImportedCollection = { name: string; modes: string[]; vars: ImportedVar[] }
+/* E6.7 — Dan's REAL export (SSOT: storybook/design-system/variables/figma-export.json) is the
+   variables2json shape: an ARRAY of `{ "<coll>": { modes: { "<Mode>": { <group…>: { <leaf>:
+   {$type,$value,$scopes} } } } } }` with HEX originals. Parse it first; REST + plugin shapes stay. */
+function parseVariables2Json(data: unknown): ImportedCollection[] | null {
+  if (!Array.isArray(data) || !data.length || typeof data[0] !== 'object') return null
+  const out: ImportedCollection[] = []
+  for (const item of data as Record<string, { modes?: Record<string, unknown> }>[]) {
+    const coll = Object.keys(item)[0]
+    if (!coll || !item[coll]?.modes) return null // not this shape
+    const modes = Object.keys(item[coll].modes!)
+    const byPath = new Map<string, ImportedVar>()
+    modes.forEach((mode, mi) => {
+      const walk = (node: unknown, path: string[]) => {
+        if (!node || typeof node !== 'object') return
+        const rec = node as Record<string, unknown> & { $value?: unknown; $type?: string; $scopes?: string[] }
+        if ('$value' in rec) {
+          const key = path.join(' / ')
+          const v = byPath.get(key) ?? { name: key, type: rec.$type ?? '', values: Array(modes.length).fill(''), scopes: rec.$scopes, path: key }
+          v.values[mi] = String(rec.$value)
+          byPath.set(key, v)
+          return
+        }
+        for (const [k, val] of Object.entries(rec)) if (!k.startsWith('$')) walk(val, path.concat(k))
+      }
+      walk(item[coll].modes![mode], [])
+    })
+    out.push({ name: coll, modes, vars: [...byPath.values()] })
+  }
+  return out
+}
 function parseFigmaVariables(data: unknown): ImportedCollection[] | null {
+  const v2j = parseVariables2Json(data)
+  if (v2j) return v2j
   const meta = ((data as { meta?: unknown }).meta ?? data) as { variableCollections?: unknown; variables?: unknown; collections?: unknown }
   // Accept both documented shapes: REST export (variableCollections/variables as id-keyed OBJECTS)
   // and plugin export ({ collections: [...], variables: [...] } as ARRAYS) — Codex E5 MED finding.
@@ -762,6 +794,19 @@ function VariablesLibrary() {
   const [q, setQ] = useState('')
   const [imported, setImported] = useState<{ file: string; collections: ImportedCollection[] } | null>(null)
   const [importErr, setImportErr] = useState<string | null>(null)
+  // E6.7 — the Figma JSON is the SSOT: auto-load the repo export on open so the library shows the
+  // figma side (structure + HEX originals) by default; Load-JSON can still swap in another file.
+  useEffect(() => {
+    fetch('/api/dev/editor-tokens?figma=1').then((r) => (r.ok ? r.json() : null)).then((d: { file: string; data: unknown } | null) => {
+      if (!d) return
+      const parsed = parseFigmaVariables(d.data)
+      if (parsed) setImported((cur) => cur ?? { file: d.file.split('/').pop() ?? d.file, collections: parsed })
+    }).catch(() => {})
+  }, [])
+  // Code-equivalents join: converter path ("primCol / base / white") ← collection camel + var path.
+  const collCamelClient = (n: string) => n.replace(/^[\d.]+-/, '').split(/[-_\s]+/).filter(Boolean)
+    .map((w, i) => (i === 0 ? w.toLowerCase() : w[0].toUpperCase() + w.slice(1).toLowerCase())).join('')
+  const byPath = useMemo(() => { const m = new Map<string, DsToken>(); for (const t of tokens) if (t.path) m.set(t.path, t); return m }, [tokens])
   const loadJson = (file: File) => {
     file.text().then((txt) => {
       try { const parsed = parseFigmaVariables(JSON.parse(txt)); if (!parsed) { setImportErr('Not a Figma variables export (need variableCollections + variables).'); return } setImported({ file: file.name, collections: parsed }); setImportErr(null) }
@@ -781,6 +826,7 @@ function VariablesLibrary() {
   }
   const colHandle = (key: 'name' | 'css') => (
     <span role="separator" aria-label={`Resize ${key} column`} onPointerDown={dragCol(key)}
+      onDoubleClick={() => setColW((w) => ({ ...w, [key]: 220 }))} // dbl-click = auto-fit/reset (Dan); flex columns re-distribute
       style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 9, cursor: 'col-resize', zIndex: 1 }} />
   )
   const collOf = (t: DsToken) => t.path?.split(' / ')[0] ?? t.group
@@ -837,25 +883,37 @@ function VariablesLibrary() {
         </div>
         <div style={{ height: 32, borderBottom: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', font: `550 11px/1 ${FONT}`, color: MUTE }}>
           {imported
-            ? (<><span style={{ width: colW.name, padding: '0 16px' }}>Variable</span><span style={{ width: 96, padding: '0 12px' }}>Type</span>{(activeImported?.modes ?? []).map((m) => <span key={m} style={{ flex: 1, padding: '0 12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m}</span>)}</>)
+            ? (<>
+                <span style={{ width: colW.name, padding: '0 16px', position: 'relative' }}>Variable{colHandle('name')}</span>
+                {(activeImported?.modes ?? []).map((m) => <span key={m} style={{ flex: 1, padding: '0 12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m} <span style={{ color: FAINT }}>(figma)</span></span>)}
+                <span style={{ width: colW.css, padding: '0 12px', position: 'relative', borderLeft: `1px solid ${LINE}` }}>CSS variable{colHandle('css')}</span>
+                <span style={{ flex: 1, padding: '0 12px' }}>Code value</span>
+              </>)
             : (<><span style={{ width: colW.name, padding: '0 16px', position: 'relative' }}>Name{colHandle('name')}</span><span style={{ width: colW.css, padding: '0 12px', position: 'relative' }}>CSS variable{colHandle('css')}</span><span style={{ flex: 1, padding: '0 12px' }}>Light</span><span style={{ flex: 1, padding: '0 12px' }}>Dark</span></>)}
         </div>
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {imported ? (
             importedRows.length === 0
               ? <div style={{ padding: '16px', color: MUTE, font: `400 11px/1 ${FONT}` }}>No variables match.</div>
-              : importedRows.map((v, i) => (
-                  <div key={`${v.name}-${i}`} style={{ minHeight: 34, borderBottom: '1px solid #f2f2f3', display: 'flex', alignItems: 'center', font: `400 11px/1 ${FONT}` }}>
-                    <span style={{ width: colW.name, padding: '0 16px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: INK }}>{v.name}</span>
-                    <span style={{ width: 96, padding: '0 12px', color: MUTE, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.type}</span>
-                    {v.values.map((val, k) => (
-                      <span key={k} style={{ flex: 1, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                        {isColorVal(val) && <span style={{ flex: 'none', width: 14, height: 14, borderRadius: 3, background: val, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.12)' }} />}
-                        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{val}</span>
+              : importedRows.map((v, i) => {
+                  const code = activeImported && v.path ? byPath.get(`${collCamelClient(activeImported.name)} / ${v.path}`) : undefined
+                  return (
+                    <div key={`${v.name}-${i}`} title={v.scopes?.join(', ')} style={{ minHeight: 34, borderBottom: '1px solid #f2f2f3', display: 'flex', alignItems: 'center', font: `400 11px/1 ${FONT}` }}>
+                      <span style={{ width: colW.name, padding: '0 16px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: INK }}>{v.name}</span>
+                      {v.values.map((val, k) => (
+                        <span key={k} style={{ flex: 1, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                          {isColorVal(val) && <span style={{ flex: 'none', width: 14, height: 14, borderRadius: 3, background: val, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.12)' }} />}
+                          <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{val}</span>
+                        </span>
+                      ))}
+                      <span style={{ width: colW.css, padding: '0 12px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: MUTE, borderLeft: `1px solid ${LINE}`, alignSelf: 'stretch', display: 'flex', alignItems: 'center' }}>{code?.cssVar ?? '—'}</span>
+                      <span style={{ flex: 1, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                        {code && code.kind === 'color' && <span style={{ flex: 'none', width: 14, height: 14, borderRadius: 3, background: code.value, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.12)' }} />}
+                        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{code?.value ?? ''}</span>
                       </span>
-                    ))}
-                  </div>
-                ))
+                    </div>
+                  )
+                })
           ) : (() => {
             const valCell = (val: string, isColor: boolean) => (
               <span style={{ flex: 1, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>

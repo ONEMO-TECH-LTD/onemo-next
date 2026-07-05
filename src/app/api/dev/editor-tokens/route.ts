@@ -82,11 +82,15 @@ function classify(name: string, value: string): TokenKind {
   return 'other'
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   if (process.env.NODE_ENV !== 'development') {
     return NextResponse.json({ error: 'dev-only' }, { status: 403 })
   }
   try {
+    // E6.7 — ?figma=1 serves the raw SSOT export so the Variables library renders the figma side verbatim.
+    if (new URL(req.url).searchParams.get('figma') === '1') {
+      return NextResponse.json({ file: 'storybook/design-system/variables/figma-export.json', data: JSON.parse(await readFile(FIGMA_EXPORT, 'utf8')) as unknown })
+    }
     const [css, paths, meta] = await Promise.all([readFile(TOKENS_CSS, 'utf8'), pathByCssVar(), figmaMeta()])
     // Two theme modes: :root (Light) and [data-theme="dark"] (Dark override). Split so Light is the
     // primary value and Dark is captured where a token overrides it (else it's identical to Light).
