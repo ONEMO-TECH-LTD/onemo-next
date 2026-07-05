@@ -708,11 +708,11 @@ function AlignGrid({ sel = 1, onSelect }: { sel?: number; onSelect?: (index: num
    mock tree removed in the E2.1 deslop pass (no fake values — Dan's law). */
 type LayerIcon = 'frame' | 'image' | 'auto' | 'section' | 'toolbar' | 'component'
 type Node = { name: string; icon: LayerIcon; depth: number; kids?: boolean; open?: boolean; locked?: boolean; visible?: boolean; sel?: boolean; comp?: boolean }
-function LayerRow({ n, on, onToggle, rowId }: { n: Node; on?: () => void; onToggle?: () => void; rowId?: string }) {
+function LayerRow({ n, on, onToggle, onRename, rowId }: { n: Node; on?: () => void; onToggle?: () => void; onRename?: () => void; rowId?: string }) {
   const [h, setH] = useState(false)
   const iconName: keyof typeof UI_ICON = n.icon === 'image' ? 'layerImage' : n.icon === 'auto' ? 'layerAuto' : n.icon === 'section' ? 'layerSection' : n.icon === 'toolbar' ? 'layerToolbar' : n.icon === 'component' ? 'layerComponent' : 'layerFrame'
   return (
-    <div data-layer-row={rowId} onClick={on} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
+    <div data-layer-row={rowId} onClick={on} onDoubleClick={onRename} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
       style={{ display: 'grid', gridTemplateColumns: `${16 + n.depth * 24}px 16px minmax(0,1fr) 40px`, alignItems: 'center', height: 32, paddingRight: 8, background: n.sel ? '#dff3ff' : h ? '#f4f5f6' : 'transparent', cursor: 'pointer' }}>
       <span onClick={onToggle ? (e) => { e.stopPropagation(); onToggle() } : undefined} style={{ width: 16, height: 16, marginLeft: n.depth * 24, display: 'grid', placeItems: 'center', color: INK, cursor: onToggle ? 'pointer' : undefined }}>{n.kids && <UiIcon name={n.open ? 'caret16' : 'caretRight16'} size={16} />}</span>
       <span style={{ width: 16, height: 16, display: 'grid', placeItems: 'center', color: n.comp ? TOKEN : 'rgba(0,0,0,0.65)' }}><UiIcon name={iconName} size={16} /></span>
@@ -2308,6 +2308,20 @@ export default function ReactFigmaPage() {
     const r = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'delete-page', slug }) })
     if (r.ok) { notify(`Page deleted · ${slug}`); setFsNonce((n) => n + 1) } else notify(`Delete failed: ${await r.text()}`, 'error')
   }, [])
+  // E6.8 — layer rename: writes data-name into source at the layer's data-src position (Dan-approved
+  // analog); the tree re-reads it after HMR so the name persists like a Figma layer name.
+  const renameLayer = useCallback(async (engId: string, current: string) => {
+    const doc = iframeRef.current?.contentDocument
+    const el = doc?.querySelector(`[data-eng-id="${engId}"]`) ?? doc?.querySelector(`[data-src]`)
+    const src = (doc?.querySelector(`[data-eng-id="${engId}"]`) as HTMLElement | null)?.getAttribute('data-src')
+    if (!el || !src) { notify('Layer not resolvable for rename', 'error'); return }
+    const next = window.prompt('Rename layer', current)
+    if (!next || next === current) return
+    const m = src.match(/^(.*):(\d+):(\d+)$/)
+    if (!m) return
+    const r = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'set-layer-name', file: m[1], line: +m[2], col: +m[3], name: next }) })
+    if (r.ok) notify(`Renamed · ${next}`); else notify(`Rename failed: ${await r.text()}`, 'error')
+  }, [])
   const renamePage = useCallback(async (slug: string) => {
     const next = window.prompt('Rename page', slug)
     if (!next || next === slug) return
@@ -2846,6 +2860,7 @@ export default function ReactFigmaPage() {
                     return true
                   }).map((ln) => (
                     <LayerRow key={ln.id} rowId={ln.id}
+                      onRename={() => { void renameLayer(ln.id, ln.name) }}
                       n={{ name: ln.name, icon: ln.tag === 'img' ? 'image' : ln.tag === 'section' ? 'section' : ln.tag === 'button' ? 'component' : 'auto', depth: Math.min(ln.depth, 7), kids: ln.kids, open: !collapsed.has(ln.id), sel: ln.id === layerSelId, comp: ln.tag === 'button' }}
                       on={() => { const el = iframeRef.current?.contentDocument?.querySelector(`[data-eng-id="${ln.id}"]`); if (el) applySelection(el as HTMLElement) }}
                       onToggle={ln.kids ? () => setCollapsed((prev) => { const next = new Set(prev); if (next.has(ln.id)) next.delete(ln.id); else next.add(ln.id); return next }) : undefined} />

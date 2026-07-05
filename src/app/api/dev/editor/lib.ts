@@ -235,6 +235,7 @@ export type WriteOp =
   | { kind: 'create-component'; name: string }
   | { kind: 'delete-page'; slug: string }
   | { kind: 'rename-page'; slug: string; newSlug: string }
+  | { kind: 'set-layer-name'; file: string; line: number; col: number; name: string }
 
 // ─── JSX inline-style write (E2.4, ENGINE-PLAN-E2.4.md) ──────────────────────
 
@@ -458,6 +459,32 @@ async function createPage(op: Extract<WriteOp, { kind: 'create-page' }>): Promis
 `
   await fs.writeFile(path.join(dir, 'page.tsx'), scaffold, 'utf8')
   return { ok: true, file: `src/app/(dev)/react-figma-pages/${slug}/page.tsx`, newValueText: slug, route: `/react-figma-pages/${slug}` }
+}
+
+/* E6.8 — layer rename for plain elements: write/update a `data-name` attribute (the HTML-standard
+   metadata slot — same convention as data-testid; inert to layout/behavior). The layer tree reads
+   it back as the display name, so names persist in source like Figma layer names persist in the
+   .fig file. Components get TRUE renames via a separate op. */
+async function setLayerName(op: Extract<WriteOp, { kind: 'set-layer-name' }>): Promise<{ ok: true; file: string; newValueText: string }> {
+  const name = op.name.trim()
+  if (!name || name.length > 60 || /["<>{}\\]/.test(name)) throw Object.assign(new Error('invalid layer name (max 60 chars, no quotes/brackets)'), { status: 422 })
+  const abs = jailComponentWrite(op.file)
+  const buf = await fs.readFile(abs)
+  const source = buf.toString('utf8')
+  const sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
+  const el = findJsxAt(sf, op.line, op.col)
+  if (!el) throw Object.assign(new Error(`no JSX element at ${op.line}:${op.col}`), { status: 404 })
+  const attr = el.attributes.properties.find(
+    (p): p is ts.JsxAttribute => ts.isJsxAttribute(p) && p.name.getText(sf) === 'data-name',
+  )
+  const [start, end, text] = attr
+    ? [attr.getStart(sf), attr.getEnd(), `data-name="${name}"`]
+    : [el.tagName.getEnd(), el.tagName.getEnd(), ` data-name="${name}"`]
+  const bs = byteLen(source.slice(0, start)), be = byteLen(source.slice(0, end))
+  const next = Buffer.concat([buf.subarray(0, bs), Buffer.from(text, 'utf8'), buf.subarray(be)])
+  assertValidTsx(abs, next.toString('utf8'))
+  await fs.writeFile(abs, next)
+  return { ok: true, file: op.file, newValueText: name }
 }
 
 /* E6.8 — page delete/rename. HARD JAIL: only simple slugs, only direct children of the editor's own
@@ -712,6 +739,7 @@ export async function applyWrite(op: WriteOp): Promise<{ ok: true; file: string;
   if (op.kind === 'create-component') return createComponent(op)
   if (op.kind === 'delete-page') return deletePage(op)
   if (op.kind === 'rename-page') return renamePage(op)
+  if (op.kind === 'set-layer-name') return setLayerName(op)
   if (op.kind === 'make-component') return makeComponent(op)
   if (op.kind === 'create-page') return createPage(op)
   if (op.kind === 'set-token-value') return setTokenValue(op)

@@ -138,7 +138,9 @@ function localName(el: HTMLElement): string {
 }
 
 function layerLabel(el: HTMLElement): string {
-  return localName(el) || el.tagName.toLowerCase()
+  // E6.8 — explicit layer name first (data-name, written by the rename op; the HTML-conventional
+  // metadata slot), then CSS-module class, then tag.
+  return el.getAttribute('data-name') || localName(el) || el.tagName.toLowerCase()
 }
 
 /** Flatten the canvas DOM into layer rows — data-src-tagged elements only; untagged wrappers pass through. */
