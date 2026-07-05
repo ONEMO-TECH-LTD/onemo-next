@@ -2443,7 +2443,10 @@ export default function ReactFigmaPage() {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z') return
       const t = e.target as HTMLElement | null
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+      // Figma behavior: ⌘Z is the CANVAS undo even while an inspector field is focused (the common
+      // case right after typing a value). Blur the field and undo; only free-text areas keep native.
+      if (t && (t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+      if (t && t.tagName === 'INPUT') (t as HTMLInputElement).blur()
       e.preventDefault()
       if (e.shiftKey) redoEdit(); else undoEdit()
     }
