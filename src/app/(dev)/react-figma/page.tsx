@@ -1771,6 +1771,7 @@ type OutlineRect = { x: number; y: number; w: number; h: number }
    Fetched from /api/dev/editor-sources: every real route of the build (page.tsx walk)
    + storybook screens that have a same-origin host. Fallback until fetch resolves. */
 type BuildSource = { key: string; name: string; route: string; group: string }
+type CanvasIconAsset = { kind: 'svg' | 'image'; value: string }
 const CANVAS_FALLBACK: BuildSource[] = [
   { key: 'editor-402', name: 'Editor 402 — apple blur glass', route: '/react-figma/canvas', group: 'storybook/create-studio' },
 ]
@@ -1780,7 +1781,9 @@ const SHOW_LEDGER = false
 
 export default function ReactFigmaPage() {
   type Rail = 'file' | 'assets' | 'variables'
+  type AssetTab = 'components' | 'images' | 'icons'
   const [rail, setRail] = useState<Rail>('file')
+  const [assetTab, setAssetTab] = useState<AssetTab>('components')
   const [compNonce, setCompNonce] = useState(0)
   const [newCompName, setNewCompName] = useState('')
   const dsComponents = useDsComponents(rail === 'assets', compNonce) // E4-G4 Assets panel
@@ -1794,7 +1797,7 @@ export default function ReactFigmaPage() {
   }, [])
   // #28 Assets: also surface the loaded screen's REAL images + icons (scanned live from the canvas —
   // no invented asset library). Images insert as <img src>; icons render as thumbnails.
-  const [canvasAssets, setCanvasAssets] = useState<{ images: string[]; icons: string[] }>({ images: [], icons: [] })
+  const [canvasAssets, setCanvasAssets] = useState<{ images: string[]; icons: CanvasIconAsset[] }>({ images: [], icons: [] })
   const [layerQuery, setLayerQuery] = useState<string | null>(null) // null = search closed; '' = open, empty
   const [uiMinimized, setUiMinimized] = useState(false)
   const [view, setView] = useState({ x: 300, y: 70, z: 0.6 })
@@ -2389,9 +2392,22 @@ export default function ReactFigmaPage() {
     const scan = () => {
       const doc = iframeRef.current?.contentDocument
       if (!doc) return
-      const images = [...new Set([...doc.querySelectorAll('img')].map((i) => i.getAttribute('src') || '').filter((s) => s && !s.startsWith('data:')))].slice(0, 40)
-      const icons = [...new Set([...doc.querySelectorAll('svg')].filter((s) => { const r = s.getBoundingClientRect(); return r.width > 0 && r.width <= 40 && r.height <= 40 }).map((s) => s.outerHTML))].slice(0, 30)
-      setCanvasAssets({ images, icons })
+      const images = new Set<string>()
+      const icons = new Map<string, CanvasIconAsset>()
+      for (const img of [...doc.querySelectorAll('img')]) {
+        const src = img.getAttribute('src') || ''
+        if (!src || src.startsWith('data:')) continue
+        const r = img.getBoundingClientRect()
+        const path = src.split('?')[0].toLowerCase()
+        const isSmallSquare = r.width > 0 && r.height > 0 && r.width <= 40 && r.height <= 40 && Math.abs(r.width - r.height) <= 6
+        if (path.endsWith('.svg') || isSmallSquare) icons.set(`image:${src}`, { kind: 'image', value: src })
+        else images.add(src)
+      }
+      for (const svg of [...doc.querySelectorAll('svg')]) {
+        const r = svg.getBoundingClientRect()
+        if (r.width > 0 && r.width <= 40 && r.height <= 40) icons.set(`svg:${svg.outerHTML}`, { kind: 'svg', value: svg.outerHTML })
+      }
+      setCanvasAssets({ images: [...images].slice(0, 40), icons: [...icons.values()].slice(0, 30) })
     }
     scan()
     const t = window.setTimeout(scan, 400)
@@ -2609,6 +2625,10 @@ export default function ReactFigmaPage() {
     window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp)
   }
   const handleStyle = (side: 'left' | 'right'): React.CSSProperties => ({ position: 'absolute', top: 0, bottom: 0, [side]: 0, width: 8, cursor: 'ew-resize', zIndex: 30 })
+  const resolveCanvasAssetUrl = (src: string) => {
+    try { return new URL(src, window.location.origin).toString() }
+    catch { return src }
+  }
 
   // E5 #29/#30: Agents + Tools were dead nav buttons (null → no panel, click did nothing). Removed
   // rather than invent panels — same disposition as the "useless" Design/Prototype tablist.
@@ -2736,41 +2756,67 @@ export default function ReactFigmaPage() {
         )}
         {rail === 'assets' && (
           <>
-            <div style={{ padding: '10px 12px' }}><div style={{ height: 28, background: FIELD, borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', color: MUTE, font: `400 11px/1 ${FONT}` }}><MagnifyingGlass size={13} /> Search components…</div></div>
-            <div style={{ padding: '4px 12px 8px', font: `400 11px/1.4 ${FONT}`, color: FAINT }}>Components extracted in the editor — select a container, then click one to insert it.</div>
-            {/* #6: create a new component in code (Framer-style) */}
-            <form onSubmit={(e) => { e.preventDefault(); if (newCompName.trim()) { void newComponent(newCompName); setNewCompName('') } }} style={{ display: 'flex', gap: 6, padding: '0 12px 8px' }}>
-              <input value={newCompName} onChange={(e) => setNewCompName(e.currentTarget.value)} placeholder="New component name" aria-label="New component name"
-                style={{ flex: 1, minWidth: 0, height: 26, borderRadius: 6, border: `1px solid ${LINE}`, background: '#fff', padding: '0 8px', outline: 0, font: `400 11px/1 ${FONT}`, color: INK }} />
-              <button type="submit" title="Create component in code" style={{ appearance: 'none', border: 0, background: SEL, color: '#fff', height: 26, borderRadius: 6, padding: '0 10px', cursor: 'pointer', font: `450 11px/1 ${FONT}` }}>New</button>
-            </form>
-            {dsComponents.length === 0
-              ? <div style={{ padding: '8px 12px', font: `400 11px/1.5 ${FONT}`, color: MUTE }}>No components yet. Select an element and use “Create component” to add one here.</div>
-              : (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '4px 12px' }}>
-                  {dsComponents.map((c) => (
-                    <button key={c.name} type="button" title={`Insert <${c.name} />`} onClick={() => void insertAsset(c.name, c.importPath)}
-                      style={{ appearance: 'none', height: 56, borderRadius: 6, border: `1px solid ${LINE}`, background: '#fff', display: 'grid', placeItems: 'center', font: `450 10px/1.3 ${FONT}`, color: INK, cursor: 'pointer', padding: '4px', textAlign: 'center', overflow: 'hidden' }}>{c.name}</button>
-                  ))}
-                </div>
-              )}
-            {/* #28: real images + icons from the loaded screen */}
-            {canvasAssets.images.length > 0 && (<>
-              <div style={{ padding: '10px 12px 4px', font: `550 10px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Images · {canvasAssets.images.length}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '0 12px 8px' }}>
-                {canvasAssets.images.map((src) => (
-                  <button key={src} type="button" title={`Insert image — ${src}`} onClick={() => sel ? void insertSnippet(`<img src="${src}" alt="" style={{ maxWidth: '100%' }} />`) : notify('Select a container first', 'error')}
-                    style={{ appearance: 'none', height: 48, borderRadius: 6, border: `1px solid ${LINE}`, background: `#fff center/contain no-repeat url("${src.replace(/"/g, '%22')}")`, cursor: 'pointer', padding: 0 }} />
+            <div style={{ padding: '10px 12px 6px' }}>
+              <div role="tablist" aria-label="Assets by type" style={{ display: 'flex', gap: 4, height: 24 }}>
+                {(['components', 'images', 'icons'] as const).map(tab => (
+                  <button key={tab} type="button" role="tab" aria-selected={assetTab === tab} onClick={() => setAssetTab(tab)}
+                    style={{ appearance: 'none', border: 0, background: assetTab === tab ? FIELD : '#fff', borderRadius: 5, flex: '1 1 0', minWidth: 0, height: 24, cursor: 'pointer', color: assetTab === tab ? INK : MUTE, font: `${assetTab === tab ? 550 : 400} 11px/16px ${FONT}` }}>
+                    {tab === 'components' ? 'Components' : tab === 'images' ? 'Images' : 'Icons'}
+                  </button>
                 ))}
               </div>
+            </div>
+            {assetTab === 'components' && (<>
+              <div style={{ padding: '0 12px 8px' }}><div style={{ height: 28, background: FIELD, borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', color: MUTE, font: `400 11px/1 ${FONT}` }}><MagnifyingGlass size={13} /> Search components…</div></div>
+              <div style={{ padding: '0 12px 8px', font: `400 11px/1.4 ${FONT}`, color: FAINT }}>Components extracted in the editor — select a container, then click one to insert it.</div>
+              {/* #6: create a new component in code (Framer-style) */}
+              <form onSubmit={(e) => { e.preventDefault(); if (newCompName.trim()) { void newComponent(newCompName); setNewCompName('') } }} style={{ display: 'flex', gap: 6, padding: '0 12px 8px' }}>
+                <input value={newCompName} onChange={(e) => setNewCompName(e.currentTarget.value)} placeholder="New component name" aria-label="New component name"
+                  style={{ flex: 1, minWidth: 0, height: 26, borderRadius: 6, border: `1px solid ${LINE}`, background: '#fff', padding: '0 8px', outline: 0, font: `400 11px/1 ${FONT}`, color: INK }} />
+                <button type="submit" title="Create component in code" style={{ appearance: 'none', border: 0, background: SEL, color: '#fff', height: 26, borderRadius: 6, padding: '0 10px', cursor: 'pointer', font: `450 11px/1 ${FONT}` }}>New</button>
+              </form>
+              {dsComponents.length === 0
+                ? <div style={{ padding: '8px 12px', font: `400 11px/1.5 ${FONT}`, color: MUTE }}>No components yet. Select an element and use “Create component” to add one here.</div>
+                : (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '4px 12px' }}>
+                    {dsComponents.map((c) => (
+                      <button key={c.name} type="button" title={`Insert <${c.name} />`} onClick={() => void insertAsset(c.name, c.importPath)}
+                        style={{ appearance: 'none', height: 56, borderRadius: 6, border: `1px solid ${LINE}`, background: '#fff', display: 'grid', placeItems: 'center', font: `450 10px/1.3 ${FONT}`, color: INK, cursor: 'pointer', padding: '4px', textAlign: 'center', overflow: 'hidden' }}>{c.name}</button>
+                    ))}
+                  </div>
+                )}
             </>)}
-            {canvasAssets.icons.length > 0 && (<>
-              <div style={{ padding: '6px 12px 4px', font: `550 10px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Icons · {canvasAssets.icons.length}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6, padding: '0 12px 12px' }}>
-                {canvasAssets.icons.map((svg, i) => (
-                  <span key={i} title="Icon in this screen" aria-hidden style={{ height: 36, borderRadius: 6, border: `1px solid ${LINE}`, background: '#fff', display: 'grid', placeItems: 'center', color: INK, overflow: 'hidden' }} dangerouslySetInnerHTML={{ __html: svg }} />
-                ))}
-              </div>
+            {assetTab === 'images' && (<>
+              <div style={{ padding: '4px 12px 8px', font: `400 11px/1.4 ${FONT}`, color: FAINT }}>Images · {canvasAssets.images.length}</div>
+              {canvasAssets.images.length === 0
+                ? <div style={{ padding: '8px 12px', font: `400 11px/1.5 ${FONT}`, color: MUTE }}>No image assets found in this screen.</div>
+                : (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '0 12px 12px' }}>
+                    {canvasAssets.images.map((src) => (
+                      <button key={src} type="button" title={`Insert image — ${src}`} onClick={() => sel ? void insertSnippet(`<img src="${src}" alt="" style={{ maxWidth: '100%' }} />`) : notify('Select a container first', 'error')}
+                        style={{ appearance: 'none', height: 48, borderRadius: 6, border: `1px solid ${LINE}`, background: '#fff', cursor: 'pointer', padding: 0, overflow: 'hidden' }}>
+                        <img src={resolveCanvasAssetUrl(src)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                      </button>
+                    ))}
+                  </div>
+                )}
+            </>)}
+            {assetTab === 'icons' && (<>
+              <style>{'[data-react-figma-icon-tile] svg{width:18px;height:18px;max-width:18px;max-height:18px;display:block}'}</style>
+              <div style={{ padding: '4px 12px 8px', font: `400 11px/1.4 ${FONT}`, color: FAINT }}>Icons · {canvasAssets.icons.length}</div>
+              {canvasAssets.icons.length === 0
+                ? <div style={{ padding: '8px 12px', font: `400 11px/1.5 ${FONT}`, color: MUTE }}>No icon assets found in this screen.</div>
+                : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6, padding: '0 12px 12px' }}>
+                    {canvasAssets.icons.map((icon, i) => (
+                      <span key={`${icon.kind}-${i}`} data-react-figma-icon-tile title="Icon in this screen" aria-hidden style={{ height: 36, borderRadius: 6, border: `1px solid ${LINE}`, background: FIELD, display: 'grid', placeItems: 'center', color: INK, overflow: 'hidden' }}>
+                        {icon.kind === 'svg'
+                          ? <span style={{ width: 18, height: 18, display: 'grid', placeItems: 'center' }} dangerouslySetInnerHTML={{ __html: icon.value }} />
+                          : <img src={resolveCanvasAssetUrl(icon.value)} alt="" loading="lazy" style={{ width: 18, height: 18, objectFit: 'contain', display: 'block' }} />}
+                      </span>
+                    ))}
+                  </div>
+                )}
             </>)}
           </>
         )}
