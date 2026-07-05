@@ -792,6 +792,33 @@ function StrokeSettingsMenu({ onStyle }: { onStyle: (value: string) => void }) {
   )
 }
 
+/* E4-G3 — Code mode: floating source view of the selected element (reads /api/dev/editor-source). */
+function CodeView({ file, line, onClose }: { file: string; line: number; onClose: () => void }) {
+  const [data, setData] = useState<{ from: number; snippet: string[] } | null>(null)
+  useEffect(() => {
+    setData(null)
+    fetch(`/api/dev/editor-source?file=${encodeURIComponent(file)}&line=${line}`)
+      .then((r) => (r.ok ? r.json() : null)).then((d) => d && setData(d)).catch(() => {})
+  }, [file, line])
+  return createPortal(
+    <div data-figma-floating-root="true" style={{ position: 'fixed', right: 320, bottom: 24, width: 460, maxHeight: 340, zIndex: 1500, borderRadius: 10, background: '#1e1e1e', color: '#e6e6e6', boxShadow: '0 8px 28px rgba(0,0,0,0.35)', overflow: 'hidden', font: '400 11px/1.6 ui-monospace, "SF Mono", Menlo, monospace' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: '1px solid #333', font: `500 11px/1 ${FONT}` }}>
+        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#bbb' }}>{file}:{line}</span>
+        <button type="button" aria-label="Close code view" onClick={onClose} style={{ appearance: 'none', border: 0, background: 'transparent', color: '#bbb', cursor: 'pointer', fontSize: 16, lineHeight: 1 }}>×</button>
+      </div>
+      <div style={{ overflow: 'auto', maxHeight: 296, padding: '8px 0' }}>
+        {data ? data.snippet.map((t, i) => { const n = data.from + i; const cur = n === line; return (
+          <div key={n} style={{ display: 'flex', background: cur ? 'rgba(80,140,255,0.16)' : 'transparent', padding: '0 12px' }}>
+            <span style={{ width: 38, flex: 'none', color: '#666', textAlign: 'right', paddingRight: 12, userSelect: 'none' }}>{n}</span>
+            <span style={{ whiteSpace: 'pre', color: cur ? '#fff' : '#d4d4d4' }}>{t || ' '}</span>
+          </div>
+        ) }) : <div style={{ padding: '12px', color: '#888' }}>Loading source…</div>}
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
 /* E4-G5 — Distribute menu (Position "more"): distribute the element's children along the main axis
    → justify-content space-between/around/evenly (real analog when the element is a flex container). */
 function DistributeMenu({ onApply }: { onApply: (value: string) => void }) {
@@ -1519,7 +1546,7 @@ const FRAME_INSERT_OPTIONS = [
   { label: 'Stack', target: 'div', detail: 'display: flex' },
   { label: 'Grid', target: 'div', detail: 'display: grid' },
 ]
-function InsertIsland({ onInsert }: { onInsert?: (tag: string, display?: string) => void }) {
+function InsertIsland({ onInsert, codeMode, onCodeMode }: { onInsert?: (tag: string, display?: string) => void; codeMode?: boolean; onCodeMode?: (v: boolean) => void }) {
   const [open, setOpen] = useState(false)
   const frameMenuRef = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
   return (
@@ -1570,10 +1597,10 @@ function InsertIsland({ onInsert }: { onInsert?: (tag: string, display?: string)
       </div>
       <span style={{ width: 1, height: 32, background: LINE }} />
       <div aria-label="Mode tools" style={{ display: 'flex', alignItems: 'center', gap: 2, height: 32, padding: '0 2px', borderRadius: 9, background: FIELD, color: MUTE }}>
-        <button type="button" title="Design mode" aria-label="Design mode" style={{ appearance: 'none', border: '1px solid #dadde1', width: 32, height: 32, borderRadius: 7, background: '#fff', color: SEL, display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
+        <button type="button" title="Design mode" aria-label="Design mode" aria-pressed={!codeMode} onClick={() => onCodeMode?.(false)} style={{ appearance: 'none', border: !codeMode ? '1px solid #dadde1' : 0, width: 32, height: 32, borderRadius: 7, background: !codeMode ? '#fff' : 'transparent', color: !codeMode ? SEL : MUTE, display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
           <UiIcon name="modeDesign" />
         </button>
-        <button type="button" title="Code mode" aria-label="Code mode" style={{ appearance: 'none', border: 0, width: 32, height: 32, borderRadius: 7, background: 'transparent', color: MUTE, display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
+        <button type="button" title="Code mode" aria-label="Code mode" aria-pressed={!!codeMode} onClick={() => onCodeMode?.(true)} style={{ appearance: 'none', border: codeMode ? '1px solid #dadde1' : 0, width: 32, height: 32, borderRadius: 7, background: codeMode ? '#fff' : 'transparent', color: codeMode ? SEL : MUTE, display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
           <UiIcon name="modeDev" />
         </button>
       </div>
@@ -1651,6 +1678,7 @@ export default function ReactFigmaPage() {
   // engine M1+M2 — selection + read-bridge state
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [sel, setSel] = useState<SelPayload | null>(null)
+  const [codeMode, setCodeMode] = useState(false) // E4-G3: Design ↔ Code view of the selected element
   const [hoverRect, setHoverRect] = useState<OutlineRect | null>(null)
   const [selRect, setSelRect] = useState<OutlineRect | null>(null)
   const [layers, setLayers] = useState<LiveNode[] | null>(null)
@@ -2286,7 +2314,8 @@ export default function ReactFigmaPage() {
       {/* ░░ INFINITE CANVAS ░░ */}
       <main ref={canvasRef} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
         style={{ flex: 1, minWidth: 0, background: '#f0f0f0', position: 'relative', overflow: 'hidden', cursor: isPanning ? 'grabbing' : 'default' }}>
-        <InsertIsland onInsert={insertChild} />
+        <InsertIsland onInsert={insertChild} codeMode={codeMode} onCodeMode={setCodeMode} />
+        {codeMode && sel && <CodeView file={sel.file} line={sel.line} onClose={() => setCodeMode(false)} />}
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle, rgba(0,0,0,.09) 1px, transparent 1px)', backgroundSize: `${24 * view.z}px ${24 * view.z}px`, backgroundPosition: `${view.x}px ${view.y}px` }} />
         <div style={{ position: 'absolute', left: 0, top: 0, transform: `translate(${view.x}px,${view.y}px) scale(${view.z})`, transformOrigin: '0 0' }}>
           <div style={{ font: `550 10px/1 ${FONT}`, color: SEL, marginBottom: 8, marginLeft: 2 }}>Editor 402 · 402 × 871</div>
