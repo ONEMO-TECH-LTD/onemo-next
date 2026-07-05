@@ -1700,6 +1700,9 @@ export default function ReactFigmaPage() {
   type Rail = 'file' | 'assets' | 'variables'
   const [rail, setRail] = useState<Rail>('file')
   const dsComponents = useDsComponents(rail === 'assets') // E4-G4 Assets panel
+  // #28 Assets: also surface the loaded screen's REAL images + icons (scanned live from the canvas —
+  // no invented asset library). Images insert as <img src>; icons render as thumbnails.
+  const [canvasAssets, setCanvasAssets] = useState<{ images: string[]; icons: string[] }>({ images: [], icons: [] })
   const [layerQuery, setLayerQuery] = useState<string | null>(null) // null = search closed; '' = open, empty
   const [uiMinimized, setUiMinimized] = useState(false)
   const [view, setView] = useState({ x: 300, y: 70, z: 0.6 })
@@ -2252,6 +2255,20 @@ export default function ReactFigmaPage() {
     mo.observe(doc.body, { childList: true, subtree: true })
     console.log('[engine] canvas wired — contentDocument reachable (COEP smoke PASS)')
   }, [applySelection])
+  // #28: scan the loaded canvas for its real images + icons whenever the Assets rail is open.
+  useEffect(() => {
+    if (rail !== 'assets') return
+    const scan = () => {
+      const doc = iframeRef.current?.contentDocument
+      if (!doc) return
+      const images = [...new Set([...doc.querySelectorAll('img')].map((i) => i.getAttribute('src') || '').filter((s) => s && !s.startsWith('data:')))].slice(0, 40)
+      const icons = [...new Set([...doc.querySelectorAll('svg')].filter((s) => { const r = s.getBoundingClientRect(); return r.width > 0 && r.width <= 40 && r.height <= 40 }).map((s) => s.outerHTML))].slice(0, 30)
+      setCanvasAssets({ images, icons })
+    }
+    scan()
+    const t = window.setTimeout(scan, 400)
+    return () => window.clearTimeout(t)
+  }, [rail, canvas.route])
   // onLoad alone misses the race where the iframe finishes loading BEFORE React hydrates
   // (listener attached after the load event already fired) — wire eagerly + on every load.
   useEffect(() => {
@@ -2461,6 +2478,24 @@ export default function ReactFigmaPage() {
                   ))}
                 </div>
               )}
+            {/* #28: real images + icons from the loaded screen */}
+            {canvasAssets.images.length > 0 && (<>
+              <div style={{ padding: '10px 12px 4px', font: `550 10px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Images · {canvasAssets.images.length}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '0 12px 8px' }}>
+                {canvasAssets.images.map((src) => (
+                  <button key={src} type="button" title={`Insert image — ${src}`} onClick={() => sel ? void insertSnippet(`<img src="${src}" alt="" style={{ maxWidth: '100%' }} />`) : notify('Select a container first', 'error')}
+                    style={{ appearance: 'none', height: 48, borderRadius: 6, border: `1px solid ${LINE}`, background: `#fff center/contain no-repeat url("${src.replace(/"/g, '%22')}")`, cursor: 'pointer', padding: 0 }} />
+                ))}
+              </div>
+            </>)}
+            {canvasAssets.icons.length > 0 && (<>
+              <div style={{ padding: '6px 12px 4px', font: `550 10px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Icons · {canvasAssets.icons.length}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6, padding: '0 12px 12px' }}>
+                {canvasAssets.icons.map((svg, i) => (
+                  <span key={i} title="Icon in this screen" aria-hidden style={{ height: 36, borderRadius: 6, border: `1px solid ${LINE}`, background: '#fff', display: 'grid', placeItems: 'center', color: INK, overflow: 'hidden' }} dangerouslySetInnerHTML={{ __html: svg }} />
+                ))}
+              </div>
+            </>)}
           </>
         )}
         <div onPointerDown={startResize('l')} style={handleStyle('right')} />
