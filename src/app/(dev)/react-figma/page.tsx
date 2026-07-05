@@ -1212,7 +1212,20 @@ function FigmaPaintRow({ hex, op, label = 'Paint', onRemove, origin, onHexEdit, 
     </div>
   )
 }
-function StrokeDetailRow({ position, weight, onWeight, onPosition, onSide }: { position: string; weight: number; onWeight?: (value: string) => void; onPosition?: (value: string) => void; onSide?: (field: string, value: string) => void }) {
+/* Canonical 4-slot side/corner input grid — ONE component, reused for padding, corner-radius, and
+   per-side stroke (Dan #19/#20: "make a component already and repeat them everywhere" + "inputs for
+   each side no different to padding"). Each slot is an independent AutoValueField with its own label,
+   value and write — so T/R/B/L (or ◜◝◞◟) edit independently, matching Figma. */
+function SideInputs({ sides, style }: { sides: { label: string; value: string; ariaLabel: string; onChange: (v: string) => void }[]; style?: React.CSSProperties }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8, padding: '0 8px 8px 16px', ...style }}>
+      {sides.map((s) => (
+        <AutoValueField key={s.ariaLabel} label={s.label} value={s.value} ariaLabel={s.ariaLabel} width={44} onChange={s.onChange} />
+      ))}
+    </div>
+  )
+}
+function StrokeDetailRow({ position, weight, sides, onWeight, onPosition, onSide }: { position: string; weight: number; sides?: { top: number; right: number; bottom: number; left: number }; onWeight?: (value: string) => void; onPosition?: (value: string) => void; onSide?: (field: string, value: string) => void }) {
   const [positionValue, setPositionValue] = useState(position)
   const [weightValue, setWeightValue] = useState(String(weight))
   const [positionOpen, setPositionOpen] = useState(false)
@@ -1250,11 +1263,12 @@ function StrokeDetailRow({ position, weight, onWeight, onPosition, onSide }: { p
         <UiIB name="individualStroke" title="Individual strokes" active={individual} on={() => setIndividual((v) => !v)} />
       </div>
       {individual && (
-        <div style={{ position: 'absolute', left: 16, right: 8, top: 52, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
-          {(['Top', 'Right', 'Bottom', 'Left'] as const).map((side) => (
-            <AutoValueField key={side} icon="strokeWeight" value={String(weight)} caret={false} ariaLabel={`${side} stroke weight`} onChange={(v) => onSide?.(`stroke${side}`, v)} width={56} />
-          ))}
-        </div>
+        <SideInputs style={{ position: 'absolute', left: 16, right: 8, top: 52, padding: 0, gap: 6 }} sides={[
+          { label: 'T', value: String(sides?.top ?? weight), ariaLabel: 'Top stroke weight', onChange: (v) => onSide?.('strokeTop', v) },
+          { label: 'R', value: String(sides?.right ?? weight), ariaLabel: 'Right stroke weight', onChange: (v) => onSide?.('strokeRight', v) },
+          { label: 'B', value: String(sides?.bottom ?? weight), ariaLabel: 'Bottom stroke weight', onChange: (v) => onSide?.('strokeBottom', v) },
+          { label: 'L', value: String(sides?.left ?? weight), ariaLabel: 'Left stroke weight', onChange: (v) => onSide?.('strokeLeft', v) },
+        ]} />
       )}
     </div>
   )
@@ -1727,7 +1741,7 @@ export default function ReactFigmaPage() {
   }
   const [fieldTokens, setFieldTokens] = useState<Record<string, string | undefined>>({})
   const [liveFills, setLiveFills] = useState<{ hex: string; op: number; origin?: string; prop: string }[] | null>(null)
-  const [liveStrokes, setLiveStrokes] = useState<{ hex: string; op: number; weight: number; position: string }[] | null>(null)
+  const [liveStrokes, setLiveStrokes] = useState<{ hex: string; op: number; weight: number; position: string; sides?: { top: number; right: number; bottom: number; left: number } }[] | null>(null)
   const [liveEffects, setLiveEffects] = useState<{ type: string; detail: string }[] | null>(null)
   const liveShadowsRef = useRef<ReturnType<typeof parseShadow>[]>([])
   const [liveSelColors, setLiveSelColors] = useState<{ hex: string; op: number }[] | null>(null)
@@ -1803,9 +1817,11 @@ export default function ReactFigmaPage() {
     }
     setLiveFills(fills) // [] = selected-but-no-fill → Figma empty section, never mock rows (E2.1 rule 1)
     // Stroke: uniform border read (top edge as representative)
-    const bw = parseFloat(c['border-top-width'] || '0')
-    const bc = bw > 0 ? colorToHex(c['border-top-color'], doc) : null
-    setLiveStrokes(bc ? [{ ...bc, weight: Math.round(bw * 100) / 100, position: 'Inside' }] : [])
+    const sideW = (p: string) => Math.round((parseFloat(c[p] || '0')) * 100) / 100
+    const sw = { top: sideW('border-top-width'), right: sideW('border-right-width'), bottom: sideW('border-bottom-width'), left: sideW('border-left-width') }
+    const bw = Math.max(sw.top, sw.right, sw.bottom, sw.left) // any side with a stroke → show the section (Figma)
+    const bc = bw > 0 ? colorToHex(c[`border-${sw.top >= bw ? 'top' : sw.right >= bw ? 'right' : sw.bottom >= bw ? 'bottom' : 'left'}-color`], doc) : null
+    setLiveStrokes(bc ? [{ ...bc, weight: bw, position: 'Inside', sides: sw }] : [])
     // Effects: shadows + blurs in Figma vocabulary; keep full shadow list for index-safe editing
     setLiveEffects(parseEffects(c))
     liveShadowsRef.current = c['box-shadow'] && c['box-shadow'] !== 'none' ? splitTopLevel(c['box-shadow'], ',').map(parseShadow) : []
@@ -2525,12 +2541,12 @@ export default function ReactFigmaPage() {
               <UiIB name="paddingIndividual" title="Individual padding" active={paddingIndividual} on={() => setPaddingIndividual(v => !v)} />
             </InspectorRow>
             {paddingIndividual && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8, padding: '0 8px 8px 16px' }}>
-                <AutoValueField label="T" value={padSides.t} ariaLabel="Padding top" width={44} onChange={(v) => { setPadSides(s => ({ ...s, t: v })); applyOverride('padT', v) }} />
-                <AutoValueField label="R" value={padSides.r} ariaLabel="Padding right" width={44} onChange={(v) => { setPadSides(s => ({ ...s, r: v })); applyOverride('padR', v) }} />
-                <AutoValueField label="B" value={padSides.b} ariaLabel="Padding bottom" width={44} onChange={(v) => { setPadSides(s => ({ ...s, b: v })); applyOverride('padB', v) }} />
-                <AutoValueField label="L" value={padSides.l} ariaLabel="Padding left" width={44} onChange={(v) => { setPadSides(s => ({ ...s, l: v })); applyOverride('padL', v) }} />
-              </div>
+              <SideInputs sides={[
+                { label: 'T', value: padSides.t, ariaLabel: 'Padding top', onChange: (v) => { setPadSides(s => ({ ...s, t: v })); applyOverride('padT', v) } },
+                { label: 'R', value: padSides.r, ariaLabel: 'Padding right', onChange: (v) => { setPadSides(s => ({ ...s, r: v })); applyOverride('padR', v) } },
+                { label: 'B', value: padSides.b, ariaLabel: 'Padding bottom', onChange: (v) => { setPadSides(s => ({ ...s, b: v })); applyOverride('padB', v) } },
+                { label: 'L', value: padSides.l, ariaLabel: 'Padding left', onChange: (v) => { setPadSides(s => ({ ...s, l: v })); applyOverride('padL', v) } },
+              ]} />
             )}
             <div data-react-figma-clip-row style={{ height: 32, padding: '0 8px 0 16px', display: 'grid', gridTemplateColumns: '216px', alignItems: 'center' }}>
               <style>{'[data-react-figma-clip-row] input:not(:checked) + [data-react-figma-clip-box] svg{display:none}'}</style>
@@ -2560,12 +2576,12 @@ export default function ReactFigmaPage() {
               </div>
             </div>
             {individualCorners && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8, padding: '0 8px 8px 16px' }}>
-                <AutoValueField label="◜" value={corners.tl} ariaLabel="Corner top-left" width={44} onChange={(v) => { setCorners(s => ({ ...s, tl: v })); applyOverride('cornerTL', v) }} />
-                <AutoValueField label="◝" value={corners.tr} ariaLabel="Corner top-right" width={44} onChange={(v) => { setCorners(s => ({ ...s, tr: v })); applyOverride('cornerTR', v) }} />
-                <AutoValueField label="◞" value={corners.br} ariaLabel="Corner bottom-right" width={44} onChange={(v) => { setCorners(s => ({ ...s, br: v })); applyOverride('cornerBR', v) }} />
-                <AutoValueField label="◟" value={corners.bl} ariaLabel="Corner bottom-left" width={44} onChange={(v) => { setCorners(s => ({ ...s, bl: v })); applyOverride('cornerBL', v) }} />
-              </div>
+              <SideInputs sides={[
+                { label: '◜', value: corners.tl, ariaLabel: 'Corner top-left', onChange: (v) => { setCorners(s => ({ ...s, tl: v })); applyOverride('cornerTL', v) } },
+                { label: '◝', value: corners.tr, ariaLabel: 'Corner top-right', onChange: (v) => { setCorners(s => ({ ...s, tr: v })); applyOverride('cornerTR', v) } },
+                { label: '◞', value: corners.br, ariaLabel: 'Corner bottom-right', onChange: (v) => { setCorners(s => ({ ...s, br: v })); applyOverride('cornerBR', v) } },
+                { label: '◟', value: corners.bl, ariaLabel: 'Corner bottom-left', onChange: (v) => { setCorners(s => ({ ...s, bl: v })); applyOverride('cornerBL', v) } },
+              ]} />
             )}
           </Sec>
 
@@ -2610,7 +2626,7 @@ export default function ReactFigmaPage() {
                       onOpacityEdit={(hx, opPct) => applyOverride('strokeColor', hexToRgba(hx, opPct))}
                       onVisibleToggle={(vis, hx) => applyOverride(vis ? 'strokeColor' : 'strokeWidth0', vis ? `#${hx}` : '0')}
                       onRemove={() => applyOverride('strokeWidth0', '0')} />
-                    <StrokeDetailRow position={s.position} weight={s.weight} onWeight={(v) => applyOverride('strokeWeight', v)} onPosition={(p) => applyOverride('strokePosition', p)} onSide={(field, v) => applyOverride(field, v)} />
+                    <StrokeDetailRow position={s.position} weight={s.weight} sides={s.sides} onWeight={(v) => applyOverride('strokeWeight', v)} onPosition={(p) => applyOverride('strokePosition', p)} onSide={(field, v) => applyOverride(field, v)} />
                   </div>
                 ))
               : strokes.map(s => (
