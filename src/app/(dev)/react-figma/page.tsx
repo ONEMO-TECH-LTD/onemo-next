@@ -431,6 +431,8 @@ const shortToken = (t: string) => (t.split('/').pop() ?? t).trim().replace(/^var
 // E6.3 (Codex HIGH): a FRESHLY bound variable is a raw `var(--…)` value until commit+reload — the
 // pill must show immediately like Figma, so fields pill on the live value too.
 const varBinding = (v: string) => /^var\(\s*--[\w-]+\s*\)$/.test(v.trim())
+// E6.12 — Figma shows the weight NAME, code writes the numeric (standard CSS weight mapping).
+const WEIGHT_NAMES: [string, string][] = [['Thin', '100'], ['ExtraLight', '200'], ['Light', '300'], ['Regular', '400'], ['Medium', '500'], ['SemiBold', '600'], ['Bold', '700'], ['ExtraBold', '800'], ['Black', '900']]
 function TokenPill({ token }: { token: string }) {
   return (
     <span title={token} style={{ flex: 1, minWidth: 0, height: 18, marginRight: 2, borderRadius: 4, background: 'rgba(90,90,255,0.10)', color: TOKEN, display: 'flex', alignItems: 'center', padding: '0 6px', font: `450 10px/18px ${FONT}` }}>
@@ -1161,9 +1163,18 @@ function AutoLayoutSettingsMenu({ onApply }: { onApply: (field: string, value: s
 }
 
 /* E3.6 — Type settings popover: text-decoration + text-transform (real CSS analogs). */
-function TypeSettingsMenu({ onApply }: { onApply: (field: string, value: string) => void }) {
+function TypeSettingsMenu({ onApply, lineHeight, letterSpacing }: { onApply: (field: string, value: string) => void; lineHeight?: string; letterSpacing?: string }) {
   const [open, setOpen] = useState(false)
   const ref = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
+  // E6.12 — Figma keeps line-height/letter-spacing inside Type settings, not as bare panel rows.
+  const num = (label: string, field: string, value?: string) => (
+    <div style={{ padding: '6px 12px', display: 'grid', gridTemplateColumns: '1fr 72px', alignItems: 'center' }}>
+      <span style={{ font: `400 11px/16px ${FONT}`, color: INK }}>{label}</span>
+      <input aria-label={label} defaultValue={value ?? ''} onBlur={(e) => onApply(field, e.currentTarget.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') onApply(field, (e.target as HTMLInputElement).value) }}
+        style={{ height: 24, borderRadius: 5, border: 0, background: FIELD, padding: '0 8px', outline: 0, font: `450 11px/16px ${FONT}`, color: INK, textAlign: 'right' }} />
+    </div>
+  )
   const seg = (label: string, field: string, opts: [string, string][]) => (
     <div style={{ padding: '6px 12px' }}>
       <div style={{ font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)', marginBottom: 4 }}>{label}</div>
@@ -1180,8 +1191,11 @@ function TypeSettingsMenu({ onApply }: { onApply: (field: string, value: string)
       <UiIB name="overflowDots" title="Type settings" active={open} on={() => setOpen((v) => !v)} />
       {open && (
         <div data-figma-floating-root="true" role="menu" style={{ position: 'absolute', right: 0, top: 28, zIndex: 130, width: 200, padding: '6px 0', borderRadius: 8, background: '#fff', boxShadow: 'rgba(0,0,0,0.15) 0px 2px 5px 0px, rgba(0,0,0,0.12) 0px 10px 16px 0px, rgba(0,0,0,0.12) 0px 0px 0.5px 0px' }}>
+          {num('Line height', 'lineHeight', lineHeight)}
+          {num('Letter spacing', 'letterSpacing', letterSpacing)}
           {seg('Decoration', 'textDecoration', [['None', 'none'], ['Underline', 'underline'], ['Strikethrough', 'line-through']])}
           {seg('Case', 'textTransform', [['Original', 'none'], ['UPPER', 'uppercase'], ['lower', 'lowercase'], ['Title', 'capitalize']])}
+          {seg('Justify', 'textAlign', [['Justified', 'justify'], ['Start', 'left']])}
         </div>
       )}
     </div>
@@ -2101,6 +2115,7 @@ export default function ReactFigmaPage() {
       : field === 'letterSpacing' ? [['letter-spacing', parseFloat(n) === 0 ? 'normal' : withUnit]]
       : field === 'textAlign' ? [['text-align', n]]
       : field === 'fontFamily' ? [['font-family', n]]
+      : field === 'textVAlign' ? [['align-content', n]] // vertical text align — modern block align-content
       : field === 'textDecoration' ? [['text-decoration', n]]
       : field === 'textTransform' ? [['text-transform', n]]
       : field === 'fillOpacity' ? [['opacity', String((parseFloat(n) || 0) / 100)]]
@@ -3125,23 +3140,31 @@ export default function ReactFigmaPage() {
 
           {/* E2.2 Text section — Figma canon (FIGMA-SPEC-text.md): present only for text-bearing
               elements; unbound Typography form (individual controls) reading the element's real type. */}
+          {/* E6.12 — anatomy per the live Figma UI3 extraction (s58-figma-ui3-extracted-specs.md):
+              family row → WEIGHT-NAME dropdown + size row → alignment 3 horizontal + 3 vertical;
+              line-height/letter-spacing live in Type settings (Figma's placement), no W/S/↕/↔ glyphs. */}
           {typo && (
-            <Sec title="Text" actionWidth={24} action={<TypeSettingsMenu onApply={applyOverride} />} bodyGap={0} bodyPadding="0">
+            <Sec title="Text" actionWidth={24} action={<TypeSettingsMenu onApply={applyOverride} lineHeight={typo.lineHeight} letterSpacing={typo.letterSpacing} />} bodyGap={0} bodyPadding="0">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 8px 8px 16px' }}>
                 <FontPickerField value={typo.family} onPick={(stack) => { setTypo(t => t && { ...t, family: stack }); applyOverride('fontFamily', stack) }} />
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  <AutoValueField label="W" value={typo.weight} ariaLabel="Font weight" width={112} onChange={(v) => { setTypo(t => t && { ...t, weight: v }); applyOverride('fontWeight', v) }} />
-                  <AutoValueField label="S" value={typo.size} ariaLabel="Font size" width={112} onChange={(v) => { setTypo(t => t && { ...t, size: v }); applyOverride('fontSize', v) }} />
+                  <FigmaField ariaLabel="Font weight" value="" picker={false}
+                    mode={WEIGHT_NAMES.find(([, n]) => n === typo.weight)?.[0] ?? typo.weight} modeOptions={WEIGHT_NAMES}
+                    onMode={(v) => { setTypo(t => t && { ...t, weight: v }); applyOverride('fontWeight', v) }} />
+                  <FigmaField ariaLabel="Font size" value={typo.size} onChange={(v) => { setTypo(t => t && { ...t, size: v }); applyOverride('fontSize', v) }} />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  <AutoValueField label="↕" value={typo.lineHeight} ariaLabel="Line height" width={112} onChange={(v) => { setTypo(t => t && { ...t, lineHeight: v }); applyOverride('lineHeight', v) }} />
-                  <AutoValueField label="↔" value={typo.letterSpacing} ariaLabel="Letter spacing" width={112} onChange={(v) => { setTypo(t => t && { ...t, letterSpacing: v }); applyOverride('letterSpacing', v) }} />
+                  <Seg fill>
+                    {(['left', 'center', 'right'] as const).map((a, i) => (
+                      <FSegBtn key={a} name={a === 'left' ? 'alignLeft' : a === 'center' ? 'alignCenterH' : 'alignRight'} pos={i === 0 ? 'l' : i === 2 ? 'r' : 'm'} fill active={typo.align === a || (a === 'left' && typo.align === 'start')} title={`Text align ${a}`} on={() => { setTypo(t => t && { ...t, align: a }); applyOverride('textAlign', a) }} />
+                    ))}
+                  </Seg>
+                  <Seg fill>
+                    {([['top', 'alignTop', 'start'], ['middle', 'alignCenterV', 'center'], ['bottom', 'alignBottom', 'end']] as const).map(([key, icon, css], i) => (
+                      <FSegBtn key={key} name={icon} pos={i === 0 ? 'l' : i === 2 ? 'r' : 'm'} fill title={`Vertical align ${key}`} on={() => applyOverride('textVAlign', css)} />
+                    ))}
+                  </Seg>
                 </div>
-                <Seg fill>
-                  {(['left', 'center', 'right', 'justify'] as const).map((a, i) => (
-                    <FSegBtn key={a} name={a === 'left' ? 'alignLeft' : a === 'center' ? 'alignCenterH' : a === 'right' ? 'alignRight' : 'alignLeft'} pos={i === 0 ? 'l' : i === 3 ? 'r' : 'm'} fill active={typo.align === a || (a === 'left' && typo.align === 'start')} title={`Text align ${a}`} on={() => { setTypo(t => t && { ...t, align: a }); applyOverride('textAlign', a) }} />
-                  ))}
-                </Seg>
               </div>
             </Sec>
           )}
