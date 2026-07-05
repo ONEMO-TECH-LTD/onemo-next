@@ -2279,6 +2279,15 @@ export default function ReactFigmaPage() {
   // resizable panels — edge drag handles + min/max (Figma canon). Document-level listeners = robust through the whole drag.
   const [leftW, setLeftW] = useState(240)
   const [rightW, setRightW] = useState(241)
+  // #27: draggable divide between the Pages browser and the Layers tree (resizable Layers section).
+  const [pagesH, setPagesH] = useState(240)
+  const resizePages = (e: React.PointerEvent) => {
+    e.preventDefault()
+    const startY = e.clientY, startH = pagesH
+    const onMove = (ev: PointerEvent) => setPagesH(Math.max(80, Math.min(560, startH + (ev.clientY - startY))))
+    const onUp = () => { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp) }
+    window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp)
+  }
   const startResize = (side: 'l' | 'r') => (e: React.PointerEvent) => {
     e.preventDefault()
     const startX = e.clientX, startW = side === 'l' ? leftW : rightW
@@ -2346,7 +2355,7 @@ export default function ReactFigmaPage() {
               <span style={hdr}>Pages</span>
               <span style={{ display: 'flex', gap: 4, color: MUTE }}><UiIB name="find" title="Find" active={layerQuery !== null} on={() => setLayerQuery(q => q === null ? '' : null)} /><UiIB name="plus" title="Add new page" on={() => void addPage()} /></span>
             </div>
-            <div style={{ padding: '0 8px', maxHeight: 280, overflowY: 'auto' }}>
+            <div style={{ padding: '0 8px', height: pagesH, overflowY: 'auto' }}>
               {/* LOCAL FOLDER BROWSER — navigable filesystem under the dev root.
                   Row click: loadable screen → load in canvas; plain folder → enter.
                   Caret always enters; '..' goes up. */}
@@ -2379,6 +2388,8 @@ export default function ReactFigmaPage() {
                 </>
               )}
             </div>
+            <div role="separator" aria-label="Resize Layers section" onPointerDown={resizePages}
+              style={{ height: 7, marginBottom: -7, cursor: 'ns-resize', flex: 'none' }} />
             <div style={{ height: 49, padding: '9px 8px 0 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: `1px solid ${LINE}` }}>
               <span style={hdr}>Layers</span>
               <UiIB name="collapseLayers" title="Collapse layers" on={() => { const ids = (layers ?? []).filter((n) => n.kids).map((n) => n.id); setCollapsed((prev) => prev.size >= ids.length ? new Set() : new Set(ids)) }} />
