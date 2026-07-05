@@ -1905,7 +1905,9 @@ export default function ReactFigmaPage() {
       : field === 'flow' ? (
           n === 'horizontal' ? [['display', 'flex'], ['flex-direction', 'row']]
           : n === 'vertical' ? [['display', 'flex'], ['flex-direction', 'column']]
-          : n === 'grid' ? [['display', 'grid']]
+          // #17: bare display:grid is a single implicit column (reads as a stack). Give it a real
+          // responsive grid template so children actually flow into a grid, like Figma grid layout.
+          : n === 'grid' ? [['display', 'grid'], ['grid-template-columns', 'repeat(auto-fill, minmax(80px, 1fr))']]
           : [['display', 'block']] // freeform — no auto-layout
         )
       : field === 'selfAlign' ? ( // align the element within its parent — directional margin:auto (flex-item + block analog)
@@ -2275,8 +2277,10 @@ export default function ReactFigmaPage() {
   }
   const handleStyle = (side: 'left' | 'right'): React.CSSProperties => ({ position: 'absolute', top: 0, bottom: 0, [side]: 0, width: 8, cursor: 'ew-resize', zIndex: 30 })
 
-  const railItems: [keyof typeof UI_ICON, string, Rail | null][] = [
-    ['railFile', 'File', 'file'], ['railAgents', 'Agents', null], ['railAssets', 'Assets', 'assets'], ['railTools', 'Tools', null], ['railVariables', 'Variables', 'variables'],
+  // E5 #29/#30: Agents + Tools were dead nav buttons (null → no panel, click did nothing). Removed
+  // rather than invent panels — same disposition as the "useless" Design/Prototype tablist.
+  const railItems: [keyof typeof UI_ICON, string, Rail][] = [
+    ['railFile', 'File', 'file'], ['railAssets', 'Assets', 'assets'], ['railVariables', 'Variables', 'variables'],
   ]
 
   return (
