@@ -2052,8 +2052,19 @@ export default function ReactFigmaPage() {
       : field === 'cssPosition' ? [['position', n]]
       : field === 'blend' ? [['mix-blend-mode', n]]
       : field === 'appearanceVisible' ? [['visibility', n]]
-      : field === 'widthMode' ? [['width', n]]
-      : field === 'heightMode' ? [['height', n]]
+      : field === 'widthMode' || field === 'heightMode' ? (() => {
+          // Figma resize modes, direction-aware (Dan: "fill works in the opposite direction — hugs").
+          // width/height:100% of an auto-sized flex parent computes to content size (= hug), so Fill
+          // must use the flex mechanism: main axis → flex-grow, cross axis → align-self:stretch.
+          const horiz = field === 'widthMode'
+          const prop = horiz ? 'width' : 'height'
+          const isMain = parentIsFlex && (horiz ? parentIsRow : !parentIsRow)
+          if (n === 'Fill') return parentIsFlex
+            ? (isMain ? [['flex', '1 1 0%'], [prop, 'auto']] : [['align-self', 'stretch'], [prop, 'auto']]) as [string, string][]
+            : [[prop, '100%']] as [string, string][]
+          if (n === 'Hug') return (isMain ? [['flex', '0 0 auto'], [prop, 'fit-content']] : [[prop, 'fit-content']]) as [string, string][]
+          return [[prop, cs.getPropertyValue(prop)]] as [string, string][] // Fixed — freeze current computed size
+        })()
       : field === 'padT' ? [['padding-top', withUnit]]
       : field === 'padR' ? [['padding-right', withUnit]]
       : field === 'padB' ? [['padding-bottom', withUnit]]
@@ -2280,6 +2291,21 @@ export default function ReactFigmaPage() {
       setHoverRect(el ? rectOf(el) : null)
     }, true)
     doc.addEventListener('mouseleave', () => setHoverRect(null), true)
+    // Zoom fix (Dan, 3rd report): the wheel listener lives on the OUTER canvas, but the iframe
+    // swallows wheel events — so pinch/scroll over the frame (where the cursor actually is) never
+    // zoomed. Forward wheel from the iframe to the canvas element, mapping iframe-local coords to
+    // parent client coords through the frame's scaled bounding rect.
+    doc.addEventListener('wheel', (e) => {
+      e.preventDefault()
+      const fr = iframeRef.current?.getBoundingClientRect()
+      const host = canvasRef.current
+      if (!fr || !host) return
+      const z = viewRef.current.z
+      host.dispatchEvent(new WheelEvent('wheel', {
+        deltaX: e.deltaX, deltaY: e.deltaY, ctrlKey: e.ctrlKey, metaKey: e.metaKey,
+        clientX: fr.left + e.clientX * z, clientY: fr.top + e.clientY * z,
+      }))
+    }, { passive: false, capture: true })
     doc.addEventListener('click', (e) => {
       const el = findTagged(e.target)
       if (!el) return
@@ -2758,8 +2784,8 @@ export default function ReactFigmaPage() {
               <UiIB name="autoLayoutWrap" title="Wrap" size={16} active={autoWrap} on={() => { const nv = !autoWrap; setAutoWrap(nv); applyOverride('flexWrap', nv ? 'wrap' : 'nowrap') }} />
             </InspectorRow>
             <InspectorRow label="Resizing">
-              <ResizeDropdownField axis="W" value={widthValue} mode={widthResize} onValue={(v) => { setWidthValue(v); applyOverride('width', v) }} onMode={(m) => { setWidthResize(m); applyOverride('widthMode', m === 'Fixed' ? `${parseFloat(widthValue) || 0}px` : m === 'Hug' ? 'fit-content' : '100%') }} />
-              <ResizeDropdownField axis="H" value={heightValue} mode={heightResize} onValue={(v) => { setHeightValue(v); applyOverride('height', v) }} onMode={(m) => { setHeightResize(m); applyOverride('heightMode', m === 'Fixed' ? `${parseFloat(heightValue) || 0}px` : m === 'Hug' ? 'fit-content' : '100%') }} />
+              <ResizeDropdownField axis="W" value={widthValue} mode={widthResize} onValue={(v) => { setWidthValue(v); applyOverride('width', v) }} onMode={(m) => { setWidthResize(m); applyOverride('widthMode', m) }} />
+              <ResizeDropdownField axis="H" value={heightValue} mode={heightResize} onValue={(v) => { setHeightValue(v); applyOverride('height', v) }} onMode={(m) => { setHeightResize(m); applyOverride('heightMode', m) }} />
               <UiIB name="lockAspect" title="Lock aspect ratio" active={aspectLocked} on={() => { const nv = !aspectLocked; setAspectLocked(nv); const w = parseFloat(widthValue), h = parseFloat(heightValue); applyOverride('aspectRatio', nv && w > 0 && h > 0 ? `${w} / ${h}` : 'auto') }} />
             </InspectorRow>
             <div style={{ position: 'relative', height: 82, width: '100%' }}>
