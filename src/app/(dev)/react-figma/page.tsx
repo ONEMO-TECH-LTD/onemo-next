@@ -2214,6 +2214,14 @@ export default function ReactFigmaPage() {
     const el = canvasRef.current; const r = el?.getBoundingClientRect()
     setView(v => { const nz = Math.min(4, Math.max(0.05, v.z * factor)); const cx = (r?.width ?? 800) / 2, cy = (r?.height ?? 600) / 2; const k = nz / v.z; return { z: nz, x: cx - (cx - v.x) * k, y: cy - (cy - v.y) * k } })
   }, [])
+  // E4 vibe #4: the device-frame size follows the frame preset (was hardcoded 402×871)
+  const frameDims = (() => { const m = framePreset.size.match(/(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)/); return m ? { w: Math.round(+m[1]), h: Math.round(+m[2]) } : { w: 402, h: 871 } })()
+  // E4 vibe #3: click the frame label/border → select the frame's root element in the canvas
+  const selectFrameRoot = useCallback(() => {
+    const doc = iframeRef.current?.contentDocument, win = iframeRef.current?.contentWindow
+    const root = doc?.querySelector('body [data-src]') as HTMLElement | null
+    if (root && win) root.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: win }))
+  }, [])
   useEffect(() => {
     const el = canvasRef.current; if (!el) return
     const onWheel = (e: WheelEvent) => {
@@ -2387,10 +2395,10 @@ export default function ReactFigmaPage() {
         {codeMode && sel && <CodeView file={sel.file} line={sel.line} onClose={() => setCodeMode(false)} />}
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle, rgba(0,0,0,.09) 1px, transparent 1px)', backgroundSize: `${24 * view.z}px ${24 * view.z}px`, backgroundPosition: `${view.x}px ${view.y}px` }} />
         <div style={{ position: 'absolute', left: 0, top: 0, transform: `translate(${view.x}px,${view.y}px) scale(${view.z})`, transformOrigin: '0 0' }}>
-          <div style={{ font: `550 10px/1 ${FONT}`, color: SEL, marginBottom: 8, marginLeft: 2 }}>Editor 402 · 402 × 871</div>
-          <div data-screen-host style={{ position: 'relative', width: 402, height: 871, background: '#fff', borderRadius: 4, boxShadow: '0 0 0 1px rgba(0,0,0,.06), 0 12px 40px -8px rgba(0,0,0,.25)' }}>
+          <button type="button" onClick={selectFrameRoot} title="Select frame" style={{ appearance: 'none', border: 0, background: 'transparent', font: `550 10px/1 ${FONT}`, color: SEL, marginBottom: 8, marginLeft: 2, cursor: 'pointer', padding: 0 }}>{canvas.name} · {frameDims.w} × {frameDims.h}</button>
+          <div data-screen-host style={{ position: 'relative', width: frameDims.w, height: frameDims.h, background: '#fff', borderRadius: 4, boxShadow: '0 0 0 1px rgba(0,0,0,.06), 0 12px 40px -8px rgba(0,0,0,.25)' }}>
             <iframe key={canvas.route} ref={iframeRef} src={canvas.route} onLoad={wireCanvas} title="Canvas — real build"
-              style={{ width: 402, height: 871, border: 0, display: 'block', borderRadius: 4 }} />
+              style={{ width: frameDims.w, height: frameDims.h, border: 0, display: 'block', borderRadius: 4 }} />
             {hoverRect && (
               <div style={{ position: 'absolute', left: hoverRect.x, top: hoverRect.y, width: hoverRect.w, height: hoverRect.h, outline: `${1.5 / view.z}px solid ${SEL}`, pointerEvents: 'none' }} />
             )}
