@@ -202,13 +202,13 @@ type DsToken = { cssVar: string; value: string; dark?: string; group: string; ki
 let _dsTokenCache: DsToken[] | null = null
 /* E4-G4 — real components available to insert (extracted-in-editor), for the Assets panel. */
 type DsComponent = { name: string; importPath: string }
-function useDsComponents(active: boolean): DsComponent[] {
+function useDsComponents(active: boolean, nonce = 0): DsComponent[] {
   const [comps, setComps] = useState<DsComponent[]>([])
   useEffect(() => {
     if (!active) return
     fetch('/api/dev/editor-components').then((r) => (r.ok ? r.json() : { components: [] }))
       .then((d: { components: DsComponent[] }) => setComps(d.components)).catch(() => {})
-  }, [active])
+  }, [active, nonce])
   return comps
 }
 function useDsTokens(): DsToken[] {
@@ -1770,7 +1770,17 @@ const SHOW_LEDGER = false
 export default function ReactFigmaPage() {
   type Rail = 'file' | 'assets' | 'variables'
   const [rail, setRail] = useState<Rail>('file')
-  const dsComponents = useDsComponents(rail === 'assets') // E4-G4 Assets panel
+  const [compNonce, setCompNonce] = useState(0)
+  const [newCompName, setNewCompName] = useState('')
+  const dsComponents = useDsComponents(rail === 'assets', compNonce) // E4-G4 Assets panel
+  // #6: create a new component in code (Framer-style) — scaffolds a real editable component file.
+  const newComponent = useCallback(async (name: string) => {
+    const clean = name.trim()
+    if (!/^[A-Za-z][A-Za-z0-9]*$/.test(clean)) { notify('Name must be a PascalCase identifier', 'error'); return }
+    const r = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'create-component', name: clean }) })
+    if (r.ok) { const d = await r.json().catch(() => ({})); notify(`Created ${d.name ?? clean}`); setCompNonce((n) => n + 1) }
+    else notify(`Create failed: ${await r.text()}`, 'error')
+  }, [])
   // #28 Assets: also surface the loaded screen's REAL images + icons (scanned live from the canvas —
   // no invented asset library). Images insert as <img src>; icons render as thumbnails.
   const [canvasAssets, setCanvasAssets] = useState<{ images: string[]; icons: string[] }>({ images: [], icons: [] })
@@ -2539,6 +2549,12 @@ export default function ReactFigmaPage() {
           <>
             <div style={{ padding: '10px 12px' }}><div style={{ height: 28, background: FIELD, borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', color: MUTE, font: `400 11px/1 ${FONT}` }}><MagnifyingGlass size={13} /> Search components…</div></div>
             <div style={{ padding: '4px 12px 8px', font: `400 11px/1.4 ${FONT}`, color: FAINT }}>Components extracted in the editor — select a container, then click one to insert it.</div>
+            {/* #6: create a new component in code (Framer-style) */}
+            <form onSubmit={(e) => { e.preventDefault(); if (newCompName.trim()) { void newComponent(newCompName); setNewCompName('') } }} style={{ display: 'flex', gap: 6, padding: '0 12px 8px' }}>
+              <input value={newCompName} onChange={(e) => setNewCompName(e.currentTarget.value)} placeholder="New component name" aria-label="New component name"
+                style={{ flex: 1, minWidth: 0, height: 26, borderRadius: 6, border: `1px solid ${LINE}`, background: '#fff', padding: '0 8px', outline: 0, font: `400 11px/1 ${FONT}`, color: INK }} />
+              <button type="submit" title="Create component in code" style={{ appearance: 'none', border: 0, background: SEL, color: '#fff', height: 26, borderRadius: 6, padding: '0 10px', cursor: 'pointer', font: `450 11px/1 ${FONT}` }}>New</button>
+            </form>
             {dsComponents.length === 0
               ? <div style={{ padding: '8px 12px', font: `400 11px/1.5 ${FONT}`, color: MUTE }}>No components yet. Select an element and use “Create component” to add one here.</div>
               : (

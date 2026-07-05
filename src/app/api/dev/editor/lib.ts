@@ -232,6 +232,7 @@ export type WriteOp =
   | { kind: 'delete-jsx'; file: string; line: number; col: number }
   | { kind: 'duplicate-jsx'; file: string; line: number; col: number }
   | { kind: 'insert-component'; file: string; line: number; col: number; name: string; importPath: string }
+  | { kind: 'create-component'; name: string }
 
 // ─── JSX inline-style write (E2.4, ENGINE-PLAN-E2.4.md) ──────────────────────
 
@@ -464,6 +465,23 @@ async function createPage(op: Extract<WriteOp, { kind: 'create-page' }>): Promis
  * (props/state/local const) → refuse 422. Guarantees the extracted component compiles; errs toward
  * refusal, never toward broken output. Zero-prop extraction — the subtree is inlined verbatim.
  */
+/* #6 — "create a component in code" (Framer-style): scaffold a fresh, editable component file from a
+   name. Same validated write as make-component (PascalCase name, collision-safe, assertValidTsx),
+   but a blank starter instead of an extracted subtree. Appears in Assets + editable via Code mode. */
+async function createComponent(op: Extract<WriteOp, { kind: 'create-component' }>): Promise<{ ok: true; file: string; newValueText: string; componentFile: string; name: string }> {
+  if (!/^[A-Za-z][A-Za-z0-9]*$/.test(op.name)) throw Object.assign(new Error('name must be a PascalCase identifier'), { status: 422 })
+  const nameBase = op.name[0].toUpperCase() + op.name.slice(1)
+  const compDir = path.join(ROOT, 'src/app/(dev)/react-figma-components')
+  await fs.mkdir(compDir, { recursive: true })
+  let name = nameBase, i = 1
+  while (true) { try { await fs.access(path.join(compDir, `${name}.tsx`)); name = `${nameBase}${++i}` } catch { break } }
+  const compAbs = path.join(compDir, `${name}.tsx`)
+  const compSource = `export function ${name}() {\n  return (\n    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 16, minWidth: 120, minHeight: 80, background: '#fff', borderRadius: 8, border: '1px solid rgba(0,0,0,0.08)' }}>\n      <span style={{ font: '600 13px/1.4 system-ui' }}>${name}</span>\n    </div>\n  )\n}\n`
+  assertValidTsx(compAbs, compSource)
+  await fs.writeFile(compAbs, compSource, 'utf8')
+  const rel = `src/app/(dev)/react-figma-components/${name}.tsx`
+  return { ok: true, file: rel, newValueText: name, componentFile: rel, name }
+}
 async function makeComponent(op: Extract<WriteOp, { kind: 'make-component' }>): Promise<{ ok: true; file: string; newValueText: string; componentFile: string }> {
   const abs = jailComponentWrite(op.file)
   const buf = await fs.readFile(abs)
@@ -651,10 +669,11 @@ async function insertComponent(op: Extract<WriteOp, { kind: 'insert-component' }
   return { ok: true, file: op.file, newValueText: `<${op.name} />` }
 }
 
-export async function applyWrite(op: WriteOp): Promise<{ ok: true; file: string; newValueText: string; route?: string; componentFile?: string }> {
+export async function applyWrite(op: WriteOp): Promise<{ ok: true; file: string; newValueText: string; route?: string; componentFile?: string; name?: string }> {
   if (op.kind === 'insert-component') return insertComponent(op)
   if (op.kind === 'delete-jsx') return deleteJsx(op)
   if (op.kind === 'duplicate-jsx') return duplicateJsx(op)
+  if (op.kind === 'create-component') return createComponent(op)
   if (op.kind === 'make-component') return makeComponent(op)
   if (op.kind === 'create-page') return createPage(op)
   if (op.kind === 'set-token-value') return setTokenValue(op)
