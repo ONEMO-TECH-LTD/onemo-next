@@ -2112,16 +2112,6 @@ export default function ReactFigmaPage() {
     input.click()
   }, [sel, insertSnippet])
 
-  const insertChild = useCallback(async (tag: string, display?: string) => {
-    if (tag === 'img') { void insertImage(); return }
-    if (!sel) { notify('Select a container element first', 'error'); return }
-    const st = display === 'flex' || display === 'grid' ? ` display: '${display}',` : ''
-    const snippet =
-      tag === 'text' ? `<span style={{ fontSize: 14, color: '#000' }}>Text</span>`
-      : `<${tag} style={{${st} minWidth: 40, minHeight: 40, background: 'rgba(0,0,0,0.06)', borderRadius: 4 }} />`
-    await insertSnippet(snippet)
-  }, [sel, insertImage, insertSnippet])
-
   // E4-G2 Selection colors: recolor every occurrence of a color across the selected subtree
   // (multi-element override; commitOverrides already saves all dirty elements).
   const recolorSelection = useCallback((oldHex: string, newHex: string, newOp: number) => {
@@ -2644,7 +2634,7 @@ export default function ReactFigmaPage() {
       {/* ░░ INFINITE CANVAS ░░ */}
       <main ref={canvasRef} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
         style={{ flex: 1, minWidth: 0, background: '#f0f0f0', position: 'relative', overflow: 'hidden', cursor: drawArm ? 'crosshair' : isPanning ? 'grabbing' : 'default' }}>
-        <InsertIsland onInsert={(tag, display) => { if (tag === 'img') void insertChild('img'); else setDrawArm({ tag, display }) }} codeMode={codeMode} onCodeMode={setCodeMode} />
+        <InsertIsland onInsert={(tag, display) => { if (tag === 'img') void insertImage(); else setDrawArm({ tag, display }) }} codeMode={codeMode} onCodeMode={setCodeMode} />
         {drawArm && <div style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 40, height: 26, display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', borderRadius: 8, background: '#1e1e1e', color: '#fff', font: `450 11px/1 ${FONT}`, pointerEvents: 'none' }}>Drawing {drawArm.tag} — drag on the frame · Esc to cancel</div>}
         {codeMode && sel && <CodeView file={sel.file} line={sel.line} onClose={() => setCodeMode(false)} />}
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle, rgba(0,0,0,.09) 1px, transparent 1px)', backgroundSize: `${24 * view.z}px ${24 * view.z}px`, backgroundPosition: `${view.x}px ${view.y}px` }} />
