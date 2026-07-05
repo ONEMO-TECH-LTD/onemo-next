@@ -423,6 +423,17 @@ function AutoFlowGroup({ value, onChange }: { value: AutoFlow; onChange: (value:
     </div>
   )
 }
+/* #12 — bound-variable pill. Dan: "show label number in the capsule instead of the token full name,
+   mirror figma token behavior on selection" (supersedes the earlier E2.5 no-chip call). Figma shows
+   the variable's leaf name in a pill; derive it from the token's structural path. */
+const shortToken = (t: string) => (t.split('/').pop() ?? t).trim().replace(/^--/, '')
+function TokenPill({ token }: { token: string }) {
+  return (
+    <span title={token} style={{ flex: 1, minWidth: 0, height: 18, marginRight: 2, borderRadius: 4, background: 'rgba(90,90,255,0.10)', color: TOKEN, display: 'flex', alignItems: 'center', padding: '0 6px', font: `450 10px/18px ${FONT}` }}>
+      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{shortToken(token)}</span>
+    </span>
+  )
+}
 function AutoValueField({ icon, label, value, mode, caret = true, ariaLabel, onChange, token, width = 88 }: { icon?: keyof typeof UI_ICON; label?: string; value: string; mode?: string; caret?: boolean; ariaLabel?: string; onChange?: (value: string) => void; token?: string; width?: number }) {
   const [varOpen, setVarOpen] = useState(false)
   const fieldRef = useCloseOnOutside<HTMLDivElement>(varOpen, () => setVarOpen(false))
@@ -430,7 +441,9 @@ function AutoValueField({ icon, label, value, mode, caret = true, ariaLabel, onC
   return (
     <div ref={fieldRef} title={token /* E2.5 opt-A: token name on hover, no visible chip (Figma-exact) */} style={{ position: 'relative', height: 24, width, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'flex', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
       <span style={{ width: 24, height: 24, flex: 'none', display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)', font: `450 11px/24px ${FONT}` }}>{icon ? <UiIcon name={icon} /> : label}</span>
-      {onChange ? (
+      {token ? (
+        <TokenPill token={token} />
+      ) : onChange ? (
         <input aria-label={fieldLabel} role="spinbutton" value={value} onChange={e => onChange(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
           style={{ flex: 1, minWidth: 0, width: 1, height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: INK, font: `450 11px/16px ${FONT}` }} />
       ) : (
@@ -579,9 +592,9 @@ function InlineValueInput({ icon, value, onChange, suffix, ariaLabel, token }: {
   return (
     <div ref={fieldRef} title={token} style={{ position: 'relative', height: 24, width: 88, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: suffix ? '24px 1fr 14px 16px' : '24px 1fr 16px', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
       <span style={{ width: 24, height: 24, flex: 'none', display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)' }}><UiIcon name={icon} /></span>
-      <input aria-label={ariaLabel} value={value} onChange={e => onChange(e.currentTarget.value)}
-        style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: INK, font: `450 11px/16px ${FONT}` }} />
-      {suffix && <span style={{ color: MUTE }}>{suffix}</span>}
+      {token ? <TokenPill token={token} /> : <input aria-label={ariaLabel} value={value} onChange={e => onChange(e.currentTarget.value)}
+        style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: INK, font: `450 11px/16px ${FONT}` }} />}
+      {suffix && !token && <span style={{ color: MUTE }}>{suffix}</span>}
       <button type="button" title="Apply variable" aria-label={`Apply variable to ${ariaLabel}`} aria-haspopup="menu" aria-expanded={varOpen} onClick={event => { event.stopPropagation(); setVarOpen(v => !v) }}
         style={{ appearance: 'none', border: 0, padding: 0, width: 16, height: 24, display: 'grid', placeItems: 'center', background: 'transparent', cursor: 'pointer', color: FAINT }}>
         <UiIcon name="variable" size={12} />
