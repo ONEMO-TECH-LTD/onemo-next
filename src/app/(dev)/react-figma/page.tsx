@@ -1654,7 +1654,6 @@ export default function ReactFigmaPage() {
   const dsComponents = useDsComponents(rail === 'assets') // E4-G4 Assets panel
   const [layerQuery, setLayerQuery] = useState<string | null>(null) // null = search closed; '' = open, empty
   const [uiMinimized, setUiMinimized] = useState(false)
-  const [tab, setTab] = useState<'design' | 'prototype'>('design')
   const [view, setView] = useState({ x: 300, y: 70, z: 0.6 })
   const [frameKind, setFrameKind] = useState<FrameKind>('Frame')
   const [framePreset, setFramePreset] = useState<FramePreset>({ label: 'iPhone 17', size: '402 × 874' })
@@ -2425,16 +2424,8 @@ export default function ReactFigmaPage() {
           </div>
         </div>
         <div style={{ height: 33, borderBottom: `1px solid ${LINE}`, display: 'flex', alignItems: 'flex-start', padding: '0 8px', flex: 'none' }}>
-          <div role="tablist" style={{ display: 'flex', gap: 4, height: 24 }}>
-            {(['design', 'prototype'] as const).map(t => {
-              const active = tab === t
-              return (
-                <button key={t} type="button" onClick={() => setTab(t)}
-                  style={{ appearance: 'none', border: 0, cursor: 'pointer', width: t === 'design' ? 53 : 68.8, height: 24, borderRadius: 5, display: 'grid', placeItems: 'center', background: active ? FIELD : '#fff', padding: '0 8px', font: `${active ? 550 : 450} 11px/16px ${FONT}`, letterSpacing: '0.055px', color: active ? INK : 'rgba(0,0,0,0.5)' }}>{t === 'design' ? 'Design' : 'Prototype'}</button>
-              )
-            })}
-          </div>
-          <button type="button" style={{ appearance: 'none', border: 0, background: '#fff', borderRadius: 5, marginLeft: 'auto', width: 54.5, height: 24, padding: '4px 4px 4px 12px', color: '#000', cursor: 'pointer', font: `400 11px/16px ${FONT}`, display: 'flex', alignItems: 'center' }}><span style={{ flex: 1 }}>92%</span><UiIcon name="caret16" size={16} /></button>
+          {/* Design/Prototype tabs removed (no prototype mode in this editor — Dan vibe). */}
+          <button type="button" title="Zoom — click to reset to 100%" onClick={() => zoomStep(1 / view.z)} style={{ appearance: 'none', border: 0, background: '#fff', borderRadius: 5, marginLeft: 'auto', minWidth: 54.5, height: 24, padding: '4px 4px 4px 12px', color: '#000', cursor: 'pointer', font: `400 11px/16px ${FONT}`, display: 'flex', alignItems: 'center' }}><span style={{ flex: 1 }}>{Math.round(view.z * 100)}%</span><UiIcon name="caret16" size={16} /></button>
         </div>
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {/* M3: dirty ledger — unsaved canvas overrides (staging; E1.4 commits from here).
