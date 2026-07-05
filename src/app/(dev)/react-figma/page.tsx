@@ -1877,6 +1877,10 @@ export default function ReactFigmaPage() {
     const withUnit = /^-?\d+(\.\d+)?$/.test(n) ? `${n}px` : n
     const t0 = performance.now()
     const positioned = cs.getPropertyValue('position') !== 'static'
+    // Parent flex context — #9 self-align routes each visual axis to the mechanism that controls it.
+    const pcs = el.parentElement ? doc.defaultView!.getComputedStyle(el.parentElement) : null
+    const parentIsFlex = pcs ? pcs.display.includes('flex') : false
+    const parentIsRow = pcs ? !pcs.flexDirection.startsWith('column') : true
     const decls: [string, string][] =
       field === 'gap' ? [['column-gap', withUnit], ['row-gap', withUnit]]
       : field === 'paddingX' ? [['padding-left', withUnit], ['padding-right', withUnit]]
@@ -1925,15 +1929,20 @@ export default function ReactFigmaPage() {
           : n === 'grid' ? [['display', 'grid'], ['grid-template-columns', 'repeat(auto-fill, minmax(80px, 1fr))']]
           : [['display', 'block']] // freeform — no auto-layout
         )
-      : field === 'selfAlign' ? ( // align the element within its parent — directional margin:auto (flex-item + block analog)
-          n === 'left' ? [['margin-left', '0'], ['margin-right', 'auto']]
-          : n === 'hcenter' ? [['margin-left', 'auto'], ['margin-right', 'auto']]
-          : n === 'right' ? [['margin-left', 'auto'], ['margin-right', '0']]
-          : n === 'top' ? [['margin-top', '0'], ['margin-bottom', 'auto']]
-          : n === 'vcenter' ? [['margin-top', 'auto'], ['margin-bottom', 'auto']]
-          : n === 'bottom' ? [['margin-top', 'auto'], ['margin-bottom', '0']]
-          : []
-        )
+      : field === 'selfAlign' ? (() => { // align the element within its parent (Figma). Route each
+          // visual axis to the mechanism that controls it: flex MAIN axis → margin:auto, flex CROSS
+          // axis → align-self; block parent → margin:auto (horizontal works; vertical has no analog).
+          const horiz = n === 'left' || n === 'hcenter' || n === 'right'
+          const pos = (n === 'left' || n === 'top') ? 'start' : (n === 'right' || n === 'bottom') ? 'end' : 'center'
+          const marginPair = (a: string, b: string): [string, string][] =>
+            pos === 'center' ? [[a, 'auto'], [b, 'auto']] : pos === 'start' ? [[a, '0'], [b, 'auto']] : [[a, 'auto'], [b, '0']]
+          const marginAxis: [string, string][] = horiz ? marginPair('margin-left', 'margin-right') : marginPair('margin-top', 'margin-bottom')
+          if (parentIsFlex) {
+            const thisAxisIsMain = horiz ? parentIsRow : !parentIsRow
+            return thisAxisIsMain ? marginAxis : [['align-self', pos === 'start' ? 'flex-start' : pos === 'end' ? 'flex-end' : 'center']]
+          }
+          return marginAxis
+        })()
       : field === 'clip' ? [['overflow', n]]
       : field === 'transform' ? [['transform', n]]
       : field === 'cssPosition' ? [['position', n]]
