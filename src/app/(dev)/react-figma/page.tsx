@@ -246,13 +246,13 @@ function FigmaVariablePicker({ fieldLabel, anchorRef, onPick, onClose }: { field
       window.removeEventListener('scroll', update, true)
     }
   }, [anchorRef])
-  // E3.4 — filter to the field's token type (Figma shows only same-type variables). Inferred from
-  // the field label; only filters when confident, otherwise shows all so nothing is wrongly hidden.
-  const kind: DsToken['kind'] | null =
-    /fill|stroke|colou?r|paint|background/i.test(fieldLabel) ? 'color'
-    : /gap|pad|radi|corner|size|width|height|spac|inset|weight/i.test(fieldLabel) ? 'dimension'
-    : null
-  const pool = kind ? tokens.filter((t) => t.kind === kind) : tokens
+  // E3.4/E5 #10 — scope to the field's token type (Figma shows only same-type variables). This picker
+  // only opens on numeric value fields (X/Y, rotation, insets, gap, padding, size, opacity — color
+  // fields use StyleApplyButton), so the mapping is binary: colour-named field → colour tokens, every
+  // other field → dimension tokens. No show-all fallback — that leaked colour tokens onto X-position.
+  const kind: DsToken['kind'] =
+    /fill|stroke|colou?r|paint|background/i.test(fieldLabel) ? 'color' : 'dimension'
+  const pool = tokens.filter((t) => t.kind === kind)
   const q = query.trim().toLowerCase()
   const filtered = pool.filter((t) => !q || t.cssVar.toLowerCase().includes(q) || t.value.toLowerCase().includes(q))
   // group into header + item rows in file order (tokens.css is organised by collection)
