@@ -19,7 +19,7 @@ import { Fragment, useState, useRef, useEffect, useCallback } from 'react'
 import { buildLayerTree, readStyles, colorToHex, hexToRgba, boxSlots, gapSlots, editSlot, tokenOf, Overrides, parseEffects, parseShadow, formatShadow, splitTopLevel, alignToIndex, alignFromIndex, collectSelectionColors, ensureId, type LiveNode, type OverrideOp } from './engine'
 import { createPortal } from 'react-dom'
 import {
-  MagnifyingGlass, Plus, Minus, Sidebar, CaretDown,
+  MagnifyingGlass, Plus, Minus, Sidebar, CaretDown, ArrowUUpLeft, ArrowUUpRight,
   type Icon as PIcon,
 } from '@phosphor-icons/react'
 
@@ -2801,9 +2801,12 @@ export default function ReactFigmaPage() {
         </div>
         <div style={{ height: 33, borderBottom: `1px solid ${LINE}`, display: 'flex', alignItems: 'flex-start', padding: '0 8px', flex: 'none' }}>
           {/* Design/Prototype tabs removed (no prototype mode in this editor — Dan vibe). */}
-          {/* Dan live-QA: undo/redo of staged edits (⌘Z / ⇧⌘Z; committed code is versioned by git). */}
-          <button type="button" title="Undo (⌘Z)" onClick={undoEdit} style={{ appearance: 'none', border: 0, background: 'transparent', width: 24, height: 24, marginLeft: 'auto', borderRadius: 5, cursor: 'pointer', color: INK, font: `400 13px/24px ${FONT}` }}>↶</button>
-          <button type="button" title="Redo (⇧⌘Z)" onClick={redoEdit} style={{ appearance: 'none', border: 0, background: 'transparent', width: 24, height: 24, borderRadius: 5, cursor: 'pointer', color: INK, font: `400 13px/24px ${FONT}` }}>↷</button>
+          {/* Dan live-QA: undo/redo of staged edits (⌘Z / ⇧⌘Z; committed code is versioned by git).
+              Phosphor light icons — never hand-drawn glyphs (Dan). */}
+          <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+            <IB I={ArrowUUpLeft} title="Undo (⌘Z)" w="light" s={15} on={undoEdit} />
+            <IB I={ArrowUUpRight} title="Redo (⇧⌘Z)" w="light" s={15} on={redoEdit} />
+          </span>
           {/* Dan live-QA: side-panel zoom is a Figma-style dropdown menu, not a bare reset button. */}
           <div ref={zoomMenuRef} style={{ position: 'relative' }}>
             <button type="button" title="Zoom options" aria-haspopup="menu" aria-expanded={zoomMenuOpen} onClick={() => setZoomMenuOpen(v => !v)} style={{ appearance: 'none', border: 0, background: '#fff', borderRadius: 5, minWidth: 54.5, height: 24, padding: '4px 4px 4px 12px', color: '#000', cursor: 'pointer', font: `400 11px/16px ${FONT}`, display: 'flex', alignItems: 'center' }}><span style={{ flex: 1 }}>{Math.round(view.z * 100)}%</span><UiIcon name="caret16" size={16} /></button>
