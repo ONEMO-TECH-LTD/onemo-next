@@ -371,7 +371,9 @@ function InspectorField({ label, icon, value, bound, input, dimValue, ariaLabel,
     <div ref={fieldRef} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
       style={{ position: 'relative', minWidth: 0, height: 24, borderRadius: 5, background: h ? '#ededed' : input ? '#fff' : FIELD, border: `1px solid ${varOpen ? SEL : input ? '#e6e6e6' : 'transparent'}`, display: 'flex', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
       <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', flex: 'none', color: input ? INK : 'rgba(0,0,0,0.5)', font: `400 11px/24px ${FONT}` }}>{icon ? <UiIcon name={icon} /> : label}</span>
-      {onChange ? (
+      {varBinding(value) ? (
+        <TokenPill token={value} />
+      ) : onChange ? (
         <input aria-label={fieldLabel} role="spinbutton" value={value} onChange={e => onChange(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
           style={{ flex: 1, minWidth: 0, height: 24, border: 0, outline: 0, padding: '0 8px 0 0', background: 'transparent', color: bound ? TOKEN : dimValue ? MUTE : INK, font: `450 11px/16px ${FONT}` }} />
       ) : (
@@ -426,7 +428,10 @@ function AutoFlowGroup({ value, onChange }: { value: AutoFlow; onChange: (value:
 /* #12 — bound-variable pill. Dan: "show label number in the capsule instead of the token full name,
    mirror figma token behavior on selection" (supersedes the earlier E2.5 no-chip call). Figma shows
    the variable's leaf name in a pill; derive it from the token's structural path. */
-const shortToken = (t: string) => (t.split('/').pop() ?? t).trim().replace(/^--/, '')
+const shortToken = (t: string) => (t.split('/').pop() ?? t).trim().replace(/^var\(\s*/, '').replace(/\s*\)$/, '').replace(/^--/, '')
+// E6.3 (Codex HIGH): a FRESHLY bound variable is a raw `var(--…)` value until commit+reload — the
+// pill must show immediately like Figma, so fields pill on the live value too.
+const varBinding = (v: string) => /^var\(\s*--[\w-]+\s*\)$/.test(v.trim())
 function TokenPill({ token }: { token: string }) {
   return (
     <span title={token} style={{ flex: 1, minWidth: 0, height: 18, marginRight: 2, borderRadius: 4, background: 'rgba(90,90,255,0.10)', color: TOKEN, display: 'flex', alignItems: 'center', padding: '0 6px', font: `450 10px/18px ${FONT}` }}>
@@ -441,8 +446,8 @@ function AutoValueField({ icon, label, value, mode, caret = true, ariaLabel, onC
   return (
     <div ref={fieldRef} title={token /* E2.5 opt-A: token name on hover, no visible chip (Figma-exact) */} style={{ position: 'relative', height: 24, width, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'flex', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
       <span style={{ width: 24, height: 24, flex: 'none', display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)', font: `450 11px/24px ${FONT}` }}>{icon ? <UiIcon name={icon} /> : label}</span>
-      {token ? (
-        <TokenPill token={token} />
+      {token || varBinding(value) ? (
+        <TokenPill token={token ?? value} />
       ) : onChange ? (
         <input aria-label={fieldLabel} role="spinbutton" value={value} onChange={e => onChange(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
           style={{ flex: 1, minWidth: 0, width: 1, height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: INK, font: `450 11px/16px ${FONT}` }} />
@@ -592,9 +597,9 @@ function InlineValueInput({ icon, value, onChange, suffix, ariaLabel, token }: {
   return (
     <div ref={fieldRef} title={token} style={{ position: 'relative', height: 24, width: 88, borderRadius: 5, background: FIELD, border: `1px solid ${varOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: suffix ? '24px 1fr 14px 16px' : '24px 1fr 16px', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
       <span style={{ width: 24, height: 24, flex: 'none', display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)' }}><UiIcon name={icon} /></span>
-      {token ? <TokenPill token={token} /> : <input aria-label={ariaLabel} value={value} onChange={e => onChange(e.currentTarget.value)}
+      {token || varBinding(value) ? <TokenPill token={token ?? value} /> : <input aria-label={ariaLabel} value={value} onChange={e => onChange(e.currentTarget.value)}
         style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: 0, background: 'transparent', color: INK, font: `450 11px/16px ${FONT}` }} />}
-      {suffix && !token && <span style={{ color: MUTE }}>{suffix}</span>}
+      {suffix && !(token || varBinding(value)) && <span style={{ color: MUTE }}>{suffix}</span>}
       <button type="button" title="Apply variable" aria-label={`Apply variable to ${ariaLabel}`} aria-haspopup="menu" aria-expanded={varOpen} onClick={event => { event.stopPropagation(); setVarOpen(v => !v) }}
         style={{ appearance: 'none', border: 0, padding: 0, width: 16, height: 24, display: 'grid', placeItems: 'center', background: 'transparent', cursor: 'pointer', color: FAINT }}>
         <UiIcon name="variable" size={12} />
@@ -2546,6 +2551,10 @@ export default function ReactFigmaPage() {
   }, [])
   const onDown = useCallback((e: React.PointerEvent) => {
     if (e.button !== 0 && e.button !== 1) return
+    // E6.1 (Codex HIGH + Dan repro): pointerdown on an interactive child must NOT start a pan —
+    // setPointerCapture retargets pointerup to <main>, so the child's click never completes. This
+    // is why the zoom buttons died under a REAL mouse while synthetic .click() passed.
+    if ((e.target as HTMLElement).closest('button, input, select, a, [role="menu"], [role="dialog"]')) return
     if (drawArm && e.button === 0) {
       const fc = toFrameCoords(e.clientX, e.clientY)
       if (fc) { draw.current = { sx: fc.x, sy: fc.y, rect: { x: fc.x, y: fc.y, w: 0, h: 0 } }; setDrawRect(draw.current.rect) }
@@ -2579,14 +2588,14 @@ export default function ReactFigmaPage() {
   // resizable panels — edge drag handles + min/max (Figma canon). Document-level listeners = robust through the whole drag.
   const [leftW, setLeftW] = useState(240)
   const [rightW, setRightW] = useState(241)
-  // #27: draggable divide between the Pages browser and the Layers tree (resizable Layers section).
+  // #27 + E6.5: draggable divide between Pages and Layers. Pointer-CAPTURE pattern (handlers on the
+  // element, capture pins the stream) — the window-listener pattern missed real drags.
   const [pagesH, setPagesH] = useState(240)
-  const resizePages = (e: React.PointerEvent) => {
-    e.preventDefault()
-    const startY = e.clientY, startH = pagesH
-    const onMove = (ev: PointerEvent) => setPagesH(Math.max(80, Math.min(560, startH + (ev.clientY - startY))))
-    const onUp = () => { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp) }
-    window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp)
+  const pagesDrag = useRef<{ y: number; h: number } | null>(null)
+  const dividerHandlers = {
+    onPointerDown: (e: React.PointerEvent) => { e.preventDefault(); pagesDrag.current = { y: e.clientY, h: pagesH }; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId) },
+    onPointerMove: (e: React.PointerEvent) => { const s = pagesDrag.current; if (s) setPagesH(Math.max(80, Math.min(560, s.h + (e.clientY - s.y)))) },
+    onPointerUp: () => { pagesDrag.current = null },
   }
   const startResize = (side: 'l' | 'r') => (e: React.PointerEvent) => {
     e.preventDefault()
@@ -2688,8 +2697,14 @@ export default function ReactFigmaPage() {
                 </>
               )}
             </div>
-            <div role="separator" aria-label="Resize Layers section" onPointerDown={resizePages}
-              style={{ height: 7, marginBottom: -7, cursor: 'ns-resize', flex: 'none' }} />
+            {/* E6.5: real-mouse-grabbable divider — 12px hit area straddling the border, ns-resize
+                cursor, hover affordance (the old 7px invisible strip failed under a real mouse). */}
+            <div role="separator" aria-label="Resize Layers section" {...dividerHandlers}
+              onMouseEnter={(e) => { (e.currentTarget.firstChild as HTMLElement).style.background = SEL }}
+              onMouseLeave={(e) => { (e.currentTarget.firstChild as HTMLElement).style.background = 'transparent' }}
+              style={{ height: 12, margin: '-6px 0', cursor: 'ns-resize', flex: 'none', position: 'relative', zIndex: 5, display: 'grid', alignItems: 'center', touchAction: 'none' }}>
+              <div style={{ height: 2, background: 'transparent', transition: 'background 120ms', pointerEvents: 'none' }} />
+            </div>
             <div style={{ height: 49, padding: '9px 8px 0 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: `1px solid ${LINE}` }}>
               <span style={hdr}>Layers</span>
               <UiIB name="collapseLayers" title="Collapse layers" on={() => { const ids = (layers ?? []).filter((n) => n.kids).map((n) => n.id); setCollapsed((prev) => prev.size >= ids.length ? new Set() : new Set(ids)) }} />
@@ -2773,7 +2788,7 @@ export default function ReactFigmaPage() {
           <button type="button" onClick={selectFrameRoot} title="Select frame" style={{ appearance: 'none', border: 0, background: 'transparent', font: `550 10px/1 ${FONT}`, color: SEL, marginBottom: 8, marginLeft: 2, cursor: 'pointer', padding: 0 }}>{canvas.name} · {frameDims.w} × {frameDims.h}</button>
           <div data-screen-host onClick={selectFrameRoot} style={{ position: 'relative', width: frameDims.w, height: frameDims.h, background: '#fff', borderRadius: 4, boxShadow: '0 0 0 1px rgba(0,0,0,.06), 0 12px 40px -8px rgba(0,0,0,.25)' }}>
             <iframe key={canvas.route} ref={iframeRef} src={canvas.route} onLoad={wireCanvas} title="Canvas — real build"
-              style={{ width: frameDims.w, height: frameDims.h, border: 0, display: 'block', borderRadius: 4 }} />
+              style={{ width: frameDims.w, height: frameDims.h, border: 0, display: 'block', borderRadius: 4, pointerEvents: drawArm ? 'none' : 'auto' }} />
             {hoverRect && (
               <div style={{ position: 'absolute', left: hoverRect.x, top: hoverRect.y, width: hoverRect.w, height: hoverRect.h, outline: `${1.5 / view.z}px solid ${SEL}`, pointerEvents: 'none' }} />
             )}
