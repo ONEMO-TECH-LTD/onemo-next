@@ -708,9 +708,15 @@ function LayerRow({ n, on, onToggle, rowId }: { n: Node; on?: () => void; onTogg
 type ImportedVar = { name: string; type: string; values: string[] }
 type ImportedCollection = { name: string; modes: string[]; vars: ImportedVar[] }
 function parseFigmaVariables(data: unknown): ImportedCollection[] | null {
-  const meta = ((data as { meta?: unknown }).meta ?? data) as { variableCollections?: Record<string, unknown>; variables?: Record<string, unknown> }
-  const cols = meta.variableCollections, vars = meta.variables
-  if (!cols || !vars || typeof cols !== 'object' || typeof vars !== 'object') return null
+  const meta = ((data as { meta?: unknown }).meta ?? data) as { variableCollections?: unknown; variables?: unknown; collections?: unknown }
+  // Accept both documented shapes: REST export (variableCollections/variables as id-keyed OBJECTS)
+  // and plugin export ({ collections: [...], variables: [...] } as ARRAYS) — Codex E5 MED finding.
+  const toRecord = (v: unknown): Record<string, unknown> | null =>
+    Array.isArray(v) ? Object.fromEntries((v as { id?: string }[]).map((x, i) => [x?.id ?? String(i), x]))
+    : v && typeof v === 'object' ? v as Record<string, unknown> : null
+  const cols = toRecord(meta.variableCollections ?? meta.collections)
+  const vars = toRecord(meta.variables)
+  if (!cols || !vars) return null
   const chan = (c: number) => Math.round(Math.max(0, Math.min(1, c)) * 255).toString(16).padStart(2, '0')
   const fmt = (v: unknown): string => {
     if (v && typeof v === 'object' && 'r' in (v as object)) { const c = v as { r: number; g: number; b: number; a?: number }; return `#${chan(c.r)}${chan(c.g)}${chan(c.b)}${c.a !== undefined && c.a < 1 ? chan(c.a) : ''}`.toUpperCase() }
