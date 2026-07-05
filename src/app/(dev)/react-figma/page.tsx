@@ -2455,6 +2455,8 @@ export default function ReactFigmaPage() {
   }, [undoEdit, redoEdit])
   const [zoomMenuOpen, setZoomMenuOpen] = useState(false)
   const zoomMenuRef = useCloseOnOutside<HTMLDivElement>(zoomMenuOpen, () => setZoomMenuOpen(false))
+  const [pubMenuOpen, setPubMenuOpen] = useState(false)
+  const pubMenuRef = useCloseOnOutside<HTMLDivElement>(pubMenuOpen, () => setPubMenuOpen(false))
   // Zoom to fit — fit the frame into the visible canvas, centered (Figma ⇧1 behavior).
   const zoomToFit = useCallback(() => {
     const r = canvasRef.current?.getBoundingClientRect()
@@ -2787,29 +2789,46 @@ export default function ReactFigmaPage() {
       <aside style={{ width: rightW, flex: 'none', position: 'relative', borderLeft: `1px solid ${LINE}`, display: uiMinimized ? 'none' : 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div onPointerDown={startResize('r')} style={handleStyle('left')} />
         <div style={{ height: 48, display: 'flex', alignItems: 'center', padding: '0 8px 0 11px', flex: 'none' }}>
-          {/* E2.5 + Dan live-QA ("why no save to code"): always visible — disabled at 0 instead of
-              hidden, so the function is discoverable when the tree is clean. */}
-          {(() => { const dirtyN = ovVersion >= 0 ? ov.current!.dirty().filter((o) => !o.stale).length : 0; return (
-            <button type="button" disabled={committing || dirtyN === 0} onClick={() => void commitOverrides()}
-              style={{ appearance: 'none', border: `1px solid ${LINE}`, background: '#fff', color: committing || dirtyN === 0 ? MUTE : INK, height: 28, borderRadius: 6, padding: '0 10px', cursor: committing || dirtyN === 0 ? 'default' : 'pointer', font: `500 11px/16px ${FONT}`, display: 'flex', alignItems: 'center', gap: 6, opacity: dirtyN === 0 ? 0.6 : 1 }}>
-              <UiIcon name="devCode" size={14} />{committing ? 'Saving…' : `Save to code · ${dirtyN}`}
-            </button>
-          ) })()}
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 1, height: 32 }}>
-            {/* #7/#8: dead Present / Prototype-preview chrome removed (no analog in this editor);
-                Publish was a dead button — now commits all staged overrides to source. */}
-            <button type="button" disabled={committing || !(ovVersion >= 0 && ov.current!.dirty().filter((o) => !o.stale).length > 0)} onClick={() => void commitOverrides()} title="Publish — save all changes to code"
-              style={{ appearance: 'none', border: 0, background: SEL, color: '#fff', height: 32, borderRadius: 5, padding: '0 12px', cursor: committing ? 'default' : 'pointer', font: `450 11px/16px ${FONT}`, letterSpacing: '0.055px', opacity: (committing || !(ovVersion >= 0 && ov.current!.dirty().filter((o) => !o.stale).length > 0)) ? 0.5 : 1 }}>{committing ? 'Publishing…' : 'Publish'}</button>
-          </div>
+          {/* Dan: Publish IS the save button (Save-to-code removed) — badge shows the change count
+              when collapsed; the caret opens a dropdown listing the staged changes. */}
+          {(() => {
+            const dirty = ovVersion >= 0 ? ov.current!.dirty().filter((o) => !o.stale) : []
+            const n = dirty.length
+            return (
+              <div ref={pubMenuRef} style={{ marginLeft: 'auto', position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <button type="button" disabled={committing || n === 0} onClick={() => void commitOverrides()} title="Publish — save all changes to code"
+                  style={{ appearance: 'none', border: 0, background: SEL, color: '#fff', height: 32, borderRadius: '5px 0 0 5px', padding: '0 12px', cursor: committing || n === 0 ? 'default' : 'pointer', font: `450 11px/16px ${FONT}`, letterSpacing: '0.055px', opacity: committing || n === 0 ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {committing ? 'Publishing…' : 'Publish'}
+                  {n > 0 && !committing && <span style={{ minWidth: 16, height: 16, borderRadius: 8, background: 'rgba(255,255,255,0.28)', display: 'grid', placeItems: 'center', padding: '0 4px', font: `550 10px/16px ${FONT}` }}>{n}</span>}
+                </button>
+                <button type="button" title="Show changes" aria-haspopup="menu" aria-expanded={pubMenuOpen} onClick={() => setPubMenuOpen(v => !v)}
+                  style={{ appearance: 'none', border: 0, borderLeft: '1px solid rgba(255,255,255,0.3)', background: SEL, color: '#fff', height: 32, width: 24, borderRadius: '0 5px 5px 0', display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
+                  <UiIcon name="caret16" size={16} />
+                </button>
+                {pubMenuOpen && (
+                  <div data-figma-floating-root="true" role="menu" style={{ position: 'absolute', right: 0, top: 36, zIndex: 130, width: 232, maxHeight: 320, overflowY: 'auto', padding: '8px 0', borderRadius: 13, background: '#1e1e1e', color: '#fff', boxShadow: 'rgba(0,0,0,0.15) 0px 2px 5px 0px, rgba(0,0,0,0.12) 0px 10px 16px 0px, rgba(0,0,0,0.12) 0px 0px 0.5px 0px' }}>
+                    <div style={{ padding: '0 16px 6px', font: `550 11px/16px ${FONT}`, color: 'rgba(255,255,255,0.6)' }}>{n === 0 ? 'No unsaved changes' : `${n} change${n > 1 ? 's' : ''}`}</div>
+                    {dirty.map((op, i) => (
+                      <div key={`${op.domId}-${op.prop}-${i}`} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 8, alignItems: 'center', padding: '0 16px', height: 24, font: `400 11px/24px ${FONT}` }}>
+                        <span style={{ color: 'rgba(255,255,255,0.55)' }}>{op.prop}</span>
+                        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right' }}>{op.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
         </div>
         <div style={{ height: 33, borderBottom: `1px solid ${LINE}`, display: 'flex', alignItems: 'flex-start', padding: '0 8px', flex: 'none' }}>
           {/* Design/Prototype tabs removed (no prototype mode in this editor — Dan vibe). */}
-          {/* Dan live-QA: undo/redo of staged edits (⌘Z / ⇧⌘Z; committed code is versioned by git).
-              Phosphor light icons — never hand-drawn glyphs (Dan). */}
-          <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
-            <IB I={ArrowUUpLeft} title="Undo (⌘Z)" w="light" s={15} on={undoEdit} />
-            <IB I={ArrowUUpRight} title="Redo (⇧⌘Z)" w="light" s={15} on={redoEdit} />
+          {/* Dan: undo/redo (⌘Z / ⇧⌘Z) — same 24px control chrome as the rest of the panel,
+              LEFT-aligned with breathing room; Phosphor light icons. */}
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0 0 4px' }}>
+            <IB I={ArrowUUpLeft} title="Undo (⌘Z)" w="light" s={16} on={undoEdit} />
+            <IB I={ArrowUUpRight} title="Redo (⇧⌘Z)" w="light" s={16} on={redoEdit} />
           </span>
+          <span style={{ marginLeft: 'auto' }} />
           {/* Dan live-QA: side-panel zoom is a Figma-style dropdown menu, not a bare reset button. */}
           <div ref={zoomMenuRef} style={{ position: 'relative' }}>
             <button type="button" title="Zoom options" aria-haspopup="menu" aria-expanded={zoomMenuOpen} onClick={() => setZoomMenuOpen(v => !v)} style={{ appearance: 'none', border: 0, background: '#fff', borderRadius: 5, minWidth: 54.5, height: 24, padding: '4px 4px 4px 12px', color: '#000', cursor: 'pointer', font: `400 11px/16px ${FONT}`, display: 'flex', alignItems: 'center' }}><span style={{ flex: 1 }}>{Math.round(view.z * 100)}%</span><UiIcon name="caret16" size={16} /></button>
