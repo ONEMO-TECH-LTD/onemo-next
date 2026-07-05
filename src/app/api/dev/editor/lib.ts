@@ -529,7 +529,20 @@ async function makeComponent(op: Extract<WriteOp, { kind: 'make-component' }>): 
   let name = nameBase, i = 1
   while (true) { try { await fs.access(path.join(compDir, `${name}.tsx`)); name = `${nameBase}${++i}` } catch { break } }
   const subtree = el.getText(sf)
-  const compSource = `${neededImports.length ? neededImports.join('\n') + '\n\n' : ''}export function ${name}() {\n  return (\n    ${subtree}\n  )\n}\n`
+  // Rewrite RELATIVE import specifiers so they resolve from the new component's directory — the
+  // extracted file sits at a different depth than the source, so a verbatim `../…` breaks the build
+  // (module-not-found; the parse-guard only checks syntax, not resolution). Absolute/@-alias/package
+  // specifiers are left untouched.
+  const srcDir = path.dirname(abs)
+  const rewriteImport = (text: string): string => {
+    const m = text.match(/from\s+(['"])(\.[^'"]*)\1/)
+    if (!m) return text
+    let rel = path.relative(compDir, path.resolve(srcDir, m[2])).replace(/\\/g, '/')
+    if (!rel.startsWith('.')) rel = './' + rel
+    return text.replace(m[0], `from ${m[1]}${rel}${m[1]}`)
+  }
+  const fixedImports = neededImports.map(rewriteImport)
+  const compSource = `${fixedImports.length ? fixedImports.join('\n') + '\n\n' : ''}export function ${name}() {\n  return (\n    ${subtree}\n  )\n}\n`
   const compAbs = path.join(compDir, `${name}.tsx`)
 
   // replace subtree with <Name /> and add the import — bottom-up splice (subtree offset > import offset)
