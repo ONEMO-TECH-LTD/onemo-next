@@ -1676,6 +1676,8 @@ export default function ReactFigmaPage() {
   const [rotationValue, setRotationValue] = useState('0°')
   const [cssPosition, setCssPosition] = useState(2)
   const [insetTop, setInsetTop] = useState('auto')
+  const [insetRight, setInsetRight] = useState('auto')
+  const [insetBottom, setInsetBottom] = useState('auto')
   const [insetLeft, setInsetLeft] = useState('auto')
   const [zIndexValue, setZIndexValue] = useState('1')
   const [autoFlow, setAutoFlow] = useState<AutoFlow>('horizontal')
@@ -1773,7 +1775,8 @@ export default function ReactFigmaPage() {
     const c = rep.computed
     // Position
     setXValue(px(String(r.left))); setYValue(px(String(r.top)))
-    setInsetTop(c['top'] === 'auto' ? 'auto' : px(c['top'])); setInsetLeft(c['left'] === 'auto' ? 'auto' : px(c['left']))
+    const inset = (p: string) => c[p] === 'auto' ? 'auto' : px(c[p])
+    setInsetTop(inset('top')); setInsetRight(inset('right')); setInsetBottom(inset('bottom')); setInsetLeft(inset('left'))
     setZIndexValue(c['z-index'] === 'auto' ? '0' : c['z-index'])
     setCssPosition(({ static: 0, relative: 1, absolute: 2, fixed: 3, sticky: 4 } as Record<string, number>)[c['position']] ?? 0)
     // Auto layout
@@ -1846,7 +1849,7 @@ export default function ReactFigmaPage() {
       })
     } else setTypo(null)
     console.log('[engine] select', payload, rep)
-  }, [setXValue, setYValue, setInsetTop, setInsetLeft, setZIndexValue, setCssPosition, setAutoFlow, setAutoWrap, setWidthValue, setHeightValue, setGapValue, setPaddingXValue, setPaddingYValue, setClipContent, setOpacityValue, setCornerRadiusValue, setBlendMode])
+  }, [setXValue, setYValue, setInsetTop, setInsetRight, setInsetBottom, setInsetLeft, setZIndexValue, setCssPosition, setAutoFlow, setAutoWrap, setWidthValue, setHeightValue, setGapValue, setPaddingXValue, setPaddingYValue, setClipContent, setOpacityValue, setCornerRadiusValue, setBlendMode])
 
   /* M3: panel edit → instant canvas override (staging only — zero disk writes). */
   const applyOverride = useCallback((field: string, raw: string) => {
@@ -1870,6 +1873,8 @@ export default function ReactFigmaPage() {
       : field === 'x' ? (positioned ? [['left', withUnit]] : [['position', 'relative'], ['left', withUnit]])
       : field === 'y' ? (positioned ? [['top', withUnit]] : [['position', 'relative'], ['top', withUnit]])
       : field === 'insetT' ? (positioned ? [['top', withUnit]] : [['position', 'relative'], ['top', withUnit]])
+      : field === 'insetR' ? (positioned ? [['right', withUnit]] : [['position', 'relative'], ['right', withUnit]])
+      : field === 'insetB' ? (positioned ? [['bottom', withUnit]] : [['position', 'relative'], ['bottom', withUnit]])
       : field === 'insetL' ? (positioned ? [['left', withUnit]] : [['position', 'relative'], ['left', withUnit]])
       : field === 'zIndex' ? [['z-index', n]]
       : field === 'strokeWeight' ? [['border-width', withUnit]]
@@ -2508,9 +2513,13 @@ export default function ReactFigmaPage() {
             <InspectorRow label="CSS position" columns="1fr">
               <TextSegGroup items={['Auto', 'Rel', 'Abs', 'Fix', 'Sticky']} active={cssPosition} onSelect={(i) => { setCssPosition(i); applyOverride('cssPosition', ['static', 'relative', 'absolute', 'fixed', 'sticky'][i]) }} width="100%" ariaLabel="CSS position" />
             </InspectorRow>
-            <CompactInspectorRow label="Inset / z-index">
+            <InspectorRow label="Inset" columns="1fr 1fr 1fr 1fr">
               <InspectorField label="T" value={insetTop} ariaLabel="Top inset" onChange={(v) => { setInsetTop(v); applyOverride('insetT', v) }} />
+              <InspectorField label="R" value={insetRight} ariaLabel="Right inset" onChange={(v) => { setInsetRight(v); applyOverride('insetR', v) }} />
+              <InspectorField label="B" value={insetBottom} ariaLabel="Bottom inset" onChange={(v) => { setInsetBottom(v); applyOverride('insetB', v) }} />
               <InspectorField label="L" value={insetLeft} ariaLabel="Left inset" onChange={(v) => { setInsetLeft(v); applyOverride('insetL', v) }} />
+            </InspectorRow>
+            <CompactInspectorRow label="z-index">
               <InspectorField label="Z" value={zIndexValue} ariaLabel="z-index" onChange={(v) => { setZIndexValue(v); applyOverride('zIndex', v) }} />
             </CompactInspectorRow>
           </Sec>
