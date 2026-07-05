@@ -1829,6 +1829,7 @@ export default function ReactFigmaPage() {
   const canvasRef = useRef<HTMLDivElement>(null)
   const pan = useRef<{ x: number; y: number; vx: number; vy: number } | null>(null)
   const [isPanning, setIsPanning] = useState(false)
+  const [drawArm, setDrawArm] = useState<{ tag: string; display?: string } | null>(null) // #26 armed draw tool
 
   // engine M1+M2 — selection + read-bridge state
   const iframeRef = useRef<HTMLIFrameElement>(null)
@@ -2398,9 +2399,61 @@ export default function ReactFigmaPage() {
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
   }, [])
-  const onDown = useCallback((e: React.PointerEvent) => { if (e.button !== 0 && e.button !== 1) return; pan.current = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y }; setIsPanning(true); (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId) }, [view.x, view.y])
-  const onMove = useCallback((e: React.PointerEvent) => { if (pan.current) setView(v => ({ ...v, x: pan.current!.vx + (e.clientX - pan.current!.x), y: pan.current!.vy + (e.clientY - pan.current!.y) })) }, [])
-  const onUp = useCallback(() => { pan.current = null; setIsPanning(false) }, [])
+  // #26 draw-to-place: arm a primitive (via the insert island), then drag on the canvas to draw it at
+  // that position + size (Figma/Framer model). Strictly additive — pan/select are untouched unless a
+  // tool is armed. The drawn element is inserted absolutely-positioned into the frame root.
+  const viewRef = useRef(view); viewRef.current = view
+  const draw = useRef<{ sx: number; sy: number; rect: { x: number; y: number; w: number; h: number } } | null>(null)
+  const [drawRect, setDrawRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
+  const toFrameCoords = (clientX: number, clientY: number) => {
+    const host = canvasRef.current?.querySelector('[data-screen-host]')?.getBoundingClientRect()
+    if (!host) return null
+    const z = viewRef.current.z
+    return { x: Math.round((clientX - host.left) / z), y: Math.round((clientY - host.top) / z) }
+  }
+  const insertDrawn = useCallback(async (tag: string, display: string | undefined, r: { x: number; y: number; w: number; h: number }) => {
+    const doc = iframeRef.current?.contentDocument
+    const root = doc?.querySelector('body [data-src]') as HTMLElement | null
+    const m = root?.getAttribute('data-src')?.match(/^(.*):(\d+):(\d+)$/)
+    if (!m) { notify('No frame to draw into', 'error'); return }
+    const disp = display === 'flex' || display === 'grid' ? ` display: '${display}',` : ''
+    const snippet = tag === 'text'
+      ? `<span style={{ position: 'absolute', left: ${r.x}, top: ${r.y}, fontSize: 14, color: '#000' }}>Text</span>`
+      : `<${tag} style={{ position: 'absolute',${disp} left: ${r.x}, top: ${r.y}, width: ${Math.max(1, r.w)}, height: ${Math.max(1, r.h)}, background: 'rgba(0,0,0,0.06)', borderRadius: 4 }} />`
+    const res = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'insert-jsx-child', file: m[1], line: +m[2], col: +m[3], snippet }) })
+    if (res.ok) notify(`Drew ${tag}`); else notify(`Draw failed: ${await res.text()}`, 'error')
+  }, [])
+  const onDown = useCallback((e: React.PointerEvent) => {
+    if (e.button !== 0 && e.button !== 1) return
+    if (drawArm && e.button === 0) {
+      const fc = toFrameCoords(e.clientX, e.clientY)
+      if (fc) { draw.current = { sx: fc.x, sy: fc.y, rect: { x: fc.x, y: fc.y, w: 0, h: 0 } }; setDrawRect(draw.current.rect) }
+      ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); return
+    }
+    pan.current = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y }; setIsPanning(true); (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+  }, [view.x, view.y, drawArm])
+  const onMove = useCallback((e: React.PointerEvent) => {
+    if (draw.current) {
+      const fc = toFrameCoords(e.clientX, e.clientY); if (!fc) return
+      const s = draw.current, rect = { x: Math.min(s.sx, fc.x), y: Math.min(s.sy, fc.y), w: Math.abs(fc.x - s.sx), h: Math.abs(fc.y - s.sy) }
+      s.rect = rect; setDrawRect(rect); return
+    }
+    if (pan.current) setView(v => ({ ...v, x: pan.current!.vx + (e.clientX - pan.current!.x), y: pan.current!.vy + (e.clientY - pan.current!.y) }))
+  }, [])
+  const onUp = useCallback(() => {
+    if (draw.current) {
+      const r = draw.current.rect, arm = drawArm; draw.current = null; setDrawRect(null); setDrawArm(null)
+      if (arm) void insertDrawn(arm.tag, arm.display, r.w > 4 && r.h > 4 ? r : { x: r.x, y: r.y, w: 80, h: 80 })
+      return
+    }
+    pan.current = null; setIsPanning(false)
+  }, [drawArm, insertDrawn])
+  useEffect(() => {
+    if (!drawArm) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setDrawArm(null); draw.current = null; setDrawRect(null) } }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [drawArm])
 
   // resizable panels — edge drag handles + min/max (Figma canon). Document-level listeners = robust through the whole drag.
   const [leftW, setLeftW] = useState(240)
@@ -2590,8 +2643,9 @@ export default function ReactFigmaPage() {
 
       {/* ░░ INFINITE CANVAS ░░ */}
       <main ref={canvasRef} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
-        style={{ flex: 1, minWidth: 0, background: '#f0f0f0', position: 'relative', overflow: 'hidden', cursor: isPanning ? 'grabbing' : 'default' }}>
-        <InsertIsland onInsert={insertChild} codeMode={codeMode} onCodeMode={setCodeMode} />
+        style={{ flex: 1, minWidth: 0, background: '#f0f0f0', position: 'relative', overflow: 'hidden', cursor: drawArm ? 'crosshair' : isPanning ? 'grabbing' : 'default' }}>
+        <InsertIsland onInsert={(tag, display) => { if (tag === 'img') void insertChild('img'); else setDrawArm({ tag, display }) }} codeMode={codeMode} onCodeMode={setCodeMode} />
+        {drawArm && <div style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 40, height: 26, display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', borderRadius: 8, background: '#1e1e1e', color: '#fff', font: `450 11px/1 ${FONT}`, pointerEvents: 'none' }}>Drawing {drawArm.tag} — drag on the frame · Esc to cancel</div>}
         {codeMode && sel && <CodeView file={sel.file} line={sel.line} onClose={() => setCodeMode(false)} />}
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle, rgba(0,0,0,.09) 1px, transparent 1px)', backgroundSize: `${24 * view.z}px ${24 * view.z}px`, backgroundPosition: `${view.x}px ${view.y}px` }} />
         <div style={{ position: 'absolute', left: 0, top: 0, transform: `translate(${view.x}px,${view.y}px) scale(${view.z})`, transformOrigin: '0 0' }}>
@@ -2606,6 +2660,7 @@ export default function ReactFigmaPage() {
               <div style={{ position: 'absolute', left: selRect.x, top: selRect.y, width: selRect.w, height: selRect.h, outline: `${2 / view.z}px solid ${SEL}`, pointerEvents: 'none' }} />
             )}
             {layoutGuides.length > 0 && <LayoutGuideOverlay guides={layoutGuides} w={frameDims.w} h={frameDims.h} />}
+            {drawRect && <div style={{ position: 'absolute', left: drawRect.x, top: drawRect.y, width: drawRect.w, height: drawRect.h, border: `${1 / view.z}px dashed ${SEL}`, background: 'rgba(11,153,255,0.08)', pointerEvents: 'none' }} />}
           </div>
         </div>
         <div style={{ position: 'absolute', left: 12, bottom: 12, height: 28, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', background: '#fff', borderRadius: 6, boxShadow: '0 2px 8px rgba(0,0,0,.14)', font: `450 11px/1 ${FONT}` }}>
