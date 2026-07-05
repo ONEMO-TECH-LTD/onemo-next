@@ -104,3 +104,7 @@ public/models/
 .next-v*/
 storybook-static
 .playwright-cli/
+
+# react-figma editor time-capsule history (private snapshot repo, never versioned)
+.editor-history/
+*--sandbox-*/
