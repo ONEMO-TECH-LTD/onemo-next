@@ -16,7 +16,7 @@
  */
 
 import { Fragment, useState, useRef, useEffect, useCallback } from 'react'
-import { buildLayerTree, readStyles, colorToHex, hexToRgba, boxSlots, gapSlots, editSlot, tokenOf, Overrides, parseEffects, parseShadow, formatShadow, splitTopLevel, alignToIndex, alignFromIndex, collectSelectionColors, type LiveNode, type OverrideOp } from './engine'
+import { buildLayerTree, readStyles, colorToHex, hexToRgba, boxSlots, gapSlots, editSlot, tokenOf, Overrides, parseEffects, parseShadow, formatShadow, splitTopLevel, alignToIndex, alignFromIndex, collectSelectionColors, ensureId, type LiveNode, type OverrideOp } from './engine'
 import { createPortal } from 'react-dom'
 import {
   MagnifyingGlass, Plus, Minus, Sidebar, CaretDown,
@@ -1381,13 +1381,21 @@ function FigmaEffectRow({ type, onRemove, initial, onParams }: { type: string; o
     </div>
   )
 }
-function SelectionColorRow({ hex, name, op, grad }: { hex?: string; name?: string; op: number; grad?: boolean }) {
+function SelectionColorRow({ hex, name, op, grad, onRecolor }: { hex?: string; name?: string; op: number; grad?: boolean; onRecolor?: (oldHex: string, newHex: string, newOp: number) => void }) {
   const [hexValue, setHexValue] = useState(hex || '000000')
   const [labelValue, setLabelValue] = useState(name || hex || '')
   const [opacityValue, setOpacityValue] = useState(String(op))
   const [pickerOpen, setPickerOpen] = useState(false)
   const rowRef = useCloseOnOutside<HTMLDivElement>(pickerOpen, () => setPickerOpen(false))
   const activeHex = normalizeHex(hexValue) || '000000'
+  const appliedRef = useRef(normalizeHex(hex || '000000') || '000000')
+  useEffect(() => { appliedRef.current = normalizeHex(hex || '000000') || '000000' }, [hex]) // resync on new selection
+  const commit = (nextHex: string, nextOp: number) => { // E4-G2: recolor the subtree, then track the applied color for re-edits
+    if (grad) return
+    const h = normalizeHex(nextHex) || '000000'
+    onRecolor?.(appliedRef.current, h, nextOp)
+    appliedRef.current = h
+  }
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '156px', alignItems: 'center', height: 32, padding: '0 8px 0 16px' }}>
       <div ref={rowRef} style={{ position: 'relative', width: 156, height: 24, borderRadius: 5, background: FIELD, border: `1px solid ${pickerOpen ? SEL : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: '24px 1fr 38px 14px', alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
@@ -1399,11 +1407,13 @@ function SelectionColorRow({ hex, name, op, grad }: { hex?: string; name?: strin
             style={{ appearance: 'none', border: 0, width: 14, height: 14, justifySelf: 'center', borderRadius: 2, background: `#${activeHex}`, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.15)', padding: 0, cursor: 'pointer' }} />
         )}
         <input aria-label={grad ? 'Selection gradient' : 'Selection color'} value={grad ? labelValue : activeHex} onChange={e => grad ? setLabelValue(e.currentTarget.value) : setHexValue(normalizeHex(e.currentTarget.value))}
+          onBlur={() => commit(activeHex, parseInt(opacityValue, 10) || 100)} onKeyDown={e => { if (e.key === 'Enter') commit(activeHex, parseInt(opacityValue, 10) || 100) }}
           style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, background: 'transparent', padding: 0, color: INK, font: `450 11px/16px ${FONT}` }} />
         <input aria-label="Selection color opacity" role="spinbutton" value={opacityValue} onChange={e => setOpacityValue(e.currentTarget.value.replace(/[^0-9]/g, '').slice(0, 3))}
+          onBlur={() => commit(activeHex, parseInt(opacityValue, 10) || 100)}
           style={{ minWidth: 0, width: 38, height: 24, border: 0, outline: 0, background: 'transparent', padding: '0 7px 0 0', color: INK, textAlign: 'right', font: `450 11px/16px ${FONT}` }} />
         <span style={{ color: 'rgba(0,0,0,0.5)' }}>%</span>
-        {pickerOpen && <FigmaColorPicker anchorRef={rowRef} hex={activeHex} opacity={opacityValue} onHex={value => { setHexValue(value); if (!grad) setLabelValue(value) }} onOpacity={setOpacityValue} onClose={() => setPickerOpen(false)} />}
+        {pickerOpen && <FigmaColorPicker anchorRef={rowRef} hex={activeHex} opacity={opacityValue} onHex={value => { setHexValue(value); if (!grad) setLabelValue(value); commit(value, parseInt(opacityValue, 10) || 100) }} onOpacity={v => { setOpacityValue(v); commit(activeHex, parseInt(v, 10) || 100) }} onClose={() => setPickerOpen(false)} />}
       </div>
     </div>
   )
@@ -1962,6 +1972,29 @@ export default function ReactFigmaPage() {
       : `<${tag} style={{${st} minWidth: 40, minHeight: 40, background: 'rgba(0,0,0,0.06)', borderRadius: 4 }} />`
     await insertSnippet(snippet)
   }, [sel, insertImage, insertSnippet])
+
+  // E4-G2 Selection colors: recolor every occurrence of a color across the selected subtree
+  // (multi-element override; commitOverrides already saves all dirty elements).
+  const recolorSelection = useCallback((oldHex: string, newHex: string, newOp: number) => {
+    const id = selIdRef.current, doc = iframeRef.current?.contentDocument
+    const root = id && doc ? (doc.querySelector(`[data-eng-id="${id}"]`) as HTMLElement | null) : null
+    if (!root || !doc) return
+    const target = newOp < 100 ? hexToRgba(newHex, newOp) : `#${newHex}`
+    const nodes = [root, ...(Array.from(root.querySelectorAll('[data-src]')) as HTMLElement[])].slice(0, 200)
+    let count = 0
+    for (const n of nodes) {
+      const cs = doc.defaultView!.getComputedStyle(n)
+      for (const prop of ['background-color', 'color', 'border-color']) {
+        const p = colorToHex(cs.getPropertyValue(prop), doc)
+        if (p && p.hex.toLowerCase() === oldHex.toLowerCase()) {
+          ov.current!.set(ensureId(n), prop, target, cs.getPropertyValue(prop))
+          count++
+        }
+      }
+    }
+    if (count) { setOvVersion((v) => v + 1); notify(`Recolored ${count} occurrence${count > 1 ? 's' : ''}`) }
+    else notify('No matching color in selection', 'error')
+  }, [])
 
   // E4-G4 Assets: insert a reusable component instance (+ import) into the selected container
   const insertAsset = useCallback(async (name: string, importPath: string) => {
@@ -2593,7 +2626,7 @@ export default function ReactFigmaPage() {
               : effects.map(e => <FigmaEffectRow key={e.id} type={e.type} onRemove={() => setEffects(rows => rows.filter(row => row.id !== e.id))} />)}
           </Sec>
           <Sec title="Selection colors" bodyGap={0} bodyPadding="0">
-            {(liveSelColors ?? []).map((c, i) => <SelectionColorRow key={`live-${i}`} hex={c.hex} op={c.op} />)}
+            {(liveSelColors ?? []).map((c, i) => <SelectionColorRow key={`live-${i}`} hex={c.hex} op={c.op} onRecolor={recolorSelection} />)}
           </Sec>
           <Sec title="Layout guide" actionWidth={52} action={<><StyleApplyButton label="Layout guide" title="Layout guide, Apply styles" /><UiIB name="plus" title="Add layout guide" on={() => setLayoutGuides(rows => [...rows, { id: nextRowId(rows), size: 'Grid 10px' }])} /></>} bodyGap={0} bodyPadding="0">
             {layoutGuides.map(g => <LayoutGuideRow key={g.id} size={g.size} onRemove={() => setLayoutGuides(rows => rows.filter(row => row.id !== g.id))} />)}
