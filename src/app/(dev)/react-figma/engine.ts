@@ -72,16 +72,26 @@ export function parseEffects(c: Record<string, string>): { type: string; detail:
   return out
 }
 
-/** AlignGrid 3×3 row-major index ↔ (align-items, justify-content). */
+/** AlignGrid 3×3 row-major index ↔ (align-items, justify-content).
+   The grid always reads visually — row = vertical position, col = horizontal position (Figma).
+   In flexbox the axes that map to those depend on direction: row-flow puts the main axis
+   (justify) horizontal + cross axis (align) vertical; column-flow swaps them. So the mapping
+   is direction-aware — otherwise a column auto-layout transposes (top-row controls horizontal). */
 const AXIS = ['flex-start', 'center', 'flex-end'] as const
-export function alignToIndex(c: Record<string, string>): number {
+export function alignToIndex(c: Record<string, string>, column = false): number {
   const norm = (v: string, dflt: number) => v.includes('start') ? 0 : v.includes('center') ? 1 : v.includes('end') ? 2 : dflt
-  const row = norm(c['align-items'] ?? '', 0)
-  const col = norm(c['justify-content'] ?? '', 0) // space-* families read as packed-start (v1 note)
+  const ai = norm(c['align-items'] ?? '', 0)
+  const jc = norm(c['justify-content'] ?? '', 0) // space-* families read as packed-start (v1 note)
+  const row = column ? jc : ai // vertical visual = main(justify) in column, cross(align) in row
+  const col = column ? ai : jc // horizontal visual = cross(align) in column, main(justify) in row
   return row * 3 + col
 }
-export function alignFromIndex(i: number): { alignItems: string; justifyContent: string } {
-  return { alignItems: AXIS[Math.floor(i / 3)] ?? 'flex-start', justifyContent: AXIS[i % 3] ?? 'flex-start' }
+export function alignFromIndex(i: number, column = false): { alignItems: string; justifyContent: string } {
+  const rowV = AXIS[Math.floor(i / 3)] ?? 'flex-start' // vertical visual intent
+  const colV = AXIS[i % 3] ?? 'flex-start' // horizontal visual intent
+  return column
+    ? { alignItems: colV, justifyContent: rowV } // column-flow: cross=horizontal, main=vertical
+    : { alignItems: rowV, justifyContent: colV } // row-flow: cross=vertical, main=horizontal
 }
 
 /** Aggregate unique colors used across the selected element's tagged subtree (Selection colors). */

@@ -1812,7 +1812,7 @@ export default function ReactFigmaPage() {
     // Selection colors: unique colors across the tagged subtree
     setLiveSelColors(collectSelectionColors(el, doc))
     // Auto-layout alignment grid + resize modes
-    setAutoAlign(alignToIndex(c))
+    setAutoAlign(alignToIndex(c, (c['flex-direction'] || '').startsWith('column')))
     setWidthResize(parseFloat(c['flex-grow'] || '0') > 0 ? 'Fill' : d['width'] ? 'Fixed' : 'Hug')
     setHeightResize(d['height'] ? 'Fixed' : 'Hug')
     // Typography — only when the element directly holds text (Figma shows Text section for text nodes)
@@ -2514,7 +2514,7 @@ export default function ReactFigmaPage() {
               <span style={{ position: 'absolute', left: 16, top: 3.5, width: 88, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Alignment</span>
               <span style={{ position: 'absolute', left: 112, top: 3.5, width: 88, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Gap</span>
               <div style={{ position: 'absolute', left: 16, right: 8, top: 22, display: 'grid', gridTemplateColumns: '88px 88px 24px', gap: 8, alignItems: 'start' }}>
-                <AlignGrid sel={autoAlign} onSelect={(i) => { setAutoAlign(i); const a = alignFromIndex(i); applyOverride('alignItems', a.alignItems); applyOverride('justify', a.justifyContent) }} />
+                <AlignGrid sel={autoAlign} onSelect={(i) => { const col = autoFlow === 'vertical'; setAutoAlign(i); const a = alignFromIndex(i, col); applyOverride('alignItems', a.alignItems); applyOverride('justify', a.justifyContent) }} />
                 <GapDropdownField value={gapValue} onChange={(v) => { setGapValue(v); applyOverride('gap', v) }} token={fieldTokens.gap} />
                 <AutoLayoutSettingsMenu onApply={applyOverride} />
               </div>
