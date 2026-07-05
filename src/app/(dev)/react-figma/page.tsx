@@ -203,6 +203,17 @@ function useCloseOnOutside<T extends HTMLElement>(open: boolean, close: () => vo
 // doubles as the Figma-style label; the resolved value shows alongside for traceability.
 type DsToken = { cssVar: string; value: string; dark?: string; group: string; kind: 'color' | 'dimension' | 'other'; path?: string }
 let _dsTokenCache: DsToken[] | null = null
+/* E4-G4 — real components available to insert (extracted-in-editor), for the Assets panel. */
+type DsComponent = { name: string; importPath: string }
+function useDsComponents(active: boolean): DsComponent[] {
+  const [comps, setComps] = useState<DsComponent[]>([])
+  useEffect(() => {
+    if (!active) return
+    fetch('/api/dev/editor-components').then((r) => (r.ok ? r.json() : { components: [] }))
+      .then((d: { components: DsComponent[] }) => setComps(d.components)).catch(() => {})
+  }, [active])
+  return comps
+}
 function useDsTokens(): DsToken[] {
   const [toks, setToks] = useState<DsToken[]>(_dsTokenCache ?? [])
   useEffect(() => {
@@ -1630,6 +1641,7 @@ const SHOW_LEDGER = false
 export default function ReactFigmaPage() {
   type Rail = 'file' | 'assets' | 'variables'
   const [rail, setRail] = useState<Rail>('file')
+  const dsComponents = useDsComponents(rail === 'assets') // E4-G4 Assets panel
   const [layerQuery, setLayerQuery] = useState<string | null>(null) // null = search closed; '' = open, empty
   const [uiMinimized, setUiMinimized] = useState(false)
   const [tab, setTab] = useState<'design' | 'prototype'>('design')
@@ -1950,6 +1962,16 @@ export default function ReactFigmaPage() {
       : `<${tag} style={{${st} minWidth: 40, minHeight: 40, background: 'rgba(0,0,0,0.06)', borderRadius: 4 }} />`
     await insertSnippet(snippet)
   }, [sel, insertImage, insertSnippet])
+
+  // E4-G4 Assets: insert a reusable component instance (+ import) into the selected container
+  const insertAsset = useCallback(async (name: string, importPath: string) => {
+    if (!sel) { notify('Select a container element first', 'error'); return }
+    const r = await fetch('/api/dev/editor-write', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ kind: 'insert-component', file: sel.file, line: sel.line, col: sel.col, name, importPath }),
+    })
+    if (r.ok) notify(`Inserted <${name} />`); else notify(`Insert failed: ${await r.text()}`, 'error')
+  }, [sel])
 
   // E3.6 More-actions: duplicate / delete the selected element (structural source edits)
   const duplicateEl = useCallback(async () => {
@@ -2300,12 +2322,17 @@ export default function ReactFigmaPage() {
         {rail === 'assets' && (
           <>
             <div style={{ padding: '10px 12px' }}><div style={{ height: 28, background: FIELD, borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', color: MUTE, font: `400 11px/1 ${FONT}` }}><MagnifyingGlass size={13} /> Search components…</div></div>
-            <div style={{ padding: '4px 12px', font: `400 11px/1.6 ${FONT}`, color: FAINT }}>Local components + libraries expand here (Assets panel).</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '4px 12px' }}>
-              {['RoundButton', 'Dock', 'Dial', 'Glass', 'Surface', 'Ruler'].map(c => (
-                <div key={c} style={{ height: 56, borderRadius: 6, border: `1px solid ${LINE}`, display: 'grid', placeItems: 'center', font: `450 10px/1 ${FONT}`, color: MUTE }}>{c}</div>
-              ))}
-            </div>
+            <div style={{ padding: '4px 12px 8px', font: `400 11px/1.4 ${FONT}`, color: FAINT }}>Components extracted in the editor — select a container, then click one to insert it.</div>
+            {dsComponents.length === 0
+              ? <div style={{ padding: '8px 12px', font: `400 11px/1.5 ${FONT}`, color: MUTE }}>No components yet. Select an element and use “Create component” to add one here.</div>
+              : (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '4px 12px' }}>
+                  {dsComponents.map((c) => (
+                    <button key={c.name} type="button" title={`Insert <${c.name} />`} onClick={() => void insertAsset(c.name, c.importPath)}
+                      style={{ appearance: 'none', height: 56, borderRadius: 6, border: `1px solid ${LINE}`, background: '#fff', display: 'grid', placeItems: 'center', font: `450 10px/1.3 ${FONT}`, color: INK, cursor: 'pointer', padding: '4px', textAlign: 'center', overflow: 'hidden' }}>{c.name}</button>
+                  ))}
+                </div>
+              )}
           </>
         )}
         <div onPointerDown={startResize('l')} style={handleStyle('right')} />

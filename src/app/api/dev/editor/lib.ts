@@ -231,6 +231,7 @@ export type WriteOp =
   | { kind: 'make-component'; file: string; line: number; col: number; name?: string }
   | { kind: 'delete-jsx'; file: string; line: number; col: number }
   | { kind: 'duplicate-jsx'; file: string; line: number; col: number }
+  | { kind: 'insert-component'; file: string; line: number; col: number; name: string; importPath: string }
 
 // ─── JSX inline-style write (E2.4, ENGINE-PLAN-E2.4.md) ──────────────────────
 
@@ -594,7 +595,41 @@ async function duplicateJsx(op: Extract<WriteOp, { kind: 'duplicate-jsx' }>): Pr
   return { ok: true, file: op.file, newValueText: subtree }
 }
 
+/** Insert a component instance (E4-G4 Assets): splice `<Name />` into the selected container +
+ *  add its import if absent. Same guards as insert-jsx-child + parse-check on the output. */
+async function insertComponent(op: Extract<WriteOp, { kind: 'insert-component' }>): Promise<{ ok: true; file: string; newValueText: string }> {
+  const abs = jailComponentWrite(op.file)
+  const buf = await fs.readFile(abs)
+  const source = buf.toString('utf8')
+  const sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
+  const opening = findJsxAt(sf, op.line, op.col)
+  if (!opening) throw Object.assign(new Error(`no JSX element at ${op.line}:${op.col}`), { status: 404 })
+  const parent = opening.parent
+  if (!ts.isJsxElement(parent)) throw Object.assign(new Error('self-closing element cannot hold children — select a container'), { status: 422 })
+  const hasText = parent.children.filter(ts.isJsxText).some((t) => t.getText(sf).trim().length > 0)
+  if (hasText) throw Object.assign(new Error('container holds text content — insert into an element-only container'), { status: 422 })
+  const closeStart = parent.closingElement!.getStart(sf)
+  const lineStart = source.lastIndexOf('\n', parent.getStart(sf)) + 1
+  const parentIndent = source.slice(lineStart).match(/^[ \t]*/)?.[0] ?? ''
+  const childInsert = `  <${op.name} />\n${parentIndent}`
+  const alreadyImported = sf.statements.some((st) => ts.isImportDeclaration(st) && st.getText(sf).includes(op.importPath))
+  const lastImport = [...sf.statements].reverse().find(ts.isImportDeclaration)
+  const importPos = lastImport ? lastImport.getEnd() : 0
+  const importText = `import { ${op.name} } from '${op.importPath}'`
+  const bClose = byteLen(source.slice(0, closeStart))
+  let next = Buffer.concat([buf.subarray(0, bClose), Buffer.from(childInsert, 'utf8'), buf.subarray(bClose)])
+  if (!alreadyImported) {
+    const bImp = byteLen(source.slice(0, importPos))
+    const importInsert = importPos === 0 ? `${importText}\n` : `\n${importText}`
+    next = Buffer.concat([next.subarray(0, bImp), Buffer.from(importInsert, 'utf8'), next.subarray(bImp)])
+  }
+  assertValidTsx(abs, next.toString('utf8'))
+  await fs.writeFile(abs, next)
+  return { ok: true, file: op.file, newValueText: `<${op.name} />` }
+}
+
 export async function applyWrite(op: WriteOp): Promise<{ ok: true; file: string; newValueText: string; route?: string; componentFile?: string }> {
+  if (op.kind === 'insert-component') return insertComponent(op)
   if (op.kind === 'delete-jsx') return deleteJsx(op)
   if (op.kind === 'duplicate-jsx') return duplicateJsx(op)
   if (op.kind === 'make-component') return makeComponent(op)
