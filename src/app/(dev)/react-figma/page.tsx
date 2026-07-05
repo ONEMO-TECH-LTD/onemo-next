@@ -2584,7 +2584,7 @@ export default function ReactFigmaPage() {
             </Sec>
           )}
 
-          <Sec title="Fill" actionWidth={52} action={<><StyleApplyButton label="Fill" title="Fill, Apply styles and variables" onApply={(v) => applyOverride('fillBg', v)} /><UiIB name="plus" title="Add fill" on={() => setFills(rows => [...rows, { id: nextRowId(rows), hex: 'FFFFFF', op: 100 }])} /></>} bodyGap={0} bodyPadding="0">
+          <Sec title="Fill" actionWidth={52} action={<><StyleApplyButton label="Fill" title="Fill, Apply styles and variables" onApply={(v) => applyOverride('fillBg', v)} /><UiIB name="plus" title="Add fill" on={() => { if (sel) applyOverride('fillBg', '#D9D9D9'); else setFills(rows => [...rows, { id: nextRowId(rows), hex: 'FFFFFF', op: 100 }]) }} /></>} bodyGap={0} bodyPadding="0">
             {liveFills
               ? liveFills.map((f, i) => { const fld = f.prop === 'color' ? 'fillColor' : 'fillBg'; return <FigmaPaintRow key={`live-${i}`} hex={f.hex} op={f.op} label="Fill" origin={f.origin}
                   onHexEdit={(hx) => applyOverride(fld, `#${hx}`)}
@@ -2593,7 +2593,7 @@ export default function ReactFigmaPage() {
                   onRemove={() => applyOverride(fld, 'transparent')} /> })
               : fills.map(f => <FigmaPaintRow key={f.id} hex={f.hex} op={f.op} label="Fill" onRemove={() => setFills(rows => rows.filter(row => row.id !== f.id))} />)}
           </Sec>
-          <Sec title="Stroke" actionWidth={52} action={<><StyleApplyButton label="Stroke" title="Stroke, Apply styles and variables" onApply={(v) => applyOverride('strokeColor', v)} /><UiIB name="plus" title="Add stroke fill" on={() => setStrokes(rows => [...rows, { id: nextRowId(rows), hex: '000000', op: 100, position: 'Inside', weight: 1 }])} /></>} bodyGap={0} bodyPadding="0">
+          <Sec title="Stroke" actionWidth={52} action={<><StyleApplyButton label="Stroke" title="Stroke, Apply styles and variables" onApply={(v) => applyOverride('strokeColor', v)} /><UiIB name="plus" title="Add stroke fill" on={() => { if (sel) { applyOverride('strokeWeight', '1'); applyOverride('strokeStyle', 'solid'); applyOverride('strokeColor', '#000000') } else setStrokes(rows => [...rows, { id: nextRowId(rows), hex: '000000', op: 100, position: 'Inside', weight: 1 }]) }} /></>} bodyGap={0} bodyPadding="0">
             {liveStrokes
               ? liveStrokes.map((s, i) => (
                   <div key={`live-${i}`}>
@@ -2612,7 +2612,7 @@ export default function ReactFigmaPage() {
                   </div>
                 ))}
           </Sec>
-          <Sec title="Effects" actionWidth={52} action={<><StyleApplyButton label="Effects" title="Effects, Apply styles" onApply={(v) => applyOverride('boxShadow', `0 2px 8px ${v}`)} /><UiIB name="plus" title="Add effect" on={() => setEffects(rows => [...rows, { id: nextRowId(rows), type: 'Drop shadow' }])} /></>} bodyGap={0} bodyPadding="0">
+          <Sec title="Effects" actionWidth={52} action={<><StyleApplyButton label="Effects" title="Effects, Apply styles" onApply={(v) => applyOverride('boxShadow', `0 2px 8px ${v}`)} /><UiIB name="plus" title="Add effect" on={() => { if (sel) applyOverride('boxShadow', '0 2px 8px rgba(0,0,0,0.25)'); else setEffects(rows => [...rows, { id: nextRowId(rows), type: 'Drop shadow' }]) }} /></>} bodyGap={0} bodyPadding="0">
             {liveEffects
               ? (() => { let si = -1; return liveEffects.map((e, i) => {
                   const isShadow = e.type.toLowerCase().includes('shadow')
