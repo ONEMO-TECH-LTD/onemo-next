@@ -89,6 +89,30 @@ async function snapshot(root: string, label: string, extraFiles: string[] = []):
   const { stdout } = await hgit(root, ['rev-parse', 'HEAD'])
   return { hash: stdout.trim() }
 }
+async function checkoutHistoryRef(root: string, ref: string) {
+  // true time-travel over the WHOLE tracked history tree (seed dirs + every file Publish
+  // ever wrote): files created after the target version go away, tracked files rewind.
+  const { stdout: nowList } = await hgit(root, ['ls-files'])
+  const { stdout: refList } = await hgit(root, ['ls-tree', '-r', '--name-only', ref])
+  const refSet = new Set(refList.trim().split('\n').filter(Boolean))
+  const emptied = new Set<string>()
+  for (const f of nowList.trim().split('\n').filter(Boolean)) {
+    // DELETE only inside the editor-owned seed dirs (pages/components/canvas — editor-created
+    // content). Build-source files (storybook/…) are only ever REWOUND, never deleted: absent
+    // from an old ref usually means "entered history later", not "didn't exist".
+    const editorOwned = HISTORY_PATHS.some((p) => f.startsWith(p + '/'))
+    if (!refSet.has(f) && editorOwned) { await rm(join(root, f), { force: true }); emptied.add(dirname(f)) }
+  }
+  // prune now-empty dirs (git tracks files only); rmdir refuses non-empty dirs, so this
+  // can never remove a folder still holding untracked/unrelated files
+  for (let d of emptied) {
+    while (HISTORY_PATHS.some((p) => d.startsWith(p + '/'))) {
+      try { await rmdir(join(root, d)) } catch { break } // non-empty or gone → stop climbing
+      d = dirname(d)
+    }
+  }
+  await hgit(root, ['checkout', ref, '--', '.']).catch(() => null) // rewind whole tracked tree
+}
 
 export async function POST(req: Request) {
   if (process.env.NODE_ENV !== 'development') {
@@ -100,9 +124,11 @@ export async function POST(req: Request) {
 
     if (action === 'fork') {
       const name = (body.name ?? '').trim()
+      const ref = (body.ref ?? '').trim()
       if (!/^[a-z0-9][a-z0-9-]{0,40}$/.test(name)) {
         return NextResponse.json({ error: 'invalid sandbox name (a-z, 0-9, dashes)' }, { status: 422 })
       }
+      if (ref && !/^[0-9a-f]{7,40}$/.test(ref)) return NextResponse.json({ error: 'invalid version ref' }, { status: 422 })
       const registry = await readRegistry()
       if (registry.some((e) => e.name === name && alive(e.pid))) {
         return NextResponse.json({ error: 'sandbox name already running' }, { status: 409 })
@@ -126,7 +152,12 @@ export async function POST(req: Request) {
         await rm(join(dest, 'node_modules'), { recursive: true, force: true })
         await symlink(realMods, join(dest, 'node_modules'))
       }
-      await snapshot(dest, `fork baseline from ${basename(ROOT)}`)
+      if (ref) {
+        await checkoutHistoryRef(dest, ref)
+        await snapshot(dest, `fork baseline from ${ref.slice(0, 8)}`)
+      } else {
+        await snapshot(dest, `fork baseline from ${basename(ROOT)}`)
+      }
       const port = await freePort(3030)
       // dev server output goes to <clone>/dev.log — a boot crash must be diagnosable, not silent
       const log = await open(join(dest, 'dev.log'), 'a')
@@ -193,28 +224,7 @@ export async function POST(req: Request) {
       const ref = (body.ref ?? '').trim()
       if (!/^[0-9a-f]{7,40}$/.test(ref)) return NextResponse.json({ error: 'invalid version ref' }, { status: 422 })
       await snapshot(ROOT, `pre-restore safety checkpoint`) // restoring is itself revertable
-      // true time-travel over the WHOLE tracked history tree (seed dirs + every file Publish
-      // ever wrote): files created after the target version go away, tracked files rewind.
-      const { stdout: nowList } = await hgit(ROOT, ['ls-files'])
-      const { stdout: refList } = await hgit(ROOT, ['ls-tree', '-r', '--name-only', ref])
-      const refSet = new Set(refList.trim().split('\n').filter(Boolean))
-      const emptied = new Set<string>()
-      for (const f of nowList.trim().split('\n').filter(Boolean)) {
-        // DELETE only inside the editor-owned seed dirs (pages/components/canvas — editor-created
-        // content). Build-source files (storybook/…) are only ever REWOUND, never deleted: absent
-        // from an old ref usually means "entered history later", not "didn't exist".
-        const editorOwned = HISTORY_PATHS.some((p) => f.startsWith(p + '/'))
-        if (!refSet.has(f) && editorOwned) { await rm(join(ROOT, f), { force: true }); emptied.add(dirname(f)) }
-      }
-      // prune now-empty dirs (git tracks files only); rmdir refuses non-empty dirs, so this
-      // can never remove a folder still holding untracked/unrelated files
-      for (let d of emptied) {
-        while (HISTORY_PATHS.some((p) => d.startsWith(p + '/'))) {
-          try { await rmdir(join(ROOT, d)) } catch { break } // non-empty or gone → stop climbing
-          d = dirname(d)
-        }
-      }
-      await hgit(ROOT, ['checkout', ref, '--', '.']).catch(() => null) // rewind whole tracked tree
+      await checkoutHistoryRef(ROOT, ref)
       const { hash } = await snapshot(ROOT, `restored to ${ref.slice(0, 8)}`)
       return NextResponse.json({ ok: true, restored: ref, checkpoint: hash })
     }

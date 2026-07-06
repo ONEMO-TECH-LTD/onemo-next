@@ -589,6 +589,42 @@ function LinkTargetField({ value, options, onChange, onCommit }: { value: string
     </div>
   )
 }
+function VersionHistoryPanel({ versions, loading, busyRef, onClose, onRefresh, onRestore, onFork }: { versions: VersionEntry[]; loading: boolean; busyRef: string | null; onClose: () => void; onRefresh: () => void; onRestore: (version: VersionEntry) => void; onFork: (version: VersionEntry) => void }) {
+  const buttonBase = { appearance: 'none', height: 24, borderRadius: 5, border: `1px solid ${LINE}`, background: '#fff', color: INK, cursor: 'pointer', font: `450 11px/16px ${FONT}`, padding: '0 8px' } as const
+  return (
+    <div data-react-figma-version-history style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: '#fff' }}>
+      <div style={{ height: 40, borderBottom: `1px solid ${LINE}`, display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 6, alignItems: 'center', padding: '0 8px 0 16px', flex: 'none' }}>
+        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', font: `550 12px/16px ${FONT}`, color: INK }}>Version history</span>
+        <button type="button" onClick={onRefresh} disabled={loading} style={{ ...buttonBase, color: loading ? MUTE : INK, cursor: loading ? 'default' : 'pointer' }}>{loading ? 'Loading' : 'Refresh'}</button>
+        <button type="button" aria-label="Close version history" onClick={onClose} style={{ appearance: 'none', border: 0, background: 'transparent', width: 24, height: 24, borderRadius: 5, display: 'grid', placeItems: 'center', cursor: 'pointer', color: MUTE, font: `450 14px/1 ${FONT}` }}>x</button>
+      </div>
+      <div style={{ padding: '8px 8px 12px', overflowY: 'auto', minHeight: 0 }}>
+        {loading && <div style={{ padding: '8px', font: `400 11px/16px ${FONT}`, color: MUTE }}>Loading versions...</div>}
+        {!loading && versions.length === 0 && <div style={{ padding: '8px', font: `400 11px/16px ${FONT}`, color: MUTE }}>No checkpoints yet. Publish creates the first version.</div>}
+        {!loading && versions.map((version, index) => {
+          const current = index === 0
+          const busy = busyRef === version.hash
+          return (
+            <div key={version.hash} data-react-figma-version-row={current ? 'current' : 'past'} style={{ minHeight: 56, borderRadius: 6, padding: '6px 8px', marginBottom: 4, background: current ? '#e5f4ff' : '#fff', border: `1px solid ${current ? 'rgba(13,153,255,0.3)' : LINE}` }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'start' }}>
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: 'block', font: `550 11px/16px ${FONT}`, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{current ? 'Current' : (version.label || version.hash.slice(0, 8))}</span>
+                  <span style={{ display: 'block', font: `400 10px/14px ${FONT}`, color: MUTE, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{versionTimeLabel(version.date)} · {current ? (version.label || version.hash.slice(0, 8)) : version.hash.slice(0, 8)}</span>
+                </span>
+                <span style={{ display: 'flex', gap: 4 }}>
+                  <button type="button" disabled={current || !!busyRef} title={current ? 'Already current' : 'Restore this checkpoint'} onClick={() => onRestore(version)}
+                    style={{ ...buttonBase, height: 22, padding: '0 6px', color: current || busyRef ? MUTE : INK, cursor: current || busyRef ? 'default' : 'pointer' }}>{busy ? 'Restoring' : 'Restore'}</button>
+                  <button type="button" disabled={!!busyRef} title="Fork this checkpoint into a sandbox" onClick={() => onFork(version)}
+                    style={{ ...buttonBase, height: 22, padding: '0 6px', color: busyRef ? MUTE : INK, cursor: busyRef ? 'default' : 'pointer' }}>{busy ? 'Working' : 'Fork from here'}</button>
+                </span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
 function PickerMenuOption({ value, width, checked, onClick }: { value: string; width: number; checked?: boolean; onClick: () => void }) {
   const [h, setH] = useState(false)
   return (
@@ -1860,11 +1896,23 @@ type OutlineRect = { x: number; y: number; w: number; h: number }
    + storybook screens that have a same-origin host. Fallback until fetch resolves. */
 type BuildSource = { key: string; name: string; route: string; group: string }
 type CanvasIconAsset = { kind: 'svg' | 'image'; value: string }
+type SandboxEntry = { name: string; path: string; port: number; pid: number; forkedFrom: string; createdAt: string; alive?: boolean }
+type VersionEntry = { hash: string; date: string; label: string }
 const CANVAS_FALLBACK: BuildSource[] = [
   { key: 'editor-402', name: 'Editor 402 — apple blur glass', route: '/react-figma/canvas', group: 'storybook/create-studio' },
 ]
 const RECENT_BUILDS_KEY = 'react-figma:recent-builds'
 const MAX_RECENT_BUILDS = 8
+const SANDBOX_NAME_RE = /^[a-z0-9][a-z0-9-]{0,40}$/
+function sandboxNameFrom(label: string, suffix: string) {
+  const base = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 28) || 'react-figma'
+  return `${base}-${suffix}`.slice(0, 41).replace(/-+$/g, '')
+}
+function versionTimeLabel(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(date)
+}
 /* M3 dirty-ledger UI: OFF until a Dan-approved Figma-canon treatment exists —
    the right panel must match Codex's shell exactly. Commit path stays callable. */
 const SHOW_LEDGER = false
@@ -1943,7 +1991,34 @@ export default function ReactFigmaPage() {
   const [sourceMenuOpen, setSourceMenuOpen] = useState(false)
   const [buildSources, setBuildSources] = useState<BuildSource[]>(CANVAS_FALLBACK)
   const [recentBuilds, setRecentBuilds] = useState<BuildSource[]>([])
-  const folderPickerRef = useRef<HTMLInputElement>(null)
+  const [currentPort, setCurrentPort] = useState('')
+  const [sandboxes, setSandboxes] = useState<SandboxEntry[]>([])
+  const [versionPanelOpen, setVersionPanelOpen] = useState(false)
+  const [versions, setVersions] = useState<VersionEntry[]>([])
+  const [versionsLoading, setVersionsLoading] = useState(false)
+  const [versionBusyRef, setVersionBusyRef] = useState<string | null>(null)
+  const editorSandbox = useCallback(async <T,>(body: Record<string, unknown>) => {
+    const r = await fetch('/api/dev/editor-sandbox', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const text = await r.text()
+    let data: Record<string, unknown> = {}
+    try { data = text ? JSON.parse(text) as Record<string, unknown> : {} } catch { data = { error: text } }
+    if (!r.ok) throw new Error(typeof data.error === 'string' ? data.error : text || r.statusText)
+    return data as T
+  }, [])
+  const refreshSandboxes = useCallback(async () => {
+    try {
+      const data = await editorSandbox<{ sandboxes?: SandboxEntry[] }>({ action: 'list' })
+      setSandboxes(Array.isArray(data.sandboxes) ? data.sandboxes : [])
+    } catch { /* sandbox menu stays honest-disabled on failures */ }
+  }, [editorSandbox])
+  useEffect(() => {
+    setCurrentPort(window.location.port)
+    void refreshSandboxes()
+  }, [refreshSandboxes])
   useEffect(() => { // quick list for the top selector menu — known loadable screens
     fetch('/api/dev/editor-sources').then((r) => r.json()).then((d) => { if (Array.isArray(d.sources) && d.sources.length) setBuildSources(d.sources) }).catch(() => {})
   }, [])
@@ -1953,6 +2028,7 @@ export default function ReactFigmaPage() {
       if (Array.isArray(parsed)) setRecentBuilds(parsed.filter((s) => s && typeof s.route === 'string' && typeof s.name === 'string').slice(0, MAX_RECENT_BUILDS))
     } catch { /* ignore corrupt local recents */ }
   }, [])
+  const currentSandbox = useMemo(() => sandboxes.find((sandbox) => String(sandbox.port) === currentPort && sandbox.alive !== false) ?? null, [currentPort, sandboxes])
   // local folder browser (Pages panel) — navigable filesystem under the dev root
   type FsData = { root: string; path: string; parent: string | null; appStart: string; dirs: { name: string; route?: string }[]; files: { name: string; route?: string }[] }
   const [fsPath, setFsPath] = useState<string | null>(null)
@@ -2271,23 +2347,88 @@ export default function ReactFigmaPage() {
     } else notify(`Link failed: ${await r.text()}`, 'error')
   }, [linkHref, linkNewTab, linkTarget, sel])
 
-  const openBuildFolderPicker = useCallback(() => {
-    const input = folderPickerRef.current
-    if (!input) return
-    input.setAttribute('webkitdirectory', '')
-    input.setAttribute('directory', '')
-    input.click()
-  }, [])
-  const onBuildFolderPicked = useCallback((files: FileList | null) => {
-    const picked = Array.from(files ?? [])
-    if (!picked.length) return
-    const hasApp = picked.some((file) => {
-      const p = file.webkitRelativePath || file.name
-      return p === 'src/app/page.tsx' || p.includes('/src/app/') || p.startsWith('src/app/')
-    })
-    if (hasApp) notify('Build folder selected — connect route is E6.9 backend')
-    else notify('Folder selected, but no src/app route tree found', 'error')
-  }, [])
+  const loadVersions = useCallback(async () => {
+    setVersionPanelOpen(true)
+    setVersionsLoading(true)
+    try {
+      const data = await editorSandbox<{ versions?: VersionEntry[] }>({ action: 'versions' })
+      setVersions(Array.isArray(data.versions) ? data.versions : [])
+    } catch (e) {
+      notify(`Version history failed: ${(e as Error).message}`, 'error')
+    } finally {
+      setVersionsLoading(false)
+    }
+  }, [editorSandbox])
+  const restoreVersion = useCallback(async (version: VersionEntry) => {
+    if (versionBusyRef) return
+    const label = version.label || version.hash.slice(0, 8)
+    if (!window.confirm(`Restore "${label}"? A safety checkpoint will be created first.`)) return
+    setVersionBusyRef(version.hash)
+    try {
+      await editorSandbox<{ ok?: boolean; restored?: string; checkpoint?: string }>({ action: 'restore', ref: version.hash })
+      notify(`Restored ${version.hash.slice(0, 8)}`)
+      await loadVersions()
+      setFsNonce((n) => n + 1)
+      try { iframeRef.current?.contentWindow?.location.reload() } catch { /* HMR will catch up */ }
+    } catch (e) {
+      notify(`Restore failed: ${(e as Error).message}`, 'error')
+    } finally {
+      setVersionBusyRef(null)
+    }
+  }, [editorSandbox, loadVersions, versionBusyRef])
+  const forkBuild = useCallback(async (mode: 'branch' | 'duplicate', version?: VersionEntry) => {
+    const suffix = version ? `v-${version.hash.slice(0, 4)}-${Date.now().toString(36).slice(-3)}` : `${mode === 'duplicate' ? 'copy' : 'branch'}-${Date.now().toString(36).slice(-4)}`
+    const name = window.prompt(version ? `Fork ${version.hash.slice(0, 8)} as sandbox` : mode === 'duplicate' ? 'Duplicate build as sandbox' : 'Create branch sandbox', sandboxNameFrom(canvas.name, suffix))
+    if (name === null) return
+    const clean = name.trim()
+    if (!SANDBOX_NAME_RE.test(clean)) { notify('Use a-z, 0-9, and dashes only', 'error'); return }
+    if (version) setVersionBusyRef(version.hash)
+    try {
+      const data = await editorSandbox<{ url?: string }>({ action: 'fork', name: clean, ...(version ? { ref: version.hash } : {}) })
+      notify(`${version ? 'Forked version' : mode === 'duplicate' ? 'Duplicated' : 'Created branch'} · ${clean}`)
+      await refreshSandboxes()
+      if (data.url) window.open(data.url, '_blank', 'noopener,noreferrer')
+    } catch (e) {
+      notify(`Fork failed: ${(e as Error).message}`, 'error')
+    } finally {
+      if (version) setVersionBusyRef(null)
+    }
+  }, [canvas.name, editorSandbox, refreshSandboxes])
+  const openBuildFolderPicker = useCallback(async () => {
+    try {
+      const data = await editorSandbox<{ path?: string }>({ action: 'pick-folder' })
+      if (data.path) notify(`Selected folder · ${data.path}`)
+    } catch (e) {
+      const message = (e as Error).message
+      if (/cancel/i.test(message)) return
+      notify(`Folder picker failed: ${message}`, 'error')
+    }
+  }, [editorSandbox])
+  const renameCurrentSandbox = useCallback(async () => {
+    if (!currentSandbox) { notify('Rename is sandbox-only; original builds are locked', 'error'); return }
+    const next = window.prompt('Rename sandbox', currentSandbox.name)
+    if (next === null || next.trim() === currentSandbox.name) return
+    const clean = next.trim()
+    if (!SANDBOX_NAME_RE.test(clean)) { notify('Use a-z, 0-9, and dashes only', 'error'); return }
+    try {
+      await editorSandbox<{ ok?: boolean; renamed?: string }>({ action: 'rename-sandbox', name: currentSandbox.name, label: clean })
+      notify(`Renamed sandbox · ${clean}`)
+      await refreshSandboxes()
+    } catch (e) {
+      notify(`Rename failed: ${(e as Error).message}`, 'error')
+    }
+  }, [currentSandbox, editorSandbox, refreshSandboxes])
+  const trashCurrentSandbox = useCallback(async () => {
+    if (!currentSandbox) { notify('Move to trash is sandbox-only; original builds are locked', 'error'); return }
+    if (!window.confirm(`Move sandbox "${currentSandbox.name}" to trash?`)) return
+    try {
+      await editorSandbox<{ ok?: boolean }>({ action: 'trash-sandbox', name: currentSandbox.name })
+      notify(`Moved sandbox to trash · ${currentSandbox.name}`)
+      await refreshSandboxes()
+    } catch (e) {
+      notify(`Trash failed: ${(e as Error).message}`, 'error')
+    }
+  }, [currentSandbox, editorSandbox, refreshSandboxes])
 
   // E4-G2 Selection colors: recolor every occurrence of a color across the selected subtree
   // (multi-element override; commitOverrides already saves all dirty elements).
@@ -2868,31 +3009,32 @@ export default function ReactFigmaPage() {
             style={{ appearance: 'none', border: 0, background: 'transparent', cursor: 'pointer', minWidth: 0, padding: 0, textAlign: 'left', font: `550 12px/16px ${FONT}`, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{canvas.name}</button>
           <UiIB name="caret16" title="Select build source" on={() => setSourceMenuOpen((v) => !v)} />
           <UiIB name="minimizeUI" title={uiMinimized ? 'Expand UI' : 'Minimize UI'} active={uiMinimized} on={() => setUiMinimized(v => !v)} />
-          <input ref={folderPickerRef} type="file" multiple hidden onChange={(e) => { onBuildFolderPicked(e.currentTarget.files); e.currentTarget.value = '' }} />
           {sourceMenuOpen && (
             <div role="presentation" style={{ position: 'absolute', zIndex: 120, top: 38, left: 8, width: 200, padding: '8px 0 6px', borderRadius: 13, background: '#1e1e1e', color: '#fff', boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px' }}>
               <ul role="menu" aria-label="File menu" style={{ width: 200, margin: 0, padding: 0, listStyle: 'none', maxHeight: 420, overflowY: 'auto' }}>
                 {connectedBuilds.map((s) => (
                   <FileMenuRow key={s.route} label={s.name} checked={s.route === canvas.route} onClick={() => { switchCanvas(s.name, s.route); setSourceMenuOpen(false) }} />
                 ))}
-                <FileMenuRow label="Open build folder…" onClick={() => { setSourceMenuOpen(false); openBuildFolderPicker() }} />
+                <FileMenuRow label="Open build folder…" title="Pick a build folder in Finder" onClick={() => { setSourceMenuOpen(false); void openBuildFolderPicker() }} />
                 <FigmaMenuSeparator />
-                <FileMenuRow label="Show version history" disabled title="wired in E6.9 backend" />
+                <FileMenuRow label="Show version history" title="Show checkpoints for this build" onClick={() => { setSourceMenuOpen(false); void loadVersions() }} />
                 <FileMenuRow label="Publish library…" disabled={!canMenuPublish} title={canMenuPublish ? 'Publish staged changes' : 'No changes to publish'} onClick={() => { setSourceMenuOpen(false); void commitOverrides() }} />
-                <FileMenuRow label="Export…" shortcut="⇧⌘E" disabled title="wired in E6.9 backend" />
-                <FileMenuRow label="Add to sidebar" disabled title="wired in E6.9 backend" />
-                <FileMenuRow label="Create branch…" disabled title="wired in E6.9 backend" />
-                <FileMenuRow label="File color profile" disabled title="wired in E6.9 backend" />
-                <FileMenuRow label="Duplicate" disabled title="wired in E6.9 backend" />
-                <FileMenuRow label="Rename" disabled title="wired in E6.9 backend" />
-                <FileMenuRow label="Move file…" disabled title="wired in E6.9 backend" />
-                <FileMenuRow label="Move to trash" disabled title="wired in E6.9 backend" />
+                <FileMenuRow label="Export…" shortcut="⇧⌘E" disabled title="Export backend not implemented" />
+                <FileMenuRow label="Add to sidebar" disabled title="Sidebar pinning backend not implemented" />
+                <FileMenuRow label="Create branch…" title="Fork this build into a sandbox" onClick={() => { setSourceMenuOpen(false); void forkBuild('branch') }} />
+                <FileMenuRow label="File color profile" disabled title="Color profile backend not implemented" />
+                <FileMenuRow label="Duplicate" title="Fork a duplicate sandbox" onClick={() => { setSourceMenuOpen(false); void forkBuild('duplicate') }} />
+                <FileMenuRow label="Rename" disabled={!currentSandbox} title={currentSandbox ? 'Rename sandbox' : 'Sandbox-only; original builds cannot be renamed here'} onClick={() => { setSourceMenuOpen(false); void renameCurrentSandbox() }} />
+                <FileMenuRow label="Move file…" disabled title="Move backend not implemented" />
+                <FileMenuRow label="Move to trash" disabled={!currentSandbox} title={currentSandbox ? 'Move sandbox to trash' : 'Sandbox-only; original builds cannot be trashed here'} onClick={() => { setSourceMenuOpen(false); void trashCurrentSandbox() }} />
               </ul>
             </div>
           )}
         </div>
 
-        {rail === 'file' && (
+        {rail === 'file' && versionPanelOpen ? (
+          <VersionHistoryPanel versions={versions} loading={versionsLoading} busyRef={versionBusyRef} onClose={() => setVersionPanelOpen(false)} onRefresh={() => void loadVersions()} onRestore={(version) => void restoreVersion(version)} onFork={(version) => void forkBuild('branch', version)} />
+        ) : rail === 'file' && (
           <>
             <div style={{ height: 25, display: 'flex', alignItems: 'center', padding: '0 16px', font: `400 11px/16px ${FONT}`, color: MUTE }}>Drafts ›</div>
             <div style={{ height: 40, padding: '0 8px 0 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
