@@ -6,8 +6,10 @@
  * every Publish snapshots the editable surface; any version restores or forks.
  *
  * Safety model (deliberate):
- * - Snapshots/restore are SCOPED to the editor-writable surface only (pages sandbox,
- *   extracted components, canvas) — never the whole repo, so branch/dev work can't be clobbered.
+ * - History covers the editor-writable surface: the seed dirs (pages sandbox, extracted
+ *   components, canvas) plus every build-source file Publish writes ('track' baselines each at
+ *   its original content first). Restore rewinds tracked files; only editor-owned seed content
+ *   is ever deleted — branch/dev work outside the tracked surface can't be clobbered.
  * - History lives in a separate hidden git dir (.editor-history) — the real repo's git is
  *   never touched by versioning.
  * - Fork clones the build folder, DROPS the inherited .git link (a worktree .git file would

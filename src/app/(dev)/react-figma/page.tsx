@@ -546,16 +546,6 @@ function BlendMenuRow({ mode, checked, onClick }: { mode: string; checked?: bool
 function FigmaMenuSeparator() {
   return <li role="separator" style={{ height: 17, padding: '8px 0', boxSizing: 'border-box' }}><span style={{ display: 'block', height: 1, background: 'rgb(56,56,56)' }} /></li>
 }
-function FigmaMenuRow({ children, checked, onClick }: { children: React.ReactNode; checked?: boolean; onClick: () => void }) {
-  const [h, setH] = useState(false)
-  return (
-    <li role="menuitemradio" aria-checked={checked} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)} onClick={onClick}
-      style={{ width: '100%', height: 24, borderRadius: 5, background: checked ? SEL : h ? 'rgba(255,255,255,0.08)' : 'transparent', color: '#fff', display: 'grid', gridTemplateColumns: '24px 1fr', alignItems: 'center', cursor: 'pointer', font: `400 11px/24px ${FONT}` }}>
-      <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', visibility: checked ? 'visible' : 'hidden' }}><MenuCheck /></span>
-      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{children}</span>
-    </li>
-  )
-}
 function FileMenuRow({ label, shortcut, checked, disabled, title, onClick }: { label: string; shortcut?: string; checked?: boolean; disabled?: boolean; title?: string; onClick?: () => void }) {
   const [h, setH] = useState(false)
   return (
