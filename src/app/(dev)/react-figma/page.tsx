@@ -2396,7 +2396,8 @@ export default function ReactFigmaPage() {
   }, [canvas.name, editorSandbox, refreshSandboxes])
   const openBuildFolderPicker = useCallback(async () => {
     try {
-      const data = await editorSandbox<{ path?: string }>({ action: 'pick-folder' })
+      const data = await editorSandbox<{ ok?: boolean; path?: string; cancelled?: boolean }>({ action: 'pick-folder' })
+      if (data.cancelled || data.ok === false) return
       if (data.path) notify(`Selected folder · ${data.path}`)
     } catch (e) {
       const message = (e as Error).message
