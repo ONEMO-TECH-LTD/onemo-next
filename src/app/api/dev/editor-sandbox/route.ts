@@ -71,10 +71,19 @@ async function ensureHistory(root: string) {
     await hgit(root, ['config', 'user.name', 'react-figma editor'])
   }
 }
-async function snapshot(root: string, label: string): Promise<{ hash: string }> {
+async function snapshot(root: string, label: string, extraFiles: string[] = []): Promise<{ hash: string }> {
   await ensureHistory(root)
   // add each surface dir separately — one missing dir must not mask the others
   for (const p of HISTORY_PATHS) await hgit(root, ['add', '--force', '--', p]).catch(() => null)
+  // Publish can write anywhere in the connected build's source (e.g. storybook/…) — the client
+  // reports each written file so history covers the REAL editable surface, not just the seed dirs.
+  // Once added, a file stays tracked, so later plain snapshots keep capturing its changes.
+  for (const f of extraFiles) {
+    if (typeof f !== 'string' || f.includes('..') || f.startsWith('/')) continue // jail: repo-relative only
+    await hgit(root, ['add', '--force', '--', f]).catch(() => null)
+  }
+  // refresh everything history already tracks (files pulled in by prior publishes)
+  await hgit(root, ['add', '--update']).catch(() => null)
   const msg = label || `checkpoint ${new Date().toISOString()}`
   await hgit(root, ['commit', '-m', msg, '--allow-empty'])
   const { stdout } = await hgit(root, ['rev-parse', 'HEAD'])
@@ -86,7 +95,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'dev-only' }, { status: 403 })
   }
   try {
-    const body = await req.json() as { action: string; name?: string; label?: string; ref?: string }
+    const body = await req.json() as { action: string; name?: string; label?: string; ref?: string; files?: string[] }
     const { action } = body
 
     if (action === 'fork') {
@@ -146,8 +155,27 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, stopped: entry.name })
     }
 
+    if (action === 'track') {
+      // Called by Publish BEFORE writing: baselines not-yet-tracked build files into history at
+      // their ORIGINAL content, so the pre-edit state is always restorable. No-op if all tracked.
+      await ensureHistory(ROOT)
+      const files = (Array.isArray(body.files) ? body.files.slice(0, 200) : []).filter(
+        (f) => typeof f === 'string' && !f.includes('..') && !f.startsWith('/'),
+      )
+      let added = 0
+      for (const f of files) {
+        const { stdout } = await hgit(ROOT, ['ls-files', '--', f]).catch(() => ({ stdout: '' }))
+        if (!stdout.trim()) { await hgit(ROOT, ['add', '--force', '--', f]).catch(() => null); added++ }
+      }
+      if (added) {
+        const { stdout: staged } = await hgit(ROOT, ['diff', '--cached', '--name-only'])
+        if (staged.trim()) await hgit(ROOT, ['commit', '-m', `baseline — ${added} file(s) entered history`])
+      }
+      return NextResponse.json({ ok: true, tracked: added })
+    }
+
     if (action === 'snapshot') {
-      const { hash } = await snapshot(ROOT, (body.label ?? '').slice(0, 200))
+      const { hash } = await snapshot(ROOT, (body.label ?? '').slice(0, 200), Array.isArray(body.files) ? body.files.slice(0, 200) : [])
       return NextResponse.json({ ok: true, hash })
     }
 
@@ -165,24 +193,28 @@ export async function POST(req: Request) {
       const ref = (body.ref ?? '').trim()
       if (!/^[0-9a-f]{7,40}$/.test(ref)) return NextResponse.json({ error: 'invalid version ref' }, { status: 422 })
       await snapshot(ROOT, `pre-restore safety checkpoint`) // restoring is itself revertable
-      // true time-travel: files created AFTER the target version must go away too —
-      // checkout alone only rewrites files that existed in ref.
-      const { stdout: nowList } = await hgit(ROOT, ['ls-files', '--', ...HISTORY_PATHS])
-      const { stdout: refList } = await hgit(ROOT, ['ls-tree', '-r', '--name-only', ref, '--', ...HISTORY_PATHS])
+      // true time-travel over the WHOLE tracked history tree (seed dirs + every file Publish
+      // ever wrote): files created after the target version go away, tracked files rewind.
+      const { stdout: nowList } = await hgit(ROOT, ['ls-files'])
+      const { stdout: refList } = await hgit(ROOT, ['ls-tree', '-r', '--name-only', ref])
       const refSet = new Set(refList.trim().split('\n').filter(Boolean))
       const emptied = new Set<string>()
       for (const f of nowList.trim().split('\n').filter(Boolean)) {
-        if (!refSet.has(f)) { await rm(join(ROOT, f), { force: true }); emptied.add(dirname(f)) }
+        // DELETE only inside the editor-owned seed dirs (pages/components/canvas — editor-created
+        // content). Build-source files (storybook/…) are only ever REWOUND, never deleted: absent
+        // from an old ref usually means "entered history later", not "didn't exist".
+        const editorOwned = HISTORY_PATHS.some((p) => f.startsWith(p + '/'))
+        if (!refSet.has(f) && editorOwned) { await rm(join(ROOT, f), { force: true }); emptied.add(dirname(f)) }
       }
-      // prune now-empty dirs (git tracks files only) up to the surface roots
+      // prune now-empty dirs (git tracks files only); rmdir refuses non-empty dirs, so this
+      // can never remove a folder still holding untracked/unrelated files
       for (let d of emptied) {
         while (HISTORY_PATHS.some((p) => d.startsWith(p + '/'))) {
           try { await rmdir(join(ROOT, d)) } catch { break } // non-empty or gone → stop climbing
           d = dirname(d)
         }
       }
-      // per-path: a surface dir absent in the target version (e.g. no components yet) is fine
-      for (const p of HISTORY_PATHS) await hgit(ROOT, ['checkout', ref, '--', p]).catch(() => null)
+      await hgit(ROOT, ['checkout', ref, '--', '.']).catch(() => null) // rewind whole tracked tree
       const { hash } = await snapshot(ROOT, `restored to ${ref.slice(0, 8)}`)
       return NextResponse.json({ ok: true, restored: ref, checkpoint: hash })
     }

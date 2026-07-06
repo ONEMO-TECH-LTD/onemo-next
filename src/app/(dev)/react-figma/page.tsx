@@ -2404,6 +2404,7 @@ export default function ReactFigmaPage() {
     if (!doc || committing) return
     setCommitting(true)
     let committed = 0, anyFail = false
+    const touchedFiles = new Set<string>() // E6.9: history must cover the REAL files Publish writes
     try {
       const dirty = ov.current!.dirty().filter((op) => !op.stale)
       const byEl = new Map<string, OverrideOp[]>()
@@ -2451,12 +2452,26 @@ export default function ReactFigmaPage() {
         // shifts a later target's valueRange (409 otherwise — same-file multi-write).
         const startOf = (w: AnyWrite) => ((w as { decl?: { valueRange: { start: number } } }).decl?.valueRange.start ?? (w as { insertOffset?: number }).insertOffset ?? 0)
         writes.sort((x, y) => startOf(y) - startOf(x))
+        // E6.9: baseline target files into history BEFORE writing — captures original content
+        const planned = new Set<string>()
+        for (const w of writes) {
+          const wf = (w as { file?: string }).file ?? (w as { decl?: { file?: string } }).decl?.file
+          if (wf) planned.add(wf)
+        }
+        if (planned.size) {
+          await fetch('/api/dev/editor-sandbox', {
+            method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ action: 'track', files: [...planned] }),
+          }).catch(() => null)
+        }
         let allOk = true
         for (const w of writes) {
           const wr = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(w) })
           if (wr.status === 409) { allOk = false; anyFail = true; console.warn('[engine] 409 stale DeclRef — file changed underneath; re-select to re-resolve', await wr.json()); continue }
           if (!wr.ok) { allOk = false; anyFail = true; console.warn('[engine] write failed', await wr.text()); continue }
           committed++
+          const wf = (w as { file?: string; decl?: { file?: string } }).file ?? (w as { decl?: { file?: string } }).decl?.file
+          if (wf) touchedFiles.add(wf)
           console.log('[engine] committed', (w as { kind: string }).kind)
         }
         if (allOk) ov.current!.discard(domId) // staging dissolves — HMR re-renders build truth
@@ -2474,7 +2489,7 @@ export default function ReactFigmaPage() {
     if (committed) {
       void fetch('/api/dev/editor-sandbox', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'snapshot', label: `publish — ${committed} change${committed > 1 ? 's' : ''}` }),
+        body: JSON.stringify({ action: 'snapshot', label: `publish — ${committed} change${committed > 1 ? 's' : ''}`, files: [...touchedFiles] }),
       }).catch(() => null)
     }
   }, [committing])
