@@ -17,7 +17,7 @@
 import { NextResponse } from 'next/server'
 import { spawn, execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { cp, readFile, rm, rmdir, writeFile, stat } from 'node:fs/promises'
+import { cp, open, readFile, realpath, rm, rmdir, symlink, writeFile, stat } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { join, dirname, basename } from 'node:path'
 
@@ -109,12 +109,25 @@ export async function POST(req: Request) {
       // drop inherited git link (worktree .git is a file pointer — dangling in a copy) + stale build cache
       await rm(join(dest, '.git'), { recursive: true, force: true })
       await rm(join(dest, '.next'), { recursive: true, force: true })
+      // deps: worktrees often symlink node_modules relatively (breaks from the clone) or carry a
+      // stub dir — always point the clone at the SOURCE's resolved real node_modules (same repo,
+      // identical deps; a dangling/stub copy means `next` doesn't exist and the dev server dies).
+      const realMods = await realpath(join(ROOT, 'node_modules')).catch(() => null)
+      if (realMods) {
+        await rm(join(dest, 'node_modules'), { recursive: true, force: true })
+        await symlink(realMods, join(dest, 'node_modules'))
+      }
       await snapshot(dest, `fork baseline from ${basename(ROOT)}`)
       const port = await freePort(3030)
-      const child = spawn('npm', ['run', 'dev', '--', '--port', String(port)], {
-        cwd: dest, detached: true, stdio: 'ignore', env: { ...process.env, PORT: String(port) },
+      // dev server output goes to <clone>/dev.log — a boot crash must be diagnosable, not silent
+      const log = await open(join(dest, 'dev.log'), 'a')
+      // --webpack explicit: the editor's data-src tagging is a webpack loader, and a bare
+      // `next dev` in the clone exits prompting for a bundler choice (caught via dev.log)
+      const child = spawn('npm', ['run', 'dev', '--', '--port', String(port), '--webpack'], {
+        cwd: dest, detached: true, stdio: ['ignore', log.fd, log.fd], env: { ...process.env, PORT: String(port) },
       })
       child.unref()
+      await log.close()
       const entry: SandboxEntry = { name, path: dest, port, pid: child.pid ?? -1, forkedFrom: ROOT, createdAt: new Date().toISOString() }
       await writeRegistry([...registry.filter((e) => e.name !== name), entry])
       return NextResponse.json({ ok: true, ...entry, url: `http://localhost:${port}/react-figma` })
@@ -202,9 +215,14 @@ export async function POST(req: Request) {
 
     if (action === 'pick-folder') {
       // native Finder folder picker (Dan: "selectable on local disc via finder")
-      const { stdout } = await run('osascript', ['-e', 'POSIX path of (choose folder with prompt "Select a build folder")'], { timeout: 120_000 })
-        .catch((e) => { throw Object.assign(new Error(/-128/.test(String(e)) ? 'cancelled' : 'picker failed'), { status: /-128/.test(String(e)) ? 409 : 500 }) })
-      return NextResponse.json({ ok: true, path: stdout.trim() })
+      // cancel is a handled user action → 200 {cancelled} (a non-2xx would log a browser console error)
+      try {
+        const { stdout } = await run('osascript', ['-e', 'POSIX path of (choose folder with prompt "Select a build folder")'], { timeout: 120_000 })
+        return NextResponse.json({ ok: true, path: stdout.trim() })
+      } catch (e) {
+        if (/-128/.test(String(e))) return NextResponse.json({ ok: false, cancelled: true })
+        throw Object.assign(new Error('picker failed'), { status: 500 })
+      }
     }
 
     return NextResponse.json({ error: `unknown action: ${action}` }, { status: 400 })
