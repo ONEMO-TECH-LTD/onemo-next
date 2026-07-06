@@ -199,6 +199,9 @@ export async function POST(req: Request) {
         if (!stdout.trim()) { await hgit(ROOT, ['add', '--force', '--', f]).catch(() => null); added++ }
       }
       if (added) {
+        // Fresh histories need the seed editor dirs in the same baseline; otherwise restoring the
+        // first tracked build-file baseline can treat routes like canvas as post-ref creations.
+        for (const p of HISTORY_PATHS) await hgit(ROOT, ['add', '--force', '--', p]).catch(() => null)
         const { stdout: staged } = await hgit(ROOT, ['diff', '--cached', '--name-only'])
         if (staged.trim()) await hgit(ROOT, ['commit', '-m', `baseline — ${added} file(s) entered history`])
       }
