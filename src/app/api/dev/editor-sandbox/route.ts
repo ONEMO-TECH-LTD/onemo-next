@@ -80,6 +80,26 @@ async function snapshot(root: string, label: string): Promise<{ hash: string }> 
   const { stdout } = await hgit(root, ['rev-parse', 'HEAD'])
   return { hash: stdout.trim() }
 }
+async function checkoutHistoryRef(root: string, ref: string) {
+  // true time-travel: files created AFTER the target version must go away too —
+  // checkout alone only rewrites files that existed in ref.
+  const { stdout: nowList } = await hgit(root, ['ls-files', '--', ...HISTORY_PATHS])
+  const { stdout: refList } = await hgit(root, ['ls-tree', '-r', '--name-only', ref, '--', ...HISTORY_PATHS])
+  const refSet = new Set(refList.trim().split('\n').filter(Boolean))
+  const emptied = new Set<string>()
+  for (const f of nowList.trim().split('\n').filter(Boolean)) {
+    if (!refSet.has(f)) { await rm(join(root, f), { force: true }); emptied.add(dirname(f)) }
+  }
+  // prune now-empty dirs (git tracks files only) up to the surface roots
+  for (let d of emptied) {
+    while (HISTORY_PATHS.some((p) => d.startsWith(p + '/'))) {
+      try { await rmdir(join(root, d)) } catch { break } // non-empty or gone → stop climbing
+      d = dirname(d)
+    }
+  }
+  // per-path: a surface dir absent in the target version (e.g. no components yet) is fine
+  for (const p of HISTORY_PATHS) await hgit(root, ['checkout', ref, '--', p]).catch(() => null)
+}
 
 export async function POST(req: Request) {
   if (process.env.NODE_ENV !== 'development') {
@@ -91,9 +111,11 @@ export async function POST(req: Request) {
 
     if (action === 'fork') {
       const name = (body.name ?? '').trim()
+      const ref = (body.ref ?? '').trim()
       if (!/^[a-z0-9][a-z0-9-]{0,40}$/.test(name)) {
         return NextResponse.json({ error: 'invalid sandbox name (a-z, 0-9, dashes)' }, { status: 422 })
       }
+      if (ref && !/^[0-9a-f]{7,40}$/.test(ref)) return NextResponse.json({ error: 'invalid version ref' }, { status: 422 })
       const registry = await readRegistry()
       if (registry.some((e) => e.name === name && alive(e.pid))) {
         return NextResponse.json({ error: 'sandbox name already running' }, { status: 409 })
@@ -117,7 +139,12 @@ export async function POST(req: Request) {
         await rm(join(dest, 'node_modules'), { recursive: true, force: true })
         await symlink(realMods, join(dest, 'node_modules'))
       }
-      await snapshot(dest, `fork baseline from ${basename(ROOT)}`)
+      if (ref) {
+        await checkoutHistoryRef(dest, ref)
+        await snapshot(dest, `fork baseline from ${ref.slice(0, 8)}`)
+      } else {
+        await snapshot(dest, `fork baseline from ${basename(ROOT)}`)
+      }
       const port = await freePort(3030)
       // dev server output goes to <clone>/dev.log — a boot crash must be diagnosable, not silent
       const log = await open(join(dest, 'dev.log'), 'a')
@@ -165,24 +192,7 @@ export async function POST(req: Request) {
       const ref = (body.ref ?? '').trim()
       if (!/^[0-9a-f]{7,40}$/.test(ref)) return NextResponse.json({ error: 'invalid version ref' }, { status: 422 })
       await snapshot(ROOT, `pre-restore safety checkpoint`) // restoring is itself revertable
-      // true time-travel: files created AFTER the target version must go away too —
-      // checkout alone only rewrites files that existed in ref.
-      const { stdout: nowList } = await hgit(ROOT, ['ls-files', '--', ...HISTORY_PATHS])
-      const { stdout: refList } = await hgit(ROOT, ['ls-tree', '-r', '--name-only', ref, '--', ...HISTORY_PATHS])
-      const refSet = new Set(refList.trim().split('\n').filter(Boolean))
-      const emptied = new Set<string>()
-      for (const f of nowList.trim().split('\n').filter(Boolean)) {
-        if (!refSet.has(f)) { await rm(join(ROOT, f), { force: true }); emptied.add(dirname(f)) }
-      }
-      // prune now-empty dirs (git tracks files only) up to the surface roots
-      for (let d of emptied) {
-        while (HISTORY_PATHS.some((p) => d.startsWith(p + '/'))) {
-          try { await rmdir(join(ROOT, d)) } catch { break } // non-empty or gone → stop climbing
-          d = dirname(d)
-        }
-      }
-      // per-path: a surface dir absent in the target version (e.g. no components yet) is fine
-      for (const p of HISTORY_PATHS) await hgit(ROOT, ['checkout', ref, '--', p]).catch(() => null)
+      await checkoutHistoryRef(ROOT, ref)
       const { hash } = await snapshot(ROOT, `restored to ${ref.slice(0, 8)}`)
       return NextResponse.json({ ok: true, restored: ref, checkpoint: hash })
     }
