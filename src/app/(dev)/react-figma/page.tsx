@@ -2084,7 +2084,8 @@ export default function ReactFigmaPage() {
   // E7.3 (KAI-9377): second canvas — Design ⇄ Components toggle just swaps the iframe route;
   // the whole shell (zoom/pan/selection/overrides) is route-agnostic (architecture v4.1 §1).
   const canvasMode: 'design' | 'components' = rail === 'components' ? 'components' : 'design'
-  const [autoDistributed, setAutoDistributed] = useState(false) // justify space-between (Figma distributed) // derived — the far-left rail IS the canvas switch (Dan 2026-07-07)
+  const [autoDistributed, setAutoDistributed] = useState(false) // justify space-between (Figma distributed)
+  const [insetSides, setInsetSides] = useState({ t: '0', r: '0', b: '0', l: '0' }) // A7: per-side inset (positioned elements) // derived — the far-left rail IS the canvas switch (Dan 2026-07-07)
   const dsComponents = useDsComponents(rail === 'assets' || canvasMode === 'components', compNonce) // E4-G4 Assets panel + E7.3 components rail
   // #6: create a new component in code (Framer-style) — scaffolds a real editable component file.
   const newComponent = useCallback(async (name: string, root: 'project' | 'global' = 'project', category = '') => {
@@ -2287,6 +2288,8 @@ export default function ReactFigmaPage() {
     const fr = frameRoot ? frameRoot.getBoundingClientRect() : { left: 0, top: 0 }
     setXValue(px(String(r.left - fr.left))); setYValue(px(String(r.top - fr.top)))
     setZIndexValue(c['z-index'] === 'auto' ? '0' : c['z-index'])
+    const ins = (p: string) => { const v = c[p]; return !v || v === 'auto' ? '0' : px(v) }
+    setInsetSides({ t: ins('top'), r: ins('right'), b: ins('bottom'), l: ins('left') })
     setCssPosition(({ static: 0, relative: 1, absolute: 2, fixed: 3, sticky: 4 } as Record<string, number>)[c['position']] ?? 0)
     // Auto layout
     setAutoFlow(c['display'].includes('flex') ? (c['flex-direction'].startsWith('column') ? 'vertical' : 'horizontal') : c['display'].includes('grid') ? 'grid' : 'freeform')
@@ -2369,6 +2372,13 @@ export default function ReactFigmaPage() {
   }, [setXValue, setYValue, setZIndexValue, setCssPosition, setAutoFlow, setAutoWrap, setWidthValue, setHeightValue, setGapValue, setPaddingXValue, setPaddingYValue, setClipContent, setOpacityValue, setCornerRadiusValue, setBlendMode])
 
   /* M3: panel edit → instant canvas override (staging only — zero disk writes). */
+  /* Re-read the current selection from the live DOM — staged rules are already in the
+     overrides stylesheet, so computed style reflects them immediately. */
+  const reapplySel = useCallback(() => {
+    const doc = iframeRef.current?.contentDocument
+    const el = selIdRef.current && doc ? doc.querySelector(`[data-eng-id="${selIdRef.current}"]`) : null
+    if (el) applySelection(el as HTMLElement)
+  }, [applySelection])
   const applyOverride = useCallback((field: string, raw: string) => {
     const id = selIdRef.current
     const doc = iframeRef.current?.contentDocument
@@ -2394,6 +2404,10 @@ export default function ReactFigmaPage() {
       : field === 'x' ? (positioned ? [['left', withUnit]] : [['position', 'relative'], ['left', withUnit]])
       : field === 'y' ? (positioned ? [['top', withUnit]] : [['position', 'relative'], ['top', withUnit]])
       : field === 'zIndex' ? [['z-index', n]]
+      : field === 'insetT' ? [['top', withUnit]]
+      : field === 'insetR' ? [['right', withUnit]]
+      : field === 'insetB' ? [['bottom', withUnit]]
+      : field === 'insetL' ? [['left', withUnit]]
       : field === 'overflow' ? [['overflow', n]] // E8 item 9 (scroll half): Framer's Scroll = CSS overflow
       : field === 'strokeWeight' ? [['border-width', withUnit]]
       : field === 'strokeTop' ? [['border-top-width', withUnit]]
@@ -3602,7 +3616,7 @@ export default function ReactFigmaPage() {
             {/* selection identity label removed from render — right panel matches Codex's
                 shell exactly (Dan, 2026-07-04); sel payload still logged + in state */}
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
-              <span aria-hidden style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', flex: 'none', color: INK }}><UiIcon name="devCode" /></span>
+              <UiIB name="devCode" title="Open code panel" active={codeMode} on={() => { if (sel) setCodeMode(true); else notify('Select an element first', 'error') }} />
               <UiIB name="createComponent" title="Create component" on={() => void makeComponent()} />
               <MoreActionsMenu onDuplicate={() => void duplicateEl()} onDelete={() => void deleteEl()} />
             </div>
@@ -3632,6 +3646,18 @@ export default function ReactFigmaPage() {
               </div>
               <span />
             </PositionRow>
+            {cssPosition > 0 && (
+              <InspectorRow label="Inset" height={50}>
+                <span style={{ display: 'contents' }}>
+                  <SideInputs style={{ gridColumn: '1 / -1', padding: 0, gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }} sides={[
+                    { label: 'T', value: insetSides.t, ariaLabel: 'Inset top', onChange: (v) => { setInsetSides(x => ({ ...x, t: v })); applyOverride('insetT', v) } },
+                    { label: 'R', value: insetSides.r, ariaLabel: 'Inset right', onChange: (v) => { setInsetSides(x => ({ ...x, r: v })); applyOverride('insetR', v) } },
+                    { label: 'B', value: insetSides.b, ariaLabel: 'Inset bottom', onChange: (v) => { setInsetSides(x => ({ ...x, b: v })); applyOverride('insetB', v) } },
+                    { label: 'L', value: insetSides.l, ariaLabel: 'Inset left', onChange: (v) => { setInsetSides(x => ({ ...x, l: v })); applyOverride('insetL', v) } },
+                  ]} />
+                </span>
+              </InspectorRow>
+            )}
             <InspectorRow label="CSS position" columns="1fr">
               {/* E8 annotation: per-option tooltips answer "what does Auto do?" — Auto = normal
                   document flow (CSS static), the default before any pinning */}
@@ -3748,7 +3774,7 @@ export default function ReactFigmaPage() {
             </Sec>
           )}
 
-          <Sec title="Fill" actionWidth={52} action={<><StyleApplyButton label="Fill" title="Fill, Apply styles and variables" onApply={(v) => applyOverride('fillBg', v)} /><UiIB name="plus" title="Add fill" on={() => { if (sel) applyOverride('fillBg', '#D9D9D9'); else setFills(rows => [...rows, { id: nextRowId(rows), hex: 'FFFFFF', op: 100 }]) }} /></>} bodyGap={0} bodyPadding="0">
+          <Sec title="Fill" actionWidth={52} action={<><StyleApplyButton label="Fill" title="Fill, Apply styles and variables" onApply={(v) => applyOverride('fillBg', v)} /><UiIB name="plus" title="Add fill" on={() => { if (sel) { applyOverride('fillBg', '#D9D9D9'); reapplySel() } else setFills(rows => [...rows, { id: nextRowId(rows), hex: 'FFFFFF', op: 100 }]) }} /></>} bodyGap={0} bodyPadding="0">
             {liveFills
               ? liveFills.map((f, i) => { const fld = f.prop === 'color' ? 'fillColor' : 'fillBg'; return <FigmaPaintRow key={`live-${i}`} hex={f.hex} op={f.op} label="Fill" origin={f.origin}
                   onHexEdit={(hx) => applyOverride(fld, `#${hx}`)}
@@ -3757,7 +3783,7 @@ export default function ReactFigmaPage() {
                   onRemove={() => applyOverride(fld, 'transparent')} /> })
               : fills.map(f => <FigmaPaintRow key={f.id} hex={f.hex} op={f.op} label="Fill" onRemove={() => setFills(rows => rows.filter(row => row.id !== f.id))} />)}
           </Sec>
-          <Sec title="Stroke" actionWidth={52} action={<><StyleApplyButton label="Stroke" title="Stroke, Apply styles and variables" onApply={(v) => applyOverride('strokeColor', v)} /><UiIB name="plus" title="Add stroke fill" on={() => { if (sel) { applyOverride('strokeWeight', '1'); applyOverride('strokeStyle', 'solid'); applyOverride('strokeColor', '#000000') } else setStrokes(rows => [...rows, { id: nextRowId(rows), hex: '000000', op: 100, position: 'Inside', weight: 1 }]) }} /></>} bodyGap={0} bodyPadding="0">
+          <Sec title="Stroke" actionWidth={52} action={<><StyleApplyButton label="Stroke" title="Stroke, Apply styles and variables" onApply={(v) => applyOverride('strokeColor', v)} /><UiIB name="plus" title="Add stroke fill" on={() => { if (sel) { applyOverride('strokeWeight', '1'); applyOverride('strokeStyle', 'solid'); applyOverride('strokeColor', '#000000'); reapplySel() } else setStrokes(rows => [...rows, { id: nextRowId(rows), hex: '000000', op: 100, position: 'Inside', weight: 1 }]) }} /></>} bodyGap={0} bodyPadding="0">
             {liveStrokes
               ? liveStrokes.map((s, i) => (
                   <div key={`live-${i}`}>
