@@ -143,13 +143,34 @@ gate(`panel resize clamps at min ${SPEC.panel.ourMinWidth}`, 'true', Math.abs(na
 const fieldWmin = await opacity.evaluate((el) => Math.round(el.closest('div').getBoundingClientRect().width));
 gate(`fields never below Figma min ${SPEC.valueField.containerWidth}`, 'true', fieldWmin >= SPEC.valueField.containerWidth);
 
-// G8 — annotation: vertical alignment writes the model
-const alignBtn = page.locator('button[aria-label*="Align top"], button[title*="Align top"]').first();
+// G8 — annotation: vertical alignment MOVES a child (Dan round 2026-07-07: the idioms were legal
+// no-ops on packed parents; the gate now proves the DISPLAYED move on a real child, since the
+// suite's default selection is the frame ROOT, which — like Figma — cannot be aligned).
+const alignBtn = page.locator('button[title*="Align bottom"]').first();
 if (await alignBtn.count()) {
+  const picked = await page.evaluate(() => {
+    const d = document.querySelector('iframe')?.contentDocument;
+    const child = [...(d?.querySelectorAll('[data-src]') ?? [])].find((e) => {
+      const pr = e.parentElement?.getBoundingClientRect?.(); const er = e.getBoundingClientRect();
+      return e.parentElement && pr && er.height > 8 && pr.height - er.height > 40;
+    });
+    if (!child) return null;
+    child.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    window.__g8 = child;
+    return Math.round(child.getBoundingClientRect().top);
+  });
+  await page.waitForTimeout(350);
   const m0 = await model();
-  await alignBtn.click(); await page.waitForTimeout(300);
+  await alignBtn.click(); await page.waitForTimeout(350);
   const m1 = await model();
-  gate('vertical align (top) writes model', 'true', m1 !== m0 && /(align-self|margin-bottom)/.test(m1));
+  const after = await page.evaluate(() => Math.round(window.__g8.getBoundingClientRect().top));
+  // three legal encodings: flex cross-axis → align-self, flex main-axis with free space → auto
+  // margins, packed/block (no free space) → geometric relative shift (top).
+  gate('vertical align writes model', 'true', picked !== null && m1 !== m0 && /(align-self|margin-|top:)/.test(m1));
+  gate('vertical align MOVES the child (display)', 'true', picked !== null && after > picked);
+  await page.keyboard.press('Meta+z'); await page.waitForTimeout(300); // restore
+  await page.evaluate(() => { document.querySelector('iframe')?.contentDocument?.querySelector('[data-src]')?.dispatchEvent(new MouseEvent('click', { bubbles: true })); });
+  await page.waitForTimeout(300);
 } else gate('vertical align control present', 'true', false);
 
 // G9 — annotation: tidy-up/distribute writes the model

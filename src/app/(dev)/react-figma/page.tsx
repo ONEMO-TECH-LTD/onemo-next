@@ -2423,6 +2423,7 @@ export default function ReactFigmaPage() {
           : n === 'grid' ? [['display', 'grid'], ['grid-template-columns', 'repeat(auto-fill, minmax(80px, 1fr))']]
           : [['display', 'block']] // freeform — no auto-layout
         )
+      : field === 'selfAlign' && !el.parentElement ? [] as [string, string][] // root element — nothing to align within (Figma disables alignment at page level)
       : field === 'selfAlign' ? (() => { // align the element within its parent (Figma). Route each
           // visual axis to the mechanism that controls it: flex MAIN axis → margin:auto, flex CROSS
           // axis → align-self; block parent → margin:auto (horizontal works; vertical has no analog).
