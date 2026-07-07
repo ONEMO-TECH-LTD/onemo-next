@@ -12,7 +12,7 @@
  * set-token-value).
  */
 import { execFile } from 'node:child_process'
-import { promises as fs } from 'node:fs'
+import { promises as fs, realpathSync } from 'node:fs'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import postcss, { type Declaration, type Rule, type AtRule } from 'postcss'
@@ -50,18 +50,44 @@ export type ResolveResult = {
 
 // ─── jail ────────────────────────────────────────────────────────────────────
 
+/* E7.2 (KAI-9376, lead F1/N1): THE central editor path resolver. Every jail dispatches through
+ * it — repo-relative paths resolve against ROOT; package-prefixed paths (the stable identity
+ * the tagging-loader emits for global-library files, "onemo-component-library/src/…") resolve
+ * against the library's realpath. Never a hardcoded relative depth (checkout-independent). */
+export const LIB_NAME = 'onemo-component-library'
+export const LIB_ROOT: string | null = (() => {
+  try {
+    // pure-fs locate (npm materializes the dep at node_modules/<name>; realpath follows the
+    // worktree→clone→package symlink chain). No module machinery — webpack rewrites
+    // require.resolve in bundled server code, which silently broke the createRequire variant.
+    return realpathSync(path.join(ROOT, 'node_modules', LIB_NAME))
+  } catch { return null } // library not installed — editor works, library paths 403
+})()
+
+export function resolveEditorPath(rel: string): string {
+  if (rel === LIB_NAME || rel.startsWith(LIB_NAME + '/')) {
+    if (!LIB_ROOT) throw Object.assign(new Error('component library not installed'), { status: 403 })
+    return path.resolve(LIB_ROOT, rel.slice(LIB_NAME.length + 1))
+  }
+  return path.resolve(ROOT, rel)
+}
+
+/* Allowed roots per surface — the library's editable surface is its src/ only. */
+const LIB_SRC = LIB_ROOT ? path.join(LIB_ROOT, 'src') : null
+const CSS_ROOTS = [path.join(ROOT, 'src'), ...(LIB_SRC ? [LIB_SRC] : [])]
+// component jail = src/ (routes) + storybook/ (hosted canvas screens) + global library src
+const COMPONENT_ROOTS = [path.join(ROOT, 'src'), path.join(ROOT, 'storybook'), ...(LIB_SRC ? [LIB_SRC] : [])]
+
 export function jailModuleCss(rel: string): string {
-  const abs = path.resolve(ROOT, rel)
-  if (!abs.startsWith(path.join(ROOT, 'src') + path.sep) || !abs.endsWith('.module.css')) {
+  const abs = resolveEditorPath(rel)
+  if (!CSS_ROOTS.some((r) => abs.startsWith(r + path.sep)) || !abs.endsWith('.module.css')) {
     throw Object.assign(new Error(`outside write jail: ${rel}`), { status: 403 })
   }
   return abs
 }
 
-// component jail = src/ (routes) + storybook/ (hosted canvas screens, e.g. Editor402)
-const COMPONENT_ROOTS = [path.join(ROOT, 'src'), path.join(ROOT, 'storybook')]
 export function jailComponent(rel: string): string {
-  const abs = path.resolve(ROOT, rel)
+  const abs = resolveEditorPath(rel)
   if (!COMPONENT_ROOTS.some((r) => abs.startsWith(r + path.sep)) || !/\.(tsx|ts)$/.test(abs)) {
     throw Object.assign(new Error(`outside read jail: ${rel}`), { status: 403 })
   }
@@ -71,7 +97,7 @@ export function jailComponent(rel: string): string {
 /** WRITE jail for JSX ops (F3, s58-lead): .tsx ONLY — never .ts (no JSX to write there anyway,
  *  and it keeps non-component sources like lib.ts unwritable even though they pass the read jail). */
 function jailComponentWrite(rel: string): string {
-  const abs = path.resolve(ROOT, rel)
+  const abs = resolveEditorPath(rel)
   if (!COMPONENT_ROOTS.some((r) => abs.startsWith(r + path.sep)) || !abs.endsWith('.tsx')) {
     throw Object.assign(new Error(`outside JSX write jail (.tsx only): ${rel}`), { status: 403 })
   }

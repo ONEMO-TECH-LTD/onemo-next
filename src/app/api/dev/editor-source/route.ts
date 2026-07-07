@@ -2,14 +2,16 @@
  * react-figma engine · E4-G3 — source read for Code mode.
  * GET ?file=&line= → the source lines around the selected element's data-src position, so the
  * editor's Code mode shows the real code for what's selected. Dev-only, read-only, jailed to
- * src/ + storybook/ (same read jail as the write path).
+ * src/ + storybook/ + the global component library src (E7.2 — paths dispatch through the
+ * central resolveEditorPath, so package-prefixed identities resolve correctly).
  */
 import { NextResponse } from 'next/server'
 import { readFile } from 'node:fs/promises'
-import { join, resolve, sep } from 'node:path'
+import { join, sep } from 'node:path'
+import { resolveEditorPath, LIB_ROOT } from '../editor/lib'
 
 const ROOT = process.cwd()
-const ROOTS = [join(ROOT, 'src'), join(ROOT, 'storybook')]
+const ROOTS = [join(ROOT, 'src'), join(ROOT, 'storybook'), ...(LIB_ROOT ? [join(LIB_ROOT, 'src')] : [])]
 
 export async function GET(req: Request) {
   if (process.env.NODE_ENV !== 'development') {
@@ -19,7 +21,7 @@ export async function GET(req: Request) {
     const url = new URL(req.url)
     const file = url.searchParams.get('file') ?? ''
     const line = Math.max(1, parseInt(url.searchParams.get('line') ?? '1', 10) || 1)
-    const abs = resolve(ROOT, file)
+    const abs = resolveEditorPath(file)
     if (!ROOTS.some((r) => abs.startsWith(r + sep)) || !/\.(tsx|ts|css)$/.test(abs)) {
       return NextResponse.json({ error: 'outside read jail' }, { status: 403 })
     }
