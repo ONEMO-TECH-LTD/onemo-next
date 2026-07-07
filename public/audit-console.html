@@ -20,10 +20,21 @@
   .rail2 input[type=range]{accent-color:#39b3a6;width:260px;}
   .rail2 .tgl{margin-left:auto;display:flex;gap:6px;}
   .rail2 .tgl button.off{color:#5a5a66;}
-  .stage{position:absolute;top:84px;left:240px;right:340px;bottom:0;display:grid;place-items:center;overflow:auto;background:#0e0e12;}
-  body.hideL .stage{left:0;} body.hideR .stage{right:0;}
-  .left{position:fixed;top:84px;left:0;bottom:0;width:240px;background:#131319;border-right:1px solid #26262e;overflow:auto;padding:10px;}
-  body.hideL .left{display:none;} body.hideR .panel{display:none;}
+  :root{--leftW:240px;--rightW:340px;}
+  .stage{position:absolute;top:84px;left:var(--leftW);right:var(--rightW);bottom:0;display:grid;place-items:center;overflow:auto;background:#0e0e12;}
+  body.hideL{--leftW:0px;} body.hideR{--rightW:0px;}
+  .left{position:fixed;top:84px;left:0;bottom:0;width:var(--leftW);background:#131319;border-right:1px solid #26262e;overflow:auto;padding:10px;}
+  body.hideL .left,body.hideR .panel{display:none;}
+  /* industry-standard edge collapse tabs (chevron, vertically centered on the panel edge) */
+  .collapse{position:fixed;top:50%;transform:translateY(-50%);z-index:45;width:16px;height:56px;border:1px solid #26262e;background:#1a1a22;color:#8a8a92;display:flex;align-items:center;justify-content:center;cursor:pointer;font:600 11px system-ui;user-select:none;}
+  .collapse:hover{color:#e6e6ea;background:#22222c;}
+  #clpL{left:var(--leftW);border-radius:0 7px 7px 0;border-left:0;}
+  #clpR{right:var(--rightW);border-radius:7px 0 0 7px;border-right:0;}
+  /* drag handles — resize the panels */
+  .rs{position:fixed;top:84px;bottom:0;width:7px;z-index:44;cursor:col-resize;}
+  .rs:hover,.rs.on{background:rgba(57,179,166,.25);}
+  #rsL{left:calc(var(--leftW) - 3px);} #rsR{right:calc(var(--rightW) - 3px);}
+  body.hideL #rsL,body.hideR #rsR{display:none;}
   .device{position:relative;background:#fff;outline:1px solid #2a2a32;}
   .device iframe{display:block;border:0;background:#eceff1;position:relative;z-index:1;}
   .device canvas.overlay{position:absolute;top:0;left:0;z-index:2;pointer-events:none;}
@@ -69,10 +80,6 @@
     <span class="rawpx" id="gwv" style="color:#fff;font-weight:600">402px</span>
     <button id="gfill">⤢ Fill</button>
     <button id="greset">Reset</button>
-    <div class="tgl">
-      <button id="tglL">⟨ Tree</button>
-      <button id="tglR">Panel ⟩</button>
-    </div>
   </div>
 
   <div class="left" id="left"><div class="empty">Loading…</div></div>
@@ -86,6 +93,10 @@
   </div>
 
   <div class="panel" id="panel"><div class="empty">Loading…</div></div>
+  <div class="collapse" id="clpL" title="Collapse / expand tree">‹</div>
+  <div class="collapse" id="clpR" title="Collapse / expand panel">›</div>
+  <div class="rs" id="rsL"></div>
+  <div class="rs" id="rsR"></div>
   <div class="hint" id="hint">Inspect mode · click an element · hover to preview</div>
 
 <script>
@@ -102,21 +113,35 @@ frame.addEventListener('load',()=>{ updScrSize(); try{ win().addEventListener('r
 window.addEventListener('resize',updScrSize);
 // ── global resizer (top bar — works in EVERY mode; Dan: resizer lives at the top) ──
 const gw=document.getElementById('gw'), gwv=document.getElementById('gwv'), gdev=document.getElementById('gdev');
-function setW(w, sync){
-  w=Math.max(320,Math.min(1728,w));
-  frame.style.width=w+'px'; gwv.textContent=w+'px'; if(sync)gw.value=w;
+function setSize(w, h, sync){
+  w=Math.max(320,Math.min(2400,w));
+  frame.style.width=w+'px';
+  if(h){ frame.style.height=Math.max(320,h)+'px'; }
+  gwv.textContent=w+'px'; if(sync)gw.value=w;
   if(mode==='fidelity'&&audit&&w!==audit.frame.w) clearOverlay(); // heatmap is design-size only
   updScrSize();
   if(mode==='responsive') setTimeout(runInvariants,80);
 }
+const setW=(w,sync)=>setSize(w,null,sync);
 gw.oninput=e=>setW(+e.target.value,false);
-gdev.onchange=e=>{ if(e.target.value)setW(+e.target.value,true); };
-document.getElementById('gfill').onclick=()=>setW(Math.floor(document.querySelector('.stage').clientWidth-24),true);
-document.getElementById('greset').onclick=()=>setW(audit?.frame.w||402,true);
-// panel toggles (full-screen test: hide either side)
-const tglL=document.getElementById('tglL'), tglR=document.getElementById('tglR');
-tglL.onclick=()=>{ document.body.classList.toggle('hideL'); tglL.classList.toggle('off'); };
-tglR.onclick=()=>{ document.body.classList.toggle('hideR'); tglR.classList.toggle('off'); };
+gdev.onchange=e=>{ const o=e.target.selectedOptions[0]; if(o&&o.value)setSize(+o.value,+o.dataset.h||null,true); };
+document.getElementById('gfill').onclick=()=>{ const st=document.querySelector('.stage'); setSize(st.clientWidth-4, st.clientHeight-4, true); };
+document.getElementById('greset').onclick=()=>setSize(audit?.frame.w||402, audit?.frame.h||874, true);
+// edge collapse tabs (standard chevrons) + drag-resizable panels
+const clpL=document.getElementById('clpL'), clpR=document.getElementById('clpR');
+const flip=()=>{ clpL.textContent=document.body.classList.contains('hideL')?'›':'‹'; clpR.textContent=document.body.classList.contains('hideR')?'‹':'›'; };
+clpL.onclick=()=>{ document.body.classList.toggle('hideL'); flip(); };
+clpR.onclick=()=>{ document.body.classList.toggle('hideR'); flip(); };
+for(const [id,varName,fromRight,min,max] of [['rsL','--leftW',false,160,520],['rsR','--rightW',true,240,640]]){
+  const h=document.getElementById(id);
+  h.addEventListener('mousedown',e=>{
+    e.preventDefault(); h.classList.add('on'); frame.style.pointerEvents='none';
+    const move=ev=>{ const v=Math.max(min,Math.min(max, fromRight? window.innerWidth-ev.clientX : ev.clientX));
+      document.documentElement.style.setProperty(varName, v+'px'); };
+    const up=()=>{ h.classList.remove('on'); frame.style.pointerEvents=''; removeEventListener('mousemove',move); removeEventListener('mouseup',up); };
+    addEventListener('mousemove',move); addEventListener('mouseup',up);
+  });
+}
 
 fetch(AUDIT_URL).then(r=>r.json()).then(a=>{
   audit = a; scr.textContent = `${a.name} · ${a.screen}`;
@@ -131,7 +156,7 @@ fetch(AUDIT_URL).then(r=>r.json()).then(a=>{
   frame.style.width = a.frame.w+'px'; frame.style.height = a.frame.h+'px';
   gw.value=a.frame.w; gwv.textContent=a.frame.w+'px';
   Object.entries(DEVICE_GROUPS).forEach(([g,list])=>{ const og=document.createElement('optgroup'); og.label=g;
-    list.forEach(d=>{const o=document.createElement('option');o.value=d[1];o.textContent=`${d[0]} · ${d[1]}×${d[2]}`;og.appendChild(o);}); gdev.appendChild(og); });
+    list.forEach(d=>{const o=document.createElement('option');o.value=d[1];o.dataset.h=d[2];o.textContent=`${d[0]} · ${d[1]}×${d[2]}`;og.appendChild(o);}); gdev.appendChild(og); });
   buildTree();
   const zs=document.getElementById('zonesel');
   (a.zones||[]).forEach(z=>{const o=document.createElement('option');o.value=z.id;o.textContent=z.class;zs.appendChild(o);});
@@ -182,7 +207,7 @@ modesEl.querySelectorAll('button').forEach(b=>b.onclick=()=>{
 function clearOverlay(){ overlay.style.display='none'; if(hi)hi.style.display='none'; } // note: does NOT clear sel (QA F1 — tree click)
 function applyMode(){
   clearOverlay();
-  if(mode==='fidelity') setW(audit?.frame.w||402,true); // heatmap compares at design size
+  if(mode==='fidelity') setSize(audit?.frame.w||402, audit?.frame.h||874, true); // heatmap compares at design size
   hint.textContent = ({inspect:'Inspect · click an element · hover to preview',fidelity:'Fidelity · measured pixel diff vs Figma (red = mismatch)',responsive:'Responsive · device / slider / fill · invariants checked live',theming:'Theming · flip light/dark · token colors must move',structure:'Structure · layer tree, gates, asset integrity'})[mode];
   applyZoneBox();
   ({inspect:modeInspect,fidelity:modeFidelity,responsive:modeResponsive,theming:modeTheming,structure:modeStructure})[mode]();
