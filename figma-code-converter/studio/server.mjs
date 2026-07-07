@@ -47,6 +47,22 @@ const figmaUrlOf = (u) => { // accept any figma.com/design|file link with node-i
 };
 const json = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)); };
 
+function urlOfScreen(slug) {
+  for (const base of [SANDBOX, PROMOTED]) {
+    const rj = path.join(base, slug, 'convert-run.json');
+    if (fs.existsSync(rj)) { const r = JSON.parse(fs.readFileSync(rj, 'utf8')); return `https://www.figma.com/design/${r.fileKey}/x?node-id=${r.nodeId.replace(':', '-')}`; }
+  }
+  return null;
+}
+async function refreshScreen(slug) { // FORCE re-pull the linked Figma frame (Dan: fetch changes on button press)
+  const url = urlOfScreen(slug);
+  if (!url) throw new Error(`no linked Figma URL for "${slug}"`);
+  const cli = path.join(TOOL, 'bin/figma-to-code.mjs');
+  // best-effort dump refresh (needs Figma desktop + Bridge plugin open); ignore if the bridge is down —
+  // convert will fetch fresh nodes regardless and fail LOUDLY if the token dump is genuinely stale.
+  try { await run('node', [cli, 'dump-variables', url], { env: process.env, timeout: 30000, maxBuffer: 8e6 }); } catch { /* bridge down — convert decides */ }
+  return convertScreen(url); // no --offline → fetches the latest nodes
+}
 async function convertScreen(url) {
   const parsed = figmaUrlOf(url);
   if (!parsed) throw new Error('Not a Figma frame link (needs …figma.com/design/<key>/…?node-id=N-N)');
@@ -87,13 +103,30 @@ async function fidelityPair(parsed, slug) {
   await run('node', [path.join(TOOL, 'audit/capture.mjs'), route, path.join(AUDIT_PUB, `${slug}-build.png`), String(audit.frame.w), String(audit.frame.h)], { env: process.env, timeout: 60000 });
 }
 
+// One legible registry: every screen the operator has, with its acceptance status.
+//  · draft    = a sandbox conversion, inspectable, NOT yet saved to the app
+//  · accepted = promoted to a committed converted/<slug> route (saved; ships with the app)
+// A screen can be both (accepted + still has its draft to re-inspect). Built-in reference
+// screens (mother-v2, the audit builds) are accepted and read-only (no draft to discard).
+const BUILTIN = new Set(['mother-v2', 'audit-mother-v2', 'audit-editor-402', 'fixtures']);
+function readName(slug, inSandbox) {
+  const p = inSandbox ? path.join(AUDIT_PUB, `${slug}.json`) : null;
+  try { if (p) { const a = JSON.parse(fs.readFileSync(p, 'utf8')); return { name: a.name, frame: a.frame }; } } catch { /* pending */ }
+  return { name: slug, frame: null };
+}
 function listScreens() {
-  if (!fs.existsSync(SANDBOX)) return [];
-  return fs.readdirSync(SANDBOX).filter((d) => !d.startsWith('_') && fs.existsSync(path.join(SANDBOX, d, 'convert-run.json'))).map((slug) => {
-    let name = slug, frame = null;
-    try { const a = JSON.parse(fs.readFileSync(path.join(AUDIT_PUB, `${slug}.json`), 'utf8')); name = a.name; frame = a.frame; } catch { /* audit pending */ }
-    return { slug, name, frame, promoted: fs.existsSync(path.join(PROMOTED, slug)) };
-  });
+  const drafts = fs.existsSync(SANDBOX)
+    ? fs.readdirSync(SANDBOX).filter((d) => !d.startsWith('_') && fs.existsSync(path.join(SANDBOX, d, 'convert-run.json'))) : [];
+  const accepted = fs.existsSync(PROMOTED)
+    ? fs.readdirSync(PROMOTED).filter((d) => !d.startsWith('audit-') && d !== 'sandbox' && fs.existsSync(path.join(PROMOTED, d, 'convert-run.json'))) : [];
+  // two zones: CONVERSIONS (sandbox drafts — scratch, clearable) and SAVED (promoted routes —
+  // committed backup). A screen can be in both (saved, still has its draft to re-inspect).
+  const slugs = [...new Set([...drafts, ...accepted])].filter((slug) => !BUILTIN.has(slug));
+  return slugs.map((slug) => {
+    const hasDraft = drafts.includes(slug), isAccepted = accepted.includes(slug);
+    const { name, frame } = readName(slug, hasDraft);
+    return { slug, name, frame, status: isAccepted ? 'accepted' : 'draft', hasDraft, accepted: isAccepted, builtin: false };
+  }).sort((a, b) => (a.accepted === b.accepted ? a.name.localeCompare(b.name) : a.accepted ? 1 : -1));
 }
 
 async function promote(slug) {
@@ -105,7 +138,34 @@ async function promote(slug) {
   // promoted = clean PRODUCT build (no data-fc), from the same cached data — deterministic
   const url = `https://www.figma.com/design/${fileKey}/x?node-id=${nodeId.replace(':', '-')}`;
   await run('node', [cli, 'convert', url, '--offline', '--out', dest, '--tokens-css', TOKENS, '--fonts-dir', FONTS], { env: process.env, timeout: 120000, maxBuffer: 8e6 });
-  return { dest: path.relative(APP, dest) };
+  // self-contained bundle (Dan): extract the exact tokens this screen uses into its own tokens.css
+  // so the folder integrates into any product without an external design-system stylesheet.
+  const { bundleTokensCss } = await import(path.join(TOOL, 'src/bundle.mjs'));
+  const moduleCssFile = fs.readdirSync(dest).find((f) => f.endsWith('.module.css'));
+  const { css: tokCss, used, unresolved } = bundleTokensCss(await fsp.readFile(path.join(dest, moduleCssFile), 'utf8'), await fsp.readFile(TOKENS, 'utf8'));
+  await fsp.writeFile(path.join(dest, 'tokens.css'), tokCss);
+  // page.tsx imports tokens.css FIRST (definitions before consumers) — insert ahead of fonts.css
+  const pageFile = path.join(dest, 'page.tsx'); let page = await fsp.readFile(pageFile, 'utf8');
+  if (!page.includes("./tokens.css")) { page = page.replace(/^/, "import './tokens.css';\n"); await fsp.writeFile(pageFile, page); }
+  const hasImgs = fs.existsSync(path.join(dest, 'assets'));
+  const md = [
+    `# ${slug} — self-contained conversion bundle`, '',
+    'Drop this folder into a product and it renders without external design-system wiring.', '',
+    '## What ships',
+    `- \`page.tsx\` / \`${moduleCssFile.replace('.module.css', '')}.tsx\` — the component + full structure`,
+    `- \`${moduleCssFile}\` — styles (reference only the tokens below)`,
+    `- \`tokens.css\` — **${used.length} design tokens** this screen uses, extracted from the DS (light + dark scopes) — the self-containment guarantee`,
+    '- \`theme.css\` — dark-mode surface handling',
+    '- \`fonts.css\` + \`fonts/\` — packaged woff2 (exact weights)',
+    ...(hasImgs ? ['- \`assets/\` — byte-exact images + inline SVGs'] : []),
+    '', '## Integrate',
+    `\`import Page from './${slug}/page'\` (or copy the folder under your route). Nothing else required.`, '',
+    unresolved.length
+      ? `## ⚠ Unresolved (${unresolved.length}) — would break on integration\n${unresolved.map((u) => `- \`${u}\` — not found in the DS tokens.css`).join('\n')}`
+      : '_All tokens resolved — no external dependency._',
+  ].join('\n') + '\n';
+  await fsp.writeFile(path.join(dest, 'BUNDLE.md'), md);
+  return { dest: path.relative(APP, dest), tokens: used.length, unresolved: unresolved.length };
 }
 
 const server = createServer(async (req, res) => {
@@ -118,11 +178,32 @@ const server = createServer(async (req, res) => {
       try { return json(res, 200, await convertScreen(JSON.parse(body).url)); }
       catch (e) { return json(res, 422, { error: String(e.message).slice(0, 4000) }); }
     }
+    if (u.pathname === '/api/clear-conversions' && req.method === 'POST') {
+      let cleared = 0;
+      if (fs.existsSync(SANDBOX)) for (const slug of fs.readdirSync(SANDBOX)) {
+        if (slug.startsWith('_') || BUILTIN.has(slug)) continue;
+        await fsp.rm(path.join(SANDBOX, slug), { recursive: true, force: true });
+        for (const f of [`${slug}.json`, `${slug}-figma.png`, `${slug}-build.png`]) await fsp.rm(path.join(AUDIT_PUB, f), { force: true });
+        cleared++;
+      }
+      return json(res, 200, { cleared }); // Saved (promoted) routes are in converted/<slug> — untouched
+    }
     const del = u.pathname.match(/^\/api\/screens\/([a-z0-9-]+)$/);
     if (del && req.method === 'DELETE') {
-      await fsp.rm(path.join(SANDBOX, del[1]), { recursive: true, force: true });
-      for (const f of [`${del[1]}.json`, `${del[1]}-figma.png`, `${del[1]}-build.png`]) await fsp.rm(path.join(AUDIT_PUB, f), { force: true });
-      return json(res, 200, { deleted: del[1] });
+      const scope = u.searchParams.get('scope') || 'all'; // draft | accepted | all
+      if (scope === 'draft' || scope === 'all') {
+        await fsp.rm(path.join(SANDBOX, del[1]), { recursive: true, force: true });
+        for (const f of [`${del[1]}.json`, `${del[1]}-figma.png`, `${del[1]}-build.png`]) await fsp.rm(path.join(AUDIT_PUB, f), { force: true });
+      }
+      if (scope === 'accepted' || scope === 'all') { // remove the committed route (git tracks the deletion — a backed-up removal)
+        await fsp.rm(path.join(PROMOTED, del[1]), { recursive: true, force: true });
+      }
+      return json(res, 200, { deleted: del[1], scope });
+    }
+    const ref = u.pathname.match(/^\/api\/refresh\/([a-z0-9-]+)$/);
+    if (ref && req.method === 'POST') {
+      try { return json(res, 200, await refreshScreen(ref[1])); }
+      catch (e) { return json(res, 422, { error: String(e.message).slice(0, 4000) }); }
     }
     const pro = u.pathname.match(/^\/api\/promote\/([a-z0-9-]+)$/);
     if (pro && req.method === 'POST') {

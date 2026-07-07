@@ -14,7 +14,17 @@
   .tabs .tab{display:flex;align-items:center;gap:7px;background:#1a1a22;border:1px solid #26262e;border-bottom:0;border-radius:8px 8px 0 0;padding:5px 11px;font:500 11px system-ui;color:#b7b7c2;cursor:pointer;white-space:nowrap;flex-shrink:0;}
   .tabs .tab.on{background:#20202a;color:#e6e6ea;border-color:#39b3a6;}
   .tabs .tab .x{color:#5a5a66;font:600 12px system-ui;padding:0 1px;} .tabs .tab .x:hover{color:#f08a8a;}
-  .tabs .tab .up{color:#5a5a66;font:600 11px system-ui;} .tabs .tab .up:hover{color:#7fd8cd;} .tabs .tab .up.done{color:#7fd8cd;}
+  .tabs .tab .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .tabs .tab .dot.draft{background:#e8a94c;} .tabs .tab .dot.accepted{background:#39b3a6;}
+  .tabs .tab .act{color:#5a5a66;font:600 11px system-ui;padding:0 2px;cursor:pointer;}
+  .tabs .tab .save:hover{color:#7fd8cd;} .tabs .tab .save.done{color:#39b3a6;}
+  .tabs .tab .refresh{color:#8a8a92;} .tabs .tab .refresh:hover{color:#8fd0ff;} .tabs .tab .refresh.spin{color:#8fd0ff;}
+  .tabs .tab .x:hover{color:#f08a8a;}
+  .tabs .clearbtn{flex-shrink:0;background:#2a1a1a;border:1px solid #4a2a2a;color:#e0a0a0;border-radius:7px;padding:4px 10px;font:600 11px system-ui;cursor:pointer;}
+  .tabs .clearbtn:hover{background:#3a2020;color:#f0b0b0;}
+  .tabs .zsep{flex-shrink:0;color:#4a4a54;font:600 10px system-ui;letter-spacing:.06em;padding:0 4px;text-transform:uppercase;}
+  .tabs .legend{display:flex;gap:12px;align-items:center;color:#6a6a76;font:10px system-ui;padding:0 8px;white-space:nowrap;}
+  .tabs .legend .d{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:4px;vertical-align:middle;}
   .tabs .addr{flex:1;min-width:220px;display:flex;gap:6px;align-items:center;}
   .tabs .addr input{flex:1;background:#16161c;border:1px solid #26262e;border-radius:7px;color:#e6e6ea;font:12px ui-monospace,monospace;padding:5px 10px;outline:none;}
   .tabs .addr input:focus{border-color:#39b3a6;}
@@ -168,23 +178,70 @@ for(const [id,varName,fromRight,min,max] of [['rsL','--leftW',false,160,520],['r
 fetch('/api/screens').then(r=>r.ok?r.json():Promise.reject()).then(screens=>{
   document.body.classList.add('studio');
   const tabs=document.getElementById('tabs');
-  const tab=(label,slug,promoted)=>{
-    const t=document.createElement('div'); t.className='tab'+((slug||null)===SLUG?' on':'');
-    t.innerHTML=`<span>${esc(label)}</span>`+(slug?`<span class="up${promoted?' done':''}" title="${promoted?'promoted — re-promote':'promote to converted/'}">⇧</span><span class="x" title="delete">×</span>`:'');
-    t.querySelector('span').onclick=()=>{ location.href=slug?`/?s=${slug}`:'/'; };
-    if(slug){
-      t.querySelector('.x').onclick=async e=>{ e.stopPropagation(); if(!confirm(`Delete sandbox screen "${label}"?`))return;
-        await fetch(`/api/screens/${slug}`,{method:'DELETE'}); location.href = SLUG===slug ? '/' : location.href; };
-      t.querySelector('.up').onclick=async e=>{ e.stopPropagation();
-        const r2=await fetch(`/api/promote/${slug}`,{method:'POST'}); const j=await r2.json();
-        alert(r2.ok?`Promoted → ${j.dest}
-(product build, no audit stamps — commit it when accepted)`:`Promote failed:
-${j.error}`); };
-    }
+  const tab=(sc)=>{
+    // sc: {slug,name,status,hasDraft,accepted,builtin}; the built-in reference screen is '' slug
+    const active=(sc.slug||'mother-v2')===(SLUG||'mother-v2');
+    const t=document.createElement('div'); t.className='tab'+(active?' on':'');
+    const canOpen = sc.hasDraft || sc.slug===null; // only audit builds are inspectable in the console
+    const openSlug = sc.slug; // null → built-in mother
+    const acceptLabel = sc.accepted?'In Library ✓':'Keep';
+    t.innerHTML=`<span class="dot ${sc.status}" title="${sc.status==='accepted'?'In the Library — kept & reusable':'Conversion (scratch) — not yet kept'}"></span>`+
+      `<span title="${canOpen?'open in console':'accepted build — re-convert to inspect'}"${canOpen?'':' style="opacity:.6"'}>${esc(sc.name)}</span>`+
+      (sc.builtin?'':`<span class="act refresh" title="Refresh — re-pull the linked Figma frame (fetch latest changes)">↻</span>`+
+        (sc.hasDraft?`<span class="act save${sc.accepted?' done':''}" title="Keep = add this conversion to the Library (committed, reusable: react-figma / dev / engine)">${acceptLabel}</span>`:'')+
+        `<span class="act x" title="Delete">×</span>`);
+    t.querySelector('span:nth-child(2)').onclick=()=>{ if(canOpen) location.href=openSlug?`/?s=${openSlug}`:'/'; };
+    const saveBtn=t.querySelector('.save');
+    if(saveBtn) saveBtn.onclick=async e=>{ e.stopPropagation();
+      saveBtn.textContent='Saving…';
+      const r2=await fetch(`/api/promote/${sc.slug}`,{method:'POST'}); const j=await r2.json();
+      if(r2.ok){ location.reload(); } else { saveBtn.textContent='Save'; alert(`Save failed (gates loud by design):
+${j.error}`); }
+    };
+    const rfBtn=t.querySelector('.refresh');
+    if(rfBtn) rfBtn.onclick=async e=>{ e.stopPropagation();
+      rfBtn.classList.add('spin'); rfBtn.textContent='↻…';
+      const r2=await fetch(`/api/refresh/${sc.slug}`,{method:'POST'}); const j=await r2.json();
+      if(r2.ok){ location.href=`/?s=${sc.slug}`; location.reload(); }
+      else { rfBtn.classList.remove('spin'); rfBtn.textContent='↻'; alert(`Refresh failed (fetch/gates loud by design):\n\n${j.error}`); }
+    };
+    const xBtn=t.querySelector('.x');
+    if(xBtn) xBtn.onclick=async e=>{ e.stopPropagation();
+      let scope='all', msg=`Delete "${sc.name}"?`;
+      if(sc.accepted&&sc.hasDraft) msg=`"${sc.name}" is Accepted (saved) and has a draft.
+
+OK = remove BOTH (the saved route + the draft).
+Cancel = keep it.`;
+      else if(sc.accepted){ scope='accepted'; msg=`Remove the Accepted route "${sc.name}" from the app? (git tracks the removal)`; }
+      else scope='draft';
+      if(!confirm(msg))return;
+      await fetch(`/api/screens/${sc.slug}?scope=${scope}`,{method:'DELETE'});
+      location.href = SLUG===sc.slug ? '/' : location.pathname+location.search;
+      location.reload();
+    };
     tabs.appendChild(t);
   };
-  tab('Mother — v2', null, true);
-  screens.forEach(sc=>tab(sc.name||sc.slug, sc.slug, sc.promoted));
+  const zsep=(txt)=>{ const z=document.createElement('div'); z.className='zsep'; z.textContent=txt; tabs.appendChild(z); };
+  // reference
+  tab({slug:null,name:'Mother — v2',status:'accepted',hasDraft:false,accepted:true,builtin:true});
+  const conversions=screens.filter(s=>!s.accepted), saved=screens.filter(s=>s.accepted);
+  // CONVERSIONS zone (scratch — clearable)
+  zsep(`Conversions${conversions.length?` · ${conversions.length}`:''}`);
+  conversions.forEach(tab);
+  if(conversions.length){
+    const clr=document.createElement('div'); clr.className='clearbtn'; clr.textContent='Empty conversions';
+    clr.title='Delete ALL scratch conversions — Library screens are kept';
+    clr.onclick=async ()=>{ if(!confirm(`Empty the Conversions scratch — delete all ${conversions.length} unkept conversion(s)?\n\nLibrary screens are NOT touched.`))return;
+      await fetch('/api/clear-conversions',{method:'POST'});
+      location.href = (SLUG && conversions.some(c=>c.slug===SLUG)) ? '/' : location.pathname+location.search; location.reload(); };
+    tabs.appendChild(clr);
+  }
+  // SAVED zone (kept — committed backup)
+  zsep(`Library${saved.length?` · ${saved.length}`:''}`);
+  saved.forEach(tab);
+  const legend=document.createElement('div'); legend.className='legend';
+  legend.innerHTML=`<span><span class="d" style="background:#e8a94c"></span>Conversion (scratch)</span><span><span class="d" style="background:#39b3a6"></span>Library (kept · reusable)</span>`;
+  tabs.appendChild(legend);
   const addr=document.createElement('div'); addr.className='addr';
   addr.innerHTML=`<input id="figurl" placeholder="Paste a Figma frame link and press ⏎ to convert…" spellcheck="false"><span class="busy" id="cbusy">converting… (all gates run — ~20s)</span>`;
   tabs.appendChild(addr);
