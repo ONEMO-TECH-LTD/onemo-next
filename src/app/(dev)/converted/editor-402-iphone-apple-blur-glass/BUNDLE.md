@@ -5,7 +5,7 @@ Drop this folder into a product and it renders without external design-system wi
 ## What ships
 - `page.tsx` / `editor-402-iphone-apple-blur-glass.tsx` — the component + full structure
 - `editor-402-iphone-apple-blur-glass.module.css` — styles (reference only the tokens below)
-- `tokens.css` — **53 design tokens** this screen uses, extracted from the DS (light + dark scopes) — the self-containment guarantee
+- `tokens.css` — **54 design tokens** this screen uses, extracted from the DS (light + dark scopes) — the self-containment guarantee
 - `theme.css` — dark-mode surface handling
 - `fonts.css` + `fonts/` — packaged woff2 (exact weights)
 - `assets/` — byte-exact images + inline SVGs
