@@ -446,13 +446,16 @@ const WEIGHT_NAMES: [string, string][] = [['Thin', '100'], ['ExtraLight', '200']
  * Figma field): the pill shows the RAW VALUE in a white 20px r5 capsule (1px #E6E6E6, 0 4px pad,
  * 11px w400) — the capsule IS the "this is a variable" badge; full Figma path on hover; clicking
  * opens the variable picker with the assigned variable preselected. Raw values get no badge. */
-function TokenPill({ token, onClick }: { token: string; onClick?: () => void }) {
+function TokenPill({ token, display, onClick }: { token: string; display?: string; onClick?: () => void }) {
   const tokens = useDsTokens()
   const varName = (token.match(/var\((--[a-z0-9-]+)\)/i)?.[1]) ?? (token.startsWith('--') ? token : `--${token}`)
   const tok = tokens.find((t) => t.cssVar === varName)
   const rawSource = tok ? (tok.original ? Object.values(tok.original)[0] : tok.value) : shortToken(token)
-  // the badge shows the RESOLVED value (Figma shows the mode value, e.g. 16 — not clamp() source)
-  const raw = tok ? resolveTokenDisplay(tok.cssVar, rawSource, tok.kind) : rawSource
+  // Dan 1.1/1.2 (2026-07-07): the badge shows the value RESOLVED ON THE ELEMENT — the integer the
+  // field already read from computed style (DS is a 2/4/8/16 grid, no decimals) — never the Figma
+  // alias name ({full}) or a sub-pixel clamp() result (15.99). Fall back to probing only if the
+  // field couldn't resolve it (fresh uncommitted binding).
+  const raw = display && /^-?\d+$/.test(display) ? display : (tok ? resolveTokenDisplay(tok.cssVar, rawSource, tok.kind) : rawSource)
   const fullName = tok?.path ?? shortToken(token)
   return (
     <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center' }}>
@@ -469,7 +472,8 @@ const tokenDisplayCache = new Map<string, string>()
 function resolveTokenDisplay(cssVar: string, raw: string, kind: string): string {
   if (kind !== 'dimension') return raw
   const t = raw.trim()
-  if (/^-?[\d.]+(px)?$/.test(t)) return t.replace(/px$/, '')
+  // DS dimension grid is integer (2/4/8/16…) — round to whole px, never a decimal (Dan 1.2).
+  if (/^-?[\d.]+(px)?$/.test(t)) return String(Math.round(parseFloat(t)))
   const hit = tokenDisplayCache.get(cssVar)
   if (hit) return hit
   if (typeof document === 'undefined') return raw
@@ -478,7 +482,7 @@ function resolveTokenDisplay(cssVar: string, raw: string, kind: string): string 
   document.body.appendChild(probe)
   const px = probe.getBoundingClientRect().width
   probe.remove()
-  const out = px > 0 ? String(Math.round(px * 100) / 100) : raw
+  const out = px > 0 ? String(Math.round(px)) : raw
   tokenDisplayCache.set(cssVar, out)
   return out
 }
@@ -492,8 +496,8 @@ const MODE_CARET = '__caret__'
    the trailing edge. Every prior field variant (InspectorField / AutoValueField /
    InlineValueInput) is a thin wrapper over this — one anatomy, one implementation (Dan:
    "make a component and reuse, not vibe-code each"). */
-function FigmaField({ icon, letter, glyph, value, onChange, onCommit, token, suffix, ariaLabel, mode, modeOptions, onMode, picker = true, width, whiteBg, dim, valueInk, title, placeholder, inputRole = 'spinbutton' }: {
-  icon?: keyof typeof UI_ICON; letter?: string; glyph?: React.ReactNode; value: string; onChange?: (value: string) => void
+function FigmaField({ icon, letter, glyph, glyphWidth = 24, value, onChange, onCommit, token, suffix, ariaLabel, mode, modeOptions, onMode, picker = true, width, whiteBg, dim, valueInk, title, placeholder, inputRole = 'spinbutton' }: {
+  icon?: keyof typeof UI_ICON; letter?: string; glyph?: React.ReactNode; glyphWidth?: number; value: string; onChange?: (value: string) => void
   onCommit?: (value: string) => void
   token?: string; suffix?: string; ariaLabel: string
   mode?: string; modeOptions?: [string, string][]; onMode?: (value: string) => void
@@ -540,8 +544,15 @@ function FigmaField({ icon, letter, glyph, value, onChange, onCommit, token, suf
   /* Figma census (impartial pull 2026-07-07): the trailing ⬡ appears on HOVER only — an
    * always-present 16px cell clipped values at 88px (Dan's resize screenshot). Reserve the
    * cell only when visible; bound fields keep it (the pill state shows it in Figma too). */
-  const pickerVisible = picker && onChange && (h || varOpen || bound)
-  const cols = `24px minmax(0,1fr)${suffix && !bound ? ' auto' : ''}${mode ? ' auto' : ''}${pickerVisible ? ' 16px' : ''}`
+  // The ⬡ appears on hover to BIND an unbound field. Once bound, the token badge itself reopens the
+  // picker (TokenPill onClick), so the separate ⬡ column is dropped — that reclaims the width the
+  // badge + mode label need (Dan 1.3: badge + Fill/Hug must both fit at 88px).
+  const pickerVisible = picker && onChange && !bound && (h || varOpen)
+  // Dan 1.3 (2026-07-07): Figma keeps the Fix/Hug/Fill label ALWAYS (even bound) with a chevron on
+  // hover, and still has room for the value + token badge. The clipping was our 24px glyph CELL
+  // (Figma's |W|/H glyph is ~14px) plus a fat mode button starving the value. Narrow glyph +
+  // compact mode + a real value minimum = everything fits at 88px.
+  const cols = `${glyphWidth}px minmax(28px,1fr)${suffix && !bound ? ' auto' : ''}${mode ? ' auto' : ''}${pickerVisible ? ' 16px' : ''}`
   /* Census-measured container backgrounds: filled = #F5F5F5 (Rotation/Padding class),
    * ghost = transparent at rest (Resizing/Gap class), dim (layout-controlled X/Y) = white
    * with NO border. whiteBg (Link/typed inputs) keeps its measured #e6e6e6 border. */
@@ -550,9 +561,9 @@ function FigmaField({ icon, letter, glyph, value, onChange, onCommit, token, suf
     <div ref={fieldRef} title={title ?? token} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
       style={{ position: 'relative', minWidth: typeof width === 'number' ? width : 0, width: typeof width === 'number' ? '100%' : width, height: 24, borderRadius: 5, background: bg, border: `1px solid ${varOpen || modeOpen ? SEL : whiteBg && !dim ? '#e6e6e6' : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: cols, alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, letterSpacing: '0.055px', color: INK }}>
       <span onPointerDown={scrubDown} onPointerMove={scrubMove} onPointerUp={scrubUp}
-        style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)', font: `450 11px/24px ${FONT}`, cursor: numeric ? 'ew-resize' : undefined, touchAction: 'none' }}>{icon ? <UiIcon name={icon} /> : glyph ?? letter}</span>
+        style={{ width: glyphWidth, height: 24, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)', font: `450 11px/24px ${FONT}`, cursor: numeric ? 'ew-resize' : undefined, touchAction: 'none' }}>{icon ? <UiIcon name={icon} /> : glyph ?? letter}</span>
       {bound ? (
-        <TokenPill token={token ?? value} onClick={onChange ? () => setVarOpen(true) : undefined} />
+        <TokenPill token={token ?? value} display={/^-?\d+(\.\d+)?$/.test(String(value)) ? String(Math.round(parseFloat(String(value)))) : undefined} onClick={onChange ? () => setVarOpen(true) : undefined} />
       ) : onChange ? (
         <input aria-label={ariaLabel} role={inputRole} value={shown} placeholder={placeholder}
           onChange={e => setDraft(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
@@ -572,7 +583,11 @@ function FigmaField({ icon, letter, glyph, value, onChange, onCommit, token, suf
       {mode && (
         <button type="button" aria-label={`${ariaLabel} mode`} aria-haspopup={modeOptions ? 'menu' : undefined} aria-expanded={modeOptions ? modeOpen : undefined}
           onClick={modeOptions ? () => setModeOpen(v => !v) : undefined}
-          style={{ appearance: 'none', border: 0, background: 'transparent', height: 24, padding: mode === MODE_CARET ? 0 : '0 7px', width: mode === MODE_CARET ? 24 : undefined, display: mode === MODE_CARET ? 'grid' : undefined, placeItems: mode === MODE_CARET ? 'center' : undefined, color: mode === MODE_CARET ? FAINT : INK, cursor: modeOptions ? 'pointer' : 'default', font: `450 11px/24px ${FONT}` }}>{mode === MODE_CARET ? <UiIcon name="caret24" /> : mode}</button>
+          style={{ appearance: 'none', border: 0, background: 'transparent', height: 24, padding: mode === MODE_CARET ? 0 : '0 2px', width: mode === MODE_CARET ? 24 : undefined, display: 'flex', alignItems: 'center', gap: 1, justifyContent: mode === MODE_CARET ? 'center' : 'flex-end', color: mode === MODE_CARET ? FAINT : INK, cursor: modeOptions ? 'pointer' : 'default', font: `450 11px/24px ${FONT}`, whiteSpace: 'nowrap' }}>
+          {mode === MODE_CARET ? <UiIcon name="caret24" /> : mode}
+          {/* Dan 2026-07-07: Figma shows a chevron on HOVER indicating the dropdown */}
+          {mode !== MODE_CARET && modeOptions && h && <span style={{ display: 'grid', placeItems: 'center', color: FAINT, marginRight: -4 }}><UiIcon name="caret16" size={16} /></span>}
+        </button>
       )}
       {pickerVisible && (
         <button type="button" title="Apply variable" aria-label={`Apply variable to ${ariaLabel}`} aria-haspopup="menu" aria-expanded={varOpen} onClick={event => { event.stopPropagation(); setVarOpen(v => !v) }}
@@ -708,8 +723,8 @@ function ResizeDropdownField({ axis, value, mode, onValue, onMode }: { axis: 'W'
   const axisLabel = axis === 'W' ? 'width' : 'height'
   return (
     <span data-resize-axis={axis} data-resize-mode={mode} style={{ display: 'contents' }}>
-      <FigmaField glyph={axis === 'W'
-          ? <span style={{ display: 'flex', alignItems: 'center', gap: 1.5, color: 'rgba(0,0,0,0.5)' }} aria-hidden>
+      <FigmaField glyphWidth={18} glyph={axis === 'W'
+          ? <span style={{ display: 'flex', alignItems: 'center', gap: 1, color: 'rgba(0,0,0,0.5)' }} aria-hidden>
               <span style={{ width: 1, height: 9, background: 'currentColor' }} />
               <span style={{ font: `400 10.5px/24px ${FONT}`, letterSpacing: '0.05px' }}>W</span>
               <span style={{ width: 1, height: 9, background: 'currentColor' }} />
