@@ -1,11 +1,11 @@
 {
   "fileKey": "t88thL8hKksSpILgkeGRZ0",
   "nodeId": "4084:25997",
-  "fileVersion": "2373459676336350685",
+  "fileVersion": "2373511778581340492",
   "elements": 97,
-  "tokenCoveragePct": 76,
-  "tokenDecls": 243,
-  "styleableDecls": 320,
+  "tokenCoveragePct": 75,
+  "tokenDecls": 284,
+  "styleableDecls": 325,
   "unresolved": [],
   "raws": [
     {
@@ -73,6 +73,13 @@
     },
     {
       "className": "fillShadow",
+      "prop": "box-shadow",
+      "value": "0 8px 15px rgba(0, 0, 0, 0.02), 0 0 0 0.5px #e8e8e8, -1.25px 0 0 -0.75px #d0d0d0, 1.25px 0 0 -0.75px #d0d0d0",
+      "line": 61,
+      "candidates": []
+    },
+    {
+      "className": "fillShadow",
       "prop": "border-radius",
       "value": "1000px",
       "line": 62,
@@ -83,6 +90,13 @@
       "prop": "background-color",
       "value": "rgba(0, 0, 0, 0.004)",
       "line": 71,
+      "candidates": []
+    },
+    {
+      "className": "trailingButton",
+      "prop": "box-shadow",
+      "value": "inset -1px -1px 1px #ffffff, inset 0.8px 0.8px 0.2px #ffffff, 1px 1px 1px rgba(255, 255, 255, 0.5), -1px -1px 1px rgba(255, 255, 255, 0.5)",
+      "line": 72,
       "candidates": []
     },
     {
@@ -136,6 +150,13 @@
     },
     {
       "className": "fillShadow2",
+      "prop": "box-shadow",
+      "value": "0 8px 15px rgba(0, 0, 0, 0.02), 0 0 0 0.5px #e8e8e8, -1.25px 0 0 -0.75px #d0d0d0, 1.25px 0 0 -0.75px #d0d0d0",
+      "line": 121,
+      "candidates": []
+    },
+    {
+      "className": "fillShadow2",
       "prop": "border-radius",
       "value": "1000px",
       "line": 122,
@@ -146,6 +167,13 @@
       "prop": "background-color",
       "value": "rgba(0, 0, 0, 0.004)",
       "line": 131,
+      "candidates": []
+    },
+    {
+      "className": "trailingButton2",
+      "prop": "box-shadow",
+      "value": "inset -1px -1px 1px #ffffff, inset 0.8px 0.8px 0.2px #ffffff, 1px 1px 1px rgba(255, 255, 255, 0.5), -1px -1px 1px rgba(255, 255, 255, 0.5)",
+      "line": 132,
       "candidates": []
     },
     {
@@ -160,6 +188,13 @@
       "prop": "border",
       "value": "10px solid transparent",
       "line": 167,
+      "candidates": []
+    },
+    {
+      "className": "rectangle49",
+      "prop": "box-shadow",
+      "value": "0 4px 9.7px 2px rgba(0, 0, 0, 0.25)",
+      "line": 168,
       "candidates": []
     },
     {
@@ -187,371 +222,371 @@
       "className": "tick",
       "prop": "border-radius",
       "value": "999px",
-      "line": 384,
+      "line": 385,
       "candidates": []
     },
     {
       "className": "line58",
       "prop": "border-radius",
       "value": "999px",
-      "line": 392,
+      "line": 394,
       "candidates": []
     },
     {
       "className": "line80",
       "prop": "border-radius",
       "value": "999px",
-      "line": 400,
+      "line": 403,
       "candidates": []
     },
     {
       "className": "line81",
       "prop": "border-radius",
       "value": "999px",
-      "line": 408,
+      "line": 412,
       "candidates": []
     },
     {
       "className": "line75",
       "prop": "border-radius",
       "value": "999px",
-      "line": 416,
+      "line": 421,
       "candidates": []
     },
     {
       "className": "line72",
       "prop": "border-radius",
       "value": "999px",
-      "line": 424,
+      "line": 430,
       "candidates": []
     },
     {
       "className": "line69",
       "prop": "border-radius",
       "value": "999px",
-      "line": 432,
+      "line": 439,
       "candidates": []
     },
     {
       "className": "line66",
       "prop": "border-radius",
       "value": "999px",
-      "line": 440,
+      "line": 448,
       "candidates": []
     },
     {
       "className": "line63",
       "prop": "border-radius",
       "value": "999px",
-      "line": 448,
+      "line": 457,
       "candidates": []
     },
     {
       "className": "line61",
       "prop": "border-radius",
       "value": "999px",
-      "line": 456,
+      "line": 466,
       "candidates": []
     },
     {
       "className": "line60",
       "prop": "border-radius",
       "value": "999px",
-      "line": 464,
+      "line": 475,
       "candidates": []
     },
     {
       "className": "line79",
       "prop": "border-radius",
       "value": "999px",
-      "line": 472,
+      "line": 484,
       "candidates": []
     },
     {
       "className": "line76",
       "prop": "border-radius",
       "value": "999px",
-      "line": 480,
+      "line": 493,
       "candidates": []
     },
     {
       "className": "line57",
       "prop": "border-radius",
       "value": "999px",
-      "line": 488,
+      "line": 502,
       "candidates": []
     },
     {
       "className": "line71",
       "prop": "border-radius",
       "value": "999px",
-      "line": 496,
+      "line": 511,
       "candidates": []
     },
     {
       "className": "line68",
       "prop": "border-radius",
       "value": "999px",
-      "line": 504,
+      "line": 520,
       "candidates": []
     },
     {
       "className": "line65",
       "prop": "border-radius",
       "value": "999px",
-      "line": 512,
+      "line": 529,
       "candidates": []
     },
     {
       "className": "line56",
       "prop": "border-radius",
       "value": "999px",
-      "line": 520,
+      "line": 538,
       "candidates": []
     },
     {
       "className": "line54",
       "prop": "border-radius",
       "value": "999px",
-      "line": 528,
+      "line": 547,
       "candidates": []
     },
     {
       "className": "line52",
       "prop": "border-radius",
       "value": "999px",
-      "line": 536,
+      "line": 556,
       "candidates": []
     },
     {
       "className": "center",
       "prop": "border-radius",
       "value": "999px",
-      "line": 544,
+      "line": 565,
       "candidates": []
     },
     {
       "className": "line73",
       "prop": "border-radius",
       "value": "999px",
-      "line": 552,
+      "line": 574,
       "candidates": []
     },
     {
       "className": "line40",
       "prop": "border-radius",
       "value": "999px",
-      "line": 560,
+      "line": 583,
       "candidates": []
     },
     {
       "className": "line48",
       "prop": "border-radius",
       "value": "999px",
-      "line": 568,
+      "line": 592,
       "candidates": []
     },
     {
       "className": "line46",
       "prop": "border-radius",
       "value": "999px",
-      "line": 576,
+      "line": 601,
       "candidates": []
     },
     {
       "className": "line59",
       "prop": "border-radius",
       "value": "999px",
-      "line": 584,
+      "line": 610,
       "candidates": []
     },
     {
       "className": "line78",
       "prop": "border-radius",
       "value": "999px",
-      "line": 592,
+      "line": 619,
       "candidates": []
     },
     {
       "className": "line77",
       "prop": "border-radius",
       "value": "999px",
-      "line": 600,
+      "line": 628,
       "candidates": []
     },
     {
       "className": "line74",
       "prop": "border-radius",
       "value": "999px",
-      "line": 608,
+      "line": 637,
       "candidates": []
     },
     {
       "className": "line70",
       "prop": "border-radius",
       "value": "999px",
-      "line": 616,
+      "line": 646,
       "candidates": []
     },
     {
       "className": "line67",
       "prop": "border-radius",
       "value": "999px",
-      "line": 624,
+      "line": 655,
       "candidates": []
     },
     {
       "className": "line64",
       "prop": "border-radius",
       "value": "999px",
-      "line": 632,
+      "line": 664,
       "candidates": []
     },
     {
       "className": "line62",
       "prop": "border-radius",
       "value": "999px",
-      "line": 640,
+      "line": 673,
       "candidates": []
     },
     {
       "className": "line53",
       "prop": "border-radius",
       "value": "999px",
-      "line": 648,
+      "line": 682,
       "candidates": []
     },
     {
       "className": "line51",
       "prop": "border-radius",
       "value": "999px",
-      "line": 656,
+      "line": 691,
       "candidates": []
     },
     {
       "className": "line50",
       "prop": "border-radius",
       "value": "999px",
-      "line": 664,
+      "line": 700,
       "candidates": []
     },
     {
       "className": "line44",
       "prop": "border-radius",
       "value": "999px",
-      "line": 672,
+      "line": 709,
       "candidates": []
     },
     {
       "className": "line49",
       "prop": "border-radius",
       "value": "999px",
-      "line": 680,
+      "line": 718,
       "candidates": []
     },
     {
       "className": "line47",
       "prop": "border-radius",
       "value": "999px",
-      "line": 688,
+      "line": 727,
       "candidates": []
     },
     {
       "className": "line45",
       "prop": "border-radius",
       "value": "999px",
-      "line": 696,
+      "line": 736,
       "candidates": []
     },
     {
       "className": "line55",
       "prop": "border-radius",
       "value": "999px",
-      "line": 704,
+      "line": 745,
       "candidates": []
     },
     {
       "className": "dock",
       "prop": "border-radius",
       "value": "2000px",
-      "line": 713,
+      "line": 754,
       "candidates": []
     },
     {
       "className": "label",
       "prop": "font-weight",
       "value": "500",
-      "line": 749,
+      "line": 790,
       "candidates": []
     },
     {
       "className": "icon13",
       "prop": "width",
       "value": "24px",
-      "line": 766,
+      "line": 807,
       "candidates": []
     },
     {
       "className": "icon13",
       "prop": "height",
       "value": "24px",
-      "line": 767,
+      "line": 808,
       "candidates": []
     },
     {
       "className": "label2",
       "prop": "font-weight",
       "value": "500",
-      "line": 777,
+      "line": 818,
       "candidates": []
     },
     {
       "className": "icon14",
       "prop": "width",
       "value": "24px",
-      "line": 794,
+      "line": 835,
       "candidates": []
     },
     {
       "className": "icon14",
       "prop": "height",
       "value": "24px",
-      "line": 795,
+      "line": 836,
       "candidates": []
     },
     {
       "className": "label3",
       "prop": "font-weight",
       "value": "500",
-      "line": 805,
+      "line": 846,
       "candidates": []
     },
     {
       "className": "icon15",
       "prop": "width",
       "value": "24px",
-      "line": 822,
+      "line": 863,
       "candidates": []
     },
     {
       "className": "icon15",
       "prop": "height",
       "value": "24px",
-      "line": 823,
+      "line": 864,
       "candidates": []
     },
     {
       "className": "label4",
       "prop": "font-weight",
       "value": "500",
-      "line": 833,
+      "line": 874,
       "candidates": []
     },
     {
       "className": "label5",
       "prop": "font-weight",
       "value": "500",
-      "line": 861,
+      "line": 902,
       "candidates": []
     }
   ],

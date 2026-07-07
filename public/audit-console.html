@@ -7,6 +7,18 @@
 <style>
   *{box-sizing:border-box;}
   html,body{margin:0;height:100%;background:#0e0e12;color:#e6e6ea;font:13px/1.5 ui-sans-serif,system-ui,sans-serif;overflow:hidden;}
+  :root{--topH:84px;}
+  body.studio{--topH:118px;}
+  .tabs{display:none;position:fixed;top:84px;left:0;right:0;height:34px;z-index:30;background:#0f0f14;border-bottom:1px solid #26262e;align-items:center;gap:6px;padding:0 10px;overflow-x:auto;}
+  body.studio .tabs{display:flex;}
+  .tabs .tab{display:flex;align-items:center;gap:7px;background:#1a1a22;border:1px solid #26262e;border-bottom:0;border-radius:8px 8px 0 0;padding:5px 11px;font:500 11px system-ui;color:#b7b7c2;cursor:pointer;white-space:nowrap;flex-shrink:0;}
+  .tabs .tab.on{background:#20202a;color:#e6e6ea;border-color:#39b3a6;}
+  .tabs .tab .x{color:#5a5a66;font:600 12px system-ui;padding:0 1px;} .tabs .tab .x:hover{color:#f08a8a;}
+  .tabs .tab .up{color:#5a5a66;font:600 11px system-ui;} .tabs .tab .up:hover{color:#7fd8cd;} .tabs .tab .up.done{color:#7fd8cd;}
+  .tabs .addr{flex:1;min-width:220px;display:flex;gap:6px;align-items:center;}
+  .tabs .addr input{flex:1;background:#16161c;border:1px solid #26262e;border-radius:7px;color:#e6e6ea;font:12px ui-monospace,monospace;padding:5px 10px;outline:none;}
+  .tabs .addr input:focus{border-color:#39b3a6;}
+  .tabs .addr .busy{color:#7fd8cd;font:11px ui-monospace,monospace;white-space:nowrap;display:none;}
   .rail{position:fixed;top:0;left:0;right:0;height:46px;z-index:30;background:#16161c;border-bottom:1px solid #26262e;display:flex;align-items:center;gap:14px;padding:0 16px;}
   .rail b{font-size:13px;} .rail .scr{color:#8a8a92;font:12px ui-monospace,monospace;}
   .modes{display:flex;gap:4px;margin-left:6px;}
@@ -21,9 +33,9 @@
   .rail2 .tgl{margin-left:auto;display:flex;gap:6px;}
   .rail2 .tgl button.off{color:#5a5a66;}
   :root{--leftW:240px;--rightW:340px;}
-  .stage{position:absolute;top:84px;left:var(--leftW);right:var(--rightW);bottom:0;display:grid;place-items:center;overflow:auto;background:#0e0e12;}
+  .stage{position:absolute;top:var(--topH);left:var(--leftW);right:var(--rightW);bottom:0;display:grid;place-items:center;overflow:auto;background:#0e0e12;}
   body.hideL{--leftW:0px;} body.hideR{--rightW:0px;}
-  .left{position:fixed;top:84px;left:0;bottom:0;width:var(--leftW);background:#131319;border-right:1px solid #26262e;overflow:auto;padding:10px;}
+  .left{position:fixed;top:var(--topH);left:0;bottom:0;width:var(--leftW);background:#131319;border-right:1px solid #26262e;overflow:auto;padding:10px;}
   body.hideL .left,body.hideR .panel{display:none;}
   /* industry-standard edge collapse tabs (chevron, vertically centered on the panel edge) */
   .collapse{position:fixed;top:50%;transform:translateY(-50%);z-index:45;width:16px;height:56px;border:1px solid #26262e;background:#1a1a22;color:#8a8a92;display:flex;align-items:center;justify-content:center;cursor:pointer;font:600 11px system-ui;user-select:none;}
@@ -31,7 +43,7 @@
   #clpL{left:var(--leftW);border-radius:0 7px 7px 0;border-left:0;}
   #clpR{right:var(--rightW);border-radius:7px 0 0 7px;border-right:0;}
   /* drag handles — resize the panels */
-  .rs{position:fixed;top:84px;bottom:0;width:7px;z-index:44;cursor:col-resize;}
+  .rs{position:fixed;top:var(--topH);bottom:0;width:7px;z-index:44;cursor:col-resize;}
   .rs:hover,.rs.on{background:rgba(57,179,166,.25);}
   #rsL{left:calc(var(--leftW) - 3px);} #rsR{right:calc(var(--rightW) - 3px);}
   body.hideL #rsL,body.hideR #rsR{display:none;}
@@ -39,7 +51,7 @@
   .device iframe{display:block;border:0;background:#eceff1;position:relative;z-index:1;}
   .device canvas.overlay{position:absolute;top:0;left:0;z-index:2;pointer-events:none;}
   .zonebox{position:absolute;z-index:3;pointer-events:none;border:1.5px dashed #8fd0ff;background:rgba(143,208,255,.08);display:none;}
-  .panel{position:fixed;top:84px;right:0;bottom:0;width:340px;background:#131319;border-left:1px solid #26262e;overflow:auto;padding:14px;}
+  .panel{position:fixed;top:var(--topH);right:0;bottom:0;width:340px;background:#131319;border-left:1px solid #26262e;overflow:auto;padding:14px;}
   .panel .empty{color:#6a6a76;font-size:12px;padding:40px 8px;text-align:center;}
   .nodehdr{font-family:ui-monospace,monospace;font-size:12px;margin-bottom:2px;}
   .nodehdr b{color:#8fd0ff;} .nodesub{color:#7a7a86;font:11px ui-monospace,monospace;margin-bottom:12px;word-break:break-all;}
@@ -82,11 +94,13 @@
     <button id="greset">Reset</button>
   </div>
 
+  <div class="tabs" id="tabs"></div>
+
   <div class="left" id="left"><div class="empty">Loading…</div></div>
 
   <div class="stage">
     <div class="device" id="device">
-      <iframe id="frame" src="/converted/audit-mother-v2"></iframe>
+      <iframe id="frame"></iframe>
       <canvas class="overlay" id="overlay"></canvas>
       <div class="zonebox" id="zonebox"></div>
     </div>
@@ -100,8 +114,15 @@
   <div class="hint" id="hint">Inspect mode · click an element · hover to preview</div>
 
 <script>
-const AUDIT_URL = '/audit/mother-v2.json', FIG = '/audit/fidelity-figma.png', BUILD = '/audit/fidelity-build.png', BUDGET = 10;
-const frame = document.getElementById('frame'), device = document.getElementById('device'), overlay = document.getElementById('overlay'),
+// screen source: ?s=<slug> → a studio sandbox screen; no param → the built-in mother screen
+const SLUG = new URLSearchParams(location.search).get('s');
+const AUDIT_URL = SLUG ? `/audit/sandbox/${SLUG}.json` : '/audit/mother-v2.json';
+const FIG   = SLUG ? `/audit/sandbox/${SLUG}-figma.png` : '/audit/fidelity-figma.png';
+const BUILD = SLUG ? `/audit/sandbox/${SLUG}-build.png` : '/audit/fidelity-build.png';
+const BUDGET = 10;
+const frame = document.getElementById('frame');
+frame.src = SLUG ? `/converted/sandbox/${SLUG}` : '/converted/audit-mother-v2';
+const device = document.getElementById('device'), overlay = document.getElementById('overlay'),
       zonebox = document.getElementById('zonebox'), panel = document.getElementById('panel'), chips = document.getElementById('chips'),
       scr = document.getElementById('scr'), hint = document.getElementById('hint'), modesEl = document.getElementById('modes');
 let audit = null, mode = 'inspect', sel = null, zone = null, hi = null, iframeReady = false;
@@ -142,6 +163,43 @@ for(const [id,varName,fromRight,min,max] of [['rsL','--leftW',false,160,520],['r
     addEventListener('mousemove',move); addEventListener('mouseup',up);
   });
 }
+
+// ── STUDIO (paste-link conversion, tabs, sandbox) — active only when served by studio/server.mjs ──
+fetch('/api/screens').then(r=>r.ok?r.json():Promise.reject()).then(screens=>{
+  document.body.classList.add('studio');
+  const tabs=document.getElementById('tabs');
+  const tab=(label,slug,promoted)=>{
+    const t=document.createElement('div'); t.className='tab'+((slug||null)===SLUG?' on':'');
+    t.innerHTML=`<span>${esc(label)}</span>`+(slug?`<span class="up${promoted?' done':''}" title="${promoted?'promoted — re-promote':'promote to converted/'}">⇧</span><span class="x" title="delete">×</span>`:'');
+    t.querySelector('span').onclick=()=>{ location.href=slug?`/?s=${slug}`:'/'; };
+    if(slug){
+      t.querySelector('.x').onclick=async e=>{ e.stopPropagation(); if(!confirm(`Delete sandbox screen "${label}"?`))return;
+        await fetch(`/api/screens/${slug}`,{method:'DELETE'}); location.href = SLUG===slug ? '/' : location.href; };
+      t.querySelector('.up').onclick=async e=>{ e.stopPropagation();
+        const r2=await fetch(`/api/promote/${slug}`,{method:'POST'}); const j=await r2.json();
+        alert(r2.ok?`Promoted → ${j.dest}
+(product build, no audit stamps — commit it when accepted)`:`Promote failed:
+${j.error}`); };
+    }
+    tabs.appendChild(t);
+  };
+  tab('Mother — v2', null, true);
+  screens.forEach(sc=>tab(sc.name||sc.slug, sc.slug, sc.promoted));
+  const addr=document.createElement('div'); addr.className='addr';
+  addr.innerHTML=`<input id="figurl" placeholder="Paste a Figma frame link and press ⏎ to convert…" spellcheck="false"><span class="busy" id="cbusy">converting… (all gates run — ~20s)</span>`;
+  tabs.appendChild(addr);
+  const inp=addr.querySelector('#figurl'), busy=addr.querySelector('#cbusy');
+  inp.addEventListener('keydown',async e=>{
+    if(e.key!=='Enter'||!inp.value.trim())return;
+    inp.disabled=true; busy.style.display='inline';
+    const r2=await fetch('/api/convert',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({url:inp.value.trim()})});
+    const j=await r2.json();
+    if(r2.ok) location.href=`/?s=${j.slug}`;
+    else { inp.disabled=false; busy.style.display='none'; alert(`Conversion failed (gates are loud by design):
+
+${j.error}`); }
+  });
+}).catch(()=>{}); // no studio server → plain console, unchanged
 
 fetch(AUDIT_URL).then(r=>r.json()).then(a=>{
   audit = a; scr.textContent = `${a.name} · ${a.screen}`;
