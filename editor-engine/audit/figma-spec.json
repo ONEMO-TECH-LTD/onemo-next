@@ -50,8 +50,18 @@
     "clickOpensPickerWithVariableSelected": true,
     "rawValuesHaveNoBadge": true,
     "pillAnatomy": {
-      "measured": false,
-      "todo": "extract pill container bg/radius/height/padding from a var-bound field in Figma DOM"
+      "measured": true,
+      "element": "button",
+      "height": 20,
+      "borderRadius": "5px",
+      "background": "rgb(255, 255, 255)",
+      "border": "1px solid rgb(230, 230, 230)",
+      "padding": "0px 4px",
+      "font": "11px w400",
+      "cursor": "pointer",
+      "widthHugsContent": true,
+      "hoverTooltip": "full variable path (e.g. standard/m) + raw value",
+      "_provenance": "measured live on var-bound Padding field (Top Section 4076:15236), 2026-07-07"
     },
     "provenance": "Dan spec items 2/3 (his statement of Figma behavior); pill visual anatomy pending measurement"
   },
@@ -60,8 +70,30 @@
     "scopedToField": true,
     "searchWorks": true,
     "rowAnatomy": {
-      "measured": false,
-      "todo": "extract picker row height/font/swatch + search field + selected-state from open picker DOM in Figma"
+      "measured": true,
+      "popover": {
+        "width": 216,
+        "borderRadius": "13px",
+        "background": "rgb(255, 255, 255)",
+        "shadow": "rgba(0,0,0,0.15) 0 2px 5px, rgba(0,0,0,0.12) 0 10px 16px"
+      },
+      "search": {
+        "height": 24,
+        "font": "11px",
+        "placeholder": "Search",
+        "position": "top"
+      },
+      "scopeDropdown": "All libraries",
+      "row": {
+        "height": 24,
+        "font": "11px w450",
+        "ink": "rgba(0, 0, 0, 0.898)",
+        "layout": "icon + figma short name left, raw value right-aligned"
+      },
+      "groupHeaders": "variable group names (e.g. standard, big)",
+      "selectedRowBg": "#E5F4FF",
+      "assignedVariablePreselected": true,
+      "_provenance": "measured live with the real picker open (pill click), 2026-07-07 \u2014 screenshot ss_4522ehf0f shows m\u00b716 preselected"
     }
   },
   "sectionOrder": {
