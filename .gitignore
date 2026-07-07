@@ -109,3 +109,4 @@ src/app/(dev)/converted/sandbox/
 public/audit/sandbox/
 
 figma-code-converter/exports/
+.playwright-cli/
