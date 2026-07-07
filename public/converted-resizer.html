@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>figma-to-code — viewport resizer</title>
+<style>
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;background:#dfe3e7;font-family:ui-sans-serif,system-ui,sans-serif;color:#0b1316;overflow:hidden;}
+  .rail{position:fixed;top:0;left:0;right:0;z-index:30;background:#0b1316;color:#fafafa;display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:10px 16px;box-shadow:0 4px 16px rgba(0,0,0,.2);}
+  .rail b{font-size:13px;}
+  .dim{font:600 14px ui-monospace,Menlo,monospace;color:#7fd8cd;min-width:130px;}
+  .rail select,.rail button{font:500 11px system-ui;background:#1d2a2e;color:#cfe;border:0;border-radius:8px;padding:5px 8px;cursor:pointer;}
+  .sliders{display:flex;align-items:center;gap:10px;font-size:11px;opacity:.85;}
+  .sliders input{accent-color:#39b3a6;width:150px;}
+  .hint{margin-left:auto;font-size:11px;opacity:.6;}
+  .arena{position:absolute;inset:0;display:grid;place-items:center;padding-top:54px;overflow:auto;}
+  .device{position:relative;background:#fff;outline:1px solid #b7bec4;}
+  .device iframe{display:block;width:100%;height:100%;border:0;background:#eceff1;}
+  .grip{position:absolute;right:-6px;bottom:-6px;width:22px;height:22px;border-radius:6px;background:#39b3a6;cursor:nwse-resize;box-shadow:0 2px 6px rgba(0,0,0,.4);z-index:5;}
+  .grip::after{content:"";position:absolute;right:5px;bottom:5px;width:7px;height:7px;border-right:2px solid #06231f;border-bottom:2px solid #06231f;}
+  .ruler{position:absolute;top:-22px;left:0;width:100%;text-align:center;font:600 11px ui-monospace,monospace;color:#5a6670;}
+  .vruler{position:absolute;left:-30px;top:0;height:100%;display:flex;align-items:center;font:600 11px ui-monospace,monospace;color:#5a6670;writing-mode:vertical-rl;}
+</style>
+</head>
+<body>
+  <div class="rail">
+    <b>figma-to-code</b><span style="opacity:.6;font-size:11px">converted routes · frame = viewport</span>
+    <select id="routesel">
+      <option value="/converted/editor-402-iphone-apple-blur-glass">editor-402 (product screen)</option>
+      <option value="/converted/fixtures">fixture board (dev · watch-live)</option>
+    </select>
+    <span class="dim" id="dim">402 × 871</span>
+    <span id="devs" style="display:flex;gap:6px;"></span>
+    <div class="sliders">
+      W<input id="sw" type="range" min="120" max="1800" value="402">
+      H<input id="sh" type="range" min="150" max="1400" value="871">
+    </div>
+    <span class="hint">drag the green corner ↘ to free-resize</span>
+  </div>
+
+  <div class="arena">
+    <div class="device" id="device" style="width:402px;height:871px;">
+      <span class="ruler" id="rulerW">402</span>
+      <span class="vruler" id="rulerH">871</span>
+      <iframe id="frame" src="/converted/editor-402-iphone-apple-blur-glass"></iframe>
+      <div class="grip" id="grip"></div>
+    </div>
+  </div>
+
+<script>
+const DEVICE_GROUPS={
+  'iPhone':[["iPhone 17 · NOMINAL",402,871],["iPhone 16 & 17 Pro",402,874],["iPhone 16 & 17 Pro Max",440,956],["iPhone Air",420,912],["iPhone 16 Plus",430,932],["iPhone 16",393,852],["iPhone 14 & 15 Pro Max",430,932],["iPhone 14 & 15 Pro",393,852],["iPhone 14 Plus",428,926],["iPhone 13 & 14",390,844],["iPhone 13 Pro Max",428,926],["iPhone 13 / 13 Pro",390,844],["iPhone 13 mini",375,812],["iPhone 11 Pro Max",414,896],["iPhone 11 Pro / X",375,812],["iPhone 8 Plus",414,736],["iPhone 8",375,667],["iPhone SE",320,568]],
+  'Android':[["Android Compact",412,917],["Android Medium",700,840],["Android Expanded",1280,800],["Google Pixel 2 XL",411,823],["Google Pixel 2",411,731],["Android Large",360,800],["Android Small",360,640]],
+  'Tablet':[["iPad mini 8.3",744,1133],["iPad mini 5",768,1024],["iPad Pro 11\"",834,1194],["iPad Pro 12.9\"",1024,1366],["Surface Pro 4",1368,912],["Surface Pro 8",1440,960]],
+  'Desktop / Laptop':[["MacBook",1152,700],["iMac",1280,720],["MacBook Air",1280,832],["MacBook Pro",1440,900],["Desktop",1440,1024],["Surface Book",1500,1000],["MacBook Pro 14\"",1512,982],["MacBook Pro 16\"",1728,1117]],
+  'Watch':[["Apple Watch 38mm",136,170],["Apple Watch 42mm",156,195]]
+};
+const dev=document.getElementById('device'), dim=document.getElementById('dim'),
+      sw=document.getElementById('sw'), sh=document.getElementById('sh'),
+      rulerW=document.getElementById('rulerW'), rulerH=document.getElementById('rulerH'),
+      devsEl=document.getElementById('devs'), frame=document.getElementById('frame');
+function apply(w,h){
+  w=Math.max(120,Math.min(4000,Math.round(w))); h=Math.max(150,Math.min(2400,Math.round(h)));
+  dev.style.width=w+'px'; dev.style.height=h+'px';
+  dim.textContent=w+' × '+h; rulerW.textContent=w; rulerH.textContent=h;
+  sw.value=w; sh.value=h;
+  const ds=document.getElementById('devsel'); if(ds){ const v=w+','+h; ds.value=[...ds.options].some(o=>o.value===v)?v:''; }
+}
+const sel=document.createElement('select'); sel.id='devsel';
+sel.appendChild(Object.assign(document.createElement('option'),{textContent:'— pick device —',value:''}));
+for(const [grp,list] of Object.entries(DEVICE_GROUPS)){
+  const og=document.createElement('optgroup'); og.label=grp;
+  for(const [n,w,h] of list){ const o=document.createElement('option'); o.textContent=n+'  '+w+'×'+h; o.value=w+','+h; og.appendChild(o); }
+  sel.appendChild(og);
+}
+sel.onchange=e=>{ if(e.target.value){ const [w,h]=e.target.value.split(',').map(Number); dev.dataset.fill=''; apply(w,h); } };
+devsEl.appendChild(sel);
+document.getElementById('routesel').onchange=e=>{ frame.src=e.target.value; };
+const rb=document.createElement('button'); rb.textContent='⟳ Refresh';
+rb.onclick=()=>{ frame.src=frame.src.split('?')[0]+'?t='+Date.now(); }; devsEl.appendChild(rb);
+function fillWindow(){
+  dev.dataset.fill='1';
+  const arena=document.querySelector('.arena');
+  const padTop=parseFloat(getComputedStyle(arena).paddingTop)||0;
+  apply(arena.clientWidth-18, arena.clientHeight-padTop-18);
+}
+const fb=document.createElement('button'); fb.textContent='⤢ Fill window';
+fb.style.background='#39b3a6'; fb.style.color='#06231f'; fb.onclick=fillWindow; devsEl.appendChild(fb);
+window.addEventListener('resize',()=>{ if(dev.dataset.fill==='1') fillWindow(); });
+sw.oninput=e=>{ dev.dataset.fill=''; apply(+e.target.value, dev.offsetHeight); };
+sh.oninput=e=>{ dev.dataset.fill=''; apply(dev.offsetWidth, +e.target.value); };
+let drag=null;
+const grip=document.getElementById('grip');
+grip.addEventListener('pointerdown',e=>{e.preventDefault();drag={x:e.clientX,y:e.clientY,w:dev.offsetWidth,h:dev.offsetHeight};grip.setPointerCapture(e.pointerId);});
+grip.addEventListener('pointermove',e=>{if(drag){dev.dataset.fill='';apply(drag.w+(e.clientX-drag.x), drag.h+(e.clientY-drag.y));}});
+grip.addEventListener('pointerup',()=>drag=null);
+apply(402,871);
+</script>
+</body>
+</html>

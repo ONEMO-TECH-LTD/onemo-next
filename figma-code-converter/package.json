@@ -1,0 +1,16 @@
+{
+  "name": "@onemo/figma-to-code",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Deterministic Figma\u2192React/CSS-Modules converter. Contract: SPEC.md \u2014 no rule there, no code here.",
+  "bin": {
+    "figma-to-code": "bin/figma-to-code.mjs"
+  },
+  "scripts": {
+    "fetch": "node bin/figma-to-code.mjs fetch",
+    "dump-variables": "node bin/figma-to-code.mjs dump-variables",
+    "test": "node --test --test-force-exit test/*.test.mjs",
+    "studio": "node studio/server.mjs"
+  }
+}

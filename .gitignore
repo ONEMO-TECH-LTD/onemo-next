@@ -103,3 +103,16 @@ public/models/
 # parallel-build caches (v1/v2/v3 dev dirs)
 .next-v*/
 storybook-static
+
+# figma-to-code studio sandbox (unaccepted conversions — promoted screens are committed instead)
+src/app/(dev)/converted/sandbox/
+public/audit/sandbox/
+
+figma-code-converter/exports/
+.playwright-cli/
+
+# macOS Finder metadata (custom-folder-icon resource stub + directory store)
+Icon\r
+**/Icon\r
+.DS_Store
+**/.DS_Store

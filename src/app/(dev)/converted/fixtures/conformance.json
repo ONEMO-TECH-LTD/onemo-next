@@ -1,0 +1,832 @@
+{
+  "fileKey": "t88thL8hKksSpILgkeGRZ0",
+  "nodeId": "4274:31085",
+  "fileVersion": "2373459676336350685",
+  "elements": 39,
+  "tokenCoveragePct": 0,
+  "tokenDecls": 0,
+  "styleableDecls": 116,
+  "unresolved": [],
+  "raws": [
+    {
+      "className": "fixtureBoard",
+      "prop": "gap",
+      "value": "12px",
+      "line": 6,
+      "candidates": []
+    },
+    {
+      "className": "fixtureBoard",
+      "prop": "padding",
+      "value": "12px",
+      "line": 7,
+      "candidates": []
+    },
+    {
+      "className": "fixtureBoard",
+      "prop": "width",
+      "value": "100%",
+      "line": 8,
+      "candidates": []
+    },
+    {
+      "className": "fixtureBoard",
+      "prop": "height",
+      "value": "100dvh",
+      "line": 9,
+      "candidates": []
+    },
+    {
+      "className": "fixtureBoard",
+      "prop": "background-color",
+      "value": "#f7f7fa",
+      "line": 11,
+      "candidates": []
+    },
+    {
+      "className": "fxTextWrap",
+      "prop": "padding",
+      "value": "8px",
+      "line": 18,
+      "candidates": []
+    },
+    {
+      "className": "fxTextWrap",
+      "prop": "width",
+      "value": "240px",
+      "line": 20,
+      "candidates": []
+    },
+    {
+      "className": "fxTextWrap",
+      "prop": "background-color",
+      "value": "#ffffff",
+      "line": 22,
+      "candidates": []
+    },
+    {
+      "className": "multiLineWrappingTextFixtureThatMustBreakAcrossSeveralLinesExactlyLikeFigmaDoes",
+      "prop": "color",
+      "value": "#000000",
+      "line": 27,
+      "candidates": []
+    },
+    {
+      "className": "multiLineWrappingTextFixtureThatMustBreakAcrossSeveralLinesExactlyLikeFigmaDoes",
+      "prop": "font-family",
+      "value": "'Chillax'",
+      "line": 28,
+      "candidates": []
+    },
+    {
+      "className": "multiLineWrappingTextFixtureThatMustBreakAcrossSeveralLinesExactlyLikeFigmaDoes",
+      "prop": "font-size",
+      "value": "14px",
+      "line": 29,
+      "candidates": []
+    },
+    {
+      "className": "multiLineWrappingTextFixtureThatMustBreakAcrossSeveralLinesExactlyLikeFigmaDoes",
+      "prop": "font-weight",
+      "value": "500",
+      "line": 30,
+      "candidates": []
+    },
+    {
+      "className": "fxTextTruncate",
+      "prop": "width",
+      "value": "200px",
+      "line": 34,
+      "candidates": []
+    },
+    {
+      "className": "fxTextTruncate",
+      "prop": "height",
+      "value": "36px",
+      "line": 35,
+      "candidates": []
+    },
+    {
+      "className": "fxTextTruncate",
+      "prop": "background-color",
+      "value": "#ffffff",
+      "line": 38,
+      "candidates": []
+    },
+    {
+      "className": "truncatedTextFixtureThatIsFarTooLongToFit",
+      "prop": "width",
+      "value": "184px",
+      "line": 42,
+      "candidates": []
+    },
+    {
+      "className": "truncatedTextFixtureThatIsFarTooLongToFit",
+      "prop": "height",
+      "value": "20px",
+      "line": 43,
+      "candidates": []
+    },
+    {
+      "className": "truncatedTextFixtureThatIsFarTooLongToFit",
+      "prop": "color",
+      "value": "#000000",
+      "line": 47,
+      "candidates": []
+    },
+    {
+      "className": "truncatedTextFixtureThatIsFarTooLongToFit",
+      "prop": "font-family",
+      "value": "'Chillax'",
+      "line": 48,
+      "candidates": []
+    },
+    {
+      "className": "truncatedTextFixtureThatIsFarTooLongToFit",
+      "prop": "font-size",
+      "value": "14px",
+      "line": 49,
+      "candidates": []
+    },
+    {
+      "className": "truncatedTextFixtureThatIsFarTooLongToFit",
+      "prop": "font-weight",
+      "value": "500",
+      "line": 50,
+      "candidates": []
+    },
+    {
+      "className": "fxSpaceBetween",
+      "prop": "height",
+      "value": "40px",
+      "line": 62,
+      "candidates": []
+    },
+    {
+      "className": "fxSpaceBetween",
+      "prop": "background-color",
+      "value": "#ffffff",
+      "line": 64,
+      "candidates": []
+    },
+    {
+      "className": "rectangle",
+      "prop": "width",
+      "value": "24px",
+      "line": 68,
+      "candidates": []
+    },
+    {
+      "className": "rectangle",
+      "prop": "height",
+      "value": "24px",
+      "line": 69,
+      "candidates": []
+    },
+    {
+      "className": "rectangle",
+      "prop": "background-color",
+      "value": "#598ce5",
+      "line": 71,
+      "candidates": []
+    },
+    {
+      "className": "rectangle2",
+      "prop": "width",
+      "value": "24px",
+      "line": 75,
+      "candidates": []
+    },
+    {
+      "className": "rectangle2",
+      "prop": "height",
+      "value": "24px",
+      "line": 76,
+      "candidates": []
+    },
+    {
+      "className": "rectangle2",
+      "prop": "background-color",
+      "value": "#598ce5",
+      "line": 78,
+      "candidates": []
+    },
+    {
+      "className": "rectangle3",
+      "prop": "width",
+      "value": "24px",
+      "line": 82,
+      "candidates": []
+    },
+    {
+      "className": "rectangle3",
+      "prop": "height",
+      "value": "24px",
+      "line": 83,
+      "candidates": []
+    },
+    {
+      "className": "rectangle3",
+      "prop": "background-color",
+      "value": "#598ce5",
+      "line": 85,
+      "candidates": []
+    },
+    {
+      "className": "fxNegativeGap",
+      "prop": "height",
+      "value": "40px",
+      "line": 92,
+      "candidates": []
+    },
+    {
+      "className": "fxNegativeGap",
+      "prop": "background-color",
+      "value": "#ffffff",
+      "line": 94,
+      "candidates": []
+    },
+    {
+      "className": "ellipse",
+      "prop": "width",
+      "value": "28px",
+      "line": 98,
+      "candidates": []
+    },
+    {
+      "className": "ellipse",
+      "prop": "height",
+      "value": "28px",
+      "line": 99,
+      "candidates": []
+    },
+    {
+      "className": "ellipse2",
+      "prop": "width",
+      "value": "28px",
+      "line": 104,
+      "candidates": []
+    },
+    {
+      "className": "ellipse2",
+      "prop": "height",
+      "value": "28px",
+      "line": 105,
+      "candidates": []
+    },
+    {
+      "className": "ellipse3",
+      "prop": "width",
+      "value": "28px",
+      "line": 111,
+      "candidates": []
+    },
+    {
+      "className": "ellipse3",
+      "prop": "height",
+      "value": "28px",
+      "line": 112,
+      "candidates": []
+    },
+    {
+      "className": "ellipse4",
+      "prop": "width",
+      "value": "28px",
+      "line": 118,
+      "candidates": []
+    },
+    {
+      "className": "ellipse4",
+      "prop": "height",
+      "value": "28px",
+      "line": 119,
+      "candidates": []
+    },
+    {
+      "className": "fxWrap",
+      "prop": "gap",
+      "value": "8px",
+      "line": 128,
+      "candidates": []
+    },
+    {
+      "className": "fxWrap",
+      "prop": "width",
+      "value": "180px",
+      "line": 130,
+      "candidates": []
+    },
+    {
+      "className": "fxWrap",
+      "prop": "background-color",
+      "value": "#ffffff",
+      "line": 132,
+      "candidates": []
+    },
+    {
+      "className": "rectangle4",
+      "prop": "width",
+      "value": "40px",
+      "line": 136,
+      "candidates": []
+    },
+    {
+      "className": "rectangle4",
+      "prop": "height",
+      "value": "20px",
+      "line": 137,
+      "candidates": []
+    },
+    {
+      "className": "rectangle4",
+      "prop": "background-color",
+      "value": "#262633",
+      "line": 139,
+      "candidates": []
+    },
+    {
+      "className": "rectangle5",
+      "prop": "width",
+      "value": "40px",
+      "line": 143,
+      "candidates": []
+    },
+    {
+      "className": "rectangle5",
+      "prop": "height",
+      "value": "20px",
+      "line": 144,
+      "candidates": []
+    },
+    {
+      "className": "rectangle5",
+      "prop": "background-color",
+      "value": "#262633",
+      "line": 146,
+      "candidates": []
+    },
+    {
+      "className": "rectangle6",
+      "prop": "width",
+      "value": "40px",
+      "line": 150,
+      "candidates": []
+    },
+    {
+      "className": "rectangle6",
+      "prop": "height",
+      "value": "20px",
+      "line": 151,
+      "candidates": []
+    },
+    {
+      "className": "rectangle6",
+      "prop": "background-color",
+      "value": "#262633",
+      "line": 153,
+      "candidates": []
+    },
+    {
+      "className": "rectangle7",
+      "prop": "width",
+      "value": "40px",
+      "line": 157,
+      "candidates": []
+    },
+    {
+      "className": "rectangle7",
+      "prop": "height",
+      "value": "20px",
+      "line": 158,
+      "candidates": []
+    },
+    {
+      "className": "rectangle7",
+      "prop": "background-color",
+      "value": "#262633",
+      "line": 160,
+      "candidates": []
+    },
+    {
+      "className": "rectangle8",
+      "prop": "width",
+      "value": "40px",
+      "line": 164,
+      "candidates": []
+    },
+    {
+      "className": "rectangle8",
+      "prop": "height",
+      "value": "20px",
+      "line": 165,
+      "candidates": []
+    },
+    {
+      "className": "rectangle8",
+      "prop": "background-color",
+      "value": "#262633",
+      "line": 167,
+      "candidates": []
+    },
+    {
+      "className": "rectangle9",
+      "prop": "width",
+      "value": "40px",
+      "line": 171,
+      "candidates": []
+    },
+    {
+      "className": "rectangle9",
+      "prop": "height",
+      "value": "20px",
+      "line": 172,
+      "candidates": []
+    },
+    {
+      "className": "rectangle9",
+      "prop": "background-color",
+      "value": "#262633",
+      "line": 174,
+      "candidates": []
+    },
+    {
+      "className": "rectangle10",
+      "prop": "width",
+      "value": "40px",
+      "line": 178,
+      "candidates": []
+    },
+    {
+      "className": "rectangle10",
+      "prop": "height",
+      "value": "20px",
+      "line": 179,
+      "candidates": []
+    },
+    {
+      "className": "rectangle10",
+      "prop": "background-color",
+      "value": "#262633",
+      "line": 181,
+      "candidates": []
+    },
+    {
+      "className": "fxAbsolute",
+      "prop": "width",
+      "value": "200px",
+      "line": 185,
+      "candidates": []
+    },
+    {
+      "className": "fxAbsolute",
+      "prop": "height",
+      "value": "80px",
+      "line": 186,
+      "candidates": []
+    },
+    {
+      "className": "fxAbsolute",
+      "prop": "background-color",
+      "value": "#ffffff",
+      "line": 189,
+      "candidates": []
+    },
+    {
+      "className": "rectangle11",
+      "prop": "width",
+      "value": "30px",
+      "line": 193,
+      "candidates": []
+    },
+    {
+      "className": "rectangle11",
+      "prop": "height",
+      "value": "30px",
+      "line": 194,
+      "candidates": []
+    },
+    {
+      "className": "rectangle11",
+      "prop": "background-color",
+      "value": "#e55966",
+      "line": 198,
+      "candidates": []
+    },
+    {
+      "className": "rectangle12",
+      "prop": "width",
+      "value": "30px",
+      "line": 202,
+      "candidates": []
+    },
+    {
+      "className": "rectangle12",
+      "prop": "height",
+      "value": "30px",
+      "line": 203,
+      "candidates": []
+    },
+    {
+      "className": "rectangle12",
+      "prop": "background-color",
+      "value": "#598ce5",
+      "line": 207,
+      "candidates": []
+    },
+    {
+      "className": "fxRotate30",
+      "prop": "width",
+      "value": "160px",
+      "line": 211,
+      "candidates": []
+    },
+    {
+      "className": "fxRotate30",
+      "prop": "height",
+      "value": "70px",
+      "line": 212,
+      "candidates": []
+    },
+    {
+      "className": "fxRotate30",
+      "prop": "background-color",
+      "value": "#ffffff",
+      "line": 215,
+      "candidates": []
+    },
+    {
+      "className": "rectangle13",
+      "prop": "width",
+      "value": "60px",
+      "line": 219,
+      "candidates": []
+    },
+    {
+      "className": "rectangle13",
+      "prop": "height",
+      "value": "24px",
+      "line": 220,
+      "candidates": []
+    },
+    {
+      "className": "rectangle13",
+      "prop": "background-color",
+      "value": "#262633",
+      "line": 224,
+      "candidates": []
+    },
+    {
+      "className": "fxGradients",
+      "prop": "gap",
+      "value": "12px",
+      "line": 231,
+      "candidates": []
+    },
+    {
+      "className": "fxGradients",
+      "prop": "height",
+      "value": "60px",
+      "line": 233,
+      "candidates": []
+    },
+    {
+      "className": "fxRadial",
+      "prop": "width",
+      "value": "80px",
+      "line": 238,
+      "candidates": []
+    },
+    {
+      "className": "fxRadial",
+      "prop": "height",
+      "value": "48px",
+      "line": 239,
+      "candidates": []
+    },
+    {
+      "className": "fxAngular",
+      "prop": "width",
+      "value": "80px",
+      "line": 245,
+      "candidates": []
+    },
+    {
+      "className": "fxAngular",
+      "prop": "height",
+      "value": "48px",
+      "line": 246,
+      "candidates": []
+    },
+    {
+      "className": "fxLinear",
+      "prop": "width",
+      "value": "80px",
+      "line": 252,
+      "candidates": []
+    },
+    {
+      "className": "fxLinear",
+      "prop": "height",
+      "value": "48px",
+      "line": 253,
+      "candidates": []
+    },
+    {
+      "className": "fxStrokes",
+      "prop": "gap",
+      "value": "12px",
+      "line": 261,
+      "candidates": []
+    },
+    {
+      "className": "fxStrokes",
+      "prop": "height",
+      "value": "60px",
+      "line": 263,
+      "candidates": []
+    },
+    {
+      "className": "fxStrokePerside",
+      "prop": "width",
+      "value": "80px",
+      "line": 268,
+      "candidates": []
+    },
+    {
+      "className": "fxStrokePerside",
+      "prop": "height",
+      "value": "48px",
+      "line": 269,
+      "candidates": []
+    },
+    {
+      "className": "fxStrokePerside",
+      "prop": "background-color",
+      "value": "#ffffff",
+      "line": 271,
+      "candidates": []
+    },
+    {
+      "className": "fxStrokeOutside",
+      "prop": "width",
+      "value": "80px",
+      "line": 278,
+      "candidates": []
+    },
+    {
+      "className": "fxStrokeOutside",
+      "prop": "height",
+      "value": "48px",
+      "line": 279,
+      "candidates": []
+    },
+    {
+      "className": "fxStrokeOutside",
+      "prop": "background-color",
+      "value": "#ffffff",
+      "line": 281,
+      "candidates": []
+    },
+    {
+      "className": "fxStrokeCenter",
+      "prop": "width",
+      "value": "80px",
+      "line": 286,
+      "candidates": []
+    },
+    {
+      "className": "fxStrokeCenter",
+      "prop": "height",
+      "value": "48px",
+      "line": 287,
+      "candidates": []
+    },
+    {
+      "className": "fxStrokeCenter",
+      "prop": "background-color",
+      "value": "#ffffff",
+      "line": 289,
+      "candidates": []
+    },
+    {
+      "className": "fxEffectStack",
+      "prop": "width",
+      "value": "120px",
+      "line": 294,
+      "candidates": []
+    },
+    {
+      "className": "fxEffectStack",
+      "prop": "height",
+      "value": "60px",
+      "line": 295,
+      "candidates": []
+    },
+    {
+      "className": "fxEffectStack",
+      "prop": "background-color",
+      "value": "#ffffff",
+      "line": 297,
+      "candidates": []
+    },
+    {
+      "className": "fxEffectStack",
+      "prop": "border-radius",
+      "value": "12px",
+      "line": 299,
+      "candidates": []
+    },
+    {
+      "className": "fxOpacityBlend",
+      "prop": "width",
+      "value": "120px",
+      "line": 303,
+      "candidates": []
+    },
+    {
+      "className": "fxOpacityBlend",
+      "prop": "height",
+      "value": "50px",
+      "line": 304,
+      "candidates": []
+    },
+    {
+      "className": "fxOpacityBlend",
+      "prop": "background-color",
+      "value": "#3366f2",
+      "line": 306,
+      "candidates": []
+    },
+    {
+      "className": "fxRadiusMixed",
+      "prop": "width",
+      "value": "120px",
+      "line": 312,
+      "candidates": []
+    },
+    {
+      "className": "fxRadiusMixed",
+      "prop": "height",
+      "value": "50px",
+      "line": 313,
+      "candidates": []
+    },
+    {
+      "className": "fxRadiusMixed",
+      "prop": "background-color",
+      "value": "#ffffff",
+      "line": 315,
+      "candidates": []
+    },
+    {
+      "className": "fxRadiusMixed",
+      "prop": "border",
+      "value": "1px solid #262633",
+      "line": 316,
+      "candidates": []
+    },
+    {
+      "className": "fxRadiusMixed",
+      "prop": "border-radius",
+      "value": "4px 12px 24px 0",
+      "line": 317,
+      "candidates": []
+    },
+    {
+      "className": "fxGradientRing",
+      "prop": "width",
+      "value": "120px",
+      "line": 321,
+      "candidates": []
+    },
+    {
+      "className": "fxGradientRing",
+      "prop": "height",
+      "value": "50px",
+      "line": 322,
+      "candidates": []
+    },
+    {
+      "className": "fxGradientRing",
+      "prop": "border",
+      "value": "5px solid transparent",
+      "line": 327,
+      "candidates": []
+    },
+    {
+      "className": "fxGradientRing",
+      "prop": "border-radius",
+      "value": "16px",
+      "line": 328,
+      "candidates": []
+    }
+  ],
+  "refusals": [],
+  "approximations": [],
+  "valueParity": [],
+  "fonts": [
+    "Chillax"
+  ],
+  "missingAssets": [],
+  "pass": true
+}

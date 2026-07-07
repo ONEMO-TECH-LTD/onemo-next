@@ -1,0 +1,215 @@
+{
+  "fileKey": "t88thL8hKksSpILgkeGRZ0",
+  "nodeId": "4274:31085",
+  "fileVersion": "2373459676336350685",
+  "contentHash": "206807c867ea9eaa9b058313fa296d39973703031a6ec320d442ff344ccbe0b2",
+  "absoluteCount": 4,
+  "idMap": [
+    {
+      "figmaId": "4274:31085",
+      "class": "fixtureBoard",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31086",
+      "class": "fxTextWrap",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31087",
+      "class": "multiLineWrappingTextFixtureThatMustBreakAcrossSeveralLinesExactlyLikeFigmaDoes",
+      "kind": "text"
+    },
+    {
+      "figmaId": "4274:31088",
+      "class": "fxTextTruncate",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31089",
+      "class": "truncatedTextFixtureThatIsFarTooLongToFit",
+      "kind": "text"
+    },
+    {
+      "figmaId": "4274:31090",
+      "class": "fxSpaceBetween",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31091",
+      "class": "rectangle",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31092",
+      "class": "rectangle2",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31093",
+      "class": "rectangle3",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31094",
+      "class": "fxNegativeGap",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31095",
+      "class": "ellipse",
+      "kind": "svg"
+    },
+    {
+      "figmaId": "4274:31096",
+      "class": "ellipse2",
+      "kind": "svg"
+    },
+    {
+      "figmaId": "4274:31097",
+      "class": "ellipse3",
+      "kind": "svg"
+    },
+    {
+      "figmaId": "4274:31098",
+      "class": "ellipse4",
+      "kind": "svg"
+    },
+    {
+      "figmaId": "4274:31099",
+      "class": "fxWrap",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31100",
+      "class": "rectangle4",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31101",
+      "class": "rectangle5",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31102",
+      "class": "rectangle6",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31103",
+      "class": "rectangle7",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31104",
+      "class": "rectangle8",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31105",
+      "class": "rectangle9",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31106",
+      "class": "rectangle10",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31107",
+      "class": "fxAbsolute",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31108",
+      "class": "rectangle11",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31109",
+      "class": "rectangle12",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31110",
+      "class": "fxRotate30",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31111",
+      "class": "rectangle13",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31112",
+      "class": "fxGradients",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31113",
+      "class": "fxRadial",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31114",
+      "class": "fxAngular",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31115",
+      "class": "fxLinear",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31116",
+      "class": "fxStrokes",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31117",
+      "class": "fxStrokePerside",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31118",
+      "class": "fxStrokeOutside",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31119",
+      "class": "fxStrokeCenter",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31120",
+      "class": "fxEffectStack",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31121",
+      "class": "fxOpacityBlend",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31122",
+      "class": "fxRadiusMixed",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4274:31123",
+      "class": "fxGradientRing",
+      "kind": "element"
+    }
+  ],
+  "refusals": [],
+  "notes": [],
+  "assetHashes": {
+    "4274:31095": "1bb86f22c0c4dc69",
+    "4274:31096": "80e2e6dcb0cb07ae",
+    "4274:31097": "1bb86f22c0c4dc69",
+    "4274:31098": "80e2e6dcb0cb07ae"
+  },
+  "missingAssets": [],
+  "imageHashes": {},
+  "missingImages": []
+}

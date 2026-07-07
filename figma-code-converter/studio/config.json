@@ -1,0 +1,10 @@
+{
+  "port": 3900,
+  "nextPort": 3077,
+  "appWorktree": "..",
+  "envFile": "/Users/daniilsolopov/Dev/onemo-dev/onemo-next/.env.local",
+  "tokensCss": "src/app/tokens/tokens.css",
+  "fontsDir": "asset-library/fonts",
+  "exportsDir": "exports",
+  "dsBuildScan": "/Users/daniilsolopov/Dev/onemo-dev/onemo-ssot-global/tools/ds-pipeline/build-scan.mjs"
+}
