@@ -26,7 +26,7 @@ import {
 const INK = 'rgba(0,0,0,0.898)', MUTE = 'rgba(0,0,0,0.45)', FAINT = 'rgba(0,0,0,0.3)' // INK: Figma's exact ink (E8 audit — measured, was 0.9)
 const LINE = '#e6e7e9', FIELD = '#f5f5f5', SEL = '#0d99ff', TOKEN = '#7a3fb0', RAIL = '#fff'
 const FONT = 'Inter, -apple-system, system-ui, sans-serif'
-const hdr = { font: `550 11px/16px ${FONT}`, letterSpacing: '0.4px', color: INK } as const
+const hdr = { font: `550 11px/16px ${FONT}`, letterSpacing: '0.055px', color: INK } as const
 
 /* ── icon button ── */
 function IB({ I, title, active, on, w = 'regular', s = 16 }: { I: PIcon; title?: string; active?: boolean; on?: () => void; w?: 'thin' | 'light' | 'regular' | 'bold'; s?: number }) {
@@ -283,7 +283,9 @@ function FigmaVariablePicker({ fieldLabel, anchorRef, onPick, onClose, selected 
     const grp = segs.length > 1 ? segs.slice(0, -1).join(' / ') : t.group
     if (grp !== lastGroup) { rows.push({ kind: 'header', label: grp }); lastGroup = grp }
     const raw = t.original ? Object.values(t.original)[0] : t.value
-    rows.push({ kind: 'item', label: leaf, value: raw, bind: `var(${t.cssVar})`, full: t.path ?? t.cssVar })
+    // resolved display value (Figma shows the mode value, e.g. 16 — never the clamp() source)
+    const shown = resolveTokenDisplay(t.cssVar, raw, t.kind)
+    rows.push({ kind: 'item', label: leaf, value: shown, bind: `var(${t.cssVar})`, full: `${t.path ?? t.cssVar}\n${raw}` })
   }
   if (!anchorRect) return null
   const width = 216
@@ -317,10 +319,10 @@ function FigmaVariablePicker({ fieldLabel, anchorRef, onPick, onClose, selected 
         ) : (
           <button key={`${row.label}-${row.value}-${index}`} type="button" title={row.full} onClick={() => { if (row.bind) onPick?.(row.bind); onClose() }}
             ref={selected && row.bind === selected ? (el) => el?.scrollIntoView({ block: 'center' }) : undefined}
-            style={{ appearance: 'none', border: 0, width: 216, height: 24, background: selected && row.bind === selected ? '#E5F4FF' : '#fff', display: 'grid', gridTemplateColumns: '40px 1fr 32px', alignItems: 'center', padding: 0, cursor: 'pointer', color: INK, font: `450 11px/16px ${FONT}`, textAlign: 'left' }}>
+            style={{ appearance: 'none', border: 0, width: 216, height: 24, background: selected && row.bind === selected ? '#E5F4FF' : '#fff', display: 'grid', gridTemplateColumns: '40px minmax(0,1fr) minmax(24px,auto)', alignItems: 'center', padding: 0, cursor: 'pointer', color: INK, font: `450 11px/16px ${FONT}`, textAlign: 'left', overflow: 'hidden' }}>
             <span style={{ width: 24, height: 24, marginLeft: 16, display: 'grid', placeItems: 'center', color: INK }}><VariableHashIcon /></span>
             <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.label}</span>
-            <span style={{ color: 'rgba(0,0,0,0.3)', textAlign: 'right', paddingRight: 16 }}>{row.value}</span>
+            <span style={{ color: 'rgba(0,0,0,0.3)', textAlign: 'right', paddingRight: 16, maxWidth: 72, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.value}</span>
           </button>
         ))}
       </div>
@@ -448,7 +450,9 @@ function TokenPill({ token, onClick }: { token: string; onClick?: () => void }) 
   const tokens = useDsTokens()
   const varName = (token.match(/var\((--[a-z0-9-]+)\)/i)?.[1]) ?? (token.startsWith('--') ? token : `--${token}`)
   const tok = tokens.find((t) => t.cssVar === varName)
-  const raw = tok ? (tok.original ? Object.values(tok.original)[0] : tok.value) : shortToken(token)
+  const rawSource = tok ? (tok.original ? Object.values(tok.original)[0] : tok.value) : shortToken(token)
+  // the badge shows the RESOLVED value (Figma shows the mode value, e.g. 16 — not clamp() source)
+  const raw = tok ? resolveTokenDisplay(tok.cssVar, rawSource, tok.kind) : rawSource
   const fullName = tok?.path ?? shortToken(token)
   return (
     <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center' }}>
@@ -458,6 +462,25 @@ function TokenPill({ token, onClick }: { token: string; onClick?: () => void }) 
       </button>
     </span>
   )
+}
+/* Dan item 6 (2026-07-07): the badge/picker show the token's RESOLVED value like Figma shows the
+   mode value — never a truncated clamp()/calc() source string. Probe-measured once per var. */
+const tokenDisplayCache = new Map<string, string>()
+function resolveTokenDisplay(cssVar: string, raw: string, kind: string): string {
+  if (kind !== 'dimension') return raw
+  const t = raw.trim()
+  if (/^-?[\d.]+(px)?$/.test(t)) return t.replace(/px$/, '')
+  const hit = tokenDisplayCache.get(cssVar)
+  if (hit) return hit
+  if (typeof document === 'undefined') return raw
+  const probe = document.createElement('div')
+  probe.style.cssText = `position:absolute;visibility:hidden;pointer-events:none;width:var(${cssVar})`
+  document.body.appendChild(probe)
+  const px = probe.getBoundingClientRect().width
+  probe.remove()
+  const out = px > 0 ? String(Math.round(px * 100) / 100) : raw
+  tokenDisplayCache.set(cssVar, out)
+  return out
 }
 /* Sentinel mode value: render the caret icon instead of a text mode label. */
 const MODE_CARET = '__caret__'
@@ -767,15 +790,27 @@ function Sec({ title, action, children, caret, bodyGap = 8, bodyPadding = '0 8px
     </div>
   )
 }
-function AlignGrid({ sel = 1, onSelect }: { sel?: number; onSelect?: (index: number) => void }) {
+function AlignGrid({ sel = 1, distributed = false, vertical = false, onSelect }: { sel?: number; distributed?: boolean; vertical?: boolean; onSelect?: (index: number) => void }) {
+  // Dan item 4 (2026-07-07): with DISTRIBUTED spacing (justify space-between / gap Auto) Figma
+  // lights a tick at EVERY main-axis stop of the selected cross line (top/mid/bottom in column
+  // flow) — never a single tick. Packed keeps the single tick.
+  const active = new Set<number>(
+    distributed
+      ? vertical
+        ? [sel % 3, (sel % 3) + 3, (sel % 3) + 6]            // column flow: whole selected column
+        : [Math.floor(sel / 3) * 3, Math.floor(sel / 3) * 3 + 1, Math.floor(sel / 3) * 3 + 2] // row flow: whole selected row
+      : [sel])
   return (
     <div style={{ flex: 'none', width: 88, height: 56, background: FIELD, borderRadius: 5, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', padding: '5px 1px' }}>
-      {Array.from({ length: 9 }).map((_, i) => (
-        <button key={i} type="button" aria-label={`Auto layout alignment ${i + 1}`} aria-pressed={i === sel} onClick={() => onSelect?.(i)}
+      {Array.from({ length: 9 }).map((_, i) => {
+        const on = active.has(i)
+        return (
+        <button key={i} type="button" aria-label={`Auto layout alignment ${i + 1}`} aria-pressed={on} onClick={() => onSelect?.(i)}
           style={{ appearance: 'none', border: 0, background: 'transparent', padding: 0, display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
-          <span style={{ width: i === sel ? 9 : 3, height: 2, borderRadius: 2, background: i === sel ? SEL : FAINT }} />
+          <span style={{ width: on ? 9 : 3, height: 2, borderRadius: 2, background: on ? SEL : FAINT }} />
         </button>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -2032,7 +2067,7 @@ function versionTimeLabel(value: string) {
 const SHOW_LEDGER = false
 
 export default function ReactFigmaPage() {
-  type Rail = 'file' | 'assets' | 'variables'
+  type Rail = 'file' | 'assets' | 'components' | 'variables'
   type AssetTab = 'components' | 'images' | 'icons'
   const [rail, setRail] = useState<Rail>('file')
   const [assetTab, setAssetTab] = useState<AssetTab>('components')
@@ -2042,7 +2077,8 @@ export default function ReactFigmaPage() {
   const [newCompCategory, setNewCompCategory] = useState('')
   // E7.3 (KAI-9377): second canvas — Design ⇄ Components toggle just swaps the iframe route;
   // the whole shell (zoom/pan/selection/overrides) is route-agnostic (architecture v4.1 §1).
-  const [canvasMode, setCanvasMode] = useState<'design' | 'components'>('design')
+  const canvasMode: 'design' | 'components' = rail === 'components' ? 'components' : 'design'
+  const [autoDistributed, setAutoDistributed] = useState(false) // justify space-between (Figma distributed) // derived — the far-left rail IS the canvas switch (Dan 2026-07-07)
   const dsComponents = useDsComponents(rail === 'assets' || canvasMode === 'components', compNonce) // E4-G4 Assets panel + E7.3 components rail
   // #6: create a new component in code (Framer-style) — scaffolds a real editable component file.
   const newComponent = useCallback(async (name: string, root: 'project' | 'global' = 'project', category = '') => {
@@ -2306,6 +2342,7 @@ export default function ReactFigmaPage() {
     setLiveSelColors(collectSelectionColors(el, doc))
     // Auto-layout alignment grid + resize modes
     setAutoAlign(alignToIndex(c, (c['flex-direction'] || '').startsWith('column')))
+    setAutoDistributed(c['justify-content'] === 'space-between') // Dan item 4: distributed state
     setWidthResize(parseFloat(c['flex-grow'] || '0') > 0 ? 'Fill' : d['width'] ? 'Fixed' : 'Hug')
     setHeightResize(d['height'] ? 'Fixed' : 'Hug')
     // Typography — only when the element directly holds text (Figma shows Text section for text nodes)
@@ -2341,7 +2378,7 @@ export default function ReactFigmaPage() {
     const parentIsFlex = pcs ? pcs.display.includes('flex') : false
     const parentIsRow = pcs ? !pcs.flexDirection.startsWith('column') : true
     const decls: [string, string][] =
-      field === 'gap' ? (n === 'Auto' ? [['column-gap', 'normal'], ['row-gap', 'normal']] : [['column-gap', withUnit], ['row-gap', withUnit]])
+      field === 'gap' ? (n === 'Auto' ? [['column-gap', 'normal'], ['row-gap', 'normal'], ['justify-content', 'space-between']] : [['column-gap', withUnit], ['row-gap', withUnit]]) // gap Auto = Figma distributed
       : field === 'paddingX' ? [['padding-left', withUnit], ['padding-right', withUnit]]
       : field === 'paddingY' ? [['padding-top', withUnit], ['padding-bottom', withUnit]]
       : field === 'opacity' ? [['opacity', String((parseFloat(n) || 0) / 100)]]
@@ -2394,11 +2431,32 @@ export default function ReactFigmaPage() {
           const marginPair = (a: string, b: string): [string, string][] =>
             pos === 'center' ? [[a, 'auto'], [b, 'auto']] : pos === 'start' ? [[a, '0'], [b, 'auto']] : [[a, 'auto'], [b, '0']]
           const marginAxis: [string, string][] = horiz ? marginPair('margin-left', 'margin-right') : marginPair('margin-top', 'margin-bottom')
+          // Dan item 3 (2026-07-07): the idiomatic mechanisms (auto-margin / align-self) are legal
+          // NO-OPS when the parent axis has no free space (packed flex whose children fill it, or
+          // block flow which has no vertical auto-margin at all) — the click looked dead. Figma's
+          // alignment always moves the element; when the idiom can't, write the real geometric
+          // shift (position:relative + offset), the code analog of Figma writing x/y.
+          const pr = el.parentElement!.getBoundingClientRect()
+          const er = el.getBoundingClientRect()
+          const cs = doc.defaultView!.getComputedStyle(el)
+          const relShift = (axis: 'top' | 'left'): [string, string][] => {
+            const span = axis === 'top' ? pr.height - er.height : pr.width - er.width
+            const target = pos === 'start' ? 0 : pos === 'end' ? Math.max(0, Math.round(span)) : Math.max(0, Math.round(span / 2))
+            const current = Math.round(axis === 'top' ? er.top - pr.top : er.left - pr.left)
+            const existing = cs.position === 'relative' ? Math.round(parseFloat(cs[axis]) || 0) : 0
+            return [['position', 'relative'], [axis, `${existing + (target - current)}px`]]
+          }
+          const mainFreeSpace = (() => {
+            const kids = [...el.parentElement!.children]
+            const used = kids.reduce((a, k) => a + k.getBoundingClientRect()[parentIsRow ? 'width' : 'height'], 0)
+            return (parentIsRow ? pr.width : pr.height) - used
+          })()
           if (parentIsFlex) {
             const thisAxisIsMain = horiz ? parentIsRow : !parentIsRow
-            return thisAxisIsMain ? marginAxis : [['align-self', pos === 'start' ? 'flex-start' : pos === 'end' ? 'flex-end' : 'center']]
+            if (!thisAxisIsMain) return [['align-self', pos === 'start' ? 'flex-start' : pos === 'end' ? 'flex-end' : 'center']]
+            return mainFreeSpace > 4 ? marginAxis : relShift(horiz ? 'left' : 'top')
           }
-          return marginAxis
+          return horiz ? marginAxis : relShift('top')
         })()
       : field === 'clip' ? [['overflow', n]]
       : field === 'transform' ? [['transform', n]]
@@ -2826,14 +2884,20 @@ export default function ReactFigmaPage() {
     doc.addEventListener('keydown', (e) => {
       const t = e.target as HTMLElement | null
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
-      if (['+', '=', '-', '_', '0'].includes(e.key) || ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z')) {
+      // Escape forwards too — deselect must work when focus sits INSIDE the canvas iframe
+      // (QA E8 MED: parent-window listener never saw iframe keydowns).
+      if (['+', '=', '-', '_', '0', 'Escape'].includes(e.key) || ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z')) {
         e.preventDefault()
         window.dispatchEvent(new KeyboardEvent('keydown', { key: e.key, metaKey: e.metaKey, ctrlKey: e.ctrlKey, shiftKey: e.shiftKey }))
       }
     }, true)
     doc.addEventListener('click', (e) => {
       const el = findTagged(e.target)
-      if (!el) return
+      if (!el) {
+        // Figma parity (Dan 2026-07-07): clicking empty canvas DESELECTS — the inspector empties.
+        if (selIdRef.current) { selIdRef.current = null; setSel(null); setSelRect(null); setLiveFills(null); setLayerSelId(null) }
+        return
+      }
       e.preventDefault(); e.stopPropagation()
       applySelection(el)
     }, true)
@@ -3089,11 +3153,16 @@ export default function ReactFigmaPage() {
     }
     if (pan.current) setView(v => ({ ...v, x: pan.current!.vx + (e.clientX - pan.current!.x), y: pan.current!.vy + (e.clientY - pan.current!.y) }))
   }, [])
-  const onUp = useCallback(() => {
+  const onUp = useCallback((e: React.PointerEvent) => {
     if (draw.current) {
       const r = draw.current.rect, arm = drawArm; draw.current = null; setDrawRect(null); setDrawArm(null)
       if (arm) void insertDrawn(arm.tag, arm.display, r.w > 4 && r.h > 4 ? r : { x: r.x, y: r.y, w: 80, h: 80 })
       return
+    }
+    // Figma parity (Dan 2026-07-07): a plain CLICK on the grey canvas (press+release, no pan
+    // movement) deselects — same as clicking empty space in Figma.
+    if (pan.current && Math.abs(e.clientX - pan.current.x) < 3 && Math.abs(e.clientY - pan.current.y) < 3 && selIdRef.current) {
+      selIdRef.current = null; setSel(null); setSelRect(null); setLiveFills(null); setLayerSelId(null)
     }
     pan.current = null; setIsPanning(false)
   }, [drawArm, insertDrawn])
@@ -3103,6 +3172,9 @@ export default function ReactFigmaPage() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [drawArm])
+  // F6 (lead E7 gate) under the rail-switch model: entering the components canvas clears any
+  // armed draw tool — the arm can never survive into the gallery.
+  useEffect(() => { if (canvasMode === 'components') { setDrawArm(null); draw.current = null; setDrawRect(null) } }, [canvasMode])
   // Figma parity (Dan 2026-07-07): Escape with no armed tool DESELECTS — the inspector empties
   // (nothing selected = nothing to measure). Field-level Escape already stopPropagation()s.
   useEffect(() => {
@@ -3165,7 +3237,7 @@ export default function ReactFigmaPage() {
   // E5 #29/#30: Agents + Tools were dead nav buttons (null → no panel, click did nothing). Removed
   // rather than invent panels — same disposition as the "useless" Design/Prototype tablist.
   const railItems: [keyof typeof UI_ICON, string, Rail][] = [
-    ['railFile', 'File', 'file'], ['railAssets', 'Assets', 'assets'], ['railVariables', 'Variables', 'variables'],
+    ['railFile', 'File', 'file'], ['railAssets', 'Assets', 'assets'], ['createComponent', 'Components', 'components'], ['railVariables', 'Variables', 'variables'],
   ]
 
   return (
@@ -3178,7 +3250,7 @@ export default function ReactFigmaPage() {
             <button key={label} type="button" title={label} onClick={() => key && setRail(key)}
               style={{ appearance: 'none', border: 0, cursor: 'pointer', width: 56, height: 56, borderRadius: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', gap: 2, background: 'transparent', padding: '5px 0 0', marginTop: label === 'Variables' ? 16 : 0, color: active ? SEL : INK }}>
               <span style={{ width: 32, height: 28, borderRadius: 5, display: 'grid', placeItems: 'center', background: active ? '#e5f4ff' : 'transparent' }}><UiIcon name={icon} /></span>
-              <span style={{ font: `450 9px/14px ${FONT}`, color: INK }}>{label}</span>
+              <span style={{ font: `450 9px/14px ${FONT}`, letterSpacing: '0.045px', color: INK }}>{label}</span>
             </button>
           )
         })}
@@ -3220,27 +3292,9 @@ export default function ReactFigmaPage() {
           <VersionHistoryPanel versions={versions} loading={versionsLoading} busyRef={versionBusyRef} onClose={() => setVersionPanelOpen(false)} onRefresh={() => void loadVersions()} onRestore={(version) => void restoreVersion(version)} onFork={(version) => void forkBuild('branch', version)} />
         ) : rail === 'file' && (
           <>
-            {/* E7.3: Design ⇄ Components canvas toggle (v4.1 §1 — swaps the iframe route only) */}
-            <div role="tablist" aria-label="Canvas mode" style={{ margin: '8px 12px 0', height: 28, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, padding: 2, borderRadius: 7, background: FIELD }}>
-              {(['design', 'components'] as const).map((m) => (
-                <button key={m} type="button" role="tab" aria-selected={canvasMode === m}
-                  onClick={() => { setCanvasMode(m); setDrawArm(null); draw.current = null; setDrawRect(null) /* F6: no stale arm across canvases */ }}
-                  style={{ appearance: 'none', border: 0, borderRadius: 5, background: canvasMode === m ? '#fff' : 'transparent', color: canvasMode === m ? INK : MUTE, font: `500 11px/16px ${FONT}`, cursor: 'pointer', boxShadow: canvasMode === m ? '0 1px 3px rgba(0,0,0,0.12)' : 'none' }}>
-                  {m === 'design' ? 'Design' : 'Components'}
-                </button>
-              ))}
-            </div>
-            {canvasMode === 'components' ? (
-              <ComponentsRail components={dsComponents} selectedFile={sel?.file} onJump={(label) => {
-                const doc = iframeRef.current?.contentDocument
-                const frame = doc?.querySelector(`[data-component-frame="${label}"]`)
-                frame?.scrollIntoView({ block: 'center', behavior: 'smooth' })
-                const source = frame?.getAttribute('data-component-source')
-                const tagged = Array.from(frame?.querySelectorAll('[data-src]') ?? []) as HTMLElement[]
-                const el = (source ? tagged.find((node) => node.getAttribute('data-src')?.startsWith(`${source}:`)) : null) ?? tagged[0] ?? null
-                if (el) el.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-              }} />
-            ) : (<>
+            {/* Design/Components tablist REMOVED — Components is a far-left rail page now
+                (Dan 2026-07-07: 'same as variables switching… component must sit there'). */}
+            <>
             <div style={{ height: 25, display: 'flex', alignItems: 'center', padding: '0 16px', font: `400 11px/16px ${FONT}`, color: MUTE }}>Drafts ›</div>
             <div style={{ height: 40, padding: '0 8px 0 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={hdr}>Pages</span>
@@ -3253,7 +3307,7 @@ export default function ReactFigmaPage() {
               {fsData && (
                 <>
                   {fsData.parent !== null && (
-                    <div onClick={() => setFsPath(fsData.parent ?? '')} style={{ height: 28, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', borderRadius: 5, font: `400 11px/16px ${FONT}`, color: MUTE, cursor: 'pointer' }}>
+                    <div onClick={() => setFsPath(fsData.parent ?? '')} style={{ height: 32, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', borderRadius: 5, font: `400 11px/16px ${FONT}`, color: MUTE, cursor: 'pointer' }}>
                       <span style={{ width: 16, textAlign: 'center' }}>‹</span><span>..</span>
                     </div>
                   )}
@@ -3263,7 +3317,7 @@ export default function ReactFigmaPage() {
                     return (
                       <div key={d.name} onClick={() => (d.route ? switchCanvas(d.name, d.route) : setFsPath(rel))}
                         onDoubleClick={editorPage ? (e) => { e.stopPropagation(); void renamePage(d.name) } : undefined}
-                        style={{ height: 28, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', borderRadius: 5, background: d.route && d.route === canvas.route ? '#f0f1f3' : 'transparent', font: `400 11px/16px ${FONT}`, color: INK, cursor: 'pointer' }}>
+                        style={{ height: 32, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', borderRadius: 5, background: d.route && d.route === canvas.route ? '#f0f1f3' : 'transparent', font: `400 11px/16px ${FONT}`, color: INK, cursor: 'pointer' }}>
                         <span onClick={(e) => { e.stopPropagation(); setFsPath(rel) }} style={{ width: 16, height: 16, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)' }}><UiIcon name="caretRight16" size={16} /></span>
                         <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', font: d.route ? `550 11px/16px ${FONT}` : `400 11px/16px ${FONT}` }}>{d.name}</span>
                         {editorPage && <span onClick={(e) => e.stopPropagation()} style={{ display: 'flex' }}><UiIB name="minus" title="Delete page" on={() => void deletePage(d.name)} /></span>}
@@ -3273,7 +3327,7 @@ export default function ReactFigmaPage() {
                   })}
                   {fsData.files.map((f) => (
                     <div key={f.name} onClick={f.route ? () => switchCanvas(f.name.replace(/\.stories\.tsx$/, ''), f.route!) : undefined}
-                      style={{ height: 28, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px 0 30px', borderRadius: 5, background: f.route && f.route === canvas.route ? '#f0f1f3' : 'transparent', font: `400 11px/16px ${FONT}`, color: f.route ? INK : FAINT, cursor: f.route ? 'pointer' : 'default' }}>
+                      style={{ height: 32, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px 0 30px', borderRadius: 5, background: f.route && f.route === canvas.route ? '#f0f1f3' : 'transparent', font: `400 11px/16px ${FONT}`, color: f.route ? INK : FAINT, cursor: f.route ? 'pointer' : 'default' }}>
                       <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
                       {f.route && <span style={{ color: MUTE, font: `400 9px/16px ${FONT}` }}>screen</span>}
                     </div>
@@ -3317,8 +3371,19 @@ export default function ReactFigmaPage() {
                   ))
                 : null /* live DOM only — empty until the canvas wires (E2.1 deslop) */}
             </div>
-            </>)}
+            </>
           </>
+        )}
+        {rail === 'components' && (
+          <ComponentsRail components={dsComponents} selectedFile={sel?.file} onJump={(label) => {
+            const doc = iframeRef.current?.contentDocument
+            const frame = doc?.querySelector(`[data-component-frame="${label}"]`)
+            frame?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+            const source = frame?.getAttribute('data-component-source')
+            const tagged = Array.from(frame?.querySelectorAll('[data-src]') ?? []) as HTMLElement[]
+            const el = (source ? tagged.find((node) => node.getAttribute('data-src')?.startsWith(`${source}:`)) : null) ?? tagged[0] ?? null
+            if (el) el.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+          }} />
         )}
         {rail === 'assets' && (
           <>
@@ -3543,7 +3608,7 @@ export default function ReactFigmaPage() {
             <PositionRow label="Alignment">
               <Seg fill><FSegBtn name="alignLeft" pos="l" fill title="Align left" on={() => applyOverride('selfAlign', 'left')} /><FSegBtn name="alignCenterH" pos="m" fill title="Align horizontal centers" on={() => applyOverride('selfAlign', 'hcenter')} /><FSegBtn name="alignRight" pos="r" fill title="Align right" on={() => applyOverride('selfAlign', 'right')} /></Seg>
               <Seg fill><FSegBtn name="alignTop" pos="l" fill title="Align top" on={() => applyOverride('selfAlign', 'top')} /><FSegBtn name="alignCenterV" pos="m" fill title="Align vertical centers" on={() => applyOverride('selfAlign', 'vcenter')} /><FSegBtn name="alignBottom" pos="r" fill title="Align bottom" on={() => applyOverride('selfAlign', 'bottom')} /></Seg>
-              <DistributeMenu onApply={(v) => applyOverride('justify', v)} />
+              <DistributeMenu onApply={(v) => { applyOverride('justify', v); setAutoDistributed(v === 'space-between') }} />
             </PositionRow>
             <PositionRow label="Position">
               <InspectorField label="X" value={xValue} input dimValue ariaLabel="X-position" onChange={(v) => { setXValue(v); applyOverride('x', v) }} />
@@ -3589,8 +3654,8 @@ export default function ReactFigmaPage() {
               <span style={{ position: 'absolute', left: 16, top: 3.5, width: 88, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Alignment</span>
               <span style={{ position: 'absolute', left: 112, top: 3.5, width: 88, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Gap</span>
               <div style={{ position: 'absolute', left: 16, right: 8, top: 22, display: 'grid', gridTemplateColumns: 'minmax(88px,1fr) minmax(88px,1fr) 24px', gap: 8, alignItems: 'start' }}>
-                <AlignGrid sel={autoAlign} onSelect={(i) => { const col = autoFlow === 'vertical'; setAutoAlign(i); const a = alignFromIndex(i, col); applyOverride('alignItems', a.alignItems); applyOverride('justify', a.justifyContent) }} />
-                <GapDropdownField value={gapValue} onChange={(v) => { setGapValue(v); applyOverride('gap', v) }} token={fieldTokens.gap} />
+                <AlignGrid sel={autoAlign} distributed={autoDistributed} vertical={autoFlow === 'vertical'} onSelect={(i) => { const col = autoFlow === 'vertical'; setAutoAlign(i); const a = alignFromIndex(i, col); applyOverride('alignItems', a.alignItems); applyOverride('justify', a.justifyContent) }} />
+                <GapDropdownField value={gapValue} onChange={(v) => { setGapValue(v); applyOverride('gap', v); if (v === 'Auto') setAutoDistributed(true) }} token={fieldTokens.gap} />
                 <AutoLayoutSettingsMenu onApply={applyOverride} />
               </div>
             </div>
