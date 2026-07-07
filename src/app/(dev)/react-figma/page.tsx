@@ -492,12 +492,12 @@ const MODE_CARET = '__caret__'
    the trailing edge. Every prior field variant (InspectorField / AutoValueField /
    InlineValueInput) is a thin wrapper over this — one anatomy, one implementation (Dan:
    "make a component and reuse, not vibe-code each"). */
-function FigmaField({ icon, letter, glyph, value, onChange, onCommit, token, suffix, ariaLabel, mode, modeOptions, onMode, picker = true, width, whiteBg, ghost, dim, valueInk, title, placeholder, inputRole = 'spinbutton' }: {
+function FigmaField({ icon, letter, glyph, value, onChange, onCommit, token, suffix, ariaLabel, mode, modeOptions, onMode, picker = true, width, whiteBg, dim, valueInk, title, placeholder, inputRole = 'spinbutton' }: {
   icon?: keyof typeof UI_ICON; letter?: string; glyph?: React.ReactNode; value: string; onChange?: (value: string) => void
   onCommit?: (value: string) => void
   token?: string; suffix?: string; ariaLabel: string
   mode?: string; modeOptions?: [string, string][]; onMode?: (value: string) => void
-  picker?: boolean; width?: number | string; whiteBg?: boolean; ghost?: boolean; dim?: boolean; valueInk?: string; title?: string; placeholder?: string; inputRole?: 'spinbutton' | 'textbox'
+  picker?: boolean; width?: number | string; whiteBg?: boolean; dim?: boolean; valueInk?: string; title?: string; placeholder?: string; inputRole?: 'spinbutton' | 'textbox'
 }) {
   const [varOpen, setVarOpen] = useState(false)
   const [modeOpen, setModeOpen] = useState(false)
@@ -545,7 +545,7 @@ function FigmaField({ icon, letter, glyph, value, onChange, onCommit, token, suf
   /* Census-measured container backgrounds: filled = #F5F5F5 (Rotation/Padding class),
    * ghost = transparent at rest (Resizing/Gap class), dim (layout-controlled X/Y) = white
    * with NO border. whiteBg (Link/typed inputs) keeps its measured #e6e6e6 border. */
-  const bg = dim ? '#fff' : whiteBg ? (h ? '#ededed' : '#fff') : ghost ? (h ? FIELD : 'transparent') : FIELD
+  const bg = dim ? '#fff' : whiteBg ? (h ? '#ededed' : '#fff') : FIELD
   return (
     <div ref={fieldRef} title={title ?? token} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
       style={{ position: 'relative', minWidth: typeof width === 'number' ? width : 0, width: typeof width === 'number' ? '100%' : width, height: 24, borderRadius: 5, background: bg, border: `1px solid ${varOpen || modeOpen ? SEL : whiteBg && !dim ? '#e6e6e6' : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: cols, alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, letterSpacing: '0.055px', color: INK }}>
@@ -708,8 +708,14 @@ function ResizeDropdownField({ axis, value, mode, onValue, onMode }: { axis: 'W'
   const axisLabel = axis === 'W' ? 'width' : 'height'
   return (
     <span data-resize-axis={axis} data-resize-mode={mode} style={{ display: 'contents' }}>
-      <FigmaField glyph={<span style={{ font: `450 11px/24px ${FONT}`, letterSpacing: '0.055px' }}>{axis}</span>} value={value} onChange={onValue} ariaLabel={`${axisLabel} value`}
-        title={`${axis === 'W' ? 'Horizontal' : 'Vertical'} resizing: ${mode}`} width={88} ghost valueInk="rgba(0,0,0,0.5)"
+      <FigmaField glyph={axis === 'W'
+          ? <span style={{ display: 'flex', alignItems: 'center', gap: 1.5, color: 'rgba(0,0,0,0.5)' }} aria-hidden>
+              <span style={{ width: 1, height: 9, background: 'currentColor' }} />
+              <span style={{ font: `400 10.5px/24px ${FONT}`, letterSpacing: '0.05px' }}>W</span>
+              <span style={{ width: 1, height: 9, background: 'currentColor' }} />
+            </span>
+          : <span style={{ font: `450 11px/24px ${FONT}`, letterSpacing: '0.055px', color: 'rgba(0,0,0,0.5)' }}>H</span>} value={value} onChange={onValue} ariaLabel={`${axisLabel} value`}
+        title={`${axis === 'W' ? 'Horizontal' : 'Vertical'} resizing: ${mode}`} width={88} valueInk="rgba(0,0,0,0.5)"
         mode={mode} onMode={next => onMode(next as ResizeMode)}
         modeOptions={[[`Fixed ${axisLabel} (${value})`, 'Fixed'], ['Hug contents', 'Hug'], ['Fill container', 'Fill']]} />
     </span>
@@ -720,7 +726,7 @@ function ResizeDropdownField({ axis, value, mode, onValue, onMode }: { axis: 'W'
    drop down like gap input"). */
 function GapDropdownField({ value, onChange, token }: { value: string; onChange: (value: string) => void; token?: string }) {
   return (
-    <FigmaField glyph={<UiIcon name="gapVertical" />} value={value} onChange={onChange} ariaLabel="Gap value" token={token} width={88} ghost
+    <FigmaField glyph={<UiIcon name="gapVertical" />} value={value} onChange={onChange} ariaLabel="Gap value" token={token} width={88}
       mode={value === 'Auto' ? 'Auto' : MODE_CARET} onMode={v => onChange(v)}
       modeOptions={[['10', '10'], ['Auto', 'Auto']]} />
   )

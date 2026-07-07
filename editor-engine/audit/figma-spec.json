@@ -144,11 +144,12 @@
       },
       "inputFontFamilyFirst": "Inter",
       "container": {
-        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "backgroundColor": "rgb(245, 245, 245)",
         "borderRadius": "5px"
       },
       "containerRectH": 24,
-      "containerRectW": 88
+      "containerRectW": 88,
+      "_bgNote": "VISIBLE-TRUTH correction 2026-07-07: retina reference crops (figma-refs/) show the grey F5F5F5 capsule; the DOM census transparent container was an inner wrapper, not the visible chrome. Pixel layer overrides DOM layer."
     },
     "gap": {
       "input": {
@@ -160,11 +161,12 @@
       },
       "inputFontFamilyFirst": "Inter",
       "container": {
-        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "backgroundColor": "rgb(245, 245, 245)",
         "borderRadius": "5px"
       },
       "containerRectH": 24,
-      "containerRectW": 88
+      "containerRectW": 88,
+      "_bgNote": "VISIBLE-TRUTH correction 2026-07-07: retina reference crops (figma-refs/) show the grey F5F5F5 capsule; the DOM census transparent container was an inner wrapper, not the visible chrome. Pixel layer overrides DOM layer."
     },
     "buildFieldMap": {
       "X-position": "mutedPosition|standard",

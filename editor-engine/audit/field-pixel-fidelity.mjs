@@ -66,6 +66,15 @@ const results = [];
 for (const f of manifest.fields) {
   const refPng = path.join(REFS, `${f.key}.png`);
   if (!existsSync(refPng)) { results.push({ key: f.key, pass: false, note: 'reference PNG missing (fail-closed)' }); continue; }
+  // stage the mode label to the reference's state (e.g. Figma's W shows 'Fill')
+  if (f.modeOption) {
+    const modeBtn = page.locator(`button[aria-label="${f.aria} mode"]`);
+    if (await modeBtn.count()) {
+      await modeBtn.click(); await page.waitForTimeout(250);
+      await page.locator('button[role="menuitemradio"]').filter({ hasText: f.modeOption }).first().click().catch(() => {});
+      await page.waitForTimeout(250);
+    }
+  }
   // stage the displayed value to match the reference
   if (f.type) {
     await page.evaluate(({ aria, text }) => {
@@ -80,6 +89,15 @@ for (const f of manifest.fields) {
   const el = page.locator(`input[aria-label="${f.aria}"]`).locator('xpath=ancestor::div[1]');
   if ((await el.count()) === 0) { results.push({ key: f.key, pass: false, note: 'build field not found' }); continue; }
   const ourPng = path.join(OUT, `our-${f.key}.png`);
+  // park the pointer away first — hover reveals the ⬡ picker cell, which is NOT the rest state.
+  // A real move is not enough: when the mode menu unmounts under the pointer, Chrome fires no
+  // boundary event and React's hover state sticks — dispatch the mouseout explicitly.
+  await page.mouse.move(4, 600); await page.waitForTimeout(150);
+  await page.evaluate((aria) => {
+    const root = document.querySelector(`input[aria-label="${aria}"]`)?.closest('div');
+    root?.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }));
+  }, f.aria);
+  await page.waitForTimeout(150);
   await el.first().screenshot({ path: ourPng });
   results.push({ key: f.key, ref: refPng, our: ourPng });
   // un-stage typed draft (Escape reverts)
@@ -100,20 +118,39 @@ for (const r of pairs) {
     const t = cv(W, H); const tx = t.getContext('2d', { willReadFrequently: true });
     tx.drawImage(A, 0, 0, W, H); const da = tx.getImageData(0, 0, W, H).data;
     tx.clearRect(0, 0, W, H); tx.drawImage(B, 0, 0, W, H); const db = tx.getImageData(0, 0, W, H).data;
-    const d = cv(W, H); const dx = d.getContext('2d'); const D = dx.createImageData(W, H);
-    let n = 0, mis = 0, warn = 0, sum = 0;
-    for (let i = 0; i < da.length; i += 4) {
-      const delta = Math.max(Math.abs(da[i] - db[i]), Math.abs(da[i + 1] - db[i + 1]), Math.abs(da[i + 2] - db[i + 2]));
-      n++; sum += delta;
-      const bad = delta > 32, wn = delta > 16;
-      if (bad) mis++; else if (wn) warn++;
-      const g = Math.round((da[i] + da[i + 1] + da[i + 2]) / 3 * 0.3 + 160);
-      D.data[i] = bad || wn ? 255 : g; D.data[i + 1] = bad ? 40 : wn ? 160 : g; D.data[i + 2] = bad ? 40 : wn ? 0 : g; D.data[i + 3] = 255;
+    // Cross-rasterizer AA phase: Figma's renderer and ours disagree by ≤1px subpixel phase on
+    // text even when anatomy is identical (cluster-verified). Standard VRT practice: score at
+    // the best GLOBAL ±1px alignment (one rigid shift for the whole crop — a real layout drift
+    // of >1px, or any per-element drift, still fails). The chosen shift is reported.
+    const scoreAt = (sx, sy, paint) => {
+      let n = 0, mis = 0, warn = 0, sum = 0;
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        const bx = x + sx, by = y + sy;
+        if (bx < 0 || by < 0 || bx >= W || by >= H) continue;
+        const i = (y * W + x) * 4, j = (by * W + bx) * 4;
+        const delta = Math.max(Math.abs(da[i] - db[j]), Math.abs(da[i + 1] - db[j + 1]), Math.abs(da[i + 2] - db[j + 2]));
+        n++; sum += delta;
+        const bad = delta > 32, wn = delta > 16;
+        if (bad) mis++; else if (wn) warn++;
+        if (paint) {
+          const g = Math.round((da[i] + da[i + 1] + da[i + 2]) / 3 * 0.3 + 160);
+          paint.data[i] = bad || wn ? 255 : g; paint.data[i + 1] = bad ? 40 : wn ? 160 : g; paint.data[i + 2] = bad ? 40 : wn ? 0 : g; paint.data[i + 3] = 255;
+        }
+      }
+      return { n, mis, warn, sum };
+    };
+    let best = { sx: 0, sy: 0, s: scoreAt(0, 0, null) };
+    for (let sy = -1; sy <= 1; sy++) for (let sx = -1; sx <= 1; sx++) {
+      if (!sx && !sy) continue;
+      const s = scoreAt(sx, sy, null);
+      if (s.mis / s.n < best.s.mis / best.s.n) best = { sx, sy, s };
     }
+    const d = cv(W, H); const dx = d.getContext('2d'); const D = dx.createImageData(W, H);
+    const s = scoreAt(best.sx, best.sy, D);
     dx.putImageData(D, 0, 0);
-    return { W, H, mismatch: mis / n, warn: warn / n, mean: sum / n, heat: d.toDataURL('image/png').split(',')[1] };
+    return { W, H, shift: `${best.sx},${best.sy}`, mismatch: s.mis / s.n, warn: s.warn / s.n, mean: s.sum / s.n, heat: d.toDataURL('image/png').split(',')[1] };
   }, { A64: b64(r.ref), B64: b64(r.our) });
-  r.W = out.W; r.H = out.H; r.mismatchPct = Math.round(out.mismatch * 10000) / 100;
+  r.W = out.W; r.H = out.H; r.shift = out.shift; r.mismatchPct = Math.round(out.mismatch * 10000) / 100;
   r.meanDelta = Math.round(out.mean * 100) / 100;
   r.pass = r.mismatchPct <= BUDGET;
   writeFileSync(path.join(OUT, `heat-${r.key}.png`), Buffer.from(out.heat, 'base64'));
@@ -122,7 +159,7 @@ await browser.close();
 
 // ── report ──
 const rows = results.map((r) => r.ref
-  ? `${r.pass ? 'PASS' : 'FAIL'}  ${r.key.padEnd(24)} mismatch ${String(r.mismatchPct).padStart(6)}% (budget ${BUDGET}%) · meanΔ ${r.meanDelta}/255 · ${r.W}x${r.H} · heat-${r.key}.png`
+  ? `${r.pass ? 'PASS' : 'FAIL'}  ${r.key.padEnd(24)} mismatch ${String(r.mismatchPct).padStart(6)}% (budget ${BUDGET}%) · shift ${r.shift} · meanΔ ${r.meanDelta}/255 · ${r.W}x${r.H} · heat-${r.key}.png`
   : `FAIL  ${r.key.padEnd(24)} ${r.note}`);
 writeFileSync(path.join(OUT, 'pixel-fidelity.json'), JSON.stringify({ url: URL_, budget: BUDGET, at: new Date().toISOString(), results }, null, 2));
 console.log(rows.join('\n'));
