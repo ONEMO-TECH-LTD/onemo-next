@@ -915,25 +915,31 @@ function Sec({ title, action, children, caret, bodyGap = 8, bodyPadding = '0 8px
     </div>
   )
 }
+// Alignment box — every value below is pulled from the live Figma console (figma-census, 2026-07-07),
+// NOT hand-guessed: box 88×56 F5F5F5 r5; 9 dots 2×2 round rgba(0,0,0,0.3) at FIXED centres
+// cols {15,44,73} rows {13,28,43}; selected cell = 3 bars 2px, rgb(0,123,229), r2, oriented by flow.
+const ALIGN_BLUE = '#007be5'
+const ALIGN_COLS = [15, 44, 73]
+const ALIGN_ROWS = [13, 28, 43]
+const ALIGN_BAR_H = [7, 10, 5] // Figma's mini item-preview: bars of unequal height
 function AlignGrid({ sel = 1, distributed = false, vertical = false, onSelect }: { sel?: number; distributed?: boolean; vertical?: boolean; onSelect?: (index: number) => void }) {
-  // Dan 2.5 (2026-07-07): match Figma. The SELECTED cell previews the items as 3 bars oriented by
-  // the flow direction (horizontal flow → vertical bars │││; vertical flow → horizontal bars ≡);
-  // distributed spacing spreads the bars apart. Every other cell shows a single dot. The cell's
-  // position in the 3×3 IS the alignment (top-left … bottom-right), fully wired via onSelect.
   const horiz = !vertical
   return (
-    <div style={{ flex: 'none', width: 88, height: 56, background: FIELD, borderRadius: 5, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', padding: '4px 2px' }}>
+    <div style={{ position: 'relative', flex: 'none', width: 88, height: 56, background: FIELD, borderRadius: 5 }}>
       {Array.from({ length: 9 }).map((_, i) => {
         const on = i === sel
+        const cx = ALIGN_COLS[i % 3], cy = ALIGN_ROWS[Math.floor(i / 3)]
+        // absolutely positioned + centred on its fixed point → dots NEVER move when a cell is
+        // selected (Dan 2.5: the taller bars used to expand the grid row and shove the dots).
         return (
           <button key={i} type="button" aria-label={`Auto layout alignment ${i + 1}`} aria-pressed={on} onClick={() => onSelect?.(i)}
-            style={{ appearance: 'none', border: 0, background: 'transparent', padding: 0, display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
+            style={{ appearance: 'none', border: 0, background: 'transparent', padding: 0, cursor: 'pointer', position: 'absolute', left: cx - 13, top: cy - 8, width: 26, height: 16, display: 'grid', placeItems: 'center' }}>
             {on ? (
               <span aria-hidden style={{ display: 'flex', flexDirection: horiz ? 'row' : 'column', gap: distributed ? 3 : 1.5, alignItems: 'center', justifyContent: 'center' }}>
-                {[0, 1, 2].map((b) => <span key={b} style={{ width: horiz ? 2 : 8, height: horiz ? 8 : 2, borderRadius: 1, background: SEL }} />)}
+                {ALIGN_BAR_H.map((s, b) => <span key={b} style={{ width: horiz ? 2 : s, height: horiz ? s : 2, borderRadius: 2, background: ALIGN_BLUE }} />)}
               </span>
             ) : (
-              <span aria-hidden style={{ width: 3, height: 3, borderRadius: 3, background: FAINT }} />
+              <span aria-hidden style={{ width: 2, height: 2, borderRadius: '50%', background: FAINT }} />
             )}
           </button>
         )
