@@ -13,12 +13,12 @@
     "fontWeight": "450",
     "inkColor": "rgba(0, 0, 0, 0.898)",
     "measured": true,
-    "mutedInkColor": "rgba(0, 0, 0, 0.45)",
+    "mutedInkColor": "rgba(0, 0, 0, 0.3)",
     "mutedAllowedFields": [
       "X-position",
       "Y-position"
     ],
-    "_mutedNote": "Figma greys X/Y for auto-layout children (measured: grey 0/635 on Bottom Section, screenshot 2026-07-07); ours dims for position-driven elements \u2014 same semantic, state encoded per the transform-law."
+    "_mutedNote": "Figma greys layout-controlled X/Y at rgba(0,0,0,0.3) (FAINT) \u2014 measured LIVE from Figma DOM 2026-07-07 16:16, correcting an earlier oracle-from-artifact error where 0.45 was taken from the build."
   },
   "panel": {
     "figmaWidth": 241,

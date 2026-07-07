@@ -108,3 +108,6 @@ storybook-static
 # react-figma editor time-capsule history (private snapshot repo, never versioned)
 .editor-history/
 *--sandbox-*/
+
+# Playwright test-runner output (regenerable)
+test-results/
