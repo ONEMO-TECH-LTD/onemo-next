@@ -3,9 +3,9 @@
 | Check | Result |
 |---|---|
 | Elements (ID map) | 91 |
-| Token coverage (styleable) | **79%** (288 var-decls / 297 styleable) |
+| Token coverage (styleable) | **80%** (288 var-decls / 309 styleable) |
 | Unresolved `var(--…)` | **0** ✅ |
-| RAW values | 62 (worklist below) |
+| RAW values | 63 (worklist below) |
 | REFUSED nodes | 0 (design cleanup below) |
 | APPROXIMATIONS | 0 (lossy-but-deliberate, listed below) |
 | TOKEN VALUE PARITY | **0** ✅ |
@@ -19,6 +19,7 @@
 - .effect · `font-weight: 500` (css:60)
 - .canvas · `width: 100%` (css:89)
 - .rectangle49 · `border: 10px solid transparent` (css:105)
+- .rectangle49 · `box-shadow: 0 4px 9.7px 2px rgba(0, 0, 0, 0.25)` (css:106)
 - .rectangle49 · `border-radius: 40px` (css:107)
 - .bottomSection · `width: 100%` (css:114)
 - .tool2 · `gap: 10px` (css:305)

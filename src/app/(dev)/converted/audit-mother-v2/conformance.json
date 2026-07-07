@@ -3,9 +3,9 @@
   "nodeId": "4311:31631",
   "fileVersion": "2373493327970007291",
   "elements": 91,
-  "tokenCoveragePct": 79,
+  "tokenCoveragePct": 80,
   "tokenDecls": 288,
-  "styleableDecls": 297,
+  "styleableDecls": 309,
   "unresolved": [],
   "raws": [
     {
@@ -48,6 +48,13 @@
       "prop": "border",
       "value": "10px solid transparent",
       "line": 105,
+      "candidates": []
+    },
+    {
+      "className": "rectangle49",
+      "prop": "box-shadow",
+      "value": "0 4px 9.7px 2px rgba(0, 0, 0, 0.25)",
+      "line": 106,
       "candidates": []
     },
     {
