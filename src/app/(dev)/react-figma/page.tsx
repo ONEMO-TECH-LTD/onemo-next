@@ -911,11 +911,11 @@ function AlignGrid({ sel = 1, distributed = false, vertical = false, onSelect }:
    mock tree removed in the E2.1 deslop pass (no fake values — Dan's law). */
 type LayerIcon = 'frame' | 'image' | 'auto' | 'section' | 'toolbar' | 'component'
 type Node = { name: string; icon: LayerIcon; depth: number; kids?: boolean; open?: boolean; locked?: boolean; visible?: boolean; sel?: boolean; comp?: boolean }
-function LayerRow({ n, on, onToggle, onRename, rowId }: { n: Node; on?: () => void; onToggle?: () => void; onRename?: () => void; rowId?: string }) {
+function LayerRow({ n, on, onToggle, onRename, onContext, rowId }: { n: Node; on?: () => void; onToggle?: () => void; onRename?: () => void; onContext?: (e: React.MouseEvent) => void; rowId?: string }) {
   const [h, setH] = useState(false)
   const iconName: keyof typeof UI_ICON = n.icon === 'image' ? 'layerImage' : n.icon === 'auto' ? 'layerAuto' : n.icon === 'section' ? 'layerSection' : n.icon === 'toolbar' ? 'layerToolbar' : n.icon === 'component' ? 'layerComponent' : 'layerFrame'
   return (
-    <div data-layer-row={rowId} onClick={on} onDoubleClick={onRename} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
+    <div data-layer-row={rowId} onClick={on} onDoubleClick={onRename} onContextMenu={onContext} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
       style={{ display: 'grid', gridTemplateColumns: `${16 + n.depth * 24}px 16px minmax(0,1fr) 40px`, alignItems: 'center', height: 32, paddingRight: 8, background: n.sel ? '#dff3ff' : h ? '#f4f5f6' : 'transparent', cursor: 'pointer' }}>
       <span onClick={onToggle ? (e) => { e.stopPropagation(); onToggle() } : undefined} style={{ width: 16, height: 16, marginLeft: n.depth * 24, display: 'grid', placeItems: 'center', color: INK, cursor: onToggle ? 'pointer' : undefined }}>{n.kids && <UiIcon name={n.open ? 'caret16' : 'caretRight16'} size={16} />}</span>
       <span style={{ width: 16, height: 16, display: 'grid', placeItems: 'center', color: n.comp ? TOKEN : 'rgba(0,0,0,0.65)' }}><UiIcon name={iconName} size={16} /></span>
@@ -2298,6 +2298,26 @@ export default function ReactFigmaPage() {
       setFsData(d)
     }).catch(() => {})
   }, [fsPath, fsNonce])
+  // 3.0 (Dan): "pages section must only show pages … toggle to see what the build is made of."
+  // Pages-only (default) = the editor's own react-figma-pages sandbox — the user's pages, where a
+  // created page appears instantly (fixing "Plus does nothing"). Toggle off = the full folder browser.
+  const [pagesOnly, setPagesOnly] = useState(true)
+  const [editorPages, setEditorPages] = useState<{ name: string; route: string }[]>([])
+  useEffect(() => {
+    if (!fsData?.appStart) return
+    const p = `${fsData.appStart}/(dev)/react-figma-pages`
+    fetch(`/api/dev/editor-fs?path=${encodeURIComponent(p)}`).then((r) => r.ok ? r.json() : { dirs: [] })
+      .then((d: FsData) => setEditorPages((d.dirs ?? []).filter((x) => x.route).map((x) => ({ name: x.name, route: x.route! }))))
+      .catch(() => {})
+  }, [fsData?.appStart, fsNonce])
+  // 3.0 (Dan): right-click context menu for page/layer add·delete·duplicate·rename.
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: { label: string; onClick: () => void; danger?: boolean }[] } | null>(null)
+  useEffect(() => {
+    if (!ctxMenu) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setCtxMenu(null) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [ctxMenu])
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const rememberBuildSource = useCallback((source: BuildSource) => {
     setRecentBuilds((prev) => {
@@ -2879,6 +2899,28 @@ export default function ReactFigmaPage() {
     const r = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'rename-page', slug, newSlug: next }) })
     if (r.ok) { const d = await r.json() as { newValueText: string }; notify(`Renamed · ${d.newValueText}`); setFsNonce((n) => n + 1) } else notify(`Rename failed: ${await r.text()}`, 'error')
   }, [])
+  // 3.0 (Dan): page duplicate + layer duplicate/delete — all through the existing jailed, assertValidTsx-
+  // guarded ops (duplicate-page / duplicate-jsx / delete-jsx). No new source-mutation surface.
+  const duplicatePage = useCallback(async (slug: string) => {
+    const r = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'duplicate-page', slug }) })
+    if (r.ok) { const d = await r.json() as { newValueText: string; route: string }; notify(`Duplicated · ${d.newValueText}`); setBuildSources((s) => [...s, { key: d.route, name: d.newValueText, route: d.route, group: 'react-figma-pages' }]); setFsNonce((n) => n + 1) } else notify(`Duplicate failed: ${await r.text()}`, 'error')
+  }, [])
+  const layerSrc = useCallback((engId: string) => {
+    const src = (iframeRef.current?.contentDocument?.querySelector(`[data-eng-id="${engId}"]`) as HTMLElement | null)?.getAttribute('data-src')
+    const m = src?.match(/^(.*):(\d+):(\d+)$/)
+    return m ? { file: m[1], line: +m[2], col: +m[3] } : null
+  }, [])
+  const duplicateLayer = useCallback(async (engId: string) => {
+    const loc = layerSrc(engId); if (!loc) { notify('Layer not resolvable for duplicate', 'error'); return }
+    const r = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'duplicate-jsx', ...loc }) })
+    if (r.ok) notify('Layer duplicated'); else notify(`Duplicate failed: ${await r.text()}`, 'error')
+  }, [layerSrc])
+  const deleteLayer = useCallback(async (engId: string, name: string) => {
+    const loc = layerSrc(engId); if (!loc) { notify('Layer not resolvable for delete', 'error'); return }
+    if (!window.confirm(`Delete layer “${name}”? This removes it from the source.`)) return
+    const r = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'delete-jsx', ...loc }) })
+    if (r.ok) notify('Layer deleted'); else notify(`Delete failed: ${await r.text()}`, 'error')
+  }, [layerSrc])
 
   const pushTransform = useCallback((rot: string, fh: boolean, fv: boolean) => {
     const deg = parseFloat(rot) || 0
@@ -3445,13 +3487,29 @@ export default function ReactFigmaPage() {
             <div style={{ height: 25, display: 'flex', alignItems: 'center', padding: '0 16px', font: `400 11px/16px ${FONT}`, color: MUTE }}>Drafts ›</div>
             <div style={{ height: 40, padding: '0 8px 0 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={hdr}>Pages</span>
-              <span style={{ display: 'flex', gap: 4, color: MUTE }}><UiIB name="find" title="Find" active={layerQuery !== null} on={() => setLayerQuery(q => q === null ? '' : null)} /><UiIB name="plus" title="Add new page" on={() => void addPage()} /></span>
+              <span style={{ display: 'flex', gap: 4, color: MUTE }}><IB I={Sidebar} title={pagesOnly ? 'Show all build files' : 'Pages only'} active={!pagesOnly} s={15} on={() => setPagesOnly((v) => !v)} /><UiIB name="find" title="Find" active={layerQuery !== null} on={() => setLayerQuery(q => q === null ? '' : null)} /><UiIB name="plus" title="Add new page" on={() => void addPage()} /></span>
             </div>
             <div style={{ padding: '0 8px', height: pagesH, overflowY: 'auto' }}>
-              {/* LOCAL FOLDER BROWSER — navigable filesystem under the dev root.
-                  Row click: loadable screen → load in canvas; plain folder → enter.
-                  Caret always enters; '..' goes up. */}
-              {fsData && (
+              {/* 3.0 (Dan): PAGES-ONLY (default) — the editor's own page sandbox as a flat list; a created
+                  page appears here immediately. Right-click a row for rename/duplicate/delete. */}
+              {pagesOnly ? (
+                editorPages.length === 0 ? (
+                  <div style={{ height: 32, display: 'flex', alignItems: 'center', padding: '0 8px', font: `400 11px/16px ${FONT}`, color: FAINT }}>No pages yet — press + to add one</div>
+                ) : editorPages.map((pg) => (
+                  <div key={pg.route} onClick={() => switchCanvas(pg.name, pg.route)}
+                    onDoubleClick={(e) => { e.stopPropagation(); void renamePage(pg.name) }}
+                    onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, items: [
+                      { label: 'Rename', onClick: () => void renamePage(pg.name) },
+                      { label: 'Duplicate', onClick: () => void duplicatePage(pg.name) },
+                      { label: 'Delete', danger: true, onClick: () => void deletePage(pg.name) },
+                    ] }) }}
+                    style={{ height: 32, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', borderRadius: 5, background: pg.route === canvas.route ? '#f0f1f3' : 'transparent', font: `400 11px/16px ${FONT}`, color: INK, cursor: 'pointer' }}>
+                    <span style={{ width: 16, height: 16, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.65)' }}><UiIcon name="layerFrame" size={16} /></span>
+                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pg.name}</span>
+                    <span onClick={(e) => e.stopPropagation()} style={{ display: 'flex' }}><UiIB name="minus" title="Delete page" on={() => void deletePage(pg.name)} /></span>
+                  </div>
+                ))
+              ) : fsData && (
                 <>
                   {fsData.parent !== null && (
                     <div onClick={() => setFsPath(fsData.parent ?? '')} style={{ height: 32, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', borderRadius: 5, font: `400 11px/16px ${FONT}`, color: MUTE, cursor: 'pointer' }}>
@@ -3512,6 +3570,11 @@ export default function ReactFigmaPage() {
                   }).map((ln) => (
                     <LayerRow key={ln.id} rowId={ln.id}
                       onRename={() => { void renameLayer(ln.id, ln.name) }}
+                      onContext={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, items: [
+                        { label: 'Rename', onClick: () => void renameLayer(ln.id, ln.name) },
+                        { label: 'Duplicate', onClick: () => void duplicateLayer(ln.id) },
+                        { label: 'Delete', danger: true, onClick: () => void deleteLayer(ln.id, ln.name) },
+                      ] }) }}
                       n={{ name: ln.name, icon: ln.tag === 'img' ? 'image' : ln.tag === 'section' ? 'section' : ln.tag === 'button' ? 'component' : 'auto', depth: Math.min(ln.depth, 7), kids: ln.kids, open: !collapsed.has(ln.id), sel: ln.id === layerSelId, comp: ln.tag === 'button' }}
                       on={() => { const el = iframeRef.current?.contentDocument?.querySelector(`[data-eng-id="${ln.id}"]`); if (el) applySelection(el as HTMLElement) }}
                       onToggle={ln.kids ? () => setCollapsed((prev) => { const next = new Set(prev); if (next.has(ln.id)) next.delete(ln.id); else next.add(ln.id); return next }) : undefined} />
@@ -4001,6 +4064,17 @@ export default function ReactFigmaPage() {
         </div>
       </aside>
       </>)}
+      {ctxMenu && createPortal(
+        <div onClick={() => setCtxMenu(null)} onContextMenu={(e) => { e.preventDefault(); setCtxMenu(null) }} style={{ position: 'fixed', inset: 0, zIndex: 200 }}>
+          <div role="menu" data-figma-floating-root="true" onClick={(e) => e.stopPropagation()}
+            style={{ position: 'fixed', left: Math.min(ctxMenu.x, (typeof window !== 'undefined' ? window.innerWidth : 1728) - 180), top: Math.min(ctxMenu.y, (typeof window !== 'undefined' ? window.innerHeight : 1080) - 120), minWidth: 160, padding: '6px 0', borderRadius: 8, background: '#fff', boxShadow: 'rgba(0,0,0,0.15) 0px 2px 5px 0px, rgba(0,0,0,0.12) 0px 10px 16px 0px, rgba(0,0,0,0.12) 0px 0px 0.5px 0px' }}>
+            {ctxMenu.items.map((it, i) => (
+              <button key={i} type="button" onClick={() => { setCtxMenu(null); it.onClick() }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = '#f0f1f3')} onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                style={{ display: 'block', width: '100%', textAlign: 'left', appearance: 'none', border: 0, background: 'transparent', padding: '8px 14px', cursor: 'pointer', color: it.danger ? '#d93025' : INK, font: `400 12px/1 ${FONT}` }}>{it.label}</button>
+            ))}
+          </div>
+        </div>, document.body)}
       <Toaster />
     </div>
   )

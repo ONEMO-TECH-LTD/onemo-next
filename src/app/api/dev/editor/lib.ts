@@ -271,6 +271,7 @@ export type WriteOp =
   | { kind: 'insert-component'; file: string; line: number; col: number; name: string; importPath: string }
   | { kind: 'create-component'; name: string; category?: string; root?: 'project' | 'global' }
   | { kind: 'delete-page'; slug: string }
+  | { kind: 'duplicate-page'; slug: string }
   | { kind: 'rename-page'; slug: string; newSlug: string }
   | { kind: 'set-layer-name'; file: string; line: number; col: number; name: string }
   | { kind: 'rename-component'; name: string; newName: string }
@@ -488,7 +489,10 @@ async function createPage(op: Extract<WriteOp, { kind: 'create-page' }>): Promis
   const w = op.width ?? 402, h = op.height ?? 871
   const dir = path.join(parent, slug)
   await fs.mkdir(dir, { recursive: true })
-  const componentName = 'Page' + slug.replace(/(^|-)([a-z])/g, (_, __, c) => c.toUpperCase())
+  // 3.0 fix (Dan "Plus does nothing"): the old /(^|-)([a-z])/ missed digit-led segments, so
+  // slug `new-page-2` produced the INVALID identifier `PageNewPage-2` → build-500 on the 2nd
+  // page and the whole editor died. Uppercase the first char of EVERY [a-z0-9] segment.
+  const componentName = 'Page' + slug.replace(/(^|-)([a-z0-9])/g, (_, __, c) => c.toUpperCase())
   const scaffold = `export default function ${componentName}() {
   return (
     <div style={{ width: ${w}, height: ${h}, display: 'flex', flexDirection: 'column', background: '#fff', overflow: 'hidden' }}>
@@ -682,6 +686,25 @@ async function deletePage(op: Extract<WriteOp, { kind: 'delete-page' }>): Promis
   await fs.rm(dir, { recursive: true })
   await dropPageTypeStubs(op.slug)
   return { ok: true, file: `src/app/(dev)/react-figma-pages/${op.slug}`, newValueText: '(deleted)' }
+}
+/* 3.0 (Dan): duplicate a page inside the same jailed sandbox. Reads the source page.tsx, renames its
+   default-export component to the new slug (each page is its own module, so this only keeps names
+   readable), writes it under a fresh unique slug. Same hard jail as delete/rename — sandbox only. */
+async function duplicatePage(op: Extract<WriteOp, { kind: 'duplicate-page' }>): Promise<{ ok: true; file: string; newValueText: string; route: string }> {
+  const from = jailPageSlug(op.slug)
+  const srcFile = path.join(from, 'page.tsx')
+  let source: string
+  try { source = (await fs.readFile(srcFile)).toString('utf8') } catch { throw Object.assign(new Error('page not found'), { status: 404 }) }
+  const base = `${op.slug}-copy`
+  let slug = base, n = 1
+  while (true) { try { await fs.access(path.join(PAGES_DIR, slug)); slug = `${base}-${++n}` } catch { break } }
+  const componentName = 'Page' + slug.replace(/(^|-)([a-z0-9])/g, (_, __, c) => c.toUpperCase())
+  const next = source.replace(/export default function\s+\w+/, `export default function ${componentName}`)
+  assertValidTsx(srcFile, next)
+  const dir = path.join(PAGES_DIR, slug)
+  await fs.mkdir(dir, { recursive: true })
+  await fs.writeFile(path.join(dir, 'page.tsx'), next, 'utf8')
+  return { ok: true, file: `src/app/(dev)/react-figma-pages/${slug}/page.tsx`, newValueText: slug, route: `/react-figma-pages/${slug}` }
 }
 async function renamePage(op: Extract<WriteOp, { kind: 'rename-page' }>): Promise<{ ok: true; file: string; newValueText: string; route: string }> {
   const from = jailPageSlug(op.slug)
@@ -967,6 +990,7 @@ export async function applyWrite(op: WriteOp): Promise<{ ok: true; file: string;
   if (op.kind === 'duplicate-jsx') return duplicateJsx(op)
   if (op.kind === 'create-component') return createComponent(op)
   if (op.kind === 'delete-page') return deletePage(op)
+  if (op.kind === 'duplicate-page') return duplicatePage(op)
   if (op.kind === 'rename-page') return renamePage(op)
   if (op.kind === 'set-layer-name') return setLayerName(op)
   if (op.kind === 'rename-component') return renameComponentOp(op)
