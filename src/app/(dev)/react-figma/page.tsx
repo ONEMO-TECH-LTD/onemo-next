@@ -499,11 +499,12 @@ const MODE_CARET = '__caret__'
    the trailing edge. Every prior field variant (InspectorField / AutoValueField /
    InlineValueInput) is a thin wrapper over this — one anatomy, one implementation (Dan:
    "make a component and reuse, not vibe-code each"). */
-function FigmaField({ icon, letter, glyph, glyphWidth = 24, value, onChange, onCommit, token, suffix, ariaLabel, mode, modeOptions, onMode, picker = true, width, whiteBg, dim, valueInk, title, placeholder, inputRole = 'spinbutton' }: {
+function FigmaField({ icon, letter, glyph, glyphWidth = 24, value, onChange, onCommit, token, suffix, ariaLabel, mode, modeOptions, modeIcons, menuExtras, onMode, picker = true, width, whiteBg, dim, valueInk, title, placeholder, inputRole = 'spinbutton' }: {
   icon?: keyof typeof UI_ICON; letter?: string; glyph?: React.ReactNode; glyphWidth?: number; value: string; onChange?: (value: string) => void
   onCommit?: (value: string) => void
   token?: string; suffix?: string; ariaLabel: string
-  mode?: string; modeOptions?: [string, string][]; onMode?: (value: string) => void
+  mode?: string; modeOptions?: [string, string][]; modeIcons?: React.ReactNode[]; onMode?: (value: string) => void
+  menuExtras?: { label: string; icon?: React.ReactNode; onClick: () => void; dividerBefore?: boolean }[]
   picker?: boolean; width?: number | string; whiteBg?: boolean; dim?: boolean; valueInk?: string; title?: string; placeholder?: string; inputRole?: 'spinbutton' | 'textbox'
 }) {
   const [varOpen, setVarOpen] = useState(false)
@@ -599,13 +600,39 @@ function FigmaField({ icon, letter, glyph, glyphWidth = 24, value, onChange, onC
         </button>
       )}
       {modeOpen && modeOptions && (
-        <div role="presentation" data-figma-floating-root="true" style={{ position: 'absolute', zIndex: 130, top: 28, right: 0, minWidth: 140, padding: '8px 0 6px', borderRadius: 13, background: '#1e1e1e', color: '#fff', boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px' }}>
-          {modeOptions.map(([label, v]) => (
+        <div role="menu" data-figma-floating-root="true" style={{ position: 'absolute', zIndex: 130, top: 28, right: 0, minWidth: 200, padding: '8px 0 6px', borderRadius: 13, background: '#1e1e1e', color: '#fff', boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px' }}>
+          {/* Figma menu row: [check][icon][label] (Dan 2026-07-07 — resize dropdown parity) */}
+          {modeOptions.map(([label, v], i) => (
             <button key={label} type="button" role="menuitemradio" aria-checked={mode === label || mode === v} onClick={() => { onMode?.(v); setModeOpen(false) }}
-              style={{ appearance: 'none', border: 0, width: '100%', height: 24, background: 'transparent', color: '#fff', display: 'grid', gridTemplateColumns: '24px 1fr', alignItems: 'center', padding: '0 8px', cursor: 'pointer', font: `400 11px/24px ${FONT}`, textAlign: 'left' }}>
-              <span style={{ display: 'grid', placeItems: 'center' }}>{(mode === label || mode === v) && <MenuCheck />}</span><span>{label}</span>
+              style={{ appearance: 'none', border: 0, width: '100%', height: 28, background: 'transparent', color: '#fff', display: 'grid', gridTemplateColumns: '22px 22px 1fr', alignItems: 'center', padding: '0 12px 0 8px', cursor: 'pointer', font: `400 11px/28px ${FONT}`, textAlign: 'left' }}>
+              <span style={{ display: 'grid', placeItems: 'center' }}>{(mode === label || mode === v) && <MenuCheck />}</span>
+              <span style={{ display: 'grid', placeItems: 'center', color: '#fff' }}>{modeIcons?.[i]}</span>
+              <span>{label}</span>
             </button>
           ))}
+          {menuExtras?.map((ex) => (
+            <span key={ex.label} style={{ display: 'contents' }}>
+              {ex.dividerBefore && <div role="separator" style={{ height: 1, background: 'rgba(255,255,255,0.14)', margin: '6px 12px' }} />}
+              <button type="button" role="menuitem" onClick={() => { ex.onClick(); setModeOpen(false) }}
+                style={{ appearance: 'none', border: 0, width: '100%', height: 28, background: 'transparent', color: '#fff', display: 'grid', gridTemplateColumns: '22px 22px 1fr', alignItems: 'center', padding: '0 12px 0 8px', cursor: 'pointer', font: `400 11px/28px ${FONT}`, textAlign: 'left' }}>
+                <span />
+                <span style={{ display: 'grid', placeItems: 'center', color: '#fff' }}>{ex.icon}</span>
+                <span>{ex.label}</span>
+              </button>
+            </span>
+          ))}
+          {/* Figma's resize menu ends with "Apply variable…" — opens THIS field's picker (Dan parity). */}
+          {picker && onChange && (
+            <span style={{ display: 'contents' }}>
+              <div role="separator" style={{ height: 1, background: 'rgba(255,255,255,0.14)', margin: '6px 12px' }} />
+              <button type="button" role="menuitem" onClick={() => { setModeOpen(false); setVarOpen(true) }}
+                style={{ appearance: 'none', border: 0, width: '100%', height: 28, background: 'transparent', color: '#fff', display: 'grid', gridTemplateColumns: '22px 22px 1fr', alignItems: 'center', padding: '0 12px 0 8px', cursor: 'pointer', font: `400 11px/28px ${FONT}`, textAlign: 'left' }}>
+                <span />
+                <span style={{ display: 'grid', placeItems: 'center' }}><UiIcon name="variable" size={13} /></span>
+                <span>Apply variable…</span>
+              </button>
+            </span>
+          )}
         </div>
       )}
       {varOpen && onChange && <FigmaVariablePicker fieldLabel={ariaLabel} anchorRef={fieldRef} onPick={onChange} onClose={() => setVarOpen(false)} selected={bound ? (token?.startsWith('--') ? `var(${token})` : (varBinding(value) ? value.trim() : token)) : undefined} />}
@@ -722,8 +749,25 @@ function PickerMenuOption({ value, width, checked, onClick }: { value: string; w
    (2026-07-07, Dan's resize screenshots): Figma's Resizing fields show a W/H LETTER glyph in
    every mode (never arrow icons), sit on a TRANSPARENT container at rest (ghost — not the
    grey capsule), and render the value at rgba(0,0,0,0.5) ink. */
-function ResizeDropdownField({ axis, value, mode, onValue, onMode }: { axis: 'W' | 'H'; value: string; mode: ResizeMode; onValue: (value: string) => void; onMode: (mode: ResizeMode) => void }) {
+/* Figma resize-mode menu icons (thin 16px strokes, axis-aware). W = horizontal, H = vertical. */
+function ResizeMenuIcon({ kind, axis }: { kind: 'fixed' | 'hug' | 'fill' | 'min' | 'max'; axis: 'W' | 'H' }) {
+  const v = axis === 'H'
+  const d = {
+    // I-beam
+    fixed: v ? 'M6 3.5h4M6 12.5h4M8 3.5v9' : 'M3.5 6v4M12.5 6v4M3.5 8h9',
+    // arrows pointing INWARD (hug)
+    hug: v ? 'M8 2.5v3M6.5 4 8 5.5 9.5 4M8 13.5v-3M6.5 12 8 10.5 9.5 12' : 'M2.5 8h3M4 6.5 5.5 8 4 9.5M13.5 8h-3M12 6.5 10.5 8 12 9.5',
+    // arrows pointing OUTWARD (fill)
+    fill: v ? 'M8 5.5v-3M6.5 4 8 2.5 9.5 4M8 10.5v3M6.5 12 8 13.5 9.5 12' : 'M5.5 8h-3M4 6.5 2.5 8 4 9.5M10.5 8h3M12 6.5 13.5 8 12 9.5',
+    // bar + arrow toward it (min = toward the near edge, max = toward the far edge)
+    min: v ? 'M4 13h8M8 4v6M6 8l2 2 2-2' : 'M13 4v8M4 8h6M8 6l2 2-2 2',
+    max: v ? 'M4 3h8M8 12V6M6 8l2-2 2 2' : 'M3 4v8M12 8H6M8 6L6 8l2 2',
+  }[kind]
+  return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden><path d={d} stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" /></svg>
+}
+function ResizeDropdownField({ axis, value, mode, onValue, onMode, onAddMin, onAddMax }: { axis: 'W' | 'H'; value: string; mode: ResizeMode; onValue: (value: string) => void; onMode: (mode: ResizeMode) => void; onAddMin?: () => void; onAddMax?: () => void }) {
   const axisLabel = axis === 'W' ? 'width' : 'height'
+  const dim = axis === 'W' ? 'width' : 'height'
   return (
     <span data-resize-axis={axis} data-resize-mode={mode} style={{ display: 'contents' }}>
       <FigmaField glyphWidth={18} glyph={axis === 'W'
@@ -735,7 +779,12 @@ function ResizeDropdownField({ axis, value, mode, onValue, onMode }: { axis: 'W'
           : <span style={{ font: `450 11px/24px ${FONT}`, letterSpacing: '0.055px', color: 'rgba(0,0,0,0.5)' }}>H</span>} value={value} onChange={onValue} ariaLabel={`${axisLabel} value`}
         title={`${axis === 'W' ? 'Horizontal' : 'Vertical'} resizing: ${mode}`} width={88} valueInk="rgba(0,0,0,0.5)"
         mode={mode} onMode={next => onMode(next as ResizeMode)}
-        modeOptions={[[`Fixed ${axisLabel} (${value})`, 'Fixed'], ['Hug contents', 'Hug'], ['Fill container', 'Fill']]} />
+        modeOptions={[[`Fixed ${dim} (${value})`, 'Fixed'], ['Hug contents', 'Hug'], ['Fill container', 'Fill']]}
+        modeIcons={[<ResizeMenuIcon key="f" kind="fixed" axis={axis} />, <ResizeMenuIcon key="h" kind="hug" axis={axis} />, <ResizeMenuIcon key="l" kind="fill" axis={axis} />]}
+        menuExtras={[
+          { label: `Add min ${dim}…`, icon: <ResizeMenuIcon kind="min" axis={axis} />, onClick: () => onAddMin?.(), dividerBefore: true },
+          { label: `Add max ${dim}…`, icon: <ResizeMenuIcon kind="max" axis={axis} />, onClick: () => onAddMax?.() },
+        ]} />
     </span>
   )
 }
@@ -2139,6 +2188,11 @@ export default function ReactFigmaPage() {
   const [heightValue, setHeightValue] = useState('427')
   const [widthResize, setWidthResize] = useState<ResizeMode>('Fill')
   const [heightResize, setHeightResize] = useState<ResizeMode>('Fill')
+  // Figma resize min/max sizing (Dan 2026-07-07): null = not set; a string reveals the inline field.
+  const [minW, setMinW] = useState<string | null>(null)
+  const [maxW, setMaxW] = useState<string | null>(null)
+  const [minH, setMinH] = useState<string | null>(null)
+  const [maxH, setMaxH] = useState<string | null>(null)
   const [autoAlign, setAutoAlign] = useState(4)
   const [gapValue, setGapValue] = useState('10')
   const [paddingXValue, setPaddingXValue] = useState('0')
@@ -2372,6 +2426,9 @@ export default function ReactFigmaPage() {
     setAutoDistributed(c['justify-content'] === 'space-between') // Dan item 4: distributed state
     setWidthResize(parseFloat(c['flex-grow'] || '0') > 0 ? 'Fill' : d['width'] ? 'Fixed' : 'Hug')
     setHeightResize(d['height'] ? 'Fixed' : 'Hug')
+    // min/max sizing — reveal the inline field only when the element actually constrains it
+    const mm = (p: string, off: string) => { const v = c[p]; return !v || v === off || v === 'auto' ? null : px(v) }
+    setMinW(mm('min-width', '0px')); setMaxW(mm('max-width', 'none')); setMinH(mm('min-height', '0px')); setMaxH(mm('max-height', 'none'))
     // Typography — only when the element directly holds text (Figma shows Text section for text nodes)
     const hasText = [...el.childNodes].some((nn) => nn.nodeType === 3 && nn.textContent?.trim())
     if (hasText) {
@@ -2422,6 +2479,10 @@ export default function ReactFigmaPage() {
       : field === 'x' ? (positioned ? [['left', withUnit]] : [['position', 'relative'], ['left', withUnit]])
       : field === 'y' ? (positioned ? [['top', withUnit]] : [['position', 'relative'], ['top', withUnit]])
       : field === 'zIndex' ? [['z-index', n]]
+      : field === 'minWidth' ? [['min-width', n === '' ? 'auto' : withUnit]]
+      : field === 'maxWidth' ? [['max-width', n === '' ? 'none' : withUnit]]
+      : field === 'minHeight' ? [['min-height', n === '' ? 'auto' : withUnit]]
+      : field === 'maxHeight' ? [['max-height', n === '' ? 'none' : withUnit]]
       : field === 'insetT' ? [['top', withUnit]]
       : field === 'insetR' ? [['right', withUnit]]
       : field === 'insetB' ? [['bottom', withUnit]]
@@ -3697,10 +3758,27 @@ export default function ReactFigmaPage() {
               <UiIB name="autoLayoutWrap" title="Wrap" size={16} active={autoWrap} on={() => { const nv = !autoWrap; setAutoWrap(nv); applyOverride('flexWrap', nv ? 'wrap' : 'nowrap') }} />
             </InspectorRow>
             <InspectorRow label="Resizing">
-              <ResizeDropdownField axis="W" value={widthValue} mode={widthResize} onValue={(v) => { setWidthValue(v); applyOverride('width', v) }} onMode={(m) => { setWidthResize(m); applyOverride('widthMode', m) }} />
-              <ResizeDropdownField axis="H" value={heightValue} mode={heightResize} onValue={(v) => { setHeightValue(v); applyOverride('height', v) }} onMode={(m) => { setHeightResize(m); applyOverride('heightMode', m) }} />
+              <ResizeDropdownField axis="W" value={widthValue} mode={widthResize} onValue={(v) => { setWidthValue(v); applyOverride('width', v) }} onMode={(m) => { setWidthResize(m); applyOverride('widthMode', m) }}
+                onAddMin={() => { const dflt = widthValue || '0'; setMinW(dflt); applyOverride('minWidth', dflt) }} onAddMax={() => { const dflt = widthValue || '0'; setMaxW(dflt); applyOverride('maxWidth', dflt) }} />
+              <ResizeDropdownField axis="H" value={heightValue} mode={heightResize} onValue={(v) => { setHeightValue(v); applyOverride('height', v) }} onMode={(m) => { setHeightResize(m); applyOverride('heightMode', m) }}
+                onAddMin={() => { const dflt = heightValue || '0'; setMinH(dflt); applyOverride('minHeight', dflt) }} onAddMax={() => { const dflt = heightValue || '0'; setMaxH(dflt); applyOverride('maxHeight', dflt) }} />
               <UiIB name="lockAspect" title="Lock aspect ratio" active={aspectLocked} on={() => { const nv = !aspectLocked; setAspectLocked(nv); const w = parseFloat(widthValue), h = parseFloat(heightValue); applyOverride('aspectRatio', nv && w > 0 && h > 0 ? `${w} / ${h}` : 'auto') }} />
             </InspectorRow>
+            {/* Figma min/max sizing: an inline field appears once "Add min/max" is chosen; the − removes it */}
+            {(minW !== null || maxW !== null || minH !== null || maxH !== null) && (() => {
+              const rows: [string, string, string, (v: string | null) => void, string][] = []
+              if (minW !== null) rows.push(['Min W', minW, 'minWidth', setMinW, 'minWidth'])
+              if (maxW !== null) rows.push(['Max W', maxW, 'maxWidth', setMaxW, 'maxWidth'])
+              if (minH !== null) rows.push(['Min H', minH, 'minHeight', setMinH, 'minHeight'])
+              if (maxH !== null) rows.push(['Max H', maxH, 'maxHeight', setMaxH, 'maxHeight'])
+              return rows.map(([label, val, field, setter]) => (
+                <InspectorRow key={field} label={label} columns="minmax(88px,1fr) 24px">
+                  <FigmaField letter={label.split(' ')[1]} value={val} ariaLabel={`${label} value`} width="100%"
+                    onChange={(v) => { setter(v); applyOverride(field, v) }} />
+                  <UiIB name="minus" title={`Remove ${label}`} on={() => { setter(null); applyOverride(field, '') }} />
+                </InspectorRow>
+              ))
+            })()}
             <div style={{ position: 'relative', height: 82, width: '100%' }}>
               <span style={{ position: 'absolute', left: 16, top: 3.5, width: 88, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Alignment</span>
               <span style={{ position: 'absolute', left: 112, top: 3.5, width: 88, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Gap</span>
