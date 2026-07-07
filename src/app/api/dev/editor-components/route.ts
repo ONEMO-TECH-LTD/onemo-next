@@ -10,29 +10,17 @@
 import { NextResponse } from 'next/server'
 import { readdir, readFile } from 'node:fs/promises'
 import { join, relative, sep } from 'node:path'
-import * as ts from 'typescript'
-import { LIB_NAME, LIB_ROOT } from '../editor/lib'
+import { LIB_NAME, LIB_ROOT, exportedTsxNames } from '../editor/lib'
 
 const ROOT = process.cwd()
 const COMP_DIR = join(ROOT, 'src', 'app', '(dev)', 'react-figma-components')
 
 type Entry = { name: string; category: string; importPath: string; root: 'project' | 'global'; file: string; exports: string[] }
 
-/* Named exports of a component file = the component + its variants (v4.1 §4). Parsed
- * server-side from the file (always fresh — a NEW global file's variants are correct even
- * though webpack's context can't see new node_modules files until the barrel pulls them in). */
+/* Variants metadata: parsed server-side from the file (always fresh — a NEW global file's
+ * variants are correct even before webpack sees it). Parser shared with the barrel regen. */
 async function exportedNames(abs: string): Promise<string[]> {
-  try {
-    const sf = ts.createSourceFile(abs, await readFile(abs, 'utf8'), ts.ScriptTarget.ESNext, false, ts.ScriptKind.TSX)
-    const names: string[] = []
-    for (const st of sf.statements) {
-      const isExported = (st as { modifiers?: ts.NodeArray<ts.ModifierLike> }).modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
-      if (!isExported) continue
-      if (ts.isFunctionDeclaration(st) && st.name) names.push(st.name.text)
-      else if (ts.isVariableStatement(st)) for (const d of st.declarationList.declarations) if (ts.isIdentifier(d.name)) names.push(d.name.text)
-    }
-    return names
-  } catch { return [] }
+  try { return exportedTsxNames(abs, await readFile(abs, 'utf8')) } catch { return [] }
 }
 
 async function walkTsx(dir: string): Promise<string[]> {

@@ -693,6 +693,20 @@ async function renamePage(op: Extract<WriteOp, { kind: 'rename-page' }>): Promis
 /* #6 — "create a component in code" (Framer-style): scaffold a fresh, editable component file from a
    name. Same validated write as make-component (PascalCase name, collision-safe, assertValidTsx),
    but a blank starter instead of an extracted subtree. Appears in Assets + editable via Code mode. */
+/* Named exports of a component file = the component + its variants (v4.1 §4). Shared by the
+ * inventory route (variants metadata) and the barrel regenerator. */
+export function exportedTsxNames(abs: string, source: string): string[] {
+  const sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, false, ts.ScriptKind.TSX)
+  const names: string[] = []
+  for (const st of sf.statements) {
+    const isExported = (st as { modifiers?: ts.NodeArray<ts.ModifierLike> }).modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
+    if (!isExported) continue
+    if (ts.isFunctionDeclaration(st) && st.name) names.push(st.name.text)
+    else if (ts.isVariableStatement(st)) for (const d of st.declarationList.declarations) if (ts.isIdentifier(d.name)) names.push(d.name.text)
+  }
+  return names
+}
+
 /* E7.4 (KAI-9378, v4.1 N2): the library barrel is NEVER a client-write surface — the server
  * REGENERATES src/index.ts from an fs walk of the package src/ tree. Client inputs reach this
  * only as already-validated filenames; the .tsx-only write jail law is untouched. */
@@ -713,15 +727,7 @@ export async function regenerateLibraryBarrel(): Promise<void> {
   files.sort()
   const lines = ['// GENERATED barrel — server-regenerated from an fs walk of src/ (v4.1 N2). Do not hand-edit in builds.']
   for (const abs of files) {
-    const source = await fs.readFile(abs, 'utf8')
-    const sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, false, ts.ScriptKind.TSX)
-    const names: string[] = []
-    for (const st of sf.statements) {
-      const isExported = (st as { modifiers?: ts.NodeArray<ts.ModifierLike> }).modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
-      if (!isExported) continue
-      if (ts.isFunctionDeclaration(st) && st.name) names.push(st.name.text)
-      else if (ts.isVariableStatement(st)) for (const d of st.declarationList.declarations) if (ts.isIdentifier(d.name)) names.push(d.name.text)
-    }
+    const names = exportedTsxNames(abs, await fs.readFile(abs, 'utf8'))
     if (names.length) {
       const spec = './' + path.relative(libSrc, abs).replace(/\.tsx$/, '').split(path.sep).join('/')
       lines.push(`export { ${names.join(', ')} } from '${spec}'`)
