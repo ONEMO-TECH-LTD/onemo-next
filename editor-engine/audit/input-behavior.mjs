@@ -232,6 +232,25 @@ if (await hoverOp.count()) {
 }
 await page.unroute('**/api/dev/editor-resolve');
 
+// G15 — self-QA: EVERY labeled value field must revert its DISPLAY on undo (the rotation-class
+// bug swept across all fields: model reverts but display can lag if the field isn't re-read).
+const undoDisplaySweep = await page.evaluate(async () => {
+  const q = (a) => document.querySelector(`input[aria-label="${a}"]`);
+  const setV = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const bad = [];
+  for (const [aria, v] of [['X-position','25'],['Y-position','25'],['Rotation','33'],['z-index','4'],['width value','300'],['Gap value','12'],['Horizontal padding','20'],['Vertical padding','20'],['Opacity','60'],['Corner radius','15']]) {
+    const inp = q(aria); if (!inp) continue;
+    const orig = inp.value;
+    inp.focus(); setV.call(inp, v); inp.dispatchEvent(new Event('input', { bubbles: true }));
+    inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await sleep(180);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', metaKey: true, bubbles: true })); await sleep(250);
+    if (q(aria).value !== orig) bad.push(`${aria}: ${q(aria).value}≠${orig}`);
+  }
+  return bad;
+});
+gate('EVERY field reverts DISPLAY on undo', '[]', JSON.stringify(undoDisplaySweep));
+
 await browser.close();
 writeFileSync(path.join(OUT, 'behavior-gates.json'), JSON.stringify({ url: URL_, at: new Date().toISOString(), rows }, null, 2));
 const lines = rows.map((r) => `${r.pass ? 'PASS' : 'FAIL'}  ${r.name} · expected ${r.expected} · actual ${r.actual}`);
