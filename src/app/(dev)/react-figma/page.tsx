@@ -481,17 +481,54 @@ function FigmaField({ icon, letter, glyph, value, onChange, onCommit, token, suf
   const [h, setH] = useState(false)
   const fieldRef = useCloseOnOutside<HTMLDivElement>(varOpen || modeOpen, () => { setVarOpen(false); setModeOpen(false) })
   const bound = !!token || varBinding(value)
+  /* E8 item 11 (contract: inputCommitSemantics, PROVEN in real Figma): typing edits a LOCAL
+   * draft only — Enter commits (single onChange → single undo entry), blur/Esc REVERT to the
+   * incoming value. Fixes item 10's undo granularity too (no per-keystroke history pollution). */
+  const [draft, setDraft] = useState<string | null>(null)
+  const editing = draft !== null
+  const commitDraft = () => { if (editing) { if (draft !== value) onChange?.(draft); setDraft(null) } }
+  const revertDraft = () => setDraft(null)
+  /* E8 item 12 (contract: scrub): dragging the leading glyph/label scrubs the value —
+   * ew-resize cursor, 1 unit per px (Shift ×10), single commit on release. */
+  const scrub = useRef<{ startX: number; startVal: number; moved: boolean; pointerId: number; lastVal: number } | null>(null)
+  const numeric = onChange && !bound && /^-?\d*\.?\d*$/.test(String(value).replace(/(px|%|°)$/, ''))
+  const scrubDown = (e: React.PointerEvent) => {
+    if (!numeric || !onChange) return
+    const startVal = parseFloat(String(value)) || 0
+    scrub.current = { startX: e.clientX, startVal, moved: false, pointerId: e.pointerId, lastVal: startVal }
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+  }
+  const scrubMove = (e: React.PointerEvent) => {
+    const s = scrub.current; if (!s) return
+    const dx = e.clientX - s.startX
+    if (!s.moved && Math.abs(dx) < 2) return
+    s.moved = true
+    const step = e.shiftKey ? 10 : 1
+    s.lastVal = Math.round(s.startVal + dx * step)
+    setDraft(String(s.lastVal))
+  }
+  const scrubUp = () => {
+    const s = scrub.current; scrub.current = null
+    // commit from the REF — the state draft can lag a frame behind the last pointermove
+    if (s?.moved) { onChange?.(String(s.lastVal)); setDraft(null) }
+  }
+  const shown = editing ? draft : value
   const cols = `24px minmax(0,1fr)${suffix && !bound ? ' auto' : ''}${mode ? ' auto' : ''}${picker && onChange ? ' 16px' : ''}`
   return (
     <div ref={fieldRef} title={title ?? token} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
       style={{ position: 'relative', minWidth: 0, width, height: 24, borderRadius: 5, background: whiteBg ? (h ? '#ededed' : '#fff') : FIELD, border: `1px solid ${varOpen || modeOpen ? SEL : whiteBg ? '#e6e6e6' : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: cols, alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
-      <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)', font: `450 11px/24px ${FONT}` }}>{icon ? <UiIcon name={icon} /> : glyph ?? letter}</span>
+      <span onPointerDown={scrubDown} onPointerMove={scrubMove} onPointerUp={scrubUp}
+        style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)', font: `450 11px/24px ${FONT}`, cursor: numeric ? 'ew-resize' : undefined, touchAction: 'none' }}>{icon ? <UiIcon name={icon} /> : glyph ?? letter}</span>
       {bound ? (
         <TokenPill token={token ?? value} onClick={onChange ? () => setVarOpen(true) : undefined} />
       ) : onChange ? (
-        <input aria-label={ariaLabel} role={inputRole} value={value} placeholder={placeholder} onChange={e => onChange(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
-          onBlur={e => onCommit?.(e.currentTarget.value)}
-          onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
+        <input aria-label={ariaLabel} role={inputRole} value={shown} placeholder={placeholder}
+          onChange={e => setDraft(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
+          onBlur={() => { if (onCommit && editing) { onCommit(draft!); setDraft(null) } else revertDraft() }}
+          onKeyDown={e => {
+            if (e.key === 'Enter') { commitDraft(); onCommit?.(editing ? draft! : String(value)); e.currentTarget.blur() }
+            else if (e.key === 'Escape') { revertDraft(); e.currentTarget.blur(); e.stopPropagation() }
+          }}
           style={{ minWidth: 0, width: '100%', height: 22, border: 0, outline: 0, padding: 0, background: 'transparent', color: dim ? MUTE : INK, font: `450 11px/16px ${FONT}` }} />
       ) : (
         <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: dim ? MUTE : INK }}>{value}</span>
@@ -2027,9 +2064,10 @@ export default function ReactFigmaPage() {
   const [view, setView] = useState({ x: 300, y: 70, z: 0.6 })
   const [frameKind, setFrameKind] = useState<FrameKind>('Frame')
   const [framePreset, setFramePreset] = useState<FramePreset>({ label: 'iPhone 17', size: '402 × 874' })
+  const framePresetRef = useRef(framePreset); useEffect(() => { framePresetRef.current = framePreset }, [framePreset])
   const [xValue, setXValue] = useState('0')
   const [yValue, setYValue] = useState('122')
-  const [rotationValue, setRotationValue] = useState('0°')
+  const [rotationValue, setRotationValue] = useState('0') // numeric only — ° is a display transform (E8 item 10)
   const [cssPosition, setCssPosition] = useState(2)
   const [zIndexValue, setZIndexValue] = useState('1')
   const [autoFlow, setAutoFlow] = useState<AutoFlow>('horizontal')
@@ -2877,7 +2915,10 @@ export default function ReactFigmaPage() {
   const undoEdit = useCallback(() => {
     const step = historyRef.current.pop()
     if (!step) { notify('Nothing to undo'); return }
-    for (const c of step) { if (c.before === null) ov.current!.discard(c.id, c.prop); else ov.current!.set(c.id, c.prop, c.before, c.before) }
+    for (const c of step) {
+      if (c.id === '__frame__') { setFramePreset(JSON.parse(c.before ?? 'null') ?? framePresetRef.current); continue } // E8: frame preset is undoable
+      if (c.before === null) ov.current!.discard(c.id, c.prop); else ov.current!.set(c.id, c.prop, c.before, c.before)
+    }
     redoRef.current.push(step)
     setOvVersion((v) => v + 1)
     const el = selIdRef.current ? iframeRef.current?.contentDocument?.querySelector(`[data-eng-id="${selIdRef.current}"]`) as HTMLElement | null : null
@@ -2887,7 +2928,10 @@ export default function ReactFigmaPage() {
   const redoEdit = useCallback(() => {
     const step = redoRef.current.pop()
     if (!step) { notify('Nothing to redo'); return }
-    for (const c of step) ov.current!.set(c.id, c.prop, c.after, c.after)
+    for (const c of step) {
+      if (c.id === '__frame__') { setFramePreset(JSON.parse(c.after)); continue }
+      ov.current!.set(c.id, c.prop, c.after, c.after)
+    }
     historyRef.current.push(step)
     setOvVersion((v) => v + 1)
     const el = selIdRef.current ? iframeRef.current?.contentDocument?.querySelector(`[data-eng-id="${selIdRef.current}"]`) as HTMLElement | null : null
@@ -3440,7 +3484,8 @@ export default function ReactFigmaPage() {
           )}
           {/* Frame preset + actions */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 48, padding: '4px 8px' }}>
-            <FramePresetDropdown kind={frameKind} preset={framePreset} onKind={setFrameKind} onPreset={setFramePreset} />
+            <FramePresetDropdown kind={frameKind} preset={framePreset} onKind={setFrameKind}
+              onPreset={(next) => { historyRef.current.push([{ id: '__frame__', prop: 'preset', before: JSON.stringify(framePresetRef.current), after: JSON.stringify(next) }]); redoRef.current.length = 0; setFramePreset(next) }} />
             {/* selection identity label removed from render — right panel matches Codex's
                 shell exactly (Dan, 2026-07-04); sel payload still logged + in state */}
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
@@ -3462,9 +3507,10 @@ export default function ReactFigmaPage() {
               <span />
             </PositionRow>
             <PositionRow label="Rotation">
-              <InspectorField icon="rotationField" value={rotationValue} ariaLabel="Rotation" onChange={(v) => { setRotationValue(v); pushTransform(v, flipH, flipV) }} />
+              {/* E8 item 10: Figma shows the degree suffix IN the value (contract: rotation.example "0°") */}
+              <InspectorField icon="rotationField" value={rotationValue === '' ? '' : `${parseFloat(rotationValue) || 0}°`} ariaLabel="Rotation" onChange={(v) => { const n = v.replace(/[^\d.-]/g, ''); setRotationValue(n); pushTransform(n, flipH, flipV) }} />
               <div style={{ display: 'flex', gap: 1, width: '100%' }}>
-                <FSegBtn name="rotate" pos="l" fill title="Rotate 90° right" on={() => { const next = String(((parseFloat(rotationValue) || 0) + 90) % 360) + '°'; setRotationValue(next); pushTransform(next, flipH, flipV) }} />
+                <FSegBtn name="rotate" pos="l" fill title="Rotate 90° right" on={() => { const next = String(((parseFloat(rotationValue) || 0) + 90) % 360); setRotationValue(next); pushTransform(next, flipH, flipV) }} />
                 <FSegBtn name="flipH" pos="m" fill active={flipH} title="Flip horizontal" on={() => { const nv = !flipH; setFlipH(nv); pushTransform(rotationValue, nv, flipV) }} />
                 <FSegBtn name="flipV" pos="r" fill active={flipV} title="Flip vertical" on={() => { const nv = !flipV; setFlipV(nv); pushTransform(rotationValue, flipH, nv) }} />
               </div>
