@@ -1100,25 +1100,47 @@ function VariablesLibrary() {
           {imported ? (
             importedRows.length === 0
               ? <div style={{ padding: '16px', color: MUTE, font: `400 11px/1 ${FONT}` }}>No variables match.</div>
-              : importedRows.map((v, i) => {
-                  const code = activeImported && v.path ? byPath.get(`${collCamelClient(activeImported.name)} / ${v.path}`) : undefined
-                  return (
-                    <div key={`${v.name}-${i}`} title={v.scopes?.join(', ')} style={{ minHeight: 34, borderBottom: '1px solid #f2f2f3', display: 'flex', alignItems: 'center', font: `400 11px/1 ${FONT}` }}>
-                      <span style={{ width: colW.name, padding: '0 16px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: INK }}>{v.name}</span>
-                      {v.values.map((val, k) => (
-                        <span key={k} style={{ flex: 1, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                          {isColorVal(val) && <span style={{ flex: 'none', width: 14, height: 14, borderRadius: 3, background: val, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.12)' }} />}
-                          <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{val}</span>
+              : (() => {
+                  // 2.9 (Dan): the Figma (imported) view was flat — no group headers, and an icon only on
+                  // colours. Figma groups variables by their name's slash-path and shows a type icon on
+                  // every row. Bring it to parity with the DS view: group headers + leading type icon +
+                  // leaf name in the row (group lives in the header).
+                  const out: React.ReactNode[] = []
+                  let lastGroup: string | null = null
+                  for (let i = 0; i < importedRows.length; i++) {
+                    const v = importedRows[i]
+                    const segs = v.name.split('/').filter(Boolean)
+                    const grp = segs.length > 1 ? segs.slice(0, -1).join(' / ') : ''
+                    if (grp !== lastGroup) {
+                      lastGroup = grp
+                      if (grp) out.push(<div key={`h-${grp}-${i}`} style={{ padding: '12px 16px 6px', font: `600 11px/1 ${FONT}`, color: INK }}>{grp}</div>)
+                    }
+                    const leaf = segs.length ? segs[segs.length - 1] : v.name
+                    const swatch = v.values.find(isColorVal)
+                    const isColor = v.type === 'COLOR' || !!swatch
+                    const code = activeImported && v.path ? byPath.get(`${collCamelClient(activeImported.name)} / ${v.path}`) : undefined
+                    out.push(
+                      <div key={`${v.name}-${i}`} title={v.scopes?.join(', ')} style={{ minHeight: 34, borderBottom: '1px solid #f2f2f3', display: 'flex', alignItems: 'center', font: `400 11px/1 ${FONT}` }}>
+                        <span style={{ width: colW.name, padding: '0 16px', minWidth: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+                          {isColor && swatch ? <span style={{ flex: 'none', width: 14, height: 14, borderRadius: 3, background: swatch, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.12)' }} /> : <VariableHashIcon />}
+                          <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: INK }}>{leaf}</span>
                         </span>
-                      ))}
-                      <span style={{ width: colW.css, padding: '0 12px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: MUTE, borderLeft: `1px solid ${LINE}`, alignSelf: 'stretch', display: 'flex', alignItems: 'center' }}>{code?.cssVar ?? '—'}</span>
-                      <span style={{ flex: 1, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                        {code && code.kind === 'color' && <span style={{ flex: 'none', width: 14, height: 14, borderRadius: 3, background: code.value, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.12)' }} />}
-                        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{code?.value ?? ''}</span>
-                      </span>
-                    </div>
-                  )
-                })
+                        {v.values.map((val, k) => (
+                          <span key={k} style={{ flex: 1, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                            {isColorVal(val) && <span style={{ flex: 'none', width: 14, height: 14, borderRadius: 3, background: val, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.12)' }} />}
+                            <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{val}</span>
+                          </span>
+                        ))}
+                        <span style={{ width: colW.css, padding: '0 12px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: MUTE, borderLeft: `1px solid ${LINE}`, alignSelf: 'stretch', display: 'flex', alignItems: 'center' }}>{code?.cssVar ?? '—'}</span>
+                        <span style={{ flex: 1, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                          {code && code.kind === 'color' && <span style={{ flex: 'none', width: 14, height: 14, borderRadius: 3, background: code.value, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.12)' }} />}
+                          <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{code?.value ?? ''}</span>
+                        </span>
+                      </div>,
+                    )
+                  }
+                  return out
+                })()
           ) : (() => {
             const valCell = (val: string, isColor: boolean) => (
               <span style={{ flex: 1, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
