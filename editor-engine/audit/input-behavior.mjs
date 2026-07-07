@@ -142,6 +142,13 @@ if (await moreBtn.count()) {
   } else { gate('distribute menu has options', 'true', false); await page.keyboard.press('Escape'); }
 } else gate('distribute control present', 'true', false);
 
+// G10 — item 9 (scroll half): overflow control writes the model
+const scrollSeg = page.locator('[role="radiogroup"][aria-label="Scroll overflow"] button').filter({ hasText: 'Hidden' });
+if (await scrollSeg.count()) {
+  await scrollSeg.click(); await page.waitForTimeout(300);
+  gate('scroll overflow writes model', 'true', /overflow: hidden/.test(await model()));
+} else gate('scroll control present', 'true', false);
+
 await browser.close();
 writeFileSync(path.join(OUT, 'behavior-gates.json'), JSON.stringify({ url: URL_, at: new Date().toISOString(), rows }, null, 2));
 const lines = rows.map((r) => `${r.pass ? 'PASS' : 'FAIL'}  ${r.name} · expected ${r.expected} · actual ${r.actual}`);

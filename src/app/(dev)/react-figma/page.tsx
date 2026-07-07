@@ -2069,6 +2069,7 @@ export default function ReactFigmaPage() {
   const [yValue, setYValue] = useState('122')
   const [rotationValue, setRotationValue] = useState('0') // numeric only — ° is a display transform (E8 item 10)
   const [cssPosition, setCssPosition] = useState(2)
+  const [overflowIdx, setOverflowIdx] = useState(0) // E8 item 9: Scroll (overflow) control
   const [zIndexValue, setZIndexValue] = useState('1')
   const [autoFlow, setAutoFlow] = useState<AutoFlow>('horizontal')
   const [autoWrap, setAutoWrap] = useState(false)
@@ -2324,6 +2325,7 @@ export default function ReactFigmaPage() {
       : field === 'x' ? (positioned ? [['left', withUnit]] : [['position', 'relative'], ['left', withUnit]])
       : field === 'y' ? (positioned ? [['top', withUnit]] : [['position', 'relative'], ['top', withUnit]])
       : field === 'zIndex' ? [['z-index', n]]
+      : field === 'overflow' ? [['overflow', n]] // E8 item 9 (scroll half): Framer's Scroll = CSS overflow
       : field === 'strokeWeight' ? [['border-width', withUnit]]
       : field === 'strokeTop' ? [['border-top-width', withUnit]]
       : field === 'strokeRight' ? [['border-right-width', withUnit]]
@@ -3520,6 +3522,10 @@ export default function ReactFigmaPage() {
               {/* E8 annotation: per-option tooltips answer "what does Auto do?" — Auto = normal
                   document flow (CSS static), the default before any pinning */}
               <TextSegGroup items={['Auto', 'Rel', 'Abs', 'Fix', 'Sticky']} titles={['Normal flow (CSS static) — element sits where the layout puts it', 'Relative — nudge from its normal spot; children anchor to it', 'Absolute — pin to the nearest positioned parent', 'Fixed — pin to the screen', 'Sticky — scrolls, then pins']} active={cssPosition} onSelect={(i) => { setCssPosition(i); applyOverride('cssPosition', ['static', 'relative', 'absolute', 'fixed', 'sticky'][i]) }} width="100%" ariaLabel="CSS position" />
+            </InspectorRow>
+            {/* E8 item 9 (Framer Scroll semantics, Figma DS chrome): overflow behavior */}
+            <InspectorRow label="Scroll" columns="1fr">
+              <TextSegGroup items={['Visible', 'Hidden', 'Scroll', 'Auto']} titles={['Content can spill out (overflow: visible)', 'Clip overflowing content (overflow: hidden)', 'Always show scrollbars (overflow: scroll)', 'Scroll only when needed (overflow: auto)']} active={overflowIdx} onSelect={(i) => { setOverflowIdx(i); applyOverride('overflow', ['visible', 'hidden', 'scroll', 'auto'][i]) }} width="100%" ariaLabel="Scroll overflow" />
             </InspectorRow>
             <CompactInspectorRow label="z-index">
               <InspectorField label="Z" value={zIndexValue} ariaLabel="z-index" onChange={(v) => { setZIndexValue(v); applyOverride('zIndex', v) }} />
