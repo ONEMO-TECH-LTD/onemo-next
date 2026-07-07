@@ -12,12 +12,28 @@
  */
 const ts = require('typescript');
 const path = require('path');
+const fs = require('fs');
+
+/* E7.1 (KAI-9375, lead F1): files from the global component library get a PACKAGE-NAME-PREFIXED
+ * identity ("onemo-component-library/src/...") — never a `..`-relative path, whose depth differs
+ * per checkout (worktree vs clone) and breaks selection identity. Resolved once per process. */
+const LIB_NAME = 'onemo-component-library';
+let libRoot = null;
+try {
+  libRoot = fs.realpathSync(path.dirname(require.resolve(`${LIB_NAME}/package.json`, { paths: [process.cwd()] })));
+} catch { /* library not installed — repo-relative tagging only */ }
 
 module.exports = function taggingLoader(source) {
   // Only ever wired in dev (next.config gate), but double-guard anyway.
   if (process.env.NODE_ENV === 'production') return source;
 
-  const rel = path.relative(this.rootContext || process.cwd(), this.resourcePath);
+  let rel;
+  const real = fs.realpathSync(this.resourcePath);
+  if (libRoot && real.startsWith(libRoot + path.sep)) {
+    rel = `${LIB_NAME}/${path.relative(libRoot, real)}`;
+  } else {
+    rel = path.relative(this.rootContext || process.cwd(), this.resourcePath);
+  }
 
   let sf;
   try {

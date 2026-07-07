@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // E7.1 (KAI-9375): the global component library ships as TS source — compiled by the
+  // consuming build via transpilePackages (QA R1-proven config; architecture v4.1 §3).
+  transpilePackages: ["onemo-component-library"],
   // Effect-creator G5: cross-origin isolation so onnxruntime-web's wasm fallback can run
   // MULTI-THREADED (SharedArrayBuffer needs COOP+COEP). Without these headers a device without
   // WebGPU falls back to SINGLE-threaded wasm — historically a 30–60 s page freeze per Magic run.
@@ -32,10 +35,23 @@ const nextConfig: NextConfig = {
     // See src/app/(dev)/react-figma/ENGINE-PLAN.md (M1).
     if (dev) {
       const nodePath = require("node:path");
+      // storybook/ included so screens hosted on the canvas route (Editor402) carry data-src too.
+      const tagIncludes = [nodePath.join(process.cwd(), "src"), nodePath.join(process.cwd(), "storybook")];
+      // E7.1 (KAI-9375): global component library source is tagged too, so library components are
+      // selectable/editable in the editor (QA R2-proven include). Resolved via require.resolve —
+      // never a hardcoded relative depth (checkout-independent, lead F1).
+      try {
+        const nodeFs = require("node:fs");
+        const pkgRoot = nodeFs.realpathSync(
+          nodePath.dirname(require.resolve("onemo-component-library/package.json", { paths: [process.cwd()] }))
+        );
+        tagIncludes.push(nodePath.join(pkgRoot, "src"));
+      } catch {
+        // library not installed in this checkout — editor works, library features absent
+      }
       config.module.rules.unshift({
         test: /\.tsx$/,
-        // storybook/ included so screens hosted on the canvas route (Editor402) carry data-src too
-        include: [nodePath.join(process.cwd(), "src"), nodePath.join(process.cwd(), "storybook")],
+        include: tagIncludes,
         enforce: "pre",
         use: [{ loader: nodePath.resolve(process.cwd(), "editor-engine/tagging-loader.cjs") }],
       });
