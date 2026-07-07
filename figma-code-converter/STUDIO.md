@@ -3,9 +3,16 @@
 One deterministic block: paste a Figma frame link, get a converted, gate-checked, auditable
 screen as a tab. No coding, no agents — the entire pipeline runs by itself.
 
+## Launch from the Dock (the app)
+
+**`launcher/FigmaConverter.app`** — double-click it (or keep it in the Dock: drag it there once,
+or right-click its Dock icon while running → Options → Keep in Dock). Every launch it checks the
+two servers, starts whichever is down, waits until ready, and opens the studio as its own
+chrome-less app window. Failures show a macOS alert with the log path — never silent.
+
 ## How to use (the 60-second manual)
 
-1. **Start the two servers** (each once, they keep running):
+1. **Start the two servers** (the Dock app does this for you — manual path below) (each once, they keep running):
    - the Next dev app (renders the converted React): `npm run dev` in the app worktree (port 3077)
    - the studio: `npm run studio` in `figma-code-converter/` (port 3900) — the tool lives at the repo root of onemo-next
 2. **Open `http://localhost:3900`** — the audit console with a browser-style tab strip on top.

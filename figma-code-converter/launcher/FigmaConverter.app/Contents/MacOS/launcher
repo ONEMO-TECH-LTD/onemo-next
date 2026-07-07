@@ -1,0 +1,28 @@
+#!/bin/bash
+# Figma Converter launcher — dockable. Ensures both servers, then opens the studio as an
+# app window. Deterministic: same checks every launch, everything loud (macOS alerts on fail).
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+# the .app lives at <tool>/launcher/FigmaConverter.app → tool root is 3 dirs up
+TOOL="$(cd "$(dirname "$0")/../../../.."; pwd)"
+APP_REPO="$(cd "$TOOL/.."; pwd)"
+STUDIO_URL="http://127.0.0.1:3900"
+fail(){ osascript -e "display alert \"Figma Converter\" message \"$1\""; exit 1; }
+up(){ curl -s -o /dev/null -m 2 -w '%{http_code}' "$1" 2>/dev/null; }
+command -v node >/dev/null || fail "node not found on PATH"
+# 1. Next dev app (:3077) — renders the converted screens
+if [ "$(up http://127.0.0.1:3077)" = "000" ]; then
+  ( cd "$APP_REPO" && PORT=3077 nohup npm run dev >/tmp/figma-converter-next.log 2>&1 & )
+fi
+# 2. studio server (:3900)
+if [ "$(up $STUDIO_URL)" = "000" ]; then
+  ( cd "$TOOL" && nohup node studio/server.mjs >/tmp/figma-converter-studio.log 2>&1 & )
+fi
+# 3. wait for the studio (Next may still be compiling — the console proxies when it's ready)
+for i in $(seq 1 40); do [ "$(up $STUDIO_URL)" = "200" ] && break; sleep 1; done
+[ "$(up $STUDIO_URL)" = "200" ] || fail "studio did not start — see /tmp/figma-converter-studio.log"
+# 4. open as an app window (chrome-less) — falls back to the default browser
+if [ -d "/Applications/Google Chrome.app" ]; then
+  open -na "Google Chrome" --args --app="$STUDIO_URL"
+else
+  open "$STUDIO_URL"
+fi
