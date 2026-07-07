@@ -1,0 +1,329 @@
+.fixtureBoard {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  background-color: #f7f7fa;
+}
+
+.fxTextWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 8px;
+  overflow: hidden;
+  width: 240px;
+  flex-shrink: 0;
+  background-color: #ffffff;
+}
+
+.multiLineWrappingTextFixtureThatMustBreakAcrossSeveralLinesExactlyLikeFigmaDoes {
+  flex-shrink: 0;
+  color: #000000;
+  font-family: 'Chillax';
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.fxTextTruncate {
+  width: 200px;
+  height: 36px;
+  flex-shrink: 0;
+  position: relative;
+  background-color: #ffffff;
+}
+
+.truncatedTextFixtureThatIsFarTooLongToFit {
+  width: 184px;
+  height: 20px;
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  color: #000000;
+  font-family: 'Chillax';
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fxSpaceBetween {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  overflow: hidden;
+  height: 40px;
+  flex-shrink: 0;
+  background-color: #ffffff;
+}
+
+.rectangle {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  background-color: #598ce5;
+}
+
+.rectangle2 {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  background-color: #598ce5;
+}
+
+.rectangle3 {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  background-color: #598ce5;
+}
+
+.fxNegativeGap {
+  display: flex;
+  align-items: flex-start;
+  overflow: hidden;
+  height: 40px;
+  flex-shrink: 0;
+  background-color: #ffffff;
+}
+
+.ellipse {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.ellipse2 {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  margin-left: -10px;
+}
+
+.ellipse3 {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  margin-left: -10px;
+}
+
+.ellipse4 {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  margin-left: -10px;
+}
+
+.fxWrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+  overflow: hidden;
+  width: 180px;
+  flex-shrink: 0;
+  background-color: #ffffff;
+}
+
+.rectangle4 {
+  width: 40px;
+  height: 20px;
+  flex-shrink: 0;
+  background-color: #262633;
+}
+
+.rectangle5 {
+  width: 40px;
+  height: 20px;
+  flex-shrink: 0;
+  background-color: #262633;
+}
+
+.rectangle6 {
+  width: 40px;
+  height: 20px;
+  flex-shrink: 0;
+  background-color: #262633;
+}
+
+.rectangle7 {
+  width: 40px;
+  height: 20px;
+  flex-shrink: 0;
+  background-color: #262633;
+}
+
+.rectangle8 {
+  width: 40px;
+  height: 20px;
+  flex-shrink: 0;
+  background-color: #262633;
+}
+
+.rectangle9 {
+  width: 40px;
+  height: 20px;
+  flex-shrink: 0;
+  background-color: #262633;
+}
+
+.rectangle10 {
+  width: 40px;
+  height: 20px;
+  flex-shrink: 0;
+  background-color: #262633;
+}
+
+.fxAbsolute {
+  width: 200px;
+  height: 80px;
+  flex-shrink: 0;
+  position: relative;
+  background-color: #ffffff;
+}
+
+.rectangle11 {
+  width: 30px;
+  height: 30px;
+  position: absolute;
+  left: 12px;
+  top: 10px;
+  background-color: #e55966;
+}
+
+.rectangle12 {
+  width: 30px;
+  height: 30px;
+  position: absolute;
+  left: 150px;
+  top: 38px;
+  background-color: #598ce5;
+}
+
+.fxRotate30 {
+  width: 160px;
+  height: 70px;
+  flex-shrink: 0;
+  position: relative;
+  background-color: #ffffff;
+}
+
+.rectangle13 {
+  width: 60px;
+  height: 24px;
+  position: absolute;
+  left: 51.98px;
+  top: 5.39px;
+  background-color: #262633;
+  transform: rotate(30deg);
+}
+
+.fxGradients {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  overflow: hidden;
+  height: 60px;
+  flex-shrink: 0;
+}
+
+.fxRadial {
+  width: 80px;
+  height: 48px;
+  flex-shrink: 0;
+  background-image: radial-gradient(ellipse 50% 50% at 50% 50%, #ff664d 0%, #334de5 100%);
+}
+
+.fxAngular {
+  width: 80px;
+  height: 48px;
+  flex-shrink: 0;
+  background-image: conic-gradient(from 90deg at 50% 50%, #ff664d 0%, #334de5 100%);
+}
+
+.fxLinear {
+  width: 80px;
+  height: 48px;
+  flex-shrink: 0;
+  background-image: linear-gradient(90deg, #ff664d 0%, #334de5 100%);
+}
+
+.fxStrokes {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  overflow: hidden;
+  height: 60px;
+  flex-shrink: 0;
+}
+
+.fxStrokePerside {
+  width: 80px;
+  height: 48px;
+  flex-shrink: 0;
+  background-color: #ffffff;
+  border-top: 4px solid #262633;
+  border-right: 1px solid #262633;
+  border-left: 1px solid #262633;
+}
+
+.fxStrokeOutside {
+  width: 80px;
+  height: 48px;
+  flex-shrink: 0;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px #e55966;
+}
+
+.fxStrokeCenter {
+  width: 80px;
+  height: 48px;
+  flex-shrink: 0;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 2px #598ce5, inset 0 0 0 2px #598ce5;
+}
+
+.fxEffectStack {
+  width: 120px;
+  height: 60px;
+  flex-shrink: 0;
+  background-color: #ffffff;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(51, 77, 229, 0.4), inset 1px 1px 2px rgba(0, 0, 0, 0.25);
+  border-radius: 12px;
+}
+
+.fxOpacityBlend {
+  width: 120px;
+  height: 50px;
+  flex-shrink: 0;
+  background-color: #3366f2;
+  opacity: 0.8;
+  mix-blend-mode: multiply;
+}
+
+.fxRadiusMixed {
+  width: 120px;
+  height: 50px;
+  flex-shrink: 0;
+  background-color: #ffffff;
+  border: 1px solid #262633;
+  border-radius: 4px 12px 24px 0;
+}
+
+.fxGradientRing {
+  width: 120px;
+  height: 50px;
+  flex-shrink: 0;
+  background-image: linear-gradient(#ffffff, #ffffff), linear-gradient(90deg, #000000 0%, #999999 100%);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  border: 5px solid transparent;
+  border-radius: 16px;
+}

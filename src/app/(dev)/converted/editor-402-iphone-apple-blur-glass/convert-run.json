@@ -1,0 +1,520 @@
+{
+  "fileKey": "t88thL8hKksSpILgkeGRZ0",
+  "nodeId": "4084:25997",
+  "fileVersion": "2373459676336350685",
+  "contentHash": "c760fe2f689e8198eaae9f2336f4b07aa166ee5ef5c0cc5ca812832c504dc5bb",
+  "absoluteCount": 4,
+  "idMap": [
+    {
+      "figmaId": "4084:25997",
+      "class": "editor402IphoneAppleBlurGlass",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:25999",
+      "class": "topSection",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26000",
+      "class": "titleAndControls",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26010",
+      "class": "buttonGroupLeading",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26011",
+      "class": "bg",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26012",
+      "class": "fillShadow",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26014",
+      "class": "trailingButton",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4085:26311",
+      "class": "icon",
+      "kind": "svg"
+    },
+    {
+      "figmaId": "4084:26006",
+      "class": "effect",
+      "kind": "text"
+    },
+    {
+      "figmaId": "4085:26304",
+      "class": "buttonGroupLeading2",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4085:26305",
+      "class": "bg2",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4085:26306",
+      "class": "fillShadow2",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4085:26307",
+      "class": "trailingButton2",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4085:26308",
+      "class": "icon2",
+      "kind": "svg"
+    },
+    {
+      "figmaId": "4084:26019",
+      "class": "canvas",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26020",
+      "class": "rectangle49",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26021",
+      "class": "bottomSection",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26022",
+      "class": "toolbox",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26023",
+      "class": "tool",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26024",
+      "class": "dial",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26025",
+      "class": "icon3",
+      "kind": "svg"
+    },
+    {
+      "figmaId": "4084:26034",
+      "class": "dial2",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26035",
+      "class": "icon4",
+      "kind": "svg"
+    },
+    {
+      "figmaId": "4084:26044",
+      "class": "dial3",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26045",
+      "class": "icon5",
+      "kind": "svg"
+    },
+    {
+      "figmaId": "4084:26054",
+      "class": "dial4",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26055",
+      "class": "icon6",
+      "kind": "svg"
+    },
+    {
+      "figmaId": "4095:29309",
+      "class": "dial5",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4095:29310",
+      "class": "icon7",
+      "kind": "svg"
+    },
+    {
+      "figmaId": "4084:26074",
+      "class": "dial6",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26075",
+      "class": "icon8",
+      "kind": "svg"
+    },
+    {
+      "figmaId": "4084:26084",
+      "class": "dial7",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26085",
+      "class": "icon9",
+      "kind": "svg"
+    },
+    {
+      "figmaId": "4084:26094",
+      "class": "dial8",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26095",
+      "class": "icon10",
+      "kind": "svg"
+    },
+    {
+      "figmaId": "4084:26104",
+      "class": "dial9",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26105",
+      "class": "icon11",
+      "kind": "svg"
+    },
+    {
+      "figmaId": "4084:26114",
+      "class": "tool2",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26115",
+      "class": "ruller",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26116",
+      "class": "tick",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26117",
+      "class": "line58",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26118",
+      "class": "line80",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26119",
+      "class": "line81",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26120",
+      "class": "line75",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26121",
+      "class": "line72",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26122",
+      "class": "line69",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26123",
+      "class": "line66",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26124",
+      "class": "line63",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26125",
+      "class": "line61",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26126",
+      "class": "line60",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26127",
+      "class": "line79",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26128",
+      "class": "line76",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26129",
+      "class": "line57",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26130",
+      "class": "line71",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26131",
+      "class": "line68",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26132",
+      "class": "line65",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26133",
+      "class": "line56",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26134",
+      "class": "line54",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26135",
+      "class": "line52",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26136",
+      "class": "center",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26137",
+      "class": "line73",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26138",
+      "class": "line40",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26139",
+      "class": "line48",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26140",
+      "class": "line46",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26141",
+      "class": "line59",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26142",
+      "class": "line78",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26143",
+      "class": "line77",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26144",
+      "class": "line74",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26145",
+      "class": "line70",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26146",
+      "class": "line67",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26147",
+      "class": "line64",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26148",
+      "class": "line62",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26149",
+      "class": "line53",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26150",
+      "class": "line51",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26151",
+      "class": "line50",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26152",
+      "class": "line44",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26153",
+      "class": "line49",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26154",
+      "class": "line47",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26155",
+      "class": "line45",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26156",
+      "class": "line55",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26157",
+      "class": "dock",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26158",
+      "class": "tabBar",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26159",
+      "class": "tab",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26160",
+      "class": "icon12",
+      "kind": "svg"
+    },
+    {
+      "figmaId": "4084:26172",
+      "class": "label",
+      "kind": "text"
+    },
+    {
+      "figmaId": "4084:26173",
+      "class": "tab2",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26174",
+      "class": "icon13",
+      "kind": "svg"
+    },
+    {
+      "figmaId": "4084:26187",
+      "class": "label2",
+      "kind": "text"
+    },
+    {
+      "figmaId": "4084:26188",
+      "class": "tab3",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26189",
+      "class": "icon14",
+      "kind": "svg"
+    },
+    {
+      "figmaId": "4084:26201",
+      "class": "label3",
+      "kind": "text"
+    },
+    {
+      "figmaId": "4084:26202",
+      "class": "tab4",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26203",
+      "class": "icon15",
+      "kind": "svg"
+    },
+    {
+      "figmaId": "4084:26216",
+      "class": "label4",
+      "kind": "text"
+    },
+    {
+      "figmaId": "4084:26217",
+      "class": "tab5",
+      "kind": "element"
+    },
+    {
+      "figmaId": "4084:26218",
+      "class": "icon16",
+      "kind": "svg"
+    },
+    {
+      "figmaId": "4084:26230",
+      "class": "label5",
+      "kind": "text"
+    }
+  ],
+  "refusals": [],
+  "notes": [],
+  "assetHashes": {
+    "4085:26311": "dbbe081010e77592",
+    "4085:26308": "eacbb3c7aaab7cd6",
+    "4084:26025": "4e67236c89090def",
+    "4084:26035": "0ec28d3d4a488742",
+    "4084:26045": "d0d2751cb2da6233",
+    "4084:26055": "f88e198226465398",
+    "4095:29310": "90141a46b683e167",
+    "4084:26075": "b6055caf36c93b01",
+    "4084:26085": "518fe59078e2843e",
+    "4084:26095": "de27290804f63d21",
+    "4084:26105": "320cbd7c8dba0fc7",
+    "4084:26160": "b277cd92b8186637",
+    "4084:26174": "92e703961d355bf4",
+    "4084:26189": "40c3cbf5d62a495e",
+    "4084:26203": "505fa9467d374e7f",
+    "4084:26218": "11f9c4ba11c14444"
+  },
+  "missingAssets": [],
+  "imageHashes": {
+    "6034837ae5832521fff757c2a3b7f2d266e78dfd": "35477c9e0f349b43",
+    "5a6a0ff38f4c992038fcb46fa2b7719f30e1160f": "bc5723133791921e"
+  },
+  "missingImages": []
+}

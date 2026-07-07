@@ -1,0 +1,20 @@
+<!doctype html><meta charset="utf-8"><div id="out">computing…</div><script>
+const MASKS=[{"x":0,"y":-1,"w":220,"h":200,"badge":true}];
+const load=s=>new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=s;});
+(async()=>{
+  const [A,B]=await Promise.all([load('fg-figma.png'),load('fg-converted.png')]);
+  const W=Math.min(A.width,B.width),H=Math.min(A.height,B.height);
+  const t=document.createElement('canvas');t.width=W;t.height=H;const x=t.getContext('2d');
+  x.drawImage(A,0,0);const da=x.getImageData(0,0,W,H).data;
+  x.clearRect(0,0,W,H);x.drawImage(B,0,0);const db=x.getImageData(0,0,W,H).data;
+  const masked=(px,py)=>MASKS.some(m=>{const y0=m.badge?H-m.h:m.y;return px>=m.x&&px<m.x+m.w&&py>=y0&&py<y0+m.h;});
+  let n=0,mis=0;
+  for(let y=0;y<H;y++)for(let xx=0;xx<W;xx++){
+    if(masked(xx,y))continue;
+    const i=(y*W+xx)*4;
+    const d=Math.max(Math.abs(da[i]-db[i]),Math.abs(da[i+1]-db[i+1]),Math.abs(da[i+2]-db[i+2]));
+    n++;if(d>32)mis++;
+  }
+  document.getElementById('out').textContent='RESIDUAL '+(mis/n*100).toFixed(2);
+})();
+</script>
