@@ -245,7 +245,7 @@ function VariableHashIcon() {
     </svg>
   )
 }
-function FigmaVariablePicker({ fieldLabel, anchorRef, onPick, onClose }: { fieldLabel: string; anchorRef: { current: HTMLElement | null }; onPick?: (value: string) => void; onClose: () => void }) {
+function FigmaVariablePicker({ fieldLabel, anchorRef, onPick, onClose, selected }: { fieldLabel: string; anchorRef: { current: HTMLElement | null }; onPick?: (value: string) => void; onClose: () => void; selected?: string }) {
   const [query, setQuery] = useState('')
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
   const tokens = useDsTokens()
@@ -273,11 +273,17 @@ function FigmaVariablePicker({ fieldLabel, anchorRef, onPick, onClose }: { field
   const q = query.trim().toLowerCase()
   const filtered = pool.filter((t) => !q || t.cssVar.toLowerCase().includes(q) || t.value.toLowerCase().includes(q))
   // group into header + item rows in file order (tokens.css is organised by collection)
-  const rows: { kind: 'header' | 'item'; label: string; value?: string; bind?: string }[] = []
+  // E8 items 3/4 (contract: variablePicker.rowAnatomy, measured 2026-07-07): rows show the
+  // FIGMA original short name (path leaf), full path groups as headers, raw value right-aligned.
+  const rows: { kind: 'header' | 'item'; label: string; value?: string; bind?: string; full?: string }[] = []
   let lastGroup = ''
   for (const t of filtered) {
-    if (t.group !== lastGroup) { rows.push({ kind: 'header', label: t.group }); lastGroup = t.group }
-    rows.push({ kind: 'item', label: t.cssVar.replace(/^--/, ''), value: t.value, bind: `var(${t.cssVar})` })
+    const segs = (t.path ?? '').split('/').map((x) => x.trim()).filter(Boolean)
+    const leaf = segs.length ? segs[segs.length - 1] : t.cssVar.replace(/^--/, '')
+    const grp = segs.length > 1 ? segs.slice(0, -1).join(' / ') : t.group
+    if (grp !== lastGroup) { rows.push({ kind: 'header', label: grp }); lastGroup = grp }
+    const raw = t.original ? Object.values(t.original)[0] : t.value
+    rows.push({ kind: 'item', label: leaf, value: raw, bind: `var(${t.cssVar})`, full: t.path ?? t.cssVar })
   }
   if (!anchorRect) return null
   const width = 216
@@ -309,8 +315,9 @@ function FigmaVariablePicker({ fieldLabel, anchorRef, onPick, onClose }: { field
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.label}</span>
           </div>
         ) : (
-          <button key={`${row.label}-${row.value}-${index}`} type="button" onClick={() => { if (row.bind) onPick?.(row.bind); onClose() }}
-            style={{ appearance: 'none', border: 0, width: 216, height: 32, background: '#fff', display: 'grid', gridTemplateColumns: '40px 1fr 32px', alignItems: 'center', padding: 0, cursor: 'pointer', color: INK, font: `400 11px/16px ${FONT}`, textAlign: 'left' }}>
+          <button key={`${row.label}-${row.value}-${index}`} type="button" title={row.full} onClick={() => { if (row.bind) onPick?.(row.bind); onClose() }}
+            ref={selected && row.bind === selected ? (el) => el?.scrollIntoView({ block: 'center' }) : undefined}
+            style={{ appearance: 'none', border: 0, width: 216, height: 24, background: selected && row.bind === selected ? '#E5F4FF' : '#fff', display: 'grid', gridTemplateColumns: '40px 1fr 32px', alignItems: 'center', padding: 0, cursor: 'pointer', color: INK, font: `450 11px/16px ${FONT}`, textAlign: 'left' }}>
             <span style={{ width: 24, height: 24, marginLeft: 16, display: 'grid', placeItems: 'center', color: INK }}><VariableHashIcon /></span>
             <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.label}</span>
             <span style={{ color: 'rgba(0,0,0,0.3)', textAlign: 'right', paddingRight: 16 }}>{row.value}</span>
@@ -433,10 +440,22 @@ const shortToken = (t: string) => (t.split('/').pop() ?? t).trim().replace(/^var
 const varBinding = (v: string) => /^var\(\s*--[\w-]+\s*\)$/.test(v.trim())
 // E6.12 — Figma shows the weight NAME, code writes the numeric (standard CSS weight mapping).
 const WEIGHT_NAMES: [string, string][] = [['Thin', '100'], ['ExtraLight', '200'], ['Light', '300'], ['Regular', '400'], ['Medium', '500'], ['SemiBold', '600'], ['Bold', '700'], ['ExtraBold', '800'], ['Black', '900']]
-function TokenPill({ token }: { token: string }) {
+/* E8 items 2/3 (contract: variablePill.pillAnatomy, measured 2026-07-07 on a real var-bound
+ * Figma field): the pill shows the RAW VALUE in a white 20px r5 capsule (1px #E6E6E6, 0 4px pad,
+ * 11px w400) — the capsule IS the "this is a variable" badge; full Figma path on hover; clicking
+ * opens the variable picker with the assigned variable preselected. Raw values get no badge. */
+function TokenPill({ token, onClick }: { token: string; onClick?: () => void }) {
+  const tokens = useDsTokens()
+  const varName = (token.match(/var\((--[a-z0-9-]+)\)/i)?.[1]) ?? (token.startsWith('--') ? token : `--${token}`)
+  const tok = tokens.find((t) => t.cssVar === varName)
+  const raw = tok ? (tok.original ? Object.values(tok.original)[0] : tok.value) : shortToken(token)
+  const fullName = tok?.path ?? shortToken(token)
   return (
-    <span title={token} style={{ flex: 1, minWidth: 0, height: 18, marginRight: 2, borderRadius: 4, background: 'rgba(90,90,255,0.10)', color: TOKEN, display: 'flex', alignItems: 'center', padding: '0 6px', font: `450 10px/18px ${FONT}` }}>
-      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{shortToken(token)}</span>
+    <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center' }}>
+      <button type="button" title={`${fullName}\n${raw}`} onClick={onClick}
+        style={{ appearance: 'none', height: 20, borderRadius: 5, background: '#fff', border: '1px solid #E6E6E6', padding: '0 4px', font: `400 11px/18px ${FONT}`, color: INK, cursor: 'pointer', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {raw}
+      </button>
     </span>
   )
 }
@@ -468,7 +487,7 @@ function FigmaField({ icon, letter, glyph, value, onChange, onCommit, token, suf
       style={{ position: 'relative', minWidth: 0, width, height: 24, borderRadius: 5, background: whiteBg ? (h ? '#ededed' : '#fff') : FIELD, border: `1px solid ${varOpen || modeOpen ? SEL : whiteBg ? '#e6e6e6' : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: cols, alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
       <span style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)', font: `450 11px/24px ${FONT}` }}>{icon ? <UiIcon name={icon} /> : glyph ?? letter}</span>
       {bound ? (
-        <TokenPill token={token ?? value} />
+        <TokenPill token={token ?? value} onClick={onChange ? () => setVarOpen(true) : undefined} />
       ) : onChange ? (
         <input aria-label={ariaLabel} role={inputRole} value={value} placeholder={placeholder} onChange={e => onChange(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
           onBlur={e => onCommit?.(e.currentTarget.value)}
@@ -499,7 +518,7 @@ function FigmaField({ icon, letter, glyph, value, onChange, onCommit, token, suf
           ))}
         </div>
       )}
-      {varOpen && onChange && <FigmaVariablePicker fieldLabel={ariaLabel} anchorRef={fieldRef} onPick={onChange} onClose={() => setVarOpen(false)} />}
+      {varOpen && onChange && <FigmaVariablePicker fieldLabel={ariaLabel} anchorRef={fieldRef} onPick={onChange} onClose={() => setVarOpen(false)} selected={bound ? (token?.startsWith('--') ? `var(${token})` : (varBinding(value) ? value.trim() : token)) : undefined} />}
     </div>
   )
 }
