@@ -57,7 +57,12 @@ class FrameBoundary extends React.Component<{ label: string; children: React.Rea
 }
 
 export default function ComponentsCanvasHost() {
-  const frames = collectFrames()
+  // QA HIGH (E7 gate): component modules must NOT render during SSR — a throwing component
+  // would 500 the whole route before any ErrorBoundary exists (boundaries only catch in the
+  // client tree). SSR serves the shell; frames mount client-side where FrameBoundary isolates.
+  const [mounted, setMounted] = React.useState(false)
+  React.useEffect(() => setMounted(true), [])
+  const frames = mounted ? collectFrames() : []
   const byCategory = new Map<string, Frame[]>()
   for (const f of frames) {
     const cat = `${f.root === 'global' ? 'Global' : 'Project'} / ${f.category}`
@@ -65,7 +70,7 @@ export default function ComponentsCanvasHost() {
   }
   return (
     <div data-components-canvas style={{ minWidth: 800, padding: 40, display: 'flex', flexDirection: 'column', gap: 48, background: '#f5f5f5' }}>
-      {frames.length === 0 && (
+      {mounted && frames.length === 0 && (
         <div style={{ font: '13px system-ui', color: 'rgba(0,0,0,0.5)' }}>No components yet — create one from the Assets panel.</div>
       )}
       {[...byCategory.entries()].map(([cat, list]) => (

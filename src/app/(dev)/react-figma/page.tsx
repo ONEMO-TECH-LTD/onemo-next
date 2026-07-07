@@ -1836,8 +1836,8 @@ function InsertIsland({ onInsert: onInsertProp, codeMode, onCodeMode, drawDisabl
             style={dimIf({ appearance: 'none', border: 0, width: 32, height: 32, borderRadius: 7, background: open ? FIELD : '#fff', color: INK, display: 'grid', placeItems: 'center', cursor: 'pointer' })}>
             <UiIcon name="insertFrame" />
           </button>
-          <button type="button" title="Region tools" aria-label="Region tools" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(v => !v)}
-            style={{ appearance: 'none', border: 0, width: 16, height: 32, background: '#fff', color: FAINT, opacity: 0.55, display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
+          <button type="button" disabled={drawDisabled} title={`Region tools${disabledTitle}`} aria-label="Region tools" aria-haspopup="menu" aria-expanded={open} onClick={() => !drawDisabled && setOpen(v => !v)}
+            style={dimIf({ appearance: 'none', border: 0, width: 16, height: 32, background: '#fff', color: FAINT, opacity: 0.55, display: 'grid', placeItems: 'center', cursor: 'pointer' })}>
             <UiIcon name="caret24" />
           </button>
           {open && (
@@ -1860,7 +1860,7 @@ function InsertIsland({ onInsert: onInsertProp, codeMode, onCodeMode, drawDisabl
           <button type="button" disabled={drawDisabled} title={`Text${disabledTitle}`} aria-label="Text" onClick={() => onInsert?.('text')} style={dimIf({ appearance: 'none', border: 0, width: 32, height: 32, borderRadius: 7, background: '#fff', color: INK, display: 'grid', placeItems: 'center', cursor: 'pointer' })}>
             <UiIcon name="insertText" />
           </button>
-          <button type="button" title="Type tools" aria-label="Type tools" style={{ appearance: 'none', border: 0, width: 16, height: 32, background: '#fff', color: FAINT, opacity: 0.55, display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
+          <button type="button" disabled={drawDisabled} title={`Type tools${disabledTitle}`} aria-label="Type tools" style={dimIf({ appearance: 'none', border: 0, width: 16, height: 32, background: '#fff', color: FAINT, opacity: 0.55, display: 'grid', placeItems: 'center', cursor: 'pointer' })}>
             <UiIcon name="caret24" />
           </button>
         </div>
@@ -1926,6 +1926,19 @@ function ComponentsRail({ components, onJump }: { components: DsComponent[]; onJ
   )
 }
 
+/* E7 (QA HIGH): partition edited-file identities by their history root. Package-prefixed
+ * paths ("onemo-component-library/src/…") snapshot into the PACKAGE's own time capsule,
+ * with paths made relative to that root (the server-side jail rejects '..'/absolute). */
+const LIB_PREFIX = 'onemo-component-library/'
+function splitFilesByHistoryRoot(files: Iterable<string>): Array<['app' | 'package', string[]]> {
+  const app: string[] = [], pkg: string[] = []
+  for (const f of files) {
+    if (f.startsWith(LIB_PREFIX)) pkg.push(f.slice(LIB_PREFIX.length))
+    else app.push(f)
+  }
+  return [['app', app], ['package', pkg]]
+}
+
 const nextRowId = <T extends { id: number }>(rows: T[]) => rows.reduce((max, row) => Math.max(max, row.id), 0) + 1
 
 /* ── engine M1 · selection-core (KAI-9304) ─────────────────────────────────────
@@ -1967,16 +1980,20 @@ export default function ReactFigmaPage() {
   const [assetTab, setAssetTab] = useState<AssetTab>('components')
   const [compNonce, setCompNonce] = useState(0)
   const [newCompName, setNewCompName] = useState('')
+  const [newCompRoot, setNewCompRoot] = useState<'project' | 'global'>('project') // E7.4 QA MED: UI parity with the op
+  const [newCompCategory, setNewCompCategory] = useState('')
   // E7.3 (KAI-9377): second canvas — Design ⇄ Components toggle just swaps the iframe route;
   // the whole shell (zoom/pan/selection/overrides) is route-agnostic (architecture v4.1 §1).
   const [canvasMode, setCanvasMode] = useState<'design' | 'components'>('design')
   const dsComponents = useDsComponents(rail === 'assets' || canvasMode === 'components', compNonce) // E4-G4 Assets panel + E7.3 components rail
   // #6: create a new component in code (Framer-style) — scaffolds a real editable component file.
-  const newComponent = useCallback(async (name: string) => {
+  const newComponent = useCallback(async (name: string, root: 'project' | 'global' = 'project', category = '') => {
     const clean = name.trim()
     if (!/^[A-Za-z][A-Za-z0-9]*$/.test(clean)) { notify('Name must be a PascalCase identifier', 'error'); return }
-    const r = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'create-component', name: clean }) })
-    if (r.ok) { const d = await r.json().catch(() => ({})); notify(`Created ${d.name ?? clean}`); setCompNonce((n) => n + 1) }
+    const body: Record<string, string> = { kind: 'create-component', name: clean, root }
+    if (category.trim()) body.category = category.trim()
+    const r = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+    if (r.ok) { const d = await r.json().catch(() => ({})); notify(`Created ${d.name ?? clean}${root === 'global' ? ' in the global library' : ''}`); setCompNonce((n) => n + 1) }
     else notify(`Create failed: ${await r.text()}`, 'error')
   }, [])
   // #28 Assets: also surface the loaded screen's REAL images + icons (scanned live from the canvas —
@@ -2646,10 +2663,13 @@ export default function ReactFigmaPage() {
           const wf = (w as { file?: string }).file ?? (w as { decl?: { file?: string } }).decl?.file
           if (wf) planned.add(wf)
         }
-        if (planned.size) {
+        // QA HIGH (E7 gate): package-prefixed files belong to the PACKAGE history root —
+        // paths passed per root are RELATIVE TO THAT ROOT (jail rejects '..'/absolute).
+        for (const [snapRoot, files] of splitFilesByHistoryRoot(planned)) {
+          if (!files.length) continue
           await fetch('/api/dev/editor-sandbox', {
             method: 'POST', headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ action: 'track', files: [...planned] }),
+            body: JSON.stringify({ action: 'track', files, root: snapRoot }),
           }).catch(() => null)
         }
         let allOk = true
@@ -2675,10 +2695,14 @@ export default function ReactFigmaPage() {
     else if (committed) notify(`Saved ${committed} change${committed > 1 ? 's' : ''} to code`)
     // E6.9 time capsule: every publish is a version checkpoint annotated with what changed
     if (committed) {
-      void fetch('/api/dev/editor-sandbox', {
-        method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'snapshot', label: `publish — ${committed} change${committed > 1 ? 's' : ''}`, files: [...touchedFiles] }),
-      }).catch(() => null)
+      // per-root checkpoints: app edits → app history, library edits → package history (QA HIGH)
+      for (const [snapRoot, files] of splitFilesByHistoryRoot(touchedFiles)) {
+        if (!files.length) continue
+        void fetch('/api/dev/editor-sandbox', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ action: 'snapshot', label: `publish — ${committed} change${committed > 1 ? 's' : ''}`, files, root: snapRoot }),
+        }).catch(() => null)
+      }
     }
   }, [committing])
 
@@ -3202,10 +3226,22 @@ export default function ReactFigmaPage() {
               <div style={{ padding: '0 12px 8px' }}><div style={{ height: 28, background: FIELD, borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', color: MUTE, font: `400 11px/1 ${FONT}` }}><MagnifyingGlass size={13} /> Search components…</div></div>
               <div style={{ padding: '0 12px 8px', font: `400 11px/1.4 ${FONT}`, color: FAINT }}>Components extracted in the editor — select a container, then click one to insert it.</div>
               {/* #6: create a new component in code (Framer-style) */}
-              <form onSubmit={(e) => { e.preventDefault(); if (newCompName.trim()) { void newComponent(newCompName); setNewCompName('') } }} style={{ display: 'flex', gap: 6, padding: '0 12px 8px' }}>
-                <input value={newCompName} onChange={(e) => setNewCompName(e.currentTarget.value)} placeholder="New component name" aria-label="New component name"
-                  style={{ flex: 1, minWidth: 0, height: 26, borderRadius: 6, border: `1px solid ${LINE}`, background: '#fff', padding: '0 8px', outline: 0, font: `400 11px/1 ${FONT}`, color: INK }} />
-                <button type="submit" title="Create component in code" style={{ appearance: 'none', border: 0, background: SEL, color: '#fff', height: 26, borderRadius: 6, padding: '0 10px', cursor: 'pointer', font: `450 11px/1 ${FONT}` }}>New</button>
+              <form onSubmit={(e) => { e.preventDefault(); if (newCompName.trim()) { void newComponent(newCompName, newCompRoot, newCompCategory); setNewCompName(''); setNewCompCategory('') } }} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '0 12px 8px' }}>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input value={newCompName} onChange={(e) => setNewCompName(e.currentTarget.value)} placeholder="New component name" aria-label="New component name"
+                    style={{ flex: 1, minWidth: 0, height: 26, borderRadius: 6, border: `1px solid ${LINE}`, background: '#fff', padding: '0 8px', outline: 0, font: `400 11px/1 ${FONT}`, color: INK }} />
+                  <button type="submit" title="Create component in code" style={{ appearance: 'none', border: 0, background: SEL, color: '#fff', height: 26, borderRadius: 6, padding: '0 10px', cursor: 'pointer', font: `450 11px/1 ${FONT}` }}>New</button>
+                </div>
+                {/* E7.4 QA MED: UI parity with the op — library destination + category slug */}
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <select value={newCompRoot} onChange={(e) => setNewCompRoot(e.currentTarget.value as 'project' | 'global')} aria-label="Component library"
+                    style={{ height: 26, borderRadius: 6, border: `1px solid ${LINE}`, background: '#fff', padding: '0 6px', outline: 0, font: `400 11px/1 ${FONT}`, color: INK }}>
+                    <option value="project">Project</option>
+                    <option value="global">Global library</option>
+                  </select>
+                  <input value={newCompCategory} onChange={(e) => setNewCompCategory(e.currentTarget.value)} placeholder="Category (optional)" aria-label="Component category"
+                    style={{ flex: 1, minWidth: 0, height: 26, borderRadius: 6, border: `1px solid ${LINE}`, background: '#fff', padding: '0 8px', outline: 0, font: `400 11px/1 ${FONT}`, color: INK }} />
+                </div>
               </form>
               {dsComponents.length === 0
                 ? <div style={{ padding: '8px 12px', font: `400 11px/1.5 ${FONT}`, color: MUTE }}>No components yet. Select an element and use “Create component” to add one here.</div>
