@@ -23,7 +23,7 @@ import {
   type Icon as PIcon,
 } from '@phosphor-icons/react'
 
-const INK = 'rgba(0,0,0,0.9)', MUTE = 'rgba(0,0,0,0.45)', FAINT = 'rgba(0,0,0,0.3)'
+const INK = 'rgba(0,0,0,0.898)', MUTE = 'rgba(0,0,0,0.45)', FAINT = 'rgba(0,0,0,0.3)' // INK: Figma's exact ink (E8 audit — measured, was 0.9)
 const LINE = '#e6e7e9', FIELD = '#f5f5f5', SEL = '#0d99ff', TOKEN = '#7a3fb0', RAIL = '#fff'
 const FONT = 'Inter, -apple-system, system-ui, sans-serif'
 const hdr = { font: `550 11px/16px ${FONT}`, letterSpacing: '0.4px', color: INK } as const
@@ -3529,16 +3529,6 @@ export default function ReactFigmaPage() {
             )}
           </Sec>
 
-          <Sec title="Link" actionWidth={24} action={<UiIB name={linkTarget ? 'minus' : 'plus'} title={linkTarget ? 'Remove link (wired in E6.9 backend)' : 'Apply link'} on={() => { if (linkTarget) notify('Remove link is E6.9 backend', 'error'); else void applyLink() }} />} bodyGap={0} bodyPadding="0">
-            <InspectorRow label="Link To" columns="1fr" height={48}>
-              <LinkTargetField value={linkHref} options={linkTargetOptions} onChange={setLinkHref} onCommit={(href) => void applyLink(href)} />
-            </InspectorRow>
-            {linkHref.trim() && (
-              <InspectorRow label="Open in new tab" columns="1fr" height={48}>
-                <TextSegGroup items={['No', 'Yes']} active={linkNewTab ? 1 : 0} onSelect={(i) => { const next = i === 1; setLinkNewTab(next); void applyLink(linkHref, next) }} width="100%" ariaLabel="Open link in new tab" />
-              </InspectorRow>
-            )}
-          </Sec>
 
           {/* E2.2 Text section — Figma canon (FIGMA-SPEC-text.md): present only for text-bearing
               elements; unbound Typography form (individual controls) reading the element's real type. */}
@@ -3617,6 +3607,18 @@ export default function ReactFigmaPage() {
           </Sec>
           <Sec title="Layout guide" actionWidth={52} action={<><StyleApplyButton label="Layout guide" title="Layout guide, Apply styles" /><UiIB name="plus" title="Add layout guide" on={() => setLayoutGuides(rows => [...rows, { id: nextRowId(rows), type: 'Columns', count: 5, gutter: 16, visible: true }])} /></>} bodyGap={0} bodyPadding="0">
             {layoutGuides.map(g => <LayoutGuideRow key={g.id} guide={g} onChange={(patch) => setLayoutGuides(rows => rows.map(r => r.id === g.id ? { ...r, ...patch } : r))} onRemove={() => setLayoutGuides(rows => rows.filter(row => row.id !== g.id))} />)}
+          </Sec>
+
+          {/* E8 item 8 (Dan): Link To is the LAST inspector section */}
+          <Sec title="Link" actionWidth={24} action={<UiIB name={linkTarget ? 'minus' : 'plus'} title={linkTarget ? 'Remove link (wired in E6.9 backend)' : 'Apply link'} on={() => { if (linkTarget) notify('Remove link is E6.9 backend', 'error'); else void applyLink() }} />} bodyGap={0} bodyPadding="0">
+            <InspectorRow label="Link To" columns="1fr" height={48}>
+              <LinkTargetField value={linkHref} options={linkTargetOptions} onChange={setLinkHref} onCommit={(href) => void applyLink(href)} />
+            </InspectorRow>
+            {linkHref.trim() && (
+              <InspectorRow label="Open in new tab" columns="1fr" height={48}>
+                <TextSegGroup items={['No', 'Yes']} active={linkNewTab ? 1 : 0} onSelect={(i) => { const next = i === 1; setLinkNewTab(next); void applyLink(linkHref, next) }} width="100%" ariaLabel="Open link in new tab" />
+              </InspectorRow>
+            )}
           </Sec>
         </div>
       </aside>

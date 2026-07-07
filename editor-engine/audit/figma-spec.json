@@ -1,0 +1,71 @@
+{
+  "_provenance": "Measured live from Dan's authenticated Figma tab (ONEMO DS v2.3.1) 2026-07-07 via programmatic DOM census + real-input behavior probes. Entries with measured:false are PENDING extraction and MUST fail the audit until filled \u2014 never skipped (expert harness law: contract from spec, fail loud).",
+  "valueField": {
+    "containerWidth": 88,
+    "containerHeight": 24,
+    "borderRadius": "5px",
+    "backgroundRest": "rgb(245, 245, 245)",
+    "backgroundFocus": "rgb(255, 255, 255)",
+    "focusRing": "rgb(13, 153, 255)",
+    "fontFamily": "Inter",
+    "fontSize": "11px",
+    "lineHeight": "16px",
+    "fontWeight": "450",
+    "inkColor": "rgba(0, 0, 0, 0.898)",
+    "measured": true,
+    "mutedInkColor": "rgba(0, 0, 0, 0.45)",
+    "mutedAllowedFields": [
+      "X-position",
+      "Y-position"
+    ],
+    "_mutedNote": "Figma greys X/Y for auto-layout children (measured: grey 0/635 on Bottom Section, screenshot 2026-07-07); ours dims for position-driven elements \u2014 same semantic, state encoded per the transform-law."
+  },
+  "panel": {
+    "figmaWidth": 241,
+    "ourMinWidth": 240,
+    "ourMaxWidth": 480,
+    "note": "Figma right panel is fixed 241px (measured). Dan spec item 7 extends ours: resizable with min/max. Min = Figma's 241-1; max = 2x per Dan's resizing requirement.",
+    "measured": true
+  },
+  "rotation": {
+    "degreeSuffixInValue": true,
+    "example": "0\u00b0",
+    "measured": true
+  },
+  "inputCommitSemantics": {
+    "enterCommits": true,
+    "blurWithoutEnterReverts": true,
+    "escapeReverts": true,
+    "provenance": "blurWithoutEnterReverts PROVEN by real typing in Figma (typed 50 into X, clicked canvas, node.x stayed 0 via plugin API read). enterCommits/escapeReverts = Figma standard, re-verify opportunistically.",
+    "measured": true
+  },
+  "scrub": {
+    "labelDragChangesValue": true,
+    "cursor": "ew-resize",
+    "note": "Figma uses a custom cursor image applied dynamically (not synthetically reachable); platform equivalent ew-resize. Behavior contract: drag on the field's leading label/icon scrubs the value 1 unit per px (Shift = 10). Behavior gate tests OURS.",
+    "measured": "behavior-convention"
+  },
+  "variablePill": {
+    "showsRawValueNotName": true,
+    "clickOpensPickerWithVariableSelected": true,
+    "rawValuesHaveNoBadge": true,
+    "pillAnatomy": {
+      "measured": false,
+      "todo": "extract pill container bg/radius/height/padding from a var-bound field in Figma DOM"
+    },
+    "provenance": "Dan spec items 2/3 (his statement of Figma behavior); pill visual anatomy pending measurement"
+  },
+  "variablePicker": {
+    "showsFigmaOriginalNames": true,
+    "scopedToField": true,
+    "searchWorks": true,
+    "rowAnatomy": {
+      "measured": false,
+      "todo": "extract picker row height/font/swatch + search field + selected-state from open picker DOM in Figma"
+    }
+  },
+  "sectionOrder": {
+    "linkToLast": true,
+    "note": "Dan spec item 8: Link To is the LAST inspector section."
+  }
+}
