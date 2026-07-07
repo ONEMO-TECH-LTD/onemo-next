@@ -427,7 +427,7 @@ let _ctx: CanvasRenderingContext2D | null = null
 /** Any CSS color (rgb/oklch/color()/named) → {hex, op%}; null for transparent/none. */
 export function colorToHex(c: string, doc: Document): { hex: string; op: number } | null {
   if (!c || c === 'transparent' || c === 'none') return null
-  _ctx ??= doc.createElement('canvas').getContext('2d')
+  _ctx ??= doc.createElement('canvas').getContext('2d', { willReadFrequently: true })
   if (!_ctx) return null
   _ctx.fillStyle = '#000000'
   try { _ctx.fillStyle = c } catch { return null }
