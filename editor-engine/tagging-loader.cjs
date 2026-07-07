@@ -28,7 +28,8 @@ module.exports = function taggingLoader(source) {
   if (process.env.NODE_ENV === 'production') return source;
 
   let rel;
-  const real = fs.realpathSync(this.resourcePath);
+  let real = this.resourcePath;
+  try { real = fs.realpathSync(this.resourcePath); } catch { /* transiently missing file — let webpack report it, never crash the compile */ }
   if (libRoot && real.startsWith(libRoot + path.sep)) {
     rel = `${LIB_NAME}/${path.relative(libRoot, real)}`;
   } else {

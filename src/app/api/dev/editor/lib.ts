@@ -258,7 +258,7 @@ export type WriteOp =
   | { kind: 'delete-jsx'; file: string; line: number; col: number }
   | { kind: 'duplicate-jsx'; file: string; line: number; col: number }
   | { kind: 'insert-component'; file: string; line: number; col: number; name: string; importPath: string }
-  | { kind: 'create-component'; name: string }
+  | { kind: 'create-component'; name: string; category?: string; root?: 'project' | 'global' }
   | { kind: 'delete-page'; slug: string }
   | { kind: 'rename-page'; slug: string; newSlug: string }
   | { kind: 'set-layer-name'; file: string; line: number; col: number; name: string }
@@ -693,10 +693,59 @@ async function renamePage(op: Extract<WriteOp, { kind: 'rename-page' }>): Promis
 /* #6 — "create a component in code" (Framer-style): scaffold a fresh, editable component file from a
    name. Same validated write as make-component (PascalCase name, collision-safe, assertValidTsx),
    but a blank starter instead of an extracted subtree. Appears in Assets + editable via Code mode. */
+/* E7.4 (KAI-9378, v4.1 N2): the library barrel is NEVER a client-write surface — the server
+ * REGENERATES src/index.ts from an fs walk of the package src/ tree. Client inputs reach this
+ * only as already-validated filenames; the .tsx-only write jail law is untouched. */
+export async function regenerateLibraryBarrel(): Promise<void> {
+  if (!LIB_ROOT) throw Object.assign(new Error('component library not installed'), { status: 403 })
+  const libSrc = path.join(LIB_ROOT, 'src')
+  const files: string[] = []
+  const walk = async (dir: string) => {
+    let entries: import('node:fs').Dirent[] = []
+    try { entries = await fs.readdir(dir, { withFileTypes: true }) } catch { return }
+    for (const e of entries) {
+      const p = path.join(dir, e.name)
+      if (e.isDirectory()) await walk(p)
+      else if (e.isFile() && e.name.endsWith('.tsx')) files.push(p)
+    }
+  }
+  await walk(libSrc)
+  files.sort()
+  const lines = ['// GENERATED barrel — server-regenerated from an fs walk of src/ (v4.1 N2). Do not hand-edit in builds.']
+  for (const abs of files) {
+    const source = await fs.readFile(abs, 'utf8')
+    const sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, false, ts.ScriptKind.TSX)
+    const names: string[] = []
+    for (const st of sf.statements) {
+      const isExported = (st as { modifiers?: ts.NodeArray<ts.ModifierLike> }).modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
+      if (!isExported) continue
+      if (ts.isFunctionDeclaration(st) && st.name) names.push(st.name.text)
+      else if (ts.isVariableStatement(st)) for (const d of st.declarationList.declarations) if (ts.isIdentifier(d.name)) names.push(d.name.text)
+    }
+    if (names.length) {
+      const spec = './' + path.relative(libSrc, abs).replace(/\.tsx$/, '').split(path.sep).join('/')
+      lines.push(`export { ${names.join(', ')} } from '${spec}'`)
+    }
+  }
+  await fs.writeFile(path.join(libSrc, 'index.ts'), lines.join('\n') + '\n', 'utf8')
+}
+
 async function createComponent(op: Extract<WriteOp, { kind: 'create-component' }>): Promise<{ ok: true; file: string; newValueText: string; componentFile: string; name: string }> {
   if (!/^[A-Za-z][A-Za-z0-9]*$/.test(op.name)) throw Object.assign(new Error('name must be a PascalCase identifier'), { status: 422 })
+  const root = op.root ?? 'project'
+  if (root !== 'project' && root !== 'global') throw Object.assign(new Error('root must be project|global'), { status: 422 })
+  const category = op.category?.trim() ?? ''
+  if (category && !/^[a-z0-9][a-z0-9-]{0,40}$/.test(category)) throw Object.assign(new Error('invalid category slug (a-z, 0-9, dashes)'), { status: 422 })
   const nameBase = op.name[0].toUpperCase() + op.name.slice(1)
-  const compDir = path.join(ROOT, 'src/app/(dev)/react-figma-components')
+  let compDir: string, relBase: string
+  if (root === 'global') {
+    if (!LIB_ROOT) throw Object.assign(new Error('component library not installed'), { status: 403 })
+    compDir = path.join(LIB_ROOT, 'src', category || 'ungrouped')
+    relBase = `${LIB_NAME}/src/${category || 'ungrouped'}` // F1 package-prefixed identity
+  } else {
+    compDir = path.join(ROOT, 'src/app/(dev)/react-figma-components', category)
+    relBase = `src/app/(dev)/react-figma-components${category ? `/${category}` : ''}`
+  }
   await fs.mkdir(compDir, { recursive: true })
   let name = nameBase, i = 1
   while (true) { try { await fs.access(path.join(compDir, `${name}.tsx`)); name = `${nameBase}${++i}` } catch { break } }
@@ -704,7 +753,8 @@ async function createComponent(op: Extract<WriteOp, { kind: 'create-component' }
   const compSource = `export function ${name}() {\n  return (\n    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 16, minWidth: 120, minHeight: 80, background: '#fff', borderRadius: 8, border: '1px solid rgba(0,0,0,0.08)' }}>\n      <span style={{ font: '600 13px/1.4 system-ui' }}>${name}</span>\n    </div>\n  )\n}\n`
   assertValidTsx(compAbs, compSource)
   await fs.writeFile(compAbs, compSource, 'utf8')
-  const rel = `src/app/(dev)/react-figma-components/${name}.tsx`
+  if (root === 'global') await regenerateLibraryBarrel() // new export reaches builds via barrel recompile
+  const rel = `${relBase}/${name}.tsx`
   return { ok: true, file: rel, newValueText: name, componentFile: rel, name }
 }
 async function makeComponent(op: Extract<WriteOp, { kind: 'make-component' }>): Promise<{ ok: true; file: string; newValueText: string; componentFile: string }> {
