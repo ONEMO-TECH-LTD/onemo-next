@@ -111,6 +111,7 @@ async function promote(slug) {
 const server = createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x');
   try {
+    if (u.pathname === '/api/root' && req.method === 'GET') return json(res, 200, { tool: TOOL, app: APP });
     if (u.pathname === '/api/screens' && req.method === 'GET') return json(res, 200, listScreens());
     if (u.pathname === '/api/convert' && req.method === 'POST') {
       let body = ''; for await (const c of req) body += c;

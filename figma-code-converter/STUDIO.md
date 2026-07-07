@@ -5,10 +5,18 @@ screen as a tab. No coding, no agents — the entire pipeline runs by itself.
 
 ## Launch from the Dock (the app)
 
-**`launcher/FigmaConverter.app`** — double-click it (or keep it in the Dock: drag it there once,
-or right-click its Dock icon while running → Options → Keep in Dock). Every launch it checks the
-two servers, starts whichever is down, waits until ready, and opens the studio as its own
-chrome-less app window. Failures show a macOS alert with the log path — never silent.
+**`Figma Converter.app`** is symlinked into **/Applications** — launch it from Spotlight/Launchpad,
+or right-click its Dock icon while running → Options → Keep in Dock.
+
+Every launch it asks **which converter folder to run from** (the main clone or any worktree),
+remembering your last choice with a 5-second auto-continue — so the app is not tied to one
+worktree and survives when a worktree is deleted. If a studio is already running for a different
+checkout it restarts it on the one you picked. Then it ensures both servers and opens the studio
+as its own chrome-less window. Failures show a macOS alert with the log path — never silent.
+
+The remembered choice lives in `~/.figma-converter/root`. The /Applications entry is a symlink to
+the bundle inside the checkout — after the converter merges to the main clone, re-point it:
+`ln -sfn <main-clone>/figma-code-converter/launcher/FigmaConverter.app "/Applications/Figma Converter.app"`.
 
 ## How to use (the 60-second manual)
 
