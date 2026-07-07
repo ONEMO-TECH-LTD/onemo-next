@@ -3,9 +3,11 @@
 // Expert laws: gates read the MODEL (the iframe #engine-overrides staging sheet), never just the
 // input box; real keyboard/mouse via Playwright (in-page probes can't even focus in bg tabs).
 // usage: node editor-engine/audit/input-behavior.mjs [--url http://localhost:3025/react-figma]
-import { existsSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, writeFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
+const SPEC = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'figma-spec.json'), 'utf8'));
 const args = process.argv.slice(2);
 const flag = (n, d) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : d; };
 const URL_ = flag('--url', 'http://localhost:3025/react-figma');
@@ -108,7 +110,7 @@ await page.mouse.move(asideBox.x - 600, asideBox.y + 400, { steps: 8 }); // try 
 await page.mouse.up();
 await page.waitForTimeout(300);
 const wideW = Math.round((await aside.boundingBox()).width);
-gate('panel resize clamps at max 480', 'true', wideW <= 481 && wideW >= 470);
+gate(`panel resize clamps at max ${SPEC.panel.ourMaxWidth}`, 'true', wideW <= SPEC.panel.ourMaxWidth + 1 && wideW >= SPEC.panel.ourMaxWidth - 10);
 const fieldW1 = await opacity.evaluate((el) => Math.round(el.closest('div').getBoundingClientRect().width));
 gate('fields grow with panel (responsive)', 'true', fieldW1 > fieldW0);
 await page.mouse.move((await aside.boundingBox()).x + 3, asideBox.y + 400);
@@ -117,9 +119,9 @@ await page.mouse.move(asideBox.x + 900, asideBox.y + 400, { steps: 8 }); // try 
 await page.mouse.up();
 await page.waitForTimeout(300);
 const narrowW = Math.round((await aside.boundingBox()).width);
-gate('panel resize clamps at min 241', 'true', narrowW >= 240 && narrowW <= 242);
+gate(`panel resize clamps at min ${SPEC.panel.ourMinWidth}`, 'true', Math.abs(narrowW - SPEC.panel.ourMinWidth) <= 1);
 const fieldWmin = await opacity.evaluate((el) => Math.round(el.closest('div').getBoundingClientRect().width));
-gate('fields never below Figma min 88', 'true', fieldWmin >= 88);
+gate(`fields never below Figma min ${SPEC.valueField.containerWidth}`, 'true', fieldWmin >= SPEC.valueField.containerWidth);
 
 // G8 — annotation: vertical alignment writes the model
 const alignBtn = page.locator('button[aria-label*="Align top"], button[title*="Align top"]').first();
@@ -148,6 +150,24 @@ if (await scrollSeg.count()) {
   await scrollSeg.click(); await page.waitForTimeout(300);
   gate('scroll overflow writes model', 'true', /overflow: hidden/.test(await model()));
 } else gate('scroll control present', 'true', false);
+
+// G11 — F-C (lead): Enter on the LINK field fires exactly ONE wrap-jsx-link write
+let linkWrites = 0;
+await page.route('**/api/dev/editor-write', (route) => {
+  const body = route.request().postData() ?? '';
+  if (body.includes('wrap-jsx-link')) { linkWrites++; return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"file":"stub","newValueText":"stub"}' }); }
+  return route.continue();
+});
+const linkInput = page.locator('input[aria-label="Link target"]');
+if (await linkInput.count()) {
+  await linkInput.scrollIntoViewIfNeeded();
+  await linkInput.click();
+  await linkInput.fill('/g11-probe');
+  await linkInput.press('Enter');
+  await page.waitForTimeout(600);
+  gate('link Enter fires exactly ONE wrap-jsx-link', '1', linkWrites);
+} else gate('link field present', 'true', false);
+await page.unroute('**/api/dev/editor-write');
 
 await browser.close();
 writeFileSync(path.join(OUT, 'behavior-gates.json'), JSON.stringify({ url: URL_, at: new Date().toISOString(), rows }, null, 2));

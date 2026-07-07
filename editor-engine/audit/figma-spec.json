@@ -22,7 +22,7 @@
   },
   "panel": {
     "figmaWidth": 241,
-    "ourMinWidth": 240,
+    "ourMinWidth": 241,
     "ourMaxWidth": 480,
     "note": "Figma right panel is fixed 241px (measured). Dan spec item 7 extends ours: resizable with min/max. Min = Figma's 241-1; max = 2x per Dan's resizing requirement.",
     "measured": true

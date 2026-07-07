@@ -486,6 +486,7 @@ function FigmaField({ icon, letter, glyph, value, onChange, onCommit, token, suf
    * incoming value. Fixes item 10's undo granularity too (no per-keystroke history pollution). */
   const [draft, setDraft] = useState<string | null>(null)
   const editing = draft !== null
+  const justCommitted = useRef(false) // F-A (lead E8 gate): Enter's synchronous blur must not re-fire onCommit
   const commitDraft = () => { if (editing) { if (draft !== value) onChange?.(draft); setDraft(null) } }
   const revertDraft = () => setDraft(null)
   /* E8 item 12 (contract: scrub): dragging the leading glyph/label scrubs the value —
@@ -524,9 +525,12 @@ function FigmaField({ icon, letter, glyph, value, onChange, onCommit, token, suf
       ) : onChange ? (
         <input aria-label={ariaLabel} role={inputRole} value={shown} placeholder={placeholder}
           onChange={e => setDraft(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
-          onBlur={() => { if (onCommit && editing) { onCommit(draft!); setDraft(null) } else revertDraft() }}
+          onBlur={() => {
+            if (justCommitted.current) { justCommitted.current = false; return } // F-A: trailing blur after Enter
+            if (onCommit && editing) { onCommit(draft!); setDraft(null) } else revertDraft()
+          }}
           onKeyDown={e => {
-            if (e.key === 'Enter') { commitDraft(); onCommit?.(editing ? draft! : String(value)); e.currentTarget.blur() }
+            if (e.key === 'Enter') { justCommitted.current = true; commitDraft(); onCommit?.(editing ? draft! : String(value)); e.currentTarget.blur() }
             else if (e.key === 'Escape') { revertDraft(); e.currentTarget.blur(); e.stopPropagation() }
           }}
           style={{ minWidth: 0, width: '100%', height: 22, border: 0, outline: 0, padding: 0, background: 'transparent', color: dim ? MUTE : INK, font: `450 11px/16px ${FONT}` }} />

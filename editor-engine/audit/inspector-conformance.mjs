@@ -159,7 +159,7 @@ if (pillRun.pillInfo) {
   check('pill', 'height', pillSpec.height, pillRun.pillInfo.h);
   check('pill', 'borderRadius', pillSpec.borderRadius, pillRun.pillInfo.radius);
   check('pill', 'background', pillSpec.background, pillRun.pillInfo.bg);
-  check('pill', 'font', pillSpec.font, pillRun.pillInfo.font.replace('px w', 'px w'), (e, a) => a === '11px w400');
+  check('pill', 'font', pillSpec.font, pillRun.pillInfo.font, (e, a) => a === String(e));
   check('pill', 'showsRawValue', 'true', pillRun.pillInfo.rawText);
   check('pill', 'tooltipFullPath', 'true', pillRun.pillInfo.tooltipHasPath);
 } else fail('pill', 'present-after-bind', 'pill rendered', 'not found');
