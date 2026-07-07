@@ -79,6 +79,21 @@ gate('undo restores prior committed value (model)', 'true', /opacity: 0\.42/.tes
 const rotGlyph = page.locator('input[aria-label="Rotation"]').locator('xpath=../span[1]');
 const gb = await rotGlyph.boundingBox();
 gate('scrub cursor ew-resize', 'ew-resize', await rotGlyph.evaluate((el) => getComputedStyle(el).cursor));
+// widen (self-QA finding): every LABELED value field (FigmaField pattern — has a leading
+// 24px glyph cell) must scrub. SCOPE per Figma: the compact swatch-row opacity (Fill/
+// Selection color) has NO leading glyph and is NOT a scrub field in Figma either (verified
+// live in Figma DOM 2026-07-07) — excluding it is conformance, not a pass-grant.
+const scrubMiss = await page.evaluate(() => {
+  const aside = [...document.querySelectorAll('aside')].pop();
+  const fields = [...aside.querySelectorAll('input[role="spinbutton"]')];
+  return fields.filter((i) => {
+    const g = i.parentElement?.firstElementChild;
+    const hasGlyphCell = g && g.tagName === 'SPAN' && Math.round(g.getBoundingClientRect().width) === 24; // FigmaField leading cell
+    if (!hasGlyphCell) return false; // swatch-row opacity etc. — no scrub in Figma, correctly excluded
+    return getComputedStyle(g).cursor !== 'ew-resize';
+  }).map((i) => i.getAttribute('aria-label'));
+});
+gate('every glyph-cell value field has scrub cursor', '[]', JSON.stringify(scrubMiss));
 await page.mouse.move(gb.x + 8, gb.y + 12);
 await page.mouse.down();
 for (let i = 1; i <= 5; i++) await page.mouse.move(gb.x + 8 + i * 4, gb.y + 12);
@@ -201,6 +216,15 @@ if (await hoverOp.count()) {
   gate('hover rule targets :hover with opacity', 'true', !!w && w.state === 'hover' && JSON.stringify(w.decls).includes('opacity'));
 } else gate('interactions section present', 'true', false);
 await page.unroute('**/api/dev/editor-write');
+// G14 — F-i9a (lead): inline-styled (no class) → hover commit fires ZERO add-state-rule (honest error, no fake write)
+await page.unroute('**/api/dev/editor-resolve');
+await page.route('**/api/dev/editor-resolve', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ props: {}, fallbackRule: null }) }));
+if (await hoverOp.count()) {
+  const before = stateWrites.length;
+  await hoverOp.click(); await hoverOp.fill('70'); await hoverOp.press('Enter');
+  await page.waitForTimeout(600);
+  gate('inline-styled hover fires ZERO add-state-rule (honest error)', '0', stateWrites.length - before);
+}
 await page.unroute('**/api/dev/editor-resolve');
 
 await browser.close();
