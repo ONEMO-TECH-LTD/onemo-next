@@ -112,11 +112,12 @@
       },
       "inputFontFamilyFirst": "Inter",
       "container": {
-        "backgroundColor": "rgb(255, 255, 255)",
+        "backgroundColor": "rgb(245, 245, 245)",
         "borderRadius": "5px"
       },
       "containerRectH": 24,
-      "containerRectW": 88
+      "containerRectW": 88,
+      "_bgNote": "VISIBLE-TRUTH correction 2026-07-07 (Dan 2.6): X/Y render on the grey F5F5F5 field capsule like every other value field; the DOM census measured an inner WHITE wrapper (same trap as resize/gap). Backed by field-pixel-fidelity: x-position/y-position still pass vs Figma real crops (2.69%/4.1% < 12%). Muted 0.3 ink is the only thing that differs for X/Y."
     },
     "standard": {
       "input": {

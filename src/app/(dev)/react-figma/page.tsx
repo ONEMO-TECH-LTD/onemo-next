@@ -598,10 +598,13 @@ function FigmaField({ icon, letter, glyph, glyphWidth = 24, value, onChange, onC
   /* Census-measured container backgrounds: filled = #F5F5F5 (Rotation/Padding class),
    * ghost = transparent at rest (Resizing/Gap class), dim (layout-controlled X/Y) = white
    * with NO border. whiteBg (Link/typed inputs) keeps its measured #e6e6e6 border. */
-  const bg = dim ? '#fff' : whiteBg ? (h ? '#ededed' : '#fff') : FIELD
+  // 2.6 (Dan): `dim` is a muted-INK flag (layout-controlled X/Y), NOT a background — forcing white
+  // here made the field invisible on the white panel ("lost the boxes"). The box is the grey FIELD
+  // capsule like every other value field; dim only lightens the text.
+  const bg = whiteBg ? (h ? '#ededed' : '#fff') : FIELD
   return (
     <div ref={fieldRef} title={title ?? token} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
-      style={{ position: 'relative', minWidth: typeof width === 'number' ? width : 0, width: typeof width === 'number' ? '100%' : width, height: 24, borderRadius: 5, background: bg, border: `1px solid ${varOpen || modeOpen ? SEL : whiteBg && !dim ? '#e6e6e6' : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: cols, alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, letterSpacing: '0.055px', color: INK }}>
+      style={{ position: 'relative', minWidth: typeof width === 'number' ? width : 0, width: typeof width === 'number' ? '100%' : width, height: 24, borderRadius: 5, background: bg, border: `1px solid ${varOpen || modeOpen ? SEL : whiteBg ? '#e6e6e6' : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: cols, alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, letterSpacing: '0.055px', color: INK }}>
       <span onPointerDown={scrubDown} onPointerMove={scrubMove} onPointerUp={scrubUp}
         style={{ width: glyphWidth, height: 24, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)', font: `450 11px/24px ${FONT}`, cursor: numeric ? 'ew-resize' : undefined, touchAction: 'none' }}>{icon ? <UiIcon name={icon} /> : glyph ?? letter}</span>
       {bound ? (
