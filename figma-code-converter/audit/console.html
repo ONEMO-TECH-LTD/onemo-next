@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>figma-to-code — audit console</title>
+<style>
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;background:#0e0e12;color:#e6e6ea;font:13px/1.5 ui-sans-serif,system-ui,sans-serif;overflow:hidden;}
+  :root{--topH:84px;}
+  body.studio{--topH:118px;}
+  .tabs{display:none;position:fixed;top:84px;left:0;right:0;height:34px;z-index:30;background:#0f0f14;border-bottom:1px solid #26262e;align-items:center;gap:6px;padding:0 10px;overflow-x:auto;}
+  body.studio .tabs{display:flex;}
+  .tabs .tab{display:flex;align-items:center;gap:7px;background:#1a1a22;border:1px solid #26262e;border-bottom:0;border-radius:8px 8px 0 0;padding:5px 11px;font:500 11px system-ui;color:#b7b7c2;cursor:pointer;white-space:nowrap;flex-shrink:0;}
+  .tabs .tab.on{background:#20202a;color:#e6e6ea;border-color:#39b3a6;}
+  .tabs .tab .x{color:#5a5a66;font:600 12px system-ui;padding:0 1px;} .tabs .tab .x:hover{color:#f08a8a;}
+  .tabs .tab .up{color:#5a5a66;font:600 11px system-ui;} .tabs .tab .up:hover{color:#7fd8cd;} .tabs .tab .up.done{color:#7fd8cd;}
+  .tabs .addr{flex:1;min-width:220px;display:flex;gap:6px;align-items:center;}
+  .tabs .addr input{flex:1;background:#16161c;border:1px solid #26262e;border-radius:7px;color:#e6e6ea;font:12px ui-monospace,monospace;padding:5px 10px;outline:none;}
+  .tabs .addr input:focus{border-color:#39b3a6;}
+  .tabs .addr .busy{color:#7fd8cd;font:11px ui-monospace,monospace;white-space:nowrap;display:none;}
+  .rail{position:fixed;top:0;left:0;right:0;height:46px;z-index:30;background:#16161c;border-bottom:1px solid #26262e;display:flex;align-items:center;gap:14px;padding:0 16px;}
+  .rail b{font-size:13px;} .rail .scr{color:#8a8a92;font:12px ui-monospace,monospace;}
+  .modes{display:flex;gap:4px;margin-left:6px;}
+  .modes button{font:500 11px system-ui;border:0;border-radius:7px;padding:5px 11px;cursor:pointer;background:#20202a;color:#b7b7c2;}
+  .modes button.on{background:#39b3a6;color:#06231f;}
+  .chips{margin-left:auto;display:flex;gap:7px;font:11px ui-monospace,monospace;}
+  .chip{background:#20202a;border-radius:7px;padding:4px 9px;color:#b7b7c2;}
+  .chip b{color:#7fd8cd;} .chip.warn b{color:#e8a94c;} .chip.bad b{color:#f08a8a;}
+  .rail2{position:fixed;top:46px;left:0;right:0;height:38px;z-index:30;background:#131319;border-bottom:1px solid #26262e;display:flex;align-items:center;gap:10px;padding:0 16px;font:11px ui-monospace,monospace;color:#b7b7c2;}
+  .rail2 select,.rail2 button{background:#20202a;color:#cfe;border:0;border-radius:6px;padding:4px 9px;cursor:pointer;font:500 11px system-ui;}
+  .rail2 input[type=range]{accent-color:#39b3a6;width:260px;}
+  .rail2 .tgl{margin-left:auto;display:flex;gap:6px;}
+  .rail2 .tgl button.off{color:#5a5a66;}
+  :root{--leftW:240px;--rightW:340px;}
+  .stage{position:absolute;top:var(--topH);left:var(--leftW);right:var(--rightW);bottom:0;display:grid;place-items:center;overflow:auto;background:#0e0e12;}
+  body.hideL{--leftW:0px;} body.hideR{--rightW:0px;}
+  .left{position:fixed;top:var(--topH);left:0;bottom:0;width:var(--leftW);background:#131319;border-right:1px solid #26262e;overflow:auto;padding:10px;}
+  body.hideL .left,body.hideR .panel{display:none;}
+  /* industry-standard edge collapse tabs (chevron, vertically centered on the panel edge) */
+  .collapse{position:fixed;top:50%;transform:translateY(-50%);z-index:45;width:16px;height:56px;border:1px solid #26262e;background:#1a1a22;color:#8a8a92;display:flex;align-items:center;justify-content:center;cursor:pointer;font:600 11px system-ui;user-select:none;}
+  .collapse:hover{color:#e6e6ea;background:#22222c;}
+  #clpL{left:var(--leftW);border-radius:0 7px 7px 0;border-left:0;}
+  #clpR{right:var(--rightW);border-radius:7px 0 0 7px;border-right:0;}
+  /* drag handles — resize the panels */
+  .rs{position:fixed;top:var(--topH);bottom:0;width:7px;z-index:44;cursor:col-resize;}
+  .rs:hover,.rs.on{background:rgba(57,179,166,.25);}
+  #rsL{left:calc(var(--leftW) - 3px);} #rsR{right:calc(var(--rightW) - 3px);}
+  body.hideL #rsL,body.hideR #rsR{display:none;}
+  .device{position:relative;background:#fff;outline:1px solid #2a2a32;}
+  .device iframe{display:block;border:0;background:#eceff1;position:relative;z-index:1;}
+  .device canvas.overlay{position:absolute;top:0;left:0;z-index:2;pointer-events:none;}
+  .zonebox{position:absolute;z-index:3;pointer-events:none;border:1.5px dashed #8fd0ff;background:rgba(143,208,255,.08);display:none;}
+  .panel{position:fixed;top:var(--topH);right:0;bottom:0;width:340px;background:#131319;border-left:1px solid #26262e;overflow:auto;padding:14px;}
+  .panel .empty{color:#6a6a76;font-size:12px;padding:40px 8px;text-align:center;}
+  .nodehdr{font-family:ui-monospace,monospace;font-size:12px;margin-bottom:2px;}
+  .nodehdr b{color:#8fd0ff;} .nodesub{color:#7a7a86;font:11px ui-monospace,monospace;margin-bottom:12px;word-break:break-all;}
+  .sect{font:10px system-ui;letter-spacing:.08em;color:#6cf;margin:14px 0 6px;text-transform:uppercase;}
+  .row{display:flex;gap:8px;padding:2px 0;font:12px ui-monospace,monospace;align-items:baseline;}
+  .row .k{color:#8a8a92;min-width:96px;flex-shrink:0;} .row .v{color:#e6e6ea;word-break:break-word;}
+  .row .tok{color:#7fd8cd;} .row .res{color:#7d7;} .row .raw{color:#c9a86a;} .row .rawpx{color:#fff;font-weight:600;}
+  .flag{margin-top:10px;padding:8px 10px;border-radius:8px;font:11px/1.4 system-ui;}
+  .flag.drift{background:#3a2a10;color:#e8c07a;} .flag.approx{background:#2a2036;color:#c9a4e8;}
+  .flag.ok{background:#12321e;color:#8fe0a8;} .flag.bad{background:#3a1414;color:#f0a0a0;}
+  .big{font:600 30px ui-monospace,monospace;} .big.ok{color:#7fd8cd;} .big.bad{color:#f08a8a;}
+  .zonebtns{display:flex;flex-wrap:wrap;gap:5px;}
+  .zonebtns button{font:500 11px system-ui;border:0;border-radius:6px;padding:4px 9px;cursor:pointer;background:#20202a;color:#b7b7c2;}
+  .zonebtns button.on{background:#8fd0ff;color:#06202f;}
+  .ctl{display:flex;align-items:center;gap:8px;margin:6px 0;font:11px ui-monospace,monospace;}
+  .ctl input[type=range]{accent-color:#39b3a6;flex:1;} .ctl button{background:#20202a;border:0;color:#cfe;border-radius:6px;padding:5px 10px;cursor:pointer;}
+  .tree{font:11px ui-monospace,monospace;} .tree .t{padding:1px 0;color:#c7c7d0;white-space:pre;cursor:pointer;} .tree .t:hover{color:#8fd0ff;}
+  .hint{position:fixed;bottom:10px;left:14px;color:#5a5a66;font-size:11px;}
+</style>
+</head>
+<body>
+  <div class="rail">
+    <b>figma-to-code</b><span class="scr" id="scr">audit console</span>
+    <div class="modes" id="modes">
+      <button class="on" data-mode="inspect">Inspect</button>
+      <button data-mode="fidelity">Fidelity</button>
+      <button data-mode="responsive">Responsive</button>
+      <button data-mode="theming">Theming</button>
+      <button data-mode="structure">Structure</button>
+    </div>
+    <select id="zonesel" style="font:500 11px system-ui;background:#20202a;color:#b7b7c2;border:0;border-radius:7px;padding:5px 8px;cursor:pointer;"><option value="">All zones</option></select>
+    <div class="chips" id="chips"></div>
+  </div>
+
+  <div class="rail2">
+    <select id="gdev"><option value="">— device —</option></select>
+    <span>W</span><input type="range" id="gw" min="320" max="1728" value="402">
+    <span class="rawpx" id="gwv" style="color:#fff;font-weight:600">402px</span>
+    <button id="gfill">⤢ Fill</button>
+    <button id="greset">Reset</button>
+  </div>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="left" id="left"><div class="empty">Loading…</div></div>
+
+  <div class="stage">
+    <div class="device" id="device">
+      <iframe id="frame"></iframe>
+      <canvas class="overlay" id="overlay"></canvas>
+      <div class="zonebox" id="zonebox"></div>
+    </div>
+  </div>
+
+  <div class="panel" id="panel"><div class="empty">Loading…</div></div>
+  <div class="collapse" id="clpL" title="Collapse / expand tree">‹</div>
+  <div class="collapse" id="clpR" title="Collapse / expand panel">›</div>
+  <div class="rs" id="rsL"></div>
+  <div class="rs" id="rsR"></div>
+  <div class="hint" id="hint">Inspect mode · click an element · hover to preview</div>
+
+<script>
+// screen source: ?s=<slug> → a studio sandbox screen; no param → the built-in mother screen
+const SLUG = new URLSearchParams(location.search).get('s');
+const AUDIT_URL = SLUG ? `/audit/sandbox/${SLUG}.json` : '/audit/mother-v2.json';
+const FIG   = SLUG ? `/audit/sandbox/${SLUG}-figma.png` : '/audit/fidelity-figma.png';
+const BUILD = SLUG ? `/audit/sandbox/${SLUG}-build.png` : '/audit/fidelity-build.png';
+const BUDGET = 10;
+const frame = document.getElementById('frame');
+frame.src = SLUG ? `/converted/sandbox/${SLUG}` : '/converted/audit-mother-v2';
+const device = document.getElementById('device'), overlay = document.getElementById('overlay'),
+      zonebox = document.getElementById('zonebox'), panel = document.getElementById('panel'), chips = document.getElementById('chips'),
+      scr = document.getElementById('scr'), hint = document.getElementById('hint'), modesEl = document.getElementById('modes');
+let audit = null, mode = 'inspect', sel = null, zone = null, hi = null, iframeReady = false;
+const esc = s => String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const doc = () => frame.contentDocument, win = () => frame.contentWindow;
+
+function updScrSize(){ try{ const w=win(), el=document.getElementById('scrsize'); if(el&&w) el.textContent=`${w.innerWidth}×${w.innerHeight}`; }catch{} }
+frame.addEventListener('load',()=>{ updScrSize(); try{ win().addEventListener('resize',updScrSize); }catch{} });
+window.addEventListener('resize',updScrSize);
+// ── global resizer (top bar — works in EVERY mode; Dan: resizer lives at the top) ──
+const gw=document.getElementById('gw'), gwv=document.getElementById('gwv'), gdev=document.getElementById('gdev');
+function setSize(w, h, sync){
+  w=Math.max(320,Math.min(2400,w));
+  frame.style.width=w+'px';
+  if(h){ frame.style.height=Math.max(320,h)+'px'; }
+  gwv.textContent=w+'px'; if(sync)gw.value=w;
+  if(mode==='fidelity'&&audit&&w!==audit.frame.w) clearOverlay(); // heatmap is design-size only
+  updScrSize();
+  if(mode==='responsive') setTimeout(runInvariants,80);
+}
+const setW=(w,sync)=>setSize(w,null,sync);
+gw.oninput=e=>setW(+e.target.value,false);
+gdev.onchange=e=>{ const o=e.target.selectedOptions[0]; if(o&&o.value)setSize(+o.value,+o.dataset.h||null,true); };
+document.getElementById('gfill').onclick=()=>{ const st=document.querySelector('.stage'); setSize(st.clientWidth-4, st.clientHeight-4, true); };
+document.getElementById('greset').onclick=()=>setSize(audit?.frame.w||402, audit?.frame.h||874, true);
+// edge collapse tabs (standard chevrons) + drag-resizable panels
+const clpL=document.getElementById('clpL'), clpR=document.getElementById('clpR');
+const flip=()=>{ clpL.textContent=document.body.classList.contains('hideL')?'›':'‹'; clpR.textContent=document.body.classList.contains('hideR')?'‹':'›'; };
+clpL.onclick=()=>{ document.body.classList.toggle('hideL'); flip(); };
+clpR.onclick=()=>{ document.body.classList.toggle('hideR'); flip(); };
+for(const [id,varName,fromRight,min,max] of [['rsL','--leftW',false,160,520],['rsR','--rightW',true,240,640]]){
+  const h=document.getElementById(id);
+  h.addEventListener('mousedown',e=>{
+    e.preventDefault(); h.classList.add('on'); frame.style.pointerEvents='none';
+    const move=ev=>{ const v=Math.max(min,Math.min(max, fromRight? window.innerWidth-ev.clientX : ev.clientX));
+      document.documentElement.style.setProperty(varName, v+'px'); };
+    const up=()=>{ h.classList.remove('on'); frame.style.pointerEvents=''; removeEventListener('mousemove',move); removeEventListener('mouseup',up); };
+    addEventListener('mousemove',move); addEventListener('mouseup',up);
+  });
+}
+
+// ── STUDIO (paste-link conversion, tabs, sandbox) — active only when served by studio/server.mjs ──
+fetch('/api/screens').then(r=>r.ok?r.json():Promise.reject()).then(screens=>{
+  document.body.classList.add('studio');
+  const tabs=document.getElementById('tabs');
+  const tab=(label,slug,promoted)=>{
+    const t=document.createElement('div'); t.className='tab'+((slug||null)===SLUG?' on':'');
+    t.innerHTML=`<span>${esc(label)}</span>`+(slug?`<span class="up${promoted?' done':''}" title="${promoted?'promoted — re-promote':'promote to converted/'}">⇧</span><span class="x" title="delete">×</span>`:'');
+    t.querySelector('span').onclick=()=>{ location.href=slug?`/?s=${slug}`:'/'; };
+    if(slug){
+      t.querySelector('.x').onclick=async e=>{ e.stopPropagation(); if(!confirm(`Delete sandbox screen "${label}"?`))return;
+        await fetch(`/api/screens/${slug}`,{method:'DELETE'}); location.href = SLUG===slug ? '/' : location.href; };
+      t.querySelector('.up').onclick=async e=>{ e.stopPropagation();
+        const r2=await fetch(`/api/promote/${slug}`,{method:'POST'}); const j=await r2.json();
+        alert(r2.ok?`Promoted → ${j.dest}
+(product build, no audit stamps — commit it when accepted)`:`Promote failed:
+${j.error}`); };
+    }
+    tabs.appendChild(t);
+  };
+  tab('Mother — v2', null, true);
+  screens.forEach(sc=>tab(sc.name||sc.slug, sc.slug, sc.promoted));
+  const addr=document.createElement('div'); addr.className='addr';
+  addr.innerHTML=`<input id="figurl" placeholder="Paste a Figma frame link and press ⏎ to convert…" spellcheck="false"><span class="busy" id="cbusy">converting… (all gates run — ~20s)</span>`;
+  tabs.appendChild(addr);
+  const inp=addr.querySelector('#figurl'), busy=addr.querySelector('#cbusy');
+  inp.addEventListener('keydown',async e=>{
+    if(e.key!=='Enter'||!inp.value.trim())return;
+    inp.disabled=true; busy.style.display='inline';
+    const r2=await fetch('/api/convert',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({url:inp.value.trim()})});
+    const j=await r2.json();
+    if(r2.ok) location.href=`/?s=${j.slug}`;
+    else { inp.disabled=false; busy.style.display='none'; alert(`Conversion failed (gates are loud by design):
+
+${j.error}`); }
+  });
+}).catch(()=>{}); // no studio server → plain console, unchanged
+
+fetch(AUDIT_URL).then(r=>r.json()).then(a=>{
+  audit = a; scr.textContent = `${a.name} · ${a.screen}`;
+  const s = a.summary;
+  chips.innerHTML =
+    `<span class="chip">screen <b id="scrsize">—</b></span>`+
+    `<span class="chip">elements <b>${s.elements}</b></span>`+
+    `<span class="chip">coverage <b>${s.coverage}%</b></span>`+
+    `<span class="chip ${s.refusals?'bad':''}">refusals <b>${s.refusals}</b></span>`+
+    `<span class="chip ${s.drift?'warn':''}">drift <b>${s.drift}</b></span>`+
+    `<span class="chip ${s.approximations?'warn':''}">approx <b>${s.approximations}</b></span>`;
+  frame.style.width = a.frame.w+'px'; frame.style.height = a.frame.h+'px';
+  gw.value=a.frame.w; gwv.textContent=a.frame.w+'px';
+  Object.entries(DEVICE_GROUPS).forEach(([g,list])=>{ const og=document.createElement('optgroup'); og.label=g;
+    list.forEach(d=>{const o=document.createElement('option');o.value=d[1];o.dataset.h=d[2];o.textContent=`${d[0]} · ${d[1]}×${d[2]}`;og.appendChild(o);}); gdev.appendChild(og); });
+  buildTree();
+  const zs=document.getElementById('zonesel');
+  (a.zones||[]).forEach(z=>{const o=document.createElement('option');o.value=z.id;o.textContent=z.class;zs.appendChild(o);});
+  zs.onchange=e=>{ zone=e.target.value||null; applyMode(); };
+  if (iframeReady) applyMode();
+});
+
+frame.addEventListener('load', ()=>{
+  iframeReady = true;
+  const d = doc(); if (!d) return;
+  hi = d.createElement('div');
+  hi.style.cssText='position:absolute;pointer-events:none;z-index:99999;border:1.5px solid #39b3a6;background:rgba(57,179,166,.12);display:none;';
+  const label = d.createElement('div');
+  label.style.cssText='position:absolute;top:-20px;left:0;background:#39b3a6;color:#06231f;font:600 10px ui-monospace,monospace;padding:1px 5px;border-radius:4px;white-space:nowrap;';
+  hi.appendChild(label); d.body.appendChild(hi); hi._label = label;
+  d.addEventListener('mousemove', e=>{ if (mode!=='inspect'||sel) return; const t=e.target.closest('[data-fc]'); t?boxEl(t,false):(hi.style.display='none'); });
+  d.addEventListener('click', e=>{ if (mode!=='inspect') return; const t=e.target.closest('[data-fc]'); if(!t)return; e.preventDefault(); sel=t.getAttribute('data-fc'); boxEl(t,true); renderInspect(sel); }, true);
+  if (audit) applyMode();
+});
+function boxEl(el, persist){
+  const r = el.getBoundingClientRect(), d = doc();
+  const top=r.top+d.documentElement.scrollTop, left=r.left+d.documentElement.scrollLeft;
+  hi.style.left=left+'px'; hi.style.top=top+'px';
+  hi.style.width=r.width+'px'; hi.style.height=r.height+'px'; hi.style.borderStyle=persist?'solid':'dashed';
+  hi._label.textContent=`${Math.round(r.width)} × ${Math.round(r.height)}`;
+  hi._label.style.top = top < 22 ? '2px' : '-20px';  // flip inside when near the top edge (no iframe clip)
+  hi._label.style.left = left < 4 ? '2px' : '0';
+  hi.style.display='block';
+}
+
+// ── LEFT: structure tree, always visible (Dan: structure on the left, own panel) ──
+function buildTree(){
+  const st=audit.structure, leftEl=document.getElementById('left'), lines=[];
+  (function walk(id,depth){ const n=audit.nodes[id]; if(!n)return; lines.push(`<div class="t" data-fc="${id}">${'  '.repeat(depth)}&lt;${esc(n.tag)}&gt; ${esc(n.name)}</div>`); (st.tree[id]||[]).forEach(c=>walk(c,depth+1)); })(st.rootId,0);
+  leftEl.innerHTML=`<div class="sect">Structure</div><div class="tree">${lines.join('')}</div>`;
+  leftEl.querySelectorAll('.tree .t').forEach(t=>t.onclick=()=>{
+    mode='inspect'; modesEl.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.mode==='inspect'));
+    sel=t.dataset.fc; applyMode();
+    const el=doc()?.querySelector(`[data-fc="${CSS.escape(sel)}"]`); if(el)boxEl(el,true);
+  });
+}
+
+// ── mode switching ──
+modesEl.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+  mode=b.dataset.mode; modesEl.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
+  applyMode();
+});
+function clearOverlay(){ overlay.style.display='none'; if(hi)hi.style.display='none'; } // note: does NOT clear sel (QA F1 — tree click)
+function applyMode(){
+  clearOverlay();
+  if(mode==='fidelity') setSize(audit?.frame.w||402, audit?.frame.h||874, true); // heatmap compares at design size
+  hint.textContent = ({inspect:'Inspect · click an element · hover to preview',fidelity:'Fidelity · measured pixel diff vs Figma (red = mismatch)',responsive:'Responsive · device / slider / fill · invariants checked live',theming:'Theming · flip light/dark · token colors must move',structure:'Structure · layer tree, gates, asset integrity'})[mode];
+  applyZoneBox();
+  ({inspect:modeInspect,fidelity:modeFidelity,responsive:modeResponsive,theming:modeTheming,structure:modeStructure})[mode]();
+}
+
+// ── INSPECT ──
+function modeInspect(){
+  if(sel){ renderInspect(sel); const el=doc()?.querySelector(`[data-fc="${(window.CSS&&CSS.escape)?CSS.escape(sel):sel}"]`); if(el)boxEl(el,true); }
+  else panel.innerHTML='<div class="empty">Click any element to inspect its Figma anatomy and the tokens → DS value → final px in its CSS.</div>';
+}
+function renderInspect(fc){
+  const n = audit.nodes[fc]; if(!n){panel.innerHTML='<div class="empty">No data.</div>';return;}
+  const fig = n.figma.map(([k,v])=>`<div class="row"><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span></div>`).join('');
+  const el = doc()?.querySelector(`[data-fc="${(window.CSS&&CSS.escape)?CSS.escape(fc):fc}"]`);
+  const cs = el ? win().getComputedStyle(el) : null;
+  const css = n.css.map(c=>{
+    const tok = c.token?`<span class="tok">var(${esc(c.token)})</span>`:`<span class="${c.raw?'raw':'v'}">${esc(c.value)}</span>`;
+    const res = c.resolved?` <span class="res">→ ${esc(c.resolved)}</span>`:'';
+    let comp = cs?cs.getPropertyValue(c.prop):''; comp=comp&&comp.trim();
+    const rawpx = comp&&comp!==c.value&&comp!==c.resolved?` <span class="rawpx">= ${esc(comp)}</span>`:'';
+    return `<div class="row"><span class="k">${esc(c.prop)}</span><span class="v">${tok}${res}${rawpx}</span></div>`;
+  }).join('')||'<div class="row"><span class="v" style="color:#6a6a76">(structural — no CSS)</span></div>';
+  let flags='';
+  if(n.drift) flags+=`<div class="flag drift">TOKEN DRIFT — Figma ${n.drift.figma} vs token resolves ${n.drift.resolved}</div>`;
+  if(n.approximation) flags+=`<div class="flag approx">APPROXIMATION — ${esc(n.approximation.join('; '))}</div>`;
+  panel.innerHTML=`<div class="nodehdr">&lt;${esc(n.tag)}&gt; <b>${esc(n.name)}</b></div>`+
+    `<div class="nodesub">.${esc(n.class)} · ${esc(fc)} · figma ${n.rel.w}×${n.rel.h} @ ${n.rel.x},${n.rel.y}${el?(()=>{const b=el.getBoundingClientRect();return ` · <span class="rawpx">live ${Math.round(b.width)}×${Math.round(b.height)} @ ${Math.round(b.x)},${Math.round(b.y)}</span>`;})():''}</div>`+
+    `<div class="sect">Figma</div>${fig}`+
+    `<div class="sect">Converted CSS · <span class="tok">token</span> → <span class="res">DS value</span> → <span class="rawpx">final px</span></div>${css}`+flags;
+}
+
+// ── FIDELITY (measured pixel diff vs Figma) ──
+function modeFidelity(){
+  panel.innerHTML='<div class="empty">Measuring pixel diff vs Figma…</div>';
+  const load=s=>new Promise((res,rej)=>{const i=new Image();i.crossOrigin='anonymous';i.onload=()=>res(i);i.onerror=rej;i.src=s;});
+  Promise.all([load(FIG),load(BUILD)]).then(([A,B])=>{
+    const W=Math.min(A.width,B.width),H=Math.min(A.height,B.height);
+    const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d',{willReadFrequently:true});
+    x.drawImage(A,0,0);const da=x.getImageData(0,0,W,H).data;
+    x.clearRect(0,0,W,H);x.drawImage(B,0,0);const db=x.getImageData(0,0,W,H).data;
+    // zone bands (×2 for the @2x images)
+    const Z=(audit.zones||[]).map(z=>({name:z.class,y0:z.rel.y*2,y1:(z.rel.y+z.rel.h)*2,n:0,mis:0}));
+    let n=0,mis=0; const heat=x.createImageData(W,H); const hd=heat.data;
+    for(let y=0;y<H;y++)for(let xx=0;xx<W;xx++){
+      const i=(y*W+xx)*4; const d=Math.max(Math.abs(da[i]-db[i]),Math.abs(da[i+1]-db[i+1]),Math.abs(da[i+2]-db[i+2]));
+      n++; const bad=d>32; if(bad)mis++;
+      const z=Z.find(z=>y>=z.y0&&y<z.y1); if(z){z.n++; if(bad)z.mis++;}
+      if(bad){hd[i]=255;hd[i+1]=40;hd[i+2]=40;hd[i+3]=150;}
+    }
+    // draw heatmap overlay scaled to the device
+    overlay.width=W;overlay.height=H;overlay.style.width=audit.frame.w+'px';overlay.style.height=audit.frame.h+'px';overlay.style.display='block';
+    overlay.getContext('2d').putImageData(heat,0,0);
+    const pct=v=>(v*100).toFixed(2);
+    const overall=mis/n*100, ok=overall<=BUDGET;
+    panel.innerHTML=`<div class="sect">Measured fidelity vs Figma</div>`+
+      `<div class="big ${ok?'ok':'bad'}">${pct(mis/n)}%</div>`+
+      `<div class="row"><span class="k">budget</span><span class="v">${BUDGET}% · <span class="${ok?'res':'raw'}">${ok?'PASS':'OVER'}</span></span></div>`+
+      `<div class="row"><span class="k">mismatch px</span><span class="v">${mis.toLocaleString()} / ${n.toLocaleString()}</span></div>`+
+      `<div class="sect">Per zone</div>`+
+      Z.map(z=>`<div class="row"><span class="k">${esc(z.name)}</span><span class="v">${z.n?pct(z.mis/z.n):'—'}%</span></div>`).join('')+
+      `<div class="flag ${ok?'ok':'bad'}">${ok?'Within budget — red = font anti-aliasing + any ledgered approximation.':'Over budget — inspect the red zones.'}</div>`;
+  }).catch(()=>{panel.innerHTML='<div class="flag bad">Could not load fidelity images (/audit/fidelity-*.png).</div>';});
+}
+
+// ── RESPONSIVE (device / slider / fill — invariants checked live at every width) ──
+// Full Figma device catalog (matches the Figma frame-preset picker exactly).
+const DEVICE_GROUPS={
+  'iPhone':[['iPhone 17',402,874],['iPhone 16 & 17 Pro',402,874],['iPhone 16 & 17 Pro Max',440,956],['iPhone 16 Plus',430,932],['iPhone 16',393,852],['iPhone Air',420,912],['iPhone 14 & 15 Pro Max',430,932],['iPhone 14 & 15 Pro',393,852],['iPhone 14 Plus',428,926],['iPhone 13 & 14',390,844],['iPhone 13 mini',375,812],['iPhone SE',320,568]],
+  'Android':[['Android Compact',412,917],['Android Medium',700,840],['Android Expanded',1280,800]],
+  'Tablet':[['iPad mini 8.3',744,1133],['iPad Pro 11"',834,1194],['iPad Pro 12.9"',1024,1366],['Surface Pro 8',1440,960]],
+  'Laptop / Desktop':[['MacBook Air',1280,832],['MacBook Pro 14"',1512,982],['MacBook Pro 16"',1728,1117],['Desktop',1440,1024]]
+};
+function runInvariants(){
+  const res=document.getElementById('rres'); if(!res)return;
+  const w=parseInt(frame.style.width)||audit.frame.w;
+  const d=doc(), root=[...d.body.children].find(e=>e.tagName==='DIV'&&win().getComputedStyle(e).display!=='none'); if(!root){res.innerHTML='';return;}
+  const vw=win().innerWidth, fails=[]; const rb=root.getBoundingClientRect();
+  if(Math.abs(rb.width-vw)>1) fails.push(`root width ${Math.round(rb.width)} ≠ viewport ${vw}`);
+  if(d.documentElement.scrollWidth>vw+1) fails.push(`horizontal overflow ${d.documentElement.scrollWidth}>${vw}`);
+  let capped=0;
+  for(const c of root.children){const s=win().getComputedStyle(c); if(s.maxWidth!=='none'){capped++; const b=c.getBoundingClientRect(); const off=Math.abs((b.x+b.width/2)-vw/2); if(off>2)fails.push(`.${String(c.className).split('_')[0]||'child'} off-center ${Math.round(off)}px`);}}
+  const ok=fails.length===0;
+  res.innerHTML=`<div class="big ${ok?'ok':'bad'}">${ok?'✓':'✗'} <span style="font:600 12px ui-monospace;color:#8a8a92">${w}px</span></div>`+
+    `<div class="row"><span class="k">root=viewport</span><span class="v">${fails.some(f=>f.includes('root width'))?'<span class=raw>fail</span>':'<span class=res>ok</span>'}</span></div>`+
+    `<div class="row"><span class="k">no overflow</span><span class="v">${fails.some(f=>f.includes('overflow'))?'<span class=raw>fail</span>':'<span class=res>ok</span>'}</span></div>`+
+    `<div class="row"><span class="k">capped centered</span><span class="v">${fails.some(f=>f.includes('off-center'))?'<span class=raw>fail</span>':'<span class=res>ok</span>'} (${capped} capped)</span></div>`+
+    (fails.length?`<div class="flag bad">${fails.map(esc).join('<br>')}</div>`:`<div class="flag ok">Every invariant holds at ${w}px — content centered, fills to cap, no overflow.</div>`)+
+    `<div class="flag ok" style="background:#12251e">Pixel fidelity is measured at the design size only (Figma renders at ${audit.frame.w}px). Other widths verify behaviour. Resize from the TOP BAR — works in every mode, panels hideable (⟨ ⟩).</div>`;
+}
+function modeResponsive(){
+  panel.innerHTML=`<div class="sect">Responsive parity — resize from the top bar</div><div id=rres></div>`;
+  runInvariants();
+}
+
+// ── THEMING (token-driven colours must move on theme flip) ──
+function modeTheming(){
+  const d=doc(), root=d.documentElement, cur=root.getAttribute('data-theme')||'light';
+  const icons=[...d.querySelectorAll('svg')].filter(s=>{const c=win().getComputedStyle(s); return c.color&&[...s.querySelectorAll('[fill],[stroke]')].some(p=>p.getAttribute('fill')==='currentColor'||p.getAttribute('stroke')==='currentColor');});
+  const before=icons.map(s=>win().getComputedStyle(s).color);
+  const flip=cur==='dark'?'light':'dark';
+  const render=(applied)=>{
+    const after=icons.map(s=>win().getComputedStyle(s).color);
+    const moved=applied?before.filter((c,i)=>c!==after[i]).length:0;
+    panel.innerHTML=`<div class="sect">Theming — token-driven colour</div>`+
+      `<div class="ctl"><button id=flip>${applied?`Reset to ${cur}`:`Flip ${cur} → ${flip}`}</button></div>`+
+      `<div class="row"><span class="k">token icons</span><span class="v">${icons.length}</span></div>`+
+      (applied?`<div class="row"><span class="k">re-coloured</span><span class="v"><span class="${moved===icons.length?'res':'raw'}">${moved}/${icons.length}</span></span></div>`+
+        `<div class="row"><span class="k">sample</span><span class="v">${esc(before[0]||'')} <span class=res>→</span> <span class=rawpx>${esc(after[0]||'')}</span></span></div>`+
+        `<div class="flag ${moved===icons.length&&icons.length?'ok':'bad'}">${moved===icons.length&&icons.length?'All token icons followed the theme — the DS link is live.':'Some icons did not move — token link broken.'}</div>`
+        :`<div class="empty" style="padding:20px 4px">Flip the theme to verify token-driven colours actually move.</div>`);
+    document.getElementById('flip').onclick=()=>{ const now=root.getAttribute('data-theme')||'light'; root.setAttribute('data-theme', now===cur?flip:cur); render(now===cur); };
+  };
+  render(false);
+}
+
+// ── STRUCTURE / ASSETS ──
+function modeStructure(){
+  const st=audit.structure, s=audit.summary;
+  panel.innerHTML=`<div class="sect">Structure — gates &amp; assets (tree in the left panel)</div>`+
+    `<div class="row"><span class="k">elements</span><span class="v">${s.elements}</span></div>`+
+    `<div class="row"><span class="k">refusals</span><span class="v"><span class="${s.refusals?'raw':'res'}">${s.refusals}</span></span></div>`+
+    `<div class="row"><span class="k">gates</span><span class="v"><span class=res>census · canon · reverse · conformance OK</span></span></div>`+
+    `<div class="sect">Assets</div>`+
+    `<div class="row"><span class="k">inline SVGs</span><span class="v">${st.svgCount} preserved</span></div>`+
+    st.images.map(im=>`<div class="row"><span class="k">image</span><span class="v">${(im.bytes/1e6).toFixed(2)}MB · <span class="${im.byteExact?'res':'raw'}">${im.byteExact?'byte-exact original':'RE-ENCODED'}</span></span></div>`).join('');
+}
+
+// ── ZONES (region filter — highlight the screen region) ──
+function applyZoneBox(){
+  const z=(audit?.zones||[]).find(z=>z.id===zone);
+  // the zone box is design-size coords — meaningless once the device resizes, so it only shows
+  // in the design-size modes (Dan: the blue frame in Responsive was awkward + didn't track resize)
+  if(!z || mode==='responsive' || mode==='theming'){zonebox.style.display='none';return;}
+  zonebox.style.left=z.rel.x+'px';zonebox.style.top=z.rel.y+'px';zonebox.style.width=z.rel.w+'px';zonebox.style.height=z.rel.h+'px';zonebox.style.display='block';
+}
+</script>
+</body>
+</html>

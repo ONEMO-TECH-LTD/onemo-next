@@ -1,0 +1,3 @@
+# per-machine artifacts — raw fetch cache + variable dumps (content-hash-stamped, regenerable)
+cache/
+out/
