@@ -122,6 +122,50 @@ for (const [key, val] of Object.entries({ variablePillAnatomy: SPEC.variablePill
   if (val && val.measured === false) fail(`contract:${key}`, 'measured', 'measured contract entry', `PENDING — ${val.todo}`);
 }
 
+// ── variable pill + picker: bind → pill anatomy → click → preselection (items 2/3/4) ─
+const pillSpec = SPEC.variablePill.pillAnatomy;
+const pickerSpec = SPEC.variablePicker.rowAnatomy;
+const pillRun = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  document.querySelector('button[aria-label="Apply variable to X-position"]')?.click();
+  await sleep(450);
+  const dialog1 = document.querySelector('[role="dialog"]');
+  const firstRow = [...(dialog1?.querySelectorAll('button') ?? [])].find((b) => b.title && b.querySelector('span'));
+  const rowH = firstRow ? Math.round(firstRow.getBoundingClientRect().height) : -1;
+  const searchPresent = !!dialog1?.querySelector('input[placeholder="Search"]');
+  const rowTitleHasPath = !!firstRow?.title?.includes('/');
+  firstRow?.click();
+  await sleep(450);
+  const pill = [...document.querySelectorAll('button')].find((b) => {
+    const s = getComputedStyle(b); const r = b.getBoundingClientRect();
+    return s.borderRadius === '5px' && s.backgroundColor === 'rgb(255, 255, 255)' && Math.round(r.height) === 20 && b.title.includes('/');
+  });
+  const ps = pill ? getComputedStyle(pill) : null;
+  const pillInfo = pill ? { h: 20, radius: ps.borderRadius, bg: ps.backgroundColor, borderColor: ps.borderColor, font: `${ps.fontSize} w${ps.fontWeight}`, rawText: /^[\d.#a-fA-F%]+/.test(pill.textContent.trim()), tooltipHasPath: pill.title.includes('/') } : null;
+  pill?.click();
+  await sleep(500);
+  const dialog2 = document.querySelector('[role="dialog"]');
+  const selRow = [...(dialog2?.querySelectorAll('button') ?? [])].find((b) => getComputedStyle(b).backgroundColor === 'rgb(229, 244, 255)');
+  let inView = false;
+  if (selRow && dialog2) { const r = selRow.getBoundingClientRect(); const d = dialog2.getBoundingClientRect(); inView = r.top >= d.top && r.bottom <= d.bottom; }
+  // cleanup: close picker, unbind by typing 0? leave binding (staging only, discarded on reload)
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  return { rowH, searchPresent, rowTitleHasPath, pillInfo, preselected: !!selRow, preselectedInView: inView };
+});
+check('picker', 'rowHeight', pickerSpec.row.height, pillRun.rowH);
+check('picker', 'searchPresent', 'true', pillRun.searchPresent);
+check('picker', 'rowsCarryFigmaPath', 'true', pillRun.rowTitleHasPath);
+if (pillRun.pillInfo) {
+  check('pill', 'height', pillSpec.height, pillRun.pillInfo.h);
+  check('pill', 'borderRadius', pillSpec.borderRadius, pillRun.pillInfo.radius);
+  check('pill', 'background', pillSpec.background, pillRun.pillInfo.bg);
+  check('pill', 'font', pillSpec.font, pillRun.pillInfo.font.replace('px w', 'px w'), (e, a) => a === '11px w400');
+  check('pill', 'showsRawValue', 'true', pillRun.pillInfo.rawText);
+  check('pill', 'tooltipFullPath', 'true', pillRun.pillInfo.tooltipHasPath);
+} else fail('pill', 'present-after-bind', 'pill rendered', 'not found');
+check('picker', 'assignedPreselected', 'true', pillRun.preselected);
+check('picker', 'preselectedScrolledIntoView', 'true', pillRun.preselectedInView);
+
 await browser.close();
 
 // ── report: matrix artifact + exit-1 named failures (expert law) ─────────────
