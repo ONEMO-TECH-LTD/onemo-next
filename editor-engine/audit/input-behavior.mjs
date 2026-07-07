@@ -74,6 +74,7 @@ await page.waitForTimeout(250);
 await page.keyboard.press('Meta+z');
 await page.waitForTimeout(350);
 gate('undo restores prior committed value (model)', 'true', /opacity: 0\.42/.test(await model()));
+gate('undo restores prior value in the DISPLAY', '42', await opacity.inputValue());
 
 // G5 — item 12: scrub — real mouse drag on the rotation glyph changes value + stages model
 const rotGlyph = page.locator('input[aria-label="Rotation"]').locator('xpath=../span[1]');
@@ -101,6 +102,10 @@ await page.mouse.up();
 await page.waitForTimeout(400);
 gate('scrub stages rotation in model', 'true', /rotate\(20deg\)/.test(await model()));
 gate('scrub display shows degrees', '20°', await page.locator('input[aria-label="Rotation"]').inputValue());
+// self-QA finding: one undo after a scrub must revert the rotation DISPLAY, not just the model
+await page.keyboard.press('Meta+z');
+await page.waitForTimeout(400);
+gate('undo after scrub reverts rotation DISPLAY', '0°', await page.locator('input[aria-label="Rotation"]').inputValue());
 
 // G6 — item 10 annotation: frame preset change is undoable
 const label = () => page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.title === 'Select frame')?.textContent ?? '');

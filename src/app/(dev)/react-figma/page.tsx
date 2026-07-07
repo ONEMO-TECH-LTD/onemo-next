@@ -2261,6 +2261,13 @@ export default function ReactFigmaPage() {
     setClipContent(c['overflow'] !== 'visible')
     // Appearance
     setOpacityValue(String(Math.round(parseFloat(c['opacity'] || '1') * 100)))
+    // E8 item 10 (self-QA): re-read rotation from the live transform so undo/redo/re-select
+    // sync the DISPLAY, not just the model (opacity already did — rotation was the one gap).
+    const tf = c['transform']
+    if (tf && tf !== 'none') {
+      const m = tf.match(/matrix\(([^)]+)\)/)
+      if (m) { const [a, b] = m[1].split(',').map(parseFloat); const deg = Math.round(Math.atan2(b, a) * 180 / Math.PI); setRotationValue(String(((deg % 360) + 360) % 360)) }
+    } else setRotationValue('0')
     // Mixed corners (Figma canon, E2.1 rule 2): unequal radii → 'Mixed' + individual toggle on
     const cornerVals = ['border-top-left-radius', 'border-top-right-radius', 'border-bottom-right-radius', 'border-bottom-left-radius'].map((p) => c[p])
     const cornersEqual = cornerVals.every((v) => v === cornerVals[0])
