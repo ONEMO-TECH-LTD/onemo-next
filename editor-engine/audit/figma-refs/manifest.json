@@ -1,0 +1,12 @@
+{
+  "_provenance": "References = native retina crops of Figma's REAL inspector fields (Dan's authenticated tab, node 4076:15236 'Top Section', 100% browser zoom). Captured per README.md. FAIL-CLOSED: a field listed here with no PNG is a FAILURE in field-pixel-fidelity.mjs, never a skip.",
+  "figmaValues": { "x": "0", "y": "62", "rotation": "0°", "w": "402 Fill", "h": "60 Hug", "gap": "0" },
+  "fields": [
+    { "key": "x-position",  "aria": "X-position",  "type": "0" },
+    { "key": "y-position",  "aria": "Y-position",  "type": "62" },
+    { "key": "rotation",    "aria": "Rotation",    "type": "0°" },
+    { "key": "resize-w",    "aria": "width value", "type": "402" },
+    { "key": "resize-h",    "aria": "height value","type": "60" },
+    { "key": "gap",         "aria": "Gap value",   "type": "0" }
+  ]
+}
