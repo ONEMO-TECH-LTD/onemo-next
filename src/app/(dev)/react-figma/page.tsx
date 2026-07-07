@@ -466,25 +466,28 @@ function TokenPill({ token, display, onClick }: { token: string; display?: strin
     </span>
   )
 }
-/* Dan item 6 (2026-07-07): the badge/picker show the token's RESOLVED value like Figma shows the
-   mode value — never a truncated clamp()/calc() source string. Probe-measured once per var. */
-const tokenDisplayCache = new Map<string, string>()
-function resolveTokenDisplay(cssVar: string, raw: string, kind: string): string {
+/* Dan 2026-07-07: the badge/picker show the token's FIXED design value — read straight from the
+   token data (`original.Value` = the exact Figma px the DS author set: 16, 24…), NEVER a live DOM
+   measurement. The old probe (`width: var(--x)` → getBoundingClientRect) returned sub-pixel /
+   viewport-dependent numbers (15.99) for rem + fluid clamp() tokens — that was the bug, not the
+   token system. Deterministic, viewport-independent, matches Figma. `raw` is passed as the token's
+   original.Value when available; rem/px fall back convert exactly (rem×16), clamp() keeps nominal. */
+function resolveTokenDisplay(_cssVar: string, raw: string, kind: string): string {
   if (kind !== 'dimension') return raw
-  const t = raw.trim()
-  // DS dimension grid is integer (2/4/8/16…) — round to whole px, never a decimal (Dan 1.2).
-  if (/^-?[\d.]+(px)?$/.test(t)) return String(Math.round(parseFloat(t)))
-  const hit = tokenDisplayCache.get(cssVar)
-  if (hit) return hit
-  if (typeof document === 'undefined') return raw
-  const probe = document.createElement('div')
-  probe.style.cssText = `position:absolute;visibility:hidden;pointer-events:none;width:var(${cssVar})`
-  document.body.appendChild(probe)
-  const px = probe.getBoundingClientRect().width
-  probe.remove()
-  const out = px > 0 ? String(Math.round(px)) : raw
-  tokenDisplayCache.set(cssVar, out)
-  return out
+  const t = String(raw).trim()
+  const toPx = (s: string): string | null => {
+    const n = s.trim()
+    if (/^-?\d+(\.\d+)?$/.test(n)) return String(Math.round(parseFloat(n)))          // Figma px original (16)
+    const rem = n.match(/^(-?[\d.]+)rem$/); if (rem) return String(Math.round(parseFloat(rem[1]) * 16)) // rem→px exact
+    const px = n.match(/^(-?[\d.]+)px$/); if (px) return String(Math.round(parseFloat(px[1])))
+    return null
+  }
+  const direct = toPx(t); if (direct != null) return direct
+  // Fluid token: clamp(min, preferred, MAX) — the design NOMINAL is the max (desktop ceiling), which
+  // is what Figma shows for the variable. Take the last rem/px term, never a viewport measurement.
+  const clamp = t.match(/^clamp\(([^)]*)\)$/i)
+  if (clamp) { const parts = clamp[1].split(','); const max = toPx(parts[parts.length - 1]); if (max != null) return max }
+  return t
 }
 /* Sentinel mode value: render the caret icon instead of a text mode label. */
 const MODE_CARET = '__caret__'
