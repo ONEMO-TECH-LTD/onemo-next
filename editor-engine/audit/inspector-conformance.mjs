@@ -98,6 +98,15 @@ const rot = census.find((f) => /rotation/i.test(f.aria));
 if (rot) check('field:Rotation', 'degreeSuffixInValue', SPEC.rotation.example.replace(/^\d+/, 'n') , /°$/.test(rot.value) ? 'n°' : rot.value || '(empty)');
 else fail('field:Rotation', 'present', 'rotation input', 'not found');
 
+// ── item 5: RESIZE field mode label (Fill/Hug/Fixed) must be the SAME 11px as the value,
+// not oversized (Dan: 'resizing font too big not fitting the input') ─────────
+const resizeModeFont = await page.evaluate(() => {
+  const w = document.querySelector('input[aria-label="width value"]');
+  const btn = w?.parentElement && [...w.parentElement.children].find((c) => c.tagName === 'BUTTON');
+  return btn ? getComputedStyle(btn).fontSize : null;
+});
+check('field:width mode label', 'fontSize', SPEC.valueField.fontSize, resizeModeFont);
+
 // ── panel geometry + resize clamps ───────────────────────────────────────────
 const panelGeo = await page.evaluate(() => {
   const aside = [...document.querySelectorAll('aside')].pop();
