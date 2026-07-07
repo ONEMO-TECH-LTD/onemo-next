@@ -3457,7 +3457,7 @@ export default function ReactFigmaPage() {
             <button key={label} type="button" title={label} onClick={() => key && setRail(key)}
               style={{ appearance: 'none', border: 0, cursor: 'pointer', width: 56, height: 56, borderRadius: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', gap: 2, background: 'transparent', padding: '5px 0 0', marginTop: label === 'Variables' ? 16 : 0, color: active ? SEL : INK }}>
               <span style={{ width: 32, height: 28, borderRadius: 5, display: 'grid', placeItems: 'center', background: active ? '#e5f4ff' : 'transparent' }}><UiIcon name={icon} /></span>
-              <span style={{ font: `450 9px/14px ${FONT}`, letterSpacing: '0.045px', color: INK }}>{label}</span>
+              <span style={{ font: `450 ${label.length > 8 ? 8 : 9}px/14px ${FONT}`, letterSpacing: label.length > 8 ? '0px' : '0.045px', color: INK, maxWidth: 54, padding: '0 1px', boxSizing: 'border-box', overflow: 'hidden', whiteSpace: 'nowrap', textAlign: 'center' }}>{label}</span>
             </button>
           )
         })}
