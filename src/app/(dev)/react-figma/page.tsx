@@ -273,10 +273,10 @@ function FigmaVariablePicker({ fieldLabel, anchorRef, onPick, onClose, selected 
       window.removeEventListener('scroll', update, true)
     }
   }, [anchorRef])
-  // E3.4/E5 #10 — scope to the field's token type (Figma shows only same-type variables). This picker
-  // only opens on numeric value fields (X/Y, rotation, insets, gap, padding, size, opacity — color
-  // fields use StyleApplyButton), so the mapping is binary: colour-named field → colour tokens, every
-  // other field → dimension tokens. No show-all fallback — that leaked colour tokens onto X-position.
+  // E3.4/E5 #10 — scope to the field's token type (Figma shows only same-type variables). Opens on
+  // numeric value fields (X/Y, rotation, insets, gap, padding, size) AND on the Fill/Stroke ⬡ (3.5),
+  // so the mapping is binary: colour-named field → colour tokens, every other field → dimension
+  // tokens. No show-all fallback — that leaked colour tokens onto X-position.
   const kind: DsToken['kind'] =
     /fill|stroke|colou?r|paint|background/i.test(fieldLabel) ? 'color' : 'dimension'
   // E6.13 — Figma's own $scopes narrow further: a token scoped FONT_SIZE never appears on a gap
@@ -368,67 +368,6 @@ function FigmaVariablePicker({ fieldLabel, anchorRef, onPick, onClose, selected 
     document.body
   )
 }
-function StyleApplyButton({ label, title, onApply }: { label: string; title: string; onApply?: (tokenVar: string) => void }) {
-  const [open, setOpen] = useState(false)
-  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
-  const [activeTab, setActiveTab] = useState<'custom' | 'libraries'>('custom')
-  const [selected, setSelected] = useState('')
-  const tokens = useDsTokens().filter((t) => t.kind === 'color')
-  const anchorRef = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
-  const optionListId = `${label.toLowerCase().replace(/\s+/g, '-')}-style-variable-options`
-  useEffect(() => {
-    if (!open) return
-    const update = () => setAnchorRect(anchorRef.current?.getBoundingClientRect() ?? null)
-    update()
-    window.addEventListener('resize', update)
-    window.addEventListener('scroll', update, true)
-    return () => {
-      window.removeEventListener('resize', update)
-      window.removeEventListener('scroll', update, true)
-    }
-  }, [anchorRef, open])
-  return (
-    <div ref={anchorRef} style={{ position: 'relative', width: 24, height: 24 }}>
-      <UiIB name="styleDots" title={title} active={open} on={() => setOpen(v => !v)} />
-      {open && anchorRect && createPortal(
-        <div data-figma-floating-root="true" role="dialog" aria-label={`${label} styles and variables`}
-          style={{ position: 'fixed', zIndex: 1220, left: Math.max(8, anchorRect.left - 420), top: Math.max(8, anchorRect.top - 8), width: 240, height: 427, borderRadius: 13, background: '#fff', color: INK, boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px', overflow: 'hidden', font: `400 11px/16px ${FONT}` }}>
-          <div style={{ height: 40, display: 'grid', gridTemplateColumns: '1fr 28px 24px', alignItems: 'center', padding: '0 8px', boxSizing: 'border-box' }}>
-            <div role="tablist" style={{ display: 'flex', gap: 4, width: 124, height: 24 }}>
-              {(['custom', 'libraries'] as const).map(tabName => (
-                <button key={tabName} type="button" role="tab" aria-selected={activeTab === tabName} onClick={() => setActiveTab(tabName)}
-                  style={{ appearance: 'none', border: 0, background: activeTab === tabName ? FIELD : '#fff', borderRadius: 5, height: 24, width: tabName === 'custom' ? 58 : 62, cursor: 'pointer', color: activeTab === tabName ? INK : MUTE, font: `${activeTab === tabName ? 550 : 400} 11px/16px ${FONT}` }}>
-                  {tabName === 'custom' ? 'Custom' : 'Libraries'}
-                </button>
-              ))}
-            </div>
-            <button type="button" aria-label="New style or variable" style={{ appearance: 'none', border: 0, background: '#fff', width: 24, height: 24, display: 'grid', placeItems: 'center', cursor: 'pointer', color: INK }}><PickerSvgIcon name="plus" /></button>
-            <button type="button" aria-label="Close" onClick={() => setOpen(false)} style={{ appearance: 'none', border: 0, background: '#fff', width: 24, height: 24, display: 'grid', placeItems: 'center', cursor: 'pointer', color: INK }}><PickerSvgIcon name="close" /></button>
-          </div>
-          <div role="tabpanel" style={{ height: 387, borderTop: `1px solid ${LINE}`, background: '#fff' }}>
-            <div style={{ height: 42, borderBottom: `1px solid ${LINE}`, display: 'grid', gridTemplateColumns: '1fr 32px', alignItems: 'center', padding: '0 8px', boxSizing: 'border-box' }}>
-              <button type="button" role="combobox" aria-label="Variable set" aria-controls={optionListId} aria-expanded={false}
-                style={{ appearance: 'none', border: `1px solid ${LINE}`, background: '#fff', height: 24, width: 92, borderRadius: 5, padding: '0 8px', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', font: `400 11px/16px ${FONT}`, color: INK }}>
-                <span>All libraries</span><CaretDown size={10} />
-              </button>
-            </div>
-            <div id={optionListId} role="listbox" style={{ height: 345, overflowY: 'auto', paddingTop: 8 }}>
-              {tokens.map((t) => (
-                <button key={t.cssVar} type="button" role="option" aria-selected={selected === t.cssVar} onClick={() => { setSelected(t.cssVar); onApply?.(`var(${t.cssVar})`); setOpen(false) }}
-                  style={{ appearance: 'none', border: 0, width: 240, height: 32, background: selected === t.cssVar ? '#f5f5f5' : '#fff', display: 'grid', gridTemplateColumns: '40px 1fr', alignItems: 'center', padding: 0, cursor: 'pointer', color: INK, font: `400 11px/16px ${FONT}`, textAlign: 'left' }}>
-                  <span style={{ width: 14, height: 14, marginLeft: 17, borderRadius: 3, background: t.value, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.15)' }} />
-                  <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(t.path ?? t.cssVar).replace(/^[^/]+ \/ /, '')}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-    </div>
-  )
-}
-
 /* Thin wrapper (legacy signature) over FigmaField — E6.4. */
 function InspectorField({ label, icon, value, input, dimValue, ariaLabel, onChange }: { label?: string; icon?: keyof typeof UI_ICON; value: string; bound?: boolean; input?: boolean; dimValue?: boolean; ariaLabel?: string; onChange?: (value: string) => void }) {
   return <FigmaField icon={icon} letter={label} value={value} ariaLabel={ariaLabel ?? label ?? 'value'} onChange={onChange} whiteBg={input} dim={dimValue} />
@@ -1629,7 +1568,7 @@ function FigmaColorPicker({ anchorRef, hex, opacity, onHex, onOpacity, onClose }
     document.body
   )
 }
-function FigmaPaintRow({ hex, op, label = 'Paint', onRemove, origin, onHexEdit, onOpacityEdit, onVisibleToggle }: { hex: string; op: number; label?: string; onRemove?: () => void; origin?: string; onHexEdit?: (hex: string) => void; onOpacityEdit?: (hex: string, opPct: number) => void; onVisibleToggle?: (visible: boolean, hex: string) => void }) {
+function FigmaPaintRow({ hex, op, label = 'Paint', onRemove, origin, onHexEdit, onOpacityEdit, onVisibleToggle, onColorVar }: { hex: string; op: number; label?: string; onRemove?: () => void; origin?: string; onHexEdit?: (hex: string) => void; onOpacityEdit?: (hex: string, opPct: number) => void; onVisibleToggle?: (visible: boolean, hex: string) => void; onColorVar?: (varValue: string) => void }) {
   const [hexValue, setHexValue] = useState(hex)
   const [opacityValue, setOpacityValue] = useState(String(op))
   const [varOpen, setVarOpen] = useState(false)
@@ -1648,11 +1587,12 @@ function FigmaPaintRow({ hex, op, label = 'Paint', onRemove, origin, onHexEdit, 
         <input aria-label={`${label} opacity`} role="spinbutton" value={opacityValue} onChange={e => { const v = e.currentTarget.value; setOpacityValue(v); const n = parseFloat(v); if (Number.isFinite(n) && normalizeHex(hexValue).length === 6) onOpacityEdit?.(normalizeHex(hexValue), Math.max(0, Math.min(100, n))) }} onFocus={e => e.currentTarget.select()}
           style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, padding: '0 3px 0 0', background: 'transparent', color: INK, font: `450 11px/16px ${FONT}`, textAlign: 'right' }} />
         <span style={{ color: 'rgba(0,0,0,0.5)' }}>%</span>
-        <button type="button" title="Apply variable" aria-label={`Apply variable to ${label} opacity`} aria-haspopup="menu" aria-expanded={varOpen} onClick={event => { event.stopPropagation(); setPickerOpen(false); setVarOpen(v => !v) }}
+        <button type="button" title="Apply color variable" aria-label={`Apply color variable to ${label}`} aria-haspopup="menu" aria-expanded={varOpen} onClick={event => { event.stopPropagation(); setPickerOpen(false); setVarOpen(v => !v) }}
           style={{ appearance: 'none', border: 0, padding: 0, width: 16, height: 24, display: 'grid', placeItems: 'center', background: 'transparent', cursor: 'pointer', color: FAINT }}>
           <UiIcon name="variable" size={12} />
         </button>
-        {varOpen && <FigmaVariablePicker fieldLabel={`${label} opacity`} anchorRef={fieldRef} onPick={setOpacityValue} onClose={() => setVarOpen(false)} />}
+        {/* 3.5 (Dan): the ⬡ applies a COLOUR variable to the fill/stroke (fieldLabel "Fill"/"Stroke" → colour kind in the picker), not opacity. */}
+        {varOpen && <FigmaVariablePicker fieldLabel={label} anchorRef={fieldRef} onPick={(v) => { onColorVar?.(v); setVarOpen(false) }} onClose={() => setVarOpen(false)} />}
         {pickerOpen && <FigmaColorPicker anchorRef={fieldRef} hex={hexValue} opacity={opacityValue} onHex={(hx) => { setHexValue(hx); const nv = normalizeHex(hx); if (nv.length === 6) onHexEdit?.(nv) }} onOpacity={setOpacityValue} onClose={() => setPickerOpen(false)} />}
       </div>
       <span />
@@ -3979,16 +3919,17 @@ export default function ReactFigmaPage() {
             </Sec>
           )}
 
-          <Sec title="Fill" actionWidth={52} action={<><StyleApplyButton label="Fill" title="Fill, Apply styles and variables" onApply={(v) => applyOverride('fillBg', v)} /><UiIB name="plus" title="Add fill" on={() => { if (sel) { applyOverride('fillBg', '#D9D9D9'); reapplySel() } else setFills(rows => [...rows, { id: nextRowId(rows), hex: 'FFFFFF', op: 100 }]) }} /></>} bodyGap={0} bodyPadding="0">
+          <Sec title="Fill" actionWidth={24} action={<UiIB name="plus" title="Add fill" on={() => { if (sel) { applyOverride('fillBg', '#D9D9D9'); reapplySel() } else setFills(rows => [...rows, { id: nextRowId(rows), hex: 'FFFFFF', op: 100 }]) }} />} bodyGap={0} bodyPadding="0">
             {liveFills
               ? liveFills.map((f, i) => { const fld = f.prop === 'color' ? 'fillColor' : 'fillBg'; return <FigmaPaintRow key={`live-${i}`} hex={f.hex} op={f.op} label="Fill" origin={f.origin}
                   onHexEdit={(hx) => applyOverride(fld, `#${hx}`)}
                   onOpacityEdit={(hx, opPct) => applyOverride(fld, hexToRgba(hx, opPct))}
                   onVisibleToggle={(vis, hx) => applyOverride(fld, vis ? `#${hx}` : 'transparent')}
+                  onColorVar={(v) => { applyOverride(fld, v); reapplySel() }}
                   onRemove={() => applyOverride(fld, 'transparent')} /> })
               : fills.map(f => <FigmaPaintRow key={f.id} hex={f.hex} op={f.op} label="Fill" onRemove={() => setFills(rows => rows.filter(row => row.id !== f.id))} />)}
           </Sec>
-          <Sec title="Stroke" actionWidth={52} action={<><StyleApplyButton label="Stroke" title="Stroke, Apply styles and variables" onApply={(v) => applyOverride('strokeColor', v)} /><UiIB name="plus" title="Add stroke fill" on={() => { if (sel) { applyOverride('strokeWeight', '1'); applyOverride('strokeStyle', 'solid'); applyOverride('strokeColor', '#000000'); reapplySel() } else setStrokes(rows => [...rows, { id: nextRowId(rows), hex: '000000', op: 100, position: 'Inside', weight: 1 }]) }} /></>} bodyGap={0} bodyPadding="0">
+          <Sec title="Stroke" actionWidth={24} action={<UiIB name="plus" title="Add stroke fill" on={() => { if (sel) { applyOverride('strokeWeight', '1'); applyOverride('strokeStyle', 'solid'); applyOverride('strokeColor', '#000000'); reapplySel() } else setStrokes(rows => [...rows, { id: nextRowId(rows), hex: '000000', op: 100, position: 'Inside', weight: 1 }]) }} />} bodyGap={0} bodyPadding="0">
             {liveStrokes
               ? liveStrokes.map((s, i) => (
                   <div key={`live-${i}`}>
@@ -3996,6 +3937,7 @@ export default function ReactFigmaPage() {
                       onHexEdit={(hx) => applyOverride('strokeColor', `#${hx}`)}
                       onOpacityEdit={(hx, opPct) => applyOverride('strokeColor', hexToRgba(hx, opPct))}
                       onVisibleToggle={(vis, hx) => applyOverride(vis ? 'strokeColor' : 'strokeWidth0', vis ? `#${hx}` : '0')}
+                      onColorVar={(v) => { applyOverride('strokeColor', v); reapplySel() }}
                       onRemove={() => applyOverride('strokeWidth0', '0')} />
                     <StrokeDetailRow position={s.position} weight={s.weight} sides={s.sides} onWeight={(v) => applyOverride('strokeWeight', v)} onPosition={(p) => applyOverride('strokePosition', p)} onSide={(field, v) => applyOverride(field, v)} />
                   </div>
@@ -4007,7 +3949,7 @@ export default function ReactFigmaPage() {
                   </div>
                 ))}
           </Sec>
-          <Sec title="Effects" actionWidth={52} action={<><StyleApplyButton label="Effects" title="Effects, Apply styles" onApply={(v) => applyOverride('boxShadow', `0 2px 8px ${v}`)} /><UiIB name="plus" title="Add effect" on={() => { if (sel) applyOverride('boxShadow', '0 2px 8px rgba(0,0,0,0.25)'); else setEffects(rows => [...rows, { id: nextRowId(rows), type: 'Drop shadow' }]) }} /></>} bodyGap={0} bodyPadding="0">
+          <Sec title="Effects" actionWidth={24} action={<UiIB name="plus" title="Add effect" on={() => { if (sel) applyOverride('boxShadow', '0 2px 8px rgba(0,0,0,0.25)'); else setEffects(rows => [...rows, { id: nextRowId(rows), type: 'Drop shadow' }]) }} />} bodyGap={0} bodyPadding="0">
             {liveEffects
               ? (() => { let si = -1; return liveEffects.map((e, i) => {
                   const isShadow = e.type.toLowerCase().includes('shadow')
@@ -4023,7 +3965,7 @@ export default function ReactFigmaPage() {
           <Sec title="Selection colors" bodyGap={0} bodyPadding="0">
             {(liveSelColors ?? []).map((c, i) => <SelectionColorRow key={`live-${i}`} hex={c.hex} op={c.op} onRecolor={recolorSelection} />)}
           </Sec>
-          <Sec title="Layout guide" actionWidth={52} action={<><StyleApplyButton label="Layout guide" title="Layout guide, Apply styles" /><UiIB name="plus" title="Add layout guide" on={() => setLayoutGuides(rows => [...rows, { id: nextRowId(rows), type: 'Columns', count: 5, gutter: 16, visible: true }])} /></>} bodyGap={0} bodyPadding="0">
+          <Sec title="Layout guide" actionWidth={24} action={<UiIB name="plus" title="Add layout guide" on={() => setLayoutGuides(rows => [...rows, { id: nextRowId(rows), type: 'Columns', count: 5, gutter: 16, visible: true }])} />} bodyGap={0} bodyPadding="0">
             {layoutGuides.map(g => <LayoutGuideRow key={g.id} guide={g} onChange={(patch) => setLayoutGuides(rows => rows.map(r => r.id === g.id ? { ...r, ...patch } : r))} onRemove={() => setLayoutGuides(rows => rows.filter(row => row.id !== g.id))} />)}
           </Sec>
 
