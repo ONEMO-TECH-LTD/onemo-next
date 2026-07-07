@@ -19,7 +19,7 @@ import { Fragment, useState, useRef, useEffect, useCallback, useMemo } from 'rea
 import { buildLayerTree, readStyles, colorToHex, hexToRgba, boxSlots, gapSlots, editSlot, tokenOf, Overrides, parseEffects, parseShadow, formatShadow, splitTopLevel, alignToIndex, alignFromIndex, collectSelectionColors, ensureId, type LiveNode, type OverrideOp } from './engine'
 import { createPortal } from 'react-dom'
 import {
-  MagnifyingGlass, Plus, Minus, Sidebar, CaretDown, ArrowUUpLeft, ArrowUUpRight,
+  MagnifyingGlass, Plus, Minus, Sidebar, CaretDown, ArrowUUpLeft, ArrowUUpRight, LinkBreak,
   type Icon as PIcon,
 } from '@phosphor-icons/react'
 
@@ -550,6 +550,16 @@ function FigmaField({ icon, letter, glyph, glyphWidth = 24, value, onChange, onC
   const [h, setH] = useState(false)
   const fieldRef = useCloseOnOutside<HTMLDivElement>(varOpen || modeOpen, () => { setVarOpen(false); setModeOpen(false) })
   const bound = !!token || varBinding(value)
+  // 2.7 (Dan): detach must write the RESOLVED raw value. Freshly bound, `value` is still var(--x)
+  // (not yet re-read to the number), so resolve the token to its display value here.
+  const fieldTokensList = useDsTokens()
+  const resolvedRaw = (() => {
+    if (/^-?\d+(\.\d+)?$/.test(String(value))) return String(Math.round(parseFloat(String(value))))
+    const vn = (String(token ?? value).match(/var\((--[a-z0-9-]+)\)/i)?.[1]) ?? (token?.startsWith('--') ? token : null)
+    const tok = vn ? fieldTokensList.find((t) => t.cssVar === vn) : null
+    if (tok) return resolveTokenDisplay(tok.cssVar, tok.original ? String(Object.values(tok.original)[0]) : tok.value, tok.kind)
+    return String(value)
+  })()
   /* E8 item 11 (contract: inputCommitSemantics, PROVEN in real Figma): typing edits a LOCAL
    * draft only — Enter commits (single onChange → single undo entry), blur/Esc REVERT to the
    * incoming value. Fixes item 10's undo granularity too (no per-keystroke history pollution). */
@@ -594,7 +604,11 @@ function FigmaField({ icon, letter, glyph, glyphWidth = 24, value, onChange, onC
   // hover, and still has room for the value + token badge. The clipping was our 24px glyph CELL
   // (Figma's |W|/H glyph is ~14px) plus a fat mode button starving the value. Narrow glyph +
   // compact mode + a real value minimum = everything fits at 88px.
-  const cols = `${glyphWidth}px minmax(28px,1fr)${suffix && !bound ? ' auto' : ''}${mode ? ' auto' : ''}${pickerVisible ? ' 16px' : ''}`
+  // 2.7 (Dan): a bound field gets an UNLINK (detach) button to the right of the badge — Figma's
+  // universal "press to unbind". Clicking writes the resolved raw value, dropping the var().
+  const pillDisplay = resolvedRaw
+  const showUnlink = bound && !!onChange
+  const cols = `${glyphWidth}px minmax(28px,1fr)${suffix && !bound ? ' auto' : ''}${mode ? ' auto' : ''}${pickerVisible ? ' 16px' : ''}${showUnlink ? ' 16px' : ''}`
   /* Census-measured container backgrounds: filled = #F5F5F5 (Rotation/Padding class),
    * ghost = transparent at rest (Resizing/Gap class), dim (layout-controlled X/Y) = white
    * with NO border. whiteBg (Link/typed inputs) keeps its measured #e6e6e6 border. */
@@ -608,7 +622,7 @@ function FigmaField({ icon, letter, glyph, glyphWidth = 24, value, onChange, onC
       <span onPointerDown={scrubDown} onPointerMove={scrubMove} onPointerUp={scrubUp}
         style={{ width: glyphWidth, height: 24, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)', font: `450 11px/24px ${FONT}`, cursor: numeric ? 'ew-resize' : undefined, touchAction: 'none' }}>{icon ? <UiIcon name={icon} /> : glyph ?? letter}</span>
       {bound ? (
-        <TokenPill token={token ?? value} display={/^-?\d+(\.\d+)?$/.test(String(value)) ? String(Math.round(parseFloat(String(value)))) : undefined} onClick={onChange ? () => setVarOpen(true) : undefined} />
+        <TokenPill token={token ?? value} display={/^-?\d+$/.test(resolvedRaw) ? resolvedRaw : undefined} onClick={onChange ? () => setVarOpen(true) : undefined} />
       ) : onChange ? (
         <input aria-label={ariaLabel} role={inputRole} value={shown} placeholder={placeholder}
           onChange={e => setDraft(e.currentTarget.value)} onFocus={e => e.currentTarget.select()}
@@ -638,6 +652,12 @@ function FigmaField({ icon, letter, glyph, glyphWidth = 24, value, onChange, onC
         <button type="button" title="Apply variable" aria-label={`Apply variable to ${ariaLabel}`} aria-haspopup="menu" aria-expanded={varOpen} onClick={event => { event.stopPropagation(); setVarOpen(v => !v) }}
           style={{ appearance: 'none', border: 0, padding: 0, width: 16, height: 24, display: 'grid', placeItems: 'center', background: 'transparent', cursor: 'pointer', color: bound ? TOKEN : FAINT }}>
           <UiIcon name="variable" size={12} />
+        </button>
+      )}
+      {showUnlink && (
+        <button type="button" title="Detach variable" aria-label={`Detach variable from ${ariaLabel}`} onClick={event => { event.stopPropagation(); onChange?.(pillDisplay) }}
+          style={{ appearance: 'none', border: 0, padding: 0, width: 16, height: 24, display: 'grid', placeItems: 'center', background: 'transparent', cursor: 'pointer', color: FAINT }}>
+          <LinkBreak size={13} />
         </button>
       )}
       {modeOpen && modeOptions && createPortal(
@@ -2676,6 +2696,10 @@ export default function ReactFigmaPage() {
     for (const [prop, value] of decls) ov.current!.set(id, prop, value, cs.getPropertyValue(prop))
     setOvVersion((v) => v + 1)
     setSelRect(rectOf(el))
+    // 2.7 (Dan): writing a LITERAL value to a token-bound field DETACHES it (turns the variable into
+    // its raw value) — clear the matching field-token so the pill drops and the raw value shows.
+    // A `var(--…)` write is a (re)bind, so it keeps/uses the token; only literals detach.
+    if (!/^var\(/.test(n)) setFieldTokens((tks) => (tks[field] !== undefined ? { ...tks, [field]: undefined } : tks))
     console.log('[engine] override', field, '→', withUnit, `${(performance.now() - t0).toFixed(1)}ms`)
   }, [])
 
@@ -3107,6 +3131,11 @@ export default function ReactFigmaPage() {
     }, true)
     // M2: live layer tree + HMR/mutation re-read (AC2, AC6)
     setLayers(buildLayerTree(doc))
+    // 3.1 (Dan): select the top layer by default on launch — nothing selected on load reads as empty.
+    if (!selIdRef.current) {
+      const first = doc.querySelector('body [data-src]') as HTMLElement | null
+      if (first) applySelection(first)
+    }
     let t: ReturnType<typeof setTimeout> | undefined
     const mo = new MutationObserver(() => {
       clearTimeout(t)
@@ -3842,18 +3871,20 @@ export default function ReactFigmaPage() {
                 onAddMin={() => { const dflt = heightValue || '0'; setMinH(dflt); applyOverride('minHeight', dflt) }} onAddMax={() => { const dflt = heightValue || '0'; setMaxH(dflt); applyOverride('maxHeight', dflt) }} />
               <UiIB name="lockAspect" title="Lock aspect ratio" active={aspectLocked} on={() => { const nv = !aspectLocked; setAspectLocked(nv); const w = parseFloat(widthValue), h = parseFloat(heightValue); applyOverride('aspectRatio', nv && w > 0 && h > 0 ? `${w} / ${h}` : 'auto') }} />
             </InspectorRow>
-            {/* Figma min/max sizing: an inline field appears once "Add min/max" is chosen; the − removes it */}
+            {/* 2.8 (Dan): min/max appears as a labelled row ("Min width") directly under Resizing, with
+                the min/max glyph + placeholder + a chevron dropdown to Remove — matching Figma. */}
             {(minW !== null || maxW !== null || minH !== null || maxH !== null) && (() => {
-              const rows: [string, string, string, (v: string | null) => void, string][] = []
-              if (minW !== null) rows.push(['Min W', minW, 'minWidth', setMinW, 'minWidth'])
-              if (maxW !== null) rows.push(['Max W', maxW, 'maxWidth', setMaxW, 'maxWidth'])
-              if (minH !== null) rows.push(['Min H', minH, 'minHeight', setMinH, 'minHeight'])
-              if (maxH !== null) rows.push(['Max H', maxH, 'maxHeight', setMaxH, 'maxHeight'])
-              return rows.map(([label, val, field, setter]) => (
-                <InspectorRow key={field} label={label} columns="minmax(88px,1fr) 24px">
-                  <FigmaField letter={label.split(' ')[1]} value={val} ariaLabel={`${label} value`} width="100%"
-                    onChange={(v) => { setter(v); applyOverride(field, v) }} />
-                  <UiIB name="minus" title={`Remove ${label}`} on={() => { setter(null); applyOverride(field, '') }} />
+              const rows: { label: string; ph: string; val: string; field: string; setter: (v: string | null) => void; axis: 'W' | 'H'; kind: 'min' | 'max' }[] = []
+              if (minW !== null) rows.push({ label: 'Min width', ph: 'Min W', val: minW, field: 'minWidth', setter: setMinW, axis: 'W', kind: 'min' })
+              if (maxW !== null) rows.push({ label: 'Max width', ph: 'Max W', val: maxW, field: 'maxWidth', setter: setMaxW, axis: 'W', kind: 'max' })
+              if (minH !== null) rows.push({ label: 'Min height', ph: 'Min H', val: minH, field: 'minHeight', setter: setMinH, axis: 'H', kind: 'min' })
+              if (maxH !== null) rows.push({ label: 'Max height', ph: 'Max H', val: maxH, field: 'maxHeight', setter: setMaxH, axis: 'H', kind: 'max' })
+              return rows.map(({ label, ph, val, field, setter, axis, kind }) => (
+                <InspectorRow key={field} label={label} columns="1fr">
+                  <FigmaField glyph={<ResizeMenuIcon kind={kind} axis={axis} />} value={val} placeholder={ph} ariaLabel={`${label} value`} width="100%"
+                    onChange={(v) => { setter(v); applyOverride(field, v) }}
+                    mode={MODE_CARET} modeOptions={[]} onMode={() => {}}
+                    menuExtras={[{ label: `Remove ${label.toLowerCase()}`, icon: <Minus size={13} />, onClick: () => { setter(null); applyOverride(field, '') } }]} />
                 </InspectorRow>
               ))
             })()}
