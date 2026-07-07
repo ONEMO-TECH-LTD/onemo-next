@@ -2952,7 +2952,10 @@ export default function ReactFigmaPage() {
     // setPointerCapture retargets pointerup to <main>, so the child's click never completes. This
     // is why the zoom buttons died under a REAL mouse while synthetic .click() passed.
     if ((e.target as HTMLElement).closest('button, input, select, a, [role="menu"], [role="dialog"]')) return
-    if (drawArm && e.button === 0) {
+    // F6 (lead E7 gate): draw is dead BY STATE in components mode — not just hidden UI. A stale
+    // arm surviving the mode toggle must never reach insertDrawn (it would splice JSX into the
+    // gallery HOST file).
+    if (drawArm && e.button === 0 && canvasMode !== 'components') {
       const fc = toFrameCoords(e.clientX, e.clientY)
       if (fc) { draw.current = { sx: fc.x, sy: fc.y, rect: { x: fc.x, y: fc.y, w: 0, h: 0 } }; setDrawRect(draw.current.rect) }
       ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); return
@@ -3088,7 +3091,8 @@ export default function ReactFigmaPage() {
             {/* E7.3: Design ⇄ Components canvas toggle (v4.1 §1 — swaps the iframe route only) */}
             <div role="tablist" aria-label="Canvas mode" style={{ margin: '8px 12px 0', height: 28, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, padding: 2, borderRadius: 7, background: FIELD }}>
               {(['design', 'components'] as const).map((m) => (
-                <button key={m} type="button" role="tab" aria-selected={canvasMode === m} onClick={() => setCanvasMode(m)}
+                <button key={m} type="button" role="tab" aria-selected={canvasMode === m}
+                  onClick={() => { setCanvasMode(m); setDrawArm(null); draw.current = null; setDrawRect(null) /* F6: no stale arm across canvases */ }}
                   style={{ appearance: 'none', border: 0, borderRadius: 5, background: canvasMode === m ? '#fff' : 'transparent', color: canvasMode === m ? INK : MUTE, font: `500 11px/16px ${FONT}`, cursor: 'pointer', boxShadow: canvasMode === m ? '0 1px 3px rgba(0,0,0,0.12)' : 'none' }}>
                   {m === 'design' ? 'Design' : 'Components'}
                 </button>

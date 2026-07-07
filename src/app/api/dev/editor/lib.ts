@@ -56,15 +56,25 @@ export type ResolveResult = {
  * against the library's realpath. Never a hardcoded relative depth (checkout-independent). */
 export const LIB_NAME = 'onemo-component-library'
 export const LIB_ROOT: string | null = (() => {
-  try {
-    // pure-fs locate (npm materializes the dep at node_modules/<name>; realpath follows the
-    // worktree→clone→package symlink chain). No module machinery — webpack rewrites
-    // require.resolve in bundled server code, which silently broke the createRequire variant.
-    return realpathSync(path.join(ROOT, 'node_modules', LIB_NAME))
-  } catch { return null } // library not installed — editor works, library paths 403
+  // pure-fs locate mirroring node's upward node_modules walk (F7: hoisting-robust — a dep
+  // hoisted above ROOT still resolves, matching the loader's require.resolve semantics).
+  // No module machinery — webpack rewrites require.resolve in bundled server code, which
+  // silently broke the createRequire variant.
+  let dir = ROOT
+  for (let i = 0; i < 10; i++) {
+    try { return realpathSync(path.join(dir, 'node_modules', LIB_NAME)) } catch { /* keep walking up */ }
+    const parent = path.dirname(dir)
+    if (parent === dir) break
+    dir = parent
+  }
+  return null // library not installed — editor works, library paths 403
 })()
 
 export function resolveEditorPath(rel: string): string {
+  // F8 (lead N1): traversal rejection lives IN the resolver — every caller inherits it.
+  if (rel.split(/[\\/]/).includes('..')) {
+    throw Object.assign(new Error(`path traversal rejected: ${rel}`), { status: 403 })
+  }
   if (rel === LIB_NAME || rel.startsWith(LIB_NAME + '/')) {
     if (!LIB_ROOT) throw Object.assign(new Error('component library not installed'), { status: 403 })
     return path.resolve(LIB_ROOT, rel.slice(LIB_NAME.length + 1))
