@@ -1878,10 +1878,14 @@ function InsertIsland({ onInsert: onInsertProp, codeMode, onCodeMode, drawDisabl
   )
 }
 
+const COMPONENT_TEXT = '#8638E5'
+const COMPONENT_SELECTED_BG = '#E5F4FF'
+const COMPONENT_SELECTED_BORDER = '#0D99FF'
+
 /* E7.3 (KAI-9377): left rail in Components mode — categories as "pages", components →
  * variant children as "layers" (v4.1 §5). Data = the dual-root inventory (editor-components);
  * clicking jumps the gallery to the frame and selects it. Chrome matches the pages/layers rail. */
-function ComponentsRail({ components, onJump }: { components: DsComponent[]; onJump: (label: string) => void }) {
+function ComponentsRail({ components, selectedFile, onJump }: { components: DsComponent[]; selectedFile?: string; onJump: (label: string) => void }) {
   const bySection = new Map<string, Map<string, DsComponent[]>>()
   for (const c of components) {
     const section = c.root === 'global' ? 'Global library' : 'Project'
@@ -1907,12 +1911,12 @@ function ComponentsRail({ components, onJump }: { components: DsComponent[]; onJ
               {list.map((c) => (
                 <div key={`${c.root}:${c.file ?? c.name}`}>
                   <button type="button" onClick={() => onJump(c.name)} title={c.file}
-                    style={{ appearance: 'none', border: 0, width: '100%', height: 28, padding: '0 16px 0 24px', background: 'transparent', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', font: `400 11px/16px ${FONT}`, color: '#9747ff', textAlign: 'left' }}>
-                    <UiIcon name="layerComponent" size={12} /> <span style={{ color: INK }}>{c.name}</span>
+                    style={{ appearance: 'none', border: 0, width: '100%', height: 32, padding: '0 16px', background: selectedFile && c.file === selectedFile ? COMPONENT_SELECTED_BG : '#fff', boxShadow: selectedFile && c.file === selectedFile ? `inset 0 0 0 1px ${COMPONENT_SELECTED_BORDER}` : 'none', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', font: `400 11px/16px ${FONT}`, color: COMPONENT_TEXT, textAlign: 'left' }}>
+                    <UiIcon name="layerComponent" size={12} /> <span style={{ color: COMPONENT_TEXT }}>{c.name}</span>
                   </button>
                   {(c.exports ?? []).filter((x) => x !== c.name).map((v) => (
                     <button key={v} type="button" onClick={() => onJump(v)} title={`${c.name} variant`}
-                      style={{ appearance: 'none', border: 0, width: '100%', height: 24, padding: '0 16px 0 40px', background: 'transparent', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', font: `400 11px/16px ${FONT}`, color: MUTE, textAlign: 'left' }}>
+                      style={{ appearance: 'none', border: 0, width: '100%', height: 32, padding: '0 16px 0 32px', background: '#fff', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', font: `400 11px/16px ${FONT}`, color: COMPONENT_TEXT, textAlign: 'left' }}>
                       <UiIcon name="layerComponent" size={10} /> {v}
                     </button>
                   ))}
@@ -3123,11 +3127,13 @@ export default function ReactFigmaPage() {
               ))}
             </div>
             {canvasMode === 'components' ? (
-              <ComponentsRail components={dsComponents} onJump={(label) => {
+              <ComponentsRail components={dsComponents} selectedFile={sel?.file} onJump={(label) => {
                 const doc = iframeRef.current?.contentDocument
                 const frame = doc?.querySelector(`[data-component-frame="${label}"]`)
                 frame?.scrollIntoView({ block: 'center', behavior: 'smooth' })
-                const el = frame?.querySelector('[data-src]') as HTMLElement | null
+                const source = frame?.getAttribute('data-component-source')
+                const tagged = Array.from(frame?.querySelectorAll('[data-src]') ?? []) as HTMLElement[]
+                const el = (source ? tagged.find((node) => node.getAttribute('data-src')?.startsWith(`${source}:`)) : null) ?? tagged[0] ?? null
                 if (el) el.dispatchEvent(new MouseEvent('click', { bubbles: true }))
               }} />
             ) : (<>

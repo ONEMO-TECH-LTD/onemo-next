@@ -20,7 +20,13 @@ import * as Library from 'onemo-component-library'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const projectCtx = (require as any).context('../../react-figma-components', true, /\.tsx$/)
 
-type Frame = { key: string; label: string; category: string; root: 'global' | 'project'; Comp: React.ElementType }
+type Root = 'global' | 'project'
+type InventoryEntry = { name: string; category: string; importPath: string; root: Root; file: string; exports: string[] }
+type Frame = { key: string; label: string; category: string; root: Root; file?: string; Comp: React.ElementType }
+type ComponentGroup = { key: string; name: string; category: string; root: Root; file?: string; variants: Frame[] }
+const COMPONENT_TEXT = '#8638E5'
+const COMPONENT_ACCENT = '#9747FF'
+const CANVAS_BG = '#F5F5F5'
 
 function collectFrames(): Frame[] {
   const frames: Frame[] = []
@@ -36,13 +42,56 @@ function collectFrames(): Frame[] {
     const mod = projectCtx(key) as Record<string, unknown>
     const parts = key.replace(/^\.\//, '').split('/')
     const category = parts.length > 1 ? parts[0] : 'ungrouped'
+    const file = `src/app/(dev)/react-figma-components/${key.replace(/^\.\//, '')}`
     for (const [name, val] of Object.entries(mod)) {
       if (isValidElementType(val) && typeof val !== 'string') {
-        frames.push({ key: `project:${key}:${name}`, label: name, category, root: 'project', Comp: val as React.ElementType })
+        frames.push({ key: `project:${key}:${name}`, label: name, category, root: 'project', file, Comp: val as React.ElementType })
       }
     }
   }
   return frames
+}
+
+function fallbackGroups(frames: Frame[]): ComponentGroup[] {
+  return frames.map((f) => ({
+    key: f.key,
+    name: f.label,
+    category: f.category,
+    root: f.root,
+    file: f.file,
+    variants: [f],
+  }))
+}
+
+function groupFrames(frames: Frame[], inventory: InventoryEntry[] | null): ComponentGroup[] {
+  if (!inventory?.length) return fallbackGroups(frames)
+  const byRootLabel = new Map(frames.map((f) => [`${f.root}:${f.label}`, f]))
+  const byProjectFileLabel = new Map(frames.filter((f) => f.file).map((f) => [`${f.file}:${f.label}`, f]))
+  const used = new Set<string>()
+  const groups: ComponentGroup[] = []
+  for (const entry of inventory) {
+    const exportNames = entry.exports?.length ? entry.exports : [entry.name]
+    const variants = exportNames.flatMap((name) => {
+      const frame = entry.root === 'project'
+        ? byProjectFileLabel.get(`${entry.file}:${name}`) ?? byRootLabel.get(`${entry.root}:${name}`)
+        : byRootLabel.get(`${entry.root}:${name}`)
+      if (!frame) return []
+      used.add(frame.key)
+      return [frame]
+    })
+    if (variants.length) {
+      groups.push({
+        key: `${entry.root}:${entry.file}`,
+        name: entry.name,
+        category: entry.category ?? variants[0]?.category ?? 'ungrouped',
+        root: entry.root,
+        file: entry.file,
+        variants,
+      })
+    }
+  }
+  for (const frame of frames) if (!used.has(frame.key)) groups.push(...fallbackGroups([frame]))
+  return groups
 }
 
 class FrameBoundary extends React.Component<{ label: string; children: React.ReactNode }, { err: string | null }> {
@@ -63,27 +112,49 @@ export default function ComponentsCanvasHost() {
   const [mounted, setMounted] = React.useState(false)
   React.useEffect(() => setMounted(true), [])
   const frames = mounted ? collectFrames() : []
-  const byCategory = new Map<string, Frame[]>()
-  for (const f of frames) {
-    const cat = `${f.root === 'global' ? 'Global' : 'Project'} / ${f.category}`
-    byCategory.set(cat, [...(byCategory.get(cat) ?? []), f])
+  const [inventory, setInventory] = React.useState<InventoryEntry[] | null>(null)
+  React.useEffect(() => {
+    fetch('/api/dev/editor-components').then((r) => (r.ok ? r.json() : { components: [] }))
+      .then((d: { components?: InventoryEntry[] }) => setInventory(d.components ?? []))
+      .catch(() => setInventory([]))
+  }, [])
+  const loadingInventory = inventory === null
+  const groups = loadingInventory ? [] : groupFrames(frames, inventory)
+  const byCategory = new Map<string, ComponentGroup[]>()
+  for (const g of groups) {
+    const cat = `${g.root === 'global' ? 'Global' : 'Project'} / ${g.category}`
+    byCategory.set(cat, [...(byCategory.get(cat) ?? []), g])
   }
   return (
-    <div data-components-canvas style={{ minWidth: 800, padding: 40, display: 'flex', flexDirection: 'column', gap: 48, background: '#f5f5f5' }}>
+    <div data-components-canvas suppressHydrationWarning style={{ minWidth: 800, padding: 40, display: 'flex', flexDirection: 'column', gap: 48, background: CANVAS_BG }}>
       {mounted && frames.length === 0 && (
         <div style={{ font: '13px system-ui', color: 'rgba(0,0,0,0.5)' }}>No components yet — create one from the Assets panel.</div>
+      )}
+      {frames.length > 0 && loadingInventory && (
+        <div style={{ font: '13px system-ui', color: 'rgba(0,0,0,0.5)' }}>Loading component inventory…</div>
       )}
       {[...byCategory.entries()].map(([cat, list]) => (
         <section key={cat} data-category={cat} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <h2 style={{ margin: 0, font: '600 12px/1.2 system-ui', color: 'rgba(0,0,0,0.45)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{cat}</h2>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 32, alignItems: 'flex-start' }}>
-            {list.map((f) => (
-              <figure key={f.key} data-component-frame={f.label} data-frame-root={f.root} style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <figcaption style={{ font: '500 11px/1.2 system-ui', color: '#9747ff' }}>{f.label}</figcaption>
-                <div style={{ padding: 24, background: '#fff', borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}>
-                  <FrameBoundary label={f.label}>{React.createElement(f.Comp)}</FrameBoundary>
+            {list.map((group) => (
+              <article key={group.key} data-component-group={group.name} data-frame-root={group.root} title={group.file} style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span aria-hidden style={{ width: 10, height: 10, transform: 'rotate(45deg)', borderRadius: 2, background: COMPONENT_ACCENT, flex: 'none' }} />
+                  <h3 style={{ margin: 0, font: '600 11px/1.2 system-ui', color: COMPONENT_TEXT }}>{group.name}</h3>
+                  {group.variants.length > 1 && <span style={{ font: '500 10px/1.2 system-ui', color: 'rgba(0,0,0,0.45)' }}>{group.variants.length} variants</span>}
                 </div>
-              </figure>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 32, alignItems: 'flex-start', padding: 24, borderRadius: 12, border: `1px ${group.variants.length > 1 ? 'dashed' : 'solid'} ${COMPONENT_ACCENT}` }}>
+                  {group.variants.map((f) => (
+                    <figure key={f.key} data-component-frame={f.label} data-component-parent={group.name} data-component-variant={f.label} data-component-source={f.file ?? group.file} data-frame-root={f.root} style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {group.variants.length > 1 && <figcaption style={{ font: '500 11px/1.2 system-ui', color: COMPONENT_TEXT }}>{f.label}</figcaption>}
+                      <div style={{ padding: 24, background: '#fff', borderRadius: 12 }}>
+                        <FrameBoundary label={f.label}>{React.createElement(f.Comp)}</FrameBoundary>
+                      </div>
+                    </figure>
+                  ))}
+                </div>
+              </article>
             ))}
           </div>
         </section>
