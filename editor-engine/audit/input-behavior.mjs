@@ -98,6 +98,50 @@ if (await rowBtn.count()) {
   gate('frame preset undo restores', 'true', changed && (await label()) === before6);
 } else gate('frame preset menu reachable', 'true', false);
 
+// G7 — items 6/7: panel resize clamps + fields grow responsively
+const aside = page.locator('aside').last();
+const asideBox = await aside.boundingBox();
+const fieldW0 = await opacity.evaluate((el) => Math.round(el.closest('div').getBoundingClientRect().width));
+await page.mouse.move(asideBox.x + 3, asideBox.y + 400);
+await page.mouse.down();
+await page.mouse.move(asideBox.x - 600, asideBox.y + 400, { steps: 8 }); // try far beyond max
+await page.mouse.up();
+await page.waitForTimeout(300);
+const wideW = Math.round((await aside.boundingBox()).width);
+gate('panel resize clamps at max 480', 'true', wideW <= 481 && wideW >= 470);
+const fieldW1 = await opacity.evaluate((el) => Math.round(el.closest('div').getBoundingClientRect().width));
+gate('fields grow with panel (responsive)', 'true', fieldW1 > fieldW0);
+await page.mouse.move((await aside.boundingBox()).x + 3, asideBox.y + 400);
+await page.mouse.down();
+await page.mouse.move(asideBox.x + 900, asideBox.y + 400, { steps: 8 }); // try far below min
+await page.mouse.up();
+await page.waitForTimeout(300);
+const narrowW = Math.round((await aside.boundingBox()).width);
+gate('panel resize clamps at min 241', 'true', narrowW >= 240 && narrowW <= 242);
+const fieldWmin = await opacity.evaluate((el) => Math.round(el.closest('div').getBoundingClientRect().width));
+gate('fields never below Figma min 88', 'true', fieldWmin >= 88);
+
+// G8 — annotation: vertical alignment writes the model
+const alignBtn = page.locator('button[aria-label*="Align top"], button[title*="Align top"]').first();
+if (await alignBtn.count()) {
+  const m0 = await model();
+  await alignBtn.click(); await page.waitForTimeout(300);
+  const m1 = await model();
+  gate('vertical align (top) writes model', 'true', m1 !== m0 && /(align-self|margin-bottom)/.test(m1));
+} else gate('vertical align control present', 'true', false);
+
+// G9 — annotation: tidy-up/distribute writes the model
+const moreBtn = page.locator('button[title="Distribute"]').first();
+if (await moreBtn.count()) {
+  await moreBtn.click(); await page.waitForTimeout(300);
+  const item = page.locator('[role="menu"] button, [role="menuitem"], [role="menuitemradio"]').filter({ hasText: /space|between|distribute/i }).first();
+  if (await item.count()) {
+    const m0 = await model();
+    await item.click(); await page.waitForTimeout(300);
+    gate('distribute writes model', 'true', (await model()) !== m0 && /justify-content/.test(await model()));
+  } else { gate('distribute menu has options', 'true', false); await page.keyboard.press('Escape'); }
+} else gate('distribute control present', 'true', false);
+
 await browser.close();
 writeFileSync(path.join(OUT, 'behavior-gates.json'), JSON.stringify({ url: URL_, at: new Date().toISOString(), rows }, null, 2));
 const lines = rows.map((r) => `${r.pass ? 'PASS' : 'FAIL'}  ${r.name} · expected ${r.expected} · actual ${r.actual}`);

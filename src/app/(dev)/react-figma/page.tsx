@@ -397,11 +397,11 @@ function PositionRow({ label, children }: { label: string; children: React.React
   return (
     <div style={{ position: 'relative', height: 48, width: '100%' }}>
       <span style={{ position: 'absolute', left: 16, top: 3.5, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>{label}</span>
-      <div style={{ position: 'absolute', left: 16, right: 8, top: 20, display: 'grid', gridTemplateColumns: '88px 88px 24px', gap: 8, alignItems: 'center' }}>{children}</div>
+      <div style={{ position: 'absolute', left: 16, right: 8, top: 20, display: 'grid', gridTemplateColumns: 'minmax(88px,1fr) minmax(88px,1fr) 24px', gap: 8, alignItems: 'center' }}>{children}</div>
     </div>
   )
 }
-function InspectorRow({ label, height = 48, top = 20, columns = '88px 88px 24px', gap = 8, children }: { label: string; height?: number; top?: number; columns?: string; gap?: number; children: React.ReactNode }) {
+function InspectorRow({ label, height = 48, top = 20, columns = 'minmax(88px,1fr) minmax(88px,1fr) 24px', gap = 8, children }: { label: string; height?: number; top?: number; columns?: string; gap?: number; children: React.ReactNode }) {
   return (
     <div style={{ position: 'relative', height, width: '100%' }}>
       <span style={{ position: 'absolute', left: 16, top: 3.5, width: 88, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>{label}</span>
@@ -516,7 +516,7 @@ function FigmaField({ icon, letter, glyph, value, onChange, onCommit, token, suf
   const cols = `24px minmax(0,1fr)${suffix && !bound ? ' auto' : ''}${mode ? ' auto' : ''}${picker && onChange ? ' 16px' : ''}`
   return (
     <div ref={fieldRef} title={title ?? token} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
-      style={{ position: 'relative', minWidth: 0, width, height: 24, borderRadius: 5, background: whiteBg ? (h ? '#ededed' : '#fff') : FIELD, border: `1px solid ${varOpen || modeOpen ? SEL : whiteBg ? '#e6e6e6' : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: cols, alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
+      style={{ position: 'relative', minWidth: typeof width === 'number' ? width : 0, width: typeof width === 'number' ? '100%' : width, height: 24, borderRadius: 5, background: whiteBg ? (h ? '#ededed' : '#fff') : FIELD, border: `1px solid ${varOpen || modeOpen ? SEL : whiteBg ? '#e6e6e6' : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: cols, alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
       <span onPointerDown={scrubDown} onPointerMove={scrubMove} onPointerUp={scrubUp}
         style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)', font: `450 11px/24px ${FONT}`, cursor: numeric ? 'ew-resize' : undefined, touchAction: 'none' }}>{icon ? <UiIcon name={icon} /> : glyph ?? letter}</span>
       {bound ? (
@@ -738,11 +738,11 @@ function BlendModeMenu({ value, onChange }: { value: string; onChange: (value: s
     </div>
   )
 }
-function TextSegGroup({ items, active = 0, width = 184, onSelect, ariaLabel }: { items: string[]; active?: number; width?: number | string; onSelect?: (index: number) => void; ariaLabel?: string }) {
+function TextSegGroup({ items, titles, active = 0, width = 184, onSelect, ariaLabel }: { items: string[]; titles?: string[]; active?: number; width?: number | string; onSelect?: (index: number) => void; ariaLabel?: string }) {
   return (
     <div role="radiogroup" aria-label={ariaLabel} style={{ width, height: 24, borderRadius: 5, background: FIELD, display: 'flex', overflow: 'hidden' }}>
       {items.map((item, i) => (
-        <button key={item} type="button" role="radio" aria-checked={i === active} title={item} onClick={() => onSelect?.(i)}
+        <button key={item} type="button" role="radio" aria-checked={i === active} title={titles?.[i] ?? item} onClick={() => onSelect?.(i)}
           style={{ appearance: 'none', border: 0, cursor: 'pointer', flex: '1 1 0', minWidth: 0, height: 24, borderRadius: i === active ? 5 : 0, display: 'grid', placeItems: 'center', background: i === active ? '#fff' : 'transparent', color: i === active ? INK : MUTE, font: `${i === active ? 550 : 450} 10px/14px ${FONT}`, padding: '0 4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {item}
         </button>
@@ -3094,7 +3094,7 @@ export default function ReactFigmaPage() {
     const onMove = (ev: PointerEvent) => {
       const dx = ev.clientX - startX
       if (side === 'l') setLeftW(Math.max(208, Math.min(400, startW + dx)))
-      else setRightW(Math.max(232, Math.min(440, startW - dx)))
+      else setRightW(Math.max(241, Math.min(480, startW - dx))) // E8 item 7: contract panel.ourMin/MaxWidth
     }
     const onUp = () => { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp) }
     window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp)
@@ -3517,7 +3517,9 @@ export default function ReactFigmaPage() {
               <span />
             </PositionRow>
             <InspectorRow label="CSS position" columns="1fr">
-              <TextSegGroup items={['Auto', 'Rel', 'Abs', 'Fix', 'Sticky']} active={cssPosition} onSelect={(i) => { setCssPosition(i); applyOverride('cssPosition', ['static', 'relative', 'absolute', 'fixed', 'sticky'][i]) }} width="100%" ariaLabel="CSS position" />
+              {/* E8 annotation: per-option tooltips answer "what does Auto do?" — Auto = normal
+                  document flow (CSS static), the default before any pinning */}
+              <TextSegGroup items={['Auto', 'Rel', 'Abs', 'Fix', 'Sticky']} titles={['Normal flow (CSS static) — element sits where the layout puts it', 'Relative — nudge from its normal spot; children anchor to it', 'Absolute — pin to the nearest positioned parent', 'Fixed — pin to the screen', 'Sticky — scrolls, then pins']} active={cssPosition} onSelect={(i) => { setCssPosition(i); applyOverride('cssPosition', ['static', 'relative', 'absolute', 'fixed', 'sticky'][i]) }} width="100%" ariaLabel="CSS position" />
             </InspectorRow>
             <CompactInspectorRow label="z-index">
               <InspectorField label="Z" value={zIndexValue} ariaLabel="z-index" onChange={(v) => { setZIndexValue(v); applyOverride('zIndex', v) }} />
@@ -3538,7 +3540,7 @@ export default function ReactFigmaPage() {
             <div style={{ position: 'relative', height: 82, width: '100%' }}>
               <span style={{ position: 'absolute', left: 16, top: 3.5, width: 88, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Alignment</span>
               <span style={{ position: 'absolute', left: 112, top: 3.5, width: 88, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Gap</span>
-              <div style={{ position: 'absolute', left: 16, right: 8, top: 22, display: 'grid', gridTemplateColumns: '88px 88px 24px', gap: 8, alignItems: 'start' }}>
+              <div style={{ position: 'absolute', left: 16, right: 8, top: 22, display: 'grid', gridTemplateColumns: 'minmax(88px,1fr) minmax(88px,1fr) 24px', gap: 8, alignItems: 'start' }}>
                 <AlignGrid sel={autoAlign} onSelect={(i) => { const col = autoFlow === 'vertical'; setAutoAlign(i); const a = alignFromIndex(i, col); applyOverride('alignItems', a.alignItems); applyOverride('justify', a.justifyContent) }} />
                 <GapDropdownField value={gapValue} onChange={(v) => { setGapValue(v); applyOverride('gap', v) }} token={fieldTokens.gap} />
                 <AutoLayoutSettingsMenu onApply={applyOverride} />
@@ -3578,7 +3580,7 @@ export default function ReactFigmaPage() {
             <div style={{ position: 'relative', height: 50, width: '100%' }}>
               <span style={{ position: 'absolute', left: 16, top: 3.5, width: 88, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Opacity</span>
               <span style={{ position: 'absolute', left: 112, top: 3.5, width: 120, font: `500 9px/14px ${FONT}`, letterSpacing: '0.27px', color: 'rgba(0,0,0,0.5)' }}>Corner radius</span>
-              <div style={{ position: 'absolute', left: 16, right: 8, top: 22, display: 'grid', gridTemplateColumns: '88px 88px 24px', gap: 8, alignItems: 'start' }}>
+              <div style={{ position: 'absolute', left: 16, right: 8, top: 22, display: 'grid', gridTemplateColumns: 'minmax(88px,1fr) minmax(88px,1fr) 24px', gap: 8, alignItems: 'start' }}>
                 <InlineValueInput icon="opacity" value={opacityValue} onChange={(v) => { setOpacityValue(v); applyOverride('opacity', v) }} suffix="%" ariaLabel="Opacity" token={fieldTokens.opacity} />
                 <InlineValueInput icon="cornerRadius" value={cornerRadiusValue} onChange={(v) => { setCornerRadiusValue(v); applyOverride('radius', v) }} ariaLabel="Corner radius" token={fieldTokens.radius} />
                 <UiIB name="cornerRadius" title="Individual corners" active={individualCorners} on={() => setIndividualCorners(v => !v)} />
