@@ -10,7 +10,7 @@
   "scripts": {
     "fetch": "node bin/figma-to-code.mjs fetch",
     "dump-variables": "node bin/figma-to-code.mjs dump-variables",
-    "test": "node --test test/*.test.mjs",
+    "test": "node --test --test-force-exit test/*.test.mjs",
     "studio": "node studio/server.mjs"
   }
 }

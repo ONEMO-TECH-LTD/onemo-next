@@ -22,6 +22,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
+import os from 'node:os';
+import { startBridgePeer } from '../src/bridge-peer.mjs';
+import { toDsExport, toVariableDump } from '../src/ds-export.mjs';
 
 const run = promisify(execFile);
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -41,6 +44,12 @@ for (const line of fs.readFileSync(path.join(cfg.envFile), 'utf8').split('\n')) 
   const m = line.match(/^([A-Z_]+)=(.*)$/); if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim();
 }
 
+// ── Desktop-Bridge peer (C10.4): the studio IS a bridge server — the Figma plugin scans
+// 9223-9232, connects, and pushes the full variable catalog. No MCP, no agent, no manual export.
+let bridge = null;
+try { bridge = await startBridgePeer({ log: (m) => console.log(`[bridge] ${m}`) }); }
+catch (e) { console.error(`[bridge] peer disabled: ${e.message}`); }
+
 const slugOf = (dir) => fs.readdirSync(dir).find((f) => f.endsWith('.module.css'))?.replace(/\.module\.css$/, '');
 const figmaUrlOf = (u) => { // accept any figma.com/design|file link with node-id
   const m = String(u).match(/figma\.com\/(?:design|file)\/([A-Za-z0-9]+)[^\s]*?node-id=([0-9]+)[-:]([0-9]+)/);
@@ -55,14 +64,47 @@ function urlOfScreen(slug) {
   }
   return null;
 }
-async function refreshScreen(slug) { // FORCE re-pull the linked Figma frame (Dan: fetch changes on button press)
+// current file version via REST (lightweight) — the dump must be stamped with it
+async function fileVersionOf(fileKey) {
+  const r = await fetch(`https://api.figma.com/v1/files/${fileKey}?depth=1`, { headers: { 'X-Figma-Token': process.env.FIGMA_TOKEN } });
+  if (!r.ok) throw new Error(`REST version check failed: HTTP ${r.status}`);
+  return (await r.json()).version;
+}
+
+// variables → BOTH artifacts: the converter's ID→name dump AND a regenerated tokens.css
+// (synthesized DS-export JSON → ds-pipeline build-scan). This is what makes "edit tokens in
+// Figma → Refresh" work with no manual JSON export (Dan's directive).
+async function syncVariables(fileKey) {
+  if (!bridge) throw new Error('bridge peer disabled (port range full)');
+  const data = await bridge.freshVariables();               // fresh if plugin connected, cached else, throws if neither
+  if (data.fileKey && data.fileKey !== fileKey) throw new Error(`bridge is attached to file ${data.fileKey}, not ${fileKey} — open the right file in Figma`);
+  const fileVersion = await fileVersionOf(fileKey);
+  // 1. converter dump
+  await fsp.writeFile(path.join(TOOL, `cache/${fileKey}.variables.json`), JSON.stringify(toVariableDump(data, fileKey, fileVersion), null, 1));
+  // 2. tokens.css regeneration via the DS pipeline (ad-hoc --output-dir; only tokens.css is copied in)
+  let tokensRegenerated = false;
+  if (cfg.dsBuildScan && fs.existsSync(cfg.dsBuildScan)) {
+    const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), 'fc-ds-'));
+    const inputJson = path.join(tmp, 'ds-live.json');
+    await fsp.writeFile(inputJson, JSON.stringify(toDsExport(data), null, 1));
+    await run('node', [cfg.dsBuildScan, '--input', inputJson, '--output-dir', tmp], { env: process.env, timeout: 60000, maxBuffer: 8e6 });
+    const built = path.join(tmp, path.basename(TOKENS));
+    if (!fs.existsSync(built)) throw new Error('build-scan produced no tokens.css');
+    await fsp.copyFile(built, TOKENS); tokensRegenerated = true;
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+  return { variables: data.variables?.length ?? 0, fileVersion, tokensRegenerated, live: bridge.state.connected };
+}
+
+async function refreshScreen(slug) { // FORCE re-pull: variables + token system + nodes (Dan: one button keeps everything updated)
   const url = urlOfScreen(slug);
   if (!url) throw new Error(`no linked Figma URL for "${slug}"`);
-  const cli = path.join(TOOL, 'bin/figma-to-code.mjs');
-  // best-effort dump refresh (needs Figma desktop + Bridge plugin open); ignore if the bridge is down —
-  // convert will fetch fresh nodes regardless and fail LOUDLY if the token dump is genuinely stale.
-  try { await run('node', [cli, 'dump-variables', url], { env: process.env, timeout: 30000, maxBuffer: 8e6 }); } catch { /* bridge down — convert decides */ }
-  return convertScreen(url); // no --offline → fetches the latest nodes
+  const { fileKey } = figmaUrlOf(url);
+  let vars = null, varsError = null;
+  try { vars = await syncVariables(fileKey); }
+  catch (e) { varsError = e.message; }                       // plugin closed → still refresh nodes; stale dump fails loudly downstream
+  const converted = await convertScreen(url);                // no --offline → fetches the latest nodes, all gates
+  return { ...converted, variables: vars, variablesError: varsError };
 }
 async function convertScreen(url) {
   const parsed = figmaUrlOf(url);
@@ -224,6 +266,13 @@ const server = createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x');
   try {
     if (u.pathname === '/api/root' && req.method === 'GET') return json(res, 200, { tool: TOOL, app: APP });
+    if (u.pathname === '/api/bridge' && req.method === 'GET')
+      return json(res, 200, bridge ? { port: bridge.port, connected: bridge.state.connected, variables: bridge.state.variables?.variables?.length ?? 0, variablesAt: bridge.state.variablesAt, fileKey: bridge.state.variables?.fileKey ?? null } : { disabled: true });
+    const bd = u.pathname.match(/^\/api\/bridge\/dump\/([A-Za-z0-9]+)$/);
+    if (bd && req.method === 'POST') {
+      try { return json(res, 200, await syncVariables(bd[1])); }
+      catch (e) { return json(res, 422, { error: String(e.message).slice(0, 2000) }); }
+    }
     if (u.pathname === '/api/screens' && req.method === 'GET') return json(res, 200, listScreens());
     if (u.pathname === '/api/convert' && req.method === 'POST') {
       let body = ''; for await (const c of req) body += c;

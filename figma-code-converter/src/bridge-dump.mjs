@@ -13,9 +13,9 @@ import { createConnection } from 'node:net';
 
 const BRIDGE_PORTS = [9223, 9224, 9225, 9226, 9227, 9228, 9229, 9230, 9231];
 
-function tcpReachable(port, timeoutMs = 400) {
+function tcpReachable(port, timeoutMs = 400, host = '127.0.0.1') {
   return new Promise((resolve) => {
-    const sock = createConnection({ host: '127.0.0.1', port });
+    const sock = createConnection({ host, port });
     const done = (v) => { try { sock.destroy(); } catch { /* gone */ } resolve(v); };
     sock.once('connect', () => done(true));
     sock.once('error', () => done(false));
@@ -27,7 +27,9 @@ function tcpReachable(port, timeoutMs = 400) {
 export async function tryBridgeDump(_root, _fileKey) {
   const up = [];
   for (const p of BRIDGE_PORTS) {
-    if (await tcpReachable(p)) up.push(p);
+    // dial BOTH stacks — node MCP servers bind [::1] (IPv6); a 127.0.0.1-only probe reports a
+    // healthy bridge as "not running" (live-hit 2026-07-07)
+    if (await tcpReachable(p) || await tcpReachable(p, 400, '::1')) up.push(p);
   }
   if (up.length === 0) {
     return { ok: false, reason: 'no bridge server on 9223-9231 (figma-console MCP not running)' };

@@ -47,7 +47,14 @@ if (cmd === 'fetch') {
     else throw e;
   }
 } else if (cmd === 'dump-variables') {
-  // F6 workflow: try the desktop bridge first; refusal-with-instruction is the FALLBACK.
+  // C10.4: the STUDIO hosts a live Desktop-Bridge peer (the plugin pushes the full catalog to it)
+  // — ask it first; the raw probe + instruction path is the fallback when no studio is running.
+  try {
+    const r2 = await fetch(`http://127.0.0.1:3900/api/bridge/dump/${fileKey}`, { method: 'POST', signal: AbortSignal.timeout(30000) });
+    const j = await r2.json();
+    if (r2.ok) { console.log(`dump written via studio bridge peer: ${j.variables} variables @ file version ${j.fileVersion}${j.tokensRegenerated ? ' · tokens.css regenerated' : ''}`); process.exit(0); }
+    console.error(`studio bridge: ${j.error}`);
+  } catch { /* no studio running — fall through to the probe */ }
   const { tryBridgeDump } = await import('../src/bridge-dump.mjs');
   const r = await tryBridgeDump(ROOT, fileKey);
   if (r.ok) {
