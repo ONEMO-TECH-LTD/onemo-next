@@ -15,12 +15,20 @@
   .chips{margin-left:auto;display:flex;gap:7px;font:11px ui-monospace,monospace;}
   .chip{background:#20202a;border-radius:7px;padding:4px 9px;color:#b7b7c2;}
   .chip b{color:#7fd8cd;} .chip.warn b{color:#e8a94c;} .chip.bad b{color:#f08a8a;}
-  .stage{position:absolute;top:46px;left:0;right:340px;bottom:0;display:grid;place-items:center;overflow:auto;background:#0e0e12;}
+  .rail2{position:fixed;top:46px;left:0;right:0;height:38px;z-index:30;background:#131319;border-bottom:1px solid #26262e;display:flex;align-items:center;gap:10px;padding:0 16px;font:11px ui-monospace,monospace;color:#b7b7c2;}
+  .rail2 select,.rail2 button{background:#20202a;color:#cfe;border:0;border-radius:6px;padding:4px 9px;cursor:pointer;font:500 11px system-ui;}
+  .rail2 input[type=range]{accent-color:#39b3a6;width:260px;}
+  .rail2 .tgl{margin-left:auto;display:flex;gap:6px;}
+  .rail2 .tgl button.off{color:#5a5a66;}
+  .stage{position:absolute;top:84px;left:240px;right:340px;bottom:0;display:grid;place-items:center;overflow:auto;background:#0e0e12;}
+  body.hideL .stage{left:0;} body.hideR .stage{right:0;}
+  .left{position:fixed;top:84px;left:0;bottom:0;width:240px;background:#131319;border-right:1px solid #26262e;overflow:auto;padding:10px;}
+  body.hideL .left{display:none;} body.hideR .panel{display:none;}
   .device{position:relative;background:#fff;outline:1px solid #2a2a32;}
   .device iframe{display:block;border:0;background:#eceff1;position:relative;z-index:1;}
   .device canvas.overlay{position:absolute;top:0;left:0;z-index:2;pointer-events:none;}
   .zonebox{position:absolute;z-index:3;pointer-events:none;border:1.5px dashed #8fd0ff;background:rgba(143,208,255,.08);display:none;}
-  .panel{position:fixed;top:46px;right:0;bottom:0;width:340px;background:#131319;border-left:1px solid #26262e;overflow:auto;padding:14px;}
+  .panel{position:fixed;top:84px;right:0;bottom:0;width:340px;background:#131319;border-left:1px solid #26262e;overflow:auto;padding:14px;}
   .panel .empty{color:#6a6a76;font-size:12px;padding:40px 8px;text-align:center;}
   .nodehdr{font-family:ui-monospace,monospace;font-size:12px;margin-bottom:2px;}
   .nodehdr b{color:#8fd0ff;} .nodesub{color:#7a7a86;font:11px ui-monospace,monospace;margin-bottom:12px;word-break:break-all;}
@@ -55,6 +63,20 @@
     <div class="chips" id="chips"></div>
   </div>
 
+  <div class="rail2">
+    <select id="gdev"><option value="">— device —</option></select>
+    <span>W</span><input type="range" id="gw" min="320" max="1728" value="402">
+    <span class="rawpx" id="gwv" style="color:#fff;font-weight:600">402px</span>
+    <button id="gfill">⤢ Fill</button>
+    <button id="greset">Reset</button>
+    <div class="tgl">
+      <button id="tglL">⟨ Tree</button>
+      <button id="tglR">Panel ⟩</button>
+    </div>
+  </div>
+
+  <div class="left" id="left"><div class="empty">Loading…</div></div>
+
   <div class="stage">
     <div class="device" id="device">
       <iframe id="frame" src="/converted/audit-mother-v2"></iframe>
@@ -75,16 +97,42 @@ let audit = null, mode = 'inspect', sel = null, zone = null, hi = null, iframeRe
 const esc = s => String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 const doc = () => frame.contentDocument, win = () => frame.contentWindow;
 
+function updScrSize(){ try{ const w=win(), el=document.getElementById('scrsize'); if(el&&w) el.textContent=`${w.innerWidth}×${w.innerHeight}`; }catch{} }
+frame.addEventListener('load',()=>{ updScrSize(); try{ win().addEventListener('resize',updScrSize); }catch{} });
+window.addEventListener('resize',updScrSize);
+// ── global resizer (top bar — works in EVERY mode; Dan: resizer lives at the top) ──
+const gw=document.getElementById('gw'), gwv=document.getElementById('gwv'), gdev=document.getElementById('gdev');
+function setW(w, sync){
+  w=Math.max(320,Math.min(1728,w));
+  frame.style.width=w+'px'; gwv.textContent=w+'px'; if(sync)gw.value=w;
+  if(mode==='fidelity'&&audit&&w!==audit.frame.w) clearOverlay(); // heatmap is design-size only
+  updScrSize();
+  if(mode==='responsive') setTimeout(runInvariants,80);
+}
+gw.oninput=e=>setW(+e.target.value,false);
+gdev.onchange=e=>{ if(e.target.value)setW(+e.target.value,true); };
+document.getElementById('gfill').onclick=()=>setW(Math.floor(document.querySelector('.stage').clientWidth-24),true);
+document.getElementById('greset').onclick=()=>setW(audit?.frame.w||402,true);
+// panel toggles (full-screen test: hide either side)
+const tglL=document.getElementById('tglL'), tglR=document.getElementById('tglR');
+tglL.onclick=()=>{ document.body.classList.toggle('hideL'); tglL.classList.toggle('off'); };
+tglR.onclick=()=>{ document.body.classList.toggle('hideR'); tglR.classList.toggle('off'); };
+
 fetch(AUDIT_URL).then(r=>r.json()).then(a=>{
   audit = a; scr.textContent = `${a.name} · ${a.screen}`;
   const s = a.summary;
   chips.innerHTML =
+    `<span class="chip">screen <b id="scrsize">—</b></span>`+
     `<span class="chip">elements <b>${s.elements}</b></span>`+
     `<span class="chip">coverage <b>${s.coverage}%</b></span>`+
     `<span class="chip ${s.refusals?'bad':''}">refusals <b>${s.refusals}</b></span>`+
     `<span class="chip ${s.drift?'warn':''}">drift <b>${s.drift}</b></span>`+
     `<span class="chip ${s.approximations?'warn':''}">approx <b>${s.approximations}</b></span>`;
   frame.style.width = a.frame.w+'px'; frame.style.height = a.frame.h+'px';
+  gw.value=a.frame.w; gwv.textContent=a.frame.w+'px';
+  Object.entries(DEVICE_GROUPS).forEach(([g,list])=>{ const og=document.createElement('optgroup'); og.label=g;
+    list.forEach(d=>{const o=document.createElement('option');o.value=d[1];o.textContent=`${d[0]} · ${d[1]}×${d[2]}`;og.appendChild(o);}); gdev.appendChild(og); });
+  buildTree();
   const zs=document.getElementById('zonesel');
   (a.zones||[]).forEach(z=>{const o=document.createElement('option');o.value=z.id;o.textContent=z.class;zs.appendChild(o);});
   zs.onchange=e=>{ zone=e.target.value||null; applyMode(); };
@@ -114,6 +162,18 @@ function boxEl(el, persist){
   hi.style.display='block';
 }
 
+// ── LEFT: structure tree, always visible (Dan: structure on the left, own panel) ──
+function buildTree(){
+  const st=audit.structure, leftEl=document.getElementById('left'), lines=[];
+  (function walk(id,depth){ const n=audit.nodes[id]; if(!n)return; lines.push(`<div class="t" data-fc="${id}">${'  '.repeat(depth)}&lt;${esc(n.tag)}&gt; ${esc(n.name)}</div>`); (st.tree[id]||[]).forEach(c=>walk(c,depth+1)); })(st.rootId,0);
+  leftEl.innerHTML=`<div class="sect">Structure</div><div class="tree">${lines.join('')}</div>`;
+  leftEl.querySelectorAll('.tree .t').forEach(t=>t.onclick=()=>{
+    mode='inspect'; modesEl.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.mode==='inspect'));
+    sel=t.dataset.fc; applyMode();
+    const el=doc()?.querySelector(`[data-fc="${CSS.escape(sel)}"]`); if(el)boxEl(el,true);
+  });
+}
+
 // ── mode switching ──
 modesEl.querySelectorAll('button').forEach(b=>b.onclick=()=>{
   mode=b.dataset.mode; modesEl.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
@@ -122,7 +182,7 @@ modesEl.querySelectorAll('button').forEach(b=>b.onclick=()=>{
 function clearOverlay(){ overlay.style.display='none'; if(hi)hi.style.display='none'; } // note: does NOT clear sel (QA F1 — tree click)
 function applyMode(){
   clearOverlay();
-  if(mode!=='responsive') frame.style.width=(audit?.frame.w||402)+'px'; // reset device size outside responsive
+  if(mode==='fidelity') setW(audit?.frame.w||402,true); // heatmap compares at design size
   hint.textContent = ({inspect:'Inspect · click an element · hover to preview',fidelity:'Fidelity · measured pixel diff vs Figma (red = mismatch)',responsive:'Responsive · device / slider / fill · invariants checked live',theming:'Theming · flip light/dark · token colors must move',structure:'Structure · layer tree, gates, asset integrity'})[mode];
   applyZoneBox();
   ({inspect:modeInspect,fidelity:modeFidelity,responsive:modeResponsive,theming:modeTheming,structure:modeStructure})[mode]();
@@ -149,7 +209,7 @@ function renderInspect(fc){
   if(n.drift) flags+=`<div class="flag drift">TOKEN DRIFT — Figma ${n.drift.figma} vs token resolves ${n.drift.resolved}</div>`;
   if(n.approximation) flags+=`<div class="flag approx">APPROXIMATION — ${esc(n.approximation.join('; '))}</div>`;
   panel.innerHTML=`<div class="nodehdr">&lt;${esc(n.tag)}&gt; <b>${esc(n.name)}</b></div>`+
-    `<div class="nodesub">.${esc(n.class)} · ${esc(fc)} · ${n.rel.w}×${n.rel.h} @ ${n.rel.x},${n.rel.y}</div>`+
+    `<div class="nodesub">.${esc(n.class)} · ${esc(fc)} · figma ${n.rel.w}×${n.rel.h} @ ${n.rel.x},${n.rel.y}${el?(()=>{const b=el.getBoundingClientRect();return ` · <span class="rawpx">live ${Math.round(b.width)}×${Math.round(b.height)} @ ${Math.round(b.x)},${Math.round(b.y)}</span>`;})():''}</div>`+
     `<div class="sect">Figma</div>${fig}`+
     `<div class="sect">Converted CSS · <span class="tok">token</span> → <span class="res">DS value</span> → <span class="rawpx">final px</span></div>${css}`+flags;
 }
@@ -195,38 +255,26 @@ const DEVICE_GROUPS={
   'Tablet':[['iPad mini 8.3',744,1133],['iPad Pro 11"',834,1194],['iPad Pro 12.9"',1024,1366],['Surface Pro 8',1440,960]],
   'Laptop / Desktop':[['MacBook Air',1280,832],['MacBook Pro 14"',1512,982],['MacBook Pro 16"',1728,1117],['Desktop',1440,1024]]
 };
+function runInvariants(){
+  const res=document.getElementById('rres'); if(!res)return;
+  const w=parseInt(frame.style.width)||audit.frame.w;
+  const d=doc(), root=[...d.body.children].find(e=>e.tagName==='DIV'&&win().getComputedStyle(e).display!=='none'); if(!root){res.innerHTML='';return;}
+  const vw=win().innerWidth, fails=[]; const rb=root.getBoundingClientRect();
+  if(Math.abs(rb.width-vw)>1) fails.push(`root width ${Math.round(rb.width)} ≠ viewport ${vw}`);
+  if(d.documentElement.scrollWidth>vw+1) fails.push(`horizontal overflow ${d.documentElement.scrollWidth}>${vw}`);
+  let capped=0;
+  for(const c of root.children){const s=win().getComputedStyle(c); if(s.maxWidth!=='none'){capped++; const b=c.getBoundingClientRect(); const off=Math.abs((b.x+b.width/2)-vw/2); if(off>2)fails.push(`.${String(c.className).split('_')[0]||'child'} off-center ${Math.round(off)}px`);}}
+  const ok=fails.length===0;
+  res.innerHTML=`<div class="big ${ok?'ok':'bad'}">${ok?'✓':'✗'} <span style="font:600 12px ui-monospace;color:#8a8a92">${w}px</span></div>`+
+    `<div class="row"><span class="k">root=viewport</span><span class="v">${fails.some(f=>f.includes('root width'))?'<span class=raw>fail</span>':'<span class=res>ok</span>'}</span></div>`+
+    `<div class="row"><span class="k">no overflow</span><span class="v">${fails.some(f=>f.includes('overflow'))?'<span class=raw>fail</span>':'<span class=res>ok</span>'}</span></div>`+
+    `<div class="row"><span class="k">capped centered</span><span class="v">${fails.some(f=>f.includes('off-center'))?'<span class=raw>fail</span>':'<span class=res>ok</span>'} (${capped} capped)</span></div>`+
+    (fails.length?`<div class="flag bad">${fails.map(esc).join('<br>')}</div>`:`<div class="flag ok">Every invariant holds at ${w}px — content centered, fills to cap, no overflow.</div>`)+
+    `<div class="flag ok" style="background:#12251e">Pixel fidelity is measured at the design size only (Figma renders at ${audit.frame.w}px). Other widths verify behaviour. Resize from the TOP BAR — works in every mode, panels hideable (⟨ ⟩).</div>`;
+}
 function modeResponsive(){
-  let w = parseInt(frame.style.width) || audit.frame.w;
-  // build the controls ONCE (recreating them on every input dropped drag increments — Dan)
-  panel.innerHTML=`<div class="sect">Responsive parity</div>`+
-    `<div class="ctl"><select id=rdev style="flex:1;background:#20202a;color:#cfe;border:0;border-radius:6px;padding:6px 8px;cursor:pointer"><option value="">— device —</option>${Object.entries(DEVICE_GROUPS).map(([g,list])=>`<optgroup label="${esc(g)}">${list.map(d=>`<option value="${d[1]}">${esc(d[0])} · ${d[1]}×${d[2]}</option>`).join('')}</optgroup>`).join('')}</select></div>`+
-    `<div class="ctl">W <input type=range id=rw min=320 max=1728 value=${w} style="flex:1"> <span class=rawpx id=rwv>${w}px</span></div>`+
-    `<div class="ctl"><button id=rfill>⤢ Fill window</button> <button id=rreset>Reset ${audit.frame.w}</button></div>`+
-    `<div id=rres></div>`;
-  const res=document.getElementById('rres'), rw=document.getElementById('rw'), rwv=document.getElementById('rwv');
-  const check=(sync)=>{
-    frame.style.width=w+'px'; rwv.textContent=w+'px'; if(sync)rw.value=w;
-    setTimeout(()=>{
-      const d=doc(), root=[...d.body.children].find(e=>e.tagName==='DIV'&&win().getComputedStyle(e).display!=='none'); if(!root){res.innerHTML='';return;}
-      const vw=win().innerWidth, fails=[]; const rb=root.getBoundingClientRect();
-      if(Math.abs(rb.width-vw)>1) fails.push(`root width ${Math.round(rb.width)} ≠ viewport ${vw}`);
-      if(d.documentElement.scrollWidth>vw+1) fails.push(`horizontal overflow ${d.documentElement.scrollWidth}>${vw}`);
-      let capped=0;
-      for(const c of root.children){const s=win().getComputedStyle(c); if(s.maxWidth!=='none'){capped++; const b=c.getBoundingClientRect(); const off=Math.abs((b.x+b.width/2)-vw/2); if(off>2)fails.push(`.${String(c.className).split('_')[0]||'child'} off-center ${Math.round(off)}px`);}}
-      const ok=fails.length===0;
-      res.innerHTML=`<div class="big ${ok?'ok':'bad'}">${ok?'✓':'✗'} <span style="font:600 12px ui-monospace;color:#8a8a92">${w}px</span></div>`+
-        `<div class="row"><span class="k">root=viewport</span><span class="v">${fails.some(f=>f.includes('root width'))?'<span class=raw>fail</span>':'<span class=res>ok</span>'}</span></div>`+
-        `<div class="row"><span class="k">no overflow</span><span class="v">${fails.some(f=>f.includes('overflow'))?'<span class=raw>fail</span>':'<span class=res>ok</span>'}</span></div>`+
-        `<div class="row"><span class="k">capped centered</span><span class="v">${fails.some(f=>f.includes('off-center'))?'<span class=raw>fail</span>':'<span class=res>ok</span>'} (${capped} capped)</span></div>`+
-        (fails.length?`<div class="flag bad">${fails.map(esc).join('<br>')}</div>`:`<div class="flag ok">Every invariant holds at ${w}px — content centered, fills to cap, no overflow.</div>`)+
-        `<div class="flag ok" style="background:#12251e">Pixel fidelity is measured at the design size only (Figma renders at ${audit.frame.w}px). Other widths verify behaviour + the clone-resize ground truth: 640px 4.06% · 900px 4.13%.</div>`;
-    },70);
-  };
-  rw.oninput=e=>{ w=+e.target.value; check(false); };
-  document.getElementById('rdev').onchange=e=>{ if(e.target.value){ w=+e.target.value; check(true); } };
-  document.getElementById('rfill').onclick=()=>{ w=Math.max(320,Math.floor(document.querySelector('.stage').clientWidth-24)); check(true); };
-  document.getElementById('rreset').onclick=()=>{ w=audit.frame.w; check(true); };
-  check(true);
+  panel.innerHTML=`<div class="sect">Responsive parity — resize from the top bar</div><div id=rres></div>`;
+  runInvariants();
 }
 
 // ── THEMING (token-driven colours must move on theme flip) ──
@@ -253,17 +301,13 @@ function modeTheming(){
 // ── STRUCTURE / ASSETS ──
 function modeStructure(){
   const st=audit.structure, s=audit.summary;
-  const lines=[];
-  (function walk(id,depth){ const n=audit.nodes[id]; if(!n)return; lines.push(`<div class="t" data-fc="${id}">${'  '.repeat(depth)}&lt;${esc(n.tag)}&gt; ${esc(n.name)}</div>`); (st.tree[id]||[]).forEach(c=>walk(c,depth+1)); })(st.rootId,0);
-  panel.innerHTML=`<div class="sect">Structure — layer tree 1:1</div>`+
+  panel.innerHTML=`<div class="sect">Structure — gates &amp; assets (tree in the left panel)</div>`+
     `<div class="row"><span class="k">elements</span><span class="v">${s.elements}</span></div>`+
     `<div class="row"><span class="k">refusals</span><span class="v"><span class="${s.refusals?'raw':'res'}">${s.refusals}</span></span></div>`+
     `<div class="row"><span class="k">gates</span><span class="v"><span class=res>census · canon · reverse · conformance OK</span></span></div>`+
     `<div class="sect">Assets</div>`+
     `<div class="row"><span class="k">inline SVGs</span><span class="v">${st.svgCount} preserved</span></div>`+
-    st.images.map(im=>`<div class="row"><span class="k">image</span><span class="v">${(im.bytes/1e6).toFixed(2)}MB · <span class="${im.byteExact?'res':'raw'}">${im.byteExact?'byte-exact original':'RE-ENCODED'}</span></span></div>`).join('')+
-    `<div class="sect">Tree</div><div class="tree">${lines.join('')}</div>`;
-  panel.querySelectorAll('.tree .t').forEach(t=>t.onclick=()=>{ mode='inspect'; modesEl.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.mode==='inspect')); sel=t.dataset.fc; applyMode(); renderInspect(sel); const el=doc().querySelector(`[data-fc="${CSS.escape(sel)}"]`); if(el)boxEl(el,true); });
+    st.images.map(im=>`<div class="row"><span class="k">image</span><span class="v">${(im.bytes/1e6).toFixed(2)}MB · <span class="${im.byteExact?'res':'raw'}">${im.byteExact?'byte-exact original':'RE-ENCODED'}</span></span></div>`).join('');
 }
 
 // ── ZONES (region filter — highlight the screen region) ──
