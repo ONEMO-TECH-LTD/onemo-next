@@ -217,7 +217,7 @@ const fieldScopes = (label: string): string[] | null =>
   : null
 let _dsTokenCache: DsToken[] | null = null
 /* E4-G4 — real components available to insert (extracted-in-editor), for the Assets panel. */
-type DsComponent = { name: string; importPath: string }
+type DsComponent = { name: string; importPath: string; category?: string; root?: 'project' | 'global'; file?: string; exports?: string[] }
 function useDsComponents(active: boolean, nonce = 0): DsComponent[] {
   const [comps, setComps] = useState<DsComponent[]>([])
   useEffect(() => {
@@ -1811,9 +1811,14 @@ const FRAME_INSERT_OPTIONS = [
   { label: 'Stack', target: 'div', detail: 'display: flex' },
   { label: 'Grid', target: 'div', detail: 'display: grid' },
 ]
-function InsertIsland({ onInsert, codeMode, onCodeMode }: { onInsert?: (tag: string, display?: string) => void; codeMode?: boolean; onCodeMode?: (v: boolean) => void }) {
+function InsertIsland({ onInsert: onInsertProp, codeMode, onCodeMode, drawDisabled }: { onInsert?: (tag: string, display?: string) => void; codeMode?: boolean; onCodeMode?: (v: boolean) => void; drawDisabled?: boolean }) {
   const [open, setOpen] = useState(false)
   const frameMenuRef = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
+  // E7.3/F3 (lead): drawing on the components canvas would splice JSX into the gallery HOST
+  // file — insert tools are honestly disabled there, not silently no-op'd.
+  const onInsert = drawDisabled ? undefined : onInsertProp
+  const disabledTitle = drawDisabled ? ' — available on the Design canvas' : ''
+  const dimIf = (base: React.CSSProperties): React.CSSProperties => (drawDisabled ? { ...base, opacity: 0.35, cursor: 'default' } : base)
   return (
     <div aria-label="Insert tools" onPointerDown={e => e.stopPropagation()}
       style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 25, height: 48, display: 'flex', alignItems: 'center', gap: 8, padding: '0 10px', borderRadius: 14, background: '#fff', boxShadow: '0 10px 30px rgba(0,0,0,.16), 0 0 0 1px rgba(0,0,0,.08)' }}>
@@ -1827,8 +1832,8 @@ function InsertIsland({ onInsert, codeMode, onCodeMode }: { onInsert?: (tag: str
           </button>
         </div>
         <div ref={frameMenuRef} role="group" aria-label="Frame" style={{ position: 'relative', display: 'grid', gridTemplateColumns: '32px 16px', width: 49, height: 32 }}>
-          <button type="button" aria-label="Frame" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(v => !v)}
-            style={{ appearance: 'none', border: 0, width: 32, height: 32, borderRadius: 7, background: open ? FIELD : '#fff', color: INK, display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
+          <button type="button" disabled={drawDisabled} aria-label="Frame" title={`Frame${disabledTitle}`} aria-haspopup="menu" aria-expanded={open} onClick={() => !drawDisabled && setOpen(v => !v)}
+            style={dimIf({ appearance: 'none', border: 0, width: 32, height: 32, borderRadius: 7, background: open ? FIELD : '#fff', color: INK, display: 'grid', placeItems: 'center', cursor: 'pointer' })}>
             <UiIcon name="insertFrame" />
           </button>
           <button type="button" title="Region tools" aria-label="Region tools" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(v => !v)}
@@ -1852,7 +1857,7 @@ function InsertIsland({ onInsert, codeMode, onCodeMode }: { onInsert?: (tag: str
           )}
         </div>
         <div role="group" aria-label="Text" style={{ display: 'grid', gridTemplateColumns: '32px 16px', width: 49, height: 32 }}>
-          <button type="button" title="Text" aria-label="Text" onClick={() => onInsert?.('text')} style={{ appearance: 'none', border: 0, width: 32, height: 32, borderRadius: 7, background: '#fff', color: INK, display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
+          <button type="button" disabled={drawDisabled} title={`Text${disabledTitle}`} aria-label="Text" onClick={() => onInsert?.('text')} style={dimIf({ appearance: 'none', border: 0, width: 32, height: 32, borderRadius: 7, background: '#fff', color: INK, display: 'grid', placeItems: 'center', cursor: 'pointer' })}>
             <UiIcon name="insertText" />
           </button>
           <button type="button" title="Type tools" aria-label="Type tools" style={{ appearance: 'none', border: 0, width: 16, height: 32, background: '#fff', color: FAINT, opacity: 0.55, display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
@@ -1869,6 +1874,54 @@ function InsertIsland({ onInsert, codeMode, onCodeMode }: { onInsert?: (tag: str
           <UiIcon name="modeDev" />
         </button>
       </div>
+    </div>
+  )
+}
+
+/* E7.3 (KAI-9377): left rail in Components mode — categories as "pages", components →
+ * variant children as "layers" (v4.1 §5). Data = the dual-root inventory (editor-components);
+ * clicking jumps the gallery to the frame and selects it. Chrome matches the pages/layers rail. */
+function ComponentsRail({ components, onJump }: { components: DsComponent[]; onJump: (label: string) => void }) {
+  const bySection = new Map<string, Map<string, DsComponent[]>>()
+  for (const c of components) {
+    const section = c.root === 'global' ? 'Global library' : 'Project'
+    const cats = bySection.get(section) ?? new Map<string, DsComponent[]>()
+    const cat = c.category ?? 'ungrouped'
+    cats.set(cat, [...(cats.get(cat) ?? []), c])
+    bySection.set(section, cats)
+  }
+  return (
+    <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 12 }}>
+      {components.length === 0 && (
+        <div style={{ padding: '12px 16px', font: `400 11px/1.5 ${FONT}`, color: MUTE }}>No components yet — create one from the Assets panel.</div>
+      )}
+      {[...bySection.entries()].map(([section, cats]) => (
+        <div key={section}>
+          <div style={{ height: 40, padding: '0 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={hdr}>{section}</span>
+            <span style={{ font: `400 11px/16px ${FONT}`, color: MUTE }}>{[...cats.values()].reduce((n, l) => n + l.length, 0)}</span>
+          </div>
+          {[...cats.entries()].map(([cat, list]) => (
+            <div key={cat}>
+              <div style={{ height: 28, padding: '0 16px', display: 'flex', alignItems: 'center', font: `500 11px/16px ${FONT}`, color: MUTE }}>{cat}</div>
+              {list.map((c) => (
+                <div key={`${c.root}:${c.file ?? c.name}`}>
+                  <button type="button" onClick={() => onJump(c.name)} title={c.file}
+                    style={{ appearance: 'none', border: 0, width: '100%', height: 28, padding: '0 16px 0 24px', background: 'transparent', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', font: `400 11px/16px ${FONT}`, color: '#9747ff', textAlign: 'left' }}>
+                    <UiIcon name="layerComponent" size={12} /> <span style={{ color: INK }}>{c.name}</span>
+                  </button>
+                  {(c.exports ?? []).filter((x) => x !== c.name).map((v) => (
+                    <button key={v} type="button" onClick={() => onJump(v)} title={`${c.name} variant`}
+                      style={{ appearance: 'none', border: 0, width: '100%', height: 24, padding: '0 16px 0 40px', background: 'transparent', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', font: `400 11px/16px ${FONT}`, color: MUTE, textAlign: 'left' }}>
+                      <UiIcon name="layerComponent" size={10} /> {v}
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      ))}
     </div>
   )
 }
@@ -1914,7 +1967,10 @@ export default function ReactFigmaPage() {
   const [assetTab, setAssetTab] = useState<AssetTab>('components')
   const [compNonce, setCompNonce] = useState(0)
   const [newCompName, setNewCompName] = useState('')
-  const dsComponents = useDsComponents(rail === 'assets', compNonce) // E4-G4 Assets panel
+  // E7.3 (KAI-9377): second canvas — Design ⇄ Components toggle just swaps the iframe route;
+  // the whole shell (zoom/pan/selection/overrides) is route-agnostic (architecture v4.1 §1).
+  const [canvasMode, setCanvasMode] = useState<'design' | 'components'>('design')
+  const dsComponents = useDsComponents(rail === 'assets' || canvasMode === 'components', compNonce) // E4-G4 Assets panel + E7.3 components rail
   // #6: create a new component in code (Framer-style) — scaffolds a real editable component file.
   const newComponent = useCallback(async (name: string) => {
     const clean = name.trim()
@@ -2765,6 +2821,8 @@ export default function ReactFigmaPage() {
   }, [])
   // E4 vibe #4: the device-frame size follows the frame preset (was hardcoded 402×871)
   const frameDims = (() => { const m = framePreset.size.match(/(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)/); return m ? { w: Math.round(+m[1]), h: Math.round(+m[2]) } : { w: 402, h: 871 } })()
+  // E7.3: components gallery grows with content — roomy fixed host; Design keeps preset dims.
+  const hostDims = canvasMode === 'components' ? { w: 1480, h: 1040 } : frameDims
   // Undo/redo over canvas edits (Dan live-QA "there must be undo/redo"). Versioning of committed
   // code = git (every Save-to-code is a tracked source edit); this stack covers staged overrides.
   const historyRef = useRef<{ id: string; prop: string; before: string | null; after: string }[][]>([])
@@ -3027,6 +3085,24 @@ export default function ReactFigmaPage() {
           <VersionHistoryPanel versions={versions} loading={versionsLoading} busyRef={versionBusyRef} onClose={() => setVersionPanelOpen(false)} onRefresh={() => void loadVersions()} onRestore={(version) => void restoreVersion(version)} onFork={(version) => void forkBuild('branch', version)} />
         ) : rail === 'file' && (
           <>
+            {/* E7.3: Design ⇄ Components canvas toggle (v4.1 §1 — swaps the iframe route only) */}
+            <div role="tablist" aria-label="Canvas mode" style={{ margin: '8px 12px 0', height: 28, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, padding: 2, borderRadius: 7, background: FIELD }}>
+              {(['design', 'components'] as const).map((m) => (
+                <button key={m} type="button" role="tab" aria-selected={canvasMode === m} onClick={() => setCanvasMode(m)}
+                  style={{ appearance: 'none', border: 0, borderRadius: 5, background: canvasMode === m ? '#fff' : 'transparent', color: canvasMode === m ? INK : MUTE, font: `500 11px/16px ${FONT}`, cursor: 'pointer', boxShadow: canvasMode === m ? '0 1px 3px rgba(0,0,0,0.12)' : 'none' }}>
+                  {m === 'design' ? 'Design' : 'Components'}
+                </button>
+              ))}
+            </div>
+            {canvasMode === 'components' ? (
+              <ComponentsRail components={dsComponents} onJump={(label) => {
+                const doc = iframeRef.current?.contentDocument
+                const frame = doc?.querySelector(`[data-component-frame="${label}"]`)
+                frame?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+                const el = frame?.querySelector('[data-src]') as HTMLElement | null
+                if (el) el.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+              }} />
+            ) : (<>
             <div style={{ height: 25, display: 'flex', alignItems: 'center', padding: '0 16px', font: `400 11px/16px ${FONT}`, color: MUTE }}>Drafts ›</div>
             <div style={{ height: 40, padding: '0 8px 0 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={hdr}>Pages</span>
@@ -3103,6 +3179,7 @@ export default function ReactFigmaPage() {
                   ))
                 : null /* live DOM only — empty until the canvas wires (E2.1 deslop) */}
             </div>
+            </>)}
           </>
         )}
         {rail === 'assets' && (
@@ -3177,15 +3254,15 @@ export default function ReactFigmaPage() {
       {/* ░░ INFINITE CANVAS ░░ */}
       <main ref={canvasRef} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
         style={{ flex: 1, minWidth: 0, background: '#f0f0f0', position: 'relative', overflow: 'hidden', cursor: drawArm ? 'crosshair' : isPanning ? 'grabbing' : 'default' }}>
-        <InsertIsland onInsert={(tag, display) => { if (tag === 'img') void insertImage(); else setDrawArm({ tag, display }) }} codeMode={codeMode} onCodeMode={setCodeMode} />
+        <InsertIsland drawDisabled={canvasMode === 'components'} onInsert={(tag, display) => { if (canvasMode === 'components') return; if (tag === 'img') void insertImage(); else setDrawArm({ tag, display }) }} codeMode={codeMode} onCodeMode={setCodeMode} />
         {drawArm && <div style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 40, height: 26, display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', borderRadius: 8, background: '#1e1e1e', color: '#fff', font: `450 11px/1 ${FONT}`, pointerEvents: 'none' }}>Drawing {drawArm.tag} — drag on the frame · Esc to cancel</div>}
         {codeMode && sel && <CodeView file={sel.file} line={sel.line} onClose={() => setCodeMode(false)} />}
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle, rgba(0,0,0,.09) 1px, transparent 1px)', backgroundSize: `${24 * view.z}px ${24 * view.z}px`, backgroundPosition: `${view.x}px ${view.y}px` }} />
         <div style={{ position: 'absolute', left: 0, top: 0, transform: `translate(${view.x}px,${view.y}px) scale(${view.z})`, transformOrigin: '0 0' }}>
-          <button type="button" onClick={selectFrameRoot} title="Select frame" style={{ appearance: 'none', border: 0, background: 'transparent', font: `550 10px/1 ${FONT}`, color: SEL, marginBottom: 8, marginLeft: 2, cursor: 'pointer', padding: 0 }}>{canvas.name} · {frameDims.w} × {frameDims.h}</button>
-          <div data-screen-host onClick={selectFrameRoot} style={{ position: 'relative', width: frameDims.w, height: frameDims.h, background: '#fff', borderRadius: 4, boxShadow: '0 0 0 1px rgba(0,0,0,.06), 0 12px 40px -8px rgba(0,0,0,.25)' }}>
-            <iframe key={canvas.route} ref={iframeRef} src={canvas.route} onLoad={wireCanvas} title="Canvas — real build"
-              style={{ width: frameDims.w, height: frameDims.h, border: 0, display: 'block', borderRadius: 4, pointerEvents: drawArm ? 'none' : 'auto' }} />
+          <button type="button" onClick={selectFrameRoot} title="Select frame" style={{ appearance: 'none', border: 0, background: 'transparent', font: `550 10px/1 ${FONT}`, color: SEL, marginBottom: 8, marginLeft: 2, cursor: 'pointer', padding: 0 }}>{canvasMode === 'components' ? 'Components' : canvas.name} · {hostDims.w} × {hostDims.h}</button>
+          <div data-screen-host onClick={selectFrameRoot} style={{ position: 'relative', width: hostDims.w, height: hostDims.h, background: '#fff', borderRadius: 4, boxShadow: '0 0 0 1px rgba(0,0,0,.06), 0 12px 40px -8px rgba(0,0,0,.25)' }}>
+            <iframe key={canvasMode === 'components' ? '/react-figma/components-canvas' : canvas.route} ref={iframeRef} src={canvasMode === 'components' ? '/react-figma/components-canvas' : canvas.route} onLoad={wireCanvas} title="Canvas — real build"
+              style={{ width: hostDims.w, height: hostDims.h, border: 0, display: 'block', borderRadius: 4, pointerEvents: drawArm ? 'none' : 'auto' }} />
             {hoverRect && (
               <div style={{ position: 'absolute', left: hoverRect.x, top: hoverRect.y, width: hoverRect.w, height: hoverRect.h, outline: `${1.5 / view.z}px solid ${SEL}`, pointerEvents: 'none' }} />
             )}
