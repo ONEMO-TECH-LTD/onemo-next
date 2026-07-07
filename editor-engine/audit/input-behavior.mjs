@@ -167,6 +167,15 @@ if (await linkInput.count()) {
   await page.waitForTimeout(600);
   gate('link Enter fires exactly ONE wrap-jsx-link', '1', linkWrites);
 } else gate('link field present', 'true', false);
+// G12 — F-E (lead): Escape on the link field fires ZERO link writes (genuinely discards)
+if (await linkInput.count()) {
+  const beforeCount = linkWrites;
+  await linkInput.click();
+  await linkInput.fill('/g12-escape-probe');
+  await linkInput.press('Escape');
+  await page.waitForTimeout(500);
+  gate('link Escape fires ZERO wrap-jsx-link', '0', linkWrites - beforeCount);
+}
 await page.unroute('**/api/dev/editor-write');
 
 await browser.close();

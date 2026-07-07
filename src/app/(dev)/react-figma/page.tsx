@@ -531,7 +531,7 @@ function FigmaField({ icon, letter, glyph, value, onChange, onCommit, token, suf
           }}
           onKeyDown={e => {
             if (e.key === 'Enter') { justCommitted.current = true; commitDraft(); onCommit?.(editing ? draft! : String(value)); e.currentTarget.blur() }
-            else if (e.key === 'Escape') { revertDraft(); e.currentTarget.blur(); e.stopPropagation() }
+            else if (e.key === 'Escape') { justCommitted.current = true; revertDraft(); e.currentTarget.blur(); e.stopPropagation() } // F-E: Escape's trailing blur must not commit either
           }}
           style={{ minWidth: 0, width: '100%', height: 22, border: 0, outline: 0, padding: 0, background: 'transparent', color: dim ? MUTE : INK, font: `450 11px/16px ${FONT}` }} />
       ) : (
