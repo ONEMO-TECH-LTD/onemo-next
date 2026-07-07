@@ -4,5 +4,6 @@
   "appWorktree": "..",
   "envFile": "/Users/daniilsolopov/Dev/onemo-dev/onemo-next/.env.local",
   "tokensCss": "src/app/tokens/tokens.css",
-  "fontsDir": "asset-library/fonts"
+  "fontsDir": "asset-library/fonts",
+  "exportsDir": "exports"
 }

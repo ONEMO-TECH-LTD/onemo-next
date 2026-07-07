@@ -107,3 +107,5 @@ storybook-static
 # figma-to-code studio sandbox (unaccepted conversions — promoted screens are committed instead)
 src/app/(dev)/converted/sandbox/
 public/audit/sandbox/
+
+figma-code-converter/exports/

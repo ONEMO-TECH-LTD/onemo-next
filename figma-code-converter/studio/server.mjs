@@ -32,6 +32,7 @@ const APP = path.resolve(TOOL, cfg.appWorktree); // relative = resolved against 
 const SANDBOX = path.join(APP, 'src/app/(dev)/converted/sandbox');
 const PROMOTED = path.join(APP, 'src/app/(dev)/converted');
 const AUDIT_PUB = path.join(APP, 'public/audit/sandbox');
+const EXPORTS = path.resolve(TOOL, cfg.exportsDir || 'exports');
 const TOKENS = path.join(APP, cfg.tokensCss);
 const FONTS = path.join(APP, cfg.fontsDir);
 
@@ -129,6 +130,19 @@ function listScreens() {
   }).sort((a, b) => (a.accepted === b.accepted ? a.name.localeCompare(b.name) : a.accepted ? 1 : -1));
 }
 
+// Export a portable integration bundle OUT of the app, for dropping into a dev/prod product.
+// Ships only the runtime files (component, styles, self-contained tokens, theme, fonts, assets,
+// manifest) — dev/audit metadata excluded. Reveals the folder in Finder (macOS).
+const BUNDLE_META_SKIP = new Set(['convert-run.json', 'conformance.json', 'CONFORMANCE.md', 'anatomy.html', 'audit.json']);
+async function exportBundle(slug) {
+  await promote(slug); // guarantee a fresh self-contained bundle in converted/<slug>
+  const src = path.join(PROMOTED, slug), out = path.join(EXPORTS, slug);
+  await fsp.rm(out, { recursive: true, force: true }); await fsp.mkdir(out, { recursive: true });
+  for (const f of fs.readdirSync(src)) if (!BUNDLE_META_SKIP.has(f)) await fsp.cp(path.join(src, f), path.join(out, f), { recursive: true });
+  try { await run('open', [out]); } catch { /* non-macOS/headless — path still returned */ }
+  return { export: out };
+}
+
 async function promote(slug) {
   const src = path.join(SANDBOX, slug);
   if (!fs.existsSync(src)) throw new Error(`no sandbox screen "${slug}"`);
@@ -203,6 +217,11 @@ const server = createServer(async (req, res) => {
     const ref = u.pathname.match(/^\/api\/refresh\/([a-z0-9-]+)$/);
     if (ref && req.method === 'POST') {
       try { return json(res, 200, await refreshScreen(ref[1])); }
+      catch (e) { return json(res, 422, { error: String(e.message).slice(0, 4000) }); }
+    }
+    const exp = u.pathname.match(/^\/api\/export\/([a-z0-9-]+)$/);
+    if (exp && req.method === 'POST') {
+      try { return json(res, 200, await exportBundle(exp[1])); }
       catch (e) { return json(res, 422, { error: String(e.message).slice(0, 4000) }); }
     }
     const pro = u.pathname.match(/^\/api\/promote\/([a-z0-9-]+)$/);
