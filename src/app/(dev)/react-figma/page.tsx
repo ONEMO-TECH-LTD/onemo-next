@@ -201,6 +201,16 @@ function useCloseOnOutside<T extends HTMLElement>(open: boolean, close: () => vo
 type DsToken = { cssVar: string; value: string; dark?: string; group: string; kind: 'color' | 'dimension' | 'other'; path?: string; scopes?: string[]; original?: Record<string, string> }
 // E6.13 — field → Figma's OWN scope model (the $scopes carried by the SSOT export; Dan: "we cannot
 // have scopes for font showing dimensions"). Unmapped fields keep the kind filter only.
+// 2.2 (Dan): token TIER from the cssVar prefix — the "library" a variable belongs to. Semantic +
+// Component are shown by default (cover ~99% of real use); Primitive + Alias are toggled on via the
+// picker's library dropdown when prototyping / hunting a fit.
+type TokenTier = 'Primitive' | 'Alias' | 'Semantic' | 'Component'
+const TOKEN_TIERS: TokenTier[] = ['Semantic', 'Component', 'Alias', 'Primitive']
+const tierOf = (cssVar: string): TokenTier =>
+  cssVar.startsWith('--sem-') ? 'Semantic'
+  : cssVar.startsWith('--com') ? 'Component'
+  : cssVar.startsWith('--al-') ? 'Alias'
+  : 'Primitive'
 const fieldScopes = (label: string): string[] | null =>
   /font family/i.test(label) ? ['FONT_FAMILY']
   : /font size|text size/i.test(label) ? ['FONT_SIZE']
@@ -248,6 +258,10 @@ function VariableHashIcon() {
 function FigmaVariablePicker({ fieldLabel, anchorRef, onPick, onClose, selected }: { fieldLabel: string; anchorRef: { current: HTMLElement | null }; onPick?: (value: string) => void; onClose: () => void; selected?: string }) {
   const [query, setQuery] = useState('')
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
+  const didScroll = useRef(false) // 2.1: scroll to the selected row ONCE — a per-render scrollIntoView fought the user's scroll (jitter)
+  const [visibleTiers, setVisibleTiers] = useState<Set<TokenTier>>(() => new Set<TokenTier>(['Semantic', 'Component'])) // 2.2
+  const [libMenuOpen, setLibMenuOpen] = useState(false)
+  const libRef = useCloseOnOutside<HTMLDivElement>(libMenuOpen, () => setLibMenuOpen(false))
   const tokens = useDsTokens()
   useEffect(() => {
     const update = () => setAnchorRect(anchorRef.current?.getBoundingClientRect() ?? null)
@@ -268,8 +282,13 @@ function FigmaVariablePicker({ fieldLabel, anchorRef, onPick, onClose, selected 
   // E6.13 — Figma's own $scopes narrow further: a token scoped FONT_SIZE never appears on a gap
   // field. ALL_SCOPES and scope-less (unjoined) tokens pass through the kind filter as before.
   const want = fieldScopes(fieldLabel)
-  const pool = tokens.filter((t) => t.kind === kind)
+  const base = tokens.filter((t) => t.kind === kind)
     .filter((t) => !want || !t.scopes || t.scopes.includes('ALL_SCOPES') || t.scopes.some((s) => want.includes(s)))
+  // 2.2: default to Semantic + Component; if that leaves nothing for this field, fall back to the
+  // full base so the picker is never empty (e.g. X/Y position has only primitive dimension tokens).
+  const tierFiltered = base.filter((t) => visibleTiers.has(tierOf(t.cssVar)))
+  const pool = tierFiltered.length ? tierFiltered : base
+  const tierCounts = TOKEN_TIERS.reduce((m, tier) => { m[tier] = base.filter((t) => tierOf(t.cssVar) === tier).length; return m }, {} as Record<TokenTier, number>)
   const q = query.trim().toLowerCase()
   const filtered = pool.filter((t) => !q || t.cssVar.toLowerCase().includes(q) || t.value.toLowerCase().includes(q))
   // group into header + item rows in file order (tokens.css is organised by collection)
@@ -290,7 +309,9 @@ function FigmaVariablePicker({ fieldLabel, anchorRef, onPick, onClose, selected 
   if (!anchorRect) return null
   const width = 216
   const height = 387
-  const left = Math.max(8, Math.min(anchorRect.left, window.innerWidth - width - 8))
+  // 2.3 (Dan): open to the LEFT of the field so the inspector panel stays visible and the popup
+  // isn't cramped/clipped against the panel edge — like Figma floats the variable picker.
+  const left = Math.max(8, Math.min(anchorRect.left - width - 12, window.innerWidth - width - 8))
   const top = Math.max(8, Math.min(anchorRect.top - 4, window.innerHeight - height - 8))
   return createPortal(
     <div data-figma-floating-root="true" role="dialog" aria-label={`${fieldLabel} variable set`}
@@ -303,10 +324,27 @@ function FigmaVariablePicker({ fieldLabel, anchorRef, onPick, onClose, selected 
           style={{ appearance: 'none', border: 0, background: 'transparent', width: 32, height: 40, display: 'grid', placeItems: 'center', cursor: 'pointer', color: 'rgba(0,0,0,0.8)', font: `400 18px/18px ${FONT}` }}>×</button>
       </div>
       <div style={{ height: 42, borderBottom: `1px solid ${LINE}`, display: 'grid', gridTemplateColumns: '1fr 32px', alignItems: 'center', padding: '0 8px', boxSizing: 'border-box' }}>
-        <button type="button" role="combobox" aria-controls="figma-variable-library-list" aria-expanded={false}
-          style={{ appearance: 'none', border: `1px solid ${LINE}`, background: '#fff', height: 24, width: 92.3, borderRadius: 5, padding: '0 8px', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', font: `400 11px/16px ${FONT}`, color: INK }}>
-          <span>All libraries</span><CaretDown size={10} />
-        </button>
+        <div ref={libRef} style={{ position: 'relative', justifySelf: 'start' }}>
+          <button type="button" role="combobox" aria-haspopup="menu" aria-expanded={libMenuOpen} onClick={() => setLibMenuOpen((v) => !v)}
+            style={{ appearance: 'none', border: `1px solid ${LINE}`, background: '#fff', height: 24, minWidth: 92, maxWidth: 150, borderRadius: 5, padding: '0 6px 0 8px', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', font: `400 11px/16px ${FONT}`, color: INK }}>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{visibleTiers.size === TOKEN_TIERS.length ? 'All libraries' : [...visibleTiers].join(', ') || 'None'}</span><CaretDown size={10} />
+          </button>
+          {libMenuOpen && (
+            <div role="menu" data-figma-floating-root="true" style={{ position: 'absolute', zIndex: 1300, left: 0, top: 28, width: 176, padding: '8px 0', borderRadius: 8, background: '#1e1e1e', color: '#fff', boxShadow: 'rgba(0,0,0,0.15) 0px 2px 5px 0px, rgba(0,0,0,0.12) 0px 10px 16px 0px' }}>
+              {TOKEN_TIERS.map((tier) => {
+                const on = visibleTiers.has(tier)
+                return (
+                  <button key={tier} type="button" role="menuitemcheckbox" aria-checked={on} onClick={() => setVisibleTiers((prev) => { const n = new Set(prev); if (n.has(tier)) n.delete(tier); else n.add(tier); return n.size ? n : prev })}
+                    style={{ appearance: 'none', border: 0, width: '100%', height: 28, background: 'transparent', color: '#fff', display: 'grid', gridTemplateColumns: '24px 1fr auto', alignItems: 'center', padding: '0 12px 0 8px', cursor: 'pointer', font: `400 11px/28px ${FONT}`, textAlign: 'left' }}>
+                    <span style={{ display: 'grid', placeItems: 'center' }}>{on && <MenuCheck />}</span>
+                    <span>{tier}</span>
+                    <span style={{ color: 'rgba(255,255,255,0.4)' }}>{tierCounts[tier]}</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
         <button type="button" aria-label="New variable" style={{ appearance: 'none', border: 0, background: 'transparent', width: 24, height: 24, justifySelf: 'end', display: 'grid', placeItems: 'center', cursor: 'pointer', color: INK }}>
           <Plus size={13} />
         </button>
@@ -318,7 +356,7 @@ function FigmaVariablePicker({ fieldLabel, anchorRef, onPick, onClose, selected 
           </div>
         ) : (
           <button key={`${row.label}-${row.value}-${index}`} type="button" title={row.full} onClick={() => { if (row.bind) onPick?.(row.bind); onClose() }}
-            ref={selected && row.bind === selected ? (el) => el?.scrollIntoView({ block: 'center' }) : undefined}
+            ref={selected && row.bind === selected ? (el) => { if (el && !didScroll.current) { didScroll.current = true; el.scrollIntoView({ block: 'center' }) } } : undefined}
             style={{ appearance: 'none', border: 0, width: 216, height: 24, background: selected && row.bind === selected ? '#E5F4FF' : '#fff', display: 'grid', gridTemplateColumns: '40px minmax(0,1fr) minmax(24px,auto)', alignItems: 'center', padding: 0, cursor: 'pointer', color: INK, font: `450 11px/16px ${FONT}`, textAlign: 'left', overflow: 'hidden' }}>
             <span style={{ width: 24, height: 24, marginLeft: 16, display: 'grid', placeItems: 'center', color: INK }}><VariableHashIcon /></span>
             <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.label}</span>
@@ -599,8 +637,16 @@ function FigmaField({ icon, letter, glyph, glyphWidth = 24, value, onChange, onC
           <UiIcon name="variable" size={12} />
         </button>
       )}
-      {modeOpen && modeOptions && (
-        <div role="menu" data-figma-floating-root="true" style={{ position: 'absolute', zIndex: 130, top: 28, right: 0, minWidth: 200, padding: '8px 0 6px', borderRadius: 13, background: '#1e1e1e', color: '#fff', boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px' }}>
+      {modeOpen && modeOptions && createPortal(
+        (() => {
+          // 2.3 (Dan): portal to body + fixed position so the panel's overflow can't clip the menu,
+          // and shift left to keep it off the panel edge.
+          const r = fieldRef.current?.getBoundingClientRect()
+          const mw = 208
+          const mLeft = r ? Math.max(8, Math.min(r.right - mw, window.innerWidth - mw - 8)) : 8
+          const mTop = r ? r.bottom + 4 : 8
+          return (
+        <div role="menu" data-figma-floating-root="true" style={{ position: 'fixed', zIndex: 1200, left: mLeft, top: mTop, width: mw, padding: '8px 0 6px', borderRadius: 13, background: '#1e1e1e', color: '#fff', boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px' }}>
           {/* Figma menu row: [check][icon][label] (Dan 2026-07-07 — resize dropdown parity) */}
           {modeOptions.map(([label, v], i) => (
             <button key={label} type="button" role="menuitemradio" aria-checked={mode === label || mode === v} onClick={() => { onMode?.(v); setModeOpen(false) }}
@@ -634,6 +680,9 @@ function FigmaField({ icon, letter, glyph, glyphWidth = 24, value, onChange, onC
             </span>
           )}
         </div>
+          )
+        })(),
+        document.body
       )}
       {varOpen && onChange && <FigmaVariablePicker fieldLabel={ariaLabel} anchorRef={fieldRef} onPick={onChange} onClose={() => setVarOpen(false)} selected={bound ? (token?.startsWith('--') ? `var(${token})` : (varBinding(value) ? value.trim() : token)) : undefined} />}
     </div>
@@ -864,24 +913,26 @@ function Sec({ title, action, children, caret, bodyGap = 8, bodyPadding = '0 8px
   )
 }
 function AlignGrid({ sel = 1, distributed = false, vertical = false, onSelect }: { sel?: number; distributed?: boolean; vertical?: boolean; onSelect?: (index: number) => void }) {
-  // Dan item 4 (2026-07-07): with DISTRIBUTED spacing (justify space-between / gap Auto) Figma
-  // lights a tick at EVERY main-axis stop of the selected cross line (top/mid/bottom in column
-  // flow) — never a single tick. Packed keeps the single tick.
-  const active = new Set<number>(
-    distributed
-      ? vertical
-        ? [sel % 3, (sel % 3) + 3, (sel % 3) + 6]            // column flow: whole selected column
-        : [Math.floor(sel / 3) * 3, Math.floor(sel / 3) * 3 + 1, Math.floor(sel / 3) * 3 + 2] // row flow: whole selected row
-      : [sel])
+  // Dan 2.5 (2026-07-07): match Figma. The SELECTED cell previews the items as 3 bars oriented by
+  // the flow direction (horizontal flow → vertical bars │││; vertical flow → horizontal bars ≡);
+  // distributed spacing spreads the bars apart. Every other cell shows a single dot. The cell's
+  // position in the 3×3 IS the alignment (top-left … bottom-right), fully wired via onSelect.
+  const horiz = !vertical
   return (
-    <div style={{ flex: 'none', width: 88, height: 56, background: FIELD, borderRadius: 5, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', padding: '5px 1px' }}>
+    <div style={{ flex: 'none', width: 88, height: 56, background: FIELD, borderRadius: 5, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', padding: '4px 2px' }}>
       {Array.from({ length: 9 }).map((_, i) => {
-        const on = active.has(i)
+        const on = i === sel
         return (
-        <button key={i} type="button" aria-label={`Auto layout alignment ${i + 1}`} aria-pressed={on} onClick={() => onSelect?.(i)}
-          style={{ appearance: 'none', border: 0, background: 'transparent', padding: 0, display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
-          <span style={{ width: on ? 9 : 3, height: 2, borderRadius: 2, background: on ? SEL : FAINT }} />
-        </button>
+          <button key={i} type="button" aria-label={`Auto layout alignment ${i + 1}`} aria-pressed={on} onClick={() => onSelect?.(i)}
+            style={{ appearance: 'none', border: 0, background: 'transparent', padding: 0, display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
+            {on ? (
+              <span aria-hidden style={{ display: 'flex', flexDirection: horiz ? 'row' : 'column', gap: distributed ? 3 : 1.5, alignItems: 'center', justifyContent: 'center' }}>
+                {[0, 1, 2].map((b) => <span key={b} style={{ width: horiz ? 2 : 8, height: horiz ? 8 : 2, borderRadius: 1, background: SEL }} />)}
+              </span>
+            ) : (
+              <span aria-hidden style={{ width: 3, height: 3, borderRadius: 3, background: FAINT }} />
+            )}
+          </button>
         )
       })}
     </div>
@@ -2326,6 +2377,23 @@ export default function ReactFigmaPage() {
   // E2.2 Text section — present only for text-bearing elements (Figma canon)
   const [typo, setTypo] = useState<{ family: string; weight: string; size: string; lineHeight: string; letterSpacing: string; align: string } | null>(null)
   const selIdRef = useRef<string | null>(null)
+  // 2.4 (Dan): two-step click-away — if an inspector input is focused, the first click-away only
+  // blurs it (layer stays selected); the second click-away deselects the layer.
+  const inputFocusRef = useRef(false)
+  useEffect(() => {
+    const onFocusIn = (e: FocusEvent) => {
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable) && !t.closest('iframe')) inputFocusRef.current = true
+    }
+    document.addEventListener('focusin', onFocusIn)
+    return () => document.removeEventListener('focusin', onFocusIn)
+  }, [])
+  const deselectLayer = useCallback(() => {
+    // step 1: consume the first click-away by just blurring the focused input
+    if (inputFocusRef.current) { inputFocusRef.current = false; (document.activeElement as HTMLElement | null)?.blur?.(); return }
+    // step 2: actually deselect
+    if (selIdRef.current) { selIdRef.current = null; setSel(null); setSelRect(null); setLiveFills(null); setLayerSelId(null) }
+  }, [])
   const ov = useRef<Overrides | null>(null)
   if (!ov.current) ov.current = new Overrides()
   const [ovVersion, setOvVersion] = useState(0) // bump → DirtyBar re-render
@@ -2994,8 +3062,9 @@ export default function ReactFigmaPage() {
     doc.addEventListener('click', (e) => {
       const el = findTagged(e.target)
       if (!el) {
-        // Figma parity (Dan 2026-07-07): clicking empty canvas DESELECTS — the inspector empties.
-        if (selIdRef.current) { selIdRef.current = null; setSel(null); setSelRect(null); setLiveFills(null); setLayerSelId(null) }
+        // Figma parity (Dan 2026-07-07): clicking empty canvas deselects — but two-step if an
+        // inspector input is focused (first click blurs, second deselects).
+        deselectLayer()
         return
       }
       e.preventDefault(); e.stopPropagation()
@@ -3261,11 +3330,11 @@ export default function ReactFigmaPage() {
     }
     // Figma parity (Dan 2026-07-07): a plain CLICK on the grey canvas (press+release, no pan
     // movement) deselects — same as clicking empty space in Figma.
-    if (pan.current && Math.abs(e.clientX - pan.current.x) < 3 && Math.abs(e.clientY - pan.current.y) < 3 && selIdRef.current) {
-      selIdRef.current = null; setSel(null); setSelRect(null); setLiveFills(null); setLayerSelId(null)
+    if (pan.current && Math.abs(e.clientX - pan.current.x) < 3 && Math.abs(e.clientY - pan.current.y) < 3 && (selIdRef.current || inputFocusRef.current)) {
+      deselectLayer() // two-step: first click-away blurs a focused input, second deselects
     }
     pan.current = null; setIsPanning(false)
-  }, [drawArm, insertDrawn])
+  }, [drawArm, insertDrawn, deselectLayer])
   useEffect(() => {
     if (!drawArm) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setDrawArm(null); draw.current = null; setDrawRect(null) } }
