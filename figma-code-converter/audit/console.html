@@ -25,6 +25,10 @@
   .tabs .tab .x{color:#5a5a66;font:600 13px system-ui;line-height:1;opacity:0;flex-shrink:0;}
   .tabs .tab:hover .x,.tabs .tab.on .x{opacity:1;} .tabs .tab .x:hover{color:#f08a8a;}
   .tabs .empty-hint{color:#5a5a66;font:11px system-ui;padding:0 6px;}
+  .tabs .tab.loading .nm::after{content:' …';color:#8fd0ff;}
+  .compiling{position:fixed;inset:var(--topH) var(--rightW) 0 var(--leftW);z-index:20;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:#0e0e12ee;color:#b7b7c2;font:13px system-ui;}
+  .compiling.on{display:flex;} .compiling .sp{width:26px;height:26px;border:3px solid #26263a;border-top-color:#39b3a6;border-radius:50%;animation:spin 0.8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg)}}
   /* address bar — its own row below the tabs */
   .addrbar{display:none;position:fixed;top:118px;left:0;right:0;height:36px;z-index:30;background:#131319;border-bottom:1px solid #26262e;align-items:center;gap:8px;padding:0 14px;}
   body.studio .addrbar{display:flex;}
@@ -126,6 +130,7 @@
 
   <div class="left" id="left"><div class="empty">Loading…</div></div>
 
+  <div class="compiling" id="compiling"><div class="sp"></div><div id="compmsg">Compiling route…</div></div>
   <div class="stage">
     <div class="device" id="device">
       <iframe id="frame"></iframe>
@@ -214,16 +219,27 @@ fetch('/api/screens').then(r=>r.ok?r.json():Promise.reject()).then(screens=>{
   const gsw=document.createElement('div'); gsw.className='groupsw';
   gsw.innerHTML=`<button class="sandbox${group==='sandbox'?' on':''}">Sandbox <span class="c">${conversions.length}</span></button>`+
                 `<button class="library${group==='library'?' on':''}">Library <span class="c">${saved.length}</span></button>`;
-  gsw.children[0].onclick=()=>go({g:'sandbox'}); gsw.children[1].onclick=()=>go({g:'library'});
+  // switching group must not leave an out-of-group screen selected (stale toolbox — meta-qa #2):
+  // if the current selection isn't in the target group, drop it (falls back to the reference screen).
+  const inGroup=(g)=>(g==='library'?saved:conversions).some(s=>s.slug===SLUG);
+  gsw.children[0].onclick=()=>go({g:'sandbox', s:inGroup('sandbox')?SLUG:null}); gsw.children[1].onclick=()=>go({g:'library', s:inGroup('library')?SLUG:null});
   tabsEl.appendChild(gsw);
 
+  // open a screen — if it has no inspectable (audit) build yet (accepted-only, meta-qa #2), first
+  // re-materialise it from cache, then navigate. Shows a spinner on the tab meanwhile.
+  async function openScreen(sc, tabEl){
+    if(sc.builtin) return go({s:null});
+    if(sc.hasDraft) return go({s:sc.slug});             // audit build present → open directly
+    if(tabEl) tabEl.classList.add('loading');
+    const r=await fetch(`/api/ensure-audit/${sc.slug}`,{method:'POST'}); const j=await r.json();
+    if(r.ok) go({s:sc.slug}); else { tabEl&&tabEl.classList.remove('loading'); alert(`Couldn't open "${sc.name}":\n\n${j.error}`); }
+  }
   // ── tabs of the active group (clean: dot + name + hover ×) ──
   const mkTab=(sc)=>{
     const isOpen=(sc.slug||null)===(SLUG||null) || (sc.builtin&&!SLUG);
-    const canOpen=sc.hasDraft||sc.builtin;
     const t=document.createElement('div'); t.className='tab'+(isOpen?' on':'');
     t.innerHTML=`<span class="dot ${sc.status}"></span><span class="nm" title="${esc(sc.name)}">${esc(sc.name)}</span>`+(sc.builtin?'':`<span class="x" title="close / delete">×</span>`);
-    t.querySelector('.nm').onclick=()=>{ if(canOpen) sc.builtin?go({s:null}):go({s:sc.slug}); };
+    t.querySelector('.nm').onclick=()=>openScreen(sc,t);
     const x=t.querySelector('.x'); if(x) x.onclick=e=>{ e.stopPropagation(); delScreen(sc); };
     tabsEl.appendChild(t);
   };
@@ -277,6 +293,26 @@ fetch('/api/screens').then(r=>r.ok?r.json():Promise.reject()).then(screens=>{
     if(r2.ok) go({s:j.slug,g:'sandbox'});
     else { inp.disabled=false; cbusy.style.display='none'; alert(`Conversion failed (gates loud by design):\n\n${j.error}`); }
   });
+  // ── route-readiness overlay: Next compiles converted routes on-demand; a fresh/large screen can
+  // leave the iframe blank while it builds. Poll the route, show a spinner, reload the iframe once
+  // ready (self-heal, meta-qa #1). A pathologically large screen (fixture board) stays honest. ──
+  if(SLUG){
+    const ov=document.getElementById('compiling'), msg=document.getElementById('compmsg');
+    const routeUrl=`/converted/sandbox/${SLUG}`;
+    const probe=async()=>{ const ac=new AbortController(); const t=setTimeout(()=>ac.abort(),3500);
+      try{ const ok=(await fetch(routeUrl,{method:'HEAD',signal:ac.signal})).ok; clearTimeout(t); return ok; }catch{ clearTimeout(t); return false; } };
+    (async()=>{
+      if(await probe()) return;                       // already warm (common case) — no overlay
+      ov.classList.add('on'); let ready=false;
+      for(let i=1;i<=40 && !ready;i++){
+        msg.textContent=i<4?'Compiling route…':`Compiling route… (large screen — ~${i*3}s)`;
+        await new Promise(r=>setTimeout(r,1500));
+        ready=await probe();
+      }
+      if(ready){ if(!(doc()&&doc().querySelector('[data-fc]'))) frame.src=frame.src; ov.classList.remove('on'); }
+      else msg.textContent='This screen is very large and is still compiling — it will appear when Next finishes.';
+    })();
+  }
 }).catch(()=>{}); // no studio server → plain console, unchanged
 
 fetch(AUDIT_URL).then(r=>r.json()).then(a=>{

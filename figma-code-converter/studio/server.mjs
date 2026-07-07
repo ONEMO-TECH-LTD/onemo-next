@@ -87,7 +87,43 @@ async function convertScreen(url) {
   await run('node', [path.join(TOOL, 'audit/audit-export.mjs'), dest, nodesCache, TOKENS, '--out', path.join(AUDIT_PUB, `${slug}.json`)], { env: process.env, maxBuffer: 8e6 });
   // fidelity pair — Figma's own render (REST) + the live build (captured once Next compiles the route)
   fidelityPair(parsed, slug).catch((e) => console.error(`[studio] fidelity ${slug}:`, e.message));
-  return { slug, nodeId: parsed.nodeId };
+  // warm the route so the operator doesn't land on a blank/compiling iframe (meta-qa HIGH #1). Next
+  // compiles on-demand; a huge screen (e.g. the fixture board) can exceed this — report routeReady
+  // honestly rather than hang, and the console keeps polling.
+  const routeReady = await warmRoute(`sandbox/${slug}`, 30000);
+  return { slug, nodeId: parsed.nodeId, routeReady };
+}
+
+// poll a converted route on the Next dev server until it serves 200 (on-demand compile), bounded.
+async function warmRoute(routePath, budgetMs = 25000) {
+  const url = `http://127.0.0.1:${cfg.nextPort}/converted/${routePath}`;
+  const deadline = Date.now() + budgetMs;
+  while (Date.now() < deadline) {
+    try { const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 4000);
+      const ok = (await fetch(url, { signal: ac.signal })).ok; clearTimeout(t); if (ok) return true; }
+    catch { /* compiling / not ready */ }
+    await new Promise((r) => setTimeout(r, 1200));
+  }
+  return false;
+}
+
+// ensure an INSPECTABLE (audit) build + audit.json exist for a screen (meta-qa HIGH #2: accepted-only
+// Library screens have only a product build → not openable). Re-materialize the audit build from the
+// committed cache, deterministically, then warm its route.
+async function ensureAudit(slug) {
+  const dest = path.join(SANDBOX, slug), auditJson = path.join(AUDIT_PUB, `${slug}.json`);
+  if (!fs.existsSync(path.join(dest, 'convert-run.json')) || !fs.existsSync(auditJson)) {
+    const runJson = fs.existsSync(path.join(PROMOTED, slug, 'convert-run.json')) ? path.join(PROMOTED, slug, 'convert-run.json') : path.join(dest, 'convert-run.json');
+    if (!fs.existsSync(runJson)) throw new Error(`no build to inspect for "${slug}"`);
+    const { nodeId, fileKey } = JSON.parse(await fsp.readFile(runJson, 'utf8'));
+    const url = `https://www.figma.com/design/${fileKey}/x?node-id=${nodeId.replace(':', '-')}`;
+    const cli = path.join(TOOL, 'bin/figma-to-code.mjs');
+    await fsp.mkdir(SANDBOX, { recursive: true }); await fsp.mkdir(AUDIT_PUB, { recursive: true });
+    await run('node', [cli, 'convert', url, '--offline', '--audit', '--out', dest, '--tokens-css', TOKENS, '--fonts-dir', FONTS], { env: process.env, timeout: 120000, maxBuffer: 8e6 });
+    const nodesCache = path.join(TOOL, `cache/${fileKey}-${nodeId.replace(':', '-')}.nodes.json`);
+    await run('node', [path.join(TOOL, 'audit/audit-export.mjs'), dest, nodesCache, TOKENS, '--out', auditJson], { env: process.env, maxBuffer: 8e6 });
+  }
+  return { slug, routeReady: await warmRoute(`sandbox/${slug}`, 30000) };
 }
 
 async function fidelityPair(parsed, slug) {
@@ -217,6 +253,11 @@ const server = createServer(async (req, res) => {
     const ref = u.pathname.match(/^\/api\/refresh\/([a-z0-9-]+)$/);
     if (ref && req.method === 'POST') {
       try { return json(res, 200, await refreshScreen(ref[1])); }
+      catch (e) { return json(res, 422, { error: String(e.message).slice(0, 4000) }); }
+    }
+    const ea = u.pathname.match(/^\/api\/ensure-audit\/([a-z0-9-]+)$/);
+    if (ea && req.method === 'POST') {
+      try { return json(res, 200, await ensureAudit(ea[1])); }
       catch (e) { return json(res, 422, { error: String(e.message).slice(0, 4000) }); }
     }
     const exp = u.pathname.match(/^\/api\/export\/([a-z0-9-]+)$/);
