@@ -192,7 +192,9 @@ async function promote(slug) {
   // so the folder integrates into any product without an external design-system stylesheet.
   const { bundleTokensCss } = await import(path.join(TOOL, 'src/bundle.mjs'));
   const moduleCssFile = fs.readdirSync(dest).find((f) => f.endsWith('.module.css'));
-  const { css: tokCss, used, unresolved } = bundleTokensCss(await fsp.readFile(path.join(dest, moduleCssFile), 'utf8'), await fsp.readFile(TOKENS, 'utf8'));
+  const themeCssPath = path.join(dest, 'theme.css');
+  const extraCss = fs.existsSync(themeCssPath) ? await fsp.readFile(themeCssPath, 'utf8') : '';
+  const { css: tokCss, used, unresolved } = bundleTokensCss(await fsp.readFile(path.join(dest, moduleCssFile), 'utf8'), await fsp.readFile(TOKENS, 'utf8'), extraCss);
   await fsp.writeFile(path.join(dest, 'tokens.css'), tokCss);
   // page.tsx imports tokens.css FIRST (definitions before consumers) — insert ahead of fonts.css
   const pageFile = path.join(dest, 'page.tsx'); let page = await fsp.readFile(pageFile, 'utf8');

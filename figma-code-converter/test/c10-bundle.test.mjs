@@ -44,3 +44,18 @@ test('unresolved tokens are reported, not silently dropped', () => {
   const { unresolved } = bundleTokensCss(`.a { color: var(--does-not-exist); }`, APP_TOKENS);
   assert.deepEqual(unresolved, ['--does-not-exist']);
 });
+
+test('fallback-carrying vars are seen (not regex-skipped) and classified, not silently ignored', () => {
+  // meta-qa caveat: var(--x, fallback) was invisible to the old regex — --fc-surface-invert class
+  const m = `.a { background-color: var(--fc-surface-invert, transparent); color: var(--sem-fg); }`;
+  const themed = `[data-theme="dark"] { --fc-surface-invert: #ffffff; }`;
+  // defined in theme.css (extraCss) → resolved by the bundle, not unresolved
+  const r1 = bundleTokensCss(m, APP_TOKENS, themed);
+  assert.deepEqual(r1.unresolved, []); assert.deepEqual(r1.fallbackOnly, []);
+  // NOT defined anywhere but carries a literal fallback → fallbackOnly (safe, reported)
+  const r2 = bundleTokensCss(m, APP_TOKENS, '');
+  assert.deepEqual(r2.unresolved, []); assert.deepEqual(r2.fallbackOnly, ['--fc-surface-invert']);
+  // undefined AND no fallback → unresolved (would break)
+  const r3 = bundleTokensCss(`.a { color: var(--nope); }`, APP_TOKENS, '');
+  assert.deepEqual(r3.unresolved, ['--nope']);
+});

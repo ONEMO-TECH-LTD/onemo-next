@@ -7,8 +7,11 @@
 // Determinism: pure string→string; same inputs → byte-identical output (tokens emitted in the
 // order first seen, so a re-Keep never churns the file).
 
-const VAR_RE = /var\((--[a-zA-Z0-9-]+)\)/g;
+// matches BOTH var(--x) and var(--x, fallback) — a fallback-carrying var skipped by a naive
+// regex is exactly how --fc-surface-invert slipped past the self-containment check (meta-qa caveat)
+const VAR_RE = /var\(\s*(--[a-zA-Z0-9-]+)\s*[,)]/g;
 const refsIn = (value) => [...String(value).matchAll(VAR_RE)].map((m) => m[1]);
+const hasFallback = (css, v) => new RegExp(`var\\(\\s*${v}\\s*,`).test(css);
 
 // parse tokens.css into { scopeSelector: Map(--var → value) }, preserving :root + every [data-theme]
 function parseScopes(cssText) {
@@ -29,24 +32,31 @@ function parseScopes(cssText) {
 /**
  * @param {string} moduleCss  the screen's emitted .module.css (the var() consumers)
  * @param {string} appTokensCss  the app's global tokens.css (the definitions)
- * @returns {{css:string, used:string[], unresolved:string[]}}  a self-contained tokens.css +
- *          the exact tokens used and any that could not be resolved (bundle would break — caller warns)
+ * @param {string} [extraCss]  other bundled stylesheets that also DEFINE vars (theme.css) —
+ *        a var defined there is resolved-by-bundle, not unresolved
+ * @returns {{css:string, used:string[], unresolved:string[], fallbackOnly:string[]}}
+ *          unresolved = would break on integration; fallbackOnly = undefined everywhere but
+ *          carries a literal fallback (cannot break — reported for honesty, not failure)
  */
-export function bundleTokensCss(moduleCss, appTokensCss) {
+export function bundleTokensCss(moduleCss, appTokensCss, extraCss = '') {
+  const extraDefs = new Set([...String(extraCss).matchAll(/(--[a-zA-Z0-9-]+)\s*:/g)].map((m) => m[1]));
   const scopes = parseScopes(appTokensCss);
   const rootSel = [...scopes.keys()].find((s) => s.split(',').some((part) => part.trim() === ':root')) ?? ':root';
   const root = scopes.get(rootSel) ?? new Map();
   // BFS the transitive closure of every var the module.css consumes (following chains through
   // the value of each var, in EVERY scope so a dark-only chain link is still pulled in)
   const needed = new Set(); const queue = [...new Set(refsIn(moduleCss))];
-  const unresolved = new Set();
+  const unresolved = new Set(); const fallbackOnly = new Set();
   while (queue.length) {
     const v = queue.shift(); if (needed.has(v)) continue; needed.add(v);
     let defined = false;
     for (const defs of scopes.values()) if (defs.has(v)) { defined = true; for (const r of refsIn(defs.get(v))) if (!needed.has(v === r ? '' : r) && r) queue.push(r); }
-    if (!defined) unresolved.add(v);
+    if (!defined) {
+      if (extraDefs.has(v)) continue;                       // defined by another bundled sheet (theme.css)
+      (hasFallback(moduleCss, v) ? fallbackOnly : unresolved).add(v); // literal fallback = safe, reported
+    }
   }
-  needed.delete(''); for (const u of unresolved) needed.delete(u);
+  needed.delete(''); for (const u of [...unresolved, ...fallbackOnly]) needed.delete(u);
   const order = [...new Set(refsIn(moduleCss))].filter((v) => needed.has(v)); // stable: first-seen order, then deps
   for (const v of needed) if (!order.includes(v)) order.push(v);
 
@@ -60,5 +70,5 @@ export function bundleTokensCss(moduleCss, appTokensCss) {
     const themeDefs = order.filter((v) => defs.has(v) && defs.get(v) !== root.get(v));
     if (themeDefs.length) lines.push(`${sel} {`, ...themeDefs.map((v) => `  ${v}: ${defs.get(v)};`), '}');
   }
-  return { css: lines.join('\n') + '\n', used: order, unresolved: [...unresolved] };
+  return { css: lines.join('\n') + '\n', used: order, unresolved: [...unresolved], fallbackOnly: [...fallbackOnly] };
 }
