@@ -82,7 +82,7 @@ async function syncVariables(fileKey) {
   // 1. converter dump
   await fsp.writeFile(path.join(TOOL, `cache/${fileKey}.variables.json`), JSON.stringify(toVariableDump(data, fileKey, fileVersion), null, 1));
   // 2. tokens.css regeneration via the DS pipeline (ad-hoc --output-dir; only tokens.css is copied in)
-  let tokensRegenerated = false;
+  let tokensRegenerated = false, tokensAdded = 0, tokensChanged = 0;
   if (cfg.dsBuildScan && fs.existsSync(cfg.dsBuildScan)) {
     const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), 'fc-ds-'));
     const inputJson = path.join(tmp, 'ds-live.json');
@@ -90,10 +90,19 @@ async function syncVariables(fileKey) {
     await run('node', [cfg.dsBuildScan, '--input', inputJson, '--output-dir', tmp], { env: process.env, timeout: 60000, maxBuffer: 8e6 });
     const built = path.join(tmp, path.basename(TOKENS));
     if (!fs.existsSync(built)) throw new Error('build-scan produced no tokens.css');
-    await fsp.copyFile(built, TOKENS); tokensRegenerated = true;
+    // EQUIVALENCE GUARD (Dan: "it better not break our design system"): the regen may ADD tokens
+    // (new/edited in Figma) and change values, but an EXISTING var disappearing means the synthesis
+    // diverged from the pipeline's contract — refuse and keep the current tokens.css, loudly.
+    const varsOf = (css) => { const m = new Map(); for (const d of css.matchAll(/(--[a-zA-Z0-9-]+)\s*:\s*([^;]+);/g)) if (!m.has(d[1])) m.set(d[1], d[2].trim()); return m; };
+    const cur = varsOf(await fsp.readFile(TOKENS, 'utf8')), nxt = varsOf(await fsp.readFile(built, 'utf8'));
+    const removed = [...cur.keys()].filter((k) => !nxt.has(k));
+    if (removed.length) throw new Error(`tokens regen REFUSED — ${removed.length} existing token(s) would disappear (synthesis/pipeline mismatch, not a token edit): ${removed.slice(0, 8).join(', ')}${removed.length > 8 ? ', …' : ''}. Current tokens.css kept.`);
+    tokensAdded = [...nxt.keys()].filter((k) => !cur.has(k)).length;
+    tokensChanged = [...cur.keys()].filter((k) => nxt.has(k) && nxt.get(k) !== cur.get(k)).length;
+    if (tokensAdded || tokensChanged) { await fsp.copyFile(built, TOKENS); tokensRegenerated = true; }
     await fsp.rm(tmp, { recursive: true, force: true });
   }
-  return { variables: data.variables?.length ?? 0, fileVersion, tokensRegenerated, live: bridge.state.connected };
+  return { variables: data.variables?.length ?? 0, fileVersion, tokensRegenerated, tokensAdded, tokensChanged, live: bridge.state.connected };
 }
 
 async function refreshScreen(slug) { // FORCE re-pull: variables + token system + nodes (Dan: one button keeps everything updated)
@@ -266,6 +275,8 @@ const server = createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x');
   try {
     if (u.pathname === '/api/root' && req.method === 'GET') return json(res, 200, { tool: TOOL, app: APP });
+    if (u.pathname === '/api/bridge/payload' && req.method === 'GET')
+      return json(res, 200, bridge?.state.variables ?? { error: 'no payload yet' });
     if (u.pathname === '/api/bridge' && req.method === 'GET')
       return json(res, 200, bridge ? { port: bridge.port, connected: bridge.state.connected, variables: bridge.state.variables?.variables?.length ?? 0, variablesAt: bridge.state.variablesAt, fileKey: bridge.state.variables?.fileKey ?? null } : { disabled: true });
     const bd = u.pathname.match(/^\/api\/bridge\/dump\/([A-Za-z0-9]+)$/);

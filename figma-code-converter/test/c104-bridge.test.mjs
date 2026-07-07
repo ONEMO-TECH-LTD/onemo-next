@@ -35,7 +35,7 @@ test('toDsExport matches the Figma variables-export format build-scan consumes',
   assert.equal(sem.text.primary.$value, '{base.white}');
   assert.equal(sem.text.primary.$collectionName, '.1.0-Prim-Col');
   assert.equal(sem.text.primary.$description, 'Primary text.');
-  assert.deepEqual(sem.standard.m, { $type: 'number', $libraryName: '', $value: 16 });
+  assert.deepEqual(sem.standard.m, { $type: 'float', $libraryName: '', $value: 16 }); // 'float' is what Figma's export writes (not DTCG 'number') — build-scan keys on it
 });
 
 test('toDsExport is deterministic (same payload → byte-identical JSON)', () => {

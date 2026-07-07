@@ -6,13 +6,16 @@
 //
 // Format (verified against 11-design-system/figma-var/DS-V2.3.12--1-JULY-2026.json):
 //   [ { "<collectionName>": { "modes": { "<modeName>": <nested tree> } } }, … ]
-//   leaf: { "$scopes":[...], "$description":"…", "$type":"color|number|string|boolean",
+//   leaf: { "$scopes":[...], "$description":"…", "$type":"color|float|string|boolean",
 //           "$libraryName":"", "$collectionName":"<target coll>" (aliases only),
 //           "$value": "#hex" | number | "string" | "{dot.path}" (alias), "$hiddenFromPublishing":true? }
 // Deterministic: same payload → byte-identical JSON (collection order = payload order,
 // leaves inserted in variableIds order).
 
-const TYPE = { COLOR: 'color', FLOAT: 'number', STRING: 'string', BOOLEAN: 'boolean' };
+// $type names exactly as Figma's own variables export writes them (verified against DS-V2.3.12:
+// color 463 / float 429 / string 97 — NOT the DTCG 'number'; build-scan's Track scope re-injection
+// keys on 'float' and silently mistreats letter-spacing otherwise — live-hit: -0.1em became -0.625rem)
+const TYPE = { COLOR: 'color', FLOAT: 'float', STRING: 'string', BOOLEAN: 'boolean' };
 
 const hex2 = (x) => Math.round(x * 255).toString(16).padStart(2, '0');
 const colorHex = (c) => `#${hex2(c.r)}${hex2(c.g)}${hex2(c.b)}${c.a != null && c.a < 1 ? hex2(c.a) : ''}`;
