@@ -469,12 +469,12 @@ const MODE_CARET = '__caret__'
    the trailing edge. Every prior field variant (InspectorField / AutoValueField /
    InlineValueInput) is a thin wrapper over this — one anatomy, one implementation (Dan:
    "make a component and reuse, not vibe-code each"). */
-function FigmaField({ icon, letter, glyph, value, onChange, onCommit, token, suffix, ariaLabel, mode, modeOptions, onMode, picker = true, width, whiteBg, dim, title, placeholder, inputRole = 'spinbutton' }: {
+function FigmaField({ icon, letter, glyph, value, onChange, onCommit, token, suffix, ariaLabel, mode, modeOptions, onMode, picker = true, width, whiteBg, ghost, dim, valueInk, title, placeholder, inputRole = 'spinbutton' }: {
   icon?: keyof typeof UI_ICON; letter?: string; glyph?: React.ReactNode; value: string; onChange?: (value: string) => void
   onCommit?: (value: string) => void
   token?: string; suffix?: string; ariaLabel: string
   mode?: string; modeOptions?: [string, string][]; onMode?: (value: string) => void
-  picker?: boolean; width?: number | string; whiteBg?: boolean; dim?: boolean; title?: string; placeholder?: string; inputRole?: 'spinbutton' | 'textbox'
+  picker?: boolean; width?: number | string; whiteBg?: boolean; ghost?: boolean; dim?: boolean; valueInk?: string; title?: string; placeholder?: string; inputRole?: 'spinbutton' | 'textbox'
 }) {
   const [varOpen, setVarOpen] = useState(false)
   const [modeOpen, setModeOpen] = useState(false)
@@ -514,10 +514,18 @@ function FigmaField({ icon, letter, glyph, value, onChange, onCommit, token, suf
     if (s?.moved) { onChange?.(String(s.lastVal)); setDraft(null) }
   }
   const shown = editing ? draft : value
-  const cols = `24px minmax(0,1fr)${suffix && !bound ? ' auto' : ''}${mode ? ' auto' : ''}${picker && onChange ? ' 16px' : ''}`
+  /* Figma census (impartial pull 2026-07-07): the trailing ⬡ appears on HOVER only — an
+   * always-present 16px cell clipped values at 88px (Dan's resize screenshot). Reserve the
+   * cell only when visible; bound fields keep it (the pill state shows it in Figma too). */
+  const pickerVisible = picker && onChange && (h || varOpen || bound)
+  const cols = `24px minmax(0,1fr)${suffix && !bound ? ' auto' : ''}${mode ? ' auto' : ''}${pickerVisible ? ' 16px' : ''}`
+  /* Census-measured container backgrounds: filled = #F5F5F5 (Rotation/Padding class),
+   * ghost = transparent at rest (Resizing/Gap class), dim (layout-controlled X/Y) = white
+   * with NO border. whiteBg (Link/typed inputs) keeps its measured #e6e6e6 border. */
+  const bg = dim ? '#fff' : whiteBg ? (h ? '#ededed' : '#fff') : ghost ? (h ? FIELD : 'transparent') : FIELD
   return (
     <div ref={fieldRef} title={title ?? token} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
-      style={{ position: 'relative', minWidth: typeof width === 'number' ? width : 0, width: typeof width === 'number' ? '100%' : width, height: 24, borderRadius: 5, background: whiteBg ? (h ? '#ededed' : '#fff') : FIELD, border: `1px solid ${varOpen || modeOpen ? SEL : whiteBg ? '#e6e6e6' : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: cols, alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, color: INK }}>
+      style={{ position: 'relative', minWidth: typeof width === 'number' ? width : 0, width: typeof width === 'number' ? '100%' : width, height: 24, borderRadius: 5, background: bg, border: `1px solid ${varOpen || modeOpen ? SEL : whiteBg && !dim ? '#e6e6e6' : 'transparent'}`, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: cols, alignItems: 'center', overflow: 'visible', font: `450 11px/16px ${FONT}`, letterSpacing: '0.055px', color: INK }}>
       <span onPointerDown={scrubDown} onPointerMove={scrubMove} onPointerUp={scrubUp}
         style={{ width: 24, height: 24, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)', font: `450 11px/24px ${FONT}`, cursor: numeric ? 'ew-resize' : undefined, touchAction: 'none' }}>{icon ? <UiIcon name={icon} /> : glyph ?? letter}</span>
       {bound ? (
@@ -533,9 +541,9 @@ function FigmaField({ icon, letter, glyph, value, onChange, onCommit, token, suf
             if (e.key === 'Enter') { justCommitted.current = true; commitDraft(); onCommit?.(editing ? draft! : String(value)); e.currentTarget.blur() }
             else if (e.key === 'Escape') { justCommitted.current = true; revertDraft(); e.currentTarget.blur(); e.stopPropagation() } // F-E: Escape's trailing blur must not commit either
           }}
-          style={{ minWidth: 0, width: '100%', height: 22, border: 0, outline: 0, padding: 0, background: 'transparent', color: dim ? FAINT : INK, font: `450 11px/16px ${FONT}` }} />
+          style={{ minWidth: 0, width: '100%', height: 22, border: 0, outline: 0, padding: 0, background: 'transparent', color: valueInk ?? (dim ? FAINT : INK), font: `450 11px/16px ${FONT}`, letterSpacing: '0.055px', textOverflow: 'ellipsis' }} />
       ) : (
-        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: dim ? FAINT : INK }}>{value}</span>
+        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: valueInk ?? (dim ? FAINT : INK) }}>{value}</span>
       )}
       {suffix && !bound && <span style={{ color: MUTE, padding: '0 4px' }}>{suffix}</span>}
       {mode && (
@@ -543,9 +551,9 @@ function FigmaField({ icon, letter, glyph, value, onChange, onCommit, token, suf
           onClick={modeOptions ? () => setModeOpen(v => !v) : undefined}
           style={{ appearance: 'none', border: 0, background: 'transparent', height: 24, padding: mode === MODE_CARET ? 0 : '0 7px', width: mode === MODE_CARET ? 24 : undefined, display: mode === MODE_CARET ? 'grid' : undefined, placeItems: mode === MODE_CARET ? 'center' : undefined, color: mode === MODE_CARET ? FAINT : INK, cursor: modeOptions ? 'pointer' : 'default', font: `450 11px/24px ${FONT}` }}>{mode === MODE_CARET ? <UiIcon name="caret24" /> : mode}</button>
       )}
-      {picker && onChange && (
+      {pickerVisible && (
         <button type="button" title="Apply variable" aria-label={`Apply variable to ${ariaLabel}`} aria-haspopup="menu" aria-expanded={varOpen} onClick={event => { event.stopPropagation(); setVarOpen(v => !v) }}
-          style={{ appearance: 'none', border: 0, padding: 0, width: 16, height: 24, display: 'grid', placeItems: 'center', background: 'transparent', cursor: 'pointer', color: bound ? TOKEN : FAINT, opacity: bound || h || varOpen ? 1 : 0.55 }}>
+          style={{ appearance: 'none', border: 0, padding: 0, width: 16, height: 24, display: 'grid', placeItems: 'center', background: 'transparent', cursor: 'pointer', color: bound ? TOKEN : FAINT }}>
           <UiIcon name="variable" size={12} />
         </button>
       )}
@@ -568,24 +576,8 @@ function AutoValueField({ icon, label, value, mode, ariaLabel, onChange, token, 
   return <FigmaField icon={icon} letter={label} value={value} mode={mode} ariaLabel={ariaLabel ?? label ?? 'value'} onChange={onChange} token={token} width={width} />
 }
 type ResizeMode = 'Fixed' | 'Hug' | 'Fill'
-function ResizeModeGlyph({ axis, mode }: { axis: 'W' | 'H'; mode: ResizeMode }) {
-  if (mode === 'Fixed') {
-    return <span style={{ font: `450 11px/24px ${FONT}`, letterSpacing: '0.055px' }}>{axis}</span>
-  }
-  const horizontal = axis === 'W'
-  const d = mode === 'Fill'
-    ? horizontal
-      ? 'M6 12h12M8.5 9.5 6 12l2.5 2.5M15.5 9.5 18 12l-2.5 2.5'
-      : 'M12 6v12M9.5 8.5 12 6l2.5 2.5M9.5 15.5 12 18l2.5-2.5'
-    : horizontal
-      ? 'M5.5 12h5M8.5 9.5 11 12l-2.5 2.5M18.5 12h-5M15.5 9.5 13 12l2.5 2.5'
-      : 'M12 5.5v5M9.5 8.5 12 11l2.5-2.5M12 18.5v-5M9.5 15.5 12 13l2.5 2.5'
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden style={{ display: 'block' }}>
-      <path d={d} stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
+/* ResizeModeGlyph (arrow icons per mode) removed — the impartial Figma census + Dan's
+   screenshots show Figma renders the W/H LETTER in every resize mode, never arrows. */
 function MenuCheck() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden style={{ display: 'block' }}>
@@ -685,14 +677,16 @@ function PickerMenuOption({ value, width, checked, onClick }: { value: string; w
     </li>
   )
 }
-/* Thin wrapper over FigmaField — E6.4. Resize glyph + Fix/Fill/Hug mode-in-field
-   (Figma Resizing anatomy: value + mode label INSIDE the field). */
+/* Thin wrapper over FigmaField — E6.4, re-measured against the impartial Figma census
+   (2026-07-07, Dan's resize screenshots): Figma's Resizing fields show a W/H LETTER glyph in
+   every mode (never arrow icons), sit on a TRANSPARENT container at rest (ghost — not the
+   grey capsule), and render the value at rgba(0,0,0,0.5) ink. */
 function ResizeDropdownField({ axis, value, mode, onValue, onMode }: { axis: 'W' | 'H'; value: string; mode: ResizeMode; onValue: (value: string) => void; onMode: (mode: ResizeMode) => void }) {
   const axisLabel = axis === 'W' ? 'width' : 'height'
   return (
     <span data-resize-axis={axis} data-resize-mode={mode} style={{ display: 'contents' }}>
-      <FigmaField glyph={<ResizeModeGlyph axis={axis} mode={mode} />} value={value} onChange={onValue} ariaLabel={`${axisLabel} value`}
-        title={`${axis === 'W' ? 'Horizontal' : 'Vertical'} resizing: ${mode}`} width={88}
+      <FigmaField glyph={<span style={{ font: `450 11px/24px ${FONT}`, letterSpacing: '0.055px' }}>{axis}</span>} value={value} onChange={onValue} ariaLabel={`${axisLabel} value`}
+        title={`${axis === 'W' ? 'Horizontal' : 'Vertical'} resizing: ${mode}`} width={88} ghost valueInk="rgba(0,0,0,0.5)"
         mode={mode} onMode={next => onMode(next as ResizeMode)}
         modeOptions={[[`Fixed ${axisLabel} (${value})`, 'Fixed'], ['Hug contents', 'Hug'], ['Fill container', 'Fill']]} />
     </span>
@@ -703,7 +697,7 @@ function ResizeDropdownField({ axis, value, mode, onValue, onMode }: { axis: 'W'
    drop down like gap input"). */
 function GapDropdownField({ value, onChange, token }: { value: string; onChange: (value: string) => void; token?: string }) {
   return (
-    <FigmaField glyph={<UiIcon name="gapVertical" />} value={value} onChange={onChange} ariaLabel="Gap value" token={token} width={88}
+    <FigmaField glyph={<UiIcon name="gapVertical" />} value={value} onChange={onChange} ariaLabel="Gap value" token={token} width={88} ghost
       mode={value === 'Auto' ? 'Auto' : MODE_CARET} onMode={v => onChange(v)}
       modeOptions={[['10', '10'], ['Auto', 'Auto']]} />
   )
@@ -1690,10 +1684,10 @@ function SelectionColorRow({ hex, name, op, grad, onRecolor }: { hex?: string; n
         )}
         <input aria-label={grad ? 'Selection gradient' : 'Selection color'} value={grad ? labelValue : activeHex} onChange={e => grad ? setLabelValue(e.currentTarget.value) : setHexValue(normalizeHex(e.currentTarget.value))}
           onBlur={() => commit(activeHex, parseInt(opacityValue, 10) || 100)} onKeyDown={e => { if (e.key === 'Enter') commit(activeHex, parseInt(opacityValue, 10) || 100) }}
-          style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, background: 'transparent', padding: 0, color: INK, font: `450 11px/16px ${FONT}` }} />
+          style={{ minWidth: 0, width: '100%', height: 24, border: 0, outline: 0, background: 'transparent', padding: 0, color: INK, letterSpacing: '0.055px', font: `450 11px/16px ${FONT}` }} />
         <input aria-label="Selection color opacity" role="spinbutton" value={opacityValue} onChange={e => setOpacityValue(e.currentTarget.value.replace(/[^0-9]/g, '').slice(0, 3))}
           onBlur={() => commit(activeHex, parseInt(opacityValue, 10) || 100)}
-          style={{ minWidth: 0, width: 38, height: 24, border: 0, outline: 0, background: 'transparent', padding: '0 7px 0 0', color: INK, textAlign: 'right', font: `450 11px/16px ${FONT}` }} />
+          style={{ minWidth: 0, width: 38, height: 24, border: 0, outline: 0, background: 'transparent', padding: '0 7px 0 0', color: INK, textAlign: 'right', letterSpacing: '0.055px', font: `450 11px/16px ${FONT}` }} />
         <span style={{ color: 'rgba(0,0,0,0.5)' }}>%</span>
         {pickerOpen && <FigmaColorPicker anchorRef={rowRef} hex={activeHex} opacity={opacityValue} onHex={value => { setHexValue(value); if (!grad) setLabelValue(value); commit(value, parseInt(opacityValue, 10) || 100) }} onOpacity={v => { setOpacityValue(v); commit(activeHex, parseInt(v, 10) || 100) }} onClose={() => setPickerOpen(false)} />}
       </div>
@@ -3109,6 +3103,19 @@ export default function ReactFigmaPage() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [drawArm])
+  // Figma parity (Dan 2026-07-07): Escape with no armed tool DESELECTS — the inspector empties
+  // (nothing selected = nothing to measure). Field-level Escape already stopPropagation()s.
+  useEffect(() => {
+    if (drawArm) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || !selIdRef.current) return
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return
+      selIdRef.current = null; setSel(null); setSelRect(null); setLiveFills(null); setLayerSelId(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [drawArm])
 
   // resizable panels — edge drag handles + min/max (Figma canon). Document-level listeners = robust through the whole drag.
   const [leftW, setLeftW] = useState(240)
@@ -3529,6 +3536,9 @@ export default function ReactFigmaPage() {
             </div>
           </div>
 
+          {/* Figma parity (Dan 2026-07-07): with NOTHING selected there is nothing to measure —
+              no element sections, no stale values. Sections render only for a live selection. */}
+          {sel && (<>
           <Sec title="Position" first bodyGap={0} bodyPadding="0">
             <PositionRow label="Alignment">
               <Seg fill><FSegBtn name="alignLeft" pos="l" fill title="Align left" on={() => applyOverride('selfAlign', 'left')} /><FSegBtn name="alignCenterH" pos="m" fill title="Align horizontal centers" on={() => applyOverride('selfAlign', 'hcenter')} /><FSegBtn name="alignRight" pos="r" fill title="Align right" on={() => applyOverride('selfAlign', 'right')} /></Seg>
@@ -3742,6 +3752,7 @@ export default function ReactFigmaPage() {
               </InspectorRow>
             )}
           </Sec>
+          </>)}
         </div>
       </aside>
       </>)}

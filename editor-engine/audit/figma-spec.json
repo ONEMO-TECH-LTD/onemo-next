@@ -99,5 +99,83 @@
   "sectionOrder": {
     "linkToLast": true,
     "note": "Dan spec item 8: Link To is the LAST inspector section."
+  },
+  "fieldGroups": {
+    "_provenance": "IMPARTIAL census pulled live from Dan's Figma tab 2026-07-07 17:30 \u2014 the FULL fixed property list on every visible inspector input (no hand-picked properties). Raw census: 10 fields, 5 distinct style groups. Comparability laws: fontFamily compares the first family; letterSpacing tolerance 0.01px; cursor and the input's own bg/radius are Figma-internal-DOM artifacts, covered by behavior gates instead.",
+    "mutedPosition": {
+      "input": {
+        "fontSize": "11px",
+        "fontWeight": "450",
+        "lineHeight": "16px",
+        "letterSpacing": "0.05504px",
+        "color": "rgba(0, 0, 0, 0.3)"
+      },
+      "inputFontFamilyFirst": "Inter",
+      "container": {
+        "backgroundColor": "rgb(255, 255, 255)",
+        "borderRadius": "5px"
+      },
+      "containerRectH": 24,
+      "containerRectW": 88
+    },
+    "standard": {
+      "input": {
+        "fontSize": "11px",
+        "fontWeight": "450",
+        "lineHeight": "16px",
+        "letterSpacing": "0.05504px",
+        "color": "rgba(0, 0, 0, 0.898)"
+      },
+      "inputFontFamilyFirst": "Inter",
+      "container": {
+        "backgroundColor": "rgb(245, 245, 245)",
+        "borderRadius": "5px"
+      },
+      "containerRectH": 24,
+      "containerRectW": 88
+    },
+    "resize": {
+      "input": {
+        "fontSize": "11px",
+        "fontWeight": "450",
+        "lineHeight": "16px",
+        "letterSpacing": "0.05504px",
+        "color": "rgba(0, 0, 0, 0.5)"
+      },
+      "inputFontFamilyFirst": "Inter",
+      "container": {
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "borderRadius": "5px"
+      },
+      "containerRectH": 24,
+      "containerRectW": 88
+    },
+    "gap": {
+      "input": {
+        "fontSize": "11px",
+        "fontWeight": "450",
+        "lineHeight": "16px",
+        "letterSpacing": "0.05504px",
+        "color": "rgba(0, 0, 0, 0.898)"
+      },
+      "inputFontFamilyFirst": "Inter",
+      "container": {
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "borderRadius": "5px"
+      },
+      "containerRectH": 24,
+      "containerRectW": 88
+    },
+    "buildFieldMap": {
+      "X-position": "mutedPosition|standard",
+      "Y-position": "mutedPosition|standard",
+      "Rotation": "standard",
+      "width value": "resize",
+      "height value": "resize",
+      "Gap value": "gap",
+      "Horizontal padding": "standard",
+      "Vertical padding": "standard",
+      "_default": "standard"
+    }
   }
 }

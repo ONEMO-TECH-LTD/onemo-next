@@ -49,8 +49,15 @@ const pass = (field, prop, expected, actual) => rows.push({ field, prop, expecte
 const check = (field, prop, expected, actual, cmp = (e, a) => String(e) === String(a)) =>
   (cmp(expected, actual) ? pass : fail)(field, prop, expected, actual);
 
-// ── value-field census: EVERY visible inspector input vs the contract ────────
+// ── value-field census: EVERY visible inspector input vs the IMPARTIAL contract ─────
+// Dan (2026-07-07): "the contract must be deterministic - it must read all figma properties
+// and impartially match." The oracle is SPEC.fieldGroups — the FULL fixed property list
+// pulled from Figma's inspector DOM per distinct field group, no hand-picked properties.
+// Comparability laws (declared in the contract's _provenance): fontFamily = first family,
+// letterSpacing tolerance 0.01px; cursor + input-internal bg/radius are Figma-DOM artifacts
+// covered by the behavior gates (scrub cursor) instead of this anatomy matrix.
 const spec = SPEC.valueField;
+const groups = SPEC.fieldGroups;
 const census = await page.evaluate(() => {
   const panel = [...document.querySelectorAll('aside')].pop();
   const inputs = [...(panel?.querySelectorAll('input[role="spinbutton"], input[aria-label]') ?? [])]
@@ -70,22 +77,32 @@ const census = await page.evaluate(() => {
       aria: i.getAttribute('aria-label') ?? '(unlabeled)',
       fontFamily: s.fontFamily.split(',')[0].replace(/["']/g, ''),
       fontSize: s.fontSize, lineHeight: s.lineHeight, fontWeight: s.fontWeight, color: s.color,
+      letterSpacing: s.letterSpacing,
       contH: cr ? Math.round(cr.height) : -1, contR: cs?.borderRadius ?? '-', contBg: cs?.backgroundColor ?? '-',
       value: i.value,
     };
   });
 });
 if (census.length === 0) fail('inspector', 'inputs-present', '>0 inputs', '0 (selection failed?)');
+const lsNum = (v) => (v === 'normal' ? 0 : parseFloat(v) || 0);
 for (const f of census) {
   const id = `field:${f.aria}`;
-  check(id, 'fontFamily', spec.fontFamily, f.fontFamily);
-  check(id, 'fontSize', spec.fontSize, f.fontSize);
-  check(id, 'lineHeight', spec.lineHeight, f.lineHeight);
-  check(id, 'fontWeight', spec.fontWeight, f.fontWeight);
-  const mutedOk = (spec.mutedAllowedFields ?? []).includes(f.aria) && f.color === spec.mutedInkColor;
-  check(id, 'inkColor', mutedOk ? spec.mutedInkColor : spec.inkColor, f.color);
-  check(id, 'containerHeight', spec.containerHeight, f.contH, (e, a) => Math.abs(e - a) <= 1);
-  check(id, 'borderRadius', spec.borderRadius, f.contR);
+  // resolve the field's Figma group; 'a|b' alternatives resolve by measured ink
+  let gName = groups.buildFieldMap[f.aria] ?? groups.buildFieldMap._default;
+  if (gName.includes('|')) {
+    const [a, b] = gName.split('|');
+    gName = f.color === groups[a].input.color ? a : b;
+  }
+  const g = groups[gName];
+  check(id, `fontFamily(${gName})`, g.inputFontFamilyFirst, f.fontFamily);
+  check(id, `fontSize(${gName})`, g.input.fontSize, f.fontSize);
+  check(id, `lineHeight(${gName})`, g.input.lineHeight, f.lineHeight);
+  check(id, `fontWeight(${gName})`, g.input.fontWeight, f.fontWeight);
+  check(id, `letterSpacing(${gName})`, g.input.letterSpacing, f.letterSpacing, (e, a) => Math.abs(lsNum(e) - lsNum(a)) <= 0.01);
+  check(id, `inkColor(${gName})`, g.input.color, f.color);
+  check(id, `containerHeight(${gName})`, g.containerRectH, f.contH, (e, a) => Math.abs(e - a) <= 1);
+  check(id, `borderRadius(${gName})`, g.container.borderRadius, f.contR);
+  check(id, `containerBg(${gName})`, g.container.backgroundColor, f.contBg);
 }
 
 // ── rendered-truth font gate: DECLARED Inter passes computed-style checks even when the
@@ -136,6 +153,10 @@ const pillSpec = SPEC.variablePill.pillAnatomy;
 const pickerSpec = SPEC.variablePicker.rowAnatomy;
 const pillRun = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  // the ⬡ picker is hover-revealed (Figma census: no trailing cell at rest) — hover the field first
+  const xInput = document.querySelector('input[aria-label="X-position"]');
+  xInput?.closest('div')?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+  await sleep(400);
   document.querySelector('button[aria-label="Apply variable to X-position"]')?.click();
   await sleep(450);
   const dialog1 = document.querySelector('[role="dialog"]');
