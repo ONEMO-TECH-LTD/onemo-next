@@ -842,7 +842,7 @@ function ResizeDropdownField({ axis, value, mode, onValue, onMode, onAddMin, onA
   const dim = axis === 'W' ? 'width' : 'height'
   return (
     <span data-resize-axis={axis} data-resize-mode={mode} style={{ display: 'contents' }}>
-      <FigmaField glyphWidth={18} glyph={axis === 'W'
+      <FigmaField glyph={axis === 'W'
           ? <span style={{ display: 'flex', alignItems: 'center', gap: 1, color: 'rgba(0,0,0,0.5)' }} aria-hidden>
               <span style={{ width: 1, height: 9, background: 'currentColor' }} />
               <span style={{ font: `400 10.5px/24px ${FONT}`, letterSpacing: '0.05px' }}>W</span>
