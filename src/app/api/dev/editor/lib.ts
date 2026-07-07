@@ -259,6 +259,7 @@ export type WriteOp =
   | { kind: 'set-shorthand-slots'; decl: DeclRef; slots: string[] }
   | { kind: 'bind-token'; decl: DeclRef; token: string }
   | { kind: 'add-declaration'; file: string; insertOffset: number; indent: string; prop: string; valueText: string }
+  | { kind: 'add-state-rule'; file: string; localClass: string; state: 'hover' | 'active'; decls: [string, string][] } // E8 item 9: Framer hover/tap → real CSS pseudo-state rules
   | { kind: 'set-token-value'; tokenPath: string; theme?: string; value: string | number }
   | { kind: 'set-jsx-style'; file: string; line: number; col: number; prop: string; value: string; expectRaw?: string }
   | { kind: 'set-jsx-text'; file: string; line: number; col: number; newText: string; expectRaw?: string }
@@ -976,6 +977,28 @@ export async function applyWrite(op: WriteOp): Promise<{ ok: true; file: string;
   if (op.kind === 'set-jsx-style') return setJsxStyle(op)
   if (op.kind === 'set-jsx-text') return setJsxText(op)
   if (op.kind === 'insert-jsx-child') return insertJsxChild(op)
+  if (op.kind === 'add-state-rule') {
+    // E8 item 9 (hover/tap): append `.cls:hover { ... }` to the element's OWN module.css —
+    // real shippable CSS (Framer semantics), parse-guarded, jailed like every css write.
+    if (op.state !== 'hover' && op.state !== 'active') throw Object.assign(new Error('state must be hover|active'), { status: 422 })
+    if (!/^[a-zA-Z_][a-zA-Z0-9_-]*$/.test(op.localClass)) throw Object.assign(new Error('invalid class name'), { status: 422 })
+    if (!Array.isArray(op.decls) || op.decls.length === 0) throw Object.assign(new Error('decls required'), { status: 422 })
+    for (const [prop, value] of op.decls) {
+      if (!/^[a-z-]+$/.test(prop) || /[{};]/.test(value)) throw Object.assign(new Error(`invalid decl: ${prop}`), { status: 422 })
+    }
+    const abs = jailModuleCss(op.file)
+    const source = (await fs.readFile(abs)).toString('utf8')
+    const selector = `.${op.localClass}:${op.state}`
+    const body = op.decls.map(([prop, value]) => `  ${prop}: ${value};`).join('\n')
+    // one rule per class+state: replace the existing block if we wrote one before, else append
+    const marker = new RegExp(`\\n?${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{[^}]*\\}`, 'm')
+    const next = marker.test(source)
+      ? source.replace(marker, `\n${selector} {\n${body}\n}`)
+      : `${source.replace(/\n*$/, '')}\n\n${selector} {\n${body}\n}\n`
+    await postcss.parse(next, { from: abs }) // parse-guard: refuse rather than corrupt
+    await fs.writeFile(abs, next, 'utf8')
+    return { ok: true, file: op.file, newValueText: `${selector} (${op.decls.length} decls)` }
+  }
   if (op.kind === 'add-declaration') {
     const abs = jailModuleCss(op.file)
     const buf = await fs.readFile(abs)

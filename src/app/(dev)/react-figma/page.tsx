@@ -2192,6 +2192,27 @@ export default function ReactFigmaPage() {
   const [liveSelColors, setLiveSelColors] = useState<{ hex: string; op: number }[] | null>(null)
   const [linkHref, setLinkHref] = useState('')
   const [linkNewTab, setLinkNewTab] = useState(false)
+  // E8 item 9 (hover/tap — Framer interaction states as REAL CSS pseudo-rules via add-state-rule)
+  const [ixHover, setIxHover] = useState({ opacity: '', scale: '' })
+  const [ixTap, setIxTap] = useState({ opacity: '', scale: '' })
+  const applyStateRule = useCallback(async (state: 'hover' | 'active', vals: { opacity: string; scale: string }) => {
+    const el = iframeRef.current?.contentDocument?.querySelector('[data-eng-id]') && selIdRef.current
+      ? iframeRef.current?.contentDocument?.querySelector(`[data-eng-id="${selIdRef.current}"]`) as HTMLElement | null : null
+    const src = el?.getAttribute('data-src')
+    if (!el || !src) { notify('Select an element first', 'error'); return }
+    const file = src.replace(/:\d+:\d+$/, '')
+    const rs = await fetch('/api/dev/editor-resolve', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ file, classes: [...el.classList], props: [] }) })
+    const resolved = rs.ok ? await rs.json() as { fallbackRule?: { file: string; localClass: string } } : null
+    if (!resolved?.fallbackRule) { notify('Hover/Tap needs a CSS class — inline-styled element (extract to a component first)', 'error'); return }
+    const decls: [string, string][] = []
+    if (vals.opacity.trim()) decls.push(['opacity', String((parseFloat(vals.opacity) || 100) / 100)])
+    if (vals.scale.trim()) decls.push(['transform', `scale(${parseFloat(vals.scale) || 1})`])
+    if (!decls.length) { notify('Set opacity or scale first', 'error'); return }
+    decls.push(['transition', 'opacity .15s ease, transform .15s ease']) // Framer smooths state changes; CSS-ease analog
+    const r = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'add-state-rule', file: resolved.fallbackRule.file, localClass: resolved.fallbackRule.localClass, state, decls }) })
+    if (r.ok) notify(`${state === 'hover' ? 'Hover' : 'Tap'} state saved to code`)
+    else notify(`State write failed: ${await r.text()}`, 'error')
+  }, [])
   const [linkTarget, setLinkTarget] = useState<SelPayload | null>(null)
   // E2.2 Text section — present only for text-bearing elements (Figma canon)
   const [typo, setTypo] = useState<{ family: string; weight: string; size: string; lineHeight: string; letterSpacing: string; align: string } | null>(null)
@@ -3684,6 +3705,23 @@ export default function ReactFigmaPage() {
           </Sec>
           <Sec title="Layout guide" actionWidth={52} action={<><StyleApplyButton label="Layout guide" title="Layout guide, Apply styles" /><UiIB name="plus" title="Add layout guide" on={() => setLayoutGuides(rows => [...rows, { id: nextRowId(rows), type: 'Columns', count: 5, gutter: 16, visible: true }])} /></>} bodyGap={0} bodyPadding="0">
             {layoutGuides.map(g => <LayoutGuideRow key={g.id} guide={g} onChange={(patch) => setLayoutGuides(rows => rows.map(r => r.id === g.id ? { ...r, ...patch } : r))} onRemove={() => setLayoutGuides(rows => rows.filter(row => row.id !== g.id))} />)}
+          </Sec>
+
+          {/* E8 item 9 — Interactions (Framer hover/tap semantics, Figma DS chrome): writes REAL
+              .cls:hover/.cls:active rules into the element's own CSS module (add-state-rule op). */}
+          <Sec title="Interactions" bodyGap={0} bodyPadding="0">
+            <InspectorRow label="Hover" height={48}>
+              <FigmaField letter="O" suffix="%" ariaLabel="Hover opacity" value={ixHover.opacity} picker={false} placeholder="100"
+                onChange={(v) => { const next = { ...ixHover, opacity: v }; setIxHover(next); void applyStateRule('hover', next) }} />
+              <FigmaField letter="S" ariaLabel="Hover scale" value={ixHover.scale} picker={false} placeholder="1"
+                onChange={(v) => { const next = { ...ixHover, scale: v }; setIxHover(next); void applyStateRule('hover', next) }} />
+            </InspectorRow>
+            <InspectorRow label="Tap" height={48}>
+              <FigmaField letter="O" suffix="%" ariaLabel="Tap opacity" value={ixTap.opacity} picker={false} placeholder="100"
+                onChange={(v) => { const next = { ...ixTap, opacity: v }; setIxTap(next); void applyStateRule('active', next) }} />
+              <FigmaField letter="S" ariaLabel="Tap scale" value={ixTap.scale} picker={false} placeholder="1"
+                onChange={(v) => { const next = { ...ixTap, scale: v }; setIxTap(next); void applyStateRule('active', next) }} />
+            </InspectorRow>
           </Sec>
 
           {/* E8 item 8 (Dan): Link To is the LAST inspector section */}

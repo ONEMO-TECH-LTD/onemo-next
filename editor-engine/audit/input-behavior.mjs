@@ -178,6 +178,31 @@ if (await linkInput.count()) {
 }
 await page.unroute('**/api/dev/editor-write');
 
+// G13 — item 9 (hover/tap half): Interactions Hover commit fires ONE add-state-rule with hover decls
+let stateWrites = [];
+await page.route('**/api/dev/editor-write', (route) => {
+  const body = route.request().postData() ?? '';
+  if (body.includes('add-state-rule')) { stateWrites.push(JSON.parse(body)); return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"file":"stub","newValueText":"stub"}' }); }
+  return route.continue();
+});
+// the demo canvas is inline-styled (no css-module class), so stub resolve with a fake
+// fallbackRule — this gate proves the CLIENT flow (commit→resolve→single write with hover
+// decls); the add-state-rule OP itself is live-proven separately on a real module.css.
+await page.route('**/api/dev/editor-resolve', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ props: {}, fallbackRule: { file: 'src/stub.module.css', localClass: 'stub' } }) }));
+const hoverOp = page.locator('input[aria-label="Hover opacity"]');
+if (await hoverOp.count()) {
+  await hoverOp.scrollIntoViewIfNeeded();
+  await hoverOp.click();
+  await hoverOp.fill('90');
+  await hoverOp.press('Enter');
+  await page.waitForTimeout(700);
+  const w = stateWrites[0];
+  gate('hover commit fires ONE add-state-rule', '1', stateWrites.length);
+  gate('hover rule targets :hover with opacity', 'true', !!w && w.state === 'hover' && JSON.stringify(w.decls).includes('opacity'));
+} else gate('interactions section present', 'true', false);
+await page.unroute('**/api/dev/editor-write');
+await page.unroute('**/api/dev/editor-resolve');
+
 await browser.close();
 writeFileSync(path.join(OUT, 'behavior-gates.json'), JSON.stringify({ url: URL_, at: new Date().toISOString(), rows }, null, 2));
 const lines = rows.map((r) => `${r.pass ? 'PASS' : 'FAIL'}  ${r.name} · expected ${r.expected} · actual ${r.actual}`);
