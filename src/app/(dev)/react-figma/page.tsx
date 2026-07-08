@@ -2339,11 +2339,27 @@ export default function ReactFigmaPage() {
   const [editTarget, setEditTarget] = useState<EditTarget>({ kind: 'base' })
   const editTargetRef = useRef(editTarget); useEffect(() => { editTargetRef.current = editTarget }, [editTarget])
   // component model of the component currently being edited (its .tsx file + base class + variants/states)
-  type EditModel = { file: string; cssModule: string | null; rootClass: string | null; root: { line: number; col: number } | null; rootTag: string | null; variantAxes: { axis: string; values: string[]; defaultValue: string }[]; variants: string[]; states: string[] }
+  type EditModel = { file: string; cssModule: string | null; rootClass: string | null; root: { line: number; col: number } | null; rootTag: string | null; variantAxes: { axis: string; values: string[]; defaultValue: string }[]; states: string[] }
   const [editModel, setEditModel] = useState<EditModel | null>(null)
   const editModelRef = useRef(editModel); useEffect(() => { editModelRef.current = editModel }, [editModel])
   const editingComponentRef = useRef(editingComponent); useEffect(() => { editingComponentRef.current = editingComponent }, [editingComponent])
-  const shapeModel = (m: { file: string; cssModule: string | null; rootClass: string | null; root: { line: number; col: number } | null; structure?: { tag: string } | null; variantAxes?: { axis: string; values: string[]; defaultValue: string }[]; variants: { name: string }[]; states: { state: string }[] }): EditModel => ({ file: m.file, cssModule: m.cssModule, rootClass: m.rootClass, root: m.root, rootTag: m.structure?.tag ?? null, variantAxes: m.variantAxes ?? [], variants: m.variants.map((v) => v.name), states: m.states.map((s) => s.state) })
+  // §0 unified model: the server returns ONE `rules` list + `props`; the state-EXISTENCE list the chips/guard
+  // need is DERIVED here — semantic states from boolean-prop presence (loading/error always; disabled only on
+  // a non-form root, F-M2) + interaction states from pure-pseudo rules.
+  const shapeModel = (m: { file: string; cssModule: string | null; rootClass: string | null; root: { line: number; col: number } | null; structure?: { tag: string } | null; props?: { name: string; tsType: string }[]; variantAxes?: { axis: string; values: string[]; defaultValue: string }[]; rules?: { axisValues: { axis: string; value: string }[]; semantic: string[]; pseudo?: string }[] }): EditModel => {
+    const tag = m.structure?.tag ?? null
+    const states = new Set<string>()
+    for (const p of m.props ?? []) {
+      if ((p.name === 'loading' || p.name === 'error') && /boolean/.test(p.tsType)) states.add(p.name)
+      if (p.name === 'disabled' && /boolean/.test(p.tsType) && tag != null && !FORM_ROOTS.has(tag)) states.add('disabled')
+    }
+    const PSEUDO_STATE: Record<string, string> = { hover: 'hover', active: 'pressed', 'focus-visible': 'focus', disabled: 'disabled' }
+    for (const r of m.rules ?? []) {
+      if (!r.axisValues.length && !r.semantic.length && r.pseudo) states.add(PSEUDO_STATE[r.pseudo] ?? r.pseudo)
+      if (!r.axisValues.length && !r.pseudo) for (const s of r.semantic) states.add(s)
+    }
+    return { file: m.file, cssModule: m.cssModule, rootClass: m.rootClass, root: m.root, rootTag: tag, variantAxes: m.variantAxes ?? [], states: [...states] }
+  }
   const fetchModel = (file: string) => fetch(`/api/dev/editor-component-model?file=${encodeURIComponent(file)}`).then((r) => (r.ok ? r.json() : null)).catch(() => null)
   useEffect(() => { // reset the target + load the model; AUTO-PROMOTE the root so states/variants are authorable
     setEditTarget({ kind: 'base' })

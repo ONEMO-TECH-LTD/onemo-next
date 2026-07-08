@@ -822,8 +822,10 @@ export type ComponentModel = {
   root: { line: number; col: number } | null // 1-based position of the root returned element (for auto-promote)
   props: { name: string; tsType: string; optional: boolean; default?: string }[]
   variantAxes: { axis: string; values: string[]; defaultValue: string }[]  // D1: config variants = N INDEPENDENT axes (§6.1); each = one string-union prop
-  variants: { name: string; kind: 'config'; selector: string; decls: Record<string, string> }[]  // the raw `.base.<axis>_<value>` CSS rules (their decls); the axes above are the READ authority
-  states: { state: string; kind: 'interaction' | 'semantic'; selector: string; decls: Record<string, string> }[]
+  // §0/§1 UNIFIED: EVERY scoped .module.css rule — single-part OR combinatorial — decomposed into one shape
+  // in ONE list, so re-read reflects truth (no rule silently dropped). axisValues=[] + pseudo = a plain
+  // interaction rule; a single axis-value = one axisValues entry; legacyName = a pre-axes single-variant class.
+  rules: { selector: string; axisValues: { axis: string; value: string }[]; semantic: string[]; pseudo?: string; legacyName?: string; decls: Record<string, string> }[]
   structure: StructureNode | null  // D6: recursive JSX tree of the component (server mirror of engine.ts buildLayerTree)
 }
 export type StructureNode = { tag: string; class?: string; name?: string; children: StructureNode[] }
@@ -847,15 +849,35 @@ function buildStructure(el: ts.JsxElement | ts.JsxSelfClosingElement, sf: ts.Sou
   return { tag, ...(cls ? { class: cls } : {}), ...(name ? { name } : {}), children }
 }
 
-/** Classify a .module.css rule selector relative to the base class (blueprint §1/§3.2). */
-function classifyScopedSelector(sel: string, base: string): { kind: 'base' | 'config' | 'interaction' | 'semantic'; name: string } | null {
-  const first = sel.split(',')[0].trim() // dual pseudo selectors: `.base:hover, .base[data-preview=...]`
+export type DecomposedRule = { axisValues: { axis: string; value: string }[]; semantic: string[]; pseudo?: string; legacyName?: string }
+/** Decompose a .module.css scoped selector into the UNIFIED shape (blueprint §1/§3.2) — the READ mirror of
+ * the WRITE composer, so EVERY scoped rule (single-part OR combinatorial like
+ * `.base.size_lg.variant_primary[data-loading]:hover`) decomposes into one shape and NONE is dropped (§0
+ * re-read reflects truth). `axisNames` (the component's variantAxes) distinguishes an axis token `size_lg`
+ * from a legacy single-variant class `.secondary`. Returns 'base' for the base rule, null for non-`.base`. */
+function decomposeRule(sel: string, base: string, axisNames: string[]): 'base' | DecomposedRule | null {
+  const first = sel.split(',')[0].trim() // dual pseudo selectors: `.base:hover, :global([data-fc-preview])…`
   const b = `.${base}`
-  if (first === b) return { kind: 'base', name: base }
-  let m = new RegExp(`^\\.${base}\\.([\\w-]+)$`).exec(first); if (m) return { kind: 'config', name: m[1] }        // .base.secondary
-  m = new RegExp(`^\\.${base}:([\\w-]+)$`).exec(first); if (m) return { kind: 'interaction', name: m[1] }         // .base:hover
-  m = new RegExp(`^\\.${base}\\[data-([\\w-]+)\\]$`).exec(first); if (m) return { kind: 'semantic', name: m[1] }  // .base[data-loading]
-  return null
+  if (first === b) return 'base'
+  if (!first.startsWith(b)) return null
+  let rest = first.slice(b.length)
+  const classNames: string[] = []; const semantic: string[] = []; let pseudo: string | undefined
+  const tok = /^\.([\w-]+)|^\[data-([\w-]+)\]|^:([\w-]+)/
+  while (rest.length) {
+    const m = tok.exec(rest)
+    if (!m) return null // unrecognized remainder → not a clean scoped selector
+    if (m[1] !== undefined) classNames.push(m[1])
+    else if (m[2] !== undefined) semantic.push(m[2])
+    else pseudo = m[3]
+    rest = rest.slice(m[0].length)
+  }
+  const axisValues: { axis: string; value: string }[] = []; let legacyName: string | undefined
+  for (const cn of classNames) {
+    const us = cn.indexOf('_')
+    if (us > 0 && axisNames.includes(cn.slice(0, us))) axisValues.push({ axis: cn.slice(0, us), value: cn.slice(us + 1) })
+    else legacyName = cn // a legacy single-variant class (`.secondary`) — no matching axis
+  }
+  return { axisValues, semantic, ...(pseudo ? { pseudo } : {}), ...(legacyName ? { legacyName } : {}) }
 }
 
 /** Parse a component .tsx (+ its .module.css) → the structured ComponentModel. READ layer of the
@@ -920,8 +942,7 @@ export async function parseComponentModel(file: string): Promise<ComponentModel>
     }
   }
 
-  const variants: ComponentModel['variants'] = []
-  const states: ComponentModel['states'] = []
+  const rules: ComponentModel['rules'] = []
   let rootClass: string | null = null
   if (cssModule) {
     try {
@@ -931,32 +952,21 @@ export async function parseComponentModel(file: string): Promise<ComponentModel>
       // base class = the first bare `.<ident>` rule (convention: `.base`).
       const baseRule = root.nodes.find((n): n is Rule => n.type === 'rule' && /^\.[\w-]+$/.test(n.selector.split(',')[0].trim()))
       rootClass = baseRule ? baseRule.selector.split(',')[0].trim().slice(1) : null
+      const axisNames = variantAxes.map((a) => a.axis)
       if (rootClass) for (const node of root.nodes) {
         if (node.type !== 'rule') continue
-        const cls = classifyScopedSelector((node as Rule).selector, rootClass)
-        if (!cls || cls.kind === 'base') continue
+        const d = decomposeRule((node as Rule).selector, rootClass, axisNames)
+        if (!d || d === 'base') continue // base rule + non-scoped rules aren't deltas
         const decls: Record<string, string> = {}
-        for (const d of (node as Rule).nodes) if (d.type === 'decl') decls[(d as Declaration).prop] = (d as Declaration).value
-        if (cls.kind === 'config') variants.push({ name: cls.name, kind: 'config', selector: (node as Rule).selector, decls })
-        else states.push({ state: cls.name, kind: cls.kind === 'interaction' ? 'interaction' : 'semantic', selector: (node as Rule).selector, decls })
+        for (const dd of (node as Rule).nodes) if (dd.type === 'decl') decls[(dd as Declaration).prop] = (dd as Declaration).value
+        rules.push({ selector: (node as Rule).selector, axisValues: d.axisValues, semantic: d.semantic, ...(d.pseudo ? { pseudo: d.pseudo } : {}), ...(d.legacyName ? { legacyName: d.legacyName } : {}), decls })
       }
     } catch { /* module unreadable → treat as unpromoted */ cssModule = cssModule }
   }
-  // §6.2: a SEMANTIC state's source of truth is its boolean PROP — add-state creates the `<state>` prop +
-  // `data-<state>` toggle before any scoped edit creates the `.base[data-<state>]` CSS rule, so the state
-  // EXISTS the moment add-state runs (unstyled). List it from prop presence so the model round-trips
-  // immediately (fixes the I1 add-state finding: state missing / re-select 409 until a later styling edit).
-  for (const s of ['loading', 'error'] as const) {
-    if (props.some((p) => p.name === s && /boolean/.test(p.tsType)) && !states.some((st) => st.state === s)) {
-      states.push({ state: s, kind: 'semantic', selector: rootClass ? `.${rootClass}[data-${s}]` : `[data-${s}]`, decls: {} })
-    }
-  }
-  // F-M2: `disabled` is semantic ONLY on a non-form root (a form root uses the `:disabled` pseudo, no prop).
-  // Mirror the add-state write so the model lists it immediately from prop presence (same drift fix as above).
-  if (structure && !FORM_CONTROLS.has(structure.tag) && props.some((p) => p.name === 'disabled' && /boolean/.test(p.tsType)) && !states.some((st) => st.state === 'disabled')) {
-    states.push({ state: 'disabled', kind: 'semantic', selector: rootClass ? `.${rootClass}[data-disabled]` : `[data-disabled]`, decls: {} })
-  }
-  return { name, file, cssModule, rootClass, root, props, variantAxes, variants, states, structure }
+  // NOTE: which STATES exist (a semantic state exists from its boolean PROP even before any `.base[data-*]`
+  // rule — §6.2/I1 drift fix; disabled is semantic only on a non-form root — F-M2) is DERIVED by the consumer
+  // from `props` + `rules` + `structure`, not stored as a second array — the model keeps ONE rule list (§0).
+  return { name, file, cssModule, rootClass, root, props, variantAxes, rules, structure }
 }
 
 /**
