@@ -1106,6 +1106,20 @@ function VariablesLibrary() {
   // becomes fixed px only once the user drags its handle. Last column always flexes (keeps header
   // and rows aligned with no horizontal scroll).
   const colTemplate = cols.map((c, i) => (i === cols.length - 1 || !colW[c.id] ? 'minmax(80px, 1fr)' : `${colW[c.id]}px`)).join(' ')
+  // Figma census 2026-07-08: the table is a solid grid — every column has a continuous vertical
+  // separator that runs full-height UNBROKEN through the section headers. Draw the rule as a
+  // borderLeft on every non-first cell (header, section headers, data rows) so it never breaks.
+  const SEP = `1px solid ${LINE}`
+  const cellSep = (ci: number): string | undefined => (ci > 0 ? SEP : undefined)
+  // A group header spanning the grid: label in col 0, empty cells after — but the vertical rules
+  // still pass through it (Figma parity), so the columns read as one solid grid top-to-bottom.
+  const sectionHeader = (key: string, grp: string) => (
+    <div key={key} style={{ display: 'grid', gridTemplateColumns: colTemplate, borderBottom: '1px solid #f2f2f3' }}>
+      {cols.map((c, ci) => (
+        <span key={c.id} style={{ padding: ci === 0 ? '12px 16px 6px' : 0, borderLeft: cellSep(ci), font: `600 11px/1 ${FONT}`, color: INK, display: 'flex', alignItems: 'flex-end', overflow: 'hidden' }}>{ci === 0 ? grp : ''}</span>
+      ))}
+    </div>
+  )
   return (
     <div style={{ flex: 1, minWidth: 0, display: 'flex', overflow: 'hidden' }}>
       {/* Collections/Groups sidebar — hidden when collapsed ("Hide panel", Figma census). */}
@@ -1175,7 +1189,7 @@ function VariablesLibrary() {
             + equal by default). Handle on all but the last (flex-fill) column. */}
         <div ref={tableRef} style={{ height: 32, borderBottom: `1px solid ${LINE}`, display: 'grid', gridTemplateColumns: colTemplate, alignItems: 'center', font: `550 11px/1 ${FONT}`, color: MUTE }}>
           {cols.map((c, ci) => (
-            <span key={c.id} style={{ padding: ci === 0 ? '0 16px' : '0 12px', position: 'relative', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', borderLeft: c.id === 'css' ? `1px solid ${LINE}` : undefined }}>{c.label}{ci < cols.length - 1 && colHandle(c.id)}</span>
+            <span key={c.id} style={{ padding: ci === 0 ? '0 16px' : '0 12px', position: 'relative', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', alignSelf: 'stretch', display: 'flex', alignItems: 'center', borderLeft: cellSep(ci) }}>{c.label}{ci < cols.length - 1 && colHandle(c.id)}</span>
           ))}
         </div>
         <div style={{ flex: 1, overflowY: 'auto' }}>
@@ -1195,7 +1209,7 @@ function VariablesLibrary() {
                     const grp = segs.length > 1 ? segs.slice(0, -1).join(' / ') : ''
                     if (grp !== lastGroup) {
                       lastGroup = grp
-                      if (grp) out.push(<div key={`h-${grp}-${i}`} style={{ padding: '12px 16px 6px', font: `600 11px/1 ${FONT}`, color: INK }}>{grp}</div>)
+                      if (grp) out.push(sectionHeader(`h-${grp}-${i}`, grp))
                     }
                     const leaf = segs.length ? segs[segs.length - 1] : v.name
                     const isColor = v.type === 'COLOR' || v.values.some(isColorVal)
@@ -1209,14 +1223,14 @@ function VariablesLibrary() {
                           <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: INK }}>{leaf}</span>
                         </span>
                         {v.values.map((val, k) => (
-                          <span key={k} style={{ padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                          <span key={k} style={{ padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, alignSelf: 'stretch', borderLeft: SEP }}>
                             {isColorVal(val) && <span style={{ flex: 'none', width: 14, height: 14, borderRadius: 3, background: val, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.12)' }} />}
                             {/* Figma shows hex UPPERCASE without '#' (census 2026-07-08) */}
                             <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{isColorVal(val) ? val.replace(/^#/, '').toUpperCase() : val}</span>
                           </span>
                         ))}
-                        <span style={{ padding: '0 12px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: MUTE, borderLeft: `1px solid ${LINE}`, alignSelf: 'stretch', display: 'flex', alignItems: 'center' }}>{code?.cssVar ?? '—'}</span>
-                        <span style={{ padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                        <span style={{ padding: '0 12px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: MUTE, borderLeft: SEP, alignSelf: 'stretch', display: 'flex', alignItems: 'center' }}>{code?.cssVar ?? '—'}</span>
+                        <span style={{ padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, alignSelf: 'stretch', borderLeft: SEP }}>
                           {code && code.kind === 'color' && <span style={{ flex: 'none', width: 14, height: 14, borderRadius: 3, background: code.value, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.12)' }} />}
                           <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{code?.value ?? ''}</span>
                         </span>
@@ -1227,7 +1241,7 @@ function VariablesLibrary() {
                 })()
           ) : (() => {
             const valCell = (val: string, isColor: boolean) => (
-              <span style={{ padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+              <span style={{ padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, alignSelf: 'stretch', borderLeft: SEP }}>
                 {isColor && <span style={{ flex: 'none', width: 14, height: 14, borderRadius: 3, background: val, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.12)' }} />}
                 <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{val}</span>
               </span>
@@ -1239,7 +1253,7 @@ function VariablesLibrary() {
               const grp = parts.length > 2 ? parts[1] : ''
               if (grp !== lastGroup) {
                 lastGroup = grp
-                if (grp) out.push(<div key={`h-${grp}`} style={{ padding: '12px 16px 6px', font: `600 11px/1 ${FONT}`, color: INK }}>{grp}</div>)
+                if (grp) out.push(sectionHeader(`h-${grp}`, grp))
               }
               const name = (parts.length > 2 ? parts.slice(2) : parts.slice(1)).join(' / ')
               const isColor = t.kind === 'color'
@@ -1249,7 +1263,7 @@ function VariablesLibrary() {
                     {isColor ? <span style={{ flex: 'none', width: 14, height: 14, borderRadius: 3, background: t.value, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.12)' }} /> : <VariableHashIcon />}
                     <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
                   </span>
-                  <span style={{ padding: '0 12px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: MUTE }}>{t.cssVar}</span>
+                  <span style={{ padding: '0 12px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: MUTE, alignSelf: 'stretch', display: 'flex', alignItems: 'center', borderLeft: SEP }}>{t.cssVar}</span>
                   {valCell(t.value, isColor)}
                   {valCell(t.dark ?? t.value, isColor)}
                 </div>,
@@ -3563,7 +3577,7 @@ export default function ReactFigmaPage() {
           const active = key !== null && rail === key
           return (
             <button key={label} type="button" title={label} onClick={() => key && setRail(key)}
-              style={{ appearance: 'none', border: 0, cursor: 'pointer', width: 56, height: 56, borderRadius: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', gap: 2, background: 'transparent', padding: '5px 0 0', marginTop: label === 'Variables' ? 16 : 0, color: active ? SEL : INK }}>
+              style={{ appearance: 'none', border: 0, cursor: 'pointer', width: 56, height: 56, borderRadius: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', gap: 2, background: 'transparent', padding: '5px 0 0', color: active ? SEL : INK }}>
               <span style={{ width: 32, height: 28, borderRadius: 5, display: 'grid', placeItems: 'center', background: active ? '#e5f4ff' : 'transparent' }}><UiIcon name={icon} /></span>
               <span style={{ font: `450 ${label.length > 8 ? 8 : 9}px/14px ${FONT}`, letterSpacing: label.length > 8 ? '0px' : '0.045px', color: INK, maxWidth: 54, padding: '0 1px', boxSizing: 'border-box', overflow: 'hidden', whiteSpace: 'nowrap', textAlign: 'center' }}>{label}</span>
             </button>
