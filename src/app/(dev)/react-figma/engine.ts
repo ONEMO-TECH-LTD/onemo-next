@@ -95,21 +95,52 @@ export function alignFromIndex(i: number, column = false): { alignItems: string;
 }
 
 /** Aggregate unique colors used across the selected element's tagged subtree (Selection colors). */
-export function collectSelectionColors(el: HTMLElement, doc: Document, max = 8): { hex: string; op: number }[] {
-  const seen = new Map<string, { hex: string; op: number }>()
-  const consider = (val: string) => {
+/* 3.6 (Dan, spec measured from Figma 2026-07-08): selection colours = colours the selection
+ * VISIBLY OWNS — not every inherited text colour / zero-width border across the subtree (the old
+ * over-collection showed colours "not in the dial button"). Each entry carries the source element
+ * ids (Figma's target-◎ "Select N using this color") and the bound variable when one declares it. */
+export type SelectionColor = { hex: string; op: number; count: number; ids: string[]; varName?: string; props: string[] }
+export function collectSelectionColors(el: HTMLElement, doc: Document, max = 24): SelectionColor[] {
+  const byKey = new Map<string, SelectionColor>()
+  const consider = (n: HTMLElement, prop: string, val: string) => {
     const p = colorToHex(val, doc)
-    if (p) seen.set(`${p.hex}/${p.op}`, p)
+    if (!p) return
+    const key = `${p.hex}/${p.op}`
+    let e = byKey.get(key)
+    if (!e) { e = { hex: p.hex, op: p.op, count: 0, ids: [], props: [] }; byKey.set(key, e) }
+    e.count++
+    const id = ensureId(n)
+    if (e.ids.length < 40 && !e.ids.includes(id)) e.ids.push(id)
+    if (!e.props.includes(prop)) e.props.push(prop)
   }
   const nodes: HTMLElement[] = [el, ...(Array.from(el.querySelectorAll('[data-src]')) as HTMLElement[])]
-  for (const n of nodes.slice(0, 200)) {
+  for (const n of nodes.slice(0, 120)) {
     const cs = doc.defaultView!.getComputedStyle(n)
-    consider(cs.getPropertyValue('background-color'))
-    consider(cs.getPropertyValue('color'))
-    if (parseFloat(cs.getPropertyValue('border-top-width')) > 0) consider(cs.getPropertyValue('border-top-color'))
-    if (seen.size >= max) break
+    const r = n.getBoundingClientRect()
+    if (r.width < 1 || r.height < 1) continue // invisible boxes own nothing
+    const bg = cs.getPropertyValue('background-color')
+    if (bg && !/^rgba\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)$/.test(bg.replace(/\s+/g, ' '))) consider(n, 'background-color', bg)
+    // text colour counts only where the element actually RENDERS text (direct text node) —
+    // inherited `color` on wrappers was the "colours not in the component" bug.
+    const hasText = Array.from(n.childNodes).some((c) => c.nodeType === 3 && (c.textContent ?? '').trim())
+    if (hasText) consider(n, 'color', cs.getPropertyValue('color'))
+    if (parseFloat(cs.getPropertyValue('border-top-width')) > 0 && cs.getPropertyValue('border-top-style') !== 'none') consider(n, 'border-color', cs.getPropertyValue('border-top-color'))
+    if (byKey.size >= max * 2) break
   }
-  return [...seen.values()].slice(0, max)
+  const out = [...byKey.values()].slice(0, max)
+  // second pass: resolve a declared var() binding per colour (first source element only — cheap)
+  for (const e of out) {
+    const first = e.ids[0] && (doc.querySelector(`[data-eng-id="${e.ids[0]}"]`) as HTMLElement | null)
+    if (!first) continue
+    try {
+      const rep = readStyles(first)
+      for (const prop of e.props) {
+        const tok = rep.defined[prop]?.token ?? (prop === 'border-color' ? rep.defined['border-top-color']?.token : undefined)
+        if (tok) { e.varName = tok; break }
+      }
+    } catch { /* declared-style read is best-effort */ }
+  }
+  return out
 }
 
 const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'LINK', 'META', 'TEMPLATE', 'NEXT-ROUTE-ANNOUNCER', 'NEXTJS-PORTAL'])

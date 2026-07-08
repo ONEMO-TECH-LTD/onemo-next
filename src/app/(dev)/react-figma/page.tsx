@@ -16,10 +16,10 @@
  */
 
 import { Fragment, useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { buildLayerTree, readStyles, colorToHex, hexToRgba, boxSlots, gapSlots, editSlot, tokenOf, Overrides, parseEffects, parseShadow, formatShadow, splitTopLevel, alignToIndex, alignFromIndex, collectSelectionColors, ensureId, type LiveNode, type OverrideOp } from './engine'
+import { buildLayerTree, readStyles, colorToHex, hexToRgba, boxSlots, gapSlots, editSlot, tokenOf, Overrides, parseEffects, parseShadow, formatShadow, splitTopLevel, alignToIndex, alignFromIndex, collectSelectionColors, ensureId, type LiveNode, type OverrideOp, type SelectionColor } from './engine'
 import { createPortal } from 'react-dom'
 import {
-  MagnifyingGlass, Plus, Minus, Sidebar, CaretDown, ArrowUUpLeft, ArrowUUpRight, LinkBreak,
+  MagnifyingGlass, Plus, Minus, Sidebar, CaretDown, ArrowUUpLeft, ArrowUUpRight, LinkBreak, Crosshair,
   type Icon as PIcon,
 } from '@phosphor-icons/react'
 
@@ -1864,6 +1864,27 @@ function FigmaEffectRow({ type, onRemove, initial, onParams }: { type: string; o
     </div>
   )
 }
+/* 3.6 (Dan, Figma spec measured 2026-07-08): a VARIABLE-bound selection colour renders as a white
+   bordered capsule with swatch + the variable's Figma JSON NAME; hover reveals unlink (detach to
+   raw) + target-◎ ("Select N using this color" → selects the layer using it). Raw colours keep the
+   editable grey hex+% capsule. */
+function SelectionVarRow({ entry, label, onUnlink, onSelectSource }: { entry: SelectionColor; label: string; onUnlink: () => void; onSelectSource: () => void }) {
+  const [h, setH] = useState(false)
+  return (
+    <div onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)} style={{ display: 'flex', alignItems: 'center', gap: 4, height: 32, padding: '0 8px 0 16px' }}>
+      <div style={{ width: 156, height: 24, borderRadius: 5, background: '#fff', border: '1px solid #E6E6E6', boxSizing: 'border-box', display: 'flex', alignItems: 'center', gap: 6, padding: '0 6px', font: `450 11px/16px ${FONT}`, color: INK, overflow: 'hidden' }}>
+        <span aria-hidden style={{ flex: 'none', width: 14, height: 14, borderRadius: 3, background: `#${entry.hex}`, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.15)' }} />
+        <span title={label} style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+      </div>
+      {h && (
+        <>
+          <IB I={LinkBreak} title="Detach variable (use raw value)" s={13} on={onUnlink} />
+          <IB I={Crosshair} title={`Select ${entry.count} using this color`} s={13} on={onSelectSource} />
+        </>
+      )}
+    </div>
+  )
+}
 function SelectionColorRow({ hex, name, op, grad, onRecolor }: { hex?: string; name?: string; op: number; grad?: boolean; onRecolor?: (oldHex: string, newHex: string, newOp: number) => void }) {
   const [hexValue, setHexValue] = useState(hex || '000000')
   const [labelValue, setLabelValue] = useState(name || hex || '')
@@ -2416,7 +2437,12 @@ export default function ReactFigmaPage() {
   const [liveStrokes, setLiveStrokes] = useState<{ hex: string; op: number; weight: number; position: string; sides?: { top: number; right: number; bottom: number; left: number } }[] | null>(null)
   const [liveEffects, setLiveEffects] = useState<{ type: string; detail: string }[] | null>(null)
   const liveShadowsRef = useRef<ReturnType<typeof parseShadow>[]>([])
-  const [liveSelColors, setLiveSelColors] = useState<{ hex: string; op: number }[] | null>(null)
+  const [liveSelColors, setLiveSelColors] = useState<SelectionColor[] | null>(null)
+  // 3.6 (Dan/Figma): Selection colors is collapsible (collapsed = swatch strip + "+N") and long
+  // lists sit behind "See all N colors". Variable-bound rows need token names → DS tokens here.
+  const [selColorsOpen, setSelColorsOpen] = useState(true)
+  const [selColorsAll, setSelColorsAll] = useState(false)
+  const dsTokensAll = useDsTokens()
   const [linkHref, setLinkHref] = useState('')
   const [linkNewTab, setLinkNewTab] = useState(false)
   // E8 item 9 (hover/tap — Framer interaction states as REAL CSS pseudo-rules via add-state-rule)
@@ -4083,8 +4109,33 @@ export default function ReactFigmaPage() {
                 }) })()
               : effects.map(e => <FigmaEffectRow key={e.id} type={e.type} onRemove={() => setEffects(rows => rows.filter(row => row.id !== e.id))} />)}
           </Sec>
-          <Sec title="Selection colors" bodyGap={0} bodyPadding="0">
-            {(liveSelColors ?? []).map((c, i) => <SelectionColorRow key={`live-${i}`} hex={c.hex} op={c.op} onRecolor={recolorSelection} />)}
+          <Sec title="Selection colors" bodyGap={0} bodyPadding="0" actionWidth={120}
+            action={(
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                {/* collapsed preview: first 3 swatches + overflow count (Figma spec) */}
+                {!selColorsOpen && (liveSelColors ?? []).slice(0, 3).map((c, i) => (
+                  <span key={i} aria-hidden style={{ width: 14, height: 14, borderRadius: 3, background: `#${c.hex}`, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.15)' }} />
+                ))}
+                {!selColorsOpen && (liveSelColors?.length ?? 0) > 3 && <span style={{ font: `450 11px/16px ${FONT}`, color: MUTE }}>+{(liveSelColors?.length ?? 0) - 3}</span>}
+                <UiIB name={selColorsOpen ? 'caret16' : 'caretRight16'} title={selColorsOpen ? 'Collapse selection colors' : 'Expand selection colors'} on={() => setSelColorsOpen((v) => !v)} />
+              </span>
+            )}>
+            {selColorsOpen && ((selColorsAll ? (liveSelColors ?? []) : (liveSelColors ?? []).slice(0, 11)).map((c, i) => {
+              const tok = c.varName ? dsTokensAll.find((t) => t.cssVar === c.varName) : undefined
+              if (c.varName) {
+                const label = tok?.path ? tok.path.split('/').map((s) => s.trim()).filter(Boolean).slice(1).join('/') : c.varName.replace(/^--/, '')
+                return <SelectionVarRow key={`v-${i}`} entry={c} label={label}
+                  onUnlink={() => recolorSelection(c.hex, c.hex, c.op)}
+                  onSelectSource={() => { const el = iframeRef.current?.contentDocument?.querySelector(`[data-eng-id="${c.ids[0]}"]`); if (el) applySelection(el as HTMLElement) }} />
+              }
+              return <SelectionColorRow key={`live-${i}`} hex={c.hex} op={c.op} onRecolor={recolorSelection} />
+            }))}
+            {selColorsOpen && !selColorsAll && (liveSelColors?.length ?? 0) > 11 && (
+              <button type="button" onClick={() => setSelColorsAll(true)}
+                style={{ appearance: 'none', border: 0, background: 'transparent', height: 32, display: 'flex', alignItems: 'center', gap: 6, padding: '0 16px', cursor: 'pointer', color: MUTE, font: `400 11px/16px ${FONT}` }}>
+                ⋮ See all {liveSelColors!.length} colors
+              </button>
+            )}
           </Sec>
           <Sec title="Layout guide" actionWidth={24} action={<UiIB name="plus" title="Add layout guide" on={() => setLayoutGuides(rows => [...rows, { id: nextRowId(rows), type: 'Columns', count: 5, gutter: 16, visible: true }])} />} bodyGap={0} bodyPadding="0">
             {layoutGuides.map(g => <LayoutGuideRow key={g.id} guide={g} onChange={(patch) => setLayoutGuides(rows => rows.map(r => r.id === g.id ? { ...r, ...patch } : r))} onRemove={() => setLayoutGuides(rows => rows.filter(row => row.id !== g.id))} />)}
