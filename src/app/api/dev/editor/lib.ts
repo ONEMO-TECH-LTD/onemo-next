@@ -845,7 +845,12 @@ function addStringParam(source: string, sf: ts.SourceFile, propName: string): { 
   return edits
 }
 /** The tsx half of the module-css bridge (§5): `addStringParam` PLUS a `style={{ '--<prop>': <prop> }}`
- * custom property on the ROOT (merged into an existing style object, or a new style attr). */
+ * custom property on the ROOT (merged into an existing style object, or a new style attr). React's
+ * `CSSProperties` type rejects arbitrary `--x` keys, so the generated style object carries an `as
+ * CSSProperties` cast (the standard React+TS custom-property pattern) — else the generated component fails
+ * tsc (TS2353). The `CSSProperties` type is imported once (these generated files use the automatic JSX
+ * runtime, so `React` is not in scope). A second expose merges into the existing `{…} as CSSProperties`
+ * without double-casting or re-importing. */
 function exposeStringPropOnRoot(source: string, sf: ts.SourceFile, propName: string): string {
   const edits = addStringParam(source, sf, propName)
   const fn = findComponentFn(sf)!
@@ -854,13 +859,27 @@ function exposeStringPropOnRoot(source: string, sf: ts.SourceFile, propName: str
   const opening = ts.isJsxElement(root) ? root.openingElement : root
   const styleAttr = opening.attributes.properties.find((p): p is ts.JsxAttribute => ts.isJsxAttribute(p) && p.name.getText(sf) === 'style')
   const cssVar = `'--${propName}': ${propName}`
+  let castEmitted = false
   if (!styleAttr) {
-    edits.push({ s: opening.tagName.getEnd(), t: ` style={{ ${cssVar} }}` })
+    edits.push({ s: opening.tagName.getEnd(), t: ` style={{ ${cssVar} } as CSSProperties}` })
+    castEmitted = true
   } else {
     const init = styleAttr.initializer
-    if (init && ts.isJsxExpression(init) && init.expression && ts.isObjectLiteralExpression(init.expression)) {
-      edits.push({ s: init.expression.getStart(sf) + 1, t: ` ${cssVar},` }) // prepend into the object literal
+    if (!init || !ts.isJsxExpression(init) || !init.expression) throw Object.assign(new Error('root style is not an inline object literal — cannot merge the custom property'), { status: 422 })
+    const expr = init.expression
+    if (ts.isAsExpression(expr) && ts.isObjectLiteralExpression(expr.expression)) {
+      // already `{…} as CSSProperties` (prior expose) → prepend into the inner object; cast + import already present
+      edits.push({ s: expr.expression.getStart(sf) + 1, t: ` ${cssVar},` })
+    } else if (ts.isObjectLiteralExpression(expr)) {
+      // plain object literal → prepend the custom property AND wrap the whole object with the cast
+      edits.push({ s: expr.getStart(sf) + 1, t: ` ${cssVar},` })
+      edits.push({ s: expr.getEnd(), t: ` as CSSProperties` })
+      castEmitted = true
     } else throw Object.assign(new Error('root style is not an inline object literal — cannot merge the custom property'), { status: 422 })
+  }
+  // import the cast type once (idempotent — a prior expose may have added it)
+  if (castEmitted && !/import\s+type\s*\{[^}]*\bCSSProperties\b[^}]*\}\s*from\s*['"]react['"]/.test(source)) {
+    edits.push({ s: 0, t: `import type { CSSProperties } from 'react'\n` })
   }
   edits.sort((a, b) => b.s - a.s)
   let out = source
