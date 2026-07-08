@@ -260,7 +260,7 @@ export type ScopedTarget =
   | { kind: 'base' }
   | { kind: 'variant'; name: string }
   | { kind: 'state'; pseudo: 'hover' | 'active' | 'focus-visible' | 'disabled' }
-  | { kind: 'state'; propClass: 'loading' | 'error' }
+  | { kind: 'state'; propClass: 'loading' | 'error' | 'disabled' }
 
 export type WriteOp =
   | { kind: 'set-declaration'; decl: DeclRef; newValueText: string }
@@ -596,14 +596,37 @@ function addBooleanPropToComponent(source: string, sf: ts.SourceFile, propName: 
 }
 
 const STATE_PSEUDO: Record<string, 'hover' | 'active' | 'focus-visible' | 'disabled'> = { hover: 'hover', pressed: 'active', focus: 'focus-visible', disabled: 'disabled' }
-/** add-state (blueprint §3.5): make a state authorable. INTERACTION (hover/pressed/focus/disabled) → just
- * ensure the base `transition` (smoothness); the `.base:<pseudo>` rule is created on the first scoped edit.
- * SEMANTIC (loading/error) → add a real boolean prop + `data-<state>` toggle on the root, so the state is
- * driven by app state, plus the base transition. Requires the component be promoted first. */
+/** Form-associated elements — the only tags CSS `:disabled` can match. A `disabled` state on any other root
+ * (e.g. mother-v2's `<div>`) must use the semantic `[data-disabled]` path instead (blueprint §6.2), or the
+ * pseudo rule is dead CSS (F-M2). */
+const FORM_CONTROLS = new Set(['button', 'input', 'select', 'textarea', 'fieldset', 'option', 'optgroup'])
+/** F-M1: is a `transition` already declared on `.base`? Used to keep the base-transition write IDEMPOTENT. */
+async function baseHasTransition(cssModule: string, rootClass: string): Promise<boolean> {
+  const abs = jailModuleCss(cssModule)
+  const source = (await fs.readFile(abs)).toString('utf8')
+  const root = postcss.parse(source, { from: abs })
+  const rule = root.nodes.find((n): n is Rule => n.type === 'rule' && n.selector === `.${rootClass}`)
+  return !!rule?.nodes.some((n): n is Declaration => n.type === 'decl' && n.prop === 'transition')
+}
+/** Ensure a base `transition` (the `all` superset) so states animate BOTH directions — a transition only on
+ * a state rule (`:hover`) snaps back on exit, not Framer parity (blueprint §6.3, corrected). IDEMPOTENT: never
+ * overwrite an existing base transition, so interaction + semantic add-state can't clobber each other (F-M1 —
+ * was last-write-wins). */
+async function ensureBaseTransition(model: ComponentModel): Promise<void> {
+  if (await baseHasTransition(model.cssModule!, model.rootClass!)) return
+  await writeScopedDeclaration({ kind: 'write-scoped-declaration', file: model.cssModule!, localClass: model.rootClass!, scope: { kind: 'base' }, prop: 'transition', value: 'all .15s ease' })
+}
+/** add-state (blueprint §3.5): make a state authorable. INTERACTION (hover/pressed/focus, + `disabled` on a
+ * FORM-associated root) → ensure the base `transition`; the `.base:<pseudo>` rule is created on the first
+ * scoped edit. SEMANTIC (loading/error, + `disabled` on a NON-form root per §6.2/F-M2) → add a real boolean
+ * prop + `data-<state>` toggle on the root, driven by app state, plus the base transition. Promote first. */
 async function addState(op: Extract<WriteOp, { kind: 'add-state' }>): Promise<{ ok: true; file: string; newValueText: string }> {
   const model = await parseComponentModel(op.file)
   if (!model.cssModule || !model.rootClass) throw Object.assign(new Error('promote the component to a CSS module first (no base class)'), { status: 422 })
-  const isSemantic = op.state === 'loading' || op.state === 'error'
+  // F-M2: `disabled` on a non-form root (e.g. mother-v2's <div>) can't use `:disabled` (CSS matches
+  // form-associated elements only) → route it through the SEMANTIC path (boolean prop + [data-disabled]).
+  const disabledSemantic = op.state === 'disabled' && !FORM_CONTROLS.has(model.structure?.tag ?? '')
+  const isSemantic = op.state === 'loading' || op.state === 'error' || disabledSemantic
   if (isSemantic) {
     // IDEMPOTENT: if the boolean prop already exists (state already added), skip the prop-add — re-selecting
     // the chip must just re-target, never re-add → 409 (the second half of the I1 add-state finding).
@@ -616,12 +639,12 @@ async function addState(op: Extract<WriteOp, { kind: 'add-state' }>): Promise<{ 
       assertValidTsx(abs, tsx)
       await fs.writeFile(abs, tsx, 'utf8')
     }
-    await writeScopedDeclaration({ kind: 'write-scoped-declaration', file: model.cssModule, localClass: model.rootClass, scope: { kind: 'base' }, prop: 'transition', value: 'opacity .2s ease, background .2s ease' })
+    await ensureBaseTransition(model)
     return { ok: true, file: op.file, newValueText: propExists ? `semantic state "${op.state}" already present (re-targeted)` : `semantic state "${op.state}": boolean prop + [data-${op.state}] toggle` }
   }
   const pseudo = STATE_PSEUDO[op.state]
   if (!pseudo) throw Object.assign(new Error(`unknown state: ${op.state}`), { status: 422 })
-  await writeScopedDeclaration({ kind: 'write-scoped-declaration', file: model.cssModule, localClass: model.rootClass, scope: { kind: 'base' }, prop: 'transition', value: 'all .15s ease' })
+  await ensureBaseTransition(model)
   return { ok: true, file: op.file, newValueText: `interaction state "${op.state}" (:${pseudo}) — edit it to create the rule` }
 }
 
@@ -751,6 +774,11 @@ export async function parseComponentModel(file: string): Promise<ComponentModel>
     if (props.some((p) => p.name === s && /boolean/.test(p.tsType)) && !states.some((st) => st.state === s)) {
       states.push({ state: s, kind: 'semantic', selector: rootClass ? `.${rootClass}[data-${s}]` : `[data-${s}]`, decls: {} })
     }
+  }
+  // F-M2: `disabled` is semantic ONLY on a non-form root (a form root uses the `:disabled` pseudo, no prop).
+  // Mirror the add-state write so the model lists it immediately from prop presence (same drift fix as above).
+  if (structure && !FORM_CONTROLS.has(structure.tag) && props.some((p) => p.name === 'disabled' && /boolean/.test(p.tsType)) && !states.some((st) => st.state === 'disabled')) {
+    states.push({ state: 'disabled', kind: 'semantic', selector: rootClass ? `.${rootClass}[data-disabled]` : `[data-disabled]`, decls: {} })
   }
   return { name, file, cssModule, rootClass, root, props, variants, states, structure }
 }

@@ -2334,11 +2334,11 @@ export default function ReactFigmaPage() {
   const [editTarget, setEditTarget] = useState<EditTarget>({ kind: 'base' })
   const editTargetRef = useRef(editTarget); useEffect(() => { editTargetRef.current = editTarget }, [editTarget])
   // component model of the component currently being edited (its .tsx file + base class + variants/states)
-  type EditModel = { file: string; cssModule: string | null; rootClass: string | null; root: { line: number; col: number } | null; variants: string[]; states: string[] }
+  type EditModel = { file: string; cssModule: string | null; rootClass: string | null; root: { line: number; col: number } | null; rootTag: string | null; variants: string[]; states: string[] }
   const [editModel, setEditModel] = useState<EditModel | null>(null)
   const editModelRef = useRef(editModel); useEffect(() => { editModelRef.current = editModel }, [editModel])
   const editingComponentRef = useRef(editingComponent); useEffect(() => { editingComponentRef.current = editingComponent }, [editingComponent])
-  const shapeModel = (m: { file: string; cssModule: string | null; rootClass: string | null; root: { line: number; col: number } | null; variants: { name: string }[]; states: { state: string }[] }): EditModel => ({ file: m.file, cssModule: m.cssModule, rootClass: m.rootClass, root: m.root, variants: m.variants.map((v) => v.name), states: m.states.map((s) => s.state) })
+  const shapeModel = (m: { file: string; cssModule: string | null; rootClass: string | null; root: { line: number; col: number } | null; structure?: { tag: string } | null; variants: { name: string }[]; states: { state: string }[] }): EditModel => ({ file: m.file, cssModule: m.cssModule, rootClass: m.rootClass, root: m.root, rootTag: m.structure?.tag ?? null, variants: m.variants.map((v) => v.name), states: m.states.map((s) => s.state) })
   const fetchModel = (file: string) => fetch(`/api/dev/editor-component-model?file=${encodeURIComponent(file)}`).then((r) => (r.ok ? r.json() : null)).catch(() => null)
   useEffect(() => { // reset the target + load the model; AUTO-PROMOTE the root so states/variants are authorable
     setEditTarget({ kind: 'base' })
@@ -2889,9 +2889,12 @@ export default function ReactFigmaPage() {
     {
       const et = editTargetRef.current, em = editModelRef.current
       if (editingComponentRef.current && em?.cssModule && em.rootClass && et.kind !== 'base' && decls.length) {
+        // F-M2: `disabled` on a non-form root (e.g. a <div>) can't match CSS `:disabled` → route it to the
+        // semantic `[data-disabled]` path, same as the server add-state; form-associated roots keep `:disabled`.
+        const FORM_ROOTS = new Set(['button', 'input', 'select', 'textarea', 'fieldset', 'option', 'optgroup'])
         const scope = et.kind === 'variant'
           ? { kind: 'variant', name: et.name }
-          : (et.state === 'hover' || et.state === 'pressed' || et.state === 'focus' || et.state === 'disabled')
+          : (et.state === 'hover' || et.state === 'pressed' || et.state === 'focus' || (et.state === 'disabled' && em.rootTag != null && FORM_ROOTS.has(em.rootTag)))
             ? { kind: 'state', pseudo: ({ hover: 'hover', pressed: 'active', focus: 'focus-visible', disabled: 'disabled' } as const)[et.state] }
             : { kind: 'state', propClass: et.state }
         for (const [prop, value] of decls) {
