@@ -277,6 +277,7 @@ export type WriteOp =
   | { kind: 'add-variant-axis'; file: string; axis: string; values: string[]; defaultValue: string } // I2: a new config axis (blueprint §3.3a)
   | { kind: 'add-variant-value'; file: string; axis: string; value: string } // I2: extend an axis's union (blueprint §3.3b)
   | { kind: 'expose-as-prop'; file: string; cssProp: string; propName: string; controlType?: string } // I3: fixed CSS value → editable prop via the custom-property bridge (blueprint §5)
+  | { kind: 'set-instance-prop'; file: string; line: number; col: number; propName: string; value: string } // I3: set a string prop on a component instance (blueprint §5)
   | { kind: 'set-token-value'; tokenPath: string; theme?: string; value: string | number }
   | { kind: 'set-jsx-style'; file: string; line: number; col: number; prop: string; value: string; expectRaw?: string }
   | { kind: 'set-jsx-text'; file: string; line: number; col: number; newText: string; expectRaw?: string }
@@ -893,6 +894,29 @@ async function exposeAsProp(op: Extract<WriteOp, { kind: 'expose-as-prop' }>): P
   await fs.writeFile(cssAbs, cssNext, 'utf8')
   await fs.writeFile(abs, tsxNext, 'utf8')
   return { ok: true, file: op.file, newValueText: `exposed ${op.cssProp} as prop "${op.propName}" (${rewrites} rule${rewrites > 1 ? 's' : ''} bridged)` }
+}
+/** set-instance-prop (blueprint §5, I3): set/update a string prop on a component INSTANCE (`<Comp bg="#f00"/>`)
+ * — the per-instance override. Refuses on a host element (only components take props) and on a
+ * value needing an expression (v1 = string props). */
+async function setInstanceProp(op: Extract<WriteOp, { kind: 'set-instance-prop' }>): Promise<{ ok: true; file: string; newValueText: string }> {
+  if (!/^[a-zA-Z][a-zA-Z0-9]*$/.test(op.propName)) throw Object.assign(new Error(`invalid prop name: ${op.propName}`), { status: 422 })
+  if (RESERVED_PROP_NAMES.has(op.propName)) throw Object.assign(new Error(`"${op.propName}" is a React-reserved prop name`), { status: 422 })
+  if (/[{}<>"]/.test(op.value)) throw Object.assign(new Error('value needs an expression — out of v1 scope (string props only)'), { status: 422 })
+  const abs = jailComponentWrite(op.file)
+  const source = (await fs.readFile(abs)).toString('utf8')
+  const sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
+  const el = findJsxAt(sf, op.line, op.col)
+  if (!el) throw Object.assign(new Error(`no JSX element at ${op.line}:${op.col}`), { status: 404 })
+  const tag = el.tagName.getText(sf)
+  if (!/^[A-Z]/.test(tag)) throw Object.assign(new Error(`"${tag}" is a host element, not a component instance — props only set on components`), { status: 422 })
+  const existing = el.attributes.properties.find((p): p is ts.JsxAttribute => ts.isJsxAttribute(p) && p.name.getText(sf) === op.propName)
+  const [start, end, text] = existing
+    ? [existing.getStart(sf), existing.getEnd(), `${op.propName}="${op.value}"`]
+    : [el.tagName.getEnd(), el.tagName.getEnd(), ` ${op.propName}="${op.value}"`]
+  const next = source.slice(0, start) + text + source.slice(end)
+  assertValidTsx(abs, next)
+  await fs.writeFile(abs, next, 'utf8')
+  return { ok: true, file: op.file, newValueText: `${tag} ${op.propName}="${op.value}"` }
 }
 
 // ─── I0: ComponentModel READ (blueprint §1) — source IS the model ────────────────
@@ -1781,6 +1805,7 @@ async function applyWriteInner(op: WriteOp): Promise<{ ok: true; file: string; n
   if (op.kind === 'add-variant-axis') return addVariantAxis(op)
   if (op.kind === 'add-variant-value') return addVariantValue(op)
   if (op.kind === 'expose-as-prop') return exposeAsProp(op)
+  if (op.kind === 'set-instance-prop') return setInstanceProp(op)
   if (op.kind === 'create-page') return createPage(op)
   if (op.kind === 'set-token-value') return setTokenValue(op)
   if (op.kind === 'set-jsx-style') return setJsxStyle(op)
