@@ -2290,7 +2290,7 @@ type CanvasIconAsset = { kind: 'svg' | 'image'; value: string }
 type SandboxEntry = { name: string; path: string; port: number; pid: number; forkedFrom: string; createdAt: string; alive?: boolean }
 type VersionEntry = { hash: string; date: string; label: string }
 const CANVAS_FALLBACK: BuildSource[] = [
-  { key: 'editor-402', name: 'Editor 402 — apple blur glass', route: '/react-figma/canvas', group: 'storybook/create-studio' },
+  { key: 'mother-v2', name: 'Mother v2 — converted', route: '/converted/mother-v2', group: 'converted' },
 ]
 const RECENT_BUILDS_KEY = 'react-figma:recent-builds'
 const MAX_RECENT_BUILDS = 8
@@ -2410,7 +2410,9 @@ export default function ReactFigmaPage() {
   const [selRect, setSelRect] = useState<OutlineRect | null>(null)
   const [layers, setLayers] = useState<LiveNode[] | null>(null)
   const [layerSelId, setLayerSelId] = useState<string | null>(null)
-  const [canvas, setCanvas] = useState<{ name: string; route: string }>({ name: 'Editor 402 — apple blur glass', route: '/react-figma/canvas' })
+  // Dan (permanent, 2026-07-08): the editor OPENS on the CONVERTED mother screen — real converter output
+  // (364 tagged els, 289 token vars), NOT the storybook Editor402 prototype. Do not revert to Editor402.
+  const [canvas, setCanvas] = useState<{ name: string; route: string }>({ name: 'Mother v2 — converted', route: '/converted/mother-v2' })
   const [sourceMenuOpen, setSourceMenuOpen] = useState(false)
   const [buildSources, setBuildSources] = useState<BuildSource[]>(CANVAS_FALLBACK)
   const [recentBuilds, setRecentBuilds] = useState<BuildSource[]>([])
