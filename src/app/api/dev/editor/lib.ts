@@ -626,6 +626,7 @@ export type ComponentModel = {
   file: string
   cssModule: string | null    // relative path, null = not yet promoted (inline-styled)
   rootClass: string | null    // the base local class, null pre-promotion
+  root: { line: number; col: number } | null // 1-based position of the root returned element (for auto-promote)
   props: { name: string; tsType: string; optional: boolean; default?: string }[]
   variants: { name: string; kind: 'config'; selector: string; decls: Record<string, string> }[]
   states: { state: string; kind: 'interaction' | 'semantic'; selector: string; decls: Record<string, string> }[]
@@ -657,6 +658,16 @@ export async function parseComponentModel(file: string): Promise<ComponentModel>
     if (ts.isFunctionDeclaration(st) && st.name && /^[A-Z]/.test(st.name.text)) { fn = st; break }
     if (ts.isVariableStatement(st)) for (const d of st.declarationList.declarations) {
       if (ts.isIdentifier(d.name) && /^[A-Z]/.test(d.name.text) && d.initializer && ts.isArrowFunction(d.initializer)) { fn = d.initializer }
+    }
+  }
+  // root returned element position (for auto-promote on edit-entry)
+  let root: { line: number; col: number } | null = null
+  if (fn) {
+    const rootEl = findRootReturnedElement(fn, sf)
+    if (rootEl) {
+      const opening = ts.isJsxElement(rootEl) ? rootEl.openingElement : rootEl
+      const lc = sf.getLineAndCharacterOfPosition(opening.getStart(sf))
+      root = { line: lc.line + 1, col: lc.character + 1 }
     }
   }
   const param = fn?.parameters[0]
@@ -704,7 +715,7 @@ export async function parseComponentModel(file: string): Promise<ComponentModel>
       }
     } catch { /* module unreadable → treat as unpromoted */ cssModule = cssModule }
   }
-  return { name, file, cssModule, rootClass, props, variants, states }
+  return { name, file, cssModule, rootClass, root, props, variants, states }
 }
 
 /**

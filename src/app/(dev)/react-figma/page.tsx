@@ -2326,6 +2326,70 @@ export default function ReactFigmaPage() {
   // NOT the rail — which kills the selection-race by construction (the page is never auto-replaced).
   const [editingComponent, setEditingComponent] = useState<DsComponent | null>(null)
   const canvasMode: 'design' | 'components' = rail === 'components' && editingComponent ? 'components' : 'design'
+  // I1 (blueprint §4 editTarget + §6.2 two-kind states): while editing a component, which RULE the
+  // inspector's edits target — base / a config variant / an interaction pseudo-state / a semantic
+  // prop-state. Non-base targets route applyOverride → write-scoped-declaration on the component's
+  // .module.css, and (for pseudo states) force a live preview via data-fc-preview on the frame wrapper.
+  type EditTarget = { kind: 'base' } | { kind: 'variant'; name: string } | { kind: 'state'; state: 'hover' | 'pressed' | 'focus' | 'disabled' | 'loading' | 'error' }
+  const [editTarget, setEditTarget] = useState<EditTarget>({ kind: 'base' })
+  const editTargetRef = useRef(editTarget); useEffect(() => { editTargetRef.current = editTarget }, [editTarget])
+  // component model of the component currently being edited (its .tsx file + base class + variants/states)
+  type EditModel = { file: string; cssModule: string | null; rootClass: string | null; root: { line: number; col: number } | null; variants: string[]; states: string[] }
+  const [editModel, setEditModel] = useState<EditModel | null>(null)
+  const editModelRef = useRef(editModel); useEffect(() => { editModelRef.current = editModel }, [editModel])
+  const editingComponentRef = useRef(editingComponent); useEffect(() => { editingComponentRef.current = editingComponent }, [editingComponent])
+  const shapeModel = (m: { file: string; cssModule: string | null; rootClass: string | null; root: { line: number; col: number } | null; variants: { name: string }[]; states: { state: string }[] }): EditModel => ({ file: m.file, cssModule: m.cssModule, rootClass: m.rootClass, root: m.root, variants: m.variants.map((v) => v.name), states: m.states.map((s) => s.state) })
+  const fetchModel = (file: string) => fetch(`/api/dev/editor-component-model?file=${encodeURIComponent(file)}`).then((r) => (r.ok ? r.json() : null)).catch(() => null)
+  useEffect(() => { // reset the target + load the model; AUTO-PROMOTE the root so states/variants are authorable
+    setEditTarget({ kind: 'base' })
+    if (!editingComponent?.file) { setEditModel(null); return }
+    const file = editingComponent.file
+    let live = true
+    void (async () => {
+      let m = await fetchModel(file)
+      // blueprint §4: an un-promoted (inline-styled) component can't hold scoped rules — promote its root
+      // transparently on edit-entry (representation change, visual-identical per R4), then re-read.
+      if (m && !m.cssModule && m.root) {
+        await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'promote-element', file, line: m.root.line, col: m.root.col }) }).catch(() => {})
+        m = await fetchModel(file)
+      }
+      if (live && m) setEditModel(shapeModel(m))
+    })()
+    return () => { live = false }
+  }, [editingComponent])
+  const reloadEditModel = useCallback(async (file: string) => {
+    const m = await fetchModel(file)
+    if (m) setEditModel(shapeModel(m))
+    return m
+  }, [])
+  // Selecting a state chip: semantic states (loading/error) get their real boolean prop added on first
+  // pick (add-state), THEN become the edit target. Interaction states + variants just set the target.
+  const selectEditTarget = useCallback(async (t: EditTarget) => {
+    if (t.kind === 'state' && (t.state === 'loading' || t.state === 'error')) {
+      const em = editModelRef.current
+      if (em?.file && !em.states.includes(t.state)) {
+        await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'add-state', file: em.file, state: t.state }) })
+        await reloadEditModel(em.file)
+      }
+    }
+    setEditTarget(t)
+  }, [reloadEditModel])
+  // Force-preview the active state on the component frames so the user SEES the state they're authoring:
+  // interaction → data-fc-preview on the frame (ancestor half of the dual selector); semantic → data-<state>
+  // on the component's rendered root (.base element). Base/variant → clear all preview attrs.
+  useEffect(() => {
+    const doc = iframeRef.current?.contentDocument
+    if (!doc || canvasMode !== 'components') return
+    const et = editTarget
+    const pseudo = et.kind === 'state' && (et.state === 'hover' || et.state === 'pressed' || et.state === 'focus' || et.state === 'disabled') ? ({ hover: 'hover', pressed: 'active', focus: 'focus-visible', disabled: 'disabled' } as const)[et.state] : null
+    const semantic = et.kind === 'state' && (et.state === 'loading' || et.state === 'error') ? et.state : null
+    doc.querySelectorAll('[data-component-frame]').forEach((f) => {
+      if (pseudo) f.setAttribute('data-fc-preview', pseudo); else f.removeAttribute('data-fc-preview')
+      const rootEl = f.querySelector('*') as HTMLElement | null
+      for (const s of ['loading', 'error']) rootEl?.removeAttribute(`data-${s}`)
+      if (semantic && rootEl) rootEl.setAttribute(`data-${semantic}`, '')
+    })
+  }, [editTarget, canvasMode])
   const [autoDistributed, setAutoDistributed] = useState(false) // justify space-between (Figma distributed)
   const [insetSides, setInsetSides] = useState({ t: '0', r: '0', b: '0', l: '0' }) // A7: per-side inset (positioned elements) // derived — the far-left rail IS the canvas switch (Dan 2026-07-07)
   const dsComponents = useDsComponents(rail === 'assets' || rail === 'components', compNonce) // E4-G4 Assets panel + E10 components rail (library panel needs the list whether or not editing)
@@ -2818,6 +2882,27 @@ export default function ReactFigmaPage() {
       : []
     // Stroke position "Center" has no clean CSS analog (border is inside, outline is outside) — no-op, honest.
     if (field === 'strokePosition' && n !== 'Inside' && n !== 'Outside') { console.warn('[engine] stroke position', n, '— no clean CSS analog (border=Inside, outline=Outside); no-op'); return }
+    // I1 (blueprint §4 editTarget): editing a component in a NON-BASE scope routes the SAME inspector
+    // edit to the component's .module.css as a scoped write (variant / pseudo-state / prop-state rule),
+    // instead of the live-element override engine. The active state chip = "I'm authoring this state",
+    // so we also apply the decls inline for immediate preview; switching back to Base re-reads truth.
+    {
+      const et = editTargetRef.current, em = editModelRef.current
+      if (editingComponentRef.current && em?.cssModule && em.rootClass && et.kind !== 'base' && decls.length) {
+        const scope = et.kind === 'variant'
+          ? { kind: 'variant', name: et.name }
+          : (et.state === 'hover' || et.state === 'pressed' || et.state === 'focus' || et.state === 'disabled')
+            ? { kind: 'state', pseudo: ({ hover: 'hover', pressed: 'active', focus: 'focus-visible', disabled: 'disabled' } as const)[et.state] }
+            : { kind: 'state', propClass: et.state }
+        for (const [prop, value] of decls) {
+          void fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'write-scoped-declaration', file: em.cssModule, localClass: em.rootClass, scope, prop, value }) })
+          el.style.setProperty(prop, value) // immediate preview while this scope is active
+        }
+        setSelRect(rectOf(el))
+        console.log('[engine] scoped write', et.kind, 'name' in et ? et.name : et.kind === 'state' ? et.state : '', decls.map((d) => d[0]).join(','))
+        return
+      }
+    }
     // Undo/redo (Dan live-QA): record each edit as one history step; before=null means the prop had
     // no override yet (undo → discard it entirely).
     if (decls.length) {
@@ -3845,11 +3930,28 @@ export default function ReactFigmaPage() {
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle, rgba(0,0,0,.09) 1px, transparent 1px)', backgroundSize: `${24 * view.z}px ${24 * view.z}px`, backgroundPosition: `${view.x}px ${view.y}px` }} />
         <div style={{ position: 'absolute', left: 0, top: 0, transform: `translate(${view.x}px,${view.y}px) scale(${view.z})`, transformOrigin: '0 0' }}>
           {canvasMode === 'components' && editingComponent ? (
-            // E10 (Dan LOCKED): Framer-style breadcrumb — Home (back to the page) > Component name.
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8, marginLeft: 2, font: `550 10px/1 ${FONT}` }}>
-              <button type="button" onClick={() => setEditingComponent(null)} title="Back to the page" style={{ appearance: 'none', border: 0, background: 'transparent', font: 'inherit', color: MUTE, cursor: 'pointer', padding: 0 }}>Home</button>
-              <span style={{ color: FAINT }}>›</span>
-              <button type="button" onClick={selectFrameRoot} title="Select component frame" style={{ appearance: 'none', border: 0, background: 'transparent', font: 'inherit', color: SEL, cursor: 'pointer', padding: 0 }}>{editingComponent.name}</button>
+            <div style={{ marginBottom: 8, marginLeft: 2 }}>
+              {/* E10 (Dan LOCKED): Framer-style breadcrumb — Home (back to the page) > Component name. */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6, font: `550 10px/1 ${FONT}` }}>
+                <button type="button" onClick={() => setEditingComponent(null)} title="Back to the page" style={{ appearance: 'none', border: 0, background: 'transparent', font: 'inherit', color: MUTE, cursor: 'pointer', padding: 0 }}>Home</button>
+                <span style={{ color: FAINT }}>›</span>
+                <button type="button" onClick={selectFrameRoot} title="Select component frame" style={{ appearance: 'none', border: 0, background: 'transparent', font: 'inherit', color: SEL, cursor: 'pointer', padding: 0 }}>{editingComponent.name}</button>
+              </div>
+              {/* I1 editTarget chips: Base + config variants + the 6 states. Selecting redirects the
+                  inspector to that rule (§4). Semantic states (loading/error) add their boolean prop on first pick. */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap', font: `500 9px/1 ${FONT}` }}>
+                {[{ t: { kind: 'base' as const }, label: 'Base' },
+                  ...(editModel?.variants ?? []).map((v) => ({ t: { kind: 'variant' as const, name: v }, label: v })),
+                  { divider: true as const },
+                  ...(['hover', 'pressed', 'focus', 'disabled', 'loading', 'error'] as const).map((s) => ({ t: { kind: 'state' as const, state: s }, label: s[0].toUpperCase() + s.slice(1), semantic: s === 'loading' || s === 'error' }))
+                ].map((c, i) => 'divider' in c ? <span key={i} style={{ width: 1, height: 13, background: LINE, margin: '0 2px' }} />
+                  : (() => {
+                    const active = c.t.kind === editTarget.kind && (c.t.kind !== 'variant' || ('name' in editTarget && editTarget.name === c.t.name)) && (c.t.kind !== 'state' || ('state' in editTarget && editTarget.state === (c.t as { state: string }).state))
+                    return <button key={i} type="button" title={'semantic' in c && c.semantic ? `${c.label} — a real boolean prop drives this state` : c.label}
+                      onClick={() => void selectEditTarget(c.t)}
+                      style={{ appearance: 'none', border: `1px solid ${active ? SEL : LINE}`, background: active ? '#e5f4ff' : '#fff', color: active ? SEL : INK, borderRadius: 5, padding: '3px 7px', cursor: 'pointer', font: 'inherit' }}>{c.label}</button>
+                  })())}
+              </div>
             </div>
           ) : (
             <button type="button" onClick={selectFrameRoot} title="Select frame" style={{ appearance: 'none', border: 0, background: 'transparent', font: `550 10px/1 ${FONT}`, color: SEL, marginBottom: 8, marginLeft: 2, cursor: 'pointer', padding: 0 }}>{canvas.name} · {hostDims.w} × {hostDims.h}</button>
