@@ -2208,9 +2208,14 @@ const COMPONENT_SELECTED_BORDER = '#0D99FF'
 /* E7.3 (KAI-9377): left rail in Components mode — categories as "pages", components →
  * variant children as "layers" (v4.1 §5). Data = the dual-root inventory (editor-components);
  * clicking jumps the gallery to the frame and selects it. Chrome matches the pages/layers rail. */
-function ComponentsRail({ components, selectedFile, onJump }: { components: DsComponent[]; selectedFile?: string; onJump: (label: string) => void }) {
+function ComponentsRail({ components, selectedFile, onJump, query = '', onContext }: { components: DsComponent[]; selectedFile?: string; onJump: (label: string) => void; query?: string; onContext?: (c: DsComponent, e: React.MouseEvent) => void }) {
+  // E10-E2: live search across name / category / root / variant exports.
+  const q = query.trim().toLowerCase()
+  const filtered = q
+    ? components.filter((c) => c.name.toLowerCase().includes(q) || (c.category ?? '').toLowerCase().includes(q) || (c.root ?? '').toLowerCase().includes(q) || (c.exports ?? []).some((x) => x.toLowerCase().includes(q)))
+    : components
   const bySection = new Map<string, Map<string, DsComponent[]>>()
-  for (const c of components) {
+  for (const c of filtered) {
     const section = c.root === 'global' ? 'Global library' : 'Project'
     const cats = bySection.get(section) ?? new Map<string, DsComponent[]>()
     const cat = c.category ?? 'ungrouped'
@@ -2220,7 +2225,10 @@ function ComponentsRail({ components, selectedFile, onJump }: { components: DsCo
   return (
     <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 12 }}>
       {components.length === 0 && (
-        <div style={{ padding: '12px 16px', font: `400 11px/1.5 ${FONT}`, color: MUTE }}>No components yet — create one from the Assets panel.</div>
+        <div style={{ padding: '12px 16px', font: `400 11px/1.5 ${FONT}`, color: MUTE }}>No components yet — create one above, or select an element on the canvas and use “Create component from selection”.</div>
+      )}
+      {components.length > 0 && filtered.length === 0 && (
+        <div style={{ padding: '12px 16px', font: `400 11px/1.5 ${FONT}`, color: MUTE }}>No components match “{query}”.</div>
       )}
       {[...bySection.entries()].map(([section, cats]) => (
         <div key={section}>
@@ -2233,7 +2241,7 @@ function ComponentsRail({ components, selectedFile, onJump }: { components: DsCo
               <div style={{ height: 28, padding: '0 16px', display: 'flex', alignItems: 'center', font: `500 11px/16px ${FONT}`, color: MUTE }}>{cat}</div>
               {list.map((c) => (
                 <div key={`${c.root}:${c.file ?? c.name}`}>
-                  <button type="button" onClick={() => onJump(c.name)} title={c.file}
+                  <button type="button" onClick={() => onJump(c.name)} onContextMenu={onContext ? (e) => onContext(c, e) : undefined} title={c.file}
                     style={{ appearance: 'none', border: 0, width: '100%', height: 32, padding: '0 16px', background: selectedFile && c.file === selectedFile ? COMPONENT_SELECTED_BG : '#fff', boxShadow: selectedFile && c.file === selectedFile ? `inset 0 0 0 1px ${COMPONENT_SELECTED_BORDER}` : 'none', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', font: `400 11px/16px ${FONT}`, color: COMPONENT_TEXT, textAlign: 'left' }}>
                     <UiIcon name="layerComponent" size={12} /> <span style={{ color: COMPONENT_TEXT }}>{c.name}</span>
                   </button>
@@ -2302,9 +2310,10 @@ const SHOW_LEDGER = false
 
 export default function ReactFigmaPage() {
   type Rail = 'file' | 'assets' | 'components' | 'variables'
-  type AssetTab = 'components' | 'images' | 'icons'
+  type AssetTab = 'images' | 'icons' // E10-E4: components tab REMOVED — components live on their own rail page now
   const [rail, setRail] = useState<Rail>('file')
-  const [assetTab, setAssetTab] = useState<AssetTab>('components')
+  const [assetTab, setAssetTab] = useState<AssetTab>('images')
+  const [compSearch, setCompSearch] = useState('') // E10-E2: functional Components-page search
   const [compNonce, setCompNonce] = useState(0)
   const [newCompName, setNewCompName] = useState('')
   const [newCompRoot, setNewCompRoot] = useState<'project' | 'global'>('project') // E7.4 QA MED: UI parity with the op
@@ -2324,6 +2333,16 @@ export default function ReactFigmaPage() {
     const r = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
     if (r.ok) { const d = await r.json().catch(() => ({})); notify(`Created ${d.name ?? clean}${root === 'global' ? ' in the global library' : ''}`); setCompNonce((n) => n + 1) }
     else notify(`Create failed: ${await r.text()}`, 'error')
+  }, [])
+  // E10-A5: rename a component by name (existing `rename-component` op). NOTE: the server op currently
+  // resolves the FLAT project dir only — it fails for global-library + categorized components; that
+  // extension (shared component-locator) lands in the lifecycle phase. Wired here for flat-project comps.
+  const renameComponentByName = useCallback(async (name: string) => {
+    const next = window.prompt(`Rename component "${name}" to:`, name)?.trim()
+    if (!next || next === name) return
+    if (!/^[A-Za-z][A-Za-z0-9]*$/.test(next)) { notify('Name must be a PascalCase identifier', 'error'); return }
+    const r = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'rename-component', name, newName: next }) })
+    if (r.ok) { notify(`Renamed ${name} → ${next}`); setCompNonce((n) => n + 1) } else notify(`Rename failed: ${await r.text()}`, 'error')
   }, [])
   // #28 Assets: also surface the loaded screen's REAL images + icons (scanned live from the canvas —
   // no invented asset library). Images insert as <img src>; icons render as thumbnails.
@@ -2453,7 +2472,7 @@ export default function ReactFigmaPage() {
       .catch(() => setBuildInfo((cur) => ({ ...cur, error: true })))
   }, [fsNonce])
   // 3.0 (Dan): right-click context menu for page/layer add·delete·duplicate·rename.
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: { label: string; onClick: () => void; danger?: boolean; divider?: boolean }[] } | null>(null)
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: { label: string; onClick?: () => void; danger?: boolean; divider?: boolean; disabled?: boolean; title?: string }[] } | null>(null)
   useEffect(() => {
     if (!ctxMenu) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setCtxMenu(null) }
@@ -3708,8 +3727,11 @@ export default function ReactFigmaPage() {
             </>
           </>
         )}
-        {rail === 'components' && (
-          <ComponentsRail components={dsComponents} selectedFile={sel?.file} onJump={(label) => {
+        {rail === 'components' && (() => {
+          // E10-A/E: the Components page is self-sufficient — create (blank + from selection),
+          // search, and per-component manage menu (Insert/Edit/Find/Rename/Copy import) all live here.
+          // Component creation + insert NO LONGER live in Assets (E10-E4).
+          const jumpTo = (label: string) => {
             const doc = iframeRef.current?.contentDocument
             const frame = doc?.querySelector(`[data-component-frame="${label}"]`)
             frame?.scrollIntoView({ block: 'center', behavior: 'smooth' })
@@ -3717,52 +3739,59 @@ export default function ReactFigmaPage() {
             const tagged = Array.from(frame?.querySelectorAll('[data-src]') ?? []) as HTMLElement[]
             const el = (source ? tagged.find((node) => node.getAttribute('data-src')?.startsWith(`${source}:`)) : null) ?? tagged[0] ?? null
             if (el) el.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-          }} />
-        )}
+          }
+          return (<>
+            <div style={{ height: 40, padding: '0 8px 0 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flex: 'none' }}>
+              <span style={hdr}>Components</span>
+              <UiIB name="createComponent" title={sel ? 'Create component from selection' : 'Select an element on the canvas first'} on={() => void makeComponent()} />
+            </div>
+            <div style={{ padding: '0 12px 8px', flex: 'none' }}>
+              <div style={{ height: 28, background: FIELD, borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px' }}>
+                <MagnifyingGlass size={13} color={MUTE} />
+                <input value={compSearch} onChange={(e) => setCompSearch(e.currentTarget.value)} placeholder="Search components…" aria-label="Search components"
+                  style={{ flex: 1, minWidth: 0, border: 0, background: 'transparent', outline: 0, font: `400 11px/1 ${FONT}`, color: INK }} />
+              </div>
+            </div>
+            <form onSubmit={(e) => { e.preventDefault(); if (newCompName.trim()) { void newComponent(newCompName, newCompRoot, newCompCategory); setNewCompName(''); setNewCompCategory('') } }} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '0 12px 8px', flex: 'none' }}>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <input value={newCompName} onChange={(e) => setNewCompName(e.currentTarget.value)} placeholder="New component name" aria-label="New component name"
+                  style={{ flex: 1, minWidth: 0, height: 26, borderRadius: 6, border: `1px solid ${LINE}`, background: '#fff', padding: '0 8px', outline: 0, font: `400 11px/1 ${FONT}`, color: INK }} />
+                <button type="submit" title="Create blank component" style={{ appearance: 'none', border: 0, background: SEL, color: '#fff', height: 26, borderRadius: 6, padding: '0 10px', cursor: 'pointer', font: `450 11px/1 ${FONT}` }}>New</button>
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <select value={newCompRoot} onChange={(e) => setNewCompRoot(e.currentTarget.value as 'project' | 'global')} aria-label="Component library"
+                  style={{ height: 26, borderRadius: 6, border: `1px solid ${LINE}`, background: '#fff', padding: '0 6px', outline: 0, font: `400 11px/1 ${FONT}`, color: INK }}>
+                  <option value="project">Project</option>
+                  <option value="global">Global library</option>
+                </select>
+                <input value={newCompCategory} onChange={(e) => setNewCompCategory(e.currentTarget.value)} placeholder="Category (optional)" aria-label="Component category"
+                  style={{ flex: 1, minWidth: 0, height: 26, borderRadius: 6, border: `1px solid ${LINE}`, background: '#fff', padding: '0 8px', outline: 0, font: `400 11px/1 ${FONT}`, color: INK }} />
+              </div>
+            </form>
+            <ComponentsRail components={dsComponents} selectedFile={sel?.file} query={compSearch} onJump={jumpTo}
+              onContext={(c, e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, items: [
+                { label: 'Insert into selection', onClick: () => void insertAsset(c.name, c.importPath) },
+                { label: 'Edit', onClick: () => jumpTo(c.name) },
+                { label: 'Find in gallery', onClick: () => jumpTo(c.name) },
+                { label: 'Rename', divider: true, onClick: () => void renameComponentByName(c.name) },
+                { label: 'Copy import', onClick: () => { try { void navigator.clipboard?.writeText(`import { ${c.name} } from '${c.importPath}'`); notify(`Copied import · ${c.name}`) } catch { notify('Clipboard blocked', 'error') } } },
+                { label: 'Duplicate — lands in the lifecycle phase', divider: true, disabled: true, title: 'Component duplicate ships in the E10 lifecycle phase' },
+                { label: 'Delete — lands in the lifecycle phase', danger: true, disabled: true, title: 'Component delete ships in the E10 lifecycle phase' },
+              ] }) }} />
+          </>)
+        })()}
         {rail === 'assets' && (
           <>
             <div style={{ padding: '10px 12px 6px' }}>
               <div role="tablist" aria-label="Assets by type" style={{ display: 'flex', gap: 4, height: 24 }}>
-                {(['components', 'images', 'icons'] as const).map(tab => (
+                {(['images', 'icons'] as const).map(tab => (
                   <button key={tab} type="button" role="tab" aria-selected={assetTab === tab} onClick={() => setAssetTab(tab)}
                     style={{ appearance: 'none', border: 0, background: assetTab === tab ? FIELD : '#fff', borderRadius: 5, flex: '1 1 0', minWidth: 0, height: 24, cursor: 'pointer', color: assetTab === tab ? INK : MUTE, font: `${assetTab === tab ? 550 : 400} 11px/16px ${FONT}` }}>
-                    {tab === 'components' ? 'Components' : tab === 'images' ? 'Images' : 'Icons'}
+                    {tab === 'images' ? 'Images' : 'Icons'}
                   </button>
                 ))}
               </div>
             </div>
-            {assetTab === 'components' && (<>
-              <div style={{ padding: '0 12px 8px' }}><div style={{ height: 28, background: FIELD, borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', color: MUTE, font: `400 11px/1 ${FONT}` }}><MagnifyingGlass size={13} /> Search components…</div></div>
-              <div style={{ padding: '0 12px 8px', font: `400 11px/1.4 ${FONT}`, color: FAINT }}>Components extracted in the editor — select a container, then click one to insert it.</div>
-              {/* #6: create a new component in code (Framer-style) */}
-              <form onSubmit={(e) => { e.preventDefault(); if (newCompName.trim()) { void newComponent(newCompName, newCompRoot, newCompCategory); setNewCompName(''); setNewCompCategory('') } }} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '0 12px 8px' }}>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <input value={newCompName} onChange={(e) => setNewCompName(e.currentTarget.value)} placeholder="New component name" aria-label="New component name"
-                    style={{ flex: 1, minWidth: 0, height: 26, borderRadius: 6, border: `1px solid ${LINE}`, background: '#fff', padding: '0 8px', outline: 0, font: `400 11px/1 ${FONT}`, color: INK }} />
-                  <button type="submit" title="Create component in code" style={{ appearance: 'none', border: 0, background: SEL, color: '#fff', height: 26, borderRadius: 6, padding: '0 10px', cursor: 'pointer', font: `450 11px/1 ${FONT}` }}>New</button>
-                </div>
-                {/* E7.4 QA MED: UI parity with the op — library destination + category slug */}
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <select value={newCompRoot} onChange={(e) => setNewCompRoot(e.currentTarget.value as 'project' | 'global')} aria-label="Component library"
-                    style={{ height: 26, borderRadius: 6, border: `1px solid ${LINE}`, background: '#fff', padding: '0 6px', outline: 0, font: `400 11px/1 ${FONT}`, color: INK }}>
-                    <option value="project">Project</option>
-                    <option value="global">Global library</option>
-                  </select>
-                  <input value={newCompCategory} onChange={(e) => setNewCompCategory(e.currentTarget.value)} placeholder="Category (optional)" aria-label="Component category"
-                    style={{ flex: 1, minWidth: 0, height: 26, borderRadius: 6, border: `1px solid ${LINE}`, background: '#fff', padding: '0 8px', outline: 0, font: `400 11px/1 ${FONT}`, color: INK }} />
-                </div>
-              </form>
-              {dsComponents.length === 0
-                ? <div style={{ padding: '8px 12px', font: `400 11px/1.5 ${FONT}`, color: MUTE }}>No components yet. Select an element and use “Create component” to add one here.</div>
-                : (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '4px 12px' }}>
-                    {dsComponents.map((c) => (
-                      <button key={c.name} type="button" title={`Insert <${c.name} />`} onClick={() => void insertAsset(c.name, c.importPath)}
-                        style={{ appearance: 'none', height: 56, borderRadius: 6, border: `1px solid ${LINE}`, background: '#fff', display: 'grid', placeItems: 'center', font: `450 10px/1.3 ${FONT}`, color: INK, cursor: 'pointer', padding: '4px', textAlign: 'center', overflow: 'hidden' }}>{c.name}</button>
-                    ))}
-                  </div>
-                )}
-            </>)}
             {assetTab === 'images' && (<>
               <div style={{ padding: '4px 12px 8px', font: `400 11px/1.4 ${FONT}`, color: FAINT }}>Images · {canvasAssets.images.length}</div>
               {canvasAssets.images.length === 0
@@ -4220,9 +4249,9 @@ export default function ReactFigmaPage() {
             {ctxMenu.items.map((it, i) => (
               <Fragment key={i}>
                 {it.divider && <div style={{ height: 1, background: LINE, margin: '5px 0' }} />}
-                <button type="button" onClick={() => { setCtxMenu(null); it.onClick() }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = '#f0f1f3')} onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                  style={{ display: 'block', width: '100%', textAlign: 'left', appearance: 'none', border: 0, background: 'transparent', padding: '8px 14px', cursor: 'pointer', color: it.danger ? '#d93025' : INK, font: `400 12px/1 ${FONT}` }}>{it.label}</button>
+                <button type="button" disabled={it.disabled} title={it.title} onClick={() => { if (it.disabled) return; setCtxMenu(null); it.onClick?.() }}
+                  onMouseEnter={(e) => { if (!it.disabled) e.currentTarget.style.background = '#f0f1f3' }} onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                  style={{ display: 'block', width: '100%', textAlign: 'left', appearance: 'none', border: 0, background: 'transparent', padding: '8px 14px', cursor: it.disabled ? 'default' : 'pointer', color: it.disabled ? FAINT : it.danger ? '#d93025' : INK, font: `400 12px/1 ${FONT}` }}>{it.label}</button>
               </Fragment>
             ))}
           </div>
