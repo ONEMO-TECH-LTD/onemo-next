@@ -2412,7 +2412,7 @@ export default function ReactFigmaPage() {
       .catch(() => setBuildInfo((cur) => ({ ...cur, error: true })))
   }, [fsNonce])
   // 3.0 (Dan): right-click context menu for page/layer add·delete·duplicate·rename.
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: { label: string; onClick: () => void; danger?: boolean }[] } | null>(null)
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: { label: string; onClick: () => void; danger?: boolean; divider?: boolean }[] } | null>(null)
   useEffect(() => {
     if (!ctxMenu) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setCtxMenu(null) }
@@ -3605,15 +3605,17 @@ export default function ReactFigmaPage() {
                 <div key={pg.route} onClick={() => switchCanvas(pg.name, pg.route)}
                   onDoubleClick={pg.mutable && !pg.home ? (e) => { e.stopPropagation(); void renamePage(pg) } : undefined}
                   onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, items: [
-                    ...(pg.mutable && !pg.home ? [{ label: 'Rename', onClick: () => void renamePage(pg) }] : []),
-                    ...(pg.mutable ? [{ label: 'Duplicate', onClick: () => void duplicatePage(pg) }] : []),
-                    ...(pg.mutable && !pg.home ? [{ label: 'Delete', danger: true, onClick: () => void deletePage(pg) }] : []),
+                    // Figma parity (Dan 2026-07-08): NO per-row delete button — actions live only in the
+                    // right-click menu: Copy link · Rename · Duplicate · Delete, grouped by dividers.
+                    { label: 'Copy link to page', onClick: () => { try { void navigator.clipboard?.writeText(`${window.location.origin}${pg.route}`); notify(`Copied · ${pg.route}`) } catch { /* clipboard blocked */ } } },
+                    ...(pg.mutable && !pg.home ? [{ label: 'Rename page', divider: true, onClick: () => void renamePage(pg) }] : []),
+                    ...(pg.mutable ? [{ label: 'Duplicate page', divider: !(pg.mutable && !pg.home), onClick: () => void duplicatePage(pg) }] : []),
+                    ...(pg.mutable && !pg.home ? [{ label: 'Delete page', danger: true, divider: true, onClick: () => void deletePage(pg) }] : []),
                   ] }) }}
                   style={{ height: 32, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', borderRadius: 5, background: pg.route === canvas.route ? '#f0f1f3' : 'transparent', font: `400 11px/16px ${FONT}`, color: INK, cursor: 'pointer' }}>
                   <span style={{ width: 16, height: 16, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.65)' }}><UiIcon name={pg.home ? 'layerSection' : 'layerFrame'} size={16} /></span>
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pg.name}</span>
                   <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: FAINT, font: `400 9px/16px ${FONT}` }}>{pg.home ? '/' : pg.route}</span>
-                  {pg.mutable && !pg.home && <span onClick={(e) => e.stopPropagation()} style={{ display: 'flex' }}><UiIB name="minus" title="Delete page" on={() => void deletePage(pg)} /></span>}
                 </div>
               ))}
             </div>
@@ -4175,9 +4177,12 @@ export default function ReactFigmaPage() {
           <div role="menu" data-figma-floating-root="true" onClick={(e) => e.stopPropagation()}
             style={{ position: 'fixed', left: Math.min(ctxMenu.x, (typeof window !== 'undefined' ? window.innerWidth : 1728) - 180), top: Math.min(ctxMenu.y, (typeof window !== 'undefined' ? window.innerHeight : 1080) - 120), minWidth: 160, padding: '6px 0', borderRadius: 8, background: '#fff', boxShadow: 'rgba(0,0,0,0.15) 0px 2px 5px 0px, rgba(0,0,0,0.12) 0px 10px 16px 0px, rgba(0,0,0,0.12) 0px 0px 0.5px 0px' }}>
             {ctxMenu.items.map((it, i) => (
-              <button key={i} type="button" onClick={() => { setCtxMenu(null); it.onClick() }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = '#f0f1f3')} onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                style={{ display: 'block', width: '100%', textAlign: 'left', appearance: 'none', border: 0, background: 'transparent', padding: '8px 14px', cursor: 'pointer', color: it.danger ? '#d93025' : INK, font: `400 12px/1 ${FONT}` }}>{it.label}</button>
+              <Fragment key={i}>
+                {it.divider && <div style={{ height: 1, background: LINE, margin: '5px 0' }} />}
+                <button type="button" onClick={() => { setCtxMenu(null); it.onClick() }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = '#f0f1f3')} onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                  style={{ display: 'block', width: '100%', textAlign: 'left', appearance: 'none', border: 0, background: 'transparent', padding: '8px 14px', cursor: 'pointer', color: it.danger ? '#d93025' : INK, font: `400 12px/1 ${FONT}` }}>{it.label}</button>
+              </Fragment>
             ))}
           </div>
         </div>, document.body)}
