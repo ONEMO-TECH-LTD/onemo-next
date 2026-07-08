@@ -254,12 +254,22 @@ export async function resolveDeclRefs(componentFile: string, hashedClasses: stri
 
 // ─── write ───────────────────────────────────────────────────────────────────
 
+// I0 (blueprint §3.2): which rule a scoped write targets — base / a config variant / an interaction
+// pseudo-state / a semantic prop-driven state class.
+export type ScopedTarget =
+  | { kind: 'base' }
+  | { kind: 'variant'; name: string }
+  | { kind: 'state'; pseudo: 'hover' | 'active' | 'focus-visible' | 'disabled' }
+  | { kind: 'state'; propClass: 'loading' | 'error' }
+
 export type WriteOp =
   | { kind: 'set-declaration'; decl: DeclRef; newValueText: string }
   | { kind: 'set-shorthand-slots'; decl: DeclRef; slots: string[] }
   | { kind: 'bind-token'; decl: DeclRef; token: string }
   | { kind: 'add-declaration'; file: string; insertOffset: number; indent: string; prop: string; valueText: string }
   | { kind: 'add-state-rule'; file: string; localClass: string; state: 'hover' | 'active'; decls: [string, string][] } // E8 item 9: Framer hover/tap → real CSS pseudo-state rules
+  | { kind: 'promote-element'; file: string; line: number; col: number } // I0: lift inline style → .module.css class (blueprint §2)
+  | { kind: 'write-scoped-declaration'; file: string; localClass: string; scope: ScopedTarget; prop: string; value: string } // I0: 4-scope CSS write (blueprint §3.2)
   | { kind: 'set-token-value'; tokenPath: string; theme?: string; value: string | number }
   | { kind: 'set-jsx-style'; file: string; line: number; col: number; prop: string; value: string; expectRaw?: string }
   | { kind: 'set-jsx-text'; file: string; line: number; col: number; newText: string; expectRaw?: string }
@@ -381,6 +391,237 @@ async function setJsxStyle(op: Extract<WriteOp, { kind: 'set-jsx-style' }>): Pro
   const next = Buffer.concat([buf.subarray(0, bOff), Buffer.from(insert, 'utf8'), buf.subarray(bOff)])
   await fs.writeFile(abs, next)
   return { ok: true, file: op.file, newValueText: literal }
+}
+
+// ─── I0: component-engine substrate — style→CSS converter + promote-element ──────
+// Blueprint §2.1 (F1): a NUMBER value is unitless on these props, else it gets 'px' — MIRRORING
+// react-dom's own isUnitlessNumber set, so our lift equals EXACTLY what React rendered (anti-corruption
+// core, not a px heuristic). Source: react-dom CSSProperty.js unitlessKeys.
+const REACT_UNITLESS = new Set(['animationIterationCount', 'aspectRatio', 'borderImageOutset', 'borderImageSlice', 'borderImageWidth', 'boxFlex', 'boxFlexGroup', 'boxOrdinalGroup', 'columnCount', 'columns', 'flex', 'flexGrow', 'flexPositive', 'flexShrink', 'flexNegative', 'flexOrder', 'gridArea', 'gridRow', 'gridRowEnd', 'gridRowSpan', 'gridRowStart', 'gridColumn', 'gridColumnEnd', 'gridColumnSpan', 'gridColumnStart', 'fontWeight', 'lineClamp', 'lineHeight', 'opacity', 'order', 'orphans', 'scale', 'tabSize', 'widows', 'zIndex', 'zoom', 'fillOpacity', 'floodOpacity', 'stopOpacity', 'strokeDasharray', 'strokeDashoffset', 'strokeMiterlimit', 'strokeOpacity', 'strokeWidth'])
+const camelToKebab = (k: string) => (k.startsWith('--') ? k : k.replace(/[A-Z]/g, (m) => '-' + m.toLowerCase()))
+
+/** Lift a React style-object literal → CSS declarations, mirroring React's render (blueprint §2.1).
+ * Refuses (does NOT partial-write) on any non-literal member — a dynamic value can't be promoted. */
+function styleObjectToCssDecls(obj: ts.ObjectLiteralExpression, sf: ts.SourceFile): { decls: [string, string][]; refusal?: string } {
+  const decls: [string, string][] = []
+  for (const p of obj.properties) {
+    if (!ts.isPropertyAssignment(p)) return { decls, refusal: 'style object has a spread/shorthand/method member — cannot promote (v1 supports a plain literal style object)' }
+    const rawKey = p.name.getText(sf).replace(/^['"]|['"]$/g, '')
+    const cssKey = camelToKebab(rawKey)
+    let init = p.initializer
+    let neg = ''
+    if (ts.isPrefixUnaryExpression(init) && init.operator === ts.SyntaxKind.MinusToken && ts.isNumericLiteral(init.operand)) { neg = '-'; init = init.operand }
+    let val: string
+    if (ts.isStringLiteral(init) || ts.isNoSubstitutionTemplateLiteral(init)) val = init.text // verbatim: shorthands, var(), calc(), gradients (quote-stripped at the object boundary)
+    else if (ts.isNumericLiteral(init)) val = neg + init.text + (REACT_UNITLESS.has(rawKey) ? '' : 'px')
+    else return { decls, refusal: `style value for "${rawKey}" is a dynamic expression, not a literal — can't promote (would drop a live binding)` }
+    decls.push([cssKey, val])
+  }
+  return { decls }
+}
+
+/** Is this JSX element the component's ROOT returned element? (→ localName 'base', else a generated name.) */
+function isRootReturnElement(el: ts.Node): boolean {
+  let n: ts.Node | undefined = el.parent
+  while (n) {
+    if (ts.isJsxElement(n) || ts.isJsxFragment(n)) return false // a JSX ancestor ⇒ this is a child
+    if (ts.isReturnStatement(n) || ts.isArrowFunction(n) || ts.isParenthesizedExpression(n)) { n = n.parent; continue }
+    if (ts.isFunctionDeclaration(n) || ts.isFunctionExpression(n) || ts.isSourceFile(n)) return true
+    n = n.parent
+  }
+  return true
+}
+
+/** promote-element (blueprint §2/§2.1): lift ONE element's inline style → a class in <Name>.module.css.
+ * Idempotent no-op if already promoted / converter-output (R3). Creates the module + import on first use. */
+async function promoteElement(op: Extract<WriteOp, { kind: 'promote-element' }>): Promise<{ ok: true; file: string; newValueText: string; localClass: string; cssFile: string; noop?: boolean }> {
+  const abs = jailComponentWrite(op.file)
+  const buf = await fs.readFile(abs)
+  const source = buf.toString('utf8')
+  const sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
+  const el = findJsxAt(sf, op.line, op.col)
+  if (!el) throw Object.assign(new Error(`no JSX element at ${op.line}:${op.col}`), { status: 404 })
+  const attrs = el.attributes.properties
+  const classAttr = attrs.find((p): p is ts.JsxAttribute => ts.isJsxAttribute(p) && p.name.getText(sf) === 'className')
+  const styleAttr = attrs.find((p): p is ts.JsxAttribute => ts.isJsxAttribute(p) && p.name.getText(sf) === 'style')
+  const hasStylesImport = sf.statements.some((s) => ts.isImportDeclaration(s) && /\.module\.css['"]$/.test(s.moduleSpecifier.getText(sf)) && s.importClause?.name?.text === 'styles')
+  // R3 — idempotent no-op: already has a styles.* className + the module import (converter output / re-promote)
+  const classText = classAttr?.initializer?.getText(sf) ?? ''
+  const stylesClassMatch = /styles\.([A-Za-z_$][\w$]*)/.exec(classText)
+  if (hasStylesImport && stylesClassMatch && !styleAttr) {
+    return { ok: true, file: op.file, newValueText: stylesClassMatch[1], localClass: stylesClassMatch[1], cssFile: '', noop: true }
+  }
+  if (!styleAttr) throw Object.assign(new Error('element has no inline style to promote'), { status: 422 })
+  const init0 = styleAttr.initializer
+  if (!init0 || !ts.isJsxExpression(init0) || !init0.expression || !ts.isObjectLiteralExpression(init0.expression)) {
+    throw Object.assign(new Error('style is not a plain object literal — cannot promote'), { status: 422 })
+  }
+  const { decls, refusal } = styleObjectToCssDecls(init0.expression, sf)
+  if (refusal) throw Object.assign(new Error(refusal), { status: 422 })
+
+  // isRootReturnElement walks from the ELEMENT node (a JsxElement's parent is the return/paren, an
+  // opening element's parent is its own JsxElement) — pass the element, not the opening tag. localClass
+  // must be a valid JS identifier (used as `styles.<localClass>`), so hyphen-free: root → 'base'.
+  const elementNode: ts.Node = ts.isJsxSelfClosingElement(el) ? el : el.parent
+  const tag = (el.tagName.getText(sf) || 'el').replace(/[^a-zA-Z0-9]/g, '')
+  const localClass = isRootReturnElement(elementNode) ? 'base' : `${tag}${op.line}`
+  const compName = path.basename(abs, '.tsx')
+  const cssRel = op.file.replace(/[^/\\]+\.tsx$/, `${compName}.module.css`)
+  const cssAbs = jailModuleCss(cssRel)
+
+  // Build the CSS module content (create or append the rule).
+  const ruleBody = decls.map(([k, v]) => `  ${k}: ${v};`).join('\n')
+  const rule = `.${localClass} {\n${ruleBody}\n}\n`
+  let cssNext: string
+  try { const existing = (await fs.readFile(cssAbs)).toString('utf8'); cssNext = `${existing.replace(/\n*$/, '')}\n\n${rule}` }
+  catch { cssNext = rule }
+  await postcss.parse(cssNext, { from: cssAbs }) // parse-guard the CSS before ANY write
+
+  // Rewrite the .tsx: remove the style attr, add className={styles.<localClass>} (merge if present), add import.
+  const styleStart = byteLen(source.slice(0, styleAttr.getFullStart())), styleEnd = byteLen(source.slice(0, styleAttr.getEnd()))
+  let tsx: string
+  if (classAttr) {
+    // merge: className={styles.x} exists → make it className={`${styles.x} ${styles.localClass}`}? keep simple: append via clsx-free template
+    const ci = classAttr.initializer
+    const ciStart = byteLen(source.slice(0, ci!.getStart(sf))), ciEnd = byteLen(source.slice(0, ci!.getEnd()))
+    const inner = ci && ts.isJsxExpression(ci) && ci.expression ? ci.expression.getText(sf) : (ci ? ci.getText(sf).replace(/^['"]|['"]$/g, () => '') : '')
+    const merged = `{[${inner || "''"}, styles.${localClass}].filter(Boolean).join(' ')}`
+    // apply the higher-offset edit first (style removal) then the className (lower offset unaffected if class before style; guard by ordering)
+    const edits = [{ s: styleStart, e: styleEnd, t: '' }, { s: ciStart, e: ciEnd, t: merged }].sort((a, b) => b.s - a.s)
+    let b = buf
+    for (const ed of edits) b = Buffer.concat([b.subarray(0, ed.s), Buffer.from(ed.t, 'utf8'), b.subarray(ed.e)])
+    tsx = b.toString('utf8')
+  } else {
+    const repl = ` className={styles.${localClass}}`
+    tsx = Buffer.concat([buf.subarray(0, styleStart), Buffer.from(repl, 'utf8'), buf.subarray(styleEnd)]).toString('utf8')
+  }
+  if (!hasStylesImport) tsx = `import styles from './${compName}.module.css'\n${tsx}`
+  assertValidTsx(abs, tsx) // parse-guard the rewritten component BEFORE writing either file
+
+  await fs.writeFile(cssAbs, cssNext, 'utf8')
+  await fs.writeFile(abs, tsx, 'utf8')
+  return { ok: true, file: op.file, newValueText: `.${localClass} (${decls.length} decls)`, localClass, cssFile: cssRel }
+}
+
+/** The CSS selector a scoped write targets (blueprint §3.2). Interaction pseudo-states emit the F3 DUAL
+ * selector (`.base:hover, .base[data-preview="hover"]`) — the [data-preview] half is editor-only, stripped
+ * on export; the gallery force-previews a state by setting data-preview on the frame root. */
+function scopedSelector(localClass: string, scope: ScopedTarget): string {
+  const c = `.${localClass}`
+  if (scope.kind === 'base') return c
+  if (scope.kind === 'variant') return `${c}.${scope.name}`
+  if ('pseudo' in scope) return `${c}:${scope.pseudo}, ${c}[data-preview="${scope.pseudo}"]`
+  return `${c}[data-${scope.propClass}]`
+}
+
+/** write-scoped-declaration (blueprint §3.2): write ONE declaration into the base / variant / pseudo-state /
+ * prop-state rule of a component's .module.css, creating the rule if absent. DELTA discipline: caller only
+ * sends props that differ from base. postcss-manipulated + parse-guarded + jailed like every css write. */
+async function writeScopedDeclaration(op: Extract<WriteOp, { kind: 'write-scoped-declaration' }>): Promise<{ ok: true; file: string; newValueText: string }> {
+  if (!/^[a-zA-Z_][\w-]*$/.test(op.localClass)) throw Object.assign(new Error('invalid class name'), { status: 422 })
+  if (op.scope.kind === 'variant' && !/^[a-zA-Z_][\w-]*$/.test(op.scope.name)) throw Object.assign(new Error('invalid variant name'), { status: 422 })
+  if (!/^(--)?[a-zA-Z][\w-]*$/.test(op.prop)) throw Object.assign(new Error(`invalid CSS property: ${op.prop}`), { status: 422 })
+  if (/[{};]/.test(op.value) || op.value.trim() === '') throw Object.assign(new Error(`invalid CSS value: ${op.value}`), { status: 422 })
+  const abs = jailModuleCss(op.file)
+  const source = (await fs.readFile(abs)).toString('utf8')
+  const selector = scopedSelector(op.localClass, op.scope)
+  const root = postcss.parse(source, { from: abs })
+  let rule = root.nodes.find((n): n is Rule => n.type === 'rule' && n.selector === selector)
+  if (!rule) { rule = postcss.rule({ selector }); root.append(rule) }
+  const decl = rule.nodes.find((n): n is Declaration => n.type === 'decl' && n.prop === op.prop)
+  if (decl) decl.value = op.value
+  else rule.append({ prop: op.prop, value: op.value })
+  const next = root.toString()
+  await postcss.parse(next, { from: abs }) // parse-guard: refuse rather than corrupt
+  await fs.writeFile(abs, next, 'utf8')
+  return { ok: true, file: op.file, newValueText: `${selector} { ${op.prop}: ${op.value} }` }
+}
+
+// ─── I0: ComponentModel READ (blueprint §1) — source IS the model ────────────────
+export type ComponentModel = {
+  name: string
+  file: string
+  cssModule: string | null    // relative path, null = not yet promoted (inline-styled)
+  rootClass: string | null    // the base local class, null pre-promotion
+  props: { name: string; tsType: string; optional: boolean; default?: string }[]
+  variants: { name: string; kind: 'config'; selector: string; decls: Record<string, string> }[]
+  states: { state: string; kind: 'interaction' | 'semantic'; selector: string; decls: Record<string, string> }[]
+}
+
+/** Classify a .module.css rule selector relative to the base class (blueprint §1/§3.2). */
+function classifyScopedSelector(sel: string, base: string): { kind: 'base' | 'config' | 'interaction' | 'semantic'; name: string } | null {
+  const first = sel.split(',')[0].trim() // dual pseudo selectors: `.base:hover, .base[data-preview=...]`
+  const b = `.${base}`
+  if (first === b) return { kind: 'base', name: base }
+  let m = new RegExp(`^\\.${base}\\.([\\w-]+)$`).exec(first); if (m) return { kind: 'config', name: m[1] }        // .base.secondary
+  m = new RegExp(`^\\.${base}:([\\w-]+)$`).exec(first); if (m) return { kind: 'interaction', name: m[1] }         // .base:hover
+  m = new RegExp(`^\\.${base}\\[data-([\\w-]+)\\]$`).exec(first); if (m) return { kind: 'semantic', name: m[1] }  // .base[data-loading]
+  return null
+}
+
+/** Parse a component .tsx (+ its .module.css) → the structured ComponentModel. READ layer of the
+ * bidirectional compiler: after every write the editor re-reads this so nothing drifts from source. */
+export async function parseComponentModel(file: string): Promise<ComponentModel> {
+  const abs = jailComponent(file)
+  const source = (await fs.readFile(abs)).toString('utf8')
+  const sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
+  const name = path.basename(abs, path.extname(abs))
+
+  // props ← the exported component function's first (destructured) param + its type literal.
+  const props: ComponentModel['props'] = []
+  let fn: ts.FunctionDeclaration | ts.ArrowFunction | undefined
+  for (const st of sf.statements) {
+    if (ts.isFunctionDeclaration(st) && st.name && /^[A-Z]/.test(st.name.text)) { fn = st; break }
+    if (ts.isVariableStatement(st)) for (const d of st.declarationList.declarations) {
+      if (ts.isIdentifier(d.name) && /^[A-Z]/.test(d.name.text) && d.initializer && ts.isArrowFunction(d.initializer)) { fn = d.initializer }
+    }
+  }
+  const param = fn?.parameters[0]
+  if (param && ts.isObjectBindingPattern(param.name)) {
+    const typeMembers = new Map<string, { type: string; optional: boolean }>()
+    if (param.type && ts.isTypeLiteralNode(param.type)) for (const m of param.type.members) {
+      if (ts.isPropertySignature(m) && m.name) typeMembers.set(m.name.getText(sf), { type: m.type?.getText(sf) ?? 'unknown', optional: !!m.questionToken })
+    }
+    for (const e of param.name.elements) {
+      if (!ts.isIdentifier(e.name)) continue
+      const pn = e.name.text
+      const t = typeMembers.get(pn)
+      props.push({ name: pn, tsType: t?.type ?? 'unknown', optional: t?.optional ?? false, default: e.initializer?.getText(sf) })
+    }
+  }
+
+  // cssModule ← the `import styles from './X.module.css'` specifier.
+  let cssModule: string | null = null
+  for (const st of sf.statements) {
+    if (ts.isImportDeclaration(st) && st.importClause?.name?.text === 'styles') {
+      const spec = st.moduleSpecifier.getText(sf).replace(/^['"]|['"]$/g, '')
+      if (spec.endsWith('.module.css')) cssModule = file.replace(/[^/\\]+$/, spec.replace(/^\.\//, ''))
+    }
+  }
+
+  const variants: ComponentModel['variants'] = []
+  const states: ComponentModel['states'] = []
+  let rootClass: string | null = null
+  if (cssModule) {
+    try {
+      const cssAbs = jailModuleCss(cssModule)
+      const css = (await fs.readFile(cssAbs)).toString('utf8')
+      const root = postcss.parse(css, { from: cssAbs })
+      // base class = the first bare `.<ident>` rule (convention: `.base`).
+      const baseRule = root.nodes.find((n): n is Rule => n.type === 'rule' && /^\.[\w-]+$/.test(n.selector.split(',')[0].trim()))
+      rootClass = baseRule ? baseRule.selector.split(',')[0].trim().slice(1) : null
+      if (rootClass) for (const node of root.nodes) {
+        if (node.type !== 'rule') continue
+        const cls = classifyScopedSelector((node as Rule).selector, rootClass)
+        if (!cls || cls.kind === 'base') continue
+        const decls: Record<string, string> = {}
+        for (const d of (node as Rule).nodes) if (d.type === 'decl') decls[(d as Declaration).prop] = (d as Declaration).value
+        if (cls.kind === 'config') variants.push({ name: cls.name, kind: 'config', selector: (node as Rule).selector, decls })
+        else states.push({ state: cls.name, kind: cls.kind === 'interaction' ? 'interaction' : 'semantic', selector: (node as Rule).selector, decls })
+      }
+    } catch { /* module unreadable → treat as unpromoted */ cssModule = cssModule }
+  }
+  return { name, file, cssModule, rootClass, props, variants, states }
 }
 
 /**
@@ -1098,6 +1339,8 @@ export async function applyWrite(op: WriteOp): Promise<{ ok: true; file: string;
   if (op.kind === 'rename-component') return renameComponentOp(op)
   if (op.kind === 'wrap-jsx-link') return wrapJsxLink(op)
   if (op.kind === 'make-component') return makeComponent(op)
+  if (op.kind === 'promote-element') return promoteElement(op)
+  if (op.kind === 'write-scoped-declaration') return writeScopedDeclaration(op)
   if (op.kind === 'create-page') return createPage(op)
   if (op.kind === 'set-token-value') return setTokenValue(op)
   if (op.kind === 'set-jsx-style') return setJsxStyle(op)
