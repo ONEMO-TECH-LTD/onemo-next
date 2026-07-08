@@ -550,7 +550,19 @@ async function writeScopedDeclaration(op: Extract<WriteOp, { kind: 'write-scoped
   if (/[{};]/.test(op.value) || op.value.trim() === '') throw Object.assign(new Error(`invalid CSS value: ${op.value}`), { status: 422 })
   const abs = jailModuleCss(op.file)
   const source = (await fs.readFile(abs)).toString('utf8')
-  const selector = scopedSelector(op.localClass, op.scope)
+  // Determinism is a property of the COMPOSER, not a caller convention (blueprint §3.2): sort the composite
+  // axisValues by the component's actual `variantAxes` index (read from the .tsx sibling), regardless of the
+  // order the caller sent them — so any two edits to the same target always compose the SAME rule. Only
+  // matters for ≥2 axes; single-axis / non-composite need no sort.
+  let scope: ScopedTarget = op.scope
+  if (op.scope.kind === 'composite' && (op.scope.axisValues?.length ?? 0) >= 2) {
+    try {
+      const order = (await parseComponentModel(op.file.replace(/\.module\.css$/, '.tsx'))).variantAxes.map((a) => a.axis)
+      const rank = (axis: string) => { const i = order.indexOf(axis); return i === -1 ? Number.MAX_SAFE_INTEGER : i }
+      scope = { ...op.scope, axisValues: [...op.scope.axisValues!].sort((a, b) => rank(a.axis) - rank(b.axis)) }
+    } catch { /* model unreadable → keep caller order (still deterministic per this write) */ }
+  }
+  const selector = scopedSelector(op.localClass, scope)
   const root = postcss.parse(source, { from: abs })
   let rule = root.nodes.find((n): n is Rule => n.type === 'rule' && n.selector === selector)
   if (!rule) { rule = postcss.rule({ selector }); root.append(rule) }
