@@ -481,7 +481,8 @@ async function insertJsxChild(op: Extract<WriteOp, { kind: 'insert-jsx-child' }>
 async function createPage(op: Extract<WriteOp, { kind: 'create-page' }>): Promise<{ ok: true; file: string; newValueText: string; route: string }> {
   // E9: creating a page is a TRUE action in the loaded build — a new top-level route in ITS app
   // dir (Framer's New Page analog), not a write into a hardcoded editor sandbox.
-  const base = (op.slugBase ?? 'new-page').replace(/[^a-z0-9-]/gi, '-').toLowerCase()
+  // F-E9c (lead LOW): trim leading/trailing/collapsed dashes like rename does (no /------etc)
+  const base = ((op.slugBase ?? 'new-page').replace(/[^a-z0-9-]/gi, '-').toLowerCase().replace(/-+/g, '-').replace(/^-+|-+$/g, '')) || 'new-page'
   const parent = await buildAppDir()
   let slug = base, n = 1
   // unique in BOTH the sibling dir space AND the route space (groups collapse — expert #2)
@@ -709,6 +710,12 @@ async function dirForRoute(route: string): Promise<{ appDir: string; dir: string
   }
   await walk(appDir)
   if (!found) throw Object.assign(new Error(`no page at route ${route}`), { status: 404 })
+  // F-E9a (lead MED): realpath-confine before returning — fs.rm/rename would otherwise operate
+  // THROUGH a mid-path symlink and escape the app tree (this repo uses symlinks). The structural
+  // jail silently dropped the guarantee the old location jail gave; restore it.
+  const realFound = await fs.realpath(found)
+  const realApp = await fs.realpath(appDir)
+  if (realFound !== realApp && !realFound.startsWith(realApp + path.sep)) throw Object.assign(new Error('resolved page dir escapes the build (symlink)'), { status: 403 })
   return { appDir, dir: found }
 }
 /** Route-space uniqueness (expert #2 — same failure class as the digit-slug 500): sibling-dir checks
@@ -736,6 +743,9 @@ async function assertDeletablePage(appDir: string, dir: string): Promise<void> {
   // guard 2: only page-owned files (page.tsx + styles + static assets) — layout/route/other code = refuse
   const OWNED = /^page\.(t|j)sx?$|\.module\.css$|\.(png|jpe?g|svg|webp|gif|ico)$/
   for (const e of entries) {
+    // F-E9b (lead LOW): a symlink Dirent is neither isFile nor isDirectory → it slips both guards
+    // and is the subdir vector for the F-E9a follow-escape. Refuse any symlink outright.
+    if (e.isSymbolicLink()) throw Object.assign(new Error(`dir contains a symlink ${e.name} — not deletable as a page`), { status: 422 })
     if (e.isFile() && !OWNED.test(e.name)) throw Object.assign(new Error(`dir contains non-page file ${e.name} — not deletable as a page`), { status: 422 })
     // guard 1: leaf only — any descendant page.tsx means child pages would be nuked
     if (e.isDirectory()) {
