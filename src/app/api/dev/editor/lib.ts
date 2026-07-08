@@ -709,8 +709,14 @@ function extractUnionValues(type: ts.TypeNode): string[] {
  * params + inline type literal. Generalizes addBooleanPropToComponent (boolean → a `'a'|'b'|…` union with a
  * default). CREATE if absent; EXTEND (merge new values into the union) if present; idempotent no-op if all
  * values already there. NO data-attr — a config axis drives `className`, not a toggle. Caller assertValidTsx's. */
+// React-reserved / special prop names that a component NEVER receives as a plain prop (React intercepts them)
+// — minting one as a variant axis or exposed prop is a SILENT runtime trap (tsc 0, but the axis never switches
+// / the prop shadows React's own). Reject at the mint (F-M5, expert's adversarial catch). Shared by
+// add-variant-axis (I2) AND expose-as-prop (I3, user-typed names → collisions likely).
+const RESERVED_PROP_NAMES = new Set(['key', 'ref', 'children', 'className', 'style', 'dangerouslySetInnerHTML', 'defaultValue', 'defaultChecked'])
 function mintUnionProp(source: string, sf: ts.SourceFile, propName: string, values: string[], defaultValue: string): string {
   if (!/^[a-zA-Z][a-zA-Z0-9]*$/.test(propName)) throw Object.assign(new Error(`invalid axis/prop name: ${propName}`), { status: 422 })
+  if (RESERVED_PROP_NAMES.has(propName)) throw Object.assign(new Error(`"${propName}" is a React-reserved prop name — it can't be a variant axis or exposed prop (React never passes it through, so it would silently never work)`), { status: 422 })
   if (!values.length) throw Object.assign(new Error('no values'), { status: 422 })
   for (const v of values) if (!/^[a-zA-Z0-9][\w-]*$/.test(v)) throw Object.assign(new Error(`invalid value: ${v}`), { status: 422 })
   if (!values.includes(defaultValue)) throw Object.assign(new Error(`default "${defaultValue}" not in values`), { status: 422 })
