@@ -46,6 +46,9 @@ function routeFor(appDir: string, absDir: string): string | undefined {
 async function scanPages(root: string): Promise<{ appDir: string; pages: BuildPage[] } | null> {
   const appDir = await appDirOf(root)
   if (!appDir) return null
+  // s58-qa MED: the LISTING must apply the same realpath-confinement the write ops do — an escaped
+  // mid-path symlink was listed as a real mutable page (delete then 403'd, but the list lied).
+  const realApp = await fs.realpath(appDir).catch(() => appDir)
   const pages: BuildPage[] = []
   // The editor's own machinery is not editable content (restores the original routeFor's
   // self-exclusion the lift dropped — expert meta finding: the editor could delete its own
@@ -57,6 +60,8 @@ async function scanPages(root: string): Promise<{ appDir: string; pages: BuildPa
   const walk = async (dir: string): Promise<void> => {
     let real: string
     try { real = await fs.realpath(dir) } catch { return }
+    // confine to the build's real app dir — a symlink that escapes it is not a page of this build
+    if (real !== realApp && !real.startsWith(realApp + path.sep)) return
     if (seen.has(real)) return
     seen.add(real)
     let entries
