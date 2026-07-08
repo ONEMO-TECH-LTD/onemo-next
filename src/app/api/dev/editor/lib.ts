@@ -681,6 +681,11 @@ function routeOfDir(appDir: string, absDir: string): string | undefined {
   return url === '' ? '/' : url
 }
 const PAGE_SCAN_SKIP = new Set(['node_modules', '.git', '.next', '.turbo', 'dist', 'coverage'])
+/** Editor-own routes are never page-op targets — the editor must not edit/delete its own host
+ *  (expert meta finding: without this, delete-page could remove the editor's canvas). */
+function assertNotEditorSelf(route: string): void {
+  if (/^\/react-figma(\/|$)/.test(route)) throw Object.assign(new Error('editor-own route — not editable as a page'), { status: 422 })
+}
 /** Map a route back to its page dir — via the same scan the pages API uses (the fs is the registry). */
 async function dirForRoute(route: string): Promise<{ appDir: string; dir: string }> {
   const appDir = await buildAppDir()
@@ -733,6 +738,7 @@ async function assertDeletablePage(appDir: string, dir: string): Promise<void> {
   }
 }
 async function deletePage(op: Extract<WriteOp, { kind: 'delete-page' }>): Promise<{ ok: true; file: string; newValueText: string }> {
+  assertNotEditorSelf(op.route)
   const { appDir, dir } = await dirForRoute(op.route)
   await assertDeletablePage(appDir, dir)
   await fs.rm(dir, { recursive: true })
@@ -741,6 +747,7 @@ async function deletePage(op: Extract<WriteOp, { kind: 'delete-page' }>): Promis
 }
 /* 3.0/E9 (Dan): duplicate a page — a sibling dir next to the original, wherever it lives. */
 async function duplicatePage(op: Extract<WriteOp, { kind: 'duplicate-page' }>): Promise<{ ok: true; file: string; newValueText: string; route: string }> {
+  assertNotEditorSelf(op.route)
   const { appDir, dir } = await dirForRoute(op.route)
   const srcFile = path.join(dir, 'page.tsx')
   let source: string
@@ -758,8 +765,9 @@ async function duplicatePage(op: Extract<WriteOp, { kind: 'duplicate-page' }>): 
   return { ok: true, file: path.relative(ROOT, path.join(target, 'page.tsx')), newValueText: slug, route: routeOfDir(appDir, target) ?? `/${slug}` }
 }
 async function renamePage(op: Extract<WriteOp, { kind: 'rename-page' }>): Promise<{ ok: true; file: string; newValueText: string; route: string }> {
-  const { appDir, dir } = await dirForRoute(op.route)
+  assertNotEditorSelf(op.route)
   if (op.route === '/') throw Object.assign(new Error('cannot rename the home page'), { status: 422 })
+  const { appDir, dir } = await dirForRoute(op.route)
   const base = op.newSlug.replace(/[^a-z0-9-]/gi, '-').toLowerCase().replace(/^-+|-+$/g, '')
   if (!base) throw Object.assign(new Error('invalid new name'), { status: 422 })
   const parent = path.dirname(dir)

@@ -47,15 +47,21 @@ async function scanPages(root: string): Promise<{ appDir: string; pages: BuildPa
   const appDir = await appDirOf(root)
   if (!appDir) return null
   const pages: BuildPage[] = []
+  // The editor's own machinery is not editable content (restores the original routeFor's
+  // self-exclusion the lift dropped — expert meta finding: the editor could delete its own
+  // canvas host). /react-figma itself is excluded; its sub-routes (canvas hosts) stay LISTED
+  // (canvas can BE the loaded page) but are never mutable — and the write ops refuse them
+  // independently (defense in depth, not UI-only).
+  const EDITOR_SELF = /^\/react-figma(\/|$)/
   const walk = async (dir: string): Promise<void> => {
     let entries
     try { entries = await fs.readdir(dir, { withFileTypes: true }) } catch { return }
     for (const f of ['page.tsx', 'page.jsx', 'page.js']) {
       if (entries.some((e) => e.isFile() && e.name === f)) {
         const route = routeFor(appDir, dir)
-        if (route !== undefined) {
+        if (route !== undefined && route !== '/react-figma') {
           const segs = route.split('/').filter(Boolean)
-          pages.push({ name: route === '/' ? 'home' : segs[segs.length - 1], route, file: path.relative(root, path.join(dir, f)), home: route === '/', mutable: true })
+          pages.push({ name: route === '/' ? 'home' : segs[segs.length - 1], route, file: path.relative(root, path.join(dir, f)), home: route === '/', mutable: !EDITOR_SELF.test(route) })
         }
         break
       }
