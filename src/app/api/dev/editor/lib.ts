@@ -276,6 +276,7 @@ export type WriteOp =
   | { kind: 'add-state'; file: string; state: 'hover' | 'pressed' | 'focus' | 'disabled' | 'loading' | 'error' } // I1: make a state authorable (blueprint §3.5)
   | { kind: 'add-variant-axis'; file: string; axis: string; values: string[]; defaultValue: string } // I2: a new config axis (blueprint §3.3a)
   | { kind: 'add-variant-value'; file: string; axis: string; value: string } // I2: extend an axis's union (blueprint §3.3b)
+  | { kind: 'expose-as-prop'; file: string; cssProp: string; propName: string; controlType?: string } // I3: fixed CSS value → editable prop via the custom-property bridge (blueprint §5)
   | { kind: 'set-token-value'; tokenPath: string; theme?: string; value: string | number }
   | { kind: 'set-jsx-style'; file: string; line: number; col: number; prop: string; value: string; expectRaw?: string }
   | { kind: 'set-jsx-text'; file: string; line: number; col: number; newText: string; expectRaw?: string }
@@ -817,6 +818,81 @@ async function addVariantValue(op: Extract<WriteOp, { kind: 'add-variant-value' 
   assertValidTsx(abs, next)
   await fs.writeFile(abs, next, 'utf8')
   return { ok: true, file: op.file, newValueText: `variant value "${op.axis}=${op.value}" added` }
+}
+
+// ─── I3: props — expose-as-prop + the custom-property bridge (blueprint §5) ────────
+/** The tsx half of the module-css bridge (§5): add a `<prop>?: string` to the component's destructured
+ * params + inline type literal (OPTIONAL, default undefined so React omits an unset custom property), plus a
+ * `style={{ '--<prop>': <prop> }}` custom property on the ROOT (merged into an existing style object, or a
+ * new style attr). Refuses 409 if the prop already exists. */
+function exposeStringPropOnRoot(source: string, sf: ts.SourceFile, propName: string): string {
+  const fn = findComponentFn(sf)
+  if (!fn) throw Object.assign(new Error('no exported component function found'), { status: 422 })
+  const root = findRootReturnedElement(fn, sf)
+  if (!root) throw Object.assign(new Error('no root JSX element'), { status: 422 })
+  const edits: { s: number; e?: number; t: string }[] = []
+  const param = fn.parameters[0]
+  if (!param) {
+    const openParen = source.indexOf('(', fn.getStart(sf))
+    edits.push({ s: openParen + 1, t: `{ ${propName} }: { ${propName}?: string }` })
+  } else if (ts.isObjectBindingPattern(param.name)) {
+    if (param.name.elements.some((el) => ts.isIdentifier(el.name) && el.name.text === propName)) throw Object.assign(new Error(`prop "${propName}" already exists`), { status: 409 })
+    const hasElems = param.name.elements.length > 0
+    edits.push({ s: param.name.getEnd() - 1, t: `${hasElems ? ', ' : ' '}${propName} ` })
+    if (param.type && ts.isTypeLiteralNode(param.type)) {
+      const hasMembers = param.type.members.length > 0
+      edits.push({ s: param.type.getEnd() - 1, t: `${hasMembers ? '; ' : ' '}${propName}?: string ` })
+    } else throw Object.assign(new Error('component params have no inline type literal — cannot type the new prop'), { status: 422 })
+  } else throw Object.assign(new Error('component param is not a destructured object — out of scope'), { status: 422 })
+  const opening = ts.isJsxElement(root) ? root.openingElement : root
+  const styleAttr = opening.attributes.properties.find((p): p is ts.JsxAttribute => ts.isJsxAttribute(p) && p.name.getText(sf) === 'style')
+  const cssVar = `'--${propName}': ${propName}`
+  if (!styleAttr) {
+    edits.push({ s: opening.tagName.getEnd(), t: ` style={{ ${cssVar} }}` })
+  } else {
+    const init = styleAttr.initializer
+    if (init && ts.isJsxExpression(init) && init.expression && ts.isObjectLiteralExpression(init.expression)) {
+      edits.push({ s: init.expression.getStart(sf) + 1, t: ` ${cssVar},` }) // prepend into the object literal
+    } else throw Object.assign(new Error('root style is not an inline object literal — cannot merge the custom property'), { status: 422 })
+  }
+  edits.sort((a, b) => b.s - a.s)
+  let out = source
+  for (const ed of edits) out = out.slice(0, ed.s) + ed.t + out.slice(ed.e ?? ed.s)
+  return out
+}
+/** expose-as-prop (blueprint §5, module-css bridge): turn a fixed CSS value into an editable prop. Rewrites
+ * EVERY rule of this component that declares `cssProp` (base + variant/state deltas) →
+ * `var(--<prop>, <that-rule's-literal>)` (keeping each literal as the fallback), then adds the `<prop>?:
+ * string` prop + the `style={{'--<prop>': prop}}` root custom property. Precedence falls out clean —
+ * explicit prop > variant > base (§5): prop set → the root var cascades into every rule and wins; prop
+ * unset → each rule falls to its own literal, so the higher-specificity variant/state beats base. */
+async function exposeAsProp(op: Extract<WriteOp, { kind: 'expose-as-prop' }>): Promise<{ ok: true; file: string; newValueText: string }> {
+  if (!/^[a-zA-Z][a-zA-Z0-9]*$/.test(op.propName)) throw Object.assign(new Error(`invalid prop name: ${op.propName}`), { status: 422 })
+  if (RESERVED_PROP_NAMES.has(op.propName)) throw Object.assign(new Error(`"${op.propName}" is a React-reserved prop name — it can't be exposed as a prop`), { status: 422 })
+  if (!/^[a-z][a-z-]*$/.test(op.cssProp)) throw Object.assign(new Error(`invalid CSS property: ${op.cssProp}`), { status: 422 })
+  const model = await parseComponentModel(op.file)
+  if (!model.cssModule || !model.rootClass) throw Object.assign(new Error('promote the component to a CSS module first'), { status: 422 })
+  const cssAbs = jailModuleCss(model.cssModule)
+  const cssRoot = postcss.parse((await fs.readFile(cssAbs)).toString('utf8'), { from: cssAbs })
+  let rewrites = 0
+  cssRoot.walkRules((rule) => {
+    if (!rule.selector.split(',')[0].trim().startsWith(`.${model.rootClass}`)) return // this component's rules only
+    rule.walkDecls(op.cssProp, (decl) => {
+      if (/^var\(/.test(decl.value.trim())) return // already bridged
+      decl.value = `var(--${op.propName}, ${decl.value})`
+      rewrites++
+    })
+  })
+  if (!rewrites) throw Object.assign(new Error(`no "${op.cssProp}" declaration on this component to expose`), { status: 422 })
+  const cssNext = cssRoot.toString()
+  await postcss.parse(cssNext, { from: cssAbs }) // parse-guard: refuse rather than corrupt
+  const abs = jailComponentWrite(op.file)
+  const sf = ts.createSourceFile(abs, (await fs.readFile(abs)).toString('utf8'), ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
+  const tsxNext = exposeStringPropOnRoot(sf.getFullText(), sf, op.propName)
+  assertValidTsx(abs, tsxNext)
+  await fs.writeFile(cssAbs, cssNext, 'utf8')
+  await fs.writeFile(abs, tsxNext, 'utf8')
+  return { ok: true, file: op.file, newValueText: `exposed ${op.cssProp} as prop "${op.propName}" (${rewrites} rule${rewrites > 1 ? 's' : ''} bridged)` }
 }
 
 // ─── I0: ComponentModel READ (blueprint §1) — source IS the model ────────────────
@@ -1704,6 +1780,7 @@ async function applyWriteInner(op: WriteOp): Promise<{ ok: true; file: string; n
   if (op.kind === 'add-state') return addState(op)
   if (op.kind === 'add-variant-axis') return addVariantAxis(op)
   if (op.kind === 'add-variant-value') return addVariantValue(op)
+  if (op.kind === 'expose-as-prop') return exposeAsProp(op)
   if (op.kind === 'create-page') return createPage(op)
   if (op.kind === 'set-token-value') return setTokenValue(op)
   if (op.kind === 'set-jsx-style') return setJsxStyle(op)
