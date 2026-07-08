@@ -2339,7 +2339,7 @@ export default function ReactFigmaPage() {
   const [editTarget, setEditTarget] = useState<EditTarget>({ kind: 'base' })
   const editTargetRef = useRef(editTarget); useEffect(() => { editTargetRef.current = editTarget }, [editTarget])
   // component model of the component currently being edited (its .tsx file + base class + variants/states)
-  type EditModel = { file: string; cssModule: string | null; rootClass: string | null; root: { line: number; col: number } | null; rootTag: string | null; variantAxes: { axis: string; values: string[]; defaultValue: string }[]; states: string[] }
+  type EditModel = { file: string; cssModule: string | null; rootClass: string | null; root: { line: number; col: number } | null; rootTag: string | null; variantAxes: { axis: string; values: string[]; defaultValue: string }[]; props: { name: string; tsType: string }[]; states: string[] }
   const [editModel, setEditModel] = useState<EditModel | null>(null)
   const editModelRef = useRef(editModel); useEffect(() => { editModelRef.current = editModel }, [editModel])
   const editingComponentRef = useRef(editingComponent); useEffect(() => { editingComponentRef.current = editingComponent }, [editingComponent])
@@ -2358,7 +2358,7 @@ export default function ReactFigmaPage() {
       if (!r.axisValues.length && !r.semantic.length && r.pseudo) states.add(PSEUDO_STATE[r.pseudo] ?? r.pseudo)
       if (!r.axisValues.length && !r.pseudo) for (const s of r.semantic) states.add(s)
     }
-    return { file: m.file, cssModule: m.cssModule, rootClass: m.rootClass, root: m.root, rootTag: tag, variantAxes: m.variantAxes ?? [], states: [...states] }
+    return { file: m.file, cssModule: m.cssModule, rootClass: m.rootClass, root: m.root, rootTag: tag, variantAxes: m.variantAxes ?? [], props: (m.props ?? []).map((p) => ({ name: p.name, tsType: p.tsType })), states: [...states] }
   }
   const fetchModel = (file: string) => fetch(`/api/dev/editor-component-model?file=${encodeURIComponent(file)}`).then((r) => (r.ok ? r.json() : null)).catch(() => null)
   useEffect(() => { // reset the target + load the model; AUTO-PROMOTE the root so states/variants are authorable
@@ -3987,6 +3987,24 @@ export default function ReactFigmaPage() {
                       style={{ appearance: 'none', border: `1px solid ${active ? SEL : LINE}`, background: active ? '#e5f4ff' : '#fff', color: active ? SEL : INK, borderRadius: 5, padding: '3px 7px', cursor: 'pointer', font: 'inherit' }}>{c.label}</button>
                   })())}
               </div>
+              {/* I3 props panel (§5): the component's EXPOSED props — text/colour/etc turned editable via the
+                  custom-property bridge. Axis props render as the variant chips above; the 6 states as state
+                  chips; this lists the rest (a real prop a consumer sets per-instance). */}
+              {(() => {
+                const STATE_NAMES = new Set(['hover', 'pressed', 'focus', 'disabled', 'loading', 'error'])
+                const exposed = (editModel?.props ?? []).filter((p) => !(editModel?.variantAxes ?? []).some((a) => a.axis === p.name) && !STATE_NAMES.has(p.name))
+                return exposed.length > 0 ? (
+                  <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <div style={{ font: `600 8px/1 ${FONT}`, color: MUTE, textTransform: 'uppercase', letterSpacing: '0.4px' }}>Props</div>
+                    {exposed.map((p) => (
+                      <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 6, font: `500 9px/1 ${FONT}` }}>
+                        <span style={{ color: SEL }}>{p.name}</span>
+                        <span style={{ color: FAINT }}>{p.tsType}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null
+              })()}
             </div>
           ) : (
             <button type="button" onClick={selectFrameRoot} title="Select frame" style={{ appearance: 'none', border: 0, background: 'transparent', font: `550 10px/1 ${FONT}`, color: SEL, marginBottom: 8, marginLeft: 2, cursor: 'pointer', padding: 0 }}>{canvas.name} · {hostDims.w} × {hostDims.h}</button>
