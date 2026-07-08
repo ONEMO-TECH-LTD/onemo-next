@@ -1430,6 +1430,11 @@ function FontPickerField({ value, onPick }: { value: string; onPick: (stack: str
    Module-level notify() so handlers don't thread a prop; Toaster (rendered once) listens. */
 type ToastKind = 'ok' | 'error'
 let _toastSeq = 0
+
+// Form-associated roots — the only tags CSS `:disabled` matches. `disabled` on any other root (a <div>
+// component) is a SEMANTIC state (boolean prop + `[data-disabled]`, §6.2), mirrored server-side in lib.ts.
+// Module-scoped so it's a stable reference (not a hook dependency).
+const FORM_ROOTS = new Set(['button', 'input', 'select', 'textarea', 'fieldset', 'option', 'optgroup'])
 function notify(message: string, kind: ToastKind = 'ok') {
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('rf-toast', { detail: { id: ++_toastSeq, message, kind } }))
 }
@@ -2365,9 +2370,14 @@ export default function ReactFigmaPage() {
   // Selecting a state chip: semantic states (loading/error) get their real boolean prop added on first
   // pick (add-state), THEN become the edit target. Interaction states + variants just set the target.
   const selectEditTarget = useCallback(async (t: EditTarget) => {
-    if (t.kind === 'state' && (t.state === 'loading' || t.state === 'error')) {
+    if (t.kind === 'state') {
       const em = editModelRef.current
-      if (em?.file && !em.states.includes(t.state)) {
+      // SEMANTIC states (loading/error, + `disabled` on a NON-form root — §6.2) must add their boolean prop
+      // + data-toggle BEFORE the `[data-<state>]` rule can be driven, so fire add-state on chip selection.
+      // INTERACTION states (hover/pressed/focus, + `disabled` on a FORM root) create their `:pseudo` rule
+      // lazily on the first scoped edit, so no add-state trigger is needed.
+      const needsAddState = t.state === 'loading' || t.state === 'error' || (t.state === 'disabled' && em?.rootTag != null && !FORM_ROOTS.has(em.rootTag))
+      if (needsAddState && em?.file && !em.states.includes(t.state)) {
         await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'add-state', file: em.file, state: t.state }) })
         await reloadEditModel(em.file)
       }
@@ -2381,15 +2391,19 @@ export default function ReactFigmaPage() {
     const doc = iframeRef.current?.contentDocument
     if (!doc || canvasMode !== 'components') return
     const et = editTarget
-    const pseudo = et.kind === 'state' && (et.state === 'hover' || et.state === 'pressed' || et.state === 'focus' || et.state === 'disabled') ? ({ hover: 'hover', pressed: 'active', focus: 'focus-visible', disabled: 'disabled' } as const)[et.state] : null
-    const semantic = et.kind === 'state' && (et.state === 'loading' || et.state === 'error') ? et.state : null
+    const em = editModelRef.current
+    // `disabled` on a non-form root force-previews via the SEMANTIC `data-disabled` toggle (its real rule is
+    // `.base[data-disabled]`), NOT the interaction `data-fc-preview` path — mirror the server/redirect branch.
+    const disabledSemantic = et.kind === 'state' && et.state === 'disabled' && em?.rootTag != null && !FORM_ROOTS.has(em.rootTag)
+    const pseudo = et.kind === 'state' && (et.state === 'hover' || et.state === 'pressed' || et.state === 'focus' || (et.state === 'disabled' && !disabledSemantic)) ? ({ hover: 'hover', pressed: 'active', focus: 'focus-visible', disabled: 'disabled' } as const)[et.state] : null
+    const semantic = et.kind === 'state' && (et.state === 'loading' || et.state === 'error' || disabledSemantic) ? et.state : null
     doc.querySelectorAll('[data-component-frame]').forEach((f) => {
       if (pseudo) f.setAttribute('data-fc-preview', pseudo); else f.removeAttribute('data-fc-preview')
       const rootEl = f.querySelector('*') as HTMLElement | null
-      for (const s of ['loading', 'error']) rootEl?.removeAttribute(`data-${s}`)
+      for (const s of ['loading', 'error', 'disabled']) rootEl?.removeAttribute(`data-${s}`)
       if (semantic && rootEl) rootEl.setAttribute(`data-${semantic}`, '')
     })
-  }, [editTarget, canvasMode])
+  }, [editTarget, canvasMode, editModel])
   const [autoDistributed, setAutoDistributed] = useState(false) // justify space-between (Figma distributed)
   const [insetSides, setInsetSides] = useState({ t: '0', r: '0', b: '0', l: '0' }) // A7: per-side inset (positioned elements) // derived — the far-left rail IS the canvas switch (Dan 2026-07-07)
   const dsComponents = useDsComponents(rail === 'assets' || rail === 'components', compNonce) // E4-G4 Assets panel + E10 components rail (library panel needs the list whether or not editing)
@@ -2891,7 +2905,6 @@ export default function ReactFigmaPage() {
       if (editingComponentRef.current && em?.cssModule && em.rootClass && et.kind !== 'base' && decls.length) {
         // F-M2: `disabled` on a non-form root (e.g. a <div>) can't match CSS `:disabled` → route it to the
         // semantic `[data-disabled]` path, same as the server add-state; form-associated roots keep `:disabled`.
-        const FORM_ROOTS = new Set(['button', 'input', 'select', 'textarea', 'fieldset', 'option', 'optgroup'])
         const scope = et.kind === 'variant'
           ? { kind: 'variant', name: et.name }
           : (et.state === 'hover' || et.state === 'pressed' || et.state === 'focus' || (et.state === 'disabled' && em.rootTag != null && FORM_ROOTS.has(em.rootTag)))
