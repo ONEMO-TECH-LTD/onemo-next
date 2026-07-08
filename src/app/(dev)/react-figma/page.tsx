@@ -3598,7 +3598,7 @@ export default function ReactFigmaPage() {
                   home first (Framer), current highlighted. Right-click = rename/duplicate/delete
                   (real route ops; home protected server-side). */}
               {buildInfo.error ? (
-                <div style={{ height: 32, display: 'flex', alignItems: 'center', padding: '0 8px', font: `400 11px/16px ${FONT}`, color: '#d33' }}>Couldn't read this build's pages — reload to retry</div>
+                <div style={{ height: 32, display: 'flex', alignItems: 'center', padding: '0 8px', font: `400 11px/16px ${FONT}`, color: '#d33' }}>{`Couldn't read this build's pages — reload to retry`}</div>
               ) : buildInfo.pages.length === 0 ? (
                 <div style={{ height: 32, display: 'flex', alignItems: 'center', padding: '0 8px', font: `400 11px/16px ${FONT}`, color: FAINT }}>No pages in this build — press + to create the first</div>
               ) : buildInfo.pages.map((pg) => (
