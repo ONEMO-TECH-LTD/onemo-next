@@ -223,7 +223,11 @@ const fieldScopes = (label: string): string[] | null =>
   : /opacity/i.test(label) ? ['OPACITY']
   : /stroke.*(weight|width)/i.test(label) ? ['STROKE_FLOAT']
   : /stroke|border/i.test(label) ? ['STROKE_COLOR', 'ALL_FILLS']
-  : /fill|background|paint|colou?r/i.test(label) ? ['ALL_FILLS', 'FRAME_FILL', 'SHAPE_FILL', 'TEXT_FILL']
+  // Dan 2026-07-08 (scope mismatch): TEXT_FILL-scoped colours were offered on BACKGROUND fills.
+  // Text-colour fields get TEXT_FILL; background/shape fills do NOT (Figma's own scoping).
+  : /text.*(fill|colou?r)|(fill|colou?r).*text/i.test(label) ? ['ALL_FILLS', 'TEXT_FILL']
+  : /fill|background|paint/i.test(label) ? ['ALL_FILLS', 'FRAME_FILL', 'SHAPE_FILL']
+  : /colou?r/i.test(label) ? ['ALL_FILLS', 'FRAME_FILL', 'SHAPE_FILL', 'TEXT_FILL']
   : null
 let _dsTokenCache: DsToken[] | null = null
 /* E4-G4 — real components available to insert (extracted-in-editor), for the Assets panel. */
@@ -294,17 +298,21 @@ function FigmaVariablePicker({ fieldLabel, anchorRef, onPick, onClose, selected 
   // group into header + item rows in file order (tokens.css is organised by collection)
   // E8 items 3/4 (contract: variablePicker.rowAnatomy, measured 2026-07-07): rows show the
   // FIGMA original short name (path leaf), full path groups as headers, raw value right-aligned.
-  const rows: { kind: 'header' | 'item'; label: string; value?: string; bind?: string; full?: string }[] = []
+  const rows: { kind: 'header' | 'item'; label: string; value?: string; swatch?: string; bind?: string; full?: string }[] = []
   let lastGroup = ''
   for (const t of filtered) {
-    const segs = (t.path ?? '').split('/').map((x) => x.trim()).filter(Boolean)
-    const leaf = segs.length ? segs[segs.length - 1] : t.cssVar.replace(/^--/, '')
+    // Dan rule (2026-07-08): the picker speaks Figma-JSON only. Tokens without a JSON path are not
+    // Figma variables → they don't belong in this list (the old fallback leaked cssVar names here).
+    if (!t.path) continue
+    const segs = t.path.split('/').map((x) => x.trim()).filter(Boolean)
+    const leaf = segs[segs.length - 1]
     const grp = segs.length > 1 ? segs.slice(0, -1).join(' / ') : t.group
     if (grp !== lastGroup) { rows.push({ kind: 'header', label: grp }); lastGroup = grp }
     const raw = t.original ? Object.values(t.original)[0] : t.value
-    // resolved display value (Figma shows the mode value, e.g. 16 — never the clamp() source)
+    // resolved display value (Figma shows the mode value, e.g. 16 — never the clamp() source).
+    // COLOUR rows show a swatch, not value text — raw colour refs are alias paths/var() (css leak).
     const shown = resolveTokenDisplay(t.cssVar, raw, t.kind)
-    rows.push({ kind: 'item', label: leaf, value: shown, bind: `var(${t.cssVar})`, full: `${t.path ?? t.cssVar}\n${raw}` })
+    rows.push({ kind: 'item', label: leaf, value: t.kind === 'color' ? undefined : shown, swatch: t.kind === 'color' ? t.value : undefined, bind: `var(${t.cssVar})`, full: `${t.path}\n${raw}` })
   }
   if (!anchorRect) return null
   const width = 216
@@ -358,9 +366,9 @@ function FigmaVariablePicker({ fieldLabel, anchorRef, onPick, onClose, selected 
           <button key={`${row.label}-${row.value}-${index}`} type="button" title={row.full} onClick={() => { if (row.bind) onPick?.(row.bind); onClose() }}
             ref={selected && row.bind === selected ? (el) => { if (el && !didScroll.current) { didScroll.current = true; el.scrollIntoView({ block: 'center' }) } } : undefined}
             style={{ appearance: 'none', border: 0, width: 216, height: 24, background: selected && row.bind === selected ? '#E5F4FF' : '#fff', display: 'grid', gridTemplateColumns: '40px minmax(0,1fr) minmax(24px,auto)', alignItems: 'center', padding: 0, cursor: 'pointer', color: INK, font: `450 11px/16px ${FONT}`, textAlign: 'left', overflow: 'hidden' }}>
-            <span style={{ width: 24, height: 24, marginLeft: 16, display: 'grid', placeItems: 'center', color: INK }}><VariableHashIcon /></span>
+            <span style={{ width: 24, height: 24, marginLeft: 16, display: 'grid', placeItems: 'center', color: INK }}>{row.swatch ? <span aria-hidden style={{ width: 14, height: 14, borderRadius: 3, background: row.swatch, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.12)' }} /> : <VariableHashIcon />}</span>
             <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.label}</span>
-            <span style={{ color: 'rgba(0,0,0,0.3)', textAlign: 'right', paddingRight: 16, maxWidth: 72, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.value}</span>
+            <span style={{ color: 'rgba(0,0,0,0.3)', textAlign: 'right', paddingRight: 16, maxWidth: 72, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.value ?? ''}</span>
           </button>
         ))}
       </div>
@@ -432,13 +440,20 @@ function TokenPill({ token, display, onClick }: { token: string; display?: strin
   // field already read from computed style (DS is a 2/4/8/16 grid, no decimals) — never the Figma
   // alias name ({full}) or a sub-pixel clamp() result (15.99). Fall back to probing only if the
   // field couldn't resolve it (fresh uncommitted binding).
+  // Dan rule (2026-07-08): badges show RAW VALUES except colour — a COLOUR badge shows the token's
+  // Figma JSON NAME (the variable name inside its collection), never a hex and never a css var.
+  // The UI speaks Figma-JSON; css is downstream converter output (variables page code columns only).
+  const jsonName = tok?.path ? tok.path.split('/').map((s) => s.trim()).filter(Boolean).slice(1).join('/') : null
+  const isColor = tok?.kind === 'color'
   const raw = display && /^-?\d+$/.test(display) ? display : (tok ? resolveTokenDisplay(tok.cssVar, rawSource, tok.kind) : rawSource)
+  const shown = isColor ? (jsonName ?? shortToken(token)) : raw
   const fullName = tok?.path ?? shortToken(token)
   return (
     <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center' }}>
       <button type="button" title={`${fullName}\n${raw}`} onClick={onClick}
-        style={{ appearance: 'none', height: 20, borderRadius: 5, background: '#fff', border: '1px solid #E6E6E6', padding: '0 4px', font: `400 11px/18px ${FONT}`, color: INK, cursor: 'pointer', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {raw}
+        style={{ appearance: 'none', height: 20, borderRadius: 5, background: '#fff', border: '1px solid #E6E6E6', padding: '0 4px', font: `400 11px/18px ${FONT}`, color: INK, cursor: 'pointer', maxWidth: '100%', display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {isColor && tok && <span aria-hidden style={{ flex: 'none', width: 10, height: 10, borderRadius: 2, background: tok.value, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.12)' }} />}
+        {shown}
       </button>
     </span>
   )
@@ -993,9 +1008,20 @@ function parseFigmaVariables(data: unknown): ImportedCollection[] | null {
     return { name: c.name ?? 'Collection', modes, vars: vlist }
   })
 }
+/* Figma variables-editor colour type icon — extracted from Figma's own DOM (live census
+   2026-07-08, viewBox 0 0 24 24): the paint-wheel glyph every COLOR variable row carries. */
+function VarColorIcon() {
+  return (
+    <svg width="24" height="24" fill="none" viewBox="0 0 24 24" aria-hidden style={{ display: 'block' }}>
+      <path fill="currentColor" d="M7.312 6.803a7 7 0 0 1 9.639.248l.28.298a7 7 0 0 1 1.76 4.998l-.029.38C18.807 14.222 17.446 15 16.242 15H13.5l-.101.01a.5.5 0 0 0-.4.49v.5c0 .82-.338 1.603-.92 2.127-.6.542-1.468.8-2.37.488a7 7 0 0 1-2.362-1.385l-.297-.28a7 7 0 0 1 0-9.9zm8.93.955a6 6 0 0 0-8.485 0l-.212.225a6 6 0 0 0 2.492 9.689c.978.337 1.848-.457 1.953-1.467L12 16v-.499a1.5 1.5 0 0 1 1.5-1.5h2.743l.158-.006c.733-.057 1.391-.513 1.543-1.216l.024-.155a6 6 0 0 0-1.484-4.611zM8.5 12.001a1 1 0 1 1 0 2 1 1 0 0 1 0-2m7-2a1 1 0 1 1-.001 2 1 1 0 0 1 0-2m-6-1.5a1 1 0 1 1 0 2.001 1 1 0 0 1 0-2m3.5-1a1 1 0 1 1 0 2 1 1 0 0 1 0-2" />
+    </svg>
+  )
+}
 function VariablesLibrary() {
   const tokens = useDsTokens()
   const [colSel, setColSel] = useState(0)
+  // 2.9 (Dan): Figma's Groups sidebar — group tree under the collection, click to filter.
+  const [groupSel, setGroupSel] = useState<string | null>(null)
   const [q, setQ] = useState('')
   const [imported, setImported] = useState<{ file: string; collections: ImportedCollection[] } | null>(null)
   const [importErr, setImportErr] = useState<string | null>(null)
@@ -1047,7 +1073,18 @@ function VariablesLibrary() {
   const rows = tokens.filter((t) => collOf(t) === activeCol)
     .filter((t) => !ql || (t.path ?? '').toLowerCase().includes(ql) || t.cssVar.toLowerCase().includes(ql) || t.value.toLowerCase().includes(ql))
   const activeImported = imported?.collections[colSel] ?? null
-  const importedRows = activeImported ? activeImported.vars.filter((v) => !ql || v.name.toLowerCase().includes(ql) || v.values.some((x) => x.toLowerCase().includes(ql))) : []
+  // 2.9 Groups sidebar (measured from Figma's variables editor 2026-07-08): groups = the first
+  // slash-segment of each variable name; 'All <count>' + per-group rows with counts, click filters.
+  const importedGroups: [string, number][] = []
+  for (const v of activeImported?.vars ?? []) {
+    const g = v.name.split('/').filter(Boolean).length > 1 ? v.name.split('/').filter(Boolean)[0] : ''
+    if (!g) continue
+    const hit = importedGroups.find((x) => x[0] === g)
+    if (hit) hit[1]++; else importedGroups.push([g, 1])
+  }
+  const importedRows = activeImported ? activeImported.vars
+    .filter((v) => !groupSel || v.name.split('/').filter(Boolean)[0] === groupSel)
+    .filter((v) => !ql || v.name.toLowerCase().includes(ql) || v.values.some((x) => x.toLowerCase().includes(ql))) : []
   const isColorVal = (s: string) => /^#[0-9a-f]{6,8}$/i.test(s)
   return (
     <div style={{ flex: 1, minWidth: 0, display: 'flex', overflow: 'hidden' }}>
@@ -1067,11 +1104,29 @@ function VariablesLibrary() {
         <div style={{ padding: '8px 12px 4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={hdr}>Collections</span></div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 6px' }}>
           {(imported ? imported.collections.map((c, i) => [c.name, c.vars.length, i] as [string, number, number]) : collections.map(([n, c], i) => [n, c, i] as [string, number, number])).map(([n, c, i]) => (
-            <button key={`${n}-${i}`} type="button" onClick={() => setColSel(i)} style={{ appearance: 'none', border: 0, cursor: 'pointer', width: '100%', height: 30, display: 'flex', alignItems: 'center', gap: 8, padding: '0 8px', borderRadius: 5, background: i === colSel ? '#f0f1f3' : 'transparent', color: INK }}>
+            <button key={`${n}-${i}`} type="button" onClick={() => { setColSel(i); setGroupSel(null) }} style={{ appearance: 'none', border: 0, cursor: 'pointer', width: '100%', height: 30, display: 'flex', alignItems: 'center', gap: 8, padding: '0 8px', borderRadius: 5, background: i === colSel ? '#f0f1f3' : 'transparent', color: INK }}>
               <span style={{ flex: 1, minWidth: 0, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', font: `${i === colSel ? 550 : 400} 11px/1 ${FONT}` }}>{n}</span>
               <span style={{ flex: 'none', color: MUTE, font: `400 11px/1 ${FONT}` }}>{c}</span>
             </button>
           ))}
+          {/* 2.9 Groups sidebar (Figma variables editor, live census 2026-07-08: rows 32px, 11px,
+              selected 600 + highlight, count right-aligned; 'All' first). Imported view only —
+              groups derive from variable name slash-paths. */}
+          {imported && importedGroups.length > 0 && activeImported && (
+            <>
+              <div style={{ padding: '12px 8px 4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={hdr}>Groups</span></div>
+              <button type="button" onClick={() => setGroupSel(null)} style={{ appearance: 'none', border: 0, cursor: 'pointer', width: '100%', height: 32, display: 'flex', alignItems: 'center', gap: 8, padding: '0 8px', borderRadius: 5, background: groupSel === null ? '#e5f4ff' : 'transparent', color: INK }}>
+                <span style={{ flex: 1, minWidth: 0, textAlign: 'left', font: `${groupSel === null ? 600 : 400} 11px/1 ${FONT}` }}>All</span>
+                <span style={{ flex: 'none', color: MUTE, font: `400 11px/1 ${FONT}` }}>{activeImported.vars.length}</span>
+              </button>
+              {importedGroups.map(([g, count]) => (
+                <button key={g} type="button" onClick={() => setGroupSel((cur) => cur === g ? null : g)} style={{ appearance: 'none', border: 0, cursor: 'pointer', width: '100%', height: 32, display: 'flex', alignItems: 'center', gap: 8, padding: '0 8px 0 16px', borderRadius: 5, background: groupSel === g ? '#e5f4ff' : 'transparent', color: INK }}>
+                  <span style={{ flex: 1, minWidth: 0, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', font: `${groupSel === g ? 600 : 400} 11px/1 ${FONT}` }}>{g}</span>
+                  <span style={{ flex: 'none', color: MUTE, font: `400 11px/1 ${FONT}` }}>{count}</span>
+                </button>
+              ))}
+            </>
+          )}
         </div>
       </div>
       {/* traceability table: Name · CSS variable · Light · Dark — grouped like Figma's variables editor */}
@@ -1116,19 +1171,21 @@ function VariablesLibrary() {
                       if (grp) out.push(<div key={`h-${grp}-${i}`} style={{ padding: '12px 16px 6px', font: `600 11px/1 ${FONT}`, color: INK }}>{grp}</div>)
                     }
                     const leaf = segs.length ? segs[segs.length - 1] : v.name
-                    const swatch = v.values.find(isColorVal)
-                    const isColor = v.type === 'COLOR' || !!swatch
+                    const isColor = v.type === 'COLOR' || v.values.some(isColorVal)
                     const code = activeImported && v.path ? byPath.get(`${collCamelClient(activeImported.name)} / ${v.path}`) : undefined
                     out.push(
                       <div key={`${v.name}-${i}`} title={v.scopes?.join(', ')} style={{ minHeight: 34, borderBottom: '1px solid #f2f2f3', display: 'flex', alignItems: 'center', font: `400 11px/1 ${FONT}` }}>
                         <span style={{ width: colW.name, padding: '0 16px', minWidth: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
-                          {isColor && swatch ? <span style={{ flex: 'none', width: 14, height: 14, borderRadius: 3, background: swatch, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.12)' }} /> : <VariableHashIcon />}
+                          {/* Figma census 2026-07-08: the LEADING icon is the variable TYPE icon
+                              (paint-wheel for colour) — swatches live in the VALUE cells only. */}
+                          <span style={{ flex: 'none', color: 'rgba(0,0,0,0.5)' }}>{isColor ? <VarColorIcon /> : <VariableHashIcon />}</span>
                           <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: INK }}>{leaf}</span>
                         </span>
                         {v.values.map((val, k) => (
                           <span key={k} style={{ flex: 1, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                             {isColorVal(val) && <span style={{ flex: 'none', width: 14, height: 14, borderRadius: 3, background: val, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.12)' }} />}
-                            <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{val}</span>
+                            {/* Figma shows hex UPPERCASE without '#' (census 2026-07-08) */}
+                            <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{isColorVal(val) ? val.replace(/^#/, '').toUpperCase() : val}</span>
                           </span>
                         ))}
                         <span style={{ width: colW.css, padding: '0 12px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: MUTE, borderLeft: `1px solid ${LINE}`, alignSelf: 'stretch', display: 'flex', alignItems: 'center' }}>{code?.cssVar ?? '—'}</span>
@@ -3985,7 +4042,7 @@ export default function ReactFigmaPage() {
 
           <Sec title="Fill" actionWidth={24} action={<UiIB name="plus" title="Add fill" on={() => { if (sel) { applyOverride('fillBg', '#D9D9D9'); reapplySel() } else setFills(rows => [...rows, { id: nextRowId(rows), hex: 'FFFFFF', op: 100 }]) }} />} bodyGap={0} bodyPadding="0">
             {liveFills
-              ? liveFills.map((f, i) => { const fld = f.prop === 'color' ? 'fillColor' : 'fillBg'; return <FigmaPaintRow key={`live-${i}`} hex={f.hex} op={f.op} label="Fill" origin={f.origin}
+              ? liveFills.map((f, i) => { const fld = f.prop === 'color' ? 'fillColor' : 'fillBg'; return <FigmaPaintRow key={`live-${i}`} hex={f.hex} op={f.op} label={f.prop === 'color' ? 'Text fill' : 'Fill'} origin={f.origin}
                   onHexEdit={(hx) => applyOverride(fld, `#${hx}`)}
                   onOpacityEdit={(hx, opPct) => applyOverride(fld, hexToRgba(hx, opPct))}
                   onVisibleToggle={(vis, hx) => applyOverride(fld, vis ? `#${hx}` : 'transparent')}
