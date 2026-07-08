@@ -2320,18 +2320,17 @@ export default function ReactFigmaPage() {
       setFsData(d)
     }).catch(() => {})
   }, [fsPath, fsNonce])
-  // 3.0 (Dan): "pages section must only show pages … toggle to see what the build is made of."
-  // Pages-only (default) = the editor's own react-figma-pages sandbox — the user's pages, where a
-  // created page appears instantly (fixing "Plus does nothing"). Toggle off = the full folder browser.
-  const [pagesOnly, setPagesOnly] = useState(true)
-  const [editorPages, setEditorPages] = useState<{ name: string; route: string }[]>([])
+  // E9 pages model (Dan + expert design s58-e9-pages-model-answer.md): the Pages panel shows the
+  // loaded BUILD's TRUE pages — its router IS the page registry (Framer/Webflow own a project DB;
+  // for a code build the app route tree is that DB). Empty build → empty list → + creates the
+  // first real route. Never a finder.
+  type BuildPage = { name: string; route: string; file: string; home: boolean; mutable: boolean }
+  const [buildInfo, setBuildInfo] = useState<{ buildName: string; pages: BuildPage[] }>({ buildName: '', pages: [] })
   useEffect(() => {
-    if (!fsData?.appStart) return
-    const p = `${fsData.appStart}/(dev)/react-figma-pages`
-    fetch(`/api/dev/editor-fs?path=${encodeURIComponent(p)}`).then((r) => r.ok ? r.json() : { dirs: [] })
-      .then((d: FsData) => setEditorPages((d.dirs ?? []).filter((x) => x.route).map((x) => ({ name: x.name, route: x.route! }))))
+    fetch('/api/dev/editor-pages').then((r) => (r.ok ? r.json() : null))
+      .then((d: { buildName: string; pages: BuildPage[] } | null) => { if (d) setBuildInfo({ buildName: d.buildName, pages: d.pages ?? [] }) })
       .catch(() => {})
-  }, [fsData?.appStart, fsNonce])
+  }, [fsNonce])
   // 3.0 (Dan): right-click context menu for page/layer add·delete·duplicate·rename.
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: { label: string; onClick: () => void; danger?: boolean }[] } | null>(null)
   useEffect(() => {
@@ -2891,15 +2890,14 @@ export default function ReactFigmaPage() {
     const res = await r.json() as { route: string; newValueText: string }
     notify(`Page created · ${res.newValueText}`)
     console.log('[engine] page created', res)
-    setBuildSources((s) => [...s, { key: res.route, name: res.newValueText, route: res.route, group: 'react-figma-pages' }])
     setFsNonce((n) => n + 1)
     setTimeout(() => switchCanvas(res.newValueText, res.route), 600) // give the route a beat to compile
   }, [switchCanvas])
-  // E6.8 — delete/rename editor pages (jailed server ops; only the editor's own pages sandbox).
-  const deletePage = useCallback(async (slug: string) => {
-    if (!window.confirm(`Delete page “${slug}”? This removes its source file.`)) return
-    const r = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'delete-page', slug }) })
-    if (r.ok) { notify(`Page deleted · ${slug}`); setFsNonce((n) => n + 1) } else notify(`Delete failed: ${await r.text()}`, 'error')
+  // E9 — page CRUD = TRUE route ops on the loaded build (route-addressed; structural server guards).
+  const deletePage = useCallback(async (page: { name: string; route: string }) => {
+    if (!window.confirm(`Delete page “${page.name}” (${page.route})? This removes its route from the build (git is the undo).`)) return
+    const r = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'delete-page', route: page.route }) })
+    if (r.ok) { notify(`Page deleted · ${page.name}`); setFsNonce((n) => n + 1) } else notify(`Delete failed: ${await r.text()}`, 'error')
   }, [])
   // E6.8 — layer rename: writes data-name into source at the layer's data-src position (Dan-approved
   // analog); the tree re-reads it after HMR so the name persists like a Figma layer name.
@@ -2915,17 +2913,17 @@ export default function ReactFigmaPage() {
     const r = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'set-layer-name', file: m[1], line: +m[2], col: +m[3], name: next }) })
     if (r.ok) notify(`Renamed · ${next}`); else notify(`Rename failed: ${await r.text()}`, 'error')
   }, [])
-  const renamePage = useCallback(async (slug: string) => {
-    const next = window.prompt('Rename page', slug)
-    if (!next || next === slug) return
-    const r = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'rename-page', slug, newSlug: next }) })
+  const renamePage = useCallback(async (page: { name: string; route: string }) => {
+    const next = window.prompt('Rename page', page.name)
+    if (!next || next === page.name) return
+    const r = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'rename-page', route: page.route, newSlug: next }) })
     if (r.ok) { const d = await r.json() as { newValueText: string }; notify(`Renamed · ${d.newValueText}`); setFsNonce((n) => n + 1) } else notify(`Rename failed: ${await r.text()}`, 'error')
   }, [])
-  // 3.0 (Dan): page duplicate + layer duplicate/delete — all through the existing jailed, assertValidTsx-
-  // guarded ops (duplicate-page / duplicate-jsx / delete-jsx). No new source-mutation surface.
-  const duplicatePage = useCallback(async (slug: string) => {
-    const r = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'duplicate-page', slug }) })
-    if (r.ok) { const d = await r.json() as { newValueText: string; route: string }; notify(`Duplicated · ${d.newValueText}`); setBuildSources((s) => [...s, { key: d.route, name: d.newValueText, route: d.route, group: 'react-figma-pages' }]); setFsNonce((n) => n + 1) } else notify(`Duplicate failed: ${await r.text()}`, 'error')
+  // 3.0/E9 (Dan): page duplicate + layer duplicate/delete — all through the existing jailed,
+  // assertValidTsx-guarded ops (duplicate-page / duplicate-jsx / delete-jsx).
+  const duplicatePage = useCallback(async (page: { route: string }) => {
+    const r = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'duplicate-page', route: page.route }) })
+    if (r.ok) { const d = await r.json() as { newValueText: string; route: string }; notify(`Duplicated · ${d.newValueText}`); setFsNonce((n) => n + 1) } else notify(`Duplicate failed: ${await r.text()}`, 'error')
   }, [])
   const layerSrc = useCallback((engId: string) => {
     const src = (iframeRef.current?.contentDocument?.querySelector(`[data-eng-id="${engId}"]`) as HTMLElement | null)?.getAttribute('data-src')
@@ -3451,6 +3449,9 @@ export default function ReactFigmaPage() {
     ['railFile', 'File', 'file'], ['railAssets', 'Assets', 'assets'], ['createComponent', 'Components', 'components'], ['railVariables', 'Variables', 'variables'],
   ]
 
+  // E9 (Dan): the panel title is the BUILD/project name — the page is shown below in Pages.
+  const sourceMenuRef = useCloseOnOutside<HTMLDivElement>(sourceMenuOpen, () => setSourceMenuOpen(false))
+
   return (
     <div style={{ position: 'fixed', inset: 0, display: 'flex', background: '#fff', fontFamily: FONT, color: INK, userSelect: 'none' }}>
       {/* ░░ ICON RAIL ░░ */}
@@ -3471,19 +3472,22 @@ export default function ReactFigmaPage() {
       {/* ░░ LEFT PANEL (rail-switched) ░░ */}
       <aside style={{ width: leftW, flex: 'none', position: 'relative', borderRight: `1px solid ${LINE}`, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* build-source selector (Figma file-selector slot; menu = the shell's own dark menu chrome) */}
-        <div style={{ position: 'relative', height: 40, borderBottom: `1px solid ${LINE}`, display: 'grid', gridTemplateColumns: '1fr 24px 32px', alignItems: 'center', gap: 4, padding: '0 8px 0 16px', flex: 'none' }}>
-          <button type="button" aria-label={`${canvas.name}, build source`} aria-haspopup="menu" aria-expanded={sourceMenuOpen} onClick={() => setSourceMenuOpen((v) => !v)}
-            style={{ appearance: 'none', border: 0, background: 'transparent', cursor: 'pointer', minWidth: 0, padding: 0, textAlign: 'left', font: `550 12px/16px ${FONT}`, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{canvas.name}</button>
+        <div ref={sourceMenuRef} style={{ position: 'relative', height: 40, borderBottom: `1px solid ${LINE}`, display: 'grid', gridTemplateColumns: '1fr 24px 32px', alignItems: 'center', gap: 4, padding: '0 8px 0 16px', flex: 'none' }}>
+          <button type="button" aria-label={`${buildInfo.buildName || canvas.name}, build source`} aria-haspopup="menu" aria-expanded={sourceMenuOpen} onClick={() => setSourceMenuOpen((v) => !v)}
+            style={{ appearance: 'none', border: 0, background: 'transparent', cursor: 'pointer', minWidth: 0, padding: 0, textAlign: 'left', font: `550 12px/16px ${FONT}`, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{buildInfo.buildName || canvas.name}</button>
           <UiIB name="caret16" title="Select build source" on={() => setSourceMenuOpen((v) => !v)} />
           <UiIB name="minimizeUI" title={uiMinimized ? 'Expand UI' : 'Minimize UI'} active={uiMinimized} on={() => setUiMinimized(v => !v)} />
           {sourceMenuOpen && (
             <div role="presentation" style={{ position: 'absolute', zIndex: 120, top: 38, left: 8, width: 200, padding: '8px 0 6px', borderRadius: 13, background: '#1e1e1e', color: '#fff', boxShadow: 'rgba(0, 0, 0, 0.15) 0px 2px 5px 0px, rgba(0, 0, 0, 0.12) 0px 10px 16px 0px, rgba(0, 0, 0, 0.12) 0px 0px 0.5px 0px' }}>
               <ul role="menu" aria-label="File menu" style={{ width: 200, margin: 0, padding: 0, listStyle: 'none', maxHeight: 420, overflowY: 'auto' }}>
+                {/* E9 (Dan): clear section groups — recent builds vs utility actions. */}
+                <li role="presentation" style={{ padding: '4px 14px 2px', font: `500 9px/14px ${FONT}`, letterSpacing: '0.4px', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)', listStyle: 'none' }}>Recent builds</li>
                 {connectedBuilds.map((s) => (
                   <FileMenuRow key={s.route} label={s.name} checked={s.route === canvas.route} onClick={() => { switchCanvas(s.name, s.route); setSourceMenuOpen(false) }} />
                 ))}
                 <FileMenuRow label="Open build folder…" title="Pick a build folder in Finder" onClick={() => { setSourceMenuOpen(false); void openBuildFolderPicker() }} />
                 <FigmaMenuSeparator />
+                <li role="presentation" style={{ padding: '4px 14px 2px', font: `500 9px/14px ${FONT}`, letterSpacing: '0.4px', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)', listStyle: 'none' }}>Actions</li>
                 <FileMenuRow label="Show version history" title="Show checkpoints for this build" onClick={() => { setSourceMenuOpen(false); void loadVersions() }} />
                 <FileMenuRow label="Publish library…" disabled={!canMenuPublish} title={canMenuPublish ? 'Publish staged changes' : 'No changes to publish'} onClick={() => { setSourceMenuOpen(false); void commitOverrides() }} />
                 <FileMenuRow label="Export…" shortcut="⇧⌘E" disabled title="Export backend not implemented" />
@@ -3509,58 +3513,29 @@ export default function ReactFigmaPage() {
             <div style={{ height: 25, display: 'flex', alignItems: 'center', padding: '0 16px', font: `400 11px/16px ${FONT}`, color: MUTE }}>Drafts ›</div>
             <div style={{ height: 40, padding: '0 8px 0 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={hdr}>Pages</span>
-              <span style={{ display: 'flex', gap: 4, color: MUTE }}><IB I={Sidebar} title={pagesOnly ? 'Show all build files' : 'Pages only'} active={!pagesOnly} s={15} on={() => setPagesOnly((v) => !v)} /><UiIB name="find" title="Find" active={layerQuery !== null} on={() => setLayerQuery(q => q === null ? '' : null)} /><UiIB name="plus" title="Add new page" on={() => void addPage()} /></span>
+              <UiIB name="plus" title="Add new page" on={() => void addPage()} />
             </div>
             <div style={{ padding: '0 8px', height: pagesH, overflowY: 'auto' }}>
-              {/* 3.0 (Dan): PAGES-ONLY (default) — the editor's own page sandbox as a flat list; a created
-                  page appears here immediately. Right-click a row for rename/duplicate/delete. */}
-              {pagesOnly ? (
-                editorPages.length === 0 ? (
-                  <div style={{ height: 32, display: 'flex', alignItems: 'center', padding: '0 8px', font: `400 11px/16px ${FONT}`, color: FAINT }}>No pages yet — press + to add one</div>
-                ) : editorPages.map((pg) => (
-                  <div key={pg.route} onClick={() => switchCanvas(pg.name, pg.route)}
-                    onDoubleClick={(e) => { e.stopPropagation(); void renamePage(pg.name) }}
-                    onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, items: [
-                      { label: 'Rename', onClick: () => void renamePage(pg.name) },
-                      { label: 'Duplicate', onClick: () => void duplicatePage(pg.name) },
-                      { label: 'Delete', danger: true, onClick: () => void deletePage(pg.name) },
-                    ] }) }}
-                    style={{ height: 32, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', borderRadius: 5, background: pg.route === canvas.route ? '#f0f1f3' : 'transparent', font: `400 11px/16px ${FONT}`, color: INK, cursor: 'pointer' }}>
-                    <span style={{ width: 16, height: 16, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.65)' }}><UiIcon name="layerFrame" size={16} /></span>
-                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pg.name}</span>
-                    <span onClick={(e) => e.stopPropagation()} style={{ display: 'flex' }}><UiIB name="minus" title="Delete page" on={() => void deletePage(pg.name)} /></span>
-                  </div>
-                ))
-              ) : fsData && (
-                <>
-                  {fsData.parent !== null && (
-                    <div onClick={() => setFsPath(fsData.parent ?? '')} style={{ height: 32, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', borderRadius: 5, font: `400 11px/16px ${FONT}`, color: MUTE, cursor: 'pointer' }}>
-                      <span style={{ width: 16, textAlign: 'center' }}>‹</span><span>..</span>
-                    </div>
-                  )}
-                  {fsData.dirs.map((d) => {
-                    const rel = fsData.path ? `${fsData.path}/${d.name}` : d.name
-                    const editorPage = d.route?.startsWith('/react-figma-pages/') // E6.8: only editor-created pages are mutable
-                    return (
-                      <div key={d.name} onClick={() => (d.route ? switchCanvas(d.name, d.route) : setFsPath(rel))}
-                        onDoubleClick={editorPage ? (e) => { e.stopPropagation(); void renamePage(d.name) } : undefined}
-                        style={{ height: 32, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', borderRadius: 5, background: d.route && d.route === canvas.route ? '#f0f1f3' : 'transparent', font: `400 11px/16px ${FONT}`, color: INK, cursor: 'pointer' }}>
-                        <span onClick={(e) => { e.stopPropagation(); setFsPath(rel) }} style={{ width: 16, height: 16, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.5)' }}><UiIcon name="caretRight16" size={16} /></span>
-                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', font: d.route ? `550 11px/16px ${FONT}` : `400 11px/16px ${FONT}` }}>{d.name}</span>
-                        {editorPage && <span onClick={(e) => e.stopPropagation()} style={{ display: 'flex' }}><UiIB name="minus" title="Delete page" on={() => void deletePage(d.name)} /></span>}
-                        {d.route && <span style={{ color: MUTE, font: `400 9px/16px ${FONT}` }}>screen</span>}
-                      </div>
-                    )
-                  })}
-                  {fsData.files.map((f) => (
-                    <div key={f.name} onClick={f.route ? () => switchCanvas(f.name.replace(/\.stories\.tsx$/, ''), f.route!) : undefined}
-                      style={{ height: 32, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px 0 30px', borderRadius: 5, background: f.route && f.route === canvas.route ? '#f0f1f3' : 'transparent', font: `400 11px/16px ${FONT}`, color: f.route ? INK : FAINT, cursor: f.route ? 'pointer' : 'default' }}>
-                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
-                      {f.route && <span style={{ color: MUTE, font: `400 9px/16px ${FONT}` }}>screen</span>}
-                    </div>
-                  ))}
-                </>
-              )}
+              {/* E9 (Dan): the loaded build's TRUE pages — its router is the page registry. Flat list,
+                  home first (Framer), current highlighted. Right-click = rename/duplicate/delete
+                  (real route ops; home protected server-side). */}
+              {buildInfo.pages.length === 0 ? (
+                <div style={{ height: 32, display: 'flex', alignItems: 'center', padding: '0 8px', font: `400 11px/16px ${FONT}`, color: FAINT }}>No pages in this build — press + to create the first</div>
+              ) : buildInfo.pages.map((pg) => (
+                <div key={pg.route} onClick={() => switchCanvas(pg.name, pg.route)}
+                  onDoubleClick={pg.mutable && !pg.home ? (e) => { e.stopPropagation(); void renamePage(pg) } : undefined}
+                  onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, items: [
+                    ...(pg.mutable && !pg.home ? [{ label: 'Rename', onClick: () => void renamePage(pg) }] : []),
+                    ...(pg.mutable ? [{ label: 'Duplicate', onClick: () => void duplicatePage(pg) }] : []),
+                    ...(pg.mutable && !pg.home ? [{ label: 'Delete', danger: true, onClick: () => void deletePage(pg) }] : []),
+                  ] }) }}
+                  style={{ height: 32, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', borderRadius: 5, background: pg.route === canvas.route ? '#f0f1f3' : 'transparent', font: `400 11px/16px ${FONT}`, color: INK, cursor: 'pointer' }}>
+                  <span style={{ width: 16, height: 16, display: 'grid', placeItems: 'center', color: 'rgba(0,0,0,0.65)' }}><UiIcon name={pg.home ? 'layerSection' : 'layerFrame'} size={16} /></span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pg.name}</span>
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: FAINT, font: `400 9px/16px ${FONT}` }}>{pg.home ? '/' : pg.route}</span>
+                  {pg.mutable && !pg.home && <span onClick={(e) => e.stopPropagation()} style={{ display: 'flex' }}><UiIB name="minus" title="Delete page" on={() => void deletePage(pg)} /></span>}
+                </div>
+              ))}
             </div>
             {/* E6.5: real-mouse-grabbable divider — 12px hit area straddling the border, ns-resize
                 cursor, hover affordance (the old 7px invisible strip failed under a real mouse). */}
@@ -3572,7 +3547,11 @@ export default function ReactFigmaPage() {
             </div>
             <div style={{ height: 49, padding: '9px 8px 0 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: `1px solid ${LINE}` }}>
               <span style={hdr}>Layers</span>
-              <UiIB name="collapseLayers" title="Collapse layers" on={() => { const ids = (layers ?? []).filter((n) => n.kids).map((n) => n.id); setCollapsed((prev) => prev.size >= ids.length ? new Set() : new Set(ids)) }} />
+              <span style={{ display: 'flex', gap: 4, color: MUTE }}>
+                {/* E9 (Dan): Find filters LAYERS, so it lives on the Layers header — not Pages. */}
+                <UiIB name="find" title="Find layers" active={layerQuery !== null} on={() => setLayerQuery(q => q === null ? '' : null)} />
+                <UiIB name="collapseLayers" title="Collapse layers" on={() => { const ids = (layers ?? []).filter((n) => n.kids).map((n) => n.id); setCollapsed((prev) => prev.size >= ids.length ? new Set() : new Set(ids)) }} />
+              </span>
             </div>
             {layerQuery !== null && (
               <div style={{ padding: '0 8px 6px 16px' }}>

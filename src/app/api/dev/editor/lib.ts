@@ -270,9 +270,9 @@ export type WriteOp =
   | { kind: 'duplicate-jsx'; file: string; line: number; col: number }
   | { kind: 'insert-component'; file: string; line: number; col: number; name: string; importPath: string }
   | { kind: 'create-component'; name: string; category?: string; root?: 'project' | 'global' }
-  | { kind: 'delete-page'; slug: string }
-  | { kind: 'duplicate-page'; slug: string }
-  | { kind: 'rename-page'; slug: string; newSlug: string }
+  | { kind: 'delete-page'; route: string }
+  | { kind: 'duplicate-page'; route: string }
+  | { kind: 'rename-page'; route: string; newSlug: string }
   | { kind: 'set-layer-name'; file: string; line: number; col: number; name: string }
   | { kind: 'rename-component'; name: string; newName: string }
   | { kind: 'wrap-jsx-link'; file: string; line: number; col: number; href: string; newTab?: boolean }
@@ -479,9 +479,10 @@ async function insertJsxChild(op: Extract<WriteOp, { kind: 'insert-jsx-child' }>
 
 /** Create a new page route (E3.5): src/app/(dev)/react-figma-pages/<slug>/page.tsx scaffold. */
 async function createPage(op: Extract<WriteOp, { kind: 'create-page' }>): Promise<{ ok: true; file: string; newValueText: string; route: string }> {
+  // E9: creating a page is a TRUE action in the loaded build — a new top-level route in ITS app
+  // dir (Framer's New Page analog), not a write into a hardcoded editor sandbox.
   const base = (op.slugBase ?? 'new-page').replace(/[^a-z0-9-]/gi, '-').toLowerCase()
-  const parent = path.join(ROOT, 'src/app/(dev)/react-figma-pages')
-  await fs.mkdir(parent, { recursive: true })
+  const parent = await buildAppDir()
   let slug = base, n = 1
   while (true) {
     try { await fs.access(path.join(parent, slug)); slug = `${base}-${++n}` } catch { break }
@@ -501,7 +502,7 @@ async function createPage(op: Extract<WriteOp, { kind: 'create-page' }>): Promis
 }
 `
   await fs.writeFile(path.join(dir, 'page.tsx'), scaffold, 'utf8')
-  return { ok: true, file: `src/app/(dev)/react-figma-pages/${slug}/page.tsx`, newValueText: slug, route: `/react-figma-pages/${slug}` }
+  return { ok: true, file: path.relative(ROOT, path.join(dir, 'page.tsx')), newValueText: slug, route: `/${slug}` }
 }
 
 /* E6.8 — layer rename for plain elements: write/update a `data-name` attribute (the HTML-standard
@@ -660,61 +661,114 @@ async function renameComponentOp(op: Extract<WriteOp, { kind: 'rename-component'
   for (const p of pending) if (p.abs !== toAbs) await fs.writeFile(p.abs, p.next, 'utf8')
   await fs.writeFile(toAbs, pending[0].next, 'utf8')
   await fs.rm(fromAbs)
-  await dropPageTypeStubs('') // no-op guard for pages; component stubs live elsewhere and regenerate
+  // (component stubs live elsewhere and regenerate — no page-type-stub cleanup needed here)
   return { ok: true, file: `src/app/(dev)/react-figma-components/${newName}.tsx`, newValueText: newName, updatedFiles: pending.map((p) => p.rel) }
 }
 
-/* E6.8 — page delete/rename. HARD JAIL: only simple slugs, only direct children of the editor's own
-   react-figma-pages sandbox (the dir create-page writes) — nothing else in the tree is deletable. */
-const PAGES_DIR = path.join(ROOT, 'src/app/(dev)/react-figma-pages')
-function jailPageSlug(slug: string): string {
-  if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) throw Object.assign(new Error('invalid page slug'), { status: 422 })
-  return path.join(PAGES_DIR, slug)
+/* E9 pages model (expert design s58-e9-pages-model-answer.md): pages ops are TRUE actions on the
+   loaded build's app tree. Jail = DERIVED (the build's app dir), never a hardcoded folder.
+   Safety = STRUCTURAL guards (leaf-only delete, page-owned files only, never home), not location
+   guards. Dev-only + worktree — git is the undo. */
+async function buildAppDir(): Promise<string> {
+  for (const c of ['src/app', 'app']) { const p = path.join(ROOT, c); try { await fs.access(p); return p } catch { /* next candidate */ } }
+  throw Object.assign(new Error('loaded build has no app dir'), { status: 422 })
+}
+function routeOfDir(appDir: string, absDir: string): string | undefined {
+  const segs = path.relative(appDir, absDir).split(path.sep).filter(Boolean)
+  if (segs.some((s) => s.startsWith('['))) return undefined
+  if (segs[0] === 'api') return undefined
+  const url = '/' + segs.filter((s) => !(s.startsWith('(') && s.endsWith(')'))).join('/')
+  return url === '' ? '/' : url
+}
+const PAGE_SCAN_SKIP = new Set(['node_modules', '.git', '.next', '.turbo', 'dist', 'coverage'])
+/** Map a route back to its page dir — via the same scan the pages API uses (the fs is the registry). */
+async function dirForRoute(route: string): Promise<{ appDir: string; dir: string }> {
+  const appDir = await buildAppDir()
+  let found: string | null = null
+  const walk = async (dir: string): Promise<void> => {
+    if (found) return
+    let entries
+    try { entries = await fs.readdir(dir, { withFileTypes: true }) } catch { return }
+    if (entries.some((e) => e.isFile() && /^page\.(t|j)sx?$/.test(e.name)) && routeOfDir(appDir, dir) === route) { found = dir; return }
+    for (const e of entries) if ((e.isDirectory() || e.isSymbolicLink()) && !e.name.startsWith('.') && !PAGE_SCAN_SKIP.has(e.name)) await walk(path.join(dir, e.name))
+  }
+  await walk(appDir)
+  if (!found) throw Object.assign(new Error(`no page at route ${route}`), { status: 404 })
+  return { appDir, dir: found }
 }
 /* Next dev generates type stubs per route (.next/dev/types/app/…); they linger after the source
    dir is removed and turn the typecheck gate red (meta-qa E6 batch-2 HIGH). Clearing the GENERATED
-   stub is safe — it's cache, regenerated on demand. */
-async function dropPageTypeStubs(slug: string): Promise<void> {
+   stub is safe — it's cache, regenerated on demand. Generalized to any page dir (E9). */
+async function dropPageTypeStubs(appDir: string, absDir: string): Promise<void> {
+  const rel = path.relative(appDir, absDir)
+  if (!rel || rel.startsWith('..')) return
   for (const p of [
-    path.join(ROOT, '.next', 'dev', 'types', 'app', '(dev)', 'react-figma-pages', slug),
-    path.join(ROOT, '.next', 'types', 'app', '(dev)', 'react-figma-pages', slug),
+    path.join(ROOT, '.next', 'dev', 'types', 'app', rel),
+    path.join(ROOT, '.next', 'types', 'app', rel),
   ]) { try { await fs.rm(p, { recursive: true, force: true }) } catch { /* cache layout differs — fine */ } }
 }
-async function deletePage(op: Extract<WriteOp, { kind: 'delete-page' }>): Promise<{ ok: true; file: string; newValueText: string }> {
-  const dir = jailPageSlug(op.slug)
-  try { await fs.access(path.join(dir, 'page.tsx')) } catch { throw Object.assign(new Error('page not found'), { status: 404 }) }
-  await fs.rm(dir, { recursive: true })
-  await dropPageTypeStubs(op.slug)
-  return { ok: true, file: `src/app/(dev)/react-figma-pages/${op.slug}`, newValueText: '(deleted)' }
+/** Structural delete guards — what makes a dir safely deletable AS A PAGE, wherever it lives. */
+async function assertDeletablePage(appDir: string, dir: string): Promise<void> {
+  if (path.resolve(dir) === path.resolve(appDir)) throw Object.assign(new Error('cannot delete the home page'), { status: 422 })
+  let entries
+  try { entries = await fs.readdir(dir, { withFileTypes: true }) } catch { throw Object.assign(new Error('page not found'), { status: 404 }) }
+  // guard 2: only page-owned files (page.tsx + styles + static assets) — layout/route/other code = refuse
+  const OWNED = /^page\.(t|j)sx?$|\.module\.css$|\.(png|jpe?g|svg|webp|gif|ico)$/
+  for (const e of entries) {
+    if (e.isFile() && !OWNED.test(e.name)) throw Object.assign(new Error(`dir contains non-page file ${e.name} — not deletable as a page`), { status: 422 })
+    // guard 1: leaf only — any descendant page.tsx means child pages would be nuked
+    if (e.isDirectory()) {
+      const sub = path.join(dir, e.name)
+      let hasChildPage = false
+      const check = async (d: string): Promise<void> => {
+        if (hasChildPage) return
+        let es; try { es = await fs.readdir(d, { withFileTypes: true }) } catch { return }
+        if (es.some((x) => x.isFile() && /^page\.(t|j)sx?$/.test(x.name))) { hasChildPage = true; return }
+        for (const x of es) if (x.isDirectory()) await check(path.join(d, x.name))
+      }
+      await check(sub)
+      if (hasChildPage) throw Object.assign(new Error('page has child pages — delete them first'), { status: 422 })
+      throw Object.assign(new Error(`dir contains subdirectory ${e.name} — not deletable as a page`), { status: 422 })
+    }
+  }
 }
-/* 3.0 (Dan): duplicate a page inside the same jailed sandbox. Reads the source page.tsx, renames its
-   default-export component to the new slug (each page is its own module, so this only keeps names
-   readable), writes it under a fresh unique slug. Same hard jail as delete/rename — sandbox only. */
+async function deletePage(op: Extract<WriteOp, { kind: 'delete-page' }>): Promise<{ ok: true; file: string; newValueText: string }> {
+  const { appDir, dir } = await dirForRoute(op.route)
+  await assertDeletablePage(appDir, dir)
+  await fs.rm(dir, { recursive: true })
+  await dropPageTypeStubs(appDir, dir)
+  return { ok: true, file: path.relative(ROOT, dir), newValueText: '(deleted)' }
+}
+/* 3.0/E9 (Dan): duplicate a page — a sibling dir next to the original, wherever it lives. */
 async function duplicatePage(op: Extract<WriteOp, { kind: 'duplicate-page' }>): Promise<{ ok: true; file: string; newValueText: string; route: string }> {
-  const from = jailPageSlug(op.slug)
-  const srcFile = path.join(from, 'page.tsx')
+  const { appDir, dir } = await dirForRoute(op.route)
+  const srcFile = path.join(dir, 'page.tsx')
   let source: string
-  try { source = (await fs.readFile(srcFile)).toString('utf8') } catch { throw Object.assign(new Error('page not found'), { status: 404 }) }
-  const base = `${op.slug}-copy`
+  try { source = (await fs.readFile(srcFile)).toString('utf8') } catch { throw Object.assign(new Error('page not found (only page.tsx pages duplicable)'), { status: 404 }) }
+  const parent = op.route === '/' ? appDir : path.dirname(dir)
+  const base = `${op.route === '/' ? 'home' : path.basename(dir)}-copy`
   let slug = base, n = 1
-  while (true) { try { await fs.access(path.join(PAGES_DIR, slug)); slug = `${base}-${++n}` } catch { break } }
+  while (true) { try { await fs.access(path.join(parent, slug)); slug = `${base}-${++n}` } catch { break } }
   const componentName = 'Page' + slug.replace(/(^|-)([a-z0-9])/g, (_, __, c) => c.toUpperCase())
   const next = source.replace(/export default function\s+\w+/, `export default function ${componentName}`)
   assertValidTsx(srcFile, next)
-  const dir = path.join(PAGES_DIR, slug)
-  await fs.mkdir(dir, { recursive: true })
-  await fs.writeFile(path.join(dir, 'page.tsx'), next, 'utf8')
-  return { ok: true, file: `src/app/(dev)/react-figma-pages/${slug}/page.tsx`, newValueText: slug, route: `/react-figma-pages/${slug}` }
+  const target = path.join(parent, slug)
+  await fs.mkdir(target, { recursive: true })
+  await fs.writeFile(path.join(target, 'page.tsx'), next, 'utf8')
+  return { ok: true, file: path.relative(ROOT, path.join(target, 'page.tsx')), newValueText: slug, route: routeOfDir(appDir, target) ?? `/${slug}` }
 }
 async function renamePage(op: Extract<WriteOp, { kind: 'rename-page' }>): Promise<{ ok: true; file: string; newValueText: string; route: string }> {
-  const from = jailPageSlug(op.slug)
+  const { appDir, dir } = await dirForRoute(op.route)
+  if (op.route === '/') throw Object.assign(new Error('cannot rename the home page'), { status: 422 })
   const base = op.newSlug.replace(/[^a-z0-9-]/gi, '-').toLowerCase().replace(/^-+|-+$/g, '')
   if (!base) throw Object.assign(new Error('invalid new name'), { status: 422 })
+  const parent = path.dirname(dir)
   let slug = base, n = 1
-  while (slug !== op.slug) { try { await fs.access(path.join(PAGES_DIR, slug)); slug = `${base}-${++n}` } catch { break } }
-  await fs.rename(from, path.join(PAGES_DIR, slug))
-  await dropPageTypeStubs(op.slug) // the OLD slug's generated type stub would go stale
-  return { ok: true, file: `src/app/(dev)/react-figma-pages/${slug}/page.tsx`, newValueText: slug, route: `/react-figma-pages/${slug}` }
+  while (slug !== path.basename(dir)) { try { await fs.access(path.join(parent, slug)); slug = `${base}-${++n}` } catch { break } }
+  const target = path.join(parent, slug)
+  await fs.rename(dir, target)
+  await dropPageTypeStubs(appDir, dir) // the OLD dir's generated type stub would go stale
+  return { ok: true, file: path.relative(ROOT, path.join(target, 'page.tsx')), newValueText: slug, route: routeOfDir(appDir, target) ?? `/${slug}` }
 }
 
 /**
