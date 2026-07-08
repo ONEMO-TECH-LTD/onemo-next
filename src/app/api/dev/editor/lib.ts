@@ -503,14 +503,15 @@ async function promoteElement(op: Extract<WriteOp, { kind: 'promote-element' }>)
   return { ok: true, file: op.file, newValueText: `.${localClass} (${decls.length} decls)`, localClass, cssFile: cssRel }
 }
 
-/** The CSS selector a scoped write targets (blueprint §3.2). Interaction pseudo-states emit the F3 DUAL
- * selector (`.base:hover, .base[data-preview="hover"]`) — the [data-preview] half is editor-only, stripped
- * on export; the gallery force-previews a state by setting data-preview on the frame root. */
+/** The CSS selector a scoped write targets (signed blueprint §3.2). Interaction pseudo-states emit the F3
+ * DUAL selector `.base:hover, :global([data-fc-preview="hover"]) .base` — the ANCESTOR half lets the gallery
+ * force-preview a state by setting `data-fc-preview` on the WRAPPER around the component (the pseudo can't
+ * be forced on .base itself); it is editor-only and stripped on export so shipped CSS is pure `.base:hover`. */
 function scopedSelector(localClass: string, scope: ScopedTarget): string {
   const c = `.${localClass}`
   if (scope.kind === 'base') return c
   if (scope.kind === 'variant') return `${c}.${scope.name}`
-  if ('pseudo' in scope) return `${c}:${scope.pseudo}, ${c}[data-preview="${scope.pseudo}"]`
+  if ('pseudo' in scope) return `${c}:${scope.pseudo}, :global([data-fc-preview="${scope.pseudo}"]) ${c}`
   return `${c}[data-${scope.propClass}]`
 }
 
@@ -1327,7 +1328,16 @@ async function insertComponent(op: Extract<WriteOp, { kind: 'insert-component' }
   return { ok: true, file: op.file, newValueText: `<${op.name} />` }
 }
 
-export async function applyWrite(op: WriteOp): Promise<{ ok: true; file: string; newValueText: string; route?: string; componentFile?: string; name?: string }> {
+// I0 gate (LOW): writes are read-modify-write on shared files; the variant board can fire several
+// scoped writes to one .module.css back-to-back. Serialize ALL writes through one queue so no concurrent
+// write loses another (the transient 404 under 3 rapid writes was this race).
+let writeQueue: Promise<unknown> = Promise.resolve()
+export function applyWrite(op: WriteOp): Promise<{ ok: true; file: string; newValueText: string; route?: string; componentFile?: string; name?: string }> {
+  const run = writeQueue.then(() => applyWriteInner(op), () => applyWriteInner(op))
+  writeQueue = run.catch(() => undefined)
+  return run
+}
+async function applyWriteInner(op: WriteOp): Promise<{ ok: true; file: string; newValueText: string; route?: string; componentFile?: string; name?: string }> {
   if (op.kind === 'insert-component') return insertComponent(op)
   if (op.kind === 'delete-jsx') return deleteJsx(op)
   if (op.kind === 'duplicate-jsx') return duplicateJsx(op)
