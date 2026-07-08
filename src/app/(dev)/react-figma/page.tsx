@@ -2208,7 +2208,7 @@ const COMPONENT_SELECTED_BORDER = '#0D99FF'
 /* E7.3 (KAI-9377): left rail in Components mode — categories as "pages", components →
  * variant children as "layers" (v4.1 §5). Data = the dual-root inventory (editor-components);
  * clicking jumps the gallery to the frame and selects it. Chrome matches the pages/layers rail. */
-function ComponentsRail({ components, selectedFile, onJump, query = '', onContext }: { components: DsComponent[]; selectedFile?: string; onJump: (label: string) => void; query?: string; onContext?: (c: DsComponent, e: React.MouseEvent) => void }) {
+function ComponentsRail({ components, selectedFile, onJump, query = '', onContext, onEdit }: { components: DsComponent[]; selectedFile?: string; onJump: (label: string) => void; query?: string; onContext?: (c: DsComponent, e: React.MouseEvent) => void; onEdit?: (c: DsComponent) => void }) {
   // E10-E2: live search across name / category / root / variant exports.
   const q = query.trim().toLowerCase()
   const filtered = q
@@ -2241,7 +2241,7 @@ function ComponentsRail({ components, selectedFile, onJump, query = '', onContex
               <div style={{ height: 28, padding: '0 16px', display: 'flex', alignItems: 'center', font: `500 11px/16px ${FONT}`, color: MUTE }}>{cat}</div>
               {list.map((c) => (
                 <div key={`${c.root}:${c.file ?? c.name}`}>
-                  <button type="button" onClick={() => onJump(c.name)} onContextMenu={onContext ? (e) => onContext(c, e) : undefined} title={c.file}
+                  <button type="button" onClick={() => onJump(c.name)} onDoubleClick={onEdit ? () => onEdit(c) : undefined} onContextMenu={onContext ? (e) => onContext(c, e) : undefined} title={onEdit ? `${c.file} — double-click to edit` : c.file}
                     style={{ appearance: 'none', border: 0, width: '100%', height: 32, padding: '0 16px', background: selectedFile && c.file === selectedFile ? COMPONENT_SELECTED_BG : '#fff', boxShadow: selectedFile && c.file === selectedFile ? `inset 0 0 0 1px ${COMPONENT_SELECTED_BORDER}` : 'none', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', font: `400 11px/16px ${FONT}`, color: COMPONENT_TEXT, textAlign: 'left' }}>
                     <UiIcon name="layerComponent" size={12} /> <span style={{ color: COMPONENT_TEXT }}>{c.name}</span>
                   </button>
@@ -2320,10 +2320,15 @@ export default function ReactFigmaPage() {
   const [newCompCategory, setNewCompCategory] = useState('')
   // E7.3 (KAI-9377): second canvas — Design ⇄ Components toggle just swaps the iframe route;
   // the whole shell (zoom/pan/selection/overrides) is route-agnostic (architecture v4.1 §1).
-  const canvasMode: 'design' | 'components' = rail === 'components' ? 'components' : 'design'
+  // E10 (Dan LOCKED interaction model, 2026-07-08): the Components rail keeps your PAGE as the canvas
+  // BY DEFAULT — the library lives in the left panel. Only DOUBLE-CLICKING a component enters its edit
+  // view (the component gallery + a `Home > Name` breadcrumb). So canvasMode follows editingComponent,
+  // NOT the rail — which kills the selection-race by construction (the page is never auto-replaced).
+  const [editingComponent, setEditingComponent] = useState<DsComponent | null>(null)
+  const canvasMode: 'design' | 'components' = rail === 'components' && editingComponent ? 'components' : 'design'
   const [autoDistributed, setAutoDistributed] = useState(false) // justify space-between (Figma distributed)
   const [insetSides, setInsetSides] = useState({ t: '0', r: '0', b: '0', l: '0' }) // A7: per-side inset (positioned elements) // derived — the far-left rail IS the canvas switch (Dan 2026-07-07)
-  const dsComponents = useDsComponents(rail === 'assets' || canvasMode === 'components', compNonce) // E4-G4 Assets panel + E7.3 components rail
+  const dsComponents = useDsComponents(rail === 'assets' || rail === 'components', compNonce) // E4-G4 Assets panel + E10 components rail (library panel needs the list whether or not editing)
   // #6: create a new component in code (Framer-style) — scaffolds a real editable component file.
   const newComponent = useCallback(async (name: string, root: 'project' | 'global' = 'project', category = '') => {
     const clean = name.trim()
@@ -3768,11 +3773,11 @@ export default function ReactFigmaPage() {
                   style={{ flex: 1, minWidth: 0, height: 26, borderRadius: 6, border: `1px solid ${LINE}`, background: '#fff', padding: '0 8px', outline: 0, font: `400 11px/1 ${FONT}`, color: INK }} />
               </div>
             </form>
-            <ComponentsRail components={dsComponents} selectedFile={sel?.file} query={compSearch} onJump={jumpTo}
+            <ComponentsRail components={dsComponents} selectedFile={sel?.file} query={compSearch} onJump={jumpTo} onEdit={(c) => setEditingComponent(c)}
               onContext={(c, e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, items: [
                 { label: 'Insert into selection', onClick: () => void insertAsset(c.name, c.importPath) },
-                { label: 'Edit', onClick: () => jumpTo(c.name) },
-                { label: 'Find in gallery', onClick: () => jumpTo(c.name) },
+                { label: 'Edit component', onClick: () => setEditingComponent(c) },
+                { label: 'Find in gallery', onClick: () => { setEditingComponent(c); setTimeout(() => jumpTo(c.name), 300) } },
                 { label: 'Rename', divider: true, onClick: () => void renameComponentByName(c.name) },
                 { label: 'Copy import', onClick: () => { try { void navigator.clipboard?.writeText(`import { ${c.name} } from '${c.importPath}'`); notify(`Copied import · ${c.name}`) } catch { notify('Clipboard blocked', 'error') } } },
                 { label: 'Duplicate — lands in the lifecycle phase', divider: true, disabled: true, title: 'Component duplicate ships in the E10 lifecycle phase' },
@@ -3837,7 +3842,16 @@ export default function ReactFigmaPage() {
         {codeMode && sel && <CodeView file={sel.file} line={sel.line} onClose={() => setCodeMode(false)} />}
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle, rgba(0,0,0,.09) 1px, transparent 1px)', backgroundSize: `${24 * view.z}px ${24 * view.z}px`, backgroundPosition: `${view.x}px ${view.y}px` }} />
         <div style={{ position: 'absolute', left: 0, top: 0, transform: `translate(${view.x}px,${view.y}px) scale(${view.z})`, transformOrigin: '0 0' }}>
-          <button type="button" onClick={selectFrameRoot} title="Select frame" style={{ appearance: 'none', border: 0, background: 'transparent', font: `550 10px/1 ${FONT}`, color: SEL, marginBottom: 8, marginLeft: 2, cursor: 'pointer', padding: 0 }}>{canvasMode === 'components' ? 'Components' : canvas.name} · {hostDims.w} × {hostDims.h}</button>
+          {canvasMode === 'components' && editingComponent ? (
+            // E10 (Dan LOCKED): Framer-style breadcrumb — Home (back to the page) > Component name.
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8, marginLeft: 2, font: `550 10px/1 ${FONT}` }}>
+              <button type="button" onClick={() => setEditingComponent(null)} title="Back to the page" style={{ appearance: 'none', border: 0, background: 'transparent', font: 'inherit', color: MUTE, cursor: 'pointer', padding: 0 }}>Home</button>
+              <span style={{ color: FAINT }}>›</span>
+              <button type="button" onClick={selectFrameRoot} title="Select component frame" style={{ appearance: 'none', border: 0, background: 'transparent', font: 'inherit', color: SEL, cursor: 'pointer', padding: 0 }}>{editingComponent.name}</button>
+            </div>
+          ) : (
+            <button type="button" onClick={selectFrameRoot} title="Select frame" style={{ appearance: 'none', border: 0, background: 'transparent', font: `550 10px/1 ${FONT}`, color: SEL, marginBottom: 8, marginLeft: 2, cursor: 'pointer', padding: 0 }}>{canvas.name} · {hostDims.w} × {hostDims.h}</button>
+          )}
           <div data-screen-host onClick={selectFrameRoot} style={{ position: 'relative', width: hostDims.w, height: hostDims.h, background: '#fff', borderRadius: 4, boxShadow: '0 0 0 1px rgba(0,0,0,.06), 0 12px 40px -8px rgba(0,0,0,.25)' }}>
             <iframe key={canvasMode === 'components' ? '/react-figma/components-canvas' : canvas.route} ref={iframeRef} src={canvasMode === 'components' ? '/react-figma/components-canvas' : canvas.route} onLoad={wireCanvas} title="Canvas — real build"
               style={{ width: hostDims.w, height: hostDims.h, border: 0, display: 'block', borderRadius: 4, pointerEvents: drawArm ? 'none' : 'auto' }} />
