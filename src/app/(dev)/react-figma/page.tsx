@@ -1044,22 +1044,34 @@ function VariablesLibrary() {
       catch { setImportErr('Invalid JSON file.') }
     })
   }
-  // #32: resizable Name / CSS-variable columns (Light/Dark absorb the remainder). Handle is an
-  // absolute overlay at the cell's right edge so it consumes no layout width — header and rows stay
-  // aligned by the shared width value alone.
-  const [colW, setColW] = useState({ name: 220, css: 220 })
-  const dragCol = (key: 'name' | 'css') => (e: React.PointerEvent) => {
-    e.preventDefault()
-    const startX = e.clientX, startW = colW[key]
-    const onMove = (ev: PointerEvent) => setColW((w) => ({ ...w, [key]: Math.max(120, Math.min(480, startW + (ev.clientX - startX))) }))
+  // Columns — Dan 2026-07-08 ("extract from Figma + repeat"): ALL columns visible + resizable +
+  // auto-distributed equally by default (Figma census: Light/Dark are equal 200px, resizable via
+  // per-column handles). Generic keyed widths so every column (incl. our css/code additions) resizes.
+  const tableRef = useRef<HTMLDivElement>(null)
+  const [colW, setColW] = useState<Record<string, number>>({})
+  const dragCol = (id: string) => (e: React.PointerEvent) => {
+    e.preventDefault(); e.stopPropagation()
+    const cell = (e.currentTarget as HTMLElement).parentElement
+    const startX = e.clientX, startW = cell ? cell.getBoundingClientRect().width : (colW[id] ?? 160)
+    const onMove = (ev: PointerEvent) => setColW((w) => ({ ...w, [id]: Math.max(80, startW + (ev.clientX - startX)) }))
     const onUp = () => { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp) }
     window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp)
   }
-  const colHandle = (key: 'name' | 'css') => (
-    <span role="separator" aria-label={`Resize ${key} column`} onPointerDown={dragCol(key)}
-      onDoubleClick={() => setColW((w) => ({ ...w, [key]: 220 }))} // dbl-click = auto-fit/reset (Dan); flex columns re-distribute
-      style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 9, cursor: 'col-resize', zIndex: 1 }} />
+  const colHandle = (id: string) => (
+    <span role="separator" aria-label={`Resize ${id} column`} onPointerDown={dragCol(id)}
+      style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 9, cursor: 'col-resize', zIndex: 2 }} />
   )
+  // Collapse (Figma census: the top control is "Hide panel" — it hides the Collections/Groups
+  // sidebar, table fills). Ours was a dead toggle; wire it. Plus a draggable divider that splits the
+  // Collections list and the Groups list (Dan: like the main panel's Pages/Layers divider).
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [collectionsH, setCollectionsH] = useState(300)
+  const colDivRef = useRef<{ y: number; h: number } | null>(null)
+  const collectionsDivider = {
+    onPointerDown: (e: React.PointerEvent) => { e.preventDefault(); colDivRef.current = { y: e.clientY, h: collectionsH }; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId) },
+    onPointerMove: (e: React.PointerEvent) => { const s = colDivRef.current; if (s) setCollectionsH(Math.max(80, Math.min(600, s.h + (e.clientY - s.y)))) },
+    onPointerUp: (e: React.PointerEvent) => { colDivRef.current = null; try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId) } catch { /* already released */ } },
+  }
   const collOf = (t: DsToken) => t.path?.split(' / ')[0] ?? t.group
   const collections: [string, number][] = []
   for (const t of tokens) {
@@ -1086,38 +1098,53 @@ function VariablesLibrary() {
     .filter((v) => !groupSel || v.name.split('/').filter(Boolean)[0] === groupSel)
     .filter((v) => !ql || v.name.toLowerCase().includes(ql) || v.values.some((x) => x.toLowerCase().includes(ql))) : []
   const isColorVal = (s: string) => /^#[0-9a-f]{6,8}$/i.test(s)
+  // column set per view; grid template from the keyed widths (equal by default via the effect below)
+  const cols: { id: string; label: string }[] = imported
+    ? [{ id: 'name', label: 'Variable' }, ...(activeImported?.modes ?? []).map((m, i) => ({ id: `mode${i}`, label: `${m} (figma)` })), { id: 'css', label: 'CSS variable' }, { id: 'code', label: 'Code value' }]
+    : [{ id: 'name', label: 'Name' }, { id: 'css', label: 'CSS variable' }, { id: 'light', label: 'Light' }, { id: 'dark', label: 'Dark' }]
+  // Columns auto-distribute equally by default (every col = 1fr → equal, fills the width); a column
+  // becomes fixed px only once the user drags its handle. Last column always flexes (keeps header
+  // and rows aligned with no horizontal scroll).
+  const colTemplate = cols.map((c, i) => (i === cols.length - 1 || !colW[c.id] ? 'minmax(80px, 1fr)' : `${colW[c.id]}px`)).join(' ')
   return (
     <div style={{ flex: 1, minWidth: 0, display: 'flex', overflow: 'hidden' }}>
-      {/* collections */}
-      <div style={{ width: 260, flex: 'none', borderRight: `1px solid ${LINE}`, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {/* Collections/Groups sidebar — hidden when collapsed ("Hide panel", Figma census). */}
+      {!sidebarCollapsed && (() => {
+        const groupsPane = !!(imported && importedGroups.length > 0 && activeImported)
+        return (
+        <div style={{ width: 240, flex: 'none', borderRight: `1px solid ${LINE}`, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ height: 40, borderBottom: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', gap: 6, padding: '0 12px' }}>
           <span style={{ flex: 1, minWidth: 0, font: `550 12px/1 ${FONT}`, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={imported ? imported.file : undefined}>{imported ? `Figma · ${imported.file}` : `ONEMO DS · ${tokens.length} tokens`}</span>
           {imported && <button type="button" title="Back to DS tokens" onClick={() => { setImported(null); setColSel(0) }} style={{ appearance: 'none', border: 0, background: 'transparent', cursor: 'pointer', color: MUTE, font: `400 15px/1 ${FONT}`, padding: 0 }}>×</button>}
-          <IB I={Sidebar} title="Toggle panel" s={15} />
+          <IB I={Sidebar} title="Hide panel" s={15} on={() => setSidebarCollapsed(true)} />
         </div>
         {/* #31: import a Figma variables JSON export and render it in figma format */}
-        <label title="Load a Figma variables JSON export" style={{ margin: '8px 12px 2px', height: 26, borderRadius: 6, border: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer', font: `450 11px/1 ${FONT}`, color: INK }}>
+        <label title="Load a Figma variables JSON export" style={{ margin: '8px 12px 2px', height: 26, borderRadius: 6, border: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer', font: `450 11px/1 ${FONT}`, color: INK, flex: 'none' }}>
           <input type="file" accept="application/json,.json" style={{ display: 'none' }} onChange={(e) => { const f = e.currentTarget.files?.[0]; if (f) loadJson(f); e.currentTarget.value = '' }} />
           ↥ Load Figma JSON
         </label>
-        {importErr && <div style={{ padding: '2px 12px 4px', font: `400 10px/1.4 ${FONT}`, color: '#d33' }}>{importErr}</div>}
-        <div style={{ padding: '8px 12px 4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={hdr}>Collections</span></div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: '0 6px' }}>
+        {importErr && <div style={{ padding: '2px 12px 4px', font: `400 10px/1.4 ${FONT}`, color: '#d33', flex: 'none' }}>{importErr}</div>}
+        <div style={{ padding: '8px 12px 4px', flex: 'none' }}><span style={hdr}>Collections</span></div>
+        {/* Collections pane — fixed height (draggable) when a Groups pane sits below, else fills. */}
+        <div style={{ height: groupsPane ? collectionsH : undefined, flex: groupsPane ? 'none' : 1, overflowY: 'auto', padding: '0 6px' }}>
           {(imported ? imported.collections.map((c, i) => [c.name, c.vars.length, i] as [string, number, number]) : collections.map(([n, c], i) => [n, c, i] as [string, number, number])).map(([n, c, i]) => (
-            <button key={`${n}-${i}`} type="button" onClick={() => { setColSel(i); setGroupSel(null) }} style={{ appearance: 'none', border: 0, cursor: 'pointer', width: '100%', height: 30, display: 'flex', alignItems: 'center', gap: 8, padding: '0 8px', borderRadius: 5, background: i === colSel ? '#f0f1f3' : 'transparent', color: INK }}>
-              <span style={{ flex: 1, minWidth: 0, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', font: `${i === colSel ? 550 : 400} 11px/1 ${FONT}` }}>{n}</span>
+            <button key={`${n}-${i}`} type="button" onClick={() => { setColSel(i); setGroupSel(null) }} style={{ appearance: 'none', border: 0, cursor: 'pointer', width: '100%', height: 30, display: 'flex', alignItems: 'center', gap: 8, padding: '0 8px', borderRadius: 5, background: i === colSel ? '#e5f4ff' : 'transparent', color: INK }}>
+              <span style={{ flex: 1, minWidth: 0, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', font: `${i === colSel ? 600 : 400} 11px/1 ${FONT}` }}>{n}</span>
               <span style={{ flex: 'none', color: MUTE, font: `400 11px/1 ${FONT}` }}>{c}</span>
             </button>
           ))}
-          {/* 2.9 Groups sidebar (Figma variables editor, live census 2026-07-08: rows 32px, 11px,
-              selected 600 + highlight, count right-aligned; 'All' first). Imported view only —
-              groups derive from variable name slash-paths. */}
-          {imported && importedGroups.length > 0 && activeImported && (
-            <>
-              <div style={{ padding: '12px 8px 4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={hdr}>Groups</span></div>
+        </div>
+        {/* 2.9 Groups sidebar — its own scroll pane below a DRAGGABLE divider (Dan: like Pages/Layers).
+            The active COLLECTION stays selected above (persistent blue) — group is a sub-filter. */}
+        {groupsPane && (
+          <>
+            <div role="separator" aria-label="Resize Collections section" {...collectionsDivider}
+              style={{ height: 12, margin: '-6px 0', cursor: 'ns-resize', flex: 'none', position: 'relative', zIndex: 5, display: 'grid', alignItems: 'center', touchAction: 'none', borderTop: `1px solid ${LINE}` }} />
+            <div style={{ padding: '8px 12px 4px', flex: 'none' }}><span style={hdr}>Groups</span></div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0 6px' }}>
               <button type="button" onClick={() => setGroupSel(null)} style={{ appearance: 'none', border: 0, cursor: 'pointer', width: '100%', height: 32, display: 'flex', alignItems: 'center', gap: 8, padding: '0 8px', borderRadius: 5, background: groupSel === null ? '#e5f4ff' : 'transparent', color: INK }}>
                 <span style={{ flex: 1, minWidth: 0, textAlign: 'left', font: `${groupSel === null ? 600 : 400} 11px/1 ${FONT}` }}>All</span>
-                <span style={{ flex: 'none', color: MUTE, font: `400 11px/1 ${FONT}` }}>{activeImported.vars.length}</span>
+                <span style={{ flex: 'none', color: MUTE, font: `400 11px/1 ${FONT}` }}>{activeImported!.vars.length}</span>
               </button>
               {importedGroups.map(([g, count]) => (
                 <button key={g} type="button" onClick={() => setGroupSel((cur) => cur === g ? null : g)} style={{ appearance: 'none', border: 0, cursor: 'pointer', width: '100%', height: 32, display: 'flex', alignItems: 'center', gap: 8, padding: '0 8px 0 16px', borderRadius: 5, background: groupSel === g ? '#e5f4ff' : 'transparent', color: INK }}>
@@ -1125,13 +1152,16 @@ function VariablesLibrary() {
                   <span style={{ flex: 'none', color: MUTE, font: `400 11px/1 ${FONT}` }}>{count}</span>
                 </button>
               ))}
-            </>
-          )}
+            </div>
+          </>
+        )}
         </div>
-      </div>
+        )
+      })()}
       {/* traceability table: Name · CSS variable · Light · Dark — grouped like Figma's variables editor */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div style={{ height: 40, borderBottom: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', gap: 12, padding: '0 16px' }}>
+        <div style={{ height: 40, borderBottom: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', gap: 8, padding: '0 16px' }}>
+          {sidebarCollapsed && <IB I={Sidebar} title="Show panel" active s={15} on={() => setSidebarCollapsed(false)} />}
           <span style={{ font: `550 12px/1 ${FONT}` }}>{imported ? (activeImported?.name ?? '—') : activeCol}</span>
           <span style={{ color: MUTE, font: `400 11px/1 ${FONT}` }}>{imported ? importedRows.length : rows.length}</span>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1141,15 +1171,12 @@ function VariablesLibrary() {
             </div>
           </div>
         </div>
-        <div style={{ height: 32, borderBottom: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', font: `550 11px/1 ${FONT}`, color: MUTE }}>
-          {imported
-            ? (<>
-                <span style={{ width: colW.name, padding: '0 16px', position: 'relative' }}>Variable{colHandle('name')}</span>
-                {(activeImported?.modes ?? []).map((m) => <span key={m} style={{ flex: 1, padding: '0 12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m} <span style={{ color: FAINT }}>(figma)</span></span>)}
-                <span style={{ width: colW.css, padding: '0 12px', position: 'relative', borderLeft: `1px solid ${LINE}` }}>CSS variable{colHandle('css')}</span>
-                <span style={{ flex: 1, padding: '0 12px' }}>Code value</span>
-              </>)
-            : (<><span style={{ width: colW.name, padding: '0 16px', position: 'relative' }}>Name{colHandle('name')}</span><span style={{ width: colW.css, padding: '0 12px', position: 'relative' }}>CSS variable{colHandle('css')}</span><span style={{ flex: 1, padding: '0 12px' }}>Light</span><span style={{ flex: 1, padding: '0 12px' }}>Dark</span></>)}
+        {/* header row — grid template shared with every data row (Dan: all columns visible + resizable
+            + equal by default). Handle on all but the last (flex-fill) column. */}
+        <div ref={tableRef} style={{ height: 32, borderBottom: `1px solid ${LINE}`, display: 'grid', gridTemplateColumns: colTemplate, alignItems: 'center', font: `550 11px/1 ${FONT}`, color: MUTE }}>
+          {cols.map((c, ci) => (
+            <span key={c.id} style={{ padding: ci === 0 ? '0 16px' : '0 12px', position: 'relative', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', borderLeft: c.id === 'css' ? `1px solid ${LINE}` : undefined }}>{c.label}{ci < cols.length - 1 && colHandle(c.id)}</span>
+          ))}
         </div>
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {imported ? (
@@ -1174,22 +1201,22 @@ function VariablesLibrary() {
                     const isColor = v.type === 'COLOR' || v.values.some(isColorVal)
                     const code = activeImported && v.path ? byPath.get(`${collCamelClient(activeImported.name)} / ${v.path}`) : undefined
                     out.push(
-                      <div key={`${v.name}-${i}`} title={v.scopes?.join(', ')} style={{ minHeight: 34, borderBottom: '1px solid #f2f2f3', display: 'flex', alignItems: 'center', font: `400 11px/1 ${FONT}` }}>
-                        <span style={{ width: colW.name, padding: '0 16px', minWidth: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div key={`${v.name}-${i}`} title={v.scopes?.join(', ')} style={{ minHeight: 34, borderBottom: '1px solid #f2f2f3', display: 'grid', gridTemplateColumns: colTemplate, alignItems: 'center', font: `400 11px/1 ${FONT}` }}>
+                        <span style={{ padding: '0 16px', minWidth: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
                           {/* Figma census 2026-07-08: the LEADING icon is the variable TYPE icon
                               (paint-wheel for colour) — swatches live in the VALUE cells only. */}
                           <span style={{ flex: 'none', color: 'rgba(0,0,0,0.5)' }}>{isColor ? <VarColorIcon /> : <VariableHashIcon />}</span>
                           <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: INK }}>{leaf}</span>
                         </span>
                         {v.values.map((val, k) => (
-                          <span key={k} style={{ flex: 1, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                          <span key={k} style={{ padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                             {isColorVal(val) && <span style={{ flex: 'none', width: 14, height: 14, borderRadius: 3, background: val, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.12)' }} />}
                             {/* Figma shows hex UPPERCASE without '#' (census 2026-07-08) */}
                             <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{isColorVal(val) ? val.replace(/^#/, '').toUpperCase() : val}</span>
                           </span>
                         ))}
-                        <span style={{ width: colW.css, padding: '0 12px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: MUTE, borderLeft: `1px solid ${LINE}`, alignSelf: 'stretch', display: 'flex', alignItems: 'center' }}>{code?.cssVar ?? '—'}</span>
-                        <span style={{ flex: 1, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                        <span style={{ padding: '0 12px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: MUTE, borderLeft: `1px solid ${LINE}`, alignSelf: 'stretch', display: 'flex', alignItems: 'center' }}>{code?.cssVar ?? '—'}</span>
+                        <span style={{ padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                           {code && code.kind === 'color' && <span style={{ flex: 'none', width: 14, height: 14, borderRadius: 3, background: code.value, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.12)' }} />}
                           <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{code?.value ?? ''}</span>
                         </span>
@@ -1200,7 +1227,7 @@ function VariablesLibrary() {
                 })()
           ) : (() => {
             const valCell = (val: string, isColor: boolean) => (
-              <span style={{ flex: 1, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+              <span style={{ padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                 {isColor && <span style={{ flex: 'none', width: 14, height: 14, borderRadius: 3, background: val, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.12)' }} />}
                 <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{val}</span>
               </span>
@@ -1217,12 +1244,12 @@ function VariablesLibrary() {
               const name = (parts.length > 2 ? parts.slice(2) : parts.slice(1)).join(' / ')
               const isColor = t.kind === 'color'
               out.push(
-                <div key={t.cssVar} style={{ minHeight: 34, borderBottom: '1px solid #f2f2f3', display: 'flex', alignItems: 'center', font: `400 11px/1 ${FONT}` }}>
-                  <span style={{ width: colW.name, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                <div key={t.cssVar} style={{ minHeight: 34, borderBottom: '1px solid #f2f2f3', display: 'grid', gridTemplateColumns: colTemplate, alignItems: 'center', font: `400 11px/1 ${FONT}` }}>
+                  <span style={{ padding: '0 16px', display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                     {isColor ? <span style={{ flex: 'none', width: 14, height: 14, borderRadius: 3, background: t.value, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.12)' }} /> : <VariableHashIcon />}
                     <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
                   </span>
-                  <span style={{ width: colW.css, padding: '0 12px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: MUTE }}>{t.cssVar}</span>
+                  <span style={{ padding: '0 12px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: MUTE }}>{t.cssVar}</span>
                   {valCell(t.value, isColor)}
                   {valCell(t.dark ?? t.value, isColor)}
                 </div>,
