@@ -270,6 +270,7 @@ export type WriteOp =
   | { kind: 'add-state-rule'; file: string; localClass: string; state: 'hover' | 'active'; decls: [string, string][] } // E8 item 9: Framer hover/tap → real CSS pseudo-state rules
   | { kind: 'promote-element'; file: string; line: number; col: number } // I0: lift inline style → .module.css class (blueprint §2)
   | { kind: 'write-scoped-declaration'; file: string; localClass: string; scope: ScopedTarget; prop: string; value: string } // I0: 4-scope CSS write (blueprint §3.2)
+  | { kind: 'add-state'; file: string; state: 'hover' | 'pressed' | 'focus' | 'disabled' | 'loading' | 'error' } // I1: make a state authorable (blueprint §3.5)
   | { kind: 'set-token-value'; tokenPath: string; theme?: string; value: string | number }
   | { kind: 'set-jsx-style'; file: string; line: number; col: number; prop: string; value: string; expectRaw?: string }
   | { kind: 'set-jsx-text'; file: string; line: number; col: number; newText: string; expectRaw?: string }
@@ -536,6 +537,87 @@ async function writeScopedDeclaration(op: Extract<WriteOp, { kind: 'write-scoped
   await postcss.parse(next, { from: abs }) // parse-guard: refuse rather than corrupt
   await fs.writeFile(abs, next, 'utf8')
   return { ok: true, file: op.file, newValueText: `${selector} { ${op.prop}: ${op.value} }` }
+}
+
+// ─── I1: states — add-state op (blueprint §3.5, §6.2 two-kind) ────────────────────
+/** The root JSX element a component's function returns (unwrapping parens). */
+function findRootReturnedElement(fn: ts.FunctionLikeDeclaration, sf: ts.SourceFile): ts.JsxElement | ts.JsxSelfClosingElement | null {
+  let found: ts.JsxElement | ts.JsxSelfClosingElement | null = null
+  const visit = (n: ts.Node) => {
+    if (found) return
+    if (ts.isReturnStatement(n) && n.expression) {
+      let e: ts.Node = n.expression
+      while (ts.isParenthesizedExpression(e)) e = e.expression
+      if (ts.isJsxElement(e) || ts.isJsxSelfClosingElement(e)) { found = e; return }
+    }
+    ts.forEachChild(n, visit)
+  }
+  visit(fn)
+  return found
+}
+
+/** Add a `<prop>?: boolean` (default false) to a component's destructured params + type literal, plus a
+ * `data-<attr>={<prop> || undefined}` toggle on its root element. Returns the rewritten source (string-
+ * spliced with char offsets; the caller assertValidTsx's it). Reused by add-state (semantic) + later
+ * expose-as-prop's boolean path. Refuses (409) if the prop already exists. */
+function addBooleanPropToComponent(source: string, sf: ts.SourceFile, propName: string, dataAttr: string): string {
+  let fn: ts.FunctionDeclaration | ts.ArrowFunction | undefined
+  for (const st of sf.statements) {
+    if (ts.isFunctionDeclaration(st) && st.name && /^[A-Z]/.test(st.name.text)) { fn = st; break }
+    if (ts.isVariableStatement(st)) for (const d of st.declarationList.declarations)
+      if (ts.isIdentifier(d.name) && /^[A-Z]/.test(d.name.text) && d.initializer && ts.isArrowFunction(d.initializer)) fn = d.initializer
+  }
+  if (!fn) throw Object.assign(new Error('no exported component function found'), { status: 422 })
+  const root = findRootReturnedElement(fn, sf)
+  if (!root) throw Object.assign(new Error('no root JSX element returned by the component'), { status: 422 })
+
+  const edits: { s: number; t: string }[] = []
+  const param = fn.parameters[0]
+  if (!param) {
+    const openParen = source.indexOf('(', fn.getStart(sf))
+    edits.push({ s: openParen + 1, t: `{ ${propName} = false }: { ${propName}?: boolean }` })
+  } else if (ts.isObjectBindingPattern(param.name)) {
+    if (param.name.elements.some((e) => ts.isIdentifier(e.name) && e.name.text === propName)) throw Object.assign(new Error(`prop "${propName}" already exists`), { status: 409 })
+    const hasElems = param.name.elements.length > 0
+    edits.push({ s: param.name.getEnd() - 1, t: `${hasElems ? ', ' : ' '}${propName} = false ` })
+    if (param.type && ts.isTypeLiteralNode(param.type)) {
+      const hasMembers = param.type.members.length > 0
+      edits.push({ s: param.type.getEnd() - 1, t: `${hasMembers ? '; ' : ' '}${propName}?: boolean ` })
+    } else throw Object.assign(new Error('component params have no inline type literal — cannot type the new prop (v1 scope)'), { status: 422 })
+  } else throw Object.assign(new Error('component param is not a destructured object — out of v1 scope'), { status: 422 })
+
+  const opening = ts.isJsxElement(root) ? root.openingElement : root
+  edits.push({ s: opening.tagName.getEnd(), t: ` data-${dataAttr}={${propName} || undefined}` })
+
+  edits.sort((a, b) => b.s - a.s) // apply high→low so earlier offsets stay valid
+  let out = source
+  for (const e of edits) out = out.slice(0, e.s) + e.t + out.slice(e.s)
+  return out
+}
+
+const STATE_PSEUDO: Record<string, 'hover' | 'active' | 'focus-visible' | 'disabled'> = { hover: 'hover', pressed: 'active', focus: 'focus-visible', disabled: 'disabled' }
+/** add-state (blueprint §3.5): make a state authorable. INTERACTION (hover/pressed/focus/disabled) → just
+ * ensure the base `transition` (smoothness); the `.base:<pseudo>` rule is created on the first scoped edit.
+ * SEMANTIC (loading/error) → add a real boolean prop + `data-<state>` toggle on the root, so the state is
+ * driven by app state, plus the base transition. Requires the component be promoted first. */
+async function addState(op: Extract<WriteOp, { kind: 'add-state' }>): Promise<{ ok: true; file: string; newValueText: string }> {
+  const model = await parseComponentModel(op.file)
+  if (!model.cssModule || !model.rootClass) throw Object.assign(new Error('promote the component to a CSS module first (no base class)'), { status: 422 })
+  const isSemantic = op.state === 'loading' || op.state === 'error'
+  if (isSemantic) {
+    const abs = jailComponentWrite(op.file)
+    const source = (await fs.readFile(abs)).toString('utf8')
+    const sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
+    const tsx = addBooleanPropToComponent(source, sf, op.state, op.state)
+    assertValidTsx(abs, tsx)
+    await fs.writeFile(abs, tsx, 'utf8')
+    await writeScopedDeclaration({ kind: 'write-scoped-declaration', file: model.cssModule, localClass: model.rootClass, scope: { kind: 'base' }, prop: 'transition', value: 'opacity .2s ease, background .2s ease' })
+    return { ok: true, file: op.file, newValueText: `semantic state "${op.state}": boolean prop + [data-${op.state}] toggle` }
+  }
+  const pseudo = STATE_PSEUDO[op.state]
+  if (!pseudo) throw Object.assign(new Error(`unknown state: ${op.state}`), { status: 422 })
+  await writeScopedDeclaration({ kind: 'write-scoped-declaration', file: model.cssModule, localClass: model.rootClass, scope: { kind: 'base' }, prop: 'transition', value: 'all .15s ease' })
+  return { ok: true, file: op.file, newValueText: `interaction state "${op.state}" (:${pseudo}) — edit it to create the rule` }
 }
 
 // ─── I0: ComponentModel READ (blueprint §1) — source IS the model ────────────────
@@ -1351,6 +1433,7 @@ async function applyWriteInner(op: WriteOp): Promise<{ ok: true; file: string; n
   if (op.kind === 'make-component') return makeComponent(op)
   if (op.kind === 'promote-element') return promoteElement(op)
   if (op.kind === 'write-scoped-declaration') return writeScopedDeclaration(op)
+  if (op.kind === 'add-state') return addState(op)
   if (op.kind === 'create-page') return createPage(op)
   if (op.kind === 'set-token-value') return setTokenValue(op)
   if (op.kind === 'set-jsx-style') return setJsxStyle(op)
