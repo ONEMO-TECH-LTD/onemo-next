@@ -261,6 +261,9 @@ export type ScopedTarget =
   | { kind: 'variant'; name: string }
   | { kind: 'state'; pseudo: 'hover' | 'active' | 'focus-visible' | 'disabled' }
   | { kind: 'state'; propClass: 'loading' | 'error' | 'disabled' }
+  // I2/D2 (blueprint §3.2): the COMPOSITE target — 0..N config-axis selectors + 0..N semantic states +
+  // 0..1 interaction pseudo, combined into ONE deterministic selector. Single-axis is just N=1.
+  | { kind: 'composite'; axisValues?: { axis: string; value: string }[]; pseudo?: 'hover' | 'active' | 'focus-visible' | 'disabled'; semantic?: ('loading' | 'error' | 'disabled')[] }
 
 export type WriteOp =
   | { kind: 'set-declaration'; decl: DeclRef; newValueText: string }
@@ -271,6 +274,8 @@ export type WriteOp =
   | { kind: 'promote-element'; file: string; line: number; col: number } // I0: lift inline style → .module.css class (blueprint §2)
   | { kind: 'write-scoped-declaration'; file: string; localClass: string; scope: ScopedTarget; prop: string; value: string } // I0: 4-scope CSS write (blueprint §3.2)
   | { kind: 'add-state'; file: string; state: 'hover' | 'pressed' | 'focus' | 'disabled' | 'loading' | 'error' } // I1: make a state authorable (blueprint §3.5)
+  | { kind: 'add-variant-axis'; file: string; axis: string; values: string[]; defaultValue: string } // I2: a new config axis (blueprint §3.3a)
+  | { kind: 'add-variant-value'; file: string; axis: string; value: string } // I2: extend an axis's union (blueprint §3.3b)
   | { kind: 'set-token-value'; tokenPath: string; theme?: string; value: string | number }
   | { kind: 'set-jsx-style'; file: string; line: number; col: number; prop: string; value: string; expectRaw?: string }
   | { kind: 'set-jsx-text'; file: string; line: number; col: number; newText: string; expectRaw?: string }
@@ -508,10 +513,24 @@ async function promoteElement(op: Extract<WriteOp, { kind: 'promote-element' }>)
  * DUAL selector `.base:hover, :global([data-fc-preview="hover"]) .base` — the ANCESTOR half lets the gallery
  * force-preview a state by setting `data-fc-preview` on the WRAPPER around the component (the pseudo can't
  * be forced on .base itself); it is editor-only and stripped on export so shipped CSS is pure `.base:hover`. */
+// The full 6-state order (§6.2) — used to sort semantic `[data-*]` selectors deterministically so WRITE
+// and READ always compose the same combinatorial rule.
+const STATE_ORDER = ['hover', 'pressed', 'focus', 'disabled', 'loading', 'error']
 function scopedSelector(localClass: string, scope: ScopedTarget): string {
   const c = `.${localClass}`
   if (scope.kind === 'base') return c
   if (scope.kind === 'variant') return `${c}.${scope.name}`
+  if (scope.kind === 'composite') {
+    // §3.2 deterministic order: axis classes `.<axis>_<value>` (caller sends them in variantAxes-index
+    // order) → semantic `[data-*]` sorted by the 6-state order → the single `:pseudo` LAST. So
+    // {axisValues:[{size,lg}], semantic:[loading], pseudo:hover} → `.base.size_lg[data-loading]:hover`.
+    const axisPart = (scope.axisValues ?? []).map((av) => `.${av.axis}_${av.value}`).join('')
+    const semPart = [...(scope.semantic ?? [])].sort((a, b) => STATE_ORDER.indexOf(a) - STATE_ORDER.indexOf(b)).map((s) => `[data-${s}]`).join('')
+    const core = `${c}${axisPart}${semPart}`
+    // A pseudo can't be forced statically in the gallery → emit the F3 DUAL selector (the ancestor-preview
+    // half is editor-only, stripped on export so shipped CSS is pure `…:hover`).
+    return scope.pseudo ? `${core}:${scope.pseudo}, :global([data-fc-preview="${scope.pseudo}"]) ${core}` : core
+  }
   if ('pseudo' in scope) return `${c}:${scope.pseudo}, :global([data-fc-preview="${scope.pseudo}"]) ${c}`
   return `${c}[data-${scope.propClass}]`
 }
@@ -522,6 +541,11 @@ function scopedSelector(localClass: string, scope: ScopedTarget): string {
 async function writeScopedDeclaration(op: Extract<WriteOp, { kind: 'write-scoped-declaration' }>): Promise<{ ok: true; file: string; newValueText: string }> {
   if (!/^[a-zA-Z_][\w-]*$/.test(op.localClass)) throw Object.assign(new Error('invalid class name'), { status: 422 })
   if (op.scope.kind === 'variant' && !/^[a-zA-Z_][\w-]*$/.test(op.scope.name)) throw Object.assign(new Error('invalid variant name'), { status: 422 })
+  if (op.scope.kind === 'composite') for (const av of op.scope.axisValues ?? []) {
+    // axis is a prop identifier → NO underscore (the READ splits on the FIRST `_` → axis, rest → value)
+    if (!/^[a-zA-Z][a-zA-Z0-9]*$/.test(av.axis)) throw Object.assign(new Error(`invalid axis name: ${av.axis}`), { status: 422 })
+    if (!/^[a-zA-Z0-9][\w-]*$/.test(av.value)) throw Object.assign(new Error(`invalid axis value: ${av.value}`), { status: 422 })
+  }
   if (!/^(--)?[a-zA-Z][\w-]*$/.test(op.prop)) throw Object.assign(new Error(`invalid CSS property: ${op.prop}`), { status: 422 })
   if (/[{};]/.test(op.value) || op.value.trim() === '') throw Object.assign(new Error(`invalid CSS value: ${op.value}`), { status: 422 })
   const abs = jailModuleCss(op.file)
@@ -648,6 +672,135 @@ async function addState(op: Extract<WriteOp, { kind: 'add-state' }>): Promise<{ 
   return { ok: true, file: op.file, newValueText: `interaction state "${op.state}" (:${pseudo}) — edit it to create the rule` }
 }
 
+// ─── I2: config variants — multi-axis (blueprint §3.3, §6.1) ──────────────────────
+/** Find the exported component function in a source file (same walker as parseComponentModel/addState). */
+function findComponentFn(sf: ts.SourceFile): ts.FunctionDeclaration | ts.ArrowFunction | undefined {
+  let fn: ts.FunctionDeclaration | ts.ArrowFunction | undefined
+  for (const st of sf.statements) {
+    if (ts.isFunctionDeclaration(st) && st.name && /^[A-Z]/.test(st.name.text)) { fn = st; break }
+    if (ts.isVariableStatement(st)) for (const d of st.declarationList.declarations)
+      if (ts.isIdentifier(d.name) && /^[A-Z]/.test(d.name.text) && d.initializer && ts.isArrowFunction(d.initializer)) fn = d.initializer
+  }
+  return fn
+}
+/** Pull the string-literal members out of a (possibly union) type node. */
+function extractUnionValues(type: ts.TypeNode): string[] {
+  const out: string[] = []
+  const collect = (t: ts.TypeNode) => {
+    if (ts.isUnionTypeNode(t)) t.types.forEach(collect)
+    else if (ts.isLiteralTypeNode(t) && ts.isStringLiteral(t.literal)) out.push(t.literal.text)
+  }
+  collect(type)
+  return out
+}
+/** mint-union-prop (blueprint §3.3): add or extend a string-union prop on the component's destructured
+ * params + inline type literal. Generalizes addBooleanPropToComponent (boolean → a `'a'|'b'|…` union with a
+ * default). CREATE if absent; EXTEND (merge new values into the union) if present; idempotent no-op if all
+ * values already there. NO data-attr — a config axis drives `className`, not a toggle. Caller assertValidTsx's. */
+function mintUnionProp(source: string, sf: ts.SourceFile, propName: string, values: string[], defaultValue: string): string {
+  if (!/^[a-zA-Z][a-zA-Z0-9]*$/.test(propName)) throw Object.assign(new Error(`invalid axis/prop name: ${propName}`), { status: 422 })
+  if (!values.length) throw Object.assign(new Error('no values'), { status: 422 })
+  for (const v of values) if (!/^[a-zA-Z0-9][\w-]*$/.test(v)) throw Object.assign(new Error(`invalid value: ${v}`), { status: 422 })
+  if (!values.includes(defaultValue)) throw Object.assign(new Error(`default "${defaultValue}" not in values`), { status: 422 })
+  const union = values.map((v) => `'${v}'`).join(' | ')
+  const fn = findComponentFn(sf)
+  if (!fn) throw Object.assign(new Error('no exported component function found'), { status: 422 })
+
+  const edits: { s: number; e?: number; t: string }[] = []
+  const param = fn.parameters[0]
+  if (!param) {
+    const openParen = source.indexOf('(', fn.getStart(sf))
+    edits.push({ s: openParen + 1, t: `{ ${propName} = '${defaultValue}' }: { ${propName}?: ${union} }` })
+  } else if (ts.isObjectBindingPattern(param.name)) {
+    const existing = param.name.elements.find((el) => ts.isIdentifier(el.name) && el.name.text === propName)
+    if (existing) {
+      // EXTEND — merge new values into the existing union (leave the destructured default as-is).
+      if (!(param.type && ts.isTypeLiteralNode(param.type))) throw Object.assign(new Error('no inline type literal to extend'), { status: 422 })
+      const member = param.type.members.find((m) => ts.isPropertySignature(m) && m.name && m.name.getText(sf) === propName) as ts.PropertySignature | undefined
+      if (!member?.type) throw Object.assign(new Error(`prop "${propName}" has no type to extend`), { status: 422 })
+      const existingVals = extractUnionValues(member.type)
+      const merged = [...new Set([...existingVals, ...values])]
+      if (merged.length === existingVals.length) return source // idempotent — all values already present
+      edits.push({ s: member.type.getStart(sf), e: member.type.getEnd(), t: merged.map((v) => `'${v}'`).join(' | ') })
+    } else {
+      const hasElems = param.name.elements.length > 0
+      edits.push({ s: param.name.getEnd() - 1, t: `${hasElems ? ', ' : ' '}${propName} = '${defaultValue}' ` })
+      if (param.type && ts.isTypeLiteralNode(param.type)) {
+        const hasMembers = param.type.members.length > 0
+        edits.push({ s: param.type.getEnd() - 1, t: `${hasMembers ? '; ' : ' '}${propName}?: ${union} ` })
+      } else throw Object.assign(new Error('component params have no inline type literal — cannot type the new prop'), { status: 422 })
+    }
+  } else throw Object.assign(new Error('component param is not a destructured object — out of scope'), { status: 422 })
+
+  edits.sort((a, b) => b.s - a.s) // apply high→low so earlier offsets stay valid
+  let out = source
+  for (const ed of edits) out = out.slice(0, ed.s) + ed.t + out.slice(ed.e ?? ed.s)
+  return out
+}
+/** Ensure the root's `className` composes an axis's delta class: `styles[`<axis>_${<axis>}`]` (the prop is
+ * defaulted so `props[axis] ?? default` is just the destructured var). Idempotent. Handles both the simple
+ * `className={styles.base}` form and the already-composed array form. */
+function ensureAxisInClassName(source: string, sf: ts.SourceFile, rootClass: string, axis: string): string {
+  const fn = findComponentFn(sf)
+  if (!fn) throw Object.assign(new Error('no exported component function found'), { status: 422 })
+  const root = findRootReturnedElement(fn, sf)
+  if (!root) throw Object.assign(new Error('no root JSX element'), { status: 422 })
+  const opening = ts.isJsxElement(root) ? root.openingElement : root
+  const attr = opening.attributes.properties.find((p): p is ts.JsxAttribute => ts.isJsxAttribute(p) && p.name.getText(sf) === 'className')
+  if (!attr?.initializer || !ts.isJsxExpression(attr.initializer) || !attr.initializer.expression) throw Object.assign(new Error('root has no className={…} expression to compose'), { status: 422 })
+  const expr = attr.initializer.expression
+  const term = `styles[\`${axis}_\${${axis}}\`]`
+  if (expr.getText(sf).includes(term)) return source // idempotent
+  let replacement: string
+  if (ts.isPropertyAccessExpression(expr) || ts.isElementAccessExpression(expr)) {
+    // simple `styles.base` → compose an array
+    replacement = `[${expr.getText(sf)}, ${term}].filter(Boolean).join(' ')`
+  } else if (ts.isCallExpression(expr) && expr.getText(sf).includes('.filter(Boolean)')) {
+    // already composed: `[styles.base, …].filter(Boolean).join(' ')` — insert the new term into the array
+    const arr = ((): ts.ArrayLiteralExpression | undefined => {
+      let e: ts.Expression = expr
+      // unwrap .join('') → .filter(Boolean) → the array
+      while (ts.isCallExpression(e) && ts.isPropertyAccessExpression(e.expression)) e = e.expression.expression
+      return ts.isArrayLiteralExpression(e) ? e : undefined
+    })()
+    if (!arr) throw Object.assign(new Error('cannot locate the className array to extend'), { status: 422 })
+    const lastEl = arr.elements[arr.elements.length - 1]
+    const insertAt = lastEl ? lastEl.getEnd() : arr.getStart(sf) + 1
+    return source.slice(0, insertAt) + `, ${term}` + source.slice(insertAt)
+  } else throw Object.assign(new Error('unrecognised className expression shape'), { status: 422 })
+  return source.slice(0, expr.getStart(sf)) + replacement + source.slice(expr.getEnd())
+}
+/** add-variant-axis (blueprint §3.3a): a NEW config axis — mint its `<axis>` union prop + compose it into
+ * `className`. The `.base.<axis>_<value>` delta rules are created lazily on the first scoped edit (the union
+ * prop is the source of truth for the axis, like a semantic state's boolean prop). Requires promotion. */
+async function addVariantAxis(op: Extract<WriteOp, { kind: 'add-variant-axis' }>): Promise<{ ok: true; file: string; newValueText: string }> {
+  const model = await parseComponentModel(op.file)
+  if (!model.cssModule || !model.rootClass) throw Object.assign(new Error('promote the component to a CSS module first'), { status: 422 })
+  const abs = jailComponentWrite(op.file)
+  let source = (await fs.readFile(abs)).toString('utf8')
+  let sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
+  source = mintUnionProp(source, sf, op.axis, op.values, op.defaultValue)
+  sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
+  source = ensureAxisInClassName(source, sf, model.rootClass, op.axis)
+  assertValidTsx(abs, source)
+  await fs.writeFile(abs, source, 'utf8')
+  return { ok: true, file: op.file, newValueText: `variant axis "${op.axis}": ${op.values.join(' | ')} (default ${op.defaultValue})` }
+}
+/** add-variant-value (blueprint §3.3b): extend ONE existing axis's union with a new value (mint-union-prop
+ * EXTEND). The `.base.<axis>_<value>` rule is created on the first scoped edit. */
+async function addVariantValue(op: Extract<WriteOp, { kind: 'add-variant-value' }>): Promise<{ ok: true; file: string; newValueText: string }> {
+  const model = await parseComponentModel(op.file)
+  const axis = model.variantAxes.find((a) => a.axis === op.axis)
+  if (!axis) throw Object.assign(new Error(`no variant axis "${op.axis}"`), { status: 422 })
+  const abs = jailComponentWrite(op.file)
+  const source = (await fs.readFile(abs)).toString('utf8')
+  const sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
+  const next = mintUnionProp(source, sf, op.axis, [...axis.values, op.value], axis.defaultValue)
+  assertValidTsx(abs, next)
+  await fs.writeFile(abs, next, 'utf8')
+  return { ok: true, file: op.file, newValueText: `variant value "${op.axis}=${op.value}" added` }
+}
+
 // ─── I0: ComponentModel READ (blueprint §1) — source IS the model ────────────────
 export type ComponentModel = {
   name: string
@@ -656,7 +809,8 @@ export type ComponentModel = {
   rootClass: string | null    // the base local class, null pre-promotion
   root: { line: number; col: number } | null // 1-based position of the root returned element (for auto-promote)
   props: { name: string; tsType: string; optional: boolean; default?: string }[]
-  variants: { name: string; kind: 'config'; selector: string; decls: Record<string, string> }[]
+  variantAxes: { axis: string; values: string[]; defaultValue: string }[]  // D1: config variants = N INDEPENDENT axes (§6.1); each = one string-union prop
+  variants: { name: string; kind: 'config'; selector: string; decls: Record<string, string> }[]  // the raw `.base.<axis>_<value>` CSS rules (their decls); the axes above are the READ authority
   states: { state: string; kind: 'interaction' | 'semantic'; selector: string; decls: Record<string, string> }[]
   structure: StructureNode | null  // D6: recursive JSX tree of the component (server mirror of engine.ts buildLayerTree)
 }
@@ -734,6 +888,16 @@ export async function parseComponentModel(file: string): Promise<ComponentModel>
       props.push({ name: pn, tsType: t?.type ?? 'unknown', optional: t?.optional ?? false, default: e.initializer?.getText(sf) })
     }
   }
+  // variantAxes (D1, §6.1) — each STRING-UNION prop is a config axis; the union prop is the source of truth
+  // (values + default), so an axis lists in the model the moment add-variant-axis runs, before any
+  // `.base.<axis>_<value>` CSS rule exists (mirrors the semantic-state derive-from-prop pattern).
+  const variantAxes: ComponentModel['variantAxes'] = []
+  for (const p of props) {
+    const vals = [...p.tsType.matchAll(/'([^']*)'/g)].map((m) => m[1])
+    if (!vals.length) continue // not a string-literal union → not a config axis (boolean/string/number props)
+    const def = p.default ? p.default.replace(/^['"]|['"]$/g, '') : vals[0]
+    variantAxes.push({ axis: p.name, values: vals, defaultValue: vals.includes(def) ? def : vals[0] })
+  }
 
   // cssModule ← the `import styles from './X.module.css'` specifier.
   let cssModule: string | null = null
@@ -780,7 +944,7 @@ export async function parseComponentModel(file: string): Promise<ComponentModel>
   if (structure && !FORM_CONTROLS.has(structure.tag) && props.some((p) => p.name === 'disabled' && /boolean/.test(p.tsType)) && !states.some((st) => st.state === 'disabled')) {
     states.push({ state: 'disabled', kind: 'semantic', selector: rootClass ? `.${rootClass}[data-disabled]` : `[data-disabled]`, decls: {} })
   }
-  return { name, file, cssModule, rootClass, root, props, variants, states, structure }
+  return { name, file, cssModule, rootClass, root, props, variantAxes, variants, states, structure }
 }
 
 /**
@@ -1510,6 +1674,8 @@ async function applyWriteInner(op: WriteOp): Promise<{ ok: true; file: string; n
   if (op.kind === 'promote-element') return promoteElement(op)
   if (op.kind === 'write-scoped-declaration') return writeScopedDeclaration(op)
   if (op.kind === 'add-state') return addState(op)
+  if (op.kind === 'add-variant-axis') return addVariantAxis(op)
+  if (op.kind === 'add-variant-value') return addVariantValue(op)
   if (op.kind === 'create-page') return createPage(op)
   if (op.kind === 'set-token-value') return setTokenValue(op)
   if (op.kind === 'set-jsx-style') return setJsxStyle(op)

@@ -2335,15 +2335,15 @@ export default function ReactFigmaPage() {
   // inspector's edits target — base / a config variant / an interaction pseudo-state / a semantic
   // prop-state. Non-base targets route applyOverride → write-scoped-declaration on the component's
   // .module.css, and (for pseudo states) force a live preview via data-fc-preview on the frame wrapper.
-  type EditTarget = { kind: 'base' } | { kind: 'variant'; name: string } | { kind: 'state'; state: 'hover' | 'pressed' | 'focus' | 'disabled' | 'loading' | 'error' }
+  type EditTarget = { kind: 'base' } | { kind: 'variant'; name: string } | { kind: 'axis'; axis: string; value: string } | { kind: 'state'; state: 'hover' | 'pressed' | 'focus' | 'disabled' | 'loading' | 'error' }
   const [editTarget, setEditTarget] = useState<EditTarget>({ kind: 'base' })
   const editTargetRef = useRef(editTarget); useEffect(() => { editTargetRef.current = editTarget }, [editTarget])
   // component model of the component currently being edited (its .tsx file + base class + variants/states)
-  type EditModel = { file: string; cssModule: string | null; rootClass: string | null; root: { line: number; col: number } | null; rootTag: string | null; variants: string[]; states: string[] }
+  type EditModel = { file: string; cssModule: string | null; rootClass: string | null; root: { line: number; col: number } | null; rootTag: string | null; variantAxes: { axis: string; values: string[]; defaultValue: string }[]; variants: string[]; states: string[] }
   const [editModel, setEditModel] = useState<EditModel | null>(null)
   const editModelRef = useRef(editModel); useEffect(() => { editModelRef.current = editModel }, [editModel])
   const editingComponentRef = useRef(editingComponent); useEffect(() => { editingComponentRef.current = editingComponent }, [editingComponent])
-  const shapeModel = (m: { file: string; cssModule: string | null; rootClass: string | null; root: { line: number; col: number } | null; structure?: { tag: string } | null; variants: { name: string }[]; states: { state: string }[] }): EditModel => ({ file: m.file, cssModule: m.cssModule, rootClass: m.rootClass, root: m.root, rootTag: m.structure?.tag ?? null, variants: m.variants.map((v) => v.name), states: m.states.map((s) => s.state) })
+  const shapeModel = (m: { file: string; cssModule: string | null; rootClass: string | null; root: { line: number; col: number } | null; structure?: { tag: string } | null; variantAxes?: { axis: string; values: string[]; defaultValue: string }[]; variants: { name: string }[]; states: { state: string }[] }): EditModel => ({ file: m.file, cssModule: m.cssModule, rootClass: m.rootClass, root: m.root, rootTag: m.structure?.tag ?? null, variantAxes: m.variantAxes ?? [], variants: m.variants.map((v) => v.name), states: m.states.map((s) => s.state) })
   const fetchModel = (file: string) => fetch(`/api/dev/editor-component-model?file=${encodeURIComponent(file)}`).then((r) => (r.ok ? r.json() : null)).catch(() => null)
   useEffect(() => { // reset the target + load the model; AUTO-PROMOTE the root so states/variants are authorable
     setEditTarget({ kind: 'base' })
@@ -2907,6 +2907,9 @@ export default function ReactFigmaPage() {
         // semantic `[data-disabled]` path, same as the server add-state; form-associated roots keep `:disabled`.
         const scope = et.kind === 'variant'
           ? { kind: 'variant', name: et.name }
+          : et.kind === 'axis'
+            // I2 (§3.2): a config axis-value edit → the COMPOSITE `.base.<axis>_<value>` rule.
+            ? { kind: 'composite', axisValues: [{ axis: et.axis, value: et.value }] }
           : (et.state === 'hover' || et.state === 'pressed' || et.state === 'focus' || (et.state === 'disabled' && em.rootTag != null && FORM_ROOTS.has(em.rootTag)))
             ? { kind: 'state', pseudo: ({ hover: 'hover', pressed: 'active', focus: 'focus-visible', disabled: 'disabled' } as const)[et.state] }
             : { kind: 'state', propClass: et.state }
@@ -3957,12 +3960,12 @@ export default function ReactFigmaPage() {
                   inspector to that rule (§4). Semantic states (loading/error) add their boolean prop on first pick. */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap', font: `500 9px/1 ${FONT}` }}>
                 {[{ t: { kind: 'base' as const }, label: 'Base' },
-                  ...(editModel?.variants ?? []).map((v) => ({ t: { kind: 'variant' as const, name: v }, label: v })),
+                  ...(editModel?.variantAxes ?? []).flatMap((ax) => ax.values.map((value) => ({ t: { kind: 'axis' as const, axis: ax.axis, value }, label: `${ax.axis}=${value}` }))),
                   { divider: true as const },
                   ...(['hover', 'pressed', 'focus', 'disabled', 'loading', 'error'] as const).map((s) => ({ t: { kind: 'state' as const, state: s }, label: s[0].toUpperCase() + s.slice(1), semantic: s === 'loading' || s === 'error' }))
                 ].map((c, i) => 'divider' in c ? <span key={i} style={{ width: 1, height: 13, background: LINE, margin: '0 2px' }} />
                   : (() => {
-                    const active = c.t.kind === editTarget.kind && (c.t.kind !== 'variant' || ('name' in editTarget && editTarget.name === c.t.name)) && (c.t.kind !== 'state' || ('state' in editTarget && editTarget.state === (c.t as { state: string }).state))
+                    const active = c.t.kind === editTarget.kind && (c.t.kind !== 'axis' || ('axis' in editTarget && editTarget.axis === (c.t as { axis: string; value: string }).axis && editTarget.value === (c.t as { axis: string; value: string }).value)) && (c.t.kind !== 'state' || ('state' in editTarget && editTarget.state === (c.t as { state: string }).state))
                     return <button key={i} type="button" title={'semantic' in c && c.semantic ? `${c.label} — a real boolean prop drives this state` : c.label}
                       onClick={() => void selectEditTarget(c.t)}
                       style={{ appearance: 'none', border: `1px solid ${active ? SEL : LINE}`, background: active ? '#e5f4ff' : '#fff', color: active ? SEL : INK, borderRadius: 5, padding: '3px 7px', cursor: 'pointer', font: 'inherit' }}>{c.label}</button>

@@ -10,12 +10,19 @@
 import { NextResponse } from 'next/server'
 import { readdir, readFile } from 'node:fs/promises'
 import { join, relative, sep } from 'node:path'
-import { LIB_NAME, LIB_ROOT, exportedTsxNames } from '../editor/lib'
+import { LIB_NAME, LIB_ROOT, exportedTsxNames, parseComponentModel } from '../editor/lib'
 
 const ROOT = process.cwd()
 const COMP_DIR = join(ROOT, 'src', 'app', '(dev)', 'react-figma-components')
 
-type Entry = { name: string; category: string; importPath: string; root: 'project' | 'global'; file: string; exports: string[] }
+type Axis = { axis: string; values: string[]; defaultValue: string }
+type Entry = { name: string; category: string; importPath: string; root: 'project' | 'global'; file: string; exports: string[]; variantAxes: Axis[] }
+
+/* I2 (§7): the component's config-variant axes, parsed server-side so the gallery can render a frame per
+ * axis-value (`<Comp <axis>=X/>`). Defensive — a component that fails to parse just has no axes. */
+async function axesOf(file: string): Promise<Axis[]> {
+  try { return (await parseComponentModel(file)).variantAxes } catch { return [] }
+}
 
 /* Variants metadata: parsed server-side from the file (always fresh — a NEW global file's
  * variants are correct even before webpack sees it). Parser shared with the barrel regen. */
@@ -57,6 +64,7 @@ export async function GET() {
         root: 'project',
         file: relative(ROOT, abs),
         exports: await exportedNames(abs),
+        variantAxes: await axesOf(relative(ROOT, abs)),
       })
     }
     if (LIB_ROOT) {
@@ -70,6 +78,7 @@ export async function GET() {
           root: 'global',
           file: `${LIB_NAME}/src/${rel.split(sep).join('/')}`, // F1 package-prefixed identity
           exports: await exportedNames(abs),
+          variantAxes: await axesOf(`${LIB_NAME}/src/${rel.split(sep).join('/')}`),
         })
       }
     }

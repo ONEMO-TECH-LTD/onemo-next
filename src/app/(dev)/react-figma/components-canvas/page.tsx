@@ -21,8 +21,10 @@ import * as Library from 'onemo-component-library'
 const projectCtx = (require as any).context('../../react-figma-components', true, /\.tsx$/)
 
 type Root = 'global' | 'project'
-type InventoryEntry = { name: string; category: string; importPath: string; root: Root; file: string; exports: string[] }
-type Frame = { key: string; label: string; category: string; root: Root; file?: string; Comp: React.ElementType }
+type Axis = { axis: string; values: string[]; defaultValue: string }
+type InventoryEntry = { name: string; category: string; importPath: string; root: Root; file: string; exports: string[]; variantAxes?: Axis[] }
+// I2 §7: `props` carries the axis-value prop for a variant frame (`<Comp size=lg/>`); undefined → base render.
+type Frame = { key: string; label: string; category: string; root: Root; file?: string; Comp: React.ElementType; props?: Record<string, string> }
 type ComponentGroup = { key: string; name: string; category: string; root: Root; file?: string; variants: Frame[] }
 const COMPONENT_TEXT = '#8638E5'
 const COMPONENT_ACCENT = '#9747FF'
@@ -71,7 +73,7 @@ function groupFrames(frames: Frame[], inventory: InventoryEntry[] | null): Compo
   const groups: ComponentGroup[] = []
   for (const entry of inventory) {
     const exportNames = entry.exports?.length ? entry.exports : [entry.name]
-    const variants = exportNames.flatMap((name) => {
+    const baseFrames = exportNames.flatMap((name) => {
       const frame = entry.root === 'project'
         ? byProjectFileLabel.get(`${entry.file}:${name}`) ?? byRootLabel.get(`${entry.root}:${name}`)
         : byRootLabel.get(`${entry.root}:${name}`)
@@ -79,6 +81,20 @@ function groupFrames(frames: Frame[], inventory: InventoryEntry[] | null): Compo
       used.add(frame.key)
       return [frame]
     })
+    // I2 §7: a component with config-variant AXES renders a FRAME PER AXIS-VALUE (`<Comp axis=value/>`) so
+    // the board shows every value; without axes it stays the named-export frame(s).
+    const axes = entry.variantAxes ?? []
+    const variants: Frame[] = (axes.length && baseFrames.length)
+      ? axes.flatMap((ax) => ax.values.map((value) => ({
+          key: `${entry.root}:${entry.file}:${ax.axis}=${value}`,
+          label: `${ax.axis}=${value}`,
+          category: entry.category ?? baseFrames[0].category,
+          root: entry.root,
+          file: entry.file,
+          Comp: baseFrames[0].Comp,
+          props: { [ax.axis]: value },
+        })))
+      : baseFrames
     if (variants.length) {
       groups.push({
         key: `${entry.root}:${entry.file}`,
@@ -149,7 +165,7 @@ export default function ComponentsCanvasHost() {
                     <figure key={f.key} data-component-frame={f.label} data-component-parent={group.name} data-component-variant={f.label} data-component-source={f.file ?? group.file} data-frame-root={f.root} style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {group.variants.length > 1 && <figcaption style={{ font: '500 11px/1.2 system-ui', color: COMPONENT_TEXT }}>{f.label}</figcaption>}
                       <div style={{ padding: 24, background: '#fff', borderRadius: 12 }}>
-                        <FrameBoundary label={f.label}>{React.createElement(f.Comp)}</FrameBoundary>
+                        <FrameBoundary label={f.label}>{React.createElement(f.Comp, f.props)}</FrameBoundary>
                       </div>
                     </figure>
                   ))}
