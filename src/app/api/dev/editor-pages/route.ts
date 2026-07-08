@@ -53,7 +53,12 @@ async function scanPages(root: string): Promise<{ appDir: string; pages: BuildPa
   // (canvas can BE the loaded page) but are never mutable — and the write ops refuse them
   // independently (defense in depth, not UI-only).
   const EDITOR_SELF = /^\/react-figma(\/|$)/
+  const seen = new Set<string>() // symlink-cycle guard (a loop under the app dir must not hang the scan)
   const walk = async (dir: string): Promise<void> => {
+    let real: string
+    try { real = await fs.realpath(dir) } catch { return }
+    if (seen.has(real)) return
+    seen.add(real)
     let entries
     try { entries = await fs.readdir(dir, { withFileTypes: true }) } catch { return }
     for (const f of ['page.tsx', 'page.jsx', 'page.js']) {
@@ -84,6 +89,10 @@ export async function GET(req: Request) {
   const kind = await detectBuildKind(root)
   if (!kind) return NextResponse.json({ kind: null, root: path.relative(FS_ROOT, root), buildName: path.basename(root), pages: [] })
   const scanned = await scanPages(root)
+  // ?root= trap guard: the write ops are anchored to THIS app (cwd) — pages of any OTHER root must
+  // never claim mutability, or a future caller writes into the wrong build. Lifts with step-4
+  // (BuildSource-carrying ops that verify the registered loaded build).
+  if (path.resolve(root) !== path.resolve(APP_ROOT) && scanned) for (const p of scanned.pages) p.mutable = false
   let buildName = path.basename(root)
   try { buildName = (JSON.parse((await fs.readFile(path.join(root, 'package.json'))).toString('utf8')) as { name?: string }).name ?? buildName } catch { /* basename fallback */ }
   return NextResponse.json({ kind, root: path.relative(FS_ROOT, root), buildName, appDir: path.relative(root, scanned!.appDir), pages: scanned!.pages })

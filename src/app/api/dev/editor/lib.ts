@@ -484,8 +484,12 @@ async function createPage(op: Extract<WriteOp, { kind: 'create-page' }>): Promis
   const base = (op.slugBase ?? 'new-page').replace(/[^a-z0-9-]/gi, '-').toLowerCase()
   const parent = await buildAppDir()
   let slug = base, n = 1
+  // unique in BOTH the sibling dir space AND the route space (groups collapse — expert #2)
   while (true) {
-    try { await fs.access(path.join(parent, slug)); slug = `${base}-${++n}` } catch { break }
+    let dirExists = false
+    try { await fs.access(path.join(parent, slug)); dirExists = true } catch { /* free */ }
+    if (!dirExists && !(await routeTaken(`/${slug}`))) break
+    slug = `${base}-${++n}`
   }
   const w = op.width ?? 402, h = op.height ?? 871
   const dir = path.join(parent, slug)
@@ -686,12 +690,18 @@ const PAGE_SCAN_SKIP = new Set(['node_modules', '.git', '.next', '.turbo', 'dist
 function assertNotEditorSelf(route: string): void {
   if (/^\/react-figma(\/|$)/.test(route)) throw Object.assign(new Error('editor-own route — not editable as a page'), { status: 422 })
 }
-/** Map a route back to its page dir — via the same scan the pages API uses (the fs is the registry). */
+/** Map a route back to its page dir — via the same scan the pages API uses (the fs is the registry).
+ *  Symlink-safe: tracks visited realpaths so a cycle can't hang the walk (expert #6). */
 async function dirForRoute(route: string): Promise<{ appDir: string; dir: string }> {
   const appDir = await buildAppDir()
   let found: string | null = null
+  const seen = new Set<string>()
   const walk = async (dir: string): Promise<void> => {
     if (found) return
+    let real: string
+    try { real = await fs.realpath(dir) } catch { return }
+    if (seen.has(real)) return
+    seen.add(real)
     let entries
     try { entries = await fs.readdir(dir, { withFileTypes: true }) } catch { return }
     if (entries.some((e) => e.isFile() && /^page\.(t|j)sx?$/.test(e.name)) && routeOfDir(appDir, dir) === route) { found = dir; return }
@@ -700,6 +710,12 @@ async function dirForRoute(route: string): Promise<{ appDir: string; dir: string
   await walk(appDir)
   if (!found) throw Object.assign(new Error(`no page at route ${route}`), { status: 404 })
   return { appDir, dir: found }
+}
+/** Route-space uniqueness (expert #2 — same failure class as the digit-slug 500): sibling-dir checks
+ *  miss collisions ACROSS route groups (creating `community` beside `(store)/community` → Next
+ *  parallel-route conflict → whole app 500s). The route space is the registry — check it. */
+async function routeTaken(route: string): Promise<boolean> {
+  try { await dirForRoute(route); return true } catch { return false }
 }
 /* Next dev generates type stubs per route (.next/dev/types/app/…); they linger after the source
    dir is removed and turn the typecheck gate red (meta-qa E6 batch-2 HIGH). Clearing the GENERATED
@@ -739,6 +755,8 @@ async function assertDeletablePage(appDir: string, dir: string): Promise<void> {
 }
 async function deletePage(op: Extract<WriteOp, { kind: 'delete-page' }>): Promise<{ ok: true; file: string; newValueText: string }> {
   assertNotEditorSelf(op.route)
+  // home guard by ROUTE, not dir identity — a grouped home ((group)/page.tsx) must not escape (expert #5)
+  if (op.route === '/') throw Object.assign(new Error('cannot delete the home page'), { status: 422 })
   const { appDir, dir } = await dirForRoute(op.route)
   await assertDeletablePage(appDir, dir)
   await fs.rm(dir, { recursive: true })
@@ -755,7 +773,13 @@ async function duplicatePage(op: Extract<WriteOp, { kind: 'duplicate-page' }>): 
   const parent = op.route === '/' ? appDir : path.dirname(dir)
   const base = `${op.route === '/' ? 'home' : path.basename(dir)}-copy`
   let slug = base, n = 1
-  while (true) { try { await fs.access(path.join(parent, slug)); slug = `${base}-${++n}` } catch { break } }
+  while (true) {
+    let dirExists = false
+    try { await fs.access(path.join(parent, slug)); dirExists = true } catch { /* free */ }
+    const candidate = routeOfDir(appDir, path.join(parent, slug))
+    if (!dirExists && (candidate === undefined || !(await routeTaken(candidate)))) break
+    slug = `${base}-${++n}`
+  }
   const componentName = 'Page' + slug.replace(/(^|-)([a-z0-9])/g, (_, __, c) => c.toUpperCase())
   const next = source.replace(/export default function\s+\w+/, `export default function ${componentName}`)
   assertValidTsx(srcFile, next)
@@ -772,7 +796,13 @@ async function renamePage(op: Extract<WriteOp, { kind: 'rename-page' }>): Promis
   if (!base) throw Object.assign(new Error('invalid new name'), { status: 422 })
   const parent = path.dirname(dir)
   let slug = base, n = 1
-  while (slug !== path.basename(dir)) { try { await fs.access(path.join(parent, slug)); slug = `${base}-${++n}` } catch { break } }
+  while (slug !== path.basename(dir)) {
+    let dirExists = false
+    try { await fs.access(path.join(parent, slug)); dirExists = true } catch { /* free */ }
+    const candidate = routeOfDir(appDir, path.join(parent, slug))
+    if (!dirExists && (candidate === undefined || !(await routeTaken(candidate)))) break
+    slug = `${base}-${++n}`
+  }
   const target = path.join(parent, slug)
   await fs.rename(dir, target)
   await dropPageTypeStubs(appDir, dir) // the OLD dir's generated type stub would go stale

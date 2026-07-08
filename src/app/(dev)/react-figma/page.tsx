@@ -2403,11 +2403,13 @@ export default function ReactFigmaPage() {
   // for a code build the app route tree is that DB). Empty build → empty list → + creates the
   // first real route. Never a finder.
   type BuildPage = { name: string; route: string; file: string; home: boolean; mutable: boolean }
-  const [buildInfo, setBuildInfo] = useState<{ buildName: string; pages: BuildPage[] }>({ buildName: '', pages: [] })
+  const [buildInfo, setBuildInfo] = useState<{ buildName: string; pages: BuildPage[]; error?: boolean }>({ buildName: '', pages: [] })
   useEffect(() => {
-    fetch('/api/dev/editor-pages').then((r) => (r.ok ? r.json() : null))
-      .then((d: { buildName: string; pages: BuildPage[] } | null) => { if (d) setBuildInfo({ buildName: d.buildName, pages: d.pages ?? [] }) })
-      .catch(() => {})
+    // fetch failure ≠ empty build — an error state must never invite "+ create the first page"
+    // into a build whose pages we simply couldn't read (expert #7).
+    fetch('/api/dev/editor-pages').then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((d: { buildName: string; pages: BuildPage[] }) => setBuildInfo({ buildName: d.buildName, pages: d.pages ?? [] }))
+      .catch(() => setBuildInfo((cur) => ({ ...cur, error: true })))
   }, [fsNonce])
   // 3.0 (Dan): right-click context menu for page/layer add·delete·duplicate·rename.
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: { label: string; onClick: () => void; danger?: boolean }[] } | null>(null)
@@ -2869,17 +2871,8 @@ export default function ReactFigmaPage() {
       if (version) setVersionBusyRef(null)
     }
   }, [canvas.name, editorSandbox, refreshSandboxes])
-  const openBuildFolderPicker = useCallback(async () => {
-    try {
-      const data = await editorSandbox<{ ok?: boolean; path?: string; cancelled?: boolean }>({ action: 'pick-folder' })
-      if (data.cancelled || data.ok === false) return
-      if (data.path) notify(`Selected folder · ${data.path}`)
-    } catch (e) {
-      const message = (e as Error).message
-      if (/cancel/i.test(message)) return
-      notify(`Folder picker failed: ${message}`, 'error')
-    }
-  }, [editorSandbox])
+  // (openBuildFolderPicker removed — expert #3: it success-toasted a picked path while loading
+  //  nothing. The server pick-folder action stays; the client re-wires with BuildSource step 4.)
   const renameCurrentSandbox = useCallback(async () => {
     if (!currentSandbox) { notify('Rename is sandbox-only; original builds are locked', 'error'); return }
     const next = window.prompt('Rename sandbox', currentSandbox.name)
@@ -3568,7 +3561,9 @@ export default function ReactFigmaPage() {
                 {connectedBuilds.map((s) => (
                   <FileMenuRow key={s.route} label={s.name} checked={s.route === canvas.route} onClick={() => { switchCanvas(s.name, s.route); setSourceMenuOpen(false) }} />
                 ))}
-                <FileMenuRow label="Open build folder…" title="Pick a build folder in Finder" onClick={() => { setSourceMenuOpen(false); void openBuildFolderPicker() }} />
+                {/* expert #3: the picker returned a path and success-toasted while loading NOTHING —
+                    a fake action. Honest-disabled until multi-root build loading (BuildSource step 4). */}
+                <FileMenuRow label="Open build folder…" disabled title="Build switching lands with multi-root loading (BuildSource step 4)" />
                 <FigmaMenuSeparator />
                 <li role="presentation" style={{ padding: '4px 14px 2px', font: `500 9px/14px ${FONT}`, letterSpacing: '0.4px', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)', listStyle: 'none' }}>Actions</li>
                 <FileMenuRow label="Show version history" title="Show checkpoints for this build" onClick={() => { setSourceMenuOpen(false); void loadVersions() }} />
@@ -3602,7 +3597,9 @@ export default function ReactFigmaPage() {
               {/* E9 (Dan): the loaded build's TRUE pages — its router is the page registry. Flat list,
                   home first (Framer), current highlighted. Right-click = rename/duplicate/delete
                   (real route ops; home protected server-side). */}
-              {buildInfo.pages.length === 0 ? (
+              {buildInfo.error ? (
+                <div style={{ height: 32, display: 'flex', alignItems: 'center', padding: '0 8px', font: `400 11px/16px ${FONT}`, color: '#d33' }}>Couldn't read this build's pages — reload to retry</div>
+              ) : buildInfo.pages.length === 0 ? (
                 <div style={{ height: 32, display: 'flex', alignItems: 'center', padding: '0 8px', font: `400 11px/16px ${FONT}`, color: FAINT }}>No pages in this build — press + to create the first</div>
               ) : buildInfo.pages.map((pg) => (
                 <div key={pg.route} onClick={() => switchCanvas(pg.name, pg.route)}
