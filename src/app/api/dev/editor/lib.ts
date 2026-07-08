@@ -605,14 +605,19 @@ async function addState(op: Extract<WriteOp, { kind: 'add-state' }>): Promise<{ 
   if (!model.cssModule || !model.rootClass) throw Object.assign(new Error('promote the component to a CSS module first (no base class)'), { status: 422 })
   const isSemantic = op.state === 'loading' || op.state === 'error'
   if (isSemantic) {
-    const abs = jailComponentWrite(op.file)
-    const source = (await fs.readFile(abs)).toString('utf8')
-    const sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
-    const tsx = addBooleanPropToComponent(source, sf, op.state, op.state)
-    assertValidTsx(abs, tsx)
-    await fs.writeFile(abs, tsx, 'utf8')
+    // IDEMPOTENT: if the boolean prop already exists (state already added), skip the prop-add — re-selecting
+    // the chip must just re-target, never re-add → 409 (the second half of the I1 add-state finding).
+    const propExists = model.props.some((p) => p.name === op.state)
+    if (!propExists) {
+      const abs = jailComponentWrite(op.file)
+      const source = (await fs.readFile(abs)).toString('utf8')
+      const sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
+      const tsx = addBooleanPropToComponent(source, sf, op.state, op.state)
+      assertValidTsx(abs, tsx)
+      await fs.writeFile(abs, tsx, 'utf8')
+    }
     await writeScopedDeclaration({ kind: 'write-scoped-declaration', file: model.cssModule, localClass: model.rootClass, scope: { kind: 'base' }, prop: 'transition', value: 'opacity .2s ease, background .2s ease' })
-    return { ok: true, file: op.file, newValueText: `semantic state "${op.state}": boolean prop + [data-${op.state}] toggle` }
+    return { ok: true, file: op.file, newValueText: propExists ? `semantic state "${op.state}" already present (re-targeted)` : `semantic state "${op.state}": boolean prop + [data-${op.state}] toggle` }
   }
   const pseudo = STATE_PSEUDO[op.state]
   if (!pseudo) throw Object.assign(new Error(`unknown state: ${op.state}`), { status: 422 })
@@ -737,6 +742,15 @@ export async function parseComponentModel(file: string): Promise<ComponentModel>
         else states.push({ state: cls.name, kind: cls.kind === 'interaction' ? 'interaction' : 'semantic', selector: (node as Rule).selector, decls })
       }
     } catch { /* module unreadable → treat as unpromoted */ cssModule = cssModule }
+  }
+  // §6.2: a SEMANTIC state's source of truth is its boolean PROP — add-state creates the `<state>` prop +
+  // `data-<state>` toggle before any scoped edit creates the `.base[data-<state>]` CSS rule, so the state
+  // EXISTS the moment add-state runs (unstyled). List it from prop presence so the model round-trips
+  // immediately (fixes the I1 add-state finding: state missing / re-select 409 until a later styling edit).
+  for (const s of ['loading', 'error'] as const) {
+    if (props.some((p) => p.name === s && /boolean/.test(p.tsType)) && !states.some((st) => st.state === s)) {
+      states.push({ state: s, kind: 'semantic', selector: rootClass ? `.${rootClass}[data-${s}]` : `[data-${s}]`, decls: {} })
+    }
   }
   return { name, file, cssModule, rootClass, root, props, variants, states, structure }
 }
