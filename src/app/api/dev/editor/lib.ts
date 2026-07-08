@@ -630,6 +630,27 @@ export type ComponentModel = {
   props: { name: string; tsType: string; optional: boolean; default?: string }[]
   variants: { name: string; kind: 'config'; selector: string; decls: Record<string, string> }[]
   states: { state: string; kind: 'interaction' | 'semantic'; selector: string; decls: Record<string, string> }[]
+  structure: StructureNode | null  // D6: recursive JSX tree of the component (server mirror of engine.ts buildLayerTree)
+}
+export type StructureNode = { tag: string; class?: string; name?: string; children: StructureNode[] }
+
+/** D6: build the recursive JSX-element tree of a component (server-side mirror of the runtime
+ * engine.ts buildLayerTree). Static JSX children only; name = data-name ‖ styles class ‖ (omit). */
+function buildStructure(el: ts.JsxElement | ts.JsxSelfClosingElement, sf: ts.SourceFile): StructureNode {
+  const opening = ts.isJsxElement(el) ? el.openingElement : el
+  const tag = opening.tagName.getText(sf)
+  const attr = (nm: string): string | undefined => {
+    const a = opening.attributes.properties.find((p): p is ts.JsxAttribute => ts.isJsxAttribute(p) && p.name.getText(sf) === nm)
+    if (!a?.initializer) return undefined
+    return ts.isStringLiteral(a.initializer) ? a.initializer.text : ts.isJsxExpression(a.initializer) ? (a.initializer.expression?.getText(sf) ?? undefined) : a.initializer.getText(sf)
+  }
+  const cls = /styles\.([\w$]+)/.exec(attr('className') ?? '')?.[1]
+  const name = attr('data-name') ?? cls
+  const children: StructureNode[] = []
+  if (ts.isJsxElement(el)) for (const c of el.children) {
+    if (ts.isJsxElement(c) || ts.isJsxSelfClosingElement(c)) children.push(buildStructure(c, sf))
+  }
+  return { tag, ...(cls ? { class: cls } : {}), ...(name ? { name } : {}), children }
 }
 
 /** Classify a .module.css rule selector relative to the base class (blueprint §1/§3.2). */
@@ -660,14 +681,16 @@ export async function parseComponentModel(file: string): Promise<ComponentModel>
       if (ts.isIdentifier(d.name) && /^[A-Z]/.test(d.name.text) && d.initializer && ts.isArrowFunction(d.initializer)) { fn = d.initializer }
     }
   }
-  // root returned element position (for auto-promote on edit-entry)
+  // root returned element position (for auto-promote on edit-entry) + the recursive structure (D6)
   let root: { line: number; col: number } | null = null
+  let structure: StructureNode | null = null
   if (fn) {
     const rootEl = findRootReturnedElement(fn, sf)
     if (rootEl) {
       const opening = ts.isJsxElement(rootEl) ? rootEl.openingElement : rootEl
       const lc = sf.getLineAndCharacterOfPosition(opening.getStart(sf))
       root = { line: lc.line + 1, col: lc.character + 1 }
+      structure = buildStructure(rootEl, sf)
     }
   }
   const param = fn?.parameters[0]
@@ -715,7 +738,7 @@ export async function parseComponentModel(file: string): Promise<ComponentModel>
       }
     } catch { /* module unreadable → treat as unpromoted */ cssModule = cssModule }
   }
-  return { name, file, cssModule, rootClass, root, props, variants, states }
+  return { name, file, cssModule, rootClass, root, props, variants, states, structure }
 }
 
 /**
