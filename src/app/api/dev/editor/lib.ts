@@ -825,18 +825,22 @@ async function addVariantValue(op: Extract<WriteOp, { kind: 'add-variant-value' 
 /** Shared: add a `<prop>?: string` to the component's destructured params + inline type literal (OPTIONAL,
  * default undefined). Returns the edit list (not applied) so callers can combine it with a swap/root edit in
  * one splice pass. Refuses 409 if the prop already exists. Used by every expose-as-prop route. */
-function addStringParam(source: string, sf: ts.SourceFile, propName: string): { s: number; e?: number; t: string }[] {
+function addStringParam(source: string, sf: ts.SourceFile, propName: string, defaultLiteral?: string): { s: number; e?: number; t: string }[] {
   const fn = findComponentFn(sf)
   if (!fn) throw Object.assign(new Error('no exported component function found'), { status: 422 })
+  // F-M7: the literal-swap routes pass the swapped-out literal as the prop's DEFAULT so a prop-less render
+  // stays byte-identical (exposing is representation-only). The module-css bridge passes no default — its
+  // CSS var() fallback holds the literal and the undefined default is what lets variants win (do NOT default).
+  const decl = defaultLiteral !== undefined ? `${propName} = ${defaultLiteral}` : propName
   const edits: { s: number; e?: number; t: string }[] = []
   const param = fn.parameters[0]
   if (!param) {
     const openParen = source.indexOf('(', fn.getStart(sf))
-    edits.push({ s: openParen + 1, t: `{ ${propName} }: { ${propName}?: string }` })
+    edits.push({ s: openParen + 1, t: `{ ${decl} }: { ${propName}?: string }` })
   } else if (ts.isObjectBindingPattern(param.name)) {
     if (param.name.elements.some((el) => ts.isIdentifier(el.name) && el.name.text === propName)) throw Object.assign(new Error(`prop "${propName}" already exists`), { status: 409 })
     const hasElems = param.name.elements.length > 0
-    edits.push({ s: param.name.getEnd() - 1, t: `${hasElems ? ', ' : ' '}${propName} ` })
+    edits.push({ s: param.name.getEnd() - 1, t: `${hasElems ? ', ' : ' '}${decl} ` })
     if (param.type && ts.isTypeLiteralNode(param.type)) {
       const hasMembers = param.type.members.length > 0
       edits.push({ s: param.type.getEnd() - 1, t: `${hasMembers ? '; ' : ' '}${propName}?: string ` })
@@ -900,7 +904,14 @@ async function exposeModuleCssBridge(op: Extract<WriteOp, { kind: 'expose-as-pro
   const cssRoot = postcss.parse((await fs.readFile(cssAbs)).toString('utf8'), { from: cssAbs })
   let rewrites = 0
   cssRoot.walkRules((rule) => {
-    if (!rule.selector.split(',')[0].trim().startsWith(`.${model.rootClass}`)) return // this component's rules only
+    // F-M6: this component's rules only — with a CLASS-BOUNDARY check. A bare startsWith false-matches a
+    // sibling class (`.base` ⊂ `.baseline`); the char after the `.<rootClass>` prefix must be a
+    // non-identifier char (`.`/`:`/`[`/combinator/whitespace/end), not another `[\w-]` (a different class).
+    const sel = rule.selector.split(',')[0].trim()
+    const prefix = `.${model.rootClass}`
+    if (!sel.startsWith(prefix)) return
+    const next = sel[prefix.length]
+    if (next !== undefined && /[\w-]/.test(next)) return // `.baseline` / `.base-x` / `.base2` → foreign class
     rule.walkDecls(op.cssProp!, (decl) => {
       if (/^var\(/.test(decl.value.trim())) return // already bridged
       decl.value = `var(--${op.propName}, ${decl.value})`
@@ -936,6 +947,7 @@ async function exposeAsProp(op: Extract<WriteOp, { kind: 'expose-as-prop' }>): P
   const el = findJsxAt(sf, op.line, op.col)
   if (!el) throw Object.assign(new Error(`no JSX element at ${op.line}:${op.col}`), { status: 404 })
   let swap: { s: number; e: number; t: string }
+  let defaultLiteral: string
   if (target === 'text') {
     const parent = el.parent
     if (!parent || !ts.isJsxElement(parent)) throw Object.assign(new Error('element has no text body to expose (self-closing?)'), { status: 422 })
@@ -945,11 +957,13 @@ async function exposeAsProp(op: Extract<WriteOp, { kind: 'expose-as-prop' }>): P
     const raw = texts[0].getText(sf) // preserve surrounding JSX whitespace; swap only the trimmed literal
     const lead = raw.length - raw.trimStart().length, trail = raw.length - raw.trimEnd().length
     swap = { s: texts[0].getStart(sf) + lead, e: texts[0].getEnd() - trail, t: `{${op.propName}}` }
+    defaultLiteral = JSON.stringify(raw.trim()) // F-M7: prop default = the original text so a prop-less render is byte-identical
   } else if (target === 'attr') {
     if (!op.attrName) throw Object.assign(new Error('the attr route needs an attrName'), { status: 422 })
     const attr = el.attributes.properties.find((p): p is ts.JsxAttribute => ts.isJsxAttribute(p) && p.name.getText(sf) === op.attrName)
     if (!attr?.initializer || !ts.isStringLiteral(attr.initializer)) throw Object.assign(new Error(`attribute "${op.attrName}" is not a string literal — refusing (would clobber a binding)`), { status: 422 })
     swap = { s: attr.initializer.getStart(sf), e: attr.initializer.getEnd(), t: `{${op.propName}}` }
+    defaultLiteral = JSON.stringify(attr.initializer.text) // F-M7: prop default = the original attr value
   } else { // inline-style
     if (!op.cssProp) throw Object.assign(new Error('the inline-style route needs a cssProp'), { status: 422 })
     const styleAttr = el.attributes.properties.find((p): p is ts.JsxAttribute => ts.isJsxAttribute(p) && p.name.getText(sf) === 'style')
@@ -960,8 +974,13 @@ async function exposeAsProp(op: Extract<WriteOp, { kind: 'expose-as-prop' }>): P
     if (!prop) throw Object.assign(new Error(`no inline "${op.cssProp}" on this element to expose`), { status: 422 })
     if (!ts.isStringLiteral(prop.initializer) && !ts.isNumericLiteral(prop.initializer)) throw Object.assign(new Error('inline style value is a dynamic expression, not a literal — refusing (would destroy a binding)'), { status: 422 })
     swap = { s: prop.initializer.getStart(sf), e: prop.initializer.getEnd(), t: op.propName }
+    // F-M7: prop default = the original value, rendered identically. A numeric literal serializes per §2.1's
+    // unitless/length law ('13px' for length props, raw for unitless) since the prop is string-typed.
+    defaultLiteral = ts.isStringLiteral(prop.initializer)
+      ? JSON.stringify(prop.initializer.text)
+      : JSON.stringify(prop.initializer.text + (REACT_UNITLESS.has(key) ? '' : 'px'))
   }
-  const edits = [...addStringParam(source, sf, op.propName), { s: swap.s, e: swap.e, t: swap.t }].sort((a, b) => b.s - a.s)
+  const edits = [...addStringParam(source, sf, op.propName, defaultLiteral), { s: swap.s, e: swap.e, t: swap.t }].sort((a, b) => b.s - a.s)
   let out = source
   for (const ed of edits) out = out.slice(0, ed.s) + ed.t + out.slice(ed.e ?? ed.s)
   assertValidTsx(abs, out)
