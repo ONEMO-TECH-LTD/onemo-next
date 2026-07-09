@@ -2397,7 +2397,7 @@ export default function ReactFigmaPage() {
       if (live && m) setEditModel(shapeModel(m))
     })()
     return () => { live = false }
-  }, [editingComponent])
+  }, [editingComponent, engineWrite])
   const reloadEditModel = useCallback(async (file: string) => {
     const m = await fetchModel(file)
     if (m) setEditModel(shapeModel(m))
@@ -2419,7 +2419,7 @@ export default function ReactFigmaPage() {
       }
     }
     setEditTarget(t)
-  }, [reloadEditModel])
+  }, [reloadEditModel, engineWrite])
   // Force-preview the active state on the component frames so the user SEES the state they're authoring:
   // interaction → data-fc-preview on the frame (ancestor half of the dual selector); semantic → data-<state>
   // on the component's rendered root (.base element). Base/variant → clear all preview attrs.
@@ -2975,7 +2975,7 @@ export default function ReactFigmaPage() {
     // A `var(--…)` write is a (re)bind, so it keeps/uses the token; only literals detach.
     if (!/^var\(/.test(n)) setFieldTokens((tks) => (tks[field] !== undefined ? { ...tks, [field]: undefined } : tks))
     console.log('[engine] override', field, '→', withUnit, `${(performance.now() - t0).toFixed(1)}ms`)
-  }, [])
+  }, [engineWrite])
 
   const discardOverride = useCallback((op?: OverrideOp) => {
     // no-arg = 'Discard all' = GLOBAL clear across every dirty element (QA KAI-9306 finding 1);
