@@ -1305,11 +1305,15 @@ async function setVariantStructure(op: Extract<WriteOp, { kind: 'set-variant-str
   // full subtree = the JsxElement (opening's parent) or the self-closing element itself
   const node: ts.JsxElement | ts.JsxSelfClosingElement = ts.isJsxOpeningElement(opening) ? (opening.parent as ts.JsxElement) : opening
 
-  // Refusal — target already under a DIFFERENT axis's structural guard (nesting would be ambiguous; §3.9).
+  // Refusal — target already under ANY structural guard. §3.9 is FLAT: "one guard per subtree, never nested."
+  // A DIFFERENT-axis guard nests ambiguously; a SAME-axis guard nests a contradiction (diff value) or a
+  // redundant always-true guard (same value) — either way a nested guard the flat model can't represent, and
+  // (F-M-I6, expert's Meta edge) silently mis-renders. This also covers editing inside a swap ternary's branch
+  // (the ternary IS a guard). Refuse both — the divergence must be authored at the OUTER guard.
   for (let p: ts.Node | undefined = node.parent; p; p = p.parent) {
     if (ts.isJsxExpression(p) && p.expression) {
       const ax = guardAxisOf(p.expression)
-      if (ax && ax !== axis) throw Object.assign(new Error(`target is already inside the "${ax}" axis's structural guard — edit at the outer guard (nesting different-axis guards is unsupported)`), { status: 422 })
+      if (ax) throw Object.assign(new Error(`target is already inside the "${ax}" axis's structural guard — edit at the outer guard (§3.9 keeps structural guards flat, never nested)`), { status: 422 })
     }
   }
 
