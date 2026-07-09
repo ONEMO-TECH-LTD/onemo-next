@@ -2403,6 +2403,13 @@ export default function ReactFigmaPage() {
     if (m) setEditModel(shapeModel(m))
     return m
   }, [])
+  // I7 node-system: the board iframe fires `fc-model-changed` after a visual connector write (set/remove-connector)
+  // → reload the parent's own model so the inspector's connector state stays in sync with the wires.
+  useEffect(() => {
+    const on = (e: MessageEvent) => { if (e.data?.type === 'fc-model-changed') { const f = editModelRef.current?.file; if (f) void reloadEditModel(f) } }
+    window.addEventListener('message', on)
+    return () => window.removeEventListener('message', on)
+  }, [reloadEditModel])
   // Selecting a state chip: semantic states (loading/error) get their real boolean prop added on first
   // pick (add-state), THEN become the edit target. Interaction states + variants just set the target.
   const selectEditTarget = useCallback(async (t: EditTarget) => {

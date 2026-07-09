@@ -279,6 +279,7 @@ export type WriteOp =
   | { kind: 'expose-as-prop'; file: string; propName: string; target?: 'text' | 'attr' | 'inline-style' | 'module-css'; line?: number; col?: number; attrName?: string; cssProp?: string; controlType?: string } // I3: fixed value → editable prop, routed BY TARGET LOCATION (blueprint §5): text/attr/inline-style = literal-swap; module-css = custom-property bridge
   | { kind: 'set-instance-prop'; file: string; line: number; col: number; propName: string; value: string } // I3: set a string prop on a component instance (blueprint §5)
   | { kind: 'set-connector'; file: string; mode: 'state' | 'switch'; trigger: 'hover' | 'pressed' | 'focus' | 'tap'; to: { state?: 'hover' | 'pressed' | 'focus' | 'disabled' | 'loading' | 'error'; axis?: string; value?: string }; transition?: { kind: 'spring'; stiffness: number; damping: number; mass: number } | { kind: 'tween'; duration: number; ease?: string }; cycle?: boolean } // I4: connectors (blueprint §3.6) — 'state'=base transition (spring→linear()) + @fc-transition side-channel; 'switch'=D3 controllable useState + onClick + @fc-connector side-channel (D4 read source-of-truth)
+  | { kind: 'remove-connector'; file: string; mode: 'state' | 'switch'; to: { axis?: string } } // I7 node-system: delete a connector wire — reverse of set-connector (both modes); closes the F-M10 re-point gap
   | { kind: 'set-variant-structure'; file: string; axisValue: { axis: string; value: string }; edit:
       | { op: 'add'; anchor: { line: number; col: number }; position: 'before' | 'after' | 'firstChild' | 'lastChild'; jsx: string }
       | { op: 'remove'; target: { line: number; col: number } }
@@ -1179,6 +1180,86 @@ async function setConnector(op: Extract<WriteOp, { kind: 'set-connector' }>): Pr
   assertValidTsx(abs, out)
   await fs.writeFile(abs, out, 'utf8')
   return { ok: true, file: op.file, newValueText: `switch connector: tap ${axis} → ${toVal}${op.cycle ? ' (cycle)' : ''}` }
+}
+
+const escapeReg = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+/** remove-connector (I7 node-system) — delete a connector wire, the REVERSE of set-connector (both modes).
+ * state: drop the `@fc-transition` side-channel + reset the base transition to the default. switch: undo the
+ * D3 controllable injection for THIS axis only (revert the aliased binding → defaulted destructure, remove the
+ * `@fc-connector` comment + the useState/derived-const, remove this axis's onClick guard — dropping the whole
+ * onClick if it was the only guard, else just this axis's clause). Never corrupts: assertValidTsx before write,
+ * refuse 422 on any shape it doesn't recognise (connectors are machine-authored, so the shape is known). */
+async function removeConnector(op: Extract<WriteOp, { kind: 'remove-connector' }>): Promise<{ ok: true; file: string; newValueText: string }> {
+  const model = await parseComponentModel(op.file)
+  if (op.mode === 'state') {
+    if (!model.cssModule || !model.rootClass) throw Object.assign(new Error('component is not promoted — no state connector to remove'), { status: 422 })
+    const cssAbs = jailModuleCss(model.cssModule)
+    const cssRoot = postcss.parse((await fs.readFile(cssAbs)).toString('utf8'), { from: cssAbs })
+    const baseRule = cssRoot.nodes.find((n): n is Rule => n.type === 'rule' && n.selector === `.${model.rootClass}`)
+    if (!baseRule) throw Object.assign(new Error('no base rule — no state connector to remove'), { status: 422 })
+    const prev = baseRule.prev()
+    if (prev && prev.type === 'comment' && /@fc-transition:/.test((prev as unknown as { text: string }).text)) prev.remove()
+    const trans = baseRule.nodes.find((n): n is Declaration => n.type === 'decl' && n.prop === 'transition')
+    if (trans) trans.value = 'all .15s ease' // reset to the idempotent default (states still animate; the spring is gone)
+    const next = cssRoot.toString()
+    await postcss.parse(next, { from: cssAbs }) // parse-guard
+    await fs.writeFile(cssAbs, next, 'utf8')
+    return { ok: true, file: model.cssModule, newValueText: 'state connector removed (transition reset to default)' }
+  }
+  // switch mode — undo the D3 injection for op.to.axis only
+  const axis = op.to.axis
+  if (!axis) throw Object.assign(new Error('remove switch connector needs to.axis'), { status: 422 })
+  const abs = jailComponentWrite(op.file)
+  let source = (await fs.readFile(abs)).toString('utf8')
+  let sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
+  const fn = findComponentFn(sf)
+  if (!fn || !fn.body || !ts.isBlock(fn.body)) throw Object.assign(new Error('component has no block body'), { status: 422 })
+  const param = fn.parameters[0]
+  if (!param || !ts.isObjectBindingPattern(param.name)) throw Object.assign(new Error('component params are not a destructured object'), { status: 422 })
+  const bind = param.name.elements.find((el) => (el.propertyName && ts.isIdentifier(el.propertyName) ? el.propertyName.text : (ts.isIdentifier(el.name) ? el.name.text : undefined)) === axis)
+  if (!bind) throw Object.assign(new Error(`axis "${axis}" is not a prop on this component`), { status: 422 })
+  if (!bind.propertyName) throw Object.assign(new Error(`axis "${axis}" is not a switch connector (nothing to remove)`), { status: 422 }) // not aliased → no switch
+  const cap = axis.charAt(0).toUpperCase() + axis.slice(1)
+  const propLocal = `${axis}Prop`, internal = `${axis}Internal`, setter = `set${cap}Internal`
+  const dflt = model.variantAxes.find((a) => a.axis === axis)?.defaultValue ?? bind.name.getText(sf)
+  // 1) revert the aliased binding `axis: axisProp` → `axis = 'default'` (re-establish the plain defaulted prop)
+  source = source.slice(0, bind.getStart(sf)) + `${axis} = '${dflt}'` + source.slice(bind.getEnd())
+  // 2) remove THIS axis's blob: `/* @fc-connector: tap axis→… */ + useState line + derived-const line` (leaves
+  //    other switches' blobs intact — each axis has its own contiguous blob).
+  const blobRe = new RegExp(
+    `\\n?[ \\t]*/\\* @fc-connector: tap ${escapeReg(axis)}→[^*]*\\*/` +
+    `\\n[ \\t]*const \\[${escapeReg(internal)}, ${escapeReg(setter)}\\] = useState\\([^\\n]*\\)` +
+    `\\n[ \\t]*const ${escapeReg(axis)} = ${escapeReg(propLocal)} \\?\\? ${escapeReg(internal)}[ \\t]*`)
+  if (!blobRe.test(source)) throw Object.assign(new Error(`could not locate the "${axis}" switch hook (hand-edited?) — refusing`), { status: 422 })
+  source = source.replace(blobRe, '')
+  // 3) remove this axis's onClick guard. Re-parse (offsets moved). The guard is `if (axisProp == null) <expr>`.
+  sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
+  const fn2 = findComponentFn(sf); const root2 = fn2 ? findRootReturnedElement(fn2, sf) : null
+  if (root2) {
+    const opening = ts.isJsxElement(root2) ? root2.openingElement : root2
+    const onClick = opening.attributes.properties.find((p): p is ts.JsxAttribute => ts.isJsxAttribute(p) && p.name.getText(sf) === 'onClick')
+    const inner = onClick?.initializer && ts.isJsxExpression(onClick.initializer) ? onClick.initializer.expression : undefined
+    if (onClick && inner && ts.isArrowFunction(inner) && ts.isBlock(inner.body)) {
+      const guards = inner.body.statements.filter((st) => ts.isIfStatement(st) && new RegExp(`\\b${escapeReg(propLocal)}\\s*==\\s*null`).test(st.getText(sf)))
+      const mine = inner.body.statements.filter((st) => ts.isIfStatement(st) && new RegExp(`\\bif \\(${escapeReg(propLocal)} == null\\)`).test(st.getText(sf)))
+      if (mine.length && guards.length <= mine.length && inner.body.statements.length === mine.length) {
+        // this axis was the ONLY guard(s) → drop the whole onClick attribute (incl. one leading space)
+        let s = onClick.getStart(sf); if (source[s - 1] === ' ') s -= 1
+        source = source.slice(0, s) + source.slice(onClick.getEnd())
+      } else if (mine.length) {
+        // merged with other axes → remove just this axis's guard statement(s) + a trailing `; ` if present
+        for (const st of mine.sort((a, b) => b.getStart(sf) - a.getStart(sf))) {
+          let e = st.getEnd(); while (source[e] === ';' || source[e] === ' ') e++
+          source = source.slice(0, st.getStart(sf)) + source.slice(e)
+        }
+      }
+    }
+  }
+  // drop the now-unused `import { useState }` if no switch connector remains (kept it clean, no dead import)
+  if (!/\buseState\s*\(/.test(source)) source = source.replace(/import \{ useState \} from 'react'\n/, '')
+  assertValidTsx(abs, source) // refuse-not-corrupt
+  await fs.writeFile(abs, source, 'utf8')
+  return { ok: true, file: op.file, newValueText: `switch connector removed: ${axis}` }
 }
 
 // ─── I0: ComponentModel READ (blueprint §1) — source IS the model ────────────────
@@ -2244,6 +2325,7 @@ async function applyWriteInner(op: WriteOp): Promise<{ ok: true; file: string; n
   if (op.kind === 'expose-as-prop') return exposeAsProp(op)
   if (op.kind === 'set-instance-prop') return setInstanceProp(op)
   if (op.kind === 'set-connector') return setConnector(op)
+  if (op.kind === 'remove-connector') return removeConnector(op)
   if (op.kind === 'set-variant-structure') return setVariantStructure(op)
   if (op.kind === 'create-page') return createPage(op)
   if (op.kind === 'set-token-value') return setTokenValue(op)

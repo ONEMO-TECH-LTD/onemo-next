@@ -40,6 +40,128 @@ const SEMANTIC_STATES = ['disabled', 'loading', 'error'] as const
 const GHOST_STATES: readonly string[] = [...INTERACTION_STATES, ...SEMANTIC_STATES]
 const isInteractionState = (s?: string): boolean => !!s && (INTERACTION_STATES as readonly string[]).includes(s)
 
+// ─── I7 NODE SYSTEM (Framer ⚡ connector layer, s58-nodesystem-design.md) ────────────────
+type Conn = { mode: 'state' | 'switch'; trigger?: string; to: { state?: string; axis?: string; value?: string }; transition?: { stiffness: number; damping: number; mass: number }; cycle?: boolean }
+type Wire = { key: string; x1: number; y1: number; x2: number; y2: number; conn: Conn; mx: number; my: number }
+const WIRE = '#9747FF'
+/** The ⚡ visual connector layer over the edited component's board (Framer clone). Draws a directional wire
+ * from the base frame → each connector's target frame (state ghost or axis-value frame), a diamond drag-handle
+ * on every frame's right edge (drag → drop on a target = set-connector, mode inferred from the target kind),
+ * and a popover on wire-select (edit the spring / remove). All writes go through the shipped ops; the board
+ * re-reads after every write (no optimistic wire state — the model is the truth). */
+function NodeLayer({ file, connectors, boardRef, onWrite }: { file: string; connectors: Conn[]; boardRef: React.RefObject<HTMLDivElement | null>; onWrite: (body: object) => Promise<boolean> }) {
+  const [wires, setWires] = React.useState<Wire[]>([])
+  const [handles, setHandles] = React.useState<{ key: string; x: number; y: number; frame: HTMLElement }[]>([])
+  const [drag, setDrag] = React.useState<{ x0: number; y0: number; x: number; y: number; overKey: string | null; overRect: { left: number; top: number; right: number; bottom: number } | null } | null>(null)
+  const [sel, setSel] = React.useState<Wire | null>(null)
+  const [busy, setBusy] = React.useState(false)
+  const [boardW, setBoardW] = React.useState(400) // board width tracked in state (no ref reads during render)
+
+  const frameRect = (el: Element, board: HTMLElement) => {
+    const r = el.getBoundingClientRect(), b = board.getBoundingClientRect()
+    return { left: r.left - b.left, top: r.top - b.top, right: r.right - b.left, bottom: r.bottom - b.top, cx: (r.left + r.right) / 2 - b.left, cy: (r.top + r.bottom) / 2 - b.top }
+  }
+  const targetOf = (board: HTMLElement, c: Conn): HTMLElement | null =>
+    c.mode === 'state'
+      ? board.querySelector(`[data-component-state="${c.to.state}"]`)
+      : board.querySelector(`[data-component-variant="${c.to.axis}=${c.to.value}"]`)
+  // the base frame = a frame with no state and not inside an axis sub-group (the component's default render)
+  const baseFrame = (board: HTMLElement): HTMLElement | null =>
+    [...board.querySelectorAll('[data-component-frame]')].find((f) => !f.hasAttribute('data-component-state') && !f.closest('[data-axis-group]')) as HTMLElement ?? board.querySelector('[data-component-frame]')
+
+  const measure = React.useCallback(() => {
+    const board = boardRef.current; if (!board) return
+    setBoardW(board.clientWidth)
+    const src = baseFrame(board); if (!src) { setWires([]); setHandles([]); return }
+    const sr = frameRect(src, board)
+    setWires(connectors.map((c, i) => {
+      const t = targetOf(board, c); if (!t) return null
+      const tr = frameRect(t, board)
+      // wire from source's nearest edge midpoint → target's nearest edge midpoint (Framer-style straight edge-to-edge)
+      const [x1, y1] = tr.top >= sr.bottom ? [sr.cx, sr.bottom] : tr.left >= sr.right ? [sr.right, sr.cy] : [sr.cx, sr.top]
+      const [x2, y2] = tr.top >= sr.bottom ? [tr.cx, tr.top] : tr.left >= sr.right ? [tr.left, tr.cy] : [tr.cx, tr.bottom]
+      return { key: `${c.mode}-${c.to.state ?? ''}${c.to.axis ?? ''}-${i}`, x1, y1, x2, y2, conn: c, mx: (x1 + x2) / 2, my: (y1 + y2) / 2 }
+    }).filter(Boolean) as Wire[])
+    // a drag handle on every real frame + state ghost (source of a new wire)
+    setHandles([...board.querySelectorAll('[data-component-frame]')].map((f, i) => { const r = frameRect(f, board); return { key: `h${i}`, x: r.right, y: r.cy, frame: f as HTMLElement } }))
+  }, [connectors, boardRef])
+
+  React.useLayoutEffect(() => { measure() }, [measure])
+  React.useEffect(() => {
+    const board = boardRef.current; if (!board) return
+    const ro = new ResizeObserver(() => measure()); ro.observe(board)
+    window.addEventListener('resize', measure)
+    const id = setTimeout(measure, 120) // after images/fonts settle
+    return () => { ro.disconnect(); window.removeEventListener('resize', measure); clearTimeout(id) }
+  }, [measure, boardRef])
+
+  // drag-to-wire: pointer-move tracks the rubber-band + hovered target; pointer-up fires set-connector.
+  React.useEffect(() => {
+    if (!drag) return
+    const board = boardRef.current; if (!board) return
+    const move = (e: PointerEvent) => {
+      const b = board.getBoundingClientRect(); const x = e.clientX - b.left, y = e.clientY - b.top
+      const el = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-component-frame]') as HTMLElement | null
+      const overKey = el && (el.getAttribute('data-component-state') ? `state:${el.getAttribute('data-component-state')}` : el.getAttribute('data-component-variant')?.includes('=') ? `axis:${el.getAttribute('data-component-variant')}` : null)
+      const overRect = el && overKey ? frameRect(el, board) : null // computed HERE (in the handler), not during render
+      setDrag((d) => d && { ...d, x, y, overKey: overKey ?? null, overRect })
+    }
+    const up = async () => {
+      const d = drag; setDrag(null)
+      if (!d?.overKey || busy) return
+      let body: object | null = null
+      if (d.overKey.startsWith('state:')) { const st = d.overKey.slice(6); body = { kind: 'set-connector', file, mode: 'state', trigger: st, to: { state: st }, transition: { kind: 'spring', stiffness: 260, damping: 20, mass: 1 } } }
+      else if (d.overKey.startsWith('axis:')) { const [axis, value] = d.overKey.slice(5).split('='); body = { kind: 'set-connector', file, mode: 'switch', trigger: 'tap', to: { axis, value }, cycle: true } }
+      if (body) { setBusy(true); await onWrite(body); setBusy(false) }
+    }
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up, { once: true })
+    return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up) }
+  }, [drag, busy, file, onWrite, boardRef])
+
+  const editSpring = async (c: Conn, s: number, d: number, m: number) => { setBusy(true); await onWrite({ kind: 'set-connector', file, mode: 'state', trigger: c.trigger ?? 'hover', to: c.to, transition: { kind: 'spring', stiffness: s, damping: d, mass: m } }); setBusy(false); setSel(null) }
+  const removeWire = async (c: Conn) => { setBusy(true); await onWrite({ kind: 'remove-connector', file, mode: c.mode, to: { axis: c.to.axis } }); setBusy(false); setSel(null) }
+
+  return (
+    <>
+      <svg data-node-layer style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'visible', zIndex: 5 }}>
+        <defs><marker id="fc-arrow" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill={WIRE} /></marker></defs>
+        {wires.map((w) => (
+          <g key={w.key} data-wire={`${w.conn.mode}:${w.conn.to.state ?? ''}${w.conn.to.axis ?? ''}`} style={{ pointerEvents: 'stroke', cursor: 'pointer' }} onClick={() => setSel(w)}>
+            <line x1={w.x1} y1={w.y1} x2={w.x2} y2={w.y2} stroke="transparent" strokeWidth={12} />
+            <line x1={w.x1} y1={w.y1} x2={w.x2} y2={w.y2} stroke={WIRE} strokeWidth={sel === w ? 2.5 : 1.5} markerEnd="url(#fc-arrow)" />
+            {w.conn.mode === 'state' && <circle cx={w.mx} cy={w.my} r={7} fill="#fff" stroke={WIRE} strokeWidth={1.5} /> }
+            {w.conn.mode === 'state' && <text x={w.mx} y={w.my + 2.5} textAnchor="middle" fontSize={8} fill={WIRE}>⚡</text>}
+          </g>
+        ))}
+        {drag && <line x1={drag.x0} y1={drag.y0} x2={drag.x} y2={drag.y} stroke={WIRE} strokeWidth={1.5} strokeDasharray="4 3" markerEnd="url(#fc-arrow)" />}
+      </svg>
+      {/* drag handles — a diamond on each frame's right edge */}
+      {handles.map((h) => (
+        <div key={h.key} data-connect-handle title="Drag to a state or variant frame to wire an interaction"
+          onPointerDown={(e) => { e.preventDefault(); const b = boardRef.current!.getBoundingClientRect(); setDrag({ x0: h.x, y0: h.y, x: e.clientX - b.left, y: e.clientY - b.top, overKey: null, overRect: null }) }}
+          style={{ position: 'absolute', left: h.x - 5, top: h.y - 5, width: 10, height: 10, background: WIRE, border: '1.5px solid #fff', borderRadius: 2, transform: 'rotate(45deg)', cursor: 'crosshair', zIndex: 6, boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+      ))}
+      {/* drop-target highlight — rect was computed in the pointer handler (no ref read during render) */}
+      {drag?.overRect && <div style={{ position: 'absolute', left: drag.overRect.left - 3, top: drag.overRect.top - 3, width: drag.overRect.right - drag.overRect.left + 6, height: drag.overRect.bottom - drag.overRect.top + 6, border: `2px solid ${WIRE}`, borderRadius: 8, pointerEvents: 'none', zIndex: 6 }} />}
+      {/* wire popover: edit spring / remove */}
+      {sel && (
+        <div style={{ position: 'absolute', left: Math.min(sel.mx + 10, boardW - 150), top: sel.my + 8, width: 140, background: '#fff', border: `1px solid ${WIRE}`, borderRadius: 8, padding: 8, zIndex: 20, boxShadow: '0 4px 16px rgba(0,0,0,0.15)', font: '500 10px/1.4 system-ui' }} onClick={(e) => e.stopPropagation()}>
+          <div style={{ font: '600 9px/1 system-ui', color: 'rgba(0,0,0,0.5)', textTransform: 'uppercase', marginBottom: 6 }}>{sel.conn.mode === 'state' ? `Transition → ${sel.conn.to.state}` : `Tap-switch → ${sel.conn.to.axis}=${sel.conn.to.value}`}</div>
+          {sel.conn.mode === 'state' && (
+            <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+              {(['stiffness', 'damping', 'mass'] as const).map((k, i) => { const def = [sel.conn.transition?.stiffness ?? 260, sel.conn.transition?.damping ?? 20, sel.conn.transition?.mass ?? 1][i]; return <label key={k} style={{ flex: 1, font: '8px system-ui', color: 'rgba(0,0,0,0.5)' }}>{k[0].toUpperCase()}<input defaultValue={def} data-spring={k} style={{ width: '100%', font: '9px system-ui', border: '1px solid #ddd', borderRadius: 3, padding: '1px 3px' }} /></label> })}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 4 }}>
+            {sel.conn.mode === 'state' && <button type="button" disabled={busy} onClick={(e) => { const pop = (e.currentTarget.closest('div')!.parentElement as HTMLElement); const g = (k: string) => Number((pop.querySelector(`[data-spring="${k}"]`) as HTMLInputElement).value); editSpring(sel.conn, g('stiffness'), g('damping'), g('mass')) }} style={{ flex: 1, font: '9px system-ui', border: `1px solid ${WIRE}`, background: '#fff', color: WIRE, borderRadius: 4, padding: '2px 4px', cursor: 'pointer' }}>Apply</button>}
+            <button type="button" disabled={busy} onClick={() => removeWire(sel.conn)} style={{ flex: 1, font: '9px system-ui', border: '1px solid #f24822', background: '#fff', color: '#f24822', borderRadius: 4, padding: '2px 4px', cursor: 'pointer' }}>Remove</button>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
 function collectFrames(): Frame[] {
   const frames: Frame[] = []
   // GLOBAL — barrel namespace; category is resolved by the editor shell via the
@@ -157,6 +279,23 @@ export default function ComponentsCanvasHost() {
   const [editFile, setEditFile] = React.useState<string | null>(null)
   React.useEffect(() => { setMounted(true); setEditFile(new URLSearchParams(window.location.search).get('edit')) }, [])
   const frames = mounted ? collectFrames() : []
+  // I7 node-system: the edited component's connectors (drives the wire overlay). Re-fetched on every board refresh.
+  const boardRef = React.useRef<HTMLDivElement | null>(null)
+  const [editConn, setEditConn] = React.useState<Conn[]>([])
+  const fetchConn = React.useCallback(() => {
+    if (!editFile) { setEditConn([]); return }
+    fetch(`/api/dev/editor-component-model?file=${encodeURIComponent(editFile)}`).then((r) => (r.ok ? r.json() : null)).then((m) => setEditConn(m?.connectors ?? [])).catch(() => setEditConn([]))
+  }, [editFile])
+  React.useEffect(() => { fetchConn() }, [fetchConn])
+  // I7: fire a node-system write (set/remove-connector), then re-read (board + connectors) and tell the parent
+  // shell to reload its own model (its inspector shows connectors too). No optimistic wire state — model is truth.
+  const nodeWrite = React.useCallback(async (body: object): Promise<boolean> => {
+    const r = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+    if (!r.ok) return false
+    setTimeout(() => { fetchConn() }, 60) // let the write settle, then re-read the wires from source
+    window.parent?.postMessage({ type: 'fc-model-changed' }, '*') // parent reloadEditModel + will bounce fc-board-refresh
+    return true
+  }, [fetchConn])
   const [inventory, setInventory] = React.useState<InventoryEntry[] | null>(null)
   const fetchInventory = React.useCallback(() => {
     fetch('/api/dev/editor-components').then((r) => (r.ok ? r.json() : { components: [] }))
@@ -169,10 +308,10 @@ export default function ComponentsCanvasHost() {
   // it. (Fast Refresh reloads the component module but never re-runs this mount-time fetch, so the axis-value
   // frames would otherwise stay stale until a manual reload.)
   React.useEffect(() => {
-    const onMsg = (e: MessageEvent) => { if (e.data?.type === 'fc-board-refresh') fetchInventory() }
+    const onMsg = (e: MessageEvent) => { if (e.data?.type === 'fc-board-refresh') { fetchInventory(); fetchConn() } }
     window.addEventListener('message', onMsg)
     return () => window.removeEventListener('message', onMsg)
-  }, [fetchInventory])
+  }, [fetchInventory, fetchConn])
   const loadingInventory = inventory === null
   const groups = loadingInventory ? [] : groupFrames(frames, inventory, editFile)
   const byCategory = new Map<string, ComponentGroup[]>()
@@ -199,7 +338,8 @@ export default function ComponentsCanvasHost() {
                   <h3 style={{ margin: 0, font: '600 11px/1.2 system-ui', color: COMPONENT_TEXT }}>{group.name}</h3>
                   {group.variants.length > 1 && <span style={{ font: '500 10px/1.2 system-ui', color: 'rgba(0,0,0,0.45)' }}>{group.variants.length} variants</span>}
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: 24, borderRadius: 12, border: `1px ${group.variants.length > 1 ? 'dashed' : 'solid'} ${COMPONENT_ACCENT}` }}>
+                <div {...(group.file && group.file === editFile ? { ref: boardRef } : {})} style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 16, padding: 24, borderRadius: 12, border: `1px ${group.variants.length > 1 ? 'dashed' : 'solid'} ${COMPONENT_ACCENT}` }}>
+                  {group.file && group.file === editFile && <NodeLayer file={group.file} connectors={editConn} boardRef={boardRef} onWrite={nodeWrite} />}
                   {(() => {
                     // I5/D1: the axis-grouped board — base row, one labeled sub-group PER variant axis, then the
                     // state ghost slots. State ghosts apply the §3.2 preview contract: interaction → data-fc-preview
