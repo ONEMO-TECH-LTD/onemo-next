@@ -278,6 +278,7 @@ export type WriteOp =
   | { kind: 'add-variant-value'; file: string; axis: string; value: string } // I2: extend an axis's union (blueprint §3.3b)
   | { kind: 'expose-as-prop'; file: string; propName: string; target?: 'text' | 'attr' | 'inline-style' | 'module-css'; line?: number; col?: number; attrName?: string; cssProp?: string; controlType?: string } // I3: fixed value → editable prop, routed BY TARGET LOCATION (blueprint §5): text/attr/inline-style = literal-swap; module-css = custom-property bridge
   | { kind: 'set-instance-prop'; file: string; line: number; col: number; propName: string; value: string } // I3: set a string prop on a component instance (blueprint §5)
+  | { kind: 'set-connector'; file: string; mode: 'state' | 'switch'; trigger: 'hover' | 'pressed' | 'focus' | 'tap'; to: { state?: 'hover' | 'pressed' | 'focus' | 'disabled' | 'loading' | 'error'; axis?: string; value?: string }; transition?: { kind: 'spring'; stiffness: number; damping: number; mass: number } | { kind: 'tween'; duration: number; ease?: string }; cycle?: boolean } // I4: connectors (blueprint §3.6) — 'state'=base transition (spring→linear()) + @fc-transition side-channel; 'switch'=D3 controllable useState + onClick + @fc-connector side-channel (D4 read source-of-truth)
   | { kind: 'set-token-value'; tokenPath: string; theme?: string; value: string | number }
   | { kind: 'set-jsx-style'; file: string; line: number; col: number; prop: string; value: string; expectRaw?: string }
   | { kind: 'set-jsx-text'; file: string; line: number; col: number; newText: string; expectRaw?: string }
@@ -1011,6 +1012,110 @@ async function setInstanceProp(op: Extract<WriteOp, { kind: 'set-instance-prop' 
   return { ok: true, file: op.file, newValueText: `${tag} ${op.propName}="${op.value}"` }
 }
 
+// ─── I4: connectors (blueprint §3.6 / §6.3 / D3 / D4) ────────────────────────────
+/** §6.3: a spring{stiffness,damping,mass} → a CSS `linear()` easing (spring→linear is IRREVERSIBLE, so the
+ * params live in the `@fc-transition` side-channel; this is the OUTPUT). Numerically integrates the damped
+ * spring m·x'' = -k(x-1) - c·x' from x=0,v=0, samples the normalized position → `linear(…)` + settle seconds. */
+function springToLinear(stiffness: number, damping: number, mass: number): { easing: string; durationS: number } {
+  const k = stiffness, c = damping, m = mass > 0 ? mass : 1
+  const dt = 1 / 240
+  let x = 0, v = 0, t = 0
+  const xs: number[] = [0]
+  const maxT = 4
+  while (t < maxT) {
+    const a = (-k * (x - 1) - c * v) / m
+    v += a * dt
+    x += v * dt
+    t += dt
+    xs.push(x)
+    if (Math.abs(x - 1) < 0.001 && Math.abs(v) < 0.001) break
+  }
+  const durationS = Math.min(maxT, Math.max(0.05, t))
+  const N = 24, last = xs.length - 1
+  const pts = Array.from({ length: N + 1 }, (_, i) => xs[Math.round((i / N) * last)])
+  pts[0] = 0; pts[N] = 1 // clamp endpoints (overshoot between is valid + wanted for bounce)
+  return { easing: `linear(${pts.map((p) => Number(p.toFixed(4))).join(', ')})`, durationS: Number(durationS.toFixed(3)) }
+}
+/** set-connector (blueprint §3.6) — TWO connector KINDS (F2, never collapse tap→:active):
+ * - `state` (momentary, pure CSS): set the BASE rule's transition (spring→linear() / tween) so a state
+ *   animates BOTH directions (§6.3), + the `@fc-transition` side-channel that IS the read source of truth (D4).
+ * - `switch` (persistent, the one allowed JS): tap → a CONFIG axis value → the D3 controllable-state idiom
+ *   (`useState(default)` + `value = prop ?? internal`; onClick sets internal only when uncontrolled, so a
+ *   controlled parent always wins — no desync), + the mandatory `@fc-connector` side-channel the READ parses. */
+async function setConnector(op: Extract<WriteOp, { kind: 'set-connector' }>): Promise<{ ok: true; file: string; newValueText: string }> {
+  const model = await parseComponentModel(op.file)
+  if (!model.cssModule || !model.rootClass) throw Object.assign(new Error('promote the component to a CSS module first'), { status: 422 })
+  if (op.mode === 'state') {
+    // momentary interaction transition on the BASE rule (bidirectional, §6.3) + @fc-transition comment
+    let transCss = 'all .15s ease', comment: string | null = null
+    if (op.transition?.kind === 'spring') {
+      const { easing, durationS } = springToLinear(op.transition.stiffness, op.transition.damping, op.transition.mass)
+      transCss = `all ${durationS}s ${easing}`
+      comment = `@fc-transition: spring ${op.transition.stiffness} ${op.transition.damping} ${op.transition.mass}`
+    } else if (op.transition?.kind === 'tween') {
+      transCss = `all ${op.transition.duration}s ${op.transition.ease ?? 'ease'}`
+    }
+    const cssAbs = jailModuleCss(model.cssModule)
+    const cssRoot = postcss.parse((await fs.readFile(cssAbs)).toString('utf8'), { from: cssAbs })
+    const baseRule = cssRoot.nodes.find((n): n is Rule => n.type === 'rule' && n.selector === `.${model.rootClass}`)
+    if (!baseRule) throw Object.assign(new Error('no base rule to attach the transition'), { status: 422 })
+    const existing = baseRule.nodes.find((n): n is Declaration => n.type === 'decl' && n.prop === 'transition')
+    if (existing) existing.value = transCss
+    else baseRule.append({ prop: 'transition', value: transCss })
+    const prev = baseRule.prev() // drop a stale @fc-transition comment, then re-add if spring (idempotent)
+    if (prev && prev.type === 'comment' && /@fc-transition:/.test((prev as unknown as { text: string }).text)) prev.remove()
+    if (comment) baseRule.before(`/* ${comment} */\n`)
+    const cssNext = cssRoot.toString()
+    await postcss.parse(cssNext, { from: cssAbs }) // parse-guard
+    await fs.writeFile(cssAbs, cssNext, 'utf8')
+    return { ok: true, file: model.cssModule, newValueText: `state connector: ${op.trigger} → transition ${transCss}` }
+  }
+  // ── switch mode: tap → a config axis value → the D3 controllable idiom + @fc-connector side-channel ──
+  const axis = op.to.axis
+  const toVal = op.to.value
+  if (!axis || !toVal) throw Object.assign(new Error('switch connector needs to.axis and to.value'), { status: 422 })
+  const ax = model.variantAxes.find((a) => a.axis === axis)
+  if (!ax) throw Object.assign(new Error(`no config axis "${axis}" to switch`), { status: 422 })
+  if (!ax.values.includes(toVal)) throw Object.assign(new Error(`"${toVal}" is not a value of axis "${axis}"`), { status: 422 })
+  const abs = jailComponentWrite(op.file)
+  const source = (await fs.readFile(abs)).toString('utf8')
+  const sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
+  const fn = findComponentFn(sf)
+  if (!fn || !fn.body || !ts.isBlock(fn.body)) throw Object.assign(new Error('component has no block body — cannot add the switch hook'), { status: 422 })
+  const param = fn.parameters[0]
+  if (!param || !ts.isObjectBindingPattern(param.name)) throw Object.assign(new Error('component params are not a destructured object — out of scope'), { status: 422 })
+  const bind = param.name.elements.find((el) => ts.isIdentifier(el.name) && el.name.text === axis)
+  if (!bind) throw Object.assign(new Error(`axis "${axis}" is not a destructured prop`), { status: 422 })
+  if (bind.propertyName) throw Object.assign(new Error(`axis "${axis}" is already a switch connector (already controllable)`), { status: 409 }) // idempotency: already renamed
+  const ret = fn.body.statements.find(ts.isReturnStatement)
+  if (!ret) throw Object.assign(new Error('component has no return statement'), { status: 422 })
+  const propLocal = `${axis}Prop`
+  const cap = axis.charAt(0).toUpperCase() + axis.slice(1)
+  const setter = `set${cap}Internal`, internal = `${axis}Internal`
+  const setExpr = op.cycle
+    ? `${setter}((v) => { const vals = [${ax.values.map((x) => `'${x}'`).join(', ')}]; return vals[(vals.indexOf(v) + 1) % vals.length] })`
+    : `${setter}('${toVal}')`
+  const edits: { s: number; e?: number; t: string }[] = []
+  // 1) rename the destructured axis binding `axis = 'x'` → `axis: axisProp` (drop the default; the derived const carries it)
+  edits.push({ s: bind.getStart(sf), e: bind.getEnd(), t: `${axis}: ${propLocal}` })
+  // 2) inject the controllable hook + connector side-channel just before the return
+  const indent = ' '.repeat(ret.getStart(sf) - source.lastIndexOf('\n', ret.getStart(sf)) - 1)
+  edits.push({ s: ret.getStart(sf), t: `/* @fc-connector: tap ${axis}→${toVal}${op.cycle ? ' cycle' : ''} */\n${indent}const [${internal}, ${setter}] = useState(${propLocal} ?? '${ax.defaultValue}')\n${indent}const ${axis} = ${propLocal} ?? ${internal}\n${indent}` })
+  // 3) onClick on the root (uncontrolled-only — a controlled parent always wins, D3)
+  const root = findRootReturnedElement(fn, sf)
+  if (!root) throw Object.assign(new Error('no root JSX element for the tap handler'), { status: 422 })
+  const opening = ts.isJsxElement(root) ? root.openingElement : root
+  edits.push({ s: opening.tagName.getEnd(), t: ` onClick={() => { if (${propLocal} == null) ${setExpr} }}` })
+  // 4) ensure `import { useState } from 'react'`
+  if (!/import\s*\{[^}]*\buseState\b[^}]*\}\s*from\s*['"]react['"]/.test(source)) edits.push({ s: 0, t: `import { useState } from 'react'\n` })
+  edits.sort((a, b) => b.s - a.s)
+  let out = source
+  for (const ed of edits) out = out.slice(0, ed.s) + ed.t + out.slice(ed.e ?? ed.s)
+  assertValidTsx(abs, out)
+  await fs.writeFile(abs, out, 'utf8')
+  return { ok: true, file: op.file, newValueText: `switch connector: tap ${axis} → ${toVal}${op.cycle ? ' (cycle)' : ''}` }
+}
+
 // ─── I0: ComponentModel READ (blueprint §1) — source IS the model ────────────────
 export type ComponentModel = {
   name: string
@@ -1025,6 +1130,9 @@ export type ComponentModel = {
   // interaction rule; a single axis-value = one axisValues entry; legacyName = a pre-axes single-variant class.
   rules: { selector: string; axisValues: { axis: string; value: string }[]; semantic: string[]; pseudo?: string; legacyName?: string; decls: Record<string, string> }[]
   structure: StructureNode | null  // D6: recursive JSX tree of the component (server mirror of engine.ts buildLayerTree)
+  // I4 (§3.6/D4): connectors read back from the SIDE-CHANNEL comments (never inferred from JSX/CSS shape).
+  // `state` = the base transition's `@fc-transition: spring …`; `switch` = the `@fc-connector: tap axis→to`.
+  connectors: { mode: 'state' | 'switch'; trigger: string; to: { axis?: string; value?: string }; transition?: { kind: 'spring'; stiffness: number; damping: number; mass: number }; cycle?: boolean }[]
 }
 export type StructureNode = { tag: string; class?: string; name?: string; children: StructureNode[] }
 
@@ -1115,7 +1223,10 @@ export async function parseComponentModel(file: string): Promise<ComponentModel>
     }
     for (const e of param.name.elements) {
       if (!ts.isIdentifier(e.name)) continue
-      const pn = e.name.text
+      // PUBLIC prop name = the property name (matches the type member + what consumers pass), not the local
+      // binding — a switch connector renames `{ size }` → `{ size: sizeProp }` (D3 controllable), and the axis
+      // must still read as `size` (I4 connectors). Unaliased bindings have no propertyName → the local name is the public name.
+      const pn = e.propertyName && ts.isIdentifier(e.propertyName) ? e.propertyName.text : e.name.text
       const t = typeMembers.get(pn)
       props.push({ name: pn, tsType: t?.type ?? 'unknown', optional: t?.optional ?? false, default: e.initializer?.getText(sf) })
     }
@@ -1141,6 +1252,7 @@ export async function parseComponentModel(file: string): Promise<ComponentModel>
   }
 
   const rules: ComponentModel['rules'] = []
+  const connectors: ComponentModel['connectors'] = []
   let rootClass: string | null = null
   if (cssModule) {
     try {
@@ -1159,12 +1271,21 @@ export async function parseComponentModel(file: string): Promise<ComponentModel>
         for (const dd of (node as Rule).nodes) if (dd.type === 'decl') decls[(dd as Declaration).prop] = (dd as Declaration).value
         rules.push({ selector: (node as Rule).selector, axisValues: d.axisValues, semantic: d.semantic, ...(d.pseudo ? { pseudo: d.pseudo } : {}), ...(d.legacyName ? { legacyName: d.legacyName } : {}), decls })
       }
+      // I4/D4: STATE connector read — from the `@fc-transition: spring <s> <d> <m>` side-channel (the base
+      // transition's motion), NOT inferred from the CSS shape (spring→linear() is irreversible).
+      const mt = /@fc-transition:\s*spring\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/.exec(css)
+      if (mt) connectors.push({ mode: 'state', trigger: 'state', to: {}, transition: { kind: 'spring', stiffness: Number(mt[1]), damping: Number(mt[2]), mass: Number(mt[3]) } })
     } catch { /* module unreadable → treat as unpromoted */ cssModule = cssModule }
+  }
+  // I4/D4: SWITCH connector read — from the mandatory `@fc-connector: tap <axis>→<to> [cycle]` side-channel
+  // in the .tsx, NOT by pattern-matching the useState/onClick JSX shape (fragile across formattings).
+  for (const m of source.matchAll(/@fc-connector:\s*tap\s+([A-Za-z][\w-]*)→([\w-]+)(\s+cycle)?/g)) {
+    connectors.push({ mode: 'switch', trigger: 'tap', to: { axis: m[1], value: m[2] }, ...(m[3] ? { cycle: true } : {}) })
   }
   // NOTE: which STATES exist (a semantic state exists from its boolean PROP even before any `.base[data-*]`
   // rule — §6.2/I1 drift fix; disabled is semantic only on a non-form root — F-M2) is DERIVED by the consumer
   // from `props` + `rules` + `structure`, not stored as a second array — the model keeps ONE rule list (§0).
-  return { name, file, cssModule, rootClass, root, props, variantAxes, rules, structure }
+  return { name, file, cssModule, rootClass, root, props, variantAxes, rules, structure, connectors }
 }
 
 /**
@@ -1898,6 +2019,7 @@ async function applyWriteInner(op: WriteOp): Promise<{ ok: true; file: string; n
   if (op.kind === 'add-variant-value') return addVariantValue(op)
   if (op.kind === 'expose-as-prop') return exposeAsProp(op)
   if (op.kind === 'set-instance-prop') return setInstanceProp(op)
+  if (op.kind === 'set-connector') return setConnector(op)
   if (op.kind === 'create-page') return createPage(op)
   if (op.kind === 'set-token-value') return setTokenValue(op)
   if (op.kind === 'set-jsx-style') return setJsxStyle(op)
