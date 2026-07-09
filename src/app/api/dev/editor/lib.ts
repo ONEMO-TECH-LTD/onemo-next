@@ -1257,16 +1257,12 @@ async function setVariantStructure(op: Extract<WriteOp, { kind: 'set-variant-str
   const sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
   const { axis, value } = op.axisValue
 
-  // F-I6-1/F-I6-2 (§8/§D2, lead's verify): the guard references the axis and compares to a union member — a
-  // bogus axis → `{notAProp === 'v'}` (TS2304) and a value outside the union → `{shape === 'triangle'}`
-  // (TS2367) both compile to type-invalid code the syntax-only assertValidTsx can't catch. Validate against
-  // the component's DECLARED destructured props (public-name resolution). AND resolve the IN-SCOPE identifier
-  // to emit (`guardId`): the public name is in scope for a plain `{ size }` binding OR a switch-connector-
-  // resolved `const size = sizeProp ?? sizeInternal` (and the STYLE layer keys on that resolved `size`); an
-  // aliased `{ size: sizeProp }` with NO resolved const only has the LOCAL name (`sizeProp`) in scope. Emit
-  // the public name when it's resolved (matches the style variant + keeps the READ on the public axis), else
-  // the local binding name — so the guard never references an undefined identifier (F-I6-2, QA's alias catch).
-  let guardId = axis
+  // F-I6-1/F-I6-2 (§8/§D2, lead's verify): the guard emits `{${axis} === 'v'}` by the PUBLIC axis name and
+  // compares to a union member. A bogus axis → `{notAProp === 'v'}` (TS2304), a value outside the union →
+  // `{shape === 'triangle'}` (TS2367), and an ALIASED binding `{ size: sizeProp }` with no resolved `const size`
+  // → `{size === 'v'}` where `size` isn't in scope (TS2304) all compile to type-invalid code the syntax-only
+  // assertValidTsx can't catch. Validate here (refuse rather than corrupt) so `${axis}` is always a real,
+  // in-scope, string-union axis before any write.
   {
     let fn: ts.FunctionDeclaration | ts.ArrowFunction | undefined
     for (const st of sf.statements) {
@@ -1288,14 +1284,18 @@ async function setVariantStructure(op: Extract<WriteOp, { kind: 'set-variant-str
     if (!isStringUnion) throw Object.assign(new Error(`prop "${axis}" isn't a config variant axis (not a string-literal union) — can't be used as a structural-variant guard`), { status: 422 })
     const vals = extractUnionValues(member!.type!)
     if (!vals.includes(value)) throw Object.assign(new Error(`value "${value}" is not one of prop "${axis}"'s declared values: [${vals.join(', ')}]`), { status: 422 })
-    // F-I6-2: resolve the in-scope guard identifier. localName = the destructure's local binding (aliased →
-    // `sizeProp`, plain → the public name). Emit the public name only when a resolved `const <axis>` exists.
+    // F-I6-2 (QA/lead, option A): `${axis}` (the public name) is in scope as a runtime value for a plain
+    // `{ size }` binding OR a switch-connector-resolved `const size = sizeProp ?? sizeInternal`. An ALIASED
+    // binding `{ size: sizeProp }` with NO resolved const leaves only the local name in scope. setConnector's
+    // rename + const-injection are ONE atomic edit (the only `propertyName`-setting site in lib.ts), so an
+    // aliased binding without that const is unreachable via any real op — only hand-authorable. Refuse it (§8)
+    // so `${axis}` stays valid and the READ stays on the public axis for every reachable state (no reverse-map).
     const localName = ts.isIdentifier(bindingEl.name) ? bindingEl.name.text : axis
     if (localName !== axis) {
       const body = fn && ts.isFunctionDeclaration(fn) ? fn.body : (fn && ts.isArrowFunction(fn) && fn.body && ts.isBlock(fn.body) ? fn.body : undefined)
       let hasResolvedConst = false
       body?.statements.forEach((st) => { if (ts.isVariableStatement(st)) for (const d of st.declarationList.declarations) if (ts.isIdentifier(d.name) && d.name.text === axis) hasResolvedConst = true })
-      guardId = hasResolvedConst ? axis : localName
+      if (!hasResolvedConst) throw Object.assign(new Error(`axis "${axis}" is aliased ({ ${axis}: ${localName} }) without a resolved value — not a supported structural-variant target (§8)`), { status: 422 })
     }
   }
 
@@ -1320,7 +1320,7 @@ async function setVariantStructure(op: Extract<WriteOp, { kind: 'set-variant-str
 
   let start: number, end: number, replacement: string
   if (op.edit.op === 'add') {
-    const guarded = `{${guardId} === '${value}' && (\n${indent}  ${op.edit.jsx}\n${indent})}`
+    const guarded = `{${axis} === '${value}' && (\n${indent}  ${op.edit.jsx}\n${indent})}`
     if (op.edit.position === 'firstChild' || op.edit.position === 'lastChild') {
       // a subtree to add WITHIN requires a paired element; a void (self-closing) node has none → walled edge.
       if (!ts.isJsxElement(node)) throw Object.assign(new Error(REPARENT), { status: 422 })
@@ -1335,10 +1335,10 @@ async function setVariantStructure(op: Extract<WriteOp, { kind: 'set-variant-str
     }
   } else if (op.edit.op === 'remove') {
     start = node.getStart(sf); end = node.getEnd()
-    replacement = `{${guardId} !== '${value}' && (\n${indent}  ${nodeText}\n${indent})}`
+    replacement = `{${axis} !== '${value}' && (\n${indent}  ${nodeText}\n${indent})}`
   } else { // swap — the one allowed single-level ternary, at the swap site only
     start = node.getStart(sf); end = node.getEnd()
-    replacement = `{${guardId} === '${value}' ? (\n${indent}  ${op.edit.jsx}\n${indent}) : (\n${indent}  ${nodeText}\n${indent})}`
+    replacement = `{${axis} === '${value}' ? (\n${indent}  ${op.edit.jsx}\n${indent}) : (\n${indent}  ${nodeText}\n${indent})}`
   }
 
   const next = source.slice(0, start) + replacement + source.slice(end)
