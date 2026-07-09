@@ -847,8 +847,7 @@ async function addVariantValue(op: Extract<WriteOp, { kind: 'add-variant-value' 
   // `const vals: (<union>)[] = [<list>]` with the AUTHORING-TIME values. Once the axis union widens, that stale
   // `vals` (a) omits the new value from the cycle and (b) makes `vals.indexOf(v)` fail tsc (TS2345) against the
   // widened setter. Sync the baked vals to ALL current values so the new value joins the cycle AND it typechecks.
-  const cap = op.axis.charAt(0).toUpperCase() + op.axis.slice(1)
-  const setter = `set${cap}Internal`
+  const { setter } = switchNames(op.axis)
   const cycleRe = new RegExp(`(${setter}\\(\\(v\\) => \\{ const vals: )\\([^)]*\\)(\\[\\] = )\\[[^\\]]*\\]`)
   if (cycleRe.test(next)) {
     const union = allValues.map((x) => `'${x}'`).join(' | ')
@@ -1076,6 +1075,12 @@ function springToLinear(stiffness: number, damping: number, mass: number): { eas
   pts[0] = 0; pts[N] = 1 // clamp endpoints (overshoot between is valid + wanted for bounce)
   return { easing: `linear(${pts.map((p) => Number(p.toFixed(4))).join(', ')})`, durationS: Number(durationS.toFixed(3)) }
 }
+/** The derived identifier names for a switch-connector axis (the D3 controllable hook + its guard) — shared
+ * by set-connector, remove-connector, and add-variant-value's cycle-sync so the naming stays in ONE place. */
+function switchNames(axis: string): { cap: string; propLocal: string; internal: string; setter: string } {
+  const cap = axis.charAt(0).toUpperCase() + axis.slice(1)
+  return { cap, propLocal: `${axis}Prop`, internal: `${axis}Internal`, setter: `set${cap}Internal` }
+}
 /** set-connector (blueprint §3.6) — TWO connector KINDS (F2, never collapse tap→:active):
  * - `state` (momentary, pure CSS): set the BASE rule's transition (spring→linear() / tween) so a state
  *   animates BOTH directions (§6.3), + the `@fc-transition` side-channel that IS the read source of truth (D4).
@@ -1134,9 +1139,7 @@ async function setConnector(op: Extract<WriteOp, { kind: 'set-connector' }>): Pr
   if (bind.propertyName) throw Object.assign(new Error(`axis "${axis}" is already a switch connector (already controllable)`), { status: 409 }) // idempotency: already renamed (aliased binding)
   const ret = fn.body.statements.find(ts.isReturnStatement)
   if (!ret) throw Object.assign(new Error('component has no return statement'), { status: 422 })
-  const propLocal = `${axis}Prop`
-  const cap = axis.charAt(0).toUpperCase() + axis.slice(1)
-  const setter = `set${cap}Internal`, internal = `${axis}Internal`
+  const { propLocal, internal, setter } = switchNames(axis)
   // F1 (HIGH): type the cycle array as the axis union — TS infers a bare `string[]` otherwise, so the indexed
   // access is `string` and fails against the setter's `Dispatch<SetStateAction<'a'|'b'>>` (generated-tsc bug).
   const unionType = ax.values.map((x) => `'${x}'`).join(' | ')
@@ -1219,8 +1222,7 @@ async function removeConnector(op: Extract<WriteOp, { kind: 'remove-connector' }
   const bind = param.name.elements.find((el) => (el.propertyName && ts.isIdentifier(el.propertyName) ? el.propertyName.text : (ts.isIdentifier(el.name) ? el.name.text : undefined)) === axis)
   if (!bind) throw Object.assign(new Error(`axis "${axis}" is not a prop on this component`), { status: 422 })
   if (!bind.propertyName) throw Object.assign(new Error(`axis "${axis}" is not a switch connector (nothing to remove)`), { status: 422 }) // not aliased → no switch
-  const cap = axis.charAt(0).toUpperCase() + axis.slice(1)
-  const propLocal = `${axis}Prop`, internal = `${axis}Internal`, setter = `set${cap}Internal`
+  const { propLocal, internal, setter } = switchNames(axis)
   const axDef = model.variantAxes.find((a) => a.axis === axis)
   const dflt = axDef?.defaultValue ?? axDef?.values[0] ?? 'default' // #5 harden: never fall back to the alias identifier text
   // ── QA-HIGH FIX: VALIDATE EVERYTHING on the ORIGINAL source FIRST, mutate NOTHING until every piece is
