@@ -1256,6 +1256,35 @@ async function setVariantStructure(op: Extract<WriteOp, { kind: 'set-variant-str
   const source = (await fs.readFile(abs)).toString('utf8')
   const sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
   const { axis, value } = op.axisValue
+
+  // F-I6-1 (§8/§D2, lead's verify): the guard references the axis prop and compares to a union member — a
+  // bogus axis → `{notAProp === 'v'}` (TS2304) and a value outside the union → `{shape === 'triangle'}`
+  // (TS2367) both compile to type-invalid code the syntax-only assertValidTsx can't catch (the recurring
+  // syntax-valid-but-type-invalid class). Validate against the component's DECLARED destructured props
+  // (public-name resolution — a switch-connected `{size: sizeProp}` still reads as `size`) BEFORE any write.
+  {
+    let fn: ts.FunctionDeclaration | ts.ArrowFunction | undefined
+    for (const st of sf.statements) {
+      if (ts.isFunctionDeclaration(st) && st.name && /^[A-Z]/.test(st.name.text)) { fn = st; break }
+      if (ts.isVariableStatement(st)) for (const d of st.declarationList.declarations)
+        if (ts.isIdentifier(d.name) && /^[A-Z]/.test(d.name.text) && d.initializer && ts.isArrowFunction(d.initializer)) fn = d.initializer
+    }
+    const param = fn?.parameters[0]
+    const isProp = !!param && ts.isObjectBindingPattern(param.name) && param.name.elements.some((el) => {
+      const pub = el.propertyName && ts.isIdentifier(el.propertyName) ? el.propertyName.text : (ts.isIdentifier(el.name) ? el.name.text : undefined)
+      return pub === axis
+    })
+    if (!isProp) throw Object.assign(new Error(`axis "${axis}" is not a prop on this component`), { status: 422 })
+    const member = param && param.type && ts.isTypeLiteralNode(param.type)
+      ? param.type.members.find((m): m is ts.PropertySignature => ts.isPropertySignature(m) && !!m.name && m.name.getText(sf) === axis)
+      : undefined
+    const isStrLit = (t: ts.TypeNode): boolean => ts.isLiteralTypeNode(t) && ts.isStringLiteral(t.literal)
+    const isStringUnion = member?.type ? (ts.isUnionTypeNode(member.type) ? member.type.types.every(isStrLit) : isStrLit(member.type)) : false
+    if (!isStringUnion) throw Object.assign(new Error(`prop "${axis}" isn't a config variant axis (not a string-literal union) — can't be used as a structural-variant guard`), { status: 422 })
+    const vals = extractUnionValues(member!.type!)
+    if (!vals.includes(value)) throw Object.assign(new Error(`value "${value}" is not one of prop "${axis}"'s declared values: [${vals.join(', ')}]`), { status: 422 })
+  }
+
   const loc = op.edit.op === 'add' ? op.edit.anchor : op.edit.target
   const opening = findJsxAt(sf, loc.line, loc.col)
   if (!opening) throw Object.assign(new Error(`no JSX element at ${loc.line}:${loc.col}`), { status: 404 })
