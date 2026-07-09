@@ -2341,6 +2341,9 @@ export default function ReactFigmaPage() {
   // component model of the component currently being edited (its .tsx file + base class + variants/states)
   type EditModel = { file: string; cssModule: string | null; rootClass: string | null; root: { line: number; col: number } | null; rootTag: string | null; variantAxes: { axis: string; values: string[]; defaultValue: string }[]; props: { name: string; tsType: string }[]; states: string[]; connectors: { mode: string; to: { axis?: string; value?: string }; transition?: { stiffness: number; damping: number; mass: number } }[] }
   const [editModel, setEditModel] = useState<EditModel | null>(null)
+  // I5 (§I5): board-authoring inputs — new-axis name + per-axis new-value drafts (fire add-variant-axis/value).
+  const [newAxisName, setNewAxisName] = useState('')
+  const [newValueByAxis, setNewValueByAxis] = useState<Record<string, string>>({})
   const editModelRef = useRef(editModel); useEffect(() => { editModelRef.current = editModel }, [editModel])
   const editingComponentRef = useRef(editingComponent); useEffect(() => { editingComponentRef.current = editingComponent }, [editingComponent])
   // §0 unified model: the server returns ONE `rules` list + `props`; the state-EXISTENCE list the chips/guard
@@ -2413,7 +2416,10 @@ export default function ReactFigmaPage() {
     const disabledSemantic = et.kind === 'state' && et.state === 'disabled' && em?.rootTag != null && !FORM_ROOTS.has(em.rootTag)
     const pseudo = et.kind === 'state' && (et.state === 'hover' || et.state === 'pressed' || et.state === 'focus' || (et.state === 'disabled' && !disabledSemantic)) ? ({ hover: 'hover', pressed: 'active', focus: 'focus-visible', disabled: 'disabled' } as const)[et.state] : null
     const semantic = et.kind === 'state' && (et.state === 'loading' || et.state === 'error' || disabledSemantic) ? et.state : null
-    doc.querySelectorAll('[data-component-frame]').forEach((f) => {
+    // I5: skip the STATE GHOST frames (`[data-component-state]`) — they carry their OWN static §3.2 preview
+    // (data-fc-preview for interaction, the boolean prop for semantic); the editTarget-driven preview applies
+    // only to the real base/axis-value frames.
+    doc.querySelectorAll('[data-component-frame]:not([data-component-state])').forEach((f) => {
       if (pseudo) f.setAttribute('data-fc-preview', pseudo); else f.removeAttribute('data-fc-preview')
       const rootEl = f.querySelector('*') as HTMLElement | null
       for (const s of ['loading', 'error', 'disabled']) rootEl?.removeAttribute(`data-${s}`)
@@ -3987,6 +3993,34 @@ export default function ReactFigmaPage() {
                       style={{ appearance: 'none', border: `1px solid ${active ? SEL : LINE}`, background: active ? '#e5f4ff' : '#fff', color: active ? SEL : INK, borderRadius: 5, padding: '3px 7px', cursor: 'pointer', font: 'inherit' }}>{c.label}</button>
                   })())}
               </div>
+              {/* I5 (§I5): board authoring — +Axis / +Value fire the shipped I2 ops (add-variant-axis /
+                  add-variant-value); +State is the state chips above (semantic states fire add-state on pick);
+                  editing a frame routes via the editTarget chips. All authoring happens FROM this board. */}
+              {editModel?.cssModule && (() => {
+                const em = editModel
+                const inp = { appearance: 'none' as const, border: `1px solid ${LINE}`, borderRadius: 4, padding: '2px 5px', font: `500 9px/1 ${FONT}`, color: INK, width: 64, outline: 'none' as const }
+                const btn = { appearance: 'none' as const, border: `1px solid ${LINE}`, background: '#fff', borderRadius: 5, padding: '3px 7px', cursor: 'pointer', font: `500 9px/1 ${FONT}`, color: SEL }
+                const write = async (body: object) => { await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); await reloadEditModel(em.file); iframeRef.current?.contentWindow?.postMessage({ type: 'fc-board-refresh' }, '*') }
+                return (
+                  <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div style={{ font: `600 8px/1 ${FONT}`, color: MUTE, textTransform: 'uppercase', letterSpacing: '0.4px' }}>Variants</div>
+                    {em.variantAxes.map((ax) => (
+                      <div key={ax.axis} style={{ display: 'flex', alignItems: 'center', gap: 4, font: `500 9px/1 ${FONT}`, flexWrap: 'wrap' }}>
+                        <span style={{ color: SEL }}>{ax.axis}</span>
+                        <span style={{ color: FAINT }}>{ax.values.join(', ')}</span>
+                        <input value={newValueByAxis[ax.axis] ?? ''} onChange={(e) => setNewValueByAxis((m) => ({ ...m, [ax.axis]: e.target.value }))} placeholder="value" style={inp} />
+                        <button type="button" style={btn} disabled={!(newValueByAxis[ax.axis] ?? '').trim()}
+                          onClick={async () => { const v = (newValueByAxis[ax.axis] ?? '').trim(); if (!v) return; await write({ kind: 'add-variant-value', file: em.file, axis: ax.axis, value: v }); setNewValueByAxis((m) => ({ ...m, [ax.axis]: '' })) }}>+ value</button>
+                      </div>
+                    ))}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <input value={newAxisName} onChange={(e) => setNewAxisName(e.target.value)} placeholder="axis name" style={inp} />
+                      <button type="button" style={btn} disabled={!newAxisName.trim()}
+                        onClick={async () => { const a = newAxisName.trim(); if (!a) return; await write({ kind: 'add-variant-axis', file: em.file, axis: a, values: ['a', 'b'], defaultValue: 'a' }); setNewAxisName('') }}>+ axis</button>
+                    </div>
+                  </div>
+                )
+              })()}
               {/* I3 props panel (§5): the component's EXPOSED props — text/colour/etc turned editable via the
                   custom-property bridge. Axis props render as the variant chips above; the 6 states as state
                   chips; this lists the rest (a real prop a consumer sets per-instance). */}
@@ -4045,7 +4079,7 @@ export default function ReactFigmaPage() {
             <button type="button" onClick={selectFrameRoot} title="Select frame" style={{ appearance: 'none', border: 0, background: 'transparent', font: `550 10px/1 ${FONT}`, color: SEL, marginBottom: 8, marginLeft: 2, cursor: 'pointer', padding: 0 }}>{canvas.name} · {hostDims.w} × {hostDims.h}</button>
           )}
           <div data-screen-host onClick={selectFrameRoot} style={{ position: 'relative', width: hostDims.w, height: hostDims.h, background: '#fff', borderRadius: 4, boxShadow: '0 0 0 1px rgba(0,0,0,.06), 0 12px 40px -8px rgba(0,0,0,.25)' }}>
-            <iframe key={canvasMode === 'components' ? '/react-figma/components-canvas' : canvas.route} ref={iframeRef} src={canvasMode === 'components' ? '/react-figma/components-canvas' : canvas.route} onLoad={wireCanvas} title="Canvas — real build"
+            <iframe key={canvasMode === 'components' ? `/react-figma/components-canvas${editingComponent?.file ? `?edit=${encodeURIComponent(editingComponent.file)}` : ''}` : canvas.route} ref={iframeRef} src={canvasMode === 'components' ? `/react-figma/components-canvas${editingComponent?.file ? `?edit=${encodeURIComponent(editingComponent.file)}` : ''}` : canvas.route} onLoad={wireCanvas} title="Canvas — real build"
               style={{ width: hostDims.w, height: hostDims.h, border: 0, display: 'block', borderRadius: 4, pointerEvents: drawArm ? 'none' : 'auto' }} />
             {hoverRect && (
               <div style={{ position: 'absolute', left: hoverRect.x, top: hoverRect.y, width: hoverRect.w, height: hoverRect.h, outline: `${1.5 / view.z}px solid ${SEL}`, pointerEvents: 'none' }} />
