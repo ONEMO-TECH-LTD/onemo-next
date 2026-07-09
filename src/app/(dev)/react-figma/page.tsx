@@ -2335,7 +2335,7 @@ export default function ReactFigmaPage() {
   // inspector's edits target — base / a config variant / an interaction pseudo-state / a semantic
   // prop-state. Non-base targets route applyOverride → write-scoped-declaration on the component's
   // .module.css, and (for pseudo states) force a live preview via data-fc-preview on the frame wrapper.
-  type EditTarget = { kind: 'base' } | { kind: 'variant'; name: string } | { kind: 'axis'; axis: string; value: string } | { kind: 'state'; state: 'hover' | 'pressed' | 'focus' | 'disabled' | 'loading' | 'error' }
+  type EditTarget = { kind: 'base' } | { kind: 'axis'; axis: string; value: string } | { kind: 'state'; state: 'hover' | 'pressed' | 'focus' | 'disabled' | 'loading' | 'error' } // D-2: dead `{kind:'variant'}` removed (zombie from before the I2 axis-chip model — zero setters)
   const [editTarget, setEditTarget] = useState<EditTarget>({ kind: 'base' })
   const editTargetRef = useRef(editTarget); useEffect(() => { editTargetRef.current = editTarget }, [editTarget])
   // component model of the component currently being edited (its .tsx file + base class + variants/states)
@@ -2364,6 +2364,23 @@ export default function ReactFigmaPage() {
     return { file: m.file, cssModule: m.cssModule, rootClass: m.rootClass, root: m.root, rootTag: tag, variantAxes: m.variantAxes ?? [], props: (m.props ?? []).map((p) => ({ name: p.name, tsType: p.tsType })), states: [...states], connectors: m.connectors ?? [] }
   }
   const fetchModel = (file: string) => fetch(`/api/dev/editor-component-model?file=${encodeURIComponent(file)}`).then((r) => (r.ok ? r.json() : null)).catch(() => null)
+  // F-A1: writes were fire-and-forget (no `r.ok` check) — during a dev-server recompile a write can 404
+  // (HTML, not JSON) and silently no-op, hiding the server's named 422 refusals from whoever's authoring.
+  // One shared helper: check `r.ok`, surface the server's named error via the toast, retry once on a
+  // recompile 404. Returns the Response on success, null on failure (so callers can skip the reload).
+  const engineWrite = useCallback(async (body: object): Promise<Response | null> => {
+    const send = () => fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+    let r: Response | null = await send().catch(() => null)
+    if (r && r.status === 404 && !(r.headers.get('content-type') || '').includes('application/json')) {
+      await new Promise((res) => setTimeout(res, 1200)); r = await send().catch(() => null) // route mid-recompile → retry once
+    }
+    if (!r || !r.ok) {
+      let msg = r ? `Write failed (${r.status})` : 'Write failed — no response'
+      try { const j = await r?.clone().json(); if (j?.error) msg = String(j.error) } catch {}
+      notify(msg, 'error'); return null
+    }
+    return r
+  }, [])
   useEffect(() => { // reset the target + load the model; AUTO-PROMOTE the root so states/variants are authorable
     setEditTarget({ kind: 'base' })
     if (!editingComponent?.file) { setEditModel(null); return }
@@ -2374,7 +2391,7 @@ export default function ReactFigmaPage() {
       // blueprint §4: an un-promoted (inline-styled) component can't hold scoped rules — promote its root
       // transparently on edit-entry (representation change, visual-identical per R4), then re-read.
       if (m && !m.cssModule && m.root) {
-        await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'promote-element', file, line: m.root.line, col: m.root.col }) }).catch(() => {})
+        await engineWrite({ kind: 'promote-element', file, line: m.root.line, col: m.root.col }) // F-A1
         m = await fetchModel(file)
       }
       if (live && m) setEditModel(shapeModel(m))
@@ -2397,7 +2414,7 @@ export default function ReactFigmaPage() {
       // lazily on the first scoped edit, so no add-state trigger is needed.
       const needsAddState = t.state === 'loading' || t.state === 'error' || (t.state === 'disabled' && em?.rootTag != null && !FORM_ROOTS.has(em.rootTag))
       if (needsAddState && em?.file && !em.states.includes(t.state)) {
-        await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'add-state', file: em.file, state: t.state }) })
+        await engineWrite({ kind: 'add-state', file: em.file, state: t.state }) // F-A1
         await reloadEditModel(em.file)
       }
     }
@@ -2927,16 +2944,14 @@ export default function ReactFigmaPage() {
       if (editingComponentRef.current && em?.cssModule && em.rootClass && et.kind !== 'base' && decls.length) {
         // F-M2: `disabled` on a non-form root (e.g. a <div>) can't match CSS `:disabled` → route it to the
         // semantic `[data-disabled]` path, same as the server add-state; form-associated roots keep `:disabled`.
-        const scope = et.kind === 'variant'
-          ? { kind: 'variant', name: et.name }
-          : et.kind === 'axis'
+        const scope = et.kind === 'axis'
             // I2 (§3.2): a config axis-value edit → the COMPOSITE `.base.<axis>_<value>` rule.
             ? { kind: 'composite', axisValues: [{ axis: et.axis, value: et.value }] }
           : (et.state === 'hover' || et.state === 'pressed' || et.state === 'focus' || (et.state === 'disabled' && em.rootTag != null && FORM_ROOTS.has(em.rootTag)))
             ? { kind: 'state', pseudo: ({ hover: 'hover', pressed: 'active', focus: 'focus-visible', disabled: 'disabled' } as const)[et.state] }
             : { kind: 'state', propClass: et.state }
         for (const [prop, value] of decls) {
-          void fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'write-scoped-declaration', file: em.cssModule, localClass: em.rootClass, scope, prop, value }) })
+          void engineWrite({ kind: 'write-scoped-declaration', file: em.cssModule, localClass: em.rootClass, scope, prop, value }) // F-A1
           el.style.setProperty(prop, value) // immediate preview while this scope is active
         }
         setSelRect(rectOf(el))
@@ -4000,7 +4015,7 @@ export default function ReactFigmaPage() {
                 const em = editModel
                 const inp = { appearance: 'none' as const, border: `1px solid ${LINE}`, borderRadius: 4, padding: '2px 5px', font: `500 9px/1 ${FONT}`, color: INK, width: 64, outline: 'none' as const }
                 const btn = { appearance: 'none' as const, border: `1px solid ${LINE}`, background: '#fff', borderRadius: 5, padding: '3px 7px', cursor: 'pointer', font: `500 9px/1 ${FONT}`, color: SEL }
-                const write = async (body: object) => { await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); await reloadEditModel(em.file); iframeRef.current?.contentWindow?.postMessage({ type: 'fc-board-refresh' }, '*') }
+                const write = async (body: object) => { if (await engineWrite(body)) { await reloadEditModel(em.file); iframeRef.current?.contentWindow?.postMessage({ type: 'fc-board-refresh' }, '*') } } // F-A1: only reload/refresh on a successful write; a refusal surfaces via the toast
                 // F-M11 (board-input blocklist, §D2): variant axes and states are orthogonal — an axis named like
                 // one of the 6 reserved states would collide with the semantic-state prop (server refuses 422).
                 // Reject it CLIENT-SIDE too, before any fetch, so the board never even attempts the invalid op.
@@ -4057,8 +4072,7 @@ export default function ReactFigmaPage() {
                     <div style={{ font: `600 8px/1 ${FONT}`, color: MUTE, textTransform: 'uppercase', letterSpacing: '0.4px' }}>Connectors</div>
                     <button type="button" title="Spring transition on this component's states (animates hover/press/… both ways)"
                       onClick={async () => {
-                        await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'set-connector', file: em.file, mode: 'state', trigger: 'hover', to: { state: 'hover' }, transition: { kind: 'spring', stiffness: 260, damping: 20, mass: 1 } }) })
-                        await reloadEditModel(em.file)
+                        if (await engineWrite({ kind: 'set-connector', file: em.file, mode: 'state', trigger: 'hover', to: { state: 'hover' }, transition: { kind: 'spring', stiffness: 260, damping: 20, mass: 1 } })) await reloadEditModel(em.file) // F-A1
                       }}
                       style={{ ...btn, border: `1px solid ${stateConn ? SEL : LINE}`, background: stateConn ? '#e5f4ff' : '#fff' }}>
                       {stateConn?.transition ? `Spring ${stateConn.transition.stiffness}/${stateConn.transition.damping}/${stateConn.transition.mass}` : 'Add spring transition'}
@@ -4069,8 +4083,7 @@ export default function ReactFigmaPage() {
                         <button key={ax.axis} type="button" title={`On tap, cycle the ${ax.axis} variant (${ax.values.join(' then ')})`}
                           onClick={async () => {
                             const next = ax.values[(ax.values.indexOf(ax.defaultValue) + 1) % Math.max(1, ax.values.length)]
-                            await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'set-connector', file: em.file, mode: 'switch', trigger: 'tap', to: { axis: ax.axis, value: next }, cycle: true }) })
-                            await reloadEditModel(em.file)
+                            if (await engineWrite({ kind: 'set-connector', file: em.file, mode: 'switch', trigger: 'tap', to: { axis: ax.axis, value: next }, cycle: true })) await reloadEditModel(em.file) // F-A1
                           }}
                           style={{ ...btn, border: `1px solid ${sw ? SEL : LINE}`, background: sw ? '#e5f4ff' : '#fff' }}>
                           {sw ? `Tap-cycles ${ax.axis}` : `Tap-cycle ${ax.axis}`}

@@ -604,12 +604,7 @@ function findRootReturnedElement(fn: ts.FunctionLikeDeclaration, sf: ts.SourceFi
  * spliced with char offsets; the caller assertValidTsx's it). Reused by add-state (semantic) + later
  * expose-as-prop's boolean path. Refuses (409) if the prop already exists. */
 function addBooleanPropToComponent(source: string, sf: ts.SourceFile, propName: string, dataAttr: string): string {
-  let fn: ts.FunctionDeclaration | ts.ArrowFunction | undefined
-  for (const st of sf.statements) {
-    if (ts.isFunctionDeclaration(st) && st.name && /^[A-Z]/.test(st.name.text)) { fn = st; break }
-    if (ts.isVariableStatement(st)) for (const d of st.declarationList.declarations)
-      if (ts.isIdentifier(d.name) && /^[A-Z]/.test(d.name.text) && d.initializer && ts.isArrowFunction(d.initializer)) fn = d.initializer
-  }
+  const fn = findComponentFn(sf) // D-4: shared finder (was an inlined duplicate of findComponentFn's loop)
   if (!fn) throw Object.assign(new Error('no exported component function found'), { status: 422 })
   const root = findRootReturnedElement(fn, sf)
   if (!root) throw Object.assign(new Error('no root JSX element returned by the component'), { status: 422 })
@@ -1130,9 +1125,12 @@ async function setConnector(op: Extract<WriteOp, { kind: 'set-connector' }>): Pr
   if (!fn || !fn.body || !ts.isBlock(fn.body)) throw Object.assign(new Error('component has no block body — cannot add the switch hook'), { status: 422 })
   const param = fn.parameters[0]
   if (!param || !ts.isObjectBindingPattern(param.name)) throw Object.assign(new Error('component params are not a destructured object — out of scope'), { status: 422 })
-  const bind = param.name.elements.find((el) => ts.isIdentifier(el.name) && el.name.text === axis)
+  // D-1: match the PUBLIC prop name (propertyName ?? name) — an already-switch-connected axis is aliased
+  // `{ size: sizeProp }`, so keying on the LOCAL `el.name` would miss it and throw the wrong "not a
+  // destructured prop" 422 instead of reaching the intended 409 idempotency refusal below.
+  const bind = param.name.elements.find((el) => (el.propertyName && ts.isIdentifier(el.propertyName) ? el.propertyName.text : (ts.isIdentifier(el.name) ? el.name.text : undefined)) === axis)
   if (!bind) throw Object.assign(new Error(`axis "${axis}" is not a destructured prop`), { status: 422 })
-  if (bind.propertyName) throw Object.assign(new Error(`axis "${axis}" is already a switch connector (already controllable)`), { status: 409 }) // idempotency: already renamed
+  if (bind.propertyName) throw Object.assign(new Error(`axis "${axis}" is already a switch connector (already controllable)`), { status: 409 }) // idempotency: already renamed (aliased binding)
   const ret = fn.body.statements.find(ts.isReturnStatement)
   if (!ret) throw Object.assign(new Error('component has no return statement'), { status: 422 })
   const propLocal = `${axis}Prop`
@@ -1376,7 +1374,7 @@ function buildStructure(el: ts.JsxElement | ts.JsxSelfClosingElement, sf: ts.Sou
   return { tag, ...(cls ? { class: cls } : {}), ...(name ? { name } : {}), line: lc.line + 1, col: lc.character + 1, children }
 }
 
-export type DecomposedRule = { axisValues: { axis: string; value: string }[]; semantic: string[]; pseudo?: string; legacyName?: string }
+type DecomposedRule = { axisValues: { axis: string; value: string }[]; semantic: string[]; pseudo?: string; legacyName?: string } // D-5: internal only (no external refs)
 /** Decompose a .module.css scoped selector into the UNIFIED shape (blueprint §1/§3.2) — the READ mirror of
  * the WRITE composer, so EVERY scoped rule (single-part OR combinatorial like
  * `.base.size_lg.variant_primary[data-loading]:hover`) decomposes into one shape and NONE is dropped (§0
