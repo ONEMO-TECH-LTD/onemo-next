@@ -1051,7 +1051,9 @@ async function setConnector(op: Extract<WriteOp, { kind: 'set-connector' }>): Pr
     if (op.transition?.kind === 'spring') {
       const { easing, durationS } = springToLinear(op.transition.stiffness, op.transition.damping, op.transition.mass)
       transCss = `all ${durationS}s ${easing}`
-      comment = `@fc-transition: spring ${op.transition.stiffness} ${op.transition.damping} ${op.transition.mass}`
+      // F2 (D4): the side-channel encodes trigger + to.state (mirrors `@fc-connector: tap axis→to`) so the
+      // READ round-trips the full connector shape, not just the spring (write→read→write no drift, §10-I4).
+      comment = `@fc-transition: ${op.trigger} ${op.to.state ?? op.trigger} spring ${op.transition.stiffness} ${op.transition.damping} ${op.transition.mass}`
     } else if (op.transition?.kind === 'tween') {
       transCss = `all ${op.transition.duration}s ${op.transition.ease ?? 'ease'}`
     }
@@ -1092,8 +1094,11 @@ async function setConnector(op: Extract<WriteOp, { kind: 'set-connector' }>): Pr
   const propLocal = `${axis}Prop`
   const cap = axis.charAt(0).toUpperCase() + axis.slice(1)
   const setter = `set${cap}Internal`, internal = `${axis}Internal`
+  // F1 (HIGH): type the cycle array as the axis union — TS infers a bare `string[]` otherwise, so the indexed
+  // access is `string` and fails against the setter's `Dispatch<SetStateAction<'a'|'b'>>` (generated-tsc bug).
+  const unionType = ax.values.map((x) => `'${x}'`).join(' | ')
   const setExpr = op.cycle
-    ? `${setter}((v) => { const vals = [${ax.values.map((x) => `'${x}'`).join(', ')}]; return vals[(vals.indexOf(v) + 1) % vals.length] })`
+    ? `${setter}((v) => { const vals: (${unionType})[] = [${ax.values.map((x) => `'${x}'`).join(', ')}]; return vals[(vals.indexOf(v) + 1) % vals.length] })`
     : `${setter}('${toVal}')`
   const edits: { s: number; e?: number; t: string }[] = []
   // 1) rename the destructured axis binding `axis = 'x'` → `axis: axisProp` (drop the default; the derived const carries it)
@@ -1132,7 +1137,7 @@ export type ComponentModel = {
   structure: StructureNode | null  // D6: recursive JSX tree of the component (server mirror of engine.ts buildLayerTree)
   // I4 (§3.6/D4): connectors read back from the SIDE-CHANNEL comments (never inferred from JSX/CSS shape).
   // `state` = the base transition's `@fc-transition: spring …`; `switch` = the `@fc-connector: tap axis→to`.
-  connectors: { mode: 'state' | 'switch'; trigger: string; to: { axis?: string; value?: string }; transition?: { kind: 'spring'; stiffness: number; damping: number; mass: number }; cycle?: boolean }[]
+  connectors: { mode: 'state' | 'switch'; trigger: string; to: { axis?: string; value?: string; state?: string }; transition?: { kind: 'spring'; stiffness: number; damping: number; mass: number }; cycle?: boolean }[]
 }
 export type StructureNode = { tag: string; class?: string; name?: string; children: StructureNode[] }
 
@@ -1271,10 +1276,12 @@ export async function parseComponentModel(file: string): Promise<ComponentModel>
         for (const dd of (node as Rule).nodes) if (dd.type === 'decl') decls[(dd as Declaration).prop] = (dd as Declaration).value
         rules.push({ selector: (node as Rule).selector, axisValues: d.axisValues, semantic: d.semantic, ...(d.pseudo ? { pseudo: d.pseudo } : {}), ...(d.legacyName ? { legacyName: d.legacyName } : {}), decls })
       }
-      // I4/D4: STATE connector read — from the `@fc-transition: spring <s> <d> <m>` side-channel (the base
-      // transition's motion), NOT inferred from the CSS shape (spring→linear() is irreversible).
-      const mt = /@fc-transition:\s*spring\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/.exec(css)
-      if (mt) connectors.push({ mode: 'state', trigger: 'state', to: {}, transition: { kind: 'spring', stiffness: Number(mt[1]), damping: Number(mt[2]), mass: Number(mt[3]) } })
+      // I4/D4: STATE connector read — from the `@fc-transition: <trigger> <to.state> spring <s> <d> <m>`
+      // side-channel (the base transition's motion), NOT inferred from the CSS shape (spring→linear() is
+      // irreversible). F2: parse the encoded trigger + to.state (back-compat: an old spring-only comment
+      // reads with the placeholders) so write→read→write preserves the full connector shape (§10-I4/D4).
+      const mt = /@fc-transition:(?:\s+(\w+)\s+([\w-]+))?\s+spring\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/.exec(css)
+      if (mt) connectors.push({ mode: 'state', trigger: mt[1] ?? 'state', to: mt[2] ? { state: mt[2] } : {}, transition: { kind: 'spring', stiffness: Number(mt[3]), damping: Number(mt[4]), mass: Number(mt[5]) } })
     } catch { /* module unreadable → treat as unpromoted */ cssModule = cssModule }
   }
   // I4/D4: SWITCH connector read — from the mandatory `@fc-connector: tap <axis>→<to> [cycle]` side-channel
