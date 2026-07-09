@@ -4001,6 +4001,11 @@ export default function ReactFigmaPage() {
                 const inp = { appearance: 'none' as const, border: `1px solid ${LINE}`, borderRadius: 4, padding: '2px 5px', font: `500 9px/1 ${FONT}`, color: INK, width: 64, outline: 'none' as const }
                 const btn = { appearance: 'none' as const, border: `1px solid ${LINE}`, background: '#fff', borderRadius: 5, padding: '3px 7px', cursor: 'pointer', font: `500 9px/1 ${FONT}`, color: SEL }
                 const write = async (body: object) => { await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); await reloadEditModel(em.file); iframeRef.current?.contentWindow?.postMessage({ type: 'fc-board-refresh' }, '*') }
+                // F-M11 (board-input blocklist, §D2): variant axes and states are orthogonal — an axis named like
+                // one of the 6 reserved states would collide with the semantic-state prop (server refuses 422).
+                // Reject it CLIENT-SIDE too, before any fetch, so the board never even attempts the invalid op.
+                const RESERVED_STATE_NAMES = ['hover', 'pressed', 'focus', 'disabled', 'loading', 'error']
+                const axisReserved = RESERVED_STATE_NAMES.includes(newAxisName.trim())
                 return (
                   <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
                     <div style={{ font: `600 8px/1 ${FONT}`, color: MUTE, textTransform: 'uppercase', letterSpacing: '0.4px' }}>Variants</div>
@@ -4013,10 +4018,11 @@ export default function ReactFigmaPage() {
                           onClick={async () => { const v = (newValueByAxis[ax.axis] ?? '').trim(); if (!v) return; await write({ kind: 'add-variant-value', file: em.file, axis: ax.axis, value: v }); setNewValueByAxis((m) => ({ ...m, [ax.axis]: '' })) }}>+ value</button>
                       </div>
                     ))}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
                       <input value={newAxisName} onChange={(e) => setNewAxisName(e.target.value)} placeholder="axis name" style={inp} />
-                      <button type="button" style={btn} disabled={!newAxisName.trim()}
-                        onClick={async () => { const a = newAxisName.trim(); if (!a) return; await write({ kind: 'add-variant-axis', file: em.file, axis: a, values: ['a', 'b'], defaultValue: 'a' }); setNewAxisName('') }}>+ axis</button>
+                      <button type="button" style={{ ...btn, ...(axisReserved ? { color: FAINT, cursor: 'not-allowed' } : {}) }} disabled={!newAxisName.trim() || axisReserved}
+                        onClick={async () => { const a = newAxisName.trim(); if (!a || RESERVED_STATE_NAMES.includes(a)) return; await write({ kind: 'add-variant-axis', file: em.file, axis: a, values: ['a', 'b'], defaultValue: 'a' }); setNewAxisName('') }}>+ axis</button>
+                      {axisReserved && <span style={{ font: `500 8px/1.2 ${FONT}`, color: '#f24822' }}>“{newAxisName.trim()}” is a reserved state name</span>}
                     </div>
                   </div>
                 )
