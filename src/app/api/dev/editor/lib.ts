@@ -756,6 +756,14 @@ function mintUnionProp(source: string, sf: ts.SourceFile, propName: string, valu
       if (!(param.type && ts.isTypeLiteralNode(param.type))) throw Object.assign(new Error('no inline type literal to extend'), { status: 422 })
       const member = param.type.members.find((m) => ts.isPropertySignature(m) && m.name && m.name.getText(sf) === propName) as ts.PropertySignature | undefined
       if (!member?.type) throw Object.assign(new Error(`prop "${propName}" has no type to extend`), { status: 422 })
+      // F-M11 (BLOCKING, mirror of F-I5-2): the existing prop must be a config AXIS — a pure string-literal
+      // union. A boolean SEMANTIC-STATE prop (addBooleanPropToComponent emits `?: boolean`) that shares the name
+      // would be overwritten `boolean` → `'x'|'y'` here while its `= false` binding + `data-<state>` toggle stay
+      // → tsc TS2322 corrupt write (§8). Axes and states are orthogonal (§D2) — refuse. Check every leaf is a
+      // string-literal type (matches what extractUnionValues actually consumes); boolean/anything-else → 422.
+      const isStrLit = (t: ts.TypeNode): boolean => ts.isLiteralTypeNode(t) && ts.isStringLiteral(t.literal)
+      const isStringUnion = ts.isUnionTypeNode(member.type) ? member.type.types.every(isStrLit) : isStrLit(member.type)
+      if (!isStringUnion) throw Object.assign(new Error(`prop "${propName}" already exists as a semantic state — variant axes and states are orthogonal (§D2); it can't also be a config axis (rename one)`), { status: 422 })
       const existingVals = extractUnionValues(member.type)
       const merged = [...new Set([...existingVals, ...values])]
       if (merged.length === existingVals.length) return source // idempotent — all values already present
