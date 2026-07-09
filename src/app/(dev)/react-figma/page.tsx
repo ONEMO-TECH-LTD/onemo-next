@@ -2339,14 +2339,14 @@ export default function ReactFigmaPage() {
   const [editTarget, setEditTarget] = useState<EditTarget>({ kind: 'base' })
   const editTargetRef = useRef(editTarget); useEffect(() => { editTargetRef.current = editTarget }, [editTarget])
   // component model of the component currently being edited (its .tsx file + base class + variants/states)
-  type EditModel = { file: string; cssModule: string | null; rootClass: string | null; root: { line: number; col: number } | null; rootTag: string | null; variantAxes: { axis: string; values: string[]; defaultValue: string }[]; props: { name: string; tsType: string }[]; states: string[] }
+  type EditModel = { file: string; cssModule: string | null; rootClass: string | null; root: { line: number; col: number } | null; rootTag: string | null; variantAxes: { axis: string; values: string[]; defaultValue: string }[]; props: { name: string; tsType: string }[]; states: string[]; connectors: { mode: string; to: { axis?: string; value?: string }; transition?: { stiffness: number; damping: number; mass: number } }[] }
   const [editModel, setEditModel] = useState<EditModel | null>(null)
   const editModelRef = useRef(editModel); useEffect(() => { editModelRef.current = editModel }, [editModel])
   const editingComponentRef = useRef(editingComponent); useEffect(() => { editingComponentRef.current = editingComponent }, [editingComponent])
   // §0 unified model: the server returns ONE `rules` list + `props`; the state-EXISTENCE list the chips/guard
   // need is DERIVED here — semantic states from boolean-prop presence (loading/error always; disabled only on
   // a non-form root, F-M2) + interaction states from pure-pseudo rules.
-  const shapeModel = (m: { file: string; cssModule: string | null; rootClass: string | null; root: { line: number; col: number } | null; structure?: { tag: string } | null; props?: { name: string; tsType: string }[]; variantAxes?: { axis: string; values: string[]; defaultValue: string }[]; rules?: { axisValues: { axis: string; value: string }[]; semantic: string[]; pseudo?: string }[] }): EditModel => {
+  const shapeModel = (m: { file: string; cssModule: string | null; rootClass: string | null; root: { line: number; col: number } | null; structure?: { tag: string } | null; props?: { name: string; tsType: string }[]; variantAxes?: { axis: string; values: string[]; defaultValue: string }[]; rules?: { axisValues: { axis: string; value: string }[]; semantic: string[]; pseudo?: string }[]; connectors?: { mode: string; to: { axis?: string; value?: string }; transition?: { stiffness: number; damping: number; mass: number } }[] }): EditModel => {
     const tag = m.structure?.tag ?? null
     const states = new Set<string>()
     for (const p of m.props ?? []) {
@@ -2358,7 +2358,7 @@ export default function ReactFigmaPage() {
       if (!r.axisValues.length && !r.semantic.length && r.pseudo) states.add(PSEUDO_STATE[r.pseudo] ?? r.pseudo)
       if (!r.axisValues.length && !r.pseudo) for (const s of r.semantic) states.add(s)
     }
-    return { file: m.file, cssModule: m.cssModule, rootClass: m.rootClass, root: m.root, rootTag: tag, variantAxes: m.variantAxes ?? [], props: (m.props ?? []).map((p) => ({ name: p.name, tsType: p.tsType })), states: [...states] }
+    return { file: m.file, cssModule: m.cssModule, rootClass: m.rootClass, root: m.root, rootTag: tag, variantAxes: m.variantAxes ?? [], props: (m.props ?? []).map((p) => ({ name: p.name, tsType: p.tsType })), states: [...states], connectors: m.connectors ?? [] }
   }
   const fetchModel = (file: string) => fetch(`/api/dev/editor-component-model?file=${encodeURIComponent(file)}`).then((r) => (r.ok ? r.json() : null)).catch(() => null)
   useEffect(() => { // reset the target + load the model; AUTO-PROMOTE the root so states/variants are authorable
@@ -4004,6 +4004,41 @@ export default function ReactFigmaPage() {
                     ))}
                   </div>
                 ) : null
+              })()}
+              {/* I4 (§3.6): minimal connector-authoring trigger — a state SPRING transition (momentary, on the
+                  base rule §6.3) and a per-axis TAP switch (persistent, the D3 controllable hook). I5's variant
+                  board replaces this with the polished ⚡-between-frames UI; this proves I4's own live gate. */}
+              {editModel?.cssModule && (() => {
+                const em = editModel
+                const btn = { appearance: 'none' as const, borderRadius: 5, padding: '3px 7px', cursor: 'pointer', font: `500 9px/1 ${FONT}`, color: INK, textAlign: 'left' as const }
+                const stateConn = em.connectors.find((c) => c.mode === 'state')
+                return (
+                  <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <div style={{ font: `600 8px/1 ${FONT}`, color: MUTE, textTransform: 'uppercase', letterSpacing: '0.4px' }}>Connectors</div>
+                    <button type="button" title="Spring transition on this component's states (animates hover/press/… both ways)"
+                      onClick={async () => {
+                        await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'set-connector', file: em.file, mode: 'state', trigger: 'hover', to: { state: 'hover' }, transition: { kind: 'spring', stiffness: 260, damping: 20, mass: 1 } }) })
+                        await reloadEditModel(em.file)
+                      }}
+                      style={{ ...btn, border: `1px solid ${stateConn ? SEL : LINE}`, background: stateConn ? '#e5f4ff' : '#fff' }}>
+                      {stateConn?.transition ? `Spring ${stateConn.transition.stiffness}/${stateConn.transition.damping}/${stateConn.transition.mass}` : 'Add spring transition'}
+                    </button>
+                    {em.variantAxes.map((ax) => {
+                      const sw = em.connectors.find((c) => c.mode === 'switch' && c.to.axis === ax.axis)
+                      return (
+                        <button key={ax.axis} type="button" title={`On tap, cycle the ${ax.axis} variant (${ax.values.join(' then ')})`}
+                          onClick={async () => {
+                            const next = ax.values[(ax.values.indexOf(ax.defaultValue) + 1) % Math.max(1, ax.values.length)]
+                            await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'set-connector', file: em.file, mode: 'switch', trigger: 'tap', to: { axis: ax.axis, value: next }, cycle: true }) })
+                            await reloadEditModel(em.file)
+                          }}
+                          style={{ ...btn, border: `1px solid ${sw ? SEL : LINE}`, background: sw ? '#e5f4ff' : '#fff' }}>
+                          {sw ? `Tap-cycles ${ax.axis}` : `Tap-cycle ${ax.axis}`}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )
               })()}
             </div>
           ) : (
