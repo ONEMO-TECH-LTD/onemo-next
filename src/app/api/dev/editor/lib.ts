@@ -616,7 +616,9 @@ function addBooleanPropToComponent(source: string, sf: ts.SourceFile, propName: 
     const openParen = source.indexOf('(', fn.getStart(sf))
     edits.push({ s: openParen + 1, t: `{ ${propName} = false }: { ${propName}?: boolean }` })
   } else if (ts.isObjectBindingPattern(param.name)) {
-    if (param.name.elements.some((e) => ts.isIdentifier(e.name) && e.name.text === propName)) throw Object.assign(new Error(`prop "${propName}" already exists`), { status: 409 })
+    // F-I5-1 class: match the PUBLIC prop name so an aliased binding `{ size: sizeProp }` (I4 switch) is DETECTED
+    // (409), not missed → duplicate-binding corrupt write. propertyName when present, else the local name.
+    if (param.name.elements.some((e) => (e.propertyName && ts.isIdentifier(e.propertyName) ? e.propertyName.text : (ts.isIdentifier(e.name) ? e.name.text : undefined)) === propName)) throw Object.assign(new Error(`prop "${propName}" already exists`), { status: 409 })
     const hasElems = param.name.elements.length > 0
     edits.push({ s: param.name.getEnd() - 1, t: `${hasElems ? ', ' : ' '}${propName} = false ` })
     if (param.type && ts.isTypeLiteralNode(param.type)) {
@@ -733,7 +735,15 @@ function mintUnionProp(source: string, sf: ts.SourceFile, propName: string, valu
     const openParen = source.indexOf('(', fn.getStart(sf))
     edits.push({ s: openParen + 1, t: `{ ${propName} = '${defaultValue}' }: { ${propName}?: ${union} }` })
   } else if (ts.isObjectBindingPattern(param.name)) {
-    const existing = param.name.elements.find((el) => ts.isIdentifier(el.name) && el.name.text === propName)
+    // F-I5-1 (BLOCKING): match the PUBLIC prop name, not the local binding. After an I4 switch connector the
+    // axis binding is aliased `{ size: sizeProp }` — `el.name` is the local (`sizeProp`), the public prop is
+    // `el.propertyName` (`size`). Keying on `el.name` missed the existing prop → the CREATE branch inserted a
+    // SECOND `size` binding + type member (TS2300/TS2717, app 500). Mirror lib.ts:1252 / parseComponentModel.
+    // The EXTEND branch below only edits `param.type.members` (public name), so the aliased binding stays intact.
+    const existing = param.name.elements.find((el) => {
+      const pub = el.propertyName && ts.isIdentifier(el.propertyName) ? el.propertyName.text : (ts.isIdentifier(el.name) ? el.name.text : undefined)
+      return pub === propName
+    })
     if (existing) {
       // EXTEND — merge new values into the existing union (leave the destructured default as-is).
       if (!(param.type && ts.isTypeLiteralNode(param.type))) throw Object.assign(new Error('no inline type literal to extend'), { status: 422 })
@@ -816,7 +826,20 @@ async function addVariantValue(op: Extract<WriteOp, { kind: 'add-variant-value' 
   const abs = jailComponentWrite(op.file)
   const source = (await fs.readFile(abs)).toString('utf8')
   const sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
-  const next = mintUnionProp(source, sf, op.axis, [...axis.values, op.value], axis.defaultValue)
+  const allValues = [...axis.values, op.value]
+  let next = mintUnionProp(source, sf, op.axis, allValues, axis.defaultValue)
+  // F-I5-1 follow-on: if this axis carries a CYCLE switch connector (I4), its generated updater baked
+  // `const vals: (<union>)[] = [<list>]` with the AUTHORING-TIME values. Once the axis union widens, that stale
+  // `vals` (a) omits the new value from the cycle and (b) makes `vals.indexOf(v)` fail tsc (TS2345) against the
+  // widened setter. Sync the baked vals to ALL current values so the new value joins the cycle AND it typechecks.
+  const cap = op.axis.charAt(0).toUpperCase() + op.axis.slice(1)
+  const setter = `set${cap}Internal`
+  const cycleRe = new RegExp(`(${setter}\\(\\(v\\) => \\{ const vals: )\\([^)]*\\)(\\[\\] = )\\[[^\\]]*\\]`)
+  if (cycleRe.test(next)) {
+    const union = allValues.map((x) => `'${x}'`).join(' | ')
+    const list = allValues.map((x) => `'${x}'`).join(', ')
+    next = next.replace(cycleRe, `$1(${union})$2[${list}]`)
+  }
   assertValidTsx(abs, next)
   await fs.writeFile(abs, next, 'utf8')
   return { ok: true, file: op.file, newValueText: `variant value "${op.axis}=${op.value}" added` }
@@ -839,7 +862,9 @@ function addStringParam(source: string, sf: ts.SourceFile, propName: string, def
     const openParen = source.indexOf('(', fn.getStart(sf))
     edits.push({ s: openParen + 1, t: `{ ${decl} }: { ${propName}?: string }` })
   } else if (ts.isObjectBindingPattern(param.name)) {
-    if (param.name.elements.some((el) => ts.isIdentifier(el.name) && el.name.text === propName)) throw Object.assign(new Error(`prop "${propName}" already exists`), { status: 409 })
+    // F-I5-1 class: match the PUBLIC prop name so an aliased binding `{ size: sizeProp }` (I4 switch) is DETECTED
+    // (409), not missed → duplicate-binding corrupt write. propertyName when present, else the local name.
+    if (param.name.elements.some((el) => (el.propertyName && ts.isIdentifier(el.propertyName) ? el.propertyName.text : (ts.isIdentifier(el.name) ? el.name.text : undefined)) === propName)) throw Object.assign(new Error(`prop "${propName}" already exists`), { status: 409 })
     const hasElems = param.name.elements.length > 0
     edits.push({ s: param.name.getEnd() - 1, t: `${hasElems ? ', ' : ' '}${decl} ` })
     if (param.type && ts.isTypeLiteralNode(param.type)) {
