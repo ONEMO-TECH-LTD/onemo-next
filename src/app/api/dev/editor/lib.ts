@@ -279,6 +279,10 @@ export type WriteOp =
   | { kind: 'expose-as-prop'; file: string; propName: string; target?: 'text' | 'attr' | 'inline-style' | 'module-css'; line?: number; col?: number; attrName?: string; cssProp?: string; controlType?: string } // I3: fixed value → editable prop, routed BY TARGET LOCATION (blueprint §5): text/attr/inline-style = literal-swap; module-css = custom-property bridge
   | { kind: 'set-instance-prop'; file: string; line: number; col: number; propName: string; value: string } // I3: set a string prop on a component instance (blueprint §5)
   | { kind: 'set-connector'; file: string; mode: 'state' | 'switch'; trigger: 'hover' | 'pressed' | 'focus' | 'tap'; to: { state?: 'hover' | 'pressed' | 'focus' | 'disabled' | 'loading' | 'error'; axis?: string; value?: string }; transition?: { kind: 'spring'; stiffness: number; damping: number; mass: number } | { kind: 'tween'; duration: number; ease?: string }; cycle?: boolean } // I4: connectors (blueprint §3.6) — 'state'=base transition (spring→linear()) + @fc-transition side-channel; 'switch'=D3 controllable useState + onClick + @fc-connector side-channel (D4 read source-of-truth)
+  | { kind: 'set-variant-structure'; file: string; axisValue: { axis: string; value: string }; edit:
+      | { op: 'add'; anchor: { line: number; col: number }; position: 'before' | 'after' | 'firstChild' | 'lastChild'; jsx: string }
+      | { op: 'remove'; target: { line: number; col: number } }
+      | { op: 'swap'; target: { line: number; col: number }; jsx: string } } // I6: STRUCTURAL variants (blueprint §3.9) — per-axis-value LAYER divergence → FLAT conditional JSX (one guard per subtree, keyed on the bare axis prop, never nested); add/remove/swap addressed by source {line,col} via findJsxAt; different-axis-guard nesting + deep-reparenting walled with named 422s
   | { kind: 'set-token-value'; tokenPath: string; theme?: string; value: string | number }
   | { kind: 'set-jsx-style'; file: string; line: number; col: number; prop: string; value: string; expectRaw?: string }
   | { kind: 'set-jsx-text'; file: string; line: number; col: number; newText: string; expectRaw?: string }
@@ -1197,7 +1201,108 @@ export type ComponentModel = {
   // `state` = the base transition's `@fc-transition: spring …`; `switch` = the `@fc-connector: tap axis→to`.
   connectors: { mode: 'state' | 'switch'; trigger: string; to: { axis?: string; value?: string; state?: string }; transition?: { kind: 'spring'; stiffness: number; damping: number; mass: number }; cycle?: boolean }[]
 }
-export type StructureNode = { tag: string; class?: string; name?: string; children: StructureNode[] }
+// I6/§1 (line 60): each node carries the source {line,col} that set-variant-structure addresses AND the
+// condVariant guard it sits under (which axis-value the guarded subtree diverges on), so re-read is lossless.
+export type StructureNode = { tag: string; class?: string; name?: string; line?: number; col?: number; condVariant?: { axis: string; value: string; negated?: boolean }; children: StructureNode[] }
+
+// ─── I6 (§3.9/D5): structural-variant guard parsing (shared by the WRITE op + the READ mirror) ──────────
+type CondGuard = { axis: string; value: string; negated?: boolean }
+/** Parse an equality guard `<ident> === '<lit>'` / `<ident> !== '<lit>'` → its axis+value (negated for !==). */
+function parseEqGuard(e: ts.Expression): CondGuard | null {
+  if (!ts.isBinaryExpression(e) || !ts.isIdentifier(e.left) || !ts.isStringLiteral(e.right)) return null
+  if (e.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken) return { axis: e.left.text, value: e.right.text }
+  if (e.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsEqualsToken) return { axis: e.left.text, value: e.right.text, negated: true }
+  return null
+}
+/** Unwrap parentheses to a single JSX element (a structural-variant subtree is ONE element, never a fragment). */
+function unwrapJsxElement(e: ts.Expression): ts.JsxElement | ts.JsxSelfClosingElement | null {
+  let x: ts.Expression = e
+  while (ts.isParenthesizedExpression(x)) x = x.expression
+  return ts.isJsxElement(x) || ts.isJsxSelfClosingElement(x) ? x : null
+}
+/** The axis a `{ … }` JSX-expression child guards on, if it's a structural-variant guard (`&&` or ternary). */
+function guardAxisOf(expr: ts.Expression): string | null {
+  if (ts.isBinaryExpression(expr) && expr.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken) return parseEqGuard(expr.left)?.axis ?? null
+  if (ts.isConditionalExpression(expr)) return parseEqGuard(expr.condition)?.axis ?? null
+  return null
+}
+/** Guarded structural subtrees inside a `{ … }` JSX-expression child — the READ mirror of set-variant-structure:
+ * `{c && <el/>}` → [el@cond]; `{c ? <a/> : <b/>}` → [a@cond, b@¬cond]. */
+function structuralGuards(expr: ts.Expression): { el: ts.JsxElement | ts.JsxSelfClosingElement; cond: CondGuard }[] {
+  if (ts.isBinaryExpression(expr) && expr.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken) {
+    const cond = parseEqGuard(expr.left); const el = unwrapJsxElement(expr.right)
+    return cond && el ? [{ el, cond }] : []
+  }
+  if (ts.isConditionalExpression(expr)) {
+    const cond = parseEqGuard(expr.condition); const a = unwrapJsxElement(expr.whenTrue); const b = unwrapJsxElement(expr.whenFalse)
+    const out: { el: ts.JsxElement | ts.JsxSelfClosingElement; cond: CondGuard }[] = []
+    if (cond && a) out.push({ el: a, cond })
+    if (cond && b) out.push({ el: b, cond: { axis: cond.axis, value: cond.value, negated: !cond.negated } })
+    return out
+  }
+  return []
+}
+
+/** I6 (blueprint §3.9): STRUCTURAL variants — a per-axis-value LAYER divergence compiled to FLAT conditional
+ * JSX (one guard per subtree, keyed on the bare axis prop — never nested ternaries). Target = source {line,col}
+ * via findJsxAt (same as promote-element/set-instance-prop). add = show-in-value `{axis === 'v' && (…)}`;
+ * remove = hide-in-value `{axis !== 'v' && (<target/>)}` (the node STAYS in source, guarded — other values
+ * keep it); swap = the ONE allowed single-level ternary `{axis === 'v' ? (<jsx/>) : (<target/>)}`. assertValidTsx
+ * before write (never silent corruption). Refuses 422: target under a DIFFERENT axis's guard (ambiguous nesting);
+ * DEEP REPARENTING (add-child into a void element / sibling where the parent isn't a JSX children list) — the
+ * explicit walled edge: "add/remove/swap within a subtree only". */
+async function setVariantStructure(op: Extract<WriteOp, { kind: 'set-variant-structure' }>): Promise<{ ok: true; file: string; newValueText: string }> {
+  const abs = jailComponentWrite(op.file)
+  const source = (await fs.readFile(abs)).toString('utf8')
+  const sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
+  const { axis, value } = op.axisValue
+  const loc = op.edit.op === 'add' ? op.edit.anchor : op.edit.target
+  const opening = findJsxAt(sf, loc.line, loc.col)
+  if (!opening) throw Object.assign(new Error(`no JSX element at ${loc.line}:${loc.col}`), { status: 404 })
+  // full subtree = the JsxElement (opening's parent) or the self-closing element itself
+  const node: ts.JsxElement | ts.JsxSelfClosingElement = ts.isJsxOpeningElement(opening) ? (opening.parent as ts.JsxElement) : opening
+
+  // Refusal — target already under a DIFFERENT axis's structural guard (nesting would be ambiguous; §3.9).
+  for (let p: ts.Node | undefined = node.parent; p; p = p.parent) {
+    if (ts.isJsxExpression(p) && p.expression) {
+      const ax = guardAxisOf(p.expression)
+      if (ax && ax !== axis) throw Object.assign(new Error(`target is already inside the "${ax}" axis's structural guard — edit at the outer guard (nesting different-axis guards is unsupported)`), { status: 422 })
+    }
+  }
+
+  const REPARENT = `deep reparenting unsupported: add/remove/swap within a subtree only`
+  const nodeText = source.slice(node.getStart(sf), node.getEnd())
+  const lineStart = source.lastIndexOf('\n', node.getStart(sf)) + 1
+  const indent = source.slice(lineStart, node.getStart(sf)).match(/^[ \t]*/)?.[0] ?? ''
+
+  let start: number, end: number, replacement: string
+  if (op.edit.op === 'add') {
+    const guarded = `{${axis} === '${value}' && (\n${indent}  ${op.edit.jsx}\n${indent})}`
+    if (op.edit.position === 'firstChild' || op.edit.position === 'lastChild') {
+      // a subtree to add WITHIN requires a paired element; a void (self-closing) node has none → walled edge.
+      if (!ts.isJsxElement(node)) throw Object.assign(new Error(REPARENT), { status: 422 })
+      if (op.edit.position === 'firstChild') { start = end = node.openingElement.getEnd(); replacement = `\n${indent}  ${guarded}` }
+      else { start = end = node.closingElement.getStart(sf); replacement = `${guarded}\n${indent}` }
+    } else {
+      // a sibling requires the anchor's parent to BE a JSX children list; otherwise placing it reparents → walled.
+      const par = node.parent
+      if (!(ts.isJsxElement(par) || ts.isJsxFragment(par))) throw Object.assign(new Error(REPARENT), { status: 422 })
+      if (op.edit.position === 'before') { start = end = node.getStart(sf); replacement = `${guarded}\n${indent}` }
+      else { start = end = node.getEnd(); replacement = `\n${indent}${guarded}` }
+    }
+  } else if (op.edit.op === 'remove') {
+    start = node.getStart(sf); end = node.getEnd()
+    replacement = `{${axis} !== '${value}' && (\n${indent}  ${nodeText}\n${indent})}`
+  } else { // swap — the one allowed single-level ternary, at the swap site only
+    start = node.getStart(sf); end = node.getEnd()
+    replacement = `{${axis} === '${value}' ? (\n${indent}  ${op.edit.jsx}\n${indent}) : (\n${indent}  ${nodeText}\n${indent})}`
+  }
+
+  const next = source.slice(0, start) + replacement + source.slice(end)
+  assertValidTsx(abs, next) // F1: re-parse the OUTPUT; any structurally-invalid result (e.g. wrapping the root return) → clean 422, never a corrupt write
+  await fs.writeFile(abs, next)
+  return { ok: true, file: op.file, newValueText: replacement }
+}
 
 /** D6: build the recursive JSX-element tree of a component (server-side mirror of the runtime
  * engine.ts buildLayerTree). Static JSX children only; name = data-name ‖ styles class ‖ (omit). */
@@ -1211,11 +1316,17 @@ function buildStructure(el: ts.JsxElement | ts.JsxSelfClosingElement, sf: ts.Sou
   }
   const cls = /styles\.([\w$]+)/.exec(attr('className') ?? '')?.[1]
   const name = attr('data-name') ?? cls
+  const lc = sf.getLineAndCharacterOfPosition(opening.getStart(sf)) // I6/§3.9: the address set-variant-structure uses
   const children: StructureNode[] = []
   if (ts.isJsxElement(el)) for (const c of el.children) {
     if (ts.isJsxElement(c) || ts.isJsxSelfClosingElement(c)) children.push(buildStructure(c, sf))
+    // I6/D5: recurse into structural-variant guards `{axis === 'v' && <el/>}` / `{axis === 'v' ? … : …}` —
+    // the I0 gap where guarded subtrees were dropped from the tree. Tag each with the condVariant it sits under.
+    else if (ts.isJsxExpression(c) && c.expression) {
+      for (const g of structuralGuards(c.expression)) children.push({ ...buildStructure(g.el, sf), condVariant: g.cond })
+    }
   }
-  return { tag, ...(cls ? { class: cls } : {}), ...(name ? { name } : {}), children }
+  return { tag, ...(cls ? { class: cls } : {}), ...(name ? { name } : {}), line: lc.line + 1, col: lc.character + 1, children }
 }
 
 export type DecomposedRule = { axisValues: { axis: string; value: string }[]; semantic: string[]; pseudo?: string; legacyName?: string }
@@ -2088,6 +2199,7 @@ async function applyWriteInner(op: WriteOp): Promise<{ ok: true; file: string; n
   if (op.kind === 'expose-as-prop') return exposeAsProp(op)
   if (op.kind === 'set-instance-prop') return setInstanceProp(op)
   if (op.kind === 'set-connector') return setConnector(op)
+  if (op.kind === 'set-variant-structure') return setVariantStructure(op)
   if (op.kind === 'create-page') return createPage(op)
   if (op.kind === 'set-token-value') return setTokenValue(op)
   if (op.kind === 'set-jsx-style') return setJsxStyle(op)
