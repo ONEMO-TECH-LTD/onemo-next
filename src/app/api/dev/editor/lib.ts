@@ -669,9 +669,16 @@ async function addState(op: Extract<WriteOp, { kind: 'add-state' }>): Promise<{ 
   const disabledSemantic = op.state === 'disabled' && !FORM_CONTROLS.has(model.structure?.tag ?? '')
   const isSemantic = op.state === 'loading' || op.state === 'error' || disabledSemantic
   if (isSemantic) {
-    // IDEMPOTENT: if the boolean prop already exists (state already added), skip the prop-add — re-selecting
-    // the chip must just re-target, never re-add → 409 (the second half of the I1 add-state finding).
-    const propExists = model.props.some((p) => p.name === op.state)
+    // F-I5-2 (HIGH): the idempotency check must match the SEMANTIC BOOLEAN state, not just the name. A prop
+    // that shares the name but is NOT boolean — e.g. a config AXIS named `loading` (quoted-union tsType) — is a
+    // NAME COLLISION, not the state; axes and states are orthogonal (§D2). Name-only matching would misread it
+    // as "state already present" and silently re-target the axis (200 fake-success). Match name AND
+    // `tsType === 'boolean'` for idempotency; a same-name non-boolean prop is a genuine collision → refuse (422).
+    const sameName = model.props.find((p) => p.name === op.state)
+    if (sameName && sameName.tsType !== 'boolean') throw Object.assign(new Error(`prop "${op.state}" already exists as a config axis — variant axes and states are orthogonal (§D2); it can't also be a semantic state (rename the axis)`), { status: 422 })
+    // IDEMPOTENT: if the boolean state prop already exists, skip the prop-add — re-selecting the chip must just
+    // re-target, never re-add (the second half of the I1 add-state finding).
+    const propExists = !!sameName
     if (!propExists) {
       const abs = jailComponentWrite(op.file)
       const source = (await fs.readFile(abs)).toString('utf8')
