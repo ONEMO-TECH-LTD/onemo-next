@@ -74,17 +74,23 @@ function NodeLayer({ file, connectors, boardRef, onWrite }: { file: string; conn
     setBoardW(board.clientWidth)
     const src = baseFrame(board); if (!src) { setWires([]); setHandles([]); return }
     const sr = frameRect(src, board)
-    // route every wire through the RIGHT MARGIN (an orthogonal elbow) so it NEVER crosses an intervening frame
-    // (F-N1/designer: straight edge-to-edge wires cut through unrelated frames stacked in the same column).
+    // Route each wire so NO segment runs along a frame ROW (designer: a shared far-right gutter still crosses
+    // the target row's siblings on final approach). Per-wire: drop down the NEAREST clear margin corridor to a
+    // channel just ABOVE the target's row (an empty band between rows), then straight DOWN into the target's TOP
+    // edge in its own column. Every segment is provably clear — corridor (margin) · channel (inter-row gap) ·
+    // drop (target column, above target). Nearest-side corridor keeps wires short (no full-width loop).
     const allR = [...board.querySelectorAll('[data-component-frame]')].map((f) => frameRect(f, board))
-    const gutter = Math.max(...allR.map((r) => r.right), sr.right) + 20
+    const leftC = Math.min(...allR.map((r) => r.left)) - 14
+    const rightC = Math.max(...allR.map((r) => r.right)) + 14
     setWires(connectors.map((c, i) => {
       const t = targetOf(board, c); if (!t) return null
       const tr = frameRect(t, board)
-      // exit source's right edge → out to the gutter → down/up to the target's row → into target's right edge
-      const sx = sr.right, sy = sr.cy, tx = tr.right, ty = tr.cy
-      const d = `M ${sx} ${sy} L ${gutter} ${sy} L ${gutter} ${ty} L ${tx + 6} ${ty}`
-      return { key: `${c.mode}-${c.to.state ?? ''}${c.to.axis ?? ''}-${i}`, d, conn: c, mx: gutter, my: (sy + ty) / 2 }
+      const useLeft = Math.abs(tr.cx - leftC) <= Math.abs(tr.cx - rightC)
+      const cor = useLeft ? leftC : rightC
+      const srcX = useLeft ? sr.left : sr.right // exit the source on the corridor side (shortest orthogonal path)
+      const channelY = tr.top - 12 // the empty band just above the target's row
+      const d = `M ${srcX} ${sr.cy} L ${cor} ${sr.cy} L ${cor} ${channelY} L ${tr.cx} ${channelY} L ${tr.cx} ${tr.top}`
+      return { key: `${c.mode}-${c.to.state ?? ''}${c.to.axis ?? ''}-${i}`, d, conn: c, mx: (cor + tr.cx) / 2, my: channelY }
     }).filter(Boolean) as Wire[])
     // a drag handle on every real frame + state ghost (source of a new wire)
     setHandles([...board.querySelectorAll('[data-component-frame]')].map((f, i) => { const r = frameRect(f, board); return { key: `h${i}`, x: r.right, y: r.cy, frame: f as HTMLElement } }))
