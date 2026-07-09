@@ -1105,12 +1105,30 @@ async function setConnector(op: Extract<WriteOp, { kind: 'set-connector' }>): Pr
   edits.push({ s: bind.getStart(sf), e: bind.getEnd(), t: `${axis}: ${propLocal}` })
   // 2) inject the controllable hook + connector side-channel just before the return
   const indent = ' '.repeat(ret.getStart(sf) - source.lastIndexOf('\n', ret.getStart(sf)) - 1)
-  edits.push({ s: ret.getStart(sf), t: `/* @fc-connector: tap ${axis}→${toVal}${op.cycle ? ' cycle' : ''} */\n${indent}const [${internal}, ${setter}] = useState(${propLocal} ?? '${ax.defaultValue}')\n${indent}const ${axis} = ${propLocal} ?? ${internal}\n${indent}` })
+  // F-M9 (MED): the rename below drops the binding's `= '<default>'` literal (D3 requires it), so a later
+  // parseComponentModel has no source default to read for this axis and falls back to values[0] — real drift
+  // (e.g. 'lg'→'sm'). Encode the real default in the side-channel (D4 source-of-truth) so the READ recovers it.
+  edits.push({ s: ret.getStart(sf), t: `/* @fc-connector: tap ${axis}→${toVal}${op.cycle ? ' cycle' : ''} default=${ax.defaultValue} */\n${indent}const [${internal}, ${setter}] = useState(${propLocal} ?? '${ax.defaultValue}')\n${indent}const ${axis} = ${propLocal} ?? ${internal}\n${indent}` })
   // 3) onClick on the root (uncontrolled-only — a controlled parent always wins, D3)
   const root = findRootReturnedElement(fn, sf)
   if (!root) throw Object.assign(new Error('no root JSX element for the tap handler'), { status: 422 })
   const opening = ts.isJsxElement(root) ? root.openingElement : root
-  edits.push({ s: opening.tagName.getEnd(), t: ` onClick={() => { if (${propLocal} == null) ${setExpr} }}` })
+  // F-M8 (BLOCKING): a root already carrying an onClick (a prior tap-switch, or hand-authored) would get a
+  // DUPLICATE `onClick` attr — valid TSX syntax but a tsc TS17001 error, and assertValidTsx is syntax-only so it
+  // would WRITE corrupt code (§8 "refuse rather than corrupt"). If the existing onClick is an inline block arrow,
+  // MERGE the new guard into it — each guard checks its OWN prop, so both switches stay correct with no desync
+  // (two interactions per component is legit Framer surface). Otherwise REFUSE with a named 422 (never corrupt).
+  const existingOnClick = opening.attributes.properties.find((p) => ts.isJsxAttribute(p) && p.name.getText(sf) === 'onClick')
+  if (existingOnClick && ts.isJsxAttribute(existingOnClick)) {
+    const inner = existingOnClick.initializer && ts.isJsxExpression(existingOnClick.initializer) ? existingOnClick.initializer.expression : undefined
+    if (inner && ts.isArrowFunction(inner) && ts.isBlock(inner.body)) {
+      edits.push({ s: inner.body.getEnd() - 1, t: `; if (${propLocal} == null) ${setExpr} ` }) // splice the guard in before the block's closing brace
+    } else {
+      throw Object.assign(new Error('component root already has an onClick that is not an inline block handler — compose the tap-switch manually (cannot safely merge)'), { status: 422 })
+    }
+  } else {
+    edits.push({ s: opening.tagName.getEnd(), t: ` onClick={() => { if (${propLocal} == null) ${setExpr} }}` })
+  }
   // 4) ensure `import { useState } from 'react'`
   if (!/import\s*\{[^}]*\buseState\b[^}]*\}\s*from\s*['"]react['"]/.test(source)) edits.push({ s: 0, t: `import { useState } from 'react'\n` })
   edits.sort((a, b) => b.s - a.s)
@@ -1286,8 +1304,11 @@ export async function parseComponentModel(file: string): Promise<ComponentModel>
   }
   // I4/D4: SWITCH connector read — from the mandatory `@fc-connector: tap <axis>→<to> [cycle]` side-channel
   // in the .tsx, NOT by pattern-matching the useState/onClick JSX shape (fragile across formattings).
-  for (const m of source.matchAll(/@fc-connector:\s*tap\s+([A-Za-z][\w-]*)→([\w-]+)(\s+cycle)?/g)) {
+  for (const m of source.matchAll(/@fc-connector:\s*tap\s+([A-Za-z][\w-]*)→([\w-]+)(\s+cycle)?(?:\s+default=([\w-]+))?/g)) {
     connectors.push({ mode: 'switch', trigger: 'tap', to: { axis: m[1], value: m[2] }, ...(m[3] ? { cycle: true } : {}) })
+    // F-M9: the D3 rename dropped the axis's destructure default, so the variantAxes read above fell back to
+    // values[0]; the side-channel carries the real default (D4 source-of-truth) — prefer it for the switched axis.
+    if (m[4]) { const va = variantAxes.find((a) => a.axis === m[1]); if (va) va.defaultValue = m[4] }
   }
   // NOTE: which STATES exist (a semantic state exists from its boolean PROP even before any `.base[data-*]`
   // rule — §6.2/I1 drift fix; disabled is semantic only on a non-form root — F-M2) is DERIVED by the consumer
