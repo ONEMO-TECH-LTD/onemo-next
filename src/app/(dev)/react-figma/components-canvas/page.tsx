@@ -42,7 +42,7 @@ const isInteractionState = (s?: string): boolean => !!s && (INTERACTION_STATES a
 
 // ─── I7 NODE SYSTEM (Framer ⚡ connector layer, s58-nodesystem-design.md) ────────────────
 type Conn = { mode: 'state' | 'switch'; trigger?: string; to: { state?: string; axis?: string; value?: string }; transition?: { stiffness: number; damping: number; mass: number }; cycle?: boolean }
-type Wire = { key: string; x1: number; y1: number; x2: number; y2: number; conn: Conn; mx: number; my: number }
+type Wire = { key: string; d: string; conn: Conn; mx: number; my: number }
 const WIRE = '#9747FF'
 /** The ⚡ visual connector layer over the edited component's board (Framer clone). Draws a directional wire
  * from the base frame → each connector's target frame (state ghost or axis-value frame), a diamond drag-handle
@@ -74,13 +74,17 @@ function NodeLayer({ file, connectors, boardRef, onWrite }: { file: string; conn
     setBoardW(board.clientWidth)
     const src = baseFrame(board); if (!src) { setWires([]); setHandles([]); return }
     const sr = frameRect(src, board)
+    // route every wire through the RIGHT MARGIN (an orthogonal elbow) so it NEVER crosses an intervening frame
+    // (F-N1/designer: straight edge-to-edge wires cut through unrelated frames stacked in the same column).
+    const allR = [...board.querySelectorAll('[data-component-frame]')].map((f) => frameRect(f, board))
+    const gutter = Math.max(...allR.map((r) => r.right), sr.right) + 20
     setWires(connectors.map((c, i) => {
       const t = targetOf(board, c); if (!t) return null
       const tr = frameRect(t, board)
-      // wire from source's nearest edge midpoint → target's nearest edge midpoint (Framer-style straight edge-to-edge)
-      const [x1, y1] = tr.top >= sr.bottom ? [sr.cx, sr.bottom] : tr.left >= sr.right ? [sr.right, sr.cy] : [sr.cx, sr.top]
-      const [x2, y2] = tr.top >= sr.bottom ? [tr.cx, tr.top] : tr.left >= sr.right ? [tr.left, tr.cy] : [tr.cx, tr.bottom]
-      return { key: `${c.mode}-${c.to.state ?? ''}${c.to.axis ?? ''}-${i}`, x1, y1, x2, y2, conn: c, mx: (x1 + x2) / 2, my: (y1 + y2) / 2 }
+      // exit source's right edge → out to the gutter → down/up to the target's row → into target's right edge
+      const sx = sr.right, sy = sr.cy, tx = tr.right, ty = tr.cy
+      const d = `M ${sx} ${sy} L ${gutter} ${sy} L ${gutter} ${ty} L ${tx + 6} ${ty}`
+      return { key: `${c.mode}-${c.to.state ?? ''}${c.to.axis ?? ''}-${i}`, d, conn: c, mx: gutter, my: (sy + ty) / 2 }
     }).filter(Boolean) as Wire[])
     // a drag handle on every real frame + state ghost (source of a new wire)
     setHandles([...board.querySelectorAll('[data-component-frame]')].map((f, i) => { const r = frameRect(f, board); return { key: `h${i}`, x: r.right, y: r.cy, frame: f as HTMLElement } }))
@@ -127,9 +131,9 @@ function NodeLayer({ file, connectors, boardRef, onWrite }: { file: string; conn
         <defs><marker id="fc-arrow" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill={WIRE} /></marker></defs>
         {wires.map((w) => (
           <g key={w.key} data-wire={`${w.conn.mode}:${w.conn.to.state ?? ''}${w.conn.to.axis ?? ''}`} style={{ pointerEvents: 'stroke', cursor: 'pointer' }} onClick={() => setSel(w)}>
-            <line x1={w.x1} y1={w.y1} x2={w.x2} y2={w.y2} stroke="transparent" strokeWidth={12} />
-            <line x1={w.x1} y1={w.y1} x2={w.x2} y2={w.y2} stroke={WIRE} strokeWidth={sel === w ? 2.5 : 1.5} markerEnd="url(#fc-arrow)" />
-            {w.conn.mode === 'state' && <circle cx={w.mx} cy={w.my} r={7} fill="#fff" stroke={WIRE} strokeWidth={1.5} /> }
+            <path d={w.d} fill="none" stroke="transparent" strokeWidth={12} />
+            <path d={w.d} fill="none" stroke={WIRE} strokeWidth={sel === w ? 2.5 : 1.5} markerEnd="url(#fc-arrow)" />
+            {w.conn.mode === 'state' && <circle cx={w.mx} cy={w.my} r={7} fill="#fff" stroke={WIRE} strokeWidth={1.5} />}
             {w.conn.mode === 'state' && <text x={w.mx} y={w.my + 2.5} textAnchor="middle" fontSize={8} fill={WIRE}>⚡</text>}
           </g>
         ))}
@@ -218,7 +222,11 @@ function groupFrames(frames: Frame[], inventory: InventoryEntry[] | null, editFi
     // its `axis` so the render lays out one labeled sub-group per axis (the Framer axis-grouped board).
     const axes = entry.variantAxes ?? []
     const variants: Frame[] = (axes.length && baseFrames.length)
-      ? axes.flatMap((ax) => ax.values.map((value) => ({
+      // F-N1 (Meta+designer converged): a multi-axis component gets a dedicated BASE frame (the default
+      // `<Comp/>` render) FIRST, so the node-system wires source from a true base (Framer's Primary config
+      // variant) instead of the arbitrary first axis-value frame — no more wires crossing unrelated frames.
+      ? [{ key: `${entry.root}:${entry.file}:base`, label: `${entry.name} · Base`, category: entry.category ?? baseFrames[0].category, root: entry.root, file: entry.file, Comp: baseFrames[0].Comp },
+         ...axes.flatMap((ax) => ax.values.map((value) => ({
           key: `${entry.root}:${entry.file}:${ax.axis}=${value}`,
           label: `${ax.axis}=${value}`,
           category: entry.category ?? baseFrames[0].category,
@@ -227,7 +235,7 @@ function groupFrames(frames: Frame[], inventory: InventoryEntry[] | null, editFi
           Comp: baseFrames[0].Comp,
           props: { [ax.axis]: value },
           axis: ax.axis,
-        })))
+        })))]
       : baseFrames
     // I5 (§I5): the EDITED component's board also shows the 6 STATE GHOST slots (interaction + semantic),
     // so the author sees + edits every state from the board. Scoped to the edited component (via ?edit=) so the
@@ -291,7 +299,13 @@ export default function ComponentsCanvasHost() {
   // shell to reload its own model (its inspector shows connectors too). No optimistic wire state — model is truth.
   const nodeWrite = React.useCallback(async (body: object): Promise<boolean> => {
     const r = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
-    if (!r.ok) return false
+    if (!r.ok) {
+      // QA-MED (F-A1 class): a failed connector write must SURFACE the server's named error, not fail silently.
+      // This route is a separate iframe with no local Toaster — relay to the parent shell's toast.
+      const msg = await r.json().then((j) => j?.error).catch(() => null)
+      window.parent?.postMessage({ type: 'fc-toast', kind: 'error', message: msg || `connector write failed (${r.status})` }, '*')
+      return false
+    }
     setTimeout(() => { fetchConn() }, 60) // let the write settle, then re-read the wires from source
     window.parent?.postMessage({ type: 'fc-model-changed' }, '*') // parent reloadEditModel + will bounce fc-board-refresh
     return true

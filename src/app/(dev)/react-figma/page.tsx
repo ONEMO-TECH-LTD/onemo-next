@@ -2406,7 +2406,11 @@ export default function ReactFigmaPage() {
   // I7 node-system: the board iframe fires `fc-model-changed` after a visual connector write (set/remove-connector)
   // → reload the parent's own model so the inspector's connector state stays in sync with the wires.
   useEffect(() => {
-    const on = (e: MessageEvent) => { if (e.data?.type === 'fc-model-changed') { const f = editModelRef.current?.file; if (f) void reloadEditModel(f) } }
+    const on = (e: MessageEvent) => {
+      if (e.data?.type === 'fc-model-changed') { const f = editModelRef.current?.file; if (f) void reloadEditModel(f) }
+      // QA-MED: relay the board iframe's connector-write errors to the shell's toast (the iframe has no Toaster).
+      if (e.data?.type === 'fc-toast') notify(e.data.message ?? 'connector write failed', e.data.kind === 'error' ? 'error' : 'ok')
+    }
     window.addEventListener('message', on)
     return () => window.removeEventListener('message', on)
   }, [reloadEditModel])

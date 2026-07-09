@@ -1211,7 +1211,7 @@ async function removeConnector(op: Extract<WriteOp, { kind: 'remove-connector' }
   if (!axis) throw Object.assign(new Error('remove switch connector needs to.axis'), { status: 422 })
   const abs = jailComponentWrite(op.file)
   let source = (await fs.readFile(abs)).toString('utf8')
-  let sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
+  const sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
   const fn = findComponentFn(sf)
   if (!fn || !fn.body || !ts.isBlock(fn.body)) throw Object.assign(new Error('component has no block body'), { status: 422 })
   const param = fn.parameters[0]
@@ -1221,40 +1221,36 @@ async function removeConnector(op: Extract<WriteOp, { kind: 'remove-connector' }
   if (!bind.propertyName) throw Object.assign(new Error(`axis "${axis}" is not a switch connector (nothing to remove)`), { status: 422 }) // not aliased → no switch
   const cap = axis.charAt(0).toUpperCase() + axis.slice(1)
   const propLocal = `${axis}Prop`, internal = `${axis}Internal`, setter = `set${cap}Internal`
-  const dflt = model.variantAxes.find((a) => a.axis === axis)?.defaultValue ?? bind.name.getText(sf)
-  // 1) revert the aliased binding `axis: axisProp` → `axis = 'default'` (re-establish the plain defaulted prop)
-  source = source.slice(0, bind.getStart(sf)) + `${axis} = '${dflt}'` + source.slice(bind.getEnd())
-  // 2) remove THIS axis's blob: `/* @fc-connector: tap axis→… */ + useState line + derived-const line` (leaves
-  //    other switches' blobs intact — each axis has its own contiguous blob).
-  const blobRe = new RegExp(
+  const axDef = model.variantAxes.find((a) => a.axis === axis)
+  const dflt = axDef?.defaultValue ?? axDef?.values[0] ?? 'default' // #5 harden: never fall back to the alias identifier text
+  // ── QA-HIGH FIX: VALIDATE EVERYTHING on the ORIGINAL source FIRST, mutate NOTHING until every piece is
+  //    recognized. The old code reverted the binding + removed the blob UNCONDITIONALLY, then bailed if the
+  //    onClick shape was unrecognized → a dangling `${propLocal}` reference (TS2304) written to disk (§8
+  //    corrupt write, F-M8/F-M11 class; assertValidTsx is syntax-only so it wouldn't catch it). Validate all → refuse → then apply all edits offset-safe.
+  // (a) the injected blob (comment + useState + derived const), this axis only
+  const blobMatch = new RegExp(
     `\\n?[ \\t]*/\\* @fc-connector: tap ${escapeReg(axis)}→[^*]*\\*/` +
     `\\n[ \\t]*const \\[${escapeReg(internal)}, ${escapeReg(setter)}\\] = useState\\([^\\n]*\\)` +
-    `\\n[ \\t]*const ${escapeReg(axis)} = ${escapeReg(propLocal)} \\?\\? ${escapeReg(internal)}[ \\t]*`)
-  if (!blobRe.test(source)) throw Object.assign(new Error(`could not locate the "${axis}" switch hook (hand-edited?) — refusing`), { status: 422 })
-  source = source.replace(blobRe, '')
-  // 3) remove this axis's onClick guard. Re-parse (offsets moved). The guard is `if (axisProp == null) <expr>`.
-  sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
-  const fn2 = findComponentFn(sf); const root2 = fn2 ? findRootReturnedElement(fn2, sf) : null
-  if (root2) {
-    const opening = ts.isJsxElement(root2) ? root2.openingElement : root2
-    const onClick = opening.attributes.properties.find((p): p is ts.JsxAttribute => ts.isJsxAttribute(p) && p.name.getText(sf) === 'onClick')
-    const inner = onClick?.initializer && ts.isJsxExpression(onClick.initializer) ? onClick.initializer.expression : undefined
-    if (onClick && inner && ts.isArrowFunction(inner) && ts.isBlock(inner.body)) {
-      const guards = inner.body.statements.filter((st) => ts.isIfStatement(st) && new RegExp(`\\b${escapeReg(propLocal)}\\s*==\\s*null`).test(st.getText(sf)))
-      const mine = inner.body.statements.filter((st) => ts.isIfStatement(st) && new RegExp(`\\bif \\(${escapeReg(propLocal)} == null\\)`).test(st.getText(sf)))
-      if (mine.length && guards.length <= mine.length && inner.body.statements.length === mine.length) {
-        // this axis was the ONLY guard(s) → drop the whole onClick attribute (incl. one leading space)
-        let s = onClick.getStart(sf); if (source[s - 1] === ' ') s -= 1
-        source = source.slice(0, s) + source.slice(onClick.getEnd())
-      } else if (mine.length) {
-        // merged with other axes → remove just this axis's guard statement(s) + a trailing `; ` if present
-        for (const st of mine.sort((a, b) => b.getStart(sf) - a.getStart(sf))) {
-          let e = st.getEnd(); while (source[e] === ';' || source[e] === ' ') e++
-          source = source.slice(0, st.getStart(sf)) + source.slice(e)
-        }
-      }
-    }
-  }
+    `\\n[ \\t]*const ${escapeReg(axis)} = ${escapeReg(propLocal)} \\?\\? ${escapeReg(internal)}[ \\t]*`).exec(source)
+  if (!blobMatch) throw Object.assign(new Error(`could not locate the "${axis}" switch hook (hand-edited?) — refusing`), { status: 422 })
+  // (b) the onClick guard — recognized block-arrow shape + this axis's guard present
+  const root = findRootReturnedElement(fn, sf)
+  if (!root) throw Object.assign(new Error('no root JSX element'), { status: 422 })
+  const opening = ts.isJsxElement(root) ? root.openingElement : root
+  const onClick = opening.attributes.properties.find((p): p is ts.JsxAttribute => ts.isJsxAttribute(p) && p.name.getText(sf) === 'onClick')
+  const inner = onClick?.initializer && ts.isJsxExpression(onClick.initializer) ? onClick.initializer.expression : undefined
+  if (!onClick || !inner || !ts.isArrowFunction(inner) || !ts.isBlock(inner.body)) throw Object.assign(new Error(`onClick has an unrecognized shape — can't safely remove the "${axis}" tap-switch guard (hand-edited?)`), { status: 422 })
+  const mine = inner.body.statements.filter((st) => ts.isIfStatement(st) && new RegExp(`\\bif \\(${escapeReg(propLocal)} == null\\)`).test(st.getText(sf)))
+  if (!mine.length) throw Object.assign(new Error(`no "${axis}" tap guard in the onClick (hand-edited?) — refusing`), { status: 422 })
+  const onlyMine = inner.body.statements.length === mine.length // this axis's guard(s) are the only content
+  // ── all recognized → compute EVERY edit on the original source, apply high→low (offset-safe, single pass) ──
+  const edits: { s: number; e: number }[] = []
+  const bindEdit = { s: bind.getStart(sf), e: bind.getEnd(), t: `${axis} = '${dflt}'` } // 1) revert aliased binding → defaulted destructure
+  edits.push({ s: blobMatch.index, e: blobMatch.index + blobMatch[0].length }) // 2) remove the blob
+  if (onlyMine) { let s = onClick.getStart(sf); if (source[s - 1] === ' ') s -= 1; edits.push({ s, e: onClick.getEnd() }) } // 3a) drop the whole onClick
+  else for (const st of mine) { let e = st.getEnd(); while (source[e] === ';' || source[e] === ' ') e++; edits.push({ s: st.getStart(sf), e }) } // 3b) remove only this axis's guard
+  const all = [{ ...bindEdit }, ...edits.map((x) => ({ ...x, t: '' }))].sort((a, b) => b.s - a.s)
+  for (const ed of all) source = source.slice(0, ed.s) + ed.t + source.slice(ed.e)
   // drop the now-unused `import { useState }` if no switch connector remains (kept it clean, no dead import)
   if (!/\buseState\s*\(/.test(source)) source = source.replace(/import \{ useState \} from 'react'\n/, '')
   assertValidTsx(abs, source) // refuse-not-corrupt
