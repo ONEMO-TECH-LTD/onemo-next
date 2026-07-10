@@ -258,7 +258,6 @@ export async function resolveDeclRefs(componentFile: string, hashedClasses: stri
 // pseudo-state / a semantic prop-driven state class.
 export type ScopedTarget =
   | { kind: 'base' }
-  | { kind: 'variant'; name: string }
   | { kind: 'state'; pseudo: 'hover' | 'active' | 'focus-visible' | 'disabled' }
   | { kind: 'state'; propClass: 'loading' | 'error' | 'disabled' }
   // I2/D2 (blueprint §3.2): the COMPOSITE target — 0..N config-axis selectors + 0..N semantic states +
@@ -527,7 +526,6 @@ const STATE_ORDER = ['hover', 'pressed', 'focus', 'disabled', 'loading', 'error'
 function scopedSelector(localClass: string, scope: ScopedTarget): string {
   const c = `.${localClass}`
   if (scope.kind === 'base') return c
-  if (scope.kind === 'variant') return `${c}.${scope.name}`
   if (scope.kind === 'composite') {
     // §3.2 deterministic order: axis classes `.<axis>_<value>` (caller sends them in variantAxes-index
     // order) → semantic `[data-*]` sorted by the 6-state order → the single `:pseudo` LAST. So
@@ -548,7 +546,6 @@ function scopedSelector(localClass: string, scope: ScopedTarget): string {
  * sends props that differ from base. postcss-manipulated + parse-guarded + jailed like every css write. */
 async function writeScopedDeclaration(op: Extract<WriteOp, { kind: 'write-scoped-declaration' }>): Promise<{ ok: true; file: string; newValueText: string }> {
   if (!/^[a-zA-Z_][\w-]*$/.test(op.localClass)) throw Object.assign(new Error('invalid class name'), { status: 422 })
-  if (op.scope.kind === 'variant' && !/^[a-zA-Z_][\w-]*$/.test(op.scope.name)) throw Object.assign(new Error('invalid variant name'), { status: 422 })
   if (op.scope.kind === 'composite') for (const av of op.scope.axisValues ?? []) {
     // axis is a prop identifier → NO underscore (the READ splits on the FIRST `_` → axis, rest → value)
     if (!/^[a-zA-Z][a-zA-Z0-9]*$/.test(av.axis)) throw Object.assign(new Error(`invalid axis name: ${av.axis}`), { status: 422 })

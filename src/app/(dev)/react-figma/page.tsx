@@ -4071,39 +4071,9 @@ export default function ReactFigmaPage() {
                   </div>
                 ) : null
               })()}
-              {/* I4 (§3.6): minimal connector-authoring trigger — a state SPRING transition (momentary, on the
-                  base rule §6.3) and a per-axis TAP switch (persistent, the D3 controllable hook). I5's variant
-                  board replaces this with the polished ⚡-between-frames UI; this proves I4's own live gate. */}
-              {editModel?.cssModule && (() => {
-                const em = editModel
-                const btn = { appearance: 'none' as const, borderRadius: 5, padding: '3px 7px', cursor: 'pointer', font: `500 9px/1 ${FONT}`, color: INK, textAlign: 'left' as const }
-                const stateConn = em.connectors.find((c) => c.mode === 'state')
-                return (
-                  <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                    <div style={{ font: `600 8px/1 ${FONT}`, color: MUTE, textTransform: 'uppercase', letterSpacing: '0.4px' }}>Connectors</div>
-                    <button type="button" title="Spring transition on this component's states (animates hover/press/… both ways)"
-                      onClick={async () => {
-                        if (await engineWrite({ kind: 'set-connector', file: em.file, mode: 'state', trigger: 'hover', to: { state: 'hover' }, transition: { kind: 'spring', stiffness: 260, damping: 20, mass: 1 } })) await reloadEditModel(em.file) // F-A1
-                      }}
-                      style={{ ...btn, border: `1px solid ${stateConn ? SEL : LINE}`, background: stateConn ? '#e5f4ff' : '#fff' }}>
-                      {stateConn?.transition ? `Spring ${stateConn.transition.stiffness}/${stateConn.transition.damping}/${stateConn.transition.mass}` : 'Add spring transition'}
-                    </button>
-                    {em.variantAxes.map((ax) => {
-                      const sw = em.connectors.find((c) => c.mode === 'switch' && c.to.axis === ax.axis)
-                      return (
-                        <button key={ax.axis} type="button" title={`On tap, cycle the ${ax.axis} variant (${ax.values.join(' then ')})`}
-                          onClick={async () => {
-                            const next = ax.values[(ax.values.indexOf(ax.defaultValue) + 1) % Math.max(1, ax.values.length)]
-                            if (await engineWrite({ kind: 'set-connector', file: em.file, mode: 'switch', trigger: 'tap', to: { axis: ax.axis, value: next }, cycle: true })) await reloadEditModel(em.file) // F-A1
-                          }}
-                          style={{ ...btn, border: `1px solid ${sw ? SEL : LINE}`, background: sw ? '#e5f4ff' : '#fff' }}>
-                          {sw ? `Tap-cycles ${ax.axis}` : `Tap-cycle ${ax.axis}`}
-                        </button>
-                      )
-                    })}
-                  </div>
-                )
-              })()}
+              {/* I7: connectors are authored on the BOARD now — drag a frame's ⚡ handle to a state/variant frame
+                  to wire, click a wire to tune its spring or remove it. The old side-panel buttons (a redundant
+                  second authoring surface) were removed once the visual layer reached full create/edit/remove parity. */}
             </div>
           ) : (
             <button type="button" onClick={selectFrameRoot} title="Select frame" style={{ appearance: 'none', border: 0, background: 'transparent', font: `550 10px/1 ${FONT}`, color: SEL, marginBottom: 8, marginLeft: 2, cursor: 'pointer', padding: 0 }}>{canvas.name} · {hostDims.w} × {hostDims.h}</button>
