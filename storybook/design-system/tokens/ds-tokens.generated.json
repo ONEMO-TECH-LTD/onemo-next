@@ -1,7 +1,7 @@
 {
  "fileKey": "Qdb9Kx98afJHxaCGAIxoMC",
  "pulledAtFileVersion": null,
- "variables": 3076,
+ "variables": 3098,
  "export": [
   {
    ".1.0-Prim-Col": {
@@ -19405,101 +19405,325 @@
         "$scopes": [
          "STROKE_COLOR"
         ],
-        "$description": "Primary border. Use for input fields and card edges.",
+        "$description": "🔒 border/ v2.3.2 — Interactive element outline — inputs, controls at rest.",
         "$type": "color",
         "$libraryName": "",
         "$collectionName": ".2.0-Al-Col",
-        "$value": "{neutral.7}"
+        "$value": "{neutral.7}",
+        "subtle": {
+         "$scopes": [
+          "STROKE_COLOR"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Subtle border — card edges, separators, non-interactive.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.6}"
+        },
+        "muted": {
+         "$scopes": [
+          "STROKE_COLOR"
+         ],
+         "$description": "🔒 border/ v2.3.2 — The hairline — quieter than canon by design; the documented step deviation.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.5}"
+        },
+        "strong": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Emphasis outline — the strong border register.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.8}"
+        },
+        "inverse": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Interactive outline, opposite of theme — controls on inverting surfaces.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.inverse.7}"
+        },
+        "perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Interactive outline, light-world reading pinned.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.l-constant.7}"
+        },
+        "inverse-perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Interactive outline, dark-world reading pinned — constant-dark surfaces.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.d-constant.7}"
+        },
+        "strong-inverse": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Emphasis outline, opposite of theme.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.inverse.8}"
+        },
+        "strong-perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Emphasis outline, light-world reading pinned.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.l-constant.8}"
+        },
+        "strong-inverse-perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Emphasis outline, dark-world reading pinned.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.d-constant.8}"
+        },
+        "subtle-inverse": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Separator, opposite of theme.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.inverse.6}"
+        },
+        "subtle-perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Separator, light-world reading pinned.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.l-constant.6}"
+        },
+        "subtle-inverse-perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Separator, dark-world reading pinned.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.d-constant.6}"
+        },
+        "muted-inverse": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Hairline, opposite of theme.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.inverse.5}"
+        },
+        "muted-perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Hairline, light-world reading pinned — chrome hairlines.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.l-constant.5}"
+        },
+        "muted-inverse-perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Hairline, dark-world reading pinned.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.d-constant.5}"
+        }
        },
-       "secondary": {
-        "$scopes": [
-         "STROKE_COLOR"
-        ],
-        "$description": "Secondary border. Subtler than primary.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{neutral.6}"
-       },
-       "secondary-alt": {
-        "$scopes": [
-         "STROKE_COLOR"
-        ],
-        "$description": "Alternative secondary border.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{neutral.5}"
-       },
-       "tertiary": {
-        "$scopes": [
-         "STROKE_COLOR"
-        ],
-        "$description": "Tertiary border. Subtle dividers.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{neutral.5}"
-       },
-       "disabled": {
-        "$scopes": [
-         "STROKE_COLOR"
-        ],
-        "$description": "Disabled border.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{neutral.6}"
-       },
-       "disabled-subtle": {
-        "$scopes": [
-         "STROKE_COLOR"
-        ],
-        "$description": "Subtle disabled border. Lower contrast.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{neutral.5}"
+       "system": {
+        "disabled": {
+         "$scopes": [
+          "STROKE_COLOR"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Unavailable control outline.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.6}"
+        },
+        "disabled-subtle": {
+         "$scopes": [
+          "STROKE_COLOR"
+         ],
+         "$description": "🔒 border/ v2.3.2 — The quieter disabled outline tier.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.5}"
+        },
+        "error": {
+         "$scopes": [
+          "STROKE_COLOR"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Error outline — validation.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{error.8}"
+        },
+        "error-subtle": {
+         "$scopes": [
+          "STROKE_COLOR"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Error outline, subtle register.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{error.7}"
+        },
+        "warning": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Warning outline — validation states.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{warning.8}"
+        },
+        "warning-subtle": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Warning outline, subtle register.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{warning.7}"
+        },
+        "success": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Success outline — validation states.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{success.8}"
+        },
+        "success-subtle": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Success outline, subtle register.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{success.7}"
+        }
        },
        "brand": {
-        "$scopes": [
-         "STROKE_COLOR"
-        ],
-        "$description": "Brand-coloured border.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.1.8}"
-       },
-       "brand-alt": {
-        "$scopes": [
-         "STROKE_COLOR"
-        ],
-        "$description": "Alternative brand-coloured border.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.1.7}"
-       },
-       "error": {
-        "$scopes": [
-         "STROKE_COLOR"
-        ],
-        "$description": "Error state border.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{error.8}"
-       },
-       "error-subtle": {
-        "$scopes": [
-         "STROKE_COLOR"
-        ],
-        "$description": "Subtle error border. Lower contrast.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{error.7}"
+        "primary": {
+         "$scopes": [
+          "STROKE_COLOR"
+         ],
+         "$description": "🔒 border/ v2.3.2 — First brand colour outline — selected/branded edges.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.1.8}"
+        },
+        "primary-subtle": {
+         "$scopes": [
+          "STROKE_COLOR"
+         ],
+         "$description": "🔒 border/ v2.3.2 — First brand colour outline, subtle register.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.1.7}"
+        },
+        "primary-inverse": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — First brand colour outline, opposite of theme.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.1.inverse.8}"
+        },
+        "primary-perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — First brand colour outline, light-world reading pinned.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.1.l-constant.8}"
+        },
+        "secondary": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Second brand colour outline.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.2.8}"
+        },
+        "secondary-subtle": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Second brand colour outline, subtle register.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.2.7}"
+        },
+        "tertiary": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Third brand colour outline.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.3.8}"
+        },
+        "tertiary-subtle": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Third brand colour outline, subtle register.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.3.7}"
+        }
        }
       },
       "bg": {

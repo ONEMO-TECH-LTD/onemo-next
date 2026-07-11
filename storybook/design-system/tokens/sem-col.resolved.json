@@ -460,72 +460,226 @@
   {
    "name": "border/primary",
    "binding": "neutral/7",
-   "description": "Primary border. Use for input fields and card edges.",
+   "description": "🔒 border/ v2.3.2 — Interactive element outline — inputs, controls at rest.",
    "L": "#cdced6",
    "D": "#43484e"
   },
   {
-   "name": "border/secondary",
+   "name": "border/primary/subtle",
    "binding": "neutral/6",
-   "description": "Secondary border. Subtler than primary.",
+   "description": "🔒 border/ v2.3.2 — Subtle border — card edges, separators, non-interactive.",
    "L": "#d9d9e0",
    "D": "#363a3f"
   },
   {
-   "name": "border/secondary-alt",
+   "name": "border/primary/muted",
    "binding": "neutral/5",
-   "description": "Alternative secondary border.",
+   "description": "🔒 border/ v2.3.2 — The hairline — quieter than canon by design; the documented step deviation.",
    "L": "#e0e1e6",
    "D": "#2e3135"
   },
   {
-   "name": "border/tertiary",
-   "binding": "neutral/5",
-   "description": "Tertiary border. Subtle dividers.",
-   "L": "#e0e1e6",
+   "name": "border/primary/strong",
+   "binding": "neutral/8",
+   "description": "🔒 border/ v2.3.2 — Emphasis outline — the strong border register.",
+   "L": "#b9bbc6",
+   "D": "#5a6169"
+  },
+  {
+   "name": "border/primary/inverse",
+   "binding": "neutral/inverse/7",
+   "description": "🔒 border/ v2.3.2 — Interactive outline, opposite of theme — controls on inverting surfaces.",
+   "L": "#43484e",
+   "D": "#cdced6"
+  },
+  {
+   "name": "border/primary/perma",
+   "binding": "neutral/l-constant/7",
+   "description": "🔒 border/ v2.3.2 — Interactive outline, light-world reading pinned.",
+   "L": "#cdced6",
+   "D": "#363a3f"
+  },
+  {
+   "name": "border/primary/inverse-perma",
+   "binding": "neutral/d-constant/7",
+   "description": "🔒 border/ v2.3.2 — Interactive outline, dark-world reading pinned — constant-dark surfaces.",
+   "L": "#d9d9e0",
+   "D": "#43484e"
+  },
+  {
+   "name": "border/primary/strong-inverse",
+   "binding": "neutral/inverse/8",
+   "description": "🔒 border/ v2.3.2 — Emphasis outline, opposite of theme.",
+   "L": "#5a6169",
+   "D": "#b9bbc6"
+  },
+  {
+   "name": "border/primary/strong-perma",
+   "binding": "neutral/l-constant/8",
+   "description": "🔒 border/ v2.3.2 — Emphasis outline, light-world reading pinned.",
+   "L": "#b9bbc6",
    "D": "#2e3135"
   },
   {
-   "name": "border/disabled",
+   "name": "border/primary/strong-inverse-perma",
+   "binding": "neutral/d-constant/8",
+   "description": "🔒 border/ v2.3.2 — Emphasis outline, dark-world reading pinned.",
+   "L": "#e0e1e6",
+   "D": "#5a6169"
+  },
+  {
+   "name": "border/primary/subtle-inverse",
+   "binding": "neutral/inverse/6",
+   "description": "🔒 border/ v2.3.2 — Separator, opposite of theme.",
+   "L": "#363a3f",
+   "D": "#d9d9e0"
+  },
+  {
+   "name": "border/primary/subtle-perma",
+   "binding": "neutral/l-constant/6",
+   "description": "🔒 border/ v2.3.2 — Separator, light-world reading pinned.",
+   "L": "#d9d9e0",
+   "D": "#43484e"
+  },
+  {
+   "name": "border/primary/subtle-inverse-perma",
+   "binding": "neutral/d-constant/6",
+   "description": "🔒 border/ v2.3.2 — Separator, dark-world reading pinned.",
+   "L": "#cdced6",
+   "D": "#363a3f"
+  },
+  {
+   "name": "border/primary/muted-inverse",
+   "binding": "neutral/inverse/5",
+   "description": "🔒 border/ v2.3.2 — Hairline, opposite of theme.",
+   "L": "#2e3135",
+   "D": "#e0e1e6"
+  },
+  {
+   "name": "border/primary/muted-perma",
+   "binding": "neutral/l-constant/5",
+   "description": "🔒 border/ v2.3.2 — Hairline, light-world reading pinned — chrome hairlines.",
+   "L": "#e0e1e6",
+   "D": "#5a6169"
+  },
+  {
+   "name": "border/primary/muted-inverse-perma",
+   "binding": "neutral/d-constant/5",
+   "description": "🔒 border/ v2.3.2 — Hairline, dark-world reading pinned.",
+   "L": "#b9bbc6",
+   "D": "#2e3135"
+  },
+  {
+   "name": "border/system/disabled",
    "binding": "neutral/6",
-   "description": "Disabled border.",
+   "description": "🔒 border/ v2.3.2 — Unavailable control outline.",
    "L": "#d9d9e0",
    "D": "#363a3f"
   },
   {
-   "name": "border/disabled-subtle",
+   "name": "border/system/disabled-subtle",
    "binding": "neutral/5",
-   "description": "Subtle disabled border. Lower contrast.",
+   "description": "🔒 border/ v2.3.2 — The quieter disabled outline tier.",
    "L": "#e0e1e6",
    "D": "#2e3135"
   },
   {
-   "name": "border/brand",
-   "binding": "brand/1/8",
-   "description": "Brand-coloured border.",
-   "L": "#60a8d7",
-   "D": "#237cad"
-  },
-  {
-   "name": "border/brand-alt",
-   "binding": "brand/1/7",
-   "description": "Alternative brand-coloured border.",
-   "L": "#8cbfe2",
-   "D": "#1e658d"
-  },
-  {
-   "name": "border/error",
+   "name": "border/system/error",
    "binding": "error/8",
-   "description": "Error state border.",
+   "description": "🔒 border/ v2.3.2 — Error outline — validation.",
    "L": "#dc8d87",
    "D": "#c0383b"
   },
   {
-   "name": "border/error-subtle",
+   "name": "border/system/error-subtle",
    "binding": "error/7",
-   "description": "Subtle error border. Lower contrast.",
+   "description": "🔒 border/ v2.3.2 — Error outline, subtle register.",
    "L": "#e6a6a1",
    "D": "#942a2c"
+  },
+  {
+   "name": "border/system/warning",
+   "binding": "warning/8",
+   "description": "🔒 border/ v2.3.2 — Warning outline — validation states.",
+   "L": "#b8b100",
+   "D": "#716f28"
+  },
+  {
+   "name": "border/system/warning-subtle",
+   "binding": "warning/7",
+   "description": "🔒 border/ v2.3.2 — Warning outline, subtle register.",
+   "L": "#ccc849",
+   "D": "#5c5b21"
+  },
+  {
+   "name": "border/system/success",
+   "binding": "success/8",
+   "description": "🔒 border/ v2.3.2 — Success outline — validation states.",
+   "L": "#2fb957",
+   "D": "#2d7c40"
+  },
+  {
+   "name": "border/system/success-subtle",
+   "binding": "success/7",
+   "description": "🔒 border/ v2.3.2 — Success outline, subtle register.",
+   "L": "#76cd86",
+   "D": "#296a38"
+  },
+  {
+   "name": "border/brand/primary",
+   "binding": "brand/1/8",
+   "description": "🔒 border/ v2.3.2 — First brand colour outline — selected/branded edges.",
+   "L": "#60a8d7",
+   "D": "#237cad"
+  },
+  {
+   "name": "border/brand/primary-subtle",
+   "binding": "brand/1/7",
+   "description": "🔒 border/ v2.3.2 — First brand colour outline, subtle register.",
+   "L": "#8cbfe2",
+   "D": "#1e658d"
+  },
+  {
+   "name": "border/brand/primary-inverse",
+   "binding": "brand/1/inverse/8",
+   "description": "🔒 border/ v2.3.2 — First brand colour outline, opposite of theme.",
+   "L": "#237cad",
+   "D": "#60a8d7"
+  },
+  {
+   "name": "border/brand/primary-perma",
+   "binding": "brand/1/l-constant/8",
+   "description": "🔒 border/ v2.3.2 — First brand colour outline, light-world reading pinned.",
+   "L": "#60a8d7",
+   "D": "#094463"
+  },
+  {
+   "name": "border/brand/secondary",
+   "binding": "brand/2/8",
+   "description": "🔒 border/ v2.3.2 — Second brand colour outline.",
+   "L": "#80b125",
+   "D": "#577623"
+  },
+  {
+   "name": "border/brand/secondary-subtle",
+   "binding": "brand/2/7",
+   "description": "🔒 border/ v2.3.2 — Second brand colour outline, subtle register.",
+   "L": "#9bc55f",
+   "D": "#4a6420"
+  },
+  {
+   "name": "border/brand/tertiary",
+   "binding": "brand/3/8",
+   "description": "🔒 border/ v2.3.2 — Third brand colour outline.",
+   "L": "#a68eeb",
+   "D": "#6e52b1"
+  },
+  {
+   "name": "border/brand/tertiary-subtle",
+   "binding": "brand/3/7",
+   "description": "🔒 border/ v2.3.2 — Third brand colour outline, subtle register.",
+   "L": "#bcacf3",
+   "D": "#594391"
   },
   {
    "name": "bg/overlay",
