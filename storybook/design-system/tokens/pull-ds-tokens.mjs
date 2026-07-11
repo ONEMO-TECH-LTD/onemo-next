@@ -78,12 +78,16 @@ const semTree = byColl.get(semName)[Object.keys(byColl.get(semName))[0]];
 const rows = [];
 const walk = (t, prefix) => {
   for (const [k, v] of Object.entries(t)) {
-    if (v && typeof v === 'object' && '$type' in v) {
+    if (!v || typeof v !== 'object') continue;
+    // a node can be BOTH a token and a group (bare family token + its variants folder)
+    if ('$type' in v) {
       const binding = typeof v.$value === 'string' && v.$value.startsWith('{')
         ? v.$value.slice(1, -1).replaceAll('.', '/') : 'RAW';
       rows.push({ name: prefix + k, binding, description: v.$description ?? '',
         L: resolveFace(v, 'L'), D: resolveFace(v, 'D') });
-    } else if (v && typeof v === 'object') walk(v, prefix + k + '/');
+    }
+    const kids = Object.fromEntries(Object.entries(v).filter(([kk]) => !kk.startsWith('$')));
+    if (Object.keys(kids).length) walk(kids, prefix + k + '/');
   }
 };
 walk(semTree, '');

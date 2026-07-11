@@ -11,6 +11,55 @@ export const RESOLVED = {
    "D": "#fafafa"
   },
   {
+   "name": "text/primary/perma",
+   "binding": "brand/black/l-constant",
+   "description": "🔒 LOCKED · text/ v2.3.2 — Primary voice, light-world reading pinned — text on constant-light surfaces.",
+   "L": "#071013",
+   "D": "#071013"
+  },
+  {
+   "name": "text/primary/inverse-perma",
+   "binding": "brand/white/l-constant",
+   "description": "🔒 LOCKED · text/ v2.3.2 — Primary voice, dark-world reading pinned — text on constant-dark surfaces: chrome, the constant button, the ink panel.",
+   "L": "#fafafa",
+   "D": "#fafafa"
+  },
+  {
+   "name": "text/primary/inverse",
+   "binding": "brand/white",
+   "description": "🔒 LOCKED · text/ v2.3.2 — Primary voice, opposite of theme — text on surfaces that invert (the flipping button).",
+   "L": "#fafafa",
+   "D": "#071013"
+  },
+  {
+   "name": "text/primary/subtle",
+   "binding": "neutral/11",
+   "description": "🔒 LOCKED · text/ v2.3.2 — Supporting register — captions, labels, meta.",
+   "L": "#60646c",
+   "D": "#b0b4ba"
+  },
+  {
+   "name": "text/primary/subtle-inverse-perma",
+   "binding": "brand/white/l-alpha/9",
+   "description": "🔒 LOCKED · text/ v2.3.2 — Supporting register, dark-world reading pinned.",
+   "L": "#fafafab2",
+   "D": "#fafafab2"
+  },
+  {
+   "name": "text/primary/subtle-perma",
+   "binding": "brand/black/l-alpha/9",
+   "description": "🔒 LOCKED · text/ v2.3.2 — Supporting register, light-world reading pinned.",
+   "L": "#071013b2",
+   "D": "#071013b2"
+  },
+  {
+   "name": "text/primary/subtle-inverse",
+   "binding": "brand/white/alpha/9",
+   "description": "🔒 LOCKED · text/ v2.3.2 — Supporting register, opposite of theme — secondary text on inverse surfaces.",
+   "L": "#fafafab2",
+   "D": "#071013b2"
+  },
+  {
    "name": "text/disabled",
    "binding": "neutral/8",
    "description": "🔒 LOCKED · text/ v2.3.2 — Unavailable controls. Law: never on selectable options.",
@@ -144,6 +193,27 @@ export const RESOLVED = {
    "D": "#ffffff"
   },
   {
+   "name": "text/max/inverse",
+   "binding": "base/white",
+   "description": "🔒 LOCKED · text/ v2.3.2 — Maximum contrast, opposite of theme — text on surfaces that invert against the theme.",
+   "L": "#ffffff",
+   "D": "#000000"
+  },
+  {
+   "name": "text/max/perma",
+   "binding": "base/black/l-constant",
+   "description": "🔒 LOCKED · text/ v2.3.2 — Maximum contrast, light-world reading pinned — never role-flips. Media & absolutes.",
+   "L": "#000000",
+   "D": "#000000"
+  },
+  {
+   "name": "text/max/inverse-perma",
+   "binding": "base/white/l-constant",
+   "description": "🔒 LOCKED · text/ v2.3.2 — Maximum contrast, dark-world reading pinned — photo text; luminance-picked with max-perma.",
+   "L": "#ffffff",
+   "D": "#ffffff"
+  },
+  {
    "name": "border/primary",
    "binding": "neutral/7",
    "description": "Primary border. Use for input fields and card edges.",
@@ -233,6 +303,34 @@ export const RESOLVED = {
    "description": "🔒 LOCKED · fg/ v2.3.2 — The default glyph voice — icon strokes, indicator dots, tick lines.",
    "L": "#071013",
    "D": "#fafafa"
+  },
+  {
+   "name": "fg/primary/subtle",
+   "binding": "neutral/11",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Supporting glyph register.",
+   "L": "#60646c",
+   "D": "#b0b4ba"
+  },
+  {
+   "name": "fg/primary/muted",
+   "binding": "neutral/10",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Muted glyph register — inactive but present; the quietest readable glyph tier.",
+   "L": "#80838d",
+   "D": "#777b84"
+  },
+  {
+   "name": "fg/primary/inverse",
+   "binding": "brand/white",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Glyphs on surfaces that invert against the theme.",
+   "L": "#fafafa",
+   "D": "#071013"
+  },
+  {
+   "name": "fg/primary/perma",
+   "binding": "brand/black/l-constant",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Glyph ink voice, light-world reading pinned — constant-light surfaces.",
+   "L": "#071013",
+   "D": "#071013"
   },
   {
    "name": "fg/disabled",
