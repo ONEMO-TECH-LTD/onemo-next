@@ -1,7 +1,7 @@
 {
  "fileKey": "Qdb9Kx98afJHxaCGAIxoMC",
  "pulledAtFileVersion": null,
- "variables": 3117,
+ "variables": 3114,
  "export": [
   {
    ".1.0-Prim-Col": {
@@ -19391,6 +19391,14 @@
       },
       "border": {
        "primary": {
+        "$scopes": [
+         "STROKE_COLOR"
+        ],
+        "$description": "🔒 border/ v2.3.2 — Interactive element outline — inputs, controls at rest.",
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".2.0-Al-Col",
+        "$value": "{neutral.7}",
         "strong": {
          "$scopes": [
           "ALL_SCOPES"
@@ -19401,14 +19409,6 @@
          "$collectionName": ".2.0-Al-Col",
          "$value": "{neutral.8}"
         },
-        "$scopes": [
-         "STROKE_COLOR"
-        ],
-        "$description": "🔒 border/ v2.3.2 — Interactive element outline — inputs, controls at rest.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{neutral.7}",
         "subtle": {
          "$scopes": [
           "STROKE_COLOR"
@@ -20204,38 +20204,6 @@
          "$libraryName": "",
          "$collectionName": ".2.0-Al-Col",
          "$value": "{base.black.l-alpha.2}"
-        }
-       },
-       "hover": {
-        "on-neutral": {
-         "$scopes": [
-          "ALL_SCOPES"
-         ],
-         "$description": "Draft — pending live wash calibration. Pointer-hover wash, pointer devices only — the quietest layer.",
-         "$type": "color",
-         "$libraryName": "",
-         "$collectionName": ".2.0-Al-Col",
-         "$value": "{brand.black.alpha.1}"
-        },
-        "on-solid": {
-         "$scopes": [
-          "ALL_SCOPES"
-         ],
-         "$description": "Draft — pending live wash calibration. Pointer-hover wash on dark fills, pointer devices only.",
-         "$type": "color",
-         "$libraryName": "",
-         "$collectionName": ".2.0-Al-Col",
-         "$value": "{brand.white.alpha.2}"
-        },
-        "on-image": {
-         "$scopes": [
-          "ALL_SCOPES"
-         ],
-         "$description": "Draft — pending live wash calibration. Pointer-hover wash on imagery, pointer devices only — pinned dark layer.",
-         "$type": "color",
-         "$libraryName": "",
-         "$collectionName": ".2.0-Al-Col",
-         "$value": "{base.black.l-alpha.1}"
         }
        },
        "drag": {

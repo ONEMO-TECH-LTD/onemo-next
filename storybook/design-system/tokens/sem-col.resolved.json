@@ -990,27 +990,6 @@
    "D": "#0000001a"
   },
   {
-   "name": "interaction/hover/on-neutral",
-   "binding": "brand/black/alpha/1",
-   "description": "Draft — pending live wash calibration. Pointer-hover wash, pointer devices only — the quietest layer.",
-   "L": "#0710130d",
-   "D": "#fafafa0d"
-  },
-  {
-   "name": "interaction/hover/on-solid",
-   "binding": "brand/white/alpha/2",
-   "description": "Draft — pending live wash calibration. Pointer-hover wash on dark fills, pointer devices only.",
-   "L": "#fafafa1a",
-   "D": "#0710131a"
-  },
-  {
-   "name": "interaction/hover/on-image",
-   "binding": "base/black/l-alpha/1",
-   "description": "Draft — pending live wash calibration. Pointer-hover wash on imagery, pointer devices only — pinned dark layer.",
-   "L": "#0000000d",
-   "D": "#0000000d"
-  },
-  {
    "name": "interaction/drag/on-neutral",
    "binding": "brand/black/alpha/3",
    "description": "Draft — pending live wash calibration. Drag wash — while directly manipulating; strongest transient layer.",
