@@ -17,6 +17,8 @@ import * as React from 'react'
 import { isValidElementType } from 'react-is'
 import * as Library from 'onemo-component-library'
 
+import { selectCanvasGroupsForMode } from './component-canvas-groups'
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const projectCtx = (require as any).context('../../react-figma-components', true, /\.tsx$/)
 
@@ -463,8 +465,9 @@ export default function ComponentsCanvasHost() {
   }, [fetchInventory, fetchConn, fetchAuthoring])
   const loadingInventory = inventory === null
   const groups = loadingInventory ? [] : groupFrames(frames, inventory, editFile)
+  const visibleGroups = selectCanvasGroupsForMode(groups, editFile)
   const byCategory = new Map<string, ComponentGroup[]>()
-  for (const g of groups) {
+  for (const g of visibleGroups) {
     const cat = `${g.root === 'global' ? 'Global' : 'Project'} / ${g.category}`
     byCategory.set(cat, [...(byCategory.get(cat) ?? []), g])
   }
