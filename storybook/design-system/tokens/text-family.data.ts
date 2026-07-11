@@ -241,6 +241,20 @@ export const TEXT_FAMILY: TextToken[] = [
     surface: 'ground',
   },
 
+
+  { name: 'text/brand-primary-subtle', group: 'brand', behavior: 'adaptive', usage: '', binding: '', light: '#000', dark: '#000', surface: 'ground' },
+  { name: 'text/brand-primary-inverse', group: 'brand', behavior: 'inverse', usage: '', binding: '', light: '#000', dark: '#000', surface: 'inverse-pill' },
+  { name: 'text/brand-primary-dark', group: 'brand', behavior: 'fixed', usage: '', binding: '', light: '#000', dark: '#000', surface: 'ground' },
+  { name: 'text/brand-primary-light', group: 'brand', behavior: 'fixed', usage: '', binding: '', light: '#000', dark: '#000', surface: 'tint', tintLight: '#0a293c', tintDark: '#0a293c' },
+  { name: 'text/brand-secondary-subtle', group: 'brand', behavior: 'adaptive', usage: '', binding: '', light: '#000', dark: '#000', surface: 'ground' },
+  { name: 'text/brand-secondary-inverse', group: 'brand', behavior: 'inverse', usage: '', binding: '', light: '#000', dark: '#000', surface: 'inverse-pill' },
+  { name: 'text/brand-secondary-dark', group: 'brand', behavior: 'fixed', usage: '', binding: '', light: '#000', dark: '#000', surface: 'ground' },
+  { name: 'text/brand-secondary-light', group: 'brand', behavior: 'fixed', usage: '', binding: '', light: '#000', dark: '#000', surface: 'tint', tintLight: '#202915', tintDark: '#202915' },
+  { name: 'text/brand-tertiary-subtle', group: 'brand', behavior: 'adaptive', usage: '', binding: '', light: '#000', dark: '#000', surface: 'ground' },
+  { name: 'text/brand-tertiary-inverse', group: 'brand', behavior: 'inverse', usage: '', binding: '', light: '#000', dark: '#000', surface: 'inverse-pill' },
+  { name: 'text/brand-tertiary-dark', group: 'brand', behavior: 'fixed', usage: '', binding: '', light: '#000', dark: '#000', surface: 'ground' },
+  { name: 'text/brand-tertiary-light', group: 'brand', behavior: 'fixed', usage: '', binding: '', light: '#000', dark: '#000', surface: 'tint', tintLight: '#291d46', tintDark: '#291d46' },
+
   // ── status ────────────────────────────────────────────────────────────────
   {
     name: 'text/error',

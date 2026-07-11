@@ -11,11 +11,53 @@ export const RESOLVED = {
    "D": "#fafafa"
   },
   {
+   "name": "text/primary-dark",
+   "binding": "brand/black/l-constant",
+   "description": "🔒 LOCKED · text/ v2.3.2 · 2026-07-11 — Ink voice pinned, never flips — text on constant-light surfaces.",
+   "L": "#071013",
+   "D": "#071013"
+  },
+  {
+   "name": "text/primary-light",
+   "binding": "brand/white/l-constant",
+   "description": "🔒 LOCKED · text/ v2.3.2 · 2026-07-11 — Paper voice pinned, never flips — the constant-black button, ink panel, chrome capsules.",
+   "L": "#fafafa",
+   "D": "#fafafa"
+  },
+  {
+   "name": "text/primary-inverse",
+   "binding": "brand/white",
+   "description": "🔒 LOCKED · text/ v2.3.2 · 2026-07-11 — Paper in light, ink in dark — the flipping black button.",
+   "L": "#fafafa",
+   "D": "#071013"
+  },
+  {
    "name": "text/primary-subtle",
    "binding": "neutral/11",
    "description": "🔒 LOCKED · text/ v2.3.2 · 2026-07-11 — Secondary text. Slightly muted for supporting content.",
    "L": "#60646c",
    "D": "#b0b4ba"
+  },
+  {
+   "name": "text/primary-subtle-light",
+   "binding": "brand/white/l-alpha/9",
+   "description": "🔒 LOCKED · text/ v2.3.2 · 2026-07-11 — 70% paper pinned — supporting text on the constant-black button, chrome.",
+   "L": "#fafafab2",
+   "D": "#fafafab2"
+  },
+  {
+   "name": "text/primary-subtle-dark",
+   "binding": "brand/black/l-alpha/9",
+   "description": "🔒 LOCKED · text/ v2.3.2 · 2026-07-11 — 70% ink pinned — supporting text on constant-light surfaces.",
+   "L": "#071013b2",
+   "D": "#071013b2"
+  },
+  {
+   "name": "text/primary-subtle-inverse",
+   "binding": "brand/white/alpha/9",
+   "description": "🔒 LOCKED · text/ v2.3.2 · 2026-07-11 — 70% paper → 70% ink — supporting text on the flipping black button.",
+   "L": "#fafafab2",
+   "D": "#071013b2"
   },
   {
    "name": "text/disabled",
@@ -37,6 +79,13 @@ export const RESOLVED = {
    "description": "🔒 LOCKED · text/ v2.3.2 · 2026-07-11 — Brand-coloured text. Use sparingly for emphasis.",
    "L": "#1170a1",
    "D": "#73c4f8"
+  },
+  {
+   "name": "text/brand-primary-strong",
+   "binding": "brand/1/12",
+   "description": "🔒 LOCKED · text/ v2.3.2 · 2026-07-11 — High emphasis + the text on brand-primary tints (on-colour law: tint carries own 12).",
+   "L": "#19394d",
+   "D": "#c4ecff"
   },
   {
    "name": "text/brand-secondary",
@@ -102,53 +151,88 @@ export const RESOLVED = {
    "D": "#ffffff"
   },
   {
-   "name": "text/primary-inverse",
-   "binding": "brand/white",
-   "description": "🔒 LOCKED · text/ v2.3.2 · 2026-07-11 — Paper in light, ink in dark — the flipping black button.",
-   "L": "#fafafa",
-   "D": "#071013"
+   "name": "text/brand-primary-subtle",
+   "binding": "brand/1/10",
+   "description": "🔒 LOCKED · text/ v2.3.2 · 2026-07-11 — Decorative/quiet coloured text — step 10, deco only (below body-contrast on light steps).",
+   "L": "#287fb0",
+   "D": "#287fb0"
   },
   {
-   "name": "text/primary-dark",
-   "binding": "brand/black/l-constant",
-   "description": "🔒 LOCKED · text/ v2.3.2 · 2026-07-11 — Ink voice pinned, never flips — text on constant-light surfaces.",
-   "L": "#071013",
-   "D": "#071013"
+   "name": "text/brand-primary-inverse",
+   "binding": "brand/1/inverse/11",
+   "description": "🔒 LOCKED · text/ v2.3.2 · 2026-07-11 — Opposite of theme — voices swapped: the dark theme's reading in light theme and vice versa (text on inverse surfaces).",
+   "L": "#73c4f8",
+   "D": "#1170a1"
   },
   {
-   "name": "text/primary-light",
-   "binding": "brand/white/l-constant",
-   "description": "🔒 LOCKED · text/ v2.3.2 · 2026-07-11 — Paper voice pinned, never flips — the constant-black button, ink panel, chrome capsules.",
-   "L": "#fafafa",
-   "D": "#fafafa"
+   "name": "text/brand-primary-dark",
+   "binding": "brand/1/l-constant/11",
+   "description": "🔒 LOCKED · text/ v2.3.2 · 2026-07-11 — Dark voice anchored (light-anchored identity, dark-tuned in dark theme — colours are never byte-frozen by design).",
+   "L": "#1170a1",
+   "D": "#0e1a22"
   },
   {
-   "name": "text/primary-subtle-inverse",
-   "binding": "brand/white/alpha/9",
-   "description": "🔒 LOCKED · text/ v2.3.2 · 2026-07-11 — 70% paper → 70% ink — supporting text on the flipping black button.",
-   "L": "#fafafab2",
-   "D": "#071013b2"
+   "name": "text/brand-primary-light",
+   "binding": "brand/1/d-constant/11",
+   "description": "🔒 LOCKED · text/ v2.3.2 · 2026-07-11 — Light voice anchored (dark-anchored identity — the pale reading in both themes, theme-tuned).",
+   "L": "#eef4f8",
+   "D": "#73c4f8"
   },
   {
-   "name": "text/primary-subtle-dark",
-   "binding": "brand/black/l-alpha/9",
-   "description": "🔒 LOCKED · text/ v2.3.2 · 2026-07-11 — 70% ink pinned — supporting text on constant-light surfaces.",
-   "L": "#071013b2",
-   "D": "#071013b2"
+   "name": "text/brand-secondary-subtle",
+   "binding": "brand/2/10",
+   "description": "🔒 LOCKED · text/ v2.3.2 · 2026-07-11 — Decorative/quiet coloured text — step 10, deco only (below body-contrast on light steps).",
+   "L": "#81b228",
+   "D": "#81b321"
   },
   {
-   "name": "text/primary-subtle-light",
-   "binding": "brand/white/l-alpha/9",
-   "description": "🔒 LOCKED · text/ v2.3.2 · 2026-07-11 — 70% paper pinned — supporting text on the constant-black button, chrome.",
-   "L": "#fafafab2",
-   "D": "#fafafab2"
+   "name": "text/brand-secondary-inverse",
+   "binding": "brand/2/inverse/11",
+   "description": "🔒 LOCKED · text/ v2.3.2 · 2026-07-11 — Opposite of theme — voices swapped: the dark theme's reading in light theme and vice versa (text on inverse surfaces).",
+   "L": "#98cb46",
+   "D": "#517700"
   },
   {
-   "name": "text/brand-primary-strong",
-   "binding": "brand/1/12",
-   "description": "🔒 LOCKED · text/ v2.3.2 · 2026-07-11 — High emphasis + the text on brand-primary tints (on-colour law: tint carries own 12).",
-   "L": "#19394d",
-   "D": "#c4ecff"
+   "name": "text/brand-secondary-dark",
+   "binding": "brand/2/l-constant/11",
+   "description": "🔒 LOCKED · text/ v2.3.2 · 2026-07-11 — Dark voice anchored (light-anchored identity, dark-tuned in dark theme — colours are never byte-frozen by design).",
+   "L": "#517700",
+   "D": "#151911"
+  },
+  {
+   "name": "text/brand-secondary-light",
+   "binding": "brand/2/d-constant/11",
+   "description": "🔒 LOCKED · text/ v2.3.2 · 2026-07-11 — Light voice anchored (dark-anchored identity — the pale reading in both themes, theme-tuned).",
+   "L": "#f1f5ec",
+   "D": "#98cb46"
+  },
+  {
+   "name": "text/brand-tertiary-subtle",
+   "binding": "brand/3/10",
+   "description": "🔒 LOCKED · text/ v2.3.2 · 2026-07-11 — Decorative/quiet coloured text — step 10, deco only (below body-contrast on light steps).",
+   "L": "#5a24ad",
+   "D": "#5a24ad"
+  },
+  {
+   "name": "text/brand-tertiary-inverse",
+   "binding": "brand/3/inverse/11",
+   "description": "🔒 LOCKED · text/ v2.3.2 · 2026-07-11 — Opposite of theme — voices swapped: the dark theme's reading in light theme and vice versa (text on inverse surfaces).",
+   "L": "#bda2ff",
+   "D": "#6940b9"
+  },
+  {
+   "name": "text/brand-tertiary-dark",
+   "binding": "brand/3/l-constant/11",
+   "description": "🔒 LOCKED · text/ v2.3.2 · 2026-07-11 — Dark voice anchored (light-anchored identity, dark-tuned in dark theme — colours are never byte-frozen by design).",
+   "L": "#6940b9",
+   "D": "#181425"
+  },
+  {
+   "name": "text/brand-tertiary-light",
+   "binding": "brand/3/d-constant/11",
+   "description": "🔒 LOCKED · text/ v2.3.2 · 2026-07-11 — Light voice anchored (dark-anchored identity — the pale reading in both themes, theme-tuned).",
+   "L": "#f4f2fa",
+   "D": "#bda2ff"
   },
   {
    "name": "border/primary",

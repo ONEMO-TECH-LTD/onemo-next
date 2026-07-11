@@ -16,4 +16,4 @@ export default meta;
 
 type Story = StoryObj<typeof TokenFamilyDoc>;
 
-export const TextFamily: Story = { name: 'text/ — 21 tokens' };
+export const TextFamily: Story = { name: 'text/ — 33 tokens' };

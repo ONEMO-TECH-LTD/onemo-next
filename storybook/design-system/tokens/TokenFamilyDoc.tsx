@@ -211,7 +211,7 @@ export function TokenFamilyDoc() {
   const groups = ['max', 'primary', 'secondary', 'neutrals', 'brand', 'status'] as const;
   return (
     <div style={S.page}>
-      <h1 style={S.h1}>text/ — FINAL · 21 tokens</h1>
+      <h1 style={S.h1}>text/ — FINAL · 33 tokens</h1>
       <p style={S.sub}>
         DS v2.3.2 semantic rebuild · decided 2026-07-11, pending formal lock. Two symmetric mono four-packs
         (pure extreme + brand voice), a secondary four-pack on the 70% alpha ladders, two field neutrals, the
