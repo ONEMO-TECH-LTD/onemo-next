@@ -234,9 +234,7 @@ function findReturnedJsx(fn: ts.FunctionLikeDeclaration): ts.JsxElement | ts.Jsx
 }
 
 function isNestedExecutableBoundary(node: ts.Node): boolean {
-  return ts.isFunctionDeclaration(node) ||
-    ts.isFunctionExpression(node) ||
-    ts.isArrowFunction(node) ||
+  return ts.isFunctionLike(node) ||
     ts.isClassDeclaration(node) ||
     ts.isClassExpression(node)
 }

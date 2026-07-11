@@ -201,4 +201,27 @@ describe('SourceAnchor deterministic fingerprinting', () => {
     expect(symbols).not.toContain('span')
     expect(symbols).not.toContain('b')
   })
+
+  it('ignores object-literal method JSX when finding the exported component return', () => {
+    const anchors = extractSourceAnchorsFromTsx({
+      file: 'src/app/(dev)/react-figma-components/Outer.tsx',
+      exportName: 'Outer',
+      source: `
+        export function Outer() {
+          const helper = { render() { return <span><b /></span> } }
+          return <section><button /></section>
+        }
+      `,
+    })
+
+    expect(anchors.map((item) => item.semanticPath.map((part) => part.symbol).concat(
+      item.semanticPath.length === 0 ? ['section'] : ['button'],
+    ))).toEqual([
+      ['section'],
+      ['section', 'button'],
+    ])
+    const symbols = anchors.flatMap((item) => item.semanticPath.map((part) => part.symbol))
+    expect(symbols).not.toContain('span')
+    expect(symbols).not.toContain('b')
+  })
 })
