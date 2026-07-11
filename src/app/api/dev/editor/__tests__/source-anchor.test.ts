@@ -224,4 +224,36 @@ describe('SourceAnchor deterministic fingerprinting', () => {
     expect(symbols).not.toContain('span')
     expect(symbols).not.toContain('b')
   })
+
+  it('ignores nested class and object accessor JSX when finding the exported component return', () => {
+    const anchors = extractSourceAnchorsFromTsx({
+      file: 'src/app/(dev)/react-figma-components/Outer.tsx',
+      exportName: 'Outer',
+      source: `
+        export function Outer() {
+          class HelperClass {
+            get preview() { return <aside><em /></aside> }
+          }
+          const helper = {
+            get render() { return <span><b /></span> },
+            set render(value) { const ignored = <i>{value}</i> },
+          }
+          return <section><button /></section>
+        }
+      `,
+    })
+
+    expect(anchors.map((item) => item.semanticPath.map((part) => part.symbol).concat(
+      item.semanticPath.length === 0 ? ['section'] : ['button'],
+    ))).toEqual([
+      ['section'],
+      ['section', 'button'],
+    ])
+    const symbols = anchors.flatMap((item) => item.semanticPath.map((part) => part.symbol))
+    expect(symbols).not.toContain('aside')
+    expect(symbols).not.toContain('em')
+    expect(symbols).not.toContain('span')
+    expect(symbols).not.toContain('b')
+    expect(symbols).not.toContain('i')
+  })
 })
