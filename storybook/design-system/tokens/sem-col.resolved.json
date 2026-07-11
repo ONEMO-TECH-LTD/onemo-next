@@ -311,13 +311,6 @@
    "D": "#5a6169"
   },
   {
-   "name": "fg/system/disabled-subtle",
-   "binding": "neutral/7",
-   "description": "🔒 LOCKED · fg/ v2.3.2 — The quieter disabled glyph tier.",
-   "L": "#cdced6",
-   "D": "#43484e"
-  },
-  {
    "name": "fg/system/error",
    "binding": "error/11",
    "description": "🔒 LOCKED · fg/ v2.3.2 — Status glyph voice.",
@@ -575,13 +568,6 @@
    "description": "🔒 border/ v2.3.2 — Unavailable control outline.",
    "L": "#d9d9e0",
    "D": "#363a3f"
-  },
-  {
-   "name": "border/system/disabled-subtle",
-   "binding": "neutral/5",
-   "description": "🔒 border/ v2.3.2 — The quieter disabled outline tier.",
-   "L": "#e0e1e6",
-   "D": "#2e3135"
   },
   {
    "name": "border/system/error",
@@ -981,6 +967,97 @@
    "description": "Solid success background.",
    "L": "#37bf5d",
    "D": "#37bf5d"
+  },
+  {
+   "name": "interaction/press/on-neutral",
+   "binding": "brand/black/alpha/2",
+   "description": "Draft — pending live wash calibration. Finger-down wash on light surfaces — a translucent ink layer over the whole control, removed on release.",
+   "L": "#0710131a",
+   "D": "#fafafa1a"
+  },
+  {
+   "name": "interaction/press/on-solid",
+   "binding": "brand/white/alpha/2",
+   "description": "Draft — pending live wash calibration. Finger-down wash on dark fills — the Snow-side layer.",
+   "L": "#fafafa1a",
+   "D": "#0710131a"
+  },
+  {
+   "name": "interaction/press/on-image",
+   "binding": "base/black/l-alpha/2",
+   "description": "Draft — pending live wash calibration. Finger-down wash on imagery — pure dark layer, pinned: a photo never theme-flips.",
+   "L": "#0000001a",
+   "D": "#0000001a"
+  },
+  {
+   "name": "interaction/hover/on-neutral",
+   "binding": "brand/black/alpha/1",
+   "description": "Draft — pending live wash calibration. Pointer-hover wash, pointer devices only — the quietest layer.",
+   "L": "#0710130d",
+   "D": "#fafafa0d"
+  },
+  {
+   "name": "interaction/hover/on-solid",
+   "binding": "brand/white/alpha/2",
+   "description": "Draft — pending live wash calibration. Pointer-hover wash on dark fills, pointer devices only.",
+   "L": "#fafafa1a",
+   "D": "#0710131a"
+  },
+  {
+   "name": "interaction/hover/on-image",
+   "binding": "base/black/l-alpha/1",
+   "description": "Draft — pending live wash calibration. Pointer-hover wash on imagery, pointer devices only — pinned dark layer.",
+   "L": "#0000000d",
+   "D": "#0000000d"
+  },
+  {
+   "name": "interaction/drag/on-neutral",
+   "binding": "brand/black/alpha/3",
+   "description": "Draft — pending live wash calibration. Drag wash — while directly manipulating; strongest transient layer.",
+   "L": "#07101326",
+   "D": "#fafafa26"
+  },
+  {
+   "name": "interaction/drag/on-solid",
+   "binding": "brand/white/alpha/3",
+   "description": "Draft — pending live wash calibration. Drag wash on dark fills.",
+   "L": "#fafafa26",
+   "D": "#07101326"
+  },
+  {
+   "name": "interaction/drag/on-image",
+   "binding": "base/black/l-alpha/3",
+   "description": "Draft — pending live wash calibration. Drag wash on imagery — pinned dark layer.",
+   "L": "#00000026",
+   "D": "#00000026"
+  },
+  {
+   "name": "scrim/dim",
+   "binding": "base/black/l-alpha/8",
+   "description": "Draft — pending live wash calibration. Modal backdrop — pushes everything behind a sheet into the background; pinned dark over any content in any theme.",
+   "L": "#00000099",
+   "D": "#00000099"
+  },
+  {
+   "name": "scrim/on-image",
+   "binding": "base/black/l-alpha/5",
+   "description": "Draft — pending live wash calibration. Legibility wash under type on imagery — pinned dark.",
+   "L": "#0000004d",
+   "D": "#0000004d"
+  },
+  {
+   "name": "focus/ring/on-neutral",
+   "binding": "brand/1/11",
+   "description": "Draft — pending live wash calibration. Keyboard/assistive focus ring on light surfaces — never shown for plain touches; additive over any state.",
+   "L": "#1170a1",
+   "D": "#73c4f8"
+  },
+  {
+   "name": "focus/ring/on-solid",
+   "binding": "base/white",
+   "description": "Draft — pending live wash calibration. Keyboard/assistive focus ring on dark fills — the surface-aware counterpart.",
+   "L": "#ffffff",
+   "D": "#000000"
   }
  ]
 }

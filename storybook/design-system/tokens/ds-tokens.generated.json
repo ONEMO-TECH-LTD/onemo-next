@@ -1,7 +1,7 @@
 {
  "fileKey": "Qdb9Kx98afJHxaCGAIxoMC",
  "pulledAtFileVersion": null,
- "variables": 3106,
+ "variables": 3117,
  "export": [
   {
    ".1.0-Prim-Col": {
@@ -19176,17 +19176,6 @@
          "$collectionName": ".2.0-Al-Col",
          "$value": "{neutral.8}"
         },
-        "disabled-subtle": {
-         "$scopes": [
-          "ALL_FILLS",
-          "STROKE_COLOR"
-         ],
-         "$description": "🔒 LOCKED · fg/ v2.3.2 — The quieter disabled glyph tier.",
-         "$type": "color",
-         "$libraryName": "",
-         "$collectionName": ".2.0-Al-Col",
-         "$value": "{neutral.7}"
-        },
         "error": {
          "$scopes": [
           "ALL_FILLS",
@@ -19571,16 +19560,6 @@
          "$libraryName": "",
          "$collectionName": ".2.0-Al-Col",
          "$value": "{neutral.6}"
-        },
-        "disabled-subtle": {
-         "$scopes": [
-          "STROKE_COLOR"
-         ],
-         "$description": "🔒 border/ v2.3.2 — The quieter disabled outline tier.",
-         "$type": "color",
-         "$libraryName": "",
-         "$collectionName": ".2.0-Al-Col",
-         "$value": "{neutral.5}"
         },
         "error": {
          "$scopes": [
@@ -20192,6 +20171,150 @@
         "$libraryName": "",
         "$collectionName": ".2.0-Al-Col",
         "$value": "{success.9}"
+       }
+      },
+      "interaction": {
+       "press": {
+        "on-neutral": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "Draft — pending live wash calibration. Finger-down wash on light surfaces — a translucent ink layer over the whole control, removed on release.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.black.alpha.2}"
+        },
+        "on-solid": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "Draft — pending live wash calibration. Finger-down wash on dark fills — the Snow-side layer.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.white.alpha.2}"
+        },
+        "on-image": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "Draft — pending live wash calibration. Finger-down wash on imagery — pure dark layer, pinned: a photo never theme-flips.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{base.black.l-alpha.2}"
+        }
+       },
+       "hover": {
+        "on-neutral": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "Draft — pending live wash calibration. Pointer-hover wash, pointer devices only — the quietest layer.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.black.alpha.1}"
+        },
+        "on-solid": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "Draft — pending live wash calibration. Pointer-hover wash on dark fills, pointer devices only.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.white.alpha.2}"
+        },
+        "on-image": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "Draft — pending live wash calibration. Pointer-hover wash on imagery, pointer devices only — pinned dark layer.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{base.black.l-alpha.1}"
+        }
+       },
+       "drag": {
+        "on-neutral": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "Draft — pending live wash calibration. Drag wash — while directly manipulating; strongest transient layer.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.black.alpha.3}"
+        },
+        "on-solid": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "Draft — pending live wash calibration. Drag wash on dark fills.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.white.alpha.3}"
+        },
+        "on-image": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "Draft — pending live wash calibration. Drag wash on imagery — pinned dark layer.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{base.black.l-alpha.3}"
+        }
+       }
+      },
+      "scrim": {
+       "dim": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "Draft — pending live wash calibration. Modal backdrop — pushes everything behind a sheet into the background; pinned dark over any content in any theme.",
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".2.0-Al-Col",
+        "$value": "{base.black.l-alpha.8}"
+       },
+       "on-image": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "Draft — pending live wash calibration. Legibility wash under type on imagery — pinned dark.",
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".2.0-Al-Col",
+        "$value": "{base.black.l-alpha.5}"
+       }
+      },
+      "focus": {
+       "ring": {
+        "on-neutral": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "Draft — pending live wash calibration. Keyboard/assistive focus ring on light surfaces — never shown for plain touches; additive over any state.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.1.11}"
+        },
+        "on-solid": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "Draft — pending live wash calibration. Keyboard/assistive focus ring on dark fills — the surface-aware counterpart.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{base.white}"
+        }
        }
       }
      }
