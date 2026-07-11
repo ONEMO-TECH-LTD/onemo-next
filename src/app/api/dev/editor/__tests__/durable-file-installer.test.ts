@@ -53,6 +53,7 @@ describe('DurableFileInstaller', () => {
   it('surfaces unsupported directory fsync through an injectable seam', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'durable-fsync-'))
     const file = path.join(dir, 'authoring-v1.json')
+    await fs.writeFile(file, '{"before":true}\n', { mode: 0o644 })
     const installer = new DurableFileInstaller({
       syncDirectory: async () => {
         throw Object.assign(new Error('fsync unsupported'), { code: 'DURABILITY_UNSUPPORTED' })
@@ -61,5 +62,67 @@ describe('DurableFileInstaller', () => {
 
     await expect(installer.writeFileAtomic(file, '{}\n'))
       .rejects.toMatchObject({ code: 'DURABILITY_UNSUPPORTED' })
+    await expect(fs.readFile(file, 'utf8')).resolves.toBe('{"before":true}\n')
+    expect((await fs.stat(file)).mode & 0o777).toBe(0o644)
+  })
+
+  it('preserves the existing destination mode when replacing source bytes', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'durable-mode-'))
+    const file = path.join(dir, 'Button.tsx')
+    await fs.writeFile(file, 'before\n', { mode: 0o644 })
+    await fs.chmod(file, 0o644)
+
+    await new DurableFileInstaller().writeFileAtomic(file, 'after\n')
+
+    await expect(fs.readFile(file, 'utf8')).resolves.toBe('after\n')
+    expect((await fs.stat(file)).mode & 0o777).toBe(0o644)
+  })
+
+  it('refuses a symlink destination without changing its target', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'durable-link-'))
+    const target = path.join(dir, 'target.tsx')
+    const link = path.join(dir, 'Button.tsx')
+    await fs.writeFile(target, 'outside\n')
+    await fs.symlink(target, link)
+
+    await expect(new DurableFileInstaller().writeFileAtomic(link, 'changed\n'))
+      .rejects.toMatchObject({ code: 'DURABLE_DESTINATION_SYMLINK' })
+    await expect(fs.readFile(target, 'utf8')).resolves.toBe('outside\n')
+  })
+
+  it('reports recoverable uncertainty when directory sync fails after rename', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'durable-uncertain-'))
+    const file = path.join(dir, 'Button.tsx')
+    await fs.writeFile(file, 'before\n', { mode: 0o644 })
+    let syncCalls = 0
+    const installer = new DurableFileInstaller({
+      syncDirectory: async () => {
+        syncCalls += 1
+        if (syncCalls === 3) throw new Error('post-rename sync failed')
+      },
+    })
+
+    await expect(installer.writeFileAtomic(file, 'after\n'))
+      .rejects.toMatchObject({ code: 'DURABLE_INSTALL_UNCERTAIN' })
+    await expect(fs.readFile(file, 'utf8')).resolves.toBe('after\n')
+    expect((await fs.stat(file)).mode & 0o777).toBe(0o644)
+  })
+
+  it('reports recoverable uncertainty when tombstone directory sync fails', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'durable-delete-uncertain-'))
+    const file = path.join(dir, 'Button.tsx')
+    await fs.writeFile(file, 'before\n')
+    let syncCalls = 0
+    const installer = new DurableFileInstaller({
+      syncDirectory: async () => {
+        syncCalls += 1
+        if (syncCalls === 3) throw new Error('post-tombstone sync failed')
+      },
+    })
+
+    await expect(installer.deleteFileAtomic(file))
+      .rejects.toMatchObject({ code: 'DURABLE_DELETE_UNCERTAIN' })
+    await expect(fs.readFile(file, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
+    expect((await fs.readdir(dir)).some((entry) => entry.endsWith('.tombstone'))).toBe(true)
   })
 })

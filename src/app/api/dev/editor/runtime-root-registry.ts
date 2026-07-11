@@ -45,9 +45,18 @@ export class RuntimeRootRegistry {
     }
     const root = this.get(storeId)
     const abs = path.join(root.canonicalRealPath, relativePath)
+    await this.refuseSymlinkComponents(root, relativePath)
     const ancestorReal = await this.realpathNearestExistingAncestor(path.dirname(abs))
     if (ancestorReal !== root.canonicalRealPath && !ancestorReal.startsWith(root.canonicalRealPath + path.sep)) {
       throw namedError('PATH_OUTSIDE_STORE', `path escapes store root: ${relativePath}`)
+    }
+    try {
+      const targetReal = await fs.realpath(abs)
+      if (targetReal !== root.canonicalRealPath && !targetReal.startsWith(root.canonicalRealPath + path.sep)) {
+        throw namedError('PATH_OUTSIDE_STORE', `path escapes store root: ${relativePath}`)
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
     }
     return abs
   }
@@ -66,6 +75,22 @@ export class RuntimeRootRegistry {
         const parent = path.dirname(current)
         if (parent === current) throw error
         current = parent
+      }
+    }
+  }
+
+  private async refuseSymlinkComponents(root: RegisteredRoot, relativePath: string): Promise<void> {
+    let current = root.canonicalRealPath
+    for (const part of relativePath.split('/')) {
+      current = path.join(current, part)
+      try {
+        const stat = await fs.lstat(current)
+        if (stat.isSymbolicLink()) {
+          throw namedError('PATH_SYMLINK_REFUSED', `symlink path component refused: ${relativePath}`)
+        }
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
+        throw error
       }
     }
   }

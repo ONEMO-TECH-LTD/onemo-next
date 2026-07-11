@@ -1,7 +1,7 @@
 import { constants, promises as fs } from 'node:fs'
 import path from 'node:path'
 
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 
 export type DurableWriteResult = {
   path: string
@@ -22,17 +22,23 @@ export type DurableFileInstallerOptions = {
 }
 
 export class DurableFileInstaller {
+  private readonly probedDirectories = new Set<string>()
+
   constructor(private readonly options: DurableFileInstallerOptions = {}) {}
 
-  async writeFileAtomic(absPath: string, bytes: Buffer | string): Promise<DurableWriteResult> {
+  async writeFileAtomic(absPath: string, bytes: Buffer | string, options: { mode?: number } = {}): Promise<DurableWriteResult> {
     const data = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes, 'utf8')
     const dir = path.dirname(absPath)
     await fs.mkdir(dir, { recursive: true })
+    const destination = await this.destinationState(absPath)
+    const mode = options.mode ?? destination.mode ?? 0o600
+    await this.ensureCapabilities(dir)
 
-    const temp = path.join(dir, `.${path.basename(absPath)}.${process.pid}.${Date.now()}.tmp`)
+    const temp = siblingArtifactPath(absPath, 'tmp')
     let handle: import('node:fs/promises').FileHandle | null = null
+    let didInstall = false
     try {
-      handle = await fs.open(temp, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | noFollowFlag(), 0o600)
+      handle = await fs.open(temp, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | requireNoFollowFlag(), mode)
       await handle.writeFile(data)
       await handle.sync()
       await handle.close()
@@ -46,17 +52,25 @@ export class DurableFileInstaller {
 
       await this.assertSameDevice(temp, absPath)
       await fs.rename(temp, absPath)
-      await this.syncDirectory(dir)
+      didInstall = true
+      try {
+        await this.syncDirectory(dir)
+      } catch (error) {
+        throw namedError('DURABLE_INSTALL_UNCERTAIN', `destination installed but directory sync failed for ${absPath}`, error)
+      }
 
-      const installed = await fs.readFile(absPath)
-      const installedSha = sha256(installed)
+      const installedBytes = await fs.readFile(absPath)
+      const installedSha = sha256(installedBytes)
       if (installedSha !== plannedSha) {
         throw namedError('DURABLE_INSTALL_HASH_MISMATCH', `installed hash mismatch for ${absPath}`)
       }
-      return { path: absPath, sha256: installedSha, bytes: installed.length }
+      return { path: absPath, sha256: installedSha, bytes: installedBytes.length }
     } catch (error) {
       if (handle) await handle.close().catch(() => undefined)
-      await fs.rm(temp, { force: true }).catch(() => undefined)
+      if (!didInstall) {
+        await fs.rm(temp, { force: true }).catch(() => undefined)
+        await this.syncDirectory(dir).catch(() => undefined)
+      }
       throw error
     }
   }
@@ -67,11 +81,17 @@ export class DurableFileInstaller {
 
   async deleteFileAtomic(absPath: string): Promise<DurableDeleteResult> {
     const dir = path.dirname(absPath)
+    await this.destinationState(absPath, true)
+    await this.ensureCapabilities(dir)
     const before = await fs.readFile(absPath)
-    const tombstone = path.join(dir, `.${path.basename(absPath)}.${process.pid}.${Date.now()}.tombstone`)
+    const tombstone = siblingArtifactPath(absPath, 'tombstone')
     await this.assertSameDevice(absPath, tombstone)
     await fs.rename(absPath, tombstone)
-    await this.syncDirectory(dir)
+    try {
+      await this.syncDirectory(dir)
+    } catch (error) {
+      throw namedError('DURABLE_DELETE_UNCERTAIN', `tombstone installed but directory sync failed for ${absPath}`, error)
+    }
     const tombstoneBytes = await fs.readFile(tombstone)
     const digest = sha256(tombstoneBytes)
     if (digest !== sha256(before)) {
@@ -99,6 +119,46 @@ export class DurableFileInstaller {
       throw namedError('DURABILITY_UNSUPPORTED', `cross-device install refused for ${destinationPath}`)
     }
   }
+
+  private async destinationState(absPath: string, required = false): Promise<{ mode: number | null }> {
+    try {
+      const stat = await fs.lstat(absPath)
+      if (stat.isSymbolicLink()) {
+        throw namedError('DURABLE_DESTINATION_SYMLINK', `symlink destination refused: ${absPath}`)
+      }
+      if (!stat.isFile()) throw namedError('DURABLE_DESTINATION_NOT_FILE', `destination is not a file: ${absPath}`)
+      return { mode: stat.mode & 0o777 }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT' && !required) return { mode: null }
+      throw error
+    }
+  }
+
+  private async ensureCapabilities(dir: string): Promise<void> {
+    if (this.probedDirectories.has(dir)) return
+    const before = path.join(dir, `.onemo-durability-probe.${process.pid}.${randomUUID()}.before`)
+    const after = `${before}.after`
+    let handle: import('node:fs/promises').FileHandle | null = null
+    try {
+      handle = await fs.open(before, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | requireNoFollowFlag(), 0o600)
+      await handle.writeFile('probe')
+      await handle.sync()
+      await handle.close()
+      handle = null
+      await this.assertSameDevice(before, after)
+      await fs.rename(before, after)
+      await this.syncDirectory(dir)
+      await fs.rm(after)
+      await this.syncDirectory(dir)
+      this.probedDirectories.add(dir)
+    } catch (error) {
+      if (handle) await handle.close().catch(() => undefined)
+      await fs.rm(before, { force: true }).catch(() => undefined)
+      await fs.rm(after, { force: true }).catch(() => undefined)
+      if ((error as { code?: string }).code === 'DURABILITY_UNSUPPORTED') throw error
+      throw namedError('DURABILITY_UNSUPPORTED', `durability capability probe failed for ${dir}`, error)
+    }
+  }
 }
 
 export function sha256(bytes: Buffer | string): string {
@@ -117,8 +177,15 @@ async function syncDirectory(dir: string) {
   }
 }
 
-function noFollowFlag() {
-  return typeof constants.O_NOFOLLOW === 'number' ? constants.O_NOFOLLOW : 0
+function requireNoFollowFlag() {
+  if (typeof constants.O_NOFOLLOW !== 'number') {
+    throw namedError('DURABILITY_UNSUPPORTED', 'O_NOFOLLOW is unavailable on this platform')
+  }
+  return constants.O_NOFOLLOW
+}
+
+function siblingArtifactPath(absPath: string, suffix: string) {
+  return path.join(path.dirname(absPath), `.onemo-${path.basename(absPath)}.${process.pid}.${randomUUID()}.${suffix}`)
 }
 
 function namedError(code: string, message: string, cause?: unknown) {

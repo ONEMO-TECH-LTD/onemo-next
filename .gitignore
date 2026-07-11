@@ -111,3 +111,10 @@ storybook-static
 
 # Playwright test-runner output (regenerable)
 test-results/
+
+# react-figma authoring: track the canonical sidecar; ignore runtime durability/history residue
+src/app/(dev)/react-figma-components/.onemo/*
+!src/app/(dev)/react-figma-components/.onemo/authoring-v1.json
+src/app/(dev)/react-figma-components/**/.onemo-*.tmp
+src/app/(dev)/react-figma-components/**/.onemo-*.tombstone
+src/app/(dev)/react-figma-components/**/.onemo-*.lock

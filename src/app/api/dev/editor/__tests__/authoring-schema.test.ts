@@ -160,6 +160,102 @@ describe('AuthoringGraphV1 checkpoint schema', () => {
       errors: expect.arrayContaining(['components.component-button must have exactly one primary variant']),
     })
   })
+
+  it('rejects malformed entity fields instead of accepting reference-shaped records', () => {
+    const graph = minimalGraph()
+    Object.assign(graph.components['component-button'], {
+      compatibility: 'sometimes-compatible',
+      folderId: 'folder-missing',
+    })
+    Object.assign(graph.variants['variant-primary'], {
+      displayName: '',
+      frame: { x: '0', y: Number.NaN, width: -1, height: 0 },
+      kind: 'base',
+      transition: { kind: 'ease', durationMs: -1, easing: '', delayMs: -2 },
+    })
+    ;(graph.interactions as unknown as Record<string, unknown>)['interaction-a'] = {
+      id: 'interaction-a',
+      componentId: 'component-button',
+      sourceVariantId: 'variant-primary',
+      trigger: 'hover',
+      action: { kind: 'set-variant', targetVariantId: 'variant-primary' },
+      repeat: 'forever',
+      delayMs: -1,
+      inheritedFromEdgeId: null,
+    }
+    ;(graph.folders as unknown as Record<string, unknown>)['folder-a'] = { id: 'folder-a', name: '', parentId: 'folder-b', sortKey: '' }
+    ;(graph.folders as unknown as Record<string, unknown>)['folder-b'] = { id: 'folder-b', name: 'B', parentId: 'folder-a', sortKey: 'b' }
+
+    const result = validateAuthoringGraphV1(graph)
+
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('expected malformed graph to fail')
+    expect(result.errors).toEqual(expect.arrayContaining([
+      expect.stringContaining('components.component-button.compatibility'),
+      expect.stringContaining('components.component-button.folderId'),
+      expect.stringContaining('variants.variant-primary.displayName'),
+      expect.stringContaining('variants.variant-primary.frame.x'),
+      expect.stringContaining('variants.variant-primary.frame.width'),
+      expect.stringContaining('variants.variant-primary.kind'),
+      expect.stringContaining('variants.variant-primary.transition.durationMs'),
+      expect.stringContaining('interactions.interaction-a.trigger'),
+      expect.stringContaining('interactions.interaction-a.repeat'),
+      expect.stringContaining('interactions.interaction-a.delayMs'),
+      expect.stringContaining('folders.folder-a.name'),
+      expect.stringContaining('folders contain a parent cycle'),
+    ]))
+  })
+
+  it('rejects malformed property, override, instance, anchor, and unknown nested fields', () => {
+    const graph = minimalGraph()
+    const property = graph.sourceProperties['prop-root-color'] as unknown as Record<string, unknown>
+    Object.assign(property, {
+      inheritedFromPropertyId: 42,
+      binding: { kind: 'jsx-prop', propName: '', extra: true },
+      unexpected: true,
+    })
+    const source = property.source as Record<string, unknown>
+    source.unexpected = true
+    const ownerAnchor = property.ownerAnchor as Record<string, unknown>
+    ownerAnchor.unexpected = true
+    ownerAnchor.semanticPath = [{ syntaxKind: '', symbol: '', keyLiteral: 42, staticPropNames: [42] }]
+    ;(graph.interactionOverrides as unknown as Record<string, unknown>)['override-a'] = {
+      id: 'override-a',
+      variantId: 'variant-primary',
+      inheritedEdgeId: 'interaction-missing',
+      disposition: 'suppressed',
+      replacementEdgeId: 'interaction-missing',
+    }
+    ;(graph.instances as unknown as Record<string, unknown>)['instance-a'] = {
+      id: 'instance-a',
+      componentId: 'component-button',
+      variantId: 'variant-primary',
+      source: {
+        storeId: '',
+        file: '/tmp/Outside.tsx',
+        anchor: { ...minimalGraph().sourceProperties['prop-root-color'].ownerAnchor, lastKnownLine: 0 },
+        unexpected: true,
+      },
+    }
+
+    const result = validateAuthoringGraphV1(graph)
+
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('expected malformed graph to fail')
+    expect(result.errors).toEqual(expect.arrayContaining([
+      expect.stringContaining('sourceProperties.prop-root-color contains unknown key'),
+      expect.stringContaining('sourceProperties.prop-root-color.source contains unknown key'),
+      expect.stringContaining('sourceProperties.prop-root-color.inheritedFromPropertyId'),
+      expect.stringContaining('sourceProperties.prop-root-color.binding is invalid'),
+      expect.stringContaining('ownerAnchor contains unknown key'),
+      expect.stringContaining('ownerAnchor.semanticPath.0.syntaxKind'),
+      expect.stringContaining('ownerAnchor.semanticPath.0.keyLiteral'),
+      expect.stringContaining('interactionOverrides.override-a.suppressed override cannot have replacementEdgeId'),
+      expect.stringContaining('instances.instance-a.source contains unknown key'),
+      expect.stringContaining('instances.instance-a.source.file must be store-relative'),
+      expect.stringContaining('instances.instance-a.source.anchor.lastKnownLine must be positive'),
+    ]))
+  })
 })
 
 describe('RuntimeRootRegistry checkpoint behavior', () => {
@@ -185,5 +281,32 @@ describe('RuntimeRootRegistry checkpoint behavior', () => {
 
     await expect(registry.register({ storeId: 'project-main', kind: 'project', rootPath: second }))
       .rejects.toMatchObject({ code: 'DUPLICATE_STORE_ID' })
+  })
+
+  it('refuses an existing exact-file symlink before it can escape the store', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'authoring-root-link-'))
+    const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'authoring-outside-'))
+    await fs.mkdir(path.join(root, 'src'), { recursive: true })
+    await fs.writeFile(path.join(outside, 'Outside.tsx'), 'outside')
+    await fs.symlink(path.join(outside, 'Outside.tsx'), path.join(root, 'src', 'Link.tsx'))
+    const registry = await RuntimeRootRegistry.create([
+      { storeId: 'project-main', kind: 'project', rootPath: root },
+    ])
+
+    await expect(registry.resolveStorePath('project-main', 'src/Link.tsx'))
+      .rejects.toMatchObject({ code: 'PATH_SYMLINK_REFUSED' })
+  })
+
+  it('refuses a symlinked ancestor even when its target remains inside the store', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'authoring-root-parent-link-'))
+    await fs.mkdir(path.join(root, 'real'), { recursive: true })
+    await fs.writeFile(path.join(root, 'real', 'Button.tsx'), 'inside')
+    await fs.symlink(path.join(root, 'real'), path.join(root, 'linked'))
+    const registry = await RuntimeRootRegistry.create([
+      { storeId: 'project-main', kind: 'project', rootPath: root },
+    ])
+
+    await expect(registry.resolveStorePath('project-main', 'linked/Button.tsx'))
+      .rejects.toMatchObject({ code: 'PATH_SYMLINK_REFUSED' })
   })
 })
