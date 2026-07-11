@@ -92,4 +92,37 @@ describe('importProjectionToAuthoringGraph', () => {
       sourceHash: SOURCE_HASH,
     })).toEqual({ kind: 'unsupported', reason: 'single-axis source is not losslessly importable' })
   })
+
+  it.each([
+    { variantAxes: [], label: 'zero axes' },
+    { variantAxes: singleAxis(['primary'], 'primary').variantAxes, label: 'one axis' },
+  ])('refuses multi-axis compatibility with $label', ({ variantAxes }) => {
+    const projection: SourceProjection = {
+      ...singleAxis(['primary'], 'primary'),
+      compatibility: 'legacy-multi-axis',
+      variantAxes,
+    }
+
+    expect(importProjectionToAuthoringGraph({
+      storeId: 'project-main',
+      projection,
+      sourceHash: SOURCE_HASH,
+    })).toEqual({ kind: 'unsupported', reason: 'multi-axis compatibility does not match source axes' })
+  })
+
+  it('holds an actual multi-axis source for explicit conversion', () => {
+    const projection = singleAxis(['primary'], 'primary')
+    projection.compatibility = 'legacy-multi-axis'
+    projection.variantAxes.push({ axis: 'size', values: ['sm', 'lg'], defaultValue: 'sm' })
+
+    expect(importProjectionToAuthoringGraph({
+      storeId: 'project-main',
+      projection,
+      sourceHash: SOURCE_HASH,
+    })).toEqual({
+      kind: 'hold',
+      compatibility: 'legacy-multi-axis',
+      reason: 'multi-axis source requires explicit conversion preview',
+    })
+  })
 })

@@ -20,6 +20,9 @@ export function importProjectionToAuthoringGraph(input: {
     return { kind: 'unsupported', reason: projection.unsupportedReason ?? 'unsupported projection' }
   }
   if (projection.compatibility === 'legacy-multi-axis') {
+    if (projection.variantAxes.length < 2) {
+      return { kind: 'unsupported', reason: 'multi-axis compatibility does not match source axes' }
+    }
     return { kind: 'hold', compatibility: 'legacy-multi-axis', reason: 'multi-axis source requires explicit conversion preview' }
   }
   if (!isSha256(sourceHash)) return { kind: 'unsupported', reason: 'exact source hash is required for import' }
