@@ -44,6 +44,21 @@ describe('AuthoringSidecarStore', () => {
     })
   })
 
+  it('produces byte-identical sidecars after relocating the same logical store', async () => {
+    const first = await makeStore()
+    const relocated = await makeStore()
+    expect(first.root).not.toBe(relocated.root)
+
+    await first.tx.commit({ expectedRevision: 0, sourceFiles: [SOURCE_FILE], mutate: (draft) => draft })
+    await relocated.tx.commit({ expectedRevision: 0, sourceFiles: [SOURCE_FILE], mutate: (draft) => draft })
+
+    const firstBytes = await fs.readFile(path.join(first.root, PROJECT_AUTHORING_SIDECAR))
+    const relocatedBytes = await fs.readFile(path.join(relocated.root, PROJECT_AUTHORING_SIDECAR))
+    expect(relocatedBytes).toEqual(firstBytes)
+    expect(relocatedBytes.toString()).not.toContain(first.root)
+    expect(relocatedBytes.toString()).not.toContain(relocated.root)
+  })
+
   it('rejects stale revisions instead of overwriting sidecar state', async () => {
     const { tx } = await makeStore()
     await tx.commit({ expectedRevision: 0, sourceFiles: [SOURCE_FILE], mutate: (draft) => draft })
