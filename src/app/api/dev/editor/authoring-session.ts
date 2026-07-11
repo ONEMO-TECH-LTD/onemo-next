@@ -5,7 +5,6 @@ import { AuthoringHistoryStore } from './authoring-history'
 import { AuthoringSidecarStore, PROJECT_AUTHORING_SIDECAR } from './authoring-store'
 import { SingleRootAuthoringTransaction } from './authoring-transaction'
 import type { AuthoringGraphV1, EntityId, StoreId, VariantFrame } from './authoring-types'
-import { DurableFileInstaller } from './durable-file-installer'
 import { RuntimeRootRegistry } from './runtime-root-registry'
 import { sourceProjectionFromTsxSource } from './source-projection'
 
@@ -61,7 +60,6 @@ export async function createProjectAuthoringSession(input: {
 }
 
 export class ProjectAuthoringSession {
-  private readonly installer = new DurableFileInstaller()
   private readonly history: AuthoringHistoryStore
 
   constructor(private readonly input: {
@@ -112,47 +110,40 @@ export class ProjectAuthoringSession {
       command: input.command,
       exportName: component?.source.exportName,
     })
-    const preimages = new Map<string, string>()
     const preimageBlobs: Array<{ file: string; sha256: string; path: string }> = []
     const graphPreimage = await this.history.putBlob(JSON.stringify(projectedGraph, null, 2) + '\n')
-    try {
-      for (const patch of plan.sourcePatches) {
-        preimages.set(patch.file, patch.before)
-        const blob = await this.history.putBlob(patch.before)
-        preimageBlobs.push({ file: patch.file, ...blob })
-        await this.writeStoreFile(patch.file, patch.after)
-      }
-      const tx = new SingleRootAuthoringTransaction({
-        transactionId: `authoring-${Date.now()}`,
-        storeId: this.input.storeId,
-        registry: this.input.registry,
-        store: this.input.store,
-      })
-      const committed = await tx.commit({
-        expectedRevision: input.expectedRevision,
-        sourceFiles: projectionFiles,
-        mutate: () => plan.graph,
-      })
-      await this.history.appendJournal({
-        type: 'authoring-command',
-        command: input.command,
-        sourceFiles: projectionFiles,
-        sourcePatches: plan.sourcePatches.map((patch) => ({ file: patch.file })),
-        preimages: preimageBlobs,
-        graphPreimage,
-        revision: committed.revision,
-      })
-      return {
-        revision: committed.revision,
-        graph: committed,
-        sourcePatches: plan.sourcePatches.map((patch) => ({ file: patch.file })),
-        semanticAssertions: plan.semanticAssertions,
-      }
-    } catch (error) {
-      for (const [file, bytes] of preimages) {
-        await this.writeStoreFile(file, bytes)
-      }
-      throw error
+    for (const patch of plan.sourcePatches) {
+      const blob = await this.history.putBlob(patch.before)
+      preimageBlobs.push({ file: patch.file, ...blob })
+    }
+    const tx = new SingleRootAuthoringTransaction({
+      transactionId: `authoring-${Date.now()}`,
+      storeId: this.input.storeId,
+      registry: this.input.registry,
+      store: this.input.store,
+    })
+    const committed = await tx.commit({
+      expectedRevision: input.expectedRevision,
+      expectedSourceHashes: input.expectedSourceHashes,
+      sourceFiles: projectionFiles,
+      sourcePatches: plan.sourcePatches,
+      command: input.command,
+      mutate: () => plan.graph,
+    })
+    await this.history.appendJournal({
+      type: 'authoring-command',
+      command: input.command,
+      sourceFiles: projectionFiles,
+      sourcePatches: plan.sourcePatches.map((patch) => ({ file: patch.file })),
+      preimages: preimageBlobs,
+      graphPreimage,
+      revision: committed.revision,
+    })
+    return {
+      revision: committed.revision,
+      graph: committed,
+      sourcePatches: plan.sourcePatches.map((patch) => ({ file: patch.file })),
+      semanticAssertions: plan.semanticAssertions,
     }
   }
 
@@ -171,41 +162,37 @@ export class ProjectAuthoringSession {
       await this.input.store.verifyExpectedSourceHashes(input.expectedSourceHashes)
     }
     const restoredFiles = new Set<string>(latest.record.sourceFiles ?? preimages.map((preimage) => preimage.file))
-    const rollbackBytes = new Map<string, string>()
-    try {
-      for (const preimage of preimages) {
-        rollbackBytes.set(preimage.file, await this.readStoreFile(preimage.file))
-        await this.writeStoreFile(preimage.file, await this.history.readBlob(preimage))
-      }
-      const graphPreimage = JSON.parse(await this.history.readBlob(latest.record.graphPreimage)) as AuthoringGraphV1
-      const tx = new SingleRootAuthoringTransaction({
-        transactionId: `authoring-undo-${Date.now()}`,
-        storeId: this.input.storeId,
-        registry: this.input.registry,
-        store: this.input.store,
-      })
-      const committed = await tx.commit({
-        expectedRevision: input.expectedRevision,
-        sourceFiles: [...restoredFiles],
-        mutate: () => graphPreimage,
-      })
-      await this.history.appendJournal({
-        type: 'authoring-undo',
-        undoneJournalIndex: latest.index,
-        restoredFiles: [...restoredFiles],
-        revision: committed.revision,
-      })
-      return {
-        revision: committed.revision,
-        graph: committed,
-        restoredFiles: [...restoredFiles],
-        undoneCommand: latest.record.command,
-      }
-    } catch (error) {
-      for (const [file, bytes] of rollbackBytes) {
-        await this.writeStoreFile(file, bytes)
-      }
-      throw error
+    const sourcePatches = await Promise.all(preimages.map(async (preimage) => ({
+      file: preimage.file,
+      before: await this.readStoreFile(preimage.file),
+      after: await this.history.readBlob(preimage),
+    })))
+    const graphPreimage = JSON.parse(await this.history.readBlob(latest.record.graphPreimage)) as AuthoringGraphV1
+    const tx = new SingleRootAuthoringTransaction({
+      transactionId: `authoring-undo-${Date.now()}`,
+      storeId: this.input.storeId,
+      registry: this.input.registry,
+      store: this.input.store,
+    })
+    const committed = await tx.commit({
+      expectedRevision: input.expectedRevision,
+      expectedSourceHashes: input.expectedSourceHashes,
+      sourceFiles: [...restoredFiles],
+      sourcePatches,
+      command: { kind: 'undo', journalIndex: latest.index },
+      mutate: () => graphPreimage,
+    })
+    await this.history.appendJournal({
+      type: 'authoring-undo',
+      undoneJournalIndex: latest.index,
+      restoredFiles: [...restoredFiles],
+      revision: committed.revision,
+    })
+    return {
+      revision: committed.revision,
+      graph: committed,
+      restoredFiles: [...restoredFiles],
+      undoneCommand: latest.record.command,
     }
   }
 
@@ -220,10 +207,6 @@ export class ProjectAuthoringSession {
     return fs.readFile(abs, 'utf8')
   }
 
-  private async writeStoreFile(file: string, bytes: string): Promise<void> {
-    const abs = await this.input.registry.resolveStorePath(this.input.storeId, file)
-    await this.installer.writeFileAtomic(abs, bytes)
-  }
 }
 
 function projectionFilesForCommand(command: AuthoringVariantCommand): string[] {

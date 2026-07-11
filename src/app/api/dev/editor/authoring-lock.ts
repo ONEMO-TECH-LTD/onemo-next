@@ -3,10 +3,13 @@ import { constants, promises as fs } from 'node:fs'
 import path from 'node:path'
 
 import { syncDirectoryDurable } from './durable-file-installer'
+import { authoringMetadataPath } from './authoring-paths'
 import { RuntimeRootRegistry } from './runtime-root-registry'
-import type { StoreId } from './authoring-types'
+import type { RootKind, StoreId } from './authoring-types'
 
-const LOCK_PATH = 'src/app/(dev)/react-figma-components/.onemo/locks/store.lock'
+export function authoringStoreLockPath(kind: RootKind): string {
+  return authoringMetadataPath(kind, 'locks/store.lock')
+}
 
 export type AuthoringStoreLockLease = {
   token: string
@@ -21,10 +24,11 @@ export class CrossProcessAuthoringStoreLock {
   ) {}
 
   async acquire(): Promise<AuthoringStoreLockLease> {
-    const abs = await this.registry.resolveStorePath(this.storeId, LOCK_PATH)
+    const lockPath = authoringStoreLockPath(this.registry.get(this.storeId).kind)
+    const abs = await this.registry.resolveStorePath(this.storeId, lockPath)
     const dir = path.dirname(abs)
     await fs.mkdir(dir, { recursive: true })
-    await this.registry.resolveStorePath(this.storeId, LOCK_PATH)
+    await this.registry.resolveStorePath(this.storeId, lockPath)
     const token = randomUUID()
     let handle: import('node:fs/promises').FileHandle | null = null
     let created = false
@@ -57,12 +61,26 @@ export class CrossProcessAuthoringStoreLock {
       token,
       release: async () => {
         if (released) return
-        const ownershipHandle = await fs.open(abs, constants.O_RDONLY | requireNoFollowFlag())
-        let record: { token?: unknown }
+        let ownershipHandle: import('node:fs/promises').FileHandle
         try {
-          record = JSON.parse(await ownershipHandle.readFile('utf8')) as { token?: unknown }
+          ownershipHandle = await fs.open(abs, constants.O_RDONLY | requireNoFollowFlag())
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+            throw namedError('AUTHORING_LOCK_MISSING', `authoring lock disappeared: ${this.storeId}`, 409, error)
+          }
+          throw error
+        }
+        let raw: string
+        try {
+          raw = await ownershipHandle.readFile('utf8')
         } finally {
           await ownershipHandle.close()
+        }
+        let record: { token?: unknown }
+        try {
+          record = JSON.parse(raw) as { token?: unknown }
+        } catch (error) {
+          throw namedError('AUTHORING_LOCK_RECORD_INVALID', `authoring lock record is invalid: ${this.storeId}`, 409, error)
         }
         if (record.token !== token) {
           throw namedError('AUTHORING_LOCK_OWNERSHIP_LOST', `authoring lock ownership changed: ${this.storeId}`, 409)

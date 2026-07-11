@@ -2,13 +2,15 @@ import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
+import { CrossProcessAuthoringStoreLock } from '../authoring-lock'
 import { AuthoringSidecarStore } from '../authoring-store'
-import { SingleRootAuthoringTransaction, discoverSingleRootRecoveryDecisions, executeSingleRootRecovery } from '../authoring-transaction'
+import { SingleRootAuthoringTransaction, discoverSingleRootRecoveryDecisions, executeSingleRootRecovery, type AuthoringTransactionHooks } from '../authoring-transaction'
+import { DurableFileInstaller } from '../durable-file-installer'
 import { RuntimeRootRegistry } from '../runtime-root-registry'
 
-async function makeTransaction() {
+async function makeTransaction(hooks?: AuthoringTransactionHooks) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'authoring-tx-'))
   const sourceFile = 'src/app/(dev)/react-figma-components/Button.tsx'
   await fs.mkdir(path.dirname(path.join(root, sourceFile)), { recursive: true })
@@ -27,6 +29,7 @@ async function makeTransaction() {
       storeId: 'project-main',
       registry,
       store,
+      hooks,
     }),
   }
 }
@@ -51,17 +54,27 @@ describe('SingleRootAuthoringTransaction', () => {
       'utf8',
     ))
     expect(participant).toMatchObject({
+      schemaVersion: 1,
       transactionId: 'tx-1',
       storeId: 'project-main',
       coordinator: {
         storeId: 'project-main',
-        relativeTransactionPath: 'src/app/(dev)/react-figma-components/.onemo/transactions/tx-1/participant.json',
+        relativeTransactionPath: 'src/app/(dev)/react-figma-components/.onemo/transactions/tx-1/coordinator.json',
       },
       participants: ['project-main'],
       status: 'committed',
       beforeRevision: 0,
       afterRevision: 1,
+      files: [],
+      sidecar: { file: 'src/app/(dev)/react-figma-components/.onemo/authoring-v1.json', before: null },
     })
+    const coordinator = JSON.parse(await fs.readFile(
+      path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions/tx-1/coordinator.json'),
+      'utf8',
+    ))
+    expect(coordinator).toMatchObject({ transactionId: 'tx-1', status: 'committed' })
+    expect(participant.sidecar.after.sha256).toMatch(/^[a-f0-9]{64}$/)
+    await expect(fs.readFile(path.join(root, participant.sidecar.after.path))).resolves.toBeTruthy()
     expect(JSON.stringify(participant)).not.toContain(root)
   })
 
@@ -139,180 +152,210 @@ describe('SingleRootAuthoringTransaction', () => {
     )).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
-  it('rolls back a prepared sidecar record to the supplied preimage', async () => {
-    const { root, store, tx } = await makeTransaction()
-    const preimage = await store.loadOrCreate()
-    const graph = await tx.commit({
-      expectedRevision: 0,
-      mutate: (draft) => ({
-        ...draft,
-        folders: {
-          folder_a: { id: 'folder_a', name: 'Buttons', parentId: null, sortKey: 'a' },
-        },
-      }),
-    })
-    const prepared = {
-      transactionId: 'tx-rollback',
-      storeId: 'project-main',
-      coordinator: {
-        storeId: 'project-main',
-        relativeTransactionPath: 'src/app/(dev)/react-figma-components/.onemo/transactions/tx-rollback/participant.json',
+  it('prepares blobs and both records before source mutation, then restores them on failure', async () => {
+    let root = ''
+    let sourceFile = ''
+    const transactions = () => path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions/tx-1')
+    const txFixture = await makeTransaction({
+      afterPrepare: async () => {
+        expect(JSON.parse(await fs.readFile(path.join(transactions(), 'participant.json'), 'utf8')).status).toBe('prepared')
+        expect(JSON.parse(await fs.readFile(path.join(transactions(), 'coordinator.json'), 'utf8')).status).toBe('prepared')
+        expect(await fs.readFile(path.join(root, sourceFile), 'utf8'))
+          .toBe('export function Button() { return <button /> }\n')
       },
-      participants: ['project-main'],
-      status: 'prepared' as const,
-      beforeRevision: preimage.revision,
-      afterRevision: graph.revision,
-      beforeSidecarHash: null,
-      afterSidecarHash: 'b'.repeat(64),
-    }
+      afterSourceInstall: async () => {
+        expect(await fs.readFile(path.join(root, sourceFile), 'utf8')).toBe('after\n')
+        throw Object.assign(new Error('injected after-source failure'), { code: 'INJECTED_SOURCE_FAILURE' })
+      },
+    })
+    ;({ root, sourceFile } = txFixture)
+    const before = await fs.readFile(path.join(root, sourceFile), 'utf8')
 
-    await tx.rollbackPrepared(preimage, prepared)
-
-    const rolledBack = await store.load()
-    expect(rolledBack?.revision).toBe(0)
-    const participant = JSON.parse(await fs.readFile(
-      path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions/tx-rollback/participant.json'),
-      'utf8',
-    ))
-    expect(participant.status).toBe('rolled-back')
-  })
-
-  it('marks a prepared transaction rolled back when sidecar save fails before commit decision', async () => {
-    const { root, store, tx } = await makeTransaction()
-    vi.spyOn(store, 'save')
-      .mockRejectedValueOnce(Object.assign(new Error('sidecar write failed'), { code: 'INJECTED_SAVE_FAILURE' }))
-
-    await expect(tx.commit({
+    await expect(txFixture.tx.commit({
       expectedRevision: 0,
-      mutate: (draft) => ({
-        ...draft,
-        folders: {
-          folder_a: { id: 'folder_a', name: 'Buttons', parentId: null, sortKey: 'a' },
-        },
-      }),
-    })).rejects.toMatchObject({ code: 'INJECTED_SAVE_FAILURE' })
+      sourceFiles: [sourceFile],
+      sourcePatches: [{ file: sourceFile, before, after: 'after\n' }],
+      command: { kind: 'test-source-install' },
+      mutate: (draft) => draft,
+    })).rejects.toMatchObject({ code: 'INJECTED_SOURCE_FAILURE' })
 
     const participant = JSON.parse(await fs.readFile(
       path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions/tx-1/participant.json'),
       'utf8',
     ))
     expect(participant.status).toBe('rolled-back')
+    expect(participant.files[0]).toMatchObject({ file: sourceFile })
+    expect(participant.files[0].before.sha256).not.toBe(participant.files[0].after.sha256)
+    await expect(fs.readFile(path.join(root, sourceFile), 'utf8')).resolves.toBe(before)
     await expect(fs.readFile(
       path.join(root, 'src/app/(dev)/react-figma-components/.onemo/authoring-v1.json'),
       'utf8',
     )).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
-  it('discovers single-root participant records and classifies restart decisions', async () => {
-    const { root, tx } = await makeTransaction()
-    await tx.commit({ expectedRevision: 0, mutate: (draft) => draft })
-    const transactionsRoot = path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions')
-    await fs.mkdir(path.join(transactionsRoot, 'tx-prepared'), { recursive: true })
-    await fs.writeFile(path.join(transactionsRoot, 'tx-prepared', 'participant.json'), JSON.stringify({
-      transactionId: 'tx-prepared',
-      storeId: 'project-main',
-      coordinator: { storeId: 'project-main', relativeTransactionPath: 'src/app/(dev)/react-figma-components/.onemo/transactions/tx-prepared/participant.json' },
-      participants: ['project-main'],
-      status: 'prepared',
-      beforeRevision: 1,
-      afterRevision: 2,
-      beforeSidecarHash: 'a'.repeat(64),
-      afterSidecarHash: 'b'.repeat(64),
-    }))
-    await fs.mkdir(path.join(transactionsRoot, 'tx-rolled-back'), { recursive: true })
-    await fs.writeFile(path.join(transactionsRoot, 'tx-rolled-back', 'participant.json'), JSON.stringify({
-      transactionId: 'tx-rolled-back',
-      storeId: 'project-main',
-      coordinator: { storeId: 'project-main', relativeTransactionPath: 'src/app/(dev)/react-figma-components/.onemo/transactions/tx-rolled-back/participant.json' },
-      participants: ['project-main'],
-      status: 'rolled-back',
-      beforeRevision: 1,
-      afterRevision: 2,
-      beforeSidecarHash: 'a'.repeat(64),
-      afterSidecarHash: 'b'.repeat(64),
-    }))
-
-    const registry = await RuntimeRootRegistry.create([
-      { storeId: 'project-main', kind: 'project', rootPath: root },
-    ])
-    const decisions = await discoverSingleRootRecoveryDecisions({ storeId: 'project-main', registry })
-
-    expect(decisions.map((decision) => [decision.transactionId, decision.decision])).toEqual([
-      ['tx-1', 'finish-committed'],
-      ['tx-prepared', 'rollback-prepared'],
-      ['tx-rolled-back', 'ignore-rolled-back'],
-    ])
-    expect(JSON.stringify(decisions)).not.toContain(root)
-  })
-
-  it('executes single-root recovery decisions for prepared, committed, and rolled-back records', async () => {
-    const { root, store } = await makeTransaction()
-    const preimage = await store.loadOrCreate()
-    await store.save({
-      ...preimage,
-      revision: 1,
-      folders: {
-        folder_a: { id: 'folder_a', name: 'Partial', parentId: null, sortKey: 'a' },
-      },
+  it('preserves RECOVERY_REQUIRED when lock release also fails', async () => {
+    const { registry, store } = await makeTransaction()
+    let syncs = 0
+    const lock = new CrossProcessAuthoringStoreLock(registry, 'project-main', async () => {
+      syncs += 1
+      if (syncs === 2) throw new Error('injected release sync failure')
     })
-    const transactionsRoot = path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions')
-    await fs.mkdir(path.join(transactionsRoot, 'tx-prepared'), { recursive: true })
-    await fs.writeFile(path.join(transactionsRoot, 'tx-prepared', 'participant.json'), JSON.stringify({
-      transactionId: 'tx-prepared',
-      storeId: 'project-main',
-      coordinator: { storeId: 'project-main', relativeTransactionPath: 'src/app/(dev)/react-figma-components/.onemo/transactions/tx-prepared/participant.json' },
-      participants: ['project-main'],
-      status: 'prepared',
-      beforeRevision: 0,
-      afterRevision: 1,
-      beforeSidecarHash: 'a'.repeat(64),
-      afterSidecarHash: 'b'.repeat(64),
-    }))
-    await fs.mkdir(path.join(transactionsRoot, 'tx-committed'), { recursive: true })
-    await fs.writeFile(path.join(transactionsRoot, 'tx-committed', 'participant.json'), JSON.stringify({
-      transactionId: 'tx-committed',
-      storeId: 'project-main',
-      coordinator: { storeId: 'project-main', relativeTransactionPath: 'src/app/(dev)/react-figma-components/.onemo/transactions/tx-committed/participant.json' },
-      participants: ['project-main'],
-      status: 'committed',
-      beforeRevision: 1,
-      afterRevision: 2,
-      beforeSidecarHash: 'c'.repeat(64),
-      afterSidecarHash: 'd'.repeat(64),
-    }))
-    await fs.mkdir(path.join(transactionsRoot, 'tx-rolled-back'), { recursive: true })
-    await fs.writeFile(path.join(transactionsRoot, 'tx-rolled-back', 'participant.json'), JSON.stringify({
-      transactionId: 'tx-rolled-back',
-      storeId: 'project-main',
-      coordinator: { storeId: 'project-main', relativeTransactionPath: 'src/app/(dev)/react-figma-components/.onemo/transactions/tx-rolled-back/participant.json' },
-      participants: ['project-main'],
-      status: 'rolled-back',
-      beforeRevision: 1,
-      afterRevision: 2,
-      beforeSidecarHash: 'e'.repeat(64),
-      afterSidecarHash: 'f'.repeat(64),
-    }))
-    const registry = await RuntimeRootRegistry.create([
-      { storeId: 'project-main', kind: 'project', rootPath: root },
-    ])
-
-    const results = await executeSingleRootRecovery({
+    const tx = new SingleRootAuthoringTransaction({
+      transactionId: 'tx-dual-failure',
       storeId: 'project-main',
       registry,
       store,
-      preimages: { 'tx-prepared': preimage },
+      lock,
+      hooks: { afterCoordinatorCommit: () => { throw new Error('injected post-decision failure') } },
     })
 
-    expect(results).toEqual([
-      { transactionId: 'tx-committed', action: 'finished-committed' },
-      { transactionId: 'tx-prepared', action: 'rolled-back-prepared' },
-      { transactionId: 'tx-rolled-back', action: 'ignored-rolled-back' },
+    await expect(tx.commit({ expectedRevision: 0, mutate: (draft) => draft })).rejects.toMatchObject({
+      code: 'RECOVERY_REQUIRED',
+      releaseError: { code: 'AUTHORING_LOCK_RELEASE_UNCERTAIN' },
+    })
+  })
+
+  it('never rolls back a coordinator decision installed with uncertain directory sync', async () => {
+    const { root, registry, store } = await makeTransaction()
+    class UncertainCoordinatorInstaller extends DurableFileInstaller {
+      override async writeJsonAtomic(absPath: string, value: unknown) {
+        const result = await super.writeJsonAtomic(absPath, value)
+        if ((value as { status?: unknown; participantPaths?: unknown }).status === 'committed' &&
+          Array.isArray((value as { participantPaths?: unknown }).participantPaths)) {
+          throw Object.assign(new Error('injected coordinator uncertainty'), { code: 'DURABLE_INSTALL_UNCERTAIN' })
+        }
+        return result
+      }
+    }
+    const tx = new SingleRootAuthoringTransaction({
+      transactionId: 'tx-uncertain-decision',
+      storeId: 'project-main',
+      registry,
+      store,
+      installer: new UncertainCoordinatorInstaller(),
+    })
+
+    await expect(tx.commit({ expectedRevision: 0, mutate: (draft) => draft }))
+      .rejects.toMatchObject({ code: 'RECOVERY_REQUIRED' })
+    const txRoot = path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions/tx-uncertain-decision')
+    expect(JSON.parse(await fs.readFile(path.join(txRoot, 'coordinator.json'), 'utf8')).status).toBe('committed')
+    expect(JSON.parse(await fs.readFile(path.join(txRoot, 'participant.json'), 'utf8')).status).toBe('prepared')
+    expect((await store.load())?.revision).toBe(1)
+  })
+
+  it('writes global participant state under the global root metadata directory', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'authoring-global-tx-'))
+    await fs.writeFile(path.join(root, 'Button.tsx'), 'before\n')
+    const registry = await RuntimeRootRegistry.create([
+      { storeId: 'global-main', kind: 'global', rootPath: root },
     ])
-    expect((await store.load())?.revision).toBe(0)
-    const prepared = JSON.parse(await fs.readFile(path.join(transactionsRoot, 'tx-prepared', 'participant.json'), 'utf8'))
-    const committed = JSON.parse(await fs.readFile(path.join(transactionsRoot, 'tx-committed', 'participant.json'), 'utf8'))
-    expect(prepared.status).toBe('rolled-back')
-    expect(committed.status).toBe('committed')
-    expect(JSON.stringify(results)).not.toContain(root)
+    const store = new AuthoringSidecarStore({
+      storeId: 'global-main',
+      rootKind: 'global',
+      registry,
+      sidecarPath: '.onemo/authoring-v1.json',
+    })
+    const tx = new SingleRootAuthoringTransaction({ transactionId: 'tx-global', storeId: 'global-main', registry, store })
+
+    await tx.commit({
+      expectedRevision: 0,
+      sourceFiles: ['Button.tsx'],
+      sourcePatches: [{ file: 'Button.tsx', before: 'before\n', after: 'after\n' }],
+      mutate: (draft) => draft,
+    })
+
+    await expect(fs.readFile(path.join(root, '.onemo/transactions/tx-global/coordinator.json'), 'utf8'))
+      .resolves.toContain('committed')
+    await expect(fs.readFile(path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions/tx-global/coordinator.json')))
+      .rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('uses the coordinator as the sole restart decision', async () => {
+    const { root, registry, tx } = await makeTransaction()
+    await tx.commit({ expectedRevision: 0, mutate: (draft) => draft })
+    const txRoot = path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions/tx-1')
+    const participantPath = path.join(txRoot, 'participant.json')
+    const coordinatorPath = path.join(txRoot, 'coordinator.json')
+
+    expect((await discoverSingleRootRecoveryDecisions({ storeId: 'project-main', registry }))[0]?.decision)
+      .toBe('finish-committed')
+
+    const coordinator = JSON.parse(await fs.readFile(coordinatorPath, 'utf8'))
+    await fs.writeFile(coordinatorPath, JSON.stringify({ ...coordinator, status: 'prepared' }))
+    expect((await discoverSingleRootRecoveryDecisions({ storeId: 'project-main', registry }))[0]?.decision)
+      .toBe('rollback-prepared')
+
+    const participant = JSON.parse(await fs.readFile(participantPath, 'utf8'))
+    await fs.writeFile(participantPath, JSON.stringify({ ...participant, status: 'rolled-back' }))
+    await fs.writeFile(coordinatorPath, JSON.stringify({ ...coordinator, status: 'rolled-back' }))
+    expect((await discoverSingleRootRecoveryDecisions({ storeId: 'project-main', registry }))[0]?.decision)
+      .toBe('ignore-rolled-back')
+  })
+
+  it('rolls back prepared source and sidecar bytes from disk evidence alone', async () => {
+    const { root, sourceFile, registry, store, tx } = await makeTransaction()
+    const before = await fs.readFile(path.join(root, sourceFile), 'utf8')
+    await tx.commit({
+      expectedRevision: 0,
+      sourceFiles: [sourceFile],
+      sourcePatches: [{ file: sourceFile, before, after: 'after\n' }],
+      mutate: (draft) => draft,
+    })
+    const txRoot = path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions/tx-1')
+    for (const name of ['participant.json', 'coordinator.json']) {
+      const file = path.join(txRoot, name)
+      const record = JSON.parse(await fs.readFile(file, 'utf8'))
+      await fs.writeFile(file, JSON.stringify({ ...record, status: 'prepared' }))
+    }
+
+    const results = await executeSingleRootRecovery({ storeId: 'project-main', registry, store })
+
+    expect(results).toEqual([{ transactionId: 'tx-1', action: 'rolled-back-prepared' }])
+    await expect(fs.readFile(path.join(root, sourceFile), 'utf8')).resolves.toBe(before)
+    expect(await store.load()).toBeNull()
+    expect(JSON.parse(await fs.readFile(path.join(txRoot, 'participant.json'), 'utf8')).status).toBe('rolled-back')
+    expect(JSON.parse(await fs.readFile(path.join(txRoot, 'coordinator.json'), 'utf8')).status).toBe('rolled-back')
+  })
+
+  it('finishes committed after-images from disk evidence alone', async () => {
+    const { root, sourceFile, registry, store, tx } = await makeTransaction()
+    const before = await fs.readFile(path.join(root, sourceFile), 'utf8')
+    await tx.commit({
+      expectedRevision: 0,
+      sourceFiles: [sourceFile],
+      sourcePatches: [{ file: sourceFile, before, after: 'after\n' }],
+      mutate: (draft) => draft,
+    })
+    const txRoot = path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions/tx-1')
+    const participantPath = path.join(txRoot, 'participant.json')
+    const participant = JSON.parse(await fs.readFile(participantPath, 'utf8'))
+    await fs.writeFile(participantPath, JSON.stringify({ ...participant, status: 'prepared' }))
+    await fs.writeFile(path.join(root, sourceFile), before)
+    await fs.unlink(path.join(root, 'src/app/(dev)/react-figma-components/.onemo/authoring-v1.json'))
+
+    const results = await executeSingleRootRecovery({ storeId: 'project-main', registry, store })
+
+    expect(results).toEqual([{ transactionId: 'tx-1', action: 'finished-committed' }])
+    await expect(fs.readFile(path.join(root, sourceFile), 'utf8')).resolves.toBe('after\n')
+    expect((await store.load())?.revision).toBe(1)
+    expect(JSON.parse(await fs.readFile(participantPath, 'utf8')).status).toBe('committed')
+  })
+
+  it('refuses recovery over source bytes outside both recorded images', async () => {
+    const { root, sourceFile, registry, store, tx } = await makeTransaction()
+    const before = await fs.readFile(path.join(root, sourceFile), 'utf8')
+    await tx.commit({
+      expectedRevision: 0,
+      sourceFiles: [sourceFile],
+      sourcePatches: [{ file: sourceFile, before, after: 'after\n' }],
+      mutate: (draft) => draft,
+    })
+    const coordinatorPath = path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions/tx-1/coordinator.json')
+    const coordinator = JSON.parse(await fs.readFile(coordinatorPath, 'utf8'))
+    await fs.writeFile(coordinatorPath, JSON.stringify({ ...coordinator, status: 'prepared' }))
+    await fs.writeFile(path.join(root, sourceFile), 'hand edit\n')
+
+    await expect(executeSingleRootRecovery({ storeId: 'project-main', registry, store }))
+      .rejects.toMatchObject({ code: 'RECOVERY_CONFLICT', changedPaths: [sourceFile] })
   })
 })

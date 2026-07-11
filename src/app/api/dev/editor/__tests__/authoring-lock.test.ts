@@ -6,10 +6,10 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { CrossProcessAuthoringStoreLock } from '../authoring-lock'
+import { authoringStoreLockPath, CrossProcessAuthoringStoreLock } from '../authoring-lock'
 import { RuntimeRootRegistry } from '../runtime-root-registry'
 
-const LOCK_PATH = 'src/app/(dev)/react-figma-components/.onemo/locks/store.lock'
+const LOCK_PATH = authoringStoreLockPath('project')
 
 async function makeLock() {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'authoring-lock-'))
@@ -71,5 +71,41 @@ describe('CrossProcessAuthoringStoreLock', () => {
 
     await expect(lease.release()).rejects.toMatchObject({ code: 'AUTHORING_LOCK_RELEASE_UNCERTAIN' })
     await expect(fs.readFile(path.join(root, LOCK_PATH))).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('refuses replaced ownership tokens and corrupt lock records', async () => {
+    const replaced = await makeLock()
+    const replacedLease = await replaced.lock.acquire()
+    const replacedPath = path.join(replaced.root, LOCK_PATH)
+    await fs.writeFile(replacedPath, JSON.stringify({ token: 'another-owner' }) + '\n')
+    await expect(replacedLease.release()).rejects.toMatchObject({ code: 'AUTHORING_LOCK_OWNERSHIP_LOST' })
+    await expect(fs.readFile(replacedPath, 'utf8')).resolves.toContain('another-owner')
+
+    const corrupt = await makeLock()
+    const corruptLease = await corrupt.lock.acquire()
+    const corruptPath = path.join(corrupt.root, LOCK_PATH)
+    await fs.writeFile(corruptPath, 'not-json\n')
+    await expect(corruptLease.release()).rejects.toMatchObject({ code: 'AUTHORING_LOCK_RECORD_INVALID' })
+    await expect(fs.readFile(corruptPath, 'utf8')).resolves.toBe('not-json\n')
+  })
+
+  it('uses the global root lock location instead of the project-nested path', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'authoring-global-lock-'))
+    const registry = await RuntimeRootRegistry.create([
+      { storeId: 'global-main', kind: 'global', rootPath: root },
+    ])
+    const lease = await new CrossProcessAuthoringStoreLock(registry, 'global-main').acquire()
+
+    await expect(fs.readFile(path.join(root, authoringStoreLockPath('global')), 'utf8')).resolves.toContain('global-main')
+    await expect(fs.readFile(path.join(root, LOCK_PATH), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
+    await lease.release()
+  })
+
+  it('names a missing ownership record without guessing', async () => {
+    const { root, lock } = await makeLock()
+    const lease = await lock.acquire()
+    await fs.unlink(path.join(root, LOCK_PATH))
+
+    await expect(lease.release()).rejects.toMatchObject({ code: 'AUTHORING_LOCK_MISSING' })
   })
 })

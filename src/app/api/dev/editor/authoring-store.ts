@@ -1,11 +1,12 @@
 import { promises as fs } from 'node:fs'
 
 import { assertAuthoringGraphV1 } from './authoring-schema'
+import { authoringMetadataPath } from './authoring-paths'
 import type { AuthoringGraphV1, RootKind, StoreId } from './authoring-types'
 import { DurableFileInstaller, sha256 } from './durable-file-installer'
 import { RuntimeRootRegistry } from './runtime-root-registry'
 
-export const PROJECT_AUTHORING_SIDECAR = 'src/app/(dev)/react-figma-components/.onemo/authoring-v1.json'
+export const PROJECT_AUTHORING_SIDECAR = authoringMetadataPath('project', 'authoring-v1.json')
 
 export type AuthoringStoreOptions = {
   storeId: StoreId
@@ -24,16 +25,24 @@ export class AuthoringSidecarStore {
     this.sidecarPath = options.sidecarPath ?? PROJECT_AUTHORING_SIDECAR
   }
 
+  get relativeSidecarPath(): string {
+    return this.sidecarPath
+  }
+
   async load(): Promise<AuthoringGraphV1 | null> {
+    return (await this.loadSnapshot())?.graph ?? null
+  }
+
+  async loadSnapshot(): Promise<{ graph: AuthoringGraphV1; bytes: Buffer } | null> {
     const abs = await this.options.registry.resolveStorePath(this.options.storeId, this.sidecarPath)
-    let raw: string
+    let bytes: Buffer
     try {
-      raw = await fs.readFile(abs, 'utf8')
+      bytes = await fs.readFile(abs)
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
       throw error
     }
-    const parsed = JSON.parse(raw) as unknown
+    const parsed = JSON.parse(bytes.toString('utf8')) as unknown
     const graph = assertAuthoringGraphV1(parsed)
     if (graph.storeId !== this.options.storeId) {
       throw namedError('STORE_ID_MISMATCH', `sidecar storeId ${graph.storeId} does not match ${this.options.storeId}`, 409)
@@ -41,7 +50,7 @@ export class AuthoringSidecarStore {
     if (graph.root.kind !== this.options.rootKind) {
       throw namedError('STORE_KIND_MISMATCH', `sidecar root kind ${graph.root.kind} does not match ${this.options.rootKind}`, 409)
     }
-    return graph
+    return { graph, bytes }
   }
 
   async loadOrCreate(sourceFiles: string[] = []): Promise<AuthoringGraphV1> {
