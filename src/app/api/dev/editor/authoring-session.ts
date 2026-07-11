@@ -3,6 +3,7 @@ import { promises as fs } from 'node:fs'
 
 import { compileAuthoringCommand, projectVariantProjectionIntoGraph, type AuthoringVariantCommand } from './authoring-compiler'
 import { AuthoringHistoryStore } from './authoring-history'
+import { assertAuthoringGraphV1 } from './authoring-schema'
 import { AuthoringSidecarStore, PROJECT_AUTHORING_SIDECAR } from './authoring-store'
 import { SingleRootAuthoringTransaction } from './authoring-transaction'
 import type { AuthoringGraphV1, EntityId, StoreId, VariantFrame } from './authoring-types'
@@ -147,21 +148,20 @@ export class ProjectAuthoringSession {
   }): Promise<UndoAuthoringCommandResult> {
     const latest = await this.history.latestUndoableCommand()
     if (!latest) throw namedError('UNDO_EMPTY', 'no authoring command to undo', 404)
-    const preimages = latest.record.preimages ?? []
-    if (!latest.record.graphPreimage) throw namedError('UNDO_GRAPH_PREIMAGE_MISSING', 'undo graph preimage missing', 422)
+    const preimages = latest.record.preimages
     if (preimages.length > 0 && !input.expectedSourceHashes) {
       throw namedError('SOURCE_HASH_PRECONDITION_REQUIRED', 'expectedSourceHashes required for source-restoring undo', 400)
     }
     if (input.expectedSourceHashes) {
       await this.input.store.verifyExpectedSourceHashes(input.expectedSourceHashes)
     }
-    const restoredFiles = new Set<string>(latest.record.sourceFiles ?? preimages.map((preimage) => preimage.file))
+    const restoredFiles = new Set<string>(latest.record.sourceFiles)
     const sourcePatches = await Promise.all(preimages.map(async (preimage) => ({
       file: preimage.file,
       before: await this.readStoreFile(preimage.file),
       after: await this.history.readBlob(preimage),
     })))
-    const graphPreimage = JSON.parse(await this.history.readBlob(latest.record.graphPreimage)) as AuthoringGraphV1
+    const graphPreimage = await this.readGraphPreimage(latest.record.graphPreimage)
     const historyPatches = await this.history.planUndo({
       undoneJournalIndex: latest.index,
       restoredFiles: [...restoredFiles],
@@ -201,6 +201,16 @@ export class ProjectAuthoringSession {
     return fs.readFile(abs, 'utf8')
   }
 
+  private async readGraphPreimage(ref: { sha256: string; path: string }): Promise<AuthoringGraphV1> {
+    try {
+      return assertAuthoringGraphV1(JSON.parse(await this.history.readBlob(ref)) as unknown)
+    } catch (error) {
+      if ((error as { code?: unknown }).code === 'HISTORY_BLOB_HASH_MISMATCH' ||
+        (error as { code?: unknown }).code === 'HISTORY_RECORD_INVALID') throw error
+      throw namedError('UNDO_GRAPH_PREIMAGE_INVALID', 'undo graph preimage is invalid', 422, error)
+    }
+  }
+
 }
 
 function projectionFilesForCommand(command: AuthoringVariantCommand): string[] {
@@ -232,6 +242,6 @@ function componentCanvasState(graph: AuthoringGraphV1, file: string): AuthoringC
   }
 }
 
-function namedError(code: string, message: string, status: number) {
-  return Object.assign(new Error(message), { code, status })
+function namedError(code: string, message: string, status: number, cause?: unknown) {
+  return Object.assign(new Error(message), { code, status, cause })
 }

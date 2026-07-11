@@ -5,6 +5,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { createProjectAuthoringSession } from '../authoring-session'
+import { sha256 } from '../durable-file-installer'
 
 const SOURCE_FILE = 'src/app/(dev)/react-figma-components/Button.tsx'
 
@@ -112,6 +113,35 @@ describe('ProjectAuthoringSession', () => {
     )
     expect(journal).toContain('authoring-undo')
     expect(journal).not.toContain(root)
+  })
+
+  it('refuses a hash-valid malformed graph preimage before undo mutates source', async () => {
+    const { root, session } = await makeSession()
+    const before = await session.loadCanvas(SOURCE_FILE)
+    await session.executeCommand({
+      expectedRevision: before.revision,
+      expectedSourceHashes: before.sourceHashes,
+      command: { kind: 'create-variant', file: SOURCE_FILE, name: 'Tertiary' },
+    })
+    const afterCreate = await session.loadCanvas(SOURCE_FILE)
+    const journalPath = path.join(root, 'src/app/(dev)/react-figma-components/.onemo/history/journal.ndjson')
+    const records = (await fs.readFile(journalPath, 'utf8')).trimEnd().split('\n').map((line) => JSON.parse(line))
+    const invalidGraph = Buffer.from('{"not":"an authoring graph"}\n')
+    const digest = sha256(invalidGraph)
+    const blobPath = path.join(root, `src/app/(dev)/react-figma-components/.onemo/history/blobs/${digest}`)
+    await fs.writeFile(blobPath, invalidGraph)
+    records[0].graphPreimage = {
+      sha256: digest,
+      path: `src/app/(dev)/react-figma-components/.onemo/history/blobs/${digest}`,
+    }
+    await fs.writeFile(journalPath, records.map((record) => JSON.stringify(record)).join('\n') + '\n')
+    const sourceBeforeUndo = await fs.readFile(path.join(root, SOURCE_FILE), 'utf8')
+
+    await expect(session.undoLastCommand({
+      expectedRevision: afterCreate.revision,
+      expectedSourceHashes: afterCreate.sourceHashes,
+    })).rejects.toMatchObject({ code: 'UNDO_GRAPH_PREIMAGE_INVALID', status: 422 })
+    expect(await fs.readFile(path.join(root, SOURCE_FILE), 'utf8')).toBe(sourceBeforeUndo)
   })
 
   it('refuses source-mutating commands without expected source hashes', async () => {
