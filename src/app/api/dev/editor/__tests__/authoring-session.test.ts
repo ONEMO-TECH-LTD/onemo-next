@@ -66,6 +66,54 @@ describe('ProjectAuthoringSession', () => {
     expect(journal).not.toContain(root)
   })
 
+  it('reloads committed sidecar state from a fresh session and survives Home -> edit navigation', async () => {
+    const { root, session } = await makeSession()
+    const before = await session.loadCanvas(SOURCE_FILE)
+    await session.executeCommand({
+      expectedRevision: before.revision,
+      expectedSourceHashes: before.sourceHashes,
+      command: { kind: 'create-variant', file: SOURCE_FILE, name: 'Tertiary' },
+    })
+    const reloadedSession = await createProjectAuthoringSession({ rootPath: root })
+
+    const home = await reloadedSession.loadCanvas(null)
+    const afterHomeBack = await reloadedSession.loadCanvas(SOURCE_FILE)
+
+    expect(home.component).toBeNull()
+    expect(afterHomeBack.revision).toBe(1)
+    expect(afterHomeBack.canUndo).toBe(true)
+    expect(afterHomeBack.component?.variants.map((variant) => variant.displayName)).toEqual(['Primary', 'Secondary', 'Tertiary'])
+  })
+
+  it('undoes the latest source-backed command by restoring the preimage and committing prior graph state', async () => {
+    const { root, session } = await makeSession()
+    const before = await session.loadCanvas(SOURCE_FILE)
+    await session.executeCommand({
+      expectedRevision: before.revision,
+      expectedSourceHashes: before.sourceHashes,
+      command: { kind: 'create-variant', file: SOURCE_FILE, name: 'Tertiary' },
+    })
+    const afterCreate = await session.loadCanvas(SOURCE_FILE)
+
+    const undo = await session.undoLastCommand({
+      expectedRevision: afterCreate.revision,
+      expectedSourceHashes: afterCreate.sourceHashes,
+    })
+
+    expect(undo.revision).toBe(2)
+    expect(undo.restoredFiles).toEqual([SOURCE_FILE])
+    expect(await fs.readFile(path.join(root, SOURCE_FILE), 'utf8')).toBe(source)
+    const afterUndo = await session.loadCanvas(SOURCE_FILE)
+    expect(afterUndo.component?.variants.map((variant) => variant.displayName)).toEqual(['Primary', 'Secondary'])
+    expect(afterUndo.sourceHashes[SOURCE_FILE]).toBe(before.sourceHashes[SOURCE_FILE])
+    const journal = await fs.readFile(
+      path.join(root, 'src/app/(dev)/react-figma-components/.onemo/history/journal.ndjson'),
+      'utf8',
+    )
+    expect(journal).toContain('authoring-undo')
+    expect(journal).not.toContain(root)
+  })
+
   it('refuses source-mutating commands without expected source hashes', async () => {
     const { session } = await makeSession()
 
@@ -105,5 +153,28 @@ describe('ProjectAuthoringSession', () => {
     expect(after.revision).toBe(1)
     expect(after.component?.variants.find((variant) => variant.id === secondary!.id)?.frame)
       .toEqual({ x: 40, y: 80, width: 360, height: 220 })
+  })
+
+  it('undoes sidecar-only move-variant-frame without modifying source bytes', async () => {
+    const { root, session } = await makeSession()
+    const before = await session.loadCanvas(SOURCE_FILE)
+    const secondary = before.component?.variants.find((variant) => variant.displayName === 'Secondary')
+    expect(secondary).toBeTruthy()
+    await session.executeCommand({
+      expectedRevision: before.revision,
+      command: { kind: 'move-variant-frame', file: SOURCE_FILE, variantId: secondary!.id, frame: { x: 40, y: 80, width: 360, height: 220 } },
+    })
+    const afterMove = await session.loadCanvas(SOURCE_FILE)
+
+    await session.undoLastCommand({
+      expectedRevision: afterMove.revision,
+      expectedSourceHashes: afterMove.sourceHashes,
+    })
+
+    expect(await fs.readFile(path.join(root, SOURCE_FILE), 'utf8')).toBe(source)
+    const afterUndo = await session.loadCanvas(SOURCE_FILE)
+    expect(afterUndo.revision).toBe(2)
+    expect(afterUndo.component?.variants.find((variant) => variant.id === secondary!.id)?.frame)
+      .toEqual(secondary!.frame)
   })
 })

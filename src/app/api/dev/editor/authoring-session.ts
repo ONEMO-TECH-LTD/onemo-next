@@ -29,6 +29,7 @@ export type AuthoringCanvasState = {
   sidecarPath: string
   revision: number
   sourceHashes: Record<string, string>
+  canUndo: boolean
   graph: AuthoringGraphV1
   component: AuthoringCanvasComponent | null
 }
@@ -38,6 +39,13 @@ export type ExecuteAuthoringCommandResult = {
   graph: AuthoringGraphV1
   sourcePatches: Array<{ file: string }>
   semanticAssertions: string[]
+}
+
+export type UndoAuthoringCommandResult = {
+  revision: number
+  graph: AuthoringGraphV1
+  restoredFiles: string[]
+  undoneCommand: unknown
 }
 
 export async function createProjectAuthoringSession(input: {
@@ -72,6 +80,7 @@ export class ProjectAuthoringSession {
       sidecarPath: PROJECT_AUTHORING_SIDECAR,
       revision: graph.revision,
       sourceHashes: graph.sourceHashes,
+      canUndo: (await this.history.latestUndoableCommand()) !== null,
       graph: projected,
       component: file ? componentCanvasState(projected, file) : null,
     }
@@ -105,6 +114,7 @@ export class ProjectAuthoringSession {
     })
     const preimages = new Map<string, string>()
     const preimageBlobs: Array<{ file: string; sha256: string; path: string }> = []
+    const graphPreimage = await this.history.putBlob(JSON.stringify(projectedGraph, null, 2) + '\n')
     try {
       for (const patch of plan.sourcePatches) {
         preimages.set(patch.file, patch.before)
@@ -126,8 +136,10 @@ export class ProjectAuthoringSession {
       await this.history.appendJournal({
         type: 'authoring-command',
         command: input.command,
+        sourceFiles: projectionFiles,
         sourcePatches: plan.sourcePatches.map((patch) => ({ file: patch.file })),
         preimages: preimageBlobs,
+        graphPreimage,
         revision: committed.revision,
       })
       return {
@@ -138,6 +150,59 @@ export class ProjectAuthoringSession {
       }
     } catch (error) {
       for (const [file, bytes] of preimages) {
+        await this.writeStoreFile(file, bytes)
+      }
+      throw error
+    }
+  }
+
+  async undoLastCommand(input: {
+    expectedRevision: number
+    expectedSourceHashes?: Record<string, string>
+  }): Promise<UndoAuthoringCommandResult> {
+    const latest = await this.history.latestUndoableCommand()
+    if (!latest) throw namedError('UNDO_EMPTY', 'no authoring command to undo', 404)
+    const preimages = latest.record.preimages ?? []
+    if (!latest.record.graphPreimage) throw namedError('UNDO_GRAPH_PREIMAGE_MISSING', 'undo graph preimage missing', 422)
+    if (preimages.length > 0 && !input.expectedSourceHashes) {
+      throw namedError('SOURCE_HASH_PRECONDITION_REQUIRED', 'expectedSourceHashes required for source-restoring undo', 400)
+    }
+    if (input.expectedSourceHashes) {
+      await this.input.store.verifyExpectedSourceHashes(input.expectedSourceHashes)
+    }
+    const restoredFiles = new Set<string>(latest.record.sourceFiles ?? preimages.map((preimage) => preimage.file))
+    const rollbackBytes = new Map<string, string>()
+    try {
+      for (const preimage of preimages) {
+        rollbackBytes.set(preimage.file, await this.readStoreFile(preimage.file))
+        await this.writeStoreFile(preimage.file, await this.history.readBlob(preimage))
+      }
+      const graphPreimage = JSON.parse(await this.history.readBlob(latest.record.graphPreimage)) as AuthoringGraphV1
+      const tx = new SingleRootAuthoringTransaction({
+        transactionId: `authoring-undo-${Date.now()}`,
+        storeId: this.input.storeId,
+        registry: this.input.registry,
+        store: this.input.store,
+      })
+      const committed = await tx.commit({
+        expectedRevision: input.expectedRevision,
+        sourceFiles: [...restoredFiles],
+        mutate: () => graphPreimage,
+      })
+      await this.history.appendJournal({
+        type: 'authoring-undo',
+        undoneJournalIndex: latest.index,
+        restoredFiles: [...restoredFiles],
+        revision: committed.revision,
+      })
+      return {
+        revision: committed.revision,
+        graph: committed,
+        restoredFiles: [...restoredFiles],
+        undoneCommand: latest.record.command,
+      }
+    } catch (error) {
+      for (const [file, bytes] of rollbackBytes) {
         await this.writeStoreFile(file, bytes)
       }
       throw error

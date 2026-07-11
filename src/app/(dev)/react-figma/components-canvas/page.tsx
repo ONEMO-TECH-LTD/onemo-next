@@ -32,6 +32,7 @@ type ComponentGroup = { key: string; name: string; category: string; root: Root;
 type AuthoringCanvasState = {
   revision: number
   sourceHashes: Record<string, string>
+  canUndo: boolean
   component: {
     id: string
     displayName: string
@@ -43,6 +44,7 @@ type AuthoringCommand =
   | { kind: 'create-variant'; file: string; name: string }
   | { kind: 'rename-variant'; file: string; from: string; to: string }
   | { kind: 'move-variant-frame'; file: string; variantId: string; frame: { x: number; y: number; width: number; height: number } }
+  | { kind: 'undo' }
 const COMPONENT_TEXT = '#8638E5'
 const COMPONENT_ACCENT = '#9747FF'
 const CANVAS_BG = '#F5F5F5'
@@ -300,10 +302,12 @@ class FrameBoundary extends React.Component<{ label: string; children: React.Rea
 function AuthoringVariantBoard({
   group,
   authoring,
+  canUndo,
   onCommand,
 }: {
   group: ComponentGroup
   authoring: NonNullable<AuthoringCanvasState['component']>
+  canUndo: boolean
   onCommand: (command: AuthoringCommand) => Promise<boolean>
 }) {
   const [selectedId, setSelectedId] = React.useState<string | null>(authoring.variants[0]?.id ?? null)
@@ -339,6 +343,7 @@ function AuthoringVariantBoard({
       frame: { ...selected.frame, x: selected.frame.x + 24 },
     })
   }
+  const undo = async () => { await onCommand({ kind: 'undo' }) }
   return (
     <div data-authoring-canvas data-authoring-component={authoring.id} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div data-authoring-breadcrumb style={{ display: 'flex', alignItems: 'center', gap: 8, font: '600 11px/1.2 system-ui', color: COMPONENT_TEXT }}>
@@ -350,6 +355,7 @@ function AuthoringVariantBoard({
         <input aria-label="Rename selected variant" placeholder={selected ? `Rename ${selected.displayName}` : 'Rename'} value={renameTo} onChange={(e) => setRenameTo(e.target.value)} style={{ width: 152, border: '1px solid rgba(0,0,0,0.18)', borderRadius: 6, padding: '5px 7px', font: '11px system-ui' }} />
         <button type="button" disabled={!selected} onClick={rename} style={{ border: '1px solid rgba(0,0,0,0.18)', background: '#fff', color: 'rgba(0,0,0,0.65)', borderRadius: 6, padding: '5px 8px', font: '600 11px system-ui', cursor: selected ? 'pointer' : 'default' }}>Rename</button>
         <button type="button" disabled={!selected} onClick={nudge} style={{ border: '1px solid rgba(0,0,0,0.18)', background: '#fff', color: 'rgba(0,0,0,0.65)', borderRadius: 6, padding: '5px 8px', font: '600 11px system-ui', cursor: selected ? 'pointer' : 'default' }}>Move +24px</button>
+        <button type="button" disabled={!canUndo} onClick={undo} style={{ border: '1px solid rgba(0,0,0,0.18)', background: '#fff', color: canUndo ? 'rgba(0,0,0,0.65)' : 'rgba(0,0,0,0.3)', borderRadius: 6, padding: '5px 8px', font: '600 11px system-ui', cursor: canUndo ? 'pointer' : 'default' }}>Undo</button>
       </div>
       <div style={{ position: 'relative', width, height, border: `1px dashed ${COMPONENT_ACCENT}`, borderRadius: 12, background: 'rgba(151,71,255,0.03)' }}>
         {componentFrame && authoring.variants.map((variant) => {
@@ -485,7 +491,7 @@ export default function ComponentsCanvasHost() {
                   {group.file && group.file === editFile && !authoring?.component && <NodeLayer file={group.file} connectors={editConn} boardRef={boardRef} onWrite={nodeWrite} />}
                   {group.file && group.file === editFile && authoringError && <div style={{ color: '#f24822', font: '11px system-ui' }}>{authoringError}</div>}
                   {group.file && group.file === editFile && authoring?.component ? (
-                    <AuthoringVariantBoard group={group} authoring={authoring.component} onCommand={authoringWrite} />
+                    <AuthoringVariantBoard group={group} authoring={authoring.component} canUndo={authoring.canUndo} onCommand={authoringWrite} />
                   ) : (() => {
                     // I5/D1: the axis-grouped board — base row, one labeled sub-group PER variant axis, then the
                     // state ghost slots. State ghosts apply the §3.2 preview contract: interaction → data-fc-preview
