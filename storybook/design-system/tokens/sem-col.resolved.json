@@ -10,55 +10,6 @@
    "D": "#fafafa"
   },
   {
-   "name": "text/primary-dark",
-   "binding": "brand/black/l-constant",
-   "description": "🔒 LOCKED · text/ v2.3.2 — Ink voice pinned, never flips — text on constant-light surfaces.",
-   "L": "#071013",
-   "D": "#071013"
-  },
-  {
-   "name": "text/primary-light",
-   "binding": "brand/white/l-constant",
-   "description": "🔒 LOCKED · text/ v2.3.2 — Paper voice pinned, never flips — text on constant-dark surfaces: chrome, the constant button, the ink panel.",
-   "L": "#fafafa",
-   "D": "#fafafa"
-  },
-  {
-   "name": "text/primary-inverse",
-   "binding": "brand/white",
-   "description": "🔒 LOCKED · text/ v2.3.2 — Primary voice, opposite of theme — text on surfaces that invert (the flipping button).",
-   "L": "#fafafa",
-   "D": "#071013"
-  },
-  {
-   "name": "text/primary-subtle",
-   "binding": "neutral/11",
-   "description": "🔒 LOCKED · text/ v2.3.2 — Supporting register — captions, labels, meta.",
-   "L": "#60646c",
-   "D": "#b0b4ba"
-  },
-  {
-   "name": "text/primary-subtle-light",
-   "binding": "brand/white/l-alpha/9",
-   "description": "🔒 LOCKED · text/ v2.3.2 — Supporting register, paper voice pinned — secondary text on constant-dark surfaces.",
-   "L": "#fafafab2",
-   "D": "#fafafab2"
-  },
-  {
-   "name": "text/primary-subtle-dark",
-   "binding": "brand/black/l-alpha/9",
-   "description": "🔒 LOCKED · text/ v2.3.2 — Supporting register, ink voice pinned — secondary text on constant-light surfaces.",
-   "L": "#071013b2",
-   "D": "#071013b2"
-  },
-  {
-   "name": "text/primary-subtle-inverse",
-   "binding": "brand/white/alpha/9",
-   "description": "🔒 LOCKED · text/ v2.3.2 — Supporting register, opposite of theme — secondary text on inverse surfaces.",
-   "L": "#fafafab2",
-   "D": "#071013b2"
-  },
-  {
    "name": "text/disabled",
    "binding": "neutral/8",
    "description": "🔒 LOCKED · text/ v2.3.2 — Unavailable controls. Law: never on selectable options.",
@@ -73,39 +24,95 @@
    "D": "#696e77"
   },
   {
-   "name": "text/brand-primary",
+   "name": "text/brand/primary",
    "binding": "brand/1/11",
    "description": "🔒 LOCKED · text/ v2.3.2 — First brand colour as text — links, active labels, accents.",
    "L": "#1170a1",
    "D": "#73c4f8"
   },
   {
-   "name": "text/brand-primary-subtle",
+   "name": "text/brand/primary-subtle",
    "binding": "brand/1/10",
    "description": "🔒 LOCKED · text/ v2.3.2 — First brand colour, decorative register — below body-text contrast; never reading copy.",
    "L": "#287fb0",
    "D": "#287fb0"
   },
   {
-   "name": "text/brand-primary-strong",
+   "name": "text/brand/primary-strong",
    "binding": "brand/1/12",
    "description": "🔒 LOCKED · text/ v2.3.2 — First brand colour, emphasis register — and the text voice on its own tints (on-colour law).",
    "L": "#19394d",
    "D": "#c4ecff"
   },
   {
-   "name": "text/brand-secondary",
+   "name": "text/brand/secondary",
    "binding": "brand/2/11",
    "description": "🔒 LOCKED · text/ v2.3.2 — Second brand colour as text.",
    "L": "#517700",
    "D": "#98cb46"
   },
   {
-   "name": "text/brand-tertiary",
+   "name": "text/brand/tertiary",
    "binding": "brand/3/11",
    "description": "🔒 LOCKED · text/ v2.3.2 — Third brand colour as text.",
    "L": "#6940b9",
    "D": "#bda2ff"
+  },
+  {
+   "name": "text/brand/primary-inverse",
+   "binding": "brand/1/inverse/11",
+   "description": "🔒 LOCKED · text/ v2.3.2 — First brand colour, opposite of theme — coloured text on inverse surfaces.",
+   "L": "#73c4f8",
+   "D": "#1170a1"
+  },
+  {
+   "name": "text/brand/primary-strong-perma",
+   "binding": "brand/1/l-constant/12",
+   "description": "🔒 LOCKED · text/ v2.3.2 — First brand colour, emphasis register, light-world reading pinned — the deep identity that never flips.",
+   "L": "#19394d",
+   "D": "#061016"
+  },
+  {
+   "name": "text/brand/secondary-subtle",
+   "binding": "brand/2/10",
+   "description": "🔒 LOCKED · text/ v2.3.2 — Second brand colour, decorative register — below body-text contrast.",
+   "L": "#81b228",
+   "D": "#81b321"
+  },
+  {
+   "name": "text/brand/secondary-inverse",
+   "binding": "brand/2/inverse/11",
+   "description": "🔒 LOCKED · text/ v2.3.2 — Second brand colour, opposite of theme.",
+   "L": "#98cb46",
+   "D": "#517700"
+  },
+  {
+   "name": "text/brand/secondary-strong-perma",
+   "binding": "brand/2/l-constant/12",
+   "description": "🔒 LOCKED · text/ v2.3.2 — Second brand colour, emphasis register, light-world reading pinned.",
+   "L": "#304215",
+   "D": "#0c1008"
+  },
+  {
+   "name": "text/brand/tertiary-subtle",
+   "binding": "brand/3/10",
+   "description": "🔒 LOCKED · text/ v2.3.2 — Third brand colour, decorative register — below body-text contrast.",
+   "L": "#5a24ad",
+   "D": "#5a24ad"
+  },
+  {
+   "name": "text/brand/tertiary-inverse",
+   "binding": "brand/3/inverse/11",
+   "description": "🔒 LOCKED · text/ v2.3.2 — Third brand colour, opposite of theme.",
+   "L": "#bda2ff",
+   "D": "#6940b9"
+  },
+  {
+   "name": "text/brand/tertiary-strong-perma",
+   "binding": "brand/3/l-constant/12",
+   "description": "🔒 LOCKED · text/ v2.3.2 — Third brand colour, emphasis register, light-world reading pinned.",
+   "L": "#372163",
+   "D": "#0f0c19"
   },
   {
    "name": "text/error",
@@ -134,104 +141,6 @@
    "description": "🔒 LOCKED · text/ v2.3.2 — True maximum contrast, follows theme. Absolutes and media only — UI text uses primary.",
    "L": "#000000",
    "D": "#ffffff"
-  },
-  {
-   "name": "text/max-inverse",
-   "binding": "base/white",
-   "description": "🔒 LOCKED · text/ v2.3.2 — Maximum contrast, opposite of theme — text on surfaces that invert against the theme.",
-   "L": "#ffffff",
-   "D": "#000000"
-  },
-  {
-   "name": "text/max-dark",
-   "binding": "base/black/l-constant",
-   "description": "🔒 LOCKED · text/ v2.3.2 — The dark extreme pinned, never flips — text over light imagery; luminance-picked with max-light.",
-   "L": "#000000",
-   "D": "#000000"
-  },
-  {
-   "name": "text/max-light",
-   "binding": "base/white/l-constant",
-   "description": "🔒 LOCKED · text/ v2.3.2 — The light extreme pinned, never flips — photo text; pairs with the on-image scrim or region-luminance pick.",
-   "L": "#ffffff",
-   "D": "#ffffff"
-  },
-  {
-   "name": "text/brand-primary-inverse",
-   "binding": "brand/1/inverse/11",
-   "description": "🔒 LOCKED · text/ v2.3.2 — First brand colour, opposite of theme — coloured text on inverse surfaces.",
-   "L": "#73c4f8",
-   "D": "#1170a1"
-  },
-  {
-   "name": "text/brand-primary-dark",
-   "binding": "brand/1/l-constant/12",
-   "description": "🔒 LOCKED · text/ v2.3.2 — First brand colour, dark voice anchored — theme-tuned, not byte-frozen (colour constants keep identity, not bytes).",
-   "L": "#19394d",
-   "D": "#061016"
-  },
-  {
-   "name": "text/brand-primary-light",
-   "binding": "brand/1/l-constant/1",
-   "description": "🔒 LOCKED · text/ v2.3.2 — First brand colour, light voice anchored — theme-tuned pale reading.",
-   "L": "#f5f7f9",
-   "D": "#c4ecff"
-  },
-  {
-   "name": "text/brand-secondary-subtle",
-   "binding": "brand/2/10",
-   "description": "🔒 LOCKED · text/ v2.3.2 — Second brand colour, decorative register — below body-text contrast.",
-   "L": "#81b228",
-   "D": "#81b321"
-  },
-  {
-   "name": "text/brand-secondary-inverse",
-   "binding": "brand/2/inverse/11",
-   "description": "🔒 LOCKED · text/ v2.3.2 — Second brand colour, opposite of theme.",
-   "L": "#98cb46",
-   "D": "#517700"
-  },
-  {
-   "name": "text/brand-secondary-dark",
-   "binding": "brand/2/l-constant/12",
-   "description": "🔒 LOCKED · text/ v2.3.2 — Second brand colour, dark voice anchored — theme-tuned.",
-   "L": "#304215",
-   "D": "#0c1008"
-  },
-  {
-   "name": "text/brand-secondary-light",
-   "binding": "brand/2/l-constant/1",
-   "description": "🔒 LOCKED · text/ v2.3.2 — Second brand colour, light voice anchored — theme-tuned.",
-   "L": "#f6f8f4",
-   "D": "#d0eeab"
-  },
-  {
-   "name": "text/brand-tertiary-subtle",
-   "binding": "brand/3/10",
-   "description": "🔒 LOCKED · text/ v2.3.2 — Third brand colour, decorative register — below body-text contrast.",
-   "L": "#5a24ad",
-   "D": "#5a24ad"
-  },
-  {
-   "name": "text/brand-tertiary-inverse",
-   "binding": "brand/3/inverse/11",
-   "description": "🔒 LOCKED · text/ v2.3.2 — Third brand colour, opposite of theme.",
-   "L": "#bda2ff",
-   "D": "#6940b9"
-  },
-  {
-   "name": "text/brand-tertiary-dark",
-   "binding": "brand/3/l-constant/12",
-   "description": "🔒 LOCKED · text/ v2.3.2 — Third brand colour, dark voice anchored — theme-tuned.",
-   "L": "#372163",
-   "D": "#0f0c19"
-  },
-  {
-   "name": "text/brand-tertiary-light",
-   "binding": "brand/3/l-constant/1",
-   "description": "🔒 LOCKED · text/ v2.3.2 — Third brand colour, light voice anchored — theme-tuned.",
-   "L": "#f7f7f9",
-   "D": "#e3dcff"
   },
   {
    "name": "border/primary",
@@ -304,18 +213,18 @@
    "D": "#942a2c"
   },
   {
-   "name": "fg/max-light",
+   "name": "fg/max/inverse-perma",
    "binding": "base/white/l-constant",
-   "description": "🔒 LOCKED · fg/ v2.3.2 — The light extreme pinned — glyphs on imagery; luminance-picked with max-dark.",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Glyph light extreme pinned — imagery; luminance-picked with max-perma.",
    "L": "#ffffff",
    "D": "#ffffff"
   },
   {
-   "name": "fg/primary-light",
-   "binding": "brand/white/l-constant",
-   "description": "🔒 LOCKED · fg/ v2.3.2 — Paper voice pinned — glyphs on constant-dark surfaces: chrome capsules, the constant button.",
-   "L": "#fafafa",
-   "D": "#fafafa"
+   "name": "fg/max/perma",
+   "binding": "base/black/l-constant",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Glyph dark extreme pinned — light imagery.",
+   "L": "#000000",
+   "D": "#000000"
   },
   {
    "name": "fg/primary",
@@ -323,20 +232,6 @@
    "description": "🔒 LOCKED · fg/ v2.3.2 — The default glyph voice — icon strokes, indicator dots, tick lines.",
    "L": "#071013",
    "D": "#fafafa"
-  },
-  {
-   "name": "fg/primary-subtle",
-   "binding": "neutral/11",
-   "description": "🔒 LOCKED · fg/ v2.3.2 — Supporting glyph register.",
-   "L": "#60646c",
-   "D": "#b0b4ba"
-  },
-  {
-   "name": "fg/primary-muted",
-   "binding": "neutral/10",
-   "description": "🔒 LOCKED · fg/ v2.3.2 — Muted glyph register — inactive but present; the quietest readable glyph tier.",
-   "L": "#80838d",
-   "D": "#777b84"
   },
   {
    "name": "fg/disabled",
@@ -353,21 +248,21 @@
    "D": "#43484e"
   },
   {
-   "name": "fg/brand-primary",
+   "name": "fg/brand/primary",
    "binding": "brand/1/11",
    "description": "🔒 LOCKED · fg/ v2.3.2 — First brand colour as glyph — active/accent glyphs.",
    "L": "#1170a1",
    "D": "#73c4f8"
   },
   {
-   "name": "fg/brand-primary-solid",
+   "name": "fg/brand/primary-solid",
    "binding": "brand/1/9",
    "description": "🔒 LOCKED · fg/ v2.3.2 — First brand colour, solid voice — graphic accents: the dial arc, gauges, badges.",
    "L": "#378cbe",
    "D": "#378cbe"
   },
   {
-   "name": "fg/brand-secondary-hover",
+   "name": "fg/brand/secondary-hover",
    "binding": "brand/1/10",
    "description": "🔒 LOCKED · fg/ v2.3.2 — PENDING pointer-hover ruling — held, not part of the locked shape.",
    "L": "#287fb0",
@@ -414,27 +309,6 @@
    "description": "🔒 LOCKED · fg/ v2.3.2 — Status solid voice — graphic accents.",
    "L": "#37bf5d",
    "D": "#37bf5d"
-  },
-  {
-   "name": "fg/primary-inverse",
-   "binding": "brand/white",
-   "description": "🔒 LOCKED · fg/ v2.3.2 — Glyphs on surfaces that invert against the theme.",
-   "L": "#fafafa",
-   "D": "#071013"
-  },
-  {
-   "name": "fg/primary-dark",
-   "binding": "brand/black/l-constant",
-   "description": "🔒 LOCKED · fg/ v2.3.2 — Ink voice pinned — glyphs on constant-light surfaces.",
-   "L": "#071013",
-   "D": "#071013"
-  },
-  {
-   "name": "fg/max-dark",
-   "binding": "base/black/l-constant",
-   "description": "🔒 LOCKED · fg/ v2.3.2 — The dark extreme pinned — glyphs on light imagery.",
-   "L": "#000000",
-   "D": "#000000"
   },
   {
    "name": "bg/overlay",

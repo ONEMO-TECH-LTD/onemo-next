@@ -1,7 +1,7 @@
 {
  "fileKey": "Qdb9Kx98afJHxaCGAIxoMC",
  "pulledAtFileVersion": null,
- "variables": 3063,
+ "variables": 3060,
  "export": [
   {
    ".1.0-Prim-Col": {
@@ -18731,77 +18731,77 @@
         "$type": "color",
         "$libraryName": "",
         "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.black}"
-       },
-       "primary-dark": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — Ink voice pinned, never flips — text on constant-light surfaces.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.black.l-constant}"
-       },
-       "primary-light": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — Paper voice pinned, never flips — text on constant-dark surfaces: chrome, the constant button, the ink panel.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.white.l-constant}"
-       },
-       "primary-inverse": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — Primary voice, opposite of theme — text on surfaces that invert (the flipping button).",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.white}"
-       },
-       "primary-subtle": {
-        "$scopes": [
-         "TEXT_FILL"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — Supporting register — captions, labels, meta.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{neutral.11}"
-       },
-       "primary-subtle-light": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — Supporting register, paper voice pinned — secondary text on constant-dark surfaces.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.white.l-alpha.9}"
-       },
-       "primary-subtle-dark": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — Supporting register, ink voice pinned — secondary text on constant-light surfaces.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.black.l-alpha.9}"
-       },
-       "primary-subtle-inverse": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — Supporting register, opposite of theme — secondary text on inverse surfaces.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.white.alpha.9}"
+        "$value": "{brand.black}",
+        "perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — Primary voice, light-world reading pinned — text on constant-light surfaces.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.black.l-constant}"
+        },
+        "inverse-perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — Primary voice, dark-world reading pinned — text on constant-dark surfaces: chrome, the constant button, the ink panel.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.white.l-constant}"
+        },
+        "inverse": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — Primary voice, opposite of theme — text on surfaces that invert (the flipping button).",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.white}"
+        },
+        "subtle": {
+         "$scopes": [
+          "TEXT_FILL"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — Supporting register — captions, labels, meta.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.11}"
+        },
+        "subtle-inverse-perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — Supporting register, dark-world reading pinned.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.white.l-alpha.9}"
+        },
+        "subtle-perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — Supporting register, light-world reading pinned.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.black.l-alpha.9}"
+        },
+        "subtle-inverse": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — Supporting register, opposite of theme — secondary text on inverse surfaces.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.white.alpha.9}"
+        }
        },
        "disabled": {
         "$scopes": [
@@ -18823,55 +18823,137 @@
         "$collectionName": ".2.0-Al-Col",
         "$value": "{neutral.9}"
        },
-       "brand-primary": {
-        "$scopes": [
-         "TEXT_FILL"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — First brand colour as text — links, active labels, accents.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.1.11}"
-       },
-       "brand-primary-subtle": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — First brand colour, decorative register — below body-text contrast; never reading copy.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.1.10}"
-       },
-       "brand-primary-strong": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — First brand colour, emphasis register — and the text voice on its own tints (on-colour law).",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.1.12}"
-       },
-       "brand-secondary": {
-        "$scopes": [
-         "TEXT_FILL"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — Second brand colour as text.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.2.11}"
-       },
-       "brand-tertiary": {
-        "$scopes": [
-         "TEXT_FILL"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — Third brand colour as text.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.3.11}"
+       "brand": {
+        "primary": {
+         "$scopes": [
+          "TEXT_FILL"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — First brand colour as text — links, active labels, accents.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.1.11}"
+        },
+        "primary-subtle": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — First brand colour, decorative register — below body-text contrast; never reading copy.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.1.10}"
+        },
+        "primary-strong": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — First brand colour, emphasis register — and the text voice on its own tints (on-colour law).",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.1.12}"
+        },
+        "secondary": {
+         "$scopes": [
+          "TEXT_FILL"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — Second brand colour as text.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.2.11}"
+        },
+        "tertiary": {
+         "$scopes": [
+          "TEXT_FILL"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — Third brand colour as text.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.3.11}"
+        },
+        "primary-inverse": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — First brand colour, opposite of theme — coloured text on inverse surfaces.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.1.inverse.11}"
+        },
+        "primary-strong-perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — First brand colour, emphasis register, light-world reading pinned — the deep identity that never flips.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.1.l-constant.12}"
+        },
+        "secondary-subtle": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — Second brand colour, decorative register — below body-text contrast.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.2.10}"
+        },
+        "secondary-inverse": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — Second brand colour, opposite of theme.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.2.inverse.11}"
+        },
+        "secondary-strong-perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — Second brand colour, emphasis register, light-world reading pinned.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.2.l-constant.12}"
+        },
+        "tertiary-subtle": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — Third brand colour, decorative register — below body-text contrast.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.3.10}"
+        },
+        "tertiary-inverse": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — Third brand colour, opposite of theme.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.3.inverse.11}"
+        },
+        "tertiary-strong-perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — Third brand colour, emphasis register, light-world reading pinned.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.3.l-constant.12}"
+        }
        },
        "error": {
         "$scopes": [
@@ -18911,147 +18993,37 @@
         "$type": "color",
         "$libraryName": "",
         "$collectionName": ".2.0-Al-Col",
-        "$value": "{base.black}"
-       },
-       "max-inverse": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — Maximum contrast, opposite of theme — text on surfaces that invert against the theme.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{base.white}"
-       },
-       "max-dark": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — The dark extreme pinned, never flips — text over light imagery; luminance-picked with max-light.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{base.black.l-constant}"
-       },
-       "max-light": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — The light extreme pinned, never flips — photo text; pairs with the on-image scrim or region-luminance pick.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{base.white.l-constant}"
-       },
-       "brand-primary-inverse": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — First brand colour, opposite of theme — coloured text on inverse surfaces.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.1.inverse.11}"
-       },
-       "brand-primary-dark": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — First brand colour, dark voice anchored — theme-tuned, not byte-frozen (colour constants keep identity, not bytes).",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.1.l-constant.12}"
-       },
-       "brand-primary-light": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — First brand colour, light voice anchored — theme-tuned pale reading.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.1.l-constant.1}"
-       },
-       "brand-secondary-subtle": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — Second brand colour, decorative register — below body-text contrast.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.2.10}"
-       },
-       "brand-secondary-inverse": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — Second brand colour, opposite of theme.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.2.inverse.11}"
-       },
-       "brand-secondary-dark": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — Second brand colour, dark voice anchored — theme-tuned.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.2.l-constant.12}"
-       },
-       "brand-secondary-light": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — Second brand colour, light voice anchored — theme-tuned.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.2.l-constant.1}"
-       },
-       "brand-tertiary-subtle": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — Third brand colour, decorative register — below body-text contrast.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.3.10}"
-       },
-       "brand-tertiary-inverse": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — Third brand colour, opposite of theme.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.3.inverse.11}"
-       },
-       "brand-tertiary-dark": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — Third brand colour, dark voice anchored — theme-tuned.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.3.l-constant.12}"
-       },
-       "brand-tertiary-light": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — Third brand colour, light voice anchored — theme-tuned.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.3.l-constant.1}"
+        "$value": "{base.black}",
+        "inverse": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — Maximum contrast, opposite of theme — text on surfaces that invert against the theme.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{base.white}"
+        },
+        "perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — Maximum contrast, light-world reading pinned — never role-flips. Media & absolutes.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{base.black.l-constant}"
+        },
+        "inverse-perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — Maximum contrast, dark-world reading pinned — photo text; luminance-picked with max-perma.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{base.white.l-constant}"
+        }
        }
       },
       "border": {
@@ -19157,27 +19129,28 @@
        }
       },
       "fg": {
-       "max-light": {
-        "$scopes": [
-         "ALL_FILLS",
-         "STROKE_COLOR"
-        ],
-        "$description": "🔒 LOCKED · fg/ v2.3.2 — The light extreme pinned — glyphs on imagery; luminance-picked with max-dark.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{base.white.l-constant}"
-       },
-       "primary-light": {
-        "$scopes": [
-         "ALL_FILLS",
-         "STROKE_COLOR"
-        ],
-        "$description": "🔒 LOCKED · fg/ v2.3.2 — Paper voice pinned — glyphs on constant-dark surfaces: chrome capsules, the constant button.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.white.l-constant}"
+       "max": {
+        "inverse-perma": {
+         "$scopes": [
+          "ALL_FILLS",
+          "STROKE_COLOR"
+         ],
+         "$description": "🔒 LOCKED · fg/ v2.3.2 — Glyph light extreme pinned — imagery; luminance-picked with max-perma.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{base.white.l-constant}"
+        },
+        "perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 LOCKED · fg/ v2.3.2 — Glyph dark extreme pinned — light imagery.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{base.black.l-constant}"
+        }
        },
        "primary": {
         "$scopes": [
@@ -19188,29 +19161,49 @@
         "$type": "color",
         "$libraryName": "",
         "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.black}"
-       },
-       "primary-subtle": {
-        "$scopes": [
-         "ALL_FILLS",
-         "STROKE_COLOR"
-        ],
-        "$description": "🔒 LOCKED · fg/ v2.3.2 — Supporting glyph register.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{neutral.11}"
-       },
-       "primary-muted": {
-        "$scopes": [
-         "ALL_FILLS",
-         "STROKE_COLOR"
-        ],
-        "$description": "🔒 LOCKED · fg/ v2.3.2 — Muted glyph register — inactive but present; the quietest readable glyph tier.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{neutral.10}"
+        "$value": "{brand.black}",
+        "subtle": {
+         "$scopes": [
+          "ALL_FILLS",
+          "STROKE_COLOR"
+         ],
+         "$description": "🔒 LOCKED · fg/ v2.3.2 — Supporting glyph register.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.11}"
+        },
+        "muted": {
+         "$scopes": [
+          "ALL_FILLS",
+          "STROKE_COLOR"
+         ],
+         "$description": "🔒 LOCKED · fg/ v2.3.2 — Muted glyph register — inactive but present; the quietest readable glyph tier.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.10}"
+        },
+        "inverse": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 LOCKED · fg/ v2.3.2 — Glyphs on surfaces that invert against the theme.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.white}"
+        },
+        "perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 LOCKED · fg/ v2.3.2 — Glyph ink voice, light-world reading pinned — constant-light surfaces.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.black.l-constant}"
+        }
        },
        "disabled": {
         "$scopes": [
@@ -19234,38 +19227,40 @@
         "$collectionName": ".2.0-Al-Col",
         "$value": "{neutral.7}"
        },
-       "brand-primary": {
-        "$scopes": [
-         "ALL_FILLS",
-         "STROKE_COLOR"
-        ],
-        "$description": "🔒 LOCKED · fg/ v2.3.2 — First brand colour as glyph — active/accent glyphs.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.1.11}"
-       },
-       "brand-primary-solid": {
-        "$scopes": [
-         "ALL_FILLS",
-         "STROKE_COLOR"
-        ],
-        "$description": "🔒 LOCKED · fg/ v2.3.2 — First brand colour, solid voice — graphic accents: the dial arc, gauges, badges.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.1.9}"
-       },
-       "brand-secondary-hover": {
-        "$scopes": [
-         "ALL_FILLS",
-         "STROKE_COLOR"
-        ],
-        "$description": "🔒 LOCKED · fg/ v2.3.2 — PENDING pointer-hover ruling — held, not part of the locked shape.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.1.10}"
+       "brand": {
+        "primary": {
+         "$scopes": [
+          "ALL_FILLS",
+          "STROKE_COLOR"
+         ],
+         "$description": "🔒 LOCKED · fg/ v2.3.2 — First brand colour as glyph — active/accent glyphs.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.1.11}"
+        },
+        "primary-solid": {
+         "$scopes": [
+          "ALL_FILLS",
+          "STROKE_COLOR"
+         ],
+         "$description": "🔒 LOCKED · fg/ v2.3.2 — First brand colour, solid voice — graphic accents: the dial arc, gauges, badges.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.1.9}"
+        },
+        "secondary-hover": {
+         "$scopes": [
+          "ALL_FILLS",
+          "STROKE_COLOR"
+         ],
+         "$description": "🔒 LOCKED · fg/ v2.3.2 — PENDING pointer-hover ruling — held, not part of the locked shape.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.1.10}"
+        }
        },
        "error": {
         "$scopes": [
@@ -19332,36 +19327,6 @@
         "$libraryName": "",
         "$collectionName": ".2.0-Al-Col",
         "$value": "{success.9}"
-       },
-       "primary-inverse": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 LOCKED · fg/ v2.3.2 — Glyphs on surfaces that invert against the theme.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.white}"
-       },
-       "primary-dark": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 LOCKED · fg/ v2.3.2 — Ink voice pinned — glyphs on constant-light surfaces.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.black.l-constant}"
-       },
-       "max-dark": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 LOCKED · fg/ v2.3.2 — The dark extreme pinned — glyphs on light imagery.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{base.black.l-constant}"
        }
       },
       "bg": {
