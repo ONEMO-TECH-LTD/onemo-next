@@ -10,6 +10,12 @@ import { SingleRootAuthoringTransaction, discoverSingleRootRecoveryDecisions, ex
 import { DurableFileInstaller } from '../durable-file-installer'
 import { RuntimeRootRegistry } from '../runtime-root-registry'
 
+type ParticipantGraphFixture = {
+  sidecar: { after: unknown }
+  graphPatches: Array<{ before: unknown }>
+  inverse: Array<{ after: unknown }>
+}
+
 async function makeTransaction(hooks?: AuthoringTransactionHooks) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'authoring-tx-'))
   const sourceFile = 'src/app/(dev)/react-figma-components/Button.tsx'
@@ -67,6 +73,8 @@ describe('SingleRootAuthoringTransaction', () => {
       afterRevision: 1,
       files: [],
       sidecar: { file: 'src/app/(dev)/react-figma-components/.onemo/authoring-v1.json', before: null },
+      graphPatches: [{ kind: 'replace-graph', before: null }],
+      inverse: [{ kind: 'replace-graph', after: null }],
     })
     const coordinator = JSON.parse(await fs.readFile(
       path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions/tx-1/coordinator.json'),
@@ -74,6 +82,8 @@ describe('SingleRootAuthoringTransaction', () => {
     ))
     expect(coordinator).toMatchObject({ transactionId: 'tx-1', status: 'committed' })
     expect(participant.sidecar.after.sha256).toMatch(/^[a-f0-9]{64}$/)
+    expect(participant.graphPatches[0].after).toEqual(participant.sidecar.after)
+    expect(participant.inverse[0].before).toEqual(participant.sidecar.after)
     await expect(fs.readFile(path.join(root, participant.sidecar.after.path))).resolves.toBeTruthy()
     expect(JSON.stringify(participant)).not.toContain(root)
   })
@@ -513,6 +523,32 @@ describe('SingleRootAuthoringTransaction', () => {
       transactionId: 'tx-1',
       decision: 'invalid-record',
       reason: expect.stringContaining('path'),
+    })])
+  })
+
+  it.each([
+    {
+      label: 'forward patch',
+      mutate: (participant: ParticipantGraphFixture) => { participant.graphPatches[0]!.before = participant.sidecar.after },
+    },
+    {
+      label: 'inverse',
+      mutate: (participant: ParticipantGraphFixture) => { participant.inverse[0]!.after = participant.sidecar.after },
+    },
+  ])('classifies a $label that diverges from sidecar images as invalid', async ({ mutate }) => {
+    const { root, registry, tx } = await makeTransaction()
+    await tx.commit({ expectedRevision: 0, mutate: (draft) => draft })
+    const participantPath = path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions/tx-1/participant.json')
+    const participant = JSON.parse(await fs.readFile(participantPath, 'utf8'))
+    mutate(participant as ParticipantGraphFixture)
+    await fs.writeFile(participantPath, JSON.stringify(participant))
+
+    const decisions = await discoverSingleRootRecoveryDecisions({ storeId: 'project-main', registry })
+
+    expect(decisions).toEqual([expect.objectContaining({
+      transactionId: 'tx-1',
+      decision: 'invalid-record',
+      reason: expect.stringContaining('does not match the sidecar image'),
     })])
   })
 

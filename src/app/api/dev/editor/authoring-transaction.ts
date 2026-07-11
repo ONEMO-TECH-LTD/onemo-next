@@ -20,6 +20,18 @@ export type TransactionFileImage = {
   after: TransactionBlobRef | null
 }
 
+export type TransactionGraphPatch = {
+  kind: 'replace-graph'
+  before: TransactionBlobRef | null
+  after: TransactionBlobRef
+}
+
+export type TransactionGraphInverse = {
+  kind: 'replace-graph'
+  before: TransactionBlobRef
+  after: TransactionBlobRef | null
+}
+
 export type SingleRootTransactionRecord = {
   schemaVersion: 1
   transactionId: string
@@ -33,6 +45,8 @@ export type SingleRootTransactionRecord = {
   files: TransactionFileImage[]
   sidecar: TransactionFileImage
   metadata: TransactionFileImage[]
+  graphPatches: [TransactionGraphPatch]
+  inverse: [TransactionGraphInverse]
 }
 
 export type SingleRootCoordinatorRecord = {
@@ -252,6 +266,7 @@ export class SingleRootAuthoringTransaction {
     sidecar: TransactionFileImage,
     metadata: TransactionFileImage[],
   ): SingleRootTransactionRecord {
+    if (!sidecar.after) invalidRecord('prepared sidecar must have an after-image')
     const relativeTransactionPath = this.transactionPath('coordinator.json')
     return {
       schemaVersion: 1,
@@ -266,6 +281,8 @@ export class SingleRootAuthoringTransaction {
       files,
       sidecar,
       metadata,
+      graphPatches: [{ kind: 'replace-graph', before: sidecar.before, after: sidecar.after }],
+      inverse: [{ kind: 'replace-graph', before: sidecar.after, after: sidecar.before }],
     }
   }
 
@@ -702,7 +719,7 @@ function assertParticipantRecord(
   const record = requireRecord(value, 'participant')
   requireExactKeys(record, [
     'schemaVersion', 'transactionId', 'storeId', 'coordinator', 'participants', 'status', 'command',
-    'beforeRevision', 'afterRevision', 'files', 'sidecar', 'metadata',
+    'beforeRevision', 'afterRevision', 'files', 'sidecar', 'metadata', 'graphPatches', 'inverse',
   ], 'participant')
   if (record.schemaVersion !== 1 || record.transactionId !== transactionId || record.storeId !== storeId) {
     invalidRecord('participant identity mismatch')
@@ -724,6 +741,8 @@ function assertParticipantRecord(
   if (new Set(files.map((image) => image.file)).size !== files.length) invalidRecord('participant files contain duplicates')
   const sidecar = assertFileImage(record.sidecar, transactionId, kind, 'participant.sidecar')
   if (sidecar.file !== sidecarPath || sidecar.after === null) invalidRecord('participant sidecar image is invalid')
+  assertGraphReplaceList(record.graphPatches, transactionId, kind, 'participant.graphPatches', sidecar.before, sidecar.after)
+  assertGraphReplaceList(record.inverse, transactionId, kind, 'participant.inverse', sidecar.after, sidecar.before)
   if (files.some((image) => image.file === sidecar.file)) invalidRecord('participant sidecar is duplicated as a source file')
   if (!Array.isArray(record.metadata)) invalidRecord('participant metadata must be an array')
   const metadata = record.metadata.map((image, index) => assertFileImage(image, transactionId, kind, `participant.metadata.${index}`))
@@ -780,6 +799,31 @@ function assertBlobRef(value: unknown, transactionId: string, kind: RootKind, la
   const expected = authoringMetadataPath(kind, `transactions/${transactionId}/blobs/${ref.sha256}`)
   if (ref.path !== expected) invalidRecord(`${label}.path does not match its hash`)
   return ref as unknown as TransactionBlobRef
+}
+
+function assertGraphReplaceList(
+  value: unknown,
+  transactionId: string,
+  kind: RootKind,
+  label: string,
+  expectedBefore: TransactionBlobRef | null,
+  expectedAfter: TransactionBlobRef | null,
+): void {
+  if (!Array.isArray(value) || value.length !== 1) invalidRecord(`${label} must contain one replace-graph entry`)
+  const entry = requireRecord(value[0], `${label}.0`)
+  requireExactKeys(entry, ['kind', 'before', 'after'], `${label}.0`)
+  if (entry.kind !== 'replace-graph') invalidRecord(`${label}.0 kind is invalid`)
+  const before = entry.before === null ? null : assertBlobRef(entry.before, transactionId, kind, `${label}.0.before`)
+  const after = entry.after === null ? null : assertBlobRef(entry.after, transactionId, kind, `${label}.0.after`)
+  if (!sameBlobRef(before, expectedBefore) || !sameBlobRef(after, expectedAfter)) {
+    invalidRecord(`${label}.0 does not match the sidecar image`)
+  }
+}
+
+function sameBlobRef(left: TransactionBlobRef | null, right: TransactionBlobRef | null): boolean {
+  return left === null || right === null
+    ? left === right
+    : left.sha256 === right.sha256 && left.path === right.path && left.mode === right.mode
 }
 
 function requireRecord(value: unknown, label: string): Record<string, unknown> {
