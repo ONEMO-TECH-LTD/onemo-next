@@ -217,6 +217,23 @@ describe('AuthoringGraphV1 checkpoint schema', () => {
       property: 'color',
     }
     expect(validateAuthoringGraphV1(graph)).toEqual({ ok: true, graph })
+
+    const otherStylesheet = 'src/app/(dev)/react-figma-components/Other.module.css'
+    graph.sourceHashes[otherStylesheet] = SHA
+    const mismatchedBindings = [
+      { kind: 'module-css' as const, stylesheet: { storeId: 'project-main', file: stylesheet }, localClass: 'secondary', property: 'backgroundColor' },
+      { kind: 'module-css' as const, stylesheet: { storeId: 'project-main', file: otherStylesheet }, localClass: 'secondary', property: 'color' },
+      { kind: 'module-css' as const, stylesheet: { storeId: 'global-library', file: stylesheet }, localClass: 'secondary', property: 'color' },
+    ]
+    for (const binding of mismatchedBindings) {
+      graph.sourceProperties['prop-secondary-label'].binding = binding
+      expect(validateAuthoringGraphV1(graph)).toMatchObject({
+        ok: false,
+        errors: expect.arrayContaining([
+          'sourceProperties.prop-secondary-label.inheritedFromPropertyId must reference a matching typed binding',
+        ]),
+      })
+    }
   })
 
   it('requires hashes for same-store module-CSS and instance source files', () => {
