@@ -9,25 +9,28 @@ import { sha256 } from '../durable-file-installer'
 import { RuntimeRootRegistry } from '../runtime-root-registry'
 
 describe('AuthoringHistoryStore', () => {
-  it('stores content-addressed blobs and append-only journal records without absolute paths', async () => {
+  it('plans content-addressed blobs and append-only journal bytes without writing outside a transaction', async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'authoring-history-'))
     const registry = await RuntimeRootRegistry.create([
       { storeId: 'project-main', kind: 'project', rootPath: root },
     ])
     const history = new AuthoringHistoryStore(registry, 'project-main')
 
-    const blob = await history.putBlob('before bytes')
-    await history.appendJournal({ type: 'undo-preimage', blob })
-
-    expect(blob).toEqual({
-      sha256: sha256('before bytes'),
-      path: `src/app/(dev)/react-figma-components/.onemo/history/blobs/${sha256('before bytes')}`,
+    const patches = await history.planCommand({
+      command: { kind: 'test' },
+      sourceFiles: ['Button.tsx'],
+      sourcePreimages: [{ file: 'Button.tsx', bytes: 'before bytes' }],
+      graphPreimage: '{}\n',
+      revision: 1,
     })
-    const journal = await fs.readFile(
-      path.join(root, 'src/app/(dev)/react-figma-components/.onemo/history/journal.ndjson'),
-      'utf8',
-    )
-    expect(journal).toContain(blob.sha256)
-    expect(journal).not.toContain(root)
+    const blobPath = `src/app/(dev)/react-figma-components/.onemo/history/blobs/${sha256('before bytes')}`
+    const blob = patches.find((patch) => patch.file === blobPath)
+    const journal = patches.find((patch) => patch.file.endsWith('/history/journal.ndjson'))
+
+    expect(blob).toMatchObject({ file: blobPath, before: null })
+    expect(blob?.after.toString()).toBe('before bytes')
+    expect(journal?.after.toString()).toContain(sha256('before bytes'))
+    expect(JSON.stringify(patches)).not.toContain(root)
+    await expect(fs.readFile(path.join(root, blobPath))).rejects.toMatchObject({ code: 'ENOENT' })
   })
 })

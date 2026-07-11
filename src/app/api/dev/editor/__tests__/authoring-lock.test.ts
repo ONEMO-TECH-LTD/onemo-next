@@ -77,7 +77,8 @@ describe('CrossProcessAuthoringStoreLock', () => {
     const replaced = await makeLock()
     const replacedLease = await replaced.lock.acquire()
     const replacedPath = path.join(replaced.root, LOCK_PATH)
-    await fs.writeFile(replacedPath, JSON.stringify({ token: 'another-owner' }) + '\n')
+    const originalRecord = JSON.parse(await fs.readFile(replacedPath, 'utf8'))
+    await fs.writeFile(replacedPath, JSON.stringify({ ...originalRecord, token: 'another-owner' }) + '\n')
     await expect(replacedLease.release()).rejects.toMatchObject({ code: 'AUTHORING_LOCK_OWNERSHIP_LOST' })
     await expect(fs.readFile(replacedPath, 'utf8')).resolves.toContain('another-owner')
 
@@ -107,5 +108,34 @@ describe('CrossProcessAuthoringStoreLock', () => {
     await fs.unlink(path.join(root, LOCK_PATH))
 
     await expect(lease.release()).rejects.toMatchObject({ code: 'AUTHORING_LOCK_MISSING' })
+  })
+
+  it('reclaims a valid lock only after its owner process has exited', async () => {
+    const { root, lock } = await makeLock()
+    const abs = path.join(root, LOCK_PATH)
+    await fs.mkdir(path.dirname(abs), { recursive: true })
+    const child = spawn(process.execPath, ['-e', [
+      "const fs=require('node:fs')",
+      `const file=${JSON.stringify(abs)}`,
+      "const record={schemaVersion:1,storeId:'project-main',token:'dead-owner',pid:process.pid}",
+      "const fd=fs.openSync(file, fs.constants.O_CREAT|fs.constants.O_EXCL|fs.constants.O_WRONLY, 0o600)",
+      "fs.writeFileSync(fd, JSON.stringify(record)+'\\n')",
+      "fs.fsyncSync(fd)",
+      "fs.closeSync(fd)",
+    ].join(';')])
+    await once(child, 'exit')
+
+    const recovered = await lock.acquireForRecovery()
+
+    expect(recovered.token).not.toBe('dead-owner')
+    await recovered.release()
+  })
+
+  it('does not reclaim a lock owned by a live process', async () => {
+    const { lock } = await makeLock()
+    const active = await lock.acquire()
+
+    await expect(lock.acquireForRecovery()).rejects.toMatchObject({ code: 'AUTHORING_STORE_LOCKED' })
+    await active.release()
   })
 })

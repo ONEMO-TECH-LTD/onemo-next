@@ -1,9 +1,8 @@
 import { promises as fs } from 'node:fs'
-import path from 'node:path'
 
 import { CrossProcessAuthoringStoreLock } from './authoring-lock'
 import { authoringMetadataPath } from './authoring-paths'
-import { assertAuthoringGraphV1 } from './authoring-schema'
+import { assertAuthoringGraphV1, isSha256, isStoreRelativePath } from './authoring-schema'
 import { AuthoringSidecarStore, createEmptyAuthoringGraph } from './authoring-store'
 import type { AuthoringGraphV1, RootKind, StoreId } from './authoring-types'
 import { DurableFileInstaller, sha256 } from './durable-file-installer'
@@ -33,6 +32,7 @@ export type SingleRootTransactionRecord = {
   afterRevision: number
   files: TransactionFileImage[]
   sidecar: TransactionFileImage
+  metadata: TransactionFileImage[]
 }
 
 export type SingleRootCoordinatorRecord = {
@@ -45,10 +45,12 @@ export type SingleRootCoordinatorRecord = {
 }
 
 export type SourcePatch = { file: string; before: string | Buffer; after: string | Buffer }
+export type MetadataPatch = { file: string; before: string | Buffer | null; after: string | Buffer | null }
 
 export type AuthoringTransactionHooks = {
   afterPrepare?: () => Promise<void> | void
   afterSourceInstall?: () => Promise<void> | void
+  afterMetadataInstall?: () => Promise<void> | void
   afterCoordinatorCommit?: () => Promise<void> | void
 }
 
@@ -68,6 +70,7 @@ export class SingleRootAuthoringTransaction {
       installer?: DurableFileInstaller
     },
   ) {
+    if (!isTransactionId(input.transactionId)) invalidRecord('transactionId is not a safe path segment')
     this.rootKind = input.registry.get(input.storeId).kind
     this.lock = input.lock ?? new CrossProcessAuthoringStoreLock(input.registry, input.storeId)
     this.installer = input.installer ?? new DurableFileInstaller()
@@ -78,6 +81,7 @@ export class SingleRootAuthoringTransaction {
     sourceFiles?: string[]
     expectedSourceHashes?: Record<string, string>
     sourcePatches?: SourcePatch[]
+    metadataPatches?: MetadataPatch[]
     command?: unknown
     mutate: (graph: AuthoringGraphV1) => AuthoringGraphV1
   }): Promise<AuthoringGraphV1> {
@@ -89,6 +93,7 @@ export class SingleRootAuthoringTransaction {
     sourceFiles?: string[]
     expectedSourceHashes?: Record<string, string>
     sourcePatches?: SourcePatch[]
+    metadataPatches?: MetadataPatch[]
     command?: unknown
     mutate: (graph: AuthoringGraphV1) => AuthoringGraphV1
   }): Promise<AuthoringGraphV1> {
@@ -104,6 +109,8 @@ export class SingleRootAuthoringTransaction {
       })
     }
     const sourcePatches = update.sourcePatches ?? []
+    const metadataPatches = update.metadataPatches ?? []
+    this.validatePatchPaths(sourcePatches, metadataPatches)
     const sourceFiles = unique([
       ...(update.sourceFiles ?? Object.keys(update.expectedSourceHashes ?? before.sourceHashes)),
       ...sourcePatches.map((patch) => patch.file),
@@ -112,6 +119,9 @@ export class SingleRootAuthoringTransaction {
     const currentSources = await this.readSourceFiles(sourceFiles)
     this.verifyExpectedHashes(update.expectedSourceHashes, currentSources)
     this.verifyPatchPreimages(sourcePatches, currentSources)
+    const currentMetadata = await this.readOptionalFiles(metadataPatches.map((patch) => patch.file))
+    this.verifyMetadataPreimages(metadataPatches, currentMetadata)
+    await this.assertTransactionIdAvailable()
     const patchByFile = new Map(sourcePatches.map((patch) => [patch.file, patch]))
     const sourceHashes = Object.fromEntries(sourceFiles.map((file) => [
       file,
@@ -141,7 +151,16 @@ export class SingleRootAuthoringTransaction {
       before: sidecarSnapshot ? await this.putTransactionBlob(sidecarSnapshot.bytes, await this.fileMode(this.input.store.relativeSidecarPath)) : null,
       after: await this.putTransactionBlob(afterSidecarBytes, sidecarSnapshot ? await this.fileMode(this.input.store.relativeSidecarPath) : 0o600),
     }
-    const prepared = this.record('prepared', update.command ?? null, before, after, files, sidecar)
+    const metadata = await Promise.all(metadataPatches.map(async (patch) => {
+      const current = currentMetadata.get(patch.file) ?? null
+      const mode = current === null ? 0o600 : await this.fileMode(patch.file)
+      return {
+        file: patch.file,
+        before: patch.before === null ? null : await this.putTransactionBlob(patch.before, mode),
+        after: patch.after === null ? null : await this.putTransactionBlob(patch.after, mode),
+      }
+    }))
+    const prepared = this.record('prepared', update.command ?? null, before, after, files, sidecar, metadata)
     const coordinator = this.coordinator('prepared')
     await this.writeParticipant(prepared)
     await this.writeCoordinator(coordinator)
@@ -151,7 +170,9 @@ export class SingleRootAuthoringTransaction {
       for (const image of files) await this.installImage(image, 'after')
       await this.input.hooks?.afterSourceInstall?.()
       await this.installImage(sidecar, 'after')
-      await this.verifyInstalledImages([...files, sidecar], 'after')
+      for (const image of metadata) await this.installImage(image, 'after')
+      await this.input.hooks?.afterMetadataInstall?.()
+      await this.verifyInstalledImages([...files, sidecar, ...metadata], 'after')
       const committedCoordinator = { ...coordinator, status: 'committed' as const }
       try {
         await this.writeCoordinator(committedCoordinator)
@@ -172,7 +193,7 @@ export class SingleRootAuthoringTransaction {
         throw namedError('RECOVERY_REQUIRED', `committed transaction needs recovery: ${this.input.transactionId}`, 500, error)
       }
       try {
-        await this.restoreImages([...files, sidecar])
+        await this.restoreImages([...files, sidecar, ...metadata])
         await this.writeCoordinator({ ...coordinator, status: 'rolled-back' })
         await this.writeParticipant({ ...prepared, status: 'rolled-back' })
       } catch (rollbackError) {
@@ -182,18 +203,35 @@ export class SingleRootAuthoringTransaction {
     }
   }
 
-  async recover(record: SingleRootTransactionRecord, decision: 'rollback' | 'finish-commit'): Promise<void> {
-    await this.withLock(async () => {
-      const images = [...record.files, record.sidecar]
+  async recover(): Promise<ExecutableRecoveryAction> {
+    return this.withRecoveryLock(async () => {
+      const participantAbs = await this.input.registry.resolveStorePath(this.input.storeId, this.transactionPath('participant.json'))
+      const record = assertParticipantRecord(
+        JSON.parse(await fs.readFile(participantAbs, 'utf8')),
+        this.input.transactionId,
+        this.input.storeId,
+        this.rootKind,
+        this.input.store.relativeSidecarPath,
+      )
+      const coordinatorAbs = await this.input.registry.resolveStorePath(this.input.storeId, this.transactionPath('coordinator.json'))
+      const coordinator = await readCoordinator(coordinatorAbs, this.input.transactionId, this.input.storeId, this.rootKind)
+      const images = [...record.files, record.sidecar, ...record.metadata]
+      if (coordinator?.status === 'committed' && record.status === 'committed') return 'ignored-committed'
+      if (coordinator?.status !== 'committed' && (coordinator?.status === 'rolled-back' || record.status === 'rolled-back')) {
+        if (record.status !== 'rolled-back') await this.writeParticipant({ ...record, status: 'rolled-back' })
+        return 'ignored-rolled-back'
+      }
       await this.verifyRecoveryCompatible(images)
-      if (decision === 'rollback') {
+      if (!coordinator || coordinator.status === 'prepared') {
         await this.restoreImages(images)
         await this.writeCoordinator({ ...this.coordinator('prepared'), status: 'rolled-back' })
         await this.writeParticipant({ ...record, status: 'rolled-back' })
+        return 'rolled-back-prepared'
       } else {
         for (const image of images) await this.installImage(image, 'after')
         await this.verifyInstalledImages(images, 'after')
         await this.writeParticipant({ ...record, status: 'committed' })
+        return 'finished-committed'
       }
     })
   }
@@ -205,6 +243,7 @@ export class SingleRootAuthoringTransaction {
     after: AuthoringGraphV1,
     files: TransactionFileImage[],
     sidecar: TransactionFileImage,
+    metadata: TransactionFileImage[],
   ): SingleRootTransactionRecord {
     const relativeTransactionPath = this.transactionPath('coordinator.json')
     return {
@@ -219,6 +258,7 @@ export class SingleRootAuthoringTransaction {
       afterRevision: after.revision,
       files,
       sidecar,
+      metadata,
     }
   }
 
@@ -234,6 +274,7 @@ export class SingleRootAuthoringTransaction {
   }
 
   private async writeParticipant(record: SingleRootTransactionRecord) {
+    assertParticipantRecord(record, this.input.transactionId, this.input.storeId, this.rootKind, this.input.store.relativeSidecarPath)
     await writeSingleRootParticipantRecord({
       registry: this.input.registry,
       storeId: this.input.storeId,
@@ -243,6 +284,7 @@ export class SingleRootAuthoringTransaction {
   }
 
   private async writeCoordinator(record: SingleRootCoordinatorRecord): Promise<void> {
+    assertCoordinatorRecord(record, this.input.transactionId, this.input.storeId, this.rootKind)
     const abs = await this.input.registry.resolveStorePath(this.input.storeId, this.transactionPath('coordinator.json'))
     await this.installer.writeJsonAtomic(abs, record)
   }
@@ -256,11 +298,38 @@ export class SingleRootAuthoringTransaction {
     }
   }
 
+  private async assertTransactionIdAvailable(): Promise<void> {
+    const abs = await this.input.registry.resolveStorePath(
+      this.input.storeId,
+      authoringMetadataPath(this.rootKind, `transactions/${this.input.transactionId}`),
+    )
+    try {
+      await fs.lstat(abs)
+      throw namedError('TRANSACTION_ID_EXISTS', `transaction already exists: ${this.input.transactionId}`, 409)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    }
+  }
+
   private async readSourceFiles(files: string[]): Promise<Map<string, Buffer>> {
     const snapshots = new Map<string, Buffer>()
     for (const file of files) {
       const abs = await this.input.registry.resolveStorePath(this.input.storeId, file)
       snapshots.set(file, await fs.readFile(abs))
+    }
+    return snapshots
+  }
+
+  private async readOptionalFiles(files: string[]): Promise<Map<string, Buffer | null>> {
+    const snapshots = new Map<string, Buffer | null>()
+    for (const file of unique(files)) {
+      const abs = await this.input.registry.resolveStorePath(this.input.storeId, file)
+      try {
+        snapshots.set(file, await fs.readFile(abs))
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+        snapshots.set(file, null)
+      }
     }
     return snapshots
   }
@@ -293,6 +362,35 @@ export class SingleRootAuthoringTransaction {
         changedPaths,
       })
     }
+  }
+
+  private verifyMetadataPreimages(patches: MetadataPatch[], current: Map<string, Buffer | null>): void {
+    if (new Set(patches.map((patch) => patch.file)).size !== patches.length) {
+      throw namedError('DUPLICATE_METADATA_PATCH', 'metadata patch files must be unique', 422)
+    }
+    const changedPaths = patches
+      .filter((patch) => {
+        const actual = current.get(patch.file) ?? null
+        if (patch.before === null || actual === null) return patch.before !== null || actual !== null
+        return sha256(actual) !== sha256(patch.before)
+      })
+      .map((patch) => patch.file)
+    if (changedPaths.length > 0) {
+      throw Object.assign(new Error(`metadata preimage mismatch: ${changedPaths.join(', ')}`), {
+        status: 409,
+        code: 'METADATA_PREIMAGE_STALE',
+        changedPaths,
+      })
+    }
+  }
+
+  private validatePatchPaths(sourcePatches: SourcePatch[], metadataPatches: MetadataPatch[]): void {
+    const metadataRoot = authoringMetadataPath(this.rootKind, '')
+    const historyRoot = authoringMetadataPath(this.rootKind, 'history/')
+    const invalidSource = sourcePatches.find((patch) => patch.file.startsWith(metadataRoot))
+    if (invalidSource) throw namedError('SOURCE_PATCH_PATH_INVALID', `source patch targets authoring metadata: ${invalidSource.file}`, 422)
+    const invalidMetadata = metadataPatches.find((patch) => !patch.file.startsWith(historyRoot))
+    if (invalidMetadata) throw namedError('METADATA_PATCH_PATH_INVALID', `metadata patch is outside history: ${invalidMetadata.file}`, 422)
   }
 
   private async putTransactionBlob(bytes: Buffer | string, mode: number): Promise<TransactionBlobRef> {
@@ -363,14 +461,20 @@ export class SingleRootAuthoringTransaction {
     for (const image of images) {
       const abs = await this.input.registry.resolveStorePath(this.input.storeId, image.file)
       let currentHash: string | null
+      let currentMode: number | null
       try {
+        const stat = await fs.lstat(abs)
+        currentMode = stat.mode & 0o777
         currentHash = sha256(await fs.readFile(abs))
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
         currentHash = null
+        currentMode = null
       }
-      const allowed = new Set([image.before?.sha256 ?? null, image.after?.sha256 ?? null])
-      if (!allowed.has(currentHash)) conflicts.push(image.file)
+      const allowed = [image.before, image.after]
+        .map((ref) => ref ? `${ref.sha256}:${ref.mode}` : 'missing')
+      const current = currentHash === null ? 'missing' : `${currentHash}:${currentMode}`
+      if (!allowed.includes(current)) conflicts.push(image.file)
     }
     if (conflicts.length > 0) {
       throw Object.assign(new Error(`recovery conflict: ${conflicts.join(', ')}`), {
@@ -382,7 +486,18 @@ export class SingleRootAuthoringTransaction {
   }
 
   private async withLock<T>(operation: () => Promise<T>): Promise<T> {
-    const lease = await this.lock.acquire()
+    return this.withLease(() => this.lock.acquire(), operation)
+  }
+
+  private async withRecoveryLock<T>(operation: () => Promise<T>): Promise<T> {
+    return this.withLease(() => this.lock.acquireForRecovery(), operation)
+  }
+
+  private async withLease<T>(
+    acquire: () => Promise<{ release: () => Promise<void> }>,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    const lease = await acquire()
     let result: T | undefined
     let operationError: unknown
     try {
@@ -409,14 +524,18 @@ export class SingleRootAuthoringTransaction {
 export type RecoveryDecision =
   | { transactionId: string; decision: 'rollback-prepared'; record: SingleRootTransactionRecord }
   | { transactionId: string; decision: 'finish-committed'; record: SingleRootTransactionRecord }
+  | { transactionId: string; decision: 'ignore-committed'; record: SingleRootTransactionRecord }
   | { transactionId: string; decision: 'ignore-rolled-back'; record: SingleRootTransactionRecord }
   | { transactionId: string; decision: 'invalid-record'; reason: string }
 
 export type RecoveryExecutionResult =
   | { transactionId: string; action: 'rolled-back-prepared' }
   | { transactionId: string; action: 'finished-committed' }
+  | { transactionId: string; action: 'ignored-committed' }
   | { transactionId: string; action: 'ignored-rolled-back' }
   | { transactionId: string; action: 'invalid-record'; reason: string }
+
+type ExecutableRecoveryAction = Exclude<RecoveryExecutionResult['action'], 'invalid-record'>
 
 export async function discoverSingleRootRecoveryDecisions(input: {
   storeId: StoreId
@@ -433,27 +552,40 @@ export async function discoverSingleRootRecoveryDecisions(input: {
     throw error
   }
   const decisions: RecoveryDecision[] = []
+  const kind = input.registry.get(input.storeId).kind
+  const sidecarPath = authoringMetadataPath(kind, 'authoring-v1.json')
   for (const entry of entries) {
-    if (!entry.isDirectory()) continue
     const transactionId = entry.name
-    const participantPath = path.join(absRoot, transactionId, 'participant.json')
+    if (entry.isSymbolicLink()) {
+      decisions.push({ transactionId, decision: 'invalid-record', reason: 'symlink transaction directory refused' })
+      continue
+    }
+    if (!entry.isDirectory()) continue
     try {
-      const record = JSON.parse(await fs.readFile(participantPath, 'utf8')) as SingleRootTransactionRecord
-      if (record.transactionId !== transactionId) {
-        decisions.push({ transactionId, decision: 'invalid-record', reason: 'transactionId mismatch' })
-      } else {
-        const coordinator = await readCoordinator(path.join(absRoot, transactionId, 'coordinator.json'))
-        if (coordinator && coordinator.transactionId !== transactionId) {
-          decisions.push({ transactionId, decision: 'invalid-record', reason: 'coordinator transactionId mismatch' })
-        } else if (coordinator?.status === 'committed') {
+      const participantPath = await input.registry.resolveStorePath(
+        input.storeId,
+        `${relRoot}/${transactionId}/participant.json`,
+      )
+      const record = assertParticipantRecord(
+        JSON.parse(await fs.readFile(participantPath, 'utf8')),
+        transactionId,
+        input.storeId,
+        kind,
+        sidecarPath,
+      )
+      const coordinatorPath = await input.registry.resolveStorePath(
+        input.storeId,
+        `${relRoot}/${transactionId}/coordinator.json`,
+      )
+      const coordinator = await readCoordinator(coordinatorPath, transactionId, input.storeId, kind)
+      if (coordinator?.status === 'committed' && record.status === 'committed') {
+          decisions.push({ transactionId, decision: 'ignore-committed', record })
+      } else if (coordinator?.status === 'committed') {
           decisions.push({ transactionId, decision: 'finish-committed', record })
-        } else if (coordinator?.status === 'rolled-back' || record.status === 'rolled-back') {
+      } else if (coordinator?.status === 'rolled-back' || record.status === 'rolled-back') {
           decisions.push({ transactionId, decision: 'ignore-rolled-back', record })
-        } else if (!coordinator || coordinator.status === 'prepared') {
+      } else if (!coordinator || coordinator.status === 'prepared') {
           decisions.push({ transactionId, decision: 'rollback-prepared', record })
-        } else {
-          decisions.push({ transactionId, decision: 'invalid-record', reason: `unknown coordinator status: ${String(coordinator.status)}` })
-        }
       }
     } catch (error) {
       decisions.push({ transactionId, decision: 'invalid-record', reason: (error as Error).message })
@@ -472,26 +604,15 @@ export async function executeSingleRootRecovery(input: {
   for (const decision of decisions) {
     if (decision.decision === 'invalid-record') {
       results.push({ transactionId: decision.transactionId, action: 'invalid-record', reason: decision.reason })
-    } else if (decision.decision === 'rollback-prepared') {
-      const tx = new SingleRootAuthoringTransaction({
-        transactionId: decision.transactionId,
-        storeId: input.storeId,
-        registry: input.registry,
-        store: input.store,
-      })
-      await tx.recover(decision.record, 'rollback')
-      results.push({ transactionId: decision.transactionId, action: 'rolled-back-prepared' })
-    } else if (decision.decision === 'finish-committed') {
-      const tx = new SingleRootAuthoringTransaction({
-        transactionId: decision.transactionId,
-        storeId: input.storeId,
-        registry: input.registry,
-        store: input.store,
-      })
-      await tx.recover(decision.record, 'finish-commit')
-      results.push({ transactionId: decision.transactionId, action: 'finished-committed' })
     } else {
-      results.push({ transactionId: decision.transactionId, action: 'ignored-rolled-back' })
+      const tx = new SingleRootAuthoringTransaction({
+        transactionId: decision.transactionId,
+        storeId: input.storeId,
+        registry: input.registry,
+        store: input.store,
+      })
+      const action = await tx.recover()
+      results.push({ transactionId: decision.transactionId, action })
     }
   }
   return results
@@ -499,9 +620,14 @@ export async function executeSingleRootRecovery(input: {
 
 export const recoverSingleRootTransactions = executeSingleRootRecovery
 
-async function readCoordinator(abs: string): Promise<SingleRootCoordinatorRecord | null> {
+async function readCoordinator(
+  abs: string,
+  transactionId: string,
+  storeId: StoreId,
+  kind: RootKind,
+): Promise<SingleRootCoordinatorRecord | null> {
   try {
-    return JSON.parse(await fs.readFile(abs, 'utf8')) as SingleRootCoordinatorRecord
+    return assertCoordinatorRecord(JSON.parse(await fs.readFile(abs, 'utf8')), transactionId, storeId, kind)
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
     throw error
@@ -532,4 +658,126 @@ function attachReleaseFailure(primary: unknown, releaseError: unknown): unknown 
   if (releaseError === undefined) return primary
   if (primary instanceof Error) return Object.assign(primary, { releaseError })
   return namedError('AUTHORING_COMMIT_FAILED', 'authoring commit and lock release both failed', 500, { primary, releaseError })
+}
+
+function assertParticipantRecord(
+  value: unknown,
+  transactionId: string,
+  storeId: StoreId,
+  kind: RootKind,
+  sidecarPath: string,
+): SingleRootTransactionRecord {
+  const record = requireRecord(value, 'participant')
+  requireExactKeys(record, [
+    'schemaVersion', 'transactionId', 'storeId', 'coordinator', 'participants', 'status', 'command',
+    'beforeRevision', 'afterRevision', 'files', 'sidecar', 'metadata',
+  ], 'participant')
+  if (record.schemaVersion !== 1 || record.transactionId !== transactionId || record.storeId !== storeId) {
+    invalidRecord('participant identity mismatch')
+  }
+  if (!isTransactionId(transactionId)) invalidRecord('transactionId is not a safe path segment')
+  if (!isSingleStoreList(record.participants, storeId)) invalidRecord('participant store list is invalid')
+  if (!isStatus(record.status)) invalidRecord('participant status is invalid')
+  if (!isRevision(record.beforeRevision) || record.afterRevision !== record.beforeRevision + 1) {
+    invalidRecord('participant revision step is invalid')
+  }
+  const coordinator = requireRecord(record.coordinator, 'participant.coordinator')
+  requireExactKeys(coordinator, ['storeId', 'relativeTransactionPath'], 'participant.coordinator')
+  const expectedCoordinator = authoringMetadataPath(kind, `transactions/${transactionId}/coordinator.json`)
+  if (coordinator.storeId !== storeId || coordinator.relativeTransactionPath !== expectedCoordinator) {
+    invalidRecord('participant coordinator pointer is invalid')
+  }
+  if (!Array.isArray(record.files)) invalidRecord('participant files must be an array')
+  const files = record.files.map((image, index) => assertFileImage(image, transactionId, kind, `participant.files.${index}`))
+  if (new Set(files.map((image) => image.file)).size !== files.length) invalidRecord('participant files contain duplicates')
+  const sidecar = assertFileImage(record.sidecar, transactionId, kind, 'participant.sidecar')
+  if (sidecar.file !== sidecarPath || sidecar.after === null) invalidRecord('participant sidecar image is invalid')
+  if (files.some((image) => image.file === sidecar.file)) invalidRecord('participant sidecar is duplicated as a source file')
+  if (!Array.isArray(record.metadata)) invalidRecord('participant metadata must be an array')
+  const metadata = record.metadata.map((image, index) => assertFileImage(image, transactionId, kind, `participant.metadata.${index}`))
+  if (new Set(metadata.map((image) => image.file)).size !== metadata.length) invalidRecord('participant metadata contains duplicates')
+  const allFiles = [...files, sidecar, ...metadata].map((image) => image.file)
+  if (new Set(allFiles).size !== allFiles.length) invalidRecord('participant image paths overlap')
+  const historyRoot = authoringMetadataPath(kind, 'history/')
+  if (metadata.some((image) => !image.file.startsWith(historyRoot))) invalidRecord('participant metadata is outside history')
+  const metadataRoot = authoringMetadataPath(kind, '')
+  if (files.some((image) => image.file.startsWith(metadataRoot))) invalidRecord('participant source image targets authoring metadata')
+  return record as unknown as SingleRootTransactionRecord
+}
+
+function assertCoordinatorRecord(
+  value: unknown,
+  transactionId: string,
+  storeId: StoreId,
+  kind: RootKind,
+): SingleRootCoordinatorRecord {
+  const record = requireRecord(value, 'coordinator')
+  requireExactKeys(record, ['schemaVersion', 'transactionId', 'storeId', 'participants', 'participantPaths', 'status'], 'coordinator')
+  if (record.schemaVersion !== 1 || record.transactionId !== transactionId || record.storeId !== storeId) {
+    invalidRecord('coordinator identity mismatch')
+  }
+  if (!isTransactionId(transactionId)) invalidRecord('transactionId is not a safe path segment')
+  if (!isSingleStoreList(record.participants, storeId) || !isStatus(record.status)) invalidRecord('coordinator state is invalid')
+  if (!Array.isArray(record.participantPaths) || record.participantPaths.length !== 1) {
+    invalidRecord('coordinator participant paths are invalid')
+  }
+  const pointer = requireRecord(record.participantPaths[0], 'coordinator.participantPaths.0')
+  requireExactKeys(pointer, ['storeId', 'path'], 'coordinator.participantPaths.0')
+  const expected = authoringMetadataPath(kind, `transactions/${transactionId}/participant.json`)
+  if (pointer.storeId !== storeId || pointer.path !== expected) invalidRecord('coordinator participant pointer is invalid')
+  return record as unknown as SingleRootCoordinatorRecord
+}
+
+function assertFileImage(value: unknown, transactionId: string, kind: RootKind, label: string): TransactionFileImage {
+  const image = requireRecord(value, label)
+  requireExactKeys(image, ['file', 'before', 'after'], label)
+  if (!isStoreRelativePath(image.file)) invalidRecord(`${label}.file is invalid`)
+  const before = image.before === null ? null : assertBlobRef(image.before, transactionId, kind, `${label}.before`)
+  const after = image.after === null ? null : assertBlobRef(image.after, transactionId, kind, `${label}.after`)
+  if (before === null && after === null) invalidRecord(`${label} has no image`)
+  return { file: image.file, before, after }
+}
+
+function assertBlobRef(value: unknown, transactionId: string, kind: RootKind, label: string): TransactionBlobRef {
+  const ref = requireRecord(value, label)
+  requireExactKeys(ref, ['sha256', 'path', 'mode'], label)
+  if (!isSha256(ref.sha256) || !isStoreRelativePath(ref.path)) invalidRecord(`${label} hash/path is invalid`)
+  if (!Number.isSafeInteger(ref.mode) || (ref.mode as number) < 0 || (ref.mode as number) > 0o777) {
+    invalidRecord(`${label}.mode is invalid`)
+  }
+  const expected = authoringMetadataPath(kind, `transactions/${transactionId}/blobs/${ref.sha256}`)
+  if (ref.path !== expected) invalidRecord(`${label}.path does not match its hash`)
+  return ref as unknown as TransactionBlobRef
+}
+
+function requireRecord(value: unknown, label: string): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) invalidRecord(`${label} must be an object`)
+  return value as Record<string, unknown>
+}
+
+function requireExactKeys(value: Record<string, unknown>, keys: string[], label: string): void {
+  const expected = new Set(keys)
+  if (Object.keys(value).some((key) => !expected.has(key)) || keys.some((key) => !Object.hasOwn(value, key))) {
+    invalidRecord(`${label} keys are invalid`)
+  }
+}
+
+function isStatus(value: unknown): value is SingleRootTransactionRecord['status'] {
+  return value === 'prepared' || value === 'committed' || value === 'rolled-back'
+}
+
+function isRevision(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+}
+
+function isSingleStoreList(value: unknown, storeId: StoreId): boolean {
+  return Array.isArray(value) && value.length === 1 && value[0] === storeId
+}
+
+function isTransactionId(value: string): boolean {
+  return /^[A-Za-z0-9_-]+$/.test(value)
+}
+
+function invalidRecord(message: string): never {
+  throw namedError('TRANSACTION_RECORD_INVALID', message, 409)
 }

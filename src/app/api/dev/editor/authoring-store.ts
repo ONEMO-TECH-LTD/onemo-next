@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs'
 import { assertAuthoringGraphV1 } from './authoring-schema'
 import { authoringMetadataPath } from './authoring-paths'
 import type { AuthoringGraphV1, RootKind, StoreId } from './authoring-types'
-import { DurableFileInstaller, sha256 } from './durable-file-installer'
+import { sha256 } from './durable-file-installer'
 import { RuntimeRootRegistry } from './runtime-root-registry'
 
 export const PROJECT_AUTHORING_SIDECAR = authoringMetadataPath('project', 'authoring-v1.json')
@@ -12,17 +12,17 @@ export type AuthoringStoreOptions = {
   storeId: StoreId
   rootKind: RootKind
   registry: RuntimeRootRegistry
-  installer?: DurableFileInstaller
-  sidecarPath?: string
 }
 
 export class AuthoringSidecarStore {
-  private readonly installer: DurableFileInstaller
   private readonly sidecarPath: string
 
   constructor(private readonly options: AuthoringStoreOptions) {
-    this.installer = options.installer ?? new DurableFileInstaller()
-    this.sidecarPath = options.sidecarPath ?? PROJECT_AUTHORING_SIDECAR
+    const registeredKind = options.registry.get(options.storeId).kind
+    if (registeredKind !== options.rootKind) {
+      throw namedError('STORE_KIND_MISMATCH', `registered root kind ${registeredKind} does not match ${options.rootKind}`, 409)
+    }
+    this.sidecarPath = authoringMetadataPath(options.rootKind, 'authoring-v1.json')
   }
 
   get relativeSidecarPath(): string {
@@ -59,36 +59,6 @@ export class AuthoringSidecarStore {
       rootKind: this.options.rootKind,
       sourceHashes: await this.computeSourceHashes(sourceFiles),
     })
-  }
-
-  async commit(update: {
-    expectedRevision: number
-    sourceFiles?: string[]
-    expectedSourceHashes?: Record<string, string>
-    mutate?: (graph: AuthoringGraphV1) => AuthoringGraphV1
-  }): Promise<AuthoringGraphV1> {
-    const current = await this.loadOrCreate(update.sourceFiles ?? [])
-    if (current.revision !== update.expectedRevision) {
-      throw namedError('AUTHORING_REVISION_STALE', `expected revision ${update.expectedRevision}, found ${current.revision}`, 409)
-    }
-    if (update.expectedSourceHashes) {
-      await this.verifyExpectedSourceHashes(update.expectedSourceHashes)
-    }
-
-    const base: AuthoringGraphV1 = {
-      ...current,
-      revision: current.revision + 1,
-      sourceHashes: await this.computeSourceHashes(update.sourceFiles ?? Object.keys(current.sourceHashes)),
-    }
-    const next = assertAuthoringGraphV1(update.mutate ? update.mutate(base) : base)
-    await this.save(next)
-    return next
-  }
-
-  async save(graph: AuthoringGraphV1): Promise<void> {
-    const checked = assertAuthoringGraphV1(graph)
-    const abs = await this.options.registry.resolveStorePath(this.options.storeId, this.sidecarPath)
-    await this.installer.writeJsonAtomic(abs, checked)
   }
 
   async computeSourceHashes(files: string[]): Promise<Record<string, string>> {

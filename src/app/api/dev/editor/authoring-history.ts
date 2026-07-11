@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs'
 
-import { DurableFileInstaller, sha256 } from './durable-file-installer'
+import { sha256 } from './durable-file-installer'
+import { authoringMetadataPath } from './authoring-paths'
 import { RuntimeRootRegistry } from './runtime-root-registry'
 import type { StoreId } from './authoring-types'
 
@@ -35,27 +36,56 @@ export type IndexedAuthoringCommandHistoryRecord = {
   record: AuthoringCommandHistoryRecord
 }
 
-export class AuthoringHistoryStore {
-  private readonly installer = new DurableFileInstaller()
+export type PlannedHistoryPatch = {
+  file: string
+  before: Buffer | null
+  after: Buffer
+}
 
+export class AuthoringHistoryStore {
   constructor(
     private readonly registry: RuntimeRootRegistry,
     private readonly storeId: StoreId,
   ) {}
 
-  async putBlob(bytes: Buffer | string): Promise<HistoryBlobRef> {
-    const data = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes, 'utf8')
-    const digest = sha256(data)
-    const rel = `src/app/(dev)/react-figma-components/.onemo/history/blobs/${digest}`
-    const abs = await this.registry.resolveStorePath(this.storeId, rel)
-    try {
-      const existing = await fs.readFile(abs)
-      if (sha256(existing) !== digest) throw namedError('HISTORY_BLOB_COLLISION', `blob collision for ${digest}`)
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
-      await this.installer.writeFileAtomic(abs, data)
+  async planCommand(input: {
+    command: unknown
+    sourceFiles: string[]
+    sourcePreimages: Array<{ file: string; bytes: Buffer | string }>
+    graphPreimage: Buffer | string
+    revision: number
+  }): Promise<PlannedHistoryPatch[]> {
+    const patches = new Map<string, PlannedHistoryPatch>()
+    const graphPreimage = await this.planBlob(input.graphPreimage, patches)
+    const preimages: AuthoringHistoryPreimageRef[] = []
+    for (const preimage of input.sourcePreimages) {
+      preimages.push({ file: preimage.file, ...await this.planBlob(preimage.bytes, patches) })
     }
-    return { sha256: digest, path: rel }
+    await this.planJournalAppend({
+      type: 'authoring-command',
+      command: input.command,
+      sourceFiles: input.sourceFiles,
+      sourcePatches: input.sourcePreimages.map((preimage) => ({ file: preimage.file })),
+      preimages,
+      graphPreimage,
+      revision: input.revision,
+    }, patches)
+    return [...patches.values()]
+  }
+
+  async planUndo(input: {
+    undoneJournalIndex: number
+    restoredFiles: string[]
+    revision: number
+  }): Promise<PlannedHistoryPatch[]> {
+    const patches = new Map<string, PlannedHistoryPatch>()
+    await this.planJournalAppend({
+      type: 'authoring-undo',
+      undoneJournalIndex: input.undoneJournalIndex,
+      restoredFiles: input.restoredFiles,
+      revision: input.revision,
+    }, patches)
+    return [...patches.values()]
   }
 
   async readBlob(ref: HistoryBlobRef): Promise<string> {
@@ -67,20 +97,8 @@ export class AuthoringHistoryStore {
     return bytes.toString('utf8')
   }
 
-  async appendJournal(record: unknown): Promise<void> {
-    const rel = 'src/app/(dev)/react-figma-components/.onemo/history/journal.ndjson'
-    const abs = await this.registry.resolveStorePath(this.storeId, rel)
-    let current = ''
-    try {
-      current = await fs.readFile(abs, 'utf8')
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
-    }
-    await this.installer.writeFileAtomic(abs, current + JSON.stringify(record) + '\n')
-  }
-
   async readJournal(): Promise<Array<{ index: number; record: unknown }>> {
-    const rel = 'src/app/(dev)/react-figma-components/.onemo/history/journal.ndjson'
+    const rel = this.historyPath('journal.ndjson')
     const abs = await this.registry.resolveStorePath(this.storeId, rel)
     let current = ''
     try {
@@ -109,6 +127,47 @@ export class AuthoringHistoryStore {
       }
     }
     return null
+  }
+
+  private async planBlob(
+    bytes: Buffer | string,
+    patches: Map<string, PlannedHistoryPatch>,
+  ): Promise<HistoryBlobRef> {
+    const data = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes, 'utf8')
+    const digest = sha256(data)
+    const rel = this.historyPath(`blobs/${digest}`)
+    const abs = await this.registry.resolveStorePath(this.storeId, rel)
+    try {
+      const existing = await fs.readFile(abs)
+      if (sha256(existing) !== digest) throw namedError('HISTORY_BLOB_COLLISION', `blob collision for ${digest}`)
+      patches.set(rel, { file: rel, before: existing, after: existing })
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+      patches.set(rel, { file: rel, before: null, after: data })
+    }
+    return { sha256: digest, path: rel }
+  }
+
+  private async planJournalAppend(
+    record: AuthoringCommandHistoryRecord | AuthoringUndoHistoryRecord,
+    patches: Map<string, PlannedHistoryPatch>,
+  ): Promise<void> {
+    const rel = this.historyPath('journal.ndjson')
+    const abs = await this.registry.resolveStorePath(this.storeId, rel)
+    let before: Buffer | null
+    try {
+      before = await fs.readFile(abs)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+      before = null
+    }
+    const prefix = before ?? Buffer.alloc(0)
+    const after = Buffer.concat([prefix, Buffer.from(JSON.stringify(record) + '\n')])
+    patches.set(rel, { file: rel, before, after })
+  }
+
+  private historyPath(suffix: string): string {
+    return authoringMetadataPath(this.registry.get(this.storeId).kind, `history/${suffix}`)
   }
 }
 

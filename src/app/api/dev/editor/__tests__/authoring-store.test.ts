@@ -5,6 +5,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { AuthoringSidecarStore, PROJECT_AUTHORING_SIDECAR } from '../authoring-store'
+import { SingleRootAuthoringTransaction } from '../authoring-transaction'
 import { RuntimeRootRegistry } from '../runtime-root-registry'
 
 const SOURCE_FILE = 'src/app/(dev)/react-figma-components/Button.tsx'
@@ -16,17 +17,20 @@ async function makeStore() {
   const registry = await RuntimeRootRegistry.create([
     { storeId: 'project-main', kind: 'project', rootPath: root },
   ])
+  const store = new AuthoringSidecarStore({ storeId: 'project-main', rootKind: 'project', registry })
   return {
     root,
-    store: new AuthoringSidecarStore({ storeId: 'project-main', rootKind: 'project', registry }),
+    registry,
+    store,
+    tx: new SingleRootAuthoringTransaction({ transactionId: 'store-test', storeId: 'project-main', registry, store }),
   }
 }
 
 describe('AuthoringSidecarStore', () => {
   it('commits a project-root sidecar with revision and exact source hashes', async () => {
-    const { root, store } = await makeStore()
+    const { root, tx } = await makeStore()
 
-    const graph = await store.commit({ expectedRevision: 0, sourceFiles: [SOURCE_FILE] })
+    const graph = await tx.commit({ expectedRevision: 0, sourceFiles: [SOURCE_FILE], mutate: (draft) => draft })
 
     expect(graph.revision).toBe(1)
     expect(graph.sourceHashes[SOURCE_FILE]).toMatch(/^[a-f0-9]{64}$/)
@@ -41,33 +45,44 @@ describe('AuthoringSidecarStore', () => {
   })
 
   it('rejects stale revisions instead of overwriting sidecar state', async () => {
-    const { store } = await makeStore()
-    await store.commit({ expectedRevision: 0, sourceFiles: [SOURCE_FILE] })
+    const { tx } = await makeStore()
+    await tx.commit({ expectedRevision: 0, sourceFiles: [SOURCE_FILE], mutate: (draft) => draft })
 
-    await expect(store.commit({ expectedRevision: 0, sourceFiles: [SOURCE_FILE] }))
+    await expect(tx.commit({ expectedRevision: 0, sourceFiles: [SOURCE_FILE], mutate: (draft) => draft }))
       .rejects.toMatchObject({ code: 'AUTHORING_REVISION_STALE', status: 409 })
   })
 
   it('updates hashes from exact source bytes on the next revision', async () => {
-    const { root, store } = await makeStore()
-    const first = await store.commit({ expectedRevision: 0, sourceFiles: [SOURCE_FILE] })
+    const { root, registry, store, tx } = await makeStore()
+    const first = await tx.commit({ expectedRevision: 0, sourceFiles: [SOURCE_FILE], mutate: (draft) => draft })
     await fs.writeFile(path.join(root, SOURCE_FILE), 'export function Button() { return <button>Changed</button> }\n')
 
-    const second = await store.commit({ expectedRevision: 1, sourceFiles: [SOURCE_FILE] })
+    const second = await new SingleRootAuthoringTransaction({
+      transactionId: 'store-test-2',
+      storeId: 'project-main',
+      registry,
+      store,
+    }).commit({ expectedRevision: 1, sourceFiles: [SOURCE_FILE], mutate: (draft) => draft })
 
     expect(second.revision).toBe(2)
     expect(second.sourceHashes[SOURCE_FILE]).not.toBe(first.sourceHashes[SOURCE_FILE])
   })
 
   it('enforces expected per-file source hashes before accepting a commit', async () => {
-    const { root, store } = await makeStore()
-    const first = await store.commit({ expectedRevision: 0, sourceFiles: [SOURCE_FILE] })
+    const { root, registry, store, tx } = await makeStore()
+    const first = await tx.commit({ expectedRevision: 0, sourceFiles: [SOURCE_FILE], mutate: (draft) => draft })
     await fs.writeFile(path.join(root, SOURCE_FILE), 'export function Button() { return <button>Hand edit</button> }\n')
 
-    await expect(store.commit({
+    await expect(new SingleRootAuthoringTransaction({
+      transactionId: 'store-test-2',
+      storeId: 'project-main',
+      registry,
+      store,
+    }).commit({
       expectedRevision: 1,
       sourceFiles: [SOURCE_FILE],
       expectedSourceHashes: first.sourceHashes,
+      mutate: (draft) => draft,
     })).rejects.toMatchObject({
       code: 'SOURCE_HASH_STALE',
       status: 409,

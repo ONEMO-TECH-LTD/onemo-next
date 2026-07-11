@@ -16,6 +16,13 @@ export type AuthoringStoreLockLease = {
   release: () => Promise<void>
 }
 
+type AuthoringLockRecord = {
+  schemaVersion: 1
+  storeId: StoreId
+  token: string
+  pid: number
+}
+
 export class CrossProcessAuthoringStoreLock {
   constructor(
     private readonly registry: RuntimeRootRegistry,
@@ -61,27 +68,7 @@ export class CrossProcessAuthoringStoreLock {
       token,
       release: async () => {
         if (released) return
-        let ownershipHandle: import('node:fs/promises').FileHandle
-        try {
-          ownershipHandle = await fs.open(abs, constants.O_RDONLY | requireNoFollowFlag())
-        } catch (error) {
-          if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-            throw namedError('AUTHORING_LOCK_MISSING', `authoring lock disappeared: ${this.storeId}`, 409, error)
-          }
-          throw error
-        }
-        let raw: string
-        try {
-          raw = await ownershipHandle.readFile('utf8')
-        } finally {
-          await ownershipHandle.close()
-        }
-        let record: { token?: unknown }
-        try {
-          record = JSON.parse(raw) as { token?: unknown }
-        } catch (error) {
-          throw namedError('AUTHORING_LOCK_RECORD_INVALID', `authoring lock record is invalid: ${this.storeId}`, 409, error)
-        }
+        const record = await this.readRecord(abs)
         if (record.token !== token) {
           throw namedError('AUTHORING_LOCK_OWNERSHIP_LOST', `authoring lock ownership changed: ${this.storeId}`, 409)
         }
@@ -94,6 +81,91 @@ export class CrossProcessAuthoringStoreLock {
         }
       },
     }
+  }
+
+  async acquireForRecovery(): Promise<AuthoringStoreLockLease> {
+    try {
+      return await this.acquire()
+    } catch (error) {
+      if ((error as { code?: unknown }).code !== 'AUTHORING_STORE_LOCKED') throw error
+    }
+    const abs = await this.lockAbsolutePath()
+    const record = await this.readRecord(abs)
+    if (record.storeId !== this.storeId) {
+      throw namedError('AUTHORING_LOCK_RECORD_INVALID', `authoring lock store mismatch: ${this.storeId}`, 409)
+    }
+    if (await processIsAlive(record.pid)) {
+      throw namedError('AUTHORING_STORE_LOCKED', `authoring store is locked by live pid ${record.pid}: ${this.storeId}`, 409)
+    }
+    const confirmed = await this.readRecord(abs)
+    if (confirmed.token !== record.token) {
+      throw namedError('AUTHORING_LOCK_OWNERSHIP_LOST', `authoring lock changed during recovery: ${this.storeId}`, 409)
+    }
+    await fs.unlink(abs)
+    try {
+      await this.syncDirectory(path.dirname(abs))
+    } catch (error) {
+      throw namedError('AUTHORING_STALE_LOCK_RELEASE_UNCERTAIN', `stale lock removed but directory sync failed: ${this.storeId}`, 500, error)
+    }
+    return this.acquire()
+  }
+
+  private async lockAbsolutePath(): Promise<string> {
+    return this.registry.resolveStorePath(
+      this.storeId,
+      authoringStoreLockPath(this.registry.get(this.storeId).kind),
+    )
+  }
+
+  private async readRecord(abs: string): Promise<AuthoringLockRecord> {
+    let handle: import('node:fs/promises').FileHandle
+    try {
+      handle = await fs.open(abs, constants.O_RDONLY | requireNoFollowFlag())
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        throw namedError('AUTHORING_LOCK_MISSING', `authoring lock disappeared: ${this.storeId}`, 409, error)
+      }
+      throw error
+    }
+    let raw: string
+    try {
+      raw = await handle.readFile('utf8')
+    } finally {
+      await handle.close()
+    }
+    let value: unknown
+    try {
+      value = JSON.parse(raw)
+    } catch (error) {
+      throw namedError('AUTHORING_LOCK_RECORD_INVALID', `authoring lock record is invalid: ${this.storeId}`, 409, error)
+    }
+    if (!isLockRecord(value)) {
+      throw namedError('AUTHORING_LOCK_RECORD_INVALID', `authoring lock record has invalid fields: ${this.storeId}`, 409)
+    }
+    return value
+  }
+}
+
+function isLockRecord(value: unknown): value is AuthoringLockRecord {
+  if (!value || typeof value !== 'object') return false
+  const record = value as Partial<AuthoringLockRecord>
+  const keys = Object.keys(value)
+  return keys.length === 4 && keys.every((key) => ['schemaVersion', 'storeId', 'token', 'pid'].includes(key)) &&
+    record.schemaVersion === 1 &&
+    typeof record.storeId === 'string' && record.storeId.length > 0 &&
+    typeof record.token === 'string' && record.token.length > 0 &&
+    typeof record.pid === 'number' && Number.isSafeInteger(record.pid) && record.pid > 0
+}
+
+async function processIsAlive(pid: number): Promise<boolean> {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code
+    if (code === 'ESRCH') return false
+    if (code === 'EPERM') return true
+    throw namedError('AUTHORING_LOCK_LIVENESS_UNKNOWN', `cannot determine lock owner liveness for pid ${pid}`, 409, error)
   }
 }
 
