@@ -682,34 +682,6 @@
    "D": "#594391"
   },
   {
-   "name": "border/brand/dark",
-   "binding": "brand/black",
-   "description": "🔒 border/ v2.3.2 — The Ink line, follows theme — flips into Snow. The pair is mutually inverse: light is the opposite of dark.",
-   "L": "#071013",
-   "D": "#fafafa"
-  },
-  {
-   "name": "border/brand/light",
-   "binding": "brand/white",
-   "description": "🔒 border/ v2.3.2 — The Snow line, follows theme — flips into Ink. The pair is mutually inverse: dark is the opposite of light.",
-   "L": "#fafafa",
-   "D": "#071013"
-  },
-  {
-   "name": "border/brand/dark-perma",
-   "binding": "brand/black/l-constant",
-   "description": "🔒 border/ v2.3.2 — The Ink line pinned, never flips — edges on constant-light surfaces.",
-   "L": "#071013",
-   "D": "#071013"
-  },
-  {
-   "name": "border/brand/light-perma",
-   "binding": "brand/white/l-constant",
-   "description": "🔒 border/ v2.3.2 — The Snow line pinned, never flips — edges on ink and chrome surfaces.",
-   "L": "#fafafa",
-   "D": "#fafafa"
-  },
-  {
    "name": "border/max",
    "binding": "base/black",
    "description": "🔒 border/ v2.3.2 — Maximum-contrast line, follows theme. Media edges and absolute rules — UI lines use the brand pair.",
@@ -736,6 +708,34 @@
    "description": "🔒 border/ v2.3.2 — Maximum-contrast line, dark-world reading pinned.",
    "L": "#ffffff",
    "D": "#ffffff"
+  },
+  {
+   "name": "border/max/brand",
+   "binding": "brand/black",
+   "description": "🔒 border/ v2.3.2 — The brand extreme line — the strongest brand-material line against the current surface (Ink in light, Snow in dark). Contrast-role name: true in both themes.",
+   "L": "#071013",
+   "D": "#fafafa"
+  },
+  {
+   "name": "border/max/brand-inverse",
+   "binding": "brand/white",
+   "description": "🔒 border/ v2.3.2 — The reverse brand extreme — the brand line matching the opposing surface.",
+   "L": "#fafafa",
+   "D": "#071013"
+  },
+  {
+   "name": "border/max/brand-perma",
+   "binding": "brand/black/l-constant",
+   "description": "🔒 border/ v2.3.2 — The brand extreme, light-world reading pinned — edges on constant-light surfaces.",
+   "L": "#071013",
+   "D": "#071013"
+  },
+  {
+   "name": "border/max/brand-inverse-perma",
+   "binding": "brand/white/l-constant",
+   "description": "🔒 border/ v2.3.2 — The brand extreme, dark-world reading pinned — edges on ink and chrome surfaces.",
+   "L": "#fafafa",
+   "D": "#fafafa"
   },
   {
    "name": "bg/overlay",

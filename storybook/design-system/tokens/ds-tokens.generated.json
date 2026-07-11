@@ -19723,46 +19723,6 @@
          "$libraryName": "",
          "$collectionName": ".2.0-Al-Col",
          "$value": "{brand.3.7}"
-        },
-        "dark": {
-         "$scopes": [
-          "ALL_SCOPES"
-         ],
-         "$description": "🔒 border/ v2.3.2 — The Ink line, follows theme — flips into Snow. The pair is mutually inverse: light is the opposite of dark.",
-         "$type": "color",
-         "$libraryName": "",
-         "$collectionName": ".2.0-Al-Col",
-         "$value": "{brand.black}"
-        },
-        "light": {
-         "$scopes": [
-          "ALL_SCOPES"
-         ],
-         "$description": "🔒 border/ v2.3.2 — The Snow line, follows theme — flips into Ink. The pair is mutually inverse: dark is the opposite of light.",
-         "$type": "color",
-         "$libraryName": "",
-         "$collectionName": ".2.0-Al-Col",
-         "$value": "{brand.white}"
-        },
-        "dark-perma": {
-         "$scopes": [
-          "ALL_SCOPES"
-         ],
-         "$description": "🔒 border/ v2.3.2 — The Ink line pinned, never flips — edges on constant-light surfaces.",
-         "$type": "color",
-         "$libraryName": "",
-         "$collectionName": ".2.0-Al-Col",
-         "$value": "{brand.black.l-constant}"
-        },
-        "light-perma": {
-         "$scopes": [
-          "ALL_SCOPES"
-         ],
-         "$description": "🔒 border/ v2.3.2 — The Snow line pinned, never flips — edges on ink and chrome surfaces.",
-         "$type": "color",
-         "$libraryName": "",
-         "$collectionName": ".2.0-Al-Col",
-         "$value": "{brand.white.l-constant}"
         }
        },
        "max": {
@@ -19803,6 +19763,46 @@
          "$libraryName": "",
          "$collectionName": ".2.0-Al-Col",
          "$value": "{base.white.l-constant}"
+        },
+        "brand": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — The brand extreme line — the strongest brand-material line against the current surface (Ink in light, Snow in dark). Contrast-role name: true in both themes.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.black}"
+        },
+        "brand-inverse": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — The reverse brand extreme — the brand line matching the opposing surface.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.white}"
+        },
+        "brand-perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — The brand extreme, light-world reading pinned — edges on constant-light surfaces.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.black.l-constant}"
+        },
+        "brand-inverse-perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — The brand extreme, dark-world reading pinned — edges on ink and chrome surfaces.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.white.l-constant}"
         }
        }
       },
