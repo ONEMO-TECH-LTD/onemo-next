@@ -220,6 +220,8 @@ export class SingleRootAuthoringTransaction {
       if (coordinator?.status === 'committed' && record.status === 'committed') return 'ignored-committed'
       if (coordinator?.status === 'rolled-back' && record.status === 'rolled-back') return 'ignored-rolled-back'
       if (coordinator?.status !== 'committed' && (coordinator?.status === 'rolled-back' || record.status === 'rolled-back')) {
+        await this.verifyRecoveryCompatible(images)
+        await this.restoreImages(images)
         if (coordinator?.status !== 'rolled-back') {
           await this.writeCoordinator({ ...this.coordinator('prepared'), status: 'rolled-back' })
         }
@@ -452,6 +454,8 @@ export class SingleRootAuthoringTransaction {
         }
       } else if (sha256(await fs.readFile(abs)) !== ref.sha256) {
         throw namedError('TRANSACTION_INSTALL_HASH_MISMATCH', `installed hash mismatch: ${image.file}`, 409)
+      } else if (((await fs.lstat(abs)).mode & 0o777) !== ref.mode) {
+        throw namedError('TRANSACTION_INSTALL_MODE_MISMATCH', `installed mode mismatch: ${image.file}`, 409)
       }
     }
   }
@@ -583,7 +587,10 @@ export async function discoverSingleRootRecoveryDecisions(input: {
       decisions.push({ transactionId, decision: 'invalid-record', reason: 'symlink transaction directory refused' })
       continue
     }
-    if (!entry.isDirectory()) continue
+    if (!entry.isDirectory()) {
+      decisions.push({ transactionId, decision: 'invalid-record', reason: 'transaction entry is not a directory' })
+      continue
+    }
     try {
       const participantPath = await input.registry.resolveStorePath(
         input.storeId,

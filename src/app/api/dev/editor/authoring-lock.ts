@@ -85,23 +85,25 @@ export class CrossProcessAuthoringStoreLock {
       record = await this.readRecordFromHandle(handle)
       await this.assertCanonicalHandle(abs, handle)
     } catch (error) {
-      await handle.close().catch(() => undefined)
-      throw error
+      return closeRefusedLease(handle, error)
     }
     if (record.storeId !== this.storeId) {
-      await handle.close()
-      throw namedError('AUTHORING_LOCK_RECORD_INVALID', `authoring lock store mismatch: ${this.storeId}`, 409)
+      return closeRefusedLease(
+        handle,
+        namedError('AUTHORING_LOCK_RECORD_INVALID', `authoring lock store mismatch: ${this.storeId}`, 409),
+      )
     }
     let ownerAlive: boolean
     try {
       ownerAlive = await processIsAlive(record.pid)
     } catch (error) {
-      await handle.close().catch(() => undefined)
-      throw error
+      return closeRefusedLease(handle, error)
     }
     if (ownerAlive) {
-      await handle.close()
-      throw namedError('AUTHORING_STORE_LOCKED', `authoring store is locked by live pid ${record.pid}: ${this.storeId}`, 409)
+      return closeRefusedLease(
+        handle,
+        namedError('AUTHORING_STORE_LOCKED', `authoring store is locked by live pid ${record.pid}: ${this.storeId}`, 409),
+      )
     }
     const token = randomUUID()
     try {
@@ -110,8 +112,10 @@ export class CrossProcessAuthoringStoreLock {
       await handle.sync()
       await this.syncDirectory(dir)
     } catch (error) {
-      await handle.close().catch(() => undefined)
-      throw namedError('AUTHORING_STALE_LOCK_CLAIM_UNCERTAIN', `stale lock ownership update is uncertain: ${this.storeId}`, 500, error)
+      return closeRefusedLease(
+        handle,
+        namedError('AUTHORING_STALE_LOCK_CLAIM_UNCERTAIN', `stale lock ownership update is uncertain: ${this.storeId}`, 500, error),
+      )
     }
     return this.lease(handle, abs, dir, token)
   }
@@ -132,14 +136,15 @@ export class CrossProcessAuthoringStoreLock {
           record = await this.readRecordFromHandle(handle)
           await this.assertCanonicalHandle(abs, handle)
         } catch (error) {
-          await handle.close().catch(() => undefined)
           released = true
-          throw error
+          return closeRefusedLease(handle, error)
         }
         if (record.token !== token) {
-          await handle.close().catch(() => undefined)
           released = true
-          throw namedError('AUTHORING_LOCK_OWNERSHIP_LOST', `authoring lock ownership changed: ${this.storeId}`, 409)
+          return closeRefusedLease(
+            handle,
+            namedError('AUTHORING_LOCK_OWNERSHIP_LOST', `authoring lock ownership changed: ${this.storeId}`, 409),
+          )
         }
         await fs.unlink(abs)
         await handle.close()
@@ -234,4 +239,23 @@ function requireExclusiveLockFlags(): number {
 
 function namedError(code: string, message: string, status: number, cause?: unknown) {
   return Object.assign(new Error(message), { code, status, cause })
+}
+
+async function closeRefusedLease(handle: import('node:fs/promises').FileHandle, primary: unknown): Promise<never> {
+  try {
+    await handle.close()
+  } catch (closeError) {
+    const namedCloseError = namedError(
+      'AUTHORING_LOCK_CLOSE_UNCERTAIN',
+      'descriptor close failed while preserving refused lock evidence',
+      500,
+      closeError,
+    )
+    if (primary instanceof Error) throw Object.assign(primary, { closeError: namedCloseError })
+    throw namedError('AUTHORING_LOCK_CLOSE_UNCERTAIN', 'lock refusal and descriptor close both failed', 500, {
+      primary,
+      closeError: namedCloseError,
+    })
+  }
+  throw primary
 }

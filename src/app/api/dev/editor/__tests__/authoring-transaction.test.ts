@@ -395,6 +395,66 @@ describe('SingleRootAuthoringTransaction', () => {
     expect(JSON.parse(await fs.readFile(coordinatorPath, 'utf8')).status).toBe('rolled-back')
   })
 
+  it.each([
+    { participantStatus: 'prepared', coordinatorStatus: 'rolled-back' },
+    { participantStatus: 'rolled-back', coordinatorStatus: 'prepared' },
+  ] as const)('restores rollback images before converging $participantStatus/$coordinatorStatus markers', async ({
+    participantStatus,
+    coordinatorStatus,
+  }) => {
+    const { root, sourceFile, registry, store, tx } = await makeTransaction()
+    const sourceAbs = path.join(root, sourceFile)
+    await fs.chmod(sourceAbs, 0o640)
+    const before = await fs.readFile(sourceAbs, 'utf8')
+    const historyFile = 'src/app/(dev)/react-figma-components/.onemo/history/journal.ndjson'
+    const historyAbs = path.join(root, historyFile)
+    const beforeHistory = '{"before":true}\n'
+    await fs.mkdir(path.dirname(historyAbs), { recursive: true })
+    await fs.writeFile(historyAbs, beforeHistory, { mode: 0o640 })
+    await fs.chmod(historyAbs, 0o640)
+    await tx.commit({
+      expectedRevision: 0,
+      sourceFiles: [sourceFile],
+      sourcePatches: [{ file: sourceFile, before, after: 'after bytes requiring rollback\n' }],
+      metadataPatches: [{ file: historyFile, before: beforeHistory, after: `${beforeHistory}{"after":true}\n` }],
+      mutate: (draft) => draft,
+    })
+    const txRoot = path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions/tx-1')
+    const participantPath = path.join(txRoot, 'participant.json')
+    const coordinatorPath = path.join(txRoot, 'coordinator.json')
+    const participant = JSON.parse(await fs.readFile(participantPath, 'utf8'))
+    const coordinator = JSON.parse(await fs.readFile(coordinatorPath, 'utf8'))
+    participant.files[0].after.mode = 0o600
+    await fs.writeFile(participantPath, JSON.stringify({ ...participant, status: participantStatus }))
+    await fs.writeFile(coordinatorPath, JSON.stringify({ ...coordinator, status: coordinatorStatus }))
+    await fs.chmod(sourceAbs, 0o600)
+
+    expect(await executeSingleRootRecovery({ storeId: 'project-main', registry, store }))
+      .toEqual([{ transactionId: 'tx-1', action: 'finished-rolled-back' }])
+    await expect(fs.readFile(sourceAbs, 'utf8')).resolves.toBe(before)
+    expect((await fs.stat(sourceAbs)).mode & 0o777).toBe(0o640)
+    expect(await store.load()).toBeNull()
+    await expect(fs.readFile(historyAbs, 'utf8')).resolves.toBe(beforeHistory)
+    expect((await fs.stat(historyAbs)).mode & 0o777).toBe(0o640)
+    expect(JSON.parse(await fs.readFile(participantPath, 'utf8')).status).toBe('rolled-back')
+    expect(JSON.parse(await fs.readFile(coordinatorPath, 'utf8')).status).toBe('rolled-back')
+  })
+
+  it('blocks new writes when the transactions directory contains a non-directory entry', async () => {
+    const { root, sourceFile, tx } = await makeTransaction()
+    const transactionsRoot = path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions')
+    await fs.mkdir(transactionsRoot, { recursive: true })
+    await fs.writeFile(path.join(transactionsRoot, 'orphan-entry'), 'invalid recovery evidence\n')
+
+    await expect(tx.commit({ expectedRevision: 0, mutate: (draft) => draft }))
+      .rejects.toMatchObject({ code: 'RECOVERY_REQUIRED', transactionIds: ['orphan-entry'] })
+    await expect(fs.readFile(path.join(root, sourceFile), 'utf8'))
+      .resolves.toBe('export function Button() { return <button /> }\n')
+    await expect(fs.readFile(
+      path.join(root, 'src/app/(dev)/react-figma-components/.onemo/authoring-v1.json'),
+    )).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
   it('does not replay terminal committed transactions over newer source state', async () => {
     const { root, sourceFile, registry, store, tx } = await makeTransaction()
     const before = await fs.readFile(path.join(root, sourceFile), 'utf8')
