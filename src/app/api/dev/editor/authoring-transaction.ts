@@ -97,6 +97,7 @@ export class SingleRootAuthoringTransaction {
     command?: unknown
     mutate: (graph: AuthoringGraphV1) => AuthoringGraphV1
   }): Promise<AuthoringGraphV1> {
+    await this.assertNoUnresolvedRecovery()
     const sidecarSnapshot = await this.input.store.loadSnapshot()
     const before = sidecarSnapshot?.graph ?? createEmptyAuthoringGraph({
       storeId: this.input.storeId,
@@ -217,9 +218,13 @@ export class SingleRootAuthoringTransaction {
       const coordinator = await readCoordinator(coordinatorAbs, this.input.transactionId, this.input.storeId, this.rootKind)
       const images = [...record.files, record.sidecar, ...record.metadata]
       if (coordinator?.status === 'committed' && record.status === 'committed') return 'ignored-committed'
+      if (coordinator?.status === 'rolled-back' && record.status === 'rolled-back') return 'ignored-rolled-back'
       if (coordinator?.status !== 'committed' && (coordinator?.status === 'rolled-back' || record.status === 'rolled-back')) {
+        if (coordinator?.status !== 'rolled-back') {
+          await this.writeCoordinator({ ...this.coordinator('prepared'), status: 'rolled-back' })
+        }
         if (record.status !== 'rolled-back') await this.writeParticipant({ ...record, status: 'rolled-back' })
-        return 'ignored-rolled-back'
+        return 'finished-rolled-back'
       }
       await this.verifyRecoveryCompatible(images)
       if (!coordinator || coordinator.status === 'prepared') {
@@ -489,6 +494,22 @@ export class SingleRootAuthoringTransaction {
     return this.withLease(() => this.lock.acquire(), operation)
   }
 
+  private async assertNoUnresolvedRecovery(): Promise<void> {
+    const decisions = await discoverSingleRootRecoveryDecisions({
+      storeId: this.input.storeId,
+      registry: this.input.registry,
+    })
+    const unresolved = decisions.filter((decision) =>
+      decision.decision !== 'ignore-committed' && decision.decision !== 'ignore-rolled-back')
+    if (unresolved.length > 0) {
+      throw Object.assign(new Error(`unresolved authoring recovery: ${unresolved.map((entry) => entry.transactionId).join(', ')}`), {
+        code: 'RECOVERY_REQUIRED',
+        status: 409,
+        transactionIds: unresolved.map((entry) => entry.transactionId),
+      })
+    }
+  }
+
   private async withRecoveryLock<T>(operation: () => Promise<T>): Promise<T> {
     return this.withLease(() => this.lock.acquireForRecovery(), operation)
   }
@@ -525,6 +546,7 @@ export type RecoveryDecision =
   | { transactionId: string; decision: 'rollback-prepared'; record: SingleRootTransactionRecord }
   | { transactionId: string; decision: 'finish-committed'; record: SingleRootTransactionRecord }
   | { transactionId: string; decision: 'ignore-committed'; record: SingleRootTransactionRecord }
+  | { transactionId: string; decision: 'finish-rolled-back'; record: SingleRootTransactionRecord }
   | { transactionId: string; decision: 'ignore-rolled-back'; record: SingleRootTransactionRecord }
   | { transactionId: string; decision: 'invalid-record'; reason: string }
 
@@ -532,6 +554,7 @@ export type RecoveryExecutionResult =
   | { transactionId: string; action: 'rolled-back-prepared' }
   | { transactionId: string; action: 'finished-committed' }
   | { transactionId: string; action: 'ignored-committed' }
+  | { transactionId: string; action: 'finished-rolled-back' }
   | { transactionId: string; action: 'ignored-rolled-back' }
   | { transactionId: string; action: 'invalid-record'; reason: string }
 
@@ -582,8 +605,10 @@ export async function discoverSingleRootRecoveryDecisions(input: {
           decisions.push({ transactionId, decision: 'ignore-committed', record })
       } else if (coordinator?.status === 'committed') {
           decisions.push({ transactionId, decision: 'finish-committed', record })
-      } else if (coordinator?.status === 'rolled-back' || record.status === 'rolled-back') {
+      } else if (coordinator?.status === 'rolled-back' && record.status === 'rolled-back') {
           decisions.push({ transactionId, decision: 'ignore-rolled-back', record })
+      } else if (coordinator?.status === 'rolled-back' || record.status === 'rolled-back') {
+          decisions.push({ transactionId, decision: 'finish-rolled-back', record })
       } else if (!coordinator || coordinator.status === 'prepared') {
           decisions.push({ transactionId, decision: 'rollback-prepared', record })
       }

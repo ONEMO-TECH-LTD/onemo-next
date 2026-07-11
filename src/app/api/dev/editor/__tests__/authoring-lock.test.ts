@@ -138,4 +138,35 @@ describe('CrossProcessAuthoringStoreLock', () => {
     await expect(lock.acquireForRecovery()).rejects.toMatchObject({ code: 'AUTHORING_STORE_LOCKED' })
     await active.release()
   })
+
+  it('preserves a live replacement owner held by another process', async () => {
+    const { root, lock } = await makeLock()
+    const abs = path.join(root, LOCK_PATH)
+    await fs.mkdir(path.dirname(abs), { recursive: true })
+    await fs.writeFile(abs, JSON.stringify({
+      schemaVersion: 1,
+      storeId: 'project-main',
+      token: 'stale-owner',
+      pid: 99_999_999,
+    }) + '\n')
+    const child = spawn(process.execPath, ['-e', [
+      "const fs=require('node:fs')",
+      `const file=${JSON.stringify(abs)}`,
+      "const fd=fs.openSync(file,fs.constants.O_RDWR|fs.constants.O_NONBLOCK|0x20)",
+      "const record={schemaVersion:1,storeId:'project-main',token:'replacement-live-owner',pid:process.pid}",
+      "fs.ftruncateSync(fd,0)",
+      "fs.writeFileSync(fd,JSON.stringify(record)+'\\n')",
+      "fs.fsyncSync(fd)",
+      "process.stdout.write('replacement-locked\\n')",
+      "setInterval(()=>{},1000)",
+    ].join(';')], { stdio: ['ignore', 'pipe', 'inherit'] })
+    try {
+      await once(child.stdout!, 'data')
+      await expect(lock.acquireForRecovery()).rejects.toMatchObject({ code: 'AUTHORING_STORE_LOCKED' })
+      await expect(fs.readFile(abs, 'utf8')).resolves.toContain('replacement-live-owner')
+    } finally {
+      child.kill('SIGTERM')
+      await once(child, 'exit')
+    }
+  })
 })

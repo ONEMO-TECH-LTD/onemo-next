@@ -40,16 +40,11 @@ export class CrossProcessAuthoringStoreLock {
     let handle: import('node:fs/promises').FileHandle | null = null
     let created = false
     try {
-      handle = await fs.open(
-        abs,
-        constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | requireNoFollowFlag(),
-        0o600,
-      )
+      handle = await fs.open(abs, constants.O_CREAT | constants.O_EXCL | constants.O_RDWR |
+        requireNoFollowFlag() | requireExclusiveLockFlags(), 0o600)
       created = true
       await handle.writeFile(JSON.stringify({ schemaVersion: 1, storeId: this.storeId, token, pid: process.pid }) + '\n')
       await handle.sync()
-      await handle.close()
-      handle = null
       await this.syncDirectory(dir)
     } catch (error) {
       if (handle) await handle.close().catch(() => undefined)
@@ -63,16 +58,82 @@ export class CrossProcessAuthoringStoreLock {
       throw error
     }
 
+    return this.lease(handle, abs, dir, token)
+  }
+
+  async acquireForRecovery(): Promise<AuthoringStoreLockLease> {
+    try {
+      return await this.acquire()
+    } catch (error) {
+      if ((error as { code?: unknown }).code !== 'AUTHORING_STORE_LOCKED') throw error
+    }
+    const abs = await this.lockAbsolutePath()
+    const dir = path.dirname(abs)
+    let handle: import('node:fs/promises').FileHandle
+    try {
+      handle = await fs.open(abs, constants.O_RDWR | requireNoFollowFlag() | requireExclusiveLockFlags())
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code
+      if (code === 'EAGAIN' || code === 'EWOULDBLOCK') {
+        throw namedError('AUTHORING_STORE_LOCKED', `authoring store lock is held by another process: ${this.storeId}`, 409, error)
+      }
+      if (code === 'ENOENT') throw namedError('AUTHORING_LOCK_MISSING', `authoring lock disappeared: ${this.storeId}`, 409, error)
+      throw error
+    }
+    let record: AuthoringLockRecord
+    try {
+      record = await this.readRecordFromHandle(handle)
+      await this.assertCanonicalHandle(abs, handle)
+    } catch (error) {
+      await handle.close().catch(() => undefined)
+      throw error
+    }
+    if (record.storeId !== this.storeId) {
+      await handle.close()
+      throw namedError('AUTHORING_LOCK_RECORD_INVALID', `authoring lock store mismatch: ${this.storeId}`, 409)
+    }
+    let ownerAlive: boolean
+    try {
+      ownerAlive = await processIsAlive(record.pid)
+    } catch (error) {
+      await handle.close().catch(() => undefined)
+      throw error
+    }
+    if (ownerAlive) {
+      await handle.close()
+      throw namedError('AUTHORING_STORE_LOCKED', `authoring store is locked by live pid ${record.pid}: ${this.storeId}`, 409)
+    }
+    const token = randomUUID()
+    try {
+      await handle.truncate(0)
+      await handle.writeFile(JSON.stringify({ schemaVersion: 1, storeId: this.storeId, token, pid: process.pid }) + '\n')
+      await handle.sync()
+      await this.syncDirectory(dir)
+    } catch (error) {
+      await handle.close().catch(() => undefined)
+      throw namedError('AUTHORING_STALE_LOCK_CLAIM_UNCERTAIN', `stale lock ownership update is uncertain: ${this.storeId}`, 500, error)
+    }
+    return this.lease(handle, abs, dir, token)
+  }
+
+  private lease(
+    handle: import('node:fs/promises').FileHandle,
+    abs: string,
+    dir: string,
+    token: string,
+  ): AuthoringStoreLockLease {
     let released = false
     return {
       token,
       release: async () => {
         if (released) return
-        const record = await this.readRecord(abs)
+        const record = await this.readRecordFromHandle(handle)
+        await this.assertCanonicalHandle(abs, handle)
         if (record.token !== token) {
           throw namedError('AUTHORING_LOCK_OWNERSHIP_LOST', `authoring lock ownership changed: ${this.storeId}`, 409)
         }
         await fs.unlink(abs)
+        await handle.close()
         released = true
         try {
           await this.syncDirectory(dir)
@@ -83,33 +144,6 @@ export class CrossProcessAuthoringStoreLock {
     }
   }
 
-  async acquireForRecovery(): Promise<AuthoringStoreLockLease> {
-    try {
-      return await this.acquire()
-    } catch (error) {
-      if ((error as { code?: unknown }).code !== 'AUTHORING_STORE_LOCKED') throw error
-    }
-    const abs = await this.lockAbsolutePath()
-    const record = await this.readRecord(abs)
-    if (record.storeId !== this.storeId) {
-      throw namedError('AUTHORING_LOCK_RECORD_INVALID', `authoring lock store mismatch: ${this.storeId}`, 409)
-    }
-    if (await processIsAlive(record.pid)) {
-      throw namedError('AUTHORING_STORE_LOCKED', `authoring store is locked by live pid ${record.pid}: ${this.storeId}`, 409)
-    }
-    const confirmed = await this.readRecord(abs)
-    if (confirmed.token !== record.token) {
-      throw namedError('AUTHORING_LOCK_OWNERSHIP_LOST', `authoring lock changed during recovery: ${this.storeId}`, 409)
-    }
-    await fs.unlink(abs)
-    try {
-      await this.syncDirectory(path.dirname(abs))
-    } catch (error) {
-      throw namedError('AUTHORING_STALE_LOCK_RELEASE_UNCERTAIN', `stale lock removed but directory sync failed: ${this.storeId}`, 500, error)
-    }
-    return this.acquire()
-  }
-
   private async lockAbsolutePath(): Promise<string> {
     return this.registry.resolveStorePath(
       this.storeId,
@@ -117,22 +151,11 @@ export class CrossProcessAuthoringStoreLock {
     )
   }
 
-  private async readRecord(abs: string): Promise<AuthoringLockRecord> {
-    let handle: import('node:fs/promises').FileHandle
-    try {
-      handle = await fs.open(abs, constants.O_RDONLY | requireNoFollowFlag())
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        throw namedError('AUTHORING_LOCK_MISSING', `authoring lock disappeared: ${this.storeId}`, 409, error)
-      }
-      throw error
-    }
-    let raw: string
-    try {
-      raw = await handle.readFile('utf8')
-    } finally {
-      await handle.close()
-    }
+  private async readRecordFromHandle(handle: import('node:fs/promises').FileHandle): Promise<AuthoringLockRecord> {
+    const stat = await handle.stat()
+    const bytes = Buffer.alloc(stat.size)
+    await handle.read(bytes, 0, bytes.length, 0)
+    const raw = bytes.toString('utf8')
     let value: unknown
     try {
       value = JSON.parse(raw)
@@ -143,6 +166,22 @@ export class CrossProcessAuthoringStoreLock {
       throw namedError('AUTHORING_LOCK_RECORD_INVALID', `authoring lock record has invalid fields: ${this.storeId}`, 409)
     }
     return value
+  }
+
+  private async assertCanonicalHandle(abs: string, handle: import('node:fs/promises').FileHandle): Promise<void> {
+    let canonical: import('node:fs').Stats
+    try {
+      canonical = await fs.lstat(abs)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        throw namedError('AUTHORING_LOCK_MISSING', `authoring lock disappeared: ${this.storeId}`, 409, error)
+      }
+      throw error
+    }
+    const opened = await handle.stat()
+    if (canonical.dev !== opened.dev || canonical.ino !== opened.ino) {
+      throw namedError('AUTHORING_LOCK_OWNERSHIP_LOST', `authoring lock inode changed: ${this.storeId}`, 409)
+    }
   }
 }
 
@@ -174,6 +213,14 @@ function requireNoFollowFlag(): number {
     throw namedError('DURABILITY_UNSUPPORTED', 'O_NOFOLLOW is unavailable on this platform', 422)
   }
   return constants.O_NOFOLLOW
+}
+
+function requireExclusiveLockFlags(): number {
+  if (process.platform !== 'darwin') {
+    throw namedError('DURABILITY_UNSUPPORTED', 'kernel exclusive file locks are unavailable on this platform', 422)
+  }
+  const O_EXLOCK = 0x00000020
+  return O_EXLOCK | constants.O_NONBLOCK
 }
 
 function namedError(code: string, message: string, status: number, cause?: unknown) {
