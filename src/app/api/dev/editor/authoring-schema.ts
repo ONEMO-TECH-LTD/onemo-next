@@ -31,7 +31,7 @@ export function isStoreRelativePath(value: unknown): value is string {
   if (typeof value !== 'string' || value.length === 0) return false
   if (path.isAbsolute(value)) return false
   if (value.includes('\\')) return false
-  return !value.split('/').some((part) => part === '..' || part === '')
+  return !value.split('/').some((part) => part === '.' || part === '..' || part === '')
 }
 
 export function validateAuthoringGraphV1(input: unknown): ValidationResult {
@@ -364,6 +364,12 @@ function validateGraphReferences(graph: Record<string, unknown>, errors: string[
       if (!isNonEmptyString(component.source.storeId)) errors.push(`components.${componentId}.source.storeId is required`)
       if (!isStoreRelativePath(component.source.file)) errors.push(`components.${componentId}.source.file must be store-relative`)
       if (!isNonEmptyString(component.source.exportName)) errors.push(`components.${componentId}.source.exportName is required`)
+      if (
+        isStoreRelativePath(component.source.file) &&
+        (!isRecord(graph.sourceHashes) || !isSha256(graph.sourceHashes[component.source.file]))
+      ) {
+        errors.push(`components.${componentId}.source.file missing source hash: ${component.source.file}`)
+      }
     }
     if (!isNonEmptyString(component.primaryVariantId)) {
       errors.push(`components.${componentId}.primaryVariantId is required`)
@@ -456,6 +462,9 @@ function validateGraphReferences(graph: Record<string, unknown>, errors: string[
         const component = graph.components[property.componentId]
         if (isRecord(component) && inherited.variantId !== component.primaryVariantId) {
           errors.push(`sourceProperties.${propertyId}.inheritedFromPropertyId must reference a primary property`)
+        }
+        if (!propertyBindingsMatch(property.binding, inherited.binding)) {
+          errors.push(`sourceProperties.${propertyId}.inheritedFromPropertyId must reference a matching typed binding`)
         }
       }
     }
@@ -604,6 +613,18 @@ function validateExactKeys(label: string, value: Record<string, unknown>, allowe
   for (const key of Object.keys(value)) {
     if (!allowedSet.has(key)) errors.push(`${label} contains unknown key: ${key}`)
   }
+}
+
+function propertyBindingsMatch(left: unknown, right: unknown): boolean {
+  if (!isRecord(left) || !isRecord(right) || left.kind !== right.kind) return false
+  if (left.kind === 'text-content') return true
+  if (left.kind === 'jsx-prop') return left.propName === right.propName
+  if (left.kind === 'inline-style') return left.property === right.property
+  if (left.kind !== 'module-css' || !isRecord(left.stylesheet) || !isRecord(right.stylesheet)) return false
+  return left.stylesheet.storeId === right.stylesheet.storeId &&
+    left.stylesheet.file === right.stylesheet.file &&
+    left.localClass === right.localClass &&
+    left.property === right.property
 }
 
 function isFiniteNumber(value: unknown): value is number {

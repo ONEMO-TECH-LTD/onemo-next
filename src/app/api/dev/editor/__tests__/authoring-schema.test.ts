@@ -116,6 +116,24 @@ describe('AuthoringGraphV1 checkpoint schema', () => {
     })
   })
 
+  it('rejects dot-segment aliases for one physical source file', () => {
+    const graph = minimalGraph()
+    const alias = 'src/app/(dev)/react-figma-components/./Button.tsx'
+    graph.sourceHashes = { [alias]: SHA }
+    graph.components['component-button'].source.file = alias
+    graph.sourceProperties['prop-root-color'].source.file = alias
+
+    const result = validateAuthoringGraphV1(graph)
+
+    expect(result).toMatchObject({
+      ok: false,
+      errors: expect.arrayContaining([
+        `sourceHashes key must be store-relative: ${alias}`,
+        'components.component-button.source.file must be store-relative',
+      ]),
+    })
+  })
+
   it('rejects a property anchor bound to a different source export', () => {
     const graph = minimalGraph()
     graph.sourceProperties['prop-root-color'].ownerAnchor.exportName = 'DifferentExport'
@@ -126,6 +144,61 @@ describe('AuthoringGraphV1 checkpoint schema', () => {
       ok: false,
       errors: expect.arrayContaining([
         'sourceProperties.prop-root-color.ownerAnchor.exportName must match source.exportName',
+      ]),
+    })
+  })
+
+  it('rejects a component source without an exact source hash entry', () => {
+    const graph = minimalGraph()
+    graph.sourceHashes = {}
+
+    const result = validateAuthoringGraphV1(graph)
+
+    expect(result).toMatchObject({
+      ok: false,
+      errors: expect.arrayContaining([
+        'components.component-button.source.file missing source hash: src/app/(dev)/react-figma-components/Button.tsx',
+      ]),
+    })
+  })
+
+  it('rejects linked property lineage across different typed binding paths', () => {
+    const graph = minimalGraph()
+    graph.variants['variant-secondary'] = {
+      id: 'variant-secondary',
+      componentId: 'component-button',
+      displayName: 'Secondary',
+      frame: { x: 360, y: 0, width: 320, height: 180 },
+      inheritance: {
+        kind: 'linked',
+        primaryVariantId: 'variant-primary',
+        overridePropertyIds: ['prop-secondary-label'],
+      },
+      kind: 'custom',
+      transition: { kind: 'instant', delayMs: 0 },
+    }
+    graph.sourceProperties['prop-secondary-label'] = {
+      ...graph.sourceProperties['prop-root-color'],
+      id: 'prop-secondary-label',
+      variantId: 'variant-secondary',
+      inheritedFromPropertyId: 'prop-root-color',
+      binding: { kind: 'jsx-prop', propName: 'label' },
+    }
+
+    const result = validateAuthoringGraphV1(graph)
+
+    expect(result).toMatchObject({
+      ok: false,
+      errors: expect.arrayContaining([
+        'sourceProperties.prop-secondary-label.inheritedFromPropertyId must reference a matching typed binding',
+      ]),
+    })
+
+    graph.sourceProperties['prop-secondary-label'].binding = { kind: 'inline-style', property: 'backgroundColor' }
+    expect(validateAuthoringGraphV1(graph)).toMatchObject({
+      ok: false,
+      errors: expect.arrayContaining([
+        'sourceProperties.prop-secondary-label.inheritedFromPropertyId must reference a matching typed binding',
       ]),
     })
   })
