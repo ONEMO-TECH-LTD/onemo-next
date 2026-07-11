@@ -1,0 +1,69 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+import { Page, H2, P, C, Note } from './blocks';
+import { PaletteGroup, ColourAnatomy, PairAnatomy } from './aliases';
+
+<Meta title="Documentation/Colour/Aliases" />
+
+<Page
+  title="Colour aliases — the product palette"
+  lead="The alias tier allocates pigments to product meaning. It holds no values — every entry is a pointer into the primitives — so the palette stays editable in exactly one place. Its grammar is colour-first: the product asks for a colour, then a behavior, then a step."
+>
+
+<H2>The grammar</H2>
+
+<P>
+  Every route reads <C>colour/qualifier/step</C>. A bare step is the default — the adaptive solid that
+  follows the theme. Behavior qualifiers nest inside each colour, the same six behaviors the primitives
+  define, so asking for a transparent or anchored form of any palette colour is a predictable path, never a
+  new name.
+</P>
+
+<H2>The brand</H2>
+
+<P>
+  The brand group holds the ink/paper pair and the numbered brand colours. Numbering is deliberate: a new
+  brand colour joins as the next number with nothing else moving, and the numbers say palette identity
+  while the semantic tier speaks role language on top.
+</P>
+
+<PairAnatomy group="brand" />
+<ColourAnatomy path="brand/1" />
+
+<P>
+  Each numbered colour carries the full behavior anatomy shown above for the first brand colour; the others
+  repeat the identical shape.
+</P>
+
+<H2>Neutral and statuses</H2>
+
+<P>
+  One neutral scale carries the product's surfaces and supporting text. The four status colours are
+  functional — validation, caution, confirmation, information — not accents; they keep their own names so
+  usage stays legible.
+</P>
+
+<PaletteGroup group="neutral" />
+<PaletteGroup group="error" />
+<PaletteGroup group="warning" />
+<PaletteGroup group="success" />
+<PaletteGroup group="info" />
+
+<H2>Base extremes</H2>
+
+<PairAnatomy group="base" />
+
+<H2>Why this tier is invisible in the picker</H2>
+
+<P>
+  Primitives and aliases are plumbing: they carry no scopes, so they never appear where a designer chooses a
+  fill. The picker offers only the semantic tier — the roles — keeping every selection a usage decision
+  rather than a colour decision. The full cascade still resolves underneath.
+</P>
+
+<Note>
+  Behavior qualifiers on a colour resolve to the matching primitive group of its pigment — e.g.{' '}
+  <C>brand/1/inverse/…</C> points into <C>inverse/…</C> of the pigment family the brand colour is allocated
+  to.
+</Note>
+
+</Page>

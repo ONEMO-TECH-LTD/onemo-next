@@ -1,0 +1,43 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+import { Page, H2, P, C } from './blocks';
+
+<Meta title="Documentation/Changelog" />
+
+<Page
+  title="Changelog"
+  lead="The process record for the design system. Version numbers, dates and change counts live here and only here — documentation pages describe the system as it is."
+>
+
+<H2>DS v2.3.2 — the colour rebuild</H2>
+
+<P><b>2026-07-11 · Semantic text roles executed.</b> The <C>text/</C> family rebuilt from 23 legacy tokens to
+33 roles under the family × register × behavior grammar: mono four-packs (pure extremes + brand voice), a
+supporting register on the transparency ladders, per-brand-colour behavior packs (subtle, inverse, dark,
+light), and statuses re-anchored for legibility. Fifteen legacy names retired with every consumer
+re-pointed before deletion; two deliberate visible fixes (an illegible placeholder tier and a
+tone-on-same-tone role). Verified by full cascade read-back.</P>
+
+<P><b>2026-07-11 · Inverse primitive group.</b> Mode-swapped copies of all adaptive ramps added as a new
+behavior group, giving coloured tokens a true opposite-of-theme behavior; alias routes added across the
+palette.</P>
+
+<P><b>2026-07-11 · Anchored groups and brand pair.</b> Light- and dark-anchored constants and transparencies
+(anchor-by-counting: the dark-anchored group reads the same values from the opposite end) replaced the
+single constant group; the brand ink/paper pair corrected to flip into each other rather than into the
+grey ramp's endpoints.</P>
+
+<P><b>2026-07-10 · Alias tier rebuilt colour-first.</b> The palette tier restructured to
+<C>colour/qualifier/step</C> with full behavior collections per palette colour; behavior-first names and
+suffix conventions retired. Plumbing tiers (primitives, aliases) de-scoped so the picker exposes semantic
+roles only.</P>
+
+<P><b>2026-07-10 · Transparency system.</b> Solved-twin alpha ramps generated for every family and validated
+byte-exact against the reference implementation; opacity ladders added for the base tones; saturated-step
+twins accepted as opaque by mathematical necessity.</P>
+
+<H2>Pending</H2>
+
+<P>Foreground-glyph, border and surface semantic families — same review and grammar. Interaction and scrim
+semantic tokens — after live wash calibration. Motion pairing and component-tier selected contracts.</P>
+
+</Page>

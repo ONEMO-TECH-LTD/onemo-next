@@ -1,0 +1,78 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+import { Page, H2, P, C, Note, Table, S, Swatch } from './blocks';
+import { resolve, PRIM_COL } from './data';
+
+<Meta title="Documentation/Overview" />
+
+<Page
+  title="ONEMO Design System"
+  lead="The single source of truth for how ONEMO looks and behaves: a token architecture that carries every colour, dimension and type decision from the design file into the product, with theming resolved by construction rather than by convention."
+>
+
+<H2>The four tiers</H2>
+
+<P>Every visual decision travels through four tiers. Each tier has one job, and values exist exactly once.</P>
+
+<Table head={['Tier', 'Speaks', 'Job']}>
+  <tr>
+    <td style={S.td}><C>primitive</C></td>
+    <td style={S.td}>pigment names</td>
+    <td style={S.td}>Raw values only — every colour with its two theme faces. Never an alias to another primitive; the layer is the ground truth.</td>
+  </tr>
+  <tr>
+    <td style={S.td}><C>alias</C></td>
+    <td style={S.td}>the product palette</td>
+    <td style={S.td}>Allocates pigments to product meaning — the brand colours, the neutral, the statuses — and exposes each in every behavior. Pure pointers; no values of its own.</td>
+  </tr>
+  <tr>
+    <td style={S.td}><C>semantic</C></td>
+    <td style={S.td}>usage roles</td>
+    <td style={S.td}>The only tier a designer picks from: text roles, foreground glyphs, borders, surfaces. Each role binds one alias route.</td>
+  </tr>
+  <tr>
+    <td style={S.td}><C>component</C></td>
+    <td style={S.td}>per-control contracts</td>
+    <td style={S.td}>Control-specific values (a selected tab, a dial arc) that compose semantic roles into named parts.</td>
+  </tr>
+</Table>
+
+<H2>How theming works</H2>
+
+<P>
+  Themes flip at the <b>primitive</b> tier and nowhere else. Primitive colour ramps carry a Light and a Dark
+  face; aliases and semantics are single-mode and inherit the flip through the chain. No tier above the
+  primitives ever restates a value per theme — a semantic role binds one route, and both theme appearances
+  fall out of the cascade.
+</P>
+
+<P>
+  The brand ink and paper pair flip into <i>each other</i>, not into the grey ramp:
+  <span style={{ display: 'inline-flex', gap: 6, verticalAlign: 'middle', marginLeft: 8 }}>
+    <Swatch value={resolve(PRIM_COL, 'base/brand-black').L} title="ink · light" />
+    <Swatch value={resolve(PRIM_COL, 'base/brand-black').D} title="ink · dark" />
+  </span>
+</P>
+
+<H2>The neutral-first law</H2>
+
+<P>
+  ONEMO's primary identity is the brand ink, paper and grey. Coloured ramps are occasional accents — an
+  indicator, a dial arc, a focus ring — never the default surface of buttons or icons. The palette is built
+  so the neutral system carries the product and colour appears deliberately.
+</P>
+
+<H2>Where the data comes from</H2>
+
+<P>
+  Every swatch and value in this documentation is rendered from a generated snapshot of the design file's
+  variables. The pages describe method and law; the numbers on them are computed from the data at render
+  time, so the documentation cannot drift from the file.
+</P>
+
+<Note>
+  Sections: <b>Colour</b> (primitives → aliases → semantic roles → accessible text) ·{' '}
+  <b>States &amp; Interaction</b> · <b>Changelog</b>. Type, dimension and effects documentation follow as
+  those tiers are rebuilt.
+</Note>
+
+</Page>

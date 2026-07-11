@@ -1,0 +1,82 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+import { Page, H2, P, C, Note, Table, S } from './blocks';
+import { WashDemo, ScrimDemo } from './states';
+
+<Meta title="Documentation/States & Interaction" />
+
+<Page
+  title="States & interaction"
+  lead="A control's colour says what it is; a wash says what's happening to it. Transient states are never expressed by changing a control's colours — they are a translucent layer laid over the whole control for the duration of the interaction, then removed. Persistent states are the control's own styling."
+>
+
+<Note>
+  Draft status: the model and grammar below are agreed direction; wash intensities await live calibration on
+  real controls before the interaction tokens are minted at the semantic tier.
+</Note>
+
+<H2>Why washes</H2>
+
+<P>
+  One recipe fits every surface — the same wash darkens a pill, a chip, a photograph or a gradient alike,
+  so no component ever needs a second "pressed colour". Washes stack: a selected control that is also
+  pressed is the selected styling with the wash on top, with no combinatorial colours. And the mechanism is
+  the platform canon — the state-layer model native mobile users already feel.
+</P>
+
+<WashDemo />
+
+<P>
+  Washes are surface-aware: the ink voice over light surfaces, the paper voice over dark fills, and the
+  pinned dark extreme over imagery — a photograph does not theme-flip, so its wash must not either. The
+  intensity ladder is bound to the transparency steps shown above; the opacity never changes between
+  themes, only the tone flips through the primitive cascade.
+</P>
+
+<H2>The state grammar</H2>
+
+<Table head={['State', 'Lasts', 'Input', 'Expressed as']}>
+  <tr><td style={S.td}>Rest</td><td style={S.td}>—</td><td style={S.td}>—</td><td style={S.td}>the control's base tokens</td></tr>
+  <tr><td style={S.td}><b>Pressed</b></td><td style={S.td}>finger down → release</td><td style={S.td}>touch · pointer · key</td><td style={S.td}>press wash</td></tr>
+  <tr><td style={S.td}><b>Selected</b></td><td style={S.td}>until changed</td><td style={S.td}>product state</td><td style={S.td}>component-tier styling — never a global wash</td></tr>
+  <tr><td style={S.td}>Hover</td><td style={S.td}>pointer over</td><td style={S.td}>pointer-capable devices only</td><td style={S.td}>hover wash</td></tr>
+  <tr><td style={S.td}>Dragging</td><td style={S.td}>while moving</td><td style={S.td}>direct manipulation</td><td style={S.td}>drag wash, paired with motion</td></tr>
+  <tr><td style={S.td}>Focus-visible</td><td style={S.td}>while navigated</td><td style={S.td}>keyboard/assistive only</td><td style={S.td}>additive ring — never on plain taps</td></tr>
+  <tr><td style={S.td}>Disabled</td><td style={S.td}>until enabled</td><td style={S.td}>—</td><td style={S.td}>own styling; suppresses all feedback</td></tr>
+</Table>
+
+<P>
+  <b>Priority:</b> disabled suppresses everything; selected is a base other states stack on; the focus ring
+  is additive and never suppressed; press overrides hover; drag overrides press. <b>Commit:</b> actions
+  commit on release inside the control, and sliding away cancels; every drag interaction has a non-drag
+  alternative; hit targets meet the platform minimum.
+</P>
+
+<H2>Scrims</H2>
+
+<P>
+  A scrim pushes content back: a translucent dark layer behind modals, or under text sitting directly on a
+  photograph. Scrims use the pinned dark extreme so they read identically in both themes — the content they
+  cover does not theme-flip. Scrim pushes back; frost brings a surface forward — the two are different
+  materials and never substitute for each other.
+</P>
+
+<ScrimDemo />
+
+<H2>Selected has no global token</H2>
+
+<P>
+  Selection is persistent product state, so it is expressed as the control's own styling at the component
+  tier — a selected tab, a selected dial segment — each with its own contract. A global "selected wash"
+  would flatten controls that need different selected identities.
+</P>
+
+<H2>Execution shape</H2>
+
+<P>
+  A wash is an overlay filling the control's rounded bounds, shown between pointer-down and
+  pointer-up or cancel. Hover variants are gated to pointer-capable devices; the focus ring renders only for
+  keyboard and assistive navigation. Because intensity lives in the token's alpha and tone lives in the
+  primitive cascade, the implementation never branches on theme.
+</P>
+
+</Page>

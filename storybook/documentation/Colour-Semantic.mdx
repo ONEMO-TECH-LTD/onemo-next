@@ -1,0 +1,60 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+import { Page, H2, P, C, Note } from './blocks';
+import { TextGroup, TextGroupTitle, RetiredNames } from './semantic';
+
+<Meta title="Documentation/Colour/Semantic roles" />
+
+<Page
+  title="Semantic colour roles"
+  lead="The only colour tier a designer touches: roles named for usage, each binding one alias route. The naming grammar has three orthogonal slots — family, register, behavior — and every word means exactly one thing across the whole tier."
+>
+
+<H2>The naming grammar</H2>
+
+<P>
+  <b>Family</b> says whose voice speaks: the pure extremes, the brand ink/paper voice, or a brand colour.{' '}
+  <b>Register</b> modifies loudness — <C>-subtle</C> quiets a family the way <C>-strong</C> amplifies it.{' '}
+  <b>Behavior</b> says how the role responds to the theme: a bare name follows it, <C>-inverse</C> opposes
+  it, <C>-dark</C> and <C>-light</C> pin one of the family's voices so it never flips. Because the words
+  describe voices rather than pigments, greys and colours adopt the same suffixes without new vocabulary.
+</P>
+
+<P>
+  Every sample below renders on the role's real surface — the flipping button, the constant-ink pill, the
+  imagery stand-in — with the left panel in the light theme and the right in the dark.
+</P>
+
+<H2>text/ — <TextGroupTitle group="max" /></H2>
+<TextGroup group="max" />
+
+<H2>text/ — <TextGroupTitle group="primary" /></H2>
+<TextGroup group="primary" />
+
+<H2>text/ — <TextGroupTitle group="secondary" /></H2>
+<TextGroup group="secondary" />
+
+<H2>text/ — <TextGroupTitle group="neutrals" /></H2>
+<TextGroup group="neutrals" />
+
+<H2>text/ — <TextGroupTitle group="brand" /></H2>
+<TextGroup group="brand" />
+
+<H2>text/ — <TextGroupTitle group="status" /></H2>
+<TextGroup group="status" />
+
+<H2>Retired names</H2>
+
+<P>
+  Earlier role names that duplicated a value, encoded state in text colour, or misdescribed their usage were
+  retired; their consumers were re-pointed to the surviving roles listed here. Anything migrating an old
+  design finds its target by name.
+</P>
+
+<RetiredNames />
+
+<Note>
+  The foreground-glyph (<C>fg/</C>), border and surface families are documented here as each completes its
+  rebuild through the same grammar.
+</Note>
+
+</Page>

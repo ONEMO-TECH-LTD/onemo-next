@@ -6,7 +6,7 @@ import type { StorybookConfig } from '@storybook/nextjs';
  * config — IgnorePlugin for paper-full/jsdom — which nextjs-vite cannot honour).
  */
 const config: StorybookConfig = {
-  stories: ['../storybook/**/*.stories.@(ts|tsx|mdx)'],
+  stories: ['../storybook/**/*.mdx', '../storybook/**/*.stories.@(ts|tsx)'],
   addons: ['@storybook/addon-docs'],
   framework: { name: '@storybook/nextjs', options: {} },
   staticDirs: ['../public'],

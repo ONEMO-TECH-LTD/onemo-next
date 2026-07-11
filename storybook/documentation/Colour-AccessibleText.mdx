@@ -1,0 +1,45 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+import { Page, H2, P, C, Note } from './blocks';
+import { ImagePickDemo, ColourPickDemo } from './accessible-text';
+
+<Meta title="Documentation/Colour/Accessible text" />
+
+<Page
+  title="Accessible text — one algorithm"
+  lead="Text on imagery and text on colour follow a single law: measure the surface, walk a preference-ordered candidate list, take the first candidate that passes body-text contrast; if none passes, take the best available and treat it as large-type-only. Nothing on this page is hand-picked — every caption is the algorithm's own output."
+>
+
+<H2>On imagery</H2>
+
+<P>
+  A photograph does not theme-flip, so its text must not either. The candidates are the pinned pure
+  extremes; sampled region luminance decides which one speaks. Essential copy additionally sits on the
+  image scrim, so legibility never depends on the photograph cooperating.
+</P>
+
+<ImagePickDemo />
+
+<H2>On colour</H2>
+
+<P>
+  A colour surface prefers its own family's voice: the deep reading on light steps, the pale reading on deep
+  steps — colour-native pairings rather than raw black or white. Neutral candidates enter only as fallback
+  for the few mid-tone surfaces where neither of the family's own voices reaches body-text contrast; those
+  surfaces carry short, large or bold type only.
+</P>
+
+<ColourPickDemo />
+
+<H2>Where it runs</H2>
+
+<P>
+  The algorithm ships as a small pure function used by both this documentation and the product engine, so
+  the law documented here and the law executed in the app are the same code path.
+</P>
+
+<Note>
+  Candidate order encodes design intent, not just mathematics: family voices before neutrals means the
+  system prefers colour-matched text wherever it is legal, and falls back loudly rather than silently.
+</Note>
+
+</Page>

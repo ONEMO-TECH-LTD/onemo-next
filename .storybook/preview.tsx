@@ -8,6 +8,15 @@ import '../src/app/globals.css'; // DS v2.3 tokens (Tailwind v4 @theme + :root c
 const preview: Preview = {
   parameters: {
     layout: 'centered',
+    options: {
+      storySort: {
+        order: [
+          'Documentation',
+          ['Overview', 'Colour', ['Primitives', 'Aliases', 'Semantic roles', 'Accessible text'], 'States & Interaction', 'Changelog'],
+          'Design System',
+        ],
+      },
+    },
     backgrounds: {
       default: 'surface',
       values: [
