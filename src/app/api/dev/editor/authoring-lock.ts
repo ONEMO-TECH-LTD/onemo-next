@@ -127,9 +127,18 @@ export class CrossProcessAuthoringStoreLock {
       token,
       release: async () => {
         if (released) return
-        const record = await this.readRecordFromHandle(handle)
-        await this.assertCanonicalHandle(abs, handle)
+        let record: AuthoringLockRecord
+        try {
+          record = await this.readRecordFromHandle(handle)
+          await this.assertCanonicalHandle(abs, handle)
+        } catch (error) {
+          await handle.close().catch(() => undefined)
+          released = true
+          throw error
+        }
         if (record.token !== token) {
+          await handle.close().catch(() => undefined)
+          released = true
           throw namedError('AUTHORING_LOCK_OWNERSHIP_LOST', `authoring lock ownership changed: ${this.storeId}`, 409)
         }
         await fs.unlink(abs)
