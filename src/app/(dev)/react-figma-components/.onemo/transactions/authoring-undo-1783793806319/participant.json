@@ -1,0 +1,16 @@
+{
+  "transactionId": "authoring-undo-1783793806319",
+  "storeId": "project-main",
+  "coordinator": {
+    "storeId": "project-main",
+    "relativeTransactionPath": "src/app/(dev)/react-figma-components/.onemo/transactions/authoring-undo-1783793806319/participant.json"
+  },
+  "participants": [
+    "project-main"
+  ],
+  "status": "committed",
+  "beforeRevision": 4,
+  "afterRevision": 5,
+  "beforeSidecarHash": "c97821a69378ecc72cf32f86694eaa3bdc05cf56ce1c13bdc7c7b12e50d9e97b",
+  "afterSidecarHash": "8c75111d5294c433e4980fb772d4dd8c3b14072efc33b62cf29887ea06ff5466"
+}
