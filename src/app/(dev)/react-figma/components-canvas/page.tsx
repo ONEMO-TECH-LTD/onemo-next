@@ -29,6 +29,20 @@ type InventoryEntry = { name: string; category: string; importPath: string; root
 // semantic state a ghost frame previews (undefined = a normal frame).
 type Frame = { key: string; label: string; category: string; root: Root; file?: string; Comp: React.ElementType; props?: Record<string, string>; axis?: string; state?: string }
 type ComponentGroup = { key: string; name: string; category: string; root: Root; file?: string; variants: Frame[] }
+type AuthoringCanvasState = {
+  revision: number
+  sourceHashes: Record<string, string>
+  component: {
+    id: string
+    displayName: string
+    source: { file: string; exportName: string }
+    variants: Array<{ id: string; displayName: string; frame: { x: number; y: number; width: number; height: number }; kind: string; primary: boolean }>
+  } | null
+}
+type AuthoringCommand =
+  | { kind: 'create-variant'; file: string; name: string }
+  | { kind: 'rename-variant'; file: string; from: string; to: string }
+  | { kind: 'move-variant-frame'; file: string; variantId: string; frame: { x: number; y: number; width: number; height: number } }
 const COMPONENT_TEXT = '#8638E5'
 const COMPONENT_ACCENT = '#9747FF'
 const CANVAS_BG = '#F5F5F5'
@@ -283,6 +297,80 @@ class FrameBoundary extends React.Component<{ label: string; children: React.Rea
   }
 }
 
+function AuthoringVariantBoard({
+  group,
+  authoring,
+  onCommand,
+}: {
+  group: ComponentGroup
+  authoring: NonNullable<AuthoringCanvasState['component']>
+  onCommand: (command: AuthoringCommand) => Promise<boolean>
+}) {
+  const [selectedId, setSelectedId] = React.useState<string | null>(authoring.variants[0]?.id ?? null)
+  const [createName, setCreateName] = React.useState('New Variant')
+  const [renameTo, setRenameTo] = React.useState('')
+  React.useEffect(() => {
+    if (!authoring.variants.some((variant) => variant.id === selectedId)) {
+      setSelectedId(authoring.variants[0]?.id ?? null)
+    }
+  }, [authoring.variants, selectedId])
+  const selected = authoring.variants.find((variant) => variant.id === selectedId) ?? authoring.variants[0] ?? null
+  const axis = group.variants.find((variant) => variant.axis)?.axis ?? 'variant'
+  const componentFrame = group.variants.find((variant) => !variant.state)?.Comp ?? group.variants[0]?.Comp
+  const width = Math.max(420, ...authoring.variants.map((variant) => variant.frame.x + variant.frame.width + 48))
+  const height = Math.max(260, ...authoring.variants.map((variant) => variant.frame.y + variant.frame.height + 48))
+  const create = async () => {
+    const name = createName.trim()
+    if (!name) return
+    if (await onCommand({ kind: 'create-variant', file: authoring.source.file, name })) setCreateName('')
+  }
+  const rename = async () => {
+    if (!selected) return
+    const to = renameTo.trim()
+    if (!to) return
+    if (await onCommand({ kind: 'rename-variant', file: authoring.source.file, from: selected.displayName, to })) setRenameTo('')
+  }
+  const nudge = async () => {
+    if (!selected) return
+    await onCommand({
+      kind: 'move-variant-frame',
+      file: authoring.source.file,
+      variantId: selected.id,
+      frame: { ...selected.frame, x: selected.frame.x + 24 },
+    })
+  }
+  return (
+    <div data-authoring-canvas data-authoring-component={authoring.id} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div data-authoring-breadcrumb style={{ display: 'flex', alignItems: 'center', gap: 8, font: '600 11px/1.2 system-ui', color: COMPONENT_TEXT }}>
+        <span>Components</span><span style={{ color: 'rgba(0,0,0,0.35)' }}>/</span><span>{authoring.displayName}</span>
+      </div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <input aria-label="New variant name" value={createName} onChange={(e) => setCreateName(e.target.value)} style={{ width: 132, border: `1px solid ${COMPONENT_ACCENT}`, borderRadius: 6, padding: '5px 7px', font: '11px system-ui' }} />
+        <button type="button" onClick={create} style={{ border: `1px solid ${COMPONENT_ACCENT}`, background: '#fff', color: COMPONENT_TEXT, borderRadius: 6, padding: '5px 8px', font: '600 11px system-ui', cursor: 'pointer' }}>Create variant</button>
+        <input aria-label="Rename selected variant" placeholder={selected ? `Rename ${selected.displayName}` : 'Rename'} value={renameTo} onChange={(e) => setRenameTo(e.target.value)} style={{ width: 152, border: '1px solid rgba(0,0,0,0.18)', borderRadius: 6, padding: '5px 7px', font: '11px system-ui' }} />
+        <button type="button" disabled={!selected} onClick={rename} style={{ border: '1px solid rgba(0,0,0,0.18)', background: '#fff', color: 'rgba(0,0,0,0.65)', borderRadius: 6, padding: '5px 8px', font: '600 11px system-ui', cursor: selected ? 'pointer' : 'default' }}>Rename</button>
+        <button type="button" disabled={!selected} onClick={nudge} style={{ border: '1px solid rgba(0,0,0,0.18)', background: '#fff', color: 'rgba(0,0,0,0.65)', borderRadius: 6, padding: '5px 8px', font: '600 11px system-ui', cursor: selected ? 'pointer' : 'default' }}>Move +24px</button>
+      </div>
+      <div style={{ position: 'relative', width, height, border: `1px dashed ${COMPONENT_ACCENT}`, borderRadius: 12, background: 'rgba(151,71,255,0.03)' }}>
+        {componentFrame && authoring.variants.map((variant) => {
+          const isSelected = variant.id === selected?.id
+          return (
+            <figure key={variant.id} data-authoring-variant={variant.id} data-component-frame={variant.displayName} data-component-source={authoring.source.file} onPointerDown={() => setSelectedId(variant.id)} style={{ position: 'absolute', left: variant.frame.x, top: variant.frame.y, width: variant.frame.width, minHeight: variant.frame.height, margin: 0, display: 'flex', flexDirection: 'column', gap: 8, cursor: 'pointer' }}>
+              <figcaption style={{ display: 'flex', alignItems: 'center', gap: 6, font: '600 11px/1.2 system-ui', color: COMPONENT_TEXT }}>
+                <span aria-hidden style={{ width: 8, height: 8, transform: 'rotate(45deg)', borderRadius: 2, background: variant.primary ? COMPONENT_ACCENT : '#fff', border: `1px solid ${COMPONENT_ACCENT}` }} />
+                {variant.displayName}
+              </figcaption>
+              <div style={{ minHeight: variant.frame.height - 24, padding: 24, background: '#fff', borderRadius: 12, outline: isSelected ? `2px solid ${COMPONENT_ACCENT}` : '1px solid rgba(0,0,0,0.08)', outlineOffset: isSelected ? 2 : 0 }}>
+                <FrameBoundary label={variant.displayName}>{React.createElement(componentFrame, { [axis]: variant.displayName })}</FrameBoundary>
+              </div>
+            </figure>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export default function ComponentsCanvasHost() {
   // QA HIGH (E7 gate): component modules must NOT render during SSR — a throwing component
   // would 500 the whole route before any ErrorBoundary exists (boundaries only catch in the
@@ -296,11 +384,52 @@ export default function ComponentsCanvasHost() {
   // I7 node-system: the edited component's connectors (drives the wire overlay). Re-fetched on every board refresh.
   const boardRef = React.useRef<HTMLDivElement | null>(null)
   const [editConn, setEditConn] = React.useState<Conn[]>([])
+  const [authoring, setAuthoring] = React.useState<AuthoringCanvasState | null>(null)
+  const [authoringError, setAuthoringError] = React.useState<string | null>(null)
+  const [inventory, setInventory] = React.useState<InventoryEntry[] | null>(null)
+  const fetchInventory = React.useCallback(() => {
+    fetch('/api/dev/editor-components').then((r) => (r.ok ? r.json() : { components: [] }))
+      .then((d: { components?: InventoryEntry[] }) => setInventory(d.components ?? []))
+      .catch(() => setInventory([]))
+  }, [])
   const fetchConn = React.useCallback(() => {
     if (!editFile) { setEditConn([]); return }
     fetch(`/api/dev/editor-component-model?file=${encodeURIComponent(editFile)}`).then((r) => (r.ok ? r.json() : null)).then((m) => setEditConn(m?.connectors ?? [])).catch(() => setEditConn([]))
   }, [editFile])
   React.useEffect(() => { fetchConn() }, [fetchConn])
+  const fetchAuthoring = React.useCallback(() => {
+    if (!editFile) { setAuthoring(null); setAuthoringError(null); return }
+    fetch(`/api/dev/editor-authoring?file=${encodeURIComponent(editFile)}`)
+      .then(async (r) => {
+        const data = await r.json().catch(() => null)
+        if (!r.ok) throw new Error(data?.error || `authoring load failed (${r.status})`)
+        setAuthoring(data as AuthoringCanvasState)
+        setAuthoringError(null)
+      })
+      .catch((error) => { setAuthoring(null); setAuthoringError((error as Error).message) })
+  }, [editFile])
+  React.useEffect(() => { fetchAuthoring() }, [fetchAuthoring])
+  const authoringWrite = React.useCallback(async (command: AuthoringCommand): Promise<boolean> => {
+    if (!authoring) return false
+    const r = await fetch('/api/dev/editor-authoring', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        command,
+        expectedRevision: authoring.revision,
+        expectedSourceHashes: authoring.sourceHashes,
+      }),
+    })
+    if (!r.ok) {
+      const msg = await r.json().then((j) => j?.error).catch(() => null)
+      window.parent?.postMessage({ type: 'fc-toast', kind: 'error', message: msg || `authoring write failed (${r.status})` }, '*')
+      return false
+    }
+    fetchAuthoring()
+    fetchInventory()
+    window.parent?.postMessage({ type: 'fc-model-changed' }, '*')
+    return true
+  }, [authoring, fetchAuthoring, fetchInventory])
   // I7: fire a node-system write (set/remove-connector), then re-read (board + connectors) and tell the parent
   // shell to reload its own model (its inspector shows connectors too). No optimistic wire state — model is truth.
   const nodeWrite = React.useCallback(async (body: object): Promise<boolean> => {
@@ -316,22 +445,16 @@ export default function ComponentsCanvasHost() {
     window.parent?.postMessage({ type: 'fc-model-changed' }, '*') // parent reloadEditModel + will bounce fc-board-refresh
     return true
   }, [fetchConn])
-  const [inventory, setInventory] = React.useState<InventoryEntry[] | null>(null)
-  const fetchInventory = React.useCallback(() => {
-    fetch('/api/dev/editor-components').then((r) => (r.ok ? r.json() : { components: [] }))
-      .then((d: { components?: InventoryEntry[] }) => setInventory(d.components ?? []))
-      .catch(() => setInventory([]))
-  }, [])
   React.useEffect(() => { fetchInventory() }, [fetchInventory])
   // I5 (§I5): the editor shell posts `fc-board-refresh` after an authoring op (add axis/value/state) so the board
   // RE-FETCHES the inventory and shows the new frame live — "ALL authoring works FROM the board", not just renders
   // it. (Fast Refresh reloads the component module but never re-runs this mount-time fetch, so the axis-value
   // frames would otherwise stay stale until a manual reload.)
   React.useEffect(() => {
-    const onMsg = (e: MessageEvent) => { if (e.data?.type === 'fc-board-refresh') { fetchInventory(); fetchConn() } }
+    const onMsg = (e: MessageEvent) => { if (e.data?.type === 'fc-board-refresh') { fetchInventory(); fetchConn(); fetchAuthoring() } }
     window.addEventListener('message', onMsg)
     return () => window.removeEventListener('message', onMsg)
-  }, [fetchInventory, fetchConn])
+  }, [fetchInventory, fetchConn, fetchAuthoring])
   const loadingInventory = inventory === null
   const groups = loadingInventory ? [] : groupFrames(frames, inventory, editFile)
   const byCategory = new Map<string, ComponentGroup[]>()
@@ -359,8 +482,11 @@ export default function ComponentsCanvasHost() {
                   {group.variants.length > 1 && <span style={{ font: '500 10px/1.2 system-ui', color: 'rgba(0,0,0,0.45)' }}>{group.variants.length} variants</span>}
                 </div>
                 <div {...(group.file && group.file === editFile ? { ref: boardRef } : {})} style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 16, padding: 24, borderRadius: 12, border: `1px ${group.variants.length > 1 ? 'dashed' : 'solid'} ${COMPONENT_ACCENT}` }}>
-                  {group.file && group.file === editFile && <NodeLayer file={group.file} connectors={editConn} boardRef={boardRef} onWrite={nodeWrite} />}
-                  {(() => {
+                  {group.file && group.file === editFile && !authoring?.component && <NodeLayer file={group.file} connectors={editConn} boardRef={boardRef} onWrite={nodeWrite} />}
+                  {group.file && group.file === editFile && authoringError && <div style={{ color: '#f24822', font: '11px system-ui' }}>{authoringError}</div>}
+                  {group.file && group.file === editFile && authoring?.component ? (
+                    <AuthoringVariantBoard group={group} authoring={authoring.component} onCommand={authoringWrite} />
+                  ) : (() => {
                     // I5/D1: the axis-grouped board — base row, one labeled sub-group PER variant axis, then the
                     // state ghost slots. State ghosts apply the §3.2 preview contract: interaction → data-fc-preview
                     // on the host figure (the editor-only dual-selector half); semantic → the boolean prop.
