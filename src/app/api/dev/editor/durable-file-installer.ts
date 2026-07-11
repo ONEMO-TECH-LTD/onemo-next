@@ -108,7 +108,7 @@ export class DurableFileInstaller {
 
   private async syncDirectory(dir: string) {
     if (this.options.syncDirectory) return this.options.syncDirectory(dir)
-    return syncDirectory(dir)
+    return syncDirectoryDurable(dir)
   }
 
   private async assertSameDevice(tempPath: string, destinationPath: string) {
@@ -165,7 +165,7 @@ export function sha256(bytes: Buffer | string): string {
   return createHash('sha256').update(bytes).digest('hex')
 }
 
-async function syncDirectory(dir: string) {
+export async function syncDirectoryDurable(dir: string) {
   let handle: import('node:fs/promises').FileHandle | null = null
   try {
     handle = await fs.open(dir, constants.O_RDONLY)

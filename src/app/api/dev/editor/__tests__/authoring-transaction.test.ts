@@ -20,6 +20,7 @@ async function makeTransaction() {
   return {
     root,
     sourceFile,
+    registry,
     store,
     tx: new SingleRootAuthoringTransaction({
       transactionId: 'tx-1',
@@ -70,6 +71,26 @@ describe('SingleRootAuthoringTransaction', () => {
 
     await expect(tx.commit({ expectedRevision: 0, mutate: (draft) => draft }))
       .rejects.toMatchObject({ code: 'AUTHORING_REVISION_STALE', status: 409 })
+  })
+
+  it('serializes the live transaction path with a filesystem lock', async () => {
+    const { registry, store, tx } = await makeTransaction()
+    const competing = new SingleRootAuthoringTransaction({
+      transactionId: 'tx-2',
+      storeId: 'project-main',
+      registry,
+      store,
+    })
+
+    const results = await Promise.allSettled([
+      tx.commit({ expectedRevision: 0, mutate: (draft) => draft }),
+      competing.commit({ expectedRevision: 0, mutate: (draft) => draft }),
+    ])
+
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1)
+    const rejection = results.find((result): result is PromiseRejectedResult => result.status === 'rejected')
+    expect(rejection?.reason).toMatchObject({ code: 'AUTHORING_STORE_LOCKED', status: 409 })
+    expect((await store.load())?.revision).toBe(1)
   })
 
   it('persists exact source hashes during transaction commit and updates them after byte edits', async () => {

@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 
+import { CrossProcessAuthoringStoreLock } from './authoring-lock'
 import { AuthoringSidecarStore, PROJECT_AUTHORING_SIDECAR } from './authoring-store'
 import type { AuthoringGraphV1, StoreId } from './authoring-types'
 import { DurableFileInstaller, sha256 } from './durable-file-installer'
@@ -20,6 +21,7 @@ export type SingleRootTransactionRecord = {
 
 export class SingleRootAuthoringTransaction {
   private readonly installer = new DurableFileInstaller()
+  private readonly lock: CrossProcessAuthoringStoreLock
 
   constructor(
     private readonly input: {
@@ -28,9 +30,25 @@ export class SingleRootAuthoringTransaction {
       registry: RuntimeRootRegistry
       store: AuthoringSidecarStore
     },
-  ) {}
+  ) {
+    this.lock = new CrossProcessAuthoringStoreLock(input.registry, input.storeId)
+  }
 
   async commit(update: {
+    expectedRevision: number
+    sourceFiles?: string[]
+    expectedSourceHashes?: Record<string, string>
+    mutate: (graph: AuthoringGraphV1) => AuthoringGraphV1
+  }): Promise<AuthoringGraphV1> {
+    const lease = await this.lock.acquire()
+    try {
+      return await this.commitLocked(update)
+    } finally {
+      await lease.release()
+    }
+  }
+
+  private async commitLocked(update: {
     expectedRevision: number
     sourceFiles?: string[]
     expectedSourceHashes?: Record<string, string>
