@@ -256,6 +256,34 @@ export const RESOLVED = {
    "D": "#071013"
   },
   {
+   "name": "fg/primary/subtle-inverse",
+   "binding": "brand/white/alpha/9",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Supporting glyph register, opposite of theme — quiet marks on inverse surfaces.",
+   "L": "#fafafab2",
+   "D": "#071013b2"
+  },
+  {
+   "name": "fg/primary/subtle-perma",
+   "binding": "brand/black/l-alpha/9",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Supporting glyph register, light-world reading pinned.",
+   "L": "#071013b2",
+   "D": "#071013b2"
+  },
+  {
+   "name": "fg/primary/subtle-inverse-perma",
+   "binding": "brand/white/l-alpha/9",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Supporting glyph register, dark-world reading pinned — quiet marks on chrome.",
+   "L": "#fafafab2",
+   "D": "#fafafab2"
+  },
+  {
+   "name": "fg/max",
+   "binding": "base/black",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Maximum contrast, follows theme. Media absolutes only — UI glyphs use primary.",
+   "L": "#000000",
+   "D": "#ffffff"
+  },
+  {
    "name": "fg/max/inverse-perma",
    "binding": "base/white/l-constant",
    "description": "🔒 LOCKED · fg/ v2.3.2 — Glyph light extreme pinned — imagery; luminance-picked with max-perma.",
@@ -267,6 +295,13 @@ export const RESOLVED = {
    "binding": "base/black/l-constant",
    "description": "🔒 LOCKED · fg/ v2.3.2 — Glyph dark extreme pinned — light imagery.",
    "L": "#000000",
+   "D": "#000000"
+  },
+  {
+   "name": "fg/max/inverse",
+   "binding": "base/white",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Maximum contrast, opposite of theme.",
+   "L": "#ffffff",
    "D": "#000000"
   },
   {
@@ -340,11 +375,88 @@ export const RESOLVED = {
    "D": "#378cbe"
   },
   {
-   "name": "fg/brand/secondary-hover",
+   "name": "fg/brand/primary-subtle",
    "binding": "brand/1/10",
-   "description": "🔒 LOCKED · fg/ v2.3.2 — PENDING pointer-hover ruling — held, not part of the locked shape.",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — First brand colour, decorative register — below the glyph-contrast floor for small marks; ornament only.",
    "L": "#287fb0",
    "D": "#287fb0"
+  },
+  {
+   "name": "fg/brand/primary-strong",
+   "binding": "brand/1/12",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — First brand colour, emphasis register.",
+   "L": "#19394d",
+   "D": "#c4ecff"
+  },
+  {
+   "name": "fg/brand/primary-inverse",
+   "binding": "brand/1/inverse/11",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — First brand colour, opposite of theme.",
+   "L": "#73c4f8",
+   "D": "#1170a1"
+  },
+  {
+   "name": "fg/brand/primary-strong-perma",
+   "binding": "brand/1/l-constant/12",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — First brand colour, emphasis register, light-world reading pinned.",
+   "L": "#19394d",
+   "D": "#061016"
+  },
+  {
+   "name": "fg/brand/secondary",
+   "binding": "brand/2/11",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Second brand colour as glyph.",
+   "L": "#517700",
+   "D": "#98cb46"
+  },
+  {
+   "name": "fg/brand/secondary-subtle",
+   "binding": "brand/2/10",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Second brand colour, decorative register.",
+   "L": "#81b228",
+   "D": "#81b321"
+  },
+  {
+   "name": "fg/brand/secondary-inverse",
+   "binding": "brand/2/inverse/11",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Second brand colour, opposite of theme.",
+   "L": "#98cb46",
+   "D": "#517700"
+  },
+  {
+   "name": "fg/brand/secondary-strong-perma",
+   "binding": "brand/2/l-constant/12",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Second brand colour, emphasis register, light-world reading pinned.",
+   "L": "#304215",
+   "D": "#0c1008"
+  },
+  {
+   "name": "fg/brand/tertiary",
+   "binding": "brand/3/11",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Third brand colour as glyph.",
+   "L": "#6940b9",
+   "D": "#bda2ff"
+  },
+  {
+   "name": "fg/brand/tertiary-subtle",
+   "binding": "brand/3/10",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Third brand colour, decorative register.",
+   "L": "#5a24ad",
+   "D": "#5a24ad"
+  },
+  {
+   "name": "fg/brand/tertiary-inverse",
+   "binding": "brand/3/inverse/11",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Third brand colour, opposite of theme.",
+   "L": "#bda2ff",
+   "D": "#6940b9"
+  },
+  {
+   "name": "fg/brand/tertiary-strong-perma",
+   "binding": "brand/3/l-constant/12",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Third brand colour, emphasis register, light-world reading pinned.",
+   "L": "#372163",
+   "D": "#0f0c19"
   },
   {
    "name": "border/primary",
