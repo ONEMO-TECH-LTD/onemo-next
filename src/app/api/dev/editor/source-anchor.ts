@@ -222,6 +222,7 @@ function findReturnedJsx(fn: ts.FunctionLikeDeclaration): ts.JsxElement | ts.Jsx
   let found: ts.JsxElement | ts.JsxSelfClosingElement | null = null
   const visit = (node: ts.Node) => {
     if (found) return
+    if (node !== fn.body && isNestedExecutableBoundary(node)) return
     if (ts.isReturnStatement(node) && node.expression) {
       found = unwrapJsx(node.expression)
       if (found) return
@@ -230,6 +231,14 @@ function findReturnedJsx(fn: ts.FunctionLikeDeclaration): ts.JsxElement | ts.Jsx
   }
   visit(fn.body)
   return found
+}
+
+function isNestedExecutableBoundary(node: ts.Node): boolean {
+  return ts.isFunctionDeclaration(node) ||
+    ts.isFunctionExpression(node) ||
+    ts.isArrowFunction(node) ||
+    ts.isClassDeclaration(node) ||
+    ts.isClassExpression(node)
 }
 
 function unwrapJsx(node: ts.Node): ts.JsxElement | ts.JsxSelfClosingElement | null {

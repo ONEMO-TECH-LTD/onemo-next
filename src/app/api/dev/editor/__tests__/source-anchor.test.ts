@@ -178,4 +178,27 @@ describe('SourceAnchor deterministic fingerprinting', () => {
       candidates: [firstDuplicateSpan, secondDuplicateSpan],
     })
   })
+
+  it('ignores nested helper function JSX when finding the exported component return', () => {
+    const anchors = extractSourceAnchorsFromTsx({
+      file: 'src/app/(dev)/react-figma-components/Outer.tsx',
+      exportName: 'Outer',
+      source: `
+        export function Outer() {
+          function Inner() { return <span><b /></span> }
+          return <section><button /></section>
+        }
+      `,
+    })
+
+    expect(anchors.map((item) => item.semanticPath.map((part) => part.symbol).concat(
+      item.semanticPath.length === 0 ? ['section'] : ['button'],
+    ))).toEqual([
+      ['section'],
+      ['section', 'button'],
+    ])
+    const symbols = anchors.flatMap((item) => item.semanticPath.map((part) => part.symbol))
+    expect(symbols).not.toContain('span')
+    expect(symbols).not.toContain('b')
+  })
 })
