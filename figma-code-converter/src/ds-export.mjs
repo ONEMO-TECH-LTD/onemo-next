@@ -55,7 +55,10 @@ export function toDsExport(data) {
         const segs = v.name.split('/');
         let node = tree;
         for (const s of segs.slice(0, -1)) node = (node[s] ??= {});
-        node[segs.at(-1)] = leafFor(v, mode.modeId);
+        // a name can be BOTH a token and a group (bare family token + variants folder):
+        // merge into an existing group node instead of clobbering its children
+        const last = segs.at(-1);
+        node[last] = node[last] ? Object.assign(node[last], leafFor(v, mode.modeId)) : leafFor(v, mode.modeId);
       }
       modes[mode.name] = tree;
     }

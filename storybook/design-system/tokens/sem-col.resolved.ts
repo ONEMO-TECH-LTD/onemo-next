@@ -60,18 +60,67 @@ export const RESOLVED = {
    "D": "#071013b2"
   },
   {
-   "name": "text/disabled",
+   "name": "text/max",
+   "binding": "base/black",
+   "description": "🔒 LOCKED · text/ v2.3.2 — True maximum contrast, follows theme. Absolutes and media only — UI text uses primary.",
+   "L": "#000000",
+   "D": "#ffffff"
+  },
+  {
+   "name": "text/max/inverse",
+   "binding": "base/white",
+   "description": "🔒 LOCKED · text/ v2.3.2 — Maximum contrast, opposite of theme — text on surfaces that invert against the theme.",
+   "L": "#ffffff",
+   "D": "#000000"
+  },
+  {
+   "name": "text/max/perma",
+   "binding": "base/black/l-constant",
+   "description": "🔒 LOCKED · text/ v2.3.2 — Maximum contrast, light-world reading pinned — never role-flips. Media & absolutes.",
+   "L": "#000000",
+   "D": "#000000"
+  },
+  {
+   "name": "text/max/inverse-perma",
+   "binding": "base/white/l-constant",
+   "description": "🔒 LOCKED · text/ v2.3.2 — Maximum contrast, dark-world reading pinned — photo text; luminance-picked with max-perma.",
+   "L": "#ffffff",
+   "D": "#ffffff"
+  },
+  {
+   "name": "text/system/disabled",
    "binding": "neutral/8",
    "description": "🔒 LOCKED · text/ v2.3.2 — Unavailable controls. Law: never on selectable options.",
    "L": "#b9bbc6",
    "D": "#5a6169"
   },
   {
-   "name": "text/placeholder",
+   "name": "text/system/placeholder",
    "binding": "neutral/9",
    "description": "🔒 LOCKED · text/ v2.3.2 — Input hints — the placeholder exception: quieter than readable tiers by design, vanishes on input.",
    "L": "#8b8d98",
    "D": "#696e77"
+  },
+  {
+   "name": "text/system/error",
+   "binding": "error/12",
+   "description": "🔒 LOCKED · text/ v2.3.2 — Validation and destructive copy.",
+   "L": "#601f1e",
+   "D": "#ffcfcb"
+  },
+  {
+   "name": "text/system/warning",
+   "binding": "warning/12",
+   "description": "🔒 LOCKED · text/ v2.3.2 — Caution copy.",
+   "L": "#403f19",
+   "D": "#f2f1b3"
+  },
+  {
+   "name": "text/system/success",
+   "binding": "success/11",
+   "description": "🔒 LOCKED · text/ v2.3.2 — Confirmation copy.",
+   "L": "#007d1c",
+   "D": "#57d574"
   },
   {
    "name": "text/brand/primary",
@@ -165,53 +214,137 @@ export const RESOLVED = {
    "D": "#0f0c19"
   },
   {
-   "name": "text/error",
-   "binding": "error/12",
-   "description": "🔒 LOCKED · text/ v2.3.2 — Validation and destructive copy.",
-   "L": "#601f1e",
-   "D": "#ffcfcb"
+   "name": "fg/primary",
+   "binding": "brand/black",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — The default glyph voice — icon strokes, indicator dots, tick lines.",
+   "L": "#071013",
+   "D": "#fafafa"
   },
   {
-   "name": "text/warning",
-   "binding": "warning/12",
-   "description": "🔒 LOCKED · text/ v2.3.2 — Caution copy.",
-   "L": "#403f19",
-   "D": "#f2f1b3"
+   "name": "fg/primary/inverse-perma",
+   "binding": "brand/white/l-constant",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Glyph paper voice, dark-world reading pinned — chrome capsules, the constant button.",
+   "L": "#fafafa",
+   "D": "#fafafa"
   },
   {
-   "name": "text/success",
+   "name": "fg/primary/subtle",
+   "binding": "neutral/11",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Supporting glyph register.",
+   "L": "#60646c",
+   "D": "#b0b4ba"
+  },
+  {
+   "name": "fg/primary/muted",
+   "binding": "neutral/10",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Muted glyph register — inactive but present; the quietest readable glyph tier.",
+   "L": "#80838d",
+   "D": "#777b84"
+  },
+  {
+   "name": "fg/primary/inverse",
+   "binding": "brand/white",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Glyphs on surfaces that invert against the theme.",
+   "L": "#fafafa",
+   "D": "#071013"
+  },
+  {
+   "name": "fg/primary/perma",
+   "binding": "brand/black/l-constant",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Glyph ink voice, light-world reading pinned — constant-light surfaces.",
+   "L": "#071013",
+   "D": "#071013"
+  },
+  {
+   "name": "fg/max/inverse-perma",
+   "binding": "base/white/l-constant",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Glyph light extreme pinned — imagery; luminance-picked with max-perma.",
+   "L": "#ffffff",
+   "D": "#ffffff"
+  },
+  {
+   "name": "fg/max/perma",
+   "binding": "base/black/l-constant",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Glyph dark extreme pinned — light imagery.",
+   "L": "#000000",
+   "D": "#000000"
+  },
+  {
+   "name": "fg/system/disabled",
+   "binding": "neutral/8",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Unavailable control glyphs.",
+   "L": "#b9bbc6",
+   "D": "#5a6169"
+  },
+  {
+   "name": "fg/system/disabled-subtle",
+   "binding": "neutral/7",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — The quieter disabled glyph tier.",
+   "L": "#cdced6",
+   "D": "#43484e"
+  },
+  {
+   "name": "fg/system/error",
+   "binding": "error/11",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Status glyph voice.",
+   "L": "#bc3438",
+   "D": "#ff8f89"
+  },
+  {
+   "name": "fg/system/error-solid",
+   "binding": "error/9",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Status solid voice — graphic accents.",
+   "L": "#bf373a",
+   "D": "#bf373a"
+  },
+  {
+   "name": "fg/system/warning",
+   "binding": "warning/11",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Status glyph voice.",
+   "L": "#7b7600",
+   "D": "#e4df4d"
+  },
+  {
+   "name": "fg/system/warning-solid",
+   "binding": "warning/9",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Status solid voice — graphic accents.",
+   "L": "#d8d33e",
+   "D": "#d8d33e"
+  },
+  {
+   "name": "fg/system/success",
    "binding": "success/11",
-   "description": "🔒 LOCKED · text/ v2.3.2 — Confirmation copy.",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Status glyph voice.",
    "L": "#007d1c",
    "D": "#57d574"
   },
   {
-   "name": "text/max",
-   "binding": "base/black",
-   "description": "🔒 LOCKED · text/ v2.3.2 — True maximum contrast, follows theme. Absolutes and media only — UI text uses primary.",
-   "L": "#000000",
-   "D": "#ffffff"
+   "name": "fg/system/success-solid",
+   "binding": "success/9",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Status solid voice — graphic accents.",
+   "L": "#37bf5d",
+   "D": "#37bf5d"
   },
   {
-   "name": "text/max/inverse",
-   "binding": "base/white",
-   "description": "🔒 LOCKED · text/ v2.3.2 — Maximum contrast, opposite of theme — text on surfaces that invert against the theme.",
-   "L": "#ffffff",
-   "D": "#000000"
+   "name": "fg/brand/primary",
+   "binding": "brand/1/11",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — First brand colour as glyph — active/accent glyphs.",
+   "L": "#1170a1",
+   "D": "#73c4f8"
   },
   {
-   "name": "text/max/perma",
-   "binding": "base/black/l-constant",
-   "description": "🔒 LOCKED · text/ v2.3.2 — Maximum contrast, light-world reading pinned — never role-flips. Media & absolutes.",
-   "L": "#000000",
-   "D": "#000000"
+   "name": "fg/brand/primary-solid",
+   "binding": "brand/1/9",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — First brand colour, solid voice — graphic accents: the dial arc, gauges, badges.",
+   "L": "#378cbe",
+   "D": "#378cbe"
   },
   {
-   "name": "text/max/inverse-perma",
-   "binding": "base/white/l-constant",
-   "description": "🔒 LOCKED · text/ v2.3.2 — Maximum contrast, dark-world reading pinned — photo text; luminance-picked with max-perma.",
-   "L": "#ffffff",
-   "D": "#ffffff"
+   "name": "fg/brand/secondary-hover",
+   "binding": "brand/1/10",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — PENDING pointer-hover ruling — held, not part of the locked shape.",
+   "L": "#287fb0",
+   "D": "#287fb0"
   },
   {
    "name": "border/primary",
@@ -282,132 +415,6 @@ export const RESOLVED = {
    "description": "Subtle error border. Lower contrast.",
    "L": "#e6a6a1",
    "D": "#942a2c"
-  },
-  {
-   "name": "fg/max/inverse-perma",
-   "binding": "base/white/l-constant",
-   "description": "🔒 LOCKED · fg/ v2.3.2 — Glyph light extreme pinned — imagery; luminance-picked with max-perma.",
-   "L": "#ffffff",
-   "D": "#ffffff"
-  },
-  {
-   "name": "fg/max/perma",
-   "binding": "base/black/l-constant",
-   "description": "🔒 LOCKED · fg/ v2.3.2 — Glyph dark extreme pinned — light imagery.",
-   "L": "#000000",
-   "D": "#000000"
-  },
-  {
-   "name": "fg/primary",
-   "binding": "brand/black",
-   "description": "🔒 LOCKED · fg/ v2.3.2 — The default glyph voice — icon strokes, indicator dots, tick lines.",
-   "L": "#071013",
-   "D": "#fafafa"
-  },
-  {
-   "name": "fg/primary/subtle",
-   "binding": "neutral/11",
-   "description": "🔒 LOCKED · fg/ v2.3.2 — Supporting glyph register.",
-   "L": "#60646c",
-   "D": "#b0b4ba"
-  },
-  {
-   "name": "fg/primary/muted",
-   "binding": "neutral/10",
-   "description": "🔒 LOCKED · fg/ v2.3.2 — Muted glyph register — inactive but present; the quietest readable glyph tier.",
-   "L": "#80838d",
-   "D": "#777b84"
-  },
-  {
-   "name": "fg/primary/inverse",
-   "binding": "brand/white",
-   "description": "🔒 LOCKED · fg/ v2.3.2 — Glyphs on surfaces that invert against the theme.",
-   "L": "#fafafa",
-   "D": "#071013"
-  },
-  {
-   "name": "fg/primary/perma",
-   "binding": "brand/black/l-constant",
-   "description": "🔒 LOCKED · fg/ v2.3.2 — Glyph ink voice, light-world reading pinned — constant-light surfaces.",
-   "L": "#071013",
-   "D": "#071013"
-  },
-  {
-   "name": "fg/disabled",
-   "binding": "neutral/8",
-   "description": "🔒 LOCKED · fg/ v2.3.2 — Unavailable control glyphs.",
-   "L": "#b9bbc6",
-   "D": "#5a6169"
-  },
-  {
-   "name": "fg/disabled-subtle",
-   "binding": "neutral/7",
-   "description": "🔒 LOCKED · fg/ v2.3.2 — The quieter disabled glyph tier.",
-   "L": "#cdced6",
-   "D": "#43484e"
-  },
-  {
-   "name": "fg/brand/primary",
-   "binding": "brand/1/11",
-   "description": "🔒 LOCKED · fg/ v2.3.2 — First brand colour as glyph — active/accent glyphs.",
-   "L": "#1170a1",
-   "D": "#73c4f8"
-  },
-  {
-   "name": "fg/brand/primary-solid",
-   "binding": "brand/1/9",
-   "description": "🔒 LOCKED · fg/ v2.3.2 — First brand colour, solid voice — graphic accents: the dial arc, gauges, badges.",
-   "L": "#378cbe",
-   "D": "#378cbe"
-  },
-  {
-   "name": "fg/brand/secondary-hover",
-   "binding": "brand/1/10",
-   "description": "🔒 LOCKED · fg/ v2.3.2 — PENDING pointer-hover ruling — held, not part of the locked shape.",
-   "L": "#287fb0",
-   "D": "#287fb0"
-  },
-  {
-   "name": "fg/error",
-   "binding": "error/11",
-   "description": "🔒 LOCKED · fg/ v2.3.2 — Status glyph voice.",
-   "L": "#bc3438",
-   "D": "#ff8f89"
-  },
-  {
-   "name": "fg/error-solid",
-   "binding": "error/9",
-   "description": "🔒 LOCKED · fg/ v2.3.2 — Status solid voice — graphic accents.",
-   "L": "#bf373a",
-   "D": "#bf373a"
-  },
-  {
-   "name": "fg/warning",
-   "binding": "warning/11",
-   "description": "🔒 LOCKED · fg/ v2.3.2 — Status glyph voice.",
-   "L": "#7b7600",
-   "D": "#e4df4d"
-  },
-  {
-   "name": "fg/warning-solid",
-   "binding": "warning/9",
-   "description": "🔒 LOCKED · fg/ v2.3.2 — Status solid voice — graphic accents.",
-   "L": "#d8d33e",
-   "D": "#d8d33e"
-  },
-  {
-   "name": "fg/success",
-   "binding": "success/11",
-   "description": "🔒 LOCKED · fg/ v2.3.2 — Status glyph voice.",
-   "L": "#007d1c",
-   "D": "#57d574"
-  },
-  {
-   "name": "fg/success-solid",
-   "binding": "success/9",
-   "description": "🔒 LOCKED · fg/ v2.3.2 — Status solid voice — graphic accents.",
-   "L": "#37bf5d",
-   "D": "#37bf5d"
   },
   {
    "name": "bg/overlay",

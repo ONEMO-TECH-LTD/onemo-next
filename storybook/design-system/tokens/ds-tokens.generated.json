@@ -18803,25 +18803,97 @@
          "$value": "{brand.white.alpha.9}"
         }
        },
-       "disabled": {
+       "max": {
+        "inverse": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — Maximum contrast, opposite of theme — text on surfaces that invert against the theme.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{base.white}"
+        },
+        "perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — Maximum contrast, light-world reading pinned — never role-flips. Media & absolutes.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{base.black.l-constant}"
+        },
+        "inverse-perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — Maximum contrast, dark-world reading pinned — photo text; luminance-picked with max-perma.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{base.white.l-constant}"
+        },
         "$scopes": [
-         "TEXT_FILL"
+         "ALL_SCOPES"
         ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — Unavailable controls. Law: never on selectable options.",
+        "$description": "🔒 LOCKED · text/ v2.3.2 — True maximum contrast, follows theme. Absolutes and media only — UI text uses primary.",
         "$type": "color",
         "$libraryName": "",
         "$collectionName": ".2.0-Al-Col",
-        "$value": "{neutral.8}"
+        "$value": "{base.black}"
        },
-       "placeholder": {
-        "$scopes": [
-         "TEXT_FILL"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — Input hints — the placeholder exception: quieter than readable tiers by design, vanishes on input.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{neutral.9}"
+       "system": {
+        "disabled": {
+         "$scopes": [
+          "TEXT_FILL"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — Unavailable controls. Law: never on selectable options.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.8}"
+        },
+        "placeholder": {
+         "$scopes": [
+          "TEXT_FILL"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — Input hints — the placeholder exception: quieter than readable tiers by design, vanishes on input.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.9}"
+        },
+        "error": {
+         "$scopes": [
+          "TEXT_FILL"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — Validation and destructive copy.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{error.12}"
+        },
+        "warning": {
+         "$scopes": [
+          "TEXT_FILL"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — Caution copy.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{warning.12}"
+        },
+        "success": {
+         "$scopes": [
+          "TEXT_FILL"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — Confirmation copy.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{success.11}"
+        }
        },
        "brand": {
         "primary": {
@@ -18954,75 +19026,219 @@
          "$collectionName": ".2.0-Al-Col",
          "$value": "{brand.3.l-constant.12}"
         }
-       },
-       "error": {
+       }
+      },
+      "fg": {
+       "primary": {
         "$scopes": [
-         "TEXT_FILL"
+         "ALL_FILLS",
+         "STROKE_COLOR"
         ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — Validation and destructive copy.",
+        "$description": "🔒 LOCKED · fg/ v2.3.2 — The default glyph voice — icon strokes, indicator dots, tick lines.",
         "$type": "color",
         "$libraryName": "",
         "$collectionName": ".2.0-Al-Col",
-        "$value": "{error.12}"
-       },
-       "warning": {
-        "$scopes": [
-         "TEXT_FILL"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — Caution copy.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{warning.12}"
-       },
-       "success": {
-        "$scopes": [
-         "TEXT_FILL"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — Confirmation copy.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{success.11}"
-       },
-       "max": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — True maximum contrast, follows theme. Absolutes and media only — UI text uses primary.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{base.black}",
+        "$value": "{brand.black}",
+        "inverse-perma": {
+         "$scopes": [
+          "ALL_FILLS",
+          "STROKE_COLOR"
+         ],
+         "$description": "🔒 LOCKED · fg/ v2.3.2 — Glyph paper voice, dark-world reading pinned — chrome capsules, the constant button.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.white.l-constant}"
+        },
+        "subtle": {
+         "$scopes": [
+          "ALL_FILLS",
+          "STROKE_COLOR"
+         ],
+         "$description": "🔒 LOCKED · fg/ v2.3.2 — Supporting glyph register.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.11}"
+        },
+        "muted": {
+         "$scopes": [
+          "ALL_FILLS",
+          "STROKE_COLOR"
+         ],
+         "$description": "🔒 LOCKED · fg/ v2.3.2 — Muted glyph register — inactive but present; the quietest readable glyph tier.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.10}"
+        },
         "inverse": {
          "$scopes": [
           "ALL_SCOPES"
          ],
-         "$description": "🔒 LOCKED · text/ v2.3.2 — Maximum contrast, opposite of theme — text on surfaces that invert against the theme.",
+         "$description": "🔒 LOCKED · fg/ v2.3.2 — Glyphs on surfaces that invert against the theme.",
          "$type": "color",
          "$libraryName": "",
          "$collectionName": ".2.0-Al-Col",
-         "$value": "{base.white}"
+         "$value": "{brand.white}"
         },
         "perma": {
          "$scopes": [
           "ALL_SCOPES"
          ],
-         "$description": "🔒 LOCKED · text/ v2.3.2 — Maximum contrast, light-world reading pinned — never role-flips. Media & absolutes.",
+         "$description": "🔒 LOCKED · fg/ v2.3.2 — Glyph ink voice, light-world reading pinned — constant-light surfaces.",
          "$type": "color",
          "$libraryName": "",
          "$collectionName": ".2.0-Al-Col",
-         "$value": "{base.black.l-constant}"
-        },
+         "$value": "{brand.black.l-constant}"
+        }
+       },
+       "max": {
         "inverse-perma": {
          "$scopes": [
-          "ALL_SCOPES"
+          "ALL_FILLS",
+          "STROKE_COLOR"
          ],
-         "$description": "🔒 LOCKED · text/ v2.3.2 — Maximum contrast, dark-world reading pinned — photo text; luminance-picked with max-perma.",
+         "$description": "🔒 LOCKED · fg/ v2.3.2 — Glyph light extreme pinned — imagery; luminance-picked with max-perma.",
          "$type": "color",
          "$libraryName": "",
          "$collectionName": ".2.0-Al-Col",
          "$value": "{base.white.l-constant}"
+        },
+        "perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 LOCKED · fg/ v2.3.2 — Glyph dark extreme pinned — light imagery.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{base.black.l-constant}"
+        }
+       },
+       "system": {
+        "disabled": {
+         "$scopes": [
+          "ALL_FILLS",
+          "STROKE_COLOR"
+         ],
+         "$description": "🔒 LOCKED · fg/ v2.3.2 — Unavailable control glyphs.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.8}"
+        },
+        "disabled-subtle": {
+         "$scopes": [
+          "ALL_FILLS",
+          "STROKE_COLOR"
+         ],
+         "$description": "🔒 LOCKED · fg/ v2.3.2 — The quieter disabled glyph tier.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.7}"
+        },
+        "error": {
+         "$scopes": [
+          "ALL_FILLS",
+          "STROKE_COLOR"
+         ],
+         "$description": "🔒 LOCKED · fg/ v2.3.2 — Status glyph voice.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{error.11}"
+        },
+        "error-solid": {
+         "$scopes": [
+          "ALL_FILLS",
+          "STROKE_COLOR"
+         ],
+         "$description": "🔒 LOCKED · fg/ v2.3.2 — Status solid voice — graphic accents.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{error.9}"
+        },
+        "warning": {
+         "$scopes": [
+          "ALL_FILLS",
+          "STROKE_COLOR"
+         ],
+         "$description": "🔒 LOCKED · fg/ v2.3.2 — Status glyph voice.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{warning.11}"
+        },
+        "warning-solid": {
+         "$scopes": [
+          "ALL_FILLS",
+          "STROKE_COLOR"
+         ],
+         "$description": "🔒 LOCKED · fg/ v2.3.2 — Status solid voice — graphic accents.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{warning.9}"
+        },
+        "success": {
+         "$scopes": [
+          "ALL_FILLS",
+          "STROKE_COLOR"
+         ],
+         "$description": "🔒 LOCKED · fg/ v2.3.2 — Status glyph voice.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{success.11}"
+        },
+        "success-solid": {
+         "$scopes": [
+          "ALL_FILLS",
+          "STROKE_COLOR"
+         ],
+         "$description": "🔒 LOCKED · fg/ v2.3.2 — Status solid voice — graphic accents.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{success.9}"
+        }
+       },
+       "brand": {
+        "primary": {
+         "$scopes": [
+          "ALL_FILLS",
+          "STROKE_COLOR"
+         ],
+         "$description": "🔒 LOCKED · fg/ v2.3.2 — First brand colour as glyph — active/accent glyphs.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.1.11}"
+        },
+        "primary-solid": {
+         "$scopes": [
+          "ALL_FILLS",
+          "STROKE_COLOR"
+         ],
+         "$description": "🔒 LOCKED · fg/ v2.3.2 — First brand colour, solid voice — graphic accents: the dial arc, gauges, badges.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.1.9}"
+        },
+        "secondary-hover": {
+         "$scopes": [
+          "ALL_FILLS",
+          "STROKE_COLOR"
+         ],
+         "$description": "🔒 LOCKED · fg/ v2.3.2 — PENDING pointer-hover ruling — held, not part of the locked shape.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.1.10}"
         }
        }
       },
@@ -19126,207 +19342,6 @@
         "$libraryName": "",
         "$collectionName": ".2.0-Al-Col",
         "$value": "{error.7}"
-       }
-      },
-      "fg": {
-       "max": {
-        "inverse-perma": {
-         "$scopes": [
-          "ALL_FILLS",
-          "STROKE_COLOR"
-         ],
-         "$description": "🔒 LOCKED · fg/ v2.3.2 — Glyph light extreme pinned — imagery; luminance-picked with max-perma.",
-         "$type": "color",
-         "$libraryName": "",
-         "$collectionName": ".2.0-Al-Col",
-         "$value": "{base.white.l-constant}"
-        },
-        "perma": {
-         "$scopes": [
-          "ALL_SCOPES"
-         ],
-         "$description": "🔒 LOCKED · fg/ v2.3.2 — Glyph dark extreme pinned — light imagery.",
-         "$type": "color",
-         "$libraryName": "",
-         "$collectionName": ".2.0-Al-Col",
-         "$value": "{base.black.l-constant}"
-        }
-       },
-       "primary": {
-        "$scopes": [
-         "ALL_FILLS",
-         "STROKE_COLOR"
-        ],
-        "$description": "🔒 LOCKED · fg/ v2.3.2 — The default glyph voice — icon strokes, indicator dots, tick lines.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.black}",
-        "subtle": {
-         "$scopes": [
-          "ALL_FILLS",
-          "STROKE_COLOR"
-         ],
-         "$description": "🔒 LOCKED · fg/ v2.3.2 — Supporting glyph register.",
-         "$type": "color",
-         "$libraryName": "",
-         "$collectionName": ".2.0-Al-Col",
-         "$value": "{neutral.11}"
-        },
-        "muted": {
-         "$scopes": [
-          "ALL_FILLS",
-          "STROKE_COLOR"
-         ],
-         "$description": "🔒 LOCKED · fg/ v2.3.2 — Muted glyph register — inactive but present; the quietest readable glyph tier.",
-         "$type": "color",
-         "$libraryName": "",
-         "$collectionName": ".2.0-Al-Col",
-         "$value": "{neutral.10}"
-        },
-        "inverse": {
-         "$scopes": [
-          "ALL_SCOPES"
-         ],
-         "$description": "🔒 LOCKED · fg/ v2.3.2 — Glyphs on surfaces that invert against the theme.",
-         "$type": "color",
-         "$libraryName": "",
-         "$collectionName": ".2.0-Al-Col",
-         "$value": "{brand.white}"
-        },
-        "perma": {
-         "$scopes": [
-          "ALL_SCOPES"
-         ],
-         "$description": "🔒 LOCKED · fg/ v2.3.2 — Glyph ink voice, light-world reading pinned — constant-light surfaces.",
-         "$type": "color",
-         "$libraryName": "",
-         "$collectionName": ".2.0-Al-Col",
-         "$value": "{brand.black.l-constant}"
-        }
-       },
-       "disabled": {
-        "$scopes": [
-         "ALL_FILLS",
-         "STROKE_COLOR"
-        ],
-        "$description": "🔒 LOCKED · fg/ v2.3.2 — Unavailable control glyphs.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{neutral.8}"
-       },
-       "disabled-subtle": {
-        "$scopes": [
-         "ALL_FILLS",
-         "STROKE_COLOR"
-        ],
-        "$description": "🔒 LOCKED · fg/ v2.3.2 — The quieter disabled glyph tier.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{neutral.7}"
-       },
-       "brand": {
-        "primary": {
-         "$scopes": [
-          "ALL_FILLS",
-          "STROKE_COLOR"
-         ],
-         "$description": "🔒 LOCKED · fg/ v2.3.2 — First brand colour as glyph — active/accent glyphs.",
-         "$type": "color",
-         "$libraryName": "",
-         "$collectionName": ".2.0-Al-Col",
-         "$value": "{brand.1.11}"
-        },
-        "primary-solid": {
-         "$scopes": [
-          "ALL_FILLS",
-          "STROKE_COLOR"
-         ],
-         "$description": "🔒 LOCKED · fg/ v2.3.2 — First brand colour, solid voice — graphic accents: the dial arc, gauges, badges.",
-         "$type": "color",
-         "$libraryName": "",
-         "$collectionName": ".2.0-Al-Col",
-         "$value": "{brand.1.9}"
-        },
-        "secondary-hover": {
-         "$scopes": [
-          "ALL_FILLS",
-          "STROKE_COLOR"
-         ],
-         "$description": "🔒 LOCKED · fg/ v2.3.2 — PENDING pointer-hover ruling — held, not part of the locked shape.",
-         "$type": "color",
-         "$libraryName": "",
-         "$collectionName": ".2.0-Al-Col",
-         "$value": "{brand.1.10}"
-        }
-       },
-       "error": {
-        "$scopes": [
-         "ALL_FILLS",
-         "STROKE_COLOR"
-        ],
-        "$description": "🔒 LOCKED · fg/ v2.3.2 — Status glyph voice.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{error.11}"
-       },
-       "error-solid": {
-        "$scopes": [
-         "ALL_FILLS",
-         "STROKE_COLOR"
-        ],
-        "$description": "🔒 LOCKED · fg/ v2.3.2 — Status solid voice — graphic accents.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{error.9}"
-       },
-       "warning": {
-        "$scopes": [
-         "ALL_FILLS",
-         "STROKE_COLOR"
-        ],
-        "$description": "🔒 LOCKED · fg/ v2.3.2 — Status glyph voice.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{warning.11}"
-       },
-       "warning-solid": {
-        "$scopes": [
-         "ALL_FILLS",
-         "STROKE_COLOR"
-        ],
-        "$description": "🔒 LOCKED · fg/ v2.3.2 — Status solid voice — graphic accents.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{warning.9}"
-       },
-       "success": {
-        "$scopes": [
-         "ALL_FILLS",
-         "STROKE_COLOR"
-        ],
-        "$description": "🔒 LOCKED · fg/ v2.3.2 — Status glyph voice.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{success.11}"
-       },
-       "success-solid": {
-        "$scopes": [
-         "ALL_FILLS",
-         "STROKE_COLOR"
-        ],
-        "$description": "🔒 LOCKED · fg/ v2.3.2 — Status solid voice — graphic accents.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{success.9}"
        }
       },
       "bg": {
