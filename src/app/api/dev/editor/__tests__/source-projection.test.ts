@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { importProjectionToAuthoringGraph } from '../authoring-migrations'
+import { sha256 } from '../durable-file-installer'
 import { classifyVariantAxes, readSourceProjection, sourceProjectionFromModel, unsupportedSourceProjection } from '../source-projection'
 import type { ComponentModel } from '../lib'
 
@@ -20,6 +21,7 @@ function model(axes: ComponentModel['variantAxes']): ComponentModel {
 }
 
 describe('SourceProjection classification', () => {
+  const sourceHash = sha256('source bytes')
   it('classifies single-axis source as importable legacy source', () => {
     expect(classifyVariantAxes([{ axis: 'variant', values: ['primary', 'secondary'], defaultValue: 'primary' }]))
       .toBe('legacy-single-axis')
@@ -31,7 +33,7 @@ describe('SourceProjection classification', () => {
       { axis: 'size', values: ['sm', 'lg'], defaultValue: 'sm' },
     ]))
 
-    expect(importProjectionToAuthoringGraph({ storeId: 'project-main', projection })).toEqual({
+    expect(importProjectionToAuthoringGraph({ storeId: 'project-main', projection, sourceHash })).toEqual({
       kind: 'hold',
       compatibility: 'legacy-multi-axis',
       reason: 'multi-axis source requires explicit conversion preview',
@@ -43,8 +45,8 @@ describe('SourceProjection classification', () => {
       { axis: 'variant', values: ['primary', 'secondary'], defaultValue: 'primary' },
     ]))
 
-    const first = importProjectionToAuthoringGraph({ storeId: 'project-main', projection })
-    const second = importProjectionToAuthoringGraph({ storeId: 'project-main', projection })
+    const first = importProjectionToAuthoringGraph({ storeId: 'project-main', projection, sourceHash })
+    const second = importProjectionToAuthoringGraph({ storeId: 'project-main', projection, sourceHash })
 
     expect(first).toEqual(second)
     expect(first.kind).toBe('imported')
@@ -59,7 +61,7 @@ describe('SourceProjection classification', () => {
   it('keeps parse failures unsupported instead of treating them as empty axes', () => {
     const projection = unsupportedSourceProjection('Broken.tsx', 'parse failed')
 
-    expect(importProjectionToAuthoringGraph({ storeId: 'project-main', projection })).toEqual({
+    expect(importProjectionToAuthoringGraph({ storeId: 'project-main', projection, sourceHash })).toEqual({
       kind: 'unsupported',
       reason: 'parse failed',
     })

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 
+import { assertAuthoringGraphV1, isSha256 } from './authoring-schema'
 import type { AuthoringGraphV1, StoreId } from './authoring-types'
 import { createEmptyAuthoringGraph } from './authoring-store'
 import type { SourceProjection } from './source-projection'
@@ -12,17 +13,30 @@ export type ProjectionImportResult =
 export function importProjectionToAuthoringGraph(input: {
   storeId: StoreId
   projection: SourceProjection
+  sourceHash: string
 }): ProjectionImportResult {
-  const { storeId, projection } = input
+  const { storeId, projection, sourceHash } = input
   if (projection.compatibility === 'unsupported') {
     return { kind: 'unsupported', reason: projection.unsupportedReason ?? 'unsupported projection' }
   }
   if (projection.compatibility === 'legacy-multi-axis') {
     return { kind: 'hold', compatibility: 'legacy-multi-axis', reason: 'multi-axis source requires explicit conversion preview' }
   }
-  const graph = createEmptyAuthoringGraph({ storeId, rootKind: 'project' })
+  if (!isSha256(sourceHash)) return { kind: 'unsupported', reason: 'exact source hash is required for import' }
+  const values = importableVariantValues(projection)
+  if (!values) return { kind: 'unsupported', reason: 'single-axis source is not losslessly importable' }
+  const graph = createEmptyAuthoringGraph({
+    storeId,
+    rootKind: 'project',
+    sourceHashes: { [projection.file]: sourceHash },
+  })
   const componentId = stableId('component', storeId, projection.file, projection.exportName)
-  const primaryVariantId = stableId('variant', storeId, projection.file, projection.exportName, 'primary')
+  const variantIds = values.map((_, index) =>
+    stableId('variant', storeId, projection.file, projection.exportName, 'source-slot', String(index)))
+  const primaryIndex = projection.variantAxes[0]
+    ? projection.variantAxes[0].values.indexOf(projection.variantAxes[0].defaultValue)
+    : 0
+  const primaryVariantId = variantIds[primaryIndex]!
 
   graph.components[componentId] = {
     id: componentId,
@@ -32,16 +46,31 @@ export function importProjectionToAuthoringGraph(input: {
     folderId: null,
     compatibility: projection.compatibility,
   }
-  graph.variants[primaryVariantId] = {
-    id: primaryVariantId,
-    componentId,
-    displayName: 'Primary',
-    frame: { x: 0, y: 0, width: 320, height: 180 },
-    inheritance: { kind: 'primary' },
-    kind: 'primary',
-    transition: { kind: 'instant', delayMs: 0 },
+  for (const [index, displayName] of values.entries()) {
+    const id = variantIds[index]!
+    const primary = index === primaryIndex
+    graph.variants[id] = {
+      id,
+      componentId,
+      displayName,
+      frame: { x: index * 344, y: 0, width: 320, height: 180 },
+      inheritance: primary
+        ? { kind: 'primary' }
+        : { kind: 'linked', primaryVariantId, overridePropertyIds: [] },
+      kind: primary ? 'primary' : 'custom',
+      transition: { kind: 'instant', delayMs: 0 },
+    }
   }
-  return { kind: 'imported', graph }
+  return { kind: 'imported', graph: assertAuthoringGraphV1(graph) }
+}
+
+function importableVariantValues(projection: SourceProjection): string[] | null {
+  if (projection.compatibility === 'native-v1') return projection.variantAxes.length === 0 ? ['Primary'] : null
+  if (projection.compatibility !== 'legacy-single-axis' || projection.variantAxes.length !== 1) return null
+  const axis = projection.variantAxes[0]
+  if (!axis || axis.values.length === 0 || new Set(axis.values).size !== axis.values.length) return null
+  if (axis.values.some((value) => value.length === 0) || !axis.values.includes(axis.defaultValue)) return null
+  return axis.values
 }
 
 export function stableId(prefix: string, ...parts: string[]): string {
