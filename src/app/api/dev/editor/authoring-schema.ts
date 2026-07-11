@@ -108,6 +108,15 @@ function validateSourcePropertyRefs(value: unknown, errors: string[]) {
       if (!isNonEmptyString(ref.source.exportName)) errors.push(`sourceProperties.${id}.source.exportName is required`)
     }
     validateSourceAnchor(`sourceProperties.${id}.ownerAnchor`, ref.ownerAnchor, errors)
+    if (
+      isRecord(ref.source) &&
+      isNonEmptyString(ref.source.exportName) &&
+      isRecord(ref.ownerAnchor) &&
+      isNonEmptyString(ref.ownerAnchor.exportName) &&
+      ref.ownerAnchor.exportName !== ref.source.exportName
+    ) {
+      errors.push(`sourceProperties.${id}.ownerAnchor.exportName must match source.exportName`)
+    }
     if (ref.inheritedFromPropertyId !== null && !isNonEmptyString(ref.inheritedFromPropertyId)) {
       errors.push(`sourceProperties.${id}.inheritedFromPropertyId must be null or a non-empty string`)
     }

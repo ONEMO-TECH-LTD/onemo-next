@@ -116,6 +116,20 @@ describe('AuthoringGraphV1 checkpoint schema', () => {
     })
   })
 
+  it('rejects a property anchor bound to a different source export', () => {
+    const graph = minimalGraph()
+    graph.sourceProperties['prop-root-color'].ownerAnchor.exportName = 'DifferentExport'
+
+    const result = validateAuthoringGraphV1(graph)
+
+    expect(result).toMatchObject({
+      ok: false,
+      errors: expect.arrayContaining([
+        'sourceProperties.prop-root-color.ownerAnchor.exportName must match source.exportName',
+      ]),
+    })
+  })
+
   it('rejects broken component, variant, property, and interaction references', () => {
     const graph = minimalGraph()
     graph.components['component-button'].primaryVariantId = 'variant-missing'
