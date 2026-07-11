@@ -128,4 +128,28 @@ export function primitiveFamilies(): string[] {
   return childrenOf(PRIM_COL).filter((k) => !BEHAVIORS.has(k) && ramp(PRIM_COL, k).length === 12);
 }
 
+// ── semantic (resolved) ──────────────────────────────────────────────────────
+import { RESOLVED } from '../design-system/tokens/sem-col.resolved';
 
+export interface SemToken {
+  name: string;
+  binding: string;
+  description: string;
+  L: string;
+  D: string;
+}
+
+/** Semantic colour tokens with process/migration metadata stripped from descriptions. */
+export function semanticFamily(prefix: string): SemToken[] {
+  return RESOLVED.tokens
+    .filter((t) => t.name.startsWith(prefix))
+    .map((t) => ({
+      name: t.name,
+      binding: t.binding,
+      description: (t.description ?? '')
+        .replace(/^🔒[^—]*— /, '')
+        .replace(/ ?NOTE: name reused[^]*$/, ''),
+      L: t.L,
+      D: t.D,
+    }));
+}

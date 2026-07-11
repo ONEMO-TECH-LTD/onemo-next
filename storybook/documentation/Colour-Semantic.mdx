@@ -1,60 +1,82 @@
 import { Meta } from '@storybook/addon-docs/blocks';
-import { Page, H2, P, C, Note } from './blocks';
-import { TextGroup, TextGroupTitle, RetiredNames } from './semantic';
+import { Page, H2, P, C, Note, Table, S } from './blocks';
+import { FolderTable, FolderNote } from './semantic';
 
 <Meta title="Documentation/Colour/Semantic roles" />
 
 <Page
   title="Semantic colour roles"
-  lead="The only colour tier a designer touches: roles named for usage, each binding one alias route. The naming grammar has three orthogonal slots — family, register, behavior — and every word means exactly one thing across the whole tier."
+  lead="The only colour tier a designer touches: roles named for usage, each binding one alias route. Every token is a sentence in a four-slot grammar — family, register, theme, constancy — and no slot ever borrows another slot's word."
 >
 
-<H2>The naming grammar</H2>
+<H2>The grammar</H2>
 
 <P>
-  <b>Family</b> says whose voice speaks: the pure extremes, the brand ink/paper voice, or a brand colour.{' '}
-  <b>Register</b> modifies loudness — <C>-subtle</C> quiets a family the way <C>-strong</C> amplifies it.{' '}
-  <b>Behavior</b> says how the role responds to the theme: a bare name follows it, <C>-inverse</C> opposes
-  it, <C>-dark</C> and <C>-light</C> pin one of the family's voices so it never flips. Because the words
-  describe voices rather than pigments, greys and colours adopt the same suffixes without new vocabulary.
+  <b>Family</b> says what is speaking: the brand voice (<C>primary</C> — Ink on Snow), the pure extremes
+  (<C>max</C>), the platform (<C>system</C>), or a brand colour (<C>brand/…</C>). <b>Register</b> says how
+  loudly — <C>-strong</C> amplifies, <C>-subtle</C> quiets, <C>-muted</C> is the quietest readable tier.{' '}
+  <b>Theme</b> says which way it follows the world — a bare name follows the theme, <C>-inverse</C> opposes
+  it. <b>Constancy</b> says whether it flips at all: <C>-perma</C> freezes what you see in the light theme,{' '}
+  <C>-inverse-perma</C> freezes what you see in the dark theme. Perma composes with any family, register or
+  theme word — a missing constant is minted by suffixing, never by inventing vocabulary.
 </P>
 
 <P>
-  Every sample below renders on the role's real surface — the flipping button, the constant-ink pill, the
-  imagery stand-in — with the left panel in the light theme and the right in the dark.
+  Families are picker folders: variants live inside <C>text/primary/…</C>, <C>text/brand/…</C>,{' '}
+  <C>text/max/…</C>, <C>text/system/…</C>, and the glyph tier mirrors the shape. Folders are free — code
+  flattens every path to dashes — so the folder word never repeats in the leaf, and slash and dash
+  spellings of one path must never coexist.
 </P>
-
-<H2>text/ — <TextGroupTitle group="max" /></H2>
-<TextGroup group="max" />
-
-<H2>text/ — <TextGroupTitle group="primary" /></H2>
-<TextGroup group="primary" />
-
-<H2>text/ — <TextGroupTitle group="secondary" /></H2>
-<TextGroup group="secondary" />
-
-<H2>text/ — <TextGroupTitle group="neutrals" /></H2>
-<TextGroup group="neutrals" />
-
-<H2>text/ — <TextGroupTitle group="brand" /></H2>
-<TextGroup group="brand" />
-
-<H2>text/ — <TextGroupTitle group="status" /></H2>
-<TextGroup group="status" />
-
-<H2>Retired names</H2>
 
 <P>
-  Earlier role names that duplicated a value, encoded state in text colour, or misdescribed their usage were
-  retired; their consumers were re-pointed to the surviving roles listed here. Anything migrating an old
-  design finds its target by name.
+  Every sample below renders on a surface derived from the role's own name — pinned readings on the
+  opposing material, inverse on the flipping control, extremes on imagery — left panel light theme, right
+  panel dark.
 </P>
 
-<RetiredNames />
+<H2>text/ — primary</H2>
+<FolderNote folder="primary" />
+<FolderTable tier="text" folder="primary" />
+
+<H2>text/ — max</H2>
+<FolderNote folder="max" />
+<FolderTable tier="text" folder="max" />
+
+<H2>text/ — system</H2>
+<FolderNote folder="system" />
+<FolderTable tier="text" folder="system" />
+
+<H2>text/ — brand</H2>
+<FolderNote folder="brand" />
+<FolderTable tier="text" folder="brand" />
+
+<H2>fg/ — the glyph tier</H2>
+
+<P>
+  Non-text glyphs — icon strokes, indicator dots, tick lines — mirror the text grammar folder for folder.
+  The glyph tier adds the <C>-muted</C> register (the quietest readable tier, kept where usage evidence
+  demands it) and per-status solid voices for filled indicators.
+</P>
+
+<H2>fg/ — primary</H2>
+<FolderNote folder="primary" />
+<FolderTable tier="fg" folder="primary" />
+
+<H2>fg/ — max</H2>
+<FolderNote folder="max" />
+<FolderTable tier="fg" folder="max" />
+
+<H2>fg/ — system</H2>
+<FolderNote folder="system" />
+<FolderTable tier="fg" folder="system" />
+
+<H2>fg/ — brand</H2>
+<FolderNote folder="brand" />
+<FolderTable tier="fg" folder="brand" />
 
 <Note>
-  The foreground-glyph (<C>fg/</C>), border and surface families are documented here as each completes its
-  rebuild through the same grammar.
+  Border and surface families adopt this grammar as they are rebuilt. Retired legacy names and their
+  migration targets are process history — see the Changelog.
 </Note>
 
 </Page>

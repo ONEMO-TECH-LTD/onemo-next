@@ -9,6 +9,33 @@ import { resolve, PRIM_COL } from './data';
   lead="The single source of truth for how ONEMO looks and behaves: a token architecture that carries every colour, dimension and type decision from the design file into the product, with theming resolved by construction rather than by convention."
 >
 
+<H2>The materials</H2>
+
+<P>The mono palette carries brand material names, used in every description and conversation:</P>
+
+<Table head={['Material', 'What it is', '']}>
+  <tr>
+    <td style={S.td}><b>Ink</b></td>
+    <td style={S.td}>The brand black — the voice of the UI in the light theme.</td>
+    <td style={S.td}><Swatch value={resolve(PRIM_COL, 'base/brand-black').L} /> <Swatch value={resolve(PRIM_COL, 'base/brand-black').D} /></td>
+  </tr>
+  <tr>
+    <td style={S.td}><b>Snow</b></td>
+    <td style={S.td}>The brand white — the paper the product is printed on.</td>
+    <td style={S.td}><Swatch value={resolve(PRIM_COL, 'base/brand-white').L} /> <Swatch value={resolve(PRIM_COL, 'base/brand-white').D} /></td>
+  </tr>
+  <tr>
+    <td style={S.td}><b>Aluminium</b></td>
+    <td style={S.td}>The neutral greys — structure, borders, supporting voices.</td>
+    <td style={S.td}><Swatch value={resolve(PRIM_COL, 'grey/6').L} /> <Swatch value={resolve(PRIM_COL, 'grey/6').D} /></td>
+  </tr>
+</Table>
+
+<P>
+  <C>max</C> remains the unnamed pure extremes — true black and white, media only, deliberately outside the
+  material vocabulary.
+</P>
+
 <H2>The four tiers</H2>
 
 <P>Every visual decision travels through four tiers. Each tier has one job, and values exist exactly once.</P>
@@ -36,37 +63,85 @@ import { resolve, PRIM_COL } from './data';
   </tr>
 </Table>
 
+<H2>The naming grammar</H2>
+
+<P>
+  Every semantic colour token is a sentence built from four orthogonal slots —{' '}
+  <C>{'<family>[/group] × <register> × <theme> × <constancy>'}</C> — and no slot ever borrows another
+  slot's word. A reader who knows the vocabulary can parse any token without a legend, and mint a missing
+  one without inventing vocabulary.
+</P>
+
+<Table head={['Slot', 'Words', 'Meaning']}>
+  <tr>
+    <td style={S.td}><b>family</b></td>
+    <td style={S.td}><C>max</C> · <C>primary</C> · <C>brand/…</C> · <C>system/…</C></td>
+    <td style={S.td}>What is speaking: the extremes, the brand voice, a brand colour, or the platform (statuses and field neutrals).</td>
+  </tr>
+  <tr>
+    <td style={S.td}><b>register</b></td>
+    <td style={S.td}>bare · <C>-strong</C> · <C>-subtle</C> · <C>-muted</C></td>
+    <td style={S.td}>How loudly: defaults carry no word; strong amplifies (and is the on-tint text voice); subtle supports; muted is the quietest readable tier.</td>
+  </tr>
+  <tr>
+    <td style={S.td}><b>theme</b></td>
+    <td style={S.td}>bare · <C>-inverse</C></td>
+    <td style={S.td}>Which way it follows the world — inverse serves content on surfaces that invert against the theme.</td>
+  </tr>
+  <tr>
+    <td style={S.td}><b>constancy</b></td>
+    <td style={S.td}>bare · <C>-perma</C></td>
+    <td style={S.td}>Whether it flips at all: perma freezes what you see in the light theme; inverse-perma freezes what you see in the dark theme.</td>
+  </tr>
+</Table>
+
+<P>
+  Families are picker folders (<C>text/primary/…</C>, <C>text/brand/…</C>, <C>text/system/…</C>). Folders
+  are free — code flattens every path to dashes — with two corollaries: the folder word never repeats in
+  the leaf, and slash and dash spellings of one path must never coexist.
+</P>
+
+<H2>The laws behind the words</H2>
+
+<P>
+  <b>Perma is anchored identity, not frozen bytes.</b> Mono families pin to literal values — Ink is Ink
+  everywhere. Colour families pin to their anchored voice, dark-tuned in the dark theme, because primitive
+  constancy is anchor-by-counting by design. Media that never flips uses <C>max</C>, whose extremes are
+  byte-stable.
+</P>
+<P>
+  <b>Registers select values; constancy never does.</b> Pinning a deeper voice is a composition —
+  amplify, then pin — never a special-cased word.
+</P>
+<P>
+  <b>One word, one meaning.</b> Ordinal words exist only inside <C>brand/</C> as allocation order;
+  supporting tiers are registers of <C>primary</C>; state words never appear in colour tokens — interaction
+  is expressed as washes.
+</P>
+<P>
+  <b>Lazy mint, loud gaps.</b> Only consumed combinations exist; the grammar guarantees a missing token's
+  name before the token does.
+</P>
+<P>
+  <b>Descriptions are law, not data.</b> Token descriptions state method and usage in neutral prose;
+  values live in the tokens, and this documentation renders them from the live pull — the pages cannot
+  drift from the file.
+</P>
+
 <H2>How theming works</H2>
 
 <P>
-  Themes flip at the <b>primitive</b> tier and nowhere else. Primitive colour ramps carry a Light and a Dark
-  face; aliases and semantics are single-mode and inherit the flip through the chain. No tier above the
-  primitives ever restates a value per theme — a semantic role binds one route, and both theme appearances
-  fall out of the cascade.
-</P>
-
-<P>
-  The brand ink and paper pair flip into <i>each other</i>, not into the grey ramp:
-  <span style={{ display: 'inline-flex', gap: 6, verticalAlign: 'middle', marginLeft: 8 }}>
-    <Swatch value={resolve(PRIM_COL, 'base/brand-black').L} title="ink · light" />
-    <Swatch value={resolve(PRIM_COL, 'base/brand-black').D} title="ink · dark" />
-  </span>
+  Themes flip at the <b>primitive</b> tier and nowhere else. Primitive colour ramps carry a Light and a
+  Dark face; aliases and semantics are single-mode and inherit the flip through the chain. Ink and Snow
+  flip into <i>each other</i>, not into Aluminium's endpoints.
 </P>
 
 <H2>The neutral-first law</H2>
 
 <P>
-  ONEMO's primary identity is the brand ink, paper and grey. Coloured ramps are occasional accents — an
-  indicator, a dial arc, a focus ring — never the default surface of buttons or icons. The palette is built
-  so the neutral system carries the product and colour appears deliberately.
-</P>
-
-<H2>Where the data comes from</H2>
-
-<P>
-  Every swatch and value in this documentation is rendered from a generated snapshot of the design file's
-  variables. The pages describe method and law; the numbers on them are computed from the data at render
-  time, so the documentation cannot drift from the file.
+  ONEMO's primary identity is Ink, Snow and Aluminium. Coloured ramps are occasional accents — an
+  indicator, a dial arc, a focus ring — never the default surface of buttons or icons. The palette is
+  built so the neutral system carries the product and colour appears deliberately.
 </P>
 
 <Note>
