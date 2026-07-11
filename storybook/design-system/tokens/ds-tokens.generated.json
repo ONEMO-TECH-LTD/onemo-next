@@ -18833,6 +18833,16 @@
         "$collectionName": ".2.0-Al-Col",
         "$value": "{brand.1.11}"
        },
+       "brand-primary-subtle": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 LOCKED · text/ v2.3.2 — First brand colour, decorative register — below body-text contrast; never reading copy.",
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".2.0-Al-Col",
+        "$value": "{brand.1.10}"
+       },
        "brand-primary-strong": {
         "$scopes": [
          "ALL_SCOPES"
@@ -18933,16 +18943,6 @@
         "$collectionName": ".2.0-Al-Col",
         "$value": "{base.white.l-constant}"
        },
-       "brand-primary-subtle": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — First brand colour, decorative register — below body-text contrast; never reading copy.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.1.10}"
-       },
        "brand-primary-inverse": {
         "$scopes": [
          "ALL_SCOPES"
@@ -18961,7 +18961,7 @@
         "$type": "color",
         "$libraryName": "",
         "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.1.l-constant.11}"
+        "$value": "{brand.1.l-constant.12}"
        },
        "brand-primary-light": {
         "$scopes": [
@@ -18971,7 +18971,7 @@
         "$type": "color",
         "$libraryName": "",
         "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.1.d-constant.11}"
+        "$value": "{brand.1.l-constant.1}"
        },
        "brand-secondary-subtle": {
         "$scopes": [
@@ -19001,7 +19001,7 @@
         "$type": "color",
         "$libraryName": "",
         "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.2.l-constant.11}"
+        "$value": "{brand.2.l-constant.12}"
        },
        "brand-secondary-light": {
         "$scopes": [
@@ -19011,7 +19011,7 @@
         "$type": "color",
         "$libraryName": "",
         "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.2.d-constant.11}"
+        "$value": "{brand.2.l-constant.1}"
        },
        "brand-tertiary-subtle": {
         "$scopes": [
@@ -19041,7 +19041,7 @@
         "$type": "color",
         "$libraryName": "",
         "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.3.l-constant.11}"
+        "$value": "{brand.3.l-constant.12}"
        },
        "brand-tertiary-light": {
         "$scopes": [
@@ -19051,7 +19051,7 @@
         "$type": "color",
         "$libraryName": "",
         "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.3.d-constant.11}"
+        "$value": "{brand.3.l-constant.1}"
        }
       },
       "border": {

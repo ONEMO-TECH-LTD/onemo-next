@@ -80,6 +80,13 @@
    "D": "#73c4f8"
   },
   {
+   "name": "text/brand-primary-subtle",
+   "binding": "brand/1/10",
+   "description": "🔒 LOCKED · text/ v2.3.2 — First brand colour, decorative register — below body-text contrast; never reading copy.",
+   "L": "#287fb0",
+   "D": "#287fb0"
+  },
+  {
    "name": "text/brand-primary-strong",
    "binding": "brand/1/12",
    "description": "🔒 LOCKED · text/ v2.3.2 — First brand colour, emphasis register — and the text voice on its own tints (on-colour law).",
@@ -150,13 +157,6 @@
    "D": "#ffffff"
   },
   {
-   "name": "text/brand-primary-subtle",
-   "binding": "brand/1/10",
-   "description": "🔒 LOCKED · text/ v2.3.2 — First brand colour, decorative register — below body-text contrast; never reading copy.",
-   "L": "#287fb0",
-   "D": "#287fb0"
-  },
-  {
    "name": "text/brand-primary-inverse",
    "binding": "brand/1/inverse/11",
    "description": "🔒 LOCKED · text/ v2.3.2 — First brand colour, opposite of theme — coloured text on inverse surfaces.",
@@ -165,17 +165,17 @@
   },
   {
    "name": "text/brand-primary-dark",
-   "binding": "brand/1/l-constant/11",
+   "binding": "brand/1/l-constant/12",
    "description": "🔒 LOCKED · text/ v2.3.2 — First brand colour, dark voice anchored — theme-tuned, not byte-frozen (colour constants keep identity, not bytes).",
-   "L": "#1170a1",
-   "D": "#0e1a22"
+   "L": "#19394d",
+   "D": "#061016"
   },
   {
    "name": "text/brand-primary-light",
-   "binding": "brand/1/d-constant/11",
+   "binding": "brand/1/l-constant/1",
    "description": "🔒 LOCKED · text/ v2.3.2 — First brand colour, light voice anchored — theme-tuned pale reading.",
-   "L": "#eef4f8",
-   "D": "#73c4f8"
+   "L": "#f5f7f9",
+   "D": "#c4ecff"
   },
   {
    "name": "text/brand-secondary-subtle",
@@ -193,17 +193,17 @@
   },
   {
    "name": "text/brand-secondary-dark",
-   "binding": "brand/2/l-constant/11",
+   "binding": "brand/2/l-constant/12",
    "description": "🔒 LOCKED · text/ v2.3.2 — Second brand colour, dark voice anchored — theme-tuned.",
-   "L": "#517700",
-   "D": "#151911"
+   "L": "#304215",
+   "D": "#0c1008"
   },
   {
    "name": "text/brand-secondary-light",
-   "binding": "brand/2/d-constant/11",
+   "binding": "brand/2/l-constant/1",
    "description": "🔒 LOCKED · text/ v2.3.2 — Second brand colour, light voice anchored — theme-tuned.",
-   "L": "#f1f5ec",
-   "D": "#98cb46"
+   "L": "#f6f8f4",
+   "D": "#d0eeab"
   },
   {
    "name": "text/brand-tertiary-subtle",
@@ -221,17 +221,17 @@
   },
   {
    "name": "text/brand-tertiary-dark",
-   "binding": "brand/3/l-constant/11",
+   "binding": "brand/3/l-constant/12",
    "description": "🔒 LOCKED · text/ v2.3.2 — Third brand colour, dark voice anchored — theme-tuned.",
-   "L": "#6940b9",
-   "D": "#181425"
+   "L": "#372163",
+   "D": "#0f0c19"
   },
   {
    "name": "text/brand-tertiary-light",
-   "binding": "brand/3/d-constant/11",
+   "binding": "brand/3/l-constant/1",
    "description": "🔒 LOCKED · text/ v2.3.2 — Third brand colour, light voice anchored — theme-tuned.",
-   "L": "#f4f2fa",
-   "D": "#bda2ff"
+   "L": "#f7f7f9",
+   "D": "#e3dcff"
   },
   {
    "name": "border/primary",
