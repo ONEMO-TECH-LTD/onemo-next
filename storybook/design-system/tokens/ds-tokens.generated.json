@@ -1,7 +1,7 @@
 {
  "fileKey": "Qdb9Kx98afJHxaCGAIxoMC",
  "pulledAtFileVersion": null,
- "variables": 3098,
+ "variables": 3106,
  "export": [
   {
    ".1.0-Prim-Col": {
@@ -19402,6 +19402,16 @@
       },
       "border": {
        "primary": {
+        "strong": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Emphasis outline — the strong border register.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.8}"
+        },
         "$scopes": [
          "STROKE_COLOR"
         ],
@@ -19429,16 +19439,6 @@
          "$libraryName": "",
          "$collectionName": ".2.0-Al-Col",
          "$value": "{neutral.5}"
-        },
-        "strong": {
-         "$scopes": [
-          "ALL_SCOPES"
-         ],
-         "$description": "🔒 border/ v2.3.2 — Emphasis outline — the strong border register.",
-         "$type": "color",
-         "$libraryName": "",
-         "$collectionName": ".2.0-Al-Col",
-         "$value": "{neutral.8}"
         },
         "inverse": {
          "$scopes": [
@@ -19723,6 +19723,86 @@
          "$libraryName": "",
          "$collectionName": ".2.0-Al-Col",
          "$value": "{brand.3.7}"
+        },
+        "dark": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — The Ink line, follows theme — flips into Snow. The pair is mutually inverse: light is the opposite of dark.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.black}"
+        },
+        "light": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — The Snow line, follows theme — flips into Ink. The pair is mutually inverse: dark is the opposite of light.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.white}"
+        },
+        "dark-perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — The Ink line pinned, never flips — edges on constant-light surfaces.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.black.l-constant}"
+        },
+        "light-perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — The Snow line pinned, never flips — edges on ink and chrome surfaces.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.white.l-constant}"
+        }
+       },
+       "max": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 border/ v2.3.2 — Maximum-contrast line, follows theme. Media edges and absolute rules — UI lines use the brand pair.",
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".2.0-Al-Col",
+        "$value": "{base.black}",
+        "inverse": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Maximum-contrast line, opposite of theme.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{base.white}"
+        },
+        "perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Maximum-contrast line, light-world reading pinned.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{base.black.l-constant}"
+        },
+        "inverse-perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Maximum-contrast line, dark-world reading pinned.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{base.white.l-constant}"
         }
        }
       },

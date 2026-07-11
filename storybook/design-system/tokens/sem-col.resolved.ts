@@ -466,6 +466,13 @@ export const RESOLVED = {
    "D": "#43484e"
   },
   {
+   "name": "border/primary/strong",
+   "binding": "neutral/8",
+   "description": "🔒 border/ v2.3.2 — Emphasis outline — the strong border register.",
+   "L": "#b9bbc6",
+   "D": "#5a6169"
+  },
+  {
    "name": "border/primary/subtle",
    "binding": "neutral/6",
    "description": "🔒 border/ v2.3.2 — Subtle border — card edges, separators, non-interactive.",
@@ -478,13 +485,6 @@ export const RESOLVED = {
    "description": "🔒 border/ v2.3.2 — The hairline — quieter than canon by design; the documented step deviation.",
    "L": "#e0e1e6",
    "D": "#2e3135"
-  },
-  {
-   "name": "border/primary/strong",
-   "binding": "neutral/8",
-   "description": "🔒 border/ v2.3.2 — Emphasis outline — the strong border register.",
-   "L": "#b9bbc6",
-   "D": "#5a6169"
   },
   {
    "name": "border/primary/inverse",
@@ -681,6 +681,62 @@ export const RESOLVED = {
    "description": "🔒 border/ v2.3.2 — Third brand colour outline, subtle register.",
    "L": "#bcacf3",
    "D": "#594391"
+  },
+  {
+   "name": "border/brand/dark",
+   "binding": "brand/black",
+   "description": "🔒 border/ v2.3.2 — The Ink line, follows theme — flips into Snow. The pair is mutually inverse: light is the opposite of dark.",
+   "L": "#071013",
+   "D": "#fafafa"
+  },
+  {
+   "name": "border/brand/light",
+   "binding": "brand/white",
+   "description": "🔒 border/ v2.3.2 — The Snow line, follows theme — flips into Ink. The pair is mutually inverse: dark is the opposite of light.",
+   "L": "#fafafa",
+   "D": "#071013"
+  },
+  {
+   "name": "border/brand/dark-perma",
+   "binding": "brand/black/l-constant",
+   "description": "🔒 border/ v2.3.2 — The Ink line pinned, never flips — edges on constant-light surfaces.",
+   "L": "#071013",
+   "D": "#071013"
+  },
+  {
+   "name": "border/brand/light-perma",
+   "binding": "brand/white/l-constant",
+   "description": "🔒 border/ v2.3.2 — The Snow line pinned, never flips — edges on ink and chrome surfaces.",
+   "L": "#fafafa",
+   "D": "#fafafa"
+  },
+  {
+   "name": "border/max",
+   "binding": "base/black",
+   "description": "🔒 border/ v2.3.2 — Maximum-contrast line, follows theme. Media edges and absolute rules — UI lines use the brand pair.",
+   "L": "#000000",
+   "D": "#ffffff"
+  },
+  {
+   "name": "border/max/inverse",
+   "binding": "base/white",
+   "description": "🔒 border/ v2.3.2 — Maximum-contrast line, opposite of theme.",
+   "L": "#ffffff",
+   "D": "#000000"
+  },
+  {
+   "name": "border/max/perma",
+   "binding": "base/black/l-constant",
+   "description": "🔒 border/ v2.3.2 — Maximum-contrast line, light-world reading pinned.",
+   "L": "#000000",
+   "D": "#000000"
+  },
+  {
+   "name": "border/max/inverse-perma",
+   "binding": "base/white/l-constant",
+   "description": "🔒 border/ v2.3.2 — Maximum-contrast line, dark-world reading pinned.",
+   "L": "#ffffff",
+   "D": "#ffffff"
   },
   {
    "name": "bg/overlay",
