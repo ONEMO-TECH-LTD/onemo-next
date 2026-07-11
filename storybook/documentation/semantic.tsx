@@ -157,3 +157,65 @@ export function FolderNote({ folder }: { folder: string }) {
   const f = FOLDERS.find((x) => x.folder === folder);
   return f ? <p style={{ ...S.p, color: '#60646c', fontSize: 12.5 }}>{f.note}</p> : null;
 }
+
+// ── tier comparison: text ↔ fg, computed from the pull at render time ────────
+
+/** Physical reasons for divergence, keyed by combination. Prose only — the
+ *  combinations themselves are computed; a reason with no live combination
+ *  simply never renders. */
+const DIVERGENCE_REASON: Record<string, string> = {
+  'system/placeholder': 'A glyph cannot be a placeholder — hint text is a text-only concept.',
+  'primary/muted': 'The inactive-but-present glyph tier; text this quiet would be unreadable copy.',
+  'system/disabled-subtle': 'Glyphs carry a second disabled tier where controls stack disabled elements.',
+  'brand/primary-solid': 'The solid graphic register — arcs, badges, filled indicators. Text has no solid register by design.',
+  'system/error-solid': 'Filled status indicator — the graphic register of the status voice.',
+  'system/warning-solid': 'Filled status indicator — the graphic register of the status voice.',
+  'system/success-solid': 'Filled status indicator — the graphic register of the status voice.',
+};
+
+function tierMap(tier: 'text' | 'fg'): Map<string, string> {
+  const m = new Map<string, string>();
+  for (const t of semanticFamily(tier + '/')) m.set(t.name.slice(tier.length + 1), t.binding);
+  return m;
+}
+
+/** The divergence table: only-rows and binding splits, all derived from data. */
+export function TierComparison() {
+  const tx = tierMap('text');
+  const fg = tierMap('fg');
+  const textOnly = [...tx.keys()].filter((k) => !fg.has(k)).sort();
+  const fgOnly = [...fg.keys()].filter((k) => !tx.has(k)).sort();
+  const splits = [...tx.keys()].filter((k) => fg.has(k) && fg.get(k) !== tx.get(k)).sort();
+  return (
+    <Table head={['Combination', 'text/', 'fg/', 'Why the tiers diverge']}>
+      {textOnly.map((k) => (
+        <tr key={k}>
+          <td style={{ ...S.td, whiteSpace: 'nowrap' }}><C>{k}</C></td>
+          <td style={{ ...S.td, whiteSpace: 'nowrap' }}><C>{tx.get(k)}</C></td>
+          <td style={{ ...S.td, color: '#8b8d98' }}>—</td>
+          <td style={{ ...S.td, color: '#60646c', fontSize: 11.5 }}>{DIVERGENCE_REASON[k] ?? ''}</td>
+        </tr>
+      ))}
+      {fgOnly.map((k) => (
+        <tr key={k}>
+          <td style={{ ...S.td, whiteSpace: 'nowrap' }}><C>{k}</C></td>
+          <td style={{ ...S.td, color: '#8b8d98' }}>—</td>
+          <td style={{ ...S.td, whiteSpace: 'nowrap' }}><C>{fg.get(k)}</C></td>
+          <td style={{ ...S.td, color: '#60646c', fontSize: 11.5 }}>{DIVERGENCE_REASON[k] ?? ''}</td>
+        </tr>
+      ))}
+      {splits.map((k) => (
+        <tr key={k}>
+          <td style={{ ...S.td, whiteSpace: 'nowrap' }}><C>{k}</C></td>
+          <td style={{ ...S.td, whiteSpace: 'nowrap' }}><C>{tx.get(k)}</C></td>
+          <td style={{ ...S.td, whiteSpace: 'nowrap' }}><C>{fg.get(k)}</C></td>
+          <td style={{ ...S.td, color: '#60646c', fontSize: 11.5 }}>
+            Text follows the body-text contrast law (the deep voice); glyphs follow the non-text contrast
+            law. Where both laws land on the same step the tiers agree — the agreement elsewhere is the
+            proof this is optics, not drift.
+          </td>
+        </tr>
+      ))}
+    </Table>
+  );
+}
