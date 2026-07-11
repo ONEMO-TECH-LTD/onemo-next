@@ -6,7 +6,7 @@
  */
 
 import React from 'react';
-import { cssColor, splitAlpha, contrastRatio } from './data';
+import { cssColor, splitAlpha } from './data';
 
 const FONT = 'ui-sans-serif, -apple-system, "SF Pro Text", system-ui, sans-serif';
 const MONO = 'ui-monospace, "SF Mono", Menlo, monospace';
@@ -29,21 +29,19 @@ export function Page({ title, lead, children }: { title: string; lead?: React.Re
   return (
     <div style={S.page}>
       <h1 style={S.h1}>{title}</h1>
-      {lead ? <p style={S.lead}>{lead}</p> : null}
+      {lead ? <div style={S.lead}>{lead}</div> : null}
       {children}
     </div>
   );
 }
 
 export const H2 = ({ children }: { children: React.ReactNode }) => <h2 style={S.h2}>{children}</h2>;
-export const H3 = ({ children }: { children: React.ReactNode }) => <h3 style={S.h3}>{children}</h3>;
-export const P = ({ children }: { children: React.ReactNode }) => <p style={S.p}>{children}</p>;
+export const P = ({ children }: { children: React.ReactNode }) => <div style={S.p}>{children}</div>;
 export const C = ({ children }: { children: React.ReactNode }) => <code style={S.code}>{children}</code>;
-export const Faint = ({ children }: { children: React.ReactNode }) => <span style={S.faint}>{children}</span>;
 
 export function Note({ children }: { children: React.ReactNode }) {
   return (
-    <p style={{ ...S.p, borderLeft: '3px solid #e0e1e6', paddingLeft: 10, color: '#60646c', fontSize: 12.5 }}>{children}</p>
+    <div style={{ ...S.p, borderLeft: '3px solid #e0e1e6', paddingLeft: 10, color: '#60646c', fontSize: 12.5 }}>{children}</div>
   );
 }
 
@@ -110,18 +108,6 @@ export function ValueLabel({ value }: { value: string }) {
   );
 }
 
-/** Computed contrast badge — the number is derived at render time. */
-export function Contrast({ fg, bg, large }: { fg: string; bg: string; large?: boolean }) {
-  const ratio = contrastRatio(splitAlpha(fg).hex, splitAlpha(bg).hex);
-  const pass = ratio >= (large ? 3 : 4.5);
-  return (
-    <span style={{ ...S.mono, color: pass ? '#007d1c' : '#bf373a' }}>
-      {ratio.toFixed(2)}
-      {pass ? ' ✓' : ' ✗'}
-    </span>
-  );
-}
-
 export function Table({ head, children }: { head: string[]; children: React.ReactNode }) {
   return (
     <div style={{ border: '1px solid #e0e1e6', borderRadius: 10, overflowX: 'auto', margin: '10px 0' }}>
@@ -141,31 +127,3 @@ export function Table({ head, children }: { head: string[]; children: React.Reac
   );
 }
 
-/** Example pill pair: a sample glyph/text on light and dark grounds. */
-export function GroundPair({
-  render,
-}: {
-  render: (ground: string, face: 'L' | 'D') => React.ReactNode;
-}) {
-  return (
-    <span style={{ display: 'inline-flex', gap: 5 }}>
-      {(['L', 'D'] as const).map((face) => (
-        <span
-          key={face}
-          style={{
-            display: 'inline-flex',
-            width: 96,
-            height: 44,
-            borderRadius: 9,
-            background: face === 'L' ? '#fafafa' : '#111113',
-            border: '1px solid rgba(128,128,128,.25)',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          {render(face === 'L' ? '#fafafa' : '#111113', face)}
-        </span>
-      ))}
-    </span>
-  );
-}

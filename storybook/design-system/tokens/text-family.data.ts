@@ -1,5 +1,5 @@
 /**
- * text/ — FINAL semantic family spec (DS v2.3.2 rebuild · decided 2026-07-11, pending formal lock).
+ * text/ — semantic family presentation overlay for the documentation.
  *
  * PILOT SNAPSHOT — hand-assembled from the live Figma file (values pulled 2026-07-11).
  * At DS lock this file becomes a generated output of tools/ds-pipeline (the token
@@ -197,7 +197,7 @@ export const TEXT_FAMILY: TextToken[] = [
     surface: 'ground',
   },
 
-  // ── brand colours — numbered, mirrors alias brand/1·2·3 (naming pending Dan)
+  // ── brand colours ──
   {
     name: 'text/brand-primary',
     group: 'brand',
@@ -291,22 +291,22 @@ export const TEXT_FAMILY: TextToken[] = [
 export const GROUP_META: Record<TextToken['group'], { title: string; note: string }> = {
   max: {
     title: 'max — pure extremes',
-    note: '#000/#fff — media & absolutes. Photo text = max-light / max-dark picked by sampled region luminance, or sits on scrim/on-image.',
+    note: 'The absolute extremes, for media and edge surfaces. Photo text is the pinned pair, picked by sampled region luminance or seated on the image scrim.',
   },
   primary: {
     title: 'primary — brand voice',
-    note: 'Ink #071013 / paper #fafafa — the UI default. Naming law: bare = follows theme · -inverse = opposite · -dark/-light = that VOICE of the family pinned, never flips (generalizes to greys and colours — NOT Material-2 tint/shade).',
+    note: 'The brand ink and paper — the UI default voice. Naming law: a bare name follows the theme; -inverse opposes it; -dark and -light pin one of the voices so it never flips.',
   },
   secondary: {
     title: 'primary-subtle — the supporting register',
-    note: "Dan ruling: the quiet register of the primary voice — '-subtle' quiets a family the way '-strong' amplifies it; 'secondary' is reserved for brand-secondary. Solid grey on theme surfaces; on mono surfaces the 70% alpha ladders (Material convention) — self-adapting over any fill.",
+    note: 'The quiet register of the primary voice: -subtle quiets a family the way -strong amplifies it. Solid neutral on theme surfaces; on mono surfaces the transparency ladder, self-adapting over any fill.',
   },
-  neutrals: { title: 'field neutrals', note: 'Disabled and placeholder — the two survivors of the fake-tier cull.' },
+  neutrals: { title: 'field neutrals', note: 'Disabled and placeholder — the input-field voices, deliberately below the reading tiers.' },
   brand: {
     title: 'brand colours',
-    note: 'Dan ruling: brand-primary (blue-green) · brand-secondary (lime-moss) · brand-tertiary (indigo-bloom); alias tier stays brand/1·2·3. -strong variants for secondary/tertiary mint lazily on first real use.',
+    note: 'Colour used deliberately: each brand colour carries the same behavior pack — a quiet decorative register, an inverse, and the two pinned voices.',
   },
-  status: { title: 'status', note: 'Functional colours, not accents — error · warning (now 12) · success.' },
+  status: { title: 'status', note: 'Functional colours, not accents — validation, caution, confirmation. Each binds the step of its family that reads as text.' },
 };
 
 /** The 15 removals — recorded so migrating consumers know their target. */
@@ -336,6 +336,6 @@ for (const t of TEXT_FAMILY) {
   t.light = r.L.slice(0, 7);
   t.dark = r.D.slice(0, 7);
   if (r.L.length === 9) t.alpha = parseInt(r.L.slice(7), 16) / 255;
-  const desc = r.description.replace(/^🔒[^—]*— /, '');
+  const desc = r.description.replace(/^🔒[^—]*— /, '').replace(/ ?NOTE: name reused[^]*$/, '');
   if (desc) t.usage = desc;
 }

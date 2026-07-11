@@ -7,7 +7,7 @@
 
 import React from 'react';
 import { PRIM_COL, primitiveFamilies, ramp, resolve, childrenOf, cssColor, splitAlpha } from './data';
-import { S, FamilyRamp, Swatch, ValueLabel, C, P, H3 } from './blocks';
+import { S, FamilyRamp, Swatch, ValueLabel, C, P } from './blocks';
 
 /** All adaptive family ramps, both faces. */
 export function AdaptiveFamilies() {

@@ -33,16 +33,18 @@ const COLLECTIONS = new Map<string, ModeMap>(
 
 export const PRIM_COL = '.1.0-Prim-Col';
 export const AL_COL = '.2.0-Al-Col';
-export const SEM_COL = '3.0-Sem-Col';
 
 function isLeaf(node: Tree | Leaf): node is Leaf {
   return typeof node === 'object' && node !== null && '$type' in node;
 }
 
 function leafAt(tree: Tree, dotPath: string): Leaf | null {
+  // A node can be BOTH a token and a group (e.g. a pair tone that also carries
+  // behavior children), so the walk indexes through any object and only checks
+  // leaf-ness at the destination.
   let node: Tree | Leaf | undefined = tree;
   for (const key of dotPath.split('.')) {
-    if (!node || isLeaf(node)) return null;
+    if (!node || typeof node !== 'object') return null;
     node = (node as Tree)[key];
   }
   return node && isLeaf(node) ? node : null;
@@ -101,12 +103,12 @@ export function childrenOf(collection: string, slashPath = ''): string[] {
   let node: Tree | Leaf | undefined = tree;
   if (slashPath) {
     for (const key of slashPath.split('/')) {
-      if (!node || isLeaf(node)) return [];
+      if (!node || typeof node !== 'object') return [];
       node = (node as Tree)[key];
     }
   }
-  if (!node || isLeaf(node)) return [];
-  return Object.keys(node);
+  if (!node || typeof node !== 'object') return [];
+  return Object.keys(node).filter((k) => !k.startsWith('$'));
 }
 
 /** A 12-step ramp with both faces, or null if the family isn't ramp-shaped. */
@@ -126,54 +128,4 @@ export function primitiveFamilies(): string[] {
   return childrenOf(PRIM_COL).filter((k) => !BEHAVIORS.has(k) && ramp(PRIM_COL, k).length === 12);
 }
 
-export const BEHAVIOR_GROUPS = ['alpha', 'l-constant', 'd-constant', 'l-alpha', 'd-alpha', 'inverse'] as const;
 
-/** Alias palette top-level groups in presentation order (whatever exists). */
-export function aliasPalette(): string[] {
-  const order = ['brand', 'neutral', 'error', 'warning', 'success', 'info', 'base'];
-  const present = new Set(childrenOf(AL_COL));
-  return order.filter((k) => present.has(k)).concat([...present].filter((k) => !order.includes(k)));
-}
-
-// ── semantic (resolved) ──────────────────────────────────────────────────────
-import { RESOLVED } from '../design-system/tokens/sem-col.resolved';
-
-export interface SemToken {
-  name: string;
-  binding: string;
-  description: string;
-  L: string;
-  D: string;
-}
-
-/** Semantic colour tokens with process metadata stripped from descriptions. */
-export function semanticFamily(prefix: string): SemToken[] {
-  return RESOLVED.tokens
-    .filter((t) => t.name.startsWith(prefix))
-    .map((t) => ({
-      name: t.name,
-      binding: t.binding,
-      description: (t.description ?? '').replace(/^🔒[^—]*— /, ''),
-      L: t.L,
-      D: t.D,
-    }));
-}
-
-// ── contrast (WCAG relative luminance) — for values computed at render time ──
-export function relLuminance(hex: string): number {
-  const n = hex.replace('#', '').slice(0, 6);
-  const f = (x: number) => {
-    const c = x / 255;
-    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-  };
-  return (
-    0.2126 * f(parseInt(n.slice(0, 2), 16)) +
-    0.7152 * f(parseInt(n.slice(2, 4), 16)) +
-    0.0722 * f(parseInt(n.slice(4, 6), 16))
-  );
-}
-
-export function contrastRatio(a: string, b: string): number {
-  const [hi, lo] = [relLuminance(a), relLuminance(b)].sort((x, y) => y - x);
-  return (hi + 0.05) / (lo + 0.05);
-}
