@@ -201,6 +201,60 @@ describe('AuthoringGraphV1 checkpoint schema', () => {
         'sourceProperties.prop-secondary-label.inheritedFromPropertyId must reference a matching typed binding',
       ]),
     })
+
+    const stylesheet = 'src/app/(dev)/react-figma-components/Button.module.css'
+    graph.sourceHashes[stylesheet] = SHA
+    graph.sourceProperties['prop-root-color'].binding = {
+      kind: 'module-css',
+      stylesheet: { storeId: 'project-main', file: stylesheet },
+      localClass: 'primary',
+      property: 'color',
+    }
+    graph.sourceProperties['prop-secondary-label'].binding = {
+      kind: 'module-css',
+      stylesheet: { storeId: 'project-main', file: stylesheet },
+      localClass: 'secondary',
+      property: 'color',
+    }
+    expect(validateAuthoringGraphV1(graph)).toEqual({ ok: true, graph })
+  })
+
+  it('requires hashes for same-store module-CSS and instance source files', () => {
+    const graph = minimalGraph()
+    const stylesheet = 'src/app/(dev)/react-figma-components/Button.module.css'
+    const instanceFile = 'src/app/(dev)/react-figma-components/Consumer.tsx'
+    graph.sourceProperties['prop-root-color'].binding = {
+      kind: 'module-css',
+      stylesheet: { storeId: 'project-main', file: stylesheet },
+      localClass: 'primary',
+      property: 'color',
+    }
+    graph.instances['instance-button'] = {
+      id: 'instance-button',
+      componentId: 'component-button',
+      variantId: 'variant-primary',
+      source: {
+        storeId: 'project-main',
+        file: instanceFile,
+        anchor: { ...graph.sourceProperties['prop-root-color'].ownerAnchor },
+      },
+    }
+
+    const result = validateAuthoringGraphV1(graph)
+
+    expect(result).toMatchObject({
+      ok: false,
+      errors: expect.arrayContaining([
+        `sourceProperties.prop-root-color.binding.stylesheet.file missing source hash: ${stylesheet}`,
+        `instances.instance-button.source.file missing source hash: ${instanceFile}`,
+      ]),
+    })
+
+    const binding = graph.sourceProperties['prop-root-color'].binding
+    if (binding.kind !== 'module-css') throw new Error('expected module-css fixture')
+    binding.stylesheet.storeId = 'global-library'
+    graph.instances['instance-button'].source.storeId = 'global-library'
+    expect(validateAuthoringGraphV1(graph)).toEqual({ ok: true, graph })
   })
 
   it('rejects broken component, variant, property, and interaction references', () => {

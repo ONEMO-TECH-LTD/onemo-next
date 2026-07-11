@@ -364,12 +364,7 @@ function validateGraphReferences(graph: Record<string, unknown>, errors: string[
       if (!isNonEmptyString(component.source.storeId)) errors.push(`components.${componentId}.source.storeId is required`)
       if (!isStoreRelativePath(component.source.file)) errors.push(`components.${componentId}.source.file must be store-relative`)
       if (!isNonEmptyString(component.source.exportName)) errors.push(`components.${componentId}.source.exportName is required`)
-      if (
-        isStoreRelativePath(component.source.file) &&
-        (!isRecord(graph.sourceHashes) || !isSha256(graph.sourceHashes[component.source.file]))
-      ) {
-        errors.push(`components.${componentId}.source.file missing source hash: ${component.source.file}`)
-      }
+      validateSameStoreSourceHash(graph, `components.${componentId}.source.file`, component.source.storeId, component.source.file, errors)
     }
     if (!isNonEmptyString(component.primaryVariantId)) {
       errors.push(`components.${componentId}.primaryVariantId is required`)
@@ -452,6 +447,15 @@ function validateGraphReferences(graph: Record<string, unknown>, errors: string[
         errors.push(`sourceProperties.${propertyId}.source must match its component source`)
       }
     }
+    if (isRecord(property.binding) && property.binding.kind === 'module-css' && isRecord(property.binding.stylesheet)) {
+      validateSameStoreSourceHash(
+        graph,
+        `sourceProperties.${propertyId}.binding.stylesheet.file`,
+        property.binding.stylesheet.storeId,
+        property.binding.stylesheet.file,
+        errors,
+      )
+    }
     if (property.inheritedFromPropertyId !== null && property.inheritedFromPropertyId !== undefined && !isRecord(graph.sourceProperties[property.inheritedFromPropertyId as string])) {
       errors.push(`sourceProperties.${propertyId}.inheritedFromPropertyId missing property: ${String(property.inheritedFromPropertyId)}`)
     } else if (isNonEmptyString(property.inheritedFromPropertyId)) {
@@ -529,6 +533,7 @@ function validateGraphReferences(graph: Record<string, unknown>, errors: string[
       if (!isNonEmptyString(instance.source.storeId)) errors.push(`instances.${instanceId}.source.storeId is required`)
       if (!isStoreRelativePath(instance.source.file)) errors.push(`instances.${instanceId}.source.file must be store-relative`)
       validateSourceAnchor(`instances.${instanceId}.source.anchor`, instance.source.anchor, errors)
+      validateSameStoreSourceHash(graph, `instances.${instanceId}.source.file`, instance.source.storeId, instance.source.file, errors)
     }
     if (isNonEmptyString(instance.variantId) && isNonEmptyString(instance.componentId)) {
       const variant = graph.variants[instance.variantId]
@@ -623,8 +628,20 @@ function propertyBindingsMatch(left: unknown, right: unknown): boolean {
   if (left.kind !== 'module-css' || !isRecord(left.stylesheet) || !isRecord(right.stylesheet)) return false
   return left.stylesheet.storeId === right.stylesheet.storeId &&
     left.stylesheet.file === right.stylesheet.file &&
-    left.localClass === right.localClass &&
     left.property === right.property
+}
+
+function validateSameStoreSourceHash(
+  graph: Record<string, unknown>,
+  label: string,
+  storeId: unknown,
+  file: unknown,
+  errors: string[],
+) {
+  if (storeId !== graph.storeId || !isStoreRelativePath(file)) return
+  if (!isRecord(graph.sourceHashes) || !isSha256(graph.sourceHashes[file])) {
+    errors.push(`${label} missing source hash: ${file}`)
+  }
 }
 
 function isFiniteNumber(value: unknown): value is number {
