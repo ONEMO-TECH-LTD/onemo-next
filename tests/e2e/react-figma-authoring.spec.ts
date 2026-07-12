@@ -45,11 +45,6 @@ test.describe('React Figma component authoring', () => {
     expect(imported.ok()).toBe(true)
     const frame = page.locator('iframe')
     const editorUrl = page.url()
-    await frame.evaluate((node) => {
-      const iframe = node as HTMLIFrameElement & { __e2eRetainedFrame?: boolean }
-      iframe.__e2eRetainedFrame = true
-      ;(iframe.contentDocument as Document & { __e2eRetainedDocument?: boolean }).__e2eRetainedDocument = true
-    })
 
     await expect(async () => {
       await componentsRail.click()
@@ -59,6 +54,11 @@ test.describe('React Figma component authoring', () => {
     await expect(page.locator('[data-authoring-canvas]')).toBeVisible()
     const authoringHost = await page.locator('[data-screen-host]').evaluate((node) => ({ width: node.clientWidth, height: node.clientHeight }))
     expect(authoringHost.width).toBeGreaterThan(402)
+    await frame.evaluate((node) => {
+      const iframe = node as HTMLIFrameElement & { __e2eRetainedFrame?: boolean }
+      iframe.__e2eRetainedFrame = true
+      ;(iframe.contentDocument as Document & { __e2eRetainedDocument?: boolean }).__e2eRetainedDocument = true
+    })
 
     await page.getByRole('button', { name: 'Home' }).click()
     expect(page.url()).toBe(editorUrl)

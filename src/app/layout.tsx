@@ -3,6 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "ONEMO",
+  icons: { icon: "/favicon.ico" },
 };
 
 export default function RootLayout({
