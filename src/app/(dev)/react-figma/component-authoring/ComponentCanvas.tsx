@@ -205,8 +205,8 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged }: {
           const moved = movedVariantFrame(current.frame, dx, dy)
           if (!moved) return
           void execute({ kind: 'move-variant', commandId: crypto.randomUUID(), componentId: definition.id, variantId: current.id, frame: moved })
-        }} onPointerCancel={() => { drag.current = null; setDragPreview(null) }} style={{ position: 'absolute', left: frame.x, top: frame.y, width: frame.width, minHeight: frame.height, margin: 0, padding: 12, boxSizing: 'border-box', background: selected ? 'var(--sem-col-bg-brand-primary)' : 'var(--sem-col-bg-primary)', border: `${selected ? 2 : 1}px ${selected ? 'solid' : 'dashed'} ${accent}`, borderRadius: 'var(--sem-radii-md)' }}>
-          <figcaption onClick={() => { if (selected) { cancelRename.current = false; setRenamingId(variant.id) } }} style={{ marginBottom: 8, color: 'var(--sem-col-text-brand-primary)', cursor: selected ? 'text' : 'default', fontFamily: 'var(--sem-type-fluid-label-s-font)', fontSize: 'var(--sem-type-fluid-label-s-size)', lineHeight: 'var(--sem-type-fluid-label-s-line-height)', letterSpacing: 'var(--sem-type-fluid-label-s-letter-spacing)' }}>
+        }} onPointerCancel={() => { drag.current = null; setDragPreview(null) }} style={{ position: 'absolute', left: frame.x, top: frame.y, width: frame.width, minHeight: frame.height, margin: 0, padding: 12, boxSizing: 'border-box', background: selected ? 'var(--sem-col-bg-brand-primary)' : 'var(--sem-col-bg-primary)', border: 0, outline: selected ? `2px solid ${accent}` : 'none', borderRadius: 'var(--sem-radii-md)' }}>
+          <figcaption data-variant-label onClick={() => { if (selected) { cancelRename.current = false; setRenamingId(variant.id) } }} style={{ marginBottom: 8, color: 'var(--sem-col-text-brand-primary)', cursor: selected ? 'text' : 'default', fontFamily: 'var(--sem-type-fluid-label-s-font)', fontSize: 'var(--sem-type-fluid-label-s-size)', lineHeight: 'var(--sem-type-fluid-label-s-line-height)', letterSpacing: 'var(--sem-type-fluid-label-s-letter-spacing)' }}>
             {renamingId === variant.id ? <input aria-label={`Rename ${variant.displayName}`} autoFocus defaultValue={variant.displayName} onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => {
               if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur() }
               if (event.key === 'Escape') { event.preventDefault(); cancelRename.current = true; event.currentTarget.blur() }
@@ -216,7 +216,7 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged }: {
               const displayName = event.currentTarget.value.trim()
               if (displayName && displayName !== variant.displayName) void execute({ kind: 'rename-variant', commandId: crypto.randomUUID(), componentId: definition.id, variantId: variant.id, displayName })
             }} /> : variant.displayName}
-            {variant.id === definition.primaryVariantId ? ' · Primary' : ''}
+            {variant.id === definition.primaryVariantId && variant.displayName.trim().toLowerCase() !== 'primary' ? ' · Primary' : ''}
           </figcaption>
           {(() => { const Comp = component; return <Comp {...(props.get(variant.id) ?? {})} /> })()}
         </figure>

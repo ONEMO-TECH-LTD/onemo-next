@@ -57,6 +57,14 @@ test.describe('React Figma component authoring', () => {
     ])
     if (await revalidateSource.isVisible()) await revalidateSource.click()
     await expect(authoringCanvas).toBeVisible({ timeout: 30_000 })
+    await expect(page.locator('[data-variant-label]').filter({ hasText: 'Primary · Primary' })).toHaveCount(0)
+    expect(await page.locator('[data-variant-id]').evaluateAll((frames) => frames.map((frame) => {
+      const style = getComputedStyle(frame)
+      return { borderStyle: style.borderStyle, outlineStyle: style.outlineStyle }
+    }))).toEqual(expect.arrayContaining([
+      { borderStyle: 'none', outlineStyle: 'solid' },
+      { borderStyle: 'none', outlineStyle: 'none' },
+    ]))
     await page.getByRole('button', { name: 'Create variant' }).click()
     await expect(page.getByText('Variant 3', { exact: true })).toBeVisible({ timeout: 30_000 })
 
