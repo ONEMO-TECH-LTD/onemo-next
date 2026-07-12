@@ -63,6 +63,8 @@
 - What worked: retain the real integration coverage and give only the three multi-program/multi-transaction cases bounded 15-second or 20-second ceilings, then require the full suite to pass.
 - Remember: do not use a focused green run to overrule a red full gate; distinguish contention with measured focused evidence, then make the full proof stable.
 
+Follow-up at the committed authoring E2E gate: the local-`typeRoots` semantic case and source+graph+history undo case measured 1.32s and 1.72s alone, but crossed Vitest's 5s default under QA's cold parallel load. Both now use the same bounded 15s integration ceiling; assertions and suite parallelism remain unchanged.
+
 ## S58 component-shell Playwright setup
 
 - What did not work: importing `@playwright/test` from a temporary test outside the repository, then launching the runner's bundled headless Chromium.

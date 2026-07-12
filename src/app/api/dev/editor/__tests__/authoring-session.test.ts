@@ -139,5 +139,5 @@ describe('ProjectAuthoringSession', () => {
     const journal = await fs.readFile(path.join(root, 'src/app/(dev)/react-figma-components/.onemo/history/journal.ndjson'), 'utf8')
     expect(journal).toContain('session-create-undo')
     expect(journal).toContain('authoring-undo')
-  })
+  }, 15_000)
 })

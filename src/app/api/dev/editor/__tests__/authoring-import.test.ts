@@ -305,7 +305,7 @@ export function Button() { return <button className={styles.base} /> }
       expectedRevision: loaded.graph.revision,
       expectedSourceHashes: loaded.sourceHashes,
     })).resolves.toMatchObject({ graph: { revision: 2 } })
-  })
+  }, 15_000)
 
   it('hashes the complete config chain and refuses option-only drift before transaction prepare', async () => {
     const { root, registry, store } = await makeImportStore()
