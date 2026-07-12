@@ -22,6 +22,8 @@ import {
   MagnifyingGlass, Plus, Minus, Sidebar, CaretDown, ArrowUUpLeft, ArrowUUpRight, LinkBreak, Crosshair,
   type Icon as PIcon,
 } from '@phosphor-icons/react'
+import { ComponentCanvas } from './component-authoring/ComponentCanvas'
+import { canvasHistoryAction } from './component-authoring/gestures'
 
 const INK = 'rgba(0,0,0,0.898)', MUTE = 'rgba(0,0,0,0.45)', FAINT = 'rgba(0,0,0,0.3)' // INK: Figma's exact ink (E8 audit — measured, was 0.9)
 const LINE = '#e6e7e9', FIELD = '#f5f5f5', SEL = '#0d99ff', TOKEN = '#7a3fb0', RAIL = '#fff'
@@ -2250,7 +2252,7 @@ function ComponentsRail({ components, selectedFile, onJump, query = '', onContex
                     style={{ appearance: 'none', border: 0, width: '100%', height: 32, padding: '0 16px', background: selectedFile && c.file === selectedFile ? COMPONENT_SELECTED_BG : '#fff', boxShadow: selectedFile && c.file === selectedFile ? `inset 0 0 0 1px ${COMPONENT_SELECTED_BORDER}` : 'none', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', font: `400 11px/16px ${FONT}`, color: COMPONENT_TEXT, textAlign: 'left' }}>
                     <UiIcon name="layerComponent" size={12} /> <span style={{ color: COMPONENT_TEXT }}>{c.name}</span>
                   </button>
-                  {(c.exports ?? []).filter((x) => x !== c.name).map((v) => (
+                  {(c.exports ?? []).filter((x) => x !== c.name && x !== '__onemoVariantRegistry').map((v) => (
                     <button key={v} type="button" onClick={() => onJump(v)} title={`${c.name} variant`}
                       style={{ appearance: 'none', border: 0, width: '100%', height: 32, padding: '0 16px 0 32px', background: '#fff', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', font: `400 11px/16px ${FONT}`, color: COMPONENT_TEXT, textAlign: 'left' }}>
                       <UiIcon name="layerComponent" size={10} /> {v}
@@ -2323,13 +2325,15 @@ export default function ReactFigmaPage() {
   const [newCompName, setNewCompName] = useState('')
   const [newCompRoot, setNewCompRoot] = useState<'project' | 'global'>('project') // E7.4 QA MED: UI parity with the op
   const [newCompCategory, setNewCompCategory] = useState('')
-  // E7.3 (KAI-9377): second canvas — Design ⇄ Components toggle just swaps the iframe route;
-  // the whole shell (zoom/pan/selection/overrides) is route-agnostic (architecture v4.1 §1).
-  // E10 (Dan LOCKED interaction model, 2026-07-08): the Components rail keeps your PAGE as the canvas
-  // BY DEFAULT — the library lives in the left panel. Only DOUBLE-CLICKING a component enters its edit
-  // view (the component gallery + a `Home > Name` breadcrumb). So canvasMode follows editingComponent,
-  // NOT the rail — which kills the selection-race by construction (the page is never auto-replaced).
+  // Components keep the current page iframe mounted. Entering one project component overlays its graph-backed
+  // authoring frames in this same canvas host; Home removes the overlay and reveals the unchanged page.
   const [editingComponent, setEditingComponent] = useState<DsComponent | null>(null)
+  const [authoringBounds, setAuthoringBounds] = useState({ w: 800, h: 600 })
+  const [authoringUndoNonce, setAuthoringUndoNonce] = useState(0)
+  const updateAuthoringBounds = useCallback((w: number, h: number) => {
+    setAuthoringBounds({ w: Math.max(800, w), h: Math.max(600, h) })
+  }, [])
+  const noteAuthoringChanged = useCallback(() => setCompNonce((value) => value + 1), [])
   const canvasMode: 'design' | 'components' = rail === 'components' && editingComponent ? 'components' : 'design'
   // I1 (blueprint §4 editTarget + §6.2 two-kind states): while editing a component, which RULE the
   // inspector's edits target — base / a config variant / an interaction pseudo-state / a semantic
@@ -2341,9 +2345,6 @@ export default function ReactFigmaPage() {
   // component model of the component currently being edited (its .tsx file + base class + variants/states)
   type EditModel = { file: string; cssModule: string | null; rootClass: string | null; root: { line: number; col: number } | null; rootTag: string | null; variantAxes: { axis: string; values: string[]; defaultValue: string }[]; props: { name: string; tsType: string }[]; states: string[]; connectors: { mode: string; to: { axis?: string; value?: string }; transition?: { stiffness: number; damping: number; mass: number } }[] }
   const [editModel, setEditModel] = useState<EditModel | null>(null)
-  // I5 (§I5): board-authoring inputs — new-axis name + per-axis new-value drafts (fire add-variant-axis/value).
-  const [newAxisName, setNewAxisName] = useState('')
-  const [newValueByAxis, setNewValueByAxis] = useState<Record<string, string>>({})
   const editModelRef = useRef(editModel); useEffect(() => { editModelRef.current = editModel }, [editModel])
   const editingComponentRef = useRef(editingComponent); useEffect(() => { editingComponentRef.current = editingComponent }, [editingComponent])
   // §0 unified model: the server returns ONE `rules` list + `props`; the state-EXISTENCE list the chips/guard
@@ -2381,23 +2382,17 @@ export default function ReactFigmaPage() {
     }
     return r
   }, [])
-  useEffect(() => { // reset the target + load the model; AUTO-PROMOTE the root so states/variants are authorable
+  useEffect(() => { // navigation is read-only: load inspection state without promoting or writing source
     setEditTarget({ kind: 'base' })
     if (!editingComponent?.file) { setEditModel(null); return }
     const file = editingComponent.file
     let live = true
     void (async () => {
-      let m = await fetchModel(file)
-      // blueprint §4: an un-promoted (inline-styled) component can't hold scoped rules — promote its root
-      // transparently on edit-entry (representation change, visual-identical per R4), then re-read.
-      if (m && !m.cssModule && m.root) {
-        await engineWrite({ kind: 'promote-element', file, line: m.root.line, col: m.root.col }) // F-A1
-        m = await fetchModel(file)
-      }
+      const m = await fetchModel(file)
       if (live && m) setEditModel(shapeModel(m))
     })()
     return () => { live = false }
-  }, [editingComponent, engineWrite])
+  }, [editingComponent])
   const reloadEditModel = useCallback(async (file: string) => {
     const m = await fetchModel(file)
     if (m) setEditModel(shapeModel(m))
@@ -2414,23 +2409,6 @@ export default function ReactFigmaPage() {
     window.addEventListener('message', on)
     return () => window.removeEventListener('message', on)
   }, [reloadEditModel])
-  // Selecting a state chip: semantic states (loading/error) get their real boolean prop added on first
-  // pick (add-state), THEN become the edit target. Interaction states + variants just set the target.
-  const selectEditTarget = useCallback(async (t: EditTarget) => {
-    if (t.kind === 'state') {
-      const em = editModelRef.current
-      // SEMANTIC states (loading/error, + `disabled` on a NON-form root — §6.2) must add their boolean prop
-      // + data-toggle BEFORE the `[data-<state>]` rule can be driven, so fire add-state on chip selection.
-      // INTERACTION states (hover/pressed/focus, + `disabled` on a FORM root) create their `:pseudo` rule
-      // lazily on the first scoped edit, so no add-state trigger is needed.
-      const needsAddState = t.state === 'loading' || t.state === 'error' || (t.state === 'disabled' && em?.rootTag != null && !FORM_ROOTS.has(em.rootTag))
-      if (needsAddState && em?.file && !em.states.includes(t.state)) {
-        await engineWrite({ kind: 'add-state', file: em.file, state: t.state }) // F-A1
-        await reloadEditModel(em.file)
-      }
-    }
-    setEditTarget(t)
-  }, [reloadEditModel, engineWrite])
   // Force-preview the active state on the component frames so the user SEES the state they're authoring:
   // interaction → data-fc-preview on the frame (ancestor half of the dual selector); semantic → data-<state>
   // on the component's rendered root (.base element). Base/variant → clear all preview attrs.
@@ -3502,13 +3480,17 @@ export default function ReactFigmaPage() {
   }, [])
   // E4 vibe #4: the device-frame size follows the frame preset (was hardcoded 402×871)
   const frameDims = (() => { const m = framePreset.size.match(/(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)/); return m ? { w: Math.round(+m[1]), h: Math.round(+m[2]) } : { w: 402, h: 871 } })()
-  // E7.3: components gallery grows with content — roomy fixed host; Design keeps preset dims.
-  const hostDims = canvasMode === 'components' ? { w: 1480, h: 1040 } : frameDims
+  // Component authoring bounds follow graph geometry; the page canvas keeps its selected frame preset.
+  const hostDims = canvasMode === 'components' ? authoringBounds : frameDims
   // Undo/redo over canvas edits (Dan live-QA "there must be undo/redo"). Versioning of committed
   // code = git (every Save-to-code is a tracked source edit); this stack covers staged overrides.
   const historyRef = useRef<{ id: string; prop: string; before: string | null; after: string }[][]>([])
   const redoRef = useRef<{ id: string; prop: string; before: string | null; after: string }[][]>([])
   const undoEdit = useCallback(() => {
+    if (editingComponentRef.current) {
+      setAuthoringUndoNonce((value) => value + 1)
+      return
+    }
     const step = historyRef.current.pop()
     if (!step) { notify('Nothing to undo'); return }
     for (const c of step) {
@@ -3522,6 +3504,10 @@ export default function ReactFigmaPage() {
     notify('Undo')
   }, [])
   const redoEdit = useCallback(() => {
+    if (editingComponentRef.current) {
+      notify('Component redo is not available')
+      return
+    }
     const step = redoRef.current.pop()
     if (!step) { notify('Nothing to redo'); return }
     for (const c of step) {
@@ -3536,14 +3522,15 @@ export default function ReactFigmaPage() {
   }, [])
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z') return
+      const action = canvasHistoryAction(e)
+      if (!action) return
       const t = e.target as HTMLElement | null
       // Figma behavior: ⌘Z is the CANVAS undo even while an inspector field is focused (the common
       // case right after typing a value). Blur the field and undo; only free-text areas keep native.
       if (t && (t.tagName === 'TEXTAREA' || t.isContentEditable)) return
       if (t && t.tagName === 'INPUT') (t as HTMLInputElement).blur()
       e.preventDefault()
-      if (e.shiftKey) redoEdit(); else undoEdit()
+      if (action === 'redo') redoEdit(); else undoEdit()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -3754,7 +3741,7 @@ export default function ReactFigmaPage() {
         {railItems.map(([icon, label, key]) => {
           const active = key !== null && rail === key
           return (
-            <button key={label} type="button" title={label} onClick={() => key && setRail(key)}
+            <button key={label} type="button" title={label} onClick={() => { setRail(key); if (key !== 'components') setEditingComponent(null) }}
               style={{ appearance: 'none', border: 0, cursor: 'pointer', width: 56, height: 56, borderRadius: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', gap: 2, background: 'transparent', padding: '5px 0 0', color: active ? SEL : INK }}>
               <span style={{ width: 32, height: 28, borderRadius: 5, display: 'grid', placeItems: 'center', background: active ? '#e5f4ff' : 'transparent' }}><UiIcon name={icon} /></span>
               <span style={{ font: `450 ${label.length > 8 ? 8 : 9}px/14px ${FONT}`, letterSpacing: label.length > 8 ? '0px' : '0.045px', color: INK, maxWidth: 54, padding: '0 1px', boxSizing: 'border-box', overflow: 'hidden', whiteSpace: 'nowrap', textAlign: 'center' }}>{label}</span>
@@ -3927,11 +3914,13 @@ export default function ReactFigmaPage() {
                   style={{ flex: 1, minWidth: 0, height: 26, borderRadius: 6, border: `1px solid ${LINE}`, background: '#fff', padding: '0 8px', outline: 0, font: `400 11px/1 ${FONT}`, color: INK }} />
               </div>
             </form>
-            <ComponentsRail components={dsComponents} selectedFile={sel?.file} query={compSearch} onJump={jumpTo} onEdit={(c) => setEditingComponent(c)}
+            <ComponentsRail components={dsComponents} selectedFile={sel?.file} query={compSearch} onJump={jumpTo} onEdit={(c) => {
+              if (c.root === 'project') setEditingComponent(c)
+              else notify('Global library authoring is not available in this phase', 'error')
+            }}
               onContext={(c, e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, items: [
                 { label: 'Insert into selection', onClick: () => void insertAsset(c.name, c.importPath) },
-                { label: 'Edit component', onClick: () => setEditingComponent(c) },
-                { label: 'Find in gallery', onClick: () => { setEditingComponent(c); setTimeout(() => jumpTo(c.name), 300) } },
+                { label: 'Edit component', onClick: () => c.root === 'project' ? setEditingComponent(c) : notify('Global library authoring is not available in this phase', 'error') },
                 { label: 'Rename', divider: true, onClick: () => void renameComponentByName(c.name) },
                 { label: 'Copy import', onClick: () => { try { void navigator.clipboard?.writeText(`import { ${c.name} } from '${c.importPath}'`); notify(`Copied import · ${c.name}`) } catch { notify('Clipboard blocked', 'error') } } },
                 { label: 'Duplicate — lands in the lifecycle phase', divider: true, disabled: true, title: 'Component duplicate ships in the E10 lifecycle phase' },
@@ -4004,83 +3993,23 @@ export default function ReactFigmaPage() {
                 <span style={{ color: FAINT }}>›</span>
                 <button type="button" onClick={selectFrameRoot} title="Select component frame" style={{ appearance: 'none', border: 0, background: 'transparent', font: 'inherit', color: SEL, cursor: 'pointer', padding: 0 }}>{editingComponent.name}</button>
               </div>
-              {/* I1 editTarget chips: Base + config variants + the 6 states. Selecting redirects the
-                  inspector to that rule (§4). Semantic states (loading/error) add their boolean prop on first pick. */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap', font: `500 9px/1 ${FONT}` }}>
-                {[{ t: { kind: 'base' as const }, label: 'Base' },
-                  ...(editModel?.variantAxes ?? []).flatMap((ax) => ax.values.map((value) => ({ t: { kind: 'axis' as const, axis: ax.axis, value }, label: `${ax.axis}=${value}` }))),
-                  { divider: true as const },
-                  ...(['hover', 'pressed', 'focus', 'disabled', 'loading', 'error'] as const).map((s) => ({ t: { kind: 'state' as const, state: s }, label: s[0].toUpperCase() + s.slice(1), semantic: s === 'loading' || s === 'error' }))
-                ].map((c, i) => 'divider' in c ? <span key={i} style={{ width: 1, height: 13, background: LINE, margin: '0 2px' }} />
-                  : (() => {
-                    const active = c.t.kind === editTarget.kind && (c.t.kind !== 'axis' || ('axis' in editTarget && editTarget.axis === (c.t as { axis: string; value: string }).axis && editTarget.value === (c.t as { axis: string; value: string }).value)) && (c.t.kind !== 'state' || ('state' in editTarget && editTarget.state === (c.t as { state: string }).state))
-                    return <button key={i} type="button" title={'semantic' in c && c.semantic ? `${c.label} — a real boolean prop drives this state` : c.label}
-                      onClick={() => void selectEditTarget(c.t)}
-                      style={{ appearance: 'none', border: `1px solid ${active ? SEL : LINE}`, background: active ? '#e5f4ff' : '#fff', color: active ? SEL : INK, borderRadius: 5, padding: '3px 7px', cursor: 'pointer', font: 'inherit' }}>{c.label}</button>
-                  })())}
-              </div>
-              {/* I5 (§I5): board authoring — +Axis / +Value fire the shipped I2 ops (add-variant-axis /
-                  add-variant-value); +State is the state chips above (semantic states fire add-state on pick);
-                  editing a frame routes via the editTarget chips. All authoring happens FROM this board. */}
-              {editModel?.cssModule && (() => {
-                const em = editModel
-                const inp = { appearance: 'none' as const, border: `1px solid ${LINE}`, borderRadius: 4, padding: '2px 5px', font: `500 9px/1 ${FONT}`, color: INK, width: 64, outline: 'none' as const }
-                const btn = { appearance: 'none' as const, border: `1px solid ${LINE}`, background: '#fff', borderRadius: 5, padding: '3px 7px', cursor: 'pointer', font: `500 9px/1 ${FONT}`, color: SEL }
-                const write = async (body: object) => { if (await engineWrite(body)) { await reloadEditModel(em.file); iframeRef.current?.contentWindow?.postMessage({ type: 'fc-board-refresh' }, '*') } } // F-A1: only reload/refresh on a successful write; a refusal surfaces via the toast
-                // F-M11 (board-input blocklist, §D2): variant axes and states are orthogonal — an axis named like
-                // one of the 6 reserved states would collide with the semantic-state prop (server refuses 422).
-                // Reject it CLIENT-SIDE too, before any fetch, so the board never even attempts the invalid op.
-                const RESERVED_STATE_NAMES = ['hover', 'pressed', 'focus', 'disabled', 'loading', 'error']
-                const axisReserved = RESERVED_STATE_NAMES.includes(newAxisName.trim())
-                return (
-                  <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <div style={{ font: `600 8px/1 ${FONT}`, color: MUTE, textTransform: 'uppercase', letterSpacing: '0.4px' }}>Variants</div>
-                    {em.variantAxes.map((ax) => (
-                      <div key={ax.axis} style={{ display: 'flex', alignItems: 'center', gap: 4, font: `500 9px/1 ${FONT}`, flexWrap: 'wrap' }}>
-                        <span style={{ color: SEL }}>{ax.axis}</span>
-                        <span style={{ color: FAINT }}>{ax.values.join(', ')}</span>
-                        <input value={newValueByAxis[ax.axis] ?? ''} onChange={(e) => setNewValueByAxis((m) => ({ ...m, [ax.axis]: e.target.value }))} placeholder="value" style={inp} />
-                        <button type="button" style={btn} disabled={!(newValueByAxis[ax.axis] ?? '').trim()}
-                          onClick={async () => { const v = (newValueByAxis[ax.axis] ?? '').trim(); if (!v) return; await write({ kind: 'add-variant-value', file: em.file, axis: ax.axis, value: v }); setNewValueByAxis((m) => ({ ...m, [ax.axis]: '' })) }}>+ value</button>
-                      </div>
-                    ))}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                      <input value={newAxisName} onChange={(e) => setNewAxisName(e.target.value)} placeholder="axis name" style={inp} />
-                      <button type="button" style={{ ...btn, ...(axisReserved ? { color: FAINT, cursor: 'not-allowed' } : {}) }} disabled={!newAxisName.trim() || axisReserved}
-                        onClick={async () => { const a = newAxisName.trim(); if (!a || RESERVED_STATE_NAMES.includes(a)) return; await write({ kind: 'add-variant-axis', file: em.file, axis: a, values: ['a', 'b'], defaultValue: 'a' }); setNewAxisName('') }}>+ axis</button>
-                      {axisReserved && <span style={{ font: `500 8px/1.2 ${FONT}`, color: '#f24822' }}>“{newAxisName.trim()}” is a reserved state name</span>}
-                    </div>
-                  </div>
-                )
-              })()}
-              {/* I3 props panel (§5): the component's EXPOSED props — text/colour/etc turned editable via the
-                  custom-property bridge. Axis props render as the variant chips above; the 6 states as state
-                  chips; this lists the rest (a real prop a consumer sets per-instance). */}
-              {(() => {
-                const STATE_NAMES = new Set(['hover', 'pressed', 'focus', 'disabled', 'loading', 'error'])
-                const exposed = (editModel?.props ?? []).filter((p) => !(editModel?.variantAxes ?? []).some((a) => a.axis === p.name) && !STATE_NAMES.has(p.name))
-                return exposed.length > 0 ? (
-                  <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                    <div style={{ font: `600 8px/1 ${FONT}`, color: MUTE, textTransform: 'uppercase', letterSpacing: '0.4px' }}>Props</div>
-                    {exposed.map((p) => (
-                      <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 6, font: `500 9px/1 ${FONT}` }}>
-                        <span style={{ color: SEL }}>{p.name}</span>
-                        <span style={{ color: FAINT }}>{p.tsType}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : null
-              })()}
-              {/* I7: connectors are authored on the BOARD now — drag a frame's ⚡ handle to a state/variant frame
-                  to wire, click a wire to tune its spring or remove it. The old side-panel buttons (a redundant
-                  second authoring surface) were removed once the visual layer reached full create/edit/remove parity. */}
             </div>
           ) : (
             <button type="button" onClick={selectFrameRoot} title="Select frame" style={{ appearance: 'none', border: 0, background: 'transparent', font: `550 10px/1 ${FONT}`, color: SEL, marginBottom: 8, marginLeft: 2, cursor: 'pointer', padding: 0 }}>{canvas.name} · {hostDims.w} × {hostDims.h}</button>
           )}
           <div data-screen-host onClick={selectFrameRoot} style={{ position: 'relative', width: hostDims.w, height: hostDims.h, background: '#fff', borderRadius: 4, boxShadow: '0 0 0 1px rgba(0,0,0,.06), 0 12px 40px -8px rgba(0,0,0,.25)' }}>
-            <iframe key={canvasMode === 'components' ? `/react-figma/components-canvas${editingComponent?.file ? `?edit=${encodeURIComponent(editingComponent.file)}` : ''}` : canvas.route} ref={iframeRef} src={canvasMode === 'components' ? `/react-figma/components-canvas${editingComponent?.file ? `?edit=${encodeURIComponent(editingComponent.file)}` : ''}` : canvas.route} onLoad={wireCanvas} title="Canvas — real build"
-              style={{ width: hostDims.w, height: hostDims.h, border: 0, display: 'block', borderRadius: 4, pointerEvents: drawArm ? 'none' : 'auto' }} />
+            <iframe key={canvas.route} ref={iframeRef} src={canvas.route} onLoad={wireCanvas} title="Canvas — real build"
+              style={{ width: hostDims.w, height: hostDims.h, border: 0, display: 'block', borderRadius: 4, pointerEvents: drawArm || canvasMode === 'components' ? 'none' : 'auto', visibility: canvasMode === 'components' ? 'hidden' : 'visible' }} />
+            {canvasMode === 'components' && editingComponent?.file && (
+              <div onClick={(event) => event.stopPropagation()} style={{ position: 'absolute', inset: 0, overflow: 'hidden', borderRadius: 4 }}>
+                <ComponentCanvas
+                  file={editingComponent.file}
+                  undoNonce={authoringUndoNonce}
+                  onBounds={updateAuthoringBounds}
+                  onChanged={noteAuthoringChanged}
+                />
+              </div>
+            )}
             {hoverRect && (
               <div style={{ position: 'absolute', left: hoverRect.x, top: hoverRect.y, width: hoverRect.w, height: hoverRect.h, outline: `${1.5 / view.z}px solid ${SEL}`, pointerEvents: 'none' }} />
             )}

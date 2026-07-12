@@ -46,6 +46,10 @@ export async function handlePost(req: Request, rootPath = process.cwd()) {
       const { session } = await createContext(rootPath)
       return NextResponse.json(await session.execute(body))
     }
+    if (isUndoRequest(body)) {
+      const { session } = await createContext(rootPath)
+      return NextResponse.json(await session.undo(body))
+    }
     return NextResponse.json({ error: 'invalid authoring request' }, { status: 400 })
   } catch (error) {
     return errorResponse(error)
@@ -82,6 +86,19 @@ function isImportRequest(value: unknown): value is {
   const record = value as Record<string, unknown>
   if (Object.keys(record).length !== 3 || record.kind !== 'import-source' || !isImportFile(record.file)) return false
   return isHashMap(record.expectedSourceHashes)
+}
+
+function isUndoRequest(value: unknown): value is {
+  kind: 'undo'
+  expectedRevision: number
+  expectedSourceHashes: Record<string, string>
+} {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const record = value as Record<string, unknown>
+  return Object.keys(record).sort().join('\0') === ['expectedRevision', 'expectedSourceHashes', 'kind'].sort().join('\0') &&
+    record.kind === 'undo' &&
+    typeof record.expectedRevision === 'number' && Number.isSafeInteger(record.expectedRevision) && record.expectedRevision >= 0 &&
+    isHashMap(record.expectedSourceHashes)
 }
 
 function isHashMap(value: unknown): value is Record<string, string> {

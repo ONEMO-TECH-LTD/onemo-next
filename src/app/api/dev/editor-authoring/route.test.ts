@@ -148,6 +148,7 @@ describe('editor-authoring G1 import route', () => {
     expect(create.status).toBe(200)
     const created = await create.json()
     const variant = Object.values(created.graph.variants as Record<string, { id: string; displayName: string }>).find((entry) => entry.displayName === 'New Variant')!
+    const frameBeforeMove = (created.graph.variants as Record<string, { frame: { x: number; y: number } }>)[variant.id]!.frame
 
     loaded = await (await handleGet(componentRequest(), root)).json()
     const rename = await handlePost(request('POST', {
@@ -167,6 +168,19 @@ describe('editor-authoring G1 import route', () => {
     }), root)
     expect(move.status).toBe(200)
     await expect(move.json()).resolves.toMatchObject({ graph: { revision: 4, variants: { [variant.id]: { id: variant.id, displayName: 'Renamed', frame: { x: 80, y: 40 } } } } })
+
+    loaded = await (await handleGet(componentRequest(), root)).json()
+    expect(loaded.canUndo).toBe(true)
+    const undo = await handlePost(request('POST', {
+      kind: 'undo',
+      expectedRevision: loaded.graph.revision,
+      expectedSourceHashes: loaded.sourceHashes,
+    }), root)
+    expect(undo.status).toBe(200)
+    await expect(undo.json()).resolves.toMatchObject({
+      graph: { revision: 5, variants: { [variant.id]: { frame: frameBeforeMove } } },
+      undoneCommand: { kind: 'move-variant', commandId: 'route-move' },
+    })
   }, 10_000)
 
   it('rejects malformed G2 command keys and geometry before filesystem access', async () => {
@@ -186,5 +200,13 @@ describe('editor-authoring G1 import route', () => {
       expectedSourceHashes: { [SOURCE_FILE]: 'a'.repeat(64) },
     }), '/path/that/must/not-be-read')
     expect(invalidName.status).toBe(400)
+
+    const invalidUndo = await handlePost(request('POST', {
+      kind: 'undo',
+      expectedRevision: 1,
+      expectedSourceHashes: { [SOURCE_FILE]: 'a'.repeat(64) },
+      extra: true,
+    }), '/path/that/must/not-be-read')
+    expect(invalidUndo.status).toBe(400)
   })
 })

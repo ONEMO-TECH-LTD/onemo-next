@@ -52,7 +52,7 @@ export async function compileG2VariantCommand(input: {
     let afterProjection = beforeProjection
     let sourcePatches: CompilePlan['sourcePatches'] = []
     if (beforeProjection.nativeVariants.length === 0) {
-      const registry = registryForCreate(graph, component, beforeProjection)
+      const registry = projectVariantRegistry(graph, component, beforeProjection)
       afterSource = writeRegistry(input.source, beforeProjection.exportName, registry)
       afterProjection = await requireProjection(component.source.file, afterSource, input.cssSources)
       assertUntouchedProjection(beforeProjection, afterProjection)
@@ -70,7 +70,7 @@ export async function compileG2VariantCommand(input: {
 
   const variantId = stableId('variant', component.id, input.command.commandId)
   if (graph.variants[variantId]) throw namedError('VARIANT_ID_COLLISION', `variant already exists: ${variantId}`, 409)
-  const registry = registryForCreate(graph, component, beforeProjection)
+  const registry = projectVariantRegistry(graph, component, beforeProjection)
   registry.push({ id: variantId, props: {} })
   const afterSource = writeRegistry(input.source, beforeProjection.exportName, registry)
   const afterProjection = await requireProjection(component.source.file, afterSource, input.cssSources)
@@ -126,7 +126,7 @@ function checkedPlan(
   }
 }
 
-function registryForCreate(
+export function projectVariantRegistry(
   graph: AuthoringGraphV1,
   component: ComponentDefinition,
   projection: SourceProjection,
