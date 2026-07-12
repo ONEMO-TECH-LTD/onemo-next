@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 
-import { compileG2VariantCommand, projectVariantRegistry, type CompilePlan } from './authoring-compiler'
+import { assertStagedTypeScriptSemantics, compileG2VariantCommand, projectVariantRegistry, type CompilePlan } from './authoring-compiler'
 import { parseG2VariantCommand, type G2VariantCommand } from './authoring-commands'
 import { AuthoringHistoryStore } from './authoring-history'
 import { readExactAuthoringSourceSnapshot } from './authoring-import'
@@ -108,13 +108,21 @@ export class ProjectAuthoringSession {
     }
     const component = Object.values(before.components).filter((candidate) => candidate.source.file === input.file)
     if (component.length !== 1) throw namedError('COMPONENT_SOURCE_AMBIGUOUS', `expected one component for ${input.file}`, 422)
+    const definition = component[0]!
     const snapshot = await readExactAuthoringSourceSnapshot({
       storeId: this.input.storeId,
       file: input.file,
       registry: this.input.registry,
     })
     assertExactHashSet(input.expectedSourceHashes, snapshot.sourceHashes)
-    projectVariantRegistry(before, component[0]!, snapshot.projection)
+    assertStagedTypeScriptSemantics(
+      definition.source.file,
+      snapshot.sources[definition.source.file]!,
+      this.input.registry.get(this.input.storeId).canonicalRealPath,
+      snapshot.compilerOptions,
+      Object.fromEntries(Object.entries(snapshot.sources).filter(([file]) => file !== definition.source.file)),
+    )
+    projectVariantRegistry(before, definition, snapshot.projection)
     const command = { kind: 'revalidate-source', file: input.file }
     const historyPatches = await this.history.planCommand({
       command,

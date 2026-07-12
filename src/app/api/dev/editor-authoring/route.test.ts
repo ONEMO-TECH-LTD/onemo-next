@@ -5,6 +5,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { PROJECT_AUTHORING_SIDECAR } from '../editor/authoring-store'
+import { authoringMetadataPath } from '../editor/authoring-paths'
 import { linkTestNodeModules } from '../editor/__tests__/test-project-root'
 import { handleGet, handlePost } from './handler'
 import { GET } from './route'
@@ -144,6 +145,49 @@ describe('editor-authoring G1 import route', () => {
       undoneCommand: { kind: 'create-variant', commandId: 'before-revalidate' },
     })
     expect(Object.keys(undone.graph.variants)).toHaveLength(2)
+  }, 20_000)
+
+  it('refuses type-invalid source revalidation before sidecar, history, or transaction writes', async () => {
+    const root = await makeRoot()
+    const classified = await (await handleGet(request('GET'), root)).json()
+    await handlePost(request('POST', {
+      kind: 'import-source', file: SOURCE_FILE, expectedSourceHashes: classified.sourceHashes,
+    }), root)
+    const loaded = await (await handleGet(componentRequest(), root)).json()
+    await handlePost(request('POST', {
+      kind: 'execute-command',
+      command: { kind: 'create-variant', commandId: 'before-invalid-revalidation', componentId: loaded.componentId, displayName: 'Created' },
+      expectedRevision: loaded.graph.revision,
+      expectedSourceHashes: loaded.sourceHashes,
+    }), root)
+
+    const sourcePath = path.join(root, SOURCE_FILE)
+    const validSource = await fs.readFile(sourcePath, 'utf8')
+    expect(validSource).toContain('"variant":"Secondary"')
+    const invalidSource = validSource.replace('"variant":"Secondary"', '"variant":1')
+    await fs.writeFile(sourcePath, invalidSource)
+    const sidecarPath = path.join(root, PROJECT_AUTHORING_SIDECAR)
+    const journalPath = path.join(root, authoringMetadataPath('project', 'history/journal.ndjson'))
+    const transactionsPath = path.join(root, authoringMetadataPath('project', 'transactions'))
+    const beforeSidecar = await fs.readFile(sidecarPath)
+    const beforeJournal = await fs.readFile(journalPath)
+    const beforeTransactions = (await fs.readdir(transactionsPath)).sort()
+
+    const stale = await (await handleGet(componentStatusRequest(), root)).json()
+    expect(stale).toMatchObject({ authoringState: 'source-stale', expectedRevision: 2 })
+    const response = await handlePost(request('POST', {
+      kind: 'revalidate-source',
+      file: SOURCE_FILE,
+      expectedRevision: stale.expectedRevision,
+      expectedSourceHashes: stale.sourceHashes,
+    }), root)
+
+    expect(response.status).toBe(422)
+    await expect(response.json()).resolves.toMatchObject({ code: 'STAGED_TYPECHECK_FAILED' })
+    await expect(fs.readFile(sourcePath, 'utf8')).resolves.toBe(invalidSource)
+    await expect(fs.readFile(sidecarPath)).resolves.toEqual(beforeSidecar)
+    await expect(fs.readFile(journalPath)).resolves.toEqual(beforeJournal)
+    expect((await fs.readdir(transactionsPath)).sort()).toEqual(beforeTransactions)
   }, 20_000)
 
   it('rejects malformed and extra request fields before filesystem access', async () => {

@@ -37,7 +37,7 @@ export async function compileG2VariantCommand(input: {
     throw namedError('COMPONENT_EXPORT_MISMATCH', `expected export ${component.source.exportName}, found ${beforeProjection.exportName}`, 422)
   }
   const beforeTypechecked = beforeProjection.nativeVariants.length > 0
-  if (beforeTypechecked) assertSemanticTypecheck(component.source.file, input.source, input.projectRoot, input.compilerOptions, input.dependencySources)
+  if (beforeTypechecked) assertStagedTypeScriptSemantics(component.source.file, input.source, input.projectRoot, input.compilerOptions, input.dependencySources)
 
   if (input.command.kind === 'move-variant') {
     const variant = requireOwnedVariant(graph, component, input.command.variantId)
@@ -58,7 +58,7 @@ export async function compileG2VariantCommand(input: {
       afterProjection = await requireProjection(component.source.file, afterSource, input.cssSources)
       assertUntouchedProjection(beforeProjection, afterProjection)
       assertRegistry(afterProjection, registry)
-      assertSemanticTypecheck(component.source.file, afterSource, input.projectRoot, input.compilerOptions, input.dependencySources)
+      assertStagedTypeScriptSemantics(component.source.file, afterSource, input.projectRoot, input.compilerOptions, input.dependencySources)
       sourcePatches = [{ file: component.source.file, before: input.source, after: afterSource }]
     } else {
       assertNativeRegistryMatchesGraph(graph, component, beforeProjection)
@@ -77,7 +77,7 @@ export async function compileG2VariantCommand(input: {
   const afterProjection = await requireProjection(component.source.file, afterSource, input.cssSources)
   assertUntouchedProjection(beforeProjection, afterProjection)
   assertRegistry(afterProjection, registry)
-  assertSemanticTypecheck(component.source.file, afterSource, input.projectRoot, input.compilerOptions, input.dependencySources)
+  assertStagedTypeScriptSemantics(component.source.file, afterSource, input.projectRoot, input.compilerOptions, input.dependencySources)
 
   const next = cloneGraph(graph)
   next.components[component.id] = { ...component, compatibility: 'native-v1' }
@@ -190,7 +190,7 @@ function assertUntouchedProjection(before: SourceProjection, after: SourceProjec
   }
 }
 
-function assertSemanticTypecheck(
+export function assertStagedTypeScriptSemantics(
   file: string,
   source: string,
   projectRoot: string,
