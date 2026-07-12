@@ -452,18 +452,18 @@ export const RESOLVED = {
    "D": "#0f0c19"
   },
   {
-   "name": "border/primary/strong",
-   "binding": "neutral/8",
-   "description": "🔒 border/ v2.3.2 — Emphasis outline — the strong border register.",
-   "L": "#b9bbc6",
-   "D": "#5a6169"
-  },
-  {
    "name": "border/primary/default",
    "binding": "neutral/7",
    "description": "🔒 border/ v2.3.2 — Interactive element outline — inputs, controls at rest.",
    "L": "#cdced6",
    "D": "#43484e"
+  },
+  {
+   "name": "border/primary/strong",
+   "binding": "neutral/8",
+   "description": "🔒 border/ v2.3.2 — Emphasis outline — the strong border register.",
+   "L": "#b9bbc6",
+   "D": "#5a6169"
   },
   {
    "name": "border/primary/subtle",
@@ -725,9 +725,16 @@ export const RESOLVED = {
    "D": "#fafafa"
   },
   {
-   "name": "bg/elevated",
+   "name": "bg/max/default",
+   "binding": "base/black",
+   "description": "The pure extreme surface of the current theme — black in light, white in dark. Media and absolutes only; UI surfaces use max/brand.",
+   "L": "#000000",
+   "D": "#ffffff"
+  },
+  {
+   "name": "bg/max/inverse",
    "binding": "base/white",
-   "description": "Active/pressed state background.",
+   "description": "The pure extreme surface opposing the theme — white in light, black in dark.",
    "L": "#ffffff",
    "D": "#000000"
   },
@@ -758,6 +765,76 @@ export const RESOLVED = {
    "description": "🔒 bg/ v2.3.2 — Pure white pinned — light media ground.",
    "L": "#ffffff",
    "D": "#ffffff"
+  },
+  {
+   "name": "bg/max/brand-inverse",
+   "binding": "brand/white",
+   "description": "The brand extreme surface opposing the theme — Snow in light, Ink in dark.",
+   "L": "#fafafa",
+   "D": "#071013"
+  },
+  {
+   "name": "bg/max/brand-inverse-perma",
+   "binding": "brand/white/l-constant",
+   "description": "The Snow surface pinned — stays the paper reading in both themes.",
+   "L": "#fafafa",
+   "D": "#fafafa"
+  },
+  {
+   "name": "bg/app/primary",
+   "binding": "brand/alu",
+   "description": "The app ground — the aluminium surface the editor stands on.",
+   "L": "#fbfbfc",
+   "D": "#212225"
+  },
+  {
+   "name": "bg/app/secondary",
+   "binding": "neutral/1",
+   "description": "Second app surface — the first grey off the ground.",
+   "L": "#fcfcfd",
+   "D": "#111113"
+  },
+  {
+   "name": "bg/app/tertiary",
+   "binding": "neutral/2",
+   "description": "Third app surface — the deeper grey zone.",
+   "L": "#f9f9fb",
+   "D": "#18191b"
+  },
+  {
+   "name": "bg/app/quaternary",
+   "binding": "neutral/4",
+   "description": "Fourth app surface — the deepest grey zone.",
+   "L": "#e8e8ec",
+   "D": "#272a2d"
+  },
+  {
+   "name": "bg/app/chrome",
+   "binding": "neutral/l-constant/11",
+   "description": "Overlay background for modals and scrims. Immutable — stays dark in all themes.",
+   "L": "#60646c",
+   "D": "#18191b"
+  },
+  {
+   "name": "bg/app/veil",
+   "binding": "brand/white/alpha/2",
+   "description": "🔒 bg/ v2.3.2 — Pure translucency, no blur — a quieting layer that is not glass.",
+   "L": "#fafafa1a",
+   "D": "#0710131a"
+  },
+  {
+   "name": "bg/app/primary-inverse",
+   "binding": "brand/alu/inverse",
+   "description": "The app ground opposing the theme — the dark slab in light, the light slab in dark.",
+   "L": "#212225",
+   "D": "#fbfbfc"
+  },
+  {
+   "name": "bg/app/primary-perma",
+   "binding": "brand/alu/l-constant",
+   "description": "The app ground pinned — the light-world aluminium reading in both themes.",
+   "L": "#fbfbfc",
+   "D": "#fbfbfc"
   },
   {
    "name": "bg/system/disabled",
@@ -828,34 +905,6 @@ export const RESOLVED = {
    "description": "Solid success background.",
    "L": "#37bf5d",
    "D": "#37bf5d"
-  },
-  {
-   "name": "bg/app/default",
-   "binding": "brand/white",
-   "description": "Primary background surface. Use for page backgrounds and main content areas.",
-   "L": "#fafafa",
-   "D": "#071013"
-  },
-  {
-   "name": "bg/app/subtle",
-   "binding": "neutral/2",
-   "description": "Secondary background. Use for cards, panels, and elevated surfaces.",
-   "L": "#f9f9fb",
-   "D": "#18191b"
-  },
-  {
-   "name": "bg/app/grouped",
-   "binding": "neutral/3",
-   "description": "🔒 bg/ v2.3.2 — The grouped canvas — shop/library grounds; cards stand on it.",
-   "L": "#f0f0f3",
-   "D": "#212225"
-  },
-  {
-   "name": "bg/chrome",
-   "binding": "neutral/l-constant/11",
-   "description": "Overlay background for modals and scrims. Immutable — stays dark in all themes.",
-   "L": "#60646c",
-   "D": "#18191b"
   },
   {
    "name": "bg/control/solid",
@@ -968,13 +1017,6 @@ export const RESOLVED = {
    "description": "🔒 bg/ v2.3.2 — Near-solid glass — the drawer material. Recipe: tint + blur-3xl + saturate + brightness.",
    "L": "#fafafae5",
    "D": "#071013e5"
-  },
-  {
-   "name": "bg/veil",
-   "binding": "brand/white/alpha/2",
-   "description": "🔒 bg/ v2.3.2 — Pure translucency, no blur — a quieting layer that is not glass.",
-   "L": "#fafafa1a",
-   "D": "#0710131a"
   },
   {
    "name": "interaction/press/on-neutral",

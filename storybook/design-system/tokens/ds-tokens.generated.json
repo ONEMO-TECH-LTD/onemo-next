@@ -1,7 +1,7 @@
 {
  "fileKey": "Qdb9Kx98afJHxaCGAIxoMC",
  "pulledAtFileVersion": null,
- "variables": 3176,
+ "variables": 3262,
  "export": [
   {
    ".1.0-Prim-Col": {
@@ -32,6 +32,13 @@
         "$type": "color",
         "$libraryName": "",
         "$value": "#071013",
+        "$hiddenFromPublishing": true
+       },
+       "brand-aluminium": {
+        "$description": "Mutable brand aluminium — #FBFBFC (light) / #212225 (dark). Theme-tuned per face, does not swap pair. The aluminium surface tone — third member of the brand mono set (Ink, Snow, Aluminium).",
+        "$type": "color",
+        "$libraryName": "",
+        "$value": "#fbfbfc",
         "$hiddenFromPublishing": true
        }
       },
@@ -1072,6 +1079,80 @@
           "$libraryName": "",
           "$value": "#fafafaf2"
          }
+        },
+        "brand-aluminium": {
+         "1": {
+          "$description": "Alpha ladder step 1 (5%) — mirrors base/brand-aluminium; flips at primitive level.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfc0d"
+         },
+         "2": {
+          "$description": "Alpha ladder step 2 (10%) — mirrors base/brand-aluminium; flips at primitive level.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfc1a"
+         },
+         "3": {
+          "$description": "Alpha ladder step 3 (15%) — mirrors base/brand-aluminium; flips at primitive level.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfc26"
+         },
+         "4": {
+          "$description": "Alpha ladder step 4 (20%) — mirrors base/brand-aluminium; flips at primitive level.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfc33"
+         },
+         "5": {
+          "$description": "Alpha ladder step 5 (30%) — mirrors base/brand-aluminium; flips at primitive level.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfc4d"
+         },
+         "6": {
+          "$description": "Alpha ladder step 6 (40%) — mirrors base/brand-aluminium; flips at primitive level.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfc66"
+         },
+         "7": {
+          "$description": "Alpha ladder step 7 (50%) — mirrors base/brand-aluminium; flips at primitive level.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfc80"
+         },
+         "8": {
+          "$description": "Alpha ladder step 8 (60%) — mirrors base/brand-aluminium; flips at primitive level.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfc99"
+         },
+         "9": {
+          "$description": "Alpha ladder step 9 (70%) — mirrors base/brand-aluminium; flips at primitive level.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfcb2"
+         },
+         "10": {
+          "$description": "Alpha ladder step 10 (80%) — mirrors base/brand-aluminium; flips at primitive level.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfccc"
+         },
+         "11": {
+          "$description": "Alpha ladder step 11 (90%) — mirrors base/brand-aluminium; flips at primitive level.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfce5"
+         },
+         "12": {
+          "$description": "Alpha ladder step 12 (95%) — mirrors base/brand-aluminium; flips at primitive level.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfcf2"
+         }
         }
        },
        "grey": {
@@ -1842,6 +1923,12 @@
          "$type": "color",
          "$libraryName": "",
          "$value": "#fafafa"
+        },
+        "brand-aluminium": {
+         "$description": "Constant base tone — does not flip, identical in both themes.",
+         "$type": "color",
+         "$libraryName": "",
+         "$value": "#fbfbfc"
         }
        },
        "grey": {
@@ -2881,6 +2968,80 @@
           "$type": "color",
           "$libraryName": "",
           "$value": "#fafafaf2"
+         }
+        },
+        "brand-aluminium": {
+         "1": {
+          "$description": "Constant alpha — NEVER flips (identical both themes). brand-aluminium light face @ 5%.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfc0d"
+         },
+         "2": {
+          "$description": "Constant alpha — NEVER flips (identical both themes). brand-aluminium light face @ 10%.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfc1a"
+         },
+         "3": {
+          "$description": "Constant alpha — NEVER flips (identical both themes). brand-aluminium light face @ 15%.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfc26"
+         },
+         "4": {
+          "$description": "Constant alpha — NEVER flips (identical both themes). brand-aluminium light face @ 20%.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfc33"
+         },
+         "5": {
+          "$description": "Constant alpha — NEVER flips (identical both themes). brand-aluminium light face @ 30%.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfc4d"
+         },
+         "6": {
+          "$description": "Constant alpha — NEVER flips (identical both themes). brand-aluminium light face @ 40%.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfc66"
+         },
+         "7": {
+          "$description": "Constant alpha — NEVER flips (identical both themes). brand-aluminium light face @ 50%.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfc80"
+         },
+         "8": {
+          "$description": "Constant alpha — NEVER flips (identical both themes). brand-aluminium light face @ 60%.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfc99"
+         },
+         "9": {
+          "$description": "Constant alpha — NEVER flips (identical both themes). brand-aluminium light face @ 70%.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfcb2"
+         },
+         "10": {
+          "$description": "Constant alpha — NEVER flips (identical both themes). brand-aluminium light face @ 80%.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfccc"
+         },
+         "11": {
+          "$description": "Constant alpha — NEVER flips (identical both themes). brand-aluminium light face @ 90%.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfce5"
+         },
+         "12": {
+          "$description": "Constant alpha — NEVER flips (identical both themes). brand-aluminium light face @ 95%.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfcf2"
          }
         }
        },
@@ -4390,6 +4551,12 @@
          "$type": "color",
          "$libraryName": "",
          "$value": "#071013"
+        },
+        "brand-aluminium": {
+         "$description": "Dark-anchored base constant — the dark face of base/brand-aluminium, pinned in both themes.",
+         "$type": "color",
+         "$libraryName": "",
+         "$value": "#212225"
         }
        }
       },
@@ -5430,6 +5597,80 @@
           "$libraryName": "",
           "$value": "#071013f2"
          }
+        },
+        "brand-aluminium": {
+         "1": {
+          "$description": "Dark-anchored alpha ladder — dark face of brand-aluminium @ same opacity step, pinned both themes.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#2122250d"
+         },
+         "2": {
+          "$description": "Dark-anchored alpha ladder — dark face of brand-aluminium @ same opacity step, pinned both themes.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#2122251a"
+         },
+         "3": {
+          "$description": "Dark-anchored alpha ladder — dark face of brand-aluminium @ same opacity step, pinned both themes.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#21222526"
+         },
+         "4": {
+          "$description": "Dark-anchored alpha ladder — dark face of brand-aluminium @ same opacity step, pinned both themes.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#21222533"
+         },
+         "5": {
+          "$description": "Dark-anchored alpha ladder — dark face of brand-aluminium @ same opacity step, pinned both themes.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#2122254d"
+         },
+         "6": {
+          "$description": "Dark-anchored alpha ladder — dark face of brand-aluminium @ same opacity step, pinned both themes.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#21222566"
+         },
+         "7": {
+          "$description": "Dark-anchored alpha ladder — dark face of brand-aluminium @ same opacity step, pinned both themes.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#21222580"
+         },
+         "8": {
+          "$description": "Dark-anchored alpha ladder — dark face of brand-aluminium @ same opacity step, pinned both themes.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#21222599"
+         },
+         "9": {
+          "$description": "Dark-anchored alpha ladder — dark face of brand-aluminium @ same opacity step, pinned both themes.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#212225b2"
+         },
+         "10": {
+          "$description": "Dark-anchored alpha ladder — dark face of brand-aluminium @ same opacity step, pinned both themes.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#212225cc"
+         },
+         "11": {
+          "$description": "Dark-anchored alpha ladder — dark face of brand-aluminium @ same opacity step, pinned both themes.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#212225e5"
+         },
+         "12": {
+          "$description": "Dark-anchored alpha ladder — dark face of brand-aluminium @ same opacity step, pinned both themes.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#212225f2"
+         }
         }
        }
       },
@@ -6173,6 +6414,12 @@
          "$libraryName": "",
          "$value": "#b5f4be"
         }
+       },
+       "brand-aluminium": {
+        "$description": "Inverse behavior: opposite of theme — Light face carries the dark face and vice versa. Raw copies (raw-primitives law).",
+        "$type": "color",
+        "$libraryName": "",
+        "$value": "#212225"
        }
       }
      },
@@ -6202,6 +6449,13 @@
         "$type": "color",
         "$libraryName": "",
         "$value": "#fafafa",
+        "$hiddenFromPublishing": true
+       },
+       "brand-aluminium": {
+        "$description": "Mutable brand aluminium — #FBFBFC (light) / #212225 (dark). Theme-tuned per face, does not swap pair. The aluminium surface tone — third member of the brand mono set (Ink, Snow, Aluminium).",
+        "$type": "color",
+        "$libraryName": "",
+        "$value": "#212225",
         "$hiddenFromPublishing": true
        }
       },
@@ -7242,6 +7496,80 @@
           "$libraryName": "",
           "$value": "#071013f2"
          }
+        },
+        "brand-aluminium": {
+         "1": {
+          "$description": "Alpha ladder step 1 (5%) — mirrors base/brand-aluminium; flips at primitive level.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#2122250d"
+         },
+         "2": {
+          "$description": "Alpha ladder step 2 (10%) — mirrors base/brand-aluminium; flips at primitive level.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#2122251a"
+         },
+         "3": {
+          "$description": "Alpha ladder step 3 (15%) — mirrors base/brand-aluminium; flips at primitive level.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#21222526"
+         },
+         "4": {
+          "$description": "Alpha ladder step 4 (20%) — mirrors base/brand-aluminium; flips at primitive level.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#21222533"
+         },
+         "5": {
+          "$description": "Alpha ladder step 5 (30%) — mirrors base/brand-aluminium; flips at primitive level.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#2122254d"
+         },
+         "6": {
+          "$description": "Alpha ladder step 6 (40%) — mirrors base/brand-aluminium; flips at primitive level.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#21222566"
+         },
+         "7": {
+          "$description": "Alpha ladder step 7 (50%) — mirrors base/brand-aluminium; flips at primitive level.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#21222580"
+         },
+         "8": {
+          "$description": "Alpha ladder step 8 (60%) — mirrors base/brand-aluminium; flips at primitive level.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#21222599"
+         },
+         "9": {
+          "$description": "Alpha ladder step 9 (70%) — mirrors base/brand-aluminium; flips at primitive level.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#212225b2"
+         },
+         "10": {
+          "$description": "Alpha ladder step 10 (80%) — mirrors base/brand-aluminium; flips at primitive level.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#212225cc"
+         },
+         "11": {
+          "$description": "Alpha ladder step 11 (90%) — mirrors base/brand-aluminium; flips at primitive level.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#212225e5"
+         },
+         "12": {
+          "$description": "Alpha ladder step 12 (95%) — mirrors base/brand-aluminium; flips at primitive level.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#212225f2"
+         }
         }
        },
        "grey": {
@@ -8012,6 +8340,12 @@
          "$type": "color",
          "$libraryName": "",
          "$value": "#fafafa"
+        },
+        "brand-aluminium": {
+         "$description": "Constant base tone — does not flip, identical in both themes.",
+         "$type": "color",
+         "$libraryName": "",
+         "$value": "#fbfbfc"
         }
        },
        "grey": {
@@ -9051,6 +9385,80 @@
           "$type": "color",
           "$libraryName": "",
           "$value": "#fafafaf2"
+         }
+        },
+        "brand-aluminium": {
+         "1": {
+          "$description": "Constant alpha — NEVER flips (identical both themes). brand-aluminium light face @ 5%.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfc0d"
+         },
+         "2": {
+          "$description": "Constant alpha — NEVER flips (identical both themes). brand-aluminium light face @ 10%.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfc1a"
+         },
+         "3": {
+          "$description": "Constant alpha — NEVER flips (identical both themes). brand-aluminium light face @ 15%.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfc26"
+         },
+         "4": {
+          "$description": "Constant alpha — NEVER flips (identical both themes). brand-aluminium light face @ 20%.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfc33"
+         },
+         "5": {
+          "$description": "Constant alpha — NEVER flips (identical both themes). brand-aluminium light face @ 30%.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfc4d"
+         },
+         "6": {
+          "$description": "Constant alpha — NEVER flips (identical both themes). brand-aluminium light face @ 40%.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfc66"
+         },
+         "7": {
+          "$description": "Constant alpha — NEVER flips (identical both themes). brand-aluminium light face @ 50%.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfc80"
+         },
+         "8": {
+          "$description": "Constant alpha — NEVER flips (identical both themes). brand-aluminium light face @ 60%.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfc99"
+         },
+         "9": {
+          "$description": "Constant alpha — NEVER flips (identical both themes). brand-aluminium light face @ 70%.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfcb2"
+         },
+         "10": {
+          "$description": "Constant alpha — NEVER flips (identical both themes). brand-aluminium light face @ 80%.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfccc"
+         },
+         "11": {
+          "$description": "Constant alpha — NEVER flips (identical both themes). brand-aluminium light face @ 90%.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfce5"
+         },
+         "12": {
+          "$description": "Constant alpha — NEVER flips (identical both themes). brand-aluminium light face @ 95%.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#fbfbfcf2"
          }
         }
        },
@@ -10560,6 +10968,12 @@
          "$type": "color",
          "$libraryName": "",
          "$value": "#071013"
+        },
+        "brand-aluminium": {
+         "$description": "Dark-anchored base constant — the dark face of base/brand-aluminium, pinned in both themes.",
+         "$type": "color",
+         "$libraryName": "",
+         "$value": "#212225"
         }
        }
       },
@@ -11600,6 +12014,80 @@
           "$libraryName": "",
           "$value": "#071013f2"
          }
+        },
+        "brand-aluminium": {
+         "1": {
+          "$description": "Dark-anchored alpha ladder — dark face of brand-aluminium @ same opacity step, pinned both themes.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#2122250d"
+         },
+         "2": {
+          "$description": "Dark-anchored alpha ladder — dark face of brand-aluminium @ same opacity step, pinned both themes.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#2122251a"
+         },
+         "3": {
+          "$description": "Dark-anchored alpha ladder — dark face of brand-aluminium @ same opacity step, pinned both themes.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#21222526"
+         },
+         "4": {
+          "$description": "Dark-anchored alpha ladder — dark face of brand-aluminium @ same opacity step, pinned both themes.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#21222533"
+         },
+         "5": {
+          "$description": "Dark-anchored alpha ladder — dark face of brand-aluminium @ same opacity step, pinned both themes.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#2122254d"
+         },
+         "6": {
+          "$description": "Dark-anchored alpha ladder — dark face of brand-aluminium @ same opacity step, pinned both themes.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#21222566"
+         },
+         "7": {
+          "$description": "Dark-anchored alpha ladder — dark face of brand-aluminium @ same opacity step, pinned both themes.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#21222580"
+         },
+         "8": {
+          "$description": "Dark-anchored alpha ladder — dark face of brand-aluminium @ same opacity step, pinned both themes.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#21222599"
+         },
+         "9": {
+          "$description": "Dark-anchored alpha ladder — dark face of brand-aluminium @ same opacity step, pinned both themes.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#212225b2"
+         },
+         "10": {
+          "$description": "Dark-anchored alpha ladder — dark face of brand-aluminium @ same opacity step, pinned both themes.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#212225cc"
+         },
+         "11": {
+          "$description": "Dark-anchored alpha ladder — dark face of brand-aluminium @ same opacity step, pinned both themes.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#212225e5"
+         },
+         "12": {
+          "$description": "Dark-anchored alpha ladder — dark face of brand-aluminium @ same opacity step, pinned both themes.",
+          "$type": "color",
+          "$libraryName": "",
+          "$value": "#212225f2"
+         }
         }
        }
       },
@@ -12343,6 +12831,12 @@
          "$libraryName": "",
          "$value": "#143f1e"
         }
+       },
+       "brand-aluminium": {
+        "$description": "Inverse behavior: opposite of theme — Light face carries the dark face and vice versa. Raw copies (raw-primitives law).",
+        "$type": "color",
+        "$libraryName": "",
+        "$value": "#fbfbfc"
        }
       }
      }
@@ -16354,6 +16848,292 @@
           "$value": "{d-alpha.base.brand-white.12}"
          }
         }
+       },
+       "alu": {
+        "$description": "Alias route: brand/alu — part of the product palette × behavior grid.",
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".1.0-Prim-Col",
+        "$value": "{base.brand-aluminium}",
+        "l-constant": {
+         "$description": "Light-anchored base constant of base/brand-aluminium.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".1.0-Prim-Col",
+         "$value": "{l-constant.base.brand-aluminium}"
+        },
+        "d-constant": {
+         "$description": "Dark-anchored base constant of base/brand-aluminium.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".1.0-Prim-Col",
+         "$value": "{d-constant.base.brand-aluminium}"
+        },
+        "inverse": {
+         "$description": "Inverse route of brand/alu — opposes the theme (dark face in light, light face in dark).",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".1.0-Prim-Col",
+         "$value": "{inverse.brand-aluminium}"
+        },
+        "alpha": {
+         "1": {
+          "$description": "Aluminium wash 5% (adaptive).",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{alpha.base.brand-aluminium.1}"
+         },
+         "2": {
+          "$description": "Aluminium wash 10% (adaptive).",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{alpha.base.brand-aluminium.2}"
+         },
+         "3": {
+          "$description": "Aluminium wash 15% (adaptive).",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{alpha.base.brand-aluminium.3}"
+         },
+         "4": {
+          "$description": "Aluminium wash 20% (adaptive).",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{alpha.base.brand-aluminium.4}"
+         },
+         "5": {
+          "$description": "Aluminium wash 30% (adaptive).",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{alpha.base.brand-aluminium.5}"
+         },
+         "6": {
+          "$description": "Aluminium wash 40% (adaptive).",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{alpha.base.brand-aluminium.6}"
+         },
+         "7": {
+          "$description": "Aluminium wash 50% (adaptive).",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{alpha.base.brand-aluminium.7}"
+         },
+         "8": {
+          "$description": "Aluminium wash 60% (adaptive).",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{alpha.base.brand-aluminium.8}"
+         },
+         "9": {
+          "$description": "Aluminium wash 70% (adaptive).",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{alpha.base.brand-aluminium.9}"
+         },
+         "10": {
+          "$description": "Aluminium wash 80% (adaptive).",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{alpha.base.brand-aluminium.10}"
+         },
+         "11": {
+          "$description": "Aluminium wash 90% (adaptive).",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{alpha.base.brand-aluminium.11}"
+         },
+         "12": {
+          "$description": "Aluminium wash 95% (adaptive).",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{alpha.base.brand-aluminium.12}"
+         }
+        },
+        "l-alpha": {
+         "1": {
+          "$description": "Light-anchored alpha ladder of base/brand-aluminium, step 1.",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{l-alpha.base.brand-aluminium.1}"
+         },
+         "2": {
+          "$description": "Light-anchored alpha ladder of base/brand-aluminium, step 2.",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{l-alpha.base.brand-aluminium.2}"
+         },
+         "3": {
+          "$description": "Light-anchored alpha ladder of base/brand-aluminium, step 3.",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{l-alpha.base.brand-aluminium.3}"
+         },
+         "4": {
+          "$description": "Light-anchored alpha ladder of base/brand-aluminium, step 4.",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{l-alpha.base.brand-aluminium.4}"
+         },
+         "5": {
+          "$description": "Light-anchored alpha ladder of base/brand-aluminium, step 5.",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{l-alpha.base.brand-aluminium.5}"
+         },
+         "6": {
+          "$description": "Light-anchored alpha ladder of base/brand-aluminium, step 6.",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{l-alpha.base.brand-aluminium.6}"
+         },
+         "7": {
+          "$description": "Light-anchored alpha ladder of base/brand-aluminium, step 7.",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{l-alpha.base.brand-aluminium.7}"
+         },
+         "8": {
+          "$description": "Light-anchored alpha ladder of base/brand-aluminium, step 8.",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{l-alpha.base.brand-aluminium.8}"
+         },
+         "9": {
+          "$description": "Light-anchored alpha ladder of base/brand-aluminium, step 9.",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{l-alpha.base.brand-aluminium.9}"
+         },
+         "10": {
+          "$description": "Light-anchored alpha ladder of base/brand-aluminium, step 10.",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{l-alpha.base.brand-aluminium.10}"
+         },
+         "11": {
+          "$description": "Light-anchored alpha ladder of base/brand-aluminium, step 11.",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{l-alpha.base.brand-aluminium.11}"
+         },
+         "12": {
+          "$description": "Light-anchored alpha ladder of base/brand-aluminium, step 12.",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{l-alpha.base.brand-aluminium.12}"
+         }
+        },
+        "d-alpha": {
+         "1": {
+          "$description": "Dark-anchored alpha ladder of base/brand-aluminium, step 1.",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{d-alpha.base.brand-aluminium.1}"
+         },
+         "2": {
+          "$description": "Dark-anchored alpha ladder of base/brand-aluminium, step 2.",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{d-alpha.base.brand-aluminium.2}"
+         },
+         "3": {
+          "$description": "Dark-anchored alpha ladder of base/brand-aluminium, step 3.",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{d-alpha.base.brand-aluminium.3}"
+         },
+         "4": {
+          "$description": "Dark-anchored alpha ladder of base/brand-aluminium, step 4.",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{d-alpha.base.brand-aluminium.4}"
+         },
+         "5": {
+          "$description": "Dark-anchored alpha ladder of base/brand-aluminium, step 5.",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{d-alpha.base.brand-aluminium.5}"
+         },
+         "6": {
+          "$description": "Dark-anchored alpha ladder of base/brand-aluminium, step 6.",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{d-alpha.base.brand-aluminium.6}"
+         },
+         "7": {
+          "$description": "Dark-anchored alpha ladder of base/brand-aluminium, step 7.",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{d-alpha.base.brand-aluminium.7}"
+         },
+         "8": {
+          "$description": "Dark-anchored alpha ladder of base/brand-aluminium, step 8.",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{d-alpha.base.brand-aluminium.8}"
+         },
+         "9": {
+          "$description": "Dark-anchored alpha ladder of base/brand-aluminium, step 9.",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{d-alpha.base.brand-aluminium.9}"
+         },
+         "10": {
+          "$description": "Dark-anchored alpha ladder of base/brand-aluminium, step 10.",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{d-alpha.base.brand-aluminium.10}"
+         },
+         "11": {
+          "$description": "Dark-anchored alpha ladder of base/brand-aluminium, step 11.",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{d-alpha.base.brand-aluminium.11}"
+         },
+         "12": {
+          "$description": "Dark-anchored alpha ladder of base/brand-aluminium, step 12.",
+          "$type": "color",
+          "$libraryName": "",
+          "$collectionName": ".1.0-Prim-Col",
+          "$value": "{d-alpha.base.brand-aluminium.12}"
+         }
+        }
        }
       },
       "error": {
@@ -19449,16 +20229,6 @@
       },
       "border": {
        "primary": {
-        "strong": {
-         "$scopes": [
-          "ALL_SCOPES"
-         ],
-         "$description": "🔒 border/ v2.3.2 — Emphasis outline — the strong border register.",
-         "$type": "color",
-         "$libraryName": "",
-         "$collectionName": ".2.0-Al-Col",
-         "$value": "{neutral.8}"
-        },
         "default": {
          "$scopes": [
           "STROKE_COLOR"
@@ -19468,6 +20238,16 @@
          "$libraryName": "",
          "$collectionName": ".2.0-Al-Col",
          "$value": "{neutral.7}"
+        },
+        "strong": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Emphasis outline — the strong border register.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.8}"
         },
         "subtle": {
          "$scopes": [
@@ -19848,18 +20628,27 @@
        }
       },
       "bg": {
-       "elevated": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Active/pressed state background.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{base.white}"
-       },
        "max": {
+        "default": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "The pure extreme surface of the current theme — black in light, white in dark. Media and absolutes only; UI surfaces use max/brand.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".1.0-Prim-Col",
+         "$value": "{base.black}"
+        },
+        "inverse": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "The pure extreme surface opposing the theme — white in light, black in dark.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".1.0-Prim-Col",
+         "$value": "{base.white}"
+        },
         "brand-perma": {
          "$scopes": [
           "FRAME_FILL",
@@ -19900,6 +20689,116 @@
          "$libraryName": "",
          "$collectionName": ".2.0-Al-Col",
          "$value": "{base.white.l-constant}"
+        },
+        "brand-inverse": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "The brand extreme surface opposing the theme — Snow in light, Ink in dark.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.white}"
+        },
+        "brand-inverse-perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "The Snow surface pinned — stays the paper reading in both themes.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.white.l-constant}"
+        }
+       },
+       "app": {
+        "primary": {
+         "$scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL",
+          "EFFECT_COLOR"
+         ],
+         "$description": "The app ground — the aluminium surface the editor stands on.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.alu}"
+        },
+        "secondary": {
+         "$scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL"
+         ],
+         "$description": "Second app surface — the first grey off the ground.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.1}"
+        },
+        "tertiary": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "Third app surface — the deeper grey zone.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.2}"
+        },
+        "quaternary": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "Fourth app surface — the deepest grey zone.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.4}"
+        },
+        "chrome": {
+         "$scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL"
+         ],
+         "$description": "Overlay background for modals and scrims. Immutable — stays dark in all themes.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.l-constant.11}"
+        },
+        "veil": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 bg/ v2.3.2 — Pure translucency, no blur — a quieting layer that is not glass.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.white.alpha.2}"
+        },
+        "primary-inverse": {
+         "$scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL",
+          "EFFECT_COLOR"
+         ],
+         "$description": "The app ground opposing the theme — the dark slab in light, the light slab in dark.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.alu.inverse}"
+        },
+        "primary-perma": {
+         "$scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL",
+          "EFFECT_COLOR"
+         ],
+         "$description": "The app ground pinned — the light-world aluminium reading in both themes.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.alu.l-constant}"
         }
        },
        "system": {
@@ -20013,52 +20912,6 @@
          "$collectionName": ".2.0-Al-Col",
          "$value": "{success.9}"
         }
-       },
-       "app": {
-        "default": {
-         "$scopes": [
-          "FRAME_FILL",
-          "SHAPE_FILL",
-          "EFFECT_COLOR"
-         ],
-         "$description": "Primary background surface. Use for page backgrounds and main content areas.",
-         "$type": "color",
-         "$libraryName": "",
-         "$collectionName": ".2.0-Al-Col",
-         "$value": "{brand.white}"
-        },
-        "subtle": {
-         "$scopes": [
-          "FRAME_FILL",
-          "SHAPE_FILL"
-         ],
-         "$description": "Secondary background. Use for cards, panels, and elevated surfaces.",
-         "$type": "color",
-         "$libraryName": "",
-         "$collectionName": ".2.0-Al-Col",
-         "$value": "{neutral.2}"
-        },
-        "grouped": {
-         "$scopes": [
-          "ALL_SCOPES"
-         ],
-         "$description": "🔒 bg/ v2.3.2 — The grouped canvas — shop/library grounds; cards stand on it.",
-         "$type": "color",
-         "$libraryName": "",
-         "$collectionName": ".2.0-Al-Col",
-         "$value": "{neutral.3}"
-        }
-       },
-       "chrome": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Overlay background for modals and scrims. Immutable — stays dark in all themes.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{neutral.l-constant.11}"
        },
        "control": {
         "solid": {
@@ -20230,16 +21083,6 @@
          "$collectionName": ".2.0-Al-Col",
          "$value": "{brand.white.alpha.11}"
         }
-       },
-       "veil": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 bg/ v2.3.2 — Pure translucency, no blur — a quieting layer that is not glass.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.white.alpha.2}"
        }
       },
       "interaction": {
