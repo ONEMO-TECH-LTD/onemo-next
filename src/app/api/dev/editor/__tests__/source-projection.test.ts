@@ -164,4 +164,19 @@ const __onemoVariantRegistry = { "variant_1111111111111111": {} } as const`,
       { id: 'variant_2222222222222222', props: { tone: 'quiet' } },
     ])
   })
+
+  it('binds projection to the actual exported component and resolves a local named Props type', async () => {
+    const projection = await sourceProjectionFromSource({
+      file: 'FileAlias.tsx',
+      source: `function EarlierHelper({ wrong }: { wrong?: 'bad' | 'worse' }) { return <i>{wrong}</i> }
+type ActualProps = { variant?: 'Primary' | 'Secondary' }
+export function ActualButton({ variant = 'Primary' }: ActualProps) { return <button>{variant}</button> }`,
+    })
+    expect(projection).toMatchObject({
+      exportName: 'ActualButton',
+      compatibility: 'legacy-single-axis',
+      variantAxes: [{ axis: 'variant', values: ['Primary', 'Secondary'], defaultValue: 'Primary' }],
+      structure: { tag: 'button' },
+    })
+  })
 })

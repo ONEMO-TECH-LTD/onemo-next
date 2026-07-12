@@ -240,4 +240,45 @@ describe('G2 native variant compiler', () => {
       },
     })).rejects.toMatchObject({ code: 'NATIVE_VARIANT_REGISTRY_STALE' })
   })
+
+  it('uses the TypeScript checker for union assignability and rejects a generic type violation', async () => {
+    const validBase = `export function Button({ value }: { value?: string | number }) { return <button>{value}</button> }\n`
+    const validProjection = await sourceProjectionFromSource({ file: FILE, source: validBase })
+    const validImport = importProjectionToAuthoringGraph({ storeId: 'project-main', projection: validProjection, sourceHashes: { [FILE]: sha256(validBase) } })
+    if (validImport.kind !== 'imported') throw new Error('expected valid import')
+    const validComponent = Object.values(validImport.graph.components)[0]!
+    const validId = validComponent.primaryVariantId
+    const validSource = `${validBase}\nexport const __onemoVariantRegistry = { "${validId}": { value: 1 } } as const satisfies Record<string, Partial<React.ComponentProps<typeof Button>>>\n`
+    await expect(compileG2VariantCommand({
+      graph: { ...validImport.graph, components: { ...validImport.graph.components, [validComponent.id]: { ...validComponent, compatibility: 'native-v1' } } },
+      source: validSource,
+      command: { kind: 'move-variant', commandId: 'type-valid', componentId: validComponent.id, variantId: validId, frame: { x: 1, y: 2, width: 3, height: 4 } },
+    })).resolves.toMatchObject({ verifiedAssertions: expect.arrayContaining([{ kind: 'geometry-sidecar-only', status: 'passed' }]) })
+
+    const invalidBase = `type Props<T> = { value?: T }
+export function Button({ value }: Props<number>) { return <button>{value}</button> }
+`
+    const invalidProjection = await sourceProjectionFromSource({ file: FILE, source: invalidBase })
+    const invalidImport = importProjectionToAuthoringGraph({ storeId: 'project-main', projection: invalidProjection, sourceHashes: { [FILE]: sha256(invalidBase) } })
+    if (invalidImport.kind !== 'imported') throw new Error('expected invalid fixture bootstrap import')
+    const invalidComponent = Object.values(invalidImport.graph.components)[0]!
+    const invalidId = invalidComponent.primaryVariantId
+    const invalidSource = `${invalidBase}\nexport const __onemoVariantRegistry = { "${invalidId}": { value: "wrong" } } as const satisfies Record<string, Partial<React.ComponentProps<typeof Button>>>\n`
+    await expect(compileG2VariantCommand({
+      graph: { ...invalidImport.graph, components: { ...invalidImport.graph.components, [invalidComponent.id]: { ...invalidComponent, compatibility: 'native-v1' } } },
+      source: invalidSource,
+      command: { kind: 'move-variant', commandId: 'type-invalid', componentId: invalidComponent.id, variantId: invalidId, frame: { x: 1, y: 2, width: 3, height: 4 } },
+    })).rejects.toMatchObject({ code: 'STAGED_TYPECHECK_FAILED', message: expect.stringContaining('TS2322') })
+  })
+
+  it('refuses sidecar-only move when native registry IDs are stale', async () => {
+    const graph = await importedGraph()
+    const component = Object.values(graph.components)[0]!
+    const source = `${SOURCE}\nexport const __onemoVariantRegistry = { "variant_0000000000000000": {} } as const\n`
+    await expect(compileG2VariantCommand({
+      graph: { ...graph, components: { ...graph.components, [component.id]: { ...component, compatibility: 'native-v1' } } },
+      source,
+      command: { kind: 'move-variant', commandId: 'move-stale', componentId: component.id, variantId: component.primaryVariantId, frame: { x: 1, y: 2, width: 3, height: 4 } },
+    })).rejects.toMatchObject({ code: 'NATIVE_VARIANT_REGISTRY_STALE' })
+  })
 })

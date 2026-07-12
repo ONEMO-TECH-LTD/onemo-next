@@ -1,3 +1,5 @@
+import path from 'node:path'
+
 import * as ts from 'typescript'
 
 import { stableId } from './authoring-migrations'
@@ -13,7 +15,7 @@ export type CompilePlan = {
   stagedSources: Array<{ file: string; bytes: string }>
   projection: SourceProjection
   verifiedAssertions: Array<{
-    kind: 'stable-variant-identity' | 'native-registry-round-trip' | 'untouched-source-semantics' | 'geometry-sidecar-only'
+    kind: 'stable-variant-identity' | 'native-registry-round-trip' | 'untouched-source-semantics' | 'staged-typescript-semantics' | 'geometry-sidecar-only'
     status: 'passed'
   }>
 }
@@ -28,10 +30,14 @@ export async function compileG2VariantCommand(input: {
   const component = requireComponent(graph, input.command.componentId)
   assertCommand(input.command, component)
   const beforeProjection = await requireProjection(component.source.file, input.source, input.cssSources)
-  if (beforeProjection.nativeVariants.length > 0) assertRegistryPropTypes(beforeProjection)
+  if (beforeProjection.exportName !== component.source.exportName) {
+    throw namedError('COMPONENT_EXPORT_MISMATCH', `expected export ${component.source.exportName}, found ${beforeProjection.exportName}`, 422)
+  }
+  assertSemanticTypecheck(component.source.file, input.source)
 
   if (input.command.kind === 'move-variant') {
     const variant = requireOwnedVariant(graph, component, input.command.variantId)
+    if (beforeProjection.nativeVariants.length > 0) assertNativeRegistryMatchesGraph(graph, component, beforeProjection)
     const next = cloneGraph(graph)
     next.variants[variant.id] = { ...variant, frame: { ...input.command.frame } }
     return checkedPlan(input.command, graph, next, beforeProjection, input.source, [])
@@ -48,7 +54,7 @@ export async function compileG2VariantCommand(input: {
       afterProjection = await requireProjection(component.source.file, afterSource, input.cssSources)
       assertUntouchedProjection(beforeProjection, afterProjection)
       assertRegistry(afterProjection, registry)
-      assertRegistryPropTypes(afterProjection)
+      assertSemanticTypecheck(component.source.file, afterSource)
       sourcePatches = [{ file: component.source.file, before: input.source, after: afterSource }]
     } else {
       assertNativeRegistryMatchesGraph(graph, component, beforeProjection)
@@ -67,7 +73,7 @@ export async function compileG2VariantCommand(input: {
   const afterProjection = await requireProjection(component.source.file, afterSource, input.cssSources)
   assertUntouchedProjection(beforeProjection, afterProjection)
   assertRegistry(afterProjection, registry)
-  assertRegistryPropTypes(afterProjection)
+  assertSemanticTypecheck(component.source.file, afterSource)
 
   const next = cloneGraph(graph)
   next.components[component.id] = { ...component, compatibility: 'native-v1' }
@@ -107,8 +113,9 @@ function checkedPlan(
     projection: afterProjection,
     verifiedAssertions: [
       { kind: 'stable-variant-identity', status: 'passed' },
-      { kind: 'native-registry-round-trip', status: 'passed' },
       { kind: 'untouched-source-semantics', status: 'passed' },
+      { kind: 'staged-typescript-semantics', status: 'passed' },
+      ...(afterProjection.nativeVariants.length > 0 ? [{ kind: 'native-registry-round-trip' as const, status: 'passed' as const }] : []),
       ...(command.kind === 'move-variant' ? [{ kind: 'geometry-sidecar-only' as const, status: 'passed' as const }] : []),
     ],
   }
@@ -177,24 +184,34 @@ function assertUntouchedProjection(before: SourceProjection, after: SourceProjec
   }
 }
 
-function assertRegistryPropTypes(projection: SourceProjection): void {
-  const props = new Map(projection.props.map((prop) => [prop.name, prop]))
-  for (const variant of projection.nativeVariants) {
-    for (const [name, value] of Object.entries(variant.props)) {
-      const prop = props.get(name)
-      if (!prop) throw namedError('NATIVE_VARIANT_PROP_INVALID', `variant ${variant.id} references unknown prop ${name}`, 422)
-      const stringValues = [...prop.tsType.matchAll(/'([^']*)'|"([^"]*)"/g)].map((match) => match[1] ?? match[2] ?? '')
-      const valid = stringValues.length > 0
-        ? typeof value === 'string' && stringValues.includes(value)
-        : prop.tsType.includes('boolean')
-          ? typeof value === 'boolean'
-          : prop.tsType.includes('number')
-            ? typeof value === 'number'
-            : prop.tsType.includes('string')
-              ? typeof value === 'string'
-              : false
-      if (!valid) throw namedError('NATIVE_VARIANT_PROP_INVALID', `variant ${variant.id} has invalid value for prop ${name}`, 422)
-    }
+function assertSemanticTypecheck(file: string, source: string): void {
+  const fileName = path.resolve(file)
+  const ambientName = path.resolve('__onemo-native-variants.d.ts')
+  const options: ts.CompilerOptions = {
+    strict: true,
+    noEmit: true,
+    skipLibCheck: true,
+    target: ts.ScriptTarget.ESNext,
+    module: ts.ModuleKind.ESNext,
+    moduleResolution: ts.ModuleResolutionKind.Bundler,
+    jsx: ts.JsxEmit.ReactJSX,
+    esModuleInterop: true,
+  }
+  const host = ts.createCompilerHost(options, true)
+  const readFile = host.readFile.bind(host)
+  const fileExists = host.fileExists.bind(host)
+  const ambient = `declare module '*.module.css' { const classes: Record<string, string>; export default classes }\n`
+  host.fileExists = (candidate) => candidate === fileName || candidate === ambientName || fileExists(candidate)
+  host.readFile = (candidate) => candidate === fileName ? source : candidate === ambientName ? ambient : readFile(candidate)
+  host.getSourceFile = (candidate, languageVersion) => {
+    const text = host.readFile(candidate)
+    return text === undefined ? undefined : ts.createSourceFile(candidate, text, languageVersion, true, candidate.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
+  }
+  const program = ts.createProgram({ rootNames: [fileName, ambientName], options, host })
+  const diagnostics = ts.getPreEmitDiagnostics(program).filter((diagnostic) => diagnostic.file?.fileName === fileName)
+  if (diagnostics.length > 0) {
+    const detail = diagnostics.map((diagnostic) => `TS${diagnostic.code}: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, ' ')}`).join('; ')
+    throw namedError('STAGED_TYPECHECK_FAILED', detail, 422)
   }
 }
 

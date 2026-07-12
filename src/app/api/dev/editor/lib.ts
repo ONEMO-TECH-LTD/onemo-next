@@ -1533,17 +1533,19 @@ async function parseComponentModelSnapshot(input: {
 }): Promise<ComponentModel> {
   const { file, fileName: abs, source } = input
   const sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
-  const name = path.basename(abs, path.extname(abs))
+  const fileStem = path.basename(abs, path.extname(abs))
 
   // props ← the exported component function's first (destructured) param + its type literal.
   const props: ComponentModel['props'] = []
-  let fn: ts.FunctionDeclaration | ts.ArrowFunction | undefined
-  for (const st of sf.statements) {
-    if (ts.isFunctionDeclaration(st) && st.name && /^[A-Z]/.test(st.name.text)) { fn = st; break }
-    if (ts.isVariableStatement(st)) for (const d of st.declarationList.declarations) {
-      if (ts.isIdentifier(d.name) && /^[A-Z]/.test(d.name.text) && d.initializer && ts.isArrowFunction(d.initializer)) { fn = d.initializer }
-    }
+  const exported = findExportedComponents(sf)
+  const selected = exported.length === 1 ? exported[0] : exported.find((candidate) => candidate.name === fileStem)
+  if (!selected) {
+    throw projectionError(
+      exported.length === 0 ? 'COMPONENT_EXPORT_MISSING' : 'COMPONENT_EXPORT_AMBIGUOUS',
+      exported.length === 0 ? 'no exported PascalCase component found' : `multiple exported components require an exact binding: ${exported.map((candidate) => candidate.name).join(', ')}`,
+    )
   }
+  const { name, fn } = selected
   // root returned element position (for auto-promote on edit-entry) + the recursive structure (D6)
   let root: { line: number; col: number } | null = null
   let structure: StructureNode | null = null
@@ -1559,7 +1561,8 @@ async function parseComponentModelSnapshot(input: {
   const param = fn?.parameters[0]
   if (param && ts.isObjectBindingPattern(param.name)) {
     const typeMembers = new Map<string, { type: string; optional: boolean }>()
-    if (param.type && ts.isTypeLiteralNode(param.type)) for (const m of param.type.members) {
+    const members = componentPropMembers(sf, param.type)
+    for (const m of members) {
       if (ts.isPropertySignature(m) && m.name) typeMembers.set(m.name.getText(sf), { type: m.type?.getText(sf) ?? 'unknown', optional: !!m.questionToken })
     }
     for (const e of param.name.elements) {
@@ -1635,6 +1638,41 @@ async function parseComponentModelSnapshot(input: {
   // rule — §6.2/I1 drift fix; disabled is semantic only on a non-form root — F-M2) is DERIVED by the consumer
   // from `props` + `rules` + `structure`, not stored as a second array — the model keeps ONE rule list (§0).
   return { name, file, cssModule, rootClass, root, props, variantAxes, nativeVariants, rules, structure, connectors }
+}
+
+function findExportedComponents(sf: ts.SourceFile): Array<{
+  name: string
+  fn: ts.FunctionDeclaration | ts.ArrowFunction | ts.FunctionExpression
+}> {
+  const found: Array<{ name: string; fn: ts.FunctionDeclaration | ts.ArrowFunction | ts.FunctionExpression }> = []
+  for (const statement of sf.statements) {
+    const exported = ts.canHaveModifiers(statement) && ts.getModifiers(statement)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)
+    if (!exported) continue
+    if (ts.isFunctionDeclaration(statement) && statement.name && /^[A-Z]/.test(statement.name.text)) {
+      found.push({ name: statement.name.text, fn: statement })
+    } else if (ts.isVariableStatement(statement)) {
+      for (const declaration of statement.declarationList.declarations) {
+        if (ts.isIdentifier(declaration.name) && /^[A-Z]/.test(declaration.name.text) && declaration.initializer &&
+          (ts.isArrowFunction(declaration.initializer) || ts.isFunctionExpression(declaration.initializer))) {
+          found.push({ name: declaration.name.text, fn: declaration.initializer })
+        }
+      }
+    }
+  }
+  return found
+}
+
+function componentPropMembers(sf: ts.SourceFile, type: ts.TypeNode | undefined): ts.NodeArray<ts.TypeElement> | readonly ts.TypeElement[] {
+  if (!type) return []
+  if (ts.isTypeLiteralNode(type)) return type.members
+  if (!ts.isTypeReferenceNode(type) || !ts.isIdentifier(type.typeName)) {
+    throw projectionError('COMPONENT_PROPS_UNRESOLVED', `component props type is not statically resolvable: ${type.getText(sf)}`)
+  }
+  for (const statement of sf.statements) {
+    if (ts.isInterfaceDeclaration(statement) && statement.name.text === type.typeName.text) return statement.members
+    if (ts.isTypeAliasDeclaration(statement) && statement.name.text === type.typeName.text && ts.isTypeLiteralNode(statement.type)) return statement.type.members
+  }
+  throw projectionError('COMPONENT_PROPS_UNRESOLVED', `component props type is not locally resolvable: ${type.typeName.text}`)
 }
 
 function parseNativeVariantRegistry(sf: ts.SourceFile): ComponentModel['nativeVariants'] {
