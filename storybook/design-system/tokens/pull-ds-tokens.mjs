@@ -45,6 +45,12 @@ while (!bridge.state.connected) {
 console.log('[pull-ds-tokens] plugin connected — requesting fresh catalog (REFRESH_VARIABLES)…');
 const data = await bridge.freshVariables(30_000);
 if (!data) { console.error('[pull-ds-tokens] connected but no catalog delivered'); bridge.close(); process.exit(1); }
+const EXPECTED_FILE_KEY = 'Qdb9Kx98afJHxaCGAIxoMC';
+if (data.fileKey && data.fileKey !== EXPECTED_FILE_KEY) {
+  console.error(`[pull-ds-tokens] wrong file: catalog came from ${data.fileKey} — open the DS file (${EXPECTED_FILE_KEY}) with the Desktop Bridge plugin and re-run. Nothing written.`);
+  bridge.close();
+  process.exit(1);
+}
 const fileVersion = bridge.state.fileInfo?.version ?? null;
 const out = {
   fileKey: data.fileKey ?? null,
