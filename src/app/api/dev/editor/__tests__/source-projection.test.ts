@@ -141,21 +141,45 @@ export const __onemoVariantRegistry = { "variant_aaaaaaaaaaaaaaaa": {}, "variant
     expect(sourceProjectionFingerprint(reorderedProps)).not.toBe(sourceProjectionFingerprint(first))
   })
 
-  it('does not collide non-finite numeric registry values with null', async () => {
-    const infinity = await sourceProjectionFromSource({
-      file: 'Button.tsx',
-      source: `export function Button() { return <button /> }
-export const __onemoVariantRegistry = { "variant_aaaaaaaaaaaaaaaa": { value: 1e999 } } as const
+  it.each(['1e999', '-1e999', 'NaN', 'Infinity'])(
+    'refuses non-JSON-safe native registry value %s instead of fingerprinting a coerced value',
+    async (value) => {
+      const projection = await sourceProjectionFromSource({
+        file: 'Button.tsx',
+        source: `export function Button() { return <button /> }
+export const __onemoVariantRegistry = { "variant_aaaaaaaaaaaaaaaa": { value: ${value} } } as const
 `,
-    })
-    const nullValue = await sourceProjectionFromSource({
+      })
+
+      expect(projection).toMatchObject({
+        compatibility: 'unsupported',
+        unsupportedReason: expect.stringMatching(/finite numeric literal|static literal/),
+      })
+    },
+  )
+
+  it('retains null as a valid native registry value', async () => {
+    const projection = await sourceProjectionFromSource({
       file: 'Button.tsx',
       source: `export function Button() { return <button /> }
 export const __onemoVariantRegistry = { "variant_aaaaaaaaaaaaaaaa": { value: null } } as const
 `,
     })
 
-    expect(sourceProjectionFingerprint(infinity)).not.toBe(sourceProjectionFingerprint(nullValue))
+    expect(projection.nativeVariants[0]?.props).toEqual({ value: null })
+  })
+
+  it('fails canonical projection serialization closed on any non-finite numeric field', () => {
+    const projection = sourceProjectionFromModel('Button.tsx', model([]))
+    projection.connectors = [{
+      mode: 'state', trigger: 'hover', to: {},
+      transition: { kind: 'spring', stiffness: Number.POSITIVE_INFINITY, damping: 20, mass: 1 },
+    }]
+
+    expect(() => sourceProjectionFingerprint(projection)).toThrow(expect.objectContaining({
+      code: 'SOURCE_PROJECTION_NON_JSON_VALUE',
+      status: 422,
+    }))
   })
 
   it('encodes TypeScript tokens structurally instead of using an ambiguous delimiter string', async () => {

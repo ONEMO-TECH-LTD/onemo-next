@@ -177,7 +177,12 @@ function normalizeStructure(node: ComponentModel['structure']): unknown {
 
 function canonicalize(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalize)
-  if (typeof value === 'number' && !Number.isFinite(value)) return { nonFiniteNumber: String(value) }
+  if (typeof value === 'number' && !Number.isFinite(value)) {
+    throw Object.assign(new Error('source projection contains a non-finite number'), {
+      code: 'SOURCE_PROJECTION_NON_JSON_VALUE',
+      status: 422,
+    })
+  }
   if (!value || typeof value !== 'object') return value
   return Object.fromEntries(Object.entries(value as Record<string, unknown>)
     .sort(([left], [right]) => compareCodePoints(left, right))

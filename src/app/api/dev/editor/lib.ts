@@ -1885,7 +1885,13 @@ function parseNativeVariantRegistry(sf: ts.SourceFile): ComponentModel['nativeVa
       }
       const initializer = prop.initializer
       if (ts.isStringLiteralLike(initializer)) props[propName] = initializer.text
-      else if (ts.isNumericLiteral(initializer)) props[propName] = Number(initializer.text)
+      else if (ts.isNumericLiteral(initializer)) {
+        const numeric = Number(initializer.text)
+        if (!Number.isFinite(numeric)) {
+          throw projectionError('NATIVE_VARIANT_REGISTRY_INVALID', `native variant ${id} prop ${propName} must be a finite numeric literal`)
+        }
+        props[propName] = numeric
+      }
       else if (initializer.kind === ts.SyntaxKind.TrueKeyword) props[propName] = true
       else if (initializer.kind === ts.SyntaxKind.FalseKeyword) props[propName] = false
       else if (initializer.kind === ts.SyntaxKind.NullKeyword) props[propName] = null
