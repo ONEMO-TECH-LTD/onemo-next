@@ -170,6 +170,16 @@ test.describe('React Figma component authoring', () => {
     })
     expect(restored).toEqual({ host: { width: 402, height: 874 }, iframe: { width: 402, height: 874 } })
 
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await expect(page.locator('main')).toHaveAttribute('data-authoring-resume-phase', 'none')
+    await expect(page.locator('[data-authoring-resume-error]')).toHaveCount(0)
+    expect(editorDocumentRequests).toHaveLength(2)
+    await expect.poll(
+      () => componentsRail.evaluate((node) => Object.keys(node).some((key) => key.startsWith('__reactProps'))),
+      { timeout: 20_000 },
+    ).toBe(true)
+    await componentsRail.click()
+    await expect(page.getByRole('textbox', { name: 'Search components' })).toBeVisible({ timeout: 20_000 })
     await page.getByRole('button', { name: fixtureName, exact: true }).dblclick()
     await expect(authoringCanvas).toBeVisible({ timeout: 30_000 })
     await expect.poll(() => movedVariant.evaluate((node) => ({
@@ -182,9 +192,6 @@ test.describe('React Figma component authoring', () => {
       y: Number.parseFloat((node as HTMLElement).style.top),
     }), { timeout: 30_000 })).toEqual(geometryBeforeMove)
 
-    expect(editorDocumentRequests).toHaveLength(1)
-    await page.reload({ waitUntil: 'domcontentloaded' })
-    await expect(page.locator('[data-authoring-resume-error]')).toContainText('AUTHORING_SECOND_RELOAD_REFUSED')
     expect(editorDocumentRequests).toHaveLength(2)
 
     expect(consoleErrors, `Failed responses: ${failedResponses.join(', ')}`).toEqual([])

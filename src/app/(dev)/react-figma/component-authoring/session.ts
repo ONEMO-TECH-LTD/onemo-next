@@ -1,5 +1,4 @@
 export const AUTHORING_RESUME_MARKER_KEY = 'react-figma:authoring-import-resume-v1'
-export const AUTHORING_CONSUMED_MARKER_KEY = 'react-figma:authoring-import-consumed-v1'
 export const AUTHORING_RESUME_TTL_MS = 120_000
 
 export type AuthoringResumeMarker = {
@@ -29,7 +28,7 @@ export function issueAuthoringResumeMarker(input: {
   expectedHash: string
   transactionId: string
 }, storage: ResumeStorage = sessionStorage, now = Date.now()): AuthoringResumeMarker {
-  if (storage.getItem(AUTHORING_RESUME_MARKER_KEY) !== null || storage.getItem(AUTHORING_CONSUMED_MARKER_KEY) !== null) {
+  if (storage.getItem(AUTHORING_RESUME_MARKER_KEY) !== null) {
     throw Object.assign(new Error('another import reload marker already exists'), { code: 'AUTHORING_SECOND_RELOAD_REFUSED' })
   }
   const marker: AuthoringResumeMarker = {
@@ -60,15 +59,6 @@ export function readAuthoringResumeState(
   now = Date.now(),
   issued = issuedByThisDocument,
 ): AuthoringResumeState {
-  const consumedRaw = storage.getItem(AUTHORING_CONSUMED_MARKER_KEY)
-  if (consumedRaw !== null) {
-    storage.removeItem(AUTHORING_CONSUMED_MARKER_KEY)
-    storage.removeItem(AUTHORING_RESUME_MARKER_KEY)
-    const consumed = parseMarker(consumedRaw)
-    if (!consumed) return { kind: 'refused', code: 'AUTHORING_RESUME_MARKER_INVALID' }
-    if (now > consumed.issuedAt + consumed.ttlMs) return { kind: 'refused', code: 'AUTHORING_RESUME_MARKER_EXPIRED' }
-    return { kind: 'refused', code: 'AUTHORING_SECOND_RELOAD_REFUSED' }
-  }
   const raw = storage.getItem(AUTHORING_RESUME_MARKER_KEY)
   if (raw === null) return { kind: 'none' }
   const marker = parseMarker(raw)
@@ -94,7 +84,6 @@ export function completeAuthoringResume(input: {
     return { kind: 'refused', code: 'AUTHORING_RESUME_MARKER_INVALID' }
   }
   storage.removeItem(AUTHORING_RESUME_MARKER_KEY)
-  storage.setItem(AUTHORING_CONSUMED_MARKER_KEY, JSON.stringify(state.marker))
   return { kind: 'none' }
 }
 

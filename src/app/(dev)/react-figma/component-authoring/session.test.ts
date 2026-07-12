@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  AUTHORING_CONSUMED_MARKER_KEY,
   AUTHORING_RESUME_MARKER_KEY,
   AUTHORING_RESUME_TTL_MS,
   completeAuthoringResume,
@@ -32,7 +31,7 @@ describe('authoring import resume protocol', () => {
     expect(storage.getItem(AUTHORING_RESUME_MARKER_KEY)).not.toBeNull()
   })
 
-  it('lets a different document consume one exact target/hash then refuses a second reload', () => {
+  it('lets a different document consume one exact target/hash without poisoning ordinary reloads', () => {
     const storage = memoryStorage()
     issueAuthoringResumeMarker({ targetFile, expectedHash, transactionId }, storage, 100)
     const newDocument = new Set<string>()
@@ -40,11 +39,7 @@ describe('authoring import resume protocol', () => {
     expect(completeAuthoringResume({ targetFile, resolvedHash: expectedHash }, storage, 101, newDocument))
       .toEqual({ kind: 'none' })
     expect(storage.getItem(AUTHORING_RESUME_MARKER_KEY)).toBeNull()
-    expect(storage.getItem(AUTHORING_CONSUMED_MARKER_KEY)).not.toBeNull()
-    expect(readAuthoringResumeState(storage, 102, new Set())).toEqual({
-      kind: 'refused', code: 'AUTHORING_SECOND_RELOAD_REFUSED',
-    })
-    expect(storage.getItem(AUTHORING_CONSUMED_MARKER_KEY)).toBeNull()
+    expect(readAuthoringResumeState(storage, 102, new Set())).toEqual({ kind: 'none' })
   })
 
   it('refuses and deletes malformed, expired, and mismatched markers', () => {
