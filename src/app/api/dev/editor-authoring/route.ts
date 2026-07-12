@@ -30,16 +30,10 @@ export async function POST(req: Request) {
     if (!body.command || typeof body.expectedRevision !== 'number') {
       return NextResponse.json({ error: 'command and expectedRevision required' }, { status: 400 })
     }
-    const session = await createProjectAuthoringSession()
-    if (isUndoCommand(body.command)) {
-      return NextResponse.json(await session.undoLastCommand({
-        expectedRevision: body.expectedRevision,
-        expectedSourceHashes: body.expectedSourceHashes,
-      }))
-    }
     if (!isAuthoringVariantCommand(body.command)) {
       return NextResponse.json({ error: 'invalid authoring command' }, { status: 400 })
     }
+    const session = await createProjectAuthoringSession()
     return NextResponse.json(await session.executeCommand({
       command: body.command,
       expectedRevision: body.expectedRevision,
@@ -49,10 +43,6 @@ export async function POST(req: Request) {
     const err = error as Error & { status?: number }
     return NextResponse.json({ error: err.message, code: (err as { code?: string }).code }, { status: err.status ?? 500 })
   }
-}
-
-function isUndoCommand(value: unknown): value is { kind: 'undo' } {
-  return !!value && typeof value === 'object' && (value as { kind?: unknown }).kind === 'undo'
 }
 
 function isAuthoringVariantCommand(value: unknown): value is AuthoringVariantCommand {
