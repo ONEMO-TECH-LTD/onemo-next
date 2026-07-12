@@ -83,6 +83,28 @@ describe('AuthoringSidecarStore', () => {
     expect(second.sourceHashes[SOURCE_FILE]).not.toBe(first.sourceHashes[SOURCE_FILE])
   })
 
+  it('updates touched hashes without dropping untouched source authority', async () => {
+    const { root, registry, store, tx } = await makeStore()
+    const otherFile = 'src/app/(dev)/react-figma-components/Other.tsx'
+    await fs.writeFile(path.join(root, otherFile), 'export function Other() { return <div /> }\n')
+    const first = await tx.commit({
+      expectedRevision: 0,
+      sourceFiles: [SOURCE_FILE, otherFile],
+      mutate: (draft) => draft,
+    })
+    await fs.writeFile(path.join(root, SOURCE_FILE), 'export function Button() { return <button>Changed</button> }\n')
+
+    const second = await new SingleRootAuthoringTransaction({
+      transactionId: 'store-test-2',
+      storeId: 'project-main',
+      registry,
+      store,
+    }).commit({ expectedRevision: 1, sourceFiles: [SOURCE_FILE], mutate: (draft) => draft })
+
+    expect(second.sourceHashes[SOURCE_FILE]).not.toBe(first.sourceHashes[SOURCE_FILE])
+    expect(second.sourceHashes[otherFile]).toBe(first.sourceHashes[otherFile])
+  })
+
   it('enforces expected per-file source hashes before accepting a commit', async () => {
     const { root, registry, store, tx } = await makeStore()
     const first = await tx.commit({ expectedRevision: 0, sourceFiles: [SOURCE_FILE], mutate: (draft) => draft })

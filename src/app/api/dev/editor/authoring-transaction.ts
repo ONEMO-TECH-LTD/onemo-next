@@ -143,10 +143,11 @@ export class SingleRootAuthoringTransaction {
     this.verifyMetadataPreimages(metadataPatches, currentMetadata)
     await this.assertTransactionIdAvailable()
     const patchByFile = new Map(sourcePatches.map((patch) => [patch.file, patch]))
-    const sourceHashes = Object.fromEntries(sourceFiles.map((file) => [
+    const touchedSourceHashes = Object.fromEntries(sourceFiles.map((file) => [
       file,
       sha256(patchByFile.get(file)?.after ?? currentSources.get(file)!),
     ]))
+    const sourceHashes = { ...before.sourceHashes, ...touchedSourceHashes }
     const afterCandidate = update.mutate({
       ...before,
       revision: before.revision + 1,
@@ -155,10 +156,7 @@ export class SingleRootAuthoringTransaction {
     const after = assertAuthoringGraphV1({
       ...afterCandidate,
       revision: before.revision + 1,
-      sourceHashes: {
-        ...afterCandidate.sourceHashes,
-        ...sourceHashes,
-      },
+      sourceHashes,
     })
     const afterSidecarBytes = Buffer.from(JSON.stringify(after, null, 2) + '\n')
     const files = await Promise.all(sourcePatches.map(async (patch) => ({
