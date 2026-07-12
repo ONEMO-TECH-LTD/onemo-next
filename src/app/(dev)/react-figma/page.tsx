@@ -3464,6 +3464,17 @@ export default function ReactFigmaPage() {
     const root = doc?.querySelector('body [data-src]') as HTMLElement | null
     if (root && win) root.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: win }))
   }, [])
+  // The retained page iframe is temporarily resized to component-authoring bounds. Once design mode
+  // returns, remeasure the retained selection after that iframe has reflowed to its page dimensions.
+  useEffect(() => {
+    if (canvasMode !== 'design') return
+    const frame = window.requestAnimationFrame(() => {
+      const doc = iframeRef.current?.contentDocument
+      const el = selIdRef.current && doc ? engineElement(doc, selIdRef.current) : null
+      if (el) applySelection(el)
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [applySelection, canvasMode])
   useEffect(() => {
     const el = canvasRef.current; if (!el) return
     const onWheel = (e: WheelEvent) => {
