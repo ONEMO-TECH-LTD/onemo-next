@@ -65,6 +65,11 @@ test.describe('React Figma component authoring', () => {
       { borderStyle: 'none', outlineStyle: 'solid' },
       { borderStyle: 'none', outlineStyle: 'none' },
     ]))
+    const breadcrumb = page.locator('[data-component-breadcrumb]')
+    const breadcrumbBeforeZoom = await breadcrumb.boundingBox()
+    await page.getByTitle('Zoom in').click()
+    await expect.poll(() => breadcrumb.boundingBox()).toEqual(breadcrumbBeforeZoom)
+    await page.getByTitle('Zoom out').click()
     await page.getByRole('button', { name: 'Create variant' }).click()
     await expect(page.getByText('Variant 3', { exact: true })).toBeVisible({ timeout: 30_000 })
 

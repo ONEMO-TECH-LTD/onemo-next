@@ -3897,18 +3897,16 @@ export default function ReactFigmaPage() {
         {canvasMode === 'design' && <InsertIsland drawDisabled={false} onInsert={(tag, display) => { if (tag === 'img') void insertImage(); else setDrawArm({ tag, display }) }} codeMode={codeMode} onCodeMode={setCodeMode} />}
         {canvasMode === 'design' && drawArm && <div style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 40, height: 26, display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', borderRadius: 8, background: '#1e1e1e', color: '#fff', font: `450 11px/1 ${FONT}`, pointerEvents: 'none' }}>Drawing {drawArm.tag} — drag on the frame · Esc to cancel</div>}
         {canvasMode === 'design' && codeMode && sel && <CodeView file={sel.file} line={sel.line} onClose={() => setCodeMode(false)} />}
+        {canvasMode === 'components' && editingComponent && (
+          <nav aria-label="Component breadcrumb" data-component-breadcrumb style={{ position: 'absolute', top: 12, left: 12, zIndex: 50, display: 'flex', alignItems: 'center', gap: 4, width: 'fit-content', padding: 3, border: '1px solid var(--sem-col-border-secondary)', borderRadius: 'var(--sem-radii-full)', background: 'var(--sem-col-bg-primary)', fontFamily: 'var(--sem-type-fluid-label-xs-font)', fontSize: 'var(--sem-type-fluid-label-xs-size)', lineHeight: 'var(--sem-type-fluid-label-xs-line-height)', letterSpacing: 'var(--sem-type-fluid-label-xs-letter-spacing)' }}>
+            <button type="button" data-component-home onClick={() => setEditingComponent(null)} title="Back to the page" style={{ appearance: 'none', border: 0, borderRadius: 'var(--sem-radii-full)', background: 'var(--sem-col-bg-secondary)', font: 'inherit', color: 'var(--sem-col-text-secondary)', cursor: 'pointer', padding: '4px 8px' }}>Home</button>
+            <span aria-hidden="true" style={{ color: 'var(--sem-col-text-placeholder)' }}>›</span>
+            <button type="button" data-component-current aria-current="page" onClick={selectFrameRoot} title="Select component frame" style={{ appearance: 'none', border: '1px solid var(--sem-col-border-brand)', borderRadius: 'var(--sem-radii-full)', background: 'var(--sem-col-bg-brand-primary)', font: 'inherit', color: 'var(--sem-col-text-brand-primary)', cursor: 'pointer', padding: '4px 8px' }}>{editingComponent.name}</button>
+          </nav>
+        )}
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle, rgba(0,0,0,.09) 1px, transparent 1px)', backgroundSize: `${24 * view.z}px ${24 * view.z}px`, backgroundPosition: `${view.x}px ${view.y}px` }} />
         <div style={{ position: 'absolute', left: 0, top: 0, transform: `translate(${view.x}px,${view.y}px) scale(${view.z})`, transformOrigin: '0 0' }}>
-          {canvasMode === 'components' && editingComponent ? (
-            <div style={{ marginBottom: 8, marginLeft: 2 }}>
-              {/* E10 (Dan LOCKED): Framer-style breadcrumb — Home (back to the page) > Component name. */}
-              <nav aria-label="Component breadcrumb" data-component-breadcrumb style={{ display: 'flex', alignItems: 'center', gap: 4, width: 'fit-content', marginBottom: 6, padding: 3, border: '1px solid var(--sem-col-border-secondary)', borderRadius: 'var(--sem-radii-full)', background: 'var(--sem-col-bg-primary)', fontFamily: 'var(--sem-type-fluid-label-xs-font)', fontSize: 'var(--sem-type-fluid-label-xs-size)', lineHeight: 'var(--sem-type-fluid-label-xs-line-height)', letterSpacing: 'var(--sem-type-fluid-label-xs-letter-spacing)' }}>
-                <button type="button" data-component-home onClick={() => setEditingComponent(null)} title="Back to the page" style={{ appearance: 'none', border: 0, borderRadius: 'var(--sem-radii-full)', background: 'var(--sem-col-bg-secondary)', font: 'inherit', color: 'var(--sem-col-text-secondary)', cursor: 'pointer', padding: '4px 8px' }}>Home</button>
-                <span aria-hidden="true" style={{ color: 'var(--sem-col-text-placeholder)' }}>›</span>
-                <button type="button" data-component-current aria-current="page" onClick={selectFrameRoot} title="Select component frame" style={{ appearance: 'none', border: '1px solid var(--sem-col-border-brand)', borderRadius: 'var(--sem-radii-full)', background: 'var(--sem-col-bg-brand-primary)', font: 'inherit', color: 'var(--sem-col-text-brand-primary)', cursor: 'pointer', padding: '4px 8px' }}>{editingComponent.name}</button>
-              </nav>
-            </div>
-          ) : (
+          {canvasMode === 'design' && (
             <button type="button" onClick={selectFrameRoot} title="Select frame" style={{ appearance: 'none', border: 0, background: 'transparent', font: `550 10px/1 ${FONT}`, color: SEL, marginBottom: 8, marginLeft: 2, cursor: 'pointer', padding: 0 }}>{canvas.name} · {hostDims.w} × {hostDims.h}</button>
           )}
           <div data-screen-host onClick={selectFrameRoot} style={{ position: 'relative', width: hostDims.w, height: hostDims.h, background: canvasMode === 'components' ? 'var(--sem-col-bg-primary)' : '#fff', borderRadius: 4, boxShadow: '0 0 0 1px rgba(0,0,0,.06), 0 12px 40px -8px rgba(0,0,0,.25)' }}>
