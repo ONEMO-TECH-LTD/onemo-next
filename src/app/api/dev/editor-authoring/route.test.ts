@@ -5,7 +5,8 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { PROJECT_AUTHORING_SIDECAR } from '../editor/authoring-store'
-import { GET, handleGet, handlePost } from './route'
+import { handleGet, handlePost } from './handler'
+import { GET } from './route'
 
 const SOURCE_FILE = 'src/app/(dev)/react-figma-components/Button.tsx'
 const singleAxisSource = `export function Button({ variant = 'Primary' }: { variant?: 'Primary' | 'Secondary' }) {
@@ -133,6 +134,7 @@ describe('editor-authoring G1 import route', () => {
     expect(create.status).toBe(200)
     const created = await create.json()
     const variant = Object.values(created.graph.variants as Record<string, { id: string; displayName: string }>).find((entry) => entry.displayName === 'New Variant')!
+    const frameBeforeMove = (created.graph.variants as Record<string, { frame: { x: number; y: number } }>)[variant.id]!.frame
 
     loaded = await (await handleGet(componentRequest(), root)).json()
     const rename = await handlePost(request('POST', {
@@ -152,6 +154,19 @@ describe('editor-authoring G1 import route', () => {
     }), root)
     expect(move.status).toBe(200)
     await expect(move.json()).resolves.toMatchObject({ graph: { revision: 4, variants: { [variant.id]: { id: variant.id, displayName: 'Renamed', frame: { x: 80, y: 40 } } } } })
+
+    loaded = await (await handleGet(componentRequest(), root)).json()
+    expect(loaded.canUndo).toBe(true)
+    const undo = await handlePost(request('POST', {
+      kind: 'undo',
+      expectedRevision: loaded.graph.revision,
+      expectedSourceHashes: loaded.sourceHashes,
+    }), root)
+    expect(undo.status).toBe(200)
+    await expect(undo.json()).resolves.toMatchObject({
+      graph: { revision: 5, variants: { [variant.id]: { frame: frameBeforeMove } } },
+      undoneCommand: { kind: 'move-variant', commandId: 'route-move' },
+    })
   }, 10_000)
 
   it('rejects malformed G2 command keys and geometry before filesystem access', async () => {
