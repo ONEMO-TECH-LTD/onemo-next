@@ -2204,9 +2204,11 @@ function InsertIsland({ onInsert: onInsertProp, codeMode, onCodeMode, drawDisabl
   )
 }
 
-const COMPONENT_TEXT = '#8638E5'
-const COMPONENT_SELECTED_BG = '#E5F4FF'
-const COMPONENT_SELECTED_BORDER = '#0D99FF'
+const COMPONENT_TEXT = 'var(--sem-col-text-brand-primary)'
+const COMPONENT_SELECTED_BG = 'var(--sem-col-bg-brand-primary)'
+const COMPONENT_SELECTED_BORDER = 'var(--sem-col-border-brand)'
+const COMPONENT_SURFACE = 'var(--sem-col-bg-primary)'
+const COMPONENT_LABEL_FONT = 'var(--sem-type-fluid-label-s-font)'
 
 /* E7.3 (KAI-9377): left rail in Components mode — categories as "pages", components →
  * variant children as "layers" (v4.1 §5). Data = the dual-root inventory (editor-components);
@@ -2244,13 +2246,13 @@ function ComponentsRail({ components, selectedFile, onJump, query = '', onContex
               <div style={{ height: 28, padding: '0 16px', display: 'flex', alignItems: 'center', font: `500 11px/16px ${FONT}`, color: MUTE }}>{cat}</div>
               {list.map((c) => (
                 <div key={`${c.root}:${c.file ?? c.name}`}>
-                  <button type="button" onClick={() => onJump(c.name)} onDoubleClick={onEdit ? () => onEdit(c) : undefined} onContextMenu={onContext ? (e) => onContext(c, e) : undefined} title={onEdit ? `${c.file} — double-click to edit` : c.file}
-                    style={{ appearance: 'none', border: 0, width: '100%', height: 32, padding: '0 16px', background: selectedFile && c.file === selectedFile ? COMPONENT_SELECTED_BG : '#fff', boxShadow: selectedFile && c.file === selectedFile ? `inset 0 0 0 1px ${COMPONENT_SELECTED_BORDER}` : 'none', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', font: `400 11px/16px ${FONT}`, color: COMPONENT_TEXT, textAlign: 'left' }}>
+                  <button type="button" aria-current={selectedFile && c.file === selectedFile ? 'true' : undefined} onClick={() => onJump(c.name)} onDoubleClick={onEdit ? () => onEdit(c) : undefined} onContextMenu={onContext ? (e) => onContext(c, e) : undefined} title={onEdit ? `${c.file} — double-click to edit` : c.file}
+                    style={{ appearance: 'none', border: 0, width: '100%', height: 32, padding: '0 16px', background: selectedFile && c.file === selectedFile ? COMPONENT_SELECTED_BG : COMPONENT_SURFACE, boxShadow: selectedFile && c.file === selectedFile ? `inset 0 0 0 1px ${COMPONENT_SELECTED_BORDER}` : 'none', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontFamily: COMPONENT_LABEL_FONT, fontSize: 'var(--sem-type-fluid-label-s-size)', lineHeight: 'var(--sem-type-fluid-label-s-line-height)', letterSpacing: 'var(--sem-type-fluid-label-s-letter-spacing)', color: COMPONENT_TEXT, textAlign: 'left' }}>
                     <UiIcon name="layerComponent" size={12} /> <span style={{ color: COMPONENT_TEXT }}>{c.name}</span>
                   </button>
                   {(c.exports ?? []).filter((x) => x !== c.name && x !== '__onemoVariantRegistry').map((v) => (
                     <button key={v} type="button" onClick={() => onJump(v)} title={`${c.name} variant`}
-                      style={{ appearance: 'none', border: 0, width: '100%', height: 32, padding: '0 16px 0 32px', background: '#fff', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', font: `400 11px/16px ${FONT}`, color: COMPONENT_TEXT, textAlign: 'left' }}>
+                      style={{ appearance: 'none', border: 0, width: '100%', height: 32, padding: '0 16px 0 32px', background: COMPONENT_SURFACE, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontFamily: COMPONENT_LABEL_FONT, fontSize: 'var(--sem-type-fluid-label-s-size)', lineHeight: 'var(--sem-type-fluid-label-s-line-height)', letterSpacing: 'var(--sem-type-fluid-label-s-letter-spacing)', color: COMPONENT_TEXT, textAlign: 'left' }}>
                       <UiIcon name="layerComponent" size={10} /> {v}
                     </button>
                   ))}
@@ -3858,7 +3860,7 @@ export default function ReactFigmaPage() {
 
       {/* ░░ INFINITE CANVAS ░░ */}
       <main ref={canvasRef} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
-        style={{ flex: 1, minWidth: 0, background: '#f0f0f0', position: 'relative', overflow: 'hidden', cursor: drawArm ? 'crosshair' : isPanning ? 'grabbing' : 'default' }}>
+        style={{ flex: 1, minWidth: 0, background: canvasMode === 'components' ? 'var(--sem-col-bg-secondary)' : '#f0f0f0', position: 'relative', overflow: 'hidden', cursor: drawArm ? 'crosshair' : isPanning ? 'grabbing' : 'default' }}>
         {canvasMode === 'design' && <InsertIsland drawDisabled={false} onInsert={(tag, display) => { if (tag === 'img') void insertImage(); else setDrawArm({ tag, display }) }} codeMode={codeMode} onCodeMode={setCodeMode} />}
         {canvasMode === 'design' && drawArm && <div style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 40, height: 26, display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', borderRadius: 8, background: '#1e1e1e', color: '#fff', font: `450 11px/1 ${FONT}`, pointerEvents: 'none' }}>Drawing {drawArm.tag} — drag on the frame · Esc to cancel</div>}
         {canvasMode === 'design' && codeMode && sel && <CodeView file={sel.file} line={sel.line} onClose={() => setCodeMode(false)} />}
@@ -3867,16 +3869,16 @@ export default function ReactFigmaPage() {
           {canvasMode === 'components' && editingComponent ? (
             <div style={{ marginBottom: 8, marginLeft: 2 }}>
               {/* E10 (Dan LOCKED): Framer-style breadcrumb — Home (back to the page) > Component name. */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6, font: `550 10px/1 ${FONT}` }}>
-                <button type="button" onClick={() => setEditingComponent(null)} title="Back to the page" style={{ appearance: 'none', border: 0, background: 'transparent', font: 'inherit', color: MUTE, cursor: 'pointer', padding: 0 }}>Home</button>
-                <span style={{ color: FAINT }}>›</span>
-                <button type="button" onClick={selectFrameRoot} title="Select component frame" style={{ appearance: 'none', border: 0, background: 'transparent', font: 'inherit', color: SEL, cursor: 'pointer', padding: 0 }}>{editingComponent.name}</button>
-              </div>
+              <nav aria-label="Component breadcrumb" data-component-breadcrumb style={{ display: 'flex', alignItems: 'center', gap: 4, width: 'fit-content', marginBottom: 6, padding: 3, border: '1px solid var(--sem-col-border-secondary)', borderRadius: 'var(--sem-radii-full)', background: 'var(--sem-col-bg-primary)', fontFamily: 'var(--sem-type-fluid-label-xs-font)', fontSize: 'var(--sem-type-fluid-label-xs-size)', lineHeight: 'var(--sem-type-fluid-label-xs-line-height)', letterSpacing: 'var(--sem-type-fluid-label-xs-letter-spacing)' }}>
+                <button type="button" data-component-home onClick={() => setEditingComponent(null)} title="Back to the page" style={{ appearance: 'none', border: 0, borderRadius: 'var(--sem-radii-full)', background: 'var(--sem-col-bg-secondary)', font: 'inherit', color: 'var(--sem-col-text-secondary)', cursor: 'pointer', padding: '4px 8px' }}>Home</button>
+                <span aria-hidden="true" style={{ color: 'var(--sem-col-text-placeholder)' }}>›</span>
+                <button type="button" data-component-current aria-current="page" onClick={selectFrameRoot} title="Select component frame" style={{ appearance: 'none', border: '1px solid var(--sem-col-border-brand)', borderRadius: 'var(--sem-radii-full)', background: 'var(--sem-col-bg-brand-primary)', font: 'inherit', color: 'var(--sem-col-text-brand-primary)', cursor: 'pointer', padding: '4px 8px' }}>{editingComponent.name}</button>
+              </nav>
             </div>
           ) : (
             <button type="button" onClick={selectFrameRoot} title="Select frame" style={{ appearance: 'none', border: 0, background: 'transparent', font: `550 10px/1 ${FONT}`, color: SEL, marginBottom: 8, marginLeft: 2, cursor: 'pointer', padding: 0 }}>{canvas.name} · {hostDims.w} × {hostDims.h}</button>
           )}
-          <div data-screen-host onClick={selectFrameRoot} style={{ position: 'relative', width: hostDims.w, height: hostDims.h, background: '#fff', borderRadius: 4, boxShadow: '0 0 0 1px rgba(0,0,0,.06), 0 12px 40px -8px rgba(0,0,0,.25)' }}>
+          <div data-screen-host onClick={selectFrameRoot} style={{ position: 'relative', width: hostDims.w, height: hostDims.h, background: canvasMode === 'components' ? 'var(--sem-col-bg-primary)' : '#fff', borderRadius: 4, boxShadow: '0 0 0 1px rgba(0,0,0,.06), 0 12px 40px -8px rgba(0,0,0,.25)' }}>
             <iframe key={canvas.route} ref={iframeRef} src={canvas.route} onLoad={wireCanvas} title="Canvas — real build"
               style={{ width: hostDims.w, height: hostDims.h, border: 0, display: 'block', borderRadius: 4, pointerEvents: drawArm || canvasMode === 'components' ? 'none' : 'auto', visibility: canvasMode === 'components' ? 'hidden' : 'visible' }} />
             {canvasMode === 'components' && editingComponent?.file && (

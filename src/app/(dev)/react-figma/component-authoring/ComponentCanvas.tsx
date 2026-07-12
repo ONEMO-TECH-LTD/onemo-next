@@ -136,8 +136,8 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged }: {
           const moved = movedVariantFrame(current.frame, dx, dy)
           if (!moved) return
           void execute({ kind: 'move-variant', commandId: crypto.randomUUID(), componentId: definition.id, variantId: current.id, frame: moved })
-        }} onPointerCancel={() => { drag.current = null; setDragPreview(null) }} style={{ position: 'absolute', left: frame.x, top: frame.y, width: frame.width, minHeight: frame.height, margin: 0, padding: 12, boxSizing: 'border-box', background: 'var(--sem-col-bg-secondary)', border: `${selected ? 2 : 1}px ${selected ? 'solid' : 'dashed'} ${accent}`, borderRadius: 8 }}>
-          <figcaption onClick={() => { if (selected) setRenamingId(variant.id) }} style={{ marginBottom: 8, color: accent, cursor: selected ? 'text' : 'default', fontSize: 12 }}>
+        }} onPointerCancel={() => { drag.current = null; setDragPreview(null) }} style={{ position: 'absolute', left: frame.x, top: frame.y, width: frame.width, minHeight: frame.height, margin: 0, padding: 12, boxSizing: 'border-box', background: selected ? 'var(--sem-col-bg-brand-primary)' : 'var(--sem-col-bg-primary)', border: `${selected ? 2 : 1}px ${selected ? 'solid' : 'dashed'} ${accent}`, borderRadius: 'var(--sem-radii-md)' }}>
+          <figcaption onClick={() => { if (selected) setRenamingId(variant.id) }} style={{ marginBottom: 8, color: 'var(--sem-col-text-brand-primary)', cursor: selected ? 'text' : 'default', fontFamily: 'var(--sem-type-fluid-label-s-font)', fontSize: 'var(--sem-type-fluid-label-s-size)', lineHeight: 'var(--sem-type-fluid-label-s-line-height)', letterSpacing: 'var(--sem-type-fluid-label-s-letter-spacing)' }}>
             {renamingId === variant.id ? <input autoFocus defaultValue={variant.displayName} onPointerDown={(event) => event.stopPropagation()} onBlur={(event) => { setRenamingId(null); const displayName = event.currentTarget.value.trim(); if (displayName && displayName !== variant.displayName) void execute({ kind: 'rename-variant', commandId: crypto.randomUUID(), componentId: definition.id, variantId: variant.id, displayName }) }} /> : variant.displayName}
             {variant.id === definition.primaryVariantId ? ' · Primary' : ''}
           </figcaption>
@@ -145,7 +145,7 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged }: {
         </figure>
       })}
       {selectedId && <button type="button" disabled={busy} data-create-variant data-ghost-label="+ Variant" aria-label="Create variant" onClick={() => void execute({ kind: 'create-variant', commandId: crypto.randomUUID(), componentId: definition.id, displayName: `Variant ${variants.length + 1}` })}
-        style={{ position: 'absolute', left: ghost.x, top: ghost.y, width: ghost.width, height: ghost.height, border: `1px dashed ${accent}`, borderRadius: 8, color: 'var(--sem-col-text-brand-primary)', background: 'color-mix(in srgb, var(--sem-col-bg-secondary) 88%, transparent)', cursor: 'pointer', font: 'inherit' }}>+ Variant</button>}
+        style={{ position: 'absolute', left: ghost.x, top: ghost.y, width: ghost.width, height: ghost.height, border: `1px dashed ${accent}`, borderRadius: 'var(--sem-radii-md)', color: 'var(--sem-col-text-brand-primary)', background: 'var(--sem-col-bg-brand-primary)', cursor: 'pointer', fontFamily: 'var(--sem-type-fluid-label-s-font)', fontSize: 'var(--sem-type-fluid-label-s-size)', lineHeight: 'var(--sem-type-fluid-label-s-line-height)', letterSpacing: 'var(--sem-type-fluid-label-s-letter-spacing)' }}>+ Variant</button>}
     </div>
   )
 }
