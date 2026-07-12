@@ -1,7 +1,7 @@
 {
  "fileKey": "Qdb9Kx98afJHxaCGAIxoMC",
  "pulledAtFileVersion": null,
- "variables": 3152,
+ "variables": 3167,
  "export": [
   {
    ".1.0-Prim-Col": {
@@ -12615,6 +12615,56 @@
        "$libraryName": "",
        "$value": 9999,
        "$hiddenFromPublishing": true
+      },
+      "0-1": {
+       "$type": "float",
+       "$libraryName": "",
+       "$value": 0.10000000149011612
+      },
+      "0-15": {
+       "$type": "float",
+       "$libraryName": "",
+       "$value": 0.15000000596046448
+      },
+      "0-2": {
+       "$type": "float",
+       "$libraryName": "",
+       "$value": 0.20000000298023224
+      },
+      "0-3": {
+       "$type": "float",
+       "$libraryName": "",
+       "$value": 0.30000001192092896
+      },
+      "0-4": {
+       "$type": "float",
+       "$libraryName": "",
+       "$value": 0.4000000059604645
+      },
+      "0-5": {
+       "$type": "float",
+       "$libraryName": "",
+       "$value": 0.5
+      },
+      "0-6": {
+       "$type": "float",
+       "$libraryName": "",
+       "$value": 0.6000000238418579
+      },
+      "0-7": {
+       "$type": "float",
+       "$libraryName": "",
+       "$value": 0.699999988079071
+      },
+      "0-8": {
+       "$type": "float",
+       "$libraryName": "",
+       "$value": 0.800000011920929
+      },
+      "0-9": {
+       "$type": "float",
+       "$libraryName": "",
+       "$value": 0.8999999761581421
       }
      }
     }
@@ -20978,85 +21028,75 @@
        "$value": "#0a0d122e"
       },
       "blur": {
-       "sm": {
+       "soft": {
         "$scopes": [
-         "EFFECT_FLOAT"
+         "ALL_SCOPES"
         ],
-        "$description": "Blur strength — bind into either effect slot: Background blur (blurs what is behind) or Layer blur (blurs the element). One range, the slot decides.",
+        "$description": "🔒 effects v2.3.2 — Blur strength: bind into Background blur or Layer blur slot; the slot carries the physics, the token the strength.",
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
         "$value": "{soft.xl}"
        },
-       "md": {
+       "mild": {
         "$scopes": [
-         "EFFECT_FLOAT"
+         "ALL_SCOPES"
         ],
-        "$description": "Blur strength — bind into either effect slot: Background blur (blurs what is behind) or Layer blur (blurs the element). One range, the slot decides.",
+        "$description": "🔒 effects v2.3.2 — Blur strength: bind into Background blur or Layer blur slot; the slot carries the physics, the token the strength.",
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
         "$value": "{mild.m}"
        },
-       "lg": {
+       "regular": {
         "$scopes": [
-         "EFFECT_FLOAT"
+         "ALL_SCOPES"
         ],
-        "$description": "Blur strength — bind into either effect slot: Background blur (blurs what is behind) or Layer blur (blurs the element). One range, the slot decides.",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".2.6-Al-Effects",
-        "$value": "{regular.xs}"
-       },
-       "xl": {
-        "$scopes": [
-         "EFFECT_FLOAT"
-        ],
-        "$description": "Blur strength — bind into either effect slot: Background blur (blurs what is behind) or Layer blur (blurs the element). One range, the slot decides.",
+        "$description": "🔒 effects v2.3.2 — Blur strength: bind into Background blur or Layer blur slot; the slot carries the physics, the token the strength.",
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
         "$value": "{regular.m}"
        },
-       "2xl": {
-        "$scopes": [
-         "EFFECT_FLOAT"
-        ],
-        "$description": "Blur strength — bind into either effect slot: Background blur (blurs what is behind) or Layer blur (blurs the element). One range, the slot decides.",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".2.6-Al-Effects",
-        "$value": "{regular.xl}"
-       },
-       "3xl": {
+       "intense": {
         "$scopes": [
          "ALL_SCOPES"
         ],
-        "$description": "Blur strength — bind into either effect slot: Background blur (blurs what is behind) or Layer blur (blurs the element). One range, the slot decides.",
+        "$description": "🔒 effects v2.3.2 — Blur strength: bind into Background blur or Layer blur slot; the slot carries the physics, the token the strength.",
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
         "$value": "{intense.l}"
        },
-       "2xs": {
+       "nano": {
         "$scopes": [
          "ALL_SCOPES"
         ],
-        "$description": "Blur strength — bind into either effect slot: Background blur (blurs what is behind) or Layer blur (blurs the element). One range, the slot decides.",
+        "$description": "🔒 effects v2.3.2 — Blur strength: bind into Background blur or Layer blur slot; the slot carries the physics, the token the strength.",
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
-        "$value": "{soft.s}"
+        "$value": "{nano.m}"
        },
-       "xs": {
+       "micro": {
         "$scopes": [
          "ALL_SCOPES"
         ],
-        "$description": "Blur strength — bind into either effect slot: Background blur (blurs what is behind) or Layer blur (blurs the element). One range, the slot decides.",
+        "$description": "🔒 effects v2.3.2 — Blur strength: bind into Background blur or Layer blur slot; the slot carries the physics, the token the strength.",
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
-        "$value": "{soft.m}"
+        "$value": "{micro.l}"
+       },
+       "max": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 effects v2.3.2 — Blur strength: bind into Background blur or Layer blur slot; the slot carries the physics, the token the strength.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{max.xs}"
        }
       },
       "material-saturate": {
@@ -21088,48 +21128,6 @@
        "$libraryName": "",
        "$collectionName": ".1.4-Prim-Ratios",
        "$value": "{1-05}"
-      },
-      "frost": {
-       "ultrathin": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 effects v2.3.2 — Backdrop-blur strength of the material; name-paired with bg/frost/ultrathin (the tint). A material = the pair. NOT layer blur.",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".2.6-Al-Effects",
-        "$value": "{regular.xs}"
-       },
-       "thin": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 effects v2.3.2 — Backdrop-blur strength of the material; name-paired with bg/frost/thin (the tint). A material = the pair. NOT layer blur.",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".2.6-Al-Effects",
-        "$value": "{regular.m}"
-       },
-       "regular": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 effects v2.3.2 — Backdrop-blur strength of the material; name-paired with bg/frost/regular (the tint). A material = the pair. NOT layer blur.",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".2.6-Al-Effects",
-        "$value": "{regular.xl}"
-       },
-       "thick": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 effects v2.3.2 — Backdrop-blur strength of the material; name-paired with bg/frost/thick (the tint). A material = the pair. NOT layer blur.",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".2.6-Al-Effects",
-        "$value": "{intense.l}"
-       }
       }
      },
      "Dark": {
@@ -21287,85 +21285,75 @@
        "$value": "#0c0e122e"
       },
       "blur": {
-       "sm": {
+       "soft": {
         "$scopes": [
-         "EFFECT_FLOAT"
+         "ALL_SCOPES"
         ],
-        "$description": "Blur strength — bind into either effect slot: Background blur (blurs what is behind) or Layer blur (blurs the element). One range, the slot decides.",
+        "$description": "🔒 effects v2.3.2 — Blur strength: bind into Background blur or Layer blur slot; the slot carries the physics, the token the strength.",
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
         "$value": "{soft.xl}"
        },
-       "md": {
+       "mild": {
         "$scopes": [
-         "EFFECT_FLOAT"
+         "ALL_SCOPES"
         ],
-        "$description": "Blur strength — bind into either effect slot: Background blur (blurs what is behind) or Layer blur (blurs the element). One range, the slot decides.",
+        "$description": "🔒 effects v2.3.2 — Blur strength: bind into Background blur or Layer blur slot; the slot carries the physics, the token the strength.",
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
         "$value": "{mild.m}"
        },
-       "lg": {
+       "regular": {
         "$scopes": [
-         "EFFECT_FLOAT"
+         "ALL_SCOPES"
         ],
-        "$description": "Blur strength — bind into either effect slot: Background blur (blurs what is behind) or Layer blur (blurs the element). One range, the slot decides.",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".2.6-Al-Effects",
-        "$value": "{regular.xs}"
-       },
-       "xl": {
-        "$scopes": [
-         "EFFECT_FLOAT"
-        ],
-        "$description": "Blur strength — bind into either effect slot: Background blur (blurs what is behind) or Layer blur (blurs the element). One range, the slot decides.",
+        "$description": "🔒 effects v2.3.2 — Blur strength: bind into Background blur or Layer blur slot; the slot carries the physics, the token the strength.",
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
         "$value": "{regular.m}"
        },
-       "2xl": {
-        "$scopes": [
-         "EFFECT_FLOAT"
-        ],
-        "$description": "Blur strength — bind into either effect slot: Background blur (blurs what is behind) or Layer blur (blurs the element). One range, the slot decides.",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".2.6-Al-Effects",
-        "$value": "{regular.xl}"
-       },
-       "3xl": {
+       "intense": {
         "$scopes": [
          "ALL_SCOPES"
         ],
-        "$description": "Blur strength — bind into either effect slot: Background blur (blurs what is behind) or Layer blur (blurs the element). One range, the slot decides.",
+        "$description": "🔒 effects v2.3.2 — Blur strength: bind into Background blur or Layer blur slot; the slot carries the physics, the token the strength.",
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
         "$value": "{intense.l}"
        },
-       "2xs": {
+       "nano": {
         "$scopes": [
          "ALL_SCOPES"
         ],
-        "$description": "Blur strength — bind into either effect slot: Background blur (blurs what is behind) or Layer blur (blurs the element). One range, the slot decides.",
+        "$description": "🔒 effects v2.3.2 — Blur strength: bind into Background blur or Layer blur slot; the slot carries the physics, the token the strength.",
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
-        "$value": "{soft.s}"
+        "$value": "{nano.m}"
        },
-       "xs": {
+       "micro": {
         "$scopes": [
          "ALL_SCOPES"
         ],
-        "$description": "Blur strength — bind into either effect slot: Background blur (blurs what is behind) or Layer blur (blurs the element). One range, the slot decides.",
+        "$description": "🔒 effects v2.3.2 — Blur strength: bind into Background blur or Layer blur slot; the slot carries the physics, the token the strength.",
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
-        "$value": "{soft.m}"
+        "$value": "{micro.l}"
+       },
+       "max": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 effects v2.3.2 — Blur strength: bind into Background blur or Layer blur slot; the slot carries the physics, the token the strength.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{max.xs}"
        }
       },
       "material-saturate": {
@@ -21397,48 +21385,6 @@
        "$libraryName": "",
        "$collectionName": ".1.4-Prim-Ratios",
        "$value": "{1-05}"
-      },
-      "frost": {
-       "ultrathin": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 effects v2.3.2 — Backdrop-blur strength of the material; name-paired with bg/frost/ultrathin (the tint). A material = the pair. NOT layer blur.",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".2.6-Al-Effects",
-        "$value": "{regular.xs}"
-       },
-       "thin": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 effects v2.3.2 — Backdrop-blur strength of the material; name-paired with bg/frost/thin (the tint). A material = the pair. NOT layer blur.",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".2.6-Al-Effects",
-        "$value": "{regular.m}"
-       },
-       "regular": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 effects v2.3.2 — Backdrop-blur strength of the material; name-paired with bg/frost/regular (the tint). A material = the pair. NOT layer blur.",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".2.6-Al-Effects",
-        "$value": "{regular.xl}"
-       },
-       "thick": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 effects v2.3.2 — Backdrop-blur strength of the material; name-paired with bg/frost/thick (the tint). A material = the pair. NOT layer blur.",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".2.6-Al-Effects",
-        "$value": "{intense.l}"
-       }
       }
      }
     }
@@ -28606,6 +28552,80 @@
         "$libraryName": "",
         "$collectionName": ".1.1-Prim-Dim",
         "$value": "{320}"
+       }
+      },
+      "nano": {
+       "xs": {
+        "$description": "Universal effect strength — one range for every effect.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{0-1}"
+       },
+       "s": {
+        "$description": "Universal effect strength — one range for every effect.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{0-15}"
+       },
+       "m": {
+        "$description": "Universal effect strength — one range for every effect.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{0-2}"
+       },
+       "l": {
+        "$description": "Universal effect strength — one range for every effect.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{0-3}"
+       },
+       "xl": {
+        "$description": "Universal effect strength — one range for every effect.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{0-4}"
+       }
+      },
+      "micro": {
+       "xs": {
+        "$description": "Universal effect strength — one range for every effect.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{0-5}"
+       },
+       "s": {
+        "$description": "Universal effect strength — one range for every effect.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{0-6}"
+       },
+       "m": {
+        "$description": "Universal effect strength — one range for every effect.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{0-7}"
+       },
+       "l": {
+        "$description": "Universal effect strength — one range for every effect.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{0-8}"
+       },
+       "xl": {
+        "$description": "Universal effect strength — one range for every effect.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{0-9}"
        }
       }
      }
