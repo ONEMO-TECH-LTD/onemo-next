@@ -6,10 +6,15 @@ import { sha256 } from '../durable-file-installer'
 import type { SourceProjection } from '../source-projection'
 
 const SOURCE_HASH = sha256('exact source bytes')
+const SOURCE_FILE = 'src/app/(dev)/react-figma-components/Button.tsx'
+
+function sourceHashes(hash = SOURCE_HASH) {
+  return { [SOURCE_FILE]: hash }
+}
 
 function singleAxis(values: string[], defaultValue: string): SourceProjection {
   return {
-    file: 'src/app/(dev)/react-figma-components/Button.tsx',
+    file: SOURCE_FILE,
     exportName: 'Button',
     variantAxes: [{ axis: 'variant', values, defaultValue }],
     props: [],
@@ -24,7 +29,7 @@ describe('importProjectionToAuthoringGraph', () => {
     const result = importProjectionToAuthoringGraph({
       storeId: 'project-main',
       projection: singleAxis(['primary', 'secondary', 'danger'], 'secondary'),
-      sourceHash: SOURCE_HASH,
+      sourceHashes: sourceHashes(),
     })
 
     expect(result.kind).toBe('imported')
@@ -48,12 +53,12 @@ describe('importProjectionToAuthoringGraph', () => {
     const first = importProjectionToAuthoringGraph({
       storeId: 'project-main',
       projection: singleAxis(['primary', 'secondary'], 'primary'),
-      sourceHash: SOURCE_HASH,
+      sourceHashes: sourceHashes(),
     })
     const renamed = importProjectionToAuthoringGraph({
       storeId: 'project-main',
       projection: singleAxis(['base', 'alternate'], 'base'),
-      sourceHash: SOURCE_HASH,
+      sourceHashes: sourceHashes(),
     })
 
     expect(first.kind).toBe('imported')
@@ -70,7 +75,7 @@ describe('importProjectionToAuthoringGraph', () => {
     expect(importProjectionToAuthoringGraph({
       storeId: 'project-main',
       projection: singleAxis(values, defaultValue),
-      sourceHash: SOURCE_HASH,
+      sourceHashes: sourceHashes(),
     })).toEqual({ kind: 'unsupported', reason: 'single-axis source is not losslessly importable' })
   })
 
@@ -78,8 +83,8 @@ describe('importProjectionToAuthoringGraph', () => {
     expect(importProjectionToAuthoringGraph({
       storeId: 'project-main',
       projection: singleAxis(['primary'], 'primary'),
-      sourceHash: 'not-a-hash',
-    })).toEqual({ kind: 'unsupported', reason: 'exact source hash is required for import' })
+      sourceHashes: sourceHashes('not-a-hash'),
+    })).toEqual({ kind: 'unsupported', reason: 'exact source hashes are required for import' })
   })
 
   it('refuses a compatibility label that disagrees with the actual axis count', () => {
@@ -89,7 +94,7 @@ describe('importProjectionToAuthoringGraph', () => {
     expect(importProjectionToAuthoringGraph({
       storeId: 'project-main',
       projection,
-      sourceHash: SOURCE_HASH,
+      sourceHashes: sourceHashes(),
     })).toEqual({ kind: 'unsupported', reason: 'single-axis source is not losslessly importable' })
   })
 
@@ -106,7 +111,7 @@ describe('importProjectionToAuthoringGraph', () => {
     expect(importProjectionToAuthoringGraph({
       storeId: 'project-main',
       projection,
-      sourceHash: SOURCE_HASH,
+      sourceHashes: sourceHashes(),
     })).toEqual({ kind: 'unsupported', reason: 'multi-axis compatibility does not match source axes' })
   })
 
@@ -118,7 +123,7 @@ describe('importProjectionToAuthoringGraph', () => {
     expect(importProjectionToAuthoringGraph({
       storeId: 'project-main',
       projection,
-      sourceHash: SOURCE_HASH,
+      sourceHashes: sourceHashes(),
     })).toEqual({
       kind: 'hold',
       compatibility: 'legacy-multi-axis',

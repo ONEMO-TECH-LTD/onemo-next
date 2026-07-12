@@ -1486,6 +1486,51 @@ function decomposeRule(sel: string, base: string, axisNames: string[]): 'base' |
 export async function parseComponentModel(file: string): Promise<ComponentModel> {
   const abs = jailComponent(file)
   const source = (await fs.readFile(abs)).toString('utf8')
+  return parseComponentModelSnapshot({
+    file,
+    fileName: abs,
+    source,
+    strictDependencies: false,
+    readCss: async (cssFile) => {
+      const cssAbs = jailModuleCss(cssFile)
+      return { fileName: cssAbs, source: (await fs.readFile(cssAbs)).toString('utf8') }
+    },
+  })
+}
+
+export async function parseComponentModelFromSource(input: {
+  file: string
+  source: string
+  fileName?: string
+  cssSources?: Record<string, string>
+}): Promise<ComponentModel> {
+  return parseComponentModelSnapshot({
+    file: input.file,
+    fileName: input.fileName ?? input.file,
+    source: input.source,
+    strictDependencies: true,
+    readCss: async (cssFile) => {
+      const source = input.cssSources?.[cssFile]
+      if (source === undefined) {
+        throw Object.assign(new Error(`exact source dependency required: ${cssFile}`), {
+          code: 'SOURCE_DEPENDENCY_REQUIRED',
+          status: 422,
+          dependency: cssFile,
+        })
+      }
+      return { fileName: cssFile, source }
+    },
+  })
+}
+
+async function parseComponentModelSnapshot(input: {
+  file: string
+  fileName: string
+  source: string
+  strictDependencies: boolean
+  readCss: (file: string) => Promise<{ fileName: string; source: string }>
+}): Promise<ComponentModel> {
+  const { file, fileName: abs, source } = input
   const sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
   const name = path.basename(abs, path.extname(abs))
 
@@ -1551,8 +1596,7 @@ export async function parseComponentModel(file: string): Promise<ComponentModel>
   let rootClass: string | null = null
   if (cssModule) {
     try {
-      const cssAbs = jailModuleCss(cssModule)
-      const css = (await fs.readFile(cssAbs)).toString('utf8')
+      const { fileName: cssAbs, source: css } = await input.readCss(cssModule)
       const root = postcss.parse(css, { from: cssAbs })
       // base class = the first bare `.<ident>` rule (convention: `.base`).
       const baseRule = root.nodes.find((n): n is Rule => n.type === 'rule' && /^\.[\w-]+$/.test(n.selector.split(',')[0].trim()))
@@ -1572,7 +1616,10 @@ export async function parseComponentModel(file: string): Promise<ComponentModel>
       // reads with the placeholders) so write→read→write preserves the full connector shape (§10-I4/D4).
       const mt = /@fc-transition:(?:\s+(\w+)\s+([\w-]+))?\s+spring\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/.exec(css)
       if (mt) connectors.push({ mode: 'state', trigger: mt[1] ?? 'state', to: mt[2] ? { state: mt[2] } : {}, transition: { kind: 'spring', stiffness: Number(mt[3]), damping: Number(mt[4]), mass: Number(mt[5]) } })
-    } catch { /* module unreadable → treat as unpromoted */ cssModule = cssModule }
+    } catch (error) {
+      if (input.strictDependencies) throw error
+      /* module unreadable → treat as unpromoted */ cssModule = cssModule
+    }
   }
   // I4/D4: SWITCH connector read — from the mandatory `@fc-connector: tap <axis>→<to> [cycle]` side-channel
   // in the .tsx, NOT by pattern-matching the useState/onClick JSX shape (fragile across formattings).

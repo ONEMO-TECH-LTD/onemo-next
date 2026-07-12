@@ -1,7 +1,7 @@
 import type { ComponentModel } from './lib'
-import { parseComponentModel, resolveEditorPath } from './lib'
+import { parseComponentModel, parseComponentModelFromSource, resolveEditorPath } from './lib'
 import type { SourceAnchor } from './authoring-types'
-import { readSourceAnchorsFromTsxFile } from './source-anchor'
+import { extractSourceAnchorsFromTsx, readSourceAnchorsFromTsxFile } from './source-anchor'
 
 export type SourceProjectionCompatibility =
   | 'native-v1'
@@ -42,6 +42,24 @@ export function sourceProjectionFromModel(file: string, model: ComponentModel, a
     anchors,
     compatibility: classifyVariantAxes(model.variantAxes),
     unsupportedReason: null,
+  }
+}
+
+export async function sourceProjectionFromSource(input: {
+  file: string
+  source: string
+  cssSources?: Record<string, string>
+}): Promise<SourceProjection> {
+  try {
+    const model = await parseComponentModelFromSource(input)
+    const anchors = extractSourceAnchorsFromTsx({
+      file: input.file,
+      source: input.source,
+      exportName: model.name,
+    })
+    return sourceProjectionFromModel(input.file, model, anchors)
+  } catch (error) {
+    return unsupportedSourceProjection(input.file, (error as Error).message)
   }
 }
 
