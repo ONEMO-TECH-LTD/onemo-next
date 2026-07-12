@@ -18,9 +18,14 @@ test.describe('React Figma component authoring', () => {
     const failedResponses: string[] = []
     const failedRequests: string[] = []
     const tokenResponses: number[] = []
+    const editorDocumentRequests: string[] = []
     page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()) })
     page.on('console', (message) => { if (message.type() === 'warning') consoleWarnings.push(message.text()) })
     page.on('pageerror', (error) => pageErrors.push(error.message))
+    page.on('request', (request) => {
+      const url = new URL(request.url())
+      if (request.resourceType() === 'document' && url.pathname === '/react-figma') editorDocumentRequests.push(request.url())
+    })
     page.on('response', (response) => {
       const url = new URL(response.url())
       if (url.pathname === '/api/dev/editor-tokens' && !url.search) tokenResponses.push(response.status())
@@ -80,7 +85,8 @@ test.describe('React Figma component authoring', () => {
     expect(consoleErrors, `Failed responses: ${failedResponses.join(', ')}`).toEqual([])
     expect(consoleWarnings).toEqual([])
     expect(pageErrors).toEqual([])
-    expect(tokenResponses).toEqual([200])
+    expect(tokenResponses, `Editor documents: ${editorDocumentRequests.join(', ')}`)
+      .toEqual(editorDocumentRequests.map(() => 200))
     expect(failedResponses).toEqual([])
     expect(failedRequests).toEqual([])
   })
