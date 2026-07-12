@@ -17,11 +17,24 @@ export type SourceImportClassification = {
   sourceHashes: Record<string, string>
 }
 
+export type ExactAuthoringSourceSnapshot = SourceImportClassification & {
+  sources: Record<string, string>
+}
+
 export async function classifySourceFileForImport(input: {
   storeId: StoreId
   file: string
   registry: RuntimeRootRegistry
 }): Promise<SourceImportClassification> {
+  const snapshot = await readExactAuthoringSourceSnapshot(input)
+  return { projection: snapshot.projection, sourceHashes: snapshot.sourceHashes }
+}
+
+export async function readExactAuthoringSourceSnapshot(input: {
+  storeId: StoreId
+  file: string
+  registry: RuntimeRootRegistry
+}): Promise<ExactAuthoringSourceSnapshot> {
   const sources = new Map<string, Buffer>()
   const sourceAbs = await input.registry.resolveStorePath(input.storeId, input.file)
   sources.set(input.file, await fs.readFile(sourceAbs))
@@ -61,6 +74,7 @@ export async function classifySourceFileForImport(input: {
   return {
     projection,
     sourceHashes: Object.fromEntries([...sources].map(([file, bytes]) => [file, sha256(bytes)])),
+    sources: Object.fromEntries([...sources].map(([file, bytes]) => [file, bytes.toString('utf8')])),
   }
 }
 
