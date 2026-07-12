@@ -16,6 +16,7 @@ function model(axes: ComponentModel['variantAxes']): ComponentModel {
     root: null,
     props: [],
     variantAxes: axes,
+    nativeVariants: [],
     rules: [],
     structure: null,
     connectors: [],
@@ -112,5 +113,55 @@ export function Button() { return <button className={styles.base} /> }`,
       compatibility: 'unsupported',
       unsupportedReason: 'exact source dependency required: Button.module.css',
     })
+  })
+
+  it('projects only a strict static native registry and refuses duplicate identity', async () => {
+    const valid = await sourceProjectionFromSource({
+      file: 'Button.tsx',
+      source: `export function Button() { return <button /> }
+export const __onemoVariantRegistry = {
+  "variant_1111111111111111": {},
+  "variant_2222222222222222": { tone: "quiet", disabled: true },
+} as const`,
+    })
+    expect(valid).toMatchObject({
+      compatibility: 'native-v1',
+      nativeVariants: [
+        { id: 'variant_1111111111111111', props: {} },
+        { id: 'variant_2222222222222222', props: { tone: 'quiet', disabled: true } },
+      ],
+    })
+
+    const duplicate = await sourceProjectionFromSource({
+      file: 'Button.tsx',
+      source: `export function Button() { return <button /> }
+export const __onemoVariantRegistry = {
+  "variant_1111111111111111": {},
+  "variant_1111111111111111": {},
+} as const`,
+    })
+    expect(duplicate).toMatchObject({
+      compatibility: 'unsupported',
+      unsupportedReason: 'invalid or duplicate native variant id: variant_1111111111111111',
+    })
+
+    const hidden = await sourceProjectionFromSource({
+      file: 'Button.tsx',
+      source: `export function Button() { return <button /> }
+const __onemoVariantRegistry = { "variant_1111111111111111": {} } as const`,
+    })
+    expect(hidden).toMatchObject({
+      compatibility: 'unsupported',
+      unsupportedReason: 'native variant registry must be one exported const declaration',
+    })
+  })
+
+  it('typechecks and projects the committed native registry fixture through the filesystem parser', async () => {
+    const projection = await readSourceProjection('src/app/api/dev/editor/__tests__/fixtures/NativeVariantFixture.tsx')
+    expect(projection.compatibility).toBe('native-v1')
+    expect(projection.nativeVariants).toEqual([
+      { id: 'variant_1111111111111111', props: {} },
+      { id: 'variant_2222222222222222', props: { tone: 'quiet' } },
+    ])
   })
 })

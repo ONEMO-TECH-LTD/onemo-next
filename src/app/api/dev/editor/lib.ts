@@ -1266,6 +1266,7 @@ export type ComponentModel = {
   root: { line: number; col: number } | null // 1-based position of the root returned element (for auto-promote)
   props: { name: string; tsType: string; optional: boolean; default?: string }[]
   variantAxes: { axis: string; values: string[]; defaultValue: string }[]  // D1: config variants = N INDEPENDENT axes (§6.1); each = one string-union prop
+  nativeVariants: { id: string; props: Record<string, string | number | boolean | null> }[]
   // §0/§1 UNIFIED: EVERY scoped .module.css rule — single-part OR combinatorial — decomposed into one shape
   // in ONE list, so re-read reflects truth (no rule silently dropped). axisValues=[] + pseudo = a plain
   // interaction rule; a single axis-value = one axisValues entry; legacyName = a pre-axes single-variant class.
@@ -1581,6 +1582,7 @@ async function parseComponentModelSnapshot(input: {
     const def = p.default ? p.default.replace(/^['"]|['"]$/g, '') : vals[0]
     variantAxes.push({ axis: p.name, values: vals, defaultValue: vals.includes(def) ? def : vals[0] })
   }
+  const nativeVariants = parseNativeVariantRegistry(sf)
 
   // cssModule ← the `import styles from './X.module.css'` specifier.
   let cssModule: string | null = null
@@ -1632,7 +1634,75 @@ async function parseComponentModelSnapshot(input: {
   // NOTE: which STATES exist (a semantic state exists from its boolean PROP even before any `.base[data-*]`
   // rule — §6.2/I1 drift fix; disabled is semantic only on a non-form root — F-M2) is DERIVED by the consumer
   // from `props` + `rules` + `structure`, not stored as a second array — the model keeps ONE rule list (§0).
-  return { name, file, cssModule, rootClass, root, props, variantAxes, rules, structure, connectors }
+  return { name, file, cssModule, rootClass, root, props, variantAxes, nativeVariants, rules, structure, connectors }
+}
+
+function parseNativeVariantRegistry(sf: ts.SourceFile): ComponentModel['nativeVariants'] {
+  const declarations: Array<{ declaration: ts.VariableDeclaration; statement: ts.VariableStatement }> = []
+  for (const statement of sf.statements) {
+    if (!ts.isVariableStatement(statement)) continue
+    for (const declaration of statement.declarationList.declarations) {
+      if (ts.isIdentifier(declaration.name) && declaration.name.text === '__onemoVariantRegistry') {
+        declarations.push({ declaration, statement })
+      }
+    }
+  }
+  if (declarations.length === 0) return []
+  if (declarations.length !== 1) throw projectionError('NATIVE_VARIANT_REGISTRY_INVALID', 'native variant registry must be declared exactly once')
+  const { declaration, statement } = declarations[0]!
+  const exported = ts.getModifiers(statement)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)
+  const constant = (statement.declarationList.flags & ts.NodeFlags.Const) !== 0
+  if (!exported || !constant || statement.declarationList.declarations.length !== 1) {
+    throw projectionError('NATIVE_VARIANT_REGISTRY_INVALID', 'native variant registry must be one exported const declaration')
+  }
+  let expression = declaration.initializer
+  while (expression && (ts.isAsExpression(expression) || ts.isSatisfiesExpression(expression) || ts.isParenthesizedExpression(expression))) {
+    expression = expression.expression
+  }
+  if (!expression || !ts.isObjectLiteralExpression(expression)) {
+    throw projectionError('NATIVE_VARIANT_REGISTRY_INVALID', 'native variant registry must be a static object literal')
+  }
+  const variants: ComponentModel['nativeVariants'] = []
+  const ids = new Set<string>()
+  for (const property of expression.properties) {
+    if (!ts.isPropertyAssignment(property) || !ts.isStringLiteralLike(property.name)) {
+      throw projectionError('NATIVE_VARIANT_REGISTRY_INVALID', 'native variant registry keys must be string literals')
+    }
+    const id = property.name.text
+    if (!/^variant_[a-f0-9]{16}$/.test(id) || ids.has(id)) {
+      throw projectionError('NATIVE_VARIANT_REGISTRY_INVALID', `invalid or duplicate native variant id: ${id}`)
+    }
+    ids.add(id)
+    let value = property.initializer
+    while (ts.isAsExpression(value) || ts.isSatisfiesExpression(value) || ts.isParenthesizedExpression(value)) value = value.expression
+    if (!ts.isObjectLiteralExpression(value)) {
+      throw projectionError('NATIVE_VARIANT_REGISTRY_INVALID', `native variant ${id} props must be a static object literal`)
+    }
+    const props: Record<string, string | number | boolean | null> = {}
+    for (const prop of value.properties) {
+      if (!ts.isPropertyAssignment(prop) || !(ts.isIdentifier(prop.name) || ts.isStringLiteralLike(prop.name))) {
+        throw projectionError('NATIVE_VARIANT_REGISTRY_INVALID', `native variant ${id} contains a non-static prop`)
+      }
+      const propName = ts.isIdentifier(prop.name) ? prop.name.text : prop.name.text
+      if (Object.hasOwn(props, propName)) {
+        throw projectionError('NATIVE_VARIANT_REGISTRY_INVALID', `native variant ${id} contains duplicate prop ${propName}`)
+      }
+      const initializer = prop.initializer
+      if (ts.isStringLiteralLike(initializer)) props[propName] = initializer.text
+      else if (ts.isNumericLiteral(initializer)) props[propName] = Number(initializer.text)
+      else if (initializer.kind === ts.SyntaxKind.TrueKeyword) props[propName] = true
+      else if (initializer.kind === ts.SyntaxKind.FalseKeyword) props[propName] = false
+      else if (initializer.kind === ts.SyntaxKind.NullKeyword) props[propName] = null
+      else throw projectionError('NATIVE_VARIANT_REGISTRY_INVALID', `native variant ${id} prop ${propName} must be a static literal`)
+    }
+    variants.push({ id, props })
+  }
+  if (variants.length === 0) throw projectionError('NATIVE_VARIANT_REGISTRY_INVALID', 'native variant registry cannot be empty')
+  return variants
+}
+
+function projectionError(code: string, message: string): Error {
+  return Object.assign(new Error(message), { code, status: 422 })
 }
 
 /**

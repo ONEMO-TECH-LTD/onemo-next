@@ -12,8 +12,14 @@ export type SourceProjectionCompatibility =
 export type SourceProjection = {
   file: string
   exportName: string
+  cssModule: ComponentModel['cssModule']
+  rootClass: ComponentModel['rootClass']
   variantAxes: ComponentModel['variantAxes']
+  nativeVariants: ComponentModel['nativeVariants']
   props: ComponentModel['props']
+  rules: ComponentModel['rules']
+  structure: ComponentModel['structure']
+  connectors: ComponentModel['connectors']
   anchors: SourceAnchor[]
   compatibility: SourceProjectionCompatibility
   unsupportedReason: string | null
@@ -37,10 +43,16 @@ export function sourceProjectionFromModel(file: string, model: ComponentModel, a
   return {
     file,
     exportName: model.name,
+    cssModule: model.cssModule,
+    rootClass: model.rootClass,
     variantAxes: model.variantAxes,
+    nativeVariants: model.nativeVariants,
     props: model.props,
+    rules: model.rules,
+    structure: model.structure,
+    connectors: model.connectors,
     anchors,
-    compatibility: classifyVariantAxes(model.variantAxes),
+    compatibility: model.nativeVariants.length > 0 ? 'native-v1' : classifyVariantAxes(model.variantAxes),
     unsupportedReason: null,
   }
 }
@@ -73,8 +85,14 @@ export function unsupportedSourceProjection(file: string, reason: string): Sourc
   return {
     file,
     exportName: '',
+    cssModule: null,
+    rootClass: null,
     variantAxes: [],
+    nativeVariants: [],
     props: [],
+    rules: [],
+    structure: null,
+    connectors: [],
     anchors: [],
     compatibility: 'unsupported',
     unsupportedReason: reason,
