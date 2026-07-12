@@ -74,9 +74,6 @@ export async function importSourceFileToAuthoringStore(input: {
   if (input.registry.get(input.storeId).kind !== 'project') {
     throw namedError('IMPORT_ROOT_UNSUPPORTED', 'G1 source import supports the project root only', 422)
   }
-  if (await input.store.load()) {
-    throw namedError('AUTHORING_SIDECAR_EXISTS', 'source import requires a missing authoring sidecar', 409)
-  }
   const classified = await classifySourceFileForImport(input)
   assertExpectedHashes(input.expectedSourceHashes, classified.sourceHashes)
   const imported = importProjectionToAuthoringGraph({
@@ -106,6 +103,7 @@ export async function importSourceFileToAuthoringStore(input: {
     store: input.store,
   }).commit({
     expectedRevision: 0,
+    requireMissingSidecar: true,
     expectedSourceHashes: input.expectedSourceHashes,
     sourceFiles: Object.keys(classified.sourceHashes),
     metadataPatches,

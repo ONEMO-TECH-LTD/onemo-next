@@ -92,6 +92,7 @@ export class SingleRootAuthoringTransaction {
 
   async commit(update: {
     expectedRevision: number
+    requireMissingSidecar?: boolean
     sourceFiles?: string[]
     expectedSourceHashes?: Record<string, string>
     sourcePatches?: SourcePatch[]
@@ -104,6 +105,7 @@ export class SingleRootAuthoringTransaction {
 
   private async commitLocked(update: {
     expectedRevision: number
+    requireMissingSidecar?: boolean
     sourceFiles?: string[]
     expectedSourceHashes?: Record<string, string>
     sourcePatches?: SourcePatch[]
@@ -113,6 +115,9 @@ export class SingleRootAuthoringTransaction {
   }): Promise<AuthoringGraphV1> {
     await this.assertNoUnresolvedRecovery()
     const sidecarSnapshot = await this.input.store.loadSnapshot()
+    if (update.requireMissingSidecar && sidecarSnapshot) {
+      throw namedError('AUTHORING_SIDECAR_EXISTS', 'transaction requires a missing authoring sidecar', 409)
+    }
     const before = sidecarSnapshot?.graph ?? createEmptyAuthoringGraph({
       storeId: this.input.storeId,
       rootKind: this.rootKind,

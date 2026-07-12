@@ -5,7 +5,8 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { classifySourceFileForImport, importSourceFileToAuthoringStore } from '../authoring-import'
-import { AuthoringSidecarStore, PROJECT_AUTHORING_SIDECAR } from '../authoring-store'
+import { AuthoringSidecarStore, createEmptyAuthoringGraph, PROJECT_AUTHORING_SIDECAR } from '../authoring-store'
+import { DurableFileInstaller } from '../durable-file-installer'
 import { RuntimeRootRegistry } from '../runtime-root-registry'
 
 const SOURCE_FILE = 'src/app/(dev)/react-figma-components/Button.tsx'
@@ -95,6 +96,31 @@ export function Button({ variant = 'Primary' }: { variant?: 'Primary' | 'Seconda
       store,
     })).rejects.toMatchObject({ code: 'SOURCE_HASH_STALE', changedPaths: [SOURCE_FILE] })
     expect(await store.load()).toBeNull()
+  })
+
+  it('refuses rather than replacing a persisted revision-zero sidecar', async () => {
+    const { root, registry, store } = await makeImportStore()
+    const classified = await classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry })
+    const existing = createEmptyAuthoringGraph({
+      storeId: 'project-main',
+      rootKind: 'project',
+      sourceHashes: classified.sourceHashes,
+    })
+    const sidecar = path.join(root, PROJECT_AUTHORING_SIDECAR)
+    await new DurableFileInstaller().writeJsonAtomic(sidecar, existing)
+    const before = await fs.readFile(sidecar)
+
+    await expect(importSourceFileToAuthoringStore({
+      storeId: 'project-main',
+      file: SOURCE_FILE,
+      expectedSourceHashes: classified.sourceHashes,
+      registry,
+      store,
+    })).rejects.toMatchObject({ code: 'AUTHORING_SIDECAR_EXISTS', status: 409 })
+
+    await expect(fs.readFile(sidecar)).resolves.toEqual(before)
+    await expect(fs.readdir(path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions')))
+      .rejects.toMatchObject({ code: 'ENOENT' })
   })
 
   it('holds actual multi-axis source without writing metadata', async () => {
