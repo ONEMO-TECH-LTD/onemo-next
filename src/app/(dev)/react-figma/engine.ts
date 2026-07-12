@@ -150,7 +150,7 @@ const SHORTHANDS = ['gap', 'padding', 'margin', 'border-radius', 'background', '
 
 let seq = 0
 const runtimeIds = new WeakMap<HTMLElement, string>()
-const runtimeElements = new WeakMap<Document, Map<string, HTMLElement>>()
+const runtimeElements = new WeakMap<Document, Map<string, WeakRef<HTMLElement>>>()
 
 /** Runtime element address for layers↔canvas sync — kept outside SSR DOM until an override needs CSS. */
 export function ensureId(el: HTMLElement): string {
@@ -159,14 +159,20 @@ export function ensureId(el: HTMLElement): string {
   runtimeIds.set(el, id)
   let elements = runtimeElements.get(el.ownerDocument)
   if (!elements) { elements = new Map(); runtimeElements.set(el.ownerDocument, elements) }
-  elements.set(id, el)
+  elements.set(id, new WeakRef(el))
   return id
 }
 
 export function engineElement(doc: Document, id: string): HTMLElement | null {
-  return (doc.querySelector(`[data-eng-id="${id}"]`) as HTMLElement | null)
-    ?? runtimeElements.get(doc)?.get(id)
-    ?? null
+  const attributed = doc.querySelector(`[data-eng-id="${id}"]`) as HTMLElement | null
+  if (attributed) return attributed
+  const elements = runtimeElements.get(doc)
+  const runtime = elements?.get(id)?.deref()
+  if (!runtime?.isConnected) {
+    elements?.delete(id)
+    return null
+  }
+  return runtime
 }
 
 /** Dev css-module class `file_local__hash` → `local`; '' when none.
