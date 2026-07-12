@@ -130,11 +130,17 @@ describe('AuthoringSidecarStore', () => {
       expectedRevision: 1,
       sourceFiles: [SOURCE_FILE],
       expectedSourceHashes: await store.computeSourceHashes([SOURCE_FILE]),
-      mutate: (draft) => draft,
+      mutate: (draft) => {
+        draft.sourceHashes[otherFile] = '0'.repeat(64)
+        delete draft.sourceHashes[SOURCE_FILE]
+        draft.sourceHashes['src/app/(dev)/react-figma-components/Forged.tsx'] = 'f'.repeat(64)
+        return draft
+      },
     })
 
     expect(second.sourceHashes[SOURCE_FILE]).not.toBe(first.sourceHashes[SOURCE_FILE])
     expect(second.sourceHashes[otherFile]).toBe(first.sourceHashes[otherFile])
+    expect(second.sourceHashes).not.toHaveProperty('src/app/(dev)/react-figma-components/Forged.tsx')
   })
 
   it('enforces expected per-file source hashes before accepting a commit', async () => {

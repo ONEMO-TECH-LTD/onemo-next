@@ -160,7 +160,7 @@ export class SingleRootAuthoringTransaction {
     const afterCandidate = update.mutate({
       ...before,
       revision: before.revision + 1,
-      sourceHashes,
+      sourceHashes: { ...sourceHashes },
     })
     const after = assertAuthoringGraphV1({
       ...afterCandidate,
