@@ -77,6 +77,7 @@ describe('create-component-from-selection authoring session', () => {
 
     const created = await session.createComponentFromSelection({
       command,
+      transactionId: '00000000-0000-4000-8000-000000000101',
       expectedRevision: 0,
       expectedSourceHashes: preview.sourceHashes,
       expectedEnvironmentFingerprint: preview.environmentFingerprint,
@@ -142,6 +143,7 @@ describe('create-component-from-selection authoring session', () => {
         kind: 'create-component-from-selection', commandId: 'collision.card:1',
         file: PAGE, line: 4, col: 7, name: 'Card',
       },
+      transactionId: '00000000-0000-4000-8000-000000000102',
       expectedRevision: 0,
       expectedSourceHashes: preview.sourceHashes,
       expectedEnvironmentFingerprint: preview.environmentFingerprint,

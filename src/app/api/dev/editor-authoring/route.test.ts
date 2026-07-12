@@ -869,21 +869,33 @@ export function Button() { return <button className={styles.base} /> }
     tsconfig.compilerOptions.paths = { '@/*': ['src/*'] }
     await fs.writeFile(tsconfigPath, JSON.stringify(tsconfig))
     await fs.writeFile(path.join(root, pageFile), pageSource)
-    const previewResponse = await handleGet(new Request(
-      `http://localhost/api/dev/editor-authoring?mode=create-component-preview&file=${encodeURIComponent(pageFile)}`,
-    ), root)
+    const command = {
+      kind: 'create-component-from-selection', commandId: 'route-create-card',
+      file: pageFile, line: 4, col: 7, name: 'Card',
+    }
+    const previewUrl = new URL('http://localhost/api/dev/editor-authoring')
+    previewUrl.searchParams.set('mode', 'create-component-preview')
+    for (const [key, value] of Object.entries(command)) previewUrl.searchParams.set(key, String(value))
+    const previewResponse = await handleGet(new Request(previewUrl), root)
     expect(previewResponse.status).toBe(200)
     const preview = await previewResponse.json()
+    expect(preview).toMatchObject({
+      componentFile: 'src/app/(dev)/react-figma-components/Card.tsx',
+      componentId: expect.any(String),
+      expectedComponentHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      expectedRevision: 0,
+    })
+    await expect(fs.readFile(path.join(root, pageFile), 'utf8')).resolves.toBe(pageSource)
+    await expect(fs.readFile(path.join(root, preview.componentFile))).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(fs.readFile(path.join(root, PROJECT_AUTHORING_SIDECAR))).rejects.toMatchObject({ code: 'ENOENT' })
 
     const response = await handlePost(new Request('http://localhost/api/dev/editor-authoring', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         kind: 'execute-create-component',
-        command: {
-          kind: 'create-component-from-selection', commandId: 'route-create-card',
-          file: pageFile, line: 4, col: 7, name: 'Card',
-        },
+        command,
+        transactionId: '00000000-0000-4000-8000-000000000103',
         expectedRevision: preview.expectedRevision,
         expectedSourceHashes: preview.sourceHashes,
         expectedEnvironmentFingerprint: preview.environmentFingerprint,
@@ -942,6 +954,7 @@ export function Button() { return <button className={styles.base} /> }
         kind: 'create-component-from-selection', commandId: 'bad',
         file: '../outside.tsx', line: 1, col: 1, name: 'Card',
       },
+      transactionId: '00000000-0000-4000-8000-000000000104',
       expectedRevision: 0,
       expectedSourceHashes: { [SOURCE_FILE]: 'a'.repeat(64) },
       expectedEnvironmentFingerprint: 'b'.repeat(64),

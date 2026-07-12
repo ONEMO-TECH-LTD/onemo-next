@@ -23,7 +23,7 @@ import {
   type Icon as PIcon,
 } from '@phosphor-icons/react'
 import { ComponentCanvas } from './component-authoring/ComponentCanvas'
-import { completeAuthoringResume, readAuthoringResumeState } from './component-authoring/session'
+import { cancelAuthoringResumeMarker, completeAuthoringResume, issueAuthoringResumeMarker, readAuthoringResumeState } from './component-authoring/session'
 import { canvasHistoryAction } from './component-authoring/gestures'
 
 const INK = 'rgba(0,0,0,0.898)', MUTE = 'rgba(0,0,0,0.45)', FAINT = 'rgba(0,0,0,0.3)' // INK: Figma's exact ink (E8 audit — measured, was 0.9)
@@ -1472,6 +1472,37 @@ function Toaster() {
   )
 }
 
+function CreateComponentDialog({ name, busy, error, onName, onCancel, onSubmit }: {
+  name: string
+  busy: boolean
+  error: string | null
+  onName: (name: string) => void
+  onCancel: () => void
+  onSubmit: () => void
+}) {
+  return createPortal(
+    <div data-create-component-dialog-backdrop onPointerDown={(event) => { if (event.target === event.currentTarget && !busy) onCancel() }}
+      style={{ position: 'fixed', inset: 0, zIndex: 1900, display: 'grid', placeItems: 'center', background: 'color-mix(in srgb, var(--sem-col-bg-overlay) 36%, transparent)' }}>
+      <form role="dialog" aria-modal="true" aria-labelledby="create-component-title" onSubmit={(event) => { event.preventDefault(); onSubmit() }}
+        onKeyDown={(event) => { if (event.key === 'Escape' && !busy) { event.preventDefault(); onCancel() } }}
+        style={{ width: 320, padding: 16, border: '1px solid var(--sem-col-border-secondary)', borderRadius: 'var(--sem-radii-lg)', background: 'var(--sem-col-bg-primary)', color: 'var(--sem-col-text-primary)', fontFamily: 'var(--sem-type-fluid-label-s-font)' }}>
+        <div id="create-component-title" style={{ fontSize: 'var(--sem-type-fluid-label-s-size)', lineHeight: 'var(--sem-type-fluid-label-s-line-height)', fontWeight: 600 }}>Create component</div>
+        <label style={{ display: 'grid', gap: 6, marginTop: 12, fontSize: 'var(--sem-type-fluid-label-xs-size)', lineHeight: 'var(--sem-type-fluid-label-xs-line-height)', color: 'var(--sem-col-text-secondary)' }}>
+          Name
+          <input autoFocus value={name} disabled={busy} onChange={(event) => onName(event.currentTarget.value)} aria-describedby={error ? 'create-component-error' : undefined}
+            style={{ height: 32, boxSizing: 'border-box', border: '1px solid var(--sem-col-border-secondary)', borderRadius: 'var(--sem-radii-sm)', background: 'var(--sem-col-bg-secondary)', color: 'var(--sem-col-text-primary)', padding: '0 10px', font: 'inherit', outlineColor: 'var(--sem-col-border-brand)' }} />
+        </label>
+        {error && <div id="create-component-error" role="alert" style={{ marginTop: 8, color: 'var(--sem-col-text-error-primary)', fontSize: 'var(--sem-type-fluid-label-xs-size)', lineHeight: 'var(--sem-type-fluid-label-xs-line-height)' }}>{error}</div>}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+          <button type="button" disabled={busy} onClick={onCancel} style={{ appearance: 'none', height: 30, padding: '0 12px', border: '1px solid var(--sem-col-border-secondary)', borderRadius: 'var(--sem-radii-full)', background: 'var(--sem-col-bg-secondary)', color: 'var(--sem-col-text-secondary)', cursor: busy ? 'default' : 'pointer', font: 'inherit' }}>Cancel</button>
+          <button type="submit" disabled={busy || !name.trim()} style={{ appearance: 'none', height: 30, padding: '0 12px', border: '1px solid var(--sem-col-border-brand)', borderRadius: 'var(--sem-radii-full)', background: 'var(--sem-col-bg-brand-primary)', color: 'var(--sem-col-text-brand-primary)', cursor: busy || !name.trim() ? 'default' : 'pointer', font: 'inherit' }}>{busy ? 'Creating…' : 'Create'}</button>
+        </div>
+      </form>
+    </div>,
+    document.body,
+  )
+}
+
 /* E3.6 — Auto layout settings: direction + distribution (the CSS-flexbox analogs). */
 function AutoLayoutSettingsMenu({ onApply }: { onApply: (field: string, value: string) => void }) {
   const [open, setOpen] = useState(false)
@@ -2339,7 +2370,7 @@ export default function ReactFigmaPage() {
   // authoring frames in this same canvas host; Home removes the overlay and reveals the unchanged page.
   const [editingComponent, setEditingComponent] = useState<DsComponent | null>(null)
   const [authoringResumeTarget, setAuthoringResumeTarget] = useState<string | null>(null)
-  const [authoringResumePhase, setAuthoringResumePhase] = useState<'none' | 'resuming' | 'resumed' | 'refused'>('none')
+  const [authoringResumePhase, setAuthoringResumePhase] = useState<'none' | 'originating' | 'resuming' | 'resumed' | 'refused'>('none')
   const [authoringResumeError, setAuthoringResumeError] = useState<string | null>(null)
   const [authoringBounds, setAuthoringBounds] = useState({ w: 800, h: 600 })
   const [authoringUndoNonce, setAuthoringUndoNonce] = useState(0)
@@ -2461,6 +2492,12 @@ export default function ReactFigmaPage() {
   // engine M1+M2 — selection + read-bridge state
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [sel, setSel] = useState<SelPayload | null>(null)
+  const [componentCreateDialog, setComponentCreateDialog] = useState<{
+    selection: SelPayload
+    name: string
+    busy: boolean
+    error: string | null
+  } | null>(null)
   const [codeMode, setCodeMode] = useState(false) // E4-G3: Design ↔ Code view of the selected element
   const [hoverRect, setHoverRect] = useState<OutlineRect | null>(null)
   const [selRect, setSelRect] = useState<OutlineRect | null>(null)
@@ -3067,17 +3104,96 @@ export default function ReactFigmaPage() {
     if (r.ok) notify('Deleted'); else notify(`Delete failed: ${await r.text()}`, 'error')
   }, [sel])
 
-  // E3.5 creation: extract the selected element into its own component file + instance
-  const makeComponent = useCallback(async () => {
-    if (!sel) { notify('Select an element first', 'error'); return }
-    const r = await fetch('/api/dev/editor-write', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ kind: 'make-component', file: sel.file, line: sel.line, col: sel.col }),
-    })
-    if (!r.ok) { notify(`Extract failed: ${await r.text()}`, 'error'); return }
-    const res = await r.json() as { componentFile?: string }
-    notify(`Component created${res.componentFile ? ` · ${res.componentFile.split('/').pop()}` : ''}`)
-  }, [sel])
+  const openCreateComponentDialog = useCallback(() => {
+    if (canvasMode !== 'design' || !sel) { notify('Select an element on the page canvas first', 'error'); return }
+    setComponentCreateDialog({ selection: { ...sel, classes: [...sel.classes] }, name: 'Component', busy: false, error: null })
+  }, [canvasMode, sel])
+  // Hard Contract §6/§8/§11-G2: naming + preview + marker happen before the one atomic
+  // create-component-from-selection command. The legacy editor-write make-component path is not used.
+  const createComponentFromSelection = useCallback(async () => {
+    const dialog = componentCreateDialog
+    if (!dialog || dialog.busy) return
+    const name = dialog.name.trim()
+    if (!/^[A-Z][A-Za-z0-9]*$/.test(name) || name.length > 120) {
+      setComponentCreateDialog({ ...dialog, error: 'Use a PascalCase name up to 120 characters.' })
+      return
+    }
+    setComponentCreateDialog({ ...dialog, name, busy: true, error: null })
+    const command = {
+      kind: 'create-component-from-selection' as const,
+      commandId: crypto.randomUUID(),
+      file: dialog.selection.file,
+      line: dialog.selection.line,
+      col: dialog.selection.col,
+      name,
+    }
+    const transactionId = crypto.randomUUID()
+    let markerIssued = false
+    try {
+      const previewUrl = new URL('/api/dev/editor-authoring', window.location.origin)
+      previewUrl.searchParams.set('mode', 'create-component-preview')
+      for (const [key, value] of Object.entries(command)) previewUrl.searchParams.set(key, String(value))
+      const previewResponse = await fetch(previewUrl)
+      const preview = await previewResponse.json() as {
+        error?: string
+        code?: string
+        expectedRevision?: number
+        sourceHashes?: Record<string, string>
+        environmentFingerprint?: string
+        componentFile?: string
+        expectedComponentHash?: string
+      }
+      if (!previewResponse.ok) throw new Error(preview.code ?? preview.error ?? 'Create preview failed')
+      if (!Number.isSafeInteger(preview.expectedRevision) || !preview.sourceHashes ||
+        !preview.environmentFingerprint?.match(/^[a-f0-9]{64}$/) ||
+        !preview.componentFile?.startsWith('src/app/(dev)/react-figma-components/') ||
+        !preview.expectedComponentHash?.match(/^[a-f0-9]{64}$/)) {
+        throw new Error('CREATE_COMPONENT_PREVIEW_INVALID')
+      }
+      issueAuthoringResumeMarker({
+        targetFile: preview.componentFile,
+        expectedHash: preview.expectedComponentHash,
+        transactionId,
+      })
+      markerIssued = true
+      setAuthoringResumeTarget(preview.componentFile)
+      setAuthoringResumePhase('originating')
+      setRail('components')
+      setEditingComponent(null)
+      const response = await fetch('/api/dev/editor-authoring', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          kind: 'execute-create-component',
+          command,
+          transactionId,
+          expectedRevision: preview.expectedRevision,
+          expectedSourceHashes: preview.sourceHashes,
+          expectedEnvironmentFingerprint: preview.environmentFingerprint,
+        }),
+      })
+      const result = await response.json() as { error?: string; code?: string; componentFile?: string }
+      if (!response.ok) {
+        if (response.status < 500) {
+          cancelAuthoringResumeMarker(transactionId)
+          markerIssued = false
+          setAuthoringResumeTarget(null)
+          setAuthoringResumePhase('none')
+        }
+        throw new Error(result.code ?? result.error ?? 'Create component failed')
+      }
+      if (result.componentFile !== preview.componentFile) throw new Error('CREATE_COMPONENT_RESULT_MISMATCH')
+      setComponentCreateDialog(null)
+      setCompNonce((value) => value + 1)
+      notify(`Created ${name}`)
+      // The originating document deliberately leaves the marker intact. Next's route-tree rescan
+      // performs the single permitted reload; only that resumed document may consume it (§6.5).
+    } catch (error) {
+      const message = (error as Error).message
+      setComponentCreateDialog((current) => current ? { ...current, busy: false, error: message } : current)
+      if (markerIssued) notify(`Create result uncertain: ${message}`, 'error')
+    }
+  }, [componentCreateDialog])
 
   // E3.5 creation: add a new page route (real folder + page.tsx scaffold), then load it
   const addPage = useCallback(async () => {
@@ -3830,7 +3946,7 @@ export default function ReactFigmaPage() {
           return (<>
             <div style={{ height: 40, padding: '0 8px 0 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flex: 'none' }}>
               <span style={hdr}>Components</span>
-              <UiIB name="createComponent" title={sel ? 'Create component from selection' : 'Select an element on the canvas first'} on={() => void makeComponent()} />
+              <UiIB name="createComponent" title={sel && canvasMode === 'design' ? 'Create component from selection' : 'Select an element on the page canvas first'} on={openCreateComponentDialog} />
             </div>
             <div style={{ padding: '0 12px 8px', flex: 'none' }}>
               <div style={{ height: 28, background: FIELD, borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px' }}>
@@ -4071,7 +4187,7 @@ export default function ReactFigmaPage() {
                 shell exactly (Dan, 2026-07-04); sel payload still logged + in state */}
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
               <UiIB name="devCode" title="Open code panel" active={codeMode} on={() => { if (sel) setCodeMode(true); else notify('Select an element first', 'error') }} />
-              <UiIB name="createComponent" title="Create component" on={() => void makeComponent()} />
+              <UiIB name="createComponent" title="Create component" on={openCreateComponentDialog} />
               <MoreActionsMenu onDuplicate={() => void duplicateEl()} onDelete={() => void deleteEl()} />
             </div>
           </div>
@@ -4369,6 +4485,14 @@ export default function ReactFigmaPage() {
             ))}
           </div>
         </div>, document.body)}
+      {componentCreateDialog && <CreateComponentDialog
+        name={componentCreateDialog.name}
+        busy={componentCreateDialog.busy}
+        error={componentCreateDialog.error}
+        onName={(name) => setComponentCreateDialog((current) => current ? { ...current, name, error: null } : current)}
+        onCancel={() => { if (!componentCreateDialog.busy) setComponentCreateDialog(null) }}
+        onSubmit={() => void createComponentFromSelection()}
+      />}
       <Toaster />
     </div>
   )

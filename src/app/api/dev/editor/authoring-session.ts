@@ -56,30 +56,18 @@ export class ProjectAuthoringSession {
 
   async createComponentFromSelection(input: {
     command: CreateComponentFromSelectionCommand
+    transactionId: string
     expectedRevision: number
     expectedSourceHashes: Record<string, string>
     expectedEnvironmentFingerprint: string
   }): Promise<{ graph: AuthoringGraphV1; componentId: string; componentFile: string }> {
-    const existing = await this.input.store.load()
-    const snapshot = await readExactAuthoringSourceSnapshot({
-      storeId: this.input.storeId,
-      file: input.command.file,
-      registry: this.input.registry,
-    })
-    const before = existing ?? createEmptyAuthoringGraph({
-      storeId: this.input.storeId,
-      rootKind: 'project',
-      environmentFingerprint: snapshot.environmentFingerprint,
-    })
+    const { existing, snapshot, before, expectedBeforeHashes } = await this.readCreateComponentContext(input.command)
     if (input.expectedEnvironmentFingerprint !== snapshot.environmentFingerprint) {
       throw namedError('ENVIRONMENT_FINGERPRINT_STALE', 'compiler environment changed after create preview', 409)
     }
     if (before.revision !== input.expectedRevision) {
       throw namedError('AUTHORING_REVISION_STALE', `expected revision ${input.expectedRevision}, found ${before.revision}`, 409)
     }
-    assertMatchingHashOverlap(before.sourceHashes, snapshot.sourceHashes)
-    if (existing) assertEnvironmentFingerprint(before.environmentFingerprint, snapshot.environmentFingerprint)
-    const expectedBeforeHashes = { ...before.sourceHashes, ...snapshot.sourceHashes }
     assertExactHashSet(input.expectedSourceHashes, expectedBeforeHashes)
 
     const plan = await compileCreateComponentFromSelection({
@@ -105,7 +93,7 @@ export class ProjectAuthoringSession {
       revision: before.revision + 1,
     })
     const committed = await new SingleRootAuthoringTransaction({
-      transactionId: `g2-create-component-${randomUUID()}`,
+      transactionId: input.transactionId,
       storeId: this.input.storeId,
       registry: this.input.registry,
       store: this.input.store,
@@ -122,6 +110,57 @@ export class ProjectAuthoringSession {
       mutate: () => plan.graph,
     })
     return { graph: committed, componentId: plan.componentId, componentFile: plan.componentFile }
+  }
+
+  async previewComponentFromSelection(command: CreateComponentFromSelectionCommand): Promise<{
+    expectedRevision: number
+    sourceHashes: Record<string, string>
+    environmentFingerprint: string
+    componentId: string
+    componentFile: string
+    expectedComponentHash: string
+  }> {
+    const { snapshot, before, expectedBeforeHashes } = await this.readCreateComponentContext(command)
+    const plan = await compileCreateComponentFromSelection({
+      graph: before,
+      command,
+      consumerSource: snapshot.sources[command.file]!,
+      sourceHashes: expectedBeforeHashes,
+      environmentFingerprint: snapshot.environmentFingerprint,
+      projectRoot: this.input.registry.get(this.input.storeId).canonicalRealPath,
+      compilerOptions: snapshot.compilerOptions,
+      dependencySources: snapshot.sources,
+    })
+    return {
+      expectedRevision: before.revision,
+      sourceHashes: expectedBeforeHashes,
+      environmentFingerprint: snapshot.environmentFingerprint,
+      componentId: plan.componentId,
+      componentFile: plan.componentFile,
+      expectedComponentHash: plan.graph.sourceHashes[plan.componentFile]!,
+    }
+  }
+
+  private async readCreateComponentContext(command: CreateComponentFromSelectionCommand) {
+    const existing = await this.input.store.load()
+    const snapshot = await readExactAuthoringSourceSnapshot({
+      storeId: this.input.storeId,
+      file: command.file,
+      registry: this.input.registry,
+    })
+    const before = existing ?? createEmptyAuthoringGraph({
+      storeId: this.input.storeId,
+      rootKind: 'project',
+      environmentFingerprint: snapshot.environmentFingerprint,
+    })
+    assertMatchingHashOverlap(before.sourceHashes, snapshot.sourceHashes)
+    if (existing) assertEnvironmentFingerprint(before.environmentFingerprint, snapshot.environmentFingerprint)
+    return {
+      existing,
+      snapshot,
+      before,
+      expectedBeforeHashes: { ...before.sourceHashes, ...snapshot.sourceHashes },
+    }
   }
 
   async execute(input: {
