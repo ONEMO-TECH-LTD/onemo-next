@@ -95,6 +95,26 @@ describe('SourceProjection classification', () => {
     expect(projection.anchors.length).toBeGreaterThan(0)
   })
 
+  it.each([
+    {
+      label: 'missing',
+      declaration: `export function Button({ variant }: { variant?: 'Primary' | 'Secondary' }) { return <button>{variant}</button> }`,
+    },
+    {
+      label: 'dynamic',
+      declaration: `const DEFAULT = 'Primary' as const\nexport function Button({ variant = DEFAULT }: { variant?: 'Primary' | 'Secondary' }) { return <button>{variant}</button> }`,
+    },
+    {
+      label: 'outside the union',
+      declaration: `export function Button({ variant = 'Tertiary' }: { variant?: 'Primary' | 'Secondary' }) { return <button>{variant}</button> }`,
+    },
+  ])('refuses a $label legacy-axis default instead of fabricating Primary', async ({ declaration }) => {
+    await expect(sourceProjectionFromSource({ file: 'Button.tsx', source: declaration })).resolves.toMatchObject({
+      compatibility: 'unsupported',
+      unsupportedReason: 'component axis default must be a static union member: variant',
+    })
+  })
+
   it('returns the same projection from filesystem and exact bytes for a real fixture', async () => {
     const file = 'src/app/api/dev/editor/__tests__/fixtures/source-anchor/AnchorFixture.tsx'
     const source = await fs.readFile(file, 'utf8')
@@ -250,7 +270,7 @@ export function Button<T>({ variant }: Props<T>) { return <button /> }`,
   it('resolves local alias chains, strips only nullish members, deduplicates values, and refuses alias cycles', async () => {
     const project = (name: string, declarations: string, type: string) => sourceProjectionFromSource({
       file: `${name}.tsx`,
-      source: `${declarations}\nexport function ${name}({ variant }: { variant?: ${type} }) { return <button>{variant}</button> }`,
+      source: `${declarations}\nexport function ${name}({ variant = 'Primary' }: { variant?: ${type} }) { return <button>{variant}</button> }`,
     })
     const expectedAxis = { compatibility: 'legacy-single-axis', variantAxes: [{ axis: 'variant', values: ['Primary', 'Secondary'] }] }
 

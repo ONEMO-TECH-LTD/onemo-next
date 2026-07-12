@@ -1568,6 +1568,7 @@ async function parseComponentModelSnapshot(input: {
   }
   const param = fn?.parameters[0]
   const axisValuesByProp = new Map<string, string[]>()
+  const axisDefaultsByProp = new Map<string, ts.Expression | undefined>()
   if (param && ts.isObjectBindingPattern(param.name)) {
     const typeMembers = new Map<string, { type: string; optional: boolean; axisValues: string[] | null }>()
     const members = componentPropMembers(sf, param.type, fn?.typeParameters)
@@ -1582,9 +1583,13 @@ async function parseComponentModelSnapshot(input: {
       const pn = e.propertyName && ts.isIdentifier(e.propertyName) ? e.propertyName.text : e.name.text
       const t = typeMembers.get(pn)
       props.push({ name: pn, tsType: t?.type ?? 'unknown', optional: t?.optional ?? false, default: e.initializer?.getText(sf) })
-      if (t?.axisValues) axisValuesByProp.set(pn, t.axisValues)
+      if (t?.axisValues) {
+        axisValuesByProp.set(pn, t.axisValues)
+        axisDefaultsByProp.set(pn, e.initializer)
+      }
     }
   }
+  const nativeVariants = parseNativeVariantRegistry(sf)
   // variantAxes (D1, §6.1) — each STRING-UNION prop is a config axis; the union prop is the source of truth
   // (values + default), so an axis lists in the model the moment add-variant-axis runs, before any
   // `.base.<axis>_<value>` CSS rule exists (mirrors the semantic-state derive-from-prop pattern).
@@ -1592,10 +1597,16 @@ async function parseComponentModelSnapshot(input: {
   for (const p of props) {
     const vals = axisValuesByProp.get(p.name)
     if (!vals) continue
-    const def = p.default ? p.default.replace(/^['"]|['"]$/g, '') : vals[0]
-    variantAxes.push({ axis: p.name, values: vals, defaultValue: vals.includes(def) ? def : vals[0] })
+    const initializer = axisDefaultsByProp.get(p.name)
+    if (!initializer || !ts.isStringLiteralLike(initializer) || !vals.includes(initializer.text)) {
+      if (nativeVariants.length > 0) continue
+      throw projectionError(
+        'COMPONENT_AXIS_DEFAULT_UNSUPPORTED',
+        `component axis default must be a static union member: ${p.name}`,
+      )
+    }
+    variantAxes.push({ axis: p.name, values: vals, defaultValue: initializer.text })
   }
-  const nativeVariants = parseNativeVariantRegistry(sf)
 
   // cssModule ← the `import styles from './X.module.css'` specifier.
   let cssModule: string | null = null

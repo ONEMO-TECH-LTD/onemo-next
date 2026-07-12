@@ -167,6 +167,40 @@ export function Button() { return <button className={styles.base} /> }
     await expect(fs.readFile(path.join(root, PROJECT_AUTHORING_SIDECAR))).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
+  it.each([
+    {
+      label: 'missing',
+      source: `export function Button({ variant }: { variant?: 'Primary' | 'Secondary' }) { return <button>{variant}</button> }\n`,
+    },
+    {
+      label: 'dynamic',
+      source: `const DEFAULT = 'Primary' as const\nexport function Button({ variant = DEFAULT }: { variant?: 'Primary' | 'Secondary' }) { return <button>{variant}</button> }\n`,
+    },
+    {
+      label: 'outside the union',
+      source: `export function Button({ variant = 'Tertiary' }: { variant?: 'Primary' | 'Secondary' }) { return <button>{variant}</button> }\n`,
+    },
+  ])('refuses a $label legacy-axis default without source, sidecar, or transaction drift', async ({ source }) => {
+    const { root, registry, store } = await makeImportStore(source)
+    const classified = await classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry })
+
+    expect(classified.projection).toMatchObject({
+      compatibility: 'unsupported',
+      unsupportedReason: 'component axis default must be a static union member: variant',
+    })
+    await expect(importSourceFileToAuthoringStore({
+      storeId: 'project-main',
+      file: SOURCE_FILE,
+      expectedSourceHashes: classified.sourceHashes,
+      registry,
+      store,
+    })).resolves.toMatchObject({ kind: 'unsupported' })
+    await expect(fs.readFile(path.join(root, SOURCE_FILE), 'utf8')).resolves.toBe(source)
+    await expect(fs.readFile(path.join(root, PROJECT_AUTHORING_SIDECAR))).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(fs.readdir(path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions')))
+      .rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
   it('refuses relative, path-alias, and symlinked project dependencies that escape the registered root', async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'authoring-import-jail-'))
     const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'authoring-import-outside-'))
