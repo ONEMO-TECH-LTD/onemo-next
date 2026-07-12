@@ -5,7 +5,7 @@ import { isValidElementType } from 'react-is'
 
 import type { AuthoringGraphV1, VariantFrame } from '@/app/api/dev/editor/authoring-types'
 import type { SourceProjection } from '@/app/api/dev/editor/source-projection'
-import { movedVariantFrame } from './gestures'
+import { componentCanvasGeometry, movedVariantFrame } from './gestures'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const projectComponents = (require as any).context('../../react-figma-components', true, /\.tsx$/)
@@ -53,10 +53,11 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged }: {
 
   useEffect(() => {
     if (!snapshot) return
+    const definition = snapshot.graph.components[snapshot.componentId]!
     const variants = Object.values(snapshot.graph.variants).filter((variant) => variant.componentId === snapshot.componentId)
-    const w = Math.max(800, ...variants.map((variant) => variant.frame.x + variant.frame.width + 80))
-    const h = Math.max(600, ...variants.map((variant) => variant.frame.y + variant.frame.height + 80))
-    onBounds(w, h)
+    const primary = snapshot.graph.variants[definition.primaryVariantId]!
+    const { bounds } = componentCanvasGeometry(variants.map((variant) => variant.frame), primary.frame)
+    onBounds(bounds.width, bounds.height)
   }, [onBounds, snapshot])
 
   const component = useMemo(() => {
@@ -109,12 +110,7 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged }: {
   const variants = Object.values(snapshot.graph.variants).filter((variant) => variant.componentId === snapshot.componentId)
   const props = new Map(Object.entries(snapshot.variantProps))
   const primary = snapshot.graph.variants[definition.primaryVariantId]!
-  const ghost = {
-    x: Math.max(...variants.map((variant) => variant.frame.x + variant.frame.width), 0) + 24,
-    y: primary.frame.y,
-    width: primary.frame.width,
-    height: primary.frame.height,
-  }
+  const { ghost } = componentCanvasGeometry(variants.map((variant) => variant.frame), primary.frame)
 
   return (
     <div data-authoring-canvas data-component-id={definition.id} onPointerDown={(event) => { if (event.target === event.currentTarget) setSelectedId(null) }}
@@ -148,7 +144,7 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged }: {
           {(() => { const Comp = component; return <Comp {...(props.get(variant.id) ?? {})} /> })()}
         </figure>
       })}
-      {selectedId && <button type="button" disabled={busy} data-create-variant aria-label="Create variant" onClick={() => void execute({ kind: 'create-variant', commandId: crypto.randomUUID(), componentId: definition.id, displayName: `Variant ${variants.length + 1}` })}
+      {selectedId && <button type="button" disabled={busy} data-create-variant data-ghost-label="+ Variant" aria-label="Create variant" onClick={() => void execute({ kind: 'create-variant', commandId: crypto.randomUUID(), componentId: definition.id, displayName: `Variant ${variants.length + 1}` })}
         style={{ position: 'absolute', left: ghost.x, top: ghost.y, width: ghost.width, height: ghost.height, border: `1px dashed ${accent}`, borderRadius: 8, color: 'var(--sem-col-text-brand-primary)', background: 'color-mix(in srgb, var(--sem-col-bg-secondary) 88%, transparent)', cursor: 'pointer', font: 'inherit' }}>+ Variant</button>}
     </div>
   )
