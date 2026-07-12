@@ -1682,7 +1682,7 @@ function componentPropMembers(
     return type.members.filter(ts.isPropertySignature).map((member) => ({
       member,
       typeText: member.type?.getText(sf) ?? 'unknown',
-      axisValues: member.type ? topLevelStringLiteralUnion(member.type) : null,
+      axisValues: member.type ? topLevelStringLiteralUnion(sf, member.type) : null,
     }))
   }
   if (!ts.isTypeReferenceNode(type) || !ts.isIdentifier(type.typeName)) {
@@ -1748,25 +1748,50 @@ function describeSubstitutedType(sf: ts.SourceFile, type: ts.TypeNode, substitut
     const resolved = transformed.transformed[0]!
     return {
       typeText: ts.createPrinter().printNode(ts.EmitHint.Unspecified, resolved, sf),
-      axisValues: topLevelStringLiteralUnion(resolved),
+      axisValues: topLevelStringLiteralUnion(sf, resolved),
     }
   } finally {
     transformed.dispose()
   }
 }
 
-function topLevelStringLiteralUnion(input: ts.TypeNode): string[] | null {
+function topLevelStringLiteralUnion(sf: ts.SourceFile, input: ts.TypeNode): string[] | null {
+  const aliases = new Map(sf.statements.filter(ts.isTypeAliasDeclaration).map((alias) => [alias.name.text, alias]))
+  const resolved = collectAxisTypeMembers(input, aliases, [])
+  if (!resolved?.isUnion) return null
+  const unique = [...new Set(resolved.values)]
+  return unique.length >= 2 ? unique : null
+}
+
+function collectAxisTypeMembers(
+  input: ts.TypeNode,
+  aliases: Map<string, ts.TypeAliasDeclaration>,
+  stack: string[],
+): { values: string[]; isUnion: boolean } | null {
   let type = input
   while (ts.isParenthesizedTypeNode(type)) type = type.type
-  if (!ts.isUnionTypeNode(type) || type.types.length < 2) return null
-  const values: string[] = []
-  for (const inputMember of type.types) {
-    let member = inputMember
-    while (ts.isParenthesizedTypeNode(member)) member = member.type
-    if (!ts.isLiteralTypeNode(member) || !ts.isStringLiteral(member.literal)) return null
-    values.push(member.literal.text)
+  if (ts.isLiteralTypeNode(type) && ts.isStringLiteral(type.literal)) {
+    return { values: [type.literal.text], isUnion: false }
   }
-  return new Set(values).size === values.length ? values : null
+  if (type.kind === ts.SyntaxKind.UndefinedKeyword || (ts.isLiteralTypeNode(type) && type.literal.kind === ts.SyntaxKind.NullKeyword)) {
+    return { values: [], isUnion: false }
+  }
+  if (ts.isTypeReferenceNode(type) && ts.isIdentifier(type.typeName) && !type.typeArguments?.length) {
+    const alias = aliases.get(type.typeName.text)
+    if (!alias || alias.typeParameters?.length) return null
+    if (stack.includes(alias.name.text)) {
+      throw new Error(`component prop type alias cycle: ${[...stack, alias.name.text].join(' -> ')}`)
+    }
+    return collectAxisTypeMembers(alias.type, aliases, [...stack, alias.name.text])
+  }
+  if (!ts.isUnionTypeNode(type)) return null
+  const values: string[] = []
+  for (const member of type.types) {
+    const resolved = collectAxisTypeMembers(member, aliases, stack)
+    if (!resolved) return null
+    values.push(...resolved.values)
+  }
+  return { values, isUnion: true }
 }
 
 function parseNativeVariantRegistry(sf: ts.SourceFile): ComponentModel['nativeVariants'] {

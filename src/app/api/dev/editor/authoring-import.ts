@@ -93,36 +93,121 @@ async function readProjectModuleDependencies(
     moduleResolution: ts.ModuleResolutionKind.Bundler,
     jsx: ts.JsxEmit.ReactJSX,
   }
+  let configuredFiles: string[] = []
   if (ts.sys.fileExists(configPath)) {
     const config = ts.readConfigFile(configPath, ts.sys.readFile)
     if (config.error) throw namedError('SOURCE_TSCONFIG_INVALID', formatDiagnostic(config.error), 422)
     const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, root, { noEmit: true }, configPath)
     if (parsed.errors.length) throw namedError('SOURCE_TSCONFIG_INVALID', parsed.errors.map(formatDiagnostic).join('; '), 422)
     options = parsed.options
+    configuredFiles = parsed.fileNames
   }
-  const pending = [input.file]
+  await readConfiguredAmbientDeclarations(input, root, configuredFiles, sources)
+  await readConfiguredTypeDirectives(input, root, options, sources)
+  const pending = [...sources.keys()]
   while (pending.length > 0) {
     const file = pending.pop()!
     const bytes = sources.get(file)
     if (!bytes || !/\.[cm]?[jt]sx?$/.test(file)) continue
     const abs = path.join(root, file)
-    const sf = ts.createSourceFile(abs, bytes.toString('utf8'), ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
-    for (const statement of sf.statements) {
-      const specifier = (ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement)) && statement.moduleSpecifier && ts.isStringLiteralLike(statement.moduleSpecifier)
-        ? statement.moduleSpecifier.text
-        : null
-      if (!specifier) continue
-      const resolved = ts.resolveModuleName(specifier, abs, options, ts.sys).resolvedModule
+    const preprocessed = ts.preProcessFile(bytes.toString('utf8'))
+    for (const reference of preprocessed.referencedFiles) {
+      const referencedAbs = path.resolve(path.dirname(abs), reference.fileName)
+      const relative = storeRelativeDependency(root, referencedAbs)
+      if (sources.has(relative)) continue
+      const jailed = await input.registry.resolveStorePath(input.storeId, relative)
+      sources.set(relative, await fs.readFile(jailed))
+      pending.push(relative)
+    }
+    for (const reference of preprocessed.typeReferenceDirectives) {
+      const relative = await readTypeDirective(input, root, options, abs, reference.fileName, sources)
+      if (relative) pending.push(relative)
+    }
+    for (const imported of preprocessed.importedFiles) {
+      const resolved = ts.resolveModuleName(imported.fileName, abs, options, ts.sys).resolvedModule
       if (!resolved || resolved.isExternalLibraryImport) continue
       const resolvedAbs = path.resolve(resolved.resolvedFileName)
-      if (resolvedAbs !== root && !resolvedAbs.startsWith(root + path.sep)) continue
-      const relative = path.relative(root, resolvedAbs).split(path.sep).join('/')
+      const relative = storeRelativeDependency(root, resolvedAbs)
       if (sources.has(relative)) continue
       const jailed = await input.registry.resolveStorePath(input.storeId, relative)
       sources.set(relative, await fs.readFile(jailed))
       pending.push(relative)
     }
   }
+}
+
+async function readConfiguredTypeDirectives(
+  input: { storeId: StoreId; file: string; registry: RuntimeRootRegistry },
+  root: string,
+  options: ts.CompilerOptions,
+  sources: Map<string, Buffer>,
+): Promise<void> {
+  const containingFile = path.join(root, input.file)
+  for (const name of ts.getAutomaticTypeDirectiveNames(options, ts.sys)) {
+    await readTypeDirective(input, root, options, containingFile, name, sources)
+  }
+}
+
+async function readTypeDirective(
+  input: { storeId: StoreId; registry: RuntimeRootRegistry },
+  root: string,
+  options: ts.CompilerOptions,
+  containingFile: string,
+  name: string,
+  sources: Map<string, Buffer>,
+): Promise<string | null> {
+  const resolved = ts.resolveTypeReferenceDirective(name, containingFile, options, ts.sys).resolvedTypeReferenceDirective
+  if (!resolved || resolved.isExternalLibraryImport) return null
+  if (!resolved.resolvedFileName) throw namedError('SOURCE_TYPE_DIRECTIVE_UNRESOLVED', `local type directive has no resolved file: ${name}`, 422)
+  const relative = storeRelativeDependency(root, resolved.resolvedFileName)
+  if (sources.has(relative)) return null
+  const jailed = await input.registry.resolveStorePath(input.storeId, relative)
+  sources.set(relative, await fs.readFile(jailed))
+  return relative
+}
+
+async function readConfiguredAmbientDeclarations(
+  input: { storeId: StoreId; registry: RuntimeRootRegistry },
+  root: string,
+  configuredFiles: string[],
+  sources: Map<string, Buffer>,
+): Promise<void> {
+  for (const configuredFile of configuredFiles) {
+    if (!configuredFile.endsWith('.d.ts') || isPackageDependency(configuredFile)) continue
+    const relative = storeRelativeDependency(root, configuredFile)
+    if (sources.has(relative)) continue
+    const jailed = await input.registry.resolveStorePath(input.storeId, relative)
+    const bytes = await fs.readFile(jailed)
+    if (isRelevantAmbientDeclaration(jailed, bytes.toString('utf8'))) sources.set(relative, bytes)
+  }
+}
+
+function isRelevantAmbientDeclaration(file: string, source: string): boolean {
+  const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+  if (sf.statements.length === 0) return false
+  if (!ts.isExternalModule(sf)) return true
+  let relevant = false
+  const visit = (node: ts.Node) => {
+    if (ts.isModuleDeclaration(node) && (ts.isStringLiteral(node.name) || node.flags & ts.NodeFlags.GlobalAugmentation)) {
+      relevant = true
+      return
+    }
+    if (!relevant) ts.forEachChild(node, visit)
+  }
+  visit(sf)
+  return relevant
+}
+
+function storeRelativeDependency(root: string, candidate: string): string {
+  const resolved = path.resolve(candidate)
+  if (resolved !== root && !resolved.startsWith(root + path.sep)) {
+    throw namedError('SOURCE_DEPENDENCY_OUTSIDE_ROOT', `source dependency resolves outside the registered root: ${resolved}`, 422)
+  }
+  return path.relative(root, resolved).split(path.sep).join('/')
+}
+
+function isPackageDependency(file: string): boolean {
+  return path.resolve(file).split(path.sep).includes('node_modules')
 }
 
 function formatDiagnostic(diagnostic: ts.Diagnostic): string {

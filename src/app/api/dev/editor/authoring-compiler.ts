@@ -214,7 +214,9 @@ function assertSemanticTypecheck(file: string, source: string, projectRoot: stri
   const dependencyPrefix = path.join(path.resolve(projectRoot), 'node_modules') + path.sep
   const isUnstagedProjectFile = (candidate: string) => {
     const normalized = path.resolve(candidate)
-    return normalized.startsWith(projectPrefix) && !normalized.startsWith(dependencyPrefix) && !exactSources.has(normalized)
+    if (exactSources.has(normalized)) return false
+    if (normalized.startsWith(projectPrefix) && !normalized.startsWith(dependencyPrefix)) return true
+    return /\.(?:[cm]?[jt]sx?|json)$/.test(normalized) && !normalized.split(path.sep).includes('node_modules')
   }
   host.fileExists = (candidate) => exactSources.has(path.resolve(candidate)) || candidate === ambientName || (!isUnstagedProjectFile(candidate) && fileExists(candidate))
   host.readFile = (candidate) => exactSources.get(path.resolve(candidate)) ?? (candidate === ambientName ? ambient : isUnstagedProjectFile(candidate) ? undefined : readFile(candidate))
@@ -222,13 +224,15 @@ function assertSemanticTypecheck(file: string, source: string, projectRoot: stri
     const text = host.readFile(candidate)
     return text === undefined ? undefined : ts.createSourceFile(candidate, text, languageVersion, true, candidate.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
   }
-  const program = ts.createProgram({ rootNames: [fileName, ambientName], options, host })
+  const ambientRoots = Object.keys(dependencies).filter((relative) => relative.endsWith('.d.ts')).map((relative) => path.resolve(projectRoot, relative))
+  const program = ts.createProgram({ rootNames: [fileName, ambientName, ...ambientRoots], options, host })
   const stagedFile = program.getSourceFile(fileName)
   if (!stagedFile) throw namedError('STAGED_TYPECHECK_FAILED', `staged source was not loaded: ${file}`, 422)
-  const diagnostics = [
-    ...program.getSyntacticDiagnostics(stagedFile),
-    ...program.getSemanticDiagnostics(stagedFile),
-  ]
+  const exactProgramFiles = [...exactSources.keys()].map((candidate) => program.getSourceFile(candidate)).filter((candidate): candidate is ts.SourceFile => candidate !== undefined)
+  const diagnostics = exactProgramFiles.flatMap((candidate) => [
+    ...program.getSyntacticDiagnostics(candidate),
+    ...program.getSemanticDiagnostics(candidate),
+  ])
   if (diagnostics.length > 0) {
     const detail = diagnostics.map(formatDiagnostic).join('; ')
     throw namedError('STAGED_TYPECHECK_FAILED', detail, 422)

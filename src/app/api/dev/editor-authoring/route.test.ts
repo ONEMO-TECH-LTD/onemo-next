@@ -5,6 +5,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { PROJECT_AUTHORING_SIDECAR } from '../editor/authoring-store'
+import { linkTestNodeModules } from '../editor/__tests__/test-project-root'
 import { handleGet, handlePost } from './handler'
 import { GET } from './route'
 
@@ -17,7 +18,7 @@ const singleAxisSource = `export function Button({ variant = 'Primary' }: { vari
 async function makeRoot(source = singleAxisSource) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'authoring-import-route-'))
   await fs.mkdir(path.dirname(path.join(root, SOURCE_FILE)), { recursive: true })
-  await fs.symlink(path.resolve(process.cwd(), '../../..', 'node_modules'), path.join(root, 'node_modules'), 'dir')
+  await linkTestNodeModules(root)
   await fs.writeFile(path.join(root, 'tsconfig.json'), JSON.stringify({
     compilerOptions: {
       strict: true,

@@ -8,6 +8,7 @@ import { classifySourceFileForImport, importSourceFileToAuthoringStore } from '.
 import { ProjectAuthoringSession } from '../authoring-session'
 import { AuthoringSidecarStore } from '../authoring-store'
 import { RuntimeRootRegistry } from '../runtime-root-registry'
+import { linkTestNodeModules } from './test-project-root'
 
 const FILE = 'src/app/(dev)/react-figma-components/Button.tsx'
 const SOURCE = `import type { EntityId } from '@/types'
@@ -20,7 +21,7 @@ async function setup() {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'g2-authoring-session-'))
   await fs.mkdir(path.dirname(path.join(root, FILE)), { recursive: true })
   await fs.mkdir(path.join(root, 'src'), { recursive: true })
-  await fs.symlink(path.resolve(process.cwd(), '../../..', 'node_modules'), path.join(root, 'node_modules'), 'dir')
+  await linkTestNodeModules(root)
   await fs.writeFile(path.join(root, 'src/types.ts'), 'export type EntityId = string\n')
   await fs.writeFile(path.join(root, 'tsconfig.json'), JSON.stringify({
     compilerOptions: {

@@ -9,6 +9,7 @@ import { stableId } from '../authoring-migrations'
 import { importProjectionToAuthoringGraph } from '../authoring-migrations'
 import { sha256 } from '../durable-file-installer'
 import { sourceProjectionFromSource } from '../source-projection'
+import { linkTestNodeModules } from './test-project-root'
 
 const FILE = 'src/app/(dev)/react-figma-components/Button.tsx'
 const compile = (input: Omit<Parameters<typeof compileG2VariantCommand>[0], 'projectRoot'>) =>
@@ -277,6 +278,22 @@ export function Button({ value }: Props<number>) { return <button>{value}</butto
     })).rejects.toMatchObject({ code: 'STAGED_TYPECHECK_FAILED', message: expect.stringContaining('TS2322') })
   })
 
+  it('refuses syntax errors in an exact ambient declaration instead of certifying only the component file', async () => {
+    const graph = await importedGraph()
+    const component = Object.values(graph.components)[0]!
+    const created = await compile({
+      graph,
+      source: SOURCE,
+      command: { kind: 'create-variant', commandId: 'ambient-source', componentId: component.id, displayName: 'New Variant' },
+    })
+    await expect(compile({
+      graph: created.graph,
+      source: created.sourcePatches[0]!.after,
+      dependencySources: { 'src/invalid-ambient.d.ts': 'type Broken =' },
+      command: { kind: 'move-variant', commandId: 'ambient-invalid', componentId: component.id, variantId: component.primaryVariantId, frame: { x: 1, y: 2, width: 3, height: 4 } },
+    })).rejects.toMatchObject({ code: 'STAGED_TYPECHECK_FAILED', message: expect.stringMatching(/TS\d+/) })
+  })
+
   it('uses the project tsconfig when resolving path aliases in staged source', async () => {
     const source = `import type { EntityId } from '@/app/api/dev/editor/authoring-types'
 export function Button({ id }: { id?: EntityId }) { return <button>{id}</button> }
@@ -304,7 +321,7 @@ export function Button({ id }: { id?: EntityId }) { return <button>{id}</button>
   it('uses the registered project root and exact dependency snapshot instead of process cwd', async () => {
     const projectRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'g2-relocated-typecheck-'))
     await fs.mkdir(path.join(projectRoot, 'src'), { recursive: true })
-    await fs.symlink(path.resolve(process.cwd(), '../../..', 'node_modules'), path.join(projectRoot, 'node_modules'), 'dir')
+    await linkTestNodeModules(projectRoot)
     await fs.writeFile(path.join(projectRoot, 'tsconfig.json'), JSON.stringify({
       compilerOptions: {
         strict: true, noEmit: true, target: 'ESNext', module: 'ESNext', moduleResolution: 'Bundler',

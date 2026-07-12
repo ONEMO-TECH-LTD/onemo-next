@@ -246,4 +246,27 @@ export function Button<T>({ variant }: Props<T>) { return <button /> }`,
     expect(array).toMatchObject({ compatibility: 'native-v1', variantAxes: [] })
     expect(objects).toMatchObject({ compatibility: 'native-v1', variantAxes: [] })
   })
+
+  it('resolves local alias chains, strips only nullish members, deduplicates values, and refuses alias cycles', async () => {
+    const project = (name: string, declarations: string, type: string) => sourceProjectionFromSource({
+      file: `${name}.tsx`,
+      source: `${declarations}\nexport function ${name}({ variant }: { variant?: ${type} }) { return <button>{variant}</button> }`,
+    })
+    const expectedAxis = { compatibility: 'legacy-single-axis', variantAxes: [{ axis: 'variant', values: ['Primary', 'Secondary'] }] }
+
+    await expect(project('DirectAxis', '', `'Primary' | 'Secondary'`)).resolves.toMatchObject(expectedAxis)
+    await expect(project('ParenthesizedAxis', '', `('Primary' | 'Secondary')`)).resolves.toMatchObject(expectedAxis)
+    await expect(project('AliasedAxis', `type Tone = 'Primary' | 'Secondary'`, 'Tone')).resolves.toMatchObject(expectedAxis)
+    await expect(project('AliasChainAxis', `type Tone = 'Primary' | 'Secondary'; type Alias = Tone`, 'Alias')).resolves.toMatchObject(expectedAxis)
+    await expect(project('NullableAxis', '', `'Primary' | undefined | 'Secondary' | null`)).resolves.toMatchObject(expectedAxis)
+    await expect(project('DuplicateAxis', '', `'Primary' | 'Primary' | 'Secondary'`)).resolves.toMatchObject(expectedAxis)
+
+    await expect(project('MixedAxis', '', `'Primary' | 'Secondary' | number`)).resolves.toMatchObject({ compatibility: 'native-v1', variantAxes: [] })
+    await expect(project('ContainerAxis', '', `ReadonlyArray<'Primary' | 'Secondary'>`)).resolves.toMatchObject({ compatibility: 'native-v1', variantAxes: [] })
+    await expect(project('ObjectAxis', '', `{ kind: 'Primary' } | { kind: 'Secondary' }`)).resolves.toMatchObject({ compatibility: 'native-v1', variantAxes: [] })
+    await expect(project('CyclicAxis', `type A = B; type B = A`, 'A')).resolves.toMatchObject({
+      compatibility: 'unsupported',
+      unsupportedReason: 'component prop type alias cycle: A -> B -> A',
+    })
+  })
 })
