@@ -94,3 +94,10 @@ Follow-up after the bounded import-reload protocol: the one permitted document r
 - Symptoms: the first run observed zero reloads and left the origin marker pending; the next two runs observed the one reload but the identity assertion raced the destroyed origin context.
 - What worked: the successful import explicitly triggers its one contract-permitted reload, and the E2E subscribes to the next `domcontentloaded` event before clicking Import, then asserts the new document identity and exact request count.
 - Remember: document-replacement proofs must arm the next-document event before the user action; a request event is earlier than navigation commit, and `waitForLoadState` is not a future-navigation subscription.
+
+## S58 projection-fingerprint formatting probe
+
+- What did not work: relying on TypeScript `Printer.printNode()` to canonicalize an original source node, then switching to a trivia-free scanner without first diffing every other normalized projection field; a shell `diff` pipeline subsequently closed stdout early and caused the diagnostic process to throw `EPIPE`.
+- Symptoms: semantically identical inline union types still produced different projection hashes after the first two attempts, while the shell diagnostic obscured the actual remaining field difference.
+- What worked: compare the two parsed projections recursively after applying the intended normalization and report exact differing property paths directly from one process.
+- Remember: projection fingerprint debugging must compare normalized semantic payloads field-by-field; do not infer the remaining mismatch from the final SHA or pipe large JSON through early-closing shell consumers.

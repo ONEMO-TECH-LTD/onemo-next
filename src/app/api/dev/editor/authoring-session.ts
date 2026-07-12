@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 
-import { assertStagedTypeScriptSemantics, compileG2VariantCommand, projectVariantRegistry, type CompilePlan } from './authoring-compiler'
+import { assertAcceptedSourceProjection, assertStagedTypeScriptSemantics, compileG2VariantCommand, projectVariantRegistry, type CompilePlan } from './authoring-compiler'
 import { parseG2VariantCommand, type G2VariantCommand } from './authoring-commands'
 import { AuthoringHistoryStore } from './authoring-history'
 import { readExactAuthoringSourceSnapshot } from './authoring-import'
@@ -127,6 +127,7 @@ export class ProjectAuthoringSession {
       Object.fromEntries(Object.entries(snapshot.sources).filter(([file]) => file !== definition.source.file)),
     )
     projectVariantRegistry(before, definition, snapshot.projection)
+    assertAcceptedSourceProjection(definition, snapshot.projection)
     const command = { kind: 'revalidate-source', file: input.file }
     const historyPatches = await this.history.planCommand({
       command,
@@ -187,6 +188,7 @@ export class ProjectAuthoringSession {
       Object.fromEntries(Object.entries(snapshot.sources).filter(([file]) => file !== definition.source.file)),
     )
     projectVariantRegistry(before, definition, snapshot.projection)
+    assertAcceptedSourceProjection(definition, snapshot.projection)
     const command = { kind: 'environment-rebase', file: input.file }
     const historyPatches = await this.history.planCommand({
       command,

@@ -17,6 +17,7 @@ export type AuthoringStoreOptions = {
 
 export class AuthoringSidecarStore {
   private readonly sidecarPath: string
+  private migration: Promise<void> | null = null
 
   constructor(private readonly options: AuthoringStoreOptions) {
     const registeredKind = options.registry.get(options.storeId).kind
@@ -35,6 +36,37 @@ export class AuthoringSidecarStore {
   }
 
   async loadSnapshot(): Promise<{ graph: AuthoringGraphV1; bytes: Buffer } | null> {
+    let raw = await this.loadRawSnapshot()
+    if (!raw) return null
+    if (graphVersion(raw.value) === 1) {
+      await this.migrateLegacySidecar()
+      raw = await this.loadRawSnapshot()
+      if (!raw) throw namedError('AUTHORING_MIGRATION_SOURCE_MISSING', 'sidecar disappeared after schema migration', 409)
+    }
+    return this.validateCurrentSnapshot(raw)
+  }
+
+  async loadCurrentSnapshot(): Promise<{ graph: AuthoringGraphV1; bytes: Buffer } | null> {
+    const raw = await this.loadRawSnapshot()
+    if (!raw) return null
+    if (graphVersion(raw.value) !== 2) {
+      throw namedError('AUTHORING_MIGRATION_REQUIRED', 'authoring sidecar requires schema migration before this transaction', 409)
+    }
+    return this.validateCurrentSnapshot(raw)
+  }
+
+  private validateCurrentSnapshot(raw: { value: unknown; bytes: Buffer }): { graph: AuthoringGraphV1; bytes: Buffer } {
+    const graph = assertAuthoringGraphV1(raw.value)
+    if (graph.storeId !== this.options.storeId) {
+      throw namedError('STORE_ID_MISMATCH', `sidecar storeId ${graph.storeId} does not match ${this.options.storeId}`, 409)
+    }
+    if (graph.root.kind !== this.options.rootKind) {
+      throw namedError('STORE_KIND_MISMATCH', `sidecar root kind ${graph.root.kind} does not match ${this.options.rootKind}`, 409)
+    }
+    return { graph, bytes: raw.bytes }
+  }
+
+  async loadRawSnapshot(): Promise<{ value: unknown; bytes: Buffer } | null> {
     const abs = await this.options.registry.resolveStorePath(this.options.storeId, this.sidecarPath)
     let bytes: Buffer
     try {
@@ -43,15 +75,7 @@ export class AuthoringSidecarStore {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
       throw error
     }
-    const parsed = JSON.parse(bytes.toString('utf8')) as unknown
-    const graph = assertAuthoringGraphV1(parsed)
-    if (graph.storeId !== this.options.storeId) {
-      throw namedError('STORE_ID_MISMATCH', `sidecar storeId ${graph.storeId} does not match ${this.options.storeId}`, 409)
-    }
-    if (graph.root.kind !== this.options.rootKind) {
-      throw namedError('STORE_KIND_MISMATCH', `sidecar root kind ${graph.root.kind} does not match ${this.options.rootKind}`, 409)
-    }
-    return { graph, bytes }
+    return { value: JSON.parse(bytes.toString('utf8')) as unknown, bytes }
   }
 
   async loadOrCreate(sourceFiles: string[] = []): Promise<AuthoringGraphV1> {
@@ -84,6 +108,19 @@ export class AuthoringSidecarStore {
       })
     }
   }
+
+  private async migrateLegacySidecar(): Promise<void> {
+    if (!this.migration) {
+      this.migration = import('./authoring-sidecar-migration')
+        .then(({ migrateAuthoringSidecarOnLoad }) => migrateAuthoringSidecarOnLoad({
+          storeId: this.options.storeId,
+          registry: this.options.registry,
+          store: this,
+        }))
+        .finally(() => { this.migration = null })
+    }
+    await this.migration
+  }
 }
 
 export function createEmptyAuthoringGraph(input: {
@@ -93,7 +130,7 @@ export function createEmptyAuthoringGraph(input: {
   environmentFingerprint?: string
 }): AuthoringGraphV1 {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     storeId: input.storeId,
     revision: 0,
     root: { kind: input.rootKind },
@@ -111,4 +148,10 @@ export function createEmptyAuthoringGraph(input: {
 
 function namedError(code: string, message: string, status: number) {
   return Object.assign(new Error(message), { status, code })
+}
+
+function graphVersion(value: unknown): unknown {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>).schemaVersion
+    : undefined
 }

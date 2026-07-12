@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { PROJECT_AUTHORING_SIDECAR } from '../editor/authoring-store'
 import { authoringMetadataPath } from '../editor/authoring-paths'
+import { sha256 } from '../editor/durable-file-installer'
 import { linkTestNodeModules } from '../editor/__tests__/test-project-root'
 import { handleGet, handlePost } from './handler'
 import { GET } from './route'
@@ -92,6 +93,185 @@ describe('editor-authoring G1 import route', () => {
     expect(directResponse.status).toBe(409)
     await expect(directResponse.json()).resolves.toMatchObject({ code: 'AUTHORING_GRAPH_MISSING' })
   })
+
+  it('transactionally migrates a V1 sidecar from exact current source before component load', async () => {
+    const root = await makeRoot()
+    const environmentFile = '.next/dev/types/routes.d.ts'
+    const environmentPath = path.join(root, environmentFile)
+    await fs.mkdir(path.dirname(environmentPath), { recursive: true })
+    const legacyEnvironmentBytes = 'declare type GeneratedRoute = "/legacy"\n'
+    await fs.writeFile(environmentPath, legacyEnvironmentBytes)
+    const tsconfigPath = path.join(root, 'tsconfig.json')
+    const tsconfig = JSON.parse(await fs.readFile(tsconfigPath, 'utf8'))
+    tsconfig.include.push('.next/dev/types/**/*.d.ts')
+    await fs.writeFile(tsconfigPath, JSON.stringify(tsconfig))
+    const classified = await (await handleGet(request('GET'), root)).json()
+    await handlePost(request('POST', {
+      kind: 'import-source', file: SOURCE_FILE, expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint,
+      transactionId: '00000000-0000-4000-8000-000000000005',
+    }), root)
+    let loaded = await (await handleGet(componentRequest(), root)).json()
+    const componentId = loaded.componentId as string
+    const secondary = Object.values(loaded.graph.variants as Record<string, { id: string; displayName: string }>)
+      .find((variant) => variant.displayName === 'Secondary')!
+    await handlePost(request('POST', {
+      kind: 'execute-command',
+      command: {
+        kind: 'move-variant', commandId: 'before-schema-migration-move', componentId,
+        variantId: secondary.id, frame: { x: 400, y: 20, width: 320, height: 180 },
+      },
+      expectedRevision: loaded.graph.revision,
+      expectedSourceHashes: loaded.sourceHashes,
+    }), root)
+    loaded = await (await handleGet(componentRequest(), root)).json()
+    await handlePost(request('POST', {
+      kind: 'execute-command',
+      command: { kind: 'create-variant', commandId: 'before-schema-migration-create', componentId, displayName: 'Created' },
+      expectedRevision: loaded.graph.revision,
+      expectedSourceHashes: loaded.sourceHashes,
+    }), root)
+    loaded = await (await handleGet(componentRequest(), root)).json()
+    await handlePost(request('POST', {
+      kind: 'undo', expectedRevision: loaded.graph.revision, expectedSourceHashes: loaded.sourceHashes,
+    }), root)
+    loaded = await (await handleGet(componentRequest(), root)).json()
+    await handlePost(request('POST', {
+      kind: 'execute-command',
+      command: { kind: 'create-variant', commandId: 'after-source-undo-create', componentId, displayName: 'After Undo' },
+      expectedRevision: loaded.graph.revision,
+      expectedSourceHashes: loaded.sourceHashes,
+    }), root)
+    const sourcePath = path.join(root, SOURCE_FILE)
+    const sourceBefore = await fs.readFile(sourcePath)
+    const sidecarPath = path.join(root, PROJECT_AUTHORING_SIDECAR)
+    const legacy = JSON.parse(await fs.readFile(sidecarPath, 'utf8')) as Record<string, unknown>
+    legacy.schemaVersion = 1
+    ;(legacy.sourceHashes as Record<string, string>)[environmentFile] = sha256(legacyEnvironmentBytes)
+    delete legacy.environmentFingerprint
+    for (const component of Object.values(legacy.components as Record<string, Record<string, unknown>>)) {
+      delete component.projectionFingerprint
+    }
+    await fs.writeFile(sidecarPath, JSON.stringify(legacy, null, 2) + '\n')
+    const journalPath = path.join(root, authoringMetadataPath('project', 'history/journal.ndjson'))
+    const journal = (await fs.readFile(journalPath, 'utf8')).trimEnd().split('\n').map((line) => JSON.parse(line))
+    for (const record of journal) {
+      if (record.type !== 'authoring-command') continue
+      const graphRef = record.graphPreimage as { sha256: string; path: string }
+      const graph = JSON.parse(await fs.readFile(path.join(root, graphRef.path), 'utf8')) as Record<string, unknown>
+      graph.schemaVersion = 1
+      for (const component of Object.values(graph.components as Record<string, Record<string, unknown>>)) {
+        delete component.projectionFingerprint
+      }
+      ;(graph.sourceHashes as Record<string, string>)[environmentFile] = sha256(legacyEnvironmentBytes)
+      delete graph.environmentFingerprint
+      const graphBytes = Buffer.from(JSON.stringify(graph, null, 2) + '\n')
+      const graphHash = sha256(graphBytes)
+      const graphPath = authoringMetadataPath('project', `history/blobs/${graphHash}`)
+      await fs.writeFile(path.join(root, graphPath), graphBytes)
+      record.graphPreimage = { sha256: graphHash, path: graphPath }
+    }
+    await fs.writeFile(journalPath, journal.map((record) => JSON.stringify(record)).join('\n') + '\n')
+    const transactionsPath = path.join(root, authoringMetadataPath('project', 'transactions'))
+    const transactionsBefore = await fs.readdir(transactionsPath)
+    await fs.writeFile(environmentPath, 'declare type GeneratedRoute = "/current"\n')
+
+    const response = await handleGet(componentRequest(), root)
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ graph: { schemaVersion: 2, revision: 6 } })
+    await expect(fs.readFile(sourcePath)).resolves.toEqual(sourceBefore)
+    const persisted = JSON.parse(await fs.readFile(sidecarPath, 'utf8'))
+    expect(persisted).toMatchObject({ schemaVersion: 2, revision: 6 })
+    expect(persisted.sourceHashes).not.toHaveProperty(environmentFile)
+    expect(persisted.environmentFingerprint).toMatch(/^[a-f0-9]{64}$/)
+    expect(Object.values(persisted.components)[0]).toMatchObject({ projectionFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/) })
+    expect(await fs.readdir(transactionsPath)).toHaveLength(transactionsBefore.length + 1)
+    const migratedJournal = (await fs.readFile(journalPath, 'utf8')).trimEnd().split('\n').map((line) => JSON.parse(line))
+    expect(migratedJournal.at(-1)?.command).toEqual({ kind: 'schema-migration', from: 1, to: 2 })
+    for (const record of migratedJournal) {
+      if (record.type !== 'authoring-command') continue
+      await expect(fs.readFile(path.join(root, record.graphPreimage.path), 'utf8').then(JSON.parse))
+        .resolves.toMatchObject({ schemaVersion: 2 })
+    }
+    const migrated = await (await handleGet(componentRequest(), root)).json()
+    expect(migrated.canUndo).toBe(true)
+    const undo = await handlePost(request('POST', {
+      kind: 'undo', expectedRevision: migrated.graph.revision, expectedSourceHashes: migrated.sourceHashes,
+    }), root)
+    expect(undo.status).toBe(200)
+    await expect(undo.json()).resolves.toMatchObject({
+      undoneCommand: { kind: 'create-variant', commandId: 'after-source-undo-create' },
+      graph: { revision: 7 },
+    })
+  }, 20_000)
+
+  it('refuses V1 migration without rewriting sidecar evidence when tracked source drifted', async () => {
+    const root = await makeRoot()
+    const classified = await (await handleGet(request('GET'), root)).json()
+    await handlePost(request('POST', {
+      kind: 'import-source', file: SOURCE_FILE, expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint,
+      transactionId: '00000000-0000-4000-8000-000000000006',
+    }), root)
+    const sidecarPath = path.join(root, PROJECT_AUTHORING_SIDECAR)
+    const legacy = JSON.parse(await fs.readFile(sidecarPath, 'utf8')) as Record<string, unknown>
+    legacy.schemaVersion = 1
+    for (const component of Object.values(legacy.components as Record<string, Record<string, unknown>>)) {
+      delete component.projectionFingerprint
+    }
+    const legacyBytes = Buffer.from(JSON.stringify(legacy, null, 2) + '\n')
+    await fs.writeFile(sidecarPath, legacyBytes)
+    await fs.appendFile(path.join(root, SOURCE_FILE), '\n// external drift\n')
+    const transactionsPath = path.join(root, authoringMetadataPath('project', 'transactions'))
+    const transactionsBefore = (await fs.readdir(transactionsPath)).sort()
+
+    const response = await handleGet(componentRequest(), root)
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({ code: 'AUTHORING_MIGRATION_SOURCE_STALE' })
+    await expect(fs.readFile(sidecarPath)).resolves.toEqual(legacyBytes)
+    expect((await fs.readdir(transactionsPath)).sort()).toEqual(transactionsBefore)
+  }, 20_000)
+
+  it('refuses invalid ambient regeneration during V1 migration without durable writes', async () => {
+    const root = await makeRoot()
+    const environmentFile = '.next/dev/types/routes.d.ts'
+    const environmentPath = path.join(root, environmentFile)
+    await fs.mkdir(path.dirname(environmentPath), { recursive: true })
+    const legacyEnvironmentBytes = 'declare type GeneratedRoute = "/legacy"\n'
+    await fs.writeFile(environmentPath, legacyEnvironmentBytes)
+    const tsconfigPath = path.join(root, 'tsconfig.json')
+    const tsconfig = JSON.parse(await fs.readFile(tsconfigPath, 'utf8'))
+    tsconfig.include.push('.next/dev/types/**/*.d.ts')
+    await fs.writeFile(tsconfigPath, JSON.stringify(tsconfig))
+    const classified = await (await handleGet(request('GET'), root)).json()
+    await handlePost(request('POST', {
+      kind: 'import-source', file: SOURCE_FILE, expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint,
+      transactionId: '00000000-0000-4000-8000-000000000007',
+    }), root)
+    const sidecarPath = path.join(root, PROJECT_AUTHORING_SIDECAR)
+    const legacy = JSON.parse(await fs.readFile(sidecarPath, 'utf8')) as Record<string, unknown>
+    legacy.schemaVersion = 1
+    ;(legacy.sourceHashes as Record<string, string>)[environmentFile] = sha256(legacyEnvironmentBytes)
+    delete legacy.environmentFingerprint
+    for (const component of Object.values(legacy.components as Record<string, Record<string, unknown>>)) {
+      delete component.projectionFingerprint
+    }
+    const legacyBytes = Buffer.from(JSON.stringify(legacy, null, 2) + '\n')
+    await fs.writeFile(sidecarPath, legacyBytes)
+    await fs.writeFile(environmentPath, 'type Broken =\n')
+    const transactionsPath = path.join(root, authoringMetadataPath('project', 'transactions'))
+    const transactionsBefore = (await fs.readdir(transactionsPath)).sort()
+
+    const response = await handleGet(componentRequest(), root)
+
+    expect(response.status).toBe(422)
+    await expect(response.json()).resolves.toMatchObject({ code: 'STAGED_TYPECHECK_FAILED' })
+    await expect(fs.readFile(sidecarPath)).resolves.toEqual(legacyBytes)
+    expect((await fs.readdir(transactionsPath)).sort()).toEqual(transactionsBefore)
+  }, 20_000)
 
   it('revalidates changed source authority without hiding the latest variant undo', async () => {
     const root = await makeRoot()
@@ -283,6 +463,71 @@ describe('editor-authoring G1 import route', () => {
     await expect(fs.readFile(sidecarPath)).resolves.toEqual(beforeSidecar)
     await expect(fs.readFile(journalPath)).resolves.toEqual(beforeJournal)
     expect((await fs.readdir(transactionsPath)).sort()).toEqual(beforeTransactions)
+  }, 20_000)
+
+  it('refuses type-valid structural drift before sidecar, history, or transaction writes', async () => {
+    const root = await makeRoot()
+    const classified = await (await handleGet(request('GET'), root)).json()
+    await handlePost(request('POST', {
+      kind: 'import-source', file: SOURCE_FILE, expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint,
+      transactionId: '00000000-0000-4000-8000-000000000003',
+    }), root)
+    const sourcePath = path.join(root, SOURCE_FILE)
+    const changedSource = singleAxisSource.replace(
+      'return <button>{variant}</button>',
+      'return <section><button>{variant}</button></section>',
+    )
+    await fs.writeFile(sourcePath, changedSource)
+    const stale = await (await handleGet(componentStatusRequest(), root)).json()
+    expect(stale).toMatchObject({ authoringState: 'source-stale', expectedRevision: 1 })
+    const sidecarPath = path.join(root, PROJECT_AUTHORING_SIDECAR)
+    const journalPath = path.join(root, authoringMetadataPath('project', 'history/journal.ndjson'))
+    const transactionsPath = path.join(root, authoringMetadataPath('project', 'transactions'))
+    const beforeSidecar = await fs.readFile(sidecarPath)
+    const beforeJournal = await fs.readFile(journalPath)
+    const beforeTransactions = (await fs.readdir(transactionsPath)).sort()
+
+    const response = await handlePost(request('POST', {
+      kind: 'revalidate-source', file: SOURCE_FILE,
+      expectedRevision: stale.expectedRevision,
+      expectedSourceHashes: stale.sourceHashes,
+    }), root)
+
+    expect(response.status).toBe(422)
+    await expect(response.json()).resolves.toMatchObject({ code: 'SOURCE_PROJECTION_DRIFT' })
+    await expect(fs.readFile(sourcePath, 'utf8')).resolves.toBe(changedSource)
+    await expect(fs.readFile(sidecarPath)).resolves.toEqual(beforeSidecar)
+    await expect(fs.readFile(journalPath)).resolves.toEqual(beforeJournal)
+    expect((await fs.readdir(transactionsPath)).sort()).toEqual(beforeTransactions)
+  }, 20_000)
+
+  it('accepts formatting-only source drift while preserving the accepted projection', async () => {
+    const root = await makeRoot()
+    const classified = await (await handleGet(request('GET'), root)).json()
+    await handlePost(request('POST', {
+      kind: 'import-source', file: SOURCE_FILE, expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint,
+      transactionId: '00000000-0000-4000-8000-000000000004',
+    }), root)
+    const sourcePath = path.join(root, SOURCE_FILE)
+    const formattedSource = singleAxisSource.replace(
+      'return <button>{variant}</button>',
+      'return (\n    <button>\n      {variant}\n    </button>\n  )',
+    )
+    await fs.writeFile(sourcePath, formattedSource)
+    const stale = await (await handleGet(componentStatusRequest(), root)).json()
+    expect(stale).toMatchObject({ authoringState: 'source-stale', expectedRevision: 1 })
+
+    const response = await handlePost(request('POST', {
+      kind: 'revalidate-source', file: SOURCE_FILE,
+      expectedRevision: stale.expectedRevision,
+      expectedSourceHashes: stale.sourceHashes,
+    }), root)
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ kind: 'revalidated', graph: { revision: 2 } })
+    await expect(fs.readFile(sourcePath, 'utf8')).resolves.toBe(formattedSource)
   }, 20_000)
 
   it('rejects malformed and extra request fields before filesystem access', async () => {

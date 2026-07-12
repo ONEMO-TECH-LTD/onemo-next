@@ -46,6 +46,8 @@
     "paper": "^0.12.18",
     "paperjs-round-corners": "^0.0.10",
     "pikaicons": "^0.0.5",
+    "postcss-selector-parser": "^7.1.4",
+    "postcss-value-parser": "^4.2.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "three": "^0.183.2",

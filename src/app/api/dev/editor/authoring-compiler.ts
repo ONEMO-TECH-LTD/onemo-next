@@ -6,7 +6,7 @@ import { stableId } from './authoring-migrations'
 import { assertAuthoringGraphV1, isStoreRelativePath } from './authoring-schema'
 import type { G2VariantCommand } from './authoring-commands'
 import type { AuthoringGraphV1, ComponentDefinition, VariantFrame } from './authoring-types'
-import { sourceProjectionFromSource, type SourceProjection } from './source-projection'
+import { sourceProjectionFingerprint, sourceProjectionFromSource, type SourceProjection } from './source-projection'
 
 export type CompilePlan = {
   command: G2VariantCommand
@@ -36,6 +36,7 @@ export async function compileG2VariantCommand(input: {
   if (beforeProjection.exportName !== component.source.exportName) {
     throw namedError('COMPONENT_EXPORT_MISMATCH', `expected export ${component.source.exportName}, found ${beforeProjection.exportName}`, 422)
   }
+  assertAcceptedSourceProjection(component, beforeProjection)
   const beforeTypechecked = beforeProjection.nativeVariants.length > 0
   if (beforeTypechecked) assertStagedTypeScriptSemantics(component.source.file, input.source, input.projectRoot, input.compilerOptions, input.dependencySources)
 
@@ -110,6 +111,11 @@ function checkedPlan(
   sourcePatches: CompilePlan['sourcePatches'],
   typechecked: boolean,
 ): CompilePlan {
+  const component = nextGraph.components[command.componentId]!
+  nextGraph.components[command.componentId] = {
+    ...component,
+    projectionFingerprint: sourceProjectionFingerprint(afterProjection),
+  }
   const graph = assertAuthoringGraphV1({ ...nextGraph, revision: beforeGraph.revision })
   return {
     command,
@@ -125,6 +131,11 @@ function checkedPlan(
       ...(command.kind === 'move-variant' ? [{ kind: 'geometry-sidecar-only' as const, status: 'passed' as const }] : []),
     ],
   }
+}
+
+export function assertAcceptedSourceProjection(component: ComponentDefinition, projection: SourceProjection): void {
+  if (component.projectionFingerprint === sourceProjectionFingerprint(projection)) return
+  throw namedError('SOURCE_PROJECTION_DRIFT', 'current source projection differs from the accepted authoring baseline', 422)
 }
 
 export function projectVariantRegistry(
@@ -251,7 +262,7 @@ function writeRegistry(
     throw namedError('COMPONENT_EXPORT_INVALID', `unsupported component export: ${exportName}`, 422)
   }
   const entries = variants.map(({ id, props }) => {
-    const sortedProps = Object.fromEntries(Object.entries(props).sort(([a], [b]) => a.localeCompare(b)))
+    const sortedProps = Object.fromEntries(Object.entries(props).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0))
     return `  ${JSON.stringify(id)}: ${JSON.stringify(sortedProps)},`
   }).join('\n')
   const registry = `export const __onemoVariantRegistry = {\n${entries}\n} as const satisfies Record<string, Partial<React.ComponentProps<typeof ${exportName}>>>`

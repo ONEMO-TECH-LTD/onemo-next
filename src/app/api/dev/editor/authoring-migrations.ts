@@ -4,11 +4,47 @@ import { assertAuthoringGraphV1, isSha256 } from './authoring-schema'
 import type { AuthoringGraphV1, StoreId } from './authoring-types'
 import { createEmptyAuthoringGraph } from './authoring-store'
 import type { SourceProjection } from './source-projection'
+import { sourceProjectionFingerprint } from './source-projection'
 
 export type ProjectionImportResult =
   | { kind: 'imported'; graph: AuthoringGraphV1 }
   | { kind: 'hold'; compatibility: 'legacy-multi-axis'; reason: string }
   | { kind: 'unsupported'; reason: string }
+
+export function migrateAuthoringGraphV1(input: {
+  graph: unknown
+  projectionFingerprints: Record<string, string>
+  sourceHashes?: Record<string, string>
+  environmentFingerprint?: string
+}): AuthoringGraphV1 {
+  if (!isRecord(input.graph) || input.graph.schemaVersion !== 1) {
+    throw namedError('AUTHORING_MIGRATION_INPUT_INVALID', 'expected an AuthoringGraph schemaVersion 1 graph')
+  }
+  const graph = input.graph
+  if (!isRecord(graph.components)) {
+    throw namedError('AUTHORING_MIGRATION_INPUT_INVALID', 'legacy components must be an object record')
+  }
+  const componentsInput = graph.components
+  const componentIds = Object.keys(componentsInput).sort()
+  const fingerprintIds = Object.keys(input.projectionFingerprints).sort()
+  if (JSON.stringify(componentIds) !== JSON.stringify(fingerprintIds) || fingerprintIds.some((id) => !isSha256(input.projectionFingerprints[id]))) {
+    throw namedError('AUTHORING_MIGRATION_PROJECTION_REQUIRED', 'every migrated component requires one exact projection fingerprint')
+  }
+  const components = Object.fromEntries(componentIds.map((id) => {
+    const component = componentsInput[id]
+    if (!isRecord(component) || Object.hasOwn(component, 'projectionFingerprint')) {
+      throw namedError('AUTHORING_MIGRATION_INPUT_INVALID', `legacy component shape is invalid: ${id}`)
+    }
+    return [id, { ...component, projectionFingerprint: input.projectionFingerprints[id] }]
+  }))
+  return assertAuthoringGraphV1({
+    ...graph,
+    schemaVersion: 2,
+    components,
+    ...(input.sourceHashes ? { sourceHashes: input.sourceHashes } : {}),
+    ...(input.environmentFingerprint ? { environmentFingerprint: input.environmentFingerprint } : {}),
+  })
+}
 
 export function importProjectionToAuthoringGraph(input: {
   storeId: StoreId
@@ -49,6 +85,7 @@ export function importProjectionToAuthoringGraph(input: {
     id: componentId,
     displayName: projection.exportName,
     source: { storeId, file: projection.file, exportName: projection.exportName },
+    projectionFingerprint: sourceProjectionFingerprint(projection),
     primaryVariantId,
     folderId: null,
     compatibility: projection.compatibility,
@@ -82,4 +119,12 @@ function importableVariantValues(projection: SourceProjection): string[] | null 
 
 export function stableId(prefix: string, ...parts: string[]): string {
   return `${prefix}_${createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 16)}`
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function namedError(code: string, message: string): Error {
+  return Object.assign(new Error(message), { code, status: 422 })
 }

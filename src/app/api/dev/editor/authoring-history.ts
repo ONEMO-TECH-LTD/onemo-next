@@ -91,6 +91,47 @@ export class AuthoringHistoryStore {
     return [...patches.values()]
   }
 
+  async planSchemaMigration(input: {
+    command: { kind: 'schema-migration'; from: 1; to: 2 }
+    sourceFiles: string[]
+    graphPreimage: Buffer
+    revision: number
+    migrateGraphPreimage: (record: AuthoringCommandHistoryRecord, bytes: string) => Promise<string>
+    rewindUndo: (record: AuthoringUndoHistoryRecord) => Promise<void>
+  }): Promise<PlannedHistoryPatch[]> {
+    const patches = new Map<string, PlannedHistoryPatch>()
+    const snapshot = await this.readJournalSnapshot()
+    const migrated = snapshot.entries.map((entry) => entry.record)
+    for (let index = snapshot.entries.length - 1; index >= 0; index--) {
+      const entry = snapshot.entries[index]!
+      if (entry.record.type === 'authoring-undo') {
+        await input.rewindUndo(entry.record)
+        continue
+      }
+      const bytes = await this.readBlob(entry.record.graphPreimage)
+      const graphPreimage = await this.planBlob(await input.migrateGraphPreimage(entry.record, bytes), patches)
+      migrated[index] = { ...entry.record, graphPreimage }
+    }
+    const graphPreimage = await this.planBlob(input.graphPreimage, patches)
+    const next = assertHistoryRecord({
+      type: 'authoring-command',
+      command: input.command,
+      sourceFiles: input.sourceFiles,
+      sourcePatches: [],
+      preimages: [],
+      graphPreimage,
+      revision: input.revision,
+    }, this.registry.get(this.storeId).kind, migrated.length)
+    const expectedRevision = (migrated.at(-1)?.revision ?? 0) + 1
+    if (next.revision !== expectedRevision) {
+      throw namedError('HISTORY_REVISION_STALE', `history append revision ${next.revision} does not match next revision ${expectedRevision}`)
+    }
+    const rel = this.historyPath('journal.ndjson')
+    const after = Buffer.from([...migrated, next].map((record) => JSON.stringify(record)).join('\n') + '\n')
+    patches.set(rel, { file: rel, before: snapshot.bytes, after })
+    return [...patches.values()]
+  }
+
   async readBlob(ref: HistoryBlobRef): Promise<string> {
     const validated = assertHistoryBlobRef(
       { sha256: ref.sha256, path: ref.path },

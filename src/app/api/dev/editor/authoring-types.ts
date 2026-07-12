@@ -6,7 +6,7 @@ export type Sha256 = string
 export type RootKind = 'project' | 'global'
 
 export type AuthoringGraphV1 = {
-  schemaVersion: 1
+  schemaVersion: 2
   storeId: StoreId
   revision: number
   root: { kind: RootKind }
@@ -45,6 +45,7 @@ export type ComponentDefinition = {
   id: EntityId
   displayName: string
   source: SourceRef
+  projectionFingerprint: Sha256
   primaryVariantId: EntityId
   folderId: EntityId | null
   compatibility: 'native-v1' | 'legacy-single-axis' | 'legacy-multi-axis' | 'unsupported'

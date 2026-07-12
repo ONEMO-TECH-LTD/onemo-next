@@ -7,7 +7,8 @@ export function isGeneratedCompilerEnvironmentFile(file: string): boolean {
 }
 
 export function compilerEnvironmentFingerprint(hashes: Record<string, string>): string {
-  return sha256(Buffer.from(JSON.stringify(Object.entries(hashes).sort(([left], [right]) => left.localeCompare(right)))))
+  return sha256(Buffer.from(JSON.stringify(Object.entries(hashes).sort(([left], [right]) =>
+    left < right ? -1 : left > right ? 1 : 0))))
 }
 
 export const EMPTY_ENVIRONMENT_FINGERPRINT = compilerEnvironmentFingerprint({})

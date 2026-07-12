@@ -4,7 +4,8 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { AuthoringSidecarStore, PROJECT_AUTHORING_SIDECAR } from '../authoring-store'
+import { AuthoringSidecarStore, createEmptyAuthoringGraph, PROJECT_AUTHORING_SIDECAR } from '../authoring-store'
+import { authoringMetadataPath } from '../authoring-paths'
 import { SingleRootAuthoringTransaction } from '../authoring-transaction'
 import { RuntimeRootRegistry } from '../runtime-root-registry'
 
@@ -27,6 +28,39 @@ async function makeStore() {
 }
 
 describe('AuthoringSidecarStore', () => {
+  it('migrates a V1 sidecar through the transaction boundary on direct load', async () => {
+    const { root, store } = await makeStore()
+    const legacy = { ...createEmptyAuthoringGraph({ storeId: 'project-main', rootKind: 'project' }), schemaVersion: 1 }
+    const sidecarPath = path.join(root, PROJECT_AUTHORING_SIDECAR)
+    await fs.mkdir(path.dirname(sidecarPath), { recursive: true })
+    await fs.writeFile(sidecarPath, JSON.stringify(legacy, null, 2) + '\n')
+
+    const graph = await store.load()
+
+    expect(graph).toMatchObject({ schemaVersion: 2, revision: 1 })
+    const transactions = await fs.readdir(path.join(root, authoringMetadataPath('project', 'transactions')))
+    expect(transactions).toHaveLength(1)
+  })
+
+  it('keeps transaction reads lock-first and named-refuses V1 until the explicit load migration runs', async () => {
+    const { root, registry, store, tx } = await makeStore()
+    const legacy = { ...createEmptyAuthoringGraph({ storeId: 'project-main', rootKind: 'project' }), schemaVersion: 1 }
+    const sidecarPath = path.join(root, PROJECT_AUTHORING_SIDECAR)
+    await fs.mkdir(path.dirname(sidecarPath), { recursive: true })
+    const legacyBytes = Buffer.from(JSON.stringify(legacy, null, 2) + '\n')
+    await fs.writeFile(sidecarPath, legacyBytes)
+
+    await expect(tx.commit({ expectedRevision: 0, mutate: (draft) => draft }))
+      .rejects.toMatchObject({ code: 'AUTHORING_MIGRATION_REQUIRED', status: 409 })
+    await expect(fs.readFile(sidecarPath)).resolves.toEqual(legacyBytes)
+
+    expect((await store.load())?.revision).toBe(1)
+    const committed = await new SingleRootAuthoringTransaction({
+      transactionId: 'store-test-after-migration', storeId: 'project-main', registry, store,
+    }).commit({ expectedRevision: 1, mutate: (draft) => draft })
+    expect(committed.revision).toBe(2)
+  })
+
   it('commits a project-root sidecar with revision and exact source hashes', async () => {
     const { root, store, tx } = await makeStore()
 
@@ -42,7 +76,7 @@ describe('AuthoringSidecarStore', () => {
     const raw = await fs.readFile(path.join(root, PROJECT_AUTHORING_SIDECAR), 'utf8')
     expect(raw).not.toContain(root)
     expect(JSON.parse(raw)).toMatchObject({
-      schemaVersion: 1,
+      schemaVersion: 2,
       storeId: 'project-main',
       root: { kind: 'project' },
       revision: 1,

@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { importProjectionToAuthoringGraph } from '../authoring-migrations'
+import { importProjectionToAuthoringGraph, migrateAuthoringGraphV1 } from '../authoring-migrations'
 import { EMPTY_ENVIRONMENT_FINGERPRINT } from '../authoring-environment'
 import { assertAuthoringGraphV1 } from '../authoring-schema'
 import { sha256 } from '../durable-file-installer'
 import type { SourceProjection } from '../source-projection'
+import { sourceProjectionFingerprint } from '../source-projection'
 
 const SOURCE_HASH = sha256('exact source bytes')
 const SOURCE_FILE = 'src/app/(dev)/react-figma-components/Button.tsx'
@@ -32,6 +33,40 @@ function singleAxis(values: string[], defaultValue: string): SourceProjection {
 }
 
 describe('importProjectionToAuthoringGraph', () => {
+  it('migrates a validated V1 graph only with an exact re-derived component projection fingerprint', () => {
+    const projection = singleAxis(['primary', 'secondary'], 'primary')
+    const imported = importProjectionToAuthoringGraph({
+      storeId: 'project-main', projection, sourceHashes: sourceHashes(), environmentFingerprint: EMPTY_ENVIRONMENT_FINGERPRINT,
+    })
+    if (imported.kind !== 'imported') throw new Error(`expected imported graph, received ${imported.kind}`)
+    const component = Object.values(imported.graph.components)[0]!
+    const legacy = structuredClone(imported.graph) as unknown as Record<string, unknown>
+    legacy.schemaVersion = 1
+    delete (legacy.components as Record<string, Record<string, unknown>>)[component.id]!.projectionFingerprint
+
+    expect(migrateAuthoringGraphV1({
+      graph: legacy,
+      projectionFingerprints: { [component.id]: sourceProjectionFingerprint(projection) },
+    })).toEqual(imported.graph)
+  })
+
+  it('refuses V1 migration when an exact component projection fingerprint is unavailable or malformed', () => {
+    const projection = singleAxis(['primary', 'secondary'], 'primary')
+    const imported = importProjectionToAuthoringGraph({
+      storeId: 'project-main', projection, sourceHashes: sourceHashes(), environmentFingerprint: EMPTY_ENVIRONMENT_FINGERPRINT,
+    })
+    if (imported.kind !== 'imported') throw new Error(`expected imported graph, received ${imported.kind}`)
+    const component = Object.values(imported.graph.components)[0]!
+    const legacy = structuredClone(imported.graph) as unknown as Record<string, unknown>
+    legacy.schemaVersion = 1
+    delete (legacy.components as Record<string, Record<string, unknown>>)[component.id]!.projectionFingerprint
+
+    expect(() => migrateAuthoringGraphV1({ graph: legacy, projectionFingerprints: {} }))
+      .toThrow(expect.objectContaining({ code: 'AUTHORING_MIGRATION_PROJECTION_REQUIRED' }))
+    expect(() => migrateAuthoringGraphV1({ graph: legacy, projectionFingerprints: { [component.id]: 'not-a-hash' } }))
+      .toThrow(expect.objectContaining({ code: 'AUTHORING_MIGRATION_PROJECTION_REQUIRED' }))
+  })
+
   it('imports every clean single-axis value into a canonical hashed graph', () => {
     const result = importProjectionToAuthoringGraph({
       storeId: 'project-main',

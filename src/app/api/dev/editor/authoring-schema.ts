@@ -43,7 +43,7 @@ export function validateAuthoringGraphV1(input: unknown): ValidationResult {
     if (!GRAPH_KEYS.has(key)) errors.push(`unknown top-level key: ${key}`)
   }
 
-  if (input.schemaVersion !== 1) errors.push('schemaVersion must be 1')
+  if (input.schemaVersion !== 2) errors.push('schemaVersion must be 2')
   if (!isNonEmptyString(input.storeId)) errors.push('storeId must be a non-empty string')
   if (typeof input.revision !== 'number' || !Number.isSafeInteger(input.revision) || input.revision < 0) {
     errors.push('revision must be a non-negative safe integer')
@@ -179,9 +179,10 @@ function validateComponents(value: unknown, errors: string[]) {
       errors.push(`components.${id} must be an object`)
       continue
     }
-    validateExactKeys(`components.${id}`, component, ['id', 'displayName', 'source', 'primaryVariantId', 'folderId', 'compatibility'], errors)
+    validateExactKeys(`components.${id}`, component, ['id', 'displayName', 'source', 'projectionFingerprint', 'primaryVariantId', 'folderId', 'compatibility'], errors)
     if (!isNonEmptyString(component.displayName)) errors.push(`components.${id}.displayName must be a non-empty string`)
     validateSourceRef(`components.${id}.source`, component.source, errors)
+    if (!isSha256(component.projectionFingerprint)) errors.push(`components.${id}.projectionFingerprint must be sha256`)
     if (!isNonEmptyString(component.primaryVariantId)) errors.push(`components.${id}.primaryVariantId must be a non-empty string`)
     if (component.folderId !== null && !isNonEmptyString(component.folderId)) errors.push(`components.${id}.folderId must be null or a non-empty string`)
     if (!compatibility.has(String(component.compatibility))) errors.push(`components.${id}.compatibility is invalid`)

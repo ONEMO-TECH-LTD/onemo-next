@@ -10,7 +10,8 @@ import { EMPTY_ENVIRONMENT_FINGERPRINT } from '../authoring-environment'
 import { stableId } from '../authoring-migrations'
 import { importProjectionToAuthoringGraph } from '../authoring-migrations'
 import { sha256 } from '../durable-file-installer'
-import { sourceProjectionFromSource } from '../source-projection'
+import { sourceProjectionFingerprint, sourceProjectionFromSource } from '../source-projection'
+import type { AuthoringGraphV1 } from '../authoring-types'
 import { linkTestNodeModules } from './test-project-root'
 
 const FILE = 'src/app/(dev)/react-figma-components/Button.tsx'
@@ -41,6 +42,22 @@ async function importedGraph() {
   })
   if (result.kind !== 'imported') throw new Error(`expected imported graph, received ${result.kind}`)
   return result.graph
+}
+
+async function acceptedGraphForSource(graph: AuthoringGraphV1, componentId: string, source: string): Promise<AuthoringGraphV1> {
+  const projection = await sourceProjectionFromSource({ file: FILE, source })
+  const component = graph.components[componentId]!
+  return {
+    ...graph,
+    components: {
+      ...graph.components,
+      [componentId]: {
+        ...component,
+        compatibility: 'native-v1',
+        projectionFingerprint: sourceProjectionFingerprint(projection),
+      },
+    },
+  }
 }
 
 describe('G2 native variant compiler', () => {
@@ -249,7 +266,7 @@ describe('G2 native variant compiler', () => {
     const source = `${SOURCE}\nexport const __onemoVariantRegistry = {\n  "variant_0000000000000000": {},\n} as const\n`
 
     await expect(compile({
-      graph: { ...graph, components: { ...graph.components, [component.id]: { ...component, compatibility: 'native-v1' } } },
+      graph: await acceptedGraphForSource(graph, component.id, source),
       source,
       command: {
         kind: 'rename-variant',
@@ -270,7 +287,7 @@ describe('G2 native variant compiler', () => {
     const validId = validComponent.primaryVariantId
     const validSource = `${validBase}\nexport const __onemoVariantRegistry = { "${validId}": { value: 1 } } as const satisfies Record<string, Partial<React.ComponentProps<typeof Button>>>\n`
     await expect(compile({
-      graph: { ...validImport.graph, components: { ...validImport.graph.components, [validComponent.id]: { ...validComponent, compatibility: 'native-v1' } } },
+      graph: await acceptedGraphForSource(validImport.graph, validComponent.id, validSource),
       source: validSource,
       command: { kind: 'move-variant', commandId: 'type-valid', componentId: validComponent.id, variantId: validId, frame: { x: 1, y: 2, width: 3, height: 4 } },
     })).resolves.toMatchObject({ verifiedAssertions: expect.arrayContaining([{ kind: 'geometry-sidecar-only', status: 'passed' }]) })
@@ -285,7 +302,7 @@ export function Button({ value }: Props<number>) { return <button>{value}</butto
     const invalidId = invalidComponent.primaryVariantId
     const invalidSource = `${invalidBase}\nexport const __onemoVariantRegistry = { "${invalidId}": { value: "wrong" } } as const satisfies Record<string, Partial<React.ComponentProps<typeof Button>>>\n`
     await expect(compile({
-      graph: { ...invalidImport.graph, components: { ...invalidImport.graph.components, [invalidComponent.id]: { ...invalidComponent, compatibility: 'native-v1' } } },
+      graph: await acceptedGraphForSource(invalidImport.graph, invalidComponent.id, invalidSource),
       source: invalidSource,
       command: { kind: 'move-variant', commandId: 'type-invalid', componentId: invalidComponent.id, variantId: invalidId, frame: { x: 1, y: 2, width: 3, height: 4 } },
     })).rejects.toMatchObject({ code: 'STAGED_TYPECHECK_FAILED', message: expect.stringContaining('TS2322') })
@@ -320,7 +337,7 @@ export function Button({ id }: { id?: EntityId }) { return <button>{id}</button>
     const registrySource = `${source}\nexport const __onemoVariantRegistry = { "${component.primaryVariantId}": { id: "component_test" } } as const satisfies Record<string, Partial<React.ComponentProps<typeof Button>>>\n`
 
     await expect(compile({
-      graph: { ...imported.graph, components: { ...imported.graph.components, [component.id]: { ...component, compatibility: 'native-v1' } } },
+      graph: await acceptedGraphForSource(imported.graph, component.id, registrySource),
       source: registrySource,
       dependencySources: {
         'src/app/api/dev/editor/authoring-types.ts': await fs.readFile(path.join(process.cwd(), 'src/app/api/dev/editor/authoring-types.ts'), 'utf8'),
@@ -355,7 +372,7 @@ export function Button({ tone }: { tone?: Tone }) { return <button>{tone}</butto
     const command = { kind: 'move-variant' as const, commandId: 'relocated-valid', componentId: component.id, variantId: component.primaryVariantId, frame: { x: 1, y: 2, width: 3, height: 4 } }
 
     await expect(compileG2VariantCommand({
-      graph: { ...imported.graph, components: { ...imported.graph.components, [component.id]: { ...component, compatibility: 'native-v1' } } },
+      graph: await acceptedGraphForSource(imported.graph, component.id, registrySource),
       source: registrySource,
       projectRoot,
       compilerOptions: {
@@ -367,7 +384,7 @@ export function Button({ tone }: { tone?: Tone }) { return <button>{tone}</butto
     })).rejects.toThrow(/TS2307/)
 
     await expect(compileG2VariantCommand({
-      graph: { ...imported.graph, components: { ...imported.graph.components, [component.id]: { ...component, compatibility: 'native-v1' } } },
+      graph: await acceptedGraphForSource(imported.graph, component.id, registrySource),
       source: registrySource,
       projectRoot,
       compilerOptions: {
@@ -387,7 +404,7 @@ export function Button({ tone }: { tone?: Tone }) { return <button>{tone}</butto
     const component = Object.values(graph.components)[0]!
     const source = `${SOURCE}\nexport const __onemoVariantRegistry = { "variant_0000000000000000": {} } as const\n`
     await expect(compile({
-      graph: { ...graph, components: { ...graph.components, [component.id]: { ...component, compatibility: 'native-v1' } } },
+      graph: await acceptedGraphForSource(graph, component.id, source),
       source,
       command: { kind: 'move-variant', commandId: 'move-stale', componentId: component.id, variantId: component.primaryVariantId, frame: { x: 1, y: 2, width: 3, height: 4 } },
     })).rejects.toMatchObject({ code: 'NATIVE_VARIANT_REGISTRY_STALE' })

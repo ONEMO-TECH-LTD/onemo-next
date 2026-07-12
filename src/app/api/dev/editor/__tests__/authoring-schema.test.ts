@@ -13,7 +13,7 @@ const SHA = 'a'.repeat(64)
 
 function minimalGraph(): AuthoringGraphV1 {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     storeId: 'project-main',
     revision: 0,
     root: { kind: 'project' },
@@ -30,6 +30,7 @@ function minimalGraph(): AuthoringGraphV1 {
           file: 'src/app/(dev)/react-figma-components/Button.tsx',
           exportName: 'Button',
         },
+        projectionFingerprint: SHA,
         primaryVariantId: 'variant-primary',
         folderId: null,
         compatibility: 'native-v1',
@@ -125,6 +126,16 @@ describe('AuthoringGraphV1 checkpoint schema', () => {
     expect(validateAuthoringGraphV1(graph)).toMatchObject({
       ok: false,
       errors: expect.arrayContaining(['environmentFingerprint must be sha256']),
+    })
+  })
+
+  it('requires an exact accepted projection fingerprint for every component', () => {
+    const graph = minimalGraph()
+    graph.components['component-button'].projectionFingerprint = 'not-a-hash'
+
+    expect(validateAuthoringGraphV1(graph)).toMatchObject({
+      ok: false,
+      errors: expect.arrayContaining(['components.component-button.projectionFingerprint must be sha256']),
     })
   })
 

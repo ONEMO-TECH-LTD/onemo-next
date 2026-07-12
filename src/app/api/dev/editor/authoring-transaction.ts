@@ -69,6 +69,19 @@ export type AuthoringTransactionHooks = {
   afterCoordinatorCommit?: () => Promise<void> | void
 }
 
+type AuthoringCommitUpdate = {
+  expectedRevision: number
+  requireMissingSidecar?: boolean
+  sourceFiles?: string[]
+  expectedSourceHashes?: Record<string, string>
+  expectedEnvironmentHashes?: Record<string, string>
+  expectedEnvironmentFingerprint?: string
+  sourcePatches?: SourcePatch[]
+  metadataPatches?: MetadataPatch[]
+  command?: unknown
+  mutate: (graph: AuthoringGraphV1) => AuthoringGraphV1
+}
+
 export class SingleRootAuthoringTransaction {
   private readonly installer: DurableFileInstaller
   private readonly lock: CrossProcessAuthoringStoreLock
@@ -91,35 +104,37 @@ export class SingleRootAuthoringTransaction {
     this.installer = input.installer ?? new DurableFileInstaller()
   }
 
-  async commit(update: {
-    expectedRevision: number
-    requireMissingSidecar?: boolean
-    sourceFiles?: string[]
-    expectedSourceHashes?: Record<string, string>
-    expectedEnvironmentHashes?: Record<string, string>
-    expectedEnvironmentFingerprint?: string
-    sourcePatches?: SourcePatch[]
-    metadataPatches?: MetadataPatch[]
-    command?: unknown
-    mutate: (graph: AuthoringGraphV1) => AuthoringGraphV1
-  }): Promise<AuthoringGraphV1> {
+  async commit(update: AuthoringCommitUpdate): Promise<AuthoringGraphV1> {
     return this.withLock(() => this.commitLocked(update))
   }
 
-  private async commitLocked(update: {
-    expectedRevision: number
-    requireMissingSidecar?: boolean
-    sourceFiles?: string[]
-    expectedSourceHashes?: Record<string, string>
-    expectedEnvironmentHashes?: Record<string, string>
-    expectedEnvironmentFingerprint?: string
-    sourcePatches?: SourcePatch[]
-    metadataPatches?: MetadataPatch[]
-    command?: unknown
-    mutate: (graph: AuthoringGraphV1) => AuthoringGraphV1
-  }): Promise<AuthoringGraphV1> {
-    await this.assertNoUnresolvedRecovery()
-    const sidecarSnapshot = await this.input.store.loadSnapshot()
+  async commitLegacyMigration(prepare: (legacy: unknown) => Promise<{
+    graph: AuthoringGraphV1
+    update: Omit<AuthoringCommitUpdate, 'mutate'>
+  } | null>): Promise<AuthoringGraphV1> {
+    return this.withLock(async () => {
+      await this.assertNoUnresolvedRecovery()
+      const raw = await this.input.store.loadRawSnapshot()
+      if (!raw) throw namedError('AUTHORING_MIGRATION_SOURCE_MISSING', 'legacy sidecar disappeared before migration', 409)
+      const prepared = await prepare(raw.value)
+      if (!prepared) {
+        const current = await this.input.store.loadSnapshot()
+        if (!current) throw namedError('AUTHORING_MIGRATION_SOURCE_MISSING', 'authoring sidecar disappeared during migration', 409)
+        return current.graph
+      }
+      return this.commitLocked(
+        { ...prepared.update, mutate: () => prepared.graph },
+        { graph: prepared.graph, bytes: raw.bytes },
+      )
+    })
+  }
+
+  private async commitLocked(
+    update: AuthoringCommitUpdate,
+    preloadedSidecar?: { graph: AuthoringGraphV1; bytes: Buffer },
+  ): Promise<AuthoringGraphV1> {
+    if (!preloadedSidecar) await this.assertNoUnresolvedRecovery()
+    const sidecarSnapshot = preloadedSidecar ?? await this.input.store.loadCurrentSnapshot()
     if (update.requireMissingSidecar && sidecarSnapshot) {
       throw namedError('AUTHORING_SIDECAR_EXISTS', 'transaction requires a missing authoring sidecar', 409)
     }

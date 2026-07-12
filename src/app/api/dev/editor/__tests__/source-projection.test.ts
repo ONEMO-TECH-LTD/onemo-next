@@ -6,7 +6,7 @@ import { EMPTY_ENVIRONMENT_FINGERPRINT } from '../authoring-environment'
 
 import { importProjectionToAuthoringGraph } from '../authoring-migrations'
 import { sha256 } from '../durable-file-installer'
-import { classifyVariantAxes, readSourceProjection, sourceProjectionFromModel, sourceProjectionFromSource, unsupportedSourceProjection } from '../source-projection'
+import { classifyVariantAxes, readSourceProjection, sourceProjectionFingerprint, sourceProjectionFromModel, sourceProjectionFromSource, unsupportedSourceProjection } from '../source-projection'
 import type { ComponentModel } from '../lib'
 
 function model(axes: ComponentModel['variantAxes']): ComponentModel {
@@ -95,6 +95,147 @@ describe('SourceProjection classification', () => {
       { axis: 'variant', values: ['Primary', 'Secondary'], defaultValue: 'Primary' },
     ])
     expect(projection.anchors.length).toBeGreaterThan(0)
+  })
+
+  it('fingerprints semantic projection while ignoring formatting and source positions', async () => {
+    const compact = await sourceProjectionFromSource({
+      file: 'Button.tsx',
+      source: `export function Button({ tone = 'Primary' }:{tone?:'Primary'|'Secondary'}) { return <button><span /></button> }\n`,
+    })
+    const formatted = await sourceProjectionFromSource({
+      file: 'Button.tsx',
+      source: `export function Button(\n  { tone = 'Primary' }: { tone?: 'Primary' | 'Secondary' },\n) {\n  return (\n    <button>\n      <span />\n    </button>\n  )\n}\n`,
+    })
+    const structuralDrift = await sourceProjectionFromSource({
+      file: 'Button.tsx',
+      source: `export function Button({ tone = 'Primary' }: { tone?: 'Primary' | 'Secondary' }) { return <section><button><span /></button></section> }\n`,
+    })
+
+    expect(sourceProjectionFingerprint(formatted)).toBe(sourceProjectionFingerprint(compact))
+    expect(sourceProjectionFingerprint(structuralDrift)).not.toBe(sourceProjectionFingerprint(compact))
+  })
+
+  it('canonicalizes native-variant registry order while preserving observable prop binding order', async () => {
+    const first = await sourceProjectionFromSource({
+      file: 'Button.tsx',
+      source: `export function Button({ a, b }: { a?: string; b?: number }) { return <button /> }
+export const __onemoVariantRegistry = { "variant_bbbbbbbbbbbbbbbb": {}, "variant_aaaaaaaaaaaaaaaa": {} } as const
+`,
+    })
+    const reordered = await sourceProjectionFromSource({
+      file: 'Button.tsx',
+      source: `export function Button({ a, b }: { a?: string; b?: number }) { return <button /> }
+export const __onemoVariantRegistry = { "variant_aaaaaaaaaaaaaaaa": {}, "variant_bbbbbbbbbbbbbbbb": {} } as const
+`,
+    })
+
+    expect(sourceProjectionFingerprint(reordered)).toBe(sourceProjectionFingerprint(first))
+
+    const reorderedProps = await sourceProjectionFromSource({
+      file: 'Button.tsx',
+      source: `export function Button({ b, a }: { b?: number; a?: string }) { return <button /> }
+export const __onemoVariantRegistry = { "variant_aaaaaaaaaaaaaaaa": {}, "variant_bbbbbbbbbbbbbbbb": {} } as const
+`,
+    })
+    expect(sourceProjectionFingerprint(reorderedProps)).not.toBe(sourceProjectionFingerprint(first))
+  })
+
+  it('does not collide non-finite numeric registry values with null', async () => {
+    const infinity = await sourceProjectionFromSource({
+      file: 'Button.tsx',
+      source: `export function Button() { return <button /> }
+export const __onemoVariantRegistry = { "variant_aaaaaaaaaaaaaaaa": { value: 1e999 } } as const
+`,
+    })
+    const nullValue = await sourceProjectionFromSource({
+      file: 'Button.tsx',
+      source: `export function Button() { return <button /> }
+export const __onemoVariantRegistry = { "variant_aaaaaaaaaaaaaaaa": { value: null } } as const
+`,
+    })
+
+    expect(sourceProjectionFingerprint(infinity)).not.toBe(sourceProjectionFingerprint(nullValue))
+  })
+
+  it('encodes TypeScript tokens structurally instead of using an ambiguous delimiter string', async () => {
+    const union = await sourceProjectionFromSource({
+      file: 'Button.tsx',
+      source: `type b = number
+export function Button({ value }: { value?: 'a'|b }) { return <button /> }
+export const __onemoVariantRegistry = { "variant_aaaaaaaaaaaaaaaa": {} } as const
+`,
+    })
+    const craftedLiteral = await sourceProjectionFromSource({
+      file: 'Button.tsx',
+      source: `export function Button({ value }: { value?: 'a|52:||80:b' }) { return <button /> }
+export const __onemoVariantRegistry = { "variant_aaaaaaaaaaaaaaaa": {} } as const
+`,
+    })
+
+    expect(sourceProjectionFingerprint(craftedLiteral)).not.toBe(sourceProjectionFingerprint(union))
+  })
+
+  it('preserves default evaluation order while ignoring default-expression formatting', async () => {
+    const first = await sourceProjectionFromSource({
+      file: 'Button.tsx',
+      source: `declare function mark(value: string): string
+export function Button({ a = mark('a'), b = mark('b') }: { a?: string; b?: string }) { return <button /> }
+`,
+    })
+    const formatted = await sourceProjectionFromSource({
+      file: 'Button.tsx',
+      source: `declare function mark(value: string): string
+export function Button({ a = mark( 'a' ), b = mark( 'b' ) }: { a?: string; b?: string }) { return <button /> }
+`,
+    })
+    const reordered = await sourceProjectionFromSource({
+      file: 'Button.tsx',
+      source: `declare function mark(value: string): string
+export function Button({ b = mark('b'), a = mark('a') }: { b?: string; a?: string }) { return <button /> }
+`,
+    })
+
+    expect(sourceProjectionFingerprint(formatted)).toBe(sourceProjectionFingerprint(first))
+    expect(sourceProjectionFingerprint(reordered)).not.toBe(sourceProjectionFingerprint(first))
+  })
+
+  it('preserves regex-literal whitespace inside default expressions', async () => {
+    const compact = await sourceProjectionFromSource({
+      file: 'Button.tsx',
+      source: `export function Button({ pattern = /a/ }: { pattern?: RegExp }) { return <button /> }`,
+    })
+    const trailingSpace = await sourceProjectionFromSource({
+      file: 'Button.tsx',
+      source: `export function Button({ pattern = /a / }: { pattern?: RegExp }) { return <button /> }`,
+    })
+
+    expect(sourceProjectionFingerprint(trailingSpace)).not.toBe(sourceProjectionFingerprint(compact))
+  })
+
+  it('ignores CSS-only formatting while retaining rule and declaration semantics', async () => {
+    const source = `import styles from './Button.module.css'
+export function Button() { return <button className={styles.base} /> }
+`
+    const compact = await sourceProjectionFromSource({
+      file: 'Button.tsx', source,
+      cssSources: { 'Button.module.css': `.base{color:rgb(255,255,255);padding:0  4px}.base:hover,.base:focus{opacity:.5}` },
+    })
+    const formatted = await sourceProjectionFromSource({
+      file: 'Button.tsx', source,
+      cssSources: { 'Button.module.css': `.base {
+  color: rgb(255, 255, 255);
+  padding: 0 4px;
+}
+
+.base:hover, .base:focus {
+  opacity: .5;
+}
+` },
+    })
+
+    expect(compact.rules).toHaveLength(1)
+    expect(formatted.rules).toHaveLength(1)
+    expect(sourceProjectionFingerprint(formatted)).toBe(sourceProjectionFingerprint(compact))
   })
 
   it.each([

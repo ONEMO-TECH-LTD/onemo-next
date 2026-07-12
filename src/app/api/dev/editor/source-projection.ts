@@ -1,6 +1,11 @@
+import * as ts from 'typescript'
+import selectorParser from 'postcss-selector-parser'
+import valueParser from 'postcss-value-parser'
+
 import type { ComponentModel } from './lib'
 import { parseComponentModel, parseComponentModelFromSource, resolveEditorPath } from './lib'
 import type { SourceAnchor } from './authoring-types'
+import { sha256 } from './durable-file-installer'
 import { extractSourceAnchorsFromTsx, readSourceAnchorsFromTsxFile } from './source-anchor'
 
 export type SourceProjectionCompatibility =
@@ -96,5 +101,134 @@ export function unsupportedSourceProjection(file: string, reason: string): Sourc
     anchors: [],
     compatibility: 'unsupported',
     unsupportedReason: reason,
+  }
+}
+
+export function sourceProjectionFingerprint(projection: SourceProjection): string {
+  const props = projection.props.map((prop) => ({
+    ...prop,
+    tsType: tokenizeTypeScriptType(prop.tsType),
+    ...(prop.default === undefined ? {} : { default: tokenizeTypeScriptExpression(prop.default) }),
+  }))
+  const normalized = {
+    file: projection.file,
+    exportName: projection.exportName,
+    cssModule: projection.cssModule,
+    rootClass: projection.rootClass,
+    variantAxes: projection.variantAxes,
+    nativeVariants: [...projection.nativeVariants].sort((left, right) => compareCodePoints(left.id, right.id)),
+    props,
+    rules: projection.rules.map((rule) => ({
+      ...rule,
+      selector: selectorParser().processSync(rule.selector, { lossless: false }),
+      decls: Object.fromEntries(Object.entries(rule.decls).map(([property, value]) => [
+        property,
+        normalizeCssValue(value),
+      ])),
+    })),
+    structure: normalizeStructure(projection.structure),
+    connectors: projection.connectors,
+    anchors: projection.anchors.map((anchor) => Object.fromEntries(
+      Object.entries(anchor).filter(([key]) => key !== 'lastKnownLine' && key !== 'lastKnownCol'),
+    )),
+    compatibility: projection.compatibility,
+    unsupportedReason: projection.unsupportedReason,
+  }
+  return sha256(Buffer.from(JSON.stringify(canonicalize(normalized))))
+}
+
+function normalizeStructure(node: ComponentModel['structure']): unknown {
+  if (!node) return null
+  const semantic = Object.fromEntries(Object.entries(node)
+    .filter(([key]) => key !== 'line' && key !== 'col' && key !== 'children'))
+  return { ...semantic, children: node.children.map(normalizeStructure) }
+}
+
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalize)
+  if (typeof value === 'number' && !Number.isFinite(value)) return { nonFiniteNumber: String(value) }
+  if (!value || typeof value !== 'object') return value
+  return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+    .sort(([left], [right]) => compareCodePoints(left, right))
+    .map(([key, nested]) => [key, canonicalize(nested)]))
+}
+
+function compareCodePoints(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0
+}
+
+function tokenizeTypeScriptType(source: string): Array<{ kind: number; value: string }> {
+  const scanner = ts.createScanner(ts.ScriptTarget.Latest, true, ts.LanguageVariant.Standard, source)
+  const tokens: Array<{ kind: number; value: string }> = []
+  for (let token = scanner.scan(); token !== ts.SyntaxKind.EndOfFileToken; token = scanner.scan()) {
+    const value = token === ts.SyntaxKind.StringLiteral || token === ts.SyntaxKind.NumericLiteral
+      ? scanner.getTokenValue()
+      : scanner.getTokenText()
+    tokens.push({ kind: token, value })
+  }
+  return tokens
+}
+
+function tokenizeTypeScriptExpression(source: string): Array<{ kind: number; value: string }> {
+  const file = ts.createSourceFile(
+    '__authoring_default.tsx',
+    `const __authoringDefault = (${source})`,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  )
+  const declaration = file.statements[0]
+  if (!declaration || !ts.isVariableStatement(declaration)) return tokenizeTypeScriptType(source)
+  const initializer = declaration.declarationList.declarations[0]?.initializer
+  if (!initializer) return tokenizeTypeScriptType(source)
+  const tokens: Array<{ kind: number; value: string }> = []
+  const visit = (node: ts.Node) => {
+    const children = node.getChildren(file)
+    if (children.length > 0) {
+      for (const child of children) visit(child)
+      return
+    }
+    const value = ts.isStringLiteralLike(node) || ts.isIdentifier(node) || ts.isNumericLiteral(node)
+      ? node.text
+      : node.getText(file)
+    tokens.push({ kind: node.kind, value })
+  }
+  visit(initializer)
+  return tokens
+}
+
+function normalizeCssValue(value: string): unknown {
+  return valueParser(value).nodes.map(normalizeCssValueNode)
+}
+
+type CssValueNode = ReturnType<typeof valueParser>['nodes'][number]
+
+function normalizeCssValueNode(node: CssValueNode): unknown {
+  switch (node.type) {
+    case 'space':
+      return { type: node.type }
+    case 'div':
+      return { type: node.type, value: node.value }
+    case 'function':
+      return {
+        type: node.type,
+        value: node.value,
+        ...(node.unclosed ? { unclosed: true } : {}),
+        nodes: node.nodes.map(normalizeCssValueNode),
+      }
+    case 'string':
+      return {
+        type: node.type,
+        value: node.value,
+        ...(node.unclosed ? { unclosed: true } : {}),
+      }
+    case 'comment':
+      return {
+        type: node.type,
+        value: node.value,
+        ...(node.unclosed ? { unclosed: true } : {}),
+      }
+    default:
+      return { type: node.type, value: node.value }
   }
 }
