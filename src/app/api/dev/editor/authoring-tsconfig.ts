@@ -59,6 +59,7 @@ export async function readExactCompilerConfig(input: {
     { noEmit: true },
     configPath,
   )
+  await validateProjectResolutionAuthorities(input, root, parsed.options)
   if (parsed.errors.length > 0) {
     throw namedError('SOURCE_TSCONFIG_INVALID', parsed.errors.map(formatDiagnostic).join('; '))
   }
@@ -66,6 +67,25 @@ export async function readExactCompilerConfig(input: {
     options: freezeCompilerOptions({ ...parsed.options, noEmit: true }),
     configuredFiles: [...parsed.fileNames],
     sources: Object.fromEntries(sources),
+  }
+}
+
+async function validateProjectResolutionAuthorities(
+  input: { storeId: StoreId; registry: RuntimeRootRegistry },
+  root: string,
+  options: ts.CompilerOptions,
+): Promise<void> {
+  const authorities = [
+    ...(options.baseUrl ? [options.baseUrl] : []),
+    ...(options.rootDirs ?? []),
+  ]
+  const pathsBase = options.baseUrl ?? root
+  for (const targets of Object.values(options.paths ?? {})) {
+    for (const target of targets) authorities.push(path.resolve(pathsBase, target.replace('*', '__onemo_wildcard__')))
+  }
+  for (const authority of authorities) {
+    const relative = toStoreRelative(root, authority)
+    if (relative !== '') await input.registry.resolveStorePath(input.storeId, relative)
   }
 }
 

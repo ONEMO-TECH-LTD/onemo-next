@@ -220,7 +220,7 @@ export function Button() { return <button className={styles.base} /> }
     }))
     await fs.writeFile(path.join(root, SOURCE_FILE), `import type { Tone } from '@outside/tone'\nexport function Button({ tone }: { tone?: Tone }) { return <button /> }\n`)
     await expect(classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry }))
-      .rejects.toMatchObject({ code: 'SOURCE_DEPENDENCY_OUTSIDE_ROOT' })
+      .rejects.toMatchObject({ code: 'SOURCE_TSCONFIG_OUTSIDE_ROOT' })
 
     await fs.writeFile(path.join(root, 'tsconfig.json'), JSON.stringify({
       compilerOptions: { baseUrl: '.', paths: { '@/*': ['src/*'] }, moduleResolution: 'Bundler' },
@@ -411,5 +411,25 @@ export function Button() { return <button className={styles.base} /> }
     await fs.writeFile(path.join(root, SOURCE_FILE), `import type { MissingPackageSubpath } from 'react/definitely-missing'\nexport function Button({ value }: { value?: MissingPackageSubpath }) { return <button /> }\n`)
     await expect(classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry }))
       .resolves.toMatchObject({ projection: { compatibility: 'native-v1' } })
+  })
+
+  it.each(['absolute', 'relative'] as const)('refuses an %s outside-root baseUrl before any import evidence', async (kind) => {
+    const source = `import type { Missing } from 'outside/missing'\nexport function Button({ value }: { value?: Missing }) { return <button /> }\n`
+    const { root, registry, store } = await makeImportStore(source)
+    const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'authoring-import-baseurl-outside-'))
+    const baseUrl = kind === 'absolute' ? outside : path.relative(root, outside).split(path.sep).join('/')
+    await fs.writeFile(path.join(root, 'tsconfig.json'), JSON.stringify({ compilerOptions: { baseUrl, moduleResolution: 'Bundler' } }))
+
+    await expect(classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry }))
+      .rejects.toMatchObject({ code: 'SOURCE_TSCONFIG_OUTSIDE_ROOT', status: 422 })
+    await expect(importSourceFileToAuthoringStore({
+      storeId: 'project-main', file: SOURCE_FILE, expectedSourceHashes: {}, registry, store,
+    })).rejects.toMatchObject({ code: 'SOURCE_TSCONFIG_OUTSIDE_ROOT', status: 422 })
+    await expect(fs.readFile(path.join(root, SOURCE_FILE), 'utf8')).resolves.toBe(source)
+    await expect(fs.readFile(path.join(root, PROJECT_AUTHORING_SIDECAR))).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(fs.readdir(path.join(root, 'src/app/(dev)/react-figma-components/.onemo/history')))
+      .rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(fs.readdir(path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions')))
+      .rejects.toMatchObject({ code: 'ENOENT' })
   })
 })

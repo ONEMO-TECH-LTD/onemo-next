@@ -66,6 +66,21 @@ describe('exact compiler configuration', () => {
       .rejects.toMatchObject({ code: 'PATH_SYMLINK_REFUSED' })
   })
 
+  it('refuses project-resolution authorities outside the registered root', async () => {
+    const { root, registry } = await makeRoot()
+    const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'authoring-tsconfig-authority-'))
+
+    await fs.writeFile(path.join(root, 'tsconfig.json'), JSON.stringify({ compilerOptions: { baseUrl: outside } }))
+    await expect(readExactCompilerConfig({ storeId: 'project-main', registry }))
+      .rejects.toMatchObject({ code: 'SOURCE_TSCONFIG_OUTSIDE_ROOT' })
+
+    await fs.writeFile(path.join(root, 'tsconfig.json'), JSON.stringify({
+      compilerOptions: { baseUrl: '.', paths: { '@outside/*': [`${path.relative(root, outside).split(path.sep).join('/')}/*`] } },
+    }))
+    await expect(readExactCompilerConfig({ storeId: 'project-main', registry }))
+      .rejects.toMatchObject({ code: 'SOURCE_TSCONFIG_OUTSIDE_ROOT' })
+  })
+
   it('snapshots a root-local package config and its resolution metadata', async () => {
     const { root, registry } = await makeRoot()
     const packageRoot = path.join(root, 'node_modules/example-config')
