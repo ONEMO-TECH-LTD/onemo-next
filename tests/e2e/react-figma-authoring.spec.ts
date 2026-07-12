@@ -57,6 +57,36 @@ test.describe('React Figma component authoring', () => {
     ])
     if (await revalidateSource.isVisible()) await revalidateSource.click()
     await expect(authoringCanvas).toBeVisible({ timeout: 30_000 })
+    await page.getByRole('button', { name: 'Create variant' }).click()
+    await expect(page.getByText('Variant 3', { exact: true })).toBeVisible({ timeout: 30_000 })
+
+    await expect(async () => {
+      if (await page.getByText('Enter Rename', { exact: true }).isVisible()) return
+      const variant = page.locator('[data-variant-id]').filter({ hasText: 'Variant 3' })
+      await variant.click()
+      await variant.getByText('Variant 3', { exact: true }).click()
+      const input = page.getByRole('textbox', { name: 'Rename Variant 3' })
+      await input.fill('Enter Rename')
+      await input.press('Enter')
+      await expect(page.getByText('Enter Rename', { exact: true })).toBeVisible({ timeout: 15_000 })
+    }).toPass({ timeout: 60_000 })
+
+    const createdVariant = page.locator('[data-variant-id]').filter({ hasText: 'Enter Rename' })
+    await createdVariant.click()
+    await createdVariant.getByText('Enter Rename', { exact: true }).click()
+    let renameInput = page.getByRole('textbox', { name: 'Rename Enter Rename' })
+    await renameInput.fill('Cancelled Rename')
+    await renameInput.press('Escape')
+    await expect(page.getByText('Enter Rename', { exact: true })).toBeVisible()
+    await expect(page.getByText('Cancelled Rename', { exact: true })).toHaveCount(0)
+
+    const createdVariantId = await createdVariant.getAttribute('data-variant-id')
+    expect(createdVariantId).not.toBeNull()
+    await createdVariant.getByText('Enter Rename', { exact: true }).click()
+    renameInput = page.getByRole('textbox', { name: 'Rename Enter Rename' })
+    await renameInput.fill('Blur Rename')
+    await page.locator(`[data-variant-id]:not([data-variant-id="${createdVariantId}"])`).first().click()
+    await expect(page.getByText('Blur Rename', { exact: true })).toBeVisible({ timeout: 30_000 })
     const authoringHost = await page.locator('[data-screen-host]').evaluate((node) => ({ width: node.clientWidth, height: node.clientHeight }))
     expect(authoringHost.width).toBeGreaterThan(402)
     await frame.evaluate((node) => {

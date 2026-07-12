@@ -42,6 +42,7 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged }: {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const drag = useRef<{ id: string; x: number; y: number; frame: VariantFrame['frame'] } | null>(null)
+  const cancelRename = useRef(false)
   const handledUndoNonce = useRef(undoNonce)
   const [dragPreview, setDragPreview] = useState<{ id: string; frame: VariantFrame['frame'] } | null>(null)
 
@@ -93,6 +94,7 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged }: {
   const execute = useCallback(async (command: object) => {
     if (!snapshot || busy) return
     setBusy(true); setError(null)
+    sessionStorage.setItem(AUTHORING_RESUME_KEY, file)
     try {
       const response = await fetch('/api/dev/editor-authoring', {
         method: 'POST', headers: { 'content-type': 'application/json' },
@@ -102,8 +104,11 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged }: {
       if (!response.ok) throw new Error(data.error ?? `Authoring command failed (${response.status})`)
       await load()
       onChanged()
-    } catch (cause) { setError((cause as Error).message) } finally { setBusy(false) }
-  }, [busy, load, onChanged, snapshot])
+    } catch (cause) {
+      sessionStorage.removeItem(AUTHORING_RESUME_KEY)
+      setError((cause as Error).message)
+    } finally { setBusy(false) }
+  }, [busy, file, load, onChanged, snapshot])
 
   const prepareSource = useCallback(async () => {
     if (!importPreview || busy) return
@@ -201,8 +206,16 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged }: {
           if (!moved) return
           void execute({ kind: 'move-variant', commandId: crypto.randomUUID(), componentId: definition.id, variantId: current.id, frame: moved })
         }} onPointerCancel={() => { drag.current = null; setDragPreview(null) }} style={{ position: 'absolute', left: frame.x, top: frame.y, width: frame.width, minHeight: frame.height, margin: 0, padding: 12, boxSizing: 'border-box', background: selected ? 'var(--sem-col-bg-brand-primary)' : 'var(--sem-col-bg-primary)', border: `${selected ? 2 : 1}px ${selected ? 'solid' : 'dashed'} ${accent}`, borderRadius: 'var(--sem-radii-md)' }}>
-          <figcaption onClick={() => { if (selected) setRenamingId(variant.id) }} style={{ marginBottom: 8, color: 'var(--sem-col-text-brand-primary)', cursor: selected ? 'text' : 'default', fontFamily: 'var(--sem-type-fluid-label-s-font)', fontSize: 'var(--sem-type-fluid-label-s-size)', lineHeight: 'var(--sem-type-fluid-label-s-line-height)', letterSpacing: 'var(--sem-type-fluid-label-s-letter-spacing)' }}>
-            {renamingId === variant.id ? <input autoFocus defaultValue={variant.displayName} onPointerDown={(event) => event.stopPropagation()} onBlur={(event) => { setRenamingId(null); const displayName = event.currentTarget.value.trim(); if (displayName && displayName !== variant.displayName) void execute({ kind: 'rename-variant', commandId: crypto.randomUUID(), componentId: definition.id, variantId: variant.id, displayName }) }} /> : variant.displayName}
+          <figcaption onClick={() => { if (selected) { cancelRename.current = false; setRenamingId(variant.id) } }} style={{ marginBottom: 8, color: 'var(--sem-col-text-brand-primary)', cursor: selected ? 'text' : 'default', fontFamily: 'var(--sem-type-fluid-label-s-font)', fontSize: 'var(--sem-type-fluid-label-s-size)', lineHeight: 'var(--sem-type-fluid-label-s-line-height)', letterSpacing: 'var(--sem-type-fluid-label-s-letter-spacing)' }}>
+            {renamingId === variant.id ? <input aria-label={`Rename ${variant.displayName}`} autoFocus defaultValue={variant.displayName} onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => {
+              if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur() }
+              if (event.key === 'Escape') { event.preventDefault(); cancelRename.current = true; event.currentTarget.blur() }
+            }} onBlur={(event) => {
+              setRenamingId(null)
+              if (cancelRename.current) { cancelRename.current = false; return }
+              const displayName = event.currentTarget.value.trim()
+              if (displayName && displayName !== variant.displayName) void execute({ kind: 'rename-variant', commandId: crypto.randomUUID(), componentId: definition.id, variantId: variant.id, displayName })
+            }} /> : variant.displayName}
             {variant.id === definition.primaryVariantId ? ' · Primary' : ''}
           </figcaption>
           {(() => { const Comp = component; return <Comp {...(props.get(variant.id) ?? {})} /> })()}

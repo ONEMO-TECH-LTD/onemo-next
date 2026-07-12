@@ -78,3 +78,10 @@ Follow-up at the committed authoring E2E gate: the local-`typeRoots` semantic ca
 - Symptoms: the first run never hydrated because the dev-origin was rejected; later runs targeted a hidden component row; cold loads also launched about 30 token requests because the module cache had no shared in-flight promise, producing 404/aborted requests.
 - What worked: use the configured `localhost` origin, prove each shell transition, deduplicate token loading in product code, and manage fixture/server teardown with a marker-backed wrapper that restores on startup failure or signal.
 - Remember: committed S58 E2E must remain cold and fail on real console/network defects; environment setup must not prewarm product races away or rely only on test `afterAll` for cleanup.
+
+## S58 inline-rename E2E interactions
+
+- What did not work: clicking a nominally empty canvas coordinate that is covered by the fixed shell overlay, starting rename immediately before a delayed cold document replacement, and reading a frame through a text-filtered locator after its input value replaced that text.
+- Symptoms: the click-away action was intercepted indefinitely, the first Enter edit was lost with the uncommitted label correctly unchanged, and the final attribute lookup waited on a locator that could no longer match.
+- What worked: click a different visible variant for the blur-commit proof, retry the complete Enter transition across the known cold document replacement, and capture the stable `data-variant-id` before opening the input.
+- Remember: S58 authoring E2E locators must follow stable identity across editable text changes; cold retries wrap a complete observable transition, never the semantic assertion alone.
