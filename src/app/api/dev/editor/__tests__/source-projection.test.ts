@@ -330,6 +330,36 @@ export function Button() { return <button className={styles.base} /> }
     expect(sourceProjectionFingerprint(nestedDrift)).not.toBe(sourceProjectionFingerprint(original))
   })
 
+  it('normalizes nested at-rule formatting while preserving context and child order', async () => {
+    const source = `import styles from './Button.module.css'
+export function Button() { return <button className={styles.base} /> }
+`
+    const project = (css: string) => sourceProjectionFromSource({
+      file: 'Button.tsx', source, cssSources: { 'Button.module.css': css },
+    })
+    const original = await project(`.base {}
+@media (min-width: 600px) {
+  .base { color: red }
+  .base:hover { color: blue }
+}`)
+    const formatted = await project(`.base{}
+@MEDIA ( min-width:600px ){.base{color:red}.base:hover{color:blue}}`)
+    const differentContext = await project(`.base {}
+@supports (min-width: 600px) {
+  .base { color: red }
+  .base:hover { color: blue }
+}`)
+    const reorderedChildren = await project(`.base {}
+@media (min-width: 600px) {
+  .base:hover { color: blue }
+  .base { color: red }
+}`)
+
+    expect(sourceProjectionFingerprint(formatted)).toBe(sourceProjectionFingerprint(original))
+    expect(sourceProjectionFingerprint(differentContext)).not.toBe(sourceProjectionFingerprint(original))
+    expect(sourceProjectionFingerprint(reorderedChildren)).not.toBe(sourceProjectionFingerprint(original))
+  })
+
   it.each([
     {
       label: 'missing',
