@@ -117,7 +117,17 @@ async function readProjectModuleDependencies(
     }
     for (const imported of preprocessed.importedFiles) {
       const resolved = ts.resolveModuleName(imported.fileName, abs, options, ts.sys).resolvedModule
-      if (!resolved || resolved.isExternalLibraryImport) continue
+      if (!resolved) {
+        if (requiresProjectResolution(imported.fileName, options) && !imported.fileName.endsWith('.css')) {
+          throw namedError(
+            'SOURCE_DEPENDENCY_UNRESOLVED',
+            `project source dependency could not be resolved from ${file}: ${imported.fileName}`,
+            422,
+          )
+        }
+        continue
+      }
+      if (resolved.isExternalLibraryImport) continue
       const resolvedAbs = path.resolve(resolved.resolvedFileName)
       const relative = storeRelativeDependency(root, resolvedAbs)
       if (sources.has(relative)) continue
@@ -200,6 +210,15 @@ function storeRelativeDependency(root: string, candidate: string): string {
 
 function isPackageDependency(file: string): boolean {
   return path.resolve(file).split(path.sep).includes('node_modules')
+}
+
+function requiresProjectResolution(specifier: string, options: ts.CompilerOptions): boolean {
+  if (specifier.startsWith('.') || path.isAbsolute(specifier)) return true
+  return Object.keys(options.paths ?? {}).some((pattern) => {
+    const star = pattern.indexOf('*')
+    if (star === -1) return specifier === pattern
+    return specifier.startsWith(pattern.slice(0, star)) && specifier.endsWith(pattern.slice(star + 1))
+  })
 }
 
 export async function importSourceFileToAuthoringStore(input: {

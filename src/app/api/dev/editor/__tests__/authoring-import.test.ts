@@ -341,4 +341,43 @@ export function Button() { return <button className={styles.base} /> }
     })).rejects.toMatchObject({ code: 'SOURCE_HASH_STALE', changedPaths: [baseConfig] })
     expect(await fs.readdir(transactions)).toEqual(beforeTransactions)
   }, 15_000)
+
+  it.each([
+    {
+      label: 'relative static import',
+      source: `import type { Missing } from './missing'\nexport function Button({ value }: { value?: Missing }) { return <button /> }\n`,
+      config: undefined,
+    },
+    {
+      label: 'relative import type',
+      source: `type Missing = import('./missing').Missing\nexport function Button({ value }: { value?: Missing }) { return <button /> }\n`,
+      config: undefined,
+    },
+    {
+      label: 'project path alias',
+      source: `import type { Missing } from '@/missing'\nexport function Button({ value }: { value?: Missing }) { return <button /> }\n`,
+      config: { compilerOptions: { baseUrl: '.', paths: { '@/*': ['src/*'] }, moduleResolution: 'Bundler' } },
+    },
+  ])('refuses an unresolved $label before classification or persistence', async ({ source, config }) => {
+    const { root, registry, store } = await makeImportStore(source)
+    if (config) await fs.writeFile(path.join(root, 'tsconfig.json'), JSON.stringify(config))
+
+    await expect(classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry }))
+      .rejects.toMatchObject({ code: 'SOURCE_DEPENDENCY_UNRESOLVED', status: 422 })
+    await expect(importSourceFileToAuthoringStore({
+      storeId: 'project-main', file: SOURCE_FILE, expectedSourceHashes: {}, registry, store,
+    })).rejects.toMatchObject({ code: 'SOURCE_DEPENDENCY_UNRESOLVED', status: 422 })
+    await expect(fs.readFile(path.join(root, PROJECT_AUTHORING_SIDECAR))).rejects.toMatchObject({ code: 'ENOENT' })
+    expect(await store.load()).toBeNull()
+    await expect(fs.readdir(path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions')))
+      .rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('does not misclassify an unresolved bare package import as project-owned source', async () => {
+    const source = `import 'optional-external-package'\nexport function Button() { return <button /> }\n`
+    const { registry } = await makeImportStore(source)
+
+    await expect(classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry }))
+      .resolves.toMatchObject({ projection: { compatibility: 'native-v1' } })
+  })
 })
