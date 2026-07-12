@@ -18,9 +18,19 @@ test.describe('React Figma component authoring', () => {
     const failedResponses: string[] = []
     const failedRequests: string[] = []
     const tokenResponses: number[] = []
+    const tokenRequestFrames: string[] = []
+    const mainFrameNavigations: { phase: string; url: string }[] = []
+    const documentRequests: { phase: string; url: string }[] = []
+    let phase = 'initial'
     page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()) })
     page.on('console', (message) => { if (message.type() === 'warning') consoleWarnings.push(message.text()) })
     page.on('pageerror', (error) => pageErrors.push(error.message))
+    page.on('framenavigated', (frame) => { if (frame === page.mainFrame()) mainFrameNavigations.push({ phase, url: frame.url() }) })
+    page.on('request', (request) => {
+      const url = new URL(request.url())
+      if (url.pathname === '/api/dev/editor-tokens' && !url.search) tokenRequestFrames.push(request.frame().url())
+      if (request.resourceType() === 'document') documentRequests.push({ phase, url: request.url() })
+    })
     page.on('response', (response) => {
       const url = new URL(response.url())
       if (url.pathname === '/api/dev/editor-tokens' && !url.search) tokenResponses.push(response.status())
@@ -29,6 +39,7 @@ test.describe('React Figma component authoring', () => {
     page.on('requestfailed', (request) => failedRequests.push(`${request.url()} ${request.failure()?.errorText ?? 'unknown failure'}`))
 
     await page.goto('/react-figma', { waitUntil: 'domcontentloaded' })
+    phase = 'editor-loaded'
     const componentsRail = page.getByTitle('Components')
     await expect.poll(
       () => componentsRail.evaluate((node) => Object.keys(node).some((key) => key.startsWith('__reactProps'))),
@@ -43,6 +54,7 @@ test.describe('React Figma component authoring', () => {
       data: { kind: 'import-source', file: storeFile, expectedSourceHashes: classification.sourceHashes },
     })
     expect(imported.ok()).toBe(true)
+    phase = 'source-imported'
     const frame = page.locator('iframe')
     const editorUrl = page.url()
 
@@ -52,6 +64,7 @@ test.describe('React Figma component authoring', () => {
     }).toPass({ timeout: 20_000 })
     await page.getByText(fixtureName, { exact: true }).first().dblclick()
     await expect(page.locator('[data-authoring-canvas]')).toBeVisible()
+    phase = 'authoring-visible'
     const authoringHost = await page.locator('[data-screen-host]').evaluate((node) => ({ width: node.clientWidth, height: node.clientHeight }))
     expect(authoringHost.width).toBeGreaterThan(402)
     await frame.evaluate((node) => {
@@ -80,7 +93,7 @@ test.describe('React Figma component authoring', () => {
     expect(consoleErrors, `Failed responses: ${failedResponses.join(', ')}`).toEqual([])
     expect(consoleWarnings).toEqual([])
     expect(pageErrors).toEqual([])
-    expect(tokenResponses).toEqual([200])
+    expect(tokenResponses, JSON.stringify({ tokenRequestFrames, mainFrameNavigations, documentRequests })).toEqual([200])
     expect(failedResponses).toEqual([])
     expect(failedRequests).toEqual([])
   })
