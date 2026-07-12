@@ -380,4 +380,36 @@ export function Button() { return <button className={styles.base} /> }
     await expect(classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry }))
       .resolves.toMatchObject({ projection: { compatibility: 'native-v1' } })
   })
+
+  it('distinguishes baseUrl-owned imports from installed package specifiers', async () => {
+    const { root, registry, store } = await makeImportStore()
+    await linkTestNodeModules(root)
+    await fs.writeFile(path.join(root, 'tsconfig.json'), JSON.stringify({
+      compilerOptions: { baseUrl: '.', moduleResolution: 'Bundler' },
+    }))
+    await fs.mkdir(path.join(root, 'src'), { recursive: true })
+    await fs.writeFile(path.join(root, 'src/existing.ts'), 'export type Existing = string\n')
+
+    await fs.writeFile(path.join(root, SOURCE_FILE), `import type { Existing } from 'src/existing'\nexport function Button({ value }: { value?: Existing }) { return <button /> }\n`)
+    await expect(classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry }))
+      .resolves.toMatchObject({
+        projection: { compatibility: 'native-v1' },
+        sourceHashes: { 'src/existing.ts': expect.stringMatching(/^[a-f0-9]{64}$/) },
+      })
+
+    await fs.writeFile(path.join(root, SOURCE_FILE), `import type { Missing } from 'src/missing'\nexport function Button({ value }: { value?: Missing }) { return <button /> }\n`)
+    await expect(classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry }))
+      .rejects.toMatchObject({ code: 'SOURCE_DEPENDENCY_UNRESOLVED', status: 422 })
+    await expect(importSourceFileToAuthoringStore({
+      storeId: 'project-main', file: SOURCE_FILE, expectedSourceHashes: {}, registry, store,
+    })).rejects.toMatchObject({ code: 'SOURCE_DEPENDENCY_UNRESOLVED', status: 422 })
+    await expect(fs.readFile(path.join(root, PROJECT_AUTHORING_SIDECAR))).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(fs.readdir(path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions')))
+      .rejects.toMatchObject({ code: 'ENOENT' })
+
+    await fs.mkdir(path.join(root, 'react'), { recursive: true })
+    await fs.writeFile(path.join(root, SOURCE_FILE), `import type { MissingPackageSubpath } from 'react/definitely-missing'\nexport function Button({ value }: { value?: MissingPackageSubpath }) { return <button /> }\n`)
+    await expect(classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry }))
+      .resolves.toMatchObject({ projection: { compatibility: 'native-v1' } })
+  })
 })

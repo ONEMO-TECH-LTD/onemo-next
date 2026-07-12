@@ -118,7 +118,7 @@ async function readProjectModuleDependencies(
     for (const imported of preprocessed.importedFiles) {
       const resolved = ts.resolveModuleName(imported.fileName, abs, options, ts.sys).resolvedModule
       if (!resolved) {
-        if (requiresProjectResolution(imported.fileName, options) && !imported.fileName.endsWith('.css')) {
+        if (requiresProjectResolution(imported.fileName, options, root, abs) && !imported.fileName.endsWith('.css')) {
           throw namedError(
             'SOURCE_DEPENDENCY_UNRESOLVED',
             `project source dependency could not be resolved from ${file}: ${imported.fileName}`,
@@ -212,13 +212,35 @@ function isPackageDependency(file: string): boolean {
   return path.resolve(file).split(path.sep).includes('node_modules')
 }
 
-function requiresProjectResolution(specifier: string, options: ts.CompilerOptions): boolean {
+function requiresProjectResolution(
+  specifier: string,
+  options: ts.CompilerOptions,
+  root: string,
+  containingFile: string,
+): boolean {
   if (specifier.startsWith('.') || path.isAbsolute(specifier)) return true
-  return Object.keys(options.paths ?? {}).some((pattern) => {
+  if (Object.keys(options.paths ?? {}).some((pattern) => {
     const star = pattern.indexOf('*')
     if (star === -1) return specifier === pattern
     return specifier.startsWith(pattern.slice(0, star)) && specifier.endsWith(pattern.slice(star + 1))
-  })
+  })) return true
+  if (!options.baseUrl || packageExistsForSpecifier(specifier, containingFile)) return false
+  const baseUrl = path.isAbsolute(options.baseUrl) ? options.baseUrl : path.resolve(root, options.baseUrl)
+  const candidate = path.resolve(baseUrl, specifier)
+  return candidate === root || candidate.startsWith(root + path.sep)
+}
+
+function packageExistsForSpecifier(specifier: string, containingFile: string): boolean {
+  const parts = specifier.split('/')
+  const packageName = specifier.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0]
+  if (!packageName || (specifier.startsWith('@') && parts.length < 2)) return false
+  let directory = path.dirname(containingFile)
+  for (;;) {
+    if (ts.sys.fileExists(path.join(directory, 'node_modules', packageName, 'package.json'))) return true
+    const parent = path.dirname(directory)
+    if (parent === directory) return false
+    directory = parent
+  }
 }
 
 export async function importSourceFileToAuthoringStore(input: {
