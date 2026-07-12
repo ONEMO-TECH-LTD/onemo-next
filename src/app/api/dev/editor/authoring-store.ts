@@ -75,7 +75,11 @@ export class AuthoringSidecarStore {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
       throw error
     }
-    return { value: JSON.parse(bytes.toString('utf8')) as unknown, bytes }
+    try {
+      return { value: JSON.parse(bytes.toString('utf8')) as unknown, bytes }
+    } catch (error) {
+      throw namedError('AUTHORING_SIDECAR_INVALID', 'authoring sidecar is not valid JSON', 409, error)
+    }
   }
 
   async loadOrCreate(sourceFiles: string[] = []): Promise<AuthoringGraphV1> {
@@ -146,8 +150,8 @@ export function createEmptyAuthoringGraph(input: {
   }
 }
 
-function namedError(code: string, message: string, status: number) {
-  return Object.assign(new Error(message), { status, code })
+function namedError(code: string, message: string, status: number, cause?: unknown) {
+  return Object.assign(new Error(message), { status, code, cause })
 }
 
 function graphVersion(value: unknown): unknown {

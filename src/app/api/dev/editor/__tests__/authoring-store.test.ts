@@ -28,6 +28,19 @@ async function makeStore() {
 }
 
 describe('AuthoringSidecarStore', () => {
+  it('named-refuses malformed persisted JSON without rewriting evidence', async () => {
+    const { root, store } = await makeStore()
+    const sidecarPath = path.join(root, PROJECT_AUTHORING_SIDECAR)
+    await fs.mkdir(path.dirname(sidecarPath), { recursive: true })
+    const malformed = Buffer.from('{')
+    await fs.writeFile(sidecarPath, malformed)
+
+    await expect(store.load()).rejects.toMatchObject({ code: 'AUTHORING_SIDECAR_INVALID', status: 409 })
+    await expect(fs.readFile(sidecarPath)).resolves.toEqual(malformed)
+    await expect(fs.readdir(path.join(root, authoringMetadataPath('project', 'transactions'))))
+      .rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
   it('migrates a V1 sidecar through the transaction boundary on direct load', async () => {
     const { root, store } = await makeStore()
     const legacy = { ...createEmptyAuthoringGraph({ storeId: 'project-main', rootKind: 'project' }), schemaVersion: 1 }
