@@ -1,7 +1,7 @@
 {
  "fileKey": "Qdb9Kx98afJHxaCGAIxoMC",
  "pulledAtFileVersion": null,
- "variables": 3150,
+ "variables": 3156,
  "export": [
   {
    ".1.0-Prim-Col": {
@@ -21110,6 +21110,68 @@
         "$collectionName": ".2.6-Al-Effects",
         "$value": "{intense.l}"
        }
+      },
+      "bg-blur": {
+       "sm": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "Backdrop blur strength (blurs what is BEHIND the element) — routes through the universal strength range. Materials use the frost/* pair; this is the generic backdrop range.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{soft.xl}"
+       },
+       "md": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "Backdrop blur strength (blurs what is BEHIND the element) — routes through the universal strength range. Materials use the frost/* pair; this is the generic backdrop range.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{mild.m}"
+       },
+       "lg": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "Backdrop blur strength (blurs what is BEHIND the element) — routes through the universal strength range. Materials use the frost/* pair; this is the generic backdrop range.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{regular.xs}"
+       },
+       "xl": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "Backdrop blur strength (blurs what is BEHIND the element) — routes through the universal strength range. Materials use the frost/* pair; this is the generic backdrop range.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{regular.m}"
+       },
+       "2xl": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "Backdrop blur strength (blurs what is BEHIND the element) — routes through the universal strength range. Materials use the frost/* pair; this is the generic backdrop range.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{regular.xl}"
+       },
+       "3xl": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "Backdrop blur strength (blurs what is BEHIND the element) — routes through the universal strength range. Materials use the frost/* pair; this is the generic backdrop range.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{intense.l}"
+       }
       }
      },
      "Dark": {
@@ -21394,6 +21456,68 @@
          "ALL_SCOPES"
         ],
         "$description": "🔒 effects v2.3.2 — Backdrop-blur strength of the material; name-paired with bg/frost/thick (the tint). A material = the pair. NOT layer blur.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{intense.l}"
+       }
+      },
+      "bg-blur": {
+       "sm": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "Backdrop blur strength (blurs what is BEHIND the element) — routes through the universal strength range. Materials use the frost/* pair; this is the generic backdrop range.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{soft.xl}"
+       },
+       "md": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "Backdrop blur strength (blurs what is BEHIND the element) — routes through the universal strength range. Materials use the frost/* pair; this is the generic backdrop range.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{mild.m}"
+       },
+       "lg": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "Backdrop blur strength (blurs what is BEHIND the element) — routes through the universal strength range. Materials use the frost/* pair; this is the generic backdrop range.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{regular.xs}"
+       },
+       "xl": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "Backdrop blur strength (blurs what is BEHIND the element) — routes through the universal strength range. Materials use the frost/* pair; this is the generic backdrop range.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{regular.m}"
+       },
+       "2xl": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "Backdrop blur strength (blurs what is BEHIND the element) — routes through the universal strength range. Materials use the frost/* pair; this is the generic backdrop range.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{regular.xl}"
+       },
+       "3xl": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "Backdrop blur strength (blurs what is BEHIND the element) — routes through the universal strength range. Materials use the frost/* pair; this is the generic backdrop range.",
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
