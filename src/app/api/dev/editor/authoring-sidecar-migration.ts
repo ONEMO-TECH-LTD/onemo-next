@@ -59,7 +59,11 @@ export async function migrateAuthoringSidecarOnLoad(input: {
       projectionFingerprints[componentId] = sourceProjectionFingerprint(snapshot.projection)
       snapshots.set(componentId, snapshot)
     }
-    assertExactHashes(sourceHashes, currentSourceHashes, 'AUTHORING_MIGRATION_SOURCE_STALE')
+    if (validatedLegacy.hadEnvironmentFingerprint) {
+      assertExactHashes(sourceHashes, currentSourceHashes, 'AUTHORING_MIGRATION_SOURCE_STALE')
+    } else {
+      assertHashSubset(sourceHashes, currentSourceHashes, 'AUTHORING_MIGRATION_SOURCE_STALE')
+    }
     const environmentFingerprint = compilerEnvironmentFingerprint(environmentHashes)
     if (validatedLegacy.hadEnvironmentFingerprint && environmentFingerprint !== validatedLegacy.graph.environmentFingerprint) {
       throw namedError('AUTHORING_MIGRATION_ENVIRONMENT_STALE', 'compiler environment changed before schema migration', 409)
@@ -207,6 +211,16 @@ async function migrateHistoryGraphPreimage(input: {
       throw namedError('AUTHORING_MIGRATION_HISTORY_SOURCE_UNAVAILABLE', `historical source bytes are unavailable: ${file}`, 409)
     }
   }
+  const expandedSourceHashes: Record<string, string> = {}
+  for (const snapshot of input.snapshots.values()) {
+    for (const file of Object.keys(snapshot.sourceHashes)) {
+      const historical = input.historicalSources.get(file)
+      if (historical === undefined) {
+        throw namedError('AUTHORING_MIGRATION_HISTORY_SOURCE_UNAVAILABLE', `historical source bytes are unavailable: ${file}`, 409)
+      }
+      expandedSourceHashes[file] = sha256(historical)
+    }
+  }
   const components = validatedLegacy.graph.components
   const cssSources = Object.fromEntries([...input.historicalSources].filter(([file]) => file.endsWith('.css')))
   const projectionFingerprints: Record<string, string> = {}
@@ -227,7 +241,7 @@ async function migrateHistoryGraphPreimage(input: {
   const migrated = migrateAuthoringGraphV1({
     graph,
     projectionFingerprints,
-    sourceHashes,
+    sourceHashes: expandedSourceHashes,
     environmentFingerprint,
   })
   const projectRoot = input.registry.get(input.storeId).canonicalRealPath
@@ -298,6 +312,15 @@ function validateLegacyGraphShape(graph: unknown): {
 function assertExactHashes(expected: Record<string, string>, actual: Record<string, string>, code: string): void {
   const paths = [...new Set([...Object.keys(expected), ...Object.keys(actual)])].sort()
   const changedPaths = paths.filter((file) => expected[file] !== actual[file])
+  if (changedPaths.length > 0) {
+    throw Object.assign(new Error(`migration source hash mismatch: ${changedPaths.join(', ')}`), {
+      code, status: 409, changedPaths,
+    })
+  }
+}
+
+function assertHashSubset(expected: Record<string, string>, actual: Record<string, string>, code: string): void {
+  const changedPaths = Object.keys(expected).filter((file) => actual[file] !== expected[file]).sort()
   if (changedPaths.length > 0) {
     throw Object.assign(new Error(`migration source hash mismatch: ${changedPaths.join(', ')}`), {
       code, status: 409, changedPaths,

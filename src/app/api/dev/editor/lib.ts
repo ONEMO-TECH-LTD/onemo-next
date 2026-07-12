@@ -1278,7 +1278,7 @@ export type ComponentModel = {
   // §0/§1 UNIFIED: EVERY scoped .module.css rule — single-part OR combinatorial — decomposed into one shape
   // in ONE list, so re-read reflects truth (no rule silently dropped). axisValues=[] + pseudo = a plain
   // interaction rule; a single axis-value = one axisValues entry; legacyName = a pre-axes single-variant class.
-  rules: { selector: string; axisValues: { axis: string; value: string }[]; semantic: string[]; pseudo?: string; legacyName?: string; decls: Record<string, string> }[]
+  rules: { selector: string; axisValues: { axis: string; value: string }[]; semantic: string[]; pseudo?: string; legacyName?: string; decls: Array<{ property: string; value: string; important: boolean }> }[]
   structure: StructureNode | null  // D6: recursive JSX tree of the component (server mirror of engine.ts buildLayerTree)
   // I4 (§3.6/D4): connectors read back from the SIDE-CHANNEL comments (never inferred from JSX/CSS shape).
   // `state` = the base transition's `@fc-transition: spring …`; `switch` = the `@fc-connector: tap axis→to`.
@@ -1632,8 +1632,12 @@ async function parseComponentModelSnapshot(input: {
         if (node.type !== 'rule') continue
         const d = decomposeRule((node as Rule).selector, rootClass, axisNames)
         if (!d || d === 'base') continue // base rule + non-scoped rules aren't deltas
-        const decls: Record<string, string> = {}
-        for (const dd of (node as Rule).nodes) if (dd.type === 'decl') decls[(dd as Declaration).prop] = (dd as Declaration).value
+        const decls: Array<{ property: string; value: string; important: boolean }> = []
+        for (const dd of (node as Rule).nodes) {
+          if (dd.type !== 'decl') continue
+          const declaration = dd as Declaration
+          decls.push({ property: declaration.prop, value: declaration.value, important: declaration.important === true })
+        }
         rules.push({ selector: (node as Rule).selector, axisValues: d.axisValues, semantic: d.semantic, ...(d.pseudo ? { pseudo: d.pseudo } : {}), ...(d.legacyName ? { legacyName: d.legacyName } : {}), decls })
       }
       // I4/D4: STATE connector read — from the `@fc-transition: <trigger> <to.state> spring <s> <d> <m>`

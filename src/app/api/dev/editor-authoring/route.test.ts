@@ -147,7 +147,11 @@ describe('editor-authoring G1 import route', () => {
     const sidecarPath = path.join(root, PROJECT_AUTHORING_SIDECAR)
     const legacy = JSON.parse(await fs.readFile(sidecarPath, 'utf8')) as Record<string, unknown>
     legacy.schemaVersion = 1
-    ;(legacy.sourceHashes as Record<string, string>)[environmentFile] = sha256(legacyEnvironmentBytes)
+    const legacySourceHashes = legacy.sourceHashes as Record<string, string>
+    legacy.sourceHashes = {
+      [SOURCE_FILE]: legacySourceHashes[SOURCE_FILE]!,
+      [environmentFile]: sha256(legacyEnvironmentBytes),
+    }
     delete legacy.environmentFingerprint
     for (const component of Object.values(legacy.components as Record<string, Record<string, unknown>>)) {
       delete component.projectionFingerprint
@@ -163,7 +167,11 @@ describe('editor-authoring G1 import route', () => {
       for (const component of Object.values(graph.components as Record<string, Record<string, unknown>>)) {
         delete component.projectionFingerprint
       }
-      ;(graph.sourceHashes as Record<string, string>)[environmentFile] = sha256(legacyEnvironmentBytes)
+      const graphSourceHashes = graph.sourceHashes as Record<string, string>
+      graph.sourceHashes = {
+        ...(graphSourceHashes[SOURCE_FILE] ? { [SOURCE_FILE]: graphSourceHashes[SOURCE_FILE] } : {}),
+        [environmentFile]: sha256(legacyEnvironmentBytes),
+      }
       delete graph.environmentFingerprint
       const graphBytes = Buffer.from(JSON.stringify(graph, null, 2) + '\n')
       const graphHash = sha256(graphBytes)
@@ -184,6 +192,7 @@ describe('editor-authoring G1 import route', () => {
     const persisted = JSON.parse(await fs.readFile(sidecarPath, 'utf8'))
     expect(persisted).toMatchObject({ schemaVersion: 2, revision: 6 })
     expect(persisted.sourceHashes).not.toHaveProperty(environmentFile)
+    expect(persisted.sourceHashes).toHaveProperty('tsconfig.json', expect.stringMatching(/^[a-f0-9]{64}$/))
     expect(persisted.environmentFingerprint).toMatch(/^[a-f0-9]{64}$/)
     expect(Object.values(persisted.components)[0]).toMatchObject({ projectionFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/) })
     expect(await fs.readdir(transactionsPath)).toHaveLength(transactionsBefore.length + 1)
@@ -497,6 +506,42 @@ describe('editor-authoring G1 import route', () => {
     expect(response.status).toBe(422)
     await expect(response.json()).resolves.toMatchObject({ code: 'SOURCE_PROJECTION_DRIFT' })
     await expect(fs.readFile(sourcePath, 'utf8')).resolves.toBe(changedSource)
+    await expect(fs.readFile(sidecarPath)).resolves.toEqual(beforeSidecar)
+    await expect(fs.readFile(journalPath)).resolves.toEqual(beforeJournal)
+    expect((await fs.readdir(transactionsPath)).sort()).toEqual(beforeTransactions)
+  }, 20_000)
+
+  it('refuses CSS cascade-order drift before sidecar, history, or transaction writes', async () => {
+    const root = await makeRoot(`import styles from './Button.module.css'
+export function Button() { return <button className={styles.base} /> }
+`)
+    const cssFile = 'src/app/(dev)/react-figma-components/Button.module.css'
+    const cssPath = path.join(root, cssFile)
+    await fs.writeFile(cssPath, '.base{}.base:hover{margin:0;margin-left:1px}\n')
+    const classified = await (await handleGet(request('GET'), root)).json()
+    await handlePost(request('POST', {
+      kind: 'import-source', file: SOURCE_FILE, expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint,
+      transactionId: '00000000-0000-4000-8000-000000000008',
+    }), root)
+    await fs.writeFile(cssPath, '.base{}.base:hover{margin-left:1px;margin:0}\n')
+    const stale = await (await handleGet(componentStatusRequest(), root)).json()
+    expect(stale).toMatchObject({ authoringState: 'source-stale', changedPaths: [cssFile] })
+    const sidecarPath = path.join(root, PROJECT_AUTHORING_SIDECAR)
+    const journalPath = path.join(root, authoringMetadataPath('project', 'history/journal.ndjson'))
+    const transactionsPath = path.join(root, authoringMetadataPath('project', 'transactions'))
+    const beforeSidecar = await fs.readFile(sidecarPath)
+    const beforeJournal = await fs.readFile(journalPath)
+    const beforeTransactions = (await fs.readdir(transactionsPath)).sort()
+
+    const response = await handlePost(request('POST', {
+      kind: 'revalidate-source', file: SOURCE_FILE,
+      expectedRevision: stale.expectedRevision,
+      expectedSourceHashes: stale.sourceHashes,
+    }), root)
+
+    expect(response.status).toBe(422)
+    await expect(response.json()).resolves.toMatchObject({ code: 'SOURCE_PROJECTION_DRIFT' })
     await expect(fs.readFile(sidecarPath)).resolves.toEqual(beforeSidecar)
     await expect(fs.readFile(journalPath)).resolves.toEqual(beforeJournal)
     expect((await fs.readdir(transactionsPath)).sort()).toEqual(beforeTransactions)

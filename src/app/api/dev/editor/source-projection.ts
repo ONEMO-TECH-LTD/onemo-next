@@ -121,10 +121,10 @@ export function sourceProjectionFingerprint(projection: SourceProjection): strin
     rules: projection.rules.map((rule) => ({
       ...rule,
       selector: selectorParser().processSync(rule.selector, { lossless: false }),
-      decls: Object.fromEntries(Object.entries(rule.decls).map(([property, value]) => [
-        property,
-        normalizeCssValue(value),
-      ])),
+      decls: rule.decls.map((declaration) => ({
+        ...declaration,
+        value: normalizeCssValue(declaration.value),
+      })),
     })),
     structure: normalizeStructure(projection.structure),
     connectors: projection.connectors,
@@ -188,8 +188,12 @@ function tokenizeTypeScriptExpression(source: string): Array<{ kind: number; val
       for (const child of children) visit(child)
       return
     }
-    const value = ts.isStringLiteralLike(node) || ts.isIdentifier(node) || ts.isNumericLiteral(node)
-      ? node.text
+    const value = ts.isNumericLiteral(node)
+      ? String(Number(node.text.replaceAll('_', '')))
+      : ts.isBigIntLiteral(node)
+        ? BigInt(node.text.slice(0, -1).replaceAll('_', '')).toString()
+        : ts.isStringLiteralLike(node) || ts.isIdentifier(node)
+          ? node.text
       : node.getText(file)
     tokens.push({ kind: node.kind, value })
   }
@@ -198,12 +202,24 @@ function tokenizeTypeScriptExpression(source: string): Array<{ kind: number; val
 }
 
 function normalizeCssValue(value: string): unknown {
-  return valueParser(value).nodes.map(normalizeCssValueNode)
+  return normalizeCssValueNodes(valueParser(value).nodes)
 }
 
 type CssValueNode = ReturnType<typeof valueParser>['nodes'][number]
 
-function normalizeCssValueNode(node: CssValueNode): unknown {
+function normalizeCssValueNodes(nodes: CssValueNode[]): unknown[] {
+  const normalized: unknown[] = []
+  for (const node of nodes) {
+    const value = normalizeCssValueNode(node)
+    if (value === null) continue
+    if ((value as { type?: unknown }).type === 'space' &&
+        (normalized.at(-1) as { type?: unknown } | undefined)?.type === 'space') continue
+    normalized.push(value)
+  }
+  return normalized
+}
+
+function normalizeCssValueNode(node: CssValueNode): unknown | null {
   switch (node.type) {
     case 'space':
       return { type: node.type }
@@ -214,7 +230,7 @@ function normalizeCssValueNode(node: CssValueNode): unknown {
         type: node.type,
         value: node.value,
         ...(node.unclosed ? { unclosed: true } : {}),
-        nodes: node.nodes.map(normalizeCssValueNode),
+        nodes: normalizeCssValueNodes(node.nodes),
       }
     case 'string':
       return {
@@ -223,11 +239,7 @@ function normalizeCssValueNode(node: CssValueNode): unknown {
         ...(node.unclosed ? { unclosed: true } : {}),
       }
     case 'comment':
-      return {
-        type: node.type,
-        value: node.value,
-        ...(node.unclosed ? { unclosed: true } : {}),
-      }
+      return null
     default:
       return { type: node.type, value: node.value }
   }

@@ -212,13 +212,26 @@ export function Button({ b = mark('b'), a = mark('a') }: { b?: string; a?: strin
     expect(sourceProjectionFingerprint(trailingSpace)).not.toBe(sourceProjectionFingerprint(compact))
   })
 
+  it('canonicalizes equivalent numeric default spellings', async () => {
+    const underscored = await sourceProjectionFromSource({
+      file: 'Button.tsx',
+      source: `export function Button({ count = 1_000 }: { count?: number }) { return <button /> }`,
+    })
+    const exponent = await sourceProjectionFromSource({
+      file: 'Button.tsx',
+      source: `export function Button({ count = 1e3 }: { count?: number }) { return <button /> }`,
+    })
+
+    expect(sourceProjectionFingerprint(exponent)).toBe(sourceProjectionFingerprint(underscored))
+  })
+
   it('ignores CSS-only formatting while retaining rule and declaration semantics', async () => {
     const source = `import styles from './Button.module.css'
 export function Button() { return <button className={styles.base} /> }
 `
     const compact = await sourceProjectionFromSource({
       file: 'Button.tsx', source,
-      cssSources: { 'Button.module.css': `.base{color:rgb(255,255,255);padding:0  4px}.base:hover,.base:focus{opacity:.5}` },
+      cssSources: { 'Button.module.css': `.base{color:rgb(255,/**/255,255);padding:0/**/  4px}.base:hover,.base:focus{opacity:.5}` },
     })
     const formatted = await sourceProjectionFromSource({
       file: 'Button.tsx', source,
@@ -236,6 +249,33 @@ export function Button() { return <button className={styles.base} /> }
     expect(compact.rules).toHaveLength(1)
     expect(formatted.rules).toHaveLength(1)
     expect(sourceProjectionFingerprint(formatted)).toBe(sourceProjectionFingerprint(compact))
+  })
+
+  it('preserves declaration order, duplicates, and important priority', async () => {
+    const source = `import styles from './Button.module.css'
+export function Button() { return <button className={styles.base} /> }
+`
+    const shorthandFirst = await sourceProjectionFromSource({
+      file: 'Button.tsx', source,
+      cssSources: { 'Button.module.css': `.base{}.base:hover{margin:0;margin-left:1px;color:red;color:blue}` },
+    })
+    const shorthandLast = await sourceProjectionFromSource({
+      file: 'Button.tsx', source,
+      cssSources: { 'Button.module.css': `.base{}.base:hover{margin-left:1px;margin:0;color:blue;color:red}` },
+    })
+    const important = await sourceProjectionFromSource({
+      file: 'Button.tsx', source,
+      cssSources: { 'Button.module.css': `.base{}.base:hover{margin:0;margin-left:1px!important;color:red;color:blue}` },
+    })
+
+    expect(shorthandFirst.rules[0]?.decls).toEqual([
+      { property: 'margin', value: '0', important: false },
+      { property: 'margin-left', value: '1px', important: false },
+      { property: 'color', value: 'red', important: false },
+      { property: 'color', value: 'blue', important: false },
+    ])
+    expect(sourceProjectionFingerprint(shorthandLast)).not.toBe(sourceProjectionFingerprint(shorthandFirst))
+    expect(sourceProjectionFingerprint(important)).not.toBe(sourceProjectionFingerprint(shorthandFirst))
   })
 
   it.each([
