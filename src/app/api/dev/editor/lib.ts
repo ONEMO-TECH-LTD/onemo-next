@@ -2423,13 +2423,27 @@ async function createComponent(op: Extract<WriteOp, { kind: 'create-component' }
   const rel = `${relBase}/${name}.tsx`
   return { ok: true, file: rel, newValueText: name, componentFile: rel, name }
 }
-async function makeComponent(op: Extract<WriteOp, { kind: 'make-component' }>): Promise<{ ok: true; file: string; newValueText: string; componentFile: string }> {
-  const abs = jailComponentWrite(op.file)
-  const buf = await fs.readFile(abs)
-  const source = buf.toString('utf8')
-  const sf = ts.createSourceFile(abs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
-  const opening = findJsxAt(sf, op.line, op.col)
-  if (!opening) throw Object.assign(new Error(`no JSX element at ${op.line}:${op.col}`), { status: 404 })
+export type MakeComponentPlan = {
+  name: string
+  componentSource: string
+  consumerSource: Buffer
+}
+
+export function planMakeComponentFromSelection(input: {
+  source: Buffer
+  sourceAbs: string
+  componentDir: string
+  line: number
+  col: number
+  name: string
+}): MakeComponentPlan {
+  if (!/^[A-Z][A-Za-z0-9]*$/.test(input.name)) {
+    throw Object.assign(new Error('component name must be a PascalCase identifier'), { status: 422 })
+  }
+  const source = input.source.toString('utf8')
+  const sf = ts.createSourceFile(input.sourceAbs, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
+  const opening = findJsxAt(sf, input.line, input.col)
+  if (!opening) throw Object.assign(new Error(`no JSX element at ${input.line}:${input.col}`), { status: 404 })
   const el: ts.Node = ts.isJsxSelfClosingElement(opening) ? opening : opening.parent
   if (!ts.isJsxElement(el) && !ts.isJsxSelfClosingElement(el)) {
     throw Object.assign(new Error('could not resolve the full element subtree'), { status: 422 })
@@ -2476,33 +2490,23 @@ async function makeComponent(op: Extract<WriteOp, { kind: 'make-component' }>): 
   }
   const neededImports = [...new Set(trulyFree.map((n) => importByName.get(n)!))]
 
-  // create the component file (collision-safe), inlining the subtree verbatim.
-  // Name must be a VALID JS identifier: strip non-alphanumerics, and a JS identifier cannot start
-  // with a digit — prefix a letter if it would (e.g. "123box" → "C123box"), else `export function
-  // 123box()` is a syntax error (peer-review finding).
-  let rawBase = (op.name ?? 'Component').replace(/[^a-z0-9]/gi, '') || 'Component'
-  if (!/^[a-z]/i.test(rawBase)) rawBase = 'C' + rawBase
-  const nameBase = rawBase[0].toUpperCase() + rawBase.slice(1)
-  const compDir = path.join(ROOT, 'src/app/(dev)/react-figma-components')
-  await fs.mkdir(compDir, { recursive: true })
-  let name = nameBase, i = 1
-  while (true) { try { await fs.access(path.join(compDir, `${name}.tsx`)); name = `${nameBase}${++i}` } catch { break } }
+  const name = input.name
   const subtree = el.getText(sf)
   // Rewrite RELATIVE import specifiers so they resolve from the new component's directory — the
   // extracted file sits at a different depth than the source, so a verbatim `../…` breaks the build
   // (module-not-found; the parse-guard only checks syntax, not resolution). Absolute/@-alias/package
   // specifiers are left untouched.
-  const srcDir = path.dirname(abs)
+  const srcDir = path.dirname(input.sourceAbs)
   const rewriteImport = (text: string): string => {
     const m = text.match(/from\s+(['"])(\.[^'"]*)\1/)
     if (!m) return text
-    let rel = path.relative(compDir, path.resolve(srcDir, m[2])).replace(/\\/g, '/')
+    let rel = path.relative(input.componentDir, path.resolve(srcDir, m[2])).replace(/\\/g, '/')
     if (!rel.startsWith('.')) rel = './' + rel
     return text.replace(m[0], `from ${m[1]}${rel}${m[1]}`)
   }
   const fixedImports = neededImports.map(rewriteImport)
   const compSource = `${fixedImports.length ? fixedImports.join('\n') + '\n\n' : ''}export function ${name}() {\n  return (\n    ${subtree}\n  )\n}\n`
-  const compAbs = path.join(compDir, `${name}.tsx`)
+  const compAbs = path.join(input.componentDir, `${name}.tsx`)
 
   // replace subtree with <Name /> and add the import — bottom-up splice (subtree offset > import offset)
   const elStart = el.getStart(sf), elEnd = el.getEnd()
@@ -2511,14 +2515,31 @@ async function makeComponent(op: Extract<WriteOp, { kind: 'make-component' }>): 
   const importText = `import { ${name} } from '@/app/(dev)/react-figma-components/${name}'`
   const bElStart = byteLen(source.slice(0, elStart)), bElEnd = byteLen(source.slice(0, elEnd))
   const bImp = byteLen(source.slice(0, importPos))
-  let next = Buffer.concat([buf.subarray(0, bElStart), Buffer.from(`<${name} />`, 'utf8'), buf.subarray(bElEnd)])
+  let next = Buffer.concat([input.source.subarray(0, bElStart), Buffer.from(`<${name} />`, 'utf8'), input.source.subarray(bElEnd)])
   const importInsert = importPos === 0 ? `${importText}\n` : `\n${importText}`
   next = Buffer.concat([next.subarray(0, bImp), Buffer.from(importInsert, 'utf8'), next.subarray(bImp)])
   // F1: validate BOTH outputs before writing EITHER — no half-written state on refusal
   assertValidTsx(compAbs, compSource)
-  assertValidTsx(abs, next.toString('utf8'))
-  await fs.writeFile(compAbs, compSource, 'utf8')
-  await fs.writeFile(abs, next)
+  assertValidTsx(input.sourceAbs, next.toString('utf8'))
+  return { name, componentSource: compSource, consumerSource: next }
+}
+
+async function makeComponent(op: Extract<WriteOp, { kind: 'make-component' }>): Promise<{ ok: true; file: string; newValueText: string; componentFile: string }> {
+  const abs = jailComponentWrite(op.file)
+  const source = await fs.readFile(abs)
+  let rawBase = (op.name ?? 'Component').replace(/[^a-z0-9]/gi, '') || 'Component'
+  if (!/^[a-z]/i.test(rawBase)) rawBase = 'C' + rawBase
+  const nameBase = rawBase[0].toUpperCase() + rawBase.slice(1)
+  const compDir = path.join(ROOT, 'src/app/(dev)/react-figma-components')
+  await fs.mkdir(compDir, { recursive: true })
+  let name = nameBase, i = 1
+  while (true) { try { await fs.access(path.join(compDir, `${name}.tsx`)); name = `${nameBase}${++i}` } catch { break } }
+  const plan = planMakeComponentFromSelection({
+    source, sourceAbs: abs, componentDir: compDir, line: op.line, col: op.col, name,
+  })
+  const compAbs = path.join(compDir, `${name}.tsx`)
+  await fs.writeFile(compAbs, plan.componentSource, 'utf8')
+  await fs.writeFile(abs, plan.consumerSource)
   return { ok: true, file: op.file, newValueText: `<${name} />`, componentFile: `src/app/(dev)/react-figma-components/${name}.tsx` }
 }
 
