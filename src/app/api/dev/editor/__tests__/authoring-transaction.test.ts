@@ -96,6 +96,57 @@ describe('SingleRootAuthoringTransaction', () => {
     expect(JSON.stringify(participant)).not.toContain(root)
   })
 
+  it('durably creates a new source file with a null preimage and records its exact hash', async () => {
+    const { root, tx } = await makeTransaction()
+    const file = 'src/app/(dev)/react-figma-components/Card.tsx'
+    const bytes = 'export function Card() { return <section /> }\n'
+
+    const graph = await tx.commit({
+      expectedRevision: 0,
+      sourceFiles: [file],
+      sourcePatches: [{ file, before: null, after: bytes }],
+      mutate: (draft) => draft,
+    })
+
+    await expect(fs.readFile(path.join(root, file), 'utf8')).resolves.toBe(bytes)
+    expect(graph.sourceHashes[file]).toBe(sha256(bytes))
+    const participant = JSON.parse(await fs.readFile(
+      path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions/tx-1/participant.json'),
+      'utf8',
+    ))
+    expect(participant.files).toEqual([expect.objectContaining({ file, before: null, after: expect.any(Object) })])
+  })
+
+  it('removes a newly created source file when failure occurs before the commit decision', async () => {
+    const { root, tx } = await makeTransaction({ afterSourceInstall: () => { throw new Error('injected create failure') } })
+    const file = 'src/app/(dev)/react-figma-components/Card.tsx'
+
+    await expect(tx.commit({
+      expectedRevision: 0,
+      sourceFiles: [file],
+      sourcePatches: [{ file, before: null, after: 'export function Card() { return <section /> }\n' }],
+      mutate: (draft) => draft,
+    })).rejects.toThrow('injected create failure')
+
+    await expect(fs.readFile(path.join(root, file))).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(fs.readFile(path.join(root, 'src/app/(dev)/react-figma-components/.onemo/authoring-v1.json')))
+      .rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('refuses a null source preimage when the target already exists', async () => {
+    const { root, tx } = await makeTransaction()
+    const file = 'src/app/(dev)/react-figma-components/Card.tsx'
+    await fs.writeFile(path.join(root, file), 'existing bytes')
+
+    await expect(tx.commit({
+      expectedRevision: 0,
+      sourceFiles: [file],
+      sourcePatches: [{ file, before: null, after: 'replacement bytes' }],
+      mutate: (draft) => draft,
+    })).rejects.toMatchObject({ code: 'SOURCE_PREIMAGE_STALE', changedPaths: [file] })
+    await expect(fs.readFile(path.join(root, file), 'utf8')).resolves.toBe('existing bytes')
+  })
+
   it('rejects stale revision before preparing a transaction', async () => {
     const { tx } = await makeTransaction()
     await tx.commit({ expectedRevision: 0, mutate: (draft) => draft })

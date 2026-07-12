@@ -59,7 +59,7 @@ export type SingleRootCoordinatorRecord = {
   status: 'prepared' | 'committed' | 'rolled-back'
 }
 
-export type SourcePatch = { file: string; before: string | Buffer; after: string | Buffer }
+export type SourcePatch = { file: string; before: string | Buffer | null; after: string | Buffer }
 export type MetadataPatch = { file: string; before: string | Buffer | null; after: string | Buffer | null }
 
 export type AuthoringTransactionHooks = {
@@ -151,13 +151,15 @@ export class SingleRootAuthoringTransaction {
     const sourcePatches = update.sourcePatches ?? []
     const metadataPatches = update.metadataPatches ?? []
     const expectedSourceHashes = update.expectedSourceHashes ?? {}
+    const patchByFile = new Map(sourcePatches.map((patch) => [patch.file, patch]))
     this.validatePatchPaths(sourcePatches, metadataPatches)
     const sourceFiles = unique([
       ...(update.sourceFiles ?? Object.keys(expectedSourceHashes)),
       ...sourcePatches.map((patch) => patch.file),
       ...Object.keys(expectedSourceHashes),
     ])
-    const missingHashPreconditions = sourceFiles.filter((file) => !isSha256(expectedSourceHashes[file]))
+    const missingHashPreconditions = sourceFiles.filter((file) =>
+      !isSha256(expectedSourceHashes[file]) && patchByFile.get(file)?.before !== null)
     if (missingHashPreconditions.length > 0) {
       throw Object.assign(new Error(`source hash precondition required: ${missingHashPreconditions.join(', ')}`), {
         status: 422,
@@ -165,7 +167,7 @@ export class SingleRootAuthoringTransaction {
         changedPaths: missingHashPreconditions,
       })
     }
-    const currentSources = await this.readSourceFiles(sourceFiles)
+    const currentSources = await this.readOptionalFiles(sourceFiles)
     this.verifyExpectedHashes(expectedSourceHashes, currentSources)
     const expectedEnvironmentHashes = update.expectedEnvironmentHashes ?? {}
     const currentEnvironment = await this.readEnvironmentFiles(Object.keys(expectedEnvironmentHashes))
@@ -178,12 +180,15 @@ export class SingleRootAuthoringTransaction {
     const currentMetadata = await this.readOptionalFiles(metadataPatches.map((patch) => patch.file))
     this.verifyMetadataPreimages(metadataPatches, currentMetadata)
     await this.assertTransactionIdAvailable()
-    const patchByFile = new Map(sourcePatches.map((patch) => [patch.file, patch]))
-    const touchedSourceHashes = Object.fromEntries(sourceFiles.map((file) => [
-      file,
-      sha256(patchByFile.get(file)?.after ?? currentSources.get(file)!),
-    ]))
-    const sourceHashes = { ...before.sourceHashes, ...touchedSourceHashes }
+    const sourceHashes = { ...before.sourceHashes }
+    for (const file of sourceFiles) {
+      const patch = patchByFile.get(file)
+      const after = patch?.after ?? currentSources.get(file)
+      if (after === null || after === undefined) {
+        throw namedError('SOURCE_BYTES_MISSING', `source bytes missing after preflight: ${file}`, 409)
+      }
+      sourceHashes[file] = sha256(after)
+    }
     const afterCandidate = update.mutate({
       ...before,
       revision: before.revision + 1,
@@ -195,11 +200,15 @@ export class SingleRootAuthoringTransaction {
       sourceHashes,
     })
     const afterSidecarBytes = Buffer.from(JSON.stringify(after, null, 2) + '\n')
-    const files = await Promise.all(sourcePatches.map(async (patch) => ({
-      file: patch.file,
-      before: await this.putTransactionBlob(patch.before, await this.fileMode(patch.file)),
-      after: await this.putTransactionBlob(patch.after, await this.fileMode(patch.file)),
-    })))
+    const files = await Promise.all(sourcePatches.map(async (patch) => {
+      const current = currentSources.get(patch.file) ?? null
+      const mode = current === null ? 0o644 : await this.fileMode(patch.file)
+      return {
+        file: patch.file,
+        before: patch.before === null ? null : await this.putTransactionBlob(patch.before, mode),
+        after: await this.putTransactionBlob(patch.after, mode),
+      }
+    }))
     const sidecar = {
       file: this.input.store.relativeSidecarPath,
       before: sidecarSnapshot ? await this.putTransactionBlob(sidecarSnapshot.bytes, await this.fileMode(this.input.store.relativeSidecarPath)) : null,
@@ -410,9 +419,12 @@ export class SingleRootAuthoringTransaction {
     return snapshots
   }
 
-  private verifyExpectedHashes(expected: Record<string, string>, current: Map<string, Buffer>): void {
+  private verifyExpectedHashes(expected: Record<string, string>, current: Map<string, Buffer | null>): void {
     const changedPaths = Object.entries(expected)
-      .filter(([file, hash]) => sha256(current.get(file)!) !== hash)
+      .filter(([file, hash]) => {
+        const bytes = current.get(file)
+        return bytes === null || bytes === undefined || sha256(bytes) !== hash
+      })
       .map(([file]) => file)
     if (changedPaths.length > 0) {
       throw Object.assign(new Error(`source hash mismatch: ${changedPaths.join(', ')}`), {
@@ -440,12 +452,16 @@ export class SingleRootAuthoringTransaction {
     }
   }
 
-  private verifyPatchPreimages(patches: SourcePatch[], current: Map<string, Buffer>): void {
+  private verifyPatchPreimages(patches: SourcePatch[], current: Map<string, Buffer | null>): void {
     if (new Set(patches.map((patch) => patch.file)).size !== patches.length) {
       throw namedError('DUPLICATE_SOURCE_PATCH', 'source patch files must be unique', 422)
     }
     const changedPaths = patches
-      .filter((patch) => sha256(current.get(patch.file)!) !== sha256(patch.before))
+      .filter((patch) => {
+        const actual = current.get(patch.file) ?? null
+        if (patch.before === null || actual === null) return patch.before !== null || actual !== null
+        return sha256(actual) !== sha256(patch.before)
+      })
       .map((patch) => patch.file)
     if (changedPaths.length > 0) {
       throw Object.assign(new Error(`source preimage mismatch: ${changedPaths.join(', ')}`), {
