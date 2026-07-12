@@ -68,6 +68,20 @@ describe('ProjectAuthoringSession', () => {
       .toContain('session-create')
   })
 
+  it('returns source-owned render props keyed by stable graph identity before native conversion', async () => {
+    const { registry, store } = await setup()
+    const session = new ProjectAuthoringSession({ storeId: 'project-main', registry, store })
+    const loaded = await session.loadComponent(FILE)
+    const variants = Object.values(loaded.graph.variants)
+    const primary = variants.find((variant) => variant.id === loaded.graph.components[loaded.componentId]!.primaryVariantId)!
+    const secondary = variants.find((variant) => variant.id !== primary.id)!
+
+    expect(loaded.variantProps).toEqual({
+      [primary.id]: {},
+      [secondary.id]: { variant: 'Secondary' },
+    })
+  })
+
   it('refuses an incomplete hash set before compile or transaction evidence', async () => {
     const { root, registry, store, graph } = await setup()
     const component = Object.values(graph.components)[0]!
@@ -100,5 +114,30 @@ describe('ProjectAuthoringSession', () => {
       expectedSourceHashes: loaded.sourceHashes,
     })).rejects.toMatchObject({ code: 'SOURCE_HASH_STALE', changedPaths: ['src/types.ts'] })
     await expect(fs.readdir(transactions)).resolves.toEqual(beforeEntries)
+  })
+
+  it('undoes the latest command through the same source, graph, and history transaction', async () => {
+    const { root, registry, store, graph } = await setup()
+    const component = Object.values(graph.components)[0]!
+    const session = new ProjectAuthoringSession({ storeId: 'project-main', registry, store })
+    const created = await session.execute({
+      command: { kind: 'create-variant', commandId: 'session-create-undo', componentId: component.id, displayName: 'Temporary' },
+      expectedRevision: graph.revision,
+      expectedSourceHashes: graph.sourceHashes,
+    })
+    const loaded = await session.loadComponent(FILE)
+
+    const undone = await session.undo({
+      expectedRevision: created.graph.revision,
+      expectedSourceHashes: loaded.sourceHashes,
+    })
+
+    expect(undone.graph.revision).toBe(3)
+    expect(Object.values(undone.graph.variants).map((variant) => variant.displayName)).not.toContain('Temporary')
+    expect(await fs.readFile(path.join(root, FILE), 'utf8')).toBe(SOURCE)
+    expect((await session.loadComponent(FILE)).canUndo).toBe(false)
+    const journal = await fs.readFile(path.join(root, 'src/app/(dev)/react-figma-components/.onemo/history/journal.ndjson'), 'utf8')
+    expect(journal).toContain('session-create-undo')
+    expect(journal).toContain('authoring-undo')
   })
 })
