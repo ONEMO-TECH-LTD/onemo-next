@@ -23,7 +23,7 @@ import {
   type Icon as PIcon,
 } from '@phosphor-icons/react'
 import { ComponentCanvas } from './component-authoring/ComponentCanvas'
-import { AUTHORING_RESUME_KEY } from './component-authoring/resume'
+import { AUTHORING_ACTIVE_FILE_KEY } from './component-authoring/session'
 import { canvasHistoryAction } from './component-authoring/gestures'
 
 const INK = 'rgba(0,0,0,0.898)', MUTE = 'rgba(0,0,0,0.45)', FAINT = 'rgba(0,0,0,0.3)' // INK: Figma's exact ink (E8 audit — measured, was 0.9)
@@ -2344,20 +2344,27 @@ export default function ReactFigmaPage() {
     setAuthoringBounds({ w: Math.max(800, w), h: Math.max(600, h) })
   }, [])
   const noteAuthoringChanged = useCallback(() => setCompNonce((value) => value + 1), [])
+  const closeComponentAuthoring = useCallback(() => {
+    sessionStorage.removeItem(AUTHORING_ACTIVE_FILE_KEY)
+    setEditingComponent(null)
+  }, [])
   const canvasMode: 'design' | 'components' = rail === 'components' && editingComponent ? 'components' : 'design'
   const [autoDistributed, setAutoDistributed] = useState(false) // justify space-between (Figma distributed)
   const [insetSides, setInsetSides] = useState({ t: '0', r: '0', b: '0', l: '0' }) // A7: per-side inset (positioned elements) // derived — the far-left rail IS the canvas switch (Dan 2026-07-07)
   const dsComponents = useDsComponents(rail === 'assets' || rail === 'components', compNonce) // E4-G4 Assets panel + E10 components rail (library panel needs the list whether or not editing)
   useEffect(() => {
-    if (sessionStorage.getItem(AUTHORING_RESUME_KEY)) setRail('components')
+    if (sessionStorage.getItem(AUTHORING_ACTIVE_FILE_KEY)) setRail('components')
   }, [])
   useEffect(() => {
     if (editingComponent || rail !== 'components') return
-    const resumeFile = sessionStorage.getItem(AUTHORING_RESUME_KEY)
+    const resumeFile = sessionStorage.getItem(AUTHORING_ACTIVE_FILE_KEY)
     if (!resumeFile) return
     const component = dsComponents.find((candidate) => candidate.root === 'project' && candidate.file === resumeFile)
     if (component) setEditingComponent(component)
   }, [dsComponents, editingComponent, rail])
+  useEffect(() => {
+    if (editingComponent?.file) sessionStorage.setItem(AUTHORING_ACTIVE_FILE_KEY, editingComponent.file)
+  }, [editingComponent])
   // #6: create a new component in code (Framer-style) — scaffolds a real editable component file.
   const newComponent = useCallback(async (name: string, root: 'project' | 'global' = 'project', category = '') => {
     const clean = name.trim()
@@ -3655,7 +3662,7 @@ export default function ReactFigmaPage() {
         {railItems.map(([icon, label, key]) => {
           const active = key !== null && rail === key
           return (
-            <button key={label} type="button" title={label} onClick={() => { setRail(key); if (key !== 'components') setEditingComponent(null) }}
+            <button key={label} type="button" title={label} onClick={() => { setRail(key); if (key !== 'components') closeComponentAuthoring() }}
               style={{ appearance: 'none', border: 0, cursor: 'pointer', width: 56, height: 56, borderRadius: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', gap: 2, background: 'transparent', padding: '5px 0 0', color: active ? SEL : INK }}>
               <span style={{ width: 32, height: 28, borderRadius: 5, display: 'grid', placeItems: 'center', background: active ? '#e5f4ff' : 'transparent' }}><UiIcon name={icon} /></span>
               <span style={{ font: `450 ${label.length > 8 ? 8 : 9}px/14px ${FONT}`, letterSpacing: label.length > 8 ? '0px' : '0.045px', color: INK, maxWidth: 54, padding: '0 1px', boxSizing: 'border-box', overflow: 'hidden', whiteSpace: 'nowrap', textAlign: 'center' }}>{label}</span>
@@ -3899,7 +3906,7 @@ export default function ReactFigmaPage() {
         {canvasMode === 'design' && codeMode && sel && <CodeView file={sel.file} line={sel.line} onClose={() => setCodeMode(false)} />}
         {canvasMode === 'components' && editingComponent && (
           <nav aria-label="Component breadcrumb" data-component-breadcrumb style={{ position: 'absolute', top: 12, left: 12, zIndex: 50, display: 'flex', alignItems: 'center', gap: 4, width: 'fit-content', padding: 3, border: '1px solid var(--sem-col-border-secondary)', borderRadius: 'var(--sem-radii-full)', background: 'var(--sem-col-bg-primary)', fontFamily: 'var(--sem-type-fluid-label-xs-font)', fontSize: 'var(--sem-type-fluid-label-xs-size)', lineHeight: 'var(--sem-type-fluid-label-xs-line-height)', letterSpacing: 'var(--sem-type-fluid-label-xs-letter-spacing)' }}>
-            <button type="button" data-component-home onClick={() => setEditingComponent(null)} title="Back to the page" style={{ appearance: 'none', border: 0, borderRadius: 'var(--sem-radii-full)', background: 'var(--sem-col-bg-secondary)', font: 'inherit', color: 'var(--sem-col-text-secondary)', cursor: 'pointer', padding: '4px 8px' }}>Home</button>
+            <button type="button" data-component-home onClick={closeComponentAuthoring} title="Back to the page" style={{ appearance: 'none', border: 0, borderRadius: 'var(--sem-radii-full)', background: 'var(--sem-col-bg-secondary)', font: 'inherit', color: 'var(--sem-col-text-secondary)', cursor: 'pointer', padding: '4px 8px' }}>Home</button>
             <span aria-hidden="true" style={{ color: 'var(--sem-col-text-placeholder)' }}>›</span>
             <button type="button" data-component-current aria-current="page" onClick={selectFrameRoot} title="Select component frame" style={{ appearance: 'none', border: '1px solid var(--sem-col-border-brand)', borderRadius: 'var(--sem-radii-full)', background: 'var(--sem-col-bg-brand-primary)', font: 'inherit', color: 'var(--sem-col-text-brand-primary)', cursor: 'pointer', padding: '4px 8px' }}>{editingComponent.name}</button>
           </nav>

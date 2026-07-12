@@ -100,6 +100,22 @@ test.describe('React Figma component authoring', () => {
     await renameInput.fill('Blur Rename')
     await page.locator(`[data-variant-id]:not([data-variant-id="${createdVariantId}"])`).first().click()
     await expect(page.getByText('Blur Rename', { exact: true })).toBeVisible({ timeout: 30_000 })
+    const movedVariant = page.locator(`[data-variant-id="${createdVariantId}"]`)
+    const geometryBeforeMove = await movedVariant.evaluate((node) => ({
+      x: Number.parseFloat((node as HTMLElement).style.left),
+      y: Number.parseFloat((node as HTMLElement).style.top),
+    }))
+    const movedVariantBox = await movedVariant.boundingBox()
+    if (!movedVariantBox) throw new Error('Created variant has no rendered drag bounds')
+    await page.mouse.move(movedVariantBox.x + 20, movedVariantBox.y + 20)
+    await page.mouse.down()
+    await page.mouse.move(movedVariantBox.x + 68, movedVariantBox.y + 44, { steps: 4 })
+    await page.mouse.up()
+    const geometryAfterMove = { x: geometryBeforeMove.x + 48, y: geometryBeforeMove.y + 24 }
+    await expect.poll(() => movedVariant.evaluate((node) => ({
+      x: Number.parseFloat((node as HTMLElement).style.left),
+      y: Number.parseFloat((node as HTMLElement).style.top),
+    }))).toEqual(geometryAfterMove)
     const authoringHost = await page.locator('[data-screen-host]').evaluate((node) => ({ width: node.clientWidth, height: node.clientHeight }))
     expect(authoringHost.width).toBeGreaterThan(402)
     await frame.evaluate((node) => {
@@ -124,6 +140,29 @@ test.describe('React Figma component authoring', () => {
       }
     })
     expect(restored).toEqual({ host: { width: 402, height: 874 }, iframe: { width: 402, height: 874 } })
+
+    await page.getByRole('button', { name: fixtureName, exact: true }).dblclick()
+    await expect(authoringCanvas).toBeVisible({ timeout: 30_000 })
+    await expect.poll(() => movedVariant.evaluate((node) => ({
+      x: Number.parseFloat((node as HTMLElement).style.left),
+      y: Number.parseFloat((node as HTMLElement).style.top),
+    }))).toEqual(geometryAfterMove)
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await Promise.race([
+      authoringCanvas.waitFor({ state: 'visible', timeout: 60_000 }),
+      revalidateSource.waitFor({ state: 'visible', timeout: 60_000 }),
+    ])
+    if (await revalidateSource.isVisible()) await revalidateSource.click()
+    await expect(authoringCanvas).toBeVisible({ timeout: 30_000 })
+    await expect.poll(() => movedVariant.evaluate((node) => ({
+      x: Number.parseFloat((node as HTMLElement).style.left),
+      y: Number.parseFloat((node as HTMLElement).style.top),
+    }))).toEqual(geometryAfterMove)
+    await page.keyboard.press('Meta+z')
+    await expect.poll(() => movedVariant.evaluate((node) => ({
+      x: Number.parseFloat((node as HTMLElement).style.left),
+      y: Number.parseFloat((node as HTMLElement).style.top),
+    }), { timeout: 30_000 })).toEqual(geometryBeforeMove)
 
     expect(consoleErrors, `Failed responses: ${failedResponses.join(', ')}`).toEqual([])
     expect(consoleWarnings).toEqual([])

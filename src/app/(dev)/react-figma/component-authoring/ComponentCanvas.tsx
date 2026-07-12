@@ -6,7 +6,6 @@ import { isValidElementType } from 'react-is'
 import type { AuthoringGraphV1, VariantFrame } from '@/app/api/dev/editor/authoring-types'
 import type { SourceProjection } from '@/app/api/dev/editor/source-projection'
 import { componentCanvasGeometry, movedVariantFrame } from './gestures'
-import { AUTHORING_RESUME_KEY } from './resume'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const projectComponents = (require as any).context('../../react-figma-components', true, /\.tsx$/)
@@ -63,7 +62,6 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged }: {
     if (data.authoringState !== 'loaded') throw new Error('Authoring load returned an invalid state')
     setImportPreview(null)
     setSnapshot(data)
-    if (sessionStorage.getItem(AUTHORING_RESUME_KEY) === file) sessionStorage.removeItem(AUTHORING_RESUME_KEY)
     setSelectedId((current) => current && data.graph.variants[current] ? current : data.graph.components[data.componentId]?.primaryVariantId ?? null)
   }, [file])
 
@@ -94,7 +92,6 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged }: {
   const execute = useCallback(async (command: object) => {
     if (!snapshot || busy) return
     setBusy(true); setError(null)
-    sessionStorage.setItem(AUTHORING_RESUME_KEY, file)
     try {
       const response = await fetch('/api/dev/editor-authoring', {
         method: 'POST', headers: { 'content-type': 'application/json' },
@@ -105,15 +102,13 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged }: {
       await load()
       onChanged()
     } catch (cause) {
-      sessionStorage.removeItem(AUTHORING_RESUME_KEY)
       setError((cause as Error).message)
     } finally { setBusy(false) }
-  }, [busy, file, load, onChanged, snapshot])
+  }, [busy, load, onChanged, snapshot])
 
   const prepareSource = useCallback(async () => {
     if (!importPreview || busy) return
     setBusy(true); setError(null)
-    sessionStorage.setItem(AUTHORING_RESUME_KEY, file)
     try {
       const response = await fetch('/api/dev/editor-authoring', {
         method: 'POST', headers: { 'content-type': 'application/json' },
@@ -133,7 +128,6 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged }: {
       await load()
       onChanged()
     } catch (cause) {
-      sessionStorage.removeItem(AUTHORING_RESUME_KEY)
       setError((cause as Error).message)
     } finally { setBusy(false) }
   }, [busy, file, importPreview, load, onChanged])
