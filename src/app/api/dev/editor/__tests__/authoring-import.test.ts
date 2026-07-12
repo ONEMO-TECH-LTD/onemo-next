@@ -243,7 +243,7 @@ export function Button() { return <button className={styles.base} /> }
       include: ['src/**/*.ts', 'src/**/*.tsx'],
     }))
     const classified = await classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry })
-    expect(Object.keys(classified.sourceHashes).sort()).toEqual([SOURCE_FILE, ambientFile].sort())
+    expect(Object.keys(classified.sourceHashes).sort()).toEqual([SOURCE_FILE, ambientFile, 'tsconfig.json'].sort())
     const imported = await importSourceFileToAuthoringStore({
       storeId: 'project-main', file: SOURCE_FILE, expectedSourceHashes: classified.sourceHashes, registry, store,
     })
@@ -293,7 +293,7 @@ export function Button() { return <button className={styles.base} /> }
       },
     }))
     const classified = await classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry })
-    expect(Object.keys(classified.sourceHashes).sort()).toEqual([SOURCE_FILE, typeFile].sort())
+    expect(Object.keys(classified.sourceHashes).sort()).toEqual([SOURCE_FILE, typeFile, 'tsconfig.json'].sort())
     const imported = await importSourceFileToAuthoringStore({
       storeId: 'project-main', file: SOURCE_FILE, expectedSourceHashes: classified.sourceHashes, registry, store,
     })
@@ -306,4 +306,39 @@ export function Button() { return <button className={styles.base} /> }
       expectedSourceHashes: loaded.sourceHashes,
     })).resolves.toMatchObject({ graph: { revision: 2 } })
   })
+
+  it('hashes the complete config chain and refuses option-only drift before transaction prepare', async () => {
+    const { root, registry, store } = await makeImportStore()
+    await linkTestNodeModules(root)
+    await fs.mkdir(path.join(root, 'config'), { recursive: true })
+    const baseConfig = 'config/compiler.json'
+    await fs.writeFile(path.join(root, baseConfig), JSON.stringify({
+      compilerOptions: {
+        strict: true, target: 'ESNext', module: 'ESNext', moduleResolution: 'Bundler', jsx: 'react-jsx', types: ['react'],
+      },
+    }))
+    await fs.writeFile(path.join(root, 'tsconfig.json'), JSON.stringify({ extends: './config/compiler.json' }))
+    const classified = await classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry })
+    expect(Object.keys(classified.sourceHashes).sort()).toEqual([SOURCE_FILE, baseConfig, 'tsconfig.json'].sort())
+    const imported = await importSourceFileToAuthoringStore({
+      storeId: 'project-main', file: SOURCE_FILE, expectedSourceHashes: classified.sourceHashes, registry, store,
+    })
+    if (imported.kind !== 'imported') throw new Error(`expected import, received ${imported.kind}`)
+    const session = new ProjectAuthoringSession({ storeId: 'project-main', registry, store })
+    const loaded = await session.loadComponent(SOURCE_FILE)
+    const transactions = path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions')
+    const beforeTransactions = await fs.readdir(transactions)
+
+    await fs.writeFile(path.join(root, baseConfig), JSON.stringify({
+      compilerOptions: {
+        strict: false, target: 'ESNext', module: 'ESNext', moduleResolution: 'Bundler', jsx: 'react-jsx', types: ['react'],
+      },
+    }))
+    await expect(session.execute({
+      command: { kind: 'create-variant', commandId: 'config-drift', componentId: loaded.componentId, displayName: 'Nope' },
+      expectedRevision: loaded.graph.revision,
+      expectedSourceHashes: loaded.sourceHashes,
+    })).rejects.toMatchObject({ code: 'SOURCE_HASH_STALE', changedPaths: [baseConfig] })
+    expect(await fs.readdir(transactions)).toEqual(beforeTransactions)
+  }, 15_000)
 })

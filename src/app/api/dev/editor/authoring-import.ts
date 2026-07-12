@@ -8,6 +8,7 @@ import { AuthoringHistoryStore } from './authoring-history'
 import { importProjectionToAuthoringGraph, type ProjectionImportResult } from './authoring-migrations'
 import { AuthoringSidecarStore, createEmptyAuthoringGraph } from './authoring-store'
 import { SingleRootAuthoringTransaction } from './authoring-transaction'
+import { readExactCompilerConfig } from './authoring-tsconfig'
 import type { StoreId } from './authoring-types'
 import { sha256 } from './durable-file-installer'
 import { parseComponentModelFromSource } from './lib'
@@ -22,6 +23,7 @@ export type SourceImportClassification = {
 
 export type ExactAuthoringSourceSnapshot = SourceImportClassification & {
   sources: Record<string, string>
+  compilerOptions: ts.CompilerOptions
 }
 
 export async function classifySourceFileForImport(input: {
@@ -41,7 +43,9 @@ export async function readExactAuthoringSourceSnapshot(input: {
   const sources = new Map<string, Buffer>()
   const sourceAbs = await input.registry.resolveStorePath(input.storeId, input.file)
   sources.set(input.file, await fs.readFile(sourceAbs))
-  await readProjectModuleDependencies(input, sources)
+  const compilerConfig = await readExactCompilerConfig(input)
+  for (const [file, bytes] of Object.entries(compilerConfig.sources)) sources.set(file, bytes)
+  await readProjectModuleDependencies(input, sources, compilerConfig.options, compilerConfig.configuredFiles)
   const cssSources: Record<string, string> = {}
   let projection: SourceProjection
 
@@ -79,29 +83,17 @@ export async function readExactAuthoringSourceSnapshot(input: {
     projection,
     sourceHashes: Object.fromEntries([...sources].map(([file, bytes]) => [file, sha256(bytes)])),
     sources: Object.fromEntries([...sources].map(([file, bytes]) => [file, bytes.toString('utf8')])),
+    compilerOptions: compilerConfig.options,
   }
 }
 
 async function readProjectModuleDependencies(
   input: { storeId: StoreId; file: string; registry: RuntimeRootRegistry },
   sources: Map<string, Buffer>,
+  options: ts.CompilerOptions,
+  configuredFiles: string[],
 ): Promise<void> {
   const root = input.registry.get(input.storeId).canonicalRealPath
-  const configPath = path.join(root, 'tsconfig.json')
-  let options: ts.CompilerOptions = {
-    module: ts.ModuleKind.ESNext,
-    moduleResolution: ts.ModuleResolutionKind.Bundler,
-    jsx: ts.JsxEmit.ReactJSX,
-  }
-  let configuredFiles: string[] = []
-  if (ts.sys.fileExists(configPath)) {
-    const config = ts.readConfigFile(configPath, ts.sys.readFile)
-    if (config.error) throw namedError('SOURCE_TSCONFIG_INVALID', formatDiagnostic(config.error), 422)
-    const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, root, { noEmit: true }, configPath)
-    if (parsed.errors.length) throw namedError('SOURCE_TSCONFIG_INVALID', parsed.errors.map(formatDiagnostic).join('; '), 422)
-    options = parsed.options
-    configuredFiles = parsed.fileNames
-  }
   await readConfiguredAmbientDeclarations(input, root, configuredFiles, sources)
   await readConfiguredTypeDirectives(input, root, options, sources)
   const pending = [...sources.keys()]
@@ -208,10 +200,6 @@ function storeRelativeDependency(root: string, candidate: string): string {
 
 function isPackageDependency(file: string): boolean {
   return path.resolve(file).split(path.sep).includes('node_modules')
-}
-
-function formatDiagnostic(diagnostic: ts.Diagnostic): string {
-  return `TS${diagnostic.code}: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, ' ')}`
 }
 
 export async function importSourceFileToAuthoringStore(input: {

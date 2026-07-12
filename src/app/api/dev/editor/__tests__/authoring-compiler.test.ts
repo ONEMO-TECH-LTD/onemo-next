@@ -3,6 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
+import * as ts from 'typescript'
 
 import { compileG2VariantCommand } from '../authoring-compiler'
 import { stableId } from '../authoring-migrations'
@@ -12,8 +13,18 @@ import { sourceProjectionFromSource } from '../source-projection'
 import { linkTestNodeModules } from './test-project-root'
 
 const FILE = 'src/app/(dev)/react-figma-components/Button.tsx'
-const compile = (input: Omit<Parameters<typeof compileG2VariantCommand>[0], 'projectRoot'>) =>
-  compileG2VariantCommand({ ...input, projectRoot: process.cwd() })
+const TEST_COMPILER_OPTIONS: ts.CompilerOptions = {
+  strict: true,
+  noEmit: true,
+  target: ts.ScriptTarget.ESNext,
+  module: ts.ModuleKind.ESNext,
+  moduleResolution: ts.ModuleResolutionKind.Bundler,
+  jsx: ts.JsxEmit.ReactJSX,
+  baseUrl: process.cwd(),
+  paths: { '@/*': ['./src/*'] },
+}
+const compile = (input: Omit<Parameters<typeof compileG2VariantCommand>[0], 'projectRoot' | 'compilerOptions'>) =>
+  compileG2VariantCommand({ ...input, projectRoot: process.cwd(), compilerOptions: TEST_COMPILER_OPTIONS })
 const SOURCE = `export function Button({ variant = 'Primary' }: { variant?: 'Primary' | 'Secondary' }) {
   return <button data-variant={variant}>Button</button>
 }
@@ -345,6 +356,11 @@ export function Button({ tone }: { tone?: Tone }) { return <button>{tone}</butto
       graph: { ...imported.graph, components: { ...imported.graph.components, [component.id]: { ...component, compatibility: 'native-v1' } } },
       source: registrySource,
       projectRoot,
+      compilerOptions: {
+        strict: true, noEmit: true, target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext,
+        moduleResolution: ts.ModuleResolutionKind.Bundler, jsx: ts.JsxEmit.ReactJSX,
+        baseUrl: projectRoot, paths: { '@/*': ['src/*'] }, types: ['react'],
+      },
       command,
     })).rejects.toThrow(/TS2307/)
 
@@ -352,6 +368,11 @@ export function Button({ tone }: { tone?: Tone }) { return <button>{tone}</butto
       graph: { ...imported.graph, components: { ...imported.graph.components, [component.id]: { ...component, compatibility: 'native-v1' } } },
       source: registrySource,
       projectRoot,
+      compilerOptions: {
+        strict: true, noEmit: true, target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext,
+        moduleResolution: ts.ModuleResolutionKind.Bundler, jsx: ts.JsxEmit.ReactJSX,
+        baseUrl: projectRoot, paths: { '@/*': ['src/*'] }, types: ['react'],
+      },
       dependencySources: { 'src/types.ts': `export type Tone = 'quiet' | 'loud'\n` },
       command,
     })).resolves.toMatchObject({

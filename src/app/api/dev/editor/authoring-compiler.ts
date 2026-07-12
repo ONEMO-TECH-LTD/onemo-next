@@ -25,6 +25,7 @@ export async function compileG2VariantCommand(input: {
   command: G2VariantCommand
   source: string
   projectRoot: string
+  compilerOptions: ts.CompilerOptions
   cssSources?: Record<string, string>
   dependencySources?: Record<string, string>
 }): Promise<CompilePlan> {
@@ -36,7 +37,7 @@ export async function compileG2VariantCommand(input: {
     throw namedError('COMPONENT_EXPORT_MISMATCH', `expected export ${component.source.exportName}, found ${beforeProjection.exportName}`, 422)
   }
   const beforeTypechecked = beforeProjection.nativeVariants.length > 0
-  if (beforeTypechecked) assertSemanticTypecheck(component.source.file, input.source, input.projectRoot, input.dependencySources)
+  if (beforeTypechecked) assertSemanticTypecheck(component.source.file, input.source, input.projectRoot, input.compilerOptions, input.dependencySources)
 
   if (input.command.kind === 'move-variant') {
     const variant = requireOwnedVariant(graph, component, input.command.variantId)
@@ -57,7 +58,7 @@ export async function compileG2VariantCommand(input: {
       afterProjection = await requireProjection(component.source.file, afterSource, input.cssSources)
       assertUntouchedProjection(beforeProjection, afterProjection)
       assertRegistry(afterProjection, registry)
-      assertSemanticTypecheck(component.source.file, afterSource, input.projectRoot, input.dependencySources)
+      assertSemanticTypecheck(component.source.file, afterSource, input.projectRoot, input.compilerOptions, input.dependencySources)
       sourcePatches = [{ file: component.source.file, before: input.source, after: afterSource }]
     } else {
       assertNativeRegistryMatchesGraph(graph, component, beforeProjection)
@@ -76,7 +77,7 @@ export async function compileG2VariantCommand(input: {
   const afterProjection = await requireProjection(component.source.file, afterSource, input.cssSources)
   assertUntouchedProjection(beforeProjection, afterProjection)
   assertRegistry(afterProjection, registry)
-  assertSemanticTypecheck(component.source.file, afterSource, input.projectRoot, input.dependencySources)
+  assertSemanticTypecheck(component.source.file, afterSource, input.projectRoot, input.compilerOptions, input.dependencySources)
 
   const next = cloneGraph(graph)
   next.components[component.id] = { ...component, compatibility: 'native-v1' }
@@ -189,18 +190,16 @@ function assertUntouchedProjection(before: SourceProjection, after: SourceProjec
   }
 }
 
-function assertSemanticTypecheck(file: string, source: string, projectRoot: string, dependencies: Record<string, string> = {}): void {
+function assertSemanticTypecheck(
+  file: string,
+  source: string,
+  projectRoot: string,
+  compilerOptions: ts.CompilerOptions,
+  dependencies: Record<string, string> = {},
+): void {
   const fileName = path.resolve(projectRoot, file)
   const ambientName = path.resolve(projectRoot, '__onemo-native-variants.d.ts')
-  const configPath = path.join(projectRoot, 'tsconfig.json')
-  if (!ts.sys.fileExists(configPath)) throw namedError('STAGED_TSCONFIG_MISSING', `tsconfig.json not found for ${file}`, 422)
-  const config = ts.readConfigFile(configPath, ts.sys.readFile)
-  if (config.error) throw namedError('STAGED_TSCONFIG_INVALID', formatDiagnostic(config.error), 422)
-  const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, path.dirname(configPath), { noEmit: true }, configPath)
-  if (parsed.errors.length > 0) {
-    throw namedError('STAGED_TSCONFIG_INVALID', parsed.errors.map(formatDiagnostic).join('; '), 422)
-  }
-  const options = parsed.options
+  const options = compilerOptions
   const host = ts.createCompilerHost(options, true)
   const readFile = host.readFile.bind(host)
   const fileExists = host.fileExists.bind(host)
