@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
 
 import { classifySourceFileForImport, importSourceFileToAuthoringStore } from '../editor/authoring-import'
+import { parseG2VariantCommand } from '../editor/authoring-commands'
 import { isSha256, isStoreRelativePath } from '../editor/authoring-schema'
+import { ProjectAuthoringSession } from '../editor/authoring-session'
 import { AuthoringSidecarStore } from '../editor/authoring-store'
 import { RuntimeRootRegistry } from '../editor/runtime-root-registry'
 
@@ -21,7 +23,10 @@ export async function handleGet(req: Request, rootPath = process.cwd()) {
   try {
     const file = new URL(req.url).searchParams.get('file')
     if (!isImportFile(file)) return NextResponse.json({ error: 'valid component file required' }, { status: 400 })
-    const { registry } = await createContext(rootPath)
+    const { registry, session } = await createContext(rootPath)
+    if (new URL(req.url).searchParams.get('mode') === 'component') {
+      return NextResponse.json(await session.loadComponent(file))
+    }
     return NextResponse.json(await classifySourceFileForImport({ storeId: STORE_ID, file, registry }))
   } catch (error) {
     return errorResponse(error)
@@ -35,17 +40,23 @@ export async function handlePost(req: Request, rootPath = process.cwd()) {
     try {
       body = await req.json() as unknown
     } catch {
-      return NextResponse.json({ error: 'invalid source import request' }, { status: 400 })
+      return NextResponse.json({ error: 'invalid authoring request' }, { status: 400 })
     }
-    if (!isImportRequest(body)) return NextResponse.json({ error: 'invalid source import request' }, { status: 400 })
-    const { registry, store } = await createContext(rootPath)
-    return NextResponse.json(await importSourceFileToAuthoringStore({
-      storeId: STORE_ID,
-      file: body.file,
-      expectedSourceHashes: body.expectedSourceHashes,
-      registry,
-      store,
-    }))
+    if (isImportRequest(body)) {
+      const { registry, store } = await createContext(rootPath)
+      return NextResponse.json(await importSourceFileToAuthoringStore({
+        storeId: STORE_ID,
+        file: body.file,
+        expectedSourceHashes: body.expectedSourceHashes,
+        registry,
+        store,
+      }))
+    }
+    if (isExecuteRequest(body)) {
+      const { session } = await createContext(rootPath)
+      return NextResponse.json(await session.execute(body))
+    }
+    return NextResponse.json({ error: 'invalid authoring request' }, { status: 400 })
   } catch (error) {
     return errorResponse(error)
   }
@@ -56,7 +67,22 @@ async function createContext(rootPath: string) {
     { storeId: STORE_ID, kind: 'project', rootPath },
   ])
   const store = new AuthoringSidecarStore({ storeId: STORE_ID, rootKind: 'project', registry })
-  return { registry, store }
+  const session = new ProjectAuthoringSession({ storeId: STORE_ID, registry, store })
+  return { registry, store, session }
+}
+
+function isExecuteRequest(value: unknown): value is {
+  kind: 'execute-command'
+  command: NonNullable<ReturnType<typeof parseG2VariantCommand>>
+  expectedRevision: number
+  expectedSourceHashes: Record<string, string>
+} {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const record = value as Record<string, unknown>
+  return Object.keys(record).sort().join('\0') === ['command', 'expectedRevision', 'expectedSourceHashes', 'kind'].sort().join('\0') &&
+    record.kind === 'execute-command' && parseG2VariantCommand(record.command) !== null &&
+    typeof record.expectedRevision === 'number' && Number.isSafeInteger(record.expectedRevision) && record.expectedRevision >= 0 &&
+    isHashMap(record.expectedSourceHashes)
 }
 
 function isImportRequest(value: unknown): value is {
@@ -67,10 +93,13 @@ function isImportRequest(value: unknown): value is {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   const record = value as Record<string, unknown>
   if (Object.keys(record).length !== 3 || record.kind !== 'import-source' || !isImportFile(record.file)) return false
-  if (!record.expectedSourceHashes || typeof record.expectedSourceHashes !== 'object' || Array.isArray(record.expectedSourceHashes)) return false
-  const hashes = record.expectedSourceHashes as Record<string, unknown>
-  return Object.keys(hashes).length > 0 && Object.entries(hashes).every(([file, hash]) =>
-    isStoreRelativePath(file) && isSha256(hash))
+  return isHashMap(record.expectedSourceHashes)
+}
+
+function isHashMap(value: unknown): value is Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const hashes = value as Record<string, unknown>
+  return Object.keys(hashes).length > 0 && Object.entries(hashes).every(([file, hash]) => isStoreRelativePath(file) && isSha256(hash))
 }
 
 function isImportFile(value: unknown): value is string {
