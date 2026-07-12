@@ -21058,7 +21058,7 @@
         "$collectionName": ".2.6-Al-Effects",
         "$value": "{soft.s}"
        },
-       "faint": {
+       "soft": {
         "$scopes": [
          "ALL_SCOPES"
         ],
@@ -21068,7 +21068,7 @@
         "$collectionName": ".2.6-Al-Effects",
         "$value": "{soft.m}"
        },
-       "soft": {
+       "mild": {
         "$scopes": [
          "ALL_SCOPES"
         ],
@@ -21078,7 +21078,7 @@
         "$collectionName": ".2.6-Al-Effects",
         "$value": "{soft.xl}"
        },
-       "mild": {
+       "regular": {
         "$scopes": [
          "ALL_SCOPES"
         ],
@@ -21088,7 +21088,7 @@
         "$collectionName": ".2.6-Al-Effects",
         "$value": "{mild.m}"
        },
-       "regular": {
+       "vibrant": {
         "$scopes": [
          "ALL_SCOPES"
         ],
@@ -21345,7 +21345,7 @@
         "$collectionName": ".2.6-Al-Effects",
         "$value": "{soft.s}"
        },
-       "faint": {
+       "soft": {
         "$scopes": [
          "ALL_SCOPES"
         ],
@@ -21355,7 +21355,7 @@
         "$collectionName": ".2.6-Al-Effects",
         "$value": "{soft.m}"
        },
-       "soft": {
+       "mild": {
         "$scopes": [
          "ALL_SCOPES"
         ],
@@ -21365,7 +21365,7 @@
         "$collectionName": ".2.6-Al-Effects",
         "$value": "{soft.xl}"
        },
-       "mild": {
+       "regular": {
         "$scopes": [
          "ALL_SCOPES"
         ],
@@ -21375,7 +21375,7 @@
         "$collectionName": ".2.6-Al-Effects",
         "$value": "{mild.m}"
        },
-       "regular": {
+       "vibrant": {
         "$scopes": [
          "ALL_SCOPES"
         ],
