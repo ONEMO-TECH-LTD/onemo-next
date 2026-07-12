@@ -102,8 +102,10 @@ function DragChip({ ground, wash, shadow }: { ground: string; wash: string | nul
   );
 }
 
-/** Real keyboard focus — Tab into it; the ring is the token. */
-function FocusChip({ ground, ring, caption }: { ground: string; ring: string | null; caption: string }) {
+/** Real keyboard focus — Tab into it; the ring is the token. On-solid rings draw inset
+ * (inside the solid surface) — outside they'd sit on the app ground where a pure ring
+ * has no contrast; the placement is the component contract. */
+function FocusChip({ ground, ring, caption, inset }: { ground: string; ring: string | null; caption: string; inset?: boolean }) {
   const [focused, setFocused] = React.useState(false);
   return (
     <span style={{ textAlign: 'center' }}>
@@ -112,8 +114,9 @@ function FocusChip({ ground, ring, caption }: { ground: string; ring: string | n
         style={{
           ...chipBase,
           background: ground,
-          outline: focused && ring ? `2px solid ${ring}` : 'none',
+          outline: focused && ring && !inset ? `2px solid ${ring}` : 'none',
           outlineOffset: 2,
+          boxShadow: focused && ring && inset ? `inset 0 0 0 2px ${ring}` : undefined,
         }}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
@@ -187,7 +190,7 @@ function Panel({ face }: { face: Face }) {
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
         <FocusChip ground={control} ring={ringInk} caption="A · Ink (proposal)" />
         <FocusChip ground={control} ring={ringCur} caption="B · current (colour)" />
-        <FocusChip ground={solid} ring={ringSolid} caption="on-solid" />
+        <FocusChip ground={solid} ring={ringSolid} caption="on-solid (inset)" inset />
       </div>
 
       <div style={label}>SCRIM — click to raise the modal dim ({washAlpha('scrim/dim')})</div>
