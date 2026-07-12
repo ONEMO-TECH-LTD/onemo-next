@@ -55,9 +55,12 @@ describe('AuthoringSidecarStore', () => {
     expect(transactions).toHaveLength(1)
   })
 
-  it('refuses V1 migration under a foreign logical store without transaction evidence', async () => {
+  it.each([
+    { label: 'foreign store id', storeId: 'foreign-store', rootKind: 'project' as const },
+    { label: 'wrong root kind', storeId: 'project-main', rootKind: 'global' as const },
+  ])('refuses V1 migration with $label without transaction evidence', async ({ storeId, rootKind }) => {
     const { root, store } = await makeStore()
-    const legacy = { ...createEmptyAuthoringGraph({ storeId: 'foreign-store', rootKind: 'project' }), schemaVersion: 1 }
+    const legacy = { ...createEmptyAuthoringGraph({ storeId, rootKind }), schemaVersion: 1 }
     const sidecarPath = path.join(root, PROJECT_AUTHORING_SIDECAR)
     await fs.mkdir(path.dirname(sidecarPath), { recursive: true })
     const legacyBytes = Buffer.from(JSON.stringify(legacy, null, 2) + '\n')
