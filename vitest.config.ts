@@ -18,6 +18,7 @@ export default defineConfig({
       "node_modules/**",
       "studio/**",
       "studio-v2/**",
+      "tests/e2e/**",
     ],
   },
 });

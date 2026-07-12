@@ -232,6 +232,20 @@ const fieldScopes = (label: string): string[] | null =>
   : /colou?r/i.test(label) ? ['ALL_FILLS', 'FRAME_FILL', 'SHAPE_FILL', 'TEXT_FILL']
   : null
 let _dsTokenCache: DsToken[] | null = null
+let _dsTokenRequest: Promise<DsToken[]> | null = null
+function loadDsTokens(): Promise<DsToken[]> {
+  if (_dsTokenCache) return Promise.resolve(_dsTokenCache)
+  if (!_dsTokenRequest) {
+    _dsTokenRequest = fetch('/api/dev/editor-tokens')
+      .then((r) => (r.ok ? r.json() : { tokens: [] }))
+      .then((d: { tokens: DsToken[] }) => {
+        _dsTokenCache = d.tokens
+        return d.tokens
+      })
+      .finally(() => { _dsTokenRequest = null })
+  }
+  return _dsTokenRequest
+}
 /* E4-G4 — real components available to insert (extracted-in-editor), for the Assets panel. */
 type DsComponent = { name: string; importPath: string; category?: string; root?: 'project' | 'global'; file?: string; exports?: string[] }
 function useDsComponents(active: boolean, nonce = 0): DsComponent[] {
@@ -247,10 +261,7 @@ function useDsTokens(): DsToken[] {
   const [toks, setToks] = useState<DsToken[]>(_dsTokenCache ?? [])
   useEffect(() => {
     if (_dsTokenCache) return
-    fetch('/api/dev/editor-tokens')
-      .then((r) => (r.ok ? r.json() : { tokens: [] }))
-      .then((d: { tokens: DsToken[] }) => { _dsTokenCache = d.tokens; setToks(d.tokens) })
-      .catch(() => {})
+    loadDsTokens().then(setToks).catch(() => {})
   }, [])
   return toks
 }

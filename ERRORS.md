@@ -69,3 +69,10 @@
 - Symptoms: the temporary test could not resolve the package until it used the installed global runner; after that, Playwright reported the cached `chromium_headless_shell-1208` executable was missing.
 - What worked: keep the proof script outside committed source, use the installed global Playwright test package, and run the temporary config with `channel: 'chrome'` so it launches the Mac's existing Google Chrome.
 - Remember: S58 browser proofs should use the system Chrome channel unless the Playwright browser cache is explicitly installed; do not install a second browser just for verification.
+
+## S58 committed authoring E2E cold-start stability
+
+- What did not work: using the 5-second default hydration poll, using `127.0.0.1` for the editor shell, assuming the Components panel switched immediately, and prewarming `/api/dev/editor-tokens` to hide cold-start request failures.
+- Symptoms: the first run never hydrated because the dev-origin was rejected; later runs targeted a hidden component row; cold loads also launched about 30 token requests because the module cache had no shared in-flight promise, producing 404/aborted requests.
+- What worked: use the configured `localhost` origin, prove each shell transition, deduplicate token loading in product code, and manage fixture/server teardown with a marker-backed wrapper that restores on startup failure or signal.
+- Remember: committed S58 E2E must remain cold and fail on real console/network defects; environment setup must not prewarm product races away or rely only on test `afterAll` for cleanup.

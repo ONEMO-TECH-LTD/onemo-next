@@ -9,6 +9,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
+    "test:e2e": "playwright test",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },
@@ -53,6 +54,7 @@
     "onemo-component-library": "file:../onemo-component-library"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@storybook/addon-docs": "^10.4.6",
     "@storybook/nextjs": "^10.4.6",
     "@tailwindcss/postcss": "^4",
