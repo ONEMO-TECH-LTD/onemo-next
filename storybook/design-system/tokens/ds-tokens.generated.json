@@ -1,7 +1,7 @@
 {
  "fileKey": "Qdb9Kx98afJHxaCGAIxoMC",
  "pulledAtFileVersion": null,
- "variables": 3156,
+ "variables": 3160,
  "export": [
   {
    ".1.0-Prim-Col": {
@@ -21037,6 +21037,26 @@
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
         "$value": "{intense.l}"
+       },
+       "2xs": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "Layer blur strength — routes through the universal strength range.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{soft.s}"
+       },
+       "xs": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "Layer blur strength — routes through the universal strength range.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{soft.m}"
        }
       },
       "material-saturate": {
@@ -21171,6 +21191,26 @@
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
         "$value": "{intense.l}"
+       },
+       "2xs": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "Backdrop blur strength — routes through the universal strength range.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{soft.s}"
+       },
+       "xs": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "Backdrop blur strength — routes through the universal strength range.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{soft.m}"
        }
       }
      },
@@ -21388,6 +21428,26 @@
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
         "$value": "{intense.l}"
+       },
+       "2xs": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "Layer blur strength — routes through the universal strength range.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{soft.s}"
+       },
+       "xs": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "Layer blur strength — routes through the universal strength range.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{soft.m}"
        }
       },
       "material-saturate": {
@@ -21522,6 +21582,26 @@
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
         "$value": "{intense.l}"
+       },
+       "2xs": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "Backdrop blur strength — routes through the universal strength range.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{soft.s}"
+       },
+       "xs": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "Backdrop blur strength — routes through the universal strength range.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{soft.m}"
        }
       }
      }
