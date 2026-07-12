@@ -228,6 +228,41 @@ describe('editor-authoring G1 import route', () => {
     await expect(fs.readFile(sourcePath)).resolves.toEqual(sourceAfterCreateUndo)
   }, 20_000)
 
+  it('migrates the accepted G1 V1 shape with authored-only hashes and no environment fingerprint', async () => {
+    const root = await makeRoot()
+    const classified = await (await handleGet(request('GET'), root)).json()
+    await handlePost(request('POST', {
+      kind: 'import-source', file: SOURCE_FILE, expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint,
+      transactionId: '00000000-0000-4000-8000-000000000012',
+    }), root)
+    const sidecarPath = path.join(root, PROJECT_AUTHORING_SIDECAR)
+    const legacy = JSON.parse(await fs.readFile(sidecarPath, 'utf8')) as Record<string, unknown>
+    const acceptedSourceHash = (legacy.sourceHashes as Record<string, string>)[SOURCE_FILE]!
+    legacy.schemaVersion = 1
+    legacy.sourceHashes = { [SOURCE_FILE]: acceptedSourceHash }
+    delete legacy.environmentFingerprint
+    for (const component of Object.values(legacy.components as Record<string, Record<string, unknown>>)) {
+      delete component.projectionFingerprint
+    }
+    await fs.writeFile(sidecarPath, JSON.stringify(legacy, null, 2) + '\n')
+
+    const response = await handleGet(componentRequest(), root)
+
+    expect(response.status).toBe(200)
+    const migrated = await response.json()
+    expect(migrated.graph).toMatchObject({
+      schemaVersion: 2,
+      revision: 2,
+      sourceHashes: {
+        [SOURCE_FILE]: acceptedSourceHash,
+        'tsconfig.json': expect.stringMatching(/^[a-f0-9]{64}$/),
+      },
+      environmentFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+    })
+    expect(migrated.graph.sourceHashes).not.toHaveProperty('.next/dev/types/routes.d.ts')
+  }, 20_000)
+
   it('refuses V1 migration without rewriting sidecar evidence when tracked source drifted', async () => {
     const root = await makeRoot()
     const classified = await (await handleGet(request('GET'), root)).json()
