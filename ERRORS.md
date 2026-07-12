@@ -55,3 +55,10 @@
 - Symptoms: macOS `nl` returned usage text instead of file contents; three parallel read commands failed the same way.
 - What worked: run `nl -ba` one file at a time, or use a shell loop only when explicit per-file headers are needed.
 - Remember: for full-read hydration, do not batch multiple file operands into `nl`; one file per command keeps coverage auditable.
+
+## S58 authoring semantic integration test contention
+
+- What did not work: treating default 5-second and 10-second Vitest ceilings as stable evidence for TypeScript semantic-program plus durable-transaction integration cases during the full parallel suite.
+- Symptoms: the exact same tests passed together in 3.64 seconds focused, but full-suite runs stopped at 5.003 or 10.003 seconds while other filesystem/compiler tests were contending; no assertion failed.
+- What worked: retain the real integration coverage and give only the three multi-program/multi-transaction cases bounded 15-second or 20-second ceilings, then require the full suite to pass.
+- Remember: do not use a focused green run to overrule a red full gate; distinguish contention with measured focused evidence, then make the full proof stable.

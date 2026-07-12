@@ -181,7 +181,7 @@ describe('editor-authoring G1 import route', () => {
       graph: { revision: 5, variants: { [variant.id]: { frame: frameBeforeMove } } },
       undoneCommand: { kind: 'move-variant', commandId: 'route-move' },
     })
-  }, 10_000)
+  }, 20_000)
 
   it('rejects malformed G2 command keys and geometry before filesystem access', async () => {
     const response = await handlePost(request('POST', {

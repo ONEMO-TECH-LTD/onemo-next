@@ -66,7 +66,7 @@ describe('ProjectAuthoringSession', () => {
     expect((await store.load())?.sourceHashes[FILE]).not.toBe(graph.sourceHashes[FILE])
     expect(await fs.readFile(path.join(root, 'src/app/(dev)/react-figma-components/.onemo/history/journal.ndjson'), 'utf8'))
       .toContain('session-create')
-  })
+  }, 15_000)
 
   it('returns source-owned render props keyed by stable graph identity before native conversion', async () => {
     const { registry, store } = await setup()

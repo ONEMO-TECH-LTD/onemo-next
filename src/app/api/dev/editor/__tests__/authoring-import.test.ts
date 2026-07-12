@@ -229,7 +229,7 @@ export function Button() { return <button className={styles.base} /> }
       expectedRevision: afterCreate.graph.revision,
       expectedSourceHashes: afterCreate.sourceHashes,
     })).rejects.toMatchObject({ code: 'SOURCE_HASH_STALE', changedPaths: [ambientFile] })
-  })
+  }, 15_000)
 
   it('hashes an exact local triple-slash declaration even when it is not a tsconfig root', async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'authoring-import-reference-'))
