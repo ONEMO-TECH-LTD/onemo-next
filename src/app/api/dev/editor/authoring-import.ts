@@ -5,6 +5,7 @@ import path from 'node:path'
 import * as ts from 'typescript'
 
 import { AuthoringHistoryStore } from './authoring-history'
+import { compilerEnvironmentFingerprint, isGeneratedCompilerEnvironmentFile } from './authoring-environment'
 import { importProjectionToAuthoringGraph, type ProjectionImportResult } from './authoring-migrations'
 import { AuthoringSidecarStore, createEmptyAuthoringGraph } from './authoring-store'
 import { SingleRootAuthoringTransaction } from './authoring-transaction'
@@ -19,10 +20,12 @@ import { sourceProjectionFromModel, type SourceProjection, unsupportedSourceProj
 export type SourceImportClassification = {
   projection: SourceProjection
   sourceHashes: Record<string, string>
+  environmentFingerprint: string
 }
 
 export type ExactAuthoringSourceSnapshot = SourceImportClassification & {
   sources: Record<string, string>
+  environmentHashes: Record<string, string>
   compilerOptions: ts.CompilerOptions
 }
 
@@ -32,7 +35,11 @@ export async function classifySourceFileForImport(input: {
   registry: RuntimeRootRegistry
 }): Promise<SourceImportClassification> {
   const snapshot = await readExactAuthoringSourceSnapshot(input)
-  return { projection: snapshot.projection, sourceHashes: snapshot.sourceHashes }
+  return {
+    projection: snapshot.projection,
+    sourceHashes: snapshot.sourceHashes,
+    environmentFingerprint: snapshot.environmentFingerprint,
+  }
 }
 
 export async function readExactAuthoringSourceSnapshot(input: {
@@ -79,9 +86,18 @@ export async function readExactAuthoringSourceSnapshot(input: {
     }
   }
 
+  const exactHashes = Object.fromEntries([...sources].map(([file, bytes]) => [file, sha256(bytes)]))
+  const environmentHashes = Object.fromEntries(
+    Object.entries(exactHashes).filter(([file]) => isGeneratedCompilerEnvironmentFile(file)),
+  )
+  const sourceHashes = Object.fromEntries(
+    Object.entries(exactHashes).filter(([file]) => !isGeneratedCompilerEnvironmentFile(file)),
+  )
   return {
     projection,
-    sourceHashes: Object.fromEntries([...sources].map(([file, bytes]) => [file, sha256(bytes)])),
+    sourceHashes,
+    environmentHashes,
+    environmentFingerprint: compilerEnvironmentFingerprint(environmentHashes),
     sources: Object.fromEntries([...sources].map(([file, bytes]) => [file, bytes.toString('utf8')])),
     compilerOptions: compilerConfig.options,
   }
@@ -247,36 +263,43 @@ export async function importSourceFileToAuthoringStore(input: {
   storeId: StoreId
   file: string
   expectedSourceHashes: Record<string, string>
+  expectedEnvironmentFingerprint: string
+  transactionId?: string
   registry: RuntimeRootRegistry
   store: AuthoringSidecarStore
 }): Promise<ProjectionImportResult> {
   if (input.registry.get(input.storeId).kind !== 'project') {
     throw namedError('IMPORT_ROOT_UNSUPPORTED', 'G1 source import supports the project root only', 422)
   }
-  const classified = await classifySourceFileForImport(input)
-  assertExpectedHashes(input.expectedSourceHashes, classified.sourceHashes)
+  const snapshot = await readExactAuthoringSourceSnapshot(input)
+  assertExpectedHashes(input.expectedSourceHashes, snapshot.sourceHashes)
+  if (input.expectedEnvironmentFingerprint !== snapshot.environmentFingerprint) {
+    throw namedError('ENVIRONMENT_FINGERPRINT_STALE', 'compiler environment changed after classification', 409)
+  }
   const imported = importProjectionToAuthoringGraph({
     storeId: input.storeId,
-    projection: classified.projection,
-    sourceHashes: classified.sourceHashes,
+    projection: snapshot.projection,
+    sourceHashes: snapshot.sourceHashes,
+    environmentFingerprint: snapshot.environmentFingerprint,
   })
   if (imported.kind !== 'imported') return imported
 
   const graphPreimage = createEmptyAuthoringGraph({
     storeId: input.storeId,
     rootKind: input.registry.get(input.storeId).kind,
-    sourceHashes: classified.sourceHashes,
+    sourceHashes: snapshot.sourceHashes,
+    environmentFingerprint: snapshot.environmentFingerprint,
   })
   const history = new AuthoringHistoryStore(input.registry, input.storeId)
   const metadataPatches = await history.planCommand({
     command: { kind: 'import-legacy-component', file: input.file },
-    sourceFiles: Object.keys(classified.sourceHashes),
+    sourceFiles: Object.keys(snapshot.sourceHashes),
     sourcePreimages: [],
     graphPreimage: JSON.stringify(graphPreimage, null, 2) + '\n',
     revision: 1,
   })
   const committed = await new SingleRootAuthoringTransaction({
-    transactionId: `import-${randomUUID()}`,
+    transactionId: input.transactionId ?? `import-${randomUUID()}`,
     storeId: input.storeId,
     registry: input.registry,
     store: input.store,
@@ -284,7 +307,9 @@ export async function importSourceFileToAuthoringStore(input: {
     expectedRevision: 0,
     requireMissingSidecar: true,
     expectedSourceHashes: input.expectedSourceHashes,
-    sourceFiles: Object.keys(classified.sourceHashes),
+    expectedEnvironmentHashes: snapshot.environmentHashes,
+    expectedEnvironmentFingerprint: snapshot.environmentFingerprint,
+    sourceFiles: Object.keys(snapshot.sourceHashes),
     metadataPatches,
     command: { kind: 'import-legacy-component', file: input.file },
     mutate: () => imported.graph,

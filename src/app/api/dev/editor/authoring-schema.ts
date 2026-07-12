@@ -12,6 +12,7 @@ const GRAPH_KEYS = new Set([
   'revision',
   'root',
   'sourceHashes',
+  'environmentFingerprint',
   'components',
   'variants',
   'sourceProperties',
@@ -57,6 +58,7 @@ export function validateAuthoringGraphV1(input: unknown): ValidationResult {
   }
 
   validateHashMap(input.sourceHashes, errors)
+  if (!isSha256(input.environmentFingerprint)) errors.push('environmentFingerprint must be sha256')
   for (const key of ['components', 'variants', 'sourceProperties', 'interactions', 'interactionOverrides', 'instances', 'folders']) {
     if (!isRecord(input[key])) errors.push(`${key} must be an object record`)
   }

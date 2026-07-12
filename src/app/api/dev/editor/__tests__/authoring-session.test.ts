@@ -41,7 +41,8 @@ async function setup() {
   const store = new AuthoringSidecarStore({ storeId: 'project-main', rootKind: 'project', registry })
   const classified = await classifySourceFileForImport({ storeId: 'project-main', file: FILE, registry })
   const imported = await importSourceFileToAuthoringStore({
-    storeId: 'project-main', file: FILE, expectedSourceHashes: classified.sourceHashes, registry, store,
+    storeId: 'project-main', file: FILE, expectedSourceHashes: classified.sourceHashes,
+    expectedEnvironmentFingerprint: classified.environmentFingerprint, registry, store,
   })
   if (imported.kind !== 'imported') throw new Error(`expected import, received ${imported.kind}`)
   return { root, registry, store, graph: imported.graph }

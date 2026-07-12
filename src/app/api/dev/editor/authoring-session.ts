@@ -39,6 +39,7 @@ export class ProjectAuthoringSession {
     if (component.length !== 1) throw namedError('COMPONENT_SOURCE_AMBIGUOUS', `expected one component for ${file}`, 422)
     const snapshot = await readExactAuthoringSourceSnapshot({ storeId: this.input.storeId, file, registry: this.input.registry })
     assertExpectedHashes(graph.sourceHashes, snapshot.sourceHashes)
+    assertEnvironmentFingerprint(graph.environmentFingerprint, snapshot.environmentFingerprint)
     return {
       graph,
       componentId: component[0]!.id,
@@ -64,6 +65,7 @@ export class ProjectAuthoringSession {
       registry: this.input.registry,
     })
     assertExactHashSet(input.expectedSourceHashes, snapshot.sourceHashes)
+    assertEnvironmentFingerprint(before.environmentFingerprint, snapshot.environmentFingerprint)
     const plan = await compileG2VariantCommand({
       graph: before,
       command: input.command,
@@ -88,6 +90,8 @@ export class ProjectAuthoringSession {
     }).commit({
       expectedRevision: input.expectedRevision,
       expectedSourceHashes: input.expectedSourceHashes,
+      expectedEnvironmentHashes: snapshot.environmentHashes,
+      expectedEnvironmentFingerprint: snapshot.environmentFingerprint,
       sourceFiles: Object.keys(snapshot.sourceHashes),
       sourcePatches: plan.sourcePatches,
       metadataPatches: historyPatches,
@@ -139,12 +143,74 @@ export class ProjectAuthoringSession {
     }).commit({
       expectedRevision: input.expectedRevision,
       expectedSourceHashes: input.expectedSourceHashes,
+      expectedEnvironmentHashes: snapshot.environmentHashes,
+      expectedEnvironmentFingerprint: snapshot.environmentFingerprint,
       sourceFiles: Object.keys(snapshot.sourceHashes),
       metadataPatches: historyPatches,
       command,
       mutate: () => before,
     })
     return { kind: 'revalidated', graph }
+  }
+
+  async rebaseEnvironment(input: {
+    file: string
+    expectedRevision: number
+    expectedSourceHashes: Record<string, string>
+    expectedEnvironmentFingerprint: string
+  }): Promise<{ kind: 'environment-rebased'; graph: AuthoringGraphV1 }> {
+    const before = await this.requireGraph()
+    if (before.revision !== input.expectedRevision) {
+      throw namedError('AUTHORING_REVISION_STALE', `expected revision ${input.expectedRevision}, found ${before.revision}`, 409)
+    }
+    const component = Object.values(before.components).filter((candidate) => candidate.source.file === input.file)
+    if (component.length !== 1) throw namedError('COMPONENT_SOURCE_AMBIGUOUS', `expected one component for ${input.file}`, 422)
+    const definition = component[0]!
+    const snapshot = await readExactAuthoringSourceSnapshot({
+      storeId: this.input.storeId,
+      file: input.file,
+      registry: this.input.registry,
+    })
+    assertExactHashSet(input.expectedSourceHashes, snapshot.sourceHashes)
+    assertExactHashSet(before.sourceHashes, snapshot.sourceHashes)
+    if (input.expectedEnvironmentFingerprint !== snapshot.environmentFingerprint) {
+      throw namedError('ENVIRONMENT_FINGERPRINT_STALE', 'compiler environment changed after preview', 409)
+    }
+    if (before.environmentFingerprint === snapshot.environmentFingerprint) {
+      throw namedError('ENVIRONMENT_REBASE_NOT_REQUIRED', 'compiler environment already matches the accepted baseline', 409)
+    }
+    assertStagedTypeScriptSemantics(
+      definition.source.file,
+      snapshot.sources[definition.source.file]!,
+      this.input.registry.get(this.input.storeId).canonicalRealPath,
+      snapshot.compilerOptions,
+      Object.fromEntries(Object.entries(snapshot.sources).filter(([file]) => file !== definition.source.file)),
+    )
+    projectVariantRegistry(before, definition, snapshot.projection)
+    const command = { kind: 'environment-rebase', file: input.file }
+    const historyPatches = await this.history.planCommand({
+      command,
+      sourceFiles: Object.keys(snapshot.sourceHashes),
+      sourcePreimages: [],
+      graphPreimage: JSON.stringify(before, null, 2) + '\n',
+      revision: before.revision + 1,
+    })
+    const graph = await new SingleRootAuthoringTransaction({
+      transactionId: `g2-environment-rebase-${randomUUID()}`,
+      storeId: this.input.storeId,
+      registry: this.input.registry,
+      store: this.input.store,
+    }).commit({
+      expectedRevision: input.expectedRevision,
+      expectedSourceHashes: input.expectedSourceHashes,
+      expectedEnvironmentHashes: snapshot.environmentHashes,
+      expectedEnvironmentFingerprint: snapshot.environmentFingerprint,
+      sourceFiles: Object.keys(snapshot.sourceHashes),
+      metadataPatches: historyPatches,
+      command,
+      mutate: (graph) => ({ ...graph, environmentFingerprint: snapshot.environmentFingerprint }),
+    })
+    return { kind: 'environment-rebased', graph }
   }
 
   async undo(input: {
@@ -157,6 +223,16 @@ export class ProjectAuthoringSession {
     }
     const latest = await this.latestUndoableG2Command(before.revision)
     if (!latest) throw namedError('UNDO_EMPTY', 'no authoring command to undo', 404)
+    const latestCommand = parseG2VariantCommand(latest.record.command)
+    if (!latestCommand) throw namedError('UNDO_HISTORY_INVALID', 'latest undo command is not a G2 variant command', 409)
+    const component = before.components[latestCommand.componentId]
+    if (!component) throw namedError('COMPONENT_MISSING', `component not found: ${latestCommand.componentId}`, 404)
+    const snapshot = await readExactAuthoringSourceSnapshot({
+      storeId: this.input.storeId,
+      file: component.source.file,
+      registry: this.input.registry,
+    })
+    assertEnvironmentFingerprint(before.environmentFingerprint, snapshot.environmentFingerprint)
 
     const sourceBytes = new Map<string, Buffer>()
     for (const file of latest.record.sourceFiles) {
@@ -191,6 +267,8 @@ export class ProjectAuthoringSession {
     }).commit({
       expectedRevision: input.expectedRevision,
       expectedSourceHashes: input.expectedSourceHashes,
+      expectedEnvironmentHashes: snapshot.environmentHashes,
+      expectedEnvironmentFingerprint: snapshot.environmentFingerprint,
       sourceFiles: latest.record.sourceFiles,
       sourcePatches,
       metadataPatches: historyPatches,
@@ -235,6 +313,13 @@ function assertExpectedHashes(expected: Record<string, string>, actual: Record<s
       code: 'SOURCE_HASH_STALE', status: 409, changedPaths,
     })
   }
+}
+
+function assertEnvironmentFingerprint(expected: string, actual: string): void {
+  if (expected === actual) return
+  throw Object.assign(new Error('compiler environment fingerprint changed'), {
+    code: 'ENVIRONMENT_FINGERPRINT_STALE', status: 409,
+  })
 }
 
 function namedError(code: string, message: string, status: number): Error {

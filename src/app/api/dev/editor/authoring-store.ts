@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs'
 
 import { assertAuthoringGraphV1 } from './authoring-schema'
+import { EMPTY_ENVIRONMENT_FINGERPRINT } from './authoring-environment'
 import { authoringMetadataPath } from './authoring-paths'
 import type { AuthoringGraphV1, RootKind, StoreId } from './authoring-types'
 import { sha256 } from './durable-file-installer'
@@ -89,6 +90,7 @@ export function createEmptyAuthoringGraph(input: {
   storeId: StoreId
   rootKind: RootKind
   sourceHashes?: Record<string, string>
+  environmentFingerprint?: string
 }): AuthoringGraphV1 {
   return {
     schemaVersion: 1,
@@ -96,6 +98,7 @@ export function createEmptyAuthoringGraph(input: {
     revision: 0,
     root: { kind: input.rootKind },
     sourceHashes: input.sourceHashes ?? {},
+    environmentFingerprint: input.environmentFingerprint ?? EMPTY_ENVIRONMENT_FINGERPRINT,
     components: {},
     variants: {},
     sourceProperties: {},

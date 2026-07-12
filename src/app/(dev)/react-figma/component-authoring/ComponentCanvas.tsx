@@ -6,6 +6,7 @@ import { isValidElementType } from 'react-is'
 import type { AuthoringGraphV1, VariantFrame } from '@/app/api/dev/editor/authoring-types'
 import type { SourceProjection } from '@/app/api/dev/editor/source-projection'
 import { componentCanvasGeometry, movedVariantFrame } from './gestures'
+import { cancelAuthoringResumeMarker, issueAuthoringResumeMarker } from './session'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const projectComponents = (require as any).context('../../react-figma-components', true, /\.tsx$/)
@@ -19,20 +20,22 @@ type CanvasSnapshot = {
   canUndo: boolean
 }
 type ImportPreview = {
-  action: 'import' | 'revalidate'
+  action: 'import' | 'revalidate' | 'environment-rebase'
   projection: SourceProjection
   sourceHashes: Record<string, string>
+  environmentFingerprint: string
   expectedRevision?: number
   changedPaths?: string[]
 }
 
 const accent = 'var(--sem-col-border-brand)'
 
-export function ComponentCanvas({ file, undoNonce, onBounds, onChanged }: {
+export function ComponentCanvas({ file, undoNonce, onBounds, onChanged, onResumeResolved }: {
   file: string
   undoNonce: number
   onBounds: (width: number, height: number) => void
   onChanged: () => void
+  onResumeResolved: (file: string, sourceHash: string) => void
 }) {
   const [snapshot, setSnapshot] = useState<CanvasSnapshot | null>(null)
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null)
@@ -44,10 +47,16 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged }: {
   const cancelRename = useRef(false)
   const handledUndoNonce = useRef(undoNonce)
   const [dragPreview, setDragPreview] = useState<{ id: string; frame: VariantFrame['frame'] } | null>(null)
+  const loadGeneration = useRef(0)
+  const onResumeResolvedRef = useRef(onResumeResolved)
+
+  useEffect(() => { onResumeResolvedRef.current = onResumeResolved }, [onResumeResolved])
 
   const load = useCallback(async () => {
+    const generation = ++loadGeneration.current
     const response = await fetch(`/api/dev/editor-authoring?mode=component-status&file=${encodeURIComponent(file)}`)
     const data = await response.json()
+    if (generation !== loadGeneration.current) return
     if (!response.ok) throw new Error(data.error ?? `Authoring load failed (${response.status})`)
     if (data.authoringState === 'import-preview') {
       setSnapshot(null)
@@ -59,9 +68,15 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged }: {
       setImportPreview({ ...data, action: 'revalidate' })
       return
     }
+    if (data.authoringState === 'environment-stale') {
+      setSnapshot(null)
+      setImportPreview({ ...data, action: 'environment-rebase' })
+      return
+    }
     if (data.authoringState !== 'loaded') throw new Error('Authoring load returned an invalid state')
     setImportPreview(null)
     setSnapshot(data)
+    onResumeResolvedRef.current(file, data.sourceHashes[file])
     setSelectedId((current) => current && data.graph.variants[current] ? current : data.graph.components[data.componentId]?.primaryVariantId ?? null)
   }, [file])
 
@@ -69,7 +84,7 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged }: {
     let live = true
     setError(null)
     load().catch((cause) => { if (live) setError((cause as Error).message) })
-    return () => { live = false }
+    return () => { live = false; loadGeneration.current += 1 }
   }, [load])
 
   useEffect(() => {
@@ -109,22 +124,44 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged }: {
   const prepareSource = useCallback(async () => {
     if (!importPreview || busy) return
     setBusy(true); setError(null)
+    let importTransactionId: string | null = null
     try {
+      if (importPreview.action === 'import') {
+        importTransactionId = crypto.randomUUID()
+        issueAuthoringResumeMarker({
+          targetFile: file,
+          expectedHash: importPreview.sourceHashes[file]!,
+          transactionId: importTransactionId,
+        })
+      }
       const response = await fetch('/api/dev/editor-authoring', {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify(importPreview.action === 'import'
-          ? { kind: 'import-source', file, expectedSourceHashes: importPreview.sourceHashes }
-          : { kind: 'revalidate-source', file, expectedRevision: importPreview.expectedRevision, expectedSourceHashes: importPreview.sourceHashes }),
+          ? { kind: 'import-source', file, expectedSourceHashes: importPreview.sourceHashes, expectedEnvironmentFingerprint: importPreview.environmentFingerprint, transactionId: importTransactionId }
+          : importPreview.action === 'revalidate'
+            ? { kind: 'revalidate-source', file, expectedRevision: importPreview.expectedRevision, expectedSourceHashes: importPreview.sourceHashes }
+            : { kind: 'environment-rebase', file, expectedRevision: importPreview.expectedRevision, expectedSourceHashes: importPreview.sourceHashes, expectedEnvironmentFingerprint: importPreview.environmentFingerprint }),
       })
       const data = await response.json()
       if (!response.ok && data.code === 'SOURCE_HASH_STALE') {
+        if (importTransactionId) cancelAuthoringResumeMarker(importTransactionId)
         await load()
         setError(data.error ?? 'Source changed again; review the refreshed source state.')
         return
       }
-      if (!response.ok) throw new Error(data.error ?? `Source preparation failed (${response.status})`)
-      const expectedKind = importPreview.action === 'import' ? 'imported' : 'revalidated'
-      if (data.kind !== expectedKind) throw new Error(data.reason ?? `Source preparation refused (${data.kind ?? 'unknown'})`)
+      if (!response.ok) {
+        if (importTransactionId) cancelAuthoringResumeMarker(importTransactionId)
+        throw new Error(data.error ?? `Source preparation failed (${response.status})`)
+      }
+      const expectedKind = importPreview.action === 'import' ? 'imported' : importPreview.action === 'revalidate' ? 'revalidated' : 'environment-rebased'
+      if (data.kind !== expectedKind) {
+        if (importTransactionId) cancelAuthoringResumeMarker(importTransactionId)
+        throw new Error(data.reason ?? `Source preparation refused (${data.kind ?? 'unknown'})`)
+      }
+      if (importPreview.action === 'import') {
+        window.location.reload()
+        return
+      }
       await load()
       onChanged()
     } catch (cause) {
@@ -158,12 +195,13 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged }: {
     const importable = projection.compatibility === 'native-v1' || projection.compatibility === 'legacy-single-axis'
     const variantCount = projection.compatibility === 'legacy-single-axis' ? projection.variantAxes[0]?.values.length ?? 0 : 1
     return <section data-authoring-import style={{ width: 360, margin: 24, padding: 20, border: '1px solid var(--sem-col-border-secondary)', borderRadius: 'var(--sem-radii-md)', background: 'var(--sem-col-bg-primary)', color: 'var(--sem-col-text-primary)', fontFamily: 'var(--al-type-family-primary)' }}>
-      <h2 style={{ margin: 0, fontSize: 16 }}>{importPreview.action === 'import' ? 'Import component source' : 'Source changed'}</h2>
+      <h2 style={{ margin: 0, fontSize: 16 }}>{importPreview.action === 'import' ? 'Import component source' : importPreview.action === 'revalidate' ? 'Source changed' : 'Compiler environment changed'}</h2>
       <p style={{ margin: '8px 0 16px', color: 'var(--sem-col-text-secondary)' }}>{projection.exportName} · {projection.compatibility} · {variantCount} variant{variantCount === 1 ? '' : 's'}</p>
       {importPreview.action === 'revalidate' && <p style={{ margin: '0 0 16px', color: 'var(--sem-col-text-secondary)' }}>Revalidate the component against the current source before editing{importPreview.changedPaths?.length ? `: ${importPreview.changedPaths.join(', ')}` : '.'}</p>}
+      {importPreview.action === 'environment-rebase' && <p style={{ margin: '0 0 16px', color: 'var(--sem-col-text-secondary)' }}>Rebase the verified component against the current generated compiler environment.</p>}
       {error && <div role="alert" style={{ marginBottom: 16, color: 'var(--sem-col-text-error-primary)' }}>{error}</div>}
       {importable
-        ? <button type="button" disabled={busy} onClick={() => void prepareSource()} style={{ minHeight: 32, padding: '0 12px', border: 0, borderRadius: 'var(--sem-radii-full)', background: 'var(--sem-col-bg-brand-primary)', color: 'var(--sem-col-text-brand-primary)', cursor: busy ? 'default' : 'pointer', font: 'inherit' }}>{busy ? 'Working…' : importPreview.action === 'import' ? 'Import source' : 'Revalidate source'}</button>
+        ? <button type="button" disabled={busy} onClick={() => void prepareSource()} style={{ minHeight: 32, padding: '0 12px', border: 0, borderRadius: 'var(--sem-radii-full)', background: 'var(--sem-col-bg-brand-primary)', color: 'var(--sem-col-text-brand-primary)', cursor: busy ? 'default' : 'pointer', font: 'inherit' }}>{busy ? 'Working…' : importPreview.action === 'import' ? 'Import source' : importPreview.action === 'revalidate' ? 'Revalidate source' : 'Rebase environment'}</button>
         : <div role="alert" style={{ color: 'var(--sem-col-text-error-primary)' }}>{projection.unsupportedReason ?? 'This source requires an explicit conversion preview.'}</div>}
     </section>
   }
@@ -176,7 +214,7 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged }: {
   const { ghost } = componentCanvasGeometry(variants.map((variant) => variant.frame), primary.frame)
 
   return (
-    <div data-authoring-canvas data-component-id={definition.id} onPointerDown={(event) => { if (event.target === event.currentTarget) setSelectedId(null) }}
+    <div data-authoring-canvas data-authoring-busy={busy ? 'true' : 'false'} data-component-id={definition.id} onPointerDown={(event) => { if (event.target === event.currentTarget) setSelectedId(null) }}
       style={{ position: 'relative', width: '100%', height: '100%', minWidth: 800, minHeight: 600, background: 'var(--sem-col-bg-secondary)', fontFamily: 'var(--al-type-family-primary)' }}>
       {variants.map((variant) => {
         const selected = selectedId === variant.id

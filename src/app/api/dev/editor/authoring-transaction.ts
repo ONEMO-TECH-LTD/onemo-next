@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs'
 
 import { CrossProcessAuthoringStoreLock } from './authoring-lock'
+import { compilerEnvironmentFingerprint } from './authoring-environment'
 import { authoringMetadataPath } from './authoring-paths'
 import { assertAuthoringGraphV1, isSha256, isStoreRelativePath } from './authoring-schema'
 import { AuthoringSidecarStore, createEmptyAuthoringGraph } from './authoring-store'
@@ -95,6 +96,8 @@ export class SingleRootAuthoringTransaction {
     requireMissingSidecar?: boolean
     sourceFiles?: string[]
     expectedSourceHashes?: Record<string, string>
+    expectedEnvironmentHashes?: Record<string, string>
+    expectedEnvironmentFingerprint?: string
     sourcePatches?: SourcePatch[]
     metadataPatches?: MetadataPatch[]
     command?: unknown
@@ -108,6 +111,8 @@ export class SingleRootAuthoringTransaction {
     requireMissingSidecar?: boolean
     sourceFiles?: string[]
     expectedSourceHashes?: Record<string, string>
+    expectedEnvironmentHashes?: Record<string, string>
+    expectedEnvironmentFingerprint?: string
     sourcePatches?: SourcePatch[]
     metadataPatches?: MetadataPatch[]
     command?: unknown
@@ -147,6 +152,13 @@ export class SingleRootAuthoringTransaction {
     }
     const currentSources = await this.readSourceFiles(sourceFiles)
     this.verifyExpectedHashes(expectedSourceHashes, currentSources)
+    const expectedEnvironmentHashes = update.expectedEnvironmentHashes ?? {}
+    const currentEnvironment = await this.readEnvironmentFiles(Object.keys(expectedEnvironmentHashes))
+    this.verifyExpectedEnvironment(
+      expectedEnvironmentHashes,
+      update.expectedEnvironmentFingerprint,
+      currentEnvironment,
+    )
     this.verifyPatchPreimages(sourcePatches, currentSources)
     const currentMetadata = await this.readOptionalFiles(metadataPatches.map((patch) => patch.file))
     this.verifyMetadataPreimages(metadataPatches, currentMetadata)
@@ -356,6 +368,19 @@ export class SingleRootAuthoringTransaction {
     return snapshots
   }
 
+  private async readEnvironmentFiles(files: string[]): Promise<Map<string, Buffer>> {
+    try {
+      return await this.readSourceFiles(files)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+      throw Object.assign(new Error('compiler environment input disappeared before transaction prepare'), {
+        status: 409,
+        code: 'ENVIRONMENT_FINGERPRINT_STALE',
+        changedPaths: files,
+      })
+    }
+  }
+
   private async readOptionalFiles(files: string[]): Promise<Map<string, Buffer | null>> {
     const snapshots = new Map<string, Buffer | null>()
     for (const file of unique(files)) {
@@ -378,6 +403,23 @@ export class SingleRootAuthoringTransaction {
       throw Object.assign(new Error(`source hash mismatch: ${changedPaths.join(', ')}`), {
         status: 409,
         code: 'SOURCE_HASH_STALE',
+        changedPaths,
+      })
+    }
+  }
+
+  private verifyExpectedEnvironment(
+    expected: Record<string, string>,
+    expectedFingerprint: string | undefined,
+    current: Map<string, Buffer>,
+  ): void {
+    if (expectedFingerprint === undefined) return
+    const actual = Object.fromEntries([...current].map(([file, bytes]) => [file, sha256(bytes)]))
+    const changedPaths = Object.keys(expected).filter((file) => actual[file] !== expected[file]).sort()
+    if (changedPaths.length > 0 || compilerEnvironmentFingerprint(actual) !== expectedFingerprint) {
+      throw Object.assign(new Error('compiler environment changed before transaction prepare'), {
+        status: 409,
+        code: 'ENVIRONMENT_FINGERPRINT_STALE',
         changedPaths,
       })
     }

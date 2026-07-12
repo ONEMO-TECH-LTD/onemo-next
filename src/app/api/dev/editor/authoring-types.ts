@@ -11,6 +11,7 @@ export type AuthoringGraphV1 = {
   revision: number
   root: { kind: RootKind }
   sourceHashes: Record<string, Sha256>
+  environmentFingerprint: Sha256
   components: Record<EntityId, ComponentDefinition>
   variants: Record<EntityId, VariantFrame>
   sourceProperties: Record<PropertyId, SourcePropertyRef>

@@ -5,6 +5,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { validateAuthoringGraphV1 } from '../authoring-schema'
+import { EMPTY_ENVIRONMENT_FINGERPRINT } from '../authoring-environment'
 import type { AuthoringGraphV1 } from '../authoring-types'
 import { RuntimeRootRegistry } from '../runtime-root-registry'
 
@@ -19,6 +20,7 @@ function minimalGraph(): AuthoringGraphV1 {
     sourceHashes: {
       'src/app/(dev)/react-figma-components/Button.tsx': SHA,
     },
+    environmentFingerprint: EMPTY_ENVIRONMENT_FINGERPRINT,
     components: {
       'component-button': {
         id: 'component-button',
@@ -113,6 +115,16 @@ describe('AuthoringGraphV1 checkpoint schema', () => {
     expect(result.ok).toBe(false)
     expect(result).toMatchObject({
       errors: expect.arrayContaining(['sourceHashes key must be store-relative: /tmp/Button.tsx']),
+    })
+  })
+
+  it('requires one exact compiler environment fingerprint without persisting environment paths', () => {
+    const graph = minimalGraph() as unknown as Record<string, unknown>
+    graph.environmentFingerprint = 'not-a-hash'
+
+    expect(validateAuthoringGraphV1(graph)).toMatchObject({
+      ok: false,
+      errors: expect.arrayContaining(['environmentFingerprint must be sha256']),
     })
   })
 

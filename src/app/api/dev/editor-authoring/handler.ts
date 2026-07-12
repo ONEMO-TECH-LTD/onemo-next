@@ -23,6 +23,15 @@ export async function handleGet(req: Request, rootPath = process.cwd()) {
         return NextResponse.json({ authoringState: 'loaded', ...await session.loadComponent(file) })
       } catch (error) {
         const code = (error as { code?: unknown }).code
+        if (code === 'ENVIRONMENT_FINGERPRINT_STALE') {
+          const graph = await store.load()
+          if (!graph) throw error
+          return NextResponse.json({
+            authoringState: 'environment-stale',
+            expectedRevision: graph.revision,
+            ...await classifySourceFileForImport({ storeId: STORE_ID, file, registry }),
+          })
+        }
         if (code === 'SOURCE_HASH_STALE') {
           const graph = await store.load()
           if (!graph) throw error
@@ -61,6 +70,8 @@ export async function handlePost(req: Request, rootPath = process.cwd()) {
         storeId: STORE_ID,
         file: body.file,
         expectedSourceHashes: body.expectedSourceHashes,
+        expectedEnvironmentFingerprint: body.expectedEnvironmentFingerprint,
+        transactionId: body.transactionId,
         registry,
         store,
       }))
@@ -72,6 +83,10 @@ export async function handlePost(req: Request, rootPath = process.cwd()) {
     if (isRevalidateRequest(body)) {
       const { session } = await createContext(rootPath)
       return NextResponse.json(await session.revalidateSource(body))
+    }
+    if (isEnvironmentRebaseRequest(body)) {
+      const { session } = await createContext(rootPath)
+      return NextResponse.json(await session.rebaseEnvironment(body))
     }
     if (isUndoRequest(body)) {
       const { session } = await createContext(rootPath)
@@ -108,11 +123,14 @@ function isImportRequest(value: unknown): value is {
   kind: 'import-source'
   file: string
   expectedSourceHashes: Record<string, string>
+  expectedEnvironmentFingerprint: string
+  transactionId: string
 } {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   const record = value as Record<string, unknown>
-  if (Object.keys(record).length !== 3 || record.kind !== 'import-source' || !isImportFile(record.file)) return false
-  return isHashMap(record.expectedSourceHashes)
+  if (Object.keys(record).sort().join('\0') !== ['kind', 'file', 'expectedSourceHashes', 'expectedEnvironmentFingerprint', 'transactionId'].sort().join('\0')) return false
+  return record.kind === 'import-source' && isImportFile(record.file) && isHashMap(record.expectedSourceHashes) &&
+    isSha256(record.expectedEnvironmentFingerprint) && isUuid(record.transactionId)
 }
 
 function isUndoRequest(value: unknown): value is {
@@ -142,6 +160,21 @@ function isRevalidateRequest(value: unknown): value is {
     isHashMap(record.expectedSourceHashes)
 }
 
+function isEnvironmentRebaseRequest(value: unknown): value is {
+  kind: 'environment-rebase'
+  file: string
+  expectedRevision: number
+  expectedSourceHashes: Record<string, string>
+  expectedEnvironmentFingerprint: string
+} {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const record = value as Record<string, unknown>
+  return Object.keys(record).sort().join('\0') === ['expectedEnvironmentFingerprint', 'expectedRevision', 'expectedSourceHashes', 'file', 'kind'].sort().join('\0') &&
+    record.kind === 'environment-rebase' && isImportFile(record.file) &&
+    typeof record.expectedRevision === 'number' && Number.isSafeInteger(record.expectedRevision) && record.expectedRevision >= 0 &&
+    isHashMap(record.expectedSourceHashes) && isSha256(record.expectedEnvironmentFingerprint)
+}
+
 function isHashMap(value: unknown): value is Record<string, string> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   const hashes = value as Record<string, unknown>
@@ -150,6 +183,10 @@ function isHashMap(value: unknown): value is Record<string, string> {
 
 function isImportFile(value: unknown): value is string {
   return typeof value === 'string' && isStoreRelativePath(value) && value.startsWith(COMPONENT_ROOT) && value.endsWith('.tsx')
+}
+
+function isUuid(value: unknown): value is string {
+  return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
 }
 
 function errorResponse(error: unknown) {

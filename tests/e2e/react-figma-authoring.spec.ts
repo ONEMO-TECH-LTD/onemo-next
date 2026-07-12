@@ -42,21 +42,32 @@ test.describe('React Figma component authoring', () => {
     const frame = page.locator('iframe')
     const editorUrl = page.url()
 
-    await expect(async () => {
-      await componentsRail.click()
-      await expect(page.getByRole('textbox', { name: 'Search components' })).toBeVisible({ timeout: 3_000 })
-      await page.getByRole('button', { name: fixtureName, exact: true }).dblclick()
-      await expect(page.locator('[data-authoring-import]')).toContainText(`${fixtureName} · legacy-single-axis · 2 variants`, { timeout: 15_000 })
-    }).toPass({ timeout: 60_000 })
+    await componentsRail.click()
+    await expect(page.getByRole('textbox', { name: 'Search components' })).toBeVisible({ timeout: 20_000 })
+    const fixtureButton = page.getByRole('button', { name: fixtureName, exact: true })
+    await expect(fixtureButton).toBeVisible({ timeout: 30_000 })
+    await page.evaluate(() => { (window as Window & { __e2eImportOriginDocument?: boolean }).__e2eImportOriginDocument = true })
+    editorDocumentRequests.length = 0
+    tokenResponses.length = 0
+    await fixtureButton.dblclick()
+    await expect(page.locator('[data-authoring-import]')).toContainText(`${fixtureName} · legacy-single-axis · 2 variants`, { timeout: 30_000 })
+    const importReload = page.waitForEvent('domcontentloaded', { timeout: 30_000 })
     await page.getByRole('button', { name: 'Import source' }).click()
+    await importReload
     const authoringCanvas = page.locator('[data-authoring-canvas]')
-    const revalidateSource = page.getByRole('button', { name: 'Revalidate source' })
+    await expect.poll(() => editorDocumentRequests.length, { timeout: 30_000 }).toBe(1)
+    expect(await page.evaluate(() => (window as Window & { __e2eImportOriginDocument?: boolean }).__e2eImportOriginDocument))
+      .toBeUndefined()
+    const environmentRebase = page.getByRole('button', { name: 'Rebase environment' })
     await Promise.race([
       authoringCanvas.waitFor({ state: 'visible', timeout: 30_000 }),
-      revalidateSource.waitFor({ state: 'visible', timeout: 30_000 }),
+      environmentRebase.waitFor({ state: 'visible', timeout: 30_000 }),
     ])
-    if (await revalidateSource.isVisible()) await revalidateSource.click()
+    await expect(page.getByRole('button', { name: 'Revalidate source' })).toHaveCount(0)
+    if (await environmentRebase.isVisible()) await environmentRebase.click()
     await expect(authoringCanvas).toBeVisible({ timeout: 30_000 })
+    await expect(page.locator('main')).toHaveAttribute('data-authoring-resume-phase', 'resumed')
+    expect(editorDocumentRequests).toHaveLength(1)
     await expect(page.locator('[data-variant-label]').filter({ hasText: 'Primary · Primary' })).toHaveCount(0)
     expect(await page.locator('[data-variant-id]').evaluateAll((frames) => frames.map((frame) => {
       const style = getComputedStyle(frame)
@@ -72,17 +83,27 @@ test.describe('React Figma component authoring', () => {
     await page.getByTitle('Zoom out').click()
     await page.getByRole('button', { name: 'Create variant' }).click()
     await expect(page.getByText('Variant 3', { exact: true })).toBeVisible({ timeout: 30_000 })
+    await expect.poll(async () => {
+      const before = await authoringCanvas.evaluate((node) => {
+        const element = node as HTMLElement & { __e2eCanvasInstance?: string }
+        return element.__e2eCanvasInstance ??= crypto.randomUUID()
+      })
+      await new Promise((resolve) => setTimeout(resolve, 300))
+      const after = await authoringCanvas.evaluate((node) => {
+        const element = node as HTMLElement & { __e2eCanvasInstance?: string }
+        return element.__e2eCanvasInstance ??= crypto.randomUUID()
+      })
+      return before === after && await authoringCanvas.getAttribute('data-authoring-busy') === 'false'
+    }, { timeout: 30_000 }).toBe(true)
+    expect(editorDocumentRequests).toHaveLength(1)
 
-    await expect(async () => {
-      if (await page.getByText('Enter Rename', { exact: true }).isVisible()) return
-      const variant = page.locator('[data-variant-id]').filter({ hasText: 'Variant 3' })
-      await variant.click()
-      await variant.getByText('Variant 3', { exact: true }).click()
-      const input = page.getByRole('textbox', { name: 'Rename Variant 3' })
-      await input.fill('Enter Rename')
-      await input.press('Enter')
-      await expect(page.getByText('Enter Rename', { exact: true })).toBeVisible({ timeout: 15_000 })
-    }).toPass({ timeout: 60_000 })
+    const created = page.locator('[data-variant-id]').filter({ hasText: 'Variant 3' })
+    await created.click()
+    await created.getByText('Variant 3', { exact: true }).click()
+    const enterInput = page.getByRole('textbox', { name: 'Rename Variant 3' })
+    await enterInput.fill('Enter Rename')
+    await enterInput.press('Enter')
+    await expect(page.getByText('Enter Rename', { exact: true })).toBeVisible({ timeout: 30_000 })
 
     const createdVariant = page.locator('[data-variant-id]').filter({ hasText: 'Enter Rename' })
     await createdVariant.click()
@@ -100,6 +121,7 @@ test.describe('React Figma component authoring', () => {
     await renameInput.fill('Blur Rename')
     await page.locator(`[data-variant-id]:not([data-variant-id="${createdVariantId}"])`).first().click()
     await expect(page.getByText('Blur Rename', { exact: true })).toBeVisible({ timeout: 30_000 })
+    await expect(authoringCanvas).toHaveAttribute('data-authoring-busy', 'false')
     const movedVariant = page.locator(`[data-variant-id="${createdVariantId}"]`)
     const geometryBeforeMove = await movedVariant.evaluate((node) => ({
       x: Number.parseFloat((node as HTMLElement).style.left),
@@ -107,10 +129,17 @@ test.describe('React Figma component authoring', () => {
     }))
     const movedVariantBox = await movedVariant.boundingBox()
     if (!movedVariantBox) throw new Error('Created variant has no rendered drag bounds')
+    const moveResponsePromise = page.waitForResponse((response) =>
+      new URL(response.url()).pathname === '/api/dev/editor-authoring' &&
+      response.request().method() === 'POST' &&
+      (response.request().postData() ?? '').includes('"kind":"move-variant"'),
+    { timeout: 30_000 })
     await page.mouse.move(movedVariantBox.x + 20, movedVariantBox.y + 20)
     await page.mouse.down()
     await page.mouse.move(movedVariantBox.x + 68, movedVariantBox.y + 44, { steps: 4 })
     await page.mouse.up()
+    const moveResponse = await moveResponsePromise
+    expect(moveResponse.status(), await moveResponse.text()).toBe(200)
     const geometryAfterMove = { x: geometryBeforeMove.x + 48, y: geometryBeforeMove.y + 24 }
     await expect.poll(() => movedVariant.evaluate((node) => ({
       x: Number.parseFloat((node as HTMLElement).style.left),
@@ -147,22 +176,16 @@ test.describe('React Figma component authoring', () => {
       x: Number.parseFloat((node as HTMLElement).style.left),
       y: Number.parseFloat((node as HTMLElement).style.top),
     }))).toEqual(geometryAfterMove)
-    await page.reload({ waitUntil: 'domcontentloaded' })
-    await Promise.race([
-      authoringCanvas.waitFor({ state: 'visible', timeout: 60_000 }),
-      revalidateSource.waitFor({ state: 'visible', timeout: 60_000 }),
-    ])
-    if (await revalidateSource.isVisible()) await revalidateSource.click()
-    await expect(authoringCanvas).toBeVisible({ timeout: 30_000 })
-    await expect.poll(() => movedVariant.evaluate((node) => ({
-      x: Number.parseFloat((node as HTMLElement).style.left),
-      y: Number.parseFloat((node as HTMLElement).style.top),
-    }))).toEqual(geometryAfterMove)
     await page.keyboard.press('Meta+z')
     await expect.poll(() => movedVariant.evaluate((node) => ({
       x: Number.parseFloat((node as HTMLElement).style.left),
       y: Number.parseFloat((node as HTMLElement).style.top),
     }), { timeout: 30_000 })).toEqual(geometryBeforeMove)
+
+    expect(editorDocumentRequests).toHaveLength(1)
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await expect(page.locator('[data-authoring-resume-error]')).toContainText('AUTHORING_SECOND_RELOAD_REFUSED')
+    expect(editorDocumentRequests).toHaveLength(2)
 
     expect(consoleErrors, `Failed responses: ${failedResponses.join(', ')}`).toEqual([])
     expect(consoleWarnings).toEqual([])

@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import * as ts from 'typescript'
 
 import { compileG2VariantCommand } from '../authoring-compiler'
+import { EMPTY_ENVIRONMENT_FINGERPRINT } from '../authoring-environment'
 import { stableId } from '../authoring-migrations'
 import { importProjectionToAuthoringGraph } from '../authoring-migrations'
 import { sha256 } from '../durable-file-installer'
@@ -36,6 +37,7 @@ async function importedGraph() {
     storeId: 'project-main',
     projection,
     sourceHashes: { [FILE]: sha256(SOURCE) },
+    environmentFingerprint: EMPTY_ENVIRONMENT_FINGERPRINT,
   })
   if (result.kind !== 'imported') throw new Error(`expected imported graph, received ${result.kind}`)
   return result.graph
@@ -262,7 +264,7 @@ describe('G2 native variant compiler', () => {
   it('uses the TypeScript checker for union assignability and rejects a generic type violation', async () => {
     const validBase = `export function Button({ value }: { value?: string | number }) { return <button>{value}</button> }\n`
     const validProjection = await sourceProjectionFromSource({ file: FILE, source: validBase })
-    const validImport = importProjectionToAuthoringGraph({ storeId: 'project-main', projection: validProjection, sourceHashes: { [FILE]: sha256(validBase) } })
+    const validImport = importProjectionToAuthoringGraph({ storeId: 'project-main', projection: validProjection, sourceHashes: { [FILE]: sha256(validBase) }, environmentFingerprint: EMPTY_ENVIRONMENT_FINGERPRINT })
     if (validImport.kind !== 'imported') throw new Error('expected valid import')
     const validComponent = Object.values(validImport.graph.components)[0]!
     const validId = validComponent.primaryVariantId
@@ -277,7 +279,7 @@ describe('G2 native variant compiler', () => {
 export function Button({ value }: Props<number>) { return <button>{value}</button> }
 `
     const invalidProjection = await sourceProjectionFromSource({ file: FILE, source: invalidBase })
-    const invalidImport = importProjectionToAuthoringGraph({ storeId: 'project-main', projection: invalidProjection, sourceHashes: { [FILE]: sha256(invalidBase) } })
+    const invalidImport = importProjectionToAuthoringGraph({ storeId: 'project-main', projection: invalidProjection, sourceHashes: { [FILE]: sha256(invalidBase) }, environmentFingerprint: EMPTY_ENVIRONMENT_FINGERPRINT })
     if (invalidImport.kind !== 'imported') throw new Error('expected invalid fixture bootstrap import')
     const invalidComponent = Object.values(invalidImport.graph.components)[0]!
     const invalidId = invalidComponent.primaryVariantId
@@ -311,7 +313,7 @@ export function Button({ id }: { id?: EntityId }) { return <button>{id}</button>
 `
     const projection = await sourceProjectionFromSource({ file: FILE, source })
     const imported = importProjectionToAuthoringGraph({
-      storeId: 'project-main', projection, sourceHashes: { [FILE]: sha256(source) },
+      storeId: 'project-main', projection, sourceHashes: { [FILE]: sha256(source) }, environmentFingerprint: EMPTY_ENVIRONMENT_FINGERPRINT,
     })
     if (imported.kind !== 'imported') throw new Error(`expected imported graph, received ${imported.kind}`)
     const component = Object.values(imported.graph.components)[0]!
@@ -345,7 +347,7 @@ export function Button({ tone }: { tone?: Tone }) { return <button>{tone}</butto
 `
     const projection = await sourceProjectionFromSource({ file: FILE, source })
     const imported = importProjectionToAuthoringGraph({
-      storeId: 'project-main', projection, sourceHashes: { [FILE]: sha256(source) },
+      storeId: 'project-main', projection, sourceHashes: { [FILE]: sha256(source) }, environmentFingerprint: EMPTY_ENVIRONMENT_FINGERPRINT,
     })
     if (imported.kind !== 'imported') throw new Error(`expected imported graph, received ${imported.kind}`)
     const component = Object.values(imported.graph.components)[0]!

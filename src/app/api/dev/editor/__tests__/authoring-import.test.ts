@@ -5,6 +5,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { classifySourceFileForImport, importSourceFileToAuthoringStore } from '../authoring-import'
+import { EMPTY_ENVIRONMENT_FINGERPRINT } from '../authoring-environment'
 import { ProjectAuthoringSession } from '../authoring-session'
 import { AuthoringSidecarStore, createEmptyAuthoringGraph, PROJECT_AUTHORING_SIDECAR } from '../authoring-store'
 import { DurableFileInstaller } from '../durable-file-installer'
@@ -43,6 +44,7 @@ describe('source import integration', () => {
       storeId: 'project-main',
       file: SOURCE_FILE,
       expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint,
       registry,
       store,
     })
@@ -78,6 +80,7 @@ export function Button({ variant = 'Primary' }: { variant?: 'Primary' | 'Seconda
       storeId: 'project-main',
       file: SOURCE_FILE,
       expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint,
       registry,
       store,
     })
@@ -94,6 +97,7 @@ export function Button({ variant = 'Primary' }: { variant?: 'Primary' | 'Seconda
       storeId: 'project-main',
       file: SOURCE_FILE,
       expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint,
       registry,
       store,
     })).rejects.toMatchObject({ code: 'SOURCE_HASH_STALE', changedPaths: [SOURCE_FILE] })
@@ -116,6 +120,7 @@ export function Button({ variant = 'Primary' }: { variant?: 'Primary' | 'Seconda
       storeId: 'project-main',
       file: SOURCE_FILE,
       expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint,
       registry,
       store,
     })).rejects.toMatchObject({ code: 'AUTHORING_SIDECAR_EXISTS', status: 409 })
@@ -139,6 +144,7 @@ export function Button({ variant = 'Primary', size = 'sm' }: {
       storeId: 'project-main',
       file: SOURCE_FILE,
       expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint,
       registry,
       store,
     })).resolves.toMatchObject({ kind: 'hold', compatibility: 'legacy-multi-axis' })
@@ -161,6 +167,7 @@ export function Button() { return <button className={styles.base} /> }
       storeId: 'project-main',
       file: SOURCE_FILE,
       expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint,
       registry,
       store,
     })).resolves.toMatchObject({ kind: 'unsupported' })
@@ -192,6 +199,7 @@ export function Button() { return <button className={styles.base} /> }
       storeId: 'project-main',
       file: SOURCE_FILE,
       expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint,
       registry,
       store,
     })).resolves.toMatchObject({ kind: 'unsupported' })
@@ -245,7 +253,8 @@ export function Button() { return <button className={styles.base} /> }
     const classified = await classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry })
     expect(Object.keys(classified.sourceHashes).sort()).toEqual([SOURCE_FILE, ambientFile, 'tsconfig.json'].sort())
     const imported = await importSourceFileToAuthoringStore({
-      storeId: 'project-main', file: SOURCE_FILE, expectedSourceHashes: classified.sourceHashes, registry, store,
+      storeId: 'project-main', file: SOURCE_FILE, expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint, registry, store,
     })
     if (imported.kind !== 'imported') throw new Error(`expected import, received ${imported.kind}`)
     const session = new ProjectAuthoringSession({ storeId: 'project-main', registry, store })
@@ -295,7 +304,8 @@ export function Button() { return <button className={styles.base} /> }
     const classified = await classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry })
     expect(Object.keys(classified.sourceHashes).sort()).toEqual([SOURCE_FILE, typeFile, 'tsconfig.json'].sort())
     const imported = await importSourceFileToAuthoringStore({
-      storeId: 'project-main', file: SOURCE_FILE, expectedSourceHashes: classified.sourceHashes, registry, store,
+      storeId: 'project-main', file: SOURCE_FILE, expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint, registry, store,
     })
     if (imported.kind !== 'imported') throw new Error(`expected import, received ${imported.kind}`)
     const session = new ProjectAuthoringSession({ storeId: 'project-main', registry, store })
@@ -321,7 +331,8 @@ export function Button() { return <button className={styles.base} /> }
     const classified = await classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry })
     expect(Object.keys(classified.sourceHashes).sort()).toEqual([SOURCE_FILE, baseConfig, 'tsconfig.json'].sort())
     const imported = await importSourceFileToAuthoringStore({
-      storeId: 'project-main', file: SOURCE_FILE, expectedSourceHashes: classified.sourceHashes, registry, store,
+      storeId: 'project-main', file: SOURCE_FILE, expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint, registry, store,
     })
     if (imported.kind !== 'imported') throw new Error(`expected import, received ${imported.kind}`)
     const session = new ProjectAuthoringSession({ storeId: 'project-main', registry, store })
@@ -365,7 +376,8 @@ export function Button() { return <button className={styles.base} /> }
     await expect(classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry }))
       .rejects.toMatchObject({ code: 'SOURCE_DEPENDENCY_UNRESOLVED', status: 422 })
     await expect(importSourceFileToAuthoringStore({
-      storeId: 'project-main', file: SOURCE_FILE, expectedSourceHashes: {}, registry, store,
+      storeId: 'project-main', file: SOURCE_FILE, expectedSourceHashes: {},
+      expectedEnvironmentFingerprint: EMPTY_ENVIRONMENT_FINGERPRINT, registry, store,
     })).rejects.toMatchObject({ code: 'SOURCE_DEPENDENCY_UNRESOLVED', status: 422 })
     await expect(fs.readFile(path.join(root, PROJECT_AUTHORING_SIDECAR))).rejects.toMatchObject({ code: 'ENOENT' })
     expect(await store.load()).toBeNull()
@@ -401,7 +413,8 @@ export function Button() { return <button className={styles.base} /> }
     await expect(classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry }))
       .rejects.toMatchObject({ code: 'SOURCE_DEPENDENCY_UNRESOLVED', status: 422 })
     await expect(importSourceFileToAuthoringStore({
-      storeId: 'project-main', file: SOURCE_FILE, expectedSourceHashes: {}, registry, store,
+      storeId: 'project-main', file: SOURCE_FILE, expectedSourceHashes: {},
+      expectedEnvironmentFingerprint: EMPTY_ENVIRONMENT_FINGERPRINT, registry, store,
     })).rejects.toMatchObject({ code: 'SOURCE_DEPENDENCY_UNRESOLVED', status: 422 })
     await expect(fs.readFile(path.join(root, PROJECT_AUTHORING_SIDECAR))).rejects.toMatchObject({ code: 'ENOENT' })
     await expect(fs.readdir(path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions')))
@@ -423,7 +436,8 @@ export function Button() { return <button className={styles.base} /> }
     await expect(classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry }))
       .rejects.toMatchObject({ code: 'SOURCE_TSCONFIG_OUTSIDE_ROOT', status: 422 })
     await expect(importSourceFileToAuthoringStore({
-      storeId: 'project-main', file: SOURCE_FILE, expectedSourceHashes: {}, registry, store,
+      storeId: 'project-main', file: SOURCE_FILE, expectedSourceHashes: {},
+      expectedEnvironmentFingerprint: EMPTY_ENVIRONMENT_FINGERPRINT, registry, store,
     })).rejects.toMatchObject({ code: 'SOURCE_TSCONFIG_OUTSIDE_ROOT', status: 422 })
     await expect(fs.readFile(path.join(root, SOURCE_FILE), 'utf8')).resolves.toBe(source)
     await expect(fs.readFile(path.join(root, PROJECT_AUTHORING_SIDECAR))).rejects.toMatchObject({ code: 'ENOENT' })

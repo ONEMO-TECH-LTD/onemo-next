@@ -2,6 +2,8 @@ import { promises as fs } from 'node:fs'
 
 import { describe, expect, it } from 'vitest'
 
+import { EMPTY_ENVIRONMENT_FINGERPRINT } from '../authoring-environment'
+
 import { importProjectionToAuthoringGraph } from '../authoring-migrations'
 import { sha256 } from '../durable-file-installer'
 import { classifyVariantAxes, readSourceProjection, sourceProjectionFromModel, sourceProjectionFromSource, unsupportedSourceProjection } from '../source-projection'
@@ -37,7 +39,7 @@ describe('SourceProjection classification', () => {
       { axis: 'size', values: ['sm', 'lg'], defaultValue: 'sm' },
     ]))
 
-    expect(importProjectionToAuthoringGraph({ storeId: 'project-main', projection, sourceHashes: sourceHashes(projection.file) })).toEqual({
+    expect(importProjectionToAuthoringGraph({ storeId: 'project-main', projection, sourceHashes: sourceHashes(projection.file), environmentFingerprint: EMPTY_ENVIRONMENT_FINGERPRINT })).toEqual({
       kind: 'hold',
       compatibility: 'legacy-multi-axis',
       reason: 'multi-axis source requires explicit conversion preview',
@@ -49,8 +51,8 @@ describe('SourceProjection classification', () => {
       { axis: 'variant', values: ['primary', 'secondary'], defaultValue: 'primary' },
     ]))
 
-    const first = importProjectionToAuthoringGraph({ storeId: 'project-main', projection, sourceHashes: sourceHashes(projection.file) })
-    const second = importProjectionToAuthoringGraph({ storeId: 'project-main', projection, sourceHashes: sourceHashes(projection.file) })
+    const first = importProjectionToAuthoringGraph({ storeId: 'project-main', projection, sourceHashes: sourceHashes(projection.file), environmentFingerprint: EMPTY_ENVIRONMENT_FINGERPRINT })
+    const second = importProjectionToAuthoringGraph({ storeId: 'project-main', projection, sourceHashes: sourceHashes(projection.file), environmentFingerprint: EMPTY_ENVIRONMENT_FINGERPRINT })
 
     expect(first).toEqual(second)
     expect(first.kind).toBe('imported')
@@ -65,7 +67,7 @@ describe('SourceProjection classification', () => {
   it('keeps parse failures unsupported instead of treating them as empty axes', () => {
     const projection = unsupportedSourceProjection('Broken.tsx', 'parse failed')
 
-    expect(importProjectionToAuthoringGraph({ storeId: 'project-main', projection, sourceHashes: sourceHashes(projection.file) })).toEqual({
+    expect(importProjectionToAuthoringGraph({ storeId: 'project-main', projection, sourceHashes: sourceHashes(projection.file), environmentFingerprint: EMPTY_ENVIRONMENT_FINGERPRINT })).toEqual({
       kind: 'unsupported',
       reason: 'parse failed',
     })

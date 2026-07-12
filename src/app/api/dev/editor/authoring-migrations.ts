@@ -14,8 +14,9 @@ export function importProjectionToAuthoringGraph(input: {
   storeId: StoreId
   projection: SourceProjection
   sourceHashes: Record<string, string>
+  environmentFingerprint: string
 }): ProjectionImportResult {
-  const { storeId, projection, sourceHashes } = input
+  const { storeId, projection, sourceHashes, environmentFingerprint } = input
   if (projection.compatibility === 'unsupported') {
     return { kind: 'unsupported', reason: projection.unsupportedReason ?? 'unsupported projection' }
   }
@@ -25,7 +26,7 @@ export function importProjectionToAuthoringGraph(input: {
     }
     return { kind: 'hold', compatibility: 'legacy-multi-axis', reason: 'multi-axis source requires explicit conversion preview' }
   }
-  if (!isSha256(sourceHashes[projection.file]) || Object.values(sourceHashes).some((hash) => !isSha256(hash))) {
+  if (!isSha256(sourceHashes[projection.file]) || Object.values(sourceHashes).some((hash) => !isSha256(hash)) || !isSha256(environmentFingerprint)) {
     return { kind: 'unsupported', reason: 'exact source hashes are required for import' }
   }
   const values = importableVariantValues(projection)
@@ -34,6 +35,7 @@ export function importProjectionToAuthoringGraph(input: {
     storeId,
     rootKind: 'project',
     sourceHashes,
+    environmentFingerprint,
   })
   const componentId = stableId('component', storeId, projection.file, projection.exportName)
   const variantIds = values.map((_, index) =>

@@ -23,7 +23,7 @@ import {
   type Icon as PIcon,
 } from '@phosphor-icons/react'
 import { ComponentCanvas } from './component-authoring/ComponentCanvas'
-import { AUTHORING_ACTIVE_FILE_KEY } from './component-authoring/session'
+import { completeAuthoringResume, readAuthoringResumeState } from './component-authoring/session'
 import { canvasHistoryAction } from './component-authoring/gestures'
 
 const INK = 'rgba(0,0,0,0.898)', MUTE = 'rgba(0,0,0,0.45)', FAINT = 'rgba(0,0,0,0.3)' // INK: Figma's exact ink (E8 audit — measured, was 0.9)
@@ -2338,6 +2338,9 @@ export default function ReactFigmaPage() {
   // Components keep the current page iframe mounted. Entering one project component overlays its graph-backed
   // authoring frames in this same canvas host; Home removes the overlay and reveals the unchanged page.
   const [editingComponent, setEditingComponent] = useState<DsComponent | null>(null)
+  const [authoringResumeTarget, setAuthoringResumeTarget] = useState<string | null>(null)
+  const [authoringResumePhase, setAuthoringResumePhase] = useState<'none' | 'resuming' | 'resumed' | 'refused'>('none')
+  const [authoringResumeError, setAuthoringResumeError] = useState<string | null>(null)
   const [authoringBounds, setAuthoringBounds] = useState({ w: 800, h: 600 })
   const [authoringUndoNonce, setAuthoringUndoNonce] = useState(0)
   const updateAuthoringBounds = useCallback((w: number, h: number) => {
@@ -2345,26 +2348,43 @@ export default function ReactFigmaPage() {
   }, [])
   const noteAuthoringChanged = useCallback(() => setCompNonce((value) => value + 1), [])
   const closeComponentAuthoring = useCallback(() => {
-    sessionStorage.removeItem(AUTHORING_ACTIVE_FILE_KEY)
     setEditingComponent(null)
   }, [])
+  const resolveAuthoringResume = useCallback((file: string, sourceHash: string) => {
+    if (authoringResumeTarget !== file) return
+    const result = completeAuthoringResume({ targetFile: file, resolvedHash: sourceHash })
+    if (result.kind === 'refused') {
+      setAuthoringResumeError(result.code)
+      setAuthoringResumePhase('refused')
+      setEditingComponent(null)
+      return
+    }
+    if (result.kind === 'none') {
+      setAuthoringResumeTarget(null)
+      setAuthoringResumePhase('resumed')
+    }
+  }, [authoringResumeTarget])
   const canvasMode: 'design' | 'components' = rail === 'components' && editingComponent ? 'components' : 'design'
   const [autoDistributed, setAutoDistributed] = useState(false) // justify space-between (Figma distributed)
   const [insetSides, setInsetSides] = useState({ t: '0', r: '0', b: '0', l: '0' }) // A7: per-side inset (positioned elements) // derived — the far-left rail IS the canvas switch (Dan 2026-07-07)
   const dsComponents = useDsComponents(rail === 'assets' || rail === 'components', compNonce) // E4-G4 Assets panel + E10 components rail (library panel needs the list whether or not editing)
   useEffect(() => {
-    if (sessionStorage.getItem(AUTHORING_ACTIVE_FILE_KEY)) setRail('components')
+    const state = readAuthoringResumeState()
+    if (state.kind === 'resuming') {
+      setAuthoringResumeTarget(state.marker.targetFile)
+      setAuthoringResumePhase('resuming')
+      setRail('components')
+    } else if (state.kind === 'refused') {
+      setAuthoringResumeError(state.code)
+      setAuthoringResumePhase('refused')
+    }
   }, [])
   useEffect(() => {
     if (editingComponent || rail !== 'components') return
-    const resumeFile = sessionStorage.getItem(AUTHORING_ACTIVE_FILE_KEY)
-    if (!resumeFile) return
-    const component = dsComponents.find((candidate) => candidate.root === 'project' && candidate.file === resumeFile)
+    if (!authoringResumeTarget) return
+    const component = dsComponents.find((candidate) => candidate.root === 'project' && candidate.file === authoringResumeTarget)
     if (component) setEditingComponent(component)
-  }, [dsComponents, editingComponent, rail])
-  useEffect(() => {
-    if (editingComponent?.file) sessionStorage.setItem(AUTHORING_ACTIVE_FILE_KEY, editingComponent.file)
-  }, [editingComponent])
+  }, [authoringResumeTarget, dsComponents, editingComponent, rail])
   // #6: create a new component in code (Framer-style) — scaffolds a real editable component file.
   const newComponent = useCallback(async (name: string, root: 'project' | 'global' = 'project', category = '') => {
     const clean = name.trim()
@@ -3899,11 +3919,12 @@ export default function ReactFigmaPage() {
       </aside>
 
       {/* ░░ INFINITE CANVAS ░░ */}
-      <main ref={canvasRef} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
+      <main ref={canvasRef} data-authoring-resume-phase={authoringResumePhase} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
         style={{ flex: 1, minWidth: 0, background: canvasMode === 'components' ? 'var(--sem-col-bg-secondary)' : '#f0f0f0', position: 'relative', overflow: 'hidden', cursor: drawArm ? 'crosshair' : isPanning ? 'grabbing' : 'default' }}>
         {canvasMode === 'design' && <InsertIsland drawDisabled={false} onInsert={(tag, display) => { if (tag === 'img') void insertImage(); else setDrawArm({ tag, display }) }} codeMode={codeMode} onCodeMode={setCodeMode} />}
         {canvasMode === 'design' && drawArm && <div style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 40, height: 26, display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', borderRadius: 8, background: '#1e1e1e', color: '#fff', font: `450 11px/1 ${FONT}`, pointerEvents: 'none' }}>Drawing {drawArm.tag} — drag on the frame · Esc to cancel</div>}
         {canvasMode === 'design' && codeMode && sel && <CodeView file={sel.file} line={sel.line} onClose={() => setCodeMode(false)} />}
+        {authoringResumeError && <div role="alert" data-authoring-resume-error style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 60, padding: '8px 12px', borderRadius: 'var(--sem-radii-md)', background: 'var(--sem-col-bg-primary)', color: 'var(--sem-col-text-error-primary)' }}>{authoringResumeError}</div>}
         {canvasMode === 'components' && editingComponent && (
           <nav aria-label="Component breadcrumb" data-component-breadcrumb style={{ position: 'absolute', top: 12, left: 12, zIndex: 50, display: 'flex', alignItems: 'center', gap: 4, width: 'fit-content', padding: 3, border: '1px solid var(--sem-col-border-secondary)', borderRadius: 'var(--sem-radii-full)', background: 'var(--sem-col-bg-primary)', fontFamily: 'var(--sem-type-fluid-label-xs-font)', fontSize: 'var(--sem-type-fluid-label-xs-size)', lineHeight: 'var(--sem-type-fluid-label-xs-line-height)', letterSpacing: 'var(--sem-type-fluid-label-xs-letter-spacing)' }}>
             <button type="button" data-component-home onClick={closeComponentAuthoring} title="Back to the page" style={{ appearance: 'none', border: 0, borderRadius: 'var(--sem-radii-full)', background: 'var(--sem-col-bg-secondary)', font: 'inherit', color: 'var(--sem-col-text-secondary)', cursor: 'pointer', padding: '4px 8px' }}>Home</button>
@@ -3922,10 +3943,12 @@ export default function ReactFigmaPage() {
             {canvasMode === 'components' && editingComponent?.file && (
               <div onClick={(event) => event.stopPropagation()} style={{ position: 'absolute', inset: 0, overflow: 'hidden', borderRadius: 4 }}>
                 <ComponentCanvas
+                  key={editingComponent.file}
                   file={editingComponent.file}
                   undoNonce={authoringUndoNonce}
                   onBounds={updateAuthoringBounds}
                   onChanged={noteAuthoringChanged}
+                  onResumeResolved={resolveAuthoringResume}
                 />
               </div>
             )}

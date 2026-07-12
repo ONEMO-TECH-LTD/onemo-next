@@ -85,3 +85,12 @@ Follow-up at the committed authoring E2E gate: the local-`typeRoots` semantic ca
 - Symptoms: the click-away action was intercepted indefinitely, the first Enter edit was lost with the uncommitted label correctly unchanged, and the final attribute lookup waited on a locator that could no longer match.
 - What worked: click a different visible variant for the blur-commit proof, retry the complete Enter transition across the known cold document replacement, and capture the stable `data-variant-id` before opening the input.
 - Remember: S58 authoring E2E locators must follow stable identity across editable text changes; cold retries wrap a complete observable transition, never the semantic assertion alone.
+
+Follow-up after the bounded import-reload protocol: the one permitted document replacement now completes before semantic commands begin, so Enter rename is single-shot again. Retrying it would mask a forbidden later reload and is no longer valid evidence.
+
+## S58 import-bootstrap document identity proof
+
+- What did not work: assuming Next would always reload after the sidecar import, polling `page.evaluate` as navigation destroyed the origin context, and calling `waitForLoadState` after the document request had already started (which returned the already-loaded origin document).
+- Symptoms: the first run observed zero reloads and left the origin marker pending; the next two runs observed the one reload but the identity assertion raced the destroyed origin context.
+- What worked: the successful import explicitly triggers its one contract-permitted reload, and the E2E subscribes to the next `domcontentloaded` event before clicking Import, then asserts the new document identity and exact request count.
+- Remember: document-replacement proofs must arm the next-document event before the user action; a request event is earlier than navigation commit, and `waitForLoadState` is not a future-navigation subscription.

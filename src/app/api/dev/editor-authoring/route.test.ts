@@ -66,6 +66,8 @@ describe('editor-authoring G1 import route', () => {
       kind: 'import-source',
       file: SOURCE_FILE,
       expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint,
+      transactionId: '00000000-0000-4000-8000-000000000001',
     }), root)
     const imported = await importedResponse.json()
 
@@ -100,6 +102,8 @@ describe('editor-authoring G1 import route', () => {
       kind: 'import-source',
       file: SOURCE_FILE,
       expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint,
+      transactionId: '00000000-0000-4000-8000-000000000001',
     }), root)
 
     let loaded = await (await handleGet(componentRequest(), root)).json()
@@ -147,11 +151,102 @@ describe('editor-authoring G1 import route', () => {
     expect(Object.keys(undone.graph.variants)).toHaveLength(2)
   }, 20_000)
 
+  it('rebases generated compiler-environment drift without changing authored authority or semantic undo', async () => {
+    const root = await makeRoot()
+    const environmentFile = '.next/dev/types/routes.d.ts'
+    await fs.mkdir(path.dirname(path.join(root, environmentFile)), { recursive: true })
+    await fs.writeFile(path.join(root, environmentFile), 'declare type GeneratedRoute = "/before"\n')
+    await fs.writeFile(path.join(root, 'tsconfig.json'), JSON.stringify({
+      compilerOptions: {
+        strict: true, noEmit: true, target: 'ESNext', module: 'ESNext', moduleResolution: 'Bundler', jsx: 'react-jsx', types: ['react'],
+      },
+      include: ['src/**/*.ts', 'src/**/*.tsx', '.next/dev/types/**/*.d.ts'],
+    }))
+    const classified = await (await handleGet(request('GET'), root)).json()
+    expect(classified.sourceHashes).not.toHaveProperty(environmentFile)
+    expect(classified.environmentFingerprint).toMatch(/^[a-f0-9]{64}$/)
+    const imported = await (await handlePost(request('POST', {
+      kind: 'import-source', file: SOURCE_FILE, expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint,
+      transactionId: '00000000-0000-4000-8000-000000000002',
+    }), root)).json()
+    const acceptedEnvironment = imported.graph.environmentFingerprint
+
+    const loadedBeforeCreate = await (await handleGet(componentRequest(), root)).json()
+    await handlePost(request('POST', {
+      kind: 'execute-command',
+      command: { kind: 'create-variant', commandId: 'before-environment-rebase', componentId: loadedBeforeCreate.componentId, displayName: 'Created' },
+      expectedRevision: loadedBeforeCreate.graph.revision,
+      expectedSourceHashes: loadedBeforeCreate.sourceHashes,
+    }), root)
+    const beforeDrift = await (await handleGet(componentRequest(), root)).json()
+    const authoredBytes = await fs.readFile(path.join(root, SOURCE_FILE))
+    await fs.writeFile(path.join(root, environmentFile), 'type Broken =\n')
+
+    let staleResponse = await handleGet(componentStatusRequest(), root)
+    expect(staleResponse.status).toBe(200)
+    let stale = await staleResponse.json()
+    expect(stale).toMatchObject({
+      authoringState: 'environment-stale',
+      expectedRevision: beforeDrift.graph.revision,
+      sourceHashes: beforeDrift.sourceHashes,
+      environmentFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+    })
+    expect(stale.environmentFingerprint).not.toBe(acceptedEnvironment)
+
+    const sidecarPath = path.join(root, PROJECT_AUTHORING_SIDECAR)
+    const journalPath = path.join(root, authoringMetadataPath('project', 'history/journal.ndjson'))
+    const transactionsPath = path.join(root, authoringMetadataPath('project', 'transactions'))
+    const beforeSidecar = await fs.readFile(sidecarPath)
+    const beforeJournal = await fs.readFile(journalPath)
+    const beforeTransactions = (await fs.readdir(transactionsPath)).sort()
+    const invalidResponse = await handlePost(request('POST', {
+      kind: 'environment-rebase', file: SOURCE_FILE,
+      expectedRevision: stale.expectedRevision,
+      expectedSourceHashes: stale.sourceHashes,
+      expectedEnvironmentFingerprint: stale.environmentFingerprint,
+    }), root)
+    expect(invalidResponse.status).toBe(422)
+    await expect(invalidResponse.json()).resolves.toMatchObject({ code: 'STAGED_TYPECHECK_FAILED' })
+    await expect(fs.readFile(sidecarPath)).resolves.toEqual(beforeSidecar)
+    await expect(fs.readFile(journalPath)).resolves.toEqual(beforeJournal)
+    expect((await fs.readdir(transactionsPath)).sort()).toEqual(beforeTransactions)
+
+    await fs.writeFile(path.join(root, environmentFile), 'declare type GeneratedRoute = "/after"\n')
+    staleResponse = await handleGet(componentStatusRequest(), root)
+    stale = await staleResponse.json()
+
+    const rebasedResponse = await handlePost(request('POST', {
+      kind: 'environment-rebase', file: SOURCE_FILE,
+      expectedRevision: stale.expectedRevision,
+      expectedSourceHashes: stale.sourceHashes,
+      expectedEnvironmentFingerprint: stale.environmentFingerprint,
+    }), root)
+    expect(rebasedResponse.status).toBe(200)
+    const rebased = await rebasedResponse.json()
+    expect(rebased).toMatchObject({ kind: 'environment-rebased', graph: { revision: beforeDrift.graph.revision + 1 } })
+    expect(rebased.graph.sourceHashes).toEqual(beforeDrift.graph.sourceHashes)
+    expect(rebased.graph.environmentFingerprint).toBe(stale.environmentFingerprint)
+    await expect(fs.readFile(path.join(root, SOURCE_FILE))).resolves.toEqual(authoredBytes)
+
+    const loaded = await (await handleGet(componentRequest(), root)).json()
+    expect(loaded.canUndo).toBe(true)
+    const undo = await handlePost(request('POST', {
+      kind: 'undo', expectedRevision: loaded.graph.revision, expectedSourceHashes: loaded.sourceHashes,
+    }), root)
+    expect(undo.status).toBe(200)
+    await expect(undo.json()).resolves.toMatchObject({
+      undoneCommand: { kind: 'create-variant', commandId: 'before-environment-rebase' },
+    })
+  }, 20_000)
+
   it('refuses type-invalid source revalidation before sidecar, history, or transaction writes', async () => {
     const root = await makeRoot()
     const classified = await (await handleGet(request('GET'), root)).json()
     await handlePost(request('POST', {
       kind: 'import-source', file: SOURCE_FILE, expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint,
+      transactionId: '00000000-0000-4000-8000-000000000001',
     }), root)
     const loaded = await (await handleGet(componentRequest(), root)).json()
     await handlePost(request('POST', {
@@ -222,6 +317,8 @@ describe('editor-authoring G1 import route', () => {
       kind: 'import-source',
       file: SOURCE_FILE,
       expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint,
+      transactionId: '00000000-0000-4000-8000-000000000001',
     }), root)
 
     expect(response.status).toBe(409)
@@ -239,6 +336,8 @@ describe('editor-authoring G1 import route', () => {
       kind: 'import-source',
       file: SOURCE_FILE,
       expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint,
+      transactionId: '00000000-0000-4000-8000-000000000001',
     }), root)
 
     expect(response.status).toBe(200)
@@ -255,7 +354,11 @@ describe('editor-authoring G1 import route', () => {
   it('loads and persists create, rename, and move through the strict G2 command route', async () => {
     const root = await makeRoot()
     const classified = await (await handleGet(request('GET'), root)).json()
-    await handlePost(request('POST', { kind: 'import-source', file: SOURCE_FILE, expectedSourceHashes: classified.sourceHashes }), root)
+    await handlePost(request('POST', {
+      kind: 'import-source', file: SOURCE_FILE, expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint,
+      transactionId: '00000000-0000-4000-8000-000000000001',
+    }), root)
 
     let loaded = await (await handleGet(componentRequest(), root)).json()
     const componentId = loaded.componentId as string

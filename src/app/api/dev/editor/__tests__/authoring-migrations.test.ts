@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { importProjectionToAuthoringGraph } from '../authoring-migrations'
+import { EMPTY_ENVIRONMENT_FINGERPRINT } from '../authoring-environment'
 import { assertAuthoringGraphV1 } from '../authoring-schema'
 import { sha256 } from '../durable-file-installer'
 import type { SourceProjection } from '../source-projection'
@@ -36,6 +37,7 @@ describe('importProjectionToAuthoringGraph', () => {
       storeId: 'project-main',
       projection: singleAxis(['primary', 'secondary', 'danger'], 'secondary'),
       sourceHashes: sourceHashes(),
+      environmentFingerprint: EMPTY_ENVIRONMENT_FINGERPRINT,
     })
 
     expect(result.kind).toBe('imported')
@@ -60,11 +62,13 @@ describe('importProjectionToAuthoringGraph', () => {
       storeId: 'project-main',
       projection: singleAxis(['primary', 'secondary'], 'primary'),
       sourceHashes: sourceHashes(),
+      environmentFingerprint: EMPTY_ENVIRONMENT_FINGERPRINT,
     })
     const renamed = importProjectionToAuthoringGraph({
       storeId: 'project-main',
       projection: singleAxis(['base', 'alternate'], 'base'),
       sourceHashes: sourceHashes(),
+      environmentFingerprint: EMPTY_ENVIRONMENT_FINGERPRINT,
     })
 
     expect(first.kind).toBe('imported')
@@ -82,6 +86,7 @@ describe('importProjectionToAuthoringGraph', () => {
       storeId: 'project-main',
       projection: singleAxis(values, defaultValue),
       sourceHashes: sourceHashes(),
+      environmentFingerprint: EMPTY_ENVIRONMENT_FINGERPRINT,
     })).toEqual({ kind: 'unsupported', reason: 'single-axis source is not losslessly importable' })
   })
 
@@ -90,6 +95,7 @@ describe('importProjectionToAuthoringGraph', () => {
       storeId: 'project-main',
       projection: singleAxis(['primary'], 'primary'),
       sourceHashes: sourceHashes('not-a-hash'),
+      environmentFingerprint: EMPTY_ENVIRONMENT_FINGERPRINT,
     })).toEqual({ kind: 'unsupported', reason: 'exact source hashes are required for import' })
   })
 
@@ -101,6 +107,7 @@ describe('importProjectionToAuthoringGraph', () => {
       storeId: 'project-main',
       projection,
       sourceHashes: sourceHashes(),
+      environmentFingerprint: EMPTY_ENVIRONMENT_FINGERPRINT,
     })).toEqual({ kind: 'unsupported', reason: 'single-axis source is not losslessly importable' })
   })
 
@@ -118,6 +125,7 @@ describe('importProjectionToAuthoringGraph', () => {
       storeId: 'project-main',
       projection,
       sourceHashes: sourceHashes(),
+      environmentFingerprint: EMPTY_ENVIRONMENT_FINGERPRINT,
     })).toEqual({ kind: 'unsupported', reason: 'multi-axis compatibility does not match source axes' })
   })
 
@@ -130,6 +138,7 @@ describe('importProjectionToAuthoringGraph', () => {
       storeId: 'project-main',
       projection,
       sourceHashes: sourceHashes(),
+      environmentFingerprint: EMPTY_ENVIRONMENT_FINGERPRINT,
     })).toEqual({
       kind: 'hold',
       compatibility: 'legacy-multi-axis',
