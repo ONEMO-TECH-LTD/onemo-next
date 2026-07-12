@@ -80,7 +80,7 @@ export class ProjectAuthoringSession {
       sidecarPath: PROJECT_AUTHORING_SIDECAR,
       revision: graph.revision,
       sourceHashes: graph.sourceHashes,
-      canUndo: (await this.history.latestUndoableCommand()) !== null,
+      canUndo: (await this.history.latestUndoableCommand(graph.revision)) !== null,
       graph: projected,
       component: file ? componentCanvasState(projected, file) : null,
     }
@@ -146,7 +146,7 @@ export class ProjectAuthoringSession {
     expectedRevision: number
     expectedSourceHashes?: Record<string, string>
   }): Promise<UndoAuthoringCommandResult> {
-    const latest = await this.history.latestUndoableCommand()
+    const latest = await this.history.latestUndoableCommand(input.expectedRevision)
     if (!latest) throw namedError('UNDO_EMPTY', 'no authoring command to undo', 404)
     const preimages = latest.record.preimages
     if (preimages.length > 0 && !input.expectedSourceHashes) {

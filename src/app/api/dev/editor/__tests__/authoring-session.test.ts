@@ -144,6 +144,27 @@ describe('ProjectAuthoringSession', () => {
     expect(await fs.readFile(path.join(root, SOURCE_FILE), 'utf8')).toBe(sourceBeforeUndo)
   })
 
+  it('refuses a revision-incoherent history before undo reads preimages', async () => {
+    const { root, session } = await makeSession()
+    const before = await session.loadCanvas(SOURCE_FILE)
+    await session.executeCommand({
+      expectedRevision: before.revision,
+      expectedSourceHashes: before.sourceHashes,
+      command: { kind: 'create-variant', file: SOURCE_FILE, name: 'Tertiary' },
+    })
+    const afterCreate = await session.loadCanvas(SOURCE_FILE)
+    const journalPath = path.join(root, 'src/app/(dev)/react-figma-components/.onemo/history/journal.ndjson')
+    const record = JSON.parse((await fs.readFile(journalPath, 'utf8')).trim())
+    await fs.writeFile(journalPath, JSON.stringify({ ...record, revision: afterCreate.revision + 1 }) + '\n')
+    const sourceBeforeUndo = await fs.readFile(path.join(root, SOURCE_FILE), 'utf8')
+
+    await expect(session.undoLastCommand({
+      expectedRevision: afterCreate.revision,
+      expectedSourceHashes: afterCreate.sourceHashes,
+    })).rejects.toMatchObject({ code: 'HISTORY_REVISION_STALE' })
+    expect(await fs.readFile(path.join(root, SOURCE_FILE), 'utf8')).toBe(sourceBeforeUndo)
+  })
+
   it('refuses source-mutating commands without expected source hashes', async () => {
     const { session } = await makeSession()
 

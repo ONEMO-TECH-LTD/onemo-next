@@ -139,7 +139,11 @@ export class AuthoringHistoryStore {
         return { index, record: assertHistoryRecord(parsed, kind, index) }
       })
     const undone = new Set<number>()
-    for (const entry of entries) {
+    for (const [entryIndex, entry] of entries.entries()) {
+      const previous = entries[entryIndex - 1]
+      if (previous && entry.record.revision !== previous.record.revision + 1) {
+        throw namedError('HISTORY_RECORD_INVALID', `history revision at line ${entry.index} is not contiguous`)
+      }
       if (entry.record.type !== 'authoring-undo') continue
       const target = entries[entry.record.undoneJournalIndex]
       if (!target || target.index >= entry.index || target.record.type !== 'authoring-command' || undone.has(target.index)) {
@@ -150,8 +154,15 @@ export class AuthoringHistoryStore {
     return entries
   }
 
-  async latestUndoableCommand(): Promise<IndexedAuthoringCommandHistoryRecord | null> {
+  async latestUndoableCommand(expectedRevision?: number): Promise<IndexedAuthoringCommandHistoryRecord | null> {
     const journal = await this.readJournal()
+    const journalRevision = journal.at(-1)?.record.revision ?? 0
+    if (expectedRevision !== undefined && journalRevision !== expectedRevision) {
+      throw namedError(
+        'HISTORY_REVISION_STALE',
+        `history revision ${journalRevision} does not match current revision ${expectedRevision}`,
+      )
+    }
     const undone = new Set<number>()
     for (const entry of journal) {
       if (entry.record.type === 'authoring-undo') undone.add(entry.record.undoneJournalIndex)

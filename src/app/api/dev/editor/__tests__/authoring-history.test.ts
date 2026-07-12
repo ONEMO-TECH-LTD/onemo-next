@@ -81,6 +81,22 @@ describe('AuthoringHistoryStore', () => {
     await expect(history.latestUndoableCommand()).rejects.toMatchObject({ code: 'HISTORY_RECORD_INVALID' })
   })
 
+  it('refuses a validly shaped journal whose tail revision disagrees with current state', async () => {
+    const { history, journalPath, validCommandRecord } = await historyFixture()
+    await fs.writeFile(journalPath, JSON.stringify(validCommandRecord()) + '\n')
+
+    await expect(history.latestUndoableCommand(2)).rejects.toMatchObject({ code: 'HISTORY_REVISION_STALE' })
+  })
+
+  it('refuses non-contiguous durable history revisions', async () => {
+    const { history, journalPath, validCommandRecord } = await historyFixture()
+    const command = validCommandRecord()
+    const undo = { type: 'authoring-undo', undoneJournalIndex: 0, restoredFiles: ['Button.tsx'], revision: 3 }
+    await fs.writeFile(journalPath, `${JSON.stringify(command)}\n${JSON.stringify(undo)}\n`)
+
+    await expect(history.latestUndoableCommand()).rejects.toMatchObject({ code: 'HISTORY_RECORD_INVALID' })
+  })
+
   it('returns a named refusal for a missing content-addressed blob', async () => {
     const { history, validCommandRecord } = await historyFixture()
     const record = validCommandRecord()
