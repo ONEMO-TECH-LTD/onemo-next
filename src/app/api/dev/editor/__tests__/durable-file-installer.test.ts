@@ -78,6 +78,22 @@ describe('DurableFileInstaller', () => {
     expect((await fs.stat(file)).mode & 0o777).toBe(0o644)
   })
 
+  it('preserves destination mode even when the process umask is more restrictive', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'durable-mode-umask-'))
+    const file = path.join(dir, 'Button.tsx')
+    await fs.writeFile(file, 'before\n')
+    await fs.chmod(file, 0o666)
+    const previousUmask = process.umask(0o077)
+    try {
+      await new DurableFileInstaller().writeFileAtomic(file, 'after\n')
+    } finally {
+      process.umask(previousUmask)
+    }
+
+    await expect(fs.readFile(file, 'utf8')).resolves.toBe('after\n')
+    expect((await fs.stat(file)).mode & 0o777).toBe(0o666)
+  })
+
   it('refuses a symlink destination without changing its target', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'durable-link-'))
     const target = path.join(dir, 'target.tsx')

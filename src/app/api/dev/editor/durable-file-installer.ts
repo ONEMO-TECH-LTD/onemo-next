@@ -39,6 +39,7 @@ export class DurableFileInstaller {
     let didInstall = false
     try {
       handle = await fs.open(temp, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | requireNoFollowFlag(), mode)
+      await handle.chmod(mode)
       await handle.writeFile(data)
       await handle.sync()
       await handle.close()
