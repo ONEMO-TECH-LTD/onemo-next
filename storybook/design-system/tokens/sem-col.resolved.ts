@@ -4,7 +4,7 @@ export const RESOLVED = {
  "pulledAtFileVersion": null,
  "tokens": [
   {
-   "name": "text/primary",
+   "name": "text/primary/default",
    "binding": "brand/black",
    "description": "🔒 LOCKED · text/ v2.3.2 — The default text voice — body, headings, controls.",
    "L": "#071013",
@@ -60,13 +60,6 @@ export const RESOLVED = {
    "D": "#071013b2"
   },
   {
-   "name": "text/max",
-   "binding": "base/black",
-   "description": "🔒 LOCKED · text/ v2.3.2 — True maximum contrast, follows theme. Absolutes and media only — UI text uses primary.",
-   "L": "#000000",
-   "D": "#ffffff"
-  },
-  {
    "name": "text/max/inverse",
    "binding": "base/white",
    "description": "🔒 LOCKED · text/ v2.3.2 — Maximum contrast, opposite of theme — text on surfaces that invert against the theme.",
@@ -85,6 +78,13 @@ export const RESOLVED = {
    "binding": "base/white/l-constant",
    "description": "🔒 LOCKED · text/ v2.3.2 — Maximum contrast, dark-world reading pinned — photo text; luminance-picked with max-perma.",
    "L": "#ffffff",
+   "D": "#ffffff"
+  },
+  {
+   "name": "text/max/default",
+   "binding": "base/black",
+   "description": "🔒 LOCKED · text/ v2.3.2 — True maximum contrast, follows theme. Absolutes and media only — UI text uses primary.",
+   "L": "#000000",
    "D": "#ffffff"
   },
   {
@@ -214,7 +214,7 @@ export const RESOLVED = {
    "D": "#0f0c19"
   },
   {
-   "name": "fg/primary",
+   "name": "fg/primary/default",
    "binding": "brand/black",
    "description": "🔒 LOCKED · fg/ v2.3.2 — The default glyph voice — icon strokes, indicator dots, tick lines.",
    "L": "#071013",
@@ -277,13 +277,6 @@ export const RESOLVED = {
    "D": "#fafafab2"
   },
   {
-   "name": "fg/max",
-   "binding": "base/black",
-   "description": "🔒 LOCKED · fg/ v2.3.2 — Maximum contrast, follows theme. Media absolutes only — UI glyphs use primary.",
-   "L": "#000000",
-   "D": "#ffffff"
-  },
-  {
    "name": "fg/max/inverse-perma",
    "binding": "base/white/l-constant",
    "description": "🔒 LOCKED · fg/ v2.3.2 — Glyph light extreme pinned — imagery; luminance-picked with max-perma.",
@@ -296,6 +289,13 @@ export const RESOLVED = {
    "description": "🔒 LOCKED · fg/ v2.3.2 — Glyph dark extreme pinned — light imagery.",
    "L": "#000000",
    "D": "#000000"
+  },
+  {
+   "name": "fg/max/default",
+   "binding": "base/black",
+   "description": "🔒 LOCKED · fg/ v2.3.2 — Maximum contrast, follows theme. Media absolutes only — UI glyphs use primary.",
+   "L": "#000000",
+   "D": "#ffffff"
   },
   {
    "name": "fg/max/inverse",
@@ -452,18 +452,18 @@ export const RESOLVED = {
    "D": "#0f0c19"
   },
   {
-   "name": "border/primary",
-   "binding": "neutral/7",
-   "description": "🔒 border/ v2.3.2 — Interactive element outline — inputs, controls at rest.",
-   "L": "#cdced6",
-   "D": "#43484e"
-  },
-  {
    "name": "border/primary/strong",
    "binding": "neutral/8",
    "description": "🔒 border/ v2.3.2 — Emphasis outline — the strong border register.",
    "L": "#b9bbc6",
    "D": "#5a6169"
+  },
+  {
+   "name": "border/primary/default",
+   "binding": "neutral/7",
+   "description": "🔒 border/ v2.3.2 — Interactive element outline — inputs, controls at rest.",
+   "L": "#cdced6",
+   "D": "#43484e"
   },
   {
    "name": "border/primary/subtle",
@@ -669,7 +669,7 @@ export const RESOLVED = {
    "D": "#594391"
   },
   {
-   "name": "border/max",
+   "name": "border/max/default",
    "binding": "base/black",
    "description": "🔒 border/ v2.3.2 — Maximum-contrast line, follows theme. Media edges and absolute rules — UI lines use the brand pair.",
    "L": "#000000",
@@ -726,10 +726,38 @@ export const RESOLVED = {
   },
   {
    "name": "bg/elevated",
-   "binding": "surface/card",
+   "binding": "base/white",
    "description": "Active/pressed state background.",
-   "L": "#fafafa",
-   "D": "#18191b"
+   "L": "#ffffff",
+   "D": "#000000"
+  },
+  {
+   "name": "bg/max/brand-perma",
+   "binding": "brand/black/l-constant",
+   "description": "Solid dark background. Immutable — stays dark in all themes.",
+   "L": "#071013",
+   "D": "#071013"
+  },
+  {
+   "name": "bg/max/brand",
+   "binding": "brand/black",
+   "description": "🔒 bg/ v2.3.2 — The brand-extreme surface, follows theme — the flipping button.",
+   "L": "#071013",
+   "D": "#fafafa"
+  },
+  {
+   "name": "bg/max/perma",
+   "binding": "base/black/l-constant",
+   "description": "🔒 bg/ v2.3.2 — Pure black pinned — the media letterbox.",
+   "L": "#000000",
+   "D": "#000000"
+  },
+  {
+   "name": "bg/max/inverse-perma",
+   "binding": "base/white/l-constant",
+   "description": "🔒 bg/ v2.3.2 — Pure white pinned — light media ground.",
+   "L": "#ffffff",
+   "D": "#ffffff"
   },
   {
    "name": "bg/system/disabled",
@@ -802,7 +830,7 @@ export const RESOLVED = {
    "D": "#37bf5d"
   },
   {
-   "name": "bg/app",
+   "name": "bg/app/default",
    "binding": "brand/white",
    "description": "Primary background surface. Use for page backgrounds and main content areas.",
    "L": "#fafafa",
@@ -817,38 +845,10 @@ export const RESOLVED = {
   },
   {
    "name": "bg/app/grouped",
-   "binding": "surface/grouped",
+   "binding": "neutral/3",
    "description": "🔒 bg/ v2.3.2 — The grouped canvas — shop/library grounds; cards stand on it.",
    "L": "#f0f0f3",
-   "D": "#071013"
-  },
-  {
-   "name": "bg/max/brand-perma",
-   "binding": "brand/black/l-constant",
-   "description": "Solid dark background. Immutable — stays dark in all themes.",
-   "L": "#071013",
-   "D": "#071013"
-  },
-  {
-   "name": "bg/max/brand",
-   "binding": "brand/black",
-   "description": "🔒 bg/ v2.3.2 — The brand-extreme surface, follows theme — the flipping button.",
-   "L": "#071013",
-   "D": "#fafafa"
-  },
-  {
-   "name": "bg/max/perma",
-   "binding": "base/black/l-constant",
-   "description": "🔒 bg/ v2.3.2 — Pure black pinned — the media letterbox.",
-   "L": "#000000",
-   "D": "#000000"
-  },
-  {
-   "name": "bg/max/inverse-perma",
-   "binding": "base/white/l-constant",
-   "description": "🔒 bg/ v2.3.2 — Pure white pinned — light media ground.",
-   "L": "#ffffff",
-   "D": "#ffffff"
+   "D": "#212225"
   },
   {
    "name": "bg/chrome",
@@ -858,18 +858,18 @@ export const RESOLVED = {
    "D": "#18191b"
   },
   {
-   "name": "bg/control",
-   "binding": "neutral/3",
-   "description": "Tertiary background. Use for nested containers and inset areas.",
-   "L": "#f0f0f3",
-   "D": "#212225"
-  },
-  {
    "name": "bg/control/solid",
    "binding": "neutral/9",
    "description": "Solid secondary background.",
    "L": "#8b8d98",
    "D": "#696e77"
+  },
+  {
+   "name": "bg/control/default",
+   "binding": "neutral/3",
+   "description": "Tertiary background. Use for nested containers and inset areas.",
+   "L": "#f0f0f3",
+   "D": "#212225"
   },
   {
    "name": "bg/control/strong",
@@ -975,20 +975,6 @@ export const RESOLVED = {
    "description": "🔒 bg/ v2.3.2 — Pure translucency, no blur — a quieting layer that is not glass.",
    "L": "#fafafa1a",
    "D": "#0710131a"
-  },
-  {
-   "name": "bg/card",
-   "binding": "surface/card",
-   "description": "🔒 bg/ v2.3.2 — The container surface — product cards, tiles, list groups.",
-   "L": "#fafafa",
-   "D": "#18191b"
-  },
-  {
-   "name": "bg/sheet",
-   "binding": "surface/sheet",
-   "description": "🔒 bg/ v2.3.2 — Sheets, dialogs, trays — the solid floating surface.",
-   "L": "#fafafa",
-   "D": "#212225"
   },
   {
    "name": "interaction/press/on-neutral",

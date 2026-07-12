@@ -1,7 +1,7 @@
 {
  "fileKey": "Qdb9Kx98afJHxaCGAIxoMC",
  "pulledAtFileVersion": null,
- "variables": 3184,
+ "variables": 3176,
  "export": [
   {
    ".1.0-Prim-Col": {
@@ -6174,26 +6174,6 @@
          "$value": "#b5f4be"
         }
        }
-      },
-      "surface": {
-       "grouped": {
-        "$description": "Crosswise pair (raw): The grouped canvas — recessed ground under cards; content contexts keep the Snow canvas.",
-        "$type": "color",
-        "$libraryName": "",
-        "$value": "#f0f0f3"
-       },
-       "card": {
-        "$description": "Crosswise pair (raw): The container surface — Snow standing on the grouped ground; lifted grey in dark.",
-        "$type": "color",
-        "$libraryName": "",
-        "$value": "#fafafa"
-       },
-       "sheet": {
-        "$description": "Crosswise pair (raw): The sheet/dialog surface — one notch above card in the dark stack.",
-        "$type": "color",
-        "$libraryName": "",
-        "$value": "#fafafa"
-       }
       }
      },
      "Dark": {
@@ -12363,26 +12343,6 @@
          "$libraryName": "",
          "$value": "#143f1e"
         }
-       }
-      },
-      "surface": {
-       "grouped": {
-        "$description": "Crosswise pair (raw): The grouped canvas — recessed ground under cards; content contexts keep the Snow canvas.",
-        "$type": "color",
-        "$libraryName": "",
-        "$value": "#071013"
-       },
-       "card": {
-        "$description": "Crosswise pair (raw): The container surface — Snow standing on the grouped ground; lifted grey in dark.",
-        "$type": "color",
-        "$libraryName": "",
-        "$value": "#18191b"
-       },
-       "sheet": {
-        "$description": "Crosswise pair (raw): The sheet/dialog surface — one notch above card in the dark stack.",
-        "$type": "color",
-        "$libraryName": "",
-        "$value": "#212225"
        }
       }
      }
@@ -18803,26 +18763,6 @@
          "$value": "{inverse.jade-green.12}"
         }
        }
-      },
-      "surface": {
-       "grouped": {
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".1.0-Prim-Col",
-        "$value": "{surface.grouped}"
-       },
-       "card": {
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".1.0-Prim-Col",
-        "$value": "{surface.card}"
-       },
-       "sheet": {
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".1.0-Prim-Col",
-        "$value": "{surface.sheet}"
-       }
       }
      }
     }
@@ -18834,14 +18774,16 @@
      "Value": {
       "text": {
        "primary": {
-        "$scopes": [
-         "TEXT_FILL"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — The default text voice — body, headings, controls.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.black}",
+        "default": {
+         "$scopes": [
+          "TEXT_FILL"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — The default text voice — body, headings, controls.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.black}"
+        },
         "perma": {
          "$scopes": [
           "ALL_SCOPES"
@@ -18944,14 +18886,16 @@
          "$collectionName": ".2.0-Al-Col",
          "$value": "{base.white.l-constant}"
         },
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 LOCKED · text/ v2.3.2 — True maximum contrast, follows theme. Absolutes and media only — UI text uses primary.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{base.black}"
+        "default": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 LOCKED · text/ v2.3.2 — True maximum contrast, follows theme. Absolutes and media only — UI text uses primary.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{base.black}"
+        }
        },
        "system": {
         "disabled": {
@@ -19140,15 +19084,17 @@
       },
       "fg": {
        "primary": {
-        "$scopes": [
-         "ALL_FILLS",
-         "STROKE_COLOR"
-        ],
-        "$description": "🔒 LOCKED · fg/ v2.3.2 — The default glyph voice — icon strokes, indicator dots, tick lines.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.black}",
+        "default": {
+         "$scopes": [
+          "ALL_FILLS",
+          "STROKE_COLOR"
+         ],
+         "$description": "🔒 LOCKED · fg/ v2.3.2 — The default glyph voice — icon strokes, indicator dots, tick lines.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.black}"
+        },
         "inverse-perma": {
          "$scopes": [
           "ALL_FILLS",
@@ -19255,14 +19201,16 @@
          "$collectionName": ".2.0-Al-Col",
          "$value": "{base.black.l-constant}"
         },
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 LOCKED · fg/ v2.3.2 — Maximum contrast, follows theme. Media absolutes only — UI glyphs use primary.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{base.black}",
+        "default": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 LOCKED · fg/ v2.3.2 — Maximum contrast, follows theme. Media absolutes only — UI glyphs use primary.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{base.black}"
+        },
         "inverse": {
          "$scopes": [
           "ALL_SCOPES"
@@ -19511,14 +19459,16 @@
          "$collectionName": ".2.0-Al-Col",
          "$value": "{neutral.8}"
         },
-        "$scopes": [
-         "STROKE_COLOR"
-        ],
-        "$description": "🔒 border/ v2.3.2 — Interactive element outline — inputs, controls at rest.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{neutral.7}",
+        "default": {
+         "$scopes": [
+          "STROKE_COLOR"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Interactive element outline — inputs, controls at rest.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.7}"
+        },
         "subtle": {
          "$scopes": [
           "STROKE_COLOR"
@@ -19815,14 +19765,16 @@
         }
        },
        "max": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 border/ v2.3.2 — Maximum-contrast line, follows theme. Media edges and absolute rules — UI lines use the brand pair.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{base.black}",
+        "default": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 border/ v2.3.2 — Maximum-contrast line, follows theme. Media edges and absolute rules — UI lines use the brand pair.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{base.black}"
+        },
         "inverse": {
          "$scopes": [
           "ALL_SCOPES"
@@ -19905,7 +19857,50 @@
         "$type": "color",
         "$libraryName": "",
         "$collectionName": ".2.0-Al-Col",
-        "$value": "{surface.card}"
+        "$value": "{base.white}"
+       },
+       "max": {
+        "brand-perma": {
+         "$scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL"
+         ],
+         "$description": "Solid dark background. Immutable — stays dark in all themes.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.black.l-constant}"
+        },
+        "brand": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 bg/ v2.3.2 — The brand-extreme surface, follows theme — the flipping button.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.black}"
+        },
+        "perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 bg/ v2.3.2 — Pure black pinned — the media letterbox.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{base.black.l-constant}"
+        },
+        "inverse-perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 bg/ v2.3.2 — Pure white pinned — light media ground.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{base.white.l-constant}"
+        }
        },
        "system": {
         "disabled": {
@@ -20020,16 +20015,18 @@
         }
        },
        "app": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL",
-         "EFFECT_COLOR"
-        ],
-        "$description": "Primary background surface. Use for page backgrounds and main content areas.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.white}",
+        "default": {
+         "$scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL",
+          "EFFECT_COLOR"
+         ],
+         "$description": "Primary background surface. Use for page backgrounds and main content areas.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.white}"
+        },
         "subtle": {
          "$scopes": [
           "FRAME_FILL",
@@ -20049,50 +20046,7 @@
          "$type": "color",
          "$libraryName": "",
          "$collectionName": ".2.0-Al-Col",
-         "$value": "{surface.grouped}"
-        }
-       },
-       "max": {
-        "brand-perma": {
-         "$scopes": [
-          "FRAME_FILL",
-          "SHAPE_FILL"
-         ],
-         "$description": "Solid dark background. Immutable — stays dark in all themes.",
-         "$type": "color",
-         "$libraryName": "",
-         "$collectionName": ".2.0-Al-Col",
-         "$value": "{brand.black.l-constant}"
-        },
-        "brand": {
-         "$scopes": [
-          "ALL_SCOPES"
-         ],
-         "$description": "🔒 bg/ v2.3.2 — The brand-extreme surface, follows theme — the flipping button.",
-         "$type": "color",
-         "$libraryName": "",
-         "$collectionName": ".2.0-Al-Col",
-         "$value": "{brand.black}"
-        },
-        "perma": {
-         "$scopes": [
-          "ALL_SCOPES"
-         ],
-         "$description": "🔒 bg/ v2.3.2 — Pure black pinned — the media letterbox.",
-         "$type": "color",
-         "$libraryName": "",
-         "$collectionName": ".2.0-Al-Col",
-         "$value": "{base.black.l-constant}"
-        },
-        "inverse-perma": {
-         "$scopes": [
-          "ALL_SCOPES"
-         ],
-         "$description": "🔒 bg/ v2.3.2 — Pure white pinned — light media ground.",
-         "$type": "color",
-         "$libraryName": "",
-         "$collectionName": ".2.0-Al-Col",
-         "$value": "{base.white.l-constant}"
+         "$value": "{neutral.3}"
         }
        },
        "chrome": {
@@ -20118,15 +20072,17 @@
          "$collectionName": ".2.0-Al-Col",
          "$value": "{neutral.9}"
         },
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Tertiary background. Use for nested containers and inset areas.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{neutral.3}",
+        "default": {
+         "$scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL"
+         ],
+         "$description": "Tertiary background. Use for nested containers and inset areas.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.3}"
+        },
         "strong": {
          "$scopes": [
           "ALL_SCOPES"
@@ -20284,26 +20240,6 @@
         "$libraryName": "",
         "$collectionName": ".2.0-Al-Col",
         "$value": "{brand.white.alpha.2}"
-       },
-       "card": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 bg/ v2.3.2 — The container surface — product cards, tiles, list groups.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{surface.card}"
-       },
-       "sheet": {
-        "$scopes": [
-         "ALL_SCOPES"
-        ],
-        "$description": "🔒 bg/ v2.3.2 — Sheets, dialogs, trays — the solid floating surface.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{surface.sheet}"
        }
       },
       "interaction": {
