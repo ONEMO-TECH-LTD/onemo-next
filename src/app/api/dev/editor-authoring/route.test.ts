@@ -116,6 +116,7 @@ describe('editor-authoring G1 import route', () => {
     const componentId = loaded.componentId as string
     const secondary = Object.values(loaded.graph.variants as Record<string, { id: string; displayName: string }>)
       .find((variant) => variant.displayName === 'Secondary')!
+    const secondaryFrameBeforeMove = loaded.graph.variants[secondary.id].frame
     await handlePost(request('POST', {
       kind: 'execute-command',
       command: {
@@ -214,6 +215,17 @@ describe('editor-authoring G1 import route', () => {
       undoneCommand: { kind: 'create-variant', commandId: 'after-source-undo-create' },
       graph: { revision: 7 },
     })
+    const sourceAfterCreateUndo = await fs.readFile(sourcePath)
+    loaded = await (await handleGet(componentRequest(), root)).json()
+    const moveUndo = await handlePost(request('POST', {
+      kind: 'undo', expectedRevision: loaded.graph.revision, expectedSourceHashes: loaded.sourceHashes,
+    }), root)
+    expect(moveUndo.status).toBe(200)
+    await expect(moveUndo.json()).resolves.toMatchObject({
+      undoneCommand: { kind: 'move-variant', commandId: 'before-schema-migration-move' },
+      graph: { revision: 8, variants: { [secondary.id]: { frame: secondaryFrameBeforeMove } } },
+    })
+    await expect(fs.readFile(sourcePath)).resolves.toEqual(sourceAfterCreateUndo)
   }, 20_000)
 
   it('refuses V1 migration without rewriting sidecar evidence when tracked source drifted', async () => {
