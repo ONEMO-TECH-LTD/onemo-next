@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { classifySourceFileForImport, importSourceFileToAuthoringStore } from '../editor/authoring-import'
-import { parseG2VariantCommand } from '../editor/authoring-commands'
+import { isProjectSelectionFile, parseCreateComponentFromSelectionCommand, parseG2VariantCommand } from '../editor/authoring-commands'
 import { isSha256, isStoreRelativePath } from '../editor/authoring-schema'
 import { ProjectAuthoringSession } from '../editor/authoring-session'
 import { AuthoringSidecarStore } from '../editor/authoring-store'
@@ -13,10 +13,22 @@ const COMPONENT_ROOT = 'src/app/(dev)/react-figma-components/'
 export async function handleGet(req: Request, rootPath = process.cwd()) {
   if (process.env.NODE_ENV !== 'development') return NextResponse.json({ error: 'dev-only' }, { status: 403 })
   try {
-    const file = new URL(req.url).searchParams.get('file')
+    const params = new URL(req.url).searchParams
+    const file = params.get('file')
+    const mode = params.get('mode')
+    if (mode === 'create-component-preview') {
+      if (!isSelectionFile(file)) return NextResponse.json({ error: 'valid selection file required' }, { status: 400 })
+      const { registry, store } = await createContext(rootPath)
+      const graph = await store.load()
+      const classified = await classifySourceFileForImport({ storeId: STORE_ID, file, registry })
+      return NextResponse.json({
+        expectedRevision: graph?.revision ?? 0,
+        sourceHashes: { ...(graph?.sourceHashes ?? {}), ...classified.sourceHashes },
+        environmentFingerprint: classified.environmentFingerprint,
+      })
+    }
     if (!isImportFile(file)) return NextResponse.json({ error: 'valid component file required' }, { status: 400 })
     const { registry, store, session } = await createContext(rootPath)
-    const mode = new URL(req.url).searchParams.get('mode')
     if (mode === 'component') return NextResponse.json(await session.loadComponent(file))
     if (mode === 'component-status') {
       try {
@@ -84,6 +96,10 @@ export async function handlePost(req: Request, rootPath = process.cwd()) {
         sourceChanged: result.plan.sourcePatches.length > 0,
       })
     }
+    if (isCreateComponentRequest(body)) {
+      const { session } = await createContext(rootPath)
+      return NextResponse.json(await session.createComponentFromSelection(body))
+    }
     if (isRevalidateRequest(body)) {
       const { session } = await createContext(rootPath)
       return NextResponse.json(await session.revalidateSource(body))
@@ -121,6 +137,21 @@ function isExecuteRequest(value: unknown): value is {
     record.kind === 'execute-command' && parseG2VariantCommand(record.command) !== null &&
     typeof record.expectedRevision === 'number' && Number.isSafeInteger(record.expectedRevision) && record.expectedRevision >= 0 &&
     isHashMap(record.expectedSourceHashes)
+}
+
+function isCreateComponentRequest(value: unknown): value is {
+  kind: 'execute-create-component'
+  command: NonNullable<ReturnType<typeof parseCreateComponentFromSelectionCommand>>
+  expectedRevision: number
+  expectedSourceHashes: Record<string, string>
+  expectedEnvironmentFingerprint: string
+} {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const record = value as Record<string, unknown>
+  return Object.keys(record).sort().join('\0') === ['command', 'expectedEnvironmentFingerprint', 'expectedRevision', 'expectedSourceHashes', 'kind'].sort().join('\0') &&
+    record.kind === 'execute-create-component' && parseCreateComponentFromSelectionCommand(record.command) !== null &&
+    typeof record.expectedRevision === 'number' && Number.isSafeInteger(record.expectedRevision) && record.expectedRevision >= 0 &&
+    isHashMap(record.expectedSourceHashes) && isSha256(record.expectedEnvironmentFingerprint)
 }
 
 function isImportRequest(value: unknown): value is {
@@ -187,6 +218,10 @@ function isHashMap(value: unknown): value is Record<string, string> {
 
 function isImportFile(value: unknown): value is string {
   return typeof value === 'string' && isStoreRelativePath(value) && value.startsWith(COMPONENT_ROOT) && value.endsWith('.tsx')
+}
+
+function isSelectionFile(value: unknown): value is string {
+  return typeof value === 'string' && isProjectSelectionFile(value)
 }
 
 function isUuid(value: unknown): value is string {

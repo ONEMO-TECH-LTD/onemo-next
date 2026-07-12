@@ -1,17 +1,19 @@
 import { promises as fs } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 
-import { assertAcceptedSourceProjection, assertStagedTypeScriptSemantics, compileG2VariantCommand, projectVariantRegistry, type CompilePlan } from './authoring-compiler'
-import { parseG2VariantCommand, type G2VariantCommand } from './authoring-commands'
+import { assertAcceptedSourceProjection, assertStagedTypeScriptSemantics, compileCreateComponentFromSelection, compileG2VariantCommand, projectVariantRegistry, type CompilePlan } from './authoring-compiler'
+import { parseCreateComponentFromSelectionCommand, parseG2VariantCommand, type CreateComponentFromSelectionCommand, type G2VariantCommand } from './authoring-commands'
 import { AuthoringHistoryStore } from './authoring-history'
 import { readExactAuthoringSourceSnapshot } from './authoring-import'
 import { assertAuthoringGraphV1 } from './authoring-schema'
-import { AuthoringSidecarStore } from './authoring-store'
+import { AuthoringSidecarStore, createEmptyAuthoringGraph } from './authoring-store'
 import { SingleRootAuthoringTransaction } from './authoring-transaction'
 import type { AuthoringGraphV1, StoreId } from './authoring-types'
 import { sha256 } from './durable-file-installer'
 import { RuntimeRootRegistry } from './runtime-root-registry'
 import { legacySourceProjectionFingerprint, sourceProjectionFingerprint, type SourceProjection } from './source-projection'
+
+const COMPONENT_ROOT = 'src/app/(dev)/react-figma-components/'
 
 export class ProjectAuthoringSession {
   private readonly history: AuthoringHistoryStore
@@ -45,11 +47,81 @@ export class ProjectAuthoringSession {
       graph,
       componentId: component[0]!.id,
       projection: snapshot.projection,
-      sourceHashes: snapshot.sourceHashes,
+      sourceHashes: graph.sourceHashes,
       variantProps: Object.fromEntries(projectVariantRegistry(graph, component[0]!, snapshot.projection)
         .map((variant) => [variant.id, variant.props])),
-      canUndo: await this.latestUndoableG2Command(graph.revision) !== null,
+      canUndo: await this.latestUndoableAuthoringCommand(graph.revision) !== null,
     }
+  }
+
+  async createComponentFromSelection(input: {
+    command: CreateComponentFromSelectionCommand
+    expectedRevision: number
+    expectedSourceHashes: Record<string, string>
+    expectedEnvironmentFingerprint: string
+  }): Promise<{ graph: AuthoringGraphV1; componentId: string; componentFile: string }> {
+    const existing = await this.input.store.load()
+    const snapshot = await readExactAuthoringSourceSnapshot({
+      storeId: this.input.storeId,
+      file: input.command.file,
+      registry: this.input.registry,
+    })
+    const before = existing ?? createEmptyAuthoringGraph({
+      storeId: this.input.storeId,
+      rootKind: 'project',
+      environmentFingerprint: snapshot.environmentFingerprint,
+    })
+    if (input.expectedEnvironmentFingerprint !== snapshot.environmentFingerprint) {
+      throw namedError('ENVIRONMENT_FINGERPRINT_STALE', 'compiler environment changed after create preview', 409)
+    }
+    if (before.revision !== input.expectedRevision) {
+      throw namedError('AUTHORING_REVISION_STALE', `expected revision ${input.expectedRevision}, found ${before.revision}`, 409)
+    }
+    assertMatchingHashOverlap(before.sourceHashes, snapshot.sourceHashes)
+    if (existing) assertEnvironmentFingerprint(before.environmentFingerprint, snapshot.environmentFingerprint)
+    const expectedBeforeHashes = { ...before.sourceHashes, ...snapshot.sourceHashes }
+    assertExactHashSet(input.expectedSourceHashes, expectedBeforeHashes)
+
+    const plan = await compileCreateComponentFromSelection({
+      graph: before,
+      command: input.command,
+      consumerSource: snapshot.sources[input.command.file]!,
+      sourceHashes: expectedBeforeHashes,
+      environmentFingerprint: snapshot.environmentFingerprint,
+      projectRoot: this.input.registry.get(this.input.storeId).canonicalRealPath,
+      compilerOptions: snapshot.compilerOptions,
+      dependencySources: snapshot.sources,
+    })
+    const committedCommand = {
+      ...input.command,
+      createdComponentId: plan.componentId,
+      componentFile: plan.componentFile,
+    }
+    const historyPatches = await this.history.planCommand({
+      command: committedCommand,
+      sourceFiles: Object.keys(plan.graph.sourceHashes),
+      sourcePreimages: plan.sourcePatches.map((patch) => ({ file: patch.file, bytes: patch.before })),
+      graphPreimage: JSON.stringify(before, null, 2) + '\n',
+      revision: before.revision + 1,
+    })
+    const committed = await new SingleRootAuthoringTransaction({
+      transactionId: `g2-create-component-${randomUUID()}`,
+      storeId: this.input.storeId,
+      registry: this.input.registry,
+      store: this.input.store,
+    }).commit({
+      expectedRevision: input.expectedRevision,
+      requireMissingSidecar: existing === null,
+      expectedSourceHashes: input.expectedSourceHashes,
+      expectedEnvironmentHashes: snapshot.environmentHashes,
+      expectedEnvironmentFingerprint: snapshot.environmentFingerprint,
+      sourceFiles: Object.keys(plan.graph.sourceHashes),
+      sourcePatches: plan.sourcePatches,
+      metadataPatches: historyPatches,
+      command: committedCommand,
+      mutate: () => plan.graph,
+    })
+    return { graph: committed, componentId: plan.componentId, componentFile: plan.componentFile }
   }
 
   async execute(input: {
@@ -65,8 +137,8 @@ export class ProjectAuthoringSession {
       file: component.source.file,
       registry: this.input.registry,
     })
-    assertExactHashSet(input.expectedSourceHashes, snapshot.sourceHashes)
-    assertExactHashSet(before.sourceHashes, snapshot.sourceHashes)
+    assertExactHashSet(input.expectedSourceHashes, before.sourceHashes)
+    assertExpectedHashes(before.sourceHashes, snapshot.sourceHashes)
     assertEnvironmentFingerprint(before.environmentFingerprint, snapshot.environmentFingerprint)
     const acceptedGraph = upgradeLegacyProjectionFingerprint(before, component.id, snapshot.projection)
     const plan = await compileG2VariantCommand({
@@ -80,7 +152,7 @@ export class ProjectAuthoringSession {
     })
     const historyPatches = await this.history.planCommand({
       command: input.command,
-      sourceFiles: Object.keys(snapshot.sourceHashes),
+      sourceFiles: Object.keys(before.sourceHashes),
       sourcePreimages: plan.sourcePatches.map((patch) => ({ file: patch.file, bytes: patch.before })),
       graphPreimage: JSON.stringify(before, null, 2) + '\n',
       revision: input.expectedRevision + 1,
@@ -95,7 +167,7 @@ export class ProjectAuthoringSession {
       expectedSourceHashes: input.expectedSourceHashes,
       expectedEnvironmentHashes: snapshot.environmentHashes,
       expectedEnvironmentFingerprint: snapshot.environmentFingerprint,
-      sourceFiles: Object.keys(snapshot.sourceHashes),
+      sourceFiles: Object.keys(before.sourceHashes),
       sourcePatches: plan.sourcePatches,
       metadataPatches: historyPatches,
       command: input.command,
@@ -176,7 +248,7 @@ export class ProjectAuthoringSession {
       registry: this.input.registry,
     })
     assertExactHashSet(input.expectedSourceHashes, snapshot.sourceHashes)
-    assertExactHashSet(before.sourceHashes, snapshot.sourceHashes)
+    assertExpectedHashes(before.sourceHashes, snapshot.sourceHashes)
     if (input.expectedEnvironmentFingerprint !== snapshot.environmentFingerprint) {
       throw namedError('ENVIRONMENT_FINGERPRINT_STALE', 'compiler environment changed after preview', 409)
     }
@@ -228,12 +300,16 @@ export class ProjectAuthoringSession {
     if (before.revision !== input.expectedRevision) {
       throw namedError('AUTHORING_REVISION_STALE', `expected revision ${input.expectedRevision}, found ${before.revision}`, 409)
     }
-    const latest = await this.latestUndoableG2Command(before.revision)
+    const latest = await this.latestUndoableAuthoringCommand(before.revision)
     if (!latest) throw namedError('UNDO_EMPTY', 'no authoring command to undo', 404)
     const latestCommand = parseG2VariantCommand(latest.record.command)
-    if (!latestCommand) throw namedError('UNDO_HISTORY_INVALID', 'latest undo command is not a G2 variant command', 409)
-    const component = before.components[latestCommand.componentId]
-    if (!component) throw namedError('COMPONENT_MISSING', `component not found: ${latestCommand.componentId}`, 404)
+    const createCommand = parseCommittedCreateComponentCommand(latest.record.command)
+    if (!latestCommand && !createCommand) {
+      throw namedError('UNDO_HISTORY_INVALID', 'latest undo command is not supported', 409)
+    }
+    const componentId = latestCommand?.componentId ?? createCommand!.createdComponentId
+    const component = before.components[componentId]
+    if (!component) throw namedError('COMPONENT_MISSING', `component not found: ${componentId}`, 404)
     const snapshot = await readExactAuthoringSourceSnapshot({
       storeId: this.input.storeId,
       file: component.source.file,
@@ -295,9 +371,25 @@ export class ProjectAuthoringSession {
     return graph
   }
 
-  private async latestUndoableG2Command(expectedRevision: number) {
-    return this.history.latestUndoableCommand(expectedRevision, (command) => parseG2VariantCommand(command) !== null)
+  private async latestUndoableAuthoringCommand(expectedRevision: number) {
+    return this.history.latestUndoableCommand(expectedRevision, (command) =>
+      parseG2VariantCommand(command) !== null || parseCommittedCreateComponentCommand(command) !== null)
   }
+}
+
+type CommittedCreateComponentCommand = CreateComponentFromSelectionCommand & {
+  createdComponentId: string
+  componentFile: string
+}
+
+function parseCommittedCreateComponentCommand(value: unknown): CommittedCreateComponentCommand | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const record = value as Record<string, unknown>
+  const { createdComponentId, componentFile, ...request } = record
+  const command = parseCreateComponentFromSelectionCommand(request)
+  if (!command || typeof createdComponentId !== 'string' || !createdComponentId ||
+    typeof componentFile !== 'string' || componentFile !== `${COMPONENT_ROOT}${command.name}.tsx`) return null
+  return { ...command, createdComponentId, componentFile }
 }
 
 function assertExactHashSet(expected: Record<string, string>, actual: Record<string, string>): void {
@@ -315,6 +407,17 @@ function assertExactHashSet(expected: Record<string, string>, actual: Record<str
 
 function assertExpectedHashes(expected: Record<string, string>, actual: Record<string, string>): void {
   const changedPaths = Object.keys(actual).filter((file) => expected[file] !== actual[file]).sort()
+  if (changedPaths.length > 0) {
+    throw Object.assign(new Error(`source hash mismatch: ${changedPaths.join(', ')}`), {
+      code: 'SOURCE_HASH_STALE', status: 409, changedPaths,
+    })
+  }
+}
+
+function assertMatchingHashOverlap(expected: Record<string, string>, actual: Record<string, string>): void {
+  const changedPaths = Object.keys(actual)
+    .filter((file) => expected[file] !== undefined && expected[file] !== actual[file])
+    .sort()
   if (changedPaths.length > 0) {
     throw Object.assign(new Error(`source hash mismatch: ${changedPaths.join(', ')}`), {
       code: 'SOURCE_HASH_STALE', status: 409, changedPaths,

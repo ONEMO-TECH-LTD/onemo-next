@@ -2427,6 +2427,9 @@ export type MakeComponentPlan = {
   name: string
   componentSource: string
   consumerSource: Buffer
+  consumerExportName: string
+  instanceLine: number
+  instanceCol: number
 }
 
 export function planMakeComponentFromSelection(input: {
@@ -2437,7 +2440,7 @@ export function planMakeComponentFromSelection(input: {
   col: number
   name: string
 }): MakeComponentPlan {
-  if (!/^[A-Z][A-Za-z0-9]*$/.test(input.name)) {
+  if (input.name.length > 120 || !/^[A-Z][A-Za-z0-9]*$/.test(input.name)) {
     throw Object.assign(new Error('component name must be a PascalCase identifier'), { status: 422 })
   }
   const source = input.source.toString('utf8')
@@ -2447,6 +2450,14 @@ export function planMakeComponentFromSelection(input: {
   const el: ts.Node = ts.isJsxSelfClosingElement(opening) ? opening : opening.parent
   if (!ts.isJsxElement(el) && !ts.isJsxSelfClosingElement(el)) {
     throw Object.assign(new Error('could not resolve the full element subtree'), { status: 422 })
+  }
+  const owningExports = findExportedComponents(sf).filter(({ fn }) =>
+    el.getStart(sf) >= fn.getStart(sf) && el.getEnd() <= fn.getEnd())
+  if (owningExports.length !== 1) {
+    throw Object.assign(new Error('selection must belong to exactly one exported component'), {
+      status: 422,
+      code: 'SELECTION_EXPORT_AMBIGUOUS',
+    })
   }
 
   // top-level imports: imported name → full import statement text
@@ -2520,8 +2531,19 @@ export function planMakeComponentFromSelection(input: {
   next = Buffer.concat([next.subarray(0, bImp), Buffer.from(importInsert, 'utf8'), next.subarray(bImp)])
   // F1: validate BOTH outputs before writing EITHER — no half-written state on refusal
   assertValidTsx(compAbs, compSource)
-  assertValidTsx(input.sourceAbs, next.toString('utf8'))
-  return { name, componentSource: compSource, consumerSource: next }
+  const consumerSource = next.toString('utf8')
+  assertValidTsx(input.sourceAbs, consumerSource)
+  const instanceOffset = elStart + (importPos <= elStart ? importInsert.length : 0)
+  const nextSourceFile = ts.createSourceFile(input.sourceAbs, consumerSource, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX)
+  const instanceLocation = nextSourceFile.getLineAndCharacterOfPosition(instanceOffset)
+  return {
+    name,
+    componentSource: compSource,
+    consumerSource: next,
+    consumerExportName: owningExports[0]!.name,
+    instanceLine: instanceLocation.line + 1,
+    instanceCol: instanceLocation.character + 1,
+  }
 }
 
 async function makeComponent(op: Extract<WriteOp, { kind: 'make-component' }>): Promise<{ ok: true; file: string; newValueText: string; componentFile: string }> {

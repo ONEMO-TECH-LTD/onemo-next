@@ -2,11 +2,16 @@ import path from 'node:path'
 
 import * as ts from 'typescript'
 
-import { stableId } from './authoring-migrations'
+import { importProjectionToAuthoringGraph, stableId } from './authoring-migrations'
 import { assertAuthoringGraphV1, isStoreRelativePath } from './authoring-schema'
-import type { G2VariantCommand } from './authoring-commands'
+import type { CreateComponentFromSelectionCommand, G2VariantCommand } from './authoring-commands'
 import type { AuthoringGraphV1, ComponentDefinition, VariantFrame } from './authoring-types'
+import { sha256 } from './durable-file-installer'
+import { planMakeComponentFromSelection } from './lib'
+import { extractSourceAnchorsFromTsx, resolveSourceAnchor } from './source-anchor'
 import { sourceProjectionFingerprint, sourceProjectionFromSource, type SourceProjection } from './source-projection'
+
+const COMPONENT_ROOT = 'src/app/(dev)/react-figma-components/'
 
 export type CompilePlan = {
   command: G2VariantCommand
@@ -18,6 +23,128 @@ export type CompilePlan = {
     kind: 'stable-variant-identity' | 'native-registry-round-trip' | 'untouched-source-semantics' | 'staged-typescript-semantics' | 'geometry-sidecar-only'
     status: 'passed'
   }>
+}
+
+export type CreateComponentCompilePlan = {
+  command: CreateComponentFromSelectionCommand
+  graph: AuthoringGraphV1
+  componentId: string
+  componentFile: string
+  sourcePatches: Array<{ file: string; before: string | null; after: string }>
+  verifiedAssertions: Array<{
+    kind: 'staged-typescript-semantics' | 'source-projection-round-trip' | 'stable-component-identity' | 'stable-instance-anchor'
+    status: 'passed'
+  }>
+}
+
+export async function compileCreateComponentFromSelection(input: {
+  graph: AuthoringGraphV1
+  command: CreateComponentFromSelectionCommand
+  consumerSource: string
+  sourceHashes: Record<string, string>
+  environmentFingerprint: string
+  projectRoot: string
+  compilerOptions: ts.CompilerOptions
+  dependencySources: Record<string, string>
+}): Promise<CreateComponentCompilePlan> {
+  const before = assertAuthoringGraphV1(input.graph)
+  const sourceAbs = path.resolve(input.projectRoot, input.command.file)
+  const plan = planMakeComponentFromSelection({
+    source: Buffer.from(input.consumerSource),
+    sourceAbs,
+    componentDir: path.join(input.projectRoot, COMPONENT_ROOT),
+    line: input.command.line,
+    col: input.command.col,
+    name: input.command.name,
+  })
+  const componentFile = `${COMPONENT_ROOT}${plan.name}.tsx`
+  const stagedSources = {
+    ...input.dependencySources,
+    [input.command.file]: plan.consumerSource.toString('utf8'),
+    [componentFile]: plan.componentSource,
+  }
+  assertStagedTypeScriptSemantics(
+    componentFile, plan.componentSource, input.projectRoot, input.compilerOptions, stagedSources,
+  )
+  assertStagedTypeScriptSemantics(
+    input.command.file, stagedSources[input.command.file]!, input.projectRoot, input.compilerOptions, stagedSources,
+  )
+  const cssSources = Object.fromEntries(Object.entries(stagedSources).filter(([file]) => file.endsWith('.css')))
+  const projection = await sourceProjectionFromSource({
+    file: componentFile,
+    source: plan.componentSource,
+    cssSources,
+  })
+  const sourceHashes = {
+    ...input.sourceHashes,
+    [input.command.file]: sha256(plan.consumerSource),
+    [componentFile]: sha256(plan.componentSource),
+  }
+  const imported = importProjectionToAuthoringGraph({
+    storeId: before.storeId,
+    projection,
+    sourceHashes,
+    environmentFingerprint: input.environmentFingerprint,
+  })
+  if (imported.kind !== 'imported') {
+    throw namedError('CREATE_COMPONENT_SOURCE_UNSUPPORTED', imported.reason, 422)
+  }
+  const component = Object.values(imported.graph.components)[0]!
+  projectVariantRegistry(imported.graph, component, projection)
+  if (Object.values(before.components).some((candidate) =>
+    candidate.id === component.id || candidate.source.file === componentFile)) {
+    throw namedError('COMPONENT_ALREADY_EXISTS', `component already exists: ${componentFile}`, 409)
+  }
+  const anchors = extractSourceAnchorsFromTsx({
+    file: input.command.file,
+    source: plan.consumerSource.toString('utf8'),
+    exportName: plan.consumerExportName,
+  })
+  const positioned = anchors.filter((anchor) =>
+    anchor.lastKnownLine === plan.instanceLine && anchor.lastKnownCol === plan.instanceCol)
+  if (positioned.length !== 1) {
+    throw namedError('INSTANCE_ANCHOR_MISSING', 'created component instance could not be anchored exactly', 422)
+  }
+  const resolved = resolveSourceAnchor(positioned[0]!.fingerprint, anchors)
+  if (!resolved.ok) throw namedError(resolved.code, 'created component instance anchor is ambiguous', 422)
+  const instanceId = stableId('instance', before.storeId, input.command.commandId)
+  if (before.instances[instanceId]) throw namedError('INSTANCE_ID_COLLISION', `instance already exists: ${instanceId}`, 409)
+  const graph = assertAuthoringGraphV1({
+    ...before,
+    sourceHashes,
+    environmentFingerprint: input.environmentFingerprint,
+    components: { ...before.components, ...imported.graph.components },
+    variants: { ...before.variants, ...imported.graph.variants },
+    sourceProperties: { ...before.sourceProperties, ...imported.graph.sourceProperties },
+    interactions: { ...before.interactions, ...imported.graph.interactions },
+    interactionOverrides: { ...before.interactionOverrides, ...imported.graph.interactionOverrides },
+    instances: {
+      ...before.instances,
+      [instanceId]: {
+        id: instanceId,
+        componentId: component.id,
+        source: { storeId: before.storeId, file: input.command.file, anchor: resolved.anchor },
+        variantId: component.primaryVariantId,
+      },
+    },
+    folders: { ...before.folders, ...imported.graph.folders },
+  })
+  return {
+    command: input.command,
+    graph,
+    componentId: component.id,
+    componentFile,
+    sourcePatches: [
+      { file: input.command.file, before: input.consumerSource, after: plan.consumerSource.toString('utf8') },
+      { file: componentFile, before: null, after: plan.componentSource },
+    ],
+    verifiedAssertions: [
+      { kind: 'staged-typescript-semantics', status: 'passed' },
+      { kind: 'source-projection-round-trip', status: 'passed' },
+      { kind: 'stable-component-identity', status: 'passed' },
+      { kind: 'stable-instance-anchor', status: 'passed' },
+    ],
+  }
 }
 
 export async function compileG2VariantCommand(input: {
@@ -214,11 +341,22 @@ export function assertStagedTypeScriptSemantics(
   const host = ts.createCompilerHost(options, true)
   const readFile = host.readFile.bind(host)
   const fileExists = host.fileExists.bind(host)
+  const directoryExists = host.directoryExists?.bind(host)
   const ambient = `declare module '*.module.css' { const classes: Record<string, string>; export default classes }\n`
   const exactSources = new Map<string, string>([[fileName, source]])
   for (const [relative, bytes] of Object.entries(dependencies)) {
     if (!isStoreRelativePath(relative)) throw namedError('STAGED_DEPENDENCY_PATH_INVALID', `invalid staged dependency path: ${relative}`, 422)
     exactSources.set(path.resolve(projectRoot, relative), bytes)
+  }
+  const stagedDirectories = new Set<string>()
+  for (const sourceFile of exactSources.keys()) {
+    let directory = path.dirname(sourceFile)
+    while (directory.startsWith(path.resolve(projectRoot))) {
+      stagedDirectories.add(directory)
+      const parent = path.dirname(directory)
+      if (parent === directory) break
+      directory = parent
+    }
   }
   const projectPrefix = path.resolve(projectRoot) + path.sep
   const dependencyPrefix = path.join(path.resolve(projectRoot), 'node_modules') + path.sep
@@ -229,6 +367,7 @@ export function assertStagedTypeScriptSemantics(
     return /\.(?:[cm]?[jt]sx?|json)$/.test(normalized) && !normalized.split(path.sep).includes('node_modules')
   }
   host.fileExists = (candidate) => exactSources.has(path.resolve(candidate)) || candidate === ambientName || (!isUnstagedProjectFile(candidate) && fileExists(candidate))
+  host.directoryExists = (candidate) => stagedDirectories.has(path.resolve(candidate)) || directoryExists?.(candidate) === true
   host.readFile = (candidate) => exactSources.get(path.resolve(candidate)) ?? (candidate === ambientName ? ambient : isUnstagedProjectFile(candidate) ? undefined : readFile(candidate))
   host.getSourceFile = (candidate, languageVersion) => {
     const text = host.readFile(candidate)

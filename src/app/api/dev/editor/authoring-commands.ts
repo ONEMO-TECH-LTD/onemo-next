@@ -1,4 +1,14 @@
 import type { EntityId, VariantFrame } from './authoring-types'
+import { isStoreRelativePath } from './authoring-schema'
+
+export type CreateComponentFromSelectionCommand = {
+  kind: 'create-component-from-selection'
+  commandId: string
+  file: string
+  line: number
+  col: number
+  name: string
+}
 
 export type CreateVariantCommand = {
   kind: 'create-variant'
@@ -24,6 +34,20 @@ export type MoveVariantCommand = {
 }
 
 export type G2VariantCommand = CreateVariantCommand | RenameVariantCommand | MoveVariantCommand
+
+export function parseCreateComponentFromSelectionCommand(value: unknown): CreateComponentFromSelectionCommand | null {
+  if (!isRecord(value) || !exactKeys(value, ['kind', 'commandId', 'file', 'line', 'col', 'name'])) return null
+  if (value.kind !== 'create-component-from-selection' || !validCommandId(value.commandId) ||
+    typeof value.file !== 'string' || !isProjectSelectionFile(value.file) ||
+    !positivePosition(value.line) || !positivePosition(value.col) ||
+    typeof value.name !== 'string' || value.name.length > 120 || !/^[A-Z][A-Za-z0-9]*$/.test(value.name)) return null
+  return value as CreateComponentFromSelectionCommand
+}
+
+export function isProjectSelectionFile(value: string): boolean {
+  return isStoreRelativePath(value) && value.endsWith('.tsx') &&
+    (value.startsWith('src/') || value.startsWith('storybook/'))
+}
 
 export function parseG2VariantCommand(value: unknown): G2VariantCommand | null {
   if (!isRecord(value)) return null
@@ -61,6 +85,10 @@ function validDisplayName(value: unknown): value is string {
 
 function validId(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0 && value.length <= 200 && !/[\u0000-\u001f\u007f]/.test(value)
+}
+
+function positivePosition(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

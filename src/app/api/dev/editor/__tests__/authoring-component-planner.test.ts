@@ -47,6 +47,9 @@ export function Page() {
   )
 }
 `),
+      consumerExportName: 'Page',
+      instanceLine: 7,
+      instanceCol: 7,
     })
     expect(source.toString('utf8')).toContain('<section data-name="Card">')
   })

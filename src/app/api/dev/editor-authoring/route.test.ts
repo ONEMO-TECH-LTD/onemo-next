@@ -852,6 +852,56 @@ export function Button() { return <button className={styles.base} /> }
     })
   }, 20_000)
 
+  it('preflights and commits create-from-selection through the authoring route', async () => {
+    const root = await makeRoot()
+    const pageFile = 'src/app/page.tsx'
+    const pageSource = `export function Page() {
+  return (
+    <main>
+      <section data-card>Card</section>
+    </main>
+  )
+}
+`
+    const tsconfigPath = path.join(root, 'tsconfig.json')
+    const tsconfig = JSON.parse(await fs.readFile(tsconfigPath, 'utf8'))
+    tsconfig.compilerOptions.baseUrl = '.'
+    tsconfig.compilerOptions.paths = { '@/*': ['src/*'] }
+    await fs.writeFile(tsconfigPath, JSON.stringify(tsconfig))
+    await fs.writeFile(path.join(root, pageFile), pageSource)
+    const previewResponse = await handleGet(new Request(
+      `http://localhost/api/dev/editor-authoring?mode=create-component-preview&file=${encodeURIComponent(pageFile)}`,
+    ), root)
+    expect(previewResponse.status).toBe(200)
+    const preview = await previewResponse.json()
+
+    const response = await handlePost(new Request('http://localhost/api/dev/editor-authoring', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        kind: 'execute-create-component',
+        command: {
+          kind: 'create-component-from-selection', commandId: 'route-create-card',
+          file: pageFile, line: 4, col: 7, name: 'Card',
+        },
+        expectedRevision: preview.expectedRevision,
+        expectedSourceHashes: preview.sourceHashes,
+        expectedEnvironmentFingerprint: preview.environmentFingerprint,
+      }),
+    }), root)
+
+    const created = await response.json()
+    expect(response.status, JSON.stringify(created)).toBe(200)
+    expect(created).toMatchObject({
+      componentFile: 'src/app/(dev)/react-figma-components/Card.tsx',
+      componentId: expect.any(String),
+      graph: { revision: 1 },
+    })
+    await expect(fs.readFile(path.join(root, pageFile), 'utf8')).resolves.toContain('<Card />')
+    await expect(fs.readFile(path.join(root, 'src/app/(dev)/react-figma-components/Card.tsx'), 'utf8'))
+      .resolves.toContain('export function Card()')
+  }, 20_000)
+
   it('rejects malformed G2 command keys and geometry before filesystem access', async () => {
     const response = await handlePost(request('POST', {
       kind: 'execute-command',
@@ -885,5 +935,17 @@ export function Button() { return <button className={styles.base} /> }
       expectedSourceHashes: {},
     }), '/path/that/must/not-be-read')
     expect(invalidRevalidation.status).toBe(400)
+
+    const invalidCreate = await handlePost(request('POST', {
+      kind: 'execute-create-component',
+      command: {
+        kind: 'create-component-from-selection', commandId: 'bad',
+        file: '../outside.tsx', line: 1, col: 1, name: 'Card',
+      },
+      expectedRevision: 0,
+      expectedSourceHashes: { [SOURCE_FILE]: 'a'.repeat(64) },
+      expectedEnvironmentFingerprint: 'b'.repeat(64),
+    }), '/path/that/must/not-be-read')
+    expect(invalidCreate.status).toBe(400)
   })
 })
