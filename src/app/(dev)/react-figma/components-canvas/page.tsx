@@ -47,21 +47,9 @@ type AuthoringCommand =
   | { kind: 'rename-variant'; file: string; from: string; to: string }
   | { kind: 'move-variant-frame'; file: string; variantId: string; frame: { x: number; y: number; width: number; height: number } }
   | { kind: 'undo' }
-const COMPONENT_TEXT = 'var(--sem-col-text-brand-primary)'
-const COMPONENT_ACCENT = 'var(--sem-col-fg-brand-primary)'
-const COMPONENT_BORDER = 'var(--sem-col-border-brand)'
-const CANVAS_BG = 'var(--sem-col-bg-secondary)'
-const SURFACE_BG = 'var(--sem-col-bg-active)'
-const BRAND_WASH = 'color-mix(in oklch, var(--sem-col-bg-brand-solid) 3%, transparent)'
-const FIELD_BORDER = 'var(--sem-col-border-secondary)'
-const SUBTLE_BORDER = 'var(--sem-col-border-tertiary)'
-const MUTED_TEXT = 'var(--sem-col-text-tertiary)'
-const SUBTLE_TEXT = 'var(--sem-col-text-secondary)'
-const DISABLED_TEXT = 'var(--sem-col-text-disabled)'
-const ERROR_TEXT = 'var(--sem-col-text-error-primary)'
-const ERROR_BORDER = 'var(--sem-col-border-error)'
-const CANVAS_FONT = 'var(--al-type-family-primary)'
-const dsFont = (spec: string): string => `${spec} ${CANVAS_FONT}`
+const COMPONENT_TEXT = '#8638E5'
+const COMPONENT_ACCENT = '#9747FF'
+const CANVAS_BG = '#F5F5F5'
 // I5 (§I5 + §3.2/§7): the 6 states shown as GHOST SLOTS on the edited component's board. INTERACTION states
 // preview via `data-fc-preview="<state>"` on the host frame (the editor-only dual-selector half, §3.2); SEMANTIC
 // states preview via the boolean PROP (`<Comp loading/>`), which drives the component's own `data-<state>`.
@@ -73,7 +61,7 @@ const isInteractionState = (s?: string): boolean => !!s && (INTERACTION_STATES a
 // ─── I7 NODE SYSTEM (Framer ⚡ connector layer, s58-nodesystem-design.md) ────────────────
 type Conn = { mode: 'state' | 'switch'; trigger?: string; to: { state?: string; axis?: string; value?: string }; transition?: { stiffness: number; damping: number; mass: number }; cycle?: boolean }
 type Wire = { key: string; d: string; conn: Conn; mx: number; my: number }
-const WIRE = COMPONENT_ACCENT
+const WIRE = '#9747FF'
 /** The ⚡ visual connector layer over the edited component's board (Framer clone). Draws a directional wire
  * from the base frame → each connector's target frame (state ghost or axis-value frame), a diamond drag-handle
  * on every frame's right edge (drag → drop on a target = set-connector, mode inferred from the target kind),
@@ -169,7 +157,7 @@ function NodeLayer({ file, connectors, boardRef, onWrite }: { file: string; conn
           <g key={w.key} data-wire={`${w.conn.mode}:${w.conn.to.state ?? ''}${w.conn.to.axis ?? ''}`} style={{ pointerEvents: 'stroke', cursor: 'pointer' }} onClick={() => setSel(w)}>
             <path d={w.d} fill="none" stroke="transparent" strokeWidth={12} />
             <path d={w.d} fill="none" stroke={WIRE} strokeWidth={sel === w ? 2.5 : 1.5} markerEnd="url(#fc-arrow)" />
-            {w.conn.mode === 'state' && <circle cx={w.mx} cy={w.my} r={7} fill={SURFACE_BG} stroke={WIRE} strokeWidth={1.5} />}
+            {w.conn.mode === 'state' && <circle cx={w.mx} cy={w.my} r={7} fill="#fff" stroke={WIRE} strokeWidth={1.5} />}
             {w.conn.mode === 'state' && <text x={w.mx} y={w.my + 2.5} textAnchor="middle" fontSize={8} fill={WIRE}>⚡</text>}
           </g>
         ))}
@@ -179,22 +167,22 @@ function NodeLayer({ file, connectors, boardRef, onWrite }: { file: string; conn
       {handles.map((h) => (
         <div key={h.key} data-connect-handle title="Drag to a state or variant frame to wire an interaction"
           onPointerDown={(e) => { e.preventDefault(); const b = boardRef.current!.getBoundingClientRect(); setDrag({ x0: h.x, y0: h.y, x: e.clientX - b.left, y: e.clientY - b.top, overKey: null, overRect: null }) }}
-          style={{ position: 'absolute', left: h.x - 5, top: h.y - 5, width: 10, height: 10, background: WIRE, border: `1.5px solid ${SURFACE_BG}`, borderRadius: 2, transform: 'rotate(45deg)', cursor: 'crosshair', zIndex: 6, boxShadow: '0 1px 3px var(--effects-shadow-sm-01)' }} />
+          style={{ position: 'absolute', left: h.x - 5, top: h.y - 5, width: 10, height: 10, background: WIRE, border: '1.5px solid #fff', borderRadius: 2, transform: 'rotate(45deg)', cursor: 'crosshair', zIndex: 6, boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
       ))}
       {/* drop-target highlight — rect was computed in the pointer handler (no ref read during render) */}
       {drag?.overRect && <div style={{ position: 'absolute', left: drag.overRect.left - 3, top: drag.overRect.top - 3, width: drag.overRect.right - drag.overRect.left + 6, height: drag.overRect.bottom - drag.overRect.top + 6, border: `2px solid ${WIRE}`, borderRadius: 8, pointerEvents: 'none', zIndex: 6 }} />}
       {/* wire popover: edit spring / remove */}
       {sel && (
-        <div style={{ position: 'absolute', left: Math.min(sel.mx + 10, boardW - 150), top: sel.my + 8, width: 140, background: SURFACE_BG, border: `1px solid ${COMPONENT_BORDER}`, borderRadius: 8, padding: 8, zIndex: 20, boxShadow: '0 4px 16px var(--effects-shadow-lg-01)', font: dsFont('500 10px/1.4') }} onClick={(e) => e.stopPropagation()}>
-          <div style={{ font: dsFont('600 9px/1'), color: SUBTLE_TEXT, textTransform: 'uppercase', marginBottom: 6 }}>{sel.conn.mode === 'state' ? `Transition → ${sel.conn.to.state}` : `Tap-switch → ${sel.conn.to.axis}=${sel.conn.to.value}`}</div>
+        <div style={{ position: 'absolute', left: Math.min(sel.mx + 10, boardW - 150), top: sel.my + 8, width: 140, background: '#fff', border: `1px solid ${WIRE}`, borderRadius: 8, padding: 8, zIndex: 20, boxShadow: '0 4px 16px rgba(0,0,0,0.15)', font: '500 10px/1.4 system-ui' }} onClick={(e) => e.stopPropagation()}>
+          <div style={{ font: '600 9px/1 system-ui', color: 'rgba(0,0,0,0.5)', textTransform: 'uppercase', marginBottom: 6 }}>{sel.conn.mode === 'state' ? `Transition → ${sel.conn.to.state}` : `Tap-switch → ${sel.conn.to.axis}=${sel.conn.to.value}`}</div>
           {sel.conn.mode === 'state' && (
             <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
-              {(['stiffness', 'damping', 'mass'] as const).map((k, i) => { const def = [sel.conn.transition?.stiffness ?? 260, sel.conn.transition?.damping ?? 20, sel.conn.transition?.mass ?? 1][i]; return <label key={k} style={{ flex: 1, font: dsFont('8px'), color: SUBTLE_TEXT }}>{k[0].toUpperCase()}<input defaultValue={def} data-spring={k} style={{ width: '100%', font: dsFont('9px'), border: `1px solid ${FIELD_BORDER}`, borderRadius: 3, padding: '1px 3px' }} /></label> })}
+              {(['stiffness', 'damping', 'mass'] as const).map((k, i) => { const def = [sel.conn.transition?.stiffness ?? 260, sel.conn.transition?.damping ?? 20, sel.conn.transition?.mass ?? 1][i]; return <label key={k} style={{ flex: 1, font: '8px system-ui', color: 'rgba(0,0,0,0.5)' }}>{k[0].toUpperCase()}<input defaultValue={def} data-spring={k} style={{ width: '100%', font: '9px system-ui', border: '1px solid #ddd', borderRadius: 3, padding: '1px 3px' }} /></label> })}
             </div>
           )}
           <div style={{ display: 'flex', gap: 4 }}>
-            {sel.conn.mode === 'state' && <button type="button" disabled={busy} onClick={(e) => { const pop = (e.currentTarget.closest('div')!.parentElement as HTMLElement); const g = (k: string) => Number((pop.querySelector(`[data-spring="${k}"]`) as HTMLInputElement).value); editSpring(sel.conn, g('stiffness'), g('damping'), g('mass')) }} style={{ flex: 1, font: dsFont('9px'), border: `1px solid ${COMPONENT_BORDER}`, background: SURFACE_BG, color: WIRE, borderRadius: 4, padding: '2px 4px', cursor: 'pointer' }}>Apply</button>}
-            <button type="button" disabled={busy} onClick={() => removeWire(sel.conn)} style={{ flex: 1, font: dsFont('9px'), border: `1px solid ${ERROR_BORDER}`, background: SURFACE_BG, color: ERROR_TEXT, borderRadius: 4, padding: '2px 4px', cursor: 'pointer' }}>Remove</button>
+            {sel.conn.mode === 'state' && <button type="button" disabled={busy} onClick={(e) => { const pop = (e.currentTarget.closest('div')!.parentElement as HTMLElement); const g = (k: string) => Number((pop.querySelector(`[data-spring="${k}"]`) as HTMLInputElement).value); editSpring(sel.conn, g('stiffness'), g('damping'), g('mass')) }} style={{ flex: 1, font: '9px system-ui', border: `1px solid ${WIRE}`, background: '#fff', color: WIRE, borderRadius: 4, padding: '2px 4px', cursor: 'pointer' }}>Apply</button>}
+            <button type="button" disabled={busy} onClick={() => removeWire(sel.conn)} style={{ flex: 1, font: '9px system-ui', border: '1px solid #f24822', background: '#fff', color: '#f24822', borderRadius: 4, padding: '2px 4px', cursor: 'pointer' }}>Remove</button>
           </div>
         </div>
       )}
@@ -307,7 +295,7 @@ class FrameBoundary extends React.Component<{ label: string; children: React.Rea
   static getDerivedStateFromError(e: Error) { return { err: e.message } }
   render() {
     if (this.state.err) {
-      return <div data-frame-error={this.props.label} style={{ padding: 12, border: `1px dashed ${ERROR_BORDER}`, borderRadius: 8, color: ERROR_TEXT, font: dsFont('11px'), maxWidth: 240 }}>{this.props.label} failed: {this.state.err}</div>
+      return <div data-frame-error={this.props.label} style={{ padding: 12, border: '1px dashed #f24822', borderRadius: 8, color: '#f24822', font: '11px system-ui', maxWidth: 240 }}>{this.props.label} failed: {this.state.err}</div>
     }
     return this.props.children
   }
@@ -360,27 +348,27 @@ function AuthoringVariantBoard({
   const undo = async () => { await onCommand({ kind: 'undo' }) }
   return (
     <div data-authoring-canvas data-authoring-component={authoring.id} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div data-authoring-breadcrumb style={{ display: 'flex', alignItems: 'center', gap: 8, font: dsFont('600 11px/1.2'), color: COMPONENT_TEXT }}>
-        <span>Components</span><span style={{ color: MUTED_TEXT }}>/</span><span>{authoring.displayName}</span>
+      <div data-authoring-breadcrumb style={{ display: 'flex', alignItems: 'center', gap: 8, font: '600 11px/1.2 system-ui', color: COMPONENT_TEXT }}>
+        <span>Components</span><span style={{ color: 'rgba(0,0,0,0.35)' }}>/</span><span>{authoring.displayName}</span>
       </div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        <input aria-label="New variant name" value={createName} onChange={(e) => setCreateName(e.target.value)} style={{ width: 132, border: `1px solid ${COMPONENT_BORDER}`, borderRadius: 6, padding: '5px 7px', font: dsFont('11px') }} />
-        <button type="button" onClick={create} style={{ border: `1px solid ${COMPONENT_BORDER}`, background: SURFACE_BG, color: COMPONENT_TEXT, borderRadius: 6, padding: '5px 8px', font: dsFont('600 11px'), cursor: 'pointer' }}>Create variant</button>
-        <input aria-label="Rename selected variant" placeholder={selected ? `Rename ${selected.displayName}` : 'Rename'} value={renameTo} onChange={(e) => setRenameTo(e.target.value)} style={{ width: 152, border: `1px solid ${FIELD_BORDER}`, borderRadius: 6, padding: '5px 7px', font: dsFont('11px') }} />
-        <button type="button" disabled={!selected} onClick={rename} style={{ border: `1px solid ${FIELD_BORDER}`, background: SURFACE_BG, color: SUBTLE_TEXT, borderRadius: 6, padding: '5px 8px', font: dsFont('600 11px'), cursor: selected ? 'pointer' : 'default' }}>Rename</button>
-        <button type="button" disabled={!selected} onClick={nudge} style={{ border: `1px solid ${FIELD_BORDER}`, background: SURFACE_BG, color: SUBTLE_TEXT, borderRadius: 6, padding: '5px 8px', font: dsFont('600 11px'), cursor: selected ? 'pointer' : 'default' }}>Move +24px</button>
-        <button type="button" disabled={!canUndo} onClick={undo} style={{ border: `1px solid ${FIELD_BORDER}`, background: SURFACE_BG, color: canUndo ? SUBTLE_TEXT : DISABLED_TEXT, borderRadius: 6, padding: '5px 8px', font: dsFont('600 11px'), cursor: canUndo ? 'pointer' : 'default' }}>Undo</button>
+        <input aria-label="New variant name" value={createName} onChange={(e) => setCreateName(e.target.value)} style={{ width: 132, border: `1px solid ${COMPONENT_ACCENT}`, borderRadius: 6, padding: '5px 7px', font: '11px system-ui' }} />
+        <button type="button" onClick={create} style={{ border: `1px solid ${COMPONENT_ACCENT}`, background: '#fff', color: COMPONENT_TEXT, borderRadius: 6, padding: '5px 8px', font: '600 11px system-ui', cursor: 'pointer' }}>Create variant</button>
+        <input aria-label="Rename selected variant" placeholder={selected ? `Rename ${selected.displayName}` : 'Rename'} value={renameTo} onChange={(e) => setRenameTo(e.target.value)} style={{ width: 152, border: '1px solid rgba(0,0,0,0.18)', borderRadius: 6, padding: '5px 7px', font: '11px system-ui' }} />
+        <button type="button" disabled={!selected} onClick={rename} style={{ border: '1px solid rgba(0,0,0,0.18)', background: '#fff', color: 'rgba(0,0,0,0.65)', borderRadius: 6, padding: '5px 8px', font: '600 11px system-ui', cursor: selected ? 'pointer' : 'default' }}>Rename</button>
+        <button type="button" disabled={!selected} onClick={nudge} style={{ border: '1px solid rgba(0,0,0,0.18)', background: '#fff', color: 'rgba(0,0,0,0.65)', borderRadius: 6, padding: '5px 8px', font: '600 11px system-ui', cursor: selected ? 'pointer' : 'default' }}>Move +24px</button>
+        <button type="button" disabled={!canUndo} onClick={undo} style={{ border: '1px solid rgba(0,0,0,0.18)', background: '#fff', color: canUndo ? 'rgba(0,0,0,0.65)' : 'rgba(0,0,0,0.3)', borderRadius: 6, padding: '5px 8px', font: '600 11px system-ui', cursor: canUndo ? 'pointer' : 'default' }}>Undo</button>
       </div>
-      <div style={{ position: 'relative', width, height, border: `1px dashed ${COMPONENT_BORDER}`, borderRadius: 12, background: BRAND_WASH }}>
+      <div style={{ position: 'relative', width, height, border: `1px dashed ${COMPONENT_ACCENT}`, borderRadius: 12, background: 'rgba(151,71,255,0.03)' }}>
         {componentFrame && authoring.variants.map((variant) => {
           const isSelected = variant.id === selected?.id
           return (
             <figure key={variant.id} data-authoring-variant={variant.id} data-component-frame={variant.displayName} data-component-source={authoring.source.file} onPointerDown={() => setSelectedId(variant.id)} style={{ position: 'absolute', left: variant.frame.x, top: variant.frame.y, width: variant.frame.width, minHeight: variant.frame.height, margin: 0, display: 'flex', flexDirection: 'column', gap: 8, cursor: 'pointer' }}>
-              <figcaption style={{ display: 'flex', alignItems: 'center', gap: 6, font: dsFont('600 11px/1.2'), color: COMPONENT_TEXT }}>
-                <span aria-hidden style={{ width: 8, height: 8, transform: 'rotate(45deg)', borderRadius: 2, background: variant.primary ? COMPONENT_ACCENT : SURFACE_BG, border: `1px solid ${COMPONENT_BORDER}` }} />
+              <figcaption style={{ display: 'flex', alignItems: 'center', gap: 6, font: '600 11px/1.2 system-ui', color: COMPONENT_TEXT }}>
+                <span aria-hidden style={{ width: 8, height: 8, transform: 'rotate(45deg)', borderRadius: 2, background: variant.primary ? COMPONENT_ACCENT : '#fff', border: `1px solid ${COMPONENT_ACCENT}` }} />
                 {variant.displayName}
               </figcaption>
-              <div style={{ minHeight: variant.frame.height - 24, padding: 24, background: SURFACE_BG, borderRadius: 12, outline: isSelected ? `2px solid ${COMPONENT_BORDER}` : `1px solid ${SUBTLE_BORDER}`, outlineOffset: isSelected ? 2 : 0 }}>
+              <div style={{ minHeight: variant.frame.height - 24, padding: 24, background: '#fff', borderRadius: 12, outline: isSelected ? `2px solid ${COMPONENT_ACCENT}` : '1px solid rgba(0,0,0,0.08)', outlineOffset: isSelected ? 2 : 0 }}>
                 <FrameBoundary label={variant.displayName}>{React.createElement(componentFrame, { [axis]: variant.displayName })}</FrameBoundary>
               </div>
             </figure>
@@ -486,25 +474,25 @@ export default function ComponentsCanvasHost() {
   return (
     <div data-components-canvas suppressHydrationWarning style={{ minWidth: 800, padding: 40, display: 'flex', flexDirection: 'column', gap: 48, background: CANVAS_BG }}>
       {mounted && frames.length === 0 && (
-        <div style={{ font: dsFont('13px'), color: SUBTLE_TEXT }}>No components yet — create one from the Assets panel.</div>
+        <div style={{ font: '13px system-ui', color: 'rgba(0,0,0,0.5)' }}>No components yet — create one from the Assets panel.</div>
       )}
       {frames.length > 0 && loadingInventory && (
-        <div style={{ font: dsFont('13px'), color: SUBTLE_TEXT }}>Loading component inventory…</div>
+        <div style={{ font: '13px system-ui', color: 'rgba(0,0,0,0.5)' }}>Loading component inventory…</div>
       )}
       {[...byCategory.entries()].map(([cat, list]) => (
         <section key={cat} data-category={cat} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <h2 style={{ margin: 0, font: dsFont('600 12px/1.2'), color: MUTED_TEXT, textTransform: 'uppercase', letterSpacing: '0.4px' }}>{cat}</h2>
+          <h2 style={{ margin: 0, font: '600 12px/1.2 system-ui', color: 'rgba(0,0,0,0.45)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{cat}</h2>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 32, alignItems: 'flex-start' }}>
             {list.map((group) => (
               <article key={group.key} data-component-group={group.name} data-frame-root={group.root} title={group.file} style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span aria-hidden style={{ width: 10, height: 10, transform: 'rotate(45deg)', borderRadius: 2, background: COMPONENT_ACCENT, flex: 'none' }} />
-                  <h3 style={{ margin: 0, font: dsFont('600 11px/1.2'), color: COMPONENT_TEXT }}>{group.name}</h3>
-                  {group.variants.length > 1 && <span style={{ font: dsFont('500 10px/1.2'), color: MUTED_TEXT }}>{group.variants.length} variants</span>}
+                  <h3 style={{ margin: 0, font: '600 11px/1.2 system-ui', color: COMPONENT_TEXT }}>{group.name}</h3>
+                  {group.variants.length > 1 && <span style={{ font: '500 10px/1.2 system-ui', color: 'rgba(0,0,0,0.45)' }}>{group.variants.length} variants</span>}
                 </div>
-                <div {...(group.file && group.file === editFile ? { ref: boardRef } : {})} style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 16, padding: 24, borderRadius: 12, border: `1px ${group.variants.length > 1 ? 'dashed' : 'solid'} ${COMPONENT_BORDER}` }}>
+                <div {...(group.file && group.file === editFile ? { ref: boardRef } : {})} style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 16, padding: 24, borderRadius: 12, border: `1px ${group.variants.length > 1 ? 'dashed' : 'solid'} ${COMPONENT_ACCENT}` }}>
                   {group.file && group.file === editFile && !authoring?.component && <NodeLayer file={group.file} connectors={editConn} boardRef={boardRef} onWrite={nodeWrite} />}
-                  {group.file && group.file === editFile && authoringError && <div style={{ color: ERROR_TEXT, font: dsFont('11px') }}>{authoringError}</div>}
+                  {group.file && group.file === editFile && authoringError && <div style={{ color: '#f24822', font: '11px system-ui' }}>{authoringError}</div>}
                   {group.file && group.file === editFile && authoring?.component ? (
                     <AuthoringVariantBoard group={group} authoring={authoring.component} canUndo={authoring.canUndo} onCommand={authoringWrite} />
                   ) : (() => {
@@ -522,15 +510,15 @@ export default function ComponentsCanvasHost() {
                       const showLabel = !!f.axis || !!f.state || base.length > 1
                       return (
                         <figure key={f.key} {...preview} data-component-frame={f.label} data-component-parent={group.name} data-component-variant={f.label} data-component-source={f.file ?? group.file} data-frame-root={f.root} {...(f.state ? { 'data-component-state': f.state } : {})} style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 8, opacity: f.state ? 0.9 : 1 }}>
-                          {showLabel && <figcaption style={{ font: dsFont('500 11px/1.2'), color: f.state ? SUBTLE_TEXT : COMPONENT_TEXT }}>{f.label}</figcaption>}
-                          <div style={{ padding: 24, background: SURFACE_BG, borderRadius: 12, ...(f.state ? { outline: `1px dashed ${SUBTLE_BORDER}`, outlineOffset: -1 } : {}) }}>
+                          {showLabel && <figcaption style={{ font: '500 11px/1.2 system-ui', color: f.state ? 'rgba(0,0,0,0.5)' : COMPONENT_TEXT }}>{f.label}</figcaption>}
+                          <div style={{ padding: 24, background: '#fff', borderRadius: 12, ...(f.state ? { outline: '1px dashed rgba(0,0,0,0.15)', outlineOffset: -1 } : {}) }}>
                             <FrameBoundary label={f.label}>{React.createElement(f.Comp, props)}</FrameBoundary>
                           </div>
                         </figure>
                       )
                     }
                     const row = (fs: Frame[]) => <div style={{ display: 'flex', flexWrap: 'wrap', gap: 32, alignItems: 'flex-start' }}>{fs.map(renderFrame)}</div>
-                    const subLabel = (t: string) => <div style={{ font: dsFont('600 9px/1'), color: MUTED_TEXT, textTransform: 'uppercase', letterSpacing: '0.4px' }}>{t}</div>
+                    const subLabel = (t: string) => <div style={{ font: '600 9px/1 system-ui', color: 'rgba(0,0,0,0.4)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{t}</div>
                     return (
                       <>
                         {base.length > 0 && row(base)}

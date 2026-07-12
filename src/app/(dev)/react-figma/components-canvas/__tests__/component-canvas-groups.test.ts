@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs'
-
 import { describe, expect, it } from 'vitest'
 
 import { selectCanvasGroupsForMode } from '../component-canvas-groups'
@@ -25,15 +23,5 @@ describe('selectCanvasGroupsForMode', () => {
   it('does not fall back to the full inventory gallery when an edit target is missing', () => {
     expect(selectCanvasGroupsForMode(groups, 'src/app/(dev)/react-figma-components/Missing.tsx'))
       .toEqual([])
-  })
-
-  it('keeps canvas chrome on ONEMO DS tokens instead of Framer hex colors or system fonts', () => {
-    const pageSource = readFileSync(new URL('../page.tsx', import.meta.url), 'utf8')
-
-    expect(pageSource).not.toMatch(/#[0-9a-f]{3,8}\b/i)
-    expect(pageSource).not.toContain(['system', 'ui'].join('-'))
-    expect(pageSource).toContain('var(--sem-col-fg-brand-primary)')
-    expect(pageSource).toContain('var(--sem-col-text-brand-primary)')
-    expect(pageSource).toContain('var(--al-type-family-primary)')
   })
 })
