@@ -1,7 +1,7 @@
 {
  "fileKey": "Qdb9Kx98afJHxaCGAIxoMC",
  "pulledAtFileVersion": null,
- "variables": 3114,
+ "variables": 3121,
  "export": [
   {
    ".1.0-Prim-Col": {
@@ -19391,14 +19391,6 @@
       },
       "border": {
        "primary": {
-        "$scopes": [
-         "STROKE_COLOR"
-        ],
-        "$description": "🔒 border/ v2.3.2 — Interactive element outline — inputs, controls at rest.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{neutral.7}",
         "strong": {
          "$scopes": [
           "ALL_SCOPES"
@@ -19409,6 +19401,14 @@
          "$collectionName": ".2.0-Al-Col",
          "$value": "{neutral.8}"
         },
+        "$scopes": [
+         "STROKE_COLOR"
+        ],
+        "$description": "🔒 border/ v2.3.2 — Interactive element outline — inputs, controls at rest.",
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".2.0-Al-Col",
+        "$value": "{neutral.7}",
         "subtle": {
          "$scopes": [
           "STROKE_COLOR"
@@ -19786,17 +19786,6 @@
        }
       },
       "bg": {
-       "overlay": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Overlay background for modals and scrims. Immutable — stays dark in all themes.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".1.0-Prim-Col",
-        "$value": "{alpha.base.brand-white.2}"
-       },
        "active": {
         "$scopes": [
          "FRAME_FILL",
@@ -19874,17 +19863,6 @@
         "$libraryName": "",
         "$collectionName": ".2.0-Al-Col",
         "$value": "{brand.white}"
-       },
-       "primary-alt-trans": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Alternative primary background. Use for subtle differentiation from bg-primary.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".1.0-Prim-Col",
-        "$value": "{alpha.base.brand-white.11}"
        },
        "primary-hover": {
         "$scopes": [
@@ -20171,6 +20149,58 @@
         "$libraryName": "",
         "$collectionName": ".2.0-Al-Col",
         "$value": "{success.9}"
+       },
+       "frost": {
+        "ultrathin": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 bg/ v2.3.2 — The barest material — Snow veil in light, Ink veil in dark. Recipe: tint + blur-lg + saturate-soft.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.white.alpha.1}"
+        },
+        "thin": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 bg/ v2.3.2 — Light material — floating rails and pop-up menus over content. Recipe: tint + blur-xl + saturate-soft.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.white.alpha.2}"
+        },
+        "regular": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 bg/ v2.3.2 — The default material — sheets, menus. Recipe: tint + blur-2xl + saturate.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.white.alpha.6}"
+        },
+        "thick": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 bg/ v2.3.2 — Near-solid glass — the drawer material. Recipe: tint + blur-3xl + saturate + brightness.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.white.alpha.11}"
+        }
+       },
+       "veil": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 bg/ v2.3.2 — Pure translucency, no blur — a quieting layer that is not glass.",
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".2.0-Al-Col",
+        "$value": "{brand.white.alpha.2}"
        }
       },
       "interaction": {
@@ -20954,7 +20984,8 @@
        "$description": "Small blur radius (8px). For subtle frosted effects.",
        "$type": "float",
        "$libraryName": "",
-       "$value": 8
+       "$collectionName": ".1.1-Prim-Dim",
+       "$value": "{8}"
       },
       "blur-md": {
        "$scopes": [
@@ -20963,7 +20994,8 @@
        "$description": "Medium blur radius (16px). For card overlays.",
        "$type": "float",
        "$libraryName": "",
-       "$value": 16
+       "$collectionName": ".1.1-Prim-Dim",
+       "$value": "{16}"
       },
       "blur-lg": {
        "$scopes": [
@@ -20972,7 +21004,8 @@
        "$description": "Large blur radius (24px). For modal backdrops.",
        "$type": "float",
        "$libraryName": "",
-       "$value": 24
+       "$collectionName": ".1.1-Prim-Dim",
+       "$value": "{24}"
       },
       "blur-xl": {
        "$scopes": [
@@ -20981,7 +21014,8 @@
        "$description": "Extra large blur radius (40px). For hero backgrounds.",
        "$type": "float",
        "$libraryName": "",
-       "$value": 40
+       "$collectionName": ".1.1-Prim-Dim",
+       "$value": "{40}"
       },
       "blur-2xl": {
        "$scopes": [
@@ -20990,7 +21024,48 @@
        "$description": "Extra large blur radius (40px). For hero backgrounds.",
        "$type": "float",
        "$libraryName": "",
-       "$value": 56
+       "$collectionName": ".1.1-Prim-Dim",
+       "$value": "{56}"
+      },
+      "blur-3xl": {
+       "$scopes": [
+        "ALL_SCOPES"
+       ],
+       "$description": "Thick-material blur.",
+       "$type": "float",
+       "$libraryName": "",
+       "$collectionName": ".1.1-Prim-Dim",
+       "$value": "{96}"
+      },
+      "material-saturate": {
+       "$scopes": [
+        "ALL_SCOPES"
+       ],
+       "$description": "Material saturation factor — the dodge-physics of the web recipe.",
+       "$type": "float",
+       "$libraryName": "",
+       "$collectionName": ".1.4-Prim-Ratios",
+       "$value": "{1-80}"
+      },
+      "material-saturate-soft": {
+       "$scopes": [
+        "ALL_SCOPES"
+       ],
+       "$description": "Softer saturation for the thinnest materials.",
+       "$type": "float",
+       "$libraryName": "",
+       "$collectionName": ".1.4-Prim-Ratios",
+       "$value": "{1-50}"
+      },
+      "material-brightness": {
+       "$scopes": [
+        "ALL_SCOPES"
+       ],
+       "$description": "Luminance lift for the thick material.",
+       "$type": "float",
+       "$libraryName": "",
+       "$collectionName": ".1.4-Prim-Ratios",
+       "$value": "{1-05}"
       }
      },
      "Dark": {
@@ -21154,7 +21229,8 @@
        "$description": "Small blur radius (8px). For subtle frosted effects.",
        "$type": "float",
        "$libraryName": "",
-       "$value": 8
+       "$collectionName": ".1.1-Prim-Dim",
+       "$value": "{8}"
       },
       "blur-md": {
        "$scopes": [
@@ -21163,7 +21239,8 @@
        "$description": "Medium blur radius (16px). For card overlays.",
        "$type": "float",
        "$libraryName": "",
-       "$value": 16
+       "$collectionName": ".1.1-Prim-Dim",
+       "$value": "{16}"
       },
       "blur-lg": {
        "$scopes": [
@@ -21172,7 +21249,8 @@
        "$description": "Large blur radius (24px). For modal backdrops.",
        "$type": "float",
        "$libraryName": "",
-       "$value": 24
+       "$collectionName": ".1.1-Prim-Dim",
+       "$value": "{24}"
       },
       "blur-xl": {
        "$scopes": [
@@ -21181,7 +21259,8 @@
        "$description": "Extra large blur radius (40px). For hero backgrounds.",
        "$type": "float",
        "$libraryName": "",
-       "$value": 40
+       "$collectionName": ".1.1-Prim-Dim",
+       "$value": "{40}"
       },
       "blur-2xl": {
        "$scopes": [
@@ -21190,7 +21269,48 @@
        "$description": "Extra large blur radius (40px). For hero backgrounds.",
        "$type": "float",
        "$libraryName": "",
-       "$value": 56
+       "$collectionName": ".1.1-Prim-Dim",
+       "$value": "{56}"
+      },
+      "blur-3xl": {
+       "$scopes": [
+        "ALL_SCOPES"
+       ],
+       "$description": "Thick-material blur.",
+       "$type": "float",
+       "$libraryName": "",
+       "$collectionName": ".1.1-Prim-Dim",
+       "$value": "{96}"
+      },
+      "material-saturate": {
+       "$scopes": [
+        "ALL_SCOPES"
+       ],
+       "$description": "Material saturation factor — the dodge-physics of the web recipe.",
+       "$type": "float",
+       "$libraryName": "",
+       "$collectionName": ".1.4-Prim-Ratios",
+       "$value": "{1-80}"
+      },
+      "material-saturate-soft": {
+       "$scopes": [
+        "ALL_SCOPES"
+       ],
+       "$description": "Softer saturation for the thinnest materials.",
+       "$type": "float",
+       "$libraryName": "",
+       "$collectionName": ".1.4-Prim-Ratios",
+       "$value": "{1-50}"
+      },
+      "material-brightness": {
+       "$scopes": [
+        "ALL_SCOPES"
+       ],
+       "$description": "Luminance lift for the thick material.",
+       "$type": "float",
+       "$libraryName": "",
+       "$collectionName": ".1.4-Prim-Ratios",
+       "$value": "{1-05}"
       }
      }
     }

@@ -725,13 +725,6 @@ export const RESOLVED = {
    "D": "#fafafa"
   },
   {
-   "name": "bg/overlay",
-   "binding": "alpha/base/brand-white/2",
-   "description": "Overlay background for modals and scrims. Immutable — stays dark in all themes.",
-   "L": "#fafafa1a",
-   "D": "#0710131a"
-  },
-  {
    "name": "bg/active",
    "binding": "base/white",
    "description": "Active/pressed state background.",
@@ -779,13 +772,6 @@ export const RESOLVED = {
    "description": "Alternative primary background. Use for subtle differentiation from bg-primary.",
    "L": "#fafafa",
    "D": "#071013"
-  },
-  {
-   "name": "bg/primary-alt-trans",
-   "binding": "alpha/base/brand-white/11",
-   "description": "Alternative primary background. Use for subtle differentiation from bg-primary.",
-   "L": "#fafafae5",
-   "D": "#071013e5"
   },
   {
    "name": "bg/primary-hover",
@@ -968,6 +954,41 @@ export const RESOLVED = {
    "description": "Solid success background.",
    "L": "#37bf5d",
    "D": "#37bf5d"
+  },
+  {
+   "name": "bg/frost/ultrathin",
+   "binding": "brand/white/alpha/1",
+   "description": "🔒 bg/ v2.3.2 — The barest material — Snow veil in light, Ink veil in dark. Recipe: tint + blur-lg + saturate-soft.",
+   "L": "#fafafa0d",
+   "D": "#0710130d"
+  },
+  {
+   "name": "bg/frost/thin",
+   "binding": "brand/white/alpha/2",
+   "description": "🔒 bg/ v2.3.2 — Light material — floating rails and pop-up menus over content. Recipe: tint + blur-xl + saturate-soft.",
+   "L": "#fafafa1a",
+   "D": "#0710131a"
+  },
+  {
+   "name": "bg/frost/regular",
+   "binding": "brand/white/alpha/6",
+   "description": "🔒 bg/ v2.3.2 — The default material — sheets, menus. Recipe: tint + blur-2xl + saturate.",
+   "L": "#fafafa66",
+   "D": "#07101366"
+  },
+  {
+   "name": "bg/frost/thick",
+   "binding": "brand/white/alpha/11",
+   "description": "🔒 bg/ v2.3.2 — Near-solid glass — the drawer material. Recipe: tint + blur-3xl + saturate + brightness.",
+   "L": "#fafafae5",
+   "D": "#071013e5"
+  },
+  {
+   "name": "bg/veil",
+   "binding": "brand/white/alpha/2",
+   "description": "🔒 bg/ v2.3.2 — Pure translucency, no blur — a quieting layer that is not glass.",
+   "L": "#fafafa1a",
+   "D": "#0710131a"
   },
   {
    "name": "interaction/press/on-neutral",
