@@ -193,7 +193,9 @@ async function migrateHistoryGraphPreimage(input: {
     throw namedError('AUTHORING_MIGRATION_HISTORY_INVALID', `history graph preimage is not JSON: ${(error as Error).message}`, 422)
   }
   for (const preimage of input.record.preimages) {
-    input.historicalSources.set(preimage.file, await input.history.readBlob(preimage))
+    const bytes = await input.history.readPreimage(preimage)
+    if (bytes === null) input.historicalSources.delete(preimage.file)
+    else input.historicalSources.set(preimage.file, bytes)
   }
   if (graphVersion(parsed) === 2) {
     assertAuthoringGraphV1(parsed)

@@ -147,6 +147,36 @@ describe('SingleRootAuthoringTransaction', () => {
     await expect(fs.readFile(path.join(root, file), 'utf8')).resolves.toBe('existing bytes')
   })
 
+  it('durably deletes a source file when applying the inverse of creation', async () => {
+    const { root, registry, store, tx } = await makeTransaction()
+    const file = 'src/app/(dev)/react-figma-components/Card.tsx'
+    const bytes = 'export function Card() { return <section /> }\n'
+    await tx.commit({
+      expectedRevision: 0,
+      sourceFiles: [file],
+      sourcePatches: [{ file, before: null, after: bytes }],
+      mutate: (draft) => draft,
+    })
+
+    const graph = await new SingleRootAuthoringTransaction({
+      transactionId: 'tx-2', storeId: 'project-main', registry, store,
+    }).commit({
+      expectedRevision: 1,
+      sourceFiles: [file],
+      expectedSourceHashes: { [file]: sha256(bytes) },
+      sourcePatches: [{ file, before: bytes, after: null }],
+      mutate: (draft) => draft,
+    })
+
+    await expect(fs.readFile(path.join(root, file))).rejects.toMatchObject({ code: 'ENOENT' })
+    expect(graph.sourceHashes[file]).toBeUndefined()
+    const participant = JSON.parse(await fs.readFile(
+      path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions/tx-2/participant.json'),
+      'utf8',
+    ))
+    expect(participant.files).toEqual([expect.objectContaining({ file, before: expect.any(Object), after: null })])
+  })
+
   it('rejects stale revision before preparing a transaction', async () => {
     const { tx } = await makeTransaction()
     await tx.commit({ expectedRevision: 0, mutate: (draft) => draft })

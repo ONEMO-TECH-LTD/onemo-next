@@ -59,7 +59,7 @@ export type SingleRootCoordinatorRecord = {
   status: 'prepared' | 'committed' | 'rolled-back'
 }
 
-export type SourcePatch = { file: string; before: string | Buffer | null; after: string | Buffer }
+export type SourcePatch = { file: string; before: string | Buffer | null; after: string | Buffer | null }
 export type MetadataPatch = { file: string; before: string | Buffer | null; after: string | Buffer | null }
 
 export type AuthoringTransactionHooks = {
@@ -183,11 +183,10 @@ export class SingleRootAuthoringTransaction {
     const sourceHashes = { ...before.sourceHashes }
     for (const file of sourceFiles) {
       const patch = patchByFile.get(file)
-      const after = patch?.after ?? currentSources.get(file)
-      if (after === null || after === undefined) {
-        throw namedError('SOURCE_BYTES_MISSING', `source bytes missing after preflight: ${file}`, 409)
-      }
-      sourceHashes[file] = sha256(after)
+      const after = patch ? patch.after : currentSources.get(file)
+      if (after === null) delete sourceHashes[file]
+      else if (after === undefined) throw namedError('SOURCE_BYTES_MISSING', `source bytes missing after preflight: ${file}`, 409)
+      else sourceHashes[file] = sha256(after)
     }
     const afterCandidate = update.mutate({
       ...before,
@@ -206,7 +205,7 @@ export class SingleRootAuthoringTransaction {
       return {
         file: patch.file,
         before: patch.before === null ? null : await this.putTransactionBlob(patch.before, mode),
-        after: await this.putTransactionBlob(patch.after, mode),
+        after: patch.after === null ? null : await this.putTransactionBlob(patch.after, mode),
       }
     }))
     const sidecar = {

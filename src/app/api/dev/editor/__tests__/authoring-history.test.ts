@@ -34,6 +34,39 @@ describe('AuthoringHistoryStore', () => {
     await expect(fs.readFile(path.join(root, blobPath))).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
+  it('records a missing-file preimage without fabricating a content blob', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'authoring-history-create-'))
+    const registry = await RuntimeRootRegistry.create([
+      { storeId: 'project-main', kind: 'project', rootPath: root },
+    ])
+    const history = new AuthoringHistoryStore(registry, 'project-main')
+
+    const patches = await history.planCommand({
+      command: { kind: 'create-component-from-selection' },
+      sourceFiles: ['Page.tsx', 'Card.tsx'],
+      sourcePreimages: [
+        { file: 'Page.tsx', bytes: 'before page' },
+        { file: 'Card.tsx', bytes: null },
+      ],
+      graphPreimage: '{}\n',
+      revision: 1,
+    })
+    const journal = patches.find((patch) => patch.file.endsWith('/history/journal.ndjson'))!
+    const record = JSON.parse(journal.after.toString())
+
+    expect(record.preimages).toEqual([
+      expect.objectContaining({ file: 'Page.tsx', sha256: sha256('before page') }),
+      { file: 'Card.tsx', sha256: null, path: null },
+    ])
+    expect(patches.filter((patch) => patch.file.includes('/history/blobs/'))).toHaveLength(2)
+    const journalPath = await registry.resolveStorePath('project-main', journal.file)
+    await fs.mkdir(path.dirname(journalPath), { recursive: true })
+    await fs.writeFile(journalPath, journal.after)
+    expect((await history.latestUndoableCommand())?.record.preimages[1]).toEqual({
+      file: 'Card.tsx', sha256: null, path: null,
+    })
+  })
+
   it.each([
     {
       label: 'a traversal source path',
@@ -58,6 +91,13 @@ describe('AuthoringHistoryStore', () => {
       label: 'an untyped command',
       mutate: (record: Record<string, unknown>) => {
         record.command = null
+      },
+    },
+    {
+      label: 'a partial missing-file marker',
+      mutate: (record: Record<string, unknown>) => {
+        const preimage = (record.preimages as Array<Record<string, unknown>>)[0]!
+        preimage.sha256 = null
       },
     },
   ])('refuses a journal record containing $label', async ({ mutate }) => {

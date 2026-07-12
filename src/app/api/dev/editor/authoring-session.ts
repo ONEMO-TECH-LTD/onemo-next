@@ -259,7 +259,7 @@ export class ProjectAuthoringSession {
     const sourcePatches = await Promise.all(latest.record.preimages.map(async (preimage) => {
       const current = sourceBytes.get(preimage.file)
       if (!current) throw namedError('UNDO_HISTORY_INVALID', `undo preimage is outside its source set: ${preimage.file}`, 409)
-      return { file: preimage.file, before: current, after: await this.history.readBlob(preimage) }
+      return { file: preimage.file, before: current, after: await this.history.readPreimage(preimage) }
     }))
     const historyPatches = await this.history.planUndo({
       undoneJournalIndex: latest.index,

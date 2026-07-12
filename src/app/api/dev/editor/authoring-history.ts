@@ -11,8 +11,10 @@ export type HistoryBlobRef = {
   path: string
 }
 
-export type AuthoringHistoryPreimageRef = HistoryBlobRef & {
+export type AuthoringHistoryPreimageRef = {
   file: string
+  sha256: string | null
+  path: string | null
 }
 
 export type AuthoringCommandHistoryRecord = {
@@ -54,7 +56,7 @@ export class AuthoringHistoryStore {
   async planCommand(input: {
     command: unknown
     sourceFiles: string[]
-    sourcePreimages: Array<{ file: string; bytes: Buffer | string }>
+    sourcePreimages: Array<{ file: string; bytes: Buffer | string | null }>
     graphPreimage: Buffer | string
     revision: number
   }): Promise<PlannedHistoryPatch[]> {
@@ -62,7 +64,9 @@ export class AuthoringHistoryStore {
     const graphPreimage = await this.planBlob(input.graphPreimage, patches)
     const preimages: AuthoringHistoryPreimageRef[] = []
     for (const preimage of input.sourcePreimages) {
-      preimages.push({ file: preimage.file, ...await this.planBlob(preimage.bytes, patches) })
+      preimages.push(preimage.bytes === null
+        ? { file: preimage.file, sha256: null, path: null }
+        : { file: preimage.file, ...await this.planBlob(preimage.bytes, patches) })
     }
     await this.planJournalAppend({
       type: 'authoring-command',
@@ -152,6 +156,14 @@ export class AuthoringHistoryStore {
       throw namedError('HISTORY_BLOB_HASH_MISMATCH', `blob hash mismatch for ${validated.sha256}`)
     }
     return bytes.toString('utf8')
+  }
+
+  async readPreimage(ref: AuthoringHistoryPreimageRef): Promise<string | null> {
+    if (ref.sha256 === null || ref.path === null) {
+      if (ref.sha256 !== null || ref.path !== null) invalidHistory('history preimage missing-file marker is invalid')
+      return null
+    }
+    return this.readBlob({ sha256: ref.sha256, path: ref.path })
   }
 
   async readJournal(): Promise<Array<{ index: number; record: AuthoringHistoryRecord }>> {
@@ -305,14 +317,17 @@ function assertCommandRecord(record: Record<string, unknown>, kind: RootKind, in
     const preimage = requireRecord(value, `history line ${index}.preimages.${preimageIndex}`)
     requireExactKeys(preimage, ['file', 'sha256', 'path'], `history line ${index}.preimages.${preimageIndex}`)
     if (!isStoreRelativePath(preimage.file)) invalidHistory(`history line ${index}.preimages.${preimageIndex}.file is invalid`)
-    return {
-      file: preimage.file,
-      ...assertHistoryBlobRef(
-        { sha256: preimage.sha256, path: preimage.path },
-        kind,
-        `history line ${index}.preimages.${preimageIndex}`,
-      ),
+    if (preimage.sha256 === null || preimage.path === null) {
+      if (preimage.sha256 !== null || preimage.path !== null) {
+        invalidHistory(`history line ${index}.preimages.${preimageIndex} missing-file marker is invalid`)
+      }
+      return { file: preimage.file, sha256: null, path: null }
     }
+    return { file: preimage.file, ...assertHistoryBlobRef(
+      { sha256: preimage.sha256, path: preimage.path },
+      kind,
+      `history line ${index}.preimages.${preimageIndex}`,
+    ) }
   })
   const patchFiles = sourcePatches.map((patch) => patch.file)
   const preimageFiles = preimages.map((preimage) => preimage.file)
