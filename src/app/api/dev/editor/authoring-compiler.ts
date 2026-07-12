@@ -24,6 +24,7 @@ export async function compileG2VariantCommand(input: {
   graph: AuthoringGraphV1
   command: G2VariantCommand
   source: string
+  projectRoot: string
   cssSources?: Record<string, string>
 }): Promise<CompilePlan> {
   const graph = assertAuthoringGraphV1(input.graph)
@@ -34,7 +35,7 @@ export async function compileG2VariantCommand(input: {
     throw namedError('COMPONENT_EXPORT_MISMATCH', `expected export ${component.source.exportName}, found ${beforeProjection.exportName}`, 422)
   }
   const beforeTypechecked = beforeProjection.nativeVariants.length > 0
-  if (beforeTypechecked) assertSemanticTypecheck(component.source.file, input.source)
+  if (beforeTypechecked) assertSemanticTypecheck(component.source.file, input.source, input.projectRoot, input.cssSources)
 
   if (input.command.kind === 'move-variant') {
     const variant = requireOwnedVariant(graph, component, input.command.variantId)
@@ -55,7 +56,7 @@ export async function compileG2VariantCommand(input: {
       afterProjection = await requireProjection(component.source.file, afterSource, input.cssSources)
       assertUntouchedProjection(beforeProjection, afterProjection)
       assertRegistry(afterProjection, registry)
-      assertSemanticTypecheck(component.source.file, afterSource)
+      assertSemanticTypecheck(component.source.file, afterSource, input.projectRoot, input.cssSources)
       sourcePatches = [{ file: component.source.file, before: input.source, after: afterSource }]
     } else {
       assertNativeRegistryMatchesGraph(graph, component, beforeProjection)
@@ -74,7 +75,7 @@ export async function compileG2VariantCommand(input: {
   const afterProjection = await requireProjection(component.source.file, afterSource, input.cssSources)
   assertUntouchedProjection(beforeProjection, afterProjection)
   assertRegistry(afterProjection, registry)
-  assertSemanticTypecheck(component.source.file, afterSource)
+  assertSemanticTypecheck(component.source.file, afterSource, input.projectRoot, input.cssSources)
 
   const next = cloneGraph(graph)
   next.components[component.id] = { ...component, compatibility: 'native-v1' }
@@ -187,9 +188,9 @@ function assertUntouchedProjection(before: SourceProjection, after: SourceProjec
   }
 }
 
-function assertSemanticTypecheck(file: string, source: string): void {
-  const fileName = path.resolve(file)
-  const ambientName = path.resolve('__onemo-native-variants.d.ts')
+function assertSemanticTypecheck(file: string, source: string, projectRoot: string, dependencies: Record<string, string> = {}): void {
+  const fileName = path.resolve(projectRoot, file)
+  const ambientName = path.resolve(projectRoot, '__onemo-native-variants.d.ts')
   const configPath = ts.findConfigFile(path.dirname(fileName), ts.sys.fileExists, 'tsconfig.json')
   if (!configPath) throw namedError('STAGED_TSCONFIG_MISSING', `tsconfig.json not found for ${file}`, 422)
   const config = ts.readConfigFile(configPath, ts.sys.readFile)
@@ -203,8 +204,12 @@ function assertSemanticTypecheck(file: string, source: string): void {
   const readFile = host.readFile.bind(host)
   const fileExists = host.fileExists.bind(host)
   const ambient = `declare module '*.module.css' { const classes: Record<string, string>; export default classes }\n`
-  host.fileExists = (candidate) => candidate === fileName || candidate === ambientName || fileExists(candidate)
-  host.readFile = (candidate) => candidate === fileName ? source : candidate === ambientName ? ambient : readFile(candidate)
+  const exactSources = new Map<string, string>([
+    [fileName, source],
+    ...Object.entries(dependencies).map(([relative, bytes]) => [path.resolve(projectRoot, relative), bytes] as const),
+  ])
+  host.fileExists = (candidate) => exactSources.has(candidate) || candidate === ambientName || fileExists(candidate)
+  host.readFile = (candidate) => exactSources.get(candidate) ?? (candidate === ambientName ? ambient : readFile(candidate))
   host.getSourceFile = (candidate, languageVersion) => {
     const text = host.readFile(candidate)
     return text === undefined ? undefined : ts.createSourceFile(candidate, text, languageVersion, true, candidate.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)

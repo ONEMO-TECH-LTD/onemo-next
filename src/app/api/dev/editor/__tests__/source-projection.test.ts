@@ -221,4 +221,29 @@ export function Button<T>({ variant }: Props<T>) { return <button /> }`,
       unsupportedReason: 'component props generic arguments are unresolved: Props<T>',
     })
   })
+
+  it('projects a concise-arrow JSX root instead of certifying an incomplete structure', async () => {
+    const projection = await sourceProjectionFromSource({
+      file: 'Button.tsx',
+      source: `export const Button = () => <button><span /></button>`,
+    })
+    expect(projection).toMatchObject({
+      compatibility: 'native-v1',
+      structure: { tag: 'button', children: [{ tag: 'span' }] },
+    })
+    expect(projection.anchors).toHaveLength(2)
+  })
+
+  it('classifies axes only from a top-level string-literal union AST', async () => {
+    const array = await sourceProjectionFromSource({
+      file: 'ArrayProps.tsx',
+      source: `export function ArrayProps({ values }: { values?: ReadonlyArray<'Primary' | 'Secondary'> }) { return <div /> }`,
+    })
+    const objects = await sourceProjectionFromSource({
+      file: 'ObjectProps.tsx',
+      source: `export function ObjectProps({ config }: { config?: { kind: 'Primary' } | { kind: 'Secondary' } }) { return <div /> }`,
+    })
+    expect(array).toMatchObject({ compatibility: 'native-v1', variantAxes: [] })
+    expect(objects).toMatchObject({ compatibility: 'native-v1', variantAxes: [] })
+  })
 })
