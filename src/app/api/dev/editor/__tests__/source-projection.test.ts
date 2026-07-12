@@ -179,4 +179,46 @@ export function ActualButton({ variant = 'Primary' }: ActualProps) { return <but
       structure: { tag: 'button' },
     })
   })
+
+  it('does not cross nested executable boundaries when projecting the component root', async () => {
+    const projection = await sourceProjectionFromSource({
+      file: 'Outer.tsx',
+      source: `export function Outer() {
+  const helper = { render() { return <span><b /></span> } }
+  function Inner() { return <i /> }
+  return <section><button /></section>
+}`,
+    })
+
+    expect(projection).toMatchObject({
+      exportName: 'Outer',
+      structure: { tag: 'section', children: [{ tag: 'button' }] },
+    })
+    expect(JSON.stringify(projection.structure)).not.toMatch(/span|\"b\"|\"i\"/)
+  })
+
+  it('substitutes local generic Props arguments and refuses unresolved component type parameters', async () => {
+    const resolved = await sourceProjectionFromSource({
+      file: 'Button.tsx',
+      source: `type Props<T> = { variant?: T }
+export function Button({ variant = 'Primary' }: Props<'Primary' | 'Secondary'>) {
+  return <button>{variant}</button>
+}`,
+    })
+    expect(resolved).toMatchObject({
+      compatibility: 'legacy-single-axis',
+      props: [{ name: 'variant', tsType: "'Primary' | 'Secondary'" }],
+      variantAxes: [{ axis: 'variant', values: ['Primary', 'Secondary'], defaultValue: 'Primary' }],
+    })
+
+    const unresolved = await sourceProjectionFromSource({
+      file: 'Button.tsx',
+      source: `type Props<T> = { variant?: T }
+export function Button<T>({ variant }: Props<T>) { return <button /> }`,
+    })
+    expect(unresolved).toMatchObject({
+      compatibility: 'unsupported',
+      unsupportedReason: 'component props generic arguments are unresolved: Props<T>',
+    })
+  })
 })

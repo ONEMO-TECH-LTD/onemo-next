@@ -271,6 +271,27 @@ export function Button({ value }: Props<number>) { return <button>{value}</butto
     })).rejects.toMatchObject({ code: 'STAGED_TYPECHECK_FAILED', message: expect.stringContaining('TS2322') })
   })
 
+  it('uses the project tsconfig when resolving path aliases in staged source', async () => {
+    const source = `import type { EntityId } from '@/app/api/dev/editor/authoring-types'
+export function Button({ id }: { id?: EntityId }) { return <button>{id}</button> }
+`
+    const projection = await sourceProjectionFromSource({ file: FILE, source })
+    const imported = importProjectionToAuthoringGraph({
+      storeId: 'project-main', projection, sourceHashes: { [FILE]: sha256(source) },
+    })
+    if (imported.kind !== 'imported') throw new Error(`expected imported graph, received ${imported.kind}`)
+    const component = Object.values(imported.graph.components)[0]!
+    const registrySource = `${source}\nexport const __onemoVariantRegistry = { "${component.primaryVariantId}": { id: "component_test" } } as const satisfies Record<string, Partial<React.ComponentProps<typeof Button>>>\n`
+
+    await expect(compileG2VariantCommand({
+      graph: { ...imported.graph, components: { ...imported.graph.components, [component.id]: { ...component, compatibility: 'native-v1' } } },
+      source: registrySource,
+      command: { kind: 'move-variant', commandId: 'alias-valid', componentId: component.id, variantId: component.primaryVariantId, frame: { x: 1, y: 2, width: 3, height: 4 } },
+    })).resolves.toMatchObject({
+      verifiedAssertions: expect.arrayContaining([{ kind: 'staged-typescript-semantics', status: 'passed' }]),
+    })
+  })
+
   it('refuses sidecar-only move when native registry IDs are stale', async () => {
     const graph = await importedGraph()
     const component = Object.values(graph.components)[0]!

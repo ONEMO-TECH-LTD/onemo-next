@@ -584,8 +584,11 @@ async function writeScopedDeclaration(op: Extract<WriteOp, { kind: 'write-scoped
 /** The root JSX element a component's function returns (unwrapping parens). */
 function findRootReturnedElement(fn: ts.FunctionLikeDeclaration, sf: ts.SourceFile): ts.JsxElement | ts.JsxSelfClosingElement | null {
   let found: ts.JsxElement | ts.JsxSelfClosingElement | null = null
+  const root = fn.body
+  if (!root) return null
   const visit = (n: ts.Node) => {
     if (found) return
+    if (n !== root && (ts.isFunctionLike(n) || ts.isClassDeclaration(n) || ts.isClassExpression(n))) return
     if (ts.isReturnStatement(n) && n.expression) {
       let e: ts.Node = n.expression
       while (ts.isParenthesizedExpression(e)) e = e.expression
@@ -593,7 +596,7 @@ function findRootReturnedElement(fn: ts.FunctionLikeDeclaration, sf: ts.SourceFi
     }
     ts.forEachChild(n, visit)
   }
-  visit(fn)
+  visit(root)
   return found
 }
 
@@ -1561,9 +1564,9 @@ async function parseComponentModelSnapshot(input: {
   const param = fn?.parameters[0]
   if (param && ts.isObjectBindingPattern(param.name)) {
     const typeMembers = new Map<string, { type: string; optional: boolean }>()
-    const members = componentPropMembers(sf, param.type)
-    for (const m of members) {
-      if (ts.isPropertySignature(m) && m.name) typeMembers.set(m.name.getText(sf), { type: m.type?.getText(sf) ?? 'unknown', optional: !!m.questionToken })
+    const members = componentPropMembers(sf, param.type, fn?.typeParameters)
+    for (const { member, typeText } of members) {
+      if (member.name) typeMembers.set(member.name.getText(sf), { type: typeText, optional: !!member.questionToken })
     }
     for (const e of param.name.elements) {
       if (!ts.isIdentifier(e.name)) continue
@@ -1662,17 +1665,79 @@ function findExportedComponents(sf: ts.SourceFile): Array<{
   return found
 }
 
-function componentPropMembers(sf: ts.SourceFile, type: ts.TypeNode | undefined): ts.NodeArray<ts.TypeElement> | readonly ts.TypeElement[] {
+function componentPropMembers(
+  sf: ts.SourceFile,
+  type: ts.TypeNode | undefined,
+  componentTypeParameters: readonly ts.TypeParameterDeclaration[] | undefined,
+): Array<{ member: ts.PropertySignature; typeText: string }> {
   if (!type) return []
-  if (ts.isTypeLiteralNode(type)) return type.members
+  if (ts.isTypeLiteralNode(type)) {
+    return type.members.filter(ts.isPropertySignature).map((member) => ({
+      member,
+      typeText: member.type?.getText(sf) ?? 'unknown',
+    }))
+  }
   if (!ts.isTypeReferenceNode(type) || !ts.isIdentifier(type.typeName)) {
     throw projectionError('COMPONENT_PROPS_UNRESOLVED', `component props type is not statically resolvable: ${type.getText(sf)}`)
   }
+  let declaration: ts.InterfaceDeclaration | ts.TypeAliasDeclaration | undefined
   for (const statement of sf.statements) {
-    if (ts.isInterfaceDeclaration(statement) && statement.name.text === type.typeName.text) return statement.members
-    if (ts.isTypeAliasDeclaration(statement) && statement.name.text === type.typeName.text && ts.isTypeLiteralNode(statement.type)) return statement.type.members
+    if (ts.isInterfaceDeclaration(statement) && statement.name.text === type.typeName.text) declaration = statement
+    if (ts.isTypeAliasDeclaration(statement) && statement.name.text === type.typeName.text && ts.isTypeLiteralNode(statement.type)) declaration = statement
   }
-  throw projectionError('COMPONENT_PROPS_UNRESOLVED', `component props type is not locally resolvable: ${type.typeName.text}`)
+  if (!declaration) {
+    throw projectionError('COMPONENT_PROPS_UNRESOLVED', `component props type is not locally resolvable: ${type.typeName.text}`)
+  }
+  if (ts.isInterfaceDeclaration(declaration) && declaration.heritageClauses?.length) {
+    throw projectionError('COMPONENT_PROPS_UNRESOLVED', `component props interface inheritance is not statically resolvable: ${type.typeName.text}`)
+  }
+  const parameters = declaration.typeParameters ?? []
+  const arguments_ = type.typeArguments ?? []
+  if (parameters.length !== arguments_.length) {
+    throw projectionError('COMPONENT_PROPS_UNRESOLVED', `component props generic arguments are unresolved: ${type.getText(sf)}`)
+  }
+  const outerParameters = new Set((componentTypeParameters ?? []).map((parameter) => parameter.name.text))
+  if (arguments_.some((argument) => containsTypeParameterReference(argument, outerParameters))) {
+    throw projectionError('COMPONENT_PROPS_UNRESOLVED', `component props generic arguments are unresolved: ${type.getText(sf)}`)
+  }
+  const substitutions = new Map(parameters.map((parameter, index) => [parameter.name.text, arguments_[index]!]))
+  let members: readonly ts.TypeElement[]
+  if (ts.isInterfaceDeclaration(declaration)) members = declaration.members
+  else if (ts.isTypeLiteralNode(declaration.type)) members = declaration.type.members
+  else throw projectionError('COMPONENT_PROPS_UNRESOLVED', `component props type is not a static object: ${type.typeName.text}`)
+  const properties = [...members].filter((member): member is ts.PropertySignature => ts.isPropertySignature(member))
+  return properties.map((member) => ({
+    member,
+    typeText: member.type ? printSubstitutedType(sf, member.type, substitutions) : 'unknown',
+  }))
+}
+
+function containsTypeParameterReference(type: ts.TypeNode, names: Set<string>): boolean {
+  let found = false
+  const visit = (node: ts.Node) => {
+    if (ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName) && names.has(node.typeName.text)) found = true
+    if (!found) ts.forEachChild(node, visit)
+  }
+  visit(type)
+  return found
+}
+
+function printSubstitutedType(sf: ts.SourceFile, type: ts.TypeNode, substitutions: Map<string, ts.TypeNode>): string {
+  const transformed = ts.transform(type, [(context) => {
+    const visit: ts.Visitor = (node) => {
+      if (ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName) && !node.typeArguments) {
+        const replacement = substitutions.get(node.typeName.text)
+        if (replacement) return replacement
+      }
+      return ts.visitEachChild(node, visit, context)
+    }
+    return (node) => ts.visitNode(node, visit) as ts.TypeNode
+  }])
+  try {
+    return ts.createPrinter().printNode(ts.EmitHint.Unspecified, transformed.transformed[0]!, sf)
+  } finally {
+    transformed.dispose()
+  }
 }
 
 function parseNativeVariantRegistry(sf: ts.SourceFile): ComponentModel['nativeVariants'] {

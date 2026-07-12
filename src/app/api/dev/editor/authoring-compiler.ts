@@ -190,16 +190,15 @@ function assertUntouchedProjection(before: SourceProjection, after: SourceProjec
 function assertSemanticTypecheck(file: string, source: string): void {
   const fileName = path.resolve(file)
   const ambientName = path.resolve('__onemo-native-variants.d.ts')
-  const options: ts.CompilerOptions = {
-    strict: true,
-    noEmit: true,
-    skipLibCheck: true,
-    target: ts.ScriptTarget.ESNext,
-    module: ts.ModuleKind.ESNext,
-    moduleResolution: ts.ModuleResolutionKind.Bundler,
-    jsx: ts.JsxEmit.ReactJSX,
-    esModuleInterop: true,
+  const configPath = ts.findConfigFile(path.dirname(fileName), ts.sys.fileExists, 'tsconfig.json')
+  if (!configPath) throw namedError('STAGED_TSCONFIG_MISSING', `tsconfig.json not found for ${file}`, 422)
+  const config = ts.readConfigFile(configPath, ts.sys.readFile)
+  if (config.error) throw namedError('STAGED_TSCONFIG_INVALID', formatDiagnostic(config.error), 422)
+  const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, path.dirname(configPath), { noEmit: true }, configPath)
+  if (parsed.errors.length > 0) {
+    throw namedError('STAGED_TSCONFIG_INVALID', parsed.errors.map(formatDiagnostic).join('; '), 422)
   }
+  const options = parsed.options
   const host = ts.createCompilerHost(options, true)
   const readFile = host.readFile.bind(host)
   const fileExists = host.fileExists.bind(host)
@@ -213,9 +212,13 @@ function assertSemanticTypecheck(file: string, source: string): void {
   const program = ts.createProgram({ rootNames: [fileName, ambientName], options, host })
   const diagnostics = ts.getPreEmitDiagnostics(program).filter((diagnostic) => diagnostic.file?.fileName === fileName)
   if (diagnostics.length > 0) {
-    const detail = diagnostics.map((diagnostic) => `TS${diagnostic.code}: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, ' ')}`).join('; ')
+    const detail = diagnostics.map(formatDiagnostic).join('; ')
     throw namedError('STAGED_TYPECHECK_FAILED', detail, 422)
   }
+}
+
+function formatDiagnostic(diagnostic: ts.Diagnostic): string {
+  return `TS${diagnostic.code}: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, ' ')}`
 }
 
 function writeRegistry(
