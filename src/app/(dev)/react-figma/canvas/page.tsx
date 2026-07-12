@@ -5,11 +5,12 @@
  * Figma 4084:25997, every dimension bound to live v2.3 tokens).
  */
 import { Editor402 } from '../../../../../storybook/prototypes/create-studio/Editor402'
+import { PersistentCanvasHost } from '../component-authoring/PersistentCanvasHost'
 
 export default function CanvasHost() {
   return (
-    <div style={{ width: 402, height: 871, overflow: 'hidden' }}>
-      <Editor402 />
-    </div>
+    <PersistentCanvasHost>
+      <div style={{ width: 402, height: 871, overflow: 'hidden' }}><Editor402 /></div>
+    </PersistentCanvasHost>
   )
 }

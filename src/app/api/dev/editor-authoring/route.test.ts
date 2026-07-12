@@ -152,6 +152,19 @@ describe('editor-authoring G1 import route', () => {
     }), root)
     expect(move.status).toBe(200)
     await expect(move.json()).resolves.toMatchObject({ graph: { revision: 4, variants: { [variant.id]: { id: variant.id, displayName: 'Renamed', frame: { x: 80, y: 40 } } } } })
+
+    loaded = await (await handleGet(componentRequest(), root)).json()
+    expect(loaded.canUndo).toBe(true)
+    const undo = await handlePost(request('POST', {
+      kind: 'undo',
+      expectedRevision: loaded.graph.revision,
+      expectedSourceHashes: loaded.sourceHashes,
+    }), root)
+    expect(undo.status).toBe(200)
+    await expect(undo.json()).resolves.toMatchObject({
+      graph: { revision: 5, variants: { [variant.id]: { frame: { x: 344, y: 0 } } } },
+      undoneCommand: { kind: 'move-variant', commandId: 'route-move' },
+    })
   }, 10_000)
 
   it('rejects malformed G2 command keys and geometry before filesystem access', async () => {

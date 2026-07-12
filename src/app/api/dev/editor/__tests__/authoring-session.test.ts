@@ -65,4 +65,29 @@ describe('ProjectAuthoringSession', () => {
     await expect(fs.readFile(path.join(root, FILE))).resolves.toEqual(sourceBefore)
     await expect(fs.readdir(transactions)).resolves.toEqual(transactionEntriesBefore)
   })
+
+  it('undoes the latest command through the same source, graph, and history transaction', async () => {
+    const { root, registry, store, graph } = await setup()
+    const component = Object.values(graph.components)[0]!
+    const session = new ProjectAuthoringSession({ storeId: 'project-main', registry, store })
+    const created = await session.execute({
+      command: { kind: 'create-variant', commandId: 'session-create-undo', componentId: component.id, displayName: 'Temporary' },
+      expectedRevision: graph.revision,
+      expectedSourceHashes: graph.sourceHashes,
+    })
+    const loaded = await session.loadComponent(FILE)
+
+    const undone = await session.undo({
+      expectedRevision: created.graph.revision,
+      expectedSourceHashes: loaded.sourceHashes,
+    })
+
+    expect(undone.graph.revision).toBe(3)
+    expect(Object.values(undone.graph.variants).map((variant) => variant.displayName)).not.toContain('Temporary')
+    expect(await fs.readFile(path.join(root, FILE), 'utf8')).toBe(SOURCE)
+    expect((await session.loadComponent(FILE)).canUndo).toBe(false)
+    const journal = await fs.readFile(path.join(root, 'src/app/(dev)/react-figma-components/.onemo/history/journal.ndjson'), 'utf8')
+    expect(journal).toContain('session-create-undo')
+    expect(journal).toContain('authoring-undo')
+  })
 })
