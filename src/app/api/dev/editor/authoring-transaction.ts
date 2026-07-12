@@ -130,14 +130,23 @@ export class SingleRootAuthoringTransaction {
     }
     const sourcePatches = update.sourcePatches ?? []
     const metadataPatches = update.metadataPatches ?? []
+    const expectedSourceHashes = update.expectedSourceHashes ?? {}
     this.validatePatchPaths(sourcePatches, metadataPatches)
     const sourceFiles = unique([
-      ...(update.sourceFiles ?? Object.keys(update.expectedSourceHashes ?? before.sourceHashes)),
+      ...(update.sourceFiles ?? Object.keys(expectedSourceHashes)),
       ...sourcePatches.map((patch) => patch.file),
-      ...Object.keys(update.expectedSourceHashes ?? {}),
+      ...Object.keys(expectedSourceHashes),
     ])
+    const missingHashPreconditions = sourceFiles.filter((file) => !isSha256(expectedSourceHashes[file]))
+    if (missingHashPreconditions.length > 0) {
+      throw Object.assign(new Error(`source hash precondition required: ${missingHashPreconditions.join(', ')}`), {
+        status: 422,
+        code: 'SOURCE_HASH_PRECONDITION_REQUIRED',
+        changedPaths: missingHashPreconditions,
+      })
+    }
     const currentSources = await this.readSourceFiles(sourceFiles)
-    this.verifyExpectedHashes(update.expectedSourceHashes, currentSources)
+    this.verifyExpectedHashes(expectedSourceHashes, currentSources)
     this.verifyPatchPreimages(sourcePatches, currentSources)
     const currentMetadata = await this.readOptionalFiles(metadataPatches.map((patch) => patch.file))
     this.verifyMetadataPreimages(metadataPatches, currentMetadata)
@@ -361,8 +370,7 @@ export class SingleRootAuthoringTransaction {
     return snapshots
   }
 
-  private verifyExpectedHashes(expected: Record<string, string> | undefined, current: Map<string, Buffer>): void {
-    if (!expected) return
+  private verifyExpectedHashes(expected: Record<string, string>, current: Map<string, Buffer>): void {
     const changedPaths = Object.entries(expected)
       .filter(([file, hash]) => sha256(current.get(file)!) !== hash)
       .map(([file]) => file)

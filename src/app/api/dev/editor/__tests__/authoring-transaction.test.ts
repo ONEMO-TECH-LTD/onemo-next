@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest'
 import { authoringStoreLockPath, CrossProcessAuthoringStoreLock } from '../authoring-lock'
 import { AuthoringSidecarStore } from '../authoring-store'
 import { SingleRootAuthoringTransaction, discoverSingleRootRecoveryDecisions, executeSingleRootRecovery, type AuthoringTransactionHooks } from '../authoring-transaction'
-import { DurableFileInstaller } from '../durable-file-installer'
+import { DurableFileInstaller, sha256 } from '../durable-file-installer'
 import { RuntimeRootRegistry } from '../runtime-root-registry'
 
 type ParticipantGraphFixture = {
@@ -138,6 +138,7 @@ describe('SingleRootAuthoringTransaction', () => {
     const first = await tx.commit({
       expectedRevision: 0,
       sourceFiles: [sourceFile],
+      expectedSourceHashes: await store.computeSourceHashes([sourceFile]),
       mutate: (draft) => draft,
     })
     await fs.writeFile(path.join(root, sourceFile), 'export function Button() { return <button>Changed</button> }\n')
@@ -149,6 +150,7 @@ describe('SingleRootAuthoringTransaction', () => {
     }).commit({
       expectedRevision: 1,
       sourceFiles: [sourceFile],
+      expectedSourceHashes: await store.computeSourceHashes([sourceFile]),
       mutate: (draft) => draft,
     })
 
@@ -180,6 +182,23 @@ describe('SingleRootAuthoringTransaction', () => {
     await expect(fs.readFile(
       path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions/tx-1/participant.json'),
       'utf8',
+    )).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('requires an expected hash for every listed source before preparing', async () => {
+    const { root, sourceFile, tx } = await makeTransaction()
+
+    await expect(tx.commit({
+      expectedRevision: 0,
+      sourceFiles: [sourceFile],
+      mutate: (draft) => draft,
+    })).rejects.toMatchObject({
+      code: 'SOURCE_HASH_PRECONDITION_REQUIRED',
+      status: 422,
+      changedPaths: [sourceFile],
+    })
+    await expect(fs.readFile(
+      path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions/tx-1/participant.json'),
     )).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
@@ -228,6 +247,7 @@ describe('SingleRootAuthoringTransaction', () => {
     await expect(txFixture.tx.commit({
       expectedRevision: 0,
       sourceFiles: [sourceFile],
+      expectedSourceHashes: { [sourceFile]: sha256(before) },
       sourcePatches: [{ file: sourceFile, before, after: 'after\n' }],
       metadataPatches: [{
         file: 'src/app/(dev)/react-figma-components/.onemo/history/journal.ndjson',
@@ -323,6 +343,7 @@ describe('SingleRootAuthoringTransaction', () => {
     await tx.commit({
       expectedRevision: 0,
       sourceFiles: ['Button.tsx'],
+      expectedSourceHashes: { 'Button.tsx': sha256('before\n') },
       sourcePatches: [{ file: 'Button.tsx', before: 'before\n', after: 'after\n' }],
       mutate: (draft) => draft,
     })
@@ -366,6 +387,7 @@ describe('SingleRootAuthoringTransaction', () => {
     await tx.commit({
       expectedRevision: 0,
       sourceFiles: [sourceFile],
+      expectedSourceHashes: { [sourceFile]: sha256(before) },
       sourcePatches: [{ file: sourceFile, before, after: 'first committed bytes\n' }],
       mutate: (draft) => draft,
     })
@@ -385,6 +407,7 @@ describe('SingleRootAuthoringTransaction', () => {
     await expect(next.commit({
       expectedRevision: 1,
       sourceFiles: [sourceFile],
+      expectedSourceHashes: { [sourceFile]: sha256('first committed bytes\n') },
       sourcePatches: [{ file: sourceFile, before: 'first committed bytes\n', after: 'must not install\n' }],
       mutate: (draft) => draft,
     })).rejects.toMatchObject({ code: 'RECOVERY_REQUIRED', status: 409, transactionIds: ['tx-1'] })
@@ -433,6 +456,7 @@ describe('SingleRootAuthoringTransaction', () => {
     await tx.commit({
       expectedRevision: 0,
       sourceFiles: [sourceFile],
+      expectedSourceHashes: { [sourceFile]: sha256(before) },
       sourcePatches: [{ file: sourceFile, before, after: 'after bytes requiring rollback\n' }],
       metadataPatches: [{ file: historyFile, before: beforeHistory, after: `${beforeHistory}{"after":true}\n` }],
       mutate: (draft) => draft,
@@ -479,6 +503,7 @@ describe('SingleRootAuthoringTransaction', () => {
     await tx.commit({
       expectedRevision: 0,
       sourceFiles: [sourceFile],
+      expectedSourceHashes: { [sourceFile]: sha256(before) },
       sourcePatches: [{ file: sourceFile, before, after: 'after one\n' }],
       mutate: (draft) => draft,
     })
@@ -490,6 +515,7 @@ describe('SingleRootAuthoringTransaction', () => {
     }).commit({
       expectedRevision: 1,
       sourceFiles: [sourceFile],
+      expectedSourceHashes: { [sourceFile]: sha256('after one\n') },
       sourcePatches: [{ file: sourceFile, before: 'after one\n', after: 'after two\n' }],
       mutate: (draft) => draft,
     })
@@ -566,6 +592,7 @@ describe('SingleRootAuthoringTransaction', () => {
     await tx.commit({
       expectedRevision: 0,
       sourceFiles: [sourceFile],
+      expectedSourceHashes: { [sourceFile]: sha256(before) },
       sourcePatches: [{ file: sourceFile, before, after: 'after\n' }],
       mutate: (draft) => draft,
     })
@@ -599,6 +626,7 @@ describe('SingleRootAuthoringTransaction', () => {
     await tx.commit({
       expectedRevision: 0,
       sourceFiles: [sourceFile],
+      expectedSourceHashes: { [sourceFile]: sha256(before) },
       sourcePatches: [{ file: sourceFile, before, after: 'after\n' }],
       mutate: (draft) => draft,
     })
@@ -656,6 +684,7 @@ describe('SingleRootAuthoringTransaction', () => {
     await tx.commit({
       expectedRevision: 0,
       sourceFiles: [sourceFile],
+      expectedSourceHashes: { [sourceFile]: sha256(before) },
       sourcePatches: [{ file: sourceFile, before, after: 'after\n' }],
       mutate: (draft) => draft,
     })
@@ -674,6 +703,7 @@ describe('SingleRootAuthoringTransaction', () => {
     await tx.commit({
       expectedRevision: 0,
       sourceFiles: [sourceFile],
+      expectedSourceHashes: { [sourceFile]: sha256(before) },
       sourcePatches: [{ file: sourceFile, before, after: 'after\n' }],
       mutate: (draft) => draft,
     })

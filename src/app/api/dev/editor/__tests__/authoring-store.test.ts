@@ -28,9 +28,14 @@ async function makeStore() {
 
 describe('AuthoringSidecarStore', () => {
   it('commits a project-root sidecar with revision and exact source hashes', async () => {
-    const { root, tx } = await makeStore()
+    const { root, store, tx } = await makeStore()
 
-    const graph = await tx.commit({ expectedRevision: 0, sourceFiles: [SOURCE_FILE], mutate: (draft) => draft })
+    const graph = await tx.commit({
+      expectedRevision: 0,
+      sourceFiles: [SOURCE_FILE],
+      expectedSourceHashes: await store.computeSourceHashes([SOURCE_FILE]),
+      mutate: (draft) => draft,
+    })
 
     expect(graph.revision).toBe(1)
     expect(graph.sourceHashes[SOURCE_FILE]).toMatch(/^[a-f0-9]{64}$/)
@@ -49,8 +54,18 @@ describe('AuthoringSidecarStore', () => {
     const relocated = await makeStore()
     expect(first.root).not.toBe(relocated.root)
 
-    await first.tx.commit({ expectedRevision: 0, sourceFiles: [SOURCE_FILE], mutate: (draft) => draft })
-    await relocated.tx.commit({ expectedRevision: 0, sourceFiles: [SOURCE_FILE], mutate: (draft) => draft })
+    await first.tx.commit({
+      expectedRevision: 0,
+      sourceFiles: [SOURCE_FILE],
+      expectedSourceHashes: await first.store.computeSourceHashes([SOURCE_FILE]),
+      mutate: (draft) => draft,
+    })
+    await relocated.tx.commit({
+      expectedRevision: 0,
+      sourceFiles: [SOURCE_FILE],
+      expectedSourceHashes: await relocated.store.computeSourceHashes([SOURCE_FILE]),
+      mutate: (draft) => draft,
+    })
 
     const firstBytes = await fs.readFile(path.join(first.root, PROJECT_AUTHORING_SIDECAR))
     const relocatedBytes = await fs.readFile(path.join(relocated.root, PROJECT_AUTHORING_SIDECAR))
@@ -60,16 +75,22 @@ describe('AuthoringSidecarStore', () => {
   })
 
   it('rejects stale revisions instead of overwriting sidecar state', async () => {
-    const { tx } = await makeStore()
-    await tx.commit({ expectedRevision: 0, sourceFiles: [SOURCE_FILE], mutate: (draft) => draft })
+    const { store, tx } = await makeStore()
+    const expectedSourceHashes = await store.computeSourceHashes([SOURCE_FILE])
+    await tx.commit({ expectedRevision: 0, sourceFiles: [SOURCE_FILE], expectedSourceHashes, mutate: (draft) => draft })
 
-    await expect(tx.commit({ expectedRevision: 0, sourceFiles: [SOURCE_FILE], mutate: (draft) => draft }))
+    await expect(tx.commit({ expectedRevision: 0, sourceFiles: [SOURCE_FILE], expectedSourceHashes, mutate: (draft) => draft }))
       .rejects.toMatchObject({ code: 'AUTHORING_REVISION_STALE', status: 409 })
   })
 
   it('updates hashes from exact source bytes on the next revision', async () => {
     const { root, registry, store, tx } = await makeStore()
-    const first = await tx.commit({ expectedRevision: 0, sourceFiles: [SOURCE_FILE], mutate: (draft) => draft })
+    const first = await tx.commit({
+      expectedRevision: 0,
+      sourceFiles: [SOURCE_FILE],
+      expectedSourceHashes: await store.computeSourceHashes([SOURCE_FILE]),
+      mutate: (draft) => draft,
+    })
     await fs.writeFile(path.join(root, SOURCE_FILE), 'export function Button() { return <button>Changed</button> }\n')
 
     const second = await new SingleRootAuthoringTransaction({
@@ -77,7 +98,12 @@ describe('AuthoringSidecarStore', () => {
       storeId: 'project-main',
       registry,
       store,
-    }).commit({ expectedRevision: 1, sourceFiles: [SOURCE_FILE], mutate: (draft) => draft })
+    }).commit({
+      expectedRevision: 1,
+      sourceFiles: [SOURCE_FILE],
+      expectedSourceHashes: await store.computeSourceHashes([SOURCE_FILE]),
+      mutate: (draft) => draft,
+    })
 
     expect(second.revision).toBe(2)
     expect(second.sourceHashes[SOURCE_FILE]).not.toBe(first.sourceHashes[SOURCE_FILE])
@@ -90,6 +116,7 @@ describe('AuthoringSidecarStore', () => {
     const first = await tx.commit({
       expectedRevision: 0,
       sourceFiles: [SOURCE_FILE, otherFile],
+      expectedSourceHashes: await store.computeSourceHashes([SOURCE_FILE, otherFile]),
       mutate: (draft) => draft,
     })
     await fs.writeFile(path.join(root, SOURCE_FILE), 'export function Button() { return <button>Changed</button> }\n')
@@ -99,7 +126,12 @@ describe('AuthoringSidecarStore', () => {
       storeId: 'project-main',
       registry,
       store,
-    }).commit({ expectedRevision: 1, sourceFiles: [SOURCE_FILE], mutate: (draft) => draft })
+    }).commit({
+      expectedRevision: 1,
+      sourceFiles: [SOURCE_FILE],
+      expectedSourceHashes: await store.computeSourceHashes([SOURCE_FILE]),
+      mutate: (draft) => draft,
+    })
 
     expect(second.sourceHashes[SOURCE_FILE]).not.toBe(first.sourceHashes[SOURCE_FILE])
     expect(second.sourceHashes[otherFile]).toBe(first.sourceHashes[otherFile])
@@ -107,7 +139,12 @@ describe('AuthoringSidecarStore', () => {
 
   it('enforces expected per-file source hashes before accepting a commit', async () => {
     const { root, registry, store, tx } = await makeStore()
-    const first = await tx.commit({ expectedRevision: 0, sourceFiles: [SOURCE_FILE], mutate: (draft) => draft })
+    const first = await tx.commit({
+      expectedRevision: 0,
+      sourceFiles: [SOURCE_FILE],
+      expectedSourceHashes: await store.computeSourceHashes([SOURCE_FILE]),
+      mutate: (draft) => draft,
+    })
     await fs.writeFile(path.join(root, SOURCE_FILE), 'export function Button() { return <button>Hand edit</button> }\n')
 
     await expect(new SingleRootAuthoringTransaction({

@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs'
 
 import { AuthoringSidecarStore } from '../../authoring-store'
 import { SingleRootAuthoringTransaction } from '../../authoring-transaction'
+import { sha256 } from '../../durable-file-installer'
 import { RuntimeRootRegistry } from '../../runtime-root-registry'
 
 const [root, sourceFile] = process.argv.slice(2)
@@ -28,6 +29,7 @@ const transaction = new SingleRootAuthoringTransaction({
 await transaction.commit({
   expectedRevision: 0,
   sourceFiles: [sourceFile],
+  expectedSourceHashes: { [sourceFile]: sha256(before) },
   sourcePatches: [{ file: sourceFile, before, after: 'after bytes from killed child\n' }],
   command: { kind: 'crash-fixture' },
   mutate: (draft) => draft,
