@@ -1433,10 +1433,6 @@ function FontPickerField({ value, onPick }: { value: string; onPick: (stack: str
 type ToastKind = 'ok' | 'error'
 let _toastSeq = 0
 
-// Form-associated roots — the only tags CSS `:disabled` matches. `disabled` on any other root (a <div>
-// component) is a SEMANTIC state (boolean prop + `[data-disabled]`, §6.2), mirrored server-side in lib.ts.
-// Module-scoped so it's a stable reference (not a hook dependency).
-const FORM_ROOTS = new Set(['button', 'input', 'select', 'textarea', 'fieldset', 'option', 'optgroup'])
 function notify(message: string, kind: ToastKind = 'ok') {
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('rf-toast', { detail: { id: ++_toastSeq, message, kind } }))
 }
@@ -2335,103 +2331,6 @@ export default function ReactFigmaPage() {
   }, [])
   const noteAuthoringChanged = useCallback(() => setCompNonce((value) => value + 1), [])
   const canvasMode: 'design' | 'components' = rail === 'components' && editingComponent ? 'components' : 'design'
-  // I1 (blueprint §4 editTarget + §6.2 two-kind states): while editing a component, which RULE the
-  // inspector's edits target — base / a config variant / an interaction pseudo-state / a semantic
-  // prop-state. Non-base targets route applyOverride → write-scoped-declaration on the component's
-  // .module.css, and (for pseudo states) force a live preview via data-fc-preview on the frame wrapper.
-  type EditTarget = { kind: 'base' } | { kind: 'axis'; axis: string; value: string } | { kind: 'state'; state: 'hover' | 'pressed' | 'focus' | 'disabled' | 'loading' | 'error' } // D-2: dead `{kind:'variant'}` removed (zombie from before the I2 axis-chip model — zero setters)
-  const [editTarget, setEditTarget] = useState<EditTarget>({ kind: 'base' })
-  const editTargetRef = useRef(editTarget); useEffect(() => { editTargetRef.current = editTarget }, [editTarget])
-  // component model of the component currently being edited (its .tsx file + base class + variants/states)
-  type EditModel = { file: string; cssModule: string | null; rootClass: string | null; root: { line: number; col: number } | null; rootTag: string | null; variantAxes: { axis: string; values: string[]; defaultValue: string }[]; props: { name: string; tsType: string }[]; states: string[]; connectors: { mode: string; to: { axis?: string; value?: string }; transition?: { stiffness: number; damping: number; mass: number } }[] }
-  const [editModel, setEditModel] = useState<EditModel | null>(null)
-  const editModelRef = useRef(editModel); useEffect(() => { editModelRef.current = editModel }, [editModel])
-  const editingComponentRef = useRef(editingComponent); useEffect(() => { editingComponentRef.current = editingComponent }, [editingComponent])
-  // §0 unified model: the server returns ONE `rules` list + `props`; the state-EXISTENCE list the chips/guard
-  // need is DERIVED here — semantic states from boolean-prop presence (loading/error always; disabled only on
-  // a non-form root, F-M2) + interaction states from pure-pseudo rules.
-  const shapeModel = (m: { file: string; cssModule: string | null; rootClass: string | null; root: { line: number; col: number } | null; structure?: { tag: string } | null; props?: { name: string; tsType: string }[]; variantAxes?: { axis: string; values: string[]; defaultValue: string }[]; rules?: { axisValues: { axis: string; value: string }[]; semantic: string[]; pseudo?: string }[]; connectors?: { mode: string; to: { axis?: string; value?: string }; transition?: { stiffness: number; damping: number; mass: number } }[] }): EditModel => {
-    const tag = m.structure?.tag ?? null
-    const states = new Set<string>()
-    for (const p of m.props ?? []) {
-      if ((p.name === 'loading' || p.name === 'error') && /boolean/.test(p.tsType)) states.add(p.name)
-      if (p.name === 'disabled' && /boolean/.test(p.tsType) && tag != null && !FORM_ROOTS.has(tag)) states.add('disabled')
-    }
-    const PSEUDO_STATE: Record<string, string> = { hover: 'hover', active: 'pressed', 'focus-visible': 'focus', disabled: 'disabled' }
-    for (const r of m.rules ?? []) {
-      if (!r.axisValues.length && !r.semantic.length && r.pseudo) states.add(PSEUDO_STATE[r.pseudo] ?? r.pseudo)
-      if (!r.axisValues.length && !r.pseudo) for (const s of r.semantic) states.add(s)
-    }
-    return { file: m.file, cssModule: m.cssModule, rootClass: m.rootClass, root: m.root, rootTag: tag, variantAxes: m.variantAxes ?? [], props: (m.props ?? []).map((p) => ({ name: p.name, tsType: p.tsType })), states: [...states], connectors: m.connectors ?? [] }
-  }
-  const fetchModel = (file: string) => fetch(`/api/dev/editor-component-model?file=${encodeURIComponent(file)}`).then((r) => (r.ok ? r.json() : null)).catch(() => null)
-  // F-A1: writes were fire-and-forget (no `r.ok` check) — during a dev-server recompile a write can 404
-  // (HTML, not JSON) and silently no-op, hiding the server's named 422 refusals from whoever's authoring.
-  // One shared helper: check `r.ok`, surface the server's named error via the toast, retry once on a
-  // recompile 404. Returns the Response on success, null on failure (so callers can skip the reload).
-  const engineWrite = useCallback(async (body: object): Promise<Response | null> => {
-    const send = () => fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
-    let r: Response | null = await send().catch(() => null)
-    if (r && r.status === 404 && !(r.headers.get('content-type') || '').includes('application/json')) {
-      await new Promise((res) => setTimeout(res, 1200)); r = await send().catch(() => null) // route mid-recompile → retry once
-    }
-    if (!r || !r.ok) {
-      let msg = r ? `Write failed (${r.status})` : 'Write failed — no response'
-      try { const j = await r?.clone().json(); if (j?.error) msg = String(j.error) } catch {}
-      notify(msg, 'error'); return null
-    }
-    return r
-  }, [])
-  useEffect(() => { // navigation is read-only: load inspection state without promoting or writing source
-    setEditTarget({ kind: 'base' })
-    if (!editingComponent?.file) { setEditModel(null); return }
-    const file = editingComponent.file
-    let live = true
-    void (async () => {
-      const m = await fetchModel(file)
-      if (live && m) setEditModel(shapeModel(m))
-    })()
-    return () => { live = false }
-  }, [editingComponent])
-  const reloadEditModel = useCallback(async (file: string) => {
-    const m = await fetchModel(file)
-    if (m) setEditModel(shapeModel(m))
-    return m
-  }, [])
-  // I7 node-system: the board iframe fires `fc-model-changed` after a visual connector write (set/remove-connector)
-  // → reload the parent's own model so the inspector's connector state stays in sync with the wires.
-  useEffect(() => {
-    const on = (e: MessageEvent) => {
-      if (e.data?.type === 'fc-model-changed') { const f = editModelRef.current?.file; if (f) void reloadEditModel(f) }
-      // QA-MED: relay the board iframe's connector-write errors to the shell's toast (the iframe has no Toaster).
-      if (e.data?.type === 'fc-toast') notify(e.data.message ?? 'connector write failed', e.data.kind === 'error' ? 'error' : 'ok')
-    }
-    window.addEventListener('message', on)
-    return () => window.removeEventListener('message', on)
-  }, [reloadEditModel])
-  // Force-preview the active state on the component frames so the user SEES the state they're authoring:
-  // interaction → data-fc-preview on the frame (ancestor half of the dual selector); semantic → data-<state>
-  // on the component's rendered root (.base element). Base/variant → clear all preview attrs.
-  useEffect(() => {
-    const doc = iframeRef.current?.contentDocument
-    if (!doc || canvasMode !== 'components') return
-    const et = editTarget
-    const em = editModelRef.current
-    // `disabled` on a non-form root force-previews via the SEMANTIC `data-disabled` toggle (its real rule is
-    // `.base[data-disabled]`), NOT the interaction `data-fc-preview` path — mirror the server/redirect branch.
-    const disabledSemantic = et.kind === 'state' && et.state === 'disabled' && em?.rootTag != null && !FORM_ROOTS.has(em.rootTag)
-    const pseudo = et.kind === 'state' && (et.state === 'hover' || et.state === 'pressed' || et.state === 'focus' || (et.state === 'disabled' && !disabledSemantic)) ? ({ hover: 'hover', pressed: 'active', focus: 'focus-visible', disabled: 'disabled' } as const)[et.state] : null
-    const semantic = et.kind === 'state' && (et.state === 'loading' || et.state === 'error' || disabledSemantic) ? et.state : null
-    // I5: skip the STATE GHOST frames (`[data-component-state]`) — they carry their OWN static §3.2 preview
-    // (data-fc-preview for interaction, the boolean prop for semantic); the editTarget-driven preview applies
-    // only to the real base/axis-value frames.
-    doc.querySelectorAll('[data-component-frame]:not([data-component-state])').forEach((f) => {
-      if (pseudo) f.setAttribute('data-fc-preview', pseudo); else f.removeAttribute('data-fc-preview')
-      const rootEl = f.querySelector('*') as HTMLElement | null
-      for (const s of ['loading', 'error', 'disabled']) rootEl?.removeAttribute(`data-${s}`)
-      if (semantic && rootEl) rootEl.setAttribute(`data-${semantic}`, '')
-    })
-  }, [editTarget, canvasMode, editModel])
   const [autoDistributed, setAutoDistributed] = useState(false) // justify space-between (Figma distributed)
   const [insetSides, setInsetSides] = useState({ t: '0', r: '0', b: '0', l: '0' }) // A7: per-side inset (positioned elements) // derived — the far-left rail IS the canvas switch (Dan 2026-07-07)
   const dsComponents = useDsComponents(rail === 'assets' || rail === 'components', compNonce) // E4-G4 Assets panel + E10 components rail (library panel needs the list whether or not editing)
@@ -2924,30 +2823,6 @@ export default function ReactFigmaPage() {
       : []
     // Stroke position "Center" has no clean CSS analog (border is inside, outline is outside) — no-op, honest.
     if (field === 'strokePosition' && n !== 'Inside' && n !== 'Outside') { console.warn('[engine] stroke position', n, '— no clean CSS analog (border=Inside, outline=Outside); no-op'); return }
-    // I1 (blueprint §4 editTarget): editing a component in a NON-BASE scope routes the SAME inspector
-    // edit to the component's .module.css as a scoped write (variant / pseudo-state / prop-state rule),
-    // instead of the live-element override engine. The active state chip = "I'm authoring this state",
-    // so we also apply the decls inline for immediate preview; switching back to Base re-reads truth.
-    {
-      const et = editTargetRef.current, em = editModelRef.current
-      if (editingComponentRef.current && em?.cssModule && em.rootClass && et.kind !== 'base' && decls.length) {
-        // F-M2: `disabled` on a non-form root (e.g. a <div>) can't match CSS `:disabled` → route it to the
-        // semantic `[data-disabled]` path, same as the server add-state; form-associated roots keep `:disabled`.
-        const scope = et.kind === 'axis'
-            // I2 (§3.2): a config axis-value edit → the COMPOSITE `.base.<axis>_<value>` rule.
-            ? { kind: 'composite', axisValues: [{ axis: et.axis, value: et.value }] }
-          : (et.state === 'hover' || et.state === 'pressed' || et.state === 'focus' || (et.state === 'disabled' && em.rootTag != null && FORM_ROOTS.has(em.rootTag)))
-            ? { kind: 'state', pseudo: ({ hover: 'hover', pressed: 'active', focus: 'focus-visible', disabled: 'disabled' } as const)[et.state] }
-            : { kind: 'state', propClass: et.state }
-        for (const [prop, value] of decls) {
-          void engineWrite({ kind: 'write-scoped-declaration', file: em.cssModule, localClass: em.rootClass, scope, prop, value }) // F-A1
-          el.style.setProperty(prop, value) // immediate preview while this scope is active
-        }
-        setSelRect(rectOf(el))
-        console.log('[engine] scoped write', et.kind, 'name' in et ? et.name : et.kind === 'state' ? et.state : '', decls.map((d) => d[0]).join(','))
-        return
-      }
-    }
     // Undo/redo (Dan live-QA): record each edit as one history step; before=null means the prop had
     // no override yet (undo → discard it entirely).
     if (decls.length) {
@@ -2964,7 +2839,7 @@ export default function ReactFigmaPage() {
     // A `var(--…)` write is a (re)bind, so it keeps/uses the token; only literals detach.
     if (!/^var\(/.test(n)) setFieldTokens((tks) => (tks[field] !== undefined ? { ...tks, [field]: undefined } : tks))
     console.log('[engine] override', field, '→', withUnit, `${(performance.now() - t0).toFixed(1)}ms`)
-  }, [engineWrite])
+  }, [])
 
   const discardOverride = useCallback((op?: OverrideOp) => {
     // no-arg = 'Discard all' = GLOBAL clear across every dirty element (QA KAI-9306 finding 1);
@@ -3487,7 +3362,7 @@ export default function ReactFigmaPage() {
   const historyRef = useRef<{ id: string; prop: string; before: string | null; after: string }[][]>([])
   const redoRef = useRef<{ id: string; prop: string; before: string | null; after: string }[][]>([])
   const undoEdit = useCallback(() => {
-    if (editingComponentRef.current) {
+    if (canvasMode === 'components') {
       setAuthoringUndoNonce((value) => value + 1)
       return
     }
@@ -3502,9 +3377,9 @@ export default function ReactFigmaPage() {
     const el = selIdRef.current ? iframeRef.current?.contentDocument?.querySelector(`[data-eng-id="${selIdRef.current}"]`) as HTMLElement | null : null
     if (el) { setSelRect(rectOf(el)); applySelection(el) }
     notify('Undo')
-  }, [])
+  }, [canvasMode])
   const redoEdit = useCallback(() => {
-    if (editingComponentRef.current) {
+    if (canvasMode === 'components') {
       notify('Component redo is not available')
       return
     }
@@ -3519,7 +3394,7 @@ export default function ReactFigmaPage() {
     const el = selIdRef.current ? iframeRef.current?.contentDocument?.querySelector(`[data-eng-id="${selIdRef.current}"]`) as HTMLElement | null : null
     if (el) { setSelRect(rectOf(el)); applySelection(el) }
     notify('Redo')
-  }, [])
+  }, [canvasMode])
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const action = canvasHistoryAction(e)
@@ -3914,7 +3789,7 @@ export default function ReactFigmaPage() {
                   style={{ flex: 1, minWidth: 0, height: 26, borderRadius: 6, border: `1px solid ${LINE}`, background: '#fff', padding: '0 8px', outline: 0, font: `400 11px/1 ${FONT}`, color: INK }} />
               </div>
             </form>
-            <ComponentsRail components={dsComponents} selectedFile={sel?.file} query={compSearch} onJump={jumpTo} onEdit={(c) => {
+            <ComponentsRail components={dsComponents} selectedFile={editingComponent?.file} query={compSearch} onJump={jumpTo} onEdit={(c) => {
               if (c.root === 'project') setEditingComponent(c)
               else notify('Global library authoring is not available in this phase', 'error')
             }}
@@ -3980,9 +3855,9 @@ export default function ReactFigmaPage() {
       {/* ░░ INFINITE CANVAS ░░ */}
       <main ref={canvasRef} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
         style={{ flex: 1, minWidth: 0, background: '#f0f0f0', position: 'relative', overflow: 'hidden', cursor: drawArm ? 'crosshair' : isPanning ? 'grabbing' : 'default' }}>
-        <InsertIsland drawDisabled={canvasMode === 'components'} onInsert={(tag, display) => { if (canvasMode === 'components') return; if (tag === 'img') void insertImage(); else setDrawArm({ tag, display }) }} codeMode={codeMode} onCodeMode={setCodeMode} />
-        {drawArm && <div style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 40, height: 26, display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', borderRadius: 8, background: '#1e1e1e', color: '#fff', font: `450 11px/1 ${FONT}`, pointerEvents: 'none' }}>Drawing {drawArm.tag} — drag on the frame · Esc to cancel</div>}
-        {codeMode && sel && <CodeView file={sel.file} line={sel.line} onClose={() => setCodeMode(false)} />}
+        {canvasMode === 'design' && <InsertIsland drawDisabled={false} onInsert={(tag, display) => { if (tag === 'img') void insertImage(); else setDrawArm({ tag, display }) }} codeMode={codeMode} onCodeMode={setCodeMode} />}
+        {canvasMode === 'design' && drawArm && <div style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 40, height: 26, display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', borderRadius: 8, background: '#1e1e1e', color: '#fff', font: `450 11px/1 ${FONT}`, pointerEvents: 'none' }}>Drawing {drawArm.tag} — drag on the frame · Esc to cancel</div>}
+        {canvasMode === 'design' && codeMode && sel && <CodeView file={sel.file} line={sel.line} onClose={() => setCodeMode(false)} />}
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle, rgba(0,0,0,.09) 1px, transparent 1px)', backgroundSize: `${24 * view.z}px ${24 * view.z}px`, backgroundPosition: `${view.x}px ${view.y}px` }} />
         <div style={{ position: 'absolute', left: 0, top: 0, transform: `translate(${view.x}px,${view.y}px) scale(${view.z})`, transformOrigin: '0 0' }}>
           {canvasMode === 'components' && editingComponent ? (
@@ -4010,14 +3885,14 @@ export default function ReactFigmaPage() {
                 />
               </div>
             )}
-            {hoverRect && (
+            {canvasMode === 'design' && hoverRect && (
               <div style={{ position: 'absolute', left: hoverRect.x, top: hoverRect.y, width: hoverRect.w, height: hoverRect.h, outline: `${1.5 / view.z}px solid ${SEL}`, pointerEvents: 'none' }} />
             )}
-            {selRect && (
+            {canvasMode === 'design' && selRect && (
               <div style={{ position: 'absolute', left: selRect.x, top: selRect.y, width: selRect.w, height: selRect.h, outline: `${2 / view.z}px solid ${SEL}`, pointerEvents: 'none' }} />
             )}
-            {layoutGuides.length > 0 && <LayoutGuideOverlay guides={layoutGuides} w={frameDims.w} h={frameDims.h} />}
-            {drawRect && <div style={{ position: 'absolute', left: drawRect.x, top: drawRect.y, width: drawRect.w, height: drawRect.h, border: `${1 / view.z}px dashed ${SEL}`, background: 'rgba(11,153,255,0.08)', pointerEvents: 'none' }} />}
+            {canvasMode === 'design' && layoutGuides.length > 0 && <LayoutGuideOverlay guides={layoutGuides} w={frameDims.w} h={frameDims.h} />}
+            {canvasMode === 'design' && drawRect && <div style={{ position: 'absolute', left: drawRect.x, top: drawRect.y, width: drawRect.w, height: drawRect.h, border: `${1 / view.z}px dashed ${SEL}`, background: 'rgba(11,153,255,0.08)', pointerEvents: 'none' }} />}
           </div>
         </div>
         <div style={{ position: 'absolute', left: 12, bottom: 12, height: 28, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', background: '#fff', borderRadius: 6, boxShadow: '0 2px 8px rgba(0,0,0,.14)', font: `450 11px/1 ${FONT}` }}>
@@ -4028,7 +3903,8 @@ export default function ReactFigmaPage() {
       </main>
 
       {/* ░░ RIGHT — Design inspector ░░ */}
-      <aside style={{ width: rightW, flex: 'none', position: 'relative', borderLeft: `1px solid ${LINE}`, display: uiMinimized ? 'none' : 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {canvasMode === 'design' && (
+      <aside data-page-design-inspector style={{ width: rightW, flex: 'none', position: 'relative', borderLeft: `1px solid ${LINE}`, display: uiMinimized ? 'none' : 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div onPointerDown={startResize('r')} style={handleStyle('left')} />
         <div style={{ height: 48, display: 'flex', alignItems: 'center', padding: '0 8px 0 11px', flex: 'none' }}>
           {/* Dan: Publish IS the save button (Save-to-code removed) — badge shows the change count
@@ -4410,6 +4286,7 @@ export default function ReactFigmaPage() {
           </>)}
         </div>
       </aside>
+      )}
       </>)}
       {ctxMenu && createPortal(
         <div onClick={() => setCtxMenu(null)} onContextMenu={(e) => { e.preventDefault(); setCtxMenu(null) }} style={{ position: 'fixed', inset: 0, zIndex: 200 }}>

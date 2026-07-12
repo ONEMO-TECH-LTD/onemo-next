@@ -62,3 +62,10 @@
 - Symptoms: the exact same tests passed together in 3.64 seconds focused, but full-suite runs stopped at 5.003 or 10.003 seconds while other filesystem/compiler tests were contending; no assertion failed.
 - What worked: retain the real integration coverage and give only the three multi-program/multi-transaction cases bounded 15-second or 20-second ceilings, then require the full suite to pass.
 - Remember: do not use a focused green run to overrule a red full gate; distinguish contention with measured focused evidence, then make the full proof stable.
+
+## S58 component-shell Playwright setup
+
+- What did not work: importing `@playwright/test` from a temporary test outside the repository, then launching the runner's bundled headless Chromium.
+- Symptoms: the temporary test could not resolve the package until it used the installed global runner; after that, Playwright reported the cached `chromium_headless_shell-1208` executable was missing.
+- What worked: keep the proof script outside committed source, use the installed global Playwright test package, and run the temporary config with `channel: 'chrome'` so it launches the Mac's existing Google Chrome.
+- Remember: S58 browser proofs should use the system Chrome channel unless the Playwright browser cache is explicitly installed; do not install a second browser just for verification.
