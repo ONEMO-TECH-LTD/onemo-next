@@ -1,6 +1,10 @@
+import { spawn } from 'node:child_process'
+import { once } from 'node:events'
 import { promises as fs } from 'node:fs'
+import { createRequire } from 'node:module'
 import os from 'node:os'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
@@ -15,6 +19,10 @@ type ParticipantGraphFixture = {
   graphPatches: Array<{ before: unknown }>
   inverse: Array<{ after: unknown }>
 }
+
+const require = createRequire(import.meta.url)
+const VITE_NODE = require.resolve('vite-node/vite-node.mjs')
+const CRASH_FIXTURE = fileURLToPath(new URL('fixtures/transaction-crash-child.ts', import.meta.url))
 
 async function makeTransaction(hooks?: AuthoringTransactionHooks) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'authoring-tx-'))
@@ -607,6 +615,39 @@ describe('SingleRootAuthoringTransaction', () => {
     await expect(fs.readFile(path.join(root, sourceFile), 'utf8')).resolves.toBe('after\n')
     expect((await store.load())?.revision).toBe(1)
     expect(JSON.parse(await fs.readFile(participantPath, 'utf8')).status).toBe('committed')
+  })
+
+  it('rolls back from durable disk evidence after a child process is killed mid-transaction', async () => {
+    const { root, sourceFile, registry, store } = await makeTransaction()
+    const sourceAbs = path.join(root, sourceFile)
+    const before = await fs.readFile(sourceAbs, 'utf8')
+    const child = spawn(process.execPath, [VITE_NODE, CRASH_FIXTURE, root, sourceFile], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    try {
+      const [ready] = await once(child.stdout!, 'data')
+      expect(ready.toString()).toContain('after-source-install')
+      expect(await fs.readFile(sourceAbs, 'utf8')).toBe('after bytes from killed child\n')
+      const txRoot = path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions/tx-killed-child')
+      expect(JSON.parse(await fs.readFile(path.join(txRoot, 'participant.json'), 'utf8')).status).toBe('prepared')
+      expect(JSON.parse(await fs.readFile(path.join(txRoot, 'coordinator.json'), 'utf8')).status).toBe('prepared')
+      await expect(fs.readFile(path.join(root, 'src/app/(dev)/react-figma-components/.onemo/authoring-v1.json')))
+        .rejects.toMatchObject({ code: 'ENOENT' })
+      child.kill('SIGKILL')
+      const [, signal] = await once(child, 'exit')
+      expect(signal).toBe('SIGKILL')
+
+      expect(await executeSingleRootRecovery({ storeId: 'project-main', registry, store }))
+        .toEqual([{ transactionId: 'tx-killed-child', action: 'rolled-back-prepared' }])
+      expect(await fs.readFile(sourceAbs, 'utf8')).toBe(before)
+      expect(await store.load()).toBeNull()
+      expect(JSON.parse(await fs.readFile(path.join(txRoot, 'participant.json'), 'utf8')).status).toBe('rolled-back')
+      expect(JSON.parse(await fs.readFile(path.join(txRoot, 'coordinator.json'), 'utf8')).status).toBe('rolled-back')
+      await expect(fs.readFile(path.join(root, authoringStoreLockPath('project'))))
+        .rejects.toMatchObject({ code: 'ENOENT' })
+    } finally {
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL')
+    }
   })
 
   it('refuses recovery over source bytes outside both recorded images', async () => {
