@@ -725,235 +725,221 @@ export const RESOLVED = {
    "D": "#fafafa"
   },
   {
-   "name": "bg/active",
-   "binding": "base/white",
+   "name": "bg/elevated",
+   "binding": "surface/card",
    "description": "Active/pressed state background.",
-   "L": "#ffffff",
-   "D": "#000000"
+   "L": "#fafafa",
+   "D": "#18191b"
   },
   {
-   "name": "bg/disabled",
+   "name": "bg/system/disabled",
    "binding": "neutral/3",
    "description": "Disabled state background. Reduced contrast.",
    "L": "#f0f0f3",
    "D": "#212225"
   },
   {
-   "name": "bg/primary",
-   "binding": "brand/white",
-   "description": "Primary background surface. Use for page backgrounds and main content areas.",
-   "L": "#fafafa",
-   "D": "#071013"
-  },
-  {
-   "name": "bg/primary-solid",
-   "binding": "brand/black/l-constant",
-   "description": "Solid dark background. Immutable — stays dark in all themes.",
-   "L": "#071013",
-   "D": "#071013"
-  },
-  {
-   "name": "bg/primary-semi-solid",
-   "binding": "neutral/l-constant/11",
-   "description": "Overlay background for modals and scrims. Immutable — stays dark in all themes.",
-   "L": "#60646c",
-   "D": "#18191b"
-  },
-  {
-   "name": "bg/primary-solid-lighter",
-   "binding": "neutral/l-constant/11",
-   "description": "Overlay background for modals and scrims. Immutable — stays dark in all themes.",
-   "L": "#60646c",
-   "D": "#18191b"
-  },
-  {
-   "name": "bg/primary-alt",
-   "binding": "brand/white",
-   "description": "Alternative primary background. Use for subtle differentiation from bg-primary.",
-   "L": "#fafafa",
-   "D": "#071013"
-  },
-  {
-   "name": "bg/primary-hover",
-   "binding": "neutral/2",
-   "description": "Hover state for primary background.",
-   "L": "#f9f9fb",
-   "D": "#18191b"
-  },
-  {
-   "name": "bg/secondary",
-   "binding": "neutral/2",
-   "description": "Secondary background. Use for cards, panels, and elevated surfaces.",
-   "L": "#f9f9fb",
-   "D": "#18191b"
-  },
-  {
-   "name": "bg/secondary-alt",
-   "binding": "neutral/2",
-   "description": "Alternative secondary background.",
-   "L": "#f9f9fb",
-   "D": "#18191b"
-  },
-  {
-   "name": "bg/secondary-hover",
-   "binding": "neutral/3",
-   "description": "Hover state for secondary backgrounds.",
-   "L": "#f0f0f3",
-   "D": "#212225"
-  },
-  {
-   "name": "bg/secondary-subtle",
-   "binding": "brand/white",
-   "description": "Subtle secondary background. Lighter than bg-secondary.",
-   "L": "#fafafa",
-   "D": "#071013"
-  },
-  {
-   "name": "bg/secondary-solid",
-   "binding": "neutral/9",
-   "description": "Solid secondary background.",
-   "L": "#8b8d98",
-   "D": "#696e77"
-  },
-  {
-   "name": "bg/tertiary",
-   "binding": "neutral/3",
-   "description": "Tertiary background. Use for nested containers and inset areas.",
-   "L": "#f0f0f3",
-   "D": "#212225"
-  },
-  {
-   "name": "bg/quaternary",
-   "binding": "neutral/4",
-   "description": "Quaternary background. Deepest nesting level.",
-   "L": "#e8e8ec",
-   "D": "#272a2d"
-  },
-  {
-   "name": "bg/disabled-subtle",
-   "binding": "neutral/2",
-   "description": "Subtle disabled background.",
-   "L": "#f9f9fb",
-   "D": "#18191b"
-  },
-  {
-   "name": "bg/brand-primary",
-   "binding": "brand/1/2",
-   "description": "Brand accent background. Subtle tint.",
-   "L": "#eef4f8",
-   "D": "#0e1a22"
-  },
-  {
-   "name": "bg/brand-primary-alt",
-   "binding": "brand/1/2",
-   "description": "Alternative brand accent background.",
-   "L": "#eef4f8",
-   "D": "#0e1a22"
-  },
-  {
-   "name": "bg/brand-secondary",
-   "binding": "brand/1/3",
-   "description": "Brand accent secondary background.",
-   "L": "#deeef9",
-   "D": "#0a293c"
-  },
-  {
-   "name": "bg/brand-solid",
-   "binding": "brand/1/9",
-   "description": "Solid brand background. Use for primary CTAs and brand moments.",
-   "L": "#378cbe",
-   "D": "#378cbe"
-  },
-  {
-   "name": "bg/brand-solid-hover",
-   "binding": "brand/1/10",
-   "description": "Hover state for solid brand background.",
-   "L": "#287fb0",
-   "D": "#287fb0"
-  },
-  {
-   "name": "bg/brand-section",
-   "binding": "brand/1/9",
-   "description": "Brand section background. Large area brand tint.",
-   "L": "#378cbe",
-   "D": "#378cbe"
-  },
-  {
-   "name": "bg/brand-section-subtle",
-   "binding": "brand/1/3",
-   "description": "Subtle brand section background.",
-   "L": "#deeef9",
-   "D": "#0a293c"
-  },
-  {
-   "name": "bg/error-primary",
+   "name": "bg/system/error",
    "binding": "error/2",
    "description": "Error state primary background.",
    "L": "#f9f2f1",
    "D": "#211211"
   },
   {
-   "name": "bg/error-secondary",
+   "name": "bg/system/error-strong",
    "binding": "error/3",
    "description": "Error state secondary background.",
    "L": "#f7e6e4",
    "D": "#3e0e0e"
   },
   {
-   "name": "bg/error-solid",
+   "name": "bg/system/error-solid",
    "binding": "error/9",
    "description": "Solid error background. High contrast for alerts.",
    "L": "#bf373a",
    "D": "#bf373a"
   },
   {
-   "name": "bg/error-solid-hover",
-   "binding": "error/10",
-   "description": "Hover state for solid error background.",
-   "L": "#af262d",
-   "D": "#a33838"
-  },
-  {
-   "name": "bg/warning-primary",
+   "name": "bg/system/warning",
    "binding": "warning/2",
    "description": "Warning state primary background.",
    "L": "#f7f7e0",
    "D": "#18180e"
   },
   {
-   "name": "bg/warning-secondary",
+   "name": "bg/system/warning-strong",
    "binding": "warning/3",
    "description": "Warning state secondary background.",
    "L": "#f7f6a4",
    "D": "#262610"
   },
   {
-   "name": "bg/warning-solid",
+   "name": "bg/system/warning-solid",
    "binding": "warning/9",
    "description": "Solid warning background.",
    "L": "#d8d33e",
    "D": "#d8d33e"
   },
   {
-   "name": "bg/success-primary",
+   "name": "bg/system/success",
    "binding": "success/2",
    "description": "Success state primary background.",
    "L": "#eef6ef",
    "D": "#121a13"
   },
   {
-   "name": "bg/success-secondary",
+   "name": "bg/system/success-strong",
    "binding": "success/3",
    "description": "Success state secondary background.",
    "L": "#def2e0",
    "D": "#182a1b"
   },
   {
-   "name": "bg/success-solid",
+   "name": "bg/system/success-solid",
    "binding": "success/9",
    "description": "Solid success background.",
    "L": "#37bf5d",
    "D": "#37bf5d"
+  },
+  {
+   "name": "bg/app",
+   "binding": "brand/white",
+   "description": "Primary background surface. Use for page backgrounds and main content areas.",
+   "L": "#fafafa",
+   "D": "#071013"
+  },
+  {
+   "name": "bg/app/subtle",
+   "binding": "neutral/2",
+   "description": "Secondary background. Use for cards, panels, and elevated surfaces.",
+   "L": "#f9f9fb",
+   "D": "#18191b"
+  },
+  {
+   "name": "bg/app/grouped",
+   "binding": "surface/grouped",
+   "description": "🔒 bg/ v2.3.2 — The grouped canvas — shop/library grounds; cards stand on it.",
+   "L": "#f0f0f3",
+   "D": "#071013"
+  },
+  {
+   "name": "bg/max/brand-perma",
+   "binding": "brand/black/l-constant",
+   "description": "Solid dark background. Immutable — stays dark in all themes.",
+   "L": "#071013",
+   "D": "#071013"
+  },
+  {
+   "name": "bg/max/brand",
+   "binding": "brand/black",
+   "description": "🔒 bg/ v2.3.2 — The brand-extreme surface, follows theme — the flipping button.",
+   "L": "#071013",
+   "D": "#fafafa"
+  },
+  {
+   "name": "bg/max/perma",
+   "binding": "base/black/l-constant",
+   "description": "🔒 bg/ v2.3.2 — Pure black pinned — the media letterbox.",
+   "L": "#000000",
+   "D": "#000000"
+  },
+  {
+   "name": "bg/max/inverse-perma",
+   "binding": "base/white/l-constant",
+   "description": "🔒 bg/ v2.3.2 — Pure white pinned — light media ground.",
+   "L": "#ffffff",
+   "D": "#ffffff"
+  },
+  {
+   "name": "bg/chrome",
+   "binding": "neutral/l-constant/11",
+   "description": "Overlay background for modals and scrims. Immutable — stays dark in all themes.",
+   "L": "#60646c",
+   "D": "#18191b"
+  },
+  {
+   "name": "bg/control",
+   "binding": "neutral/3",
+   "description": "Tertiary background. Use for nested containers and inset areas.",
+   "L": "#f0f0f3",
+   "D": "#212225"
+  },
+  {
+   "name": "bg/control/solid",
+   "binding": "neutral/9",
+   "description": "Solid secondary background.",
+   "L": "#8b8d98",
+   "D": "#696e77"
+  },
+  {
+   "name": "bg/control/strong",
+   "binding": "neutral/5",
+   "description": "🔒 bg/ v2.3.2 — The engaged control fill — persistent, bound by component contracts.",
+   "L": "#e0e1e6",
+   "D": "#2e3135"
+  },
+  {
+   "name": "bg/brand/primary",
+   "binding": "brand/1/2",
+   "description": "Brand accent background. Subtle tint.",
+   "L": "#eef4f8",
+   "D": "#0e1a22"
+  },
+  {
+   "name": "bg/brand/primary-strong",
+   "binding": "brand/1/3",
+   "description": "Brand accent secondary background.",
+   "L": "#deeef9",
+   "D": "#0a293c"
+  },
+  {
+   "name": "bg/brand/primary-solid",
+   "binding": "brand/1/9",
+   "description": "Solid brand background. Use for primary CTAs and brand moments.",
+   "L": "#378cbe",
+   "D": "#378cbe"
+  },
+  {
+   "name": "bg/brand/secondary",
+   "binding": "brand/2/2",
+   "description": "🔒 bg/ v2.3.2 — Second brand colour surface tint.",
+   "L": "#f1f5ec",
+   "D": "#151911"
+  },
+  {
+   "name": "bg/brand/secondary-strong",
+   "binding": "brand/2/3",
+   "description": "🔒 bg/ v2.3.2 — Second brand colour, strong tint.",
+   "L": "#e1f3cc",
+   "D": "#202915"
+  },
+  {
+   "name": "bg/brand/secondary-solid",
+   "binding": "brand/2/9",
+   "description": "🔒 bg/ v2.3.2 — Second brand colour solid surface.",
+   "L": "#8cbe37",
+   "D": "#8cbe37"
+  },
+  {
+   "name": "bg/brand/tertiary",
+   "binding": "brand/3/2",
+   "description": "🔒 bg/ v2.3.2 — Third brand colour surface tint.",
+   "L": "#f4f2fa",
+   "D": "#181425"
+  },
+  {
+   "name": "bg/brand/tertiary-strong",
+   "binding": "brand/3/3",
+   "description": "🔒 bg/ v2.3.2 — Third brand colour, strong tint.",
+   "L": "#edeafa",
+   "D": "#291d46"
+  },
+  {
+   "name": "bg/brand/tertiary-solid",
+   "binding": "brand/3/9",
+   "description": "🔒 bg/ v2.3.2 — Third brand colour solid surface.",
+   "L": "#6837be",
+   "D": "#6837be"
   },
   {
    "name": "bg/frost/ultrathin",
@@ -989,6 +975,20 @@ export const RESOLVED = {
    "description": "🔒 bg/ v2.3.2 — Pure translucency, no blur — a quieting layer that is not glass.",
    "L": "#fafafa1a",
    "D": "#0710131a"
+  },
+  {
+   "name": "bg/card",
+   "binding": "surface/card",
+   "description": "🔒 bg/ v2.3.2 — The container surface — product cards, tiles, list groups.",
+   "L": "#fafafa",
+   "D": "#18191b"
+  },
+  {
+   "name": "bg/sheet",
+   "binding": "surface/sheet",
+   "description": "🔒 bg/ v2.3.2 — Sheets, dialogs, trays — the solid floating surface.",
+   "L": "#fafafa",
+   "D": "#212225"
   },
   {
    "name": "interaction/press/on-neutral",

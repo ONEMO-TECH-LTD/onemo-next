@@ -1,7 +1,7 @@
 {
  "fileKey": "Qdb9Kx98afJHxaCGAIxoMC",
  "pulledAtFileVersion": null,
- "variables": 3170,
+ "variables": 3204,
  "export": [
   {
    ".1.0-Prim-Col": {
@@ -6174,6 +6174,26 @@
          "$value": "#b5f4be"
         }
        }
+      },
+      "surface": {
+       "grouped": {
+        "$description": "Crosswise pair (raw): The grouped canvas — recessed ground under cards; content contexts keep the Snow canvas.",
+        "$type": "color",
+        "$libraryName": "",
+        "$value": "#f0f0f3"
+       },
+       "card": {
+        "$description": "Crosswise pair (raw): The container surface — Snow standing on the grouped ground; lifted grey in dark.",
+        "$type": "color",
+        "$libraryName": "",
+        "$value": "#fafafa"
+       },
+       "sheet": {
+        "$description": "Crosswise pair (raw): The sheet/dialog surface — one notch above card in the dark stack.",
+        "$type": "color",
+        "$libraryName": "",
+        "$value": "#fafafa"
+       }
       }
      },
      "Dark": {
@@ -12343,6 +12363,26 @@
          "$libraryName": "",
          "$value": "#143f1e"
         }
+       }
+      },
+      "surface": {
+       "grouped": {
+        "$description": "Crosswise pair (raw): The grouped canvas — recessed ground under cards; content contexts keep the Snow canvas.",
+        "$type": "color",
+        "$libraryName": "",
+        "$value": "#071013"
+       },
+       "card": {
+        "$description": "Crosswise pair (raw): The container surface — Snow standing on the grouped ground; lifted grey in dark.",
+        "$type": "color",
+        "$libraryName": "",
+        "$value": "#18191b"
+       },
+       "sheet": {
+        "$description": "Crosswise pair (raw): The sheet/dialog surface — one notch above card in the dark stack.",
+        "$type": "color",
+        "$libraryName": "",
+        "$value": "#212225"
        }
       }
      }
@@ -18763,6 +18803,26 @@
          "$value": "{inverse.jade-green.12}"
         }
        }
+      },
+      "surface": {
+       "grouped": {
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".1.0-Prim-Col",
+        "$value": "{surface.grouped}"
+       },
+       "card": {
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".1.0-Prim-Col",
+        "$value": "{surface.card}"
+       },
+       "sheet": {
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".1.0-Prim-Col",
+        "$value": "{surface.sheet}"
+       }
       }
      }
     }
@@ -19836,7 +19896,7 @@
        }
       },
       "bg": {
-       "active": {
+       "elevated": {
         "$scopes": [
          "FRAME_FILL",
          "SHAPE_FILL"
@@ -19845,20 +19905,121 @@
         "$type": "color",
         "$libraryName": "",
         "$collectionName": ".2.0-Al-Col",
-        "$value": "{base.white}"
+        "$value": "{surface.card}"
        },
-       "disabled": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Disabled state background. Reduced contrast.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{neutral.3}"
+       "system": {
+        "disabled": {
+         "$scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL"
+         ],
+         "$description": "Disabled state background. Reduced contrast.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.3}"
+        },
+        "error": {
+         "$scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL"
+         ],
+         "$description": "Error state primary background.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{error.2}"
+        },
+        "error-strong": {
+         "$scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL"
+         ],
+         "$description": "Error state secondary background.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{error.3}"
+        },
+        "error-solid": {
+         "$scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL"
+         ],
+         "$description": "Solid error background. High contrast for alerts.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{error.9}"
+        },
+        "warning": {
+         "$scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL"
+         ],
+         "$description": "Warning state primary background.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{warning.2}"
+        },
+        "warning-strong": {
+         "$scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL"
+         ],
+         "$description": "Warning state secondary background.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{warning.3}"
+        },
+        "warning-solid": {
+         "$scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL"
+         ],
+         "$description": "Solid warning background.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{warning.9}"
+        },
+        "success": {
+         "$scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL"
+         ],
+         "$description": "Success state primary background.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{success.2}"
+        },
+        "success-strong": {
+         "$scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL"
+         ],
+         "$description": "Success state secondary background.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{success.3}"
+        },
+        "success-solid": {
+         "$scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL"
+         ],
+         "$description": "Solid success background.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{success.9}"
+        }
        },
-       "primary": {
+       "app": {
         "$scopes": [
          "FRAME_FILL",
          "SHAPE_FILL",
@@ -19868,20 +20029,73 @@
         "$type": "color",
         "$libraryName": "",
         "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.white}"
+        "$value": "{brand.white}",
+        "subtle": {
+         "$scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL"
+         ],
+         "$description": "Secondary background. Use for cards, panels, and elevated surfaces.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.2}"
+        },
+        "grouped": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 bg/ v2.3.2 — The grouped canvas — shop/library grounds; cards stand on it.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{surface.grouped}"
+        }
        },
-       "primary-solid": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Solid dark background. Immutable — stays dark in all themes.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.black.l-constant}"
+       "max": {
+        "brand-perma": {
+         "$scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL"
+         ],
+         "$description": "Solid dark background. Immutable — stays dark in all themes.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.black.l-constant}"
+        },
+        "brand": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 bg/ v2.3.2 — The brand-extreme surface, follows theme — the flipping button.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.black}"
+        },
+        "perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 bg/ v2.3.2 — Pure black pinned — the media letterbox.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{base.black.l-constant}"
+        },
+        "inverse-perma": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 bg/ v2.3.2 — Pure white pinned — light media ground.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{base.white.l-constant}"
+        }
        },
-       "primary-semi-solid": {
+       "chrome": {
         "$scopes": [
          "FRAME_FILL",
          "SHAPE_FILL"
@@ -19892,95 +20106,18 @@
         "$collectionName": ".2.0-Al-Col",
         "$value": "{neutral.l-constant.11}"
        },
-       "primary-solid-lighter": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Overlay background for modals and scrims. Immutable — stays dark in all themes.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{neutral.l-constant.11}"
-       },
-       "primary-alt": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Alternative primary background. Use for subtle differentiation from bg-primary.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.white}"
-       },
-       "primary-hover": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Hover state for primary background.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{neutral.2}"
-       },
-       "secondary": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Secondary background. Use for cards, panels, and elevated surfaces.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{neutral.2}"
-       },
-       "secondary-alt": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Alternative secondary background.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{neutral.2}"
-       },
-       "secondary-hover": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Hover state for secondary backgrounds.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{neutral.3}"
-       },
-       "secondary-subtle": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Subtle secondary background. Lighter than bg-secondary.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.white}"
-       },
-       "secondary-solid": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Solid secondary background.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{neutral.9}"
-       },
-       "tertiary": {
+       "control": {
+        "solid": {
+         "$scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL"
+         ],
+         "$description": "Solid secondary background.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.9}"
+        },
         "$scopes": [
          "FRAME_FILL",
          "SHAPE_FILL"
@@ -19989,216 +20126,112 @@
         "$type": "color",
         "$libraryName": "",
         "$collectionName": ".2.0-Al-Col",
-        "$value": "{neutral.3}"
+        "$value": "{neutral.3}",
+        "strong": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 bg/ v2.3.2 — The engaged control fill — persistent, bound by component contracts.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{neutral.5}"
+        }
        },
-       "quaternary": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Quaternary background. Deepest nesting level.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{neutral.4}"
-       },
-       "disabled-subtle": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Subtle disabled background.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{neutral.2}"
-       },
-       "brand-primary": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Brand accent background. Subtle tint.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.1.2}"
-       },
-       "brand-primary-alt": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Alternative brand accent background.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.1.2}"
-       },
-       "brand-secondary": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Brand accent secondary background.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.1.3}"
-       },
-       "brand-solid": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Solid brand background. Use for primary CTAs and brand moments.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.1.9}"
-       },
-       "brand-solid-hover": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Hover state for solid brand background.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.1.10}"
-       },
-       "brand-section": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Brand section background. Large area brand tint.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.1.9}"
-       },
-       "brand-section-subtle": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Subtle brand section background.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{brand.1.3}"
-       },
-       "error-primary": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Error state primary background.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{error.2}"
-       },
-       "error-secondary": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Error state secondary background.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{error.3}"
-       },
-       "error-solid": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Solid error background. High contrast for alerts.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{error.9}"
-       },
-       "error-solid-hover": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Hover state for solid error background.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{error.10}"
-       },
-       "warning-primary": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Warning state primary background.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{warning.2}"
-       },
-       "warning-secondary": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Warning state secondary background.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{warning.3}"
-       },
-       "warning-solid": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Solid warning background.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{warning.9}"
-       },
-       "success-primary": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Success state primary background.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{success.2}"
-       },
-       "success-secondary": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Success state secondary background.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{success.3}"
-       },
-       "success-solid": {
-        "$scopes": [
-         "FRAME_FILL",
-         "SHAPE_FILL"
-        ],
-        "$description": "Solid success background.",
-        "$type": "color",
-        "$libraryName": "",
-        "$collectionName": ".2.0-Al-Col",
-        "$value": "{success.9}"
+       "brand": {
+        "primary": {
+         "$scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL"
+         ],
+         "$description": "Brand accent background. Subtle tint.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.1.2}"
+        },
+        "primary-strong": {
+         "$scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL"
+         ],
+         "$description": "Brand accent secondary background.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.1.3}"
+        },
+        "primary-solid": {
+         "$scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL"
+         ],
+         "$description": "Solid brand background. Use for primary CTAs and brand moments.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.1.9}"
+        },
+        "secondary": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 bg/ v2.3.2 — Second brand colour surface tint.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.2.2}"
+        },
+        "secondary-strong": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 bg/ v2.3.2 — Second brand colour, strong tint.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.2.3}"
+        },
+        "secondary-solid": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 bg/ v2.3.2 — Second brand colour solid surface.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.2.9}"
+        },
+        "tertiary": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 bg/ v2.3.2 — Third brand colour surface tint.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.3.2}"
+        },
+        "tertiary-strong": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 bg/ v2.3.2 — Third brand colour, strong tint.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.3.3}"
+        },
+        "tertiary-solid": {
+         "$scopes": [
+          "ALL_SCOPES"
+         ],
+         "$description": "🔒 bg/ v2.3.2 — Third brand colour solid surface.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.3.9}"
+        }
        },
        "frost": {
         "ultrathin": {
@@ -20251,6 +20284,26 @@
         "$libraryName": "",
         "$collectionName": ".2.0-Al-Col",
         "$value": "{brand.white.alpha.2}"
+       },
+       "card": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 bg/ v2.3.2 — The container surface — product cards, tiles, list groups.",
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".2.0-Al-Col",
+        "$value": "{surface.card}"
+       },
+       "sheet": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 bg/ v2.3.2 — Sheets, dialogs, trays — the solid floating surface.",
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".2.0-Al-Col",
+        "$value": "{surface.sheet}"
        }
       },
       "interaction": {
@@ -20881,7 +20934,8 @@
        "$description": "Shadow colour for extra-small elevation (1 layer).",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#0a0d120d"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.soft.s}"
       },
       "shadow-sm-01": {
        "$scopes": [
@@ -20890,7 +20944,8 @@
        "$description": "Shadow layer 1 for small elevation.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#0a0d121a"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.soft.m}"
       },
       "shadow-sm-02": {
        "$scopes": [
@@ -20899,7 +20954,8 @@
        "$description": "Shadow layer 2 for small elevation.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#0a0d121a"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.soft.m}"
       },
       "shadow-md-01": {
        "$scopes": [
@@ -20908,7 +20964,8 @@
        "$description": "Shadow layer 1 for medium elevation.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#0a0d121a"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.soft.m}"
       },
       "shadow-md-02": {
        "$scopes": [
@@ -20917,7 +20974,8 @@
        "$description": "Shadow layer 2 for medium elevation.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#0a0d120f"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.soft.s}"
       },
       "shadow-lg-01": {
        "$scopes": [
@@ -20926,7 +20984,8 @@
        "$description": "Shadow layer 1 for large elevation.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#0a0d1214"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.soft.m}"
       },
       "shadow-lg-02": {
        "$scopes": [
@@ -20935,7 +20994,8 @@
        "$description": "Shadow layer 2 for large elevation.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#0a0d1208"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.soft.s}"
       },
       "shadow-lg-03": {
        "$scopes": [
@@ -20944,7 +21004,8 @@
        "$description": "Shadow layer 3 for large elevation.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#0a0d120a"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.soft.s}"
       },
       "shadow-xl-01": {
        "$scopes": [
@@ -20953,7 +21014,8 @@
        "$description": "Shadow layer 1 for extra-large elevation.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#0a0d1214"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.soft.m}"
       },
       "shadow-xl-02": {
        "$scopes": [
@@ -20962,7 +21024,8 @@
        "$description": "Shadow layer 2 for extra-large elevation.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#0a0d1208"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.soft.s}"
       },
       "shadow-xl-03": {
        "$scopes": [
@@ -20971,7 +21034,8 @@
        "$description": "Shadow layer 3 for extra-large elevation.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#0a0d120a"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.soft.s}"
       },
       "shadow-2xl-01": {
        "$scopes": [
@@ -20980,7 +21044,8 @@
        "$description": "Shadow layer 1 for 2xl elevation.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#0a0d122e"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.regular.s}"
       },
       "shadow-2xl-02": {
        "$scopes": [
@@ -20989,7 +21054,8 @@
        "$description": "Shadow layer 2 for 2xl elevation.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#0a0d120a"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.soft.s}"
       },
       "shadow-3xl-01": {
        "$scopes": [
@@ -20998,7 +21064,8 @@
        "$description": "Shadow layer 1 for 3xl elevation. Maximum depth.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#0a0d1224"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.soft.l}"
       },
       "shadow-3xl-02": {
        "$scopes": [
@@ -21007,7 +21074,8 @@
        "$description": "Shadow layer 2 for 3xl elevation. Maximum depth.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#0a0d120a"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.soft.s}"
       },
       "shadow-skeumorphic-inner": {
        "$scopes": [
@@ -21016,7 +21084,8 @@
        "$description": "Inner shadow for skeuomorphic depth effects.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#0a0d120d"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.soft.s}"
       },
       "shadow-skeumorphic-inner-border": {
        "$scopes": [
@@ -21025,7 +21094,8 @@
        "$description": "Inner border shadow for skeuomorphic depth effects.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#0a0d122e"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.regular.s}"
       },
       "blur": {
        "min": {
@@ -21036,7 +21106,7 @@
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
-        "$value": "{micro.xs}"
+        "$value": "{fx.micro.xs}"
        },
        "ghost": {
         "$scopes": [
@@ -21046,7 +21116,7 @@
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
-        "$value": "{soft.xs}"
+        "$value": "{fx.soft.xs}"
        },
        "trace": {
         "$scopes": [
@@ -21056,7 +21126,7 @@
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
-        "$value": "{soft.s}"
+        "$value": "{fx.soft.s}"
        },
        "soft": {
         "$scopes": [
@@ -21066,7 +21136,7 @@
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
-        "$value": "{soft.m}"
+        "$value": "{fx.soft.m}"
        },
        "mild": {
         "$scopes": [
@@ -21076,7 +21146,7 @@
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
-        "$value": "{soft.xl}"
+        "$value": "{fx.soft.xl}"
        },
        "regular": {
         "$scopes": [
@@ -21086,7 +21156,7 @@
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
-        "$value": "{mild.m}"
+        "$value": "{fx.mild.m}"
        },
        "vibrant": {
         "$scopes": [
@@ -21096,7 +21166,7 @@
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
-        "$value": "{regular.m}"
+        "$value": "{fx.regular.m}"
        },
        "strong": {
         "$scopes": [
@@ -21106,7 +21176,7 @@
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
-        "$value": "{intense.xs}"
+        "$value": "{fx.intense.xs}"
        },
        "intense": {
         "$scopes": [
@@ -21116,7 +21186,7 @@
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
-        "$value": "{intense.l}"
+        "$value": "{fx.intense.l}"
        },
        "max": {
         "$scopes": [
@@ -21126,7 +21196,7 @@
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
-        "$value": "{max.xs}"
+        "$value": "{fx.max.xs}"
        }
       },
       "material-saturate": {
@@ -21158,6 +21228,110 @@
        "$libraryName": "",
        "$collectionName": ".1.4-Prim-Ratios",
        "$value": "{1-05}"
+      },
+      "shadow": {
+       "trace": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 effects v2.3.2 — Shadow tint (occlusion — pinned dark; dark-theme depth is carried by surfaces).",
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{shadow-tint.soft.s}"
+       },
+       "soft": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 effects v2.3.2 — Shadow tint (occlusion — pinned dark; dark-theme depth is carried by surfaces).",
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{shadow-tint.soft.l}"
+       },
+       "regular": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 effects v2.3.2 — Shadow tint (occlusion — pinned dark; dark-theme depth is carried by surfaces).",
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{shadow-tint.regular.m}"
+       },
+       "strong": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 effects v2.3.2 — Shadow tint (occlusion — pinned dark; dark-theme depth is carried by surfaces).",
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{shadow-tint.deep.s}"
+       },
+       "intense": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 effects v2.3.2 — Shadow tint (occlusion — pinned dark; dark-theme depth is carried by surfaces).",
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{shadow-tint.deep.l}"
+       }
+      },
+      "light": {
+       "trace": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 effects v2.3.2 — Light tint (emission — pinned light; highlights, rims, sheen).",
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{light-tint.soft.s}"
+       },
+       "soft": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 effects v2.3.2 — Light tint (emission — pinned light; highlights, rims, sheen).",
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{light-tint.soft.l}"
+       },
+       "regular": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 effects v2.3.2 — Light tint (emission — pinned light; highlights, rims, sheen).",
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{light-tint.regular.m}"
+       },
+       "strong": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 effects v2.3.2 — Light tint (emission — pinned light; highlights, rims, sheen).",
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{light-tint.bright.s}"
+       },
+       "intense": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 effects v2.3.2 — Light tint (emission — pinned light; highlights, rims, sheen).",
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{light-tint.bright.l}"
+       }
       }
      },
      "Dark": {
@@ -21168,7 +21342,8 @@
        "$description": "Shadow colour for extra-small elevation (1 layer).",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#00000026"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.soft.s}"
       },
       "shadow-sm-01": {
        "$scopes": [
@@ -21177,7 +21352,8 @@
        "$description": "Shadow layer 1 for small elevation.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#00000040"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.soft.m}"
       },
       "shadow-sm-02": {
        "$scopes": [
@@ -21186,7 +21362,8 @@
        "$description": "Shadow layer 2 for small elevation.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#00000033"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.soft.m}"
       },
       "shadow-md-01": {
        "$scopes": [
@@ -21195,7 +21372,8 @@
        "$description": "Shadow layer 1 for medium elevation.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#00000040"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.soft.m}"
       },
       "shadow-md-02": {
        "$scopes": [
@@ -21204,7 +21382,8 @@
        "$description": "Shadow layer 2 for medium elevation.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#00000026"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.soft.s}"
       },
       "shadow-lg-01": {
        "$scopes": [
@@ -21213,7 +21392,8 @@
        "$description": "Shadow layer 1 for large elevation.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#00000033"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.soft.m}"
       },
       "shadow-lg-02": {
        "$scopes": [
@@ -21222,7 +21402,8 @@
        "$description": "Shadow layer 2 for large elevation.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#0000001a"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.soft.s}"
       },
       "shadow-lg-03": {
        "$scopes": [
@@ -21231,7 +21412,8 @@
        "$description": "Shadow layer 3 for large elevation.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#0000001a"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.soft.s}"
       },
       "shadow-xl-01": {
        "$scopes": [
@@ -21240,7 +21422,8 @@
        "$description": "Shadow layer 1 for extra-large elevation.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#00000033"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.soft.m}"
       },
       "shadow-xl-02": {
        "$scopes": [
@@ -21249,7 +21432,8 @@
        "$description": "Shadow layer 2 for extra-large elevation.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#0000001a"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.soft.s}"
       },
       "shadow-xl-03": {
        "$scopes": [
@@ -21258,7 +21442,8 @@
        "$description": "Shadow layer 3 for extra-large elevation.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#0000001a"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.soft.s}"
       },
       "shadow-2xl-01": {
        "$scopes": [
@@ -21267,7 +21452,8 @@
        "$description": "Shadow layer 1 for 2xl elevation.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#00000066"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.regular.s}"
       },
       "shadow-2xl-02": {
        "$scopes": [
@@ -21276,7 +21462,8 @@
        "$description": "Shadow layer 2 for 2xl elevation.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#0000001a"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.soft.s}"
       },
       "shadow-3xl-01": {
        "$scopes": [
@@ -21285,7 +21472,8 @@
        "$description": "Shadow layer 1 for 3xl elevation. Maximum depth.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#00000059"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.soft.l}"
       },
       "shadow-3xl-02": {
        "$scopes": [
@@ -21294,7 +21482,8 @@
        "$description": "Shadow layer 2 for 3xl elevation. Maximum depth.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#0000001a"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.soft.s}"
       },
       "shadow-skeumorphic-inner": {
        "$scopes": [
@@ -21303,7 +21492,8 @@
        "$description": "Inner shadow for skeuomorphic depth effects.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#0c0e120d"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.soft.s}"
       },
       "shadow-skeumorphic-inner-border": {
        "$scopes": [
@@ -21312,7 +21502,8 @@
        "$description": "Inner border shadow for skeuomorphic depth effects.",
        "$type": "color",
        "$libraryName": "",
-       "$value": "#0c0e122e"
+       "$collectionName": ".2.6-Al-Effects",
+       "$value": "{shadow-tint.regular.s}"
       },
       "blur": {
        "min": {
@@ -21323,7 +21514,7 @@
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
-        "$value": "{micro.xs}"
+        "$value": "{fx.micro.xs}"
        },
        "ghost": {
         "$scopes": [
@@ -21333,7 +21524,7 @@
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
-        "$value": "{soft.xs}"
+        "$value": "{fx.soft.xs}"
        },
        "trace": {
         "$scopes": [
@@ -21343,7 +21534,7 @@
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
-        "$value": "{soft.s}"
+        "$value": "{fx.soft.s}"
        },
        "soft": {
         "$scopes": [
@@ -21353,7 +21544,7 @@
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
-        "$value": "{soft.m}"
+        "$value": "{fx.soft.m}"
        },
        "mild": {
         "$scopes": [
@@ -21363,7 +21554,7 @@
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
-        "$value": "{soft.xl}"
+        "$value": "{fx.soft.xl}"
        },
        "regular": {
         "$scopes": [
@@ -21373,7 +21564,7 @@
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
-        "$value": "{mild.m}"
+        "$value": "{fx.mild.m}"
        },
        "vibrant": {
         "$scopes": [
@@ -21383,7 +21574,7 @@
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
-        "$value": "{regular.m}"
+        "$value": "{fx.regular.m}"
        },
        "strong": {
         "$scopes": [
@@ -21393,7 +21584,7 @@
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
-        "$value": "{intense.xs}"
+        "$value": "{fx.intense.xs}"
        },
        "intense": {
         "$scopes": [
@@ -21403,7 +21594,7 @@
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
-        "$value": "{intense.l}"
+        "$value": "{fx.intense.l}"
        },
        "max": {
         "$scopes": [
@@ -21413,7 +21604,7 @@
         "$type": "float",
         "$libraryName": "",
         "$collectionName": ".2.6-Al-Effects",
-        "$value": "{max.xs}"
+        "$value": "{fx.max.xs}"
        }
       },
       "material-saturate": {
@@ -21445,6 +21636,110 @@
        "$libraryName": "",
        "$collectionName": ".1.4-Prim-Ratios",
        "$value": "{1-05}"
+      },
+      "shadow": {
+       "trace": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 effects v2.3.2 — Shadow tint (occlusion — pinned dark; dark-theme depth is carried by surfaces).",
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{shadow-tint.soft.s}"
+       },
+       "soft": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 effects v2.3.2 — Shadow tint (occlusion — pinned dark; dark-theme depth is carried by surfaces).",
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{shadow-tint.soft.l}"
+       },
+       "regular": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 effects v2.3.2 — Shadow tint (occlusion — pinned dark; dark-theme depth is carried by surfaces).",
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{shadow-tint.regular.m}"
+       },
+       "strong": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 effects v2.3.2 — Shadow tint (occlusion — pinned dark; dark-theme depth is carried by surfaces).",
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{shadow-tint.deep.s}"
+       },
+       "intense": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 effects v2.3.2 — Shadow tint (occlusion — pinned dark; dark-theme depth is carried by surfaces).",
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{shadow-tint.deep.l}"
+       }
+      },
+      "light": {
+       "trace": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 effects v2.3.2 — Light tint (emission — pinned light; highlights, rims, sheen).",
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{light-tint.soft.s}"
+       },
+       "soft": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 effects v2.3.2 — Light tint (emission — pinned light; highlights, rims, sheen).",
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{light-tint.soft.l}"
+       },
+       "regular": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 effects v2.3.2 — Light tint (emission — pinned light; highlights, rims, sheen).",
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{light-tint.regular.m}"
+       },
+       "strong": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 effects v2.3.2 — Light tint (emission — pinned light; highlights, rims, sheen).",
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{light-tint.bright.s}"
+       },
+       "intense": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 effects v2.3.2 — Light tint (emission — pinned light; highlights, rims, sheen).",
+        "$type": "color",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{light-tint.bright.l}"
+       }
       }
      }
     }
@@ -28429,263 +28724,407 @@
    ".2.6-Al-Effects": {
     "modes": {
      "Mode 1": {
-      "soft": {
-       "xs": {
-        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{1}"
+      "fx": {
+       "nano": {
+        "xs": {
+         "$description": "Universal effect strength — one range for every effect.",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{0-1}"
+        },
+        "s": {
+         "$description": "Universal effect strength — one range for every effect.",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{0-15}"
+        },
+        "m": {
+         "$description": "Universal effect strength — one range for every effect.",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{0-2}"
+        },
+        "l": {
+         "$description": "Universal effect strength — one range for every effect.",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{0-3}"
+        },
+        "xl": {
+         "$description": "Universal effect strength — one range for every effect.",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{0-4}"
+        }
        },
-       "s": {
-        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{2}"
+       "micro": {
+        "xs": {
+         "$description": "Universal effect strength — one range for every effect.",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{0-5}"
+        },
+        "s": {
+         "$description": "Universal effect strength — one range for every effect.",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{0-6}"
+        },
+        "m": {
+         "$description": "Universal effect strength — one range for every effect.",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{0-7}"
+        },
+        "l": {
+         "$description": "Universal effect strength — one range for every effect.",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{0-8}"
+        },
+        "xl": {
+         "$description": "Universal effect strength — one range for every effect.",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{0-9}"
+        }
        },
-       "m": {
-        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{4}"
+       "soft": {
+        "xs": {
+         "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{1}"
+        },
+        "s": {
+         "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{2}"
+        },
+        "m": {
+         "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{4}"
+        },
+        "l": {
+         "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{6}"
+        },
+        "xl": {
+         "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{8}"
+        }
        },
-       "l": {
-        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{6}"
+       "mild": {
+        "xs": {
+         "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{10}"
+        },
+        "s": {
+         "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{12}"
+        },
+        "m": {
+         "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{16}"
+        },
+        "l": {
+         "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{18}"
+        },
+        "xl": {
+         "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{20}"
+        }
        },
-       "xl": {
-        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{8}"
+       "regular": {
+        "xs": {
+         "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{24}"
+        },
+        "s": {
+         "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{32}"
+        },
+        "m": {
+         "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{40}"
+        },
+        "l": {
+         "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{48}"
+        },
+        "xl": {
+         "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{56}"
+        }
+       },
+       "intense": {
+        "xs": {
+         "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{64}"
+        },
+        "s": {
+         "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{72}"
+        },
+        "m": {
+         "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{80}"
+        },
+        "l": {
+         "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{96}"
+        },
+        "xl": {
+         "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{128}"
+        }
+       },
+       "max": {
+        "xs": {
+         "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{160}"
+        },
+        "s": {
+         "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{192}"
+        },
+        "m": {
+         "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{224}"
+        },
+        "l": {
+         "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{256}"
+        },
+        "xl": {
+         "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+         "$type": "float",
+         "$libraryName": "",
+         "$collectionName": ".1.1-Prim-Dim",
+         "$value": "{320}"
+        }
        }
       },
-      "mild": {
-       "xs": {
-        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{10}"
+      "shadow-tint": {
+       "soft": {
+        "s": {
+         "$description": "Effect tint intensity — plumbing route to the pinned alpha ladder.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.black.l-alpha.1}"
+        },
+        "m": {
+         "$description": "Effect tint intensity — plumbing route to the pinned alpha ladder.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.black.l-alpha.2}"
+        },
+        "l": {
+         "$description": "Effect tint intensity — plumbing route to the pinned alpha ladder.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.black.l-alpha.3}"
+        }
        },
-       "s": {
-        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{12}"
+       "regular": {
+        "s": {
+         "$description": "Effect tint intensity — plumbing route to the pinned alpha ladder.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.black.l-alpha.4}"
+        },
+        "m": {
+         "$description": "Effect tint intensity — plumbing route to the pinned alpha ladder.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.black.l-alpha.5}"
+        },
+        "l": {
+         "$description": "Effect tint intensity — plumbing route to the pinned alpha ladder.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.black.l-alpha.6}"
+        }
        },
-       "m": {
-        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{16}"
-       },
-       "l": {
-        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{18}"
-       },
-       "xl": {
-        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{20}"
+       "deep": {
+        "s": {
+         "$description": "Effect tint intensity — plumbing route to the pinned alpha ladder.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.black.l-alpha.7}"
+        },
+        "m": {
+         "$description": "Effect tint intensity — plumbing route to the pinned alpha ladder.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.black.l-alpha.8}"
+        },
+        "l": {
+         "$description": "Effect tint intensity — plumbing route to the pinned alpha ladder.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.black.l-alpha.9}"
+        }
        }
       },
-      "regular": {
-       "xs": {
-        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{24}"
+      "light-tint": {
+       "soft": {
+        "s": {
+         "$description": "Effect tint intensity — plumbing route to the pinned alpha ladder.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.white.l-alpha.1}"
+        },
+        "m": {
+         "$description": "Effect tint intensity — plumbing route to the pinned alpha ladder.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.white.l-alpha.2}"
+        },
+        "l": {
+         "$description": "Effect tint intensity — plumbing route to the pinned alpha ladder.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.white.l-alpha.3}"
+        }
        },
-       "s": {
-        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{32}"
+       "regular": {
+        "s": {
+         "$description": "Effect tint intensity — plumbing route to the pinned alpha ladder.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.white.l-alpha.4}"
+        },
+        "m": {
+         "$description": "Effect tint intensity — plumbing route to the pinned alpha ladder.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.white.l-alpha.5}"
+        },
+        "l": {
+         "$description": "Effect tint intensity — plumbing route to the pinned alpha ladder.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.white.l-alpha.6}"
+        }
        },
-       "m": {
-        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{40}"
-       },
-       "l": {
-        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{48}"
-       },
-       "xl": {
-        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{56}"
-       }
-      },
-      "intense": {
-       "xs": {
-        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{64}"
-       },
-       "s": {
-        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{72}"
-       },
-       "m": {
-        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{80}"
-       },
-       "l": {
-        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{96}"
-       },
-       "xl": {
-        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{128}"
-       }
-      },
-      "max": {
-       "xs": {
-        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{160}"
-       },
-       "s": {
-        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{192}"
-       },
-       "m": {
-        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{224}"
-       },
-       "l": {
-        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{256}"
-       },
-       "xl": {
-        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{320}"
-       }
-      },
-      "nano": {
-       "xs": {
-        "$description": "Universal effect strength — one range for every effect.",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{0-1}"
-       },
-       "s": {
-        "$description": "Universal effect strength — one range for every effect.",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{0-15}"
-       },
-       "m": {
-        "$description": "Universal effect strength — one range for every effect.",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{0-2}"
-       },
-       "l": {
-        "$description": "Universal effect strength — one range for every effect.",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{0-3}"
-       },
-       "xl": {
-        "$description": "Universal effect strength — one range for every effect.",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{0-4}"
-       }
-      },
-      "micro": {
-       "xs": {
-        "$description": "Universal effect strength — one range for every effect.",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{0-5}"
-       },
-       "s": {
-        "$description": "Universal effect strength — one range for every effect.",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{0-6}"
-       },
-       "m": {
-        "$description": "Universal effect strength — one range for every effect.",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{0-7}"
-       },
-       "l": {
-        "$description": "Universal effect strength — one range for every effect.",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{0-8}"
-       },
-       "xl": {
-        "$description": "Universal effect strength — one range for every effect.",
-        "$type": "float",
-        "$libraryName": "",
-        "$collectionName": ".1.1-Prim-Dim",
-        "$value": "{0-9}"
+       "bright": {
+        "s": {
+         "$description": "Effect tint intensity — plumbing route to the pinned alpha ladder.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.white.l-alpha.7}"
+        },
+        "m": {
+         "$description": "Effect tint intensity — plumbing route to the pinned alpha ladder.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.white.l-alpha.8}"
+        },
+        "l": {
+         "$description": "Effect tint intensity — plumbing route to the pinned alpha ladder.",
+         "$type": "color",
+         "$libraryName": "",
+         "$collectionName": ".2.0-Al-Col",
+         "$value": "{brand.white.l-alpha.9}"
+        }
        }
       }
      }
