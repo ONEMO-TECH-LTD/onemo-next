@@ -17,16 +17,6 @@ import * as React from 'react'
 import { isValidElementType } from 'react-is'
 import * as Library from 'onemo-component-library'
 
-import {
-  createGhostFrame,
-  createVariantCommandFromGhost,
-  moveVariantFrameCommandFromDrag,
-  nextAutoVariantName,
-  renameVariantCommandFromDraft,
-  translateVariantFrame,
-  undoCommandFromKeyboard,
-  type VariantFrameGeometry,
-} from './component-canvas-gestures'
 import { selectCanvasGroupsForMode } from './component-canvas-groups'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -323,17 +313,6 @@ class FrameBoundary extends React.Component<{ label: string; children: React.Rea
   }
 }
 
-type AuthoringVariantModel = NonNullable<AuthoringCanvasState['component']>['variants'][number]
-type VariantDrag = {
-  pointerId: number
-  variantId: string
-  startClientX: number
-  startClientY: number
-  originFrame: VariantFrameGeometry
-  currentFrame: VariantFrameGeometry
-  moved: boolean
-}
-
 function AuthoringVariantBoard({
   group,
   authoring,
@@ -346,168 +325,60 @@ function AuthoringVariantBoard({
   onCommand: (command: AuthoringCommand) => Promise<boolean>
 }) {
   const [selectedId, setSelectedId] = React.useState<string | null>(authoring.variants[0]?.id ?? null)
-  const [renamingId, setRenamingId] = React.useState<string | null>(null)
-  const [renameDraft, setRenameDraft] = React.useState('')
-  const [dragMove, setDragMove] = React.useState<VariantDrag | null>(null)
-  const dragMoveRef = React.useRef<VariantDrag | null>(null)
-  const setActiveDrag = React.useCallback((next: VariantDrag | null) => {
-    dragMoveRef.current = next
-    setDragMove(next)
-  }, [])
+  const [createName, setCreateName] = React.useState('New Variant')
+  const [renameTo, setRenameTo] = React.useState('')
   React.useEffect(() => {
     if (!authoring.variants.some((variant) => variant.id === selectedId)) {
       setSelectedId(authoring.variants[0]?.id ?? null)
     }
   }, [authoring.variants, selectedId])
-  React.useEffect(() => {
-    if (renamingId && !authoring.variants.some((variant) => variant.id === renamingId)) {
-      setRenamingId(null)
-      setRenameDraft('')
-    }
-  }, [authoring.variants, renamingId])
-  React.useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (renamingId) return
-      const command = undoCommandFromKeyboard(event, canUndo)
-      if (!command) return
-      event.preventDefault()
-      void onCommand(command)
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [canUndo, onCommand, renamingId])
   const selected = authoring.variants.find((variant) => variant.id === selectedId) ?? authoring.variants[0] ?? null
   const axis = group.variants.find((variant) => variant.axis)?.axis ?? 'variant'
   const componentFrame = group.variants.find((variant) => !variant.state)?.Comp ?? group.variants[0]?.Comp
-  const ghostFrame = createGhostFrame(authoring.variants)
-  const ghostName = nextAutoVariantName(authoring.variants)
-  const boardFrames = [...authoring.variants.map((variant) => variant.frame), ghostFrame]
-  const width = Math.max(420, ...boardFrames.map((frame) => frame.x + frame.width + 48))
-  const height = Math.max(260, ...boardFrames.map((frame) => frame.y + frame.height + 48))
+  const width = Math.max(420, ...authoring.variants.map((variant) => variant.frame.x + variant.frame.width + 48))
+  const height = Math.max(260, ...authoring.variants.map((variant) => variant.frame.y + variant.frame.height + 48))
   const create = async () => {
-    await onCommand(createVariantCommandFromGhost(authoring.source.file, authoring.variants))
+    const name = createName.trim()
+    if (!name) return
+    if (await onCommand({ kind: 'create-variant', file: authoring.source.file, name })) setCreateName('')
   }
-  const startRename = (variant: AuthoringVariantModel) => {
-    setSelectedId(variant.id)
-    setRenamingId(variant.id)
-    setRenameDraft(variant.displayName)
+  const rename = async () => {
+    if (!selected) return
+    const to = renameTo.trim()
+    if (!to) return
+    if (await onCommand({ kind: 'rename-variant', file: authoring.source.file, from: selected.displayName, to })) setRenameTo('')
   }
-  const commitRename = async (variant: AuthoringVariantModel) => {
-    const command = renameVariantCommandFromDraft(authoring.source.file, variant.displayName, renameDraft)
-    setRenamingId(null)
-    setRenameDraft('')
-    if (command) await onCommand(command)
-  }
-  const beginVariantDrag = (event: React.PointerEvent<HTMLElement>, variant: AuthoringVariantModel) => {
-    if (event.button !== 0 || renamingId) return
-    event.preventDefault()
-    setSelectedId(variant.id)
-    event.currentTarget.setPointerCapture?.(event.pointerId)
-    setActiveDrag({
-      pointerId: event.pointerId,
-      variantId: variant.id,
-      startClientX: event.clientX,
-      startClientY: event.clientY,
-      originFrame: variant.frame,
-      currentFrame: variant.frame,
-      moved: false,
+  const nudge = async () => {
+    if (!selected) return
+    await onCommand({
+      kind: 'move-variant-frame',
+      file: authoring.source.file,
+      variantId: selected.id,
+      frame: { ...selected.frame, x: selected.frame.x + 24 },
     })
   }
-  const updateVariantDrag = (event: React.PointerEvent<HTMLElement>) => {
-    const active = dragMoveRef.current
-    if (!active || active.pointerId !== event.pointerId) return
-    const deltaX = event.clientX - active.startClientX
-    const deltaY = event.clientY - active.startClientY
-    const next = {
-      ...active,
-      currentFrame: translateVariantFrame(active.originFrame, deltaX, deltaY),
-      moved: active.moved || Math.abs(deltaX) >= 1 || Math.abs(deltaY) >= 1,
-    }
-    setActiveDrag(next)
-  }
-  const finishVariantDrag = async (event: React.PointerEvent<HTMLElement>) => {
-    const active = dragMoveRef.current
-    if (!active || active.pointerId !== event.pointerId) return
-    const deltaX = event.clientX - active.startClientX
-    const deltaY = event.clientY - active.startClientY
-    const moved = active.moved || Math.abs(deltaX) >= 1 || Math.abs(deltaY) >= 1
-    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
-      event.currentTarget.releasePointerCapture?.(event.pointerId)
-    }
-    setActiveDrag(null)
-    if (!moved) return
-    await onCommand(moveVariantFrameCommandFromDrag(
-      authoring.source.file,
-      active.variantId,
-      active.originFrame,
-      deltaX,
-      deltaY,
-    ))
-  }
+  const undo = async () => { await onCommand({ kind: 'undo' }) }
   return (
     <div data-authoring-canvas data-authoring-component={authoring.id} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div data-authoring-breadcrumb style={{ display: 'flex', alignItems: 'center', gap: 8, font: dsFont('600 11px/1.2'), color: COMPONENT_TEXT }}>
         <span>Components</span><span style={{ color: MUTED_TEXT }}>/</span><span>{authoring.displayName}</span>
       </div>
-      <div data-authoring-gesture-hints style={{ font: dsFont('500 10px/1.3'), color: canUndo ? SUBTLE_TEXT : DISABLED_TEXT }}>
-        Click the ghost to create · click a label to rename · drag frames to move · ⌘Z to undo
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <input aria-label="New variant name" value={createName} onChange={(e) => setCreateName(e.target.value)} style={{ width: 132, border: `1px solid ${COMPONENT_BORDER}`, borderRadius: 6, padding: '5px 7px', font: dsFont('11px') }} />
+        <button type="button" onClick={create} style={{ border: `1px solid ${COMPONENT_BORDER}`, background: SURFACE_BG, color: COMPONENT_TEXT, borderRadius: 6, padding: '5px 8px', font: dsFont('600 11px'), cursor: 'pointer' }}>Create variant</button>
+        <input aria-label="Rename selected variant" placeholder={selected ? `Rename ${selected.displayName}` : 'Rename'} value={renameTo} onChange={(e) => setRenameTo(e.target.value)} style={{ width: 152, border: `1px solid ${FIELD_BORDER}`, borderRadius: 6, padding: '5px 7px', font: dsFont('11px') }} />
+        <button type="button" disabled={!selected} onClick={rename} style={{ border: `1px solid ${FIELD_BORDER}`, background: SURFACE_BG, color: SUBTLE_TEXT, borderRadius: 6, padding: '5px 8px', font: dsFont('600 11px'), cursor: selected ? 'pointer' : 'default' }}>Rename</button>
+        <button type="button" disabled={!selected} onClick={nudge} style={{ border: `1px solid ${FIELD_BORDER}`, background: SURFACE_BG, color: SUBTLE_TEXT, borderRadius: 6, padding: '5px 8px', font: dsFont('600 11px'), cursor: selected ? 'pointer' : 'default' }}>Move +24px</button>
+        <button type="button" disabled={!canUndo} onClick={undo} style={{ border: `1px solid ${FIELD_BORDER}`, background: SURFACE_BG, color: canUndo ? SUBTLE_TEXT : DISABLED_TEXT, borderRadius: 6, padding: '5px 8px', font: dsFont('600 11px'), cursor: canUndo ? 'pointer' : 'default' }}>Undo</button>
       </div>
       <div style={{ position: 'relative', width, height, border: `1px dashed ${COMPONENT_BORDER}`, borderRadius: 12, background: BRAND_WASH }}>
         {componentFrame && authoring.variants.map((variant) => {
           const isSelected = variant.id === selected?.id
-          const liveFrame = dragMove?.variantId === variant.id ? dragMove.currentFrame : variant.frame
           return (
-            <figure
-              key={variant.id}
-              data-authoring-variant={variant.id}
-              data-authoring-dragging={dragMove?.variantId === variant.id ? 'true' : undefined}
-              data-component-frame={variant.displayName}
-              data-component-source={authoring.source.file}
-              onPointerDown={(event) => beginVariantDrag(event, variant)}
-              onPointerMove={updateVariantDrag}
-              onPointerUp={finishVariantDrag}
-              onPointerCancel={() => setActiveDrag(null)}
-              style={{ position: 'absolute', left: liveFrame.x, top: liveFrame.y, width: liveFrame.width, minHeight: liveFrame.height, margin: 0, display: 'flex', flexDirection: 'column', gap: 8, cursor: dragMove?.variantId === variant.id ? 'grabbing' : 'grab' }}
-            >
+            <figure key={variant.id} data-authoring-variant={variant.id} data-component-frame={variant.displayName} data-component-source={authoring.source.file} onPointerDown={() => setSelectedId(variant.id)} style={{ position: 'absolute', left: variant.frame.x, top: variant.frame.y, width: variant.frame.width, minHeight: variant.frame.height, margin: 0, display: 'flex', flexDirection: 'column', gap: 8, cursor: 'pointer' }}>
               <figcaption style={{ display: 'flex', alignItems: 'center', gap: 6, font: dsFont('600 11px/1.2'), color: COMPONENT_TEXT }}>
                 <span aria-hidden style={{ width: 8, height: 8, transform: 'rotate(45deg)', borderRadius: 2, background: variant.primary ? COMPONENT_ACCENT : SURFACE_BG, border: `1px solid ${COMPONENT_BORDER}` }} />
-                {renamingId === variant.id ? (
-                  <input
-                    data-authoring-inline-rename
-                    aria-label={`Rename ${variant.displayName}`}
-                    autoFocus
-                    value={renameDraft}
-                    onPointerDown={(event) => event.stopPropagation()}
-                    onChange={(event) => setRenameDraft(event.target.value)}
-                    onBlur={() => { void commitRename(variant) }}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') event.currentTarget.blur()
-                      if (event.key === 'Escape') {
-                        setRenamingId(null)
-                        setRenameDraft('')
-                      }
-                    }}
-                    style={{ width: Math.max(84, variant.displayName.length * 7), border: `1px solid ${COMPONENT_BORDER}`, borderRadius: 4, padding: '2px 4px', font: dsFont('600 11px/1.2'), color: COMPONENT_TEXT, background: SURFACE_BG }}
-                  />
-                ) : (
-                  <span
-                    data-authoring-variant-label
-                    role="button"
-                    tabIndex={0}
-                    title="Click to rename"
-                    onPointerDown={(event) => event.stopPropagation()}
-                    onClick={() => startRename(variant)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault()
-                        startRename(variant)
-                      }
-                    }}
-                    style={{ cursor: 'text' }}
-                  >
-                    {variant.displayName}
-                  </span>
-                )}
+                {variant.displayName}
               </figcaption>
               <div style={{ minHeight: variant.frame.height - 24, padding: 24, background: SURFACE_BG, borderRadius: 12, outline: isSelected ? `2px solid ${COMPONENT_BORDER}` : `1px solid ${SUBTLE_BORDER}`, outlineOffset: isSelected ? 2 : 0 }}>
                 <FrameBoundary label={variant.displayName}>{React.createElement(componentFrame, { [axis]: variant.displayName })}</FrameBoundary>
@@ -515,30 +386,6 @@ function AuthoringVariantBoard({
             </figure>
           )
         })}
-        {componentFrame && (
-          <figure
-            data-authoring-create-ghost
-            role="button"
-            tabIndex={0}
-            aria-label={`Create ${ghostName}`}
-            onClick={create}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault()
-                void create()
-              }
-            }}
-            style={{ position: 'absolute', left: ghostFrame.x, top: ghostFrame.y, width: ghostFrame.width, minHeight: ghostFrame.height, margin: 0, display: 'flex', flexDirection: 'column', gap: 8, cursor: 'copy', opacity: 0.82 }}
-          >
-            <figcaption style={{ display: 'flex', alignItems: 'center', gap: 6, font: dsFont('600 11px/1.2'), color: COMPONENT_TEXT }}>
-              <span aria-hidden style={{ width: 8, height: 8, transform: 'rotate(45deg)', borderRadius: 2, background: SURFACE_BG, border: `1px dashed ${COMPONENT_BORDER}` }} />
-              {ghostName}
-            </figcaption>
-            <div style={{ minHeight: ghostFrame.height - 24, padding: 24, background: 'transparent', borderRadius: 12, outline: `1px dashed ${COMPONENT_BORDER}`, outlineOffset: -1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: SUBTLE_TEXT, font: dsFont('600 11px/1.2') }}>
-              Click to create
-            </div>
-          </figure>
-        )}
       </div>
     </div>
   )
