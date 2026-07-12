@@ -1,5 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { promises as fs } from 'node:fs'
+import path from 'node:path'
+
+import * as ts from 'typescript'
 
 import { AuthoringHistoryStore } from './authoring-history'
 import { importProjectionToAuthoringGraph, type ProjectionImportResult } from './authoring-migrations'
@@ -38,6 +41,7 @@ export async function readExactAuthoringSourceSnapshot(input: {
   const sources = new Map<string, Buffer>()
   const sourceAbs = await input.registry.resolveStorePath(input.storeId, input.file)
   sources.set(input.file, await fs.readFile(sourceAbs))
+  await readProjectModuleDependencies(input, sources)
   const cssSources: Record<string, string> = {}
   let projection: SourceProjection
 
@@ -76,6 +80,53 @@ export async function readExactAuthoringSourceSnapshot(input: {
     sourceHashes: Object.fromEntries([...sources].map(([file, bytes]) => [file, sha256(bytes)])),
     sources: Object.fromEntries([...sources].map(([file, bytes]) => [file, bytes.toString('utf8')])),
   }
+}
+
+async function readProjectModuleDependencies(
+  input: { storeId: StoreId; file: string; registry: RuntimeRootRegistry },
+  sources: Map<string, Buffer>,
+): Promise<void> {
+  const root = input.registry.get(input.storeId).canonicalRealPath
+  const configPath = path.join(root, 'tsconfig.json')
+  let options: ts.CompilerOptions = {
+    module: ts.ModuleKind.ESNext,
+    moduleResolution: ts.ModuleResolutionKind.Bundler,
+    jsx: ts.JsxEmit.ReactJSX,
+  }
+  if (ts.sys.fileExists(configPath)) {
+    const config = ts.readConfigFile(configPath, ts.sys.readFile)
+    if (config.error) throw namedError('SOURCE_TSCONFIG_INVALID', formatDiagnostic(config.error), 422)
+    const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, root, { noEmit: true }, configPath)
+    if (parsed.errors.length) throw namedError('SOURCE_TSCONFIG_INVALID', parsed.errors.map(formatDiagnostic).join('; '), 422)
+    options = parsed.options
+  }
+  const pending = [input.file]
+  while (pending.length > 0) {
+    const file = pending.pop()!
+    const bytes = sources.get(file)
+    if (!bytes || !/\.[cm]?[jt]sx?$/.test(file)) continue
+    const abs = path.join(root, file)
+    const sf = ts.createSourceFile(abs, bytes.toString('utf8'), ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
+    for (const statement of sf.statements) {
+      const specifier = (ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement)) && statement.moduleSpecifier && ts.isStringLiteralLike(statement.moduleSpecifier)
+        ? statement.moduleSpecifier.text
+        : null
+      if (!specifier) continue
+      const resolved = ts.resolveModuleName(specifier, abs, options, ts.sys).resolvedModule
+      if (!resolved || resolved.isExternalLibraryImport) continue
+      const resolvedAbs = path.resolve(resolved.resolvedFileName)
+      if (resolvedAbs !== root && !resolvedAbs.startsWith(root + path.sep)) continue
+      const relative = path.relative(root, resolvedAbs).split(path.sep).join('/')
+      if (sources.has(relative)) continue
+      const jailed = await input.registry.resolveStorePath(input.storeId, relative)
+      sources.set(relative, await fs.readFile(jailed))
+      pending.push(relative)
+    }
+  }
+}
+
+function formatDiagnostic(diagnostic: ts.Diagnostic): string {
+  return `TS${diagnostic.code}: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, ' ')}`
 }
 
 export async function importSourceFileToAuthoringStore(input: {

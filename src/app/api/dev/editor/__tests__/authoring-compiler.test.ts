@@ -1,3 +1,7 @@
+import { promises as fs } from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
 import { compileG2VariantCommand } from '../authoring-compiler'
@@ -7,6 +11,8 @@ import { sha256 } from '../durable-file-installer'
 import { sourceProjectionFromSource } from '../source-projection'
 
 const FILE = 'src/app/(dev)/react-figma-components/Button.tsx'
+const compile = (input: Omit<Parameters<typeof compileG2VariantCommand>[0], 'projectRoot'>) =>
+  compileG2VariantCommand({ ...input, projectRoot: process.cwd() })
 const SOURCE = `export function Button({ variant = 'Primary' }: { variant?: 'Primary' | 'Secondary' }) {
   return <button data-variant={variant}>Button</button>
 }
@@ -30,7 +36,7 @@ describe('G2 native variant compiler', () => {
     const commandId = 'command-create-tertiary'
     const createdId = stableId('variant', component.id, commandId)
 
-    const plan = await compileG2VariantCommand({
+    const plan = await compile({
       graph,
       source: SOURCE,
       command: {
@@ -63,7 +69,7 @@ describe('G2 native variant compiler', () => {
   it('renames by variantId while preserving identity, geometry, registry binding, and edge references', async () => {
     const graph = await importedGraph()
     const component = Object.values(graph.components)[0]!
-    const created = await compileG2VariantCommand({
+    const created = await compile({
       graph,
       source: SOURCE,
       command: {
@@ -130,7 +136,7 @@ describe('G2 native variant compiler', () => {
       },
     }
 
-    const renamed = await compileG2VariantCommand({
+    const renamed = await compile({
       graph: graphWithEdge,
       source: created.sourcePatches[0]!.after,
       command: {
@@ -162,7 +168,7 @@ describe('G2 native variant compiler', () => {
     const component = Object.values(graph.components)[0]!
     const secondary = Object.values(graph.variants).find((variant) => variant.displayName === 'Secondary')!
 
-    const renamed = await compileG2VariantCommand({
+    const renamed = await compile({
       graph,
       source: SOURCE,
       command: {
@@ -184,12 +190,12 @@ describe('G2 native variant compiler', () => {
   it('adds a second free variant without recreating or relabeling existing source slots', async () => {
     const graph = await importedGraph()
     const component = Object.values(graph.components)[0]!
-    const first = await compileG2VariantCommand({
+    const first = await compile({
       graph,
       source: SOURCE,
       command: { kind: 'create-variant', commandId: 'command-create-a', componentId: component.id, displayName: 'A' },
     })
-    const second = await compileG2VariantCommand({
+    const second = await compile({
       graph: first.graph,
       source: first.sourcePatches[0]!.after,
       command: { kind: 'create-variant', commandId: 'command-create-b', componentId: component.id, displayName: 'B' },
@@ -211,12 +217,12 @@ describe('G2 native variant compiler', () => {
       variantId: variant.id,
       frame: { x: 40, y: -20, width: 360, height: 220 },
     }
-    const moved = await compileG2VariantCommand({ graph, source: SOURCE, command })
+    const moved = await compile({ graph, source: SOURCE, command })
 
     expect(moved.sourcePatches).toEqual([])
     expect(moved.stagedSources).toEqual([{ file: FILE, bytes: SOURCE }])
     expect(moved.graph.variants[variant.id]?.frame).toEqual(command.frame)
-    await expect(compileG2VariantCommand({
+    await expect(compile({
       graph,
       source: SOURCE,
       command: { ...command, frame: { x: Number.NaN, y: 0, width: 0, height: 10 } },
@@ -228,7 +234,7 @@ describe('G2 native variant compiler', () => {
     const component = Object.values(graph.components)[0]!
     const source = `${SOURCE}\nexport const __onemoVariantRegistry = {\n  "variant_0000000000000000": {},\n} as const\n`
 
-    await expect(compileG2VariantCommand({
+    await expect(compile({
       graph: { ...graph, components: { ...graph.components, [component.id]: { ...component, compatibility: 'native-v1' } } },
       source,
       command: {
@@ -249,7 +255,7 @@ describe('G2 native variant compiler', () => {
     const validComponent = Object.values(validImport.graph.components)[0]!
     const validId = validComponent.primaryVariantId
     const validSource = `${validBase}\nexport const __onemoVariantRegistry = { "${validId}": { value: 1 } } as const satisfies Record<string, Partial<React.ComponentProps<typeof Button>>>\n`
-    await expect(compileG2VariantCommand({
+    await expect(compile({
       graph: { ...validImport.graph, components: { ...validImport.graph.components, [validComponent.id]: { ...validComponent, compatibility: 'native-v1' } } },
       source: validSource,
       command: { kind: 'move-variant', commandId: 'type-valid', componentId: validComponent.id, variantId: validId, frame: { x: 1, y: 2, width: 3, height: 4 } },
@@ -264,7 +270,7 @@ export function Button({ value }: Props<number>) { return <button>{value}</butto
     const invalidComponent = Object.values(invalidImport.graph.components)[0]!
     const invalidId = invalidComponent.primaryVariantId
     const invalidSource = `${invalidBase}\nexport const __onemoVariantRegistry = { "${invalidId}": { value: "wrong" } } as const satisfies Record<string, Partial<React.ComponentProps<typeof Button>>>\n`
-    await expect(compileG2VariantCommand({
+    await expect(compile({
       graph: { ...invalidImport.graph, components: { ...invalidImport.graph.components, [invalidComponent.id]: { ...invalidComponent, compatibility: 'native-v1' } } },
       source: invalidSource,
       command: { kind: 'move-variant', commandId: 'type-invalid', componentId: invalidComponent.id, variantId: invalidId, frame: { x: 1, y: 2, width: 3, height: 4 } },
@@ -283,10 +289,54 @@ export function Button({ id }: { id?: EntityId }) { return <button>{id}</button>
     const component = Object.values(imported.graph.components)[0]!
     const registrySource = `${source}\nexport const __onemoVariantRegistry = { "${component.primaryVariantId}": { id: "component_test" } } as const satisfies Record<string, Partial<React.ComponentProps<typeof Button>>>\n`
 
+    await expect(compile({
+      graph: { ...imported.graph, components: { ...imported.graph.components, [component.id]: { ...component, compatibility: 'native-v1' } } },
+      source: registrySource,
+      dependencySources: {
+        'src/app/api/dev/editor/authoring-types.ts': await fs.readFile(path.join(process.cwd(), 'src/app/api/dev/editor/authoring-types.ts'), 'utf8'),
+      },
+      command: { kind: 'move-variant', commandId: 'alias-valid', componentId: component.id, variantId: component.primaryVariantId, frame: { x: 1, y: 2, width: 3, height: 4 } },
+    })).resolves.toMatchObject({
+      verifiedAssertions: expect.arrayContaining([{ kind: 'staged-typescript-semantics', status: 'passed' }]),
+    })
+  })
+
+  it('uses the registered project root and exact dependency snapshot instead of process cwd', async () => {
+    const projectRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'g2-relocated-typecheck-'))
+    await fs.mkdir(path.join(projectRoot, 'src'), { recursive: true })
+    await fs.symlink(path.resolve(process.cwd(), '../../..', 'node_modules'), path.join(projectRoot, 'node_modules'), 'dir')
+    await fs.writeFile(path.join(projectRoot, 'tsconfig.json'), JSON.stringify({
+      compilerOptions: {
+        strict: true, noEmit: true, target: 'ESNext', module: 'ESNext', moduleResolution: 'Bundler',
+        jsx: 'react-jsx', baseUrl: '.', paths: { '@/*': ['src/*'] }, types: ['react'],
+      },
+    }))
+    await fs.writeFile(path.join(projectRoot, 'src/types.ts'), 'export type Tone = number\n')
+    const source = `import type { Tone } from '@/types'
+export function Button({ tone }: { tone?: Tone }) { return <button>{tone}</button> }
+`
+    const projection = await sourceProjectionFromSource({ file: FILE, source })
+    const imported = importProjectionToAuthoringGraph({
+      storeId: 'project-main', projection, sourceHashes: { [FILE]: sha256(source) },
+    })
+    if (imported.kind !== 'imported') throw new Error(`expected imported graph, received ${imported.kind}`)
+    const component = Object.values(imported.graph.components)[0]!
+    const registrySource = `${source}\nexport const __onemoVariantRegistry = { "${component.primaryVariantId}": { tone: "quiet" } } as const satisfies Record<string, Partial<React.ComponentProps<typeof Button>>>\n`
+    const command = { kind: 'move-variant' as const, commandId: 'relocated-valid', componentId: component.id, variantId: component.primaryVariantId, frame: { x: 1, y: 2, width: 3, height: 4 } }
+
     await expect(compileG2VariantCommand({
       graph: { ...imported.graph, components: { ...imported.graph.components, [component.id]: { ...component, compatibility: 'native-v1' } } },
       source: registrySource,
-      command: { kind: 'move-variant', commandId: 'alias-valid', componentId: component.id, variantId: component.primaryVariantId, frame: { x: 1, y: 2, width: 3, height: 4 } },
+      projectRoot,
+      command,
+    })).rejects.toThrow(/TS2307/)
+
+    await expect(compileG2VariantCommand({
+      graph: { ...imported.graph, components: { ...imported.graph.components, [component.id]: { ...component, compatibility: 'native-v1' } } },
+      source: registrySource,
+      projectRoot,
+      dependencySources: { 'src/types.ts': `export type Tone = 'quiet' | 'loud'\n` },
+      command,
     })).resolves.toMatchObject({
       verifiedAssertions: expect.arrayContaining([{ kind: 'staged-typescript-semantics', status: 'passed' }]),
     })
@@ -296,7 +346,7 @@ export function Button({ id }: { id?: EntityId }) { return <button>{id}</button>
     const graph = await importedGraph()
     const component = Object.values(graph.components)[0]!
     const source = `${SOURCE}\nexport const __onemoVariantRegistry = { "variant_0000000000000000": {} } as const\n`
-    await expect(compileG2VariantCommand({
+    await expect(compile({
       graph: { ...graph, components: { ...graph.components, [component.id]: { ...component, compatibility: 'native-v1' } } },
       source,
       command: { kind: 'move-variant', commandId: 'move-stale', componentId: component.id, variantId: component.primaryVariantId, frame: { x: 1, y: 2, width: 3, height: 4 } },

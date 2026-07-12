@@ -3,7 +3,7 @@ import path from 'node:path'
 import * as ts from 'typescript'
 
 import { stableId } from './authoring-migrations'
-import { assertAuthoringGraphV1 } from './authoring-schema'
+import { assertAuthoringGraphV1, isStoreRelativePath } from './authoring-schema'
 import type { G2VariantCommand } from './authoring-commands'
 import type { AuthoringGraphV1, ComponentDefinition, VariantFrame } from './authoring-types'
 import { sourceProjectionFromSource, type SourceProjection } from './source-projection'
@@ -24,7 +24,9 @@ export async function compileG2VariantCommand(input: {
   graph: AuthoringGraphV1
   command: G2VariantCommand
   source: string
+  projectRoot: string
   cssSources?: Record<string, string>
+  dependencySources?: Record<string, string>
 }): Promise<CompilePlan> {
   const graph = assertAuthoringGraphV1(input.graph)
   const component = requireComponent(graph, input.command.componentId)
@@ -34,7 +36,7 @@ export async function compileG2VariantCommand(input: {
     throw namedError('COMPONENT_EXPORT_MISMATCH', `expected export ${component.source.exportName}, found ${beforeProjection.exportName}`, 422)
   }
   const beforeTypechecked = beforeProjection.nativeVariants.length > 0
-  if (beforeTypechecked) assertSemanticTypecheck(component.source.file, input.source)
+  if (beforeTypechecked) assertSemanticTypecheck(component.source.file, input.source, input.projectRoot, input.dependencySources)
 
   if (input.command.kind === 'move-variant') {
     const variant = requireOwnedVariant(graph, component, input.command.variantId)
@@ -55,7 +57,7 @@ export async function compileG2VariantCommand(input: {
       afterProjection = await requireProjection(component.source.file, afterSource, input.cssSources)
       assertUntouchedProjection(beforeProjection, afterProjection)
       assertRegistry(afterProjection, registry)
-      assertSemanticTypecheck(component.source.file, afterSource)
+      assertSemanticTypecheck(component.source.file, afterSource, input.projectRoot, input.dependencySources)
       sourcePatches = [{ file: component.source.file, before: input.source, after: afterSource }]
     } else {
       assertNativeRegistryMatchesGraph(graph, component, beforeProjection)
@@ -74,7 +76,7 @@ export async function compileG2VariantCommand(input: {
   const afterProjection = await requireProjection(component.source.file, afterSource, input.cssSources)
   assertUntouchedProjection(beforeProjection, afterProjection)
   assertRegistry(afterProjection, registry)
-  assertSemanticTypecheck(component.source.file, afterSource)
+  assertSemanticTypecheck(component.source.file, afterSource, input.projectRoot, input.dependencySources)
 
   const next = cloneGraph(graph)
   next.components[component.id] = { ...component, compatibility: 'native-v1' }
@@ -187,11 +189,11 @@ function assertUntouchedProjection(before: SourceProjection, after: SourceProjec
   }
 }
 
-function assertSemanticTypecheck(file: string, source: string): void {
-  const fileName = path.resolve(file)
-  const ambientName = path.resolve('__onemo-native-variants.d.ts')
-  const configPath = ts.findConfigFile(path.dirname(fileName), ts.sys.fileExists, 'tsconfig.json')
-  if (!configPath) throw namedError('STAGED_TSCONFIG_MISSING', `tsconfig.json not found for ${file}`, 422)
+function assertSemanticTypecheck(file: string, source: string, projectRoot: string, dependencies: Record<string, string> = {}): void {
+  const fileName = path.resolve(projectRoot, file)
+  const ambientName = path.resolve(projectRoot, '__onemo-native-variants.d.ts')
+  const configPath = path.join(projectRoot, 'tsconfig.json')
+  if (!ts.sys.fileExists(configPath)) throw namedError('STAGED_TSCONFIG_MISSING', `tsconfig.json not found for ${file}`, 422)
   const config = ts.readConfigFile(configPath, ts.sys.readFile)
   if (config.error) throw namedError('STAGED_TSCONFIG_INVALID', formatDiagnostic(config.error), 422)
   const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, path.dirname(configPath), { noEmit: true }, configPath)
@@ -203,14 +205,30 @@ function assertSemanticTypecheck(file: string, source: string): void {
   const readFile = host.readFile.bind(host)
   const fileExists = host.fileExists.bind(host)
   const ambient = `declare module '*.module.css' { const classes: Record<string, string>; export default classes }\n`
-  host.fileExists = (candidate) => candidate === fileName || candidate === ambientName || fileExists(candidate)
-  host.readFile = (candidate) => candidate === fileName ? source : candidate === ambientName ? ambient : readFile(candidate)
+  const exactSources = new Map<string, string>([[fileName, source]])
+  for (const [relative, bytes] of Object.entries(dependencies)) {
+    if (!isStoreRelativePath(relative)) throw namedError('STAGED_DEPENDENCY_PATH_INVALID', `invalid staged dependency path: ${relative}`, 422)
+    exactSources.set(path.resolve(projectRoot, relative), bytes)
+  }
+  const projectPrefix = path.resolve(projectRoot) + path.sep
+  const dependencyPrefix = path.join(path.resolve(projectRoot), 'node_modules') + path.sep
+  const isUnstagedProjectFile = (candidate: string) => {
+    const normalized = path.resolve(candidate)
+    return normalized.startsWith(projectPrefix) && !normalized.startsWith(dependencyPrefix) && !exactSources.has(normalized)
+  }
+  host.fileExists = (candidate) => exactSources.has(path.resolve(candidate)) || candidate === ambientName || (!isUnstagedProjectFile(candidate) && fileExists(candidate))
+  host.readFile = (candidate) => exactSources.get(path.resolve(candidate)) ?? (candidate === ambientName ? ambient : isUnstagedProjectFile(candidate) ? undefined : readFile(candidate))
   host.getSourceFile = (candidate, languageVersion) => {
     const text = host.readFile(candidate)
     return text === undefined ? undefined : ts.createSourceFile(candidate, text, languageVersion, true, candidate.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
   }
   const program = ts.createProgram({ rootNames: [fileName, ambientName], options, host })
-  const diagnostics = ts.getPreEmitDiagnostics(program).filter((diagnostic) => diagnostic.file?.fileName === fileName)
+  const stagedFile = program.getSourceFile(fileName)
+  if (!stagedFile) throw namedError('STAGED_TYPECHECK_FAILED', `staged source was not loaded: ${file}`, 422)
+  const diagnostics = [
+    ...program.getSyntacticDiagnostics(stagedFile),
+    ...program.getSemanticDiagnostics(stagedFile),
+  ]
   if (diagnostics.length > 0) {
     const detail = diagnostics.map(formatDiagnostic).join('; ')
     throw namedError('STAGED_TYPECHECK_FAILED', detail, 422)

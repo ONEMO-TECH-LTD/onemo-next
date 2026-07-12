@@ -55,7 +55,9 @@ export class ProjectAuthoringSession {
       graph: before,
       command: input.command,
       source: snapshot.sources[component.source.file]!,
+      projectRoot: this.input.registry.get(this.input.storeId).canonicalRealPath,
       cssSources: Object.fromEntries(Object.entries(snapshot.sources).filter(([file]) => file !== component.source.file)),
+      dependencySources: Object.fromEntries(Object.entries(snapshot.sources).filter(([file]) => file !== component.source.file)),
     })
     const historyPatches = await this.history.planCommand({
       command: input.command,

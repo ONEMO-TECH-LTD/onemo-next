@@ -17,6 +17,19 @@ const singleAxisSource = `export function Button({ variant = 'Primary' }: { vari
 async function makeRoot(source = singleAxisSource) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'authoring-import-route-'))
   await fs.mkdir(path.dirname(path.join(root, SOURCE_FILE)), { recursive: true })
+  await fs.symlink(path.resolve(process.cwd(), '../../..', 'node_modules'), path.join(root, 'node_modules'), 'dir')
+  await fs.writeFile(path.join(root, 'tsconfig.json'), JSON.stringify({
+    compilerOptions: {
+      strict: true,
+      noEmit: true,
+      target: 'ESNext',
+      module: 'ESNext',
+      moduleResolution: 'Bundler',
+      jsx: 'react-jsx',
+      types: ['react'],
+    },
+    include: ['src/**/*.ts', 'src/**/*.tsx'],
+  }))
   await fs.writeFile(path.join(root, SOURCE_FILE), source)
   return root
 }

@@ -586,6 +586,11 @@ function findRootReturnedElement(fn: ts.FunctionLikeDeclaration, sf: ts.SourceFi
   let found: ts.JsxElement | ts.JsxSelfClosingElement | null = null
   const root = fn.body
   if (!root) return null
+  if (!ts.isBlock(root)) {
+    let expression: ts.Node = root
+    while (ts.isParenthesizedExpression(expression)) expression = expression.expression
+    return ts.isJsxElement(expression) || ts.isJsxSelfClosingElement(expression) ? expression : null
+  }
   const visit = (n: ts.Node) => {
     if (found) return
     if (n !== root && (ts.isFunctionLike(n) || ts.isClassDeclaration(n) || ts.isClassExpression(n))) return
@@ -1562,11 +1567,12 @@ async function parseComponentModelSnapshot(input: {
     }
   }
   const param = fn?.parameters[0]
+  const axisValuesByProp = new Map<string, string[]>()
   if (param && ts.isObjectBindingPattern(param.name)) {
-    const typeMembers = new Map<string, { type: string; optional: boolean }>()
+    const typeMembers = new Map<string, { type: string; optional: boolean; axisValues: string[] | null }>()
     const members = componentPropMembers(sf, param.type, fn?.typeParameters)
-    for (const { member, typeText } of members) {
-      if (member.name) typeMembers.set(member.name.getText(sf), { type: typeText, optional: !!member.questionToken })
+    for (const { member, typeText, axisValues } of members) {
+      if (member.name) typeMembers.set(member.name.getText(sf), { type: typeText, optional: !!member.questionToken, axisValues })
     }
     for (const e of param.name.elements) {
       if (!ts.isIdentifier(e.name)) continue
@@ -1576,6 +1582,7 @@ async function parseComponentModelSnapshot(input: {
       const pn = e.propertyName && ts.isIdentifier(e.propertyName) ? e.propertyName.text : e.name.text
       const t = typeMembers.get(pn)
       props.push({ name: pn, tsType: t?.type ?? 'unknown', optional: t?.optional ?? false, default: e.initializer?.getText(sf) })
+      if (t?.axisValues) axisValuesByProp.set(pn, t.axisValues)
     }
   }
   // variantAxes (D1, §6.1) — each STRING-UNION prop is a config axis; the union prop is the source of truth
@@ -1583,8 +1590,8 @@ async function parseComponentModelSnapshot(input: {
   // `.base.<axis>_<value>` CSS rule exists (mirrors the semantic-state derive-from-prop pattern).
   const variantAxes: ComponentModel['variantAxes'] = []
   for (const p of props) {
-    const vals = [...p.tsType.matchAll(/'([^']*)'/g)].map((m) => m[1])
-    if (!vals.length) continue // not a string-literal union → not a config axis (boolean/string/number props)
+    const vals = axisValuesByProp.get(p.name)
+    if (!vals) continue
     const def = p.default ? p.default.replace(/^['"]|['"]$/g, '') : vals[0]
     variantAxes.push({ axis: p.name, values: vals, defaultValue: vals.includes(def) ? def : vals[0] })
   }
@@ -1669,12 +1676,13 @@ function componentPropMembers(
   sf: ts.SourceFile,
   type: ts.TypeNode | undefined,
   componentTypeParameters: readonly ts.TypeParameterDeclaration[] | undefined,
-): Array<{ member: ts.PropertySignature; typeText: string }> {
+): Array<{ member: ts.PropertySignature; typeText: string; axisValues: string[] | null }> {
   if (!type) return []
   if (ts.isTypeLiteralNode(type)) {
     return type.members.filter(ts.isPropertySignature).map((member) => ({
       member,
       typeText: member.type?.getText(sf) ?? 'unknown',
+      axisValues: member.type ? topLevelStringLiteralUnion(member.type) : null,
     }))
   }
   if (!ts.isTypeReferenceNode(type) || !ts.isIdentifier(type.typeName)) {
@@ -1708,7 +1716,7 @@ function componentPropMembers(
   const properties = [...members].filter((member): member is ts.PropertySignature => ts.isPropertySignature(member))
   return properties.map((member) => ({
     member,
-    typeText: member.type ? printSubstitutedType(sf, member.type, substitutions) : 'unknown',
+    ...(member.type ? describeSubstitutedType(sf, member.type, substitutions) : { typeText: 'unknown', axisValues: null }),
   }))
 }
 
@@ -1722,7 +1730,10 @@ function containsTypeParameterReference(type: ts.TypeNode, names: Set<string>): 
   return found
 }
 
-function printSubstitutedType(sf: ts.SourceFile, type: ts.TypeNode, substitutions: Map<string, ts.TypeNode>): string {
+function describeSubstitutedType(sf: ts.SourceFile, type: ts.TypeNode, substitutions: Map<string, ts.TypeNode>): {
+  typeText: string
+  axisValues: string[] | null
+} {
   const transformed = ts.transform(type, [(context) => {
     const visit: ts.Visitor = (node) => {
       if (ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName) && !node.typeArguments) {
@@ -1734,10 +1745,28 @@ function printSubstitutedType(sf: ts.SourceFile, type: ts.TypeNode, substitution
     return (node) => ts.visitNode(node, visit) as ts.TypeNode
   }])
   try {
-    return ts.createPrinter().printNode(ts.EmitHint.Unspecified, transformed.transformed[0]!, sf)
+    const resolved = transformed.transformed[0]!
+    return {
+      typeText: ts.createPrinter().printNode(ts.EmitHint.Unspecified, resolved, sf),
+      axisValues: topLevelStringLiteralUnion(resolved),
+    }
   } finally {
     transformed.dispose()
   }
+}
+
+function topLevelStringLiteralUnion(input: ts.TypeNode): string[] | null {
+  let type = input
+  while (ts.isParenthesizedTypeNode(type)) type = type.type
+  if (!ts.isUnionTypeNode(type) || type.types.length < 2) return null
+  const values: string[] = []
+  for (const inputMember of type.types) {
+    let member = inputMember
+    while (ts.isParenthesizedTypeNode(member)) member = member.type
+    if (!ts.isLiteralTypeNode(member) || !ts.isStringLiteral(member.literal)) return null
+    values.push(member.literal.text)
+  }
+  return new Set(values).size === values.length ? values : null
 }
 
 function parseNativeVariantRegistry(sf: ts.SourceFile): ComponentModel['nativeVariants'] {
