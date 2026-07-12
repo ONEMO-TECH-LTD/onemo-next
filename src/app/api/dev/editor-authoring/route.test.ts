@@ -5,7 +5,8 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { PROJECT_AUTHORING_SIDECAR } from '../editor/authoring-store'
-import { GET, handleGet, handlePost } from './route'
+import { handleGet, handlePost } from './handler'
+import { GET } from './route'
 
 const SOURCE_FILE = 'src/app/(dev)/react-figma-components/Button.tsx'
 const singleAxisSource = `export function Button({ variant = 'Primary' }: { variant?: 'Primary' | 'Secondary' }) {
