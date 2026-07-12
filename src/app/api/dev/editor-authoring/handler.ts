@@ -78,7 +78,11 @@ export async function handlePost(req: Request, rootPath = process.cwd()) {
     }
     if (isExecuteRequest(body)) {
       const { session } = await createContext(rootPath)
-      return NextResponse.json(await session.execute(body))
+      const result = await session.execute(body)
+      return NextResponse.json({
+        graph: result.graph,
+        sourceChanged: result.plan.sourcePatches.length > 0,
+      })
     }
     if (isRevalidateRequest(body)) {
       const { session } = await createContext(rootPath)

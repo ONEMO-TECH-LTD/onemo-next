@@ -51,8 +51,35 @@ test.describe('React Figma component authoring', () => {
     tokenResponses.length = 0
     await fixtureButton.dblclick()
     await expect(page.locator('[data-authoring-import]')).toContainText(`${fixtureName} · legacy-single-axis · 2 variants`, { timeout: 30_000 })
+    const importButton = page.getByRole('button', { name: 'Import source' })
+    const isImportPost = (route: import('@playwright/test').Route) =>
+      route.request().method() === 'POST' && (route.request().postData() ?? '').includes('"kind":"import-source"')
+    const invalidJson = async (route: import('@playwright/test').Route) => {
+      if (isImportPost(route)) await route.fulfill({ status: 200, contentType: 'application/json', body: '{' })
+      else await route.continue()
+    }
+    await page.route('**/api/dev/editor-authoring', invalidJson)
+    await importButton.click()
+    await expect(page.locator('[data-authoring-import] [role="alert"]')).toBeVisible()
+    expect(await page.evaluate(() => sessionStorage.getItem('react-figma:authoring-import-resume-v1'))).toBeNull()
+    await page.unroute('**/api/dev/editor-authoring', invalidJson)
+
+    const abortImport = async (route: import('@playwright/test').Route) => {
+      if (isImportPost(route)) await route.abort('failed')
+      else await route.continue()
+    }
+    await page.route('**/api/dev/editor-authoring', abortImport)
+    await importButton.click()
+    await expect(page.locator('[data-authoring-import] [role="alert"]')).toBeVisible()
+    expect(await page.evaluate(() => sessionStorage.getItem('react-figma:authoring-import-resume-v1'))).toBeNull()
+    await page.unroute('**/api/dev/editor-authoring', abortImport)
+    expect(failedRequests.some((entry) => entry.includes('/api/dev/editor-authoring'))).toBe(true)
+    expect(consoleErrors.some((entry) => entry.includes('net::ERR_FAILED'))).toBe(true)
+    failedRequests.length = 0
+    consoleErrors.length = 0
+
     const importReload = page.waitForEvent('domcontentloaded', { timeout: 30_000 })
-    await page.getByRole('button', { name: 'Import source' }).click()
+    await importButton.click()
     await importReload
     const authoringCanvas = page.locator('[data-authoring-canvas]')
     await expect.poll(() => editorDocumentRequests.length, { timeout: 30_000 }).toBe(1)
@@ -83,18 +110,7 @@ test.describe('React Figma component authoring', () => {
     await page.getByTitle('Zoom out').click()
     await page.getByRole('button', { name: 'Create variant' }).click()
     await expect(page.getByText('Variant 3', { exact: true })).toBeVisible({ timeout: 30_000 })
-    await expect.poll(async () => {
-      const before = await authoringCanvas.evaluate((node) => {
-        const element = node as HTMLElement & { __e2eCanvasInstance?: string }
-        return element.__e2eCanvasInstance ??= crypto.randomUUID()
-      })
-      await new Promise((resolve) => setTimeout(resolve, 300))
-      const after = await authoringCanvas.evaluate((node) => {
-        const element = node as HTMLElement & { __e2eCanvasInstance?: string }
-        return element.__e2eCanvasInstance ??= crypto.randomUUID()
-      })
-      return before === after && await authoringCanvas.getAttribute('data-authoring-busy') === 'false'
-    }, { timeout: 30_000 }).toBe(true)
+    await expect(authoringCanvas).toHaveAttribute('data-authoring-busy', 'false', { timeout: 30_000 })
     expect(editorDocumentRequests).toHaveLength(1)
 
     const created = page.locator('[data-variant-id]').filter({ hasText: 'Variant 3' })

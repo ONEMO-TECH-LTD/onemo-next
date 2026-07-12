@@ -660,6 +660,7 @@ export function Button() { return <button className={styles.base} /> }
     }), root)
     expect(create.status).toBe(200)
     const created = await create.json()
+    expect(created.sourceChanged).toBe(true)
     const variant = Object.values(created.graph.variants as Record<string, { id: string; displayName: string }>).find((entry) => entry.displayName === 'New Variant')!
     const frameBeforeMove = (created.graph.variants as Record<string, { frame: { x: number; y: number } }>)[variant.id]!.frame
 
@@ -671,6 +672,7 @@ export function Button() { return <button className={styles.base} /> }
       expectedSourceHashes: loaded.sourceHashes,
     }), root)
     expect(rename.status).toBe(200)
+    await expect(rename.json()).resolves.toMatchObject({ sourceChanged: false })
 
     loaded = await (await handleGet(componentRequest(), root)).json()
     const move = await handlePost(request('POST', {
@@ -680,7 +682,7 @@ export function Button() { return <button className={styles.base} /> }
       expectedSourceHashes: loaded.sourceHashes,
     }), root)
     expect(move.status).toBe(200)
-    await expect(move.json()).resolves.toMatchObject({ graph: { revision: 4, variants: { [variant.id]: { id: variant.id, displayName: 'Renamed', frame: { x: 80, y: 40 } } } } })
+    await expect(move.json()).resolves.toMatchObject({ sourceChanged: false, graph: { revision: 4, variants: { [variant.id]: { id: variant.id, displayName: 'Renamed', frame: { x: 80, y: 40 } } } } })
 
     loaded = await (await handleGet(componentRequest(), root)).json()
     expect(loaded.canUndo).toBe(true)

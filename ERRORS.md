@@ -101,3 +101,9 @@ Follow-up after the bounded import-reload protocol: the one permitted document r
 - Symptoms: semantically identical inline union types still produced different projection hashes after the first two attempts, while the shell diagnostic obscured the actual remaining field difference.
 - What worked: compare the two parsed projections recursively after applying the intended normalization and report exact differing property paths directly from one process.
 - Remember: projection fingerprint debugging must compare normalized semantic payloads field-by-field; do not infer the remaining mismatch from the final SHA or pipe large JSON through early-closing shell consumers.
+
+## S58 component-source HMR readiness
+
+- What did not work: polling `require.context()` during HMR, then waiting for webpack's global `idle` status and requiring once. Both touched the old recursive context while it was already disposed and produced repeated `[HMR] unexpected require ... from disposed module` warnings.
+- What worked: hot-accept the recursive component context itself, replace the context reference inside its accept callback, and keep the canvas busy until that exact context generation advances.
+- Remember: webpack `idle` does not prove a disposed `require.context` reference is safe; readiness belongs to the context's own accept lifecycle.

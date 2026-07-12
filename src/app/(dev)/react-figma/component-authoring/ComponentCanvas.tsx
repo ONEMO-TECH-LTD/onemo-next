@@ -9,7 +9,23 @@ import { componentCanvasGeometry, movedVariantFrame } from './gestures'
 import { cancelAuthoringResumeMarker, issueAuthoringResumeMarker } from './session'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const projectComponents = (require as any).context('../../react-figma-components', true, /\.tsx$/)
+let projectComponents = (require as any).context('../../react-figma-components', true, /\.tsx$/)
+let projectComponentsGeneration = 0
+const projectComponentRefreshListeners = new Set<() => void>()
+
+type WebpackHot = {
+  accept: (dependency: string, callback: () => void) => void
+}
+
+const componentHot = (module as NodeModule & { hot?: WebpackHot }).hot
+if (componentHot && typeof projectComponents.id === 'string') {
+  componentHot.accept(projectComponents.id, () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    projectComponents = (require as any).context('../../react-figma-components', true, /\.tsx$/)
+    projectComponentsGeneration += 1
+    for (const listener of projectComponentRefreshListeners) listener()
+  })
+}
 
 type CanvasSnapshot = {
   graph: AuthoringGraphV1
@@ -29,6 +45,46 @@ type ImportPreview = {
 }
 
 const accent = 'var(--sem-col-border-brand)'
+
+function armComponentModuleRefresh(): {
+  wait: () => Promise<void>
+  cancel: () => void
+} {
+  const beforeGeneration = projectComponentsGeneration
+  let cancelled = false
+  let timeout: ReturnType<typeof setTimeout> | undefined
+  let remove = () => {}
+  const lifecycle = new Promise<void>((resolve, reject) => {
+    if (!componentHot) {
+      resolve()
+      return
+    }
+    const handler = () => {
+      if (projectComponentsGeneration === beforeGeneration) return
+      projectComponentRefreshListeners.delete(handler)
+      if (timeout) clearTimeout(timeout)
+      resolve()
+    }
+    remove = () => projectComponentRefreshListeners.delete(handler)
+    projectComponentRefreshListeners.add(handler)
+    timeout = setTimeout(() => {
+      remove()
+      reject(Object.assign(new Error('component source committed, but its webpack context did not refresh'), { code: 'AUTHORING_HMR_NOT_READY' }))
+    }, 15_000)
+  })
+  return {
+    wait: () => componentHot
+      ? lifecycle
+      : Promise.reject(Object.assign(new Error('component HMR lifecycle is unavailable'), { code: 'AUTHORING_HMR_NOT_READY' })),
+    cancel: () => {
+      if (cancelled) return
+      cancelled = true
+      remove()
+      if (timeout) clearTimeout(timeout)
+      void lifecycle.catch(() => undefined)
+    },
+  }
+}
 
 export function ComponentCanvas({ file, undoNonce, onBounds, onChanged, onResumeResolved }: {
   file: string
@@ -107,6 +163,7 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged, onResume
   const execute = useCallback(async (command: object) => {
     if (!snapshot || busy) return
     setBusy(true); setError(null)
+    const refresh = armComponentModuleRefresh()
     try {
       const response = await fetch('/api/dev/editor-authoring', {
         method: 'POST', headers: { 'content-type': 'application/json' },
@@ -114,11 +171,14 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged, onResume
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error ?? `Authoring command failed (${response.status})`)
+      if (data.sourceChanged === true) await refresh.wait()
+      else refresh.cancel()
       await load()
       onChanged()
     } catch (cause) {
+      refresh.cancel()
       setError((cause as Error).message)
-    } finally { setBusy(false) }
+    } finally { refresh.cancel(); setBusy(false) }
   }, [busy, load, onChanged, snapshot])
 
   const prepareSource = useCallback(async () => {
@@ -165,6 +225,7 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged, onResume
       await load()
       onChanged()
     } catch (cause) {
+      if (importTransactionId) cancelAuthoringResumeMarker(importTransactionId)
       setError((cause as Error).message)
     } finally { setBusy(false) }
   }, [busy, file, importPreview, load, onChanged])
