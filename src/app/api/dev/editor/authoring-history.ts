@@ -198,6 +198,24 @@ export class AuthoringHistoryStore {
     record: AuthoringCommandHistoryRecord | AuthoringUndoHistoryRecord,
     patches: Map<string, PlannedHistoryPatch>,
   ): Promise<void> {
+    const existing = await this.readJournal()
+    const index = existing.length
+    const validated = assertHistoryRecord(record, this.registry.get(this.storeId).kind, index)
+    const expectedRevision = (existing.at(-1)?.record.revision ?? 0) + 1
+    if (validated.revision !== expectedRevision) {
+      throw namedError(
+        'HISTORY_REVISION_STALE',
+        `history append revision ${validated.revision} does not match next revision ${expectedRevision}`,
+      )
+    }
+    if (validated.type === 'authoring-undo') {
+      const target = existing[validated.undoneJournalIndex]
+      const alreadyUndone = existing.some((entry) =>
+        entry.record.type === 'authoring-undo' && entry.record.undoneJournalIndex === validated.undoneJournalIndex)
+      if (!target || target.record.type !== 'authoring-command' || alreadyUndone) {
+        throw namedError('HISTORY_RECORD_INVALID', `history undo at line ${index} has an invalid target`)
+      }
+    }
     const rel = this.historyPath('journal.ndjson')
     const abs = await this.registry.resolveStorePath(this.storeId, rel)
     let before: Buffer | null
@@ -208,7 +226,7 @@ export class AuthoringHistoryStore {
       before = null
     }
     const prefix = before ?? Buffer.alloc(0)
-    const after = Buffer.concat([prefix, Buffer.from(JSON.stringify(record) + '\n')])
+    const after = Buffer.concat([prefix, Buffer.from(JSON.stringify(validated) + '\n')])
     patches.set(rel, { file: rel, before, after })
   }
 

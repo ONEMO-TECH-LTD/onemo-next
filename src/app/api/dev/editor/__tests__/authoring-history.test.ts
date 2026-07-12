@@ -88,6 +88,45 @@ describe('AuthoringHistoryStore', () => {
     await expect(history.latestUndoableCommand(2)).rejects.toMatchObject({ code: 'HISTORY_REVISION_STALE' })
   })
 
+  it('refuses an invalid command before planning journal bytes', async () => {
+    const { history } = await historyFixture()
+
+    await expect(history.planCommand({
+      command: null,
+      sourceFiles: ['Button.tsx'],
+      sourcePreimages: [],
+      graphPreimage: '{}\n',
+      revision: 1,
+    })).rejects.toMatchObject({ code: 'HISTORY_RECORD_INVALID' })
+  })
+
+  it('refuses a non-contiguous revision before planning an append', async () => {
+    const { history, journalPath, validCommandRecord } = await historyFixture()
+    await fs.writeFile(journalPath, JSON.stringify(validCommandRecord()) + '\n')
+
+    await expect(history.planCommand({
+      command: { kind: 'next' },
+      sourceFiles: ['Button.tsx'],
+      sourcePreimages: [],
+      graphPreimage: '{}\n',
+      revision: 3,
+    })).rejects.toMatchObject({ code: 'HISTORY_REVISION_STALE' })
+  })
+
+  it('refuses planning an undo for a command already undone', async () => {
+    const { history, journalPath, validCommandRecord } = await historyFixture()
+    await fs.writeFile(journalPath, JSON.stringify(validCommandRecord()) + '\n')
+    const planned = await history.planUndo({ undoneJournalIndex: 0, restoredFiles: ['Button.tsx'], revision: 2 })
+    const journal = planned.find((patch) => patch.file.endsWith('/history/journal.ndjson'))!
+    await fs.writeFile(journalPath, journal.after)
+
+    await expect(history.planUndo({
+      undoneJournalIndex: 0,
+      restoredFiles: ['Button.tsx'],
+      revision: 3,
+    })).rejects.toMatchObject({ code: 'HISTORY_RECORD_INVALID' })
+  })
+
   it('refuses non-contiguous durable history revisions', async () => {
     const { history, journalPath, validCommandRecord } = await historyFixture()
     const command = validCommandRecord()
