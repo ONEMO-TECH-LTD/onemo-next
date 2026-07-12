@@ -3,7 +3,6 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 
 const fixtureName = 'AuthoringE2EButton'
-const storeFile = `src/app/(dev)/react-figma-components/${fixtureName}.tsx`
 const run = promisify(execFile)
 
 test.describe('React Figma component authoring', () => {
@@ -11,7 +10,8 @@ test.describe('React Figma component authoring', () => {
     await run(process.execPath, ['tests/e2e/restore-authoring-fixture.mjs'])
   })
 
-  test('Home restores the retained page canvas and inspector dimensions without navigation', async ({ page, request }) => {
+  test('Home restores the retained page canvas and inspector dimensions without navigation', async ({ page }) => {
+    test.setTimeout(120_000)
     const consoleErrors: string[] = []
     const consoleWarnings: string[] = []
     const pageErrors: string[] = []
@@ -39,24 +39,24 @@ test.describe('React Figma component authoring', () => {
       () => componentsRail.evaluate((node) => Object.keys(node).some((key) => key.startsWith('__reactProps'))),
       { timeout: 20_000 },
     ).toBe(true)
-    // Import only after the editor bundle has generated its tsconfig-owned ambient declarations;
-    // otherwise the first command correctly refuses those newly changed source-authority hashes.
-    const classified = await request.get(`/api/dev/editor-authoring?file=${encodeURIComponent(storeFile)}`)
-    expect(classified.ok()).toBe(true)
-    const classification = await classified.json()
-    const imported = await request.post('/api/dev/editor-authoring', {
-      data: { kind: 'import-source', file: storeFile, expectedSourceHashes: classification.sourceHashes },
-    })
-    expect(imported.ok()).toBe(true)
     const frame = page.locator('iframe')
     const editorUrl = page.url()
 
     await expect(async () => {
       await componentsRail.click()
       await expect(page.getByRole('textbox', { name: 'Search components' })).toBeVisible({ timeout: 3_000 })
-    }).toPass({ timeout: 20_000 })
-    await page.getByText(fixtureName, { exact: true }).first().dblclick()
-    await expect(page.locator('[data-authoring-canvas]')).toBeVisible()
+      await page.getByRole('button', { name: fixtureName, exact: true }).dblclick()
+      await expect(page.locator('[data-authoring-import]')).toContainText(`${fixtureName} · legacy-single-axis · 2 variants`, { timeout: 15_000 })
+    }).toPass({ timeout: 60_000 })
+    await page.getByRole('button', { name: 'Import source' }).click()
+    const authoringCanvas = page.locator('[data-authoring-canvas]')
+    const revalidateSource = page.getByRole('button', { name: 'Revalidate source' })
+    await Promise.race([
+      authoringCanvas.waitFor({ state: 'visible', timeout: 30_000 }),
+      revalidateSource.waitFor({ state: 'visible', timeout: 30_000 }),
+    ])
+    if (await revalidateSource.isVisible()) await revalidateSource.click()
+    await expect(authoringCanvas).toBeVisible({ timeout: 30_000 })
     const authoringHost = await page.locator('[data-screen-host]').evaluate((node) => ({ width: node.clientWidth, height: node.clientHeight }))
     expect(authoringHost.width).toBeGreaterThan(402)
     await frame.evaluate((node) => {

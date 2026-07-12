@@ -97,6 +97,48 @@ export class ProjectAuthoringSession {
     return { graph: committed, plan }
   }
 
+  async revalidateSource(input: {
+    file: string
+    expectedRevision: number
+    expectedSourceHashes: Record<string, string>
+  }): Promise<{ kind: 'revalidated'; graph: AuthoringGraphV1 }> {
+    const before = await this.requireGraph()
+    if (before.revision !== input.expectedRevision) {
+      throw namedError('AUTHORING_REVISION_STALE', `expected revision ${input.expectedRevision}, found ${before.revision}`, 409)
+    }
+    const component = Object.values(before.components).filter((candidate) => candidate.source.file === input.file)
+    if (component.length !== 1) throw namedError('COMPONENT_SOURCE_AMBIGUOUS', `expected one component for ${input.file}`, 422)
+    const snapshot = await readExactAuthoringSourceSnapshot({
+      storeId: this.input.storeId,
+      file: input.file,
+      registry: this.input.registry,
+    })
+    assertExactHashSet(input.expectedSourceHashes, snapshot.sourceHashes)
+    projectVariantRegistry(before, component[0]!, snapshot.projection)
+    const command = { kind: 'revalidate-source', file: input.file }
+    const historyPatches = await this.history.planCommand({
+      command,
+      sourceFiles: Object.keys(snapshot.sourceHashes),
+      sourcePreimages: [],
+      graphPreimage: JSON.stringify(before, null, 2) + '\n',
+      revision: before.revision + 1,
+    })
+    const graph = await new SingleRootAuthoringTransaction({
+      transactionId: `g2-revalidate-${randomUUID()}`,
+      storeId: this.input.storeId,
+      registry: this.input.registry,
+      store: this.input.store,
+    }).commit({
+      expectedRevision: input.expectedRevision,
+      expectedSourceHashes: input.expectedSourceHashes,
+      sourceFiles: Object.keys(snapshot.sourceHashes),
+      metadataPatches: historyPatches,
+      command,
+      mutate: () => before,
+    })
+    return { kind: 'revalidated', graph }
+  }
+
   async undo(input: {
     expectedRevision: number
     expectedSourceHashes: Record<string, string>
@@ -161,8 +203,7 @@ export class ProjectAuthoringSession {
   }
 
   private async latestUndoableG2Command(expectedRevision: number) {
-    const latest = await this.history.latestUndoableCommand(expectedRevision)
-    return latest && parseG2VariantCommand(latest.record.command) ? latest : null
+    return this.history.latestUndoableCommand(expectedRevision, (command) => parseG2VariantCommand(command) !== null)
   }
 }
 

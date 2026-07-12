@@ -15,8 +15,31 @@ export async function handleGet(req: Request, rootPath = process.cwd()) {
   try {
     const file = new URL(req.url).searchParams.get('file')
     if (!isImportFile(file)) return NextResponse.json({ error: 'valid component file required' }, { status: 400 })
-    const { registry, session } = await createContext(rootPath)
-    if (new URL(req.url).searchParams.get('mode') === 'component') return NextResponse.json(await session.loadComponent(file))
+    const { registry, store, session } = await createContext(rootPath)
+    const mode = new URL(req.url).searchParams.get('mode')
+    if (mode === 'component') return NextResponse.json(await session.loadComponent(file))
+    if (mode === 'component-status') {
+      try {
+        return NextResponse.json({ authoringState: 'loaded', ...await session.loadComponent(file) })
+      } catch (error) {
+        const code = (error as { code?: unknown }).code
+        if (code === 'SOURCE_HASH_STALE') {
+          const graph = await store.load()
+          if (!graph) throw error
+          return NextResponse.json({
+            authoringState: 'source-stale',
+            expectedRevision: graph.revision,
+            changedPaths: (error as { changedPaths?: unknown }).changedPaths,
+            ...await classifySourceFileForImport({ storeId: STORE_ID, file, registry }),
+          })
+        }
+        if (code !== 'AUTHORING_GRAPH_MISSING') throw error
+        return NextResponse.json({
+          authoringState: 'import-preview',
+          ...await classifySourceFileForImport({ storeId: STORE_ID, file, registry }),
+        })
+      }
+    }
     return NextResponse.json(await classifySourceFileForImport({ storeId: STORE_ID, file, registry }))
   } catch (error) {
     return errorResponse(error)
@@ -45,6 +68,10 @@ export async function handlePost(req: Request, rootPath = process.cwd()) {
     if (isExecuteRequest(body)) {
       const { session } = await createContext(rootPath)
       return NextResponse.json(await session.execute(body))
+    }
+    if (isRevalidateRequest(body)) {
+      const { session } = await createContext(rootPath)
+      return NextResponse.json(await session.revalidateSource(body))
     }
     if (isUndoRequest(body)) {
       const { session } = await createContext(rootPath)
@@ -97,6 +124,20 @@ function isUndoRequest(value: unknown): value is {
   const record = value as Record<string, unknown>
   return Object.keys(record).sort().join('\0') === ['expectedRevision', 'expectedSourceHashes', 'kind'].sort().join('\0') &&
     record.kind === 'undo' &&
+    typeof record.expectedRevision === 'number' && Number.isSafeInteger(record.expectedRevision) && record.expectedRevision >= 0 &&
+    isHashMap(record.expectedSourceHashes)
+}
+
+function isRevalidateRequest(value: unknown): value is {
+  kind: 'revalidate-source'
+  file: string
+  expectedRevision: number
+  expectedSourceHashes: Record<string, string>
+} {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const record = value as Record<string, unknown>
+  return Object.keys(record).sort().join('\0') === ['expectedRevision', 'expectedSourceHashes', 'file', 'kind'].sort().join('\0') &&
+    record.kind === 'revalidate-source' && isImportFile(record.file) &&
     typeof record.expectedRevision === 'number' && Number.isSafeInteger(record.expectedRevision) && record.expectedRevision >= 0 &&
     isHashMap(record.expectedSourceHashes)
 }

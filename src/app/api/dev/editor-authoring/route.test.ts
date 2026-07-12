@@ -46,6 +46,10 @@ function componentRequest() {
   return new Request(`http://localhost/api/dev/editor-authoring?mode=component&file=${encodeURIComponent(SOURCE_FILE)}`)
 }
 
+function componentStatusRequest() {
+  return new Request(`http://localhost/api/dev/editor-authoring?mode=component-status&file=${encodeURIComponent(SOURCE_FILE)}`)
+}
+
 describe('editor-authoring G1 import route', () => {
   beforeEach(() => vi.stubEnv('NODE_ENV', 'development'))
   afterEach(() => vi.unstubAllEnvs())
@@ -69,6 +73,78 @@ describe('editor-authoring G1 import route', () => {
     expect(await fs.readFile(path.join(root, SOURCE_FILE), 'utf8')).toBe(singleAxisSource)
     expect(await fs.readFile(path.join(root, PROJECT_AUTHORING_SIDECAR), 'utf8')).toContain('legacy-single-axis')
   })
+
+  it('returns an import preview without turning a missing graph into an HTTP failure', async () => {
+    const root = await makeRoot()
+
+    const previewResponse = await handleGet(componentStatusRequest(), root)
+    expect(previewResponse.status).toBe(200)
+    await expect(previewResponse.json()).resolves.toMatchObject({
+      authoringState: 'import-preview',
+      projection: { compatibility: 'legacy-single-axis' },
+      sourceHashes: { [SOURCE_FILE]: expect.stringMatching(/^[a-f0-9]{64}$/) },
+    })
+
+    const directResponse = await handleGet(componentRequest(), root)
+    expect(directResponse.status).toBe(409)
+    await expect(directResponse.json()).resolves.toMatchObject({ code: 'AUTHORING_GRAPH_MISSING' })
+  })
+
+  it('revalidates changed source authority without hiding the latest variant undo', async () => {
+    const root = await makeRoot()
+    const ambientFile = 'src/authoring-e2e.d.ts'
+    await fs.writeFile(path.join(root, ambientFile), 'declare type AuthoringAmbient = "before"\n')
+    const classified = await (await handleGet(request('GET'), root)).json()
+    await handlePost(request('POST', {
+      kind: 'import-source',
+      file: SOURCE_FILE,
+      expectedSourceHashes: classified.sourceHashes,
+    }), root)
+
+    let loaded = await (await handleGet(componentRequest(), root)).json()
+    const created = await (await handlePost(request('POST', {
+      kind: 'execute-command',
+      command: { kind: 'create-variant', commandId: 'before-revalidate', componentId: loaded.componentId, displayName: 'Created' },
+      expectedRevision: loaded.graph.revision,
+      expectedSourceHashes: loaded.sourceHashes,
+    }), root)).json()
+    expect(Object.keys(created.graph.variants)).toHaveLength(3)
+
+    await fs.writeFile(path.join(root, ambientFile), 'declare type AuthoringAmbient = "after"\n')
+    const staleResponse = await handleGet(componentStatusRequest(), root)
+    expect(staleResponse.status).toBe(200)
+    const stale = await staleResponse.json()
+    expect(stale).toMatchObject({
+      authoringState: 'source-stale',
+      expectedRevision: 2,
+      changedPaths: [ambientFile],
+      sourceHashes: { [ambientFile]: expect.stringMatching(/^[a-f0-9]{64}$/) },
+    })
+
+    const revalidatedResponse = await handlePost(request('POST', {
+      kind: 'revalidate-source',
+      file: SOURCE_FILE,
+      expectedRevision: stale.expectedRevision,
+      expectedSourceHashes: stale.sourceHashes,
+    }), root)
+    expect(revalidatedResponse.status).toBe(200)
+    await expect(revalidatedResponse.json()).resolves.toMatchObject({ kind: 'revalidated', graph: { revision: 3 } })
+
+    loaded = await (await handleGet(componentRequest(), root)).json()
+    expect(loaded.canUndo).toBe(true)
+    const undo = await handlePost(request('POST', {
+      kind: 'undo',
+      expectedRevision: loaded.graph.revision,
+      expectedSourceHashes: loaded.sourceHashes,
+    }), root)
+    expect(undo.status).toBe(200)
+    const undone = await undo.json()
+    expect(undone).toMatchObject({
+      graph: { revision: 4 },
+      undoneCommand: { kind: 'create-variant', commandId: 'before-revalidate' },
+    })
+    expect(Object.keys(undone.graph.variants)).toHaveLength(2)
+  }, 20_000)
 
   it('rejects malformed and extra request fields before filesystem access', async () => {
     const response = await handlePost(request('POST', {
@@ -208,5 +284,13 @@ describe('editor-authoring G1 import route', () => {
       extra: true,
     }), '/path/that/must/not-be-read')
     expect(invalidUndo.status).toBe(400)
+
+    const invalidRevalidation = await handlePost(request('POST', {
+      kind: 'revalidate-source',
+      file: SOURCE_FILE,
+      expectedRevision: 1,
+      expectedSourceHashes: {},
+    }), '/path/that/must/not-be-read')
+    expect(invalidRevalidation.status).toBe(400)
   })
 })

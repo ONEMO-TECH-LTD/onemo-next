@@ -162,7 +162,10 @@ export class AuthoringHistoryStore {
     return { entries, bytes }
   }
 
-  async latestUndoableCommand(expectedRevision?: number): Promise<IndexedAuthoringCommandHistoryRecord | null> {
+  async latestUndoableCommand(
+    expectedRevision?: number,
+    accepts: (command: unknown) => boolean = () => true,
+  ): Promise<IndexedAuthoringCommandHistoryRecord | null> {
     const journal = await this.readJournal()
     const journalRevision = journal.at(-1)?.record.revision ?? 0
     if (expectedRevision !== undefined && journalRevision !== expectedRevision) {
@@ -177,7 +180,7 @@ export class AuthoringHistoryStore {
     }
     for (let index = journal.length - 1; index >= 0; index--) {
       const entry = journal[index]
-      if (!entry || undone.has(entry.index) || entry.record.type !== 'authoring-command') continue
+      if (!entry || undone.has(entry.index) || entry.record.type !== 'authoring-command' || !accepts(entry.record.command)) continue
       return { index: entry.index, record: entry.record }
     }
     return null

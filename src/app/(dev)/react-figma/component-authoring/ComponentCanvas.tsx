@@ -6,6 +6,7 @@ import { isValidElementType } from 'react-is'
 import type { AuthoringGraphV1, VariantFrame } from '@/app/api/dev/editor/authoring-types'
 import type { SourceProjection } from '@/app/api/dev/editor/source-projection'
 import { componentCanvasGeometry, movedVariantFrame } from './gestures'
+import { AUTHORING_RESUME_KEY } from './resume'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const projectComponents = (require as any).context('../../react-figma-components', true, /\.tsx$/)
@@ -18,6 +19,13 @@ type CanvasSnapshot = {
   variantProps: Record<string, Record<string, string | number | boolean | null>>
   canUndo: boolean
 }
+type ImportPreview = {
+  action: 'import' | 'revalidate'
+  projection: SourceProjection
+  sourceHashes: Record<string, string>
+  expectedRevision?: number
+  changedPaths?: string[]
+}
 
 const accent = 'var(--sem-col-border-brand)'
 
@@ -28,6 +36,7 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged }: {
   onChanged: () => void
 }) {
   const [snapshot, setSnapshot] = useState<CanvasSnapshot | null>(null)
+  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -37,10 +46,23 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged }: {
   const [dragPreview, setDragPreview] = useState<{ id: string; frame: VariantFrame['frame'] } | null>(null)
 
   const load = useCallback(async () => {
-    const response = await fetch(`/api/dev/editor-authoring?mode=component&file=${encodeURIComponent(file)}`)
+    const response = await fetch(`/api/dev/editor-authoring?mode=component-status&file=${encodeURIComponent(file)}`)
     const data = await response.json()
     if (!response.ok) throw new Error(data.error ?? `Authoring load failed (${response.status})`)
+    if (data.authoringState === 'import-preview') {
+      setSnapshot(null)
+      setImportPreview({ ...data, action: 'import' })
+      return
+    }
+    if (data.authoringState === 'source-stale') {
+      setSnapshot(null)
+      setImportPreview({ ...data, action: 'revalidate' })
+      return
+    }
+    if (data.authoringState !== 'loaded') throw new Error('Authoring load returned an invalid state')
+    setImportPreview(null)
     setSnapshot(data)
+    if (sessionStorage.getItem(AUTHORING_RESUME_KEY) === file) sessionStorage.removeItem(AUTHORING_RESUME_KEY)
     setSelectedId((current) => current && data.graph.variants[current] ? current : data.graph.components[data.componentId]?.primaryVariantId ?? null)
   }, [file])
 
@@ -83,6 +105,34 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged }: {
     } catch (cause) { setError((cause as Error).message) } finally { setBusy(false) }
   }, [busy, load, onChanged, snapshot])
 
+  const prepareSource = useCallback(async () => {
+    if (!importPreview || busy) return
+    setBusy(true); setError(null)
+    sessionStorage.setItem(AUTHORING_RESUME_KEY, file)
+    try {
+      const response = await fetch('/api/dev/editor-authoring', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(importPreview.action === 'import'
+          ? { kind: 'import-source', file, expectedSourceHashes: importPreview.sourceHashes }
+          : { kind: 'revalidate-source', file, expectedRevision: importPreview.expectedRevision, expectedSourceHashes: importPreview.sourceHashes }),
+      })
+      const data = await response.json()
+      if (!response.ok && data.code === 'SOURCE_HASH_STALE') {
+        await load()
+        setError(data.error ?? 'Source changed again; review the refreshed source state.')
+        return
+      }
+      if (!response.ok) throw new Error(data.error ?? `Source preparation failed (${response.status})`)
+      const expectedKind = importPreview.action === 'import' ? 'imported' : 'revalidated'
+      if (data.kind !== expectedKind) throw new Error(data.reason ?? `Source preparation refused (${data.kind ?? 'unknown'})`)
+      await load()
+      onChanged()
+    } catch (cause) {
+      sessionStorage.removeItem(AUTHORING_RESUME_KEY)
+      setError((cause as Error).message)
+    } finally { setBusy(false) }
+  }, [busy, file, importPreview, load, onChanged])
+
   const undo = useCallback(async () => {
     if (!snapshot?.canUndo || busy) return
     setBusy(true); setError(null)
@@ -104,6 +154,20 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged }: {
     void undo()
   }, [undo, undoNonce])
 
+  if (importPreview) {
+    const { projection } = importPreview
+    const importable = projection.compatibility === 'native-v1' || projection.compatibility === 'legacy-single-axis'
+    const variantCount = projection.compatibility === 'legacy-single-axis' ? projection.variantAxes[0]?.values.length ?? 0 : 1
+    return <section data-authoring-import style={{ width: 360, margin: 24, padding: 20, border: '1px solid var(--sem-col-border-secondary)', borderRadius: 'var(--sem-radii-md)', background: 'var(--sem-col-bg-primary)', color: 'var(--sem-col-text-primary)', fontFamily: 'var(--al-type-family-primary)' }}>
+      <h2 style={{ margin: 0, fontSize: 16 }}>{importPreview.action === 'import' ? 'Import component source' : 'Source changed'}</h2>
+      <p style={{ margin: '8px 0 16px', color: 'var(--sem-col-text-secondary)' }}>{projection.exportName} · {projection.compatibility} · {variantCount} variant{variantCount === 1 ? '' : 's'}</p>
+      {importPreview.action === 'revalidate' && <p style={{ margin: '0 0 16px', color: 'var(--sem-col-text-secondary)' }}>Revalidate the component against the current source before editing{importPreview.changedPaths?.length ? `: ${importPreview.changedPaths.join(', ')}` : '.'}</p>}
+      {error && <div role="alert" style={{ marginBottom: 16, color: 'var(--sem-col-text-error-primary)' }}>{error}</div>}
+      {importable
+        ? <button type="button" disabled={busy} onClick={() => void prepareSource()} style={{ minHeight: 32, padding: '0 12px', border: 0, borderRadius: 'var(--sem-radii-full)', background: 'var(--sem-col-bg-brand-primary)', color: 'var(--sem-col-text-brand-primary)', cursor: busy ? 'default' : 'pointer', font: 'inherit' }}>{busy ? 'Working…' : importPreview.action === 'import' ? 'Import source' : 'Revalidate source'}</button>
+        : <div role="alert" style={{ color: 'var(--sem-col-text-error-primary)' }}>{projection.unsupportedReason ?? 'This source requires an explicit conversion preview.'}</div>}
+    </section>
+  }
   if (error) return <div role="alert" style={{ padding: 24, color: 'var(--sem-col-text-error-primary)' }}>{error}</div>
   if (!snapshot || !component) return <div style={{ padding: 24, color: 'var(--sem-col-text-secondary)' }}>Loading component…</div>
   const definition = snapshot.graph.components[snapshot.componentId]!

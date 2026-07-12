@@ -23,6 +23,7 @@ import {
   type Icon as PIcon,
 } from '@phosphor-icons/react'
 import { ComponentCanvas } from './component-authoring/ComponentCanvas'
+import { AUTHORING_RESUME_KEY } from './component-authoring/resume'
 import { canvasHistoryAction } from './component-authoring/gestures'
 
 const INK = 'rgba(0,0,0,0.898)', MUTE = 'rgba(0,0,0,0.45)', FAINT = 'rgba(0,0,0,0.3)' // INK: Figma's exact ink (E8 audit — measured, was 0.9)
@@ -2347,6 +2348,16 @@ export default function ReactFigmaPage() {
   const [autoDistributed, setAutoDistributed] = useState(false) // justify space-between (Figma distributed)
   const [insetSides, setInsetSides] = useState({ t: '0', r: '0', b: '0', l: '0' }) // A7: per-side inset (positioned elements) // derived — the far-left rail IS the canvas switch (Dan 2026-07-07)
   const dsComponents = useDsComponents(rail === 'assets' || rail === 'components', compNonce) // E4-G4 Assets panel + E10 components rail (library panel needs the list whether or not editing)
+  useEffect(() => {
+    if (sessionStorage.getItem(AUTHORING_RESUME_KEY)) setRail('components')
+  }, [])
+  useEffect(() => {
+    if (editingComponent || rail !== 'components') return
+    const resumeFile = sessionStorage.getItem(AUTHORING_RESUME_KEY)
+    if (!resumeFile) return
+    const component = dsComponents.find((candidate) => candidate.root === 'project' && candidate.file === resumeFile)
+    if (component) setEditingComponent(component)
+  }, [dsComponents, editingComponent, rail])
   // #6: create a new component in code (Framer-style) — scaffolds a real editable component file.
   const newComponent = useCallback(async (name: string, root: 'project' | 'global' = 'project', category = '') => {
     const clean = name.trim()
