@@ -114,17 +114,25 @@ export class AuthoringHistoryStore {
   }
 
   async readJournal(): Promise<Array<{ index: number; record: AuthoringHistoryRecord }>> {
+    return (await this.readJournalSnapshot()).entries
+  }
+
+  private async readJournalSnapshot(): Promise<{
+    entries: Array<{ index: number; record: AuthoringHistoryRecord }>
+    bytes: Buffer | null
+  }> {
     const rel = this.historyPath('journal.ndjson')
     const abs = await this.registry.resolveStorePath(this.storeId, rel)
-    let current = ''
+    let bytes: Buffer
     try {
-      current = await fs.readFile(abs, 'utf8')
+      bytes = await fs.readFile(abs)
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { entries: [], bytes: null }
       throw error
     }
+    const current = bytes.toString('utf8')
     const kind = this.registry.get(this.storeId).kind
-    if (current.length === 0) return []
+    if (current.length === 0) return { entries: [], bytes }
     if (!current.endsWith('\n')) invalidHistory('history journal is truncated')
     const lines = current.slice(0, -1).split('\n')
     if (lines.some((line) => line.length === 0)) invalidHistory('history journal contains a blank record')
@@ -151,7 +159,7 @@ export class AuthoringHistoryStore {
       }
       undone.add(target.index)
     }
-    return entries
+    return { entries, bytes }
   }
 
   async latestUndoableCommand(expectedRevision?: number): Promise<IndexedAuthoringCommandHistoryRecord | null> {
@@ -198,7 +206,8 @@ export class AuthoringHistoryStore {
     record: AuthoringCommandHistoryRecord | AuthoringUndoHistoryRecord,
     patches: Map<string, PlannedHistoryPatch>,
   ): Promise<void> {
-    const existing = await this.readJournal()
+    const snapshot = await this.readJournalSnapshot()
+    const existing = snapshot.entries
     const index = existing.length
     const validated = assertHistoryRecord(record, this.registry.get(this.storeId).kind, index)
     const expectedRevision = (existing.at(-1)?.record.revision ?? 0) + 1
@@ -217,14 +226,7 @@ export class AuthoringHistoryStore {
       }
     }
     const rel = this.historyPath('journal.ndjson')
-    const abs = await this.registry.resolveStorePath(this.storeId, rel)
-    let before: Buffer | null
-    try {
-      before = await fs.readFile(abs)
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
-      before = null
-    }
+    const before = snapshot.bytes
     const prefix = before ?? Buffer.alloc(0)
     const after = Buffer.concat([prefix, Buffer.from(JSON.stringify(validated) + '\n')])
     patches.set(rel, { file: rel, before, after })

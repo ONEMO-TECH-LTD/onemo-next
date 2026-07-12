@@ -2,7 +2,7 @@ import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { AuthoringHistoryStore } from '../authoring-history'
 import { sha256 } from '../durable-file-installer'
@@ -125,6 +125,38 @@ describe('AuthoringHistoryStore', () => {
       restoredFiles: ['Button.tsx'],
       revision: 3,
     })).rejects.toMatchObject({ code: 'HISTORY_RECORD_INVALID' })
+  })
+
+  it('builds an append from the same exact journal bytes it validated', async () => {
+    const { history, journalPath, validCommandRecord } = await historyFixture()
+    const validatedBytes = Buffer.from(JSON.stringify(validCommandRecord()) + '\n')
+    await fs.writeFile(journalPath, validatedBytes)
+    const originalReadFile = fs.readFile.bind(fs)
+    let replaced = false
+    const readSpy = vi.spyOn(fs, 'readFile').mockImplementation(async (file, options) => {
+      const result = await originalReadFile(file, options)
+      if (!replaced && String(file) === journalPath) {
+        replaced = true
+        await fs.writeFile(journalPath, 'corrupt\n')
+      }
+      return result
+    })
+    try {
+      const planned = await history.planCommand({
+        command: { kind: 'next' },
+        sourceFiles: ['Button.tsx'],
+        sourcePreimages: [],
+        graphPreimage: '{}\n',
+        revision: 2,
+      })
+      const journal = planned.find((patch) => patch.file.endsWith('/history/journal.ndjson'))!
+
+      expect(journal.before).toEqual(validatedBytes)
+      expect(journal.after.subarray(0, validatedBytes.length)).toEqual(validatedBytes)
+      await expect(fs.readFile(journalPath, 'utf8')).resolves.toBe('corrupt\n')
+    } finally {
+      readSpy.mockRestore()
+    }
   })
 
   it('refuses non-contiguous durable history revisions', async () => {
