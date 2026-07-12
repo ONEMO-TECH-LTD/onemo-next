@@ -11,6 +11,7 @@ import { SingleRootAuthoringTransaction } from './authoring-transaction'
 import type { AuthoringGraphV1, StoreId } from './authoring-types'
 import { sha256 } from './durable-file-installer'
 import { RuntimeRootRegistry } from './runtime-root-registry'
+import { legacySourceProjectionFingerprint, sourceProjectionFingerprint, type SourceProjection } from './source-projection'
 
 export class ProjectAuthoringSession {
   private readonly history: AuthoringHistoryStore
@@ -65,9 +66,11 @@ export class ProjectAuthoringSession {
       registry: this.input.registry,
     })
     assertExactHashSet(input.expectedSourceHashes, snapshot.sourceHashes)
+    assertExactHashSet(before.sourceHashes, snapshot.sourceHashes)
     assertEnvironmentFingerprint(before.environmentFingerprint, snapshot.environmentFingerprint)
+    const acceptedGraph = upgradeLegacyProjectionFingerprint(before, component.id, snapshot.projection)
     const plan = await compileG2VariantCommand({
-      graph: before,
+      graph: acceptedGraph,
       command: input.command,
       source: snapshot.sources[component.source.file]!,
       projectRoot: this.input.registry.get(this.input.storeId).canonicalRealPath,
@@ -187,8 +190,10 @@ export class ProjectAuthoringSession {
       snapshot.compilerOptions,
       Object.fromEntries(Object.entries(snapshot.sources).filter(([file]) => file !== definition.source.file)),
     )
-    projectVariantRegistry(before, definition, snapshot.projection)
-    assertAcceptedSourceProjection(definition, snapshot.projection)
+    const acceptedGraph = upgradeLegacyProjectionFingerprint(before, definition.id, snapshot.projection)
+    const acceptedDefinition = acceptedGraph.components[definition.id]!
+    projectVariantRegistry(acceptedGraph, acceptedDefinition, snapshot.projection)
+    assertAcceptedSourceProjection(acceptedDefinition, snapshot.projection)
     const command = { kind: 'environment-rebase', file: input.file }
     const historyPatches = await this.history.planCommand({
       command,
@@ -210,7 +215,7 @@ export class ProjectAuthoringSession {
       sourceFiles: Object.keys(snapshot.sourceHashes),
       metadataPatches: historyPatches,
       command,
-      mutate: (graph) => ({ ...graph, environmentFingerprint: snapshot.environmentFingerprint }),
+      mutate: () => ({ ...acceptedGraph, environmentFingerprint: snapshot.environmentFingerprint }),
     })
     return { kind: 'environment-rebased', graph }
   }
@@ -322,6 +327,26 @@ function assertEnvironmentFingerprint(expected: string, actual: string): void {
   throw Object.assign(new Error('compiler environment fingerprint changed'), {
     code: 'ENVIRONMENT_FINGERPRINT_STALE', status: 409,
   })
+}
+
+function upgradeLegacyProjectionFingerprint(
+  graph: AuthoringGraphV1,
+  componentId: string,
+  projection: SourceProjection,
+): AuthoringGraphV1 {
+  const component = graph.components[componentId]!
+  const current = sourceProjectionFingerprint(projection)
+  if (component.projectionFingerprint === current) return graph
+  if (component.projectionFingerprint !== legacySourceProjectionFingerprint(projection)) {
+    throw namedError('SOURCE_PROJECTION_DRIFT', 'current source projection differs from the accepted authoring baseline', 422)
+  }
+  return {
+    ...graph,
+    components: {
+      ...graph.components,
+      [componentId]: { ...component, projectionFingerprint: current },
+    },
+  }
 }
 
 function namedError(code: string, message: string, status: number): Error {

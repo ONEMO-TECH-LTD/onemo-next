@@ -2,7 +2,7 @@ import * as ts from 'typescript'
 import selectorParser from 'postcss-selector-parser'
 import valueParser from 'postcss-value-parser'
 
-import type { ComponentModel } from './lib'
+import type { ComponentModel, CssSemanticNode } from './lib'
 import { parseComponentModel, parseComponentModelFromSource, resolveEditorPath } from './lib'
 import type { SourceAnchor } from './authoring-types'
 import { sha256 } from './durable-file-installer'
@@ -23,6 +23,7 @@ export type SourceProjection = {
   nativeVariants: ComponentModel['nativeVariants']
   props: ComponentModel['props']
   rules: ComponentModel['rules']
+  cssSemantics: ComponentModel['cssSemantics']
   structure: ComponentModel['structure']
   connectors: ComponentModel['connectors']
   anchors: SourceAnchor[]
@@ -54,6 +55,7 @@ export function sourceProjectionFromModel(file: string, model: ComponentModel, a
     nativeVariants: model.nativeVariants,
     props: model.props,
     rules: model.rules,
+    cssSemantics: model.cssSemantics,
     structure: model.structure,
     connectors: model.connectors,
     anchors,
@@ -96,6 +98,7 @@ export function unsupportedSourceProjection(file: string, reason: string): Sourc
     nativeVariants: [],
     props: [],
     rules: [],
+    cssSemantics: [],
     structure: null,
     connectors: [],
     anchors: [],
@@ -105,6 +108,14 @@ export function unsupportedSourceProjection(file: string, reason: string): Sourc
 }
 
 export function sourceProjectionFingerprint(projection: SourceProjection): string {
+  return fingerprintProjection(projection, true)
+}
+
+export function legacySourceProjectionFingerprint(projection: SourceProjection): string {
+  return fingerprintProjection(projection, false)
+}
+
+function fingerprintProjection(projection: SourceProjection, includeCssSemantics: boolean): string {
   const props = projection.props.map((prop) => ({
     ...prop,
     tsType: tokenizeTypeScriptType(prop.tsType),
@@ -126,6 +137,7 @@ export function sourceProjectionFingerprint(projection: SourceProjection): strin
         value: normalizeCssValue(declaration.value),
       })),
     })),
+    ...(includeCssSemantics ? { cssSemantics: projection.cssSemantics.map(normalizeCssSemanticNode) } : {}),
     structure: normalizeStructure(projection.structure),
     connectors: projection.connectors,
     anchors: projection.anchors.map((anchor) => Object.fromEntries(
@@ -135,6 +147,25 @@ export function sourceProjectionFingerprint(projection: SourceProjection): strin
     unsupportedReason: projection.unsupportedReason,
   }
   return sha256(Buffer.from(JSON.stringify(canonicalize(normalized))))
+}
+
+function normalizeCssSemanticNode(node: CssSemanticNode): unknown {
+  if (node.kind === 'declaration') {
+    return { ...node, value: normalizeCssValue(node.value) }
+  }
+  if (node.kind === 'rule') {
+    return {
+      ...node,
+      selector: selectorParser().processSync(node.selector, { lossless: false }),
+      children: node.children.map(normalizeCssSemanticNode),
+    }
+  }
+  return {
+    ...node,
+    name: node.name.toLowerCase(),
+    params: normalizeCssValue(node.params),
+    children: node.children.map(normalizeCssSemanticNode),
+  }
 }
 
 function normalizeStructure(node: ComponentModel['structure']): unknown {

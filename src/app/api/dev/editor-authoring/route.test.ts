@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PROJECT_AUTHORING_SIDECAR } from '../editor/authoring-store'
 import { authoringMetadataPath } from '../editor/authoring-paths'
 import { sha256 } from '../editor/durable-file-installer'
+import { legacySourceProjectionFingerprint, sourceProjectionFingerprint, sourceProjectionFromSource } from '../editor/source-projection'
 import { linkTestNodeModules } from '../editor/__tests__/test-project-root'
 import { handleGet, handlePost } from './handler'
 import { GET } from './route'
@@ -545,6 +546,112 @@ export function Button() { return <button className={styles.base} /> }
     await expect(fs.readFile(sidecarPath)).resolves.toEqual(beforeSidecar)
     await expect(fs.readFile(journalPath)).resolves.toEqual(beforeJournal)
     expect((await fs.readdir(transactionsPath)).sort()).toEqual(beforeTransactions)
+  }, 20_000)
+
+  it.each([
+    {
+      label: 'base declaration',
+      transactionId: '00000000-0000-4000-8000-000000000009',
+      before: '.base { color: red }\n',
+      after: '.base { color: blue }\n',
+    },
+    {
+      label: 'nested media declaration',
+      transactionId: '00000000-0000-4000-8000-000000000010',
+      before: '.base { color: red }\n@media (min-width: 600px) { .base { padding: 8px } }\n',
+      after: '.base { color: red }\n@media (min-width: 600px) { .base { padding: 16px } }\n',
+    },
+  ])('refuses $label drift before sidecar, history, or transaction writes', async ({ transactionId, before, after }) => {
+    const root = await makeRoot(`import styles from './Button.module.css'
+export function Button() { return <button className={styles.base} /> }
+`)
+    const cssFile = 'src/app/(dev)/react-figma-components/Button.module.css'
+    const cssPath = path.join(root, cssFile)
+    await fs.writeFile(cssPath, before)
+    const classified = await (await handleGet(request('GET'), root)).json()
+    await handlePost(request('POST', {
+      kind: 'import-source', file: SOURCE_FILE, expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint,
+      transactionId,
+    }), root)
+    await fs.writeFile(cssPath, after)
+    const stale = await (await handleGet(componentStatusRequest(), root)).json()
+    expect(stale).toMatchObject({ authoringState: 'source-stale', changedPaths: [cssFile] })
+    const sidecarPath = path.join(root, PROJECT_AUTHORING_SIDECAR)
+    const journalPath = path.join(root, authoringMetadataPath('project', 'history/journal.ndjson'))
+    const transactionsPath = path.join(root, authoringMetadataPath('project', 'transactions'))
+    const beforeSidecar = await fs.readFile(sidecarPath)
+    const beforeJournal = await fs.readFile(journalPath)
+    const beforeTransactions = (await fs.readdir(transactionsPath)).sort()
+
+    const response = await handlePost(request('POST', {
+      kind: 'revalidate-source', file: SOURCE_FILE,
+      expectedRevision: stale.expectedRevision,
+      expectedSourceHashes: stale.sourceHashes,
+    }), root)
+
+    expect(response.status).toBe(422)
+    await expect(response.json()).resolves.toMatchObject({ code: 'SOURCE_PROJECTION_DRIFT' })
+    await expect(fs.readFile(cssPath, 'utf8')).resolves.toBe(after)
+    await expect(fs.readFile(sidecarPath)).resolves.toEqual(beforeSidecar)
+    await expect(fs.readFile(journalPath)).resolves.toEqual(beforeJournal)
+    expect((await fs.readdir(transactionsPath)).sort()).toEqual(beforeTransactions)
+  }, 20_000)
+
+  it('upgrades a legacy projection fingerprint only while authored hashes still match', async () => {
+    const source = `import styles from './Button.module.css'
+export function Button() { return <button className={styles.base} /> }
+`
+    const cssFile = 'src/app/(dev)/react-figma-components/Button.module.css'
+    const beforeCss = '.base { color: red }\n'
+    const root = await makeRoot(source)
+    const cssPath = path.join(root, cssFile)
+    await fs.writeFile(cssPath, beforeCss)
+    const classified = await (await handleGet(request('GET'), root)).json()
+    await handlePost(request('POST', {
+      kind: 'import-source', file: SOURCE_FILE, expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint,
+      transactionId: '00000000-0000-4000-8000-000000000011',
+    }), root)
+    const projection = await sourceProjectionFromSource({
+      file: SOURCE_FILE,
+      source,
+      cssSources: { [cssFile]: beforeCss },
+    })
+    const sidecarPath = path.join(root, PROJECT_AUTHORING_SIDECAR)
+    const legacy = JSON.parse(await fs.readFile(sidecarPath, 'utf8')) as Record<string, unknown>
+    const components = legacy.components as Record<string, { id: string; primaryVariantId: string; projectionFingerprint: string }>
+    const component = Object.values(components)[0]!
+    component.projectionFingerprint = legacySourceProjectionFingerprint(projection)
+    await fs.writeFile(sidecarPath, JSON.stringify(legacy, null, 2) + '\n')
+    const legacySidecar = await fs.readFile(sidecarPath)
+
+    await fs.writeFile(cssPath, '.base { color: blue }\n')
+    const stale = await (await handleGet(componentStatusRequest(), root)).json()
+    const refused = await handlePost(request('POST', {
+      kind: 'revalidate-source', file: SOURCE_FILE,
+      expectedRevision: stale.expectedRevision,
+      expectedSourceHashes: stale.sourceHashes,
+    }), root)
+    expect(refused.status).toBe(422)
+    await expect(refused.json()).resolves.toMatchObject({ code: 'SOURCE_PROJECTION_DRIFT' })
+    await expect(fs.readFile(sidecarPath)).resolves.toEqual(legacySidecar)
+
+    await fs.writeFile(cssPath, beforeCss)
+    const loaded = await (await handleGet(componentRequest(), root)).json()
+    const moved = await handlePost(request('POST', {
+      kind: 'execute-command',
+      command: {
+        kind: 'move-variant', commandId: 'upgrade-css-fingerprint', componentId: component.id,
+        variantId: component.primaryVariantId, frame: { x: 10, y: 20, width: 320, height: 180 },
+      },
+      expectedRevision: loaded.graph.revision,
+      expectedSourceHashes: loaded.sourceHashes,
+    }), root)
+    expect(moved.status).toBe(200)
+    const persisted = JSON.parse(await fs.readFile(sidecarPath, 'utf8')) as typeof legacy
+    expect((persisted.components as typeof components)[component.id]!.projectionFingerprint)
+      .toBe(sourceProjectionFingerprint(projection))
   }, 20_000)
 
   it('accepts formatting-only source drift while preserving the accepted projection', async () => {

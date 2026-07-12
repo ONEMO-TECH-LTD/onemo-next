@@ -15,7 +15,7 @@ import { execFile } from 'node:child_process'
 import { promises as fs, realpathSync } from 'node:fs'
 import path from 'node:path'
 import { promisify } from 'node:util'
-import postcss, { type Declaration, type Rule, type AtRule } from 'postcss'
+import postcss, { type ChildNode, type Declaration, type Rule, type AtRule } from 'postcss'
 import * as ts from 'typescript'
 
 const execFileP = promisify(execFile)
@@ -1266,6 +1266,11 @@ async function removeConnector(op: Extract<WriteOp, { kind: 'remove-connector' }
 }
 
 // ─── I0: ComponentModel READ (blueprint §1) — source IS the model ────────────────
+export type CssSemanticNode =
+  | { kind: 'rule'; selector: string; children: CssSemanticNode[] }
+  | { kind: 'at-rule'; name: string; params: string; children: CssSemanticNode[] }
+  | { kind: 'declaration'; property: string; value: string; important: boolean }
+
 export type ComponentModel = {
   name: string
   file: string
@@ -1275,10 +1280,10 @@ export type ComponentModel = {
   props: { name: string; tsType: string; optional: boolean; default?: string }[]
   variantAxes: { axis: string; values: string[]; defaultValue: string }[]  // D1: config variants = N INDEPENDENT axes (§6.1); each = one string-union prop
   nativeVariants: { id: string; props: Record<string, string | number | boolean | null> }[]
-  // §0/§1 UNIFIED: EVERY scoped .module.css rule — single-part OR combinatorial — decomposed into one shape
-  // in ONE list, so re-read reflects truth (no rule silently dropped). axisValues=[] + pseudo = a plain
-  // interaction rule; a single axis-value = one axisValues entry; legacyName = a pre-axes single-variant class.
+  // Compiler-facing variant/state deltas decomposed from scoped module rules.
   rules: { selector: string; axisValues: { axis: string; value: string }[]; semantic: string[]; pseudo?: string; legacyName?: string; decls: Array<{ property: string; value: string; important: boolean }> }[]
+  // Complete ordered CSS authority used by SourceProjection round-trip proof, including base and nested rules.
+  cssSemantics: CssSemanticNode[]
   structure: StructureNode | null  // D6: recursive JSX tree of the component (server mirror of engine.ts buildLayerTree)
   // I4 (§3.6/D4): connectors read back from the SIDE-CHANNEL comments (never inferred from JSX/CSS shape).
   // `state` = the base transition's `@fc-transition: spring …`; `switch` = the `@fc-connector: tap axis→to`.
@@ -1618,12 +1623,14 @@ async function parseComponentModelSnapshot(input: {
   }
 
   const rules: ComponentModel['rules'] = []
+  let cssSemantics: ComponentModel['cssSemantics'] = []
   const connectors: ComponentModel['connectors'] = []
   let rootClass: string | null = null
   if (cssModule) {
     try {
       const { fileName: cssAbs, source: css } = await input.readCss(cssModule)
       const root = postcss.parse(css, { from: cssAbs })
+      cssSemantics = projectCssSemantics(root.nodes)
       // base class = the first bare `.<ident>` rule (convention: `.base`).
       const baseRule = root.nodes.find((n): n is Rule => n.type === 'rule' && /^\.[\w-]+$/.test(n.selector.split(',')[0].trim()))
       rootClass = baseRule ? baseRule.selector.split(',')[0].trim().slice(1) : null
@@ -1662,7 +1669,24 @@ async function parseComponentModelSnapshot(input: {
   // NOTE: which STATES exist (a semantic state exists from its boolean PROP even before any `.base[data-*]`
   // rule — §6.2/I1 drift fix; disabled is semantic only on a non-form root — F-M2) is DERIVED by the consumer
   // from `props` + `rules` + `structure`, not stored as a second array — the model keeps ONE rule list (§0).
-  return { name, file, cssModule, rootClass, root, props, variantAxes, nativeVariants, rules, structure, connectors }
+  return { name, file, cssModule, rootClass, root, props, variantAxes, nativeVariants, rules, cssSemantics, structure, connectors }
+}
+
+function projectCssSemantics(nodes: ChildNode[]): CssSemanticNode[] {
+  const projected: CssSemanticNode[] = []
+  for (const node of nodes) {
+    if (node.type === 'comment') continue
+    if (node.type === 'decl') {
+      projected.push({ kind: 'declaration', property: node.prop, value: node.value, important: node.important === true })
+      continue
+    }
+    if (node.type === 'rule') {
+      projected.push({ kind: 'rule', selector: node.selector, children: projectCssSemantics(node.nodes) })
+      continue
+    }
+    projected.push({ kind: 'at-rule', name: node.name, params: node.params, children: projectCssSemantics(node.nodes ?? []) })
+  }
+  return projected
 }
 
 function findExportedComponents(sf: ts.SourceFile): Array<{

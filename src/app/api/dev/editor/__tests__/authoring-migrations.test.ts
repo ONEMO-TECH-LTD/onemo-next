@@ -24,6 +24,7 @@ function singleAxis(values: string[], defaultValue: string): SourceProjection {
     nativeVariants: [],
     props: [],
     rules: [],
+    cssSemantics: [],
     structure: null,
     connectors: [],
     anchors: [],

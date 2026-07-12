@@ -6,7 +6,7 @@ import { EMPTY_ENVIRONMENT_FINGERPRINT } from '../authoring-environment'
 
 import { importProjectionToAuthoringGraph } from '../authoring-migrations'
 import { sha256 } from '../durable-file-installer'
-import { classifyVariantAxes, readSourceProjection, sourceProjectionFingerprint, sourceProjectionFromModel, sourceProjectionFromSource, unsupportedSourceProjection } from '../source-projection'
+import { classifyVariantAxes, legacySourceProjectionFingerprint, readSourceProjection, sourceProjectionFingerprint, sourceProjectionFromModel, sourceProjectionFromSource, unsupportedSourceProjection } from '../source-projection'
 import type { ComponentModel } from '../lib'
 
 function model(axes: ComponentModel['variantAxes']): ComponentModel {
@@ -20,6 +20,7 @@ function model(axes: ComponentModel['variantAxes']): ComponentModel {
     variantAxes: axes,
     nativeVariants: [],
     rules: [],
+    cssSemantics: [],
     structure: null,
     connectors: [],
   }
@@ -276,6 +277,33 @@ export function Button() { return <button className={styles.base} /> }
     ])
     expect(sourceProjectionFingerprint(shorthandLast)).not.toBe(sourceProjectionFingerprint(shorthandFirst))
     expect(sourceProjectionFingerprint(important)).not.toBe(sourceProjectionFingerprint(shorthandFirst))
+  })
+
+  it('fingerprints base declarations and nested at-rule semantics outside the variant delta list', async () => {
+    const source = `import styles from './Button.module.css'
+export function Button() { return <button className={styles.base} /> }
+`
+    const original = await sourceProjectionFromSource({
+      file: 'Button.tsx', source,
+      cssSources: { 'Button.module.css': `.base { color: red }
+@media (min-width: 600px) { .base { padding: 8px } }` },
+    })
+    const baseDrift = await sourceProjectionFromSource({
+      file: 'Button.tsx', source,
+      cssSources: { 'Button.module.css': `.base { color: blue }
+@media (min-width: 600px) { .base { padding: 8px } }` },
+    })
+    const nestedDrift = await sourceProjectionFromSource({
+      file: 'Button.tsx', source,
+      cssSources: { 'Button.module.css': `.base { color: red }
+@media (min-width: 600px) { .base { padding: 16px } }` },
+    })
+
+    expect(original.rules).toEqual([])
+    expect(original.cssSemantics).toHaveLength(2)
+    expect(legacySourceProjectionFingerprint(baseDrift)).toBe(legacySourceProjectionFingerprint(original))
+    expect(sourceProjectionFingerprint(baseDrift)).not.toBe(sourceProjectionFingerprint(original))
+    expect(sourceProjectionFingerprint(nestedDrift)).not.toBe(sourceProjectionFingerprint(original))
   })
 
   it.each([
