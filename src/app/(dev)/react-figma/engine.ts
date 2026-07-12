@@ -130,7 +130,7 @@ export function collectSelectionColors(el: HTMLElement, doc: Document, max = 24)
   const out = [...byKey.values()].slice(0, max)
   // second pass: resolve a declared var() binding per colour (first source element only — cheap)
   for (const e of out) {
-    const first = e.ids[0] && (doc.querySelector(`[data-eng-id="${e.ids[0]}"]`) as HTMLElement | null)
+    const first = e.ids[0] ? engineElement(doc, e.ids[0]) : null
     if (!first) continue
     try {
       const rep = readStyles(first)
@@ -149,11 +149,24 @@ const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'LINK', 'META', 'TEMPLATE', 'NEXT-
 const SHORTHANDS = ['gap', 'padding', 'margin', 'border-radius', 'background', 'border', 'inset', 'font', 'flex']
 
 let seq = 0
-/** Runtime element address for layers↔canvas sync — DOM attribute only, never source. */
+const runtimeIds = new WeakMap<HTMLElement, string>()
+const runtimeElements = new WeakMap<Document, Map<string, HTMLElement>>()
+
+/** Runtime element address for layers↔canvas sync — kept outside SSR DOM until an override needs CSS. */
 export function ensureId(el: HTMLElement): string {
-  let id = el.getAttribute('data-eng-id')
-  if (!id) { id = `e${++seq}`; el.setAttribute('data-eng-id', id) }
+  let id = el.getAttribute('data-eng-id') ?? runtimeIds.get(el)
+  if (!id) id = `e${++seq}`
+  runtimeIds.set(el, id)
+  let elements = runtimeElements.get(el.ownerDocument)
+  if (!elements) { elements = new Map(); runtimeElements.set(el.ownerDocument, elements) }
+  elements.set(id, el)
   return id
+}
+
+export function engineElement(doc: Document, id: string): HTMLElement | null {
+  return (doc.querySelector(`[data-eng-id="${id}"]`) as HTMLElement | null)
+    ?? runtimeElements.get(doc)?.get(id)
+    ?? null
 }
 
 /** Dev css-module class `file_local__hash` → `local`; '' when none.
@@ -440,7 +453,10 @@ export class Overrides {
     for (const [domId, props] of this.map) {
       const decls = [...props.values()].filter((op) => !op.stale)
         .map((op) => `${op.prop}: ${op.value} !important;`).join(' ')
-      if (decls) css += `[data-eng-id="${domId}"] { ${decls} }\n`
+      if (decls) {
+        engineElement(doc, domId)?.setAttribute('data-eng-id', domId)
+        css += `[data-eng-id="${domId}"] { ${decls} }\n`
+      }
     }
     el.textContent = css
   }

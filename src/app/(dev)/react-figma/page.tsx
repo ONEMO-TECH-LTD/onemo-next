@@ -16,7 +16,7 @@
  */
 
 import { Fragment, useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { buildLayerTree, readStyles, colorToHex, hexToRgba, boxSlots, gapSlots, editSlot, tokenOf, Overrides, parseEffects, parseShadow, formatShadow, splitTopLevel, alignToIndex, alignFromIndex, collectSelectionColors, ensureId, type LiveNode, type OverrideOp, type SelectionColor } from './engine'
+import { buildLayerTree, readStyles, colorToHex, hexToRgba, boxSlots, gapSlots, editSlot, tokenOf, Overrides, parseEffects, parseShadow, formatShadow, splitTopLevel, alignToIndex, alignFromIndex, collectSelectionColors, engineElement, ensureId, type LiveNode, type OverrideOp, type SelectionColor } from './engine'
 import { createPortal } from 'react-dom'
 import {
   MagnifyingGlass, Plus, Minus, Sidebar, CaretDown, ArrowUUpLeft, ArrowUUpRight, LinkBreak, Crosshair,
@@ -2523,8 +2523,8 @@ export default function ReactFigmaPage() {
   const [ixHover, setIxHover] = useState({ opacity: '', scale: '' })
   const [ixTap, setIxTap] = useState({ opacity: '', scale: '' })
   const applyStateRule = useCallback(async (state: 'hover' | 'active', vals: { opacity: string; scale: string }) => {
-    const el = iframeRef.current?.contentDocument?.querySelector('[data-eng-id]') && selIdRef.current
-      ? iframeRef.current?.contentDocument?.querySelector(`[data-eng-id="${selIdRef.current}"]`) as HTMLElement | null : null
+    const doc = iframeRef.current?.contentDocument
+    const el = doc && selIdRef.current ? engineElement(doc, selIdRef.current) : null
     const src = el?.getAttribute('data-src')
     if (!el || !src) { notify('Select an element first', 'error'); return }
     const file = src.replace(/:\d+:\d+$/, '')
@@ -2575,7 +2575,7 @@ export default function ReactFigmaPage() {
     const m = (el.getAttribute('data-src') ?? '').match(/^(.*):(\d+):(\d+)$/)
     if (!m) return
     const payload: SelPayload = { file: m[1], line: +m[2], col: +m[3], tag: el.tagName.toLowerCase(), classes: [...el.classList] }
-    const id = el.getAttribute('data-eng-id') ?? (el.setAttribute('data-eng-id', `sel-${Date.now()}`), el.getAttribute('data-eng-id')!)
+    const id = ensureId(el)
     selIdRef.current = id
     setSel(payload); setLayerSelId(id); setSelRect(rectOf(el))
     const linkEl = (el.tagName.toLowerCase() === 'a' ? el : el.closest('a')) as HTMLElement | null
@@ -2686,13 +2686,13 @@ export default function ReactFigmaPage() {
      overrides stylesheet, so computed style reflects them immediately. */
   const reapplySel = useCallback(() => {
     const doc = iframeRef.current?.contentDocument
-    const el = selIdRef.current && doc ? doc.querySelector(`[data-eng-id="${selIdRef.current}"]`) : null
+    const el = selIdRef.current && doc ? engineElement(doc, selIdRef.current) : null
     if (el) applySelection(el as HTMLElement)
   }, [applySelection])
   const applyOverride = useCallback((field: string, raw: string) => {
     const id = selIdRef.current
     const doc = iframeRef.current?.contentDocument
-    const el = id && doc ? (doc.querySelector(`[data-eng-id="${id}"]`) as HTMLElement | null) : null
+    const el = id && doc ? engineElement(doc, id) : null
     if (!el || !doc || !id) return
     const cs = doc.defaultView!.getComputedStyle(el)
     const n = raw.trim() === '' ? '0' : raw.trim()
@@ -2848,7 +2848,7 @@ export default function ReactFigmaPage() {
     else ov.current!.clear()
     setOvVersion((v) => v + 1)
     const doc = iframeRef.current?.contentDocument
-    const el = selIdRef.current && doc ? (doc.querySelector(`[data-eng-id="${selIdRef.current}"]`) as HTMLElement | null) : null
+    const el = selIdRef.current && doc ? engineElement(doc, selIdRef.current) : null
     if (el) applySelection(el) // re-read truth into the fields
   }, [applySelection])
 
@@ -2975,7 +2975,7 @@ export default function ReactFigmaPage() {
   // (multi-element override; commitOverrides already saves all dirty elements).
   const recolorSelection = useCallback((oldHex: string, newHex: string, newOp: number) => {
     const id = selIdRef.current, doc = iframeRef.current?.contentDocument
-    const root = id && doc ? (doc.querySelector(`[data-eng-id="${id}"]`) as HTMLElement | null) : null
+    const root = id && doc ? engineElement(doc, id) : null
     if (!root || !doc) return
     const target = newOp < 100 ? hexToRgba(newHex, newOp) : `#${newHex}`
     const nodes = [root, ...(Array.from(root.querySelectorAll('[data-src]')) as HTMLElement[])].slice(0, 200)
@@ -3051,8 +3051,8 @@ export default function ReactFigmaPage() {
   // analog); the tree re-reads it after HMR so the name persists like a Figma layer name.
   const renameLayer = useCallback(async (engId: string, current: string) => {
     const doc = iframeRef.current?.contentDocument
-    const el = doc?.querySelector(`[data-eng-id="${engId}"]`) ?? doc?.querySelector(`[data-src]`)
-    const src = (doc?.querySelector(`[data-eng-id="${engId}"]`) as HTMLElement | null)?.getAttribute('data-src')
+    const el = doc ? engineElement(doc, engId) ?? doc.querySelector(`[data-src]`) : null
+    const src = doc ? engineElement(doc, engId)?.getAttribute('data-src') : null
     if (!el || !src) { notify('Layer not resolvable for rename', 'error'); return }
     const next = window.prompt('Rename layer', current)
     if (!next || next === current) return
@@ -3074,7 +3074,8 @@ export default function ReactFigmaPage() {
     if (r.ok) { const d = await r.json() as { newValueText: string; route: string }; notify(`Duplicated · ${d.newValueText}`); setFsNonce((n) => n + 1) } else notify(`Duplicate failed: ${await r.text()}`, 'error')
   }, [])
   const layerSrc = useCallback((engId: string) => {
-    const src = (iframeRef.current?.contentDocument?.querySelector(`[data-eng-id="${engId}"]`) as HTMLElement | null)?.getAttribute('data-src')
+    const doc = iframeRef.current?.contentDocument
+    const src = doc ? engineElement(doc, engId)?.getAttribute('data-src') : null
     const m = src?.match(/^(.*):(\d+):(\d+)$/)
     return m ? { file: m[1], line: +m[2], col: +m[3] } : null
   }, [])
@@ -3113,7 +3114,7 @@ export default function ReactFigmaPage() {
       const byEl = new Map<string, OverrideOp[]>()
       for (const op of dirty) { const a = byEl.get(op.domId) ?? []; a.push(op); byEl.set(op.domId, a) }
       for (const [domId, ops] of byEl) {
-        const el = doc.querySelector(`[data-eng-id="${domId}"]`) as HTMLElement | null
+        const el = engineElement(doc, domId)
         const src = el?.getAttribute('data-src')
         if (!el || !src) continue
         const file = src.replace(/:\d+:\d+$/, '')
@@ -3291,7 +3292,7 @@ export default function ReactFigmaPage() {
       clearTimeout(t)
       t = setTimeout(() => {
         setLayers(buildLayerTree(doc))
-        const cur = selIdRef.current && doc.querySelector(`[data-eng-id="${selIdRef.current}"]`)
+        const cur = selIdRef.current && engineElement(doc, selIdRef.current)
         if (cur) applySelection(cur as HTMLElement)
         else if (selIdRef.current) { selIdRef.current = null; setSel(null); setSelRect(null); setLiveFills(null) }
       }, 400)
@@ -3374,7 +3375,8 @@ export default function ReactFigmaPage() {
     }
     redoRef.current.push(step)
     setOvVersion((v) => v + 1)
-    const el = selIdRef.current ? iframeRef.current?.contentDocument?.querySelector(`[data-eng-id="${selIdRef.current}"]`) as HTMLElement | null : null
+    const doc = iframeRef.current?.contentDocument
+    const el = selIdRef.current && doc ? engineElement(doc, selIdRef.current) : null
     if (el) { setSelRect(rectOf(el)); applySelection(el) }
     notify('Undo')
   }, [canvasMode])
@@ -3391,7 +3393,8 @@ export default function ReactFigmaPage() {
     }
     historyRef.current.push(step)
     setOvVersion((v) => v + 1)
-    const el = selIdRef.current ? iframeRef.current?.contentDocument?.querySelector(`[data-eng-id="${selIdRef.current}"]`) as HTMLElement | null : null
+    const doc = iframeRef.current?.contentDocument
+    const el = selIdRef.current && doc ? engineElement(doc, selIdRef.current) : null
     if (el) { setSelRect(rectOf(el)); applySelection(el) }
     notify('Redo')
   }, [canvasMode])
@@ -3446,7 +3449,8 @@ export default function ReactFigmaPage() {
     const id = selIdRef.current
     if (!id) return
     const t = setTimeout(() => {
-      const el = iframeRef.current?.contentDocument?.querySelector(`[data-eng-id="${id}"]`) as HTMLElement | null
+      const doc = iframeRef.current?.contentDocument
+      const el = doc ? engineElement(doc, id) : null
       if (el) setSelRect(rectOf(el))
       setHoverRect(null)
     }, 180)
@@ -3740,7 +3744,7 @@ export default function ReactFigmaPage() {
                         { label: 'Delete', danger: true, onClick: () => void deleteLayer(ln.id, ln.name) },
                       ] }) }}
                       n={{ name: ln.name, icon: ln.tag === 'img' ? 'image' : ln.tag === 'section' ? 'section' : ln.tag === 'button' ? 'component' : 'auto', depth: Math.min(ln.depth, 7), kids: ln.kids, open: !collapsed.has(ln.id), sel: ln.id === layerSelId, comp: ln.tag === 'button' }}
-                      on={() => { const el = iframeRef.current?.contentDocument?.querySelector(`[data-eng-id="${ln.id}"]`); if (el) applySelection(el as HTMLElement) }}
+                      on={() => { const doc = iframeRef.current?.contentDocument; const el = doc ? engineElement(doc, ln.id) : null; if (el) applySelection(el) }}
                       onToggle={ln.kids ? () => setCollapsed((prev) => { const next = new Set(prev); if (next.has(ln.id)) next.delete(ln.id); else next.add(ln.id); return next }) : undefined} />
                   ))
                 : null /* live DOM only — empty until the canvas wires (E2.1 deslop) */}
@@ -4240,7 +4244,7 @@ export default function ReactFigmaPage() {
                 const label = tok?.path ? tok.path.split('/').map((s) => s.trim()).filter(Boolean).slice(1).join('/') : c.varName.replace(/^--/, '')
                 return <SelectionVarRow key={`v-${i}`} entry={c} label={label}
                   onUnlink={() => recolorSelection(c.hex, c.hex, c.op)}
-                  onSelectSource={() => { const el = iframeRef.current?.contentDocument?.querySelector(`[data-eng-id="${c.ids[0]}"]`); if (el) applySelection(el as HTMLElement) }} />
+                  onSelectSource={() => { const doc = iframeRef.current?.contentDocument; const el = doc ? engineElement(doc, c.ids[0]!) : null; if (el) applySelection(el) }} />
               }
               return <SelectionColorRow key={`live-${i}`} hex={c.hex} op={c.op} onRecolor={recolorSelection} />
             }))}
