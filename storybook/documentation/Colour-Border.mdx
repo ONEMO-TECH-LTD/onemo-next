@@ -1,0 +1,46 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+import { Page, H2, P, C, Note } from './blocks';
+import { FolderTable } from './semantic';
+
+<Meta title="Documentation/Colour/Borders" />
+
+<Page
+  title="Border roles"
+  lead="Lines are peers: no line dominates the way body text dominates a page, so the family names its mono pair by contrast role instead of voice."
+>
+
+<H2>The contrast-role law</H2>
+
+<P>
+  Material names (Ink, Snow) and lightness names (dark, light) anchor to the light world and go false when
+  the theme flips. <C>max</C> is the one word that stays true in both themes — it names contrast against
+  the current surface, not a colour. Where the mono pair appears as peers — lines, surfaces — it lives in
+  the <C>max</C> folder: bare <C>max</C> is the pure extreme, <C>max/brand</C> the brand extreme, with{' '}
+  <C>-inverse</C> and <C>-perma</C> composing as everywhere. Families with a dominant default (text,
+  glyphs) keep role names instead — prominence is the point of a picker.
+</P>
+
+<P>
+  The grey ladder underneath follows the ramp convention: separators low, interactive boundaries mid,
+  focus-adjacent lines high — with the register words (<C>-subtle</C>, <C>-strong</C>, <C>-muted</C>)
+  selecting steps, never the constancy words.
+</P>
+
+<H2>border/ — primary</H2>
+<FolderTable tier="border" folder="primary" />
+
+<H2>border/ — max</H2>
+<FolderTable tier="border" folder="max" />
+
+<H2>border/ — system</H2>
+<FolderTable tier="border" folder="system" />
+
+<H2>border/ — brand</H2>
+<FolderTable tier="border" folder="brand" />
+
+<Note>
+  Every row derives from the committed Figma pull at render time — names, bindings, both theme faces.
+  Refreshing the pull refreshes this page; nothing here is hand-typed.
+</Note>
+
+</Page>

@@ -1,0 +1,75 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+import { Page, H2, P, C, Note } from './blocks';
+import { StrengthRange, BlurLadder, TintLadder, TintRange } from './effects';
+
+<Meta title="Documentation/Effects" />
+
+<Page
+  title="Effects"
+  lead="Effects have no raw physics of their own — every ingredient is an existing primitive. The tier is alias-only: a strength vocabulary and tint ranges at the alias tier, intensity ladders at the semantic tier."
+>
+
+<H2>The alias-only law</H2>
+
+<P>
+  A blur radius is a dimension step; a filter factor is a ratio; a shadow colour is an ink alpha. An
+  effect primitive would duplicate a value that already exists — the dupe disease at the primitive tier —
+  so effects get no primitives, ever. The alias tier groups existing steps into effect vocabulary; the
+  semantic tier names intensities. One cascade shape, same as colour. The collection carries a single
+  value mode: every effect token is theme-invariant by design, and any theme-dependent colour it needs
+  flips at the primitive tier like everything else.
+</P>
+
+<H2>The universal strength range</H2>
+
+<P>
+  One range serves every effect — backdrop blur, layer blur, shadow geometry, whatever arrives next.
+  Groups run from the sub-pixel to the extreme, each carrying t-shirt sizes; the decimal groups exist for
+  fine-tuning eventualities and stay out of semantic vocabulary.
+</P>
+
+<StrengthRange />
+
+<H2>The blur ladder</H2>
+
+<P>
+  Semantic blur speaks strength, never size — the slot it is bound into decides backdrop versus layer;
+  the token carries only how much. Each name is one representative leaf of the strength range, so tuning
+  re-points inside a group without renaming.
+</P>
+
+<BlurLadder />
+
+<H2>Shadow and light</H2>
+
+<P>
+  Two physics, two families. A shadow is occlusion — the absence of light — and absence can only be
+  dark, so shadow tints pin to the ink alphas in both themes; dark-theme depth transfers to the surfaces
+  themselves. Light is emission — a highlight does not darken because the room did — so light tints pin
+  to the snow alphas. Both cascade through alias tint ranges grouped by strength.
+</P>
+
+<TintLadder kind="shadow" />
+<TintLadder kind="light" />
+
+<H2>The tint ranges underneath</H2>
+
+<TintRange kind="shadow-tint" />
+<TintRange kind="light-tint" />
+
+<H2>Materials are authored natively</H2>
+
+<P>
+  A frosted material in Figma is exactly what the platform ships: stacked fills with their blend modes
+  plus a background blur. The converter translates structure, one fill per absolute layer element with
+  its blend mode, the wrapper owning the backdrop filter and isolation. Applied filters and blends are
+  node facts the converter reads directly — no filter tokens exist, because a token earns its place by
+  being bindable or tunable, and a blend mode is neither.
+</P>
+
+<Note>
+  Every number on this page derives from the committed Figma pull at render time — the strength grid,
+  the ladder pixels, the tint opacities. Refreshing the pull refreshes the page.
+</Note>
+
+</Page>

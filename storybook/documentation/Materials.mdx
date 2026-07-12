@@ -1,0 +1,49 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+import { Page, H2, P, C, Note } from './blocks';
+import { BaseMaterials, BehaviorGrid } from './materials';
+
+<Meta title="Documentation/Colour/Materials" />
+
+<Page
+  title="The base materials"
+  lead="Ink, Snow, and Aluminium — the brand mono set. Each is a two-faced base pair carrying the full behavior grid: constants, alpha ladders, and an inverse."
+>
+
+<H2>The pairs</H2>
+
+<P>
+  A base material is a primitive with two theme faces. Ink and Snow are stored as mirror images of each
+  other — each one's dark face is the other's light face — so for that pair, "inverse" needs no token:
+  the partner is the inverse. Aluminium is the third material, the anodized slab the editor stands on.
+  It is theme-tuned rather than mirrored — its faces do not swap into any partner — so it is the one
+  base pair that stores its swap explicitly, in the <C>inverse/</C> section, the same way the ramps do.
+</P>
+
+<BaseMaterials />
+
+<H2>The aluminium behavior grid</H2>
+
+<P>
+  Every base material carries the same grid, and aluminium's is complete: the light- and dark-anchored
+  constants (what <C>-perma</C> and <C>-inverse-perma</C> resolve through), the adaptive alpha ladder
+  (its own face per theme), the pinned light and dark alpha ladders, and the explicit inverse. Missing
+  eventualities — washes on the swapped face — mint lazily at their predictable names.
+</P>
+
+<BehaviorGrid alias="brand/alu" />
+
+<H2>Where it surfaces</H2>
+
+<P>
+  The editor ground binds the aluminium route (<C>bg/app/primary</C>); the ordinal canvases beneath it
+  step through the grey ramp. Snow returns to what it is in the brand language — the paper material for
+  surfaces that want Snow — and Ink keeps the voice. The grain treatment for the anodized look is a
+  screen-level texture over the token, not a colour: the tier owns the tint, the node owns the noise.
+</P>
+
+<Note>
+  The tables derive from the committed Figma pull at render time. If the aluminium rows are absent, the
+  snapshot predates the material — refresh the pull and the grid appears.
+</Note>
+
+</Page>

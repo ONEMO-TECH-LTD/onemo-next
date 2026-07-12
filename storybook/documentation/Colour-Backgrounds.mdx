@@ -1,0 +1,82 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+import { Page, H2, P, C, Note } from './blocks';
+import { BgFolderTable } from './backgrounds';
+
+<Meta title="Documentation/Colour/Backgrounds" />
+
+<Page
+  title="Background roles"
+  lead="One question organizes the family: what kind of surface is this pixel? Each answer is a folder — canvases, controls, materials, extremes, coloured surfaces, the platform."
+>
+
+<H2>app/ — the canvases and their world</H2>
+
+<P>
+  App surfaces are peer canvases picked per context, not a default with variants — so this one family
+  carries ordinal names: <C>primary</C> is the ground the editor stands on (the aluminium surface),
+  with <C>secondary</C>, <C>tertiary</C> and <C>quaternary</C> stepping through the grey zones. The
+  app world's own materials sit beside them: <C>chrome</C> for bars and docks, <C>veil</C> for the
+  blur-free wash. Theme and constancy suffixes compose on the ordinals as everywhere
+  (<C>primary-inverse</C> opposes the theme, <C>primary-perma</C> pins the light-world reading).
+</P>
+
+<BgFolderTable folder="app" />
+
+<H2>control/ — the interactive zone</H2>
+
+<P>
+  The fills of things you can touch, on the ramp's interactive steps: rest, engaged, solid. The step
+  between rest and engaged stays deliberately unused — transient states are washes over the rest fill,
+  never colour steps, and persistent engagement is a component contract.
+</P>
+
+<BgFolderTable folder="control" />
+
+<H2>frost/ and the materials</H2>
+
+<P>
+  Translucent materials carry only their tint here — the Snow alpha ladder, adaptive by construction
+  (paper wash in light, ink wash in dark). Blur strength and blend construction are authored natively on
+  the node and translated structurally by the converter; no filter tokens exist. <C>veil</C> is the same
+  wash without glass.
+</P>
+
+<BgFolderTable folder="frost" />
+<BgFolderTable folder="veil" />
+
+<H2>max/ — the extremes</H2>
+
+<P>
+  The full peer-family set, same shape as the border tier: pure and brand extremes, each composing with
+  theme and constancy. The pure float role lives here — roles may share values, and a lifted white
+  surface is byte-identical to the pure extreme opposing the theme, so one token carries both readings.
+</P>
+
+<BgFolderTable folder="max" />
+
+<H2>brand/ and system/</H2>
+
+<P>
+  Coloured surfaces per colour — bare tint, <C>-strong</C>, <C>-solid</C> — with the neutral-first law:
+  tints are the default coloured surface. The platform's surfaces mirror the same trio per status, plus
+  the one grey disabled fill.
+</P>
+
+<BgFolderTable folder="brand" />
+<BgFolderTable folder="system" />
+
+<H2>What deliberately is not here</H2>
+
+<P>
+  <b>Card and sheet are components, not surface classes</b> — their look is a component contract binding
+  these semantic surfaces, minted at the component tier when those components exist. <b>Hover carries no
+  tokens</b> — interaction is the wash system's job. Missing combinations mint lazily at their
+  predictable names; the grammar guarantees the name before the token exists.
+</P>
+
+<Note>
+  Every row derives from the committed Figma pull at render time. If a folder shown in the prose is
+  absent from the table, the snapshot predates its mint — refresh the pull and the page completes itself.
+</Note>
+
+</Page>

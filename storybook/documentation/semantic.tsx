@@ -65,6 +65,7 @@ function ExamplePair({ t }: { t: SemToken }) {
     { face: 'D', bg: '#111113', value: t.D },
   ];
   const isGlyph = t.name.startsWith('fg/');
+  const isLine = t.name.startsWith('border/');
   return (
     <div style={{ display: 'flex', gap: 5 }}>
       {grounds.map((g) => (
@@ -81,16 +82,29 @@ function ExamplePair({ t }: { t: SemToken }) {
             justifyContent: 'center',
           }}
         >
-          <span style={{ ...surfaceStyle(t.name, g.face), color: cssColor(g.value), fontSize: 13, fontWeight: 600 }}>
-            {isGlyph ? (
-              <svg width="14" height="14" viewBox="0 0 14 14" style={{ display: 'block' }}>
-                <circle cx="7" cy="7" r="5.4" fill="none" stroke="currentColor" strokeWidth="1.6" />
-                <circle cx="7" cy="7" r="1.6" fill="currentColor" />
-              </svg>
-            ) : (
-              'Ag'
-            )}
-          </span>
+          {isLine ? (
+            <span
+              style={{
+                ...surfaceStyle(t.name, g.face),
+                width: 46,
+                height: 24,
+                borderRadius: 6,
+                border: `1.5px solid ${cssColor(g.value)}`,
+                display: 'inline-block',
+              }}
+            />
+          ) : (
+            <span style={{ ...surfaceStyle(t.name, g.face), color: cssColor(g.value), fontSize: 13, fontWeight: 600 }}>
+              {isGlyph ? (
+                <svg width="14" height="14" viewBox="0 0 14 14" style={{ display: 'block' }}>
+                  <circle cx="7" cy="7" r="5.4" fill="none" stroke="currentColor" strokeWidth="1.6" />
+                  <circle cx="7" cy="7" r="1.6" fill="currentColor" />
+                </svg>
+              ) : (
+                'Ag'
+              )}
+            </span>
+          )}
         </div>
       ))}
     </div>
@@ -98,7 +112,7 @@ function ExamplePair({ t }: { t: SemToken }) {
 }
 
 /** One picker folder of a semantic tier, rendered as a documented table. */
-export function FolderTable({ tier, folder }: { tier: 'text' | 'fg'; folder: string }) {
+export function FolderTable({ tier, folder }: { tier: 'text' | 'fg' | 'border'; folder: string }) {
   const all = semanticFamily(`${tier}/`).filter(
     (t) => t.name === `${tier}/${folder}` || t.name.startsWith(`${tier}/${folder}/`),
   );

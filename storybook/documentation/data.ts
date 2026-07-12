@@ -33,6 +33,8 @@ const COLLECTIONS = new Map<string, ModeMap>(
 
 export const PRIM_COL = '.1.0-Prim-Col';
 export const AL_COL = '.2.0-Al-Col';
+export const EFFECTS_COL = '5.0-Effects';
+export const AL_FX = '.2.6-Al-Effects';
 
 function isLeaf(node: Tree | Leaf): node is Leaf {
   return typeof node === 'object' && node !== null && '$type' in node;
@@ -109,6 +111,35 @@ export function childrenOf(collection: string, slashPath = ''): string[] {
   }
   if (!node || typeof node !== 'object') return [];
   return Object.keys(node).filter((k) => !k.startsWith('$'));
+}
+
+/** Metadata of a leaf without resolving it: binding path, description, raw value. */
+export function leafMeta(
+  collection: string,
+  slashPath: string,
+): { binding: string; description: string; raw: string | number | boolean } | null {
+  const modes = COLLECTIONS.get(collection);
+  if (!modes) return null;
+  const leaf = leafAt(modes[Object.keys(modes)[0]], slashPath.split('/').join('.'));
+  if (!leaf) return null;
+  const binding =
+    typeof leaf.$value === 'string' && leaf.$value.startsWith('{')
+      ? leaf.$value.slice(1, -1).split('.').join('/')
+      : 'RAW';
+  return { binding, description: leaf.$description ?? '', raw: leaf.$value };
+}
+
+/** Resolve a leaf to a number, following alias chains across float collections. */
+export function numeric(collection: string, slashPath: string, depth = 0): number | null {
+  if (depth > 8) return null;
+  const modes = COLLECTIONS.get(collection);
+  if (!modes) return null;
+  const leaf = leafAt(modes[Object.keys(modes)[0]], slashPath.split('/').join('.'));
+  if (!leaf) return null;
+  if (typeof leaf.$value === 'number') return leaf.$value;
+  if (typeof leaf.$value === 'string' && leaf.$value.startsWith('{') && leaf.$collectionName)
+    return numeric(leaf.$collectionName, leaf.$value.slice(1, -1).split('.').join('/'), depth + 1);
+  return null;
 }
 
 /** A 12-step ramp with both faces, or null if the family isn't ramp-shaped. */
