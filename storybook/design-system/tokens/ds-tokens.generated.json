@@ -1,7 +1,7 @@
 {
  "fileKey": "Qdb9Kx98afJHxaCGAIxoMC",
  "pulledAtFileVersion": null,
- "variables": 3121,
+ "variables": 3150,
  "export": [
   {
    ".1.0-Prim-Col": {
@@ -20977,65 +20977,67 @@
        "$libraryName": "",
        "$value": "#0a0d122e"
       },
-      "blur-sm": {
-       "$scopes": [
-        "EFFECT_FLOAT"
-       ],
-       "$description": "Small blur radius (8px). For subtle frosted effects.",
-       "$type": "float",
-       "$libraryName": "",
-       "$collectionName": ".1.1-Prim-Dim",
-       "$value": "{8}"
-      },
-      "blur-md": {
-       "$scopes": [
-        "EFFECT_FLOAT"
-       ],
-       "$description": "Medium blur radius (16px). For card overlays.",
-       "$type": "float",
-       "$libraryName": "",
-       "$collectionName": ".1.1-Prim-Dim",
-       "$value": "{16}"
-      },
-      "blur-lg": {
-       "$scopes": [
-        "EFFECT_FLOAT"
-       ],
-       "$description": "Large blur radius (24px). For modal backdrops.",
-       "$type": "float",
-       "$libraryName": "",
-       "$collectionName": ".1.1-Prim-Dim",
-       "$value": "{24}"
-      },
-      "blur-xl": {
-       "$scopes": [
-        "EFFECT_FLOAT"
-       ],
-       "$description": "Extra large blur radius (40px). For hero backgrounds.",
-       "$type": "float",
-       "$libraryName": "",
-       "$collectionName": ".1.1-Prim-Dim",
-       "$value": "{40}"
-      },
-      "blur-2xl": {
-       "$scopes": [
-        "EFFECT_FLOAT"
-       ],
-       "$description": "Extra large blur radius (40px). For hero backgrounds.",
-       "$type": "float",
-       "$libraryName": "",
-       "$collectionName": ".1.1-Prim-Dim",
-       "$value": "{56}"
-      },
-      "blur-3xl": {
-       "$scopes": [
-        "ALL_SCOPES"
-       ],
-       "$description": "Thick-material blur.",
-       "$type": "float",
-       "$libraryName": "",
-       "$collectionName": ".1.1-Prim-Dim",
-       "$value": "{96}"
+      "layer-blur": {
+       "sm": {
+        "$scopes": [
+         "EFFECT_FLOAT"
+        ],
+        "$description": "Layer blur (blurs the element itself) — routes through the universal strength range. Materials use the frost/* backdrop pair instead.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{soft.xl}"
+       },
+       "md": {
+        "$scopes": [
+         "EFFECT_FLOAT"
+        ],
+        "$description": "Layer blur (blurs the element itself) — routes through the universal strength range. Materials use the frost/* backdrop pair instead.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{mild.m}"
+       },
+       "lg": {
+        "$scopes": [
+         "EFFECT_FLOAT"
+        ],
+        "$description": "Layer blur (blurs the element itself) — routes through the universal strength range. Materials use the frost/* backdrop pair instead.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{regular.xs}"
+       },
+       "xl": {
+        "$scopes": [
+         "EFFECT_FLOAT"
+        ],
+        "$description": "Layer blur (blurs the element itself) — routes through the universal strength range. Materials use the frost/* backdrop pair instead.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{regular.m}"
+       },
+       "2xl": {
+        "$scopes": [
+         "EFFECT_FLOAT"
+        ],
+        "$description": "Layer blur (blurs the element itself) — routes through the universal strength range. Materials use the frost/* backdrop pair instead.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{regular.xl}"
+       },
+       "3xl": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "Layer blur (blurs the element itself) — routes through the universal strength range. Materials use the frost/* backdrop pair instead.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{intense.l}"
+       }
       },
       "material-saturate": {
        "$scopes": [
@@ -21066,6 +21068,48 @@
        "$libraryName": "",
        "$collectionName": ".1.4-Prim-Ratios",
        "$value": "{1-05}"
+      },
+      "frost": {
+       "ultrathin": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 effects v2.3.2 — Backdrop-blur strength of the material; name-paired with bg/frost/ultrathin (the tint). A material = the pair. NOT layer blur.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{regular.xs}"
+       },
+       "thin": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 effects v2.3.2 — Backdrop-blur strength of the material; name-paired with bg/frost/thin (the tint). A material = the pair. NOT layer blur.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{regular.m}"
+       },
+       "regular": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 effects v2.3.2 — Backdrop-blur strength of the material; name-paired with bg/frost/regular (the tint). A material = the pair. NOT layer blur.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{regular.xl}"
+       },
+       "thick": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 effects v2.3.2 — Backdrop-blur strength of the material; name-paired with bg/frost/thick (the tint). A material = the pair. NOT layer blur.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{intense.l}"
+       }
       }
      },
      "Dark": {
@@ -21222,65 +21266,67 @@
        "$libraryName": "",
        "$value": "#0c0e122e"
       },
-      "blur-sm": {
-       "$scopes": [
-        "EFFECT_FLOAT"
-       ],
-       "$description": "Small blur radius (8px). For subtle frosted effects.",
-       "$type": "float",
-       "$libraryName": "",
-       "$collectionName": ".1.1-Prim-Dim",
-       "$value": "{8}"
-      },
-      "blur-md": {
-       "$scopes": [
-        "EFFECT_FLOAT"
-       ],
-       "$description": "Medium blur radius (16px). For card overlays.",
-       "$type": "float",
-       "$libraryName": "",
-       "$collectionName": ".1.1-Prim-Dim",
-       "$value": "{16}"
-      },
-      "blur-lg": {
-       "$scopes": [
-        "EFFECT_FLOAT"
-       ],
-       "$description": "Large blur radius (24px). For modal backdrops.",
-       "$type": "float",
-       "$libraryName": "",
-       "$collectionName": ".1.1-Prim-Dim",
-       "$value": "{24}"
-      },
-      "blur-xl": {
-       "$scopes": [
-        "EFFECT_FLOAT"
-       ],
-       "$description": "Extra large blur radius (40px). For hero backgrounds.",
-       "$type": "float",
-       "$libraryName": "",
-       "$collectionName": ".1.1-Prim-Dim",
-       "$value": "{40}"
-      },
-      "blur-2xl": {
-       "$scopes": [
-        "EFFECT_FLOAT"
-       ],
-       "$description": "Extra large blur radius (40px). For hero backgrounds.",
-       "$type": "float",
-       "$libraryName": "",
-       "$collectionName": ".1.1-Prim-Dim",
-       "$value": "{56}"
-      },
-      "blur-3xl": {
-       "$scopes": [
-        "ALL_SCOPES"
-       ],
-       "$description": "Thick-material blur.",
-       "$type": "float",
-       "$libraryName": "",
-       "$collectionName": ".1.1-Prim-Dim",
-       "$value": "{96}"
+      "layer-blur": {
+       "sm": {
+        "$scopes": [
+         "EFFECT_FLOAT"
+        ],
+        "$description": "Layer blur (blurs the element itself) — routes through the universal strength range. Materials use the frost/* backdrop pair instead.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{soft.xl}"
+       },
+       "md": {
+        "$scopes": [
+         "EFFECT_FLOAT"
+        ],
+        "$description": "Layer blur (blurs the element itself) — routes through the universal strength range. Materials use the frost/* backdrop pair instead.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{mild.m}"
+       },
+       "lg": {
+        "$scopes": [
+         "EFFECT_FLOAT"
+        ],
+        "$description": "Layer blur (blurs the element itself) — routes through the universal strength range. Materials use the frost/* backdrop pair instead.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{regular.xs}"
+       },
+       "xl": {
+        "$scopes": [
+         "EFFECT_FLOAT"
+        ],
+        "$description": "Layer blur (blurs the element itself) — routes through the universal strength range. Materials use the frost/* backdrop pair instead.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{regular.m}"
+       },
+       "2xl": {
+        "$scopes": [
+         "EFFECT_FLOAT"
+        ],
+        "$description": "Layer blur (blurs the element itself) — routes through the universal strength range. Materials use the frost/* backdrop pair instead.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{regular.xl}"
+       },
+       "3xl": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "Layer blur (blurs the element itself) — routes through the universal strength range. Materials use the frost/* backdrop pair instead.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{intense.l}"
+       }
       },
       "material-saturate": {
        "$scopes": [
@@ -21311,6 +21357,48 @@
        "$libraryName": "",
        "$collectionName": ".1.4-Prim-Ratios",
        "$value": "{1-05}"
+      },
+      "frost": {
+       "ultrathin": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 effects v2.3.2 — Backdrop-blur strength of the material; name-paired with bg/frost/ultrathin (the tint). A material = the pair. NOT layer blur.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{regular.xs}"
+       },
+       "thin": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 effects v2.3.2 — Backdrop-blur strength of the material; name-paired with bg/frost/thin (the tint). A material = the pair. NOT layer blur.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{regular.m}"
+       },
+       "regular": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 effects v2.3.2 — Backdrop-blur strength of the material; name-paired with bg/frost/regular (the tint). A material = the pair. NOT layer blur.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{regular.xl}"
+       },
+       "thick": {
+        "$scopes": [
+         "ALL_SCOPES"
+        ],
+        "$description": "🔒 effects v2.3.2 — Backdrop-blur strength of the material; name-paired with bg/frost/thick (the tint). A material = the pair. NOT layer blur.",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".2.6-Al-Effects",
+        "$value": "{intense.l}"
+       }
       }
      }
     }
@@ -28285,6 +28373,199 @@
         "$libraryName": "",
         "$collectionName": ".1.0-Prim-Col",
         "$value": "{l-constant.grey.2}"
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   ".2.6-Al-Effects": {
+    "modes": {
+     "Mode 1": {
+      "soft": {
+       "xs": {
+        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{1}"
+       },
+       "s": {
+        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{2}"
+       },
+       "m": {
+        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{4}"
+       },
+       "l": {
+        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{6}"
+       },
+       "xl": {
+        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{8}"
+       }
+      },
+      "mild": {
+       "xs": {
+        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{10}"
+       },
+       "s": {
+        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{12}"
+       },
+       "m": {
+        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{16}"
+       },
+       "l": {
+        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{18}"
+       },
+       "xl": {
+        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{20}"
+       }
+      },
+      "regular": {
+       "xs": {
+        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{24}"
+       },
+       "s": {
+        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{32}"
+       },
+       "m": {
+        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{40}"
+       },
+       "l": {
+        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{48}"
+       },
+       "xl": {
+        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{56}"
+       }
+      },
+      "intense": {
+       "xs": {
+        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{64}"
+       },
+       "s": {
+        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{72}"
+       },
+       "m": {
+        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{80}"
+       },
+       "l": {
+        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{96}"
+       },
+       "xl": {
+        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{128}"
+       }
+      },
+      "max": {
+       "xs": {
+        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{160}"
+       },
+       "s": {
+        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{192}"
+       },
+       "m": {
+        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{224}"
+       },
+       "l": {
+        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{256}"
+       },
+       "xl": {
+        "$description": "Universal effect strength — one range for every effect (backdrop blur, layer blur, shadow geometry).",
+        "$type": "float",
+        "$libraryName": "",
+        "$collectionName": ".1.1-Prim-Dim",
+        "$value": "{320}"
        }
       }
      }
