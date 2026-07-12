@@ -27,6 +27,10 @@ function request(method: 'GET' | 'POST', body?: unknown) {
   })
 }
 
+function componentRequest() {
+  return new Request(`http://localhost/api/dev/editor-authoring?mode=component&file=${encodeURIComponent(SOURCE_FILE)}`)
+}
+
 describe('editor-authoring G1 import route', () => {
   beforeEach(() => vi.stubEnv('NODE_ENV', 'development'))
   afterEach(() => vi.unstubAllEnvs())
@@ -60,7 +64,7 @@ describe('editor-authoring G1 import route', () => {
     }), '/path/that/must/not/be-read')
 
     expect(response.status).toBe(400)
-    await expect(response.json()).resolves.toEqual({ error: 'invalid source import request' })
+    await expect(response.json()).resolves.toEqual({ error: 'invalid authoring request' })
   })
 
   it('rejects malformed JSON as a 400 before filesystem access', async () => {
@@ -71,7 +75,7 @@ describe('editor-authoring G1 import route', () => {
     }), '/path/that/must/not/be-read')
 
     expect(response.status).toBe(400)
-    await expect(response.json()).resolves.toEqual({ error: 'invalid source import request' })
+    await expect(response.json()).resolves.toEqual({ error: 'invalid authoring request' })
   })
 
   it('returns a named 409 and no sidecar when source changed after classification', async () => {
@@ -111,5 +115,61 @@ describe('editor-authoring G1 import route', () => {
     vi.stubEnv('NODE_ENV', 'test')
     const response = await GET(request('GET'))
     expect(response.status).toBe(403)
+  })
+
+  it('loads and persists create, rename, and move through the strict G2 command route', async () => {
+    const root = await makeRoot()
+    const classified = await (await handleGet(request('GET'), root)).json()
+    await handlePost(request('POST', { kind: 'import-source', file: SOURCE_FILE, expectedSourceHashes: classified.sourceHashes }), root)
+
+    let loaded = await (await handleGet(componentRequest(), root)).json()
+    const componentId = loaded.componentId as string
+    const create = await handlePost(request('POST', {
+      kind: 'execute-command',
+      command: { kind: 'create-variant', commandId: 'route-create', componentId, displayName: 'New Variant' },
+      expectedRevision: loaded.graph.revision,
+      expectedSourceHashes: loaded.sourceHashes,
+    }), root)
+    expect(create.status).toBe(200)
+    const created = await create.json()
+    const variant = Object.values(created.graph.variants as Record<string, { id: string; displayName: string }>).find((entry) => entry.displayName === 'New Variant')!
+
+    loaded = await (await handleGet(componentRequest(), root)).json()
+    const rename = await handlePost(request('POST', {
+      kind: 'execute-command',
+      command: { kind: 'rename-variant', commandId: 'route-rename', componentId, variantId: variant.id, displayName: 'Renamed' },
+      expectedRevision: loaded.graph.revision,
+      expectedSourceHashes: loaded.sourceHashes,
+    }), root)
+    expect(rename.status).toBe(200)
+
+    loaded = await (await handleGet(componentRequest(), root)).json()
+    const move = await handlePost(request('POST', {
+      kind: 'execute-command',
+      command: { kind: 'move-variant', commandId: 'route-move', componentId, variantId: variant.id, frame: { x: 80, y: 40, width: 320, height: 180 } },
+      expectedRevision: loaded.graph.revision,
+      expectedSourceHashes: loaded.sourceHashes,
+    }), root)
+    expect(move.status).toBe(200)
+    await expect(move.json()).resolves.toMatchObject({ graph: { revision: 4, variants: { [variant.id]: { id: variant.id, displayName: 'Renamed', frame: { x: 80, y: 40 } } } } })
+  }, 10_000)
+
+  it('rejects malformed G2 command keys and geometry before filesystem access', async () => {
+    const response = await handlePost(request('POST', {
+      kind: 'execute-command',
+      command: { kind: 'move-variant', commandId: 'bad', componentId: 'component_x', variantId: 'variant_x', frame: { x: 0, y: 0, width: Number.NaN, height: 1 }, extra: true },
+      expectedRevision: 1,
+      expectedSourceHashes: { [SOURCE_FILE]: 'a'.repeat(64) },
+    }), '/path/that/must/not-be-read')
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toEqual({ error: 'invalid authoring request' })
+
+    const invalidName = await handlePost(request('POST', {
+      kind: 'execute-command',
+      command: { kind: 'create-variant', commandId: 'bad id', componentId: 'component_x', displayName: '   ' },
+      expectedRevision: 1,
+      expectedSourceHashes: { [SOURCE_FILE]: 'a'.repeat(64) },
+    }), '/path/that/must/not-be-read')
+    expect(invalidName.status).toBe(400)
   })
 })

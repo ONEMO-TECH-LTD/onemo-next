@@ -33,14 +33,15 @@ export async function compileG2VariantCommand(input: {
   if (beforeProjection.exportName !== component.source.exportName) {
     throw namedError('COMPONENT_EXPORT_MISMATCH', `expected export ${component.source.exportName}, found ${beforeProjection.exportName}`, 422)
   }
-  assertSemanticTypecheck(component.source.file, input.source)
+  const beforeTypechecked = beforeProjection.nativeVariants.length > 0
+  if (beforeTypechecked) assertSemanticTypecheck(component.source.file, input.source)
 
   if (input.command.kind === 'move-variant') {
     const variant = requireOwnedVariant(graph, component, input.command.variantId)
     if (beforeProjection.nativeVariants.length > 0) assertNativeRegistryMatchesGraph(graph, component, beforeProjection)
     const next = cloneGraph(graph)
     next.variants[variant.id] = { ...variant, frame: { ...input.command.frame } }
-    return checkedPlan(input.command, graph, next, beforeProjection, input.source, [])
+    return checkedPlan(input.command, graph, next, beforeProjection, input.source, [], beforeTypechecked)
   }
 
   if (input.command.kind === 'rename-variant') {
@@ -62,7 +63,7 @@ export async function compileG2VariantCommand(input: {
     const next = cloneGraph(graph)
     next.components[component.id] = { ...component, compatibility: 'native-v1' }
     next.variants[variant.id] = { ...variant, displayName: normalizedName(input.command.displayName) }
-    return checkedPlan(input.command, graph, next, afterProjection, afterSource, sourcePatches)
+    return checkedPlan(input.command, graph, next, afterProjection, afterSource, sourcePatches, true)
   }
 
   const variantId = stableId('variant', component.id, input.command.commandId)
@@ -93,6 +94,7 @@ export async function compileG2VariantCommand(input: {
     afterProjection,
     afterSource,
     [{ file: component.source.file, before: input.source, after: afterSource }],
+    true,
   )
 }
 
@@ -103,6 +105,7 @@ function checkedPlan(
   afterProjection: SourceProjection,
   stagedSource: string,
   sourcePatches: CompilePlan['sourcePatches'],
+  typechecked: boolean,
 ): CompilePlan {
   const graph = assertAuthoringGraphV1({ ...nextGraph, revision: beforeGraph.revision })
   return {
@@ -114,7 +117,7 @@ function checkedPlan(
     verifiedAssertions: [
       { kind: 'stable-variant-identity', status: 'passed' },
       { kind: 'untouched-source-semantics', status: 'passed' },
-      { kind: 'staged-typescript-semantics', status: 'passed' },
+      ...(typechecked ? [{ kind: 'staged-typescript-semantics' as const, status: 'passed' as const }] : []),
       ...(afterProjection.nativeVariants.length > 0 ? [{ kind: 'native-registry-round-trip' as const, status: 'passed' as const }] : []),
       ...(command.kind === 'move-variant' ? [{ kind: 'geometry-sidecar-only' as const, status: 'passed' as const }] : []),
     ],
