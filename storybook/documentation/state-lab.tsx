@@ -117,6 +117,10 @@ function FocusChip({ ground, ring, caption }: { ground: string; ring: string | n
         }}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
+        onPointerDown={(e) => {
+          (e.currentTarget as HTMLButtonElement).focus();
+          setFocused(true);
+        }}
       />
       <div style={{ ...S.mono, fontSize: 8.5, color: '#8b8d98', marginTop: 2 }}>{caption}</div>
     </span>
@@ -179,7 +183,7 @@ function Panel({ face }: { face: Face }) {
       <div style={label}>DRAG — grab and move ({washAlpha('interaction/drag/on-neutral')} + shadow)</div>
       <DragChip ground={control} wash={dragN} shadow={shadowRegular} />
 
-      <div style={label}>FOCUS — press Tab to walk the rings</div>
+      <div style={label}>FOCUS — click a chip (or Tab) for its ring</div>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
         <FocusChip ground={control} ring={ringInk} caption="A · Ink (proposal)" />
         <FocusChip ground={control} ring={ringCur} caption="B · current (colour)" />
