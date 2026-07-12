@@ -1,0 +1,28 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+import { Page, H2, P, Note } from './blocks';
+import { StateLab } from './state-lab';
+
+<Meta title="Documentation/State Lab" />
+
+<Page
+  title="State Lab"
+  lead="The state families, operable. Hold the chips for the press wash, grab and move the drag chip, press Tab for the focus rings, click to raise the scrim — every colour resolves from the live pull, both theme faces side by side on the real app ground."
+>
+
+<Note>
+  Calibration surface: the values shown are the current draft bindings. The one structural decision on the
+  table is the neutral focus ring — option A follows the mono law (the brand ink pair), option B is the
+  current draft binding (the sole coloured token in the state families).
+</Note>
+
+<StateLab />
+
+<H2>What to judge here</H2>
+
+<P>
+  Press and drag strengths (one alpha step apart by design) · the drag lift (wash plus shadow together) ·
+  scrim depths for the modal dim and the imagery legibility band · which focus ring survives the mono law.
+  Rulings land in the tokens; this page re-renders them on the next pull.
+</P>
+
+</Page>
