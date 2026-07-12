@@ -55,6 +55,20 @@ describe('AuthoringSidecarStore', () => {
     expect(transactions).toHaveLength(1)
   })
 
+  it('refuses V1 migration under a foreign logical store without transaction evidence', async () => {
+    const { root, store } = await makeStore()
+    const legacy = { ...createEmptyAuthoringGraph({ storeId: 'foreign-store', rootKind: 'project' }), schemaVersion: 1 }
+    const sidecarPath = path.join(root, PROJECT_AUTHORING_SIDECAR)
+    await fs.mkdir(path.dirname(sidecarPath), { recursive: true })
+    const legacyBytes = Buffer.from(JSON.stringify(legacy, null, 2) + '\n')
+    await fs.writeFile(sidecarPath, legacyBytes)
+
+    await expect(store.load()).rejects.toMatchObject({ code: 'AUTHORING_MIGRATION_INPUT_INVALID', status: 409 })
+    await expect(fs.readFile(sidecarPath)).resolves.toEqual(legacyBytes)
+    await expect(fs.readdir(path.join(root, authoringMetadataPath('project', 'transactions'))))
+      .rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
   it('keeps transaction reads lock-first and named-refuses V1 until the explicit load migration runs', async () => {
     const { root, registry, store, tx } = await makeStore()
     const legacy = { ...createEmptyAuthoringGraph({ storeId: 'project-main', rootKind: 'project' }), schemaVersion: 1 }
