@@ -88,8 +88,9 @@ function fillsOf(node, varMap, refusals) {
   let backgroundColor;
   for (let i = 0; i < visible.length; i++) {
     const f = visible[i];
-    // per-fill bound variable: boundVariables.fills is an ARRAY aligned with fills
-    const ref = varRef(varMap, node.boundVariables?.fills?.[i]);
+    // binding lives INSIDE the paint (REST carrier truth); node.boundVariables.fills is a
+    // compacted mirror, NOT index-aligned — never indexed (C11 Binding Law, E1)
+    const ref = varRef(varMap, f.boundVariables?.color);
     if (f.type === 'SOLID') {
       const entry = { type: 'solid', color: colorOf(f.color, f.opacity ?? 1), ref, blendMode: f.blendMode };
       if (i === 0 && !backgroundColor) backgroundColor = entry; // bottom-most solid → background-color
@@ -97,7 +98,7 @@ function fillsOf(node, varMap, refusals) {
     } else if (f.type === 'GRADIENT_LINEAR' || f.type === 'GRADIENT_RADIAL' || f.type === 'GRADIENT_ANGULAR') {
       layers.push({
         type: f.type.slice(9).toLowerCase(), // linear|radial|angular
-        stops: (f.gradientStops ?? []).map((s) => ({ position: s.position, color: colorOf(s.color) })),
+        stops: (f.gradientStops ?? []).map((s) => ({ position: s.position, color: colorOf(s.color), ref: varRef(varMap, s.boundVariables?.color) })),
         gradientHandlePositions: f.gradientHandlePositions, blendMode: f.blendMode,
       });
     } else if (f.type === 'GRADIENT_DIAMOND') {
@@ -136,7 +137,7 @@ function strokesOf(node, varMap, refusals) {
       align, weight,
       gradient: {
         type: s.type.slice(9).toLowerCase(),
-        stops: (s.gradientStops ?? []).map((g) => ({ position: g.position, color: colorOf(g.color) })),
+        stops: (s.gradientStops ?? []).map((g) => ({ position: g.position, color: colorOf(g.color), ref: varRef(varMap, g.boundVariables?.color) })),
         gradientHandlePositions: s.gradientHandlePositions,
       },
     };
@@ -249,7 +250,18 @@ export function buildIr(rawDoc, varMap = null) {
     const absolute = parent && (!parentFlex || node.layoutPositioning === 'ABSOLUTE')
       ? offsetIn(parent, node) : undefined;
     // Rotation (Figma degrees, counter-clockwise-positive) → the emitter negates for CSS.
-    const rotation = Math.abs(node.rotation ?? 0) > 0.001 ? node.rotation : undefined;
+    let rotation = Math.abs(node.rotation ?? 0) > 0.001 ? node.rotation : undefined;
+    // Reflection (C11 transform law, narrow slice): a PURE mirror matrix ([[-1,0],[0,1]] or
+    // [[1,0],[0,-1]]) reports rotation=π over REST, but a mirror is NOT a 180° rotation — a
+    // 180° turn flips BOTH axes and inverts vertical gradients (live-hit: Spec-Pill top-light
+    // rendered bottom-up). Detect the pure mirror and emit scaleX/Y(-1); combos stay R4.
+    let mirror;
+    const rt = node.relativeTransform;
+    const near = (v, t) => Math.abs(v - t) < 0.001;
+    if (rt && near(rt[0][1], 0) && near(rt[1][0], 0)) {
+      if (near(rt[0][0], -1) && near(rt[1][1], 1)) { mirror = 'x'; rotation = undefined; }
+      else if (near(rt[0][0], 1) && near(rt[1][1], -1)) { mirror = 'y'; rotation = undefined; }
+    }
 
     // C5 fixture finding — rotated geometry: absoluteBoundingBox is the ROTATED AABB, not the
     // intrinsic box. Recover the true size (solve w·c+h·s=W, w·s+h·c=H) and position by CENTER
@@ -262,6 +274,9 @@ export function buildIr(rawDoc, varMap = null) {
       const { width: W, height: H } = node.absoluteBoundingBox;
       if (Math.abs(det) > 0.05) trueSize = { w: (W * c - H * sn) / det, h: (H * c - W * sn) / det };
     }
+    // svg exports render the node in LOCAL space (live-proven: the +90°-rotated eye exports
+    // upright) — so svg-kind nodes DO take their own rotation/mirror as css transforms,
+    // exactly like elements.
     if (absolute && trueSize) {
       const b = bboxOf(node);
       absolute.x += (b.width - trueSize.w) / 2;
@@ -331,7 +346,7 @@ export function buildIr(rawDoc, varMap = null) {
       return {
         id: node.id, name: node.name, kind: 'svg',
         bounds: { width: trueSize?.w ?? b.width, height: trueSize?.h ?? b.height },
-        sizing: sizingOf(node, varMap, trueSize), absolute, rotation,
+        sizing: sizingOf(node, varMap, trueSize), absolute, rotation, mirror,
         svgSource: node, // raw subtree — emitter exports faithful svg (C1.3)
         svgTokenColor,
         children: [],
@@ -342,7 +357,7 @@ export function buildIr(rawDoc, varMap = null) {
       return {
         id: node.id, name: node.name, kind: 'text',
         text: textOf(node, varMap, refusals),
-        style: baseStyle(node), sizing: sizingOf(node, varMap, trueSize), absolute, rotation,
+        style: baseStyle(node), sizing: sizingOf(node, varMap, trueSize), absolute, rotation, mirror,
         children: [],
       };
     }
@@ -360,7 +375,7 @@ export function buildIr(rawDoc, varMap = null) {
       layout,
       sizing: sizingOf(node, varMap, trueSize),
       style: baseStyle(node),
-      absolute, rotation,
+      absolute, rotation, mirror,
       hasAbsoluteChild: kids.some((k) => k.absolute),
       children: kids,
     };

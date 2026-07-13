@@ -281,7 +281,9 @@ function declsFor(node, notes) {
   if (st.opacity !== undefined) d.push(['opacity', String(st.opacity)]);
   if (st.blendMode) d.push(['mix-blend-mode', st.blendMode.toLowerCase().replace(/_/g, '-')]);
   // rotation → transform (C3.1: radians→degrees, sign-negated). geometry math, never refused.
-  if (node.rotation) d.push(['transform', `rotate(${rotateDeg(node.rotation)}deg)`]);
+  // Pure mirrors (C11 transform-law slice) emit as scale(-1) — a mirror is NOT a 180° rotation.
+  if (node.mirror) d.push(['transform', node.mirror === 'x' ? 'scaleX(-1)' : 'scaleY(-1)']);
+  else if (node.rotation) d.push(['transform', `rotate(${rotateDeg(node.rotation)}deg)`]);
 
   // typography (§3.5 TEXT + unit pins: lineHeight %→unitless, px→px)
   if (text) {
@@ -297,20 +299,27 @@ function declsFor(node, notes) {
     if (ls?.ref?.cssVar) d.push(['letter-spacing', `var(${ls.ref.cssVar})`]);
     else if (ls?.value) d.push(['letter-spacing', px(ls.value)]);
     if (text.alignX !== 'LEFT') d.push(['text-align', text.alignX.toLowerCase()]);
+    // Figma textAlignVertical: a fixed-box text centers/bottoms its line box; CSS top-aligns by
+    // default → glyphs ride high (live-hit: pill labels 16px box / 12px line). Text spans are
+    // flex children (blockified), so align-content positions the line box without touching the
+    // bound line-height token. (C11 E13 — full codec lands in R4.)
+    const fixedBox = node.sizing?.v === 'FIXED' && (text.autoResize === 'NONE' || text.autoResize === 'TRUNCATE');
+    if (fixedBox && node.text.alignY === 'CENTER') d.push(['align-content', 'center']);
+    if (fixedBox && node.text.alignY === 'BOTTOM') d.push(['align-content', 'end']);
     if (text.autoResize === 'TRUNCATE') { d.push(['white-space', 'nowrap']); d.push(['overflow', 'hidden']); d.push(['text-overflow', 'ellipsis']); }
   }
   return d;
 }
 
 export function gradientCss(layer, notes, node, images) {
-  if (layer.type === 'solid') return `linear-gradient(${cssColor(layer.color)}, ${cssColor(layer.color)})`; // non-bottom solid (§3.5)
+  if (layer.type === 'solid') { const c = layer.ref?.cssVar ? `var(${layer.ref.cssVar})` : cssColor(layer.color); return `linear-gradient(${c}, ${c})`; } // non-bottom solid (§3.5) — bound solids keep their token
   if (layer.type === 'image') {
     const img = images?.get(layer.imageRef);
     if (img) return `url('./assets/${img.file}')`; // container w/ image fill (§3.5 Dan package pin)
     notes.push({ nodeId: node.id, note: `image asset missing: ${layer.imageRef}` });
     return null;
   }
-  const stops = layer.stops.map((s) => `${cssColor(s.color)} ${round2(s.position * 100)}%`).join(', ');
+  const stops = layer.stops.map((s) => `${s.ref?.cssVar ? `var(${s.ref.cssVar})` : cssColor(s.color)} ${round2(s.position * 100)}%`).join(', ');
   const h = layer.gradientHandlePositions;
   const pctv = (v) => `${round2(v * 100)}%`;
   if (layer.type === 'linear') return `linear-gradient(${gradientAngle(h)}deg, ${stops})`;
@@ -436,7 +445,8 @@ export function emit(ir, frameName, { assets = new Map(), images = new Map(), au
       if (n.isFlexChild) svgDecls.push(['flex-shrink', '0']); // svg flex items must not squeeze (C3.5)
       if (n.negMargin) svgDecls.push([`margin-${n.negMargin.axis}`, px(n.negMargin.value)]);
       if (n.absolute) { svgDecls.push(['position', 'absolute'], ['left', px(n.absolute.x)], ['top', px(n.absolute.y)]); }
-      if (n.rotation) svgDecls.push(['transform', `rotate(${rotateDeg(n.rotation)}deg)`]);
+      if (n.mirror) svgDecls.push(['transform', n.mirror === 'x' ? 'scaleX(-1)' : 'scaleY(-1)']);
+      else if (n.rotation) svgDecls.push(['transform', `rotate(${rotateDeg(n.rotation)}deg)`]);
       if (body && n.svgTokenColor) svgDecls.push(['color', `var(${n.svgTokenColor.cssVar})`]);
       cssRules.push([cls, svgDecls]);
       if (body) {
@@ -464,7 +474,8 @@ export function emit(ir, frameName, { assets = new Map(), images = new Map(), au
       // Theme-responsive surface (Dan): the root's image background can't token-swap, so in dark
       // it inverts via a difference-blend against a theme-driven colour — light = transparent
       // (unchanged), dark = white (inverted). Only the ROOT surface; content images are untouched.
-      if (decls.some(([p2]) => p2 === 'background-image') && !decls.some(([p2]) => p2 === 'background-color')) {
+      // token-bound surfaces theme-swap through their own variable — the invert hack is only for truly unbound image surfaces
+      if (decls.some(([p2, v2]) => p2 === 'background-image' && !String(v2).includes('var(')) && !decls.some(([p2]) => p2 === 'background-color') && !decls.some(([p2, v2]) => p2 === 'background-image' && String(v2).includes('var('))) {
         decls.push(['background-color', 'var(--fc-surface-invert, transparent)'], ['background-blend-mode', 'difference']);
         surfaceInvert = true;
       }

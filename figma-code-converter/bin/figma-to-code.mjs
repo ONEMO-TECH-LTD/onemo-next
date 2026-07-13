@@ -79,7 +79,7 @@ if (cmd === 'fetch') {
   }
   const { root, refusals } = buildIr(r.document, varMap);
   const { exportSvgs, svgIdsOf, exportImageFills, imageRefsOf } = await import('../src/assets.mjs');
-  const svg = await exportSvgs(ROOT, fileKey, svgIdsOf(root), { offline });
+  const svg = await exportSvgs(ROOT, fileKey, svgIdsOf(root), { offline, version: r.fileVersion }); // version-keyed cache (C11 G7): a Figma vector edit invalidates its export
   // image fills → ORIGINALS into the package's assets/ (Dan pin: complete self-contained package)
   const outDirBase = outFlag >= 0 ? flags[outFlag + 1] : null;
   const imgRefs = imageRefsOf(root);

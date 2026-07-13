@@ -74,7 +74,7 @@
   #rsL{left:calc(var(--leftW) - 3px);} #rsR{right:calc(var(--rightW) - 3px);}
   body.hideL #rsL,body.hideR #rsR{display:none;}
   .device{position:relative;background:#fff;outline:1px solid #2a2a32;}
-  .device iframe{display:block;border:0;background:#eceff1;position:relative;z-index:1;}
+  .device iframe{display:block;border:0;background:#eceff1;position:relative;z-index:1;width:402px;height:874px;} /* pre-audit default = converted-frame size (Dan: the true iframe IS the converted screen); JS overrides with the exact frame dims on load */
   .device canvas.overlay{position:absolute;top:0;left:0;z-index:2;pointer-events:none;}
   .zonebox{position:absolute;z-index:3;pointer-events:none;border:1.5px dashed #8fd0ff;background:rgba(143,208,255,.08);display:none;}
   .panel{position:fixed;top:var(--topH);right:0;bottom:0;width:340px;background:#131319;border-left:1px solid #26262e;overflow:auto;padding:14px;}

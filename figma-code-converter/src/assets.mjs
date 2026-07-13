@@ -44,11 +44,13 @@ export function jsxSafeSvg(svg) {
   });
 }
 
-/** Export svg for the given node ids (batched), cache to assets/<fileKey>/<id>.svg. */
-export async function exportSvgs(root, fileKey, ids, { offline = false } = {}) {
+/** Export svg for the given node ids (batched), cache to assets/<fileKey>/<id>-<version>.svg.
+ *  The cache key CARRIES THE FILE VERSION (C11 G7/E12): an id-only key serves a stale export
+ *  forever after any vector edit (live-hit: removed icon shadow + fixed mirror kept rendering). */
+export async function exportSvgs(root, fileKey, ids, { offline = false, version = 'v0' } = {}) {
   const dir = assetDir(root, fileKey);
   await fs.mkdir(dir, { recursive: true });
-  const fileFor = (id) => path.join(dir, `${id.replace(/[:;]/g, '-')}.svg`);
+  const fileFor = (id) => path.join(dir, `${id.replace(/[:;]/g, '-')}-${version}.svg`);
 
   const missing = [];
   const out = new Map();

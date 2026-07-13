@@ -71,8 +71,10 @@ function geomOf(n, isRoot, images) {
   }
   if (n.absolute) { g.position = 'absolute'; g.left = rpx(n.absolute.x); g.top = rpx(n.absolute.y); }
   else if (n.hasAbsoluteChild) g.position = 'relative';
-  // C3.1: Figma rotation is RADIANS → CSS degrees, sign-negated (mirrors emit's rotateDeg)
-  if (n.rotation) g.transform = `rotate(${Math.round(-n.rotation * 180 / Math.PI * 100) / 100}deg)`;
+  // C3.1: Figma rotation is RADIANS → CSS degrees, sign-negated (mirrors emit's rotateDeg).
+  // Pure mirrors emit scale(-1) (C11 transform-law slice) — mirrors emit's branch exactly.
+  if (n.mirror) g.transform = n.mirror === 'x' ? 'scaleX(-1)' : 'scaleY(-1)';
+  else if (n.rotation) g.transform = `rotate(${Math.round(-n.rotation * 180 / Math.PI * 100) / 100}deg)`;
   // background + border (C4.2): merged from THE shared derivation — emit and reverse call the
   // same bgBorderDecls, so background/border rules can never drift between the two (the C2/C3
   // check-IR bug class, closed at the architecture level). Only GEOM_PROPS keys are diffed.
@@ -80,7 +82,8 @@ function geomOf(n, isRoot, images) {
     for (const [p, v] of bgBorderDecls(n, images, [])) if (GEOM_PROPS.includes(p)) g[p] = v;
     // theme-responsive surface (Dan): the root's image background inverts in dark via a
     // difference-blend against a theme colour — mirrors emit's depth-0 addition.
-    if (isRoot && g['background-image'] && g['background-color'] === undefined) {
+    if (isRoot && g['background-image'] && g['background-color'] === undefined
+      && !String(g['background-image']).includes('var(')) { // token-bound surfaces theme through their own variable (mirrors emit)
       g['background-color'] = 'var(--fc-surface-invert, transparent)';
       g['background-blend-mode'] = 'difference';
     }
