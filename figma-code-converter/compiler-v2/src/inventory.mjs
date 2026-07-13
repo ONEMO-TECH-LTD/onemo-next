@@ -13,6 +13,7 @@
  * a binding the carrier walk didn't find — silence is forbidden).
  */
 import { NONVISUAL_METADATA_PATHS } from './schema.mjs';
+import { canonicalJson } from './evidence.mjs';
 
 /** RFC 6901 token escaping — component-property keys may contain '/' or '~' and must stay
  *  unambiguous source identity (Meta probe finding 5b). */
@@ -47,6 +48,14 @@ const RULES = [
   // carrier-local paints & stops (the E1/E2 law)
   { re: /^\/fills\/(\d+)\/boundVariables\/color$/, slot: (m) => ({ kind: 'paint', index: +m[1] }), path: (m) => `/fills/${m[1]}/color`, domain: 'color' },
   { re: /^\/fills\/(\d+)\/gradientStops\/(\d+)\/boundVariables\/color$/, slot: (m) => ({ kind: 'stop', index: +m[2], paint: +m[1] }), path: (m) => `/fills/${m[1]}/stops/${m[2]}/color`, domain: 'color' },
+  // Figma's DEPRECATED `background` FRAME property is the predecessor to `fills`; REST emits it
+  // as a duplicate of the fills paints. Its bindings are a STRICT MIRROR of fills — accepted ONLY
+  // when the containing paint (or gradient stop) structurally EQUALS the same-index fills paint
+  // (proving exact duplication incl. alias). Any divergence → UNKNOWN/fail-loud (Meta strict law).
+  // `backgroundColor` (deprecated derived scalar) has no live-evidenced binding shape → stays
+  // UNKNOWN until a plugin-backed fixture proves it (no generic acceptance).
+  { re: /^\/background\/(\d+)\/boundVariables\/color$/, backgroundMirror: (m) => ({ paint: +m[1] }) },
+  { re: /^\/background\/(\d+)\/gradientStops\/(\d+)\/boundVariables\/color$/, backgroundMirror: (m) => ({ paint: +m[1], stop: +m[2] }) },
   { re: /^\/strokes\/(\d+)\/boundVariables\/color$/, slot: (m) => ({ kind: 'stroke', index: +m[1] }), path: (m) => `/strokes/${m[1]}/color`, domain: 'color' },
   { re: /^\/strokes\/(\d+)\/gradientStops\/(\d+)\/boundVariables\/color$/, slot: (m) => ({ kind: 'stop', index: +m[2], paint: +m[1], of: 'stroke' }), path: (m) => `/strokes/${m[1]}/stops/${m[2]}/color`, domain: 'color' },
   // carrier-local effects (E3)
@@ -75,11 +84,19 @@ const RULES = [
 
 const NONVISUAL_RE = new RegExp(`^\\/boundVariables\\/(${NONVISUAL_METADATA_PATHS.join('|')})(\\/\\d+)?$`);
 
+/** structural deep-equality via canonical JSON — proves exact paint/stop duplication. */
+const deepEqual = (a, b) => canonicalJson(a) === canonicalJson(b);
+
 /**
  * Classify every occurrence. Returns { canonical, mirrors, nonvisual, unknown }.
  * `unknown.length > 0` is a G1 hard failure — the caller must not proceed to lowering.
+ * @param document  required to validate the STRICT background-mirror law (structural equality
+ *                  to the same-index fills paint/stop). Without it, background occurrences are
+ *                  fail-loud UNKNOWN (a mirror cannot be proven without carrier context).
  */
-export function classifyOccurrences(occurrences) {
+export function classifyOccurrences(occurrences, document = null) {
+  const byId = new Map();
+  if (document) (function idx(n) { if (!n) return; byId.set(n.id, n); (n.children ?? []).forEach(idx); })(document);
   const canonical = [], mirrors = [], nonvisual = [], unknown = [];
   for (const occ of occurrences) {
     if (NONVISUAL_RE.test(occ.jsonPointer)) { nonvisual.push(occ); continue; }
@@ -88,7 +105,20 @@ export function classifyOccurrences(occurrences) {
       const m = occ.jsonPointer.match(rule.re);
       if (!m) continue;
       matched = true;
-      if (rule.mirror) mirrors.push({ ...occ, mirrorOf: rule.mirror });
+      if (rule.backgroundMirror) {
+        // STRICT: prove the deprecated background paint/stop EXACTLY equals the same-index fills
+        // paint/stop (same alias + same containing structure). Any divergence → UNKNOWN.
+        const { paint, stop } = rule.backgroundMirror(m);
+        const node = byId.get(occ.nodeId);
+        const bg = node?.background?.[paint], fl = node?.fills?.[paint];
+        const bgUnit = stop === undefined ? bg : bg?.gradientStops?.[stop];
+        const flUnit = stop === undefined ? fl : fl?.gradientStops?.[stop];
+        if (!node) unknown.push({ ...occ, reason: 'background mirror needs document context (none provided)' });
+        else if (!fl) unknown.push({ ...occ, reason: `background[${paint}] has no matching fills[${paint}] — divergent deprecated payload` });
+        else if (!deepEqual(bg, fl)) unknown.push({ ...occ, reason: `background[${paint}] not structurally equal to fills[${paint}] (alias/stop/paint divergence)` });
+        else if (!bgUnit || !deepEqual(bgUnit, flUnit)) unknown.push({ ...occ, reason: `background[${paint}] stop/paint unit mismatch vs fills` });
+        else mirrors.push({ ...occ, mirrorOf: 'fills', proven: 'background-structural' });
+      } else if (rule.mirror) mirrors.push({ ...occ, mirrorOf: rule.mirror });
       else canonical.push({ ...occ, propertyPath: rule.path(m), slot: rule.slot?.(m), destinationDomain: rule.domain });
       break;
     }

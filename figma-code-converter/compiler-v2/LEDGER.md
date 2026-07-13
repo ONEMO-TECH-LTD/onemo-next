@@ -17,14 +17,14 @@ review, fail-closed gaps, final Dan sign-off, Done ownership, cutover authorizat
 **Current test truth (reported separately):** legacy converter suite 46 pass / 3 fail (missing
 gitignored golden fixture `t88thL8hKksSpILgkeGRZ0-4084-25997.nodes.json`) / 0 skips ·
 compiler-v2 foundation suite 53 pass / 0 fail / 0 skip across Builder and Meta repeated runs ·
-parked P2 prototype suite 8 pass / 3 fail / 0 skip (not accepted). No phase may be recorded green
-from harness-only or REST_ONLY placeholders.
+compiler-v2 P2 graph suite 23 pass / 0 fail / 0 skip. No phase may be recorded green from
+harness-only or REST_ONLY placeholders.
 
 **Gap blocking map:** G-1 (plugin-origin corpus) blocks P0 exit + P7 full-corpus G0–G13.
 G-2 (plugin supplement capability) blocks P1 G0 supplement proof and every G1–G5 clearance of
 component/mixed-text/mode-override domains. G-3 (dark reference) blocks dark-state G11 promotion
-only. G-4 (Dan mother-screen selection) blocks P0 item 2 + the P3/P4 slice anchor. G-5
-(source-plane fail-closed enforcement, unbuilt) blocks P1 G0 / P2 provenance gating. G-6
+only. G-4 (Dan mother-screen selection) blocks P0 item 2 + the P3/P4 slice anchor. G-5's P2
+pre-graph enforcement is built; its remaining P1 live-capture enforcement blocks P1 G0. G-6
 (bounded retention/reader lease) blocks P0 operability acceptance only; it is not an atomic
 publication freeze blocker and does not authorize speculative GC.
 
@@ -39,7 +39,7 @@ Decisions/Done/cutover: Dan only.
 |---|---|---|---|
 | P0 continuity/contract/calibration | IN PROGRESS | — | see P0 section |
 | P1 evidence capture | pending | — | |
-| P2 canonical graphs | pending | — | |
+| P2 canonical graphs | BUILD CHECKPOINT — QA/META PENDING | Builder snapshot in this checkpoint | six graph families + persisted parser; live/plugin evidence still blocked by G-1/G-2 |
 | P3 mother token/component slice | pending | — | |
 | P4 mother layout/render slice | pending | — | |
 | P5 emitters/security/editability | pending | — | |
@@ -92,7 +92,7 @@ Decisions/Done/cutover: Dan only.
 | G-2 | Plugin supplement capture (resolvedVariableModes, styledTextSegments, component defs) is a REQUIRED capture plane; REST_ONLY/PARTIAL provenance is diagnostic-only and cannot pass G0 or clear supplement-dependent G1–G5 (joint route — earlier "Shape completeness without supplement" claim narrowed accordingly) | OPEN — BLOCKS P1 G0; needs Dan input #3 (bridge rescan at pinned versions) when capture lands | Kai builds; Dan rescan |
 | G-3 | Dark-mode visual promotion impossible without an authored dark reference (§4.5) | OPEN — dark states DIAGNOSTIC_ONLY until Dan authors a dark-mode reference frame | Dan (when he wants dark visually promoted) |
 | G-4 | §14.2 mother screen must be selected + version-pinned BY DAN; Shape cannot substitute | OPEN — blocks P0 item 2 and the P3/P4 mother-slice anchor | Dan (question surfaced in-session 2026-07-13) |
-| G-5 | REST_ONLY/source-plane fail-closed law is UNBUILT at a0616a8 (schema only requires sourcePlanes to exist) — Kai's earlier "encoded as data" claim was an overclaim, corrected | OPEN — per-fact provenance validator owed in P1/P2. Failure taxonomy (joint route + Meta correction): missing/partial/REST_ONLY REQUIRED supplement → **FAILED_CAPTURE before graphs**; unreadable complete component definition → FAILED_COMPONENT; fully plugin-captured but unsupported → FAILED_CAPABILITY | Pixel |
+| G-5 | Per-fact source-plane fail-closed law | PARTIAL CLOSURE — P2 canonical-model preflight now refuses missing/partial/REST_ONLY required facts as FAILED_CAPTURE before inventory/graphs; every graph repeats its required-family gate. P1 live capture/adapter enforcement remains open and blocked with G-2 | Pixel |
 | G-6 | Complete published calibration generations currently have no bounded reader-safe retention policy | OPEN — non-blocking for atomic freeze; blocks P0 §4.7 storage/operability acceptance only. Preserve reader safety; no speculative GC | Pixel + QA/Meta architecture |
 
 ## P0 findings
@@ -105,6 +105,28 @@ Decisions/Done/cutover: Dan only.
   crafted per E-row (multi-fill root, bound stops, bound effects, bound opacity, per-side
   weights, rotated asymmetric container, mirror matrix, fixed-box text). This merges P0.1 into
   P0.3 and is consistent with Meta's corpus ruling below.
+
+## P2 build checkpoint (2026-07-13)
+
+- Implemented versioned `DocumentGraph`, `VariableGraph`, `BindingGraph`, `ComponentGraph`,
+  `TextGraph`, and `AssetGraph`, composed by one JSON-safe `CanonicalModel` boundary.
+- Added strict persisted-model parsing: missing graph, unknown nested schema, malformed graph
+  arrays, or invalid binding records refuse before downstream use.
+- Source-plane preflight is centralized and runs before alias inventory: integration requires
+  plugin-primary-complete document/supplement/variables/components/fonts/assets/dependencies;
+  `fixture` is accepted only for §14.1 microfixtures.
+- Binding identity keeps stable variable/collection keys, source slot/range/domain/target,
+  subtree-complete defaulted `ModeContextId`, and persisted resolution trace tables.
+- Components preserve complete typed definitions, native instance identity, properties,
+  references, swaps/overrides; incomplete definitions and illegal variants fail
+  `FAILED_COMPONENT`. Text preserves contiguous UTF-16 ranges and proves every used font mapping.
+  Assets bind source identity/geometry to the sealed manifest hash+byte record.
+- Typed codecs keep token leaves, require explicit opacity scale, and reject CSS/React plane
+  crossover. Deprecated-background mirror proof is structural and key-order independent.
+- Independent oracle imports no P2 builders and rejects the actual legacy `src/ir.mjs` output at
+  G1-G5 on the same semantic fixture. P2 suite 23/23/0; foundation 53/53/0; syntax/diff checks
+  green. This is a Builder checkpoint only: no P2 phase, integration, promotion, or Done claim;
+  QA/Meta review and plugin-origin G-1/G-2 evidence remain required.
 
 ## Meta rulings accepted (2026-07-13)
 
