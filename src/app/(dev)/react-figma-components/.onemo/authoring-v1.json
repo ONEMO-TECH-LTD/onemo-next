@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "storeId": "project-main",
+  "revision": 4,
+  "root": {
+    "kind": "project"
+  },
+  "sourceHashes": {
+    "src/app/(dev)/react-figma-components/MetaProbeCard.tsx": "ee8c5c46120a1d3db5af2fb3a4d2d3ce03dfdf09dd4bad90c5bc71328e51bf23",
+    "tsconfig.json": "2d3a5df4502a5924d47b0ec820b7a564a1ca62a1c6a5377eb2085e0c1de5bc07",
+    "src/types/react-is.d.ts": "42b6fc9f2956907f0236011b0f974c26cd3b38418cc0f5eba35105e490121e42",
+    ".next/dev/types/cache-life.d.ts": "d1986184a09a52db8228cb2bb2a61a8c05c9354e5b93cec8e2628d8579c892d7",
+    ".next/dev/types/routes.d.ts": "147ba34db49277c30b12cd163a6be90852c0c137c200f4641b6718782af23f3b"
+  },
+  "components": {
+    "component_02743620e9dcd6c2": {
+      "id": "component_02743620e9dcd6c2",
+      "displayName": "MetaProbeCard",
+      "source": {
+        "storeId": "project-main",
+        "file": "src/app/(dev)/react-figma-components/MetaProbeCard.tsx",
+        "exportName": "MetaProbeCard"
+      },
+      "primaryVariantId": "variant_ea00eaf80a4b5df1",
+      "folderId": null,
+      "compatibility": "native-v1"
+    }
+  },
+  "variants": {
+    "variant_ea00eaf80a4b5df1": {
+      "id": "variant_ea00eaf80a4b5df1",
+      "componentId": "component_02743620e9dcd6c2",
+      "displayName": "Primary",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 180
+      },
+      "inheritance": {
+        "kind": "primary"
+      },
+      "kind": "primary",
+      "transition": {
+        "kind": "instant",
+        "delayMs": 0
+      }
+    },
+    "variant_83676b2ffad25e85": {
+      "id": "variant_83676b2ffad25e85",
+      "componentId": "component_02743620e9dcd6c2",
+      "displayName": "Hover Look",
+      "frame": {
+        "x": 404,
+        "y": 50,
+        "width": 320,
+        "height": 180
+      },
+      "inheritance": {
+        "kind": "linked",
+        "primaryVariantId": "variant_ea00eaf80a4b5df1",
+        "overridePropertyIds": []
+      },
+      "kind": "custom",
+      "transition": {
+        "kind": "instant",
+        "delayMs": 0
+      }
+    }
+  },
+  "sourceProperties": {},
+  "interactions": {},
+  "interactionOverrides": {},
+  "instances": {},
+  "folders": {}
+}
