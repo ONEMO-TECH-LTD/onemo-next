@@ -25,6 +25,7 @@ import {
 import { ComponentCanvas } from './component-authoring/ComponentCanvas'
 import { cancelAuthoringResumeMarker, completeAuthoringResume, issueAuthoringResumeMarker, readAuthoringResumeState } from './component-authoring/session'
 import { canvasHistoryAction } from './component-authoring/gestures'
+import { presentCreateComponentFailure, type CreateComponentFailureStage } from './component-authoring/create-component-errors'
 
 const INK = 'rgba(0,0,0,0.898)', MUTE = 'rgba(0,0,0,0.45)', FAINT = 'rgba(0,0,0,0.3)' // INK: Figma's exact ink (E8 audit — measured, was 0.9)
 const LINE = '#e6e7e9', FIELD = '#f5f5f5', SEL = '#0d99ff', TOKEN = '#7a3fb0', RAIL = '#fff'
@@ -1472,10 +1473,11 @@ function Toaster() {
   )
 }
 
-function CreateComponentDialog({ name, busy, error, onName, onCancel, onSubmit }: {
+function CreateComponentDialog({ name, busy, error, diagnosticCode, onName, onCancel, onSubmit }: {
   name: string
   busy: boolean
   error: string | null
+  diagnosticCode: string | null
   onName: (name: string) => void
   onCancel: () => void
   onSubmit: () => void
@@ -1493,6 +1495,12 @@ function CreateComponentDialog({ name, busy, error, onName, onCancel, onSubmit }
             style={{ height: 32, boxSizing: 'border-box', border: '1px solid var(--sem-col-border-secondary)', borderRadius: 'var(--sem-radii-sm)', background: 'var(--sem-col-bg-secondary)', color: 'var(--sem-col-text-primary)', padding: '0 10px', font: 'inherit', outlineColor: 'var(--sem-col-border-brand)' }} />
         </label>
         {error && <div id="create-component-error" role="alert" style={{ marginTop: 8, color: 'var(--sem-col-text-error-primary)', fontSize: 'var(--sem-type-fluid-label-xs-size)', lineHeight: 'var(--sem-type-fluid-label-xs-line-height)' }}>{error}</div>}
+        {diagnosticCode && (
+          <details data-create-component-diagnostics style={{ marginTop: 8, color: 'var(--sem-col-text-secondary)', fontSize: 'var(--sem-type-fluid-label-xs-size)', lineHeight: 'var(--sem-type-fluid-label-xs-line-height)' }}>
+            <summary>Technical details</summary>
+            <code>{diagnosticCode}</code>
+          </details>
+        )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
           <button type="button" disabled={busy} onClick={onCancel} style={{ appearance: 'none', height: 30, padding: '0 12px', border: '1px solid var(--sem-col-border-secondary)', borderRadius: 'var(--sem-radii-full)', background: 'var(--sem-col-bg-secondary)', color: 'var(--sem-col-text-secondary)', cursor: busy ? 'default' : 'pointer', font: 'inherit' }}>Cancel</button>
           <button type="submit" disabled={busy || !name.trim()} style={{ appearance: 'none', height: 30, padding: '0 12px', border: '1px solid var(--sem-col-border-brand)', borderRadius: 'var(--sem-radii-full)', background: 'var(--sem-col-bg-brand-primary)', color: 'var(--sem-col-text-brand-primary)', cursor: busy || !name.trim() ? 'default' : 'pointer', font: 'inherit' }}>{busy ? 'Creating…' : 'Create'}</button>
@@ -2474,6 +2482,7 @@ export default function ReactFigmaPage() {
     name: string
     busy: boolean
     error: string | null
+    diagnosticCode: string | null
   } | null>(null)
   const [codeMode, setCodeMode] = useState(false) // E4-G3: Design ↔ Code view of the selected element
   const [hoverRect, setHoverRect] = useState<OutlineRect | null>(null)
@@ -3073,7 +3082,7 @@ export default function ReactFigmaPage() {
 
   const openCreateComponentDialog = useCallback(() => {
     if (canvasMode !== 'design' || !sel) { notify('Select an element on the page canvas first', 'error'); return }
-    setComponentCreateDialog({ selection: { ...sel, classes: [...sel.classes] }, name: 'Component', busy: false, error: null })
+    setComponentCreateDialog({ selection: { ...sel, classes: [...sel.classes] }, name: 'Component', busy: false, error: null, diagnosticCode: null })
   }, [canvasMode, sel])
   // Hard Contract §6/§8/§11-G2: naming + preview + marker happen before the one atomic
   // create-component-from-selection command. The legacy editor-write make-component path is not used.
@@ -3082,10 +3091,10 @@ export default function ReactFigmaPage() {
     if (!dialog || dialog.busy) return
     const name = dialog.name.trim()
     if (!/^[A-Z][A-Za-z0-9]*$/.test(name) || name.length > 120) {
-      setComponentCreateDialog({ ...dialog, error: 'Use a PascalCase name up to 120 characters.' })
+      setComponentCreateDialog({ ...dialog, error: 'Use a PascalCase name up to 120 characters.', diagnosticCode: null })
       return
     }
-    setComponentCreateDialog({ ...dialog, name, busy: true, error: null })
+    setComponentCreateDialog({ ...dialog, name, busy: true, error: null, diagnosticCode: null })
     const command = {
       kind: 'create-component-from-selection' as const,
       commandId: crypto.randomUUID(),
@@ -3096,6 +3105,7 @@ export default function ReactFigmaPage() {
     }
     const transactionId = crypto.randomUUID()
     let markerIssued = false
+    let failureStage: CreateComponentFailureStage = 'preview'
     try {
       const previewUrl = new URL('/api/dev/editor-authoring', window.location.origin)
       previewUrl.searchParams.set('mode', 'create-component-preview')
@@ -3110,12 +3120,14 @@ export default function ReactFigmaPage() {
         componentFile?: string
         expectedComponentHash?: string
       }
-      if (!previewResponse.ok) throw new Error(preview.code ?? preview.error ?? 'Create preview failed')
+      if (!previewResponse.ok) {
+        throw Object.assign(new Error(preview.error ?? 'Create preview failed'), { code: preview.code })
+      }
       if (!Number.isSafeInteger(preview.expectedRevision) || !preview.sourceHashes ||
         !preview.environmentFingerprint?.match(/^[a-f0-9]{64}$/) ||
         !preview.componentFile?.startsWith('src/app/(dev)/react-figma-components/') ||
         !preview.expectedComponentHash?.match(/^[a-f0-9]{64}$/)) {
-        throw new Error('CREATE_COMPONENT_PREVIEW_INVALID')
+        throw Object.assign(new Error('Create preview was incomplete'), { code: 'CREATE_COMPONENT_PREVIEW_INVALID' })
       }
       issueAuthoringResumeMarker({
         targetFile: preview.componentFile,
@@ -3125,6 +3137,7 @@ export default function ReactFigmaPage() {
       markerIssued = true
       setAuthoringResumeTarget(preview.componentFile)
       setAuthoringResumePhase('originating')
+      failureStage = 'execute'
       const response = await fetch('/api/dev/editor-authoring', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -3145,17 +3158,24 @@ export default function ReactFigmaPage() {
           setAuthoringResumeTarget(null)
           setAuthoringResumePhase('none')
         }
-        throw new Error(result.code ?? result.error ?? 'Create component failed')
+        throw Object.assign(new Error(result.error ?? 'Create component failed'), { code: result.code })
       }
-      if (result.componentFile !== preview.componentFile) throw new Error('CREATE_COMPONENT_RESULT_MISMATCH')
+      if (result.componentFile !== preview.componentFile) {
+        throw Object.assign(new Error('Create result did not match its preview'), { code: 'CREATE_COMPONENT_RESULT_MISMATCH' })
+      }
       // Hard Contract §11-G2 / Architecture §6.5: the originating document deliberately leaves
       // the marker intact and performs exactly one reload; only the resumed document may consume it.
       window.location.reload()
       return
     } catch (error) {
-      const message = (error as Error).message
-      setComponentCreateDialog((current) => current ? { ...current, busy: false, error: message } : current)
-      if (markerIssued) notify(`Create result uncertain: ${message}`, 'error')
+      const failure = presentCreateComponentFailure(error, failureStage)
+      setComponentCreateDialog((current) => current ? {
+        ...current,
+        busy: false,
+        error: failure.message,
+        diagnosticCode: failure.diagnosticCode,
+      } : current)
+      if (markerIssued) notify(`Create result uncertain: ${failure.message}`, 'error')
     }
   }, [componentCreateDialog])
 
@@ -4444,7 +4464,8 @@ export default function ReactFigmaPage() {
         name={componentCreateDialog.name}
         busy={componentCreateDialog.busy}
         error={componentCreateDialog.error}
-        onName={(name) => setComponentCreateDialog((current) => current ? { ...current, name, error: null } : current)}
+        diagnosticCode={componentCreateDialog.diagnosticCode}
+        onName={(name) => setComponentCreateDialog((current) => current ? { ...current, name, error: null, diagnosticCode: null } : current)}
         onCancel={() => { if (!componentCreateDialog.busy) setComponentCreateDialog(null) }}
         onSubmit={() => void createComponentFromSelection()}
       />}

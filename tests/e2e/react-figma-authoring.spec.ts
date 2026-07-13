@@ -374,6 +374,72 @@ test.describe('React Figma component authoring', () => {
     expect(failedRequests).toEqual([])
   })
 
+  test('presents a source refusal in product language with its code confined to diagnostics', async ({ page, request }) => {
+    test.setTimeout(60_000)
+    const consoleErrors: string[] = []
+    const pageErrors: string[] = []
+    const failedRequests: string[] = []
+    const refusalResponses: number[] = []
+    page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()) })
+    page.on('pageerror', (error) => pageErrors.push(error.message))
+    page.on('requestfailed', (browserRequest) => {
+      failedRequests.push(`${browserRequest.url()} ${browserRequest.failure()?.errorText ?? 'unknown failure'}`)
+    })
+    page.on('response', (response) => {
+      const url = new URL(response.url())
+      if (url.pathname === '/api/dev/editor-authoring' && url.searchParams.get('mode') === 'create-component-preview') {
+        refusalResponses.push(response.status())
+      }
+    })
+
+    expect((await request.get('/authoring-e2e')).status()).toBe(200)
+    await page.goto('/react-figma', { waitUntil: 'domcontentloaded' })
+    const frame = page.locator('iframe')
+    const createDialog = page.getByRole('dialog', { name: 'Create component' })
+    await expect(async () => {
+      await page.getByTitle('File').click({ timeout: 5_000 })
+      await page.getByText('/authoring-e2e', { exact: true }).click({ timeout: 5_000 })
+      await expect(frame).toHaveAttribute('src', '/authoring-e2e')
+      const selection = frame.contentFrame().getByText('Refuse component creation', { exact: true })
+      await expect(selection).toBeVisible({ timeout: 10_000 })
+      await selection.click()
+      await page.getByTitle('Create component').click()
+      await expect(createDialog).toBeVisible({ timeout: 5_000 })
+    }).toPass({ timeout: 30_000, intervals: [250, 500, 1_000] })
+
+    let previewRequests = 0
+    await page.route('**/api/dev/editor-authoring?**', async (route) => {
+      const url = new URL(route.request().url())
+      if (route.request().method() === 'GET' && url.searchParams.get('mode') === 'create-component-preview') {
+        previewRequests++
+        await route.fulfill({
+          status: 422,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            error: 'raw internal source detail',
+            code: 'CREATE_COMPONENT_SOURCE_UNSUPPORTED',
+          }),
+        })
+        return
+      }
+      await route.continue()
+    })
+    await createDialog.getByRole('button', { name: 'Create', exact: true }).click()
+
+    const alert = createDialog.getByRole('alert')
+    await expect(alert).toHaveText('This selection can’t become a component yet. Choose a self-contained page element and try again.')
+    await expect(alert).not.toContainText('CREATE_COMPONENT_SOURCE_UNSUPPORTED')
+    const diagnostics = createDialog.locator('[data-create-component-diagnostics]')
+    await expect(diagnostics).toContainText('Technical details')
+    await diagnostics.locator('summary').click()
+    await expect(diagnostics.locator('code')).toHaveText('CREATE_COMPONENT_SOURCE_UNSUPPORTED')
+    expect(previewRequests).toBe(1)
+    expect(refusalResponses).toEqual([422])
+    expect(pageErrors).toEqual([])
+    expect(consoleErrors).toEqual([])
+    expect(failedRequests).toEqual([])
+  })
+
   test('creates and persists a component from a real CSS-module page element', async ({ page, request }) => {
     test.setTimeout(90_000)
     const consoleErrors: string[] = []
