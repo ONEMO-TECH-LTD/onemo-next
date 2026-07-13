@@ -6,6 +6,7 @@ import path from 'node:path'
 import { promisify } from 'node:util'
 
 const fixtureName = 'AuthoringE2EButton'
+const fixtureFile = 'src/app/(dev)/react-figma-components/AuthoringE2EButton.tsx'
 const extractedName = 'AuthoringE2EExtracted'
 const canonicalName = 'AuthoringE2ECanonical'
 const e2eBaseUrl = `http://localhost:${process.env.PLAYWRIGHT_PORT ?? 3045}`
@@ -72,6 +73,84 @@ test.describe('React Figma component authoring', () => {
     }).toPass({ timeout: 45_000, intervals: [250, 500, 1_000] })
     await expect(canvas).toBeVisible()
     await expect(page.getByText(/Application error|Runtime TypeError|Cannot read properties of null/i)).toHaveCount(0)
+    expect(pageErrors).toEqual([])
+    expect(consoleErrors).toEqual([])
+  })
+
+  test('opens the same existing project component from double-click and context-menu Edit', async ({ page }) => {
+    test.setTimeout(90_000)
+    const editorDocumentRequests: string[] = []
+    const componentStatusFiles: string[] = []
+    const tokenResponses: number[] = []
+    const consoleErrors: string[] = []
+    const pageErrors: string[] = []
+    page.on('request', (request) => {
+      const url = new URL(request.url())
+      if (request.resourceType() === 'document' && url.pathname === '/react-figma') editorDocumentRequests.push(request.url())
+      if (url.pathname === '/api/dev/editor-authoring' && url.searchParams.get('mode') === 'component-status') {
+        componentStatusFiles.push(url.searchParams.get('file') ?? '')
+      }
+    })
+    page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()) })
+    page.on('pageerror', (error) => pageErrors.push(error.message))
+    page.on('response', (response) => {
+      const url = new URL(response.url())
+      if (url.pathname === '/api/dev/editor-tokens' && !url.search) tokenResponses.push(response.status())
+    })
+
+    await page.goto('/react-figma', { waitUntil: 'domcontentloaded' })
+    const componentEntry = page.getByRole('button', { name: fixtureName, exact: true })
+    await expect(async () => {
+      await expect.poll(() => tokenResponses.length, { timeout: 10_000 }).toBe(editorDocumentRequests.length)
+      expect(tokenResponses).toEqual(editorDocumentRequests.map(() => 200))
+      await page.getByRole('button', { name: 'Components', exact: true }).click({ timeout: 5_000 })
+      await expect(page.getByRole('textbox', { name: 'Search components' })).toBeVisible({ timeout: 5_000 })
+      await expect(componentEntry).toBeVisible({ timeout: 15_000 })
+    }).toPass({ timeout: 45_000, intervals: [250, 500, 1_000] })
+
+    // Source import is setup for the already-present project component, not component creation.
+    await componentEntry.dblclick()
+    const importSource = page.getByRole('button', { name: 'Import source' })
+    const authoringCanvas = page.locator('[data-authoring-canvas]')
+    const entryState = await Promise.race([
+      importSource.waitFor({ state: 'visible', timeout: 30_000 }).then(() => 'import' as const),
+      authoringCanvas.waitFor({ state: 'visible', timeout: 30_000 }).then(() => 'loaded' as const),
+    ])
+    if (entryState === 'import') {
+      const reload = page.waitForEvent('domcontentloaded', { timeout: 30_000 })
+      await importSource.click()
+      await reload
+    }
+    await expect(authoringCanvas).toBeVisible({ timeout: 30_000 })
+    await page.getByRole('button', { name: 'Home' }).click()
+    await page.getByRole('button', { name: 'Components', exact: true }).click()
+    await expect(componentEntry).toBeVisible({ timeout: 20_000 })
+
+    editorDocumentRequests.length = 0
+    tokenResponses.length = 0
+    componentStatusFiles.length = 0
+    await componentEntry.dblclick()
+    await expect(authoringCanvas).toBeVisible({ timeout: 30_000 })
+    const breadcrumb = page.locator('[data-component-breadcrumb]')
+    await expect(breadcrumb).toHaveAttribute('data-component-file', fixtureFile)
+    await expect(page.locator('[data-component-current]')).toHaveText(fixtureName)
+    const doubleClickIdentity = await authoringCanvas.getAttribute('data-component-id')
+    expect(doubleClickIdentity).toMatch(/^component_[a-f0-9]{16}$/)
+    expect(editorDocumentRequests).toEqual([])
+    expect(new Set(componentStatusFiles)).toEqual(new Set([fixtureFile]))
+    await expect(page.locator('[data-components-canvas]')).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'Home' }).click()
+    componentStatusFiles.length = 0
+    await componentEntry.click({ button: 'right' })
+    await page.getByRole('menu').getByRole('button', { name: 'Edit component' }).click()
+    await expect(authoringCanvas).toBeVisible({ timeout: 30_000 })
+    await expect(breadcrumb).toHaveAttribute('data-component-file', fixtureFile)
+    await expect(page.locator('[data-component-current]')).toHaveText(fixtureName)
+    expect(await authoringCanvas.getAttribute('data-component-id')).toBe(doubleClickIdentity)
+    expect(editorDocumentRequests).toEqual([])
+    expect(new Set(componentStatusFiles)).toEqual(new Set([fixtureFile]))
+    await expect(page.locator('[data-components-canvas]')).toHaveCount(0)
     expect(pageErrors).toEqual([])
     expect(consoleErrors).toEqual([])
   })

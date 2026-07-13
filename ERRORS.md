@@ -148,3 +148,10 @@ The final generic `networkidle` after bootstrap resume was removed in the same c
 - Remember: E2E filesystem identities with dots need direct-key assertions, and exact-SHA browser proof must remain portable across isolated ports.
 
 Follow-up: dynamically writing the route after Next started caused a late route-tree refresh and unused-preload warnings even though the complete product flow passed. The failure-safe fixture wrapper now installs CSS before its importing page before server startup; the measured flow has no route-registration HMR phase.
+
+## S58 existing-component entry E2E cold-shell readiness
+
+- What did not work: clicking the Components rail once after `domcontentloaded` and treating the active rail icon as proof that its panel had survived the cold Next development remount; two reruns also used reporters that hid the assertion stack.
+- Symptoms: the rail button showed active while the File panel remained mounted, so the preinstalled component entry never appeared; only the JSON reporter exposed the decisive locator failure.
+- What worked: reuse the established one-successful-token-response-per-editor-document invariant, then retry the complete idempotent rail-to-existing-entry transition before beginning the measured no-reload entry proof.
+- Remember: cold setup retries may wrap read-only navigation, but the A003/A004 double-click and context-menu entry actions themselves remain single-shot after request counters are reset.
