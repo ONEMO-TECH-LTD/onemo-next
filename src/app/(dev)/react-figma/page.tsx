@@ -2273,7 +2273,7 @@ function ComponentsRail({ components, selectedFile, onJump, query = '', onContex
   return (
     <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 12 }}>
       {components.length === 0 && (
-        <div style={{ padding: '12px 16px', font: `400 11px/1.5 ${FONT}`, color: MUTE }}>No components yet — select an element on the canvas and use “Create component from selection”. Blank creation comes in G4.</div>
+        <div style={{ padding: '12px 16px', font: `400 11px/1.5 ${FONT}`, color: MUTE }}>No components yet — select an element on the canvas and use “Create component from selection”. Blank creation is not available in this phase.</div>
       )}
       {components.length > 0 && filtered.length === 0 && (
         <div style={{ padding: '12px 16px', font: `400 11px/1.5 ${FONT}`, color: MUTE }}>No components match “{query}”.</div>
@@ -3896,7 +3896,7 @@ export default function ReactFigmaPage() {
         )}
         {rail === 'components' && (() => {
           // G2 exposes only the canonical create-from-selection/edit flow. Blank creation,
-          // component rename, and instance insertion remain visible as explicit G4 deferrals.
+          // component rename, and instance insertion remain visible as explicit phase deferrals.
           const jumpTo = (label: string) => {
             const doc = iframeRef.current?.contentDocument
             const frame = doc?.querySelector(`[data-component-frame="${label}"]`)
@@ -3919,16 +3919,16 @@ export default function ReactFigmaPage() {
               </div>
             </div>
             <div data-component-phase-deferred="blank-create" style={{ padding: '0 12px 8px', color: MUTE, font: `400 10px/1.4 ${FONT}` }}>
-              Blank component creation comes in G4. Create from selection is available above.
+              Blank component creation is not available in this phase. Create from selection is available above.
             </div>
             <ComponentsRail components={dsComponents} selectedFile={editingComponent?.file} query={compSearch} onJump={jumpTo} onEdit={(c) => {
               if (c.root === 'project') setEditingComponent(c)
               else notify('Global library authoring is not available in this phase', 'error')
             }}
               onContext={(c, e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, items: [
-                { label: 'Insert into selection — coming in G4', disabled: true, title: 'Component instance insertion comes in G4' },
+                { label: 'Insert into selection — not available in this phase', disabled: true, title: 'Requires the canonical component-instance command path' },
                 { label: 'Edit component', onClick: () => c.root === 'project' ? setEditingComponent(c) : notify('Global library authoring is not available in this phase', 'error') },
-                { label: 'Rename — coming in G4', divider: true, disabled: true, title: 'Canonical component rename comes in G4' },
+                { label: 'Rename — not available in this phase', divider: true, disabled: true, title: 'Requires the canonical component-rename command path' },
                 { label: 'Copy import', onClick: () => { try { void navigator.clipboard?.writeText(`import { ${c.name} } from '${c.importPath}'`); notify(`Copied import · ${c.name}`) } catch { notify('Clipboard blocked', 'error') } } },
                 { label: 'Duplicate — lands in the lifecycle phase', divider: true, disabled: true, title: 'Component duplicate ships in the E10 lifecycle phase' },
                 { label: 'Delete — lands in the lifecycle phase', danger: true, disabled: true, title: 'Component delete ships in the E10 lifecycle phase' },
