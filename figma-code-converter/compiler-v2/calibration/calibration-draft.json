@@ -8,11 +8,11 @@
   "w": 402,
   "h": 874
  },
- "buildCommit": "f040360e08c004483cc183730c77b4220fce00eb",
+ "buildCommit": "7d01c8a4ab7de06ee74c4893be336a0d26f6466d",
  "artifacts": {
   "figma": "2ee8d8f8d69a300fdc7276439ba5c356ecf46d3a027b7e23a2fcdcc106cfbb8a",
   "buildA": "bccec2848283ae862e2bedd6e3f5c918d91d20df701ef03817bd05e0de81a134",
-  "buildB": "bccec2848283ae862e2bedd6e3f5c918d91d20df701ef03817bd05e0de81a134"
+  "buildB": "14de687921c156fa7a4d7989943936f41f3c46434067801879addbfd7d54aec6"
  },
  "environment": {
   "capture": "playwright system-chrome dpr2",
@@ -26,9 +26,9 @@
    "n": 1,
    "W": 804,
    "H": 1748,
-   "changedPct_t2": 0,
+   "changedPct_t2": 0.002,
    "changedPct_t32": 0,
-   "meanDelta": 0
+   "meanDelta": 0.004
   },
   "fidelity_figmaVsBuild": {
    "n": 1,

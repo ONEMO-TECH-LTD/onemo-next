@@ -74,7 +74,8 @@ async function captureRoute(file, w, h) {
   const browser = await chromium.launch({ executablePath: CHROME });
   try {
     const page = await browser.newPage({ viewport: { width: w, height: h }, deviceScaleFactor: 2 });
-    await page.goto(ROUTE, { waitUntil: 'load', timeout: 45000 });
+    const resp = await page.goto(ROUTE, { waitUntil: 'load', timeout: 45000 });
+    if (!resp || !resp.ok()) throw new Error(`route ${ROUTE} returned HTTP ${resp ? resp.status() : 'no-response'}`);
     await page.evaluate((t) => { document.documentElement.setAttribute('data-theme', t); }, THEME);
     await page.evaluate(() => document.fonts.ready);
     await page.waitForTimeout(1200);
@@ -121,39 +122,54 @@ const round = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, ty
 
 (async () => {
   const buildCommit = execFileSync('git', ['-C', REPO, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-  const v0 = await version();
-  const dims = await frameDims();
-  const figmaPng = path.join(OUT, 'cal-figma.png');
-  const buildA = path.join(OUT, 'cal-build-a.png');
-  const buildB = path.join(OUT, 'cal-build-b.png');
-  await figmaRender(figmaPng);
-  await captureRoute(buildA, dims.w, dims.h);
-  await captureRoute(buildB, dims.w, dims.h); // immediate repeat → renderer/capture noise floor
-  const v1 = await version();
-  if (v0 !== v1) { console.error(`UNSTABLE: file version moved ${v0} → ${v1}; pair discarded`); process.exit(1); }
+  // stage into a candidate dir; final artifacts are promoted ATOMICALLY only after version
+  // stability is confirmed — an UNSTABLE run leaves prior outputs untouched (Meta finding).
+  const staging = path.join(OUT, `.candidate-${buildCommit.slice(0, 8)}`);
+  execFileSync('rm', ['-rf', staging]); mkdirSync(staging, { recursive: true });
+  let ok = false;
+  try {
+    const v0 = await version();
+    const dims = await frameDims();
+    const figmaPng = path.join(staging, 'cal-figma.png');
+    const buildA = path.join(staging, 'cal-build-a.png');
+    const buildB = path.join(staging, 'cal-build-b.png');
+    await figmaRender(figmaPng);
+    await captureRoute(buildA, dims.w, dims.h);
+    await captureRoute(buildB, dims.w, dims.h); // immediate repeat → renderer/capture noise floor
+    const v1 = await version();
+    if (v0 !== v1) throw new Error(`UNSTABLE: file version moved ${v0} → ${v1}; candidate discarded, prior outputs untouched`);
 
-  const draft = {
-    schemaVersion: 1,
-    kind: 'calibration-draft',
-    fileKey: FK, nodeId: NODE, fileVersion: v0, frame: dims,
-    buildCommit,
-    artifacts: { figma: sha(figmaPng), buildA: sha(buildA), buildB: sha(buildB) },
-    environment: {
-      capture: 'playwright system-chrome dpr2', viewport: `${dims.w}x${dims.h}`,
-      theme: `${THEME} (stamped + verified on documentElement)`,
-      alpha: 'both sides composited onto opaque #ffffff before compare',
-      figmaExport: 'REST png scale=2 (color profile unpinned — owed)',
-    },
-    samples: {
-      noiseFloor_buildRepeat: { n: 1, ...round(await diffPair(buildA, buildB)) },
-      fidelity_figmaVsBuild: { n: 1, ...round(await diffPair(figmaPng, buildA)) },
-    },
-    honesty: [
-      'DRAFT EVIDENCE ONLY — no budget is normative until P0 calibration acceptance (QA/Meta/Dan)',
-      'n=1 per class; distributions, per-class regions, DeltaE, SSIM, known-broken runs OWED',
-      'legacy-lane build — v2 packages recalibrate at P6',
-    ],
-  };
-  writeFileSync(path.join(OUT, 'calibration-draft.json'), JSON.stringify(draft, null, 1));
-  console.log(JSON.stringify({ frame: dims, buildCommit: buildCommit.slice(0, 8), samples: draft.samples }, null, 1));
+    const draft = {
+      schemaVersion: 1,
+      kind: 'calibration-draft',
+      fileKey: FK, nodeId: NODE, fileVersion: v0, frame: dims,
+      buildCommit,
+      artifacts: { figma: sha(figmaPng), buildA: sha(buildA), buildB: sha(buildB) },
+      environment: {
+        capture: 'playwright system-chrome dpr2', viewport: `${dims.w}x${dims.h}`,
+        theme: `${THEME} (stamped + verified on documentElement)`,
+        alpha: 'both sides composited onto opaque #ffffff before compare',
+        figmaExport: 'REST png scale=2 (color profile unpinned — owed)',
+      },
+      samples: {
+        noiseFloor_buildRepeat: { n: 1, ...round(await diffPair(buildA, buildB)) },
+        fidelity_figmaVsBuild: { n: 1, ...round(await diffPair(figmaPng, buildA)) },
+      },
+      honesty: [
+        'DRAFT EVIDENCE ONLY — no budget is normative until P0 calibration acceptance (QA/Meta/Dan)',
+        'n=1 per class; distributions, per-class regions, DeltaE, SSIM, known-broken runs OWED',
+        'legacy-lane build — v2 packages recalibrate at P6',
+      ],
+    };
+    writeFileSync(path.join(staging, 'calibration-draft.json'), JSON.stringify(draft, null, 1));
+    // ATOMIC promote: only now, after version stability + diffs, do the final artifacts move in.
+    for (const f of ['cal-figma.png', 'cal-build-a.png', 'cal-build-b.png', 'calibration-draft.json']) {
+      execFileSync('mv', ['-f', path.join(staging, f), path.join(OUT, f)]);
+    }
+    ok = true;
+    console.log(JSON.stringify({ frame: dims, buildCommit: buildCommit.slice(0, 8), samples: draft.samples }, null, 1));
+  } finally {
+    execFileSync('rm', ['-rf', staging]); // clean every failure; prior OUT artifacts untouched unless promoted
+  }
+  if (!ok) process.exit(1);
 })().catch((e) => { console.error(`calibrate: ${e.message}`); process.exit(1); });

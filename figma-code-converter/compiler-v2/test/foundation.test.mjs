@@ -10,7 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { sourceBindingIdentity, emittedBindingIdentity, formatBindingForError, BindingIdentityError, validateBindingRecord, validateManifest, SCHEMA } from '../src/schema.mjs';
 const bindingIdentity = sourceBindingIdentity;
-import { writeSnapshot, readSnapshot, canonicalJson, censusOf, restTextRuns, EvidenceError } from '../src/evidence.mjs';
+import { writeSnapshot, readSnapshot, canonicalJson, censusOf, restTextRuns, metadataSeal, EvidenceError } from '../src/evidence.mjs';
 import { collectOccurrences, classifyOccurrences, escapePointerToken } from '../src/inventory.mjs';
 
 // ── G2 identity tuple: every swap the gate must catch changes the key ──────────────────────
@@ -118,14 +118,18 @@ test('PROBE 1: an empty/incomplete manifest is refused — contracted evidence s
   assert.ok(errs.some((e) => /census/.test(e)));
 });
 
-test('PROBE 1b: a manifest byte-length lie is refused at read (not just sha)', async () => {
+test('PROBE 1b: a manifest byte-length lie is refused at read — seal catches it, and byte-length catches it after re-seal', async () => {
   const tmp = path.join(await fs.mkdtemp(path.join(os.tmpdir(), 'cv2-')), 'snap');
   await makeSnap(tmp);
   const mp = path.join(tmp, 'manifest.json');
   const m = JSON.parse(await fs.readFile(mp, 'utf8'));
   m.files['document.rest.json'].bytes += 99;
   await fs.writeFile(mp, JSON.stringify(m, null, 1));
-  await assert.rejects(() => readSnapshot(tmp), (e) => e instanceof EvidenceError && /byte-length|hash|fingerprint|invalid/.test(e.message));
+  await assert.rejects(() => readSnapshot(tmp), (e) => e instanceof EvidenceError && /seal mismatch/.test(e.message)); // seal (superset) bites first
+  // re-seal so ONLY the per-file byte-length law can bite — it must still refuse
+  const m2 = JSON.parse(await fs.readFile(mp, 'utf8')); m2.seal = metadataSeal(m2);
+  await fs.writeFile(mp, JSON.stringify(m2, null, 1));
+  await assert.rejects(() => readSnapshot(tmp), (e) => e instanceof EvidenceError && /byte-length/.test(e.message));
 });
 
 test('PROBE 2: snapshots are immutable — sealed target refused; failed write leaves no partial', async () => {
@@ -337,6 +341,7 @@ test('PROBE R2-3: references cannot be metadata-only — declared references sea
     const mp = path.join(dir, 'manifest.json');
     const m = JSON.parse(await fs.readFile(mp, 'utf8'));
     m.files['references/manifest.json'] = { sha256: createHash('sha256').update(bytes).digest('hex'), bytes: bytes.length };
+    m.seal = metadataSeal(m); // re-seal so the SEAL passes and only the reference-semantic law can bite
     await fs.writeFile(mp, JSON.stringify(m, null, 1));
   };
   await tamper((rows) => { delete rows[0].sha256; }); // missing sha — self-consistent hashes, semantic law must bite
@@ -404,4 +409,25 @@ test('PROBE R3-3: an invalid ~2-class pointer is refused by validator AND identi
   const r = { ...baseRecord(), source: { ...baseRecord().source, propertyPath: '/bad/token~2x' } };
   assert.ok(validateBindingRecord(r).some((e) => /VALID RFC6901/.test(e)));
   assert.throws(() => sourceBindingIdentity(r), BindingIdentityError);
+});
+
+// ── Meta round-3 finding R3-4: provenance IMMUTABILITY (valid-value swap) ────────────────────
+
+test('PROBE R3-4: a valid-vocabulary provenance swap (fixture→plugin-primary-complete, fileVersion) is REFUSED by the seal', async () => {
+  const tmp = path.join(await fs.mkdtemp(path.join(os.tmpdir(), 'cv2-')), 'snap');
+  await makeSnap(tmp);
+  const snap = await readSnapshot(tmp); // baseline reads clean
+  assert.ok(snap.manifest.seal);
+  const mp = path.join(tmp, 'manifest.json');
+  // swap to VOCABULARY-VALID values, leave all content + hashes intact, leave the seal stale
+  const m = JSON.parse(await fs.readFile(mp, 'utf8'));
+  m.sourcePlanes.supplement = 'plugin-primary-complete';
+  m.fileVersion = 'forged-version';
+  await fs.writeFile(mp, JSON.stringify(m, null, 1));
+  await assert.rejects(() => readSnapshot(tmp), (e) => e instanceof EvidenceError && /seal mismatch/.test(e.message));
+  // and a full re-seal is the AUTHENTICITY problem (P1/live-G0) — documented, not claimed closed:
+  const m2 = JSON.parse(await fs.readFile(mp, 'utf8'));
+  m2.seal = metadataSeal(m2);
+  await fs.writeFile(mp, JSON.stringify(m2, null, 1));
+  await readSnapshot(tmp); // a fully re-sealed forgery passes offline — authenticity is live-capture law, honestly owed
 });

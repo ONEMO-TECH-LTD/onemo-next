@@ -40,6 +40,25 @@ export function fingerprint({ document, supplement, variables, components, fonts
   ].join('␞'));
 }
 
+/**
+ * Manifest metadata seal (Meta round-3 finding R3-4): the content fingerprint binds document/
+ * variables/etc., but the PROVENANCE metadata (sourcePlanes, fileVersion, versions, census,
+ * files map) floated free — a valid-value swap (fixture→plugin-primary-complete, v1→forged)
+ * left every content hash intact and passed. The seal binds those fields, so any partial tamper
+ * that leaves the seal is a FAILED_CAPTURE. (A full re-seal is the authenticity problem —
+ * correctly P1/live-G0 three-pass version reads; this closes offline IMMUTABILITY.)
+ */
+export function metadataSeal(m) {
+  return sha256(canonicalJson({
+    schemaVersion: m.schemaVersion, compilerVersion: m.compilerVersion,
+    capabilityRegistryVersion: m.capabilityRegistryVersion,
+    fileKey: m.fileKey, fileVersion: m.fileVersion, rootIds: m.rootIds,
+    captureId: m.captureId, capturedModes: m.capturedModes,
+    sourcePlanes: m.sourcePlanes, fingerprint: m.fingerprint,
+    files: m.files, census: m.census,
+  }));
+}
+
 /** The contracted evidence set (§4.3) — validateManifest refuses a manifest missing any. */
 export const REQUIRED_EVIDENCE_FILES = Object.freeze([
   'document.rest.json', 'supplement.json', 'variables.json', 'components.json', 'fonts.json',
@@ -103,6 +122,7 @@ export async function writeSnapshot(dir, {
     };
     const errs = validateManifest(manifest);
     if (errs.length) throw new EvidenceError('FAILED_CAPTURE', `refusing to seal an invalid manifest: ${errs.join('; ')}`);
+    manifest.seal = metadataSeal(manifest); // bind provenance metadata (R3-4)
     await fs.writeFile(path.join(staging, 'manifest.json'), JSON.stringify(manifest, null, 1));
     await fs.rename(staging, dir); // atomic seal
     return { dir, manifest };
@@ -165,6 +185,10 @@ export async function readSnapshot(dir) {
   catch (e) { throw new EvidenceError('FAILED_CAPTURE', `manifest unreadable at ${dir}: ${e.code ?? e.message}`); }
   const errs = validateManifest(manifest);
   if (errs.length) throw new EvidenceError('FAILED_CAPTURE', `manifest invalid: ${errs.join('; ')}`);
+  // provenance seal (R3-4): a valid-value swap of any sealed field without re-sealing is refused
+  if (!manifest.seal) throw new EvidenceError('FAILED_CAPTURE', 'manifest missing provenance seal');
+  const seal = metadataSeal(manifest);
+  if (seal !== manifest.seal) throw new EvidenceError('FAILED_CAPTURE', `provenance seal mismatch (metadata tampered — sourcePlanes/fileVersion/versions/census/files): manifest ${manifest.seal.slice(0, 12)}… ≠ recomputed ${seal.slice(0, 12)}…`);
   const rootReal = await fs.realpath(dir).catch(() => { throw new EvidenceError('FAILED_CAPTURE', `snapshot dir unreadable: ${dir}`); });
   for (const [rel, meta] of Object.entries(manifest.files)) {
     let buf;
