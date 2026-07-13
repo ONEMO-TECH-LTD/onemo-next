@@ -234,7 +234,8 @@ test.describe('React Figma component authoring', () => {
       process.cwd(),
       'src/app/(dev)/react-figma-components/.onemo/authoring-v1.json',
     ), 'utf8')) as { sourceHashes: Record<string, string> }
-    expect(sidecar.sourceHashes).toHaveProperty('src/app/(dev)/authoring-e2e/AuthoringE2ECard.module.css')
+    expect(sidecar.sourceHashes['src/app/(dev)/authoring-e2e/AuthoringE2ECard.module.css'])
+      .toMatch(/^[a-f0-9]{64}$/)
     expect(Object.keys(sidecar.sourceHashes).some((file) => file.includes('/../'))).toBe(false)
     await expect(page.locator('main')).toHaveAttribute('data-authoring-resume-phase', 'resumed')
     await expect(page.locator('[data-component-current]')).toHaveText(extractedName)
