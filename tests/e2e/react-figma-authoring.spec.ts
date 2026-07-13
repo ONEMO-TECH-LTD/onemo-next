@@ -89,7 +89,7 @@ test.describe('React Figma component authoring', () => {
     expect(consoleErrors).toEqual([])
   })
 
-  test('opens the same existing project component from double-click and context-menu Edit', async ({ page }) => {
+  test('opens the same existing project component from double-click and context-menu Edit', async ({ page }, testInfo) => {
     test.setTimeout(90_000)
     const editorDocumentRequests: string[] = []
     const componentStatusFiles: string[] = []
@@ -138,6 +138,23 @@ test.describe('React Figma component authoring', () => {
     await page.getByRole('button', { name: 'Components', exact: true }).click()
     await expect(componentEntry).toBeVisible({ timeout: 20_000 })
 
+    const pageFrame = page.getByTitle('Canvas — real build')
+    await pageFrame.evaluate((node) => {
+      const frame = node as HTMLIFrameElement & { __a007Document?: Document | null }
+      frame.__a007Document = frame.contentDocument
+    })
+    const assertComponentIsolation = async () => {
+      expect(await pageFrame.evaluate((node) => {
+        const frame = node as HTMLIFrameElement & { __a007Document?: Document | null }
+        return frame.__a007Document === frame.contentDocument
+      })).toBe(true)
+      await expect(pageFrame).toHaveCSS('visibility', 'hidden')
+      await expect(pageFrame).toHaveCSS('pointer-events', 'none')
+      await expect(page.locator('[data-screen-host] [data-authoring-canvas]')).toHaveCount(1)
+      await expect(page.locator('[data-page-design-inspector]')).toHaveCount(0)
+      await expect(page.locator('[data-components-canvas]')).toHaveCount(0)
+    }
+
     editorDocumentRequests.length = 0
     tokenResponses.length = 0
     componentStatusFiles.length = 0
@@ -148,6 +165,7 @@ test.describe('React Figma component authoring', () => {
     await expect(page.locator('[data-component-current]')).toHaveText(fixtureName)
     const doubleClickIdentity = await authoringCanvas.getAttribute('data-component-id')
     expect(doubleClickIdentity).toMatch(/^component_[a-f0-9]{16}$/)
+    await assertComponentIsolation()
     expect(editorDocumentRequests).toEqual([])
     expect(new Set(componentStatusFiles)).toEqual(new Set([fixtureFile]))
     await expect(page.locator('[data-components-canvas]')).toHaveCount(0)
@@ -160,6 +178,7 @@ test.describe('React Figma component authoring', () => {
     await expect(breadcrumb).toHaveAttribute('data-component-file', fixtureFile)
     await expect(page.locator('[data-component-current]')).toHaveText(fixtureName)
     expect(await authoringCanvas.getAttribute('data-component-id')).toBe(doubleClickIdentity)
+    await assertComponentIsolation()
     expect(editorDocumentRequests).toEqual([])
     expect(new Set(componentStatusFiles)).toEqual(new Set([fixtureFile]))
     await expect(page.locator('[data-components-canvas]')).toHaveCount(0)
@@ -201,6 +220,7 @@ test.describe('React Figma component authoring', () => {
       gaps: [10, 10],
       icons: [12, 10, 12],
     })
+    await page.screenshot({ path: testInfo.outputPath('ac-a007-page-retained-hidden.png'), animations: 'disabled' })
     expect(pageErrors).toEqual([])
     expect(consoleErrors).toEqual([])
   })
