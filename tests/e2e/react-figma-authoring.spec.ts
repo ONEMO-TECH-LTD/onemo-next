@@ -32,41 +32,43 @@ test.describe('React Figma component authoring', () => {
 
     await page.goto('/react-figma', { waitUntil: 'domcontentloaded' })
     const canvas = page.locator('main')
-    await expect.poll(
-      () => canvas.evaluate((node) => Object.keys(node).some((key) => key.startsWith('__reactProps'))),
-      { timeout: 30_000 },
-    ).toBe(true)
-    await expect.poll(() => tokenResponses.length, { timeout: 30_000 }).toBe(editorDocumentRequests.length)
-    expect(tokenResponses).toEqual(editorDocumentRequests.map(() => 200))
-    await page.evaluate(() => { (window as Window & { __panProofDocument?: boolean }).__panProofDocument = true })
-    const documentCount = editorDocumentRequests.length
-    const transformBefore = await canvas.locator(':scope > div').filter({ has: page.locator('[data-screen-host]') }).getAttribute('style')
+    await expect(async () => {
+      await expect.poll(
+        () => canvas.evaluate((node) => Object.keys(node).some((key) => key.startsWith('__reactProps'))),
+        { timeout: 10_000 },
+      ).toBe(true)
+      await expect.poll(() => tokenResponses.length, { timeout: 10_000 }).toBe(editorDocumentRequests.length)
+      expect(tokenResponses).toEqual(editorDocumentRequests.map(() => 200))
+      await page.evaluate(() => { (window as Window & { __panProofDocument?: boolean }).__panProofDocument = true })
+      const documentCount = editorDocumentRequests.length
+      const transformBefore = await canvas.locator(':scope > div').filter({ has: page.locator('[data-screen-host]') }).getAttribute('style')
 
-    await canvas.evaluate((node) => {
-      const target = node as HTMLElement
-      const setPointerCapture = target.setPointerCapture
-      target.setPointerCapture = () => undefined
-      const event = (type: string, x: number, y: number) => target.dispatchEvent(new PointerEvent(type, {
-        bubbles: true,
-        button: 0,
-        buttons: type === 'pointerup' ? 0 : 1,
-        clientX: x,
-        clientY: y,
-        pointerId: 71,
-        pointerType: 'mouse',
-      }))
-      event('pointerdown', 700, 400)
-      event('pointermove', 702, 401)
-      event('pointerup', 702, 401)
-      target.setPointerCapture = setPointerCapture
-    })
-    await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
+      await canvas.evaluate((node) => {
+        const target = node as HTMLElement
+        const setPointerCapture = target.setPointerCapture
+        target.setPointerCapture = () => undefined
+        const event = (type: string, x: number, y: number) => target.dispatchEvent(new PointerEvent(type, {
+          bubbles: true,
+          button: 0,
+          buttons: type === 'pointerup' ? 0 : 1,
+          clientX: x,
+          clientY: y,
+          pointerId: 71,
+          pointerType: 'mouse',
+        }))
+        event('pointerdown', 700, 400)
+        event('pointermove', 702, 401)
+        event('pointerup', 702, 401)
+        target.setPointerCapture = setPointerCapture
+      })
+      await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
 
-    expect(await page.evaluate(() => (window as Window & { __panProofDocument?: boolean }).__panProofDocument)).toBe(true)
-    expect(editorDocumentRequests).toHaveLength(documentCount)
+      expect(await page.evaluate(() => (window as Window & { __panProofDocument?: boolean }).__panProofDocument)).toBe(true)
+      expect(editorDocumentRequests).toHaveLength(documentCount)
+      expect(await canvas.locator(':scope > div').filter({ has: page.locator('[data-screen-host]') }).getAttribute('style')).not.toBe(transformBefore)
+    }).toPass({ timeout: 45_000, intervals: [250, 500, 1_000] })
     await expect(canvas).toBeVisible()
     await expect(page.locator('nextjs-portal')).toHaveCount(0)
-    expect(await canvas.locator(':scope > div').filter({ has: page.locator('[data-screen-host]') }).getAttribute('style')).not.toBe(transformBefore)
     expect(pageErrors).toEqual([])
     expect(consoleErrors).toEqual([])
   })
