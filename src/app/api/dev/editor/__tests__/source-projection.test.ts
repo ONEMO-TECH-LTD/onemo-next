@@ -400,6 +400,23 @@ export function Button() { return <button className={styles.base} /> }`,
     })
   })
 
+  it('canonicalizes a lawful parent-relative CSS module before exact dependency lookup', async () => {
+    const file = 'src/app/(dev)/react-figma-components/Button.tsx'
+    const cssFile = 'src/app/(dev)/authoring-e2e/Card.module.css'
+    const projection = await sourceProjectionFromSource({
+      file,
+      source: `import styles from '../authoring-e2e/Card.module.css'
+export function Button() { return <button className={styles.card} /> }`,
+      cssSources: { [cssFile]: '.card { color: red; }\n' },
+    })
+
+    expect(projection).toMatchObject({
+      compatibility: 'native-v1',
+      cssModule: cssFile,
+      rootClass: 'card',
+    })
+  })
+
   it('projects only a strict static native registry and refuses duplicate identity', async () => {
     const valid = await sourceProjectionFromSource({
       file: 'Button.tsx',

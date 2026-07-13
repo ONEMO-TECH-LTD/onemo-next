@@ -88,6 +88,61 @@ export function Button({ variant = 'Primary' }: { variant?: 'Primary' | 'Seconda
     if (result.kind === 'imported') expect(result.graph.sourceHashes).toEqual(classified.sourceHashes)
   })
 
+  it('hashes a lawful parent-relative CSS module under one canonical store identity', async () => {
+    const cssFile = 'src/app/(dev)/authoring-e2e/Card.module.css'
+    const source = `import styles from '../authoring-e2e/Card.module.css'
+export function Button() { return <button className={styles.card}>Button</button> }
+`
+    const { root, registry, store } = await makeImportStore(source)
+    await fs.mkdir(path.dirname(path.join(root, cssFile)), { recursive: true })
+    await fs.writeFile(path.join(root, cssFile), '.card { color: red; }\n')
+
+    const classified = await classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry })
+    expect(classified.projection).toMatchObject({ compatibility: 'native-v1', cssModule: cssFile })
+    expect(Object.keys(classified.sourceHashes).sort()).toEqual([cssFile, SOURCE_FILE].sort())
+
+    const result = await importSourceFileToAuthoringStore({
+      storeId: 'project-main',
+      file: SOURCE_FILE,
+      expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint,
+      registry,
+      store,
+    })
+    expect(result.kind).toBe('imported')
+    if (result.kind === 'imported') expect(result.graph.sourceHashes).toEqual(classified.sourceHashes)
+  })
+
+  it('keeps canonical CSS lookup behind the dot-segment and symlink jail with zero writes', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'authoring-import-css-jail-'))
+    const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'authoring-import-css-outside-'))
+    const componentDir = path.dirname(path.join(root, SOURCE_FILE))
+    await fs.mkdir(componentDir, { recursive: true })
+    await fs.mkdir(path.join(root, 'src/app/(dev)/authoring-e2e'), { recursive: true })
+    const registry = await RuntimeRootRegistry.create([{ storeId: 'project-main', kind: 'project', rootPath: root }])
+    const store = new AuthoringSidecarStore({ storeId: 'project-main', rootKind: 'project', registry })
+
+    const outsideSpecifier = path.relative(componentDir, path.join(outside, 'Outside.module.css')).split(path.sep).join('/')
+    await fs.writeFile(path.join(root, SOURCE_FILE), `import styles from '${outsideSpecifier}'\nexport function Button() { return <button className={styles.card} /> }\n`)
+    const outsideProjection = await classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry })
+    expect(outsideProjection.projection).toMatchObject({
+      compatibility: 'unsupported',
+      unsupportedReason: expect.stringContaining('invalid store-relative path'),
+    })
+    expect(await store.load()).toBeNull()
+
+    await fs.writeFile(path.join(outside, 'Outside.module.css'), '.card {}\n')
+    await fs.symlink(path.join(outside, 'Outside.module.css'), path.join(root, 'src/app/(dev)/authoring-e2e/Linked.module.css'))
+    await fs.writeFile(path.join(root, SOURCE_FILE), `import styles from '../authoring-e2e/Linked.module.css'\nexport function Button() { return <button className={styles.card} /> }\n`)
+    const symlinkProjection = await classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry })
+    expect(symlinkProjection.projection).toMatchObject({
+      compatibility: 'unsupported',
+      unsupportedReason: expect.stringContaining('symlink path component refused'),
+    })
+    expect(await store.load()).toBeNull()
+    await expect(fs.readFile(path.join(root, PROJECT_AUTHORING_SIDECAR))).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
   it('refuses source drift before creating a sidecar', async () => {
     const { root, registry, store } = await makeImportStore()
     const classified = await classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry })

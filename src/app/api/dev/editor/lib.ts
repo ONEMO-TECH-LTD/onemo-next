@@ -1618,7 +1618,7 @@ async function parseComponentModelSnapshot(input: {
   for (const st of sf.statements) {
     if (ts.isImportDeclaration(st) && st.importClause?.name?.text === 'styles') {
       const spec = st.moduleSpecifier.getText(sf).replace(/^['"]|['"]$/g, '')
-      if (spec.endsWith('.module.css')) cssModule = file.replace(/[^/\\]+$/, spec.replace(/^\.\//, ''))
+      if (spec.endsWith('.module.css')) cssModule = canonicalCssModulePath(file, spec)
     }
   }
 
@@ -1670,6 +1670,13 @@ async function parseComponentModelSnapshot(input: {
   // rule — §6.2/I1 drift fix; disabled is semantic only on a non-form root — F-M2) is DERIVED by the consumer
   // from `props` + `rules` + `structure`, not stored as a second array — the model keeps ONE rule list (§0).
   return { name, file, cssModule, rootClass, root, props, variantAxes, nativeVariants, rules, cssSemantics, structure, connectors }
+}
+
+function canonicalCssModulePath(file: string, specifier: string): string {
+  const storeFile = file.replaceAll('\\', '/')
+  const storeSpecifier = specifier.replaceAll('\\', '/')
+  if (!storeSpecifier.startsWith('./') && !storeSpecifier.startsWith('../')) return storeSpecifier
+  return path.posix.normalize(path.posix.join(path.posix.dirname(storeFile), storeSpecifier))
 }
 
 function projectCssSemantics(nodes: ChildNode[]): CssSemanticNode[] {
