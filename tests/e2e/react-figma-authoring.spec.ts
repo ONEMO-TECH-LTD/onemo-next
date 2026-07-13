@@ -1,8 +1,11 @@
 import { expect, test } from '@playwright/test'
 import { execFile } from 'node:child_process'
+import { mkdir, writeFile } from 'node:fs/promises'
+import path from 'node:path'
 import { promisify } from 'node:util'
 
 const fixtureName = 'AuthoringE2EButton'
+const extractedName = 'AuthoringE2EExtracted'
 const run = promisify(execFile)
 
 test.describe('React Figma component authoring', () => {
@@ -10,7 +13,7 @@ test.describe('React Figma component authoring', () => {
     await run(process.execPath, ['tests/e2e/restore-authoring-fixture.mjs'])
   })
 
-  test('Home restores the retained page canvas and inspector dimensions without navigation', async ({ page }) => {
+  test('extracts a component, reloads once, authors a variant, returns Home, persists, and undoes', async ({ page, request }) => {
     test.setTimeout(120_000)
     const consoleErrors: string[] = []
     const consoleWarnings: string[] = []
@@ -46,7 +49,6 @@ test.describe('React Figma component authoring', () => {
     await expect(page.getByRole('textbox', { name: 'Search components' })).toBeVisible({ timeout: 20_000 })
     const fixtureButton = page.getByRole('button', { name: fixtureName, exact: true })
     await expect(fixtureButton).toBeVisible({ timeout: 30_000 })
-    await page.evaluate(() => { (window as Window & { __e2eImportOriginDocument?: boolean }).__e2eImportOriginDocument = true })
     editorDocumentRequests.length = 0
     tokenResponses.length = 0
     await fixtureButton.dblclick()
@@ -78,12 +80,46 @@ test.describe('React Figma component authoring', () => {
     failedRequests.length = 0
     consoleErrors.length = 0
 
-    const importReload = page.waitForEvent('domcontentloaded', { timeout: 30_000 })
-    await importButton.click()
-    await importReload
+    // Introduce and compile the selection route only after the cold import-refusal probes. Its
+    // route-tree reload is setup; it settles before the measured create-component reload begins.
+    editorDocumentRequests.length = 0
+    const selectionRouteDir = path.join(process.cwd(), 'src/app/(dev)/authoring-e2e')
+    await mkdir(selectionRouteDir, { recursive: true })
+    await writeFile(path.join(selectionRouteDir, 'page.tsx'), `export function AuthoringE2EPage() {\n  return (\n    <main>\n      <section data-name="Extract this card">Extract this card</section>\n    </main>\n  )\n}\n\nexport default AuthoringE2EPage\n`)
+    await expect.poll(async () => (await request.get('/authoring-e2e')).status(), { timeout: 30_000 }).toBe(200)
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await expect.poll(
+      () => componentsRail.evaluate((node) => Object.keys(node).some((key) => key.startsWith('__reactProps'))),
+      { timeout: 30_000 },
+    ).toBe(true)
+    await page.getByTitle('File').click()
+    const selectionPage = page.getByText('/authoring-e2e', { exact: true })
+    await expect(selectionPage).toBeVisible({ timeout: 30_000 })
+    await selectionPage.click()
+    await expect(frame).toHaveAttribute('src', '/authoring-e2e')
+    const selection = frame.contentFrame().getByText('Extract this card', { exact: true })
+    await expect(selection).toBeVisible({ timeout: 30_000 })
+    await expect(page.locator('[data-layer-row]').filter({ hasText: 'Extract this card' })).toBeVisible({ timeout: 30_000 })
+    await selection.click()
+    const createComponentButton = page.getByTitle('Create component')
+    await createComponentButton.click()
+    const createDialog = page.getByRole('dialog', { name: 'Create component' })
+    await expect(createDialog).toBeVisible()
+    await createDialog.getByLabel('Name').fill(extractedName)
+    await page.waitForLoadState('networkidle')
+    // The explicit route-registration reload above is harness setup, not part of the measured
+    // authoring flow. Start the create/reload evidence window only after that setup is quiescent.
+    failedResponses.length = 0
+    failedRequests.length = 0
+    await page.evaluate(() => { (window as Window & { __e2eCreateOriginDocument?: boolean }).__e2eCreateOriginDocument = true })
+    editorDocumentRequests.length = 0
+    tokenResponses.length = 0
+    const createReload = page.waitForEvent('domcontentloaded', { timeout: 30_000 })
+    await createDialog.getByRole('button', { name: 'Create', exact: true }).click()
+    await createReload
     const authoringCanvas = page.locator('[data-authoring-canvas]')
     await expect.poll(() => editorDocumentRequests.length, { timeout: 30_000 }).toBe(1)
-    expect(await page.evaluate(() => (window as Window & { __e2eImportOriginDocument?: boolean }).__e2eImportOriginDocument))
+    expect(await page.evaluate(() => (window as Window & { __e2eCreateOriginDocument?: boolean }).__e2eCreateOriginDocument))
       .toBeUndefined()
     const environmentRebase = page.getByRole('button', { name: 'Rebase environment' })
     await Promise.race([
@@ -94,8 +130,27 @@ test.describe('React Figma component authoring', () => {
     if (await environmentRebase.isVisible()) await environmentRebase.click()
     await expect(authoringCanvas).toBeVisible({ timeout: 30_000 })
     await expect(page.locator('main')).toHaveAttribute('data-authoring-resume-phase', 'resumed')
+    await expect(page.locator('[data-component-current]')).toHaveText(extractedName)
+    await page.waitForLoadState('networkidle')
+    const expectedReloadAborts = failedRequests.splice(0)
+    expect(expectedReloadAborts.every((failure) =>
+      failure.startsWith(process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3045') && failure.endsWith(' net::ERR_ABORTED'),
+    )).toBe(true)
     expect(editorDocumentRequests).toHaveLength(1)
     await expect(page.locator('[data-variant-label]').filter({ hasText: 'Primary · Primary' })).toHaveCount(0)
+    expect(await page.locator('[data-variant-id]').evaluateAll((frames) => frames.map((frame) => {
+      const style = getComputedStyle(frame)
+      return { borderStyle: style.borderStyle, outlineStyle: style.outlineStyle }
+    }))).toEqual([{ borderStyle: 'none', outlineStyle: 'solid' }])
+    const breadcrumb = page.locator('[data-component-breadcrumb]')
+    const breadcrumbBeforeZoom = await breadcrumb.boundingBox()
+    await page.getByTitle('Zoom in').click()
+    await expect.poll(() => breadcrumb.boundingBox()).toEqual(breadcrumbBeforeZoom)
+    await page.getByTitle('Zoom out').click()
+    await page.getByRole('button', { name: 'Create variant' }).click()
+    await expect(page.getByText('Variant 2', { exact: true })).toBeVisible({ timeout: 30_000 })
+    await expect(authoringCanvas).toHaveAttribute('data-authoring-busy', 'false', { timeout: 30_000 })
+    expect(editorDocumentRequests).toHaveLength(1)
     expect(await page.locator('[data-variant-id]').evaluateAll((frames) => frames.map((frame) => {
       const style = getComputedStyle(frame)
       return { borderStyle: style.borderStyle, outlineStyle: style.outlineStyle }
@@ -103,20 +158,11 @@ test.describe('React Figma component authoring', () => {
       { borderStyle: 'none', outlineStyle: 'solid' },
       { borderStyle: 'none', outlineStyle: 'none' },
     ]))
-    const breadcrumb = page.locator('[data-component-breadcrumb]')
-    const breadcrumbBeforeZoom = await breadcrumb.boundingBox()
-    await page.getByTitle('Zoom in').click()
-    await expect.poll(() => breadcrumb.boundingBox()).toEqual(breadcrumbBeforeZoom)
-    await page.getByTitle('Zoom out').click()
-    await page.getByRole('button', { name: 'Create variant' }).click()
-    await expect(page.getByText('Variant 3', { exact: true })).toBeVisible({ timeout: 30_000 })
-    await expect(authoringCanvas).toHaveAttribute('data-authoring-busy', 'false', { timeout: 30_000 })
-    expect(editorDocumentRequests).toHaveLength(1)
 
-    const created = page.locator('[data-variant-id]').filter({ hasText: 'Variant 3' })
+    const created = page.locator('[data-variant-id]').filter({ hasText: 'Variant 2' })
     await created.click()
-    await created.getByText('Variant 3', { exact: true }).click()
-    const enterInput = page.getByRole('textbox', { name: 'Rename Variant 3' })
+    await created.getByText('Variant 2', { exact: true }).click()
+    const enterInput = page.getByRole('textbox', { name: 'Rename Variant 2' })
     await enterInput.fill('Enter Rename')
     await enterInput.press('Enter')
     await expect(page.getByText('Enter Rename', { exact: true })).toBeVisible({ timeout: 30_000 })
@@ -189,6 +235,11 @@ test.describe('React Figma component authoring', () => {
     await page.reload({ waitUntil: 'domcontentloaded' })
     await expect(page.locator('main')).toHaveAttribute('data-authoring-resume-phase', 'none')
     await expect(page.locator('[data-authoring-resume-error]')).toHaveCount(0)
+    await page.waitForLoadState('networkidle')
+    const expectedPersistenceReloadAborts = failedRequests.splice(0)
+    expect(expectedPersistenceReloadAborts.every((failure) =>
+      failure.startsWith(process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3045') && failure.endsWith(' net::ERR_ABORTED'),
+    )).toBe(true)
     expect(editorDocumentRequests).toHaveLength(2)
     await expect.poll(
       () => componentsRail.evaluate((node) => Object.keys(node).some((key) => key.startsWith('__reactProps'))),
@@ -196,7 +247,7 @@ test.describe('React Figma component authoring', () => {
     ).toBe(true)
     await componentsRail.click()
     await expect(page.getByRole('textbox', { name: 'Search components' })).toBeVisible({ timeout: 20_000 })
-    await page.getByRole('button', { name: fixtureName, exact: true }).dblclick()
+    await page.getByRole('button', { name: extractedName, exact: true }).dblclick()
     await expect(authoringCanvas).toBeVisible({ timeout: 30_000 })
     await expect.poll(() => movedVariant.evaluate((node) => ({
       x: Number.parseFloat((node as HTMLElement).style.left),

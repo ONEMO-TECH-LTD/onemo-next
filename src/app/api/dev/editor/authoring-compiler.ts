@@ -135,8 +135,10 @@ export async function compileCreateComponentFromSelection(input: {
     componentId: component.id,
     componentFile,
     sourcePatches: [
-      { file: input.command.file, before: input.consumerSource, after: plan.consumerSource.toString('utf8') },
+      // Install the new dependency before exposing its consumer. Transaction rollback restores
+      // this list in reverse, so the consumer is likewise restored before the dependency is removed.
       { file: componentFile, before: null, after: plan.componentSource },
+      { file: input.command.file, before: input.consumerSource, after: plan.consumerSource.toString('utf8') },
     ],
     verifiedAssertions: [
       { kind: 'staged-typescript-semantics', status: 'passed' },

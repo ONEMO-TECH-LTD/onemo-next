@@ -3158,8 +3158,6 @@ export default function ReactFigmaPage() {
       markerIssued = true
       setAuthoringResumeTarget(preview.componentFile)
       setAuthoringResumePhase('originating')
-      setRail('components')
-      setEditingComponent(null)
       const response = await fetch('/api/dev/editor-authoring', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -3183,11 +3181,10 @@ export default function ReactFigmaPage() {
         throw new Error(result.code ?? result.error ?? 'Create component failed')
       }
       if (result.componentFile !== preview.componentFile) throw new Error('CREATE_COMPONENT_RESULT_MISMATCH')
-      setComponentCreateDialog(null)
-      setCompNonce((value) => value + 1)
-      notify(`Created ${name}`)
-      // The originating document deliberately leaves the marker intact. Next's route-tree rescan
-      // performs the single permitted reload; only that resumed document may consume it (§6.5).
+      // Hard Contract §11-G2 / Architecture §6.5: the originating document deliberately leaves
+      // the marker intact and performs exactly one reload; only the resumed document may consume it.
+      window.location.reload()
+      return
     } catch (error) {
       const message = (error as Error).message
       setComponentCreateDialog((current) => current ? { ...current, busy: false, error: message } : current)

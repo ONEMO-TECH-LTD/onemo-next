@@ -48,8 +48,8 @@ describe('create-component-from-selection authoring session', () => {
     expect(plan).toMatchObject({
       componentFile: COMPONENT,
       sourcePatches: [
-        { file: PAGE, before: PAGE_SOURCE, after: expect.stringContaining('<Card />') },
         { file: COMPONENT, before: null, after: expect.stringContaining('export function Card()') },
+        { file: PAGE, before: PAGE_SOURCE, after: expect.stringContaining('<Card />') },
       ],
       verifiedAssertions: [
         { kind: 'staged-typescript-semantics', status: 'passed' },

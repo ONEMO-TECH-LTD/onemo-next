@@ -107,3 +107,10 @@ Follow-up after the bounded import-reload protocol: the one permitted document r
 - What did not work: polling `require.context()` during HMR, then waiting for webpack's global `idle` status and requiring once. Both touched the old recursive context while it was already disposed and produced repeated `[HMR] unexpected require ... from disposed module` warnings.
 - What worked: hot-accept the recursive component context itself, replace the context reference inside its accept callback, and keep the canvas busy until that exact context generation advances.
 - Remember: webpack `idle` does not prove a disposed `require.context` reference is safe; readiness belongs to the context's own accept lifecycle.
+
+## S58 extraction E2E route and reload isolation
+
+- What did not work: registering the temporary selection route before the cold import probes, clicking its visible DOM before the live-layer bridge had wired it, assuming Next would reload after extraction, and installing the rewritten consumer before the new component dependency.
+- Symptoms: route-manifest reloads reset the parent editor, the create action correctly refused a missing selection payload, the resume marker remained in the originating document, and Next briefly reported that the extracted component import could not resolve.
+- What worked: create and compile the route after the cold probes, perform one explicitly unmeasured setup reload, wait for the matching live layer row, explicitly reload only after the durable transaction succeeds, and order source patches dependency-first (rollback already restores in reverse).
+- Remember: separate harness route registration from the measured authoring reload; iframe visibility does not prove the editor selection bridge is ready; multi-file installs must expose dependencies before consumers and restore consumers before removing dependencies.
