@@ -135,7 +135,7 @@ The final generic `networkidle` after bootstrap resume was removed in the same c
 
 ## S58 AC-X-004 headed pan proof
 
-- What did not work: treating the first token/document parity as final cold-shell readiness, then asserting that `nextjs-portal` itself must not exist.
-- Symptoms: Fast Refresh replaced the document immediately after the first readiness check; after stabilizing that, the gesture passed but the test failed because Next mounts one empty dev portal during healthy operation.
-- What worked: retry the complete idempotent atomic pointerdown→move→up proof until one document remains stable, retain accumulated console/page errors across attempts, and assert the actual runtime-error copy is absent instead of asserting an implementation container is absent.
-- Remember: S58 headed crash proofs must distinguish product error UI from Next's always-mounted dev portal; cold retries may wrap only idempotent interactions and must never clear captured errors.
+- What did not work: treating the first token/document parity as final cold-shell readiness, asserting that `nextjs-portal` itself must not exist, and running a shallow `/tmp` worktree without overriding the editor filesystem root.
+- Symptoms: Fast Refresh replaced the document immediately after the first readiness check; after stabilizing that, the gesture passed but the test failed because Next mounts one empty dev portal during healthy operation; the shallow checkout then made the default depth-derived filesystem root jail healthy page/filesystem reads with 403.
+- What worked: retry the complete idempotent atomic pointerdown→move→up proof until one document remains stable, retain accumulated console/page errors across attempts, assert the actual runtime-error copy is absent, and set `EDITOR_FS_ROOT` to the parent containing a shallow throwaway checkout.
+- Remember: S58 headed crash proofs must distinguish product error UI from Next's always-mounted dev portal; cold retries may wrap only idempotent interactions and must never clear captured errors. Throwaway worktrees outside the normal `.codex/worktrees` depth need an explicit truthful `EDITOR_FS_ROOT`—never a weakened jail.
