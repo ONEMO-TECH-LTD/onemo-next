@@ -151,6 +151,44 @@ test.describe('React Figma component authoring', () => {
     expect(editorDocumentRequests).toEqual([])
     expect(new Set(componentStatusFiles)).toEqual(new Set([fixtureFile]))
     await expect(page.locator('[data-components-canvas]')).toHaveCount(0)
+    expect(await breadcrumb.evaluate((node) => {
+      const main = node.closest('main')!.getBoundingClientRect()
+      const nav = node.getBoundingClientRect()
+      const home = node.querySelector<HTMLElement>('[data-component-home]')!
+      const separator = node.querySelector<SVGElement>('[data-component-breadcrumb-separator]')!
+      const current = node.querySelector<HTMLElement>('[data-component-current]')!
+      const homeBox = home.getBoundingClientRect()
+      const separatorBox = separator.getBoundingClientRect()
+      const currentBox = current.getBoundingClientRect()
+      const navStyle = getComputedStyle(node)
+      const homeStyle = getComputedStyle(home)
+      const currentStyle = getComputedStyle(current)
+      return {
+        inset: { top: nav.top - main.top, left: nav.left - main.left },
+        nav: { height: nav.height, border: navStyle.borderTopWidth, padding: navStyle.paddingTop },
+        chips: [homeBox.height, currentBox.height],
+        radius: [homeStyle.borderRadius, currentStyle.borderRadius],
+        borders: [homeStyle.borderTopWidth, currentStyle.borderTopWidth],
+        type: { size: homeStyle.fontSize, weight: homeStyle.fontWeight },
+        padding: [homeStyle.paddingLeft, homeStyle.paddingRight, currentStyle.paddingLeft, currentStyle.paddingRight],
+        gaps: [separatorBox.left - homeBox.right, currentBox.left - separatorBox.right],
+        icons: [
+          home.querySelector('svg')!.getBoundingClientRect().width,
+          separatorBox.width,
+          current.querySelector('svg')!.getBoundingClientRect().width,
+        ],
+      }
+    })).toEqual({
+      inset: { top: 12, left: 12 },
+      nav: { height: 30, border: '0px', padding: '0px' },
+      chips: [30, 30],
+      radius: ['8px', '8px'],
+      borders: ['0px', '0px'],
+      type: { size: '12px', weight: '600' },
+      padding: ['10px', '10px', '10px', '10px'],
+      gaps: [10, 10],
+      icons: [12, 10, 12],
+    })
     expect(pageErrors).toEqual([])
     expect(consoleErrors).toEqual([])
   })
