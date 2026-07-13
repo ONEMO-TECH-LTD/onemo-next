@@ -302,6 +302,31 @@ describe('SingleRootAuthoringTransaction', () => {
     })).rejects.toMatchObject({ code: 'METADATA_PATCH_PATH_INVALID' })
   })
 
+  it.each([
+    {
+      label: 'source',
+      update: { sourcePatches: [{ file: 'src/app/(dev)/react-figma-components/Missing.tsx', before: null, after: null }] },
+      code: 'SOURCE_PATCH_EMPTY',
+    },
+    {
+      label: 'metadata',
+      update: { metadataPatches: [{ file: 'src/app/(dev)/react-figma-components/.onemo/history/journal.ndjson', before: null, after: null }] },
+      code: 'METADATA_PATCH_EMPTY',
+    },
+  ])('refuses an empty $label patch before durable evidence and permits the same transaction ID afterward', async ({ update, code }) => {
+    const { root, tx } = await makeTransaction()
+    const transactionRoot = path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions/tx-1')
+
+    await expect(tx.commit({ expectedRevision: 0, ...update, mutate: (draft) => draft }))
+      .rejects.toMatchObject({ code, status: 422 })
+    await expect(fs.lstat(transactionRoot)).rejects.toMatchObject({ code: 'ENOENT' })
+
+    await expect(tx.commit({ expectedRevision: 0, mutate: (draft) => draft }))
+      .resolves.toMatchObject({ revision: 1 })
+    await expect(fs.readFile(path.join(transactionRoot, 'participant.json'), 'utf8'))
+      .resolves.toContain('"status": "committed"')
+  })
+
   it('prepares blobs and both records before source mutation, then restores them on failure', async () => {
     let root = ''
     let sourceFile = ''

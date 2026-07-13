@@ -151,6 +151,8 @@ export class SingleRootAuthoringTransaction {
     const sourcePatches = update.sourcePatches ?? []
     const metadataPatches = update.metadataPatches ?? []
     const expectedSourceHashes = update.expectedSourceHashes ?? {}
+    this.validatePatchImages(sourcePatches, 'SOURCE')
+    this.validatePatchImages(metadataPatches, 'METADATA')
     const patchByFile = new Map(sourcePatches.map((patch) => [patch.file, patch]))
     this.validatePatchPaths(sourcePatches, metadataPatches)
     const sourceFiles = unique([
@@ -498,6 +500,19 @@ export class SingleRootAuthoringTransaction {
     if (invalidSource) throw namedError('SOURCE_PATCH_PATH_INVALID', `source patch targets authoring metadata: ${invalidSource.file}`, 422)
     const invalidMetadata = metadataPatches.find((patch) => !patch.file.startsWith(historyRoot))
     if (invalidMetadata) throw namedError('METADATA_PATCH_PATH_INVALID', `metadata patch is outside history: ${invalidMetadata.file}`, 422)
+  }
+
+  private validatePatchImages(patches: Array<SourcePatch | MetadataPatch>, label: 'SOURCE' | 'METADATA'): void {
+    for (const patch of patches) {
+      if (patch.before === null && patch.after === null) {
+        throw namedError(`${label}_PATCH_EMPTY`, `${label.toLowerCase()} patch has neither a before nor after image: ${patch.file}`, 422)
+      }
+      for (const [side, image] of [['before', patch.before], ['after', patch.after]] as const) {
+        if (image !== null && typeof image !== 'string' && !Buffer.isBuffer(image)) {
+          throw namedError(`${label}_PATCH_IMAGE_INVALID`, `${label.toLowerCase()} patch ${side}-image is invalid: ${patch.file}`, 422)
+        }
+      }
+    }
   }
 
   private async putTransactionBlob(bytes: Buffer | string, mode: number): Promise<TransactionBlobRef> {
