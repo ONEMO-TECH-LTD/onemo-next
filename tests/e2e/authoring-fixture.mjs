@@ -2,7 +2,8 @@ import { access, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises
 import path from 'node:path'
 
 const componentRoot = path.join(process.cwd(), 'src/app/(dev)/react-figma-components')
-const fixtureFile = path.join(componentRoot, 'AuthoringE2EButton.tsx')
+const fixtureSourceFile = 'src/app/(dev)/react-figma-components/AuthoringE2EButton.tsx'
+const fixtureFile = path.join(process.cwd(), fixtureSourceFile)
 const extractedComponentFile = path.join(componentRoot, 'AuthoringE2EExtracted.tsx')
 const canonicalComponentFile = path.join(componentRoot, 'AuthoringE2ECanonical.tsx')
 const selectionRouteDir = path.join(process.cwd(), 'src/app/(dev)/authoring-e2e')
@@ -30,7 +31,10 @@ export async function prepareAuthoringFixture() {
   await writeFile(markerPath, `${JSON.stringify({ hadStore })}\n`)
   try {
     if (hadStore) await rename(storePath, backupPath)
-    await writeFile(fixtureFile, `function NestedLabel() {\n  return <span data-name="Nested">Nested</span>\n}\n\nexport function AuthoringE2EButton({ variant = 'Primary' }: { variant?: 'Primary' | 'Secondary' }) {\n  return <button type="button"><NestedLabel /><span data-name="Label">{variant}</span></button>\n}\n`)
+    const labelLine = 999
+    const fixturePrefix = `function NestedLabel() {\n  return <span data-name="Nested" data-src="${fixtureSourceFile}:${labelLine}:1">Nested</span>\n}\n\nexport function AuthoringE2EButton({ variant = 'Primary' }: { variant?: 'Primary' | 'Secondary' }) {\n  return (\n    <button type="button">\n      <NestedLabel />`
+    const fixtureSource = `${fixturePrefix}${'\n'.repeat(labelLine - fixturePrefix.split('\n').length)}<span data-name="Label">{variant}</span>\n    </button>\n  )\n}\n`
+    await writeFile(fixtureFile, fixtureSource)
     await mkdir(selectionRouteDir, { recursive: true })
     await writeFile(
       path.join(selectionRouteDir, 'AuthoringE2ECard.module.css'),

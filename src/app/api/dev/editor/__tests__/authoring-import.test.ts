@@ -10,6 +10,10 @@ import { ProjectAuthoringSession } from '../authoring-session'
 import { AuthoringSidecarStore, createEmptyAuthoringGraph, PROJECT_AUTHORING_SIDECAR } from '../authoring-store'
 import { DurableFileInstaller, sha256 } from '../durable-file-installer'
 import { RuntimeRootRegistry } from '../runtime-root-registry'
+import {
+  AUTHORING_SOURCE_PROVENANCE_ATTRIBUTE,
+  AUTHORING_SOURCE_PROVENANCE_RESERVED,
+} from '@/lib/editor-source-provenance'
 import { linkTestNodeModules } from './test-project-root'
 
 const SOURCE_FILE = 'src/app/(dev)/react-figma-components/Button.tsx'
@@ -185,6 +189,34 @@ export function Button() { return <button className={styles.card}>Button</button
       store,
     })).rejects.toMatchObject({ code: 'SOURCE_HASH_STALE', changedPaths: [SOURCE_FILE] })
     expect(await store.load()).toBeNull()
+  })
+
+  it('named-refuses authored reserved provenance before production import evidence', async () => {
+    const { root, registry, store } = await makeImportStore()
+    const classified = await classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry })
+    const forged = singleAxisSource.replace(
+      '<button data-variant',
+      `<button ${AUTHORING_SOURCE_PROVENANCE_ATTRIBUTE}="${SOURCE_FILE}:999:1" data-variant`,
+    )
+    await fs.writeFile(path.join(root, SOURCE_FILE), forged)
+
+    await expect(classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry }))
+      .rejects.toMatchObject({ code: AUTHORING_SOURCE_PROVENANCE_RESERVED, status: 422 })
+    await expect(importSourceFileToAuthoringStore({
+      storeId: 'project-main',
+      file: SOURCE_FILE,
+      expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint,
+      registry,
+      store,
+    })).rejects.toMatchObject({ code: AUTHORING_SOURCE_PROVENANCE_RESERVED, status: 422 })
+
+    await expect(fs.readFile(path.join(root, SOURCE_FILE), 'utf8')).resolves.toBe(forged)
+    await expect(fs.readFile(path.join(root, PROJECT_AUTHORING_SIDECAR))).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(fs.readdir(path.join(root, 'src/app/(dev)/react-figma-components/.onemo/history')))
+      .rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(fs.readdir(path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions')))
+      .rejects.toMatchObject({ code: 'ENOENT' })
   })
 
   it('refuses rather than replacing a persisted revision-zero sidecar', async () => {

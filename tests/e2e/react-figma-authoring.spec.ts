@@ -5,6 +5,8 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { promisify } from 'node:util'
 
+import { AUTHORING_SOURCE_PROVENANCE_ATTRIBUTE } from '../../src/lib/editor-source-provenance'
+
 const fixtureName = 'AuthoringE2EButton'
 const fixtureFile = 'src/app/(dev)/react-figma-components/AuthoringE2EButton.tsx'
 const extractedName = 'AuthoringE2EExtracted'
@@ -242,8 +244,11 @@ test.describe('React Figma component authoring', () => {
     await expect(label).toHaveAttribute('data-name', 'Label')
     const nested = primary.locator('[data-name="Nested"]')
     await expect(nested).toHaveCount(1)
+    await expect(nested).toHaveAttribute('data-src', `${fixtureFile}:999:1`)
+    await expect(nested).not.toHaveAttribute(AUTHORING_SOURCE_PROVENANCE_ATTRIBUTE, `${fixtureFile}:999:1`)
     await expect(nested).not.toHaveAttribute('data-authoring-node-id', /.+/)
     await expect(nested).toHaveAttribute('data-authoring-node-refusal', 'SOURCE_CONTENT_PROVENANCE_UNOWNED')
+    await expect(label).toHaveAttribute(AUTHORING_SOURCE_PROVENANCE_ATTRIBUTE, `${fixtureFile}:999:1`)
     const sourceIdentity = await label.getAttribute('data-authoring-node-id')
     expect(sourceIdentity).toMatch(/^[a-f0-9]{64}:0$/)
     await expect(label).toHaveAttribute('data-authoring-node-file', fixtureFile)
@@ -262,6 +267,7 @@ test.describe('React Figma component authoring', () => {
     await expect(label).toHaveAttribute('data-authoring-node-id', sourceIdentity!)
     await expect(label).toHaveAttribute('data-name', 'Label')
     await expect(primary.locator('[data-name="Nested"]')).not.toHaveAttribute('data-authoring-node-id', /.+/)
+    await expect(label).toHaveAttribute(AUTHORING_SOURCE_PROVENANCE_ATTRIBUTE, `${fixtureFile}:999:1`)
     await label.click()
     await expect(authoringCanvas).toHaveAttribute('data-selected-content-id', sourceIdentity!)
     expect(authoringWrites).toEqual([])

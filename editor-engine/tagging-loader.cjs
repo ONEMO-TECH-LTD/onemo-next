@@ -1,18 +1,24 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- webpack loader is intentionally CommonJS */
 /**
  * react-figma engine · M1 selection-core (KAI-9304) — dev-only source tagging.
  *
- * Webpack `enforce:'pre'` loader: stamps host (lowercase) JSX elements with
- * `data-src="<repo-relative-file>:<line>:<col>"` in the SERVED compile only.
+ * Webpack `enforce:'pre'` loader: stamps host (lowercase) JSX elements with a
+ * reserved `data-onemo-source="<repo-relative-file>:<line>:<col>"` in the SERVED
+ * compile only. The retained page engine also receives legacy `data-src` when
+ * the source does not already own that attribute.
  * In-memory by design — the repo stays byte-identical (`git status` clean is
  * an AC). Identity IS the source location; no persisted ids (ENGINE-PLAN.md §2).
  *
- * Splice-only transform: positions come from the TypeScript parser, text is
- * inserted right after the tag name, no codegen, no added lines — so line
- * numbers downstream (SWC, sourcemaps) stay true.
+ * Splice-only transform: positions come from the TypeScript parser. Provenance
+ * is appended after authored attributes/spreads so authored props cannot
+ * override it; no codegen or lines are added, so downstream positions stay true.
  */
 const ts = require('typescript');
 const path = require('path');
 const fs = require('fs');
+
+const AUTHORING_SOURCE_ATTRIBUTE = 'data-onemo-source';
+const AUTHORING_SOURCE_RESERVED = 'SOURCE_PROVENANCE_ATTRIBUTE_RESERVED';
 
 /* E7.1 (KAI-9375, lead F1): files from the global component library get a PACKAGE-NAME-PREFIXED
  * identity ("onemo-component-library/src/...") — never a `..`-relative path, whose depth differs
@@ -36,6 +42,17 @@ module.exports = function taggingLoader(source) {
     rel = path.relative(this.rootContext || process.cwd(), this.resourcePath);
   }
 
+  const reservedIndex = source.toLowerCase().indexOf(AUTHORING_SOURCE_ATTRIBUTE);
+  if (reservedIndex >= 0) {
+    const before = source.slice(0, reservedIndex);
+    const line = before.split('\n').length;
+    const col = reservedIndex - before.lastIndexOf('\n');
+    const error = new Error(`${AUTHORING_SOURCE_RESERVED}: ${AUTHORING_SOURCE_ATTRIBUTE} is reserved at ${rel}:${line}:${col}`);
+    error.code = AUTHORING_SOURCE_RESERVED;
+    error.status = 422;
+    throw error;
+  }
+
   let sf;
   try {
     sf = ts.createSourceFile(this.resourcePath, source, ts.ScriptTarget.ESNext, false, ts.ScriptKind.TSX);
@@ -53,9 +70,13 @@ module.exports = function taggingLoader(source) {
       /^[a-z]/.test(node.tagName.text)
     ) {
       const lc = sf.getLineAndCharacterOfPosition(node.getStart(sf));
+      const authoredAttributes = node.attributes.properties
+        .filter(ts.isJsxAttribute)
+        .map((attribute) => attribute.name.getText(sf).toLowerCase());
+      const provenance = `${rel}:${lc.line + 1}:${lc.character + 1}`;
       inserts.push({
-        pos: node.tagName.end,
-        text: ` data-src="${rel}:${lc.line + 1}:${lc.character + 1}"`,
+        pos: node.attributes.end,
+        text: `${authoredAttributes.includes('data-src') ? '' : ` data-src="${provenance}"`} ${AUTHORING_SOURCE_ATTRIBUTE}="${provenance}"`,
       });
     }
     ts.forEachChild(node, visit);

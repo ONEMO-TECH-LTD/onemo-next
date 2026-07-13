@@ -15,6 +15,7 @@ import { sha256 } from './durable-file-installer'
 import { parseComponentModelFromSource } from './lib'
 import { RuntimeRootRegistry } from './runtime-root-registry'
 import { extractSourceAnchorsFromTsx } from './source-anchor'
+import { assertNoAuthoredSourceProvenance } from '@/lib/editor-source-provenance'
 import { sourceProjectionFromModel, type SourceProjection, unsupportedSourceProjection } from './source-projection'
 
 export type SourceImportClassification = {
@@ -49,10 +50,17 @@ export async function readExactAuthoringSourceSnapshot(input: {
 }): Promise<ExactAuthoringSourceSnapshot> {
   const sources = new Map<string, Buffer>()
   const sourceAbs = await input.registry.resolveStorePath(input.storeId, input.file)
-  sources.set(input.file, await fs.readFile(sourceAbs))
+  const sourceBytes = await fs.readFile(sourceAbs)
+  assertNoAuthoredSourceProvenance(input.file, sourceBytes.toString('utf8'))
+  sources.set(input.file, sourceBytes)
   const compilerConfig = await readExactCompilerConfig(input)
   for (const [file, bytes] of Object.entries(compilerConfig.sources)) sources.set(file, bytes)
   await readProjectModuleDependencies(input, sources, compilerConfig.options, compilerConfig.configuredFiles)
+  for (const [file, bytes] of sources) {
+    if (file !== input.file && /\.[cm]?[jt]sx$/.test(file)) {
+      assertNoAuthoredSourceProvenance(file, bytes.toString('utf8'))
+    }
+  }
   const cssSources: Record<string, string> = {}
   let projection: SourceProjection
 

@@ -5,6 +5,7 @@ import { isValidElementType } from 'react-is'
 
 import type { AuthoringGraphV1, SourceAnchor, VariantFrame } from '@/app/api/dev/editor/authoring-types'
 import type { SourceProjection } from '@/app/api/dev/editor/source-projection'
+import { AUTHORING_SOURCE_PROVENANCE_ATTRIBUTE } from '@/lib/editor-source-provenance'
 import { componentCanvasGeometry, movedVariantFrame } from './gestures'
 import { cancelAuthoringResumeMarker, issueAuthoringResumeMarker } from './session'
 import { resolveSourceContentBindings, sourceContentLayerId, sourceContentLayers, type SourceContentLayer } from './content-selection'
@@ -186,13 +187,13 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged, onResume
         existing.removeAttribute('data-authoring-node-selected')
         existing.removeAttribute('data-authoring-node-refusal')
       }
-      // The dev loader's file:line:col data-src is the only runtime provenance authority.
+      // The dev loader's reserved file:line:col attribute is the only runtime provenance authority.
       // Untagged or foreign descendants stay named-refused; never fall back to tag/order guessing.
       const elements = Array.from(container.querySelectorAll('*'))
       const bindings = resolveSourceContentBindings(
         contentProjection.layers,
         elements.map((element) => ({
-          provenance: element.getAttribute('data-src'),
+          provenance: element.getAttribute(AUTHORING_SOURCE_PROVENANCE_ATTRIBUTE),
           tag: element.tagName.toLowerCase(),
         })),
       )
