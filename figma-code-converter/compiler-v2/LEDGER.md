@@ -19,8 +19,8 @@ for Dan between phases. NOT waived: frozen phase evidence, authoritative QA+Meta
 gitignored golden fixture `t88thL8hKksSpILgkeGRZ0-4084-25997.nodes.json`) / 0 skips ·
 compiler-v2 foundation suite 53 pass / 0 fail / 0 skip across Builder and Meta repeated runs ·
 compiler-v2 P2 graph suite 16 pass / 0 fail / 0 skip · P2 persisted-model suite 7 pass /
-0 fail / 0 skip · compiler-v2 P3 planner suite 9 pass / 0 fail / 0 skip. Combined current truth:
-85 pass / 0 fail / 0 skip.
+0 fail / 0 skip · compiler-v2 P3 planner suite 9 pass / 0 fail / 0 skip · P4 layout/render
+suite 5 pass / 0 fail / 0 skip. Combined current truth: 90 pass / 0 fail / 0 skip.
 No phase may be recorded green from
 harness-only or REST_ONLY placeholders.
 
@@ -45,8 +45,8 @@ Decisions/Done/cutover: Dan only.
 | P0 continuity/contract/calibration | IN PROGRESS | — | see P0 section |
 | P1 evidence capture | pending | — | |
 | P2 canonical graphs | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `0c8471b` | sole authoritative QA/Meta cleared the frozen code snapshot only; live/plugin evidence still blocked by G-1/G-2 |
-| P3 mother token/component slice | AUTHORITATIVE REWORK; BUILDER REPAIR 3 READY | `d69a0fa`, `2c6b27c`, `9532450` rejected | default-tuple residual repaired; real mother/plugin-origin phase exit still blocked by G-1/G-2/G-4 |
-| P4 mother layout/render slice | pending | — | |
+| P3 mother token/component slice | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `5dbcb39` | sole authoritative QA/Meta cleared core snapshot; real mother/plugin-origin exit blocked by G-1/G-2/G-4 |
+| P4 mother layout/render slice | BUILDER CORE READY; PHASE EVIDENCE BLOCKED | — | generic G6/G7 core + hard-case microfixture ready; runnable mother output blocked by G-1/G-2/G-4 |
 | P5 emitters/security/editability | pending | — | |
 | P6 runtime/visual/editor proof | pending | — | |
 | P7 corpus & scale | pending | — | |
@@ -197,6 +197,27 @@ Decisions/Done/cutover: Dan only.
   gap: per-axis option coverage allowed the combined advertised default tuple to have no authored
   member. Repair 3 requires an exact authored default member while preserving sparse non-default
   combinations; the missing-default mutation refuses in lowering and independently trips G4.
+- Authoritative rereview cleared the resulting core snapshot `5dbcb39` with 85/85/0 and its
+  external attack replay. This is snapshot clearance only; P3 phase evidence remains blocked by
+  G-1/G-2/G-4 and external registry-stage authenticity remains an orchestration precondition.
+
+## P4 Builder core checkpoint (2026-07-14)
+
+- Added versioned semantic-layout and render/compositing IR from the sealed CanonicalModel:
+  auto-layout including wrap/negative gap/track alignment, GRID tracks + direct-child placement,
+  free/absolute layout, exact local and composed affine matrices, sizing/constraints/overflow,
+  reverse child paint order, clipping, and stroke geometry contribution.
+- Added explicit source-mapped fragments for isolation, mask, clip, every visible fill/stroke/effect,
+  content, and captured vector geometry. Decorative fragments are aria-hidden/pointer-free; raw
+  source indexes survive hidden predecessors; mask groups preserve Figma's subsequent-sibling law.
+- Every binding has exactly one layout, fragment, or semantic owner. Missing/multiple owners and
+  unsupported visible operations fail; scalar rotation cannot replace an affine matrix.
+- Added a planner-independent G6/G7 oracle and hard-case mutations for grid span, affine shear,
+  reverse-z source drift, reordered paint source, mask targets, fragment order, and exact binding
+  owner. Exact current split is foundation 53 + P2 16 + P2 persisted 7 + P3 9 + P4 5 = 90/90/0;
+  four syntax checks and diff check are green.
+- This is a Builder core checkpoint only, not P4 phase clearance: runnable sandbox emission is the
+  next seam, and real plugin/mother evidence remains blocked by G-1/G-2/G-4.
 
 ## Meta rulings accepted (2026-07-13)
 
