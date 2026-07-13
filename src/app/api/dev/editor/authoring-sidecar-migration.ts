@@ -88,10 +88,7 @@ export async function migrateAuthoringSidecarOnLoad(input: {
     }
     const historicalSources = new Map<string, string>()
     for (const snapshot of snapshots.values()) {
-      for (const file of Object.keys(snapshot.sourceHashes)) {
-        const bytes = snapshot.sources[file]
-        if (bytes !== undefined) historicalSources.set(file, bytes)
-      }
+      for (const [file, bytes] of Object.entries(snapshot.sources)) historicalSources.set(file, bytes)
     }
     const committedTransactions = await committedTransactionRecords(input.storeId, input.registry)
     const metadataPatches = await history.planSchemaMigration({
@@ -213,18 +210,28 @@ async function migrateHistoryGraphPreimage(input: {
       throw namedError('AUTHORING_MIGRATION_HISTORY_SOURCE_UNAVAILABLE', `historical source bytes are unavailable: ${file}`, 409)
     }
   }
-  const expandedSourceHashes: Record<string, string> = {}
-  for (const snapshot of input.snapshots.values()) {
-    for (const file of Object.keys(snapshot.sourceHashes)) {
-      const historical = input.historicalSources.get(file)
-      if (historical === undefined) {
-        throw namedError('AUTHORING_MIGRATION_HISTORY_SOURCE_UNAVAILABLE', `historical source bytes are unavailable: ${file}`, 409)
-      }
-      expandedSourceHashes[file] = sha256(historical)
-    }
-  }
   const components = validatedLegacy.graph.components
-  const cssSources = Object.fromEntries([...input.historicalSources].filter(([file]) => file.endsWith('.css')))
+  const historicalSnapshots = Object.keys(components).map((componentId) => {
+    const snapshot = input.snapshots.get(componentId)
+    if (!snapshot) {
+      throw namedError('AUTHORING_MIGRATION_HISTORY_SOURCE_UNAVAILABLE', `compiler snapshot is unavailable: ${componentId}`, 409)
+    }
+    return snapshot
+  })
+  const requiredAuthority = new Set<string>()
+  for (const snapshot of historicalSnapshots) {
+    for (const file of Object.keys(snapshot.sourceHashes)) requiredAuthority.add(file)
+  }
+  const missingAuthority = [...requiredAuthority].filter((file) => sourceHashes[file] === undefined).sort()
+  if (missingAuthority.length > 0) {
+    throw namedError(
+      'AUTHORING_MIGRATION_HISTORY_SOURCE_UNAVAILABLE',
+      `historical compiler authority is unavailable: ${missingAuthority.join(', ')}`,
+      409,
+    )
+  }
+  const cssSources = Object.fromEntries([...input.historicalSources]
+    .filter(([file]) => sourceHashes[file] !== undefined && file.endsWith('.css')))
   const projectionFingerprints: Record<string, string> = {}
   for (const [componentId, value] of Object.entries(components)) {
     const source = value.source
@@ -238,12 +245,25 @@ async function migrateHistoryGraphPreimage(input: {
     }
     projectionFingerprints[componentId] = sourceProjectionFingerprint(projection)
   }
-  const environmentHashes = Object.assign({}, ...[...input.snapshots.values()].map((snapshot) => snapshot.environmentHashes))
+  const expectedEnvironmentHashes = validatedLegacy.hadEnvironmentFingerprint
+    ? Object.assign({}, ...(historicalSnapshots.length > 0 ? historicalSnapshots : [...input.snapshots.values()])
+      .map((snapshot) => snapshot.environmentHashes))
+    : validatedLegacy.historicalEnvironmentHashes
+  const environmentHashes = Object.fromEntries(Object.entries(expectedEnvironmentHashes).map(([file, expectedHash]) => {
+    const historical = input.historicalSources.get(file)
+    if (historical === undefined || sha256(historical) !== expectedHash) {
+      throw namedError('AUTHORING_MIGRATION_HISTORY_SOURCE_UNAVAILABLE', `historical environment bytes are unavailable: ${file}`, 409)
+    }
+    return [file, expectedHash]
+  }))
   const environmentFingerprint = compilerEnvironmentFingerprint(environmentHashes)
+  if (validatedLegacy.hadEnvironmentFingerprint && environmentFingerprint !== validatedLegacy.graph.environmentFingerprint) {
+    throw namedError('AUTHORING_MIGRATION_HISTORY_SOURCE_UNAVAILABLE', 'historical compiler environment cannot be reconstructed', 409)
+  }
   const migrated = migrateAuthoringGraphV1({
     graph,
     projectionFingerprints,
-    sourceHashes: expandedSourceHashes,
+    sourceHashes,
     environmentFingerprint,
   })
   const projectRoot = input.registry.get(input.storeId).canonicalRealPath
@@ -251,7 +271,8 @@ async function migrateHistoryGraphPreimage(input: {
     const snapshot = input.snapshots.get(componentId)
     if (!snapshot) throw namedError('AUTHORING_MIGRATION_HISTORY_SOURCE_UNAVAILABLE', `compiler snapshot is unavailable: ${componentId}`, 409)
     const source = input.historicalSources.get(component.source.file)!
-    const dependencies = { ...snapshot.sources, ...Object.fromEntries(input.historicalSources) }
+    const dependencies = Object.fromEntries([...input.historicalSources].filter(([file]) =>
+      sourceHashes[file] !== undefined || environmentHashes[file] !== undefined))
     assertStagedTypeScriptSemantics(component.source.file, source, projectRoot, snapshot.compilerOptions, dependencies)
     const projection = await sourceProjectionFromSource({ file: component.source.file, source, cssSources })
     projectVariantRegistry(migrated, component, projection)
@@ -275,6 +296,7 @@ function requireRecord(value: unknown, label: string): Record<string, unknown> {
 function validateLegacyGraphShape(graph: unknown): {
   graph: ReturnType<typeof migrateAuthoringGraphV1>
   authoredSourceHashes: Record<string, string>
+  historicalEnvironmentHashes: Record<string, string>
   hadEnvironmentFingerprint: boolean
 } {
   const record = requireRecord(graph, 'legacy authoring graph')
@@ -289,6 +311,9 @@ function validateLegacyGraphShape(graph: unknown): {
   }
   const authoredSourceHashes = Object.fromEntries(
     Object.entries(sourceHashes).filter(([file]) => !isGeneratedCompilerEnvironmentFile(file)),
+  )
+  const historicalEnvironmentHashes = Object.fromEntries(
+    Object.entries(sourceHashes).filter(([file]) => isGeneratedCompilerEnvironmentFile(file)),
   )
   const hadEnvironmentFingerprint = Object.hasOwn(record, 'environmentFingerprint')
   if (hadEnvironmentFingerprint && !isSha256(record.environmentFingerprint)) {
@@ -307,6 +332,7 @@ function validateLegacyGraphShape(graph: unknown): {
         : EMPTY_ENVIRONMENT_FINGERPRINT,
     }),
     authoredSourceHashes,
+    historicalEnvironmentHashes,
     hadEnvironmentFingerprint,
   }
 }

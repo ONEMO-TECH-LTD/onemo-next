@@ -172,6 +172,7 @@ describe('editor-authoring G1 import route', () => {
       const graphSourceHashes = graph.sourceHashes as Record<string, string>
       graph.sourceHashes = {
         ...(graphSourceHashes[SOURCE_FILE] ? { [SOURCE_FILE]: graphSourceHashes[SOURCE_FILE] } : {}),
+        ...(graphSourceHashes['tsconfig.json'] ? { 'tsconfig.json': graphSourceHashes['tsconfig.json'] } : {}),
         [environmentFile]: sha256(legacyEnvironmentBytes),
       }
       delete graph.environmentFingerprint
@@ -184,8 +185,6 @@ describe('editor-authoring G1 import route', () => {
     await fs.writeFile(journalPath, journal.map((record) => JSON.stringify(record)).join('\n') + '\n')
     const transactionsPath = path.join(root, authoringMetadataPath('project', 'transactions'))
     const transactionsBefore = await fs.readdir(transactionsPath)
-    await fs.writeFile(environmentPath, 'declare type GeneratedRoute = "/current"\n')
-
     const response = await handleGet(componentRequest(), root)
 
     expect(response.status).toBe(200)
@@ -226,6 +225,68 @@ describe('editor-authoring G1 import route', () => {
       graph: { revision: 8, variants: { [secondary.id]: { frame: secondaryFrameBeforeMove } } },
     })
     await expect(fs.readFile(sourcePath)).resolves.toEqual(sourceAfterCreateUndo)
+  }, 20_000)
+
+  it('refuses historical V1 migration rather than borrowing a current tsconfig authority', async () => {
+    const root = await makeRoot()
+    const classified = await (await handleGet(request('GET'), root)).json()
+    await handlePost(request('POST', {
+      kind: 'import-source', file: SOURCE_FILE, expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint,
+      transactionId: '00000000-0000-4000-8000-000000000013',
+    }), root)
+    const loaded = await (await handleGet(componentRequest(), root)).json()
+    await handlePost(request('POST', {
+      kind: 'execute-command',
+      command: {
+        kind: 'create-variant', commandId: 'historical-authority-proof',
+        componentId: loaded.componentId, displayName: 'Historical',
+      },
+      expectedRevision: loaded.graph.revision,
+      expectedSourceHashes: loaded.sourceHashes,
+    }), root)
+    const sidecarPath = path.join(root, PROJECT_AUTHORING_SIDECAR)
+    const legacy = JSON.parse(await fs.readFile(sidecarPath, 'utf8')) as Record<string, unknown>
+    legacy.schemaVersion = 1
+    legacy.sourceHashes = { [SOURCE_FILE]: (legacy.sourceHashes as Record<string, string>)[SOURCE_FILE]! }
+    delete legacy.environmentFingerprint
+    for (const component of Object.values(legacy.components as Record<string, Record<string, unknown>>)) {
+      delete component.projectionFingerprint
+    }
+    const legacyBytes = Buffer.from(JSON.stringify(legacy, null, 2) + '\n')
+    await fs.writeFile(sidecarPath, legacyBytes)
+
+    const journalPath = path.join(root, authoringMetadataPath('project', 'history/journal.ndjson'))
+    const journal = (await fs.readFile(journalPath, 'utf8')).trimEnd().split('\n').map((line) => JSON.parse(line))
+    for (const record of journal) {
+      if (record.type !== 'authoring-command') continue
+      const graph = JSON.parse(await fs.readFile(path.join(root, record.graphPreimage.path), 'utf8')) as Record<string, unknown>
+      graph.schemaVersion = 1
+      graph.sourceHashes = Object.fromEntries(Object.entries(graph.sourceHashes as Record<string, string>)
+        .filter(([file]) => file === SOURCE_FILE))
+      delete graph.environmentFingerprint
+      for (const component of Object.values(graph.components as Record<string, Record<string, unknown>>)) {
+        delete component.projectionFingerprint
+      }
+      const graphBytes = Buffer.from(JSON.stringify(graph, null, 2) + '\n')
+      const graphHash = sha256(graphBytes)
+      const graphPath = authoringMetadataPath('project', `history/blobs/${graphHash}`)
+      await fs.writeFile(path.join(root, graphPath), graphBytes)
+      record.graphPreimage = { sha256: graphHash, path: graphPath }
+    }
+    await fs.writeFile(journalPath, journal.map((record) => JSON.stringify(record)).join('\n') + '\n')
+    await fs.writeFile(path.join(root, 'tsconfig.json'), JSON.stringify({ compilerOptions: { strict: false, jsx: 'react-jsx' } }))
+    const transactionsPath = path.join(root, authoringMetadataPath('project', 'transactions'))
+    const transactionsBefore = (await fs.readdir(transactionsPath)).sort()
+    const journalBefore = await fs.readFile(journalPath)
+
+    const response = await handleGet(componentRequest(), root)
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({ code: 'AUTHORING_MIGRATION_HISTORY_SOURCE_UNAVAILABLE' })
+    await expect(fs.readFile(sidecarPath)).resolves.toEqual(legacyBytes)
+    await expect(fs.readFile(journalPath)).resolves.toEqual(journalBefore)
+    expect((await fs.readdir(transactionsPath)).sort()).toEqual(transactionsBefore)
   }, 20_000)
 
   it('migrates the accepted G1 V1 shape with authored-only hashes and no environment fingerprint', async () => {
