@@ -212,9 +212,9 @@ async function migrateHistoryGraphPreimage(input: {
     }
   }
   const components = validatedLegacy.graph.components
-  const historicalNeedsConfig = Object.keys(components).some((componentId) =>
+  const currentSnapshotsUseConfig = Object.keys(components).some((componentId) =>
     input.snapshots.get(componentId)?.sourceHashes['tsconfig.json'] !== undefined)
-  if (historicalNeedsConfig && sourceHashes['tsconfig.json'] === undefined) {
+  if (!validatedLegacy.hadEnvironmentFingerprint && currentSnapshotsUseConfig && sourceHashes['tsconfig.json'] === undefined) {
     throw namedError(
       'AUTHORING_MIGRATION_HISTORY_SOURCE_UNAVAILABLE',
       'historical compiler authority is unavailable: tsconfig.json',

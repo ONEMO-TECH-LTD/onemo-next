@@ -289,6 +289,80 @@ describe('editor-authoring G1 import route', () => {
     expect((await fs.readdir(transactionsPath)).sort()).toEqual(transactionsBefore)
   }, 20_000)
 
+  it('uses historical default compiler authority when post-split history predates tsconfig', async () => {
+    const root = await makeRoot()
+    const tsconfigPath = path.join(root, 'tsconfig.json')
+    await fs.unlink(tsconfigPath)
+    const classified = await (await handleGet(request('GET'), root)).json()
+    await handlePost(request('POST', {
+      kind: 'import-source', file: SOURCE_FILE, expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint,
+      transactionId: '00000000-0000-4000-8000-000000000016',
+    }), root)
+    const loaded = await (await handleGet(componentRequest(), root)).json()
+    await handlePost(request('POST', {
+      kind: 'execute-command',
+      command: {
+        kind: 'create-variant', commandId: 'before-current-tsconfig',
+        componentId: loaded.componentId, displayName: 'Historical',
+      },
+      expectedRevision: loaded.graph.revision,
+      expectedSourceHashes: loaded.sourceHashes,
+    }), root)
+
+    await fs.writeFile(tsconfigPath, JSON.stringify({
+      compilerOptions: {
+        strict: true, noEmit: true, target: 'ESNext', module: 'ESNext',
+        moduleResolution: 'Bundler', jsx: 'react-jsx', types: ['react'],
+      },
+      include: ['src/**/*.ts', 'src/**/*.tsx'],
+    }))
+    const stale = await (await handleGet(componentStatusRequest(), root)).json()
+    const revalidated = await handlePost(request('POST', {
+      kind: 'revalidate-source', file: SOURCE_FILE,
+      expectedRevision: stale.expectedRevision,
+      expectedSourceHashes: stale.sourceHashes,
+    }), root)
+    expect(revalidated.status).toBe(200)
+
+    const sidecarPath = path.join(root, PROJECT_AUTHORING_SIDECAR)
+    const sidecar = JSON.parse(await fs.readFile(sidecarPath, 'utf8')) as Record<string, unknown>
+    sidecar.schemaVersion = 1
+    for (const component of Object.values(sidecar.components as Record<string, Record<string, unknown>>)) {
+      delete component.projectionFingerprint
+    }
+    await fs.writeFile(sidecarPath, JSON.stringify(sidecar, null, 2) + '\n')
+
+    const journalPath = path.join(root, authoringMetadataPath('project', 'history/journal.ndjson'))
+    const journal = (await fs.readFile(journalPath, 'utf8')).trimEnd().split('\n').map((line) => JSON.parse(line))
+    for (const record of journal) {
+      if (record.type !== 'authoring-command') continue
+      const graph = JSON.parse(await fs.readFile(path.join(root, record.graphPreimage.path), 'utf8')) as Record<string, unknown>
+      graph.schemaVersion = 1
+      for (const component of Object.values(graph.components as Record<string, Record<string, unknown>>)) {
+        delete component.projectionFingerprint
+      }
+      const graphBytes = Buffer.from(JSON.stringify(graph, null, 2) + '\n')
+      const graphHash = sha256(graphBytes)
+      const graphPath = authoringMetadataPath('project', `history/blobs/${graphHash}`)
+      await fs.writeFile(path.join(root, graphPath), graphBytes)
+      record.graphPreimage = { sha256: graphHash, path: graphPath }
+    }
+    await fs.writeFile(journalPath, journal.map((record) => JSON.stringify(record)).join('\n') + '\n')
+
+    const response = await handleGet(componentRequest(), root)
+
+    expect(response.status).toBe(200)
+    const migratedJournal = (await fs.readFile(journalPath, 'utf8')).trimEnd().split('\n').map((line) => JSON.parse(line))
+    const historicalGraphs = await Promise.all(migratedJournal
+      .filter((record) => record.type === 'authoring-command')
+      .map((record) => fs.readFile(path.join(root, record.graphPreimage.path), 'utf8').then(JSON.parse)))
+    const componentHistory = historicalGraphs.filter((graph) => Object.keys(graph.components).length > 0)
+    expect(componentHistory.length).toBeGreaterThan(0)
+    expect(componentHistory.every((graph) => /^[a-f0-9]{64}$/.test(graph.environmentFingerprint))).toBe(true)
+    expect(componentHistory.some((graph) => graph.sourceHashes['tsconfig.json'] === undefined)).toBe(true)
+  }, 30_000)
+
   it('migrates historical graphs with their own compiler options and dependency topology', async () => {
     const oldDependency = 'src/app/(dev)/react-figma-components/Old.ts'
     const newDependency = 'src/app/(dev)/react-figma-components/New.ts'
