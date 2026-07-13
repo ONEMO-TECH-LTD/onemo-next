@@ -171,11 +171,11 @@ test.describe('React Figma component authoring', () => {
     const selectionRouteDir = path.join(process.cwd(), 'src/app/(dev)/authoring-e2e')
     const selectionFixtureDir = path.join(process.cwd(), 'tests/e2e/fixtures/authoring-real-page')
     await mkdir(selectionRouteDir, { recursive: true })
-    await writeFile(path.join(selectionRouteDir, 'page.tsx'), await readFile(path.join(selectionFixtureDir, 'page.tsx')))
     await writeFile(
       path.join(selectionRouteDir, 'AuthoringE2ECard.module.css'),
       await readFile(path.join(selectionFixtureDir, 'AuthoringE2ECard.module.css')),
     )
+    await writeFile(path.join(selectionRouteDir, 'page.tsx'), await readFile(path.join(selectionFixtureDir, 'page.tsx')))
     await expect.poll(async () => (await request.get('/authoring-e2e')).status(), { timeout: 30_000 }).toBe(200)
     await page.reload({ waitUntil: 'domcontentloaded' })
     await expect.poll(
