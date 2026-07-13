@@ -74,7 +74,7 @@ test.describe('React Figma component authoring', () => {
     expect(consoleErrors).toEqual([])
   })
 
-  test('extracts a component, reloads once, authors a variant, returns Home, persists, and undoes', async ({ page }) => {
+  test('extracts a component, reloads once, authors a variant, returns Home, persists, and undoes', async ({ page, request }) => {
     test.setTimeout(120_000)
     const consoleErrors: string[] = []
     const consoleWarnings: string[] = []
@@ -97,6 +97,9 @@ test.describe('React Figma component authoring', () => {
     })
     page.on('requestfailed', (request) => failedRequests.push(`${request.url()} ${request.failure()?.errorText ?? 'unknown failure'}`))
 
+    // Compile the committed real-page fixture before opening the editor. This is route-fixture
+    // setup, not product-data prewarming; the measured browser flow remains fully cold.
+    expect((await request.get('/authoring-e2e')).status()).toBe(200)
     await page.goto('/react-figma', { waitUntil: 'domcontentloaded' })
     const componentsRail = page.getByTitle('Components')
     const frame = page.locator('iframe')
