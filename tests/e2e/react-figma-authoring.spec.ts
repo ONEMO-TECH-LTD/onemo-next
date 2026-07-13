@@ -442,6 +442,113 @@ test.describe('React Figma component authoring', () => {
     expect(failedRequests).toEqual([])
   })
 
+  test('retries preview and execute refusals with fresh requests in the same usable dialog', async ({ page, request }) => {
+    test.setTimeout(90_000)
+    const consoleErrors: string[] = []
+    const pageErrors: string[] = []
+    const failedRequests: string[] = []
+    page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()) })
+    page.on('pageerror', (error) => pageErrors.push(error.message))
+    page.on('requestfailed', (browserRequest) => {
+      failedRequests.push(`${browserRequest.url()} ${browserRequest.failure()?.errorText ?? 'unknown failure'}`)
+    })
+
+    expect((await request.get('/authoring-e2e')).status()).toBe(200)
+    await page.goto('/react-figma', { waitUntil: 'domcontentloaded' })
+    const frame = page.locator('iframe')
+    const createDialog = page.getByRole('dialog', { name: 'Create component' })
+    await expect(async () => {
+      await page.getByTitle('File').click({ timeout: 5_000 })
+      await page.getByText('/authoring-e2e', { exact: true }).click({ timeout: 5_000 })
+      await expect(frame).toHaveAttribute('src', '/authoring-e2e')
+      const selection = frame.contentFrame().getByText('Refuse component creation', { exact: true })
+      await expect(selection).toBeVisible({ timeout: 10_000 })
+      await selection.click()
+      await page.getByTitle('Create component').click()
+      await expect(createDialog).toBeVisible({ timeout: 5_000 })
+    }).toPass({ timeout: 30_000, intervals: [250, 500, 1_000] })
+
+    const previewCommandIds: string[] = []
+    const refusePreview = async (route: import('@playwright/test').Route) => {
+      const url = new URL(route.request().url())
+      if (route.request().method() === 'GET' && url.searchParams.get('mode') === 'create-component-preview') {
+        previewCommandIds.push(url.searchParams.get('commandId') ?? '')
+        await route.fulfill({
+          status: 422,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: 'raw preview detail', code: 'CREATE_COMPONENT_SOURCE_UNSUPPORTED' }),
+        })
+        return
+      }
+      await route.continue()
+    }
+    await page.route('**/api/dev/editor-authoring?**', refusePreview)
+    await createDialog.evaluate((node) => node.setAttribute('data-retry-proof', 'preview'))
+    const createButton = createDialog.getByRole('button', { name: 'Create', exact: true })
+    await createButton.click()
+    await expect(createDialog.getByRole('alert')).toContainText('can’t become a component yet')
+    await expect(createButton).toBeEnabled()
+    await createButton.click()
+    await expect.poll(() => previewCommandIds.length).toBe(2)
+    expect(new Set(previewCommandIds).size).toBe(2)
+    expect(previewCommandIds.every(Boolean)).toBe(true)
+    await expect(createDialog).toHaveAttribute('data-retry-proof', 'preview')
+    await expect(createButton).toBeEnabled()
+    await page.unroute('**/api/dev/editor-authoring?**', refusePreview)
+
+    await page.keyboard.press('Escape')
+    await expect(createDialog).toHaveCount(0)
+    await page.getByTitle('Create component').click()
+    await expect(createDialog).toBeVisible()
+    await createDialog.evaluate((node) => node.setAttribute('data-retry-proof', 'execute'))
+
+    const executeCommandIds: string[] = []
+    const executeTransactionIds: string[] = []
+    const refuseExecute = async (route: import('@playwright/test').Route) => {
+      if (route.request().method() === 'POST') {
+        const body = route.request().postDataJSON() as {
+          kind?: string
+          transactionId?: string
+          command?: { commandId?: string }
+        }
+        if (body.kind === 'execute-create-component') {
+          executeCommandIds.push(body.command?.commandId ?? '')
+          executeTransactionIds.push(body.transactionId ?? '')
+          await route.fulfill({
+            status: 409,
+            contentType: 'application/json',
+            body: JSON.stringify({ error: 'raw stale detail', code: 'SOURCE_PREIMAGE_STALE' }),
+          })
+          return
+        }
+      }
+      await route.continue()
+    }
+    await page.route('**/api/dev/editor-authoring**', refuseExecute)
+    const executeButton = createDialog.getByRole('button', { name: 'Create', exact: true })
+    await executeButton.click()
+    await expect(createDialog.getByRole('alert')).toContainText('The page changed while the component was being created.')
+    await expect(executeButton).toBeEnabled()
+    expect(await page.evaluate(() => sessionStorage.getItem('react-figma:authoring-import-resume-v1'))).toBeNull()
+    await executeButton.click()
+    await expect.poll(() => executeTransactionIds.length).toBe(2)
+    expect(new Set(executeCommandIds).size).toBe(2)
+    expect(new Set(executeTransactionIds).size).toBe(2)
+    expect(executeCommandIds.every(Boolean)).toBe(true)
+    expect(executeTransactionIds.every(Boolean)).toBe(true)
+    await expect(createDialog).toHaveAttribute('data-retry-proof', 'execute')
+    await expect(executeButton).toBeEnabled()
+    expect(await page.evaluate(() => sessionStorage.getItem('react-figma:authoring-import-resume-v1'))).toBeNull()
+    expect(consoleErrors).toEqual([
+      'Failed to load resource: the server responded with a status of 422 (Unprocessable Entity)',
+      'Failed to load resource: the server responded with a status of 422 (Unprocessable Entity)',
+      'Failed to load resource: the server responded with a status of 409 (Conflict)',
+      'Failed to load resource: the server responded with a status of 409 (Conflict)',
+    ])
+    expect(pageErrors).toEqual([])
+    expect(failedRequests).toEqual([])
+  })
+
   test('creates and persists a component from a real CSS-module page element', async ({ page, request }) => {
     test.setTimeout(90_000)
     const consoleErrors: string[] = []
