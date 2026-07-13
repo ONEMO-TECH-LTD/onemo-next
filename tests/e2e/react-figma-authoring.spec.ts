@@ -354,6 +354,7 @@ test.describe('React Figma component authoring', () => {
       y: Number.parseFloat((node as HTMLElement).style.top),
     }))).toEqual(geometryAfterMove)
     await expect(authoringCanvas).toHaveAttribute('data-authoring-busy', 'false')
+    await authoringCanvas.click({ position: { x: 8, y: 8 } })
     await page.keyboard.press('Meta+z')
     await expect.poll(() => movedVariant.evaluate((node) => ({
       x: Number.parseFloat((node as HTMLElement).style.left),
