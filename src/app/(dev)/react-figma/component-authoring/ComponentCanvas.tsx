@@ -7,7 +7,7 @@ import type { AuthoringGraphV1, SourceAnchor, VariantFrame } from '@/app/api/dev
 import type { SourceProjection } from '@/app/api/dev/editor/source-projection'
 import { componentCanvasGeometry, movedVariantFrame } from './gestures'
 import { cancelAuthoringResumeMarker, issueAuthoringResumeMarker } from './session'
-import { sourceContentLayerId, sourceContentLayers, type SourceContentLayer } from './content-selection'
+import { resolveSourceContentBindings, sourceContentLayerId, sourceContentLayers, type SourceContentLayer } from './content-selection'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let projectComponents = (require as any).context('../../react-figma-components', true, /\.tsx$/)
@@ -46,25 +46,6 @@ type ImportPreview = {
 }
 
 const accent = 'var(--sem-col-border-brand)'
-
-function bindSourceContent(root: Element, layer: SourceContentLayer): Array<{ element: Element; layer: SourceContentLayer }> {
-  if (!matchesSourceTag(root, layer.tag)) return []
-  const bound = [{ element: root, layer }]
-  const children = Array.from(root.children)
-  let cursor = 0
-  for (const childLayer of layer.children) {
-    const relativeIndex = children.slice(cursor).findIndex((child) => matchesSourceTag(child, childLayer.tag))
-    if (relativeIndex < 0) continue
-    const childIndex = cursor + relativeIndex
-    bound.push(...bindSourceContent(children[childIndex]!, childLayer))
-    cursor = childIndex + 1
-  }
-  return bound
-}
-
-function matchesSourceTag(element: Element, sourceTag: string): boolean {
-  return /^[a-z]/.test(sourceTag) && element.tagName.toLowerCase() === sourceTag.toLowerCase()
-}
 
 function armComponentModuleRefresh(): {
   wait: () => Promise<void>
@@ -194,7 +175,7 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged, onResume
 
   useLayoutEffect(() => {
     for (const [variantId, container] of contentRoots.current) {
-      for (const existing of container.querySelectorAll('[data-authoring-node-id]')) {
+      for (const existing of container.querySelectorAll('[data-authoring-node-id], [data-authoring-node-refusal]')) {
         existing.removeAttribute('data-authoring-node-id')
         existing.removeAttribute('data-authoring-node-file')
         existing.removeAttribute('data-authoring-node-export')
@@ -203,11 +184,26 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged, onResume
         existing.removeAttribute('data-authoring-node-col')
         existing.removeAttribute('data-authoring-node-variant-id')
         existing.removeAttribute('data-authoring-node-selected')
+        existing.removeAttribute('data-authoring-node-refusal')
       }
-      const sourceRoot = contentProjection.layers[0]
-      if (!sourceRoot || container.children.length !== 1) continue
-      for (const binding of bindSourceContent(container.children[0]!, sourceRoot)) {
-        const { element, layer } = binding
+      // The dev loader's file:line:col data-src is the only runtime provenance authority.
+      // Untagged or foreign descendants stay named-refused; never fall back to tag/order guessing.
+      const elements = Array.from(container.querySelectorAll('*'))
+      const bindings = resolveSourceContentBindings(
+        contentProjection.layers,
+        elements.map((element) => ({
+          provenance: element.getAttribute('data-src'),
+          tag: element.tagName.toLowerCase(),
+        })),
+      )
+      for (let index = 0; index < elements.length; index += 1) {
+        const element = elements[index]!
+        const binding = bindings[index]!
+        if (binding.kind === 'refused') {
+          element.setAttribute('data-authoring-node-refusal', binding.code)
+          continue
+        }
+        const { layer } = binding
         element.setAttribute('data-authoring-node-id', layer.id)
         element.setAttribute('data-authoring-node-file', layer.source.file)
         element.setAttribute('data-authoring-node-export', layer.source.exportName)

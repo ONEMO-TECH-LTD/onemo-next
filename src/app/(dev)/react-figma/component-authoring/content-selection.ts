@@ -13,6 +13,22 @@ export type SourceContentLayer = {
   children: SourceContentLayer[]
 }
 
+export type RuntimeContentProvenance = {
+  provenance: string | null
+  tag: string
+}
+
+export type SourceContentBinding =
+  | { kind: 'bound'; layer: SourceContentLayer }
+  | {
+    kind: 'refused'
+    code:
+      | 'SOURCE_CONTENT_PROVENANCE_MISSING'
+      | 'SOURCE_CONTENT_PROVENANCE_UNOWNED'
+      | 'SOURCE_CONTENT_PROVENANCE_AMBIGUOUS'
+      | 'SOURCE_CONTENT_PROVENANCE_TAG_MISMATCH'
+  }
+
 export function sourceContentLayerId(anchor: SourceAnchor): string {
   return `${anchor.fingerprint}:${anchor.siblingSignatureOrdinal}`
 }
@@ -47,6 +63,42 @@ export function sourceContentLayers(projection: SourceProjection): SourceContent
   }
 
   return [project(projection.structure)]
+}
+
+export function sourceContentProvenance(layer: SourceContentLayer): string {
+  return `${layer.source.file}:${layer.source.anchor.lastKnownLine}:${layer.source.anchor.lastKnownCol}`
+}
+
+export function resolveSourceContentBindings(
+  layers: SourceContentLayer[],
+  runtimeNodes: RuntimeContentProvenance[],
+): SourceContentBinding[] {
+  const layersByProvenance = new Map<string, SourceContentLayer[]>()
+  const index = (layer: SourceContentLayer) => {
+    const provenance = sourceContentProvenance(layer)
+    layersByProvenance.set(provenance, [...(layersByProvenance.get(provenance) ?? []), layer])
+    for (const child of layer.children) index(child)
+  }
+  for (const layer of layers) index(layer)
+
+  const runtimeCounts = new Map<string, number>()
+  for (const node of runtimeNodes) {
+    if (node.provenance) runtimeCounts.set(node.provenance, (runtimeCounts.get(node.provenance) ?? 0) + 1)
+  }
+
+  return runtimeNodes.map((node): SourceContentBinding => {
+    if (!node.provenance) return { kind: 'refused', code: 'SOURCE_CONTENT_PROVENANCE_MISSING' }
+    const candidates = layersByProvenance.get(node.provenance) ?? []
+    if (candidates.length === 0) return { kind: 'refused', code: 'SOURCE_CONTENT_PROVENANCE_UNOWNED' }
+    if (candidates.length !== 1 || runtimeCounts.get(node.provenance) !== 1) {
+      return { kind: 'refused', code: 'SOURCE_CONTENT_PROVENANCE_AMBIGUOUS' }
+    }
+    const layer = candidates[0]!
+    if (layer.tag.toLowerCase() !== node.tag.toLowerCase()) {
+      return { kind: 'refused', code: 'SOURCE_CONTENT_PROVENANCE_TAG_MISMATCH' }
+    }
+    return { kind: 'bound', layer }
+  })
 }
 
 function positionKey(line: number, col: number): string {
