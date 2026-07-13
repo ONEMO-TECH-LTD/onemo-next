@@ -3,9 +3,10 @@
 > Governing contract: `../C11-CONTRACT-V3.md` sha256 fd8b6c9258c1701bdf265072eb8e50d099359e3c677e34214d7ac936afbc540a
 > Builder baseline: commit `f37de9e` (nine legacy truth-fixes + contracts). Legacy lane stays operational (§0.1).
 > Run mode (Dan, 2026-07-13, live directive): continuous end-to-end build; phases are FROZEN
-> EVIDENCE POINTS reviewed asynchronously by @s58-pixel-3 (QA) and @s58-pixel-meta-qa (Meta);
-> REWORK findings enter the rework loop without idling the build; Dan judges the final product,
-> Done, and cutover. Evidence discipline (self-review, mutations, honest failures) is NOT waived.
+> EVIDENCE POINTS reviewed asynchronously by @s58-pixel (QA) and @s58-pixel-meta-qa (Meta);
+> REWORK findings stop ALL dependent downstream work until cleared; only demonstrably
+> orthogonal work continues during a rework. Dan judges the final product, Done, and cutover.
+> Evidence discipline (self-review, mutations, honest failures) is NOT waived.
 
 ## Governance waiver (narrow, exact)
 
@@ -23,7 +24,7 @@ component/mixed-text/mode-override domains. G-3 (dark reference) blocks dark-sta
 only.
 
 ## Ownership
-Builder/orchestrator/ledger: Kai (s58). QA structural/gate proof: @s58-pixel-3.
+Builder/orchestrator/ledger: Kai (s58). QA structural/gate proof: @s58-pixel.
 Product/editor/agnosticity challenge: @s58-pixel-meta-qa. Decisions/Done/cutover: Dan only.
 
 ## Phase ledger
@@ -46,10 +47,12 @@ Product/editor/agnosticity challenge: @s58-pixel-meta-qa. Decisions/Done/cutover
 1. **Baselines separated**: clean broken baseline = `6c36475` (E1–E13 reproduce there);
    operating delta = `f37de9e` (nine truth-fixes reproduce). Replay proof: run legacy convert
    at 6c36475 offline against the pinned Shape cache and assert E1/E7/E9 markers. [pending]
-2. **Mother screen pinned**: `Qdb9Kx98afJHxaCGAIxoMC` node `6075:53685` ("Shape") — Dan's
-   directive "code and on our screen the result" selects it; version pinned at capture time
-   into the P0 manifest. Dark-mode authored reference does not exist → dark state is
-   `reference:null` → DIAGNOSTIC_ONLY per §4.5 (honest, logged). [pending]
+2. **Mother screen selection**: OPEN — §14.2 lists "current Shape screen" AND a separate "one
+   real current ONEMO mother screen, selected and version-pinned with Dan at P0; Shape or a
+   synthetic fixture cannot substitute for it". Shape stays its own integration fixture and
+   Dan's demo target ("code and on our screen the result"); the §14.2 mother needs DAN's
+   explicit selection → gap G-4. Dark-mode authored reference does not exist → dark states are
+   `reference:null` → DIAGNOSTIC_ONLY per §4.5 (honest, logged). [BLOCKED on G-4]
 3. **Hermetic fixtures**: sanitized Shape microfixture set + replacement for the missing
    legacy golden (t88thL8h…) so `npm test` has zero missing-fixture failures. [pending]
 4. **fidelity-budgets.json**: synchronized Figma/build pairs at one file version; repeat-run
@@ -68,6 +71,8 @@ Product/editor/agnosticity challenge: @s58-pixel-meta-qa. Decisions/Done/cutover
 | G-1 | §14.2 integration corpus needs Figma files that do not exist (editorial, component-library, enterprise, non-ONEMO) | OPEN — corpus harness will be built; fixtures owed; flagged to QA+Meta 2026-07-13 | Kai builds harness; fixture authoring needs Dan/design time |
 | G-2 | Live plugin supplement (resolvedVariableModes, styledTextSegments, component defs) may need a plugin rescan Dan-side; Shape's REST evidence provably contains no overrides/mixed-text/instances, so the manifest can prove completeness for Shape without it | OPEN — supplement plane built with honest source-plane marker; live-plugin path needs bridge rescan | Kai; escalate if a non-Shape fixture needs it |
 | G-3 | Dark-mode visual promotion impossible without an authored dark reference (§4.5) | OPEN — dark states DIAGNOSTIC_ONLY until Dan authors a dark-mode reference frame | Dan (when he wants dark visually promoted) |
+| G-4 | §14.2 mother screen must be selected + version-pinned BY DAN; Shape cannot substitute | OPEN — blocks P0 item 2 and the P3/P4 mother-slice anchor | Dan (question surfaced in-session 2026-07-13) |
+| G-5 | REST_ONLY/source-plane fail-closed law is UNBUILT at a0616a8 (schema only requires sourcePlanes to exist) — Kai's earlier "encoded as data" claim was an overclaim, corrected | OPEN — per-fact provenance validator owed in P1/P2. Failure taxonomy (joint route + Meta correction): missing/partial/REST_ONLY REQUIRED supplement → **FAILED_CAPTURE before graphs**; unreadable complete component definition → FAILED_COMPONENT; fully plugin-captured but unsupported → FAILED_CAPABILITY | Kai |
 
 ## P0 findings
 
@@ -97,6 +102,38 @@ Product/editor/agnosticity challenge: @s58-pixel-meta-qa. Decisions/Done/cutover
   stopping no phase by phase - entire thing … pass to pixel and meta-qa for the final review" —
   is recorded here as the explicit resolution: continuous build, async QA/Meta review at frozen
   evidence, Dan judges the final product. Dan can veto this reading in-session at any time.
+
+## Joint Meta+Pixel gap route (2026-07-13, accepted verbatim — governs G-1/G-2/G-4/G-5)
+
+**Corpus law:** Shape and the real mother are separate §14.2 fixtures. Synthetic REST-schema
+snapshots are valid ONLY for §14.1 microfixtures/mutations/parser-lowerer tests — never for
+§14.2 integration evidence or full-corpus G0–G5 green. P0 exit needs a checked-in versioned
+corpus index, every §14.1/14.2 role present, each package passing
+schema/hash/provenance/census/reference-disposition validation. Minimum live source set:
+Shape + Dan-selected distinct mother; a published provider file (remote variables/aliases,
+complete component set, fonts, assets); a consumer file (two consuming screens + non-ONEMO,
+editorial, GRID/mask/marketing, enterprise roots — consolidated pages allowed); plugin-origin
+golden replacement. Each live root → sanitized sealed §4.3 evidence directory for hermetic CI.
+
+**Source-plane law:** provenance is per fact family/dependency (document=PLUGIN_JSON_REST_V1_PRIMARY
++ REST cross-check; supplement=PLUGIN_PRIMARY_COMPLETE|REST_ONLY|PARTIAL; variables=PLUGIN_PRIMARY
++ optional REST cross-check; components complete|partial; assets/references/fonts carry
+provider/version/hash/permissions/stability). REST_ONLY/PARTIAL = diagnostic only — cannot pass
+G0, clear supplement-dependent G1–G5, stage promotion, or reach PROMOTABLE_VERIFIED. Production
+request missing required supplement = FAILED_CAPTURE before graphs. Required mutations: supplement
+delete/relabel → G0 FAILED_CAPTURE; dropped mode/range/property/override with stable REST → census
+failure; mid-transaction dependency change → F/D mismatch → bounded retry → FAILED_CAPTURE.
+
+**Dan-only inputs (blocking, surfaced to Dan 2026-07-13):**
+1. G-4: select the distinct mother screen (or authorize a composed mother page).
+2. G-1: create/publish the provider + consumer Figma files (or authorize Kai to compose them in
+   a working file Dan reviews) — needed for §14.2 corpus roles.
+3. G-2: plugin bridge rescans at pinned versions when supplement capture lands (P1).
+
+**P0.5 envelope draft (Shape, local-heavy file, n=1):** REST version probe 807ms/2.9KB ·
+REST nodes 1,303ms/618KB · bridge variables payload 13ms/1.4MB · REST image export 1,979ms/598KB
+(2 requests). Three-pass capture projection ≈ 3×(nodes+deps) + refs ≈ 8–12s for Shape-class
+locals — inside a tolerable design-loop envelope; remote-heavy corpus measurement owed (G-1).
 
 ## Decisions log
 

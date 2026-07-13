@@ -87,6 +87,7 @@ export function validateBindingRecord(r) {
   if (!r.bindingId) errs.push('bindingId missing');
   if (!r.source?.nodeId || !r.source?.propertyPath) errs.push('source.nodeId/propertyPath missing');
   if (r.source?.slot && !SLOT_KINDS.includes(r.source.slot.kind)) errs.push(`slot.kind ${r.source.slot.kind} invalid`);
+  if (!r.variable?.key) errs.push('variable.key (stable) missing — hard-fail per §6.1, captureId is not identity');
   if (!r.variable?.captureId) errs.push('variable.captureId missing');
   if (!r.variable?.figmaType) errs.push('variable.figmaType missing');
   if (!DOMAINS.includes(r.destinationDomain)) errs.push(`destinationDomain ${r.destinationDomain} invalid`);
@@ -95,6 +96,39 @@ export function validateBindingRecord(r) {
   return errs;
 }
 
-/** Binding identity — the G2 conservation key (§3 V3, §12 G2). */
-export const bindingIdentity = (r) =>
-  `${r.source.nodeId}␟${r.source.propertyPath}␟${r.variable.captureId}`;
+/**
+ * G2 identity (§12 G2, §6.1) — TWO keys, split concerns (Meta rework, pre-commit correction 2):
+ *
+ * sourceBindingIdentity: REQUIRES the stable variable key (V3 §6.1: missing stable keys
+ * hard-fail — captureId is NOT legal promotable identity) and covers
+ * file/node/property/slot/range/mode/domain/target.
+ *
+ * emittedBindingIdentity: source identity PLUS the resolved registry channelId — same
+ * domain+target with a swapped channel must change the emitted conservation key.
+ *
+ * formatBindingForError: diagnostic ONLY — may show a missing key via its captureId, visibly
+ * marked; never used as a gate key.
+ */
+const slotStr = (s) => (s ? `${s.kind}:${s.index}${s.paint !== undefined ? `@${s.paint}` : ''}` : '');
+const rangeStr = (t) => (t ? `${t.start}-${t.end}` : '');
+
+export function sourceBindingIdentity(r) {
+  if (!r?.variable?.key) throw new BindingIdentityError('missing stable variable key — captureId is not promotable identity (§6.1)');
+  return [
+    r.variable.key, r.variable.collectionKey ?? '', r.source.fileKey ?? '',
+    r.source.nodeId, r.source.propertyPath, slotStr(r.source.slot), rangeStr(r.source.textRange),
+    r.modeContextId ?? '', r.destinationDomain, r.emissionTarget,
+  ].join('␟');
+}
+
+export function emittedBindingIdentity(r, channelId) {
+  if (!channelId) throw new BindingIdentityError('missing registry channelId — emitted conservation requires the resolved channel (G2)');
+  return `${sourceBindingIdentity(r)}␟${channelId}`;
+}
+
+export function formatBindingForError(r) {
+  const key = r?.variable?.key ?? `⚠capture-id:${r?.variable?.captureId ?? '?'}`;
+  return `${key} @ ${r?.source?.nodeId ?? '?'}/${r?.source?.propertyPath ?? '?'}${slotStr(r?.source?.slot) ? ` [${slotStr(r.source.slot)}]` : ''}`;
+}
+
+export class BindingIdentityError extends Error {}
