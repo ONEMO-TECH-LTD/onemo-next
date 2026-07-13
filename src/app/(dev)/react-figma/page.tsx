@@ -20,6 +20,7 @@ import { buildLayerTree, readStyles, colorToHex, hexToRgba, boxSlots, gapSlots, 
 import { createPortal } from 'react-dom'
 import {
   MagnifyingGlass, Plus, Minus, Sidebar, CaretDown, CaretRight, ArrowUUpLeft, ArrowUUpRight, LinkBreak, Crosshair, File as FileIcon, Diamond,
+  Cursor, Hand, ChatCircle, Sun,
   type Icon as PIcon,
 } from '@phosphor-icons/react'
 import { ComponentCanvas } from './component-authoring/ComponentCanvas'
@@ -198,6 +199,65 @@ function useCloseOnOutside<T extends HTMLElement>(open: boolean, close: () => vo
     return () => document.removeEventListener('pointerdown', onPointerDown, true)
   }, [open, close])
   return ref
+}
+
+function ComponentCanvasToolbar({ zoomPercent, onZoomIn, onZoomOut, onZoomReset }: {
+  zoomPercent: number
+  onZoomIn: () => void
+  onZoomOut: () => void
+  onZoomReset: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useCloseOnOutside<HTMLDivElement>(open, () => setOpen(false))
+  const iconButton = (label: string, Icon: PIcon, active = false) => (
+    <button
+      key={label}
+      type="button"
+      aria-label={label}
+      aria-pressed={active}
+      disabled={!active}
+      title={active ? label : `${label} behavior awaits the measured input pass`}
+      style={{ appearance: 'none', width: 30, height: 30, border: 0, borderRadius: 'var(--sem-radii-sm)', display: 'grid', placeItems: 'center', background: active ? 'var(--sem-col-bg-brand-primary)' : 'transparent', color: active ? 'var(--sem-col-text-brand-primary)' : 'var(--sem-col-text-secondary)', opacity: active ? 1 : 0.72, cursor: active ? 'default' : 'not-allowed' }}
+    >
+      <Icon size={16} weight="light" aria-hidden="true" />
+    </button>
+  )
+  const items: Array<{ label: string; shortcut: string; run?: () => void }> = [
+    { label: 'Zoom', shortcut: 'Z' },
+    { label: 'Zoom In', shortcut: '⌘+', run: onZoomIn },
+    { label: 'Zoom Out', shortcut: '⌘−', run: onZoomOut },
+    { label: 'Zoom to 100%', shortcut: '⌘0', run: onZoomReset },
+    { label: 'Zoom to Fit', shortcut: '⌘1' },
+    { label: 'Zoom to Selection', shortcut: '⌘2' },
+    { label: 'Fast Zoom', shortcut: '' },
+    { label: 'Nudge Amount', shortcut: '' },
+  ]
+  return (
+    <div data-component-canvas-toolbar style={{ position: 'absolute', left: '50%', bottom: 12, zIndex: 50, transform: 'translateX(-50%)', height: 38, display: 'flex', alignItems: 'center', gap: 2, padding: 4, border: '1px solid var(--sem-col-border-tertiary)', borderRadius: 'var(--sem-radii-lg)', background: 'var(--sem-col-bg-primary)', color: 'var(--sem-col-text-primary)', boxShadow: '0 8px 24px color-mix(in oklch, var(--sem-col-text-primary) 12%, transparent)', fontFamily: 'var(--sem-type-fluid-label-s-font)', fontSize: 'var(--sem-type-fluid-label-s-size)', lineHeight: 'var(--sem-type-fluid-label-s-line-height)', fontWeight: 600 }}>
+      {iconButton('Select', Cursor, true)}
+      {iconButton('Pan', Hand)}
+      {iconButton('Comment', ChatCircle)}
+      {iconButton('Theme', Sun)}
+      <span aria-hidden="true" style={{ width: 1, height: 20, margin: '0 2px', background: 'var(--sem-col-border-tertiary)' }} />
+      <div ref={ref} style={{ position: 'relative' }}>
+        <button type="button" data-component-zoom-readout aria-label="Zoom options" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((value) => !value)} style={{ appearance: 'none', height: 30, minWidth: 62, border: 0, borderRadius: 'var(--sem-radii-sm)', padding: '0 7px 0 9px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4, background: open ? 'var(--sem-col-bg-secondary)' : 'transparent', color: 'var(--sem-col-text-primary)', cursor: 'pointer', font: 'inherit' }}>
+          <span>{zoomPercent}%</span><CaretDown size={12} weight="light" aria-hidden="true" />
+        </button>
+        {open && (
+          <div data-figma-floating-root="true" role="menu" aria-label="Component canvas zoom" style={{ position: 'absolute', left: '50%', bottom: 36, zIndex: 70, width: 220, transform: 'translateX(-50%)', padding: '6px', border: '1px solid var(--sem-col-border-tertiary)', borderRadius: 'var(--sem-radii-lg)', background: 'var(--sem-col-bg-primary)', color: 'var(--sem-col-text-primary)', boxShadow: '0 12px 32px color-mix(in oklch, var(--sem-col-text-primary) 16%, transparent)' }}>
+            {items.map((item, index) => (
+              <Fragment key={item.label}>
+                {(index === 3 || index === 6) && <div role="separator" style={{ height: 1, margin: '5px 6px', background: 'var(--sem-col-border-tertiary)' }} />}
+                <button type="button" role="menuitem" disabled={!item.run} aria-disabled={!item.run} data-measurement-held={item.run ? undefined : 'true'} onClick={item.run ? () => { item.run?.(); setOpen(false) } : undefined} style={{ appearance: 'none', width: '100%', height: 30, border: 0, borderRadius: 'var(--sem-radii-sm)', padding: '0 8px', display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', background: 'transparent', color: item.run ? 'var(--sem-col-text-primary)' : 'var(--sem-col-text-disabled)', cursor: item.run ? 'pointer' : 'not-allowed', font: 'inherit', textAlign: 'left' }}>
+                  <span>{item.label}</span><span style={{ color: 'var(--sem-col-text-secondary)' }}>{item.shortcut}</span>
+                </button>
+              </Fragment>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }
 // E3.3 — real DS tokens from the converter output (/api/dev/editor-tokens), fetched once and
 // cached, feeding the ⬡ variable picker. The var name IS the token path (DEC-locked), so it
@@ -4082,11 +4142,20 @@ export default function ReactFigmaPage() {
             {canvasMode === 'design' && drawRect && <div style={{ position: 'absolute', left: drawRect.x, top: drawRect.y, width: drawRect.w, height: drawRect.h, border: `${1 / view.z}px dashed ${SEL}`, background: 'rgba(11,153,255,0.08)', pointerEvents: 'none' }} />}
           </div>
         </div>
-        <div style={{ position: 'absolute', left: 12, bottom: 12, height: 28, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', background: '#fff', borderRadius: 6, boxShadow: '0 2px 8px rgba(0,0,0,.14)', font: `450 11px/1 ${FONT}` }}>
-          <IB I={Minus} title="Zoom out" s={13} on={() => zoomStep(1 / 1.25)} />
-          <button type="button" title="Reset to 100%" onClick={() => zoomStep(1 / view.z)} style={{ appearance: 'none', border: 0, background: 'transparent', cursor: 'pointer', minWidth: 40, textAlign: 'center', font: 'inherit', color: 'inherit', padding: 0 }}>{Math.round(view.z * 100)}%</button>
-          <IB I={Plus} title="Zoom in" s={13} on={() => zoomStep(1.25)} />
-        </div>
+        {canvasMode === 'components' ? (
+          <ComponentCanvasToolbar
+            zoomPercent={Math.round(view.z * 100)}
+            onZoomIn={() => zoomStep(1.25)}
+            onZoomOut={() => zoomStep(1 / 1.25)}
+            onZoomReset={() => zoomStep(1 / view.z)}
+          />
+        ) : (
+          <div style={{ position: 'absolute', left: 12, bottom: 12, height: 28, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', background: '#fff', borderRadius: 6, boxShadow: '0 2px 8px rgba(0,0,0,.14)', font: `450 11px/1 ${FONT}` }}>
+            <IB I={Minus} title="Zoom out" s={13} on={() => zoomStep(1 / 1.25)} />
+            <button type="button" title="Reset to 100%" onClick={() => zoomStep(1 / view.z)} style={{ appearance: 'none', border: 0, background: 'transparent', cursor: 'pointer', minWidth: 40, textAlign: 'center', font: 'inherit', color: 'inherit', padding: 0 }}>{Math.round(view.z * 100)}%</button>
+            <IB I={Plus} title="Zoom in" s={13} on={() => zoomStep(1.25)} />
+          </div>
+        )}
       </main>
 
       {/* ░░ RIGHT — Design inspector ░░ */}

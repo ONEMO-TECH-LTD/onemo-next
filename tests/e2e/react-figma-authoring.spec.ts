@@ -335,6 +335,76 @@ test.describe('React Figma component authoring', () => {
     expect(consoleErrors).toEqual([])
   })
 
+  test('keeps the measured component canvas toolbar fixed while exposing only proven zoom actions', async ({ page }, testInfo) => {
+    test.setTimeout(90_000)
+    const consoleErrors: string[] = []
+    const pageErrors: string[] = []
+    page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()) })
+    page.on('pageerror', (error) => pageErrors.push(error.message))
+
+    await page.goto('/react-figma', { waitUntil: 'domcontentloaded' })
+    const componentEntry = page.getByRole('button', { name: fixtureName, exact: true })
+    await expect(async () => {
+      await page.getByRole('button', { name: 'Components', exact: true }).click({ timeout: 5_000 })
+      await expect(page.getByRole('textbox', { name: 'Search components' })).toBeVisible({ timeout: 5_000 })
+      await expect(componentEntry).toBeVisible({ timeout: 15_000 })
+    }).toPass({ timeout: 45_000, intervals: [250, 500, 1_000] })
+    await componentEntry.dblclick()
+
+    const authoringCanvas = page.locator('[data-authoring-canvas]')
+    const importSource = page.getByRole('button', { name: 'Import source' })
+    const entryState = await Promise.race([
+      importSource.waitFor({ state: 'visible', timeout: 30_000 }).then(() => 'import' as const),
+      authoringCanvas.waitFor({ state: 'visible', timeout: 30_000 }).then(() => 'loaded' as const),
+    ])
+    if (entryState === 'import') {
+      const reload = page.waitForEvent('domcontentloaded', { timeout: 30_000 })
+      await importSource.click()
+      await reload
+    }
+    await expect(authoringCanvas).toBeVisible({ timeout: 30_000 })
+
+    const toolbar = page.locator('[data-component-canvas-toolbar]')
+    await expect(toolbar).toBeVisible()
+    await expect(toolbar.getByRole('button', { name: 'Select' })).toHaveAttribute('aria-pressed', 'true')
+    for (const heldTool of ['Pan', 'Comment', 'Theme']) {
+      await expect(toolbar.getByRole('button', { name: heldTool })).toBeDisabled()
+    }
+    const readout = toolbar.locator('[data-component-zoom-readout]')
+    await expect(readout).toHaveText(/\d+%/)
+    expect(await readout.evaluate((node) => node.tagName)).toBe('BUTTON')
+
+    const fixedBefore = await toolbar.boundingBox()
+    const transform = page.locator('main > div').filter({ has: page.locator('[data-screen-host]') })
+    const transformBefore = await transform.getAttribute('style')
+    await readout.click()
+    const menu = page.getByRole('menu', { name: 'Component canvas zoom' })
+    await expect(menu.getByRole('menuitem')).toHaveText([
+      'ZoomZ',
+      'Zoom In⌘+',
+      'Zoom Out⌘−',
+      'Zoom to 100%⌘0',
+      'Zoom to Fit⌘1',
+      'Zoom to Selection⌘2',
+      'Fast Zoom',
+      'Nudge Amount',
+    ])
+    const heldItems = menu.locator('[data-measurement-held="true"]')
+    await expect(heldItems).toHaveCount(5)
+    expect(await heldItems.evaluateAll((nodes) => nodes.every((node) => node.getAttribute('aria-disabled') === 'true'))).toBe(true)
+    expect(await heldItems.evaluateAll((nodes) => nodes.every((node) => (node as HTMLButtonElement).disabled))).toBe(true)
+    await menu.getByRole('menuitem', { name: /^Zoom In/ }).click()
+    await expect.poll(() => transform.getAttribute('style')).not.toBe(transformBefore)
+    expect(await toolbar.boundingBox()).toEqual(fixedBefore)
+    await readout.click()
+    await page.screenshot({ path: testInfo.outputPath('ac-a001-measured-toolbar-vocabulary.png'), animations: 'disabled' })
+
+    await page.getByRole('button', { name: 'Home' }).click()
+    await expect(toolbar).toHaveCount(0)
+    expect(pageErrors).toEqual([])
+    expect(consoleErrors).toEqual([])
+  })
+
   test('selects an inner component layer by stable source identity across reload', async ({ page, request }) => {
     test.setTimeout(90_000)
     const authoringWrites: string[] = []
