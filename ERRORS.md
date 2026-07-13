@@ -146,3 +146,5 @@ The final generic `networkidle` after bootstrap resume was removed in the same c
 - Symptoms: the exact CSS hash existed but the matcher parsed `.module.css` as nested path syntax; the complete create/reload flow then passed and failed only on the wrong expected origin.
 - What worked: read the exact hash key directly and derive the expected origin from `PLAYWRIGHT_PORT`, matching `playwright.config.ts`.
 - Remember: E2E filesystem identities with dots need direct-key assertions, and exact-SHA browser proof must remain portable across isolated ports.
+
+Follow-up: dynamically writing the route after Next started caused a late route-tree refresh and unused-preload warnings even though the complete product flow passed. The failure-safe fixture wrapper now installs CSS before its importing page before server startup; the measured flow has no route-registration HMR phase.

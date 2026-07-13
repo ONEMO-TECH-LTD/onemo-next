@@ -5,6 +5,7 @@ const componentRoot = path.join(process.cwd(), 'src/app/(dev)/react-figma-compon
 const fixtureFile = path.join(componentRoot, 'AuthoringE2EButton.tsx')
 const extractedComponentFile = path.join(componentRoot, 'AuthoringE2EExtracted.tsx')
 const selectionRouteDir = path.join(process.cwd(), 'src/app/(dev)/authoring-e2e')
+const selectionFixtureDir = path.join(process.cwd(), 'tests/e2e/fixtures/authoring-real-page')
 const generatedSelectionRouteTypes = [
   path.join(process.cwd(), '.next/dev/types/app/(dev)/authoring-e2e'),
   path.join(process.cwd(), '.next/types/app/(dev)/authoring-e2e'),
@@ -28,6 +29,12 @@ export async function prepareAuthoringFixture() {
   try {
     if (hadStore) await rename(storePath, backupPath)
     await writeFile(fixtureFile, `export function AuthoringE2EButton({ variant = 'Primary' }: { variant?: 'Primary' | 'Secondary' }) {\n  return <button type="button">{variant}</button>\n}\n`)
+    await mkdir(selectionRouteDir, { recursive: true })
+    await writeFile(
+      path.join(selectionRouteDir, 'AuthoringE2ECard.module.css'),
+      await readFile(path.join(selectionFixtureDir, 'AuthoringE2ECard.module.css')),
+    )
+    await writeFile(path.join(selectionRouteDir, 'page.tsx'), await readFile(path.join(selectionFixtureDir, 'page.tsx')))
   } catch (error) {
     await restoreAuthoringFixture()
     throw error

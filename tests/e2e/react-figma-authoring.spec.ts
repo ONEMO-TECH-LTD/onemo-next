@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { execFile } from 'node:child_process'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { promisify } from 'node:util'
 
@@ -74,7 +74,7 @@ test.describe('React Figma component authoring', () => {
     expect(consoleErrors).toEqual([])
   })
 
-  test('extracts a component, reloads once, authors a variant, returns Home, persists, and undoes', async ({ page, request }) => {
+  test('extracts a component, reloads once, authors a variant, returns Home, persists, and undoes', async ({ page }) => {
     test.setTimeout(120_000)
     const consoleErrors: string[] = []
     const consoleWarnings: string[] = []
@@ -165,23 +165,9 @@ test.describe('React Figma component authoring', () => {
     failedRequests.length = 0
     consoleErrors.length = 0
 
-    // Introduce and compile the real page only after the cold import-refusal probes. The selected
-    // element uses a CSS module that extraction rewrites to a lawful parent-relative import.
+    // The failure-safe fixture wrapper installs this real CSS-module page before Next starts, so
+    // route registration cannot inject HMR reloads into the measured authoring flow.
     editorDocumentRequests.length = 0
-    const selectionRouteDir = path.join(process.cwd(), 'src/app/(dev)/authoring-e2e')
-    const selectionFixtureDir = path.join(process.cwd(), 'tests/e2e/fixtures/authoring-real-page')
-    await mkdir(selectionRouteDir, { recursive: true })
-    await writeFile(
-      path.join(selectionRouteDir, 'AuthoringE2ECard.module.css'),
-      await readFile(path.join(selectionFixtureDir, 'AuthoringE2ECard.module.css')),
-    )
-    await writeFile(path.join(selectionRouteDir, 'page.tsx'), await readFile(path.join(selectionFixtureDir, 'page.tsx')))
-    await expect.poll(async () => (await request.get('/authoring-e2e')).status(), { timeout: 30_000 }).toBe(200)
-    await page.reload({ waitUntil: 'domcontentloaded' })
-    await expect.poll(
-      () => componentsRail.evaluate((node) => Object.keys(node).some((key) => key.startsWith('__reactProps'))),
-      { timeout: 30_000 },
-    ).toBe(true)
     await page.getByTitle('File').click()
     const selectionPage = page.getByText('/authoring-e2e', { exact: true })
     await expect(selectionPage).toBeVisible({ timeout: 30_000 })
@@ -204,8 +190,6 @@ test.describe('React Figma component authoring', () => {
     await expect(page.locator('[data-layer-row]').filter({ hasText: 'Extract this card' })).toBeVisible()
     await expect.poll(() => tokenResponses.length, { timeout: 30_000 }).toBe(editorDocumentRequests.length)
     expect(tokenResponses).toEqual(editorDocumentRequests.map(() => 200))
-    // The explicit route-registration reload above is harness setup, not part of the measured
-    // authoring flow. Start the create/reload evidence window only after that setup is quiescent.
     failedResponses.length = 0
     failedRequests.length = 0
     await page.evaluate(() => { (window as Window & { __e2eCreateOriginDocument?: boolean }).__e2eCreateOriginDocument = true })
