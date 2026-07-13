@@ -436,7 +436,9 @@ test.describe('React Figma component authoring', () => {
     expect(previewRequests).toBe(1)
     expect(refusalResponses).toEqual([422])
     expect(pageErrors).toEqual([])
-    expect(consoleErrors).toEqual([])
+    expect(consoleErrors).toEqual([
+      'Failed to load resource: the server responded with a status of 422 (Unprocessable Entity)',
+    ])
     expect(failedRequests).toEqual([])
   })
 
