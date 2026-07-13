@@ -4,6 +4,7 @@ import { parseCanonicalModel } from './canonical-model.mjs';
 import { canonicalJson, sha256 } from './evidence.mjs';
 import { unescapePointerToken } from './inventory.mjs';
 import { buildModeContextPlan } from './mode-context-plan.mjs';
+import { validateTokenPlan } from './token-plan.mjs';
 
 export class SemanticSliceError extends Error {
   constructor(message) { super(message); this.state = 'FAILED_COMPONENT'; }
@@ -13,6 +14,8 @@ export function lowerSemanticSlice({ model: input, tokenPlan, modeContextPlan })
   const model = parseCanonicalModel(input);
   if (schemaError('tokenPlan', tokenPlan)) throw new SemanticSliceError('versioned TokenPlan required');
   if (schemaError('modeContextPlan', modeContextPlan)) throw new SemanticSliceError('versioned ModeContextPlan required');
+  try { validateTokenPlan({ model, tokenPlan }); }
+  catch (error) { throw new SemanticSliceError(`TokenPlan refused: ${error.message}`); }
   validatePlanConservation(model, tokenPlan, modeContextPlan);
   const bindingsByNode = new Map();
   for (const binding of tokenPlan.bindings) {
@@ -32,7 +35,7 @@ export function lowerSemanticSlice({ model: input, tokenPlan, modeContextPlan })
     const members = sourceMembers.map((row) => ({
       componentKey: row.key,
       sourceId: row.id,
-      reactName: componentSymbol(row.key),
+      variantProps: structuredClone(row.variantProperties ?? {}),
       propertyDefinitions: structuredClone(row.propertyDefinitions),
     }));
     return { componentKey: set.key, sourceId: set.id, reactName: componentSymbol(set.key), variantAxes, publicProps, members };
@@ -48,10 +51,13 @@ export function lowerSemanticSlice({ model: input, tokenPlan, modeContextPlan })
     if (!definitions.has(row.mainComponentKey)) throw new SemanticSliceError(`instance ${row.nodeId} component missing`);
     const tokenBindings = (bindingsByNode.get(row.nodeId) ?? []).filter((binding) => binding.destinationDomain === 'react-component-prop');
     validateComponentTokenTypes(row, definitions, model.bindingGraph.records, tokenBindings);
+    const component = definitions.get(row.mainComponentKey);
+    const set = component?.componentSetKey ? definitions.get(component.componentSetKey) : null;
     return {
       nodeId: row.nodeId,
-      componentKey: row.mainComponentKey,
-      reactName: componentSymbol(row.mainComponentKey),
+      componentKey: set?.key ?? row.mainComponentKey,
+      sourceComponentKey: row.mainComponentKey,
+      reactName: componentSymbol(set?.key ?? row.mainComponentKey),
       props: structuredClone(row.componentProperties),
       references: structuredClone(row.componentPropertyReferences),
       overrides: structuredClone(row.overrides),
@@ -76,6 +82,7 @@ export function lowerSemanticSlice({ model: input, tokenPlan, modeContextPlan })
   }));
   return {
     schemaVersion: SCHEMA.semanticSlice,
+    tokenPlanHash: sha256(canonicalJson(tokenPlan)),
     rootId: model.documentGraph.rootId,
     nodes,
     componentSets,
@@ -130,12 +137,7 @@ function validateComponentSet(set, members, variantAxes, publicProps) {
     if (actual.has(combination)) throw new SemanticSliceError(`component set ${set.key} duplicates variant ${combination}`);
     actual.add(combination);
   }
-  const expected = cartesian(axisNames.map((name) => variantAxes[name].options)).map((values) => values.map((value, index) => `${axisNames[index]}=${value}`).join(','));
-  if (expected.some((combination) => !actual.has(combination)) || actual.size !== expected.length) throw new SemanticSliceError(`component set ${set.key} does not capture every advertised variant combination`);
-}
-
-function cartesian(axes) {
-  return axes.reduce((rows, values) => rows.flatMap((row) => values.map((value) => [...row, value])), [[]]);
+  if (members.length === 0) throw new SemanticSliceError(`component set ${set.key} has no authored members`);
 }
 
 function validateComponentTokenTypes(instance, definitions, records, tokenBindings) {

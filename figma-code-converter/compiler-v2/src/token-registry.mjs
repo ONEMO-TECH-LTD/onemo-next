@@ -88,6 +88,8 @@ export function stageTokenRegistry({ model, baseRegistry, webSyntaxPolicy = () =
   const deltaHash = sha256(canonicalJson(delta));
   return {
     schemaVersion: SCHEMA.tokenRegistryStage,
+    sourceFingerprint: model.sourceFingerprint,
+    modelContentSeal: model.contentSeal,
     baseGeneration: baseRegistry.generation,
     baseHash,
     candidateHash,
@@ -97,13 +99,16 @@ export function stageTokenRegistry({ model, baseRegistry, webSyntaxPolicy = () =
   };
 }
 
-export function assertRegistryStageCurrent(stage, currentRegistry) {
+export function assertRegistryStageCurrent(stage, currentRegistry, { model, webSyntaxPolicy } = {}) {
   validateRegistryStage(stage);
   validateRegistry(currentRegistry);
   if (currentRegistry.generation !== stage?.baseGeneration || registryHash(currentRegistry) !== stage?.baseHash) {
     throw new RegistryError('registry commit conflict: base generation/hash changed; rebase and revalidate candidate');
   }
   validateAdditiveDelta(stage, currentRegistry);
+  if (!model || typeof webSyntaxPolicy !== 'function') throw new RegistryError('registry source model and WEB syntax policy required for exact stage validation');
+  const expected = stageTokenRegistry({ model, baseRegistry: currentRegistry, webSyntaxPolicy });
+  if (canonicalJson(stage) !== canonicalJson(expected)) throw new RegistryError('registry stage disagrees with exact source model/policy derivation');
   return true;
 }
 
@@ -111,6 +116,7 @@ export function validateRegistryStage(stage) {
   const versionError = schemaError('tokenRegistryStage', stage);
   if (versionError) throw new RegistryError(versionError);
   if (!Number.isInteger(stage.baseGeneration) || stage.baseGeneration < 0 || !/^[0-9a-f]{64}$/.test(stage.baseHash ?? '') || !/^[0-9a-f]{64}$/.test(stage.candidateHash ?? '') || !/^[0-9a-f]{16}$/.test(stage.stageId ?? '')) throw new RegistryError('registry stage identity invalid');
+  if (!stage.sourceFingerprint || !stage.modelContentSeal) throw new RegistryError('registry stage source identity missing');
   if (!stage.delta || !Array.isArray(stage.delta.addedEntries) || !Array.isArray(stage.delta.addedChannels) || !Array.isArray(stage.delta.migrations)) throw new RegistryError('registry stage delta invalid');
   validateRegistry(stage.candidateRegistry);
   if (![stage.baseGeneration, stage.baseGeneration + 1].includes(stage.candidateRegistry.generation)) throw new RegistryError('registry stage candidate generation invalid');

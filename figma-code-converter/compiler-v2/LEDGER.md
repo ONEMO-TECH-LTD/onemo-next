@@ -18,8 +18,9 @@ for Dan between phases. NOT waived: frozen phase evidence, authoritative QA+Meta
 **Current test truth (reported separately):** legacy converter suite 46 pass / 3 fail (missing
 gitignored golden fixture `t88thL8hKksSpILgkeGRZ0-4084-25997.nodes.json`) / 0 skips ·
 compiler-v2 foundation suite 53 pass / 0 fail / 0 skip across Builder and Meta repeated runs ·
-compiler-v2 P2 graph suite 16 pass / 0 fail / 0 skip · compiler-v2 P3 planner suite 7 pass /
-0 fail / 0 skip. Combined current truth: 76 pass / 0 fail / 0 skip.
+compiler-v2 P2 graph suite 16 pass / 0 fail / 0 skip · P2 persisted-model suite 7 pass /
+0 fail / 0 skip · compiler-v2 P3 planner suite 9 pass / 0 fail / 0 skip. Combined current truth:
+85 pass / 0 fail / 0 skip.
 No phase may be recorded green from
 harness-only or REST_ONLY placeholders.
 
@@ -44,7 +45,7 @@ Decisions/Done/cutover: Dan only.
 | P0 continuity/contract/calibration | IN PROGRESS | — | see P0 section |
 | P1 evidence capture | pending | — | |
 | P2 canonical graphs | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `0c8471b` | sole authoritative QA/Meta cleared the frozen code snapshot only; live/plugin evidence still blocked by G-1/G-2 |
-| P3 mother token/component slice | BUILDER CORE CHECKPOINT; REVIEW PENDING | this checkpoint | generic token/component architecture + microfixture green; real mother/plugin-origin phase exit blocked by G-1/G-2/G-4 |
+| P3 mother token/component slice | AUTHORITATIVE REWORK; BUILDER REPAIR IN PROGRESS | `d69a0fa` rejected | F1-F5 repair; real mother/plugin-origin phase exit still blocked by G-1/G-2/G-4 |
 | P4 mother layout/render slice | pending | — | |
 | P5 emitters/security/editability | pending | — | |
 | P6 runtime/visual/editor proof | pending | — | |
@@ -163,10 +164,26 @@ Decisions/Done/cutover: Dan only.
 - Failure-first progression: inherited P3 fixture failed 0/7 at the stricter P2 boundary; fixture
   truth repairs reached 7/7; forged registry stage/foreign plan mutations forced 5/7; removal
   mutation forced 6/7; implementation repairs restored green. Final exact split: foundation
-  53/53/0 + P2 16/16/0 + P3 7/7/0 = 76/76/0; eight P3 syntax checks and diff check green.
+  53/53/0 + P2 graphs 16/16/0 + P2 persisted models 7/7/0 + P3 7/7/0 = 83/83/0;
+  eight P3 syntax checks and diff check green. The earlier 76 total omitted `p2-models.test.mjs`.
 - This is a Builder architecture checkpoint only. It does not satisfy the P3 exit row: G-1/G-2
   still withhold plugin-origin supplement evidence and G-4 withholds the Dan-selected, pinned
   real mother. No P3 phase, promotion, integration-corpus, cutover, or Done claim.
+
+## P3 authoritative rework (2026-07-13)
+
+- Snapshot `d69a0fa` rejected on F1-F5: unvalidated TokenPlan content, Cartesian variant
+  overclaim, per-member rather than set-level React identity, source-unrelated registry deltas,
+  and omitted persisted-model tests.
+- Builder repair makes TokenPlan validation an exact re-derivation from its sealed model,
+  registry, and per-binding codec options; every channel/expression/registry/token-data mutation
+  refuses and the independent oracle binds the validated plan hash.
+- Sparse authored variant combinations are preserved without inventing a Cartesian product.
+  Members retain source keys/variant props, while set instances target one set-level React symbol
+  and retain the member key as source identity.
+- Registry stages now bind source fingerprint/content seal and are re-derived from the exact
+  model + WEB policy at commit validation; unrelated additions and deleted migration requests
+  refuse. Two permanent tests raise P3 to 9 tests; full required truth is now 85/85/0.
 
 ## Meta rulings accepted (2026-07-13)
 

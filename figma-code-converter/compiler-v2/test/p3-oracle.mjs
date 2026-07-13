@@ -1,4 +1,4 @@
-import { canonicalJson } from '../src/evidence.mjs';
+import { canonicalJson, sha256 } from '../src/evidence.mjs';
 
 const count = (items, key) => {
   const out = new Map();
@@ -16,7 +16,7 @@ export function p3Failures(model, output) {
     references: row.componentPropertyReferences, overrides: row.overrides,
   }));
   const actualInstances = output.semanticSlice.instances.map((row) => ({
-    nodeId: row.nodeId, componentKey: row.componentKey, props: row.props,
+    nodeId: row.nodeId, componentKey: row.sourceComponentKey, props: row.props,
     references: row.references, overrides: row.overrides,
   }));
   const expectedText = model.textGraph.textNodes.map((row) => ({ nodeId: row.nodeId, segments: row.segments, fontDependencies: row.fontDependencies }));
@@ -25,7 +25,7 @@ export function p3Failures(model, output) {
   const actualTraceContexts = count(output.tokenPlan.bindings, (row) => `${row.bindingId}:${row.modeContextId}:${row.resolutionTraceId}`);
   return {
     G2: canonicalJson(rawBindings) !== canonicalJson(plannedBindings),
-    G3: canonicalJson(expectedChannels) !== canonicalJson(actualChannels) || canonicalJson(expectedTraceContexts) !== canonicalJson(actualTraceContexts) || output.tokenPlan.bindings.some((row) => row.expression?.unsupported),
+    G3: canonicalJson(expectedChannels) !== canonicalJson(actualChannels) || canonicalJson(expectedTraceContexts) !== canonicalJson(actualTraceContexts) || output.tokenPlan.bindings.some((row) => row.expression?.unsupported) || sha256(canonicalJson(output.tokenPlan)) !== output.semanticSlice.tokenPlanHash,
     G4: canonicalJson(expectedInstances) !== canonicalJson(actualInstances),
     G5: canonicalJson(expectedText) !== canonicalJson(actualText),
   };

@@ -18,6 +18,7 @@ export function buildTokenPlan({ model: input, registry, codecOptions = () => ({
   const collectionByKey = new Map(model.variableGraph.collections.map((row) => [row.key, row]));
   const variableByKey = new Map(model.variableGraph.variables.map((row) => [row.key, row]));
   const channelOptions = new Map();
+  const codecOptionsByBinding = {};
   const bindings = [];
 
   for (const record of model.bindingGraph.records) {
@@ -33,6 +34,7 @@ export function buildTokenPlan({ model: input, registry, codecOptions = () => ({
     const priorOptions = channelOptions.get(channel.channelId);
     if (priorOptions && canonicalJson(priorOptions) !== canonicalJson(options)) throw new TokenPlanError(`channel ${channel.channelId} has conflicting codec options`);
     channelOptions.set(channel.channelId, options);
+    codecOptionsByBinding[record.bindingId] = structuredClone(options);
     const leaf = tokenLeaf({
       variableKey: record.variable.key,
       channelId: channel.channelId,
@@ -91,7 +93,29 @@ export function buildTokenPlan({ model: input, registry, codecOptions = () => ({
       (channel.target === 'css' ? css : react).push(row);
     }
   }
-  return { schemaVersion: SCHEMA.tokenPlan, registryGeneration: registry.generation, registryHash: registryHash(registry), bindings, tokenData: { css, react } };
+  return {
+    schemaVersion: SCHEMA.tokenPlan,
+    modelContentSeal: model.contentSeal,
+    registryGeneration: registry.generation,
+    registryHash: registryHash(registry),
+    registry: structuredClone(registry),
+    codecOptionsByBinding,
+    bindings,
+    tokenData: { css, react },
+  };
+}
+
+export function validateTokenPlan({ model: input, tokenPlan }) {
+  const model = parseCanonicalModel(input);
+  if (tokenPlan?.schemaVersion !== SCHEMA.tokenPlan || tokenPlan.modelContentSeal !== model.contentSeal) throw new TokenPlanError('TokenPlan schema/source identity invalid');
+  const options = tokenPlan.codecOptionsByBinding;
+  if (!options || typeof options !== 'object' || Array.isArray(options)) throw new TokenPlanError('TokenPlan codec options missing');
+  const expected = buildTokenPlan({ model, registry: tokenPlan.registry, codecOptions: (record) => {
+    if (!Object.hasOwn(options, record.bindingId)) throw new TokenPlanError(`TokenPlan codec options missing for ${record.bindingId}`);
+    return options[record.bindingId];
+  } });
+  if (canonicalJson(tokenPlan) !== canonicalJson(expected)) throw new TokenPlanError('TokenPlan disagrees with exact model/registry/codec derivation');
+  return true;
 }
 
 function contextFromId(id, collectionByKey) {

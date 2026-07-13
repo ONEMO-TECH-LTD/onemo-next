@@ -55,10 +55,10 @@ test('existing registry identity wins across label/value/WEB-syntax changes; mig
   assert.deepEqual(restaged.delta.migrations, [{ variableKey: 'K_COLOR', domain: 'color', existing: '--velvet-ink', requested: '--renamed-web' }]);
   const changedOutput = compile(changed.model, initial.registryStage.candidateRegistry);
   assert.equal(canonicalJson(changedOutput.registryStage.candidateRegistry), canonicalJson(initial.registryStage.candidateRegistry));
-  assert.equal(canonicalJson(changedOutput.semanticSlice), canonicalJson(initial.semanticSlice));
+  assert.equal(canonicalJson({ ...changedOutput.semanticSlice, tokenPlanHash: null }), canonicalJson({ ...initial.semanticSlice, tokenPlanHash: null }));
   assert.notEqual(canonicalJson(changedOutput.tokenPlan.tokenData), canonicalJson(initial.tokenPlan.tokenData));
   const componentRenamed = compile(p3Fixture({ componentName: 'Renamed component label' }).model, initial.registryStage.candidateRegistry);
-  assert.equal(canonicalJson(componentRenamed.semanticSlice), canonicalJson(initial.semanticSlice));
+  assert.equal(canonicalJson({ ...componentRenamed.semanticSlice, tokenPlanHash: null }), canonicalJson({ ...initial.semanticSlice, tokenPlanHash: null }));
 });
 
 test('registry type/name collisions and stale commit bases fail without mutating the base', () => {
@@ -74,15 +74,22 @@ test('registry type/name collisions and stale commit bases fail without mutating
   const invalidSyntax = p3Fixture({ colorWeb: 'var(--unsafe)' });
   assert.throws(() => stageTokenRegistry({ model: invalidSyntax.model, baseRegistry: base, webSyntaxPolicy: acceptColorSyntax }), RegistryError);
   const advanced = structuredClone(base); advanced.generation += 1;
-  assert.throws(() => assertRegistryStageCurrent(stage, advanced), RegistryError);
+  assert.throws(() => assertRegistryStageCurrent(stage, advanced, { model, webSyntaxPolicy: acceptColorSyntax }), RegistryError);
   const forgedStage = structuredClone(stage); forgedStage.candidateHash = 'f'.repeat(64);
-  assert.throws(() => assertRegistryStageCurrent(forgedStage, base), RegistryError);
+  assert.throws(() => assertRegistryStageCurrent(forgedStage, base, { model, webSyntaxPolicy: acceptColorSyntax }), RegistryError);
   const forgedDelta = structuredClone(stage); forgedDelta.delta.addedEntries = [];
-  assert.throws(() => assertRegistryStageCurrent(forgedDelta, base), RegistryError);
+  assert.throws(() => assertRegistryStageCurrent(forgedDelta, base, { model, webSyntaxPolicy: acceptColorSyntax }), RegistryError);
   const noChange = stageTokenRegistry({ model, baseRegistry: stage.candidateRegistry, webSyntaxPolicy: acceptColorSyntax });
   const removedIdentity = structuredClone(noChange); delete removedIdentity.candidateRegistry.entries.K_COLOR;
   resealRegistryStage(removedIdentity);
-  assert.throws(() => assertRegistryStageCurrent(removedIdentity, stage.candidateRegistry), RegistryError);
+  assert.throws(() => assertRegistryStageCurrent(removedIdentity, stage.candidateRegistry, { model, webSyntaxPolicy: acceptColorSyntax }), RegistryError);
+  const unrelated = structuredClone(stage);
+  unrelated.candidateRegistry.entries.K_FORGED = { variableKey: 'K_FORGED', figmaType: 'COLOR', stableBase: 'forged', channels: { color: { channelId: 'ch_forged', target: 'css', cssName: '--forged' } } };
+  unrelated.delta.addedEntries.push('K_FORGED');
+  unrelated.delta.addedChannels.push({ variableKey: 'K_FORGED', domain: 'color', channelId: 'ch_forged', target: 'css', cssName: '--forged' });
+  unrelated.candidateRegistry.generation = 1;
+  resealRegistryStage(unrelated);
+  assert.throws(() => assertRegistryStageCurrent(unrelated, base, { model, webSyntaxPolicy: acceptColorSyntax }), RegistryError);
   assert.equal(canonicalJson(stage.candidateRegistry), before);
 });
 
@@ -112,7 +119,10 @@ test('native components, instances, nested modes, and rich text remain semanticâ
   assert.equal(output.semanticSlice.componentSets[0].componentKey, 'SET_CHOICE');
   assert.deepEqual(output.semanticSlice.componentSets[0].variantAxes.Size.options, ['S', 'L']);
   assert.equal(output.semanticSlice.componentSets[0].members.length, 2);
-  assert.equal(output.semanticSlice.instances[0].componentKey, 'CMP_CHOICE_S');
+  assert.equal(output.semanticSlice.instances[0].componentKey, 'SET_CHOICE');
+  assert.equal(output.semanticSlice.instances[0].sourceComponentKey, 'CMP_CHOICE_S');
+  assert.equal(output.semanticSlice.instances[0].reactName, output.semanticSlice.componentSets[0].reactName);
+  assert.equal(Object.hasOwn(output.semanticSlice.componentSets[0].members[0], 'reactName'), false);
   assert.deepEqual(output.semanticSlice.instances[0].props.Enabled, { type: 'BOOLEAN', value: true });
   assert.deepEqual(output.semanticSlice.instances[0].overrides, [{ id: 'instance-control', overriddenFields: ['visible'] }]);
   assert.deepEqual(output.semanticSlice.propertyReferences, [{ nodeId: 'instance-control', ownerComponentKey: 'CMP_CHOICE_S', references: { visible: 'Enabled' } }]);
@@ -121,13 +131,38 @@ test('native components, instances, nested modes, and rich text remain semanticâ
   assert.match(output.semanticSlice.nodeModes.nested, /CK_THEME=dark/);
   const incomplete = structuredClone(model); incomplete.componentGraph.definitions = incomplete.componentGraph.definitions.filter((row) => row.key !== 'CMP_CHOICE_L');
   Object.assign(incomplete, sealCanonicalModelContent(incomplete));
-  assert.throws(() => lowerSemanticSlice({ model: incomplete, tokenPlan: output.tokenPlan, modeContextPlan: output.modeContextPlan }));
+  assert.equal(compile(incomplete).semanticSlice.componentSets[0].members.length, 1);
   const wrongPropType = p3Fixture({ componentVariable: 'V_COPY' });
   assert.throws(() => compile(wrongPropType.model), /disagrees with native component property type/);
   const foreignTokenPlan = structuredClone(output.tokenPlan); foreignTokenPlan.bindings[0].variableKey = 'K_FORGED';
   assert.throws(() => lowerSemanticSlice({ model, tokenPlan: foreignTokenPlan, modeContextPlan: output.modeContextPlan }));
   const foreignModePlan = structuredClone(output.modeContextPlan); foreignModePlan.nodes.find((row) => row.nodeId === 'nested').modeContextId = 'CK_THEME=light';
   assert.throws(() => lowerSemanticSlice({ model, tokenPlan: output.tokenPlan, modeContextPlan: foreignModePlan }));
+});
+
+test('TokenPlan semantic validation refuses forged channels, literals, registry identity, and token data', () => {
+  const { model } = p3Fixture();
+  const output = compile(model);
+  const mutations = [
+    (plan) => { plan.bindings[0].channelId = 'ch_forged'; },
+    (plan) => { plan.bindings[0].expression = { kind: 'color', space: 'srgb', channels: [0, 0, 0], alpha: 1 }; },
+    (plan) => { plan.registryGeneration += 1; plan.registryHash = 'f'.repeat(64); },
+    (plan) => { plan.tokenData.css[0].contexts[0].value = { kind: 'number', value: 999 }; },
+  ];
+  for (const mutate of mutations) {
+    const tokenPlan = structuredClone(output.tokenPlan); mutate(tokenPlan);
+    assert.throws(() => lowerSemanticSlice({ model, tokenPlan, modeContextPlan: output.modeContextPlan }), /TokenPlan refused/);
+    assert.equal(p3Failures(model, { ...output, tokenPlan }).G3, true);
+  }
+});
+
+test('registry validation derives mandatory migration requests from the exact source and policy', () => {
+  const initial = compile(p3Fixture().model);
+  const changed = p3Fixture({ colorWeb: '--renamed-web' }).model;
+  const stage = stageTokenRegistry({ model: changed, baseRegistry: initial.registryStage.candidateRegistry, webSyntaxPolicy: acceptColorSyntax });
+  assert.equal(stage.delta.migrations.length, 1);
+  const deleted = structuredClone(stage); deleted.delta.migrations = []; resealRegistryStage(deleted);
+  assert.throws(() => assertRegistryStageCurrent(deleted, initial.registryStage.candidateRegistry, { model: changed, webSyntaxPolicy: acceptColorSyntax }), RegistryError);
 });
 
 test('independent P3 G2-G5 mutations bite dropped bindings, swapped channels, flattening, and text merge', () => {
