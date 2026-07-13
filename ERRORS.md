@@ -132,3 +132,10 @@ The final generic `networkidle` after bootstrap resume was removed in the same c
 - Symptoms: two isolated fresh-cache QA runs either remounted back to the File rail before the fixture interaction or began a new editor document navigation during the fixture double-click, exhausting the locator/test timeout.
 - What worked: retry the complete idempotent rail-to-import-preview transition only after the current editor document has its matching successful token response and the current iframe document is complete and engine-wired; accept the attempt only when the preview appears without another editor document request.
 - Remember: initial cold compilation can replace a hydrated shell. Synchronize against the current document's product signals and retry only the read-only transition; import/write semantics remain single-shot.
+
+## S58 AC-X-004 headed pan proof
+
+- What did not work: treating the first token/document parity as final cold-shell readiness, then asserting that `nextjs-portal` itself must not exist.
+- Symptoms: Fast Refresh replaced the document immediately after the first readiness check; after stabilizing that, the gesture passed but the test failed because Next mounts one empty dev portal during healthy operation.
+- What worked: retry the complete idempotent atomic pointerdown→move→up proof until one document remains stable, retain accumulated console/page errors across attempts, and assert the actual runtime-error copy is absent instead of asserting an implementation container is absent.
+- Remember: S58 headed crash proofs must distinguish product error UI from Next's always-mounted dev portal; cold retries may wrap only idempotent interactions and must never clear captured errors.

@@ -68,7 +68,7 @@ test.describe('React Figma component authoring', () => {
       expect(await canvas.locator(':scope > div').filter({ has: page.locator('[data-screen-host]') }).getAttribute('style')).not.toBe(transformBefore)
     }).toPass({ timeout: 45_000, intervals: [250, 500, 1_000] })
     await expect(canvas).toBeVisible()
-    await expect(page.locator('nextjs-portal')).toHaveCount(0)
+    await expect(page.getByText(/Application error|Runtime TypeError|Cannot read properties of null/i)).toHaveCount(0)
     expect(pageErrors).toEqual([])
     expect(consoleErrors).toEqual([])
   })
