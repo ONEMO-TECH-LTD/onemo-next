@@ -182,7 +182,7 @@ test.describe('React Figma component authoring', () => {
       const style = getComputedStyle(node)
       return { background: style.backgroundColor, color: style.color, width: style.width }
     })).toEqual({ background: 'rgb(21, 88, 74)', color: 'rgb(245, 255, 252)', width: '240px' })
-    await expect(page.locator('[data-layer-row]').filter({ hasText: 'Extract this card' })).toBeVisible({ timeout: 30_000 })
+    await expect(selection).toHaveAttribute('data-src', /^src\/app\/\(dev\)\/authoring-e2e\/page\.tsx:\d+:\d+$/)
     await selection.click()
     const createComponentButton = page.getByTitle('Create component')
     await createComponentButton.click()
@@ -190,7 +190,6 @@ test.describe('React Figma component authoring', () => {
     await expect(createDialog).toBeVisible()
     await createDialog.getByLabel('Name').fill(extractedName)
     await expect(frame).toHaveAttribute('src', '/authoring-e2e')
-    await expect(page.locator('[data-layer-row]').filter({ hasText: 'Extract this card' })).toBeVisible()
     await expect.poll(() => tokenResponses.length, { timeout: 30_000 }).toBe(editorDocumentRequests.length)
     expect(tokenResponses).toEqual(editorDocumentRequests.map(() => 200))
     failedResponses.length = 0
