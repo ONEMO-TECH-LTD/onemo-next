@@ -1,0 +1,69 @@
+/* ONEMO control components — token contracts EXTRACTED VERBATIM from the converted Shape screen
+ * (node 6075:53685, legacy converter @ nine-fix snapshot f37de9e). Every value is the exact
+ * var(--…) the converter emitted from the live Figma bindings — nothing hand-authored, nothing
+ * approximated. These are the reusable component contracts hiding in the flattened screen output. */
+
+/* Button-Round-Reg (12 instances on the screen) — the light control */
+.buttonRound {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px var(--sem-col-border-primary-default-contrast);
+  border-radius: var(--sem-radii-full);
+}
+
+/* Button-Round-Spec / Button-Spec-Pill — the dark control with the top-light gradient sheen */
+.buttonSpec {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: var(--sem-dim-fluid-nano-m) var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  background-image: linear-gradient(180deg, var(--sem-col-bg-control-contrast-perma-secondary) 0%, var(--sem-col-bg-control-contrast-perma-primary) 100%);
+  background-origin: border-box;
+  box-shadow: inset 0 0 0 1px var(--sem-col-border-primary-strong);
+  border-radius: var(--sem-radii-full);
+}
+
+/* Button-Pill-Done — the light outlined pill */
+.pillDone {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0 var(--sem-dim-fluid-standard-xs);
+  height: var(--sem-dim-fluid-standard-xl);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px var(--sem-col-border-primary-default);
+  border-radius: var(--sem-radii-full);
+}
+
+/* the icon slot — sized + coloured by tokens, re-themes with the DS (currentColor) */
+.icon {
+  width: var(--com-controls-icon);
+  height: var(--com-controls-icon);
+  flex-shrink: 0;
+  color: var(--sem-col-fg-primary-default);
+}
+
+/* the dark control's icon rides the opposing voice */
+.iconOnSpec {
+  width: var(--com-controls-icon);
+  height: var(--com-controls-icon);
+  flex-shrink: 0;
+  color: var(--sem-col-fg-primary-default-contrast-perma);
+}
+
+/* Tab — dock tab structure. NOTE: the active/inactive OPACITY state is NOT bound here:
+ * the `--com-tabbar-active/inactive` opacity tokens exist in the Figma catalog but are ABSENT
+ * from this tokens.css (the E11 sync gap), and the legacy converter baked the tab opacity raw
+ * (E4). The Tab component carries the interim raw opacity (1 / 0.85 — Dan's authored values) and
+ * MUST rebind to those tokens once the DS pipeline regenerates them. No invented token here. */
+.tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sem-dim-fluid-nano-m);
+  flex: 1;
+}
