@@ -17,6 +17,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { stagingDir, publishGeneration, cleanStaging, runToken } from './atomic-publish.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const TOOL = path.resolve(HERE, '../..');            // figma-code-converter/
@@ -122,10 +123,13 @@ const round = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, ty
 
 (async () => {
   const buildCommit = execFileSync('git', ['-C', REPO, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-  // stage into a candidate dir; final artifacts are promoted ATOMICALLY only after version
-  // stability is confirmed — an UNSTABLE run leaves prior outputs untouched (Meta finding).
-  const staging = path.join(OUT, `.candidate-${buildCommit.slice(0, 8)}`);
-  execFileSync('rm', ['-rf', staging]); mkdirSync(staging, { recursive: true });
+  // Build the complete artifact SET in a UNIQUE staging dir (pid+stamp — concurrent same-commit
+  // runs never collide); publish as one atomic generation + pointer flip only after version
+  // stability. A crash leaves the prior generation + pointer byte-identical (Meta R3-6).
+  const genBase = buildCommit.slice(0, 8);
+  const token = runToken(Date.now());
+  const staging = stagingDir(OUT, genBase, token);
+  mkdirSync(staging, { recursive: true });
   let ok = false;
   try {
     const v0 = await version();
@@ -162,14 +166,12 @@ const round = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, ty
       ],
     };
     writeFileSync(path.join(staging, 'calibration-draft.json'), JSON.stringify(draft, null, 1));
-    // ATOMIC promote: only now, after version stability + diffs, do the final artifacts move in.
-    for (const f of ['cal-figma.png', 'cal-build-a.png', 'cal-build-b.png', 'calibration-draft.json']) {
-      execFileSync('mv', ['-f', path.join(staging, f), path.join(OUT, f)]);
-    }
+    // ATOMIC set promotion: one rename publishes the whole generation, one rename flips latest.json.
+    const { genDir, pointer } = await publishGeneration({ outDir: OUT, genBase, token });
     ok = true;
-    console.log(JSON.stringify({ frame: dims, buildCommit: buildCommit.slice(0, 8), samples: draft.samples }, null, 1));
+    console.log(JSON.stringify({ frame: dims, buildCommit: genBase, generation: path.relative(OUT, genDir), pointer: path.basename(pointer), samples: draft.samples }, null, 1));
   } finally {
-    execFileSync('rm', ['-rf', staging]); // clean every failure; prior OUT artifacts untouched unless promoted
+    await cleanStaging(OUT, genBase, token); // clean this run's staging; generations + pointer untouched
   }
   if (!ok) process.exit(1);
 })().catch((e) => { console.error(`calibrate: ${e.message}`); process.exit(1); });

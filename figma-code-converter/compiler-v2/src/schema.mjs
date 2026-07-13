@@ -110,6 +110,7 @@ export function validateManifest(m) {
     if (!Number.isInteger(m.census?.[k])) errs.push(`manifest.census.${k} missing`);
   }
   if (!m.fingerprint) errs.push('manifest.fingerprint missing');
+  if (!m.seal) errs.push('manifest.seal missing — provenance metadata must be sealed (R3-4/R3-5)');
   return errs;
 }
 

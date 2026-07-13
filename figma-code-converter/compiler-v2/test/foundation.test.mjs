@@ -384,7 +384,7 @@ test('PROBE R3-1: forged/free-text provenance values are refused — closed voca
   const files = Object.fromEntries(['document.rest.json', 'supplement.json', 'variables.json', 'components.json', 'fonts.json', 'dependencies.json', 'references/manifest.json'].map((f) => [f, { sha256: 'a', bytes: 1 }]));
   const census = { nodes: 1, aliases: 0, textRuns: 0, variables: 0, components: 0, supplementNodes: 0 };
   const planes = Object.fromEntries(['document', 'supplement', 'variables', 'components', 'fonts', 'assets', 'references', 'dependencies'].map((k) => [k, 'fixture']));
-  const base = { schemaVersion: SCHEMA.manifest, compilerVersion: 'v', capabilityRegistryVersion: 0, fileKey: 'F', fileVersion: 'v1', rootIds: ['1'], captureId: 'c', fingerprint: 'x', files, census, sourcePlanes: planes };
+  const base = { schemaVersion: SCHEMA.manifest, compilerVersion: 'v', capabilityRegistryVersion: 0, fileKey: 'F', fileVersion: 'v1', rootIds: ['1'], captureId: 'c', fingerprint: 'x', files, census, sourcePlanes: planes, seal: 's' };
   assert.equal(validateManifest(base).length, 0);
   const forged = { ...base, sourcePlanes: { ...planes, supplement: 'TOTALLY-LEGIT-PLUGIN' } };
   assert.ok(validateManifest(forged).some((e) => /closed provenance vocabulary/.test(e)));
@@ -430,4 +430,44 @@ test('PROBE R3-4: a valid-vocabulary provenance swap (fixture→plugin-primary-c
   m2.seal = metadataSeal(m2);
   await fs.writeFile(mp, JSON.stringify(m2, null, 1));
   await readSnapshot(tmp); // a fully re-sealed forgery passes offline — authenticity is live-capture law, honestly owed
+});
+
+// ── Meta round-4 findings R3-5 (seal completeness) + R3-6 (atomic publish) ──────────────────
+import { publishGeneration, cleanStaging, stagingDir, generationDir, runToken } from '../tools/atomic-publish.mjs';
+
+test('PROBE R3-5: the seal binds EVERY manifest field except seal — warnings/retries tamper is refused', async () => {
+  const tmp = path.join(await fs.mkdtemp(path.join(os.tmpdir(), 'cv2-')), 'snap');
+  await makeSnap(tmp);
+  const mp = path.join(tmp, 'manifest.json');
+  const m = JSON.parse(await fs.readFile(mp, 'utf8'));
+  m.warnings = ['injected'];        // fields not previously in the seal input
+  m.retries = 99;
+  await fs.writeFile(mp, JSON.stringify(m, null, 1)); // leave seal stale
+  await assert.rejects(() => readSnapshot(tmp), (e) => e instanceof EvidenceError && /seal mismatch/.test(e.message));
+});
+
+test('PROBE R3-6: atomic generation publish — one-rename set promotion; failure leaves prior byte-identical, zero debris', async () => {
+  const out = await fs.mkdtemp(path.join(os.tmpdir(), 'cal-'));
+  const genBase = 'abc1234';
+  // gen 1: build staging set, publish
+  const t1 = runToken(1);
+  await fs.mkdir(stagingDir(out, genBase, t1), { recursive: true });
+  await fs.writeFile(path.join(stagingDir(out, genBase, t1), 'a.png'), 'GEN1');
+  const p1 = await publishGeneration({ outDir: out, genBase, token: t1 });
+  const pointer1 = JSON.parse(await fs.readFile(p1.pointer, 'utf8'));
+  const gen1Bytes = await fs.readFile(path.join(out, pointer1.generation, 'a.png'), 'utf8');
+  assert.equal(gen1Bytes, 'GEN1');
+  // gen 2 FAILS mid-run (staging never built) → publish throws, prior generation + pointer intact
+  const t2 = runToken(2);
+  await assert.rejects(() => publishGeneration({ outDir: out, genBase, token: t2 }), /staging dir absent/);
+  await cleanStaging(out, genBase, t2);
+  const pointerAfter = JSON.parse(await fs.readFile(p1.pointer, 'utf8'));
+  assert.deepEqual(pointerAfter, pointer1); // pointer byte-identical
+  assert.equal(await fs.readFile(path.join(out, pointer1.generation, 'a.png'), 'utf8'), 'GEN1'); // prior gen byte-identical
+  // zero candidate/staging debris left in out/
+  const debris = (await fs.readdir(out)).filter((d) => d.startsWith('.stage') || d.startsWith('.latest'));
+  assert.deepEqual(debris, []);
+  // concurrent same-commit runs use distinct paths (no shared candidate)
+  assert.notEqual(stagingDir(out, genBase, runToken(1)), stagingDir(out, genBase, runToken(2)));
+  assert.notEqual(generationDir(out, genBase, t1), generationDir(out, genBase, t2));
 });

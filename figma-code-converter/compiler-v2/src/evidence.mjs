@@ -49,14 +49,11 @@ export function fingerprint({ document, supplement, variables, components, fonts
  * correctly P1/live-G0 three-pass version reads; this closes offline IMMUTABILITY.)
  */
 export function metadataSeal(m) {
-  return sha256(canonicalJson({
-    schemaVersion: m.schemaVersion, compilerVersion: m.compilerVersion,
-    capabilityRegistryVersion: m.capabilityRegistryVersion,
-    fileKey: m.fileKey, fileVersion: m.fileVersion, rootIds: m.rootIds,
-    captureId: m.captureId, capturedModes: m.capturedModes,
-    sourcePlanes: m.sourcePlanes, fingerprint: m.fingerprint,
-    files: m.files, census: m.census,
-  }));
+  // Bind the ENTIRE manifest except the seal field itself (future-safe: warnings, retries, and
+  // any field added later are bound automatically — Meta R3-5: a partial tamper of warnings/
+  // retries with a stale seal must not pass).
+  const { seal, ...sealed } = m;
+  return sha256(canonicalJson(sealed));
 }
 
 /** The contracted evidence set (§4.3) — validateManifest refuses a manifest missing any. */
@@ -120,9 +117,9 @@ export async function writeSnapshot(dir, {
       fingerprint: fingerprint({ document, supplement, variables, components, fonts, dependencies, assetHashes }),
       files, census,
     };
+    manifest.seal = metadataSeal(manifest); // bind provenance metadata (R3-4/R3-5) before validating
     const errs = validateManifest(manifest);
     if (errs.length) throw new EvidenceError('FAILED_CAPTURE', `refusing to seal an invalid manifest: ${errs.join('; ')}`);
-    manifest.seal = metadataSeal(manifest); // bind provenance metadata (R3-4)
     await fs.writeFile(path.join(staging, 'manifest.json'), JSON.stringify(manifest, null, 1));
     await fs.rename(staging, dir); // atomic seal
     return { dir, manifest };
