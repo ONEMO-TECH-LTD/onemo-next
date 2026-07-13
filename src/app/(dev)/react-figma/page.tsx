@@ -3474,7 +3474,7 @@ export default function ReactFigmaPage() {
     f.addEventListener('load', tryWire)
     const poll = setInterval(tryWire, 500) // covers HMR doc swaps; no-ops once wired
     return () => { f.removeEventListener('load', tryWire); clearInterval(poll) }
-  }, [wireCanvas])
+  }, [wireCanvas, canvas.route])
 
   // zoom to a point (cx,cy in canvas coords), keeping that point fixed under the cursor
   const zoomAt = useCallback((nextZ: number, cx: number, cy: number) => {
