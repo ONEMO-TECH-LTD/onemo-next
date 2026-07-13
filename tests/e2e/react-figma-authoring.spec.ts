@@ -6,6 +6,7 @@ import { promisify } from 'node:util'
 
 const fixtureName = 'AuthoringE2EButton'
 const extractedName = 'AuthoringE2EExtracted'
+const e2eBaseUrl = `http://localhost:${process.env.PLAYWRIGHT_PORT ?? 3045}`
 const run = promisify(execFile)
 
 test.describe('React Figma component authoring', () => {
@@ -243,7 +244,7 @@ test.describe('React Figma component authoring', () => {
     expect(tokenResponses).toEqual(editorDocumentRequests.map(() => 200))
     const expectedReloadAborts = failedRequests.splice(0)
     expect(expectedReloadAborts.every((failure) =>
-      failure.startsWith(process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3045') && failure.endsWith(' net::ERR_ABORTED'),
+      failure.startsWith(e2eBaseUrl) && failure.endsWith(' net::ERR_ABORTED'),
     )).toBe(true)
     expect(editorDocumentRequests).toHaveLength(1)
     await expect(page.locator('[data-variant-label]').filter({ hasText: 'Primary · Primary' })).toHaveCount(0)
@@ -347,7 +348,7 @@ test.describe('React Figma component authoring', () => {
     await expect.poll(() => tokenResponses.length, { timeout: 30_000 }).toBe(editorDocumentRequests.length)
     const expectedPersistenceReloadAborts = failedRequests.splice(0)
     expect(expectedPersistenceReloadAborts.every((failure) =>
-      failure.startsWith(process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3045') && failure.endsWith(' net::ERR_ABORTED'),
+      failure.startsWith(e2eBaseUrl) && failure.endsWith(' net::ERR_ABORTED'),
     )).toBe(true)
     expect(editorDocumentRequests).toHaveLength(2)
     await expect.poll(

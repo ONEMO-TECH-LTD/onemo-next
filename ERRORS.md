@@ -139,3 +139,10 @@ The final generic `networkidle` after bootstrap resume was removed in the same c
 - Symptoms: Fast Refresh replaced the document immediately after the first readiness check; after stabilizing that, the gesture passed but the test failed because Next mounts one empty dev portal during healthy operation; the shallow checkout then made the default depth-derived filesystem root jail healthy page/filesystem reads with 403.
 - What worked: retry the complete idempotent atomic pointerdown→move→up proof until one document remains stable, retain accumulated console/page errors across attempts, assert the actual runtime-error copy is absent, and set `EDITOR_FS_ROOT` to the parent containing a shallow throwaway checkout.
 - Remember: S58 headed crash proofs must distinguish product error UI from Next's always-mounted dev portal; cold retries may wrap only idempotent interactions and must never clear captured errors. Throwaway worktrees outside the normal `.codex/worktrees` depth need an explicit truthful `EDITOR_FS_ROOT`—never a weakened jail.
+
+## S58 AC-X-002/001/003 real CSS-module path proof
+
+- What did not work: asserting a dotted CSS filename through `toHaveProperty(path)`, then checking expected reload aborts against hardcoded port 3045 in an isolated run on another port.
+- Symptoms: the exact CSS hash existed but the matcher parsed `.module.css` as nested path syntax; the complete create/reload flow then passed and failed only on the wrong expected origin.
+- What worked: read the exact hash key directly and derive the expected origin from `PLAYWRIGHT_PORT`, matching `playwright.config.ts`.
+- Remember: E2E filesystem identities with dots need direct-key assertions, and exact-SHA browser proof must remain portable across isolated ports.
