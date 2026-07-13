@@ -171,27 +171,31 @@ test.describe('React Figma component authoring', () => {
     // The failure-safe fixture wrapper installs this real CSS-module page before Next starts, so
     // route registration cannot inject HMR reloads into the measured authoring flow.
     editorDocumentRequests.length = 0
-    await page.getByTitle('File').click()
-    const selectionPage = page.getByText('/authoring-e2e', { exact: true })
-    await expect(selectionPage).toBeVisible({ timeout: 30_000 })
-    await selectionPage.click()
-    await expect(frame).toHaveAttribute('src', '/authoring-e2e')
-    const selection = frame.contentFrame().getByText('Extract this card', { exact: true })
-    await expect(selection).toBeVisible({ timeout: 30_000 })
-    await expect.poll(() => selection.evaluate((node) => {
-      const style = getComputedStyle(node)
-      return { background: style.backgroundColor, color: style.color, width: style.width }
-    })).toEqual({ background: 'rgb(21, 88, 74)', color: 'rgb(245, 255, 252)', width: '240px' })
-    await expect(selection).toHaveAttribute('data-src', /^src\/app\/\(dev\)\/authoring-e2e\/page\.tsx:\d+:\d+$/)
-    await selection.click()
-    const createComponentButton = page.getByTitle('Create component')
-    await createComponentButton.click()
     const createDialog = page.getByRole('dialog', { name: 'Create component' })
-    await expect(createDialog).toBeVisible()
-    await createDialog.getByLabel('Name').fill(extractedName)
-    await expect(frame).toHaveAttribute('src', '/authoring-e2e')
-    await expect.poll(() => tokenResponses.length, { timeout: 30_000 }).toBe(editorDocumentRequests.length)
-    expect(tokenResponses).toEqual(editorDocumentRequests.map(() => 200))
+    await expect(async () => {
+      if (await createDialog.isVisible()) await page.keyboard.press('Escape')
+      const stableDocumentCount = editorDocumentRequests.length
+      await page.getByTitle('File').click({ timeout: 5_000 })
+      const selectionPage = page.getByText('/authoring-e2e', { exact: true })
+      await expect(selectionPage).toBeVisible({ timeout: 5_000 })
+      await selectionPage.click()
+      await expect(frame).toHaveAttribute('src', '/authoring-e2e')
+      const selection = frame.contentFrame().getByText('Extract this card', { exact: true })
+      await expect(selection).toBeVisible({ timeout: 10_000 })
+      await expect.poll(() => selection.evaluate((node) => {
+        const style = getComputedStyle(node)
+        return { background: style.backgroundColor, color: style.color, width: style.width }
+      })).toEqual({ background: 'rgb(21, 88, 74)', color: 'rgb(245, 255, 252)', width: '240px' })
+      await expect(selection).toHaveAttribute('data-src', /^src\/app\/\(dev\)\/authoring-e2e\/page\.tsx:\d+:\d+$/)
+      await selection.click()
+      await page.getByTitle('Create component').click()
+      await expect(createDialog).toBeVisible({ timeout: 5_000 })
+      await createDialog.getByLabel('Name').fill(extractedName)
+      await expect(frame).toHaveAttribute('src', '/authoring-e2e')
+      await expect.poll(() => tokenResponses.length, { timeout: 10_000 }).toBe(editorDocumentRequests.length)
+      expect(tokenResponses).toEqual(editorDocumentRequests.map(() => 200))
+      expect(editorDocumentRequests).toHaveLength(stableDocumentCount)
+    }).toPass({ timeout: 45_000, intervals: [250, 500, 1_000] })
     failedResponses.length = 0
     failedRequests.length = 0
     await page.evaluate(() => { (window as Window & { __e2eCreateOriginDocument?: boolean }).__e2eCreateOriginDocument = true })
