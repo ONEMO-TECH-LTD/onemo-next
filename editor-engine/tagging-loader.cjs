@@ -2,23 +2,23 @@
 /**
  * react-figma engine · M1 selection-core (KAI-9304) — dev-only source tagging.
  *
- * Webpack `enforce:'pre'` loader: stamps host (lowercase) JSX elements with a
- * reserved `data-onemo-source="<repo-relative-file>:<line>:<col>"` in the SERVED
- * compile only. The retained page engine also receives legacy `data-src` when
- * the source does not already own that attribute.
+ * Webpack `enforce:'pre'` loader: the retained page engine receives legacy
+ * `data-src` in the SERVED compile only. Authoring-component host JSX is also
+ * wrapped in a runtime boundary that records its committed DOM Element in a
+ * module-private WeakMap; source content never owns that identity channel.
  * In-memory by design — the repo stays byte-identical (`git status` clean is
  * an AC). Identity IS the source location; no persisted ids (ENGINE-PLAN.md §2).
  *
- * Splice-only transform: positions come from the TypeScript parser. Provenance
- * is appended after authored attributes/spreads so authored props cannot
- * override it; no codegen or lines are added, so downstream positions stay true.
+ * Splice-only transform: positions come from the TypeScript parser. No authored
+ * attribute/ref is replaced, and the repository bytes remain unchanged.
  */
 const ts = require('typescript');
 const path = require('path');
 const fs = require('fs');
+const { assertNoAuthoredSourceProvenance } = require('./source-provenance-policy.cjs');
 
-const AUTHORING_SOURCE_ATTRIBUTE = 'data-onemo-source';
-const AUTHORING_SOURCE_RESERVED = 'SOURCE_PROVENANCE_ATTRIBUTE_RESERVED';
+const PROJECT_COMPONENT_ROOT = 'src/app/(dev)/react-figma-components';
+const RUNTIME_MODULE = '@/app/(dev)/react-figma/component-authoring/source-provenance-runtime';
 
 /* E7.1 (KAI-9375, lead F1): files from the global component library get a PACKAGE-NAME-PREFIXED
  * identity ("onemo-component-library/src/...") — never a `..`-relative path, whose depth differs
@@ -42,25 +42,21 @@ module.exports = function taggingLoader(source) {
     rel = path.relative(this.rootContext || process.cwd(), this.resourcePath);
   }
 
-  const reservedIndex = source.toLowerCase().indexOf(AUTHORING_SOURCE_ATTRIBUTE);
-  if (reservedIndex >= 0) {
-    const before = source.slice(0, reservedIndex);
-    const line = before.split('\n').length;
-    const col = reservedIndex - before.lastIndexOf('\n');
-    const error = new Error(`${AUTHORING_SOURCE_RESERVED}: ${AUTHORING_SOURCE_ATTRIBUTE} is reserved at ${rel}:${line}:${col}`);
-    error.code = AUTHORING_SOURCE_RESERVED;
-    error.status = 422;
-    throw error;
-  }
+  assertNoAuthoredSourceProvenance(rel, source);
 
   let sf;
   try {
-    sf = ts.createSourceFile(this.resourcePath, source, ts.ScriptTarget.ESNext, false, ts.ScriptKind.TSX);
+    sf = ts.createSourceFile(this.resourcePath, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX);
   } catch {
     return source; // unparseable → pass through untouched, never break the build
   }
 
-  /** @type {{pos:number, text:string}[]} */
+  const projectComponentRoot = path.join(this.rootContext || process.cwd(), PROJECT_COMPONENT_ROOT);
+  const authoringRuntime = real === projectComponentRoot || real.startsWith(projectComponentRoot + path.sep) ||
+    Boolean(libRoot && (real === path.join(libRoot, 'src') || real.startsWith(path.join(libRoot, 'src') + path.sep)));
+  const runtimeIdentifier = authoringRuntime ? uniqueRuntimeIdentifier(source) : null;
+
+  /** @type {{pos:number, text:string, order:number}[]} */
   const inserts = [];
 
   const visit = (node) => {
@@ -76,19 +72,50 @@ module.exports = function taggingLoader(source) {
       const provenance = `${rel}:${lc.line + 1}:${lc.character + 1}`;
       inserts.push({
         pos: node.attributes.end,
-        text: `${authoredAttributes.includes('data-src') ? '' : ` data-src="${provenance}"`} ${AUTHORING_SOURCE_ATTRIBUTE}="${provenance}"`,
+        text: authoredAttributes.includes('data-src') ? '' : ` data-src="${provenance}"`,
+        order: 0,
       });
+      if (runtimeIdentifier) {
+        const element = ts.isJsxSelfClosingElement(node) ? node : node.parent;
+        inserts.push({ pos: element.getStart(sf), text: `<${runtimeIdentifier} provenance=${JSON.stringify(provenance)}>`, order: 1 });
+        inserts.push({ pos: element.end, text: `</${runtimeIdentifier}>`, order: 0 });
+      }
     }
     ts.forEachChild(node, visit);
   };
   visit(sf);
 
+  if (runtimeIdentifier) {
+    inserts.push({
+      pos: importInsertionPosition(sf),
+      text: `${importInsertionPosition(sf) === 0 ? '' : '\n'}import { AuthoringSourceBoundary as ${runtimeIdentifier} } from ${JSON.stringify(RUNTIME_MODULE)};\n`,
+      order: 2,
+    });
+  }
+
   if (inserts.length === 0) return source;
 
   // Splice from the end so earlier offsets stay valid.
   let out = source;
-  for (let i = inserts.length - 1; i >= 0; i--) {
-    out = out.slice(0, inserts[i].pos) + inserts[i].text + out.slice(inserts[i].pos);
+  inserts.sort((left, right) => right.pos - left.pos || right.order - left.order);
+  for (const insert of inserts) {
+    out = out.slice(0, insert.pos) + insert.text + out.slice(insert.pos);
   }
   return out;
 };
+
+function uniqueRuntimeIdentifier(source) {
+  let suffix = 0;
+  let identifier = '__ONEMO_SOURCE_BOUNDARY__';
+  while (source.includes(identifier)) identifier = `__ONEMO_SOURCE_BOUNDARY_${++suffix}__`;
+  return identifier;
+}
+
+function importInsertionPosition(sf) {
+  let position = 0;
+  for (const statement of sf.statements) {
+    if (!ts.isExpressionStatement(statement) || !ts.isStringLiteral(statement.expression)) break;
+    position = statement.end;
+  }
+  return position;
+}

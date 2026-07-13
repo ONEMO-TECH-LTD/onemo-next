@@ -5,10 +5,10 @@ import { isValidElementType } from 'react-is'
 
 import type { AuthoringGraphV1, SourceAnchor, VariantFrame } from '@/app/api/dev/editor/authoring-types'
 import type { SourceProjection } from '@/app/api/dev/editor/source-projection'
-import { AUTHORING_SOURCE_PROVENANCE_ATTRIBUTE } from '@/lib/editor-source-provenance'
 import { componentCanvasGeometry, movedVariantFrame } from './gestures'
 import { cancelAuthoringResumeMarker, issueAuthoringResumeMarker } from './session'
 import { resolveSourceContentBindings, sourceContentLayerId, sourceContentLayers, type SourceContentLayer } from './content-selection'
+import { readRuntimeSourceProvenance } from './source-provenance-runtime'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let projectComponents = (require as any).context('../../react-figma-components', true, /\.tsx$/)
@@ -187,13 +187,13 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged, onResume
         existing.removeAttribute('data-authoring-node-selected')
         existing.removeAttribute('data-authoring-node-refusal')
       }
-      // The dev loader's reserved file:line:col attribute is the only runtime provenance authority.
-      // Untagged or foreign descendants stay named-refused; never fall back to tag/order guessing.
+      // Only the dev runtime's private WeakMap is authoritative. DOM attributes are authored data
+      // and therefore never participate in identity, even when they resemble source provenance.
       const elements = Array.from(container.querySelectorAll('*'))
       const bindings = resolveSourceContentBindings(
         contentProjection.layers,
         elements.map((element) => ({
-          provenance: element.getAttribute(AUTHORING_SOURCE_PROVENANCE_ATTRIBUTE),
+          provenance: readRuntimeSourceProvenance(element),
           tag: element.tagName.toLowerCase(),
         })),
       )

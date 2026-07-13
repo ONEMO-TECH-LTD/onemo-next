@@ -191,13 +191,14 @@ export function Button() { return <button className={styles.card}>Button</button
     expect(await store.load()).toBeNull()
   })
 
-  it('named-refuses authored reserved provenance before production import evidence', async () => {
+  it('named-refuses computed createElement provenance before production import evidence', async () => {
     const { root, registry, store } = await makeImportStore()
     const classified = await classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry })
-    const forged = singleAxisSource.replace(
-      '<button data-variant',
-      `<button ${AUTHORING_SOURCE_PROVENANCE_ATTRIBUTE}="${SOURCE_FILE}:999:1" data-variant`,
-    )
+    const forged = `const key = ['data', 'onemo', 'source'].join('-')
+export function Button({ variant = 'Primary' }: { variant?: 'Primary' | 'Secondary' }) {
+  return React.createElement('button', { [key]: '${SOURCE_FILE}:999:1', 'data-variant': variant }, 'Button')
+}
+`
     await fs.writeFile(path.join(root, SOURCE_FILE), forged)
 
     await expect(classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry }))
@@ -217,6 +218,17 @@ export function Button() { return <button className={styles.card}>Button</button
       .rejects.toMatchObject({ code: 'ENOENT' })
     await expect(fs.readdir(path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions')))
       .rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('does not confuse harmless provenance comments or strings with an authored sink', async () => {
+    const source = `// ${AUTHORING_SOURCE_PROVENANCE_ATTRIBUTE} is documented, not authored
+const note = '${AUTHORING_SOURCE_PROVENANCE_ATTRIBUTE}'
+export function Button() { return <button title={note}>Button</button> }
+`
+    const { registry } = await makeImportStore(source)
+
+    await expect(classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry }))
+      .resolves.toMatchObject({ projection: { compatibility: 'native-v1' } })
   })
 
   it('refuses rather than replacing a persisted revision-zero sidecar', async () => {

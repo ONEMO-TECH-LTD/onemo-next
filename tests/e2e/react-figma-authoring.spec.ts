@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { readFile } from 'node:fs/promises'
+import { readFile, readdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { promisify } from 'node:util'
 
@@ -13,6 +13,16 @@ const extractedName = 'AuthoringE2EExtracted'
 const canonicalName = 'AuthoringE2ECanonical'
 const e2eBaseUrl = `http://localhost:${process.env.PLAYWRIGHT_PORT ?? 3045}`
 const run = promisify(execFile)
+
+async function snapshotTree(root: string, relative = ''): Promise<Record<string, string>> {
+  const snapshot: Record<string, string> = {}
+  for (const entry of await readdir(path.join(root, relative), { withFileTypes: true })) {
+    const file = path.join(relative, entry.name)
+    if (entry.isDirectory()) Object.assign(snapshot, await snapshotTree(root, file))
+    else snapshot[file.split(path.sep).join('/')] = (await readFile(path.join(root, file))).toString('base64')
+  }
+  return snapshot
+}
 
 test.describe('React Figma component authoring', () => {
   test.afterAll(async () => {
@@ -195,7 +205,7 @@ test.describe('React Figma component authoring', () => {
     expect(consoleErrors).toEqual([])
   })
 
-  test('selects an inner component layer by stable source identity across reload', async ({ page }) => {
+  test('selects an inner component layer by stable source identity across reload', async ({ page, request }) => {
     test.setTimeout(90_000)
     const authoringWrites: string[] = []
     const legacyWrites: string[] = []
@@ -245,10 +255,10 @@ test.describe('React Figma component authoring', () => {
     const nested = primary.locator('[data-name="Nested"]')
     await expect(nested).toHaveCount(1)
     await expect(nested).toHaveAttribute('data-src', `${fixtureFile}:999:1`)
-    await expect(nested).not.toHaveAttribute(AUTHORING_SOURCE_PROVENANCE_ATTRIBUTE, `${fixtureFile}:999:1`)
+    await expect(nested).not.toHaveAttribute(AUTHORING_SOURCE_PROVENANCE_ATTRIBUTE, /.+/)
     await expect(nested).not.toHaveAttribute('data-authoring-node-id', /.+/)
     await expect(nested).toHaveAttribute('data-authoring-node-refusal', 'SOURCE_CONTENT_PROVENANCE_UNOWNED')
-    await expect(label).toHaveAttribute(AUTHORING_SOURCE_PROVENANCE_ATTRIBUTE, `${fixtureFile}:999:1`)
+    await expect(label).not.toHaveAttribute(AUTHORING_SOURCE_PROVENANCE_ATTRIBUTE, /.+/)
     const sourceIdentity = await label.getAttribute('data-authoring-node-id')
     expect(sourceIdentity).toMatch(/^[a-f0-9]{64}:0$/)
     await expect(label).toHaveAttribute('data-authoring-node-file', fixtureFile)
@@ -258,6 +268,8 @@ test.describe('React Figma component authoring', () => {
     await expect(authoringCanvas).toHaveAttribute('data-selected-content-id', sourceIdentity!)
     expect(authoringWrites).toEqual([])
     expect(legacyWrites).toEqual([])
+    expect(pageErrors).toEqual([])
+    expect(consoleErrors).toEqual([])
 
     await page.reload({ waitUntil: 'domcontentloaded' })
     authoringCanvas = await openComponent()
@@ -267,13 +279,52 @@ test.describe('React Figma component authoring', () => {
     await expect(label).toHaveAttribute('data-authoring-node-id', sourceIdentity!)
     await expect(label).toHaveAttribute('data-name', 'Label')
     await expect(primary.locator('[data-name="Nested"]')).not.toHaveAttribute('data-authoring-node-id', /.+/)
-    await expect(label).toHaveAttribute(AUTHORING_SOURCE_PROVENANCE_ATTRIBUTE, `${fixtureFile}:999:1`)
+    await expect(label).not.toHaveAttribute(AUTHORING_SOURCE_PROVENANCE_ATTRIBUTE, /.+/)
     await label.click()
     await expect(authoringCanvas).toHaveAttribute('data-selected-content-id', sourceIdentity!)
     expect(authoringWrites).toEqual([])
     expect(legacyWrites).toEqual([])
     expect(pageErrors).toEqual([])
     expect(consoleErrors).toEqual([])
+
+    const sourcePath = path.join(process.cwd(), fixtureFile)
+    const metadataRoot = path.join(process.cwd(), 'src/app/(dev)/react-figma-components/.onemo')
+    const sourceBeforeSpoof = await readFile(sourcePath, 'utf8')
+    const durableBeforeSpoof = {
+      sidecar: (await readFile(path.join(metadataRoot, 'authoring-v1.json'))).toString('base64'),
+      history: await snapshotTree(path.join(metadataRoot, 'history')),
+      transactions: await snapshotTree(path.join(metadataRoot, 'transactions')),
+    }
+    const safeNested = `function NestedLabel() {\n  return <span data-name="Nested" data-src="${fixtureFile}:999:1">Nested</span>\n}`
+    const forgedNested = `import * as React from 'react'\nconst key = ['data', 'onemo', 'source'].join('-')\nfunction NestedLabel() {\n  return React.createElement('span', { [key]: '${fixtureFile}:999:1', 'data-name': 'Nested' }, 'Nested')\n}`
+    const forgedSource = sourceBeforeSpoof.replace(safeNested, forgedNested)
+    expect(forgedSource).not.toBe(sourceBeforeSpoof)
+    try {
+      await writeFile(sourcePath, forgedSource)
+      const refusal = await request.get(`/api/dev/editor-authoring?mode=component-status&file=${encodeURIComponent(fixtureFile)}`)
+      expect(refusal.status()).toBe(500)
+      expect(await refusal.text()).toContain('SOURCE_PROVENANCE_ATTRIBUTE_RESERVED')
+    } finally {
+      await writeFile(sourcePath, sourceBeforeSpoof)
+    }
+    expect(await readFile(sourcePath, 'utf8')).toBe(sourceBeforeSpoof)
+    expect({
+      sidecar: (await readFile(path.join(metadataRoot, 'authoring-v1.json'))).toString('base64'),
+      history: await snapshotTree(path.join(metadataRoot, 'history')),
+      transactions: await snapshotTree(path.join(metadataRoot, 'transactions')),
+    }).toEqual(durableBeforeSpoof)
+    await expect.poll(async () => (
+      await request.get(`/api/dev/editor-authoring?mode=component-status&file=${encodeURIComponent(fixtureFile)}`)
+    ).status(), { timeout: 30_000 }).toBe(200)
+    expect(pageErrors).toEqual([])
+    expect(consoleErrors.length).toBeGreaterThan(0)
+    expect(consoleErrors.some((message) =>
+      message.includes('SOURCE_PROVENANCE_ATTRIBUTE_RESERVED') && message.includes(fixtureFile),
+    )).toBe(true)
+    expect(consoleErrors.every((message) =>
+      message.includes('SOURCE_PROVENANCE_ATTRIBUTE_RESERVED')
+      || message === 'Failed to load resource: the server responded with a status of 500 (Internal Server Error)',
+    )).toBe(true)
   })
 
   test('offers canonical extraction when the project component inventory is empty', async ({ page }) => {

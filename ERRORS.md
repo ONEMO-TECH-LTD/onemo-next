@@ -149,6 +149,13 @@ The final generic `networkidle` after bootstrap resume was removed in the same c
 
 Follow-up: dynamically writing the route after Next started caused a late route-tree refresh and unused-preload warnings even though the complete product flow passed. The failure-safe fixture wrapper now installs CSS before its importing page before server startup; the measured flow has no route-registration HMR phase.
 
+## S58 K-001 reserved-provenance headed refusal
+
+- What did not work: expecting the active Next development page to receive an API-shaped 422 when the webpack loader rejects a computed reserved-provenance key, then requiring every resulting browser console error to repeat both the named code and fixture path.
+- Symptoms: webpack correctly refused the forged source before the route handler with a 500 carrying `SOURCE_PROVENANCE_ATTRIBUTE_RESERVED`; HMR then emitted additional framework/resource console errors that did not repeat the full loader diagnostic, even though source and every durable authoring byte remained unchanged.
+- What worked: treat the loader-level 500 as the earlier pre-persistence boundary, assert its body contains the named refusal, verify source/sidecar/history/transaction byte identity, and keep the production import unit test as the route-level named-refusal/zero-write proof. Browser-console assertions distinguish the exact expected compile-failure family from unrelated errors instead of requiring framework wrappers to duplicate the diagnostic text.
+- Remember: an authoring-root webpack transform can refuse unsafe source before an API handler runs; headed adversarial proof should bind the loader diagnostic to exact durable-state invariants without mistaking Next's compile-error wrappers for a second product failure.
+
 ## S58 existing-component entry E2E cold-shell readiness
 
 - What did not work: clicking the Components rail once after `domcontentloaded` and treating the active rail icon as proof that its panel had survived the cold Next development remount; two reruns also used reporters that hid the assertion stack.
