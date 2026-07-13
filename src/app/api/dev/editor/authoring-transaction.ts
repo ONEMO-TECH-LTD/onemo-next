@@ -74,6 +74,7 @@ type AuthoringCommitUpdate = {
   requireMissingSidecar?: boolean
   sourceFiles?: string[]
   expectedSourceHashes?: Record<string, string>
+  replaceSourceHashes?: boolean
   expectedEnvironmentHashes?: Record<string, string>
   expectedEnvironmentFingerprint?: string
   sourcePatches?: SourcePatch[]
@@ -182,7 +183,7 @@ export class SingleRootAuthoringTransaction {
     const currentMetadata = await this.readOptionalFiles(metadataPatches.map((patch) => patch.file))
     this.verifyMetadataPreimages(metadataPatches, currentMetadata)
     await this.assertTransactionIdAvailable()
-    const sourceHashes = { ...before.sourceHashes }
+    const sourceHashes = update.replaceSourceHashes ? {} : { ...before.sourceHashes }
     for (const file of sourceFiles) {
       const patch = patchByFile.get(file)
       const after = patch ? patch.after : currentSources.get(file)

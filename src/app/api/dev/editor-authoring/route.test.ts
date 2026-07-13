@@ -551,6 +551,43 @@ export function Button({ variant = 'Primary' }: { variant?: 'Primary' | 'Seconda
     expect(Object.keys(undone.graph.variants)).toHaveLength(2)
   }, 20_000)
 
+  it('replaces a component dependency hash set instead of retaining a deleted dependency', async () => {
+    const oldDependency = 'src/app/(dev)/react-figma-components/Old.ts'
+    const newDependency = 'src/app/(dev)/react-figma-components/New.ts'
+    const oldSource = `import type { Marker } from './Old'
+export function Button({ variant = 'Primary' }: { variant?: 'Primary' | 'Secondary' }) {
+  const marker: Marker = variant
+  return <button>{marker}</button>
+}
+`
+    const root = await makeRoot(oldSource)
+    await fs.writeFile(path.join(root, oldDependency), 'export type Marker = string\n')
+    const classified = await (await handleGet(request('GET'), root)).json()
+    await handlePost(request('POST', {
+      kind: 'import-source', file: SOURCE_FILE, expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint,
+      transactionId: '00000000-0000-4000-8000-000000000015',
+    }), root)
+    const imported = await (await handleGet(componentRequest(), root)).json()
+    expect(imported.graph.sourceHashes).toHaveProperty(oldDependency)
+
+    await fs.writeFile(path.join(root, SOURCE_FILE), oldSource.replace("'./Old'", "'./New'"))
+    await fs.writeFile(path.join(root, newDependency), 'export type Marker = string\n')
+    await fs.unlink(path.join(root, oldDependency))
+    const stale = await (await handleGet(componentStatusRequest(), root)).json()
+    const response = await handlePost(request('POST', {
+      kind: 'revalidate-source', file: SOURCE_FILE,
+      expectedRevision: stale.expectedRevision,
+      expectedSourceHashes: stale.sourceHashes,
+    }), root)
+
+    expect(response.status).toBe(200)
+    const revalidated = await response.json()
+    expect(revalidated.graph.sourceHashes).toHaveProperty(newDependency, expect.stringMatching(/^[a-f0-9]{64}$/))
+    expect(revalidated.graph.sourceHashes).not.toHaveProperty(oldDependency)
+    await expect(fs.readFile(path.join(root, oldDependency))).rejects.toMatchObject({ code: 'ENOENT' })
+  }, 20_000)
+
   it('rebases generated compiler-environment drift without changing authored authority or semantic undo', async () => {
     const root = await makeRoot()
     const environmentFile = '.next/dev/types/routes.d.ts'

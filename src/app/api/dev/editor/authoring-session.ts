@@ -233,19 +233,44 @@ export class ProjectAuthoringSession {
       registry: this.input.registry,
     })
     assertExactHashSet(input.expectedSourceHashes, snapshot.sourceHashes)
-    assertStagedTypeScriptSemantics(
-      definition.source.file,
-      snapshot.sources[definition.source.file]!,
-      this.input.registry.get(this.input.storeId).canonicalRealPath,
-      snapshot.compilerOptions,
-      Object.fromEntries(Object.entries(snapshot.sources).filter(([file]) => file !== definition.source.file)),
-    )
-    projectVariantRegistry(before, definition, snapshot.projection)
-    assertAcceptedSourceProjection(definition, snapshot.projection)
+    const projectRoot = this.input.registry.get(this.input.storeId).canonicalRealPath
+    const targetAuthority = new Set(Object.keys(snapshot.sourceHashes))
+    const exactSourceHashes: Record<string, string> = {}
+    for (const candidate of Object.values(before.components)) {
+      const candidateSnapshot = candidate.id === definition.id
+        ? snapshot
+        : await readExactAuthoringSourceSnapshot({
+          storeId: this.input.storeId,
+          file: candidate.source.file,
+          registry: this.input.registry,
+        })
+      if (candidate.id !== definition.id) {
+        const changedPaths = Object.entries(candidateSnapshot.sourceHashes)
+          .filter(([file, hash]) => !targetAuthority.has(file) && before.sourceHashes[file] !== hash)
+          .map(([file]) => file)
+          .sort()
+        if (changedPaths.length > 0) {
+          throw Object.assign(new Error(`non-target source hash mismatch: ${changedPaths.join(', ')}`), {
+            code: 'SOURCE_HASH_STALE', status: 409, changedPaths,
+          })
+        }
+      }
+      assertEnvironmentFingerprint(snapshot.environmentFingerprint, candidateSnapshot.environmentFingerprint)
+      assertStagedTypeScriptSemantics(
+        candidate.source.file,
+        candidateSnapshot.sources[candidate.source.file]!,
+        projectRoot,
+        candidateSnapshot.compilerOptions,
+        Object.fromEntries(Object.entries(candidateSnapshot.sources).filter(([file]) => file !== candidate.source.file)),
+      )
+      projectVariantRegistry(before, candidate, candidateSnapshot.projection)
+      assertAcceptedSourceProjection(candidate, candidateSnapshot.projection)
+      Object.assign(exactSourceHashes, candidateSnapshot.sourceHashes)
+    }
     const command = { kind: 'revalidate-source', file: input.file }
     const historyPatches = await this.history.planCommand({
       command,
-      sourceFiles: Object.keys(snapshot.sourceHashes),
+      sourceFiles: Object.keys(exactSourceHashes),
       sourcePreimages: [],
       graphPreimage: JSON.stringify(before, null, 2) + '\n',
       revision: before.revision + 1,
@@ -257,10 +282,11 @@ export class ProjectAuthoringSession {
       store: this.input.store,
     }).commit({
       expectedRevision: input.expectedRevision,
-      expectedSourceHashes: input.expectedSourceHashes,
+      expectedSourceHashes: exactSourceHashes,
       expectedEnvironmentHashes: snapshot.environmentHashes,
       expectedEnvironmentFingerprint: snapshot.environmentFingerprint,
-      sourceFiles: Object.keys(snapshot.sourceHashes),
+      sourceFiles: Object.keys(exactSourceHashes),
+      replaceSourceHashes: true,
       metadataPatches: historyPatches,
       command,
       mutate: () => before,
