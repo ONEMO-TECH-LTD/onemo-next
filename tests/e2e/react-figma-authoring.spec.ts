@@ -230,6 +230,56 @@ test.describe('React Figma component authoring', () => {
     expect(consoleErrors).toEqual([])
   })
 
+  test('opens the independent blank-component shell from the Components owner without writing', async ({ page }) => {
+    test.setTimeout(60_000)
+    const authoringWrites: string[] = []
+    const legacyWrites: string[] = []
+    const consoleErrors: string[] = []
+    const pageErrors: string[] = []
+    page.on('request', (request) => {
+      const url = new URL(request.url())
+      if (url.pathname === '/api/dev/editor-authoring' && request.method() !== 'GET') authoringWrites.push(request.postData() ?? '')
+      if (url.pathname === '/api/dev/editor-write') legacyWrites.push(request.postData() ?? '')
+    })
+    page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()) })
+    page.on('pageerror', (error) => pageErrors.push(error.message))
+
+    await page.goto('/react-figma', { waitUntil: 'domcontentloaded' })
+    const components = page.getByRole('button', { name: 'Components', exact: true })
+    const newComponent = page.getByTitle('New Component')
+    await expect(async () => {
+      await components.click({ timeout: 5_000 })
+      await expect(page.getByRole('textbox', { name: 'Search components' })).toBeVisible({ timeout: 5_000 })
+      await expect(newComponent).toBeVisible({ timeout: 5_000 })
+    }).toPass({ timeout: 45_000, intervals: [250, 500, 1_000] })
+
+    await newComponent.click()
+    const dialog = page.getByRole('dialog', { name: 'New Component' })
+    const title = dialog.getByRole('textbox', { name: 'Title' })
+    const create = dialog.getByRole('button', { name: 'Create', exact: true })
+    await expect(dialog).toBeVisible()
+    await expect(dialog).toContainText('Components can be edited in their own canvas. Double-click on any instance to add visual variants and interactions.')
+    await expect(title).toHaveValue('')
+    await expect(create).toBeDisabled()
+    await title.fill('   ')
+    await expect(create).toBeDisabled()
+    await title.fill('FreshCard')
+    await expect(create).toBeEnabled()
+    await expect(dialog.getByRole('textbox', { name: /Project|Global|Category/i })).toHaveCount(0)
+    await expect(page.getByRole('dialog', { name: 'Create component' })).toHaveCount(0)
+    await create.click()
+    await expect(dialog.getByRole('status')).toHaveText('Blank component creation is pending measured behavior.')
+    expect(authoringWrites).toEqual([])
+    expect(legacyWrites).toEqual([])
+    await dialog.getByRole('button', { name: 'Cancel' }).click()
+    await expect(dialog).toHaveCount(0)
+
+    expect(authoringWrites).toEqual([])
+    expect(legacyWrites).toEqual([])
+    expect(pageErrors).toEqual([])
+    expect(consoleErrors).toEqual([])
+  })
+
   test('extracts a component, reloads once, authors a variant, returns Home, persists, and undoes', async ({ page, request }) => {
     test.setTimeout(120_000)
     const consoleErrors: string[] = []
@@ -279,8 +329,8 @@ test.describe('React Figma component authoring', () => {
       await componentsRail.click({ timeout: 5_000 })
       await expect(page.getByRole('textbox', { name: 'Search components' })).toBeVisible({ timeout: 5_000 })
       await expect(fixtureButton).toBeVisible({ timeout: 15_000 })
-      await expect(page.getByLabel('New component name')).toHaveCount(0)
-      await expect(page.locator('[data-component-phase-deferred="blank-create"]')).toContainText('not available in this phase')
+      await expect(page.getByRole('dialog', { name: 'New Component' })).toHaveCount(0)
+      await expect(page.getByTitle('New Component')).toBeVisible()
       await fixtureButton.click({ button: 'right', timeout: 5_000 })
       await expect(componentMenu.getByRole('button', { name: 'Insert into selection — not available in this phase' })).toBeDisabled()
       await expect(componentMenu.getByRole('button', { name: 'Rename — not available in this phase' })).toBeDisabled()

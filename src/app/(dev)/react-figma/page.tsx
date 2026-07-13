@@ -1511,6 +1511,39 @@ function CreateComponentDialog({ name, busy, error, diagnosticCode, onName, onCa
   )
 }
 
+// AC-B-022 holds blank-create semantics; this measured shell intentionally owns no writer.
+function NewComponentDialog({ title, onTitle, onCancel }: {
+  title: string
+  onTitle: (title: string) => void
+  onCancel: () => void
+}) {
+  const [effectHeld, setEffectHeld] = useState(false)
+  return createPortal(
+    <div data-new-component-dialog-backdrop onPointerDown={(event) => { if (event.target === event.currentTarget) onCancel() }}
+      style={{ position: 'fixed', inset: 0, zIndex: 1900, display: 'grid', placeItems: 'center', background: 'color-mix(in srgb, var(--sem-col-bg-overlay) 36%, transparent)' }}>
+      <form role="dialog" aria-modal="true" aria-labelledby="new-component-title" onSubmit={(event) => { event.preventDefault(); setEffectHeld(true) }}
+        onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); onCancel() } }}
+        style={{ width: 320, padding: 16, border: '1px solid var(--sem-col-border-secondary)', borderRadius: 'var(--sem-radii-lg)', background: 'var(--sem-col-bg-primary)', color: 'var(--sem-col-text-primary)', fontFamily: 'var(--sem-type-fluid-label-s-font)' }}>
+        <div id="new-component-title" style={{ fontSize: 'var(--sem-type-fluid-label-s-size)', lineHeight: 'var(--sem-type-fluid-label-s-line-height)', fontWeight: 600 }}>New Component</div>
+        <p style={{ margin: '8px 0 0', color: 'var(--sem-col-text-secondary)', fontSize: 'var(--sem-type-fluid-label-xs-size)', lineHeight: 'var(--sem-type-fluid-label-xs-line-height)' }}>
+          Components can be edited in their own canvas. Double-click on any instance to add visual variants and interactions.
+        </p>
+        <label style={{ display: 'grid', gap: 6, marginTop: 12, fontSize: 'var(--sem-type-fluid-label-xs-size)', lineHeight: 'var(--sem-type-fluid-label-xs-line-height)', color: 'var(--sem-col-text-secondary)' }}>
+          Title
+          <input autoFocus value={title} onChange={(event) => onTitle(event.currentTarget.value)}
+            style={{ height: 32, boxSizing: 'border-box', border: '1px solid var(--sem-col-border-secondary)', borderRadius: 'var(--sem-radii-sm)', background: 'var(--sem-col-bg-secondary)', color: 'var(--sem-col-text-primary)', padding: '0 10px', font: 'inherit', outlineColor: 'var(--sem-col-border-brand)' }} />
+        </label>
+        {effectHeld && <div role="status" style={{ marginTop: 8, color: 'var(--sem-col-text-secondary)', fontSize: 'var(--sem-type-fluid-label-xs-size)', lineHeight: 'var(--sem-type-fluid-label-xs-line-height)' }}>Blank component creation is pending measured behavior.</div>}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+          <button type="button" onClick={onCancel} style={{ appearance: 'none', height: 30, padding: '0 12px', border: '1px solid var(--sem-col-border-secondary)', borderRadius: 'var(--sem-radii-full)', background: 'var(--sem-col-bg-secondary)', color: 'var(--sem-col-text-secondary)', cursor: 'pointer', font: 'inherit' }}>Cancel</button>
+          <button type="submit" disabled={!title.trim()} style={{ appearance: 'none', height: 30, padding: '0 12px', border: '1px solid var(--sem-col-border-brand)', borderRadius: 'var(--sem-radii-full)', background: 'var(--sem-col-bg-brand-primary)', color: 'var(--sem-col-text-brand-primary)', cursor: title.trim() ? 'pointer' : 'default', font: 'inherit' }}>Create</button>
+        </div>
+      </form>
+    </div>,
+    document.body,
+  )
+}
+
 /* E3.6 — Auto layout settings: direction + distribution (the CSS-flexbox analogs). */
 function AutoLayoutSettingsMenu({ onApply }: { onApply: (field: string, value: string) => void }) {
   const [open, setOpen] = useState(false)
@@ -2489,6 +2522,7 @@ export default function ReactFigmaPage() {
     error: string | null
     diagnosticCode: string | null
   } | null>(null)
+  const [newComponentTitle, setNewComponentTitle] = useState<string | null>(null)
   const [codeMode, setCodeMode] = useState(false) // E4-G3: Design ↔ Code view of the selected element
   const [hoverRect, setHoverRect] = useState<OutlineRect | null>(null)
   const [selRect, setSelRect] = useState<OutlineRect | null>(null)
@@ -3925,8 +3959,7 @@ export default function ReactFigmaPage() {
           </>
         )}
         {rail === 'components' && (() => {
-          // G2 exposes only the canonical create-from-selection/edit flow. Blank creation,
-          // component rename, and instance insertion remain visible as explicit phase deferrals.
+          // Component rename and instance insertion remain explicit phase deferrals.
           const jumpTo = (label: string) => {
             const doc = iframeRef.current?.contentDocument
             const frame = doc?.querySelector(`[data-component-frame="${label}"]`)
@@ -3939,7 +3972,7 @@ export default function ReactFigmaPage() {
           return (<>
             <div style={{ height: 40, padding: '0 8px 0 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flex: 'none' }}>
               <span style={hdr}>Components</span>
-              <UiIB name="createComponent" title={sel && canvasMode === 'design' ? 'Create component from selection' : 'Select an element on the page canvas first'} on={openCreateComponentDialog} />
+              <UiIB name="createComponent" title="New Component" on={() => setNewComponentTitle('')} />
             </div>
             <div style={{ padding: '0 12px 8px', flex: 'none' }}>
               <div style={{ height: 28, background: FIELD, borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px' }}>
@@ -3947,9 +3980,6 @@ export default function ReactFigmaPage() {
                 <input value={compSearch} onChange={(e) => setCompSearch(e.currentTarget.value)} placeholder="Search components…" aria-label="Search components"
                   style={{ flex: 1, minWidth: 0, border: 0, background: 'transparent', outline: 0, font: `400 11px/1 ${FONT}`, color: INK }} />
               </div>
-            </div>
-            <div data-component-phase-deferred="blank-create" style={{ padding: '0 12px 8px', color: MUTE, font: `400 10px/1.4 ${FONT}` }}>
-              Blank component creation is not available in this phase. Create from selection is available above.
             </div>
             <ComponentsRail components={dsComponents} selectedFile={editingComponent?.file} query={compSearch} onJump={jumpTo} canExtract={canvasMode === 'design' && !!sel} onEmptyExtract={openCreateComponentDialog} onEdit={(c) => {
               if (c.root === 'project') setEditingComponent(c)
@@ -4473,6 +4503,11 @@ export default function ReactFigmaPage() {
         onName={(name) => setComponentCreateDialog((current) => current ? { ...current, name, error: null, diagnosticCode: null } : current)}
         onCancel={() => { if (!componentCreateDialog.busy) setComponentCreateDialog(null) }}
         onSubmit={() => void createComponentFromSelection()}
+      />}
+      {newComponentTitle !== null && <NewComponentDialog
+        title={newComponentTitle}
+        onTitle={setNewComponentTitle}
+        onCancel={() => setNewComponentTitle(null)}
       />}
       <Toaster />
     </div>
