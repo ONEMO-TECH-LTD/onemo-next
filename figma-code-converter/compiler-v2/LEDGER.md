@@ -17,7 +17,7 @@ review, fail-closed gaps, final Dan sign-off, Done ownership, cutover authorizat
 **Current test truth (reported separately):** legacy converter suite 46 pass / 3 fail (missing
 gitignored golden fixture `t88thL8hKksSpILgkeGRZ0-4084-25997.nodes.json`) / 0 skips ·
 compiler-v2 foundation suite 53 pass / 0 fail / 0 skip across Builder and Meta repeated runs ·
-compiler-v2 P2 graph suite 23 pass / 0 fail / 0 skip, including 19 persisted-boundary
+compiler-v2 P2 graph suite 23 pass / 0 fail / 0 skip, including 22 persisted-boundary
 corruption mutations. No phase may be recorded green from
 harness-only or REST_ONLY placeholders.
 
@@ -30,8 +30,9 @@ pre-graph enforcement is built; its remaining P1 live-capture enforcement blocks
 publication freeze blocker and does not authorize speculative GC.
 
 ## Ownership
-Builder/ledger: @s58-pixel. Independent QA: @s58-qa. Meta/product/editor/agnosticity challenge:
-@s58-pixel-meta-qa. Lead/orchestrator + capture/fixture operator, hands-off code: @s58-kai.
+Builder/ledger: @s58-pixel. Authoritative independent QA/Meta reviewer: @s58-pixel-meta-qa
+(Dan routing correction 2026-07-13); @s58-qa findings are advisory only and carry no gate verdict.
+Lead/orchestrator + capture/fixture operator, hands-off code: @s58-kai.
 Decisions/Done/cutover: Dan only.
 
 ## Phase ledger
@@ -40,7 +41,7 @@ Decisions/Done/cutover: Dan only.
 |---|---|---|---|
 | P0 continuity/contract/calibration | IN PROGRESS | — | see P0 section |
 | P1 evidence capture | pending | — | |
-| P2 canonical graphs | BUILD CHECKPOINT — QA REWORK ADDRESSED; RE-REVIEW PENDING | `0d04e26` plus strict-boundary follow-up snapshot | six graph families + strict persisted parser; live/plugin evidence still blocked by G-1/G-2 |
+| P2 canonical graphs | BUILD CHECKPOINT — AUTHORITATIVE REVIEW PENDING | `0d04e26` + `02fd782` + advisory-hardening follow-up | six graph families + strict persisted parser; live/plugin evidence still blocked by G-1/G-2 |
 | P3 mother token/component slice | pending | — | |
 | P4 mother layout/render slice | pending | — | |
 | P5 emitters/security/editability | pending | — | |
@@ -131,7 +132,8 @@ Decisions/Done/cutover: Dan only.
   crossover. Deprecated-background mirror proof is structural and key-order independent.
 - Independent oracle imports no P2 builders and rejects the actual legacy `src/ir.mjs` output at
   G1-G5 on the same semantic fixture. P2 suite 23/23/0; foundation 53/53/0; syntax/diff checks
-  green. QA's frozen-`0d04e26` strict-parser defect was reproduced and repaired with 19 permanent
+  green. Advisory review of frozen `0d04e26` exposed a strict-parser defect; it was reproduced
+  and repaired with permanent
   persisted-corruption mutations across all six graphs and cross-graph links. This is a Builder
   checkpoint only: no P2 phase, integration, promotion, or Done claim;
   QA/Meta review and plugin-origin G-1/G-2 evidence remain required.
@@ -220,8 +222,16 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   Figma `2ee8d8f8d69a300fdc7276439ba5c356ecf46d3a027b7e23a2fcdcc106cfbb8a`,
   draft `a8ecb8580e1475ce79c4d0b369864a83a2fd347ecde4985bee9465d2eb04de12`.
   No budget, P0, fidelity, promotion, phase, or Done claim.
-- 2026-07-13 QA `[REWORK]` at frozen `0d04e26`: `parseCanonicalModel` checked only nested
+- 2026-07-13 @s58-qa advisory finding at frozen `0d04e26` (explicitly non-authoritative per
+  Dan's later routing correction): `parseCanonicalModel` checked only nested
   versions/top-level arrays and accepted corrupt document root/node, text-node, and asset rows.
   Builder reproduced the defect failure-first, then added strict per-graph and cross-graph
-  validation plus 19 persisted mutations. Builder rerun: P2 23/23/0, foundation 53/53/0,
-  syntax/diff checks green. QA re-review remains required; no P2 clearance claimed.
+  validation plus a persisted-corruption mutation matrix. Builder rerun: P2 23/23/0,
+  foundation 53/53/0,
+  syntax/diff checks green. Authoritative @s58-pixel-meta-qa review remains required; no P2
+  clearance claimed.
+- 2026-07-13 @s58-qa second advisory finding at frozen `02fd782` (non-authoritative): persisted
+  unknown/mirror/nonvisual arrays were not reconstructed from source, and forged export assets
+  could name an absent node. Builder reproduced both failure-first; parser now reconstructs exact
+  alias classification/canonical slot multisets, and AssetGraph/parser require SVG/export source
+  nodes. This is code hardening only, not a gate verdict.

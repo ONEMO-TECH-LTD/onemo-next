@@ -104,6 +104,9 @@ test('AssetGraph preserves source identity/hash/geometry and refuses missing or 
   assert.throws(() => buildAssetGraph({ document, assetIndex: assetIndex.slice(1), assetNodeIds: ['icon'], sealedFiles, sourcePlanes: planes(), evidenceClass: 'microfixture' }), AssetGraphError);
   const mismatchedSeal = structuredClone(sealedFiles); mismatchedSeal['assets/photo.png'].sha256 = 'c'.repeat(64);
   assert.throws(() => buildAssetGraph({ document, assetIndex, assetNodeIds: ['icon'], sealedFiles: mismatchedSeal, sourcePlanes: planes(), evidenceClass: 'microfixture' }), AssetGraphError);
+  const forgedExport = [...assetIndex, { kind: 'export', sourceId: 'forged-node', file: 'assets/forged.png', sha256: 'c'.repeat(64), bytes: 1, mime: 'image/png', width: 1, height: 1 }];
+  const exportSeal = { ...sealedFiles, 'assets/forged.png': { sha256: 'c'.repeat(64), bytes: 1 } };
+  assert.throws(() => buildAssetGraph({ document, assetIndex: forgedExport, assetNodeIds: ['icon'], sealedFiles: exportSeal, sourcePlanes: planes(), evidenceClass: 'microfixture' }), AssetGraphError);
 });
 
 test('all P2 semantic graphs fail before construction on REST_ONLY/PARTIAL provenance and refuse unknown graph schemas', () => {
@@ -146,6 +149,9 @@ test('canonical-model pipeline builds all versioned P2 graphs from one snapshot 
     ['binding references missing node', (value) => { value.bindingGraph.records[0].source.nodeId = 'missing'; }],
     ['binding identity disagrees', (value) => { value.bindingGraph.records[0].bindingId = 'forged'; }],
     ['binding and variable contexts disagree', (value) => { value.bindingGraph.nodeModeContexts[0].modeContextId = 'ø'; }],
+    ['persisted unknown carrier', (value) => { value.bindingGraph.unknown.push({ nodeId: 'root', jsonPointer: '/novelFeature', variableId: 'V:op' }); }],
+    ['persisted forged mirror', (value) => { value.bindingGraph.mirrors.push({ nodeId: 'root', jsonPointer: '/boundVariables/fills/0', variableId: 'V:op', mirrorOf: 'fills' }); }],
+    ['persisted forged nonvisual disposition', (value) => { value.bindingGraph.nonvisual.push({ nodeId: 'root', jsonPointer: '/boundVariables/novel', variableId: 'V:op' }); }],
     ['malformed component definition', (value) => { value.componentGraph.definitions[0] = {}; }],
     ['malformed component instance', (value) => { value.componentGraph.instances[0] = {}; }],
     ['component supplement disagrees', (value) => { value.componentGraph.definitionSupplements[0].componentPropertyDefinitions.Size.defaultValue = 'L'; }],
@@ -153,6 +159,7 @@ test('canonical-model pipeline builds all versioned P2 graphs from one snapshot 
     ['text characters disagree', (value) => { value.textGraph.textNodes[0].segments[0].characters = 'No '; }],
     ['malformed asset', (value) => { value.assetGraph.assets.push({}); }],
     ['asset content identity malformed', (value) => { value.assetGraph.assets[0].sha256 = 'bad'; }],
+    ['export references missing source node', (value) => { value.assetGraph.assets.push({ kind: 'export', sourceId: 'forged-node', file: 'assets/forged.png', sha256: 'c'.repeat(64), bytes: 1, mime: 'image/png', width: 1, height: 1 }); }],
   ];
   for (const [name, mutate] of persistedMutations) {
     const corrupted = structuredClone(persisted);

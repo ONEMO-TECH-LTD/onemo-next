@@ -27,6 +27,7 @@ export function buildAssetGraph({ document, assetIndex, assetNodeIds = [], seale
     keys.add(key);
     const sealed = sealedFiles[row.file];
     if (!sealed || sealed.sha256 !== row.sha256 || sealed.bytes !== row.bytes) throw new AssetGraphError('FAILED_CAPTURE', `asset ${row.sourceId} identity disagrees with sealed manifest file ${row.file}`);
+    if (['svg', 'export'].includes(row.kind) && !nodeIds.has(row.sourceId)) throw new AssetGraphError('FAILED_CAPTURE', `${row.kind} asset ${row.sourceId} has no captured source node`);
   }
   for (const ref of imageRefs) if (!keys.has(`image:${ref}`)) throw new AssetGraphError('FAILED_CAPTURE', `imageRef ${ref} has no sealed asset mapping`);
   for (const nodeId of assetNodeIds) {

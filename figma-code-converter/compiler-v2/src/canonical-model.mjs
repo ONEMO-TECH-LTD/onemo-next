@@ -96,10 +96,53 @@ function validatePersistedGraphs(model, errors) {
   const documentNodes = validateDocument(model.documentGraph, errors);
   const variables = validateVariables(model.variableGraph, errors);
   const contexts = validateContexts(model.variableGraph, model.bindingGraph, documentNodes, variables, errors);
+  validateBindingInventory(model.documentGraph, model.bindingGraph, documentNodes, errors);
   validateBindings(model.bindingGraph, documentNodes, variables, contexts, errors);
   validateComponents(model.componentGraph, documentNodes, errors);
   validateText(model.textGraph, documentNodes, errors);
   validateAssets(model.assetGraph, documentNodes, errors);
+}
+
+function validateBindingInventory(documentGraph, bindingGraph, documentNodes, errors) {
+  const rebuild = (nodeId) => {
+    const row = documentNodes.get(nodeId);
+    if (!row) return null;
+    return {
+      ...structuredClone(row.properties),
+      ...(row.childrenPresent ? { children: row.childIds.map(rebuild) } : {}),
+    };
+  };
+  const document = rebuild(documentGraph.rootId);
+  const classified = classifyOccurrences(collectOccurrences(document), document);
+  if (classified.unknown.length) errors.push(`bindingGraph source reconstruction has ${classified.unknown.length} unknown carrier(s)`);
+  for (const name of ['unknown', 'mirrors', 'nonvisual']) {
+    if (canonicalJson(classified[name]) !== canonicalJson(bindingGraph[name])) errors.push(`bindingGraph.${name} disagrees with reconstructed source classification`);
+  }
+  const occurrenceKey = (row) => canonicalJson({
+    nodeId: row.nodeId,
+    propertyPath: row.propertyPath,
+    slot: row.slot ?? null,
+    variableId: row.variableId,
+    destinationDomain: row.destinationDomain,
+  });
+  const recordKey = (row) => canonicalJson({
+    nodeId: row.source?.nodeId,
+    propertyPath: row.source?.propertyPath,
+    slot: row.source?.slot ?? null,
+    variableId: row.variable?.captureId,
+    destinationDomain: row.destinationDomain,
+  });
+  const expected = multiset(classified.canonical.map(occurrenceKey));
+  const actual = multiset(bindingGraph.records.map(recordKey));
+  if (canonicalJson(Object.fromEntries([...expected].sort())) !== canonicalJson(Object.fromEntries([...actual].sort()))) {
+    errors.push('bindingGraph.records disagree with reconstructed canonical source slots');
+  }
+}
+
+function multiset(values) {
+  const counts = new Map();
+  for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
+  return counts;
 }
 
 function validateDocument(graph, errors) {
@@ -369,7 +412,7 @@ function validateAssets(graph, documentNodes, errors) {
     const identity = `${row?.kind}:${row?.sourceId}`;
     if (identities.has(identity)) errors.push(`${path} duplicate identity ${identity}`);
     identities.add(identity);
-    if (row?.kind === 'svg') add(errors, `${path}.sourceId`, documentNodes.has(row.sourceId), 'does not reference a document node');
+    if (['svg', 'export'].includes(row?.kind)) add(errors, `${path}.sourceId`, documentNodes.has(row.sourceId), 'does not reference a document node');
   }
   const imageRefs = new Set();
   for (const node of documentNodes.values()) collectImageRefs(node.properties, imageRefs);
