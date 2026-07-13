@@ -2273,7 +2273,7 @@ function ComponentsRail({ components, selectedFile, onJump, query = '', onContex
   return (
     <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 12 }}>
       {components.length === 0 && (
-        <div style={{ padding: '12px 16px', font: `400 11px/1.5 ${FONT}`, color: MUTE }}>No components yet — create one above, or select an element on the canvas and use “Create component from selection”.</div>
+        <div style={{ padding: '12px 16px', font: `400 11px/1.5 ${FONT}`, color: MUTE }}>No components yet — select an element on the canvas and use “Create component from selection”. Blank creation comes in G4.</div>
       )}
       {components.length > 0 && filtered.length === 0 && (
         <div style={{ padding: '12px 16px', font: `400 11px/1.5 ${FONT}`, color: MUTE }}>No components match “{query}”.</div>
@@ -2363,9 +2363,6 @@ export default function ReactFigmaPage() {
   const [assetTab, setAssetTab] = useState<AssetTab>('images')
   const [compSearch, setCompSearch] = useState('') // E10-E2: functional Components-page search
   const [compNonce, setCompNonce] = useState(0)
-  const [newCompName, setNewCompName] = useState('')
-  const [newCompRoot, setNewCompRoot] = useState<'project' | 'global'>('project') // E7.4 QA MED: UI parity with the op
-  const [newCompCategory, setNewCompCategory] = useState('')
   // Components keep the current page iframe mounted. Entering one project component overlays its graph-backed
   // authoring frames in this same canvas host; Home removes the overlay and reveals the unchanged page.
   const [editingComponent, setEditingComponent] = useState<DsComponent | null>(null)
@@ -2416,26 +2413,6 @@ export default function ReactFigmaPage() {
     const component = dsComponents.find((candidate) => candidate.root === 'project' && candidate.file === authoringResumeTarget)
     if (component) setEditingComponent(component)
   }, [authoringResumeTarget, dsComponents, editingComponent, rail])
-  // #6: create a new component in code (Framer-style) — scaffolds a real editable component file.
-  const newComponent = useCallback(async (name: string, root: 'project' | 'global' = 'project', category = '') => {
-    const clean = name.trim()
-    if (!/^[A-Za-z][A-Za-z0-9]*$/.test(clean)) { notify('Name must be a PascalCase identifier', 'error'); return }
-    const body: Record<string, string> = { kind: 'create-component', name: clean, root }
-    if (category.trim()) body.category = category.trim()
-    const r = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
-    if (r.ok) { const d = await r.json().catch(() => ({})); notify(`Created ${d.name ?? clean}${root === 'global' ? ' in the global library' : ''}`); setCompNonce((n) => n + 1) }
-    else notify(`Create failed: ${await r.text()}`, 'error')
-  }, [])
-  // E10-A5: rename a component by name (existing `rename-component` op). NOTE: the server op currently
-  // resolves the FLAT project dir only — it fails for global-library + categorized components; that
-  // extension (shared component-locator) lands in the lifecycle phase. Wired here for flat-project comps.
-  const renameComponentByName = useCallback(async (name: string) => {
-    const next = window.prompt(`Rename component "${name}" to:`, name)?.trim()
-    if (!next || next === name) return
-    if (!/^[A-Za-z][A-Za-z0-9]*$/.test(next)) { notify('Name must be a PascalCase identifier', 'error'); return }
-    const r = await fetch('/api/dev/editor-write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'rename-component', name, newName: next }) })
-    if (r.ok) { notify(`Renamed ${name} → ${next}`); setCompNonce((n) => n + 1) } else notify(`Rename failed: ${await r.text()}`, 'error')
-  }, [])
   // #28 Assets: also surface the loaded screen's REAL images + icons (scanned live from the canvas —
   // no invented asset library). Images insert as <img src>; icons render as thumbnails.
   const [canvasAssets, setCanvasAssets] = useState<{ images: string[]; icons: CanvasIconAsset[] }>({ images: [], icons: [] })
@@ -3081,16 +3058,6 @@ export default function ReactFigmaPage() {
     if (count) { setOvVersion((v) => v + 1); notify(`Recolored ${count} occurrence${count > 1 ? 's' : ''}`) }
     else notify('No matching color in selection', 'error')
   }, [])
-
-  // E4-G4 Assets: insert a reusable component instance (+ import) into the selected container
-  const insertAsset = useCallback(async (name: string, importPath: string) => {
-    if (!sel) { notify('Select a container element first', 'error'); return }
-    const r = await fetch('/api/dev/editor-write', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ kind: 'insert-component', file: sel.file, line: sel.line, col: sel.col, name, importPath }),
-    })
-    if (r.ok) notify(`Inserted <${name} />`); else notify(`Insert failed: ${await r.text()}`, 'error')
-  }, [sel])
 
   // E3.6 More-actions: duplicate / delete the selected element (structural source edits)
   const duplicateEl = useCallback(async () => {
@@ -3928,9 +3895,8 @@ export default function ReactFigmaPage() {
           </>
         )}
         {rail === 'components' && (() => {
-          // E10-A/E: the Components page is self-sufficient — create (blank + from selection),
-          // search, and per-component manage menu (Insert/Edit/Find/Rename/Copy import) all live here.
-          // Component creation + insert NO LONGER live in Assets (E10-E4).
+          // G2 exposes only the canonical create-from-selection/edit flow. Blank creation,
+          // component rename, and instance insertion remain visible as explicit G4 deferrals.
           const jumpTo = (label: string) => {
             const doc = iframeRef.current?.contentDocument
             const frame = doc?.querySelector(`[data-component-frame="${label}"]`)
@@ -3952,30 +3918,17 @@ export default function ReactFigmaPage() {
                   style={{ flex: 1, minWidth: 0, border: 0, background: 'transparent', outline: 0, font: `400 11px/1 ${FONT}`, color: INK }} />
               </div>
             </div>
-            <form onSubmit={(e) => { e.preventDefault(); if (newCompName.trim()) { void newComponent(newCompName, newCompRoot, newCompCategory); setNewCompName(''); setNewCompCategory('') } }} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '0 12px 8px', flex: 'none' }}>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <input value={newCompName} onChange={(e) => setNewCompName(e.currentTarget.value)} placeholder="New component name" aria-label="New component name"
-                  style={{ flex: 1, minWidth: 0, height: 26, borderRadius: 6, border: `1px solid ${LINE}`, background: '#fff', padding: '0 8px', outline: 0, font: `400 11px/1 ${FONT}`, color: INK }} />
-                <button type="submit" title="Create blank component" style={{ appearance: 'none', border: 0, background: SEL, color: '#fff', height: 26, borderRadius: 6, padding: '0 10px', cursor: 'pointer', font: `450 11px/1 ${FONT}` }}>New</button>
-              </div>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <select value={newCompRoot} onChange={(e) => setNewCompRoot(e.currentTarget.value as 'project' | 'global')} aria-label="Component library"
-                  style={{ height: 26, borderRadius: 6, border: `1px solid ${LINE}`, background: '#fff', padding: '0 6px', outline: 0, font: `400 11px/1 ${FONT}`, color: INK }}>
-                  <option value="project">Project</option>
-                  <option value="global">Global library</option>
-                </select>
-                <input value={newCompCategory} onChange={(e) => setNewCompCategory(e.currentTarget.value)} placeholder="Category (optional)" aria-label="Component category"
-                  style={{ flex: 1, minWidth: 0, height: 26, borderRadius: 6, border: `1px solid ${LINE}`, background: '#fff', padding: '0 8px', outline: 0, font: `400 11px/1 ${FONT}`, color: INK }} />
-              </div>
-            </form>
+            <div data-component-phase-deferred="blank-create" style={{ padding: '0 12px 8px', color: MUTE, font: `400 10px/1.4 ${FONT}` }}>
+              Blank component creation comes in G4. Create from selection is available above.
+            </div>
             <ComponentsRail components={dsComponents} selectedFile={editingComponent?.file} query={compSearch} onJump={jumpTo} onEdit={(c) => {
               if (c.root === 'project') setEditingComponent(c)
               else notify('Global library authoring is not available in this phase', 'error')
             }}
               onContext={(c, e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, items: [
-                { label: 'Insert into selection', onClick: () => void insertAsset(c.name, c.importPath) },
+                { label: 'Insert into selection — coming in G4', disabled: true, title: 'Component instance insertion comes in G4' },
                 { label: 'Edit component', onClick: () => c.root === 'project' ? setEditingComponent(c) : notify('Global library authoring is not available in this phase', 'error') },
-                { label: 'Rename', divider: true, onClick: () => void renameComponentByName(c.name) },
+                { label: 'Rename — coming in G4', divider: true, disabled: true, title: 'Canonical component rename comes in G4' },
                 { label: 'Copy import', onClick: () => { try { void navigator.clipboard?.writeText(`import { ${c.name} } from '${c.importPath}'`); notify(`Copied import · ${c.name}`) } catch { notify('Clipboard blocked', 'error') } } },
                 { label: 'Duplicate — lands in the lifecycle phase', divider: true, disabled: true, title: 'Component duplicate ships in the E10 lifecycle phase' },
                 { label: 'Delete — lands in the lifecycle phase', danger: true, disabled: true, title: 'Component delete ships in the E10 lifecycle phase' },

@@ -49,6 +49,14 @@ test.describe('React Figma component authoring', () => {
     await expect(page.getByRole('textbox', { name: 'Search components' })).toBeVisible({ timeout: 20_000 })
     const fixtureButton = page.getByRole('button', { name: fixtureName, exact: true })
     await expect(fixtureButton).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByLabel('New component name')).toHaveCount(0)
+    await expect(page.locator('[data-component-phase-deferred="blank-create"]')).toContainText('comes in G4')
+    await fixtureButton.click({ button: 'right' })
+    const componentMenu = page.getByRole('menu')
+    await expect(componentMenu.getByRole('button', { name: 'Insert into selection — coming in G4' })).toBeDisabled()
+    await expect(componentMenu.getByRole('button', { name: 'Rename — coming in G4' })).toBeDisabled()
+    await page.mouse.click(800, 500)
+    await expect(componentMenu).toHaveCount(0)
     editorDocumentRequests.length = 0
     tokenResponses.length = 0
     await fixtureButton.dblclick()
