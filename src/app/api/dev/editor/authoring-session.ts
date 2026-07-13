@@ -236,15 +236,36 @@ export class ProjectAuthoringSession {
     const projectRoot = this.input.registry.get(this.input.storeId).canonicalRealPath
     const targetAuthority = new Set(Object.keys(snapshot.sourceHashes))
     const exactSourceHashes: Record<string, string> = {}
+    const componentsBySource = new Map<string, typeof definition[]>()
+    const sourceRoots = new Set<string>()
+    const directSourceFiles = new Set<string>()
+    const addSourceRoot = (source: { storeId: string; file: string }) => {
+      if (source.storeId === this.input.storeId) sourceRoots.add(source.file)
+    }
     for (const candidate of Object.values(before.components)) {
-      const candidateSnapshot = candidate.id === definition.id
+      if (candidate.source.storeId !== this.input.storeId) continue
+      addSourceRoot(candidate.source)
+      const owners = componentsBySource.get(candidate.source.file) ?? []
+      owners.push(candidate)
+      componentsBySource.set(candidate.source.file, owners)
+    }
+    for (const property of Object.values(before.sourceProperties)) {
+      addSourceRoot(property.source)
+      if (property.binding.kind === 'module-css' && property.binding.stylesheet.storeId === this.input.storeId) {
+        directSourceFiles.add(property.binding.stylesheet.file)
+      }
+    }
+    for (const instance of Object.values(before.instances)) addSourceRoot(instance.source)
+
+    for (const sourceFile of [...sourceRoots].sort()) {
+      const candidateSnapshot = sourceFile === definition.source.file
         ? snapshot
         : await readExactAuthoringSourceSnapshot({
           storeId: this.input.storeId,
-          file: candidate.source.file,
+          file: sourceFile,
           registry: this.input.registry,
         })
-      if (candidate.id !== definition.id) {
+      if (sourceFile !== definition.source.file) {
         const changedPaths = Object.entries(candidateSnapshot.sourceHashes)
           .filter(([file, hash]) => !targetAuthority.has(file) && before.sourceHashes[file] !== hash)
           .map(([file]) => file)
@@ -257,15 +278,28 @@ export class ProjectAuthoringSession {
       }
       assertEnvironmentFingerprint(snapshot.environmentFingerprint, candidateSnapshot.environmentFingerprint)
       assertStagedTypeScriptSemantics(
-        candidate.source.file,
-        candidateSnapshot.sources[candidate.source.file]!,
+        sourceFile,
+        candidateSnapshot.sources[sourceFile]!,
         projectRoot,
         candidateSnapshot.compilerOptions,
-        Object.fromEntries(Object.entries(candidateSnapshot.sources).filter(([file]) => file !== candidate.source.file)),
+        Object.fromEntries(Object.entries(candidateSnapshot.sources).filter(([file]) => file !== sourceFile)),
       )
-      projectVariantRegistry(before, candidate, candidateSnapshot.projection)
-      assertAcceptedSourceProjection(candidate, candidateSnapshot.projection)
+      for (const candidate of componentsBySource.get(sourceFile) ?? []) {
+        projectVariantRegistry(before, candidate, candidateSnapshot.projection)
+        assertAcceptedSourceProjection(candidate, candidateSnapshot.projection)
+      }
       Object.assign(exactSourceHashes, candidateSnapshot.sourceHashes)
+    }
+    for (const file of [...directSourceFiles].sort()) {
+      if (exactSourceHashes[file] !== undefined) continue
+      const bytes = await fs.readFile(await this.input.registry.resolveStorePath(this.input.storeId, file))
+      const hash = sha256(bytes)
+      if (before.sourceHashes[file] !== hash) {
+        throw Object.assign(new Error(`non-target source hash mismatch: ${file}`), {
+          code: 'SOURCE_HASH_STALE', status: 409, changedPaths: [file],
+        })
+      }
+      exactSourceHashes[file] = hash
     }
     const command = { kind: 'revalidate-source', file: input.file }
     const historyPatches = await this.history.planCommand({

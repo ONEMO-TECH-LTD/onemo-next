@@ -118,6 +118,47 @@ describe('create-component-from-selection authoring session', () => {
       .resolves.toContain('"revision": 2')
   }, 20_000)
 
+  it('retains the live consumer authority through extracted-component revalidation and undo', async () => {
+    const { root, registry, session } = await fixture()
+    const pageDependency = 'src/app/page-data.ts'
+    const consumerSource = `import { pageLabel } from './page-data'\n\n${PAGE_SOURCE.replace('<main>', '<main data-label={pageLabel}>')}`
+    await fs.writeFile(path.join(root, pageDependency), "export const pageLabel = 'Page'\n")
+    await fs.writeFile(path.join(root, PAGE), consumerSource)
+    const preview = await readExactAuthoringSourceSnapshot({ storeId: 'project-main', file: PAGE, registry })
+    const created = await session.createComponentFromSelection({
+      command: {
+        kind: 'create-component-from-selection', commandId: 'create-card-revalidate',
+        file: PAGE, line: 6, col: 7, name: 'Card',
+      },
+      transactionId: '00000000-0000-4000-8000-000000000105',
+      expectedRevision: 0,
+      expectedSourceHashes: preview.sourceHashes,
+      expectedEnvironmentFingerprint: preview.environmentFingerprint,
+    })
+    const componentPath = path.join(root, COMPONENT)
+    const componentSource = await fs.readFile(componentPath, 'utf8')
+    await fs.writeFile(componentPath, componentSource.replace('export function Card() {\n', 'export function Card() {\n\n'))
+    const changed = await readExactAuthoringSourceSnapshot({ storeId: 'project-main', file: COMPONENT, registry })
+
+    const revalidated = await session.revalidateSource({
+      file: COMPONENT,
+      expectedRevision: created.graph.revision,
+      expectedSourceHashes: changed.sourceHashes,
+    })
+
+    expect(revalidated.graph.sourceHashes).toHaveProperty(PAGE, created.graph.sourceHashes[PAGE])
+    expect(revalidated.graph.sourceHashes).toHaveProperty(pageDependency, created.graph.sourceHashes[pageDependency])
+    expect(revalidated.graph.sourceHashes).toHaveProperty(COMPONENT, changed.sourceHashes[COMPONENT])
+    expect(Object.values(revalidated.graph.instances)).toHaveLength(1)
+    const undone = await session.undo({
+      expectedRevision: revalidated.graph.revision,
+      expectedSourceHashes: revalidated.graph.sourceHashes,
+    })
+    expect(undone.graph).toMatchObject({ components: {}, instances: {} })
+    await expect(fs.readFile(path.join(root, PAGE), 'utf8')).resolves.toBe(consumerSource)
+    await expect(fs.readFile(componentPath)).rejects.toMatchObject({ code: 'ENOENT' })
+  }, 20_000)
+
   it('strictly validates command identity, source location, and component name', () => {
     const valid = {
       kind: 'create-component-from-selection', commandId: 'create-card-1',
