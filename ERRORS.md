@@ -121,3 +121,10 @@ Follow-up after the bounded import-reload protocol: the one permitted document r
 - Symptoms: route-manifest reloads reset the parent editor, the create action correctly refused a missing selection payload, the resume marker remained in the originating document, and Next briefly reported that the extracted component import could not resolve.
 - What worked: create and compile the route after the cold probes, perform one explicitly unmeasured setup reload, wait for the matching live layer row, explicitly reload only after the durable transaction succeeds, and order source patches dependency-first (rollback already restores in reverse).
 - Remember: separate harness route registration from the measured authoring reload; iframe visibility does not prove the editor selection bridge is ready; multi-file installs must expose dependencies before consumers and restore consumers before removing dependencies.
+
+## S58 initial cold-shell authoring readiness
+
+- What did not work: treating React hydration, a briefly visible Components search field, and a visible fixture row as proof that the initial editor document had finished its cold remount cycle.
+- Symptoms: two isolated fresh-cache QA runs either remounted back to the File rail before the fixture interaction or began a new editor document navigation during the fixture double-click, exhausting the locator/test timeout.
+- What worked: retry the complete idempotent rail-to-import-preview transition only after the current editor document has its matching successful token response and the current iframe document is complete and engine-wired; accept the attempt only when the preview appears without another editor document request.
+- Remember: initial cold compilation can replace a hydrated shell. Synchronize against the current document's product signals and retry only the read-only transition; import/write semantics remain single-shot.

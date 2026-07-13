@@ -38,29 +38,44 @@ test.describe('React Figma component authoring', () => {
 
     await page.goto('/react-figma', { waitUntil: 'domcontentloaded' })
     const componentsRail = page.getByTitle('Components')
-    await expect.poll(
-      () => componentsRail.evaluate((node) => Object.keys(node).some((key) => key.startsWith('__reactProps'))),
-      { timeout: 20_000 },
-    ).toBe(true)
     const frame = page.locator('iframe')
     const editorUrl = page.url()
-
-    await componentsRail.click()
-    await expect(page.getByRole('textbox', { name: 'Search components' })).toBeVisible({ timeout: 20_000 })
     const fixtureButton = page.getByRole('button', { name: fixtureName, exact: true })
-    await expect(fixtureButton).toBeVisible({ timeout: 30_000 })
-    await expect(page.getByLabel('New component name')).toHaveCount(0)
-    await expect(page.locator('[data-component-phase-deferred="blank-create"]')).toContainText('not available in this phase')
-    await fixtureButton.click({ button: 'right' })
     const componentMenu = page.getByRole('menu')
-    await expect(componentMenu.getByRole('button', { name: 'Insert into selection — not available in this phase' })).toBeDisabled()
-    await expect(componentMenu.getByRole('button', { name: 'Rename — not available in this phase' })).toBeDisabled()
-    await page.mouse.click(800, 500)
-    await expect(componentMenu).toHaveCount(0)
+    const importPreview = page.locator('[data-authoring-import]')
+    await expect(async () => {
+      expect(editorDocumentRequests.length).toBeGreaterThan(0)
+      await expect.poll(() => tokenResponses.length, { timeout: 10_000 }).toBe(editorDocumentRequests.length)
+      expect(tokenResponses).toEqual(editorDocumentRequests.map(() => 200))
+      await expect.poll(
+        () => componentsRail.evaluate((node) => Object.keys(node).some((key) => key.startsWith('__reactProps'))),
+        { timeout: 10_000 },
+      ).toBe(true)
+      await expect.poll(() => frame.evaluate((node) => {
+        const doc = (node as HTMLIFrameElement).contentDocument as (Document & { __engineWired?: boolean }) | null
+        return doc?.readyState === 'complete' && doc.__engineWired === true
+      }), { timeout: 10_000 }).toBe(true)
+      await componentsRail.click({ timeout: 5_000 })
+      await expect(page.getByRole('textbox', { name: 'Search components' })).toBeVisible({ timeout: 5_000 })
+      await expect(fixtureButton).toBeVisible({ timeout: 15_000 })
+      await expect(page.getByLabel('New component name')).toHaveCount(0)
+      await expect(page.locator('[data-component-phase-deferred="blank-create"]')).toContainText('not available in this phase')
+      await fixtureButton.click({ button: 'right', timeout: 5_000 })
+      await expect(componentMenu.getByRole('button', { name: 'Insert into selection — not available in this phase' })).toBeDisabled()
+      await expect(componentMenu.getByRole('button', { name: 'Rename — not available in this phase' })).toBeDisabled()
+      await page.keyboard.press('Escape')
+      await expect(componentMenu).toHaveCount(0)
+      const stableDocumentCount = editorDocumentRequests.length
+      await fixtureButton.dblclick({ timeout: 5_000 })
+      await expect(importPreview).toContainText(`${fixtureName} · legacy-single-axis · 2 variants`, { timeout: 10_000 })
+      expect(editorDocumentRequests).toHaveLength(stableDocumentCount)
+      await expect.poll(() => tokenResponses.length, { timeout: 10_000 }).toBe(editorDocumentRequests.length)
+      expect(tokenResponses).toEqual(editorDocumentRequests.map(() => 200))
+      expect(editorDocumentRequests).toHaveLength(stableDocumentCount)
+      await expect(importPreview).toBeVisible()
+    }).toPass({ timeout: 45_000, intervals: [250, 500, 1_000] })
     editorDocumentRequests.length = 0
     tokenResponses.length = 0
-    await fixtureButton.dblclick()
-    await expect(page.locator('[data-authoring-import]')).toContainText(`${fixtureName} · legacy-single-axis · 2 variants`, { timeout: 30_000 })
     const importButton = page.getByRole('button', { name: 'Import source' })
     const isImportPost = (route: import('@playwright/test').Route) =>
       route.request().method() === 'POST' && (route.request().postData() ?? '').includes('"kind":"import-source"')
