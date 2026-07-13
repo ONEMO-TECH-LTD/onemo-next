@@ -45,32 +45,32 @@ export function collectOccurrences(document) {
 // ── pointer grammars → canonical slot + destination domain ─────────────────────────────────
 const RULES = [
   // carrier-local paints & stops (the E1/E2 law)
-  { re: /^\/fills\/(\d+)\/boundVariables\/color$/, slot: (m) => ({ kind: 'paint', index: +m[1] }), path: (m) => `fills/${m[1]}/color`, domain: 'color' },
-  { re: /^\/fills\/(\d+)\/gradientStops\/(\d+)\/boundVariables\/color$/, slot: (m) => ({ kind: 'stop', index: +m[2], paint: +m[1] }), path: (m) => `fills/${m[1]}/stops/${m[2]}/color`, domain: 'color' },
-  { re: /^\/strokes\/(\d+)\/boundVariables\/color$/, slot: (m) => ({ kind: 'stroke', index: +m[1] }), path: (m) => `strokes/${m[1]}/color`, domain: 'color' },
-  { re: /^\/strokes\/(\d+)\/gradientStops\/(\d+)\/boundVariables\/color$/, slot: (m) => ({ kind: 'stop', index: +m[2], paint: +m[1], of: 'stroke' }), path: (m) => `strokes/${m[1]}/stops/${m[2]}/color`, domain: 'color' },
+  { re: /^\/fills\/(\d+)\/boundVariables\/color$/, slot: (m) => ({ kind: 'paint', index: +m[1] }), path: (m) => `/fills/${m[1]}/color`, domain: 'color' },
+  { re: /^\/fills\/(\d+)\/gradientStops\/(\d+)\/boundVariables\/color$/, slot: (m) => ({ kind: 'stop', index: +m[2], paint: +m[1] }), path: (m) => `/fills/${m[1]}/stops/${m[2]}/color`, domain: 'color' },
+  { re: /^\/strokes\/(\d+)\/boundVariables\/color$/, slot: (m) => ({ kind: 'stroke', index: +m[1] }), path: (m) => `/strokes/${m[1]}/color`, domain: 'color' },
+  { re: /^\/strokes\/(\d+)\/gradientStops\/(\d+)\/boundVariables\/color$/, slot: (m) => ({ kind: 'stop', index: +m[2], paint: +m[1], of: 'stroke' }), path: (m) => `/strokes/${m[1]}/stops/${m[2]}/color`, domain: 'color' },
   // carrier-local effects (E3)
-  { re: /^\/effects\/(\d+)\/boundVariables\/(radius|spread|offsetX|offsetY)$/, slot: (m) => ({ kind: 'effect', index: +m[1], field: m[2] }), path: (m) => `effects/${m[1]}/${m[2]}`, domain: 'length-px' },
-  { re: /^\/effects\/(\d+)\/boundVariables\/color$/, slot: (m) => ({ kind: 'effect', index: +m[1], field: 'color' }), path: (m) => `effects/${m[1]}/color`, domain: 'color' },
+  { re: /^\/effects\/(\d+)\/boundVariables\/(radius|spread|offsetX|offsetY)$/, slot: (m) => ({ kind: 'effect', index: +m[1], field: m[2] }), path: (m) => `/effects/${m[1]}/${m[2]}`, domain: 'length-px' },
+  { re: /^\/effects\/(\d+)\/boundVariables\/color$/, slot: (m) => ({ kind: 'effect', index: +m[1], field: 'color' }), path: (m) => `/effects/${m[1]}/color`, domain: 'color' },
   // node scalars
-  { re: /^\/boundVariables\/(itemSpacing|paddingTop|paddingRight|paddingBottom|paddingLeft|strokeWeight|cornerRadius|maxWidth|minWidth|maxHeight|minHeight|counterAxisSpacing)$/, path: (m) => m[1], domain: 'length-px' },
-  { re: /^\/boundVariables\/opacity$/, path: () => 'opacity', domain: 'opacity-normalized' },
-  { re: /^\/boundVariables\/visible$/, path: () => 'visible', domain: 'react-visibility' },
-  { re: /^\/boundVariables\/characters$/, path: () => 'characters', domain: 'react-content' },
+  { re: /^\/boundVariables\/(itemSpacing|paddingTop|paddingRight|paddingBottom|paddingLeft|strokeWeight|cornerRadius|maxWidth|minWidth|maxHeight|minHeight|counterAxisSpacing)$/, path: (m) => `/${m[1]}`, domain: 'length-px' },
+  { re: /^\/boundVariables\/opacity$/, path: () => '/opacity', domain: 'opacity-normalized' },
+  { re: /^\/boundVariables\/visible$/, path: () => '/visible', domain: 'react-visibility' },
+  { re: /^\/boundVariables\/characters$/, path: () => '/characters', domain: 'react-content' },
   // keyed objects (E5, radii, size)
-  { re: /^\/boundVariables\/individualStrokeWeights\/(BORDER_(?:TOP|RIGHT|BOTTOM|LEFT)_WEIGHT)$/, path: (m) => `individualStrokeWeights/${m[1]}`, domain: 'length-px' },
-  { re: /^\/boundVariables\/rectangleCornerRadii\/(RECTANGLE_(?:TOP|BOTTOM)_(?:LEFT|RIGHT)_CORNER_RADIUS)$/, path: (m) => `rectangleCornerRadii/${m[1]}`, domain: 'length-px' },
-  { re: /^\/boundVariables\/rectangleCornerRadii\/(\d+)$/, path: (m) => `rectangleCornerRadii/${m[1]}`, domain: 'length-px' },
-  { re: /^\/boundVariables\/size\/(x|y)$/, path: (m) => `size/${m[1]}`, domain: 'length-px' },
+  { re: /^\/boundVariables\/individualStrokeWeights\/(BORDER_(?:TOP|RIGHT|BOTTOM|LEFT)_WEIGHT)$/, path: (m) => `/individualStrokeWeights/${m[1]}`, domain: 'length-px' },
+  { re: /^\/boundVariables\/rectangleCornerRadii\/(RECTANGLE_(?:TOP|BOTTOM)_(?:LEFT|RIGHT)_CORNER_RADIUS)$/, path: (m) => `/rectangleCornerRadii/${m[1]}`, domain: 'length-px' },
+  { re: /^\/boundVariables\/rectangleCornerRadii\/(\d+)$/, path: (m) => `/rectangleCornerRadii/${m[1]}`, domain: 'length-px' },
+  { re: /^\/boundVariables\/size\/(x|y)$/, path: (m) => `/size/${m[1]}`, domain: 'length-px' },
   // text properties — arrays per style range (uniform text = [0])
-  { re: /^\/boundVariables\/(fontSize|lineHeight|letterSpacing|paragraphIndent)\/(\d+)$/, slot: (m) => ({ kind: 'text-range', index: +m[2] }), path: (m) => `${m[1]}/${m[2]}`, domain: 'length-px' },
-  { re: /^\/boundVariables\/(fontFamily|fontStyle|fontWeight)\/(\d+)$/, slot: (m) => ({ kind: 'text-range', index: +m[2] }), path: (m) => `${m[1]}/${m[2]}`, domain: 'string-typography' },
+  { re: /^\/boundVariables\/(fontSize|lineHeight|letterSpacing|paragraphIndent)\/(\d+)$/, slot: (m) => ({ kind: 'text-range', index: +m[2] }), path: (m) => `/${m[1]}/${m[2]}`, domain: 'length-px' },
+  { re: /^\/boundVariables\/(fontFamily|fontStyle|fontWeight)\/(\d+)$/, slot: (m) => ({ kind: 'text-range', index: +m[2] }), path: (m) => `/${m[1]}/${m[2]}`, domain: 'string-typography' },
   { re: /^\/boundVariables\/fills\/(\d+)$/, mirror: 'fills' },
   { re: /^\/boundVariables\/strokes\/(\d+)$/, mirror: 'strokes' },
   { re: /^\/boundVariables\/effects\/(\d+)$/, mirror: 'effects' },
   // component properties (react domain)
-  { re: /^\/boundVariables\/componentProperties\/(.+)$/, path: (m) => `componentProperties/${m[1]}`, domain: 'react-component-prop' },
-  { re: /^\/componentProperties\/([^/]+)\/boundVariables\/value$/, path: (m) => `componentProperties/${m[1]}`, domain: 'react-component-prop' },
+  { re: /^\/boundVariables\/componentProperties\/(.+)$/, path: (m) => `/componentProperties/${m[1]}`, domain: 'react-component-prop' },
+  { re: /^\/componentProperties\/([^/]+)\/boundVariables\/value$/, path: (m) => `/componentProperties/${m[1]}`, domain: 'react-component-prop' },
 ];
 
 const NONVISUAL_RE = new RegExp(`^\\/boundVariables\\/(${NONVISUAL_METADATA_PATHS.join('|')})(\\/\\d+)?$`);
@@ -98,7 +98,7 @@ export function classifyOccurrences(occurrences) {
   // SAME CARRIER FAMILY (fills/strokes/effects) — same-node+same-variable across families is
   // NOT linkage (Meta probe finding 5a: an effects mirror must not pass on a fill canonical).
   const familyOf = (c) => {
-    const head = c.propertyPath.split('/')[0];
+    const head = c.propertyPath.split('/')[1]; // RFC6901 pointer: leading '/', family at [1]
     return head === 'fills' || head === 'strokes' || head === 'effects' ? head : null;
   };
   const byNodeFamily = new Map();

@@ -67,7 +67,7 @@ export function schemaError(kind, artifact) {
 }
 
 /** The fact families whose source plane MUST be declared (joint route: per-fact provenance). */
-export const REQUIRED_SOURCE_PLANES = Object.freeze(['document', 'supplement', 'variables', 'components', 'fonts', 'assets']);
+export const REQUIRED_SOURCE_PLANES = Object.freeze(['document', 'supplement', 'variables', 'components', 'fonts', 'assets', 'references', 'dependencies']);
 
 /** The contracted evidence file set (§4.3). Mirrored by evidence.REQUIRED_EVIDENCE_FILES. */
 const REQUIRED_FILES = Object.freeze([
@@ -107,6 +107,7 @@ export function validateBindingRecord(r) {
   if (!r.bindingId) errs.push('bindingId missing');
   if (!r.source?.fileKey) errs.push('source.fileKey missing — identity facts never coalesce (G2)');
   if (!r.source?.nodeId || !r.source?.propertyPath) errs.push('source.nodeId/propertyPath missing');
+  if (r.source?.propertyPath && !String(r.source.propertyPath).startsWith('/')) errs.push('source.propertyPath must be an RFC6901 JSON Pointer (leading /)');
   if (r.source?.slot) {
     const s = r.source.slot;
     if (!SLOT_KINDS.includes(s.kind)) errs.push(`slot.kind ${s.kind} invalid`);
@@ -149,8 +150,16 @@ const rangeStr = (t) => (t ? `${t.start}-${t.end}` : '');
 
 export function sourceBindingIdentity(r) {
   if (!r?.variable?.key) throw new BindingIdentityError('missing stable variable key — captureId is not promotable identity (§6.1)');
-  for (const [fact, v] of [['variable.collectionKey', r.variable.collectionKey], ['source.fileKey', r.source?.fileKey], ['modeContextId', r.modeContextId]]) {
+  for (const [fact, v] of [
+    ['variable.collectionKey', r.variable.collectionKey], ['source.fileKey', r.source?.fileKey],
+    ['source.nodeId', r.source?.nodeId], ['source.propertyPath', r.source?.propertyPath],
+    ['modeContextId', r.modeContextId], ['resolutionTraceId', r.resolutionTraceId],
+    ['destinationDomain', r.destinationDomain], ['emissionTarget', r.emissionTarget],
+  ]) {
     if (!v) throw new BindingIdentityError(`missing identity fact ${fact} — identity facts never coalesce to empty (G2)`);
+  }
+  if (!String(r.source.propertyPath).startsWith('/')) {
+    throw new BindingIdentityError(`propertyPath must be an RFC6901 JSON Pointer (got ${r.source.propertyPath})`);
   }
   return [
     r.variable.key, r.variable.collectionKey, r.source.fileKey,
@@ -162,6 +171,12 @@ export function sourceBindingIdentity(r) {
 export function emittedBindingIdentity(r, channelId) {
   if (!channelId) throw new BindingIdentityError('missing registry channelId — emitted conservation requires the resolved channel (G2)');
   return `${sourceBindingIdentity(r)}␟${channelId}`;
+}
+
+/** G3 trace conservation: the resolution trace rides its own key so a re-resolved chain
+ *  (same value, different route) cannot silently substitute (§3.5 mode-graph law). */
+export function traceConservationKey(r) {
+  return `${sourceBindingIdentity(r)}␟trace:${r.resolutionTraceId}`;
 }
 
 export function formatBindingForError(r) {

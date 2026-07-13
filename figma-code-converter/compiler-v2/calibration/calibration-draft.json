@@ -4,10 +4,21 @@
  "fileKey": "Qdb9Kx98afJHxaCGAIxoMC",
  "nodeId": "6075:53685",
  "fileVersion": "2375782983690416241",
+ "frame": {
+  "w": 402,
+  "h": 874
+ },
+ "buildCommit": "f040360e08c004483cc183730c77b4220fce00eb",
+ "artifacts": {
+  "figma": "2ee8d8f8d69a300fdc7276439ba5c356ecf46d3a027b7e23a2fcdcc106cfbb8a",
+  "buildA": "bccec2848283ae862e2bedd6e3f5c918d91d20df701ef03817bd05e0de81a134",
+  "buildB": "bccec2848283ae862e2bedd6e3f5c918d91d20df701ef03817bd05e0de81a134"
+ },
  "environment": {
   "capture": "playwright system-chrome dpr2",
   "viewport": "402x874",
-  "theme": "data-theme=light",
+  "theme": "light (stamped + verified on documentElement)",
+  "alpha": "both sides composited onto opaque #ffffff before compare",
   "figmaExport": "REST png scale=2 (color profile unpinned — owed)"
  },
  "samples": {
@@ -29,8 +40,8 @@
   }
  },
  "honesty": [
-  "n=1 per class — distributions, per-class regions (text/vector/raster), DeltaE, SSIM, and known-broken mutation runs OWED before any budget becomes normative",
-  "legacy-lane build (nine truth-fixes) — v2 packages recalibrate at P6",
-  "whole-frame metrics only; class segmentation requires region maps from the v2 source map"
+  "DRAFT EVIDENCE ONLY — no budget is normative until P0 calibration acceptance (QA/Meta/Dan)",
+  "n=1 per class; distributions, per-class regions, DeltaE, SSIM, known-broken runs OWED",
+  "legacy-lane build — v2 packages recalibrate at P6"
  ]
 }

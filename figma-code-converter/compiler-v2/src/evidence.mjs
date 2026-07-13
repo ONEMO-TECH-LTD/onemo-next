@@ -67,7 +67,9 @@ export async function writeSnapshot(dir, {
     const files = {};
     const put = async (rel, buf) => {
       if (!Buffer.isBuffer(buf)) throw new EvidenceError('FAILED_CAPTURE', `evidence part ${rel} is not byte content`);
-      await fs.writeFile(path.join(staging, rel), buf);
+      const abs = resolveUnder(staging, rel); // V13 confinement — the ONE helper, write side
+      await fs.mkdir(path.dirname(abs), { recursive: true });
+      await fs.writeFile(abs, buf);
       files[rel] = { sha256: sha256(buf), bytes: buf.length };
     };
     const parts = {
@@ -75,8 +77,19 @@ export async function writeSnapshot(dir, {
       'components.json': components, 'fonts.json': fonts, 'dependencies.json': dependencies,
     };
     for (const rel of Object.keys(parts)) await put(rel, Buffer.from(JSON.stringify(parts[rel] ?? null, null, 1)));
-    for (const [rel, buf] of assets) await put(path.join('assets', rel), buf);
-    await put('references/manifest.json', Buffer.from(JSON.stringify({ schemaVersion: SCHEMA.manifest, references }, null, 1)));
+    for (const [rel, buf] of assets) await put(`assets/${rel}`, buf);
+    // §4.5: every DECLARED reference artifact must be sealed with the snapshot — a reference
+    // row without sealed bytes is a refusal, not a dangling promise.
+    for (const ref of references) {
+      if (!ref.file) throw new EvidenceError('FAILED_CAPTURE', `reference ${ref.state ?? '?'} declares no artifact file`);
+      if (!String(ref.file).startsWith('references/')) throw new EvidenceError('FAILED_CAPTURE', `reference artifact must live under references/: ${ref.file}`);
+      if (!Buffer.isBuffer(ref.bytes)) throw new EvidenceError('FAILED_CAPTURE', `reference artifact not provided as bytes: ${ref.file}`);
+      await put(ref.file, ref.bytes);
+    }
+    await put('references/manifest.json', Buffer.from(JSON.stringify({
+      schemaVersion: SCHEMA.manifest,
+      references: references.map(({ bytes, ...meta }) => ({ ...meta, sha256: sha256(bytes) })),
+    }, null, 1)));
 
     const census = censusOf({ document, supplement, variables, components });
     const assetHashes = Object.fromEntries([...assets.keys()].map((k) => [k, files[path.join('assets', k)].sha256]));
@@ -154,16 +167,22 @@ export async function readSnapshot(dir) {
   if (errs.length) throw new EvidenceError('FAILED_CAPTURE', `manifest invalid: ${errs.join('; ')}`);
   for (const [rel, meta] of Object.entries(manifest.files)) {
     let buf;
-    try { buf = await fs.readFile(path.join(dir, rel)); }
-    catch { throw new EvidenceError('FAILED_CAPTURE', `evidence file missing: ${rel}`); }
+    try { buf = await fs.readFile(resolveUnder(dir, rel)); } // confinement on READ too — a malicious manifest cannot reach outside
+    catch (e) { throw e instanceof EvidenceError ? e : new EvidenceError('FAILED_CAPTURE', `evidence file missing: ${rel}`); }
     if (buf.length !== meta.bytes) throw new EvidenceError('FAILED_CAPTURE', `byte-length mismatch: ${rel} (manifest ${meta.bytes} ≠ disk ${buf.length})`);
     const h = sha256(buf);
     if (h !== meta.sha256) throw new EvidenceError('FAILED_CAPTURE', `hash mismatch: ${rel} (manifest ${meta.sha256.slice(0, 12)}… ≠ disk ${h.slice(0, 12)}…)`);
   }
   const read = async (rel) => {
-    try { return JSON.parse(await fs.readFile(path.join(dir, rel), 'utf8')); }
-    catch (e) { throw new EvidenceError('FAILED_CAPTURE', `evidence part unreadable: ${rel}: ${e.code ?? e.message}`); }
+    try { return JSON.parse(await fs.readFile(resolveUnder(dir, rel), 'utf8')); }
+    catch (e) { throw e instanceof EvidenceError ? e : new EvidenceError('FAILED_CAPTURE', `evidence part unreadable: ${rel}: ${e.code ?? e.message}`); }
   };
+  // every declared reference must resolve to exactly one sealed file (metadata-only forbidden)
+  const refManifest = await read('references/manifest.json');
+  for (const ref of refManifest?.references ?? []) {
+    if (!manifest.files[ref.file]) throw new EvidenceError('FAILED_CAPTURE', `declared reference not sealed in manifest.files: ${ref.file}`);
+    if (ref.sha256 && manifest.files[ref.file].sha256 !== ref.sha256) throw new EvidenceError('FAILED_CAPTURE', `reference sha mismatch: ${ref.file}`);
+  }
   const snapshot = {
     dir, manifest,
     document: await read('document.rest.json'),
@@ -183,6 +202,23 @@ export async function readSnapshot(dir) {
 }
 
 async function exists(p) { try { await fs.access(p); return true; } catch { return false; } }
+
+/**
+ * V13 path confinement — THE single resolve-under-root helper, used by BOTH write and read.
+ * Rejects absolute, empty, non-normalized, '.'/'..'-bearing, and escaping paths, so a
+ * checked-in malicious manifest can never read outside its evidence directory.
+ */
+export function resolveUnder(root, rel) {
+  if (typeof rel !== 'string' || rel.length === 0) throw new EvidenceError('FAILED_CAPTURE', 'empty evidence path');
+  if (path.isAbsolute(rel)) throw new EvidenceError('FAILED_CAPTURE', `absolute evidence path forbidden: ${rel}`);
+  const segs = rel.split('/');
+  if (segs.some((s) => s === '' || s === '.' || s === '..')) throw new EvidenceError('FAILED_CAPTURE', `non-normalized evidence path forbidden: ${rel}`);
+  const abs = path.resolve(root, rel);
+  if (abs !== path.resolve(root) && !abs.startsWith(path.resolve(root) + path.sep)) {
+    throw new EvidenceError('FAILED_CAPTURE', `evidence path escapes the snapshot: ${rel}`);
+  }
+  return abs;
+}
 
 export class EvidenceError extends Error {
   constructor(state, message) { super(message); this.state = state; }
