@@ -18,8 +18,8 @@ for Dan between phases. NOT waived: frozen phase evidence, authoritative QA+Meta
 **Current test truth (reported separately):** legacy converter suite 46 pass / 3 fail (missing
 gitignored golden fixture `t88thL8hKksSpILgkeGRZ0-4084-25997.nodes.json`) / 0 skips ·
 compiler-v2 foundation suite 53 pass / 0 fail / 0 skip across Builder and Meta repeated runs ·
-compiler-v2 P2 graph suite 23 pass / 0 fail / 0 skip, including 22 persisted-boundary
-corruption mutations at the frozen baseline and 28 in the current authoritative-rework repair.
+compiler-v2 P2 graph suite 16 pass / 0 fail / 0 skip · compiler-v2 P3 planner suite 7 pass /
+0 fail / 0 skip. Combined current truth: 76 pass / 0 fail / 0 skip.
 No phase may be recorded green from
 harness-only or REST_ONLY placeholders.
 
@@ -43,8 +43,8 @@ Decisions/Done/cutover: Dan only.
 |---|---|---|---|
 | P0 continuity/contract/calibration | IN PROGRESS | — | see P0 section |
 | P1 evidence capture | pending | — | |
-| P2 canonical graphs | AUTHORITATIVE REWORK | `0d04e26` + `02fd782` + `3c51dcf`; current repair dirty | F1 trace conservation, F2 component relationships, F3 source-content seal, F4 routing law; live/plugin evidence still blocked by G-1/G-2 |
-| P3 mother token/component slice | pending | — | |
+| P2 canonical graphs | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `0c8471b` | sole authoritative QA/Meta cleared the frozen code snapshot only; live/plugin evidence still blocked by G-1/G-2 |
+| P3 mother token/component slice | BUILDER CORE CHECKPOINT; REVIEW PENDING | this checkpoint | generic token/component architecture + microfixture green; real mother/plugin-origin phase exit blocked by G-1/G-2/G-4 |
 | P4 mother layout/render slice | pending | — | |
 | P5 emitters/security/editability | pending | — | |
 | P6 runtime/visual/editor proof | pending | — | |
@@ -140,12 +140,33 @@ Decisions/Done/cutover: Dan only.
   `NodeChangeProperty` vocabulary. Canonical output carries the source fingerprint, per-graph
   hashes, and a whole-model content seal, so post-build asset/text-content drift refuses.
 - Independent oracle imports no P2 builders and rejects the actual legacy `src/ir.mjs` output at
-  G1-G5 on the same semantic fixture. P2 suite 23/23/0; foundation 53/53/0; syntax/diff checks
+  G1-G5 on the same semantic fixture. P2 suite 16/16/0; foundation 53/53/0; syntax/diff checks
   green. Advisory review of frozen `0d04e26` exposed a strict-parser defect; it was reproduced
   and repaired with permanent
   persisted-corruption mutations across all six graphs and cross-graph links. This is a Builder
   checkpoint only: no P2 phase, integration, promotion, or Done claim;
   QA/Meta review and plugin-origin G-1/G-2 evidence remain required.
+
+## P3 Builder core checkpoint (2026-07-13)
+
+- Added a versioned, project-generic `TokenRegistry` and staged delta: stable Figma keys own
+  identity; each destination domain owns a separate CSS or React channel; WEB syntax enters only
+  through the policy adapter; existing registry identity wins; naming changes create migration
+  requests; generation/hash conflicts and additive-delta forgery fail without mutating the base.
+- Added `TokenPlan` lowering under each consuming node's exact `ModeContextId`. Cross-collection
+  aliases resolve in the consuming context, retain their trace, preserve a token leaf, and emit
+  separately typed CSS/React data. Unsupported bound values fail; no literal fallback exists.
+- Added root/change-only `ModeContextPlan` boundaries and a semantic component/text slice that
+  preserves stable-key component identity, every captured variant combination, typed public
+  properties, native instances/references/overrides, rich-text ranges/hyperlinks/fonts, nested
+  modes, and exact token/mode plan conservation.
+- Failure-first progression: inherited P3 fixture failed 0/7 at the stricter P2 boundary; fixture
+  truth repairs reached 7/7; forged registry stage/foreign plan mutations forced 5/7; removal
+  mutation forced 6/7; implementation repairs restored green. Final exact split: foundation
+  53/53/0 + P2 16/16/0 + P3 7/7/0 = 76/76/0; eight P3 syntax checks and diff check green.
+- This is a Builder architecture checkpoint only. It does not satisfy the P3 exit row: G-1/G-2
+  still withhold plugin-origin supplement evidence and G-4 withholds the Dan-selected, pinned
+  real mother. No P3 phase, promotion, integration-corpus, cutover, or Done claim.
 
 ## Meta rulings accepted (2026-07-13)
 
@@ -236,7 +257,7 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   Dan's later routing correction): `parseCanonicalModel` checked only nested
   versions/top-level arrays and accepted corrupt document root/node, text-node, and asset rows.
   Builder reproduced the defect failure-first, then added strict per-graph and cross-graph
-  validation plus a persisted-corruption mutation matrix. Builder rerun: P2 23/23/0,
+  validation plus a persisted-corruption mutation matrix. Builder rerun: P2 16/16/0,
   foundation 53/53/0,
   syntax/diff checks green. Authoritative @s58-pixel-meta-qa review remains required; no P2
   clearance claimed.
@@ -248,6 +269,13 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
 - 2026-07-13 @s58-pixel-meta-qa authoritative `[REWORK]` at range `0d04e26..3c51dcf`:
   F1 trace substitution/orphans, F2 unvalidated component references/override targets, F3
   unsealed asset/text-content drift, and F4 contradictory reviewer routing. Builder reproduced
-  the attacks, froze P3 untouched, repaired only P2 + this ledger, and reran P2 23/23/0 plus
+  the attacks, froze P3 untouched, repaired only P2 + this ledger, and reran P2 16/16/0 plus
   foundation 53/53/0. This records Builder evidence only; authoritative re-review is still
-  required and P2 remains uncleared.
+  required and P2 remained uncleared at that historical checkpoint.
+- 2026-07-13 @s58-pixel-meta-qa authoritative `[CLEAR — P2 SNAPSHOT ONLY]`: exact target
+  `0c8471b7a5d9d14825256cabf998c620c39caa9a`, diff SHA-256
+  `11a122c7c8f4be9739bc6bfcbac1bdc9bc6f7147b67f6559e15c0a24968167dc`; all seven changed
+  files read in full in clean detached checkout `/private/tmp/s58-p2-verify-0c8471b`; combined
+  suite 76/76/0, syntax/diff checks green, and stronger semantic corruption probe refused trace,
+  component, asset-hash, and hyperlink mutations. Clearance applies only to the P2 code snapshot;
+  G-1/G-2 and every phase/integration/promotion/cutover/Done gate remain open.
