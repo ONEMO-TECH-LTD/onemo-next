@@ -2261,10 +2261,9 @@ const COMPONENT_SELECTED_BORDER = 'var(--sem-col-border-brand)'
 const COMPONENT_SURFACE = 'var(--sem-col-bg-primary)'
 const COMPONENT_LABEL_FONT = 'var(--sem-type-fluid-label-s-font)'
 
-/* E7.3 (KAI-9377): left rail in Components mode — categories as "pages", components →
- * variant children as "layers" (v4.1 §5). Data = the dual-root inventory (editor-components);
- * clicking jumps the gallery to the frame and selects it. Chrome matches the pages/layers rail. */
-function ComponentsRail({ components, selectedFile, onJump, query = '', onContext, onEdit }: { components: DsComponent[]; selectedFile?: string; onJump: (label: string) => void; query?: string; onContext?: (c: DsComponent, e: React.MouseEvent) => void; onEdit?: (c: DsComponent) => void }) {
+/* Components rail: dual-root inventory from editor-components. Double-click and context-menu Edit
+ * enter the canonical project component canvas; the empty state reuses selection extraction. */
+function ComponentsRail({ components, selectedFile, onJump, query = '', onContext, onEdit, onEmptyExtract, canExtract }: { components: DsComponent[]; selectedFile?: string; onJump: (label: string) => void; query?: string; onContext?: (c: DsComponent, e: React.MouseEvent) => void; onEdit?: (c: DsComponent) => void; onEmptyExtract?: () => void; canExtract?: boolean }) {
   // E10-E2: live search across name / category / root / variant exports.
   const q = query.trim().toLowerCase()
   const filtered = q
@@ -2281,7 +2280,13 @@ function ComponentsRail({ components, selectedFile, onJump, query = '', onContex
   return (
     <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 12 }}>
       {components.length === 0 && (
-        <div style={{ padding: '12px 16px', font: `400 11px/1.5 ${FONT}`, color: MUTE }}>No components yet — select an element on the canvas and use “Create component from selection”. Blank creation is not available in this phase.</div>
+        <div data-empty-component-inventory style={{ padding: '12px 16px', font: `400 11px/1.5 ${FONT}`, color: MUTE }}>
+          <p style={{ margin: '0 0 10px' }}>No components yet. Select an element on the page canvas, then create it as a component.</p>
+          <button type="button" disabled={!canExtract} onClick={onEmptyExtract}
+            style={{ appearance: 'none', minHeight: 30, padding: '0 10px', border: '1px solid var(--sem-col-border-brand)', borderRadius: 'var(--sem-radii-md)', background: 'var(--sem-col-bg-brand-primary)', color: 'var(--sem-col-text-brand-primary)', cursor: canExtract ? 'pointer' : 'default', font: 'inherit' }}>
+            {canExtract ? 'Create component from selection' : 'Select a page element first'}
+          </button>
+        </div>
       )}
       {components.length > 0 && filtered.length === 0 && (
         <div style={{ padding: '12px 16px', font: `400 11px/1.5 ${FONT}`, color: MUTE }}>No components match “{query}”.</div>
@@ -3946,7 +3951,7 @@ export default function ReactFigmaPage() {
             <div data-component-phase-deferred="blank-create" style={{ padding: '0 12px 8px', color: MUTE, font: `400 10px/1.4 ${FONT}` }}>
               Blank component creation is not available in this phase. Create from selection is available above.
             </div>
-            <ComponentsRail components={dsComponents} selectedFile={editingComponent?.file} query={compSearch} onJump={jumpTo} onEdit={(c) => {
+            <ComponentsRail components={dsComponents} selectedFile={editingComponent?.file} query={compSearch} onJump={jumpTo} canExtract={canvasMode === 'design' && !!sel} onEmptyExtract={openCreateComponentDialog} onEdit={(c) => {
               if (c.root === 'project') setEditingComponent(c)
               else notify('Global library authoring is not available in this phase', 'error')
             }}

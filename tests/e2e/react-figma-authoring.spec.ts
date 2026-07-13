@@ -155,6 +155,43 @@ test.describe('React Figma component authoring', () => {
     expect(consoleErrors).toEqual([])
   })
 
+  test('offers canonical extraction when the project component inventory is empty', async ({ page }) => {
+    test.setTimeout(60_000)
+    const componentStatusFiles: string[] = []
+    const consoleErrors: string[] = []
+    const pageErrors: string[] = []
+    await page.route('**/api/dev/editor-components', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ components: [] }) })
+    })
+    page.on('request', (request) => {
+      const url = new URL(request.url())
+      if (url.pathname === '/api/dev/editor-authoring' && url.searchParams.get('mode') === 'component-status') {
+        componentStatusFiles.push(url.searchParams.get('file') ?? '')
+      }
+    })
+    page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()) })
+    page.on('pageerror', (error) => pageErrors.push(error.message))
+
+    await page.goto('/react-figma', { waitUntil: 'domcontentloaded' })
+    const emptyInventory = page.locator('[data-empty-component-inventory]')
+    const extraction = emptyInventory.getByRole('button', { name: 'Create component from selection', exact: true })
+    await expect(async () => {
+      await page.getByRole('button', { name: 'Components', exact: true }).click({ timeout: 5_000 })
+      await expect(emptyInventory).toBeVisible({ timeout: 5_000 })
+      await expect(extraction).toBeEnabled({ timeout: 10_000 })
+    }).toPass({ timeout: 45_000, intervals: [250, 500, 1_000] })
+
+    await extraction.click()
+    const dialog = page.getByRole('dialog', { name: 'Create component' })
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByLabel('Name')).toHaveValue('Component')
+    await dialog.getByRole('button', { name: 'Cancel' }).click()
+    await expect(dialog).toHaveCount(0)
+    expect(componentStatusFiles).toEqual([])
+    expect(pageErrors).toEqual([])
+    expect(consoleErrors).toEqual([])
+  })
+
   test('extracts a component, reloads once, authors a variant, returns Home, persists, and undoes', async ({ page, request }) => {
     test.setTimeout(120_000)
     const consoleErrors: string[] = []
