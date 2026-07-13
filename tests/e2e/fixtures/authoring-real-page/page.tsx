@@ -6,6 +6,9 @@ export function AuthoringE2EPage() {
       <section className={styles.card} data-name="Extract this card">
         Extract this card
       </section>
+      <section className={styles.card} data-name="Extract canonical CSS card">
+        Extract canonical CSS card
+      </section>
     </main>
   )
 }

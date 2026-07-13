@@ -1,11 +1,13 @@
 import { expect, test } from '@playwright/test'
 import { execFile } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { promisify } from 'node:util'
 
 const fixtureName = 'AuthoringE2EButton'
 const extractedName = 'AuthoringE2EExtracted'
+const canonicalName = 'AuthoringE2ECanonical'
 const e2eBaseUrl = `http://localhost:${process.env.PLAYWRIGHT_PORT ?? 3045}`
 const run = promisify(execFile)
 
@@ -368,6 +370,108 @@ test.describe('React Figma component authoring', () => {
     expect(pageErrors).toEqual([])
     expect(tokenResponses, `Editor documents: ${editorDocumentRequests.join(', ')}`)
       .toEqual(editorDocumentRequests.map(() => 200))
+    expect(failedResponses).toEqual([])
+    expect(failedRequests).toEqual([])
+  })
+
+  test('creates and persists a component from a real CSS-module page element', async ({ page, request }) => {
+    test.setTimeout(90_000)
+    const consoleErrors: string[] = []
+    const consoleWarnings: string[] = []
+    const pageErrors: string[] = []
+    const failedResponses: string[] = []
+    const failedRequests: string[] = []
+    const editorDocumentRequests: string[] = []
+    const tokenResponses: number[] = []
+    page.on('console', (message) => {
+      if (message.type() === 'error') consoleErrors.push(message.text())
+      if (message.type() === 'warning') consoleWarnings.push(message.text())
+    })
+    page.on('pageerror', (error) => pageErrors.push(error.message))
+    page.on('request', (browserRequest) => {
+      const url = new URL(browserRequest.url())
+      if (browserRequest.resourceType() === 'document' && url.pathname === '/react-figma') {
+        editorDocumentRequests.push(browserRequest.url())
+      }
+    })
+    page.on('response', (response) => {
+      const url = new URL(response.url())
+      if (url.pathname === '/api/dev/editor-tokens' && !url.search) tokenResponses.push(response.status())
+      if (response.status() >= 400) failedResponses.push(`${response.status()} ${response.url()}`)
+    })
+    page.on('requestfailed', (browserRequest) => {
+      failedRequests.push(`${browserRequest.url()} ${browserRequest.failure()?.errorText ?? 'unknown failure'}`)
+    })
+
+    expect((await request.get('/authoring-e2e')).status()).toBe(200)
+    await page.goto('/react-figma', { waitUntil: 'domcontentloaded' })
+    const frame = page.locator('iframe')
+    const createDialog = page.getByRole('dialog', { name: 'Create component' })
+    await expect(async () => {
+      if (await createDialog.isVisible()) await page.keyboard.press('Escape')
+      const stableDocumentCount = editorDocumentRequests.length
+      await page.getByTitle('File').click({ timeout: 5_000 })
+      await page.getByText('/authoring-e2e', { exact: true }).click({ timeout: 5_000 })
+      await expect(frame).toHaveAttribute('src', '/authoring-e2e')
+      const selection = frame.contentFrame().getByText('Extract canonical CSS card', { exact: true })
+      await expect(selection).toBeVisible({ timeout: 10_000 })
+      await expect(selection).toHaveAttribute('data-src', /^src\/app\/\(dev\)\/authoring-e2e\/page\.tsx:\d+:\d+$/)
+      await expect.poll(() => selection.evaluate((node) => getComputedStyle(node).backgroundColor))
+        .toBe('rgb(21, 88, 74)')
+      await selection.click()
+      await page.getByTitle('Create component').click()
+      await expect(createDialog).toBeVisible({ timeout: 5_000 })
+      await createDialog.getByLabel('Name').fill(canonicalName)
+      await expect.poll(() => tokenResponses.length, { timeout: 10_000 }).toBe(editorDocumentRequests.length)
+      expect(tokenResponses).toEqual(editorDocumentRequests.map(() => 200))
+      expect(editorDocumentRequests).toHaveLength(stableDocumentCount)
+    }).toPass({ timeout: 45_000, intervals: [250, 500, 1_000] })
+
+    failedResponses.length = 0
+    failedRequests.length = 0
+    editorDocumentRequests.length = 0
+    tokenResponses.length = 0
+    const createReload = page.waitForEvent('domcontentloaded', { timeout: 30_000 })
+    await createDialog.getByRole('button', { name: 'Create', exact: true }).click()
+    await createReload
+    const authoringCanvas = page.locator('[data-authoring-canvas]')
+    const environmentRebase = page.getByRole('button', { name: 'Rebase environment' })
+    await Promise.race([
+      authoringCanvas.waitFor({ state: 'visible', timeout: 30_000 }),
+      environmentRebase.waitFor({ state: 'visible', timeout: 30_000 }),
+    ])
+    if (await environmentRebase.isVisible()) await environmentRebase.click()
+    await expect(authoringCanvas).toBeVisible({ timeout: 30_000 })
+    await expect(page.locator('main')).toHaveAttribute('data-authoring-resume-phase', 'resumed')
+    await expect(page.locator('[data-component-current]')).toHaveText(canonicalName)
+    await expect.poll(() => editorDocumentRequests.length, { timeout: 30_000 }).toBe(1)
+    await expect.poll(() => tokenResponses.length, { timeout: 30_000 }).toBe(1)
+    expect(tokenResponses).toEqual([200])
+
+    const componentFile = path.join(
+      process.cwd(),
+      'src/app/(dev)/react-figma-components/AuthoringE2ECanonical.tsx',
+    )
+    const componentSource = await readFile(componentFile, 'utf8')
+    expect(componentSource).toContain("from '../authoring-e2e/AuthoringE2ECard.module.css'")
+    const cssFile = path.join(process.cwd(), 'src/app/(dev)/authoring-e2e/AuthoringE2ECard.module.css')
+    const cssBytes = await readFile(cssFile)
+    const expectedCssHash = createHash('sha256').update(cssBytes).digest('hex')
+    const sidecar = JSON.parse(await readFile(path.join(
+      process.cwd(),
+      'src/app/(dev)/react-figma-components/.onemo/authoring-v1.json',
+    ), 'utf8')) as { sourceHashes: Record<string, string> }
+    expect(sidecar.sourceHashes['src/app/(dev)/authoring-e2e/AuthoringE2ECard.module.css'])
+      .toBe(expectedCssHash)
+    expect(Object.keys(sidecar.sourceHashes).some((file) => file.includes('/../'))).toBe(false)
+
+    const expectedReloadAborts = failedRequests.splice(0)
+    expect(expectedReloadAborts.every((failure) =>
+      failure.startsWith(e2eBaseUrl) && failure.endsWith(' net::ERR_ABORTED'),
+    )).toBe(true)
+    expect(consoleErrors).toEqual([])
+    expect(consoleWarnings).toEqual([])
+    expect(pageErrors).toEqual([])
     expect(failedResponses).toEqual([])
     expect(failedRequests).toEqual([])
   })

@@ -4,6 +4,7 @@ import path from 'node:path'
 const componentRoot = path.join(process.cwd(), 'src/app/(dev)/react-figma-components')
 const fixtureFile = path.join(componentRoot, 'AuthoringE2EButton.tsx')
 const extractedComponentFile = path.join(componentRoot, 'AuthoringE2EExtracted.tsx')
+const canonicalComponentFile = path.join(componentRoot, 'AuthoringE2ECanonical.tsx')
 const selectionRouteDir = path.join(process.cwd(), 'src/app/(dev)/authoring-e2e')
 const selectionFixtureDir = path.join(process.cwd(), 'tests/e2e/fixtures/authoring-real-page')
 const generatedSelectionRouteTypes = [
@@ -20,6 +21,7 @@ export async function prepareAuthoringFixture() {
   await mkdir(componentRoot, { recursive: true })
   if (await exists(fixtureFile)) throw new Error(`E2E fixture already exists: ${fixtureFile}`)
   if (await exists(extractedComponentFile)) throw new Error(`E2E extracted component already exists: ${extractedComponentFile}`)
+  if (await exists(canonicalComponentFile)) throw new Error(`E2E canonical component already exists: ${canonicalComponentFile}`)
   if (await exists(selectionRouteDir)) throw new Error(`E2E selection route already exists: ${selectionRouteDir}`)
   if (await exists(backupPath)) throw new Error(`E2E backup already exists: ${backupPath}`)
   if (await exists(markerPath)) throw new Error(`E2E fixture marker already exists: ${markerPath}`)
@@ -51,6 +53,7 @@ export async function restoreAuthoringFixture() {
 
   await rm(fixtureFile, { force: true })
   await rm(extractedComponentFile, { force: true })
+  await rm(canonicalComponentFile, { force: true })
   await rm(selectionRouteDir, { recursive: true, force: true })
   for (const generatedDir of generatedSelectionRouteTypes) await rm(generatedDir, { recursive: true, force: true })
   if (marker.hadStore) {
