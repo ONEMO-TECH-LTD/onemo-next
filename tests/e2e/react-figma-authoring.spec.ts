@@ -13,6 +13,64 @@ test.describe('React Figma component authoring', () => {
     await run(process.execPath, ['tests/e2e/restore-authoring-fixture.mjs'])
   })
 
+  test('keeps the editor live when pointer-up clears pan before the queued view update runs', async ({ page }) => {
+    test.setTimeout(60_000)
+    const consoleErrors: string[] = []
+    const pageErrors: string[] = []
+    const editorDocumentRequests: string[] = []
+    const tokenResponses: number[] = []
+    page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()) })
+    page.on('pageerror', (error) => pageErrors.push(error.message))
+    page.on('request', (request) => {
+      const url = new URL(request.url())
+      if (request.resourceType() === 'document' && url.pathname === '/react-figma') editorDocumentRequests.push(request.url())
+    })
+    page.on('response', (response) => {
+      const url = new URL(response.url())
+      if (url.pathname === '/api/dev/editor-tokens' && !url.search) tokenResponses.push(response.status())
+    })
+
+    await page.goto('/react-figma', { waitUntil: 'domcontentloaded' })
+    const canvas = page.locator('main')
+    await expect.poll(
+      () => canvas.evaluate((node) => Object.keys(node).some((key) => key.startsWith('__reactProps'))),
+      { timeout: 30_000 },
+    ).toBe(true)
+    await expect.poll(() => tokenResponses.length, { timeout: 30_000 }).toBe(editorDocumentRequests.length)
+    expect(tokenResponses).toEqual(editorDocumentRequests.map(() => 200))
+    await page.evaluate(() => { (window as Window & { __panProofDocument?: boolean }).__panProofDocument = true })
+    const documentCount = editorDocumentRequests.length
+    const transformBefore = await canvas.locator(':scope > div').filter({ has: page.locator('[data-screen-host]') }).getAttribute('style')
+
+    await canvas.evaluate((node) => {
+      const target = node as HTMLElement
+      const setPointerCapture = target.setPointerCapture
+      target.setPointerCapture = () => undefined
+      const event = (type: string, x: number, y: number) => target.dispatchEvent(new PointerEvent(type, {
+        bubbles: true,
+        button: 0,
+        buttons: type === 'pointerup' ? 0 : 1,
+        clientX: x,
+        clientY: y,
+        pointerId: 71,
+        pointerType: 'mouse',
+      }))
+      event('pointerdown', 700, 400)
+      event('pointermove', 702, 401)
+      event('pointerup', 702, 401)
+      target.setPointerCapture = setPointerCapture
+    })
+    await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
+
+    expect(await page.evaluate(() => (window as Window & { __panProofDocument?: boolean }).__panProofDocument)).toBe(true)
+    expect(editorDocumentRequests).toHaveLength(documentCount)
+    await expect(canvas).toBeVisible()
+    await expect(page.locator('nextjs-portal')).toHaveCount(0)
+    expect(await canvas.locator(':scope > div').filter({ has: page.locator('[data-screen-host]') }).getAttribute('style')).not.toBe(transformBefore)
+    expect(pageErrors).toEqual([])
+    expect(consoleErrors).toEqual([])
+  })
+
   test('extracts a component, reloads once, authors a variant, returns Home, persists, and undoes', async ({ page, request }) => {
     test.setTimeout(120_000)
     const consoleErrors: string[] = []

@@ -3663,7 +3663,12 @@ export default function ReactFigmaPage() {
       const s = draw.current, rect = { x: Math.min(s.sx, fc.x), y: Math.min(s.sy, fc.y), w: Math.abs(fc.x - s.sx), h: Math.abs(fc.y - s.sy) }
       s.rect = rect; setDrawRect(rect); return
     }
-    if (pan.current) setView(v => ({ ...v, x: pan.current!.vx + (e.clientX - pan.current!.x), y: pan.current!.vy + (e.clientY - pan.current!.y) }))
+    const activePan = pan.current
+    if (activePan) {
+      const dx = e.clientX - activePan.x
+      const dy = e.clientY - activePan.y
+      setView(v => ({ ...v, x: activePan.vx + dx, y: activePan.vy + dy }))
+    }
   }, [])
   const onUp = useCallback((e: React.PointerEvent) => {
     if (draw.current) {
