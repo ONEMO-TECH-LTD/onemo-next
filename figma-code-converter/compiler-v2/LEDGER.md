@@ -44,9 +44,10 @@ Product/editor/agnosticity challenge: @s58-pixel-meta-qa. Decisions/Done/cutover
 
 ## P0 work items
 
-1. **Baselines separated**: clean broken baseline = `6c36475` (E1–E13 reproduce there);
-   operating delta = `f37de9e` (nine truth-fixes reproduce). Replay proof: run legacy convert
-   at 6c36475 offline against the pinned Shape cache and assert E1/E7/E9 markers. [pending]
+1. **Baselines separated**: clean broken baseline = `6c36475`; operating delta = `f37de9e`.
+   E1–E13 reproduction method = hermetic per-E-row microfixtures run against the baseline
+   converter (per finding F-P0.1 — the live-cache replay instruction is WITHDRAWN as
+   impossible). [pending — fixture build]
 2. **Mother screen selection**: OPEN — §14.2 lists "current Shape screen" AND a separate "one
    real current ONEMO mother screen, selected and version-pinned with Dan at P0; Shape or a
    synthetic fixture cannot substitute for it". Shape stays its own integration fixture and
@@ -68,8 +69,8 @@ Product/editor/agnosticity challenge: @s58-pixel-meta-qa. Decisions/Done/cutover
 
 | # | Gap | Status | Owner/next |
 |---|---|---|---|
-| G-1 | §14.2 integration corpus needs Figma files that do not exist (editorial, component-library, enterprise, non-ONEMO) | OPEN — corpus harness will be built; fixtures owed; flagged to QA+Meta 2026-07-13 | Kai builds harness; fixture authoring needs Dan/design time |
-| G-2 | Live plugin supplement (resolvedVariableModes, styledTextSegments, component defs) may need a plugin rescan Dan-side; Shape's REST evidence provably contains no overrides/mixed-text/instances, so the manifest can prove completeness for Shape without it | OPEN — supplement plane built with honest source-plane marker; live-plugin path needs bridge rescan | Kai; escalate if a non-Shape fixture needs it |
+| G-1 | §14.2 integration corpus requires PLUGIN-ORIGIN sanitized evidence packages from live Figma roots (joint route). Synthetic JSON is legal for §14.1 microfixtures/mutations/parser-lowerer tests ONLY — earlier "harness + fixtures owed" and "synthetic integration" statements are WITHDRAWN | OPEN — BLOCKS P0 exit + P7. Needs Dan input #2 (provider + consumer files) | Dan input; Kai builds capture/sanitize tooling |
+| G-2 | Plugin supplement capture (resolvedVariableModes, styledTextSegments, component defs) is a REQUIRED capture plane; REST_ONLY/PARTIAL provenance is diagnostic-only and cannot pass G0 or clear supplement-dependent G1–G5 (joint route — earlier "Shape completeness without supplement" claim narrowed accordingly) | OPEN — BLOCKS P1 G0; needs Dan input #3 (bridge rescan at pinned versions) when capture lands | Kai builds; Dan rescan |
 | G-3 | Dark-mode visual promotion impossible without an authored dark reference (§4.5) | OPEN — dark states DIAGNOSTIC_ONLY until Dan authors a dark-mode reference frame | Dan (when he wants dark visually promoted) |
 | G-4 | §14.2 mother screen must be selected + version-pinned BY DAN; Shape cannot substitute | OPEN — blocks P0 item 2 and the P3/P4 mother-slice anchor | Dan (question surfaced in-session 2026-07-13) |
 | G-5 | REST_ONLY/source-plane fail-closed law is UNBUILT at a0616a8 (schema only requires sourcePlanes to exist) — Kai's earlier "encoded as data" claim was an overclaim, corrected | OPEN — per-fact provenance validator owed in P1/P2. Failure taxonomy (joint route + Meta correction): missing/partial/REST_ONLY REQUIRED supplement → **FAILED_CAPTURE before graphs**; unreadable complete component definition → FAILED_COMPONENT; fully plugin-captured but unsupported → FAILED_CAPABILITY | Kai |
@@ -88,11 +89,10 @@ Product/editor/agnosticity challenge: @s58-pixel-meta-qa. Decisions/Done/cutover
 ## Meta rulings accepted (2026-07-13)
 
 - **Corpus:** "harness + fixtures owed" is NOT a P0/P7 exit. Missing required fixture = named
-  phase failure. P0 stays incomplete until the §14 fixture set exists. Builder route: integration
-  fixtures that don't require live-authored Figma content are constructed as **valid synthetic
-  REST-schema snapshot fixtures** (non-ONEMO names, component-set page, GRID/mask page, rich-text
-  page, enterprise-scale generator); the real ONEMO mother = Shape, pinned live. Live-capture
-  (G0) proof runs against the real file; compile-path fixtures run from snapshot directories.
+  phase failure. P0 stays incomplete until the §14 fixture set exists. ~~Builder's synthetic
+  integration-fixture route and "mother = Shape" reading~~ **SUPERSEDED 2026-07-13 by the joint
+  route below**: synthetic = §14.1 microfixtures only; §14.2 integration evidence must be
+  plugin-origin from live roots; the mother is a distinct Dan-selected screen (G-4).
 - **Supplement:** `sourcePlane: REST_ONLY` is fail-closed for any fact requiring
   resolvedVariableModes / styledTextSegments / component definitions / overrides /
   plugin-resolved remote variables. The marker grants NO capability; those capability rows stay
