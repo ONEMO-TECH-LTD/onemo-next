@@ -371,3 +371,37 @@ test('PROBE R2-5: canonical BindingRecord propertyPath is RFC6901 — leading sl
   // and the validator enforces the format on records
   assert.ok(validateBindingRecord({ ...baseRecord(), source: { ...baseRecord().source, propertyPath: 'fills/1/color' } }).some((e) => /RFC6901/.test(e)));
 });
+
+// ── Meta adversarial probe round 3 (against b0d4ed9), made permanent ────────────────────────
+import { invalidPointer, SOURCE_PLANE_VALUES } from '../src/schema.mjs';
+
+test('PROBE R3-1: forged/free-text provenance values are refused — closed vocabulary only', () => {
+  const files = Object.fromEntries(['document.rest.json', 'supplement.json', 'variables.json', 'components.json', 'fonts.json', 'dependencies.json', 'references/manifest.json'].map((f) => [f, { sha256: 'a', bytes: 1 }]));
+  const census = { nodes: 1, aliases: 0, textRuns: 0, variables: 0, components: 0, supplementNodes: 0 };
+  const planes = Object.fromEntries(['document', 'supplement', 'variables', 'components', 'fonts', 'assets', 'references', 'dependencies'].map((k) => [k, 'fixture']));
+  const base = { schemaVersion: SCHEMA.manifest, compilerVersion: 'v', capabilityRegistryVersion: 0, fileKey: 'F', fileVersion: 'v1', rootIds: ['1'], captureId: 'c', fingerprint: 'x', files, census, sourcePlanes: planes };
+  assert.equal(validateManifest(base).length, 0);
+  const forged = { ...base, sourcePlanes: { ...planes, supplement: 'TOTALLY-LEGIT-PLUGIN' } };
+  assert.ok(validateManifest(forged).some((e) => /closed provenance vocabulary/.test(e)));
+  assert.ok(SOURCE_PLANE_VALUES.includes('rest-only')); // rest-only exists but is diagnostic-only downstream
+});
+
+test('PROBE R3-2: a symlink planted inside the snapshot cannot smuggle outside bytes at read', async () => {
+  const base = await fs.mkdtemp(path.join(os.tmpdir(), 'cv2-'));
+  const snap = path.join(base, 'snap');
+  await makeSnap(snap);
+  const outside = path.join(base, 'outside.json');
+  const target = path.join(snap, 'document.rest.json');
+  await fs.copyFile(target, outside);       // identical bytes outside the snapshot
+  await fs.rm(target);
+  await fs.symlink(outside, target);        // hash/bytes would PASS — only the realpath law can bite
+  await assert.rejects(() => readSnapshot(snap), (e) => e instanceof EvidenceError && /symlink/.test(e.message));
+});
+
+test('PROBE R3-3: an invalid ~2-class pointer is refused by validator AND identity', () => {
+  assert.equal(invalidPointer('/componentProperties/mode~1dark~0x'), false);
+  assert.equal(invalidPointer('/bad/token~2x'), true);
+  const r = { ...baseRecord(), source: { ...baseRecord().source, propertyPath: '/bad/token~2x' } };
+  assert.ok(validateBindingRecord(r).some((e) => /VALID RFC6901/.test(e)));
+  assert.throws(() => sourceBindingIdentity(r), BindingIdentityError);
+});

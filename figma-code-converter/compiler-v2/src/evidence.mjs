@@ -165,9 +165,19 @@ export async function readSnapshot(dir) {
   catch (e) { throw new EvidenceError('FAILED_CAPTURE', `manifest unreadable at ${dir}: ${e.code ?? e.message}`); }
   const errs = validateManifest(manifest);
   if (errs.length) throw new EvidenceError('FAILED_CAPTURE', `manifest invalid: ${errs.join('; ')}`);
+  const rootReal = await fs.realpath(dir).catch(() => { throw new EvidenceError('FAILED_CAPTURE', `snapshot dir unreadable: ${dir}`); });
   for (const [rel, meta] of Object.entries(manifest.files)) {
     let buf;
-    try { buf = await fs.readFile(resolveUnder(dir, rel)); } // confinement on READ too — a malicious manifest cannot reach outside
+    try {
+      const abs = resolveUnder(dir, rel); // confinement on READ too — a malicious manifest cannot reach outside
+      // symlink law: the REAL path must also stay under the snapshot — a symlink planted inside
+      // the directory cannot smuggle bytes from outside the sealed evidence (Meta round-3 escape)
+      const real = await fs.realpath(abs);
+      if (real !== rootReal && !real.startsWith(rootReal + path.sep)) {
+        throw new EvidenceError('FAILED_CAPTURE', `evidence file resolves outside the snapshot (symlink): ${rel}`);
+      }
+      buf = await fs.readFile(real);
+    }
     catch (e) { throw e instanceof EvidenceError ? e : new EvidenceError('FAILED_CAPTURE', `evidence file missing: ${rel}`); }
     if (buf.length !== meta.bytes) throw new EvidenceError('FAILED_CAPTURE', `byte-length mismatch: ${rel} (manifest ${meta.bytes} ≠ disk ${buf.length})`);
     const h = sha256(buf);

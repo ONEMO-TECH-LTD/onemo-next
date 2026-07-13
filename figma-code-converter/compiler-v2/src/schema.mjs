@@ -69,6 +69,17 @@ export function schemaError(kind, artifact) {
 /** The fact families whose source plane MUST be declared (joint route: per-fact provenance). */
 export const REQUIRED_SOURCE_PLANES = Object.freeze(['document', 'supplement', 'variables', 'components', 'fonts', 'assets', 'references', 'dependencies']);
 
+/** Closed provenance vocabulary (joint route) — a forged/free-text plane value is a refusal.
+ *  'fixture' is legal ONLY for §14.1 microfixture snapshots and never clears supplement-
+ *  dependent capability (that gating lives with the capability registry, G-5). */
+export const SOURCE_PLANE_VALUES = Object.freeze([
+  'plugin-primary-complete', 'plugin-primary-partial', 'rest-cross-check', 'rest-only', 'fixture',
+]);
+
+/** RFC 6901: '~' is legal ONLY as ~0/~1. A '~2'-class token is an invalid pointer, not identity. */
+export const invalidPointer = (p) =>
+  typeof p !== 'string' || !p.startsWith('/') || /~(?![01])/.test(p);
+
 /** The contracted evidence file set (§4.3). Mirrored by evidence.REQUIRED_EVIDENCE_FILES. */
 const REQUIRED_FILES = Object.freeze([
   'document.rest.json', 'supplement.json', 'variables.json', 'components.json', 'fonts.json',
@@ -91,7 +102,9 @@ export function validateManifest(m) {
     errs.push('manifest.files entries need {sha256, bytes}');
   }
   for (const fam of REQUIRED_SOURCE_PLANES) {
-    if (!m.sourcePlanes?.[fam]) errs.push(`manifest.sourcePlanes.${fam} missing (per-fact provenance is mandatory)`);
+    const v = m.sourcePlanes?.[fam];
+    if (!v) errs.push(`manifest.sourcePlanes.${fam} missing (per-fact provenance is mandatory)`);
+    else if (!SOURCE_PLANE_VALUES.includes(v)) errs.push(`manifest.sourcePlanes.${fam} value '${v}' outside the closed provenance vocabulary — forged/free-text planes refused`);
   }
   for (const k of ['nodes', 'aliases', 'textRuns', 'variables', 'components', 'supplementNodes']) {
     if (!Number.isInteger(m.census?.[k])) errs.push(`manifest.census.${k} missing`);
@@ -107,7 +120,7 @@ export function validateBindingRecord(r) {
   if (!r.bindingId) errs.push('bindingId missing');
   if (!r.source?.fileKey) errs.push('source.fileKey missing — identity facts never coalesce (G2)');
   if (!r.source?.nodeId || !r.source?.propertyPath) errs.push('source.nodeId/propertyPath missing');
-  if (r.source?.propertyPath && !String(r.source.propertyPath).startsWith('/')) errs.push('source.propertyPath must be an RFC6901 JSON Pointer (leading /)');
+  if (r.source?.propertyPath && invalidPointer(r.source.propertyPath)) errs.push('source.propertyPath must be a VALID RFC6901 JSON Pointer (leading /, ~ only as ~0/~1)');
   if (r.source?.slot) {
     const s = r.source.slot;
     if (!SLOT_KINDS.includes(s.kind)) errs.push(`slot.kind ${s.kind} invalid`);
@@ -158,8 +171,8 @@ export function sourceBindingIdentity(r) {
   ]) {
     if (!v) throw new BindingIdentityError(`missing identity fact ${fact} — identity facts never coalesce to empty (G2)`);
   }
-  if (!String(r.source.propertyPath).startsWith('/')) {
-    throw new BindingIdentityError(`propertyPath must be an RFC6901 JSON Pointer (got ${r.source.propertyPath})`);
+  if (invalidPointer(r.source.propertyPath)) {
+    throw new BindingIdentityError(`propertyPath must be a VALID RFC6901 JSON Pointer (~ only as ~0/~1; got ${r.source.propertyPath})`);
   }
   return [
     r.variable.key, r.variable.collectionKey, r.source.fileKey,
