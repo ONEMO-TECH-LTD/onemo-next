@@ -108,6 +108,13 @@ Follow-up after the bounded import-reload protocol: the one permitted document r
 - What worked: hot-accept the recursive component context itself, replace the context reference inside its accept callback, and keep the canvas busy until that exact context generation advances.
 - Remember: webpack `idle` does not prove a disposed `require.context` reference is safe; readiness belongs to the context's own accept lifecycle.
 
+## S58 cold authoring E2E readiness after ordinary reload
+
+- What did not work: treating Playwright's generic `networkidle` as product readiness after the ordinary persistence reload, and dispatching keyboard undo without first proving the remounted authoring canvas was idle.
+- Symptoms: one cold run exhausted the full 120-second test ceiling at `waitForLoadState('networkidle')` despite the document and resume-state assertions already passing; another cold run left geometry moved after `Meta+z` while the same exact build passed on rerun.
+- What worked: wait for the exact one-successful-token-response-per-editor-document invariant already required by this test, and prove `data-authoring-busy=false` before dispatching undo.
+- Remember: HMR/dev-server background traffic is not a readiness signal. Cold E2E synchronization must use explicit product state and exact request-count invariants.
+
 ## S58 extraction E2E route and reload isolation
 
 - What did not work: registering the temporary selection route before the cold import probes, clicking its visible DOM before the live-layer bridge had wired it, assuming Next would reload after extraction, and installing the rewritten consumer before the new component dependency.

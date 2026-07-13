@@ -243,7 +243,7 @@ test.describe('React Figma component authoring', () => {
     await page.reload({ waitUntil: 'domcontentloaded' })
     await expect(page.locator('main')).toHaveAttribute('data-authoring-resume-phase', 'none')
     await expect(page.locator('[data-authoring-resume-error]')).toHaveCount(0)
-    await page.waitForLoadState('networkidle')
+    await expect.poll(() => tokenResponses.length, { timeout: 30_000 }).toBe(editorDocumentRequests.length)
     const expectedPersistenceReloadAborts = failedRequests.splice(0)
     expect(expectedPersistenceReloadAborts.every((failure) =>
       failure.startsWith(process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3045') && failure.endsWith(' net::ERR_ABORTED'),
@@ -261,6 +261,7 @@ test.describe('React Figma component authoring', () => {
       x: Number.parseFloat((node as HTMLElement).style.left),
       y: Number.parseFloat((node as HTMLElement).style.top),
     }))).toEqual(geometryAfterMove)
+    await expect(authoringCanvas).toHaveAttribute('data-authoring-busy', 'false')
     await page.keyboard.press('Meta+z')
     await expect.poll(() => movedVariant.evaluate((node) => ({
       x: Number.parseFloat((node as HTMLElement).style.left),
