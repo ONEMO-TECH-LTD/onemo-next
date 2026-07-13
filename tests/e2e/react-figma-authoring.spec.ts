@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { execFile } from 'node:child_process'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { promisify } from 'node:util'
 
@@ -164,12 +164,17 @@ test.describe('React Figma component authoring', () => {
     failedRequests.length = 0
     consoleErrors.length = 0
 
-    // Introduce and compile the selection route only after the cold import-refusal probes. Its
-    // route-tree reload is setup; it settles before the measured create-component reload begins.
+    // Introduce and compile the real page only after the cold import-refusal probes. The selected
+    // element uses a CSS module that extraction rewrites to a lawful parent-relative import.
     editorDocumentRequests.length = 0
     const selectionRouteDir = path.join(process.cwd(), 'src/app/(dev)/authoring-e2e')
+    const selectionFixtureDir = path.join(process.cwd(), 'tests/e2e/fixtures/authoring-real-page')
     await mkdir(selectionRouteDir, { recursive: true })
-    await writeFile(path.join(selectionRouteDir, 'page.tsx'), `export function AuthoringE2EPage() {\n  return (\n    <main>\n      <section data-name="Extract this card">Extract this card</section>\n    </main>\n  )\n}\n\nexport default AuthoringE2EPage\n`)
+    await writeFile(path.join(selectionRouteDir, 'page.tsx'), await readFile(path.join(selectionFixtureDir, 'page.tsx')))
+    await writeFile(
+      path.join(selectionRouteDir, 'AuthoringE2ECard.module.css'),
+      await readFile(path.join(selectionFixtureDir, 'AuthoringE2ECard.module.css')),
+    )
     await expect.poll(async () => (await request.get('/authoring-e2e')).status(), { timeout: 30_000 }).toBe(200)
     await page.reload({ waitUntil: 'domcontentloaded' })
     await expect.poll(
@@ -183,6 +188,10 @@ test.describe('React Figma component authoring', () => {
     await expect(frame).toHaveAttribute('src', '/authoring-e2e')
     const selection = frame.contentFrame().getByText('Extract this card', { exact: true })
     await expect(selection).toBeVisible({ timeout: 30_000 })
+    await expect.poll(() => selection.evaluate((node) => {
+      const style = getComputedStyle(node)
+      return { background: style.backgroundColor, color: style.color, width: style.width }
+    })).toEqual({ background: 'rgb(21, 88, 74)', color: 'rgb(245, 255, 252)', width: '240px' })
     await expect(page.locator('[data-layer-row]').filter({ hasText: 'Extract this card' })).toBeVisible({ timeout: 30_000 })
     await selection.click()
     const createComponentButton = page.getByTitle('Create component')
@@ -216,6 +225,17 @@ test.describe('React Figma component authoring', () => {
     await expect(page.getByRole('button', { name: 'Revalidate source' })).toHaveCount(0)
     if (await environmentRebase.isVisible()) await environmentRebase.click()
     await expect(authoringCanvas).toBeVisible({ timeout: 30_000 })
+    const extractedSource = await readFile(path.join(
+      process.cwd(),
+      'src/app/(dev)/react-figma-components/AuthoringE2EExtracted.tsx',
+    ), 'utf8')
+    expect(extractedSource).toContain("from '../authoring-e2e/AuthoringE2ECard.module.css'")
+    const sidecar = JSON.parse(await readFile(path.join(
+      process.cwd(),
+      'src/app/(dev)/react-figma-components/.onemo/authoring-v1.json',
+    ), 'utf8')) as { sourceHashes: Record<string, string> }
+    expect(sidecar.sourceHashes).toHaveProperty('src/app/(dev)/authoring-e2e/AuthoringE2ECard.module.css')
+    expect(Object.keys(sidecar.sourceHashes).some((file) => file.includes('/../'))).toBe(false)
     await expect(page.locator('main')).toHaveAttribute('data-authoring-resume-phase', 'resumed')
     await expect(page.locator('[data-component-current]')).toHaveText(extractedName)
     await expect.poll(() => tokenResponses.length, { timeout: 30_000 }).toBe(editorDocumentRequests.length)
