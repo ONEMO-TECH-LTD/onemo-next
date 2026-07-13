@@ -63,9 +63,50 @@ export function Page() {
 
     expect(() => planMakeComponentFromSelection({
       source, sourceAbs, componentDir, line: 3, col: 10, name: 'Label',
-    })).toThrow(expect.objectContaining({ status: 422 }))
+    })).toThrow(expect.objectContaining({ status: 422, code: 'SELECTION_LOCAL_CAPTURE' }))
     expect(() => planMakeComponentFromSelection({
       source, sourceAbs, componentDir, line: 3, col: 10, name: 'not valid',
     })).toThrow(expect.objectContaining({ status: 422 }))
+  })
+
+  it('does not let a nested parameter hide an outer capture with the same name', () => {
+    const source = Buffer.from(`export function Page({ label }: { label: string }) {
+  return (
+    <section>
+      {label}
+      {[1].map((label) => <span>{label}</span>)}
+    </section>
+  )
+}
+`)
+
+    expect(() => planMakeComponentFromSelection({
+      source, sourceAbs, componentDir, line: 3, col: 5, name: 'Card',
+    })).toThrow(expect.objectContaining({ status: 422, code: 'SELECTION_LOCAL_CAPTURE' }))
+  })
+
+  it('accepts bindings owned by nested functions, arrows, blocks, catches, and destructuring', () => {
+    const source = Buffer.from(`export function Page() {
+  return (
+    <section>
+      {(() => {
+        function render(input: { label: string }) {
+          const rows = [input]
+          try {
+            return rows.map(({ label }) => <span>{label}</span>)
+          } catch (error) {
+            return <span>{error.message}</span>
+          }
+        }
+        return render({ label: 'local' })
+      })()}
+    </section>
+  )
+}
+`)
+
+    expect(planMakeComponentFromSelection({
+      source, sourceAbs, componentDir, line: 3, col: 5, name: 'Card',
+    }).componentSource).toContain('function render')
   })
 })

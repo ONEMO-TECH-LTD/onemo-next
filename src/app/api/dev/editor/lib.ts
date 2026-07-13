@@ -2471,16 +2471,23 @@ export function planMakeComponentFromSelection(input: {
     if (nb && ts.isNamespaceImport(nb)) importByName.set(nb.name.text, text)
   }
 
-  // free-identifier analysis over the subtree — references NOT bound inside it, excluding JSX prop
-  // names, object keys, member names, and lowercase intrinsic tag names (host strings like div/span).
-  const bound = new Set<string>(), free = new Set<string>()
-  const collectBinding = (n: ts.BindingName) => {
-    if (ts.isIdentifier(n)) bound.add(n.text)
-    else n.elements.forEach((e) => { if (ts.isBindingElement(e)) collectBinding(e.name) })
+  // Free-identifier analysis over the subtree uses TypeScript's lexical symbols. A flat name set is
+  // unsound: an inner `(label) => …` must not hide an outer `{label}` capture with the same spelling.
+  const bindingOptions: ts.CompilerOptions = {
+    jsx: ts.JsxEmit.Preserve,
+    target: ts.ScriptTarget.ESNext,
+    noLib: true,
+    noResolve: true,
   }
+  const compilerHost = ts.createCompilerHost(bindingOptions, true)
+  const sourcePath = path.resolve(input.sourceAbs)
+  const getSourceFile = compilerHost.getSourceFile.bind(compilerHost)
+  compilerHost.getSourceFile = (fileName, languageVersion, onError, shouldCreateNewSourceFile) =>
+    path.resolve(fileName) === sourcePath ? sf : getSourceFile(fileName, languageVersion, onError, shouldCreateNewSourceFile)
+  const checker = ts.createProgram([sourcePath], bindingOptions, compilerHost).getTypeChecker()
+  const free = new Set<string>()
+  const subtreeStart = el.getStart(sf), subtreeEnd = el.getEnd()
   const walk = (node: ts.Node) => {
-    if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) node.parameters.forEach((p) => collectBinding(p.name))
-    if (ts.isVariableDeclaration(node)) collectBinding(node.name)
     if (ts.isIdentifier(node)) {
       const p = node.parent
       const isPropKey = ts.isPropertyAssignment(p) && p.name === node
@@ -2489,15 +2496,23 @@ export function planMakeComponentFromSelection(input: {
       const isBindingDecl = (ts.isParameter(p) || ts.isBindingElement(p) || ts.isVariableDeclaration(p)) && (p as { name?: ts.Node }).name === node
       const isJsxTag = (ts.isJsxOpeningElement(p) || ts.isJsxSelfClosingElement(p) || ts.isJsxClosingElement(p)) && p.tagName === node
       const isIntrinsicTag = isJsxTag && /^[a-z]/.test(node.text)
-      if (!isPropKey && !isMember && !isJsxAttrName && !isBindingDecl && !isIntrinsicTag) free.add(node.text)
+      if (!isPropKey && !isMember && !isJsxAttrName && !isBindingDecl && !isIntrinsicTag) {
+        const declarations = checker.getSymbolAtLocation(node)?.declarations ?? []
+        const declaredInsideSubtree = declarations.some((declaration) =>
+          declaration.getSourceFile() === sf && declaration.getStart(sf) >= subtreeStart && declaration.getEnd() <= subtreeEnd)
+        if (!declaredInsideSubtree) free.add(node.text)
+      }
     }
     ts.forEachChild(node, walk)
   }
   walk(el)
-  const trulyFree = [...free].filter((n) => !bound.has(n))
+  const trulyFree = [...free]
   const missing = trulyFree.filter((n) => !importByName.has(n))
   if (missing.length) {
-    throw Object.assign(new Error(`selection references local scope (${missing.join(', ')}) — extract a self-contained subtree (v1 supports only imported components/values)`), { status: 422 })
+    throw Object.assign(new Error(`selection references local scope (${missing.join(', ')}) — extract a self-contained subtree (v1 supports only imported components/values)`), {
+      status: 422,
+      code: 'SELECTION_LOCAL_CAPTURE',
+    })
   }
   const neededImports = [...new Set(trulyFree.map((n) => importByName.get(n)!))]
 
