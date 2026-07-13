@@ -225,6 +225,112 @@ test.describe('React Figma component authoring', () => {
     expect(consoleErrors).toEqual([])
   })
 
+  test('renders a variant beyond the former finite host without clipping the retained page', async ({ page }, testInfo) => {
+    test.setTimeout(90_000)
+    const consoleErrors: string[] = []
+    const pageErrors: string[] = []
+    page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()) })
+    page.on('pageerror', (error) => pageErrors.push(error.message))
+
+    await page.goto('/react-figma', { waitUntil: 'domcontentloaded' })
+    const componentEntry = page.getByRole('button', { name: fixtureName, exact: true })
+    await expect(async () => {
+      await page.getByRole('button', { name: 'Components', exact: true }).click({ timeout: 5_000 })
+      await expect(page.getByRole('textbox', { name: 'Search components' })).toBeVisible({ timeout: 5_000 })
+      await expect(componentEntry).toBeVisible({ timeout: 15_000 })
+    }).toPass({ timeout: 45_000, intervals: [250, 500, 1_000] })
+    await componentEntry.dblclick()
+
+    const authoringCanvas = page.locator('[data-authoring-canvas]')
+    const importSource = page.getByRole('button', { name: 'Import source' })
+    const entryState = await Promise.race([
+      importSource.waitFor({ state: 'visible', timeout: 30_000 }).then(() => 'import' as const),
+      authoringCanvas.waitFor({ state: 'visible', timeout: 30_000 }).then(() => 'loaded' as const),
+    ])
+    if (entryState === 'import') {
+      const reload = page.waitForEvent('domcontentloaded', { timeout: 30_000 })
+      await importSource.click()
+      await reload
+    }
+    await expect(authoringCanvas).toBeVisible({ timeout: 30_000 })
+    // Importing the fixture can make Next regenerate an ambient route declaration. Re-enter once
+    // and use the product's explicit environment-authority path before measuring canvas geometry.
+    await page.getByRole('button', { name: 'Home' }).click()
+    await page.getByRole('button', { name: 'Components', exact: true }).click()
+    await expect(componentEntry).toBeVisible({ timeout: 20_000 })
+    await componentEntry.dblclick()
+    const environmentRebase = page.getByRole('button', { name: 'Rebase environment' })
+    const settledState = await Promise.race([
+      environmentRebase.waitFor({ state: 'visible', timeout: 30_000 }).then(() => 'rebase' as const),
+      authoringCanvas.waitFor({ state: 'visible', timeout: 30_000 }).then(() => 'loaded' as const),
+    ])
+    if (settledState === 'rebase') await environmentRebase.click()
+    await expect(authoringCanvas).toBeVisible({ timeout: 30_000 })
+    await expect(page.locator('[data-variant-id]')).toHaveCount(2)
+
+    const screenHost = page.locator('[data-screen-host]')
+    const retainedPage = page.getByTitle('Canvas — real build')
+    expect(await screenHost.evaluate((node) => {
+      const style = getComputedStyle(node)
+      return {
+        size: [node.clientWidth, node.clientHeight],
+        overflow: style.overflow,
+        background: style.backgroundColor,
+        shadow: style.boxShadow,
+      }
+    })).toEqual({ size: [1, 1], overflow: 'visible', background: 'rgba(0, 0, 0, 0)', shadow: 'none' })
+    expect(await authoringCanvas.evaluate((node) => {
+      const style = getComputedStyle(node)
+      return { size: [node.clientWidth, node.clientHeight], overflow: style.overflow }
+    })).toEqual({ size: [1, 1], overflow: 'visible' })
+    expect(await retainedPage.evaluate((node) => ({
+      size: [node.clientWidth, node.clientHeight],
+      visibility: getComputedStyle(node).visibility,
+    }))).toEqual({ size: [402, 874], visibility: 'hidden' })
+
+    const movedVariant = page.locator('[data-variant-id]').nth(1)
+    const originalX = await movedVariant.evaluate((node) => Number.parseFloat((node as HTMLElement).style.left))
+    const dragHandle = await movedVariant.locator('[data-variant-label]').boundingBox()
+    if (!dragHandle) throw new Error('Variant label has no rendered drag bounds')
+    const moveResponsePromise = page.waitForResponse((response) =>
+      new URL(response.url()).pathname === '/api/dev/editor-authoring' &&
+      response.request().method() === 'POST' &&
+      (response.request().postData() ?? '').includes('"kind":"move-variant"'),
+    { timeout: 30_000 })
+    await page.mouse.move(dragHandle.x + 8, dragHandle.y + dragHandle.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(dragHandle.x + 608, dragHandle.y + dragHandle.height / 2, { steps: 8 })
+    await page.mouse.up()
+    const moveResponse = await moveResponsePromise
+    expect(moveResponse.status(), await moveResponse.text()).toBe(200)
+    await expect(authoringCanvas).toHaveAttribute('data-authoring-busy', 'false', { timeout: 30_000 })
+    await expect.poll(() => movedVariant.evaluate((node) => Number.parseFloat((node as HTMLElement).style.left)))
+      .toBe(originalX + 600)
+    expect(originalX + 600).toBeGreaterThan(800)
+    expect(await movedVariant.evaluate((node) => {
+      const rect = node.getBoundingClientRect()
+      const hit = document.elementFromPoint(rect.right - 2, rect.top + rect.height / 2)
+      return {
+        fullyInsideViewport: rect.left >= 0 && rect.right <= innerWidth && rect.top >= 0 && rect.bottom <= innerHeight,
+        rightEdgeHitsVariant: hit?.closest('[data-variant-id]') === node,
+      }
+    })).toEqual({ fullyInsideViewport: true, rightEdgeHitsVariant: true })
+    await page.screenshot({ path: testInfo.outputPath('ac-a002-unbounded-variant.png'), animations: 'disabled' })
+
+    await movedVariant.click()
+    await page.keyboard.press('Meta+z')
+    await expect.poll(() => movedVariant.evaluate((node) => Number.parseFloat((node as HTMLElement).style.left)), { timeout: 30_000 })
+      .toBe(originalX)
+    await page.getByRole('button', { name: 'Home' }).click()
+    expect(await screenHost.evaluate((node) => {
+      const style = getComputedStyle(node)
+      return { size: [node.clientWidth, node.clientHeight], background: style.backgroundColor, shadow: style.boxShadow }
+    })).toEqual({ size: [402, 874], background: 'rgb(255, 255, 255)', shadow: 'rgba(0, 0, 0, 0.06) 0px 0px 0px 1px, rgba(0, 0, 0, 0.25) 0px 12px 40px -8px' })
+    await expect(retainedPage).toHaveCSS('visibility', 'visible')
+    expect(pageErrors).toEqual([])
+    expect(consoleErrors).toEqual([])
+  })
+
   test('selects an inner component layer by stable source identity across reload', async ({ page, request }) => {
     test.setTimeout(90_000)
     const authoringWrites: string[] = []
@@ -667,8 +773,8 @@ test.describe('React Figma component authoring', () => {
       x: Number.parseFloat((node as HTMLElement).style.left),
       y: Number.parseFloat((node as HTMLElement).style.top),
     }))).toEqual(geometryAfterMove)
-    const authoringHost = await page.locator('[data-screen-host]').evaluate((node) => ({ width: node.clientWidth, height: node.clientHeight }))
-    expect(authoringHost.width).toBeGreaterThan(402)
+    const authoringHost = await page.locator('[data-screen-host]').evaluate((node) => ({ width: node.clientWidth, height: node.clientHeight, overflow: getComputedStyle(node).overflow }))
+    expect(authoringHost).toEqual({ width: 1, height: 1, overflow: 'visible' })
     await frame.evaluate((node) => {
       const iframe = node as HTMLIFrameElement & { __e2eRetainedFrame?: boolean }
       iframe.__e2eRetainedFrame = true

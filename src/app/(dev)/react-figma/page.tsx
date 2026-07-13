@@ -2415,11 +2415,7 @@ export default function ReactFigmaPage() {
   const [authoringResumeTarget, setAuthoringResumeTarget] = useState<string | null>(null)
   const [authoringResumePhase, setAuthoringResumePhase] = useState<'none' | 'originating' | 'resuming' | 'resumed' | 'refused'>('none')
   const [authoringResumeError, setAuthoringResumeError] = useState<string | null>(null)
-  const [authoringBounds, setAuthoringBounds] = useState({ w: 800, h: 600 })
   const [authoringUndoNonce, setAuthoringUndoNonce] = useState(0)
-  const updateAuthoringBounds = useCallback((w: number, h: number) => {
-    setAuthoringBounds({ w: Math.max(800, w), h: Math.max(600, h) })
-  }, [])
   const noteAuthoringChanged = useCallback(() => setCompNonce((value) => value + 1), [])
   const closeComponentAuthoring = useCallback(() => {
     setEditingComponent(null)
@@ -3546,8 +3542,7 @@ export default function ReactFigmaPage() {
   }, [])
   // E4 vibe #4: the device-frame size follows the frame preset (was hardcoded 402×871)
   const frameDims = (() => { const m = framePreset.size.match(/(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)/); return m ? { w: Math.round(+m[1]), h: Math.round(+m[2]) } : { w: 402, h: 871 } })()
-  // Component authoring bounds follow graph geometry; the page canvas keeps its selected frame preset.
-  const hostDims = canvasMode === 'components' ? authoringBounds : frameDims
+  const hostDims = canvasMode === 'components' ? { w: 1, h: 1 } : frameDims
   // Undo/redo over canvas edits (Dan live-QA "there must be undo/redo"). Versioning of committed
   // code = git (every Save-to-code is a tracked source edit); this stack covers staged overrides.
   const historyRef = useRef<{ id: string; prop: string; before: string | null; after: string }[][]>([])
@@ -3652,8 +3647,8 @@ export default function ReactFigmaPage() {
     const root = doc?.querySelector('body [data-src]') as HTMLElement | null
     if (root && win) root.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: win }))
   }, [])
-  // The retained page iframe is temporarily resized to component-authoring bounds. Once design mode
-  // returns, remeasure the retained selection after that iframe has reflowed to its page dimensions.
+  // Component mode keeps the retained page iframe at its real dimensions while hiding it. Once design
+  // mode returns, remeasure the retained selection after the overlay has been removed.
   useEffect(() => {
     if (canvasMode !== 'design') return
     const frame = window.requestAnimationFrame(() => {
@@ -4063,16 +4058,15 @@ export default function ReactFigmaPage() {
           {canvasMode === 'design' && (
             <button type="button" onClick={selectFrameRoot} title="Select frame" style={{ appearance: 'none', border: 0, background: 'transparent', font: `550 10px/1 ${FONT}`, color: SEL, marginBottom: 8, marginLeft: 2, cursor: 'pointer', padding: 0 }}>{canvas.name} · {hostDims.w} × {hostDims.h}</button>
           )}
-          <div data-screen-host onClick={selectFrameRoot} style={{ position: 'relative', width: hostDims.w, height: hostDims.h, background: canvasMode === 'components' ? 'var(--sem-col-bg-primary)' : '#fff', borderRadius: 4, boxShadow: '0 0 0 1px rgba(0,0,0,.06), 0 12px 40px -8px rgba(0,0,0,.25)' }}>
+          <div data-screen-host onClick={selectFrameRoot} style={{ position: 'relative', width: hostDims.w, height: hostDims.h, overflow: canvasMode === 'components' ? 'visible' : undefined, background: canvasMode === 'components' ? 'transparent' : '#fff', borderRadius: canvasMode === 'components' ? 0 : 4, boxShadow: canvasMode === 'components' ? 'none' : '0 0 0 1px rgba(0,0,0,.06), 0 12px 40px -8px rgba(0,0,0,.25)' }}>
             <iframe key={canvas.route} ref={iframeRef} src={canvas.route} onLoad={wireCanvas} title="Canvas — real build"
-              style={{ width: hostDims.w, height: hostDims.h, border: 0, display: 'block', borderRadius: 4, pointerEvents: drawArm || canvasMode === 'components' ? 'none' : 'auto', visibility: canvasMode === 'components' ? 'hidden' : 'visible' }} />
+              style={{ width: frameDims.w, height: frameDims.h, border: 0, display: 'block', borderRadius: 4, pointerEvents: drawArm || canvasMode === 'components' ? 'none' : 'auto', visibility: canvasMode === 'components' ? 'hidden' : 'visible' }} />
             {canvasMode === 'components' && editingComponent?.file && (
-              <div onClick={(event) => event.stopPropagation()} style={{ position: 'absolute', inset: 0, overflow: 'hidden', borderRadius: 4 }}>
+              <div onClick={(event) => event.stopPropagation()} style={{ position: 'absolute', left: 0, top: 0, width: 1, height: 1, overflow: 'visible' }}>
                 <ComponentCanvas
                   key={editingComponent.file}
                   file={editingComponent.file}
                   undoNonce={authoringUndoNonce}
-                  onBounds={updateAuthoringBounds}
                   onChanged={noteAuthoringChanged}
                   onResumeResolved={resolveAuthoringResume}
                 />

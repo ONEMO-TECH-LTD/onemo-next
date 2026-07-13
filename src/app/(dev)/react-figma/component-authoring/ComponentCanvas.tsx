@@ -88,10 +88,9 @@ function armComponentModuleRefresh(): {
   }
 }
 
-export function ComponentCanvas({ file, undoNonce, onBounds, onChanged, onResumeResolved }: {
+export function ComponentCanvas({ file, undoNonce, onChanged, onResumeResolved }: {
   file: string
   undoNonce: number
-  onBounds: (width: number, height: number) => void
   onChanged: () => void
   onResumeResolved: (file: string, sourceHash: string) => void
 }) {
@@ -147,15 +146,6 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged, onResume
     load().catch((cause) => { if (live) setError((cause as Error).message) })
     return () => { live = false; loadGeneration.current += 1 }
   }, [load])
-
-  useEffect(() => {
-    if (!snapshot) return
-    const definition = snapshot.graph.components[snapshot.componentId]!
-    const variants = Object.values(snapshot.graph.variants).filter((variant) => variant.componentId === snapshot.componentId)
-    const primary = snapshot.graph.variants[definition.primaryVariantId]!
-    const { bounds } = componentCanvasGeometry(variants.map((variant) => variant.frame), primary.frame)
-    onBounds(bounds.width, bounds.height)
-  }, [onBounds, snapshot])
 
   const component = useMemo(() => {
     if (!snapshot) return null
@@ -336,7 +326,7 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged, onResume
 
   return (
     <div data-authoring-canvas data-authoring-busy={busy ? 'true' : 'false'} data-component-id={definition.id} data-selected-content-id={selectedContent?.id} data-selected-content-variant-id={selectedContent?.variantId} onPointerDown={(event) => { if (event.target === event.currentTarget) { setSelectedId(null); setSelectedContent(null) } }}
-      style={{ position: 'relative', width: '100%', height: '100%', minWidth: 800, minHeight: 600, background: 'var(--sem-col-bg-secondary)', fontFamily: 'var(--al-type-family-primary)' }}>
+      style={{ position: 'relative', width: 1, height: 1, overflow: 'visible', fontFamily: 'var(--al-type-family-primary)' }}>
       <style>{`[data-authoring-node-selected="true"] { outline: 2px solid ${accent}; outline-offset: 2px; }`}</style>
       {variants.map((variant) => {
         const selected = selectedId === variant.id

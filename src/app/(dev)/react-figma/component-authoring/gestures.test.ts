@@ -12,18 +12,17 @@ describe('component canvas gestures', () => {
   it('turns a real pointer displacement into sidecar geometry and ignores a click', () => {
     const frame = { x: 20, y: 40, width: 320, height: 180 }
     expect(movedVariantFrame(frame, 56, 32)).toEqual({ x: 76, y: 72, width: 320, height: 180 })
+    expect(movedVariantFrame(frame, -20_020, 0)).toEqual({ x: -20_000, y: 40, width: 320, height: 180 })
     expect(movedVariantFrame(frame, 1, 0)).toBeNull()
   })
 
-  it('keeps the complete create ghost inside host bounds after every create', () => {
+  it('places the create ghost without defining a finite canvas boundary', () => {
     const primary = { x: 0, y: 0, width: 320, height: 180 }
-    const frames = [primary, { ...primary, x: 344 }]
+    const frames = [primary, { ...primary, x: 20_000 }]
 
-    for (let create = 0; create < 4; create += 1) {
-      const { ghost, bounds } = componentCanvasGeometry(frames, primary)
-      expect(ghost.x + ghost.width).toBeLessThanOrEqual(bounds.width)
-      expect(ghost.y + ghost.height).toBeLessThanOrEqual(bounds.height)
-      frames.push({ ...ghost })
-    }
+    const geometry = componentCanvasGeometry(frames, primary)
+
+    expect(geometry.ghost).toEqual({ x: 20_344, y: 0, width: 320, height: 180 })
+    expect('bounds' in geometry).toBe(false)
   })
 })
