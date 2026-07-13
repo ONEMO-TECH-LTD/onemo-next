@@ -122,6 +122,10 @@ Follow-up after the bounded import-reload protocol: the one permitted document r
 - What worked: create and compile the route after the cold probes, perform one explicitly unmeasured setup reload, wait for the matching live layer row, explicitly reload only after the durable transaction succeeds, and order source patches dependency-first (rollback already restores in reverse).
 - Remember: separate harness route registration from the measured authoring reload; iframe visibility does not prove the editor selection bridge is ready; multi-file installs must expose dependencies before consumers and restore consumers before removing dependencies.
 
+Follow-up: the remaining `waitForLoadState('networkidle')` after the create dialog later exhausted the full 120-second cold gate even though route, selection, and dialog state were ready. The harness now proves the `/authoring-e2e` iframe route, live selected layer row, visible create dialog, and one successful token response per current editor document before starting the measured create/reload window. The iframe-private `__engineWired` marker is deliberately not used here because the valid `onLoad` wiring path does not own that polling marker.
+
+The final generic `networkidle` after bootstrap resume was removed in the same cleanup: resumed authoring canvas, exact resume phase/component identity, and successful token/document parity now gate that phase. Dev-server background traffic is no longer used as readiness anywhere in this E2E.
+
 ## S58 initial cold-shell authoring readiness
 
 - What did not work: treating React hydration, a briefly visible Components search field, and a visible fixture row as proof that the initial editor document had finished its cold remount cycle.

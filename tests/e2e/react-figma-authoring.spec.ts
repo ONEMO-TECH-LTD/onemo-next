@@ -39,6 +39,10 @@ test.describe('React Figma component authoring', () => {
     await page.goto('/react-figma', { waitUntil: 'domcontentloaded' })
     const componentsRail = page.getByTitle('Components')
     const frame = page.locator('iframe')
+    const currentFrameIsWired = () => frame.evaluate((node) => {
+      const doc = (node as HTMLIFrameElement).contentDocument as (Document & { __engineWired?: boolean }) | null
+      return doc?.readyState === 'complete' && doc.__engineWired === true
+    })
     const editorUrl = page.url()
     const fixtureButton = page.getByRole('button', { name: fixtureName, exact: true })
     const componentMenu = page.getByRole('menu')
@@ -51,10 +55,7 @@ test.describe('React Figma component authoring', () => {
         () => componentsRail.evaluate((node) => Object.keys(node).some((key) => key.startsWith('__reactProps'))),
         { timeout: 10_000 },
       ).toBe(true)
-      await expect.poll(() => frame.evaluate((node) => {
-        const doc = (node as HTMLIFrameElement).contentDocument as (Document & { __engineWired?: boolean }) | null
-        return doc?.readyState === 'complete' && doc.__engineWired === true
-      }), { timeout: 10_000 }).toBe(true)
+      await expect.poll(currentFrameIsWired, { timeout: 10_000 }).toBe(true)
       await componentsRail.click({ timeout: 5_000 })
       await expect(page.getByRole('textbox', { name: 'Search components' })).toBeVisible({ timeout: 5_000 })
       await expect(fixtureButton).toBeVisible({ timeout: 15_000 })
@@ -129,7 +130,10 @@ test.describe('React Figma component authoring', () => {
     const createDialog = page.getByRole('dialog', { name: 'Create component' })
     await expect(createDialog).toBeVisible()
     await createDialog.getByLabel('Name').fill(extractedName)
-    await page.waitForLoadState('networkidle')
+    await expect(frame).toHaveAttribute('src', '/authoring-e2e')
+    await expect(page.locator('[data-layer-row]').filter({ hasText: 'Extract this card' })).toBeVisible()
+    await expect.poll(() => tokenResponses.length, { timeout: 30_000 }).toBe(editorDocumentRequests.length)
+    expect(tokenResponses).toEqual(editorDocumentRequests.map(() => 200))
     // The explicit route-registration reload above is harness setup, not part of the measured
     // authoring flow. Start the create/reload evidence window only after that setup is quiescent.
     failedResponses.length = 0
@@ -154,7 +158,8 @@ test.describe('React Figma component authoring', () => {
     await expect(authoringCanvas).toBeVisible({ timeout: 30_000 })
     await expect(page.locator('main')).toHaveAttribute('data-authoring-resume-phase', 'resumed')
     await expect(page.locator('[data-component-current]')).toHaveText(extractedName)
-    await page.waitForLoadState('networkidle')
+    await expect.poll(() => tokenResponses.length, { timeout: 30_000 }).toBe(editorDocumentRequests.length)
+    expect(tokenResponses).toEqual(editorDocumentRequests.map(() => 200))
     const expectedReloadAborts = failedRequests.splice(0)
     expect(expectedReloadAborts.every((failure) =>
       failure.startsWith(process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3045') && failure.endsWith(' net::ERR_ABORTED'),
