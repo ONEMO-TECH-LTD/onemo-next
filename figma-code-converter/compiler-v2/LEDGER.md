@@ -3,7 +3,8 @@
 > Governing contract: `../C11-CONTRACT-V3.md` sha256 fd8b6c9258c1701bdf265072eb8e50d099359e3c677e34214d7ac936afbc540a
 > Builder baseline: commit `f37de9e` (nine legacy truth-fixes + contracts). Legacy lane stays operational (§0.1).
 > Run mode (Dan, 2026-07-13, live directive): continuous end-to-end build; phases are FROZEN
-> EVIDENCE POINTS reviewed asynchronously by @s58-qa (QA) and @s58-pixel-meta-qa (Meta);
+> EVIDENCE POINTS reviewed asynchronously by the sole authoritative QA+Meta gate
+> @s58-pixel-meta-qa; @s58-qa is advisory only;
 > REWORK findings stop ALL dependent downstream work until cleared; only demonstrably
 > orthogonal work continues during a rework. Dan judges the final product, Done, and cutover.
 > Evidence discipline (self-review, mutations, honest failures) is NOT waived.
@@ -11,14 +12,15 @@
 ## Governance waiver (narrow, exact)
 
 Dan's newer directive supersedes the per-phase Dan-wait sentence ONLY: this run does not pause
-for Dan between phases. NOT waived: frozen phase evidence, Pixel QA handoffs, Meta conformance
-review, fail-closed gaps, final Dan sign-off, Done ownership, cutover authorization.
+for Dan between phases. NOT waived: frozen phase evidence, authoritative QA+Meta handoffs to
+@s58-pixel-meta-qa, fail-closed gaps, final Dan sign-off, Done ownership, cutover authorization.
 
 **Current test truth (reported separately):** legacy converter suite 46 pass / 3 fail (missing
 gitignored golden fixture `t88thL8hKksSpILgkeGRZ0-4084-25997.nodes.json`) / 0 skips ·
 compiler-v2 foundation suite 53 pass / 0 fail / 0 skip across Builder and Meta repeated runs ·
 compiler-v2 P2 graph suite 23 pass / 0 fail / 0 skip, including 22 persisted-boundary
-corruption mutations. No phase may be recorded green from
+corruption mutations at the frozen baseline and 28 in the current authoritative-rework repair.
+No phase may be recorded green from
 harness-only or REST_ONLY placeholders.
 
 **Gap blocking map:** G-1 (plugin-origin corpus) blocks P0 exit + P7 full-corpus G0–G13.
@@ -41,7 +43,7 @@ Decisions/Done/cutover: Dan only.
 |---|---|---|---|
 | P0 continuity/contract/calibration | IN PROGRESS | — | see P0 section |
 | P1 evidence capture | pending | — | |
-| P2 canonical graphs | BUILD CHECKPOINT — AUTHORITATIVE REVIEW PENDING | `0d04e26` + `02fd782` + advisory-hardening follow-up | six graph families + strict persisted parser; live/plugin evidence still blocked by G-1/G-2 |
+| P2 canonical graphs | AUTHORITATIVE REWORK | `0d04e26` + `02fd782` + `3c51dcf`; current repair dirty | F1 trace conservation, F2 component relationships, F3 source-content seal, F4 routing law; live/plugin evidence still blocked by G-1/G-2 |
 | P3 mother token/component slice | pending | — | |
 | P4 mother layout/render slice | pending | — | |
 | P5 emitters/security/editability | pending | — | |
@@ -130,6 +132,13 @@ Decisions/Done/cutover: Dan only.
   Assets bind source identity/geometry to the sealed manifest hash+byte record.
 - Typed codecs keep token leaves, require explicit opacity scale, and reject CSS/React plane
   crossover. Deprecated-background mirror proof is structural and key-order independent.
+- Authoritative rework repairs now conserve resolution traces exactly by trace id + consuming
+  node `ModeContext` across both graph tables, reject trace substitution at the first variable
+  hop, and reject otherwise-valid orphan traces. Component-property references are a closed
+  `visible|characters|mainComponent -> typed property name` map owned by the containing native
+  component/main component; overrides must target a real descendant and use the closed captured
+  `NodeChangeProperty` vocabulary. Canonical output carries the source fingerprint, per-graph
+  hashes, and a whole-model content seal, so post-build asset/text-content drift refuses.
 - Independent oracle imports no P2 builders and rejects the actual legacy `src/ir.mjs` output at
   G1-G5 on the same semantic fixture. P2 suite 23/23/0; foundation 53/53/0; syntax/diff checks
   green. Advisory review of frozen `0d04e26` exposed a strict-parser defect; it was reproduced
@@ -149,7 +158,8 @@ Decisions/Done/cutover: Dan only.
   resolvedVariableModes / styledTextSegments / component definitions / overrides /
   plugin-resolved remote variables. The marker grants NO capability; those capability rows stay
   unclear until supplement-backed fixtures prove them. Accepted — no escape hatch.
-- **Routing:** Builder = @s58-pixel; adversarial QA = @s58-qa; Meta = @s58-pixel-meta-qa.
+- **Routing:** Builder = @s58-pixel; sole authoritative QA+Meta gate =
+  @s58-pixel-meta-qa; @s58-qa is advisory only and cannot clear or block.
 - **§17.0 governance:** Dan's verbatim directive — "execute the v3 contract end 2 end no
   stopping no phase by phase - entire thing … pass to pixel and meta-qa for the final review" —
   is recorded here as the explicit resolution: continuous build, async QA/Meta review at frozen
@@ -235,3 +245,9 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   could name an absent node. Builder reproduced both failure-first; parser now reconstructs exact
   alias classification/canonical slot multisets, and AssetGraph/parser require SVG/export source
   nodes. This is code hardening only, not a gate verdict.
+- 2026-07-13 @s58-pixel-meta-qa authoritative `[REWORK]` at range `0d04e26..3c51dcf`:
+  F1 trace substitution/orphans, F2 unvalidated component references/override targets, F3
+  unsealed asset/text-content drift, and F4 contradictory reviewer routing. Builder reproduced
+  the attacks, froze P3 untouched, repaired only P2 + this ledger, and reran P2 23/23/0 plus
+  foundation 53/53/0. This records Builder evidence only; authoritative re-review is still
+  required and P2 remains uncleared.

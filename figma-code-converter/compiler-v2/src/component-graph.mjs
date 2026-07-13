@@ -30,8 +30,11 @@ export function buildComponentGraph({ document, components, supplement, sourcePl
     if (row.componentSetKey && !byKey.has(row.componentSetKey)) throw new ComponentGraphError('FAILED_COMPONENT', `component ${row.key} references unreadable set ${row.componentSetKey}`);
   }
   const nodeTypes = new Map();
-  (function walk(node) { if (!node) return; nodeTypes.set(node.id, node.type); (node.children ?? []).forEach(walk); })(document);
+  const parentById = new Map();
+  (function walk(node, parentId = null) { if (!node) return; nodeTypes.set(node.id, node.type); parentById.set(node.id, parentId); (node.children ?? []).forEach((child) => walk(child, node.id)); })(document);
+  const supplementByNode = new Map(supplement.nodes.map((row) => [row.nodeId, row]));
   const definitionSupplements = [];
+  const propertyReferences = [];
   const instances = [];
   for (const row of supplement.nodes) {
     if (row.componentPropertyDefinitions !== undefined) {
@@ -42,22 +45,29 @@ export function buildComponentGraph({ document, components, supplement, sourcePl
       }
       definitionSupplements.push({ nodeId: row.nodeId, componentPropertyDefinitions: structuredClone(row.componentPropertyDefinitions) });
     }
+    if (row.componentPropertyReferences !== undefined && row.componentPropertyReferences !== null) {
+      const owner = componentOwner(row.nodeId, parentById, nodeTypes, supplementByNode, byId, byKey);
+      if (!owner) throw new ComponentGraphError('FAILED_COMPONENT', `component property references on ${row.nodeId} have no containing component/main component`);
+      validateComponentReferenceMap(row.nodeId, nodeTypes.get(row.nodeId), row.componentPropertyReferences, owner);
+      propertyReferences.push({ nodeId: row.nodeId, ownerComponentKey: owner.key, references: structuredClone(row.componentPropertyReferences) });
+    }
     if (!row.mainComponentKey) continue;
     if (nodeTypes.get(row.nodeId) !== 'INSTANCE') throw new ComponentGraphError('FAILED_COMPONENT', `component instance supplement ${row.nodeId} has no INSTANCE node`);
     if (!byKey.has(row.mainComponentKey)) throw new ComponentGraphError('FAILED_COMPONENT', `instance ${row.nodeId} references unreadable component ${row.mainComponentKey}`);
     validateInstanceProperties(row, byKey);
+    validateOverrideRecords(row.nodeId, row.overrides ?? [], parentById);
     instances.push({
       nodeId: row.nodeId,
       mainComponentKey: row.mainComponentKey,
       componentProperties: structuredClone(row.componentProperties ?? {}),
-      componentPropertyReferences: structuredClone(row.componentPropertyReferences ?? {}),
+      componentPropertyReferences: structuredClone(row.componentPropertyReferences ?? null),
       overrides: structuredClone(row.overrides ?? []),
     });
   }
   for (const [nodeId, type] of nodeTypes) if (type === 'INSTANCE' && !instances.some((row) => row.nodeId === nodeId)) {
     throw new ComponentGraphError('FAILED_COMPONENT', `instance ${nodeId} lacks complete plugin semantics`);
   }
-  return { schemaVersion: SCHEMA.componentGraph, definitions, definitionSupplements, instances };
+  return { schemaVersion: SCHEMA.componentGraph, definitions, definitionSupplements, propertyReferences, instances };
 }
 
 const PROPERTY_TYPES = new Set(['BOOLEAN', 'TEXT', 'INSTANCE_SWAP', 'VARIANT']);
@@ -84,3 +94,61 @@ function validateInstanceProperties(instance, byKey) {
     if (definition.type === 'TEXT' && typeof property.value !== 'string') throw new ComponentGraphError('FAILED_COMPONENT', `instance ${instance.nodeId} text ${name} is not text`);
   }
 }
+
+const REFERENCE_FIELDS = Object.freeze({ visible: 'BOOLEAN', characters: 'TEXT', mainComponent: 'INSTANCE_SWAP' });
+
+export function validateComponentReferenceMap(nodeId, nodeType, references, owner) {
+  if (!references || typeof references !== 'object' || Array.isArray(references) || Object.keys(references).length === 0) throw new ComponentGraphError('FAILED_COMPONENT', `component property references on ${nodeId} must be a non-empty map`);
+  for (const [field, propertyName] of Object.entries(references)) {
+    const expectedType = REFERENCE_FIELDS[field];
+    if (!expectedType || typeof propertyName !== 'string' || !propertyName) throw new ComponentGraphError('FAILED_COMPONENT', `component property reference ${nodeId}.${field} has invalid field/property name`);
+    if (field === 'characters' && nodeType !== 'TEXT') throw new ComponentGraphError('FAILED_COMPONENT', `characters property reference ${nodeId} requires a TEXT node`);
+    if (field === 'mainComponent' && nodeType !== 'INSTANCE') throw new ComponentGraphError('FAILED_COMPONENT', `mainComponent property reference ${nodeId} requires an INSTANCE node`);
+    if (owner.propertyDefinitions?.[propertyName]?.type !== expectedType) throw new ComponentGraphError('FAILED_COMPONENT', `component property reference ${nodeId}.${field} does not resolve to a ${expectedType} definition on ${owner.key}`);
+  }
+}
+
+export function validateOverrideRecords(instanceId, overrides, parentById) {
+  if (!Array.isArray(overrides)) throw new ComponentGraphError('FAILED_COMPONENT', `instance ${instanceId} overrides must be an array`);
+  const seen = new Set();
+  for (const row of overrides) {
+    if (!row?.id || seen.has(row.id) || !isDescendant(row.id, instanceId, parentById)) throw new ComponentGraphError('FAILED_COMPONENT', `instance ${instanceId} override target ${row?.id ?? '?'} is missing, duplicate, or outside its subtree`);
+    if (!Array.isArray(row.overriddenFields) || row.overriddenFields.length === 0 || row.overriddenFields.some((field) => !NODE_CHANGE_PROPERTIES.has(field))) throw new ComponentGraphError('FAILED_COMPONENT', `instance ${instanceId} override ${row.id} has invalid overriddenFields`);
+    seen.add(row.id);
+  }
+}
+
+function componentOwner(nodeId, parentById, nodeTypes, supplementByNode, byId, byKey) {
+  for (let ancestor = parentById.get(nodeId); ancestor; ancestor = parentById.get(ancestor)) {
+    if (['COMPONENT', 'COMPONENT_SET'].includes(nodeTypes.get(ancestor)) && byId.has(ancestor)) return byId.get(ancestor);
+    if (nodeTypes.get(ancestor) === 'INSTANCE') {
+      const key = supplementByNode.get(ancestor)?.mainComponentKey;
+      if (key && byKey.has(key)) return byKey.get(key);
+    }
+  }
+  return null;
+}
+
+function isDescendant(nodeId, ancestorId, parentById) {
+  for (let parent = parentById.get(nodeId); parent; parent = parentById.get(parent)) if (parent === ancestorId) return true;
+  return false;
+}
+
+const NODE_CHANGE_PROPERTIES = new Set([
+  'pointCount', 'name', 'width', 'height', 'parent', 'pluginData', 'constraints', 'locked', 'visible', 'opacity', 'blendMode',
+  'layoutGrids', 'guides', 'characters', 'openTypeFeatures', 'styledTextSegments', 'vectorNetwork', 'effects', 'exportSettings',
+  'arcData', 'autoRename', 'fontName', 'innerRadius', 'fontSize', 'lineHeight', 'leadingTrim', 'paragraphIndent', 'paragraphSpacing',
+  'listSpacing', 'hangingPunctuation', 'hangingList', 'letterSpacing', 'textAlignHorizontal', 'textAlignVertical', 'textCase',
+  'textDecoration', 'textAutoResize', 'fills', 'topLeftRadius', 'topRightRadius', 'bottomLeftRadius', 'bottomRightRadius',
+  'constrainProportions', 'strokes', 'strokeWeight', 'strokeAlign', 'strokeCap', 'strokeJoin', 'strokeMiterLimit', 'booleanOperation',
+  'overflowDirection', 'dashPattern', 'backgrounds', 'handleMirroring', 'cornerRadius', 'cornerSmoothing', 'relativeTransform', 'x', 'y',
+  'rotation', 'isMask', 'clipsContent', 'type', 'overlayPositionType', 'overlayBackgroundInteraction', 'overlayBackground',
+  'prototypeStartNode', 'prototypeBackgrounds', 'expanded', 'fillStyleId', 'strokeStyleId', 'backgroundStyleId', 'textStyleId',
+  'effectStyleId', 'gridStyleId', 'description', 'layoutMode', 'paddingLeft', 'paddingTop', 'paddingRight', 'paddingBottom',
+  'itemSpacing', 'layoutAlign', 'counterAxisSizingMode', 'primaryAxisSizingMode', 'primaryAxisAlignItems', 'counterAxisAlignItems',
+  'layoutGrow', 'layoutPositioning', 'itemReverseZIndex', 'hyperlink', 'mediaData', 'stokeTopWeight', 'strokeBottomWeight',
+  'strokeLeftWeight', 'strokeRightWeight', 'reactions', 'flowStartingPoints', 'shapeType', 'connectorStart', 'connectorEnd',
+  'connectorLineType', 'connectorStartStrokeCap', 'connectorEndStrokeCap', 'codeLanguage', 'widgetSyncedState',
+  'componentPropertyDefinitions', 'componentPropertyReferences', 'componentProperties', 'embedData', 'linkUnfurlData', 'text',
+  'authorVisible', 'authorName', 'code', 'textBackground',
+]);

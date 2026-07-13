@@ -100,14 +100,16 @@ export function buildVariableGraph(variablesJson) {
     }
   };
 
-  const toJSON = ({ nodeModeContexts = [] } = {}) => ({
+  const toJSON = ({ nodeModeContexts = [], resolutionTraces = null } = {}) => ({
     schemaVersion: SCHEMA.variableGraph,
     variables: structuredClone(vars),
     collections: structuredClone(colls),
     nodeModeContexts: structuredClone(nodeModeContexts),
-    resolutionTraces: [...traceMemo.values()]
-      .map(({ traceId, modeContextId: contextId, trace }) => ({ traceId, modeContextId: contextId, hops: structuredClone(trace) }))
-      .sort((a, b) => `${a.traceId}:${a.modeContextId}`.localeCompare(`${b.traceId}:${b.modeContextId}`)),
+    resolutionTraces: resolutionTraces === null
+      ? [...traceMemo.values()]
+        .map(({ traceId, modeContextId: contextId, trace }) => ({ traceId, modeContextId: contextId, hops: structuredClone(trace) }))
+        .sort((a, b) => `${a.traceId}:${a.modeContextId}`.localeCompare(`${b.traceId}:${b.modeContextId}`))
+      : structuredClone(resolutionTraces),
   });
   return {
     schemaVersion: SCHEMA.variableGraph,

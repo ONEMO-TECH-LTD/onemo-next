@@ -5,7 +5,7 @@ import { buildDocumentGraph, DocumentGraphError } from '../src/document-graph.mj
 import { buildComponentGraph, ComponentGraphError } from '../src/component-graph.mjs';
 import { buildTextGraph, TextGraphError } from '../src/text-graph.mjs';
 import { buildAssetGraph, AssetGraphError } from '../src/asset-graph.mjs';
-import { buildCanonicalModel, parseCanonicalModel, CanonicalModelError } from '../src/canonical-model.mjs';
+import { buildCanonicalModel, parseCanonicalModel, sealCanonicalModelContent, CanonicalModelError } from '../src/canonical-model.mjs';
 import { schemaError, SCHEMA } from '../src/schema.mjs';
 import { buildIr } from '../../src/ir.mjs';
 import { documentMismatch, componentMismatch, textMismatch, assetMismatch, lossyLegacyFailures } from './p2-oracle.mjs';
@@ -18,7 +18,8 @@ function fixture() {
     boundVariables: { opacity: { type: 'VARIABLE_ALIAS', id: 'V:op' } },
     children: [
       { id: 'set', type: 'COMPONENT_SET', name: 'Button', children: [] },
-      { id: 'instance', type: 'INSTANCE', name: 'Button instance', children: [] },
+      { id: 'component', type: 'COMPONENT', name: 'Label', children: [{ id: 'component-label', type: 'TEXT', name: 'Label text', characters: 'Label', children: [] }] },
+      { id: 'instance', type: 'INSTANCE', name: 'Button instance', children: [{ id: 'instance-layer', type: 'RECTANGLE', name: 'Override target', visible: false, children: [] }] },
       { id: 'text', type: 'TEXT', name: 'Copy', characters: 'Hi 👗', children: [] },
       { id: 'photo', type: 'RECTANGLE', fills: [{ type: 'IMAGE', imageRef: 'img-ref', scaleMode: 'FILL' }], children: [] },
       { id: 'icon', type: 'VECTOR', name: 'Icon', children: [] },
@@ -26,12 +27,18 @@ function fixture() {
   };
   const components = {
     componentSets: [{ id: 'set', key: 'SET_BUTTON', name: 'Button', complete: true, propertyDefinitions: { Size: { type: 'VARIANT', defaultValue: 'S', variantOptions: ['S', 'L'] } } }],
-    components: [{ id: 'button-s', key: 'CMP_BUTTON_S', name: 'Button/S', componentSetKey: 'SET_BUTTON', complete: true, propertyDefinitions: { Disabled: { type: 'BOOLEAN', defaultValue: false } } }],
+    components: [
+      { id: 'button-s', key: 'CMP_BUTTON_S', name: 'Button/S', componentSetKey: 'SET_BUTTON', complete: true, propertyDefinitions: { Disabled: { type: 'BOOLEAN', defaultValue: false } } },
+      { id: 'component', key: 'CMP_LABEL', name: 'Label', complete: true, propertyDefinitions: { 'Label#1': { type: 'TEXT', defaultValue: 'Label' } } },
+    ],
   };
   const supplement = { schemaVersion: 1, nodes: [
     { nodeId: 'root', resolvedVariableModes: {} },
     { nodeId: 'set', resolvedVariableModes: {}, componentPropertyDefinitions: components.componentSets[0].propertyDefinitions },
-    { nodeId: 'instance', resolvedVariableModes: {}, mainComponentKey: 'CMP_BUTTON_S', componentProperties: { Size: { type: 'VARIANT', value: 'S' }, Disabled: { type: 'BOOLEAN', value: false } }, componentPropertyReferences: {}, overrides: [{ id: 'text', overriddenFields: ['characters'] }] },
+    { nodeId: 'component', resolvedVariableModes: {}, componentPropertyDefinitions: components.components[1].propertyDefinitions },
+    { nodeId: 'component-label', resolvedVariableModes: {}, componentPropertyReferences: { characters: 'Label#1' }, styledTextSegments: [{ start: 0, end: 5, characters: 'Label', fontName: { family: 'Inter', style: 'Regular' } }], fontDependencies: [{ family: 'Inter', style: 'Regular', providerId: 'font-inter-regular', sha256: '1'.repeat(64) }] },
+    { nodeId: 'instance', resolvedVariableModes: {}, mainComponentKey: 'CMP_BUTTON_S', componentProperties: { Size: { type: 'VARIANT', value: 'S' }, Disabled: { type: 'BOOLEAN', value: false } }, overrides: [{ id: 'instance-layer', overriddenFields: ['visible'] }] },
+    { nodeId: 'instance-layer', resolvedVariableModes: {} },
     { nodeId: 'text', resolvedVariableModes: {}, styledTextSegments: [
       { start: 0, end: 3, characters: 'Hi ', fontName: { family: 'Inter', style: 'Regular' } },
       { start: 3, end: 5, characters: '👗', fontName: { family: 'Inter', style: 'Bold' }, hyperlink: { type: 'URL', value: 'https://example.test' } },
@@ -48,7 +55,10 @@ function fixture() {
   ];
   const sealedFiles = Object.fromEntries(assetIndex.map((row) => [row.file, { sha256: row.sha256, bytes: row.bytes }]));
   const variables = {
-    variables: [{ id: 'V:op', key: 'K_OPACITY', name: 'opacity/card', variableCollectionId: 'C_THEME', resolvedType: 'FLOAT', valuesByMode: { light: 85 } }],
+    variables: [
+      { id: 'V:op', key: 'K_OPACITY', name: 'opacity/card', variableCollectionId: 'C_THEME', resolvedType: 'FLOAT', valuesByMode: { light: 85 } },
+      { id: 'V:other', key: 'K_OTHER', name: 'opacity/other', variableCollectionId: 'C_THEME', resolvedType: 'FLOAT', valuesByMode: { light: 50 } },
+    ],
     variableCollections: [{ id: 'C_THEME', key: 'CK_THEME', name: 'Theme', modes: [{ modeId: 'light', name: 'Light' }], defaultModeId: 'light' }],
   };
   return { document, components, supplement, assetIndex, sealedFiles, variables };
@@ -122,7 +132,7 @@ test('all P2 semantic graphs fail before construction on REST_ONLY/PARTIAL prove
 test('canonical-model pipeline builds all versioned P2 graphs from one snapshot and stops unknown carriers before lowering (G1)', () => {
   const { document, components, supplement, assetIndex, sealedFiles, variables } = fixture();
   const snapshot = {
-    manifest: { sourcePlanes: planes(), files: sealedFiles }, document, components, supplement,
+    manifest: { sourcePlanes: planes(), files: sealedFiles }, document, components, supplement, fonts: {},
     variables,
     dependencies: { assets: assetIndex, assetNodeIds: ['icon'] },
   };
@@ -132,7 +142,7 @@ test('canonical-model pipeline builds all versioned P2 graphs from one snapshot 
   const persisted = JSON.parse(JSON.stringify(model));
   assert.equal(persisted.variableGraph.variables[0].key, 'K_OPACITY'); // real arrays survive JSON; Map internals must never disappear as `{}`
   assert.equal(persisted.variableGraph.collections[0].key, 'CK_THEME');
-  assert.equal(persisted.variableGraph.nodeModeContexts.length, 6);
+  assert.equal(persisted.variableGraph.nodeModeContexts.length, 9);
   assert.equal(persisted.variableGraph.nodeModeContexts.find((row) => row.nodeId === 'root').modeContextId, 'CK_THEME=light');
   assert.ok(Array.isArray(persisted.bindingGraph.resolutionTraces));
   assert.equal(JSON.stringify(persisted).includes('"byId":{}'), false);
@@ -149,21 +159,36 @@ test('canonical-model pipeline builds all versioned P2 graphs from one snapshot 
     ['binding references missing node', (value) => { value.bindingGraph.records[0].source.nodeId = 'missing'; }],
     ['binding identity disagrees', (value) => { value.bindingGraph.records[0].bindingId = 'forged'; }],
     ['binding and variable contexts disagree', (value) => { value.bindingGraph.nodeModeContexts[0].modeContextId = 'ø'; }],
+    ['binding trace substituted from another variable', (value) => {
+      const trace = { traceId: 'K_OTHER@CK_THEME:light', modeContextId: 'CK_THEME=light', hops: [{ captureId: 'V:other', key: 'K_OTHER', collectionId: 'C_THEME', collectionKey: 'CK_THEME', modeId: 'light' }] };
+      value.bindingGraph.resolutionTraces = [structuredClone(trace)];
+      value.variableGraph.resolutionTraces = [structuredClone(trace)];
+      value.bindingGraph.records[0].resolutionTraceId = trace.traceId;
+    }],
+    ['orphan valid trace in both graph tables', (value) => {
+      const trace = { traceId: 'K_OTHER@CK_THEME:light', modeContextId: 'CK_THEME=light', hops: [{ captureId: 'V:other', key: 'K_OTHER', collectionId: 'C_THEME', collectionKey: 'CK_THEME', modeId: 'light' }] };
+      value.variableGraph.resolutionTraces.push(structuredClone(trace)); value.bindingGraph.resolutionTraces.push(structuredClone(trace));
+    }],
     ['persisted unknown carrier', (value) => { value.bindingGraph.unknown.push({ nodeId: 'root', jsonPointer: '/novelFeature', variableId: 'V:op' }); }],
     ['persisted forged mirror', (value) => { value.bindingGraph.mirrors.push({ nodeId: 'root', jsonPointer: '/boundVariables/fills/0', variableId: 'V:op', mirrorOf: 'fills' }); }],
     ['persisted forged nonvisual disposition', (value) => { value.bindingGraph.nonvisual.push({ nodeId: 'root', jsonPointer: '/boundVariables/novel', variableId: 'V:op' }); }],
     ['malformed component definition', (value) => { value.componentGraph.definitions[0] = {}; }],
     ['malformed component instance', (value) => { value.componentGraph.instances[0] = {}; }],
+    ['override target missing', (value) => { value.componentGraph.instances[0].overrides[0].id = 'missing'; }],
+    ['arbitrary component property references', (value) => { value.componentGraph.propertyReferences[0].references = { forged: { arbitrary: true } }; }],
     ['component supplement disagrees', (value) => { value.componentGraph.definitionSupplements[0].componentPropertyDefinitions.Size.defaultValue = 'L'; }],
     ['malformed text node', (value) => { value.textGraph.textNodes.push({}); }],
     ['text characters disagree', (value) => { value.textGraph.textNodes[0].segments[0].characters = 'No '; }],
+    ['captured hyperlink deleted', (value) => { delete value.textGraph.textNodes.find((row) => row.nodeId === 'text').segments[1].hyperlink; }, true],
     ['malformed asset', (value) => { value.assetGraph.assets.push({}); }],
     ['asset content identity malformed', (value) => { value.assetGraph.assets[0].sha256 = 'bad'; }],
+    ['asset content identity substituted', (value) => { value.assetGraph.assets[0].sha256 = 'c'.repeat(64); }, true],
     ['export references missing source node', (value) => { value.assetGraph.assets.push({ kind: 'export', sourceId: 'forged-node', file: 'assets/forged.png', sha256: 'c'.repeat(64), bytes: 1, mime: 'image/png', width: 1, height: 1 }); }],
   ];
-  for (const [name, mutate] of persistedMutations) {
-    const corrupted = structuredClone(persisted);
-    mutate(corrupted);
+  for (const [name, mutate, sourceContentMutation = false] of persistedMutations) {
+    const changed = structuredClone(persisted);
+    mutate(changed);
+    const corrupted = sourceContentMutation ? changed : sealCanonicalModelContent(changed);
     assert.throws(() => parseCanonicalModel(corrupted), CanonicalModelError, name);
   }
   const unknownSchema = structuredClone(persisted); unknownSchema.textGraph.schemaVersion = 999;
@@ -181,7 +206,7 @@ test('canonical-model pipeline builds all versioned P2 graphs from one snapshot 
 
 test('independent G1-G5 oracle rejects the actual legacy thin IR on the same semantic fixture', () => {
   const { document, components, supplement, assetIndex, sealedFiles, variables } = fixture();
-  const snapshot = { manifest: { sourcePlanes: planes(), files: sealedFiles }, document, components, supplement, variables, dependencies: { assets: assetIndex, assetNodeIds: ['icon'] } };
+  const snapshot = { manifest: { sourcePlanes: planes(), files: sealedFiles }, document, components, supplement, variables, fonts: {}, dependencies: { assets: assetIndex, assetNodeIds: ['icon'] } };
   const canonical = buildCanonicalModel({ snapshot, evidenceClass: 'microfixture', fileKey: 'FIX' });
   const legacy = buildIr(document, new Map([['V:op', { cssVar: '--opacity-card', name: 'opacity/card' }]]));
   assert.deepEqual(lossyLegacyFailures(canonical, legacy), { G1: true, G2: true, G3: true, G4: true, G5: true });

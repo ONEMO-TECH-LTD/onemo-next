@@ -4,18 +4,18 @@ import { collectOccurrences, classifyOccurrences } from './inventory.mjs';
 import { buildDocumentGraph } from './document-graph.mjs';
 import { buildVariableGraph, traceIdOf } from './variable-graph.mjs';
 import { buildBindingGraph } from './binding-graph.mjs';
-import { buildComponentGraph } from './component-graph.mjs';
+import { buildComponentGraph, validateComponentReferenceMap, validateOverrideRecords } from './component-graph.mjs';
 import { buildTextGraph } from './text-graph.mjs';
 import { buildAssetGraph } from './asset-graph.mjs';
 import { graphSourcePlaneErrors } from './provenance.mjs';
-import { canonicalJson } from './evidence.mjs';
+import { canonicalJson, fingerprint, sha256 } from './evidence.mjs';
 
 export class CanonicalModelError extends Error {
   constructor(state, message, options) { super(message, options); this.state = state; }
 }
 
 export function buildCanonicalModel({ snapshot, evidenceClass, fileKey = snapshot?.manifest?.fileKey }) {
-  if (!snapshot?.manifest || !snapshot.document || !snapshot.variables || !snapshot.components || !snapshot.supplement || !snapshot.dependencies) {
+  if (!snapshot?.manifest || !snapshot.document || !snapshot.variables || !snapshot.components || !snapshot.supplement || snapshot.fonts === undefined || !snapshot.dependencies) {
     throw new CanonicalModelError('FAILED_CAPTURE', 'canonical model requires one complete sealed snapshot');
   }
   const sourcePlanes = snapshot.manifest.sourcePlanes;
@@ -46,15 +46,19 @@ export function buildCanonicalModel({ snapshot, evidenceClass, fileKey = snapsho
       sourcePlanes,
       evidenceClass,
     });
-    return {
+    const assetHashes = Object.fromEntries((snapshot.dependencies.assets ?? []).map((row) => [String(row.file).replace(/^assets\//, ''), row.sha256]));
+    const sourceFingerprint = fingerprint({ ...snapshot, assetHashes });
+    if (snapshot.manifest.fingerprint && snapshot.manifest.fingerprint !== sourceFingerprint) throw new CanonicalModelError('FAILED_CAPTURE', 'canonical source fingerprint disagrees with sealed snapshot manifest');
+    return sealCanonicalModelContent({
       schemaVersion: SCHEMA.canonicalModel,
+      sourceFingerprint,
       documentGraph,
-      variableGraph: variableGraph.toJSON({ nodeModeContexts: bindingGraph.nodeModeContexts }),
+      variableGraph: variableGraph.toJSON({ nodeModeContexts: bindingGraph.nodeModeContexts, resolutionTraces: bindingGraph.resolutionTraces }),
       bindingGraph,
       componentGraph,
       textGraph,
       assetGraph,
-    };
+    });
   } catch (error) {
     if (error instanceof CanonicalModelError) throw error;
     throw new CanonicalModelError(error.state ?? 'FAILED_CAPABILITY', error.message, { cause: error });
@@ -66,11 +70,14 @@ export function parseCanonicalModel(value) {
   const errors = [];
   const modelError = schemaError('canonicalModel', value);
   if (modelError) errors.push(modelError);
+  if (!/^[0-9a-f]{64}$/i.test(value?.sourceFingerprint ?? '')) errors.push('canonicalModel.sourceFingerprint invalid');
+  if (!value?.graphHashes || typeof value.graphHashes !== 'object' || Array.isArray(value.graphHashes)) errors.push('canonicalModel.graphHashes invalid');
+  if (!/^[0-9a-f]{64}$/i.test(value?.contentSeal ?? '')) errors.push('canonicalModel.contentSeal invalid');
   const graphKinds = [
     ['documentGraph', 'documentGraph', ['nodes']],
     ['variableGraph', 'variableGraph', ['variables', 'collections', 'resolutionTraces', 'nodeModeContexts']],
     ['bindingGraph', 'bindingGraph', ['records', 'resolutionTraces', 'nodeModeContexts']],
-    ['componentGraph', 'componentGraph', ['definitions', 'definitionSupplements', 'instances']],
+    ['componentGraph', 'componentGraph', ['definitions', 'definitionSupplements', 'propertyReferences', 'instances']],
     ['textGraph', 'textGraph', ['textNodes']],
     ['assetGraph', 'assetGraph', ['assets']],
   ];
@@ -83,9 +90,30 @@ export function parseCanonicalModel(value) {
   for (const [index, record] of (value?.bindingGraph?.records ?? []).entries()) {
     errors.push(...validateBindingRecord(record).map((error) => `bindingGraph.records[${index}]: ${error}`));
   }
+  if (errors.length === 0) {
+    const expectedHashes = canonicalGraphHashes(value);
+    if (canonicalJson(expectedHashes) !== canonicalJson(value.graphHashes)) errors.push('canonicalModel.graphHashes disagree with persisted graph content');
+    if (canonicalModelSeal(value) !== value.contentSeal) errors.push('canonicalModel.contentSeal mismatch');
+  }
   if (errors.length === 0) validatePersistedGraphs(value, errors);
   if (errors.length) throw new CanonicalModelError('FAILED_CAPABILITY', `canonical model schema refused: ${errors.join('; ')}`);
   return structuredClone(value);
+}
+
+export function canonicalGraphHashes(model) {
+  return Object.fromEntries(['documentGraph', 'variableGraph', 'bindingGraph', 'componentGraph', 'textGraph', 'assetGraph'].map((name) => [name, sha256(canonicalJson(model?.[name]))]));
+}
+
+export function canonicalModelSeal(model) {
+  const { contentSeal, ...content } = model;
+  return sha256(canonicalJson(content));
+}
+
+export function sealCanonicalModelContent(value) {
+  const model = structuredClone(value);
+  model.graphHashes = canonicalGraphHashes(model);
+  model.contentSeal = canonicalModelSeal(model);
+  return model;
 }
 
 const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -95,12 +123,28 @@ const add = (errors, path, condition, message = 'invalid') => { if (!condition) 
 function validatePersistedGraphs(model, errors) {
   const documentNodes = validateDocument(model.documentGraph, errors);
   const variables = validateVariables(model.variableGraph, errors);
+  validateTraceConservation(model.variableGraph.resolutionTraces, model.bindingGraph.resolutionTraces, model.bindingGraph.records, errors);
   const contexts = validateContexts(model.variableGraph, model.bindingGraph, documentNodes, variables, errors);
   validateBindingInventory(model.documentGraph, model.bindingGraph, documentNodes, errors);
   validateBindings(model.bindingGraph, documentNodes, variables, contexts, errors);
   validateComponents(model.componentGraph, documentNodes, errors);
   validateText(model.textGraph, documentNodes, errors);
   validateAssets(model.assetGraph, documentNodes, errors);
+}
+
+function validateTraceConservation(variableRows, bindingRows, records, errors) {
+  const key = (row) => `${row?.traceId}\u241f${row?.modeContextId}`;
+  const index = (rows) => new Map(rows.map((row) => [key(row), canonicalJson(row)]));
+  const variableTraces = index(variableRows);
+  const bindingTraces = index(bindingRows);
+  const keys = new Set([...variableTraces.keys(), ...bindingTraces.keys()]);
+  for (const traceKey of keys) {
+    if (!variableTraces.has(traceKey) || variableTraces.get(traceKey) !== bindingTraces.get(traceKey)) {
+      errors.push(`VariableGraph and BindingGraph resolution trace disagree at ${traceKey}`);
+    }
+  }
+  const used = new Set(records.map((record) => `${record?.resolutionTraceId}\u241f${record?.modeContextId}`));
+  for (const traceKey of keys) if (!used.has(traceKey)) errors.push(`resolution trace ${traceKey} is orphaned from BindingRecords`);
 }
 
 function validateBindingInventory(documentGraph, bindingGraph, documentNodes, errors) {
@@ -240,8 +284,8 @@ function validateContexts(variableGraph, bindingGraph, documentNodes, variables,
 }
 
 function validateBindings(graph, documentNodes, variables, contexts, errors) {
-  validateResolutionTraces(graph.resolutionTraces, 'bindingGraph.resolutionTraces', errors, false, variables);
-  const traceIds = new Set(graph.resolutionTraces.map((trace) => trace?.traceId));
+  validateResolutionTraces(graph.resolutionTraces, 'bindingGraph.resolutionTraces', errors, true, variables);
+  const traces = new Map(graph.resolutionTraces.map((trace) => [`${trace?.traceId}\u241f${trace?.modeContextId}`, trace]));
   const ids = new Set();
   for (const [index, record] of graph.records.entries()) {
     const path = `bindingGraph.records[${index}]`;
@@ -252,7 +296,9 @@ function validateBindings(graph, documentNodes, variables, contexts, errors) {
     if (!variable || variable.id !== record?.variable?.captureId || variable.resolvedType !== record?.variable?.figmaType) errors.push(`${path}.variable disagrees with VariableGraph`);
     else if (variables.collectionKeyById.get(variable.variableCollectionId) !== record.variable.collectionKey) errors.push(`${path}.variable.collectionKey disagrees with VariableGraph`);
     if (contexts.get(record?.source?.nodeId) !== record?.modeContextId) errors.push(`${path}.modeContextId disagrees with node context`);
-    if (!traceIds.has(record?.resolutionTraceId)) errors.push(`${path}.resolutionTraceId missing from BindingGraph traces`);
+    const trace = traces.get(`${record?.resolutionTraceId}\u241f${record?.modeContextId}`);
+    if (!trace) errors.push(`${path}.resolutionTraceId/modeContextId missing from BindingGraph traces`);
+    else if (trace.hops?.[0]?.key !== record.variable?.key || trace.hops?.[0]?.captureId !== record.variable?.captureId) errors.push(`${path}.resolutionTraceId starts at another variable`);
     try { if (record.bindingId !== sourceBindingIdentity(record)) errors.push(`${path}.bindingId disagrees with identity fields`); }
     catch (error) { errors.push(`${path}.bindingId cannot be recomputed: ${error.message}`); }
   }
@@ -299,6 +345,7 @@ function validateModeContextId(value, path, modesByCollectionKey, errors) {
 function validateComponents(graph, documentNodes, errors) {
   const byKey = new Map();
   const byId = new Map();
+  const parentById = new Map([...documentNodes.values()].map((row) => [row.id, row.parentId]));
   for (const [index, definition] of graph.definitions.entries()) {
     const path = `componentGraph.definitions[${index}]`;
     for (const field of ['id', 'key', 'name']) add(errors, `${path}.${field}`, string(definition?.[field]), 'missing');
@@ -308,7 +355,10 @@ function validateComponents(graph, documentNodes, errors) {
       if (byKey.has(definition.key)) errors.push(`${path}.key duplicate`);
       byKey.set(definition.key, definition);
     }
-    if (string(definition?.id)) byId.set(definition.id, definition);
+    if (string(definition?.id)) {
+      if (byId.has(definition.id)) errors.push(`${path}.id duplicate`);
+      byId.set(definition.id, definition);
+    }
   }
   for (const [index, definition] of graph.definitions.entries()) {
     if (definition?.componentSetKey && !byKey.has(definition.componentSetKey)) errors.push(`componentGraph.definitions[${index}].componentSetKey missing from catalog`);
@@ -322,13 +372,26 @@ function validateComponents(graph, documentNodes, errors) {
     add(errors, `${path}.catalog`, Boolean(catalog), 'definition missing from catalog');
     if (catalog && canonicalJson(catalog.propertyDefinitions ?? {}) !== canonicalJson(row.componentPropertyDefinitions ?? {})) errors.push(`${path} disagrees with catalog property definitions`);
   }
+  const instanceByNode = new Map(graph.instances.map((row) => [row.nodeId, row]));
+  const referencesByNode = new Map();
+  for (const [index, row] of graph.propertyReferences.entries()) {
+    const path = `componentGraph.propertyReferences[${index}]`;
+    if (referencesByNode.has(row?.nodeId)) errors.push(`${path}.nodeId duplicate`);
+    referencesByNode.set(row?.nodeId, row);
+    const node = documentNodes.get(row?.nodeId);
+    const ownerKey = persistedComponentOwnerKey(row?.nodeId, parentById, documentNodes, instanceByNode, byId);
+    add(errors, `${path}.ownerComponentKey`, string(row?.ownerComponentKey) && row.ownerComponentKey === ownerKey, 'does not match containing component/main component');
+    const owner = byKey.get(ownerKey);
+    try { validateComponentReferenceMap(row?.nodeId, node?.properties?.type, row?.references, owner ?? {}); }
+    catch (error) { errors.push(`${path}: ${error.message}`); }
+  }
   const seenInstances = new Set();
   for (const [index, row] of graph.instances.entries()) {
     const path = `componentGraph.instances[${index}]`;
     add(errors, `${path}.nodeId`, string(row?.nodeId), 'missing');
     add(errors, `${path}.mainComponentKey`, string(row?.mainComponentKey) && byKey.has(row.mainComponentKey), 'missing from catalog');
     add(errors, `${path}.componentProperties`, object(row?.componentProperties));
-    add(errors, `${path}.componentPropertyReferences`, object(row?.componentPropertyReferences));
+    add(errors, `${path}.componentPropertyReferences`, row?.componentPropertyReferences === null || object(row?.componentPropertyReferences));
     add(errors, `${path}.overrides`, Array.isArray(row?.overrides));
     add(errors, `${path}.documentNode`, documentNodes.get(row?.nodeId)?.properties?.type === 'INSTANCE', 'must reference INSTANCE');
     const component = byKey.get(row?.mainComponentKey);
@@ -341,14 +404,22 @@ function validateComponents(graph, documentNodes, errors) {
       else if (definition.type === 'BOOLEAN' && typeof property.value !== 'boolean') errors.push(`${path}.componentProperties.${name} must be boolean`);
       else if (definition.type === 'TEXT' && typeof property.value !== 'string') errors.push(`${path}.componentProperties.${name} must be string`);
     }
-    for (const [overrideIndex, override] of (row?.overrides ?? []).entries()) {
-      add(errors, `${path}.overrides[${overrideIndex}].id`, string(override?.id), 'missing');
-      add(errors, `${path}.overrides[${overrideIndex}].overriddenFields`, Array.isArray(override?.overriddenFields) && override.overriddenFields.every(string));
-    }
+    if (row?.componentPropertyReferences !== null && canonicalJson(row?.componentPropertyReferences) !== canonicalJson(referencesByNode.get(row?.nodeId)?.references)) errors.push(`${path}.componentPropertyReferences missing or disagrees with propertyReferences table`);
+    try { validateOverrideRecords(row?.nodeId, row?.overrides, parentById); }
+    catch (error) { errors.push(`${path}: ${error.message}`); }
     if (seenInstances.has(row?.nodeId)) errors.push(`${path}.nodeId duplicate`);
     seenInstances.add(row?.nodeId);
   }
   for (const node of documentNodes.values()) if (node.properties?.type === 'INSTANCE' && !seenInstances.has(node.id)) errors.push(`componentGraph missing INSTANCE ${node.id}`);
+}
+
+function persistedComponentOwnerKey(nodeId, parentById, documentNodes, instanceByNode, definitionById) {
+  for (let ancestor = parentById.get(nodeId); ancestor; ancestor = parentById.get(ancestor)) {
+    const type = documentNodes.get(ancestor)?.properties?.type;
+    if (['COMPONENT', 'COMPONENT_SET'].includes(type)) return definitionById.get(ancestor)?.key ?? null;
+    if (type === 'INSTANCE') return instanceByNode.get(ancestor)?.mainComponentKey ?? null;
+  }
+  return null;
 }
 
 function validatePropertyDefinitions(definitions, path, errors) {

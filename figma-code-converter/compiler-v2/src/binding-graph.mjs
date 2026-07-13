@@ -82,10 +82,11 @@ export function buildBindingGraph({ fileKey, document, supplement, sourcePlanes,
     fileKey, occ, v, collectionKey, resolution,
     modeContextId: modeIdByNode.get(occ.nodeId),
   }));
-  const resolutionTraces = [...new Map(pending.map(({ resolution }) => [resolution.traceId, {
+  const resolutionTraces = [...new Map(pending.map(({ resolution }, index) => [`${resolution.traceId}\u241f${records[index].modeContextId}`, {
     traceId: resolution.traceId,
+    modeContextId: records[index].modeContextId,
     hops: structuredClone(resolution.trace),
-  }])).values()].sort((a, b) => a.traceId.localeCompare(b.traceId));
+  }])).values()].sort((a, b) => `${a.traceId}\u241f${a.modeContextId}`.localeCompare(`${b.traceId}\u241f${b.modeContextId}`));
   return { schemaVersion: SCHEMA.bindingGraph, records, resolutionTraces, nodeModeContexts, unknown: classified.unknown, mirrors: classified.mirrors, nonvisual: classified.nonvisual };
 }
 

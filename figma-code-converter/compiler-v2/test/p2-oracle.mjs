@@ -13,20 +13,24 @@ export function documentMismatch(document, graph) {
 
 export function componentMismatch(components, supplement, graph) {
   const expectedDefinitions = [...(components.componentSets ?? []), ...(components.components ?? [])]
-    .map((row) => structuredClone(row)).sort(byStableKey);
+    .map((row) => ({ ...structuredClone(row), propertyDefinitions: structuredClone(row.propertyDefinitions ?? {}) })).sort(byStableKey);
   const expectedInstances = (supplement.nodes ?? []).filter((row) => row.mainComponentKey).map((row) => ({
     nodeId: row.nodeId,
     mainComponentKey: row.mainComponentKey,
     componentProperties: structuredClone(row.componentProperties ?? {}),
-    componentPropertyReferences: structuredClone(row.componentPropertyReferences ?? {}),
+    componentPropertyReferences: structuredClone(row.componentPropertyReferences ?? null),
     overrides: structuredClone(row.overrides ?? []),
   })).sort(byNodeId);
   const expectedSupplements = (supplement.nodes ?? []).filter((row) => row.componentPropertyDefinitions !== undefined).map((row) => ({
     nodeId: row.nodeId,
     componentPropertyDefinitions: structuredClone(row.componentPropertyDefinitions),
   })).sort(byNodeId);
+  const expectedReferences = (supplement.nodes ?? []).filter((row) => row.componentPropertyReferences != null).map((row) => ({
+    nodeId: row.nodeId, references: structuredClone(row.componentPropertyReferences),
+  })).sort(byNodeId);
   return canonicalJson(expectedDefinitions) !== canonicalJson([...graph.definitions].sort(byStableKey)) ||
     canonicalJson(expectedSupplements) !== canonicalJson([...graph.definitionSupplements].sort(byNodeId)) ||
+    canonicalJson(expectedReferences) !== canonicalJson([...(graph.propertyReferences ?? [])].sort(byNodeId).map(({ ownerComponentKey, ...row }) => row)) ||
     canonicalJson(expectedInstances) !== canonicalJson([...graph.instances].sort(byNodeId));
 }
 
