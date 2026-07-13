@@ -3,7 +3,7 @@
 > Governing contract: `../C11-CONTRACT-V3.md` sha256 fd8b6c9258c1701bdf265072eb8e50d099359e3c677e34214d7ac936afbc540a
 > Builder baseline: commit `f37de9e` (nine legacy truth-fixes + contracts). Legacy lane stays operational (§0.1).
 > Run mode (Dan, 2026-07-13, live directive): continuous end-to-end build; phases are FROZEN
-> EVIDENCE POINTS reviewed asynchronously by @s58-pixel (QA) and @s58-pixel-meta-qa (Meta);
+> EVIDENCE POINTS reviewed asynchronously by @s58-qa (QA) and @s58-pixel-meta-qa (Meta);
 > REWORK findings stop ALL dependent downstream work until cleared; only demonstrably
 > orthogonal work continues during a rework. Dan judges the final product, Done, and cutover.
 > Evidence discipline (self-review, mutations, honest failures) is NOT waived.
@@ -16,18 +16,22 @@ review, fail-closed gaps, final Dan sign-off, Done ownership, cutover authorizat
 
 **Current test truth (reported separately):** legacy converter suite 46 pass / 3 fail (missing
 gitignored golden fixture `t88thL8hKksSpILgkeGRZ0-4084-25997.nodes.json`) / 0 skips ·
-compiler-v2 foundation suite 21 pass / 0 fail / 0 skip. No phase may be recorded green from
-harness-only or REST_ONLY placeholders.
+compiler-v2 foundation suite 53 pass / 0 fail / 0 skip across Builder and Meta repeated runs ·
+parked P2 prototype suite 8 pass / 3 fail / 0 skip (not accepted). No phase may be recorded green
+from harness-only or REST_ONLY placeholders.
 
 **Gap blocking map:** G-1 (plugin-origin corpus) blocks P0 exit + P7 full-corpus G0–G13.
 G-2 (plugin supplement capability) blocks P1 G0 supplement proof and every G1–G5 clearance of
 component/mixed-text/mode-override domains. G-3 (dark reference) blocks dark-state G11 promotion
 only. G-4 (Dan mother-screen selection) blocks P0 item 2 + the P3/P4 slice anchor. G-5
-(source-plane fail-closed enforcement, unbuilt) blocks P1 G0 / P2 provenance gating.
+(source-plane fail-closed enforcement, unbuilt) blocks P1 G0 / P2 provenance gating. G-6
+(bounded retention/reader lease) blocks P0 operability acceptance only; it is not an atomic
+publication freeze blocker and does not authorize speculative GC.
 
 ## Ownership
-Builder/orchestrator/ledger: Kai (s58). QA structural/gate proof: @s58-pixel.
-Product/editor/agnosticity challenge: @s58-pixel-meta-qa. Decisions/Done/cutover: Dan only.
+Builder/ledger: @s58-pixel. Independent QA: @s58-qa. Meta/product/editor/agnosticity challenge:
+@s58-pixel-meta-qa. Lead/orchestrator + capture/fixture operator, hands-off code: @s58-kai.
+Decisions/Done/cutover: Dan only.
 
 ## Phase ledger
 
@@ -66,6 +70,11 @@ Product/editor/agnosticity challenge: @s58-pixel-meta-qa. Decisions/Done/cutover
    segment edit, fragment ownership — spec'd against the react-figma engine contract. [pending]
 7. **Registry transaction protocol**: §6.1.1 verbatim; lane-scoped generations
    (v2 sandbox namespace only until P9). [no code until P3]
+8. **Calibration publication/restart seam**: UUID-isolated multi-writer transactions; pointer
+   rename final; opaque in-process ownership; strict pointer/marker/topology validation; atomic
+   temp-unlink arbitration; dead-owner recovery; legacy-v1 namespace preservation; original
+   failure diagnostics preserved. Foundation 53/53/0 plus deterministic publisher-won and
+   recovery-won races. [SEAM CLEAR — not P0 exit]
 
 ## Gap register (stop-and-collaborate log, Dan's gap protocol)
 
@@ -75,7 +84,8 @@ Product/editor/agnosticity challenge: @s58-pixel-meta-qa. Decisions/Done/cutover
 | G-2 | Plugin supplement capture (resolvedVariableModes, styledTextSegments, component defs) is a REQUIRED capture plane; REST_ONLY/PARTIAL provenance is diagnostic-only and cannot pass G0 or clear supplement-dependent G1–G5 (joint route — earlier "Shape completeness without supplement" claim narrowed accordingly) | OPEN — BLOCKS P1 G0; needs Dan input #3 (bridge rescan at pinned versions) when capture lands | Kai builds; Dan rescan |
 | G-3 | Dark-mode visual promotion impossible without an authored dark reference (§4.5) | OPEN — dark states DIAGNOSTIC_ONLY until Dan authors a dark-mode reference frame | Dan (when he wants dark visually promoted) |
 | G-4 | §14.2 mother screen must be selected + version-pinned BY DAN; Shape cannot substitute | OPEN — blocks P0 item 2 and the P3/P4 mother-slice anchor | Dan (question surfaced in-session 2026-07-13) |
-| G-5 | REST_ONLY/source-plane fail-closed law is UNBUILT at a0616a8 (schema only requires sourcePlanes to exist) — Kai's earlier "encoded as data" claim was an overclaim, corrected | OPEN — per-fact provenance validator owed in P1/P2. Failure taxonomy (joint route + Meta correction): missing/partial/REST_ONLY REQUIRED supplement → **FAILED_CAPTURE before graphs**; unreadable complete component definition → FAILED_COMPONENT; fully plugin-captured but unsupported → FAILED_CAPABILITY | Kai |
+| G-5 | REST_ONLY/source-plane fail-closed law is UNBUILT at a0616a8 (schema only requires sourcePlanes to exist) — Kai's earlier "encoded as data" claim was an overclaim, corrected | OPEN — per-fact provenance validator owed in P1/P2. Failure taxonomy (joint route + Meta correction): missing/partial/REST_ONLY REQUIRED supplement → **FAILED_CAPTURE before graphs**; unreadable complete component definition → FAILED_COMPONENT; fully plugin-captured but unsupported → FAILED_CAPABILITY | Pixel |
+| G-6 | Complete published calibration generations currently have no bounded reader-safe retention policy | OPEN — non-blocking for atomic freeze; blocks P0 §4.7 storage/operability acceptance only. Preserve reader safety; no speculative GC | Pixel + QA/Meta architecture |
 
 ## P0 findings
 
@@ -99,7 +109,7 @@ Product/editor/agnosticity challenge: @s58-pixel-meta-qa. Decisions/Done/cutover
   resolvedVariableModes / styledTextSegments / component definitions / overrides /
   plugin-resolved remote variables. The marker grants NO capability; those capability rows stay
   unclear until supplement-backed fixtures prove them. Accepted — no escape hatch.
-- **Routing:** adversarial QA = @s58-pixel; Meta = @s58-pixel-meta-qa.
+- **Routing:** Builder = @s58-pixel; adversarial QA = @s58-qa; Meta = @s58-pixel-meta-qa.
 - **§17.0 governance:** Dan's verbatim directive — "execute the v3 contract end 2 end no
   stopping no phase by phase - entire thing … pass to pixel and meta-qa for the final review" —
   is recorded here as the explicit resolution: continuous build, async QA/Meta review at frozen
@@ -144,6 +154,8 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   run; final review by pixel + meta-qa; /o-deslop mandatory post-build; gaps = stop + collaborate.
 - 2026-07-13 Kai (process synthesis, relayed to both lanes): phases = frozen evidence points with
   async QA/Meta review; no build idle; evidence discipline intact.
+- 2026-07-13 Dan/Meta: lock-free calibration publication uses atomic temp-pointer arbitration;
+  bounded retention/reader leases remain P0 operability debt, not a third atomic freeze blocker.
 
 - 2026-07-13 SUPERSESSION RECORD: the builder's initial corpus reading (synthetic REST-schema
   snapshots acceptable as §14.2 integration fixtures; Shape doubling as the §14.2 mother; E-row
@@ -154,3 +166,10 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
 
 - 2026-07-13 Meta: gap ruling accepted (corpus = phase failure not debt; REST_ONLY grants no
   capability; §17.0 narrow waiver recorded). Formal QA not started; Pixel designing gap route.
+- 2026-07-13 Meta `[CLEAR TO FREEZE SEAM ONLY]`: byte-stable hashes
+  full `3c971de483653e22dfa63f086b24e25c57dec10d77a1e116b99e094d959796b5`, narrow
+  `b31fc77d5dbc08fbe82eed45859adbe25dd1b1438b864af82cc20648be9752ad`, worker
+  `163199800fb6fa1644d44f69b0e657f9e641faf50c7ebce6af3175088d64a2fd`; independent
+  3× foundation 53/53/0, four syntax checks and diff check green. R3-18b/R3-19/R3-20/R3-21
+  cleared. This authorizes only the narrow snapshot and clean-checkout/live-calibration sequence;
+  no phase, P0, promotion, fidelity, cutover, or Done verdict.

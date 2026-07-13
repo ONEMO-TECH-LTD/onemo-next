@@ -17,7 +17,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { stagingDir, publishGeneration, cleanStaging, runToken, recoverGenerations } from './atomic-publish.mjs';
+import { compilerV2OutDir, prepareStaging, publishGeneration, cleanStaging, runToken, recoverGenerations, withTransaction } from './atomic-publish.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const TOOL = path.resolve(HERE, '../..');            // figma-code-converter/
@@ -26,6 +26,7 @@ const [, , FK, NODE, ROUTE, OUT, ...rest] = process.argv;
 if (!FK || !NODE || !ROUTE || !OUT) { console.error('usage: calibrate.mjs <fileKey> <nodeId> <routeUrl> <outDir> [--theme light]'); process.exit(2); }
 const THEME = rest[rest.indexOf('--theme') + 1] && rest.includes('--theme') ? rest[rest.indexOf('--theme') + 1] : 'light';
 mkdirSync(OUT, { recursive: true });
+const V2_OUT = compilerV2OutDir(OUT); // preserve legacy root latest.json/generations byte-for-byte
 
 const sha = (f) => createHash('sha256').update(readFileSync(f)).digest('hex');
 
@@ -126,53 +127,55 @@ const round = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, ty
   // Build the complete artifact SET in a UNIQUE staging dir (pid+stamp — concurrent same-commit
   // runs never collide); publish as one atomic generation + pointer flip only after version
   // stability. A crash leaves the prior generation + pointer byte-identical (Meta R3-6).
-  await recoverGenerations(OUT); // restart recovery: clear any temp pointers / unreferenced generations from a prior crash
   const genBase = buildCommit.slice(0, 8);
   const token = runToken(Date.now());
-  const staging = stagingDir(OUT, genBase, token);
-  mkdirSync(staging, { recursive: true });
-  let ok = false;
-  try {
-    const v0 = await version();
-    const dims = await frameDims();
-    const figmaPng = path.join(staging, 'cal-figma.png');
-    const buildA = path.join(staging, 'cal-build-a.png');
-    const buildB = path.join(staging, 'cal-build-b.png');
-    await figmaRender(figmaPng);
-    await captureRoute(buildA, dims.w, dims.h);
-    await captureRoute(buildB, dims.w, dims.h); // immediate repeat → renderer/capture noise floor
-    const v1 = await version();
-    if (v0 !== v1) throw new Error(`UNSTABLE: file version moved ${v0} → ${v1}; candidate discarded, prior outputs untouched`);
+  // UUID-owned paths isolate concurrent calibrations. Recovery removes only provably-dead owners;
+  // complete generations coexist and the final pointer rename selects the latest completion.
+  await withTransaction(V2_OUT, async (transaction) => {
+    await recoverGenerations(V2_OUT, { transaction });
+    const staging = await prepareStaging({ outDir: V2_OUT, genBase, token, transaction });
+    let handedOff = false;
+    try {
+      const v0 = await version();
+      const dims = await frameDims();
+      const figmaPng = path.join(staging, 'cal-figma.png');
+      const buildA = path.join(staging, 'cal-build-a.png');
+      const buildB = path.join(staging, 'cal-build-b.png');
+      await figmaRender(figmaPng);
+      await captureRoute(buildA, dims.w, dims.h);
+      await captureRoute(buildB, dims.w, dims.h); // immediate repeat → renderer/capture noise floor
+      const v1 = await version();
+      if (v0 !== v1) throw new Error(`UNSTABLE: file version moved ${v0} → ${v1}; candidate discarded, prior outputs untouched`);
 
-    const draft = {
-      schemaVersion: 1,
-      kind: 'calibration-draft',
-      fileKey: FK, nodeId: NODE, fileVersion: v0, frame: dims,
-      buildCommit,
-      artifacts: { figma: sha(figmaPng), buildA: sha(buildA), buildB: sha(buildB) },
-      environment: {
-        capture: 'playwright system-chrome dpr2', viewport: `${dims.w}x${dims.h}`,
-        theme: `${THEME} (stamped + verified on documentElement)`,
-        alpha: 'both sides composited onto opaque #ffffff before compare',
-        figmaExport: 'REST png scale=2 (color profile unpinned — owed)',
-      },
-      samples: {
-        noiseFloor_buildRepeat: { n: 1, ...round(await diffPair(buildA, buildB)) },
-        fidelity_figmaVsBuild: { n: 1, ...round(await diffPair(figmaPng, buildA)) },
-      },
-      honesty: [
-        'DRAFT EVIDENCE ONLY — no budget is normative until P0 calibration acceptance (QA/Meta/Dan)',
-        'n=1 per class; distributions, per-class regions, DeltaE, SSIM, known-broken runs OWED',
-        'legacy-lane build — v2 packages recalibrate at P6',
-      ],
-    };
-    writeFileSync(path.join(staging, 'calibration-draft.json'), JSON.stringify(draft, null, 1));
-    // ATOMIC set promotion: one rename publishes the whole generation, one rename flips latest.json.
-    const { genDir, pointer } = await publishGeneration({ outDir: OUT, genBase, token });
-    ok = true;
-    console.log(JSON.stringify({ frame: dims, buildCommit: genBase, generation: path.relative(OUT, genDir), pointer: path.basename(pointer), samples: draft.samples }, null, 1));
-  } finally {
-    await cleanStaging(OUT, genBase, token); // clean this run's staging; generations + pointer untouched
-  }
-  if (!ok) process.exit(1);
+      const draft = {
+        schemaVersion: 1,
+        kind: 'calibration-draft',
+        fileKey: FK, nodeId: NODE, fileVersion: v0, frame: dims,
+        buildCommit,
+        artifacts: { figma: sha(figmaPng), buildA: sha(buildA), buildB: sha(buildB) },
+        environment: {
+          capture: 'playwright system-chrome dpr2', viewport: `${dims.w}x${dims.h}`,
+          theme: `${THEME} (stamped + verified on documentElement)`,
+          alpha: 'both sides composited onto opaque #ffffff before compare',
+          figmaExport: 'REST png scale=2 (color profile unpinned — owed)',
+        },
+        samples: {
+          noiseFloor_buildRepeat: { n: 1, ...round(await diffPair(buildA, buildB)) },
+          fidelity_figmaVsBuild: { n: 1, ...round(await diffPair(figmaPng, buildA)) },
+        },
+        honesty: [
+          'DRAFT EVIDENCE ONLY — no budget is normative until P0 calibration acceptance (QA/Meta/Dan)',
+          'n=1 per class; distributions, per-class regions, DeltaE, SSIM, known-broken runs OWED',
+          'legacy-lane build — v2 packages recalibrate at P6',
+        ],
+      };
+      writeFileSync(path.join(staging, 'calibration-draft.json'), JSON.stringify(draft, null, 1));
+      // One generation rename publishes the set; the final pointer rename selects it.
+      handedOff = true;
+      const { genDir, pointer } = await publishGeneration({ outDir: V2_OUT, genBase, token, transaction });
+      console.log(JSON.stringify({ frame: dims, buildCommit: genBase, namespace: 'v2', generation: path.relative(OUT, genDir), pointer: path.relative(OUT, pointer), samples: draft.samples }, null, 1));
+    } finally {
+      if (!handedOff) await cleanStaging(V2_OUT, genBase, token, { transaction });
+    }
+  }); // withTransaction
 })().catch((e) => { console.error(`calibrate: ${e.message}`); process.exit(1); });
