@@ -1,12 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { isValidElementType } from 'react-is'
 
-import type { AuthoringGraphV1, VariantFrame } from '@/app/api/dev/editor/authoring-types'
+import type { AuthoringGraphV1, SourceAnchor, VariantFrame } from '@/app/api/dev/editor/authoring-types'
 import type { SourceProjection } from '@/app/api/dev/editor/source-projection'
 import { componentCanvasGeometry, movedVariantFrame } from './gestures'
 import { cancelAuthoringResumeMarker, issueAuthoringResumeMarker } from './session'
+import { sourceContentLayerId, sourceContentLayers, type SourceContentLayer } from './content-selection'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let projectComponents = (require as any).context('../../react-figma-components', true, /\.tsx$/)
@@ -45,6 +46,25 @@ type ImportPreview = {
 }
 
 const accent = 'var(--sem-col-border-brand)'
+
+function bindSourceContent(root: Element, layer: SourceContentLayer): Array<{ element: Element; layer: SourceContentLayer }> {
+  if (!matchesSourceTag(root, layer.tag)) return []
+  const bound = [{ element: root, layer }]
+  const children = Array.from(root.children)
+  let cursor = 0
+  for (const childLayer of layer.children) {
+    const relativeIndex = children.slice(cursor).findIndex((child) => matchesSourceTag(child, childLayer.tag))
+    if (relativeIndex < 0) continue
+    const childIndex = cursor + relativeIndex
+    bound.push(...bindSourceContent(children[childIndex]!, childLayer))
+    cursor = childIndex + 1
+  }
+  return bound
+}
+
+function matchesSourceTag(element: Element, sourceTag: string): boolean {
+  return /^[a-z]/.test(sourceTag) && element.tagName.toLowerCase() === sourceTag.toLowerCase()
+}
 
 function armComponentModuleRefresh(): {
   wait: () => Promise<void>
@@ -96,6 +116,7 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged, onResume
   const [snapshot, setSnapshot] = useState<CanvasSnapshot | null>(null)
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedContent, setSelectedContent] = useState<{ variantId: string; id: string } | null>(null)
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -104,6 +125,7 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged, onResume
   const handledUndoNonce = useRef(undoNonce)
   const [dragPreview, setDragPreview] = useState<{ id: string; frame: VariantFrame['frame'] } | null>(null)
   const loadGeneration = useRef(0)
+  const contentRoots = useRef(new Map<string, HTMLDivElement>())
   const onResumeResolvedRef = useRef(onResumeResolved)
 
   useEffect(() => { onResumeResolvedRef.current = onResumeResolved }, [onResumeResolved])
@@ -134,6 +156,7 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged, onResume
     setSnapshot(data)
     onResumeResolvedRef.current(file, data.sourceHashes[file])
     setSelectedId((current) => current && data.graph.variants[current] ? current : data.graph.components[data.componentId]?.primaryVariantId ?? null)
+    setSelectedContent((current) => current && data.graph.variants[current.variantId] && data.projection.anchors.some((anchor: SourceAnchor) => sourceContentLayerId(anchor) === current.id) ? current : null)
   }, [file])
 
   useEffect(() => {
@@ -159,6 +182,45 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged, onResume
     const candidate = projectComponents(key)?.[snapshot.projection.exportName]
     return isValidElementType(candidate) ? candidate : null
   }, [file, snapshot])
+
+  const contentProjection = useMemo(() => {
+    if (!snapshot) return { layers: [] as SourceContentLayer[], error: null as Error | null }
+    try {
+      return { layers: sourceContentLayers(snapshot.projection), error: null }
+    } catch (cause) {
+      return { layers: [] as SourceContentLayer[], error: cause as Error }
+    }
+  }, [snapshot])
+
+  useLayoutEffect(() => {
+    for (const [variantId, container] of contentRoots.current) {
+      for (const existing of container.querySelectorAll('[data-authoring-node-id]')) {
+        existing.removeAttribute('data-authoring-node-id')
+        existing.removeAttribute('data-authoring-node-file')
+        existing.removeAttribute('data-authoring-node-export')
+        existing.removeAttribute('data-authoring-node-tag')
+        existing.removeAttribute('data-authoring-node-line')
+        existing.removeAttribute('data-authoring-node-col')
+        existing.removeAttribute('data-authoring-node-variant-id')
+        existing.removeAttribute('data-authoring-node-selected')
+      }
+      const sourceRoot = contentProjection.layers[0]
+      if (!sourceRoot || container.children.length !== 1) continue
+      for (const binding of bindSourceContent(container.children[0]!, sourceRoot)) {
+        const { element, layer } = binding
+        element.setAttribute('data-authoring-node-id', layer.id)
+        element.setAttribute('data-authoring-node-file', layer.source.file)
+        element.setAttribute('data-authoring-node-export', layer.source.exportName)
+        element.setAttribute('data-authoring-node-tag', layer.tag)
+        element.setAttribute('data-authoring-node-line', String(layer.source.anchor.lastKnownLine))
+        element.setAttribute('data-authoring-node-col', String(layer.source.anchor.lastKnownCol))
+        element.setAttribute('data-authoring-node-variant-id', variantId)
+        if (selectedContent?.variantId === variantId && selectedContent.id === layer.id) {
+          element.setAttribute('data-authoring-node-selected', 'true')
+        }
+      }
+    }
+  }, [contentProjection.layers, selectedContent])
 
   const execute = useCallback(async (command: object) => {
     if (!snapshot || busy) return
@@ -267,6 +329,7 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged, onResume
     </section>
   }
   if (error) return <div role="alert" style={{ padding: 24, color: 'var(--sem-col-text-error-primary)' }}>{error}</div>
+  if (contentProjection.error) return <div role="alert" style={{ padding: 24, color: 'var(--sem-col-text-error-primary)' }}>{contentProjection.error.message}</div>
   if (!snapshot || !component) return <div style={{ padding: 24, color: 'var(--sem-col-text-secondary)' }}>Loading component…</div>
   const definition = snapshot.graph.components[snapshot.componentId]!
   const variants = Object.values(snapshot.graph.variants).filter((variant) => variant.componentId === snapshot.componentId)
@@ -275,13 +338,14 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged, onResume
   const { ghost } = componentCanvasGeometry(variants.map((variant) => variant.frame), primary.frame)
 
   return (
-    <div data-authoring-canvas data-authoring-busy={busy ? 'true' : 'false'} data-component-id={definition.id} onPointerDown={(event) => { if (event.target === event.currentTarget) setSelectedId(null) }}
+    <div data-authoring-canvas data-authoring-busy={busy ? 'true' : 'false'} data-component-id={definition.id} data-selected-content-id={selectedContent?.id} data-selected-content-variant-id={selectedContent?.variantId} onPointerDown={(event) => { if (event.target === event.currentTarget) { setSelectedId(null); setSelectedContent(null) } }}
       style={{ position: 'relative', width: '100%', height: '100%', minWidth: 800, minHeight: 600, background: 'var(--sem-col-bg-secondary)', fontFamily: 'var(--al-type-family-primary)' }}>
+      <style>{`[data-authoring-node-selected="true"] { outline: 2px solid ${accent}; outline-offset: 2px; }`}</style>
       {variants.map((variant) => {
         const selected = selectedId === variant.id
         const frame = dragPreview?.id === variant.id ? dragPreview.frame : variant.frame
         return <figure key={variant.id} data-variant-id={variant.id} onPointerDown={(event) => {
-          event.stopPropagation(); setSelectedId(variant.id)
+          event.stopPropagation(); setSelectedId(variant.id); setSelectedContent(null)
           drag.current = { id: variant.id, x: event.clientX, y: event.clientY, frame: variant.frame }
           setDragPreview({ id: variant.id, frame: variant.frame })
         }} onPointerMove={(event) => {
@@ -311,7 +375,17 @@ export function ComponentCanvas({ file, undoNonce, onBounds, onChanged, onResume
             }} /> : variant.displayName}
             {variant.id === definition.primaryVariantId && variant.displayName.trim().toLowerCase() !== 'primary' ? ' · Primary' : ''}
           </figcaption>
-          {(() => { const Comp = component; return <Comp {...(props.get(variant.id) ?? {})} /> })()}
+          <div data-variant-content ref={(node) => { if (node) contentRoots.current.set(variant.id, node); else contentRoots.current.delete(variant.id) }} onPointerDown={(event) => {
+            const target = event.target instanceof Element ? event.target.closest('[data-authoring-node-id]') : null
+            if (!target || !event.currentTarget.contains(target)) return
+            const id = target.getAttribute('data-authoring-node-id')
+            if (!id) return
+            event.stopPropagation()
+            setSelectedId(variant.id)
+            setSelectedContent({ variantId: variant.id, id })
+          }} style={{ display: 'contents' }}>
+            {(() => { const Comp = component; return <Comp {...(props.get(variant.id) ?? {})} /> })()}
+          </div>
         </figure>
       })}
       {selectedId && <button type="button" disabled={busy} data-create-variant data-ghost-label="+ Variant" aria-label="Create variant" onClick={() => void execute({ kind: 'create-variant', commandId: crypto.randomUUID(), componentId: definition.id, displayName: `Variant ${variants.length + 1}` })}

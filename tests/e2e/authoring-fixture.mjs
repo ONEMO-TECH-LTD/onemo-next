@@ -30,7 +30,7 @@ export async function prepareAuthoringFixture() {
   await writeFile(markerPath, `${JSON.stringify({ hadStore })}\n`)
   try {
     if (hadStore) await rename(storePath, backupPath)
-    await writeFile(fixtureFile, `export function AuthoringE2EButton({ variant = 'Primary' }: { variant?: 'Primary' | 'Secondary' }) {\n  return <button type="button">{variant}</button>\n}\n`)
+    await writeFile(fixtureFile, `export function AuthoringE2EButton({ variant = 'Primary' }: { variant?: 'Primary' | 'Secondary' }) {\n  return <button type="button"><span data-name="Label">{variant}</span></button>\n}\n`)
     await mkdir(selectionRouteDir, { recursive: true })
     await writeFile(
       path.join(selectionRouteDir, 'AuthoringE2ECard.module.css'),

@@ -193,6 +193,76 @@ test.describe('React Figma component authoring', () => {
     expect(consoleErrors).toEqual([])
   })
 
+  test('selects an inner component layer by stable source identity across reload', async ({ page }) => {
+    test.setTimeout(90_000)
+    const authoringWrites: string[] = []
+    const legacyWrites: string[] = []
+    const consoleErrors: string[] = []
+    const pageErrors: string[] = []
+    page.on('request', (request) => {
+      const url = new URL(request.url())
+      if (url.pathname === '/api/dev/editor-authoring' && request.method() === 'POST') authoringWrites.push(request.postData() ?? '')
+      if (url.pathname === '/api/dev/editor-write') legacyWrites.push(request.postData() ?? '')
+    })
+    page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()) })
+    page.on('pageerror', (error) => pageErrors.push(error.message))
+
+    const openComponent = async () => {
+      const components = page.getByRole('button', { name: 'Components', exact: true })
+      const entry = page.getByRole('button', { name: fixtureName, exact: true })
+      await expect(async () => {
+        await components.click({ timeout: 5_000 })
+        await expect(page.getByRole('textbox', { name: 'Search components' })).toBeVisible({ timeout: 5_000 })
+        await expect(entry).toBeVisible({ timeout: 15_000 })
+      }).toPass({ timeout: 45_000, intervals: [250, 500, 1_000] })
+      await entry.dblclick()
+      const importSource = page.getByRole('button', { name: 'Import source' })
+      const authoringCanvas = page.locator('[data-authoring-canvas]')
+      const entryState = await Promise.race([
+        importSource.waitFor({ state: 'visible', timeout: 30_000 }).then(() => 'import' as const),
+        authoringCanvas.waitFor({ state: 'visible', timeout: 30_000 }).then(() => 'loaded' as const),
+      ])
+      if (entryState === 'import') {
+        const reload = page.waitForEvent('domcontentloaded', { timeout: 30_000 })
+        await importSource.click()
+        await reload
+      }
+      await expect(authoringCanvas).toBeVisible({ timeout: 30_000 })
+      return authoringCanvas
+    }
+
+    await page.goto('/react-figma', { waitUntil: 'domcontentloaded' })
+    let authoringCanvas = await openComponent()
+    authoringWrites.length = 0
+    legacyWrites.length = 0
+    let primary = page.locator('[data-variant-id]').filter({ hasText: 'Primary' })
+    await expect(primary).toHaveCount(1)
+    let label = primary.locator('[data-authoring-node-tag="span"]')
+    await expect(label).toHaveCount(1)
+    const sourceIdentity = await label.getAttribute('data-authoring-node-id')
+    expect(sourceIdentity).toMatch(/^[a-f0-9]{64}:0$/)
+    await expect(label).toHaveAttribute('data-authoring-node-file', fixtureFile)
+    await expect(label).toHaveAttribute('data-authoring-node-export', fixtureName)
+    await label.click()
+    await expect(label).toHaveAttribute('data-authoring-node-selected', 'true')
+    await expect(authoringCanvas).toHaveAttribute('data-selected-content-id', sourceIdentity!)
+    expect(authoringWrites).toEqual([])
+    expect(legacyWrites).toEqual([])
+
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    authoringCanvas = await openComponent()
+    primary = page.locator('[data-variant-id]').filter({ hasText: 'Primary' })
+    await expect(primary).toHaveCount(1)
+    label = primary.locator('[data-authoring-node-tag="span"]')
+    await expect(label).toHaveAttribute('data-authoring-node-id', sourceIdentity!)
+    await label.click()
+    await expect(authoringCanvas).toHaveAttribute('data-selected-content-id', sourceIdentity!)
+    expect(authoringWrites).toEqual([])
+    expect(legacyWrites).toEqual([])
+    expect(pageErrors).toEqual([])
+    expect(consoleErrors).toEqual([])
+  })
+
   test('offers canonical extraction when the project component inventory is empty', async ({ page }) => {
     test.setTimeout(60_000)
     const componentStatusFiles: string[] = []
