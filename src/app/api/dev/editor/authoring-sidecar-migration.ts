@@ -9,6 +9,7 @@ import { migrateAuthoringGraphV1 } from './authoring-migrations'
 import { assertAuthoringGraphV1, isSha256, isStoreRelativePath } from './authoring-schema'
 import { AuthoringSidecarStore } from './authoring-store'
 import { discoverSingleRootRecoveryDecisions, SingleRootAuthoringTransaction, type SingleRootTransactionRecord } from './authoring-transaction'
+import { parseExactCompilerConfigFromSources } from './authoring-tsconfig'
 import type { StoreId } from './authoring-types'
 import { sha256 } from './durable-file-installer'
 import { RuntimeRootRegistry } from './runtime-root-registry'
@@ -211,22 +212,12 @@ async function migrateHistoryGraphPreimage(input: {
     }
   }
   const components = validatedLegacy.graph.components
-  const historicalSnapshots = Object.keys(components).map((componentId) => {
-    const snapshot = input.snapshots.get(componentId)
-    if (!snapshot) {
-      throw namedError('AUTHORING_MIGRATION_HISTORY_SOURCE_UNAVAILABLE', `compiler snapshot is unavailable: ${componentId}`, 409)
-    }
-    return snapshot
-  })
-  const requiredAuthority = new Set<string>()
-  for (const snapshot of historicalSnapshots) {
-    for (const file of Object.keys(snapshot.sourceHashes)) requiredAuthority.add(file)
-  }
-  const missingAuthority = [...requiredAuthority].filter((file) => sourceHashes[file] === undefined).sort()
-  if (missingAuthority.length > 0) {
+  const historicalNeedsConfig = Object.keys(components).some((componentId) =>
+    input.snapshots.get(componentId)?.sourceHashes['tsconfig.json'] !== undefined)
+  if (historicalNeedsConfig && sourceHashes['tsconfig.json'] === undefined) {
     throw namedError(
       'AUTHORING_MIGRATION_HISTORY_SOURCE_UNAVAILABLE',
-      `historical compiler authority is unavailable: ${missingAuthority.join(', ')}`,
+      'historical compiler authority is unavailable: tsconfig.json',
       409,
     )
   }
@@ -246,8 +237,9 @@ async function migrateHistoryGraphPreimage(input: {
     projectionFingerprints[componentId] = sourceProjectionFingerprint(projection)
   }
   const expectedEnvironmentHashes = validatedLegacy.hadEnvironmentFingerprint
-    ? Object.assign({}, ...(historicalSnapshots.length > 0 ? historicalSnapshots : [...input.snapshots.values()])
-      .map((snapshot) => snapshot.environmentHashes))
+    ? Object.fromEntries([...input.historicalSources]
+      .filter(([file]) => isGeneratedCompilerEnvironmentFile(file))
+      .map(([file, bytes]) => [file, sha256(bytes)]))
     : validatedLegacy.historicalEnvironmentHashes
   const environmentHashes = Object.fromEntries(Object.entries(expectedEnvironmentHashes).map(([file, expectedHash]) => {
     const historical = input.historicalSources.get(file)
@@ -267,13 +259,12 @@ async function migrateHistoryGraphPreimage(input: {
     environmentFingerprint,
   })
   const projectRoot = input.registry.get(input.storeId).canonicalRealPath
-  for (const [componentId, component] of Object.entries(migrated.components)) {
-    const snapshot = input.snapshots.get(componentId)
-    if (!snapshot) throw namedError('AUTHORING_MIGRATION_HISTORY_SOURCE_UNAVAILABLE', `compiler snapshot is unavailable: ${componentId}`, 409)
+  const dependencies = Object.fromEntries([...input.historicalSources].filter(([file]) =>
+    sourceHashes[file] !== undefined || environmentHashes[file] !== undefined))
+  const compilerConfig = parseExactCompilerConfigFromSources({ projectRoot, sources: dependencies })
+  for (const component of Object.values(migrated.components)) {
     const source = input.historicalSources.get(component.source.file)!
-    const dependencies = Object.fromEntries([...input.historicalSources].filter(([file]) =>
-      sourceHashes[file] !== undefined || environmentHashes[file] !== undefined))
-    assertStagedTypeScriptSemantics(component.source.file, source, projectRoot, snapshot.compilerOptions, dependencies)
+    assertStagedTypeScriptSemantics(component.source.file, source, projectRoot, compilerConfig.options, dependencies)
     const projection = await sourceProjectionFromSource({ file: component.source.file, source, cssSources })
     projectVariantRegistry(migrated, component, projection)
   }

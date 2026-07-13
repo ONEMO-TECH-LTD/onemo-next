@@ -4,7 +4,7 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { readExactCompilerConfig } from '../authoring-tsconfig'
+import { parseExactCompilerConfigFromSources, readExactCompilerConfig } from '../authoring-tsconfig'
 import { RuntimeRootRegistry } from '../runtime-root-registry'
 
 async function makeRoot() {
@@ -99,5 +99,19 @@ describe('exact compiler configuration', () => {
       'node_modules/example-config/strict.json',
       'tsconfig.json',
     ])
+  })
+
+  it('derives historical compiler options only from the supplied exact config bytes', () => {
+    const projectRoot = path.join(os.tmpdir(), 'historical-authoring-root')
+    const parsed = parseExactCompilerConfigFromSources({
+      projectRoot,
+      sources: {
+        'tsconfig.json': JSON.stringify({ extends: './config/base.json' }),
+        'config/base.json': JSON.stringify({ compilerOptions: { strict: false, baseUrl: '..' } }),
+      },
+    })
+
+    expect(parsed.options).toMatchObject({ strict: false, baseUrl: projectRoot })
+    expect(Object.isFrozen(parsed.options)).toBe(true)
   })
 })

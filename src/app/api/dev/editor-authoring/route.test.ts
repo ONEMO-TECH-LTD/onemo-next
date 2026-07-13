@@ -289,6 +289,108 @@ describe('editor-authoring G1 import route', () => {
     expect((await fs.readdir(transactionsPath)).sort()).toEqual(transactionsBefore)
   }, 20_000)
 
+  it('migrates historical graphs with their own compiler options and dependency topology', async () => {
+    const oldDependency = 'src/app/(dev)/react-figma-components/Old.ts'
+    const newDependency = 'src/app/(dev)/react-figma-components/New.ts'
+    const oldSource = `import type { Marker } from './Old'
+function render(value) { return value as Marker }
+export function Button({ variant = 'Primary' }: { variant?: 'Primary' | 'Secondary' }) {
+  return <button>{render(variant)}</button>
+}
+`
+    const newSource = oldSource
+      .replace("'./Old'", "'./New'")
+      .replace('function render(value)', 'function render(value: Marker)')
+    const root = await makeRoot(oldSource)
+    const tsconfigPath = path.join(root, 'tsconfig.json')
+    const oldTsconfig = JSON.stringify({
+      compilerOptions: {
+        strict: false, noEmit: true, target: 'ESNext', module: 'ESNext', moduleResolution: 'Bundler', jsx: 'react-jsx', types: ['react'],
+      },
+      include: ['src/**/*.ts', 'src/**/*.tsx'],
+    })
+    await fs.writeFile(tsconfigPath, oldTsconfig)
+    await fs.writeFile(path.join(root, oldDependency), 'export type Marker = string\n')
+    const classified = await (await handleGet(request('GET'), root)).json()
+    await handlePost(request('POST', {
+      kind: 'import-source', file: SOURCE_FILE, expectedSourceHashes: classified.sourceHashes,
+      expectedEnvironmentFingerprint: classified.environmentFingerprint,
+      transactionId: '00000000-0000-4000-8000-000000000014',
+    }), root)
+
+    const oldBytes = {
+      [SOURCE_FILE]: oldSource,
+      'tsconfig.json': oldTsconfig,
+      [oldDependency]: 'export type Marker = string\n',
+    }
+    await fs.writeFile(path.join(root, SOURCE_FILE), newSource)
+    await fs.writeFile(path.join(root, newDependency), 'export type Marker = string\n')
+    await fs.writeFile(tsconfigPath, JSON.stringify({
+      compilerOptions: {
+        strict: true, noEmit: true, target: 'ESNext', module: 'ESNext', moduleResolution: 'Bundler', jsx: 'react-jsx', types: ['react'],
+      },
+      include: ['src/**/*.ts', 'src/**/*.tsx'],
+    }))
+    const stale = await (await handleGet(componentStatusRequest(), root)).json()
+    const revalidated = await handlePost(request('POST', {
+      kind: 'revalidate-source', file: SOURCE_FILE,
+      expectedRevision: stale.expectedRevision,
+      expectedSourceHashes: stale.sourceHashes,
+    }), root)
+    expect(revalidated.status).toBe(200)
+
+    const sidecarPath = path.join(root, PROJECT_AUTHORING_SIDECAR)
+    const sidecar = JSON.parse(await fs.readFile(sidecarPath, 'utf8')) as Record<string, unknown>
+    sidecar.schemaVersion = 1
+    delete sidecar.environmentFingerprint
+    delete (sidecar.sourceHashes as Record<string, string>)[oldDependency]
+    for (const component of Object.values(sidecar.components as Record<string, Record<string, unknown>>)) {
+      delete component.projectionFingerprint
+    }
+    await fs.writeFile(sidecarPath, JSON.stringify(sidecar, null, 2) + '\n')
+
+    const journalPath = path.join(root, authoringMetadataPath('project', 'history/journal.ndjson'))
+    const journal = (await fs.readFile(journalPath, 'utf8')).trimEnd().split('\n').map((line) => JSON.parse(line))
+    const historyBlob = async (bytes: string) => {
+      const digest = sha256(bytes)
+      const relative = authoringMetadataPath('project', `history/blobs/${digest}`)
+      await fs.writeFile(path.join(root, relative), bytes)
+      return { sha256: digest, path: relative }
+    }
+    for (const record of journal) {
+      if (record.type !== 'authoring-command') continue
+      const graph = JSON.parse(await fs.readFile(path.join(root, record.graphPreimage.path), 'utf8')) as Record<string, unknown>
+      graph.schemaVersion = 1
+      delete graph.environmentFingerprint
+      for (const component of Object.values(graph.components as Record<string, Record<string, unknown>>)) {
+        delete component.projectionFingerprint
+      }
+      const graphBytes = JSON.stringify(graph, null, 2) + '\n'
+      record.graphPreimage = await historyBlob(graphBytes)
+      if (record.command.kind === 'revalidate-source') {
+        record.sourcePatches = Object.keys(oldBytes).map((file) => ({ file }))
+        record.preimages = await Promise.all(Object.entries(oldBytes).map(async ([file, bytes]) => ({
+          file,
+          ...await historyBlob(bytes),
+        })))
+      }
+    }
+    await fs.writeFile(journalPath, journal.map((record) => JSON.stringify(record)).join('\n') + '\n')
+
+    const response = await handleGet(componentRequest(), root)
+
+    expect(response.status).toBe(200)
+    const migratedJournal = (await fs.readFile(journalPath, 'utf8')).trimEnd().split('\n').map((line) => JSON.parse(line))
+    const historical = migratedJournal.find((record) => record.command?.kind === 'revalidate-source')
+    const historicalGraph = JSON.parse(await fs.readFile(path.join(root, historical.graphPreimage.path), 'utf8'))
+    expect(historicalGraph.sourceHashes).toMatchObject({
+      [SOURCE_FILE]: sha256(oldBytes[SOURCE_FILE]),
+      'tsconfig.json': sha256(oldBytes['tsconfig.json']),
+      [oldDependency]: sha256(oldBytes[oldDependency]),
+    })
+    expect(historicalGraph.sourceHashes).not.toHaveProperty(newDependency)
+  }, 30_000)
+
   it('migrates the accepted G1 V1 shape with authored-only hashes and no environment fingerprint', async () => {
     const root = await makeRoot()
     const classified = await (await handleGet(request('GET'), root)).json()

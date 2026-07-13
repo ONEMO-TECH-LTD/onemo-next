@@ -39,10 +39,49 @@ export async function readExactCompilerConfig(input: {
   const parsedConfigs = new Map<string, unknown>()
   await readConfigChain(input, rootConfig, rootBytes, sources, parsedConfigs, new Set())
 
-  const configPath = path.join(root, rootConfig)
+  const parsed = parseCompilerConfig(
+    root,
+    sources,
+    parsedConfigs.get(rootConfig),
+    ts.sys.readDirectory,
+    false,
+  )
+  await validateProjectResolutionAuthorities(input, root, parsed.options)
+  return parsed
+}
+
+export function parseExactCompilerConfigFromSources(input: {
+  projectRoot: string
+  sources: Record<string, Buffer | string>
+}): ExactCompilerConfig {
+  const sources = new Map(Object.entries(input.sources).map(([file, bytes]) => [
+    file,
+    Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes, 'utf8'),
+  ]))
+  const rootBytes = sources.get('tsconfig.json')
+  if (!rootBytes) {
+    return { options: freezeCompilerOptions({ ...DEFAULT_OPTIONS }), configuredFiles: [], sources: {} }
+  }
+  const rootConfig = ts.parseConfigFileTextToJson(
+    path.join(input.projectRoot, 'tsconfig.json'),
+    rootBytes.toString('utf8'),
+  )
+  if (rootConfig.error) throw namedError('SOURCE_TSCONFIG_INVALID', formatDiagnostic(rootConfig.error))
+  const parsed = parseCompilerConfig(input.projectRoot, sources, rootConfig.config, () => [], true)
+  return parsed
+}
+
+function parseCompilerConfig(
+  root: string,
+  sources: Map<string, Buffer>,
+  rootConfig: unknown,
+  readDirectory: ts.ParseConfigHost['readDirectory'],
+  allowNoInputs: boolean,
+): ExactCompilerConfig {
+  const configPath = path.join(root, 'tsconfig.json')
   const host: ts.ParseConfigHost = {
     useCaseSensitiveFileNames: ts.sys.useCaseSensitiveFileNames,
-    readDirectory: ts.sys.readDirectory,
+    readDirectory,
     fileExists: (candidate) => {
       const relative = maybeStoreRelative(root, candidate)
       return relative !== null && sources.has(relative)
@@ -53,15 +92,16 @@ export async function readExactCompilerConfig(input: {
     },
   }
   const parsed = ts.parseJsonConfigFileContent(
-    parsedConfigs.get(rootConfig),
+    rootConfig,
     host,
     root,
     { noEmit: true },
     configPath,
   )
-  await validateProjectResolutionAuthorities(input, root, parsed.options)
-  if (parsed.errors.length > 0) {
-    throw namedError('SOURCE_TSCONFIG_INVALID', parsed.errors.map(formatDiagnostic).join('; '))
+  projectResolutionAuthorityPaths(root, parsed.options)
+  const errors = allowNoInputs ? parsed.errors.filter((diagnostic) => diagnostic.code !== 18003) : parsed.errors
+  if (errors.length > 0) {
+    throw namedError('SOURCE_TSCONFIG_INVALID', errors.map(formatDiagnostic).join('; '))
   }
   return {
     options: freezeCompilerOptions({ ...parsed.options, noEmit: true }),
@@ -75,6 +115,12 @@ async function validateProjectResolutionAuthorities(
   root: string,
   options: ts.CompilerOptions,
 ): Promise<void> {
+  for (const relative of projectResolutionAuthorityPaths(root, options)) {
+    if (relative !== '') await input.registry.resolveStorePath(input.storeId, relative)
+  }
+}
+
+function projectResolutionAuthorityPaths(root: string, options: ts.CompilerOptions): string[] {
   const authorities = [
     ...(options.baseUrl ? [options.baseUrl] : []),
     ...(options.rootDirs ?? []),
@@ -83,10 +129,7 @@ async function validateProjectResolutionAuthorities(
   for (const targets of Object.values(options.paths ?? {})) {
     for (const target of targets) authorities.push(path.resolve(pathsBase, target.replace('*', '__onemo_wildcard__')))
   }
-  for (const authority of authorities) {
-    const relative = toStoreRelative(root, authority)
-    if (relative !== '') await input.registry.resolveStorePath(input.storeId, relative)
-  }
+  return authorities.map((authority) => toStoreRelative(root, authority))
 }
 
 async function readConfigChain(
