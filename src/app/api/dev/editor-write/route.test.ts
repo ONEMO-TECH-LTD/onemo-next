@@ -51,6 +51,27 @@ describe('legacy editor-write component boundary', () => {
     expect(applyWrite).not.toHaveBeenCalled()
   })
 
+  it.each([
+    'make-component',
+    'create-component',
+    'rename-component',
+    'add-state',
+    'add-variant-axis',
+    'add-variant-value',
+    'expose-as-prop',
+    'set-instance-prop',
+    'insert-component',
+    'set-connector',
+    'remove-connector',
+    'set-variant-structure',
+  ])('refuses semantic component operation %s even when its target is a page', async (kind) => {
+    const response = await POST(request({ kind, file: 'src/app/page.tsx' }))
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({ code: 'AUTHORING_TRANSACTION_REQUIRED' })
+    expect(applyWrite).not.toHaveBeenCalled()
+  })
+
   it('leaves non-component editor writes on the existing path', async () => {
     applyWrite.mockResolvedValue({ ok: true, file: 'src/app/page.tsx', newValueText: 'updated' })
     const op = { kind: 'set-jsx-text', file: 'src/app/page.tsx', line: 1, col: 1, text: 'updated' }

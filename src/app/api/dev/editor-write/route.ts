@@ -9,6 +9,20 @@ import path from 'node:path'
 import { applyWrite, type WriteOp } from '../editor/lib'
 
 const PROJECT_COMPONENT_ROOT = 'src/app/(dev)/react-figma-components/'
+const COMPONENT_AUTHORING_KINDS = new Set<WriteOp['kind']>([
+  'make-component',
+  'create-component',
+  'rename-component',
+  'add-state',
+  'add-variant-axis',
+  'add-variant-value',
+  'expose-as-prop',
+  'set-instance-prop',
+  'insert-component',
+  'set-connector',
+  'remove-connector',
+  'set-variant-structure',
+])
 
 function targetsProjectComponentSource(file: unknown): boolean {
   if (typeof file !== 'string') return false
@@ -22,7 +36,7 @@ export async function POST(req: Request) {
   try {
     const op = (await req.json()) as WriteOp
     if (!op?.kind) return NextResponse.json({ error: 'WriteOp required' }, { status: 400 })
-    if (targetsProjectComponentSource((op as { file?: unknown }).file)) {
+    if (COMPONENT_AUTHORING_KINDS.has(op.kind) || targetsProjectComponentSource((op as { file?: unknown }).file)) {
       return NextResponse.json({
         error: 'project component source writes require the authoring transaction',
         code: 'AUTHORING_TRANSACTION_REQUIRED',
