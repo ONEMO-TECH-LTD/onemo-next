@@ -141,7 +141,17 @@ test('native components, instances, nested modes, and rich text remain semanticâ
   const sparseMembers = sparse.componentGraph.definitions.filter((row) => row.componentSetKey === 'SET_CHOICE');
   sparseMembers[0].variantProperties.Tone = 'Light'; sparseMembers[1].variantProperties.Tone = 'Dark';
   Object.assign(sparse, sealCanonicalModelContent(sparse));
-  assert.equal(compile(sparse).semanticSlice.componentSets[0].members.length, 2);
+  const sparseOutput = compile(sparse);
+  assert.equal(sparseOutput.semanticSlice.componentSets[0].members.length, 2);
+  const missingDefault = structuredClone(sparse);
+  const missingDefaultMembers = missingDefault.componentGraph.definitions.filter((row) => row.componentSetKey === 'SET_CHOICE');
+  missingDefaultMembers[0].variantProperties.Tone = 'Dark'; missingDefaultMembers[1].variantProperties.Tone = 'Light';
+  Object.assign(missingDefault, sealCanonicalModelContent(missingDefault));
+  assert.throws(() => compile(missingDefault), /no authored default variant Size=S,Tone=Light/);
+  const forgedDefaultOutput = structuredClone(sparseOutput);
+  forgedDefaultOutput.semanticSlice.componentSets[0].members[0].variantProps.Tone = 'Dark';
+  forgedDefaultOutput.semanticSlice.componentSets[0].members[1].variantProps.Tone = 'Light';
+  assert.equal(p3Failures(missingDefault, forgedDefaultOutput).G4, true);
   const wrongPropType = p3Fixture({ componentVariable: 'V_COPY' });
   assert.throws(() => compile(wrongPropType.model), /disagrees with native component property type/);
   const foreignTokenPlan = structuredClone(output.tokenPlan); foreignTokenPlan.bindings[0].variableKey = 'K_FORGED';

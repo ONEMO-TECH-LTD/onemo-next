@@ -27,6 +27,7 @@ export function p3Failures(model, output) {
     members: model.componentGraph.definitions.filter((member) => member.componentSetKey === set.key).map((member) => ({ componentKey: member.key, variantProps: member.variantProperties })),
   }));
   const actualComponentSets = output.semanticSlice.componentSets.map((set) => ({ componentKey: set.componentKey, variantAxes: set.variantAxes, members: set.members.map((member) => ({ componentKey: member.componentKey, variantProps: member.variantProps })) }));
+  const missingDefaultMember = expectedComponentSets.some((set) => !set.members.some((member) => Object.entries(set.variantAxes).every(([name, axis]) => member.variantProps?.[name] === axis.default)));
   const expectedText = model.textGraph.textNodes.map((row) => ({ nodeId: row.nodeId, segments: row.segments, fontDependencies: row.fontDependencies }));
   const actualText = output.semanticSlice.textNodes.map((row) => ({ nodeId: row.nodeId, segments: row.segments, fontDependencies: row.fontDependencies }));
   const expectedTraceContexts = count(model.bindingGraph.records, (row) => `${row.bindingId}:${row.modeContextId}:${row.resolutionTraceId}`);
@@ -34,7 +35,7 @@ export function p3Failures(model, output) {
   return {
     G2: canonicalJson(rawBindings) !== canonicalJson(plannedBindings) || canonicalJson(expectedBindingChannels) !== canonicalJson(actualBindingChannels),
     G3: canonicalJson(expectedChannels) !== canonicalJson(actualChannels) || canonicalJson(expectedTraceContexts) !== canonicalJson(actualTraceContexts) || output.tokenPlan.bindings.some((row) => row.expression?.unsupported) || sha256(canonicalJson(output.tokenPlan)) !== output.semanticSlice.tokenPlanHash || output.tokenPlan.registryHash !== output.registryStage?.candidateHash || output.tokenPlan.registryGeneration !== output.registryStage?.candidateRegistry?.generation || output.tokenPlan.registryStageId !== output.registryStage?.stageId || output.tokenPlan.registryBaseHash !== output.registryStage?.baseHash || output.tokenPlan.codecPolicyId !== output.approvedCodecPolicyId,
-    G4: canonicalJson(expectedInstances) !== canonicalJson(actualInstances) || canonicalJson(expectedComponentSets) !== canonicalJson(actualComponentSets) || output.semanticSlice.componentSets.some((set) => set.members.some((member) => Object.hasOwn(member, 'reactName'))) || output.semanticSlice.components.some((component) => component.componentSetKey),
+    G4: missingDefaultMember || canonicalJson(expectedInstances) !== canonicalJson(actualInstances) || canonicalJson(expectedComponentSets) !== canonicalJson(actualComponentSets) || output.semanticSlice.componentSets.some((set) => set.members.some((member) => Object.hasOwn(member, 'reactName'))) || output.semanticSlice.components.some((component) => component.componentSetKey),
     G5: canonicalJson(expectedText) !== canonicalJson(actualText),
   };
 }

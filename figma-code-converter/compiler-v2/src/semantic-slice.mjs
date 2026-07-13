@@ -143,6 +143,10 @@ function validateComponentSet(set, members, variantAxes, publicProps) {
     const missing = variantAxes[name].options.filter((option) => !captured.has(option));
     if (missing.length) throw new SemanticSliceError(`component set ${set.key} has uncaptured ${name} option(s): ${missing.join(', ')}`);
   }
+  const defaultCombination = axisNames.map((name) => `${name}=${variantAxes[name].default}`).join(',');
+  if (!members.some((member) => axisNames.every((name) => member.variantProperties?.[name] === variantAxes[name].default))) {
+    throw new SemanticSliceError(`component set ${set.key} has no authored default variant ${defaultCombination}`);
+  }
 }
 
 function validateComponentTokenTypes(instance, definitions, records, tokenBindings) {

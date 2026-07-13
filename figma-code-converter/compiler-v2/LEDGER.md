@@ -45,7 +45,7 @@ Decisions/Done/cutover: Dan only.
 | P0 continuity/contract/calibration | IN PROGRESS | — | see P0 section |
 | P1 evidence capture | pending | — | |
 | P2 canonical graphs | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `0c8471b` | sole authoritative QA/Meta cleared the frozen code snapshot only; live/plugin evidence still blocked by G-1/G-2 |
-| P3 mother token/component slice | AUTHORITATIVE REWORK; BUILDER REPAIR 2 READY | `d69a0fa`, `2c6b27c` rejected | residual F1-F3 repaired; real mother/plugin-origin phase exit still blocked by G-1/G-2/G-4 |
+| P3 mother token/component slice | AUTHORITATIVE REWORK; BUILDER REPAIR 3 READY | `d69a0fa`, `2c6b27c`, `9532450` rejected | default-tuple residual repaired; real mother/plugin-origin phase exit still blocked by G-1/G-2/G-4 |
 | P4 mother layout/render slice | pending | — | |
 | P5 emitters/security/editability | pending | — | |
 | P6 runtime/visual/editor proof | pending | — | |
@@ -193,6 +193,10 @@ Decisions/Done/cutover: Dan only.
   least one captured member. Set members now exist only as metadata under the single set-level
   component; no standalone member React symbols remain. Self-consistent registry substitution,
   unapproved codec policy, missing-option, and member-symbol mutations are permanent tests.
+- Authoritative rereview of `9532450` closed those three residuals, then found one adjacent G4
+  gap: per-axis option coverage allowed the combined advertised default tuple to have no authored
+  member. Repair 3 requires an exact authored default member while preserving sparse non-default
+  combinations; the missing-default mutation refuses in lowering and independently trips G4.
 
 ## Meta rulings accepted (2026-07-13)
 
