@@ -1,6 +1,6 @@
 import { Meta } from '@storybook/addon-docs/blocks';
 import { Page, H2, P, C, Note } from './blocks';
-import { AdaptiveFamilies, BaseTones, BehaviorRamp, TwinProof, AnchorDemo, InverseDemo, AlphaLadder } from './primitives';
+import { AdaptiveFamilies, BaseTones, TwinProof, AnchorDemo, InverseDemo, AlphaLadder } from './primitives';
 
 <Meta title="Documentation/Colour/Primitives" />
 
@@ -8,6 +8,18 @@ import { AdaptiveFamilies, BaseTones, BehaviorRamp, TwinProof, AnchorDemo, Inver
   title="Colour primitives"
   lead="The ground truth of the colour system: raw values only, each with a light and a dark face. A primitive is never an alias to another primitive — wiring lives one tier up. Theming happens here and nowhere else."
 >
+
+<H2>The nine mechanism parents</H2>
+
+<P>
+  The collection is organised behavior-first: the theme-following default sits bare (the ramp folders and{' '}
+  <C>base/</C>), and every deviation has exactly one parent folder — <C>alpha/</C> for transparency,{' '}
+  <C>inverse/</C> for swaps, <C>inverse-alpha/</C> for swapped transparency, <C>constant/</C> and{' '}
+  <C>constant-alpha/</C> for pinned forms, <C>inverse-constant/</C> and <C>inverse-constant-alpha/</C> for
+  pinned swaps. The mirror rule holds inside every parent: ramps appear by name, pairs under <C>base/</C>,
+  and the deepest level is always the numeric ladder. One mechanism per folder — a token's address states
+  its behavior.
+</P>
 
 <H2>Adaptive families</H2>
 
@@ -19,22 +31,18 @@ import { AdaptiveFamilies, BaseTones, BehaviorRamp, TwinProof, AnchorDemo, Inver
 
 <AdaptiveFamilies />
 
-<H2>Base tones</H2>
+<H2>Base pairs</H2>
 
 <P>
-  The pure extremes and the brand pair — Ink and Snow. The pair flips into each other across themes,
-  distinct from Aluminium's endpoints.
+  Pair tokens are named by both faces, light-theme face first — <C>ink-snow</C> shows ink in light and snow
+  in dark; <C>silver-space</C> is the surface metal; <C>white-black</C> the pure extremes. Their swaps live
+  under <C>inverse/base/</C> with the same honest naming reversed. Single-colour names exist only in the
+  constant folders, because pinned tokens are the only ones that are one colour. Pairs carry two behavior
+  sets (adaptive, pinned-own); a pair's pinned swap would duplicate its partner's constant, so those tokens
+  deliberately do not exist — ramps, having no partner, carry all four sets.
 </P>
 
 <BaseTones />
-
-<H2>Behavior groups</H2>
-
-<P>
-  Beyond the adaptive families, each pigment exists in behavior variants. The group prefix says how a value
-  responds to the theme; the family and step inside it stay the same. Six groups cover every combination of
-  transparency and anchoring the product needs.
-</P>
 
 <H2>Transparency — <C>alpha/</C></H2>
 
@@ -47,38 +55,32 @@ import { AdaptiveFamilies, BaseTones, BehaviorRamp, TwinProof, AnchorDemo, Inver
 
 <TwinProof family="grey" />
 
-<P>
-  At fully-saturated steps the mathematics collapses honestly: no transparent colour over white can produce
-  a colour with an empty channel, so the twin degenerates to the solid. This is canon, not a defect — the
-  twin's promise is the exact match, and transparency is delivered wherever the colour allows it.
-</P>
-
-<H2>Anchored constants — <C>l-constant/</C> · <C>d-constant/</C></H2>
+<H2>Pinned — <C>constant/</C> · <C>inverse-constant/</C></H2>
 
 <P>
-  Constants keep a colour's identity when the theme flips: the step keeps meaning the same position of the
-  scale instead of following the theme's role-flip. Two anchors exist so either end of the scale can be the
-  origin of counting.
+  Constants stop a token from following the theme. <C>constant/</C> pins each entry's own reading;{' '}
+  <C>inverse-constant/</C> pins the swapped reading. For ramps, pinning is anchored identity rather than
+  frozen bytes — a step keeps its position and re-tunes per world; the pair constants pin literal values.
 </P>
 
 <AnchorDemo family="grey" />
 
-<H2>Anchored transparency — <C>l-alpha/</C> · <C>d-alpha/</C></H2>
+<H2>Pinned transparency — <C>constant-alpha/</C> · <C>inverse-constant-alpha/</C></H2>
 
 <P>
-  The transparent counterpart of the anchored constants: washes that keep being the same colour when the
-  theme flips. The base-tone ladders inside this group run a fixed opacity sequence — the workhorses for
-  scrims and photo overlays, where the imagery underneath never theme-flips.
+  The transparent counterparts of the constants: ladders that keep the same reading when the theme flips —
+  the workhorses for scrims and photo overlays, where the imagery underneath never theme-flips.
 </P>
 
-<AlphaLadder path="l-alpha/base/black" />
+<AlphaLadder path="constant-alpha/base/black" />
 
-<H2>Mode-swapped — <C>inverse/</C></H2>
+<H2>Swapped — <C>inverse/</C> · <C>inverse-alpha/</C></H2>
 
 <P>
-  The adaptive ramp with its faces exchanged: the light face carries the dark value and vice versa. This is
-  how coloured tokens serve surfaces that invert against the theme — the mono pair gets inversion free by
-  swapping members; colours get it from this group.
+  The adaptive world with its faces exchanged: the light face carries the dark value and vice versa. Ramp
+  swaps and pair swaps live here, with the swapped pairs' transparency under <C>inverse-alpha/</C>. This is
+  mechanical inversion — whether an inversion counts as contrast is a semantic-tier judgment, made one tier
+  up, never here.
 </P>
 
 <InverseDemo family="blue-green" />

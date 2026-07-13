@@ -15,17 +15,17 @@ import { resolve, PRIM_COL } from './data';
 
 <Table head={['Material', 'What it is', '']}>
   <tr>
-    <td style={S.td}><b>Ink</b></td>
+    <td style={S.td}><b>Ink — the voice pair (ink-snow)</b></td>
     <td style={S.td}>The brand black — the voice of the UI in the light theme.</td>
-    <td style={S.td}><Swatch value={resolve(PRIM_COL, 'base/brand-black').L} /> <Swatch value={resolve(PRIM_COL, 'base/brand-black').D} /></td>
+    <td style={S.td}><Swatch value={resolve(PRIM_COL, 'base/ink-snow').L} /> <Swatch value={resolve(PRIM_COL, 'base/ink-snow').D} /></td>
   </tr>
   <tr>
-    <td style={S.td}><b>Snow</b></td>
+    <td style={S.td}><b>Snow — the paper side (snow-ink)</b></td>
     <td style={S.td}>The brand white — the paper the product is printed on.</td>
-    <td style={S.td}><Swatch value={resolve(PRIM_COL, 'base/brand-white').L} /> <Swatch value={resolve(PRIM_COL, 'base/brand-white').D} /></td>
+    <td style={S.td}><Swatch value={resolve(PRIM_COL, 'base/snow-ink').L} /> <Swatch value={resolve(PRIM_COL, 'base/snow-ink').D} /></td>
   </tr>
   <tr>
-    <td style={S.td}><b>Aluminium</b></td>
+    <td style={S.td}><b>The greys — and the surface pair (silver-space)</b></td>
     <td style={S.td}>The neutral greys — structure, borders, supporting voices.</td>
     <td style={S.td}><Swatch value={resolve(PRIM_COL, 'grey/6').L} /> <Swatch value={resolve(PRIM_COL, 'grey/6').D} /></td>
   </tr>
@@ -81,7 +81,7 @@ import { resolve, PRIM_COL } from './data';
   <tr>
     <td style={S.td}><b>register</b></td>
     <td style={S.td}>bare · <C>-strong</C> · <C>-subtle</C> · <C>-muted</C></td>
-    <td style={S.td}>How loudly: defaults carry no word; strong amplifies (and is the on-tint text voice); subtle supports; muted is the quietest readable tier.</td>
+    <td style={S.td}>How loudly: the register is always spoken — the default register's variants carry the default- prefix; strong amplifies (and is the on-tint text voice); subtle supports; muted is the quietest readable tier.</td>
   </tr>
   <tr>
     <td style={S.td}><b>theme</b></td>
@@ -132,14 +132,14 @@ import { resolve, PRIM_COL } from './data';
 
 <P>
   Themes flip at the <b>primitive</b> tier and nowhere else. Primitive colour ramps carry a Light and a
-  Dark face; aliases and semantics are single-mode and inherit the flip through the chain. Ink and Snow
-  flip into <i>each other</i>, not into Aluminium's endpoints.
+  Dark face; aliases and semantics are single-mode and inherit the flip through the chain. The pair tokens say so in
+  their names — ink-snow flips into snow, never into the grey ramp's endpoints.
 </P>
 
 <H2>The neutral-first law</H2>
 
 <P>
-  ONEMO's primary identity is Ink, Snow and Aluminium. Coloured ramps are occasional accents — an
+  ONEMO's primary identity is the mono world — ink, snow, silver, space and the greys. Coloured ramps are occasional accents — an
   indicator, a dial arc, a focus ring — never the default surface of buttons or icons. The palette is
   built so the neutral system carries the product and colour appears deliberately.
 </P>

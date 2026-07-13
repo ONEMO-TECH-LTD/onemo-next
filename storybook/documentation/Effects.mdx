@@ -17,7 +17,9 @@ import { StrengthRange, BlurLadder, TintLadder, TintRange } from './effects';
   so effects get no primitives, ever. The alias tier groups existing steps into effect vocabulary; the
   semantic tier names intensities. One cascade shape, same as colour. The collection carries a single
   value mode: every effect token is theme-invariant by design, and any theme-dependent colour it needs
-  flips at the primitive tier like everything else.
+  flips at the primitive tier like everything else. Scopes are per-property: blur strengths surface only
+  in effect-radius fields, shadow and light tints only in the effect-colour picker — nothing from this
+  collection leaks into fill or stroke choices.
 </P>
 
 <H2>The universal strength range</H2>

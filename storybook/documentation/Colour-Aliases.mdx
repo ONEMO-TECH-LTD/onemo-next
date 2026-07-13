@@ -1,32 +1,41 @@
 import { Meta } from '@storybook/addon-docs/blocks';
 import { Page, H2, P, C, Note } from './blocks';
-import { PaletteGroup, ColourAnatomy, PairAnatomy } from './aliases';
+import { PaletteGroup, ColourAnatomy } from './aliases';
+import { PairGrid, FaceGrid } from './materials';
 
 <Meta title="Documentation/Colour/Aliases" />
 
 <Page
   title="Colour aliases — the product palette"
-  lead="The alias tier allocates pigments to product meaning. It holds no values — every entry is a pointer into the primitives — so the palette stays editable in exactly one place. Its grammar is colour-first: the product asks for a colour, then a behavior, then a step."
+  lead="The alias tier allocates pigments to product meaning. It holds no values — every entry is a pointer into the primitives — so the palette stays editable in exactly one place. Its grammar is colour-first: colour, then behavior, then ladder number."
 >
 
 <H2>The grammar</H2>
 
 <P>
-  Every route reads <C>colour/qualifier/step</C>. A bare step is the default — the adaptive solid that
-  follows the theme. Behavior qualifiers nest inside each colour, the same six behaviors the primitives
-  define, so asking for a transparent or anchored form of any palette colour is a predictable path, never a
-  new name.
+  One order everywhere: <C>colour/behavior/step</C>. A bare step is the default — the adaptive solid that
+  follows the theme. Ramp families nest their behaviors as folders (<C>neutral/constant/…</C>); pair and
+  face entries compose with dashes instead (<C>brand/ink-snow-alpha/…</C>, <C>brand/ink-constant</C>) —
+  no word-folder ever sits below the family, and the deepest level is always the numeric ladder. Asking
+  for any behavior of any palette colour is a predictable path, never a new name.
 </P>
 
 <H2>The brand</H2>
 
 <P>
-  The brand group holds Ink and Snow and the numbered brand colours. Numbering is deliberate: a new
-  brand colour joins as the next number with nothing else moving, and the numbers say palette identity
-  while the semantic tier speaks role language on top.
+  The brand group holds the voice pair, the surface pair, their pinned faces, and the numbered brand
+  colours. Numbering is deliberate: a new brand colour joins as the next number with nothing else moving —
+  numbers say palette identity while the semantic tier speaks role language on top.
 </P>
 
-<PairAnatomy group="brand" />
+<PairGrid family="brand" pair="ink-snow" />
+<PairGrid family="brand" pair="snow-ink" />
+<PairGrid family="brand" pair="silver-space" />
+<PairGrid family="brand" pair="space-silver" />
+<FaceGrid family="brand" face="ink" />
+<FaceGrid family="brand" face="snow" />
+<FaceGrid family="brand" face="silver" />
+<FaceGrid family="brand" face="space" />
 <ColourAnatomy path="brand/1" />
 
 <P>
@@ -37,7 +46,7 @@ import { PaletteGroup, ColourAnatomy, PairAnatomy } from './aliases';
 <H2>Neutral and statuses</H2>
 
 <P>
-  One neutral scale — Aluminium — carries the product's surfaces and supporting text. The four status colours are
+  One neutral scale carries the product's surfaces and supporting text. The four status colours are
   functional — validation, caution, confirmation, information — not accents; they keep their own names so
   usage stays legible.
 </P>
@@ -50,7 +59,10 @@ import { PaletteGroup, ColourAnatomy, PairAnatomy } from './aliases';
 
 <H2>Base extremes</H2>
 
-<PairAnatomy group="base" />
+<PairGrid family="base" pair="white-black" />
+<PairGrid family="base" pair="black-white" />
+<FaceGrid family="base" face="white" />
+<FaceGrid family="base" face="black" />
 
 <H2>Why this tier is invisible in the picker</H2>
 

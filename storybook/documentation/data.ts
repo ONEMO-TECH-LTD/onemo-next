@@ -155,7 +155,15 @@ export function ramp(collection: string, family: string): Array<{ step: number; 
 
 /** The adaptive primitive colour families (ramp-shaped, non-behavior groups). */
 export function primitiveFamilies(): string[] {
-  const BEHAVIORS = new Set(['alpha', 'l-constant', 'd-constant', 'l-alpha', 'd-alpha', 'inverse', 'base']);
+  const BEHAVIORS = new Set([
+    'alpha',
+    'constant',
+    'constant-alpha',
+    'inverse',
+    'inverse-constant',
+    'inverse-constant-alpha',
+    'base',
+  ]);
   return childrenOf(PRIM_COL).filter((k) => !BEHAVIORS.has(k) && ramp(PRIM_COL, k).length === 12);
 }
 

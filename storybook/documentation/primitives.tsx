@@ -107,12 +107,12 @@ export function TwinProof({ family }: { family: string }) {
 export function AnchorDemo({ family }: { family: string }) {
   return (
     <div>
-      <BehaviorRamp group="l-constant" family={family} />
-      <BehaviorRamp group="d-constant" family={family} />
+      <BehaviorRamp group="constant" family={family} />
+      <BehaviorRamp group="inverse-constant" family={family} />
       <P>
-        <C>l-constant</C> counts from the light end; <C>d-constant</C> holds the same values read from the
-        opposite end — the first step is the deepest reading in either theme. Anchors add no new colour
-        decisions; they change what a step number means.
+        <C>constant</C> pins each step's own reading; <C>inverse-constant</C> pins the swapped reading — the
+        same identity read from the opposite world. Pins add no new colour decisions; they change whether
+        a step follows the theme.
       </P>
     </div>
   );

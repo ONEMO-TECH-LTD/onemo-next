@@ -13,11 +13,11 @@ import { BgFolderTable } from './backgrounds';
 
 <P>
   App surfaces are peer canvases picked per context, not a default with variants — so this one family
-  carries ordinal names: <C>primary</C> is the ground the editor stands on (the aluminium surface),
-  with <C>secondary</C>, <C>tertiary</C> and <C>quaternary</C> stepping through the grey zones. The
-  app world's own materials sit beside them: <C>chrome</C> for bars and docks, <C>veil</C> for the
-  blur-free wash. Theme and constancy suffixes compose on the ordinals as everywhere
-  (<C>primary-inverse</C> opposes the theme, <C>primary-perma</C> pins the light-world reading).
+  carries ordinal names: <C>primary</C> is the ground the editor stands on (the surface pair, silver in
+  the light world), with <C>secondary</C>, <C>tertiary</C> and <C>quaternary</C> stepping through the
+  grey zones. <C>veil</C>, the blur-free wash, sits beside them. Theme and constancy suffixes compose on
+  the ordinals as everywhere (<C>primary-contrast</C> opposes the theme on the same pair,{' '}
+  <C>primary-perma</C> pins the light-world reading).
 </P>
 
 <BgFolderTable folder="app" />
@@ -25,9 +25,11 @@ import { BgFolderTable } from './backgrounds';
 <H2>control/ — the interactive zone</H2>
 
 <P>
-  The fills of things you can touch, on the ramp's interactive steps: rest, engaged, solid. The step
-  between rest and engaged stays deliberately unused — transient states are washes over the rest fill,
-  never colour steps, and persistent engagement is a component contract.
+  The fills of things you can touch. The rest fill rides the voice pair's paper side; <C>subtle</C>,{' '}
+  <C>strong</C> and <C>solid</C> step the supporting fills, and the pinned contrast ladder —{' '}
+  <C>contrast-perma-primary</C> through <C>-quaternary</C> plus <C>-absolute</C> — carries the permanently
+  dark furniture, anchored so it never flips. Transient states are washes over the rest fill, never colour
+  steps; persistent engagement is a component contract.
 </P>
 
 <BgFolderTable folder="control" />
@@ -48,8 +50,10 @@ import { BgFolderTable } from './backgrounds';
 
 <P>
   The full peer-family set, same shape as the border tier: pure and brand extremes, each composing with
-  theme and constancy. The pure float role lives here — roles may share values, and a lifted white
-  surface is byte-identical to the pure extreme opposing the theme, so one token carries both readings.
+  theme and constancy. Surfaces read light-first — <C>default</C> is the light world's own extreme and{' '}
+  <C>default-contrast</C> the opposing one — and the pure float role lives on <C>default</C>: roles may
+  share values, so one token carries the lifted white surface and the pure extreme alike. max is the
+  semantic reserve; contexts with their own names (app, control) own their specific uses.
 </P>
 
 <BgFolderTable folder="max" />

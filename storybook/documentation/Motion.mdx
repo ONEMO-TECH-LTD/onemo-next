@@ -1,0 +1,47 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+import { Page, H2, P, C, Note } from './blocks';
+import { MotionTable } from './motion';
+
+<Meta title="Documentation/Motion" />
+
+<Page
+  title="Motion"
+  lead="How the product feels when it moves: the tap squeeze, the duration ladder, the easing curves, and the spring pairs. Code-facing tokens on the breakpoints precedent — Figma cannot animate from a variable, but the feel of the product is a design decision, so the numbers live in the file and code reads them from here."
+>
+
+<H2>The cascade</H2>
+
+<P>
+  Motion follows the same three tiers as colour: raw time and easing primitives (with scale and spring
+  factors in the ratio primitives), an alias vocabulary, and the semantic set below. Values exist exactly
+  once; retuning the product's feel is one edit at the primitive tier.
+</P>
+
+<H2>The semantic set</H2>
+
+<MotionTable />
+
+<H2>The sources</H2>
+
+<P>
+  The spring pair is the platform default spring of the native canon; the snappy pair is its small-control
+  class; the duration ladder and curves align with the Material motion canon where the two agree. The press
+  scale is tuned a hair subtler than the native pattern for ONEMO's flatter language. Springs ship as raw
+  response and damping parameters — JS animation consumes them directly, and baked CSS spring curves
+  generate at converter time.
+</P>
+
+<H2>What stays native-only</H2>
+
+<P>
+  Haptic patterns, the platform keyboard curve, and refractive glass effects have no honest web delivery —
+  they are documented as native behaviors, never tokenized. Scroll feel approximates through standard
+  overscroll behavior.
+</P>
+
+<Note>
+  States pair with motion at the component tier: a press is the press wash plus the press scale in one
+  contract. The wash carries the tint; this collection carries the physics.
+</Note>
+
+</Page>

@@ -156,15 +156,15 @@ function ScrimDemo({ ground, control, scrim, sheet }: { ground: string; control:
 function Panel({ face }: { face: Face }) {
   const ground = sem(face, 'bg/app/primary', 'bg/app/default') ?? '#ccc';
   const control = sem(face, 'bg/control/default') ?? '#ddd';
-  const solid = sem(face, 'bg/max/brand') ?? '#000';
-  const float = sem(face, 'bg/max/inverse') ?? '#fff';
+  const solid = sem(face, 'bg/max/brand-contrast', 'bg/max/brand') ?? '#000';
+  const float = sem(face, 'bg/max/default', 'bg/max/inverse') ?? '#fff';
   const pressN = sem(face, 'interaction/press/on-neutral');
   const pressS = sem(face, 'interaction/press/on-solid');
   const pressI = sem(face, 'interaction/press/on-image');
   const dragN = sem(face, 'interaction/drag/on-neutral');
   const scrimDim = sem(face, 'scrim/dim');
   const scrimImg = sem(face, 'scrim/on-image');
-  const ringInk = alias(face, 'brand/black'); // proposal A — the mono ring
+  const ringInk = alias(face, 'brand/ink-snow'); // proposal A — the mono ring
   const ringCur = sem(face, 'focus/ring/on-neutral'); // current draft (colour)
   const ringSolid = sem(face, 'focus/ring/on-solid');
   const shadowRegular = (() => {

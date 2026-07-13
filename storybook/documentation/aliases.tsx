@@ -37,7 +37,7 @@ export function PaletteGroup({ group }: { group: string }) {
   return <div>{rows}</div>;
 }
 
-const BEHAVIORS = ['alpha', 'l-constant', 'd-constant', 'l-alpha', 'd-alpha', 'inverse'];
+const BEHAVIORS = ['alpha', 'constant', 'constant-alpha', 'inverse', 'inverse-constant', 'inverse-constant-alpha'];
 function isBehavior(k: string) {
   return BEHAVIORS.includes(k);
 }

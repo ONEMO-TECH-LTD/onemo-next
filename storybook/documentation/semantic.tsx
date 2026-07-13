@@ -13,7 +13,7 @@ import { S, Table, ValueLabel, C } from './blocks';
 const PHOTO = 'linear-gradient(135deg,#e8b04b 0%,#b0592f 45%,#3a6b52 100%)'; // imagery stand-in (scenery, not a token)
 
 function mono(face: 'L' | 'D', tone: 'ink' | 'snow'): string {
-  const r = resolve(PRIM_COL, tone === 'ink' ? 'base/brand-black' : 'base/brand-white');
+  const r = resolve(PRIM_COL, tone === 'ink' ? 'base/ink-snow' : 'base/snow-ink');
   return r ? (face === 'L' ? r.L : r.D) : tone === 'ink' ? '#000' : '#fff';
 }
 

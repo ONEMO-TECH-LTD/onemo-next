@@ -1,49 +1,67 @@
 import { Meta } from '@storybook/addon-docs/blocks';
 import { Page, H2, P, C, Note } from './blocks';
-import { BaseMaterials, BehaviorGrid } from './materials';
+import { BaseMaterials, PairGrid, FaceGrid } from './materials';
 
 <Meta title="Documentation/Colour/Materials" />
 
 <Page
   title="The base materials"
-  lead="Ink, Snow, and Aluminium — the brand mono set. Each is a two-faced base pair carrying the full behavior grid: constants, alpha ladders, and an inverse."
+  lead="Three flipping pairs — ink-snow, silver-space, white-black — plus their swaps and pinned faces. A pair token is named by both its faces, light-theme face first, so no name can lie about what it shows."
 >
 
-<H2>The pairs</H2>
+<H2>The pair naming law</H2>
 
 <P>
-  A base material is a primitive with two theme faces. Ink and Snow are stored as mirror images of each
-  other — each one's dark face is the other's light face — so for that pair, "inverse" needs no token:
-  the partner is the inverse. Aluminium is the third material, the anodized slab the editor stands on.
-  It is theme-tuned rather than mirrored — its faces do not swap into any partner — so it is the one
-  base pair that stores its swap explicitly, in the <C>inverse/</C> section, the same way the ramps do.
+  A base token holds two theme faces, which means it IS a pair — and naming it after one member is how
+  confusion breeds. So adaptive pair tokens carry both faces in reading order: <C>ink-snow</C> shows ink
+  in the light theme and snow in the dark. Each pair's swap is a separate token in the{' '}
+  <C>inverse/</C> section (<C>snow-ink</C>, <C>space-silver</C>, <C>black-white</C>) — same values, faces
+  reversed. Single-colour names are reserved for the pinned tokens (<C>constant/base/ink</C>), because
+  a pinned token is the only kind that is truly one colour.
 </P>
 
 <BaseMaterials />
 
-<H2>The aluminium behavior grid</H2>
+<H2>What each pair is</H2>
 
 <P>
-  Every base material carries the same grid, and aluminium's is complete: the light- and dark-anchored
-  constants (what <C>-perma</C> and <C>-inverse-perma</C> resolve through), the adaptive alpha ladder
-  (its own face per theme), the pinned light and dark alpha ladders, and the explicit inverse. Missing
-  eventualities — washes on the swapped face — mint lazily at their predictable names.
+  <C>ink-snow</C> is the voice pair — the brand black and the paper it prints on; the UI's default
+  text world. <C>silver-space</C> is the surface pair — the metal slab the editor stands on, silver in
+  the light world, space in the dark. <C>white-black</C> is the pure pair — the absolute extremes,
+  reserved for media and the max reserve. Pairs carry two behavior sets (adaptive and pinned-own);
+  their swapped-pinned forms are the partner's constants, so those tokens deliberately do not exist.
 </P>
 
-<BehaviorGrid alias="brand/alu" />
+<H2>Alias anatomy — pairs</H2>
 
-<H2>Where it surfaces</H2>
+<PairGrid family="brand" pair="ink-snow" />
+<PairGrid family="brand" pair="snow-ink" />
+<PairGrid family="brand" pair="silver-space" />
+<PairGrid family="brand" pair="space-silver" />
+<PairGrid family="base" pair="white-black" />
+<PairGrid family="base" pair="black-white" />
+
+<H2>Alias anatomy — pinned faces</H2>
+
+<FaceGrid family="brand" face="ink" />
+<FaceGrid family="brand" face="snow" />
+<FaceGrid family="brand" face="silver" />
+<FaceGrid family="brand" face="space" />
+<FaceGrid family="base" face="white" />
+<FaceGrid family="base" face="black" />
+
+<H2>Where they surface</H2>
 
 <P>
-  The editor ground binds the aluminium route (<C>bg/app/primary</C>); the ordinal canvases beneath it
-  step through the grey ramp. Snow returns to what it is in the brand language — the paper material for
-  surfaces that want Snow — and Ink keeps the voice. The grain treatment for the anodized look is a
-  screen-level texture over the token, not a colour: the tier owns the tint, the node owns the noise.
+  The editor ground binds the surface pair (<C>bg/app/primary</C>); its opposing and pinned readings ride
+  the same pair's swap and constant. The voice pair carries text and the flipping brand surfaces; the pure
+  pair carries the max reserve. The grain treatment for the anodized look remains a screen-level texture
+  over the token — the tier owns the tint, the node owns the noise.
 </P>
 
 <Note>
-  The tables derive from the committed Figma pull at render time. If the aluminium rows are absent, the
-  snapshot predates the material — refresh the pull and the grid appears.
+  Every table derives from the committed Figma pull at render time. An absent row means the snapshot
+  predates the token — refresh the pull and it appears.
 </Note>
 
 </Page>

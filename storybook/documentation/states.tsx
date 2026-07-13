@@ -71,7 +71,7 @@ function Chip({ ground, wash }: { ground: string; wash?: string }) {
 /** The washes on the three surface classes — each chip half rest, half washed. */
 export function WashDemo() {
   const light = resolve(AL_COL, 'neutral/3');
-  const inkPill = resolve(AL_COL, 'brand/black');
+  const inkPill = resolve(AL_COL, 'brand/ink-snow');
   return (
     <div>
       <p style={{ ...S.mono, fontSize: 9.5, color: '#8b8d98' }}>
@@ -82,9 +82,9 @@ export function WashDemo() {
         ground={light ? cssColor(light.L) : '#eee'}
         face="L"
         routes={[
-          { name: 'hover', path: 'brand/black/alpha/1' },
-          { name: 'press', path: 'brand/black/alpha/2' },
-          { name: 'drag', path: 'brand/black/alpha/3' },
+          { name: 'hover', path: 'brand/ink-snow-alpha/1' },
+          { name: 'press', path: 'brand/ink-snow-alpha/2' },
+          { name: 'drag', path: 'brand/ink-snow-alpha/3' },
         ]}
       />
       <WashRow
@@ -92,9 +92,9 @@ export function WashDemo() {
         ground={inkPill ? cssColor(inkPill.L) : '#000'}
         face="L"
         routes={[
-          { name: 'hover', path: 'brand/white/alpha/1' },
-          { name: 'press', path: 'brand/white/alpha/2' },
-          { name: 'drag', path: 'brand/white/alpha/3' },
+          { name: 'hover', path: 'brand/snow-ink-alpha/1' },
+          { name: 'press', path: 'brand/snow-ink-alpha/2' },
+          { name: 'drag', path: 'brand/snow-ink-alpha/3' },
         ]}
       />
       <WashRow
@@ -102,9 +102,9 @@ export function WashDemo() {
         ground={PHOTO}
         face="L"
         routes={[
-          { name: 'hover', path: 'base/black/l-alpha/1' },
-          { name: 'press', path: 'base/black/l-alpha/2' },
-          { name: 'drag', path: 'base/black/l-alpha/3' },
+          { name: 'hover', path: 'base/black-constant-alpha/1' },
+          { name: 'press', path: 'base/black-constant-alpha/2' },
+          { name: 'drag', path: 'base/black-constant-alpha/3' },
         ]}
       />
     </div>
@@ -114,8 +114,8 @@ export function WashDemo() {
 /** Scrims over imagery, opacity computed from the route. */
 export function ScrimDemo() {
   const routes = [
-    { name: 'scrim over imagery (text legibility)', path: 'base/black/l-alpha/5' },
-    { name: 'scrim behind modals', path: 'base/black/l-alpha/8' },
+    { name: 'scrim over imagery (text legibility)', path: 'base/black-constant-alpha/5' },
+    { name: 'scrim behind modals', path: 'base/black-constant-alpha/8' },
   ];
   return (
     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', margin: '8px 0' }}>

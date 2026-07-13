@@ -12,13 +12,19 @@ import { FolderTable, FolderNote, TierComparison } from './semantic';
 <H2>The grammar</H2>
 
 <P>
-  <b>Family</b> says what is speaking: the brand voice (<C>primary</C> — Ink on Snow), the pure extremes
-  (<C>max</C>), the platform (<C>system</C>), or a brand colour (<C>brand/…</C>). <b>Register</b> says how
-  loudly — <C>-strong</C> amplifies, <C>-subtle</C> quiets, <C>-muted</C> is the quietest readable tier.{' '}
-  <b>Theme</b> says which way it follows the world — a bare name follows the theme, <C>-inverse</C> opposes
-  it. <b>Constancy</b> says whether it flips at all: <C>-perma</C> freezes what you see in the light theme,{' '}
-  <C>-inverse-perma</C> freezes what you see in the dark theme. Perma composes with any family, register or
-  theme word — a missing constant is minted by suffixing, never by inventing vocabulary.
+  <b>Family</b> says what is speaking: the brand voice (<C>primary</C> — ink on snow), the semantic
+  reserve (<C>max</C> — extremes for cases not yet named; known contexts own their own words), the
+  platform (<C>system</C>), or a brand colour (<C>brand/…</C>). <b>Register</b> says how loudly —{' '}
+  <C>default</C>, <C>-strong</C>, <C>-subtle</C>, <C>-muted</C> — and the register is always spoken:
+  the default's variants carry the <C>default-</C> prefix exactly as <C>subtle-contrast</C> carries
+  subtle. Registers select steps — the quiet tiers ride grey steps, never transparency tricks; alphas
+  appear only where the role itself is a see-through layer (materials, washes, scrims). <b>Theme</b>{' '}
+  says which way it follows the world, with a condition on the word: <C>-contrast</C> is opposition on
+  mono routes, where a swap genuinely delivers the contrast function; <C>-inverse</C> is opposition on
+  colour routes, where the swap is theme tuning and a contrast claim would lie. <b>Constancy</b>:{' '}
+  <C>-perma</C> pins whichever reading it suffixes — <C>default-perma</C> freezes the light-world
+  reading, <C>contrast-perma</C> the opposing one. A missing combination is minted by composing these
+  words, never by inventing vocabulary.
 </P>
 
 <P>
@@ -85,8 +91,10 @@ import { FolderTable, FolderNote, TierComparison } from './semantic';
 <FolderTable tier="fg" folder="brand" />
 
 <Note>
-  Border and surface families adopt this grammar as they are rebuilt. Retired legacy names and their
-  migration targets are process history — see the Changelog.
+  All four families — text, fg, border, bg — speak this grammar. The light theme is the reference world
+  throughout: a bare token is what you see in light theme, per family kind (content families read
+  dark-first, surface families light-first). Retired legacy names and their migration targets are process
+  history — see the Changelog.
 </Note>
 
 </Page>
