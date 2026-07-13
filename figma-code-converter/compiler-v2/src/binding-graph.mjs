@@ -20,7 +20,7 @@ export class BindingGraphError extends Error {
 }
 
 /** Index nodes by id, capturing each bound node's resolvedVariableModes from the supplement. */
-function nodeContexts(document, supplement, requiredNodeIds) {
+function nodeContexts(document, supplement) {
   if (!supplement || supplement.schemaVersion !== SCHEMA.supplement || !Array.isArray(supplement.nodes)) {
     throw new BindingGraphError('FAILED_CAPTURE', 'complete versioned plugin supplement required before BindingGraph');
   }
@@ -31,13 +31,11 @@ function nodeContexts(document, supplement, requiredNodeIds) {
     }
     modesByNode.set(n.nodeId, n.resolvedVariableModes);
   }
-  for (const nodeId of requiredNodeIds) if (!modesByNode.has(nodeId)) {
-    throw new BindingGraphError('FAILED_CAPTURE', `supplement missing resolvedVariableModes for bound node ${nodeId}`);
-  }
   const ctxByNode = new Map();
   (function walk(n) {
     if (!n) return;
-    ctxByNode.set(n.id, modesByNode.get(n.id) ?? {});
+    if (!modesByNode.has(n.id)) throw new BindingGraphError('FAILED_CAPTURE', `supplement missing resolvedVariableModes for source node ${n.id}`);
+    ctxByNode.set(n.id, modesByNode.get(n.id));
     (n.children ?? []).forEach(walk);
   })(document);
   return ctxByNode;
@@ -56,8 +54,7 @@ export function buildBindingGraph({ fileKey, document, supplement, sourcePlanes,
   assertGraphSourcePlanes(sourcePlanes, evidenceClass);
   if (!fileKey || !document || !classified || !variableGraph) throw new BindingGraphError('FAILED_CAPTURE', 'BindingGraph input incomplete');
   if (classified.unknown?.length) throw new BindingGraphError('FAILED_CAPABILITY', `${classified.unknown.length} unknown binding carrier(s) block BindingGraph`);
-  const requiredNodeIds = new Set(classified.canonical.map((o) => o.nodeId));
-  const ctxByNode = nodeContexts(document, supplement, requiredNodeIds);
+  const ctxByNode = nodeContexts(document, supplement);
   const pending = [];
   for (const occ of classified.canonical) {
     const context = ctxByNode.get(occ.nodeId) ?? {};
@@ -71,15 +68,25 @@ export function buildBindingGraph({ fileKey, document, supplement, sourcePlanes,
     pending.push({ occ, context, v, collectionKey, resolution });
   }
   const usedBySubtree = subtreeCollections(document, pending);
+  const nodeModeContexts = [];
+  (function walk(node) {
+    if (!node) return;
+    nodeModeContexts.push({
+      nodeId: node.id,
+      modeContextId: variableGraph.modeContextId(ctxByNode.get(node.id), usedBySubtree.get(node.id) ?? []),
+    });
+    (node.children ?? []).forEach(walk);
+  })(document);
+  const modeIdByNode = new Map(nodeModeContexts.map((row) => [row.nodeId, row.modeContextId]));
   const records = pending.map(({ occ, context, v, collectionKey, resolution }) => makeRecord({
     fileKey, occ, v, collectionKey, resolution,
-    modeContextId: variableGraph.modeContextId(context, usedBySubtree.get(occ.nodeId) ?? []),
+    modeContextId: modeIdByNode.get(occ.nodeId),
   }));
   const resolutionTraces = [...new Map(pending.map(({ resolution }) => [resolution.traceId, {
     traceId: resolution.traceId,
     hops: structuredClone(resolution.trace),
   }])).values()].sort((a, b) => a.traceId.localeCompare(b.traceId));
-  return { schemaVersion: SCHEMA.bindingGraph, records, resolutionTraces, unknown: classified.unknown, mirrors: classified.mirrors, nonvisual: classified.nonvisual };
+  return { schemaVersion: SCHEMA.bindingGraph, records, resolutionTraces, nodeModeContexts, unknown: classified.unknown, mirrors: classified.mirrors, nonvisual: classified.nonvisual };
 }
 
 function makeRecord({ fileKey, occ, v, collectionKey, resolution, modeContextId }) {

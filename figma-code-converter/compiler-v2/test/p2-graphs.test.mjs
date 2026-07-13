@@ -74,6 +74,7 @@ test('binding graph builds ONE canonical record per slot with the full G2 identi
   const graph = buildBindingGraph({ fileKey: 'F', document: doc, supplement, sourcePlanes: microfixturePlanes(), evidenceClass: 'microfixture', classified, variableGraph: vg });
   assert.equal(graph.resolutionTraces.length, 2);
   assert.ok(graph.resolutionTraces.every((trace) => trace.traceId && trace.hops.length));
+  assert.deepEqual(graph.nodeModeContexts, [{ nodeId: '1:0', modeContextId: 'CK1=light' }]);
 });
 
 test('BindingGraph fails before graphs when a required fact plane is REST-only/partial or fixture is relabelled integration (G0/G5)', () => {
@@ -106,6 +107,11 @@ test('BindingGraph context identity includes defaulted collections used by desce
   const { records } = buildBindingGraph({ fileKey: 'F', document: doc, supplement, sourcePlanes: microfixturePlanes(), evidenceClass: 'microfixture', classified, variableGraph });
   assert.equal(records.find((r) => r.source.nodeId === 'root').modeContextId, 'CK1=light,CK2=base');
   assert.equal(records.find((r) => r.source.nodeId === 'child').modeContextId, 'CK2=base');
+  const graph = buildBindingGraph({ fileKey: 'F', document: doc, supplement, sourcePlanes: microfixturePlanes(), evidenceClass: 'microfixture', classified, variableGraph });
+  assert.deepEqual(graph.nodeModeContexts, [
+    { nodeId: 'root', modeContextId: 'CK1=light,CK2=base' },
+    { nodeId: 'child', modeContextId: 'CK2=base' },
+  ]);
 });
 
 test('G2 conservation: identical record sets conserve; a swapped variable key is caught', () => {

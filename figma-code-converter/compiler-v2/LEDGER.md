@@ -17,7 +17,8 @@ review, fail-closed gaps, final Dan sign-off, Done ownership, cutover authorizat
 **Current test truth (reported separately):** legacy converter suite 46 pass / 3 fail (missing
 gitignored golden fixture `t88thL8hKksSpILgkeGRZ0-4084-25997.nodes.json`) / 0 skips ·
 compiler-v2 foundation suite 53 pass / 0 fail / 0 skip across Builder and Meta repeated runs ·
-compiler-v2 P2 graph suite 23 pass / 0 fail / 0 skip. No phase may be recorded green from
+compiler-v2 P2 graph suite 23 pass / 0 fail / 0 skip, including 19 persisted-boundary
+corruption mutations. No phase may be recorded green from
 harness-only or REST_ONLY placeholders.
 
 **Gap blocking map:** G-1 (plugin-origin corpus) blocks P0 exit + P7 full-corpus G0–G13.
@@ -39,7 +40,7 @@ Decisions/Done/cutover: Dan only.
 |---|---|---|---|
 | P0 continuity/contract/calibration | IN PROGRESS | — | see P0 section |
 | P1 evidence capture | pending | — | |
-| P2 canonical graphs | BUILD CHECKPOINT — QA/META PENDING | Builder snapshot in this checkpoint | six graph families + persisted parser; live/plugin evidence still blocked by G-1/G-2 |
+| P2 canonical graphs | BUILD CHECKPOINT — QA REWORK ADDRESSED; RE-REVIEW PENDING | `0d04e26` plus strict-boundary follow-up snapshot | six graph families + strict persisted parser; live/plugin evidence still blocked by G-1/G-2 |
 | P3 mother token/component slice | pending | — | |
 | P4 mother layout/render slice | pending | — | |
 | P5 emitters/security/editability | pending | — | |
@@ -110,13 +111,18 @@ Decisions/Done/cutover: Dan only.
 
 - Implemented versioned `DocumentGraph`, `VariableGraph`, `BindingGraph`, `ComponentGraph`,
   `TextGraph`, and `AssetGraph`, composed by one JSON-safe `CanonicalModel` boundary.
-- Added strict persisted-model parsing: missing graph, unknown nested schema, malformed graph
-  arrays, or invalid binding records refuse before downstream use.
+- Added strict persisted-model parsing: missing graph, unknown nested schema, and malformed
+  identity/relationship/content fields in every graph refuse before downstream use. The parser
+  cross-checks document topology, variable catalogs/traces/modes, binding identities/references,
+  native component APIs, UTF-16 text/font coverage, and asset content identity.
 - Source-plane preflight is centralized and runs before alias inventory: integration requires
   plugin-primary-complete document/supplement/variables/components/fonts/assets/dependencies;
   `fixture` is accepted only for §14.1 microfixtures.
 - Binding identity keeps stable variable/collection keys, source slot/range/domain/target,
-  subtree-complete defaulted `ModeContextId`, and persisted resolution trace tables.
+  subtree-complete defaulted `ModeContextId`, and persisted resolution trace tables. Every
+  source node now requires a captured supplement mode row; both BindingGraph and VariableGraph
+  persist the same complete node-context table so later scoped-mode lowering cannot substitute
+  a root context for descendants.
 - Components preserve complete typed definitions, native instance identity, properties,
   references, swaps/overrides; incomplete definitions and illegal variants fail
   `FAILED_COMPONENT`. Text preserves contiguous UTF-16 ranges and proves every used font mapping.
@@ -125,7 +131,9 @@ Decisions/Done/cutover: Dan only.
   crossover. Deprecated-background mirror proof is structural and key-order independent.
 - Independent oracle imports no P2 builders and rejects the actual legacy `src/ir.mjs` output at
   G1-G5 on the same semantic fixture. P2 suite 23/23/0; foundation 53/53/0; syntax/diff checks
-  green. This is a Builder checkpoint only: no P2 phase, integration, promotion, or Done claim;
+  green. QA's frozen-`0d04e26` strict-parser defect was reproduced and repaired with 19 permanent
+  persisted-corruption mutations across all six graphs and cross-graph links. This is a Builder
+  checkpoint only: no P2 phase, integration, promotion, or Done claim;
   QA/Meta review and plugin-origin G-1/G-2 evidence remain required.
 
 ## Meta rulings accepted (2026-07-13)
@@ -212,3 +220,8 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   Figma `2ee8d8f8d69a300fdc7276439ba5c356ecf46d3a027b7e23a2fcdcc106cfbb8a`,
   draft `a8ecb8580e1475ce79c4d0b369864a83a2fd347ecde4985bee9465d2eb04de12`.
   No budget, P0, fidelity, promotion, phase, or Done claim.
+- 2026-07-13 QA `[REWORK]` at frozen `0d04e26`: `parseCanonicalModel` checked only nested
+  versions/top-level arrays and accepted corrupt document root/node, text-node, and asset rows.
+  Builder reproduced the defect failure-first, then added strict per-graph and cross-graph
+  validation plus 19 persisted mutations. Builder rerun: P2 23/23/0, foundation 53/53/0,
+  syntax/diff checks green. QA re-review remains required; no P2 clearance claimed.

@@ -13,7 +13,10 @@ export function buildComponentGraph({ document, components, supplement, sourcePl
   if (!Array.isArray(components?.components) || !Array.isArray(components?.componentSets) || !Array.isArray(supplement?.nodes)) {
     throw new ComponentGraphError('FAILED_CAPTURE', 'complete components and supplement arrays required');
   }
-  const definitions = [...components.componentSets, ...components.components].map((row) => structuredClone(row));
+  const definitions = [...components.componentSets, ...components.components].map((row) => ({
+    ...structuredClone(row),
+    propertyDefinitions: structuredClone(row?.propertyDefinitions ?? {}),
+  }));
   const byKey = new Map();
   const byId = new Map();
   for (const row of definitions) {

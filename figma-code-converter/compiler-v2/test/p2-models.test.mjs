@@ -39,6 +39,8 @@ function fixture() {
       { family: 'Inter', style: 'Regular', providerId: 'font-inter-regular', sha256: '1'.repeat(64) },
       { family: 'Inter', style: 'Bold', providerId: 'font-inter-bold', sha256: '2'.repeat(64) },
     ] },
+    { nodeId: 'photo', resolvedVariableModes: {} },
+    { nodeId: 'icon', resolvedVariableModes: {} },
   ] };
   const assetIndex = [
     { kind: 'image', sourceId: 'img-ref', file: 'assets/photo.png', sha256: 'a'.repeat(64), bytes: 10, mime: 'image/png', width: 100, height: 80 },
@@ -74,6 +76,9 @@ test('ComponentGraph preserves complete definitions, typed instance props/refere
   assert.throws(() => buildComponentGraph({ document, components: missing, supplement, sourcePlanes: planes(), evidenceClass: 'microfixture' }), (error) => error instanceof ComponentGraphError && error.state === 'FAILED_COMPONENT');
   const invalidOption = structuredClone(supplement); invalidOption.nodes.find((row) => row.nodeId === 'instance').componentProperties.Size.value = 'XL';
   assert.throws(() => buildComponentGraph({ document, components, supplement: invalidOption, sourcePlanes: planes(), evidenceClass: 'microfixture' }), ComponentGraphError);
+  const noProps = structuredClone(components); noProps.components.push({ id: 'plain', key: 'CMP_PLAIN', name: 'Plain', complete: true });
+  const normalized = buildComponentGraph({ document, components: noProps, supplement, sourcePlanes: planes(), evidenceClass: 'microfixture' });
+  assert.deepEqual(normalized.definitions.find((row) => row.key === 'CMP_PLAIN').propertyDefinitions, {});
 });
 
 test('TextGraph preserves UTF-16 ranges, characters, links/styles/fonts; coalescing unequal ranges fails G5', () => {
@@ -124,9 +129,36 @@ test('canonical-model pipeline builds all versioned P2 graphs from one snapshot 
   const persisted = JSON.parse(JSON.stringify(model));
   assert.equal(persisted.variableGraph.variables[0].key, 'K_OPACITY'); // real arrays survive JSON; Map internals must never disappear as `{}`
   assert.equal(persisted.variableGraph.collections[0].key, 'CK_THEME');
+  assert.equal(persisted.variableGraph.nodeModeContexts.length, 6);
+  assert.equal(persisted.variableGraph.nodeModeContexts.find((row) => row.nodeId === 'root').modeContextId, 'CK_THEME=light');
   assert.ok(Array.isArray(persisted.bindingGraph.resolutionTraces));
   assert.equal(JSON.stringify(persisted).includes('"byId":{}'), false);
   assert.deepEqual(parseCanonicalModel(persisted), persisted);
+  const persistedMutations = [
+    ['missing document root identity', (value) => { delete value.documentGraph.rootId; }],
+    ['empty document node', (value) => { value.documentGraph.nodes[0] = {}; }],
+    ['document node loses type', (value) => { delete value.documentGraph.nodes[0].properties.type; }],
+    ['broken document relationship', (value) => { value.documentGraph.nodes[0].childIds[0] = 'missing'; }],
+    ['malformed variable', (value) => { value.variableGraph.variables[0] = {}; }],
+    ['malformed collection', (value) => { value.variableGraph.collections[0].modes = []; }],
+    ['malformed node mode context', (value) => { value.variableGraph.nodeModeContexts[0] = {}; }],
+    ['forged resolution trace', (value) => { value.variableGraph.resolutionTraces[0].hops[0].key = 'wrong'; }],
+    ['binding references missing node', (value) => { value.bindingGraph.records[0].source.nodeId = 'missing'; }],
+    ['binding identity disagrees', (value) => { value.bindingGraph.records[0].bindingId = 'forged'; }],
+    ['binding and variable contexts disagree', (value) => { value.bindingGraph.nodeModeContexts[0].modeContextId = 'ø'; }],
+    ['malformed component definition', (value) => { value.componentGraph.definitions[0] = {}; }],
+    ['malformed component instance', (value) => { value.componentGraph.instances[0] = {}; }],
+    ['component supplement disagrees', (value) => { value.componentGraph.definitionSupplements[0].componentPropertyDefinitions.Size.defaultValue = 'L'; }],
+    ['malformed text node', (value) => { value.textGraph.textNodes.push({}); }],
+    ['text characters disagree', (value) => { value.textGraph.textNodes[0].segments[0].characters = 'No '; }],
+    ['malformed asset', (value) => { value.assetGraph.assets.push({}); }],
+    ['asset content identity malformed', (value) => { value.assetGraph.assets[0].sha256 = 'bad'; }],
+  ];
+  for (const [name, mutate] of persistedMutations) {
+    const corrupted = structuredClone(persisted);
+    mutate(corrupted);
+    assert.throws(() => parseCanonicalModel(corrupted), CanonicalModelError, name);
+  }
   const unknownSchema = structuredClone(persisted); unknownSchema.textGraph.schemaVersion = 999;
   assert.throws(() => parseCanonicalModel(unknownSchema), (error) => error instanceof CanonicalModelError && error.state === 'FAILED_CAPABILITY');
   const missingGraph = structuredClone(persisted); delete missingGraph.componentGraph;
@@ -136,6 +168,8 @@ test('canonical-model pipeline builds all versioned P2 graphs from one snapshot 
   assert.throws(() => buildCanonicalModel({ snapshot: unknown, evidenceClass: 'microfixture', fileKey: 'FIX' }), (error) => error instanceof CanonicalModelError && error.state === 'FAILED_CAPABILITY');
   const restOnlyUnknown = structuredClone(unknown); restOnlyUnknown.manifest.sourcePlanes.supplement = 'rest-only';
   assert.throws(() => buildCanonicalModel({ snapshot: restOnlyUnknown, evidenceClass: 'integration', fileKey: 'FIX' }), (error) => error instanceof CanonicalModelError && error.state === 'FAILED_CAPTURE');
+  const incompleteSupplement = structuredClone(snapshot); incompleteSupplement.supplement.nodes = incompleteSupplement.supplement.nodes.filter((row) => row.nodeId !== 'photo');
+  assert.throws(() => buildCanonicalModel({ snapshot: incompleteSupplement, evidenceClass: 'microfixture', fileKey: 'FIX' }), (error) => error instanceof CanonicalModelError && error.state === 'FAILED_CAPTURE');
 });
 
 test('independent G1-G5 oracle rejects the actual legacy thin IR on the same semantic fixture', () => {
