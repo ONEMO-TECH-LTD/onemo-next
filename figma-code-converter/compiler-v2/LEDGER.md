@@ -75,6 +75,14 @@ Decisions/Done/cutover: Dan only.
    temp-unlink arbitration; dead-owner recovery; legacy-v1 namespace preservation; original
    failure diagnostics preserved. Foundation 53/53/0 plus deterministic publisher-won and
    recovery-won races. [SEAM CLEAR — not P0 exit]
+9. **Clean-snapshot live Shape calibration evidence**: run from detached clean snapshot
+   `08fef0dfd3464b731aea9b7b320612e5b18b2402` against file
+   `Qdb9Kx98afJHxaCGAIxoMC`, node `6075:53685`, version `2375782983690416241`, light route
+   `:3077`. Sealed v2 generation records the full build SHA; latest/published records are
+   byte-identical; all images are 804×1748; declared artifact hashes match. Repeat capture is
+   byte-identical; Figma/build draft metrics are 11.21% changed >2, 0.388% changed >32,
+   mean delta 1.592. Legacy latest + four generation artifacts remained byte-identical.
+   [EVIDENCE CAPTURED — DRAFT ONLY; §13.3 distributions/class budgets/approval still pending]
 
 ## Gap register (stop-and-collaborate log, Dan's gap protocol)
 
@@ -173,3 +181,12 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   3× foundation 53/53/0, four syntax checks and diff check green. R3-18b/R3-19/R3-20/R3-21
   cleared. This authorizes only the narrow snapshot and clean-checkout/live-calibration sequence;
   no phase, P0, promotion, fidelity, cutover, or Done verdict.
+- 2026-07-13 Builder clean-snapshot calibration checkpoint: v2 generation
+  `generations/08fef0df-72869-1783979185476-d339b2aa-e3fa-4f6a-bf90-655b8c2fe6bd`;
+  draft SHA-256 `92726d5882e6af9772bd0cc52848345df1af2d2cf91e9eaa0838bb9bc59a927f`.
+  Legacy hashes reverified unchanged: latest `caf4585334077bc3672b5537c6e6649f357a46a6667582e5af7f1481538f0477`,
+  build-a `14de687921c156fa7a4d7989943936f41f3c46434067801879addbfd7d54aec6`,
+  build-b `bccec2848283ae862e2bedd6e3f5c918d91d20df701ef03817bd05e0de81a134`,
+  Figma `2ee8d8f8d69a300fdc7276439ba5c356ecf46d3a027b7e23a2fcdcc106cfbb8a`,
+  draft `a8ecb8580e1475ce79c4d0b369864a83a2fd347ecde4985bee9465d2eb04de12`.
+  No budget, P0, fidelity, promotion, phase, or Done claim.

@@ -1,0 +1,10 @@
+{
+ "schemaVersion": 2,
+ "transactionId": "d339b2aa-e3fa-4f6a-bf90-655b8c2fe6bd",
+ "pid": 72869,
+ "host": "Daniils-MacBook-Pro-2.local",
+ "genBase": "08fef0df",
+ "token": "72869-1783979185476",
+ "staging": ".stage-08fef0df-72869-1783979185476-d339b2aa-e3fa-4f6a-bf90-655b8c2fe6bd",
+ "generation": "generations/08fef0df-72869-1783979185476-d339b2aa-e3fa-4f6a-bf90-655b8c2fe6bd"
+}
