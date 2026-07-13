@@ -14,14 +14,16 @@ Dan's newer directive supersedes the per-phase Dan-wait sentence ONLY: this run 
 for Dan between phases. NOT waived: frozen phase evidence, Pixel QA handoffs, Meta conformance
 review, fail-closed gaps, final Dan sign-off, Done ownership, cutover authorization.
 
-**Current test truth:** 46 pass / 3 failures (missing gitignored golden fixture
-`t88thL8hKksSpILgkeGRZ0-4084-25997.nodes.json`) / 0 skips. No phase may be recorded green from
+**Current test truth (reported separately):** legacy converter suite 46 pass / 3 fail (missing
+gitignored golden fixture `t88thL8hKksSpILgkeGRZ0-4084-25997.nodes.json`) / 0 skips ·
+compiler-v2 foundation suite 21 pass / 0 fail / 0 skip. No phase may be recorded green from
 harness-only or REST_ONLY placeholders.
 
-**Gap blocking map:** G-1 (corpus fixtures) blocks P0 exit + P7 gates G0–G13 full-corpus runs.
+**Gap blocking map:** G-1 (plugin-origin corpus) blocks P0 exit + P7 full-corpus G0–G13.
 G-2 (plugin supplement capability) blocks P1 G0 supplement proof and every G1–G5 clearance of
 component/mixed-text/mode-override domains. G-3 (dark reference) blocks dark-state G11 promotion
-only.
+only. G-4 (Dan mother-screen selection) blocks P0 item 2 + the P3/P4 slice anchor. G-5
+(source-plane fail-closed enforcement, unbuilt) blocks P1 G0 / P2 provenance gating.
 
 ## Ownership
 Builder/orchestrator/ledger: Kai (s58). QA structural/gate proof: @s58-pixel.
@@ -89,10 +91,10 @@ Product/editor/agnosticity challenge: @s58-pixel-meta-qa. Decisions/Done/cutover
 ## Meta rulings accepted (2026-07-13)
 
 - **Corpus:** "harness + fixtures owed" is NOT a P0/P7 exit. Missing required fixture = named
-  phase failure. P0 stays incomplete until the §14 fixture set exists. ~~Builder's synthetic
-  integration-fixture route and "mother = Shape" reading~~ **SUPERSEDED 2026-07-13 by the joint
-  route below**: synthetic = §14.1 microfixtures only; §14.2 integration evidence must be
-  plugin-origin from live roots; the mother is a distinct Dan-selected screen (G-4).
+  phase failure. P0 stays incomplete until the §14 fixture set exists. Current law: synthetic =
+  §14.1 microfixtures only; §14.2 integration evidence must be plugin-origin from live roots;
+  the mother is a distinct Dan-selected screen (G-4). (A prior builder reading was superseded —
+  see Decisions log.)
 - **Supplement:** `sourcePlane: REST_ONLY` is fail-closed for any fact requiring
   resolvedVariableModes / styledTextSegments / component definitions / overrides /
   plugin-resolved remote variables. The marker grants NO capability; those capability rows stay
@@ -130,10 +132,11 @@ failure; mid-transaction dependency change → F/D mismatch → bounded retry �
    a working file Dan reviews) — needed for §14.2 corpus roles.
 3. G-2: plugin bridge rescans at pinned versions when supplement capture lands (P1).
 
-**P0.5 envelope draft (Shape, local-heavy file, n=1):** REST version probe 807ms/2.9KB ·
-REST nodes 1,303ms/618KB · bridge variables payload 13ms/1.4MB · REST image export 1,979ms/598KB
-(2 requests). Three-pass capture projection ≈ 3×(nodes+deps) + refs ≈ 8–12s for Shape-class
-locals — inside a tolerable design-loop envelope; remote-heavy corpus measurement owed (G-1).
+**P0.5 envelope measurements (Shape, local-heavy file, n=1 — DRAFT EVIDENCE ONLY, no envelope
+is approved until P0 calibration):** REST version probe 807ms/2.9KB · REST nodes 1,303ms/618KB ·
+bridge variables payload 13ms/1.4MB · REST image export 1,979ms/598KB (2 requests). Naive
+three-pass projection ≈ 8–12s for Shape-class locals (uncalibrated); remote-heavy corpus
+measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
 
 ## Decisions log
 
@@ -141,6 +144,11 @@ locals — inside a tolerable design-loop envelope; remote-heavy corpus measurem
   run; final review by pixel + meta-qa; /o-deslop mandatory post-build; gaps = stop + collaborate.
 - 2026-07-13 Kai (process synthesis, relayed to both lanes): phases = frozen evidence points with
   async QA/Meta review; no build idle; evidence discipline intact.
+
+- 2026-07-13 SUPERSESSION RECORD: the builder's initial corpus reading (synthetic REST-schema
+  snapshots acceptable as §14.2 integration fixtures; Shape doubling as the §14.2 mother; E-row
+  replay via live cache) was withdrawn and replaced by the joint Meta+Pixel route and finding
+  F-P0.1. The ledger presents only the current law; this entry is the historical note.
 
 ## Reviewer verdicts & checkpoints (append-only)
 

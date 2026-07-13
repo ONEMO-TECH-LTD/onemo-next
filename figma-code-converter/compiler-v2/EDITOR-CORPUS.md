@@ -1,10 +1,13 @@
 # Compiler v2 — Editor Round-Trip Corpus (P0 pin · C11 v3 V16/G13)
 
-> P0 deliverable: the pinned corpus of select→edit→save→recompile cases G13 must pass, spec'd
-> against the react-figma engine contract (onemo-next `src/app/(dev)/react-figma/engine.ts`:
-> `splitSlots`/`boxSlots`/`editSlot` slot law; byte-splice writes; `DeclRef` resolution;
-> `data-src` element tagging; default-import CSS-module resolver, no-underscore class law).
-> Status: SPEC (no implementation authorization; fixtures are built in P5, gated in P6).
+> P0 deliverable: the pinned corpus of select→edit→save→recompile cases G13 must pass. The
+> interface authority is the documented editor contract in `figma-code-converter/SPEC.md`
+> (§3.1 class contract, §3.2 slot law, §4b formatting law, AC8 byte-splice round trip) and the
+> ENGINE-PLAN §5 `boxSlots`/`editSlot` slot law those sections cite. NOTE: no active
+> `react-figma/engine.ts` implementation exists in THIS worktree — the implementation seam is
+> UNVERIFIED here and must be re-verified against the live editor at P5.
+> Status: P0 SPECIFICATION ONLY — implementation and evidence are assigned to P5 (fixtures,
+> adapters) and P6 (G13 gate runs).
 
 ## Corpus cases (each = fixture + mutation pair)
 
@@ -17,14 +20,18 @@
 | EC5 | scoped-mode boundary | node inside a descendant mode scope | edit inside the scope | scope marker + `ModeContextId` untouched; edit lands within the scope | save drops/duplicates the mode-context marker |
 | EC6 | auxiliary fragment ownership | render fragment by `fragmentId` in render-inspection mode | none (selection contract) | fragment resolves to its OWNING source node for semantic editing; cannot masquerade as a sibling semantic element | fragment selected as fake semantic element, or unselectable, or wrong owner |
 | EC7 | text content | text node | character edit | escaped JSX children change only; ranges/bindings intact | edit merges styled ranges or unescapes |
-| EC8 | save-recompile stability | any of EC1–EC7 after save | recompile from same snapshot + edited package | recompile is deterministic; identity/source-map/render-order hashes stable except the edited segment | recompile churns unrelated files (change-locality break) |
+| EC8a | post-edit build stability | any of EC1–EC7 after Save-to-code | rebuild/typecheck the EDITED package (no converter re-run) | build+typecheck green; identity/source-map/render-order hashes stable except the edited segment | edit breaks build or churns unrelated artifacts |
+| EC8b | converter re-run truth | unchanged snapshot recompiled AFTER a code-only edit | full compile from the same sealed snapshot | regeneration is deterministic from source truth and MAY overwrite the code-only edit — this is CONTRACTED, LOUD behavior (the report names the overwritten segments); bidirectional persistence is explicitly NOT contracted in v3 | overwrite happens silently, non-deterministically, or corrupts identity/maps |
 
 ## Acceptance mechanics (P6)
 
 - Every case runs headless against the versioned v2 sandbox package: select via source map →
-  apply edit through the editor write path → `git diff --numstat` proves locality bounds →
-  recompile → G2/G6/G9 re-verify on the edited package.
-- Diff-locality bounds are part of the fixture (exact allowed line counts per case).
+  apply edit through the editor write path → **parsed-diff + byte-range assertions** prove
+  locality (allowed file/segment inventory per case; the assertion parses the diff hunks and
+  checks every changed byte range lies inside the case's owning declaration/expression
+  segment). `git diff --numstat` may be attached as supporting evidence only — it cannot prove
+  hunk/segment locality.
+- Diff-locality bounds are part of the fixture (exact allowed files, segments, and byte ranges).
 - The G13 mutation rows in v3 §14.3 map 1:1 onto the FAIL column above.
 
 ## Dependencies

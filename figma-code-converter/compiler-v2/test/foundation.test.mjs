@@ -9,8 +9,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { sourceBindingIdentity, emittedBindingIdentity, formatBindingForError, BindingIdentityError, validateBindingRecord, validateManifest, SCHEMA } from '../src/schema.mjs';
 const bindingIdentity = sourceBindingIdentity;
-import { writeSnapshot, readSnapshot, canonicalJson, EvidenceError } from '../src/evidence.mjs';
-import { collectOccurrences, classifyOccurrences } from '../src/inventory.mjs';
+import { writeSnapshot, readSnapshot, canonicalJson, censusOf, restTextRuns, EvidenceError } from '../src/evidence.mjs';
+import { collectOccurrences, classifyOccurrences, escapePointerToken } from '../src/inventory.mjs';
 
 // ── G2 identity tuple: every swap the gate must catch changes the key ──────────────────────
 const baseRecord = () => ({
@@ -76,7 +76,7 @@ const tinyDoc = () => ({
 async function makeSnap(tmp) {
   return writeSnapshot(tmp, {
     fileKey: 'FIX', fileVersion: 'v1', rootIds: ['0:1'], captureId: 'cap-1',
-    sourcePlanes: { document: 'fixture', variables: 'fixture', supplement: 'fixture' },
+    sourcePlanes: { document: 'fixture', variables: 'fixture', supplement: 'fixture', components: 'fixture', fonts: 'fixture', assets: 'fixture' },
     document: tinyDoc(),
     supplement: { schemaVersion: SCHEMA.supplement, nodes: [] },
     variables: { variables: [{ id: 'VariableID:9:9', name: 'bg/x', key: 'K9', variableCollectionId: 'C1', resolvedType: 'COLOR', valuesByMode: { 'm1': { r: 1, g: 1, b: 1, a: 1 } } }], variableCollections: [{ id: 'C1', key: 'CK1', name: 'coll', modes: [{ modeId: 'm1', name: 'light' }], defaultModeId: 'm1' }] },
@@ -106,6 +106,91 @@ test('a tampered evidence file is REFUSED, never silently reinterpreted', async 
 
 test('canonicalJson is key-order independent (fingerprint determinism, V12)', () => {
   assert.equal(canonicalJson({ b: 1, a: [{ y: 2, x: 3 }] }), canonicalJson({ a: [{ x: 3, y: 2 }], b: 1 }));
+});
+
+// ── Meta adversarial probe cases, made permanent (REWORK bc646cb findings 1–5) ─────────────
+test('PROBE 1: an empty/incomplete manifest is refused — contracted evidence set + per-fact planes + census required', () => {
+  const m = { schemaVersion: SCHEMA.manifest, compilerVersion: 'v2-dev', capabilityRegistryVersion: 0, fileKey: 'F', fileVersion: 'v1', rootIds: ['1:1'], captureId: 'cap', files: {}, census: {}, sourcePlanes: {} };
+  const errs = validateManifest(m);
+  assert.ok(errs.some((e) => /contracted evidence/.test(e)));
+  assert.ok(errs.some((e) => /sourcePlanes/.test(e)));
+  assert.ok(errs.some((e) => /census/.test(e)));
+});
+
+test('PROBE 1b: a manifest byte-length lie is refused at read (not just sha)', async () => {
+  const tmp = path.join(await fs.mkdtemp(path.join(os.tmpdir(), 'cv2-')), 'snap');
+  await makeSnap(tmp);
+  const mp = path.join(tmp, 'manifest.json');
+  const m = JSON.parse(await fs.readFile(mp, 'utf8'));
+  m.files['document.rest.json'].bytes += 99;
+  await fs.writeFile(mp, JSON.stringify(m, null, 1));
+  await assert.rejects(() => readSnapshot(tmp), (e) => e instanceof EvidenceError && /byte-length|hash|fingerprint|invalid/.test(e.message));
+});
+
+test('PROBE 2: snapshots are immutable — sealed target refused; failed write leaves no partial', async () => {
+  const base = await fs.mkdtemp(path.join(os.tmpdir(), 'cv2-'));
+  const tmp = path.join(base, 'snap');
+  await makeSnap(tmp);
+  await assert.rejects(() => makeSnap(tmp), (e) => e instanceof EvidenceError && /already sealed/.test(e.message));
+  const bad = path.join(base, 'bad');
+  await assert.rejects(() => writeSnapshot(bad, {
+    fileKey: 'F', fileVersion: 'v1', rootIds: ['r'], captureId: 'cap-x',
+    sourcePlanes: { document: 'fixture', variables: 'fixture', supplement: 'fixture', components: 'fixture', fonts: 'fixture', assets: 'fixture' },
+    document: tinyDoc(), supplement: null, variables: null, components: null, fonts: null,
+    assets: new Map([['broken.png', 'NOT-A-BUFFER']]),
+    compilerVersion: 'v2-dev', capabilityRegistryVersion: 0,
+  }), EvidenceError);
+  const leftovers = (await fs.readdir(base)).filter((d) => d.includes('staging') || d === 'bad');
+  assert.deepEqual(leftovers, []); // no partial candidate, no staged debris
+});
+
+test('PROBE 3: descendant aliases are not double-counted; text runs are transition-based', () => {
+  const doc = { id: 'root', type: 'FRAME', children: [{ id: 'child', type: 'RECTANGLE', fills: [{ type: 'SOLID', boundVariables: { color: { type: 'VARIABLE_ALIAS', id: 'V:1' } } }] }] };
+  assert.equal(censusOf({ document: doc }).aliases, 1);
+  // 'aabba' with default style gaps: runs = a a | b b | a → 3, even though only 1 unique override id
+  assert.equal(restTextRuns({ characters: 'aabba', characterStyleOverrides: [0, 0, 7, 7, 0] }), 3);
+  assert.equal(restTextRuns({ characters: '', characterStyleOverrides: [] }), 0);
+  // supplement styled segments are authoritative when present
+  const supp = { nodes: [{ nodeId: 't1', styledTextSegments: [{}, {}, {}, {}] }] };
+  const doc2 = { id: 't1', type: 'TEXT', characters: 'xy', characterStyleOverrides: [], children: [] };
+  assert.equal(censusOf({ document: doc2, supplement: supp }).textRuns, 4);
+});
+
+test('PROBE 4: identity facts never coalesce — missing fileKey/collectionKey/modeContext hard-fail identity AND validator', () => {
+  for (const strip of [
+    (r) => delete r.source.fileKey,
+    (r) => delete r.variable.collectionKey,
+    (r) => delete r.modeContextId,
+    (r) => delete r.resolutionTraceId,
+  ]) {
+    const r = baseRecord(); strip(r);
+    assert.ok(validateBindingRecord(r).length > 0);
+  }
+  const r2 = baseRecord(); delete r2.source.fileKey;
+  assert.throws(() => bindingIdentity(r2), BindingIdentityError);
+  // slot/range boundary validation
+  assert.ok(validateBindingRecord({ ...baseRecord(), source: { ...baseRecord().source, slot: { kind: 'stop', index: 0 } } }).some((e) => /paint linkage/.test(e)));
+  assert.ok(validateBindingRecord({ ...baseRecord(), source: { ...baseRecord().source, textRange: { start: 3, end: 3 } } }).some((e) => /textRange/.test(e)));
+});
+
+test('PROBE 5: a cross-family mirror is UNKNOWN (effects mirror cannot ride a fill canonical)', () => {
+  const doc = {
+    id: 'root', type: 'FRAME',
+    fills: [{ type: 'SOLID', boundVariables: { color: { type: 'VARIABLE_ALIAS', id: 'V:same' } } }],
+    boundVariables: { effects: [{ type: 'VARIABLE_ALIAS', id: 'V:same' }] },
+    children: [],
+  };
+  const { unknown } = classifyOccurrences(collectOccurrences(doc));
+  assert.equal(unknown.length, 1);
+  assert.match(unknown[0].reason, /effects family/);
+});
+
+test('PROBE 5b: pointer tokens are RFC6901-escaped — component-property keys with / or ~ stay unambiguous', () => {
+  assert.equal(escapePointerToken('size/variant~x'), 'size~1variant~0x');
+  const doc = { id: 'root', type: 'INSTANCE', componentProperties: { 'mode/dark': { type: 'BOOLEAN', value: true, boundVariables: { value: { type: 'VARIABLE_ALIAS', id: 'V:b' } } } }, children: [] };
+  const occ = collectOccurrences(doc);
+  assert.equal(occ.length, 1);
+  assert.match(occ[0].jsonPointer, /mode~1dark/); // '/' inside the key cannot fake a path segment
 });
 
 // ── alias inventory: carrier truth, mirrors linked, unknown fatal (V2/V3, G1 core) ──────────

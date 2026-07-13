@@ -14,7 +14,12 @@
  */
 import { NONVISUAL_METADATA_PATHS } from './schema.mjs';
 
-/** Every alias occurrence in document order. */
+/** RFC 6901 token escaping — component-property keys may contain '/' or '~' and must stay
+ *  unambiguous source identity (Meta probe finding 5b). */
+export const escapePointerToken = (k) => String(k).replace(/~/g, '~0').replace(/\//g, '~1');
+export const unescapePointerToken = (t) => String(t).replace(/~1/g, '/').replace(/~0/g, '~');
+
+/** Every alias occurrence in document order (pointers RFC6901-escaped). */
 export function collectOccurrences(document) {
   const out = [];
   (function walkNode(n) {
@@ -28,7 +33,7 @@ export function collectOccurrences(document) {
         }
         for (const [k, v] of Object.entries(x)) {
           if (k === 'children') continue; // children are walked as their own nodes
-          scan(v, `${pointer}/${k}`);
+          scan(v, `${pointer}/${escapePointerToken(k)}`);
         }
       }
     })(n, '');
@@ -89,15 +94,24 @@ export function classifyOccurrences(occurrences) {
     }
     if (!matched) unknown.push(occ);
   }
-  // mirror linkage: every mirror must reference a variableId that owns a same-node canonical
-  const byNode = new Map();
+  // mirror linkage: a mirror must reference a variableId owning a same-node canonical IN THE
+  // SAME CARRIER FAMILY (fills/strokes/effects) — same-node+same-variable across families is
+  // NOT linkage (Meta probe finding 5a: an effects mirror must not pass on a fill canonical).
+  const familyOf = (c) => {
+    const head = c.propertyPath.split('/')[0];
+    return head === 'fills' || head === 'strokes' || head === 'effects' ? head : null;
+  };
+  const byNodeFamily = new Map();
   for (const c of canonical) {
-    if (!byNode.has(c.nodeId)) byNode.set(c.nodeId, new Set());
-    byNode.get(c.nodeId).add(c.variableId);
+    const fam = familyOf(c);
+    if (!fam) continue;
+    const key = `${c.nodeId}␟${fam}`;
+    if (!byNodeFamily.has(key)) byNodeFamily.set(key, new Set());
+    byNodeFamily.get(key).add(c.variableId);
   }
   for (const m of mirrors) {
-    if (!byNode.get(m.nodeId)?.has(m.variableId)) {
-      unknown.push({ ...m, reason: `mirror ${m.mirrorOf} references variable with no same-node canonical carrier` });
+    if (!byNodeFamily.get(`${m.nodeId}␟${m.mirrorOf}`)?.has(m.variableId)) {
+      unknown.push({ ...m, reason: `mirror ${m.mirrorOf} references variable with no same-node canonical carrier in the ${m.mirrorOf} family` });
     }
   }
   return { canonical, mirrors, nonvisual, unknown };

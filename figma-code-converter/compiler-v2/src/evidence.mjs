@@ -2,10 +2,10 @@
  * compiler-v2 · immutable evidence snapshots (C11 v3 §4.1–4.4, V1/V2).
  *
  * A snapshot directory is the ONLY input the compiler reads — no phase reads "latest" files
- * outside it (§4.1). This module writes/reads/validates snapshots and computes the
- * schema-versioned fingerprint used by the three-pass stability check. Capture TRANSPORT
- * (REST/bridge) lives in capture.mjs; this module is pure evidence mechanics so fixtures can
- * fabricate snapshots through the exact same code path the live capture uses (one law).
+ * outside it (§4.1). Snapshots are IMMUTABLE (V1): writes stage to a temp candidate and
+ * atomically rename; an existing sealed target is refused; a failed write leaves no partial
+ * candidate. Every read re-verifies sha256 AND byte length; any absence/mismatch surfaces
+ * EvidenceError(FAILED_CAPTURE) — never a raw ENOENT.
  */
 import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
@@ -27,7 +27,7 @@ export function canonicalJson(value) {
  * §4.1 fingerprint: hashes the canonical document + the semantic facts the compiler uses.
  * A node count/timestamp/name is NOT an adequate fingerprint — this hashes content.
  */
-export function fingerprint({ document, supplement, variables, components, fonts, assetHashes }) {
+export function fingerprint({ document, supplement, variables, components, fonts, dependencies, assetHashes }) {
   return sha256([
     `fp-schema:${SCHEMA.manifest}`,
     canonicalJson(document ?? null),
@@ -35,58 +35,93 @@ export function fingerprint({ document, supplement, variables, components, fonts
     canonicalJson(variables ?? null),
     canonicalJson(components ?? null),
     canonicalJson(fonts ?? null),
+    canonicalJson(dependencies ?? null),
     canonicalJson(assetHashes ?? null),
   ].join('␞'));
 }
 
-const EVIDENCE_FILES = ['document.rest.json', 'supplement.json', 'variables.json', 'components.json', 'fonts.json'];
+/** The contracted evidence set (§4.3) — validateManifest refuses a manifest missing any. */
+export const REQUIRED_EVIDENCE_FILES = Object.freeze([
+  'document.rest.json', 'supplement.json', 'variables.json', 'components.json', 'fonts.json',
+  'dependencies.json', 'references/manifest.json',
+]);
 
 /**
- * Write a snapshot directory. `parts` carries the JS values; assets is a Map<relPath, Buffer>.
- * Returns { dir, manifest }. The manifest seals SHA-256 + bytes of every file (§4.3).
+ * Write a sealed snapshot. Stages into `<dir>.staging-<captureId>`, atomically renames to
+ * `dir` on success, removes the staged partial on ANY failure. Refuses an existing sealed dir.
  */
 export async function writeSnapshot(dir, {
   fileKey, fileVersion, rootIds, captureId, sourcePlanes, capturedModes = [],
-  document, supplement, variables, components, fonts, assets = new Map(),
-  references = [], warnings = [], retries = 0, compilerVersion, capabilityRegistryVersion,
+  document, supplement, variables, components, fonts, dependencies = { locks: [] },
+  assets = new Map(), references = [], warnings = [], retries = 0,
+  compilerVersion, capabilityRegistryVersion,
 }) {
-  await fs.mkdir(path.join(dir, 'assets'), { recursive: true });
-  await fs.mkdir(path.join(dir, 'references'), { recursive: true });
-  const files = {};
-  const put = async (rel, buf) => {
-    await fs.writeFile(path.join(dir, rel), buf);
-    files[rel] = { sha256: sha256(buf), bytes: buf.length };
-  };
-  const parts = { 'document.rest.json': document, 'supplement.json': supplement, 'variables.json': variables, 'components.json': components, 'fonts.json': fonts };
-  for (const rel of EVIDENCE_FILES) await put(rel, Buffer.from(JSON.stringify(parts[rel] ?? null, null, 1)));
-  for (const [rel, buf] of assets) await put(path.join('assets', rel), buf);
-  await put('references/manifest.json', Buffer.from(JSON.stringify({ schemaVersion: SCHEMA.manifest, references }, null, 1)));
+  if (await exists(path.join(dir, 'manifest.json'))) {
+    throw new EvidenceError('FAILED_CAPTURE', `snapshot target already sealed: ${dir} — snapshots are immutable (V1); capture to a new directory`);
+  }
+  const staging = `${dir}.staging-${captureId}`;
+  await fs.rm(staging, { recursive: true, force: true }); // a matching stale partial from a crashed run
+  try {
+    await fs.mkdir(path.join(staging, 'assets'), { recursive: true });
+    await fs.mkdir(path.join(staging, 'references'), { recursive: true });
+    const files = {};
+    const put = async (rel, buf) => {
+      if (!Buffer.isBuffer(buf)) throw new EvidenceError('FAILED_CAPTURE', `evidence part ${rel} is not byte content`);
+      await fs.writeFile(path.join(staging, rel), buf);
+      files[rel] = { sha256: sha256(buf), bytes: buf.length };
+    };
+    const parts = {
+      'document.rest.json': document, 'supplement.json': supplement, 'variables.json': variables,
+      'components.json': components, 'fonts.json': fonts, 'dependencies.json': dependencies,
+    };
+    for (const rel of Object.keys(parts)) await put(rel, Buffer.from(JSON.stringify(parts[rel] ?? null, null, 1)));
+    for (const [rel, buf] of assets) await put(path.join('assets', rel), buf);
+    await put('references/manifest.json', Buffer.from(JSON.stringify({ schemaVersion: SCHEMA.manifest, references }, null, 1)));
 
-  const census = censusOf({ document, supplement, variables, components });
-  const manifest = {
-    schemaVersion: SCHEMA.manifest,
-    compilerVersion, capabilityRegistryVersion,
-    fileKey, fileVersion, rootIds, captureId,
-    capturedModes, sourcePlanes, warnings, retries,
-    fingerprint: fingerprint({ document, supplement, variables, components, fonts, assetHashes: Object.fromEntries([...assets.keys()].map((k) => [k, files[path.join('assets', k)].sha256])) }),
-    files, census,
-  };
-  await fs.writeFile(path.join(dir, 'manifest.json'), JSON.stringify(manifest, null, 1));
-  return { dir, manifest };
+    const census = censusOf({ document, supplement, variables, components });
+    const assetHashes = Object.fromEntries([...assets.keys()].map((k) => [k, files[path.join('assets', k)].sha256]));
+    const manifest = {
+      schemaVersion: SCHEMA.manifest,
+      compilerVersion, capabilityRegistryVersion,
+      fileKey, fileVersion, rootIds, captureId,
+      capturedModes, sourcePlanes, warnings, retries,
+      fingerprint: fingerprint({ document, supplement, variables, components, fonts, dependencies, assetHashes }),
+      files, census,
+    };
+    const errs = validateManifest(manifest);
+    if (errs.length) throw new EvidenceError('FAILED_CAPTURE', `refusing to seal an invalid manifest: ${errs.join('; ')}`);
+    await fs.writeFile(path.join(staging, 'manifest.json'), JSON.stringify(manifest, null, 1));
+    await fs.rename(staging, dir); // atomic seal
+    return { dir, manifest };
+  } catch (e) {
+    await fs.rm(staging, { recursive: true, force: true }); // no partial candidates (V1/V17 posture)
+    throw e instanceof EvidenceError ? e : new EvidenceError('FAILED_CAPTURE', `snapshot staging failed: ${e.message}`);
+  }
 }
 
-/** Node/alias/variable/component/text-run census (§4.3) — computed, never asserted. */
+/**
+ * Node/alias/variable/component/text-run census (§4.3) — computed, never asserted.
+ * Alias scan EXCLUDES children per node (they are counted as their own nodes — double-count
+ * was Meta probe finding 3). Text runs: plugin styled segments when present (authoritative),
+ * else transition-based runs over REST characterStyleOverrides (contiguous style spans).
+ */
 export function censusOf({ document, supplement, variables, components }) {
+  const segmentsByNode = new Map((supplement?.nodes ?? [])
+    .filter((n) => Array.isArray(n.styledTextSegments))
+    .map((n) => [n.nodeId, n.styledTextSegments.length]));
   let nodes = 0, aliases = 0, textRuns = 0;
   (function walk(n) {
     if (!n) return;
     nodes++;
-    if (n.type === 'TEXT') textRuns += Math.max(1, new Set(Object.values(n.characterStyleOverrides ?? {})).size || 1);
+    if (n.type === 'TEXT') textRuns += segmentsByNode.get(n.id) ?? restTextRuns(n);
     (function scanAliases(x) {
       if (Array.isArray(x)) return x.forEach(scanAliases);
       if (x !== null && typeof x === 'object') {
         if (x.type === 'VARIABLE_ALIAS' && x.id) aliases++;
-        for (const v of Object.values(x)) scanAliases(v);
+        for (const [k, v] of Object.entries(x)) {
+          if (k === 'children') continue; // children are walked as their own nodes
+          scanAliases(v);
+        }
       }
     })(n);
     (n.children ?? []).forEach(walk);
@@ -99,19 +134,36 @@ export function censusOf({ document, supplement, variables, components }) {
   };
 }
 
-/** Read + validate a snapshot. REFUSES unknown schema, hash mismatch, missing files (G0 core). */
+/** Contiguous style spans from REST per-character overrides (default style id = 0). */
+export function restTextRuns(node) {
+  const chars = node.characters ?? '';
+  if (chars.length === 0) return 0;
+  const ov = node.characterStyleOverrides;
+  const idAt = (i) => (Array.isArray(ov) ? (ov[i] ?? 0) : (ov?.[i] ?? 0));
+  let runs = 1;
+  for (let i = 1; i < chars.length; i++) if (idAt(i) !== idAt(i - 1)) runs++;
+  return runs;
+}
+
+/** Read + validate a snapshot. REFUSES unknown schema, hash/byte mismatch, missing files. */
 export async function readSnapshot(dir) {
-  const manifest = JSON.parse(await fs.readFile(path.join(dir, 'manifest.json'), 'utf8'));
+  let manifest;
+  try { manifest = JSON.parse(await fs.readFile(path.join(dir, 'manifest.json'), 'utf8')); }
+  catch (e) { throw new EvidenceError('FAILED_CAPTURE', `manifest unreadable at ${dir}: ${e.code ?? e.message}`); }
   const errs = validateManifest(manifest);
   if (errs.length) throw new EvidenceError('FAILED_CAPTURE', `manifest invalid: ${errs.join('; ')}`);
   for (const [rel, meta] of Object.entries(manifest.files)) {
     let buf;
     try { buf = await fs.readFile(path.join(dir, rel)); }
     catch { throw new EvidenceError('FAILED_CAPTURE', `evidence file missing: ${rel}`); }
+    if (buf.length !== meta.bytes) throw new EvidenceError('FAILED_CAPTURE', `byte-length mismatch: ${rel} (manifest ${meta.bytes} ≠ disk ${buf.length})`);
     const h = sha256(buf);
     if (h !== meta.sha256) throw new EvidenceError('FAILED_CAPTURE', `hash mismatch: ${rel} (manifest ${meta.sha256.slice(0, 12)}… ≠ disk ${h.slice(0, 12)}…)`);
   }
-  const read = (rel) => fs.readFile(path.join(dir, rel), 'utf8').then(JSON.parse);
+  const read = async (rel) => {
+    try { return JSON.parse(await fs.readFile(path.join(dir, rel), 'utf8')); }
+    catch (e) { throw new EvidenceError('FAILED_CAPTURE', `evidence part unreadable: ${rel}: ${e.code ?? e.message}`); }
+  };
   const snapshot = {
     dir, manifest,
     document: await read('document.rest.json'),
@@ -119,8 +171,8 @@ export async function readSnapshot(dir) {
     variables: await read('variables.json'),
     components: await read('components.json'),
     fonts: await read('fonts.json'),
+    dependencies: await read('dependencies.json'),
   };
-  // fingerprint re-verification: the manifest cannot lie about its own content
   const assetHashes = {};
   for (const [rel, meta] of Object.entries(manifest.files)) {
     if (rel.startsWith('assets/')) assetHashes[rel.slice('assets/'.length)] = meta.sha256;
@@ -129,6 +181,8 @@ export async function readSnapshot(dir) {
   if (fp !== manifest.fingerprint) throw new EvidenceError('FAILED_CAPTURE', `fingerprint mismatch (manifest ${manifest.fingerprint.slice(0, 12)}… ≠ recomputed ${fp.slice(0, 12)}…)`);
   return snapshot;
 }
+
+async function exists(p) { try { await fs.access(p); return true; } catch { return false; } }
 
 export class EvidenceError extends Error {
   constructor(state, message) { super(message); this.state = state; }

@@ -66,7 +66,17 @@ export function schemaError(kind, artifact) {
   return null;
 }
 
-/** Minimal structural validators — fail loud with the exact missing path. */
+/** The fact families whose source plane MUST be declared (joint route: per-fact provenance). */
+export const REQUIRED_SOURCE_PLANES = Object.freeze(['document', 'supplement', 'variables', 'components', 'fonts', 'assets']);
+
+/** The contracted evidence file set (§4.3). Mirrored by evidence.REQUIRED_EVIDENCE_FILES. */
+const REQUIRED_FILES = Object.freeze([
+  'document.rest.json', 'supplement.json', 'variables.json', 'components.json', 'fonts.json',
+  'dependencies.json', 'references/manifest.json',
+]);
+
+/** Structural validators — fail loud with the exact missing path. An EMPTY files/sourcePlanes/
+ *  census map is a refusal, not a pass (Meta probe finding 1). */
 export function validateManifest(m) {
   const e = schemaError('manifest', m);
   if (e) return [e];
@@ -74,9 +84,19 @@ export function validateManifest(m) {
   for (const k of ['fileKey', 'fileVersion', 'rootIds', 'captureId', 'files', 'census', 'sourcePlanes', 'compilerVersion', 'capabilityRegistryVersion']) {
     if (m[k] === undefined) errs.push(`manifest.${k} missing`);
   }
+  for (const rel of REQUIRED_FILES) {
+    if (!m.files?.[rel]) errs.push(`manifest.files missing contracted evidence: ${rel}`);
+  }
   if (m.files && !Object.values(m.files).every((f) => f?.sha256 && Number.isInteger(f?.bytes))) {
     errs.push('manifest.files entries need {sha256, bytes}');
   }
+  for (const fam of REQUIRED_SOURCE_PLANES) {
+    if (!m.sourcePlanes?.[fam]) errs.push(`manifest.sourcePlanes.${fam} missing (per-fact provenance is mandatory)`);
+  }
+  for (const k of ['nodes', 'aliases', 'textRuns', 'variables', 'components', 'supplementNodes']) {
+    if (!Number.isInteger(m.census?.[k])) errs.push(`manifest.census.${k} missing`);
+  }
+  if (!m.fingerprint) errs.push('manifest.fingerprint missing');
   return errs;
 }
 
@@ -85,11 +105,26 @@ export function validateBindingRecord(r) {
   if (e) return [e];
   const errs = [];
   if (!r.bindingId) errs.push('bindingId missing');
+  if (!r.source?.fileKey) errs.push('source.fileKey missing — identity facts never coalesce (G2)');
   if (!r.source?.nodeId || !r.source?.propertyPath) errs.push('source.nodeId/propertyPath missing');
-  if (r.source?.slot && !SLOT_KINDS.includes(r.source.slot.kind)) errs.push(`slot.kind ${r.source.slot.kind} invalid`);
+  if (r.source?.slot) {
+    const s = r.source.slot;
+    if (!SLOT_KINDS.includes(s.kind)) errs.push(`slot.kind ${s.kind} invalid`);
+    if (!Number.isInteger(s.index) || s.index < 0) errs.push('slot.index must be a non-negative integer');
+    if (s.kind === 'stop' && !Number.isInteger(s.paint)) errs.push('stop slot requires paint linkage (slot.paint)');
+  }
+  if (r.source?.textRange) {
+    const t = r.source.textRange;
+    if (!Number.isInteger(t.start) || !Number.isInteger(t.end) || t.start < 0 || t.end <= t.start) {
+      errs.push('textRange must satisfy 0 ≤ start < end (integers)');
+    }
+  }
   if (!r.variable?.key) errs.push('variable.key (stable) missing — hard-fail per §6.1, captureId is not identity');
+  if (!r.variable?.collectionKey) errs.push('variable.collectionKey missing — identity facts never coalesce (G2)');
   if (!r.variable?.captureId) errs.push('variable.captureId missing');
   if (!r.variable?.figmaType) errs.push('variable.figmaType missing');
+  if (!r.modeContextId) errs.push('modeContextId missing — root-for-descendant substitution is forbidden (V5)');
+  if (!r.resolutionTraceId) errs.push('resolutionTraceId missing — untraceable chains cannot promote (§3.5 mode-graph law)');
   if (!DOMAINS.includes(r.destinationDomain)) errs.push(`destinationDomain ${r.destinationDomain} invalid`);
   if (!['css', 'react'].includes(r.emissionTarget)) errs.push('emissionTarget invalid');
   if (!['pending', 'emitted', 'inactive-proven', 'unsupported'].includes(r.disposition)) errs.push('disposition invalid');
@@ -114,10 +149,13 @@ const rangeStr = (t) => (t ? `${t.start}-${t.end}` : '');
 
 export function sourceBindingIdentity(r) {
   if (!r?.variable?.key) throw new BindingIdentityError('missing stable variable key — captureId is not promotable identity (§6.1)');
+  for (const [fact, v] of [['variable.collectionKey', r.variable.collectionKey], ['source.fileKey', r.source?.fileKey], ['modeContextId', r.modeContextId]]) {
+    if (!v) throw new BindingIdentityError(`missing identity fact ${fact} — identity facts never coalesce to empty (G2)`);
+  }
   return [
-    r.variable.key, r.variable.collectionKey ?? '', r.source.fileKey ?? '',
+    r.variable.key, r.variable.collectionKey, r.source.fileKey,
     r.source.nodeId, r.source.propertyPath, slotStr(r.source.slot), rangeStr(r.source.textRange),
-    r.modeContextId ?? '', r.destinationDomain, r.emissionTarget,
+    r.modeContextId, r.destinationDomain, r.emissionTarget,
   ].join('␟');
 }
 
