@@ -5,6 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { promises as fs } from 'node:fs';
+import { createHash } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import { sourceBindingIdentity, emittedBindingIdentity, formatBindingForError, BindingIdentityError, validateBindingRecord, validateManifest, SCHEMA } from '../src/schema.mjs';
@@ -324,8 +325,28 @@ test('PROBE R2-3: references cannot be metadata-only — declared references sea
   assert.ok(manifest.files['references/light.png']);
   const snap = await readSnapshot(dir);
   assert.equal(snap.manifest.files['references/light.png'].bytes, 8);
-  // a manifest whose reference row points at an unsealed file refuses at read
-  const mp = path.join(dir, 'manifest.json'); // tamper reference manifest is hash-guarded, so tamper both is caught by hash — this asserts the semantic check exists via write path instead
+  // READ-SIDE stands alone: craft a fully self-consistent malicious snapshot — tamper the
+  // reference manifest AND update manifest.json's file hash/bytes to match, so every byte/hash
+  // check passes and ONLY the semantic reference law can catch it.
+  const tamper = async (mutateRows) => {
+    const refPath = path.join(dir, 'references/manifest.json');
+    const refDoc = JSON.parse(await fs.readFile(refPath, 'utf8'));
+    mutateRows(refDoc.references);
+    const bytes = Buffer.from(JSON.stringify(refDoc, null, 1));
+    await fs.writeFile(refPath, bytes);
+    const mp = path.join(dir, 'manifest.json');
+    const m = JSON.parse(await fs.readFile(mp, 'utf8'));
+    m.files['references/manifest.json'] = { sha256: createHash('sha256').update(bytes).digest('hex'), bytes: bytes.length };
+    await fs.writeFile(mp, JSON.stringify(m, null, 1));
+  };
+  await tamper((rows) => { delete rows[0].sha256; }); // missing sha — self-consistent hashes, semantic law must bite
+  await assert.rejects(() => readSnapshot(dir), (e) => e instanceof EvidenceError && /missing sha256/.test(e.message));
+  await tamper((rows) => { rows[0].sha256 = '0'.repeat(64); }); // wrong sha
+  await assert.rejects(() => readSnapshot(dir), (e) => e instanceof EvidenceError && /sha mismatch/.test(e.message));
+  await tamper((rows) => { rows[0] = { state: 'light', file: 'references/ghost.png', sha256: '0'.repeat(64) }; }); // unsealed file
+  await assert.rejects(() => readSnapshot(dir), (e) => e instanceof EvidenceError && /not sealed/.test(e.message));
+  await tamper((rows) => { rows[0] = { state: 'light', file: 'assets/../document.rest.json', sha256: '0'.repeat(64) }; }); // outside references/
+  await assert.rejects(() => readSnapshot(dir), (e) => e instanceof EvidenceError && /outside references/.test(e.message));
 });
 
 test('PROBE R2-4: missing references/dependencies provenance planes are refused', () => {

@@ -177,11 +177,15 @@ export async function readSnapshot(dir) {
     try { return JSON.parse(await fs.readFile(resolveUnder(dir, rel), 'utf8')); }
     catch (e) { throw e instanceof EvidenceError ? e : new EvidenceError('FAILED_CAPTURE', `evidence part unreadable: ${rel}: ${e.code ?? e.message}`); }
   };
-  // every declared reference must resolve to exactly one sealed file (metadata-only forbidden)
+  // every declared reference must resolve to exactly one sealed file (metadata-only forbidden).
+  // The read side stands ALONE: a crafted/checked-in snapshot cannot rely on write-side honesty,
+  // so rows REQUIRE a sha256, must live under references/, and must match the sealed bytes.
   const refManifest = await read('references/manifest.json');
   for (const ref of refManifest?.references ?? []) {
+    if (!ref.file || !String(ref.file).startsWith('references/')) throw new EvidenceError('FAILED_CAPTURE', `reference row outside references/: ${ref.file}`);
+    if (!ref.sha256) throw new EvidenceError('FAILED_CAPTURE', `reference row missing sha256: ${ref.file}`);
     if (!manifest.files[ref.file]) throw new EvidenceError('FAILED_CAPTURE', `declared reference not sealed in manifest.files: ${ref.file}`);
-    if (ref.sha256 && manifest.files[ref.file].sha256 !== ref.sha256) throw new EvidenceError('FAILED_CAPTURE', `reference sha mismatch: ${ref.file}`);
+    if (manifest.files[ref.file].sha256 !== ref.sha256) throw new EvidenceError('FAILED_CAPTURE', `reference sha mismatch: ${ref.file}`);
   }
   const snapshot = {
     dir, manifest,

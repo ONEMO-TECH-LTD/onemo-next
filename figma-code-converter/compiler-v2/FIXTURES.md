@@ -6,7 +6,7 @@
 > (built through `writeSnapshot` — the same code path as live capture, one law) plus a mutation
 > twin. "Baseline bite" = the legacy converter (6c36475) must exhibit the E-row defect on this
 > fixture; "gate bite" = the named v2 gate must fail the mutation twin.
-> Status: SPECIFICATION. Generator code is held pending Meta CLEAR of 4b9ad2a.
+> Status: SPECIFICATION. Generator code is held pending Meta CLEAR of the current frozen foundation checkpoint.
 
 | ID | v3 §14.1 row | E-row | Content shape | Gate bite (mutation twin) | Baseline bite |
 |---|---|---|---|---|---|
