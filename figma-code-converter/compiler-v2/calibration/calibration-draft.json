@@ -1,0 +1,36 @@
+{
+ "schemaVersion": 1,
+ "kind": "calibration-draft",
+ "fileKey": "Qdb9Kx98afJHxaCGAIxoMC",
+ "nodeId": "6075:53685",
+ "fileVersion": "2375782983690416241",
+ "environment": {
+  "capture": "playwright system-chrome dpr2",
+  "viewport": "402x874",
+  "theme": "data-theme=light",
+  "figmaExport": "REST png scale=2 (color profile unpinned — owed)"
+ },
+ "samples": {
+  "noiseFloor_buildRepeat": {
+   "n": 1,
+   "W": 804,
+   "H": 1748,
+   "changedPct_t2": 0,
+   "changedPct_t32": 0,
+   "meanDelta": 0
+  },
+  "fidelity_figmaVsBuild": {
+   "n": 1,
+   "W": 804,
+   "H": 1748,
+   "changedPct_t2": 11.21,
+   "changedPct_t32": 0.388,
+   "meanDelta": 1.592
+  }
+ },
+ "honesty": [
+  "n=1 per class — distributions, per-class regions (text/vector/raster), DeltaE, SSIM, and known-broken mutation runs OWED before any budget becomes normative",
+  "legacy-lane build (nine truth-fixes) — v2 packages recalibrate at P6",
+  "whole-frame metrics only; class segmentation requires region maps from the v2 source map"
+ ]
+}
