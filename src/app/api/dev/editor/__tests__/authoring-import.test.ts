@@ -8,7 +8,7 @@ import { classifySourceFileForImport, importSourceFileToAuthoringStore } from '.
 import { EMPTY_ENVIRONMENT_FINGERPRINT } from '../authoring-environment'
 import { ProjectAuthoringSession } from '../authoring-session'
 import { AuthoringSidecarStore, createEmptyAuthoringGraph, PROJECT_AUTHORING_SIDECAR } from '../authoring-store'
-import { DurableFileInstaller } from '../durable-file-installer'
+import { DurableFileInstaller, sha256 } from '../durable-file-installer'
 import { RuntimeRootRegistry } from '../runtime-root-registry'
 import { linkTestNodeModules } from './test-project-root'
 
@@ -71,11 +71,13 @@ export function Button({ variant = 'Primary' }: { variant?: 'Primary' | 'Seconda
   return <button className={styles.base} data-variant={variant}>Button</button>
 }
 `.trimStart()
-    const { registry, store } = await makeImportStore(source, '.base { color: red; }\n')
+    const css = '.base { color: red; }\n'
+    const { registry, store } = await makeImportStore(source, css)
     const classified = await classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry })
 
     expect(classified.projection.compatibility).toBe('legacy-single-axis')
     expect(Object.keys(classified.sourceHashes).sort()).toEqual([CSS_FILE, SOURCE_FILE].sort())
+    expect(classified.sourceHashes[CSS_FILE]).toBe(sha256(css))
     const result = await importSourceFileToAuthoringStore({
       storeId: 'project-main',
       file: SOURCE_FILE,
@@ -85,7 +87,10 @@ export function Button({ variant = 'Primary' }: { variant?: 'Primary' | 'Seconda
       store,
     })
     expect(result.kind).toBe('imported')
-    if (result.kind === 'imported') expect(result.graph.sourceHashes).toEqual(classified.sourceHashes)
+    if (result.kind === 'imported') {
+      expect(result.graph.sourceHashes).toEqual(classified.sourceHashes)
+      expect(result.graph.sourceHashes[CSS_FILE]).toBe(sha256(css))
+    }
   })
 
   it('hashes a lawful parent-relative CSS module under one canonical store identity', async () => {
@@ -95,11 +100,13 @@ export function Button() { return <button className={styles.card}>Button</button
 `
     const { root, registry, store } = await makeImportStore(source)
     await fs.mkdir(path.dirname(path.join(root, cssFile)), { recursive: true })
-    await fs.writeFile(path.join(root, cssFile), '.card { color: red; }\n')
+    const css = '.card { color: red; }\n'
+    await fs.writeFile(path.join(root, cssFile), css)
 
     const classified = await classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry })
     expect(classified.projection).toMatchObject({ compatibility: 'native-v1', cssModule: cssFile })
     expect(Object.keys(classified.sourceHashes).sort()).toEqual([cssFile, SOURCE_FILE].sort())
+    expect(classified.sourceHashes[cssFile]).toBe(sha256(css))
 
     const result = await importSourceFileToAuthoringStore({
       storeId: 'project-main',
@@ -110,7 +117,10 @@ export function Button() { return <button className={styles.card}>Button</button
       store,
     })
     expect(result.kind).toBe('imported')
-    if (result.kind === 'imported') expect(result.graph.sourceHashes).toEqual(classified.sourceHashes)
+    if (result.kind === 'imported') {
+      expect(result.graph.sourceHashes).toEqual(classified.sourceHashes)
+      expect(result.graph.sourceHashes[cssFile]).toBe(sha256(css))
+    }
   })
 
   it('keeps canonical CSS lookup behind the dot-segment and symlink jail with zero writes', async () => {
@@ -121,6 +131,13 @@ export function Button() { return <button className={styles.card}>Button</button
     await fs.mkdir(path.join(root, 'src/app/(dev)/authoring-e2e'), { recursive: true })
     const registry = await RuntimeRootRegistry.create([{ storeId: 'project-main', kind: 'project', rootPath: root }])
     const store = new AuthoringSidecarStore({ storeId: 'project-main', rootKind: 'project', registry })
+    const expectNoDurableWrites = async () => {
+      await expect(fs.readFile(path.join(root, PROJECT_AUTHORING_SIDECAR))).rejects.toMatchObject({ code: 'ENOENT' })
+      await expect(fs.readdir(path.join(root, 'src/app/(dev)/react-figma-components/.onemo/history')))
+        .rejects.toMatchObject({ code: 'ENOENT' })
+      await expect(fs.readdir(path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions')))
+        .rejects.toMatchObject({ code: 'ENOENT' })
+    }
 
     const outsideSpecifier = path.relative(componentDir, path.join(outside, 'Outside.module.css')).split(path.sep).join('/')
     await fs.writeFile(path.join(root, SOURCE_FILE), `import styles from '${outsideSpecifier}'\nexport function Button() { return <button className={styles.card} /> }\n`)
@@ -129,7 +146,13 @@ export function Button() { return <button className={styles.card}>Button</button
       compatibility: 'unsupported',
       unsupportedReason: expect.stringContaining('invalid store-relative path'),
     })
-    expect(await store.load()).toBeNull()
+    await expect(importSourceFileToAuthoringStore({
+      storeId: 'project-main', file: SOURCE_FILE,
+      expectedSourceHashes: outsideProjection.sourceHashes,
+      expectedEnvironmentFingerprint: outsideProjection.environmentFingerprint,
+      registry, store,
+    })).resolves.toMatchObject({ kind: 'unsupported' })
+    await expectNoDurableWrites()
 
     await fs.writeFile(path.join(outside, 'Outside.module.css'), '.card {}\n')
     await fs.symlink(path.join(outside, 'Outside.module.css'), path.join(root, 'src/app/(dev)/authoring-e2e/Linked.module.css'))
@@ -139,8 +162,13 @@ export function Button() { return <button className={styles.card}>Button</button
       compatibility: 'unsupported',
       unsupportedReason: expect.stringContaining('symlink path component refused'),
     })
-    expect(await store.load()).toBeNull()
-    await expect(fs.readFile(path.join(root, PROJECT_AUTHORING_SIDECAR))).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(importSourceFileToAuthoringStore({
+      storeId: 'project-main', file: SOURCE_FILE,
+      expectedSourceHashes: symlinkProjection.sourceHashes,
+      expectedEnvironmentFingerprint: symlinkProjection.environmentFingerprint,
+      registry, store,
+    })).resolves.toMatchObject({ kind: 'unsupported' })
+    await expectNoDurableWrites()
   })
 
   it('refuses source drift before creating a sidecar', async () => {
