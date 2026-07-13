@@ -17,7 +17,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { stagingDir, publishGeneration, cleanStaging, runToken } from './atomic-publish.mjs';
+import { stagingDir, publishGeneration, cleanStaging, runToken, recoverGenerations } from './atomic-publish.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const TOOL = path.resolve(HERE, '../..');            // figma-code-converter/
@@ -126,6 +126,7 @@ const round = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, ty
   // Build the complete artifact SET in a UNIQUE staging dir (pid+stamp — concurrent same-commit
   // runs never collide); publish as one atomic generation + pointer flip only after version
   // stability. A crash leaves the prior generation + pointer byte-identical (Meta R3-6).
+  await recoverGenerations(OUT); // restart recovery: clear any temp pointers / unreferenced generations from a prior crash
   const genBase = buildCommit.slice(0, 8);
   const token = runToken(Date.now());
   const staging = stagingDir(OUT, genBase, token);

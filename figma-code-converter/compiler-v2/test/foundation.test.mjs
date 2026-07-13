@@ -433,7 +433,7 @@ test('PROBE R3-4: a valid-vocabulary provenance swap (fixture→plugin-primary-c
 });
 
 // ── Meta round-4 findings R3-5 (seal completeness) + R3-6 (atomic publish) ──────────────────
-import { publishGeneration, cleanStaging, stagingDir, generationDir, runToken } from '../tools/atomic-publish.mjs';
+import { publishGeneration, cleanStaging, stagingDir, generationDir, runToken, recoverGenerations } from '../tools/atomic-publish.mjs';
 
 test('PROBE R3-5: the seal binds EVERY manifest field except seal — warnings/retries tamper is refused', async () => {
   const tmp = path.join(await fs.mkdtemp(path.join(os.tmpdir(), 'cv2-')), 'snap');
@@ -446,28 +446,48 @@ test('PROBE R3-5: the seal binds EVERY manifest field except seal — warnings/r
   await assert.rejects(() => readSnapshot(tmp), (e) => e instanceof EvidenceError && /seal mismatch/.test(e.message));
 });
 
-test('PROBE R3-6: atomic generation publish — one-rename set promotion; failure leaves prior byte-identical, zero debris', async () => {
+test('PROBE R3-6: atomic publish — real after-generation/before-pointer crash window; ordinary exception self-cleans; recovery is idempotent', async () => {
   const out = await fs.mkdtemp(path.join(os.tmpdir(), 'cal-'));
   const genBase = 'abc1234';
-  // gen 1: build staging set, publish
+  // GEN1 publishes cleanly
   const t1 = runToken(1);
   await fs.mkdir(stagingDir(out, genBase, t1), { recursive: true });
   await fs.writeFile(path.join(stagingDir(out, genBase, t1), 'a.png'), 'GEN1');
   const p1 = await publishGeneration({ outDir: out, genBase, token: t1 });
-  const pointer1 = JSON.parse(await fs.readFile(p1.pointer, 'utf8'));
-  const gen1Bytes = await fs.readFile(path.join(out, pointer1.generation, 'a.png'), 'utf8');
-  assert.equal(gen1Bytes, 'GEN1');
-  // gen 2 FAILS mid-run (staging never built) → publish throws, prior generation + pointer intact
+  const pointer1 = await fs.readFile(p1.pointer, 'utf8');
+  const gen1File = path.join(out, JSON.parse(pointer1).generation, 'a.png');
+  assert.equal(await fs.readFile(gen1File, 'utf8'), 'GEN1');
+
+  // GEN2 FAILS in the REAL window: after staging→generation rename, before the pointer flip.
   const t2 = runToken(2);
-  await assert.rejects(() => publishGeneration({ outDir: out, genBase, token: t2 }), /staging dir absent/);
-  await cleanStaging(out, genBase, t2);
-  const pointerAfter = JSON.parse(await fs.readFile(p1.pointer, 'utf8'));
-  assert.deepEqual(pointerAfter, pointer1); // pointer byte-identical
-  assert.equal(await fs.readFile(path.join(out, pointer1.generation, 'a.png'), 'utf8'), 'GEN1'); // prior gen byte-identical
-  // zero candidate/staging debris left in out/
-  const debris = (await fs.readdir(out)).filter((d) => d.startsWith('.stage') || d.startsWith('.latest'));
+  await fs.mkdir(stagingDir(out, genBase, t2), { recursive: true });
+  await fs.writeFile(path.join(stagingDir(out, genBase, t2), 'a.png'), 'GEN2');
+  await assert.rejects(
+    () => publishGeneration({ outDir: out, genBase, token: t2, _injectAfterGen: async () => { throw new Error('crash after generation, before pointer'); } }),
+    /crash after generation/,
+  );
+  // ordinary exception self-cleaned: pointer + GEN1 byte-identical, unreferenced GEN2 removed, no temp/stage debris
+  assert.equal(await fs.readFile(p1.pointer, 'utf8'), pointer1);       // pointer preserved (current generation immediate)
+  assert.equal(await fs.readFile(gen1File, 'utf8'), 'GEN1');           // GEN1 byte-identical
+  assert.equal(await fs.access(generationDir(out, genBase, t2)).then(() => true, () => false), false);
+  let debris = (await fs.readdir(out)).filter((d) => d.startsWith('.stage') || d.startsWith('.latest'));
   assert.deepEqual(debris, []);
-  // concurrent same-commit runs use distinct paths (no shared candidate)
+
+  // Simulate a HARD CRASH (cleanup could NOT run): plant an unreferenced generation + temp pointer.
+  const t3 = runToken(3);
+  await fs.mkdir(generationDir(out, genBase, t3), { recursive: true });
+  await fs.writeFile(path.join(generationDir(out, genBase, t3), 'a.png'), 'ORPHAN');
+  await fs.writeFile(path.join(out, `.latest-${t3}.json`), '{"generation":"orphan"}');
+  const r1 = await recoverGenerations(out);
+  assert.equal(await fs.readFile(gen1File, 'utf8'), 'GEN1');           // current generation preserved through recovery
+  assert.equal(await fs.access(generationDir(out, genBase, t3)).then(() => true, () => false), false); // orphan cleared
+  assert.deepEqual((await fs.readdir(out)).filter((d) => d.startsWith('.latest')), []); // temp pointer cleared
+  // idempotent: a second recovery yields the identical state
+  const before = JSON.stringify((await fs.readdir(path.join(out, 'generations'))).sort());
+  const r2 = await recoverGenerations(out);
+  assert.equal(JSON.stringify((await fs.readdir(path.join(out, 'generations'))).sort()), before);
+  assert.equal(r2.referenced, r1.referenced);
+
+  // concurrent same-commit runs use distinct paths
   assert.notEqual(stagingDir(out, genBase, runToken(1)), stagingDir(out, genBase, runToken(2)));
-  assert.notEqual(generationDir(out, genBase, t1), generationDir(out, genBase, t2));
 });
