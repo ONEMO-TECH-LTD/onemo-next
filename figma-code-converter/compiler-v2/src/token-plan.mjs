@@ -3,16 +3,18 @@ import { SCHEMA } from './schema.mjs';
 import { parseCanonicalModel } from './canonical-model.mjs';
 import { buildVariableGraph } from './variable-graph.mjs';
 import { codec, isSupported, tokenLeaf } from './codecs.mjs';
-import { registryHash, validateRegistry } from './token-registry.mjs';
+import { registryHash, validateRegistry, validateRegistryStage } from './token-registry.mjs';
 import { canonicalJson } from './evidence.mjs';
 
 export class TokenPlanError extends Error {
   constructor(message) { super(message); this.state = 'FAILED_BINDING'; }
 }
 
-export function buildTokenPlan({ model: input, registry, codecOptions = () => ({}) }) {
+export function buildTokenPlan({ model: input, registry, registryStageId, registryBaseHash, codecPolicyId, codecOptions = () => ({}) }) {
   const model = parseCanonicalModel(input);
   validateRegistry(registry);
+  if (typeof codecPolicyId !== 'string' || !codecPolicyId) throw new TokenPlanError('named codecPolicyId required');
+  if (!/^[0-9a-f]{16}$/.test(registryStageId ?? '') || !/^[0-9a-f]{64}$/.test(registryBaseHash ?? '')) throw new TokenPlanError('frozen registry stage identity required');
   if (typeof codecOptions !== 'function') throw new TokenPlanError('codecOptions must be a function');
   const runtime = buildVariableGraph({ variables: model.variableGraph.variables, variableCollections: model.variableGraph.collections });
   const collectionByKey = new Map(model.variableGraph.collections.map((row) => [row.key, row]));
@@ -96,6 +98,9 @@ export function buildTokenPlan({ model: input, registry, codecOptions = () => ({
   return {
     schemaVersion: SCHEMA.tokenPlan,
     modelContentSeal: model.contentSeal,
+    codecPolicyId,
+    registryStageId,
+    registryBaseHash,
     registryGeneration: registry.generation,
     registryHash: registryHash(registry),
     registry: structuredClone(registry),
@@ -105,15 +110,18 @@ export function buildTokenPlan({ model: input, registry, codecOptions = () => ({
   };
 }
 
-export function validateTokenPlan({ model: input, tokenPlan }) {
+export function validateTokenPlan({ model: input, tokenPlan, registryStage, codecPolicyId, codecOptions }) {
   const model = parseCanonicalModel(input);
   if (tokenPlan?.schemaVersion !== SCHEMA.tokenPlan || tokenPlan.modelContentSeal !== model.contentSeal) throw new TokenPlanError('TokenPlan schema/source identity invalid');
-  const options = tokenPlan.codecOptionsByBinding;
-  if (!options || typeof options !== 'object' || Array.isArray(options)) throw new TokenPlanError('TokenPlan codec options missing');
-  const expected = buildTokenPlan({ model, registry: tokenPlan.registry, codecOptions: (record) => {
-    if (!Object.hasOwn(options, record.bindingId)) throw new TokenPlanError(`TokenPlan codec options missing for ${record.bindingId}`);
-    return options[record.bindingId];
-  } });
+  validateRegistryStage(registryStage);
+  if (registryStage.modelContentSeal !== model.contentSeal || registryStage.sourceFingerprint !== model.sourceFingerprint) throw new TokenPlanError('registry stage belongs to a different canonical source');
+  const registry = registryStage.candidateRegistry;
+  if (canonicalJson(tokenPlan.registry) !== canonicalJson(registry) || tokenPlan.registryHash !== registryHash(registry) || tokenPlan.registryGeneration !== registry.generation) {
+    throw new TokenPlanError('TokenPlan registry disagrees with the independently supplied staged registry');
+  }
+  if (tokenPlan.registryStageId !== registryStage.stageId || tokenPlan.registryBaseHash !== registryStage.baseHash) throw new TokenPlanError('TokenPlan registry stage identity disagrees with the independently supplied frozen stage');
+  if (tokenPlan.codecPolicyId !== codecPolicyId || typeof codecOptions !== 'function') throw new TokenPlanError('TokenPlan codec policy identity disagrees with the approved external policy');
+  const expected = buildTokenPlan({ model, registry, registryStageId: registryStage.stageId, registryBaseHash: registryStage.baseHash, codecPolicyId, codecOptions });
   if (canonicalJson(tokenPlan) !== canonicalJson(expected)) throw new TokenPlanError('TokenPlan disagrees with exact model/registry/codec derivation');
   return true;
 }

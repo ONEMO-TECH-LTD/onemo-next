@@ -45,7 +45,7 @@ Decisions/Done/cutover: Dan only.
 | P0 continuity/contract/calibration | IN PROGRESS | — | see P0 section |
 | P1 evidence capture | pending | — | |
 | P2 canonical graphs | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `0c8471b` | sole authoritative QA/Meta cleared the frozen code snapshot only; live/plugin evidence still blocked by G-1/G-2 |
-| P3 mother token/component slice | AUTHORITATIVE REWORK; BUILDER REPAIR IN PROGRESS | `d69a0fa` rejected | F1-F5 repair; real mother/plugin-origin phase exit still blocked by G-1/G-2/G-4 |
+| P3 mother token/component slice | AUTHORITATIVE REWORK; BUILDER REPAIR 2 READY | `d69a0fa`, `2c6b27c` rejected | residual F1-F3 repaired; real mother/plugin-origin phase exit still blocked by G-1/G-2/G-4 |
 | P4 mother layout/render slice | pending | — | |
 | P5 emitters/security/editability | pending | — | |
 | P6 runtime/visual/editor proof | pending | — | |
@@ -184,6 +184,15 @@ Decisions/Done/cutover: Dan only.
 - Registry stages now bind source fingerprint/content seal and are re-derived from the exact
   model + WEB policy at commit validation; unrelated additions and deleted migration requests
   refuse. Two permanent tests raise P3 to 9 tests; full required truth is now 85/85/0.
+- Authoritative rereview of `2c6b27c` credited F4/F5 and stale-field rejection as closed, but
+  reproduced three residuals: TokenPlan trusted its embedded registry/options; missing per-axis
+  options were accepted; set members still appeared as standalone React components.
+- Repair 2 validates TokenPlan against the independently supplied frozen registry stage and named
+  external codec policy, and the independent oracle compares exact stage/channel identities.
+  Sparse cross-axis combinations remain legal only when every advertised option appears in at
+  least one captured member. Set members now exist only as metadata under the single set-level
+  component; no standalone member React symbols remain. Self-consistent registry substitution,
+  unapproved codec policy, missing-option, and member-symbol mutations are permanent tests.
 
 ## Meta rulings accepted (2026-07-13)
 

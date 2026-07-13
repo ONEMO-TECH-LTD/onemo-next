@@ -10,11 +10,11 @@ export class SemanticSliceError extends Error {
   constructor(message) { super(message); this.state = 'FAILED_COMPONENT'; }
 }
 
-export function lowerSemanticSlice({ model: input, tokenPlan, modeContextPlan }) {
+export function lowerSemanticSlice({ model: input, tokenPlan, modeContextPlan, registryStage, codecPolicyId, codecOptions }) {
   const model = parseCanonicalModel(input);
   if (schemaError('tokenPlan', tokenPlan)) throw new SemanticSliceError('versioned TokenPlan required');
   if (schemaError('modeContextPlan', modeContextPlan)) throw new SemanticSliceError('versioned ModeContextPlan required');
-  try { validateTokenPlan({ model, tokenPlan }); }
+  try { validateTokenPlan({ model, tokenPlan, registryStage, codecPolicyId, codecOptions }); }
   catch (error) { throw new SemanticSliceError(`TokenPlan refused: ${error.message}`); }
   validatePlanConservation(model, tokenPlan, modeContextPlan);
   const bindingsByNode = new Map();
@@ -40,7 +40,7 @@ export function lowerSemanticSlice({ model: input, tokenPlan, modeContextPlan })
     }));
     return { componentKey: set.key, sourceId: set.id, reactName: componentSymbol(set.key), variantAxes, publicProps, members };
   });
-  const components = model.componentGraph.definitions.filter((row) => row.componentSetKey || !componentSets.some((set) => set.componentKey === row.key)).map((row) => ({
+  const components = model.componentGraph.definitions.filter((row) => !row.componentSetKey && !componentSets.some((set) => set.componentKey === row.key)).map((row) => ({
     componentKey: row.key,
     sourceId: row.id,
     reactName: componentSymbol(row.key),
@@ -138,6 +138,11 @@ function validateComponentSet(set, members, variantAxes, publicProps) {
     actual.add(combination);
   }
   if (members.length === 0) throw new SemanticSliceError(`component set ${set.key} has no authored members`);
+  for (const name of axisNames) {
+    const captured = new Set(members.map((member) => member.variantProperties?.[name]));
+    const missing = variantAxes[name].options.filter((option) => !captured.has(option));
+    if (missing.length) throw new SemanticSliceError(`component set ${set.key} has uncaptured ${name} option(s): ${missing.join(', ')}`);
+  }
 }
 
 function validateComponentTokenTypes(instance, definitions, records, tokenBindings) {

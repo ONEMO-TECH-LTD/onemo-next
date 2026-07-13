@@ -12,13 +12,14 @@ import { sealCanonicalModelContent } from '../src/canonical-model.mjs';
 
 const acceptColorSyntax = ({ domain, syntax }) => domain === 'color' ? syntax : null;
 const optionsFor = (record) => record.destinationDomain === 'opacity-normalized' ? { opacityScale: 'percent' } : {};
+const CODEC_POLICY_ID = 'p3-fixture-codecs-v1';
 
 function compile(model, baseRegistry = emptyTokenRegistry()) {
   const registryStage = stageTokenRegistry({ model, baseRegistry, webSyntaxPolicy: acceptColorSyntax });
-  const tokenPlan = buildTokenPlan({ model, registry: registryStage.candidateRegistry, codecOptions: optionsFor });
+  const tokenPlan = buildTokenPlan({ model, registry: registryStage.candidateRegistry, registryStageId: registryStage.stageId, registryBaseHash: registryStage.baseHash, codecPolicyId: CODEC_POLICY_ID, codecOptions: optionsFor });
   const modeContextPlan = buildModeContextPlan(model);
-  const semanticSlice = lowerSemanticSlice({ model, tokenPlan, modeContextPlan });
-  return { registryStage, tokenPlan, modeContextPlan, semanticSlice };
+  const semanticSlice = lowerSemanticSlice({ model, tokenPlan, modeContextPlan, registryStage, codecPolicyId: CODEC_POLICY_ID, codecOptions: optionsFor });
+  return { registryStage, approvedCodecPolicyId: CODEC_POLICY_ID, tokenPlan, modeContextPlan, semanticSlice };
 }
 
 function resealRegistryStage(stage) {
@@ -123,6 +124,7 @@ test('native components, instances, nested modes, and rich text remain semanticâ
   assert.equal(output.semanticSlice.instances[0].sourceComponentKey, 'CMP_CHOICE_S');
   assert.equal(output.semanticSlice.instances[0].reactName, output.semanticSlice.componentSets[0].reactName);
   assert.equal(Object.hasOwn(output.semanticSlice.componentSets[0].members[0], 'reactName'), false);
+  assert.equal(output.semanticSlice.components.length, 0);
   assert.deepEqual(output.semanticSlice.instances[0].props.Enabled, { type: 'BOOLEAN', value: true });
   assert.deepEqual(output.semanticSlice.instances[0].overrides, [{ id: 'instance-control', overriddenFields: ['visible'] }]);
   assert.deepEqual(output.semanticSlice.propertyReferences, [{ nodeId: 'instance-control', ownerComponentKey: 'CMP_CHOICE_S', references: { visible: 'Enabled' } }]);
@@ -131,13 +133,21 @@ test('native components, instances, nested modes, and rich text remain semanticâ
   assert.match(output.semanticSlice.nodeModes.nested, /CK_THEME=dark/);
   const incomplete = structuredClone(model); incomplete.componentGraph.definitions = incomplete.componentGraph.definitions.filter((row) => row.key !== 'CMP_CHOICE_L');
   Object.assign(incomplete, sealCanonicalModelContent(incomplete));
-  assert.equal(compile(incomplete).semanticSlice.componentSets[0].members.length, 1);
+  assert.throws(() => compile(incomplete), /uncaptured Size option/);
+  const sparse = structuredClone(model);
+  const sparseSet = sparse.componentGraph.definitions.find((row) => row.key === 'SET_CHOICE');
+  sparseSet.propertyDefinitions.Tone = { type: 'VARIANT', defaultValue: 'Light', variantOptions: ['Light', 'Dark'] };
+  sparse.componentGraph.definitionSupplements.find((row) => row.nodeId === sparseSet.id).componentPropertyDefinitions.Tone = structuredClone(sparseSet.propertyDefinitions.Tone);
+  const sparseMembers = sparse.componentGraph.definitions.filter((row) => row.componentSetKey === 'SET_CHOICE');
+  sparseMembers[0].variantProperties.Tone = 'Light'; sparseMembers[1].variantProperties.Tone = 'Dark';
+  Object.assign(sparse, sealCanonicalModelContent(sparse));
+  assert.equal(compile(sparse).semanticSlice.componentSets[0].members.length, 2);
   const wrongPropType = p3Fixture({ componentVariable: 'V_COPY' });
   assert.throws(() => compile(wrongPropType.model), /disagrees with native component property type/);
   const foreignTokenPlan = structuredClone(output.tokenPlan); foreignTokenPlan.bindings[0].variableKey = 'K_FORGED';
-  assert.throws(() => lowerSemanticSlice({ model, tokenPlan: foreignTokenPlan, modeContextPlan: output.modeContextPlan }));
+  assert.throws(() => lowerSemanticSlice({ model, tokenPlan: foreignTokenPlan, modeContextPlan: output.modeContextPlan, registryStage: output.registryStage, codecPolicyId: CODEC_POLICY_ID, codecOptions: optionsFor }));
   const foreignModePlan = structuredClone(output.modeContextPlan); foreignModePlan.nodes.find((row) => row.nodeId === 'nested').modeContextId = 'CK_THEME=light';
-  assert.throws(() => lowerSemanticSlice({ model, tokenPlan: output.tokenPlan, modeContextPlan: foreignModePlan }));
+  assert.throws(() => lowerSemanticSlice({ model, tokenPlan: output.tokenPlan, modeContextPlan: foreignModePlan, registryStage: output.registryStage, codecPolicyId: CODEC_POLICY_ID, codecOptions: optionsFor }));
 });
 
 test('TokenPlan semantic validation refuses forged channels, literals, registry identity, and token data', () => {
@@ -151,9 +161,18 @@ test('TokenPlan semantic validation refuses forged channels, literals, registry 
   ];
   for (const mutate of mutations) {
     const tokenPlan = structuredClone(output.tokenPlan); mutate(tokenPlan);
-    assert.throws(() => lowerSemanticSlice({ model, tokenPlan, modeContextPlan: output.modeContextPlan }), /TokenPlan refused/);
+    assert.throws(() => lowerSemanticSlice({ model, tokenPlan, modeContextPlan: output.modeContextPlan, registryStage: output.registryStage, codecPolicyId: CODEC_POLICY_ID, codecOptions: optionsFor }), /TokenPlan refused/);
     assert.equal(p3Failures(model, { ...output, tokenPlan }).G3, true);
   }
+  const forgedRegistry = structuredClone(output.registryStage.candidateRegistry);
+  forgedRegistry.entries.K_COLOR.channels.color.channelId = 'ch_self_consistent_forged';
+  forgedRegistry.entries.K_COLOR.channels.color.cssName = '--self-consistent-forged';
+  const selfConsistent = buildTokenPlan({ model, registry: forgedRegistry, registryStageId: output.registryStage.stageId, registryBaseHash: output.registryStage.baseHash, codecPolicyId: CODEC_POLICY_ID, codecOptions: optionsFor });
+  assert.throws(() => lowerSemanticSlice({ model, tokenPlan: selfConsistent, modeContextPlan: output.modeContextPlan, registryStage: output.registryStage, codecPolicyId: CODEC_POLICY_ID, codecOptions: optionsFor }), /staged registry/);
+  assert.equal(p3Failures(model, { ...output, tokenPlan: selfConsistent }).G2, true);
+  assert.equal(p3Failures(model, { ...output, tokenPlan: selfConsistent }).G3, true);
+  const wrongPolicy = buildTokenPlan({ model, registry: output.registryStage.candidateRegistry, registryStageId: output.registryStage.stageId, registryBaseHash: output.registryStage.baseHash, codecPolicyId: 'unapproved-codecs', codecOptions: optionsFor });
+  assert.throws(() => lowerSemanticSlice({ model, tokenPlan: wrongPolicy, modeContextPlan: output.modeContextPlan, registryStage: output.registryStage, codecPolicyId: CODEC_POLICY_ID, codecOptions: optionsFor }), /codec policy/);
 });
 
 test('registry validation derives mandatory migration requests from the exact source and policy', () => {
@@ -181,5 +200,5 @@ test('independent P3 G2-G5 mutations bite dropped bindings, swapped channels, fl
 test('unsupported bound values stop the plan; no literal fallback is emitted', () => {
   const { model } = p3Fixture();
   const stage = stageTokenRegistry({ model, baseRegistry: emptyTokenRegistry(), webSyntaxPolicy: acceptColorSyntax });
-  assert.throws(() => buildTokenPlan({ model, registry: stage.candidateRegistry, codecOptions: () => ({}) }), TokenPlanError);
+  assert.throws(() => buildTokenPlan({ model, registry: stage.candidateRegistry, registryStageId: stage.stageId, registryBaseHash: stage.baseHash, codecPolicyId: CODEC_POLICY_ID, codecOptions: () => ({}) }), TokenPlanError);
 });
