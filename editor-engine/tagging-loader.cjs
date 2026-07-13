@@ -19,6 +19,9 @@ const { assertNoAuthoredSourceProvenance } = require('./source-provenance-policy
 
 const PROJECT_COMPONENT_ROOT = 'src/app/(dev)/react-figma-components';
 const RUNTIME_MODULE = '@/app/(dev)/react-figma/component-authoring/source-provenance-runtime';
+const RUNTIME_FILE = 'src/app/(dev)/react-figma/component-authoring/source-provenance-runtime.tsx';
+const TRUSTED_RUNTIME_READER = 'src/app/(dev)/react-figma/component-authoring/ComponentCanvas.tsx';
+const RUNTIME_CAPABILITY_MARKER = '__ONEMO_SOURCE_PROVENANCE_LOADER_CAPABILITY__';
 
 /* E7.1 (KAI-9375, lead F1): files from the global component library get a PACKAGE-NAME-PREFIXED
  * identity ("onemo-component-library/src/...") — never a `..`-relative path, whose depth differs
@@ -32,6 +35,13 @@ try {
 module.exports = function taggingLoader(source) {
   // Only ever wired in dev (next.config gate), but double-guard anyway.
   if (process.env.NODE_ENV === 'production') return source;
+  const capability = this.getOptions?.().capability;
+  if (typeof capability !== 'string' || !/^[a-f0-9]{64}$/.test(capability)) {
+    throw Object.assign(new Error('source-provenance loader capability is missing or invalid'), {
+      code: 'SOURCE_PROVENANCE_LOADER_CAPABILITY_INVALID',
+    });
+  }
+  const runtimeWriterExport = `__ONEMO_SOURCE_WRITER_${capability}__`;
 
   let rel;
   let real = this.resourcePath;
@@ -42,7 +52,21 @@ module.exports = function taggingLoader(source) {
     rel = path.relative(this.rootContext || process.cwd(), this.resourcePath);
   }
 
-  assertNoAuthoredSourceProvenance(rel, source);
+  assertNoAuthoredSourceProvenance(rel, source, {
+    allowRuntimeReader: rel.replace(/\\/g, '/') === TRUSTED_RUNTIME_READER,
+  });
+
+  const rootContext = this.rootContext || process.cwd();
+  const runtimeFile = path.resolve(rootContext, RUNTIME_FILE);
+  if (path.resolve(real) === runtimeFile) {
+    const runtimeSource = source.replace(RUNTIME_CAPABILITY_MARKER, capability);
+    if (runtimeSource === source) {
+      throw Object.assign(new Error('source-provenance runtime capability marker is missing'), {
+        code: 'SOURCE_PROVENANCE_RUNTIME_MARKER_MISSING',
+      });
+    }
+    return `${runtimeSource}\nexport const ${runtimeWriterExport} = (capability: string) => createAuthoringSourceBoundary(capability)\n`;
+  }
 
   let sf;
   try {
@@ -51,10 +75,10 @@ module.exports = function taggingLoader(source) {
     return source; // unparseable → pass through untouched, never break the build
   }
 
-  const projectComponentRoot = path.join(this.rootContext || process.cwd(), PROJECT_COMPONENT_ROOT);
+  const projectComponentRoot = path.join(rootContext, PROJECT_COMPONENT_ROOT);
   const authoringRuntime = real === projectComponentRoot || real.startsWith(projectComponentRoot + path.sep) ||
     Boolean(libRoot && (real === path.join(libRoot, 'src') || real.startsWith(path.join(libRoot, 'src') + path.sep)));
-  const runtimeIdentifier = authoringRuntime ? uniqueRuntimeIdentifier(source) : null;
+  const runtimeIdentifiers = authoringRuntime ? uniqueRuntimeIdentifiers(source, capability) : null;
 
   /** @type {{pos:number, text:string, order:number}[]} */
   const inserts = [];
@@ -75,20 +99,20 @@ module.exports = function taggingLoader(source) {
         text: authoredAttributes.includes('data-src') ? '' : ` data-src="${provenance}"`,
         order: 0,
       });
-      if (runtimeIdentifier) {
+      if (runtimeIdentifiers) {
         const element = ts.isJsxSelfClosingElement(node) ? node : node.parent;
-        inserts.push({ pos: element.getStart(sf), text: `<${runtimeIdentifier} provenance=${JSON.stringify(provenance)}>`, order: 1 });
-        inserts.push({ pos: element.end, text: `</${runtimeIdentifier}>`, order: 0 });
+        inserts.push({ pos: element.getStart(sf), text: `<${runtimeIdentifiers.boundary} provenance=${JSON.stringify(provenance)}>`, order: 1 });
+        inserts.push({ pos: element.end, text: `</${runtimeIdentifiers.boundary}>`, order: 0 });
       }
     }
     ts.forEachChild(node, visit);
   };
   visit(sf);
 
-  if (runtimeIdentifier) {
+  if (runtimeIdentifiers) {
     inserts.push({
       pos: importInsertionPosition(sf),
-      text: `${importInsertionPosition(sf) === 0 ? '' : '\n'}import { AuthoringSourceBoundary as ${runtimeIdentifier} } from ${JSON.stringify(RUNTIME_MODULE)};\n`,
+      text: `${importInsertionPosition(sf) === 0 ? '' : '\n'}import { ${runtimeWriterExport} as ${runtimeIdentifiers.writer} } from ${JSON.stringify(RUNTIME_MODULE)};\nconst ${runtimeIdentifiers.boundary} = ${runtimeIdentifiers.writer}(${JSON.stringify(capability)});\n`,
       order: 2,
     });
   }
@@ -104,11 +128,16 @@ module.exports = function taggingLoader(source) {
   return out;
 };
 
-function uniqueRuntimeIdentifier(source) {
+function uniqueRuntimeIdentifiers(source, capability) {
   let suffix = 0;
-  let identifier = '__ONEMO_SOURCE_BOUNDARY__';
-  while (source.includes(identifier)) identifier = `__ONEMO_SOURCE_BOUNDARY_${++suffix}__`;
-  return identifier;
+  let boundary = `__ONEMO_SOURCE_BOUNDARY_${capability}__`;
+  let writer = `__ONEMO_SOURCE_BOUNDARY_WRITER_${capability}__`;
+  while (source.includes(boundary) || source.includes(writer)) {
+    suffix += 1;
+    boundary = `__ONEMO_SOURCE_BOUNDARY_${capability}_${suffix}__`;
+    writer = `__ONEMO_SOURCE_BOUNDARY_WRITER_${capability}_${suffix}__`;
+  }
+  return { boundary, writer };
 }
 
 function importInsertionPosition(sf) {

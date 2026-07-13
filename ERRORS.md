@@ -162,3 +162,10 @@ Follow-up: dynamically writing the route after Next started caused a late route-
 - Symptoms: the rail button showed active while the File panel remained mounted, so the preinstalled component entry never appeared; only the JSON reporter exposed the decisive locator failure.
 - What worked: reuse the established one-successful-token-response-per-editor-document invariant, then retry the complete idempotent rail-to-existing-entry transition before beginning the measured no-reload entry proof.
 - Remember: cold setup retries may wrap read-only navigation, but the A003/A004 double-click and context-menu entry actions themselves remain single-shot after request counters are reset.
+
+## S58 K-001 runtime provenance capability
+
+- What did not work: exporting the WeakMap writer from a stable source module, then minting its replacement capability inside the webpack loader module or once per `next.config` evaluation.
+- Symptoms: authored code could import the stable writer; after it was removed, separate webpack compiler/cache processes minted different secrets, so the query-bound writer and the canvas reader silently addressed different WeakMaps and source identity disappeared intermittently.
+- What worked: keep the stable runtime source read-only, persist one random capability in the ignored `.next/cache` compiler authority, pass it through every loader rule, and have the loader append a random-named factory to the same runtime module instance. The factory still requires the secret, while the shared AST policy refuses authored access to the internal runtime module before persistence.
+- Remember: a capability shared across webpack server/client modules must survive config re-evaluation and persistent compiler-cache reuse; module-local randomness is not a cross-compiler authority.

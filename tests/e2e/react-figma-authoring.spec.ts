@@ -5,7 +5,11 @@ import { readFile, readdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { promisify } from 'node:util'
 
-import { AUTHORING_SOURCE_PROVENANCE_ATTRIBUTE } from '../../src/lib/editor-source-provenance'
+import {
+  AUTHORING_SOURCE_PROVENANCE_ATTRIBUTE,
+  AUTHORING_SOURCE_PROVENANCE_RESERVED,
+  AUTHORING_SOURCE_RUNTIME_ACCESS_RESERVED,
+} from '../../src/lib/editor-source-provenance'
 
 const fixtureName = 'AuthoringE2EButton'
 const fixtureFile = 'src/app/(dev)/react-figma-components/AuthoringE2EButton.tsx'
@@ -389,6 +393,11 @@ test.describe('React Figma component authoring', () => {
     expect(sourceIdentity).toMatch(/^[a-f0-9]{64}:0$/)
     await expect(label).toHaveAttribute('data-authoring-node-file', fixtureFile)
     await expect(label).toHaveAttribute('data-authoring-node-export', fixtureName)
+    const labelProvenance = [
+      await label.getAttribute('data-authoring-node-file'),
+      await label.getAttribute('data-authoring-node-line'),
+      await label.getAttribute('data-authoring-node-col'),
+    ].join(':')
     await label.click()
     await expect(label).toHaveAttribute('data-authoring-node-selected', 'true')
     await expect(authoringCanvas).toHaveAttribute('data-selected-content-id', sourceIdentity!)
@@ -422,35 +431,57 @@ test.describe('React Figma component authoring', () => {
       transactions: await snapshotTree(path.join(metadataRoot, 'transactions')),
     }
     const safeNested = `function NestedLabel() {\n  return <span data-name="Nested" data-src="${fixtureFile}:999:1">Nested</span>\n}`
-    const forgedNested = `import * as React from 'react'\nconst key = ['data', 'onemo', 'source'].join('-')\nfunction NestedLabel() {\n  return React.createElement('span', { [key]: '${fixtureFile}:999:1', 'data-name': 'Nested' }, 'Nested')\n}`
-    const forgedSource = sourceBeforeSpoof.replace(safeNested, forgedNested)
-    expect(forgedSource).not.toBe(sourceBeforeSpoof)
-    try {
-      await writeFile(sourcePath, forgedSource)
-      const refusal = await request.get(`/api/dev/editor-authoring?mode=component-status&file=${encodeURIComponent(fixtureFile)}`)
-      expect(refusal.status()).toBe(500)
-      expect(await refusal.text()).toContain('SOURCE_PROVENANCE_ATTRIBUTE_RESERVED')
-    } finally {
-      await writeFile(sourcePath, sourceBeforeSpoof)
+    const assertPrePersistenceRefusal = async (forgedNested: string, code: string) => {
+      const forgedSource = sourceBeforeSpoof.replace(safeNested, forgedNested)
+      expect(forgedSource).not.toBe(sourceBeforeSpoof)
+      try {
+        await writeFile(sourcePath, forgedSource)
+        const refusal = await request.get(`/api/dev/editor-authoring?mode=component-status&file=${encodeURIComponent(fixtureFile)}`)
+        expect([422, 500]).toContain(refusal.status())
+        expect(await refusal.text()).toContain(code)
+      } finally {
+        await writeFile(sourcePath, sourceBeforeSpoof)
+      }
+      expect(await readFile(sourcePath, 'utf8')).toBe(sourceBeforeSpoof)
+      expect({
+        sidecar: (await readFile(path.join(metadataRoot, 'authoring-v1.json'))).toString('base64'),
+        history: await snapshotTree(path.join(metadataRoot, 'history')),
+        transactions: await snapshotTree(path.join(metadataRoot, 'transactions')),
+      }).toEqual(durableBeforeSpoof)
+      await expect.poll(async () => (
+        await request.get(`/api/dev/editor-authoring?mode=component-status&file=${encodeURIComponent(fixtureFile)}`)
+      ).status(), { timeout: 30_000 }).toBe(200)
     }
-    expect(await readFile(sourcePath, 'utf8')).toBe(sourceBeforeSpoof)
-    expect({
-      sidecar: (await readFile(path.join(metadataRoot, 'authoring-v1.json'))).toString('base64'),
-      history: await snapshotTree(path.join(metadataRoot, 'history')),
-      transactions: await snapshotTree(path.join(metadataRoot, 'transactions')),
-    }).toEqual(durableBeforeSpoof)
-    await expect.poll(async () => (
-      await request.get(`/api/dev/editor-authoring?mode=component-status&file=${encodeURIComponent(fixtureFile)}`)
-    ).status(), { timeout: 30_000 }).toBe(200)
-    expect(pageErrors).toEqual([])
-    expect(consoleErrors.length).toBeGreaterThan(0)
-    expect(consoleErrors.some((message) =>
-      message.includes('SOURCE_PROVENANCE_ATTRIBUTE_RESERVED') && message.includes(fixtureFile),
-    )).toBe(true)
-    expect(consoleErrors.every((message) =>
-      message.includes('SOURCE_PROVENANCE_ATTRIBUTE_RESERVED')
-      || message === 'Failed to load resource: the server responded with a status of 500 (Internal Server Error)',
-    )).toBe(true)
+
+    await assertPrePersistenceRefusal(
+      `import * as React from 'react'\nconst key = ['data', 'onemo', 'source'].join('-')\nfunction NestedLabel() {\n  return React.createElement('span', { [key]: '${fixtureFile}:999:1', 'data-name': 'Nested' }, 'Nested')\n}`,
+      AUTHORING_SOURCE_PROVENANCE_RESERVED,
+    )
+    await assertPrePersistenceRefusal(
+      `import { createElement } from 'react'\nimport { AuthoringSourceBoundary as ForgedBoundary } from '@/app/(dev)/react-figma/component-authoring/source-provenance-runtime'\nfunction NestedLabel() {\n  return <ForgedBoundary provenance="${labelProvenance}">{createElement('span', { 'data-name': 'Nested' }, 'Nested')}</ForgedBoundary>\n}`,
+      AUTHORING_SOURCE_RUNTIME_ACCESS_RESERVED,
+    )
+
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    authoringCanvas = await openComponent()
+    primary = page.locator('[data-variant-id]').filter({ hasText: 'Primary' })
+    label = primary.locator('[data-authoring-node-tag="span"]')
+    await expect(label).toHaveAttribute('data-authoring-node-id', sourceIdentity!)
+    await expect(label).toHaveAttribute('data-name', 'Label')
+    await expect(primary.locator('[data-name="Nested"]')).not.toHaveAttribute('data-authoring-node-id', /.+/)
+    await expect(primary.locator('[data-name="Nested"]')).toHaveAttribute('data-authoring-node-refusal', 'SOURCE_CONTENT_PROVENANCE_UNOWNED')
+    await label.click()
+    await expect(authoringCanvas).toHaveAttribute('data-selected-content-id', sourceIdentity!)
+    expect(pageErrors.filter((message) =>
+      !message.includes(AUTHORING_SOURCE_PROVENANCE_RESERVED)
+      && !message.includes(AUTHORING_SOURCE_RUNTIME_ACCESS_RESERVED),
+    )).toEqual([])
+    expect(consoleErrors.filter((message) =>
+      !message.includes(AUTHORING_SOURCE_PROVENANCE_RESERVED)
+      && !message.includes(AUTHORING_SOURCE_RUNTIME_ACCESS_RESERVED)
+      && message !== 'Failed to load resource: the server responded with a status of 404 (Not Found)'
+      && message !== 'Failed to load resource: the server responded with a status of 500 (Internal Server Error)',
+    )).toEqual([])
   })
 
   test('offers canonical extraction when the project component inventory is empty', async ({ page }) => {

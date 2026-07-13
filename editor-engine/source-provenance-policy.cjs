@@ -1,32 +1,47 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- shared by webpack and server-side authoring */
 const ts = require('typescript');
+const path = require('path');
 
 const AUTHORING_SOURCE_ATTRIBUTE = 'data-onemo-source';
 const AUTHORING_SOURCE_RESERVED = 'SOURCE_PROVENANCE_ATTRIBUTE_RESERVED';
+const AUTHORING_SOURCE_RUNTIME_ACCESS_RESERVED = 'SOURCE_PROVENANCE_RUNTIME_ACCESS_RESERVED';
+const AUTHORING_SOURCE_RUNTIME_FILE = 'src/app/(dev)/react-figma/component-authoring/source-provenance-runtime';
 
-function assertNoAuthoredSourceProvenance(file, source) {
+function assertNoAuthoredSourceProvenance(file, source, options = {}) {
   const sf = ts.createSourceFile(file, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX);
   const declarations = collectConstantDeclarations(sf);
-  let collision = null;
+  let refusal = null;
 
   const visit = (node) => {
-    if (collision) return;
+    if (refusal) return;
+    const runtimeSpecifier = runtimeModuleSpecifier(node, declarations);
+    if (
+      runtimeSpecifier && targetsRuntimeModule(file, runtimeSpecifier) &&
+      !(options.allowRuntimeReader === true && isReadOnlyRuntimeImport(node))
+    ) {
+      refusal = {
+        node,
+        code: AUTHORING_SOURCE_RUNTIME_ACCESS_RESERVED,
+        message: 'the editor source-provenance runtime is private to the authoring loader',
+      };
+      return;
+    }
     if (ts.isJsxAttribute(node) && propertyName(node.name, declarations) === AUTHORING_SOURCE_ATTRIBUTE) {
-      collision = node;
+      refusal = { node, code: AUTHORING_SOURCE_RESERVED, message: `${AUTHORING_SOURCE_ATTRIBUTE} is reserved for editor source provenance` };
       return;
     }
     if (ts.isJsxSpreadAttribute(node) && objectContainsReservedKey(node.expression, declarations, new Set())) {
-      collision = node;
+      refusal = { node, code: AUTHORING_SOURCE_RESERVED, message: `${AUTHORING_SOURCE_ATTRIBUTE} is reserved for editor source provenance` };
       return;
     }
     if (ts.isCallExpression(node)) {
       if (isCreateElement(node.expression) && node.arguments[1] && objectContainsReservedKey(node.arguments[1], declarations, new Set())) {
-        collision = node.arguments[1];
+        refusal = { node: node.arguments[1], code: AUTHORING_SOURCE_RESERVED, message: `${AUTHORING_SOURCE_ATTRIBUTE} is reserved for editor source provenance` };
         return;
       }
       if (ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'setAttribute') {
         if (constantString(node.arguments[0], declarations, new Set()) === AUTHORING_SOURCE_ATTRIBUTE) {
-          collision = node.arguments[0];
+          refusal = { node: node.arguments[0], code: AUTHORING_SOURCE_RESERVED, message: `${AUTHORING_SOURCE_ATTRIBUTE} is reserved for editor source provenance` };
           return;
         }
       }
@@ -34,18 +49,54 @@ function assertNoAuthoredSourceProvenance(file, source) {
     ts.forEachChild(node, visit);
   };
   visit(sf);
-  if (!collision) return;
+  if (!refusal) return;
 
-  const location = sf.getLineAndCharacterOfPosition(collision.getStart(sf));
+  const location = sf.getLineAndCharacterOfPosition(refusal.node.getStart(sf));
   throw Object.assign(new Error(
-    `${AUTHORING_SOURCE_RESERVED}: ${AUTHORING_SOURCE_ATTRIBUTE} is reserved for editor source provenance at ${file}:${location.line + 1}:${location.character + 1}`,
+    `${refusal.code}: ${refusal.message} at ${file}:${location.line + 1}:${location.character + 1}`,
   ), {
-    code: AUTHORING_SOURCE_RESERVED,
+    code: refusal.code,
     status: 422,
     file,
     line: location.line + 1,
     col: location.character + 1,
   });
+}
+
+function isReadOnlyRuntimeImport(node) {
+  if (!ts.isImportDeclaration(node) || !node.importClause || node.importClause.isTypeOnly) return false;
+  const bindings = node.importClause.namedBindings;
+  if (!bindings || !ts.isNamedImports(bindings) || bindings.elements.length === 0) return false;
+  return bindings.elements.every((element) =>
+    !element.isTypeOnly && (element.propertyName ?? element.name).text === 'readRuntimeSourceProvenance');
+}
+
+function runtimeModuleSpecifier(node, declarations) {
+  if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier) {
+    return constantString(node.moduleSpecifier, declarations, new Set());
+  }
+  if (
+    ts.isImportEqualsDeclaration(node) &&
+    ts.isExternalModuleReference(node.moduleReference) &&
+    node.moduleReference.expression
+  ) {
+    return constantString(node.moduleReference.expression, declarations, new Set());
+  }
+  if (!ts.isCallExpression(node) || node.arguments.length === 0) return null;
+  const callee = resolveExpression(node.expression, declarations, new Set());
+  const loadsModule = callee?.kind === ts.SyntaxKind.ImportKeyword ||
+    (ts.isIdentifier(callee) && callee.text === 'require');
+  return loadsModule ? constantString(node.arguments[0], declarations, new Set()) : null;
+}
+
+function targetsRuntimeModule(file, specifier) {
+  const source = specifier.replace(/\\/g, '/').split(/[?#]/, 1)[0].replace(/\.[cm]?[jt]sx?$/, '');
+  let resolved;
+  if (source.startsWith('@/')) resolved = `src/${source.slice(2)}`;
+  else if (source.startsWith('.')) resolved = path.posix.join(path.posix.dirname(file.replace(/\\/g, '/')), source);
+  else resolved = source.replace(/^\/+/, '');
+  resolved = path.posix.normalize(resolved);
+  return resolved === AUTHORING_SOURCE_RUNTIME_FILE || resolved.endsWith(`/${AUTHORING_SOURCE_RUNTIME_FILE}`);
 }
 
 function collectConstantDeclarations(sf) {
@@ -166,5 +217,6 @@ function isObjectAssign(expression) {
 module.exports = {
   AUTHORING_SOURCE_ATTRIBUTE,
   AUTHORING_SOURCE_RESERVED,
+  AUTHORING_SOURCE_RUNTIME_ACCESS_RESERVED,
   assertNoAuthoredSourceProvenance,
 };

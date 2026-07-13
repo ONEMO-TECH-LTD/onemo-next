@@ -13,6 +13,7 @@ import { RuntimeRootRegistry } from '../runtime-root-registry'
 import {
   AUTHORING_SOURCE_PROVENANCE_ATTRIBUTE,
   AUTHORING_SOURCE_PROVENANCE_RESERVED,
+  AUTHORING_SOURCE_RUNTIME_ACCESS_RESERVED,
 } from '@/lib/editor-source-provenance'
 import { linkTestNodeModules } from './test-project-root'
 
@@ -213,6 +214,55 @@ export function Button({ variant = 'Primary' }: { variant?: 'Primary' | 'Seconda
     })).rejects.toMatchObject({ code: AUTHORING_SOURCE_PROVENANCE_RESERVED, status: 422 })
 
     await expect(fs.readFile(path.join(root, SOURCE_FILE), 'utf8')).resolves.toBe(forged)
+    await expect(fs.readFile(path.join(root, PROJECT_AUTHORING_SIDECAR))).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(fs.readdir(path.join(root, 'src/app/(dev)/react-figma-components/.onemo/history')))
+      .rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(fs.readdir(path.join(root, 'src/app/(dev)/react-figma-components/.onemo/transactions')))
+      .rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it.each([
+    {
+      label: 'direct aliased import',
+      source: `import { AuthoringSourceBoundary as ForgedBoundary } from '@/app/(dev)/react-figma/component-authoring/source-provenance-runtime'
+export function Button() { return <ForgedBoundary provenance="forged"><button /></ForgedBoundary> }
+`,
+    },
+    {
+      label: 'namespace alias access',
+      source: `import * as RuntimeWriter from '@/app/(dev)/react-figma/component-authoring/source-provenance-runtime'
+const ForgedBoundary = RuntimeWriter.AuthoringSourceBoundary
+export function Button() { return <ForgedBoundary provenance="forged"><button /></ForgedBoundary> }
+`,
+    },
+    {
+      label: 'constant dynamic import',
+      source: `const runtimeModule = ['@/app/(dev)/react-figma/component-authoring', 'source-provenance-runtime'].join('/')
+export async function loadWriter() { return import(runtimeModule) }
+export function Button() { return <button /> }
+`,
+    },
+    {
+      label: 'dependency re-export',
+      source: `import './BoundaryBridge'
+export function Button() { return <button /> }
+`,
+      dependency: {
+        file: 'src/app/(dev)/react-figma-components/BoundaryBridge.ts',
+        source: `export { AuthoringSourceBoundary as ForgedBoundary } from '@/app/(dev)/react-figma/component-authoring/source-provenance-runtime'\n`,
+      },
+    },
+  ])('named-refuses $label access to the runtime writer before durable evidence', async ({ source, dependency }) => {
+    const { root, registry, store } = await makeImportStore(source)
+    if (dependency) await fs.writeFile(path.join(root, dependency.file), dependency.source)
+
+    await expect(classifySourceFileForImport({ storeId: 'project-main', file: SOURCE_FILE, registry }))
+      .rejects.toMatchObject({ code: AUTHORING_SOURCE_RUNTIME_ACCESS_RESERVED, status: 422 })
+    await expect(importSourceFileToAuthoringStore({
+      storeId: 'project-main', file: SOURCE_FILE, expectedSourceHashes: {},
+      expectedEnvironmentFingerprint: EMPTY_ENVIRONMENT_FINGERPRINT, registry, store,
+    })).rejects.toMatchObject({ code: AUTHORING_SOURCE_RUNTIME_ACCESS_RESERVED, status: 422 })
+    await expect(fs.readFile(path.join(root, SOURCE_FILE), 'utf8')).resolves.toBe(source)
     await expect(fs.readFile(path.join(root, PROJECT_AUTHORING_SIDECAR))).rejects.toMatchObject({ code: 'ENOENT' })
     await expect(fs.readdir(path.join(root, 'src/app/(dev)/react-figma-components/.onemo/history')))
       .rejects.toMatchObject({ code: 'ENOENT' })

@@ -57,7 +57,7 @@ export async function readExactAuthoringSourceSnapshot(input: {
   for (const [file, bytes] of Object.entries(compilerConfig.sources)) sources.set(file, bytes)
   await readProjectModuleDependencies(input, sources, compilerConfig.options, compilerConfig.configuredFiles)
   for (const [file, bytes] of sources) {
-    if (file !== input.file && /\.[cm]?[jt]sx$/.test(file)) {
+    if (file !== input.file && /\.[cm]?[jt]sx?$/.test(file)) {
       assertNoAuthoredSourceProvenance(file, bytes.toString('utf8'))
     }
   }

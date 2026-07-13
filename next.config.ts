@@ -1,4 +1,30 @@
 import type { NextConfig } from "next";
+import { randomBytes } from "node:crypto";
+import { mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import path from "node:path";
+
+function loadSourceProvenanceCapability(): string {
+  const cacheFile = path.join(process.cwd(), ".next/cache/onemo-source-provenance-capability");
+  const read = () => {
+    const value = readFileSync(cacheFile, "utf8").trim();
+    if (!/^[a-f0-9]{64}$/.test(value)) throw new Error(`Invalid source-provenance capability cache: ${cacheFile}`);
+    return value;
+  };
+  try {
+    return read();
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+  mkdirSync(path.dirname(cacheFile), { recursive: true });
+  const generated = randomBytes(32).toString("hex");
+  try {
+    writeFileSync(cacheFile, `${generated}\n`, { flag: "wx", mode: 0o600 });
+    return generated;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+    return read();
+  }
+}
 
 const nextConfig: NextConfig = {
   // E7.1 (KAI-9375): the global component library ships as TS source — compiled by the
@@ -34,18 +60,17 @@ const nextConfig: NextConfig = {
     // `next dev --webpack` — bare `next dev` is Turbopack and skips webpack loaders entirely.
     // See src/app/(dev)/react-figma/ENGINE-PLAN.md (M1).
     if (dev) {
-      const nodePath = require("node:path");
+      const sourceProvenanceCapability = loadSourceProvenanceCapability();
       // storybook/ included so screens hosted on the canvas route (Editor402) carry data-src too.
-      const tagIncludes = [nodePath.join(process.cwd(), "src"), nodePath.join(process.cwd(), "storybook")];
+      const tagIncludes = [path.join(process.cwd(), "src"), path.join(process.cwd(), "storybook")];
       // E7.1 (KAI-9375): global component library source is tagged too, so library components are
       // selectable/editable in the editor (QA R2-proven include). Resolved via require.resolve —
       // never a hardcoded relative depth (checkout-independent, lead F1).
       try {
-        const nodeFs = require("node:fs");
-        const pkgRoot = nodeFs.realpathSync(
-          nodePath.dirname(require.resolve("onemo-component-library/package.json", { paths: [process.cwd()] }))
+        const pkgRoot = realpathSync(
+          path.dirname(require.resolve("onemo-component-library/package.json", { paths: [process.cwd()] }))
         );
-        tagIncludes.push(nodePath.join(pkgRoot, "src"));
+        tagIncludes.push(path.join(pkgRoot, "src"));
       } catch {
         // library not installed in this checkout — editor works, library features absent
       }
@@ -53,7 +78,10 @@ const nextConfig: NextConfig = {
         test: /\.tsx$/,
         include: tagIncludes,
         enforce: "pre",
-        use: [{ loader: nodePath.resolve(process.cwd(), "editor-engine/tagging-loader.cjs") }],
+        use: [{
+          loader: path.resolve(process.cwd(), "editor-engine/tagging-loader.cjs"),
+          options: { capability: sourceProvenanceCapability },
+        }],
       });
     }
     // Creator v5 (DEC-v5-02): force ALL `paper` imports — ours (vector-core/paper-kernel) AND
