@@ -287,6 +287,15 @@ describe('editor-authoring G1 import route', () => {
     await expect(fs.readFile(sidecarPath)).resolves.toEqual(legacyBytes)
     await expect(fs.readFile(journalPath)).resolves.toEqual(journalBefore)
     expect((await fs.readdir(transactionsPath)).sort()).toEqual(transactionsBefore)
+
+    await fs.unlink(path.join(root, 'tsconfig.json'))
+    const noCurrentConfigResponse = await handleGet(componentRequest(), root)
+
+    expect(noCurrentConfigResponse.status).toBe(409)
+    await expect(noCurrentConfigResponse.json()).resolves.toMatchObject({ code: 'AUTHORING_MIGRATION_HISTORY_SOURCE_UNAVAILABLE' })
+    await expect(fs.readFile(sidecarPath)).resolves.toEqual(legacyBytes)
+    await expect(fs.readFile(journalPath)).resolves.toEqual(journalBefore)
+    expect((await fs.readdir(transactionsPath)).sort()).toEqual(transactionsBefore)
   }, 20_000)
 
   it('uses historical default compiler authority when post-split history predates tsconfig', async () => {

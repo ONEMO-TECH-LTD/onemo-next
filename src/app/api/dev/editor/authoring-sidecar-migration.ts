@@ -98,7 +98,7 @@ export async function migrateAuthoringSidecarOnLoad(input: {
       graphPreimage: Buffer.from(JSON.stringify(graph, null, 2) + '\n'),
       revision: graph.revision + 1,
       migrateGraphPreimage: (record, bytes) => migrateHistoryGraphPreimage({
-        record, bytes, storeId: input.storeId, registry: input.registry, history, snapshots, historicalSources,
+        record, bytes, storeId: input.storeId, registry: input.registry, history, historicalSources,
       }),
       rewindUndo: (record) => rewindUndoFromTransaction({
         record,
@@ -181,7 +181,6 @@ async function migrateHistoryGraphPreimage(input: {
   storeId: StoreId
   registry: RuntimeRootRegistry
   history: AuthoringHistoryStore
-  snapshots: Map<string, ExactAuthoringSourceSnapshot>
   historicalSources: Map<string, string>
 }): Promise<string> {
   let parsed: unknown
@@ -212,9 +211,7 @@ async function migrateHistoryGraphPreimage(input: {
     }
   }
   const components = validatedLegacy.graph.components
-  const currentSnapshotsUseConfig = Object.keys(components).some((componentId) =>
-    input.snapshots.get(componentId)?.sourceHashes['tsconfig.json'] !== undefined)
-  if (!validatedLegacy.hadEnvironmentFingerprint && currentSnapshotsUseConfig && sourceHashes['tsconfig.json'] === undefined) {
+  if (!validatedLegacy.hadEnvironmentFingerprint && Object.keys(components).length > 0 && sourceHashes['tsconfig.json'] === undefined) {
     throw namedError(
       'AUTHORING_MIGRATION_HISTORY_SOURCE_UNAVAILABLE',
       'historical compiler authority is unavailable: tsconfig.json',
