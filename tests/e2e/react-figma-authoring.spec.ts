@@ -496,7 +496,7 @@ test.describe('React Figma component authoring', () => {
     await expect(createButton).toBeEnabled()
     await page.unroute('**/api/dev/editor-authoring?**', refusePreview)
 
-    await page.keyboard.press('Escape')
+    await createDialog.getByRole('button', { name: 'Cancel' }).click()
     await expect(createDialog).toHaveCount(0)
     await page.getByTitle('Create component').click()
     await expect(createDialog).toBeVisible()
