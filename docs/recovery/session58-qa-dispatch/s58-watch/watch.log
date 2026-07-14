@@ -1,0 +1,480 @@
+2026-07-08 19:08:20 WATCHER START pid=38216
+19:08:20 COMMIT 3aa6603 feat(react-figma): component engine I1 (server) — add-state op (two-kind states)
+19:08:20 WT-DIRTY ?? src/app/(dev)/react-figma-components/_r4/;
+2026-07-08 19:09:40 WATCHER START pid=39473
+19:09:40 WT-DIRTY ?? src/app/(dev)/react-figma-components/_r4/;
+19:14:49 WT-DIRTY  M src/app/(dev)/react-figma/page.tsx;
+2026-07-08 19:19:14 WATCHER START pid=48726
+19:19:14 WT-DIRTY  M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;
+19:19:50 WT-DIRTY  M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;
+19:24:17 WT-DIRTY  M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/I1Probe.tsx;
+19:24:59 WT-DIRTY  M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/I1Probe.module.css;?? src/app/(dev)/react-figma-components/I1Probe.tsx;
+2026-07-08 19:26:16 WATCHER START pid=57270
+19:26:16 WT-DIRTY(info)  M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/I1Probe.module.css;?? src/app/(dev)/react-figma-components/I1Probe.tsx;
+19:29:25 COMMIT 6e5e757 feat(react-figma): component engine I1 (UI) — editTarget chips + inspector redirect (states e2e)
+19:34:26 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+19:35:07 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+19:36:17 COMMIT e33b06d feat(react-figma): component engine D6 — ComponentModel structure read (recursive JSX tree)
+19:44:34 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+19:45:16 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/FixProbe.module.css;?? src/app/(dev)/react-figma-components/FixProbe.tsx;
+19:46:21 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/FixProbe.module.css;?? src/app/(dev)/react-figma-components/FixProbe.tsx;
+19:49:43 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/FixProbe.module.css;?? src/app/(dev)/react-figma-components/FixProbe.tsx;
+19:50:26 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/GateProbe.tsx;
+19:51:29 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/GateProbe.module.css;?? src/app/(dev)/react-figma-components/GateProbe.tsx;
+19:54:45 COMMIT d671909 fix(react-figma I1): derive semantic states from prop presence + idempotent add-state
+20:14:49 WT-DIRTY  M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/FMProbe.module.css;?? src/app/(dev)/react-figma-components/FMProbe.tsx;
+20:15:37 WT-DIRTY  M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/FMProbe.module.css;?? src/app/(dev)/react-figma-components/FMProbe.tsx;
+20:16:36 WT-DIRTY(info)  M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/FMProbe.module.css;?? src/app/(dev)/react-figma-components/FMProbe.tsx;
+20:19:54 WT-DIRTY  M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/FMProbe.module.css;?? src/app/(dev)/react-figma-components/FMProbe.tsx;
+20:20:37 WT-DIRTY  M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/FMProbe.module.css;?? src/app/(dev)/react-figma-components/FMProbe.tsx;
+20:21:36 WT-DIRTY(info)  M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/BtnProbe.tsx;?? src/app/(dev)/react-figma-components/FMProbe.module.css;?? src/app/(dev)/react-figma-components/FMProbe.tsx;
+20:24:56 COMMIT e0bf6fb fix(react-figma I1): F-M1 idempotent base transition + F-M2 root-tag-aware disabled
+20:34:58 WT-DIRTY  M src/app/(dev)/react-figma/page.tsx;?? src/app/(dev)/react-figma-components/UIProbe.tsx;
+20:35:38 WT-DIRTY  M src/app/(dev)/react-figma/page.tsx;?? src/app/(dev)/react-figma-components/UIProbe.tsx;
+20:36:39 WT-DIRTY(info)  M src/app/(dev)/react-figma/page.tsx;?? src/app/(dev)/react-figma-components/UIProbe.tsx;
+20:40:08 WT-DIRTY  M src/app/(dev)/react-figma/page.tsx;
+20:40:38 WT-DIRTY  M src/app/(dev)/react-figma/page.tsx;
+20:41:39 WT-DIRTY(info)  M src/app/(dev)/react-figma/page.tsx;
+20:45:23 COMMIT a1a20da fix(react-figma I1): fire add-state for disabled-on-non-form via the chip + semantic preview
+20:50:24 WT-DIRTY ?? src/app/(dev)/react-figma-components/ChipProbe.tsx;
+20:50:42 WT-DIRTY ?? src/app/(dev)/react-figma-components/ChipProbe.tsx;
+20:51:48 WT-DIRTY(info) ?? src/app/(dev)/react-figma-components/ChipProbe.tsx;
+20:55:34 WT-DIRTY ?? src/app/(dev)/react-figma-components/ChipProbe.module.css;?? src/app/(dev)/react-figma-components/ChipProbe.tsx;
+20:55:48 WT-DIRTY ?? src/app/(dev)/react-figma-components/ChipProbe.module.css;?? src/app/(dev)/react-figma-components/ChipProbe.tsx;
+21:05:41 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+21:05:58 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+21:06:49 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;
+21:10:43 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/VarProbe.module.css;?? src/app/(dev)/react-figma-components/VarProbe.tsx;
+21:10:58 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/VarProbe.module.css;?? src/app/(dev)/react-figma-components/VarProbe.tsx;
+21:11:49 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/VarProbe.module.css;?? src/app/(dev)/react-figma-components/VarProbe.tsx;
+21:15:44 WT-DIRTY  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor-components/route.ts; M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/VarProbe.module.css;?? src/app/(dev)/react-figma-components/VarProbe.tsx;
+21:16:07 WT-DIRTY  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor-components/route.ts; M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/VarProbe.module.css;?? src/app/(dev)/react-figma-components/VarProbe.tsx;
+21:16:49 WT-DIRTY(info)  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor-components/route.ts; M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/VarProbe.module.css;?? src/app/(dev)/react-figma-components/VarProbe.tsx;
+21:20:53 WT-DIRTY  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor-components/route.ts; M src/app/api/dev/editor/lib.ts;
+21:21:15 WT-DIRTY  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor-components/route.ts; M src/app/api/dev/editor/lib.ts;
+21:21:54 COMMIT 0f7754d feat(react-figma I2): multi-axis config variants — mint-union-prop, add-variant-axis/value, composite scope, gallery prop-union render
+21:25:54 COMMIT 4180242 fix(react-figma I2): scopedSelector determinism is a COMPOSER property, not a caller convention
+21:40:56 WT-DIRTY  M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/DecProbe.tsx;
+21:41:16 WT-DIRTY  M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/DecProbe.tsx;
+21:41:58 WT-DIRTY(info)  M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/DecProbe.tsx;
+21:46:07 COMMIT 3ac7ecf fix(react-figma I2): unified rule model — decompose combinatorial selectors on READ (§0)
+21:52:06 WT-DIRTY(info) ?? src/app/(dev)/_meta_i2_probe/;
+22:01:10 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/BlkProbe.module.css;?? src/app/(dev)/react-figma-components/BlkProbe.tsx;
+22:01:27 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/BlkProbe.module.css;?? src/app/(dev)/react-figma-components/BlkProbe.tsx;
+22:02:07 COMMIT a5b956a fix(react-figma I3-entry): reserved React prop-name blocklist in mint-union-prop (F-M5)
+22:06:20 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/PropProbe.module.css;?? src/app/(dev)/react-figma-components/PropProbe.tsx;
+22:06:33 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/PropProbe.module.css;?? src/app/(dev)/react-figma-components/PropProbe.tsx;
+22:07:09 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/PropProbe.module.css;?? src/app/(dev)/react-figma-components/PropProbe.tsx;
+22:11:30 COMMIT 9523737 feat(react-figma I3): expose-as-prop — the custom-property bridge (§5)
+22:11:30 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/InstProbe.tsx;
+22:11:42 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/InstProbe.tsx;
+22:12:18 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/HostProbe.tsx;?? src/app/(dev)/react-figma-components/InstProbe.tsx;
+22:16:40 COMMIT 0161941 feat(react-figma I3): set-instance-prop — per-instance prop override
+22:16:40 WT-DIRTY  M src/app/(dev)/react-figma/page.tsx;
+22:16:52 WT-DIRTY  M src/app/(dev)/react-figma/page.tsx;
+22:17:18 WT-DIRTY(info)  M src/app/(dev)/react-figma/page.tsx;
+22:21:45 COMMIT 523481e feat(react-figma I3): props in the client model + props panel display
+22:26:46 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+22:26:57 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+22:27:19 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;
+22:31:47 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/I3AttrProbe.tsx;?? src/app/(dev)/react-figma-components/I3StyleProbe.tsx;?? src/app/(dev)/react-figma-components/I3TextProbe.tsx;
+22:31:57 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/I3AttrProbe.tsx;?? src/app/(dev)/react-figma-components/I3StyleProbe.tsx;?? src/app/(dev)/react-figma-components/I3TextProbe.tsx;
+22:32:19 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/I3AttrProbe.tsx;?? src/app/(dev)/react-figma-components/I3StyleProbe.tsx;?? src/app/(dev)/react-figma-components/I3TextProbe.tsx;
+22:36:51 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/BridgeProbe.module.css;?? src/app/(dev)/react-figma-components/BridgeProbe.tsx;?? src/app/(dev)/react-figma-components/I3AttrProbe.tsx;?? src/app/(dev)/react-figma-components/I3StyleProbe.tsx;?? src/app/(dev)/react-figma-components/I3TextProbe.tsx;
+22:37:00 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/BridgeProbe.module.css;?? src/app/(dev)/react-figma-components/BridgeProbe.tsx;?? src/app/(dev)/react-figma-components/I3AttrProbe.tsx;?? src/app/(dev)/react-figma-components/I3StyleProbe.tsx;?? src/app/(dev)/react-figma-components/I3TextProbe.tsx;
+22:37:20 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/BridgeProbe.module.css;?? src/app/(dev)/react-figma-components/BridgeProbe.tsx;?? src/app/(dev)/react-figma-components/I3AttrProbe.tsx;?? src/app/(dev)/react-figma-components/I3StyleProbe.tsx;?? src/app/(dev)/react-figma-components/I3TextProbe.tsx;
+22:41:52 COMMIT 0e55ce7 feat(react-figma I3): complete expose-as-prop's 4-route signature (§5)
+22:56:55 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+22:57:06 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+22:57:27 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;
+23:01:58 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/CastProbe.module.css;?? src/app/(dev)/react-figma-components/CastProbe.tsx;
+23:02:14 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/CastProbe.module.css;?? src/app/(dev)/react-figma-components/CastProbe.tsx;
+23:02:35 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/CastProbe.module.css;?? src/app/(dev)/react-figma-components/CastProbe.tsx;
+23:07:00 COMMIT 7d67ac4 fix(react-figma I3): cast generated custom-property style to CSSProperties (QA HIGH)
+23:17:03 WT-DIRTY ?? src/app/(dev)/_meta_i3_probe/;?? src/app/(dev)/meta-i3-probe/;
+23:17:17 WT-DIRTY ?? src/app/(dev)/_meta_i3_probe/;?? src/app/(dev)/meta-i3-probe/;
+23:17:38 WT-DIRTY(info) ?? src/app/(dev)/_meta_i3_probe/;?? src/app/(dev)/meta-i3-probe/;
+23:27:48 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;
+23:32:17 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/RworkProbe.tsx;
+23:32:26 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/RworkProbe.tsx;
+23:32:56 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/Fm6Probe.module.css;?? src/app/(dev)/react-figma-components/Fm6Probe.tsx;?? src/app/(dev)/react-figma-components/RworkProbe.tsx;
+23:37:19 COMMIT 8978fa6 fix(react-figma I3): literal-swap default + bridge class-boundary (Meta F-M7/F-M6)
+23:52:35 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+23:52:42 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+23:53:14 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;
+00:03:33 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+00:03:38 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+00:04:02 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;
+12:11:40 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;
+12:11:40 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+12:11:40 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+12:16:41 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/SwProbe.module.css;?? src/app/(dev)/react-figma-components/SwProbe.tsx;
+12:16:42 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/SwProbe.module.css;?? src/app/(dev)/react-figma-components/SwProbe.tsx;
+12:16:42 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/SwProbe.module.css;?? src/app/(dev)/react-figma-components/SwProbe.tsx;
+12:21:47 COMMIT 5752078 feat(react-figma I4): connectors server core — set-connector both modes (§3.6)
+12:26:52 WT-DIRTY(info)  M src/app/(dev)/react-figma/page.tsx;?? src/app/(dev)/react-figma-components/ClickProbe.tsx;
+12:26:55 WT-DIRTY  M src/app/(dev)/react-figma/page.tsx;?? src/app/(dev)/react-figma-components/ClickProbe.tsx;
+12:26:55 WT-DIRTY  M src/app/(dev)/react-figma/page.tsx;?? src/app/(dev)/react-figma-components/ClickProbe.tsx;
+12:32:01 WT-DIRTY(info)  M src/app/(dev)/react-figma/page.tsx;?? src/app/(dev)/react-figma-components/ClickProbe.module.css;?? src/app/(dev)/react-figma-components/ClickProbe.tsx;
+12:32:06 WT-DIRTY  M src/app/(dev)/react-figma/page.tsx;?? src/app/(dev)/react-figma-components/ClickProbe.module.css;?? src/app/(dev)/react-figma-components/ClickProbe.tsx;
+12:32:06 WT-DIRTY  M src/app/(dev)/react-figma/page.tsx;?? src/app/(dev)/react-figma-components/ClickProbe.module.css;?? src/app/(dev)/react-figma-components/ClickProbe.tsx;
+12:37:04 WT-DIRTY(info)  M src/app/(dev)/react-figma/page.tsx;
+12:37:08 WT-DIRTY M  src/app/(dev)/react-figma/page.tsx;
+12:42:07 COMMIT 7239646 feat(react-figma I4): minimal connector-authoring trigger (client) — §10-I4 live gate
+13:02:12 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/RwFixProbe.tsx;
+13:02:13 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/RwFixProbe.tsx;
+13:02:15 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/RwFixProbe.tsx;
+13:07:21 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/RwFixProbe.tsx;
+13:07:24 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/RwFixProbe.tsx;
+13:07:26 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/RwFixProbe.tsx;
+13:12:27 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/RwFixProbe.module.css;?? src/app/(dev)/react-figma-components/RwFixProbe.tsx;
+13:12:33 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/RwFixProbe.module.css;?? src/app/(dev)/react-figma-components/RwFixProbe.tsx;
+13:12:33 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/RwFixProbe.module.css;?? src/app/(dev)/react-figma-components/RwFixProbe.tsx;
+13:17:36 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/RwFixProbe.module.css;?? src/app/(dev)/react-figma-components/RwFixProbe.tsx;
+13:17:45 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/RwFixProbe.module.css;?? src/app/(dev)/react-figma-components/RwFixProbe.tsx;
+13:17:46 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/RwFixProbe.module.css;?? src/app/(dev)/react-figma-components/RwFixProbe.tsx;
+13:22:44 COMMIT eeaecae fix(react-figma I4): F1 cycle-tsc union + F2 state-connector round-trip — §10-I4 QA rework
+13:37:54 WT-DIRTY(info) ?? src/app/(dev)/_meta_i4_probe/;
+13:37:58 WT-DIRTY ?? src/app/(dev)/_meta_i4_probe/;
+13:37:58 WT-DIRTY ?? src/app/(dev)/_meta_i4_probe/;
+13:42:56 WT-DIRTY(info) ?? src/app/(dev)/_meta_i4_probe/;?? src/app/(dev)/meta-i4-probe/;
+13:43:00 WT-DIRTY ?? src/app/(dev)/_meta_i4_probe/;?? src/app/(dev)/meta-i4-probe/;
+13:43:00 WT-DIRTY ?? src/app/(dev)/_meta_i4_probe/;?? src/app/(dev)/meta-i4-probe/;
+13:48:04 WT-DIRTY(info) ?? src/app/(dev)/_meta_i4_probe/;?? src/app/(dev)/meta-i4-probe/;
+13:48:11 WT-DIRTY ?? src/app/(dev)/_meta_i4_probe/;?? src/app/(dev)/meta-i4-probe/;
+13:48:11 WT-DIRTY ?? src/app/(dev)/_meta_i4_probe/;?? src/app/(dev)/meta-i4-probe/;
+13:53:13 WT-DIRTY(info) ?? src/app/(dev)/_meta_i4_probe/;?? src/app/(dev)/meta-i4-probe/;
+13:53:22 WT-DIRTY ?? src/app/(dev)/_meta_i4_probe/;?? src/app/(dev)/meta-i4-probe/;
+13:53:22 WT-DIRTY ?? src/app/(dev)/_meta_i4_probe/;?? src/app/(dev)/meta-i4-probe/;
+14:13:14 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;
+14:13:24 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+14:13:24 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+14:18:14 COMMIT 99a9ea2 fix(react-figma I4): F-M8 second-switch merge + F-M9 switched-axis default — §10-I4 Meta rework
+14:43:17 WT-DIRTY(info)  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx;
+14:43:26 WT-DIRTY  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx;
+14:43:26 WT-DIRTY  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx;
+14:43:26 EDITOR-500
+14:43:26 EDITOR-500
+14:48:25 WT-DIRTY(info)  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx;
+14:48:25 EDITOR-500
+14:48:27 WT-DIRTY  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx;
+14:48:27 WT-DIRTY  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx;
+14:48:27 EDITOR-500
+14:48:27 EDITOR-500
+14:53:26 WT-DIRTY(info)  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx;
+14:53:26 EDITOR-500
+14:53:28 WT-DIRTY  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx;
+14:53:28 WT-DIRTY  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx;
+14:53:28 EDITOR-500
+14:53:28 EDITOR-500
+14:58:27 WT-DIRTY(info)  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx;
+14:58:29 WT-DIRTY  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx;
+14:58:29 WT-DIRTY  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx;
+15:03:27 WT-DIRTY(info)  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx;?? src/app/(dev)/react-figma-components/I5Probe.module.css;?? src/app/(dev)/react-figma-components/I5Probe.tsx;
+15:03:30 WT-DIRTY  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx;?? src/app/(dev)/react-figma-components/I5Probe.module.css;?? src/app/(dev)/react-figma-components/I5Probe.tsx;
+15:03:30 WT-DIRTY  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx;?? src/app/(dev)/react-figma-components/I5Probe.module.css;?? src/app/(dev)/react-figma-components/I5Probe.tsx;
+15:08:31 COMMIT 9b0c327 feat(react-figma I5): variant board UI — axis-grouped frames + state ghost slots + board authoring (§10-I5)
+15:23:33 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/Fi5Probe.module.css;?? src/app/(dev)/react-figma-components/Fi5Probe.tsx;
+15:23:33 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/Fi5Probe.module.css;?? src/app/(dev)/react-figma-components/Fi5Probe.tsx;
+15:23:33 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/Fi5Probe.module.css;?? src/app/(dev)/react-figma-components/Fi5Probe.tsx;
+15:28:34 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;
+15:28:35 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+15:28:35 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+15:33:34 COMMIT b7230f9 fix(react-figma I5): F-I5-1 mintUnionProp aliased-binding + cycle-sync — §10-I5 QA rework
+15:43:37 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;
+15:43:37 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+15:43:37 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+15:48:37 COMMIT 11c155b fix(react-figma I5): F-I5-2 add-state name-vs-type collision guard — §10-I5 QA closure rework
+15:58:38 WT-DIRTY ?? src/app/(dev)/react-figma-components/probe/;
+15:58:38 WT-DIRTY ?? src/app/(dev)/react-figma-components/probe/;
+15:58:38 WT-DIRTY(info) ?? src/app/(dev)/react-figma-components/probe/;
+16:03:39 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;
+16:03:41 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+16:03:41 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+16:08:40 COMMIT e2957f1 fix(react-figma I5): F-M11 mintUnionProp EXTEND state-name guard — §10-I5 Meta rework
+16:08:40 WT-DIRTY(info)  M src/app/(dev)/react-figma/page.tsx;
+16:08:42 WT-DIRTY  M src/app/(dev)/react-figma/page.tsx;
+16:08:43 WT-DIRTY  M src/app/(dev)/react-figma/page.tsx;
+16:13:43 COMMIT a7e9cca fix(react-figma I5): F-M11 board +axis client blocklist — §10-I5 Meta re-gate (op AND board input)
+16:23:45 WT-DIRTY(info) ?? src/app/(dev)/react-figma-components/probe2/;
+16:23:46 WT-DIRTY ?? src/app/(dev)/react-figma-components/probe2/;
+16:23:46 WT-DIRTY ?? src/app/(dev)/react-figma-components/probe2/;
+16:33:45 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;
+16:33:47 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+16:33:47 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+16:38:47 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/I6Probe.module.css;?? src/app/(dev)/react-figma-components/I6Probe.tsx;
+16:38:49 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/I6Probe.module.css;?? src/app/(dev)/react-figma-components/I6Probe.tsx;
+16:38:49 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/I6Probe.module.css;?? src/app/(dev)/react-figma-components/I6Probe.tsx;
+16:43:47 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/I6Probe.module.css;?? src/app/(dev)/react-figma-components/I6Probe.tsx;?? src/app/(dev)/react-figma-components/I6RemProbe.module.css;?? src/app/(dev)/react-figma-components/I6RemProbe.tsx;
+16:43:50 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+16:43:50 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+16:48:47 COMMIT 7064b83 feat(react-figma I6): structural variants — set-variant-structure (§3.9)
+16:58:49 WT-DIRTY(info) ?? src/app/(dev)/react-figma-components/I6ValidationProbe.module.css;?? src/app/(dev)/react-figma-components/I6ValidationProbe.tsx;
+16:58:49 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+16:58:54 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+16:58:55 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+17:03:50 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;
+17:04:02 COMMIT f69a0a3 fix(react-figma I6): validate axis/value against declared axes — F-I6-1
+17:23:52 COMMIT e04c34c fix(react-figma I6): emit the in-scope guard identifier — F-I6-2
+17:33:53 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/I6AplF.module.css;?? src/app/(dev)/react-figma-components/I6AplF.tsx;?? src/app/(dev)/react-figma-components/I6AswF.module.css;?? src/app/(dev)/react-figma-components/I6AswF.tsx;?? src/app/(dev)/react-figma-components/I6BareA.module.css;?? src/app/(dev)/react-figma-components/I6BareA.tsx;
+17:34:05 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+17:34:05 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+17:38:54 COMMIT 6eaa9d1 fix(react-figma I6): refuse aliased-without-const axis (option A) — F-I6-2 closure
+17:48:55 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/probe3/;
+17:49:08 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/probe3/;
+17:49:08 WT-DIRTY  M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/probe3/;
+17:53:57 COMMIT 5099f12 fix(react-figma I6): refuse nesting under ANY structural guard (§3.9 flat)
+17:53:57 WT-DIRTY(info) ?? src/app/(dev)/react-figma-components/I6NestProbe.module.css;?? src/app/(dev)/react-figma-components/I6NestProbe.tsx;
+19:44:05 WT-DIRTY(info) ?? src/app/(dev)/react-figma-components/audit/;
+19:44:14 WT-DIRTY ?? src/app/(dev)/react-figma-components/audit/;
+19:44:14 WT-DIRTY ?? src/app/(dev)/react-figma-components/audit/;
+19:54:06 WT-DIRTY(info)  M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;
+19:54:15 WT-DIRTY  M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;
+19:54:15 WT-DIRTY  M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;
+19:59:07 COMMIT 252aef3 fix(react-figma): post-completion audit batch 1 (F-A1, D-1/D-2/D-4/D-5)
+20:04:08 WT-DIRTY(info)  M src/app/(dev)/react-figma/page.tsx;
+20:04:16 WT-DIRTY  M src/app/(dev)/react-figma/page.tsx;
+20:04:16 WT-DIRTY  M src/app/(dev)/react-figma/page.tsx;
+20:09:08 COMMIT ed597a4 fix(react-figma): add engineWrite to 3 hook dep arrays (batch-1 zero-warning-added)
+20:29:10 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;
+20:29:18 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+20:29:18 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+20:34:10 WT-DIRTY(info)  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/rcprobe/;
+20:34:19 WT-DIRTY  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/rcprobe/;
+20:34:19 WT-DIRTY  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/rcprobe/;
+20:39:12 WT-DIRTY(info)  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/rcprobe/;
+20:39:20 WT-DIRTY  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/rcprobe/;
+20:39:20 WT-DIRTY  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/rcprobe/;
+20:44:13 WT-DIRTY(info)  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/rcprobe/;
+20:44:20 WT-DIRTY  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/rcprobe/;
+20:44:20 WT-DIRTY  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/rcprobe/;
+20:49:13 WT-DIRTY(info)  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/vprobe/;
+20:49:21 WT-DIRTY  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/vprobe/;
+20:49:21 WT-DIRTY  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/vprobe/;
+20:54:13 COMMIT 264d8a3 feat(react-figma I7): visual node system — ⚡ connector layer (Framer clone)
+21:14:15 WT-DIRTY(info)  M src/app/api/dev/editor/lib.ts;
+21:14:23 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+21:14:23 WT-DIRTY  M src/app/api/dev/editor/lib.ts;
+21:19:16 WT-DIRTY(info)  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/fnprobe/;
+21:19:24 WT-DIRTY  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/fnprobe/;
+21:19:24 WT-DIRTY  M src/app/(dev)/react-figma/components-canvas/page.tsx; M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;?? src/app/(dev)/react-figma-components/fnprobe/;
+21:24:16 COMMIT 5163990 fix(react-figma I7): fold 3-way audit findings — corrupt-write guard, toast, base-frame + margin routing
+21:34:18 WT-DIRTY(info)  M src/app/(dev)/react-figma/components-canvas/page.tsx;?? src/app/(dev)/react-figma-components/xprobe/;
+21:34:25 WT-DIRTY  M src/app/(dev)/react-figma/components-canvas/page.tsx;?? src/app/(dev)/react-figma-components/xprobe/;
+21:34:25 WT-DIRTY  M src/app/(dev)/react-figma/components-canvas/page.tsx;?? src/app/(dev)/react-figma-components/xprobe/;
+21:39:18 COMMIT d7898ca fix(react-figma I7): connector routing — approach targets from the top via nearest clear corridor (designer Part-2)
+21:39:18 WT-DIRTY(info) ?? src/app/(dev)/react-figma-components/NsAudit.module.css;?? src/app/(dev)/react-figma-components/NsAudit.tsx;
+21:39:25 WT-DIRTY ?? src/app/(dev)/react-figma-components/NsAudit.module.css;?? src/app/(dev)/react-figma-components/NsAudit.tsx;
+21:39:25 WT-DIRTY ?? src/app/(dev)/react-figma-components/NsAudit.module.css;?? src/app/(dev)/react-figma-components/NsAudit.tsx;
+22:44:22 COMMIT bcc878e refactor(react-figma I7): extract switchNames(axis) helper — E11.3 deslop D-1
+11:15:08 WT-DIRTY  M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;
+11:15:08 WT-DIRTY(info)  M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;
+11:15:08 WT-DIRTY  M src/app/(dev)/react-figma/page.tsx; M src/app/api/dev/editor/lib.ts;
+11:20:17 COMMIT 804ffe7 chore(react-figma): own the cleanups — kill redundant connector buttons + dead variant scope
+11:20:17 WT-DIRTY(info)  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+11:20:18 WT-DIRTY  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+11:20:18 WT-DIRTY  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+11:25:20 WT-DIRTY(info)  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+11:25:20 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+11:25:21 WT-DIRTY  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+11:25:21 WT-DIRTY  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+11:25:21 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+11:25:21 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+11:30:21 WT-DIRTY(info)  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+11:30:21 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+11:30:22 WT-DIRTY  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+11:30:22 WT-DIRTY  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+11:30:22 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+11:30:22 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+11:35:22 WT-DIRTY  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+11:35:22 WT-DIRTY  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+11:35:22 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+11:35:22 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+11:35:23 WT-DIRTY(info)  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+11:35:23 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+11:40:23 WT-DIRTY(info)  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+11:40:23 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+11:40:23 WT-DIRTY  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+11:40:23 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+11:40:24 WT-DIRTY  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+11:40:24 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+11:45:24 WT-DIRTY  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+11:45:24 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+11:45:24 WT-DIRTY  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+11:45:24 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+11:45:24 WT-DIRTY(info)  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+11:45:24 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+11:50:25 WT-DIRTY(info)  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+11:50:25 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+11:50:25 WT-DIRTY  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+11:50:25 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+11:50:25 WT-DIRTY  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+11:50:25 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+11:55:25 WT-DIRTY  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+11:55:25 WT-DIRTY  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+11:55:25 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+11:55:25 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+11:55:26 WT-DIRTY(info)  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+11:55:26 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:00:26 WT-DIRTY(info)  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:00:26 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:00:26 WT-DIRTY  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:00:26 WT-DIRTY  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:00:26 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:00:26 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:05:27 WT-DIRTY  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:05:27 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:05:27 WT-DIRTY  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:05:27 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:05:27 WT-DIRTY(info)  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:05:27 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:10:27 WT-DIRTY(info)  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:10:27 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:10:28 WT-DIRTY  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:10:28 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:10:28 WT-DIRTY  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:10:28 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:15:28 WT-DIRTY  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:15:28 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:15:28 WT-DIRTY  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:15:28 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:15:28 WT-DIRTY(info)  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:15:28 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:20:29 WT-DIRTY(info)  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:20:29 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:20:29 WT-DIRTY  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:20:29 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:20:29 WT-DIRTY  M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:20:29 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:25:30 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:25:30 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:25:30 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:25:30 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:25:30 WT-DIRTY(info)  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:25:30 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:30:30 WT-DIRTY(info)  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:30:30 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:30:31 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:30:31 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:30:31 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:30:31 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:35:31 WT-DIRTY(info)  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:35:31 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:35:32 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:35:32 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:35:33 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:35:33 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:40:32 WT-DIRTY(info)  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:40:32 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:40:33 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:40:33 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:40:33 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:40:33 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:45:33 WT-DIRTY(info)  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:45:33 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:45:34 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:45:34 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:45:34 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:45:34 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:50:34 WT-DIRTY(info)  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:50:34 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:50:34 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:50:34 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:50:34 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:50:34 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:55:34 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:55:34 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:55:35 WT-DIRTY(info)  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:55:35 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+12:55:35 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+12:55:35 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:00:35 WT-DIRTY(info)  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:00:35 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:00:35 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:00:35 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:00:35 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:00:35 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:05:35 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:05:35 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:05:36 WT-DIRTY(info)  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:05:36 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:05:36 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:05:36 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:10:36 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:10:36 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:10:36 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:10:36 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:10:36 WT-DIRTY(info)  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:10:36 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:15:36 WT-DIRTY(info)  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:15:36 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:15:37 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:15:37 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:15:37 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:15:37 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:20:37 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:20:37 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:20:37 WT-DIRTY(info)  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:20:37 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:20:38 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:20:38 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:25:37 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:25:37 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:25:38 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:25:38 WT-DIRTY(info)  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:25:38 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:25:38 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:30:38 WT-DIRTY(info)  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:30:38 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:30:38 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:30:38 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:30:39 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:30:39 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:35:39 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:35:39 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:35:39 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:35:39 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:35:40 WT-DIRTY(info)  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:35:40 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:40:40 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:40:40 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:40:40 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:40:40 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:40:41 WT-DIRTY(info)  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:40:41 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:45:40 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:45:40 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:45:41 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:45:41 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:45:41 WT-DIRTY(info)  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:45:41 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:50:42 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:50:42 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:50:42 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:50:42 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:50:42 WT-DIRTY(info)  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:50:42 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:55:45 WT-DIRTY(info)  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:55:45 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:55:48 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:55:48 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+13:55:48 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+13:55:48 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+14:00:46 WT-DIRTY(info)  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+14:00:46 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+14:00:49 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+14:00:49 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+14:00:49 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+14:00:49 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+14:05:48 WT-DIRTY(info)  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+14:05:48 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+14:05:50 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+14:05:50 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+14:05:51 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+14:05:51 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+14:10:49 WT-DIRTY(info)  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+14:10:49 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+14:10:51 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+14:10:51 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;
+14:10:51 WT-DIRTY  M ERRORS.md; M src/app/(dev)/converted/mother-v2/MotherV2.tsx;?? src/app/(dev)/react-figma-components/Component.tsx;
+14:10:51 LIB-POLLUTION  M src/buttons/DemoButton.tsx;?? src/buttons/DemoButton.module.css;

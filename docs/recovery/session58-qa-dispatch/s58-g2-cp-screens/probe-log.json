@@ -1,0 +1,94 @@
+[
+ [
+  "hash:initial-source",
+  "544c509e2bcc"
+ ],
+ [
+  "sidecar:initial",
+  "ABSENT"
+ ],
+ [
+  "latency:page->board-ms",
+  "1707"
+ ],
+ [
+  "breadcrumb",
+  "Components\n/\nMetaProbeCard"
+ ],
+ [
+  "variants:initial",
+  "[{\"id\":\"variant_37b38dd67910d55b\",\"name\":\"Primary\",\"left\":\"0px\",\"top\":\"0px\"}]"
+ ],
+ [
+  "computed:accents",
+  "{\"boardBorder\":\"rgb(151, 71, 255)\",\"breadcrumbColor\":\"rgb(134, 56, 229)\",\"createBtnBorder\":\"rgb(151, 71, 255)\"}"
+ ],
+ [
+  "selection:outline-after-pointerdown",
+  "[\"rgb(151, 71, 255) solid 2px\"]"
+ ],
+ [
+  "create:variants-after",
+  "[\"Primary\",\"Hover State\"]"
+ ],
+ [
+  "create:source-hash-changed",
+  "544c509e2bcc -> 996577fefa07"
+ ],
+ [
+  "create:sidecar",
+  "[{\"n\":\"Primary\",\"x\":0,\"y\":0},{\"n\":\"Hover State\",\"x\":360,\"y\":0}]"
+ ],
+ [
+  "create:source-contains-HoverState",
+  "true"
+ ],
+ [
+  "rename:variants-after",
+  "[\"Primary\",\"Pressed State\"]"
+ ],
+ [
+  "rename:source-hash-changed",
+  "996577fefa07 -> 1709d21c1347"
+ ],
+ [
+  "rename:source-contains-Pressed",
+  "true"
+ ],
+ [
+  "move:sidecar-geom",
+  "[{\"n\":\"Primary\",\"x\":0,\"y\":0},{\"n\":\"Pressed State\",\"x\":360,\"y\":0}] -> [{\"n\":\"Primary\",\"x\":0,\"y\":0},{\"n\":\"Pressed State\",\"x\":384,\"y\":0}]"
+ ],
+ [
+  "move:source-hash-UNCHANGED",
+  "TRUE (sidecar-only ✓)"
+ ],
+ [
+  "reload:variants-persisted",
+  "[{\"name\":\"Primary\",\"left\":\"0px\"},{\"name\":\"Pressed State\",\"left\":\"384px\"}]"
+ ],
+ [
+  "undo:enabled",
+  "true"
+ ],
+ [
+  "undo1:sidecar-geom-reverted",
+  "[{\"n\":\"Primary\",\"x\":0,\"y\":0},{\"n\":\"Pressed State\",\"x\":360,\"y\":0}]"
+ ],
+ [
+  "undo1:source-hash-UNCHANGED",
+  "TRUE (move undo sidecar-only ✓)"
+ ],
+ [
+  "undo2:variants",
+  "[\"Primary\",\"Hover State\"]"
+ ],
+ [
+  "undo2:source-back-to-HoverState",
+  "true"
+ ],
+ [
+  "console:errors-warnings",
+  "NONE"
+ ]
+]
