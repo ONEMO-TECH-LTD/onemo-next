@@ -178,6 +178,26 @@ test('P4 keeps a live opacity binding fragment-owned when its current value is n
   assert.deepEqual(p4Failures(model, plan), { G6: false, G7: false });
 });
 
+test('P4 carries fixed-box text vertical alignment and the independent oracle bites drift', () => {
+  const model = fixture();
+  const text = model.documentGraph.nodes.find((row) => row.id === 'text');
+  Object.assign(text.properties, {
+    layoutSizingVertical: 'FIXED', size: { x: 40, y: 16 },
+    style: { textAlignVertical: 'CENTER', textAutoResize: 'NONE', lineHeightPx: 12 },
+  });
+  Object.assign(model, sealCanonicalModelContent(model));
+  const plan = buildLayoutRenderPlan(model);
+  const content = plan.render.nodes.find((row) => row.nodeId === 'text').fragments.find((row) => row.role === 'content');
+  assert.deepEqual(content.payload.textLayout, { alignVertical: 'CENTER', autoResize: 'NONE', sizingVertical: 'FIXED', lineHeightPx: 12 });
+  const drift = structuredClone(plan);
+  drift.render.nodes.find((row) => row.nodeId === 'text').fragments.find((row) => row.role === 'content').payload.textLayout.alignVertical = 'TOP';
+  assert.equal(p4Failures(model, drift).G7, true);
+  const invalid = structuredClone(model);
+  invalid.documentGraph.nodes.find((row) => row.id === 'text').properties.style.textAlignVertical = 'MIDDLEISH';
+  Object.assign(invalid, sealCanonicalModelContent(invalid));
+  assert.throws(() => buildLayoutRenderPlan(invalid), /textAlignVertical/);
+});
+
 test('P4 oracle refuses forged semantic ownership for an unowned CSS opacity binding', () => {
   const source = fixture();
   const forged = buildLayoutRenderPlan(source);

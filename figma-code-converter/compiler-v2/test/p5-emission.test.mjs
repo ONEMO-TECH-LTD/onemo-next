@@ -24,7 +24,11 @@ function fixtureOutput() {
     paddingTop: 4, paddingRight: 8, paddingBottom: 12, paddingLeft: 16,
     cornerRadius: 8,
   });
-  snapshot.document.children.push({ id: 'plain-text', type: 'TEXT', name: 'Plain editorial', characters: '<Look & listen>', children: [] });
+  snapshot.document.children.push({
+    id: 'plain-text', type: 'TEXT', name: 'Plain editorial', characters: '<Look & listen>',
+    layoutSizingVertical: 'FIXED', size: { x: 120, y: 16 },
+    style: { textAlignVertical: 'CENTER', textAutoResize: 'NONE', lineHeightPx: 12 }, children: [],
+  });
   const nested = snapshot.document.children.find((node) => node.id === 'nested');
   nested.opacity = 0.5;
   nested.boundVariables = { opacity: { type: 'VARIABLE_ALIAS', id: 'V_FLOAT_2' } };
@@ -75,6 +79,7 @@ test('P5 emits one deterministic production-shaped package with independent G8/G
   assert.ok(first.packageOutput.files['tokens.css'].includes('--velvet-ink'));
   assert.match(first.packageOutput.files['tokens.css'], /opacity-normalized: 85;/);
   assert.match(first.packageOutput.files[Object.keys(first.packageOutput.files).find((path) => path.startsWith('styles/'))], /opacity: calc\(var\(.+\) \/ 100\);/);
+  assert.match(first.packageOutput.files[Object.keys(first.packageOutput.files).find((path) => path.startsWith('styles/'))], /align-content: center;/);
   assert.ok(first.packageOutput.files['mode-contexts.ts'].includes('resolveModeContext'));
   assert.equal(JSON.parse(first.packageOutput.files['capability-report.json']).state, 'DIAGNOSTIC_ONLY');
   const componentFile = first.packageOutput.files[Object.keys(first.packageOutput.files).find((path) => path.startsWith('components/'))];
@@ -93,6 +98,18 @@ test('P5 emits one deterministic production-shaped package with independent G8/G
   assert.throws(() => rebuildPackage(first, { semanticSlice: forgedSemanticOnly }), /SemanticSlice disagrees/);
   const forgedLayout = structuredClone(first.layoutRenderPlan); forgedLayout.layout.nodes[0].bounds.width += 1;
   assert.throws(() => rebuildPackage(first, { layoutRenderPlan: forgedLayout }), /LayoutRenderPlan disagrees/);
+});
+
+test('P5 independent G8 proof requires emitted fixed-box vertical alignment', () => {
+  const output = fixtureOutput();
+  const segment = output.packageOutput.sourceMap.segments.find((row) =>
+    row.nodeId === 'plain-text' && row.sourcePath === '/style/textAlignVertical' && row.cssProperty === 'align-content');
+  assert.equal(segment.text, 'center');
+  const missing = structuredClone(output);
+  missing.packageOutput.sourceMap.segments = missing.packageOutput.sourceMap.segments.filter((row) => row.segmentId !== segment.segmentId);
+  missing.packageOutput.files['source-map.json'] = `${canonicalJson(missing.packageOutput.sourceMap)}\n`;
+  resealTestManifest(missing.packageOutput);
+  assert.equal(p5Failures(missing).G8, true);
 });
 
 test('P5 security boundaries reject SVG, CSS, URL, and path payloads before output', () => {

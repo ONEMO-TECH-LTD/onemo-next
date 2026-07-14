@@ -196,6 +196,7 @@ function fragmentsOf({ nodeId, source, bounds, transform, bindings }) {
   const blendMode = blendModeOf(source.blendMode, `${nodeId}.blendMode`, true);
   const opacity = unitIntervalOf(source.opacity ?? 1, `${nodeId}.opacity`);
   const cornerSmoothing = unitIntervalOf(source.cornerSmoothing ?? 0, `${nodeId}.cornerSmoothing`);
+  const textLayout = textLayoutOf(source, nodeId);
   const shapeGeometry = shapeGeometryOf(source, nodeId, cornerSmoothing);
   const hasOpacityBinding = bindings.some((record) => record.source.nodeId === nodeId && pathOwns('/opacity', record.source.propertyPath));
   const push = (role, sourcePath, sourceIndex, payload, decorative = true, bindingPaths = [sourcePath]) => {
@@ -222,7 +223,11 @@ function fragmentsOf({ nodeId, source, bounds, transform, bindings }) {
     blendModeOf(paint.blendMode, `${nodeId}.fills[${index}].blendMode`, false);
     push('paint', `/fills/${index}`, index, paint);
   });
-  push('content', '/content', null, { nodeType: source.type, visible: source.visible !== false, cornerRadius: source.cornerRadius ?? null, rectangleCornerRadii: source.rectangleCornerRadii ?? null, cornerSmoothing }, false, source.clipsContent === true ? [] : ['/cornerRadius', '/rectangleCornerRadii', '/cornerSmoothing']);
+  push('content', '/content', null, {
+    nodeType: source.type, visible: source.visible !== false,
+    cornerRadius: source.cornerRadius ?? null, rectangleCornerRadii: source.rectangleCornerRadii ?? null,
+    cornerSmoothing, ...(textLayout ? { textLayout } : {}),
+  }, false, source.clipsContent === true ? [] : ['/cornerRadius', '/rectangleCornerRadii', '/cornerSmoothing']);
   visibleArray(source.strokes, nodeId, 'strokes').forEach(({ entry: stroke, index }, visibleIndex) => {
     if (!STROKE_TYPES.has(stroke.type)) throw new LayoutRenderError('FAILED_CAPABILITY', `node ${nodeId} has unsupported stroke ${stroke.type}`);
     blendModeOf(stroke.blendMode, `${nodeId}.strokes[${index}].blendMode`, false);
@@ -239,6 +244,17 @@ function fragmentsOf({ nodeId, source, bounds, transform, bindings }) {
     push('vector', '/vector', null, { vectorNetwork }, true, ['/vectorNetwork']);
   }
   return fragments;
+}
+
+function textLayoutOf(source, nodeId) {
+  if (source.type !== 'TEXT') return null;
+  const style = source.style === undefined ? {} : source.style;
+  if (!style || typeof style !== 'object' || Array.isArray(style)) throw new LayoutRenderError('FAILED_CAPABILITY', `node ${nodeId} text style must be an object`);
+  const alignVertical = oneOf(style.textAlignVertical ?? 'TOP', ['TOP', 'CENTER', 'BOTTOM'], `${nodeId}.style.textAlignVertical`);
+  const autoResize = oneOf(style.textAutoResize ?? 'NONE', ['NONE', 'WIDTH_AND_HEIGHT', 'HEIGHT', 'TRUNCATE'], `${nodeId}.style.textAutoResize`);
+  const sizingVertical = oneOf(source.layoutSizingVertical ?? 'FIXED', ['FIXED', 'HUG', 'FILL'], `${nodeId}.layoutSizingVertical`);
+  const lineHeightPx = style.lineHeightPx === undefined ? null : nonNegativeFinite(style.lineHeightPx, `${nodeId}.style.lineHeightPx`);
+  return { alignVertical, autoResize, sizingVertical, lineHeightPx };
 }
 
 function worldResolver(nodesById, localById) {

@@ -63,7 +63,9 @@ Decisions/Done/cutover: Dan only.
 1. **Baselines separated**: clean broken baseline = `6c36475`; operating delta = `f37de9e`.
    E1–E13 reproduction method = hermetic per-E-row microfixtures run against the baseline
    converter (per finding F-P0.1 — the live-cache replay instruction is WITHDRAWN as
-   impossible). [pending — fixture build]
+   impossible). The harness now loads the exact baseline modules from Git with pinned source
+   hashes, reproduces E1–E13, and distinguishes operating-delta fixes from Compiler v2 plan/
+   snapshot evidence. [BUILDER GREEN — awaiting authoritative snapshot review]
 2. **Mother screen selection**: OPEN — §14.2 lists "current Shape screen" AND a separate "one
    real current ONEMO mother screen, selected and version-pinned with Dan at P0; Shape or a
    synthetic fixture cannot substitute for it". Shape stays its own integration fixture and
@@ -72,8 +74,11 @@ Decisions/Done/cutover: Dan only.
    `reference:null` → DIAGNOSTIC_ONLY per §4.5 (honest, logged). [BLOCKED on G-4]
 3. **Hermetic fixtures**: committed synthetic replacement for the lost gitignored legacy golden
    now preserves the 60-node structural/emission/fresh-IR reverse laws without claiming plugin
-   provenance; legacy suite is 49/49/0. Sanitized Shape E1-E13 microfixtures remain pending.
-   [PARTIAL SNAPSHOT CLEAR `8df8b1b` — missing-golden failure closed]
+   provenance; legacy suite is 49/49/0. The separate E1–E13 microfixture harness is synthetic,
+   hash-pinned to baseline `6c36475`, and explicitly non-plugin/non-integration. It reproduces
+   carrier/stop/effect/opacity/per-side/affine/invert/false-green/order/vector/atomicity/cache/text
+   failures and exercises current plan/snapshot mutations. [PARTIAL SNAPSHOT CLEAR `8df8b1b`;
+   E1–E13 harness awaiting review]
 4. **fidelity-budgets.json**: synchronized Figma/build pairs at one file version; repeat-run
    noise measured; per-class thresholds published with sample sizes + exclusions. [pending]
 5. **Capture operability envelope**: measured wall time/bytes/requests for REST nodes,
@@ -690,3 +695,17 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   structural, emission/id-map, and fresh-IR reverse laws passed. Reviewer focused boundary
   30/30/0 with syntax/diff/status green. This repairs only the lost gitignored golden; E1-E13,
   plugin corpus, P0 phase, integration, promotion, cutover, and Done remain uncleared.
+- 2026-07-14 Builder P0 E1–E13 regression checkpoint: added a hash-pinned loader for the actual
+  broken `6c36475f4b4afd04999cf6e110f8cb42c9b3e9a9` converter and hermetic microfixtures that
+  reproduce every recovery row without relying on today's changed Shape cache. E1/E2/E7/E13
+  distinguish the operating-delta corrections; E3–E6/E9/E10 remain visibly lossy in legacy and
+  are conserved as Compiler v2 binding/render-plan facts with independent mutations; E8 proves
+  the historical false-green reverse result; E11/E12 prove the historical non-atomic/unversioned
+  source law and the sealed Compiler v2 snapshot refusal. The pass exposed and repaired one real
+  adjacent gap: Compiler v2 now carries validated fixed-box text vertical alignment through P4,
+  emits `align-content` through P5, and independently rejects missing/drifted output. Focused
+  P0/P4/P5 boundary is 31/31/0. Full legacy + Compiler v2 rerun is 220/220/0; an initial full run
+  had one transient pre-existing P8 SQLite first-open `database is locked` failure, the isolated
+  race then passed and the complete rerun passed. This is Builder evidence awaiting sole
+  authoritative @s58-pixel-meta-qa review; it is not plugin/integration evidence, P0 exit,
+  promotion, cutover, or Done.

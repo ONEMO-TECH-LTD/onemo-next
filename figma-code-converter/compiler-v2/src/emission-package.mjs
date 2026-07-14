@@ -331,6 +331,11 @@ function cssDeclarations(source, node) {
     add('/paddingBottom', 'padding-bottom', `${formatNumber(node.layout.padding.bottom)}px`); add('/paddingLeft', 'padding-left', `${formatNumber(node.layout.padding.left)}px`);
   }
   if (source.cornerRadius !== undefined) add('/cornerRadius', 'border-radius', `${formatNumber(source.cornerRadius)}px`);
+  const textStyle = source.type === 'TEXT' ? (source.style ?? {}) : null;
+  const fixedTextBox = textStyle && (source.layoutSizingVertical ?? 'FIXED') === 'FIXED'
+    && ['NONE', 'TRUNCATE'].includes(textStyle.textAutoResize ?? 'NONE');
+  if (fixedTextBox && textStyle.textAlignVertical === 'CENTER') add('/style/textAlignVertical', 'align-content', 'center');
+  if (fixedTextBox && textStyle.textAlignVertical === 'BOTTOM') add('/style/textAlignVertical', 'align-content', 'end');
   add('/opacity', 'opacity', formatNumber(source.opacity ?? 1));
   const fill = source.fills?.find((paint) => paint?.visible !== false && paint.type === 'SOLID');
   if (fill) add(`/fills/${source.fills.indexOf(fill)}/color`, 'background-color', colorValue(fill.color));

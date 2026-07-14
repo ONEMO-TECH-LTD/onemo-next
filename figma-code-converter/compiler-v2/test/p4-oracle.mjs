@@ -142,7 +142,12 @@ function expectedFragments(node, bindings) {
   if (source.isMask === true) push('mask', '/mask', null, { maskType: source.maskType ?? 'ALPHA' }, true, ['/isMask', '/maskType']);
   if (source.clipsContent === true) push('clip', '/clipsContent', null, independentClipGeometry(source, cornerSmoothing), true, ['/clipsContent', '/cornerRadius', '/rectangleCornerRadii', '/cornerSmoothing']);
   visible(source.fills).forEach(({ entry, index }) => push('paint', `/fills/${index}`, index, entry));
-  push('content', '/content', null, { nodeType: source.type, visible: source.visible !== false, cornerRadius: source.cornerRadius ?? null, rectangleCornerRadii: source.rectangleCornerRadii ?? null, cornerSmoothing }, false, source.clipsContent === true ? [] : ['/cornerRadius', '/rectangleCornerRadii', '/cornerSmoothing']);
+  const textLayout = independentTextLayout(source);
+  push('content', '/content', null, {
+    nodeType: source.type, visible: source.visible !== false,
+    cornerRadius: source.cornerRadius ?? null, rectangleCornerRadii: source.rectangleCornerRadii ?? null,
+    cornerSmoothing, ...(textLayout ? { textLayout } : {}),
+  }, false, source.clipsContent === true ? [] : ['/cornerRadius', '/rectangleCornerRadii', '/cornerSmoothing']);
   visible(source.strokes).forEach(({ entry, index }, visibleIndex) => push('stroke', `/strokes/${index}`, index, { paint: entry, align: source.strokeAlign ?? 'INSIDE', weight: source.individualStrokeWeights ?? source.strokeWeight ?? 1, cap: source.strokeCap ?? 'NONE', join: source.strokeJoin ?? 'MITER', dashPattern: source.dashPattern ?? [] }, true, [`/strokes/${index}`, ...(visibleIndex === 0 ? ['/strokeWeight', '/individualStrokeWeights', '/strokeAlign', '/strokeCap', '/strokeJoin', '/dashPattern'] : [])]));
   visible(source.effects).forEach(({ entry, index }) => push('effect', `/effects/${index}`, index, entry));
   if (VECTOR_PATH_TYPES.has(source.type)) push('vector', '/vector', null, { vectorNetwork: source.vectorNetwork }, true, ['/vectorNetwork']);
@@ -176,6 +181,15 @@ function independentClipGeometry(source, cornerSmoothing) {
   return radius > 0 ? { shape: 'rounded-rect', cornerRadii: [radius, radius, radius, radius], cornerSmoothing } : { shape: 'rect', cornerSmoothing };
 }
 
+function independentTextLayout(source) {
+  if (source.type !== 'TEXT') return null;
+  const style = source.style ?? {};
+  return {
+    alignVertical: style.textAlignVertical ?? 'TOP', autoResize: style.textAutoResize ?? 'NONE',
+    sizingVertical: source.layoutSizingVertical ?? 'FIXED', lineHeightPx: style.lineHeightPx ?? null,
+  };
+}
+
 function invalidVisibleCapability(nodes) {
   for (const node of nodes) {
     const source = node.properties;
@@ -184,6 +198,14 @@ function invalidVisibleCapability(nodes) {
     if (source.cornerRadius !== undefined && source.cornerRadius !== null && !nonNegative(source.cornerRadius)) return true;
     if (source.rectangleCornerRadii !== undefined && source.rectangleCornerRadii !== null && (!Array.isArray(source.rectangleCornerRadii) || source.rectangleCornerRadii.length !== 4 || !source.rectangleCornerRadii.every(nonNegative))) return true;
     if (source.isMask === true && !MASK_TYPES.has(source.maskType ?? 'ALPHA')) return true;
+    if (source.type === 'TEXT') {
+      const style = source.style;
+      if (style !== undefined && (!record(style))) return true;
+      if (!['TOP', 'CENTER', 'BOTTOM'].includes(style?.textAlignVertical ?? 'TOP')) return true;
+      if (!['NONE', 'WIDTH_AND_HEIGHT', 'HEIGHT', 'TRUNCATE'].includes(style?.textAutoResize ?? 'NONE')) return true;
+      if (!['FIXED', 'HUG', 'FILL'].includes(source.layoutSizingVertical ?? 'FIXED')) return true;
+      if (style?.lineHeightPx !== undefined && !nonNegative(style.lineHeightPx)) return true;
+    }
     for (const [field, types] of [['fills', FILL_TYPES], ['strokes', STROKE_TYPES], ['effects', EFFECT_TYPES]]) {
       if (source[field] !== undefined && !Array.isArray(source[field])) return true;
       for (const { entry } of visible(source[field])) {

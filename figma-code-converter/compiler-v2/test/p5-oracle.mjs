@@ -8,6 +8,7 @@ import { canonicalJson, sha256 } from '../src/evidence.mjs';
 export function p5Failures({ model, tokenPlan, modeContextPlan, semanticSlice, layoutRenderPlan, packageOutput }) {
   const files = packageOutput?.files ?? {};
   const sourceMap = packageOutput?.sourceMap;
+  const cssDeclarations = [];
   const typecheck = typecheckPackage(files);
   const checker = typecheck.program.getTypeChecker();
   let G8 = packageOutput?.schemaVersion !== 1;
@@ -23,6 +24,7 @@ export function p5Failures({ model, tokenPlan, modeContextPlan, semanticSlice, l
       try {
         const root = postcss.parse(content, { from: path });
         if (hasUnsafeCssCapability(root, path, files)) G8 = true;
+        root.walkRules((rule) => rule.walkDecls((declaration) => cssDeclarations.push({ file: path, selector: rule.selector, property: declaration.prop, value: declaration.value })));
       } catch { G8 = true; }
       if (/@import\b|expression\s*\(/i.test(content)) G8 = true;
     }
@@ -47,6 +49,17 @@ export function p5Failures({ model, tokenPlan, modeContextPlan, semanticSlice, l
   if (canonicalJson(parsedManifest) !== canonicalJson(packageOutput?.manifest) || canonicalJson(parsedSourceMap) !== canonicalJson(sourceMap)) G8 = true;
   const expectedInventory = Object.fromEntries(Object.entries(files).filter(([path]) => path !== 'manifest.json').sort().map(([path, content]) => [path, { sha256: sha256(content), bytes: Buffer.byteLength(content) }]));
   if (canonicalJson(parsedManifest?.files) !== canonicalJson(expectedInventory) || parsedManifest?.schemaVersion !== 1 || parsedManifest?.modelContentSeal !== model.contentSeal || parsedManifest?.rootId !== model.documentGraph.rootId) G8 = true;
+  for (const node of model.documentGraph.nodes) {
+    const source = node.properties;
+    const style = source.type === 'TEXT' ? (source.style ?? {}) : null;
+    const fixed = style && (source.layoutSizingVertical ?? 'FIXED') === 'FIXED' && ['NONE', 'TRUNCATE'].includes(style.textAutoResize ?? 'NONE');
+    const expected = fixed && style.textAlignVertical === 'CENTER' ? 'center' : fixed && style.textAlignVertical === 'BOTTOM' ? 'end' : null;
+    if (expected) {
+      const rows = (sourceMap?.segments ?? []).filter((row) => row.nodeId === node.id && row.sourcePath === '/style/textAlignVertical' && row.cssProperty === 'align-content');
+      const declarations = cssDeclarations.filter((row) => row.selector === `.n_${sha256(node.id).slice(0, 10)}` && row.property === 'align-content');
+      if (rows.length !== 1 || rows[0].text !== expected || !rows[0].file.endsWith('.css') || declarations.length !== 1 || declarations[0].value !== expected) G8 = true;
+    }
+  }
 
   let G13 = !sourceMap || sourceMap.schemaVersion !== 1 || sourceMap.modelContentSeal !== model.contentSeal;
   const ranges = [...(sourceMap?.elements ?? []), ...(sourceMap?.components ?? []), ...(sourceMap?.fragments ?? []), ...(sourceMap?.segments ?? [])];
