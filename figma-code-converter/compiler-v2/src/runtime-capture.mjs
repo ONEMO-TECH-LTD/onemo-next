@@ -24,9 +24,13 @@ export async function createMicrofixtureEnvironmentAuthority({ environmentManife
   return authority;
 }
 
-export async function captureRuntimeState({ chromium, chromePath, bundle, buildAuthority = bundle?.buildAuthority, modeContextPlan, tokenPlan, requiredState, fidelityBudgets, environmentManifest, environmentAuthority, reference = null, metricRegions = {} }) {
-  if (!chromium?.launch || !bundle?.publicDir || !requiredState?.id || !fidelityBudgets || !environmentManifest || !environmentAuthority) throw new RuntimeCaptureError('runtime capture inputs missing');
+export async function captureRuntimeState({ chromium, chromePath, bundle, buildAuthority = bundle?.buildAuthority, packageOutput, modeContextPlan, requiredState, fidelityBudgets, environmentManifest, environmentAuthority, reference = null, metricRegions = {} }) {
+  if (!chromium?.launch || !bundle?.publicDir || !packageOutput?.sourceMap || !requiredState?.id || !fidelityBudgets || !environmentManifest || !environmentAuthority) throw new RuntimeCaptureError('runtime capture inputs missing');
   await assertRuntimeBuild(bundle, buildAuthority);
+  if (sha256(canonicalJson(packageOutput)) !== bundle.packageHash) throw new RuntimeCaptureError('runtime package differs from authenticated build');
+  let registry;
+  try { registry = JSON.parse(packageOutput.files?.['token-registry.json']); }
+  catch { throw new RuntimeCaptureError('runtime package token registry missing or invalid'); }
   const declaredEnvironmentHash = sha256(canonicalJson(environmentManifest));
   if (fidelityBudgets.environmentManifestHash !== declaredEnvironmentHash || ENVIRONMENT_AUTHORITIES.get(environmentAuthority) !== declaredEnvironmentHash) throw new RuntimeCaptureError('runtime environment manifest lacks its approved authority');
   const environmentManifestHash = await verifyEnvironmentManifest(environmentManifest, chromePath);
@@ -79,7 +83,7 @@ export async function captureRuntimeState({ chromium, chromePath, bundle, buildA
           if (!out[binding.bindingId]) out[binding.bindingId] = { channelId: binding.channelId, modeContextId: binding.modeContextId, target: binding.target, resolvedValue };
         }
         return out;
-      }, { bindings: tokenPlan.bindings, channels: channelIndex(tokenPlan.registry) });
+      }, { bindings: packageOutput.sourceMap.bindings, channels: channelIndex(registry) });
       const environment = await page.evaluate(() => ({
         browserVersion: null,
         userAgent: navigator.userAgent,

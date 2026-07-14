@@ -1,4 +1,5 @@
 /** P6 verdict builder over authority-backed build, capture, visual, and editor evidence. */
+import postcss from 'postcss';
 import { canonicalJson, sha256 } from './evidence.mjs';
 import { selectComponent, selectFragment, selectSource } from './editor-adapter.mjs';
 import { assertRuntimeBuild } from './runtime-bundle.mjs';
@@ -217,6 +218,37 @@ async function assertEditorRuntime(run, packageOutput) {
   if (run.afterBuild.bundle.packageHash !== sha256(canonicalJson(packageOutput))) throw new Error('editor build does not bind selected package');
   await assertRuntimeCapture(run.runtimeCapture, run.runtimeCapture?.captureAuthority);
   if (run.runtimeCapture.bundle.buildHash !== run.afterBuild.bundle.buildHash) throw new Error('editor runtime does not bind editor build');
+  const expectedBindings = expectedPackageRuntimeBindings(packageOutput);
+  if (canonicalJson(run.runtimeCapture.runtime.bindings) !== canonicalJson(expectedBindings)) throw new Error('editor runtime bindings differ from edited package and token data');
+}
+
+function expectedPackageRuntimeBindings(packageOutput) {
+  let registry, reactValues;
+  try {
+    registry = JSON.parse(packageOutput.files['token-registry.json']);
+    reactValues = JSON.parse(packageOutput.files['token-values.ts'].match(/^export const reactTokenValues = ([\s\S]+) as const;\n\nexport function /)?.[1]);
+  } catch { throw new Error('edited package token runtime data is malformed'); }
+  const channels = new Map();
+  for (const entry of Object.values(registry.entries ?? {})) for (const channel of Object.values(entry.channels ?? {})) channels.set(channel.channelId, channel);
+  const cssValues = new Map();
+  try {
+    postcss.parse(packageOutput.files['tokens.css']).walkRules((rule) => {
+      const match = rule.selector.match(/^\[data-mode-context=(.+)\]$/);
+      const contextId = rule.selector === ':root' ? 'ø' : match ? JSON.parse(match[1]) : null;
+      if (contextId === null || cssValues.has(contextId)) throw new Error('token context selector');
+      const declarations = new Map();
+      rule.walkDecls((declaration) => declarations.set(declaration.prop, declaration.value));
+      cssValues.set(contextId, declarations);
+    });
+  } catch { throw new Error('edited package CSS token data is malformed'); }
+  return Object.fromEntries(packageOutput.sourceMap.bindings.map((binding) => {
+    const channel = channels.get(binding.channelId);
+    const resolvedValue = binding.target === 'css'
+      ? cssValues.get(binding.modeContextId)?.get(channel?.cssName)
+      : reactValues?.[channel?.tsSymbol]?.[binding.modeContextId];
+    if (resolvedValue === undefined) throw new Error(`binding ${binding.bindingId} lacks emitted runtime token data`);
+    return [binding.bindingId, { channelId: binding.channelId, modeContextId: binding.modeContextId, target: binding.target, resolvedValue }];
+  }));
 }
 
 function assertLocalizedSegmentDiff(before, after, beforeSegment, afterSegment) {
@@ -229,7 +261,10 @@ function assertLocalizedSegmentDiff(before, after, beforeSegment, afterSegment) 
   const afterById = new Map(after.sourceMap.segments.map((row) => [row.segmentId, row]));
   for (const row of before.sourceMap.segments) {
     const next = afterById.get(row.segmentId);
-    if (!next || (row.segmentId !== beforeSegment.segmentId && row.text !== next.text) || row.nodeId !== next.nodeId || row.kind !== next.kind || row.modeContextId !== next.modeContextId) throw new Error('unaddressed source-map segment identity/content drift');
+    const containsEditedSegment = row.startByte <= beforeSegment.startByte && row.endByte >= beforeSegment.endByte
+      && next?.startByte <= afterSegment.startByte && next?.endByte >= afterSegment.endByte;
+    if (!next || (row.segmentId !== beforeSegment.segmentId && row.text !== next.text && !containsEditedSegment)
+      || row.nodeId !== next.nodeId || row.kind !== next.kind || row.modeContextId !== next.modeContextId) throw new Error('unaddressed source-map segment identity/content drift');
   }
 }
 

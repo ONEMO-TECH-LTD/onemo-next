@@ -43,14 +43,16 @@ export function saveSegmentEdit(packageOutput, editorAuthority, edit) {
   const replacement = replacementFor(segment, edit);
   const source = Buffer.from(output.files?.[segment.file] ?? '', 'utf8');
   if (segment.endByte > source.length || source.subarray(segment.startByte, segment.endByte).toString('utf8') !== segment.text) throw new EditorError('segment range/text is stale');
+  const originalStart = segment.startByte;
+  const originalEnd = segment.endByte;
   const replacementBytes = Buffer.from(replacement, 'utf8');
-  const updated = Buffer.concat([source.subarray(0, segment.startByte), replacementBytes, source.subarray(segment.endByte)]);
-  const delta = replacementBytes.length - (segment.endByte - segment.startByte);
+  const updated = Buffer.concat([source.subarray(0, originalStart), replacementBytes, source.subarray(originalEnd)]);
+  const delta = replacementBytes.length - (originalEnd - originalStart);
   for (const row of allRanges(output.sourceMap).filter((row) => row.file === segment.file)) {
     if (row.segmentId === segment.segmentId) row.endByte = row.startByte + replacementBytes.length;
-    else if (row.startByte >= segment.endByte) { row.startByte += delta; row.endByte += delta; }
-    else if (row.startByte <= segment.startByte && row.endByte >= segment.endByte) row.endByte += delta;
-    else if (row.endByte > segment.startByte && row.startByte < segment.endByte) throw new EditorError(`segment ${row.segmentId ?? row.nodeId ?? row.fragmentId} partially overlaps edit`);
+    else if (row.startByte >= originalEnd) { row.startByte += delta; row.endByte += delta; }
+    else if (row.startByte <= originalStart && row.endByte >= originalEnd) row.endByte += delta;
+    else if (row.endByte > originalStart && row.startByte < originalEnd) throw new EditorError(`segment ${row.segmentId ?? row.nodeId ?? row.fragmentId} range ${row.startByte}-${row.endByte} partially overlaps edit ${segment.segmentId} range ${originalStart}-${originalEnd}`);
   }
   output.files[segment.file] = updated.toString('utf8');
   for (const row of allRanges(output.sourceMap).filter((row) => row.file === segment.file && row.text !== undefined)) row.text = updated.subarray(row.startByte, row.endByte).toString('utf8');

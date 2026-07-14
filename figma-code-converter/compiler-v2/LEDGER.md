@@ -84,13 +84,13 @@ Decisions/Done/cutover: Dan only.
    noise measured; per-class thresholds published with sample sizes + exclusions. [pending]
 5. **Capture operability envelope**: measured wall time/bytes/requests for REST nodes,
    variables payload, svg exports on Shape (local file). Remote-heavy corpus: GAP-1. [pending]
-6. **Editor round-trip corpus pinned**: EC1 padding and EC2 asymmetric per-corner radius edits
-   now preserve untouched slots, token expressions, source identity, mode/render order, rotating
-   editor authority, localized files, rebuilt package identity, and authority-backed runtime
-   capture. P5 independently parses the emitted radius declarations; P6 independently exposes
-   per-case acceptance/refusal. Token-expression/component-prop/scoped-mode/fragment/text cases
-   have static P5 coverage, but the complete EC3–EC8b P6 runtime corpus is still pending.
-   [BUILDER GREEN — EC1/EC2 PARTIAL ONLY; awaiting authoritative snapshot review]
+6. **Editor round-trip corpus pinned**: all EC1–EC8b cases now execute in the synthetic
+   microfixture boundary with localized bytes, rotating package authority, deterministic rebuild,
+   pinned-browser capture, conserved source/mode/order identity, package-derived binding values,
+   and independent per-case mutations. EC3 swaps only the token segment; EC4 edits a typed prop;
+   EC5 preserves a descendant scope; EC6 resolves fragment ownership; EC7 keeps escaped text;
+   EC8a rebuilds the edited package; EC8b loudly inventories source-truth overwrite on rerun.
+   [BUILDER GREEN — MICROFIXTURE ONLY; plugin-origin EC4/EC5 integration evidence remains G-1/G-2]
 7. **Registry transaction protocol**: §6.1.1 verbatim; lane-scoped generations
    (v2 sandbox namespace only until P9). [P8 CORE + STUDIO SNAPSHOTS CLEAR; PHASE EVIDENCE OPEN]
 8. **Calibration publication/restart seam**: UUID-isolated multi-writer transactions; pointer
@@ -730,3 +730,13 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   four new per-corner radius properties. Safe-but-invalid `red` could therefore pass the editor
   adapter. The replacement adds those exact properties to the existing nonnegative length grammar
   and pins a permanent refusal mutation. No broader editor grammar changed.
+- 2026-07-14 Builder P0 full editor-corpus checkpoint: EC3–EC8b now join EC1/EC2 as executable
+  microfixture evidence. Failure-first work exposed that capture sampled the pre-edit TokenPlan,
+  that a length-changing token rebind rejected its equal-range CSS owner after mutating the target
+  range in-place, and that binding identity alone did not prove the resolved runtime value.
+  Capture now binds the exact edited package/build; Save-to-code compares every overlap against
+  immutable original offsets; production and independent G13 parse the sealed emitted registry,
+  `tokens.css`, and `token-values.ts` to require the full binding channel/context/target/value.
+  All nine cases pass and per-case wrong-channel/value/segment/owner/build/overwrite mutations
+  refuse. Focused P5/P6 boundary is 15/15/0. This remains synthetic microfixture evidence; live
+  plugin-origin EC4/EC5, G-1/G-2, P0 phase/integration, promotion, cutover, and Done stay open.

@@ -42,7 +42,40 @@ function compileFixture({ fixtureOptions = {}, mutate } = {}) {
     id: 'radius-box', type: 'RECTANGLE', name: 'Slot-preserving radii', size: { x: 40, y: 24 },
     rectangleCornerRadii: [2, 4, 6, 8], children: [],
   });
+  snapshot.variables.variables.push({
+    id: 'V_FLOAT_2', key: 'K_FLOAT_2', name: 'Alternate opacity', codeSyntax: {},
+    variableCollectionId: 'C_THEME', resolvedType: 'FLOAT', valuesByMode: { light: 50, dark: 40 },
+  });
+  snapshot.variables.variables.push({
+    id: 'V_COLOR_2', key: 'K_COLOR_2', name: 'Alternate scoped color', codeSyntax: {},
+    variableCollectionId: 'C_THEME', resolvedType: 'COLOR',
+    valuesByMode: { light: { r: 0.2, g: 0.3, b: 0.4, a: 1 }, dark: { r: 0.7, g: 0.6, b: 0.5, a: 1 } },
+  });
+  snapshot.document.children.push({
+    id: 'alternate-token-carrier', type: 'FRAME', name: 'Alternate token carrier', opacity: 0.5,
+    boundVariables: { opacity: { type: 'VARIABLE_ALIAS', id: 'V_FLOAT_2' } }, size: { x: 1, y: 1 },
+    children: [{ id: 'alternate-token-alias-child', type: 'RECTANGLE', name: 'Alias context', fills: [{ type: 'SOLID', color: { r: 0.7, g: 0.6, b: 0.5, a: 1 }, boundVariables: { color: { type: 'VARIABLE_ALIAS', id: 'V_ALIAS' } } }], children: [] }],
+  });
+  snapshot.document.children.push({
+    id: 'scoped-token-carrier', type: 'FRAME', name: 'Scoped token carrier',
+    fills: [{ type: 'SOLID', color: { r: 0.7, g: 0.6, b: 0.5, a: 1 }, boundVariables: { color: { type: 'VARIABLE_ALIAS', id: 'V_COLOR_2' } } }],
+    size: { x: 1, y: 1 },
+    children: [{ id: 'scoped-token-alias-child', type: 'RECTANGLE', name: 'Alias context', fills: [{ type: 'SOLID', color: { r: 0.7, g: 0.6, b: 0.5, a: 1 }, boundVariables: { color: { type: 'VARIABLE_ALIAS', id: 'V_ALIAS' } } }], children: [] }],
+  });
+  snapshot.document.children.push({
+    id: 'plain-text', type: 'TEXT', name: 'Editable editorial copy', characters: 'Look',
+    size: { x: 40, y: 16 }, children: [],
+  });
   snapshot.supplement.nodes.push({ nodeId: 'radius-box', resolvedVariableModes: { C_THEME: 'light' } });
+  snapshot.supplement.nodes.push({ nodeId: 'alternate-token-carrier', resolvedVariableModes: { C_THEME: 'light', C_ALIAS: 'base' } });
+  snapshot.supplement.nodes.push({ nodeId: 'alternate-token-alias-child', resolvedVariableModes: { C_THEME: 'light', C_ALIAS: 'base' } });
+  snapshot.supplement.nodes.push({ nodeId: 'scoped-token-carrier', resolvedVariableModes: { C_THEME: 'dark', C_ALIAS: 'base' } });
+  snapshot.supplement.nodes.push({ nodeId: 'scoped-token-alias-child', resolvedVariableModes: { C_THEME: 'dark', C_ALIAS: 'base' } });
+  snapshot.supplement.nodes.push({
+    nodeId: 'plain-text', resolvedVariableModes: { C_THEME: 'light' },
+    styledTextSegments: [{ start: 0, end: 4, characters: 'Look', fontName: { family: 'Arial', style: 'Regular' } }],
+    fontDependencies: [{ family: 'Arial', style: 'Regular', providerId: 'font-apple-arial-regular', sha256: FONT_SHA256 }],
+  });
   const textSupplement = snapshot.supplement.nodes.find((row) => row.nodeId === 'text');
   textSupplement.fontDependencies = [{ family: 'Arial', style: 'Regular', providerId: 'font-apple-arial-regular', sha256: FONT_SHA256 }];
   for (const segment of textSupplement.styledTextSegments) segment.fontName = { family: 'Arial', style: 'Regular' };
@@ -96,11 +129,11 @@ async function fixture() {
     const viewport = { width: 120, height: 200, dpr: 1 };
     const bootstrapState = { id: 'light', rootId: base.model.documentGraph.rootId, viewport, collectionModes: { CK_THEME: 'light' }, metricClasses: ['flat-color'], reference: null };
     const fidelityBudgets = { schemaVersion: 1, environmentManifestHash, classes: { 'flat-color': { maxChangedPct: 0, maxMeanDelta: 0 } } };
-    const bootstrap = await captureRuntimeState({ chromium, chromePath: CHROME, bundle: bundleA, modeContextPlan: base.modeContextPlan, tokenPlan: base.tokenPlan, requiredState: bootstrapState, fidelityBudgets, environmentManifest, environmentAuthority });
+    const bootstrap = await captureRuntimeState({ chromium, chromePath: CHROME, bundle: bundleA, packageOutput: base.packageOutput, modeContextPlan: base.modeContextPlan, requiredState: bootstrapState, fidelityBudgets, environmentManifest, environmentAuthority });
     const reference = { kind: 'microfixture', fileKey: 'P6_MICRO_REFERENCE', version: 'fixture-v1', rootId: base.model.documentGraph.rootId, exportScale: 1, colorProfile: 'srgb' };
     const requiredState = { ...bootstrapState, reference };
     const capture = await captureRuntimeState({
-      chromium, chromePath: CHROME, bundle: bundleA, modeContextPlan: base.modeContextPlan, tokenPlan: base.tokenPlan,
+      chromium, chromePath: CHROME, bundle: bundleA, packageOutput: base.packageOutput, modeContextPlan: base.modeContextPlan,
       requiredState, fidelityBudgets, environmentManifest, environmentAuthority, reference: { metadata: reference, bytes: bootstrap.screenshotBytes }, metricRegions: { 'flat-color': null },
     });
     const padding = base.packageOutput.sourceMap.segments.find((row) => row.nodeId === base.model.documentGraph.rootId && row.cssProperty === 'padding-top' && row.editable);
@@ -108,7 +141,7 @@ async function fixture() {
     const edited = saveSegmentEdit(base.packageOutput, base.editorAuthority, { segmentId: padding.segmentId, value: '12px' });
     const editedBundle = await buildRuntimeBundle({ packageOutput: edited.packageOutput, editorAuthority: edited.editorAuthority, outDir: path.join(sharedRoot, 'edited'), nodeModulesDir: NODE_MODULES });
     const editedCapture = await captureRuntimeState({
-      chromium, chromePath: CHROME, bundle: editedBundle, modeContextPlan: base.modeContextPlan, tokenPlan: base.tokenPlan,
+      chromium, chromePath: CHROME, bundle: editedBundle, packageOutput: edited.packageOutput, modeContextPlan: base.modeContextPlan,
       requiredState, fidelityBudgets, environmentManifest, environmentAuthority, reference: { metadata: reference, bytes: bootstrap.screenshotBytes }, metricRegions: { 'flat-color': null },
     });
     const editorRun = {
@@ -120,13 +153,65 @@ async function fixture() {
     const radiusEdited = saveSegmentEdit(base.packageOutput, base.editorAuthority, { segmentId: radius.segmentId, value: '14px' });
     const radiusBundle = await buildRuntimeBundle({ packageOutput: radiusEdited.packageOutput, editorAuthority: radiusEdited.editorAuthority, outDir: path.join(sharedRoot, 'edited-radius'), nodeModulesDir: NODE_MODULES });
     const radiusCapture = await captureRuntimeState({
-      chromium, chromePath: CHROME, bundle: radiusBundle, modeContextPlan: base.modeContextPlan, tokenPlan: base.tokenPlan,
+      chromium, chromePath: CHROME, bundle: radiusBundle, packageOutput: radiusEdited.packageOutput, modeContextPlan: base.modeContextPlan,
       requiredState, fidelityBudgets, environmentManifest, environmentAuthority, reference: { metadata: reference, bytes: bootstrap.screenshotBytes }, metricRegions: { 'flat-color': null },
     });
     const radiusEditorRun = {
       caseId: 'EC2', before: base, after: radiusEdited, selection: { kind: 'node', nodeId: 'radius-box' }, segmentId: radius.segmentId,
       afterBuild: { bundle: radiusBundle, buildAuthority: radiusBundle.buildAuthority }, runtimeCapture: radiusCapture,
     };
+    const token = base.packageOutput.sourceMap.segments.find((row) => row.nodeId === base.model.documentGraph.rootId && row.kind === 'token-expression' && row.sourcePath === '/opacity');
+    const replacement = base.tokenPlan.tokenData.css.find((row) => row.variableKey === 'K_FLOAT_2' && row.destinationDomain === 'opacity-normalized');
+    assert.ok(token && replacement, 'P6 editor fixture requires an alternate token-expression channel');
+    const tokenEdited = saveSegmentEdit(base.packageOutput, base.editorAuthority, {
+      segmentId: token.segmentId, value: replacement.cssName,
+      binding: { variableKey: replacement.variableKey, channelId: replacement.channelId },
+    });
+    const tokenBundle = await buildRuntimeBundle({ packageOutput: tokenEdited.packageOutput, editorAuthority: tokenEdited.editorAuthority, outDir: path.join(sharedRoot, 'edited-token'), nodeModulesDir: NODE_MODULES });
+    const tokenCapture = await captureRuntimeState({
+      chromium, chromePath: CHROME, bundle: tokenBundle, packageOutput: tokenEdited.packageOutput,
+      modeContextPlan: base.modeContextPlan, requiredState, fidelityBudgets, environmentManifest, environmentAuthority,
+      reference: { metadata: reference, bytes: bootstrap.screenshotBytes }, metricRegions: { 'flat-color': null },
+    });
+    const tokenBinding = tokenEdited.packageOutput.sourceMap.bindings.find((row) => row.segmentIds.includes(token.segmentId));
+    assert.equal(tokenCapture.runtime.bindings[tokenBinding.bindingId].channelId, replacement.channelId);
+    const tokenEditorRun = {
+      caseId: 'EC3', before: base, after: tokenEdited, selection: { kind: 'node', nodeId: base.model.documentGraph.rootId }, segmentId: token.segmentId,
+      afterBuild: { bundle: tokenBundle, buildAuthority: tokenBundle.buildAuthority }, runtimeCapture: tokenCapture,
+    };
+    const buildEditedCase = async ({ caseId, segment, selection, value, binding, directory }) => {
+      const after = saveSegmentEdit(base.packageOutput, base.editorAuthority, { segmentId: segment.segmentId, value, ...(binding ? { binding } : {}) });
+      const bundle = await buildRuntimeBundle({ packageOutput: after.packageOutput, editorAuthority: after.editorAuthority, outDir: path.join(sharedRoot, directory), nodeModulesDir: NODE_MODULES });
+      const runtimeCapture = await captureRuntimeState({
+        chromium, chromePath: CHROME, bundle, packageOutput: after.packageOutput, modeContextPlan: base.modeContextPlan,
+        requiredState, fidelityBudgets, environmentManifest, environmentAuthority,
+        reference: { metadata: reference, bytes: bootstrap.screenshotBytes }, metricRegions: { 'flat-color': null },
+      });
+      return { caseId, before: base, after, selection, segmentId: segment.segmentId, afterBuild: { bundle, buildAuthority: bundle.buildAuthority }, runtimeCapture };
+    };
+    const componentProp = base.packageOutput.sourceMap.segments.find((row) => row.nodeId === 'instance' && row.kind === 'jsx-prop-value' && row.sourcePath === '/componentProperties/Size');
+    assert.ok(componentProp, 'P6 editor fixture requires one typed component prop');
+    const componentEditorRun = await buildEditedCase({ caseId: 'EC4', segment: componentProp, selection: { kind: 'node', nodeId: 'instance' }, value: 'L', directory: 'edited-component-prop' });
+    const scopedToken = base.packageOutput.sourceMap.segments.find((row) => row.nodeId === 'nested' && row.kind === 'token-expression' && row.sourcePath === '/fills/0/color');
+    const scopedReplacement = base.tokenPlan.tokenData.css.find((row) => row.variableKey === 'K_COLOR_2' && row.destinationDomain === 'color');
+    assert.ok(scopedToken && scopedReplacement && scopedToken.modeContextId !== 'ø', 'P6 editor fixture requires one scoped token expression');
+    const scopedEditorRun = await buildEditedCase({
+      caseId: 'EC5', segment: scopedToken, selection: { kind: 'node', nodeId: 'nested' }, value: scopedReplacement.cssName,
+      binding: { variableKey: scopedReplacement.variableKey, channelId: scopedReplacement.channelId }, directory: 'edited-scoped-token',
+    });
+    const fragment = base.packageOutput.sourceMap.fragments.find((row) => row.role !== 'content');
+    assert.ok(fragment, 'P6 editor fixture requires one auxiliary render fragment');
+    const fragmentEditorRun = {
+      caseId: 'EC6', before: base, selection: { kind: 'fragment', fragmentId: fragment.fragmentId, ownerNodeId: fragment.ownerNodeId },
+      afterBuild: { bundle: bundleA, buildAuthority: bundleA.buildAuthority }, runtimeCapture: capture,
+    };
+    const text = base.packageOutput.sourceMap.segments.find((row) => row.nodeId === 'plain-text' && row.kind === 'jsx-text');
+    assert.ok(text, 'P6 editor fixture requires one unbound escaped text segment');
+    const textEditorRun = await buildEditedCase({ caseId: 'EC7', segment: text, selection: { kind: 'node', nodeId: 'plain-text' }, value: '<New & safe>', directory: 'edited-text' });
+    const buildStabilityRun = { ...editorRun, caseId: 'EC8a' };
+    const rerun = compileFixture();
+    const rerunTruthRun = { ...editorRun, caseId: 'EC8b', rerun, overwrittenSegmentIds: [editorRun.segmentId] };
+    const editorRuns = [editorRun, radiusEditorRun, tokenEditorRun, componentEditorRun, scopedEditorRun, fragmentEditorRun, textEditorRun, buildStabilityRun, rerunTruthRun];
     const input = {
       packageOutput: base.packageOutput,
       editorAuthority: base.editorAuthority,
@@ -144,7 +229,7 @@ async function fixture() {
       editorRuns: [],
       blockers: ['G-1', 'G-2'],
     };
-    return { input, base, bundleA, bundleB, capture, editorRun, radiusEditorRun, metadataOnly, environmentManifest, environmentAuthority, chromium, requiredState, fidelityBudgets };
+    return { input, base, bundleA, bundleB, capture, editorRun, radiusEditorRun, tokenEditorRun, editorRuns, metadataOnly, environmentManifest, environmentAuthority, chromium, requiredState, fidelityBudgets };
   })();
   return sharedFixture;
 }
@@ -153,7 +238,7 @@ function forkInput(input) {
   return { ...input, builds: [...input.builds], localityRuns: [...input.localityRuns], runtimeCaptures: [...input.runtimeCaptures], editorRuns: [...input.editorRuns], blockers: [...input.blockers] };
 }
 
-test('P6 proves G9-G11 from authority-backed artifacts while the incomplete editor corpus stays non-promotable', async () => {
+test('P6 proves G9-G11 from authority-backed artifacts while omitted editor runs stay non-promotable', async () => {
   const { input } = await fixture();
   const report = await buildRuntimeProof(input);
   assert.equal(report.state, 'FAILED_EDITOR');
@@ -197,20 +282,43 @@ test('P6 authorities bite independently for build, capture bytes, reference byte
 });
 
 test('P6 G13 derives exact segment locality, rotated package authority, rebuild, and runtime evidence', async () => {
-  const { input, editorRun, radiusEditorRun } = await fixture();
+  const { input, editorRun, radiusEditorRun, tokenEditorRun, editorRuns } = await fixture();
   const accepted = forkInput(input);
-  accepted.editorRuns = [editorRun, radiusEditorRun];
+  accepted.editorRuns = editorRuns;
   const report = await buildRuntimeProof(accepted);
-  assert.equal(report.gates.G13, 'FAILED');
+  assert.equal(report.gates.G13, 'VERIFIED', report.issues.G13.join('\n'));
   assert.ok(!report.issues.G13.some((issue) => issue.startsWith('editor case EC1 refused:')), report.issues.G13.join('\n'));
   assert.ok(!report.issues.G13.some((issue) => issue.startsWith('editor case EC2 refused:')), report.issues.G13.join('\n'));
-  assert.deepEqual(await p6EditorRunFailures([editorRun, radiusEditorRun]), []);
+  assert.ok(!report.issues.G13.some((issue) => issue.startsWith('editor case EC3 refused:')), report.issues.G13.join('\n'));
+  assert.deepEqual(await p6EditorRunFailures(editorRuns), []);
+  assert.deepEqual(await p6Failures({ ...accepted, report }), { G9: false, G10: false, G11: false, G13: false });
+  const cases = new Map(editorRuns.map((row) => [row.caseId, row]));
+  const tokenRuntimeDrift = structuredClone(cases.get('EC3').runtimeCapture.runtime);
+  const tokenBindingId = Object.keys(tokenRuntimeDrift.bindings).find((id) => tokenRuntimeDrift.bindings[id].channelId === replacementChannel(cases.get('EC3')));
+  tokenRuntimeDrift.bindings[tokenBindingId].channelId = 'forged-channel';
+  const tokenValueDrift = structuredClone(cases.get('EC3').runtimeCapture.runtime);
+  tokenValueDrift.bindings[tokenBindingId].resolvedValue = 'forged-value';
+  const mutations = [
+    { ...cases.get('EC3'), runtimeCapture: { ...cases.get('EC3').runtimeCapture, runtime: tokenRuntimeDrift } },
+    { ...cases.get('EC4'), segmentId: cases.get('EC3').segmentId },
+    { ...cases.get('EC5'), segmentId: cases.get('EC3').segmentId },
+    { ...cases.get('EC6'), selection: { ...cases.get('EC6').selection, ownerNodeId: 'wrong-owner' } },
+    { ...cases.get('EC7'), segmentId: cases.get('EC4').segmentId },
+    { ...cases.get('EC8a'), afterBuild: cases.get('EC2').afterBuild },
+    { ...cases.get('EC8b'), overwrittenSegmentIds: [] },
+  ];
+  assert.deepEqual(await p6EditorRunFailures(mutations), ['EC3', 'EC4', 'EC5', 'EC6', 'EC7', 'EC8a', 'EC8b']);
+  assert.deepEqual(await p6EditorRunFailures([{ ...cases.get('EC3'), runtimeCapture: { ...cases.get('EC3').runtimeCapture, runtime: tokenValueDrift } }]), ['EC3']);
   const forged = forkInput(input);
   forged.editorRuns = [{ ...editorRun, segmentId: 'forged-segment' }];
   const forgedReport = await buildRuntimeProof(forged);
   assert.ok(forgedReport.issues.G13.some((issue) => issue.startsWith('editor case EC1 refused:')));
   assert.deepEqual(await p6EditorRunFailures([{ ...radiusEditorRun, segmentId: 'forged-segment' }]), ['EC2']);
 });
+
+function replacementChannel(run) {
+  return run.after.packageOutput.sourceMap.bindings.find((row) => row.segmentIds.includes(run.segmentId)).channelId;
+}
 
 test('P6 production bundle authenticates the rotating P5 package authority and remains byte-deterministic', async () => {
   const { input, base, bundleA, bundleB } = await fixture();
@@ -232,7 +340,7 @@ test('P6 production bundle authenticates the rotating P5 package authority and r
 });
 
 test('P6 capture binds actual build, browser environment, screenshot/reference bytes, regions, and budget identity', async () => {
-  const { capture } = await fixture();
+  const { capture, tokenEditorRun, base, chromium, requiredState, fidelityBudgets, environmentManifest, environmentAuthority } = await fixture();
   await assertRuntimeCapture(capture, capture.captureAuthority);
   assert.deepEqual(capture.runtime.consoleErrors, []);
   assert.deepEqual(capture.runtime.networkRequests, []);
@@ -242,6 +350,10 @@ test('P6 capture binds actual build, browser environment, screenshot/reference b
   assert.equal(capture.runtime.reference.sha256, sha256(capture.referenceBytes));
   assert.equal(capture.runtime.environmentManifestHash, sha256(canonicalJson(capture.environmentManifest)));
   assert.deepEqual(capture.runtime.metrics, { 'flat-color': { changedPct: 0, meanDelta: 0 } });
+  await assert.rejects(captureRuntimeState({
+    chromium, chromePath: CHROME, bundle: tokenEditorRun.afterBuild.bundle, packageOutput: base.packageOutput,
+    modeContextPlan: base.modeContextPlan, requiredState, fidelityBudgets, environmentManifest, environmentAuthority,
+  }), /runtime package differs from authenticated build/);
 });
 
 test('P6 environment identity binds browser, OS image, fonts, color profile, and render settings', async () => {
@@ -262,7 +374,7 @@ test('P6 environment identity binds browser, OS image, fonts, color profile, and
     const unapprovedManifest = structuredClone(capture.environmentManifest);
     mutate(unapprovedManifest);
     await assert.rejects(captureRuntimeState({
-      chromium, chromePath: CHROME, bundle: bundleA, modeContextPlan: base.modeContextPlan, tokenPlan: base.tokenPlan, requiredState, fidelityBudgets,
+      chromium, chromePath: CHROME, bundle: bundleA, packageOutput: base.packageOutput, modeContextPlan: base.modeContextPlan, requiredState, fidelityBudgets,
       environmentManifest: unapprovedManifest, environmentAuthority, reference: { metadata: requiredState.reference, bytes: capture.referenceBytes }, metricRegions: { 'flat-color': null },
     }), /environment manifest lacks its approved authority/);
     const copy = forkInput(input);

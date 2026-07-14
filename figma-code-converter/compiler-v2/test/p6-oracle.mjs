@@ -3,6 +3,7 @@ import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
+import postcss from 'postcss';
 import { canonicalJson, sha256 } from '../src/evidence.mjs';
 
 const EDITOR_CASES = ['EC1', 'EC2', 'EC3', 'EC4', 'EC5', 'EC6', 'EC7', 'EC8a', 'EC8b'];
@@ -157,7 +158,7 @@ async function validEditorRun(row) {
     if (row.caseId === 'EC6') {
       const fragment = before.sourceMap.fragments.find((item) => item.fragmentId === row.selection?.fragmentId);
       return fragment?.ownerNodeId === row.selection?.ownerNodeId && await validBuild(row.afterBuild?.bundle, sha256(canonicalJson(before))) && await validCapture(row.runtimeCapture)
-        && row.runtimeCapture.bundle.buildHash === row.afterBuild.bundle.buildHash;
+        && row.runtimeCapture.bundle.buildHash === row.afterBuild.bundle.buildHash && runtimeBindingsMatch(before, row.runtimeCapture);
     }
     const after = row.after?.packageOutput;
     if (!validPackage(after)) return false;
@@ -167,9 +168,37 @@ async function validEditorRun(row) {
     if (!beforeSegment || !afterSegment || beforeSegment.nodeId !== sourceId || !caseSegment(row.caseId, beforeSegment)) return false;
     if (!localized(before, after, beforeSegment, afterSegment) || canonicalJson(identityOrder(before.sourceMap)) !== canonicalJson(identityOrder(after.sourceMap))) return false;
     if (!(await validBuild(row.afterBuild?.bundle, sha256(canonicalJson(after)))) || !(await validCapture(row.runtimeCapture)) || row.runtimeCapture.bundle.buildHash !== row.afterBuild.bundle.buildHash) return false;
+    if (!runtimeBindingsMatch(after, row.runtimeCapture)) return false;
     if (row.caseId === 'EC8b' && (sha256(canonicalJson(row.rerun?.packageOutput)) !== sha256(canonicalJson(before)) || !row.overwrittenSegmentIds?.includes(row.segmentId))) return false;
     return true;
   } catch { return false; }
+}
+
+function runtimeBindingsMatch(output, capture) {
+  try { return canonicalJson(capture?.runtime?.bindings) === canonicalJson(independentPackageBindings(output)); }
+  catch { return false; }
+}
+
+function independentPackageBindings(output) {
+  const registry = JSON.parse(output.files['token-registry.json']);
+  const reactValues = JSON.parse(output.files['token-values.ts'].match(/^export const reactTokenValues = ([\s\S]+) as const;\n\nexport function /)?.[1]);
+  const channels = new Map();
+  for (const entry of Object.values(registry.entries ?? {})) for (const channel of Object.values(entry.channels ?? {})) channels.set(channel.channelId, channel);
+  const cssValues = new Map();
+  postcss.parse(output.files['tokens.css']).walkRules((rule) => {
+    const match = rule.selector.match(/^\[data-mode-context=(.+)\]$/);
+    const contextId = rule.selector === ':root' ? 'ø' : match ? JSON.parse(match[1]) : null;
+    if (contextId === null || cssValues.has(contextId)) throw new Error('context');
+    const declarations = new Map();
+    rule.walkDecls((declaration) => declarations.set(declaration.prop, declaration.value));
+    cssValues.set(contextId, declarations);
+  });
+  return Object.fromEntries(output.sourceMap.bindings.map((binding) => {
+    const channel = channels.get(binding.channelId);
+    const resolvedValue = binding.target === 'css' ? cssValues.get(binding.modeContextId)?.get(channel?.cssName) : reactValues?.[channel?.tsSymbol]?.[binding.modeContextId];
+    if (resolvedValue === undefined) throw new Error('runtime token missing');
+    return [binding.bindingId, { channelId: binding.channelId, modeContextId: binding.modeContextId, target: binding.target, resolvedValue }];
+  }));
 }
 
 function validPackage(output) {
