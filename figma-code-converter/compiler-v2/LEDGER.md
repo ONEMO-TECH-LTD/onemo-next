@@ -309,6 +309,16 @@ Decisions/Done/cutover: Dan only.
   `JSON` and `Error` symbols, and callable identity is validated from the resolved declaration kind.
   Cross-function shadow/ambient confusion is now a permanent G8-red mutation. This is residual repair
   evidence awaiting authoritative rereview; CSS and all earlier P5 findings remain credited closed.
+- Authoritative rereview of `89e8eec` closed lexical use-site resolution, then identified the final
+  declaration-identity distinction: a package-owned `declare` symbol has no executable runtime body,
+  and an import alias is not confined merely because its import specifier node lives in-package.
+  Repair rejects declaration-file/`declare` ancestors, follows TypeScript alias symbols to their
+  executable target declarations, and validates every relative import by resolving it from the source
+  file to an existing generated `.ts`/`.tsx` or `.module.css` package entry without escape. Package
+  ambient globals, forged built-ins, escaping relative imports, and an in-package alias targeting an
+  ambient declaration are permanent G8-red mutations.
+  This is residual repair evidence awaiting authoritative rereview; lexical scope, CSS, and all earlier
+  P5 findings remain credited closed.
 
 ## Meta rulings accepted (2026-07-13)
 

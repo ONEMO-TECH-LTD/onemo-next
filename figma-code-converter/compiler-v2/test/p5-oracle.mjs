@@ -16,7 +16,7 @@ export function p5Failures({ model, tokenPlan, modeContextPlan, semanticSlice, l
     if (typeof content !== 'string') { G8 = true; continue; }
     if (/\.(?:ts|tsx)$/.test(path)) {
       const sourceFile = typecheck.program.getSourceFile(`${typecheck.root}/${path}`);
-      if (!sourceFile || sourceFile.parseDiagnostics.length || !hasClosedGeneratedRuntime(sourceFile, checker, typecheck.root)) G8 = true;
+      if (!sourceFile || sourceFile.parseDiagnostics.length || !hasClosedGeneratedRuntime(sourceFile, checker, typecheck.root, files)) G8 = true;
       if (/dangerouslySetInnerHTML/.test(content)) G8 = true;
     }
     if (path.endsWith('.css')) {
@@ -89,7 +89,7 @@ export function p5Failures({ model, tokenPlan, modeContextPlan, semanticSlice, l
   return { G8, G13 };
 }
 
-function hasClosedGeneratedRuntime(sourceFile, checker, packageRoot) {
+function hasClosedGeneratedRuntime(sourceFile, checker, packageRoot, files) {
   const allowedTopLevel = new Set([ts.SyntaxKind.ImportDeclaration, ts.SyntaxKind.VariableStatement, ts.SyntaxKind.FunctionDeclaration, ts.SyntaxKind.TypeAliasDeclaration, ts.SyntaxKind.InterfaceDeclaration]);
   const allowedIntrinsicAttributes = {
     div: new Set(['className', 'data-figma-id', 'data-mode-context', 'data-figma-component-key', 'data-figma-component-set-key', 'data-figma-component-props']),
@@ -99,11 +99,43 @@ function hasClosedGeneratedRuntime(sourceFile, checker, packageRoot) {
   if (sourceFile.statements.some((statement) => !allowedTopLevel.has(statement.kind))) return false;
 
   let valid = true;
-  const symbolDeclarations = (node) => checker.getSymbolAtLocation(node)?.declarations ?? [];
-  const isPackageSymbol = (node) => symbolDeclarations(node).some((declaration) => declaration.getSourceFile().fileName.startsWith(`${packageRoot}/`) && !declaration.getSourceFile().fileName.endsWith('/globals.d.ts'));
-  const isAmbientSymbol = (node, name) => ts.isIdentifier(node) && node.text === name && symbolDeclarations(node).length > 0 && !isPackageSymbol(node);
-  const isCallableSymbol = (node) => symbolDeclarations(node).some((declaration) => ts.isFunctionDeclaration(declaration)
-    || ts.isImportSpecifier(declaration) || ts.isImportClause(declaration) || ts.isNamespaceImport(declaration));
+  const originalSymbol = (node) => checker.getSymbolAtLocation(node);
+  const hasDeclareAncestor = (declaration) => {
+    if (declaration.getSourceFile().isDeclarationFile) return true;
+    for (let current = declaration; current && !ts.isSourceFile(current); current = current.parent) {
+      if (current.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.DeclareKeyword)) return true;
+    }
+    return false;
+  };
+  const isExecutableDeclaration = (declaration) => declaration.getSourceFile().fileName.startsWith(`${packageRoot}/`)
+    && !declaration.getSourceFile().fileName.endsWith('/globals.d.ts') && !hasDeclareAncestor(declaration);
+  const importDeclarationFor = (declaration) => {
+    for (let current = declaration; current && !ts.isSourceFile(current); current = current.parent) if (ts.isImportDeclaration(current)) return current;
+    return null;
+  };
+  const isConfinedImport = (declaration) => {
+    const specifier = declaration?.moduleSpecifier;
+    if (!ts.isStringLiteral(specifier) || !/^\.\.?\//.test(specifier.text) || specifier.text.includes('\\')) return false;
+    const sourcePath = declaration.getSourceFile().fileName.slice(packageRoot.length + 1);
+    const target = path.posix.normalize(path.posix.join(path.posix.dirname(sourcePath), specifier.text));
+    if (!safePackagePath(target)) return false;
+    if (target.endsWith('.module.css')) return typeof files[target] === 'string';
+    if (!target.endsWith('.js')) return false;
+    return ['.ts', '.tsx'].some((extension) => typeof files[`${target.slice(0, -3)}${extension}`] === 'string');
+  };
+  const resolvedDeclarations = (node) => {
+    const symbol = originalSymbol(node);
+    if (!symbol) return [];
+    if (!(symbol.flags & ts.SymbolFlags.Alias)) return symbol.declarations ?? [];
+    const aliasDeclarations = symbol.declarations ?? [];
+    if (aliasDeclarations.some((declaration) => importDeclarationFor(declaration)?.moduleSpecifier?.text?.endsWith('.module.css'))) return aliasDeclarations.filter((declaration) => isConfinedImport(importDeclarationFor(declaration)));
+    try { return checker.getAliasedSymbol(symbol).declarations ?? []; } catch { return []; }
+  };
+  const isPackageSymbol = (node) => resolvedDeclarations(node).some(isExecutableDeclaration);
+  const isAmbientSymbol = (node, name) => ts.isIdentifier(node) && node.text === name
+    && (originalSymbol(node)?.declarations?.length ?? 0) > 0 && !(originalSymbol(node).flags & ts.SymbolFlags.Alias)
+    && originalSymbol(node).declarations.every((declaration) => !declaration.getSourceFile().fileName.startsWith(`${packageRoot}/`));
+  const isCallableSymbol = (node) => resolvedDeclarations(node).some((declaration) => isExecutableDeclaration(declaration) && ts.isFunctionDeclaration(declaration));
   const isDeclarationName = (node) => {
     const parent = node.parent;
     return (ts.isVariableDeclaration(parent) || ts.isParameter(parent) || ts.isFunctionDeclaration(parent) || ts.isImportClause(parent)
@@ -120,7 +152,7 @@ function hasClosedGeneratedRuntime(sourceFile, checker, packageRoot) {
   const visit = (node) => {
     if (!valid || ts.isTypeNode(node)) return;
     if (node.kind === ts.SyntaxKind.ThisKeyword || ts.isMetaProperty(node) || ts.isTaggedTemplateExpression(node) || ts.isAwaitExpression(node) || ts.isYieldExpression(node)) { valid = false; return; }
-    if (ts.isImportDeclaration(node) && (!ts.isStringLiteral(node.moduleSpecifier) || !/^\.\.?\//.test(node.moduleSpecifier.text))) { valid = false; return; }
+    if (ts.isImportDeclaration(node) && !isConfinedImport(node)) { valid = false; return; }
     if (ts.isExportDeclaration(node) || ts.isImportEqualsDeclaration(node)) { valid = false; return; }
     if (ts.isCallExpression(node)) {
       const callee = node.expression;

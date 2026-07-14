@@ -209,6 +209,17 @@ test('independent P5 oracle bites unsafe output and every selection-address muta
   assert.equal(p5Failures({ ...output, packageOutput: computedNetwork }).G8, true);
   const scopeConfusion = structuredClone(output.packageOutput); scopeConfusion.files[screen] += '\nexport function localShadow(globalThis: unknown) { return globalThis; }\nexport function outsideShadow() { return globalThis; }\n'; resealTestManifest(scopeConfusion);
   assert.equal(p5Failures({ ...output, packageOutput: scopeConfusion }).G8, true);
+  const ambientDeclaration = structuredClone(output.packageOutput); ambientDeclaration.files[screen] += '\ndeclare const globalThis: unknown;\nexport function ambientOnly() { return globalThis; }\n'; resealTestManifest(ambientDeclaration);
+  assert.equal(p5Failures({ ...output, packageOutput: ambientDeclaration }).G8, true);
+  const forgedBuiltin = structuredClone(output.packageOutput); forgedBuiltin.files[screen] += '\ndeclare const JSON: { stringify(value: unknown): string };\nexport function forgedJson() { return JSON.stringify({}); }\n'; resealTestManifest(forgedBuiltin);
+  assert.equal(p5Failures({ ...output, packageOutput: forgedBuiltin }).G8, true);
+  const escapingImport = structuredClone(output.packageOutput); escapingImport.files[screen] = `import { outside } from "../../outside.js";\n${escapingImport.files[screen]}`; resealTestManifest(escapingImport);
+  assert.equal(p5Failures({ ...output, packageOutput: escapingImport }).G8, true);
+  const ambientAlias = structuredClone(output.packageOutput);
+  ambientAlias.files['ambient-runtime.ts'] = 'export declare function runtimeCall(): unknown;\n';
+  ambientAlias.files[screen] = `import { runtimeCall } from "../ambient-runtime.js";\n${ambientAlias.files[screen]}\nconst ambientAliasResult = runtimeCall();\n`;
+  resealTestManifest(ambientAlias);
+  assert.equal(p5Failures({ ...output, packageOutput: ambientAlias }).G8, true);
   const localAsset = structuredClone(output.packageOutput);
   localAsset.files['assets/look.svg'] = '<svg xmlns="http://www.w3.org/2000/svg" />\n';
   const style = Object.keys(localAsset.files).find((path) => path.startsWith('styles/'));
