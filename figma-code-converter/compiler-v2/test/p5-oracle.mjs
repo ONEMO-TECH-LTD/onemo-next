@@ -1,6 +1,8 @@
 /** Independent P5 G8/G13 oracle. No compiler emitter/editor imports. */
 import ts from 'typescript';
 import postcss from 'postcss';
+import valueParser from 'postcss-value-parser';
+import path from 'node:path';
 import { canonicalJson, sha256 } from '../src/evidence.mjs';
 
 export function p5Failures({ model, tokenPlan, modeContextPlan, semanticSlice, layoutRenderPlan, packageOutput }) {
@@ -13,12 +15,15 @@ export function p5Failures({ model, tokenPlan, modeContextPlan, semanticSlice, l
     if (/\.(?:ts|tsx)$/.test(path)) {
       const kind = path.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
       const sourceFile = ts.createSourceFile(path, content, ts.ScriptTarget.ESNext, true, kind);
-      if (sourceFile.parseDiagnostics.length || hasForbiddenRuntime(sourceFile)) G8 = true;
-      if (/dangerouslySetInnerHTML|\b(?:eval|Function|fetch|XMLHttpRequest|WebSocket|EventSource)\s*\(|\bnavigator\.sendBeacon\s*\(|from\s+["'][^./]/.test(content)) G8 = true;
+      if (sourceFile.parseDiagnostics.length || !hasClosedGeneratedRuntime(sourceFile)) G8 = true;
+      if (/dangerouslySetInnerHTML/.test(content)) G8 = true;
     }
     if (path.endsWith('.css')) {
-      try { postcss.parse(content, { from: path }); } catch { G8 = true; }
-      if (/@import\b|expression\s*\(|url\s*\(\s*["']?(?:https?:|data:|javascript:)/i.test(content)) G8 = true;
+      try {
+        const root = postcss.parse(content, { from: path });
+        if (hasUnsafeCssCapability(root, path, files)) G8 = true;
+      } catch { G8 = true; }
+      if (/@import\b|expression\s*\(/i.test(content)) G8 = true;
     }
     if (path.endsWith('.json')) { try { JSON.parse(content); } catch { G8 = true; } }
   }
@@ -83,27 +88,107 @@ export function p5Failures({ model, tokenPlan, modeContextPlan, semanticSlice, l
   return { G8, G13 };
 }
 
-function hasForbiddenRuntime(sourceFile) {
-  let forbidden = false;
-  const forbiddenIdentifiers = new Set(['fetch', 'XMLHttpRequest', 'WebSocket', 'EventSource', 'sendBeacon']);
-  const visit = (node) => {
-    if (ts.isIdentifier(node) && forbiddenIdentifiers.has(node.text)) forbidden = true;
-    if (ts.isElementAccessExpression(node)
-      && ts.isStringLiteralLike(node.argumentExpression)
-      && forbiddenIdentifiers.has(node.argumentExpression.text)) forbidden = true;
-    if (ts.isCallExpression(node)) {
-      const expression = node.expression;
-      if (ts.isIdentifier(expression) && ['fetch', 'eval', 'Function'].includes(expression.text)) forbidden = true;
-      if (ts.isPropertyAccessExpression(expression)
-        && ((['globalThis', 'window'].includes(expression.expression.getText(sourceFile)) && expression.name.text === 'fetch')
-          || (expression.expression.getText(sourceFile) === 'navigator' && expression.name.text === 'sendBeacon'))) forbidden = true;
-      if (expression.kind === ts.SyntaxKind.ImportKeyword) forbidden = true;
+function hasClosedGeneratedRuntime(sourceFile) {
+  const declared = new Set();
+  const callable = new Set();
+  const allowedAmbient = new Set(['JSON', 'Error']);
+  const allowedTopLevel = new Set([ts.SyntaxKind.ImportDeclaration, ts.SyntaxKind.VariableStatement, ts.SyntaxKind.FunctionDeclaration, ts.SyntaxKind.TypeAliasDeclaration, ts.SyntaxKind.InterfaceDeclaration]);
+  const allowedIntrinsicAttributes = {
+    div: new Set(['className', 'data-figma-id', 'data-mode-context', 'data-figma-component-key', 'data-figma-component-set-key', 'data-figma-component-props']),
+    span: new Set(['className', 'aria-hidden', 'data-fragment-id', 'data-owner-id', 'data-fragment-order']),
+    a: new Set(['href', 'rel']),
+  };
+  if (sourceFile.statements.some((statement) => !allowedTopLevel.has(statement.kind))) return false;
+
+  const bind = (name) => {
+    if (!name) return;
+    if (ts.isIdentifier(name)) declared.add(name.text);
+    else if (ts.isObjectBindingPattern(name) || ts.isArrayBindingPattern(name)) for (const element of name.elements) if (ts.isBindingElement(element)) bind(element.name);
+  };
+  const collect = (node) => {
+    if (ts.isImportDeclaration(node)) {
+      if (!ts.isStringLiteral(node.moduleSpecifier) || !/^\.\.?\//.test(node.moduleSpecifier.text)) return;
+      bind(node.importClause?.name);
+      if (node.importClause?.name) callable.add(node.importClause.name.text);
+      const bindings = node.importClause?.namedBindings;
+      if (bindings && ts.isNamespaceImport(bindings)) { bind(bindings.name); callable.add(bindings.name.text); }
+      if (bindings && ts.isNamedImports(bindings)) for (const element of bindings.elements) { bind(element.name); callable.add(element.name.text); }
     }
-    if (ts.isNewExpression(node) && ts.isIdentifier(node.expression) && ['XMLHttpRequest', 'WebSocket', 'EventSource'].includes(node.expression.text)) forbidden = true;
+    if (ts.isVariableDeclaration(node) || ts.isParameter(node) || ts.isFunctionDeclaration(node)) bind(node.name);
+    if (ts.isFunctionDeclaration(node) && node.name) callable.add(node.name.text);
+    ts.forEachChild(node, collect);
+  };
+  sourceFile.forEachChild(collect);
+
+  let valid = true;
+  const isDeclarationName = (node) => {
+    const parent = node.parent;
+    return (ts.isVariableDeclaration(parent) || ts.isParameter(parent) || ts.isFunctionDeclaration(parent) || ts.isImportClause(parent)
+      || ts.isImportSpecifier(parent) || ts.isNamespaceImport(parent) || ts.isTypeAliasDeclaration(parent) || ts.isInterfaceDeclaration(parent)
+      || ts.isPropertySignature(parent) || ts.isTypeParameterDeclaration(parent)) && parent.name === node;
+  };
+  const isNonComputedName = (node) => {
+    const parent = node.parent;
+    return (ts.isPropertyAccessExpression(parent) && parent.name === node)
+      || ((ts.isPropertyAssignment(parent) || ts.isPropertyDeclaration(parent) || ts.isMethodDeclaration(parent)) && parent.name === node && !parent.questionToken)
+      || (ts.isJsxAttribute(parent) && parent.name === node);
+  };
+  const jsxTag = (node) => (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxClosingElement(node)) ? node.tagName : null;
+  const visit = (node) => {
+    if (!valid || ts.isTypeNode(node)) return;
+    if (node.kind === ts.SyntaxKind.ThisKeyword || ts.isMetaProperty(node) || ts.isTaggedTemplateExpression(node) || ts.isAwaitExpression(node) || ts.isYieldExpression(node)) { valid = false; return; }
+    if (ts.isImportDeclaration(node) && (!ts.isStringLiteral(node.moduleSpecifier) || !/^\.\.?\//.test(node.moduleSpecifier.text))) { valid = false; return; }
+    if (ts.isExportDeclaration(node) || ts.isImportEqualsDeclaration(node)) { valid = false; return; }
+    if (ts.isCallExpression(node)) {
+      const callee = node.expression;
+      if (callee.kind === ts.SyntaxKind.ImportKeyword || ts.isElementAccessExpression(callee)) { valid = false; return; }
+      if (ts.isPropertyAccessExpression(callee) && !(ts.isIdentifier(callee.expression) && callee.expression.text === 'JSON' && callee.name.text === 'stringify')) { valid = false; return; }
+      if (!ts.isIdentifier(callee) && !ts.isPropertyAccessExpression(callee)) { valid = false; return; }
+      if (ts.isIdentifier(callee) && !callable.has(callee.text)) { valid = false; return; }
+    }
+    if (ts.isNewExpression(node) && !(ts.isIdentifier(node.expression) && node.expression.text === 'Error')) { valid = false; return; }
+    if (ts.isPropertyAccessExpression(node) && ['constructor', 'prototype', '__proto__'].includes(node.name.text)) { valid = false; return; }
+    if (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression) && ['constructor', 'prototype', '__proto__'].includes(node.argumentExpression.text)) { valid = false; return; }
+    const tag = jsxTag(node);
+    if (tag && ts.isIdentifier(tag)) {
+      if (/^[a-z]/.test(tag.text)) {
+        const attributes = allowedIntrinsicAttributes[tag.text];
+        if (!attributes) { valid = false; return; }
+        const opening = ts.isJsxClosingElement(node) ? null : node;
+        for (const attribute of opening?.attributes?.properties ?? []) {
+          if (!ts.isJsxAttribute(attribute) || !ts.isIdentifier(attribute.name) || !attributes.has(attribute.name.text)) { valid = false; return; }
+        }
+      } else if (!declared.has(tag.text)) { valid = false; return; }
+    }
+    if (ts.isIdentifier(node) && !isDeclarationName(node) && !isNonComputedName(node)) {
+      const parentTag = jsxTag(node.parent);
+      if (parentTag === node) {
+        // Tag capability was checked above.
+      } else if (!declared.has(node.text) && !allowedAmbient.has(node.text)) { valid = false; return; }
+    }
     ts.forEachChild(node, visit);
   };
   visit(sourceFile);
-  return forbidden;
+  return valid;
+}
+
+function hasUnsafeCssCapability(root, sourceFile, files) {
+  let unsafe = false;
+  root.walkAtRules(() => { unsafe = true; });
+  root.walkDecls((declaration) => {
+    if (declaration.value.includes('\\')) { unsafe = true; return; }
+    valueParser(declaration.value).walk((node) => {
+      if (['word', 'string'].includes(node.type) && (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(node.value) || node.value.startsWith('//'))) { unsafe = true; return; }
+      if (node.type !== 'function' || node.value.toLowerCase() !== 'url') return;
+      const significant = node.nodes.filter((child) => child.type !== 'space' && child.type !== 'comment');
+      if (significant.length !== 1 || !['word', 'string'].includes(significant[0].type)) { unsafe = true; return; }
+      const reference = significant[0].value;
+      if (!reference || /[\u0000-\u001f\u007f\\?#:]/.test(reference) || reference.startsWith('//')) { unsafe = true; return; }
+      const resolved = path.posix.normalize(path.posix.join(path.posix.dirname(sourceFile), reference));
+      if (!safePackagePath(resolved) || !resolved.startsWith('assets/') || typeof files[resolved] !== 'string') unsafe = true;
+    });
+  });
+  return unsafe;
 }
 
 function safePackagePath(value) {

@@ -291,6 +291,16 @@ Decisions/Done/cutover: Dan only.
   network APIs in the independent TS AST oracle; accepts only the standard SVG namespaces; and
   rejects browser-normalized separators. All five are permanent mutations. This is Builder repair
   evidence awaiting authoritative rereview, not snapshot clearance or a phase claim.
+- Authoritative rereview of `bd6f091` closed plan authority, editor authority, SVG namespace, and
+  href normalization, then reproduced two adjacent G8 escapes: computed/aliased runtime capability
+  access and protocol-relative CSS loading. Repair replaces the TS/TSX network-name blacklist with
+  an independent closed generated-module capability grammar: only local imports, declared calls,
+  `JSON.stringify`, `new Error`, and the exact emitted JSX intrinsic/attribute surface are allowed;
+  ambient globals, computed calls, constructor chains, dynamic imports, and fetching elements
+  refuse. CSS values are standards-parsed, reject remote/scheme-relative carriers in every value
+  form, and allow `url()` only when it resolves to an explicitly approved, existing package-confined
+  `assets/` entry. Exact reviewer attacks plus local-asset positives are permanent. Builder boundary
+  remains 104/104/0; this is repair evidence awaiting authoritative rereview, not phase clearance.
 
 ## Meta rulings accepted (2026-07-13)
 

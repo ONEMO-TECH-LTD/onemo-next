@@ -2,6 +2,7 @@
 import { parseDocument } from 'htmlparser2';
 import serializer from 'dom-serializer';
 import postcss from 'postcss';
+import valueParser from 'postcss-value-parser';
 import path from 'node:path';
 
 const SVG_ELEMENTS = new Set(['svg', 'g', 'defs', 'path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'linearGradient', 'radialGradient', 'stop', 'clipPath', 'mask', 'filter', 'feGaussianBlur', 'feOffset', 'feColorMatrix', 'feBlend', 'use', 'title', 'desc']);
@@ -77,13 +78,25 @@ export function sanitizeSvg(input, { namespace, maxBytes = 100_000, maxNodes = 5
   return output;
 }
 
-export function assertSafeCssValue(value, property) {
+export function assertSafeCssValue(value, property, { allowedAssetPaths = [], sourceFile = '' } = {}) {
   if (typeof value !== 'string' || !value || !CSS_PROPERTY.test(property ?? '')) throw new SecurityError('CSS property/value invalid');
-  if (/[{}]|\/\*/.test(value) || /expression\s*\(|@import\b/i.test(value) || /url\s*\(\s*["']?(?:https?:|data:|javascript:)/i.test(value)) throw new SecurityError(`unsafe CSS value for ${property}`);
+  if (/[{}]|\/\*/.test(value) || value.includes('\\') || /expression\s*\(|@import\b/i.test(value)) throw new SecurityError(`unsafe CSS value for ${property}`);
   let root;
   try { root = postcss.parse(`a{${property}:${value}}`); } catch { throw new SecurityError(`CSS value does not parse for ${property}`); }
   const rule = root.nodes[0];
   if (root.nodes.length !== 1 || rule?.type !== 'rule' || rule.nodes.length !== 1 || rule.nodes[0].type !== 'decl' || rule.nodes[0].prop !== property || rule.nodes[0].value !== value) throw new SecurityError(`CSS value escapes its declaration for ${property}`);
+  const allowed = new Set(allowedAssetPaths.map((asset) => confinedAssetPath(asset)));
+  valueParser(value).walk((node) => {
+    if (['word', 'string'].includes(node.type) && (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(node.value) || node.value.startsWith('//'))) throw new SecurityError(`CSS remote value forbidden for ${property}`);
+    if (node.type !== 'function' || node.value.toLowerCase() !== 'url') return;
+    const significant = node.nodes.filter((child) => child.type !== 'space' && child.type !== 'comment');
+    if (significant.length !== 1 || !['word', 'string'].includes(significant[0].type)) throw new SecurityError(`CSS url() grammar invalid for ${property}`);
+    const reference = significant[0].value;
+    if (!reference || reference.includes('\\') || /[\u0000-\u001f\u007f?#:]/.test(reference) || reference.startsWith('//')) throw new SecurityError(`CSS url() is not a confined local asset for ${property}`);
+    const base = sourceFile ? path.posix.dirname(confinedAssetPath(sourceFile)) : '';
+    const resolved = confinedAssetPath(path.posix.normalize(path.posix.join(base, reference)));
+    if (!resolved.startsWith('assets/') || !allowed.has(resolved)) throw new SecurityError(`CSS asset ${resolved} is not approved for ${property}`);
+  });
   return value;
 }
 

@@ -110,7 +110,8 @@ test('P5 security boundaries reject SVG, CSS, URL, and path payloads before outp
     '<svg><path id="a?" /><path id="a!" /></svg>',
   ]) assert.throws(() => sanitizeSvg(payload, { namespace: 'asset-a' }), SecurityError);
   assert.doesNotThrow(() => assertSafeCssValue('calc(var(--safe) / 100)', 'opacity'));
-  for (const value of ['red; color:blue', 'url(https://evil.test/x)', 'expression(alert(1))', 'var(--x) } .evil {']) assert.throws(() => assertSafeCssValue(value, 'color'), SecurityError);
+  assert.doesNotThrow(() => assertSafeCssValue('url("../assets/look.svg")', 'background-image', { sourceFile: 'styles/look.css', allowedAssetPaths: ['assets/look.svg'] }));
+  for (const value of ['red; color:blue', 'url(https://evil.test/x)', 'url(//evil.test/x)', 'url(data:image/svg+xml,x)', 'image-set("https://evil.test/x" 1x)', 'url("../assets/unapproved.svg")', 'expression(alert(1))', 'var(--x) } .evil {']) assert.throws(() => assertSafeCssValue(value, 'background-image'), SecurityError);
   assert.deepEqual(safeHref('https://example.test/look'), { href: 'https://example.test/look', external: true });
   assert.throws(() => safeHref('javascript:alert(1)'), SecurityError);
   assert.throws(() => safeHref('//evil.test/look'), SecurityError);
@@ -204,6 +205,17 @@ test('independent P5 oracle bites unsafe output and every selection-address muta
   assert.equal(p5Failures({ ...output, packageOutput: indirectNetwork }).G8, true);
   const bracketNetwork = structuredClone(output.packageOutput); bracketNetwork.files[screen] += '\nvoid window["fetch"]("/data");\n'; resealTestManifest(bracketNetwork);
   assert.equal(p5Failures({ ...output, packageOutput: bracketNetwork }).G8, true);
+  const computedNetwork = structuredClone(output.packageOutput); computedNetwork.files[screen] += '\nexport function injectedRuntime() { const runtime: any = globalThis; const operation = "fe" + "tch"; return runtime[operation]("https://example.test/data"); }\n'; resealTestManifest(computedNetwork);
+  assert.equal(p5Failures({ ...output, packageOutput: computedNetwork }).G8, true);
+  const localAsset = structuredClone(output.packageOutput);
+  localAsset.files['assets/look.svg'] = '<svg xmlns="http://www.w3.org/2000/svg" />\n';
+  const style = Object.keys(localAsset.files).find((path) => path.startsWith('styles/'));
+  localAsset.files[style] += '\n.localAsset { background-image: url("../assets/look.svg"); }\n'; resealTestManifest(localAsset);
+  assert.deepEqual(p5Failures({ ...output, packageOutput: localAsset }), { G8: false, G13: false });
+  const remoteCss = structuredClone(output.packageOutput); remoteCss.files[style] += '\n.remoteAsset { background-image: url(//example.test/look.svg); }\n'; resealTestManifest(remoteCss);
+  assert.equal(p5Failures({ ...output, packageOutput: remoteCss }).G8, true);
+  const remoteImageSet = structuredClone(output.packageOutput); remoteImageSet.files[style] += '\n.remoteSet { background-image: image-set("https://example.test/look.svg" 1x); }\n'; resealTestManifest(remoteImageSet);
+  assert.equal(p5Failures({ ...output, packageOutput: remoteImageSet }).G8, true);
   const typeBroken = structuredClone(output.packageOutput);
   typeBroken.files['token-values.ts'] = typeBroken.files['token-values.ts'].replace('"CK_THEME=light": true', '"CK_THEME=light": "not-a-boolean"');
   assert.notEqual(typeBroken.files['token-values.ts'], output.packageOutput.files['token-values.ts']);
