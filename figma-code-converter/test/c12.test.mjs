@@ -1,13 +1,9 @@
-/** C1.2 unit tests — one per SPEC mapping rule, + the real golden-frame structural run. */
+/** C1.2 unit tests — one per SPEC mapping rule, plus a committed hermetic structural run. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { promises as fs } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { buildIr, fontWeightOf, isVectorish } from '../src/ir.mjs';
-
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+import { goldenFrameFixture } from './fixtures/golden-frame.mjs';
 
 const vmap = new Map([
   ['VariableID:1', { name: 'standard/m', collection: '3.1-Sem-Dim-Fluid', cssVar: '--sem-dim-fluid-standard-m' }],
@@ -120,8 +116,8 @@ test('§3 visibility: invisible nodes are skipped entirely', () => {
   assert.equal(root.children.length, 0);
 });
 
-test('GOLDEN FRAME: full IR builds — structure/geometry always convert (no structural refusals)', async () => {
-  const raw = JSON.parse(await fs.readFile(path.join(ROOT, 'cache/t88thL8hKksSpILgkeGRZ0-4084-25997.nodes.json'), 'utf8'));
+test('HERMETIC GOLDEN REPLACEMENT: full IR builds — structure/geometry always convert', () => {
+  const raw = goldenFrameFixture();
   const { root, refusals } = buildIr(raw, null); // no dump yet — refs carry varId, cssVar undefined
   assert.ok(root, 'root builds');
   // count IR nodes + geometry produced (svg roots count as one each; no placeholders exist anymore)
@@ -134,11 +130,8 @@ test('GOLDEN FRAME: full IR builds — structure/geometry always convert (no str
   // the ex-'BG' no-autolayout frames now convert: their children pin absolutely from Figma coords
   assert.ok(absCount >= 3, `absolute-positioned children emitted from no-autolayout frames (${absCount})`);
   assert.ok(rotCount >= 1, `rotations carried as transform (${rotCount})`);
-  // GLASS note: the frame's 3 GLASS effects all live inside the `Toolbar - Bottom - Safari` layer,
-  // which is visible:false → correctly skipped (§3 visibility). The VISIBLE tree has no GLASS, so
-  // zero unknown-effect records is correct; the mapped blurs (BACKGROUND_BLUR/LAYER_BLUR) convert.
+  // The fixture contains only supported visible properties; no property-level refusal is legal.
   assert.equal(refusals.filter((r) => r.reason === 'unknown-effect').length, 0);
-  // zero center-stroke refusals (all CENTER strokes are vectors — spec pin)
   assert.equal(refusals.filter((r) => r.reason === 'center-stroke').length, 0);
   console.log(`  golden IR: ${count} nodes, ${absCount} absolute, ${rotCount} rotated, ${refusals.length} refusal records:`,
     Object.entries(refusals.reduce((m, r) => ((m[r.reason] = (m[r.reason] ?? 0) + 1), m), {})));

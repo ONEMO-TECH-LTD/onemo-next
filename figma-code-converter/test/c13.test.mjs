@@ -4,14 +4,12 @@ import assert from 'node:assert/strict';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { buildIr } from '../src/ir.mjs';
 import { emit, camelClass, ClassNamer, gradientAngle, cssColor } from '../src/emit.mjs';
 import { reverseCheck } from '../src/reverse.mjs';
 import { minimalBoxShorthand, minimalRadiusShorthand } from '../src/slot-law.mjs';
-
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+import { goldenFrameFixture } from './fixtures/golden-frame.mjs';
 
 test('§3.1 class contract: no underscores, digit guard, ordinal uniquing', () => {
   assert.equal(camelClass('Tool_Icon 2x'), 'toolIcon2x');
@@ -98,8 +96,8 @@ test('§3.5 composition: OUTSIDE ring first, then effect shadows (lead caution 1
   assert.match(css, /box-shadow: 0 0 0 2px #ff0000, 0 2px 4px rgba\(0, 0, 0, 0\.25\);/);
 });
 
-test('GOLDEN FRAME: emits — svg placeholders pending assets, css parses, idMap 1:1', async () => {
-  const raw = JSON.parse(await fs.readFile(path.join(ROOT, 'cache/t88thL8hKksSpILgkeGRZ0-4084-25997.nodes.json'), 'utf8'));
+test('HERMETIC GOLDEN REPLACEMENT: emits — css parses and idMap is 1:1', () => {
+  const raw = goldenFrameFixture();
   const { root } = buildIr(raw, null);
   const { tsx, css, pageTsx, idMap, notes, componentName, slug } = emit(root, 'Editor 402 iphone - apple blur glass');
   assert.equal(componentName, 'Editor402IphoneAppleBlurGlass');
@@ -118,10 +116,10 @@ test('GOLDEN FRAME: emits — svg placeholders pending assets, css parses, idMap
   assert.match(css, /box-shadow: inset 0 0 0 1px #80838d;/);
   assert.ok(!/border: 1px solid #80838d;/.test(css), 'HUG dial must not carry a size-adding border');
   assert.match(css, /border-radius: 9999px;/);
-  // pending svg assets are notes, not crashes
+  // Every report entry, if one is added to the fixture later, must stay actionable text.
   assert.ok(notes.every((n) => typeof n.note === 'string'));
   assert.match(pageTsx, /<Editor402IphoneAppleBlurGlass \/>/);
-  console.log(`  golden emit: tsx ${tsx.length}B · css ${css.length}B · ${idMap.length} elements · ${notes.length} notes (pending svg assets)`);
+  console.log(`  golden emit: tsx ${tsx.length}B · css ${css.length}B · ${idMap.length} elements · ${notes.length} notes`);
 });
 
 test('jsxSafeSvg: kebab attrs camelize (data-/xmlns exempt); style strings → JSX objects', async () => {
@@ -167,11 +165,11 @@ test('F2 (lead C2): reverse round-trip diffs GEOMETRY values — clean passes, m
   } finally { await fs.rm(dir, { recursive: true, force: true }); }
 });
 
-test('lead C3 F2 guard: check-IR == convert-IR — reverse passes with a FRESH buildIr-only IR (golden)', async () => {
+test('lead C3 F2 guard: check-IR == convert-IR — reverse passes with a fresh hermetic IR', async () => {
   // The class that broke twice (C2 varMap-null, C3 emit-mutated isFlexChild): `check` builds the IR
   // WITHOUT running emit, so the reverse gate must depend ONLY on buildIr-produced fields. This
   // simulates check's exact path: emit from one IR instance, reverse-verify with a fresh one.
-  const raw = JSON.parse(await fs.readFile(path.join(ROOT, 'cache/t88thL8hKksSpILgkeGRZ0-4084-25997.nodes.json'), 'utf8'));
+  const raw = goldenFrameFixture();
   const { root: convertIr } = buildIr(raw, null);
   const out = emit(convertIr, 'Editor 402 iphone - apple blur glass'); // emit mutates convertIr
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'f2c-parity-'));

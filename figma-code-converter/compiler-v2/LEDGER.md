@@ -15,8 +15,7 @@ Dan's newer directive supersedes the per-phase Dan-wait sentence ONLY: this run 
 for Dan between phases. NOT waived: frozen phase evidence, authoritative QA+Meta handoffs to
 @s58-pixel-meta-qa, fail-closed gaps, final Dan sign-off, Done ownership, cutover authorization.
 
-**Current test truth (reported separately):** legacy converter suite 46 pass / 3 fail (missing
-gitignored golden fixture `t88thL8hKksSpILgkeGRZ0-4084-25997.nodes.json`) / 0 skips ·
+**Current test truth (reported separately):** legacy converter suite 49 pass / 0 fail / 0 skip ·
 compiler-v2 foundation suite 53 pass / 0 fail / 0 skip across Builder and Meta repeated runs ·
 compiler-v2 P2 graph suite 16 pass / 0 fail / 0 skip · P2 persisted-model suite 7 pass /
 0 fail / 0 skip · compiler-v2 P3 planner suite 9 pass / 0 fail / 0 skip · P4 layout/render
@@ -71,8 +70,10 @@ Decisions/Done/cutover: Dan only.
    Dan's demo target ("code and on our screen the result"); the §14.2 mother needs DAN's
    explicit selection → gap G-4. Dark-mode authored reference does not exist → dark states are
    `reference:null` → DIAGNOSTIC_ONLY per §4.5 (honest, logged). [BLOCKED on G-4]
-3. **Hermetic fixtures**: sanitized Shape microfixture set + replacement for the missing
-   legacy golden (t88thL8h…) so `npm test` has zero missing-fixture failures. [pending]
+3. **Hermetic fixtures**: committed synthetic replacement for the lost gitignored legacy golden
+   now preserves the 60-node structural/emission/fresh-IR reverse laws without claiming plugin
+   provenance; legacy suite is 49/49/0. Sanitized Shape E1-E13 microfixtures remain pending.
+   [PARTIAL — missing-golden failure closed]
 4. **fidelity-budgets.json**: synchronized Figma/build pairs at one file version; repeat-run
    noise measured; per-class thresholds published with sample sizes + exclusions. [pending]
 5. **Capture operability envelope**: measured wall time/bytes/requests for REST nodes,
