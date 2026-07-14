@@ -29,6 +29,12 @@ function fixtureOutput() {
     layoutSizingVertical: 'FIXED', size: { x: 120, y: 16 },
     style: { textAlignVertical: 'CENTER', textAutoResize: 'NONE', lineHeightPx: 12 }, children: [],
   });
+  snapshot.document.children.push({
+    id: 'radius-box', type: 'RECTANGLE', name: 'Slot-preserving radii', size: { x: 40, y: 24 },
+    rectangleCornerRadii: [2, 4, 6, 8],
+    boundVariables: { rectangleCornerRadii: { RECTANGLE_TOP_LEFT_CORNER_RADIUS: { type: 'VARIABLE_ALIAS', id: 'V_FLOAT' } } },
+    children: [],
+  });
   const nested = snapshot.document.children.find((node) => node.id === 'nested');
   nested.opacity = 0.5;
   nested.boundVariables = { opacity: { type: 'VARIABLE_ALIAS', id: 'V_FLOAT_2' } };
@@ -41,6 +47,7 @@ function fixtureOutput() {
     styledTextSegments: [{ start: 0, end: 15, characters: '<Look & listen>', fontName: { family: 'Inter', style: 'Regular' } }],
     fontDependencies: [{ family: 'Inter', style: 'Regular', providerId: 'font-inter-regular', sha256: '1'.repeat(64) }],
   });
+  snapshot.supplement.nodes.push({ nodeId: 'radius-box', resolvedVariableModes: { C_THEME: 'light' } });
   const model = buildCanonicalModel({ snapshot, evidenceClass: 'microfixture', fileKey: 'P5_FIXTURE' });
   const registryStage = stageTokenRegistry({ model, baseRegistry: emptyTokenRegistry(), webSyntaxPolicy: acceptColorSyntax });
   const tokenPlan = buildTokenPlan({ model, registry: registryStage.candidateRegistry, registryStageId: registryStage.stageId, registryBaseHash: registryStage.baseHash, codecPolicyId: CODEC_POLICY_ID, codecOptions: optionsFor });
@@ -110,6 +117,13 @@ test('P5 independent G8 proof requires emitted fixed-box vertical alignment', ()
   missing.packageOutput.files['source-map.json'] = `${canonicalJson(missing.packageOutput.sourceMap)}\n`;
   resealTestManifest(missing.packageOutput);
   assert.equal(p5Failures(missing).G8, true);
+
+  const radius = output.packageOutput.sourceMap.segments.find((row) => row.nodeId === 'radius-box' && row.sourcePath === '/rectangleCornerRadii/1' && row.cssProperty === 'border-top-right-radius');
+  const missingRadius = structuredClone(output);
+  missingRadius.packageOutput.sourceMap.segments = missingRadius.packageOutput.sourceMap.segments.filter((row) => row.segmentId !== radius.segmentId);
+  missingRadius.packageOutput.files['source-map.json'] = `${canonicalJson(missingRadius.packageOutput.sourceMap)}\n`;
+  resealTestManifest(missingRadius.packageOutput);
+  assert.equal(p5Failures(missingRadius).G8, true);
 });
 
 test('P5 security boundaries reject SVG, CSS, URL, and path payloads before output', () => {
@@ -172,6 +186,19 @@ test('P5 Save-to-code edits one CSS slot and one token leaf with deterministic m
   assert.throws(() => selectSource(padded, output.editorAuthority, 'root'), /trusted editor authority mismatch/);
   assert.equal(selectSource(padded, paddedEdit.editorAuthority, 'root').nodeId, 'root');
   assert.throws(() => saveSegmentEdit(output.packageOutput, output.editorAuthority, { segmentId: padding.segmentId, value: 'red' }), EditorError);
+
+  const radius = output.packageOutput.sourceMap.segments.find((row) => row.kind === 'css-value' && row.sourcePath === '/rectangleCornerRadii/1');
+  assert.equal(radius.cssProperty, 'border-top-right-radius');
+  assert.equal(radius.text, '4px');
+  const radiusEdit = saveSegmentEdit(output.packageOutput, output.editorAuthority, { segmentId: radius.segmentId, value: '14px' }).packageOutput;
+  assert.deepEqual(changedPaths(output.packageOutput, radiusEdit), ['manifest.json', 'source-map.json', radius.file].sort());
+  assert.equal(radiusEdit.sourceMap.segments.find((row) => row.segmentId === radius.segmentId).text, '14px');
+  for (const [index, value] of [[2, '6px'], [3, '8px']]) {
+    assert.equal(radiusEdit.sourceMap.segments.find((row) => row.sourcePath === `/rectangleCornerRadii/${index}`).text, value);
+  }
+  const boundRadius = output.packageOutput.sourceMap.segments.find((row) => row.kind === 'token-expression' && row.sourcePath === '/rectangleCornerRadii/RECTANGLE_TOP_LEFT_CORNER_RADIUS');
+  assert.ok(boundRadius.text.startsWith('var('));
+  assert.equal(radiusEdit.sourceMap.segments.find((row) => row.segmentId === boundRadius.segmentId).text, boundRadius.text);
 
   const opacity = output.packageOutput.sourceMap.segments.find((row) => row.kind === 'token-expression' && row.sourcePath === '/opacity');
   const replacement = output.tokenPlan.tokenData.css.find((row) => row.variableKey === 'K_FLOAT_2' && row.destinationDomain === 'opacity-normalized');

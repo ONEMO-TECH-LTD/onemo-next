@@ -182,8 +182,8 @@ function emitStyles({ model, tokenPlan, layoutRenderPlan, channels, file, source
   const bindingsByNode = groupBy(tokenPlan.bindings, (row) => row.source.nodeId);
   for (const node of layoutRenderPlan.layout.nodes) {
     writer.write(`.${nodeClass(node.nodeId)} {\n`);
-    const declarations = cssDeclarations(modelById.get(node.nodeId).properties, layoutById.get(node.nodeId));
     const bindingByPath = new Map((bindingsByNode.get(node.nodeId) ?? []).filter((row) => row.target === 'css').map((row) => [row.source.propertyPath, row]));
+    const declarations = cssDeclarations(modelById.get(node.nodeId).properties, layoutById.get(node.nodeId), new Set(bindingByPath.keys()));
     for (const declaration of declarations) {
       const binding = bindingByPath.get(declaration.sourcePath);
       writer.write(`  ${declaration.property}: `);
@@ -318,7 +318,7 @@ function emitReactExpression(writer, binding, channels, file) {
   writer.mark(segmentMeta('react-token-expression', binding.source.nodeId, binding.source.propertyPath, file, { bindingId: binding.bindingId, modeContextId: binding.modeContextId }), () => writer.write(`resolveReactToken(${JSON.stringify(channel.tsSymbol)}, ${JSON.stringify(binding.modeContextId)})`));
 }
 
-function cssDeclarations(source, node) {
+function cssDeclarations(source, node, bindingPaths = new Set()) {
   const out = [];
   const add = (sourcePath, property, value) => { if (value !== null && value !== undefined) out.push({ sourcePath, property, value: String(value) }); };
   add('/layoutPositioning', 'position', node.layout.positioning === 'absolute' ? 'absolute' : 'relative');
@@ -330,7 +330,19 @@ function cssDeclarations(source, node) {
     add('/paddingTop', 'padding-top', `${formatNumber(node.layout.padding.top)}px`); add('/paddingRight', 'padding-right', `${formatNumber(node.layout.padding.right)}px`);
     add('/paddingBottom', 'padding-bottom', `${formatNumber(node.layout.padding.bottom)}px`); add('/paddingLeft', 'padding-left', `${formatNumber(node.layout.padding.left)}px`);
   }
-  if (source.cornerRadius !== undefined) add('/cornerRadius', 'border-radius', `${formatNumber(source.cornerRadius)}px`);
+  if (Array.isArray(source.rectangleCornerRadii)) {
+    const sides = [
+      ['RECTANGLE_TOP_LEFT_CORNER_RADIUS', 'border-top-left-radius'],
+      ['RECTANGLE_TOP_RIGHT_CORNER_RADIUS', 'border-top-right-radius'],
+      ['RECTANGLE_BOTTOM_RIGHT_CORNER_RADIUS', 'border-bottom-right-radius'],
+      ['RECTANGLE_BOTTOM_LEFT_CORNER_RADIUS', 'border-bottom-left-radius'],
+    ];
+    source.rectangleCornerRadii.forEach((value, index) => {
+      const keyedPath = `/rectangleCornerRadii/${sides[index][0]}`;
+      const numericPath = `/rectangleCornerRadii/${index}`;
+      add(bindingPaths.has(keyedPath) ? keyedPath : numericPath, sides[index][1], `${formatNumber(value)}px`);
+    });
+  } else if (source.cornerRadius !== undefined) add('/cornerRadius', 'border-radius', `${formatNumber(source.cornerRadius)}px`);
   const textStyle = source.type === 'TEXT' ? (source.style ?? {}) : null;
   const fixedTextBox = textStyle && (source.layoutSizingVertical ?? 'FIXED') === 'FIXED'
     && ['NONE', 'TRUNCATE'].includes(textStyle.textAutoResize ?? 'NONE');

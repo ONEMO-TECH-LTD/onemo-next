@@ -17,15 +17,16 @@ for Dan between phases. NOT waived: frozen phase evidence, authoritative QA+Meta
 
 **Current test truth (reported separately):** legacy converter suite 49 pass / 0 fail / 0 skip ·
 compiler-v2 foundation suite 53 pass / 0 fail / 0 skip across Builder and Meta repeated runs ·
+compiler-v2 P0 regression suite 11 pass / 0 fail / 0 skip ·
 compiler-v2 P2 graph suite 16 pass / 0 fail / 0 skip · P2 persisted-model suite 7 pass /
 0 fail / 0 skip · compiler-v2 P3 planner suite 9 pass / 0 fail / 0 skip · P4 layout/render
-suite 13 pass / 0 fail / 0 skip · P5 emission/security/editor suite 6 pass / 0 fail / 0 skip ·
+suite 13 pass / 0 fail / 0 skip · P5 emission/security/editor suite 7 pass / 0 fail / 0 skip ·
 P6 runtime/visual/editor-proof suite 8 pass / 0 fail / 0 skip, including pinned system-Chrome ·
 P7 inventory suite 6 pass / 0 fail / 0 skip · P7 mutation/scale diagnostic suite 6 pass /
 0 fail / 0 skip · P8 sandbox transaction suite 16 pass / 0 fail / 0 skip · P8 Studio suite
 8 pass / 0 fail / 0 skip · P9 cutover/rollback kernel suite 11 pass / 0 fail / 0 skip.
 Combined current truth:
-159 pass / 0 fail / 0 skip.
+220 pass / 0 fail / 0 skip.
 No phase may be recorded green from
 harness-only or REST_ONLY placeholders.
 
@@ -83,8 +84,13 @@ Decisions/Done/cutover: Dan only.
    noise measured; per-class thresholds published with sample sizes + exclusions. [pending]
 5. **Capture operability envelope**: measured wall time/bytes/requests for REST nodes,
    variables payload, svg exports on Shape (local file). Remote-heavy corpus: GAP-1. [pending]
-6. **Editor round-trip corpus pinned**: slot-preserving padding/radii edit, token-expression
-   segment edit, fragment ownership — spec'd against the react-figma engine contract. [pending]
+6. **Editor round-trip corpus pinned**: EC1 padding and EC2 asymmetric per-corner radius edits
+   now preserve untouched slots, token expressions, source identity, mode/render order, rotating
+   editor authority, localized files, rebuilt package identity, and authority-backed runtime
+   capture. P5 independently parses the emitted radius declarations; P6 independently exposes
+   per-case acceptance/refusal. Token-expression/component-prop/scoped-mode/fragment/text cases
+   have static P5 coverage, but the complete EC3–EC8b P6 runtime corpus is still pending.
+   [BUILDER GREEN — EC1/EC2 PARTIAL ONLY; awaiting authoritative snapshot review]
 7. **Registry transaction protocol**: §6.1.1 verbatim; lane-scoped generations
    (v2 sandbox namespace only until P9). [P8 CORE + STUDIO SNAPSHOTS CLEAR; PHASE EVIDENCE OPEN]
 8. **Calibration publication/restart seam**: UUID-isolated multi-writer transactions; pointer
@@ -709,3 +715,13 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   race then passed and the complete rerun passed. This is Builder evidence awaiting sole
   authoritative @s58-pixel-meta-qa review; it is not plugin/integration evidence, P0 exit,
   promotion, cutover, or Done.
+- 2026-07-14 Builder P0 editor-corpus checkpoint: P5 now emits asymmetric
+  `rectangleCornerRadii` as four independently addressable CSS longhands while retaining a keyed
+  bound corner as a token-expression segment. The EC2 edit changes only top-right radius plus
+  source-map/manifest; bottom slots and bound top-left stay unchanged. The independent P5 oracle
+  parses CSS and requires every captured corner declaration/segment. P6 now runs EC2 through
+  rotated editor authority, deterministic rebuild, pinned-browser capture, and independent
+  per-case oracle validation; a forged EC2 segment is refused. Focused P5/P6 boundary is 15/15/0;
+  full legacy + Compiler v2 boundary is 220/220/0. EC3–EC8b runtime cases, plugin corpus, P0
+  phase/integration, promotion, cutover, and Done remain open. Builder evidence awaiting sole
+  authoritative @s58-pixel-meta-qa review.

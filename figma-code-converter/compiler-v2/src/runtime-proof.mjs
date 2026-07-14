@@ -242,7 +242,7 @@ function select(selection, output, authority) {
 
 function assertEditorCaseSegment(caseId, segment) {
   if (caseId === 'EC1' && (segment.kind !== 'css-value' || !segment.cssProperty?.startsWith('padding-'))) throw new Error('EC1 requires one padding slot');
-  if (caseId === 'EC2' && (segment.kind !== 'css-value' || segment.cssProperty !== 'border-radius')) throw new Error('EC2 requires one radius slot');
+  if (caseId === 'EC2' && (segment.kind !== 'css-value' || !/^border-(?:radius|(?:top|bottom)-(?:left|right)-radius)$/.test(segment.cssProperty))) throw new Error('EC2 requires one radius slot');
   if (caseId === 'EC3' && !['token-expression', 'react-token-expression'].includes(segment.kind)) throw new Error('EC3 requires a token-expression segment');
   if (caseId === 'EC4' && segment.kind !== 'jsx-prop-value') throw new Error('EC4 requires a component prop segment');
   if (caseId === 'EC5' && (!segment.modeContextId || segment.modeContextId === 'ø')) throw new Error('EC5 requires a scoped-mode segment');

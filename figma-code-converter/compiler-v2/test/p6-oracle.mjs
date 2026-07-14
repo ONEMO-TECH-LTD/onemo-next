@@ -68,7 +68,7 @@ export async function p6Failures({ packageOutput, compileRequest, builds, locali
   }
 
   let G13 = EDITOR_CASES.some((id) => !(editorRuns ?? []).some((row) => row.caseId === id)) || new Set((editorRuns ?? []).map((row) => row.caseId)).size !== (editorRuns ?? []).length;
-  for (const row of editorRuns ?? []) if (!(await validEditorRun(row))) G13 = true;
+  if ((await p6EditorRunFailures(editorRuns)).length) G13 = true;
   const { reportHash: ignored, ...hashable } = report ?? {};
   if (report?.reportHash !== sha256(canonicalJson(hashable))) return allFailed();
   if (report?.state === 'PROMOTABLE_VERIFIED' || report?.promotionAuthorityId !== null) return allFailed();
@@ -80,6 +80,12 @@ export async function p6Failures({ packageOutput, compileRequest, builds, locali
   const expectedState = G0 ? 'FAILED_CAPTURE' : G9 ? 'FAILED_STATIC' : G10 ? 'FAILED_RUNTIME' : G11 ? 'FAILED_VISUAL' : G13 ? 'FAILED_EDITOR' : 'DIAGNOSTIC_ONLY';
   if (report?.state !== expectedState) return { G9: G9 || report?.state === 'PROMOTABLE_VERIFIED', G10, G11: G11 || report?.state === 'PROMOTABLE_VERIFIED', G13 };
   return { G9, G10, G11, G13 };
+}
+
+export async function p6EditorRunFailures(editorRuns) {
+  const failures = [];
+  for (const row of editorRuns ?? []) if (!(await validEditorRun(row))) failures.push(row?.caseId ?? '?');
+  return failures;
 }
 
 async function validBuild(bundle, packageHash = bundle?.packageHash) {
@@ -206,7 +212,7 @@ function selectionSourceId(map, selection) {
 
 function caseSegment(caseId, row) {
   if (caseId === 'EC1') return row.kind === 'css-value' && row.cssProperty?.startsWith('padding-');
-  if (caseId === 'EC2') return row.kind === 'css-value' && row.cssProperty === 'border-radius';
+  if (caseId === 'EC2') return row.kind === 'css-value' && /^border-(?:radius|(?:top|bottom)-(?:left|right)-radius)$/.test(row.cssProperty);
   if (caseId === 'EC3') return ['token-expression', 'react-token-expression'].includes(row.kind);
   if (caseId === 'EC4') return row.kind === 'jsx-prop-value';
   if (caseId === 'EC5') return row.modeContextId && row.modeContextId !== 'ø';

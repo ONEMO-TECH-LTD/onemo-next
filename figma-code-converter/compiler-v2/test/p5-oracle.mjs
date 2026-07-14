@@ -59,6 +59,23 @@ export function p5Failures({ model, tokenPlan, modeContextPlan, semanticSlice, l
       const declarations = cssDeclarations.filter((row) => row.selector === `.n_${sha256(node.id).slice(0, 10)}` && row.property === 'align-content');
       if (rows.length !== 1 || rows[0].text !== expected || !rows[0].file.endsWith('.css') || declarations.length !== 1 || declarations[0].value !== expected) G8 = true;
     }
+    if (Array.isArray(source.rectangleCornerRadii)) {
+      const sides = [
+        ['RECTANGLE_TOP_LEFT_CORNER_RADIUS', 'border-top-left-radius'],
+        ['RECTANGLE_TOP_RIGHT_CORNER_RADIUS', 'border-top-right-radius'],
+        ['RECTANGLE_BOTTOM_RIGHT_CORNER_RADIUS', 'border-bottom-right-radius'],
+        ['RECTANGLE_BOTTOM_LEFT_CORNER_RADIUS', 'border-bottom-left-radius'],
+      ];
+      source.rectangleCornerRadii.forEach((value, index) => {
+        const keyedPath = `/rectangleCornerRadii/${sides[index][0]}`;
+        const numericPath = `/rectangleCornerRadii/${index}`;
+        const sourcePath = model.bindingGraph.records.some((record) => record.source.nodeId === node.id && record.source.propertyPath === keyedPath) ? keyedPath : numericPath;
+        const rows = (sourceMap?.segments ?? []).filter((row) => row.nodeId === node.id && row.sourcePath === sourcePath && row.cssProperty === sides[index][1]);
+        const declarations = cssDeclarations.filter((row) => row.selector === `.n_${sha256(node.id).slice(0, 10)}` && row.property === sides[index][1]);
+        if (rows.length !== 1 || !rows[0].file.endsWith('.css') || declarations.length !== 1 || declarations[0].value !== rows[0].text) G8 = true;
+        if (!rows[0]?.bindingId && rows[0]?.text !== `${value}px`) G8 = true;
+      });
+    }
   }
 
   let G13 = !sourceMap || sourceMap.schemaVersion !== 1 || sourceMap.modelContentSeal !== model.contentSeal;

@@ -18,7 +18,7 @@ import { buildRuntimeProof, RuntimeProofError } from '../src/runtime-proof.mjs';
 import { assertRuntimeBuild, buildRuntimeBundle, RuntimeBundleError } from '../src/runtime-bundle.mjs';
 import { assertRuntimeCapture, captureRuntimeState, createMicrofixtureEnvironmentAuthority } from '../src/runtime-capture.mjs';
 import { p3Fixture } from './p3-fixture.mjs';
-import { p6Failures } from './p6-oracle.mjs';
+import { p6EditorRunFailures, p6Failures } from './p6-oracle.mjs';
 
 const CODEC_POLICY_ID = 'p6-fixture-codecs-v1';
 const NODE_MODULES = path.dirname(path.dirname(fileURLToPath(import.meta.resolve('react'))));
@@ -38,6 +38,11 @@ after(async () => { if (sharedRoot) await rm(sharedRoot, { recursive: true, forc
 function compileFixture({ fixtureOptions = {}, mutate } = {}) {
   const { snapshot } = p3Fixture(fixtureOptions);
   Object.assign(snapshot.document, { layoutMode: 'VERTICAL', itemSpacing: 0, paddingTop: 8, paddingRight: 8, paddingBottom: 8, paddingLeft: 8, cornerRadius: 10 });
+  snapshot.document.children.push({
+    id: 'radius-box', type: 'RECTANGLE', name: 'Slot-preserving radii', size: { x: 40, y: 24 },
+    rectangleCornerRadii: [2, 4, 6, 8], children: [],
+  });
+  snapshot.supplement.nodes.push({ nodeId: 'radius-box', resolvedVariableModes: { C_THEME: 'light' } });
   const textSupplement = snapshot.supplement.nodes.find((row) => row.nodeId === 'text');
   textSupplement.fontDependencies = [{ family: 'Arial', style: 'Regular', providerId: 'font-apple-arial-regular', sha256: FONT_SHA256 }];
   for (const segment of textSupplement.styledTextSegments) segment.fontName = { family: 'Arial', style: 'Regular' };
@@ -110,6 +115,18 @@ async function fixture() {
       caseId: 'EC1', before: base, after: edited, selection: { kind: 'node', nodeId: base.model.documentGraph.rootId }, segmentId: padding.segmentId,
       afterBuild: { bundle: editedBundle, buildAuthority: editedBundle.buildAuthority }, runtimeCapture: editedCapture,
     };
+    const radius = base.packageOutput.sourceMap.segments.find((row) => row.nodeId === 'radius-box' && row.cssProperty === 'border-top-right-radius' && row.editable);
+    assert.ok(radius, 'P6 editor fixture requires one addressable radius slot');
+    const radiusEdited = saveSegmentEdit(base.packageOutput, base.editorAuthority, { segmentId: radius.segmentId, value: '14px' });
+    const radiusBundle = await buildRuntimeBundle({ packageOutput: radiusEdited.packageOutput, editorAuthority: radiusEdited.editorAuthority, outDir: path.join(sharedRoot, 'edited-radius'), nodeModulesDir: NODE_MODULES });
+    const radiusCapture = await captureRuntimeState({
+      chromium, chromePath: CHROME, bundle: radiusBundle, modeContextPlan: base.modeContextPlan, tokenPlan: base.tokenPlan,
+      requiredState, fidelityBudgets, environmentManifest, environmentAuthority, reference: { metadata: reference, bytes: bootstrap.screenshotBytes }, metricRegions: { 'flat-color': null },
+    });
+    const radiusEditorRun = {
+      caseId: 'EC2', before: base, after: radiusEdited, selection: { kind: 'node', nodeId: 'radius-box' }, segmentId: radius.segmentId,
+      afterBuild: { bundle: radiusBundle, buildAuthority: radiusBundle.buildAuthority }, runtimeCapture: radiusCapture,
+    };
     const input = {
       packageOutput: base.packageOutput,
       editorAuthority: base.editorAuthority,
@@ -127,7 +144,7 @@ async function fixture() {
       editorRuns: [],
       blockers: ['G-1', 'G-2'],
     };
-    return { input, base, bundleA, bundleB, capture, editorRun, metadataOnly, environmentManifest, environmentAuthority, chromium, requiredState, fidelityBudgets };
+    return { input, base, bundleA, bundleB, capture, editorRun, radiusEditorRun, metadataOnly, environmentManifest, environmentAuthority, chromium, requiredState, fidelityBudgets };
   })();
   return sharedFixture;
 }
@@ -180,16 +197,19 @@ test('P6 authorities bite independently for build, capture bytes, reference byte
 });
 
 test('P6 G13 derives exact segment locality, rotated package authority, rebuild, and runtime evidence', async () => {
-  const { input, editorRun } = await fixture();
+  const { input, editorRun, radiusEditorRun } = await fixture();
   const accepted = forkInput(input);
-  accepted.editorRuns = [editorRun];
+  accepted.editorRuns = [editorRun, radiusEditorRun];
   const report = await buildRuntimeProof(accepted);
   assert.equal(report.gates.G13, 'FAILED');
   assert.ok(!report.issues.G13.some((issue) => issue.startsWith('editor case EC1 refused:')), report.issues.G13.join('\n'));
+  assert.ok(!report.issues.G13.some((issue) => issue.startsWith('editor case EC2 refused:')), report.issues.G13.join('\n'));
+  assert.deepEqual(await p6EditorRunFailures([editorRun, radiusEditorRun]), []);
   const forged = forkInput(input);
   forged.editorRuns = [{ ...editorRun, segmentId: 'forged-segment' }];
   const forgedReport = await buildRuntimeProof(forged);
   assert.ok(forgedReport.issues.G13.some((issue) => issue.startsWith('editor case EC1 refused:')));
+  assert.deepEqual(await p6EditorRunFailures([{ ...radiusEditorRun, segmentId: 'forged-segment' }]), ['EC2']);
 });
 
 test('P6 production bundle authenticates the rotating P5 package authority and remains byte-deterministic', async () => {
