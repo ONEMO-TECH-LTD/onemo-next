@@ -21,8 +21,9 @@ compiler-v2 foundation suite 53 pass / 0 fail / 0 skip across Builder and Meta r
 compiler-v2 P2 graph suite 16 pass / 0 fail / 0 skip · P2 persisted-model suite 7 pass /
 0 fail / 0 skip · compiler-v2 P3 planner suite 9 pass / 0 fail / 0 skip · P4 layout/render
 suite 13 pass / 0 fail / 0 skip · P5 emission/security/editor suite 6 pass / 0 fail / 0 skip ·
-P6 runtime/visual/editor-proof suite 7 pass / 0 fail / 0 skip, including pinned system-Chrome.
-Combined current truth: 111 pass / 0 fail / 0 skip.
+P6 runtime/visual/editor-proof suite 8 pass / 0 fail / 0 skip, including pinned system-Chrome ·
+P7 inventory suite 6 pass / 0 fail / 0 skip · P7 mutation/scale diagnostic suite 6 pass /
+0 fail / 0 skip. Combined current truth: 124 pass / 0 fail / 0 skip.
 No phase may be recorded green from
 harness-only or REST_ONLY placeholders.
 
@@ -50,8 +51,8 @@ Decisions/Done/cutover: Dan only.
 | P3 mother token/component slice | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `5dbcb39` | sole authoritative QA/Meta cleared core snapshot; real mother/plugin-origin exit blocked by G-1/G-2/G-4 |
 | P4 mother layout/render slice | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `c754741` | sole authoritative QA+Meta cleared core snapshot; runnable mother/plugin evidence remains blocked by G-1/G-2/G-4 |
 | P5 emitters/security/editability | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `4693a72` | sole authoritative QA+Meta cleared G8 core snapshot; integration/editor-corpus exit remains blocked |
-| P6 runtime/visual/editor proof | CORE REWORK BUILT; AWAITING AUTHORITATIVE SNAPSHOT REVIEW | — | authority-backed G9–G11 + one real EC1 chain; EC2–EC8b and integration promotion remain honestly unavailable |
-| P7 corpus & scale | pending | — | |
+| P6 runtime/visual/editor proof | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `948c626` | sole authoritative QA+Meta cleared the environment-bound core snapshot; integration budgets/corpus/promotion remain blocked |
+| P7 corpus & scale | INVENTORY SNAPSHOT CLEAR; DIAGNOSTIC EVIDENCE BUILDING | `4169dab` | inventory law cleared; live corpus/capture/budgets/runtime/real mutations/scale remain blocked |
 | P8 studio dual-run | pending | — | |
 | P9 cutover | pending | — | Dan-only |
 
@@ -563,3 +564,13 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   fail-closed; structurally complete descriptors remain diagnostic and not integration-ready.
   This releases dependent P7 mutation/scale construction only. Live corpus, capture authority,
   budgets, runtime, mutation, scale, P7 phase/integration/promotion/cutover/Done remain uncleared.
+- 2026-07-14 Builder P7 mutation/scale diagnostic core: transcribed the exact 34-row §14.3
+  mutation census with one earliest owning gate and target seam; a diagnostic runner now binds
+  actual before/after hashes and observed assigned refusal to an opaque process-local authority.
+  The scale harness derives wall/CPU/RSS, output inventory/bytes, operation counts, and network
+  counters, rejects inner-loop network use, and requires a unique increasing three-size series.
+  Report hashes bind every run hash. Both proof classes are explicitly diagnostic and the module
+  has no integration/promotion authority path. Full boundary: 124 pass / 0 fail / 0 skip;
+  syntax checks green. Plugin corpus, capture/network authority, accepted hardware/budgets,
+  runtime/editor evidence, real mutation execution, and P7 phase/integration/promotion/cutover/
+  Done remain blocked. Builder evidence only; authoritative snapshot review required.

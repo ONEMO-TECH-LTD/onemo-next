@@ -57,3 +57,20 @@ accepted P0 budgets, runtime proof, the complete mutation suite, and scale proof
 required blockers. As of the 2026-07-14 capture-operator check, only Shape (`6075:53685`) exists;
 the other live roots and the distinct mother remain G-1/G-2/G-4 inputs. No synthetic substitute is
 authorized.
+
+## §14.3 / §15 diagnostic evidence frontier
+
+`src/p7-evidence.mjs` transcribes all 34 §14.3 mutations into one closed id → earliest-owning-
+gate → target-seam catalog. The diagnostic runner hashes the actual before/after bytes, requires a
+real changed input plus the assigned refusal, and seals the observed run behind a process-local
+opaque authority. Missing, duplicate, invented, copied, or altered records fail the exact census.
+
+The scale harness measures its own wall/CPU/RSS, recomputes output bytes and artifact hashes, and
+records operation/network counters through a closed meter. It refuses inner-loop network calls and
+requires a unique, strictly increasing three-size series. These runs are deliberately
+`microfixture-diagnostic` / `synthetic-diagnostic`: the module exposes no integration-authority or
+promotion path. Caller-supplied evaluators and synthetic meters cannot prove the real corpus.
+
+Integration remains blocked on the plugin-origin corpus, P1 capture/network authority, P0-accepted
+hardware and budgets, authority-backed runtime/editor evidence, and the real 34-mutation corpus.
+Those inputs must replace—not relabel—the diagnostic runs before P7 can become integration-ready.
