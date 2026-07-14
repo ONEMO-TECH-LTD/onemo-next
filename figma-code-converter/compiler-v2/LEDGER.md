@@ -24,7 +24,9 @@ suite 13 pass / 0 fail / 0 skip · P5 emission/security/editor suite 6 pass / 0 
 P6 runtime/visual/editor-proof suite 8 pass / 0 fail / 0 skip, including pinned system-Chrome ·
 P7 inventory suite 6 pass / 0 fail / 0 skip · P7 mutation/scale diagnostic suite 6 pass /
 0 fail / 0 skip · P8 sandbox transaction suite 16 pass / 0 fail / 0 skip · P8 Studio suite
-8 pass / 0 fail / 0 skip. Combined current truth: 148 pass / 0 fail / 0 skip.
+8 pass / 0 fail / 0 skip · P9 cutover/rollback kernel suite 11 pass / 0 fail / 0 skip.
+Combined current truth:
+159 pass / 0 fail / 0 skip.
 No phase may be recorded green from
 harness-only or REST_ONLY placeholders.
 
@@ -54,8 +56,8 @@ Decisions/Done/cutover: Dan only.
 | P5 emitters/security/editability | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `4693a72` | sole authoritative QA+Meta cleared G8 core snapshot; integration/editor-corpus exit remains blocked |
 | P6 runtime/visual/editor proof | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `948c626` | sole authoritative QA+Meta cleared the environment-bound core snapshot; integration budgets/corpus/promotion remain blocked |
 | P7 corpus & scale | CORE SNAPSHOTS CLEAR; PHASE EVIDENCE BLOCKED | `4169dab`, `3bd8dbd` | inventory + diagnostic evidence laws cleared; live corpus/capture/budgets/runtime/real mutations/scale remain blocked |
-| P8 studio dual-run | CORE SNAPSHOT CLEAR; STUDIO UX BUILT — REVIEW PENDING | `bc6c56e` | transaction/recovery kernel cleared; truthful Studio integration awaiting snapshot review |
-| P9 cutover | pending | — | Dan-only |
+| P8 studio dual-run | CORE SNAPSHOTS CLEAR; PHASE EVIDENCE BLOCKED | `bc6c56e`, `60801e0` | transaction/recovery and truthful Studio snapshots cleared; live configured integration remains open |
+| P9 cutover | CORE BUILT — REVIEW PENDING; PHASE/CUTOVER BLOCKED | — | fail-closed cutover/rollback mechanics built in temporary stores; no live authority/configuration/activation; Dan-only |
 
 ## P0 work items
 
@@ -78,7 +80,7 @@ Decisions/Done/cutover: Dan only.
 6. **Editor round-trip corpus pinned**: slot-preserving padding/radii edit, token-expression
    segment edit, fragment ownership — spec'd against the react-figma engine contract. [pending]
 7. **Registry transaction protocol**: §6.1.1 verbatim; lane-scoped generations
-   (v2 sandbox namespace only until P9). [P8 CORE SNAPSHOT CLEAR; STUDIO REVIEW PENDING]
+   (v2 sandbox namespace only until P9). [P8 CORE + STUDIO SNAPSHOTS CLEAR; PHASE EVIDENCE OPEN]
 8. **Calibration publication/restart seam**: UUID-isolated multi-writer transactions; pointer
    rename final; opaque in-process ownership; strict pointer/marker/topology validation; atomic
    temp-unlink arbitration; dead-owner recovery; legacy-v1 namespace preservation; original
@@ -396,9 +398,37 @@ Decisions/Done/cutover: Dan only.
   cancel. Screenshot: `output/playwright/compiler-v2-studio-unconfigured.png`. The pre-existing Next
   HMR websocket proxy emits 502 console noise on the isolated port; page/runtime rendering succeeds
   and this legacy proxy debt is not presented as Compiler v2 evidence.
-- Current full compiler-v2 boundary: 148 pass / 0 fail / 0 skip; syntax/diff checks green. This is
-  Builder Studio evidence awaiting sole authoritative snapshot review. No P8 phase, live configured
-  integration candidate, promotion, production cutover, or Done claim.
+- Current full compiler-v2 boundary at the frozen Studio checkpoint: 148 pass / 0 fail / 0 skip;
+  syntax/diff checks green. Authoritative review cleared snapshot `60801e0`. No P8 phase, live
+  configured integration candidate, promotion, production cutover, or Done claim.
+
+## P9 Builder core checkpoint (2026-07-14)
+
+- Added a production namespace separate from both legacy and the v2 sandbox. Its immutable trust
+  root pins the initial legacy route/artifact identity plus distinct Ed25519 review and Dan public
+  keys; extra/private-key fields and non-Ed25519 keys refuse. No signer exists in production code.
+- P9 imports only the exact current `PROMOTED` P8 sandbox generation. It re-reads its package,
+  registry, report, receipt, corpus, budget, environment, and source identities; STAGED,
+  diagnostic, cancelled, stale, tampered, or non-current sandbox evidence cannot enter P9.
+- One signed payload binds review authority, Dan authority, production base, sandbox generation,
+  package/registry/report, G0-G13 corpus/budget/environment evidence, rollback package, and a
+  deterministic pointer-cycle exercise. Staging copies and flushes an immutable generation but
+  leaves the production pointer byte-identical.
+- Activation and rollback update package and registry identity through one SQLite
+  `BEGIN IMMEDIATE` pointer transaction. Failure after the in-transaction pointer update rolls
+  back completely. Real multi-process tests prove one activation winner and one staging owner.
+- Rollback restores the exact prior generation and survives restart. Sequential v2 releases mark
+  the prior authority `SUPERSEDED` in the activation transaction and restore it to `ACTIVE` in the
+  rollback transaction, so exactly one cutover authority remains active.
+- A complete generation orphaned by a hard crash before row insertion is adopted only after exact
+  sandbox/proposal/signature/byte re-verification. Unknown generation/staging debris is reported
+  and preserved, never guessed or deleted.
+- Independent P9 oracle code imports no production-cutover validator and catches pointer
+  package/registry splits, signed-record drift, package/registry/report tamper, authority drift,
+  and malformed rollback proof. P9 suite 11/11/0; full Compiler v2 boundary 159/159/0.
+- Operational law is documented in `P9-CUTOVER.md`. No production configuration, private keys,
+  live signatures, pointer activation, legacy deletion, P9 phase, cutover, or Done claim exists.
+  G-1/G-2/G-4, P0 budgets, live corpus, configured P8 integration, and Dan sign-off remain open.
 
 ## Meta rulings accepted (2026-07-13)
 
@@ -639,3 +669,9 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   permanent RSA refusal mutation close the only residual. Transaction/recovery/topology/
   concurrency/generation/dual-run areas remain closed. Clearance releases Studio UX integration
   only; P8 phase/integration/promotion/cutover/Done remain uncleared.
+- 2026-07-14 @s58-pixel-meta-qa authoritative `[CLEAR — P8 STUDIO SNAPSHOT ONLY]`: exact target
+  `60801e07bfffc3d41258ee4539ea01b1f1e39039`. Public-key-only configuration, closed runtime
+  HTTP/CSP, truthful unconfigured state, diagnostic refusal, signed sandbox-only commit,
+  cancellation/pointer preservation, escaped UI values, and legacy dual-run identity passed.
+  Reviewer boundary 132/132/0 with syntax/diff/status green. Live configured integration, P8
+  phase, promotion, cutover, and Done remain uncleared.

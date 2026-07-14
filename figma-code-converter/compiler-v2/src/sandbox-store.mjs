@@ -270,6 +270,43 @@ export function readCandidatePackageFile(project, transactionId, relative) {
   return bytes;
 }
 
+export function readPromotedSandboxGeneration(project) {
+  assertProject(project);
+  const pointer = readSandboxProject(project);
+  if (pointer.generation === 0 || !pointer.generationName) throw new SandboxStoreError('current promoted sandbox generation required');
+  const row = project._db.prepare('SELECT * FROM candidates WHERE generation_name=? AND state=?').get(pointer.generationName, 'PROMOTED');
+  if (!row) throw new SandboxStoreError('current promoted sandbox generation missing');
+  const verified = verifyGeneration(project, row);
+  if (!verified.record.promotionSignature) throw new SandboxStoreError('promoted sandbox generation lacks promotion signature');
+  verifyPromotionSignature(project, verified.record.receiptPayload, verified.record.promotionSignature);
+  const packageFiles = {};
+  for (const [relative, expected] of Object.entries(verified.inventory)) {
+    const bytes = fs.readFileSync(realRegularFile(verified.packageDir, path.join(verified.packageDir, relative), 'promoted sandbox package file'));
+    if (bytes.length !== expected.bytes || sha256(bytes) !== expected.sha256) throw new SandboxStoreError(`promoted sandbox package changed during read: ${relative}`);
+    packageFiles[relative] = bytes;
+  }
+  const body = {
+    schemaVersion: 1,
+    namespace: NAMESPACE,
+    projectId: project.projectId,
+    promotionAuthorityId: project.promotionAuthority.authorityId,
+    promotionPublicKeyHash: project.promotionAuthority.publicKeyHash,
+    sandboxGeneration: pointer.generation,
+    sandboxGenerationName: pointer.generationName,
+    sandboxRegistryGeneration: pointer.registryGeneration,
+    sandboxRegistryHash: pointer.registryHash,
+    transactionId: row.transaction_id,
+    packageHash: verified.packageHash,
+    packageInventory: verified.inventory,
+    reportHash: verified.report.reportHash,
+    promotionReceiptHash: row.receipt_hash,
+    receiptPayload: verified.record.receiptPayload,
+    registry: verified.registry,
+    report: verified.report,
+  };
+  return { ...structuredClone(body), packageFiles, sourceHash: sha256(canonicalJson(body)) };
+}
+
 export function recoverSandboxProject(project) {
   assertProject(project);
   const state = readSandboxProject(project);
