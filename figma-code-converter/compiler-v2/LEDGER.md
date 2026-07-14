@@ -26,7 +26,7 @@ P7 inventory suite 6 pass / 0 fail / 0 skip · P7 mutation/scale diagnostic suit
 0 fail / 0 skip · P8 sandbox transaction suite 16 pass / 0 fail / 0 skip · P8 Studio suite
 8 pass / 0 fail / 0 skip · P9 cutover/rollback kernel suite 11 pass / 0 fail / 0 skip.
 Combined current truth:
-234 pass / 0 fail / 0 skip.
+244 pass / 0 fail / 0 skip.
 No phase may be recorded green from
 harness-only or REST_ONLY placeholders.
 
@@ -49,7 +49,7 @@ Decisions/Done/cutover: Dan only.
 | Phase | State | Frozen evidence | Notes |
 |---|---|---|---|
 | P0 continuity/contract/calibration | IN PROGRESS | — | see P0 section |
-| P1 evidence capture | pending | — | |
+| P1 evidence capture | CORE BUILT — AWAITING REVIEW; PHASE EVIDENCE BLOCKED | — | diagnostic three-pass candidate core only; no accepted envelope/plugin authority/live snapshot |
 | P2 canonical graphs | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `0c8471b` | sole authoritative QA/Meta cleared the frozen code snapshot only; live/plugin evidence still blocked by G-1/G-2 |
 | P3 mother token/component slice | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `5dbcb39` | sole authoritative QA/Meta cleared core snapshot; real mother/plugin-origin exit blocked by G-1/G-2/G-4 |
 | P4 mother layout/render slice | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `c754741` | sole authoritative QA+Meta cleared core snapshot; runnable mother/plugin evidence remains blocked by G-1/G-2/G-4 |
@@ -127,7 +127,7 @@ Decisions/Done/cutover: Dan only.
 | G-2 | Plugin supplement capture (resolvedVariableModes, styledTextSegments, component defs) is a REQUIRED capture plane; REST_ONLY/PARTIAL provenance is diagnostic-only and cannot pass G0 or clear supplement-dependent G1–G5 (joint route — earlier "Shape completeness without supplement" claim narrowed accordingly) | OPEN — BLOCKS P1 G0; needs Dan input #3 (bridge rescan at pinned versions) when capture lands | Kai builds; Dan rescan |
 | G-3 | Dark-mode visual promotion impossible without an authored dark reference (§4.5) | OPEN — dark states DIAGNOSTIC_ONLY until Dan authors a dark-mode reference frame | Dan (when he wants dark visually promoted) |
 | G-4 | §14.2 mother screen must be selected + version-pinned BY DAN; Shape cannot substitute | OPEN — blocks P0 item 2 and the P3/P4 mother-slice anchor | Dan (question surfaced in-session 2026-07-13) |
-| G-5 | Per-fact source-plane fail-closed law | PARTIAL CLOSURE — P2 canonical-model preflight now refuses missing/partial/REST_ONLY required facts as FAILED_CAPTURE before inventory/graphs; every graph repeats its required-family gate. P1 live capture/adapter enforcement remains open and blocked with G-2 | Pixel |
+| G-5 | Per-fact source-plane fail-closed law | PARTIAL CLOSURE — P2 canonical-model preflight refuses missing/partial/REST_ONLY required facts. P1 diagnostic capture core now refuses every non-complete semantic plane before retaining a candidate, but persists nothing until separately trusted plugin-adapter authority and the accepted P0 envelope exist; live enforcement remains blocked with G-2 | Pixel + Kai capture operator |
 | G-6 | Complete published calibration generations currently have no bounded reader-safe retention policy | OPEN — non-blocking for atomic freeze; blocks P0 §4.7 storage/operability acceptance only. Preserve reader safety; no speculative GC | Pixel + QA/Meta architecture |
 
 ## P0 findings
@@ -770,3 +770,17 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   CANDIDATE_SEPARATED/DIAGNOSTIC_ONLY and carries QA/Meta/Dan blockers. Focused 6/6/0. No real
   calibration samples, accepted values, normative file, P0 phase, integration, promotion,
   cutover, or Done claim.
+- 2026-07-14 Builder P1 capture-core checkpoint: added the real V0→A→B→V1→references→C→V2→seal
+  orchestration over the P0 operability meter. The core derives F0/F1/F2 and D0/D1/D2 from
+  canonical semantic/asset/dependency content; binds root file/branch/page/selection/color-profile
+  identity and versioned root locks; requires the exact plugin-complete source-plane census,
+  complete supplement rows, closed node/backdrop/external boundary dispositions, confined assets,
+  pinned font provenance, exact authorized REST reference request/version/bytes, and zero
+  forbidden/dynamic/documentchange audit evidence. One instability retry, active-file drift,
+  typed permission failures, cancellation, and persistent-state drift all discard the candidate.
+  Production validation plus an independent report oracle reject re-sealed identity/authority/
+  promotion lies; the candidate is rechecked against F2/D2 and its byte hashes. Focused 10/10/0;
+  full legacy + Compiler v2 boundary 244/244/0. The result is deliberately in-memory,
+  `DIAGNOSTIC_ONLY`, `persisted:false`, and blocked by the accepted operator envelope plus external
+  plugin-capture authority. No live plugin capture, evidence snapshot, P1 phase, integration,
+  promotion, cutover, or Done claim.
