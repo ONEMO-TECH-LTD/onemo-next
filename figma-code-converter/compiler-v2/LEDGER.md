@@ -57,7 +57,7 @@ Decisions/Done/cutover: Dan only.
 | P6 runtime/visual/editor proof | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `948c626` | sole authoritative QA+Meta cleared the environment-bound core snapshot; integration budgets/corpus/promotion remain blocked |
 | P7 corpus & scale | CORE SNAPSHOTS CLEAR; PHASE EVIDENCE BLOCKED | `4169dab`, `3bd8dbd` | inventory + diagnostic evidence laws cleared; live corpus/capture/budgets/runtime/real mutations/scale remain blocked |
 | P8 studio dual-run | CORE SNAPSHOTS CLEAR; PHASE EVIDENCE BLOCKED | `bc6c56e`, `60801e0` | transaction/recovery and truthful Studio snapshots cleared; live configured integration remains open |
-| P9 cutover | CORE BUILT — REVIEW PENDING; PHASE/CUTOVER BLOCKED | — | fail-closed cutover/rollback mechanics built in temporary stores; no live authority/configuration/activation; Dan-only |
+| P9 cutover | CORE SNAPSHOT CLEAR; PHASE/CUTOVER BLOCKED | `fb41978` | fail-closed cutover/rollback mechanics cleared; no live authority/configuration/activation; Dan-only |
 
 ## P0 work items
 
@@ -675,3 +675,10 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   cancellation/pointer preservation, escaped UI values, and legacy dual-run identity passed.
   Reviewer boundary 132/132/0 with syntax/diff/status green. Live configured integration, P8
   phase, promotion, cutover, and Done remain uncleared.
+- 2026-07-14 @s58-pixel-meta-qa authoritative `[CLEAR — P9 CORE SNAPSHOT ONLY]`: exact target
+  `fb41978480763b9f1472217ce8f476c87651d64a`. The isolated production-v1 namespace, distinct
+  Ed25519 review/Dan authorizations, exact sandbox/corpus/budget/environment/base/rollback binding,
+  immutable generation bytes, atomic activation/rollback, exact signed orphan adoption, debris
+  preservation, and independent oracle passed review. Reviewer boundary 143/143/0 with syntax/
+  diff/status green. Production configuration, live signatures, activation, P9 phase, cutover,
+  promotion, and Done remain uncleared.
