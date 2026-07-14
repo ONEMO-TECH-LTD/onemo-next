@@ -508,8 +508,10 @@ const verifiedRegistryBase = (row) => {
 
 function validateAuthority(authority) {
   if (!authority || !ID.test(authority.authorityId ?? '') || typeof authority.publicKeyPem !== 'string') throw new SandboxStoreError('promotion authority malformed');
-  try { createPublicKey(authority.publicKeyPem); }
+  let key;
+  try { key = createPublicKey(authority.publicKeyPem); }
   catch (error) { throw new SandboxStoreError(`promotion public key malformed: ${error.message}`); }
+  if (key.asymmetricKeyType !== 'ed25519') throw new SandboxStoreError('promotion authority requires an Ed25519 public key');
 }
 
 function assertProject(project) {

@@ -246,7 +246,9 @@ test('P8 injected crash after pointer update rolls back, leaves staged evidence,
 test('P8 authority identity is immutable and paths stay inside the v2 sandbox namespace', async (t) => {
   const { rootDir, project } = await fixture(t);
   const other = keyPair();
+  const rsa = generateKeyPairSync('rsa', { modulusLength: 2048 });
   assert.throws(() => openSandboxProject({ rootDir, projectId: 'project-one', promotionAuthority: { authorityId: 'other', publicKeyPem: publicPem(other.publicKey) } }), /authority mismatch/);
+  assert.throws(() => openSandboxProject({ rootDir, projectId: 'project-rsa', promotionAuthority: { authorityId: 'qa-meta-v1', publicKeyPem: publicPem(rsa.publicKey) } }), /Ed25519/);
   assert.throws(() => openSandboxProject({ rootDir, projectId: '../escape', promotionAuthority: { authorityId: 'qa-meta-v1', publicKeyPem: publicPem(other.publicKey) } }), /project id/);
   assert.equal((await readFile(path.join(project.projectDir, 'project.json'), 'utf8')).includes('compiler-v2-sandbox-v1'), true);
 });

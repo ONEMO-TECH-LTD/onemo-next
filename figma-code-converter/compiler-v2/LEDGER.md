@@ -368,8 +368,9 @@ Decisions/Done/cutover: Dan only.
   compares package generation plus independently versioned registry generation/hash, re-reads all
   candidate bytes, requires exact G0–G13 `VERIFIED`, no blockers, `PROMOTABLE_VERIFIED`, and an
   Ed25519 receipt bound to project/base/registry/package/report/corpus/budget/environment. The module
-  contains no signer. A stale, diagnostic, failed, cancelled, tampered, or unsigned candidate cannot
-  move the pointer.
+  contains no signer and rejects every non-Ed25519 promotion public key before project creation. A
+  stale, diagnostic, failed, cancelled, tampered, unsigned, or wrong-key-type candidate cannot move
+  the pointer.
 - Failure-first multi-process tests exposed and closed two real races: a duplicate-stage loser could
   delete the winner generation, and simultaneous first opens could fail with `database is locked`.
   Rename-winner ownership now controls cleanup; project metadata creation converges on one immutable
@@ -610,3 +611,11 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   authorities, derived scale metrics/artifact inventories, meter enforcement, and hard
   non-promoting aggregate. Synthetic diagnostic only: plugin corpus, P1/P0 authority/budgets,
   live mutation/scale, P7 phase/integration/promotion/cutover/Done remain uncleared.
+- 2026-07-14 @s58-pixel-meta-qa authoritative `[REWORK — P8 CORE SNAPSHOT ONLY]`: exact target
+  `14f03173bff67c1c2cf609b082cde8b7aaf4da12`; transaction/recovery/topology/concurrency/
+  generation/dual-run areas credited closed. One V17 residual remained: promotion authority
+  accepted any parseable asymmetric key instead of Ed25519 only. Builder reproduced the RSA-key
+  acceptance failure-first, requires `asymmetricKeyType === ed25519`, and added a permanent RSA
+  refusal mutation. Focused P8 16/16/0 and full boundary 140/140/0; syntax/diff checks green.
+  This is repair evidence awaiting authoritative rereview, not P8 phase/integration/promotion/
+  cutover/Done clearance.
