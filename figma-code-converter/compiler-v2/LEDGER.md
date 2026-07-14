@@ -548,3 +548,12 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   browser/OS/font/color/render/viewport/manifest revalidation with no residual. This releases
   dependent P7 construction only; P6 phase/integration/accepted budgets/promotion/cutover/Done and
   P7 itself remain uncleared.
+- 2026-07-14 Builder P7 inventory stage: added an exact ten-role §14.2 checked-in corpus index
+  validator and failure-first mutations. It checks file/version/root/fingerprint conservation,
+  plugin-primary fact planes, distinct Shape/mother identities, no-WEB/component-provider/two-
+  consumer/editorial/GRID-mask-multilayer/large-deep-remote role content, exact missing/duplicate/
+  unknown-role failures, and index/snapshot realpath confinement. A structurally complete unit
+  descriptor remains `DIAGNOSTIC_ONLY` and `integrationInventoryReady:false`; P1 capture authority,
+  accepted budgets, runtime, mutation, and scale proof are explicit blockers. Capture-operator live
+  verification says only Shape `6075:53685` exists; remaining roles and distinct mother stay
+  G-1/G-2/G-4. P7 test boundary: 6 pass / 0 fail / 0 skip. Builder evidence only; P7 is uncleared.

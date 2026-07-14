@@ -1,4 +1,4 @@
-# Compiler v2 — §14.1 Microfixture Design Spec (P0 · design only, generators HELD until QA CLEAR)
+# Compiler v2 — §14.1 Microfixture Design Spec and §14.2 Inventory Frontier
 
 > Maps every C11 v3 §14.1 row + evidence row E1–E13 to an exact fixture specification. Synthetic
 > REST-schema snapshots are LEGAL here (§14.1 only — joint route); §14.2 integration evidence is
@@ -6,7 +6,9 @@
 > (built through `writeSnapshot` — the same code path as live capture, one law) plus a mutation
 > twin. "Baseline bite" = the legacy converter (6c36475) must exhibit the E-row defect on this
 > fixture; "gate bite" = the named v2 gate must fail the mutation twin.
-> Status: SPECIFICATION. Generator code is held pending Meta CLEAR of the current frozen foundation checkpoint.
+> Status: §14.1 specification; the existing compiler tests implement selected rows directly.
+> Synthetic fixtures remain inadmissible as §14.2 evidence. P7 inventory validation is implemented,
+> but integration capture, accepted budgets, runtime, mutation, and scale evidence remain open.
 
 | ID | v3 §14.1 row | E-row | Content shape | Gate bite (mutation twin) | Baseline bite |
 |---|---|---|---|---|---|
@@ -40,3 +42,18 @@
 - Supplement-backed rows (MF09–MF11, MF15, MF16) carry synthetic `supplement.json` marked
   `sourcePlane: fixture` — legal for §14.1 parser/lowerer/gate tests, NEVER admissible as §14.2
   integration or live-capture (G0) evidence (joint route).
+
+## §14.2 checked-in inventory frontier
+
+`src/corpus-index.mjs` requires one sealed role for each of: Shape; Dan-selected distinct mother;
+golden replacement; unrelated non-ONEMO/no-WEB screen; component provider; two consumers;
+editorial; GRID/mask/multilayer marketing; and enterprise/deep/remote. It validates exact
+file/version/root/fingerprint identity, plugin-primary source planes, role-specific content, and
+corpus-root path confinement. Duplicate, missing, synthetic/partial/REST-only, or symlink-escaped
+entries are capture failures, never skips.
+
+Structural inventory readiness is deliberately not integration readiness. P1 capture authority,
+accepted P0 budgets, runtime proof, the complete mutation suite, and scale proof remain separate
+required blockers. As of the 2026-07-14 capture-operator check, only Shape (`6075:53685`) exists;
+the other live roots and the distinct mother remain G-1/G-2/G-4 inputs. No synthetic substitute is
+authorized.
