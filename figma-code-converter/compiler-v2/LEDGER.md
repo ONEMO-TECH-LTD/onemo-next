@@ -814,3 +814,12 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   full Compiler v2 203/203/0 plus legacy 49/49/0 = 252/252/0. This remains synthetic diagnostic
   evidence: the adapter bytes have no external integration receipt, no live plugin-origin Shape
   capture exists, and P1 phase/integration/promotion/cutover/Done remain open.
+- 2026-07-14 Builder P1 authority-order repair: corrected the runtime security sequence discovered
+  while wiring the host adapter. Exact adapter bytes/receipt are verified first; only then may the
+  documentchange observer begin. At capture end the same audit, key, receipt, bundle, and authority
+  are reverified against the stop instant, so an expired or substituted authority cannot bless a
+  completed capture. The runtime proof now conserves the original authorityVerifiedAt separately
+  from observer start/stop, and an independent oracle rejects ordering/identity/safety drift. This
+  removes the prior impossible requirement that plugin-owned observation predate authority
+  verification without permitting unverified plugin execution. Focused P1 boundary 8/8/0; full
+  Compiler v2 203/203/0 plus legacy 49/49/0. No live receipt/capture or phase claim.

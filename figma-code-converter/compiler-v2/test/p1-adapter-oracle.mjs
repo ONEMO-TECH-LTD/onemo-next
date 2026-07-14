@@ -30,4 +30,21 @@ export function p1AdapterAuthorityFailures({ proof, bundleBytes, audit, receipt,
   return [...new Set(failures)];
 }
 
+export function p1CaptureRuntimeFailures({ runtime, proof, receipt }) {
+  const failures = [];
+  if (!plain(runtime) || runtime.adapterKind !== 'dedicated-read-only-plugin') return ['runtime shape'];
+  for (const [runtimeKey, proofKey] of [
+    ['bundleHash', 'bundleHash'], ['staticAuditHash', 'staticAuditHash'], ['authorityId', 'authorityId'],
+    ['authorityScope', 'authorityScope'], ['authorityReceiptHash', 'receiptHash'], ['authorityVerifiedAt', 'verifiedAt'],
+  ]) if (runtime[runtimeKey] !== proof?.[proofKey]) failures.push(`runtime ${runtimeKey}`);
+  const verified = Date.parse(runtime.authorityVerifiedAt);
+  const started = Date.parse(runtime.observerStartedAt);
+  const stopped = Date.parse(runtime.observerStoppedAt);
+  const expires = Date.parse(receipt?.expiresAt);
+  if (![verified, started, stopped, expires].every(Number.isFinite) || started < verified || stopped < started || stopped > expires) failures.push('runtime authority/observer order');
+  if (!Array.isArray(runtime.forbiddenCalls) || runtime.forbiddenCalls.length || runtime.dynamicAccess !== false
+    || !Array.isArray(runtime.documentChangeEvents) || runtime.documentChangeEvents.length) failures.push('runtime safety');
+  return [...new Set(failures)];
+}
+
 const plain = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);

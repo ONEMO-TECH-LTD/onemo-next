@@ -168,7 +168,11 @@ export function composeCaptureAudit({
 }) {
   assertAdapterAuthorityProof(authorityProof, { bundleBytes, audit, receipt, authority, now });
   if (!ID.test(transactionId ?? '') || !validIso(observerStartedAt) || !validIso(observerStoppedAt) || Date.parse(observerStoppedAt) < Date.parse(observerStartedAt)) throw new CaptureAdapterAuthorityError('runtime documentchange observer identity/window invalid');
-  if (Date.parse(observerStartedAt) > Date.parse(now) || Date.parse(observerStoppedAt) < Date.parse(now)) throw new CaptureAdapterAuthorityError('runtime documentchange observer window does not cover verified capture instant');
+  if (Date.parse(observerStartedAt) < Date.parse(authorityProof.verifiedAt)) throw new CaptureAdapterAuthorityError('runtime documentchange observer cannot precede adapter authority verification');
+  const endAuthority = verifyProofInputs({ bundleBytes, audit, receipt, authority, now: observerStoppedAt });
+  for (const key of ['bundleHash', 'staticAuditHash', 'authorityId', 'authorityScope', 'publicKeyHash', 'receiptHash']) {
+    if (authorityProof[key] !== endAuthority[key]) throw new CaptureAdapterAuthorityError(`adapter authority changed during capture: ${key}`);
+  }
   if (!Array.isArray(documentChangeEvents) || documentChangeEvents.length) throw new CaptureAdapterAuthorityError('runtime documentchange evidence is nonzero or malformed');
   return {
     adapterKind: authorityProof.adapterKind,
@@ -177,6 +181,7 @@ export function composeCaptureAudit({
     authorityId: authorityProof.authorityId,
     authorityScope: authorityProof.authorityScope,
     authorityReceiptHash: authorityProof.receiptHash,
+    authorityVerifiedAt: authorityProof.verifiedAt,
     transactionId,
     observerStartedAt,
     observerStoppedAt,

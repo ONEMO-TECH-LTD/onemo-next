@@ -9,7 +9,7 @@ import {
   verifyCaptureAdapterAuthority,
 } from '../src/capture-adapter-authority.mjs';
 import { canonicalJson } from '../src/evidence.mjs';
-import { p1AdapterAuthorityFailures } from './p1-adapter-oracle.mjs';
+import { p1AdapterAuthorityFailures, p1CaptureRuntimeFailures } from './p1-adapter-oracle.mjs';
 
 const SAFE = Buffer.from(`
 export function createCaptureAdapter(figma) {
@@ -57,12 +57,16 @@ test('P1 adapter audit inventories exact safe bundle calls and Ed25519 authority
     bundleBytes: SAFE,
     ...fixture,
     transactionId: 'capture-1',
-    observerStartedAt: '2026-07-14T11:59:59.000Z',
-    observerStoppedAt: '2026-07-14T12:00:01.000Z',
+    observerStartedAt: '2026-07-14T12:00:01.000Z',
+    observerStoppedAt: '2026-07-14T12:00:02.000Z',
     documentChangeEvents: [],
   });
   assert.equal(runtime.adapterKind, 'dedicated-read-only-plugin');
+  assert.equal(runtime.authorityVerifiedAt, proof.verifiedAt);
   assert.deepEqual(runtime.documentChangeEvents, []);
+  assert.deepEqual(p1CaptureRuntimeFailures({ runtime, proof, receipt: fixture.receipt }), []);
+  const forgedRuntime = structuredClone(runtime); forgedRuntime.authorityVerifiedAt = '2026-07-14T12:00:02.000Z';
+  assert.notDeepEqual(p1CaptureRuntimeFailures({ runtime: forgedRuntime, proof, receipt: fixture.receipt }), []);
 });
 
 test('P1 adapter audit rejects mutation, import, dynamic access, property writes, and runtime escapes', () => {
@@ -146,10 +150,20 @@ test('P1 adapter production and independent readers reject re-sealed proof/runti
     observerStartedAt: '2026-07-14T12:00:00.000Z', observerStoppedAt: '2026-07-14T12:00:01.000Z',
     documentChangeEvents: [{ type: 'PROPERTY_CHANGE' }],
   }), /documentchange/);
-  assert.throws(() => composeCaptureAudit({
+  assert.doesNotThrow(() => composeCaptureAudit({
     authorityProof: proof, bundleBytes: SAFE, ...fixture, transactionId: 'capture-1',
     observerStartedAt: '2026-07-14T12:00:01.000Z', observerStoppedAt: '2026-07-14T12:00:02.000Z',
     documentChangeEvents: [],
-  }), /cover/);
+  }));
+  assert.throws(() => composeCaptureAudit({
+    authorityProof: proof, bundleBytes: SAFE, ...fixture, transactionId: 'capture-1',
+    observerStartedAt: '2026-07-14T11:59:59.000Z', observerStoppedAt: '2026-07-14T12:00:02.000Z',
+    documentChangeEvents: [],
+  }), /precede|authority/);
+  assert.throws(() => composeCaptureAudit({
+    authorityProof: proof, bundleBytes: SAFE, ...fixture, transactionId: 'capture-1',
+    observerStartedAt: '2026-07-14T12:00:01.000Z', observerStoppedAt: '2026-07-15T10:00:01.000Z',
+    documentChangeEvents: [],
+  }), /expired/);
   assert.equal(canonicalJson(fixture.audit), canonicalJson(auditCaptureAdapterBundle({ bundleBytes: SAFE, entryFile: 'capture-adapter.mjs' })));
 });
