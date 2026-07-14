@@ -7,6 +7,7 @@ const FILL_TYPES = new Set(['SOLID', 'GRADIENT_LINEAR', 'GRADIENT_RADIAL', 'GRAD
 const STROKE_TYPES = new Set(['SOLID', 'GRADIENT_LINEAR', 'GRADIENT_RADIAL', 'GRADIENT_ANGULAR']);
 const EFFECT_TYPES = new Set(['DROP_SHADOW', 'INNER_SHADOW', 'LAYER_BLUR', 'BACKGROUND_BLUR']);
 const MASK_TYPES = new Set(['ALPHA', 'VECTOR', 'LUMINANCE']);
+const WINDING_RULES = new Set(['NONZERO', 'EVENODD']);
 const BLEND_MODES = new Set([
   'PASS_THROUGH', 'NORMAL', 'DARKEN', 'MULTIPLY', 'LINEAR_BURN', 'COLOR_BURN',
   'LIGHTEN', 'SCREEN', 'LINEAR_DODGE', 'COLOR_DODGE', 'OVERLAY', 'SOFT_LIGHT',
@@ -234,8 +235,8 @@ function fragmentsOf({ nodeId, source, bounds, transform, bindings }) {
     push('effect', `/effects/${index}`, index, effect);
   });
   if (VECTOR_PATH_TYPES.has(source.type)) {
-    if (!objectRecord(source.vectorNetwork)) throw new LayoutRenderError('FAILED_CAPABILITY', `node ${nodeId} needs captured vectorNetwork geometry`);
-    push('vector', '/vector', null, { vectorNetwork: source.vectorNetwork }, true, ['/vectorNetwork']);
+    const vectorNetwork = validatedVectorNetwork(source.vectorNetwork, nodeId);
+    push('vector', '/vector', null, { vectorNetwork }, true, ['/vectorNetwork']);
   }
   return fragments;
 }
@@ -272,6 +273,52 @@ function shapeGeometryOf(source, nodeId, cornerSmoothing) {
   const radius = source.cornerRadius === undefined || source.cornerRadius === null ? 0 : nonNegativeFinite(source.cornerRadius, `${nodeId}.cornerRadius`);
   return radius > 0 ? { shape: 'rounded-rect', cornerRadii: [radius, radius, radius, radius], cornerSmoothing } : { shape: 'rect', cornerSmoothing };
 }
+
+function validatedVectorNetwork(value, nodeId) {
+  if (!objectRecord(value) || !Array.isArray(value.vertices) || !Array.isArray(value.segments)) throw new LayoutRenderError('FAILED_CAPABILITY', `node ${nodeId} vectorNetwork vertices and segments must be arrays`);
+  value.vertices.forEach((vertex, index) => {
+    if (!objectRecord(vertex) || !Number.isFinite(vertex.x) || !Number.isFinite(vertex.y)) throw new LayoutRenderError('FAILED_CAPABILITY', `node ${nodeId} vectorNetwork vertex ${index} coordinates must be finite`);
+    if (vertex.cornerRadius !== undefined) nonNegativeFinite(vertex.cornerRadius, `${nodeId}.vectorNetwork.vertices[${index}].cornerRadius`);
+  });
+  value.segments.forEach((segment, index) => {
+    if (!objectRecord(segment) || !validIndex(segment.start, value.vertices.length) || !validIndex(segment.end, value.vertices.length)) throw new LayoutRenderError('FAILED_CAPABILITY', `node ${nodeId} vectorNetwork segment ${index} endpoints must reference vertices`);
+    for (const tangent of ['tangentStart', 'tangentEnd']) {
+      const vector = segment[tangent];
+      if (vector !== undefined && (!objectRecord(vector) || !Number.isFinite(vector.x) || !Number.isFinite(vector.y))) throw new LayoutRenderError('FAILED_CAPABILITY', `node ${nodeId} vectorNetwork segment ${index} ${tangent} must contain finite x/y`);
+    }
+  });
+  if (value.regions !== undefined) {
+    if (!Array.isArray(value.regions)) throw new LayoutRenderError('FAILED_CAPABILITY', `node ${nodeId} vectorNetwork regions must be an array`);
+    value.regions.forEach((region, regionIndex) => {
+      if (!objectRecord(region) || !WINDING_RULES.has(region.windingRule) || !Array.isArray(region.loops) || region.loops.length === 0) throw new LayoutRenderError('FAILED_CAPABILITY', `node ${nodeId} vectorNetwork region ${regionIndex} needs a windingRule and non-empty loops`);
+      region.loops.forEach((loop, loopIndex) => {
+        if (!Array.isArray(loop) || loop.length === 0) throw new LayoutRenderError('FAILED_CAPABILITY', `node ${nodeId} vectorNetwork region ${regionIndex} loop ${loopIndex} must be non-empty`);
+        for (const segmentIndex of loop) if (!validIndex(segmentIndex, value.segments.length)) throw new LayoutRenderError('FAILED_CAPABILITY', `node ${nodeId} vectorNetwork region ${regionIndex} loop ${loopIndex} references invalid segment ${segmentIndex}`);
+        if (!formsClosedUndirectedLoop(loop, value.segments)) throw new LayoutRenderError('FAILED_CAPABILITY', `node ${nodeId} vectorNetwork region ${regionIndex} loop ${loopIndex} must form a connected closed chain`);
+      });
+    });
+  }
+  return structuredClone(value);
+}
+
+function formsClosedUndirectedLoop(loop, segments) {
+  const first = segments[loop[0]];
+  let states = [[first.start, first.end], [first.end, first.start]];
+  for (const segmentIndex of loop.slice(1)) {
+    const segment = segments[segmentIndex];
+    const next = [];
+    for (const [origin, cursor] of states) {
+      if (segment.start === cursor) next.push([origin, segment.end]);
+      if (segment.end === cursor) next.push([origin, segment.start]);
+    }
+    states = uniquePairs(next);
+    if (states.length === 0) return false;
+  }
+  return states.some(([origin, cursor]) => origin === cursor);
+}
+
+const uniquePairs = (pairs) => [...new Map(pairs.map((pair) => [`${pair[0]}:${pair[1]}`, pair])).values()];
+const validIndex = (value, length) => Number.isInteger(value) && value >= 0 && value < length;
 
 function maskGroupsOf(nodes, nodesById) {
   const groups = [];

@@ -6,6 +6,7 @@ const FILL_TYPES = new Set(['SOLID', 'GRADIENT_LINEAR', 'GRADIENT_RADIAL', 'GRAD
 const STROKE_TYPES = new Set(['SOLID', 'GRADIENT_LINEAR', 'GRADIENT_RADIAL', 'GRADIENT_ANGULAR']);
 const EFFECT_TYPES = new Set(['DROP_SHADOW', 'INNER_SHADOW', 'LAYER_BLUR', 'BACKGROUND_BLUR']);
 const MASK_TYPES = new Set(['ALPHA', 'VECTOR', 'LUMINANCE']);
+const WINDING_RULES = new Set(['NONZERO', 'EVENODD']);
 const BLEND_MODES = new Set([
   'PASS_THROUGH', 'NORMAL', 'DARKEN', 'MULTIPLY', 'LINEAR_BURN', 'COLOR_BURN',
   'LIGHTEN', 'SCREEN', 'LINEAR_DODGE', 'COLOR_DODGE', 'OVERLAY', 'SOFT_LIGHT',
@@ -189,7 +190,7 @@ function invalidVisibleCapability(nodes) {
         if (!record(entry) || !types.has(entry.type) || !validBlend(entry.blendMode, false)) return true;
       }
     }
-    if (VECTOR_PATH_TYPES.has(source.type) && !record(source.vectorNetwork)) return true;
+    if (VECTOR_PATH_TYPES.has(source.type) && !validVectorNetwork(source.vectorNetwork)) return true;
   }
   return false;
 }
@@ -202,6 +203,34 @@ const semanticEligible = (record) => record?.emissionTarget === 'react' || recor
 const record = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const unitInterval = (value) => Number.isFinite(value) && value >= 0 && value <= 1;
 const nonNegative = (value) => Number.isFinite(value) && value >= 0;
+
+function validVectorNetwork(value) {
+  if (!record(value) || !Array.isArray(value.vertices) || !Array.isArray(value.segments)) return false;
+  if (!value.vertices.every((vertex) => record(vertex) && Number.isFinite(vertex.x) && Number.isFinite(vertex.y) && (vertex.cornerRadius === undefined || nonNegative(vertex.cornerRadius)))) return false;
+  if (!value.segments.every((segment) => record(segment) && indexIn(segment.start, value.vertices.length) && indexIn(segment.end, value.vertices.length) && validVector(segment.tangentStart) && validVector(segment.tangentEnd))) return false;
+  if (value.regions === undefined) return true;
+  if (!Array.isArray(value.regions)) return false;
+  return value.regions.every((region) => record(region) && WINDING_RULES.has(region.windingRule) && Array.isArray(region.loops) && region.loops.length > 0 && region.loops.every((loop) => Array.isArray(loop) && loop.length > 0 && loop.every((segmentIndex) => indexIn(segmentIndex, value.segments.length)) && oracleClosedLoop(loop, value.segments)));
+}
+
+function oracleClosedLoop(loop, segments) {
+  const first = segments[loop[0]];
+  let cursors = new Map([[`${first.start}:${first.end}`, { origin: first.start, cursor: first.end }], [`${first.end}:${first.start}`, { origin: first.end, cursor: first.start }]]);
+  for (const segmentIndex of loop.slice(1)) {
+    const segment = segments[segmentIndex];
+    const next = new Map();
+    for (const { origin, cursor } of cursors.values()) {
+      if (segment.start === cursor) next.set(`${origin}:${segment.end}`, { origin, cursor: segment.end });
+      if (segment.end === cursor) next.set(`${origin}:${segment.start}`, { origin, cursor: segment.start });
+    }
+    if (next.size === 0) return false;
+    cursors = next;
+  }
+  return [...cursors.values()].some(({ origin, cursor }) => origin === cursor);
+}
+
+const indexIn = (value, length) => Number.isInteger(value) && value >= 0 && value < length;
+const validVector = (value) => value === undefined || (record(value) && Number.isFinite(value.x) && Number.isFinite(value.y));
 
 function expectedMaskGroups(nodes, nodesById) {
   const groups = [];

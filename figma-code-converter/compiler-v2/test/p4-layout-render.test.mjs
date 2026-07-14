@@ -144,7 +144,7 @@ test('P4 refuses unsupported visible operations rather than flattening or guessi
   const vector = fixture();
   vector.documentGraph.nodes.find((row) => row.id === 'masked-a').properties.type = 'VECTOR';
   Object.assign(vector, sealCanonicalModelContent(vector));
-  assert.throws(() => buildLayoutRenderPlan(vector), /needs captured vectorNetwork geometry/);
+  assert.throws(() => buildLayoutRenderPlan(vector), /vectorNetwork vertices and segments must be arrays/);
 });
 
 test('P4 refuses blend modes outside the captured closed Figma enum', () => {
@@ -250,6 +250,58 @@ test('independent G7 rejects planner-forbidden visible operation types and value
   forgedOpacity.modelContentSeal = opacityModel.contentSeal;
   forgedOpacity.render.nodes.find((row) => row.nodeId === 'root').fragments.find((row) => row.role === 'isolation').payload.opacity = 1.1;
   assert.equal(p4Failures(opacityModel, forgedOpacity).G7, true);
+});
+
+test('P4 validates exact Figma VectorNetwork structure and independent topology', () => {
+  const vectorModel = (vectorNetwork) => {
+    const model = fixture();
+    const node = model.documentGraph.nodes.find((row) => row.id === 'masked-a');
+    node.properties.type = 'VECTOR';
+    node.properties.vectorNetwork = vectorNetwork;
+    Object.assign(model, sealCanonicalModelContent(model));
+    return model;
+  };
+  const emptyModel = vectorModel({ vertices: [], segments: [] });
+  const emptyPlan = buildLayoutRenderPlan(emptyModel);
+  assert.deepEqual(p4Failures(emptyModel, emptyPlan), { G6: false, G7: false });
+  const triangle = {
+    vertices: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 5, y: 10 }],
+    segments: [{ start: 0, end: 1 }, { start: 2, end: 1 }, { start: 2, end: 0, tangentStart: { x: 0, y: 0 }, tangentEnd: { x: 0, y: 0 } }],
+    regions: [{ windingRule: 'NONZERO', loops: [[0, 1, 2]] }],
+  };
+  const triangleModel = vectorModel(triangle);
+  const trianglePlan = buildLayoutRenderPlan(triangleModel);
+  assert.deepEqual(p4Failures(triangleModel, trianglePlan), { G6: false, G7: false });
+  const invalid = [
+    [{}, /vertices and segments must be arrays/],
+    [{ vertices: {}, segments: [] }, /vertices and segments must be arrays/],
+    [{ vertices: [{ x: Infinity, y: 0 }], segments: [] }, /vertex 0 coordinates must be finite/],
+    [{ vertices: [{ x: 0, y: 0 }], segments: [{ start: 0, end: 0, tangentStart: { x: Infinity, y: 0 } }] }, /tangentStart must contain finite x\/y/],
+    [{ vertices: [{ x: 0, y: 0 }], segments: [{ start: 0, end: 1 }] }, /segment 0 endpoints must reference vertices/],
+    [{ vertices: [{ x: 0, y: 0 }], segments: [], regions: [{ windingRule: 'NONZERO', loops: [[0]] }] }, /loop 0 references invalid segment 0/],
+    [{ vertices: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }], segments: [{ start: 0, end: 1 }, { start: 1, end: 2 }], regions: [{ windingRule: 'NONZERO', loops: [[0, 1]] }] }, /loop 0 must form a connected closed chain/],
+  ];
+  for (const [network, message] of invalid) assert.throws(() => buildLayoutRenderPlan(vectorModel(network)), message);
+
+  const validModel = vectorModel(triangle);
+  const validPlan = buildLayoutRenderPlan(validModel);
+  for (const [network] of invalid) {
+    const forgedModel = structuredClone(validModel);
+    const forgedPlan = structuredClone(validPlan);
+    forgedModel.documentGraph.nodes.find((row) => row.id === 'masked-a').properties.vectorNetwork = network;
+    Object.assign(forgedModel, sealCanonicalModelContent(forgedModel));
+    forgedPlan.modelContentSeal = forgedModel.contentSeal;
+    forgedPlan.render.nodes.find((row) => row.nodeId === 'masked-a').fragments.find((row) => row.role === 'vector').payload.vectorNetwork = network;
+    assert.equal(p4Failures(forgedModel, forgedPlan).G7, true);
+  }
+
+  const forgedModel = vectorModel({ vertices: [], segments: [] });
+  const forgedPlan = buildLayoutRenderPlan(forgedModel);
+  forgedModel.documentGraph.nodes.find((row) => row.id === 'masked-a').properties.vectorNetwork = {};
+  Object.assign(forgedModel, sealCanonicalModelContent(forgedModel));
+  forgedPlan.modelContentSeal = forgedModel.contentSeal;
+  forgedPlan.render.nodes.find((row) => row.nodeId === 'masked-a').fragments.find((row) => row.role === 'vector').payload.vectorNetwork = {};
+  assert.equal(p4Failures(forgedModel, forgedPlan).G7, true);
 });
 
 test('P4 world composition is independent of persisted document-node storage order', () => {

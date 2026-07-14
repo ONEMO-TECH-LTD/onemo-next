@@ -20,7 +20,7 @@ gitignored golden fixture `t88thL8hKksSpILgkeGRZ0-4084-25997.nodes.json`) / 0 sk
 compiler-v2 foundation suite 53 pass / 0 fail / 0 skip across Builder and Meta repeated runs ·
 compiler-v2 P2 graph suite 16 pass / 0 fail / 0 skip · P2 persisted-model suite 7 pass /
 0 fail / 0 skip · compiler-v2 P3 planner suite 9 pass / 0 fail / 0 skip · P4 layout/render
-suite 12 pass / 0 fail / 0 skip. Combined current truth: 97 pass / 0 fail / 0 skip.
+suite 13 pass / 0 fail / 0 skip. Combined current truth: 98 pass / 0 fail / 0 skip.
 No phase may be recorded green from
 harness-only or REST_ONLY placeholders.
 
@@ -46,7 +46,7 @@ Decisions/Done/cutover: Dan only.
 | P1 evidence capture | pending | — | |
 | P2 canonical graphs | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `0c8471b` | sole authoritative QA/Meta cleared the frozen code snapshot only; live/plugin evidence still blocked by G-1/G-2 |
 | P3 mother token/component slice | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `5dbcb39` | sole authoritative QA/Meta cleared core snapshot; real mother/plugin-origin exit blocked by G-1/G-2/G-4 |
-| P4 mother layout/render slice | RESIDUAL REWORK REPAIRED; AWAITING AUTHORITATIVE SNAPSHOT REVIEW | — | R1/R2 repaired without reopening cleared F1-F5; runnable mother output blocked by G-1/G-2/G-4 |
+| P4 mother layout/render slice | VECTOR RESIDUAL REPAIRED; AWAITING AUTHORITATIVE SNAPSHOT REVIEW | — | typed VectorNetwork repair; original F1-F5/R1 remain closed; runnable mother output blocked by G-1/G-2/G-4 |
 | P5 emitters/security/editability | pending | — | |
 | P6 runtime/visual/editor proof | pending | — | |
 | P7 corpus & scale | pending | — | |
@@ -236,6 +236,14 @@ Decisions/Done/cutover: Dan only.
   fill/stroke/effect/mask types, visible-array shape, and required vector geometry. Permanent
   forged-effect and out-of-range-opacity mutations raise P4 to 12 tests and the full boundary to
   97/97/0. This remains Builder evidence awaiting authoritative rereview.
+- Authoritative rereview of `de5734f` closed R1 and every advertised R2 class, then reproduced
+  one R2-adjacent vector hole: `{}` passed as `vectorNetwork`. The surgical repair implements the
+  current Figma VectorNetwork law independently in planner and oracle: required vertex/segment
+  arrays; finite vertex and tangent coordinates; integer in-range endpoints; typed winding-rule
+  regions with non-empty loops; valid segment references; and undirected connected closed-loop
+  topology. `{vertices:[],segments:[]}` remains valid. Permanent planner and independently forged
+  oracle mutations cover missing/non-array fields, nonfinite vertices/tangents, bad endpoints,
+  bad region references, and open/disconnected loops. P4 is 13/13/0; full boundary 98/98/0.
 - This is a Builder core checkpoint only, not P4 phase clearance: runnable sandbox emission is the
   next seam, and real plugin/mother evidence remains blocked by G-1/G-2/G-4.
 
@@ -364,3 +372,8 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   residual R2 proved a consistently forged planner-forbidden `MAGIC_GLOW` effect stayed
   `{G6:false,G7:false}` because independent capability closure covered blend only. Builder
   repaired only R1/R2; dependent sandbox emission remains stopped pending authoritative rereview.
+- 2026-07-14 @s58-pixel-meta-qa authoritative `[REWORK — P4 RESIDUAL SNAPSHOT ONLY]`: exact
+  target `de5734fe567ef335167d53f58aab2f7c4d104513`; R1 and all advertised R2 classes closed at
+  97/97/0. One adjacent R2 blocker remained: any object, including `{}`, passed as vector geometry
+  in planner and oracle. Required repair is the typed Figma VectorNetwork structure and topology,
+  with independent permanent mutations. Original F1-F5 and R1 remain closed; sandbox stays stopped.
