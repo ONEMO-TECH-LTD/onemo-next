@@ -5,7 +5,7 @@ import postcss from 'postcss';
 import path from 'node:path';
 
 const SVG_ELEMENTS = new Set(['svg', 'g', 'defs', 'path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'linearGradient', 'radialGradient', 'stop', 'clipPath', 'mask', 'filter', 'feGaussianBlur', 'feOffset', 'feColorMatrix', 'feBlend', 'use', 'title', 'desc']);
-const SVG_ATTRIBUTES = new Set(['id', 'viewBox', 'width', 'height', 'x', 'y', 'x1', 'x2', 'y1', 'y2', 'cx', 'cy', 'r', 'rx', 'ry', 'd', 'points', 'fill', 'fill-rule', 'fill-opacity', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'stroke-dasharray', 'stroke-opacity', 'opacity', 'transform', 'gradientUnits', 'gradientTransform', 'offset', 'stop-color', 'stop-opacity', 'clip-path', 'mask', 'filter', 'href', 'xlink:href', 'xmlns', 'preserveAspectRatio', 'result', 'in', 'in2', 'stdDeviation', 'dx', 'dy', 'values', 'type', 'operator', 'mode']);
+const SVG_ATTRIBUTES = new Set(['id', 'viewBox', 'width', 'height', 'x', 'y', 'x1', 'x2', 'y1', 'y2', 'cx', 'cy', 'r', 'rx', 'ry', 'd', 'points', 'fill', 'fill-rule', 'fill-opacity', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'stroke-dasharray', 'stroke-opacity', 'opacity', 'transform', 'gradientUnits', 'gradientTransform', 'offset', 'stop-color', 'stop-opacity', 'clip-path', 'mask', 'filter', 'href', 'xlink:href', 'xmlns', 'xmlns:xlink', 'preserveAspectRatio', 'result', 'in', 'in2', 'stdDeviation', 'dx', 'dy', 'values', 'type', 'operator', 'mode']);
 const CSS_PROPERTY = /^(?:--[A-Za-z_][A-Za-z0-9_-]*|[a-z][a-z0-9-]*)$/;
 const NAMESPACE = /^[A-Za-z0-9_-]+$/;
 const serialize = serializer.default ?? serializer;
@@ -34,6 +34,11 @@ export function sanitizeSvg(input, { namespace, maxBytes = 100_000, maxNodes = 5
     if (nextFilterDepth > maxFilterDepth) throw new SecurityError('SVG filter depth exceeded');
     for (const [name, value] of Object.entries(node.attribs ?? {})) {
       if (/^on/i.test(name) || name === 'style' || !SVG_ATTRIBUTES.has(name)) throw new SecurityError(`SVG attribute ${name} forbidden`);
+      if (name === 'xmlns' || name === 'xmlns:xlink') {
+        const expected = name === 'xmlns' ? 'http://www.w3.org/2000/svg' : 'http://www.w3.org/1999/xlink';
+        if (value !== expected) throw new SecurityError(`SVG namespace ${name} invalid`);
+        continue;
+      }
       if (name === 'd' && value.length > maxPathData) throw new SecurityError('SVG path-data limit exceeded');
       if (name === 'id') {
         if (!value || ids.has(value)) throw new SecurityError(`SVG duplicate/empty id ${value}`);
@@ -84,6 +89,7 @@ export function assertSafeCssValue(value, property) {
 
 export function safeHref(value) {
   if (typeof value !== 'string' || !value) throw new SecurityError('link href missing');
+  if (value.includes('\\') || /[\u0000-\u001f\u007f]/.test(value)) throw new SecurityError('link href contains browser-normalized separators');
   if (value.startsWith('//')) throw new SecurityError('protocol-relative link forbidden');
   if (value.startsWith('#') || value.startsWith('/') || value.startsWith('./')) return { href: value, external: false };
   let parsed;

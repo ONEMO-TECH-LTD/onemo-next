@@ -3,6 +3,10 @@ import { SCHEMA, schemaError } from './schema.mjs';
 import { parseCanonicalModel } from './canonical-model.mjs';
 import { canonicalJson, sha256 } from './evidence.mjs';
 import { validateRegistryStage } from './token-registry.mjs';
+import { validateTokenPlan } from './token-plan.mjs';
+import { buildModeContextPlan } from './mode-context-plan.mjs';
+import { lowerSemanticSlice } from './semantic-slice.mjs';
+import { buildLayoutRenderPlan } from './layout-render-plan.mjs';
 import { escapePointerToken } from './inventory.mjs';
 import { assertSafeCssValue, safeHref } from './security.mjs';
 
@@ -10,9 +14,9 @@ export class EmissionError extends Error {
   constructor(message) { super(message); this.state = 'FAILED_STATIC'; }
 }
 
-export function buildEmissionPackage({ model: input, tokenPlan, modeContextPlan, semanticSlice, layoutRenderPlan, registryStage }) {
+export function buildEmissionPackage({ model: input, tokenPlan, modeContextPlan, semanticSlice, layoutRenderPlan, registryStage, codecPolicyId, codecOptions }) {
   const model = parseCanonicalModel(input);
-  validateInputs(model, tokenPlan, modeContextPlan, semanticSlice, layoutRenderPlan, registryStage);
+  validateInputs(model, tokenPlan, modeContextPlan, semanticSlice, layoutRenderPlan, registryStage, codecPolicyId, codecOptions);
   const rootSymbol = `Screen_${sha256(model.documentGraph.rootId).slice(0, 8)}`;
   const screenFile = `screens/${rootSymbol}.tsx`;
   const styleFile = `styles/${rootSymbol}.module.css`;
@@ -79,15 +83,24 @@ export function buildEmissionPackage({ model: input, tokenPlan, modeContextPlan,
     files: fileInventory(files),
   };
   files['manifest.json'] = `${canonicalJson(manifest)}\n`;
-  return { schemaVersion: SCHEMA.emissionPackage, modelContentSeal: model.contentSeal, rootId: model.documentGraph.rootId, files, manifest, sourceMap };
+  const packageOutput = { schemaVersion: SCHEMA.emissionPackage, modelContentSeal: model.contentSeal, rootId: model.documentGraph.rootId, files, manifest, sourceMap };
+  return { packageOutput, editorAuthority: editorAuthorityFor(packageOutput) };
 }
 
-function validateInputs(model, tokenPlan, modeContextPlan, semanticSlice, layoutRenderPlan, registryStage) {
+function validateInputs(model, tokenPlan, modeContextPlan, semanticSlice, layoutRenderPlan, registryStage, codecPolicyId, codecOptions) {
   for (const [kind, value] of [['tokenPlan', tokenPlan], ['modeContextPlan', modeContextPlan], ['semanticSlice', semanticSlice], ['layoutRenderPlan', layoutRenderPlan]]) {
     const error = schemaError(kind, value);
     if (error) throw new EmissionError(error);
   }
   validateRegistryStage(registryStage);
+  try { validateTokenPlan({ model, tokenPlan, registryStage, codecPolicyId, codecOptions }); }
+  catch (error) { throw new EmissionError(`TokenPlan authority refused: ${error.message}`); }
+  const expectedMode = buildModeContextPlan(model);
+  const expectedSemantic = lowerSemanticSlice({ model, tokenPlan, modeContextPlan: expectedMode, registryStage, codecPolicyId, codecOptions });
+  const expectedLayout = buildLayoutRenderPlan(model);
+  if (canonicalJson(modeContextPlan) !== canonicalJson(expectedMode)) throw new EmissionError('ModeContextPlan disagrees with canonical rederivation');
+  if (canonicalJson(semanticSlice) !== canonicalJson(expectedSemantic)) throw new EmissionError('SemanticSlice disagrees with canonical rederivation');
+  if (canonicalJson(layoutRenderPlan) !== canonicalJson(expectedLayout)) throw new EmissionError('LayoutRenderPlan disagrees with canonical rederivation');
   if (tokenPlan.modelContentSeal !== model.contentSeal || layoutRenderPlan.modelContentSeal !== model.contentSeal || registryStage.modelContentSeal !== model.contentSeal) throw new EmissionError('emission inputs belong to different canonical sources');
   if (modeContextPlan.rootId !== model.documentGraph.rootId || semanticSlice.rootId !== model.documentGraph.rootId || layoutRenderPlan.rootId !== model.documentGraph.rootId) throw new EmissionError('emission input roots disagree');
   if (semanticSlice.tokenPlanHash !== sha256(canonicalJson(tokenPlan))) throw new EmissionError('semantic slice TokenPlan hash stale');
@@ -95,6 +108,18 @@ function validateInputs(model, tokenPlan, modeContextPlan, semanticSlice, layout
   const modelBindings = model.bindingGraph.records.map((row) => row.bindingId).sort();
   const layoutBindings = layoutRenderPlan.sourceMap.bindings.map((row) => row.bindingId).sort();
   if (canonicalJson(modelBindings) !== canonicalJson(layoutBindings)) throw new EmissionError('layout source map loses binding identity');
+}
+
+function editorAuthorityFor(output) {
+  return Object.freeze({
+    schemaVersion: 1,
+    packageSeal: sha256(canonicalJson({
+      manifestSha256: sha256(output.files['manifest.json']),
+      sourceMapSha256: sha256(output.files['source-map.json']),
+      modelContentSeal: output.modelContentSeal,
+      rootId: output.rootId,
+    })),
+  });
 }
 
 function emitTokensCss(tokenPlan) {

@@ -12,8 +12,9 @@ export function p5Failures({ model, tokenPlan, modeContextPlan, semanticSlice, l
     if (typeof content !== 'string') { G8 = true; continue; }
     if (/\.(?:ts|tsx)$/.test(path)) {
       const kind = path.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
-      if (ts.createSourceFile(path, content, ts.ScriptTarget.ESNext, true, kind).parseDiagnostics.length) G8 = true;
-      if (/dangerouslySetInnerHTML|\b(?:eval|Function)\s*\(|from\s+["'][^./]/.test(content)) G8 = true;
+      const sourceFile = ts.createSourceFile(path, content, ts.ScriptTarget.ESNext, true, kind);
+      if (sourceFile.parseDiagnostics.length || hasForbiddenRuntime(sourceFile)) G8 = true;
+      if (/dangerouslySetInnerHTML|\b(?:eval|Function|fetch|XMLHttpRequest|WebSocket|EventSource)\s*\(|\bnavigator\.sendBeacon\s*\(|from\s+["'][^./]/.test(content)) G8 = true;
     }
     if (path.endsWith('.css')) {
       try { postcss.parse(content, { from: path }); } catch { G8 = true; }
@@ -80,6 +81,29 @@ export function p5Failures({ model, tokenPlan, modeContextPlan, semanticSlice, l
   }));
   if (sourceMap?.identityHash !== expectedIdentityHash || sourceMap?.modeOrderHash !== expectedModeOrderHash) G13 = true;
   return { G8, G13 };
+}
+
+function hasForbiddenRuntime(sourceFile) {
+  let forbidden = false;
+  const forbiddenIdentifiers = new Set(['fetch', 'XMLHttpRequest', 'WebSocket', 'EventSource', 'sendBeacon']);
+  const visit = (node) => {
+    if (ts.isIdentifier(node) && forbiddenIdentifiers.has(node.text)) forbidden = true;
+    if (ts.isElementAccessExpression(node)
+      && ts.isStringLiteralLike(node.argumentExpression)
+      && forbiddenIdentifiers.has(node.argumentExpression.text)) forbidden = true;
+    if (ts.isCallExpression(node)) {
+      const expression = node.expression;
+      if (ts.isIdentifier(expression) && ['fetch', 'eval', 'Function'].includes(expression.text)) forbidden = true;
+      if (ts.isPropertyAccessExpression(expression)
+        && ((['globalThis', 'window'].includes(expression.expression.getText(sourceFile)) && expression.name.text === 'fetch')
+          || (expression.expression.getText(sourceFile) === 'navigator' && expression.name.text === 'sendBeacon'))) forbidden = true;
+      if (expression.kind === ts.SyntaxKind.ImportKeyword) forbidden = true;
+    }
+    if (ts.isNewExpression(node) && ts.isIdentifier(node.expression) && ['XMLHttpRequest', 'WebSocket', 'EventSource'].includes(node.expression.text)) forbidden = true;
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return forbidden;
 }
 
 function safePackagePath(value) {

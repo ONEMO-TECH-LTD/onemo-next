@@ -8,15 +8,15 @@ export class EditorError extends Error {
   constructor(message) { super(message); this.state = 'FAILED_EDITOR'; }
 }
 
-export function selectSource(packageOutput, nodeId) {
-  assertPackageIntegrity(packageOutput);
+export function selectSource(packageOutput, editorAuthority, nodeId) {
+  assertPackageIntegrity(packageOutput, editorAuthority);
   const matches = packageOutput?.sourceMap?.elements?.filter((row) => row.nodeId === nodeId) ?? [];
   if (matches.length !== 1) throw new EditorError(`source ${nodeId} is missing or ambiguous`);
   return structuredClone(matches[0]);
 }
 
-export function selectComponent(packageOutput, componentKey) {
-  assertPackageIntegrity(packageOutput);
+export function selectComponent(packageOutput, editorAuthority, componentKey) {
+  assertPackageIntegrity(packageOutput, editorAuthority);
   const matches = packageOutput?.sourceMap?.components?.flatMap((row) => {
     if (row.componentKey === componentKey) return [{ ...row, selectedComponentKey: componentKey, selectedSourceId: row.sourceId }];
     const index = row.memberKeys?.indexOf(componentKey) ?? -1;
@@ -26,16 +26,16 @@ export function selectComponent(packageOutput, componentKey) {
   return structuredClone(matches[0]);
 }
 
-export function selectFragment(packageOutput, fragmentId) {
-  assertPackageIntegrity(packageOutput);
+export function selectFragment(packageOutput, editorAuthority, fragmentId) {
+  assertPackageIntegrity(packageOutput, editorAuthority);
   const matches = packageOutput?.sourceMap?.fragments?.filter((row) => row.fragmentId === fragmentId) ?? [];
   if (matches.length !== 1) throw new EditorError(`fragment ${fragmentId} is missing or ambiguous`);
   const fragment = structuredClone(matches[0]);
-  return { ...fragment, owner: selectSource(packageOutput, fragment.ownerNodeId) };
+  return { ...fragment, owner: selectSource(packageOutput, editorAuthority, fragment.ownerNodeId) };
 }
 
-export function saveSegmentEdit(packageOutput, edit) {
-  assertPackageIntegrity(packageOutput);
+export function saveSegmentEdit(packageOutput, editorAuthority, edit) {
+  assertPackageIntegrity(packageOutput, editorAuthority);
   const output = structuredClone(packageOutput);
   const segment = output.sourceMap?.segments?.find((row) => row.segmentId === edit?.segmentId);
   if (!segment || segment.editable !== true) throw new EditorError(`editable segment ${edit?.segmentId} missing`);
@@ -62,20 +62,40 @@ export function saveSegmentEdit(packageOutput, edit) {
     binding.channelId = edit.binding.channelId;
   }
   refreshMetadata(output);
-  return output;
+  return { packageOutput: output, editorAuthority: authorityFor(output) };
 }
 
-function assertPackageIntegrity(output) {
+function assertPackageIntegrity(output, authority) {
   try {
+    if (authority?.schemaVersion !== 1 || authority.packageSeal !== authorityFor(output).packageSeal) throw new Error('trusted editor authority mismatch');
     if (output?.schemaVersion !== 1 || output?.sourceMap?.schemaVersion !== 1 || output?.manifest?.schemaVersion !== 1) throw new Error('schema');
     const parsedSourceMap = JSON.parse(output.files?.['source-map.json']);
     const parsedManifest = JSON.parse(output.files?.['manifest.json']);
     if (canonicalJson(parsedSourceMap) !== canonicalJson(output.sourceMap) || canonicalJson(parsedManifest) !== canonicalJson(output.manifest)) throw new Error('persisted metadata drift');
     const inventory = Object.fromEntries(Object.entries(output.files).filter(([name]) => name !== 'manifest.json').sort().map(([name, content]) => [name, { sha256: sha256(content), bytes: Buffer.byteLength(content) }]));
     if (canonicalJson(inventory) !== canonicalJson(output.manifest.files) || output.modelContentSeal !== output.manifest.modelContentSeal || output.rootId !== output.manifest.rootId) throw new Error('inventory/source drift');
+    const identityHash = sha256(canonicalJson({
+      nodes: output.sourceMap.elements.map((row) => row.nodeId).sort(),
+      components: output.sourceMap.components.map((row) => [row.componentKey, row.sourceId]).sort(),
+      fragments: output.sourceMap.fragments.map((row) => [row.fragmentId, row.ownerNodeId]).sort(),
+      bindings: output.sourceMap.bindings.map((row) => [row.bindingId, row.source]).sort(),
+    }));
+    if (identityHash !== output.sourceMap.identityHash) throw new Error('source identity hash drift');
   } catch (error) {
     throw new EditorError(`emission package integrity refused: ${error.message}`);
   }
+}
+
+function authorityFor(output) {
+  return Object.freeze({
+    schemaVersion: 1,
+    packageSeal: sha256(canonicalJson({
+      manifestSha256: sha256(output.files['manifest.json']),
+      sourceMapSha256: sha256(output.files['source-map.json']),
+      modelContentSeal: output.modelContentSeal,
+      rootId: output.rootId,
+    })),
+  });
 }
 
 function validateTokenRebind(output, segment, edit) {

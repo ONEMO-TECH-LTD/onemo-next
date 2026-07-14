@@ -282,6 +282,15 @@ Decisions/Done/cutover: Dan only.
 - This is Builder core evidence awaiting sole authoritative @s58-pixel-meta-qa snapshot review.
   It is not P5 phase, integration-corpus, runtime, visual, promotion, cutover, or Done clearance;
   G-1/G-2/G-4 still block real plugin/mother evidence and P6 owns runtime/visual/editor proof.
+- Authoritative review of `68e58b0` reproduced five P5-boundary gaps: self-consistent upstream
+  plan substitution, self-consistent source-map identity rewrite, generated runtime network calls,
+  false refusal of the standard SVG namespace, and browser-normalized backslash href escape.
+  Repair rederives TokenPlan/ModeContextPlan/SemanticSlice/LayoutRenderPlan from the canonical
+  model plus the trusted registry stage and named codec policy; requires an externally held,
+  rotating editor package seal and independently recomputes source identity; rejects generated
+  network APIs in the independent TS AST oracle; accepts only the standard SVG namespaces; and
+  rejects browser-normalized separators. All five are permanent mutations. This is Builder repair
+  evidence awaiting authoritative rereview, not snapshot clearance or a phase claim.
 
 ## Meta rulings accepted (2026-07-13)
 
