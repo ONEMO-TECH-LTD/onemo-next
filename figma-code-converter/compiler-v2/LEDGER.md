@@ -26,7 +26,7 @@ P7 inventory suite 6 pass / 0 fail / 0 skip · P7 mutation/scale diagnostic suit
 0 fail / 0 skip · P8 sandbox transaction suite 16 pass / 0 fail / 0 skip · P8 Studio suite
 8 pass / 0 fail / 0 skip · P9 cutover/rollback kernel suite 11 pass / 0 fail / 0 skip.
 Combined current truth:
-228 pass / 0 fail / 0 skip.
+234 pass / 0 fail / 0 skip.
 No phase may be recorded green from
 harness-only or REST_ONLY placeholders.
 
@@ -80,8 +80,14 @@ Decisions/Done/cutover: Dan only.
    carrier/stop/effect/opacity/per-side/affine/invert/false-green/order/vector/atomicity/cache/text
    failures and exercises current plan/snapshot mutations. [PARTIAL SNAPSHOT CLEAR `8df8b1b`;
    E1–E13 harness awaiting review]
-4. **fidelity-budgets.json**: synchronized Figma/build pairs at one file version; repeat-run
-   noise measured; per-class thresholds published with sample sizes + exclusions. [pending]
+4. **fidelity-budgets.json**: a diagnostic calibration core now requires the closed eight-class
+   §13.3 census, synchronized per-row source/version/environment/corpus/reference/package/build
+   identity, production/no-badge/zero-mask proof, same-source repeat groups, known-broken
+   mutations, named zero-area environment exclusions, per-metric distributions, Wilson 95%
+   confidence, and derived false-pass/false-fail truth. Partial census fails capture; overlapping
+   boundaries fail visual; separated samples remain an unapproved draft with QA/Meta/Dan blockers.
+   Real repeated image pairs, actual thresholds, approval evidence, and normative
+   `fidelity-budgets.json` remain open. [BUILDER GREEN — DIAGNOSTIC CORE ONLY]
 5. **Capture operability envelope**: the P0 diagnostic harness now enforces the exact visible
    three-pass phase order/counts; derives phase/total wall time, CPU, peak RSS, request count and
    bytes; races cancellation at every phase; permits exactly one instability retry; names changed
@@ -754,3 +760,13 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   retry/instability rates, and terminal truth; re-hashed label/metric/phase lies refuse. Focused
   boundary 8/8/0. No live capture transaction, accepted limits, remote-heavy evidence, P0/P1 phase,
   integration, promotion, cutover, or Done claim.
+- 2026-07-14 Builder P0 fidelity-calibration-core checkpoint: added a deterministic, diagnostic-
+  only §13.3 draft builder and independent oracle. The core requires all eight contracted classes,
+  distinct Shape/mother sources, synchronized source/environment/corpus/reference/package/build
+  identities, production builds without dev badges or approximation masks, repeat distributions,
+  linked known-broken mutations, named zero-area exclusions, explicit metric definitions and
+  thresholds, Wilson 95% confidence, and derived false-pass/false-fail analysis. Missing classes
+  are FAILED_CAPTURE; overlap is FAILED_VISUAL; observed separation is only
+  CANDIDATE_SEPARATED/DIAGNOSTIC_ONLY and carries QA/Meta/Dan blockers. Focused 6/6/0. No real
+  calibration samples, accepted values, normative file, P0 phase, integration, promotion,
+  cutover, or Done claim.
