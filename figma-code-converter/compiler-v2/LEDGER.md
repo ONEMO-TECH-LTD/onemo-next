@@ -301,6 +301,14 @@ Decisions/Done/cutover: Dan only.
   form, and allow `url()` only when it resolves to an explicitly approved, existing package-confined
   `assets/` entry. Exact reviewer attacks plus local-asset positives are permanent. Builder boundary
   remains 104/104/0; this is repair evidence awaiting authoritative rereview, not phase clearance.
+- Authoritative rereview of `e1c29fb` closed the CSS boundary but reproduced one runtime-grammar
+  implementation defect: file-global declaration collection let a name declared in one lexical
+  scope authorize an ambient reference in another. Repair removes handcrafted name collection and
+  asks the TypeScript checker for each identifier's actual resolved symbol/declarations. Only symbols
+  declared in the generated package are local; the sole ambient values remain the exact built-in
+  `JSON` and `Error` symbols, and callable identity is validated from the resolved declaration kind.
+  Cross-function shadow/ambient confusion is now a permanent G8-red mutation. This is residual repair
+  evidence awaiting authoritative rereview; CSS and all earlier P5 findings remain credited closed.
 
 ## Meta rulings accepted (2026-07-13)
 

@@ -8,14 +8,15 @@ import { canonicalJson, sha256 } from '../src/evidence.mjs';
 export function p5Failures({ model, tokenPlan, modeContextPlan, semanticSlice, layoutRenderPlan, packageOutput }) {
   const files = packageOutput?.files ?? {};
   const sourceMap = packageOutput?.sourceMap;
+  const typecheck = typecheckPackage(files);
+  const checker = typecheck.program.getTypeChecker();
   let G8 = packageOutput?.schemaVersion !== 1;
   for (const [path, content] of Object.entries(files)) {
     if (!safePackagePath(path)) G8 = true;
     if (typeof content !== 'string') { G8 = true; continue; }
     if (/\.(?:ts|tsx)$/.test(path)) {
-      const kind = path.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
-      const sourceFile = ts.createSourceFile(path, content, ts.ScriptTarget.ESNext, true, kind);
-      if (sourceFile.parseDiagnostics.length || !hasClosedGeneratedRuntime(sourceFile)) G8 = true;
+      const sourceFile = typecheck.program.getSourceFile(`${typecheck.root}/${path}`);
+      if (!sourceFile || sourceFile.parseDiagnostics.length || !hasClosedGeneratedRuntime(sourceFile, checker, typecheck.root)) G8 = true;
       if (/dangerouslySetInnerHTML/.test(content)) G8 = true;
     }
     if (path.endsWith('.css')) {
@@ -27,7 +28,7 @@ export function p5Failures({ model, tokenPlan, modeContextPlan, semanticSlice, l
     }
     if (path.endsWith('.json')) { try { JSON.parse(content); } catch { G8 = true; } }
   }
-  const typecheckDiagnostics = typecheckPackage(files);
+  const typecheckDiagnostics = typecheck.diagnostics;
   if (process.env.P5_TYPECHECK_DIAGNOSTICS === '1' && typecheckDiagnostics.length) {
     process.stderr.write(`${ts.formatDiagnosticsWithColorAndContext(typecheckDiagnostics, {
       getCanonicalFileName: (file) => file,
@@ -88,10 +89,7 @@ export function p5Failures({ model, tokenPlan, modeContextPlan, semanticSlice, l
   return { G8, G13 };
 }
 
-function hasClosedGeneratedRuntime(sourceFile) {
-  const declared = new Set();
-  const callable = new Set();
-  const allowedAmbient = new Set(['JSON', 'Error']);
+function hasClosedGeneratedRuntime(sourceFile, checker, packageRoot) {
   const allowedTopLevel = new Set([ts.SyntaxKind.ImportDeclaration, ts.SyntaxKind.VariableStatement, ts.SyntaxKind.FunctionDeclaration, ts.SyntaxKind.TypeAliasDeclaration, ts.SyntaxKind.InterfaceDeclaration]);
   const allowedIntrinsicAttributes = {
     div: new Set(['className', 'data-figma-id', 'data-mode-context', 'data-figma-component-key', 'data-figma-component-set-key', 'data-figma-component-props']),
@@ -100,27 +98,12 @@ function hasClosedGeneratedRuntime(sourceFile) {
   };
   if (sourceFile.statements.some((statement) => !allowedTopLevel.has(statement.kind))) return false;
 
-  const bind = (name) => {
-    if (!name) return;
-    if (ts.isIdentifier(name)) declared.add(name.text);
-    else if (ts.isObjectBindingPattern(name) || ts.isArrayBindingPattern(name)) for (const element of name.elements) if (ts.isBindingElement(element)) bind(element.name);
-  };
-  const collect = (node) => {
-    if (ts.isImportDeclaration(node)) {
-      if (!ts.isStringLiteral(node.moduleSpecifier) || !/^\.\.?\//.test(node.moduleSpecifier.text)) return;
-      bind(node.importClause?.name);
-      if (node.importClause?.name) callable.add(node.importClause.name.text);
-      const bindings = node.importClause?.namedBindings;
-      if (bindings && ts.isNamespaceImport(bindings)) { bind(bindings.name); callable.add(bindings.name.text); }
-      if (bindings && ts.isNamedImports(bindings)) for (const element of bindings.elements) { bind(element.name); callable.add(element.name.text); }
-    }
-    if (ts.isVariableDeclaration(node) || ts.isParameter(node) || ts.isFunctionDeclaration(node)) bind(node.name);
-    if (ts.isFunctionDeclaration(node) && node.name) callable.add(node.name.text);
-    ts.forEachChild(node, collect);
-  };
-  sourceFile.forEachChild(collect);
-
   let valid = true;
+  const symbolDeclarations = (node) => checker.getSymbolAtLocation(node)?.declarations ?? [];
+  const isPackageSymbol = (node) => symbolDeclarations(node).some((declaration) => declaration.getSourceFile().fileName.startsWith(`${packageRoot}/`) && !declaration.getSourceFile().fileName.endsWith('/globals.d.ts'));
+  const isAmbientSymbol = (node, name) => ts.isIdentifier(node) && node.text === name && symbolDeclarations(node).length > 0 && !isPackageSymbol(node);
+  const isCallableSymbol = (node) => symbolDeclarations(node).some((declaration) => ts.isFunctionDeclaration(declaration)
+    || ts.isImportSpecifier(declaration) || ts.isImportClause(declaration) || ts.isNamespaceImport(declaration));
   const isDeclarationName = (node) => {
     const parent = node.parent;
     return (ts.isVariableDeclaration(parent) || ts.isParameter(parent) || ts.isFunctionDeclaration(parent) || ts.isImportClause(parent)
@@ -142,11 +125,11 @@ function hasClosedGeneratedRuntime(sourceFile) {
     if (ts.isCallExpression(node)) {
       const callee = node.expression;
       if (callee.kind === ts.SyntaxKind.ImportKeyword || ts.isElementAccessExpression(callee)) { valid = false; return; }
-      if (ts.isPropertyAccessExpression(callee) && !(ts.isIdentifier(callee.expression) && callee.expression.text === 'JSON' && callee.name.text === 'stringify')) { valid = false; return; }
+      if (ts.isPropertyAccessExpression(callee) && !(callee.name.text === 'stringify' && isAmbientSymbol(callee.expression, 'JSON'))) { valid = false; return; }
       if (!ts.isIdentifier(callee) && !ts.isPropertyAccessExpression(callee)) { valid = false; return; }
-      if (ts.isIdentifier(callee) && !callable.has(callee.text)) { valid = false; return; }
+      if (ts.isIdentifier(callee) && !isCallableSymbol(callee)) { valid = false; return; }
     }
-    if (ts.isNewExpression(node) && !(ts.isIdentifier(node.expression) && node.expression.text === 'Error')) { valid = false; return; }
+    if (ts.isNewExpression(node) && !isAmbientSymbol(node.expression, 'Error')) { valid = false; return; }
     if (ts.isPropertyAccessExpression(node) && ['constructor', 'prototype', '__proto__'].includes(node.name.text)) { valid = false; return; }
     if (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression) && ['constructor', 'prototype', '__proto__'].includes(node.argumentExpression.text)) { valid = false; return; }
     const tag = jsxTag(node);
@@ -158,13 +141,13 @@ function hasClosedGeneratedRuntime(sourceFile) {
         for (const attribute of opening?.attributes?.properties ?? []) {
           if (!ts.isJsxAttribute(attribute) || !ts.isIdentifier(attribute.name) || !attributes.has(attribute.name.text)) { valid = false; return; }
         }
-      } else if (!declared.has(tag.text)) { valid = false; return; }
+      } else if (!isPackageSymbol(tag)) { valid = false; return; }
     }
     if (ts.isIdentifier(node) && !isDeclarationName(node) && !isNonComputedName(node)) {
       const parentTag = jsxTag(node.parent);
       if (parentTag === node) {
         // Tag capability was checked above.
-      } else if (!declared.has(node.text) && !allowedAmbient.has(node.text)) { valid = false; return; }
+      } else if (!isPackageSymbol(node) && !isAmbientSymbol(node, 'JSON') && !isAmbientSymbol(node, 'Error')) { valid = false; return; }
     }
     ts.forEachChild(node, visit);
   };
@@ -225,5 +208,5 @@ function typecheckPackage(files) {
     return ts.resolveModuleName(specifier, containingFile, options, base).resolvedModule;
   });
   const program = ts.createProgram({ rootNames: [...virtual.keys()], options, host: base });
-  return ts.getPreEmitDiagnostics(program);
+  return { root, program, diagnostics: ts.getPreEmitDiagnostics(program) };
 }

@@ -207,6 +207,8 @@ test('independent P5 oracle bites unsafe output and every selection-address muta
   assert.equal(p5Failures({ ...output, packageOutput: bracketNetwork }).G8, true);
   const computedNetwork = structuredClone(output.packageOutput); computedNetwork.files[screen] += '\nexport function injectedRuntime() { const runtime: any = globalThis; const operation = "fe" + "tch"; return runtime[operation]("https://example.test/data"); }\n'; resealTestManifest(computedNetwork);
   assert.equal(p5Failures({ ...output, packageOutput: computedNetwork }).G8, true);
+  const scopeConfusion = structuredClone(output.packageOutput); scopeConfusion.files[screen] += '\nexport function localShadow(globalThis: unknown) { return globalThis; }\nexport function outsideShadow() { return globalThis; }\n'; resealTestManifest(scopeConfusion);
+  assert.equal(p5Failures({ ...output, packageOutput: scopeConfusion }).G8, true);
   const localAsset = structuredClone(output.packageOutput);
   localAsset.files['assets/look.svg'] = '<svg xmlns="http://www.w3.org/2000/svg" />\n';
   const style = Object.keys(localAsset.files).find((path) => path.startsWith('styles/'));
