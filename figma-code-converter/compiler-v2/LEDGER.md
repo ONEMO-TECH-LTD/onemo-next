@@ -20,8 +20,9 @@ gitignored golden fixture `t88thL8hKksSpILgkeGRZ0-4084-25997.nodes.json`) / 0 sk
 compiler-v2 foundation suite 53 pass / 0 fail / 0 skip across Builder and Meta repeated runs ·
 compiler-v2 P2 graph suite 16 pass / 0 fail / 0 skip · P2 persisted-model suite 7 pass /
 0 fail / 0 skip · compiler-v2 P3 planner suite 9 pass / 0 fail / 0 skip · P4 layout/render
-suite 13 pass / 0 fail / 0 skip · P5 emission/security/editor suite 6 pass / 0 fail / 0 skip.
-Combined current truth: 104 pass / 0 fail / 0 skip.
+suite 13 pass / 0 fail / 0 skip · P5 emission/security/editor suite 6 pass / 0 fail / 0 skip ·
+P6 runtime/visual/editor-proof suite 7 pass / 0 fail / 0 skip, including pinned system-Chrome.
+Combined current truth: 111 pass / 0 fail / 0 skip.
 No phase may be recorded green from
 harness-only or REST_ONLY placeholders.
 
@@ -48,8 +49,8 @@ Decisions/Done/cutover: Dan only.
 | P2 canonical graphs | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `0c8471b` | sole authoritative QA/Meta cleared the frozen code snapshot only; live/plugin evidence still blocked by G-1/G-2 |
 | P3 mother token/component slice | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `5dbcb39` | sole authoritative QA/Meta cleared core snapshot; real mother/plugin-origin exit blocked by G-1/G-2/G-4 |
 | P4 mother layout/render slice | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `c754741` | sole authoritative QA+Meta cleared core snapshot; runnable mother/plugin evidence remains blocked by G-1/G-2/G-4 |
-| P5 emitters/security/editability | CORE BUILT; AWAITING AUTHORITATIVE SNAPSHOT REVIEW | — | static G8/G13 microfixture boundary only; phase evidence remains blocked |
-| P6 runtime/visual/editor proof | pending | — | |
+| P5 emitters/security/editability | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `4693a72` | sole authoritative QA+Meta cleared G8 core snapshot; integration/editor-corpus exit remains blocked |
+| P6 runtime/visual/editor proof | CORE BUILT; AWAITING AUTHORITATIVE SNAPSHOT REVIEW | — | production-bundle + system-Chrome microfixture boundary only; no real reference/budget candidate claim |
 | P7 corpus & scale | pending | — | |
 | P8 studio dual-run | pending | — | |
 | P9 cutover | pending | — | Dan-only |
@@ -319,6 +320,39 @@ Decisions/Done/cutover: Dan only.
   ambient declaration are permanent G8-red mutations.
   This is residual repair evidence awaiting authoritative rereview; lexical scope, CSS, and all earlier
   P5 findings remain credited closed.
+- Authoritative `[CLEAR — P5 CORE SNAPSHOT ONLY]` at `4693a72`: exact declaration-file,
+  declaration-only alias, escaping-import negatives and confined executable-alias positive passed;
+  dependent P6 work released. No P5 phase/integration/runtime/visual/promotion/cutover/Done claim.
+
+## P6 Builder core checkpoint (2026-07-14)
+
+- Added a deterministic production browser bundle over the sealed P5 package. Two builds produce
+  identical JS/CSS/HTML inventories and hashes; unsafe paths, persisted metadata drift, and stale
+  manifest inventory refuse before bundling.
+- Added a live state capture on pinned Playwright/system Chrome: exact viewport+DPR screenshot,
+  effective `data-mode-context` at every source node, CSS custom-property and React-channel value
+  selection per binding, derived browser/environment identity, console/page/runtime errors, and
+  external network requests. Unsupported requested root modes fail loud rather than being inferred.
+- Visual comparison requires an exact declared metric-class census, same-size pinned reference,
+  explicit opaque-white alpha composition, and class-region changed-pixel/mean-delta measurements.
+  Missing references remain diagnostic; stale references, runtime gaps, budget excess, or editor
+  drift receive their contracted terminal states.
+- G9 requires two package-identical, artifact-inventory-identical builds plus token-value, label,
+  and subtree locality records whose changed-file lists are derived from before/after inventories.
+  G13 requires all pinned EC1–EC8b cases with file locality, identity/mode-order preservation, and
+  successful recompilation. The independent oracle imports no P6 builder or emitter helpers.
+- Failure/mutation corpus covers missing runtime, context/channel/value/environment drift, external
+  network access, stale reference, metric-class additions, over-budget visual output, build churn,
+  editor churn, duplicate states, unsafe package paths, stale package inventory, and forged reports.
+- `PROMOTABLE_VERIFIED` additionally requires an externally supplied integration authority bound to
+  the exact package, compile request, fidelity budgets, and blocker inventory. Missing/stale authority
+  stays `DIAGNOSTIC_ONLY`; a self-consistent microfixture report is not promotion authority.
+- Current core boundary is 111/111/0. The in-app Browser plugin was attempted first but reported
+  `No Codex IAB backends were discovered`; the contract-pinned Playwright/system-Chrome fallback ran
+  the live production bundle with zero console/network/runtime errors and exact context/token parity.
+- This is Builder microfixture core evidence awaiting sole authoritative snapshot review. It is not
+  P6 phase, real-reference, calibrated-budget, integration, promotion, cutover, or Done clearance;
+  G-1/G-2/G-4 and P0's unaccepted budgets still prevent a real `PROMOTABLE_VERIFIED` candidate.
 
 ## Meta rulings accepted (2026-07-13)
 
