@@ -134,7 +134,9 @@ function replacementFor(segment, edit) {
 
 function editableCssValue(value, property) {
   assertSafeCssValue(value, property);
-  if (['padding-top', 'padding-right', 'padding-bottom', 'padding-left', 'border-radius', 'width', 'height'].includes(property)
+  if (['padding-top', 'padding-right', 'padding-bottom', 'padding-left', 'border-radius',
+    'border-top-left-radius', 'border-top-right-radius', 'border-bottom-right-radius', 'border-bottom-left-radius',
+    'width', 'height'].includes(property)
     && !/^(?:0|(?:\d+(?:\.\d+)?|\.\d+)(?:px|rem|em|%)|var\(--[A-Za-z_][A-Za-z0-9_-]*\)|calc\(.+\))$/.test(value)) {
     throw new EditorError(`${property} edit is outside the supported length grammar`);
   }

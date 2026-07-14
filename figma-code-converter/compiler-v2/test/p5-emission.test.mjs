@@ -199,6 +199,7 @@ test('P5 Save-to-code edits one CSS slot and one token leaf with deterministic m
   const boundRadius = output.packageOutput.sourceMap.segments.find((row) => row.kind === 'token-expression' && row.sourcePath === '/rectangleCornerRadii/RECTANGLE_TOP_LEFT_CORNER_RADIUS');
   assert.ok(boundRadius.text.startsWith('var('));
   assert.equal(radiusEdit.sourceMap.segments.find((row) => row.segmentId === boundRadius.segmentId).text, boundRadius.text);
+  assert.throws(() => saveSegmentEdit(output.packageOutput, output.editorAuthority, { segmentId: radius.segmentId, value: 'red' }), /supported length grammar/);
 
   const opacity = output.packageOutput.sourceMap.segments.find((row) => row.kind === 'token-expression' && row.sourcePath === '/opacity');
   const replacement = output.tokenPlan.tokenData.css.find((row) => row.variableKey === 'K_FLOAT_2' && row.destinationDomain === 'opacity-normalized');

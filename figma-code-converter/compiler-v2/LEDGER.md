@@ -725,3 +725,8 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   full legacy + Compiler v2 boundary is 220/220/0. EC3–EC8b runtime cases, plugin corpus, P0
   phase/integration, promotion, cutover, and Done remain open. Builder evidence awaiting sole
   authoritative @s58-pixel-meta-qa review.
+- 2026-07-14 Builder withdrew the first EC2 snapshot `e3069b3` before review after the full
+  immediate-caller audit found that Save-to-code's strict length grammar did not yet include the
+  four new per-corner radius properties. Safe-but-invalid `red` could therefore pass the editor
+  adapter. The replacement adds those exact properties to the existing nonnegative length grammar
+  and pins a permanent refusal mutation. No broader editor grammar changed.
