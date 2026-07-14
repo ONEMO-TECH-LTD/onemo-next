@@ -55,3 +55,9 @@
 - Symptoms: macOS `nl` returned usage text instead of file contents; three parallel read commands failed the same way.
 - What worked: run `nl -ba` one file at a time, or use a shell loop only when explicit per-file headers are needed.
 - Remember: for full-read hydration, do not batch multiple file operands into `nl`; one file per command keeps coverage auditable.
+
+## S58 Compiler v2 virtual-package typecheck
+
+- What did not work: treating generated `.js` imports as automatically resolvable to in-memory `.ts`/`.tsx` files, then stopping at parse-only checks; the first strict run exposed unresolved virtual modules, and the next exposed a broad `string | number | boolean` React-token return type.
+- What worked: give the independent TypeScript host an explicit relative `.js` → virtual `.ts`/`.tsx` resolver, then emit literal-preserving token data and a generic resolver whose return type stays tied to the exact symbol and mode.
+- Remember: generated-package QA needs one strict multi-file TypeScript program; syntax parsing alone cannot prove module resolution or component-prop type safety.

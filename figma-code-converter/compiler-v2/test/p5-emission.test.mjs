@@ -1,0 +1,190 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { buildCanonicalModel } from '../src/canonical-model.mjs';
+import { canonicalJson, sha256 } from '../src/evidence.mjs';
+import { emptyTokenRegistry, stageTokenRegistry } from '../src/token-registry.mjs';
+import { buildTokenPlan } from '../src/token-plan.mjs';
+import { buildModeContextPlan } from '../src/mode-context-plan.mjs';
+import { lowerSemanticSlice } from '../src/semantic-slice.mjs';
+import { buildLayoutRenderPlan } from '../src/layout-render-plan.mjs';
+import { buildEmissionPackage } from '../src/emission-package.mjs';
+import { sanitizeSvg, assertSafeCssValue, safeHref, confinedAssetPath, SecurityError } from '../src/security.mjs';
+import { selectSource, selectComponent, selectFragment, saveSegmentEdit, EditorError } from '../src/editor-adapter.mjs';
+import { p3Fixture } from './p3-fixture.mjs';
+import { p5Failures } from './p5-oracle.mjs';
+
+const acceptColorSyntax = ({ domain, syntax }) => domain === 'color' ? syntax : null;
+const optionsFor = (record) => record.destinationDomain === 'opacity-normalized' ? { opacityScale: 'percent' } : {};
+const CODEC_POLICY_ID = 'p5-fixture-codecs-v1';
+
+function fixtureOutput() {
+  const { snapshot } = p3Fixture();
+  Object.assign(snapshot.document, {
+    layoutMode: 'HORIZONTAL', itemSpacing: 6,
+    paddingTop: 4, paddingRight: 8, paddingBottom: 12, paddingLeft: 16,
+    cornerRadius: 8,
+  });
+  snapshot.document.children.push({ id: 'plain-text', type: 'TEXT', name: 'Plain editorial', characters: '<Look & listen>', children: [] });
+  const nested = snapshot.document.children.find((node) => node.id === 'nested');
+  nested.opacity = 0.5;
+  nested.boundVariables = { opacity: { type: 'VARIABLE_ALIAS', id: 'V_FLOAT_2' } };
+  snapshot.variables.variables.push({
+    id: 'V_FLOAT_2', key: 'K_FLOAT_2', name: 'Alternate opacity', codeSyntax: {},
+    variableCollectionId: 'C_THEME', resolvedType: 'FLOAT', valuesByMode: { light: 50, dark: 40 },
+  });
+  snapshot.supplement.nodes.push({
+    nodeId: 'plain-text', resolvedVariableModes: { C_THEME: 'light' },
+    styledTextSegments: [{ start: 0, end: 15, characters: '<Look & listen>', fontName: { family: 'Inter', style: 'Regular' } }],
+    fontDependencies: [{ family: 'Inter', style: 'Regular', providerId: 'font-inter-regular', sha256: '1'.repeat(64) }],
+  });
+  const model = buildCanonicalModel({ snapshot, evidenceClass: 'microfixture', fileKey: 'P5_FIXTURE' });
+  const registryStage = stageTokenRegistry({ model, baseRegistry: emptyTokenRegistry(), webSyntaxPolicy: acceptColorSyntax });
+  const tokenPlan = buildTokenPlan({ model, registry: registryStage.candidateRegistry, registryStageId: registryStage.stageId, registryBaseHash: registryStage.baseHash, codecPolicyId: CODEC_POLICY_ID, codecOptions: optionsFor });
+  const modeContextPlan = buildModeContextPlan(model);
+  const semanticSlice = lowerSemanticSlice({ model, tokenPlan, modeContextPlan, registryStage, codecPolicyId: CODEC_POLICY_ID, codecOptions: optionsFor });
+  const layoutRenderPlan = buildLayoutRenderPlan(model);
+  const packageOutput = buildEmissionPackage({ model, tokenPlan, modeContextPlan, semanticSlice, layoutRenderPlan, registryStage });
+  return { model, registryStage, tokenPlan, modeContextPlan, semanticSlice, layoutRenderPlan, packageOutput };
+}
+
+const changedPaths = (before, after) => [...new Set([...Object.keys(before.files), ...Object.keys(after.files)])].filter((path) => before.files[path] !== after.files[path]).sort();
+const resealTestManifest = (output) => {
+  output.manifest.files = Object.fromEntries(Object.entries(output.files).filter(([path]) => path !== 'manifest.json').sort().map(([path, content]) => [path, { sha256: sha256(content), bytes: Buffer.byteLength(content) }]));
+  output.files['manifest.json'] = `${canonicalJson(output.manifest)}\n`;
+};
+
+test('P5 emits one deterministic production-shaped package with independent G8/G13 closure', () => {
+  const first = fixtureOutput();
+  const second = fixtureOutput();
+  assert.equal(canonicalJson(first.packageOutput), canonicalJson(second.packageOutput));
+  assert.deepEqual(p5Failures(first), { G8: false, G13: false });
+  assert.ok(Object.keys(first.packageOutput.files).some((path) => path.startsWith('components/') && path.endsWith('.tsx')));
+  assert.equal(first.packageOutput.sourceMap.components.length, first.semanticSlice.componentSets.length + first.semanticSlice.components.length);
+  assert.ok(first.packageOutput.files['tokens.css'].includes('--velvet-ink'));
+  assert.match(first.packageOutput.files['tokens.css'], /opacity-normalized: 85;/);
+  assert.match(first.packageOutput.files[Object.keys(first.packageOutput.files).find((path) => path.startsWith('styles/'))], /opacity: calc\(var\(.+\) \/ 100\);/);
+  assert.ok(first.packageOutput.files['mode-contexts.ts'].includes('resolveModeContext'));
+  assert.equal(JSON.parse(first.packageOutput.files['capability-report.json']).state, 'DIAGNOSTIC_ONLY');
+  const componentFile = first.packageOutput.files[Object.keys(first.packageOutput.files).find((path) => path.startsWith('components/'))];
+  assert.match(componentFile, /CMP_CHOICE_S/);
+  assert.match(componentFile, /CMP_CHOICE_L/);
+  assert.match(componentFile, /sourceComponentKey/);
+  assert.match(componentFile, /"Size": props\["Size"\] \?\? "S"/);
+});
+
+test('P5 security boundaries reject SVG, CSS, URL, and path payloads before output', () => {
+  const clean = sanitizeSvg('<svg><defs><linearGradient id="paint"><stop offset="0" /></linearGradient></defs><path fill="url(#paint)" d="M0 0Z" /></svg>', { namespace: 'asset-a' });
+  assert.match(clean, /id="asset-a__paint"/);
+  assert.match(clean, /url\(#asset-a__paint\)/);
+  for (const payload of [
+    '<svg><script>alert(1)</script></svg>',
+    '<svg><foreignObject><div /></foreignObject></svg>',
+    '<svg onload="alert(1)"><path /></svg>',
+    '<svg><use href="https://evil.test/x.svg#x" /></svg>',
+    '<svg><use href="#missing" /></svg>',
+    '<svg><path fill="url(#missing)" /></svg>',
+    '<svg><path id="a?" /><path id="a!" /></svg>',
+  ]) assert.throws(() => sanitizeSvg(payload, { namespace: 'asset-a' }), SecurityError);
+  assert.doesNotThrow(() => assertSafeCssValue('calc(var(--safe) / 100)', 'opacity'));
+  for (const value of ['red; color:blue', 'url(https://evil.test/x)', 'expression(alert(1))', 'var(--x) } .evil {']) assert.throws(() => assertSafeCssValue(value, 'color'), SecurityError);
+  assert.deepEqual(safeHref('https://example.test/look'), { href: 'https://example.test/look', external: true });
+  assert.throws(() => safeHref('javascript:alert(1)'), SecurityError);
+  assert.throws(() => safeHref('//evil.test/look'), SecurityError);
+  assert.equal(confinedAssetPath('assets/look.svg'), 'assets/look.svg');
+  for (const path of ['../look.svg', 'assets/../look.svg', '/look.svg', 'assets\\look.svg']) assert.throws(() => confinedAssetPath(path), SecurityError);
+});
+
+test('P5 source and fragment selection resolve one semantic owner without fake elements', () => {
+  const output = fixtureOutput();
+  const source = selectSource(output.packageOutput, 'instance');
+  assert.equal(source.nodeId, 'instance');
+  const component = selectComponent(output.packageOutput, 'SET_CHOICE');
+  assert.equal(component.sourceId, 'set');
+  const member = selectComponent(output.packageOutput, 'CMP_CHOICE_S');
+  assert.equal(member.ownerComponentKey, 'SET_CHOICE');
+  assert.equal(member.selectedSourceId, 'choice-s');
+  const fragmentRow = output.packageOutput.sourceMap.fragments.find((row) => row.ownerNodeId === 'root');
+  const fragment = selectFragment(output.packageOutput, fragmentRow.fragmentId);
+  assert.equal(fragment.fragmentId, fragmentRow.fragmentId);
+  assert.equal(fragment.owner.nodeId, 'root');
+  assert.throws(() => selectSource(output.packageOutput, fragmentRow.fragmentId), EditorError);
+  assert.throws(() => selectComponent(output.packageOutput, 'missing-component'), EditorError);
+  assert.throws(() => selectFragment(output.packageOutput, 'missing-fragment'), EditorError);
+  const stale = structuredClone(output.packageOutput); stale.sourceMap.elements.pop();
+  assert.throws(() => selectSource(stale, 'instance'), EditorError);
+});
+
+test('P5 Save-to-code edits one CSS slot and one token leaf with deterministic metadata updates', () => {
+  const output = fixtureOutput();
+  const padding = output.packageOutput.sourceMap.segments.find((row) => row.kind === 'css-value' && row.sourcePath === '/paddingTop');
+  const padded = saveSegmentEdit(output.packageOutput, { segmentId: padding.segmentId, value: '12px' });
+  assert.deepEqual(changedPaths(output.packageOutput, padded), ['manifest.json', 'source-map.json', padding.file].sort());
+  assert.equal(padded.sourceMap.segments.find((row) => row.segmentId === padding.segmentId).text, '12px');
+  assert.deepEqual(p5Failures({ ...output, packageOutput: padded }), { G8: false, G13: false });
+  assert.throws(() => saveSegmentEdit(output.packageOutput, { segmentId: padding.segmentId, value: 'red' }), EditorError);
+
+  const opacity = output.packageOutput.sourceMap.segments.find((row) => row.kind === 'token-expression' && row.sourcePath === '/opacity');
+  const replacement = output.tokenPlan.tokenData.css.find((row) => row.variableKey === 'K_FLOAT_2' && row.destinationDomain === 'opacity-normalized');
+  const rebound = saveSegmentEdit(output.packageOutput, {
+    segmentId: opacity.segmentId,
+    value: replacement.cssName,
+    binding: { variableKey: replacement.variableKey, channelId: replacement.channelId },
+  });
+  const reboundSegment = rebound.sourceMap.segments.find((row) => row.segmentId === opacity.segmentId);
+  assert.equal(reboundSegment.text, `var(${replacement.cssName})`);
+  assert.ok(rebound.files[opacity.file].includes(`calc(var(${replacement.cssName}) / 100)`));
+  assert.deepEqual(changedPaths(output.packageOutput, rebound), ['manifest.json', 'source-map.json', opacity.file].sort());
+  assert.deepEqual(p5Failures({ ...output, packageOutput: rebound }), { G8: false, G13: true });
+  assert.throws(() => saveSegmentEdit(output.packageOutput, {
+    segmentId: opacity.segmentId,
+    value: '--forged-token',
+    binding: { variableKey: 'FORGED', channelId: 'forged-channel' },
+  }), EditorError);
+});
+
+test('P5 Save-to-code preserves component identity, scoped modes, render order, and escaped text', () => {
+  const output = fixtureOutput();
+  const prop = output.packageOutput.sourceMap.segments.find((row) => row.kind === 'jsx-prop-value' && row.sourcePath === '/componentProperties/Size');
+  const changedProp = saveSegmentEdit(output.packageOutput, { segmentId: prop.segmentId, value: 'L' });
+  assert.equal(changedProp.sourceMap.segments.find((row) => row.segmentId === prop.segmentId).text, '"L"');
+  assert.throws(() => saveSegmentEdit(output.packageOutput, { segmentId: prop.segmentId, value: 'XL' }), EditorError);
+  const text = output.packageOutput.sourceMap.segments.find((row) => row.kind === 'jsx-text' && row.nodeId === 'plain-text');
+  const changedText = saveSegmentEdit(output.packageOutput, { segmentId: text.segmentId, value: '</script><script>alert(1)</script>' });
+  assert.ok(changedText.sourceMap.segments.find((row) => row.segmentId === text.segmentId).text.startsWith('"'));
+  assert.equal(changedText.files[text.file].includes('dangerouslySetInnerHTML'), false);
+  for (const edited of [changedProp, changedText]) {
+    assert.equal(edited.sourceMap.identityHash, output.packageOutput.sourceMap.identityHash);
+    assert.equal(edited.sourceMap.modeOrderHash, output.packageOutput.sourceMap.modeOrderHash);
+    assert.deepEqual(p5Failures({ ...output, packageOutput: edited }), { G8: false, G13: false });
+  }
+});
+
+test('independent P5 oracle bites unsafe output and every selection-address mutation', () => {
+  const output = fixtureOutput();
+  const unsafe = structuredClone(output.packageOutput);
+  const screen = Object.keys(unsafe.files).find((path) => path.startsWith('screens/'));
+  unsafe.files[screen] += '\nconst injected = <div dangerouslySetInnerHTML={{__html: "x"}} />;\n';
+  resealTestManifest(unsafe);
+  assert.equal(p5Failures({ ...output, packageOutput: unsafe }).G8, true);
+  const typeBroken = structuredClone(output.packageOutput);
+  typeBroken.files['token-values.ts'] = typeBroken.files['token-values.ts'].replace('"CK_THEME=light": true', '"CK_THEME=light": "not-a-boolean"');
+  assert.notEqual(typeBroken.files['token-values.ts'], output.packageOutput.files['token-values.ts']);
+  resealTestManifest(typeBroken);
+  assert.equal(p5Failures({ ...output, packageOutput: typeBroken }).G8, true);
+  const badManifest = structuredClone(output.packageOutput); badManifest.files['manifest.json'] = badManifest.files['manifest.json'].replace(output.model.contentSeal, '0'.repeat(64));
+  assert.equal(p5Failures({ ...output, packageOutput: badManifest }).G8, true);
+  const unsafePath = structuredClone(output.packageOutput); unsafePath.files['../escape.ts'] = 'export {};\n'; resealTestManifest(unsafePath);
+  assert.equal(p5Failures({ ...output, packageOutput: unsafePath }).G8, true);
+  const missingElement = structuredClone(output.packageOutput); missingElement.sourceMap.elements.pop();
+  assert.equal(p5Failures({ ...output, packageOutput: missingElement }).G13, true);
+  const missingComponent = structuredClone(output.packageOutput); missingComponent.sourceMap.components.pop();
+  assert.equal(p5Failures({ ...output, packageOutput: missingComponent }).G13, true);
+  const wrongOwner = structuredClone(output.packageOutput); wrongOwner.sourceMap.fragments[0].ownerNodeId = 'instance';
+  assert.equal(p5Failures({ ...output, packageOutput: wrongOwner }).G13, true);
+  const wrongFragmentOrder = structuredClone(output.packageOutput); wrongFragmentOrder.sourceMap.fragments[0].role = 'forged-role';
+  assert.equal(p5Failures({ ...output, packageOutput: wrongFragmentOrder }).G13, true);
+  const wrongBindingContext = structuredClone(output.packageOutput); wrongBindingContext.sourceMap.bindings[0].modeContextId = 'forged-mode';
+  assert.equal(p5Failures({ ...output, packageOutput: wrongBindingContext }).G13, true);
+  const unaddressed = structuredClone(output.packageOutput); unaddressed.sourceMap.bindings[0].segmentIds = [];
+  assert.equal(p5Failures({ ...output, packageOutput: unaddressed }).G13, true);
+});

@@ -20,7 +20,8 @@ gitignored golden fixture `t88thL8hKksSpILgkeGRZ0-4084-25997.nodes.json`) / 0 sk
 compiler-v2 foundation suite 53 pass / 0 fail / 0 skip across Builder and Meta repeated runs ·
 compiler-v2 P2 graph suite 16 pass / 0 fail / 0 skip · P2 persisted-model suite 7 pass /
 0 fail / 0 skip · compiler-v2 P3 planner suite 9 pass / 0 fail / 0 skip · P4 layout/render
-suite 13 pass / 0 fail / 0 skip. Combined current truth: 98 pass / 0 fail / 0 skip.
+suite 13 pass / 0 fail / 0 skip · P5 emission/security/editor suite 6 pass / 0 fail / 0 skip.
+Combined current truth: 104 pass / 0 fail / 0 skip.
 No phase may be recorded green from
 harness-only or REST_ONLY placeholders.
 
@@ -46,8 +47,8 @@ Decisions/Done/cutover: Dan only.
 | P1 evidence capture | pending | — | |
 | P2 canonical graphs | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `0c8471b` | sole authoritative QA/Meta cleared the frozen code snapshot only; live/plugin evidence still blocked by G-1/G-2 |
 | P3 mother token/component slice | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `5dbcb39` | sole authoritative QA/Meta cleared core snapshot; real mother/plugin-origin exit blocked by G-1/G-2/G-4 |
-| P4 mother layout/render slice | FORK RESIDUAL REPAIRED; AWAITING AUTHORITATIVE SNAPSHOT REVIEW | — | typed fork-free VectorNetwork repair; original F1-F5/R1/R2 remain closed; runnable mother output blocked by G-1/G-2/G-4 |
-| P5 emitters/security/editability | pending | — | |
+| P4 mother layout/render slice | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `c754741` | sole authoritative QA+Meta cleared core snapshot; runnable mother/plugin evidence remains blocked by G-1/G-2/G-4 |
+| P5 emitters/security/editability | CORE BUILT; AWAITING AUTHORITATIVE SNAPSHOT REVIEW | — | static G8/G13 microfixture boundary only; phase evidence remains blocked |
 | P6 runtime/visual/editor proof | pending | — | |
 | P7 corpus & scale | pending | — | |
 | P8 studio dual-run | pending | — | |
@@ -253,6 +254,35 @@ Decisions/Done/cutover: Dan only.
 - This is a Builder core checkpoint only, not P4 phase clearance: runnable sandbox emission is the
   next seam, and real plugin/mother evidence remains blocked by G-1/G-2/G-4.
 
+## P5 Builder core checkpoint (2026-07-14)
+
+- Added a pure deterministic package compiler for reviewed P3/P4 plans: typed React components,
+  CSS Modules, CSS/React token channels, local mode resolution, sealed manifest/inventory,
+  source map, and explicitly `DIAGNOSTIC_ONLY` capability/fidelity reports. Legacy emission stays
+  untouched and remains the operating lane.
+- Stable source ranges cover semantic nodes, set-level native components plus authored member
+  identities, every auxiliary fragment, CSS declarations, token expressions, component prop
+  values, and text. Set components preserve sparse authored member mapping under one React symbol;
+  member selection resolves through that one semantic owner.
+- Save-to-code validates the sealed package before selection/edit, edits one exact UTF-8 byte
+  segment, updates containing ranges plus source-map/manifest hashes, rejects uncaptured variant
+  values and forged/cross-domain token channels, and preserves identity/mode/render-order hashes.
+- Security uses AST SVG allowlisting + deterministic local-id rewrite, rejects dangling/colliding
+  ids and remote/executable carriers, validates CSS declaration boundaries, confines package and
+  asset paths, escapes JSX text, and allowlists link protocols. Generated TS/TSX is parsed and
+  typechecked as one virtual package; the oracle imports no emitter/editor helpers.
+- Corrected an upstream opacity serialization defect exposed by real emission: percent-scale
+  token data remains raw `0..100` and the emitted `calc(var(...) / 100)` performs normalization
+  exactly once. Literal-preserving generated token types now keep React-bound booleans/props
+  type-safe.
+- Failure-first malicious/mutation corpus covers unsafe SVG/CSS/URL/path/TSX, manifest/source-map
+  drift, package traversal, type corruption, missing/forged node-component-fragment addresses,
+  fragment role/order, binding mode/source linkage, arbitrary token rebinding, invalid CSS slot
+  values, and uncaptured variants. Full code boundary: 104/104/0.
+- This is Builder core evidence awaiting sole authoritative @s58-pixel-meta-qa snapshot review.
+  It is not P5 phase, integration-corpus, runtime, visual, promotion, cutover, or Done clearance;
+  G-1/G-2/G-4 still block real plugin/mother evidence and P6 owns runtime/visual/editor proof.
+
 ## Meta rulings accepted (2026-07-13)
 
 - **Corpus:** "harness + fixtures owed" is NOT a P0/P7 exit. Missing required fixture = named
@@ -388,3 +418,11 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   mutations closed. A degree-four shared vertex across two triangles inside one declared loop
   remained planner/oracle green. Required repair is an independent degree-exactly-two fork-free
   law per region loop. Every earlier P4 finding remains credited closed; sandbox stays stopped.
+- 2026-07-14 @s58-pixel-meta-qa authoritative `[CLEAR — P4 CORE SNAPSHOT ONLY]`: exact target
+  `c754741cfbe3cb0e408dd301888f41c4de82dbe8`, parent `aafc525`, and range SHA-256
+  `c2f2fea7f02719eafa1805a4a30557624f9f3cd03935b528902b2b5ecbfc5d1b`; exact four-file
+  scope and clean detached state verified. Full boundary 98/98/0 with syntax/diff/status green;
+  independent positives cover open no-region, self-loop, separate-loop, and reversed-orientation
+  networks, while both degree-four fork shapes refuse and forged forked output trips G7. This
+  releases dependent sandbox emission only. P4 phase/integration/promotion/cutover/Done remain
+  uncleared; G-1/G-2/G-4 still block real mother/plugin-origin evidence.

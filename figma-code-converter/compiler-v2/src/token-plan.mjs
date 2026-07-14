@@ -147,7 +147,7 @@ function channelValue(domain, resolved, options) {
     case 'length-px': return { kind: 'number', value, unit: 'px' };
     case 'number': return { kind: 'number', value };
     case 'opacity-normalized':
-      if (options.opacityScale === 'percent' && value >= 0 && value <= 100) return { kind: 'number', value: value / 100 };
+      if (options.opacityScale === 'percent' && value >= 0 && value <= 100) return { kind: 'number', value };
       if (options.opacityScale === 'normalized' && value >= 0 && value <= 1) return { kind: 'number', value };
       throw new TokenPlanError(`opacity channel value ${value} lacks a valid explicit scale`);
     case 'string-typography': return { kind: 'string', value };

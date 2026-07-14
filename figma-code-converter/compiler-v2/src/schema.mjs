@@ -22,6 +22,7 @@ export const SCHEMA = Object.freeze({
   modeContextPlan: 1,
   semanticSlice: 1,
   layoutRenderPlan: 1,
+  emissionPackage: 1,
   sourceMap: 1,
   fidelityBudgets: 1,
   verdict: 1,
