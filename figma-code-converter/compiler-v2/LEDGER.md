@@ -23,7 +23,8 @@ compiler-v2 P2 graph suite 16 pass / 0 fail / 0 skip · P2 persisted-model suite
 suite 13 pass / 0 fail / 0 skip · P5 emission/security/editor suite 6 pass / 0 fail / 0 skip ·
 P6 runtime/visual/editor-proof suite 8 pass / 0 fail / 0 skip, including pinned system-Chrome ·
 P7 inventory suite 6 pass / 0 fail / 0 skip · P7 mutation/scale diagnostic suite 6 pass /
-0 fail / 0 skip. Combined current truth: 124 pass / 0 fail / 0 skip.
+0 fail / 0 skip · P8 sandbox transaction suite 16 pass / 0 fail / 0 skip. Combined current
+truth: 140 pass / 0 fail / 0 skip.
 No phase may be recorded green from
 harness-only or REST_ONLY placeholders.
 
@@ -53,7 +54,7 @@ Decisions/Done/cutover: Dan only.
 | P5 emitters/security/editability | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `4693a72` | sole authoritative QA+Meta cleared G8 core snapshot; integration/editor-corpus exit remains blocked |
 | P6 runtime/visual/editor proof | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `948c626` | sole authoritative QA+Meta cleared the environment-bound core snapshot; integration budgets/corpus/promotion remain blocked |
 | P7 corpus & scale | CORE SNAPSHOTS CLEAR; PHASE EVIDENCE BLOCKED | `4169dab`, `3bd8dbd` | inventory + diagnostic evidence laws cleared; live corpus/capture/budgets/runtime/real mutations/scale remain blocked |
-| P8 studio dual-run | pending | — | |
+| P8 studio dual-run | BUILDER CORE EVIDENCE; QA PENDING | — | transaction/recovery kernel only; Studio UI wiring waits for core clearance |
 | P9 cutover | pending | — | Dan-only |
 
 ## P0 work items
@@ -77,7 +78,7 @@ Decisions/Done/cutover: Dan only.
 6. **Editor round-trip corpus pinned**: slot-preserving padding/radii edit, token-expression
    segment edit, fragment ownership — spec'd against the react-figma engine contract. [pending]
 7. **Registry transaction protocol**: §6.1.1 verbatim; lane-scoped generations
-   (v2 sandbox namespace only until P9). [no code until P3]
+   (v2 sandbox namespace only until P9). [P8 CORE BUILT; QA PENDING]
 8. **Calibration publication/restart seam**: UUID-isolated multi-writer transactions; pointer
    rename final; opaque in-process ownership; strict pointer/marker/topology validation; atomic
    temp-unlink arbitration; dead-owner recovery; legacy-v1 namespace preservation; original
@@ -354,6 +355,34 @@ Decisions/Done/cutover: Dan only.
 - This is Builder microfixture core evidence awaiting sole authoritative snapshot review. It is not
   P6 phase, real-reference, calibrated-budget, integration, promotion, cutover, or Done clearance;
   G-1/G-2/G-4 and P0's unaccepted budgets still prevent a real `PROMOTABLE_VERIFIED` candidate.
+
+## P8 Builder transaction/recovery core checkpoint (2026-07-14)
+
+- Added a compiler-v2-only sandbox store; it never writes or activates the legacy route. A dual-run
+  view always reports legacy as the operating production lane and shows the v2 candidate separately.
+- Each candidate stages one immutable generation containing the exact token registry, generated
+  package inventory, report, and strictly derived candidate record. Every file and directory entry is
+  flushed before the generation rename; the parent directories are flushed before the database can
+  reference it. Generation/control/package symlinks and escaped topology refuse before use.
+- Registry and package identity commit through one SQLite `BEGIN IMMEDIATE` transaction. Commit
+  compares package generation plus independently versioned registry generation/hash, re-reads all
+  candidate bytes, requires exact G0–G13 `VERIFIED`, no blockers, `PROMOTABLE_VERIFIED`, and an
+  Ed25519 receipt bound to project/base/registry/package/report/corpus/budget/environment. The module
+  contains no signer. A stale, diagnostic, failed, cancelled, tampered, or unsigned candidate cannot
+  move the pointer.
+- Failure-first multi-process tests exposed and closed two real races: a duplicate-stage loser could
+  delete the winner generation, and simultaneous first opens could fail with `database is locked`.
+  Rename-winner ownership now controls cleanup; project metadata creation converges on one immutable
+  authority; SQLite busy handling is active before WAL/schema work. Permanent tests run eight real
+  processes for first-open, duplicate-stage, and commit arbitration.
+- Crash injection after the in-transaction pointer update rolls back to the exact prior registry and
+  package; staged evidence survives restart. Package-only promotion advances the package pointer while
+  preserving an unchanged registry generation/hash. Report grammar, receipt fields, record derivation,
+  authority identity, path confinement, tamper, cancel, and restart mutations are permanent.
+- Full compiler-v2 boundary: 140 pass / 0 fail / 0 skip; five P8 syntax checks and diff-check green.
+  Legacy Studio server/UI are intentionally untouched. This is Builder core evidence awaiting the sole
+  authoritative @s58-pixel-meta-qa snapshot review; no P8 phase, Studio UX, integration, promotion,
+  production cutover, or Done claim.
 
 ## Meta rulings accepted (2026-07-13)
 
