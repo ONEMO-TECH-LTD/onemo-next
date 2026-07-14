@@ -5,7 +5,7 @@ import { buildLayoutRenderPlan, LayoutRenderError } from '../src/layout-render-p
 import { p3Fixture } from './p3-fixture.mjs';
 import { p4Failures } from './p4-oracle.mjs';
 
-function fixture() {
+function fixture({ roundedClip = false } = {}) {
   const { snapshot } = p3Fixture();
   const root = snapshot.document;
   Object.assign(root, {
@@ -26,6 +26,10 @@ function fixture() {
     effects: [{ type: 'DROP_SHADOW', radius: 8, spread: 1, offset: { x: 0, y: 2 }, color: { r: 0, g: 0, b: 0, a: 0.3 } }],
     absoluteBoundingBox: { x: 10, y: 20, width: 320, height: 640 },
   });
+  if (roundedClip) {
+    root.cornerRadius = 18;
+    root.boundVariables.cornerRadius = { type: 'VARIABLE_ALIAS', id: 'V_FLOAT' };
+  }
   const nested = root.children.find((node) => node.id === 'nested');
   Object.assign(nested, {
     layoutPositioning: 'ABSOLUTE', x: 40, y: 50,
@@ -140,6 +144,96 @@ test('P4 refuses unsupported visible operations rather than flattening or guessi
   vector.documentGraph.nodes.find((row) => row.id === 'masked-a').properties.type = 'VECTOR';
   Object.assign(vector, sealCanonicalModelContent(vector));
   assert.throws(() => buildLayoutRenderPlan(vector), /needs captured vectorNetwork geometry/);
+});
+
+test('P4 refuses blend modes outside the captured closed Figma enum', () => {
+  const model = fixture();
+  model.documentGraph.nodes.find((row) => row.id === 'root').properties.blendMode = 'INVENTED_BLEND';
+  Object.assign(model, sealCanonicalModelContent(model));
+  assert.throws(() => buildLayoutRenderPlan(model), (error) =>
+    error instanceof LayoutRenderError && error.state === 'FAILED_CAPABILITY' && /blendMode/.test(error.message));
+  const nestedPaint = fixture();
+  nestedPaint.documentGraph.nodes.find((row) => row.id === 'root').properties.fills[0].blendMode = 'PASS_THROUGH';
+  Object.assign(nestedPaint, sealCanonicalModelContent(nestedPaint));
+  assert.throws(() => buildLayoutRenderPlan(nestedPaint), /fills\[0\]\.blendMode has unsupported value PASS_THROUGH/);
+  const nestedEffect = fixture();
+  nestedEffect.documentGraph.nodes.find((row) => row.id === 'root').properties.effects[0].blendMode = 'INVENTED_BLEND';
+  Object.assign(nestedEffect, sealCanonicalModelContent(nestedEffect));
+  assert.throws(() => buildLayoutRenderPlan(nestedEffect), /effects\[0\]\.blendMode has unsupported value INVENTED_BLEND/);
+});
+
+test('P4 keeps a live opacity binding fragment-owned when its current value is neutral', () => {
+  const model = fixture();
+  model.documentGraph.nodes.find((row) => row.id === 'root').properties.opacity = 1;
+  Object.assign(model, sealCanonicalModelContent(model));
+  const plan = buildLayoutRenderPlan(model);
+  const active = buildLayoutRenderPlan(fixture()).render.nodes.find((row) => row.nodeId === 'root').fragments.find((row) => row.role === 'isolation');
+  const isolation = plan.render.nodes.find((row) => row.nodeId === 'root').fragments.find((row) => row.role === 'isolation');
+  const binding = plan.sourceMap.bindings.find((row) => row.sourceNodeId === 'root' && row.sourcePath === '/opacity');
+  assert.equal(isolation.payload.opacity, 1);
+  assert.equal(binding.ownerKind, 'fragment');
+  assert.equal(binding.ownerId, isolation.fragmentId);
+  assert.equal(isolation.fragmentId, active.fragmentId);
+  assert.deepEqual(p4Failures(model, plan), { G6: false, G7: false });
+});
+
+test('P4 oracle refuses forged semantic ownership for an unowned CSS opacity binding', () => {
+  const source = fixture();
+  const forged = buildLayoutRenderPlan(source);
+  const neutral = structuredClone(source);
+  neutral.documentGraph.nodes.find((row) => row.id === 'root').properties.opacity = 1;
+  Object.assign(neutral, sealCanonicalModelContent(neutral));
+  forged.modelContentSeal = neutral.contentSeal;
+  const renderRoot = forged.render.nodes.find((row) => row.nodeId === 'root');
+  const isolation = renderRoot.fragments.find((row) => row.role === 'isolation');
+  renderRoot.fragments = renderRoot.fragments.filter((row) => row.fragmentId !== isolation.fragmentId);
+  renderRoot.fragments.forEach((fragment, order) => { fragment.order = order; });
+  forged.sourceMap.fragments = forged.sourceMap.fragments.filter((row) => row.fragmentId !== isolation.fragmentId);
+  forged.sourceMap.fragments.filter((row) => row.sourceNodeId === 'root').forEach((fragment, order) => { fragment.order = order; });
+  const opacity = forged.sourceMap.bindings.find((row) => row.sourceNodeId === 'root' && row.sourcePath === '/opacity');
+  opacity.ownerKind = 'semantic';
+  opacity.ownerId = 'root';
+  assert.equal(p4Failures(neutral, forged).G6, true);
+});
+
+test('P4 clip fragment owns exact rounded geometry and its radius token dependency', () => {
+  const model = fixture({ roundedClip: true });
+  const plan = buildLayoutRenderPlan(model);
+  const root = plan.render.nodes.find((row) => row.nodeId === 'root');
+  const clip = root.fragments.find((row) => row.role === 'clip');
+  const content = root.fragments.find((row) => row.role === 'content');
+  const radiusBinding = plan.sourceMap.bindings.find((row) => row.sourceNodeId === 'root' && row.sourcePath === '/cornerRadius');
+  assert.deepEqual(clip.payload, { shape: 'rounded-rect', cornerRadii: [18, 18, 18, 18] });
+  assert.equal(radiusBinding.ownerKind, 'fragment');
+  assert.equal(radiusBinding.ownerId, clip.fragmentId);
+  assert.equal(content.tokenBindingIds.includes(radiusBinding.bindingId), false);
+  const perCorner = fixture();
+  const perCornerRoot = perCorner.documentGraph.nodes.find((row) => row.id === 'root');
+  perCornerRoot.properties.rectangleCornerRadii = [2, 4, 6, 8];
+  Object.assign(perCorner, sealCanonicalModelContent(perCorner));
+  assert.deepEqual(
+    buildLayoutRenderPlan(perCorner).render.nodes.find((row) => row.nodeId === 'root').fragments.find((row) => row.role === 'clip').payload,
+    { shape: 'rounded-rect', cornerRadii: [2, 4, 6, 8] },
+  );
+  const flattened = structuredClone(plan);
+  flattened.render.nodes.find((row) => row.nodeId === 'root').fragments.find((row) => row.role === 'clip').payload = { shape: 'rect' };
+  assert.equal(p4Failures(model, flattened).G7, true);
+});
+
+test('P4 world composition is independent of persisted document-node storage order', () => {
+  const baselineModel = fixture();
+  const baseline = buildLayoutRenderPlan(baselineModel);
+  const reordered = structuredClone(baselineModel);
+  reordered.documentGraph.nodes.reverse();
+  Object.assign(reordered, sealCanonicalModelContent(reordered));
+  const plan = buildLayoutRenderPlan(reordered);
+  for (const nodeId of ['nested', 'grid-a', 'masked-b']) {
+    assert.deepEqual(
+      plan.layout.nodes.find((row) => row.nodeId === nodeId).worldTransform,
+      baseline.layout.nodes.find((row) => row.nodeId === nodeId).worldTransform,
+    );
+  }
+  assert.deepEqual(p4Failures(reordered, plan), { G6: false, G7: false });
 });
 
 test('independent G6/G7 oracle bites layout, transform, paint-order, and mask mutations', () => {

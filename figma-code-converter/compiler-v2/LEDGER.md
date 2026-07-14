@@ -20,7 +20,7 @@ gitignored golden fixture `t88thL8hKksSpILgkeGRZ0-4084-25997.nodes.json`) / 0 sk
 compiler-v2 foundation suite 53 pass / 0 fail / 0 skip across Builder and Meta repeated runs ·
 compiler-v2 P2 graph suite 16 pass / 0 fail / 0 skip · P2 persisted-model suite 7 pass /
 0 fail / 0 skip · compiler-v2 P3 planner suite 9 pass / 0 fail / 0 skip · P4 layout/render
-suite 5 pass / 0 fail / 0 skip. Combined current truth: 90 pass / 0 fail / 0 skip.
+suite 10 pass / 0 fail / 0 skip. Combined current truth: 95 pass / 0 fail / 0 skip.
 No phase may be recorded green from
 harness-only or REST_ONLY placeholders.
 
@@ -46,7 +46,7 @@ Decisions/Done/cutover: Dan only.
 | P1 evidence capture | pending | — | |
 | P2 canonical graphs | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `0c8471b` | sole authoritative QA/Meta cleared the frozen code snapshot only; live/plugin evidence still blocked by G-1/G-2 |
 | P3 mother token/component slice | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `5dbcb39` | sole authoritative QA/Meta cleared core snapshot; real mother/plugin-origin exit blocked by G-1/G-2/G-4 |
-| P4 mother layout/render slice | BUILDER CORE READY; PHASE EVIDENCE BLOCKED | — | generic G6/G7 core + hard-case microfixture ready; runnable mother output blocked by G-1/G-2/G-4 |
+| P4 mother layout/render slice | REWORK REPAIRED; AWAITING AUTHORITATIVE SNAPSHOT REVIEW | — | rejected core repaired failure-first; runnable mother output blocked by G-1/G-2/G-4 |
 | P5 emitters/security/editability | pending | — | |
 | P6 runtime/visual/editor proof | pending | — | |
 | P7 corpus & scale | pending | — | |
@@ -214,8 +214,19 @@ Decisions/Done/cutover: Dan only.
   unsupported visible operations fail; scalar rotation cannot replace an affine matrix.
 - Added a planner-independent G6/G7 oracle and hard-case mutations for grid span, affine shear,
   reverse-z source drift, reordered paint source, mask targets, fragment order, and exact binding
-  owner. Exact current split is foundation 53 + P2 16 + P2 persisted 7 + P3 9 + P4 5 = 90/90/0;
+  owner. Exact current split at the initial checkpoint was foundation 53 + P2 16 + P2 persisted 7
+  + P3 9 + P4 5 = 90/90/0;
   four syntax checks and diff check are green.
+- Authoritative review rejected snapshot `3e2d8bb` on five reproduced gaps: open blend-mode
+  values, neutral opacity-token owner loss, oracle semantic-owner fallback, generic clip geometry,
+  and storage-preorder-dependent world composition. Builder repair validates the closed current
+  Figma blend enum at node/paint/stroke/effect boundaries; keeps live opacity bindings on a stable
+  isolation fragment even at `1`; permits semantic owners only for React/text-range records;
+  makes clip fragments own exact uniform/per-corner geometry plus radius-token dependencies; and
+  resolves world transforms by memoized parent relations independent of persisted row order.
+  Ten permanent P4 tests include every reproduced attack plus identity/ownership and per-corner
+  strengthening. Current full boundary: 95/95/0; three changed-file syntax checks and diff check
+  green. This is Builder repair evidence awaiting authoritative snapshot rereview, not clearance.
 - This is a Builder core checkpoint only, not P4 phase clearance: runnable sandbox emission is the
   next seam, and real plugin/mother evidence remains blocked by G-1/G-2/G-4.
 
@@ -330,3 +341,11 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   suite 76/76/0, syntax/diff checks green, and stronger semantic corruption probe refused trace,
   component, asset-hash, and hyperlink mutations. Clearance applies only to the P2 code snapshot;
   G-1/G-2 and every phase/integration/promotion/cutover/Done gate remain open.
+- 2026-07-14 @s58-pixel-meta-qa authoritative `[REWORK — P4 CORE SNAPSHOT ONLY]`: exact target
+  `3e2d8bbed59941ca07135ab7175a4cf553e80a5b`; 90/90/0 and static checks were green, but the
+  external probe reproduced five semantic gaps: invented blend values accepted, neutral live
+  opacity binding lost its fragment, forged semantic fallback stayed oracle-green, rounded clip
+  geometry/token dependency was absent, and child-before-parent graph storage caused a raw
+  `TypeError`. Dependent sandbox emission remains stopped. Builder reproduced all five
+  failure-first and repaired only the P4 core/oracle/tests plus this ledger; authoritative
+  rereview is required before dependent work resumes.

@@ -7,6 +7,11 @@ const FILL_TYPES = new Set(['SOLID', 'GRADIENT_LINEAR', 'GRADIENT_RADIAL', 'GRAD
 const STROKE_TYPES = new Set(['SOLID', 'GRADIENT_LINEAR', 'GRADIENT_RADIAL', 'GRADIENT_ANGULAR']);
 const EFFECT_TYPES = new Set(['DROP_SHADOW', 'INNER_SHADOW', 'LAYER_BLUR', 'BACKGROUND_BLUR']);
 const MASK_TYPES = new Set(['ALPHA', 'VECTOR', 'LUMINANCE']);
+const BLEND_MODES = new Set([
+  'PASS_THROUGH', 'NORMAL', 'DARKEN', 'MULTIPLY', 'LINEAR_BURN', 'COLOR_BURN',
+  'LIGHTEN', 'SCREEN', 'LINEAR_DODGE', 'COLOR_DODGE', 'OVERLAY', 'SOFT_LIGHT',
+  'HARD_LIGHT', 'DIFFERENCE', 'EXCLUSION', 'HUE', 'SATURATION', 'COLOR', 'LUMINOSITY',
+]);
 const VECTOR_PATH_TYPES = new Set(['VECTOR', 'BOOLEAN_OPERATION', 'LINE', 'STAR', 'POLYGON', 'REGULAR_POLYGON']);
 const OVERFLOW_DIRECTIONS = new Set(['NONE', 'HORIZONTAL_SCROLLING', 'VERTICAL_SCROLLING', 'HORIZONTAL_AND_VERTICAL_SCROLLING']);
 const LAYOUT_PATHS = ['/size', '/x', '/y', '/width', '/height', '/itemSpacing', '/paddingTop', '/paddingRight', '/paddingBottom', '/paddingLeft', '/counterAxisSpacing', '/minWidth', '/maxWidth', '/minHeight', '/maxHeight', '/layoutGrow', '/layoutAlign', '/layoutSizingHorizontal', '/layoutSizingVertical', '/constraints', '/gridRow', '/gridColumn', '/gridAutoTracks', '/gridItemsPositioning'];
@@ -20,16 +25,16 @@ export function buildLayoutRenderPlan(input) {
   try { model = parseCanonicalModel(input); }
   catch (error) { throw new LayoutRenderError(error.state ?? 'FAILED_CAPABILITY', `canonical model refused: ${error.message}`); }
   const nodesById = new Map(model.documentGraph.nodes.map((node) => [node.id, node]));
-  const worldById = new Map();
+  const localById = new Map(model.documentGraph.nodes.map((node) => [node.id, affineOf(node.properties, node.id)]));
+  const worldTransformFor = worldResolver(nodesById, localById);
   const layoutNodes = [];
   const renderNodes = [];
 
   for (const node of model.documentGraph.nodes) {
     const source = node.properties;
     const parent = node.parentId ? nodesById.get(node.parentId) : null;
-    const localTransform = affineOf(source, node.id);
-    const worldTransform = parent ? multiply(worldById.get(parent.id), localTransform) : structuredClone(localTransform);
-    worldById.set(node.id, worldTransform);
+    const localTransform = localById.get(node.id);
+    const worldTransform = worldTransformFor(node.id);
     const bounds = boundsOf(source, node.id);
     const layoutBindingIds = model.bindingGraph.records.filter((record) => record.source.nodeId === node.id && isLayoutPath(record.source.propertyPath)).map((record) => record.bindingId).sort();
     layoutNodes.push({
@@ -187,6 +192,9 @@ function affineOf(source, nodeId) {
 
 function fragmentsOf({ nodeId, source, bounds, transform, bindings }) {
   const fragments = [];
+  const blendMode = blendModeOf(source.blendMode, `${nodeId}.blendMode`, true);
+  const opacity = opacityOf(source.opacity ?? 1, `${nodeId}.opacity`);
+  const hasOpacityBinding = bindings.some((record) => record.source.nodeId === nodeId && pathOwns('/opacity', record.source.propertyPath));
   const push = (role, sourcePath, sourceIndex, payload, decorative = true, bindingPaths = [sourcePath]) => {
     const discriminator = sourcePath;
     fragments.push({
@@ -194,30 +202,33 @@ function fragmentsOf({ nodeId, source, bounds, transform, bindings }) {
       sourceNodeId: nodeId, role, order: fragments.length, sourcePath,
       ...(sourceIndex === null ? {} : { sourceIndex }),
       bounds: structuredClone(bounds), transform: structuredClone(transform),
-      blendMode: source.blendMode ?? 'NORMAL', decorative, ariaHidden: decorative, pointerEvents: decorative ? 'none' : 'auto',
+      blendMode, decorative, ariaHidden: decorative, pointerEvents: decorative ? 'none' : 'auto',
       tokenBindingIds: bindings.filter((record) => record.source.nodeId === nodeId && bindingPaths.some((path) => pathOwns(path, record.source.propertyPath))).map((record) => record.bindingId).sort(),
       payload: structuredClone(payload),
     });
   };
-  if (source.opacity !== undefined && source.opacity !== 1 || !['NORMAL', 'PASS_THROUGH', undefined].includes(source.blendMode)) push('isolation', '/compositing', null, { opacity: source.opacity ?? 1, blendMode: source.blendMode ?? 'NORMAL' }, true, ['/opacity', '/blendMode']);
+  if (hasOpacityBinding || opacity !== 1 || !['NORMAL', 'PASS_THROUGH'].includes(blendMode)) push('isolation', '/compositing', null, { opacity, blendMode }, true, ['/opacity', '/blendMode']);
   if (source.isMask === true) {
     const maskType = source.maskType ?? 'ALPHA';
     if (!MASK_TYPES.has(maskType)) throw new LayoutRenderError('FAILED_CAPABILITY', `node ${nodeId} has unsupported maskType ${maskType}`);
     push('mask', '/mask', null, { maskType }, true, ['/isMask', '/maskType']);
   }
-  if (source.clipsContent === true) push('clip', '/clipsContent', null, { shape: 'node-bounds' });
+  if (source.clipsContent === true) push('clip', '/clipsContent', null, clipGeometryOf(source, nodeId), true, ['/clipsContent', '/cornerRadius', '/rectangleCornerRadii']);
   visibleArray(source.fills, nodeId, 'fills').forEach(({ entry: paint, index }) => {
     if (!FILL_TYPES.has(paint.type)) throw new LayoutRenderError('FAILED_CAPABILITY', `node ${nodeId} has unsupported fill ${paint.type}`);
+    blendModeOf(paint.blendMode, `${nodeId}.fills[${index}].blendMode`, false);
     push('paint', `/fills/${index}`, index, paint);
   });
-  push('content', '/content', null, { nodeType: source.type, visible: source.visible !== false, cornerRadius: source.cornerRadius ?? null, rectangleCornerRadii: source.rectangleCornerRadii ?? null }, false, ['/cornerRadius', '/rectangleCornerRadii']);
+  push('content', '/content', null, { nodeType: source.type, visible: source.visible !== false, cornerRadius: source.cornerRadius ?? null, rectangleCornerRadii: source.rectangleCornerRadii ?? null }, false, source.clipsContent === true ? [] : ['/cornerRadius', '/rectangleCornerRadii']);
   visibleArray(source.strokes, nodeId, 'strokes').forEach(({ entry: stroke, index }, visibleIndex) => {
     if (!STROKE_TYPES.has(stroke.type)) throw new LayoutRenderError('FAILED_CAPABILITY', `node ${nodeId} has unsupported stroke ${stroke.type}`);
+    blendModeOf(stroke.blendMode, `${nodeId}.strokes[${index}].blendMode`, false);
     const geometryPaths = visibleIndex === 0 ? ['/strokeWeight', '/individualStrokeWeights', '/strokeAlign', '/strokeCap', '/strokeJoin', '/dashPattern'] : [];
     push('stroke', `/strokes/${index}`, index, { paint: stroke, align: source.strokeAlign ?? 'INSIDE', weight: source.individualStrokeWeights ?? source.strokeWeight ?? 1, cap: source.strokeCap ?? 'NONE', join: source.strokeJoin ?? 'MITER', dashPattern: source.dashPattern ?? [] }, true, [`/strokes/${index}`, ...geometryPaths]);
   });
   visibleArray(source.effects, nodeId, 'effects').forEach(({ entry: effect, index }) => {
     if (!EFFECT_TYPES.has(effect.type)) throw new LayoutRenderError('FAILED_CAPABILITY', `node ${nodeId} has unsupported effect ${effect.type}`);
+    blendModeOf(effect.blendMode, `${nodeId}.effects[${index}].blendMode`, false);
     push('effect', `/effects/${index}`, index, effect);
   });
   if (VECTOR_PATH_TYPES.has(source.type)) {
@@ -225,6 +236,39 @@ function fragmentsOf({ nodeId, source, bounds, transform, bindings }) {
     push('vector', '/vector', null, { vectorNetwork: source.vectorNetwork }, true, ['/vectorNetwork']);
   }
   return fragments;
+}
+
+function worldResolver(nodesById, localById) {
+  const resolved = new Map();
+  const visiting = new Set();
+  const resolve = (nodeId) => {
+    if (resolved.has(nodeId)) return structuredClone(resolved.get(nodeId));
+    const node = nodesById.get(nodeId);
+    const local = localById.get(nodeId);
+    if (!node || !local) throw new LayoutRenderError('FAILED_CAPABILITY', `world transform references missing node ${nodeId}`);
+    if (visiting.has(nodeId)) throw new LayoutRenderError('FAILED_CAPABILITY', `world transform cycle at node ${nodeId}`);
+    visiting.add(nodeId);
+    let world;
+    if (node.parentId === null) world = structuredClone(local);
+    else {
+      if (!nodesById.has(node.parentId)) throw new LayoutRenderError('FAILED_CAPABILITY', `world transform parent ${node.parentId} missing for node ${nodeId}`);
+      world = multiply(resolve(node.parentId), local);
+    }
+    visiting.delete(nodeId);
+    resolved.set(nodeId, world);
+    return structuredClone(world);
+  };
+  return resolve;
+}
+
+function clipGeometryOf(source, nodeId) {
+  if (source.rectangleCornerRadii !== undefined && source.rectangleCornerRadii !== null) {
+    const radii = source.rectangleCornerRadii;
+    if (!Array.isArray(radii) || radii.length !== 4) throw new LayoutRenderError('FAILED_CAPABILITY', `node ${nodeId} rectangleCornerRadii must contain four values`);
+    return { shape: radii.some((radius, index) => nonNegativeFinite(radius, `${nodeId}.rectangleCornerRadii[${index}]`) > 0) ? 'rounded-rect' : 'rect', cornerRadii: radii.map((radius, index) => nonNegativeFinite(radius, `${nodeId}.rectangleCornerRadii[${index}]`)) };
+  }
+  const radius = source.cornerRadius === undefined || source.cornerRadius === null ? 0 : nonNegativeFinite(source.cornerRadius, `${nodeId}.cornerRadius`);
+  return radius > 0 ? { shape: 'rounded-rect', cornerRadii: [radius, radius, radius, radius] } : { shape: 'rect' };
 }
 
 function maskGroupsOf(nodes, nodesById) {
@@ -287,6 +331,16 @@ const nonNegativeFinite = (value, name) => {
   return result;
 };
 const optionalFinite = (value, name) => value === undefined || value === null ? null : finite(value, name);
+const opacityOf = (value, name) => {
+  const result = finite(value, name);
+  if (result < 0 || result > 1) throw new LayoutRenderError('FAILED_CAPABILITY', `${name} must be between 0 and 1`);
+  return result;
+};
+const blendModeOf = (value, name, allowPassThrough) => {
+  const result = value ?? 'NORMAL';
+  if (!BLEND_MODES.has(result) || (!allowPassThrough && result === 'PASS_THROUGH')) throw new LayoutRenderError('FAILED_CAPABILITY', `${name} has unsupported value ${result}`);
+  return result;
+};
 const oneOf = (value, allowed, name) => {
   if (!allowed.includes(value)) throw new LayoutRenderError('FAILED_CAPABILITY', `${name} has unsupported value ${value}`);
   return value;
