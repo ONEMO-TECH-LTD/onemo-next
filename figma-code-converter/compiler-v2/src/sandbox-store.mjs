@@ -224,9 +224,10 @@ export function readCandidateStatus(project, transactionId) {
   assertProject(project);
   const row = candidateRow(project._db, transactionId);
   if (!row) throw new SandboxStoreError(`candidate ${transactionId} missing`);
+  let verified = null;
   let receiptVerified = false;
   if (row.state !== 'CANCELLED') {
-    const verified = verifyGeneration(project, row);
+    verified = verifyGeneration(project, row);
     if (verified.record.promotionSignature) {
       try { verifyPromotionSignature(project, verified.record.receiptPayload, verified.record.promotionSignature); receiptVerified = true; }
       catch { receiptVerified = false; }
@@ -245,11 +246,28 @@ export function readCandidateStatus(project, transactionId) {
     packageHash: row.package_hash,
     reportHash: row.report_hash,
     generationName: row.generation_name,
+    gates: verified ? structuredClone(verified.report.gates) : null,
+    blockers: verified ? [...verified.report.blockers] : [],
     promotionReceiptVerified: receiptVerified,
     canPromote: row.state === 'STAGED' && row.report_state === 'PROMOTABLE_VERIFIED' && receiptVerified
       && current.generation === row.base_generation && current.registry_generation === verifiedRegistryBase(row)
       && current.registry_hash === row.base_registry_hash,
   };
+}
+
+export function readCandidatePackageFile(project, transactionId, relative) {
+  assertProject(project);
+  if (!ID.test(transactionId ?? '')) throw new SandboxStoreError('candidate transaction id invalid');
+  safeRelative(relative, 'candidate package path');
+  const row = candidateRow(project._db, transactionId);
+  if (!row) throw new SandboxStoreError(`candidate ${transactionId} missing`);
+  if (row.state === 'CANCELLED') throw new SandboxStoreError(`candidate ${transactionId} is CANCELLED`);
+  const verified = verifyGeneration(project, row);
+  const expected = verified.inventory[relative];
+  if (!expected) throw new SandboxStoreError(`candidate package file missing: ${relative}`);
+  const bytes = fs.readFileSync(realRegularFile(verified.packageDir, path.join(verified.packageDir, relative), 'candidate package file'));
+  if (bytes.length !== expected.bytes || sha256(bytes) !== expected.sha256) throw new SandboxStoreError(`candidate package file changed during read: ${relative}`);
+  return bytes;
 }
 
 export function recoverSandboxProject(project) {
@@ -418,7 +436,7 @@ function verifyGeneration(project, row) {
   };
   if (canonicalJson(record) !== canonicalJson(expectedRecord)) throw new SandboxStoreError('candidate record/proposal derivation drift');
   if (report.state !== row.report_state) throw new SandboxStoreError('candidate report state disagrees with transaction');
-  return { generationDir, record, registry, report, candidateRegistryHash, packageHash };
+  return { generationDir, packageDir, inventory, record, registry, report, candidateRegistryHash, packageHash };
 }
 
 function verifyPromotionSignature(project, payload, signature) {

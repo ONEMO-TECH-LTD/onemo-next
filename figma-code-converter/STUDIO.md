@@ -35,6 +35,39 @@ the bundle inside the checkout — after the converter merges to the main clone,
    stamps) is written to `src/app/(dev)/converted/<slug>/` in the app worktree, ready to commit.
    Sandbox conversions themselves are gitignored and never enter git.
 
+The steps above are the operating **legacy** converter. Its Keep/Export routes remain available
+until P9 cutover and Dan's sign-off. They do not create Compiler v2 evidence and cannot promote a
+Compiler v2 candidate.
+
+## Compiler v2 dual-run
+
+The **Compiler v2** group is a truthful read/commit surface over an already-staged v2 sandbox:
+
+- Legacy always remains visibly identified as the operating production lane.
+- A v2 candidate shows its transaction state, evidence state, G0–G13 values, blockers, receipt,
+  and exact package/report/registry hashes. Missing configuration has no invented terminal state.
+- Studio can render only the sealed `runtime/index.html`, `runtime/bundle.css`, and
+  `runtime/bundle.js` artifacts. The runtime iframe is script-enabled but origin-isolated.
+- Studio can cancel a staged candidate or commit an externally signed, fully verified candidate
+  to the **v2 sandbox pointer only**. It has no staging endpoint, private key, or signer.
+- Legacy Keep/Export remains legacy-only. The v2 view labels its paste field accordingly.
+
+Configuration is optional. With no `compilerV2` object, Studio remains usable and v2 reports
+`promotion authority not configured`. To open an existing sandbox, add this to
+`studio/config.json` (paths resolve from `studio/`):
+
+```json
+"compilerV2": {
+  "rootDir": "../compiler-v2-store",
+  "projectId": "onemo",
+  "authorityId": "qa-meta-v1",
+  "publicKeyFile": "../compiler-v2-authority.pub.pem"
+}
+```
+
+Only those four fields are accepted. Private-key/signer fields refuse. `STUDIO_PORT=3901` may be
+used for an isolated verification server without stopping the operating Studio.
+
 ## How it is built
 
 ```
@@ -44,6 +77,14 @@ studio/server.mjs   zero-dependency node server (port 3900)
   POST /api/convert {url}     full pipeline → sandbox/<slug>  (override-safe)
   DELETE /api/screens/<slug>  delete a sandbox screen + its audit artifacts
   POST /api/promote/<slug>    product build → converted/<slug> (the dev/prod migration)
+  GET  /api/compiler-v2/status
+                              exact v2 sandbox/candidate truth beside legacy identity
+  GET  /api/compiler-v2/runtime/<tx>/<index.html|bundle.css|bundle.js>
+                              sealed, allowlisted runtime artifacts only
+  POST /api/compiler-v2/commit/<tx>
+                              signed verified candidate → v2 sandbox pointer only
+  POST /api/compiler-v2/cancel/<tx>
+                              cancel staged v2 candidate; legacy untouched
   everything else             proxied to the Next dev app (:3077) — ONE origin, so the
                               console can read the iframe document (inspection needs it)
 studio/config.json  all paths/ports (app worktree, tokens.css, fonts dir, env file)

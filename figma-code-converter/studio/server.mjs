@@ -25,12 +25,17 @@ import fsp from 'node:fs/promises';
 import os from 'node:os';
 import { startBridgePeer } from '../src/bridge-peer.mjs';
 import { toDsExport, toVariableDump } from '../src/ds-export.mjs';
+import { sha256 } from '../compiler-v2/src/evidence.mjs';
+import { createUnavailableV2Studio, openV2StudioFromConfig } from './v2-studio.mjs';
+import { dispatchV2StudioRequest } from './v2-http.mjs';
 
 const run = promisify(execFile);
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const TOOL = path.resolve(HERE, '..');
 
 const cfg = JSON.parse(fs.readFileSync(path.join(HERE, 'config.json'), 'utf8'));
+const PORT = Number(process.env.STUDIO_PORT || cfg.port);
+if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) throw new Error('Studio port malformed');
 const APP = path.resolve(TOOL, cfg.appWorktree); // relative = resolved against the tool root (the tool lives inside the app repo)
 const SANDBOX = path.join(APP, 'src/app/(dev)/converted/sandbox');
 const PROMOTED = path.join(APP, 'src/app/(dev)/converted');
@@ -38,6 +43,10 @@ const AUDIT_PUB = path.join(APP, 'public/audit/sandbox');
 const EXPORTS = path.resolve(TOOL, cfg.exportsDir || 'exports');
 const TOKENS = path.join(APP, cfg.tokensCss);
 const FONTS = path.join(APP, cfg.fontsDir);
+
+let compilerV2Studio;
+try { compilerV2Studio = openV2StudioFromConfig(cfg.compilerV2, HERE); }
+catch (error) { compilerV2Studio = createUnavailableV2Studio(`configuration refused: ${error.message}`); }
 
 // FIGMA_TOKEN: from the app worktree's .env.local (single source — no new secret paths)
 for (const line of fs.readFileSync(path.join(cfg.envFile), 'utf8').split('\n')) {
@@ -63,6 +72,23 @@ function urlOfScreen(slug) {
     if (fs.existsSync(rj)) { const r = JSON.parse(fs.readFileSync(rj, 'utf8')); return `https://www.figma.com/design/${r.fileKey}/x?node-id=${r.nodeId.replace(':', '-')}`; }
   }
   return null;
+}
+
+function legacyIdentity(slug) {
+  if (slug !== null && slug !== undefined && !/^[a-z0-9-]+$/.test(slug)) throw new Error('legacy screen slug malformed');
+  const candidates = slug
+    ? [[SANDBOX, `/converted/sandbox/${slug}`], [PROMOTED, `/converted/${slug}`]]
+    : [[PROMOTED, '/converted/audit-mother-v2']];
+  for (const [base, route] of candidates) {
+    const runFile = path.join(base, slug || 'audit-mother-v2', 'convert-run.json');
+    if (fs.existsSync(runFile)) return { operating: true, route, version: `sha256:${sha256(fs.readFileSync(runFile))}` };
+  }
+  throw new Error(`legacy operating screen missing: ${slug || 'audit-mother-v2'}`);
+}
+
+function sendV2(res, response) {
+  res.writeHead(response.status, response.headers);
+  res.end(response.body);
 }
 // current file version via REST (lightweight) — the dump must be stamped with it
 async function fileVersionOf(fileKey) {
@@ -274,6 +300,14 @@ async function promote(slug) {
 const server = createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x');
   try {
+    if (u.pathname.startsWith('/api/compiler-v2/')) {
+      return sendV2(res, dispatchV2StudioRequest({
+        method: req.method,
+        pathname: u.pathname,
+        studio: compilerV2Studio,
+        legacy: legacyIdentity(u.searchParams.get('s')),
+      }));
+    }
     if (u.pathname === '/api/root' && req.method === 'GET') return json(res, 200, { tool: TOOL, app: APP });
     if (u.pathname === '/api/bridge/payload' && req.method === 'GET')
       return json(res, 200, bridge?.state.variables ?? { error: 'no payload yet' });
@@ -344,4 +378,5 @@ const server = createServer(async (req, res) => {
     req.pipe(p);
   } catch (e) { json(res, 500, { error: String(e.message) }); }
 });
-server.listen(cfg.port, () => console.log(`figma-to-code studio → http://localhost:${cfg.port}  (sandbox: ${SANDBOX})`));
+server.on('close', () => compilerV2Studio.close());
+server.listen(PORT, () => console.log(`figma-to-code studio → http://localhost:${PORT}  (sandbox: ${SANDBOX})`));

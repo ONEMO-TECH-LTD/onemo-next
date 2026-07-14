@@ -14,7 +14,7 @@
   /* group switch (Chrome tab-group style) */
   .groupsw{display:flex;gap:3px;flex-shrink:0;background:#16161c;border:1px solid #26262e;border-radius:8px;padding:2px;margin-right:8px;}
   .groupsw button{display:flex;align-items:center;gap:6px;background:none;border:0;border-radius:6px;padding:4px 11px;font:600 11px system-ui;color:#8a8a92;cursor:pointer;}
-  .groupsw button.on{color:#e6e6ea;} .groupsw button.sandbox.on{background:#3a2f1a;color:#e8c07a;} .groupsw button.library.on{background:#173029;color:#7fd8cd;}
+  .groupsw button.on{color:#e6e6ea;} .groupsw button.sandbox.on{background:#3a2f1a;color:#e8c07a;} .groupsw button.library.on{background:#173029;color:#7fd8cd;} .groupsw button.v2.on{background:#17283a;color:#8fd0ff;}
   .groupsw button .c{font:600 10px ui-monospace,monospace;opacity:.7;}
   /* clean tabs — dot + name + hover close only */
   .tabs .tab{display:flex;align-items:center;gap:7px;background:#1a1a22;border:1px solid #26262e;border-bottom:0;border-radius:8px 8px 0 0;padding:5px 12px;font:500 11px system-ui;color:#b7b7c2;cursor:pointer;white-space:nowrap;flex-shrink:0;max-width:220px;}
@@ -22,6 +22,7 @@
   .tabs .tab.on{background:#20202a;color:#e6e6ea;border-color:#39b3a6;}
   .tabs .tab .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
   .tabs .tab .dot.draft{background:#e8a94c;} .tabs .tab .dot.accepted{background:#39b3a6;}
+  .tabs .tab .dot.verified{background:#39b3a6;} .tabs .tab .dot.diagnostic{background:#e8a94c;} .tabs .tab .dot.failed,.tabs .tab .dot.cancelled{background:#f08a8a;}
   .tabs .tab .x{color:#5a5a66;font:600 13px system-ui;line-height:1;opacity:0;flex-shrink:0;}
   .tabs .tab:hover .x,.tabs .tab.on .x{opacity:1;} .tabs .tab .x:hover{color:#f08a8a;}
   .tabs .empty-hint{color:#5a5a66;font:11px system-ui;padding:0 6px;}
@@ -96,6 +97,24 @@
   .ctl input[type=range]{accent-color:#39b3a6;flex:1;} .ctl button{background:#20202a;border:0;color:#cfe;border-radius:6px;padding:5px 10px;cursor:pointer;}
   .tree{font:11px ui-monospace,monospace;} .tree .t{padding:1px 0;color:#c7c7d0;white-space:pre;cursor:pointer;} .tree .t:hover{color:#8fd0ff;}
   .hint{position:fixed;bottom:10px;left:14px;color:#5a5a66;font-size:11px;}
+  .v2stage{display:none;position:fixed;inset:var(--topH) 0 0;background:#0e0e12;padding:14px;overflow:auto;z-index:25;grid-template-rows:auto minmax(360px,1fr);gap:12px;}
+  body.v2mode{--topH:116px;} body.v2mode .v2stage{display:grid;} body.v2mode .stage,body.v2mode .left,body.v2mode .panel,body.v2mode .collapse,body.v2mode .rs,body.v2mode .hint,body.v2mode .compiling,body.v2mode .modes,body.v2mode #zonesel,body.v2mode .chips,body.v2mode .rail2{display:none;}
+  body.v2mode .tabs{top:46px;} body.v2mode .addrbar{top:80px;}
+  .v2banner{display:flex;align-items:center;justify-content:space-between;gap:16px;background:#211b10;border:1px solid #5a4825;border-radius:10px;padding:10px 14px;color:#e8c07a;font:600 12px system-ui;}
+  .v2banner small{color:#a89268;font:11px ui-monospace,monospace;font-weight:400;}
+  .v2grid{display:grid;grid-template-columns:minmax(300px,1fr) minmax(300px,1fr) 320px;gap:12px;min-height:0;}
+  .v2card{display:flex;min-width:0;min-height:0;flex-direction:column;background:#131319;border:1px solid #26262e;border-radius:10px;overflow:hidden;}
+  .v2card h3{display:flex;justify-content:space-between;gap:8px;margin:0;padding:9px 12px;border-bottom:1px solid #26262e;font:600 11px system-ui;color:#c7c7d0;}
+  .v2card h3 span{color:#6a6a76;font:10px ui-monospace,monospace;font-weight:400;}
+  .v2card iframe{width:100%;height:100%;border:0;background:#fff;}
+  .v2empty{display:grid;place-items:center;height:100%;padding:24px;text-align:center;color:#6a6a76;font:12px system-ui;}
+  .v2facts{padding:12px;overflow:auto;}
+  .v2facts .hash{font:10px ui-monospace,monospace;word-break:break-all;color:#8a8a92;}
+  .v2actions{display:flex;gap:8px;margin-top:12px;}
+  .v2actions button{border:1px solid #34566f;background:#173047;color:#9ed8ff;border-radius:7px;padding:7px 10px;font:600 11px system-ui;cursor:pointer;}
+  .v2actions button.cancel{border-color:#633737;background:#341c1c;color:#f0a0a0;}
+  .v2actions button:disabled{opacity:.35;cursor:not-allowed;}
+  @media(max-width:1000px){.v2grid{grid-template-columns:1fr 1fr;}.v2grid .v2card:last-child{grid-column:1/-1;min-height:260px;}}
 </style>
 </head>
 <body>
@@ -138,6 +157,8 @@
       <div class="zonebox" id="zonebox"></div>
     </div>
   </div>
+
+  <div class="v2stage" id="v2stage"></div>
 
   <div class="panel" id="panel"><div class="empty">Loading…</div></div>
   <div class="collapse" id="clpL" title="Collapse / expand tree">‹</div>
@@ -207,22 +228,62 @@ const ICON={
   broom:'<circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/>'};
 const svg=(k)=>`<svg viewBox="0 0 24 24">${ICON[k]}</svg>`;
 
-fetch('/api/screens').then(r=>r.ok?r.json():Promise.reject()).then(screens=>{
+const studioQuery=SLUG?`?s=${encodeURIComponent(SLUG)}`:'';
+const unavailableV2=(reason)=>({
+  configured:false,productionLane:'legacy',candidates:[],project:null,
+  legacy:{operating:true,lane:'legacy',untouched:true,route:frame.getAttribute('src'),version:'identity unavailable — Compiler v2 status refused'},
+  compilerV2:{terminalState:null,blockers:[reason]},
+});
+Promise.all([
+  fetch('/api/screens').then(r=>r.ok?r.json():Promise.reject()),
+  fetch(`/api/compiler-v2/status${studioQuery}`).then(async r=>{const j=await r.json();return r.ok?j:unavailableV2(j.error||`HTTP ${r.status}`);}).catch(e=>unavailableV2(e.message||'status unavailable')),
+]).then(([screens,v2status])=>{
   document.body.classList.add('studio');
   const tabsEl=document.getElementById('tabs'), toolbox=document.getElementById('toolbox');
-  const group=new URLSearchParams(location.search).get('g')||'sandbox'; // Sandbox is the starting point
+  const requestedGroup=new URLSearchParams(location.search).get('g')||'sandbox';
+  const group=['sandbox','library','v2'].includes(requestedGroup)?requestedGroup:'sandbox';
+  const selectedTx=new URLSearchParams(location.search).get('tx');
+  const activeTx=v2status.candidates.some(c=>c.transactionId===selectedTx)?selectedTx:(v2status.candidates[0]?.transactionId||null);
   const conversions=screens.filter(s=>!s.accepted), saved=screens.filter(s=>s.accepted);
   const open=screens.find(s=>s.slug===SLUG)||null;         // the screen currently in view (null = built-in Mother)
   const go=(params)=>{ const u=new URLSearchParams(location.search); for(const k in params){ params[k]==null?u.delete(k):u.set(k,params[k]); } location.href='/?'+u.toString(); };
 
-  // ── group switch (Sandbox ⇄ Library) ──
+  function renderV2Studio(){
+    document.body.classList.add('v2mode');
+    scr.textContent='Compiler v2 Studio · dual-run evidence';
+    const host=document.getElementById('v2stage');
+    const candidate=v2status.candidates.find(c=>c.transactionId===activeTx)||null;
+    const facts=candidate?[
+      ['transaction',candidate.transactionState],['evidence',candidate.terminalState],
+      ['commit eligible',candidate.canPromote?'yes — v2 sandbox only':'no'],
+      ['receipt',candidate.promotionReceiptVerified?'verified':'not verified'],
+    ].map(([k,v])=>`<div class="row"><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span></div>`).join(''):'';
+    const blockers=candidate?.blockers?.length?candidate.blockers.map(x=>`<div class="flag bad">${esc(x)}</div>`).join(''):'<div class="flag ok">No reported blockers.</div>';
+    const gates=candidate?.gates?Object.entries(candidate.gates).map(([k,v])=>`<div class="row"><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span></div>`).join(''):'';
+    host.innerHTML=`<div class="v2banner"><span>Legacy remains production. Compiler v2 is an isolated sandbox.</span><small>${esc(v2status.legacy.version)}</small></div>`+
+      `<div class="v2grid">`+
+      `<section class="v2card"><h3>Legacy <span>operating production lane</span></h3><iframe id="v2legacy" title="Legacy operating render"></iframe></section>`+
+      `<section class="v2card"><h3>Compiler v2 <span>${candidate?esc(candidate.transactionId):'no candidate'}</span></h3>${candidate?.runtimeAvailable?'<iframe id="v2runtime" title="Compiler v2 sandbox render" sandbox="allow-scripts"></iframe>':`<div class="v2empty">${esc(v2status.configured?'No sealed runtime is available for this candidate.':v2status.compilerV2.blockers.join(' · '))}</div>`}</section>`+
+      `<section class="v2card"><h3>Evidence truth <span>no production claim</span></h3><div class="v2facts">${candidate?facts+blockers+`<div class="sect">G0–G13</div>${gates}`:`<div class="flag bad">${esc(v2status.compilerV2.blockers.join(' · '))}</div>`}<div class="sect">Identities</div>${candidate?`<div class="hash">package ${esc(candidate.packageHash)}<br>report ${esc(candidate.reportHash)}<br>registry ${esc(candidate.candidateRegistryHash)}</div>`:''}<div class="v2actions"><button id="v2commit" ${candidate?.canPromote?'':'disabled'}>Commit to v2 sandbox</button><button class="cancel" id="v2cancel" ${candidate?.transactionState==='STAGED'?'':'disabled'}>Cancel staged candidate</button></div></div></section>`+
+      `</div>`;
+    document.getElementById('v2legacy').src=v2status.legacy.route;
+    if(candidate?.runtimeAvailable) document.getElementById('v2runtime').src=`/api/compiler-v2/runtime/${candidate.transactionId}/index.html`;
+    const act=async(name)=>{ const r=await fetch(`/api/compiler-v2/${name}/${candidate.transactionId}${studioQuery}`,{method:'POST'}); const j=await r.json(); if(!r.ok)alert(`Compiler v2 ${name} refused:\n\n${j.error}`); else location.reload(); };
+    document.getElementById('v2commit').onclick=()=>candidate&&act('commit');
+    document.getElementById('v2cancel').onclick=()=>candidate&&confirm(`Cancel staged Compiler v2 candidate ${candidate.transactionId}?\n\nLegacy production is untouched.`)&&act('cancel');
+  }
+
+  // ── group switch (legacy Sandbox / Library plus isolated Compiler v2) ──
   const gsw=document.createElement('div'); gsw.className='groupsw';
   gsw.innerHTML=`<button class="sandbox${group==='sandbox'?' on':''}">Sandbox <span class="c">${conversions.length}</span></button>`+
-                `<button class="library${group==='library'?' on':''}">Library <span class="c">${saved.length}</span></button>`;
+                `<button class="library${group==='library'?' on':''}">Library <span class="c">${saved.length}</span></button>`+
+                `<button class="v2${group==='v2'?' on':''}">Compiler v2 <span class="c">${v2status.candidates.length}</span></button>`;
   // switching group must not leave an out-of-group screen selected (stale toolbox — meta-qa #2):
   // if the current selection isn't in the target group, drop it (falls back to the reference screen).
   const inGroup=(g)=>(g==='library'?saved:conversions).some(s=>s.slug===SLUG);
-  gsw.children[0].onclick=()=>go({g:'sandbox', s:inGroup('sandbox')?SLUG:null}); gsw.children[1].onclick=()=>go({g:'library', s:inGroup('library')?SLUG:null});
+  gsw.children[0].onclick=()=>go({g:'sandbox',s:inGroup('sandbox')?SLUG:null,tx:null});
+  gsw.children[1].onclick=()=>go({g:'library',s:inGroup('library')?SLUG:null,tx:null});
+  gsw.children[2].onclick=()=>go({g:'v2',tx:activeTx});
   tabsEl.appendChild(gsw);
 
   // open a screen — if it has no inspectable (audit) build yet (accepted-only, meta-qa #2), first
@@ -246,8 +307,18 @@ fetch('/api/screens').then(r=>r.ok?r.json():Promise.reject()).then(screens=>{
   if(group==='sandbox'){
     mkTab({slug:null,name:'Mother — v2 (reference)',status:'accepted',builtin:true});
     conversions.length?conversions.forEach(mkTab):tabsEl.insertAdjacentHTML('beforeend','<span class="empty-hint">No conversions yet — paste a link below to convert.</span>');
-  } else {
+  } else if(group==='library') {
     saved.length?saved.forEach(mkTab):tabsEl.insertAdjacentHTML('beforeend','<span class="empty-hint">Library is empty — Keep a conversion to add it here.</span>');
+  } else {
+    for(const c of v2status.candidates){
+      const t=document.createElement('div');
+      const dot=c.transactionState==='CANCELLED'?'cancelled':c.terminalState==='PROMOTABLE_VERIFIED'?'verified':c.terminalState==='DIAGNOSTIC_ONLY'?'diagnostic':'failed';
+      t.className='tab'+(activeTx===c.transactionId?' on':'');
+      t.innerHTML=`<span class="dot ${dot}"></span><span class="nm" title="${esc(c.transactionId)}">${esc(c.transactionId)}</span>`;
+      t.onclick=()=>go({g:'v2',tx:c.transactionId}); tabsEl.appendChild(t);
+    }
+    if(!v2status.candidates.length) tabsEl.insertAdjacentHTML('beforeend',`<span class="empty-hint">${esc(v2status.compilerV2.blockers.join(' · '))}</span>`);
+    renderV2Studio();
   }
 
   // ── TOOLBOX: icon actions for the OPEN screen (+ group-level Empty Sandbox) ──
@@ -263,7 +334,7 @@ fetch('/api/screens').then(r=>r.ok?r.json():Promise.reject()).then(screens=>{
     await fetch(`/api/screens/${sc.slug}?scope=${scope}`,{method:'DELETE'});
     (SLUG===sc.slug)?go({s:null}):location.reload();
   }
-  if(open){
+  if(open&&group!=='v2'){
     toolbox.appendChild(btn('refresh','refresh','Refresh','Refresh — re-pull the linked Figma frame',
       (e)=>busyRun(e.currentTarget,`/api/refresh/${open.slug}`,{method:'POST'})));
     toolbox.appendChild(btn('save'+(open.accepted?' done':''),'save',open.accepted?'In Library':'Keep',
@@ -285,6 +356,11 @@ fetch('/api/screens').then(r=>r.ok?r.json():Promise.reject()).then(screens=>{
 
   // ── address bar (own row): paste-link → convert into the Sandbox ──
   const inp=document.getElementById('figurl'), cbusy=document.getElementById('cbusy');
+  if(group==='v2'){
+    document.querySelector('.addrbar .lbl').textContent='Legacy input';
+    inp.placeholder='Legacy converter only — creates a legacy Sandbox draft; it does not stage Compiler v2 evidence.';
+    cbusy.textContent='running legacy conversion…';
+  }
   inp.addEventListener('keydown',async e=>{
     if(e.key!=='Enter'||!inp.value.trim())return;
     inp.disabled=true; cbusy.style.display='inline';
@@ -296,7 +372,7 @@ fetch('/api/screens').then(r=>r.ok?r.json():Promise.reject()).then(screens=>{
   // ── route-readiness overlay: Next compiles converted routes on-demand; a fresh/large screen can
   // leave the iframe blank while it builds. Poll the route, show a spinner, reload the iframe once
   // ready (self-heal, meta-qa #1). A pathologically large screen (fixture board) stays honest. ──
-  if(SLUG){
+  if(SLUG&&group!=='v2'){
     const ov=document.getElementById('compiling'), msg=document.getElementById('compmsg');
     const routeUrl=`/converted/sandbox/${SLUG}`;
     const probe=async()=>{ const ac=new AbortController(); const t=setTimeout(()=>ac.abort(),3500);
@@ -316,7 +392,7 @@ fetch('/api/screens').then(r=>r.ok?r.json():Promise.reject()).then(screens=>{
 }).catch(()=>{}); // no studio server → plain console, unchanged
 
 fetch(AUDIT_URL).then(r=>r.json()).then(a=>{
-  audit = a; scr.textContent = `${a.name} · ${a.screen}`;
+  audit = a; if(!document.body.classList.contains('v2mode')) scr.textContent = `${a.name} · ${a.screen}`;
   const s = a.summary;
   chips.innerHTML =
     `<span class="chip">screen <b id="scrsize">—</b></span>`+
