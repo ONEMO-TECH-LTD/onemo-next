@@ -108,7 +108,6 @@ storybook-static
 src/app/(dev)/converted/sandbox/
 public/audit/sandbox/
 
-figma-code-converter/exports/
 .playwright-cli/
 
 # macOS Finder metadata (custom-folder-icon resource stub + directory store)
