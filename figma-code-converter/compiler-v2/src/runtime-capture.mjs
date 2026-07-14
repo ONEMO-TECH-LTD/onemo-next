@@ -4,13 +4,17 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
 import { canonicalJson, sha256 } from './evidence.mjs';
+import { assertRuntimeBuild } from './runtime-bundle.mjs';
+
+const CAPTURE_AUTHORITIES = new WeakMap();
 
 export class RuntimeCaptureError extends Error {
   constructor(message) { super(message); this.state = 'FAILED_RUNTIME'; }
 }
 
-export async function captureRuntimeState({ chromium, chromePath, bundle, modeContextPlan, tokenPlan, requiredState, reference = null, metricRegions = {} }) {
-  if (!chromium?.launch || !bundle?.publicDir || !requiredState?.id) throw new RuntimeCaptureError('runtime capture inputs missing');
+export async function captureRuntimeState({ chromium, chromePath, bundle, buildAuthority = bundle?.buildAuthority, modeContextPlan, tokenPlan, requiredState, fidelityBudgets, reference = null, metricRegions = {} }) {
+  if (!chromium?.launch || !bundle?.publicDir || !requiredState?.id || !fidelityBudgets) throw new RuntimeCaptureError('runtime capture inputs missing');
+  await assertRuntimeBuild(bundle, buildAuthority);
   return withServer(bundle.publicDir, async (url) => {
     const browser = await chromium.launch({ executablePath: chromePath, headless: true });
     try {
@@ -56,6 +60,7 @@ export async function captureRuntimeState({ chromium, chromePath, bundle, modeCo
         viewport: structuredClone(requiredState.viewport),
         collectionModes: structuredClone(requiredState.collectionModes),
         packageHash: bundle.packageHash,
+        buildHash: bundle.buildHash,
         contexts,
         bindings,
         consoleErrors,
@@ -71,9 +76,56 @@ export async function captureRuntimeState({ chromium, chromePath, bundle, modeCo
       if (contexts[requiredState.rootId] !== expectedRoot) runtime.runtimeErrors.push('root runtime context differs from ModeContextPlan');
       const rootModes = parseContext(expectedRoot);
       for (const [key, mode] of Object.entries(requiredState.collectionModes)) if (rootModes[key] !== mode) runtime.runtimeErrors.push(`requested root mode ${key}=${mode} is not emitted`);
-      return { runtime, screenshotBytes: bytes };
+      const evidence = {
+        schemaVersion: 1,
+        runtime,
+        screenshotBytes: bytes,
+        referenceBytes: reference?.bytes ?? null,
+        metricRegions: structuredClone(metricRegions),
+        requiredState: structuredClone(requiredState),
+        fidelityBudgets: structuredClone(fidelityBudgets),
+        bundle,
+        buildAuthority,
+      };
+      const captureAuthority = Object.freeze({ schemaVersion: 1 });
+      CAPTURE_AUTHORITIES.set(captureAuthority, captureSeal(evidence));
+      return { ...evidence, captureAuthority };
     } finally { await browser.close(); }
   });
+}
+
+export async function assertRuntimeCapture(evidence, authority) {
+  const sealed = CAPTURE_AUTHORITIES.get(authority);
+  if (!sealed || authority?.schemaVersion !== 1 || evidence?.schemaVersion !== 1) throw new RuntimeCaptureError('runtime capture authority mismatch');
+  await assertRuntimeBuild(evidence.bundle, evidence.buildAuthority);
+  if (sealed !== captureSeal(evidence)) throw new RuntimeCaptureError('runtime capture evidence drift');
+  const { runtime, requiredState, fidelityBudgets } = evidence;
+  if (runtime.buildHash !== evidence.bundle.buildHash || runtime.packageHash !== evidence.bundle.packageHash) throw new RuntimeCaptureError('runtime capture build identity drift');
+  if (runtime.environmentId !== sha256(canonicalJson(runtime.environment)) || runtime.environmentId !== fidelityBudgets.environmentId
+    || canonicalJson(runtime.environment) !== canonicalJson(fidelityBudgets.environment)) throw new RuntimeCaptureError('runtime capture environment drift');
+  const screenshot = await sharp(evidence.screenshotBytes).metadata();
+  if (runtime.screenshot.sha256 !== sha256(evidence.screenshotBytes) || runtime.screenshot.width !== screenshot.width || runtime.screenshot.height !== screenshot.height) throw new RuntimeCaptureError('runtime screenshot bytes drift');
+  if (requiredState.reference) {
+    if (!evidence.referenceBytes || !runtime.reference) throw new RuntimeCaptureError('authored reference bytes missing');
+    const reference = await sharp(evidence.referenceBytes).metadata();
+    if (runtime.reference.sha256 !== sha256(evidence.referenceBytes) || runtime.reference.width !== reference.width || runtime.reference.height !== reference.height) throw new RuntimeCaptureError('authored reference bytes drift');
+    if (canonicalJson(pickReference(runtime.reference)) !== canonicalJson(pickReference(requiredState.reference))) throw new RuntimeCaptureError('authored reference manifest drift');
+    const metrics = await measureRegions(evidence.screenshotBytes, evidence.referenceBytes, evidence.metricRegions);
+    if (canonicalJson(metrics) !== canonicalJson(runtime.metrics)) throw new RuntimeCaptureError('visual metric derivation drift');
+  } else if (evidence.referenceBytes || runtime.reference || Object.keys(runtime.metrics).length) throw new RuntimeCaptureError('unreferenced capture carries visual claims');
+  return true;
+}
+
+function captureSeal(evidence) {
+  return sha256(canonicalJson({
+    runtime: evidence.runtime,
+    screenshotSha256: sha256(evidence.screenshotBytes),
+    referenceSha256: evidence.referenceBytes ? sha256(evidence.referenceBytes) : null,
+    metricRegions: evidence.metricRegions,
+    requiredState: evidence.requiredState,
+    fidelityBudgets: evidence.fidelityBudgets,
+    buildHash: evidence.bundle?.buildHash,
+  }));
 }
 
 async function measureRegions(actualBytes, referenceBytes, regions) {
@@ -125,3 +177,4 @@ function channelIndex(registry) {
 }
 
 const parseContext = (id) => id === 'ø' ? {} : Object.fromEntries(String(id).split(',').map((part) => { const split = part.indexOf('='); return [part.slice(0, split), part.slice(split + 1)]; }));
+const pickReference = (row) => ({ kind: row.kind, fileKey: row.fileKey, version: row.version, rootId: row.rootId, manifestHash: row.manifestHash ?? null, captureId: row.captureId ?? null });

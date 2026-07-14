@@ -50,7 +50,7 @@ Decisions/Done/cutover: Dan only.
 | P3 mother token/component slice | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `5dbcb39` | sole authoritative QA/Meta cleared core snapshot; real mother/plugin-origin exit blocked by G-1/G-2/G-4 |
 | P4 mother layout/render slice | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `c754741` | sole authoritative QA+Meta cleared core snapshot; runnable mother/plugin evidence remains blocked by G-1/G-2/G-4 |
 | P5 emitters/security/editability | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `4693a72` | sole authoritative QA+Meta cleared G8 core snapshot; integration/editor-corpus exit remains blocked |
-| P6 runtime/visual/editor proof | CORE BUILT; AWAITING AUTHORITATIVE SNAPSHOT REVIEW | — | production-bundle + system-Chrome microfixture boundary only; no real reference/budget candidate claim |
+| P6 runtime/visual/editor proof | CORE REWORK BUILT; AWAITING AUTHORITATIVE SNAPSHOT REVIEW | — | authority-backed G9–G11 + one real EC1 chain; EC2–EC8b and integration promotion remain honestly unavailable |
 | P7 corpus & scale | pending | — | |
 | P8 studio dual-run | pending | — | |
 | P9 cutover | pending | — | Dan-only |
@@ -497,3 +497,32 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   networks, while both degree-four fork shapes refuse and forged forked output trips G7. This
   releases dependent sandbox emission only. P4 phase/integration/promotion/cutover/Done remain
   uncleared; G-1/G-2/G-4 still block real mother/plugin-origin evidence.
+- 2026-07-14 @s58-pixel-meta-qa authoritative `[CLEAR — P5 CORE SNAPSHOT ONLY]`: exact target
+  `4693a7297eb8f72f2eedeb0692231a71a8576e5a`; executable declaration identity,
+  alias-target resolution, and package-confined imports closed the remaining G8 boundary.
+  Clearance releases dependent P6 work only; no P5 phase/integration/runtime/visual/promotion/
+  cutover/Done claim.
+- 2026-07-14 @s58-pixel-meta-qa authoritative `[REWORK — P6 CORE SNAPSHOT ONLY]`: exact target
+  `ca385103df2454ecf1085021e20a553ea583db21`; five blockers reproduced: P5 package authority
+  reopened at bundle time; G9 trusted invented inventories/locality; G10/G11 trusted claimed
+  hashes/zero metrics without bytes; G13 trusted boolean summaries; and promotion authority was
+  caller-mintable. P7 remains stopped.
+- 2026-07-14 Builder P6 rework evidence: bundle/proof entry now requires rotating P5 authority;
+  opaque build authority re-reads actual disk bytes; G9 authenticates before/after packages and
+  derives contract-owned label/token-value/subtree locality; capture authority binds build,
+  pinned environment, screenshot/reference bytes, region geometry/census, and budget identity;
+  independent oracle re-reads builds and re-derives pixel metrics; G13 rejects booleans and
+  requires raw package authorities, exact owner/segment, localized byte diff, conserved identity/
+  modes/order, rotated authority, rebuild, and runtime capture. One real EC1 chain passes; missing
+  EC2–EC8b remain G13-failed. Figma references require captureId+manifestHash; generated references
+  are explicit microfixtures. No promotion-authority issuer exists, so microfixtures/self-labels
+  cannot promote. Full boundary: 111 pass / 0 fail / 0 skip; five syntax checks and diff-check
+  green. One frozen R3-18b race flaked once under the first combined run, passed immediate isolated
+  rerun, then the exact 111-test boundary passed. This is Builder evidence only; authoritative
+  snapshot rereview is required and P6/P7 remain uncleared.
+  Post-freeze self-audit withdrew the first candidate before verdict: reversing an authenticated
+  locality pair could change its claimed base. The replacement binds every locality `before`
+  package hash to the exact main candidate and carries the reversal mutation in both proof/oracle.
+  Meta then identified an adjacent subtree-policy hole before verdict: authenticated metadata-only
+  manifest/source-map churn satisfied the empty required set. The next replacement requires at
+  least one generated screen/style/component artifact and carries the root-name-only mutation.
