@@ -54,7 +54,7 @@ Decisions/Done/cutover: Dan only.
 | P5 emitters/security/editability | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `4693a72` | sole authoritative QA+Meta cleared G8 core snapshot; integration/editor-corpus exit remains blocked |
 | P6 runtime/visual/editor proof | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `948c626` | sole authoritative QA+Meta cleared the environment-bound core snapshot; integration budgets/corpus/promotion remain blocked |
 | P7 corpus & scale | CORE SNAPSHOTS CLEAR; PHASE EVIDENCE BLOCKED | `4169dab`, `3bd8dbd` | inventory + diagnostic evidence laws cleared; live corpus/capture/budgets/runtime/real mutations/scale remain blocked |
-| P8 studio dual-run | BUILDER CORE EVIDENCE; QA PENDING | — | transaction/recovery kernel only; Studio UI wiring waits for core clearance |
+| P8 studio dual-run | CORE SNAPSHOT CLEAR; STUDIO UX PENDING | `bc6c56e` | transaction/recovery kernel cleared; Studio integration remains |
 | P9 cutover | pending | — | Dan-only |
 
 ## P0 work items
@@ -619,3 +619,8 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   refusal mutation. Focused P8 16/16/0 and full boundary 140/140/0; syntax/diff checks green.
   This is repair evidence awaiting authoritative rereview, not P8 phase/integration/promotion/
   cutover/Done clearance.
+- 2026-07-14 @s58-pixel-meta-qa authoritative `[CLEAR — P8 CORE SNAPSHOT ONLY]`: exact target
+  `bc6c56e93ea13cef97e2b83356bbbbb4e206e07a`; strict Ed25519 authority validation and the
+  permanent RSA refusal mutation close the only residual. Transaction/recovery/topology/
+  concurrency/generation/dual-run areas remain closed. Clearance releases Studio UX integration
+  only; P8 phase/integration/promotion/cutover/Done remain uncleared.
