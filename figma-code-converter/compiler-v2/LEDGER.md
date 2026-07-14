@@ -52,7 +52,7 @@ Decisions/Done/cutover: Dan only.
 | P4 mother layout/render slice | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `c754741` | sole authoritative QA+Meta cleared core snapshot; runnable mother/plugin evidence remains blocked by G-1/G-2/G-4 |
 | P5 emitters/security/editability | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `4693a72` | sole authoritative QA+Meta cleared G8 core snapshot; integration/editor-corpus exit remains blocked |
 | P6 runtime/visual/editor proof | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `948c626` | sole authoritative QA+Meta cleared the environment-bound core snapshot; integration budgets/corpus/promotion remain blocked |
-| P7 corpus & scale | INVENTORY SNAPSHOT CLEAR; DIAGNOSTIC EVIDENCE BUILDING | `4169dab` | inventory law cleared; live corpus/capture/budgets/runtime/real mutations/scale remain blocked |
+| P7 corpus & scale | CORE SNAPSHOTS CLEAR; PHASE EVIDENCE BLOCKED | `4169dab`, `3bd8dbd` | inventory + diagnostic evidence laws cleared; live corpus/capture/budgets/runtime/real mutations/scale remain blocked |
 | P8 studio dual-run | pending | — | |
 | P9 cutover | pending | — | Dan-only |
 
@@ -574,3 +574,10 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   syntax checks green. Plugin corpus, capture/network authority, accepted hardware/budgets,
   runtime/editor evidence, real mutation execution, and P7 phase/integration/promotion/cutover/
   Done remain blocked. Builder evidence only; authoritative snapshot review required.
+- 2026-07-14 @s58-pixel-meta-qa authoritative
+  `[CLEAR — P7 DIAGNOSTIC EVIDENCE CORE SNAPSHOT ONLY]`: exact target
+  `3bd8dbd9bc1ca9e443d27a85b95d91542f032932` passed review. The reviewer confirmed the
+  closed 34-row mutation catalog, gate/seam ownership, canonical before/after hashes, opaque
+  authorities, derived scale metrics/artifact inventories, meter enforcement, and hard
+  non-promoting aggregate. Synthetic diagnostic only: plugin corpus, P1/P0 authority/budgets,
+  live mutation/scale, P7 phase/integration/promotion/cutover/Done remain uncleared.
