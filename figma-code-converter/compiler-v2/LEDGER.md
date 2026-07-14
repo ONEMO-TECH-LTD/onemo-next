@@ -26,7 +26,7 @@ P7 inventory suite 6 pass / 0 fail / 0 skip · P7 mutation/scale diagnostic suit
 0 fail / 0 skip · P8 sandbox transaction suite 16 pass / 0 fail / 0 skip · P8 Studio suite
 8 pass / 0 fail / 0 skip · P9 cutover/rollback kernel suite 11 pass / 0 fail / 0 skip.
 Combined current truth:
-220 pass / 0 fail / 0 skip.
+228 pass / 0 fail / 0 skip.
 No phase may be recorded green from
 harness-only or REST_ONLY placeholders.
 
@@ -82,8 +82,14 @@ Decisions/Done/cutover: Dan only.
    E1–E13 harness awaiting review]
 4. **fidelity-budgets.json**: synchronized Figma/build pairs at one file version; repeat-run
    noise measured; per-class thresholds published with sample sizes + exclusions. [pending]
-5. **Capture operability envelope**: measured wall time/bytes/requests for REST nodes,
-   variables payload, svg exports on Shape (local file). Remote-heavy corpus: GAP-1. [pending]
+5. **Capture operability envelope**: the P0 diagnostic harness now enforces the exact visible
+   three-pass phase order/counts; derives phase/total wall time, CPU, peak RSS, request count and
+   bytes; races cancellation at every phase; permits exactly one instability retry; names changed
+   provider/file/key/permission/action; detects active-file drift; and proves persistent registry/
+   package identity unchanged. It cannot accept its own envelope. Existing Shape n=1 REST/bridge/
+   export measurements remain draft; real local + remote-heavy runs, restart-stage evidence, numeric
+   limits, and QA/Meta/Dan acceptance remain open (remote-heavy blocked by G-1).
+   [BUILDER GREEN — DIAGNOSTIC CORE ONLY; LIVE ENVELOPE UNACCEPTED]
 6. **Editor round-trip corpus pinned**: all EC1–EC8b cases now execute in the synthetic
    microfixture boundary with localized bytes, rotating package authority, deterministic rebuild,
    pinned-browser capture, conserved source/mode/order identity, package-derived binding values,
@@ -740,3 +746,11 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   All nine cases pass and per-case wrong-channel/value/segment/owner/build/overwrite mutations
   refuse. Focused P5/P6 boundary is 15/15/0. This remains synthetic microfixture evidence; live
   plugin-origin EC4/EC5, G-1/G-2, P0 phase/integration, promotion, cutover, and Done stay open.
+- 2026-07-14 Builder P0 operability-core checkpoint: added a diagnostic-only §4.7/V18 meter with
+  eight ordered visible phases, monotonic counts, per-phase/aggregate resource and transfer data,
+  one bounded F/D/V instability retry, immediate in-flight cancellation, active-file refusal,
+  actionable dependency failures, and before/after persistent-state proof. Production validation
+  and an independent test oracle rederive request ownership/totals, stability from V/F/D triplets,
+  retry/instability rates, and terminal truth; re-hashed label/metric/phase lies refuse. Focused
+  boundary 8/8/0. No live capture transaction, accepted limits, remote-heavy evidence, P0/P1 phase,
+  integration, promotion, cutover, or Done claim.
