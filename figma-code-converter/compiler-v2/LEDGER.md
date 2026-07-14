@@ -542,3 +542,9 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   browser, OS image/receipt, font hash/provenance/license/mapping, color profile, background, and
   stable time. Full boundary: 112 pass / 0 fail / 0 skip; syntax/diff checks green. This is Builder
   evidence only; P6/P7/integration/promotion/cutover/Done remain uncleared.
+- 2026-07-14 @s58-pixel-meta-qa authoritative `[CLEAR — P6 CORE SNAPSHOT ONLY]`: exact target
+  `948c6268dfcd32913281dfe9de5a6ff92662eb4c` passed snapshot review. The reviewer confirmed
+  microfixture-only environment authority, fail-closed pre-P0 integration issuance, and independent
+  browser/OS/font/color/render/viewport/manifest revalidation with no residual. This releases
+  dependent P7 construction only; P6 phase/integration/accepted budgets/promotion/cutover/Done and
+  P7 itself remain uncleared.
