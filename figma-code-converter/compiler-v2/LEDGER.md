@@ -26,7 +26,7 @@ P7 inventory suite 6 pass / 0 fail / 0 skip · P7 mutation/scale diagnostic suit
 0 fail / 0 skip · P8 sandbox transaction suite 16 pass / 0 fail / 0 skip · P8 Studio suite
 8 pass / 0 fail / 0 skip · P9 cutover/rollback kernel suite 11 pass / 0 fail / 0 skip.
 Combined current truth:
-244 pass / 0 fail / 0 skip.
+248 pass / 0 fail / 0 skip.
 No phase may be recorded green from
 harness-only or REST_ONLY placeholders.
 
@@ -127,7 +127,7 @@ Decisions/Done/cutover: Dan only.
 | G-2 | Plugin supplement capture (resolvedVariableModes, styledTextSegments, component defs) is a REQUIRED capture plane; REST_ONLY/PARTIAL provenance is diagnostic-only and cannot pass G0 or clear supplement-dependent G1–G5 (joint route — earlier "Shape completeness without supplement" claim narrowed accordingly) | OPEN — BLOCKS P1 G0; needs Dan input #3 (bridge rescan at pinned versions) when capture lands | Kai builds; Dan rescan |
 | G-3 | Dark-mode visual promotion impossible without an authored dark reference (§4.5) | OPEN — dark states DIAGNOSTIC_ONLY until Dan authors a dark-mode reference frame | Dan (when he wants dark visually promoted) |
 | G-4 | §14.2 mother screen must be selected + version-pinned BY DAN; Shape cannot substitute | OPEN — blocks P0 item 2 and the P3/P4 mother-slice anchor | Dan (question surfaced in-session 2026-07-13) |
-| G-5 | Per-fact source-plane fail-closed law | PARTIAL CLOSURE — P2 canonical-model preflight refuses missing/partial/REST_ONLY required facts. P1 diagnostic capture core now refuses every non-complete semantic plane before retaining a candidate, but persists nothing until separately trusted plugin-adapter authority and the accepted P0 envelope exist; live enforcement remains blocked with G-2 | Pixel + Kai capture operator |
+| G-5 | Per-fact source-plane fail-closed law | PARTIAL CLOSURE — P2 canonical-model preflight refuses missing/partial/REST_ONLY required facts. P1 diagnostic capture core now refuses every non-complete semantic plane before retaining a candidate. The adapter-authority core independently audits exact bundle bytes and verifies an external Ed25519 receipt, but no reviewed live bundle/receipt exists; capture persists nothing until that authority plus the accepted P0 envelope exist. Live enforcement remains blocked with G-2 | Pixel + Kai capture operator |
 | G-6 | Complete published calibration generations currently have no bounded reader-safe retention policy | OPEN — non-blocking for atomic freeze; blocks P0 §4.7 storage/operability acceptance only. Preserve reader safety; no speculative GC | Pixel + QA/Meta architecture |
 
 ## P0 findings
@@ -784,3 +784,18 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   `DIAGNOSTIC_ONLY`, `persisted:false`, and blocked by the accepted operator envelope plus external
   plugin-capture authority. No live plugin capture, evidence snapshot, P1 phase, integration,
   promotion, cutover, or Done claim.
+- 2026-07-14 Builder P1 adapter-authority checkpoint: added a deterministic TypeScript-AST audit
+  over the exact built adapter bytes plus an external, public-key-only Ed25519 receipt verifier.
+  The audit requires one exported `createCaptureAdapter(figma)` capability boundary; refuses
+  imports, ambient runtime globals, computed/dynamic access, indirect calls, property writes,
+  nested assignment targets, invalid UTF-8, and the captured Figma mutation/import families; and
+  records exact call/property inventories. The signed receipt binds authority, scope, bundle hash,
+  audit hash, and a maximum seven-day validity window. Production re-parses the bundle and
+  re-verifies the receipt for every proof/runtime use; the independent oracle re-hashes audit,
+  receipt, public key, bundle, and verification time. Runtime composition additionally requires a
+  zero-event `documentchange` window covering the verified capture instant. Mutation coverage
+  includes document APIs, alias/dynamic/global escapes, malformed bytes/time, RSA/substituted keys,
+  receipt/audit/bundle drift, proof lies, and observer drift/events. Focused 4/4/0; full compiler-v2
+  199/199/0 plus legacy 49/49/0 = 248/248/0. This is a diagnostic authority mechanism only: no
+  separately reviewed/signed live adapter, plugin capture, evidence snapshot, accepted envelope,
+  P1 phase, integration, promotion, cutover, or Done claim.
