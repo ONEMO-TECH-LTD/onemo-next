@@ -193,7 +193,9 @@ function affineOf(source, nodeId) {
 function fragmentsOf({ nodeId, source, bounds, transform, bindings }) {
   const fragments = [];
   const blendMode = blendModeOf(source.blendMode, `${nodeId}.blendMode`, true);
-  const opacity = opacityOf(source.opacity ?? 1, `${nodeId}.opacity`);
+  const opacity = unitIntervalOf(source.opacity ?? 1, `${nodeId}.opacity`);
+  const cornerSmoothing = unitIntervalOf(source.cornerSmoothing ?? 0, `${nodeId}.cornerSmoothing`);
+  const shapeGeometry = shapeGeometryOf(source, nodeId, cornerSmoothing);
   const hasOpacityBinding = bindings.some((record) => record.source.nodeId === nodeId && pathOwns('/opacity', record.source.propertyPath));
   const push = (role, sourcePath, sourceIndex, payload, decorative = true, bindingPaths = [sourcePath]) => {
     const discriminator = sourcePath;
@@ -213,13 +215,13 @@ function fragmentsOf({ nodeId, source, bounds, transform, bindings }) {
     if (!MASK_TYPES.has(maskType)) throw new LayoutRenderError('FAILED_CAPABILITY', `node ${nodeId} has unsupported maskType ${maskType}`);
     push('mask', '/mask', null, { maskType }, true, ['/isMask', '/maskType']);
   }
-  if (source.clipsContent === true) push('clip', '/clipsContent', null, clipGeometryOf(source, nodeId), true, ['/clipsContent', '/cornerRadius', '/rectangleCornerRadii']);
+  if (source.clipsContent === true) push('clip', '/clipsContent', null, shapeGeometry, true, ['/clipsContent', '/cornerRadius', '/rectangleCornerRadii', '/cornerSmoothing']);
   visibleArray(source.fills, nodeId, 'fills').forEach(({ entry: paint, index }) => {
     if (!FILL_TYPES.has(paint.type)) throw new LayoutRenderError('FAILED_CAPABILITY', `node ${nodeId} has unsupported fill ${paint.type}`);
     blendModeOf(paint.blendMode, `${nodeId}.fills[${index}].blendMode`, false);
     push('paint', `/fills/${index}`, index, paint);
   });
-  push('content', '/content', null, { nodeType: source.type, visible: source.visible !== false, cornerRadius: source.cornerRadius ?? null, rectangleCornerRadii: source.rectangleCornerRadii ?? null }, false, source.clipsContent === true ? [] : ['/cornerRadius', '/rectangleCornerRadii']);
+  push('content', '/content', null, { nodeType: source.type, visible: source.visible !== false, cornerRadius: source.cornerRadius ?? null, rectangleCornerRadii: source.rectangleCornerRadii ?? null, cornerSmoothing }, false, source.clipsContent === true ? [] : ['/cornerRadius', '/rectangleCornerRadii', '/cornerSmoothing']);
   visibleArray(source.strokes, nodeId, 'strokes').forEach(({ entry: stroke, index }, visibleIndex) => {
     if (!STROKE_TYPES.has(stroke.type)) throw new LayoutRenderError('FAILED_CAPABILITY', `node ${nodeId} has unsupported stroke ${stroke.type}`);
     blendModeOf(stroke.blendMode, `${nodeId}.strokes[${index}].blendMode`, false);
@@ -232,7 +234,7 @@ function fragmentsOf({ nodeId, source, bounds, transform, bindings }) {
     push('effect', `/effects/${index}`, index, effect);
   });
   if (VECTOR_PATH_TYPES.has(source.type)) {
-    if (!source.vectorNetwork) throw new LayoutRenderError('FAILED_CAPABILITY', `node ${nodeId} needs captured vectorNetwork geometry`);
+    if (!objectRecord(source.vectorNetwork)) throw new LayoutRenderError('FAILED_CAPABILITY', `node ${nodeId} needs captured vectorNetwork geometry`);
     push('vector', '/vector', null, { vectorNetwork: source.vectorNetwork }, true, ['/vectorNetwork']);
   }
   return fragments;
@@ -261,14 +263,14 @@ function worldResolver(nodesById, localById) {
   return resolve;
 }
 
-function clipGeometryOf(source, nodeId) {
+function shapeGeometryOf(source, nodeId, cornerSmoothing) {
   if (source.rectangleCornerRadii !== undefined && source.rectangleCornerRadii !== null) {
     const radii = source.rectangleCornerRadii;
     if (!Array.isArray(radii) || radii.length !== 4) throw new LayoutRenderError('FAILED_CAPABILITY', `node ${nodeId} rectangleCornerRadii must contain four values`);
-    return { shape: radii.some((radius, index) => nonNegativeFinite(radius, `${nodeId}.rectangleCornerRadii[${index}]`) > 0) ? 'rounded-rect' : 'rect', cornerRadii: radii.map((radius, index) => nonNegativeFinite(radius, `${nodeId}.rectangleCornerRadii[${index}]`)) };
+    return { shape: radii.some((radius, index) => nonNegativeFinite(radius, `${nodeId}.rectangleCornerRadii[${index}]`) > 0) ? 'rounded-rect' : 'rect', cornerRadii: radii.map((radius, index) => nonNegativeFinite(radius, `${nodeId}.rectangleCornerRadii[${index}]`)), cornerSmoothing };
   }
   const radius = source.cornerRadius === undefined || source.cornerRadius === null ? 0 : nonNegativeFinite(source.cornerRadius, `${nodeId}.cornerRadius`);
-  return radius > 0 ? { shape: 'rounded-rect', cornerRadii: [radius, radius, radius, radius] } : { shape: 'rect' };
+  return radius > 0 ? { shape: 'rounded-rect', cornerRadii: [radius, radius, radius, radius], cornerSmoothing } : { shape: 'rect', cornerSmoothing };
 }
 
 function maskGroupsOf(nodes, nodesById) {
@@ -304,8 +306,10 @@ const isLayoutPath = (path) => LAYOUT_PATHS.some((prefix) => pathOwns(prefix, pa
 const visibleArray = (value, nodeId, field) => {
   if (value === undefined) return [];
   if (!Array.isArray(value)) throw new LayoutRenderError('FAILED_CAPABILITY', `node ${nodeId} ${field} must be an array`);
+  if (value.some((entry) => !objectRecord(entry))) throw new LayoutRenderError('FAILED_CAPABILITY', `node ${nodeId} ${field} entries must be objects`);
   return value.map((entry, index) => ({ entry, index })).filter(({ entry }) => entry?.visible !== false);
 };
+const objectRecord = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const pathOwns = (prefix, propertyPath) => propertyPath === prefix || propertyPath?.startsWith(`${prefix}/`);
 const trackSizing = (value, nodeId, axis) => {
   if (typeof value === 'string' && value) return value;
@@ -331,7 +335,7 @@ const nonNegativeFinite = (value, name) => {
   return result;
 };
 const optionalFinite = (value, name) => value === undefined || value === null ? null : finite(value, name);
-const opacityOf = (value, name) => {
+const unitIntervalOf = (value, name) => {
   const result = finite(value, name);
   if (result < 0 || result > 1) throw new LayoutRenderError('FAILED_CAPABILITY', `${name} must be between 0 and 1`);
   return result;

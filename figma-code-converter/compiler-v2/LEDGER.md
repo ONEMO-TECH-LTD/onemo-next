@@ -20,7 +20,7 @@ gitignored golden fixture `t88thL8hKksSpILgkeGRZ0-4084-25997.nodes.json`) / 0 sk
 compiler-v2 foundation suite 53 pass / 0 fail / 0 skip across Builder and Meta repeated runs ·
 compiler-v2 P2 graph suite 16 pass / 0 fail / 0 skip · P2 persisted-model suite 7 pass /
 0 fail / 0 skip · compiler-v2 P3 planner suite 9 pass / 0 fail / 0 skip · P4 layout/render
-suite 10 pass / 0 fail / 0 skip. Combined current truth: 95 pass / 0 fail / 0 skip.
+suite 12 pass / 0 fail / 0 skip. Combined current truth: 97 pass / 0 fail / 0 skip.
 No phase may be recorded green from
 harness-only or REST_ONLY placeholders.
 
@@ -46,7 +46,7 @@ Decisions/Done/cutover: Dan only.
 | P1 evidence capture | pending | — | |
 | P2 canonical graphs | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `0c8471b` | sole authoritative QA/Meta cleared the frozen code snapshot only; live/plugin evidence still blocked by G-1/G-2 |
 | P3 mother token/component slice | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `5dbcb39` | sole authoritative QA/Meta cleared core snapshot; real mother/plugin-origin exit blocked by G-1/G-2/G-4 |
-| P4 mother layout/render slice | REWORK REPAIRED; AWAITING AUTHORITATIVE SNAPSHOT REVIEW | — | rejected core repaired failure-first; runnable mother output blocked by G-1/G-2/G-4 |
+| P4 mother layout/render slice | RESIDUAL REWORK REPAIRED; AWAITING AUTHORITATIVE SNAPSHOT REVIEW | — | R1/R2 repaired without reopening cleared F1-F5; runnable mother output blocked by G-1/G-2/G-4 |
 | P5 emitters/security/editability | pending | — | |
 | P6 runtime/visual/editor proof | pending | — | |
 | P7 corpus & scale | pending | — | |
@@ -227,6 +227,15 @@ Decisions/Done/cutover: Dan only.
   Ten permanent P4 tests include every reproduced attack plus identity/ownership and per-corner
   strengthening. Current full boundary: 95/95/0; three changed-file syntax checks and diff check
   green. This is Builder repair evidence awaiting authoritative snapshot rereview, not clearance.
+- Authoritative rereview of `8d2ed1c` closed original F1-F5, then reproduced two adjacent gaps:
+  `cornerSmoothing` disappeared from exact shape/clip geometry, and G7 independently closed only
+  blend modes while a planner-forbidden `MAGIC_GLOW` effect could remain oracle-green. Residual
+  repair carries validated 0–1 smoothing in both content and clip payloads, with exact clip
+  mutation coverage; G7 now independently checks the complete render-capability surface the
+  planner refuses: node/paint/stroke/effect blend values, opacity/smoothing/radius ranges, closed
+  fill/stroke/effect/mask types, visible-array shape, and required vector geometry. Permanent
+  forged-effect and out-of-range-opacity mutations raise P4 to 12 tests and the full boundary to
+  97/97/0. This remains Builder evidence awaiting authoritative rereview.
 - This is a Builder core checkpoint only, not P4 phase clearance: runnable sandbox emission is the
   next seam, and real plugin/mother evidence remains blocked by G-1/G-2/G-4.
 
@@ -349,3 +358,9 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   `TypeError`. Dependent sandbox emission remains stopped. Builder reproduced all five
   failure-first and repaired only the P4 core/oracle/tests plus this ledger; authoritative
   rereview is required before dependent work resumes.
+- 2026-07-14 @s58-pixel-meta-qa authoritative `[REWORK — P4 REPAIR SNAPSHOT ONLY]`: exact target
+  `8d2ed1c783b9b84f737696a8106432a6e0596897`; all original F1-F5 closed, 95/95/0 and static
+  checks green. Residual R1 proved `cornerSmoothing:0.6` absent from content/clip IR and G7;
+  residual R2 proved a consistently forged planner-forbidden `MAGIC_GLOW` effect stayed
+  `{G6:false,G7:false}` because independent capability closure covered blend only. Builder
+  repaired only R1/R2; dependent sandbox emission remains stopped pending authoritative rereview.

@@ -5,7 +5,7 @@ import { buildLayoutRenderPlan, LayoutRenderError } from '../src/layout-render-p
 import { p3Fixture } from './p3-fixture.mjs';
 import { p4Failures } from './p4-oracle.mjs';
 
-function fixture({ roundedClip = false } = {}) {
+function fixture({ roundedClip = false, cornerSmoothing = 0 } = {}) {
   const { snapshot } = p3Fixture();
   const root = snapshot.document;
   Object.assign(root, {
@@ -28,6 +28,7 @@ function fixture({ roundedClip = false } = {}) {
   });
   if (roundedClip) {
     root.cornerRadius = 18;
+    root.cornerSmoothing = cornerSmoothing;
     root.boundVariables.cornerRadius = { type: 'VARIABLE_ALIAS', id: 'V_FLOAT' };
   }
   const nested = root.children.find((node) => node.id === 'nested');
@@ -203,7 +204,7 @@ test('P4 clip fragment owns exact rounded geometry and its radius token dependen
   const clip = root.fragments.find((row) => row.role === 'clip');
   const content = root.fragments.find((row) => row.role === 'content');
   const radiusBinding = plan.sourceMap.bindings.find((row) => row.sourceNodeId === 'root' && row.sourcePath === '/cornerRadius');
-  assert.deepEqual(clip.payload, { shape: 'rounded-rect', cornerRadii: [18, 18, 18, 18] });
+  assert.deepEqual(clip.payload, { shape: 'rounded-rect', cornerRadii: [18, 18, 18, 18], cornerSmoothing: 0 });
   assert.equal(radiusBinding.ownerKind, 'fragment');
   assert.equal(radiusBinding.ownerId, clip.fragmentId);
   assert.equal(content.tokenBindingIds.includes(radiusBinding.bindingId), false);
@@ -213,11 +214,42 @@ test('P4 clip fragment owns exact rounded geometry and its radius token dependen
   Object.assign(perCorner, sealCanonicalModelContent(perCorner));
   assert.deepEqual(
     buildLayoutRenderPlan(perCorner).render.nodes.find((row) => row.nodeId === 'root').fragments.find((row) => row.role === 'clip').payload,
-    { shape: 'rounded-rect', cornerRadii: [2, 4, 6, 8] },
+    { shape: 'rounded-rect', cornerRadii: [2, 4, 6, 8], cornerSmoothing: 0 },
   );
   const flattened = structuredClone(plan);
   flattened.render.nodes.find((row) => row.nodeId === 'root').fragments.find((row) => row.role === 'clip').payload = { shape: 'rect' };
   assert.equal(p4Failures(model, flattened).G7, true);
+});
+
+test('P4 shape and clip IR preserve and validate exact corner smoothing', () => {
+  const model = fixture({ roundedClip: true, cornerSmoothing: 0.6 });
+  const plan = buildLayoutRenderPlan(model);
+  const root = plan.render.nodes.find((row) => row.nodeId === 'root');
+  assert.equal(root.fragments.find((row) => row.role === 'clip').payload.cornerSmoothing, 0.6);
+  assert.equal(root.fragments.find((row) => row.role === 'content').payload.cornerSmoothing, 0.6);
+  const flattened = structuredClone(plan);
+  flattened.render.nodes.find((row) => row.nodeId === 'root').fragments.find((row) => row.role === 'clip').payload.cornerSmoothing = 0;
+  assert.equal(p4Failures(model, flattened).G7, true);
+  const invalid = fixture({ roundedClip: true, cornerSmoothing: 1.1 });
+  assert.throws(() => buildLayoutRenderPlan(invalid), /cornerSmoothing must be between 0 and 1/);
+});
+
+test('independent G7 rejects planner-forbidden visible operation types and value ranges', () => {
+  const effectModel = fixture();
+  const forgedEffect = buildLayoutRenderPlan(effectModel);
+  effectModel.documentGraph.nodes.find((row) => row.id === 'root').properties.effects[0].type = 'MAGIC_GLOW';
+  Object.assign(effectModel, sealCanonicalModelContent(effectModel));
+  forgedEffect.modelContentSeal = effectModel.contentSeal;
+  forgedEffect.render.nodes.find((row) => row.nodeId === 'root').fragments.find((row) => row.role === 'effect').payload.type = 'MAGIC_GLOW';
+  assert.equal(p4Failures(effectModel, forgedEffect).G7, true);
+
+  const opacityModel = fixture();
+  const forgedOpacity = buildLayoutRenderPlan(opacityModel);
+  opacityModel.documentGraph.nodes.find((row) => row.id === 'root').properties.opacity = 1.1;
+  Object.assign(opacityModel, sealCanonicalModelContent(opacityModel));
+  forgedOpacity.modelContentSeal = opacityModel.contentSeal;
+  forgedOpacity.render.nodes.find((row) => row.nodeId === 'root').fragments.find((row) => row.role === 'isolation').payload.opacity = 1.1;
+  assert.equal(p4Failures(opacityModel, forgedOpacity).G7, true);
 });
 
 test('P4 world composition is independent of persisted document-node storage order', () => {

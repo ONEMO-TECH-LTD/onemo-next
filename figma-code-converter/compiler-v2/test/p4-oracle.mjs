@@ -2,6 +2,10 @@
 import { canonicalJson, sha256 } from '../src/evidence.mjs';
 
 const VECTOR_PATH_TYPES = new Set(['VECTOR', 'BOOLEAN_OPERATION', 'LINE', 'STAR', 'POLYGON', 'REGULAR_POLYGON']);
+const FILL_TYPES = new Set(['SOLID', 'GRADIENT_LINEAR', 'GRADIENT_RADIAL', 'GRADIENT_ANGULAR', 'IMAGE']);
+const STROKE_TYPES = new Set(['SOLID', 'GRADIENT_LINEAR', 'GRADIENT_RADIAL', 'GRADIENT_ANGULAR']);
+const EFFECT_TYPES = new Set(['DROP_SHADOW', 'INNER_SHADOW', 'LAYER_BLUR', 'BACKGROUND_BLUR']);
+const MASK_TYPES = new Set(['ALPHA', 'VECTOR', 'LUMINANCE']);
 const BLEND_MODES = new Set([
   'PASS_THROUGH', 'NORMAL', 'DARKEN', 'MULTIPLY', 'LINEAR_BURN', 'COLOR_BURN',
   'LIGHTEN', 'SCREEN', 'LINEAR_DODGE', 'COLOR_DODGE', 'OVERLAY', 'SOFT_LIGHT',
@@ -119,6 +123,7 @@ function expectedFragments(node, bindings) {
   const transform = localTransform(source);
   const blendMode = source.blendMode ?? 'NORMAL';
   const opacity = source.opacity ?? 1;
+  const cornerSmoothing = source.cornerSmoothing ?? 0;
   const hasOpacityBinding = bindings.some((record) => record.source.nodeId === node.id && owns('/opacity', record.source.propertyPath));
   const fragments = [];
   const push = (role, sourcePath, sourceIndex, payload, decorative = true, bindingPaths = [sourcePath]) => {
@@ -134,9 +139,9 @@ function expectedFragments(node, bindings) {
   };
   if (hasOpacityBinding || opacity !== 1 || !['NORMAL', 'PASS_THROUGH'].includes(blendMode)) push('isolation', '/compositing', null, { opacity, blendMode }, true, ['/opacity', '/blendMode']);
   if (source.isMask === true) push('mask', '/mask', null, { maskType: source.maskType ?? 'ALPHA' }, true, ['/isMask', '/maskType']);
-  if (source.clipsContent === true) push('clip', '/clipsContent', null, independentClipGeometry(source), true, ['/clipsContent', '/cornerRadius', '/rectangleCornerRadii']);
+  if (source.clipsContent === true) push('clip', '/clipsContent', null, independentClipGeometry(source, cornerSmoothing), true, ['/clipsContent', '/cornerRadius', '/rectangleCornerRadii', '/cornerSmoothing']);
   visible(source.fills).forEach(({ entry, index }) => push('paint', `/fills/${index}`, index, entry));
-  push('content', '/content', null, { nodeType: source.type, visible: source.visible !== false, cornerRadius: source.cornerRadius ?? null, rectangleCornerRadii: source.rectangleCornerRadii ?? null }, false, source.clipsContent === true ? [] : ['/cornerRadius', '/rectangleCornerRadii']);
+  push('content', '/content', null, { nodeType: source.type, visible: source.visible !== false, cornerRadius: source.cornerRadius ?? null, rectangleCornerRadii: source.rectangleCornerRadii ?? null, cornerSmoothing }, false, source.clipsContent === true ? [] : ['/cornerRadius', '/rectangleCornerRadii', '/cornerSmoothing']);
   visible(source.strokes).forEach(({ entry, index }, visibleIndex) => push('stroke', `/strokes/${index}`, index, { paint: entry, align: source.strokeAlign ?? 'INSIDE', weight: source.individualStrokeWeights ?? source.strokeWeight ?? 1, cap: source.strokeCap ?? 'NONE', join: source.strokeJoin ?? 'MITER', dashPattern: source.dashPattern ?? [] }, true, [`/strokes/${index}`, ...(visibleIndex === 0 ? ['/strokeWeight', '/individualStrokeWeights', '/strokeAlign', '/strokeCap', '/strokeJoin', '/dashPattern'] : [])]));
   visible(source.effects).forEach(({ entry, index }) => push('effect', `/effects/${index}`, index, entry));
   if (VECTOR_PATH_TYPES.has(source.type)) push('vector', '/vector', null, { vectorNetwork: source.vectorNetwork }, true, ['/vectorNetwork']);
@@ -161,22 +166,30 @@ function independentWorldResolver(nodesById, localById) {
   return resolve;
 }
 
-function independentClipGeometry(source) {
+function independentClipGeometry(source, cornerSmoothing) {
   if (Array.isArray(source.rectangleCornerRadii)) {
     const cornerRadii = [...source.rectangleCornerRadii];
-    return { shape: cornerRadii.some((radius) => radius > 0) ? 'rounded-rect' : 'rect', cornerRadii };
+    return { shape: cornerRadii.some((radius) => radius > 0) ? 'rounded-rect' : 'rect', cornerRadii, cornerSmoothing };
   }
   const radius = source.cornerRadius ?? 0;
-  return radius > 0 ? { shape: 'rounded-rect', cornerRadii: [radius, radius, radius, radius] } : { shape: 'rect' };
+  return radius > 0 ? { shape: 'rounded-rect', cornerRadii: [radius, radius, radius, radius], cornerSmoothing } : { shape: 'rect', cornerSmoothing };
 }
 
 function invalidVisibleCapability(nodes) {
   for (const node of nodes) {
     const source = node.properties;
     if (!validBlend(source.blendMode, true)) return true;
-    for (const field of ['fills', 'strokes', 'effects']) {
-      for (const { entry } of visible(source[field])) if (!validBlend(entry.blendMode, false)) return true;
+    if (!unitInterval(source.opacity ?? 1) || !unitInterval(source.cornerSmoothing ?? 0)) return true;
+    if (source.cornerRadius !== undefined && source.cornerRadius !== null && !nonNegative(source.cornerRadius)) return true;
+    if (source.rectangleCornerRadii !== undefined && source.rectangleCornerRadii !== null && (!Array.isArray(source.rectangleCornerRadii) || source.rectangleCornerRadii.length !== 4 || !source.rectangleCornerRadii.every(nonNegative))) return true;
+    if (source.isMask === true && !MASK_TYPES.has(source.maskType ?? 'ALPHA')) return true;
+    for (const [field, types] of [['fills', FILL_TYPES], ['strokes', STROKE_TYPES], ['effects', EFFECT_TYPES]]) {
+      if (source[field] !== undefined && !Array.isArray(source[field])) return true;
+      for (const { entry } of visible(source[field])) {
+        if (!record(entry) || !types.has(entry.type) || !validBlend(entry.blendMode, false)) return true;
+      }
     }
+    if (VECTOR_PATH_TYPES.has(source.type) && !record(source.vectorNetwork)) return true;
   }
   return false;
 }
@@ -186,6 +199,9 @@ const validBlend = (value, allowPassThrough) => {
   return BLEND_MODES.has(blend) && (allowPassThrough || blend !== 'PASS_THROUGH');
 };
 const semanticEligible = (record) => record?.emissionTarget === 'react' || record?.source?.slot?.kind === 'text-range';
+const record = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+const unitInterval = (value) => Number.isFinite(value) && value >= 0 && value <= 1;
+const nonNegative = (value) => Number.isFinite(value) && value >= 0;
 
 function expectedMaskGroups(nodes, nodesById) {
   const groups = [];
