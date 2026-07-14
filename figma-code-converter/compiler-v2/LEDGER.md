@@ -526,3 +526,19 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   Meta then identified an adjacent subtree-policy hole before verdict: authenticated metadata-only
   manifest/source-map churn satisfied the empty required set. The next replacement requires at
   least one generated screen/style/component artifact and carries the root-name-only mutation.
+- 2026-07-14 @s58-pixel-meta-qa authoritative `[REWORK — P6 CORE SNAPSHOT ONLY]`: exact target
+  `58a145d56da27a4d42a4cf283207302801a9cb1f`; all earlier P6 authority/G9/capture-reference/
+  G13/promotion findings and subtree `requiredAny` repair were credited closed. One §13.1
+  residual remained: browser version/UA did not identify the Chrome executable, OS image, font
+  installation/provenance, color profile, or complete render environment. P7 remains stopped.
+- 2026-07-14 Builder P6 environment repair evidence: capture now requires an opaque
+  microfixture-only environment authority; integration authority issuance fails closed until P0.
+  The manifest binds and re-verifies Chrome executable bytes/version/provenance, OS tuple/image id/
+  receipt bytes, installed font bytes/provenance/license plus Figma-to-web mapping, reference export
+  scale/profile, screenshot/reference decoded color space, fixed time, disabled motion, image/font
+  readiness, background, locale/direction/reduced motion, viewport/DPR, and observed font stacks.
+  Fidelity budgets and the report carry the exact manifest hash; independent G10/G11 oracle code
+  re-reads the same raw bytes without production validator imports. Permanent mutations cover
+  browser, OS image/receipt, font hash/provenance/license/mapping, color profile, background, and
+  stable time. Full boundary: 112 pass / 0 fail / 0 skip; syntax/diff checks green. This is Builder
+  evidence only; P6/P7/integration/promotion/cutover/Done remain uncleared.

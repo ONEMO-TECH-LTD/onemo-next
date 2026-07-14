@@ -1,7 +1,7 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,7 +16,7 @@ import { buildEmissionPackage } from '../src/emission-package.mjs';
 import { saveSegmentEdit } from '../src/editor-adapter.mjs';
 import { buildRuntimeProof, RuntimeProofError } from '../src/runtime-proof.mjs';
 import { assertRuntimeBuild, buildRuntimeBundle, RuntimeBundleError } from '../src/runtime-bundle.mjs';
-import { assertRuntimeCapture, captureRuntimeState } from '../src/runtime-capture.mjs';
+import { assertRuntimeCapture, captureRuntimeState, createMicrofixtureEnvironmentAuthority } from '../src/runtime-capture.mjs';
 import { p3Fixture } from './p3-fixture.mjs';
 import { p6Failures } from './p6-oracle.mjs';
 
@@ -24,6 +24,10 @@ const CODEC_POLICY_ID = 'p6-fixture-codecs-v1';
 const NODE_MODULES = path.dirname(path.dirname(fileURLToPath(import.meta.resolve('react'))));
 const PLAYWRIGHT = [process.env.FTC_PLAYWRIGHT, '/opt/homebrew/lib/node_modules/@playwright/test/node_modules/playwright/index.mjs', '/opt/homebrew/lib/node_modules/playwright/index.mjs'].filter(Boolean).find(existsSync);
 const CHROME = process.env.FTC_CHROME ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const FONT_PATH = process.env.FTC_FONT ?? '/System/Library/Fonts/Times.ttc';
+const FONT_SHA256 = existsSync(FONT_PATH) ? sha256(readFileSync(FONT_PATH)) : null;
+const OS_RECEIPT = '/System/Library/CoreServices/SystemVersion.plist';
+const OS_RECEIPT_SHA256 = existsSync(OS_RECEIPT) ? sha256(readFileSync(OS_RECEIPT)) : null;
 const acceptColorSyntax = ({ domain, syntax }) => domain === 'color' ? syntax : null;
 const optionsFor = (record) => record.destinationDomain === 'opacity-normalized' ? { opacityScale: 'percent' } : {};
 let sharedFixture;
@@ -34,6 +38,9 @@ after(async () => { if (sharedRoot) await rm(sharedRoot, { recursive: true, forc
 function compileFixture({ fixtureOptions = {}, mutate } = {}) {
   const { snapshot } = p3Fixture(fixtureOptions);
   Object.assign(snapshot.document, { layoutMode: 'VERTICAL', itemSpacing: 0, paddingTop: 8, paddingRight: 8, paddingBottom: 8, paddingLeft: 8, cornerRadius: 10 });
+  const textSupplement = snapshot.supplement.nodes.find((row) => row.nodeId === 'text');
+  textSupplement.fontDependencies = [{ family: 'Arial', style: 'Regular', providerId: 'font-apple-arial-regular', sha256: FONT_SHA256 }];
+  for (const segment of textSupplement.styledTextSegments) segment.fontName = { family: 'Arial', style: 'Regular' };
   mutate?.(snapshot);
   const model = buildCanonicalModel({ snapshot, evidenceClass: 'microfixture', fileKey: 'P6_FIXTURE' });
   const registryStage = stageTokenRegistry({ model, baseRegistry: emptyTokenRegistry(), webSyntaxPolicy: acceptColorSyntax });
@@ -50,6 +57,8 @@ async function fixture() {
   sharedFixture = (async () => {
     assert.ok(PLAYWRIGHT, 'pinned P6 browser runtime requires Playwright');
     assert.ok(existsSync(CHROME), 'pinned P6 browser runtime requires Chrome');
+    assert.ok(FONT_SHA256, 'pinned P6 browser runtime requires the approved font file');
+    assert.ok(OS_RECEIPT_SHA256, 'pinned P6 browser runtime requires the OS image receipt');
     sharedRoot = await mkdtemp(path.join(os.tmpdir(), 'compiler-v2-p6-evidence-'));
     const base = compileFixture();
     const label = compileFixture({ fixtureOptions: { colorName: 'Velvet / Renamed' } });
@@ -59,16 +68,35 @@ async function fixture() {
     const bundleA = await buildRuntimeBundle({ packageOutput: base.packageOutput, editorAuthority: base.editorAuthority, outDir: path.join(sharedRoot, 'a'), nodeModulesDir: NODE_MODULES });
     const bundleB = await buildRuntimeBundle({ packageOutput: base.packageOutput, editorAuthority: base.editorAuthority, outDir: path.join(sharedRoot, 'b'), nodeModulesDir: NODE_MODULES });
     const { chromium } = await import(PLAYWRIGHT);
+    const browserProbe = await chromium.launch({ executablePath: CHROME, headless: true, args: ['--force-color-profile=srgb'] });
+    const browserVersion = await browserProbe.version();
+    await browserProbe.close();
+    const environmentManifest = {
+      schemaVersion: 1,
+      evidenceClass: 'microfixture',
+      browser: { executablePath: CHROME, sha256: sha256(await readFile(CHROME)), version: browserVersion, provenanceId: 'system-google-chrome' },
+      os: {
+        platform: os.platform(), release: os.release(), arch: os.arch(), imageId: `local-${os.platform()}-${os.release()}-${os.arch()}`, provenanceId: 'local-microfixture-host',
+        receiptPath: OS_RECEIPT, receiptSha256: OS_RECEIPT_SHA256,
+      },
+      fonts: [{ figmaFamily: 'Arial', figmaStyle: 'Regular', webFamily: 'Times', filePath: FONT_PATH, sha256: FONT_SHA256, provenanceId: 'apple-system-font', licenseId: 'apple-system-font-license' }],
+      color: { figmaExportScale: 1, figmaColorProfile: 'srgb', browserColorProfile: 'srgb' },
+      render: {
+        animations: 'disabled', transitions: 'disabled', stableTimeMs: 1783987200000, imageDecoding: 'complete', fontReadiness: 'ready',
+        backgroundColor: 'rgba(0, 0, 0, 0)', locale: 'en-US', direction: 'ltr', reducedMotion: 'no-preference',
+      },
+    };
+    const environmentManifestHash = sha256(canonicalJson(environmentManifest));
+    const environmentAuthority = await createMicrofixtureEnvironmentAuthority({ environmentManifest, chromePath: CHROME });
     const viewport = { width: 120, height: 200, dpr: 1 };
     const bootstrapState = { id: 'light', rootId: base.model.documentGraph.rootId, viewport, collectionModes: { CK_THEME: 'light' }, metricClasses: ['flat-color'], reference: null };
-    const bootstrapBudgets = { schemaVersion: 1, environmentId: 'bootstrap', environment: {}, classes: { 'flat-color': { maxChangedPct: 0, maxMeanDelta: 0 } } };
-    const bootstrap = await captureRuntimeState({ chromium, chromePath: CHROME, bundle: bundleA, modeContextPlan: base.modeContextPlan, tokenPlan: base.tokenPlan, requiredState: bootstrapState, fidelityBudgets: bootstrapBudgets });
-    const reference = { kind: 'microfixture', fileKey: 'P6_MICRO_REFERENCE', version: 'fixture-v1', rootId: base.model.documentGraph.rootId };
+    const fidelityBudgets = { schemaVersion: 1, environmentManifestHash, classes: { 'flat-color': { maxChangedPct: 0, maxMeanDelta: 0 } } };
+    const bootstrap = await captureRuntimeState({ chromium, chromePath: CHROME, bundle: bundleA, modeContextPlan: base.modeContextPlan, tokenPlan: base.tokenPlan, requiredState: bootstrapState, fidelityBudgets, environmentManifest, environmentAuthority });
+    const reference = { kind: 'microfixture', fileKey: 'P6_MICRO_REFERENCE', version: 'fixture-v1', rootId: base.model.documentGraph.rootId, exportScale: 1, colorProfile: 'srgb' };
     const requiredState = { ...bootstrapState, reference };
-    const fidelityBudgets = { schemaVersion: 1, environmentId: bootstrap.runtime.environmentId, environment: bootstrap.runtime.environment, classes: { 'flat-color': { maxChangedPct: 0, maxMeanDelta: 0 } } };
     const capture = await captureRuntimeState({
       chromium, chromePath: CHROME, bundle: bundleA, modeContextPlan: base.modeContextPlan, tokenPlan: base.tokenPlan,
-      requiredState, fidelityBudgets, reference: { metadata: reference, bytes: bootstrap.screenshotBytes }, metricRegions: { 'flat-color': null },
+      requiredState, fidelityBudgets, environmentManifest, environmentAuthority, reference: { metadata: reference, bytes: bootstrap.screenshotBytes }, metricRegions: { 'flat-color': null },
     });
     const padding = base.packageOutput.sourceMap.segments.find((row) => row.nodeId === base.model.documentGraph.rootId && row.cssProperty === 'padding-top' && row.editable);
     assert.ok(padding, 'P6 editor fixture requires one addressable padding slot');
@@ -76,7 +104,7 @@ async function fixture() {
     const editedBundle = await buildRuntimeBundle({ packageOutput: edited.packageOutput, editorAuthority: edited.editorAuthority, outDir: path.join(sharedRoot, 'edited'), nodeModulesDir: NODE_MODULES });
     const editedCapture = await captureRuntimeState({
       chromium, chromePath: CHROME, bundle: editedBundle, modeContextPlan: base.modeContextPlan, tokenPlan: base.tokenPlan,
-      requiredState, fidelityBudgets, reference: { metadata: reference, bytes: bootstrap.screenshotBytes }, metricRegions: { 'flat-color': null },
+      requiredState, fidelityBudgets, environmentManifest, environmentAuthority, reference: { metadata: reference, bytes: bootstrap.screenshotBytes }, metricRegions: { 'flat-color': null },
     });
     const editorRun = {
       caseId: 'EC1', before: base, after: edited, selection: { kind: 'node', nodeId: base.model.documentGraph.rootId }, segmentId: padding.segmentId,
@@ -99,7 +127,7 @@ async function fixture() {
       editorRuns: [],
       blockers: ['G-1', 'G-2'],
     };
-    return { input, base, bundleA, bundleB, capture, editorRun, metadataOnly };
+    return { input, base, bundleA, bundleB, capture, editorRun, metadataOnly, environmentManifest, environmentAuthority, chromium, requiredState, fidelityBudgets };
   })();
   return sharedFixture;
 }
@@ -140,7 +168,7 @@ test('P6 authorities bite independently for build, capture bytes, reference byte
     (copy) => { const row = copy.localityRuns.find((item) => item.id === 'subtree'); copy.localityRuns[copy.localityRuns.indexOf(row)] = { ...row, after: metadataOnly }; },
     (copy) => { copy.runtimeCaptures[0] = { ...copy.runtimeCaptures[0], screenshotBytes: Buffer.from('forged') }; },
     (copy) => { copy.runtimeCaptures[0] = { ...copy.runtimeCaptures[0], referenceBytes: Buffer.from('forged') }; },
-    (copy) => { copy.runtimeCaptures[0] = { ...copy.runtimeCaptures[0], fidelityBudgets: { ...copy.fidelityBudgets, environmentId: 'forged' } }; },
+    (copy) => { copy.runtimeCaptures[0] = { ...copy.runtimeCaptures[0], fidelityBudgets: { ...copy.fidelityBudgets, environmentManifestHash: 'f'.repeat(64) } }; },
     (copy) => { copy.runtimeCaptures[0] = { ...copy.runtimeCaptures[0], metricRegions: { invented: null } }; },
     (copy) => { copy.runtimeCaptures[0] = { ...copy.runtimeCaptures[0], runtime: { ...copy.runtimeCaptures[0].runtime, rootId: 'forged' } }; },
   ];
@@ -192,7 +220,42 @@ test('P6 capture binds actual build, browser environment, screenshot/reference b
   assert.equal(capture.runtime.buildHash, capture.bundle.buildHash);
   assert.equal(capture.runtime.screenshot.sha256, sha256(capture.screenshotBytes));
   assert.equal(capture.runtime.reference.sha256, sha256(capture.referenceBytes));
+  assert.equal(capture.runtime.environmentManifestHash, sha256(canonicalJson(capture.environmentManifest)));
   assert.deepEqual(capture.runtime.metrics, { 'flat-color': { changedPct: 0, meanDelta: 0 } });
+});
+
+test('P6 environment identity binds browser, OS image, fonts, color profile, and render settings', async () => {
+  const { input, capture, bundleA, base, chromium, requiredState, fidelityBudgets, environmentAuthority } = await fixture();
+  const mutations = [
+    (manifest) => { manifest.browser.sha256 = 'f'.repeat(64); },
+    (manifest) => { manifest.os.imageId = 'different-image'; },
+    (manifest) => { manifest.os.receiptSha256 = 'f'.repeat(64); },
+    (manifest) => { manifest.fonts[0].sha256 = 'f'.repeat(64); },
+    (manifest) => { delete manifest.fonts[0].provenanceId; },
+    (manifest) => { delete manifest.fonts[0].licenseId; },
+    (manifest) => { manifest.fonts[0].webFamily = 'forged'; },
+    (manifest) => { manifest.color.figmaColorProfile = 'display-p3'; },
+    (manifest) => { manifest.render.backgroundColor = 'rgb(255, 255, 255)'; },
+    (manifest) => { manifest.render.stableTimeMs += 1; },
+  ];
+  for (const mutate of mutations) {
+    const unapprovedManifest = structuredClone(capture.environmentManifest);
+    mutate(unapprovedManifest);
+    await assert.rejects(captureRuntimeState({
+      chromium, chromePath: CHROME, bundle: bundleA, modeContextPlan: base.modeContextPlan, tokenPlan: base.tokenPlan, requiredState, fidelityBudgets,
+      environmentManifest: unapprovedManifest, environmentAuthority, reference: { metadata: requiredState.reference, bytes: capture.referenceBytes }, metricRegions: { 'flat-color': null },
+    }), /environment manifest lacks its approved authority/);
+    const copy = forkInput(input);
+    const evidence = { ...capture, environmentManifest: structuredClone(capture.environmentManifest), runtime: structuredClone(capture.runtime), fidelityBudgets: structuredClone(capture.fidelityBudgets) };
+    mutate(evidence.environmentManifest);
+    evidence.runtime.environmentManifestHash = sha256(canonicalJson(evidence.environmentManifest));
+    evidence.fidelityBudgets.environmentManifestHash = evidence.runtime.environmentManifestHash;
+    copy.fidelityBudgets = evidence.fidelityBudgets;
+    copy.runtimeCaptures = [evidence];
+    const report = await buildRuntimeProof(copy);
+    assert.equal(report.gates.G10, 'FAILED', JSON.stringify(report.issues));
+    assert.equal((await p6Failures({ ...copy, report })).G10, true);
+  }
 });
 
 test('P6 shape parser refuses malformed required-state structure', async () => {

@@ -1,10 +1,13 @@
 /** Independent P6 G9-G11/G13 oracle. No production proof/planner imports. */
 import { promises as fs } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
 import { canonicalJson, sha256 } from '../src/evidence.mjs';
 
 const EDITOR_CASES = ['EC1', 'EC2', 'EC3', 'EC4', 'EC5', 'EC6', 'EC7', 'EC8a', 'EC8b'];
+const HASH = /^[0-9a-f]{64}$/;
+const FONT_ROOTS = ['/System/Library/Fonts', '/Library/Fonts', path.join(os.homedir(), 'Library/Fonts')];
 const LOCALITY = {
   label: { required: ['token-registry.json'], allowed: ['manifest.json', 'source-map.json', 'token-registry.json'] },
   'token-value': { required: ['tokens.css'], allowed: ['manifest.json', 'source-map.json', 'tokens.css', 'token-values.ts', 'fidelity-report.json'] },
@@ -47,7 +50,7 @@ export async function p6Failures({ packageOutput, compileRequest, builds, locali
     if (!(await validCapture(evidence)) || canonicalJson(evidence?.requiredState) !== canonicalJson(state) || canonicalJson(evidence?.fidelityBudgets) !== canonicalJson(fidelityBudgets)
       || runtime?.packageHash !== packageHash || canonicalJson(runtime?.contexts) !== canonicalJson(expectedContexts) || canonicalJson(runtime?.bindings) !== canonicalJson(expectedBindings)
       || runtime?.consoleErrors?.length || runtime?.runtimeErrors?.length || runtime?.networkRequests?.length
-      || runtime?.environmentId !== sha256(canonicalJson(runtime?.environment)) || runtime?.environmentId !== fidelityBudgets?.environmentId || canonicalJson(runtime?.environment) !== canonicalJson(fidelityBudgets?.environment)
+      || !(await validEnvironment(evidence, state.viewport)) || runtime?.environmentManifestHash !== fidelityBudgets?.environmentManifestHash
       || runtime?.screenshot?.width !== width || runtime?.screenshot?.height !== height) G10 = true;
     if (!state.reference) continue;
     if (!runtime?.reference || canonicalJson(pickReference(runtime.reference)) !== canonicalJson(pickReference(state.reference))
@@ -97,12 +100,47 @@ async function validCapture(evidence) {
   try {
     if (!evidence || !(await validBuild(evidence.bundle)) || evidence.runtime.buildHash !== evidence.bundle.buildHash || evidence.runtime.packageHash !== evidence.bundle.packageHash) return false;
     const screenshot = await sharp(evidence.screenshotBytes).metadata();
-    if (evidence.runtime.screenshot.sha256 !== sha256(evidence.screenshotBytes) || evidence.runtime.screenshot.width !== screenshot.width || evidence.runtime.screenshot.height !== screenshot.height) return false;
+    if (evidence.runtime.screenshot.sha256 !== sha256(evidence.screenshotBytes) || evidence.runtime.screenshot.width !== screenshot.width || evidence.runtime.screenshot.height !== screenshot.height
+      || evidence.runtime.screenshot.colorProfile !== screenshot.space || screenshot.space !== evidence.environmentManifest.color.browserColorProfile) return false;
     if (evidence.requiredState.reference) {
       const reference = await sharp(evidence.referenceBytes).metadata();
-      if (evidence.runtime.reference.sha256 !== sha256(evidence.referenceBytes) || evidence.runtime.reference.width !== reference.width || evidence.runtime.reference.height !== reference.height) return false;
+      if (evidence.runtime.reference.sha256 !== sha256(evidence.referenceBytes) || evidence.runtime.reference.width !== reference.width || evidence.runtime.reference.height !== reference.height
+        || evidence.runtime.reference.decodedColorProfile !== reference.space || reference.space !== evidence.environmentManifest.color.figmaColorProfile) return false;
     }
     return true;
+  } catch { return false; }
+}
+
+async function validEnvironment(evidence, viewport) {
+  try {
+    const manifest = evidence.environmentManifest;
+    const { browser, os: operatingSystem, fonts, color, render } = manifest;
+    if (manifest.schemaVersion !== 1 || !['microfixture', 'integration'].includes(manifest.evidenceClass) || !path.isAbsolute(browser.executablePath) || !HASH.test(browser.sha256)
+      || !browser.version || !browser.provenanceId || sha256(await fs.readFile(await fs.realpath(browser.executablePath))) !== browser.sha256) return false;
+    if (operatingSystem.platform !== os.platform() || operatingSystem.release !== os.release() || operatingSystem.arch !== os.arch() || !operatingSystem.imageId || !operatingSystem.provenanceId
+      || !path.isAbsolute(operatingSystem.receiptPath) || !HASH.test(operatingSystem.receiptSha256) || sha256(await fs.readFile(await fs.realpath(operatingSystem.receiptPath))) !== operatingSystem.receiptSha256) return false;
+    if (!Array.isArray(fonts) || !fonts.length) return false;
+    const mappings = new Set();
+    for (const font of fonts) {
+      if (!font.figmaFamily || !font.figmaStyle || !font.webFamily || !font.provenanceId || !font.licenseId || !path.isAbsolute(font.filePath) || !HASH.test(font.sha256)) return false;
+      const realFont = await fs.realpath(font.filePath);
+      const mapping = `${font.figmaFamily}\u0000${font.figmaStyle}`;
+      if (!FONT_ROOTS.some((root) => within(root, realFont)) || sha256(await fs.readFile(realFont)) !== font.sha256 || mappings.has(mapping)) return false;
+      mappings.add(mapping);
+    }
+    if (!(color.figmaExportScale > 0) || color.figmaColorProfile !== 'srgb' || color.browserColorProfile !== 'srgb') return false;
+    if (!Number.isSafeInteger(render.stableTimeMs) || render.stableTimeMs < 0 || render.animations !== 'disabled' || render.transitions !== 'disabled'
+      || render.imageDecoding !== 'complete' || render.fontReadiness !== 'ready' || !render.backgroundColor || !render.locale || !['ltr', 'rtl'].includes(render.direction)
+      || !['reduce', 'no-preference'].includes(render.reducedMotion)) return false;
+    const observed = evidence.runtime.environment;
+    const webFonts = new Set(fonts.map((font) => font.webFamily));
+    if (observed.browserVersion !== browser.version || observed.locale !== render.locale || observed.direction !== render.direction || observed.reducedMotion !== render.reducedMotion
+      || observed.fontsReady !== true || observed.imagesDecoded !== true || observed.backgroundColor !== render.backgroundColor || observed.stableTimeMs !== render.stableTimeMs
+      || observed.animationsDisabled !== true || observed.transitionsDisabled !== true || observed.deviceScaleFactor !== viewport.dpr || canonicalJson(observed.viewport) !== canonicalJson(viewport)
+      || !Array.isArray(observed.fontFamilies) || !observed.fontFamilies.every((family) => family.split(',').map((part) => part.trim().replace(/^['"]|['"]$/g, '')).some((name) => webFonts.has(name)))) return false;
+    const manifestHash = sha256(canonicalJson(manifest));
+    return evidence.runtime.environmentManifestHash === manifestHash && evidence.fidelityBudgets.environmentManifestHash === manifestHash
+      && (!evidence.requiredState.reference || (evidence.requiredState.reference.exportScale === color.figmaExportScale && evidence.requiredState.reference.colorProfile === color.figmaColorProfile));
   } catch { return false; }
 }
 
@@ -198,9 +236,10 @@ async function measureRegions(actualBytes, referenceBytes, regions) {
 const allFailed = () => ({ G9: true, G10: true, G11: true, G13: true });
 const subtreeFile = (name) => name === 'manifest.json' || name === 'source-map.json' || name === 'fidelity-report.json' || ['screens/', 'styles/', 'components/'].some((prefix) => name.startsWith(prefix));
 const generatedSubtreeFile = (name) => ['screens/', 'styles/', 'components/'].some((prefix) => name.startsWith(prefix));
-const pickReference = (row) => row && ({ kind: row.kind, fileKey: row.fileKey, version: row.version, rootId: row.rootId, manifestHash: row.manifestHash ?? null, captureId: row.captureId ?? null });
+const pickReference = (row) => row && ({ kind: row.kind, fileKey: row.fileKey, version: row.version, rootId: row.rootId, manifestHash: row.manifestHash ?? null, captureId: row.captureId ?? null, exportScale: row.exportScale, colorProfile: row.colorProfile });
 const finite = (value) => Number.isFinite(value) && value >= 0;
 const changedFiles = (before, after) => [...new Set([...Object.keys(before), ...Object.keys(after)])].filter((name) => before[name] !== after[name]).sort();
+const within = (root, candidate) => candidate === root || candidate.startsWith(`${root}${path.sep}`);
 
 function expectedRuntimeBindings(tokenPlan) {
   const rows = [...(tokenPlan?.tokenData?.css ?? []), ...(tokenPlan?.tokenData?.react ?? [])];

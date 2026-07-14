@@ -62,7 +62,7 @@ export async function buildRuntimeProof(input) {
     schemaVersion: 1,
     state,
     packageHash,
-    environmentId: input.fidelityBudgets.environmentId,
+    environmentManifestHash: input.fidelityBudgets.environmentManifestHash,
     gates,
     blockers: [...input.blockers],
     promotionAuthorityId: null,
@@ -86,9 +86,10 @@ function validateShape(input) {
   for (const state of request.requiredStates) {
     if (!state.id || !request.rootIds.includes(state.rootId) || !validViewport(state.viewport) || !plainObject(state.collectionModes) || !stringSet(state.metricClasses) || !state.metricClasses.length) throw new RuntimeProofError(`required state ${state.id ?? '?'} malformed`);
     if (state.reference !== null && (!plainObject(state.reference) || !['microfixture', 'figma-export'].includes(state.reference.kind) || !state.reference.fileKey || !state.reference.version || !state.reference.rootId
+      || !Number.isFinite(state.reference.exportScale) || state.reference.exportScale <= 0 || state.reference.colorProfile !== 'srgb'
       || (state.reference.kind === 'figma-export' && (!HASH.test(state.reference.manifestHash ?? '') || !state.reference.captureId)))) throw new RuntimeProofError(`required state ${state.id} reference malformed`);
   }
-  if (input.fidelityBudgets.schemaVersion !== 1 || !input.fidelityBudgets.environmentId || !plainObject(input.fidelityBudgets.environment) || !plainObject(input.fidelityBudgets.classes)) throw new RuntimeProofError('fidelity budgets malformed');
+  if (input.fidelityBudgets.schemaVersion !== 1 || !HASH.test(input.fidelityBudgets.environmentManifestHash ?? '') || !plainObject(input.fidelityBudgets.classes)) throw new RuntimeProofError('fidelity budgets malformed');
 }
 
 async function verifyBuilds(builds, packageHash, issues) {
@@ -262,7 +263,7 @@ const plainObject = (value) => value !== null && typeof value === 'object' && !A
 const validViewport = (row) => plainObject(row) && Number.isInteger(row.width) && row.width > 0 && Number.isInteger(row.height) && row.height > 0 && Number.isFinite(row.dpr) && row.dpr > 0;
 const stringSet = (rows) => Array.isArray(rows) && rows.every((row) => typeof row === 'string' && row) && new Set(rows).size === rows.length;
 const finiteNonnegative = (value) => Number.isFinite(value) && value >= 0;
-const pickReference = (row) => ({ kind: row.kind, fileKey: row.fileKey, version: row.version, rootId: row.rootId, manifestHash: row.manifestHash ?? null, captureId: row.captureId ?? null });
+const pickReference = (row) => ({ kind: row.kind, fileKey: row.fileKey, version: row.version, rootId: row.rootId, manifestHash: row.manifestHash ?? null, captureId: row.captureId ?? null, exportScale: row.exportScale, colorProfile: row.colorProfile });
 const changedFiles = (before, after) => [...new Set([...Object.keys(before), ...Object.keys(after)])].filter((name) => before[name] !== after[name]).sort();
 
 function expectedRuntimeBindings(tokenPlan) {
