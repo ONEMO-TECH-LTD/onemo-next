@@ -46,7 +46,7 @@ Decisions/Done/cutover: Dan only.
 | P1 evidence capture | pending | — | |
 | P2 canonical graphs | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `0c8471b` | sole authoritative QA/Meta cleared the frozen code snapshot only; live/plugin evidence still blocked by G-1/G-2 |
 | P3 mother token/component slice | SNAPSHOT CLEAR; PHASE EVIDENCE BLOCKED | `5dbcb39` | sole authoritative QA/Meta cleared core snapshot; real mother/plugin-origin exit blocked by G-1/G-2/G-4 |
-| P4 mother layout/render slice | VECTOR RESIDUAL REPAIRED; AWAITING AUTHORITATIVE SNAPSHOT REVIEW | — | typed VectorNetwork repair; original F1-F5/R1 remain closed; runnable mother output blocked by G-1/G-2/G-4 |
+| P4 mother layout/render slice | FORK RESIDUAL REPAIRED; AWAITING AUTHORITATIVE SNAPSHOT REVIEW | — | typed fork-free VectorNetwork repair; original F1-F5/R1/R2 remain closed; runnable mother output blocked by G-1/G-2/G-4 |
 | P5 emitters/security/editability | pending | — | |
 | P6 runtime/visual/editor proof | pending | — | |
 | P7 corpus & scale | pending | — | |
@@ -244,6 +244,12 @@ Decisions/Done/cutover: Dan only.
   topology. `{vertices:[],segments:[]}` remains valid. Permanent planner and independently forged
   oracle mutations cover missing/non-array fields, nonfinite vertices/tangents, bad endpoints,
   bad region references, and open/disconnected loops. P4 is 13/13/0; full boundary 98/98/0.
+- Authoritative rereview of `aafc525` closed those structure/index/value/orientation claims and
+  reproduced one topology escape: a figure-eight region made from two closed triangles sharing
+  one vertex passed the ordered cursor walk. Planner and oracle now independently require every
+  vertex participating in a declared region loop to have degree exactly two, counting a self-loop
+  twice. The shared-vertex degree-four mutation is permanently planner-red and G7-red; valid open
+  networks without regions, empty networks, and reversed-orientation triangles remain green.
 - This is a Builder core checkpoint only, not P4 phase clearance: runnable sandbox emission is the
   next seam, and real plugin/mother evidence remains blocked by G-1/G-2/G-4.
 
@@ -377,3 +383,8 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   97/97/0. One adjacent R2 blocker remained: any object, including `{}`, passed as vector geometry
   in planner and oracle. Required repair is the typed Figma VectorNetwork structure and topology,
   with independent permanent mutations. Original F1-F5 and R1 remain closed; sandbox stays stopped.
+- 2026-07-14 @s58-pixel-meta-qa authoritative `[REWORK — P4 VECTOR RESIDUAL SNAPSHOT ONLY]`:
+  exact target `aafc525fc1cab803d66d87cc43bbd657f99a5ccf`; 98/98/0 and all advertised vector
+  mutations closed. A degree-four shared vertex across two triangles inside one declared loop
+  remained planner/oracle green. Required repair is an independent degree-exactly-two fork-free
+  law per region loop. Every earlier P4 finding remains credited closed; sandbox stays stopped.

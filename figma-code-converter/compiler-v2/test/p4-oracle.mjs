@@ -210,7 +210,7 @@ function validVectorNetwork(value) {
   if (!value.segments.every((segment) => record(segment) && indexIn(segment.start, value.vertices.length) && indexIn(segment.end, value.vertices.length) && validVector(segment.tangentStart) && validVector(segment.tangentEnd))) return false;
   if (value.regions === undefined) return true;
   if (!Array.isArray(value.regions)) return false;
-  return value.regions.every((region) => record(region) && WINDING_RULES.has(region.windingRule) && Array.isArray(region.loops) && region.loops.length > 0 && region.loops.every((loop) => Array.isArray(loop) && loop.length > 0 && loop.every((segmentIndex) => indexIn(segmentIndex, value.segments.length)) && oracleClosedLoop(loop, value.segments)));
+  return value.regions.every((region) => record(region) && WINDING_RULES.has(region.windingRule) && Array.isArray(region.loops) && region.loops.length > 0 && region.loops.every((loop) => Array.isArray(loop) && loop.length > 0 && loop.every((segmentIndex) => indexIn(segmentIndex, value.segments.length)) && oracleForkFree(loop, value.segments) && oracleClosedLoop(loop, value.segments)));
 }
 
 function oracleClosedLoop(loop, segments) {
@@ -227,6 +227,16 @@ function oracleClosedLoop(loop, segments) {
     cursors = next;
   }
   return [...cursors.values()].some(({ origin, cursor }) => origin === cursor);
+}
+
+function oracleForkFree(loop, segments) {
+  const degree = new Map();
+  for (const segmentIndex of loop) {
+    const { start, end } = segments[segmentIndex];
+    degree.set(start, (degree.get(start) ?? 0) + (start === end ? 2 : 1));
+    if (start !== end) degree.set(end, (degree.get(end) ?? 0) + 1);
+  }
+  return [...degree.values()].every((value) => value === 2);
 }
 
 const indexIn = (value, length) => Number.isInteger(value) && value >= 0 && value < length;

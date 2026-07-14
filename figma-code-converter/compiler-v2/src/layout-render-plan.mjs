@@ -295,6 +295,7 @@ function validatedVectorNetwork(value, nodeId) {
         if (!Array.isArray(loop) || loop.length === 0) throw new LayoutRenderError('FAILED_CAPABILITY', `node ${nodeId} vectorNetwork region ${regionIndex} loop ${loopIndex} must be non-empty`);
         for (const segmentIndex of loop) if (!validIndex(segmentIndex, value.segments.length)) throw new LayoutRenderError('FAILED_CAPABILITY', `node ${nodeId} vectorNetwork region ${regionIndex} loop ${loopIndex} references invalid segment ${segmentIndex}`);
         if (!formsClosedUndirectedLoop(loop, value.segments)) throw new LayoutRenderError('FAILED_CAPABILITY', `node ${nodeId} vectorNetwork region ${regionIndex} loop ${loopIndex} must form a connected closed chain`);
+        if (!isForkFreeLoop(loop, value.segments)) throw new LayoutRenderError('FAILED_CAPABILITY', `node ${nodeId} vectorNetwork region ${regionIndex} loop ${loopIndex} must be fork-free`);
       });
     });
   }
@@ -315,6 +316,17 @@ function formsClosedUndirectedLoop(loop, segments) {
     if (states.length === 0) return false;
   }
   return states.some(([origin, cursor]) => origin === cursor);
+}
+
+function isForkFreeLoop(loop, segments) {
+  const degree = new Map();
+  const add = (vertex, amount = 1) => degree.set(vertex, (degree.get(vertex) ?? 0) + amount);
+  for (const segmentIndex of loop) {
+    const segment = segments[segmentIndex];
+    if (segment.start === segment.end) add(segment.start, 2);
+    else { add(segment.start); add(segment.end); }
+  }
+  return [...degree.values()].every((value) => value === 2);
 }
 
 const uniquePairs = (pairs) => [...new Map(pairs.map((pair) => [`${pair[0]}:${pair[1]}`, pair])).values()];

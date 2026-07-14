@@ -280,6 +280,11 @@ test('P4 validates exact Figma VectorNetwork structure and independent topology'
     [{ vertices: [{ x: 0, y: 0 }], segments: [{ start: 0, end: 1 }] }, /segment 0 endpoints must reference vertices/],
     [{ vertices: [{ x: 0, y: 0 }], segments: [], regions: [{ windingRule: 'NONZERO', loops: [[0]] }] }, /loop 0 references invalid segment 0/],
     [{ vertices: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }], segments: [{ start: 0, end: 1 }, { start: 1, end: 2 }], regions: [{ windingRule: 'NONZERO', loops: [[0, 1]] }] }, /loop 0 must form a connected closed chain/],
+    [{
+      vertices: [{ x: 0, y: 0 }, { x: -1, y: 1 }, { x: -1, y: -1 }, { x: 1, y: 1 }, { x: 1, y: -1 }],
+      segments: [{ start: 0, end: 1 }, { start: 1, end: 2 }, { start: 2, end: 0 }, { start: 0, end: 3 }, { start: 3, end: 4 }, { start: 4, end: 0 }],
+      regions: [{ windingRule: 'NONZERO', loops: [[0, 1, 2, 3, 4, 5]] }],
+    }, /loop 0 must be fork-free/],
   ];
   for (const [network, message] of invalid) assert.throws(() => buildLayoutRenderPlan(vectorModel(network)), message);
 
