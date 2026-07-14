@@ -73,7 +73,7 @@ Decisions/Done/cutover: Dan only.
 3. **Hermetic fixtures**: committed synthetic replacement for the lost gitignored legacy golden
    now preserves the 60-node structural/emission/fresh-IR reverse laws without claiming plugin
    provenance; legacy suite is 49/49/0. Sanitized Shape E1-E13 microfixtures remain pending.
-   [PARTIAL — missing-golden failure closed]
+   [PARTIAL SNAPSHOT CLEAR `8df8b1b` — missing-golden failure closed]
 4. **fidelity-budgets.json**: synchronized Figma/build pairs at one file version; repeat-run
    noise measured; per-class thresholds published with sample sizes + exclusions. [pending]
 5. **Capture operability envelope**: measured wall time/bytes/requests for REST nodes,
@@ -683,3 +683,10 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   preservation, and independent oracle passed review. Reviewer boundary 143/143/0 with syntax/
   diff/status green. Production configuration, live signatures, activation, P9 phase, cutover,
   promotion, and Done remain uncleared.
+- 2026-07-14 @s58-pixel-meta-qa authoritative
+  `[CLEAR — P0 HERMETIC GOLDEN REPAIR SNAPSHOT ONLY]`: exact target
+  `8df8b1b179d6beadb09b825b36dc020a1215b956`. The committed synthetic fixture deterministically
+  yields 60 IR nodes, three absolute children, one rotated child, and no structural refusals;
+  structural, emission/id-map, and fresh-IR reverse laws passed. Reviewer focused boundary
+  30/30/0 with syntax/diff/status green. This repairs only the lost gitignored golden; E1-E13,
+  plugin corpus, P0 phase, integration, promotion, cutover, and Done remain uncleared.
