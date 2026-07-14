@@ -557,3 +557,9 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   accepted budgets, runtime, mutation, and scale proof are explicit blockers. Capture-operator live
   verification says only Shape `6075:53685` exists; remaining roles and distinct mother stay
   G-1/G-2/G-4. P7 test boundary: 6 pass / 0 fail / 0 skip. Builder evidence only; P7 is uncleared.
+- 2026-07-14 @s58-pixel-meta-qa authoritative `[CLEAR — P7 INVENTORY CORE SNAPSHOT ONLY]`:
+  exact target `4169daba2169d5315b0743f651b88c51047d275e` passed review. The ten-role,
+  sealed-read/census/identity/provenance/content/distinct-mother/seal/hash/realpath laws are
+  fail-closed; structurally complete descriptors remain diagnostic and not integration-ready.
+  This releases dependent P7 mutation/scale construction only. Live corpus, capture authority,
+  budgets, runtime, mutation, scale, P7 phase/integration/promotion/cutover/Done remain uncleared.
