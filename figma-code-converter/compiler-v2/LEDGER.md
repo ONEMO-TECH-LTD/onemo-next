@@ -799,3 +799,18 @@ measurement owed (G-1). Envelope acceptance belongs to QA/Meta/Dan per §4.7.
   199/199/0 plus legacy 49/49/0 = 248/248/0. This is a diagnostic authority mechanism only: no
   separately reviewed/signed live adapter, plugin capture, evidence snapshot, accepted envelope,
   P1 phase, integration, promotion, cutover, or Done claim.
+- 2026-07-14 Builder P1 plugin-reader checkpoint: added the actual import-free, read-only Figma
+  plugin reader plus a separate host normalizer. The plugin captures one exact JSON_REST_V1 root,
+  complete node supplement rows, resolved/explicit modes, full styled-text segments, native
+  component/instance semantics, local and referenced alias variables/collections, image bytes,
+  declared SVG exports, file/page/color-profile identity, and documentchange evidence. It cannot
+  mint file-version/branch locks or licensed web-font bytes: the host independently supplies and
+  conserves those authorities before any plugin-complete source-plane label exists. The normalizer
+  requires one root per transaction; exact node/image/SVG/mode/component/variable census; pinned
+  font bytes and UTF-16 range coverage; confined collision-free assets; and a matching versioned
+  dependency boundary. The actual bundle passes the static adapter audit and its output passes the
+  existing three-pass P1 transaction. An independent oracle bites document, supplement, variable,
+  component, asset, font, root-lock, and provenance substitutions. Focused P1 boundary 8/8/0;
+  full Compiler v2 203/203/0 plus legacy 49/49/0 = 252/252/0. This remains synthetic diagnostic
+  evidence: the adapter bytes have no external integration receipt, no live plugin-origin Shape
+  capture exists, and P1 phase/integration/promotion/cutover/Done remain open.

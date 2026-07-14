@@ -69,14 +69,16 @@ export function auditCaptureAdapterBundle({ bundleBytes, entryFile }) {
       if (containsPropertyTarget(node.left)) refuse(node, 'property writes are forbidden');
       if (ts.isIdentifier(node.left) && node.left.text === 'figma') refuse(node, 'figma capability reassignment is forbidden');
     }
-    if ((ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) && (ts.isPropertyAccessExpression(node.operand) || ts.isElementAccessExpression(node.operand))) refuse(node, 'property updates are forbidden');
+    const propertyUpdate = (ts.isPrefixUnaryExpression(node) && [ts.SyntaxKind.PlusPlusToken, ts.SyntaxKind.MinusMinusToken].includes(node.operator))
+      || ts.isPostfixUnaryExpression(node);
+    if (propertyUpdate && (ts.isPropertyAccessExpression(node.operand) || ts.isElementAccessExpression(node.operand))) refuse(node, 'property updates are forbidden');
     if (ts.isPropertyAccessExpression(node)) {
       const name = node.name.text;
       const full = propertyChain(node);
       properties.add(full);
       if (FORBIDDEN_PROPERTIES.has(name)) refuse(node, `forbidden mutation/runtime property ${name}`);
     }
-    if (ts.isIdentifier(node) && FORBIDDEN_IDENTIFIERS.has(node.text)) refuse(node, `forbidden runtime identifier ${node.text}`);
+    if (ts.isIdentifier(node) && FORBIDDEN_IDENTIFIERS.has(node.text) && !isNonComputedPropertyName(node)) refuse(node, `forbidden runtime identifier ${node.text}`);
     if (ts.isIdentifier(node) && node.text === 'figma' && !isFigmaParameter(node) && (!(ts.isPropertyAccessExpression(node.parent) && node.parent.expression === node) || !isDescendantOf(node, factory))) refuse(node, 'figma capability may only be read through direct named properties inside its factory');
     if (ts.isCallExpression(node)) {
       if (node.expression.kind === ts.SyntaxKind.ImportKeyword) refuse(node, 'dynamic import is forbidden');
@@ -248,6 +250,13 @@ function propertyChain(node) {
 function isFigmaParameter(node) {
   return ts.isParameter(node.parent) && node.parent.name === node && ts.isFunctionDeclaration(node.parent.parent)
     && node.parent.parent.name?.text === 'createCaptureAdapter' && node.parent.parent.parent.kind === ts.SyntaxKind.SourceFile;
+}
+
+function isNonComputedPropertyName(node) {
+  const parent = node.parent;
+  return (ts.isPropertyAccessExpression(parent) && parent.name === node)
+    || ((ts.isPropertyAssignment(parent) || ts.isMethodDeclaration(parent) || ts.isMethodSignature(parent)
+      || ts.isPropertyDeclaration(parent) || ts.isPropertySignature(parent)) && parent.name === node);
 }
 
 function isAssignment(kind) {

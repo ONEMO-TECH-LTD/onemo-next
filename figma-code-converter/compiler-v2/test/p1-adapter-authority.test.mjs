@@ -66,6 +66,10 @@ test('P1 adapter audit inventories exact safe bundle calls and Ed25519 authority
 });
 
 test('P1 adapter audit rejects mutation, import, dynamic access, property writes, and runtime escapes', () => {
+  assert.doesNotThrow(() => auditCaptureAdapterBundle({
+    bundleBytes: Buffer.from('export function createCaptureAdapter(figma){ return Object.freeze({ absent(){ return !figma.fileKey; } }); }'),
+    entryFile: 'read-only-negation.mjs',
+  }));
   const attacks = [
     'export function createCaptureAdapter(figma){ return figma.createRectangle(); }',
     'export function createCaptureAdapter(figma){ const n=figma.currentPage; n.remove(); }',
@@ -88,7 +92,9 @@ test('P1 adapter audit rejects mutation, import, dynamic access, property writes
     'export function createCaptureAdapter(figma){ const invoke=(fn)=>fn(); return invoke; }',
     'figma.currentPage; export function createCaptureAdapter(figma){ return {}; }',
     'export function createCaptureAdapter(figma){ return globalThis.navigator; }',
+    'export function createCaptureAdapter(figma){ return document.body; }',
     'export function createCaptureAdapter(figma){ ({opacity:figma.currentPage.opacity}={opacity:0}); return {}; }',
+    'export function createCaptureAdapter(figma){ figma.currentPage.opacity++; return {}; }',
     'export function createCaptureAdapter(figma){ delete figma.currentPage.name; return {}; }',
   ];
   for (const source of attacks) assert.throws(() => auditCaptureAdapterBundle({ bundleBytes: Buffer.from(source), entryFile: 'attack.mjs' }));
