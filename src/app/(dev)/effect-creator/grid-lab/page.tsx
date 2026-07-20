@@ -101,15 +101,18 @@ export default function GridLab() {
       if (!base || base.outer.pts.length < 3) return null
       const b = base
       const cfg = { pitchMM: pitch, paddingMM: pad, pattern, plan, perimeterOnly: coverage === 'perimeter', center: centerMode }
-      // sized(mm): real-mm contour at longest-side `mm`, with the outline offset (grow/shrink) applied.
-      const sized = (mm: number): Contour => {
-        const c = scaleContour(b, mm)
-        if (!offsetMM) return c
-        const o = insetRingMM(c.outer.pts, offsetMM, 'round')
-        return o && o.length >= 3 ? { outer: { pts: o }, holes: [] } : c
+      // DESIGN stays fixed at the set size. Auto-grow adds an outward MARGIN (offset) around it — the border
+      // the magnets' padding uses. Manual "offset" is the starting margin. Total effect = design + 2×margin.
+      const design = scaleContour(b, sizeMM)
+      const withMargin = (m: number): Contour => {
+        if (Math.abs(m) < 0.01) return design
+        const o = insetRingMM(design.outer.pts, m, 'round')
+        return o && o.length >= 3 ? { outer: { pts: o }, holes: [] } : design
       }
-      const fit = balancedFit(sized, cfg, sizeMM, maxGrowMM)
-      return { contour: sized(fit.sizeMM), grid: fit.grid, effSize: fit.sizeMM, grew: fit.grew }
+      const fit = balancedFit(withMargin, cfg, offsetMM, maxGrowMM)
+      const effect = withMargin(fit.sizeMM)
+      const eff = Math.round(Math.max(dim(effect, 0), dim(effect, 1)))
+      return { contour: effect, design, grid: fit.grid, marginMM: fit.sizeMM, grew: fit.grew, effSize: eff }
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
   }, [src, preset, gen, p1, p2, sides, points, sizeMM, pitch, pad, pattern, plan, magic, coverage, offsetMM, centerMode, maxGrowMM])
 
@@ -137,7 +140,7 @@ export default function GridLab() {
             <span className="gl-eye">{model ? `1mm = ${scale.toFixed(2)} px` : '—'}</span>
           </div>
           <div className="gl-vp">
-            {model ? <Stage contour={model.contour} grid={model.grid} frame={frame} />
+            {model ? <Stage contour={model.contour} design={model.design} grid={model.grid} frame={frame} />
               : src === 'magic'
                 ? <Empty text={magStatus.startsWith('error') ? magStatus.slice(6) : magStatus === 'downloading-model' ? 'Downloading the cut-out model…' : magStatus.startsWith('cutting') ? 'Cutting out the shape…' : 'Upload an image to cut its outline'} spin={magStatus === 'downloading-model' || magStatus.startsWith('cutting')} />
                 : <Empty text="shape unavailable" />}
@@ -146,6 +149,7 @@ export default function GridLab() {
           <div className="gl-legend">
             <span><i style={{ background: 'var(--magnet)' }} />6mm magnet</span>
             <span><i style={{ background: 'var(--mag8)' }} />8mm magnet</span>
+            <span><i style={{ background: 'var(--margin)' }} />margin band</span>
             <span><i style={{ background: 'var(--grid)', opacity: .55 }} />node · no material</span>
             <span><i style={{ background: 'var(--fail)' }} />flap risk</span>
           </div>
@@ -194,12 +198,12 @@ export default function GridLab() {
           </div>
 
           <div className="gl-card gl-pad">
-            <Slider label="Min size · longest side (floor)" unit="mm" v={sizeMM} set={setSizeMM} min={40} max={200} />
-            <Slider label="Max auto-grow · balance" unit="mm" v={maxGrowMM} set={setMaxGrowMM} min={0} max={80} />
+            <Slider label="Design size · longest side" unit="mm" v={sizeMM} set={setSizeMM} min={40} max={200} />
+            <Slider label="Max auto-margin · balance" unit="mm" v={maxGrowMM} set={setMaxGrowMM} min={0} max={80} />
             {model && <div className="gl-total">
               <span className="gl-total-k">Total effect size</span>
               <b className="gl-total-v">{model.effSize}<small> mm</small></b>
-              <span className="gl-total-note">{model.grew > 0 ? `↑ auto-grew +${model.grew}mm from your ${sizeMM}mm floor` : 'at your set size'}</span>
+              <span className="gl-total-note">{model.marginMM > 0.5 ? `design ${sizeMM}mm + ${Math.round(model.marginMM)}mm margin${model.grew > 0.5 ? ` (+${Math.round(model.grew)} auto)` : ''}` : `design ${sizeMM}mm · no margin`}</span>
             </div>}
             <div className="gl-field"><span>Grid pitch · fixed standard</span>
               <div className="gl-seg">
@@ -209,7 +213,7 @@ export default function GridLab() {
               </div>
             </div>
             <Slider label="Magnet padding · per spot · min 10" unit="mm" v={pad} set={setPad} min={10} max={30} />
-            <Slider label="Outline offset · grow / shrink" unit="mm" v={offsetMM} set={setOffsetMM} min={-15} max={15} />
+            <Slider label="Base margin · outward offset" unit="mm" v={offsetMM} set={setOffsetMM} min={-15} max={15} />
 
             <div className="gl-field"><span>Grid pattern</span>
               <div className="gl-seg">
@@ -261,20 +265,27 @@ function dim(c: Contour, axis: 0 | 1): number {
   return hi - lo
 }
 
-function Stage({ contour, grid, frame }: { contour: Contour; grid: ReturnType<typeof computeGrid>; frame: boolean }) {
-  const pts = contour.outer.pts.map(([x, y]) => [x, -y] as Pt)
+const pathFrom = (pp: Pt[]) => 'M ' + pp.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ') + ' Z'
+function Stage({ contour, design, grid, frame }: { contour: Contour; design: Contour; grid: ReturnType<typeof computeGrid>; frame: boolean }) {
+  const ePts = contour.outer.pts.map(([x, y]) => [x, -y] as Pt)
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-  for (const [x, y] of pts) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y }
+  for (const [x, y] of ePts) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y }
   const w = maxX - minX, h = maxY - minY, S = (VP * FIT) / Math.max(w, h)
-  const d = 'M ' + pts.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ') + ' Z'
+  const eD = pathFrom(ePts)
+  const hasMargin = design !== contour && design.outer.pts.length >= 3
+  const dD = hasMargin ? pathFrom(design.outer.pts.map(([x, y]) => [x, -y] as Pt)) : ''
   const fy = (p: Pt): Pt => [p[0], -p[1]]
   const seat = new Set(grid.anchors.map(a => a.p[0].toFixed(2) + ',' + a.p[1].toFixed(2)))
   const hasFlap = grid.flaps.length > 0
   return (
     <svg width={w * S} height={h * S} viewBox={`${minX} ${minY} ${w} ${h}`}>
-      <path d={d} fill="var(--suede)" />
+      {/* effect = design + margin: fill the whole effect as MARGIN material, then the design on top → the
+          margin band shows as the ring between the dashed design outline and the effect edge. */}
+      <path d={eD} fill={hasMargin ? 'var(--margin)' : 'var(--suede)'} />
+      {hasMargin && <path d={dD} fill="var(--suede)" />}
       {/* frame: red when edges would lift (flap risk), else the 1mm suede edge — no per-vertex ring spam */}
-      {frame && <path d={d} fill="none" stroke={hasFlap ? 'var(--fail)' : 'var(--suede-edge)'} strokeOpacity={hasFlap ? 0.85 : 1} strokeWidth={hasFlap ? 1.5 : 1} strokeLinejoin="round" />}
+      {frame && <path d={eD} fill="none" stroke={hasFlap ? 'var(--fail)' : 'var(--suede-edge)'} strokeOpacity={hasFlap ? 0.85 : 1} strokeWidth={hasFlap ? 1.5 : 1} strokeLinejoin="round" />}
+      {hasMargin && <path d={dD} fill="none" stroke="var(--accent)" strokeOpacity={0.6} strokeWidth={0.8} strokeDasharray="3 2" />}
       {grid.candidates.filter(c => !seat.has(c[0].toFixed(2) + ',' + c[1].toFixed(2))).map((c, i) => {
         const p = fy(c); return <circle key={'c' + i} cx={p[0]} cy={p[1]} r={1.6} fill="var(--grid)" fillOpacity={0.5} />
       })}
@@ -314,11 +325,11 @@ function Cell({ k, v }: { k: string; v: string }) { return <div className="gl-ce
 
 const CSS = `
 .gl{--bg:#eef1f5;--panel:#fff;--panel-2:#f6f8fb;--line:#dbe1ea;--ink:#18202e;--ink-2:#5a6577;--ink-3:#93a0b3;
-  --accent:#2f6bff;--accent-soft:#2f6bff18;--grid:#9fb0cc;--suede:#454952;--suede-edge:#2c2f36;--magnet:#20242c;
+  --accent:#2f6bff;--accent-soft:#2f6bff18;--grid:#9fb0cc;--suede:#454952;--margin:#6a707c;--suede-edge:#2c2f36;--magnet:#20242c;
   --magnet-hi:#6b7280;--mag8:#c98a12;--pass:#1a9e4b;--fail:#e5484d;--shadow:0 1px 2px #18202e0d,0 10px 26px #18202e0f;
   --mono:ui-monospace,"SF Mono",Menlo,monospace;--sans:system-ui,-apple-system,"Segoe UI",sans-serif;
   background:var(--bg);color:var(--ink);font-family:var(--sans);min-height:100vh;padding:26px 20px 70px;-webkit-font-smoothing:antialiased}
-@media (prefers-color-scheme:dark){.gl:not([data-theme]){--bg:#0f141b;--panel:#161c25;--panel-2:#12171f;--line:#232c3a;--ink:#e6edf3;--ink-2:#9aa6b6;--ink-3:#66717f;--accent:#4d84ff;--accent-soft:#4d84ff20;--grid:#3d4a60;--suede:#3a3e46;--suede-edge:#22262d;--magnet:#0b0e12;--magnet-hi:#4a515c;--shadow:0 1px 2px #0005,0 12px 30px #0006}}
+@media (prefers-color-scheme:dark){.gl:not([data-theme]){--bg:#0f141b;--panel:#161c25;--panel-2:#12171f;--line:#232c3a;--ink:#e6edf3;--ink-2:#9aa6b6;--ink-3:#66717f;--accent:#4d84ff;--accent-soft:#4d84ff20;--grid:#3d4a60;--suede:#3a3e46;--margin:#4d535e;--suede-edge:#22262d;--magnet:#0b0e12;--magnet-hi:#4a515c;--shadow:0 1px 2px #0005,0 12px 30px #0006}}
 .gl *{box-sizing:border-box}
 .gl-head{max-width:1060px;margin:0 auto 20px}
 .gl-head h1{font-size:20px;font-weight:640;letter-spacing:-.01em;margin:0 0 5px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
