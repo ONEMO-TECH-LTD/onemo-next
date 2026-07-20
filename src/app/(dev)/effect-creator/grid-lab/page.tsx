@@ -9,13 +9,13 @@
 
 import { useMemo, useRef, useState } from 'react'
 import { getShape, hasVectorDef, type VectorShapeKind } from '@/lib/shape-library'
-import { flattenShape, type VShape } from '@/lib/vector-core'
+import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import { contourFromShape } from '@/lib/effect/geometry-truth'
 import { insetRingMM } from '@/lib/effect/offset'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { computeGrid, fitSizeToGrid, scaleContour, type GridPattern, type MagnetPlan } from '@/lib/effect/grid'
+import { computeGrid, balancedFit, scaleContour, type GridPattern, type MagnetPlan } from '@/lib/effect/grid'
 
 const IMG = 1000
 const VP = 440
@@ -32,12 +32,16 @@ function bboxOf(pts: ReadonlyArray<{ x: number; y: number }>) {
   for (const p of pts) { if (p.x < a) a = p.x; if (p.x > c) c = p.x; if (p.y < b) b = p.y; if (p.y > d) d = p.y }
   return { w: c - a, h: d - b }
 }
-/** VShape → mm contour normalized so its longest side = 1mm (scaleContour then sizes it). */
+/** VShape → mm contour normalized so its longest side = 1mm. Flatten FINELY first (mmPerPx=1 → 0.05px
+ *  tolerance = smooth curves), THEN normalize the points — otherwise the tiny mmPerPx blows up the
+ *  flatten tolerance and circles/squircles come out faceted. */
 function normBase(vs: VShape, maskH: number): Contour | null {
-  const rings = flattenShape(vs, 1)
-  const bb = bboxOf(rings[0] ?? [])
-  const L = Math.max(bb.w, bb.h, 1)
-  return contourFromShape(vs, { mmPerPx: 1 / L, maskHeightPx: maskH })
+  const c = contourFromShape(vs, { mmPerPx: 1, maskHeightPx: maskH })
+  if (!c || c.outer.pts.length < 3) return null
+  let mnx = Infinity, mny = Infinity, mxx = -Infinity, mxy = -Infinity
+  for (const [x, y] of c.outer.pts) { if (x < mnx) mnx = x; if (x > mxx) mxx = x; if (y < mny) mny = y; if (y > mxy) mxy = y }
+  const L = Math.max(mxx - mnx, mxy - mny, 1)
+  return { outer: { pts: c.outer.pts.map(([x, y]) => [x / L, y / L] as Pt) }, holes: [] }
 }
 
 export default function GridLab() {
@@ -55,8 +59,9 @@ export default function GridLab() {
   const [pattern, setPattern] = useState<GridPattern>('standard')
   const [plan, setPlan] = useState<MagnetPlan>('all6')
   const [frame, setFrame] = useState(true)
-  const [autoFit, setAutoFit] = useState(false)
   const [coverage, setCoverage] = useState<'full' | 'perimeter'>('perimeter')
+  const [centerMode, setCenterMode] = useState<'centroid' | 'bbox'>('centroid')
+  const [maxGrowMM, setMaxGrowMM] = useState(12)
 
   const [magic, setMagic] = useState<MagicState>(null)
   const [magStatus, setMagStatus] = useState<string>('')   // '', 'downloading-model', 'cutting', 'error:...'
@@ -95,7 +100,7 @@ export default function GridLab() {
       }
       if (!base || base.outer.pts.length < 3) return null
       const b = base
-      const cfg = { pitchMM: pitch, paddingMM: pad, pattern, plan, perimeterOnly: coverage === 'perimeter' }
+      const cfg = { pitchMM: pitch, paddingMM: pad, pattern, plan, perimeterOnly: coverage === 'perimeter', center: centerMode }
       // sized(mm): real-mm contour at longest-side `mm`, with the outline offset (grow/shrink) applied.
       const sized = (mm: number): Contour => {
         const c = scaleContour(b, mm)
@@ -103,14 +108,10 @@ export default function GridLab() {
         const o = insetRingMM(c.outer.pts, offsetMM, 'round')
         return o && o.length >= 3 ? { outer: { pts: o }, holes: [] } : c
       }
-      if (autoFit) {
-        const fit = fitSizeToGrid(sized, cfg, sizeMM)
-        return { contour: sized(fit.sizeMM), grid: fit.grid, effSize: fit.sizeMM, snapped: fit.snapped }
-      }
-      const contour = sized(sizeMM)
-      return { contour, grid: computeGrid(contour, cfg), effSize: sizeMM, snapped: false }
+      const fit = balancedFit(sized, cfg, sizeMM, maxGrowMM)
+      return { contour: sized(fit.sizeMM), grid: fit.grid, effSize: fit.sizeMM, grew: fit.grew }
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
-  }, [src, preset, gen, p1, p2, sides, points, sizeMM, pitch, pad, pattern, plan, magic, autoFit, coverage, offsetMM])
+  }, [src, preset, gen, p1, p2, sides, points, sizeMM, pitch, pad, pattern, plan, magic, coverage, offsetMM, centerMode, maxGrowMM])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genParams = {
@@ -193,15 +194,18 @@ export default function GridLab() {
           </div>
 
           <div className="gl-card gl-pad">
-            <label className="gl-toggle"><span>Snap size to grid <small style={{ color: 'var(--ink-3)' }}>· auto-scale to fit</small></span>
-              <input type="checkbox" checked={autoFit} onChange={e => setAutoFit(e.target.checked)} /></label>
-            {autoFit
-              ? <div className="gl-snap">Effect size <b>{model ? model.effSize : '—'} mm</b><span>snapped up the standard ladder to envelop a 4-point cell with padding</span></div>
-              : <Slider label="Effect size · longest side" unit="mm" v={sizeMM} set={setSizeMM} min={40} max={200} />}
+            <Slider label="Min size · longest side (floor)" unit="mm" v={sizeMM} set={setSizeMM} min={40} max={200} />
+            <Slider label="Max auto-grow · balance" unit="mm" v={maxGrowMM} set={setMaxGrowMM} min={0} max={80} />
+            {model && <div className="gl-total">
+              <span className="gl-total-k">Total effect size</span>
+              <b className="gl-total-v">{model.effSize}<small> mm</small></b>
+              <span className="gl-total-note">{model.grew > 0 ? `↑ auto-grew +${model.grew}mm from your ${sizeMM}mm floor` : 'at your set size'}</span>
+            </div>}
             <div className="gl-field"><span>Grid pitch · fixed standard</span>
               <div className="gl-seg">
-                <button aria-pressed={pitch === 48} onClick={() => setPitch(48)}>48 mm · standard</button>
-                <button aria-pressed={pitch === 24} onClick={() => setPitch(24)}>24 mm · fine</button>
+                <button aria-pressed={pitch === 24} onClick={() => setPitch(24)}>24 · fine</button>
+                <button aria-pressed={pitch === 48} onClick={() => setPitch(48)}>48 · standard</button>
+                <button aria-pressed={pitch === 72} onClick={() => setPitch(72)}>72 · spacious</button>
               </div>
             </div>
             <Slider label="Magnet padding · per spot · min 10" unit="mm" v={pad} set={setPad} min={10} max={30} />
@@ -209,14 +213,20 @@ export default function GridLab() {
 
             <div className="gl-field"><span>Grid pattern</span>
               <div className="gl-seg">
-                {(['standard', 'quincunx', 'granular'] as GridPattern[]).map(p =>
-                  <button key={p} aria-pressed={pattern === p} onClick={() => setPattern(p)}>{p === 'quincunx' ? 'Dice-5' : cap(p)}</button>)}
+                {(['standard', 'quincunx'] as GridPattern[]).map(p =>
+                  <button key={p} aria-pressed={pattern === p} onClick={() => setPattern(p)}>{p === 'quincunx' ? 'Dice-5' : 'Standard'}</button>)}
               </div>
             </div>
             <div className="gl-field"><span>Coverage</span>
               <div className="gl-seg">
                 {([['full', 'Full grid'], ['perimeter', 'Perimeter belt']] as ['full' | 'perimeter', string][]).map(([c, l]) =>
                   <button key={c} aria-pressed={coverage === c} onClick={() => setCoverage(c)}>{l}</button>)}
+              </div>
+            </div>
+            <div className="gl-field"><span>Grid centering · A/B</span>
+              <div className="gl-seg">
+                {([['centroid', 'Centroid'], ['bbox', 'Bbox centre']] as ['centroid' | 'bbox', string][]).map(([m, l]) =>
+                  <button key={m} aria-pressed={centerMode === m} onClick={() => setCenterMode(m)}>{l}</button>)}
               </div>
             </div>
             <div className="gl-field"><span>Magnet plan</span>
@@ -269,7 +279,7 @@ function Stage({ contour, grid, frame }: { contour: Contour; grid: ReturnType<ty
         const p = fy(c); return <circle key={'c' + i} cx={p[0]} cy={p[1]} r={1.6} fill="var(--grid)" fillOpacity={0.5} />
       })}
       {/* per-spot application padding ring: magnet radius + padding — the material each magnet needs to bond */}
-      {grid.anchors.map((a, i) => { const p = fy(a.p); return <circle key={'ring' + i} cx={p[0]} cy={p[1]} r={a.dia / 2 + grid.applicationPadMM} fill="none" stroke="var(--accent)" strokeOpacity={0.3} strokeWidth={0.5} strokeDasharray="2.5 2.5" /> })}
+      {grid.anchors.map((a, i) => { const p = fy(a.p); return <circle key={'ring' + i} cx={p[0]} cy={p[1]} r={grid.applicationPadMM} fill="none" stroke="var(--accent)" strokeOpacity={0.3} strokeWidth={0.5} strokeDasharray="2.5 2.5" /> })}
       {grid.anchors.map((a, i) => {
         const p = fy(a.p)
         return <g key={'a' + i}>
@@ -348,6 +358,11 @@ const CSS = `
 .gl-upload:hover{filter:brightness(1.05)}
 .gl-magic-note{font:11.5px var(--mono);color:var(--ink-2);line-height:1.5}
 .gl-snap{font-size:12.5px;color:var(--ink-2)}.gl-snap b{font:600 13px var(--mono);color:var(--ink)}.gl-snap span{display:block;font:11px var(--mono);color:var(--ink-3);margin-top:3px}
+.gl-total{margin:2px 0;padding:13px 15px;background:var(--accent-soft);border:1px solid var(--accent);border-radius:12px;display:flex;flex-direction:column;gap:3px}
+.gl-total-k{font:600 10px var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--accent)}
+.gl-total-v{font:700 32px var(--mono);color:var(--ink);line-height:1;font-variant-numeric:tabular-nums}
+.gl-total-v small{font-size:15px;font-weight:600;color:var(--ink-2)}
+.gl-total-note{font:11px var(--mono);color:var(--ink-2)}
 .gl-slider{display:flex;flex-direction:column;gap:6px}
 .gl-slider-row{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;color:var(--ink-2)}
 .gl-slider-row b{font:600 12.5px var(--mono);color:var(--ink);font-variant-numeric:tabular-nums}

@@ -13,7 +13,6 @@
 
 import type { Contour, Pt } from './types'
 import { pointInPolygon } from './attachment'
-import { insetRingMM } from './offset'
 
 export type GridPattern = 'standard' | 'quincunx' | 'granular'
 export type MagnetPlan = 'all6' | 'all8' | 'corners8'
@@ -23,6 +22,9 @@ export const DEFAULT_PITCH_MM = 48
 export const PADDING_FLOOR_MM = 10
 export const MIN_ANCHORS = 2
 export const TARGET_ANCHORS = 4
+/** How far a magnet holds material down before an edge would lift — a PHYSICAL distance, independent of
+ *  the chosen grid pitch (a fine 24mm grid doesn't make the fabric flap sooner). Tunable (coupon later). */
+export const HOLD_REACH_MM = 48
 
 export interface GridConfig {
   pitchMM?: number
@@ -30,6 +32,7 @@ export interface GridConfig {
   pattern?: GridPattern
   plan?: MagnetPlan
   perimeterOnly?: boolean // default true — magnetic belt (drop redundant interior)
+  center?: 'centroid' | 'bbox' // where the fixed grid is anchored (A/B). default 'centroid'
 }
 
 export interface Anchor { p: Pt; dia: MagnetDia }
@@ -55,6 +58,52 @@ function bbox(pts: ReadonlyArray<Pt>): BBox {
   return { minX, minY, maxX, maxY }
 }
 function dist(a: Pt, b: Pt) { return Math.hypot(a[0] - b[0], a[1] - b[1]) }
+
+/** Shortest distance from point `p` to segment a–b. */
+function distToSeg(p: Pt, a: Pt, b: Pt): number {
+  const vx = b[0] - a[0], vy = b[1] - a[1]
+  const wx = p[0] - a[0], wy = p[1] - a[1]
+  const c1 = vx * wx + vy * wy
+  if (c1 <= 0) return Math.hypot(wx, wy)
+  const c2 = vx * vx + vy * vy
+  if (c2 <= c1) return Math.hypot(p[0] - b[0], p[1] - b[1])
+  const t = c1 / c2
+  return Math.hypot(p[0] - (a[0] + t * vx), p[1] - (a[1] + t * vy))
+}
+/** Shortest distance from `p` to the outline ring (any edge). Used for the per-node padding test — checked
+ *  against the REAL outline (no erosion) so pinched shapes (a duck's head + body) keep BOTH regions. */
+function distToRing(p: Pt, ring: ReadonlyArray<Pt>): number {
+  let m = Infinity
+  for (let i = 0, n = ring.length; i < n; i++) { const d = distToSeg(p, ring[i], ring[(i + 1) % n]); if (d < m) m = d }
+  return m
+}
+
+/** The most-interior point of the silhouette (pole of inaccessibility, sampled) + its distance to the edge.
+ *  Used as the guaranteed single-magnet fallback when the sparse grid seats none. */
+function deepestPoint(outer: ReadonlyArray<Pt>, bb: BBox): { p: Pt; d: number } | null {
+  const step = Math.max(2, Math.min(bb.maxX - bb.minX, bb.maxY - bb.minY) / 24)
+  let best: Pt | null = null, bestD = -1
+  for (let x = bb.minX; x <= bb.maxX; x += step) for (let y = bb.minY; y <= bb.maxY; y += step) {
+    const p: Pt = [x, y]
+    if (!pointInPolygon(p, outer)) continue
+    const d = distToRing(p, outer)
+    if (d > bestD) { bestD = d; best = p }
+  }
+  return best ? { p: best, d: bestD } : null
+}
+
+/** Area centroid of a polygon ring (balances material). Falls back to bbox centre if degenerate. */
+function polyCentroid(ring: ReadonlyArray<Pt>): Pt {
+  let a = 0, cx = 0, cy = 0
+  for (let i = 0, n = ring.length; i < n; i++) {
+    const [x0, y0] = ring[i], [x1, y1] = ring[(i + 1) % n]
+    const cross = x0 * y1 - x1 * y0
+    a += cross; cx += (x0 + x1) * cross; cy += (y0 + y1) * cross
+  }
+  a *= 0.5
+  if (Math.abs(a) < 1e-6) { const b = bbox(ring); return [(b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2] }
+  return [cx / (6 * a), cy / (6 * a)]
+}
 
 /** Node positions along an axis at fixed `step` with a phase offset, spanning [min, max]. */
 function axisFrom(min: number, max: number, step: number, phase: number): number[] {
@@ -141,49 +190,60 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const pattern = cfg.pattern ?? 'standard'
   const plan = cfg.plan ?? 'all6'
   const perimeterOnly = cfg.perimeterOnly ?? true
+  const centerMode = cfg.center ?? 'centroid'
   const outer = contourMM.outer.pts
   const bb = bbox(outer)
   const issues: string[] = []
 
-  const rMag = plan === 'all6' ? 3 : 4
-  const safe = insetRingMM(outer, -(rMag + pad), 'round')
-  const hasSafe = !!safe && safe.length >= 3
-  const cx = (bb.minX + bb.maxX) / 2, cy = (bb.minY + bb.maxY) / 2
+  // A node is VALID = inside the silhouette AND ≥ pad from the outline (10mm application radius, from the
+  // magnet centre). Checked PER NODE against the REAL outline — no erosion — so a shape that pinches into
+  // separate regions (a duck's head AND body) seats magnets in BOTH, not just the largest eroded piece.
+  const valid = (p: Pt) => pointInPolygon(p, outer) && distToRing(p, outer) >= pad
+  const inMaterial = (p: Pt) => pointInPolygon(p, outer)
 
-  // Phase-optimize: MAX seated count (coverage) first, then fewest flaps, then most-centred/balanced.
-  let bestSeated: Pt[] = []
-  let bestOx = 0, bestOy = 0
-  if (hasSafe) {
-    const OFF = 6
-    let bestScore = -Infinity
-    for (let iy = 0; iy < OFF; iy++) for (let ix = 0; ix < OFF; ix++) {
-      const ox = (ix / OFF) * pitch, oy = (iy / OFF) * pitch
-      const seat = latticeAt(bb, pitch, pattern, ox, oy).filter((p) => pointInPolygon(p, safe!))
-      if (!seat.length) continue
-      const flaps = flapVerts(outer, seat, pitch).length
-      let sx = 0, sy = 0; for (const p of seat) { sx += p[0]; sy += p[1] }
-      const balance = Math.hypot(sx / seat.length - cx, sy / seat.length - cy)
-      const score = seat.length * 100000 - flaps * 100 - balance
-      if (score > bestScore) { bestScore = score; bestSeated = seat; bestOx = ox; bestOy = oy }
-    }
-  }
-
-  // GAPS: grid slots with material under them (inside the silhouette) that couldn't seat (padding blocked)
-  // yet are flanked by ≥2 seated neighbours — an unbalanced hole. balancedFit nudges size up to clear them.
+  // CENTER the fixed grid on the shape — balanced by construction (the grid translates as a rigid bulk).
+  // A/B: centroid balances MATERIAL (lopsided shapes); bbox-centre balances the FRAME (regular shapes).
+  let fullSeated: Pt[] = []
   let gaps = 0
-  if (bestSeated.length) {
-    const seatKeys = new Set(bestSeated.map((p) => p[0].toFixed(1) + ',' + p[1].toFixed(1)))
+  {
+    const c: Pt = centerMode === 'bbox'
+      ? [(bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2]
+      : polyCentroid(outer)
+    const ox0 = (((c[0] - bb.minX) % pitch) + pitch) % pitch
+    const oy0 = (((c[1] - bb.minY) % pitch) + pitch) % pitch
+    const h = pitch / 2
+    // Try both CENTRED parities per axis — a node ON the centre vs a cell centred (nodes at ±pitch/2). Both
+    // are centred rigid translations; keep whichever seats more → small shapes get a 4-corner cell, not one dot.
+    const oxs = [ox0, (ox0 + h) % pitch], oys = [oy0, (oy0 + h) % pitch]
+    let bestScore = -Infinity, chosenNodes: Pt[] = []
+    for (const px of oxs) for (const py of oys) {
+      const nodes = latticeAt(bb, pitch, pattern, px, py)
+      const seat = nodes.filter(valid)
+      let sx = 0, sy = 0; for (const p of seat) { sx += p[0]; sy += p[1] }
+      const bal = seat.length ? Math.hypot(sx / seat.length - c[0], sy / seat.length - c[1]) : 1e9
+      const score = seat.length * 1000 - bal // most seated, then most balanced
+      if (score > bestScore) { bestScore = score; fullSeated = seat; chosenNodes = nodes }
+    }
+    // GAPS: material slots (inside the silhouette) that couldn't seat (padding-blocked) yet are flanked by
+    // ≥2 seated neighbours — an unbalanced hole. balancedFit grows the size until this clears.
+    const seatKeys = new Set(fullSeated.map((p) => p[0].toFixed(1) + ',' + p[1].toFixed(1)))
     const nR = pitch * 1.2
-    for (const n of latticeAt(bb, pitch, pattern, bestOx, bestOy)) {
+    for (const n of chosenNodes) {
       if (seatKeys.has(n[0].toFixed(1) + ',' + n[1].toFixed(1))) continue
-      if (!pointInPolygon(n, outer)) continue // no material → not a gap
-      let nb = 0
-      for (const s of bestSeated) if (dist(n, s) <= nR) nb++
+      if (!inMaterial(n)) continue // no material → not a gap
+      let nb = 0; for (const s of fullSeated) if (dist(n, s) <= nR) nb++
       if (nb >= 2) gaps++
     }
   }
 
-  let seated = bestSeated
+  // GUARANTEE ≥1: if the sparse grid seated nothing but the shape can still hold a magnet, drop one at the
+  // deepest interior point (a single magnet has no spacing to honour, so grid phase is moot here).
+  if (fullSeated.length === 0) {
+    const dp = deepestPoint(outer, bb)
+    if (dp && dp.d >= pad) fullSeated = [dp.p]
+  }
+
+  let seated = fullSeated
   let interior: Pt[] = []
   if (perimeterOnly && seated.length > 4) {
     const split = splitPerimeter(seated, neighbourStep(pitch, pattern))
@@ -191,10 +251,10 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   }
   const anchors = assignSizes(seated, plan)
 
-  if (!hasSafe) issues.push(`No room for a magnet — the shape is too small/thin to fit a magnet plus its ${pad}mm application ring.`)
-  else if (seated.length < MIN_ANCHORS) issues.push(`Too small — only ${seated.length} magnet grips material. Turn on "Snap size to grid" to auto-size it up.`)
-  const flaps: Pt[] = seated.length ? flapVerts(outer, seated, pitch) : []
-  if (flaps.length > 0) issues.push(`Some edge areas have no magnet within reach (red edge). Turn on "Snap size to grid", or reduce the pitch.`)
+  if (!seated.length) issues.push(`No room for a magnet — too small/thin to keep a magnet ${pad}mm from every edge.`)
+  else if (seated.length < MIN_ANCHORS) issues.push(`Too small — only ${seated.length} magnet grips material. Increase the size or the max auto-grow.`)
+  const flaps: Pt[] = seated.length ? flapVerts(outer, seated, HOLD_REACH_MM) : []
+  if (flaps.length > 0) issues.push(`Some edge areas sit more than ${HOLD_REACH_MM}mm from a magnet (red edge) and could lift. Raise the size / max auto-grow.`)
 
   let minD = 8, maxD = 6
   for (const a of anchors) { if (a.dia < minD) minD = a.dia; if (a.dia > maxD) maxD = a.dia }
@@ -217,23 +277,30 @@ export function scaleContour(base: Contour, longestMM: number): Contour {
 }
 
 /**
- * Sizing ADAPTS: scan UP from the selected size and return the first size whose grid seats ≥ target
- * magnets (envelops the corners). `sized(mm)` produces the real-mm contour (applies any outline offset).
+ * Sizing ADAPTS (always-on, capped): from the selected size, nudge UP in small steps up to `maxGrowMM`
+ * and keep the first size that is BALANCED — zero gaps and ≥ target magnets (envelops the corners). If
+ * nothing within the cap is gap-free, keep the size with the fewest gaps (then most magnets). `sized(mm)`
+ * produces the real-mm contour (applies the outline offset). `maxGrowMM = 0` disables growth (pure size).
  */
-export function fitSizeToGrid(
-  sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number,
-  opts: { target?: number; maxMM?: number; step?: number } = {},
-): { sizeMM: number; grid: GridResult; snapped: boolean } {
+export function balancedFit(
+  sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, maxGrowMM: number,
+  opts: { target?: number; step?: number } = {},
+): { sizeMM: number; grid: GridResult; grew: number } {
   const target = opts.target ?? TARGET_ANCHORS
-  const maxMM = opts.maxMM ?? 300
-  const step = opts.step ?? 5
+  const step = opts.step ?? 3
   const start = Math.round(fromMM)
-  let fallback: { sizeMM: number; grid: GridResult } | null = null
-  for (let mm = start; mm <= maxMM; mm += step) {
+  const end = start + Math.max(0, maxGrowMM)
+  let best: { sizeMM: number; grid: GridResult } | null = null
+  let bestRank = Infinity
+  for (let mm = start; mm <= end; mm += step) {
     const grid = computeGrid(sized(mm), cfg)
-    if (!fallback && grid.anchors.length >= MIN_ANCHORS) fallback = { sizeMM: mm, grid }
-    if (grid.anchors.length >= target) return { sizeMM: mm, grid, snapped: mm !== start }
+    // perfect = zero gaps AND ≥ target magnets → take the first (smallest) such size immediately
+    if (grid.gaps === 0 && grid.anchors.length >= target) return { sizeMM: mm, grid, grew: mm - start }
+    // otherwise rank: fewer gaps first, then more magnets (negated), then smaller size
+    const rank = grid.gaps * 1000 - grid.anchors.length
+    if (rank < bestRank) { bestRank = rank; best = { sizeMM: mm, grid } }
   }
-  if (fallback) return { ...fallback, snapped: fallback.sizeMM !== start }
-  return { sizeMM: maxMM, grid: computeGrid(sized(maxMM), cfg), snapped: true }
+  if (best) return { ...best, grew: best.sizeMM - start }
+  const grid = computeGrid(sized(start), cfg)
+  return { sizeMM: start, grid, grew: 0 }
 }
