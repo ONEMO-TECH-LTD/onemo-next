@@ -80,6 +80,8 @@ export default function GridLab() {
       .catch((err) => { console.error('[grid-lab] magic failed', err); setMagStatus('error:' + ((err as Error)?.message ?? 'cut failed')) })
   }
 
+  const sizeMax = src === 'preset' ? 200 : 180 // random shapes (image/generators) capped at 180mm
+
   const model = useMemo(() => {
     try {
       // base contour normalized so longest side = 1mm (scale-free); scaleContour() sizes it in mm
@@ -103,7 +105,9 @@ export default function GridLab() {
       const cfg = { pitchMM: pitch, paddingMM: pad, pattern, plan, perimeterOnly: coverage === 'perimeter', center: centerMode }
       // DESIGN stays fixed at the set size. Auto-grow adds an outward MARGIN (offset) around it — the border
       // the magnets' padding uses. Manual "offset" is the starting margin. Total effect = design + 2×margin.
-      const design = scaleContour(b, sizeMM)
+      // random shapes (AI Magic / generators) are capped at 180mm; presets go to 200mm
+      const dSize = Math.min(sizeMM, src === 'preset' ? 200 : 180)
+      const design = scaleContour(b, dSize)
       const withMargin = (m: number): Contour => {
         if (Math.abs(m) < 0.01) return design
         const o = insetRingMM(design.outer.pts, m, 'round')
@@ -112,7 +116,7 @@ export default function GridLab() {
       const fit = balancedFit(withMargin, cfg, offsetMM, maxGrowMM)
       const effect = withMargin(fit.sizeMM)
       const eff = Math.round(Math.max(dim(effect, 0), dim(effect, 1)))
-      return { contour: effect, design, grid: fit.grid, marginMM: fit.sizeMM, grew: fit.grew, effSize: eff }
+      return { contour: effect, design, grid: fit.grid, marginMM: fit.sizeMM, grew: fit.grew, effSize: eff, designSize: dSize }
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
   }, [src, preset, gen, p1, p2, sides, points, sizeMM, pitch, pad, pattern, plan, magic, coverage, offsetMM, centerMode, maxGrowMM])
 
@@ -198,12 +202,12 @@ export default function GridLab() {
           </div>
 
           <div className="gl-card gl-pad">
-            <Slider label="Design size · longest side" unit="mm" v={sizeMM} set={setSizeMM} min={40} max={200} />
+            <Slider label={`Design size · longest side${src !== 'preset' ? ' · max 180' : ''}`} unit="mm" v={Math.min(sizeMM, sizeMax)} set={setSizeMM} min={40} max={sizeMax} />
             <Slider label="Max auto-margin · balance" unit="mm" v={maxGrowMM} set={setMaxGrowMM} min={0} max={80} />
             {model && <div className="gl-total">
               <span className="gl-total-k">Total effect size</span>
               <b className="gl-total-v">{model.effSize}<small> mm</small></b>
-              <span className="gl-total-note">{model.marginMM > 0.5 ? `design ${sizeMM}mm + ${Math.round(model.marginMM)}mm margin${model.grew > 0.5 ? ` (+${Math.round(model.grew)} auto)` : ''}` : `design ${sizeMM}mm · no margin`}</span>
+              <span className="gl-total-note">{model.marginMM > 0.5 ? `design ${model.designSize}mm + ${Math.round(model.marginMM)}mm margin${model.grew > 0.5 ? ` (+${Math.round(model.grew)} auto)` : ''}` : `design ${model.designSize}mm · no margin`}</span>
             </div>}
             <div className="gl-field"><span>Grid pitch · fixed standard</span>
               <div className="gl-seg">
