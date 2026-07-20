@@ -1,14 +1,16 @@
-@import "tailwindcss";
+/* App is plain CSS (no Tailwind). DS tokens are loaded directly in layout.tsx
+   (import "./tokens/tokens.css") as a plain :root cascade — the format every consumer
+   (app body + all converted screens via var(--sem-…)) actually uses. Tailwind was removed:
+   nothing used its utilities, and its @theme pipeline tree-shook the DS token cascade,
+   breaking converted screens. */
 
-/* Align TW4 dark: variant with our [data-theme="dark"] switching.
-   Without this, dark:bg-* uses prefers-color-scheme instead of data attribute. */
-@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
-
-/* DS v2.3 tokens (single source, auto-synced from SSOT tools/ds-pipeline).
-   tokens.tailwind.css = @theme → Tailwind v4 utilities + :root + [data-theme="dark"].
-   tokens.css adds the [data-fluid="container"] cqi container variant + full :root cascade. */
-@import "./tokens/tokens.tailwind.css";
-@import "./tokens/tokens.css";
+/* Minimal reset — replaces what Tailwind's preflight provided. Converter output assumes a
+   global border-box (rules combine width + padding), so this must stay. */
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; }
+html, body { height: 100%; }
+body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+img, svg, video, canvas { display: block; max-width: 100%; }
 
 body {
   background: var(--sem-col-bg-primary);
