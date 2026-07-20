@@ -115,7 +115,7 @@ export default function GridLab() {
         return o && o.length >= 3 ? { outer: { pts: o }, holes: [] } : design
       }
       // proportion-adaptive pitch: coarsest standard (72/48/24) that still holds; else the user's choice
-      const chosenPitch = pitchAuto ? autoPitch(withMargin(offsetMM), baseCfg) : pitch
+      const chosenPitch = pitchAuto ? autoPitch(withMargin, baseCfg, offsetMM, maxGrowMM) : pitch
       const cfg = { ...baseCfg, pitchMM: chosenPitch }
       const fit = balancedFit(withMargin, cfg, offsetMM, maxGrowMM)
       const effect = withMargin(fit.sizeMM)
