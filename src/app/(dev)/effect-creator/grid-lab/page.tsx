@@ -274,7 +274,11 @@ function Stage({ contour, design, grid, frame }: { contour: Contour; design: Con
   const ePts = contour.outer.pts.map(([x, y]) => [x, -y] as Pt)
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   for (const [x, y] of ePts) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y }
-  const w = maxX - minX, h = maxY - minY, S = (VP * FIT) / Math.max(w, h)
+  const w = maxX - minX, h = maxY - minY
+  const pad = Math.max(w, h) * 0.09 // room for the edge-to-edge measurement frame + labels
+  const vbW = w + 2 * pad, vbH = h + 2 * pad
+  const S = (VP * FIT) / Math.max(vbW, vbH)
+  const fontMM = pad * 0.5
   const eD = pathFrom(ePts)
   const hasMargin = design !== contour && design.outer.pts.length >= 3
   const dD = hasMargin ? pathFrom(design.outer.pts.map(([x, y]) => [x, -y] as Pt)) : ''
@@ -282,7 +286,11 @@ function Stage({ contour, design, grid, frame }: { contour: Contour; design: Con
   const seat = new Set(grid.anchors.map(a => a.p[0].toFixed(2) + ',' + a.p[1].toFixed(2)))
   const hasFlap = grid.flaps.length > 0
   return (
-    <svg width={w * S} height={h * S} viewBox={`${minX} ${minY} ${w} ${h}`}>
+    <svg width={vbW * S} height={vbH * S} viewBox={`${minX - pad} ${minY - pad} ${vbW} ${vbH}`}>
+      {/* faint edge-to-edge frame at the ultimate extent + the real W×H (total effect size) */}
+      <rect x={minX} y={minY} width={w} height={h} fill="none" stroke="var(--ink-3)" strokeOpacity={0.5} strokeWidth={0.6} strokeDasharray="3 2.2" />
+      <text x={minX + w / 2} y={minY - pad * 0.28} fontSize={fontMM} fill="var(--ink-3)" textAnchor="middle" fontFamily="ui-monospace,monospace">{Math.round(w)} mm</text>
+      <text x={minX - pad * 0.28} y={minY + h / 2} fontSize={fontMM} fill="var(--ink-3)" textAnchor="middle" fontFamily="ui-monospace,monospace" transform={`rotate(-90 ${minX - pad * 0.28} ${minY + h / 2})`}>{Math.round(h)} mm</text>
       {/* effect = design + margin: fill the whole effect as MARGIN material, then the design on top → the
           margin band shows as the ring between the dashed design outline and the effect edge. */}
       <path d={eD} fill={hasMargin ? 'var(--margin)' : 'var(--suede)'} />
