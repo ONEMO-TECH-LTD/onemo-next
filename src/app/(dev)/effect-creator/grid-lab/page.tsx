@@ -15,7 +15,7 @@ import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import { contourFromShape } from '@/lib/effect/geometry-truth'
 import { insetRingMM } from '@/lib/effect/offset'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { computeGrid, balancedFit, scaleContour, type GridPattern, type MagnetPlan } from '@/lib/effect/grid'
+import { computeGrid, balancedFit, autoPitch, scaleContour, type GridPattern, type MagnetPlan } from '@/lib/effect/grid'
 
 const IMG = 1000
 const VP = 440
@@ -54,6 +54,7 @@ export default function GridLab() {
   const [points, setPoints] = useState(5)
   const [sizeMM, setSizeMM] = useState(70)
   const [pitch, setPitch] = useState(48)
+  const [pitchAuto, setPitchAuto] = useState(true)
   const [pad, setPad] = useState(10)
   const [offsetMM, setOffsetMM] = useState(0)
   const [pattern, setPattern] = useState<GridPattern>('standard')
@@ -102,7 +103,7 @@ export default function GridLab() {
       }
       if (!base || base.outer.pts.length < 3) return null
       const b = base
-      const cfg = { pitchMM: pitch, paddingMM: pad, pattern, plan, perimeterOnly: coverage === 'perimeter', center: centerMode }
+      const baseCfg = { paddingMM: pad, pattern, plan, perimeterOnly: coverage === 'perimeter', center: centerMode }
       // DESIGN stays fixed at the set size. Auto-grow adds an outward MARGIN (offset) around it — the border
       // the magnets' padding uses. Manual "offset" is the starting margin. Total effect = design + 2×margin.
       // random shapes (AI Magic / generators) are capped at 180mm; presets go to 200mm
@@ -113,12 +114,15 @@ export default function GridLab() {
         const o = insetRingMM(design.outer.pts, m, 'round')
         return o && o.length >= 3 ? { outer: { pts: o }, holes: [] } : design
       }
+      // proportion-adaptive pitch: coarsest standard (72/48/24) that still holds; else the user's choice
+      const chosenPitch = pitchAuto ? autoPitch(withMargin(offsetMM), baseCfg) : pitch
+      const cfg = { ...baseCfg, pitchMM: chosenPitch }
       const fit = balancedFit(withMargin, cfg, offsetMM, maxGrowMM)
       const effect = withMargin(fit.sizeMM)
       const eff = Math.round(Math.max(dim(effect, 0), dim(effect, 1)))
-      return { contour: effect, design, grid: fit.grid, marginMM: fit.sizeMM, grew: fit.grew, effSize: eff, designSize: dSize }
+      return { contour: effect, design, grid: fit.grid, marginMM: fit.sizeMM, grew: fit.grew, effSize: eff, designSize: dSize, pitch: chosenPitch }
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
-  }, [src, preset, gen, p1, p2, sides, points, sizeMM, pitch, pad, pattern, plan, magic, coverage, offsetMM, centerMode, maxGrowMM])
+  }, [src, preset, gen, p1, p2, sides, points, sizeMM, pitch, pitchAuto, pad, pattern, plan, magic, coverage, offsetMM, centerMode, maxGrowMM])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genParams = {
@@ -209,11 +213,12 @@ export default function GridLab() {
               <b className="gl-total-v">{model.effSize}<small> mm</small></b>
               <span className="gl-total-note">{model.marginMM > 0.5 ? `design ${model.designSize}mm + ${Math.round(model.marginMM)}mm margin${model.grew > 0.5 ? ` (+${Math.round(model.grew)} auto)` : ''}` : `design ${model.designSize}mm · no margin`}</span>
             </div>}
-            <div className="gl-field"><span>Grid pitch · fixed standard</span>
+            <div className="gl-field"><span>Grid pitch · {pitchAuto && model ? `auto → ${model.pitch}mm` : 'manual'}</span>
               <div className="gl-seg">
-                <button aria-pressed={pitch === 24} onClick={() => setPitch(24)}>24 · fine</button>
-                <button aria-pressed={pitch === 48} onClick={() => setPitch(48)}>48 · standard</button>
-                <button aria-pressed={pitch === 72} onClick={() => setPitch(72)}>72 · spacious</button>
+                <button aria-pressed={pitchAuto} onClick={() => setPitchAuto(true)}>Auto</button>
+                <button aria-pressed={!pitchAuto && pitch === 24} onClick={() => { setPitchAuto(false); setPitch(24) }}>24</button>
+                <button aria-pressed={!pitchAuto && pitch === 48} onClick={() => { setPitchAuto(false); setPitch(48) }}>48</button>
+                <button aria-pressed={!pitchAuto && pitch === 72} onClick={() => { setPitchAuto(false); setPitch(72) }}>72</button>
               </div>
             </div>
             <Slider label="Magnet padding · per spot · min 10" unit="mm" v={pad} set={setPad} min={10} max={30} />
