@@ -44,6 +44,10 @@ export interface GridConfig {
   plan?: MagnetPlan
   perimeterOnly?: boolean // default true — magnetic belt (drop redundant interior)
   center?: 'centroid' | 'bbox' // where the fixed grid is anchored (A/B). default 'centroid'
+  /** STRICT pad law: disable the convex-corner tolerance (used by zero-point SIZING solves — a
+   *  standard size is defined by the exact pad, the tolerance only rescues seating on rounded corners
+   *  at a given size). */
+  strictPad?: boolean
   /** LIGHT-mode thinning of 48-composed grids (Dan 2026-07-21: "keep central 3-4, remove 2 and 5"):
    *  per axis keep the ends + alternate inward, always keeping the central pair → 96/48/96 gaps.
    *  A 262 (48×6) light row becomes 1·3·4·6. Applied only at pitch 48 with ≥5 lines. */
@@ -256,6 +260,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     if (!pointInPolygon(p, outer)) return false
     const d = distToRing(p, outer)
     if (d >= pad) return true
+    if (cfg.strictPad) return false
     return d >= pad - PAD_CORNER_TOL_MM && ringCoverage(p) >= RING_COVERAGE_MIN
   }
 
@@ -458,6 +463,44 @@ export function snapToRung(mm: number, law: SizeLaw = DEFAULT_LAW, visibleOnly =
   let best = pool[0]
   for (const r of pool) if (Math.abs(r.sizeMM - mm) < Math.abs(best.sizeMM - mm)) best = r
   return best
+}
+
+/**
+ * PER-GEOMETRY zero-point (Dan, 2026-07-21): every geometry carries its OWN edge-to-edge standard
+ * sizes — the square's formula must not be borrowed. A geometry's zero-point for a grid span is the
+ * SMALLEST size at which its silhouette fully holds (zero flaps) with the seated grid actually
+ * spanning that tier — solved NUMERICALLY against the live engine, so any admin recipe change
+ * (padding, frame, pattern, pitch) recomputes every rung. No hand-derived per-shape formulas.
+ * For the square this solve reproduces `span + 2·(pad+frame)` exactly (70/118/166…); a circle lands
+ * on its own larger rungs (the disc must reach the box corners); a triangle on its own.
+ */
+export function geoZeroPoint(
+  makeShape: (sizeMM: number) => Contour, spanMM: number, cfg: GridConfig, maxSearchMM = 400,
+): number | null {
+  for (let s = spanMM; s <= maxSearchMM; s += 1) {
+    const g = computeGrid(makeShape(s), cfg)
+    if (!g.anchors.length || g.flaps.length) continue
+    const ab = bbox(g.anchors.map((a) => a.p))
+    if (Math.max(ab.maxX - ab.minX, ab.maxY - ab.minY) >= spanMM - 1) return s
+  }
+  return null
+}
+
+/** The geometry's own standard-size ladder, one rung per grid tier (span 48, 96, 144…), each solved
+ *  from the live recipe. `pattern` is the geometry's sanctioned layout law (e.g. triangle = quincunx
+ *  per §13.5c); the effective padding includes the frame (physical pad is measured inside it). */
+export function geoLadder(
+  makeShape: (sizeMM: number) => Contour, law: SizeLaw = DEFAULT_LAW, pattern: GridPattern = 'standard',
+): SizeRung[] {
+  const rungs: SizeRung[] = []
+  for (let span = 48; span + 2 * (law.paddingMM + law.frameMM) <= law.maxRungMM + 1e-6; span += 48) {
+    const pitch = span % 96 === 0 ? 96 : 48
+    const cfg: GridConfig = { pitchMM: pitch, paddingMM: law.paddingMM + law.frameMM, pattern, perimeterOnly: true, strictPad: true }
+    const s = geoZeroPoint(makeShape, span, cfg)
+    if (s == null) continue
+    rungs.push({ sizeMM: s, pitchMM: pitch, anchorsPerSide: span / pitch + 1, spanMM: span, visible: s <= law.maxTestedMM })
+  }
+  return rungs
 }
 
 /**

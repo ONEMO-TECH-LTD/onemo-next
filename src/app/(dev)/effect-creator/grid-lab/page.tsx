@@ -15,7 +15,7 @@ import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import { contourFromShape } from '@/lib/effect/geometry-truth'
 import { insetRingMM } from '@/lib/effect/offset'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { computeGrid, balancedFit, autoGrid, scaleContour, snapToRung, sizeLadder, DEFAULT_LAW, type GridPattern, type MagnetPlan, type GridDensity } from '@/lib/effect/grid'
+import { computeGrid, balancedFit, autoGrid, scaleContour, snapToRung, sizeLadder, geoLadder, DEFAULT_LAW, type GridPattern, type MagnetPlan, type GridDensity } from '@/lib/effect/grid'
 
 const IMG = 1000
 const VP = 440
@@ -109,6 +109,15 @@ export default function GridLab() {
   // at the default 10mm padding). Tracks the padding slider rather than a hardcoded 40.
   const sizeMin = 2 * pad
 
+  // PER-GEOMETRY standard sizes (Dan): each geometry's rungs are solved numerically from the live
+  // recipe (padding/frame/pattern law) — square 70/118/…, circle and triangle their own. Rect derives
+  // per-axis from the square ladder.
+  const stdRungs = useMemo(() => {
+    if (src !== 'std' || geo === 'rect') return null
+    const mk = (s: number) => stdContour(geo, s, s)
+    return geoLadder(mk, { ...DEFAULT_LAW, paddingMM: pad }, geo === 'triangle' ? 'quincunx' : 'standard')
+  }, [src, geo, pad])
+
   const model = useMemo(() => {
     try {
       const law = { ...DEFAULT_LAW, paddingMM: pad }
@@ -123,14 +132,12 @@ export default function GridLab() {
         const rungS = shortPool.length
           ? shortPool.reduce((b, r) => Math.abs(r.sizeMM - shortMM) < Math.abs(b.sizeMM - shortMM) ? r : b)
           : rungL
-        const rungW = geo === 'rect' ? (orient === 'landscape' ? rungL : rungS) : snapToRung(sizeMM, law, false)
+        const ownLadder = stdRungs && stdRungs.length ? stdRungs : sizeLadder(law)
+        const nearestOwn = ownLadder.reduce((b, r) => Math.abs(r.sizeMM - sizeMM) < Math.abs(b.sizeMM - sizeMM) ? r : b)
+        const rungW = geo === 'rect' ? (orient === 'landscape' ? rungL : rungS) : nearestOwn
         const rungH = geo === 'rect' ? (orient === 'landscape' ? rungS : rungL) : rungW
-        // §6 envelop-the-box law: non-square geometry ADAPTS around the canonical SQUARE grid box — the
-        // grid never rotates/deforms. A circle serving the rung's box must reach the box CORNERS
-        // (span·√2/2 from centre) + padding → slightly larger disc than the square (70 rung → ~90 disc).
-        const stdSize = geo === 'circle'
-          ? Math.round(2 * (rungW.spanMM * Math.SQRT2 / 2 + law.paddingMM) + 2 * law.frameMM)
-          : rungW.sizeMM
+        // per-geometry zero-point: the rung size IS the geometry's own solved standard size
+        const stdSize = rungW.sizeMM
         const design = stdContour(geo, stdSize, geo === 'rect' ? rungH.sizeMM : stdSize)
         const withMargin = (m: number): Contour => {
           if (Math.abs(m) < 0.01) return design
@@ -202,7 +209,7 @@ export default function GridLab() {
       }
       return { contour: effect, design, grid: fit.grid, marginMM: fit.sizeMM, grew: fit.grew, effSize: eff, designSize: dSize, pitch: chosenPitch, patternUsed: sel.pattern, magDist, rung, rungH: rung, format: null }
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
-  }, [src, geo, longMM, shortMM, orient, preset, gen, p1, p2, sides, points, sizeMM, pitch, pitchAuto, density, pad, pattern, patternAuto, plan, magic, coverage, offsetMM, centerMode, maxGrowMM])
+  }, [src, geo, longMM, shortMM, orient, preset, gen, p1, p2, sides, points, sizeMM, pitch, pitchAuto, density, pad, pattern, patternAuto, plan, magic, coverage, offsetMM, centerMode, maxGrowMM, stdRungs])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genParams = {
@@ -295,9 +302,9 @@ export default function GridLab() {
 
           <div className="gl-card gl-pad">
             {/* §13 standard sizes — the full zero-point ladder incl. hidden/untested rungs (D11) */}
-            {!(src === 'std' && geo === 'rect') && <div className="gl-field"><span>Standard size · rung</span>
+            {!(src === 'std' && geo === 'rect') && <div className="gl-field"><span>Standard size · rung{src === 'std' && stdRungs ? ' · own zero-points' : ''}</span>
               <div className="gl-seg gl-wrap">
-                {sizeLadder({ ...DEFAULT_LAW, paddingMM: pad }).map(r =>
+                {(src === 'std' && stdRungs && stdRungs.length ? stdRungs : sizeLadder({ ...DEFAULT_LAW, paddingMM: pad })).map(r =>
                   <button key={r.sizeMM} aria-pressed={model?.rung.sizeMM === r.sizeMM}
                     className={r.visible ? undefined : 'gl-hidden-rung'}
                     onClick={() => setSizeMM(r.sizeMM)}
@@ -470,7 +477,7 @@ function Stage({ contour, design, grid, frame }: { contour: Contour; design: Con
           {/* dark underlay + white overlay → legible on the dark suede AND the light margin band */}
           <line x1={p1[0]} y1={p1[1]} x2={p2[0]} y2={p2[1]} stroke="#000" strokeOpacity={0.5} strokeWidth={1.6} />
           <line x1={p1[0]} y1={p1[1]} x2={p2[0]} y2={p2[1]} stroke="#fff" strokeOpacity={0.95} strokeWidth={0.7} strokeDasharray="1.8 1.4" />
-          <text x={mx} y={my - 2.4} fontSize={fontMM * 1.05} fontWeight={700} fill="#fff" stroke="#000" strokeWidth={fontMM * 0.22} strokeOpacity={0.65} style={{ paintOrder: 'stroke' }} textAnchor="middle" fontFamily="ui-monospace,monospace">{Math.round(bd)} mm</text>
+          <text x={mx} y={my - 2.4} fontSize={fontMM * 1.05} fontWeight={700} fill="#fff" stroke="#000" strokeWidth={fontMM * 0.22} strokeOpacity={0.65} style={{ paintOrder: 'stroke' }} textAnchor="middle" fontFamily="ui-monospace,monospace">{Math.round(bd)} mm{Math.abs(bd - grid.pitchCentreMM * Math.SQRT2) < 1.5 ? ` · ${grid.pitchCentreMM}×√2` : Math.abs(bd - grid.pitchCentreMM / Math.SQRT2) < 1.5 ? ` · dice ½·${grid.pitchCentreMM}√2` : ''}</text>
         </g>
       })()}
     </svg>
