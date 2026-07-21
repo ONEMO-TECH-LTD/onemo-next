@@ -228,11 +228,19 @@ function assignSizes(seated: Pt[], plan: MagnetPlan): Anchor[] {
  * fully-surrounded interior nodes (a magnetic belt). Each magnet keeps its application ring on material.
  */
 export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResult {
-  const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
+  // GLOBAL LAW (48/68 system): dice centres live at half-pitch — quincunx below 96 would put anchors
+  // on 24-offsets (34mm links), which do not exist in the system. Enforced HERE so every caller
+  // (manual pins, auto search, ladder solver, app) inherits it; pitchCentreMM reports the truth.
+  const reqPitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
+  const pitch = (cfg.pattern === 'quincunx' && reqPitch < 96) ? 96 : reqPitch
   const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
   const pattern = cfg.pattern ?? 'standard'
   const plan = cfg.plan ?? 'all6'
-  const perimeterOnly = cfg.perimeterOnly ?? true
+  // GLOBAL LAW: the perimeter belt is a STANDARD-pattern concept only. Dice and Diamond ARE their
+  // centre links (the 68-atom spokes live on interior nodes) — stripping interiors would delete the
+  // pattern itself, so for them coverage is always the full grid. Every consumer (semantic ladder
+  // solver, auto search, manual modes, app) inherits this from here — never override in a UI layer.
+  const perimeterOnly = pattern === 'standard' ? (cfg.perimeterOnly ?? true) : false
   const centerMode = cfg.center ?? 'centroid'
   const outer = contourMM.outer.pts
   const bb = bbox(outer)
@@ -360,11 +368,11 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
       const bal = fin.seated.length ? Math.hypot(sx / fin.seated.length - c[0], sy / fin.seated.length - c[1]) : 1e9
       cands.push({ fin, flapN, conform, bal })
     }
-    // STANDARD is a HARD conformance law (Dan): straight pitch-spaced rows or nothing — a diamond
-    // arrangement must never appear under the standard pattern, even when it covers better (the honest
-    // outcome is flaps + margin growth, or the user/auto picking the Diamond pattern explicitly).
-    // Other patterns keep coverage-first (their geometry is inherently mixed-spacing).
-    const pool = pattern === 'standard' && cands.some((k) => k.conform === 1 && k.fin.seated.length >= MIN_ANCHORS)
+    // STANDARD and DIAMOND are HARD conformance laws (Dan): standard shows straight pitch-spaced rows
+    // or nothing; diamond shows 68-atom (pitch·√2) links or nothing — neither may quietly resolve into
+    // the other's arrangement (the honest outcome is flaps + margin growth, or switching mode). Dice
+    // keeps coverage-first (its geometry is inherently the mix).
+    const pool = (pattern === 'standard' || pattern === 'diamond') && cands.some((k) => k.conform === 1 && k.fin.seated.length >= MIN_ANCHORS)
       ? cands.filter((k) => k.conform === 1)
       : cands
     let bestKey: [number, number, number, number] | null = null
@@ -534,7 +542,12 @@ export function autoGrid(
   opts: { minN?: number; density?: GridDensity; pitchMM?: number; pattern?: GridPattern } = {},
 ): { pitchMM: number; pattern: GridPattern } {
   const minN = opts.minN ?? TARGET_ANCHORS
-  const pitches = opts.pitchMM != null ? [opts.pitchMM] : allowedPitches(opts.density ?? 'light')
+  let pitches = opts.pitchMM != null ? [opts.pitchMM] : allowedPitches(opts.density ?? 'light')
+  // a pinned pattern restricts the pitch search to its legal pitches (dice → 96 only)
+  if (opts.pattern != null) {
+    const legal = pitches.filter((p) => legalPatterns(p).includes(opts.pattern!))
+    pitches = legal.length ? legal : [96]
+  }
   const patFor = (p: number): GridPattern[] => opts.pattern != null ? [opts.pattern] : legalPatterns(p)
   let fb = { pitchMM: pitches[pitches.length - 1], pattern: patFor(pitches[pitches.length - 1]).slice(-1)[0] }
   let fbFlaps = Infinity

@@ -119,10 +119,7 @@ export default function GridLab() {
   // SEMANTIC SIZES: every shape's own T-shirt ladder (2XS=1pt · XS=2 · S=3 · M=4 · L/XL/2XL/3XL …),
   // solved from the live inputs (padding + frame) and the MODE (auto / standard / dice / diamond).
   const gridMode: GridMode = patternAuto ? 'auto' : pattern
-  // Dice's identity is its centre magnets — the perimeter belt would strip them, so manual Dice
-  // OVERRIDES coverage to Full grid (shown on the control, never silent)
-  const diceForced = !patternAuto && pattern === 'quincunx'
-  const effCoverage = diceForced ? 'full' : coverage
+
   const stdRungs = useMemo<SemanticRung[]>(() => {
     const g: StdGeo = src === 'std' ? (geo === 'rect' ? 'square' : geo) : 'square'
     const mk = (s: number) => stdContour(g, s, s)
@@ -134,7 +131,7 @@ export default function GridLab() {
       const law = { ...DEFAULT_LAW, paddingMM: pad }
       // NO silent per-shape overrides: manual pattern/pitch buttons behave literally; Auto searches
       // pitch × pattern under the one coverage physics (autoGrid) — shape-agnostic by construction.
-      const baseCfg0 = { paddingMM: pad, pattern, plan, perimeterOnly: effCoverage === 'perimeter', center: centerMode, sparseThin: density === 'light' }
+      const baseCfg0 = { paddingMM: pad, pattern, plan, perimeterOnly: coverage === 'perimeter', center: centerMode, sparseThin: density === 'light' }
       // ── STANDARD GEOMETRIES (D12–D15): drawn directly in mm, each axis snapped to its own rung ──
       if (src === 'std') {
         if (!stdRungs.length) return null
@@ -190,7 +187,7 @@ export default function GridLab() {
       }
       if (!base || base.outer.pts.length < 3) return null
       const b = base
-      const baseCfg = { paddingMM: pad, pattern, plan, perimeterOnly: effCoverage === 'perimeter', center: centerMode, sparseThin: density === 'light' }
+      const baseCfg = { paddingMM: pad, pattern, plan, perimeterOnly: coverage === 'perimeter', center: centerMode, sparseThin: density === 'light' }
       // DESIGN stays fixed at the set size. Auto-grow adds an outward MARGIN (offset) around it — the border
       // the magnets' padding uses. Manual "offset" is the starting margin. Total effect = design + 2×margin.
       // random shapes (AI Magic / generators) are capped at 180mm; presets go to 200mm
@@ -225,7 +222,7 @@ export default function GridLab() {
       }
       return { contour: effect, design, grid: fit.grid, marginMM: fit.sizeMM, grew: fit.grew, effSize: eff, designSize: dSize, pitch: chosenPitch, patternUsed: sel.pattern, magDist, rung, rungH: rung, format: null }
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
-  }, [src, geo, longMM, shortMM, orient, preset, gen, p1, p2, sides, points, sizeMM, pitch, pitchAuto, density, pad, pattern, patternAuto, plan, magic, coverage, effCoverage, offsetMM, centerMode, maxGrowMM, stdRungs])
+  }, [src, geo, longMM, shortMM, orient, preset, gen, p1, p2, sides, points, sizeMM, pitch, pitchAuto, density, pad, pattern, patternAuto, plan, magic, coverage, offsetMM, centerMode, maxGrowMM, stdRungs])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genParams = {
@@ -391,10 +388,12 @@ export default function GridLab() {
                   <button key={p} aria-pressed={!patternAuto && pattern === p} onClick={() => { setPatternAuto(false); setPattern(p) }}>{p === 'quincunx' ? 'Dice-5' : p === 'diamond' ? 'Diamond' : 'Standard'}</button>)}
               </div>
             </div>
-            <div className="gl-field"><span>Coverage{diceForced ? ' · forced FULL by Dice' : ''}</span>
+            <div className="gl-field"><span>Coverage{model && model.patternUsed !== 'standard' ? ` · FULL — ${model.patternUsed === 'quincunx' ? 'dice' : 'diamond'} is its centre links` : ''}</span>
               <div className="gl-seg">
-                {([['full', 'Full grid'], ['perimeter', 'Perimeter belt']] as ['full' | 'perimeter', string][]).map(([c, l]) =>
-                  <button key={c} aria-pressed={effCoverage === c} disabled={diceForced} style={diceForced ? { opacity: 0.55, cursor: 'not-allowed' } : undefined} onClick={() => setCoverage(c)}>{l}</button>)}
+                {([['full', 'Full grid'], ['perimeter', 'Perimeter belt']] as ['full' | 'perimeter', string][]).map(([c, l]) => {
+                  const inert = !!model && model.patternUsed !== 'standard'
+                  return <button key={c} aria-pressed={inert ? c === 'full' : coverage === c} disabled={inert} style={inert ? { opacity: 0.55, cursor: 'not-allowed' } : undefined} onClick={() => setCoverage(c)}>{l}</button>
+                })}
               </div>
             </div>
             <div className="gl-field"><span>Grid centering · A/B</span>
