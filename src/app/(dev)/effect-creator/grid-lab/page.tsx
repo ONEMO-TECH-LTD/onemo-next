@@ -82,6 +82,10 @@ export default function GridLab() {
   }
 
   const sizeMax = src === 'preset' ? 250 : 180 // random shapes (image/generators) capped at 180mm
+  // smallest holdable effect = a SINGLE point: one magnet with its application ring. Under interp A the
+  // ring is `pad`mm radius from centre, so a centred magnet needs 2×pad of material → floor = 2×pad (20mm
+  // at the default 10mm padding). Tracks the padding slider rather than a hardcoded 40.
+  const sizeMin = 2 * pad
 
   const model = useMemo(() => {
     try {
@@ -107,7 +111,7 @@ export default function GridLab() {
       // DESIGN stays fixed at the set size. Auto-grow adds an outward MARGIN (offset) around it — the border
       // the magnets' padding uses. Manual "offset" is the starting margin. Total effect = design + 2×margin.
       // random shapes (AI Magic / generators) are capped at 180mm; presets go to 200mm
-      const dSize = Math.min(sizeMM, src === 'preset' ? 250 : 180)
+      const dSize = Math.max(sizeMin, Math.min(sizeMM, src === 'preset' ? 250 : 180))
       const design = scaleContour(b, dSize)
       const withMargin = (m: number): Contour => {
         if (Math.abs(m) < 0.01) return design
@@ -206,7 +210,7 @@ export default function GridLab() {
           </div>
 
           <div className="gl-card gl-pad">
-            <Slider label={`Design size · longest side${src !== 'preset' ? ' · max 180' : ''}`} unit="mm" v={Math.min(sizeMM, sizeMax)} set={setSizeMM} min={40} max={sizeMax} />
+            <Slider label={`Design size · longest side${src !== 'preset' ? ' · max 180' : ''}`} unit="mm" v={Math.max(sizeMin, Math.min(sizeMM, sizeMax))} set={setSizeMM} min={sizeMin} max={sizeMax} />
             <Slider label="Max auto-margin · balance" unit="mm" v={maxGrowMM} set={setMaxGrowMM} min={0} max={80} />
             {model && <div className="gl-total">
               <span className="gl-total-k">Total effect size</span>
