@@ -349,11 +349,11 @@ export default function GridLab() {
                 <button aria-pressed={density === 'light'} onClick={() => setDensity('light')} title="96-first — fewer cells, sparse/uncrowded">Light</button>
               </div>
             </div>
-            <div className="gl-field"><span>Grid pitch · {pitchAuto && model ? `auto → ${model.pitch}mm` : 'manual'}</span>
+            <div className="gl-field"><span>Grid pitch · {pitchAuto && model ? `auto → ${model.pitch}mm` : !pitchAuto && model && model.pitch !== pitch ? `${pitch} → ${model.pitch}mm · dice needs 96` : 'manual'}</span>
               <div className="gl-seg">
                 <button aria-pressed={pitchAuto} onClick={() => setPitchAuto(true)}>Auto</button>
-                <button aria-pressed={!pitchAuto && pitch === 48} onClick={() => { setPitchAuto(false); setPitch(48) }}>48</button>
-                <button aria-pressed={!pitchAuto && pitch === 96} onClick={() => { setPitchAuto(false); setPitch(96) }}>96</button>
+                <button aria-pressed={!pitchAuto && (model ? model.pitch === 48 : pitch === 48)} onClick={() => { setPitchAuto(false); setPitch(48) }}>48</button>
+                <button aria-pressed={!pitchAuto && (model ? model.pitch === 96 : pitch === 96)} onClick={() => { setPitchAuto(false); setPitch(96) }}>96</button>
               </div>
             </div>
             <Slider label="Magnet padding · per spot · min 10" unit="mm" v={pad} set={setPad} min={10} max={30} />
