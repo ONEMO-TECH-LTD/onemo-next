@@ -81,7 +81,7 @@ export default function GridLab() {
       .catch((err) => { console.error('[grid-lab] magic failed', err); setMagStatus('error:' + ((err as Error)?.message ?? 'cut failed')) })
   }
 
-  const sizeMax = src === 'preset' ? 200 : 180 // random shapes (image/generators) capped at 180mm
+  const sizeMax = src === 'preset' ? 250 : 180 // random shapes (image/generators) capped at 180mm
 
   const model = useMemo(() => {
     try {
@@ -107,7 +107,7 @@ export default function GridLab() {
       // DESIGN stays fixed at the set size. Auto-grow adds an outward MARGIN (offset) around it — the border
       // the magnets' padding uses. Manual "offset" is the starting margin. Total effect = design + 2×margin.
       // random shapes (AI Magic / generators) are capped at 180mm; presets go to 200mm
-      const dSize = Math.min(sizeMM, src === 'preset' ? 200 : 180)
+      const dSize = Math.min(sizeMM, src === 'preset' ? 250 : 180)
       const design = scaleContour(b, dSize)
       const withMargin = (m: number): Contour => {
         if (Math.abs(m) < 0.01) return design
