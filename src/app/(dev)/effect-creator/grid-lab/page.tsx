@@ -15,7 +15,7 @@ import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import { contourFromShape } from '@/lib/effect/geometry-truth'
 import { insetRingMM } from '@/lib/effect/offset'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { computeGrid, balancedFit, autoPitch, scaleContour, type GridPattern, type MagnetPlan } from '@/lib/effect/grid'
+import { computeGrid, balancedFit, autoPitch, scaleContour, snapToRung, DEFAULT_LAW, type GridPattern, type MagnetPlan } from '@/lib/effect/grid'
 
 const IMG = 1000
 const VP = 440
@@ -111,7 +111,11 @@ export default function GridLab() {
       // DESIGN stays fixed at the set size. Auto-grow adds an outward MARGIN (offset) around it — the border
       // the magnets' padding uses. Manual "offset" is the starting margin. Total effect = design + 2×margin.
       // random shapes (AI Magic / generators) are capped at 180mm; presets go to 200mm
-      const dSize = Math.max(sizeMin, Math.min(sizeMM, src === 'preset' ? 250 : 180))
+      // §13 standard mode: the requested size SNAPS to the nearest zero-point rung (70/118/166/214 at
+      // pad 10) — free sizes don't exist on the launch ladder. Law inputs (padding/frame) drive the rungs.
+      const law = { ...DEFAULT_LAW, paddingMM: pad }
+      const rung = snapToRung(Math.max(sizeMin, Math.min(sizeMM, src === 'preset' ? 250 : 180)), law)
+      const dSize = rung.sizeMM
       const design = scaleContour(b, dSize)
       const withMargin = (m: number): Contour => {
         if (Math.abs(m) < 0.01) return design
@@ -131,7 +135,7 @@ export default function GridLab() {
         const d = Math.hypot(aps[i].p[0] - aps[j].p[0], aps[i].p[1] - aps[j].p[1])
         if (magDist == null || d < magDist) magDist = d
       }
-      return { contour: effect, design, grid: fit.grid, marginMM: fit.sizeMM, grew: fit.grew, effSize: eff, designSize: dSize, pitch: chosenPitch, magDist }
+      return { contour: effect, design, grid: fit.grid, marginMM: fit.sizeMM, grew: fit.grew, effSize: eff, designSize: dSize, pitch: chosenPitch, magDist, rung }
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
   }, [src, preset, gen, p1, p2, sides, points, sizeMM, pitch, pitchAuto, pad, pattern, plan, magic, coverage, offsetMM, centerMode, maxGrowMM])
 
@@ -224,6 +228,7 @@ export default function GridLab() {
               <b className="gl-total-v">{model.effSize}<small> mm</small></b>
               <span className="gl-total-note">{model.marginMM > 0.5 ? `design ${model.designSize}mm + ${Math.round(model.marginMM)}mm margin${model.grew > 0.5 ? ` (+${Math.round(model.grew)} auto)` : ''}` : `design ${model.designSize}mm · no margin`}</span>
               <span className="gl-total-note gl-total-grid">grid {model.pitch}mm{model.magDist != null ? ` · magnets ${Math.round(model.magDist)}mm apart` : ''}</span>
+              <span className="gl-total-note">rung {model.rung.sizeMM}mm · {model.rung.pitchMM}×{model.rung.anchorsPerSide} span {model.rung.spanMM}{model.rung.visible ? '' : ' · HIDDEN (untested)'}</span>
             </div>}
             <div className="gl-field"><span>Grid pitch · {pitchAuto && model ? `auto → ${model.pitch}mm` : 'manual'}</span>
               <div className="gl-seg">

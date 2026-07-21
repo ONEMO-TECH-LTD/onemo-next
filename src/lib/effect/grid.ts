@@ -296,12 +296,60 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
  *  the effect's outer edge. One atom (24mm). Tunable (coupon later). */
 export const MAX_EMPTY_BORDER_MM = 24
 
-/** Pitch clamp by effect size: the fine 24mm atom is a SMALL-DOMAIN grid (caps / mini effects) — it must
- *  never densify a standard-size effect (Dan 2026-07-21: "not allowing 24mm above 70mm"). Above 70mm the
- *  ladder is 96/72/48 only. */
-export const FINE_PITCH_MAX_SIZE_MM = 70
-function allowedPitches(sizeMM: number): number[] {
-  return sizeMM > FINE_PITCH_MAX_SIZE_MM ? [96, 72, 48] : [96, 72, 48, 24]
+// ─── LAUNCH LAW (§13, locked 2026-07-21) — 48-family only, procedural zero-point ladder ──────────────
+// Launch pitches = 48/96 exclusively (24/72 have no counterpart on the 96-dice garment canvas; small/cap
+// domains untested — admin-only experiments). Auto never leaves the family.
+const LAUNCH_PITCHES = [96, 48]
+function allowedPitches(_sizeMM: number): number[] { return LAUNCH_PITCHES }
+
+/** The admin LAW INPUTS that generate every size procedurally — no hand-picked numbers. */
+export interface SizeLaw {
+  paddingMM: number   // mag-safe radius from magnet centre (default 10)
+  frameMM: number     // frame stroke per side (default 1; 0 = frameless… padding then absorbs it)
+  maxTestedMM: number // largest physically tested size → rungs above ship hidden (default 214)
+  maxRungMM: number   // generator stop (default 310 — the 4-column shirt max)
+}
+export const DEFAULT_LAW: SizeLaw = { paddingMM: 10, frameMM: 1, maxTestedMM: 214, maxRungMM: 310 }
+
+export interface SizeRung {
+  sizeMM: number         // total outer size (the zero-point)
+  pitchMM: number        // sparsest pitch composing it (96 preferred over 48 — fewer is better)
+  anchorsPerSide: number // anchors along the axis at that pitch
+  spanMM: number         // outermost anchor-to-anchor distance
+  visible: boolean       // launch-visible (≤ maxTested) vs hidden-untested
+}
+
+/**
+ * Zero-point ladder (§13.2): a size is OPTIMAL when the magnets' padding coincides edge-to-edge with the
+ * effect's padding — `size = (n−1)·pitch + 2·pad (+2·frame)`. With the 48-family this is simply
+ * 70 + 48k (pad 10, framed): 70 · 118 · 166 · 214 · 262 · 310. Sparse composition preferred: a rung
+ * whose span divides by 96 is a 96-pitch rung (118 = 96×2 beats 48×3 — fewer is better).
+ */
+export function sizeLadder(law: SizeLaw = DEFAULT_LAW): SizeRung[] {
+  const border = 2 * law.paddingMM + 2 * law.frameMM
+  const rungs: SizeRung[] = []
+  for (let span = 48; span + border <= law.maxRungMM + 1e-6; span += 48) {
+    const sparse96 = span % 96 === 0
+    const pitch = sparse96 ? 96 : 48
+    rungs.push({
+      sizeMM: span + border,
+      pitchMM: pitch,
+      anchorsPerSide: span / pitch + 1,
+      spanMM: span,
+      visible: span + border <= law.maxTestedMM,
+    })
+  }
+  return rungs
+}
+
+/** Snap a requested size to the NEAREST ladder rung (§13.6 standard mode; free shapes snap the same
+ *  way). `visibleOnly` (default true) restricts to launch-visible rungs. */
+export function snapToRung(mm: number, law: SizeLaw = DEFAULT_LAW, visibleOnly = true): SizeRung {
+  const all = sizeLadder(law)
+  const pool = visibleOnly ? all.filter((r) => r.visible) : all
+  let best = pool[0]
+  for (const r of pool) if (Math.abs(r.sizeMM - mm) < Math.abs(best.sizeMM - mm)) best = r
+  return best
 }
 
 /** Worst per-side gap between the seated anchors' bbox and the shape's bbox. Infinity when nothing seats. */
@@ -313,7 +361,7 @@ function emptyBorder(grid: GridResult, contour: Contour): number {
 }
 
 /**
- * Proportion-adaptive pitch (THE mechanism): the COARSEST standard pitch (96 → 72 → 48 → 24) whose grid
+ * Proportion-adaptive pitch (THE mechanism): the COARSEST launch pitch (96 → 48, §13.1) whose grid
  * (a) seats a solid hold (≥ minN magnets) AND (b) leaves no dead border — the seated grid's bbox must
  * reach within `maxEmptyMM` of every effect edge (Dan 2026-07-21: "empty spaces greater than x must be
  * filled — coarse wins as long as the space is not forcing the variable"). Without (b), 96 "passes" with
