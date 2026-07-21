@@ -15,7 +15,7 @@ import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import { contourFromShape } from '@/lib/effect/geometry-truth'
 import { insetRingMM } from '@/lib/effect/offset'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { computeGrid, balancedFit, autoPitch, scaleContour, snapToRung, DEFAULT_LAW, type GridPattern, type MagnetPlan } from '@/lib/effect/grid'
+import { computeGrid, balancedFit, autoPitch, scaleContour, snapToRung, sizeLadder, DEFAULT_LAW, type GridPattern, type MagnetPlan } from '@/lib/effect/grid'
 
 const IMG = 1000
 const VP = 440
@@ -81,7 +81,7 @@ export default function GridLab() {
       .catch((err) => { console.error('[grid-lab] magic failed', err); setMagStatus('error:' + ((err as Error)?.message ?? 'cut failed')) })
   }
 
-  const sizeMax = src === 'preset' ? 250 : 180 // random shapes (image/generators) capped at 180mm
+  const sizeMax = src === 'preset' ? 310 : 180 // presets reach the full ladder (incl. hidden rungs); random shapes capped 180
   // smallest holdable effect = a SINGLE point: one magnet with its application ring. Under interp A the
   // ring is `pad`mm radius from centre, so a centred magnet needs 2×pad of material → floor = 2×pad (20mm
   // at the default 10mm padding). Tracks the padding slider rather than a hardcoded 40.
@@ -113,8 +113,9 @@ export default function GridLab() {
       // random shapes (AI Magic / generators) are capped at 180mm; presets go to 200mm
       // §13 standard mode: the requested size SNAPS to the nearest zero-point rung (70/118/166/214 at
       // pad 10) — free sizes don't exist on the launch ladder. Law inputs (padding/frame) drive the rungs.
+      // bench = admin surface → snap across the FULL ladder (hidden rungs reachable, marked)
       const law = { ...DEFAULT_LAW, paddingMM: pad }
-      const rung = snapToRung(Math.max(sizeMin, Math.min(sizeMM, src === 'preset' ? 250 : 180)), law)
+      const rung = snapToRung(Math.max(sizeMin, Math.min(sizeMM, src === 'preset' ? 310 : 180)), law, false)
       const dSize = rung.sizeMM
       const design = scaleContour(b, dSize)
       const withMargin = (m: number): Contour => {
@@ -221,6 +222,18 @@ export default function GridLab() {
           </div>
 
           <div className="gl-card gl-pad">
+            {/* §13 standard sizes — the full zero-point ladder incl. hidden/untested rungs (D11) */}
+            <div className="gl-field"><span>Standard size · rung</span>
+              <div className="gl-seg gl-wrap">
+                {sizeLadder({ ...DEFAULT_LAW, paddingMM: pad }).map(r =>
+                  <button key={r.sizeMM} aria-pressed={model?.rung.sizeMM === r.sizeMM}
+                    className={r.visible ? undefined : 'gl-hidden-rung'}
+                    onClick={() => setSizeMM(r.sizeMM)}
+                    title={`${r.pitchMM}mm × ${r.anchorsPerSide} anchors · span ${r.spanMM}mm${r.visible ? '' : ' · hidden at launch (untested)'}`}>
+                    {r.sizeMM}{r.visible ? '' : '†'}
+                  </button>)}
+              </div>
+            </div>
             <Slider label={`Design size · longest side${src !== 'preset' ? ' · max 180' : ''}`} unit="mm" v={Math.max(sizeMin, Math.min(sizeMM, sizeMax))} set={setSizeMM} min={sizeMin} max={sizeMax} />
             <Slider label="Max auto-margin · balance" unit="mm" v={maxGrowMM} set={setMaxGrowMM} min={0} max={80} />
             {model && <div className="gl-total">
@@ -416,6 +429,8 @@ const CSS = `
 .gl-seg.gl-wrap{flex-wrap:wrap}.gl-seg.gl-wrap button{min-width:64px}
 .gl-seg button:hover{color:var(--ink)}
 .gl-seg button[aria-pressed=true]{background:var(--accent);color:#fff;box-shadow:0 1px 2px #0002}
+.gl-seg button.gl-hidden-rung{color:var(--mag8);font-style:italic}
+.gl-seg button.gl-hidden-rung[aria-pressed=true]{background:var(--mag8);color:#fff;font-style:normal}
 .gl-field{display:flex;flex-direction:column;gap:8px;font:600 10.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
 .gl-field select{font:500 13px var(--sans);color:var(--ink);background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:9px;cursor:pointer}
 .gl-upload{font:600 13px var(--sans);color:#fff;background:var(--accent);border:0;border-radius:10px;padding:11px;cursor:pointer;width:100%}
