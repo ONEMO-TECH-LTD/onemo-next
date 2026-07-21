@@ -259,9 +259,77 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     return d >= pad - PAD_CORNER_TOL_MM && ringCoverage(p) >= RING_COVERAGE_MIN
   }
 
+  // FINALIZE a candidate seed into the layout the user actually gets: coverage-verified perimeter belt
+  // + light 1·3·4·6 thinning. Placement parities are judged on THIS final layout (not the raw seed) —
+  // the old raw-seat-count scoring let a 5-node cross beat a 4-node box, and after the belt dropped the
+  // cross's centre the user saw a diamond-arranged result under the STANDARD pattern.
+  const finalize = (seed: Pt[]): { seated: Pt[]; interior: Pt[] } => {
+    let seated = seed
+    let interior: Pt[] = []
+    if (perimeterOnly && seated.length > 4) {
+      const split = splitPerimeter(seated, neighbourStep(pitch, pattern))
+      if (split.belt.length >= MIN_ANCHORS) {
+        // COVERAGE-VERIFIED belt (shape-agnostic): dropping an "interior" node must never uncover the
+        // rim — on curved/concave shapes a surrounded node can still be the closest cover for a dip.
+        const belt = split.belt.slice()
+        const pool = split.interior.slice()
+        let uncovered = flapVerts(outer, belt, HOLD_REACH_MM)
+        const fullUncovered = flapVerts(outer, seed, HOLD_REACH_MM).length
+        while (uncovered.length > fullUncovered && pool.length) {
+          let bi = -1, bestGain = 0
+          for (let i = 0; i < pool.length; i++) {
+            let gain = 0
+            for (const v of uncovered) if (dist(v, pool[i]) <= HOLD_REACH_MM) gain++
+            if (gain > bestGain) { bestGain = gain; bi = i }
+          }
+          if (bi < 0) break // no interior node can help — residual is a genuine size/pitch problem
+          belt.push(pool[bi]); pool.splice(bi, 1)
+          uncovered = flapVerts(outer, belt, HOLD_REACH_MM)
+        }
+        seated = belt; interior = pool
+      }
+    }
+    // LIGHT thinning — 1·3·4·6 (Dan: "keep central 3-4, remove 2 and 5") — along the belt edges only;
+    // corners always stay; interior nodes (full-grid mode) thin on the axis cross.
+    if (cfg.sparseThin && pitch === 48 && seated.length >= 5) {
+      const r1 = (v: number) => Math.round(v * 10) / 10
+      const mains = (vals: number[]): number[] => {
+        const u0 = [...new Set(vals.map(r1))].sort((a, b) => a - b)
+        return u0.filter((v) => { const m = (((v - u0[0]) % pitch) + pitch) % pitch; return m < 1 || m > pitch - 1 })
+      }
+      const axisKeep = (u: number[]): Set<number> => {
+        if (u.length < 5) return new Set(u)
+        const keep = new Set<number>()
+        let i = 0, j = u.length - 1, take = true
+        while (i <= j) { if (take) { keep.add(u[i]); keep.add(u[j]) } i++; j--; take = !take }
+        return keep
+      }
+      const xs = mains(seed.map((p) => p[0])), ys = mains(seed.map((p) => p[1]))
+      if (xs.length >= 5 || ys.length >= 5) {
+        const kx = axisKeep(xs), ky = axisKeep(ys)
+        const isEnd = (v: number, u: number[]) => u.length > 0 && (Math.abs(v - u[0]) < 1 || Math.abs(v - u[u.length - 1]) < 1)
+        const thinned = seated.filter((p) => {
+          const x = r1(p[0]), y = r1(p[1])
+          const endX = isEnd(x, xs), endY = isEnd(y, ys)
+          if (endX && endY) return true
+          if (endY) return kx.has(x)
+          if (endX) return ky.has(y)
+          return kx.has(x) && ky.has(y)
+        })
+        if (thinned.length >= MIN_ANCHORS) seated = thinned
+      }
+    }
+    return { seated, interior }
+  }
+
   // CENTER the fixed grid on the shape — balanced by construction (the grid translates as a rigid bulk).
   // A/B: centroid balances MATERIAL (lopsided shapes); bbox-centre balances the FRAME (regular shapes).
-  let fullSeated: Pt[] = []
+  // Each parity's FINAL layout is scored by: coverage (fewest uncovered outline points) → PATTERN
+  // CONFORMANCE (nearest-neighbour spacing must match the pattern's own geometry: standard = pitch,
+  // quincunx = pitch/√2, diamond = pitch·√2 — a standard grid must read as straight pitch-spaced rows,
+  // never a rotated/diamond arrangement) → most seated → best centred.
+  let seated: Pt[] = []
+  let interior: Pt[] = []
   {
     const c: Pt = centerMode === 'bbox'
       ? [(bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2]
@@ -269,90 +337,36 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     const ox0 = (((c[0] - bb.minX) % pitch) + pitch) % pitch
     const oy0 = (((c[1] - bb.minY) % pitch) + pitch) % pitch
     const h = pitch / 2
-    // Try both CENTRED parities per axis — a node ON the centre vs a cell centred (nodes at ±pitch/2). Both
-    // are centred rigid translations; keep whichever seats more → small shapes get a 4-corner cell, not one dot.
     const oxs = [ox0, (ox0 + h) % pitch], oys = [oy0, (oy0 + h) % pitch]
-    let bestScore = -Infinity
     // no two magnets closer than 2× the application radius → their padding rings can never overlap
     const minSpacing = 2 * pad
     const checkers = pattern === 'diamond' ? [0, 1] : [0] // diamond: try both checkerboard halves
+    const expectedMp = neighbourStep(pitch, pattern)
+    let bestKey: [number, number, number, number] | null = null
     for (const px of oxs) for (const py of oys) for (const ck of checkers) {
       const nodes = latticeAt(bb, pitch, pattern, px, py, ck)
       const seat = thinBySpacing(nodes.filter(valid), minSpacing, outer, c)
-      let sx = 0, sy = 0; for (const p of seat) { sx += p[0]; sy += p[1] }
-      const bal = seat.length ? Math.hypot(sx / seat.length - c[0], sy / seat.length - c[1]) : 1e9
-      const score = seat.length * 1000 - bal // most seated, then most balanced
-      if (score > bestScore) { bestScore = score; fullSeated = seat }
+      const fin = finalize(seat)
+      const flapN = fin.seated.length ? flapVerts(outer, fin.seated, HOLD_REACH_MM).length : outer.length
+      let mp = Infinity
+      for (let i = 0; i < fin.seated.length; i++) for (let j = i + 1; j < fin.seated.length; j++) {
+        const d = dist(fin.seated[i], fin.seated[j]); if (d < mp) mp = d
+      }
+      const conform = fin.seated.length < 2 ? 1 : Math.abs(mp - expectedMp) < 2 ? 1 : 0
+      let sx = 0, sy = 0; for (const p of fin.seated) { sx += p[0]; sy += p[1] }
+      const bal = fin.seated.length ? Math.hypot(sx / fin.seated.length - c[0], sy / fin.seated.length - c[1]) : 1e9
+      const key: [number, number, number, number] = [flapN, -conform, -fin.seated.length, bal]
+      const better = !bestKey || key[0] < bestKey[0] || (key[0] === bestKey[0] && (key[1] < bestKey[1]
+        || (key[1] === bestKey[1] && (key[2] < bestKey[2] || (key[2] === bestKey[2] && key[3] < bestKey[3])))))
+      if (better) { bestKey = key; seated = fin.seated; interior = fin.interior }
     }
   }
 
   // GUARANTEE ≥1: if the sparse grid seated nothing but the shape can still hold a magnet, drop one at the
   // deepest interior point (a single magnet has no spacing to honour, so grid phase is moot here).
-  if (fullSeated.length === 0) {
+  if (seated.length === 0) {
     const dp = deepestPoint(outer, bb)
-    if (dp && dp.d >= pad) fullSeated = [dp.p]
-  }
-
-  let seated = fullSeated
-  let interior: Pt[] = []
-  if (perimeterOnly && seated.length > 4) {
-    const split = splitPerimeter(seated, neighbourStep(pitch, pattern))
-    if (split.belt.length >= MIN_ANCHORS) {
-      // COVERAGE-VERIFIED belt (shape-agnostic): dropping an "interior" node must never uncover the rim —
-      // on curved/concave shapes a 4-side-surrounded node can still be the closest cover for a rim dip.
-      // Greedily re-add the interior nodes that recover the most uncovered outline until coverage matches
-      // what the full set achieves.
-      const belt = split.belt.slice()
-      const pool = split.interior.slice()
-      let uncovered = flapVerts(outer, belt, HOLD_REACH_MM)
-      const fullUncovered = flapVerts(outer, fullSeated, HOLD_REACH_MM).length
-      while (uncovered.length > fullUncovered && pool.length) {
-        let bi = -1, bestGain = 0
-        for (let i = 0; i < pool.length; i++) {
-          let gain = 0
-          for (const v of uncovered) if (dist(v, pool[i]) <= HOLD_REACH_MM) gain++
-          if (gain > bestGain) { bestGain = gain; bi = i }
-        }
-        if (bi < 0) break // no interior node can help — residual is a genuine size/pitch problem
-        belt.push(pool[bi]); pool.splice(bi, 1)
-        uncovered = flapVerts(outer, belt, HOLD_REACH_MM)
-      }
-      seated = belt; interior = pool
-    }
-  }
-
-  // LIGHT thinning — 1·3·4·6 (Dan: "keep central 3-4, remove 2 and 5") — applied AFTER the perimeter
-  // split, ALONG the belt edges only: top/bottom rows thin their x positions, left/right columns their
-  // y positions; corners always stay. Never introduces interior magnets (perimeter stays pure — full
-  // grid mode is the dense option). Interior nodes (full mode) thin on the axis cross.
-  if (cfg.sparseThin && pitch === 48 && seated.length >= 5) {
-    const r1 = (v: number) => Math.round(v * 10) / 10
-    const mains = (vals: number[]): number[] => {
-      const u0 = [...new Set(vals.map(r1))].sort((a, b) => a - b)
-      // main pitch lines only — quincunx half-step offsets are not lines
-      return u0.filter((v) => { const m = (((v - u0[0]) % pitch) + pitch) % pitch; return m < 1 || m > pitch - 1 })
-    }
-    const axisKeep = (u: number[]): Set<number> => {
-      if (u.length < 5) return new Set(u)
-      const keep = new Set<number>()
-      let i = 0, j = u.length - 1, take = true
-      while (i <= j) { if (take) { keep.add(u[i]); keep.add(u[j]) } i++; j--; take = !take }
-      return keep
-    }
-    const xs = mains(fullSeated.map((p) => p[0])), ys = mains(fullSeated.map((p) => p[1]))
-    if (xs.length >= 5 || ys.length >= 5) {
-      const kx = axisKeep(xs), ky = axisKeep(ys)
-      const isEnd = (v: number, u: number[]) => u.length > 0 && (Math.abs(v - u[0]) < 1 || Math.abs(v - u[u.length - 1]) < 1)
-      const thinned = seated.filter((p) => {
-        const x = r1(p[0]), y = r1(p[1])
-        const endX = isEnd(x, xs), endY = isEnd(y, ys)
-        if (endX && endY) return true                 // corners: always
-        if (endY) return kx.has(x)                    // top/bottom row → thin along x
-        if (endX) return ky.has(y)                    // left/right column → thin along y
-        return kx.has(x) && ky.has(y)                 // interior (full-grid mode only)
-      })
-      if (thinned.length >= MIN_ANCHORS) seated = thinned
-    }
+    if (dp && dp.d >= pad) { seated = [dp.p]; interior = [] }
   }
   const anchors = assignSizes(seated, plan)
 
