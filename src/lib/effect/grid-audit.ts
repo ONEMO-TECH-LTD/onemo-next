@@ -63,6 +63,29 @@ for (const [nm, mk] of SH) {
   }
   for (const cm of ['centroid', 'bbox'] as const) if (computeGrid(d, { pitchMM: 48, paddingMM: 10, perimeterOnly: true, center: cm }).anchors.length < 1) flag(`${nm}: ${cm} seats 0`)
 }
+// ATTACHMENT LAW: velcro = no grid & ok; twin-fix = identical grid to magnetic + twinRequired
+for (const [nm, mk] of SH.slice(0, 4)) {
+  const d = mk(140)
+  const m = computeGrid(d, { attachment: 'magnetic', pitchMM: 48, paddingMM: 10 })
+  const t = computeGrid(d, { attachment: 'twinfix', pitchMM: 48, paddingMM: 10 })
+  const v = computeGrid(d, { attachment: 'velcro', pitchMM: 48, paddingMM: 10 })
+  if (v.anchors.length !== 0 || !v.ok || v.twinRequired) flag(`${nm}: velcro law broken`)
+  if (t.anchors.length !== m.anchors.length || !t.twinRequired) flag(`${nm}: twin-fix law broken`)
+  if (m.twinRequired) flag(`${nm}: magnetic flagged twinRequired`)
+}
+// FOCAL-RAMP LAW (auto plan default): <=100mm all-6; >100mm 8mm at radial extremes (+6 rest when
+// interior anchors exist); ramp widens >=200
+{
+  const g70 = computeGrid(stdShapeContour('square', 70), { pitchMM: 48, paddingMM: 10 })
+  if (g70.anchors.some(a => a.dia === 8)) flag('focal: 8mm below 100')
+  const g118 = computeGrid(stdShapeContour('square', 118), { pitchMM: 48, paddingMM: 10 })
+  if (!g118.anchors.some(a => a.dia === 8) || !g118.anchors.some(a => a.dia === 6)) flag('focal: 118 not mixed 8+6')
+  const g214 = computeGrid(stdShapeContour('square', 214), { pitchMM: 48, paddingMM: 10 })
+  const n8 = (g: ReturnType<typeof computeGrid>) => g.anchors.filter(a => a.dia === 8).length
+  if (n8(g214) <= n8(g118)) flag('focal: ramp did not widen at 214')
+  const gd = computeGrid(stdShapeContour('diamondShape', 176), { pitchMM: 48, paddingMM: 10, pattern: 'diamond' })
+  if (gd.anchors.length >= 3 && !gd.anchors.some(a => a.dia === 8)) flag('focal: rotated diamond got no 8mm')
+}
 // canon: the square's exact zero-points
 const sqLad = semanticLadder((s) => stdShapeContour('square', s), DEFAULT_LAW, 'auto').map(r => r.sizeMM)
 for (const c of [22, 70, 118, 166, 214, 262, 310]) if (!sqLad.includes(c)) flag(`square canon missing ${c} (got ${sqLad.join(',')})`)
