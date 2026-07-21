@@ -468,46 +468,8 @@ export function stdShapeContour(shape: StdShape, wMM: number, hMM: number = wMM)
   return { outer: { pts: [[0, 0], [wMM, 0], [wMM, hMM], [0, hMM]] as Pt[] }, holes: [] } // square / rect
 }
 
-export interface SizeRung {
-  sizeMM: number         // total outer size (the zero-point)
-  pitchMM: number        // sparsest pitch composing it (96 preferred over 48 — fewer is better)
-  anchorsPerSide: number // anchors along the axis at that pitch
-  spanMM: number         // outermost anchor-to-anchor distance
-  visible: boolean       // launch-visible (≤ maxTested) vs hidden-untested
-}
 
-/**
- * Zero-point ladder (§13.2): a size is OPTIMAL when the magnets' padding coincides edge-to-edge with the
- * effect's padding — `size = (n−1)·pitch + 2·pad (+2·frame)`. With the 48-family this is simply
- * 70 + 48k (pad 10, framed): 70 · 118 · 166 · 214 · 262 · 310. Sparse composition preferred: a rung
- * whose span divides by 96 is a 96-pitch rung (118 = 96×2 beats 48×3 — fewer is better).
- */
-export function sizeLadder(law: SizeLaw = DEFAULT_LAW): SizeRung[] {
-  const border = 2 * law.paddingMM + 2 * law.frameMM
-  const rungs: SizeRung[] = []
-  for (let span = 48; span + border <= law.maxRungMM + 1e-6; span += 48) {
-    const sparse96 = span % 96 === 0
-    const pitch = sparse96 ? 96 : 48
-    rungs.push({
-      sizeMM: span + border,
-      pitchMM: pitch,
-      anchorsPerSide: span / pitch + 1,
-      spanMM: span,
-      visible: span + border <= law.maxTestedMM,
-    })
-  }
-  return rungs
-}
 
-/** Snap a requested size to the NEAREST ladder rung (§13.6 standard mode; free shapes snap the same
- *  way). `visibleOnly` (default true) restricts to launch-visible rungs. */
-export function snapToRung(mm: number, law: SizeLaw = DEFAULT_LAW, visibleOnly = true): SizeRung {
-  const all = sizeLadder(law)
-  const pool = visibleOnly ? all.filter((r) => r.visible) : all
-  let best = pool[0]
-  for (const r of pool) if (Math.abs(r.sizeMM - mm) < Math.abs(best.sizeMM - mm)) best = r
-  return best
-}
 
 /** GRID MODE — the four user-facing modes (§ goal 2026-07-21):
  *  auto = everything legal + extra surface anchors for irregular shapes · standard = straight (48-atom)
