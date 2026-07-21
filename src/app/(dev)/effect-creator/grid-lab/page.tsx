@@ -24,8 +24,23 @@ const FIT = 0.86
 const PRESETS: VectorShapeKind[] = ['squircle', 'square', 'circle', 'pill', 'heart', 'star', 'polygon', 'diamond', 'plus', 'teardrop', 'leaf', 'lens', 'bolt', 'sparkle', 'pinched', 'asterisk', 'bowtie']
 const GENS: { k: ShapeKind; label: string }[] = [{ k: 'blob', label: 'Blob' }, { k: 'form', label: 'Clover' }, { k: 'daisy', label: 'Daisy' }, { k: 'pinwheel', label: 'Pinwheel' }]
 
-type Src = 'preset' | 'gen' | 'magic'
+type Src = 'std' | 'preset' | 'gen' | 'magic'
+type StdGeo = 'square' | 'rect' | 'circle' | 'triangle'
 type MagicState = { vshape: VShape; maskH: number; adapter: string; imgUrl: string } | null
+
+/** D12–D15 basic geometries, drawn DIRECTLY in mm on the ladder rungs (no normalization pass). */
+function stdContour(geo: StdGeo, wMM: number, hMM: number): Contour {
+  if (geo === 'circle') {
+    const r = wMM / 2, pts: Pt[] = []
+    for (let i = 0; i < 96; i++) { const t = (i / 96) * Math.PI * 2; pts.push([r + r * Math.cos(t), r + r * Math.sin(t)]) }
+    return { outer: { pts }, holes: [] }
+  }
+  if (geo === 'triangle') {
+    // equilateral, side = rung; dice-centred anchoring comes from the engine (centroid + quincunx)
+    return { outer: { pts: [[0, 0], [wMM, 0], [wMM / 2, wMM * Math.sqrt(3) / 2]] as Pt[] }, holes: [] }
+  }
+  return { outer: { pts: [[0, 0], [wMM, 0], [wMM, hMM], [0, hMM]] as Pt[] }, holes: [] } // square / rect
+}
 
 function bboxOf(pts: ReadonlyArray<{ x: number; y: number }>) {
   let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity
@@ -45,7 +60,9 @@ function normBase(vs: VShape, maskH: number): Contour | null {
 }
 
 export default function GridLab() {
-  const [src, setSrc] = useState<Src>('preset')
+  const [src, setSrc] = useState<Src>('std')
+  const [geo, setGeo] = useState<StdGeo>('square')
+  const [hMM, setHMM] = useState(70) // rect short side (own rung)
   const [preset, setPreset] = useState<VectorShapeKind>('squircle')
   const [gen, setGen] = useState<ShapeKind>('blob')
   const [p1, setP1] = useState(55) // waviness / pinch / depth / swirl
@@ -89,6 +106,30 @@ export default function GridLab() {
 
   const model = useMemo(() => {
     try {
+      const law = { ...DEFAULT_LAW, paddingMM: pad }
+      const baseCfg0 = { paddingMM: pad, pattern, plan, perimeterOnly: coverage === 'perimeter', center: centerMode }
+      // ── STANDARD GEOMETRIES (D12–D15): drawn directly in mm, each axis snapped to its own rung ──
+      if (src === 'std') {
+        const rungW = snapToRung(sizeMM, law, false)
+        const rungH = geo === 'rect' ? snapToRung(hMM, law, false) : rungW
+        const design = stdContour(geo, rungW.sizeMM, geo === 'rect' ? rungH.sizeMM : rungW.sizeMM)
+        const withMargin = (m: number): Contour => {
+          if (Math.abs(m) < 0.01) return design
+          const o = insetRingMM(design.outer.pts, m, 'round')
+          return o && o.length >= 3 ? { outer: { pts: o }, holes: [] } : design
+        }
+        const chosenPitch = pitchAuto ? autoPitch(withMargin, baseCfg0, offsetMM, maxGrowMM) : pitch
+        const fit = balancedFit(withMargin, { ...baseCfg0, pitchMM: chosenPitch }, offsetMM, maxGrowMM)
+        const effect = withMargin(fit.sizeMM)
+        const eff = Math.round(Math.max(dim(effect, 0), dim(effect, 1)))
+        let magDist: number | null = null
+        const aps = fit.grid.anchors
+        for (let i = 0; i < aps.length; i++) for (let j = i + 1; j < aps.length; j++) {
+          const d = Math.hypot(aps[i].p[0] - aps[j].p[0], aps[i].p[1] - aps[j].p[1])
+          if (magDist == null || d < magDist) magDist = d
+        }
+        return { contour: effect, design, grid: fit.grid, marginMM: fit.sizeMM, grew: fit.grew, effSize: eff, designSize: rungW.sizeMM, pitch: chosenPitch, magDist, rung: rungW, rungH }
+      }
       // base contour normalized so longest side = 1mm (scale-free); scaleContour() sizes it in mm
       let base: Contour | null = null
       if (src === 'magic') {
@@ -114,7 +155,6 @@ export default function GridLab() {
       // §13 standard mode: the requested size SNAPS to the nearest zero-point rung (70/118/166/214 at
       // pad 10) — free sizes don't exist on the launch ladder. Law inputs (padding/frame) drive the rungs.
       // bench = admin surface → snap across the FULL ladder (hidden rungs reachable, marked)
-      const law = { ...DEFAULT_LAW, paddingMM: pad }
       const rung = snapToRung(Math.max(sizeMin, Math.min(sizeMM, src === 'preset' ? 310 : 180)), law, false)
       const dSize = rung.sizeMM
       const design = scaleContour(b, dSize)
@@ -136,9 +176,9 @@ export default function GridLab() {
         const d = Math.hypot(aps[i].p[0] - aps[j].p[0], aps[i].p[1] - aps[j].p[1])
         if (magDist == null || d < magDist) magDist = d
       }
-      return { contour: effect, design, grid: fit.grid, marginMM: fit.sizeMM, grew: fit.grew, effSize: eff, designSize: dSize, pitch: chosenPitch, magDist, rung }
+      return { contour: effect, design, grid: fit.grid, marginMM: fit.sizeMM, grew: fit.grew, effSize: eff, designSize: dSize, pitch: chosenPitch, magDist, rung, rungH: rung }
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
-  }, [src, preset, gen, p1, p2, sides, points, sizeMM, pitch, pitchAuto, pad, pattern, plan, magic, coverage, offsetMM, centerMode, maxGrowMM])
+  }, [src, geo, hMM, preset, gen, p1, p2, sides, points, sizeMM, pitch, pitchAuto, pad, pattern, plan, magic, coverage, offsetMM, centerMode, maxGrowMM])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genParams = {
@@ -183,10 +223,18 @@ export default function GridLab() {
           <div className="gl-card gl-pad">
             <div className="gl-glabel">Shape source</div>
             <div className="gl-seg gl-seg3">
+              <button aria-pressed={src === 'std'} onClick={() => setSrc('std')}>Standard</button>
               <button aria-pressed={src === 'preset'} onClick={() => setSrc('preset')}>Presets</button>
               <button aria-pressed={src === 'gen'} onClick={() => setSrc('gen')}>Generators</button>
               <button aria-pressed={src === 'magic'} onClick={() => setSrc('magic')}>AI Magic</button>
             </div>
+
+            {src === 'std' && <div className="gl-field"><span>Geometry</span>
+              <div className="gl-seg">
+                {([['square', 'Square'], ['rect', 'Rectangle'], ['circle', 'Circle'], ['triangle', 'Triangle']] as [StdGeo, string][]).map(([g, l]) =>
+                  <button key={g} aria-pressed={geo === g} onClick={() => setGeo(g)}>{l}</button>)}
+              </div>
+            </div>}
 
             {src === 'preset' && <>
               <label className="gl-field"><span>Preset shape</span>
@@ -223,7 +271,7 @@ export default function GridLab() {
 
           <div className="gl-card gl-pad">
             {/* §13 standard sizes — the full zero-point ladder incl. hidden/untested rungs (D11) */}
-            <div className="gl-field"><span>Standard size · rung</span>
+            <div className="gl-field"><span>{src === 'std' && geo === 'rect' ? 'Width · rung' : 'Standard size · rung'}</span>
               <div className="gl-seg gl-wrap">
                 {sizeLadder({ ...DEFAULT_LAW, paddingMM: pad }).map(r =>
                   <button key={r.sizeMM} aria-pressed={model?.rung.sizeMM === r.sizeMM}
@@ -234,6 +282,17 @@ export default function GridLab() {
                   </button>)}
               </div>
             </div>
+            {src === 'std' && geo === 'rect' && <div className="gl-field"><span>Height · rung</span>
+              <div className="gl-seg gl-wrap">
+                {sizeLadder({ ...DEFAULT_LAW, paddingMM: pad }).map(r =>
+                  <button key={'h' + r.sizeMM} aria-pressed={model?.rungH?.sizeMM === r.sizeMM}
+                    className={r.visible ? undefined : 'gl-hidden-rung'}
+                    onClick={() => setHMM(r.sizeMM)}
+                    title={`${r.pitchMM}mm × ${r.anchorsPerSide} anchors · span ${r.spanMM}mm${r.visible ? '' : ' · hidden at launch (untested)'}`}>
+                    {r.sizeMM}{r.visible ? '' : '†'}
+                  </button>)}
+              </div>
+            </div>}
             <Slider label={`Design size · longest side${src !== 'preset' ? ' · max 180' : ''}`} unit="mm" v={Math.max(sizeMin, Math.min(sizeMM, sizeMax))} set={setSizeMM} min={sizeMin} max={sizeMax} />
             <Slider label="Max auto-margin · balance" unit="mm" v={maxGrowMM} set={setMaxGrowMM} min={0} max={80} />
             {model && <div className="gl-total">

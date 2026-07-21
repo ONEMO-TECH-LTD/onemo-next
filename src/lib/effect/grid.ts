@@ -393,6 +393,27 @@ export function scaleContour(base: Contour, longestMM: number): Contour {
   return { outer: { pts: base.outer.pts.map(([x, y]) => [x * longestMM, y * longestMM] as Pt) }, holes: [] }
 }
 
+/** RECTANGLE law (§13 / D12): each axis snaps the SAME ladder independently — a rectangle is two rung
+ *  choices (W × H), e.g. 214×118 landscape = 96-pitch 3×2 anchors. Non-uniform scale of the normalized
+ *  base to real W×H mm. */
+export function scaleContourXY(base: Contour, wMM: number, hMM: number): Contour {
+  const bb = bbox(base.outer.pts)
+  const sx = wMM / Math.max(bb.maxX - bb.minX, 1e-6), sy = hMM / Math.max(bb.maxY - bb.minY, 1e-6)
+  return { outer: { pts: base.outer.pts.map(([x, y]) => [(x - bb.minX) * sx, (y - bb.minY) * sy] as Pt) }, holes: [] }
+}
+
+/** All rectangle variations from the ladder: every W×H rung pair (W ≥ H — portrait = the transpose).
+ *  The common pitch is 48 when either rung is 48-composed, else 96. */
+export function rectVariations(law: SizeLaw = DEFAULT_LAW, visibleOnly = true): { w: SizeRung; h: SizeRung; pitchMM: number }[] {
+  const rungs = sizeLadder(law).filter((r) => !visibleOnly || r.visible)
+  const out: { w: SizeRung; h: SizeRung; pitchMM: number }[] = []
+  for (const w of rungs) for (const h of rungs) {
+    if (h.sizeMM > w.sizeMM) continue
+    out.push({ w, h, pitchMM: w.pitchMM === 48 || h.pitchMM === 48 ? 48 : 96 })
+  }
+  return out
+}
+
 /**
  * Sizing ADAPTS (always-on, capped): from the selected size, nudge UP in small steps up to `maxGrowMM`
  * and keep the first size that is BALANCED — zero gaps and ≥ target magnets (envelops the corners). If
