@@ -13,6 +13,7 @@
 
 import type { Contour, Pt } from './types'
 import { pointInPolygon } from './attachment'
+import { insetRingMM } from './offset'
 
 /** THE 48/68 SYSTEM (§13.5d, locked): one lattice, two atoms — straight 48, diagonal 68 (=48√2).
  *  'standard' = straight rows only · 'diamond' = diagonal (68) links only · 'quincunx' (dice) = the
@@ -210,16 +211,18 @@ function neighbourStep(pitch: number, pattern: GridPattern): number {
     : pitch
 }
 
-/** Per-anchor magnet size. corners8 → 8mm on the extreme corners, 6mm elsewhere. */
+/** Per-anchor magnet size. corners8 → 8mm at the RADIAL EXTREMES — the anchors farthest from the
+ *  layout's centre, which are the true focal points on ANY geometry (a square's corners, a rotated
+ *  diamond's vertices, a star's tips). The old bbox-corner test missed every rotated shape. */
 function assignSizes(seated: Pt[], plan: MagnetPlan): Anchor[] {
   if (plan === 'all8') return seated.map((p) => ({ p, dia: 8 as MagnetDia }))
-  if (plan === 'all6') return seated.map((p) => ({ p, dia: 6 as MagnetDia }))
-  const bb = bbox(seated)
-  return seated.map((p) => {
-    const ex = Math.abs(p[0] - bb.minX) < 0.6 || Math.abs(p[0] - bb.maxX) < 0.6
-    const ey = Math.abs(p[1] - bb.minY) < 0.6 || Math.abs(p[1] - bb.maxY) < 0.6
-    return { p, dia: (ex && ey ? 8 : 6) as MagnetDia }
-  })
+  if (plan === 'all6' || seated.length === 0) return seated.map((p) => ({ p, dia: 6 as MagnetDia }))
+  let cx = 0, cy = 0
+  for (const p of seated) { cx += p[0]; cy += p[1] }
+  cx /= seated.length; cy /= seated.length
+  const radii = seated.map((p) => Math.hypot(p[0] - cx, p[1] - cy))
+  const maxR = Math.max(...radii)
+  return seated.map((p, i) => ({ p, dia: (maxR > 1 && radii[i] >= maxR - 1.5 ? 8 : 6) as MagnetDia }))
 }
 
 /**
@@ -435,6 +438,15 @@ export const DEFAULT_LAW: SizeLaw = { paddingMM: 10, frameMM: 1, maxTestedMM: 21
 
 /** LAW: random/AI-cut silhouettes are capped below the preset range until physically tested. */
 export const RANDOM_SHAPE_MAX_MM = 180
+/** LAW: the max design size per shape SOURCE — standard geometries and curated presets span the full
+ *  system range (maxRungMM); only generated/AI-cut randoms carry the untested cap. */
+export function maxDesignMM(source: 'std' | 'preset' | 'gen' | 'magic', law: SizeLaw = DEFAULT_LAW): number {
+  return source === 'gen' || source === 'magic' ? RANDOM_SHAPE_MAX_MM : law.maxRungMM
+}
+/** LAW: the default auto-margin allowance — the outward band the system may add to reach balance.
+ *  (Dan 2026-07-21: keep 12 for testing.) Part of the sizing law: semantic sizes are solved WITH this
+ *  allowance, exactly like the live placement — a solver stricter than the engine lies about sizes. */
+export const DEFAULT_MARGIN_MM = 12
 /** LAW: the smallest effect is the single-point (ONE) size — one magnet with its full pad ring. */
 export function minEffectMM(law: SizeLaw = DEFAULT_LAW): number { return 2 * (law.paddingMM + law.frameMM) }
 /** LAW: rectangle format families by aspect ratio (product naming, not navigation). */
@@ -526,26 +538,55 @@ export function semanticLadder(
 ): SemanticRung[] {
   const combos = modeCombos(mode)
   const padEff = law.paddingMM + law.frameMM
-  // every size at which the flap-free anchor count STEPS UP is a rung — all the way to the system max
-  const steps: { points: number; sizeMM: number }[] = []
-  let last = 0
-  for (let s = Math.ceil(2 * padEff); s <= law.maxRungMM; s += 1) {
-    let best = 0
-    for (const cb of combos) {
-      const g = computeGrid(makeShape(s), { pitchMM: cb.pitchMM, pattern: cb.pattern, paddingMM: padEff, perimeterOnly: true, strictPad: true })
-      if (g.flaps.length) continue
-      if (g.anchors.length > best) best = g.anchors.length
+  // TWO-TIER SIZE LAW: (1) canonical rungs are EXACT zero-points — the shape holds flap-free at that
+  // very size, margin 0, strict pad (sharp geometry; the 70/118/166/214 canon). (2) Only when a
+  // mode×shape has NO exact multi-point size at all (a triangle's tips under diamond links) does the
+  // solver fall back to the live margin mechanism (band-assisted, recording TOTAL size) — the ladder
+  // then shows the true sizes the system actually produces. Never mixed: exact stays exact.
+  const solve = (banded: boolean): { points: number; sizeMM: number }[] => {
+    const steps: { points: number; sizeMM: number }[] = []
+    let last = 0
+    for (let s = Math.ceil(2 * padEff); s <= law.maxRungMM; s += banded ? 2 : 1) {
+      let best = 0, bestTotal = s
+      for (const cb of combos) {
+        const cfg: GridConfig = { pitchMM: cb.pitchMM, pattern: cb.pattern, paddingMM: padEff, perimeterOnly: true, strictPad: true }
+        if (!banded) {
+          const g = computeGrid(makeShape(s), cfg)
+          if (g.flaps.length) continue
+          if (g.anchors.length > best) best = g.anchors.length
+        } else {
+          const design = makeShape(s)
+          const w = (m: number): Contour => {
+            if (Math.abs(m) < 0.01) return design
+            const o = insetRingMM(design.outer.pts, m, 'round')
+            return o && o.length >= 3 ? { outer: { pts: o }, holes: [] } : design
+          }
+          const fit = balancedFit(w, cfg, 0, DEFAULT_MARGIN_MM)
+          if (fit.grid.flaps.length) continue
+          if (fit.grid.anchors.length > best) {
+            best = fit.grid.anchors.length
+            const eff = w(fit.sizeMM)
+            const bb = eff.outer.pts.reduce((a, [x, y]) => [Math.min(a[0], x), Math.min(a[1], y), Math.max(a[2], x), Math.max(a[3], y)], [Infinity, Infinity, -Infinity, -Infinity])
+            bestTotal = Math.round(Math.max(bb[2] - bb[0], bb[3] - bb[1]))
+          }
+        }
+      }
+      if (best > last && bestTotal > (steps.length ? steps[steps.length - 1].sizeMM : 0)) {
+        steps.push({ points: best, sizeMM: bestTotal }); last = best
+      }
     }
-    if (best > last) { steps.push({ points: best, sizeMM: s }); last = best }
+    return steps
   }
-  // labels: the 1-point rung is always "ONE" (the default single-point size); the rest take the
-  // garment band of their real mm, bumping up one label on collision so the sequence stays ordered.
+  let steps = solve(false)
+  if (!steps.some((st) => st.points >= 2)) steps = solve(true) // band-assisted fallback for empty ladders
+  // LABEL LAW: the first multi-point rung anchors the sequence at its mm band (small shapes start at
+  // 2XS/XS, chunky ones at M/L); every later rung takes the NEXT label — strictly sequential, no skips,
+  // regardless of how far apart a mode's sizes land (Dan: each shape shows its own contiguous range).
   const rungs: SemanticRung[] = []
   let prevIdx = -1
   for (const st of steps) {
     if (st.points === 1) { rungs.push({ label: 'ONE', points: 1, sizeMM: st.sizeMM, visible: st.sizeMM <= law.maxTestedMM }); continue }
-    let idx = SIZE_BANDS.findIndex(([max]) => st.sizeMM < max)
-    if (idx <= prevIdx) idx = prevIdx + 1
+    const idx = prevIdx === -1 ? SIZE_BANDS.findIndex(([max]) => st.sizeMM < max) : prevIdx + 1
     if (idx >= BAND_LABELS.length) break
     prevIdx = idx
     rungs.push({ label: BAND_LABELS[idx], points: st.points, sizeMM: st.sizeMM, visible: st.sizeMM <= law.maxTestedMM })

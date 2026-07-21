@@ -15,7 +15,7 @@ import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import { contourFromShape } from '@/lib/effect/geometry-truth'
 import { insetRingMM } from '@/lib/effect/offset'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { computeGrid, balancedFit, autoGrid, scaleContour, semanticLadder, stdShapeContour, rectFormat, minEffectMM, RANDOM_SHAPE_MAX_MM, DEFAULT_LAW, type GridPattern, type MagnetPlan, type GridDensity, type GridMode, type SemanticRung, type StdShape } from '@/lib/effect/grid'
+import { computeGrid, balancedFit, autoGrid, scaleContour, semanticLadder, stdShapeContour, rectFormat, minEffectMM, maxDesignMM, DEFAULT_MARGIN_MM, DEFAULT_LAW, type GridPattern, type MagnetPlan, type GridDensity, type GridMode, type SemanticRung, type StdShape } from '@/lib/effect/grid'
 
 const IMG = 1000
 const VP = 440
@@ -70,7 +70,7 @@ export default function GridLab() {
   const [frame, setFrame] = useState(true)
   const [coverage, setCoverage] = useState<'full' | 'perimeter'>('perimeter')
   const [centerMode, setCenterMode] = useState<'centroid' | 'bbox'>('centroid')
-  const [maxGrowMM, setMaxGrowMM] = useState(12)
+  const [maxGrowMM, setMaxGrowMM] = useState(DEFAULT_MARGIN_MM) // engine law default
 
   const [magic, setMagic] = useState<MagicState>(null)
   const [magStatus, setMagStatus] = useState<string>('')   // '', 'downloading-model', 'cutting', 'error:...'
@@ -89,7 +89,7 @@ export default function GridLab() {
       .catch((err) => { console.error('[grid-lab] magic failed', err); setMagStatus('error:' + ((err as Error)?.message ?? 'cut failed')) })
   }
 
-  const sizeMax = src === 'preset' ? DEFAULT_LAW.maxRungMM : RANDOM_SHAPE_MAX_MM // engine law: preset range vs untested-cut cap
+  const sizeMax = maxDesignMM(src === 'std' ? 'std' : src, DEFAULT_LAW) // engine law: per-source max
   const sizeMin = minEffectMM({ ...DEFAULT_LAW, paddingMM: pad }) // engine law: the ONE (single-point) floor
 
   // PER-GEOMETRY standard sizes (Dan): each geometry's rungs are solved numerically from the live
@@ -334,7 +334,7 @@ export default function GridLab() {
                 </div>
               </div>
             </>}
-            <Slider label={`Design size · longest side${src !== 'preset' ? ` · max ${RANDOM_SHAPE_MAX_MM}` : ''}`} unit="mm" v={Math.max(sizeMin, Math.min(sizeMM, sizeMax))} set={setSizeMM} min={sizeMin} max={sizeMax} />
+            <Slider label={`Design size · longest side${sizeMax < DEFAULT_LAW.maxRungMM ? ` · max ${sizeMax}` : ''}`} unit="mm" v={Math.max(sizeMin, Math.min(sizeMM, sizeMax))} set={setSizeMM} min={sizeMin} max={sizeMax} />
             <Slider label="Max auto-margin · balance" unit="mm" v={maxGrowMM} set={setMaxGrowMM} min={0} max={80} />
             {model && <div className="gl-total">
               <span className="gl-total-k">Total effect size</span>
