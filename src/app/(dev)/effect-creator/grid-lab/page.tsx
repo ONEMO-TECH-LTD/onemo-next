@@ -62,7 +62,10 @@ function normBase(vs: VShape, maskH: number): Contour | null {
 export default function GridLab() {
   const [src, setSrc] = useState<Src>('std')
   const [geo, setGeo] = useState<StdGeo>('square')
-  const [hMM, setHMM] = useState(70) // rect short side (own rung)
+  // rect system A: long side rung → short side rung (< long) → orientation
+  const [longMM, setLongMM] = useState(118)
+  const [shortMM, setShortMM] = useState(70)
+  const [orient, setOrient] = useState<'landscape' | 'portrait'>('landscape')
   const [preset, setPreset] = useState<VectorShapeKind>('squircle')
   const [gen, setGen] = useState<ShapeKind>('blob')
   const [p1, setP1] = useState(55) // waviness / pinch / depth / swirl
@@ -111,8 +114,14 @@ export default function GridLab() {
       const baseCfg0 = { paddingMM: pad, pattern, plan, perimeterOnly: coverage === 'perimeter', center: centerMode, sparseThin: density === 'light' }
       // ── STANDARD GEOMETRIES (D12–D15): drawn directly in mm, each axis snapped to its own rung ──
       if (src === 'std') {
-        const rungW = snapToRung(sizeMM, law, false)
-        const rungH = geo === 'rect' ? snapToRung(hMM, law, false) : rungW
+        // rect (system A): long rung + short rung (< long) + orientation → W×H
+        const rungL = snapToRung(longMM, law, false)
+        const shortPool = sizeLadder(law).filter(r => r.sizeMM < rungL.sizeMM)
+        const rungS = shortPool.length
+          ? shortPool.reduce((b, r) => Math.abs(r.sizeMM - shortMM) < Math.abs(b.sizeMM - shortMM) ? r : b)
+          : rungL
+        const rungW = geo === 'rect' ? (orient === 'landscape' ? rungL : rungS) : snapToRung(sizeMM, law, false)
+        const rungH = geo === 'rect' ? (orient === 'landscape' ? rungS : rungL) : rungW
         const design = stdContour(geo, rungW.sizeMM, geo === 'rect' ? rungH.sizeMM : rungW.sizeMM)
         const withMargin = (m: number): Contour => {
           if (Math.abs(m) < 0.01) return design
@@ -129,7 +138,9 @@ export default function GridLab() {
           const d = Math.hypot(aps[i].p[0] - aps[j].p[0], aps[i].p[1] - aps[j].p[1])
           if (magDist == null || d < magDist) magDist = d
         }
-        return { contour: effect, design, grid: fit.grid, marginMM: fit.sizeMM, grew: fit.grew, effSize: eff, designSize: rungW.sizeMM, pitch: chosenPitch, magDist, rung: rungW, rungH }
+        const ratio = Math.max(rungW.sizeMM, rungH.sizeMM) / Math.min(rungW.sizeMM, rungH.sizeMM)
+        const format = geo !== 'rect' ? null : ratio >= 2.5 ? 'strip' : ratio >= 1.6 ? 'panoramic' : 'block'
+        return { contour: effect, design, grid: fit.grid, marginMM: fit.sizeMM, grew: fit.grew, effSize: eff, designSize: rungW.sizeMM, pitch: chosenPitch, magDist, rung: rungW, rungH, format }
       }
       // base contour normalized so longest side = 1mm (scale-free); scaleContour() sizes it in mm
       let base: Contour | null = null
@@ -177,9 +188,9 @@ export default function GridLab() {
         const d = Math.hypot(aps[i].p[0] - aps[j].p[0], aps[i].p[1] - aps[j].p[1])
         if (magDist == null || d < magDist) magDist = d
       }
-      return { contour: effect, design, grid: fit.grid, marginMM: fit.sizeMM, grew: fit.grew, effSize: eff, designSize: dSize, pitch: chosenPitch, magDist, rung, rungH: rung }
+      return { contour: effect, design, grid: fit.grid, marginMM: fit.sizeMM, grew: fit.grew, effSize: eff, designSize: dSize, pitch: chosenPitch, magDist, rung, rungH: rung, format: null }
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
-  }, [src, geo, hMM, preset, gen, p1, p2, sides, points, sizeMM, pitch, pitchAuto, density, pad, pattern, plan, magic, coverage, offsetMM, centerMode, maxGrowMM])
+  }, [src, geo, longMM, shortMM, orient, preset, gen, p1, p2, sides, points, sizeMM, pitch, pitchAuto, density, pad, pattern, plan, magic, coverage, offsetMM, centerMode, maxGrowMM])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genParams = {
@@ -272,7 +283,7 @@ export default function GridLab() {
 
           <div className="gl-card gl-pad">
             {/* §13 standard sizes — the full zero-point ladder incl. hidden/untested rungs (D11) */}
-            <div className="gl-field"><span>{src === 'std' && geo === 'rect' ? 'Width · rung' : 'Standard size · rung'}</span>
+            {!(src === 'std' && geo === 'rect') && <div className="gl-field"><span>Standard size · rung</span>
               <div className="gl-seg gl-wrap">
                 {sizeLadder({ ...DEFAULT_LAW, paddingMM: pad }).map(r =>
                   <button key={r.sizeMM} aria-pressed={model?.rung.sizeMM === r.sizeMM}
@@ -282,43 +293,37 @@ export default function GridLab() {
                     {r.sizeMM}{r.visible ? '' : '†'}
                   </button>)}
               </div>
-            </div>
+            </div>}
             {src === 'std' && geo === 'rect' && <>
-              {/* every rectangle variant from the ladder — landscape + portrait explicitly */}
-              <div className="gl-field"><span>Landscape variants</span>
+              {/* system A: long side → short side (< long) → orientation */}
+              <div className="gl-field"><span>Long side · rung</span>
                 <div className="gl-seg gl-wrap">
-                  {sizeLadder({ ...DEFAULT_LAW, paddingMM: pad }).flatMap(w =>
-                    sizeLadder({ ...DEFAULT_LAW, paddingMM: pad }).filter(h => h.sizeMM < w.sizeMM).map(h =>
-                      <button key={`l${w.sizeMM}x${h.sizeMM}`} aria-pressed={model?.rung.sizeMM === w.sizeMM && model?.rungH?.sizeMM === h.sizeMM}
-                        className={w.visible && h.visible ? undefined : 'gl-hidden-rung'}
-                        onClick={() => { setSizeMM(w.sizeMM); setHMM(h.sizeMM) }}>
-                        {w.sizeMM}×{h.sizeMM}{w.visible && h.visible ? '' : '†'}
-                      </button>))}
+                  {sizeLadder({ ...DEFAULT_LAW, paddingMM: pad }).filter(r => r.sizeMM > 70).map(r =>
+                    <button key={'L' + r.sizeMM} aria-pressed={Math.max(model?.rung.sizeMM ?? 0, model?.rungH?.sizeMM ?? 0) === r.sizeMM}
+                      className={r.visible ? undefined : 'gl-hidden-rung'}
+                      onClick={() => setLongMM(r.sizeMM)}
+                      title={`${r.pitchMM}mm × ${r.anchorsPerSide} anchors · span ${r.spanMM}mm${r.visible ? '' : ' · hidden at launch (untested)'}`}>
+                      {r.sizeMM}{r.visible ? '' : '†'}
+                    </button>)}
                 </div>
               </div>
-              <div className="gl-field"><span>Portrait variants</span>
+              <div className="gl-field"><span>Short side · rung</span>
                 <div className="gl-seg gl-wrap">
-                  {sizeLadder({ ...DEFAULT_LAW, paddingMM: pad }).flatMap(h =>
-                    sizeLadder({ ...DEFAULT_LAW, paddingMM: pad }).filter(w => w.sizeMM < h.sizeMM).map(w =>
-                      <button key={`p${w.sizeMM}x${h.sizeMM}`} aria-pressed={model?.rung.sizeMM === w.sizeMM && model?.rungH?.sizeMM === h.sizeMM}
-                        className={w.visible && h.visible ? undefined : 'gl-hidden-rung'}
-                        onClick={() => { setSizeMM(w.sizeMM); setHMM(h.sizeMM) }}>
-                        {w.sizeMM}×{h.sizeMM}{w.visible && h.visible ? '' : '†'}
-                      </button>))}
+                  {sizeLadder({ ...DEFAULT_LAW, paddingMM: pad }).filter(r => r.sizeMM < snapToRung(longMM, { ...DEFAULT_LAW, paddingMM: pad }, false).sizeMM).map(r =>
+                    <button key={'S' + r.sizeMM} aria-pressed={Math.min(model?.rung.sizeMM ?? 0, model?.rungH?.sizeMM ?? 0) === r.sizeMM}
+                      className={r.visible ? undefined : 'gl-hidden-rung'}
+                      onClick={() => setShortMM(r.sizeMM)}>
+                      {r.sizeMM}{r.visible ? '' : '†'}
+                    </button>)}
+                </div>
+              </div>
+              <div className="gl-field"><span>Orientation</span>
+                <div className="gl-seg">
+                  <button aria-pressed={orient === 'landscape'} onClick={() => setOrient('landscape')}>Landscape</button>
+                  <button aria-pressed={orient === 'portrait'} onClick={() => setOrient('portrait')}>Portrait</button>
                 </div>
               </div>
             </>}
-            {src === 'std' && geo === 'rect' && <div className="gl-field"><span>Height · rung</span>
-              <div className="gl-seg gl-wrap">
-                {sizeLadder({ ...DEFAULT_LAW, paddingMM: pad }).map(r =>
-                  <button key={'h' + r.sizeMM} aria-pressed={model?.rungH?.sizeMM === r.sizeMM}
-                    className={r.visible ? undefined : 'gl-hidden-rung'}
-                    onClick={() => setHMM(r.sizeMM)}
-                    title={`${r.pitchMM}mm × ${r.anchorsPerSide} anchors · span ${r.spanMM}mm${r.visible ? '' : ' · hidden at launch (untested)'}`}>
-                    {r.sizeMM}{r.visible ? '' : '†'}
-                  </button>)}
-              </div>
-            </div>}
             <Slider label={`Design size · longest side${src !== 'preset' ? ' · max 180' : ''}`} unit="mm" v={Math.max(sizeMin, Math.min(sizeMM, sizeMax))} set={setSizeMM} min={sizeMin} max={sizeMax} />
             <Slider label="Max auto-margin · balance" unit="mm" v={maxGrowMM} set={setMaxGrowMM} min={0} max={80} />
             {model && <div className="gl-total">
@@ -326,7 +331,7 @@ export default function GridLab() {
               <b className="gl-total-v">{model.effSize}<small> mm</small></b>
               <span className="gl-total-note">{model.marginMM > 0.5 ? `design ${model.designSize}mm + ${Math.round(model.marginMM)}mm margin${model.grew > 0.5 ? ` (+${Math.round(model.grew)} auto)` : ''}` : `design ${model.designSize}mm · no margin`}</span>
               <span className="gl-total-note gl-total-grid">grid {model.pitch}mm{model.magDist != null ? ` · magnets ${Math.round(model.magDist)}mm apart` : ''}</span>
-              <span className="gl-total-note">rung {model.rung.sizeMM}mm · {model.rung.pitchMM}×{model.rung.anchorsPerSide} span {model.rung.spanMM}{model.rung.visible ? '' : ' · HIDDEN (untested)'}</span>
+              <span className="gl-total-note">{model.format ? `${model.rung.sizeMM}×${model.rungH.sizeMM} · ${model.format}` : `rung ${model.rung.sizeMM}mm · ${model.rung.pitchMM}×${model.rung.anchorsPerSide} span ${model.rung.spanMM}`}{model.rung.visible && model.rungH.visible ? '' : ' · HIDDEN (untested)'}</span>
             </div>}
             <div className="gl-field"><span>Grid density · cells</span>
               <div className="gl-seg">
