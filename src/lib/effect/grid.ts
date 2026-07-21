@@ -334,7 +334,9 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     }
     // LIGHT thinning — 1·3·4·6 (Dan: "keep central 3-4, remove 2 and 5") — along the belt edges only;
     // corners always stay; interior nodes (full-grid mode) thin on the axis cross.
-    if (cfg.sparseThin && pitch === 48 && seated.length >= 5) {
+    // LIGHT 1·3·4·6 thinning is a STANDARD-rows law only — a diamond ring's midpoints are structural
+    // 68-links, not crowd (thinning them broke the 224 diamond); dice never reaches here (full).
+    if (cfg.sparseThin && pattern === 'standard' && pitch === 48 && seated.length >= 5) {
       const r1 = (v: number) => Math.round(v * 10) / 10
       const mains = (vals: number[]): number[] => {
         const u0 = [...new Set(vals.map(r1))].sort((a, b) => a - b)
@@ -541,7 +543,7 @@ export function semanticLadder(
     for (let s = Math.ceil(2 * padEff); s <= law.maxRungMM; s += banded ? 2 : 1) {
       let best = 0, bestTotal = s
       for (const cb of combos) {
-        const cfg: GridConfig = { pitchMM: cb.pitchMM, pattern: cb.pattern, paddingMM: padEff, perimeterOnly: true, strictPad: true }
+        const cfg: GridConfig = { pitchMM: cb.pitchMM, pattern: cb.pattern, paddingMM: padEff, perimeterOnly: cb.pattern === 'standard', strictPad: true }
         if (!banded) {
           const g = computeGrid(makeShape(s), cfg)
           if (g.flaps.length) continue
