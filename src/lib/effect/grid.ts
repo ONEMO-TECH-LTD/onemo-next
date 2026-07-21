@@ -28,6 +28,14 @@ export const TARGET_ANCHORS = 4
 /** How far a magnet holds material down before an edge would lift — a PHYSICAL distance, independent of
  *  the chosen grid pitch (a fine 24mm grid doesn't make the fabric flap sooner). Tunable (coupon later). */
 export const HOLD_REACH_MM = 48
+/** CORNER TOLERANCE on the pad distance: a convex corner ROUNDING may bring the outline slightly
+ *  inside the pad radius — the REAL 70mm product's corner magnets sit ~9mm from the corner arc and
+ *  hold (standard rungs must seat their canonical grid at exact size, no margin needed). Tunable. */
+export const PAD_CORNER_TOL_MM = 1.5
+/** Minimum fraction of the application ring (radius = pad) inside material — the second gate: corner
+ *  rounding clips a small arc of the ring (~29% on the squircle) while a thin arm loses ~half, so
+ *  encroachment beyond a clipped corner stays invalid. Tunable (coupon later). */
+export const RING_COVERAGE_MIN = 0.7
 
 export interface GridConfig {
   pitchMM?: number
@@ -229,10 +237,27 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const bb = bbox(outer)
   const issues: string[] = []
 
-  // A node is VALID = inside the silhouette AND ≥ pad from the outline (10mm application radius, from the
-  // magnet centre). Checked PER NODE against the REAL outline — no erosion — so a shape that pinches into
-  // separate regions (a duck's head AND body) seats magnets in BOTH, not just the largest eroded piece.
-  const valid = (p: Pt) => pointInPolygon(p, outer) && distToRing(p, outer) >= pad
+  // A node is VALID = inside the silhouette AND its application zone is present. Per node against the
+  // REAL outline (no erosion — pinched shapes keep all regions). The full pad ring inside is ideal; a
+  // convex corner ROUNDING may clip it (the real 70mm product's corner magnets sit ~9mm from the corner
+  // arc and hold — standard rungs must seat their canonical grid at exact size, no margin). Accepted
+  // only when BOTH hold: pad deficit within the corner tolerance AND most of the ring present — so
+  // encroachment on straight edges / thin arms stays invalid.
+  const ringCoverage = (p: Pt): number => {
+    const N = 24
+    let inside = 0
+    for (let i = 0; i < N; i++) {
+      const t = (i / N) * Math.PI * 2
+      if (pointInPolygon([p[0] + pad * Math.cos(t), p[1] + pad * Math.sin(t)], outer)) inside++
+    }
+    return inside / N
+  }
+  const valid = (p: Pt) => {
+    if (!pointInPolygon(p, outer)) return false
+    const d = distToRing(p, outer)
+    if (d >= pad) return true
+    return d >= pad - PAD_CORNER_TOL_MM && ringCoverage(p) >= RING_COVERAGE_MIN
+  }
 
   // CENTER the fixed grid on the shape — balanced by construction (the grid translates as a rigid bulk).
   // A/B: centroid balances MATERIAL (lopsided shapes); bbox-centre balances the FRAME (regular shapes).
