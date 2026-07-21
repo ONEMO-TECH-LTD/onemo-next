@@ -126,8 +126,11 @@ export default function GridLab() {
         const nearestOwn = nearest(sizeMM, stdRungs)
         const rungW = geo === 'rect' ? (orient === 'landscape' ? rungL : rungS) : nearestOwn
         const rungH = geo === 'rect' ? (orient === 'landscape' ? rungS : rungL) : rungW
-        // per-geometry zero-point: the rung size IS the geometry's own solved standard size
-        const stdSize = rungW.sizeMM
+        // DUAL SIZING LAW (every shape): the slider is CONTINUOUS/adaptive — the engine adapts any size
+        // exactly like generators/AI cuts; the semantic buttons are quick-sets to the pre-calculated
+        // optimal variants. `rungW` stays the NEAREST reference for display. Rect keeps axis rungs
+        // (system A per Dan's rectangle derivation).
+        const stdSize = geo === 'rect' ? rungW.sizeMM : Math.max(sizeMin, Math.min(sizeMM, sizeMax))
         const design = stdShapeContour(geo, stdSize, geo === 'rect' ? rungH.sizeMM : stdSize)
         const withMargin = (m: number): Contour => {
           if (Math.abs(m) < 0.01) return design
@@ -348,7 +351,7 @@ export default function GridLab() {
               <b className="gl-total-v">{model.effSize}<small> mm</small></b>
               <span className="gl-total-note">{model.marginMM > 0.5 ? `design ${model.designSize}mm + ${Math.round(model.marginMM)}mm margin${model.grew > 0.5 ? ` (+${Math.round(model.grew)} auto)` : ''}` : `design ${model.designSize}mm · no margin`}</span>
               <span className="gl-total-note gl-total-grid">grid {model.pitch}mm{model.magDist != null ? ` · magnets ${Math.round(model.magDist)}mm apart${Math.abs(model.magDist - model.pitch * Math.SQRT2) < 1.5 ? ` · grid diagonal (${model.pitch}×√2)` : Math.abs(model.magDist - model.pitch * Math.SQRT2 / 2) < 1.5 ? ` · dice half-diagonal` : ''}` : ''}</span>
-              <span className="gl-total-note">{model.format ? `${model.rung.sizeMM}×${model.rungH.sizeMM} · ${model.format}` : `size ${model.rung.label} (${model.rung.sizeMM}mm · tier ${model.rung.points}pt) · seated ${model.grid.anchors.length}`}{model.rung.visible && model.rungH.visible ? '' : ' · HIDDEN (untested)'}</span>
+              <span className="gl-total-note">{model.format ? `${model.rung.sizeMM}×${model.rungH.sizeMM} · ${model.format}` : `${model.designSize === model.rung.sizeMM ? 'size' : 'nearest'} ${model.rung.label} (${model.rung.sizeMM}mm · tier ${model.rung.points}pt) · seated ${model.grid.anchors.length}`}{model.rung.visible && model.rungH.visible ? '' : ' · HIDDEN (untested)'}</span>
             </div>}
             <div className="gl-field"><span>Grid density · cells</span>
               <div className="gl-seg">
