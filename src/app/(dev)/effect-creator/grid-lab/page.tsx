@@ -69,6 +69,7 @@ export default function GridLab() {
   const [patternAuto, setPatternAuto] = useState(true) // pattern joins the auto system — same physics search as pitch
   const [plan, setPlan] = useState<MagnetPlan>('auto') // engine law default: size-driven focal ramp
   const [frame, setFrame] = useState(true)
+  const [front, setFront] = useState(false) // front-face overlay: magnets shown over the design/art
   const [centerMode, setCenterMode] = useState<'centroid' | 'bbox'>('centroid')
   const [maxGrowMM, setMaxGrowMM] = useState(DEFAULT_MARGIN_MM) // engine law default
 
@@ -229,7 +230,7 @@ export default function GridLab() {
             <span className="gl-eye">{model ? `1mm = ${scale.toFixed(2)} px` : '—'}</span>
           </div>
           <div className="gl-vp">
-            {model ? <Stage contour={model.contour} design={model.design} grid={model.grid} frame={frame} />
+            {model ? <Stage contour={model.contour} design={model.design} grid={model.grid} frame={frame} front={front} frontImg={src === 'magic' && magic ? magic.imgUrl : null} />
               : src === 'magic'
                 ? <Empty text={magStatus.startsWith('error') ? magStatus.slice(6) : magStatus === 'downloading-model' ? 'Downloading the cut-out model…' : magStatus.startsWith('cutting') ? 'Cutting out the shape…' : 'Upload an image to cut its outline'} spin={magStatus === 'downloading-model' || magStatus.startsWith('cutting')} />
                 : <Empty text="shape unavailable" />}
@@ -390,6 +391,9 @@ export default function GridLab() {
             <label className="gl-toggle"><span>1 mm frame</span>
               <input type="checkbox" checked={frame} onChange={e => setFrame(e.target.checked)} />
             </label>
+            <label className="gl-toggle"><span>Front face · magnet overlay</span>
+              <input type="checkbox" checked={front} onChange={e => setFront(e.target.checked)} />
+            </label>
           </div>
 
           {model && <div className="gl-card gl-read">
@@ -414,7 +418,7 @@ function dim(c: Contour, axis: 0 | 1): number {
 }
 
 const pathFrom = (pp: Pt[]) => 'M ' + pp.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ') + ' Z'
-function Stage({ contour, design, grid, frame }: { contour: Contour; design: Contour; grid: ReturnType<typeof computeGrid>; frame: boolean }) {
+function Stage({ contour, design, grid, frame, front, frontImg }: { contour: Contour; design: Contour; grid: ReturnType<typeof computeGrid>; frame: boolean; front: boolean; frontImg: string | null }) {
   const ePts = contour.outer.pts.map(([x, y]) => [x, -y] as Pt)
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   for (const [x, y] of ePts) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y }
@@ -425,16 +429,37 @@ function Stage({ contour, design, grid, frame }: { contour: Contour; design: Con
   const fontMM = pad * 0.5
   const eD = pathFrom(ePts)
   const hasMargin = design !== contour && design.outer.pts.length >= 3
-  const dD = hasMargin ? pathFrom(design.outer.pts.map(([x, y]) => [x, -y] as Pt)) : ''
+  const dPts = design.outer.pts.map(([x, y]) => [x, -y] as Pt)
+  const dD = hasMargin ? pathFrom(dPts) : ''
   const fy = (p: Pt): Pt => [p[0], -p[1]]
   const seat = new Set(grid.anchors.map(a => a.p[0].toFixed(2) + ',' + a.p[1].toFixed(2)))
   const hasFlap = grid.flaps.length > 0
+  // design bbox (flipped screen space) for placing the front image
+  let dmnx = Infinity, dmny = Infinity, dmxx = -Infinity, dmxy = -Infinity
+  for (const [x, y] of dPts) { if (x < dmnx) dmnx = x; if (x > dmxx) dmxx = x; if (y < dmny) dmny = y; if (y > dmxy) dmxy = y }
+  const dDall = pathFrom(dPts)
   return (
     <svg width={vbW * S} height={vbH * S} viewBox={`${minX - pad} ${minY - pad} ${vbW} ${vbH}`}>
+      <defs><clipPath id="frontclip"><path d={dDall} /></clipPath></defs>
       {/* faint edge-to-edge frame at the ultimate extent + the real W×H (total effect size) */}
       <rect x={minX} y={minY} width={w} height={h} fill="none" stroke="var(--ink-3)" strokeOpacity={0.5} strokeWidth={0.6} strokeDasharray="3 2.2" />
       <text x={minX + w / 2} y={minY - pad * 0.28} fontSize={fontMM} fill="var(--ink-3)" textAnchor="middle" fontFamily="ui-monospace,monospace">{Math.round(w)} mm</text>
       <text x={minX - pad * 0.28} y={minY + h / 2} fontSize={fontMM} fill="var(--ink-3)" textAnchor="middle" fontFamily="ui-monospace,monospace" transform={`rotate(-90 ${minX - pad * 0.28} ${minY + h / 2})`}>{Math.round(h)} mm</text>
+      {front ? <>
+        {/* FRONT FACE — the design/artwork the wearer sees, with magnets as translucent overlay rings so
+            the grid can be sanity-checked over the art. Positions are engine anchors, not re-derived. */}
+        {frontImg
+          ? <image href={frontImg} x={dmnx} y={dmny} width={dmxx - dmnx} height={dmxy - dmny} clipPath="url(#frontclip)" preserveAspectRatio="none" transform={`translate(0 ${dmny + dmxy}) scale(1 -1)`} />
+          : <path d={dDall} fill="var(--suede)" />}
+        <path d={dDall} fill="none" stroke="var(--suede-edge)" strokeWidth={1} strokeLinejoin="round" />
+        {grid.anchors.map((a, i) => {
+          const p = fy(a.p)
+          return <g key={'fm' + i}>
+            <circle cx={p[0]} cy={p[1]} r={a.dia / 2} fill="#fff" fillOpacity={0.35} stroke="#fff" strokeOpacity={0.9} strokeWidth={0.6} />
+            <circle cx={p[0]} cy={p[1]} r={a.dia / 2} fill="none" stroke="#000" strokeOpacity={0.55} strokeWidth={0.5} strokeDasharray="1.1 1" />
+          </g>
+        })}
+      </> : <>
       {/* effect = design + margin: fill the whole effect as MARGIN material, then the design on top → the
           margin band shows as the ring between the dashed design outline and the effect edge. */}
       <path d={eD} fill={hasMargin ? 'var(--margin)' : 'var(--suede)'} />
@@ -454,8 +479,9 @@ function Stage({ contour, design, grid, frame }: { contour: Contour; design: Con
           <circle cx={p[0] - a.dia * 0.12} cy={p[1] - a.dia * 0.12} r={a.dia / 2 * 0.4} fill="var(--magnet-hi)" fillOpacity={0.5} />
         </g>
       })}
-      {/* live magnet-distance annotation: dimension line on the CLOSEST seated pair, real mm */}
-      {(() => {
+      </>}
+      {/* live magnet-distance annotation: dimension line on the CLOSEST seated pair, real mm (back view) */}
+      {!front && (() => {
         const a = grid.anchors
         if (a.length < 2) return null
         let bi = 0, bj = 1, bd = Infinity
