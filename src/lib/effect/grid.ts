@@ -133,6 +133,25 @@ function latticeAt(bb: BBox, pitch: number, pattern: GridPattern, ox: number, oy
   return uniq
 }
 
+/** Greedy min-spacing thinning: keep only magnets whose application rings never overlap — no two centres
+ *  closer than `minDist` (= 2× the padding radius, so two 20mm rings can't intersect). Deepest-anchored
+ *  kept first, then most central. This is the honest enforcement of per-spot padding: at fine pitch a
+ *  quincunx CENTRE sits pitch/√2 from its corners (17mm at pitch 24) — closer than two 20mm rings allow —
+ *  so those centres are dropped (Dice-5 correctly collapses to standard at 24mm). Regular 48/24 grids are
+ *  untouched (spacing already ≥ minDist). */
+function thinBySpacing(pts: Pt[], minDist: number, ring: ReadonlyArray<Pt>, c: Pt): Pt[] {
+  const ranked = pts
+    .map((p) => ({ p, d: distToRing(p, ring), r: dist(p, c) }))
+    .sort((a, b) => b.d - a.d || a.r - b.r) // deepest in material first, then most central
+  const kept: Pt[] = []
+  for (const { p } of ranked) {
+    let clear = true
+    for (const q of kept) if (dist(p, q) < minDist - 1e-6) { clear = false; break }
+    if (clear) kept.push(p)
+  }
+  return kept
+}
+
 /** Silhouette vertices further than `reach` from the nearest magnet (uncovered/flap-risk edge). */
 function flapVerts(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number): Pt[] {
   const out: Pt[] = []
@@ -216,21 +235,23 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     // are centred rigid translations; keep whichever seats more → small shapes get a 4-corner cell, not one dot.
     const oxs = [ox0, (ox0 + h) % pitch], oys = [oy0, (oy0 + h) % pitch]
     let bestScore = -Infinity, chosenNodes: Pt[] = []
+    // no two magnets closer than 2× the application radius → their padding rings can never overlap
+    const minSpacing = 2 * pad
     for (const px of oxs) for (const py of oys) {
       const nodes = latticeAt(bb, pitch, pattern, px, py)
-      const seat = nodes.filter(valid)
+      const seat = thinBySpacing(nodes.filter(valid), minSpacing, outer, c)
       let sx = 0, sy = 0; for (const p of seat) { sx += p[0]; sy += p[1] }
       const bal = seat.length ? Math.hypot(sx / seat.length - c[0], sy / seat.length - c[1]) : 1e9
       const score = seat.length * 1000 - bal // most seated, then most balanced
       if (score > bestScore) { bestScore = score; fullSeated = seat; chosenNodes = nodes }
     }
-    // GAPS: material slots (inside the silhouette) that couldn't seat (padding-blocked) yet are flanked by
-    // ≥2 seated neighbours — an unbalanced hole. balancedFit grows the size until this clears.
-    const seatKeys = new Set(fullSeated.map((p) => p[0].toFixed(1) + ',' + p[1].toFixed(1)))
+    // GAPS: material slots (inside the silhouette) that couldn't seat because padding was blocked BY THE
+    // OUTLINE (too close to an edge) yet are flanked by ≥2 seated neighbours — a hole that a bigger margin
+    // would fill. A node dropped for min-SPACING is NOT a gap (it passed the outline test; growing can't
+    // help — the neighbour is already there), so we count only nodes that fail `valid`.
     const nR = pitch * 1.2
     for (const n of chosenNodes) {
-      if (seatKeys.has(n[0].toFixed(1) + ',' + n[1].toFixed(1))) continue
-      if (!inMaterial(n)) continue // no material → not a gap
+      if (!inMaterial(n) || valid(n)) continue // no material, or seatable/spacing-dropped → not a growable gap
       let nb = 0; for (const s of fullSeated) if (dist(n, s) <= nR) nb++
       if (nb >= 2) gaps++
     }
