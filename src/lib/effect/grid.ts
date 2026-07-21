@@ -299,8 +299,10 @@ export const MAX_EMPTY_BORDER_MM = 24
 // ─── LAUNCH LAW (§13, locked 2026-07-21) — 48-family only, procedural zero-point ladder ──────────────
 // Launch pitches = 48/96 exclusively (24/72 have no counterpart on the 96-dice garment canvas; small/cap
 // domains untested — admin-only experiments). Auto never leaves the family.
-const LAUNCH_PITCHES = [96, 48]
-function allowedPitches(_sizeMM: number): number[] { return LAUNCH_PITCHES }
+/** Grid density preference: 'light' tries the coarse 96 first (sparse, uncrowded — the garment
+ *  aesthetic); 'standard' tries 48 first (denser, firmer hold). Same family either way. */
+export type GridDensity = 'standard' | 'light'
+function allowedPitches(density: GridDensity): number[] { return density === 'standard' ? [48, 96] : [96, 48] }
 
 /** The admin LAW INPUTS that generate every size procedurally — no hand-picked numbers. */
 export interface SizeLaw {
@@ -370,13 +372,11 @@ function emptyBorder(grid: GridResult, contour: Contour): number {
  */
 export function autoPitch(
   withMargin: (m: number) => Contour, cfg: GridConfig, fromMM: number, maxGrowMM: number,
-  minN = TARGET_ANCHORS, maxEmptyMM = MAX_EMPTY_BORDER_MM,
+  minN = TARGET_ANCHORS, maxEmptyMM = MAX_EMPTY_BORDER_MM, density: GridDensity = 'light',
 ): number {
-  // evaluate each pitch WITH the auto-margin (a few mm of border can let a coarser pitch hold), coarsest-first
-  // (ladder is size-clamped by the effect's real longest side: the fine 24mm atom never applies above
-  //  FINE_PITCH_MAX_SIZE_MM — fromMM is the margin start, NOT the size, so measure the contour)
-  const b0 = bbox(withMargin(fromMM).outer.pts)
-  const ladder = allowedPitches(Math.max(b0.maxX - b0.minX, b0.maxY - b0.minY))
+  // evaluate each pitch WITH the auto-margin, in the density's preference order: 'light' coarse-first
+  // (96 sparse wins while the empty-border rule allows), 'standard' dense-first (48 firm hold)
+  const ladder = allowedPitches(density)
   let fallback = ladder[ladder.length - 1], fallbackGap = Infinity
   for (const p of ladder) {
     const fit = balancedFit(withMargin, { ...cfg, pitchMM: p }, fromMM, maxGrowMM)

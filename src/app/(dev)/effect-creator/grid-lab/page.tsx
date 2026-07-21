@@ -15,7 +15,7 @@ import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import { contourFromShape } from '@/lib/effect/geometry-truth'
 import { insetRingMM } from '@/lib/effect/offset'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { computeGrid, balancedFit, autoPitch, scaleContour, snapToRung, sizeLadder, DEFAULT_LAW, type GridPattern, type MagnetPlan } from '@/lib/effect/grid'
+import { computeGrid, balancedFit, autoPitch, scaleContour, snapToRung, sizeLadder, DEFAULT_LAW, type GridPattern, type MagnetPlan, type GridDensity } from '@/lib/effect/grid'
 
 const IMG = 1000
 const VP = 440
@@ -72,6 +72,7 @@ export default function GridLab() {
   const [sizeMM, setSizeMM] = useState(70)
   const [pitch, setPitch] = useState(48)
   const [pitchAuto, setPitchAuto] = useState(true)
+  const [density, setDensity] = useState<GridDensity>('light') // cell count: standard = more cells (48-first), light = fewer (96-first)
   const [pad, setPad] = useState(10)
   const [offsetMM, setOffsetMM] = useState(0)
   const [pattern, setPattern] = useState<GridPattern>('standard')
@@ -118,7 +119,7 @@ export default function GridLab() {
           const o = insetRingMM(design.outer.pts, m, 'round')
           return o && o.length >= 3 ? { outer: { pts: o }, holes: [] } : design
         }
-        const chosenPitch = pitchAuto ? autoPitch(withMargin, baseCfg0, offsetMM, maxGrowMM) : pitch
+        const chosenPitch = pitchAuto ? autoPitch(withMargin, baseCfg0, offsetMM, maxGrowMM, undefined, undefined, density) : pitch
         const fit = balancedFit(withMargin, { ...baseCfg0, pitchMM: chosenPitch }, offsetMM, maxGrowMM)
         const effect = withMargin(fit.sizeMM)
         const eff = Math.round(Math.max(dim(effect, 0), dim(effect, 1)))
@@ -164,7 +165,7 @@ export default function GridLab() {
         return o && o.length >= 3 ? { outer: { pts: o }, holes: [] } : design
       }
       // proportion-adaptive pitch: coarsest standard (72/48/24) that still holds; else the user's choice
-      const chosenPitch = pitchAuto ? autoPitch(withMargin, baseCfg, offsetMM, maxGrowMM) : pitch
+      const chosenPitch = pitchAuto ? autoPitch(withMargin, baseCfg, offsetMM, maxGrowMM, undefined, undefined, density) : pitch
       const cfg = { ...baseCfg, pitchMM: chosenPitch }
       const fit = balancedFit(withMargin, cfg, offsetMM, maxGrowMM)
       const effect = withMargin(fit.sizeMM)
@@ -178,7 +179,7 @@ export default function GridLab() {
       }
       return { contour: effect, design, grid: fit.grid, marginMM: fit.sizeMM, grew: fit.grew, effSize: eff, designSize: dSize, pitch: chosenPitch, magDist, rung, rungH: rung }
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
-  }, [src, geo, hMM, preset, gen, p1, p2, sides, points, sizeMM, pitch, pitchAuto, pad, pattern, plan, magic, coverage, offsetMM, centerMode, maxGrowMM])
+  }, [src, geo, hMM, preset, gen, p1, p2, sides, points, sizeMM, pitch, pitchAuto, density, pad, pattern, plan, magic, coverage, offsetMM, centerMode, maxGrowMM])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genParams = {
@@ -302,6 +303,12 @@ export default function GridLab() {
               <span className="gl-total-note gl-total-grid">grid {model.pitch}mm{model.magDist != null ? ` · magnets ${Math.round(model.magDist)}mm apart` : ''}</span>
               <span className="gl-total-note">rung {model.rung.sizeMM}mm · {model.rung.pitchMM}×{model.rung.anchorsPerSide} span {model.rung.spanMM}{model.rung.visible ? '' : ' · HIDDEN (untested)'}</span>
             </div>}
+            <div className="gl-field"><span>Grid density · cells</span>
+              <div className="gl-seg">
+                <button aria-pressed={density === 'standard'} onClick={() => setDensity('standard')} title="48-first — more cells, firmer hold">Standard</button>
+                <button aria-pressed={density === 'light'} onClick={() => setDensity('light')} title="96-first — fewer cells, sparse/uncrowded">Light</button>
+              </div>
+            </div>
             <div className="gl-field"><span>Grid pitch · {pitchAuto && model ? `auto → ${model.pitch}mm` : 'manual'}</span>
               <div className="gl-seg">
                 <button aria-pressed={pitchAuto} onClick={() => setPitchAuto(true)}>Auto</button>
