@@ -134,7 +134,10 @@ export default function GridLab() {
       // ── STANDARD GEOMETRIES (D12–D15): drawn directly in mm, each axis snapped to its own rung ──
       if (src === 'std') {
         if (!stdRungs.length) return null
-        const nearest = (mm: number, pool: SemanticRung[]) => pool.reduce((b, r) => Math.abs(r.sizeMM - mm) < Math.abs(b.sizeMM - mm) ? r : b)
+        const nearest = (mm: number, pool: SemanticRung[]) => pool.reduce((b, r) => {
+          const dr = Math.abs(r.sizeMM - mm), db = Math.abs(b.sizeMM - mm)
+          return dr < db || (dr === db && r.sizeMM > b.sizeMM) ? r : b // tie → larger: never shrink on a mode switch
+        })
         // rect (system A): long + short axes each snap the SQUARE's semantic sizes; orientation flips
         const rungL = nearest(longMM, stdRungs)
         const shortPool = stdRungs.filter(r => r.sizeMM < rungL.sizeMM)
@@ -193,7 +196,10 @@ export default function GridLab() {
       // the engine adapts (auto-margin snaps coverage to the 48-family grid dynamically). The rung
       // buttons are quick-sets for the rigid standard sizes; `rung` below is the nearest reference only.
       const dSize = Math.max(sizeMin, Math.min(sizeMM, src === 'preset' ? 310 : 180))
-      const rung = stdRungs.length ? stdRungs.reduce((b, r) => Math.abs(r.sizeMM - dSize) < Math.abs(b.sizeMM - dSize) ? r : b) : { label: '—', points: 0, sizeMM: dSize, visible: true }
+      const rung = stdRungs.length ? stdRungs.reduce((b, r) => {
+        const dr = Math.abs(r.sizeMM - dSize), db = Math.abs(b.sizeMM - dSize)
+        return dr < db || (dr === db && r.sizeMM > b.sizeMM) ? r : b
+      }) : { label: '—', points: 0, sizeMM: dSize, visible: true }
       const design = scaleContour(b, dSize)
       const withMargin = (m: number): Contour => {
         if (Math.abs(m) < 0.01) return design
