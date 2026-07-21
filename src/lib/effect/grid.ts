@@ -342,7 +342,8 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     const minSpacing = 2 * pad
     const checkers = pattern === 'diamond' ? [0, 1] : [0] // diamond: try both checkerboard halves
     const expectedMp = neighbourStep(pitch, pattern)
-    let bestKey: [number, number, number, number] | null = null
+    type Cand = { fin: { seated: Pt[]; interior: Pt[] }; flapN: number; conform: number; bal: number }
+    const cands: Cand[] = []
     for (const px of oxs) for (const py of oys) for (const ck of checkers) {
       const nodes = latticeAt(bb, pitch, pattern, px, py, ck)
       const seat = thinBySpacing(nodes.filter(valid), minSpacing, outer, c)
@@ -355,10 +356,21 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
       const conform = fin.seated.length < 2 ? 1 : Math.abs(mp - expectedMp) < 2 ? 1 : 0
       let sx = 0, sy = 0; for (const p of fin.seated) { sx += p[0]; sy += p[1] }
       const bal = fin.seated.length ? Math.hypot(sx / fin.seated.length - c[0], sy / fin.seated.length - c[1]) : 1e9
-      const key: [number, number, number, number] = [flapN, -conform, -fin.seated.length, bal]
+      cands.push({ fin, flapN, conform, bal })
+    }
+    // STANDARD is a HARD conformance law (Dan): straight pitch-spaced rows or nothing — a diamond
+    // arrangement must never appear under the standard pattern, even when it covers better (the honest
+    // outcome is flaps + margin growth, or the user/auto picking the Diamond pattern explicitly).
+    // Other patterns keep coverage-first (their geometry is inherently mixed-spacing).
+    const pool = pattern === 'standard' && cands.some((k) => k.conform === 1 && k.fin.seated.length >= MIN_ANCHORS)
+      ? cands.filter((k) => k.conform === 1)
+      : cands
+    let bestKey: [number, number, number, number] | null = null
+    for (const k of pool) {
+      const key: [number, number, number, number] = [k.flapN, -k.conform, -k.fin.seated.length, k.bal]
       const better = !bestKey || key[0] < bestKey[0] || (key[0] === bestKey[0] && (key[1] < bestKey[1]
         || (key[1] === bestKey[1] && (key[2] < bestKey[2] || (key[2] === bestKey[2] && key[3] < bestKey[3])))))
-      if (better) { bestKey = key; seated = fin.seated; interior = fin.interior }
+      if (better) { bestKey = key; seated = k.fin.seated; interior = k.fin.interior }
     }
   }
 
