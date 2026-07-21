@@ -252,7 +252,7 @@ export default function GridLab() {
             </div>
 
             {src === 'std' && <div className="gl-field"><span>Geometry</span>
-              <div className="gl-seg">
+              <div className="gl-seg gl-wrap">
                 {([['square', 'Square'], ['diamondShape', 'Diamond'], ['rect', 'Rectangle'], ['circle', 'Circle'], ['triangle', 'Triangle']] as [StdGeo, string][]).map(([g, l]) =>
                   <button key={g} aria-pressed={geo === g} onClick={() => setGeo(g)}>{l}</button>)}
               </div>
