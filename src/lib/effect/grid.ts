@@ -293,7 +293,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
 }
 
 /**
- * Proportion-adaptive pitch (THE mechanism): the COARSEST standard pitch (72 → 48 → 24) whose grid still
+ * Proportion-adaptive pitch (THE mechanism): the COARSEST standard pitch (96 → 72 → 48 → 24) whose grid still
  * seats a solid hold (≥ minN magnets). Driven by the shape's REAL fit — a thin strip gets 48, not 72 —
  * not longest-side buckets. Coarsest-first also keeps the count minimal (no crowding). Falls back to 24
  * (finest) when even that can't reach minN. `contourMM` is the effect (design + base margin).
@@ -302,7 +302,7 @@ export function autoPitch(
   withMargin: (m: number) => Contour, cfg: GridConfig, fromMM: number, maxGrowMM: number, minN = TARGET_ANCHORS,
 ): number {
   // evaluate each pitch WITH the auto-margin (a few mm of border can let a coarser pitch hold), coarsest-first
-  for (const p of [72, 48, 24]) {
+  for (const p of [96, 72, 48, 24]) {
     if (balancedFit(withMargin, { ...cfg, pitchMM: p }, fromMM, maxGrowMM).grid.anchors.length >= minN) return p
   }
   return 24

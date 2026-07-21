@@ -219,6 +219,7 @@ export default function GridLab() {
                 <button aria-pressed={!pitchAuto && pitch === 24} onClick={() => { setPitchAuto(false); setPitch(24) }}>24</button>
                 <button aria-pressed={!pitchAuto && pitch === 48} onClick={() => { setPitchAuto(false); setPitch(48) }}>48</button>
                 <button aria-pressed={!pitchAuto && pitch === 72} onClick={() => { setPitchAuto(false); setPitch(72) }}>72</button>
+                <button aria-pressed={!pitchAuto && pitch === 96} onClick={() => { setPitchAuto(false); setPitch(96) }}>96</button>
               </div>
             </div>
             <Slider label="Magnet padding · per spot · min 10" unit="mm" v={pad} set={setPad} min={10} max={30} />
