@@ -67,7 +67,7 @@ export default function GridLab() {
   const [offsetMM, setOffsetMM] = useState(0)
   const [pattern, setPattern] = useState<GridPattern>('standard')
   const [patternAuto, setPatternAuto] = useState(true) // pattern joins the auto system — same physics search as pitch
-  const [plan, setPlan] = useState<MagnetPlan>('all6')
+  const [plan, setPlan] = useState<MagnetPlan>('auto') // engine law default: size-driven focal ramp
   const [frame, setFrame] = useState(true)
   const [coverage, setCoverage] = useState<'full' | 'perimeter'>('perimeter')
   const [centerMode, setCenterMode] = useState<'centroid' | 'bbox'>('centroid')
@@ -389,7 +389,7 @@ export default function GridLab() {
             </div>
             <div className="gl-field"><span>Magnet plan</span>
               <div className="gl-seg">
-                {([['all6', 'All 6mm'], ['all8', 'All 8mm'], ['corners8', 'Corners 8']] as [MagnetPlan, string][]).map(([p, l]) =>
+                {([['auto', 'Auto'], ['all6', 'All 6mm'], ['all8', 'All 8mm'], ['corners8', 'Corners 8']] as [MagnetPlan, string][]).map(([p, l]) =>
                   <button key={p} aria-pressed={plan === p} onClick={() => setPlan(p)}>{l}</button>)}
               </div>
             </div>

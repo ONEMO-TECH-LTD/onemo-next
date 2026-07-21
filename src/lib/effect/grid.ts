@@ -25,7 +25,11 @@ export type GridPattern = 'standard' | 'quincunx' | 'diamond'
  *  grid laws effect-side, NO garment constraint, the counterpart twin is part of the product ·
  *  'velcro' = NO grid at all: the back is a full velcro hook in the silhouette; any shape, any size. */
 export type Attachment = 'magnetic' | 'twinfix' | 'velcro'
-export type MagnetPlan = 'all6' | 'all8' | 'corners8'
+/** 'auto' (DEFAULT — the §10.7 law): magnet size is SIZE-DRIVEN, never a knob. ≤100mm effects run
+ *  all-6mm (light); above 100mm the FOCAL anchors (radial extremes — where peel starts) take 8mm and
+ *  the rest stay 6mm; from 200mm the focal window widens (proportional ramp — more 8mm as size/weight
+ *  grows). Manual all6/all8/corners8 remain admin experiments. */
+export type MagnetPlan = 'auto' | 'all6' | 'all8' | 'corners8'
 export type MagnetDia = 6 | 8
 
 export const DEFAULT_PITCH_MM = 48
@@ -43,6 +47,10 @@ export const PAD_CORNER_TOL_MM = 1.5
  *  rounding clips a small arc of the ring (~29% on the squircle) while a thin arm loses ~half, so
  *  encroachment beyond a clipped corner stays invalid. Tunable (coupon later). */
 export const RING_COVERAGE_MIN = 0.7
+/** Focal-ramp law thresholds (§10.7, coupon-tunable): below FOCAL_SIZE all-6; above, radial extremes
+ *  take 8mm; from RAMP2 the focal window widens to 75% of max radius. */
+export const FOCAL_SIZE_MM = 100
+export const FOCAL_RAMP2_MM = 200
 
 export interface GridConfig {
   attachment?: Attachment // default 'magnetic'
@@ -223,15 +231,20 @@ function neighbourStep(pitch: number, pattern: GridPattern): number {
 /** Per-anchor magnet size. corners8 → 8mm at the RADIAL EXTREMES — the anchors farthest from the
  *  layout's centre, which are the true focal points on ANY geometry (a square's corners, a rotated
  *  diamond's vertices, a star's tips). The old bbox-corner test missed every rotated shape. */
-function assignSizes(seated: Pt[], plan: MagnetPlan): Anchor[] {
+function assignSizes(seated: Pt[], plan: MagnetPlan, effectSizeMM: number): Anchor[] {
   if (plan === 'all8') return seated.map((p) => ({ p, dia: 8 as MagnetDia }))
   if (plan === 'all6' || seated.length === 0) return seated.map((p) => ({ p, dia: 6 as MagnetDia }))
+  if (plan === 'auto' && effectSizeMM <= FOCAL_SIZE_MM) return seated.map((p) => ({ p, dia: 6 as MagnetDia }))
   let cx = 0, cy = 0
   for (const p of seated) { cx += p[0]; cy += p[1] }
   cx /= seated.length; cy /= seated.length
   const radii = seated.map((p) => Math.hypot(p[0] - cx, p[1] - cy))
   const maxR = Math.max(...radii)
-  return seated.map((p, i) => ({ p, dia: (maxR > 1 && radii[i] >= maxR - 1.5 ? 8 : 6) as MagnetDia }))
+  // focal window: the radial extremes; on the auto plan it WIDENS proportionally past RAMP2 (§10.7 —
+  // bigger/heavier pieces get more 8mm focal anchors, the interior stays 6mm)
+  const widen = plan === 'auto' && effectSizeMM >= FOCAL_RAMP2_MM
+  const cut = widen ? maxR * 0.75 : maxR - 1.5
+  return seated.map((p, i) => ({ p, dia: (maxR > 1 && radii[i] >= cut ? 8 : 6) as MagnetDia }))
 }
 
 /**
@@ -256,7 +269,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const pitch = (cfg.pattern === 'quincunx' && reqPitch < 96) ? 96 : reqPitch
   const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
   const pattern = cfg.pattern ?? 'standard'
-  const plan = cfg.plan ?? 'all6'
+  const plan = cfg.plan ?? 'auto'
   // GLOBAL LAW: the perimeter belt is a STANDARD-pattern concept only. Dice and Diamond ARE their
   // centre links (the 68-atom spokes live on interior nodes) — stripping interiors would delete the
   // pattern itself, so for them coverage is always the full grid. Every consumer (semantic ladder
@@ -411,7 +424,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     const dp = deepestPoint(outer, bb)
     if (dp && dp.d >= pad) { seated = [dp.p]; interior = [] }
   }
-  const anchors = assignSizes(seated, plan)
+  const anchors = assignSizes(seated, plan, Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY))
 
   if (!seated.length) issues.push(`No room for a magnet — too small/thin to keep a magnet ${pad}mm from every edge.`)
   else if (seated.length < MIN_ANCHORS) issues.push(`Too small — only ${seated.length} magnet grips material. Increase the size or the max auto-grow.`)
