@@ -122,7 +122,13 @@ export default function GridLab() {
           : rungL
         const rungW = geo === 'rect' ? (orient === 'landscape' ? rungL : rungS) : snapToRung(sizeMM, law, false)
         const rungH = geo === 'rect' ? (orient === 'landscape' ? rungS : rungL) : rungW
-        const design = stdContour(geo, rungW.sizeMM, geo === 'rect' ? rungH.sizeMM : rungW.sizeMM)
+        // §6 envelop-the-box law: non-square geometry ADAPTS around the canonical SQUARE grid box — the
+        // grid never rotates/deforms. A circle serving the rung's box must reach the box CORNERS
+        // (span·√2/2 from centre) + padding → slightly larger disc than the square (70 rung → ~90 disc).
+        const stdSize = geo === 'circle'
+          ? Math.round(2 * (rungW.spanMM * Math.SQRT2 / 2 + law.paddingMM) + 2 * law.frameMM)
+          : rungW.sizeMM
+        const design = stdContour(geo, stdSize, geo === 'rect' ? rungH.sizeMM : stdSize)
         const withMargin = (m: number): Contour => {
           if (Math.abs(m) < 0.01) return design
           const o = insetRingMM(design.outer.pts, m, 'round')
@@ -140,7 +146,7 @@ export default function GridLab() {
         }
         const ratio = Math.max(rungW.sizeMM, rungH.sizeMM) / Math.min(rungW.sizeMM, rungH.sizeMM)
         const format = geo !== 'rect' ? null : ratio >= 2.5 ? 'strip' : ratio >= 1.6 ? 'panoramic' : 'block'
-        return { contour: effect, design, grid: fit.grid, marginMM: fit.sizeMM, grew: fit.grew, effSize: eff, designSize: rungW.sizeMM, pitch: chosenPitch, magDist, rung: rungW, rungH, format }
+        return { contour: effect, design, grid: fit.grid, marginMM: fit.sizeMM, grew: fit.grew, effSize: eff, designSize: stdSize, pitch: chosenPitch, magDist, rung: rungW, rungH, format }
       }
       // base contour normalized so longest side = 1mm (scale-free); scaleContour() sizes it in mm
       let base: Contour | null = null
@@ -166,9 +172,11 @@ export default function GridLab() {
       // random shapes (AI Magic / generators) are capped at 180mm; presets go to 200mm
       // §13 standard mode: the requested size SNAPS to the nearest zero-point rung (70/118/166/214 at
       // pad 10) — free sizes don't exist on the launch ladder. Law inputs (padding/frame) drive the rungs.
-      // bench = admin surface → snap across the FULL ladder (hidden rungs reachable, marked)
-      const rung = snapToRung(Math.max(sizeMin, Math.min(sizeMM, src === 'preset' ? 310 : 180)), law, false)
-      const dSize = rung.sizeMM
+      // ADAPTIVE sizing (Dan's law, restored): the slider is CONTINUOUS — free shapes take any size and
+      // the engine adapts (auto-margin snaps coverage to the 48-family grid dynamically). The rung
+      // buttons are quick-sets for the rigid standard sizes; `rung` below is the nearest reference only.
+      const dSize = Math.max(sizeMin, Math.min(sizeMM, src === 'preset' ? 310 : 180))
+      const rung = snapToRung(dSize, law, false)
       const design = scaleContour(b, dSize)
       const withMargin = (m: number): Contour => {
         if (Math.abs(m) < 0.01) return design
