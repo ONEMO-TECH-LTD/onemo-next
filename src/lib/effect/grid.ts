@@ -292,20 +292,40 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   }
 }
 
+/** Default cap on EMPTY SPACE: the max allowed gap (per side) between the seated grid's bounding box and
+ *  the effect's outer edge. One atom (24mm). Tunable (coupon later). */
+export const MAX_EMPTY_BORDER_MM = 24
+
+/** Worst per-side gap between the seated anchors' bbox and the shape's bbox. Infinity when nothing seats. */
+function emptyBorder(grid: GridResult, contour: Contour): number {
+  if (!grid.anchors.length) return Infinity
+  const sb = bbox(contour.outer.pts)
+  const ab = bbox(grid.anchors.map((a) => a.p))
+  return Math.max(ab.minX - sb.minX, ab.minY - sb.minY, sb.maxX - ab.maxX, sb.maxY - ab.maxY)
+}
+
 /**
- * Proportion-adaptive pitch (THE mechanism): the COARSEST standard pitch (96 → 72 → 48 → 24) whose grid still
- * seats a solid hold (≥ minN magnets). Driven by the shape's REAL fit — a thin strip gets 48, not 72 —
- * not longest-side buckets. Coarsest-first also keeps the count minimal (no crowding). Falls back to 24
- * (finest) when even that can't reach minN. `contourMM` is the effect (design + base margin).
+ * Proportion-adaptive pitch (THE mechanism): the COARSEST standard pitch (96 → 72 → 48 → 24) whose grid
+ * (a) seats a solid hold (≥ minN magnets) AND (b) leaves no dead border — the seated grid's bbox must
+ * reach within `maxEmptyMM` of every effect edge (Dan 2026-07-21: "empty spaces greater than x must be
+ * filled — coarse wins as long as the space is not forcing the variable"). Without (b), 96 "passes" with
+ * 4 magnets floating mid-shape from ~117mm all the way to ~210mm (huge unanchored border). Falls back to
+ * 24 (finest) when nothing qualifies. `contourMM` is the effect (design + base margin).
  */
 export function autoPitch(
-  withMargin: (m: number) => Contour, cfg: GridConfig, fromMM: number, maxGrowMM: number, minN = TARGET_ANCHORS,
+  withMargin: (m: number) => Contour, cfg: GridConfig, fromMM: number, maxGrowMM: number,
+  minN = TARGET_ANCHORS, maxEmptyMM = MAX_EMPTY_BORDER_MM,
 ): number {
   // evaluate each pitch WITH the auto-margin (a few mm of border can let a coarser pitch hold), coarsest-first
+  let fallback = 24, fallbackGap = Infinity
   for (const p of [96, 72, 48, 24]) {
-    if (balancedFit(withMargin, { ...cfg, pitchMM: p }, fromMM, maxGrowMM).grid.anchors.length >= minN) return p
+    const fit = balancedFit(withMargin, { ...cfg, pitchMM: p }, fromMM, maxGrowMM)
+    const gap = emptyBorder(fit.grid, withMargin(fit.sizeMM))
+    if (fit.grid.anchors.length >= minN && gap <= maxEmptyMM) return p
+    // no pitch qualifies (awkward half-tier sizes like 150): keep the coarsest with the least dead border
+    if (fit.grid.anchors.length >= MIN_ANCHORS && gap < fallbackGap - 1e-6) { fallback = p; fallbackGap = gap }
   }
-  return 24
+  return fallback
 }
 
 /** Scale a normalized contour (longest side = 1mm) to a real longest-side size in mm. */
