@@ -438,18 +438,34 @@ export function autoPitch(
   withMargin: (m: number) => Contour, cfg: GridConfig, fromMM: number, maxGrowMM: number,
   minN = TARGET_ANCHORS, density: GridDensity = 'light',
 ): number {
-  // evaluate each pitch WITH the auto-margin, in the density's preference order: 'light' coarse-first
-  // (96 sparse wins while it still covers), 'standard' dense-first (48 firm hold)
-  const ladder = allowedPitches(density)
-  let fallback = ladder[ladder.length - 1], fallbackFlaps = Infinity
-  for (const p of ladder) {
-    const fit = balancedFit(withMargin, { ...cfg, pitchMM: p }, fromMM, maxGrowMM)
-    if (fit.grid.anchors.length >= minN && fit.grid.flaps.length === 0) return p
-    if (fit.grid.anchors.length >= MIN_ANCHORS && fit.grid.flaps.length < fallbackFlaps) {
-      fallback = p; fallbackFlaps = fit.grid.flaps.length
+  return autoGrid(withMargin, cfg, fromMM, maxGrowMM, { minN, density, pattern: cfg.pattern ?? 'standard' }).pitchMM
+}
+
+/**
+ * Unified auto selection (pitch × pattern) under the ONE coverage physics — no shape-name branches.
+ * Tries every allowed pitch (density preference order) × every candidate pattern (simplest first:
+ * standard → diamond → quincunx) and returns the first combination that seats ≥ minN magnets with FULL
+ * hold coverage (zero flaps). Fix `pitchMM` and/or `pattern` in opts to pin a manual choice — the
+ * search then only spans the free dimension(s), so manual controls behave literally (no silent
+ * overrides). Falls back to the fewest-uncovered combination when nothing fully covers.
+ */
+export function autoGrid(
+  withMargin: (m: number) => Contour, cfg: GridConfig, fromMM: number, maxGrowMM: number,
+  opts: { minN?: number; density?: GridDensity; pitchMM?: number; pattern?: GridPattern } = {},
+): { pitchMM: number; pattern: GridPattern } {
+  const minN = opts.minN ?? TARGET_ANCHORS
+  const pitches = opts.pitchMM != null ? [opts.pitchMM] : allowedPitches(opts.density ?? 'light')
+  const patterns: GridPattern[] = opts.pattern != null ? [opts.pattern] : ['standard', 'diamond', 'quincunx']
+  let fb = { pitchMM: pitches[pitches.length - 1], pattern: patterns[patterns.length - 1] }
+  let fbFlaps = Infinity
+  for (const p of pitches) for (const pat of patterns) {
+    const fit = balancedFit(withMargin, { ...cfg, pitchMM: p, pattern: pat }, fromMM, maxGrowMM)
+    if (fit.grid.anchors.length >= minN && fit.grid.flaps.length === 0) return { pitchMM: p, pattern: pat }
+    if (fit.grid.anchors.length >= MIN_ANCHORS && fit.grid.flaps.length < fbFlaps) {
+      fb = { pitchMM: p, pattern: pat }; fbFlaps = fit.grid.flaps.length
     }
   }
-  return fallback
+  return fb
 }
 
 /** Scale a normalized contour (longest side = 1mm) to a real longest-side size in mm. */

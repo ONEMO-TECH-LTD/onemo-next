@@ -15,7 +15,7 @@ import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import { contourFromShape } from '@/lib/effect/geometry-truth'
 import { insetRingMM } from '@/lib/effect/offset'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { computeGrid, balancedFit, autoPitch, scaleContour, snapToRung, sizeLadder, DEFAULT_LAW, type GridPattern, type MagnetPlan, type GridDensity } from '@/lib/effect/grid'
+import { computeGrid, balancedFit, autoGrid, scaleContour, snapToRung, sizeLadder, DEFAULT_LAW, type GridPattern, type MagnetPlan, type GridDensity } from '@/lib/effect/grid'
 
 const IMG = 1000
 const VP = 440
@@ -79,6 +79,7 @@ export default function GridLab() {
   const [pad, setPad] = useState(10)
   const [offsetMM, setOffsetMM] = useState(0)
   const [pattern, setPattern] = useState<GridPattern>('standard')
+  const [patternAuto, setPatternAuto] = useState(true) // pattern joins the auto system — same physics search as pitch
   const [plan, setPlan] = useState<MagnetPlan>('all6')
   const [frame, setFrame] = useState(true)
   const [coverage, setCoverage] = useState<'full' | 'perimeter'>('perimeter')
@@ -111,9 +112,9 @@ export default function GridLab() {
   const model = useMemo(() => {
     try {
       const law = { ...DEFAULT_LAW, paddingMM: pad }
-      // §13.5c: triangles are DIAMOND-derived (apex + base pair) — box corners structurally miss the tips
-      const effPattern = src === 'std' && geo === 'triangle' ? 'diamond' as GridPattern : pattern
-      const baseCfg0 = { paddingMM: pad, pattern: effPattern, plan, perimeterOnly: coverage === 'perimeter', center: centerMode, sparseThin: density === 'light' }
+      // NO silent per-shape overrides: manual pattern/pitch buttons behave literally; Auto searches
+      // pitch × pattern under the one coverage physics (autoGrid) — shape-agnostic by construction.
+      const baseCfg0 = { paddingMM: pad, pattern, plan, perimeterOnly: coverage === 'perimeter', center: centerMode, sparseThin: density === 'light' }
       // ── STANDARD GEOMETRIES (D12–D15): drawn directly in mm, each axis snapped to its own rung ──
       if (src === 'std') {
         // rect (system A): long rung + short rung (< long) + orientation → W×H
@@ -136,8 +137,9 @@ export default function GridLab() {
           const o = insetRingMM(design.outer.pts, m, 'round')
           return o && o.length >= 3 ? { outer: { pts: o }, holes: [] } : design
         }
-        const chosenPitch = pitchAuto ? autoPitch(withMargin, baseCfg0, offsetMM, maxGrowMM, undefined, density) : pitch
-        const fit = balancedFit(withMargin, { ...baseCfg0, pitchMM: chosenPitch }, offsetMM, maxGrowMM)
+        const sel = autoGrid(withMargin, baseCfg0, offsetMM, maxGrowMM, { density, pitchMM: pitchAuto ? undefined : pitch, pattern: patternAuto ? undefined : pattern })
+        const chosenPitch = sel.pitchMM
+        const fit = balancedFit(withMargin, { ...baseCfg0, pitchMM: sel.pitchMM, pattern: sel.pattern }, offsetMM, maxGrowMM)
         const effect = withMargin(fit.sizeMM)
         const eff = Math.round(Math.max(dim(effect, 0), dim(effect, 1)))
         let magDist: number | null = null
@@ -148,7 +150,7 @@ export default function GridLab() {
         }
         const ratio = Math.max(rungW.sizeMM, rungH.sizeMM) / Math.min(rungW.sizeMM, rungH.sizeMM)
         const format = geo !== 'rect' ? null : ratio >= 2.5 ? 'strip' : ratio >= 1.6 ? 'panoramic' : 'block'
-        return { contour: effect, design, grid: fit.grid, marginMM: fit.sizeMM, grew: fit.grew, effSize: eff, designSize: stdSize, pitch: chosenPitch, magDist, rung: rungW, rungH, format }
+        return { contour: effect, design, grid: fit.grid, marginMM: fit.sizeMM, grew: fit.grew, effSize: eff, designSize: stdSize, pitch: chosenPitch, patternUsed: sel.pattern, magDist, rung: rungW, rungH, format }
       }
       // base contour normalized so longest side = 1mm (scale-free); scaleContour() sizes it in mm
       let base: Contour | null = null
@@ -186,9 +188,9 @@ export default function GridLab() {
         return o && o.length >= 3 ? { outer: { pts: o }, holes: [] } : design
       }
       // proportion-adaptive pitch: coarsest standard (72/48/24) that still holds; else the user's choice
-      const chosenPitch = pitchAuto ? autoPitch(withMargin, baseCfg, offsetMM, maxGrowMM, undefined, density) : pitch
-      const cfg = { ...baseCfg, pitchMM: chosenPitch }
-      const fit = balancedFit(withMargin, cfg, offsetMM, maxGrowMM)
+      const sel = autoGrid(withMargin, baseCfg, offsetMM, maxGrowMM, { density, pitchMM: pitchAuto ? undefined : pitch, pattern: patternAuto ? undefined : pattern })
+      const chosenPitch = sel.pitchMM
+      const fit = balancedFit(withMargin, { ...baseCfg, pitchMM: sel.pitchMM, pattern: sel.pattern }, offsetMM, maxGrowMM)
       const effect = withMargin(fit.sizeMM)
       const eff = Math.round(Math.max(dim(effect, 0), dim(effect, 1)))
       // actual seated magnet distance (closest pair) — shown next to the total + annotated on canvas
@@ -198,9 +200,9 @@ export default function GridLab() {
         const d = Math.hypot(aps[i].p[0] - aps[j].p[0], aps[i].p[1] - aps[j].p[1])
         if (magDist == null || d < magDist) magDist = d
       }
-      return { contour: effect, design, grid: fit.grid, marginMM: fit.sizeMM, grew: fit.grew, effSize: eff, designSize: dSize, pitch: chosenPitch, magDist, rung, rungH: rung, format: null }
+      return { contour: effect, design, grid: fit.grid, marginMM: fit.sizeMM, grew: fit.grew, effSize: eff, designSize: dSize, pitch: chosenPitch, patternUsed: sel.pattern, magDist, rung, rungH: rung, format: null }
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
-  }, [src, geo, longMM, shortMM, orient, preset, gen, p1, p2, sides, points, sizeMM, pitch, pitchAuto, density, pad, pattern, plan, magic, coverage, offsetMM, centerMode, maxGrowMM])
+  }, [src, geo, longMM, shortMM, orient, preset, gen, p1, p2, sides, points, sizeMM, pitch, pitchAuto, density, pad, pattern, patternAuto, plan, magic, coverage, offsetMM, centerMode, maxGrowMM])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genParams = {
@@ -361,10 +363,11 @@ export default function GridLab() {
             <Slider label="Magnet padding · per spot · min 10" unit="mm" v={pad} set={setPad} min={10} max={30} />
             <Slider label="Base margin · outward offset" unit="mm" v={offsetMM} set={setOffsetMM} min={-15} max={15} />
 
-            <div className="gl-field"><span>Grid pattern</span>
+            <div className="gl-field"><span>Grid pattern · {patternAuto && model ? `auto → ${model.patternUsed === 'quincunx' ? 'dice-5' : model.patternUsed}` : 'manual'}</span>
               <div className="gl-seg">
+                <button aria-pressed={patternAuto} onClick={() => setPatternAuto(true)}>Auto</button>
                 {(['standard', 'quincunx', 'diamond'] as GridPattern[]).map(p =>
-                  <button key={p} aria-pressed={pattern === p} onClick={() => setPattern(p)}>{p === 'quincunx' ? 'Dice-5' : p === 'diamond' ? 'Diamond' : 'Standard'}</button>)}
+                  <button key={p} aria-pressed={!patternAuto && pattern === p} onClick={() => { setPatternAuto(false); setPattern(p) }}>{p === 'quincunx' ? 'Dice-5' : p === 'diamond' ? 'Diamond' : 'Standard'}</button>)}
               </div>
             </div>
             <div className="gl-field"><span>Coverage</span>
@@ -396,7 +399,7 @@ export default function GridLab() {
             <Cell k="Pitch · center" v={`${model.grid.pitchCentreMM} mm`} />
             <Cell k="Pitch · edge" v={model.grid.edgeRangeMM[0] === model.grid.edgeRangeMM[1] ? `${model.grid.edgeRangeMM[0]} mm` : `${model.grid.edgeRangeMM[0]}–${model.grid.edgeRangeMM[1]} mm`} />
             <Cell k="Seated magnets" v={String(model.grid.anchors.length)} />
-            <Cell k="Pattern" v={pattern === 'quincunx' ? 'dice-5' : pattern} />
+            <Cell k="Pattern" v={model.patternUsed === 'quincunx' ? 'dice-5' : model.patternUsed} />
           </div>}
         </aside>
       </div>
