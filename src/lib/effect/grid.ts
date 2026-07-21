@@ -483,32 +483,43 @@ function modeCombos(mode: GridMode): { pitchMM: number; pattern: GridPattern }[]
  *  each label is solved numerically per shape from the live inputs (padding + frame/margin + mode), so
  *  changing the recipe or mode recomputes every size. Strict pad law (sizing), perimeter belt. */
 export interface SemanticRung { label: string; points: number; sizeMM: number; visible: boolean }
-export const SIZE_TIERS: ReadonlyArray<readonly [number, string]> =
-  [[1, '2XS'], [2, 'XS'], [3, 'S'], [4, 'M'], [6, 'L'], [8, 'XL'], [12, '2XL'], [16, '3XL']]
+/** Garment-band labels by REAL mm (matches the product canon: 70=S, ~118=M, ~166=L, ~214=XL). A rung
+ *  is labeled by the band its solved size falls in, bumping on collision — so each shape naturally
+ *  spans its own label range (small shapes reach into 2XS/XS, chunky ones start at L). */
+const SIZE_BANDS: ReadonlyArray<readonly [number, string]> = [
+  [36, '2XS'], [60, 'XS'], [100, 'S'], [140, 'M'], [190, 'L'], [240, 'XL'], [290, '2XL'], [Infinity, '3XL'],
+]
+const BAND_LABELS = ['2XS', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL']
 export function semanticLadder(
   makeShape: (sizeMM: number) => Contour, law: SizeLaw = DEFAULT_LAW, mode: GridMode = 'auto',
 ): SemanticRung[] {
   const combos = modeCombos(mode)
   const padEff = law.paddingMM + law.frameMM
-  const rungs: SemanticRung[] = []
-  let tier = 0
-  for (let s = Math.ceil(2 * padEff); s <= law.maxRungMM && tier < SIZE_TIERS.length; s += 1) {
+  // every size at which the flap-free anchor count STEPS UP is a rung — all the way to the system max
+  const steps: { points: number; sizeMM: number }[] = []
+  let last = 0
+  for (let s = Math.ceil(2 * padEff); s <= law.maxRungMM; s += 1) {
     let best = 0
     for (const cb of combos) {
       const g = computeGrid(makeShape(s), { pitchMM: cb.pitchMM, pattern: cb.pattern, paddingMM: padEff, perimeterOnly: true, strictPad: true })
       if (g.flaps.length) continue
       if (g.anchors.length > best) best = g.anchors.length
     }
-    while (tier < SIZE_TIERS.length && best >= SIZE_TIERS[tier][0]) {
-      rungs.push({ label: SIZE_TIERS[tier][1], points: SIZE_TIERS[tier][0], sizeMM: s, visible: s <= law.maxTestedMM })
-      tier++
-    }
+    if (best > last) { steps.push({ points: best, sizeMM: s }); last = best }
   }
-  // a shape may jump tiers at one size (a square seats 1 → straight to 4): keep the HIGHEST tier per
-  // size — the true anchor count there; skipped tiers simply don't exist for that shape.
-  const bySize = new Map<number, SemanticRung>()
-  for (const r of rungs) bySize.set(r.sizeMM, r)
-  return [...bySize.values()].sort((a, b) => a.sizeMM - b.sizeMM)
+  // labels: the 1-point rung is always "ONE" (the default single-point size); the rest take the
+  // garment band of their real mm, bumping up one label on collision so the sequence stays ordered.
+  const rungs: SemanticRung[] = []
+  let prevIdx = -1
+  for (const st of steps) {
+    if (st.points === 1) { rungs.push({ label: 'ONE', points: 1, sizeMM: st.sizeMM, visible: st.sizeMM <= law.maxTestedMM }); continue }
+    let idx = SIZE_BANDS.findIndex(([max]) => st.sizeMM < max)
+    if (idx <= prevIdx) idx = prevIdx + 1
+    if (idx >= BAND_LABELS.length) break
+    prevIdx = idx
+    rungs.push({ label: BAND_LABELS[idx], points: st.points, sizeMM: st.sizeMM, visible: st.sizeMM <= law.maxTestedMM })
+  }
+  return rungs
 }
 
 /**
