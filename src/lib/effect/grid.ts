@@ -33,6 +33,10 @@ export interface GridConfig {
   plan?: MagnetPlan
   perimeterOnly?: boolean // default true — magnetic belt (drop redundant interior)
   center?: 'centroid' | 'bbox' // where the fixed grid is anchored (A/B). default 'centroid'
+  /** LIGHT-mode thinning of 48-composed grids (Dan 2026-07-21: "keep central 3-4, remove 2 and 5"):
+   *  per axis keep the ends + alternate inward, always keeping the central pair → 96/48/96 gaps.
+   *  A 262 (48×6) light row becomes 1·3·4·6. Applied only at pitch 48 with ≥5 lines. */
+  sparseThin?: boolean
 }
 
 export interface Anchor { p: Pt; dia: MagnetDia }
@@ -255,6 +259,26 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
       let nb = 0; for (const s of fullSeated) if (dist(n, s) <= nR) nb++
       if (nb >= 2) gaps++
     }
+  }
+
+  // LIGHT thinning (48-composed grids): per axis keep ends + alternate inward (central pair always kept)
+  // → 1·3·4·6 on a 6-line axis (gaps 96/48/96). Corners stay pinned; the 2/5 crowd goes.
+  if (cfg.sparseThin && pitch === 48 && fullSeated.length >= 5) {
+    const r1 = (v: number) => Math.round(v * 10) / 10
+    const axisKeep = (vals: number[]): Set<number> => {
+      const u0 = [...new Set(vals.map(r1))].sort((a, b) => a - b)
+      // thin on the MAIN pitch lines only — quincunx dice offsets (half-step) interleave the axis and
+      // must not count as lines; off-line nodes are dropped by the filter below
+      const u = u0.filter((v) => { const m = (((v - u0[0]) % pitch) + pitch) % pitch; return m < 1 || m > pitch - 1 })
+      if (u.length < 5) return new Set(u)
+      const keep = new Set<number>()
+      let i = 0, j = u.length - 1, take = true
+      while (i <= j) { if (take) { keep.add(u[i]); keep.add(u[j]) } i++; j--; take = !take }
+      return keep
+    }
+    const kx = axisKeep(fullSeated.map((p) => p[0])), ky = axisKeep(fullSeated.map((p) => p[1]))
+    const thinned = fullSeated.filter((p) => kx.has(r1(p[0])) && ky.has(r1(p[1])))
+    if (thinned.length >= MIN_ANCHORS) fullSeated = thinned
   }
 
   // GUARANTEE ≥1: if the sparse grid seated nothing but the shape can still hold a magnet, drop one at the

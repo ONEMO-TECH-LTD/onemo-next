@@ -108,7 +108,7 @@ export default function GridLab() {
   const model = useMemo(() => {
     try {
       const law = { ...DEFAULT_LAW, paddingMM: pad }
-      const baseCfg0 = { paddingMM: pad, pattern, plan, perimeterOnly: coverage === 'perimeter', center: centerMode }
+      const baseCfg0 = { paddingMM: pad, pattern, plan, perimeterOnly: coverage === 'perimeter', center: centerMode, sparseThin: density === 'light' }
       // ── STANDARD GEOMETRIES (D12–D15): drawn directly in mm, each axis snapped to its own rung ──
       if (src === 'std') {
         const rungW = snapToRung(sizeMM, law, false)
@@ -149,7 +149,7 @@ export default function GridLab() {
       }
       if (!base || base.outer.pts.length < 3) return null
       const b = base
-      const baseCfg = { paddingMM: pad, pattern, plan, perimeterOnly: coverage === 'perimeter', center: centerMode }
+      const baseCfg = { paddingMM: pad, pattern, plan, perimeterOnly: coverage === 'perimeter', center: centerMode, sparseThin: density === 'light' }
       // DESIGN stays fixed at the set size. Auto-grow adds an outward MARGIN (offset) around it — the border
       // the magnets' padding uses. Manual "offset" is the starting margin. Total effect = design + 2×margin.
       // random shapes (AI Magic / generators) are capped at 180mm; presets go to 200mm
@@ -283,6 +283,31 @@ export default function GridLab() {
                   </button>)}
               </div>
             </div>
+            {src === 'std' && geo === 'rect' && <>
+              {/* every rectangle variant from the ladder — landscape + portrait explicitly */}
+              <div className="gl-field"><span>Landscape variants</span>
+                <div className="gl-seg gl-wrap">
+                  {sizeLadder({ ...DEFAULT_LAW, paddingMM: pad }).flatMap(w =>
+                    sizeLadder({ ...DEFAULT_LAW, paddingMM: pad }).filter(h => h.sizeMM < w.sizeMM).map(h =>
+                      <button key={`l${w.sizeMM}x${h.sizeMM}`} aria-pressed={model?.rung.sizeMM === w.sizeMM && model?.rungH?.sizeMM === h.sizeMM}
+                        className={w.visible && h.visible ? undefined : 'gl-hidden-rung'}
+                        onClick={() => { setSizeMM(w.sizeMM); setHMM(h.sizeMM) }}>
+                        {w.sizeMM}×{h.sizeMM}{w.visible && h.visible ? '' : '†'}
+                      </button>))}
+                </div>
+              </div>
+              <div className="gl-field"><span>Portrait variants</span>
+                <div className="gl-seg gl-wrap">
+                  {sizeLadder({ ...DEFAULT_LAW, paddingMM: pad }).flatMap(h =>
+                    sizeLadder({ ...DEFAULT_LAW, paddingMM: pad }).filter(w => w.sizeMM < h.sizeMM).map(w =>
+                      <button key={`p${w.sizeMM}x${h.sizeMM}`} aria-pressed={model?.rung.sizeMM === w.sizeMM && model?.rungH?.sizeMM === h.sizeMM}
+                        className={w.visible && h.visible ? undefined : 'gl-hidden-rung'}
+                        onClick={() => { setSizeMM(w.sizeMM); setHMM(h.sizeMM) }}>
+                        {w.sizeMM}×{h.sizeMM}{w.visible && h.visible ? '' : '†'}
+                      </button>))}
+                </div>
+              </div>
+            </>}
             {src === 'std' && geo === 'rect' && <div className="gl-field"><span>Height · rung</span>
               <div className="gl-seg gl-wrap">
                 {sizeLadder({ ...DEFAULT_LAW, paddingMM: pad }).map(r =>
