@@ -340,8 +340,10 @@ function Stage({ contour, design, grid, frame }: { contour: Contour; design: Con
         const p1 = fy(a[bi].p), p2 = fy(a[bj].p)
         const mx = (p1[0] + p2[0]) / 2, my = (p1[1] + p2[1]) / 2
         return <g>
-          <line x1={p1[0]} y1={p1[1]} x2={p2[0]} y2={p2[1]} stroke="var(--accent)" strokeOpacity={0.75} strokeWidth={0.7} strokeDasharray="1.6 1.6" />
-          <text x={mx} y={my - 2.2} fontSize={fontMM * 0.85} fill="var(--accent)" textAnchor="middle" fontFamily="ui-monospace,monospace">{Math.round(bd)} mm</text>
+          {/* dark underlay + white overlay → legible on the dark suede AND the light margin band */}
+          <line x1={p1[0]} y1={p1[1]} x2={p2[0]} y2={p2[1]} stroke="#000" strokeOpacity={0.5} strokeWidth={1.6} />
+          <line x1={p1[0]} y1={p1[1]} x2={p2[0]} y2={p2[1]} stroke="#fff" strokeOpacity={0.95} strokeWidth={0.7} strokeDasharray="1.8 1.4" />
+          <text x={mx} y={my - 2.4} fontSize={fontMM * 1.05} fontWeight={700} fill="#fff" stroke="#000" strokeWidth={fontMM * 0.22} strokeOpacity={0.65} style={{ paintOrder: 'stroke' }} textAnchor="middle" fontFamily="ui-monospace,monospace">{Math.round(bd)} mm</text>
         </g>
       })()}
     </svg>
@@ -371,7 +373,7 @@ function Cell({ k, v }: { k: string; v: string }) { return <div className="gl-ce
 
 const CSS = `
 .gl{--bg:#eef1f5;--panel:#fff;--panel-2:#f6f8fb;--line:#dbe1ea;--ink:#18202e;--ink-2:#5a6577;--ink-3:#93a0b3;
-  --accent:#2f6bff;--accent-soft:#2f6bff18;--grid:#9fb0cc;--suede:#454952;--margin:#6a707c;--suede-edge:#2c2f36;--magnet:#20242c;
+  --accent:#2f6bff;--accent-soft:#2f6bff18;--grid:#9fb0cc;--suede:#ccd0d7;--margin:#aeb4bf;--suede-edge:#8a919c;--magnet:#20242c;
   --magnet-hi:#6b7280;--mag8:#c98a12;--pass:#1a9e4b;--fail:#e5484d;--shadow:0 1px 2px #18202e0d,0 10px 26px #18202e0f;
   --mono:ui-monospace,"SF Mono",Menlo,monospace;--sans:system-ui,-apple-system,"Segoe UI",sans-serif;
   background:var(--bg);color:var(--ink);font-family:var(--sans);min-height:100vh;padding:26px 20px 70px;-webkit-font-smoothing:antialiased}
