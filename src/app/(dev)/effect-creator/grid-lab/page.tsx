@@ -376,10 +376,10 @@ export default function GridLab() {
                   <button key={p} aria-pressed={!patternAuto && pattern === p} onClick={() => { setPatternAuto(false); setPattern(p) }}>{p === 'quincunx' ? 'Dice-5' : p === 'diamond' ? 'Diamond' : 'Standard'}</button>)}
               </div>
             </div>
-            <div className="gl-field"><span>Coverage{model && model.patternUsed !== 'standard' ? ` · FULL — ${model.patternUsed === 'quincunx' ? 'dice' : 'diamond'} is its centre links` : ''}</span>
+            <div className="gl-field"><span>Coverage{model && model.patternUsed === 'quincunx' ? ' · FULL — dice is its centre magnets' : ''}</span>
               <div className="gl-seg">
                 {([['full', 'Full grid'], ['perimeter', 'Perimeter belt']] as ['full' | 'perimeter', string][]).map(([c, l]) => {
-                  const inert = !!model && model.patternUsed !== 'standard'
+                  const inert = !!model && model.patternUsed === 'quincunx'
                   return <button key={c} aria-pressed={inert ? c === 'full' : coverage === c} disabled={inert} style={inert ? { opacity: 0.55, cursor: 'not-allowed' } : undefined} onClick={() => setCoverage(c)}>{l}</button>
                 })}
               </div>

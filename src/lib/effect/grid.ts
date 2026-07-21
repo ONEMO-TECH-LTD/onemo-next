@@ -270,11 +270,10 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
   const pattern = cfg.pattern ?? 'standard'
   const plan = cfg.plan ?? 'auto'
-  // GLOBAL LAW: the perimeter belt is a STANDARD-pattern concept only. Dice and Diamond ARE their
-  // centre links (the 68-atom spokes live on interior nodes) — stripping interiors would delete the
-  // pattern itself, so for them coverage is always the full grid. Every consumer (semantic ladder
-  // solver, auto search, manual modes, app) inherits this from here — never override in a UI layer.
-  const perimeterOnly = pattern === 'standard' ? (cfg.perimeterOnly ?? true) : false
+  // GLOBAL LAW (amended, Dan 2026-07-21): the perimeter belt applies to STANDARD and DIAMOND — a
+  // diamond's outer 68-ring stands alone, its inner anchors are removable. Only DICE is forced full:
+  // its centre magnets ARE the pattern (stripping them leaves plain corners). Every consumer inherits.
+  const perimeterOnly = pattern === 'quincunx' ? false : (cfg.perimeterOnly ?? true)
   const centerMode = cfg.center ?? 'centroid'
   const outer = contourMM.outer.pts
   const bb = bbox(outer)
