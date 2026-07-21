@@ -15,7 +15,7 @@ import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import { contourFromShape } from '@/lib/effect/geometry-truth'
 import { insetRingMM } from '@/lib/effect/offset'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { computeGrid, balancedFit, autoGrid, scaleContour, semanticLadder, stdShapeContour, rectFormat, minEffectMM, maxDesignMM, DEFAULT_MARGIN_MM, DEFAULT_LAW, type GridPattern, type MagnetPlan, type GridDensity, type GridMode, type SemanticRung, type StdShape, type Attachment } from '@/lib/effect/grid'
+import { computeGrid, balancedFit, autoGrid, scaleContour, semanticLadder, stdShapeContour, rectFormat, minEffectMM, maxDesignMM, DEFAULT_MARGIN_MM, DEFAULT_LAW, type GridPattern, type MagnetPlan, type GridDensity, type GridMode, type SemanticRung, type StdShape, type Attachment, perimeterForDensity } from '@/lib/effect/grid'
 
 const IMG = 1000
 const VP = 440
@@ -69,7 +69,6 @@ export default function GridLab() {
   const [patternAuto, setPatternAuto] = useState(true) // pattern joins the auto system — same physics search as pitch
   const [plan, setPlan] = useState<MagnetPlan>('auto') // engine law default: size-driven focal ramp
   const [frame, setFrame] = useState(true)
-  const [coverage, setCoverage] = useState<'full' | 'perimeter'>('perimeter')
   const [centerMode, setCenterMode] = useState<'centroid' | 'bbox'>('centroid')
   const [maxGrowMM, setMaxGrowMM] = useState(DEFAULT_MARGIN_MM) // engine law default
 
@@ -111,7 +110,7 @@ export default function GridLab() {
       const law = { ...DEFAULT_LAW, paddingMM: pad }
       // NO silent per-shape overrides: manual pattern/pitch buttons behave literally; Auto searches
       // pitch × pattern under the one coverage physics (autoGrid) — shape-agnostic by construction.
-      const baseCfg0 = { attachment, paddingMM: pad, pattern, plan, perimeterOnly: coverage === 'perimeter', center: centerMode, sparseThin: density === 'light' }
+      const baseCfg0 = { attachment, paddingMM: pad, pattern, plan, perimeterOnly: perimeterForDensity(density, patternAuto ? 'standard' : pattern), center: centerMode, sparseThin: density === 'light' }
       // ── STANDARD GEOMETRIES (D12–D15): drawn directly in mm, each axis snapped to its own rung ──
       if (src === 'std') {
         if (!stdRungs.length) return null
@@ -169,7 +168,7 @@ export default function GridLab() {
       }
       if (!base || base.outer.pts.length < 3) return null
       const b = base
-      const baseCfg = { attachment, paddingMM: pad, pattern, plan, perimeterOnly: coverage === 'perimeter', center: centerMode, sparseThin: density === 'light' }
+      const baseCfg = { attachment, paddingMM: pad, pattern, plan, perimeterOnly: perimeterForDensity(density, patternAuto ? 'standard' : pattern), center: centerMode, sparseThin: density === 'light' }
       // DESIGN stays fixed at the set size. Auto-grow adds an outward MARGIN (offset) around it — the border
       // the magnets' padding uses. Manual "offset" is the starting margin. Total effect = design + 2×margin.
       // random shapes (AI Magic / generators) are capped at 180mm; presets go to 200mm
@@ -204,7 +203,7 @@ export default function GridLab() {
       }
       return { contour: effect, design, grid: fit.grid, marginMM: fit.sizeMM, grew: fit.grew, effSize: eff, designSize: dSize, pitch: chosenPitch, patternUsed: sel.pattern, magDist, rung, rungH: rung, format: null }
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
-  }, [src, geo, longMM, shortMM, orient, preset, gen, p1, p2, sides, points, sizeMM, pitch, pitchAuto, density, pad, pattern, patternAuto, plan, magic, coverage, offsetMM, centerMode, maxGrowMM, stdRungs, attachment])
+  }, [src, geo, longMM, shortMM, orient, preset, gen, p1, p2, sides, points, sizeMM, pitch, pitchAuto, density, pad, pattern, patternAuto, plan, magic, offsetMM, centerMode, maxGrowMM, stdRungs, attachment])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genParams = {
@@ -353,10 +352,10 @@ export default function GridLab() {
               <span className="gl-total-note gl-total-grid">grid {model.pitch}mm{model.magDist != null ? ` · magnets ${Math.round(model.magDist)}mm apart${Math.abs(model.magDist - model.pitch * Math.SQRT2) < 1.5 ? ` · grid diagonal (${model.pitch}×√2)` : Math.abs(model.magDist - model.pitch * Math.SQRT2 / 2) < 1.5 ? ` · dice half-diagonal` : ''}` : ''}</span>
               <span className="gl-total-note">{model.format ? `${model.rung.sizeMM}×${model.rungH.sizeMM} · ${model.format}` : `${model.designSize === model.rung.sizeMM ? 'size' : 'nearest'} ${model.rung.label} (${model.rung.sizeMM}mm · tier ${model.rung.points}pt) · seated ${model.grid.anchors.length}`}{model.rung.visible && model.rungH.visible ? '' : ' · HIDDEN (untested)'}</span>
             </div>}
-            <div className="gl-field"><span>Grid density · cells</span>
+            <div className="gl-field"><span>Density</span>
               <div className="gl-seg">
-                <button aria-pressed={density === 'standard'} onClick={() => setDensity('standard')} title="48-first — more cells, firmer hold">Standard</button>
-                <button aria-pressed={density === 'light'} onClick={() => setDensity('light')} title="96-first — fewer cells, sparse/uncrowded">Light</button>
+                <button aria-pressed={density === 'standard'} onClick={() => setDensity('standard')} title="dense — fine grid, full coverage, firmer hold">Standard</button>
+                <button aria-pressed={density === 'light'} onClick={() => setDensity('light')} title="sparse — coarse grid, perimeter belt, uncrowded">Light</button>
               </div>
             </div>
             <div className="gl-field"><span>Grid pitch · {pitchAuto && model ? `auto → ${model.pitch}mm` : !pitchAuto && model && model.pitch !== pitch ? `${pitch} → ${model.pitch}mm · dice needs 96` : 'manual'}</span>
@@ -374,14 +373,6 @@ export default function GridLab() {
                 <button aria-pressed={patternAuto} onClick={() => setPatternAuto(true)}>Auto</button>
                 {(['standard', 'quincunx', 'diamond'] as GridPattern[]).map(p =>
                   <button key={p} aria-pressed={!patternAuto && pattern === p} onClick={() => { setPatternAuto(false); setPattern(p) }}>{p === 'quincunx' ? 'Dice-5' : p === 'diamond' ? 'Diamond' : 'Standard'}</button>)}
-              </div>
-            </div>
-            <div className="gl-field"><span>Coverage{model && model.patternUsed === 'quincunx' ? ' · FULL — dice is its centre magnets' : ''}</span>
-              <div className="gl-seg">
-                {([['full', 'Full grid'], ['perimeter', 'Perimeter belt']] as ['full' | 'perimeter', string][]).map(([c, l]) => {
-                  const inert = !!model && model.patternUsed === 'quincunx'
-                  return <button key={c} aria-pressed={inert ? c === 'full' : coverage === c} disabled={inert} style={inert ? { opacity: 0.55, cursor: 'not-allowed' } : undefined} onClick={() => setCoverage(c)}>{l}</button>
-                })}
               </div>
             </div>
             <div className="gl-field"><span>Grid centering · A/B</span>

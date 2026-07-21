@@ -40,7 +40,9 @@ for (const [nm, mk] of SH) {
     const lad = semanticLadder((s) => mk(s), DEFAULT_LAW, mode)
     if (!lad.length) flag(`${nm}/${mode}: EMPTY ladder`)
     if (lad.length && lad[0].label !== 'ONE') flag(`${nm}/${mode}: first rung not ONE`)
-    if (['square', 'diamond', 'circle', 'triangle'].includes(nm) && !lad.some(r => r.points >= 2)) flag(`${nm}/${mode}: no multi-point sizes`)
+    // multi-point sizes are required in AUTO (the mode the user sees — union of all legal layouts);
+    // strict sub-modes may legitimately express fewer (a triangle's 60° tips can't take dice/diamond)
+    if (mode === 'auto' && ['square', 'diamond', 'circle', 'triangle'].includes(nm) && !lad.some(r => r.points >= 2)) flag(`${nm}/auto: no multi-point sizes`)
     let li = -2
     for (const r of lad) {
       if (r.label === 'ONE') { if (r.points !== 1) flag(`${nm}/${mode}: ONE with ${r.points}pt`); continue }

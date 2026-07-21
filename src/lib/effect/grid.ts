@@ -192,13 +192,29 @@ function thinBySpacing(pts: Pt[], minDist: number, ring: ReadonlyArray<Pt>, c: P
   return kept
 }
 
-/** Silhouette vertices further than `reach` from the nearest magnet (uncovered/flap-risk edge). */
+/** Outline points further than `reach` from the nearest magnet (uncovered/flap-risk). Samples ALONG
+ *  the edges (step ≤ reach/2), not just polygon vertices — a low-poly shape (diamond = 4 verts,
+ *  triangle = 3) would otherwise leave its long edge-midpoints unchecked and falsely "hold" with a
+ *  handful of corner magnets. Shape-agnostic: high-poly shapes were always fine; this makes low-poly
+ *  ones obey the same hold-coverage law. */
 function flapVerts(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number): Pt[] {
+  const step = reach / 2
   const out: Pt[] = []
-  for (const v of outer) {
+  const check = (p: Pt) => {
     let nd = Infinity
-    for (const a of seated) { const d = dist(v, a); if (d < nd) nd = d }
-    if (nd > reach) out.push(v)
+    for (const a of seated) { const d = dist(p, a); if (d < nd) nd = d }
+    if (nd > reach) out.push(p)
+  }
+  const n = outer.length
+  for (let i = 0; i < n; i++) {
+    const a = outer[i], b = outer[(i + 1) % n]
+    check(a)
+    const segLen = dist(a, b)
+    const k = Math.floor(segLen / step)
+    for (let j = 1; j <= k; j++) {
+      const t = (j * step) / segLen
+      check([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t])
+    }
   }
   return out
 }
@@ -454,6 +470,13 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
  *  aesthetic); 'standard' tries 48 first (denser, firmer hold). Same family either way. */
 export type GridDensity = 'standard' | 'light'
 function allowedPitches(density: GridDensity): number[] { return density === 'standard' ? [48, 96] : [96, 48] }
+/** MERGED COVERAGE LAW (Dan 2026-07-21 — simplify controls): density IS the coverage — 'standard' =
+ *  dense/full grid (all interior kept), 'light' = sparse/perimeter belt (interior dropped) + thinning.
+ *  Dice always full (its centres ARE the pattern). One control; the old separate Coverage toggle retired. */
+export function perimeterForDensity(density: GridDensity, pattern: GridPattern): boolean {
+  if (pattern === 'quincunx') return false
+  return density === 'light'
+}
 /** Legal patterns per pitch under the 48/68 system: dice centres live at half-pitch, so quincunx is
  *  legal ONLY at 96 (centres at 48-offsets = the shirt's own dice). Nothing ever sits at 24-offsets. */
 export function legalPatterns(pitchMM: number): GridPattern[] {
