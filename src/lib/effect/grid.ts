@@ -1,15 +1,15 @@
 // grid.ts — magnetic-grid REGISTRATION (Session 59). Pure mm computation, no DOM / no three.
 //
-// The model (SSOT _ssot-workbench/_briefs/magnetic-grid-standard-brief.md + Dan, 2026-07-20):
-//   • Fixed 48mm pitch (centre-to-centre). The lattice PHASE is the free parameter.
-//   • PER-SPOT padding: each magnet needs `pad`mm of material around it (its application ring), so its
-//     centre sits ≥ (magnetRadius + pad) from the outline → erode the silhouette to a "safe zone".
-//   • MAX COVERAGE, NEVER COLLAPSE: choose the phase that seats the MOST magnets on material — fit as
-//     many points as each axis (width AND height) allows; a tall head fits 2+ vertically, a wide piece
-//     fills its columns. Corners are reached by pushing the phase outward.
-//   • PERIMETER FRAME (default): drop only FULLY-surrounded interior nodes (regular shapes → an edge
-//     belt, a 200mm square ≈ 4–5 per side; thin/irregular shapes keep every point → no collapse).
-//   • Sizing ADAPTS: auto-scale up from the selected size until ≥4 magnets seat (envelop the corners).
+// The model (SSOT _ssot-workbench/_briefs/magnetic-grid-standard-brief.md §10/§12/§13, locked 2026-07-21):
+//   • FIXED lattice, launch family 48/96 (§13.1) — points never move; the whole grid translates as a
+//     rigid bulk, CENTRED on the shape (centroid/bbox), best of the centred parities kept.
+//   • PER-SPOT padding (interp A): a node is valid = inside the silhouette AND ≥ pad (10mm radius from
+//     the magnet centre) from the REAL outline — per-node, no erosion (pinched shapes keep all regions).
+//   • ONE physics metric everywhere: HOLD COVERAGE (no outline point beyond HOLD_REACH of a magnet).
+//     Auto pitch × pattern selection (autoGrid), margin growth (balancedFit) and the coverage-verified
+//     perimeter belt all rank by it — shape-agnostic, no shape-name branches.
+//   • MARGIN model: the design never resizes; an outward margin band grows (capped) until covered.
+//   • Procedural sizes: zero-point ladder `size = (n−1)·pitch + 2·pad (+2·frame)` → 70+48k (§13.2).
 
 import type { Contour, Pt } from './types'
 import { pointInPolygon } from './attachment'
@@ -53,9 +53,6 @@ export interface GridResult {
   pitchCentreMM: number
   edgeRangeMM: [number, number]
   applicationPadMM: number
-  /** grid slots that HAVE material but couldn't seat a magnet (padding blocked), flanked by seated
-   *  neighbours — i.e. an unbalanced hole. balancedFit nudges the size up until this reaches 0. */
-  gaps: number
 }
 
 type BBox = { minX: number; minY: number; maxX: number; maxY: number }
@@ -236,12 +233,10 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   // magnet centre). Checked PER NODE against the REAL outline — no erosion — so a shape that pinches into
   // separate regions (a duck's head AND body) seats magnets in BOTH, not just the largest eroded piece.
   const valid = (p: Pt) => pointInPolygon(p, outer) && distToRing(p, outer) >= pad
-  const inMaterial = (p: Pt) => pointInPolygon(p, outer)
 
   // CENTER the fixed grid on the shape — balanced by construction (the grid translates as a rigid bulk).
   // A/B: centroid balances MATERIAL (lopsided shapes); bbox-centre balances the FRAME (regular shapes).
   let fullSeated: Pt[] = []
-  let gaps = 0
   {
     const c: Pt = centerMode === 'bbox'
       ? [(bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2]
@@ -252,7 +247,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     // Try both CENTRED parities per axis — a node ON the centre vs a cell centred (nodes at ±pitch/2). Both
     // are centred rigid translations; keep whichever seats more → small shapes get a 4-corner cell, not one dot.
     const oxs = [ox0, (ox0 + h) % pitch], oys = [oy0, (oy0 + h) % pitch]
-    let bestScore = -Infinity, chosenNodes: Pt[] = []
+    let bestScore = -Infinity
     // no two magnets closer than 2× the application radius → their padding rings can never overlap
     const minSpacing = 2 * pad
     const checkers = pattern === 'diamond' ? [0, 1] : [0] // diamond: try both checkerboard halves
@@ -262,17 +257,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
       let sx = 0, sy = 0; for (const p of seat) { sx += p[0]; sy += p[1] }
       const bal = seat.length ? Math.hypot(sx / seat.length - c[0], sy / seat.length - c[1]) : 1e9
       const score = seat.length * 1000 - bal // most seated, then most balanced
-      if (score > bestScore) { bestScore = score; fullSeated = seat; chosenNodes = nodes }
-    }
-    // GAPS: material slots (inside the silhouette) that couldn't seat because padding was blocked BY THE
-    // OUTLINE (too close to an edge) yet are flanked by ≥2 seated neighbours — a hole that a bigger margin
-    // would fill. A node dropped for min-SPACING is NOT a gap (it passed the outline test; growing can't
-    // help — the neighbour is already there), so we count only nodes that fail `valid`.
-    const nR = pitch * 1.2
-    for (const n of chosenNodes) {
-      if (!inMaterial(n) || valid(n)) continue // no material, or seatable/spacing-dropped → not a growable gap
-      let nb = 0; for (const s of fullSeated) if (dist(n, s) <= nR) nb++
-      if (nb >= 2) gaps++
+      if (score > bestScore) { bestScore = score; fullSeated = seat }
     }
   }
 
@@ -362,7 +347,6 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     pitchCentreMM: pitch,
     edgeRangeMM: [pitch + minD, pitch + maxD],
     applicationPadMM: pad,
-    gaps,
   }
 }
 
@@ -423,22 +407,6 @@ export function snapToRung(mm: number, law: SizeLaw = DEFAULT_LAW, visibleOnly =
   let best = pool[0]
   for (const r of pool) if (Math.abs(r.sizeMM - mm) < Math.abs(best.sizeMM - mm)) best = r
   return best
-}
-
-/**
- * Proportion-adaptive pitch (THE mechanism): the COARSEST launch pitch (96 → 48, §13.1) whose grid
- * (a) seats a solid hold (≥ minN magnets) AND (b) COVERS the shape — no outline point further than
- * HOLD_REACH from a magnet (zero flaps). Coverage-by-hold is the ONE shape-agnostic metric (squares,
- * discs, stars, AI cuts alike) and it subsumes the empty-space rule: a dead border beyond reach = flaps
- * (Dan: "empty spaces greater than x must be filled — coarse wins as long as the space is not forcing
- * the variable"). When nothing fully covers, fall back to the coarsest pitch with the FEWEST uncovered
- * outline points. `withMargin` is the effect producer (design + margin).
- */
-export function autoPitch(
-  withMargin: (m: number) => Contour, cfg: GridConfig, fromMM: number, maxGrowMM: number,
-  minN = TARGET_ANCHORS, density: GridDensity = 'light',
-): number {
-  return autoGrid(withMargin, cfg, fromMM, maxGrowMM, { minN, density, pattern: cfg.pattern ?? 'standard' }).pitchMM
 }
 
 /**
