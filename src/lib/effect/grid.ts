@@ -261,26 +261,6 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     }
   }
 
-  // LIGHT thinning (48-composed grids): per axis keep ends + alternate inward (central pair always kept)
-  // → 1·3·4·6 on a 6-line axis (gaps 96/48/96). Corners stay pinned; the 2/5 crowd goes.
-  if (cfg.sparseThin && pitch === 48 && fullSeated.length >= 5) {
-    const r1 = (v: number) => Math.round(v * 10) / 10
-    const axisKeep = (vals: number[]): Set<number> => {
-      const u0 = [...new Set(vals.map(r1))].sort((a, b) => a - b)
-      // thin on the MAIN pitch lines only — quincunx dice offsets (half-step) interleave the axis and
-      // must not count as lines; off-line nodes are dropped by the filter below
-      const u = u0.filter((v) => { const m = (((v - u0[0]) % pitch) + pitch) % pitch; return m < 1 || m > pitch - 1 })
-      if (u.length < 5) return new Set(u)
-      const keep = new Set<number>()
-      let i = 0, j = u.length - 1, take = true
-      while (i <= j) { if (take) { keep.add(u[i]); keep.add(u[j]) } i++; j--; take = !take }
-      return keep
-    }
-    const kx = axisKeep(fullSeated.map((p) => p[0])), ky = axisKeep(fullSeated.map((p) => p[1]))
-    const thinned = fullSeated.filter((p) => kx.has(r1(p[0])) && ky.has(r1(p[1])))
-    if (thinned.length >= MIN_ANCHORS) fullSeated = thinned
-  }
-
   // GUARANTEE ≥1: if the sparse grid seated nothing but the shape can still hold a magnet, drop one at the
   // deepest interior point (a single magnet has no spacing to honour, so grid phase is moot here).
   if (fullSeated.length === 0) {
@@ -293,6 +273,40 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   if (perimeterOnly && seated.length > 4) {
     const split = splitPerimeter(seated, neighbourStep(pitch, pattern))
     if (split.belt.length >= MIN_ANCHORS) { seated = split.belt; interior = split.interior }
+  }
+
+  // LIGHT thinning — 1·3·4·6 (Dan: "keep central 3-4, remove 2 and 5") — applied AFTER the perimeter
+  // split, ALONG the belt edges only: top/bottom rows thin their x positions, left/right columns their
+  // y positions; corners always stay. Never introduces interior magnets (perimeter stays pure — full
+  // grid mode is the dense option). Interior nodes (full mode) thin on the axis cross.
+  if (cfg.sparseThin && pitch === 48 && seated.length >= 5) {
+    const r1 = (v: number) => Math.round(v * 10) / 10
+    const mains = (vals: number[]): number[] => {
+      const u0 = [...new Set(vals.map(r1))].sort((a, b) => a - b)
+      // main pitch lines only — quincunx half-step offsets are not lines
+      return u0.filter((v) => { const m = (((v - u0[0]) % pitch) + pitch) % pitch; return m < 1 || m > pitch - 1 })
+    }
+    const axisKeep = (u: number[]): Set<number> => {
+      if (u.length < 5) return new Set(u)
+      const keep = new Set<number>()
+      let i = 0, j = u.length - 1, take = true
+      while (i <= j) { if (take) { keep.add(u[i]); keep.add(u[j]) } i++; j--; take = !take }
+      return keep
+    }
+    const xs = mains(fullSeated.map((p) => p[0])), ys = mains(fullSeated.map((p) => p[1]))
+    if (xs.length >= 5 || ys.length >= 5) {
+      const kx = axisKeep(xs), ky = axisKeep(ys)
+      const isEnd = (v: number, u: number[]) => u.length > 0 && (Math.abs(v - u[0]) < 1 || Math.abs(v - u[u.length - 1]) < 1)
+      const thinned = seated.filter((p) => {
+        const x = r1(p[0]), y = r1(p[1])
+        const endX = isEnd(x, xs), endY = isEnd(y, ys)
+        if (endX && endY) return true                 // corners: always
+        if (endY) return kx.has(x)                    // top/bottom row → thin along x
+        if (endX) return ky.has(y)                    // left/right column → thin along y
+        return kx.has(x) && ky.has(y)                 // interior (full-grid mode only)
+      })
+      if (thinned.length >= MIN_ANCHORS) seated = thinned
+    }
   }
   const anchors = assignSizes(seated, plan)
 
