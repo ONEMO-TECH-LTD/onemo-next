@@ -570,8 +570,21 @@ export function semanticLadder(
     }
     return steps
   }
+  // exact zero-points are canonical; the band-assisted solve (the live margin mechanism) then EXTENDS
+  // the ladder wherever exact sizes run out — both for fully-empty ladders (triangle tips) and for
+  // shapes whose exact sizes stop short of the system max (a rotated square's 90° vertices exceed the
+  // hold reach at exact size beyond ~224). Union: exact first, banded steps only above the exact
+  // ceiling (higher count AND larger size), so no canon size ever shifts.
   let steps = solve(false)
-  if (!steps.some((st) => st.points >= 2)) steps = solve(true) // band-assisted fallback for empty ladders
+  const banded = solve(true)
+  if (!steps.some((st) => st.points >= 2)) {
+    steps = banded
+  } else {
+    const maxPts = Math.max(...steps.map((st) => st.points))
+    const maxSize = Math.max(...steps.map((st) => st.sizeMM))
+    for (const st of banded) if (st.points > maxPts && st.sizeMM > maxSize) steps.push(st)
+    steps.sort((a, b) => a.sizeMM - b.sizeMM)
+  }
   // LABEL LAW: the first multi-point rung anchors the sequence at its mm band (small shapes start at
   // 2XS/XS, chunky ones at M/L); every later rung takes the NEXT label — strictly sequential, no skips,
   // regardless of how far apart a mode's sizes land (Dan: each shape shows its own contiguous range).
