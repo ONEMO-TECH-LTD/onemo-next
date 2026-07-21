@@ -20,6 +20,11 @@ import { insetRingMM } from './offset'
  *  mix (legal ONLY at pitch 96 — its centres land at 48-offsets, the canvas's own dice; a 48-dice
  *  would need 24-offsets, and NOTHING halves either atom). There is no granular/24/72 anywhere. */
 export type GridPattern = 'standard' | 'quincunx' | 'diamond'
+/** ATTACHMENT LAW (§5 / §10.2): 'magnetic' = single-sided, registers on the garment's 96-dice canvas
+ *  (the whole 48/68 grid system applies) · 'twinfix' = two mirror-grid halves clamp any fabric — same
+ *  grid laws effect-side, NO garment constraint, the counterpart twin is part of the product ·
+ *  'velcro' = NO grid at all: the back is a full velcro hook in the silhouette; any shape, any size. */
+export type Attachment = 'magnetic' | 'twinfix' | 'velcro'
 export type MagnetPlan = 'all6' | 'all8' | 'corners8'
 export type MagnetDia = 6 | 8
 
@@ -40,6 +45,7 @@ export const PAD_CORNER_TOL_MM = 1.5
 export const RING_COVERAGE_MIN = 0.7
 
 export interface GridConfig {
+  attachment?: Attachment // default 'magnetic'
   pitchMM?: number
   paddingMM?: number
   pattern?: GridPattern
@@ -59,6 +65,9 @@ export interface GridConfig {
 export interface Anchor { p: Pt; dia: MagnetDia }
 
 export interface GridResult {
+  attachment: Attachment
+  /** twin-fix: the effect ships as a PAIR — this grid is also its mirror counterpart's grid. */
+  twinRequired: boolean
   anchors: Anchor[]
   candidates: Pt[]      // interior points dropped by perimeter mode (faint viz)
   flaps: Pt[]
@@ -231,6 +240,15 @@ function assignSizes(seated: Pt[], plan: MagnetPlan): Anchor[] {
  * fully-surrounded interior nodes (a magnetic belt). Each magnet keeps its application ring on material.
  */
 export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResult {
+  const attachment: Attachment = cfg.attachment ?? 'magnetic'
+  // VELCRO LAW: no grid exists — the back is a full velcro hook in the silhouette. Any shape, any
+  // size; nothing to seat, nothing to cover. (Engine-owned: ladders, auto and UI all inherit.)
+  if (attachment === 'velcro') {
+    return {
+      attachment, twinRequired: false, anchors: [], candidates: [], flaps: [], ok: true,
+      issues: [], pitchCentreMM: 0, edgeRangeMM: [0, 0], applicationPadMM: 0,
+    }
+  }
   // GLOBAL LAW (48/68 system): dice centres live at half-pitch — quincunx below 96 would put anchors
   // on 24-offsets (34mm links), which do not exist in the system. Enforced HERE so every caller
   // (manual pins, auto search, ladder solver, app) inherits it; pitchCentreMM reports the truth.
@@ -405,7 +423,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   if (anchors.length === 0) { minD = 6; maxD = 6 }
 
   return {
-    anchors, candidates: interior, flaps,
+    attachment, twinRequired: attachment === 'twinfix', anchors, candidates: interior, flaps,
     ok: issues.length === 0,
     issues,
     pitchCentreMM: pitch,

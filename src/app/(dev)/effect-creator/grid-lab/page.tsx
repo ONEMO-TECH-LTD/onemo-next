@@ -15,7 +15,7 @@ import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import { contourFromShape } from '@/lib/effect/geometry-truth'
 import { insetRingMM } from '@/lib/effect/offset'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { computeGrid, balancedFit, autoGrid, scaleContour, semanticLadder, stdShapeContour, rectFormat, minEffectMM, maxDesignMM, DEFAULT_MARGIN_MM, DEFAULT_LAW, type GridPattern, type MagnetPlan, type GridDensity, type GridMode, type SemanticRung, type StdShape } from '@/lib/effect/grid'
+import { computeGrid, balancedFit, autoGrid, scaleContour, semanticLadder, stdShapeContour, rectFormat, minEffectMM, maxDesignMM, DEFAULT_MARGIN_MM, DEFAULT_LAW, type GridPattern, type MagnetPlan, type GridDensity, type GridMode, type SemanticRung, type StdShape, type Attachment } from '@/lib/effect/grid'
 
 const IMG = 1000
 const VP = 440
@@ -61,6 +61,7 @@ export default function GridLab() {
   const [sizeMM, setSizeMM] = useState(70)
   const [pitch, setPitch] = useState(48)
   const [pitchAuto, setPitchAuto] = useState(true)
+  const [attachment, setAttachment] = useState<Attachment>('magnetic')
   const [density, setDensity] = useState<GridDensity>('light') // cell count: standard = more cells (48-first), light = fewer (96-first)
   const [pad, setPad] = useState(10)
   const [offsetMM, setOffsetMM] = useState(0)
@@ -110,7 +111,7 @@ export default function GridLab() {
       const law = { ...DEFAULT_LAW, paddingMM: pad }
       // NO silent per-shape overrides: manual pattern/pitch buttons behave literally; Auto searches
       // pitch × pattern under the one coverage physics (autoGrid) — shape-agnostic by construction.
-      const baseCfg0 = { paddingMM: pad, pattern, plan, perimeterOnly: coverage === 'perimeter', center: centerMode, sparseThin: density === 'light' }
+      const baseCfg0 = { attachment, paddingMM: pad, pattern, plan, perimeterOnly: coverage === 'perimeter', center: centerMode, sparseThin: density === 'light' }
       // ── STANDARD GEOMETRIES (D12–D15): drawn directly in mm, each axis snapped to its own rung ──
       if (src === 'std') {
         if (!stdRungs.length) return null
@@ -165,7 +166,7 @@ export default function GridLab() {
       }
       if (!base || base.outer.pts.length < 3) return null
       const b = base
-      const baseCfg = { paddingMM: pad, pattern, plan, perimeterOnly: coverage === 'perimeter', center: centerMode, sparseThin: density === 'light' }
+      const baseCfg = { attachment, paddingMM: pad, pattern, plan, perimeterOnly: coverage === 'perimeter', center: centerMode, sparseThin: density === 'light' }
       // DESIGN stays fixed at the set size. Auto-grow adds an outward MARGIN (offset) around it — the border
       // the magnets' padding uses. Manual "offset" is the starting margin. Total effect = design + 2×margin.
       // random shapes (AI Magic / generators) are capped at 180mm; presets go to 200mm
@@ -200,7 +201,7 @@ export default function GridLab() {
       }
       return { contour: effect, design, grid: fit.grid, marginMM: fit.sizeMM, grew: fit.grew, effSize: eff, designSize: dSize, pitch: chosenPitch, patternUsed: sel.pattern, magDist, rung, rungH: rung, format: null }
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
-  }, [src, geo, longMM, shortMM, orient, preset, gen, p1, p2, sides, points, sizeMM, pitch, pitchAuto, density, pad, pattern, patternAuto, plan, magic, coverage, offsetMM, centerMode, maxGrowMM, stdRungs])
+  }, [src, geo, longMM, shortMM, orient, preset, gen, p1, p2, sides, points, sizeMM, pitch, pitchAuto, density, pad, pattern, patternAuto, plan, magic, coverage, offsetMM, centerMode, maxGrowMM, stdRungs, attachment])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genParams = {
@@ -292,6 +293,12 @@ export default function GridLab() {
           </div>
 
           <div className="gl-card gl-pad">
+            <div className="gl-field"><span>Attachment</span>
+              <div className="gl-seg">
+                {([['magnetic', 'Magnetic'], ['twinfix', 'Twin-fix'], ['velcro', 'Velcro']] as [Attachment, string][]).map(([a, l]) =>
+                  <button key={a} aria-pressed={attachment === a} onClick={() => setAttachment(a)}>{l}</button>)}
+              </div>
+            </div>
             {/* SEMANTIC SIZES — the shape's own T-shirt ladder (anchor-count tiers), mode + recipe driven */}
             {!(src === 'std' && geo === 'rect') && <div className="gl-field"><span>Size · {src === 'std' ? 'this shape' : 'square ref'} · {gridMode === 'quincunx' ? 'dice' : gridMode}</span>
               <div className="gl-seg gl-wrap">
@@ -476,9 +483,14 @@ function Stage({ contour, design, grid, frame }: { contour: Contour; design: Con
 }
 
 function Verdict({ grid }: { grid: ReturnType<typeof computeGrid> }) {
+  const head = grid.attachment === 'velcro'
+    ? 'Velcro — full-surface hook, any shape and size, no grid'
+    : grid.ok
+      ? `Holds — ${grid.anchors.length} magnets seated${grid.twinRequired ? ' · ships as a TWIN pair (mirror grid clamps the fabric)' : ', spread across material'}`
+      : "Won't hold reliably"
   return (
     <div className={`gl-verdict ${grid.ok ? 'ok' : 'bad'}`}>
-      <div className="gl-vrow"><span className="gl-dot" /><b>{grid.ok ? `Holds — ${grid.anchors.length} magnets seated, spread across material` : "Won't hold reliably"}</b></div>
+      <div className="gl-vrow"><span className="gl-dot" /><b>{head}</b></div>
       {grid.issues.map((s, i) => <div key={i} className="gl-issue">{s}</div>)}
     </div>
   )
