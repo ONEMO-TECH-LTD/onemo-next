@@ -14,7 +14,10 @@
 import type { Contour, Pt } from './types'
 import { pointInPolygon } from './attachment'
 
-export type GridPattern = 'standard' | 'quincunx' | 'granular'
+/** 'diamond' (§13.5c) = checkerboard parity on the main pitch lattice — keeps alternating nodes so the
+ *  seated set forms the rotated/diamond arrangement (axis points at one pitch from centre on a disc;
+ *  apex + base pair on a triangle). All nodes remain MAIN lattice nodes → registration math unchanged. */
+export type GridPattern = 'standard' | 'quincunx' | 'granular' | 'diamond'
 export type MagnetPlan = 'all6' | 'all8' | 'corners8'
 export type MagnetDia = 6 | 8
 
@@ -119,8 +122,9 @@ function axisFrom(min: number, max: number, step: number, phase: number): number
   return res
 }
 
-/** Lattice across the bbox at PHASE (ox, oy). Pattern is a parity variant of the 24mm atom. */
-function latticeAt(bb: BBox, pitch: number, pattern: GridPattern, ox: number, oy: number): Pt[] {
+/** Lattice across the bbox at PHASE (ox, oy). Pattern is a parity variant of the 24mm atom.
+ *  `checker` (diamond only): which checkerboard half of the main lattice to keep (0 | 1). */
+function latticeAt(bb: BBox, pitch: number, pattern: GridPattern, ox: number, oy: number, checker = 0): Pt[] {
   const atom = pitch / 2
   const out: Pt[] = []
   const cross = (xs: number[], ys: number[]) => { for (const x of xs) for (const y of ys) out.push([x, y]) }
@@ -129,6 +133,13 @@ function latticeAt(bb: BBox, pitch: number, pattern: GridPattern, ox: number, oy
   } else if (pattern === 'quincunx') {
     cross(axisFrom(bb.minX, bb.maxX, pitch, ox), axisFrom(bb.minY, bb.maxY, pitch, oy))
     cross(axisFrom(bb.minX, bb.maxX, pitch, ox + pitch / 2), axisFrom(bb.minY, bb.maxY, pitch, oy + pitch / 2))
+  } else if (pattern === 'diamond') {
+    // checkerboard on the main lattice: keep nodes where (ix+iy) parity matches → alternating diagonal
+    // set (nearest neighbours at pitch·√2). Both parities are tried by the placement search.
+    const xs = axisFrom(bb.minX, bb.maxX, pitch, ox), ys = axisFrom(bb.minY, bb.maxY, pitch, oy)
+    for (let i = 0; i < xs.length; i++) for (let j = 0; j < ys.length; j++) {
+      if ((i + j) % 2 === checker) out.push([xs[i], ys[j]])
+    }
   } else {
     cross(axisFrom(bb.minX, bb.maxX, pitch, ox), axisFrom(bb.minY, bb.maxY, pitch, oy))
   }
@@ -187,7 +198,10 @@ function splitPerimeter(seated: ReadonlyArray<Pt>, step: number): { belt: Pt[]; 
   return { belt, interior }
 }
 function neighbourStep(pitch: number, pattern: GridPattern): number {
-  return pattern === 'granular' ? pitch / 2 : pattern === 'quincunx' ? pitch / Math.SQRT2 : pitch
+  return pattern === 'granular' ? pitch / 2
+    : pattern === 'quincunx' ? pitch / Math.SQRT2
+    : pattern === 'diamond' ? pitch * Math.SQRT2 // checkerboard: nearest kept neighbours are diagonal
+    : pitch
 }
 
 /** Per-anchor magnet size. corners8 → 8mm on the extreme corners, 6mm elsewhere. */
@@ -241,8 +255,9 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     let bestScore = -Infinity, chosenNodes: Pt[] = []
     // no two magnets closer than 2× the application radius → their padding rings can never overlap
     const minSpacing = 2 * pad
-    for (const px of oxs) for (const py of oys) {
-      const nodes = latticeAt(bb, pitch, pattern, px, py)
+    const checkers = pattern === 'diamond' ? [0, 1] : [0] // diamond: try both checkerboard halves
+    for (const px of oxs) for (const py of oys) for (const ck of checkers) {
+      const nodes = latticeAt(bb, pitch, pattern, px, py, ck)
       const seat = thinBySpacing(nodes.filter(valid), minSpacing, outer, c)
       let sx = 0, sy = 0; for (const p of seat) { sx += p[0]; sy += p[1] }
       const bal = seat.length ? Math.hypot(sx / seat.length - c[0], sy / seat.length - c[1]) : 1e9

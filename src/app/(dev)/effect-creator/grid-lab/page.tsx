@@ -111,7 +111,9 @@ export default function GridLab() {
   const model = useMemo(() => {
     try {
       const law = { ...DEFAULT_LAW, paddingMM: pad }
-      const baseCfg0 = { paddingMM: pad, pattern, plan, perimeterOnly: coverage === 'perimeter', center: centerMode, sparseThin: density === 'light' }
+      // §13.5c: triangles are DIAMOND-derived (apex + base pair) — box corners structurally miss the tips
+      const effPattern = src === 'std' && geo === 'triangle' ? 'diamond' as GridPattern : pattern
+      const baseCfg0 = { paddingMM: pad, pattern: effPattern, plan, perimeterOnly: coverage === 'perimeter', center: centerMode, sparseThin: density === 'light' }
       // ── STANDARD GEOMETRIES (D12–D15): drawn directly in mm, each axis snapped to its own rung ──
       if (src === 'std') {
         // rect (system A): long rung + short rung (< long) + orientation → W×H
@@ -361,8 +363,8 @@ export default function GridLab() {
 
             <div className="gl-field"><span>Grid pattern</span>
               <div className="gl-seg">
-                {(['standard', 'quincunx'] as GridPattern[]).map(p =>
-                  <button key={p} aria-pressed={pattern === p} onClick={() => setPattern(p)}>{p === 'quincunx' ? 'Dice-5' : 'Standard'}</button>)}
+                {(['standard', 'quincunx', 'diamond'] as GridPattern[]).map(p =>
+                  <button key={p} aria-pressed={pattern === p} onClick={() => setPattern(p)}>{p === 'quincunx' ? 'Dice-5' : p === 'diamond' ? 'Diamond' : 'Standard'}</button>)}
               </div>
             </div>
             <div className="gl-field"><span>Coverage</span>
