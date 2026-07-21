@@ -296,6 +296,14 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
  *  the effect's outer edge. One atom (24mm). Tunable (coupon later). */
 export const MAX_EMPTY_BORDER_MM = 24
 
+/** Pitch clamp by effect size: the fine 24mm atom is a SMALL-DOMAIN grid (caps / mini effects) — it must
+ *  never densify a standard-size effect (Dan 2026-07-21: "not allowing 24mm above 70mm"). Above 70mm the
+ *  ladder is 96/72/48 only. */
+export const FINE_PITCH_MAX_SIZE_MM = 70
+function allowedPitches(sizeMM: number): number[] {
+  return sizeMM > FINE_PITCH_MAX_SIZE_MM ? [96, 72, 48] : [96, 72, 48, 24]
+}
+
 /** Worst per-side gap between the seated anchors' bbox and the shape's bbox. Infinity when nothing seats. */
 function emptyBorder(grid: GridResult, contour: Contour): number {
   if (!grid.anchors.length) return Infinity
@@ -317,8 +325,12 @@ export function autoPitch(
   minN = TARGET_ANCHORS, maxEmptyMM = MAX_EMPTY_BORDER_MM,
 ): number {
   // evaluate each pitch WITH the auto-margin (a few mm of border can let a coarser pitch hold), coarsest-first
-  let fallback = 24, fallbackGap = Infinity
-  for (const p of [96, 72, 48, 24]) {
+  // (ladder is size-clamped by the effect's real longest side: the fine 24mm atom never applies above
+  //  FINE_PITCH_MAX_SIZE_MM — fromMM is the margin start, NOT the size, so measure the contour)
+  const b0 = bbox(withMargin(fromMM).outer.pts)
+  const ladder = allowedPitches(Math.max(b0.maxX - b0.minX, b0.maxY - b0.minY))
+  let fallback = ladder[ladder.length - 1], fallbackGap = Infinity
+  for (const p of ladder) {
     const fit = balancedFit(withMargin, { ...cfg, pitchMM: p }, fromMM, maxGrowMM)
     const gap = emptyBorder(fit.grid, withMargin(fit.sizeMM))
     if (fit.grid.anchors.length >= minN && gap <= maxEmptyMM) return p

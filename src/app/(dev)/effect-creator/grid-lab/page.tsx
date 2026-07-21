@@ -124,7 +124,14 @@ export default function GridLab() {
       const fit = balancedFit(withMargin, cfg, offsetMM, maxGrowMM)
       const effect = withMargin(fit.sizeMM)
       const eff = Math.round(Math.max(dim(effect, 0), dim(effect, 1)))
-      return { contour: effect, design, grid: fit.grid, marginMM: fit.sizeMM, grew: fit.grew, effSize: eff, designSize: dSize, pitch: chosenPitch }
+      // actual seated magnet distance (closest pair) — shown next to the total + annotated on canvas
+      let magDist: number | null = null
+      const aps = fit.grid.anchors
+      for (let i = 0; i < aps.length; i++) for (let j = i + 1; j < aps.length; j++) {
+        const d = Math.hypot(aps[i].p[0] - aps[j].p[0], aps[i].p[1] - aps[j].p[1])
+        if (magDist == null || d < magDist) magDist = d
+      }
+      return { contour: effect, design, grid: fit.grid, marginMM: fit.sizeMM, grew: fit.grew, effSize: eff, designSize: dSize, pitch: chosenPitch, magDist }
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
   }, [src, preset, gen, p1, p2, sides, points, sizeMM, pitch, pitchAuto, pad, pattern, plan, magic, coverage, offsetMM, centerMode, maxGrowMM])
 
@@ -216,6 +223,7 @@ export default function GridLab() {
               <span className="gl-total-k">Total effect size</span>
               <b className="gl-total-v">{model.effSize}<small> mm</small></b>
               <span className="gl-total-note">{model.marginMM > 0.5 ? `design ${model.designSize}mm + ${Math.round(model.marginMM)}mm margin${model.grew > 0.5 ? ` (+${Math.round(model.grew)} auto)` : ''}` : `design ${model.designSize}mm · no margin`}</span>
+              <span className="gl-total-note gl-total-grid">grid {model.pitch}mm{model.magDist != null ? ` · magnets ${Math.round(model.magDist)}mm apart` : ''}</span>
             </div>}
             <div className="gl-field"><span>Grid pitch · {pitchAuto && model ? `auto → ${model.pitch}mm` : 'manual'}</span>
               <div className="gl-seg">
@@ -320,6 +328,22 @@ function Stage({ contour, design, grid, frame }: { contour: Contour; design: Con
           <circle cx={p[0] - a.dia * 0.12} cy={p[1] - a.dia * 0.12} r={a.dia / 2 * 0.4} fill="var(--magnet-hi)" fillOpacity={0.5} />
         </g>
       })}
+      {/* live magnet-distance annotation: dimension line on the CLOSEST seated pair, real mm */}
+      {(() => {
+        const a = grid.anchors
+        if (a.length < 2) return null
+        let bi = 0, bj = 1, bd = Infinity
+        for (let i = 0; i < a.length; i++) for (let j = i + 1; j < a.length; j++) {
+          const d = Math.hypot(a[i].p[0] - a[j].p[0], a[i].p[1] - a[j].p[1])
+          if (d < bd) { bd = d; bi = i; bj = j }
+        }
+        const p1 = fy(a[bi].p), p2 = fy(a[bj].p)
+        const mx = (p1[0] + p2[0]) / 2, my = (p1[1] + p2[1]) / 2
+        return <g>
+          <line x1={p1[0]} y1={p1[1]} x2={p2[0]} y2={p2[1]} stroke="var(--accent)" strokeOpacity={0.75} strokeWidth={0.7} strokeDasharray="1.6 1.6" />
+          <text x={mx} y={my - 2.2} fontSize={fontMM * 0.85} fill="var(--accent)" textAnchor="middle" fontFamily="ui-monospace,monospace">{Math.round(bd)} mm</text>
+        </g>
+      })()}
     </svg>
   )
 }
