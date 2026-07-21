@@ -14,10 +14,11 @@
 import type { Contour, Pt } from './types'
 import { pointInPolygon } from './attachment'
 
-/** 'diamond' (§13.5c) = checkerboard parity on the main pitch lattice — keeps alternating nodes so the
- *  seated set forms the rotated/diamond arrangement (axis points at one pitch from centre on a disc;
- *  apex + base pair on a triangle). All nodes remain MAIN lattice nodes → registration math unchanged. */
-export type GridPattern = 'standard' | 'quincunx' | 'granular' | 'diamond'
+/** THE 48/68 SYSTEM (§13.5d, locked): one lattice, two atoms — straight 48, diagonal 68 (=48√2).
+ *  'standard' = straight rows only · 'diamond' = diagonal (68) links only · 'quincunx' (dice) = the
+ *  mix (legal ONLY at pitch 96 — its centres land at 48-offsets, the canvas's own dice; a 48-dice
+ *  would need 24-offsets, and NOTHING halves either atom). There is no granular/24/72 anywhere. */
+export type GridPattern = 'standard' | 'quincunx' | 'diamond'
 export type MagnetPlan = 'all6' | 'all8' | 'corners8'
 export type MagnetDia = 6 | 8
 
@@ -134,12 +135,9 @@ function axisFrom(min: number, max: number, step: number, phase: number): number
 /** Lattice across the bbox at PHASE (ox, oy). Pattern is a parity variant of the 24mm atom.
  *  `checker` (diamond only): which checkerboard half of the main lattice to keep (0 | 1). */
 function latticeAt(bb: BBox, pitch: number, pattern: GridPattern, ox: number, oy: number, checker = 0): Pt[] {
-  const atom = pitch / 2
   const out: Pt[] = []
   const cross = (xs: number[], ys: number[]) => { for (const x of xs) for (const y of ys) out.push([x, y]) }
-  if (pattern === 'granular') {
-    cross(axisFrom(bb.minX, bb.maxX, atom, ox), axisFrom(bb.minY, bb.maxY, atom, oy))
-  } else if (pattern === 'quincunx') {
+  if (pattern === 'quincunx') {
     cross(axisFrom(bb.minX, bb.maxX, pitch, ox), axisFrom(bb.minY, bb.maxY, pitch, oy))
     cross(axisFrom(bb.minX, bb.maxX, pitch, ox + pitch / 2), axisFrom(bb.minY, bb.maxY, pitch, oy + pitch / 2))
   } else if (pattern === 'diamond') {
@@ -207,8 +205,7 @@ function splitPerimeter(seated: ReadonlyArray<Pt>, step: number): { belt: Pt[]; 
   return { belt, interior }
 }
 function neighbourStep(pitch: number, pattern: GridPattern): number {
-  return pattern === 'granular' ? pitch / 2
-    : pattern === 'quincunx' ? pitch / Math.SQRT2
+  return pattern === 'quincunx' ? pitch / Math.SQRT2
     : pattern === 'diamond' ? pitch * Math.SQRT2 // checkerboard: nearest kept neighbours are diagonal
     : pitch
 }
@@ -414,7 +411,11 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
  *  aesthetic); 'standard' tries 48 first (denser, firmer hold). Same family either way. */
 export type GridDensity = 'standard' | 'light'
 function allowedPitches(density: GridDensity): number[] { return density === 'standard' ? [48, 96] : [96, 48] }
-
+/** Legal patterns per pitch under the 48/68 system: dice centres live at half-pitch, so quincunx is
+ *  legal ONLY at 96 (centres at 48-offsets = the shirt's own dice). Nothing ever sits at 24-offsets. */
+export function legalPatterns(pitchMM: number): GridPattern[] {
+  return pitchMM % 96 === 0 ? ['standard', 'diamond', 'quincunx'] : ['standard', 'diamond']
+}
 /** The admin LAW INPUTS that generate every size procedurally — no hand-picked numbers. */
 export interface SizeLaw {
   paddingMM: number   // mag-safe radius from magnet centre (default 10)
@@ -465,51 +466,57 @@ export function snapToRung(mm: number, law: SizeLaw = DEFAULT_LAW, visibleOnly =
   return best
 }
 
-/**
- * PER-GEOMETRY zero-point (Dan, 2026-07-21): every geometry carries its OWN edge-to-edge standard
- * sizes — the square's formula must not be borrowed. A geometry's zero-point for a grid span is the
- * SMALLEST size at which its silhouette fully holds (zero flaps) with the seated grid actually
- * spanning that tier — solved NUMERICALLY against the live engine, so any admin recipe change
- * (padding, frame, pattern, pitch) recomputes every rung. No hand-derived per-shape formulas.
- * For the square this solve reproduces `span + 2·(pad+frame)` exactly (70/118/166…); a circle lands
- * on its own larger rungs (the disc must reach the box corners); a triangle on its own.
- */
-export function geoZeroPoint(
-  makeShape: (sizeMM: number) => Contour, spanMM: number, cfg: GridConfig, maxSearchMM = 400,
-): number | null {
-  for (let s = spanMM; s <= maxSearchMM; s += 1) {
-    const g = computeGrid(makeShape(s), cfg)
-    if (!g.anchors.length || g.flaps.length) continue
-    const ab = bbox(g.anchors.map((a) => a.p))
-    if (Math.max(ab.maxX - ab.minX, ab.maxY - ab.minY) >= spanMM - 1) return s
-  }
-  return null
+/** GRID MODE — the four user-facing modes (§ goal 2026-07-21):
+ *  auto = everything legal + extra surface anchors for irregular shapes · standard = straight (48-atom)
+ *  links only · quincunx (dice) = the standard+diamond mix (96 pitch) · diamond = diagonal (68-atom)
+ *  links only. */
+export type GridMode = 'auto' | GridPattern
+function modeCombos(mode: GridMode): { pitchMM: number; pattern: GridPattern }[] {
+  const std = [{ pitchMM: 48, pattern: 'standard' as GridPattern }, { pitchMM: 96, pattern: 'standard' as GridPattern }]
+  const dia = [{ pitchMM: 48, pattern: 'diamond' as GridPattern }, { pitchMM: 96, pattern: 'diamond' as GridPattern }]
+  const dice = [{ pitchMM: 96, pattern: 'quincunx' as GridPattern }]
+  return mode === 'standard' ? std : mode === 'diamond' ? dia : mode === 'quincunx' ? dice : [...std, ...dia, ...dice]
 }
 
-/** The geometry's own standard-size ladder, one rung per grid tier (span 48, 96, 144…), each solved
- *  from the live recipe. `pattern` is the geometry's sanctioned layout law (e.g. triangle = quincunx
- *  per §13.5c); the effective padding includes the frame (physical pad is measured inside it). */
-export function geoLadder(
-  makeShape: (sizeMM: number) => Contour, law: SizeLaw = DEFAULT_LAW, pattern: GridPattern = 'standard',
-): SizeRung[] {
-  const rungs: SizeRung[] = []
-  for (let span = 48; span + 2 * (law.paddingMM + law.frameMM) <= law.maxRungMM + 1e-6; span += 48) {
-    const pitch = span % 96 === 0 ? 96 : 48
-    const cfg: GridConfig = { pitchMM: pitch, paddingMM: law.paddingMM + law.frameMM, pattern, perimeterOnly: true, strictPad: true }
-    const s = geoZeroPoint(makeShape, span, cfg)
-    if (s == null) continue
-    rungs.push({ sizeMM: s, pitchMM: pitch, anchorsPerSide: span / pitch + 1, spanMM: span, visible: s <= law.maxTestedMM })
+/** SEMANTIC SIZES (Dan, 2026-07-21): every shape carries its own T-shirt ladder keyed by ANCHOR COUNT —
+ *  1 point = 2XS · 2 = XS · 3 = S · 4 = M (the standard) · then 6/8/12/16 → L/XL/2XL/3XL. The mm under
+ *  each label is solved numerically per shape from the live inputs (padding + frame/margin + mode), so
+ *  changing the recipe or mode recomputes every size. Strict pad law (sizing), perimeter belt. */
+export interface SemanticRung { label: string; points: number; sizeMM: number; visible: boolean }
+export const SIZE_TIERS: ReadonlyArray<readonly [number, string]> =
+  [[1, '2XS'], [2, 'XS'], [3, 'S'], [4, 'M'], [6, 'L'], [8, 'XL'], [12, '2XL'], [16, '3XL']]
+export function semanticLadder(
+  makeShape: (sizeMM: number) => Contour, law: SizeLaw = DEFAULT_LAW, mode: GridMode = 'auto',
+): SemanticRung[] {
+  const combos = modeCombos(mode)
+  const padEff = law.paddingMM + law.frameMM
+  const rungs: SemanticRung[] = []
+  let tier = 0
+  for (let s = Math.ceil(2 * padEff); s <= law.maxRungMM && tier < SIZE_TIERS.length; s += 1) {
+    let best = 0
+    for (const cb of combos) {
+      const g = computeGrid(makeShape(s), { pitchMM: cb.pitchMM, pattern: cb.pattern, paddingMM: padEff, perimeterOnly: true, strictPad: true })
+      if (g.flaps.length) continue
+      if (g.anchors.length > best) best = g.anchors.length
+    }
+    while (tier < SIZE_TIERS.length && best >= SIZE_TIERS[tier][0]) {
+      rungs.push({ label: SIZE_TIERS[tier][1], points: SIZE_TIERS[tier][0], sizeMM: s, visible: s <= law.maxTestedMM })
+      tier++
+    }
   }
-  return rungs
+  // a shape may jump tiers at one size (a square seats 1 → straight to 4): keep the HIGHEST tier per
+  // size — the true anchor count there; skipped tiers simply don't exist for that shape.
+  const bySize = new Map<number, SemanticRung>()
+  for (const r of rungs) bySize.set(r.sizeMM, r)
+  return [...bySize.values()].sort((a, b) => a.sizeMM - b.sizeMM)
 }
 
 /**
  * Unified auto selection (pitch × pattern) under the ONE coverage physics — no shape-name branches.
- * Tries every allowed pitch (density preference order) × every candidate pattern (simplest first:
- * standard → diamond → quincunx) and returns the first combination that seats ≥ minN magnets with FULL
- * hold coverage (zero flaps). Fix `pitchMM` and/or `pattern` in opts to pin a manual choice — the
- * search then only spans the free dimension(s), so manual controls behave literally (no silent
- * overrides). Falls back to the fewest-uncovered combination when nothing fully covers.
+ * AUTO mode covers everything legal in the 48/68 system (standard straight, diamond diagonal, 96-dice
+ * mix) and, via per-node validity + the deepest-point guarantee, adds surface anchors on irregular
+ * silhouettes (blobs, L-shapes, AI cuts). Pin `pitchMM`/`pattern` for the manual modes — they behave
+ * literally. Fewest-uncovered fallback when nothing fully covers.
  */
 export function autoGrid(
   withMargin: (m: number) => Contour, cfg: GridConfig, fromMM: number, maxGrowMM: number,
@@ -517,10 +524,10 @@ export function autoGrid(
 ): { pitchMM: number; pattern: GridPattern } {
   const minN = opts.minN ?? TARGET_ANCHORS
   const pitches = opts.pitchMM != null ? [opts.pitchMM] : allowedPitches(opts.density ?? 'light')
-  const patterns: GridPattern[] = opts.pattern != null ? [opts.pattern] : ['standard', 'diamond', 'quincunx']
-  let fb = { pitchMM: pitches[pitches.length - 1], pattern: patterns[patterns.length - 1] }
+  const patFor = (p: number): GridPattern[] => opts.pattern != null ? [opts.pattern] : legalPatterns(p)
+  let fb = { pitchMM: pitches[pitches.length - 1], pattern: patFor(pitches[pitches.length - 1]).slice(-1)[0] }
   let fbFlaps = Infinity
-  for (const p of pitches) for (const pat of patterns) {
+  for (const p of pitches) for (const pat of patFor(p)) {
     const fit = balancedFit(withMargin, { ...cfg, pitchMM: p, pattern: pat }, fromMM, maxGrowMM)
     if (fit.grid.anchors.length >= minN && fit.grid.flaps.length === 0) return { pitchMM: p, pattern: pat }
     if (fit.grid.anchors.length >= MIN_ANCHORS && fit.grid.flaps.length < fbFlaps) {
@@ -533,27 +540,6 @@ export function autoGrid(
 /** Scale a normalized contour (longest side = 1mm) to a real longest-side size in mm. */
 export function scaleContour(base: Contour, longestMM: number): Contour {
   return { outer: { pts: base.outer.pts.map(([x, y]) => [x * longestMM, y * longestMM] as Pt) }, holes: [] }
-}
-
-/** RECTANGLE law (§13 / D12): each axis snaps the SAME ladder independently — a rectangle is two rung
- *  choices (W × H), e.g. 214×118 landscape = 96-pitch 3×2 anchors. Non-uniform scale of the normalized
- *  base to real W×H mm. */
-export function scaleContourXY(base: Contour, wMM: number, hMM: number): Contour {
-  const bb = bbox(base.outer.pts)
-  const sx = wMM / Math.max(bb.maxX - bb.minX, 1e-6), sy = hMM / Math.max(bb.maxY - bb.minY, 1e-6)
-  return { outer: { pts: base.outer.pts.map(([x, y]) => [(x - bb.minX) * sx, (y - bb.minY) * sy] as Pt) }, holes: [] }
-}
-
-/** All rectangle variations from the ladder: every W×H rung pair (W ≥ H — portrait = the transpose).
- *  The common pitch is 48 when either rung is 48-composed, else 96. */
-export function rectVariations(law: SizeLaw = DEFAULT_LAW, visibleOnly = true): { w: SizeRung; h: SizeRung; pitchMM: number }[] {
-  const rungs = sizeLadder(law).filter((r) => !visibleOnly || r.visible)
-  const out: { w: SizeRung; h: SizeRung; pitchMM: number }[] = []
-  for (const w of rungs) for (const h of rungs) {
-    if (h.sizeMM > w.sizeMM) continue
-    out.push({ w, h, pitchMM: w.pitchMM === 48 || h.pitchMM === 48 ? 48 : 96 })
-  }
-  return out
 }
 
 /**

@@ -15,7 +15,7 @@ import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import { contourFromShape } from '@/lib/effect/geometry-truth'
 import { insetRingMM } from '@/lib/effect/offset'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { computeGrid, balancedFit, autoGrid, scaleContour, snapToRung, sizeLadder, geoLadder, DEFAULT_LAW, type GridPattern, type MagnetPlan, type GridDensity } from '@/lib/effect/grid'
+import { computeGrid, balancedFit, autoGrid, scaleContour, semanticLadder, DEFAULT_LAW, type GridPattern, type MagnetPlan, type GridDensity, type GridMode, type SemanticRung } from '@/lib/effect/grid'
 
 const IMG = 1000
 const VP = 440
@@ -25,7 +25,7 @@ const PRESETS: VectorShapeKind[] = ['squircle', 'square', 'circle', 'pill', 'hea
 const GENS: { k: ShapeKind; label: string }[] = [{ k: 'blob', label: 'Blob' }, { k: 'form', label: 'Clover' }, { k: 'daisy', label: 'Daisy' }, { k: 'pinwheel', label: 'Pinwheel' }]
 
 type Src = 'std' | 'preset' | 'gen' | 'magic'
-type StdGeo = 'square' | 'rect' | 'circle' | 'triangle'
+type StdGeo = 'square' | 'rect' | 'circle' | 'triangle' | 'diamondShape'
 type MagicState = { vshape: VShape; maskH: number; adapter: string; imgUrl: string } | null
 
 /** D12–D15 basic geometries, drawn DIRECTLY in mm on the ladder rungs (no normalization pass). */
@@ -36,8 +36,12 @@ function stdContour(geo: StdGeo, wMM: number, hMM: number): Contour {
     return { outer: { pts }, holes: [] }
   }
   if (geo === 'triangle') {
-    // equilateral, side = rung; dice-centred anchoring comes from the engine (centroid + quincunx)
+    // equilateral, side = rung; anchoring law comes from the engine (mode-driven)
     return { outer: { pts: [[0, 0], [wMM, 0], [wMM / 2, wMM * Math.sqrt(3) / 2]] as Pt[] }, holes: [] }
+  }
+  if (geo === 'diamondShape') {
+    // the square's twin, rotated 45° — vertices on the axes
+    return { outer: { pts: [[wMM / 2, 0], [wMM, hMM / 2], [wMM / 2, hMM], [0, hMM / 2]] as Pt[] }, holes: [] }
   }
   return { outer: { pts: [[0, 0], [wMM, 0], [wMM, hMM], [0, hMM]] as Pt[] }, holes: [] } // square / rect
 }
@@ -112,11 +116,14 @@ export default function GridLab() {
   // PER-GEOMETRY standard sizes (Dan): each geometry's rungs are solved numerically from the live
   // recipe (padding/frame/pattern law) — square 70/118/…, circle and triangle their own. Rect derives
   // per-axis from the square ladder.
-  const stdRungs = useMemo(() => {
-    if (src !== 'std' || geo === 'rect') return null
-    const mk = (s: number) => stdContour(geo, s, s)
-    return geoLadder(mk, { ...DEFAULT_LAW, paddingMM: pad }, geo === 'triangle' ? 'quincunx' : 'standard')
-  }, [src, geo, pad])
+  // SEMANTIC SIZES: every shape's own T-shirt ladder (2XS=1pt · XS=2 · S=3 · M=4 · L/XL/2XL/3XL …),
+  // solved from the live inputs (padding + frame) and the MODE (auto / standard / dice / diamond).
+  const gridMode: GridMode = patternAuto ? 'auto' : pattern
+  const stdRungs = useMemo<SemanticRung[]>(() => {
+    const g: StdGeo = src === 'std' ? (geo === 'rect' ? 'square' : geo) : 'square'
+    const mk = (s: number) => stdContour(g, s, s)
+    return semanticLadder(mk, { ...DEFAULT_LAW, paddingMM: pad }, gridMode)
+  }, [src, geo, pad, gridMode])
 
   const model = useMemo(() => {
     try {
@@ -126,14 +133,13 @@ export default function GridLab() {
       const baseCfg0 = { paddingMM: pad, pattern, plan, perimeterOnly: coverage === 'perimeter', center: centerMode, sparseThin: density === 'light' }
       // ── STANDARD GEOMETRIES (D12–D15): drawn directly in mm, each axis snapped to its own rung ──
       if (src === 'std') {
-        // rect (system A): long rung + short rung (< long) + orientation → W×H
-        const rungL = snapToRung(longMM, law, false)
-        const shortPool = sizeLadder(law).filter(r => r.sizeMM < rungL.sizeMM)
-        const rungS = shortPool.length
-          ? shortPool.reduce((b, r) => Math.abs(r.sizeMM - shortMM) < Math.abs(b.sizeMM - shortMM) ? r : b)
-          : rungL
-        const ownLadder = stdRungs && stdRungs.length ? stdRungs : sizeLadder(law)
-        const nearestOwn = ownLadder.reduce((b, r) => Math.abs(r.sizeMM - sizeMM) < Math.abs(b.sizeMM - sizeMM) ? r : b)
+        if (!stdRungs.length) return null
+        const nearest = (mm: number, pool: SemanticRung[]) => pool.reduce((b, r) => Math.abs(r.sizeMM - mm) < Math.abs(b.sizeMM - mm) ? r : b)
+        // rect (system A): long + short axes each snap the SQUARE's semantic sizes; orientation flips
+        const rungL = nearest(longMM, stdRungs)
+        const shortPool = stdRungs.filter(r => r.sizeMM < rungL.sizeMM)
+        const rungS = shortPool.length ? nearest(shortMM, shortPool) : rungL
+        const nearestOwn = nearest(sizeMM, stdRungs)
         const rungW = geo === 'rect' ? (orient === 'landscape' ? rungL : rungS) : nearestOwn
         const rungH = geo === 'rect' ? (orient === 'landscape' ? rungS : rungL) : rungW
         // per-geometry zero-point: the rung size IS the geometry's own solved standard size
@@ -187,7 +193,7 @@ export default function GridLab() {
       // the engine adapts (auto-margin snaps coverage to the 48-family grid dynamically). The rung
       // buttons are quick-sets for the rigid standard sizes; `rung` below is the nearest reference only.
       const dSize = Math.max(sizeMin, Math.min(sizeMM, src === 'preset' ? 310 : 180))
-      const rung = snapToRung(dSize, law, false)
+      const rung = stdRungs.length ? stdRungs.reduce((b, r) => Math.abs(r.sizeMM - dSize) < Math.abs(b.sizeMM - dSize) ? r : b) : { label: '—', points: 0, sizeMM: dSize, visible: true }
       const design = scaleContour(b, dSize)
       const withMargin = (m: number): Contour => {
         if (Math.abs(m) < 0.01) return design
@@ -262,7 +268,7 @@ export default function GridLab() {
 
             {src === 'std' && <div className="gl-field"><span>Geometry</span>
               <div className="gl-seg">
-                {([['square', 'Square'], ['rect', 'Rectangle'], ['circle', 'Circle'], ['triangle', 'Triangle']] as [StdGeo, string][]).map(([g, l]) =>
+                {([['square', 'Square'], ['diamondShape', 'Diamond'], ['rect', 'Rectangle'], ['circle', 'Circle'], ['triangle', 'Triangle']] as [StdGeo, string][]).map(([g, l]) =>
                   <button key={g} aria-pressed={geo === g} onClick={() => setGeo(g)}>{l}</button>)}
               </div>
             </div>}
@@ -301,38 +307,38 @@ export default function GridLab() {
           </div>
 
           <div className="gl-card gl-pad">
-            {/* §13 standard sizes — the full zero-point ladder incl. hidden/untested rungs (D11) */}
-            {!(src === 'std' && geo === 'rect') && <div className="gl-field"><span>Standard size · rung{src === 'std' && stdRungs ? ' · own zero-points' : ''}</span>
+            {/* SEMANTIC SIZES — the shape's own T-shirt ladder (anchor-count tiers), mode + recipe driven */}
+            {!(src === 'std' && geo === 'rect') && <div className="gl-field"><span>Size · {src === 'std' ? 'this shape' : 'square ref'} · {gridMode === 'quincunx' ? 'dice' : gridMode}</span>
               <div className="gl-seg gl-wrap">
-                {(src === 'std' && stdRungs && stdRungs.length ? stdRungs : sizeLadder({ ...DEFAULT_LAW, paddingMM: pad })).map(r =>
+                {stdRungs.map(r =>
                   <button key={r.sizeMM} aria-pressed={model?.rung.sizeMM === r.sizeMM}
                     className={r.visible ? undefined : 'gl-hidden-rung'}
                     onClick={() => setSizeMM(r.sizeMM)}
-                    title={`${r.pitchMM}mm × ${r.anchorsPerSide} anchors · span ${r.spanMM}mm${r.visible ? '' : ' · hidden at launch (untested)'}`}>
-                    {r.sizeMM}{r.visible ? '' : '†'}
+                    title={`${r.points} anchor point${r.points > 1 ? 's' : ''} · ${r.sizeMM}mm${r.visible ? '' : ' · hidden at launch (untested)'}`}>
+                    {r.label} {r.sizeMM}{r.visible ? '' : '†'}
                   </button>)}
               </div>
             </div>}
             {src === 'std' && geo === 'rect' && <>
               {/* system A: long side → short side (< long) → orientation */}
-              <div className="gl-field"><span>Long side · rung</span>
+              <div className="gl-field"><span>Long side · size</span>
                 <div className="gl-seg gl-wrap">
-                  {sizeLadder({ ...DEFAULT_LAW, paddingMM: pad }).filter(r => r.sizeMM > 70).map(r =>
+                  {stdRungs.filter(r => r.points >= 2).map(r =>
                     <button key={'L' + r.sizeMM} aria-pressed={Math.max(model?.rung.sizeMM ?? 0, model?.rungH?.sizeMM ?? 0) === r.sizeMM}
                       className={r.visible ? undefined : 'gl-hidden-rung'}
                       onClick={() => setLongMM(r.sizeMM)}
-                      title={`${r.pitchMM}mm × ${r.anchorsPerSide} anchors · span ${r.spanMM}mm${r.visible ? '' : ' · hidden at launch (untested)'}`}>
-                      {r.sizeMM}{r.visible ? '' : '†'}
+                      title={`${r.points} anchor points · ${r.sizeMM}mm${r.visible ? '' : ' · hidden at launch (untested)'}`}>
+                      {r.label} {r.sizeMM}{r.visible ? '' : '†'}
                     </button>)}
                 </div>
               </div>
-              <div className="gl-field"><span>Short side · rung</span>
+              <div className="gl-field"><span>Short side · size</span>
                 <div className="gl-seg gl-wrap">
-                  {sizeLadder({ ...DEFAULT_LAW, paddingMM: pad }).filter(r => r.sizeMM < snapToRung(longMM, { ...DEFAULT_LAW, paddingMM: pad }, false).sizeMM).map(r =>
+                  {stdRungs.filter(r => r.sizeMM < Math.max(...stdRungs.filter(q => Math.abs(q.sizeMM - longMM) === Math.min(...stdRungs.map(w => Math.abs(w.sizeMM - longMM)))).map(q => q.sizeMM))).map(r =>
                     <button key={'S' + r.sizeMM} aria-pressed={Math.min(model?.rung.sizeMM ?? 0, model?.rungH?.sizeMM ?? 0) === r.sizeMM}
                       className={r.visible ? undefined : 'gl-hidden-rung'}
                       onClick={() => setShortMM(r.sizeMM)}>
-                      {r.sizeMM}{r.visible ? '' : '†'}
+                      {r.label} {r.sizeMM}{r.visible ? '' : '†'}
                     </button>)}
                 </div>
               </div>
@@ -350,7 +356,7 @@ export default function GridLab() {
               <b className="gl-total-v">{model.effSize}<small> mm</small></b>
               <span className="gl-total-note">{model.marginMM > 0.5 ? `design ${model.designSize}mm + ${Math.round(model.marginMM)}mm margin${model.grew > 0.5 ? ` (+${Math.round(model.grew)} auto)` : ''}` : `design ${model.designSize}mm · no margin`}</span>
               <span className="gl-total-note gl-total-grid">grid {model.pitch}mm{model.magDist != null ? ` · magnets ${Math.round(model.magDist)}mm apart${Math.abs(model.magDist - model.pitch * Math.SQRT2) < 1.5 ? ` · grid diagonal (${model.pitch}×√2)` : Math.abs(model.magDist - model.pitch * Math.SQRT2 / 2) < 1.5 ? ` · dice half-diagonal` : ''}` : ''}</span>
-              <span className="gl-total-note">{model.format ? `${model.rung.sizeMM}×${model.rungH.sizeMM} · ${model.format}` : `rung ${model.rung.sizeMM}mm · ${model.rung.pitchMM}×${model.rung.anchorsPerSide} span ${model.rung.spanMM}`}{model.rung.visible && model.rungH.visible ? '' : ' · HIDDEN (untested)'}</span>
+              <span className="gl-total-note">{model.format ? `${model.rung.sizeMM}×${model.rungH.sizeMM} · ${model.format}` : `size ${model.rung.label} · ${model.rung.points} anchor points · ${model.rung.sizeMM}mm`}{model.rung.visible && model.rungH.visible ? '' : ' · HIDDEN (untested)'}</span>
             </div>}
             <div className="gl-field"><span>Grid density · cells</span>
               <div className="gl-seg">
@@ -361,9 +367,7 @@ export default function GridLab() {
             <div className="gl-field"><span>Grid pitch · {pitchAuto && model ? `auto → ${model.pitch}mm` : 'manual'}</span>
               <div className="gl-seg">
                 <button aria-pressed={pitchAuto} onClick={() => setPitchAuto(true)}>Auto</button>
-                <button aria-pressed={!pitchAuto && pitch === 24} onClick={() => { setPitchAuto(false); setPitch(24) }}>24</button>
                 <button aria-pressed={!pitchAuto && pitch === 48} onClick={() => { setPitchAuto(false); setPitch(48) }}>48</button>
-                <button aria-pressed={!pitchAuto && pitch === 72} onClick={() => { setPitchAuto(false); setPitch(72) }}>72</button>
                 <button aria-pressed={!pitchAuto && pitch === 96} onClick={() => { setPitchAuto(false); setPitch(96) }}>96</button>
               </div>
             </div>
