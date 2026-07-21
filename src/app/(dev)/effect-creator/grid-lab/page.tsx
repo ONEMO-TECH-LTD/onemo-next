@@ -134,7 +134,7 @@ export default function GridLab() {
           const o = insetRingMM(design.outer.pts, m, 'round')
           return o && o.length >= 3 ? { outer: { pts: o }, holes: [] } : design
         }
-        const chosenPitch = pitchAuto ? autoPitch(withMargin, baseCfg0, offsetMM, maxGrowMM, undefined, undefined, density) : pitch
+        const chosenPitch = pitchAuto ? autoPitch(withMargin, baseCfg0, offsetMM, maxGrowMM, undefined, density) : pitch
         const fit = balancedFit(withMargin, { ...baseCfg0, pitchMM: chosenPitch }, offsetMM, maxGrowMM)
         const effect = withMargin(fit.sizeMM)
         const eff = Math.round(Math.max(dim(effect, 0), dim(effect, 1)))
@@ -184,7 +184,7 @@ export default function GridLab() {
         return o && o.length >= 3 ? { outer: { pts: o }, holes: [] } : design
       }
       // proportion-adaptive pitch: coarsest standard (72/48/24) that still holds; else the user's choice
-      const chosenPitch = pitchAuto ? autoPitch(withMargin, baseCfg, offsetMM, maxGrowMM, undefined, undefined, density) : pitch
+      const chosenPitch = pitchAuto ? autoPitch(withMargin, baseCfg, offsetMM, maxGrowMM, undefined, density) : pitch
       const cfg = { ...baseCfg, pitchMM: chosenPitch }
       const fit = balancedFit(withMargin, cfg, offsetMM, maxGrowMM)
       const effect = withMargin(fit.sizeMM)

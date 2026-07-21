@@ -272,7 +272,28 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   let interior: Pt[] = []
   if (perimeterOnly && seated.length > 4) {
     const split = splitPerimeter(seated, neighbourStep(pitch, pattern))
-    if (split.belt.length >= MIN_ANCHORS) { seated = split.belt; interior = split.interior }
+    if (split.belt.length >= MIN_ANCHORS) {
+      // COVERAGE-VERIFIED belt (shape-agnostic): dropping an "interior" node must never uncover the rim —
+      // on curved/concave shapes a 4-side-surrounded node can still be the closest cover for a rim dip.
+      // Greedily re-add the interior nodes that recover the most uncovered outline until coverage matches
+      // what the full set achieves.
+      const belt = split.belt.slice()
+      const pool = split.interior.slice()
+      let uncovered = flapVerts(outer, belt, HOLD_REACH_MM)
+      const fullUncovered = flapVerts(outer, fullSeated, HOLD_REACH_MM).length
+      while (uncovered.length > fullUncovered && pool.length) {
+        let bi = -1, bestGain = 0
+        for (let i = 0; i < pool.length; i++) {
+          let gain = 0
+          for (const v of uncovered) if (dist(v, pool[i]) <= HOLD_REACH_MM) gain++
+          if (gain > bestGain) { bestGain = gain; bi = i }
+        }
+        if (bi < 0) break // no interior node can help — residual is a genuine size/pitch problem
+        belt.push(pool[bi]); pool.splice(bi, 1)
+        uncovered = flapVerts(outer, belt, HOLD_REACH_MM)
+      }
+      seated = belt; interior = pool
+    }
   }
 
   // LIGHT thinning — 1·3·4·6 (Dan: "keep central 3-4, remove 2 and 5") — applied AFTER the perimeter
@@ -330,9 +351,6 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   }
 }
 
-/** Default cap on EMPTY SPACE: the max allowed gap (per side) between the seated grid's bounding box and
- *  the effect's outer edge. One atom (24mm). Tunable (coupon later). */
-export const MAX_EMPTY_BORDER_MM = 24
 
 // ─── LAUNCH LAW (§13, locked 2026-07-21) — 48-family only, procedural zero-point ladder ──────────────
 // Launch pitches = 48/96 exclusively (24/72 have no counterpart on the 96-dice garment canvas; small/cap
@@ -392,36 +410,29 @@ export function snapToRung(mm: number, law: SizeLaw = DEFAULT_LAW, visibleOnly =
   return best
 }
 
-/** Worst per-side gap between the seated anchors' bbox and the shape's bbox. Infinity when nothing seats. */
-function emptyBorder(grid: GridResult, contour: Contour): number {
-  if (!grid.anchors.length) return Infinity
-  const sb = bbox(contour.outer.pts)
-  const ab = bbox(grid.anchors.map((a) => a.p))
-  return Math.max(ab.minX - sb.minX, ab.minY - sb.minY, sb.maxX - ab.maxX, sb.maxY - ab.maxY)
-}
-
 /**
  * Proportion-adaptive pitch (THE mechanism): the COARSEST launch pitch (96 → 48, §13.1) whose grid
- * (a) seats a solid hold (≥ minN magnets) AND (b) leaves no dead border — the seated grid's bbox must
- * reach within `maxEmptyMM` of every effect edge (Dan 2026-07-21: "empty spaces greater than x must be
- * filled — coarse wins as long as the space is not forcing the variable"). Without (b), 96 "passes" with
- * 4 magnets floating mid-shape from ~117mm all the way to ~210mm (huge unanchored border). Falls back to
- * 24 (finest) when nothing qualifies. `contourMM` is the effect (design + base margin).
+ * (a) seats a solid hold (≥ minN magnets) AND (b) COVERS the shape — no outline point further than
+ * HOLD_REACH from a magnet (zero flaps). Coverage-by-hold is the ONE shape-agnostic metric (squares,
+ * discs, stars, AI cuts alike) and it subsumes the empty-space rule: a dead border beyond reach = flaps
+ * (Dan: "empty spaces greater than x must be filled — coarse wins as long as the space is not forcing
+ * the variable"). When nothing fully covers, fall back to the coarsest pitch with the FEWEST uncovered
+ * outline points. `withMargin` is the effect producer (design + margin).
  */
 export function autoPitch(
   withMargin: (m: number) => Contour, cfg: GridConfig, fromMM: number, maxGrowMM: number,
-  minN = TARGET_ANCHORS, maxEmptyMM = MAX_EMPTY_BORDER_MM, density: GridDensity = 'light',
+  minN = TARGET_ANCHORS, density: GridDensity = 'light',
 ): number {
   // evaluate each pitch WITH the auto-margin, in the density's preference order: 'light' coarse-first
-  // (96 sparse wins while the empty-border rule allows), 'standard' dense-first (48 firm hold)
+  // (96 sparse wins while it still covers), 'standard' dense-first (48 firm hold)
   const ladder = allowedPitches(density)
-  let fallback = ladder[ladder.length - 1], fallbackGap = Infinity
+  let fallback = ladder[ladder.length - 1], fallbackFlaps = Infinity
   for (const p of ladder) {
     const fit = balancedFit(withMargin, { ...cfg, pitchMM: p }, fromMM, maxGrowMM)
-    const gap = emptyBorder(fit.grid, withMargin(fit.sizeMM))
-    if (fit.grid.anchors.length >= minN && gap <= maxEmptyMM) return p
-    // no pitch qualifies (awkward half-tier sizes like 150): keep the coarsest with the least dead border
-    if (fit.grid.anchors.length >= MIN_ANCHORS && gap < fallbackGap - 1e-6) { fallback = p; fallbackGap = gap }
+    if (fit.grid.anchors.length >= minN && fit.grid.flaps.length === 0) return p
+    if (fit.grid.anchors.length >= MIN_ANCHORS && fit.grid.flaps.length < fallbackFlaps) {
+      fallback = p; fallbackFlaps = fit.grid.flaps.length
+    }
   }
   return fallback
 }
@@ -454,9 +465,11 @@ export function rectVariations(law: SizeLaw = DEFAULT_LAW, visibleOnly = true): 
 
 /**
  * Sizing ADAPTS (always-on, capped): from the selected size, nudge UP in small steps up to `maxGrowMM`
- * and keep the first size that is BALANCED — zero gaps and ≥ target magnets (envelops the corners). If
- * nothing within the cap is gap-free, keep the size with the fewest gaps (then most magnets). `sized(mm)`
- * produces the real-mm contour (applies the outline offset). `maxGrowMM = 0` disables growth (pure size).
+ * and keep the first size that is BALANCED — full hold coverage (zero flaps: no outline point beyond
+ * HOLD_REACH of a magnet) and ≥ target magnets. Coverage-by-hold is the shape-agnostic criterion (the
+ * old `gaps` bbox heuristic mis-ranked curved shapes — a disc's rim always has padding-blocked nodes).
+ * If nothing within the cap fully covers, keep the size with the fewest uncovered outline points (then
+ * most magnets). `sized(mm)` produces the real-mm contour. `maxGrowMM = 0` disables growth.
  */
 export function balancedFit(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, maxGrowMM: number,
@@ -470,10 +483,10 @@ export function balancedFit(
   let bestRank = Infinity
   for (let mm = start; mm <= end; mm += step) {
     const grid = computeGrid(sized(mm), cfg)
-    // perfect = zero gaps AND ≥ target magnets → take the first (smallest) such size immediately
-    if (grid.gaps === 0 && grid.anchors.length >= target) return { sizeMM: mm, grid, grew: mm - start }
-    // otherwise rank: fewer gaps first, then more magnets (negated), then smaller size
-    const rank = grid.gaps * 1000 - grid.anchors.length
+    // perfect = fully covered AND ≥ target magnets → take the first (smallest) such size immediately
+    if (grid.flaps.length === 0 && grid.anchors.length >= target) return { sizeMM: mm, grid, grew: mm - start }
+    // otherwise rank: fewer uncovered points first, then more magnets (negated), then smaller size
+    const rank = grid.flaps.length * 1000 - grid.anchors.length
     if (rank < bestRank) { bestRank = rank; best = { sizeMM: mm, grid } }
   }
   if (best) return { ...best, grew: best.sizeMM - start }
