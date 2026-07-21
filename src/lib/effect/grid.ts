@@ -433,6 +433,29 @@ export interface SizeLaw {
 }
 export const DEFAULT_LAW: SizeLaw = { paddingMM: 10, frameMM: 1, maxTestedMM: 214, maxRungMM: 310 }
 
+/** LAW: random/AI-cut silhouettes are capped below the preset range until physically tested. */
+export const RANDOM_SHAPE_MAX_MM = 180
+/** LAW: the smallest effect is the single-point (ONE) size — one magnet with its full pad ring. */
+export function minEffectMM(law: SizeLaw = DEFAULT_LAW): number { return 2 * (law.paddingMM + law.frameMM) }
+/** LAW: rectangle format families by aspect ratio (product naming, not navigation). */
+export function rectFormat(wMM: number, hMM: number): 'strip' | 'panoramic' | 'block' {
+  const r = Math.max(wMM, hMM) / Math.min(wMM, hMM)
+  return r >= 2.5 ? 'strip' : r >= 1.6 ? 'panoramic' : 'block'
+}
+/** LAW: the standard geometry recipes (product shape definitions — square, its rotated diamond twin,
+ *  circle, equilateral triangle, rectangle). Drawn directly in mm; app + bench share these. */
+export type StdShape = 'square' | 'rect' | 'circle' | 'triangle' | 'diamondShape'
+export function stdShapeContour(shape: StdShape, wMM: number, hMM: number = wMM): Contour {
+  if (shape === 'circle') {
+    const r = wMM / 2, pts: Pt[] = []
+    for (let i = 0; i < 96; i++) { const t = (i / 96) * Math.PI * 2; pts.push([r + r * Math.cos(t), r + r * Math.sin(t)]) }
+    return { outer: { pts }, holes: [] }
+  }
+  if (shape === 'triangle') return { outer: { pts: [[0, 0], [wMM, 0], [wMM / 2, wMM * Math.sqrt(3) / 2]] as Pt[] }, holes: [] }
+  if (shape === 'diamondShape') return { outer: { pts: [[wMM / 2, 0], [wMM, hMM / 2], [wMM / 2, hMM], [0, hMM / 2]] as Pt[] }, holes: [] }
+  return { outer: { pts: [[0, 0], [wMM, 0], [wMM, hMM], [0, hMM]] as Pt[] }, holes: [] } // square / rect
+}
+
 export interface SizeRung {
   sizeMM: number         // total outer size (the zero-point)
   pitchMM: number        // sparsest pitch composing it (96 preferred over 48 — fewer is better)

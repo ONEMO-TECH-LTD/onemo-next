@@ -15,7 +15,7 @@ import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import { contourFromShape } from '@/lib/effect/geometry-truth'
 import { insetRingMM } from '@/lib/effect/offset'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { computeGrid, balancedFit, autoGrid, scaleContour, semanticLadder, DEFAULT_LAW, type GridPattern, type MagnetPlan, type GridDensity, type GridMode, type SemanticRung } from '@/lib/effect/grid'
+import { computeGrid, balancedFit, autoGrid, scaleContour, semanticLadder, stdShapeContour, rectFormat, minEffectMM, RANDOM_SHAPE_MAX_MM, DEFAULT_LAW, type GridPattern, type MagnetPlan, type GridDensity, type GridMode, type SemanticRung, type StdShape } from '@/lib/effect/grid'
 
 const IMG = 1000
 const VP = 440
@@ -25,26 +25,8 @@ const PRESETS: VectorShapeKind[] = ['squircle', 'square', 'circle', 'pill', 'hea
 const GENS: { k: ShapeKind; label: string }[] = [{ k: 'blob', label: 'Blob' }, { k: 'form', label: 'Clover' }, { k: 'daisy', label: 'Daisy' }, { k: 'pinwheel', label: 'Pinwheel' }]
 
 type Src = 'std' | 'preset' | 'gen' | 'magic'
-type StdGeo = 'square' | 'rect' | 'circle' | 'triangle' | 'diamondShape'
+type StdGeo = StdShape
 type MagicState = { vshape: VShape; maskH: number; adapter: string; imgUrl: string } | null
-
-/** D12–D15 basic geometries, drawn DIRECTLY in mm on the ladder rungs (no normalization pass). */
-function stdContour(geo: StdGeo, wMM: number, hMM: number): Contour {
-  if (geo === 'circle') {
-    const r = wMM / 2, pts: Pt[] = []
-    for (let i = 0; i < 96; i++) { const t = (i / 96) * Math.PI * 2; pts.push([r + r * Math.cos(t), r + r * Math.sin(t)]) }
-    return { outer: { pts }, holes: [] }
-  }
-  if (geo === 'triangle') {
-    // equilateral, side = rung; anchoring law comes from the engine (mode-driven)
-    return { outer: { pts: [[0, 0], [wMM, 0], [wMM / 2, wMM * Math.sqrt(3) / 2]] as Pt[] }, holes: [] }
-  }
-  if (geo === 'diamondShape') {
-    // the square's twin, rotated 45° — vertices on the axes
-    return { outer: { pts: [[wMM / 2, 0], [wMM, hMM / 2], [wMM / 2, hMM], [0, hMM / 2]] as Pt[] }, holes: [] }
-  }
-  return { outer: { pts: [[0, 0], [wMM, 0], [wMM, hMM], [0, hMM]] as Pt[] }, holes: [] } // square / rect
-}
 
 function bboxOf(pts: ReadonlyArray<{ x: number; y: number }>) {
   let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity
@@ -107,11 +89,8 @@ export default function GridLab() {
       .catch((err) => { console.error('[grid-lab] magic failed', err); setMagStatus('error:' + ((err as Error)?.message ?? 'cut failed')) })
   }
 
-  const sizeMax = src === 'preset' ? 310 : 180 // presets reach the full ladder (incl. hidden rungs); random shapes capped 180
-  // smallest holdable effect = a SINGLE point: one magnet with its application ring. Under interp A the
-  // ring is `pad`mm radius from centre, so a centred magnet needs 2×pad of material → floor = 2×pad (20mm
-  // at the default 10mm padding). Tracks the padding slider rather than a hardcoded 40.
-  const sizeMin = 2 * pad
+  const sizeMax = src === 'preset' ? DEFAULT_LAW.maxRungMM : RANDOM_SHAPE_MAX_MM // engine law: preset range vs untested-cut cap
+  const sizeMin = minEffectMM({ ...DEFAULT_LAW, paddingMM: pad }) // engine law: the ONE (single-point) floor
 
   // PER-GEOMETRY standard sizes (Dan): each geometry's rungs are solved numerically from the live
   // recipe (padding/frame/pattern law) — square 70/118/…, circle and triangle their own. Rect derives
@@ -122,7 +101,7 @@ export default function GridLab() {
 
   const stdRungs = useMemo<SemanticRung[]>(() => {
     const g: StdGeo = src === 'std' ? (geo === 'rect' ? 'square' : geo) : 'square'
-    const mk = (s: number) => stdContour(g, s, s)
+    const mk = (s: number) => stdShapeContour(g, s, s)
     return semanticLadder(mk, { ...DEFAULT_LAW, paddingMM: pad }, gridMode)
   }, [src, geo, pad, gridMode])
 
@@ -148,7 +127,7 @@ export default function GridLab() {
         const rungH = geo === 'rect' ? (orient === 'landscape' ? rungS : rungL) : rungW
         // per-geometry zero-point: the rung size IS the geometry's own solved standard size
         const stdSize = rungW.sizeMM
-        const design = stdContour(geo, stdSize, geo === 'rect' ? rungH.sizeMM : stdSize)
+        const design = stdShapeContour(geo, stdSize, geo === 'rect' ? rungH.sizeMM : stdSize)
         const withMargin = (m: number): Contour => {
           if (Math.abs(m) < 0.01) return design
           const o = insetRingMM(design.outer.pts, m, 'round')
@@ -165,8 +144,7 @@ export default function GridLab() {
           const d = Math.hypot(aps[i].p[0] - aps[j].p[0], aps[i].p[1] - aps[j].p[1])
           if (magDist == null || d < magDist) magDist = d
         }
-        const ratio = Math.max(rungW.sizeMM, rungH.sizeMM) / Math.min(rungW.sizeMM, rungH.sizeMM)
-        const format = geo !== 'rect' ? null : ratio >= 2.5 ? 'strip' : ratio >= 1.6 ? 'panoramic' : 'block'
+        const format = geo !== 'rect' ? null : rectFormat(rungW.sizeMM, rungH.sizeMM)
         return { contour: effect, design, grid: fit.grid, marginMM: fit.sizeMM, grew: fit.grew, effSize: eff, designSize: stdSize, pitch: chosenPitch, patternUsed: sel.pattern, magDist, rung: rungW, rungH, format }
       }
       // base contour normalized so longest side = 1mm (scale-free); scaleContour() sizes it in mm
@@ -196,7 +174,7 @@ export default function GridLab() {
       // ADAPTIVE sizing (Dan's law, restored): the slider is CONTINUOUS — free shapes take any size and
       // the engine adapts (auto-margin snaps coverage to the 48-family grid dynamically). The rung
       // buttons are quick-sets for the rigid standard sizes; `rung` below is the nearest reference only.
-      const dSize = Math.max(sizeMin, Math.min(sizeMM, src === 'preset' ? 310 : 180))
+      const dSize = Math.max(sizeMin, Math.min(sizeMM, sizeMax))
       const rung = stdRungs.length ? stdRungs.reduce((b, r) => {
         const dr = Math.abs(r.sizeMM - dSize), db = Math.abs(b.sizeMM - dSize)
         return dr < db || (dr === db && r.sizeMM > b.sizeMM) ? r : b
@@ -356,7 +334,7 @@ export default function GridLab() {
                 </div>
               </div>
             </>}
-            <Slider label={`Design size · longest side${src !== 'preset' ? ' · max 180' : ''}`} unit="mm" v={Math.max(sizeMin, Math.min(sizeMM, sizeMax))} set={setSizeMM} min={sizeMin} max={sizeMax} />
+            <Slider label={`Design size · longest side${src !== 'preset' ? ` · max ${RANDOM_SHAPE_MAX_MM}` : ''}`} unit="mm" v={Math.max(sizeMin, Math.min(sizeMM, sizeMax))} set={setSizeMM} min={sizeMin} max={sizeMax} />
             <Slider label="Max auto-margin · balance" unit="mm" v={maxGrowMM} set={setMaxGrowMM} min={0} max={80} />
             {model && <div className="gl-total">
               <span className="gl-total-k">Total effect size</span>
