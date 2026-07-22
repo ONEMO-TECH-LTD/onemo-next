@@ -3,7 +3,8 @@
 import { describe, expect, it } from 'vitest'
 import { computeAttachmentGrid } from '@/app/(dev)/effect-creator/v5.3.1/core/primitives'
 import { pointInPolygon } from '../polygon'
-import { computeGrid, contourWithOuterMargin, DEFAULT_LAW, resolveGridPlan, scaleContour, semanticLadder, stdShapeContour } from '../grid'
+import { computeGrid, contourWithOuterMargin, DEFAULT_LAW, resolveGridPlan, scaleContour, semanticLadder, stdShapeContour } from '../grid-admin'
+import { resolveUserPlan } from '../grid-user'
 import type { Contour } from '../types'
 
 const donut: Contour = {
@@ -49,10 +50,22 @@ describe('resolveGridPlan — production engine seam', () => {
 
   it('is exposed to v5.3.1 as one flow-blind primitive', async () => {
     const plan = await computeAttachmentGrid(stdShapeContour('circle', 118), {
-      mode: 'auto', density: 'light', maxGrowMM: 12,
+      attachment: 'magnetic',
     })
     expect(plan.grid.attachment).toBe('magnetic')
     expect([48, 96]).toContain(plan.pitchMM)
+  })
+
+  it('keeps the constrained user door identical to the existing user-default plan', () => {
+    for (const shape of ['square', 'rect', 'circle', 'triangle', 'diamondShape'] as const) {
+      for (const sizeMM of [70, 118, 166, 214, 262, 310]) {
+        const contour = stdShapeContour(shape, sizeMM, shape === 'rect' ? Math.round(sizeMM * 0.6) : sizeMM)
+        for (const attachment of ['magnetic', 'twinfix', 'velcro'] as const) {
+          expect(resolveUserPlan(contour, { attachment }))
+            .toEqual(resolveGridPlan(contour, { attachment }))
+        }
+      }
+    }
   })
 })
 

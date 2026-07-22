@@ -1,17 +1,18 @@
 # Creator — As-Built Technical Architecture
 
 **Status:** As-built (what the code *is*, not the blueprint's intent)
-**Version:** v5.5 (foundation Phases 2–3) — the v5.3.1 baseline re-cut into the **UI-agnostic Layer-2 seam**: the `useCreator` macro is decomposed into flow-blind **primitives** + flow-owned **transaction services** (Phase 2) and formalized as the named, swappable **`v53Flow`** behind the **`CreatorFlow`** contract (Phase 3). The engine (Layer 1) + the `lib/effect` internals are **UNCHANGED** — only the orchestration seam + the page binding changed (behaviour-neutral re-cut). (v5.3.1 drift already removed: v1/v2, the prototype/shaped/studio routes, old `studio/`, `/dev/tokens`, the A/B scaffolding; the scene-format is the **live** studio-v2 → Creator `.onemo` bridge — DEC-v5-08, §8/§9.)
+**Version:** v5.5 (foundation Phases 2–3) — the v5.3.1 baseline re-cut into the **UI-agnostic Layer-2 seam**: the `useCreator` macro is decomposed into flow-blind **primitives** + flow-owned **transaction services** (Phase 2) and formalized as the named, swappable **`v53Flow`** behind the **`CreatorFlow`** contract (Phase 3). The engine (Layer 1) retains its behaviour; Session 59 additionally ringfences the magnetic-grid user/admin module boundary described below. (v5.3.1 drift already removed: v1/v2, the prototype/shaped/studio routes, old `studio/`, `/dev/tokens`, the A/B scaffolding; the scene-format is the **live** studio-v2 → Creator `.onemo` bridge — DEC-v5-08, §8/§9.)
 **Scope:** `src/app/(dev)/effect-creator/v5.3.1/` + `src/lib/effect/` + the kernels (`vector-core`, `outline-core` live half, `shape-library`, `export`). Logic/architecture only — `.module.css` styling files are excluded.
 **Provenance:** branch `session58-task/kai-9205-creator-v53flow` off `origin/staging` (Phase 2 merged @ `b60e52f`; Phase 3 `v53Flow` @ `2deda75`; dead route barrels killed @ `7e0b1c0`). Re-derived from a full code read per §11 rule-2 (KAI-9266).
 **Companion:** the forward blueprint lives at `onemo-ssot-global/_ssot-workbench/v5/` — that is *to-be*; this is *as-is*. On conflict, the code (and this doc) win.
 
 **Phase 4 (KAI-9207, branch `s58-phase4`):** the editor + image/filter tools are now PER-TOOL DESCRIPTOR modules (`editor/descriptors/*`) composed by **`useEditor`** (the composer + editor controller). `OutlineEditor` (886→349) and `FiltersSurface` are thin, **store-free CLIENTS** that bind `{state, actions}` and render `state.tools` through the generic `tool-sheet.tsx` (+ `useImageFilters` for the hero). Adding/removing a tool = a descriptor file + its `TOOL_REGISTRY` line; disabling = a runtime `?disable=` flag — **zero shared-controller edit** (the §0a bundling test, spanning both surfaces). F8/F12/F16 folded; the 3 hardcoded sheets + the monoblock controller + `useEditorAdjustments` are deleted. §3.4 below reflects this.
 
-**Session 59 engine seam:** `lib/effect/grid.ts` now owns the 48/96 magnetic-grid planning law behind
-`resolveGridPlan(contourMM, options)`. `core/primitives.computeAttachmentGrid` exposes that pure-mm operation
-to either Creator flow; no page or UI is wired yet. The legacy 54mm `validateAttachment` remains only for the
-dormant payload contract pending an approved retirement migration.
+**Session 59 engine seam:** `lib/effect/grid-core.ts` owns the 48/96 magnetic-grid planning law. The constrained
+`grid-user.ts` door exposes `resolveUserPlan(finalContourMM, { attachment })` to Creator through
+`core/primitives.computeAttachmentGrid`; `grid-admin.ts` alone exposes the low-level engine controls to the admin
+bench and standing audit. No product Creator page or UI is wired yet. The legacy 54mm `validateAttachment` remains only
+for the dormant payload contract pending an approved retirement migration.
 
 ---
 
@@ -138,7 +139,7 @@ its matte feeds the editor's Blend preview on any shape.
 | `composite.ts` (172) | The image bake (P2 cross-browser SVG engine). `composeFront(orig, subj, blurPx, fxFilter?, vignette, tint)` async. `svgFilterBake` via `URL.createObjectURL(Blob)` (Safari-safe; data-URL renders empty on WebKit). `cssColorFilterToSvg`. `PRESET_FILTER`/`presetFilter`/`PRESET_LABELS`. | One bake feeds 3D + print. Zero `ctx.filter`. |
 | `outline-resolve.ts` (263) | The shape engine. `resolve(source, adjustments)→VShape`: all-off=exact source; globalPass (straighten→simplify→smooth→radius) + localPass (curve+per-corner radius), fold-guarded. | Kernels: Paper (smooth/simplify/per-corner radius) + Clipper2 (straighten/whole radius) + in-house curve. |
 | `geometry-truth.ts` (106) | The single geometry pipeline. `contourFromShape(v)` @ `MANUFACTURING_TOLERANCE_MM` (0.05). `assertContourCuttable`. `vectorShapeHash`. | Tolerances: mfg 0.05, display 0.004, min-feature 5mm, anchor-sep 1.5mm. |
-| `grid.ts` | Session 59 pure-mm magnetic-grid engine: 48/96 pitch law, Standard/Diamond/Dice/Auto modes, per-spot safety, coverage, semantic ladders, margin adaptation, and the production `resolveGridPlan` facade. | UI-agnostic; supports full `Contour` material containment including holes. |
+| `grid-core.ts` · `grid-user.ts` · `grid-admin.ts` | Session 59 pure-mm magnetic-grid engine plus its enforced module boundary: core owns the 48/96 law; user accepts only a final `Contour` + attachment; admin exposes the low-level bench/audit controls. | Creator user code cannot import admin/core; current planning behaviour remains identical across the split. |
 | `polygon.ts` | Neutral polygon/contour containment shared by the grid engine and the dormant legacy validator. | Prevents the replacement grid engine from depending on `attachment.ts`. |
 | `mesh.ts` (212) | `buildShapedGeometry(contour, opts)` — custom BufferGeometry: front cap + rounded edge lip + back cap. 3 material groups (0 front / 1 edge / 2 back). UV0=image, UV1=world-XY suede. Canonical winding (outer CCW / holes CW). | Edge = same front image rolled over the lip. |
 | `build-mesh.ts` (46) | `buildMeshFromSpec(geometryMM, opts, composite, edgeComposite)` → geometry + 2 CanvasTextures. | The only three.js touch besides mesh.ts. |
@@ -235,9 +236,9 @@ The full contract exists, is pure + unit-tested, and is **not wired** to /create
 - `attachment.ts` — magnet/velcro validators (invented defaults, coupon-pending).
 - `sizes.ts` — interim scale band (s70 base) for the payload path; mock pricing removed (Dan s59/P2); real sizes come from the grid semantic ladder at the Creator attach.
 
-The new `grid.ts` planner is live engine code and exposed through the Creator primitive seam, but no current
-flow invokes it yet. `attachment.ts` is therefore not a valid fallback: it is the superseded 54mm payload-era
-validator and remains only until the payload contract receives an approved migration.
+The new `grid-user.ts` planner door is live engine code and exposed through the Creator primitive seam, but no
+current flow invokes it yet. `attachment.ts` is therefore not a valid fallback: it is the superseded 54mm
+payload-era validator and remains only until the payload contract receives an approved migration.
 
 The only live manufacturing output is `page.onExport` (`?internal=1`): mm-true SVG cutline via `toManufacturingSVG` (laser profile by default — red 0.1mm stroke, kerf applied by the cutter), feasibility-gated by `contourFromShape` + `assertContourCuttable`. Wiring the save/order flow + the 4 artifacts is the open manufacturing work.
 

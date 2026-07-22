@@ -15,7 +15,7 @@ import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import { contourFromShape } from '@/lib/effect/geometry-truth'
 import { insetRingMM } from '@/lib/effect/offset'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { computeGrid, balancedFit, autoGrid, scaleContour, semanticLadder, stdShapeContour, rectFormat, minEffectMM, maxDesignMM, DEFAULT_MARGIN_MM, DEFAULT_LAW, type GridPattern, type MagnetPlan, type GridDensity, type GridMode, type SemanticRung, type StdShape, type Attachment, perimeterForDensity } from '@/lib/effect/grid'
+import { computeGrid, balancedFit, autoGrid, scaleContour, semanticLadder, stdShapeContour, rectFormat, minEffectMM, maxDesignMM, DEFAULT_MARGIN_MM, DEFAULT_LAW, type GridPattern, type MagnetPlan, type GridDensity, type GridMode, type SemanticRung, type StdShape, type Attachment, perimeterForDensity } from '@/lib/effect/grid-admin'
 
 const IMG = 1000
 const VP = 440

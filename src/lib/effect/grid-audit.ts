@@ -3,7 +3,7 @@
 // Covers the launch laws across representative contour families: 48/68 vocabulary, mode purity,
 // coverage semantics, ring spacing, focal-8 radial extremes, padding monotonicity, centering,
 // semantic ladders (ONE + sequential labels, ascending sizes), caps/floors/format laws.
-import { computeGrid, autoGrid, balancedFit, semanticLadder, stdShapeContour, maxDesignMM, minEffectMM, rectFormat, legalPatterns, DEFAULT_LAW } from './grid'
+import { computeGrid, autoGrid, balancedFit, semanticLadder, stdShapeContour, maxDesignMM, minEffectMM, rectFormat, legalPatterns, DEFAULT_LAW } from './grid-admin'
 import { insetRingMM } from './offset'
 import type { Contour, Pt } from './types'
 

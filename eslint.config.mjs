@@ -5,6 +5,32 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  {
+    files: [
+      "src/app/(store)/create/**/*.{ts,tsx}",
+      "src/app/(dev)/effect-creator/v5.3.1/**/*.{ts,tsx}",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                "@/lib/effect/grid-admin",
+                "@/lib/effect/grid-core",
+                "@/lib/effect/grid",
+                "**/lib/effect/grid-admin",
+                "**/lib/effect/grid-core",
+                "**/lib/effect/grid",
+              ],
+              message: "Creator user code must use @/lib/effect/grid-user; admin and core grid modules are ringfenced.",
+            },
+          ],
+        },
+      ],
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

@@ -20,7 +20,7 @@
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
 import type { MLResult, SegmentProgress } from '@/lib/effect/segment-ml'
 import type { Contour } from '@/lib/effect/types'
-import type { GridPlanOptions, ResolvedGridPlan } from '@/lib/effect/grid'
+import type { ResolvedGridPlan, UserGridPlanOptions } from '@/lib/effect/grid-user'
 import type { VShape } from '@/lib/vector-core'
 import { detailToFloorMm } from '../user/editor/producers'
 
@@ -98,8 +98,8 @@ export async function exportCutlineSvg(
  * no store, history, notification, UI control, or sequencing knowledge. */
 export async function computeAttachmentGrid(
   contourMM: Contour,
-  options?: GridPlanOptions,
+  options: UserGridPlanOptions,
 ): Promise<ResolvedGridPlan> {
-  const { resolveGridPlan } = await import('@/lib/effect/grid')
-  return resolveGridPlan(contourMM, options)
+  const { resolveUserPlan } = await import('@/lib/effect/grid-user')
+  return resolveUserPlan(contourMM, options)
 }

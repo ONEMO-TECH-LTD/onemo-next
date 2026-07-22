@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest'
 import { getShape, type VectorShapeKind } from '@/lib/shape-library'
 import { generateShapeRing, type ShapeKind } from '@/app/(dev)/effect-creator/v5.3.1/user/shapes'
 import { contourFromShape } from '../geometry-truth'
-import { resolveGridPlan, scaleContour, stdShapeContour, type GridDensity, type GridMode } from '../grid'
+import { resolveGridPlan, scaleContour, stdShapeContour, type GridDensity, type GridMode } from '../grid-admin'
+import { resolveUserPlan } from '../grid-user'
 import type { Contour, Pt } from '../types'
 
 const PRESETS: VectorShapeKind[] = [
@@ -32,6 +33,8 @@ function normalized(contour: Contour): Contour {
 }
 
 function exercise(name: string, contour: Contour) {
+  expect(resolveUserPlan(contour, { attachment: 'magnetic' }), `${name}/user-default`)
+    .toEqual(resolveGridPlan(contour, { attachment: 'magnetic' }))
   for (const mode of MODES) for (const density of DENSITIES) {
     const plan = resolveGridPlan(contour, { mode, density, maxGrowMM: 12 })
     expect([48, 96], `${name}/${mode}/${density}`).toContain(plan.pitchMM)

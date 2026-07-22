@@ -55,3 +55,10 @@
 - Symptoms: macOS `nl` returned usage text instead of file contents; three parallel read commands failed the same way.
 - What worked: run `nl -ba` one file at a time, or use a shell loop only when explicit per-file headers are needed.
 - Remember: for full-read hydration, do not batch multiple file operands into `nl`; one file per command keeps coverage auditable.
+
+## S59 persistent browser-control connection
+
+- What did not work: connecting to the already-running Chrome extension surface twice, then selecting the in-app browser for `localhost:3970`.
+- Symptoms: Chrome was running and the ChatGPT Chrome Extension plus native host both passed installation checks, but browser selection returned `Browser is not available: extension`; the in-app browser returned `No browser is available`.
+- What worked: preserve the persistent server/Chrome state, verify HTTP and engine parity locally, and request the existing Chrome-owning QA lane to stage the required live screenshots instead of launching another server or browser.
+- Remember: do not disturb Dan's persistent Chrome or start a second grid-lab server when the control channel is unavailable; use the owning lane for visual evidence and keep code/runtime proof separate.

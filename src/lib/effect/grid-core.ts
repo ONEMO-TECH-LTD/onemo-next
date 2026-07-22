@@ -1,4 +1,4 @@
-// grid.ts — magnetic-grid REGISTRATION (Session 59). Pure mm computation, no DOM / no three.
+// grid-core.ts — internal magnetic-grid REGISTRATION engine (Session 59). Pure mm computation, no DOM / no three.
 //
 // The model (SSOT _ssot-workbench/_briefs/magnetic-grid-standard-brief.md §10/§12/§13, locked 2026-07-21):
 //   • FIXED lattice, launch family 48/96 (§13.1) — points never move; the whole grid translates as a
