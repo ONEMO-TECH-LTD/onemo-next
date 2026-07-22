@@ -69,6 +69,9 @@ export interface GridConfig {
    *  per axis keep the ends + alternate inward, always keeping the central pair → 96/48/96 gaps.
    *  A 262 (48×6) light row becomes 1·3·4·6. Applied only at pitch 48 with ≥5 lines. */
   sparseThin?: boolean
+  /** User product law: after the final perimeter belt, add only the minimum safe anchors that improve
+   *  an uncovered outline region. Admin experiments leave this off. */
+  rescueCoverage?: boolean
 }
 
 export interface Anchor { p: Pt; dia: MagnetDia }
@@ -78,6 +81,7 @@ export interface GridResult {
   /** twin-fix: the effect ships as a PAIR — this grid is also its mirror counterpart's grid. */
   twinRequired: boolean
   anchors: Anchor[]
+  rescueAnchors: Pt[] // omitted lattice/off-lattice anchors added only to recover uncovered material
   candidates: Pt[]      // interior points dropped by perimeter mode (faint viz)
   flaps: Pt[]
   ok: boolean
@@ -246,6 +250,70 @@ function flapVerts(contour: Contour, seated: ReadonlyArray<Pt>, reach: number): 
   return out
 }
 
+/** Contiguous uncovered samples on each closed outline ring. The wrap merge makes one region when a
+ *  flap crosses a ring's array boundary, so rescue is per physical gap rather than per vertex index. */
+function flapRegions(contour: Contour, seated: ReadonlyArray<Pt>, reach: number): Pt[][] {
+  const step = reach / 2
+  const uncovered = (p: Pt) => seated.every((a) => dist(p, a) > reach)
+  const out: Pt[][] = []
+  for (const ring of [contour.outer, ...contour.holes]) {
+    const samples: Pt[] = []
+    const pts = ring.pts
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i], b = pts[(i + 1) % pts.length]
+      samples.push(a)
+      const segLen = dist(a, b)
+      const k = Math.floor(segLen / step)
+      for (let j = 1; j <= k; j++) {
+        const t = (j * step) / segLen
+        samples.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t])
+      }
+    }
+    const groups: Pt[][] = []
+    let current: Pt[] = []
+    for (const p of samples) {
+      if (uncovered(p)) current.push(p)
+      else if (current.length) { groups.push(current); current = [] }
+    }
+    if (current.length) groups.push(current)
+    if (groups.length > 1 && samples.length && uncovered(samples[0]) && uncovered(samples[samples.length - 1])) {
+      groups[0] = [...groups[groups.length - 1], ...groups[0]]
+      groups.pop()
+    }
+    out.push(...groups)
+  }
+  return out
+}
+
+/** Region-local off-lattice fallback. Among safe, spacing-valid material points that improve this flap,
+ *  prefer the point covering most samples, then the deepest point in material. */
+function deepestSafePointForRegion(
+  contour: Contour,
+  region: ReadonlyArray<Pt>,
+  pad: number,
+  seated: ReadonlyArray<Pt>,
+): Pt | null {
+  if (!region.length) return null
+  const rb = bbox(region)
+  const minX = rb.minX - pad, maxX = rb.maxX + pad
+  const minY = rb.minY - pad, maxY = rb.maxY + pad
+  const step = Math.max(1, Math.min(maxX - minX, maxY - minY) / 24)
+  let best: Pt | null = null, bestGain = 0, bestDepth = -1
+  for (let x = minX; x <= maxX; x += step) for (let y = minY; y <= maxY; y += step) {
+    const p: Pt = [x, y]
+    if (!pointInContour(p, contour)) continue
+    const depth = distToContour(p, contour)
+    if (depth < pad) continue
+    if (seated.some((a) => dist(p, a) < 2 * pad - 1e-6)) continue
+    let gain = 0
+    for (const flap of region) if (dist(p, flap) <= HOLD_REACH_MM) gain++
+    if (gain > bestGain || (gain === bestGain && gain > 0 && depth > bestDepth)) {
+      best = p; bestGain = gain; bestDepth = depth
+    }
+  }
+  return best
+}
+
 /** Perimeter split: a node is INTERIOR when it has seated neighbours on all four sides (within `step`).
  *  Returns [perimeter, interior]. Thin shapes have no fully-surrounded node → everything is perimeter. */
 function splitPerimeter(seated: ReadonlyArray<Pt>, step: number): { belt: Pt[]; interior: Pt[] } {
@@ -301,7 +369,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   // size; nothing to seat, nothing to cover. (Engine-owned: ladders, auto and UI all inherit.)
   if (attachment === 'velcro') {
     return {
-      attachment, twinRequired: false, anchors: [], candidates: [], flaps: [], ok: true,
+      attachment, twinRequired: false, anchors: [], rescueAnchors: [], candidates: [], flaps: [], ok: true,
       issues: [], pitchCentreMM: 0, edgeRangeMM: [0, 0], applicationPadMM: 0,
     }
   }
@@ -352,28 +420,31 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   // + light 1·3·4·6 thinning. Placement parities are judged on THIS final layout (not the raw seed) —
   // the old raw-seat-count scoring let a 5-node cross beat a 4-node box, and after the belt dropped the
   // cross's centre the user saw a diamond-arranged result under the STANDARD pattern.
-  const finalize = (seed: Pt[]): { seated: Pt[]; interior: Pt[] } => {
+  const finalize = (seed: Pt[]): { seated: Pt[]; interior: Pt[]; rescues: Pt[] } => {
     let seated = seed
     let interior: Pt[] = []
+    const rescues: Pt[] = []
     if (perimeterOnly && seated.length > 4) {
       const split = splitPerimeter(seated, neighbourStep(pitch, pattern))
-      if (split.belt.length >= MIN_ANCHORS) {
+      if (split.belt.length >= MIN_ANCHORS || cfg.rescueCoverage) {
         // COVERAGE-VERIFIED belt (shape-agnostic): dropping an "interior" node must never uncover the
         // rim — on curved/concave shapes a surrounded node can still be the closest cover for a dip.
         const belt = split.belt.slice()
         const pool = split.interior.slice()
-        let uncovered = flapVerts(contourMM, belt, HOLD_REACH_MM)
-        const fullUncovered = flapVerts(contourMM, seed, HOLD_REACH_MM).length
-        while (uncovered.length > fullUncovered && pool.length) {
-          let bi = -1, bestGain = 0
-          for (let i = 0; i < pool.length; i++) {
-            let gain = 0
-            for (const v of uncovered) if (dist(v, pool[i]) <= HOLD_REACH_MM) gain++
-            if (gain > bestGain) { bestGain = gain; bi = i }
+        if (!cfg.rescueCoverage) {
+          let uncovered = flapVerts(contourMM, belt, HOLD_REACH_MM)
+          const fullUncovered = flapVerts(contourMM, seed, HOLD_REACH_MM).length
+          while (uncovered.length > fullUncovered && pool.length) {
+            let bi = -1, bestGain = 0
+            for (let i = 0; i < pool.length; i++) {
+              let gain = 0
+              for (const v of uncovered) if (dist(v, pool[i]) <= HOLD_REACH_MM) gain++
+              if (gain > bestGain) { bestGain = gain; bi = i }
+            }
+            if (bi < 0) break // no interior node can help — residual is a genuine size/pitch problem
+            belt.push(pool[bi]); pool.splice(bi, 1)
+            uncovered = flapVerts(contourMM, belt, HOLD_REACH_MM)
           }
-          if (bi < 0) break // no interior node can help — residual is a genuine size/pitch problem
-          belt.push(pool[bi]); pool.splice(bi, 1)
-          uncovered = flapVerts(contourMM, belt, HOLD_REACH_MM)
         }
         seated = belt; interior = pool
       }
@@ -410,7 +481,36 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
         if (thinned.length >= MIN_ANCHORS) seated = thinned
       }
     }
-    return { seated, interior }
+    if (cfg.rescueCoverage && perimeterOnly && seated.length) {
+      // The rescue pool is every safe lattice node omitted from the final belt (interior drop or Light
+      // thinning). Each original uncovered region is solved greedily with the minimum improving nodes.
+      const same = (a: Pt, b: Pt) => Math.abs(a[0] - b[0]) < 1e-6 && Math.abs(a[1] - b[1]) < 1e-6
+      const pool = seed.filter((p) => !seated.some((a) => same(a, p)))
+      const regions = flapRegions(contourMM, seated, HOLD_REACH_MM)
+      for (const region of regions) {
+        let remaining = region.filter((p) => seated.every((a) => dist(p, a) > HOLD_REACH_MM))
+        while (remaining.length && pool.length) {
+          let bi = -1, bestGain = 0
+          for (let i = 0; i < pool.length; i++) {
+            if (seated.some((a) => dist(pool[i], a) < 2 * pad - 1e-6)) continue
+            let gain = 0
+            for (const flap of remaining) if (dist(flap, pool[i]) <= HOLD_REACH_MM) gain++
+            if (gain > bestGain) { bi = i; bestGain = gain }
+          }
+          if (bi < 0) break
+          const rescue = pool.splice(bi, 1)[0]
+          seated.push(rescue); rescues.push(rescue)
+          remaining = remaining.filter((p) => dist(p, rescue) > HOLD_REACH_MM)
+        }
+        if (remaining.length) {
+          const rescue = deepestSafePointForRegion(contourMM, remaining, pad, seated)
+          if (rescue) { seated.push(rescue); rescues.push(rescue) }
+          // No safe improving point is an honest residual flap; the final verdict stays red.
+        }
+      }
+      interior = pool
+    }
+    return { seated, interior, rescues }
   }
 
   // CENTER the fixed grid on the shape — balanced by construction (the grid translates as a rigid bulk).
@@ -421,6 +521,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   // never a rotated/diamond arrangement) → most seated → best centred.
   let seated: Pt[] = []
   let interior: Pt[] = []
+  let rescues: Pt[] = []
   {
     const c: Pt = centerMode === 'bbox'
       ? [(bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2]
@@ -433,7 +534,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     const minSpacing = 2 * pad
     const checkers = pattern === 'diamond' ? [0, 1] : [0] // diamond: try both checkerboard halves
     const expectedMp = neighbourStep(pitch, pattern)
-    type Cand = { fin: { seated: Pt[]; interior: Pt[] }; flapN: number; conform: number; bal: number }
+    type Cand = { fin: { seated: Pt[]; interior: Pt[]; rescues: Pt[] }; flapN: number; conform: number; bal: number }
     const cands: Cand[] = []
     for (const px of oxs) for (const py of oys) for (const ck of checkers) {
       const nodes = latticeAt(bb, pitch, pattern, px, py, ck)
@@ -461,7 +562,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
       const key: [number, number, number, number] = [k.flapN, -k.conform, -k.fin.seated.length, k.bal]
       const better = !bestKey || key[0] < bestKey[0] || (key[0] === bestKey[0] && (key[1] < bestKey[1]
         || (key[1] === bestKey[1] && (key[2] < bestKey[2] || (key[2] === bestKey[2] && key[3] < bestKey[3])))))
-      if (better) { bestKey = key; seated = k.fin.seated; interior = k.fin.interior }
+      if (better) { bestKey = key; seated = k.fin.seated; interior = k.fin.interior; rescues = k.fin.rescues }
     }
   }
 
@@ -469,7 +570,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   // deepest interior point (a single magnet has no spacing to honour, so grid phase is moot here).
   if (seated.length === 0) {
     const dp = deepestPoint(contourMM, bb)
-    if (dp && dp.d >= pad) { seated = [dp.p]; interior = [] }
+    if (dp && dp.d >= pad) { seated = [dp.p]; interior = []; if (cfg.rescueCoverage) rescues = [dp.p] }
   }
   const anchors = assignSizes(seated, plan, Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY))
 
@@ -483,7 +584,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   if (anchors.length === 0) { minD = 6; maxD = 6 }
 
   return {
-    attachment, twinRequired: attachment === 'twinfix', anchors, candidates: interior, flaps,
+    attachment, twinRequired: attachment === 'twinfix', anchors, rescueAnchors: rescues, candidates: interior, flaps,
     ok: issues.length === 0,
     issues,
     pitchCentreMM: pitch,
@@ -666,7 +767,7 @@ export function semanticLadder(
  */
 export function autoGrid(
   withMargin: (m: number) => Contour, cfg: GridConfig, fromMM: number, maxGrowMM: number,
-  opts: { minN?: number; density?: GridDensity; pitchMM?: number; pattern?: GridPattern } = {},
+  opts: { minN?: number; density?: GridDensity; pitchMM?: number; pattern?: GridPattern; patterns?: ReadonlyArray<GridPattern> } = {},
 ): { pitchMM: number; pattern: GridPattern } {
   const minN = opts.minN ?? TARGET_ANCHORS
   let pitches = opts.pitchMM != null ? [opts.pitchMM] : allowedPitches(opts.density ?? 'light')
@@ -675,7 +776,9 @@ export function autoGrid(
     const legal = pitches.filter((p) => legalPatterns(p).includes(opts.pattern!))
     pitches = legal.length ? legal : [96]
   }
-  const patFor = (p: number): GridPattern[] => opts.pattern != null ? [opts.pattern] : legalPatterns(p)
+  const patFor = (p: number): GridPattern[] => opts.pattern != null
+    ? [opts.pattern]
+    : legalPatterns(p).filter((pattern) => !opts.patterns || opts.patterns.includes(pattern))
   let fb = { pitchMM: pitches[pitches.length - 1], pattern: patFor(pitches[pitches.length - 1]).slice(-1)[0] }
   let fbFlaps = Infinity
   for (const p of pitches) for (const pat of patFor(p)) {
@@ -778,7 +881,18 @@ function nearestAnchorDistance(anchors: ReadonlyArray<Anchor>): number | null {
  * mode legality, density/coverage, pitch selection, padding, margin adaptation, and truthful resolved
  * measurements live here once. Creator flows call one operation and render the returned facts.
  */
-export function resolveGridPlan(contourMM: Contour, opts: GridPlanOptions = {}): ResolvedGridPlan {
+interface ResolverPolicy {
+  autoPatterns?: ReadonlyArray<GridPattern>
+  perimeterOnly?: boolean
+  rescueCoverage?: boolean
+  sparseThin?: boolean
+}
+
+function resolveGridPlanWithPolicy(
+  contourMM: Contour,
+  opts: GridPlanOptions,
+  policy: ResolverPolicy,
+): ResolvedGridPlan {
   const attachment = opts.attachment ?? 'magnetic'
   const mode = opts.mode ?? 'auto'
   const density = opts.density ?? 'light'
@@ -792,8 +906,9 @@ export function resolveGridPlan(contourMM: Contour, opts: GridPlanOptions = {}):
     paddingMM: opts.paddingMM ?? PADDING_FLOOR_MM,
     plan: opts.plan ?? 'auto',
     center: opts.center ?? 'centroid',
-    perimeterOnly: perimeterForDensity(density, patternForCoverage),
-    sparseThin: density === 'light',
+    perimeterOnly: policy.perimeterOnly ?? perimeterForDensity(density, patternForCoverage),
+    sparseThin: policy.sparseThin ?? density === 'light',
+    rescueCoverage: policy.rescueCoverage,
   }
 
   if (attachment === 'velcro') {
@@ -816,6 +931,7 @@ export function resolveGridPlan(contourMM: Contour, opts: GridPlanOptions = {}):
     density,
     pitchMM: opts.pitchMM,
     pattern: manualPattern,
+    patterns: policy.autoPatterns,
   })
   const fit = balancedFit(
     withMargin,
@@ -835,4 +951,20 @@ export function resolveGridPlan(contourMM: Contour, opts: GridPlanOptions = {}):
     grewMM: fit.grew,
     nearestAnchorMM: nearestAnchorDistance(fit.grid.anchors),
   }
+}
+
+/** Admin resolver: all low-level modes and the existing density behavior remain available. */
+export function resolveGridPlan(contourMM: Contour, opts: GridPlanOptions = {}): ResolvedGridPlan {
+  return resolveGridPlanWithPolicy(contourMM, opts, {})
+}
+
+/** Internal core operation behind the constrained user door. Dice is absent by construction; the final
+ *  Light belt adds only coverage-improving rescue anchors. */
+export function resolveUserGridPlan(contourMM: Contour, attachment: Attachment): ResolvedGridPlan {
+  return resolveGridPlanWithPolicy(contourMM, { attachment }, {
+    autoPatterns: ['standard', 'diamond'],
+    perimeterOnly: true,
+    rescueCoverage: true,
+    sparseThin: true,
+  })
 }

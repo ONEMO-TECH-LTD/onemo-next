@@ -12,6 +12,16 @@ const donut: Contour = {
   holes: [{ pts: [[70, 70], [144, 70], [144, 144], [70, 144]] }],
 }
 
+// A large pad-valid body plus a 22mm pad-valid lobe joined by a thin neck. The fixed lattice seats
+// the body but misses the lobe entirely; the user law must add one local rescue anchor there.
+const asymmetricDumbbell: Contour = {
+  outer: { pts: [
+    [0, 0], [100, 0], [100, 16], [130, 16], [130, 10], [152, 10],
+    [152, 32], [130, 32], [130, 26], [100, 26], [100, 120], [0, 120],
+  ] },
+  holes: [],
+}
+
 describe('resolveGridPlan — production engine seam', () => {
   it('owns mode legality: Dice requested at 48 resolves to the legal 96 pitch', () => {
     const plan = resolveGridPlan(stdShapeContour('square', 166), {
@@ -56,16 +66,53 @@ describe('resolveGridPlan — production engine seam', () => {
     expect([48, 96]).toContain(plan.pitchMM)
   })
 
-  it('keeps the constrained user door identical to the existing user-default plan', () => {
-    for (const shape of ['square', 'rect', 'circle', 'triangle', 'diamondShape'] as const) {
-      for (const sizeMM of [70, 118, 166, 214, 262, 310]) {
-        const contour = stdShapeContour(shape, sizeMM, shape === 'rect' ? Math.round(sizeMM * 0.6) : sizeMM)
-        for (const attachment of ['magnetic', 'twinfix', 'velcro'] as const) {
-          expect(resolveUserPlan(contour, { attachment }))
-            .toEqual(resolveGridPlan(contour, { attachment }))
-        }
-      }
+  it('keeps Dice admin-only while user auto stays perimeter-first on the reported large shapes', () => {
+    for (const [shape, sizeMM, pitchMM, seated, rescues] of [
+      ['circle', 303, 48, 16, 8],
+      ['diamondShape', 310, 96, 12, 6],
+    ] as const) {
+      const contour = stdShapeContour(shape, sizeMM)
+      const user = resolveUserPlan(contour, { attachment: 'magnetic' })
+      const adminDice = resolveGridPlan(contour, {
+        mode: 'quincunx', density: 'light', maxGrowMM: 12,
+      })
+
+      expect(user.pattern).toBe('standard')
+      expect(user.pitchMM).toBe(pitchMM)
+      expect(user.grid.anchors).toHaveLength(seated)
+      expect(user.grid.rescueAnchors).toHaveLength(rescues)
+      expect(user.grid.flaps).toHaveLength(0)
+      expect(user.grid.anchors.length).toBeLessThan(adminDice.grid.anchors.length)
+      expect(adminDice.pattern).toBe('quincunx')
+      expect(adminDice.pitchMM).toBe(96)
+      expect(adminDice.grid.rescueAnchors).toEqual([])
     }
+  })
+
+  it('adds a minimum local rescue when a safe lobe has no lattice anchor', () => {
+    const plan = resolveUserPlan(asymmetricDumbbell, { attachment: 'magnetic' })
+
+    expect(plan.grid.rescueAnchors).toHaveLength(1)
+    expect(plan.grid.rescueAnchors[0][0]).toBeGreaterThanOrEqual(130)
+    expect(plan.grid.flaps).toHaveLength(0)
+    for (let i = 0; i < plan.grid.anchors.length; i++) for (let j = i + 1; j < plan.grid.anchors.length; j++) {
+      expect(Math.hypot(
+        plan.grid.anchors[i].p[0] - plan.grid.anchors[j].p[0],
+        plan.grid.anchors[i].p[1] - plan.grid.anchors[j].p[1],
+      )).toBeGreaterThanOrEqual(2 * plan.grid.applicationPadMM - 1e-6)
+    }
+  })
+
+  it('keeps an honest red verdict when no safe rescue point exists', () => {
+    const tooThinFrame: Contour = {
+      outer: { pts: [[0, 0], [100, 0], [100, 100], [0, 100]] },
+      holes: [{ pts: [[5, 5], [95, 5], [95, 95], [5, 95]] }],
+    }
+    const plan = resolveUserPlan(tooThinFrame, { attachment: 'magnetic' })
+
+    expect(plan.grid.rescueAnchors).toEqual([])
+    expect(plan.grid.ok).toBe(false)
+    expect(plan.grid.issues.join(' ')).toContain('No room for a magnet')
   })
 })
 

@@ -1,6 +1,6 @@
 import type { Contour } from './types'
 import {
-  resolveGridPlan,
+  resolveUserGridPlan,
   type Attachment,
   type ResolvedGridPlan,
 } from './grid-core'
@@ -20,7 +20,7 @@ export function resolveUserPlan(
   contourMM: Contour,
   { attachment }: UserGridPlanOptions,
 ): ResolvedGridPlan {
-  return resolveGridPlan(contourMM, { attachment })
+  return resolveUserGridPlan(contourMM, attachment)
 }
 
 export type { Attachment, ResolvedGridPlan }

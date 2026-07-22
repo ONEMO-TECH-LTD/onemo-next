@@ -33,8 +33,9 @@ function normalized(contour: Contour): Contour {
 }
 
 function exercise(name: string, contour: Contour) {
-  expect(resolveUserPlan(contour, { attachment: 'magnetic' }), `${name}/user-default`)
-    .toEqual(resolveGridPlan(contour, { attachment: 'magnetic' }))
+  const user = resolveUserPlan(contour, { attachment: 'magnetic' })
+  expect(user.pattern, `${name}/user-auto-pattern`).not.toBe('quincunx')
+  expect(user.grid.attachment, `${name}/user-attachment`).toBe('magnetic')
   for (const mode of MODES) for (const density of DENSITIES) {
     const plan = resolveGridPlan(contour, { mode, density, maxGrowMM: 12 })
     expect([48, 96], `${name}/${mode}/${density}`).toContain(plan.pitchMM)

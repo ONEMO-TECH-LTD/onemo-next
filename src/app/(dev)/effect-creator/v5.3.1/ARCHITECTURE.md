@@ -1,7 +1,7 @@
 # Creator — As-Built Technical Architecture
 
 **Status:** As-built (what the code *is*, not the blueprint's intent)
-**Version:** v5.5 (foundation Phases 2–3) — the v5.3.1 baseline re-cut into the **UI-agnostic Layer-2 seam**: the `useCreator` macro is decomposed into flow-blind **primitives** + flow-owned **transaction services** (Phase 2) and formalized as the named, swappable **`v53Flow`** behind the **`CreatorFlow`** contract (Phase 3). The engine (Layer 1) retains its behaviour; Session 59 additionally ringfences the magnetic-grid user/admin module boundary described below. (v5.3.1 drift already removed: v1/v2, the prototype/shaped/studio routes, old `studio/`, `/dev/tokens`, the A/B scaffolding; the scene-format is the **live** studio-v2 → Creator `.onemo` bridge — DEC-v5-08, §8/§9.)
+**Version:** v5.5 (foundation Phases 2–3) — the v5.3.1 baseline re-cut into the **UI-agnostic Layer-2 seam**: the `useCreator` macro is decomposed into flow-blind **primitives** + flow-owned **transaction services** (Phase 2) and formalized as the named, swappable **`v53Flow`** behind the **`CreatorFlow`** contract (Phase 3). Session 59 additionally ringfences the magnetic-grid user/admin boundary and gives the user door its perimeter-first product law, described below. (v5.3.1 drift already removed: v1/v2, the prototype/shaped/studio routes, old `studio/`, `/dev/tokens`, the A/B scaffolding; the scene-format is the **live** studio-v2 → Creator `.onemo` bridge — DEC-v5-08, §8/§9.)
 **Scope:** `src/app/(dev)/effect-creator/v5.3.1/` + `src/lib/effect/` + the kernels (`vector-core`, `outline-core` live half, `shape-library`, `export`). Logic/architecture only — `.module.css` styling files are excluded.
 **Provenance:** branch `session58-task/kai-9205-creator-v53flow` off `origin/staging` (Phase 2 merged @ `b60e52f`; Phase 3 `v53Flow` @ `2deda75`; dead route barrels killed @ `7e0b1c0`). Re-derived from a full code read per §11 rule-2 (KAI-9266).
 **Companion:** the forward blueprint lives at `onemo-ssot-global/_ssot-workbench/v5/` — that is *to-be*; this is *as-is*. On conflict, the code (and this doc) win.
@@ -10,9 +10,11 @@
 
 **Session 59 engine seam:** `lib/effect/grid-core.ts` owns the 48/96 magnetic-grid planning law. The constrained
 `grid-user.ts` door exposes `resolveUserPlan(finalContourMM, { attachment })` to Creator through
-`core/primitives.computeAttachmentGrid`; `grid-admin.ts` alone exposes the low-level engine controls to the admin
-bench and standing audit. No product Creator page or UI is wired yet. The legacy 54mm `validateAttachment` remains only
-for the dormant payload contract pending an approved retirement migration.
+`core/primitives.computeAttachmentGrid`. Its auto set is Standard + Diamond only; it always resolves a perimeter
+belt, then adds the minimum safe lattice/off-lattice anchors needed to rescue uncovered outline regions. Dice and
+full-grid controls remain available only through `grid-admin.ts` for the bench and standing audit. No product Creator
+page or UI is wired yet. The legacy 54mm `validateAttachment` remains only for the dormant payload contract pending
+an approved retirement migration.
 
 ---
 
@@ -139,7 +141,7 @@ its matte feeds the editor's Blend preview on any shape.
 | `composite.ts` (172) | The image bake (P2 cross-browser SVG engine). `composeFront(orig, subj, blurPx, fxFilter?, vignette, tint)` async. `svgFilterBake` via `URL.createObjectURL(Blob)` (Safari-safe; data-URL renders empty on WebKit). `cssColorFilterToSvg`. `PRESET_FILTER`/`presetFilter`/`PRESET_LABELS`. | One bake feeds 3D + print. Zero `ctx.filter`. |
 | `outline-resolve.ts` (263) | The shape engine. `resolve(source, adjustments)→VShape`: all-off=exact source; globalPass (straighten→simplify→smooth→radius) + localPass (curve+per-corner radius), fold-guarded. | Kernels: Paper (smooth/simplify/per-corner radius) + Clipper2 (straighten/whole radius) + in-house curve. |
 | `geometry-truth.ts` (106) | The single geometry pipeline. `contourFromShape(v)` @ `MANUFACTURING_TOLERANCE_MM` (0.05). `assertContourCuttable`. `vectorShapeHash`. | Tolerances: mfg 0.05, display 0.004, min-feature 5mm, anchor-sep 1.5mm. |
-| `grid-core.ts` · `grid-user.ts` · `grid-admin.ts` | Session 59 pure-mm magnetic-grid engine plus its enforced module boundary: core owns the 48/96 law; user accepts only a final `Contour` + attachment; admin exposes the low-level bench/audit controls. | Creator user code cannot import admin/core; current planning behaviour remains identical across the split. |
+| `grid-core.ts` · `grid-user.ts` · `grid-admin.ts` | Session 59 pure-mm magnetic-grid engine plus its enforced module boundary: core owns the 48/96 law; user accepts only a final `Contour` + attachment; admin exposes the low-level bench/audit controls. | Creator user code cannot import admin/core. User auto cannot select Dice and resolves perimeter-first with explicit minimum coverage rescue; admin modes retain Dice/full-grid experiments. |
 | `polygon.ts` | Neutral polygon/contour containment shared by the grid engine and the dormant legacy validator. | Prevents the replacement grid engine from depending on `attachment.ts`. |
 | `mesh.ts` (212) | `buildShapedGeometry(contour, opts)` — custom BufferGeometry: front cap + rounded edge lip + back cap. 3 material groups (0 front / 1 edge / 2 back). UV0=image, UV1=world-XY suede. Canonical winding (outer CCW / holes CW). | Edge = same front image rolled over the lip. |
 | `build-mesh.ts` (46) | `buildMeshFromSpec(geometryMM, opts, composite, edgeComposite)` → geometry + 2 CanvasTextures. | The only three.js touch besides mesh.ts. |
