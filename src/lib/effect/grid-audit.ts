@@ -1,8 +1,8 @@
 // grid-audit.ts — the STANDING verification gate for the magnetic-grid engine (s59).
 // Run: npx tsx src/lib/effect/grid-audit.ts   → exits non-zero on any violation.
-// Covers every engine law: 48/68 vocabulary, mode purity, coverage semantics, ring spacing,
-// focal-8 radial extremes, padding monotonicity, centering, semantic ladders (ONE + sequential
-// labels, ascending sizes, every mode×shape populated), caps/floors/format laws.
+// Covers the launch laws across representative contour families: 48/68 vocabulary, mode purity,
+// coverage semantics, ring spacing, focal-8 radial extremes, padding monotonicity, centering,
+// semantic ladders (ONE + sequential labels, ascending sizes), caps/floors/format laws.
 import { computeGrid, autoGrid, balancedFit, semanticLadder, stdShapeContour, maxDesignMM, minEffectMM, rectFormat, legalPatterns, DEFAULT_LAW } from './grid'
 import { insetRingMM } from './offset'
 import type { Contour, Pt } from './types'
@@ -47,6 +47,7 @@ for (const [nm, mk] of SH) {
     for (const r of lad) {
       if (r.label === 'ONE') { if (r.points !== 1) flag(`${nm}/${mode}: ONE with ${r.points}pt`); continue }
       const i = SEQ.indexOf(r.label)
+      if (i < 0) flag(`${nm}/${mode}: label outside audit sequence ${r.label}`)
       if (li >= 0 && i !== li + 1) flag(`${nm}/${mode}: label skip ${SEQ[li]}→${r.label}`)
       li = i
     }

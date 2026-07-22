@@ -8,6 +8,11 @@
 
 **Phase 4 (KAI-9207, branch `s58-phase4`):** the editor + image/filter tools are now PER-TOOL DESCRIPTOR modules (`editor/descriptors/*`) composed by **`useEditor`** (the composer + editor controller). `OutlineEditor` (886→349) and `FiltersSurface` are thin, **store-free CLIENTS** that bind `{state, actions}` and render `state.tools` through the generic `tool-sheet.tsx` (+ `useImageFilters` for the hero). Adding/removing a tool = a descriptor file + its `TOOL_REGISTRY` line; disabling = a runtime `?disable=` flag — **zero shared-controller edit** (the §0a bundling test, spanning both surfaces). F8/F12/F16 folded; the 3 hardcoded sheets + the monoblock controller + `useEditorAdjustments` are deleted. §3.4 below reflects this.
 
+**Session 59 engine seam:** `lib/effect/grid.ts` now owns the 48/96 magnetic-grid planning law behind
+`resolveGridPlan(contourMM, options)`. `core/primitives.computeAttachmentGrid` exposes that pure-mm operation
+to either Creator flow; no page or UI is wired yet. The legacy 54mm `validateAttachment` remains only for the
+dormant payload contract pending an approved retirement migration.
+
 ---
 
 ## 1. Overview & invariants
@@ -68,7 +73,7 @@ its matte feeds the editor's Blend preview on any shape.
 | `page.tsx` (240) | **Thin Layer-3 composition root.** Mounts the one scene; binds `useV53Flow` → renders from `state`, calls `actions`. Owns ONLY the injected UI-side adapters: notify (toast), URL/route params, the double-tap editor-entry gesture, the export file-download, the first-paint resize nudge. **No orchestration** — that's the flow. | Surfaces mutually exclusive: `sessions.trim`→Trim, `sessions.filter`→Filters, else Toolbar; `sessions.editor` is a separate overlay (keyed sessions, DEC-v5-09). |
 | `flows/v53Flow.ts` (219) | **THE v53 flow** — `useV53Flow(adapters): CreatorFlow`. Today's behaviour as a thin COMPOSITION of the primitives + transaction services + viewer adapter (blueprint §6); returns `{ state, actions }`. | Formalized from the Phase-2 `useCreator` macro (retired); body byte-identical. twoDFirstFlow is a sibling compose-fn in Phase 5. |
 | `flows/flow-contract.ts` (78) | The `CreatorFlow` `{ state, actions }` contract + `CreatorAdapters`/`Notify` — the named Layer-3 seam. | DESCRIPTIVE: v53Flow's current surface named, NOT a guaranteed shared contract (inv 18; conformance = Phase-5 finding). |
-| `core/primitives.ts` (93) | **Layer-2a flow-blind primitives** — one engine op each, zero sequencing: `loadImage` · `prepareStandard` · `runCutout` (working-res cap, inv 19) · `prepareShaped` (Option-A preseg) · `exportCutlineSvg` (feasibility-gated result). | No history, no seq-guard, no cache, no notify (blueprint inv 15). |
+| `core/primitives.ts` | **Layer-2a flow-blind primitives** — one engine op each, zero sequencing: `loadImage` · `prepareStandard` · `runCutout` (working-res cap, inv 19) · `prepareShaped` (Option-A preseg) · `exportCutlineSvg` (feasibility-gated result) · `computeAttachmentGrid` (portable magnetic-grid plan). | No history, no seq-guard, no cache, no notify (blueprint inv 15). |
 | `core/viewer-adapter.ts` (36) | **Layer-2a viewer adapter** — owns `prepared-for-3D`; `publishToViewer` builds 3D ON CALL (inv 26 2D/3D split); `handleStatus` (G4). | The flow decides WHEN to publish; split from prepared-for-editing. |
 | `core/transactions.ts` (422) | **Layer-2b flow-owned transaction services**: `useHistoryTransaction` (snap/restore/undo/redo/reset + F25 recipe/LRU/seg-cache, inv 20) · `useGenerationTask` (Magic-cancel token) · `useUploadPublish` (publishCutoutResult seq-guard at publication) · `useSessions` (editor/trim/filter begin/commit/revert). Pure helpers (unit-tested): liteSpec/liteSource + the session change-detection predicates. | Flow-timing state — NOT primitives. |
 | `types.ts` (112) | Shared viewer/scene config types. | `ViewerConfig`, `DesignState`(offsetX/offsetY/scale), `ColorConfig`, material roles. No duplicates elsewhere. |
@@ -133,6 +138,8 @@ its matte feeds the editor's Blend preview on any shape.
 | `composite.ts` (172) | The image bake (P2 cross-browser SVG engine). `composeFront(orig, subj, blurPx, fxFilter?, vignette, tint)` async. `svgFilterBake` via `URL.createObjectURL(Blob)` (Safari-safe; data-URL renders empty on WebKit). `cssColorFilterToSvg`. `PRESET_FILTER`/`presetFilter`/`PRESET_LABELS`. | One bake feeds 3D + print. Zero `ctx.filter`. |
 | `outline-resolve.ts` (263) | The shape engine. `resolve(source, adjustments)→VShape`: all-off=exact source; globalPass (straighten→simplify→smooth→radius) + localPass (curve+per-corner radius), fold-guarded. | Kernels: Paper (smooth/simplify/per-corner radius) + Clipper2 (straighten/whole radius) + in-house curve. |
 | `geometry-truth.ts` (106) | The single geometry pipeline. `contourFromShape(v)` @ `MANUFACTURING_TOLERANCE_MM` (0.05). `assertContourCuttable`. `vectorShapeHash`. | Tolerances: mfg 0.05, display 0.004, min-feature 5mm, anchor-sep 1.5mm. |
+| `grid.ts` | Session 59 pure-mm magnetic-grid engine: 48/96 pitch law, Standard/Diamond/Dice/Auto modes, per-spot safety, coverage, semantic ladders, margin adaptation, and the production `resolveGridPlan` facade. | UI-agnostic; supports full `Contour` material containment including holes. |
+| `polygon.ts` | Neutral polygon/contour containment shared by the grid engine and the dormant legacy validator. | Prevents the replacement grid engine from depending on `attachment.ts`. |
 | `mesh.ts` (212) | `buildShapedGeometry(contour, opts)` — custom BufferGeometry: front cap + rounded edge lip + back cap. 3 material groups (0 front / 1 edge / 2 back). UV0=image, UV1=world-XY suede. Canonical winding (outer CCW / holes CW). | Edge = same front image rolled over the lip. |
 | `build-mesh.ts` (46) | `buildMeshFromSpec(geometryMM, opts, composite, edgeComposite)` → geometry + 2 CanvasTextures. | The only three.js touch besides mesh.ts. |
 | `mask.ts` (293) | Image load (`loadImageData`, y-up), `deviceMaxTextureDim`, the **fallback** segmentation (`segment` = alpha-channel else border flood-fill), `postProcessMask`/`smoothMask`/`dilateMask`. | Header corrected post-de-slop (BEN2 retired; default = the trio). |
@@ -227,6 +234,10 @@ The full contract exists, is pure + unit-tested, and is **not wired** to /create
 - `persistence.ts` — saved-effect model + F1 recipe↔payload bond.
 - `attachment.ts` — magnet/velcro validators (invented defaults, coupon-pending).
 - `sizes.ts` — size bands → price multiplier.
+
+The new `grid.ts` planner is live engine code and exposed through the Creator primitive seam, but no current
+flow invokes it yet. `attachment.ts` is therefore not a valid fallback: it is the superseded 54mm payload-era
+validator and remains only until the payload contract receives an approved migration.
 
 The only live manufacturing output is `page.onExport` (`?internal=1`): mm-true SVG cutline via `toManufacturingSVG` (laser profile by default — red 0.1mm stroke, kerf applied by the cutter), feasibility-gated by `contourFromShape` + `assertContourCuttable`. Wiring the save/order flow + the 4 artifacts is the open manufacturing work.
 

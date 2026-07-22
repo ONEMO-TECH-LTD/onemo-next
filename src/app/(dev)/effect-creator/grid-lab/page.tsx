@@ -175,9 +175,7 @@ export default function GridLab() {
       const baseCfg = { attachment, paddingMM: pad, pattern, plan, perimeterOnly: perimeterForDensity(density, patternAuto ? 'standard' : pattern), center: centerMode, sparseThin: density === 'light' }
       // DESIGN stays fixed at the set size. Auto-grow adds an outward MARGIN (offset) around it — the border
       // the magnets' padding uses. Manual "offset" is the starting margin. Total effect = design + 2×margin.
-      // random shapes (AI Magic / generators) are capped at 180mm; presets go to 200mm
-      // §13 standard mode: the requested size SNAPS to the nearest zero-point rung (70/118/166/214 at
-      // pad 10) — free sizes don't exist on the launch ladder. Law inputs (padding/frame) drive the rungs.
+      // random shapes (AI Magic / generators) are capped at 180mm; curated presets use the full ladder.
       // ADAPTIVE sizing (Dan's law, restored): the slider is CONTINUOUS — free shapes take any size and
       // the engine adapts (auto-margin snaps coverage to the 48-family grid dynamically). The rung
       // buttons are quick-sets for the rigid standard sizes; `rung` below is the nearest reference only.
@@ -192,7 +190,7 @@ export default function GridLab() {
         const o = insetRingMM(design.outer.pts, m, 'round')
         return o && o.length >= 3 ? { outer: { pts: o }, holes: [] } : design
       }
-      // proportion-adaptive pitch: coarsest standard (72/48/24) that still holds; else the user's choice
+      // proportion-adaptive pitch: coarsest legal 96/48 composition that still holds
       const sel = autoGrid(withMargin, baseCfg, offsetMM, maxGrowMM, { density, pitchMM: pitchAuto ? undefined : pitch, pattern: patternAuto ? undefined : pattern })
       const chosenPitch = sel.pitchMM
       const fit = balancedFit(withMargin, { ...baseCfg, pitchMM: sel.pitchMM, pattern: sel.pattern }, offsetMM, maxGrowMM)

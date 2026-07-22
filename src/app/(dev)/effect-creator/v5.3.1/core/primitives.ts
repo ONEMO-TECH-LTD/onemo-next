@@ -19,6 +19,8 @@
 
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
 import type { MLResult, SegmentProgress } from '@/lib/effect/segment-ml'
+import type { Contour } from '@/lib/effect/types'
+import type { GridPlanOptions, ResolvedGridPlan } from '@/lib/effect/grid'
 import type { VShape } from '@/lib/vector-core'
 import { detailToFloorMm } from '../user/editor/producers'
 
@@ -90,4 +92,14 @@ export async function exportCutlineSvg(
   const feas = c ? assertContourCuttable(c, mmPerPx) : { ok: false as const, reason: 'degenerate' as const }
   if (!feas.ok) return { ok: false, reason: 'not-cuttable', detail: feas.reason ?? 'degenerate' }
   return { ok: true, svg: toManufacturingSVG(shape, { mmPerPx, widthPx: geom.maskWidthPx, heightPx: geom.maskHeightPx }) }
+}
+
+/** Resolve the magnetic attachment plan from Creator's current mm contour. One flow-blind engine op:
+ * no store, history, notification, UI control, or sequencing knowledge. */
+export async function computeAttachmentGrid(
+  contourMM: Contour,
+  options?: GridPlanOptions,
+): Promise<ResolvedGridPlan> {
+  const { resolveGridPlan } = await import('@/lib/effect/grid')
+  return resolveGridPlan(contourMM, options)
 }

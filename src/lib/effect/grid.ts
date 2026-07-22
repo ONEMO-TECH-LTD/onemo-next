@@ -12,7 +12,7 @@
 //   • Procedural sizes: zero-point ladder `size = (n−1)·pitch + 2·pad (+2·frame)` → 70+48k (§13.2).
 
 import type { Contour, Pt } from './types'
-import { pointInPolygon } from './attachment'
+import { pointInContour } from './polygon'
 import { insetRingMM } from './offset'
 
 /** THE 48/68 SYSTEM (§13.5d, locked): one lattice, two atoms — straight 48, diagonal 68 (=48√2).
@@ -33,11 +33,12 @@ export type MagnetPlan = 'auto' | 'all6' | 'all8' | 'corners8'
 export type MagnetDia = 6 | 8
 
 export const DEFAULT_PITCH_MM = 48
+export const LAUNCH_PITCHES_MM = [48, 96] as const
 export const PADDING_FLOOR_MM = 10
 export const MIN_ANCHORS = 2
 export const TARGET_ANCHORS = 4
 /** How far a magnet holds material down before an edge would lift — a PHYSICAL distance, independent of
- *  the chosen grid pitch (a fine 24mm grid doesn't make the fabric flap sooner). Tunable (coupon later). */
+ *  the chosen grid pitch. Tunable after coupon testing. */
 export const HOLD_REACH_MM = 48
 /** CORNER TOLERANCE on the pad distance: a convex corner ROUNDING may bring the outline slightly
  *  inside the pad radius — the REAL 70mm product's corner magnets sit ~9mm from the corner arc and
@@ -113,15 +114,21 @@ function distToRing(p: Pt, ring: ReadonlyArray<Pt>): number {
   return m
 }
 
+function distToContour(p: Pt, contour: Contour): number {
+  let d = distToRing(p, contour.outer.pts)
+  for (const hole of contour.holes) d = Math.min(d, distToRing(p, hole.pts))
+  return d
+}
+
 /** The most-interior point of the silhouette (pole of inaccessibility, sampled) + its distance to the edge.
  *  Used as the guaranteed single-magnet fallback when the sparse grid seats none. */
-function deepestPoint(outer: ReadonlyArray<Pt>, bb: BBox): { p: Pt; d: number } | null {
+function deepestPoint(contour: Contour, bb: BBox): { p: Pt; d: number } | null {
   const step = Math.max(2, Math.min(bb.maxX - bb.minX, bb.maxY - bb.minY) / 24)
   let best: Pt | null = null, bestD = -1
   for (let x = bb.minX; x <= bb.maxX; x += step) for (let y = bb.minY; y <= bb.maxY; y += step) {
     const p: Pt = [x, y]
-    if (!pointInPolygon(p, outer)) continue
-    const d = distToRing(p, outer)
+    if (!pointInContour(p, contour)) continue
+    const d = distToContour(p, contour)
     if (d > bestD) { bestD = d; best = p }
   }
   return best ? { p: best, d: bestD } : null
@@ -140,6 +147,27 @@ function polyCentroid(ring: ReadonlyArray<Pt>): Pt {
   return [cx / (6 * a), cy / (6 * a)]
 }
 
+function ringArea(ring: ReadonlyArray<Pt>): number {
+  let twice = 0
+  for (let i = 0; i < ring.length; i++) {
+    const [x0, y0] = ring[i], [x1, y1] = ring[(i + 1) % ring.length]
+    twice += x0 * y1 - x1 * y0
+  }
+  return Math.abs(twice / 2)
+}
+
+/** Material centroid: hole area is removed regardless of ring winding. */
+function contourCentroid(contour: Contour): Pt {
+  const outerC = polyCentroid(contour.outer.pts)
+  const outerA = ringArea(contour.outer.pts)
+  let area = outerA, x = outerC[0] * outerA, y = outerC[1] * outerA
+  for (const hole of contour.holes) {
+    const holeA = ringArea(hole.pts), holeC = polyCentroid(hole.pts)
+    area -= holeA; x -= holeC[0] * holeA; y -= holeC[1] * holeA
+  }
+  return area > 1e-6 ? [x / area, y / area] : outerC
+}
+
 /** Node positions along an axis at fixed `step` with a phase offset, spanning [min, max]. */
 function axisFrom(min: number, max: number, step: number, phase: number): number[] {
   if (step <= 0 || max <= min) return [(min + max) / 2]
@@ -150,7 +178,7 @@ function axisFrom(min: number, max: number, step: number, phase: number): number
   return res
 }
 
-/** Lattice across the bbox at PHASE (ox, oy). Pattern is a parity variant of the 24mm atom.
+/** Lattice across the bbox at PHASE (ox, oy). Pattern selects a subset of the 48mm lattice.
  *  `checker` (diamond only): which checkerboard half of the main lattice to keep (0 | 1). */
 function latticeAt(bb: BBox, pitch: number, pattern: GridPattern, ox: number, oy: number, checker = 0): Pt[] {
   const out: Pt[] = []
@@ -174,14 +202,11 @@ function latticeAt(bb: BBox, pitch: number, pattern: GridPattern, ox: number, oy
 }
 
 /** Greedy min-spacing thinning: keep only magnets whose application rings never overlap — no two centres
- *  closer than `minDist` (= 2× the padding radius, so two 20mm rings can't intersect). Deepest-anchored
- *  kept first, then most central. This is the honest enforcement of per-spot padding: at fine pitch a
- *  quincunx CENTRE sits pitch/√2 from its corners (17mm at pitch 24) — closer than two 20mm rings allow —
- *  so those centres are dropped (Dice-5 correctly collapses to standard at 24mm). Regular 48/24 grids are
- *  untouched (spacing already ≥ minDist). */
-function thinBySpacing(pts: Pt[], minDist: number, ring: ReadonlyArray<Pt>, c: Pt): Pt[] {
+ *  closer than `minDist` (= 2× the padding radius). Deepest-in-material anchors are kept first, then the
+ *  most central. */
+function thinBySpacing(pts: Pt[], minDist: number, contour: Contour, c: Pt): Pt[] {
   const ranked = pts
-    .map((p) => ({ p, d: distToRing(p, ring), r: dist(p, c) }))
+    .map((p) => ({ p, d: distToContour(p, contour), r: dist(p, c) }))
     .sort((a, b) => b.d - a.d || a.r - b.r) // deepest in material first, then most central
   const kept: Pt[] = []
   for (const { p } of ranked) {
@@ -197,7 +222,7 @@ function thinBySpacing(pts: Pt[], minDist: number, ring: ReadonlyArray<Pt>, c: P
  *  triangle = 3) would otherwise leave its long edge-midpoints unchecked and falsely "hold" with a
  *  handful of corner magnets. Shape-agnostic: high-poly shapes were always fine; this makes low-poly
  *  ones obey the same hold-coverage law. */
-function flapVerts(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number): Pt[] {
+function flapVerts(contour: Contour, seated: ReadonlyArray<Pt>, reach: number): Pt[] {
   const step = reach / 2
   const out: Pt[] = []
   const check = (p: Pt) => {
@@ -205,15 +230,17 @@ function flapVerts(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: n
     for (const a of seated) { const d = dist(p, a); if (d < nd) nd = d }
     if (nd > reach) out.push(p)
   }
-  const n = outer.length
-  for (let i = 0; i < n; i++) {
-    const a = outer[i], b = outer[(i + 1) % n]
-    check(a)
-    const segLen = dist(a, b)
-    const k = Math.floor(segLen / step)
-    for (let j = 1; j <= k; j++) {
-      const t = (j * step) / segLen
-      check([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t])
+  for (const ring of [contour.outer, ...contour.holes]) {
+    const pts = ring.pts
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i], b = pts[(i + 1) % pts.length]
+      check(a)
+      const segLen = dist(a, b)
+      const k = Math.floor(segLen / step)
+      for (let j = 1; j <= k; j++) {
+        const t = (j * step) / segLen
+        check([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t])
+      }
     }
   }
   return out
@@ -282,6 +309,9 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   // on 24-offsets (34mm links), which do not exist in the system. Enforced HERE so every caller
   // (manual pins, auto search, ladder solver, app) inherits it; pitchCentreMM reports the truth.
   const reqPitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
+  if (!(LAUNCH_PITCHES_MM as readonly number[]).includes(reqPitch)) {
+    throw new RangeError(`Unsupported magnetic-grid pitch ${reqPitch}mm; launch pitches are 48mm and 96mm.`)
+  }
   const pitch = (cfg.pattern === 'quincunx' && reqPitch < 96) ? 96 : reqPitch
   const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
   const pattern = cfg.pattern ?? 'standard'
@@ -306,13 +336,13 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     let inside = 0
     for (let i = 0; i < N; i++) {
       const t = (i / N) * Math.PI * 2
-      if (pointInPolygon([p[0] + pad * Math.cos(t), p[1] + pad * Math.sin(t)], outer)) inside++
+      if (pointInContour([p[0] + pad * Math.cos(t), p[1] + pad * Math.sin(t)], contourMM)) inside++
     }
     return inside / N
   }
   const valid = (p: Pt) => {
-    if (!pointInPolygon(p, outer)) return false
-    const d = distToRing(p, outer)
+    if (!pointInContour(p, contourMM)) return false
+    const d = distToContour(p, contourMM)
     if (d >= pad) return true
     if (cfg.strictPad) return false
     return d >= pad - PAD_CORNER_TOL_MM && ringCoverage(p) >= RING_COVERAGE_MIN
@@ -332,8 +362,8 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
         // rim — on curved/concave shapes a surrounded node can still be the closest cover for a dip.
         const belt = split.belt.slice()
         const pool = split.interior.slice()
-        let uncovered = flapVerts(outer, belt, HOLD_REACH_MM)
-        const fullUncovered = flapVerts(outer, seed, HOLD_REACH_MM).length
+        let uncovered = flapVerts(contourMM, belt, HOLD_REACH_MM)
+        const fullUncovered = flapVerts(contourMM, seed, HOLD_REACH_MM).length
         while (uncovered.length > fullUncovered && pool.length) {
           let bi = -1, bestGain = 0
           for (let i = 0; i < pool.length; i++) {
@@ -343,7 +373,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
           }
           if (bi < 0) break // no interior node can help — residual is a genuine size/pitch problem
           belt.push(pool[bi]); pool.splice(bi, 1)
-          uncovered = flapVerts(outer, belt, HOLD_REACH_MM)
+          uncovered = flapVerts(contourMM, belt, HOLD_REACH_MM)
         }
         seated = belt; interior = pool
       }
@@ -394,7 +424,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   {
     const c: Pt = centerMode === 'bbox'
       ? [(bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2]
-      : polyCentroid(outer)
+      : contourCentroid(contourMM)
     const ox0 = (((c[0] - bb.minX) % pitch) + pitch) % pitch
     const oy0 = (((c[1] - bb.minY) % pitch) + pitch) % pitch
     const h = pitch / 2
@@ -407,9 +437,9 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     const cands: Cand[] = []
     for (const px of oxs) for (const py of oys) for (const ck of checkers) {
       const nodes = latticeAt(bb, pitch, pattern, px, py, ck)
-      const seat = thinBySpacing(nodes.filter(valid), minSpacing, outer, c)
+      const seat = thinBySpacing(nodes.filter(valid), minSpacing, contourMM, c)
       const fin = finalize(seat)
-      const flapN = fin.seated.length ? flapVerts(outer, fin.seated, HOLD_REACH_MM).length : outer.length
+      const flapN = fin.seated.length ? flapVerts(contourMM, fin.seated, HOLD_REACH_MM).length : outer.length
       let mp = Infinity
       for (let i = 0; i < fin.seated.length; i++) for (let j = i + 1; j < fin.seated.length; j++) {
         const d = dist(fin.seated[i], fin.seated[j]); if (d < mp) mp = d
@@ -438,14 +468,14 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   // GUARANTEE ≥1: if the sparse grid seated nothing but the shape can still hold a magnet, drop one at the
   // deepest interior point (a single magnet has no spacing to honour, so grid phase is moot here).
   if (seated.length === 0) {
-    const dp = deepestPoint(outer, bb)
+    const dp = deepestPoint(contourMM, bb)
     if (dp && dp.d >= pad) { seated = [dp.p]; interior = [] }
   }
   const anchors = assignSizes(seated, plan, Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY))
 
   if (!seated.length) issues.push(`No room for a magnet — too small/thin to keep a magnet ${pad}mm from every edge.`)
   else if (seated.length < MIN_ANCHORS) issues.push(`Too small — only ${seated.length} magnet grips material. Increase the size or the max auto-grow.`)
-  const flaps: Pt[] = seated.length ? flapVerts(outer, seated, HOLD_REACH_MM) : []
+  const flaps: Pt[] = seated.length ? flapVerts(contourMM, seated, HOLD_REACH_MM) : []
   if (flaps.length > 0) issues.push(`Some edge areas sit more than ${HOLD_REACH_MM}mm from a magnet (red edge) and could lift. Raise the size / max auto-grow.`)
 
   let minD = 8, maxD = 6
@@ -464,8 +494,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
 
 
 // ─── LAUNCH LAW (§13, locked 2026-07-21) — 48-family only, procedural zero-point ladder ──────────────
-// Launch pitches = 48/96 exclusively (24/72 have no counterpart on the 96-dice garment canvas; small/cap
-// domains untested — admin-only experiments). Auto never leaves the family.
+// Launch pitches = 48/96 exclusively. Retired 24/72 pitches have no launch or admin exception.
 /** Grid density preference: 'light' tries the coarse 96 first (sparse, uncrowded — the garment
  *  aesthetic); 'standard' tries 48 first (denser, firmer hold). Same family either way. */
 export type GridDensity = 'standard' | 'light'
@@ -480,7 +509,9 @@ export function perimeterForDensity(density: GridDensity, pattern: GridPattern):
 /** Legal patterns per pitch under the 48/68 system: dice centres live at half-pitch, so quincunx is
  *  legal ONLY at 96 (centres at 48-offsets = the shirt's own dice). Nothing ever sits at 24-offsets. */
 export function legalPatterns(pitchMM: number): GridPattern[] {
-  return pitchMM % 96 === 0 ? ['standard', 'diamond', 'quincunx'] : ['standard', 'diamond']
+  if (pitchMM === 96) return ['standard', 'diamond', 'quincunx']
+  if (pitchMM === 48) return ['standard', 'diamond']
+  return []
 }
 /** The admin LAW INPUTS that generate every size procedurally — no hand-picked numbers. */
 export interface SizeLaw {
@@ -527,7 +558,7 @@ export function stdShapeContour(shape: StdShape, wMM: number, hMM: number = wMM)
 
 
 /** GRID MODE — the four user-facing modes (§ goal 2026-07-21):
- *  auto = everything legal + extra surface anchors for irregular shapes · standard = straight (48-atom)
+ *  auto = everything legal + a deepest-material fallback for irregular shapes · standard = straight (48-atom)
  *  links only · quincunx (dice) = the standard+diamond mix (96 pitch) · diamond = diagonal (68-atom)
  *  links only. */
 export type GridMode = 'auto' | GridPattern
@@ -538,10 +569,10 @@ function modeCombos(mode: GridMode): { pitchMM: number; pattern: GridPattern }[]
   return mode === 'standard' ? std : mode === 'diamond' ? dia : mode === 'quincunx' ? dice : [...std, ...dia, ...dice]
 }
 
-/** SEMANTIC SIZES (Dan, 2026-07-21): every shape carries its own T-shirt ladder keyed by ANCHOR COUNT —
- *  1 point = 2XS · 2 = XS · 3 = S · 4 = M (the standard) · then 6/8/12/16 → L/XL/2XL/3XL. The mm under
- *  each label is solved numerically per shape from the live inputs (padding + frame/margin + mode), so
- *  changing the recipe or mode recomputes every size. Strict pad law (sizing), perimeter belt. */
+/** SEMANTIC SIZES (Dan, 2026-07-21): every shape carries its own T-shirt ladder keyed by ANCHOR COUNT.
+ *  The mm under each sequential label is solved numerically per shape from the live inputs (padding +
+ *  frame/margin + mode), so changing the recipe or mode recomputes every size. Strict pad law (sizing),
+ *  perimeter belt. Labels continue past 3XL when legal rungs remain under maxRungMM. */
 export interface SemanticRung { label: string; points: number; sizeMM: number; visible: boolean }
 /** Garment-band labels by REAL mm (matches the product canon: 70=S, ~118=M, ~166=L, ~214=XL). A rung
  *  is labeled by the band its solved size falls in, bumping on collision — so each shape naturally
@@ -549,7 +580,10 @@ export interface SemanticRung { label: string; points: number; sizeMM: number; v
 const SIZE_BANDS: ReadonlyArray<readonly [number, string]> = [
   [36, '2XS'], [60, 'XS'], [100, 'S'], [140, 'M'], [190, 'L'], [240, 'XL'], [290, '2XL'], [Infinity, '3XL'],
 ]
-const BAND_LABELS = ['2XS', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL']
+const BASE_BAND_LABELS = ['2XS', 'XS', 'S', 'M', 'L', 'XL']
+function bandLabel(idx: number): string {
+  return idx < BASE_BAND_LABELS.length ? BASE_BAND_LABELS[idx] : `${idx - BASE_BAND_LABELS.length + 2}XL`
+}
 export function semanticLadder(
   makeShape: (sizeMM: number) => Contour, law: SizeLaw = DEFAULT_LAW, mode: GridMode = 'auto',
 ): SemanticRung[] {
@@ -573,11 +607,7 @@ export function semanticLadder(
           if (g.anchors.length > best) best = g.anchors.length
         } else {
           const design = makeShape(s)
-          const w = (m: number): Contour => {
-            if (Math.abs(m) < 0.01) return design
-            const o = insetRingMM(design.outer.pts, m, 'round')
-            return o && o.length >= 3 ? { outer: { pts: o }, holes: [] } : design
-          }
+          const w = (m: number): Contour => contourWithOuterMargin(design, m)
           const fit = balancedFit(w, cfg, 0, DEFAULT_MARGIN_MM)
           if (fit.grid.flaps.length) continue
           if (fit.grid.anchors.length > best) {
@@ -588,7 +618,7 @@ export function semanticLadder(
           }
         }
       }
-      if (best > last && bestTotal > (steps.length ? steps[steps.length - 1].sizeMM : 0)) {
+      if (best > last && bestTotal <= law.maxRungMM && bestTotal > (steps.length ? steps[steps.length - 1].sizeMM : 0)) {
         steps.push({ points: best, sizeMM: bestTotal }); last = best
       }
     }
@@ -600,7 +630,11 @@ export function semanticLadder(
   // hold reach at exact size beyond ~224). Union: exact first, banded steps only above the exact
   // ceiling (higher count AND larger size), so no canon size ever shifts.
   let steps = solve(false)
-  const banded = solve(true)
+  // The band-assisted pass is much more expensive (each size probes several margin steps). Do not run
+  // it when the exact ladder already reaches the configured ceiling; it cannot add a larger legal rung.
+  const exactNeedsExtension = !steps.some((st) => st.points >= 2)
+    || Math.max(...steps.map((st) => st.sizeMM)) < law.maxRungMM
+  const banded = exactNeedsExtension ? solve(true) : []
   if (!steps.some((st) => st.points >= 2)) {
     steps = banded
   } else {
@@ -617,9 +651,8 @@ export function semanticLadder(
   for (const st of steps) {
     if (st.points === 1) { rungs.push({ label: 'ONE', points: 1, sizeMM: st.sizeMM, visible: st.sizeMM <= law.maxTestedMM }); continue }
     const idx = prevIdx === -1 ? SIZE_BANDS.findIndex(([max]) => st.sizeMM < max) : prevIdx + 1
-    if (idx >= BAND_LABELS.length) break
     prevIdx = idx
-    rungs.push({ label: BAND_LABELS[idx], points: st.points, sizeMM: st.sizeMM, visible: st.sizeMM <= law.maxTestedMM })
+    rungs.push({ label: bandLabel(idx), points: st.points, sizeMM: st.sizeMM, visible: st.sizeMM <= law.maxTestedMM })
   }
   return rungs
 }
@@ -627,8 +660,8 @@ export function semanticLadder(
 /**
  * Unified auto selection (pitch × pattern) under the ONE coverage physics — no shape-name branches.
  * AUTO mode covers everything legal in the 48/68 system (standard straight, diamond diagonal, 96-dice
- * mix) and, via per-node validity + the deepest-point guarantee, adds surface anchors on irregular
- * silhouettes (blobs, L-shapes, AI cuts). Pin `pitchMM`/`pattern` for the manual modes — they behave
+ * mix) and, via per-node validity + the deepest-point guarantee, can place one fallback anchor in the
+ * deepest legal region of an irregular silhouette. Pin `pitchMM`/`pattern` for manual modes — they behave
  * literally. Fewest-uncovered fallback when nothing fully covers.
  */
 export function autoGrid(
@@ -657,7 +690,8 @@ export function autoGrid(
 
 /** Scale a normalized contour (longest side = 1mm) to a real longest-side size in mm. */
 export function scaleContour(base: Contour, longestMM: number): Contour {
-  return { outer: { pts: base.outer.pts.map(([x, y]) => [x * longestMM, y * longestMM] as Pt) }, holes: [] }
+  const scaleRing = (pts: ReadonlyArray<Pt>) => pts.map(([x, y]) => [x * longestMM, y * longestMM] as Pt)
+  return { outer: { pts: scaleRing(base.outer.pts) }, holes: base.holes.map((h) => ({ pts: scaleRing(h.pts) })) }
 }
 
 /**
@@ -689,4 +723,116 @@ export function balancedFit(
   if (best) return { ...best, grew: best.sizeMM - start }
   const grid = computeGrid(sized(start), cfg)
   return { sizeMM: start, grid, grew: 0 }
+}
+
+// ─── PRODUCTION FACADE ──────────────────────────────────────────────────────
+
+/** UI-agnostic inputs for resolving one final attachment grid from a real-mm contour. */
+export interface GridPlanOptions {
+  attachment?: Attachment
+  mode?: GridMode
+  density?: GridDensity
+  paddingMM?: number
+  plan?: MagnetPlan
+  center?: 'centroid' | 'bbox'
+  baseMarginMM?: number
+  maxGrowMM?: number
+  pitchMM?: number
+  targetAnchors?: number
+}
+
+/** Complete engine verdict. A caller renders these facts; it does not reimplement their laws. */
+export interface ResolvedGridPlan {
+  designContourMM: Contour
+  effectContourMM: Contour
+  grid: GridResult
+  pitchMM: number
+  pattern: GridPattern | null
+  baseMarginMM: number
+  resolvedMarginMM: number
+  grewMM: number
+  nearestAnchorMM: number | null
+}
+
+/** Add/remove only the effect's OUTER margin. Interior cut-outs remain physical cut-outs. */
+export function contourWithOuterMargin(contour: Contour, marginMM: number): Contour {
+  if (Math.abs(marginMM) < 0.01) return contour
+  const outer = insetRingMM(contour.outer.pts, marginMM, 'round')
+  if (!outer || outer.length < 3) return contour
+  return {
+    outer: { pts: outer },
+    holes: contour.holes.map((hole) => ({ pts: hole.pts.map(([x, y]) => [x, y] as Pt) })),
+  }
+}
+
+function nearestAnchorDistance(anchors: ReadonlyArray<Anchor>): number | null {
+  let nearest = Infinity
+  for (let i = 0; i < anchors.length; i++) for (let j = i + 1; j < anchors.length; j++) {
+    nearest = Math.min(nearest, dist(anchors[i].p, anchors[j].p))
+  }
+  return Number.isFinite(nearest) ? nearest : null
+}
+
+/**
+ * Resolve the complete magnetic-grid law for a production contour. This is the portable engine seam:
+ * mode legality, density/coverage, pitch selection, padding, margin adaptation, and truthful resolved
+ * measurements live here once. Creator flows call one operation and render the returned facts.
+ */
+export function resolveGridPlan(contourMM: Contour, opts: GridPlanOptions = {}): ResolvedGridPlan {
+  const attachment = opts.attachment ?? 'magnetic'
+  const mode = opts.mode ?? 'auto'
+  const density = opts.density ?? 'light'
+  const baseMarginMM = Math.max(0, opts.baseMarginMM ?? 0)
+  const maxGrowMM = opts.maxGrowMM ?? DEFAULT_MARGIN_MM
+  const withMargin = (marginMM: number) => contourWithOuterMargin(contourMM, marginMM)
+  const manualPattern = mode === 'auto' ? undefined : mode
+  const patternForCoverage = manualPattern ?? 'standard'
+  const cfg: GridConfig = {
+    attachment,
+    paddingMM: opts.paddingMM ?? PADDING_FLOOR_MM,
+    plan: opts.plan ?? 'auto',
+    center: opts.center ?? 'centroid',
+    perimeterOnly: perimeterForDensity(density, patternForCoverage),
+    sparseThin: density === 'light',
+  }
+
+  if (attachment === 'velcro') {
+    const grid = computeGrid(withMargin(baseMarginMM), { ...cfg, attachment })
+    return {
+      designContourMM: contourMM,
+      effectContourMM: withMargin(baseMarginMM),
+      grid,
+      pitchMM: 0,
+      pattern: null,
+      baseMarginMM,
+      resolvedMarginMM: baseMarginMM,
+      grewMM: 0,
+      nearestAnchorMM: null,
+    }
+  }
+
+  const selected = autoGrid(withMargin, cfg, baseMarginMM, maxGrowMM, {
+    minN: opts.targetAnchors,
+    density,
+    pitchMM: opts.pitchMM,
+    pattern: manualPattern,
+  })
+  const fit = balancedFit(
+    withMargin,
+    { ...cfg, pitchMM: selected.pitchMM, pattern: selected.pattern },
+    baseMarginMM,
+    maxGrowMM,
+    { target: opts.targetAnchors },
+  )
+  return {
+    designContourMM: contourMM,
+    effectContourMM: withMargin(fit.sizeMM),
+    grid: fit.grid,
+    pitchMM: selected.pitchMM,
+    pattern: selected.pattern,
+    baseMarginMM,
+    resolvedMarginMM: fit.sizeMM,
+    grewMM: fit.grew,
+    nearestAnchorMM: nearestAnchorDistance(fit.grid.anchors),
+  }
 }
