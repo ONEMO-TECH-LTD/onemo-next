@@ -149,9 +149,9 @@ type EffectSpecGenerator = PreparedEffect['spec']['generator']
 
 /**
  * The canonical MANUFACTURING-identity subset that `payload_hash` is computed over (F3). It deliberately
- * differs from the full record in two ways, both load-bearing:
- *  • EXCLUDES commerce — pricing never enters this hash (the mock price field itself was removed, Dan s59/P2), so the SAME physical effect at a different
- *    price yields the SAME manufacturing hash (price is not a manufacturing fact).
+ * differs from the full record in one load-bearing way:
+ *  • NO commerce exists in the payload at all (the mock price field was removed, Dan s59/P2 — pricing
+ *    is not a manufacturing fact and never enters the record or this hash).
  *  • FULLY FLOAT-FREE — EVERY residual mm / unit-ratio is quantized to integer micro-units (§11
  *    "integer microns, no floats"): `size.{scale, longest_side_mm, final_bbox}`,
  *    `artwork.source_px_to_shape_mm`, `appearance.{thickness_mm, edge_profile.radiusMm}`. Geometry is
@@ -293,8 +293,8 @@ export function buildApprovedEffectPayload(prepared: PreparedEffect, opts: Build
     generator: spec.generator,
   }
 
-  // The full record (commerce + display included). The manufacturing IDENTITY hash, however, is computed
-  // over the CANONICAL subset (canonicalHashBody): commerce excluded + residual floats quantized (F3).
+  // The full record (display metadata included; NO commerce — removed, Dan s59/P2). The manufacturing
+  // IDENTITY hash is computed over the CANONICAL subset (canonicalHashBody): residual floats quantized (F3).
   const record = { version: 1 as const, schema_version: SCHEMA_VERSION, source, geometry, size, artwork, appearance, attachment, gates, build }
   // contentHash = cyrb53 → a 16-hex digest. The 16-hex width is INTENTIONAL (F4): deterministic +
   // cross-platform (no crypto/BigInt), ample space for a per-design identity. An identity/integrity

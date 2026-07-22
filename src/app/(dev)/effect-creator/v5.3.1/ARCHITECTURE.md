@@ -151,7 +151,7 @@ its matte feeds the editor's Blend preview on any shape.
 | `payload.ts` (306) | **DORMANT** manufacturing contract. `buildApprovedEffectPayload` (content-addressed, int-micron). Not wired to /create (§7). | |
 | `persistence.ts` (167) | **DORMANT** saved-effect model (EditableRecipe + LockedPayload, F1 bond). No save surface. | |
 | `attachment.ts` (149) | **DORMANT** `validateAttachment` (magnet 54mm grid / velcro). Invented defaults. | |
-| `sizes.ts` (57) | `EFFECT_SIZES` (s70 1×, s140 2.4×), `toFinalPhysicalMm`. | |
+| `sizes.ts` | `EFFECT_SIZES` (s70 base only — mock s140/pricing removed, Dan s59/P2), `toFinalPhysicalMm`. Interim until grid semantic ladder at the Creator attach. | |
 | `offset.ts` (37) | `insetRingMM` (Clipper2). Editor Offset tool (live); −8mm magnetic inset (dormant consumer). | |
 | `types.ts` (76) | Core contracts: `EffectSpecDraft` (the `vectorShape` truth + derived `geometryMM` + `dimensions` + `rawTracePx` provenance + `diagnostics`), `Contour`/`Ring`/`Pt`, `Dimensions`, `SuedeMaterialParams`. | Draft = preview routing surface, not canonical truth. |
 | `effect-types.ts` (13) | `EFFECT_TYPES` registry: `standard` (tier-1, fixed geometry) / `shaped` (tier-2, contour silhouette). | Taxonomy carried as data, not symbol names. |
