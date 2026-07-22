@@ -2,14 +2,23 @@ import type { Contour } from './types'
 import {
   resolveUserSemanticLadder,
   resolveUserGridPlan,
+  stdShapeContour,
   type Attachment,
   type ResolvedGridPlan,
   type SemanticRung,
+  type StdShape,
 } from './grid-core'
 
 /** The complete user-facing input surface for magnetic-grid resolution. */
 export interface UserGridPlanOptions {
   attachment: Attachment
+}
+
+export type UserStandardShape = Exclude<StdShape, 'rect'>
+
+/** Build a standard final contour without exposing admin grid controls to user code. */
+export function standardShapeContour(shape: UserStandardShape, sizeMM: number): Contour {
+  return stdShapeContour(shape, sizeMM)
 }
 
 /**

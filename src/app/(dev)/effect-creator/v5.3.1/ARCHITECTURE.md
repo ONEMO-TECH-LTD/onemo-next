@@ -15,7 +15,9 @@ belt, then adds the minimum safe lattice/off-lattice anchors needed to rescue un
 semantic ladder keeps only candidates selected by that resolver, then collapses equal translation-invariant
 final-product signatures (normalized topology/adjacency, diameters, rescue membership), keeping the smallest size.
 Dice and full-grid controls remain available only through `grid-admin.ts` for the bench and standing audit. No product
-Creator page or UI is wired yet. The legacy 54mm `validateAttachment` remains only for the dormant payload contract
+law is reimplemented in UI: `(store)/create` imports `grid-user.ts` and exposes only shape, semantic size, and
+attachment before rendering the resolved product preview; the grid-lab bench imports `grid-admin.ts`. The legacy
+54mm `validateAttachment` remains only for the dormant payload contract
 pending an approved retirement migration.
 
 ---
@@ -143,7 +145,7 @@ its matte feeds the editor's Blend preview on any shape.
 | `composite.ts` (172) | The image bake (P2 cross-browser SVG engine). `composeFront(orig, subj, blurPx, fxFilter?, vignette, tint)` async. `svgFilterBake` via `URL.createObjectURL(Blob)` (Safari-safe; data-URL renders empty on WebKit). `cssColorFilterToSvg`. `PRESET_FILTER`/`presetFilter`/`PRESET_LABELS`. | One bake feeds 3D + print. Zero `ctx.filter`. |
 | `outline-resolve.ts` (263) | The shape engine. `resolve(source, adjustments)→VShape`: all-off=exact source; globalPass (straighten→simplify→smooth→radius) + localPass (curve+per-corner radius), fold-guarded. | Kernels: Paper (smooth/simplify/per-corner radius) + Clipper2 (straighten/whole radius) + in-house curve. |
 | `geometry-truth.ts` (106) | The single geometry pipeline. `contourFromShape(v)` @ `MANUFACTURING_TOLERANCE_MM` (0.05). `assertContourCuttable`. `vectorShapeHash`. | Tolerances: mfg 0.05, display 0.004, min-feature 5mm, anchor-sep 1.5mm. |
-| `grid-core.ts` · `grid-user.ts` · `grid-admin.ts` | Session 59 pure-mm magnetic-grid engine plus its enforced module boundary: core owns the 48/96 law; user resolves a final `Contour` + attachment and the distinct default semantic ladder; admin exposes the low-level bench/audit controls. | Creator user code cannot import admin/core. User auto cannot select Dice, resolves perimeter-first with explicit minimum coverage rescue, and deduplicates ladder rungs by final-product signature; admin modes retain Dice/full-grid experiments. |
+| `grid-core.ts` · `grid-user.ts` · `grid-admin.ts` | Session 59 pure-mm magnetic-grid engine plus its enforced module boundary: core owns the 48/96 law; user exposes the canonical standard-contour recipe, resolves a final `Contour` + attachment, and returns the distinct default semantic ladder; admin exposes the low-level bench/audit controls. | Creator user code cannot import admin/core or rederive standard contours in UI. User auto cannot select Dice, resolves perimeter-first with explicit minimum coverage rescue, and deduplicates ladder rungs by final-product signature; admin modes retain Dice/full-grid experiments. |
 | `polygon.ts` | Neutral polygon/contour containment shared by the grid engine and the dormant legacy validator. | Prevents the replacement grid engine from depending on `attachment.ts`. |
 | `mesh.ts` (212) | `buildShapedGeometry(contour, opts)` — custom BufferGeometry: front cap + rounded edge lip + back cap. 3 material groups (0 front / 1 edge / 2 back). UV0=image, UV1=world-XY suede. Canonical winding (outer CCW / holes CW). | Edge = same front image rolled over the lip. |
 | `build-mesh.ts` (46) | `buildMeshFromSpec(geometryMM, opts, composite, edgeComposite)` → geometry + 2 CanvasTextures. | The only three.js touch besides mesh.ts. |
@@ -240,8 +242,9 @@ The full contract exists, is pure + unit-tested, and is **not wired** to /create
 - `attachment.ts` — magnet/velcro validators (invented defaults, coupon-pending).
 - `sizes.ts` — interim scale band (s70 base) for the payload path; mock pricing removed (Dan s59/P2); real sizes come from the grid semantic ladder at the Creator attach.
 
-The new `grid-user.ts` planner door is live engine code and exposed through the Creator primitive seam, but no
-current flow invokes it yet. `attachment.ts` is therefore not a valid fallback: it is the superseded 54mm
+The `grid-user.ts` planner door is live on `(store)/create`: its three product inputs build a final contour, resolve
+the attachment plan, and render the engine-owned ladder and registration result. `attachment.ts` is not a valid
+fallback: it is the superseded 54mm
 payload-era validator and remains only until the payload contract receives an approved migration.
 
 The only live manufacturing output is `page.onExport` (`?internal=1`): mm-true SVG cutline via `toManufacturingSVG` (laser profile by default — red 0.1mm stroke, kerf applied by the cutter), feasibility-gated by `contourFromShape` + `assertContourCuttable`. Wiring the save/order flow + the 4 artifacts is the open manufacturing work.

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { computeAttachmentGrid } from '@/app/(dev)/effect-creator/v5.3.1/core/primitives'
 import { pointInPolygon } from '../polygon'
 import { computeGrid, contourWithOuterMargin, DEFAULT_LAW, finalProductSignature, resolveGridPlan, scaleContour, semanticLadder, stdShapeContour } from '../grid-admin'
-import { resolveUserPlan, semanticLadder as userSemanticLadder } from '../grid-user'
+import { resolveUserPlan, semanticLadder as userSemanticLadder, standardShapeContour } from '../grid-user'
 import type { Contour } from '../types'
 
 const donut: Contour = {
@@ -132,6 +132,12 @@ describe('contour transforms preserve the declared Contour contract', () => {
 })
 
 describe('semantic ladder stays inside its product contract', () => {
+  it('keeps the Create-page standard contour facade identical to the audited canonical recipe', () => {
+    for (const shape of ['square', 'circle', 'diamondShape', 'triangle'] as const) {
+      expect(standardShapeContour(shape, 180)).toEqual(stdShapeContour(shape, 180))
+    }
+  })
+
   it('keeps every legal circle rung even when its sequential labels continue past 3XL', () => {
     const auto = semanticLadder((sizeMM) => stdShapeContour('circle', sizeMM), DEFAULT_LAW, 'auto')
     const standard = semanticLadder((sizeMM) => stdShapeContour('circle', sizeMM), DEFAULT_LAW, 'standard')
@@ -150,7 +156,7 @@ describe('semantic ladder stays inside its product contract', () => {
   })
 
   it('deduplicates the circle by constrained final product and keeps the smallest equivalent rung', () => {
-    const makeCircle = (sizeMM: number) => stdShapeContour('circle', sizeMM)
+    const makeCircle = (sizeMM: number) => standardShapeContour('circle', sizeMM)
     const ladder = userSemanticLadder(makeCircle)
 
     expect(ladder.map((rung) => rung.sizeMM)).toEqual([23, 71, 90, 130, 158, 221, 303])

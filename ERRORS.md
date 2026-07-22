@@ -62,3 +62,4 @@
 - Symptoms: Chrome was running and the ChatGPT Chrome Extension plus native host both passed installation checks, but browser selection returned `Browser is not available: extension`; the in-app browser returned `No browser is available`.
 - What worked: preserve the persistent server/Chrome state, verify HTTP and engine parity locally, and request the existing Chrome-owning QA lane to stage the required live screenshots instead of launching another server or browser.
 - Remember: do not disturb Dan's persistent Chrome or start a second grid-lab server when the control channel is unavailable; use the owning lane for visual evidence and keep code/runtime proof separate.
+- A4 recurrence: the required in-app `browser-client` bootstrap failed before tab creation (`agent.browser` unavailable, then `Cannot redefine property: process` even after a kernel reset). The same owning-lane fallback produced the live `/create` verification without disturbing port 3970.
