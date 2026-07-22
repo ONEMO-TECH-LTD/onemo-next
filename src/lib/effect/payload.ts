@@ -123,7 +123,6 @@ export interface ApprovedEffectPayload {
     band_id: EffectSize
     longest_side_mm: number
     scale: number
-    price_multiplier: number
     final_bbox: FinalBBox
   }
   artwork: {
@@ -151,7 +150,7 @@ type EffectSpecGenerator = PreparedEffect['spec']['generator']
 /**
  * The canonical MANUFACTURING-identity subset that `payload_hash` is computed over (F3). It deliberately
  * differs from the full record in two ways, both load-bearing:
- *  • EXCLUDES commerce — `size.price_multiplier` is dropped, so the SAME physical effect at a different
+ *  • EXCLUDES commerce — pricing never enters this hash (the mock price field itself was removed, Dan s59/P2), so the SAME physical effect at a different
  *    price yields the SAME manufacturing hash (price is not a manufacturing fact).
  *  • FULLY FLOAT-FREE — EVERY residual mm / unit-ratio is quantized to integer micro-units (§11
  *    "integer microns, no floats"): `size.{scale, longest_side_mm, final_bbox}`,
@@ -164,8 +163,8 @@ type EffectSpecGenerator = PreparedEffect['spec']['generator']
  */
 export function canonicalHashBody(p: ApprovedEffectPayload) {
   const q = (n: number) => Math.round(n * MICRO) // mm / unit-ratio → integer micro-units
-  const { price_multiplier, scale, longest_side_mm, final_bbox, ...sizeRest } = p.size
-  void price_multiplier // commerce is deliberately EXCLUDED from the manufacturing-identity hash
+  const { scale, longest_side_mm, final_bbox, ...sizeRest } = p.size
+  // commerce was deliberately EXCLUDED from this hash; the mock pricing field itself was removed (Dan, s59/P2)
   const { source_px_to_shape_mm, ...artworkRest } = p.artwork
   const { thickness_mm, edge_profile, ...appearanceRest } = p.appearance
   return {
@@ -239,7 +238,6 @@ export function buildApprovedEffectPayload(prepared: PreparedEffect, opts: Build
     band_id: opts.size,
     longest_side_mm: band.longestSideMm,
     scale: final.scale,
-    price_multiplier: band.priceMultiplier,
     final_bbox: final.finalBBox,
   }
 

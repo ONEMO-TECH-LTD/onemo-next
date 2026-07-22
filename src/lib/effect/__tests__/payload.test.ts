@@ -100,15 +100,6 @@ describe('buildApprovedEffectPayload (schema 3, vector-native)', () => {
     expect(out.appearance.thickness_mm).toBe(1) // §9 1mm
   })
 
-  it('size band scales the final geometry + changes the hash (s140 ≠ s70)', () => {
-    const p = prepared(squareShape())
-    const s70 = buildApprovedEffectPayload(p, { type: 'standard', size: 's70' })
-    const s140 = buildApprovedEffectPayload(p, { type: 'standard', size: 's140' })
-    expect(s140.payload_hash).not.toBe(s70.payload_hash)
-    const xs140 = s140.geometry.final_physical_mm.outer.map((q) => q[0])
-    expect(Math.max(...xs140) - Math.min(...xs140)).toBe(140000) // 140mm longest side (span)
-  })
-
   it('THROWS EffectNotCuttableError for an uncuttable shape (never hashes it)', () => {
     expect(() => buildApprovedEffectPayload(prepared(selfIntersectShape()), { type: 'standard', size: 's70' }))
       .toThrow(EffectNotCuttableError)
@@ -156,11 +147,11 @@ describe('buildApprovedEffectPayload (schema 3, vector-native)', () => {
     expect(moved.payload_hash).not.toBe(plain.payload_hash)
   })
 
-  it('hash EXCLUDES commerce (price) + quantizes residual floats to int-micro (F3)', () => {
+  it('hash carries NO commerce fields (mock pricing removed, Dan s59/P2) + quantizes residual floats to int-micro (F3)', () => {
     const out = buildApprovedEffectPayload(prepared(squareShape()), { type: 'standard', size: 's70' })
     const body = canonicalHashBody(out)
     expect(JSON.stringify(body)).not.toContain('price_multiplier')
-    expect(out.size.price_multiplier).toBe(1)
+    expect('price_multiplier' in out.size).toBe(false) // the field itself is gone, not just hash-excluded
     expect('scale' in body.size).toBe(false)
     // centered 72%-side square: 72px·0.7 = 50.4mm → band scale 70/50.4 = 1.3888… → int-micro
     expect(body.size.scale_micro).toBe(1_388_889)
@@ -174,8 +165,8 @@ describe('buildApprovedEffectPayload (schema 3, vector-native)', () => {
 
   it('records the chosen attachment {system, result_hash} + rides in the hash (§8.5b/§11)', () => {
     const p = prepared(squareShape())
-    const none = buildApprovedEffectPayload(p, { type: 'standard', size: 's140' })
-    const mag = buildApprovedEffectPayload(p, { type: 'standard', size: 's140', attachment: 'magnet' })
+    const none = buildApprovedEffectPayload(p, { type: 'standard', size: 's70' })
+    const mag = buildApprovedEffectPayload(p, { type: 'standard', size: 's70', attachment: 'magnet' })
     expect(none.attachment.system).toBe(null)
     expect(mag.attachment.system).toBe('magnet')
     expect(mag.payload_hash).not.toBe(none.payload_hash)

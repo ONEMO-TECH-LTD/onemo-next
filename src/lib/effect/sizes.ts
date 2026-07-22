@@ -1,10 +1,11 @@
 // sizes.ts — effect size bands (lean-spec §9a), carried as DATA.
 //
-// Size is a CUSTOMER CHOICE: a band that sets the physical scale → drives the price multiplier.
-// Base shape = 70×70mm (the ONEMO square baseline); bands scale the longest side from there.
-// Mirrors the EFFECT_TYPES pattern — a new band is one entry here, NEVER a rename across the codebase.
-// The mm geometry from prepareEffect is REFERENCE geometry (built at the 70mm base); the band sets the
-// FINAL-physical-mm by uniform scale. The 2D shape is unaffected — it just scales (§9a).
+// Size sets the FINAL physical scale: the mm geometry from prepareEffect is REFERENCE geometry (built
+// at the 70mm base); the band scales the longest side. The 2D shape is unaffected — it just scales (§9a).
+// NOTE (Dan ruling 2026-07-22, s59/P2): the June-era draft pricing data (s140 + priceMultiplier) was
+// engineering-invented mock and is REMOVED. Real customer sizes/pricing are defined on the magnetic-grid
+// semantic ladder (grid.ts semanticLadder) at the s59 P4 Creator attach — this band table is interim
+// scale plumbing for the payload path until then, not a catalog.
 
 import type { Contour, Pt } from './types'
 
@@ -12,11 +13,10 @@ import type { Contour, Pt } from './types'
 export const BASE_LONGEST_SIDE_MM = 70
 
 export const EFFECT_SIZES = {
-  s70: { id: 's70', label: 'Standard · 70mm', longestSideMm: 70, priceMultiplier: 1 },
-  s140: { id: 's140', label: 'Large · 140mm', longestSideMm: 140, priceMultiplier: 2.4 },
+  s70: { id: 's70', label: 'Standard · 70mm', longestSideMm: 70 },
 } as const
 
-export type EffectSize = keyof typeof EFFECT_SIZES // 's70' | 's140'
+export type EffectSize = keyof typeof EFFECT_SIZES // 's70'
 
 export interface FinalBBox {
   widthMm: number

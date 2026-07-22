@@ -233,7 +233,7 @@ The full contract exists, is pure + unit-tested, and is **not wired** to /create
 - `payload.ts` — `ApprovedEffectPayload` (geometry in int-microns, content hash, artwork recipe hash, gates).
 - `persistence.ts` — saved-effect model + F1 recipe↔payload bond.
 - `attachment.ts` — magnet/velcro validators (invented defaults, coupon-pending).
-- `sizes.ts` — size bands → price multiplier.
+- `sizes.ts` — interim scale band (s70 base) for the payload path; mock pricing removed (Dan s59/P2); real sizes come from the grid semantic ladder at the Creator attach.
 
 The new `grid.ts` planner is live engine code and exposed through the Creator primitive seam, but no current
 flow invokes it yet. `attachment.ts` is therefore not a valid fallback: it is the superseded 54mm payload-era
