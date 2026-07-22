@@ -68,7 +68,10 @@ export default function GridLab() {
   const [pattern, setPattern] = useState<GridPattern>('standard')
   const [patternAuto, setPatternAuto] = useState(true) // pattern joins the auto system — same physics search as pitch
   const [plan, setPlan] = useState<MagnetPlan>('auto') // engine law default: size-driven focal ramp
-  const [frame, setFrame] = useState(true)
+  // NOTE: frame is NOT a control — it is a fixed engine law (DEFAULT_LAW.frameMM = 1, always baked into
+  // minEffectMM + semanticLadder). The 1mm suede edge always renders (it also carries the flap-risk signal);
+  // there is no user toggle, because a toggle here would only hide the drawn border while the manufactured
+  // size keeps the frame — a lying control. Frame thickness, if ever tunable, belongs in the Admin law inputs.
   const [front, setFront] = useState(false) // front-face overlay: magnets shown over the design/art
   const [centerMode, setCenterMode] = useState<'centroid' | 'bbox'>('centroid')
   const [maxGrowMM, setMaxGrowMM] = useState(DEFAULT_MARGIN_MM) // engine law default
@@ -230,7 +233,7 @@ export default function GridLab() {
             <span className="gl-eye">{model ? `1mm = ${scale.toFixed(2)} px` : '—'}</span>
           </div>
           <div className="gl-vp">
-            {model ? <Stage contour={model.contour} design={model.design} grid={model.grid} frame={frame} front={front} frontImg={src === 'magic' && magic ? magic.imgUrl : null} />
+            {model ? <Stage contour={model.contour} design={model.design} grid={model.grid} front={front} frontImg={src === 'magic' && magic ? magic.imgUrl : null} />
               : src === 'magic'
                 ? <Empty text={magStatus.startsWith('error') ? magStatus.slice(6) : magStatus === 'downloading-model' ? 'Downloading the cut-out model…' : magStatus.startsWith('cutting') ? 'Cutting out the shape…' : 'Upload an image to cut its outline'} spin={magStatus === 'downloading-model' || magStatus.startsWith('cutting')} />
                 : <Empty text="shape unavailable" />}
@@ -388,9 +391,6 @@ export default function GridLab() {
                   <button key={p} aria-pressed={plan === p} onClick={() => setPlan(p)}>{l}</button>)}
               </div>
             </div>
-            <label className="gl-toggle"><span>1 mm frame</span>
-              <input type="checkbox" checked={frame} onChange={e => setFrame(e.target.checked)} />
-            </label>
             <label className="gl-toggle"><span>Front face · magnet overlay</span>
               <input type="checkbox" checked={front} onChange={e => setFront(e.target.checked)} />
             </label>
@@ -418,7 +418,7 @@ function dim(c: Contour, axis: 0 | 1): number {
 }
 
 const pathFrom = (pp: Pt[]) => 'M ' + pp.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ') + ' Z'
-function Stage({ contour, design, grid, frame, front, frontImg }: { contour: Contour; design: Contour; grid: ReturnType<typeof computeGrid>; frame: boolean; front: boolean; frontImg: string | null }) {
+function Stage({ contour, design, grid, front, frontImg }: { contour: Contour; design: Contour; grid: ReturnType<typeof computeGrid>; front: boolean; frontImg: string | null }) {
   const ePts = contour.outer.pts.map(([x, y]) => [x, -y] as Pt)
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   for (const [x, y] of ePts) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y }
@@ -464,8 +464,9 @@ function Stage({ contour, design, grid, frame, front, frontImg }: { contour: Con
           margin band shows as the ring between the dashed design outline and the effect edge. */}
       <path d={eD} fill={hasMargin ? 'var(--margin)' : 'var(--suede)'} />
       {hasMargin && <path d={dD} fill="var(--suede)" />}
-      {/* frame: red when edges would lift (flap risk), else the 1mm suede edge — no per-vertex ring spam */}
-      {frame && <path d={eD} fill="none" stroke={hasFlap ? 'var(--fail)' : 'var(--suede-edge)'} strokeOpacity={hasFlap ? 0.85 : 1} strokeWidth={hasFlap ? 1.5 : 1} strokeLinejoin="round" />}
+      {/* frame: fixed 1mm suede edge (engine law, always drawn) — turns red when edges would lift (flap risk).
+          Always rendered: it is the manufactured border AND the flap-risk signal — never user-toggleable. */}
+      <path d={eD} fill="none" stroke={hasFlap ? 'var(--fail)' : 'var(--suede-edge)'} strokeOpacity={hasFlap ? 0.85 : 1} strokeWidth={hasFlap ? 1.5 : 1} strokeLinejoin="round" />
       {hasMargin && <path d={dD} fill="none" stroke="var(--accent)" strokeOpacity={0.6} strokeWidth={0.8} strokeDasharray="3 2" />}
       {grid.candidates.filter(c => !seat.has(c[0].toFixed(2) + ',' + c[1].toFixed(2))).map((c, i) => {
         const p = fy(c); return <circle key={'c' + i} cx={p[0]} cy={p[1]} r={1.6} fill="var(--grid)" fillOpacity={0.5} />
