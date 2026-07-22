@@ -685,27 +685,37 @@ const BASE_BAND_LABELS = ['2XS', 'XS', 'S', 'M', 'L', 'XL']
 function bandLabel(idx: number): string {
   return idx < BASE_BAND_LABELS.length ? BASE_BAND_LABELS[idx] : `${idx - BASE_BAND_LABELS.length + 2}XL`
 }
-export function semanticLadder(
-  makeShape: (sizeMM: number) => Contour, law: SizeLaw = DEFAULT_LAW, mode: GridMode = 'auto',
-): SemanticRung[] {
-  const combos = modeCombos(mode)
+interface SemanticStep {
+  points: number
+  sizeMM: number
+  patterns: GridPattern[]
+}
+
+function semanticSteps(
+  makeShape: (sizeMM: number) => Contour,
+  law: SizeLaw,
+  combos: ReadonlyArray<{ pitchMM: number; pattern: GridPattern }>,
+): SemanticStep[] {
   const padEff = law.paddingMM + law.frameMM
   // TWO-TIER SIZE LAW: (1) canonical rungs are EXACT zero-points — the shape holds flap-free at that
   // very size, margin 0, strict pad (sharp geometry; the 70/118/166/214 canon). (2) Only when a
   // mode×shape has NO exact multi-point size at all (a triangle's tips under diamond links) does the
   // solver fall back to the live margin mechanism (band-assisted, recording TOTAL size) — the ladder
   // then shows the true sizes the system actually produces. Never mixed: exact stays exact.
-  const solve = (banded: boolean): { points: number; sizeMM: number }[] => {
-    const steps: { points: number; sizeMM: number }[] = []
+  const solve = (banded: boolean): SemanticStep[] => {
+    const steps: SemanticStep[] = []
     let last = 0
     for (let s = Math.ceil(2 * padEff); s <= law.maxRungMM; s += banded ? 2 : 1) {
       let best = 0, bestTotal = s
+      const bestPatterns = new Set<GridPattern>()
       for (const cb of combos) {
         const cfg: GridConfig = { pitchMM: cb.pitchMM, pattern: cb.pattern, paddingMM: padEff, perimeterOnly: cb.pattern === 'standard', strictPad: true }
         if (!banded) {
           const g = computeGrid(makeShape(s), cfg)
           if (g.flaps.length) continue
-          if (g.anchors.length > best) best = g.anchors.length
+          if (g.anchors.length > best) {
+            best = g.anchors.length; bestPatterns.clear(); bestPatterns.add(cb.pattern)
+          } else if (g.anchors.length === best && best > 0) bestPatterns.add(cb.pattern)
         } else {
           const design = makeShape(s)
           const w = (m: number): Contour => contourWithOuterMargin(design, m)
@@ -713,14 +723,15 @@ export function semanticLadder(
           if (fit.grid.flaps.length) continue
           if (fit.grid.anchors.length > best) {
             best = fit.grid.anchors.length
+            bestPatterns.clear(); bestPatterns.add(cb.pattern)
             const eff = w(fit.sizeMM)
             const bb = eff.outer.pts.reduce((a, [x, y]) => [Math.min(a[0], x), Math.min(a[1], y), Math.max(a[2], x), Math.max(a[3], y)], [Infinity, Infinity, -Infinity, -Infinity])
             bestTotal = Math.round(Math.max(bb[2] - bb[0], bb[3] - bb[1]))
-          }
+          } else if (fit.grid.anchors.length === best && best > 0) bestPatterns.add(cb.pattern)
         }
       }
       if (best > last && bestTotal <= law.maxRungMM && bestTotal > (steps.length ? steps[steps.length - 1].sizeMM : 0)) {
-        steps.push({ points: best, sizeMM: bestTotal }); last = best
+        steps.push({ points: best, sizeMM: bestTotal, patterns: [...bestPatterns] }); last = best
       }
     }
     return steps
@@ -744,6 +755,10 @@ export function semanticLadder(
     for (const st of banded) if (st.points > maxPts && st.sizeMM > maxSize) steps.push(st)
     steps.sort((a, b) => a.sizeMM - b.sizeMM)
   }
+  return steps
+}
+
+function labelSemanticSteps(steps: ReadonlyArray<SemanticStep>, law: SizeLaw): SemanticRung[] {
   // LABEL LAW: the first multi-point rung anchors the sequence at its mm band (small shapes start at
   // 2XS/XS, chunky ones at M/L); every later rung takes the NEXT label — strictly sequential, no skips,
   // regardless of how far apart a mode's sizes land (Dan: each shape shows its own contiguous range).
@@ -756,6 +771,12 @@ export function semanticLadder(
     rungs.push({ label: bandLabel(idx), points: st.points, sizeMM: st.sizeMM, visible: st.sizeMM <= law.maxTestedMM })
   }
   return rungs
+}
+
+export function semanticLadder(
+  makeShape: (sizeMM: number) => Contour, law: SizeLaw = DEFAULT_LAW, mode: GridMode = 'auto',
+): SemanticRung[] {
+  return labelSemanticSteps(semanticSteps(makeShape, law, modeCombos(mode)), law)
 }
 
 /**
@@ -967,4 +988,56 @@ export function resolveUserGridPlan(contourMM: Contour, attachment: Attachment):
     rescueCoverage: true,
     sparseThin: true,
   })
+}
+
+/** Translation-invariant identity of the manufactured magnetic product. Positions are centred and
+ *  quantized to quarter-lattice units: enough to preserve lattice topology while ignoring harmless
+ *  off-lattice rescue drift between near-identical sizes. Attributed nodes carry magnet diameter and
+ *  rescue membership; the edge set records local adjacency. */
+export function finalProductSignature(plan: ResolvedGridPlan): string {
+  const anchors = plan.grid.anchors
+  if (!anchors.length || !plan.pitchMM) {
+    return `${plan.grid.attachment}|${plan.pattern ?? 'none'}|${plan.pitchMM}|[]|[]`
+  }
+  const pitch = plan.pitchMM
+  const cx = anchors.reduce((sum, anchor) => sum + anchor.p[0], 0) / anchors.length
+  const cy = anchors.reduce((sum, anchor) => sum + anchor.p[1], 0) / anchors.length
+  const isRescue = (p: Pt) => plan.grid.rescueAnchors.some((rescue) => dist(p, rescue) < 1e-4)
+  const nodes = anchors.map((anchor) => ({
+    x: Math.round(((anchor.p[0] - cx) / pitch) * 4),
+    y: Math.round(((anchor.p[1] - cy) / pitch) * 4),
+    dia: anchor.dia,
+    rescue: isRescue(anchor.p) ? 1 : 0,
+  })).sort((a, b) => a.x - b.x || a.y - b.y || a.dia - b.dia || a.rescue - b.rescue)
+  const edges: string[] = []
+  for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
+    const dx = nodes[j].x - nodes[i].x, dy = nodes[j].y - nodes[i].y
+    const quarterLinks = Math.round(Math.hypot(dx, dy))
+    if (quarterLinks <= 6) edges.push(`${i}-${j}:${quarterLinks}`) // local adjacency ≤ 1.5 pitches
+  }
+  const nodeKey = nodes.map((node) => `${node.x},${node.y},${node.dia},${node.rescue}`).join(';')
+  return `${plan.grid.attachment}|${plan.pattern ?? 'none'}|${pitch}|${nodeKey}|${edges.join(';')}`
+}
+
+/** Constrained user ladder. Candidate discovery remains the existing exhaustive zero-point scan; only
+ *  Standard/Diamond candidates are admitted. Each candidate is then resolved through the real user
+ *  door, rejected when its theoretical winning pattern is not the product-selected pattern, and
+ *  deduplicated by final-product identity. Candidate order is ascending, so the smallest survives. */
+export function resolveUserSemanticLadder(
+  makeShape: (sizeMM: number) => Contour,
+  law: SizeLaw = DEFAULT_LAW,
+): SemanticRung[] {
+  const userCombos = modeCombos('auto').filter(({ pattern }) => pattern !== 'quincunx')
+  const candidates = semanticSteps(makeShape, law, userCombos)
+  const seen = new Set<string>()
+  const products: SemanticStep[] = []
+  for (const candidate of candidates) {
+    const plan = resolveUserGridPlan(makeShape(candidate.sizeMM), 'magnetic')
+    if (!plan.pattern || !candidate.patterns.includes(plan.pattern) || plan.grid.flaps.length) continue
+    const signature = finalProductSignature(plan)
+    if (seen.has(signature)) continue
+    seen.add(signature)
+    products.push({ ...candidate, points: plan.grid.anchors.length })
+  }
+  return labelSemanticSteps(products, law)
 }

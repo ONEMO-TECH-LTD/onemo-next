@@ -11,10 +11,12 @@
 **Session 59 engine seam:** `lib/effect/grid-core.ts` owns the 48/96 magnetic-grid planning law. The constrained
 `grid-user.ts` door exposes `resolveUserPlan(finalContourMM, { attachment })` to Creator through
 `core/primitives.computeAttachmentGrid`. Its auto set is Standard + Diamond only; it always resolves a perimeter
-belt, then adds the minimum safe lattice/off-lattice anchors needed to rescue uncovered outline regions. Dice and
-full-grid controls remain available only through `grid-admin.ts` for the bench and standing audit. No product Creator
-page or UI is wired yet. The legacy 54mm `validateAttachment` remains only for the dormant payload contract pending
-an approved retirement migration.
+belt, then adds the minimum safe lattice/off-lattice anchors needed to rescue uncovered outline regions. Its default
+semantic ladder keeps only candidates selected by that resolver, then collapses equal translation-invariant
+final-product signatures (normalized topology/adjacency, diameters, rescue membership), keeping the smallest size.
+Dice and full-grid controls remain available only through `grid-admin.ts` for the bench and standing audit. No product
+Creator page or UI is wired yet. The legacy 54mm `validateAttachment` remains only for the dormant payload contract
+pending an approved retirement migration.
 
 ---
 
@@ -141,7 +143,7 @@ its matte feeds the editor's Blend preview on any shape.
 | `composite.ts` (172) | The image bake (P2 cross-browser SVG engine). `composeFront(orig, subj, blurPx, fxFilter?, vignette, tint)` async. `svgFilterBake` via `URL.createObjectURL(Blob)` (Safari-safe; data-URL renders empty on WebKit). `cssColorFilterToSvg`. `PRESET_FILTER`/`presetFilter`/`PRESET_LABELS`. | One bake feeds 3D + print. Zero `ctx.filter`. |
 | `outline-resolve.ts` (263) | The shape engine. `resolve(source, adjustments)→VShape`: all-off=exact source; globalPass (straighten→simplify→smooth→radius) + localPass (curve+per-corner radius), fold-guarded. | Kernels: Paper (smooth/simplify/per-corner radius) + Clipper2 (straighten/whole radius) + in-house curve. |
 | `geometry-truth.ts` (106) | The single geometry pipeline. `contourFromShape(v)` @ `MANUFACTURING_TOLERANCE_MM` (0.05). `assertContourCuttable`. `vectorShapeHash`. | Tolerances: mfg 0.05, display 0.004, min-feature 5mm, anchor-sep 1.5mm. |
-| `grid-core.ts` · `grid-user.ts` · `grid-admin.ts` | Session 59 pure-mm magnetic-grid engine plus its enforced module boundary: core owns the 48/96 law; user accepts only a final `Contour` + attachment; admin exposes the low-level bench/audit controls. | Creator user code cannot import admin/core. User auto cannot select Dice and resolves perimeter-first with explicit minimum coverage rescue; admin modes retain Dice/full-grid experiments. |
+| `grid-core.ts` · `grid-user.ts` · `grid-admin.ts` | Session 59 pure-mm magnetic-grid engine plus its enforced module boundary: core owns the 48/96 law; user resolves a final `Contour` + attachment and the distinct default semantic ladder; admin exposes the low-level bench/audit controls. | Creator user code cannot import admin/core. User auto cannot select Dice, resolves perimeter-first with explicit minimum coverage rescue, and deduplicates ladder rungs by final-product signature; admin modes retain Dice/full-grid experiments. |
 | `polygon.ts` | Neutral polygon/contour containment shared by the grid engine and the dormant legacy validator. | Prevents the replacement grid engine from depending on `attachment.ts`. |
 | `mesh.ts` (212) | `buildShapedGeometry(contour, opts)` — custom BufferGeometry: front cap + rounded edge lip + back cap. 3 material groups (0 front / 1 edge / 2 back). UV0=image, UV1=world-XY suede. Canonical winding (outer CCW / holes CW). | Edge = same front image rolled over the lip. |
 | `build-mesh.ts` (46) | `buildMeshFromSpec(geometryMM, opts, composite, edgeComposite)` → geometry + 2 CanvasTextures. | The only three.js touch besides mesh.ts. |

@@ -3,8 +3,8 @@
 import { describe, expect, it } from 'vitest'
 import { computeAttachmentGrid } from '@/app/(dev)/effect-creator/v5.3.1/core/primitives'
 import { pointInPolygon } from '../polygon'
-import { computeGrid, contourWithOuterMargin, DEFAULT_LAW, resolveGridPlan, scaleContour, semanticLadder, stdShapeContour } from '../grid-admin'
-import { resolveUserPlan } from '../grid-user'
+import { computeGrid, contourWithOuterMargin, DEFAULT_LAW, finalProductSignature, resolveGridPlan, scaleContour, semanticLadder, stdShapeContour } from '../grid-admin'
+import { resolveUserPlan, semanticLadder as userSemanticLadder } from '../grid-user'
 import type { Contour } from '../types'
 
 const donut: Contour = {
@@ -147,5 +147,36 @@ describe('semantic ladder stays inside its product contract', () => {
       const ladder = semanticLadder((sizeMM) => stdShapeContour(shape, sizeMM))
       expect(ladder.every((rung) => rung.sizeMM <= DEFAULT_LAW.maxRungMM)).toBe(true)
     }
+  })
+
+  it('deduplicates the circle by constrained final product and keeps the smallest equivalent rung', () => {
+    const makeCircle = (sizeMM: number) => stdShapeContour('circle', sizeMM)
+    const ladder = userSemanticLadder(makeCircle)
+
+    expect(ladder.map((rung) => rung.sizeMM)).toEqual([23, 71, 90, 130, 158, 221, 303])
+    expect(ladder.some((rung) => rung.sizeMM === 215)).toBe(false)
+    expect(ladder.some((rung) => rung.sizeMM === 226)).toBe(false)
+    for (const rung of ladder) {
+      const product = resolveUserPlan(makeCircle(rung.sizeMM), { attachment: 'magnetic' })
+      expect(rung.points).toBe(product.grid.anchors.length)
+    }
+  })
+
+  it('signs final products by topology, independent of contour translation', () => {
+    const shiftedCircle = (sizeMM: number, dx: number, dy: number): Contour => {
+      const contour = stdShapeContour('circle', sizeMM)
+      return {
+        outer: { pts: contour.outer.pts.map(([x, y]) => [x + dx, y + dy]) },
+        holes: [],
+      }
+    }
+    const plan221 = resolveUserPlan(stdShapeContour('circle', 221), { attachment: 'magnetic' })
+    const shifted221 = resolveUserPlan(shiftedCircle(221, 337, -125), { attachment: 'magnetic' })
+    const plan226 = resolveUserPlan(stdShapeContour('circle', 226), { attachment: 'magnetic' })
+    const plan215 = resolveUserPlan(stdShapeContour('circle', 215), { attachment: 'magnetic' })
+
+    expect(finalProductSignature(shifted221)).toBe(finalProductSignature(plan221))
+    expect(finalProductSignature(plan226)).toBe(finalProductSignature(plan221))
+    expect(finalProductSignature(plan215)).not.toBe(finalProductSignature(plan221))
   })
 })

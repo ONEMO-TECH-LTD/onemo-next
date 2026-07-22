@@ -1,8 +1,10 @@
 import type { Contour } from './types'
 import {
+  resolveUserSemanticLadder,
   resolveUserGridPlan,
   type Attachment,
   type ResolvedGridPlan,
+  type SemanticRung,
 } from './grid-core'
 
 /** The complete user-facing input surface for magnetic-grid resolution. */
@@ -23,4 +25,9 @@ export function resolveUserPlan(
   return resolveUserGridPlan(contourMM, attachment)
 }
 
-export type { Attachment, ResolvedGridPlan }
+/** Resolve the default magnetic product's distinct semantic sizes. */
+export function semanticLadder(makeShape: (sizeMM: number) => Contour): SemanticRung[] {
+  return resolveUserSemanticLadder(makeShape)
+}
+
+export type { Attachment, ResolvedGridPlan, SemanticRung }

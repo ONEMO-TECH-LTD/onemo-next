@@ -3,8 +3,8 @@
 // Covers the launch laws across representative contour families: 48/68 vocabulary, mode purity,
 // coverage semantics, ring spacing, focal-8 radial extremes, padding monotonicity, centering,
 // semantic ladders (ONE + sequential labels, ascending sizes), caps/floors/format laws.
-import { computeGrid, autoGrid, balancedFit, resolveGridPlan, semanticLadder, stdShapeContour, maxDesignMM, minEffectMM, rectFormat, legalPatterns, DEFAULT_LAW } from './grid-admin'
-import { resolveUserPlan } from './grid-user'
+import { computeGrid, autoGrid, balancedFit, finalProductSignature, resolveGridPlan, semanticLadder, stdShapeContour, maxDesignMM, minEffectMM, rectFormat, legalPatterns, DEFAULT_LAW } from './grid-admin'
+import { resolveUserPlan, semanticLadder as userSemanticLadder } from './grid-user'
 import { insetRingMM } from './offset'
 import type { Contour, Pt } from './types'
 
@@ -66,6 +66,16 @@ for (const [nm, mk] of SH) {
     if (gP.anchors.length > gF.anchors.length) flag(`${nm}/${pat}: belt > full`)
   }
   for (const cm of ['centroid', 'bbox'] as const) if (computeGrid(d, { pitchMM: 48, paddingMM: 10, perimeterOnly: true, center: cm }).anchors.length < 1) flag(`${nm}: ${cm} seats 0`)
+}
+// STANDING DEFAULT-LADDER LAW (Dan): no two emitted user sizes may resolve to the same final product.
+// Equality is the engine signature — never an invented minimum-mm gap.
+for (const [nm, mk] of SH.slice(0, 5)) {
+  const ladder = userSemanticLadder(mk)
+  if (!ladder.length || ladder[0].label !== 'ONE') flag(`${nm}/user: invalid default ladder start`)
+  const signatures = ladder.map((rung) => finalProductSignature(
+    resolveUserPlan(mk(rung.sizeMM), { attachment: 'magnetic' }),
+  ))
+  if (new Set(signatures).size !== signatures.length) flag(`${nm}/user: duplicate final product in default ladder`)
 }
 // ATTACHMENT LAW: velcro = no grid & ok; twin-fix = identical grid to magnetic + twinRequired
 for (const [nm, mk] of SH.slice(0, 4)) {
