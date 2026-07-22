@@ -148,10 +148,10 @@ export interface ApprovedEffectPayload {
 type EffectSpecGenerator = PreparedEffect['spec']['generator']
 
 /**
- * The canonical MANUFACTURING-identity subset that `payload_hash` is computed over (F3). It deliberately
- * differs from the full record in one load-bearing way:
- *  • NO commerce exists in the payload at all (the mock price field was removed, Dan s59/P2 — pricing
- *    is not a manufacturing fact and never enters the record or this hash).
+ * The canonical MANUFACTURING-identity subset that `payload_hash` is computed over (F3). Two contract
+ * invariants, both load-bearing:
+ *  • NO COMMERCE — pricing exists nowhere in the payload (the mock price field was removed, Dan s59/P2;
+ *    price is not a manufacturing fact), so identity can never vary by price.
  *  • FULLY FLOAT-FREE — EVERY residual mm / unit-ratio is quantized to integer micro-units (§11
  *    "integer microns, no floats"): `size.{scale, longest_side_mm, final_bbox}`,
  *    `artwork.source_px_to_shape_mm`, `appearance.{thickness_mm, edge_profile.radiusMm}`. Geometry is
@@ -163,8 +163,7 @@ type EffectSpecGenerator = PreparedEffect['spec']['generator']
  */
 export function canonicalHashBody(p: ApprovedEffectPayload) {
   const q = (n: number) => Math.round(n * MICRO) // mm / unit-ratio → integer micro-units
-  const { scale, longest_side_mm, final_bbox, ...sizeRest } = p.size
-  // commerce was deliberately EXCLUDED from this hash; the mock pricing field itself was removed (Dan, s59/P2)
+  const { scale, longest_side_mm, final_bbox, ...sizeRest } = p.size // floats → int-micro below; no commerce field exists (removed, Dan s59/P2)
   const { source_px_to_shape_mm, ...artworkRest } = p.artwork
   const { thickness_mm, edge_profile, ...appearanceRest } = p.appearance
   return {
