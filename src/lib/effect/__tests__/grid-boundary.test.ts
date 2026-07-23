@@ -9,6 +9,8 @@ const ADMIN_PAGE_PATH = 'src/app/(dev)/effect-creator/grid-lab/page.tsx'
 const ADMIN_PANEL_PATH = 'src/app/(dev)/effect-creator/grid-lab/GridWorkbenchPanel.tsx'
 const USER_PANEL_PATH = 'src/app/(dev)/effect-creator/grid-lab/GridWorkbenchUserPanel.tsx'
 const ADMIN_RENDERER_PATH = 'src/app/(dev)/effect-creator/grid-lab/GridWorkbenchRenderer.tsx'
+const USER_DOOR_PATH = 'src/lib/effect/grid-user.ts'
+const ADMIN_DOOR_PATH = 'src/lib/effect/grid-admin.ts'
 
 async function lintUserImport(modulePath: string) {
   const eslint = new ESLint({ cwd: process.cwd() })
@@ -64,6 +66,18 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(userPanelSource).toMatch(/from ['"]@\/lib\/effect\/grid-user['"]/)
     expect(userPanelSource).toContain('resolveUserPlan(')
     expect(userPanelSource).not.toMatch(/grid-(?:admin|core)/)
+  })
+
+  it('keeps serializable job handlers inside their existing semantic doors', () => {
+    const userDoorSource = readFileSync(USER_DOOR_PATH, 'utf8')
+    const adminDoorSource = readFileSync(ADMIN_DOOR_PATH, 'utf8')
+
+    expect(userDoorSource).toContain('handleUserGridJob')
+    expect(userDoorSource).not.toContain('handleAdminGridJob')
+    expect(userDoorSource).not.toMatch(/\bGridPlanOptions\b/)
+    expect(userDoorSource).not.toMatch(/grid-admin/)
+    expect(adminDoorSource).toContain('handleAdminGridJob')
+    expect(adminDoorSource).not.toContain('handleUserGridJob')
   })
 
   it('keeps the clone-gate mismatch inspectable without deciding any control', () => {

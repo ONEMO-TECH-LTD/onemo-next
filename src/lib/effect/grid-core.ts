@@ -1120,3 +1120,171 @@ export function resolveUserSemanticLadder(
   }
   return labelSemanticSteps(products, law)
 }
+
+// ─── EXACT ASYNC/CACHE CONTRACT ─────────────────────────────────────────────
+
+/** Manual cache contract version. Bump whenever an output-affecting engine algorithm or policy changes. */
+export const GRID_ENGINE_CACHE_VERSION = 1
+
+export type StandardLadderShape = Exclude<StdShape, 'rect'>
+
+/** Serializable size-family identity. No function/closure crosses the worker boundary. */
+export type LadderRecipe =
+  | { kind: 'standard'; shape: StandardLadderShape }
+  | { kind: 'uniform-contour'; unitContour: Contour }
+
+/** Serializable identity of one exact contour to resolve. */
+export type PlanRecipe =
+  | { kind: 'standard'; shape: StdShape; widthMM: number; heightMM: number }
+  | { kind: 'uniform-contour'; unitContour: Contour; longestMM: number }
+  | { kind: 'final-contour'; contourMM: Contour }
+
+function exactContourCopy(contour: Contour, label: string): Contour {
+  const ring = (pts: ReadonlyArray<Pt>, ringLabel: string): Pt[] => {
+    if (pts.length < 3) throw new RangeError(`${label} ${ringLabel} must contain at least three points.`)
+    return pts.map(([x, y], index) => {
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        throw new RangeError(`${label} ${ringLabel} point ${index} must contain finite coordinates.`)
+      }
+      return [x, y] as Pt
+    })
+  }
+  return {
+    outer: { pts: ring(contour.outer.pts, 'outer ring') },
+    holes: contour.holes.map((hole, index) => ({ pts: ring(hole.pts, `hole ${index}`) })),
+  }
+}
+
+/** Reconstruct the exact size→Contour closure inside the engine/worker. */
+export function ladderShapeFromRecipe(recipe: LadderRecipe): (sizeMM: number) => Contour {
+  if (recipe.kind === 'standard') return (sizeMM) => stdShapeContour(recipe.shape, sizeMM, sizeMM)
+  const unitContour = exactContourCopy(recipe.unitContour, 'Ladder recipe')
+  return (sizeMM) => scaleContour(unitContour, sizeMM)
+}
+
+/** Reconstruct one exact final contour inside the engine/worker. */
+export function planContourFromRecipe(recipe: PlanRecipe): Contour {
+  if (recipe.kind === 'standard') {
+    if (!Number.isFinite(recipe.widthMM) || !Number.isFinite(recipe.heightMM)) {
+      throw new RangeError('Standard plan recipe dimensions must be finite.')
+    }
+    return stdShapeContour(recipe.shape, recipe.widthMM, recipe.heightMM)
+  }
+  if (recipe.kind === 'uniform-contour') {
+    if (!Number.isFinite(recipe.longestMM)) {
+      throw new RangeError('Uniform-contour plan recipe size must be finite.')
+    }
+    return scaleContour(exactContourCopy(recipe.unitContour, 'Plan recipe'), recipe.longestMM)
+  }
+  return exactContourCopy(recipe.contourMM, 'Plan recipe')
+}
+
+/** Stable, exact serialization for cache identity. Numbers are never rounded and object keys are sorted. */
+export function canonicalGridCacheValue(value: unknown): string {
+  if (value === null) return 'null'
+  if (typeof value === 'string' || typeof value === 'boolean') return JSON.stringify(value)
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw new RangeError('Grid cache identity accepts finite numbers only.')
+    return Object.is(value, -0) ? '-0' : JSON.stringify(value)
+  }
+  if (Array.isArray(value)) return `[${value.map(canonicalGridCacheValue).join(',')}]`
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>
+    return `{${Object.keys(record).sort().map((key) =>
+      `${JSON.stringify(key)}:${canonicalGridCacheValue(record[key])}`).join(',')}}`
+  }
+  throw new TypeError(`Unsupported grid cache identity value: ${typeof value}`)
+}
+
+const GRID_ENGINE_POLICY_CONTRACT = {
+  pitchesMM: [...LAUNCH_PITCHES_MM],
+  paddingFloorMM: PADDING_FLOOR_MM,
+  minAnchors: MIN_ANCHORS,
+  targetAnchors: TARGET_ANCHORS,
+  holdReachMM: HOLD_REACH_MM,
+  padCornerToleranceMM: PAD_CORNER_TOL_MM,
+  ringCoverageMin: RING_COVERAGE_MIN,
+  focalSizeMM: FOCAL_SIZE_MM,
+  focalRamp2MM: FOCAL_RAMP2_MM,
+  defaultLaw: DEFAULT_LAW,
+  defaultMarginMM: DEFAULT_MARGIN_MM,
+  randomShapeMaxMM: RANDOM_SHAPE_MAX_MM,
+  modes: {
+    auto: modeCombos('auto'),
+    standard: modeCombos('standard'),
+    quincunx: modeCombos('quincunx'),
+    diamond: modeCombos('diamond'),
+  },
+  user: {
+    autoPatterns: ['standard', 'diamond'],
+    perimeterOnly: true,
+    rescueCoverage: true,
+    sparseThin: true,
+    ladderAttachment: 'magnetic',
+  },
+  admin: {
+    signedBaseMargin: true,
+    diagnosticVelcro: true,
+  },
+} as const
+
+/** Engine-owned law/policy identity; UI and worker clients never reconstruct it. */
+export const GRID_ENGINE_POLICY_SIGNATURE = canonicalGridCacheValue(GRID_ENGINE_POLICY_CONTRACT)
+
+function normalizedLaw(law: SizeLaw = DEFAULT_LAW): SizeLaw {
+  return {
+    paddingMM: law.paddingMM,
+    frameMM: law.frameMM,
+    maxTestedMM: law.maxTestedMM,
+    maxRungMM: law.maxRungMM,
+  }
+}
+
+function gridCacheKey(door: 'user' | 'admin', operation: 'ladder' | 'plan', body: unknown): string {
+  return canonicalGridCacheValue({
+    body,
+    cacheVersion: GRID_ENGINE_CACHE_VERSION,
+    door,
+    operation,
+    policy: GRID_ENGINE_POLICY_SIGNATURE,
+  })
+}
+
+export function userLadderCacheKey(recipe: LadderRecipe): string {
+  ladderShapeFromRecipe(recipe) // validate before admitting a recipe to the cache
+  return gridCacheKey('user', 'ladder', { law: normalizedLaw(), recipe })
+}
+
+export function adminLadderCacheKey(
+  recipe: LadderRecipe,
+  law: SizeLaw = DEFAULT_LAW,
+  mode: GridMode = 'auto',
+): string {
+  ladderShapeFromRecipe(recipe)
+  return gridCacheKey('admin', 'ladder', { law: normalizedLaw(law), mode, recipe })
+}
+
+export function userPlanCacheKey(recipe: PlanRecipe, attachment: Attachment): string {
+  planContourFromRecipe(recipe)
+  return gridCacheKey('user', 'plan', { attachment, recipe })
+}
+
+function effectiveAdminPlanOptions(opts: GridPlanOptions = {}) {
+  return {
+    attachment: opts.attachment ?? 'magnetic',
+    mode: opts.mode ?? 'auto',
+    density: opts.density ?? 'light',
+    paddingMM: Math.max(PADDING_FLOOR_MM, opts.paddingMM ?? PADDING_FLOOR_MM),
+    plan: opts.plan ?? 'auto',
+    center: opts.center ?? 'centroid',
+    baseMarginMM: opts.baseMarginMM ?? 0,
+    maxGrowMM: Math.max(0, opts.maxGrowMM ?? DEFAULT_MARGIN_MM),
+    pitchMM: opts.pitchMM ?? null,
+    targetAnchors: opts.targetAnchors ?? TARGET_ANCHORS,
+  }
+}
+
+export function adminPlanCacheKey(recipe: PlanRecipe, opts: GridPlanOptions = {}): string {
+  planContourFromRecipe(recipe)
+  return gridCacheKey('admin', 'plan', { options: effectiveAdminPlanOptions(opts), recipe })
+}
