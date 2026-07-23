@@ -1,5 +1,6 @@
 import type { Contour } from './types'
 import {
+  nearestSemanticRung,
   resolveUserSemanticLadder,
   resolveUserGridPlan,
   stdShapeContour,
@@ -37,6 +38,14 @@ export function resolveUserPlan(
 /** Resolve the default magnetic product's distinct semantic sizes. */
 export function semanticLadder(makeShape: (sizeMM: number) => Contour): SemanticRung[] {
   return resolveUserSemanticLadder(makeShape)
+}
+
+/** User-door rung selection preserves the current first-rung exact-tie behavior. */
+export function nearestUserSemanticRung(
+  rungs: ReadonlyArray<SemanticRung>,
+  targetMM: number,
+): SemanticRung {
+  return nearestSemanticRung(rungs, targetMM, 'first')
 }
 
 export type { Attachment, ResolvedGridPlan, SemanticRung }

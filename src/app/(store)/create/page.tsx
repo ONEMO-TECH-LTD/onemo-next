@@ -4,12 +4,12 @@ import { useEffect, useMemo, useState } from 'react'
 
 import type { Contour, Pt } from '@/lib/effect/types'
 import {
+  nearestUserSemanticRung,
   resolveUserPlan,
   semanticLadder,
   standardShapeContour,
   type Attachment,
   type ResolvedGridPlan,
-  type SemanticRung,
   type UserStandardShape,
 } from '@/lib/effect/grid-user'
 import { ensureSession } from '@/lib/supabase/session-client'
@@ -29,14 +29,6 @@ const ATTACHMENTS: ReadonlyArray<{ value: Attachment; label: string }> = [
   { value: 'twinfix', label: 'Twin-fix' },
   { value: 'velcro', label: 'Velcro' },
 ]
-
-function nearestRung(ladder: SemanticRung[], sizeMM: number): SemanticRung {
-  return ladder.reduce((best, rung) => {
-    const nextDistance = Math.abs(rung.sizeMM - sizeMM)
-    const bestDistance = Math.abs(best.sizeMM - sizeMM)
-    return nextDistance < bestDistance ? rung : best
-  })
-}
 
 export default function CreatePage() {
   const [shape, setShape] = useState<UserShape>('square')
@@ -59,7 +51,7 @@ export default function CreatePage() {
     () => semanticLadder((candidateMM) => standardShapeContour(shape, candidateMM)),
     [shape],
   )
-  const rung = useMemo(() => nearestRung(ladder, sizeMM), [ladder, sizeMM])
+  const rung = useMemo(() => nearestUserSemanticRung(ladder, sizeMM), [ladder, sizeMM])
   const designContour = useMemo(
     () => standardShapeContour(shape, rung.sizeMM),
     [shape, rung.sizeMM],

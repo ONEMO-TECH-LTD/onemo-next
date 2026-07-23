@@ -13,17 +13,14 @@ import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import { contourFromShape } from '@/lib/effect/geometry-truth'
-import { insetRingMM } from '@/lib/effect/offset'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { balancedFit, autoGrid, scaleContour, semanticLadder, stdShapeContour, rectFormat, minEffectMM, maxDesignMM, DEFAULT_MARGIN_MM, DEFAULT_LAW, type GridPattern, type MagnetPlan, type GridDensity, type GridMode, type SemanticRung, type StdShape, type Attachment, perimeterForDensity } from '@/lib/effect/grid-admin'
+import { nearestAnchorPair, nearestSemanticRung, resolveAdminGridPlan, resolveDesignSizeMM, resolveRectangleRungs, scaleContour, semanticLadder, stdShapeContour, rectFormat, minEffectMM, maxDesignMM, DEFAULT_MARGIN_MM, DEFAULT_LAW, type GridPattern, type MagnetPlan, type GridDensity, type GridMode, type SemanticRung, type StdShape, type Attachment } from '@/lib/effect/grid-admin'
+import { GridWorkbenchPanel } from './GridWorkbenchPanel'
 import { contourDimension as dim, GridWorkbenchReadouts, GridWorkbenchStage } from './GridWorkbenchRenderer'
 
 const IMG = 1000
 const VP = 440
 const FIT = 0.86
-
-const PRESETS: VectorShapeKind[] = ['squircle', 'square', 'circle', 'pill', 'heart', 'star', 'polygon', 'diamond', 'plus', 'teardrop', 'leaf', 'lens', 'bolt', 'sparkle', 'pinched', 'asterisk', 'bowtie']
-const GENS: { k: ShapeKind; label: string }[] = [{ k: 'blob', label: 'Blob' }, { k: 'form', label: 'Clover' }, { k: 'daisy', label: 'Daisy' }, { k: 'pinwheel', label: 'Pinwheel' }]
 
 type Src = 'std' | 'preset' | 'gen' | 'magic'
 type StdGeo = StdShape
@@ -96,6 +93,11 @@ export default function GridLab() {
 
   const sizeMax = maxDesignMM(src === 'std' ? 'std' : src, DEFAULT_LAW) // engine law: per-source max
   const sizeMin = minEffectMM({ ...DEFAULT_LAW, paddingMM: pad }) // engine law: the ONE (single-point) floor
+  const resolvedSizeMM = resolveDesignSizeMM(
+    sizeMM,
+    src === 'std' ? 'std' : src,
+    { ...DEFAULT_LAW, paddingMM: pad },
+  )
 
   // PER-GEOMETRY standard sizes (Dan): each geometry's rungs are solved numerically from the live
   // recipe (padding/frame/pattern law) — square 70/118/…, circle and triangle their own. Rect derives
@@ -110,50 +112,43 @@ export default function GridLab() {
     return semanticLadder(mk, { ...DEFAULT_LAW, paddingMM: pad }, gridMode)
   }, [src, geo, pad, gridMode])
 
+  const rectRungs = useMemo(
+    () => stdRungs.length
+      ? resolveRectangleRungs(stdRungs, { longMM, shortMM, orientation: orient })
+      : null,
+    [stdRungs, longMM, shortMM, orient],
+  )
+
   const model = useMemo(() => {
     try {
-      const law = { ...DEFAULT_LAW, paddingMM: pad }
-      // NO silent per-shape overrides: manual pattern/pitch buttons behave literally; Auto searches
-      // pitch × pattern under the one coverage physics (autoGrid) — shape-agnostic by construction.
-      const baseCfg0 = { attachment, paddingMM: pad, pattern, plan, perimeterOnly: perimeterForDensity(density, patternAuto ? 'standard' : pattern), center: centerMode, sparseThin: density === 'light' }
       // ── STANDARD GEOMETRIES (D12–D15): drawn directly in mm, each axis snapped to its own rung ──
       if (src === 'std') {
-        if (!stdRungs.length) return null
-        const nearest = (mm: number, pool: SemanticRung[]) => pool.reduce((b, r) => {
-          const dr = Math.abs(r.sizeMM - mm), db = Math.abs(b.sizeMM - mm)
-          return dr < db || (dr === db && r.sizeMM > b.sizeMM) ? r : b // tie → larger: never shrink on a mode switch
-        })
-        // rect (system A): long + short axes each snap the SQUARE's semantic sizes; orientation flips
-        const rungL = nearest(longMM, stdRungs)
-        const shortPool = stdRungs.filter(r => r.sizeMM < rungL.sizeMM)
-        const rungS = shortPool.length ? nearest(shortMM, shortPool) : rungL
-        const nearestOwn = nearest(sizeMM, stdRungs)
-        const rungW = geo === 'rect' ? (orient === 'landscape' ? rungL : rungS) : nearestOwn
-        const rungH = geo === 'rect' ? (orient === 'landscape' ? rungS : rungL) : rungW
+        if (!stdRungs.length || !rectRungs) return null
+        const nearestOwn = nearestSemanticRung(stdRungs, sizeMM)
+        const rungW = geo === 'rect' ? rectRungs.widthRung : nearestOwn
+        const rungH = geo === 'rect' ? rectRungs.heightRung : rungW
         // DUAL SIZING LAW (every shape): the slider is CONTINUOUS/adaptive — the engine adapts any size
         // exactly like generators/AI cuts; the semantic buttons are quick-sets to the pre-calculated
         // optimal variants. `rungW` stays the NEAREST reference for display. Rect keeps axis rungs
         // (system A per Dan's rectangle derivation).
-        const stdSize = geo === 'rect' ? rungW.sizeMM : Math.max(sizeMin, Math.min(sizeMM, sizeMax))
+        const stdSize = geo === 'rect' ? rungW.sizeMM : resolvedSizeMM
         const design = stdShapeContour(geo, stdSize, geo === 'rect' ? rungH.sizeMM : stdSize)
-        const withMargin = (m: number): Contour => {
-          if (Math.abs(m) < 0.01) return design
-          const o = insetRingMM(design.outer.pts, m, 'round')
-          return o && o.length >= 3 ? { outer: { pts: o }, holes: [] } : design
-        }
-        const sel = autoGrid(withMargin, baseCfg0, offsetMM, maxGrowMM, { density, pitchMM: pitchAuto ? undefined : pitch, pattern: patternAuto ? undefined : pattern })
-        const chosenPitch = sel.pitchMM
-        const fit = balancedFit(withMargin, { ...baseCfg0, pitchMM: sel.pitchMM, pattern: sel.pattern }, offsetMM, maxGrowMM)
-        const effect = withMargin(fit.sizeMM)
+        const resolved = resolveAdminGridPlan(design, {
+          attachment,
+          mode: gridMode,
+          density,
+          paddingMM: pad,
+          plan,
+          center: centerMode,
+          baseMarginMM: offsetMM,
+          maxGrowMM,
+          pitchMM: pitchAuto ? undefined : pitch,
+        })
+        const effect = resolved.effectContourMM
         const eff = Math.round(Math.max(dim(effect, 0), dim(effect, 1)))
-        let magDist: number | null = null
-        const aps = fit.grid.anchors
-        for (let i = 0; i < aps.length; i++) for (let j = i + 1; j < aps.length; j++) {
-          const d = Math.hypot(aps[i].p[0] - aps[j].p[0], aps[i].p[1] - aps[j].p[1])
-          if (magDist == null || d < magDist) magDist = d
-        }
+        const anchorPair = nearestAnchorPair(resolved.grid.anchors)
         const format = geo !== 'rect' ? null : rectFormat(rungW.sizeMM, rungH.sizeMM)
-        return { contour: effect, design, grid: fit.grid, marginMM: fit.sizeMM, grew: fit.grew, effSize: eff, designSize: stdSize, pitch: chosenPitch, patternUsed: sel.pattern, magDist, rung: rungW, rungH, format }
+        return { contour: effect, design, grid: resolved.grid, marginMM: resolved.resolvedMarginMM, grew: resolved.grewMM, effSize: eff, designSize: stdSize, pitch: resolved.pitchMM, patternUsed: resolved.pattern ?? pattern, magDist: resolved.nearestAnchorMM, anchorPair, rung: rungW, rungH, format }
       }
       // base contour normalized so longest side = 1mm (scale-free); scaleContour() sizes it in mm
       let base: Contour | null = null
@@ -173,49 +168,36 @@ export default function GridLab() {
       }
       if (!base || base.outer.pts.length < 3) return null
       const b = base
-      const baseCfg = { attachment, paddingMM: pad, pattern, plan, perimeterOnly: perimeterForDensity(density, patternAuto ? 'standard' : pattern), center: centerMode, sparseThin: density === 'light' }
       // DESIGN stays fixed at the set size. Auto-grow adds an outward MARGIN (offset) around it — the border
       // the magnets' padding uses. Manual "offset" is the starting margin. Total effect = design + 2×margin.
       // random shapes (AI Magic / generators) are capped at 180mm; curated presets use the full ladder.
       // ADAPTIVE sizing (Dan's law, restored): the slider is CONTINUOUS — free shapes take any size and
       // the engine adapts (auto-margin snaps coverage to the 48-family grid dynamically). The rung
       // buttons are quick-sets for the rigid standard sizes; `rung` below is the nearest reference only.
-      const dSize = Math.max(sizeMin, Math.min(sizeMM, sizeMax))
-      const rung = stdRungs.length ? stdRungs.reduce((b, r) => {
-        const dr = Math.abs(r.sizeMM - dSize), db = Math.abs(b.sizeMM - dSize)
-        return dr < db || (dr === db && r.sizeMM > b.sizeMM) ? r : b
-      }) : { label: '—', points: 0, sizeMM: dSize, visible: true }
+      const dSize = resolvedSizeMM
+      const rung = stdRungs.length
+        ? nearestSemanticRung(stdRungs, dSize)
+        : { label: '—', points: 0, sizeMM: dSize, visible: true }
       const design = scaleContour(b, dSize)
-      const withMargin = (m: number): Contour => {
-        if (Math.abs(m) < 0.01) return design
-        const o = insetRingMM(design.outer.pts, m, 'round')
-        return o && o.length >= 3 ? { outer: { pts: o }, holes: [] } : design
-      }
-      // proportion-adaptive pitch: coarsest legal 96/48 composition that still holds
-      const sel = autoGrid(withMargin, baseCfg, offsetMM, maxGrowMM, { density, pitchMM: pitchAuto ? undefined : pitch, pattern: patternAuto ? undefined : pattern })
-      const chosenPitch = sel.pitchMM
-      const fit = balancedFit(withMargin, { ...baseCfg, pitchMM: sel.pitchMM, pattern: sel.pattern }, offsetMM, maxGrowMM)
-      const effect = withMargin(fit.sizeMM)
+      const resolved = resolveAdminGridPlan(design, {
+        attachment,
+        mode: gridMode,
+        density,
+        paddingMM: pad,
+        plan,
+        center: centerMode,
+        baseMarginMM: offsetMM,
+        maxGrowMM,
+        pitchMM: pitchAuto ? undefined : pitch,
+      })
+      const effect = resolved.effectContourMM
       const eff = Math.round(Math.max(dim(effect, 0), dim(effect, 1)))
-      // actual seated magnet distance (closest pair) — shown next to the total + annotated on canvas
-      let magDist: number | null = null
-      const aps = fit.grid.anchors
-      for (let i = 0; i < aps.length; i++) for (let j = i + 1; j < aps.length; j++) {
-        const d = Math.hypot(aps[i].p[0] - aps[j].p[0], aps[i].p[1] - aps[j].p[1])
-        if (magDist == null || d < magDist) magDist = d
-      }
-      return { contour: effect, design, grid: fit.grid, marginMM: fit.sizeMM, grew: fit.grew, effSize: eff, designSize: dSize, pitch: chosenPitch, patternUsed: sel.pattern, magDist, rung, rungH: rung, format: null }
+      const anchorPair = nearestAnchorPair(resolved.grid.anchors)
+      return { contour: effect, design, grid: resolved.grid, marginMM: resolved.resolvedMarginMM, grew: resolved.grewMM, effSize: eff, designSize: dSize, pitch: resolved.pitchMM, patternUsed: resolved.pattern ?? pattern, magDist: resolved.nearestAnchorMM, anchorPair, rung, rungH: rung, format: null }
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
-  }, [src, geo, longMM, shortMM, orient, preset, gen, p1, p2, sides, points, sizeMM, pitch, pitchAuto, density, pad, pattern, patternAuto, plan, magic, offsetMM, centerMode, maxGrowMM, stdRungs, attachment])
+  }, [src, geo, preset, gen, p1, p2, sides, points, pitch, pitchAuto, density, pad, pattern, plan, magic, offsetMM, centerMode, maxGrowMM, stdRungs, attachment, gridMode, rectRungs, resolvedSizeMM])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
-  const genParams = {
-    blob: [['Waviness', '%'], ['Seed', '']], form: [['Pinch', '%'], ['Lobes', '']],
-    daisy: [['Depth', '%'], ['Petals', '']], pinwheel: [['Swirl', '%'], ['Blades', '']],
-  } as Record<string, [string, string][]>
-  const p2max = gen === 'blob' ? 40 : gen === 'form' ? 8 : gen === 'daisy' ? 12 : 8
-  const p2min = gen === 'blob' ? 1 : gen === 'form' ? 1 : gen === 'daisy' ? 5 : 3
-
   return (
     <div className="gl">
       <style>{CSS}</style>
@@ -240,167 +222,31 @@ export default function GridLab() {
         />
 
         <aside className="gl-controls">
-          <div className="gl-card gl-pad">
-            <div className="gl-glabel">Shape source</div>
-            <div className="gl-seg gl-seg3">
-              <button aria-pressed={src === 'std'} onClick={() => setSrc('std')}>Standard</button>
-              <button aria-pressed={src === 'preset'} onClick={() => setSrc('preset')}>Presets</button>
-              <button aria-pressed={src === 'gen'} onClick={() => setSrc('gen')}>Generators</button>
-              <button aria-pressed={src === 'magic'} onClick={() => setSrc('magic')}>AI Magic</button>
-            </div>
-
-            {src === 'std' && <div className="gl-field"><span>Geometry</span>
-              <div className="gl-seg gl-wrap">
-                {([['square', 'Square'], ['diamondShape', 'Diamond'], ['rect', 'Rectangle'], ['circle', 'Circle'], ['triangle', 'Triangle']] as [StdGeo, string][]).map(([g, l]) =>
-                  <button key={g} aria-pressed={geo === g} onClick={() => setGeo(g)}>{l}</button>)}
-              </div>
-            </div>}
-
-            {src === 'preset' && <>
-              <label className="gl-field"><span>Preset shape</span>
-                <select value={preset} onChange={e => setPreset(e.target.value as VectorShapeKind)}>
-                  {PRESETS.map(k => <option key={k} value={k}>{k}</option>)}
-                </select>
-              </label>
-              {preset === 'polygon' && <Slider label="Sides" v={sides} set={setSides} min={3} max={12} />}
-              {preset === 'star' && <Slider label="Points" v={points} set={setPoints} min={3} max={12} />}
-            </>}
-
-            {src === 'gen' && <>
-              <div className="gl-seg gl-wrap">
-                {GENS.map(g => <button key={g.k} aria-pressed={gen === g.k} onClick={() => { setGen(g.k); setP1(50); setP2(g.k === 'blob' ? 7 : g.k === 'daisy' ? 8 : g.k === 'pinwheel' ? 5 : 4) }}>{g.label}</button>)}
-              </div>
-              <Slider label={genParams[gen][0][0]} unit={genParams[gen][0][1]} v={p1} set={setP1} min={0} max={100} />
-              <Slider label={genParams[gen][1][0]} v={p2} set={setP2} min={p2min} max={p2max} />
-            </>}
-
-            {src === 'magic' && <>
-              <input ref={fileRef} type="file" accept="image/*" hidden onChange={onFile} />
-              <button className="gl-upload" onClick={() => fileRef.current?.click()}>
-                {magic ? 'Replace image' : 'Upload an image'}
-              </button>
-              <div className="gl-magic-note">
-                {magStatus === 'downloading-model' ? '↓ downloading cut-out model (one time)…'
-                  : magStatus.startsWith('cutting') ? '✂ cutting out the subject…'
-                    : magStatus.startsWith('error') ? '⚠ ' + magStatus.slice(6)
-                      : magic ? `cut by ${magic.adapter} · edit size below`
-                        : 'AI removes the background and traces the silhouette — that outline meets the grid.'}
-              </div>
-            </>}
-          </div>
-
-          <div className="gl-card gl-pad">
-            <div className="gl-field"><span>Attachment</span>
-              <div className="gl-seg">
-                {([['magnetic', 'Magnetic'], ['twinfix', 'Twin-fix'], ['velcro', 'Velcro']] as [Attachment, string][]).map(([a, l]) =>
-                  <button key={a} aria-pressed={attachment === a} onClick={() => setAttachment(a)}>{l}</button>)}
-              </div>
-            </div>
-            {/* SEMANTIC SIZES — the shape's own T-shirt ladder (anchor-count tiers), mode + recipe driven */}
-            {!(src === 'std' && geo === 'rect') && <div className="gl-field"><span>Size · {src === 'std' ? 'this shape' : 'square ref'} · {gridMode === 'quincunx' ? 'dice' : gridMode}</span>
-              <div className="gl-seg gl-wrap">
-                {stdRungs.map(r =>
-                  <button key={r.sizeMM} aria-pressed={model?.rung.sizeMM === r.sizeMM}
-                    className={r.visible ? undefined : 'gl-hidden-rung'}
-                    onClick={() => setSizeMM(r.sizeMM)}
-                    title={`${r.points} anchor point${r.points > 1 ? 's' : ''}${r.visible ? '' : ' · hidden at launch (untested)'}`}>
-                    {r.label}{r.visible ? '' : '†'}
-                  </button>)}
-              </div>
-            </div>}
-            {src === 'std' && geo === 'rect' && <>
-              {/* system A: long side → short side (< long) → orientation */}
-              <div className="gl-field"><span>Long side · size</span>
-                <div className="gl-seg gl-wrap">
-                  {stdRungs.filter(r => r.points >= 2).map(r =>
-                    <button key={'L' + r.sizeMM} aria-pressed={Math.max(model?.rung.sizeMM ?? 0, model?.rungH?.sizeMM ?? 0) === r.sizeMM}
-                      className={r.visible ? undefined : 'gl-hidden-rung'}
-                      onClick={() => setLongMM(r.sizeMM)}
-                      title={`${r.points} anchor points${r.visible ? '' : ' · hidden at launch (untested)'}`}>
-                      {r.label}{r.visible ? '' : '†'}
-                    </button>)}
-                </div>
-              </div>
-              <div className="gl-field"><span>Short side · size</span>
-                <div className="gl-seg gl-wrap">
-                  {stdRungs.filter(r => r.sizeMM < Math.max(...stdRungs.filter(q => Math.abs(q.sizeMM - longMM) === Math.min(...stdRungs.map(w => Math.abs(w.sizeMM - longMM)))).map(q => q.sizeMM))).map(r =>
-                    <button key={'S' + r.sizeMM} aria-pressed={Math.min(model?.rung.sizeMM ?? 0, model?.rungH?.sizeMM ?? 0) === r.sizeMM}
-                      className={r.visible ? undefined : 'gl-hidden-rung'}
-                      onClick={() => setShortMM(r.sizeMM)}>
-                      {r.label}{r.visible ? '' : '†'}
-                    </button>)}
-                </div>
-              </div>
-              <div className="gl-field"><span>Orientation</span>
-                <div className="gl-seg">
-                  <button aria-pressed={orient === 'landscape'} onClick={() => setOrient('landscape')}>Landscape</button>
-                  <button aria-pressed={orient === 'portrait'} onClick={() => setOrient('portrait')}>Portrait</button>
-                </div>
-              </div>
-            </>}
-            <Slider label={`Design size · longest side${sizeMax < DEFAULT_LAW.maxRungMM ? ` · max ${sizeMax}` : ''}`} unit="mm" v={Math.max(sizeMin, Math.min(sizeMM, sizeMax))} set={setSizeMM} min={sizeMin} max={sizeMax} />
-            <Slider label="Max auto-margin · balance" unit="mm" v={maxGrowMM} set={setMaxGrowMM} min={0} max={80} />
-            {model && <div className="gl-total">
-              <span className="gl-total-k">Total effect size</span>
-              <b className="gl-total-v">{model.effSize}<small> mm</small></b>
-              <span className="gl-total-note">{model.marginMM > 0.5 ? `design ${model.designSize}mm + ${Math.round(model.marginMM)}mm margin${model.grew > 0.5 ? ` (+${Math.round(model.grew)} auto)` : ''}` : `design ${model.designSize}mm · no margin`}</span>
-              <span className="gl-total-note gl-total-grid">grid {model.pitch}mm{model.magDist != null ? ` · magnets ${Math.round(model.magDist)}mm apart${Math.abs(model.magDist - model.pitch * Math.SQRT2) < 1.5 ? ` · grid diagonal (${model.pitch}×√2)` : Math.abs(model.magDist - model.pitch * Math.SQRT2 / 2) < 1.5 ? ` · dice half-diagonal` : ''}` : ''}</span>
-              <span className="gl-total-note">{model.format ? `${model.rung.sizeMM}×${model.rungH.sizeMM} · ${model.format}` : `${model.designSize === model.rung.sizeMM ? 'size' : 'nearest'} ${model.rung.label} · tier ${model.rung.points}pt · seated ${model.grid.anchors.length}`}{model.rung.visible && model.rungH.visible ? '' : ' · HIDDEN (untested)'}</span>
-            </div>}
-            <div className="gl-field"><span>Density</span>
-              <div className="gl-seg">
-                <button aria-pressed={density === 'standard'} onClick={() => setDensity('standard')} title="dense — fine grid, full coverage, firmer hold">Standard</button>
-                <button aria-pressed={density === 'light'} onClick={() => setDensity('light')} title="sparse — coarse grid, perimeter belt, uncrowded">Light</button>
-              </div>
-            </div>
-            <div className="gl-field"><span>Grid pitch · {pitchAuto && model ? `auto → ${model.pitch}mm` : !pitchAuto && model && model.pitch !== pitch ? `${pitch} → ${model.pitch}mm · dice needs 96` : 'manual'}</span>
-              <div className="gl-seg">
-                <button aria-pressed={pitchAuto} onClick={() => setPitchAuto(true)}>Auto</button>
-                <button aria-pressed={!pitchAuto && (model ? model.pitch === 48 : pitch === 48)} onClick={() => { setPitchAuto(false); setPitch(48) }}>48</button>
-                <button aria-pressed={!pitchAuto && (model ? model.pitch === 96 : pitch === 96)} onClick={() => { setPitchAuto(false); setPitch(96) }}>96</button>
-              </div>
-            </div>
-            <Slider label="Magnet padding · per spot · min 10" unit="mm" v={pad} set={setPad} min={10} max={30} />
-            <Slider label="Base margin · outward offset" unit="mm" v={offsetMM} set={setOffsetMM} min={-15} max={15} />
-
-            <div className="gl-field"><span>Grid pattern · {patternAuto && model ? `auto → ${model.patternUsed === 'quincunx' ? 'dice-5' : model.patternUsed}` : 'manual'}</span>
-              <div className="gl-seg">
-                <button aria-pressed={patternAuto} onClick={() => setPatternAuto(true)}>Auto</button>
-                {(['standard', 'quincunx', 'diamond'] as GridPattern[]).map(p =>
-                  <button key={p} aria-pressed={!patternAuto && pattern === p} onClick={() => { setPatternAuto(false); setPattern(p) }}>{p === 'quincunx' ? 'Dice-5' : p === 'diamond' ? 'Diamond' : 'Standard'}</button>)}
-              </div>
-            </div>
-            <div className="gl-field"><span>Grid centering · A/B</span>
-              <div className="gl-seg">
-                {([['centroid', 'Centroid'], ['bbox', 'Bbox centre']] as ['centroid' | 'bbox', string][]).map(([m, l]) =>
-                  <button key={m} aria-pressed={centerMode === m} onClick={() => setCenterMode(m)}>{l}</button>)}
-              </div>
-            </div>
-            <div className="gl-field"><span>Magnet plan</span>
-              <div className="gl-seg">
-                {([['auto', 'Auto'], ['all6', 'All 6mm'], ['all8', 'All 8mm'], ['corners8', 'Corners 8']] as [MagnetPlan, string][]).map(([p, l]) =>
-                  <button key={p} aria-pressed={plan === p} onClick={() => setPlan(p)}>{l}</button>)}
-              </div>
-            </div>
-            <label className="gl-toggle"><span>Front face · magnet overlay</span>
-              <input type="checkbox" checked={front} onChange={e => setFront(e.target.checked)} />
-            </label>
-          </div>
+          <GridWorkbenchPanel
+            src={src} setSrc={setSrc} geo={geo} setGeo={setGeo}
+            setLongMM={setLongMM} setShortMM={setShortMM}
+            orient={orient} setOrient={setOrient} preset={preset} setPreset={setPreset}
+            gen={gen} setGen={setGen} p1={p1} setP1={setP1} p2={p2} setP2={setP2}
+            sides={sides} setSides={setSides} points={points} setPoints={setPoints}
+            sizeMM={sizeMM} setSizeMM={setSizeMM} pitch={pitch} setPitch={setPitch}
+            pitchAuto={pitchAuto} setPitchAuto={setPitchAuto}
+            attachment={attachment} setAttachment={setAttachment}
+            density={density} setDensity={setDensity} pad={pad} setPad={setPad}
+            offsetMM={offsetMM} setOffsetMM={setOffsetMM}
+            pattern={pattern} setPattern={setPattern}
+            patternAuto={patternAuto} setPatternAuto={setPatternAuto}
+            plan={plan} setPlan={setPlan} front={front} setFront={setFront}
+            centerMode={centerMode} setCenterMode={setCenterMode}
+            maxGrowMM={maxGrowMM} setMaxGrowMM={setMaxGrowMM}
+            magic={magic} magStatus={magStatus} fileRef={fileRef} onFile={onFile}
+            sizeMax={sizeMax} sizeMin={sizeMin} resolvedSizeMM={resolvedSizeMM} maxRungMM={DEFAULT_LAW.maxRungMM}
+            gridMode={gridMode} stdRungs={stdRungs} rectRungs={rectRungs} model={model}
+          />
 
           {model && <GridWorkbenchReadouts model={model} scale={scale} />}
         </aside>
       </div>
     </div>
-  )
-}
-
-function cap(s: string) { return s[0].toUpperCase() + s.slice(1) }
-function Slider({ label, v, set, min, max, unit }: { label: string; v: number; set: (n: number) => void; min: number; max: number; unit?: string }) {
-  return (
-    <label className="gl-slider">
-      <div className="gl-slider-row"><span>{label}</span><b>{v}{unit ? ' ' + unit : ''}</b></div>
-      <input type="range" min={min} max={max} value={v} onChange={e => set(+e.target.value)} />
-    </label>
   )
 }
 
@@ -451,7 +297,6 @@ const CSS = `
 .gl-upload{font:600 13px var(--sans);color:#fff;background:var(--accent);border:0;border-radius:10px;padding:11px;cursor:pointer;width:100%}
 .gl-upload:hover{filter:brightness(1.05)}
 .gl-magic-note{font:11.5px var(--mono);color:var(--ink-2);line-height:1.5}
-.gl-snap{font-size:12.5px;color:var(--ink-2)}.gl-snap b{font:600 13px var(--mono);color:var(--ink)}.gl-snap span{display:block;font:11px var(--mono);color:var(--ink-3);margin-top:3px}
 .gl-total{margin:2px 0;padding:13px 15px;background:var(--accent-soft);border:1px solid var(--accent);border-radius:12px;display:flex;flex-direction:column;gap:3px}
 .gl-total-k{font:600 10px var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--accent)}
 .gl-total-v{font:700 32px var(--mono);color:var(--ink);line-height:1;font-variant-numeric:tabular-nums}

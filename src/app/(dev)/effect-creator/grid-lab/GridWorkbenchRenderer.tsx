@@ -18,11 +18,18 @@ interface GridWorkbenchGrid {
   applicationPadMM: number
 }
 
+interface GridWorkbenchNearestAnchorPair {
+  first: { p: Pt }
+  second: { p: Pt }
+  distanceMM: number
+}
+
 interface GridWorkbenchModel {
   contour: Contour
   design: Contour
   grid: GridWorkbenchGrid
   patternUsed: string
+  anchorPair: GridWorkbenchNearestAnchorPair | null
 }
 
 export function contourDimension(c: Contour, axis: 0 | 1): number {
@@ -57,7 +64,7 @@ export function GridWorkbenchStage({
         <span className="gl-eye">{model ? `1mm = ${scale.toFixed(2)} px` : '—'}</span>
       </div>
       <div className="gl-vp">
-        {model ? <Stage contour={model.contour} design={model.design} grid={model.grid} front={front} frontImg={frontImg} viewportPx={viewportPx} fit={fit} />
+        {model ? <Stage contour={model.contour} design={model.design} grid={model.grid} anchorPair={model.anchorPair} front={front} frontImg={frontImg} viewportPx={viewportPx} fit={fit} />
           : <Empty text={emptyText} spin={emptySpin} />}
       </div>
       {model && <Verdict grid={model.grid} />}
@@ -86,7 +93,7 @@ export function GridWorkbenchReadouts({ model, scale }: { model: GridWorkbenchMo
 }
 
 const pathFrom = (pp: Pt[]) => 'M ' + pp.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ') + ' Z'
-function Stage({ contour, design, grid, front, frontImg, viewportPx, fit }: { contour: Contour; design: Contour; grid: GridWorkbenchGrid; front: boolean; frontImg: string | null; viewportPx: number; fit: number }) {
+function Stage({ contour, design, grid, anchorPair, front, frontImg, viewportPx, fit }: { contour: Contour; design: Contour; grid: GridWorkbenchGrid; anchorPair: GridWorkbenchNearestAnchorPair | null; front: boolean; frontImg: string | null; viewportPx: number; fit: number }) {
   const ePts = contour.outer.pts.map(([x, y]) => [x, -y] as Pt)
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   for (const [x, y] of ePts) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y }
@@ -151,14 +158,9 @@ function Stage({ contour, design, grid, front, frontImg, viewportPx, fit }: { co
       </>}
       {/* live magnet-distance annotation: dimension line on the CLOSEST seated pair, real mm (back view) */}
       {!front && (() => {
-        const a = grid.anchors
-        if (a.length < 2) return null
-        let bi = 0, bj = 1, bd = Infinity
-        for (let i = 0; i < a.length; i++) for (let j = i + 1; j < a.length; j++) {
-          const d = Math.hypot(a[i].p[0] - a[j].p[0], a[i].p[1] - a[j].p[1])
-          if (d < bd) { bd = d; bi = i; bj = j }
-        }
-        const p1 = fy(a[bi].p), p2 = fy(a[bj].p)
+        if (!anchorPair) return null
+        const bd = anchorPair.distanceMM
+        const p1 = fy(anchorPair.first.p), p2 = fy(anchorPair.second.p)
         const mx = (p1[0] + p2[0]) / 2, my = (p1[1] + p2[1]) / 2
         return <g>
           {/* dark underlay + white overlay → legible on the dark suede AND the light margin band */}

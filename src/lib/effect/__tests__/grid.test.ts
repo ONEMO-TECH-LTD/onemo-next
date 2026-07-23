@@ -3,8 +3,27 @@
 import { describe, expect, it } from 'vitest'
 import { computeAttachmentGrid } from '@/app/(dev)/effect-creator/v5.3.1/core/primitives'
 import { pointInPolygon } from '../polygon'
-import { computeGrid, contourWithOuterMargin, DEFAULT_LAW, finalProductSignature, resolveGridPlan, scaleContour, semanticLadder, stdShapeContour } from '../grid-admin'
-import { resolveUserPlan, semanticLadder as userSemanticLadder, standardShapeContour } from '../grid-user'
+import {
+  computeGrid,
+  contourWithOuterMargin,
+  DEFAULT_LAW,
+  finalProductSignature,
+  nearestAnchorPair,
+  nearestSemanticRung,
+  resolveAdminGridPlan,
+  resolveDesignSizeMM,
+  resolveGridPlan,
+  resolveRectangleRungs,
+  scaleContour,
+  semanticLadder,
+  stdShapeContour,
+} from '../grid-admin'
+import {
+  nearestUserSemanticRung,
+  resolveUserPlan,
+  semanticLadder as userSemanticLadder,
+  standardShapeContour,
+} from '../grid-user'
 import type { Contour } from '../types'
 
 const donut: Contour = {
@@ -113,6 +132,117 @@ describe('resolveGridPlan — production engine seam', () => {
     expect(plan.grid.rescueAnchors).toEqual([])
     expect(plan.grid.ok).toBe(false)
     expect(plan.grid.issues.join(' ')).toContain('No room for a magnet')
+  })
+})
+
+describe('engine-owned workbench selections', () => {
+  const rungs = [
+    { label: 'ONE', points: 1, sizeMM: 22, visible: true },
+    { label: 'S', points: 2, sizeMM: 70, visible: true },
+    { label: 'M', points: 4, sizeMM: 118, visible: true },
+  ]
+
+  it('preserves the existing Admin-up and User-first exact-tie policies without blending them', () => {
+    expect(nearestSemanticRung(rungs, 94).sizeMM).toBe(118)
+    expect(nearestUserSemanticRung(rungs, 94).sizeMM).toBe(70)
+  })
+
+  it('owns rectangle option legality, fallback, and orientation', () => {
+    const landscape = resolveRectangleRungs(rungs, {
+      longMM: 94,
+      shortMM: 46,
+      orientation: 'landscape',
+    })
+    expect(landscape.longOptions.map((rung) => rung.sizeMM)).toEqual([70, 118])
+    expect(landscape.shortOptions.map((rung) => rung.sizeMM)).toEqual([22, 70])
+    expect(landscape.longRung.sizeMM).toBe(118)
+    expect(landscape.shortRung.sizeMM).toBe(70)
+    expect([landscape.widthRung.sizeMM, landscape.heightRung.sizeMM]).toEqual([118, 70])
+
+    const portrait = resolveRectangleRungs(rungs, {
+      longMM: 94,
+      shortMM: 46,
+      orientation: 'portrait',
+    })
+    expect([portrait.widthRung.sizeMM, portrait.heightRung.sizeMM]).toEqual([70, 118])
+
+    const one = resolveRectangleRungs(rungs, {
+      longMM: 22,
+      shortMM: 22,
+      orientation: 'landscape',
+    })
+    expect(one.shortOptions).toEqual([])
+    expect(one.shortRung).toBe(one.longRung)
+  })
+
+  it('returns one deterministic nearest-anchor pair and feeds the plan distance from it', () => {
+    expect(nearestAnchorPair([])).toBeNull()
+    expect(nearestAnchorPair([{ p: [0, 0], dia: 6 }])).toBeNull()
+
+    const anchors = [
+      { p: [0, 0] as [number, number], dia: 6 as const },
+      { p: [10, 0] as [number, number], dia: 6 as const },
+      { p: [0, 10] as [number, number], dia: 6 as const },
+    ]
+    const pair = nearestAnchorPair(anchors)
+    expect(pair).toMatchObject({ firstIndex: 0, secondIndex: 1, distanceMM: 10 })
+
+    const plan = resolveGridPlan(stdShapeContour('square', 118), {
+      mode: 'standard',
+      pitchMM: 48,
+      density: 'standard',
+      maxGrowMM: 0,
+    })
+    expect(plan.nearestAnchorMM).toBe(nearestAnchorPair(plan.grid.anchors)?.distanceMM)
+  })
+
+  it('owns source size bounds, including the dynamic padding floor', () => {
+    expect(resolveDesignSizeMM(999, 'std')).toBe(DEFAULT_LAW.maxRungMM)
+    expect(resolveDesignSizeMM(999, 'preset')).toBe(DEFAULT_LAW.maxRungMM)
+    expect(resolveDesignSizeMM(999, 'gen')).toBe(180)
+    expect(resolveDesignSizeMM(999, 'magic')).toBe(180)
+    expect(resolveDesignSizeMM(1, 'std', { ...DEFAULT_LAW, paddingMM: 20 })).toBe(42)
+  })
+
+  it('preserves signed-offset and Velcro diagnostics only through the Admin entry', () => {
+    const contour = stdShapeContour('square', 70)
+    const signed = resolveAdminGridPlan(contour, {
+      attachment: 'magnetic',
+      density: 'light',
+      baseMarginMM: -15,
+      maxGrowMM: 12,
+    })
+    expect({
+      pitch: signed.pitchMM,
+      pattern: signed.pattern,
+      margin: signed.resolvedMarginMM,
+      anchors: signed.grid.anchors.length,
+    }).toEqual({ pitch: 48, pattern: 'diamond', margin: -15, anchors: 1 })
+
+    const adminVelcro = resolveAdminGridPlan(contour, {
+      attachment: 'velcro',
+      density: 'light',
+      baseMarginMM: 0,
+      maxGrowMM: 12,
+    })
+    expect({
+      pitch: adminVelcro.pitchMM,
+      pattern: adminVelcro.pattern,
+      gridPitch: adminVelcro.grid.pitchCentreMM,
+      anchors: adminVelcro.grid.anchors.length,
+    }).toEqual({ pitch: 48, pattern: 'diamond', gridPitch: 0, anchors: 0 })
+
+    const productVelcro = resolveGridPlan(contour, {
+      attachment: 'velcro',
+      density: 'light',
+      baseMarginMM: -15,
+      maxGrowMM: 12,
+    })
+    expect({
+      pitch: productVelcro.pitchMM,
+      pattern: productVelcro.pattern,
+      margin: productVelcro.resolvedMarginMM,
+    }).toEqual({ pitch: 0, pattern: null, margin: 0 })
   })
 })
 

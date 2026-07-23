@@ -636,6 +636,14 @@ export function maxDesignMM(source: 'std' | 'preset' | 'gen' | 'magic', law: Siz
 export const DEFAULT_MARGIN_MM = 12
 /** LAW: the smallest effect is the single-point (ONE) size — one magnet with its full pad ring. */
 export function minEffectMM(law: SizeLaw = DEFAULT_LAW): number { return 2 * (law.paddingMM + law.frameMM) }
+/** LAW: resolve a requested design size against the selected source's complete product bounds. */
+export function resolveDesignSizeMM(
+  requestedMM: number,
+  source: 'std' | 'preset' | 'gen' | 'magic',
+  law: SizeLaw = DEFAULT_LAW,
+): number {
+  return Math.max(minEffectMM(law), Math.min(requestedMM, maxDesignMM(source, law)))
+}
 /** LAW: rectangle format families by aspect ratio (product naming, not navigation). */
 export function rectFormat(wMM: number, hMM: number): 'strip' | 'panoramic' | 'block' {
   const r = Math.max(wMM, hMM) / Math.min(wMM, hMM)
@@ -675,6 +683,52 @@ function modeCombos(mode: GridMode): { pitchMM: number; pattern: GridPattern }[]
  *  frame/margin + mode), so changing the recipe or mode recomputes every size. Strict pad law (sizing),
  *  perimeter belt. Labels continue past 3XL when legal rungs remain under maxRungMM. */
 export interface SemanticRung { label: string; points: number; sizeMM: number; visible: boolean }
+export type SemanticRungTieBreak = 'higher' | 'first'
+
+/** Select the closest semantic rung. Exact ties are explicit so each semantic door cannot drift. */
+export function nearestSemanticRung(
+  rungs: ReadonlyArray<SemanticRung>,
+  targetMM: number,
+  tieBreak: SemanticRungTieBreak = 'higher',
+): SemanticRung {
+  return rungs.reduce((best, rung) => {
+    const nextDistance = Math.abs(rung.sizeMM - targetMM)
+    const bestDistance = Math.abs(best.sizeMM - targetMM)
+    if (nextDistance < bestDistance) return rung
+    if (nextDistance > bestDistance || tieBreak === 'first') return best
+    return rung.sizeMM > best.sizeMM ? rung : best
+  })
+}
+
+export interface RectangleRungResolution {
+  longRung: SemanticRung
+  shortRung: SemanticRung
+  widthRung: SemanticRung
+  heightRung: SemanticRung
+  longOptions: SemanticRung[]
+  shortOptions: SemanticRung[]
+}
+
+/** Rectangle system A: legal long/short options and orientation are one engine-owned selection. */
+export function resolveRectangleRungs(
+  rungs: ReadonlyArray<SemanticRung>,
+  opts: { longMM: number; shortMM: number; orientation: 'landscape' | 'portrait' },
+): RectangleRungResolution {
+  const longRung = nearestSemanticRung(rungs, opts.longMM)
+  const shortOptions = rungs.filter((rung) => rung.sizeMM < longRung.sizeMM)
+  const shortRung = shortOptions.length
+    ? nearestSemanticRung(shortOptions, opts.shortMM)
+    : longRung
+  const landscape = opts.orientation === 'landscape'
+  return {
+    longRung,
+    shortRung,
+    widthRung: landscape ? longRung : shortRung,
+    heightRung: landscape ? shortRung : longRung,
+    longOptions: rungs.filter((rung) => rung.points >= 2),
+    shortOptions,
+  }
+}
 /** Garment-band labels by REAL mm (matches the product canon: 70=S, ~118=M, ~166=L, ~214=XL). A rung
  *  is labeled by the band its solved size falls in, bumping on collision — so each shape naturally
  *  spans its own label range (small shapes reach into 2XS/XS, chunky ones start at L). */
@@ -889,12 +943,24 @@ export function contourWithOuterMargin(contour: Contour, marginMM: number): Cont
   }
 }
 
-function nearestAnchorDistance(anchors: ReadonlyArray<Anchor>): number | null {
-  let nearest = Infinity
+export interface NearestAnchorPair {
+  firstIndex: number
+  secondIndex: number
+  first: Anchor
+  second: Anchor
+  distanceMM: number
+}
+
+/** Closest seated pair, with stable first-in-iteration tie behavior for deterministic annotations. */
+export function nearestAnchorPair(anchors: ReadonlyArray<Anchor>): NearestAnchorPair | null {
+  let nearest: NearestAnchorPair | null = null
   for (let i = 0; i < anchors.length; i++) for (let j = i + 1; j < anchors.length; j++) {
-    nearest = Math.min(nearest, dist(anchors[i].p, anchors[j].p))
+    const distanceMM = dist(anchors[i].p, anchors[j].p)
+    if (!nearest || distanceMM < nearest.distanceMM) {
+      nearest = { firstIndex: i, secondIndex: j, first: anchors[i], second: anchors[j], distanceMM }
+    }
   }
-  return Number.isFinite(nearest) ? nearest : null
+  return nearest
 }
 
 /**
@@ -907,6 +973,8 @@ interface ResolverPolicy {
   perimeterOnly?: boolean
   rescueCoverage?: boolean
   sparseThin?: boolean
+  signedBaseMargin?: boolean
+  diagnosticVelcro?: boolean
 }
 
 function resolveGridPlanWithPolicy(
@@ -917,7 +985,10 @@ function resolveGridPlanWithPolicy(
   const attachment = opts.attachment ?? 'magnetic'
   const mode = opts.mode ?? 'auto'
   const density = opts.density ?? 'light'
-  const baseMarginMM = Math.max(0, opts.baseMarginMM ?? 0)
+  const requestedBaseMarginMM = opts.baseMarginMM ?? 0
+  const baseMarginMM = policy.signedBaseMargin
+    ? requestedBaseMarginMM
+    : Math.max(0, requestedBaseMarginMM)
   const maxGrowMM = opts.maxGrowMM ?? DEFAULT_MARGIN_MM
   const withMargin = (marginMM: number) => contourWithOuterMargin(contourMM, marginMM)
   const manualPattern = mode === 'auto' ? undefined : mode
@@ -932,7 +1003,7 @@ function resolveGridPlanWithPolicy(
     rescueCoverage: policy.rescueCoverage,
   }
 
-  if (attachment === 'velcro') {
+  if (attachment === 'velcro' && !policy.diagnosticVelcro) {
     const grid = computeGrid(withMargin(baseMarginMM), { ...cfg, attachment })
     return {
       designContourMM: contourMM,
@@ -970,13 +1041,21 @@ function resolveGridPlanWithPolicy(
     baseMarginMM,
     resolvedMarginMM: fit.sizeMM,
     grewMM: fit.grew,
-    nearestAnchorMM: nearestAnchorDistance(fit.grid.anchors),
+    nearestAnchorMM: nearestAnchorPair(fit.grid.anchors)?.distanceMM ?? null,
   }
 }
 
-/** Admin resolver: all low-level modes and the existing density behavior remain available. */
+/** Product-safe resolver: signed inward margins are clamped and Velcro has no diagnostic grid. */
 export function resolveGridPlan(contourMM: Contour, opts: GridPlanOptions = {}): ResolvedGridPlan {
   return resolveGridPlanWithPolicy(contourMM, opts, {})
+}
+
+/** Full Admin resolver: preserves signed offsets and Velcro's diagnostic pitch/pattern preview. */
+export function resolveAdminGridPlan(contourMM: Contour, opts: GridPlanOptions = {}): ResolvedGridPlan {
+  return resolveGridPlanWithPolicy(contourMM, opts, {
+    signedBaseMargin: true,
+    diagnosticVelcro: true,
+  })
 }
 
 /** Internal core operation behind the constrained user door. Dice is absent by construction; the final
