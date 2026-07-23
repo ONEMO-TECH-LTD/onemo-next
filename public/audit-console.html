@@ -28,6 +28,7 @@
   .tabs .tab.loading .nm::after{content:' …';color:#8fd0ff;}
   .compiling{position:fixed;inset:var(--topH) var(--rightW) 0 var(--leftW);z-index:20;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:#0e0e12ee;color:#b7b7c2;font:13px system-ui;}
   .compiling.on{display:flex;} .compiling .sp{width:26px;height:26px;border:3px solid #26263a;border-top-color:#39b3a6;border-radius:50%;animation:spin 0.8s linear infinite;}
+  .compiling.error{color:#f08a8a;padding:32px;text-align:center;} .compiling.error .sp{display:none;}
   @keyframes spin{to{transform:rotate(360deg)}}
   /* address bar — its own row below the tabs */
   .addrbar{display:none;position:fixed;top:118px;left:0;right:0;height:36px;z-index:30;background:#131319;border-bottom:1px solid #26262e;align-items:center;gap:8px;padding:0 14px;}
@@ -147,20 +148,28 @@
   <div class="hint" id="hint">Inspect mode · click an element · hover to preview</div>
 
 <script>
-// screen source: ?s=<slug> → a studio sandbox screen; no param → the built-in mother screen
+// Legacy standalone console: a slug is required. The permanent Studio uses node-keyed run identity.
 const SLUG = new URLSearchParams(location.search).get('s');
-const AUDIT_URL = SLUG ? `/audit/sandbox/${SLUG}.json` : '/audit/mother-v2.json';
-const FIG   = SLUG ? `/audit/sandbox/${SLUG}-figma.png` : '/audit/fidelity-figma.png';
-const BUILD = SLUG ? `/audit/sandbox/${SLUG}-build.png` : '/audit/fidelity-build.png';
+const AUDIT_URL = SLUG ? `/audit/sandbox/${SLUG}.json` : null;
+const FIG   = SLUG ? `/audit/sandbox/${SLUG}-figma.png` : null;
+const BUILD = SLUG ? `/audit/sandbox/${SLUG}-build.png` : null;
 const BUDGET = 10;
 const frame = document.getElementById('frame');
-frame.src = SLUG ? `/converted/sandbox/${SLUG}` : '/converted/audit-mother-v2';
+frame.src = SLUG ? `/converted/sandbox/${SLUG}` : 'about:blank';
 const device = document.getElementById('device'), overlay = document.getElementById('overlay'),
       zonebox = document.getElementById('zonebox'), panel = document.getElementById('panel'), chips = document.getElementById('chips'),
       scr = document.getElementById('scr'), hint = document.getElementById('hint'), modesEl = document.getElementById('modes');
 let audit = null, mode = 'inspect', sel = null, zone = null, hi = null, iframeReady = false;
 const esc = s => String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 const doc = () => frame.contentDocument, win = () => frame.contentWindow;
+if(!SLUG){
+  const reason='screen unavailable: no converted screen slug was provided';
+  const blocker=document.getElementById('compiling');
+  blocker.classList.add('on','error');
+  document.getElementById('compmsg').textContent=reason;
+  document.getElementById('left').innerHTML=`<div class="empty">${esc(reason)}</div>`;
+  document.getElementById('panel').innerHTML=`<div class="empty">${esc(reason)}</div>`;
+}
 
 function updScrSize(){ try{ const w=win(), el=document.getElementById('scrsize'); if(el&&w) el.textContent=`${w.innerWidth}×${w.innerHeight}`; }catch{} }
 frame.addEventListener('load',()=>{ updScrSize(); try{ win().addEventListener('resize',updScrSize); }catch{} });
@@ -212,15 +221,14 @@ fetch('/api/screens').then(r=>r.ok?r.json():Promise.reject()).then(screens=>{
   const tabsEl=document.getElementById('tabs'), toolbox=document.getElementById('toolbox');
   const group=new URLSearchParams(location.search).get('g')||'sandbox'; // Sandbox is the starting point
   const conversions=screens.filter(s=>!s.accepted), saved=screens.filter(s=>s.accepted);
-  const open=screens.find(s=>s.slug===SLUG)||null;         // the screen currently in view (null = built-in Mother)
+  const open=screens.find(s=>s.slug===SLUG)||null;
   const go=(params)=>{ const u=new URLSearchParams(location.search); for(const k in params){ params[k]==null?u.delete(k):u.set(k,params[k]); } location.href='/?'+u.toString(); };
 
   // ── group switch (Sandbox ⇄ Library) ──
   const gsw=document.createElement('div'); gsw.className='groupsw';
   gsw.innerHTML=`<button class="sandbox${group==='sandbox'?' on':''}">Sandbox <span class="c">${conversions.length}</span></button>`+
                 `<button class="library${group==='library'?' on':''}">Library <span class="c">${saved.length}</span></button>`;
-  // switching group must not leave an out-of-group screen selected (stale toolbox — meta-qa #2):
-  // if the current selection isn't in the target group, drop it (falls back to the reference screen).
+  // Switching groups drops an out-of-group selection to the honest unavailable state.
   const inGroup=(g)=>(g==='library'?saved:conversions).some(s=>s.slug===SLUG);
   gsw.children[0].onclick=()=>go({g:'sandbox', s:inGroup('sandbox')?SLUG:null}); gsw.children[1].onclick=()=>go({g:'library', s:inGroup('library')?SLUG:null});
   tabsEl.appendChild(gsw);
@@ -228,7 +236,6 @@ fetch('/api/screens').then(r=>r.ok?r.json():Promise.reject()).then(screens=>{
   // open a screen — if it has no inspectable (audit) build yet (accepted-only, meta-qa #2), first
   // re-materialise it from cache, then navigate. Shows a spinner on the tab meanwhile.
   async function openScreen(sc, tabEl){
-    if(sc.builtin) return go({s:null});
     if(sc.hasDraft) return go({s:sc.slug});             // audit build present → open directly
     if(tabEl) tabEl.classList.add('loading');
     const r=await fetch(`/api/ensure-audit/${sc.slug}`,{method:'POST'}); const j=await r.json();
@@ -236,15 +243,14 @@ fetch('/api/screens').then(r=>r.ok?r.json():Promise.reject()).then(screens=>{
   }
   // ── tabs of the active group (clean: dot + name + hover ×) ──
   const mkTab=(sc)=>{
-    const isOpen=(sc.slug||null)===(SLUG||null) || (sc.builtin&&!SLUG);
+    const isOpen=(sc.slug||null)===(SLUG||null);
     const t=document.createElement('div'); t.className='tab'+(isOpen?' on':'');
-    t.innerHTML=`<span class="dot ${sc.status}"></span><span class="nm" title="${esc(sc.name)}">${esc(sc.name)}</span>`+(sc.builtin?'':`<span class="x" title="close / delete">×</span>`);
+    t.innerHTML=`<span class="dot ${sc.status}"></span><span class="nm" title="${esc(sc.name)}">${esc(sc.name)}</span><span class="x" title="close / delete">×</span>`;
     t.querySelector('.nm').onclick=()=>openScreen(sc,t);
     const x=t.querySelector('.x'); if(x) x.onclick=e=>{ e.stopPropagation(); delScreen(sc); };
     tabsEl.appendChild(t);
   };
   if(group==='sandbox'){
-    mkTab({slug:null,name:'Mother — v2 (reference)',status:'accepted',builtin:true});
     conversions.length?conversions.forEach(mkTab):tabsEl.insertAdjacentHTML('beforeend','<span class="empty-hint">No conversions yet — paste a link below to convert.</span>');
   } else {
     saved.length?saved.forEach(mkTab):tabsEl.insertAdjacentHTML('beforeend','<span class="empty-hint">Library is empty — Keep a conversion to add it here.</span>');
@@ -315,7 +321,7 @@ fetch('/api/screens').then(r=>r.ok?r.json():Promise.reject()).then(screens=>{
   }
 }).catch(()=>{}); // no studio server → plain console, unchanged
 
-fetch(AUDIT_URL).then(r=>r.json()).then(a=>{
+if(AUDIT_URL) fetch(AUDIT_URL).then(r=>r.json()).then(a=>{
   audit = a; scr.textContent = `${a.name} · ${a.screen}`;
   const s = a.summary;
   chips.innerHTML =
