@@ -39,7 +39,7 @@ interface RectangleRungsView {
   shortOptions: SemanticRungView[]
 }
 
-interface GridWorkbenchPanelProps {
+export interface GridWorkbenchPanelProps {
   src: Src
   setSrc: (value: Src) => void
   geo: StdGeo
@@ -60,7 +60,6 @@ interface GridWorkbenchPanelProps {
   setSides: (value: number) => void
   points: number
   setPoints: (value: number) => void
-  sizeMM: number
   setSizeMM: (value: number) => void
   pitch: number
   setPitch: (value: number) => void
@@ -103,7 +102,7 @@ interface GridWorkbenchPanelProps {
 export function GridWorkbenchPanel({
   src, setSrc, geo, setGeo, setLongMM, setShortMM, orient, setOrient,
   preset, setPreset, gen, setGen, p1, setP1, p2, setP2, sides, setSides, points, setPoints,
-  sizeMM, setSizeMM, pitch, setPitch, pitchAuto, setPitchAuto, attachment, setAttachment,
+  setSizeMM, pitch, setPitch, pitchAuto, setPitchAuto, attachment, setAttachment,
   density, setDensity, pad, setPad, offsetMM, setOffsetMM, pattern, setPattern,
   patternAuto, setPatternAuto, plan, setPlan, front, setFront, centerMode, setCenterMode,
   maxGrowMM, setMaxGrowMM, magic, magStatus, fileRef, onFile, sizeMax, sizeMin, resolvedSizeMM, maxRungMM,

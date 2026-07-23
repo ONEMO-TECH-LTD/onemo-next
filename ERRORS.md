@@ -1,5 +1,12 @@
 # ERRORS
 
+## S59 deleted route leaves stale Next type stubs
+
+- What did not work: deleting `(store)/create/page.tsx`, then relying on `next typegen` to remove the old `.next` page stubs.
+- Symptom: `tsc --noEmit` still imported the deleted source from `.next/dev/types/app/(store)/create/page.ts` and `.next/types/app/(store)/create/page.ts`.
+- What worked: move those two ignored generated stubs to `/tmp`, then rerun typecheck; the regenerated route map stayed current and TypeScript passed.
+- Remember: after deleting an App Router page while a dev server is live, `next typegen` may update validators without pruning stale per-page stubs.
+
 ## KAI-8318 Studio v2 preview asset collision
 
 - What did not work: copying product assets into `studio-v2/dist/assets` while Vite also emitted bundled JS/CSS chunks into `dist/assets`.

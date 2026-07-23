@@ -7,7 +7,7 @@ const eslintConfig = defineConfig([
   ...nextTs,
   {
     files: [
-      "src/app/(store)/create/**/*.{ts,tsx}",
+      "src/app/(dev)/effect-creator/grid-lab/GridWorkbenchUserPanel*.{ts,tsx}",
       "src/app/(dev)/effect-creator/v5.3.1/**/*.{ts,tsx}",
     ],
     rules: {

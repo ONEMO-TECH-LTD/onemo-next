@@ -15,8 +15,10 @@ belt, then adds the minimum safe lattice/off-lattice anchors needed to rescue un
 semantic ladder keeps only candidates selected by that resolver, then collapses equal translation-invariant
 final-product signatures (normalized topology/adjacency, diameters, rescue membership), keeping the smallest size.
 Dice and full-grid controls remain available only through `grid-admin.ts` for the bench and standing audit. No product
-law is reimplemented in UI: `(store)/create` imports `grid-user.ts` and exposes only shape, semantic size, and
-attachment before rendering the resolved product preview; the grid-lab bench imports `grid-admin.ts`. The legacy
+law is reimplemented in UI: the original grid-lab page hosts a full Admin panel and a full User-panel clone over one
+shared renderer. Admin resolves through `grid-admin.ts`; `GridWorkbenchUserPanel.tsx` is ringfenced to `grid-user.ts`.
+The A4 `(store)/create` presentation was deleted rather than treated as canonical. Control stay/go remains a
+hands-on product gate; the current full User clone deliberately preserves every control. The legacy
 54mm `validateAttachment` remains only for the dormant payload contract
 pending an approved retirement migration.
 
@@ -93,7 +95,7 @@ its matte feeds the editor's Blend preview on any shape.
 | `EffectViewer.tsx` (397) | R3F `<Canvas>` wrapper. `frameloop={frozen?'never':'demand'}`. Routes `shaped`→`ShapedModelBridge`, else `EffectModel` (GLB). OrbitControls `enableDamping=false` (damping defeats demand-loop), `enabled={!isEditing && !frozen}`. `InvalidateOnAssetLoad` = no-blank-mount burst. `deriveSuede`. DPR `[1,2]`. | The 3D shell; shared with Studio. |
 | `core/shaped/ShapedModelBridge.tsx` (45) | TRANSLATE half. Subscribes `outlineStore` (committedShape/committedContourMM/editorOpen/bgBlur/imageFx/wrapTile) → props. | "Bridge translates, viewer renders." Keeps store reads local to the 3D subtree. |
 | `core/shaped/ShapedModel.tsx` (446) | RENDER half (R7 prop-pure, reads NO store). Builds mesh + 3 materials; owns the **version-bridge defer** and the **texture rebake**. | `vectorTrueContour` tessellates at `DISPLAY_TOLERANCE_MM` (0.004). Mesh rebuild + texture rebake both `if (editorOpen) return` → fire on close. Pan/zoom = matrix-only (no `needsUpdate`). |
-| `core/EffectModel.tsx` (341) | GLB material path. **Not used by /create** (`shaped=true`); Studio/admin only. | `useGLTF` + role-material override. |
+| `core/EffectModel.tsx` (341) | GLB material path. **Not used by the shaped v5.3.1 flow**; Studio/admin only. | `useGLTF` + role-material override. |
 | `core/onemo-loader.ts` (181) | Loads the golden scene `.onemo` (zip: `scene.glb` + `studio.json`) → `ViewerConfig`. | `parseOnemoConfig(url)`. Imports `./scene-format` — the live studio-v2 → Creator `.onemo` bridge (DEC-v5-08); the Studio-only `loadOnemoTemplate` path was removed in the v5.5.1 de-slop. |
 
 ### 3.3 Scene config — `v5.3.1/admin/`
@@ -155,7 +157,7 @@ its matte feeds the editor's Blend preview on any shape.
 | `ben.worker.ts` (271) | Cut-out worker. Default = rembg trio (`resolveChain`) on **WASM EP** (no WebGPU). `?seg=ben2` = transformers/WebGPU (opt-in). Degenerate-matte guard. | Posts RGBA matte (alpha=subject). |
 | `ben-chain.ts` (37) | `resolveChain(seg)`: no seg → `[u2netp, silueta]` (production trio); single rembg model; else null→transformers. `REMBG` specs (self-hosted `/seg-models`). `isDegenerateMatte`. | The truth of which model runs. |
 | `segment-ml.ts` (174) | Main-thread worker wrapper. `segmentML(url, maskDim, texDim)` → low-res mask + hi-res texture + `adapterId`. 120s watchdog. `preloadBen` (disabled at boot). | Header corrected; residual BEN2 NAMING remains lower (segParam comment, the downscale/run comments, `ML_ADAPTER_ID='ben2-onnx'`) — naming-only; the router runs the trio (§10). |
-| `payload.ts` (306) | **DORMANT** manufacturing contract. `buildApprovedEffectPayload` (content-addressed, int-micron). Not wired to /create (§7). | |
+| `payload.ts` (306) | **DORMANT** manufacturing contract. `buildApprovedEffectPayload` (content-addressed, int-micron). Not wired to an active save/order flow (§7). | |
 | `persistence.ts` (167) | **DORMANT** saved-effect model (EditableRecipe + LockedPayload, F1 bond). No save surface. | |
 | `attachment.ts` (149) | **DORMANT** `validateAttachment` (magnet 54mm grid / velcro). Invented defaults. | |
 | `sizes.ts` | `EFFECT_SIZES` (s70 base only — mock s140/pricing removed, Dan s59/P2), `toFinalPhysicalMm`. Interim until grid semantic ladder at the Creator attach. | |
@@ -236,15 +238,16 @@ Global history (page): one user action = one step (Magic, editor session, trim, 
 
 ## 7. Manufacturing track (dormant)
 
-The full contract exists, is pure + unit-tested, and is **not wired** to /create:
+The full contract exists, is pure + unit-tested, and is **not wired** to an active save/order flow:
 - `payload.ts` — `ApprovedEffectPayload` (geometry in int-microns, content hash, artwork recipe hash, gates).
 - `persistence.ts` — saved-effect model + F1 recipe↔payload bond.
 - `attachment.ts` — magnet/velcro validators (invented defaults, coupon-pending).
 - `sizes.ts` — interim scale band (s70 base) for the payload path; mock pricing removed (Dan s59/P2); real sizes come from the grid semantic ladder at the Creator attach.
 
-The `grid-user.ts` planner door is live on `(store)/create`: its three product inputs build a final contour, resolve
-the attachment plan, and render the engine-owned ladder and registration result. `attachment.ts` is not a valid
-fallback: it is the superseded 54mm
+The `grid-user.ts` planner door is live through the User-panel clone on the original grid-lab page. The full clone
+keeps every Admin-bench control visible for Dan's hands-on stay/go gate, but only the final contour and attachment
+cross the User door; ignored controls are logged visibly beside the panel. Admin and User feed the same shared
+renderer. `attachment.ts` is not a valid fallback: it is the superseded 54mm
 payload-era validator and remains only until the payload contract receives an approved migration.
 
 The only live manufacturing output is `page.onExport` (`?internal=1`): mm-true SVG cutline via `toManufacturingSVG` (laser profile by default — red 0.1mm stroke, kerf applied by the cutter), feasibility-gated by `contourFromShape` + `assertContourCuttable`. Wiring the save/order flow + the 4 artifacts is the open manufacturing work.
@@ -271,7 +274,7 @@ What was **reverted** (P3/P5): the full-bleed canvas effects, surround-glow / 3D
 - `geometry-truth.legacy.ts` — retired trace fit, **relocated to `src/lib/effect/__tests__/`** (test-only fixture).
 
 Still present (clarified, NOT dead):
-- `EffectModel.tsx` — the GLB material path; not on the shaped (/create) route, used by Studio/admin. **`onemo-loader.ts` is LIVE** — `parseOnemoConfig` loads the golden scene through `AdminViewer` (live on /create). Per **DEC-v5-08**, the scene-format (`core/scene-format/`) is the **live studio-v2 → Creator `.onemo` single-source bridge**, not a dead one-time extraction.
+- `EffectModel.tsx` — the GLB material path; not on the shaped v5.3.1 flow, used by Studio/admin. **`onemo-loader.ts` is LIVE** — `parseOnemoConfig` loads the golden scene through `AdminViewer` on `/effect-creator/v5.3.1`. Per **DEC-v5-08**, the scene-format (`core/scene-format/`) is the **live studio-v2 → Creator `.onemo` single-source bridge**, not a dead one-time extraction.
 
 ## 10. Known drift / debt
 

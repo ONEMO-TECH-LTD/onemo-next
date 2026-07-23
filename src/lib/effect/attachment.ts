@@ -1,6 +1,6 @@
-// ⚠ DORMANT CONTRACT (Creator v5 · R6) — pure + unit-tested, but NOT wired into the active /create
+// ⚠ DORMANT CONTRACT (Creator v5 · R6) — pure + unit-tested, but NOT wired into an active product
 // flow: validateAttachment has no product caller yet. The attachment system becomes first-class in
-// /create in Phase 2 (attachment system in the creator). Validator defaults below are INVENTED
+// a later production Creator phase. Validator defaults below are INVENTED
 // (coupon-pending) — keep out of product claims until physically confirmed. Foundation, not active
 // product flow (audit §7).
 //

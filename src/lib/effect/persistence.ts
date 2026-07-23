@@ -1,4 +1,4 @@
-// ⚠ DORMANT CONTRACT (Creator v5 · R6) — pure + unit-tested, but NOT wired into the active /create
+// ⚠ DORMANT CONTRACT (Creator v5 · R6) — pure + unit-tested, but NOT wired into an active product
 // flow: makeSavedEffect / toDesignRow have no product caller (no save/order surface this wave). This
 // is the saved-effect model (EditableRecipe + LockedPayload, F1-bound) that Phase 2 (manufacturing
 // readiness) will activate. Foundation, not active product flow (audit §7).

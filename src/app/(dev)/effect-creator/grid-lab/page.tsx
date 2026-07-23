@@ -5,7 +5,7 @@
 //   • Presets    — shape-library getShape() (baked vector data)
 //   • Generators — generateShapeRing() (blob / clover / daisy / pinwheel)
 //   • AI Magic   — image upload → prepareShaped() → u2netp lightweight cut-out → outline
-// Every source yields a VShape → mm contour, the same input attachment.ts consumes.
+// Every source yields a VShape → final mm contour consumed by the selected Admin/User grid door.
 
 import { useMemo, useRef, useState } from 'react'
 import { getShape, hasVectorDef, type VectorShapeKind } from '@/lib/shape-library'
@@ -15,8 +15,15 @@ import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import { contourFromShape } from '@/lib/effect/geometry-truth'
 import type { Contour, Pt } from '@/lib/effect/types'
 import { nearestAnchorPair, nearestSemanticRung, resolveAdminGridPlan, resolveDesignSizeMM, resolveRectangleRungs, scaleContour, semanticLadder, stdShapeContour, rectFormat, minEffectMM, maxDesignMM, DEFAULT_MARGIN_MM, DEFAULT_LAW, type GridPattern, type MagnetPlan, type GridDensity, type GridMode, type SemanticRung, type StdShape, type Attachment } from '@/lib/effect/grid-admin'
-import { GridWorkbenchPanel } from './GridWorkbenchPanel'
+import { GridWorkbenchPanel, type GridWorkbenchPanelProps } from './GridWorkbenchPanel'
 import { contourDimension as dim, GridWorkbenchReadouts, GridWorkbenchStage } from './GridWorkbenchRenderer'
+import {
+  GridWorkbenchUserPanel,
+  nearestUserWorkbenchRung,
+  resolveUserWorkbenchLadder,
+  resolveUserWorkbenchPlan,
+  USER_DOOR_IGNORED_CONTROLS,
+} from './GridWorkbenchUserPanel'
 
 const IMG = 1000
 const VP = 440
@@ -25,6 +32,7 @@ const FIT = 0.86
 type Src = 'std' | 'preset' | 'gen' | 'magic'
 type StdGeo = StdShape
 type MagicState = { vshape: VShape; maskH: number; adapter: string; imgUrl: string } | null
+type PanelEntry = 'admin' | 'user'
 
 function bboxOf(pts: ReadonlyArray<{ x: number; y: number }>) {
   let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity
@@ -44,6 +52,7 @@ function normBase(vs: VShape, maskH: number): Contour | null {
 }
 
 export default function GridLab() {
+  const [panelEntry, setPanelEntry] = useState<PanelEntry>('admin')
   const [src, setSrc] = useState<Src>('std')
   const [geo, setGeo] = useState<StdGeo>('square')
   // rect system A: long side rung → short side rung (< long) → orientation
@@ -92,25 +101,35 @@ export default function GridLab() {
   }
 
   const sizeMax = maxDesignMM(src === 'std' ? 'std' : src, DEFAULT_LAW) // engine law: per-source max
-  const sizeMin = minEffectMM({ ...DEFAULT_LAW, paddingMM: pad }) // engine law: the ONE (single-point) floor
+  const activeLaw = panelEntry === 'admin' ? { ...DEFAULT_LAW, paddingMM: pad } : DEFAULT_LAW
+  const sizeMin = minEffectMM(activeLaw) // user door keeps its default product padding
   const resolvedSizeMM = resolveDesignSizeMM(
     sizeMM,
     src === 'std' ? 'std' : src,
-    { ...DEFAULT_LAW, paddingMM: pad },
+    activeLaw,
   )
 
   // PER-GEOMETRY standard sizes (Dan): each geometry's rungs are solved numerically from the live
   // recipe (padding/frame/pattern law) — square 70/118/…, circle and triangle their own. Rect derives
   // per-axis from the square ladder.
-  // SEMANTIC SIZES: every shape's own T-shirt ladder (2XS=1pt · XS=2 · S=3 · M=4 · L/XL/2XL/3XL …),
-  // solved from the live inputs (padding + frame) and the MODE (auto / standard / dice / diamond).
+  // SEMANTIC SIZES: every shape's own T-shirt ladder (2XS=1pt · XS=2 · S=3 · M=4 · L/XL/2XL/3XL …).
+  // Admin uses its live padding/mode inputs; User uses the constrained door's product defaults.
   const gridMode: GridMode = patternAuto ? 'auto' : pattern
 
-  const stdRungs = useMemo<SemanticRung[]>(() => {
+  const adminRungs = useMemo<SemanticRung[]>(() => {
+    if (panelEntry !== 'admin') return []
     const g: StdGeo = src === 'std' ? (geo === 'rect' ? 'square' : geo) : 'square'
     const mk = (s: number) => stdShapeContour(g, s, s)
     return semanticLadder(mk, { ...DEFAULT_LAW, paddingMM: pad }, gridMode)
-  }, [src, geo, pad, gridMode])
+  }, [panelEntry, src, geo, pad, gridMode])
+
+  const userRungs = useMemo<SemanticRung[]>(() => {
+    if (panelEntry !== 'user') return []
+    const g: StdGeo = src === 'std' ? (geo === 'rect' ? 'square' : geo) : 'square'
+    return resolveUserWorkbenchLadder((s) => stdShapeContour(g, s, s))
+  }, [panelEntry, src, geo])
+
+  const stdRungs = panelEntry === 'admin' ? adminRungs : userRungs
 
   const rectRungs = useMemo(
     () => stdRungs.length
@@ -121,19 +140,8 @@ export default function GridLab() {
 
   const model = useMemo(() => {
     try {
-      // ── STANDARD GEOMETRIES (D12–D15): drawn directly in mm, each axis snapped to its own rung ──
-      if (src === 'std') {
-        if (!stdRungs.length || !rectRungs) return null
-        const nearestOwn = nearestSemanticRung(stdRungs, sizeMM)
-        const rungW = geo === 'rect' ? rectRungs.widthRung : nearestOwn
-        const rungH = geo === 'rect' ? rectRungs.heightRung : rungW
-        // DUAL SIZING LAW (every shape): the slider is CONTINUOUS/adaptive — the engine adapts any size
-        // exactly like generators/AI cuts; the semantic buttons are quick-sets to the pre-calculated
-        // optimal variants. `rungW` stays the NEAREST reference for display. Rect keeps axis rungs
-        // (system A per Dan's rectangle derivation).
-        const stdSize = geo === 'rect' ? rungW.sizeMM : resolvedSizeMM
-        const design = stdShapeContour(geo, stdSize, geo === 'rect' ? rungH.sizeMM : stdSize)
-        const resolved = resolveAdminGridPlan(design, {
+      const resolvePlan = (design: Contour) => panelEntry === 'admin'
+        ? resolveAdminGridPlan(design, {
           attachment,
           mode: gridMode,
           density,
@@ -144,11 +152,28 @@ export default function GridLab() {
           maxGrowMM,
           pitchMM: pitchAuto ? undefined : pitch,
         })
+        : resolveUserWorkbenchPlan(design, attachment)
+
+      // ── STANDARD GEOMETRIES (D12–D15): drawn directly in mm, each axis snapped to its own rung ──
+      if (src === 'std') {
+        if (!stdRungs.length || !rectRungs) return null
+        const nearestOwn = panelEntry === 'admin'
+          ? nearestSemanticRung(stdRungs, sizeMM)
+          : nearestUserWorkbenchRung(stdRungs, sizeMM)
+        const rungW = geo === 'rect' ? rectRungs.widthRung : nearestOwn
+        const rungH = geo === 'rect' ? rectRungs.heightRung : rungW
+        // DUAL SIZING LAW (every shape): the slider is CONTINUOUS/adaptive — the engine adapts any size
+        // exactly like generators/AI cuts; the semantic buttons are quick-sets to the pre-calculated
+        // optimal variants. `rungW` stays the NEAREST reference for display. Rect keeps axis rungs
+        // (system A per Dan's rectangle derivation).
+        const stdSize = geo === 'rect' ? rungW.sizeMM : resolvedSizeMM
+        const design = stdShapeContour(geo, stdSize, geo === 'rect' ? rungH.sizeMM : stdSize)
+        const resolved = resolvePlan(design)
         const effect = resolved.effectContourMM
         const eff = Math.round(Math.max(dim(effect, 0), dim(effect, 1)))
         const anchorPair = nearestAnchorPair(resolved.grid.anchors)
         const format = geo !== 'rect' ? null : rectFormat(rungW.sizeMM, rungH.sizeMM)
-        return { contour: effect, design, grid: resolved.grid, marginMM: resolved.resolvedMarginMM, grew: resolved.grewMM, effSize: eff, designSize: stdSize, pitch: resolved.pitchMM, patternUsed: resolved.pattern ?? pattern, magDist: resolved.nearestAnchorMM, anchorPair, rung: rungW, rungH, format }
+        return { contour: effect, design, grid: resolved.grid, marginMM: resolved.resolvedMarginMM, grew: resolved.grewMM, effSize: eff, designSize: stdSize, pitch: resolved.pitchMM, patternUsed: resolved.pattern ?? 'surface', magDist: resolved.nearestAnchorMM, anchorPair, rung: rungW, rungH, format }
       }
       // base contour normalized so longest side = 1mm (scale-free); scaleContour() sizes it in mm
       let base: Contour | null = null
@@ -176,35 +201,37 @@ export default function GridLab() {
       // buttons are quick-sets for the rigid standard sizes; `rung` below is the nearest reference only.
       const dSize = resolvedSizeMM
       const rung = stdRungs.length
-        ? nearestSemanticRung(stdRungs, dSize)
+        ? panelEntry === 'admin'
+          ? nearestSemanticRung(stdRungs, dSize)
+          : nearestUserWorkbenchRung(stdRungs, dSize)
         : { label: '—', points: 0, sizeMM: dSize, visible: true }
       const design = scaleContour(b, dSize)
-      const resolved = resolveAdminGridPlan(design, {
-        attachment,
-        mode: gridMode,
-        density,
-        paddingMM: pad,
-        plan,
-        center: centerMode,
-        baseMarginMM: offsetMM,
-        maxGrowMM,
-        pitchMM: pitchAuto ? undefined : pitch,
-      })
+      const resolved = resolvePlan(design)
       const effect = resolved.effectContourMM
       const eff = Math.round(Math.max(dim(effect, 0), dim(effect, 1)))
       const anchorPair = nearestAnchorPair(resolved.grid.anchors)
-      return { contour: effect, design, grid: resolved.grid, marginMM: resolved.resolvedMarginMM, grew: resolved.grewMM, effSize: eff, designSize: dSize, pitch: resolved.pitchMM, patternUsed: resolved.pattern ?? pattern, magDist: resolved.nearestAnchorMM, anchorPair, rung, rungH: rung, format: null }
+      return { contour: effect, design, grid: resolved.grid, marginMM: resolved.resolvedMarginMM, grew: resolved.grewMM, effSize: eff, designSize: dSize, pitch: resolved.pitchMM, patternUsed: resolved.pattern ?? 'surface', magDist: resolved.nearestAnchorMM, anchorPair, rung, rungH: rung, format: null }
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
-  }, [src, geo, preset, gen, p1, p2, sides, points, pitch, pitchAuto, density, pad, pattern, plan, magic, offsetMM, centerMode, maxGrowMM, stdRungs, attachment, gridMode, rectRungs, resolvedSizeMM])
+  }, [panelEntry, src, geo, preset, gen, p1, p2, sides, points, sizeMM, pitch, pitchAuto, density, pad, plan, magic, offsetMM, centerMode, maxGrowMM, stdRungs, attachment, gridMode, rectRungs, resolvedSizeMM])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
+  const panelProps: GridWorkbenchPanelProps = {
+    src, setSrc, geo, setGeo, setLongMM, setShortMM, orient, setOrient,
+    preset, setPreset, gen, setGen, p1, setP1, p2, setP2, sides, setSides, points, setPoints,
+    setSizeMM, pitch, setPitch, pitchAuto, setPitchAuto, attachment, setAttachment,
+    density, setDensity, pad, setPad, offsetMM, setOffsetMM, pattern, setPattern,
+    patternAuto, setPatternAuto, plan, setPlan, front, setFront, centerMode, setCenterMode,
+    maxGrowMM, setMaxGrowMM, magic, magStatus, fileRef, onFile, sizeMax, sizeMin, resolvedSizeMM,
+    maxRungMM: DEFAULT_LAW.maxRungMM, gridMode, stdRungs, rectRungs, model,
+  }
+
   return (
     <div className="gl">
       <style>{CSS}</style>
       <header className="gl-head">
         <h1>Magnetic Grid Lab <span className="gl-tag">s59 · registration engine</span></h1>
         <p>Every engine shape source — presets, generators, and <b>AI image cut-out</b> — through the mm magnetic grid.
-          The window is fixed; change the effect's real size and the proportions move. Drawn entirely from millimetres.</p>
+          The window is fixed; change the effect&apos;s real size and the proportions move. Drawn entirely from millimetres.</p>
       </header>
 
       <div className="gl-body">
@@ -222,26 +249,25 @@ export default function GridLab() {
         />
 
         <aside className="gl-controls">
-          <GridWorkbenchPanel
-            src={src} setSrc={setSrc} geo={geo} setGeo={setGeo}
-            setLongMM={setLongMM} setShortMM={setShortMM}
-            orient={orient} setOrient={setOrient} preset={preset} setPreset={setPreset}
-            gen={gen} setGen={setGen} p1={p1} setP1={setP1} p2={p2} setP2={setP2}
-            sides={sides} setSides={setSides} points={points} setPoints={setPoints}
-            sizeMM={sizeMM} setSizeMM={setSizeMM} pitch={pitch} setPitch={setPitch}
-            pitchAuto={pitchAuto} setPitchAuto={setPitchAuto}
-            attachment={attachment} setAttachment={setAttachment}
-            density={density} setDensity={setDensity} pad={pad} setPad={setPad}
-            offsetMM={offsetMM} setOffsetMM={setOffsetMM}
-            pattern={pattern} setPattern={setPattern}
-            patternAuto={patternAuto} setPatternAuto={setPatternAuto}
-            plan={plan} setPlan={setPlan} front={front} setFront={setFront}
-            centerMode={centerMode} setCenterMode={setCenterMode}
-            maxGrowMM={maxGrowMM} setMaxGrowMM={setMaxGrowMM}
-            magic={magic} magStatus={magStatus} fileRef={fileRef} onFile={onFile}
-            sizeMax={sizeMax} sizeMin={sizeMin} resolvedSizeMM={resolvedSizeMM} maxRungMM={DEFAULT_LAW.maxRungMM}
-            gridMode={gridMode} stdRungs={stdRungs} rectRungs={rectRungs} model={model}
-          />
+          <div className="gl-card gl-entry-switch">
+            <span className="gl-glabel">Engine entry</span>
+            <div className="gl-seg" role="group" aria-label="Grid engine entry">
+              <button type="button" aria-pressed={panelEntry === 'admin'} onClick={() => setPanelEntry('admin')}>Admin</button>
+              <button type="button" aria-pressed={panelEntry === 'user'} onClick={() => setPanelEntry('user')}>User</button>
+            </div>
+          </div>
+
+          {panelEntry === 'user' && (
+            <div className="gl-card gl-mismatch" role="note" aria-label="User door clone-gate mismatch">
+              <b>User clone gate · factual mismatch log</b>
+              <span>Present in the full clone but not forwarded to the User grid door:</span>
+              <span>{USER_DOOR_IGNORED_CONTROLS.join(' · ')}</span>
+            </div>
+          )}
+
+          {panelEntry === 'admin'
+            ? <div className="gl-panel-stack" data-workbench-panel="admin"><GridWorkbenchPanel {...panelProps} /></div>
+            : <GridWorkbenchUserPanel {...panelProps} />}
 
           {model && <GridWorkbenchReadouts model={model} scale={scale} />}
         </aside>
@@ -284,6 +310,10 @@ const CSS = `
 .gl-legend{display:flex;flex-wrap:wrap;gap:13px;font:11px var(--mono);color:var(--ink-2)}
 .gl-legend span{display:inline-flex;align-items:center;gap:5px}.gl-legend i{width:10px;height:10px;border-radius:3px}
 .gl-controls{display:flex;flex-direction:column;gap:16px}
+.gl-panel-stack{display:flex;flex-direction:column;gap:16px}
+.gl-entry-switch{padding:12px;display:flex;flex-direction:column;gap:8px}
+.gl-mismatch{padding:12px 14px;display:flex;flex-direction:column;gap:5px;border-color:var(--mag8);font:11px var(--mono);line-height:1.45;color:var(--ink-2)}
+.gl-mismatch b{color:var(--mag8);font-size:11px}
 .gl-glabel{font:600 10.5px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3)}
 .gl-seg{display:flex;gap:4px;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:3px}
 .gl-seg3 button,.gl-seg button{flex:1;min-width:0;font:550 12px var(--sans);color:var(--ink-2);background:none;border:0;border-radius:7px;padding:8px 4px;cursor:pointer;transition:.12s;white-space:nowrap}
