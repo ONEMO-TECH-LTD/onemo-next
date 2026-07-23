@@ -7,23 +7,36 @@
 //   • AI Magic   — image upload → prepareShaped() → u2netp lightweight cut-out → outline
 // Every source yields a VShape → final mm contour consumed by the selected Admin/User grid door.
 
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { getShape, hasVectorDef, type VectorShapeKind } from '@/lib/shape-library'
 import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import { contourFromShape } from '@/lib/effect/geometry-truth'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { nearestAnchorPair, nearestSemanticRung, resolveAdminGridPlan, resolveDesignSizeMM, resolveRectangleRungs, scaleContour, semanticLadder, stdShapeContour, rectFormat, minEffectMM, maxDesignMM, DEFAULT_MARGIN_MM, DEFAULT_LAW, type GridPattern, type MagnetPlan, type GridDensity, type GridMode, type SemanticRung, type StdShape, type Attachment } from '@/lib/effect/grid-admin'
+import { nearestAnchorPair, nearestSemanticRung, resolveDesignSizeMM, resolveRectangleRungs, scaleContour, stdShapeContour, rectFormat, minEffectMM, maxDesignMM, DEFAULT_MARGIN_MM, DEFAULT_LAW, type AdminGridJob, type AdminGridJobResult, type GridPattern, type GridPlanOptions, type MagnetPlan, type GridDensity, type GridMode, type PlanRecipe, type ResolvedGridPlan, type SemanticRung, type StdShape, type Attachment } from '@/lib/effect/grid-admin'
+import {
+  adminGridJobKey,
+  adminStaticGeneration,
+  cachedAdminGridJob,
+  prewarmAdminCanonicalShapes,
+  requestAdminGridJob,
+} from '@/lib/effect/grid-admin-client'
 import { GridWorkbenchPanel, type GridWorkbenchPanelProps } from './GridWorkbenchPanel'
 import { contourDimension as dim, GridWorkbenchReadouts, GridWorkbenchStage } from './GridWorkbenchRenderer'
 import {
+  cachedUserGridJob,
   GridWorkbenchUserPanel,
   nearestUserWorkbenchRung,
-  resolveUserWorkbenchLadder,
-  resolveUserWorkbenchPlan,
+  prewarmUserCanonicalShapes,
+  requestUserGridJob,
+  userGridJobKey,
   USER_DOOR_IGNORED_CONTROLS,
+  type UserGridJob,
+  type UserGridJobResult,
+  type UserStandardShape,
 } from './GridWorkbenchUserPanel'
+import { useGridWorkerJob } from './useGridWorkerJob'
 
 const IMG = 1000
 const VP = 440
@@ -33,6 +46,28 @@ type Src = 'std' | 'preset' | 'gen' | 'magic'
 type StdGeo = StdShape
 type MagicState = { vshape: VShape; maskH: number; adapter: string; imgUrl: string } | null
 type PanelEntry = 'admin' | 'user'
+
+interface PreparedDesign {
+  design: Contour
+  recipe: PlanRecipe
+  designSize: number
+  rung: SemanticRung
+  rungH: SemanticRung
+  format: string | null
+}
+
+declare global {
+  interface Window {
+    __GRID_LAB_PROOF__?: {
+      door: PanelEntry
+      status: 'resolving-sizes' | 'resolving-grid' | 'ready' | 'error'
+      ladderKey: string | null
+      planKey: string | null
+      plan: ResolvedGridPlan | null
+      rendered: { effectMM: number; seated: number; pitchMM: number; pattern: string } | null
+    }
+  }
+}
 
 function bboxOf(pts: ReadonlyArray<{ x: number; y: number }>) {
   let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity
@@ -101,7 +136,8 @@ export default function GridLab() {
   }
 
   const sizeMax = maxDesignMM(src === 'std' ? 'std' : src, DEFAULT_LAW) // engine law: per-source max
-  const activeLaw = panelEntry === 'admin' ? { ...DEFAULT_LAW, paddingMM: pad } : DEFAULT_LAW
+  const adminLaw = useMemo(() => ({ ...DEFAULT_LAW, paddingMM: pad }), [pad])
+  const activeLaw = panelEntry === 'admin' ? adminLaw : DEFAULT_LAW
   const sizeMin = minEffectMM(activeLaw) // user door keeps its default product padding
   const resolvedSizeMM = resolveDesignSizeMM(
     sizeMM,
@@ -115,20 +151,51 @@ export default function GridLab() {
   // SEMANTIC SIZES: every shape's own T-shirt ladder (2XS=1pt · XS=2 · S=3 · M=4 · L/XL/2XL/3XL …).
   // Admin uses its live padding/mode inputs; User uses the constrained door's product defaults.
   const gridMode: GridMode = patternAuto ? 'auto' : pattern
+  const ladderShape: UserStandardShape = src === 'std'
+    ? (geo === 'rect' ? 'square' : geo)
+    : 'square'
+  const ladderRecipe = useMemo(
+    () => ({ kind: 'standard', shape: ladderShape } as const),
+    [ladderShape],
+  )
+  const adminPlanOptions = useMemo<GridPlanOptions>(() => ({
+    attachment,
+    mode: gridMode,
+    density,
+    paddingMM: pad,
+    plan,
+    center: centerMode,
+    baseMarginMM: offsetMM,
+    maxGrowMM,
+    pitchMM: pitchAuto ? undefined : pitch,
+  }), [attachment, gridMode, density, pad, plan, centerMode, offsetMM, maxGrowMM, pitchAuto, pitch])
 
-  const adminRungs = useMemo<SemanticRung[]>(() => {
-    if (panelEntry !== 'admin') return []
-    const g: StdGeo = src === 'std' ? (geo === 'rect' ? 'square' : geo) : 'square'
-    const mk = (s: number) => stdShapeContour(g, s, s)
-    return semanticLadder(mk, { ...DEFAULT_LAW, paddingMM: pad }, gridMode)
-  }, [panelEntry, src, geo, pad, gridMode])
-
-  const userRungs = useMemo<SemanticRung[]>(() => {
-    if (panelEntry !== 'user') return []
-    const g: StdGeo = src === 'std' ? (geo === 'rect' ? 'square' : geo) : 'square'
-    return resolveUserWorkbenchLadder((s) => stdShapeContour(g, s, s))
-  }, [panelEntry, src, geo])
-
+  const adminLadderJob = useMemo<AdminGridJob | null>(() => panelEntry === 'admin'
+    ? { operation: 'ladder', recipe: ladderRecipe, law: adminLaw, mode: gridMode }
+    : null, [panelEntry, ladderRecipe, adminLaw, gridMode])
+  const userLadderJob = useMemo<UserGridJob | null>(() => panelEntry === 'user'
+    ? { operation: 'ladder', recipe: ladderRecipe }
+    : null, [panelEntry, ladderRecipe])
+  const adminLadderKey = adminLadderJob ? adminGridJobKey(adminLadderJob) : null
+  const userLadderKey = userLadderJob ? userGridJobKey(userLadderJob) : null
+  const adminLadderState = useGridWorkerJob<AdminGridJob, AdminGridJobResult>(
+    adminLadderJob,
+    adminLadderKey,
+    requestAdminGridJob,
+    cachedAdminGridJob,
+  )
+  const userLadderState = useGridWorkerJob<UserGridJob, UserGridJobResult>(
+    userLadderJob,
+    userLadderKey,
+    requestUserGridJob,
+    cachedUserGridJob,
+  )
+  const adminRungs = adminLadderState.result?.operation === 'ladder'
+    ? adminLadderState.result.value
+    : []
+  const userRungs = userLadderState.result?.operation === 'ladder'
+    ? userLadderState.result.value
+    : []
   const stdRungs = panelEntry === 'admin' ? adminRungs : userRungs
 
   const rectRungs = useMemo(
@@ -138,22 +205,8 @@ export default function GridLab() {
     [stdRungs, longMM, shortMM, orient],
   )
 
-  const model = useMemo(() => {
+  const preparedDesign = useMemo<PreparedDesign | null>(() => {
     try {
-      const resolvePlan = (design: Contour) => panelEntry === 'admin'
-        ? resolveAdminGridPlan(design, {
-          attachment,
-          mode: gridMode,
-          density,
-          paddingMM: pad,
-          plan,
-          center: centerMode,
-          baseMarginMM: offsetMM,
-          maxGrowMM,
-          pitchMM: pitchAuto ? undefined : pitch,
-        })
-        : resolveUserWorkbenchPlan(design, attachment)
-
       // ── STANDARD GEOMETRIES (D12–D15): drawn directly in mm, each axis snapped to its own rung ──
       if (src === 'std') {
         if (!stdRungs.length || !rectRungs) return null
@@ -168,12 +221,15 @@ export default function GridLab() {
         // (system A per Dan's rectangle derivation).
         const stdSize = geo === 'rect' ? rungW.sizeMM : resolvedSizeMM
         const design = stdShapeContour(geo, stdSize, geo === 'rect' ? rungH.sizeMM : stdSize)
-        const resolved = resolvePlan(design)
-        const effect = resolved.effectContourMM
-        const eff = Math.round(Math.max(dim(effect, 0), dim(effect, 1)))
-        const anchorPair = nearestAnchorPair(resolved.grid.anchors)
         const format = geo !== 'rect' ? null : rectFormat(rungW.sizeMM, rungH.sizeMM)
-        return { contour: effect, design, grid: resolved.grid, marginMM: resolved.resolvedMarginMM, grew: resolved.grewMM, effSize: eff, designSize: stdSize, pitch: resolved.pitchMM, patternUsed: resolved.pattern ?? 'surface', magDist: resolved.nearestAnchorMM, anchorPair, rung: rungW, rungH, format }
+        return {
+          design,
+          recipe: { kind: 'standard', shape: geo, widthMM: stdSize, heightMM: geo === 'rect' ? rungH.sizeMM : stdSize },
+          designSize: stdSize,
+          rung: rungW,
+          rungH,
+          format,
+        }
       }
       // base contour normalized so longest side = 1mm (scale-free); scaleContour() sizes it in mm
       let base: Contour | null = null
@@ -192,6 +248,7 @@ export default function GridLab() {
         base = { outer: { pts: ring.map(([x, y]) => [x / L, (IMG - y) / L] as Pt) }, holes: [] }
       }
       if (!base || base.outer.pts.length < 3) return null
+      if (!stdRungs.length) return null
       const b = base
       // DESIGN stays fixed at the set size. Auto-grow adds an outward MARGIN (offset) around it — the border
       // the magnets' padding uses. Manual "offset" is the starting margin. Total effect = design + 2×margin.
@@ -200,19 +257,114 @@ export default function GridLab() {
       // the engine adapts (auto-margin snaps coverage to the 48-family grid dynamically). The rung
       // buttons are quick-sets for the rigid standard sizes; `rung` below is the nearest reference only.
       const dSize = resolvedSizeMM
-      const rung = stdRungs.length
-        ? panelEntry === 'admin'
-          ? nearestSemanticRung(stdRungs, dSize)
-          : nearestUserWorkbenchRung(stdRungs, dSize)
-        : { label: '—', points: 0, sizeMM: dSize, visible: true }
+      const rung = panelEntry === 'admin'
+        ? nearestSemanticRung(stdRungs, dSize)
+        : nearestUserWorkbenchRung(stdRungs, dSize)
       const design = scaleContour(b, dSize)
-      const resolved = resolvePlan(design)
-      const effect = resolved.effectContourMM
-      const eff = Math.round(Math.max(dim(effect, 0), dim(effect, 1)))
-      const anchorPair = nearestAnchorPair(resolved.grid.anchors)
-      return { contour: effect, design, grid: resolved.grid, marginMM: resolved.resolvedMarginMM, grew: resolved.grewMM, effSize: eff, designSize: dSize, pitch: resolved.pitchMM, patternUsed: resolved.pattern ?? 'surface', magDist: resolved.nearestAnchorMM, anchorPair, rung, rungH: rung, format: null }
+      return {
+        design,
+        recipe: { kind: 'final-contour', contourMM: design },
+        designSize: dSize,
+        rung,
+        rungH: rung,
+        format: null,
+      }
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
-  }, [panelEntry, src, geo, preset, gen, p1, p2, sides, points, sizeMM, pitch, pitchAuto, density, pad, plan, magic, offsetMM, centerMode, maxGrowMM, stdRungs, attachment, gridMode, rectRungs, resolvedSizeMM])
+  }, [panelEntry, src, geo, preset, gen, p1, p2, sides, points, sizeMM, magic, stdRungs, rectRungs, resolvedSizeMM])
+
+  const adminPlanJob = useMemo<AdminGridJob | null>(() =>
+    panelEntry === 'admin' && preparedDesign
+      ? { operation: 'plan', recipe: preparedDesign.recipe, options: adminPlanOptions }
+      : null, [panelEntry, preparedDesign, adminPlanOptions])
+  const userPlanJob = useMemo<UserGridJob | null>(() =>
+    panelEntry === 'user' && preparedDesign
+      ? { operation: 'plan', recipe: preparedDesign.recipe, attachment }
+      : null, [panelEntry, preparedDesign, attachment])
+  const adminPlanKey = adminPlanJob ? adminGridJobKey(adminPlanJob) : null
+  const userPlanKey = userPlanJob ? userGridJobKey(userPlanJob) : null
+  const adminPlanState = useGridWorkerJob<AdminGridJob, AdminGridJobResult>(
+    adminPlanJob,
+    adminPlanKey,
+    requestAdminGridJob,
+    cachedAdminGridJob,
+  )
+  const userPlanState = useGridWorkerJob<UserGridJob, UserGridJobResult>(
+    userPlanJob,
+    userPlanKey,
+    requestUserGridJob,
+    cachedUserGridJob,
+  )
+  const resolvedPlan = panelEntry === 'admin'
+    ? adminPlanState.result?.operation === 'plan' ? adminPlanState.result.value : null
+    : userPlanState.result?.operation === 'plan' ? userPlanState.result.value : null
+
+  const model = useMemo(() => {
+    if (!preparedDesign || !resolvedPlan) return null
+    const effect = resolvedPlan.effectContourMM
+    const eff = Math.round(Math.max(dim(effect, 0), dim(effect, 1)))
+    const anchorPair = nearestAnchorPair(resolvedPlan.grid.anchors)
+    return {
+      contour: effect,
+      design: preparedDesign.design,
+      grid: resolvedPlan.grid,
+      marginMM: resolvedPlan.resolvedMarginMM,
+      grew: resolvedPlan.grewMM,
+      effSize: eff,
+      designSize: preparedDesign.designSize,
+      pitch: resolvedPlan.pitchMM,
+      patternUsed: resolvedPlan.pattern ?? 'surface',
+      magDist: resolvedPlan.nearestAnchorMM,
+      anchorPair,
+      rung: preparedDesign.rung,
+      rungH: preparedDesign.rungH,
+      format: preparedDesign.format,
+    }
+  }, [preparedDesign, resolvedPlan])
+
+  const activeLadderState = panelEntry === 'admin' ? adminLadderState : userLadderState
+  const activePlanState = panelEntry === 'admin' ? adminPlanState : userPlanState
+  const runtimeError = activeLadderState.error ?? activePlanState.error
+  const runtimeStatus = runtimeError
+    ? 'error'
+    : activeLadderState.pending
+      ? 'resolving-sizes'
+      : preparedDesign && activePlanState.pending
+        ? 'resolving-grid'
+        : 'ready'
+
+  const adminGeneration = adminStaticGeneration(adminLaw, gridMode, adminPlanOptions)
+  useEffect(() => {
+    void prewarmUserCanonicalShapes(ladderShape, resolvedSizeMM, attachment).catch((error) => {
+      console.error('[grid-lab] User static prewarm failed', error)
+    })
+  }, [attachment, ladderShape, resolvedSizeMM])
+  useEffect(() => {
+    void prewarmAdminCanonicalShapes(
+      adminLaw,
+      gridMode,
+      adminPlanOptions,
+      ladderShape,
+      resolvedSizeMM,
+    ).catch((error) => {
+      console.error('[grid-lab] Admin static prewarm failed', error)
+    })
+  }, [adminGeneration, adminLaw, gridMode, adminPlanOptions, ladderShape, resolvedSizeMM])
+
+  useEffect(() => {
+    window.__GRID_LAB_PROOF__ = {
+      door: panelEntry,
+      status: runtimeStatus,
+      ladderKey: panelEntry === 'admin' ? adminLadderKey : userLadderKey,
+      planKey: panelEntry === 'admin' ? adminPlanKey : userPlanKey,
+      plan: resolvedPlan,
+      rendered: model ? {
+        effectMM: model.effSize,
+        seated: model.grid.anchors.length,
+        pitchMM: model.pitch,
+        pattern: model.patternUsed,
+      } : null,
+    }
+  }, [panelEntry, runtimeStatus, adminLadderKey, userLadderKey, adminPlanKey, userPlanKey, resolvedPlan, model])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const panelProps: GridWorkbenchPanelProps = {
@@ -226,7 +378,13 @@ export default function GridLab() {
   }
 
   return (
-    <div className="gl">
+    <div
+      className="gl"
+      data-grid-runtime-status={runtimeStatus}
+      data-grid-door={panelEntry}
+      data-grid-ladder-key={panelEntry === 'admin' ? adminLadderKey ?? '' : userLadderKey ?? ''}
+      data-grid-plan-key={panelEntry === 'admin' ? adminPlanKey ?? '' : userPlanKey ?? ''}
+    >
       <style>{CSS}</style>
       <header className="gl-head">
         <h1>Magnetic Grid Lab <span className="gl-tag">s59 · registration engine</span></h1>
@@ -242,10 +400,16 @@ export default function GridLab() {
           fit={FIT}
           front={front}
           frontImg={src === 'magic' && magic ? magic.imgUrl : null}
-          emptyText={src === 'magic'
-            ? magStatus.startsWith('error') ? magStatus.slice(6) : magStatus === 'downloading-model' ? 'Downloading the cut-out model…' : magStatus.startsWith('cutting') ? 'Cutting out the shape…' : 'Upload an image to cut its outline'
-            : 'shape unavailable'}
-          emptySpin={magStatus === 'downloading-model' || magStatus.startsWith('cutting')}
+          emptyText={runtimeError
+            ? `Grid error · ${runtimeError}`
+            : runtimeStatus === 'resolving-sizes'
+              ? 'Resolving sizes…'
+              : runtimeStatus === 'resolving-grid'
+                ? 'Resolving grid…'
+                : src === 'magic'
+                  ? magStatus.startsWith('error') ? magStatus.slice(6) : magStatus === 'downloading-model' ? 'Downloading the cut-out model…' : magStatus.startsWith('cutting') ? 'Cutting out the shape…' : 'Upload an image to cut its outline'
+                  : 'shape unavailable'}
+          emptySpin={runtimeStatus === 'resolving-sizes' || runtimeStatus === 'resolving-grid' || magStatus === 'downloading-model' || magStatus.startsWith('cutting')}
         />
 
         <aside className="gl-controls">
@@ -256,6 +420,17 @@ export default function GridLab() {
               <button type="button" aria-pressed={panelEntry === 'user'} onClick={() => setPanelEntry('user')}>User</button>
             </div>
           </div>
+
+          {runtimeStatus !== 'ready' && (
+            <div className="gl-card gl-resolving" role="status">
+              {!runtimeError && <span className="gl-spin" />}
+              <span>{runtimeError
+                ? `Grid error · ${runtimeError}`
+                : runtimeStatus === 'resolving-sizes'
+                  ? 'Resolving sizes… controls remain available'
+                  : 'Resolving grid… controls remain available'}</span>
+            </div>
+          )}
 
           {panelEntry === 'user' && (
             <div className="gl-card gl-mismatch" role="note" aria-label="User door clone-gate mismatch">
@@ -312,6 +487,7 @@ const CSS = `
 .gl-controls{display:flex;flex-direction:column;gap:16px}
 .gl-panel-stack{display:flex;flex-direction:column;gap:16px}
 .gl-entry-switch{padding:12px;display:flex;flex-direction:column;gap:8px}
+.gl-resolving{padding:11px 13px;display:flex;align-items:center;gap:9px;color:var(--ink-2);font:11.5px var(--mono)}
 .gl-mismatch{padding:12px 14px;display:flex;flex-direction:column;gap:5px;border-color:var(--mag8);font:11px var(--mono);line-height:1.45;color:var(--ink-2)}
 .gl-mismatch b{color:var(--mag8);font-size:11px}
 .gl-glabel{font:600 10.5px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3)}
@@ -322,6 +498,7 @@ const CSS = `
 .gl-seg button[aria-pressed=true]{background:var(--accent);color:#fff;box-shadow:0 1px 2px #0002}
 .gl-seg button.gl-hidden-rung{color:var(--mag8);font-style:italic}
 .gl-seg button.gl-hidden-rung[aria-pressed=true]{background:var(--mag8);color:#fff;font-style:normal}
+.gl-inline-resolving{width:100%;padding:6px 8px;color:var(--ink-3);font:11px var(--mono);text-align:center;text-transform:none;letter-spacing:0}
 .gl-field{display:flex;flex-direction:column;gap:8px;font:600 10.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
 .gl-field select{font:500 13px var(--sans);color:var(--ink);background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:9px;cursor:pointer}
 .gl-upload{font:600 13px var(--sans);color:#fff;background:var(--accent);border:0;border-radius:10px;padding:11px;cursor:pointer;width:100%}

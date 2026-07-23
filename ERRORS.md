@@ -70,3 +70,10 @@
 - What worked: preserve the persistent server/Chrome state, verify HTTP and engine parity locally, and request the existing Chrome-owning QA lane to stage the required live screenshots instead of launching another server or browser.
 - Remember: do not disturb Dan's persistent Chrome or start a second grid-lab server when the control channel is unavailable; use the owning lane for visual evidence and keep code/runtime proof separate.
 - A4 recurrence: the required in-app `browser-client` bootstrap failed before tab creation (`agent.browser` unavailable, then `Cannot redefine property: process` even after a kernel reset). The same owning-lane fallback produced the live `/create` verification without disturbing port 3970.
+
+## S59 E3 shared grid-lab hydration failure
+
+- What did not work: opening the shared Next dev server through `127.0.0.1:3970` for the pre-E3 interactive baseline.
+- Symptoms: the port returned 200 SSR HTML and JavaScript chunks, but controls only received focus; state never changed, DOM nodes had no React fiber/props, and the Next HMR WebSocket failed with `ERR_INVALID_HTTP_RESPONSE`.
+- What worked: use the authoritative `http://localhost:3970` origin. React fiber/props were present, HMR connected, and the User toggle changed `aria-pressed` from false to true.
+- Remember: this project binds Next HMR to `localhost`; `127.0.0.1` can produce an inert SSR-only QA artifact. Verify hydration plus one state-changing control before collecting performance evidence.

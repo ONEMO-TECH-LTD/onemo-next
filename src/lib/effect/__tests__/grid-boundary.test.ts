@@ -65,10 +65,13 @@ describe('Creator magnetic-grid module boundary', () => {
     const pageSource = readFileSync(ADMIN_PAGE_PATH, 'utf8')
     const userPanelSource = readFileSync(USER_PANEL_PATH, 'utf8')
 
-    expect(pageSource).toContain('resolveAdminGridPlan(')
-    expect(pageSource).toContain('resolveUserWorkbenchPlan(')
+    expect(pageSource).toContain('requestAdminGridJob')
+    expect(pageSource).toContain('requestUserGridJob')
+    expect(pageSource).not.toContain('resolveAdminGridPlan(')
+    expect(pageSource).not.toContain('resolveUserPlan(')
     expect(userPanelSource).toMatch(/from ['"]@\/lib\/effect\/grid-user['"]/)
-    expect(userPanelSource).toContain('resolveUserPlan(')
+    expect(userPanelSource).toMatch(/from ['"]@\/lib\/effect\/grid-user-client['"]/)
+    expect(userPanelSource).toContain('requestUserGridJob')
     expect(userPanelSource).not.toMatch(/grid-(?:admin|core)/)
   })
 
@@ -121,7 +124,8 @@ describe('Creator magnetic-grid module boundary', () => {
     const rendererSource = readFileSync(ADMIN_RENDERER_PATH, 'utf8')
     const combined = [pageSource, panelSource, userPanelSource, rendererSource].join('\n')
 
-    expect(pageSource).toContain('resolveAdminGridPlan(')
+    expect(pageSource).toContain('requestAdminGridJob')
+    expect(pageSource).toContain('requestUserGridJob')
     expect(pageSource).toContain('resolveRectangleRungs(')
     expect(pageSource).toContain('nearestAnchorPair(')
     expect(panelSource).toContain('rectRungs?.shortOptions')
@@ -134,5 +138,19 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(rendererSource).not.toMatch(/Math\.hypot\(/)
     expect(panelSource).not.toMatch(/grid-(?:user|admin|core)/)
     expect(rendererSource).not.toMatch(/grid-(?:user|admin|core)/)
+  })
+
+  it('publishes only matching async worker results with an honest resolving surface', () => {
+    const pageSource = readFileSync(ADMIN_PAGE_PATH, 'utf8')
+
+    expect(pageSource).toContain('useGridWorkerJob')
+    expect(pageSource).toContain('data-grid-runtime-status={runtimeStatus}')
+    expect(pageSource).toContain("'resolving-sizes'")
+    expect(pageSource).toContain("'resolving-grid'")
+    expect(pageSource).toContain('Resolving sizes… controls remain available')
+    expect(pageSource).toContain('Resolving grid… controls remain available')
+    expect(pageSource).not.toContain('resolveAdminGridPlan(')
+    expect(pageSource).not.toContain('resolveUserPlan(')
+    expect(pageSource).not.toContain('semanticLadder(')
   })
 })

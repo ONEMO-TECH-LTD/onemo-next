@@ -37,6 +37,10 @@ export class BoundedResultCache<T> {
 
   has(key: string): boolean { return this.entries.has(key) }
 
+  peek(key: string): T | undefined {
+    return this.entries.get(key)?.value
+  }
+
   get(key: string): T | undefined {
     const entry = this.entries.get(key)
     if (!entry) return undefined

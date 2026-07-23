@@ -175,6 +175,7 @@ export function GridWorkbenchPanel({
       {/* SEMANTIC SIZES — the shape's own T-shirt ladder (anchor-count tiers), mode + recipe driven */}
       {!(src === 'std' && geo === 'rect') && <div className="gl-field"><span>Size · {src === 'std' ? 'this shape' : 'square ref'} · {gridMode === 'quincunx' ? 'dice' : gridMode}</span>
         <div className="gl-seg gl-wrap">
+          {!stdRungs.length && <span className="gl-inline-resolving">Resolving…</span>}
           {stdRungs.map(r =>
             <button key={r.sizeMM} aria-pressed={model?.rung.sizeMM === r.sizeMM}
               className={r.visible ? undefined : 'gl-hidden-rung'}
@@ -188,6 +189,7 @@ export function GridWorkbenchPanel({
         {/* system A: long side → short side (< long) → orientation */}
         <div className="gl-field"><span>Long side · size</span>
           <div className="gl-seg gl-wrap">
+            {!rectRungs && <span className="gl-inline-resolving">Resolving…</span>}
             {(rectRungs?.longOptions ?? []).map(r =>
               <button key={'L' + r.sizeMM} aria-pressed={Math.max(model?.rung.sizeMM ?? 0, model?.rungH?.sizeMM ?? 0) === r.sizeMM}
                 className={r.visible ? undefined : 'gl-hidden-rung'}
@@ -199,6 +201,7 @@ export function GridWorkbenchPanel({
         </div>
         <div className="gl-field"><span>Short side · size</span>
           <div className="gl-seg gl-wrap">
+            {!rectRungs && <span className="gl-inline-resolving">Resolving…</span>}
             {(rectRungs?.shortOptions ?? []).map(r =>
               <button key={'S' + r.sizeMM} aria-pressed={Math.min(model?.rung.sizeMM ?? 0, model?.rungH?.sizeMM ?? 0) === r.sizeMM}
                 className={r.visible ? undefined : 'gl-hidden-rung'}

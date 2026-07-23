@@ -1,4 +1,8 @@
-import { BoundedResultCache, type BoundedResultCacheOptions } from './grid-cache'
+import {
+  BoundedResultCache,
+  StaticResultTable,
+  type BoundedResultCacheOptions,
+} from './grid-cache'
 
 export interface GridWorkerRequest<Job> {
   id: number
@@ -53,6 +57,7 @@ export class GridWorkerScheduler<Job, Result> {
   private readonly keyOfJob: (job: Job) => string
   private readonly keyOfResult: (result: Result) => string
   private readonly cache: BoundedResultCache<Result>
+  private readonly staticResults = new StaticResultTable<Result>()
   private readonly inFlight = new Map<string, PendingRequest<Job, Result>>()
   private readonly backgroundQueue: PendingRequest<Job, Result>[] = []
   private worker: GridWorkerLike | null = null
@@ -71,7 +76,7 @@ export class GridWorkerScheduler<Job, Result> {
   request(job: Job, priority: GridWorkerPriority = 'active'): Promise<Result> {
     if (this.disposed) return Promise.reject(new GridWorkerDisposedError())
     const key = this.keyOfJob(job)
-    const cached = this.cache.get(key)
+    const cached = this.staticResults.get(key) ?? this.cache.get(key)
     if (cached !== undefined) {
       if (priority === 'active' && this.current && this.current.key !== key) {
         this.preemptCurrent(new GridWorkerSupersededError(this.current.key, key))
@@ -120,6 +125,28 @@ export class GridWorkerScheduler<Job, Result> {
     return promise
   }
 
+  activateStaticGeneration(generation: string): boolean {
+    return this.staticResults.activate(generation)
+  }
+
+  peek(job: Job): Result | undefined {
+    const key = this.keyOfJob(job)
+    return this.staticResults.get(key) ?? this.cache.peek(key)
+  }
+
+  async prewarm(job: Job, generation: string): Promise<Result> {
+    if (this.disposed) throw new GridWorkerDisposedError()
+    if (this.staticResults.generation !== generation) {
+      throw new Error('Grid static prewarm generation is not active.')
+    }
+    const key = this.keyOfJob(job)
+    const existing = this.staticResults.get(key)
+    if (existing !== undefined) return existing
+    const result = await this.request(job, 'background')
+    this.staticResults.set(generation, key, result)
+    return result
+  }
+
   dispose(): void {
     if (this.disposed) return
     this.disposed = true
@@ -135,6 +162,7 @@ export class GridWorkerScheduler<Job, Result> {
       pending.reject(error)
     }
     this.cache.clear()
+    this.staticResults.clear()
   }
 
   get pendingCount(): number {

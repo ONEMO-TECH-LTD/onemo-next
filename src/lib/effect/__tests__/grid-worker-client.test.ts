@@ -69,6 +69,8 @@ describe('preemptive exact grid worker scheduler', () => {
     workers[0].succeed()
     await expect(first).resolves.toEqual({ key: 'same', value: 1 })
 
+    expect(scheduler.peek({ key: 'same', value: 99 }))
+      .toEqual({ key: 'same', value: 1 })
     await expect(scheduler.request({ key: 'same', value: 99 }))
       .resolves.toEqual({ key: 'same', value: 1 })
     expect(workers[0].requests).toHaveLength(1)
@@ -153,6 +155,44 @@ describe('preemptive exact grid worker scheduler', () => {
 
     expect(workers[0].terminated).toBe(true)
     await expect(staleRejected).resolves.toBeInstanceOf(GridWorkerSupersededError)
+    scheduler.dispose()
+  })
+
+  it('pins prewarmed static results outside dynamic LRU eviction for the active generation', async () => {
+    const { scheduler, workers } = fixture()
+    scheduler.activateStaticGeneration('law-a')
+    const pinned = scheduler.prewarm({ key: 'static', value: 1 }, 'law-a')
+    workers[0].succeed()
+    await pinned
+
+    for (let index = 0; index < 5; index++) {
+      const dynamic = scheduler.request({ key: `dynamic-${index}`, value: index })
+      workers[0].succeed(index + 1)
+      await dynamic
+    }
+    const requestCount = workers[0].requests.length
+    await expect(scheduler.request({ key: 'static', value: 99 }))
+      .resolves.toEqual({ key: 'static', value: 1 })
+    expect(workers[0].requests).toHaveLength(requestCount)
+    scheduler.dispose()
+  })
+
+  it('clears pinned static results on law generation change and rejects stale-generation writes', async () => {
+    const { scheduler, workers } = fixture()
+    scheduler.activateStaticGeneration('law-a')
+    const stale = scheduler.prewarm({ key: 'static', value: 1 }, 'law-a')
+    scheduler.activateStaticGeneration('law-b')
+    workers[0].succeed()
+    await stale
+
+    for (let index = 0; index < 5; index++) {
+      const dynamic = scheduler.request({ key: `replacement-${index}`, value: index })
+      workers[0].succeed(index + 1)
+      await dynamic
+    }
+    const recomputed = scheduler.prewarm({ key: 'static', value: 2 }, 'law-b')
+    workers[0].succeed(6)
+    await expect(recomputed).resolves.toEqual({ key: 'static', value: 2 })
     scheduler.dispose()
   })
 

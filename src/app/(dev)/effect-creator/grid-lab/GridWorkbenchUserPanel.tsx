@@ -1,12 +1,22 @@
-import type { Contour } from '@/lib/effect/types'
 import {
   nearestUserSemanticRung,
-  resolveUserPlan,
-  semanticLadder,
-  type Attachment,
   type SemanticRung,
 } from '@/lib/effect/grid-user'
+import {
+  cachedUserGridJob,
+  prewarmUserCanonicalShapes,
+  requestUserGridJob,
+  userGridJobKey,
+} from '@/lib/effect/grid-user-client'
 import { GridWorkbenchPanel, type GridWorkbenchPanelProps } from './GridWorkbenchPanel'
+
+export {
+  cachedUserGridJob,
+  prewarmUserCanonicalShapes,
+  requestUserGridJob,
+  userGridJobKey,
+}
+export type { UserGridJob, UserGridJobResult, UserStandardShape } from '@/lib/effect/grid-user'
 
 export const USER_DOOR_IGNORED_CONTROLS = [
   'Max auto-margin',
@@ -18,14 +28,6 @@ export const USER_DOOR_IGNORED_CONTROLS = [
   'Grid centering',
   'Magnet plan',
 ] as const
-
-export function resolveUserWorkbenchPlan(contourMM: Contour, attachment: Attachment) {
-  return resolveUserPlan(contourMM, { attachment })
-}
-
-export function resolveUserWorkbenchLadder(makeShape: (sizeMM: number) => Contour): SemanticRung[] {
-  return semanticLadder(makeShape)
-}
 
 export function nearestUserWorkbenchRung(
   rungs: ReadonlyArray<SemanticRung>,
