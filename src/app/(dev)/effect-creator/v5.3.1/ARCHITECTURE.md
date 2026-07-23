@@ -22,12 +22,15 @@ hands-on product gate; the current full User clone deliberately preserves every 
 54mm `validateAttachment` remains only for the dormant payload contract
 pending an approved retirement migration.
 
-**Session 59 performance foundation (E1 only):** the engine doors also expose exact serializable
+**Session 59 performance foundation (E1–E2):** the engine doors also expose exact serializable
 ladder/plan recipes, engine-versioned canonical cache keys, and pure User/Admin job handlers.
 `grid-cache.ts` provides a pinned one-generation static table plus a byte/entry-bounded dynamic LRU.
 Oracle tests prove direct engine versus handler/structured-clone JSON bytes across the door matrix.
-This is not yet the runtime speed fix: Web Workers, scheduling/pre-emption, async page wiring, and the
-honest resolving state remain E2/E3; the current grid-lab still resolves synchronously until those land.
+Separate User/Admin module workers preserve the semantic wall, and `grid-worker-client.ts` owns exact-result
+coalescing/cache reuse, request-ID publication, background queuing, and physical terminate/recreate pre-emption.
+Actual-browser worker oracles prove both doors preserve direct-engine JSON bytes. This is still not the runtime
+speed fix: async page wiring, static warming, the honest resolving state, and the benchmark remain E3; the current
+grid-lab still resolves synchronously until those land.
 
 ---
 

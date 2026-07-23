@@ -11,6 +11,10 @@ const USER_PANEL_PATH = 'src/app/(dev)/effect-creator/grid-lab/GridWorkbenchUser
 const ADMIN_RENDERER_PATH = 'src/app/(dev)/effect-creator/grid-lab/GridWorkbenchRenderer.tsx'
 const USER_DOOR_PATH = 'src/lib/effect/grid-user.ts'
 const ADMIN_DOOR_PATH = 'src/lib/effect/grid-admin.ts'
+const USER_WORKER_PATH = 'src/lib/effect/grid-user.worker.ts'
+const ADMIN_WORKER_PATH = 'src/lib/effect/grid-admin.worker.ts'
+const USER_WORKER_CLIENT_PATH = 'src/lib/effect/grid-user-client.ts'
+const ADMIN_WORKER_CLIENT_PATH = 'src/lib/effect/grid-admin-client.ts'
 
 async function lintUserImport(modulePath: string) {
   const eslint = new ESLint({ cwd: process.cwd() })
@@ -78,6 +82,25 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(userDoorSource).not.toMatch(/grid-admin/)
     expect(adminDoorSource).toContain('handleAdminGridJob')
     expect(adminDoorSource).not.toContain('handleUserGridJob')
+  })
+
+  it('keeps each real worker and client behind exactly one semantic door', () => {
+    const userWorkerSource = readFileSync(USER_WORKER_PATH, 'utf8')
+    const adminWorkerSource = readFileSync(ADMIN_WORKER_PATH, 'utf8')
+    const userClientSource = readFileSync(USER_WORKER_CLIENT_PATH, 'utf8')
+    const adminClientSource = readFileSync(ADMIN_WORKER_CLIENT_PATH, 'utf8')
+
+    expect(userWorkerSource.match(/^import .* from ['"].*['"]$/gm)).toEqual([
+      "import { handleUserGridJob, type UserGridJob } from './grid-user'",
+    ])
+    expect(adminWorkerSource.match(/^import .* from ['"].*['"]$/gm)).toEqual([
+      "import { handleAdminGridJob, type AdminGridJob } from './grid-admin'",
+    ])
+    expect(`${userWorkerSource}\n${userClientSource}`).not.toMatch(/grid-(?:admin|core)/)
+    expect(userClientSource).toContain("new URL('./grid-user.worker.ts', import.meta.url)")
+    expect(userClientSource).not.toContain('AdminGridJob')
+    expect(adminClientSource).toContain("new URL('./grid-admin.worker.ts', import.meta.url)")
+    expect(adminClientSource).not.toContain('UserGridJob')
   })
 
   it('keeps the clone-gate mismatch inspectable without deciding any control', () => {
