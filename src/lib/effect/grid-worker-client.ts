@@ -58,6 +58,115 @@ export class GridWorkerInactiveError extends Error {
   }
 }
 
+interface PendingCoalescedRequest<Job, Result> {
+  key: string
+  job: Job
+  dispatch: (job: Job) => Promise<Result>
+  promise: Promise<Result>
+  resolve: (result: Result) => void
+  reject: (error: Error) => void
+  timer: ReturnType<typeof setTimeout> | null
+}
+
+export interface GridWorkerRequestCoalescerOptions {
+  delayMS: number
+}
+
+/**
+ * Debounce transient UI intents before they reach the pre-emptive worker lane.
+ * Jobs and results stay untouched; settling flushes the latest exact job immediately.
+ */
+export class GridWorkerRequestCoalescer<Job, Result> {
+  private readonly delayMS: number
+  private pending: PendingCoalescedRequest<Job, Result> | null = null
+
+  constructor(options: GridWorkerRequestCoalescerOptions) {
+    this.delayMS = options.delayMS
+  }
+
+  request(
+    job: Job,
+    key: string,
+    dispatch: (job: Job) => Promise<Result>,
+  ): Promise<Result> {
+    if (this.pending?.key === key) {
+      if (this.pending.timer !== null) clearTimeout(this.pending.timer)
+      this.pending.job = job
+      this.pending.dispatch = dispatch
+      this.pending.timer = this.schedule(this.pending)
+      return this.pending.promise
+    }
+    if (this.pending) this.rejectPending(new GridWorkerSupersededError(this.pending.key, key))
+
+    let resolve!: (result: Result) => void
+    let reject!: (error: Error) => void
+    const promise = new Promise<Result>((onResolve, onReject) => {
+      resolve = onResolve
+      reject = onReject
+    })
+    const pending: PendingCoalescedRequest<Job, Result> = {
+      key,
+      job,
+      dispatch,
+      promise,
+      resolve,
+      reject,
+      timer: null,
+    }
+    pending.timer = this.schedule(pending)
+    this.pending = pending
+    return promise
+  }
+
+  flush(
+    job: Job,
+    key: string,
+    dispatch: (job: Job) => Promise<Result>,
+  ): Promise<Result> {
+    const pending = this.pending
+    if (!pending) return dispatch(job)
+    if (pending.key !== key) {
+      this.rejectPending(new GridWorkerSupersededError(pending.key, key))
+      return dispatch(job)
+    }
+    if (pending.timer !== null) clearTimeout(pending.timer)
+    pending.job = job
+    pending.dispatch = dispatch
+    this.pending = null
+    this.dispatch(pending)
+    return pending.promise
+  }
+
+  cancel(key?: string): void {
+    if (!this.pending || (key !== undefined && this.pending.key !== key)) return
+    this.rejectPending(new GridWorkerInactiveError())
+  }
+
+  private schedule(pending: PendingCoalescedRequest<Job, Result>): ReturnType<typeof setTimeout> {
+    return setTimeout(() => {
+      if (this.pending !== pending) return
+      this.pending = null
+      this.dispatch(pending)
+    }, this.delayMS)
+  }
+
+  private dispatch(pending: PendingCoalescedRequest<Job, Result>): void {
+    try {
+      pending.dispatch(pending.job).then(pending.resolve, pending.reject)
+    } catch (error) {
+      pending.reject(error instanceof Error ? error : new Error(String(error)))
+    }
+  }
+
+  private rejectPending(error: Error): void {
+    const pending = this.pending
+    if (!pending) return
+    if (pending.timer !== null) clearTimeout(pending.timer)
+    this.pending = null
+    pending.reject(error)
+  }
+}
+
 /** Keep exact background work alive across active-request pre-emption without delaying the active job. */
 export async function requestGridWorkerJobInBackground<Job, Result>(
   job: Job,

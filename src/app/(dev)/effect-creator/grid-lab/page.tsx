@@ -95,6 +95,7 @@ function normBase(vs: VShape, maskH: number): Contour | null {
 
 export default function GridLab() {
   const [panelEntry, setPanelEntry] = useState<PanelEntry>('admin')
+  const [sliderTransient, setSliderTransient] = useState(false)
   const [src, setSrc] = useState<Src>('std')
   const [geo, setGeo] = useState<StdGeo>('square')
   // rect system A: long side rung → short side rung (< long) → orientation
@@ -197,12 +198,14 @@ export default function GridLab() {
     adminLadderKey,
     requestAdminLadderJob,
     cachedAdminGridJob,
+    sliderTransient,
   )
   const userLadderState = useGridWorkerJob<UserGridJob, UserGridJobResult>(
     userLadderJob,
     userLadderKey,
     requestUserLadderJob,
     cachedUserGridJob,
+    sliderTransient,
   )
   const adminRungs = adminLadderState.result?.operation === 'ladder'
     ? adminLadderState.result.value
@@ -313,12 +316,14 @@ export default function GridLab() {
     adminPlanKey,
     requestAdminGridJob,
     cachedAdminGridJob,
+    sliderTransient,
   )
   const userPlanState = useGridWorkerJob<UserGridJob, UserGridJobResult>(
     userPlanJob,
     userPlanKey,
     requestUserGridJob,
     cachedUserGridJob,
+    sliderTransient,
   )
   const resolvedPlan = panelEntry === 'admin'
     ? adminPlanState.result?.operation === 'plan' ? adminPlanState.result.value : null
@@ -383,6 +388,7 @@ export default function GridLab() {
     patternAuto, setPatternAuto, plan, setPlan, front, setFront, centerMode, setCenterMode,
     maxGrowMM, setMaxGrowMM, magic, magStatus, fileRef, onFile, sizeMax, sizeMin, resolvedSizeMM,
     maxRungMM: DEFAULT_LAW.maxRungMM, gridMode, stdRungs, rectRungs, model,
+    onSliderInteractionChange: setSliderTransient,
   }
 
   return (
@@ -390,6 +396,7 @@ export default function GridLab() {
       className="gl"
       data-grid-runtime-status={runtimeStatus}
       data-grid-door={panelEntry}
+      data-grid-slider-transient={sliderTransient}
       data-grid-ladder-key={panelEntry === 'admin' ? adminLadderKey ?? '' : userLadderKey ?? ''}
       data-grid-plan-key={panelEntry === 'admin' ? adminPlanKey ?? '' : userPlanKey ?? ''}
     >

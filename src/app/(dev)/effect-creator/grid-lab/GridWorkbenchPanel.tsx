@@ -97,6 +97,7 @@ export interface GridWorkbenchPanelProps {
   stdRungs: SemanticRungView[]
   rectRungs: RectangleRungsView | null
   model: GridWorkbenchPanelModel | null
+  onSliderInteractionChange: (transient: boolean) => void
 }
 
 export function GridWorkbenchPanel({
@@ -106,7 +107,7 @@ export function GridWorkbenchPanel({
   density, setDensity, pad, setPad, offsetMM, setOffsetMM, pattern, setPattern,
   patternAuto, setPatternAuto, plan, setPlan, front, setFront, centerMode, setCenterMode,
   maxGrowMM, setMaxGrowMM, magic, magStatus, fileRef, onFile, sizeMax, sizeMin, resolvedSizeMM, maxRungMM,
-  gridMode, stdRungs, rectRungs, model,
+  gridMode, stdRungs, rectRungs, model, onSliderInteractionChange,
 }: GridWorkbenchPanelProps) {
   const genParams = {
     blob: [['Waviness', '%'], ['Seed', '']], form: [['Pinch', '%'], ['Lobes', '']],
@@ -138,16 +139,16 @@ export function GridWorkbenchPanel({
             {PRESETS.map(k => <option key={k} value={k}>{k}</option>)}
           </select>
         </label>
-        {preset === 'polygon' && <Slider label="Sides" v={sides} set={setSides} min={3} max={12} />}
-        {preset === 'star' && <Slider label="Points" v={points} set={setPoints} min={3} max={12} />}
+        {preset === 'polygon' && <Slider label="Sides" v={sides} set={setSides} min={3} max={12} onInteractionChange={onSliderInteractionChange} />}
+        {preset === 'star' && <Slider label="Points" v={points} set={setPoints} min={3} max={12} onInteractionChange={onSliderInteractionChange} />}
       </>}
 
       {src === 'gen' && <>
         <div className="gl-seg gl-wrap">
           {GENS.map(g => <button key={g.k} aria-pressed={gen === g.k} onClick={() => { setGen(g.k); setP1(50); setP2(g.k === 'blob' ? 7 : g.k === 'daisy' ? 8 : g.k === 'pinwheel' ? 5 : 4) }}>{g.label}</button>)}
         </div>
-        <Slider label={genParams[gen][0][0]} unit={genParams[gen][0][1]} v={p1} set={setP1} min={0} max={100} />
-        <Slider label={genParams[gen][1][0]} v={p2} set={setP2} min={p2min} max={p2max} />
+        <Slider label={genParams[gen][0][0]} unit={genParams[gen][0][1]} v={p1} set={setP1} min={0} max={100} onInteractionChange={onSliderInteractionChange} />
+        <Slider label={genParams[gen][1][0]} v={p2} set={setP2} min={p2min} max={p2max} onInteractionChange={onSliderInteractionChange} />
       </>}
 
       {src === 'magic' && <>
@@ -217,8 +218,8 @@ export function GridWorkbenchPanel({
           </div>
         </div>
       </>}
-      <Slider label={`Design size · longest side${sizeMax < maxRungMM ? ` · max ${sizeMax}` : ''}`} unit="mm" v={resolvedSizeMM} set={setSizeMM} min={sizeMin} max={sizeMax} />
-      <Slider label="Max auto-margin · balance" unit="mm" v={maxGrowMM} set={setMaxGrowMM} min={0} max={80} />
+      <Slider label={`Design size · longest side${sizeMax < maxRungMM ? ` · max ${sizeMax}` : ''}`} unit="mm" v={resolvedSizeMM} set={setSizeMM} min={sizeMin} max={sizeMax} onInteractionChange={onSliderInteractionChange} />
+      <Slider label="Max auto-margin · balance" unit="mm" v={maxGrowMM} set={setMaxGrowMM} min={0} max={80} onInteractionChange={onSliderInteractionChange} />
       {model && <div className="gl-total">
         <span className="gl-total-k">Total effect size</span>
         <b className="gl-total-v">{model.effSize}<small> mm</small></b>
@@ -239,8 +240,8 @@ export function GridWorkbenchPanel({
           <button aria-pressed={!pitchAuto && (model ? model.pitch === 96 : pitch === 96)} onClick={() => { setPitchAuto(false); setPitch(96) }}>96</button>
         </div>
       </div>
-      <Slider label="Magnet padding · per spot · min 10" unit="mm" v={pad} set={setPad} min={10} max={30} />
-      <Slider label="Base margin · outward offset" unit="mm" v={offsetMM} set={setOffsetMM} min={-15} max={15} />
+      <Slider label="Magnet padding · per spot · min 10" unit="mm" v={pad} set={setPad} min={10} max={30} onInteractionChange={onSliderInteractionChange} />
+      <Slider label="Base margin · outward offset" unit="mm" v={offsetMM} set={setOffsetMM} min={-15} max={15} onInteractionChange={onSliderInteractionChange} />
 
       <div className="gl-field"><span>Grid pattern · {patternAuto && model ? `auto → ${model.patternUsed === 'quincunx' ? 'dice-5' : model.patternUsed}` : 'manual'}</span>
         <div className="gl-seg">
@@ -268,11 +269,34 @@ export function GridWorkbenchPanel({
   </>
 }
 
-function Slider({ label, v, set, min, max, unit }: { label: string; v: number; set: (n: number) => void; min: number; max: number; unit?: string }) {
+const SLIDER_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'])
+
+function Slider({ label, v, set, min, max, unit, onInteractionChange }: {
+  label: string
+  v: number
+  set: (n: number) => void
+  min: number
+  max: number
+  unit?: string
+  onInteractionChange: (transient: boolean) => void
+}) {
   return (
     <label className="gl-slider">
       <div className="gl-slider-row"><span>{label}</span><b>{v}{unit ? ' ' + unit : ''}</b></div>
-      <input type="range" min={min} max={max} value={v} onChange={e => set(+e.target.value)} />
+      <input
+        type="range"
+        min={min}
+        max={max}
+        value={v}
+        onChange={e => set(+e.target.value)}
+        onPointerDown={() => onInteractionChange(true)}
+        onPointerUp={() => onInteractionChange(false)}
+        onPointerCancel={() => onInteractionChange(false)}
+        onLostPointerCapture={() => onInteractionChange(false)}
+        onKeyDown={e => { if (SLIDER_KEYS.has(e.key)) onInteractionChange(true) }}
+        onKeyUp={e => { if (SLIDER_KEYS.has(e.key)) onInteractionChange(false) }}
+        onBlur={() => onInteractionChange(false)}
+      />
     </label>
   )
 }

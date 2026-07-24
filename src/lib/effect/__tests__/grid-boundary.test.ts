@@ -180,4 +180,21 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(switchSource.indexOf('suspendUserGridWork()'))
       .toBeLessThan(switchSource.indexOf('setPanelEntry(next)'))
   })
+
+  it('coalesces only transient slider work before either exact worker door', () => {
+    const pageSource = readFileSync(ADMIN_PAGE_PATH, 'utf8')
+    const panelSource = readFileSync(ADMIN_PANEL_PATH, 'utf8')
+    const hookSource = readFileSync(WORKER_HOOK_PATH, 'utf8')
+
+    expect(panelSource).toContain('onPointerDown={() => onInteractionChange(true)}')
+    expect(panelSource).toContain('onPointerUp={() => onInteractionChange(false)}')
+    expect(panelSource).toContain('onKeyDown=')
+    expect(panelSource).toContain('onKeyUp=')
+    expect(pageSource).toContain('onSliderInteractionChange: setSliderTransient')
+    expect(pageSource).toContain('data-grid-slider-transient={sliderTransient}')
+    expect(hookSource).toContain('coalescer.request(job, key, request)')
+    expect(hookSource).toContain('coalescer.flush(job, key, request)')
+    expect(hookSource).not.toMatch(/grid-(?:user|admin|core)/)
+  })
+
 })
