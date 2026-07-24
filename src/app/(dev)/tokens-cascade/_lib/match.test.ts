@@ -162,9 +162,12 @@ describe('verifyRun — run integrity (source oracle + css + identity)', () => {
     const { d, m } = mk();
     expect(verifyRun(rp(d, m, 'WRONG-FILE-KEY--12-34')).verified).toBe(false);
   });
-  it('BITE: malformed route with empty fileKey prefix (--node) → NOT verified (fail-closed)', () => {
+  it('BITE: every malformed route identity → NOT verified (fail-closed)', () => {
     const { d, m } = mk();
-    expect(verifyRun(rp(d, m, '--12-34')).verified).toBe(false);
+    expect(verifyRun(rp(d, m, '--12-34')).verified).toBe(false);   // empty fileKey prefix
+    expect(verifyRun(rp(d, m, 'FK')).verified).toBe(false);        // no delimiter / node
+    expect(verifyRun(rp(d, m, 'FK--')).verified).toBe(false);      // empty node
+    expect(verifyRun(rp(d, m, 'FK--n')).verified).toBe(true);      // well-formed control
   });
   it('BITE: tampered Figma source (still-matching manifest) → NOT verified', () => {
     // manifest seals the ORIGINAL source hash; we overwrite the source on disk after.
@@ -216,5 +219,39 @@ describe('buildMatch — fail-closed on unverifiable run', () => {
     expect(integrity.verified).toBe(false);
     expect(rows.find((r) => r.cssVar === '--prim-dim-r')?.verdict).toBe('UNVERIFIED');
     expect(counts.MATCH ?? 0).toBe(0);
+  });
+});
+
+describe('buildMatch — per-mode domain (mode-divergent cascade)', () => {
+  // Sem-X/tok aliases a ratio FACTOR in Light (unitless) but a PERCENT token in Dark (%).
+  const mk = () => {
+    const d = fs.mkdtempSync(path.join(os.tmpdir(), 'md-'));
+    const source = JSON.stringify([
+      { 'Sem-X': { modes: {
+        Light: { tok: { $type: 'float', $value: '{ratio.factor}', $collectionName: 'Prim-Ratios' } },
+        Dark: { tok: { $type: 'float', $value: '{ratio.percent}', $collectionName: 'Prim-Ratios' } },
+      } } },
+      { 'Prim-Ratios': { modes: {
+        Light: { ratio: { factor: { $type: 'float', $value: 1.05 }, percent: { $type: 'float', $value: 5 } } },
+        Dark: { ratio: { factor: { $type: 'float', $value: 1.05 }, percent: { $type: 'float', $value: 5 } } },
+      } } },
+    ]);
+    const css = ':root{--prim-ratios-ratio-factor:1.05;--prim-ratios-ratio-percent:5%;--sem-x-tok:var(--prim-ratios-ratio-factor);}\n[data-theme="dark"]{--sem-x-tok:var(--prim-ratios-ratio-percent);}\n';
+    fs.writeFileSync(path.join(d, 'variables-source.json'), source);
+    fs.writeFileSync(path.join(d, 'tokens.css'), css);
+    fs.writeFileSync(path.join(d, 'token-surface.json'), JSON.stringify({
+      source: { relativePath: '_inputs/variables-source.json', sha256: sha(source), fileKey: 'FK', fileVersion: 'FV' },
+      artifacts: [{ role: 'css', relativePath: 'artifacts/tokens.css', sha256: sha(css) }],
+      generator: { gitSha: 'abc' },
+    }));
+    return { root: d, source: path.join(d, 'variables-source.json'), css: path.join(d, 'tokens.css'), manifest: path.join(d, 'token-surface.json'), screenCss: null, screen: 'FK--12-34', run: 'r' } as RunPaths;
+  };
+  it('BITE: Dark %-carrier is MATCH (per-mode domain), not false-DIFF under the Light domain', () => {
+    const { rows } = buildMatch(mk());
+    const row = rows.find((r) => r.cssVar === '--sem-x-tok')!;
+    // Light terminal = ratio factor (unitless, 1.05); Dark terminal = percent (5%). Both correct → MATCH.
+    // Under the old single-Light-exp code the Dark 5% would false-DIFF.
+    expect(row.verdict).toBe('MATCH');
+    expect(row.modesDiffer).toBe(true);
   });
 });

@@ -206,9 +206,17 @@ export function verifyRun(rp: RunPaths): RunIntegrity {
     //    (the `<fileKey>--<node>` screen segment), not merely be present. A run manifest
     //    from a different Figma file can no longer render green under this route.
     if (!src.fileKey || !src.fileVersion) return { verified: false, reason: 'manifest source lacks fileKey/fileVersion identity', sourceVerified: true, cssVerified: true, screenScopeSha };
-    const routeFileKey = rp.screen.split('--')[0];
-    if (!routeFileKey || src.fileKey !== routeFileKey) {
-      return { verified: false, reason: routeFileKey ? `manifest fileKey ${src.fileKey} != route screen ${routeFileKey}` : 'route screen has no <fileKey>--<node> identity segment', sourceVerified: true, cssVerified: true, fileKey: src.fileKey, fileVersion: src.fileVersion, screenScopeSha };
+    // Require a well-formed `<fileKey>--<node>` route identity: both segments non-empty,
+    // fileKey equal to the manifest. Rejects a missing delimiter, an empty prefix, and an
+    // empty node — all fail-closed.
+    const dash = rp.screen.indexOf('--');
+    const routeFileKey = dash >= 0 ? rp.screen.slice(0, dash) : '';
+    const routeNode = dash >= 0 ? rp.screen.slice(dash + 2) : '';
+    if (!routeFileKey || !routeNode || src.fileKey !== routeFileKey) {
+      const reason = dash < 0 || !routeNode
+        ? 'route screen is not a well-formed <fileKey>--<node> identity'
+        : `manifest fileKey ${src.fileKey} != route screen ${routeFileKey}`;
+      return { verified: false, reason, sourceVerified: true, cssVerified: true, fileKey: src.fileKey, fileVersion: src.fileVersion, screenScopeSha };
     }
     return {
       verified: true,
@@ -255,10 +263,14 @@ export function buildMatch(rp: RunPaths): { rows: MatchRow[]; counts: Record<str
       const key = (cs: CascadeStep[]) => cs.map((c) => `${c.collection}/${c.path}`).join('>');
       const modesDiffer = key(cascade) !== key(cascadeDarkFull);
       const cascadeDark = modesDiffer ? cascadeDarkFull : null;
-      // expected unit-domain driven by the RESOLVED TERMINAL primitive (collection + path),
-      // scope corroborating only — not inferred from the generated value being audited.
-      const terminal = light.steps[light.steps.length - 1];
-      const exp = expectedUnit(r.$scopes, terminal?.collection ?? coll.name, terminal?.path ?? r.path.join('/'));
+      // expected unit-domain driven by each mode's RESOLVED TERMINAL primitive (collection +
+      // path), scope corroborating only — derived PER MODE so a mode-divergent cascade (Light
+      // terminal a ratio factor, Dark a percent) grades each mode against its own domain.
+      const fallbackPath = r.path.join('/');
+      const termL = light.steps[light.steps.length - 1];
+      const termD = dark.steps[dark.steps.length - 1];
+      const expLight = expectedUnit(r.$scopes, termL?.collection ?? coll.name, termL?.path ?? fallbackPath);
+      const expDark = expectedUnit(r.$scopes, termD?.collection ?? coll.name, termD?.path ?? fallbackPath);
       const genRaw = rootVars.get(cssVar);
       let verdict: Verdict; let genLight: string; let genDark: string;
       if (genRaw === undefined) {
@@ -266,8 +278,8 @@ export function buildMatch(rp: RunPaths): { rows: MatchRow[]; counts: Record<str
       } else {
         genLight = resolveCssVar(cssVar, rootVars);
         genDark = resolveCssVar(cssVar, darkResolveVars);
-        const vL = compareOne(figLight, genLight, r.type, exp);
-        const vD = compareOne(figDark, genDark, r.type, exp);
+        const vL = compareOne(figLight, genLight, r.type, expLight);
+        const vD = compareOne(figDark, genDark, r.type, expDark);
         verdict = (vL === 'UNVERIFIED' || vD === 'UNVERIFIED') ? 'UNVERIFIED'
           : (vL === 'DIFF' || vD === 'DIFF') ? 'DIFF'
           : (vL === 'DERIVED' || vD === 'DERIVED') ? 'DERIVED' : 'MATCH';
