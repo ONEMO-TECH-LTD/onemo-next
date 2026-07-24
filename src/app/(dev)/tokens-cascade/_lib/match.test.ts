@@ -19,6 +19,16 @@ describe('compareOne — colour', () => {
     expect(compareOne('#ffffff0d', '#ffffff', 'color')).toBe('DIFF'));
   it('equal colour with matching alpha MATCH', () =>
     expect(compareOne('#ffffff0d', 'oklch(100% 0 0 / 0.05)', 'color')).toBe('MATCH'));
+  it('exact byte match is MATCH', () =>
+    expect(compareOne('#0a141eff', '#0a141e', 'color')).toBe('MATCH'));
+  it('BITE: a one-byte alpha change is BOUNDED (audit 1/255 class), never MATCH', () =>
+    expect(compareOne('#ffffff0d', '#ffffff0e', 'color')).toBe('BOUNDED'));
+  it('BITE: a one-byte RGB change is BOUNDED, never MATCH', () =>
+    expect(compareOne('#000000', '#010000', 'color')).toBe('BOUNDED'));
+  it('BITE: a ≥2/255 channel deviation is a hard DIFF', () => {
+    expect(compareOne('#000000', '#030000', 'color')).toBe('DIFF');
+    expect(compareOne('#ffffff0d', '#ffffff10', 'color')).toBe('DIFF');
+  });
 });
 
 describe('compareOne — float / units', () => {

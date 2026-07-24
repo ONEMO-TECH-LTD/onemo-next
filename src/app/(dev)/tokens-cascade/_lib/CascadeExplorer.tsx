@@ -23,12 +23,13 @@ const C = {
 const ALL_GROUPS = '__all__';
 const V = {
   MATCH: { bg: 'var(--ui-ok-bg)', fg: 'var(--ui-ok-fg)', label: 'MATCH' },
+  BOUNDED: { bg: 'var(--ui-bounded-bg)', fg: 'var(--ui-bounded-fg)', label: 'BOUNDED' },
   DIFF: { bg: 'var(--ui-err-bg)', fg: 'var(--ui-err-fg)', label: 'DIFF' },
   DERIVED: { bg: 'var(--ui-info-bg)', fg: 'var(--ui-info-fg)', label: 'DERIVED' },
   UNVERIFIED: { bg: 'var(--ui-warn-bg)', fg: 'var(--ui-warn-fg)', label: 'UNVERIFIED' },
 } as const;
 type Verdict = keyof typeof V;
-const order: Verdict[] = ['DIFF', 'UNVERIFIED', 'DERIVED', 'MATCH'];
+const order: Verdict[] = ['DIFF', 'UNVERIFIED', 'BOUNDED', 'DERIVED', 'MATCH'];
 
 function Chevron({ collapsed }: { collapsed: boolean }) {
   return <span style={{ color: C.textMuted, fontSize: 9, width: 12, flex: '0 0 auto', display: 'inline-block' }}>{collapsed ? '▸' : '▾'}</span>;

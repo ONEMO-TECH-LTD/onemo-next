@@ -19,6 +19,7 @@
   --ui-err-bg: #fdecea; --ui-err-fg: #c0392b;
   --ui-info-bg: #e9f2fd; --ui-info-fg: #0d62ff;
   --ui-warn-bg: #fef6e7; --ui-warn-fg: #b7791f;
+  --ui-bounded-bg: #f3eefd; --ui-bounded-fg: #7c3aed;
   color-scheme: light dark;
 }
 
@@ -40,5 +41,6 @@
     --ui-err-bg: #3a1113; --ui-err-fg: #f87171;
     --ui-info-bg: #132030; --ui-info-fg: #7dd3fc;
     --ui-warn-bg: #2a2410; --ui-warn-fg: #fbbf24;
+    --ui-bounded-bg: #1e1633; --ui-bounded-fg: #a78bfa;
   }
 }

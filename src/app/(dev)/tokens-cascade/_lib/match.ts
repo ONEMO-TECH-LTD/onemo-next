@@ -11,20 +11,41 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { converter, parse } from 'culori';
+import { converter, parse, formatHex8 } from 'culori';
 import { parseCollections, flattenCollection, resolveChain, type ParsedCollection } from './resolver';
 
 const toOklch = converter('oklch');
 
-/** Colour equivalence — L, C, H AND alpha (so a stripped-alpha corruption is a DIFF). */
-function colorEq(a: string, b: string): boolean {
+/** Canonical 8-bit-per-channel hex `#rrggbbaa`, lowercased, or null if unrepresentable. */
+function hex8(v: string): string | null {
+  try { const h = formatHex8(parse(v)); return h ? h.toLowerCase() : null; } catch { return null; }
+}
+const chans = (h: string): number[] => [1, 3, 5, 7].map((i) => parseInt(h.slice(i, i + 2) || 'ff', 16));
+
+/**
+ * Colour verdict — decoded sRGB8 + alpha byte, mirroring the deterministic audit's taxonomy:
+ *   MATCH   = byte-exact,
+ *   BOUNDED = within 1/255 on every channel (the 611 1/255 OKLCH round-trip rows — e.g. an
+ *             alpha the generator rounded to a whole `%`: `#…b2` vs `#…b3`) — NOT a green MATCH,
+ *             but preserved as its own class so the audit distinction isn't erased,
+ *   DIFF    = a channel off by ≥2/255 (a real colour error).
+ * Non-sRGB values (absent from this Figma-hex corpus) fall back to a tight oklch compare.
+ */
+function colorVerdict(a: string, b: string): 'MATCH' | 'BOUNDED' | 'DIFF' {
+  const ha = hex8(a), hb = hex8(b);
+  if (ha && hb) {
+    if (ha === hb) return 'MATCH';
+    const ca = chans(ha), cb = chans(hb);
+    const maxDelta = Math.max(...ca.map((v, i) => Math.abs(v - cb[i])));
+    return maxDelta <= 1 ? 'BOUNDED' : 'DIFF';
+  }
   const x = toOklch(parse(a)) as { l?: number; c?: number; h?: number; alpha?: number } | undefined;
   const y = toOklch(parse(b)) as { l?: number; c?: number; h?: number; alpha?: number } | undefined;
-  if (!x || !y) return false;
-  const near = (p = 0, q = 0, t = 0.005) => Math.abs(p - q) <= t;
-  const hueOk = (x.c ?? 0) < 0.01 || (y.c ?? 0) < 0.01
-    || Math.min(Math.abs((x.h ?? 0) - (y.h ?? 0)), 360 - Math.abs((x.h ?? 0) - (y.h ?? 0))) <= 1;
-  return near(x.l, y.l) && near(x.c, y.c) && hueOk && near(x.alpha ?? 1, y.alpha ?? 1);
+  if (!x || !y) return 'DIFF';
+  const near = (p = 0, q = 0, t = 1e-4) => Math.abs(p - q) <= t;
+  const hueOk = (x.c ?? 0) < 0.001 || (y.c ?? 0) < 0.001
+    || Math.min(Math.abs((x.h ?? 0) - (y.h ?? 0)), 360 - Math.abs((x.h ?? 0) - (y.h ?? 0))) <= 0.05;
+  return near(x.l, y.l) && near(x.c, y.c) && hueOk && near(x.alpha ?? 1, y.alpha ?? 1) ? 'MATCH' : 'DIFF';
 }
 
 type Unit = 'px' | 'unitless' | 'percent' | 'ms';
@@ -88,7 +109,7 @@ export function expectedUnit(scopes?: string[], collection?: string, path?: stri
   return null;
 }
 
-export type Verdict = 'MATCH' | 'DIFF' | 'DERIVED' | 'UNVERIFIED';
+export type Verdict = 'MATCH' | 'BOUNDED' | 'DIFF' | 'DERIVED' | 'UNVERIFIED';
 
 /**
  * Compare one Figma-authored literal vs one generated resolved value (single mode).
@@ -99,7 +120,7 @@ export function compareOne(figma: string, gen: string, type: string, exp: Unit |
   if (gen === '(missing)' || gen === 'CYCLE') return 'UNVERIFIED';   // dropped / cyclic generated var — fail-visible
   if (figma === '(unresolved)') return 'UNVERIFIED';                 // broken Figma cascade
   if (/clamp\(/.test(gen)) return 'DERIVED';                         // fluid clamp — verified by the browser/Figma bench, not a literal here
-  if (type === 'color' || /^#|^oklch\(|^rgb/.test(figma)) return colorEq(figma, gen) ? 'MATCH' : 'DIFF';
+  if (type === 'color' || /^#|^oklch\(|^rgb/.test(figma)) return colorVerdict(figma, gen);
   if (type === 'float') {
     const fn = parseFloat(figma);
     const c = toComparable(gen);
@@ -136,6 +157,7 @@ export function computeVerdict(
   const vD = compareOne(figDark, genDark, type, expD);
   return (vL === 'UNVERIFIED' || vD === 'UNVERIFIED') ? 'UNVERIFIED'
     : (vL === 'DIFF' || vD === 'DIFF') ? 'DIFF'
+    : (vL === 'BOUNDED' || vD === 'BOUNDED') ? 'BOUNDED'
     : (vL === 'DERIVED' || vD === 'DERIVED') ? 'DERIVED' : 'MATCH';
 }
 
