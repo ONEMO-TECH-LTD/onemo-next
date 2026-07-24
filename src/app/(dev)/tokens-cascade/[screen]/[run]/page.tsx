@@ -75,7 +75,15 @@ export default async function Page({ params }: { params: Promise<{ screen: strin
                 {grows.map((r) => (
                   <tr key={r.cssVar} style={{ borderBottom: '1px solid #111827' }}>
                     <td style={{ padding: '4px 10px', color: '#93c5fd', whiteSpace: 'nowrap' }}>{r.cssVar}</td>
-                    <td style={{ padding: '4px 10px' }}><Cascade steps={r.cascade} /></td>
+                    <td style={{ padding: '4px 10px' }}>
+                      <Cascade steps={r.cascade} />
+                      {r.modesDiffer && r.cascadeDark && (
+                        <div style={{ marginTop: 3 }}>
+                          <span style={{ color: '#7dd3fc', fontSize: 10, marginRight: 4 }}>dark:</span>
+                          <Cascade steps={r.cascadeDark} />
+                        </div>
+                      )}
+                    </td>
                     <td style={{ padding: '4px 10px' }}><Swatch v={r.figmaLight} /></td>
                     <td style={{ padding: '4px 10px' }}><Swatch v={r.figmaDark} /></td>
                     <td style={{ padding: '4px 10px', color: '#e5e7eb', whiteSpace: 'nowrap' }}><Swatch v={r.generatedResolved} /></td>

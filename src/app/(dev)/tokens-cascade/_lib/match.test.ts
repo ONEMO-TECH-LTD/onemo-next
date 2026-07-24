@@ -4,7 +4,7 @@
  * a tampered Figma-source oracle, and an unverifiable run (fail-closed), plus %/ms domains.
  */
 import { describe, it, expect } from 'vitest';
-import { compareOne, toComparable, consumedVars, verifyRun, buildMatch, type RunPaths } from './match';
+import { compareOne, toComparable, expectedUnit, consumedVars, verifyRun, buildMatch, type RunPaths } from './match';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -52,6 +52,33 @@ describe('compareOne — percent / duration domains (KAI-9686 rework)', () => {
   });
 });
 
+describe('domain-pin from the Figma scope contract (KAI-9686 rework #2)', () => {
+  it('expectedUnit maps scopes to domains (or null when unpinned)', () => {
+    expect(expectedUnit(['LETTER_SPACING'])).toBe('px');
+    expect(expectedUnit(['OPACITY'])).toBe('unitless');
+    expect(expectedUnit(['CORNER_RADIUS'])).toBe('px');
+    expect(expectedUnit(['(none)'])).toBeNull();   // ratios/durations carry no mapped scope
+    expect(expectedUnit(undefined)).toBeNull();
+  });
+  it('BITE: a px-domain token emitted as ms or % is DIFF at equal magnitude', () => {
+    expect(compareOne('50', '50ms', 'float', 'px')).toBe('DIFF');
+    expect(compareOne('200', '200%', 'float', 'px')).toBe('DIFF');
+    expect(compareOne('50', '50px', 'float', 'px')).toBe('MATCH');
+    expect(compareOne('10', '0.625rem', 'float', 'px')).toBe('MATCH'); // rem is the px domain
+  });
+  it('BITE: an OPACITY (unitless) token emitted with a unit is DIFF', () => {
+    expect(compareOne('0.8', '0.8', 'float', 'unitless')).toBe('MATCH');
+    expect(compareOne('0.8', '0.8px', 'float', 'unitless')).toBe('DIFF');
+  });
+  it('no scope contract → magnitude only (page always supplies the scope)', () => {
+    expect(compareOne('50', '50ms', 'float')).toBe('MATCH');
+  });
+  it('zero is domain-agnostic — bare 0 for a px token is MATCH, not a false DIFF', () => {
+    expect(compareOne('0', '0', 'float', 'px')).toBe('MATCH');
+    expect(compareOne('0', '0px', 'float', 'px')).toBe('MATCH');
+  });
+});
+
 describe('compareOne — string / fail-visible', () => {
   it('equal string MATCH; different DIFF', () => {
     expect(compareOne('Chillax', 'Chillax', 'string')).toBe('MATCH');
@@ -93,12 +120,17 @@ describe('verifyRun — run integrity (source oracle + css + identity)', () => {
     fs.writeFileSync(m, JSON.stringify(man));
     return { d, m };
   };
-  const rp = (d: string, m: string | null): RunPaths =>
-    ({ root: d, source: path.join(d, 'variables-source.json'), css: path.join(d, 'tokens.css'), manifest: m, screenCss: null, screen: 's', run: 'r' });
+  // route screen encodes the fileKey as `<fileKey>--<node>`; manifest fileKey is 'FK'.
+  const rp = (d: string, m: string | null, screen = 'FK--12-34'): RunPaths =>
+    ({ root: d, source: path.join(d, 'variables-source.json'), css: path.join(d, 'tokens.css'), manifest: m, screenCss: null, screen, run: 'r' });
 
-  it('valid manifest — source + css hash-match → verified', () => {
+  it('valid manifest — source + css hash-match + fileKey binds to route → verified', () => {
     const { d, m } = mk();
     expect(verifyRun(rp(d, m)).verified).toBe(true);
+  });
+  it('BITE: manifest fileKey != route screen fileKey → NOT verified', () => {
+    const { d, m } = mk();
+    expect(verifyRun(rp(d, m, 'WRONG-FILE-KEY--12-34')).verified).toBe(false);
   });
   it('BITE: tampered Figma source (still-matching manifest) → NOT verified', () => {
     // manifest seals the ORIGINAL source hash; we overwrite the source on disk after.
@@ -138,7 +170,7 @@ describe('buildMatch — fail-closed on unverifiable run', () => {
       artifacts: [{ role: 'css', relativePath: 'artifacts/tokens.css', sha256: goodManifest ? sha(css) : 'deadbeef'.repeat(8) }],
       generator: { gitSha: 'abc' },
     }));
-    return { root: d, source: path.join(d, 'variables-source.json'), css: path.join(d, 'tokens.css'), manifest: path.join(d, 'token-surface.json'), screenCss: null, screen: 's', run: 'r' } as RunPaths;
+    return { root: d, source: path.join(d, 'variables-source.json'), css: path.join(d, 'tokens.css'), manifest: path.join(d, 'token-surface.json'), screenCss: null, screen: 'FK--12-34', run: 'r' } as RunPaths;
   };
   it('verified run → the matching token is MATCH', () => {
     const { rows, integrity } = buildMatch(mkRun(true));

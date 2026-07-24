@@ -44,10 +44,32 @@ export function toComparable(gen: string): { n: number; unit: Unit } | null {
   return null;
 }
 
+/**
+ * Expected unit-DOMAIN per Figma variable scope — derived from the SOURCE token contract,
+ * NOT inferred from the generated value being audited. So a domain-swap (a LETTER_SPACING
+ * token wrongly emitted as `%` or `ms`) is a DIFF even though the raw magnitude matches.
+ * Verified against the run corpus: every float token carrying one of these scopes is that
+ * domain; ratios/durations that would be mis-pinned all carry no mapped scope (fallthrough).
+ */
+const SCOPE_UNIT: Record<string, Unit> = {
+  LETTER_SPACING: 'px', FONT_SIZE: 'px', LINE_HEIGHT: 'px', GAP: 'px', PARAGRAPH_SPACING: 'px',
+  CORNER_RADIUS: 'px', WIDTH_HEIGHT: 'px', STROKE_FLOAT: 'px', EFFECT_FLOAT: 'px',
+  OPACITY: 'unitless',
+};
+/** The expected domain for a token from its Figma scopes, or null when no scope pins it. */
+export function expectedUnit(scopes?: string[]): Unit | null {
+  for (const s of scopes ?? []) if (s in SCOPE_UNIT) return SCOPE_UNIT[s];
+  return null;
+}
+
 export type Verdict = 'MATCH' | 'DIFF' | 'DERIVED' | 'UNVERIFIED';
 
-/** Compare one Figma-authored literal vs one generated resolved value (single mode). */
-export function compareOne(figma: string, gen: string, type: string): Verdict {
+/**
+ * Compare one Figma-authored literal vs one generated resolved value (single mode).
+ * `exp` is the expected unit-domain from the token's Figma scope contract (see expectedUnit);
+ * when set, a generated value in the WRONG domain is a DIFF regardless of magnitude.
+ */
+export function compareOne(figma: string, gen: string, type: string, exp: Unit | null = null): Verdict {
   if (gen === '(missing)' || gen === 'CYCLE') return 'UNVERIFIED';   // dropped / cyclic generated var — fail-visible
   if (figma === '(unresolved)') return 'UNVERIFIED';                 // broken Figma cascade
   if (/clamp\(/.test(gen)) return 'DERIVED';                         // fluid clamp — verified by the browser/Figma bench, not a literal here
@@ -56,9 +78,11 @@ export function compareOne(figma: string, gen: string, type: string): Verdict {
     const fn = parseFloat(figma);
     const c = toComparable(gen);
     if (c === null || !Number.isFinite(fn)) return 'DIFF';
-    // Figma stores a bare number; the generated UNIT names the domain (px for dimensions,
-    // % for percentages, ms for durations, unitless for ratios/opacity). A wrong unit
-    // (Figma 10px → generated 10rem = 160px) is a DIFF, not a false MATCH.
+    // Domain-pin from the Figma scope contract: a LETTER_SPACING/dimension token emitted as
+    // `%`/`ms`, or an OPACITY token emitted with a dimension unit, is a DIFF even at equal
+    // magnitude (`50` vs `50ms`, `200` vs `200%`). rem is normalised to the px domain.
+    // Zero is domain-agnostic (`0` == `0px` == `0%`), so it never trips the domain-pin.
+    if (exp && c.unit !== exp && c.n !== 0) return 'DIFF';
     return Math.abs(fn - c.n) < 0.01 ? 'MATCH' : 'DIFF';
   }
   return String(figma).trim() === String(gen).trim() ? 'MATCH' : 'DIFF'; // strings, exact
@@ -70,7 +94,8 @@ export type CascadeStep = { collection: string; path: string; isAlias: boolean; 
 export type MatchRow = {
   collection: string; name: string; cssVar: string; type: string;
   figmaLight: string; figmaDark: string; generated: string; generatedResolved: string;
-  cascade: CascadeStep[]; verdict: Verdict; consumed: boolean;
+  cascade: CascadeStep[]; cascadeDark: CascadeStep[] | null; modesDiffer: boolean;
+  verdict: Verdict; consumed: boolean;
 };
 
 function cssCategory(collectionName: string): string {
@@ -150,11 +175,17 @@ export function verifyRun(rp: RunPaths): RunIntegrity {
     if (cssActual !== cssArt.sha256) {
       return { verified: false, reason: `tokens.css hash ${cssActual.slice(0, 12)} != manifest ${String(cssArt.sha256).slice(0, 12)}`, sourceVerified: true, cssVerified: false, screenScopeSha };
     }
-    // 3) Manifest identity present.
+    // 3) Manifest identity — the sealed fileKey must equal the ROUTE screen's fileKey
+    //    (the `<fileKey>--<node>` screen segment), not merely be present. A run manifest
+    //    from a different Figma file can no longer render green under this route.
     if (!src.fileKey || !src.fileVersion) return { verified: false, reason: 'manifest source lacks fileKey/fileVersion identity', sourceVerified: true, cssVerified: true, screenScopeSha };
+    const routeFileKey = rp.screen.split('--')[0];
+    if (routeFileKey && src.fileKey !== routeFileKey) {
+      return { verified: false, reason: `manifest fileKey ${src.fileKey} != route screen ${routeFileKey}`, sourceVerified: true, cssVerified: true, fileKey: src.fileKey, fileVersion: src.fileVersion, screenScopeSha };
+    }
     return {
       verified: true,
-      reason: 'run verified — Figma source + tokens.css hash-match the sealed manifest',
+      reason: 'run verified — Figma source + tokens.css hash-match the sealed manifest; fileKey bound to route',
       generatorSha: man.generator?.gitSha, fileKey: src.fileKey, fileVersion: src.fileVersion,
       sourceVerified: true, cssVerified: true, screenScopeSha,
     };
@@ -187,10 +218,18 @@ export function buildMatch(rp: RunPaths): { rows: MatchRow[]; counts: Record<str
       const dark = resolveChain(collections, coll.name, 'Dark', r.path);
       const figLight = light.resolved == null ? '(unresolved)' : String(light.resolved);
       const figDark = dark.resolved == null ? '(unresolved)' : String(dark.resolved);
-      // full cascade: every hop prim→alias→semantic, with its ref, for display.
-      const cascade: CascadeStep[] = light.steps.map((s) => ({
-        collection: shortColl(s.collection), path: s.path, isAlias: s.isAlias, raw: String(s.rawValue),
-      }));
+      // full cascade, displayed primitive→alias→semantic (resolver walks semantic→primitive,
+      // so reverse for display to match the header). Dark is exposed only when its structure
+      // actually diverges from Light (per the DS's primitive-level flip it usually doesn't).
+      const toCascade = (steps: typeof light.steps): CascadeStep[] =>
+        steps.slice().reverse().map((s) => ({ collection: shortColl(s.collection), path: s.path, isAlias: s.isAlias, raw: String(s.rawValue) }));
+      const cascade = toCascade(light.steps);
+      const cascadeDarkFull = toCascade(dark.steps);
+      const key = (cs: CascadeStep[]) => cs.map((c) => `${c.collection}/${c.path}`).join('>');
+      const modesDiffer = key(cascade) !== key(cascadeDarkFull);
+      const cascadeDark = modesDiffer ? cascadeDarkFull : null;
+      // expected unit-domain from the Figma scope contract (not the generated value).
+      const exp = expectedUnit(r.$scopes);
       const genRaw = rootVars.get(cssVar);
       let verdict: Verdict; let genLight: string; let genDark: string;
       if (genRaw === undefined) {
@@ -198,8 +237,8 @@ export function buildMatch(rp: RunPaths): { rows: MatchRow[]; counts: Record<str
       } else {
         genLight = resolveCssVar(cssVar, rootVars);
         genDark = resolveCssVar(cssVar, darkResolveVars);
-        const vL = compareOne(figLight, genLight, r.type);
-        const vD = compareOne(figDark, genDark, r.type);
+        const vL = compareOne(figLight, genLight, r.type, exp);
+        const vD = compareOne(figDark, genDark, r.type, exp);
         verdict = (vL === 'UNVERIFIED' || vD === 'UNVERIFIED') ? 'UNVERIFIED'
           : (vL === 'DIFF' || vD === 'DIFF') ? 'DIFF'
           : (vL === 'DERIVED' || vD === 'DERIVED') ? 'DERIVED' : 'MATCH';
@@ -211,7 +250,7 @@ export function buildMatch(rp: RunPaths): { rows: MatchRow[]; counts: Record<str
         collection: coll.name, name: r.path.join('/'), cssVar, type: r.type,
         figmaLight: figLight, figmaDark: figDark, generated: genRaw ?? '(missing)',
         generatedResolved: genLight === genDark ? genLight : `${genLight} / ${genDark}`,
-        cascade, verdict, consumed: isConsumed,
+        cascade, cascadeDark, modesDiffer, verdict, consumed: isConsumed,
       });
     }
   }
