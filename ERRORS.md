@@ -1,5 +1,12 @@
 # ERRORS
 
+## S59 Playwright CLI `run-code` callback syntax
+
+- What did not work: passing top-level snippets such as `await page.title()` to the current `playwright-cli run-code`, following the bundled skill reference.
+- Symptom: every invocation failed with `SyntaxError: Unexpected identifier 'page'`.
+- What worked: `run-code` requires a JavaScript function receiving `page`, e.g. `async (page) => await page.title()`; confirmed by `run-code --help`.
+- Remember: on this installed CLI, wrap all `run-code` input in a `(page) => ...` or `async (page) => ...` function.
+
 ## S59 deleted route leaves stale Next type stubs
 
 - What did not work: deleting `(store)/create/page.tsx`, then relying on `next typegen` to remove the old `.next` page stubs.

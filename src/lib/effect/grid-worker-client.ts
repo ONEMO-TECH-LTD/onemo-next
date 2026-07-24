@@ -51,6 +51,20 @@ export class GridWorkerDisposedError extends Error {
   }
 }
 
+/** Keep exact background work alive across active-request pre-emption without delaying the active job. */
+export async function requestGridWorkerJobInBackground<Job, Result>(
+  job: Job,
+  request: (job: Job, priority: GridWorkerPriority) => Promise<Result>,
+): Promise<Result> {
+  for (;;) {
+    try {
+      return await request(job, 'background')
+    } catch (error) {
+      if (!(error instanceof GridWorkerSupersededError)) throw error
+    }
+  }
+}
+
 interface PendingRequest<Job, Result> {
   id: number
   key: string

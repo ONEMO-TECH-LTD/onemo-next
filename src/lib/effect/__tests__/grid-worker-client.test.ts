@@ -4,6 +4,7 @@ import {
   GridWorkerDisposedError,
   GridWorkerScheduler,
   GridWorkerSupersededError,
+  requestGridWorkerJobInBackground,
   type GridWorkerLike,
   type GridWorkerRequest,
   type GridWorkerResponse,
@@ -58,6 +59,28 @@ function fixture() {
 }
 
 describe('preemptive exact grid worker scheduler', () => {
+  it('resolves an active current plan before the unfinished ladder, then resumes the ladder', async () => {
+    const { scheduler, workers } = fixture()
+    const ladder = requestGridWorkerJobInBackground(
+      { key: 'ladder', value: 1 },
+      (job, priority) => scheduler.request(job, priority),
+    )
+    const plan = scheduler.request({ key: 'current-plan', value: 2 })
+
+    expect(workers[0].requests[0].job.key).toBe('ladder')
+    expect(workers[0].terminated).toBe(true)
+    expect(workers[1].requests[0].job.key).toBe('current-plan')
+
+    await Promise.resolve()
+    workers[1].succeed()
+    await expect(plan).resolves.toEqual({ key: 'current-plan', value: 2 })
+    expect(workers[1].requests[1].job.key).toBe('ladder')
+
+    workers[1].succeed(1)
+    await expect(ladder).resolves.toEqual({ key: 'ladder', value: 1 })
+    scheduler.dispose()
+  })
+
   it('coalesces identical in-flight work and serves the completed exact cache', async () => {
     const { scheduler, workers } = fixture()
     const first = scheduler.request({ key: 'same', value: 1 })

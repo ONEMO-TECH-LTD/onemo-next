@@ -15,6 +15,7 @@ import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import { contourFromShape } from '@/lib/effect/geometry-truth'
 import type { Contour, Pt } from '@/lib/effect/types'
 import { nearestAnchorPair, nearestSemanticRung, resolveDesignSizeMM, resolveRectangleRungs, scaleContour, stdShapeContour, rectFormat, minEffectMM, maxDesignMM, DEFAULT_MARGIN_MM, DEFAULT_LAW, type AdminGridJob, type AdminGridJobResult, type GridPattern, type GridPlanOptions, type MagnetPlan, type GridDensity, type GridMode, type PlanRecipe, type ResolvedGridPlan, type SemanticRung, type StdShape, type Attachment } from '@/lib/effect/grid-admin'
+import { requestGridWorkerJobInBackground } from '@/lib/effect/grid-worker-client'
 import {
   adminGridJobKey,
   adminStaticGeneration,
@@ -46,14 +47,22 @@ type StdGeo = StdShape
 type MagicState = { vshape: VShape; maskH: number; adapter: string; imgUrl: string } | null
 type PanelEntry = 'admin' | 'user'
 
-interface PreparedDesign {
+interface PlanDesign {
   design: Contour
   recipe: PlanRecipe
   designSize: number
-  rung: SemanticRung
-  rungH: SemanticRung
   format: string | null
 }
+
+interface PreparedDesign extends PlanDesign {
+  rung: SemanticRung
+  rungH: SemanticRung
+}
+
+const requestAdminLadderJob = (job: AdminGridJob) =>
+  requestGridWorkerJobInBackground(job, requestAdminGridJob)
+const requestUserLadderJob = (job: UserGridJob) =>
+  requestGridWorkerJobInBackground(job, requestUserGridJob)
 
 declare global {
   interface Window {
@@ -180,13 +189,13 @@ export default function GridLab() {
   const adminLadderState = useGridWorkerJob<AdminGridJob, AdminGridJobResult>(
     adminLadderJob,
     adminLadderKey,
-    requestAdminGridJob,
+    requestAdminLadderJob,
     cachedAdminGridJob,
   )
   const userLadderState = useGridWorkerJob<UserGridJob, UserGridJobResult>(
     userLadderJob,
     userLadderKey,
-    requestUserGridJob,
+    requestUserLadderJob,
     cachedUserGridJob,
   )
   const adminRungs = adminLadderState.result?.operation === 'ladder'
@@ -204,30 +213,31 @@ export default function GridLab() {
     [stdRungs, longMM, shortMM, orient],
   )
 
-  const preparedDesign = useMemo<PreparedDesign | null>(() => {
+  const planDesign = useMemo<PlanDesign | null>(() => {
     try {
       // ── STANDARD GEOMETRIES (D12–D15): drawn directly in mm, each axis snapped to its own rung ──
       if (src === 'std') {
-        if (!stdRungs.length || !rectRungs) return null
-        const nearestOwn = panelEntry === 'admin'
-          ? nearestSemanticRung(stdRungs, sizeMM)
-          : nearestUserWorkbenchRung(stdRungs, sizeMM)
-        const rungW = geo === 'rect' ? rectRungs.widthRung : nearestOwn
-        const rungH = geo === 'rect' ? rectRungs.heightRung : rungW
         // DUAL SIZING LAW (every shape): the slider is CONTINUOUS/adaptive — the engine adapts any size
         // exactly like generators/AI cuts; the semantic buttons are quick-sets to the pre-calculated
-        // optimal variants. `rungW` stays the NEAREST reference for display. Rect keeps axis rungs
-        // (system A per Dan's rectangle derivation).
-        const stdSize = geo === 'rect' ? rungW.sizeMM : resolvedSizeMM
-        const design = stdShapeContour(geo, stdSize, geo === 'rect' ? rungH.sizeMM : stdSize)
-        const format = geo !== 'rect' ? null : rectFormat(rungW.sizeMM, rungH.sizeMM)
+        // optimal variants. Rectangle alone remains ladder-dependent because both axes are actual rungs.
+        if (geo === 'rect') {
+          if (!rectRungs) return null
+          const rungW = rectRungs.widthRung
+          const rungH = rectRungs.heightRung
+          const design = stdShapeContour(geo, rungW.sizeMM, rungH.sizeMM)
+          return {
+            design,
+            recipe: { kind: 'standard', shape: geo, widthMM: rungW.sizeMM, heightMM: rungH.sizeMM },
+            designSize: rungW.sizeMM,
+            format: rectFormat(rungW.sizeMM, rungH.sizeMM),
+          }
+        }
+        const design = stdShapeContour(geo, resolvedSizeMM, resolvedSizeMM)
         return {
           design,
-          recipe: { kind: 'standard', shape: geo, widthMM: stdSize, heightMM: geo === 'rect' ? rungH.sizeMM : stdSize },
-          designSize: stdSize,
-          rung: rungW,
-          rungH,
-          format,
+          recipe: { kind: 'standard', shape: geo, widthMM: resolvedSizeMM, heightMM: resolvedSizeMM },
+          designSize: resolvedSizeMM,
+          format: null,
         }
       }
       // base contour normalized so longest side = 1mm (scale-free); scaleContour() sizes it in mm
@@ -247,7 +257,6 @@ export default function GridLab() {
         base = { outer: { pts: ring.map(([x, y]) => [x / L, (IMG - y) / L] as Pt) }, holes: [] }
       }
       if (!base || base.outer.pts.length < 3) return null
-      if (!stdRungs.length) return null
       const b = base
       // DESIGN stays fixed at the set size. Auto-grow adds an outward MARGIN (offset) around it — the border
       // the magnets' padding uses. Manual "offset" is the starting margin. Total effect = design + 2×margin.
@@ -256,29 +265,41 @@ export default function GridLab() {
       // the engine adapts (auto-margin snaps coverage to the 48-family grid dynamically). The rung
       // buttons are quick-sets for the rigid standard sizes; `rung` below is the nearest reference only.
       const dSize = resolvedSizeMM
-      const rung = panelEntry === 'admin'
-        ? nearestSemanticRung(stdRungs, dSize)
-        : nearestUserWorkbenchRung(stdRungs, dSize)
       const design = scaleContour(b, dSize)
       return {
         design,
         recipe: { kind: 'final-contour', contourMM: design },
         designSize: dSize,
-        rung,
-        rungH: rung,
         format: null,
       }
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
-  }, [panelEntry, src, geo, preset, gen, p1, p2, sides, points, sizeMM, magic, stdRungs, rectRungs, resolvedSizeMM])
+  }, [src, geo, preset, gen, p1, p2, sides, points, magic, rectRungs, resolvedSizeMM])
+
+  const preparedDesign = useMemo<PreparedDesign | null>(() => {
+    if (!planDesign || !stdRungs.length) return null
+    if (src === 'std' && geo === 'rect') {
+      if (!rectRungs) return null
+      return {
+        ...planDesign,
+        rung: rectRungs.widthRung,
+        rungH: rectRungs.heightRung,
+      }
+    }
+    const targetMM = src === 'std' ? sizeMM : planDesign.designSize
+    const rung = panelEntry === 'admin'
+      ? nearestSemanticRung(stdRungs, targetMM)
+      : nearestUserWorkbenchRung(stdRungs, targetMM)
+    return { ...planDesign, rung, rungH: rung }
+  }, [planDesign, stdRungs, src, geo, rectRungs, sizeMM, panelEntry])
 
   const adminPlanJob = useMemo<AdminGridJob | null>(() =>
-    panelEntry === 'admin' && preparedDesign
-      ? { operation: 'plan', recipe: preparedDesign.recipe, options: adminPlanOptions }
-      : null, [panelEntry, preparedDesign, adminPlanOptions])
+    panelEntry === 'admin' && planDesign
+      ? { operation: 'plan', recipe: planDesign.recipe, options: adminPlanOptions }
+      : null, [panelEntry, planDesign, adminPlanOptions])
   const userPlanJob = useMemo<UserGridJob | null>(() =>
-    panelEntry === 'user' && preparedDesign
-      ? { operation: 'plan', recipe: preparedDesign.recipe, attachment }
-      : null, [panelEntry, preparedDesign, attachment])
+    panelEntry === 'user' && planDesign
+      ? { operation: 'plan', recipe: planDesign.recipe, attachment }
+      : null, [panelEntry, planDesign, attachment])
   const adminPlanKey = adminPlanJob ? adminGridJobKey(adminPlanJob) : null
   const userPlanKey = userPlanJob ? userGridJobKey(userPlanJob) : null
   const adminPlanState = useGridWorkerJob<AdminGridJob, AdminGridJobResult>(
@@ -325,10 +346,10 @@ export default function GridLab() {
   const runtimeError = activeLadderState.error ?? activePlanState.error
   const runtimeStatus = runtimeError
     ? 'error'
-    : activeLadderState.pending
-      ? 'resolving-sizes'
-      : preparedDesign && activePlanState.pending
-        ? 'resolving-grid'
+    : planDesign && activePlanState.pending
+      ? 'resolving-grid'
+      : activeLadderState.pending
+        ? 'resolving-sizes'
         : 'ready'
 
   const adminGeneration = adminStaticGeneration(adminLaw, gridMode, adminPlanOptions)

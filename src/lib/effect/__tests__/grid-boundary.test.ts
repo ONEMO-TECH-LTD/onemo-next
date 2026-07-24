@@ -131,8 +131,23 @@ describe('Creator magnetic-grid module boundary', () => {
 
   it('publishes only matching async worker results with an honest resolving surface', () => {
     const pageSource = readFileSync(ADMIN_PAGE_PATH, 'utf8')
+    const planDesignSource = pageSource.slice(
+      pageSource.indexOf('const planDesign ='),
+      pageSource.indexOf('const preparedDesign ='),
+    )
+    const planJobSource = pageSource.slice(
+      pageSource.indexOf('const adminPlanJob ='),
+      pageSource.indexOf('const adminPlanKey ='),
+    )
 
     expect(pageSource).toContain('useGridWorkerJob')
+    expect(pageSource).toContain('requestGridWorkerJobInBackground')
+    expect(planDesignSource).not.toContain('stdRungs')
+    expect(planDesignSource).toContain("if (geo === 'rect')")
+    expect(planDesignSource).toContain('if (!rectRungs) return null')
+    expect(planJobSource).toContain("panelEntry === 'admin' && planDesign")
+    expect(planJobSource).toContain("panelEntry === 'user' && planDesign")
+    expect(planJobSource).not.toContain('preparedDesign')
     expect(pageSource).toContain('data-grid-runtime-status={runtimeStatus}')
     expect(pageSource).toContain("'resolving-sizes'")
     expect(pageSource).toContain("'resolving-grid'")
