@@ -12,10 +12,11 @@
 //   • Procedural sizes: zero-point ladder `size = (n−1)·pitch + 2·pad (+2·frame)` → 70+48k (§13.2).
 
 import type { Contour, Pt } from './types'
-import { pointInContour } from './polygon'
 import { insetRingMM } from './offset'
 import {
   PreparedContourSource,
+  distanceToPreparedContour,
+  pointInPreparedContour,
   prepareExactContour,
   type GridBBox as BBox,
   type PreparedContour,
@@ -109,41 +110,15 @@ function bboxPoints(pts: ReadonlyArray<Pt>): BBox {
   return { minX, minY, maxX, maxY }
 }
 
-/** Shortest distance from point `p` to segment a–b. */
-function distToSeg(p: Pt, a: Pt, b: Pt): number {
-  const vx = b[0] - a[0], vy = b[1] - a[1]
-  const wx = p[0] - a[0], wy = p[1] - a[1]
-  const c1 = vx * wx + vy * wy
-  if (c1 <= 0) return Math.hypot(wx, wy)
-  const c2 = vx * vx + vy * vy
-  if (c2 <= c1) return Math.hypot(p[0] - b[0], p[1] - b[1])
-  const t = c1 / c2
-  return Math.hypot(p[0] - (a[0] + t * vx), p[1] - (a[1] + t * vy))
-}
-/** Shortest distance from `p` to the outline ring (any edge). Used for the per-node padding test — checked
- *  against the REAL outline (no erosion) so pinched shapes (a duck's head + body) keep BOTH regions. */
-function distToRing(p: Pt, ring: ReadonlyArray<Pt>): number {
-  let m = Infinity
-  for (let i = 0, n = ring.length; i < n; i++) { const d = distToSeg(p, ring[i], ring[(i + 1) % n]); if (d < m) m = d }
-  return m
-}
-
-function distToContour(p: Pt, contour: Contour): number {
-  let d = distToRing(p, contour.outer.pts)
-  for (const hole of contour.holes) d = Math.min(d, distToRing(p, hole.pts))
-  return d
-}
-
 /** The most-interior point of the silhouette (pole of inaccessibility, sampled) + its distance to the edge.
  *  Used as the guaranteed single-magnet fallback when the sparse grid seats none. */
 function deepestPoint(prepared: PreparedContour, bb: BBox): { p: Pt; d: number } | null {
-  const contour = prepared.contour
   const step = Math.max(2, Math.min(bb.maxX - bb.minX, bb.maxY - bb.minY) / 24)
   let best: Pt | null = null, bestD = -1
   for (let x = bb.minX; x <= bb.maxX; x += step) for (let y = bb.minY; y <= bb.maxY; y += step) {
     const p: Pt = [x, y]
-    if (!pointInContour(p, contour)) continue
-    const d = distToContour(p, contour)
+    if (!pointInPreparedContour(p, prepared)) continue
+    const d = distanceToPreparedContour(p, prepared)
     if (d > bestD) { bestD = d; best = p }
   }
   return best ? { p: best, d: bestD } : null
@@ -185,9 +160,9 @@ function latticeAt(bb: BBox, pitch: number, pattern: GridPattern, ox: number, oy
 /** Greedy min-spacing thinning: keep only magnets whose application rings never overlap — no two centres
  *  closer than `minDist` (= 2× the padding radius). Deepest-in-material anchors are kept first, then the
  *  most central. */
-function thinBySpacing(pts: Pt[], minDist: number, contour: Contour, c: Pt): Pt[] {
+function thinBySpacing(pts: Pt[], minDist: number, prepared: PreparedContour, c: Pt): Pt[] {
   const ranked = pts
-    .map((p) => ({ p, d: distToContour(p, contour), r: dist(p, c) }))
+    .map((p) => ({ p, d: distanceToPreparedContour(p, prepared), r: dist(p, c) }))
     .sort((a, b) => b.d - a.d || a.r - b.r) // deepest in material first, then most central
   const kept: Pt[] = []
   for (const { p } of ranked) {
@@ -270,7 +245,6 @@ function deepestSafePointForRegion(
   pad: number,
   seated: ReadonlyArray<Pt>,
 ): Pt | null {
-  const contour = prepared.contour
   if (!region.length) return null
   const rb = bboxPoints(region)
   const minX = rb.minX - pad, maxX = rb.maxX + pad
@@ -279,8 +253,8 @@ function deepestSafePointForRegion(
   let best: Pt | null = null, bestGain = 0, bestDepth = -1
   for (let x = minX; x <= maxX; x += step) for (let y = minY; y <= maxY; y += step) {
     const p: Pt = [x, y]
-    if (!pointInContour(p, contour)) continue
-    const depth = distToContour(p, contour)
+    if (!pointInPreparedContour(p, prepared)) continue
+    const depth = distanceToPreparedContour(p, prepared)
     if (depth < pad) continue
     if (seated.some((a) => dist(p, a) < 2 * pad - 1e-6)) continue
     let gain = 0
@@ -387,13 +361,13 @@ export function computePreparedGrid(prepared: PreparedContour, cfg: GridConfig =
     let inside = 0
     for (let i = 0; i < N; i++) {
       const t = (i / N) * Math.PI * 2
-      if (pointInContour([p[0] + pad * Math.cos(t), p[1] + pad * Math.sin(t)], contourMM)) inside++
+      if (pointInPreparedContour([p[0] + pad * Math.cos(t), p[1] + pad * Math.sin(t)], prepared)) inside++
     }
     return inside / N
   }
   const valid = (p: Pt) => {
-    if (!pointInContour(p, contourMM)) return false
-    const d = distToContour(p, contourMM)
+    if (!pointInPreparedContour(p, prepared)) return false
+    const d = distanceToPreparedContour(p, prepared)
     if (d >= pad) return true
     if (cfg.strictPad) return false
     return d >= pad - PAD_CORNER_TOL_MM && ringCoverage(p) >= RING_COVERAGE_MIN
@@ -521,7 +495,7 @@ export function computePreparedGrid(prepared: PreparedContour, cfg: GridConfig =
     const cands: Cand[] = []
     for (const px of oxs) for (const py of oys) for (const ck of checkers) {
       const nodes = latticeAt(bb, pitch, pattern, px, py, ck)
-      const seat = thinBySpacing(nodes.filter(valid), minSpacing, contourMM, c)
+      const seat = thinBySpacing(nodes.filter(valid), minSpacing, prepared, c)
       const fin = finalize(seat)
       const flapN = fin.seated.length ? flapVerts(contourMM, fin.seated, HOLD_REACH_MM).length : outer.length
       let mp = Infinity

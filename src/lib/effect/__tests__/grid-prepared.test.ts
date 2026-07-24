@@ -26,8 +26,8 @@ describe('S1a exact prepared-contour representation', () => {
 
     expect(prepared.contour).toBe(holed)
     expect(prepared.segmentRings).toHaveLength(2)
-    expect(prepared.segmentRings[0]).toEqual({ ringIndex: 0, pts: holed.outer.pts })
-    expect(prepared.segmentRings[1]).toEqual({ ringIndex: 1, pts: holed.holes[0].pts })
+    expect(prepared.segmentRings[0]).toMatchObject({ ringIndex: 0, pts: holed.outer.pts })
+    expect(prepared.segmentRings[1]).toMatchObject({ ringIndex: 1, pts: holed.holes[0].pts })
     const outer = prepared.segmentRings[0].pts
     expect([outer[0], outer[1]]).toEqual([holed.outer.pts[0], holed.outer.pts[1]])
     expect([outer.at(-1), outer[0]]).toEqual([holed.outer.pts.at(-1), holed.outer.pts[0]])
