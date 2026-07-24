@@ -9,6 +9,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
+    "grid:profile": "vite-node --script scripts/profile-grid-baseline.ts",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },

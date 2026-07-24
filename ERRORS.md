@@ -77,3 +77,10 @@
 - Symptoms: the port returned 200 SSR HTML and JavaScript chunks, but controls only received focus; state never changed, DOM nodes had no React fiber/props, and the Next HMR WebSocket failed with `ERR_INVALID_HTTP_RESPONSE`.
 - What worked: use the authoritative `http://localhost:3970` origin. React fiber/props were present, HMR connected, and the User toggle changed `aria-pressed` from false to true.
 - Remember: this project binds Next HMR to `localhost`; `127.0.0.1` can produce an inert SSR-only QA artifact. Verify hydration plus one state-changing control before collecting performance evidence.
+
+## S59 grid-audit runner under orchestration
+
+- What did not work: invoking `grid-audit.ts` through `vite-node --script`, then wrapping `npx --no-install tsx` inside the orchestration helper.
+- Symptoms: both calls completed without the audit's final law verdict; the script's explicit `process.exit()` did not surface a reliable result through that wrapper.
+- What worked: run `npx tsx src/lib/effect/grid-audit.ts` directly in a PTY command and poll the returned session until exit.
+- Remember: the standing magnetic-grid audit is a script with an explicit exit; execute it directly with `npx tsx` when an auditable verdict is required.
