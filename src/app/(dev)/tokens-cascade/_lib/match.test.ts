@@ -55,7 +55,7 @@ describe('compareOne — percent / duration domains (KAI-9686 rework)', () => {
 describe('domain-pin from the Figma scope contract (KAI-9686 rework #2)', () => {
   it('expectedUnit maps scopes to domains (or null when unpinned)', () => {
     expect(expectedUnit(['LETTER_SPACING'])).toBe('px');
-    expect(expectedUnit(['OPACITY'])).toBe('unitless');
+    expect(expectedUnit(['OPACITY'])).toBe('percent');   // opacity is percent-valued in this DS
     expect(expectedUnit(['CORNER_RADIUS'])).toBe('px');
     expect(expectedUnit(['(none)'])).toBeNull();   // ratios/durations carry no mapped scope
     expect(expectedUnit(undefined)).toBeNull();
@@ -79,25 +79,28 @@ describe('domain-pin from the Figma scope contract (KAI-9686 rework #2)', () => 
     expect(compareOne('0', '0ms', 'float', 'px')).toBe('DIFF');   // 0ms is not 0px
     expect(compareOne('0', '0%', 'float', 'px')).toBe('DIFF');    // 0% is not 0px
   });
-  it('collection fallback pins UNSCOPED tokens by DS convention', () => {
-    expect(expectedUnit(['(none)'], 'Prim-Dim')).toBe('px');
-    expect(expectedUnit([], 'Prim-Ratios')).toBe('unitless');
-    expect(expectedUnit([], 'Prim-Type')).toBeNull();            // strings — no float domain
-    expect(expectedUnit(['LETTER_SPACING'], 'Prim-Motion', 'x')).toBe('px'); // scope wins
+  it('terminal-driven: single-domain collections + path, scope corroborates only', () => {
+    expect(expectedUnit([], 'Prim-Dim', 'x')).toBe('px');              // terminal collection
+    expect(expectedUnit([], 'Prim-Ratios', '1-05')).toBe('unitless'); // ratio factor terminal
+    expect(expectedUnit([], 'Prim-Type', 'x')).toBeNull();            // strings — no float domain
+    expect(expectedUnit(['OPACITY'], 'Unknown', 'x')).toBe('percent'); // scope corroborates when nothing else pins
   });
-  it('motion is MIXED-domain — resolved by path, never blanket-pinned', () => {
+  it('MIXED collections resolved by terminal path (motion + ratios)', () => {
     expect(expectedUnit([], 'Prim-Motion', 'time/200')).toBe('ms');
-    expect(expectedUnit([], '.2.7-Al-Motion', 'duration/base')).toBe('ms');
-    expect(expectedUnit([], '.2.7-Al-Motion', 'scale/press')).toBe('unitless');   // NOT ms
-    expect(expectedUnit([], '.2.7-Al-Motion', 'spring/response')).toBe('unitless'); // NOT ms
-    expect(expectedUnit([], '3.8-Sem-Motion', 'easing/standard')).toBeNull();     // string
-    expect(expectedUnit([], 'Prim-Motion')).toBeNull();          // no path → unclassified, unpinned
+    expect(expectedUnit([], 'Prim-Ratios', 'percent/5')).toBe('percent');  // percent subgroup, NOT unitless
+    expect(expectedUnit([], 'Prim-Ratios', '0-96')).toBe('unitless');      // scale's terminal is a ratio factor
+    expect(expectedUnit([], 'Prim-Motion', 'easing/standard')).toBeNull(); // string, unpinned
   });
-  it('BITE: a motion scale (unitless) is NOT false-DIFF as ms', () => {
-    // regression for the 131-false-DIFF blanket motion→ms bug.
-    const exp = expectedUnit([], '.2.7-Al-Motion', 'scale/press'); // 'unitless'
-    expect(compareOne('0.96', '0.96', 'float', exp)).toBe('MATCH');
-    expect(compareOne('300', '300', 'float', expectedUnit([], '.2.7-Al-Motion', 'spring/damping'))).toBe('MATCH');
+  it('BITE: percent/opacity are percent, not unitless (42-false-red regression)', () => {
+    const pct = expectedUnit([], 'Prim-Ratios', 'percent/5');   // 'percent'
+    expect(pct).toBe('percent');
+    expect(compareOne('5', '5%', 'float', pct)).toBe('MATCH');   // correct carrier
+    expect(compareOne('5', '5', 'float', pct)).toBe('DIFF');     // bare number is wrong domain
+    expect(compareOne('80', '80%', 'float', expectedUnit(['OPACITY'], 'Sem-Motion', 'opacity/active'))).toBe('MATCH');
+  });
+  it('BITE: a motion scale/spring (unitless factor) is NOT false-DIFF as ms', () => {
+    // regression for the 131-false-DIFF blanket motion→ms bug (terminal is a ratio factor).
+    expect(compareOne('0.96', '0.96', 'float', expectedUnit([], 'Prim-Ratios', '0-96'))).toBe('MATCH');
   });
   it('BITE: an unscoped Prim-Dim 2.5rem(=40px) emitted as 40ms is DIFF, not a same-magnitude MATCH', () => {
     const exp = expectedUnit([], 'Prim-Dim');                    // 'px'
@@ -158,6 +161,10 @@ describe('verifyRun — run integrity (source oracle + css + identity)', () => {
   it('BITE: manifest fileKey != route screen fileKey → NOT verified', () => {
     const { d, m } = mk();
     expect(verifyRun(rp(d, m, 'WRONG-FILE-KEY--12-34')).verified).toBe(false);
+  });
+  it('BITE: malformed route with empty fileKey prefix (--node) → NOT verified (fail-closed)', () => {
+    const { d, m } = mk();
+    expect(verifyRun(rp(d, m, '--12-34')).verified).toBe(false);
   });
   it('BITE: tampered Figma source (still-matching manifest) → NOT verified', () => {
     // manifest seals the ORIGINAL source hash; we overwrite the source on disk after.

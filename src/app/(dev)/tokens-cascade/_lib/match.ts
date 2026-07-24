@@ -54,35 +54,37 @@ export function toComparable(gen: string): { n: number; unit: Unit } | null {
 const SCOPE_UNIT: Record<string, Unit> = {
   LETTER_SPACING: 'px', FONT_SIZE: 'px', LINE_HEIGHT: 'px', GAP: 'px', PARAGRAPH_SPACING: 'px',
   CORNER_RADIUS: 'px', WIDTH_HEIGHT: 'px', STROKE_FLOAT: 'px', EFFECT_FLOAT: 'px',
-  OPACITY: 'unitless',
+  OPACITY: 'percent',   // opacity is percent-valued in this DS (aliases Prim-Ratios/percent → `5%`)
 };
 /**
- * Collection/path fallback for UNSCOPED tokens (primitives/aliases carry no Figma scope):
- * an independent re-derivation of the DS domain convention (NOT imported from the generator,
- * to avoid the producer-as-oracle trap). Closes the same-magnitude domain swap on unscoped
- * rows (e.g. a Prim-Dim `2.5rem` emitted as `40ms`).
+ * PATH-based domain — checked BEFORE collection rules because several collections are
+ * MIXED-domain: Motion holds durations (ms) + scale/spring multipliers (unitless), and
+ * Prim-Ratios holds ratio multipliers (unitless) + a percent/* subgroup (percent). Opacity
+ * aliases the percent subgroup, so it is percent too. An independent re-derivation of the DS
+ * convention (NOT imported from the generator), by the token's path segment.
  */
+const PATH_UNIT: Array<[RegExp, Unit]> = [
+  [/(^|\/)(time|duration)(\/|$)/i, 'ms'],
+  [/(^|\/)(percent|opacity)(\/|$)/i, 'percent'],
+  [/(^|\/)(scale|spring)(\/|$)/i, 'unitless'],
+];
+/** Collection fallback for the UNAMBIGUOUS single-domain collections. */
 const COLL_UNIT: Array<[RegExp, Unit]> = [
-  [/ratio/i, 'unitless'],
+  [/ratio/i, 'unitless'],   // ratio multipliers; the percent/* subgroup is caught by PATH_UNIT first
   [/(dim|radii|container|breakpoint|border|effect|track)/i, 'px'],
 ];
 /**
- * Motion collections are MIXED-domain (durations vs scale/spring/opacity multipliers), so a
- * blanket collection rule mis-pins them. Resolve by the token's path segment instead; easing
- * is a string (handled by type), and an unrecognised motion token stays unpinned.
+ * Expected domain, driven by the RESOLVED TERMINAL primitive's identity (collection + path),
+ * per the accepted terminal-driven law (KAI-9678): the terminal path wins (percent/time), the
+ * terminal collection resolves the single-domain families (ratio/dimension), and the token's
+ * Figma scope only CORROBORATES (it can't blanket-override the terminal). Caller passes the
+ * terminal step's collection/path; scopes are the token's own.
  */
-const MOTION_PATH_UNIT: Array<[RegExp, Unit]> = [
-  [/(^|\/)(time|duration)(\/|$)/i, 'ms'],
-  [/(^|\/)(scale|spring|opacity)(\/|$)/i, 'unitless'],
-];
-/** Expected domain: Figma scope contract, else collection/path convention, else null. */
 export function expectedUnit(scopes?: string[], collection?: string, path?: string): Unit | null {
-  for (const s of scopes ?? []) if (s in SCOPE_UNIT) return SCOPE_UNIT[s];
-  if (/motion/i.test(collection ?? '')) {
-    for (const [re, u] of MOTION_PATH_UNIT) if (re.test(path ?? '')) return u;
-    return null; // easing (string) or an unclassified motion token — never blanket-pin
-  }
-  for (const [re, u] of COLL_UNIT) if (re.test(collection ?? '')) return u;
+  for (const [re, u] of PATH_UNIT) if (re.test(path ?? '')) return u;         // terminal path: percent/time/…
+  if (/motion/i.test(collection ?? '')) return null;                          // motion terminal that isn't time (easing) — unpinned
+  for (const [re, u] of COLL_UNIT) if (re.test(collection ?? '')) return u;   // terminal collection: ratio/dimension
+  for (const s of scopes ?? []) if (s in SCOPE_UNIT) return SCOPE_UNIT[s];    // scope corroborates only
   return null;
 }
 
@@ -205,8 +207,8 @@ export function verifyRun(rp: RunPaths): RunIntegrity {
     //    from a different Figma file can no longer render green under this route.
     if (!src.fileKey || !src.fileVersion) return { verified: false, reason: 'manifest source lacks fileKey/fileVersion identity', sourceVerified: true, cssVerified: true, screenScopeSha };
     const routeFileKey = rp.screen.split('--')[0];
-    if (routeFileKey && src.fileKey !== routeFileKey) {
-      return { verified: false, reason: `manifest fileKey ${src.fileKey} != route screen ${routeFileKey}`, sourceVerified: true, cssVerified: true, fileKey: src.fileKey, fileVersion: src.fileVersion, screenScopeSha };
+    if (!routeFileKey || src.fileKey !== routeFileKey) {
+      return { verified: false, reason: routeFileKey ? `manifest fileKey ${src.fileKey} != route screen ${routeFileKey}` : 'route screen has no <fileKey>--<node> identity segment', sourceVerified: true, cssVerified: true, fileKey: src.fileKey, fileVersion: src.fileVersion, screenScopeSha };
     }
     return {
       verified: true,
@@ -253,9 +255,10 @@ export function buildMatch(rp: RunPaths): { rows: MatchRow[]; counts: Record<str
       const key = (cs: CascadeStep[]) => cs.map((c) => `${c.collection}/${c.path}`).join('>');
       const modesDiffer = key(cascade) !== key(cascadeDarkFull);
       const cascadeDark = modesDiffer ? cascadeDarkFull : null;
-      // expected unit-domain from the Figma scope contract, then the collection convention
-      // for unscoped tokens (not inferred from the generated value being audited).
-      const exp = expectedUnit(r.$scopes, coll.name, r.path.join('/'));
+      // expected unit-domain driven by the RESOLVED TERMINAL primitive (collection + path),
+      // scope corroborating only — not inferred from the generated value being audited.
+      const terminal = light.steps[light.steps.length - 1];
+      const exp = expectedUnit(r.$scopes, terminal?.collection ?? coll.name, terminal?.path ?? r.path.join('/'));
       const genRaw = rootVars.get(cssVar);
       let verdict: Verdict; let genLight: string; let genDark: string;
       if (genRaw === undefined) {
