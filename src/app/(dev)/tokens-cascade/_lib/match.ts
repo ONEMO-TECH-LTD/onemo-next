@@ -57,20 +57,31 @@ const SCOPE_UNIT: Record<string, Unit> = {
   OPACITY: 'unitless',
 };
 /**
- * Collection-name fallback for UNSCOPED tokens (primitives/aliases carry no Figma scope):
- * an independent re-derivation of the DS domain-by-collection convention (NOT imported from
- * the generator, to avoid the producer-as-oracle trap). Closes the same-magnitude domain
- * swap on unscoped rows (e.g. a Prim-Dim `2.5rem` emitted as `40ms`). Order matters:
- * motion→ms and ratio→unitless are matched before the px dimension family.
+ * Collection/path fallback for UNSCOPED tokens (primitives/aliases carry no Figma scope):
+ * an independent re-derivation of the DS domain convention (NOT imported from the generator,
+ * to avoid the producer-as-oracle trap). Closes the same-magnitude domain swap on unscoped
+ * rows (e.g. a Prim-Dim `2.5rem` emitted as `40ms`).
  */
 const COLL_UNIT: Array<[RegExp, Unit]> = [
-  [/motion/i, 'ms'],
   [/ratio/i, 'unitless'],
   [/(dim|radii|container|breakpoint|border|effect|track)/i, 'px'],
 ];
-/** Expected domain from the Figma scope contract, else the collection convention, else null. */
-export function expectedUnit(scopes?: string[], collection?: string): Unit | null {
+/**
+ * Motion collections are MIXED-domain (durations vs scale/spring/opacity multipliers), so a
+ * blanket collection rule mis-pins them. Resolve by the token's path segment instead; easing
+ * is a string (handled by type), and an unrecognised motion token stays unpinned.
+ */
+const MOTION_PATH_UNIT: Array<[RegExp, Unit]> = [
+  [/(^|\/)(time|duration)(\/|$)/i, 'ms'],
+  [/(^|\/)(scale|spring|opacity)(\/|$)/i, 'unitless'],
+];
+/** Expected domain: Figma scope contract, else collection/path convention, else null. */
+export function expectedUnit(scopes?: string[], collection?: string, path?: string): Unit | null {
   for (const s of scopes ?? []) if (s in SCOPE_UNIT) return SCOPE_UNIT[s];
+  if (/motion/i.test(collection ?? '')) {
+    for (const [re, u] of MOTION_PATH_UNIT) if (re.test(path ?? '')) return u;
+    return null; // easing (string) or an unclassified motion token — never blanket-pin
+  }
   for (const [re, u] of COLL_UNIT) if (re.test(collection ?? '')) return u;
   return null;
 }
@@ -244,7 +255,7 @@ export function buildMatch(rp: RunPaths): { rows: MatchRow[]; counts: Record<str
       const cascadeDark = modesDiffer ? cascadeDarkFull : null;
       // expected unit-domain from the Figma scope contract, then the collection convention
       // for unscoped tokens (not inferred from the generated value being audited).
-      const exp = expectedUnit(r.$scopes, coll.name);
+      const exp = expectedUnit(r.$scopes, coll.name, r.path.join('/'));
       const genRaw = rootVars.get(cssVar);
       let verdict: Verdict; let genLight: string; let genDark: string;
       if (genRaw === undefined) {

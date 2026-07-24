@@ -81,10 +81,23 @@ describe('domain-pin from the Figma scope contract (KAI-9686 rework #2)', () => 
   });
   it('collection fallback pins UNSCOPED tokens by DS convention', () => {
     expect(expectedUnit(['(none)'], 'Prim-Dim')).toBe('px');
-    expect(expectedUnit([], 'Prim-Motion')).toBe('ms');
     expect(expectedUnit([], 'Prim-Ratios')).toBe('unitless');
     expect(expectedUnit([], 'Prim-Type')).toBeNull();            // strings — no float domain
-    expect(expectedUnit(['LETTER_SPACING'], 'Prim-Motion')).toBe('px'); // scope wins over collection
+    expect(expectedUnit(['LETTER_SPACING'], 'Prim-Motion', 'x')).toBe('px'); // scope wins
+  });
+  it('motion is MIXED-domain — resolved by path, never blanket-pinned', () => {
+    expect(expectedUnit([], 'Prim-Motion', 'time/200')).toBe('ms');
+    expect(expectedUnit([], '.2.7-Al-Motion', 'duration/base')).toBe('ms');
+    expect(expectedUnit([], '.2.7-Al-Motion', 'scale/press')).toBe('unitless');   // NOT ms
+    expect(expectedUnit([], '.2.7-Al-Motion', 'spring/response')).toBe('unitless'); // NOT ms
+    expect(expectedUnit([], '3.8-Sem-Motion', 'easing/standard')).toBeNull();     // string
+    expect(expectedUnit([], 'Prim-Motion')).toBeNull();          // no path → unclassified, unpinned
+  });
+  it('BITE: a motion scale (unitless) is NOT false-DIFF as ms', () => {
+    // regression for the 131-false-DIFF blanket motion→ms bug.
+    const exp = expectedUnit([], '.2.7-Al-Motion', 'scale/press'); // 'unitless'
+    expect(compareOne('0.96', '0.96', 'float', exp)).toBe('MATCH');
+    expect(compareOne('300', '300', 'float', expectedUnit([], '.2.7-Al-Motion', 'spring/damping'))).toBe('MATCH');
   });
   it('BITE: an unscoped Prim-Dim 2.5rem(=40px) emitted as 40ms is DIFF, not a same-magnitude MATCH', () => {
     const exp = expectedUnit([], 'Prim-Dim');                    // 'px'
