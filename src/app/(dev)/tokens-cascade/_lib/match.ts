@@ -23,18 +23,23 @@ function hex8(v: string): string | null {
 const chans = (h: string): number[] => [1, 3, 5, 7].map((i) => parseInt(h.slice(i, i + 2) || 'ff', 16));
 
 /**
- * Colour verdict — compared in DECODED sRGB8 + alpha-byte space (what the browser actually
- * paints), a three-way taxonomy analogous to (but NOT byte-identical to) the audit's:
- *   MATCH   = byte-exact in sRGB8+alpha,
- *   BOUNDED = within 1/255 on every channel (a sub-render 1-byte drift — e.g. an alpha the
+ * Colour verdict — compared in CANONICAL culori sRGB8 + alpha-byte SERIALIZATION (`formatHex8`),
+ * a deterministic three-way taxonomy:
+ *   MATCH   = culori serialises both sides to the identical sRGB8+alpha byte string,
+ *   BOUNDED = within 1/255 on every channel (a 1-byte serialization drift — e.g. an alpha the
  *             generator rounded to a whole `%`: `#…b2` vs `#…b3`) — NOT a green MATCH, kept as
  *             its own class so the distinction isn't erased,
  *   DIFF    = a channel off by ≥2/255 (a real colour error).
- * NOTE ON COUNT: this sRGB8-byte pass yields ~599 BOUNDED on the full graph vs the generator
- * audit's 611 (which compares in OKLCH round-trip). The ~12-row gap is tokens that are
- * byte-identical once rendered to sRGB8 (correctly MATCH here) but 1/255 apart in OKLCH — a
- * comparison-SPACE difference, not a hidden false-green. Non-sRGB values (absent from this
- * Figma-hex corpus) fall back to a tight oklch compare.
+ *
+ * ORACLE (named precisely): this is culori's canonical sRGB8 serialization — it is NOT
+ * "rendered browser pixels" (Chrome's raster differs; e.g. it maps both culori's `#…e6` and
+ * source `#…e5` alpha to the same RGBA byte). It is also a DIFFERENT method from the generator
+ * audit's manual oklch→RGB (verify-token-surface.mjs `colorEqual`, ±2 tolerance): on the full
+ * graph the two disagree BIDIRECTIONALLY — 37 audit-BOUNDED rows are MATCH here (culori
+ * serialises them identically) and 25 audit-MATCH rows are BOUNDED here (culori serialises them
+ * 1 byte apart), net 599 vs 611. Neither is a hidden false-green vs Figma — they are two
+ * deterministic oracles that split the sub-2/255 boundary differently. Non-sRGB values (absent
+ * from this Figma-hex corpus) fall back to a tight oklch compare.
  */
 function colorVerdict(a: string, b: string): 'MATCH' | 'BOUNDED' | 'DIFF' {
   const ha = hex8(a), hb = hex8(b);
