@@ -18,10 +18,9 @@ import { nearestAnchorPair, nearestSemanticRung, resolveDesignSizeMM, resolveRec
 import { requestGridWorkerJobInBackground } from '@/lib/effect/grid-worker-client'
 import {
   adminGridJobKey,
-  adminStaticGeneration,
   cachedAdminGridJob,
-  prewarmAdminCanonicalShapes,
   requestAdminGridJob,
+  suspendAdminGridWork,
 } from '@/lib/effect/grid-admin-client'
 import { GridWorkbenchPanel, type GridWorkbenchPanelProps } from './GridWorkbenchPanel'
 import { contourDimension as dim, GridWorkbenchReadouts, GridWorkbenchStage } from './GridWorkbenchRenderer'
@@ -29,8 +28,8 @@ import {
   cachedUserGridJob,
   GridWorkbenchUserPanel,
   nearestUserWorkbenchRung,
-  prewarmUserCanonicalShapes,
   requestUserGridJob,
+  suspendUserGridWork,
   userGridJobKey,
   type UserGridJob,
   type UserGridJobResult,
@@ -129,6 +128,13 @@ export default function GridLab() {
   const [magic, setMagic] = useState<MagicState>(null)
   const [magStatus, setMagStatus] = useState<string>('')   // '', 'downloading-model', 'cutting', 'error:...'
   const fileRef = useRef<HTMLInputElement>(null)
+
+  function selectPanelEntry(next: PanelEntry) {
+    if (next === panelEntry) return
+    if (next === 'admin') suspendUserGridWork()
+    else suspendAdminGridWork()
+    setPanelEntry(next)
+  }
 
   function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return
@@ -352,24 +358,6 @@ export default function GridLab() {
         ? 'resolving-sizes'
         : 'ready'
 
-  const adminGeneration = adminStaticGeneration(adminLaw, gridMode, adminPlanOptions)
-  useEffect(() => {
-    void prewarmUserCanonicalShapes(ladderShape, resolvedSizeMM, attachment).catch((error) => {
-      console.error('[grid-lab] User static prewarm failed', error)
-    })
-  }, [attachment, ladderShape, resolvedSizeMM])
-  useEffect(() => {
-    void prewarmAdminCanonicalShapes(
-      adminLaw,
-      gridMode,
-      adminPlanOptions,
-      ladderShape,
-      resolvedSizeMM,
-    ).catch((error) => {
-      console.error('[grid-lab] Admin static prewarm failed', error)
-    })
-  }, [adminGeneration, adminLaw, gridMode, adminPlanOptions, ladderShape, resolvedSizeMM])
-
   useEffect(() => {
     window.__GRID_LAB_PROOF__ = {
       door: panelEntry,
@@ -436,8 +424,8 @@ export default function GridLab() {
           <div className="gl-card gl-entry-switch">
             <span className="gl-glabel">Engine entry</span>
             <div className="gl-seg" role="group" aria-label="Grid engine entry">
-              <button type="button" aria-pressed={panelEntry === 'admin'} onClick={() => setPanelEntry('admin')}>Admin</button>
-              <button type="button" aria-pressed={panelEntry === 'user'} onClick={() => setPanelEntry('user')}>User</button>
+              <button type="button" aria-pressed={panelEntry === 'admin'} onClick={() => selectPanelEntry('admin')}>Admin</button>
+              <button type="button" aria-pressed={panelEntry === 'user'} onClick={() => selectPanelEntry('user')}>User</button>
             </div>
           </div>
 

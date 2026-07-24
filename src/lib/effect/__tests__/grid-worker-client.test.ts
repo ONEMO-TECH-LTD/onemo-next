@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   GridWorkerDisposedError,
+  GridWorkerInactiveError,
   GridWorkerScheduler,
   GridWorkerSupersededError,
   requestGridWorkerJobInBackground,
@@ -178,6 +179,31 @@ describe('preemptive exact grid worker scheduler', () => {
 
     expect(workers[0].terminated).toBe(true)
     await expect(staleRejected).resolves.toBeInstanceOf(GridWorkerSupersededError)
+    scheduler.dispose()
+  })
+
+  it('stops every pending inactive-door job without discarding its exact cache', async () => {
+    const { scheduler, workers } = fixture()
+    const cached = scheduler.request({ key: 'cached', value: 1 })
+    workers[0].succeed()
+    await cached
+
+    const current = scheduler.request({ key: 'inactive-current', value: 2 })
+    const queued = scheduler.request({ key: 'inactive-queued', value: 3 }, 'background')
+    const currentRejected = current.catch((error) => error)
+    const queuedRejected = queued.catch((error) => error)
+
+    scheduler.cancelPending()
+
+    expect(workers[0].terminated).toBe(true)
+    expect(scheduler.pendingCount).toBe(0)
+    await expect(currentRejected).resolves.toBeInstanceOf(GridWorkerInactiveError)
+    await expect(queuedRejected).resolves.toBeInstanceOf(GridWorkerInactiveError)
+
+    const workerCount = workers.length
+    await expect(scheduler.request({ key: 'cached', value: 99 }))
+      .resolves.toEqual({ key: 'cached', value: 1 })
+    expect(workers).toHaveLength(workerCount)
     scheduler.dispose()
   })
 

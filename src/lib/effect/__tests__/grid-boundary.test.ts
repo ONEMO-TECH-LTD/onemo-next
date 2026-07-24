@@ -15,6 +15,7 @@ const USER_WORKER_PATH = 'src/lib/effect/grid-user.worker.ts'
 const ADMIN_WORKER_PATH = 'src/lib/effect/grid-admin.worker.ts'
 const USER_WORKER_CLIENT_PATH = 'src/lib/effect/grid-user-client.ts'
 const ADMIN_WORKER_CLIENT_PATH = 'src/lib/effect/grid-admin-client.ts'
+const WORKER_HOOK_PATH = 'src/app/(dev)/effect-creator/grid-lab/useGridWorkerJob.ts'
 
 async function lintUserImport(modulePath: string) {
   const eslint = new ESLint({ cwd: process.cwd() })
@@ -156,5 +157,27 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(pageSource).not.toContain('resolveAdminGridPlan(')
     expect(pageSource).not.toContain('resolveUserPlan(')
     expect(pageSource).not.toContain('semanticLadder(')
+  })
+
+  it('starts only the active semantic door and stops the old door before a panel switch', () => {
+    const pageSource = readFileSync(ADMIN_PAGE_PATH, 'utf8')
+    const userClientSource = readFileSync(USER_WORKER_CLIENT_PATH, 'utf8')
+    const adminClientSource = readFileSync(ADMIN_WORKER_CLIENT_PATH, 'utf8')
+    const hookSource = readFileSync(WORKER_HOOK_PATH, 'utf8')
+    const switchSource = pageSource.slice(
+      pageSource.indexOf('function selectPanelEntry'),
+      pageSource.indexOf('function onFile'),
+    )
+
+    expect(pageSource).not.toMatch(/prewarm(?:User|Admin)CanonicalShapes/)
+    expect(userClientSource).not.toContain('prewarmUserCanonicalShapes')
+    expect(adminClientSource).not.toContain('prewarmAdminCanonicalShapes')
+    expect(hookSource).toContain("errorName === 'GridWorkerInactiveError'")
+    expect(switchSource).toContain("if (next === 'admin') suspendUserGridWork()")
+    expect(switchSource).toContain('else suspendAdminGridWork()')
+    expect(switchSource.indexOf('suspendAdminGridWork()'))
+      .toBeLessThan(switchSource.indexOf('setPanelEntry(next)'))
+    expect(switchSource.indexOf('suspendUserGridWork()'))
+      .toBeLessThan(switchSource.indexOf('setPanelEntry(next)'))
   })
 })

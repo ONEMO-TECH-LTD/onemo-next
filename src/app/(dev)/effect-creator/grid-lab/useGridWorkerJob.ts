@@ -27,7 +27,12 @@ export function useGridWorkerJob<Job, Result extends KeyedResult>(
     request(job).then((result) => {
       if (current && result.key === key) setSettled({ key, result, error: null })
     }).catch((error) => {
-      if (!current || (error as Error)?.name === 'GridWorkerSupersededError') return
+      const errorName = (error as Error)?.name
+      if (
+        !current
+        || errorName === 'GridWorkerSupersededError'
+        || errorName === 'GridWorkerInactiveError'
+      ) return
       setSettled({ key, result: null, error: String((error as Error)?.message ?? error) })
     })
     return () => { current = false }

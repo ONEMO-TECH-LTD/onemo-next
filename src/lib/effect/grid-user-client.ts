@@ -3,8 +3,6 @@ import {
   USER_GRID_CACHE_SEED_MAX_BYTES,
   userLadderCacheKey,
   userPlanCacheKey,
-  type Attachment,
-  type UserStandardShape,
   type UserGridJob,
   type UserGridJobResult,
   type UserGridWorkerEnvelope,
@@ -15,17 +13,13 @@ import { gridJsonBytes } from './grid-byte-oracle'
 import { jsonByteLength } from './grid-cache'
 import {
   GridWorkerScheduler,
-  GridWorkerSupersededError,
   type GridWorkerCacheSeed,
   type GridWorkerDecodeContext,
   type GridWorkerDecodedResult,
   type GridWorkerPriority,
 } from './grid-worker-client'
 
-const STANDARD_SHAPES: UserStandardShape[] = ['square', 'circle', 'diamondShape', 'triangle']
-const ATTACHMENTS: Attachment[] = ['magnetic', 'twinfix', 'velcro']
 let sharedClient: GridWorkerScheduler<UserGridJob, UserGridJobResult, UserGridWorkerEnvelope> | null = null
-let warmPromise: Promise<void> | null = null
 
 export function userGridJobKey(job: UserGridJob): string {
   return job.operation === 'ladder'
@@ -141,56 +135,6 @@ export function cachedUserGridJob(job: UserGridJob): UserGridJobResult | undefin
   return client().peek(job)
 }
 
-export function userStaticGeneration(): string {
-  const ladder = userLadderCacheKey({ kind: 'standard', shape: 'square' })
-  const plan = { kind: 'standard', shape: 'square', widthMM: 70, heightMM: 70 } as const
-  return [ladder, ...ATTACHMENTS.map((attachment) => userPlanCacheKey(plan, attachment))].join('|')
-}
-
-async function pinUserJob(
-  job: UserGridJob,
-  generation: string,
-): Promise<UserGridJobResult> {
-  for (;;) {
-    try {
-      return await client().prewarm(job, generation)
-    } catch (error) {
-      if (!(error instanceof GridWorkerSupersededError)) throw error
-    }
-  }
-}
-
-/** Warm exact canonical ladders, current-size plans, then every emitted rung plan. */
-export function prewarmUserCanonicalShapes(
-  preferred: UserStandardShape = 'square',
-  currentSizeMM = 70,
-  preferredAttachment: Attachment = 'magnetic',
-): Promise<void> {
-  if (warmPromise) return warmPromise
-  const generation = userStaticGeneration()
-  client().activateStaticGeneration(generation)
-  const order = [...new Set([preferred, ...STANDARD_SHAPES])]
-  const attachments = [...new Set([preferredAttachment, ...ATTACHMENTS])]
-  warmPromise = (async () => {
-    const ladders = new Map<UserStandardShape, Extract<UserGridJobResult, { operation: 'ladder' }>>()
-    for (const shape of order) {
-      const result = await pinUserJob({ operation: 'ladder', recipe: { kind: 'standard', shape } }, generation)
-      if (result.operation === 'ladder') ladders.set(shape, result)
-    }
-    for (const attachment of attachments) {
-      for (const shape of order) {
-        const recipe = { kind: 'standard', shape, widthMM: currentSizeMM, heightMM: currentSizeMM } as const
-        await pinUserJob({ operation: 'plan', recipe, attachment }, generation)
-      }
-    }
-    for (const shape of order) for (const rung of ladders.get(shape)?.value ?? []) {
-      if (rung.sizeMM === currentSizeMM) continue
-      const recipe = { kind: 'standard', shape, widthMM: rung.sizeMM, heightMM: rung.sizeMM } as const
-      for (const attachment of attachments) {
-        await pinUserJob({ operation: 'plan', recipe, attachment }, generation)
-      }
-    }
-  })()
-  warmPromise.catch(() => { warmPromise = null })
-  return warmPromise
+export function suspendUserGridWork(): void {
+  sharedClient?.cancelPending()
 }

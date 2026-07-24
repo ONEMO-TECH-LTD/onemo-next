@@ -4,16 +4,16 @@ import {
 } from '@/lib/effect/grid-user'
 import {
   cachedUserGridJob,
-  prewarmUserCanonicalShapes,
   requestUserGridJob,
+  suspendUserGridWork,
   userGridJobKey,
 } from '@/lib/effect/grid-user-client'
 import { GridWorkbenchPanel, type GridWorkbenchPanelProps } from './GridWorkbenchPanel'
 
 export {
   cachedUserGridJob,
-  prewarmUserCanonicalShapes,
   requestUserGridJob,
+  suspendUserGridWork,
   userGridJobKey,
 }
 export type { UserGridJob, UserGridJobResult, UserStandardShape } from '@/lib/effect/grid-user'

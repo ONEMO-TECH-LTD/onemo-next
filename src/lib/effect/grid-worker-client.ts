@@ -51,6 +51,13 @@ export class GridWorkerDisposedError extends Error {
   }
 }
 
+export class GridWorkerInactiveError extends Error {
+  constructor() {
+    super('Grid worker door is inactive.')
+    this.name = 'GridWorkerInactiveError'
+  }
+}
+
 /** Keep exact background work alive across active-request pre-emption without delaying the active job. */
 export async function requestGridWorkerJobInBackground<Job, Result>(
   job: Job,
@@ -186,11 +193,23 @@ export class GridWorkerScheduler<Job, Result, Transport = Result> {
     return result
   }
 
+  /** Stop an inactive door's CPU and queue while preserving its exact result caches. */
+  cancelPending(): void {
+    if (this.disposed) return
+    this.terminateWorker()
+    this.rejectPending(new GridWorkerInactiveError())
+  }
+
   dispose(): void {
     if (this.disposed) return
     this.disposed = true
     this.terminateWorker()
-    const error = new GridWorkerDisposedError()
+    this.rejectPending(new GridWorkerDisposedError())
+    this.cache.clear()
+    this.staticResults.clear()
+  }
+
+  private rejectPending(error: Error): void {
     if (this.current) {
       this.inFlight.delete(this.current.key)
       this.current.reject(error)
@@ -200,8 +219,6 @@ export class GridWorkerScheduler<Job, Result, Transport = Result> {
       this.inFlight.delete(pending.key)
       pending.reject(error)
     }
-    this.cache.clear()
-    this.staticResults.clear()
   }
 
   get pendingCount(): number {
