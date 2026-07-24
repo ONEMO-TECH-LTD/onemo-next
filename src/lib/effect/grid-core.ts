@@ -792,6 +792,18 @@ export function semanticLadder(
   return labelSemanticSteps(semanticSteps(makeShape, law, modeCombos(mode)), law)
 }
 
+export interface BalancedGridFit {
+  sizeMM: number
+  grid: GridResult
+  grew: number
+}
+
+export interface AutoGridSelection {
+  pitchMM: number
+  pattern: GridPattern
+  fit: BalancedGridFit
+}
+
 /**
  * Unified auto selection (pitch × pattern) under the ONE coverage physics — no shape-name branches.
  * AUTO mode covers everything legal in the 48/68 system (standard straight, diamond diagonal, 96-dice
@@ -802,14 +814,14 @@ export function semanticLadder(
 export function autoGrid(
   withMargin: (m: number) => Contour, cfg: GridConfig, fromMM: number, maxGrowMM: number,
   opts: { minN?: number; density?: GridDensity; pitchMM?: number; pattern?: GridPattern; patterns?: ReadonlyArray<GridPattern> } = {},
-): { pitchMM: number; pattern: GridPattern } {
+): AutoGridSelection {
   return autoPreparedGrid(new PreparedContourSource(withMargin), cfg, fromMM, maxGrowMM, opts)
 }
 
 function autoPreparedGrid(
   withMargin: PreparedContourSource, cfg: GridConfig, fromMM: number, maxGrowMM: number,
   opts: { minN?: number; density?: GridDensity; pitchMM?: number; pattern?: GridPattern; patterns?: ReadonlyArray<GridPattern> } = {},
-): { pitchMM: number; pattern: GridPattern } {
+): AutoGridSelection {
   const minN = opts.minN ?? TARGET_ANCHORS
   let pitches = opts.pitchMM != null ? [opts.pitchMM] : allowedPitches(opts.density ?? 'light')
   // a pinned pattern restricts the pitch search to its legal pitches (dice → 96 only)
@@ -820,16 +832,43 @@ function autoPreparedGrid(
   const patFor = (p: number): GridPattern[] => opts.pattern != null
     ? [opts.pattern]
     : legalPatterns(p).filter((pattern) => !opts.patterns || opts.patterns.includes(pattern))
-  let fb = { pitchMM: pitches[pitches.length - 1], pattern: patFor(pitches[pitches.length - 1]).slice(-1)[0] }
+  let fb: {
+    pitchMM: number
+    pattern: GridPattern
+    selectionFit?: BalancedGridFit
+  } = {
+    pitchMM: pitches[pitches.length - 1],
+    pattern: patFor(pitches[pitches.length - 1]).slice(-1)[0],
+  }
   let fbFlaps = Infinity
+  const finalFit = (
+    pitchMM: number,
+    pattern: GridPattern,
+    selectionFit?: BalancedGridFit,
+  ): BalancedGridFit => minN === TARGET_ANCHORS && selectionFit
+    ? selectionFit
+    : balancedPreparedFit(
+      withMargin,
+      { ...cfg, pitchMM, pattern },
+      fromMM,
+      maxGrowMM,
+      { target: opts.minN },
+    )
   for (const p of pitches) for (const pat of patFor(p)) {
     const fit = balancedPreparedFit(withMargin, { ...cfg, pitchMM: p, pattern: pat }, fromMM, maxGrowMM)
-    if (fit.grid.anchors.length >= minN && fit.grid.flaps.length === 0) return { pitchMM: p, pattern: pat }
+    if (p === fb.pitchMM && pat === fb.pattern) fb.selectionFit = fit
+    if (fit.grid.anchors.length >= minN && fit.grid.flaps.length === 0) {
+      return { pitchMM: p, pattern: pat, fit: finalFit(p, pat, fit) }
+    }
     if (fit.grid.anchors.length >= MIN_ANCHORS && fit.grid.flaps.length < fbFlaps) {
-      fb = { pitchMM: p, pattern: pat }; fbFlaps = fit.grid.flaps.length
+      fb = { pitchMM: p, pattern: pat, selectionFit: fit }; fbFlaps = fit.grid.flaps.length
     }
   }
-  return fb
+  return {
+    pitchMM: fb.pitchMM,
+    pattern: fb.pattern,
+    fit: finalFit(fb.pitchMM, fb.pattern, fb.selectionFit),
+  }
 }
 
 /** Scale a normalized contour (longest side = 1mm) to a real longest-side size in mm. */
@@ -849,14 +888,14 @@ export function scaleContour(base: Contour, longestMM: number): Contour {
 export function balancedFit(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, maxGrowMM: number,
   opts: { target?: number; step?: number } = {},
-): { sizeMM: number; grid: GridResult; grew: number } {
+): BalancedGridFit {
   return balancedPreparedFit(new PreparedContourSource(sized), cfg, fromMM, maxGrowMM, opts)
 }
 
 function balancedPreparedFit(
   sized: PreparedContourSource, cfg: GridConfig, fromMM: number, maxGrowMM: number,
   opts: { target?: number; step?: number } = {},
-): { sizeMM: number; grid: GridResult; grew: number } {
+): BalancedGridFit {
   const target = opts.target ?? TARGET_ANCHORS
   const step = opts.step ?? 3
   const start = Math.round(fromMM)
@@ -1001,13 +1040,7 @@ function resolveGridPlanWithPolicy(
     pattern: manualPattern,
     patterns: policy.autoPatterns,
   })
-  const fit = balancedPreparedFit(
-    marginVariants,
-    { ...cfg, pitchMM: selected.pitchMM, pattern: selected.pattern },
-    baseMarginMM,
-    maxGrowMM,
-    { target: opts.targetAnchors },
-  )
+  const fit = selected.fit
   return {
     designContourMM: contourMM,
     effectContourMM: marginVariants.get(fit.sizeMM).contour,
