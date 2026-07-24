@@ -1,10 +1,12 @@
 /**
  * KAI-9686 — permanent per-screen token cascade + Figma-1:1 matching page.
  * /tokens-cascade/<screenKey>/<runId> — verify a converted screen's consumed tokens against
- * Figma: cascade, Light/Dark resolved value, generated value, and a fail-visible verdict.
- * Run integrity (sealed token-surface manifest + tokens.css hash) is checked up front.
+ * the sealed Figma-source graph: full cascade (prim→alias→semantic), Light/Dark resolved
+ * value, generated value, and a fail-visible verdict. Run integrity (Figma source + tokens.css
+ * both hash-match the sealed manifest) is checked up front; an unverifiable run forces every
+ * verdict to UNVERIFIED (fail-closed).
  */
-import { buildMatch, findRun, type MatchRow } from '../../_lib/match';
+import { buildMatch, findRun, type MatchRow, type CascadeStep } from '../../_lib/match';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,7 +21,6 @@ export default async function Page({ params }: { params: Promise<{ screen: strin
     return <main style={sMain}><h1>Token cascade — run not found</h1><p>No sealed run at <code>{screen}/{run}</code>.</p></main>;
   }
   const { rows, counts, integrity } = buildMatch(rp);
-  // group by collection for the Figma-like hierarchy
   const groups = new Map<string, MatchRow[]>();
   for (const r of [...rows].sort((a, b) => order.indexOf(a.verdict) - order.indexOf(b.verdict) || a.cssVar.localeCompare(b.cssVar))) {
     const g = r.collection.replace(/^\.?\d+(?:\.\d+)?-/, '');
@@ -34,11 +35,25 @@ export default async function Page({ params }: { params: Promise<{ screen: strin
         {rp.screenCss ? ' (per-screen)' : ' (all — screen module CSS absent)'} ·{' '}
         {order.map((v) => counts[v] ? <span key={v} style={{ color: vText[v], marginRight: 12 }}>{counts[v]} {v}</span> : null)}
       </div>
-      <div style={{ fontSize: 12, marginBottom: 12, padding: '6px 10px', borderRadius: 6,
-        background: integrity.verified ? '#12251e' : '#2a2410', color: integrity.verified ? '#4ade80' : '#fbbf24' }}>
-        {integrity.verified ? '✓ run verified' : '⚠ run NOT verified'} — {integrity.reason}
-        {integrity.generatorSha ? ` · generator ${integrity.generatorSha.slice(0, 12)}` : ''}
+
+      {/* Run-integrity banner — fail-closed: an unverified run shows every verdict as UNVERIFIED. */}
+      <div style={{ fontSize: 12, marginBottom: 6, padding: '8px 10px', borderRadius: 6,
+        background: integrity.verified ? '#12251e' : '#3a1113', color: integrity.verified ? '#4ade80' : '#f87171',
+        border: `1px solid ${integrity.verified ? '#14532d' : '#7f1d1d'}` }}>
+        {integrity.verified ? '✓ run verified' : '⚠ run NOT verified — all verdicts forced UNVERIFIED (fail-closed)'} — {integrity.reason}
+        <div style={{ color: '#94a3b8', marginTop: 3, fontSize: 11 }}>
+          Figma source {integrity.sourceVerified ? '✓ hash-match' : '✗'} · tokens.css {integrity.cssVerified ? '✓ hash-match' : '✗'}
+          {integrity.generatorSha ? ` · generator ${integrity.generatorSha.slice(0, 12)}` : ''}
+          {integrity.fileVersion ? ` · figma ${String(integrity.fileVersion).slice(0, 12)}` : ''}
+        </div>
       </div>
+      {/* style.module.css is a converter output, not part of the sealed token surface, so it
+          cannot be hash-bound to the manifest — its sha is shown for change-detection. */}
+      <div style={{ fontSize: 11, color: '#64748b', marginBottom: 12 }}>
+        screen scope from <code>style.module.css</code>{' '}
+        {integrity.screenScopeSha ? <>sha <code>{integrity.screenScopeSha.slice(0, 12)}</code> (not part of the sealed surface — advisory)</> : '(absent)'}
+      </div>
+
       {[...groups.entries()].map(([g, grows]) => (
         <details key={g} open style={{ marginBottom: 8, border: '1px solid #1f2937', borderRadius: 8 }}>
           <summary style={{ padding: '6px 10px', cursor: 'pointer', color: '#cbd5e1', fontSize: 13, background: '#111827' }}>
@@ -46,11 +61,21 @@ export default async function Page({ params }: { params: Promise<{ screen: strin
           </summary>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 12 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #1f2937', color: '#64748b', textAlign: 'left' }}>
+                  <th style={thStyle}>CSS var</th>
+                  <th style={thStyle}>Cascade (prim → alias → semantic)</th>
+                  <th style={thStyle}>Figma Light</th>
+                  <th style={thStyle}>Figma Dark</th>
+                  <th style={thStyle}>Generated</th>
+                  <th style={thStyle}>Verdict</th>
+                </tr>
+              </thead>
               <tbody>
                 {grows.map((r) => (
                   <tr key={r.cssVar} style={{ borderBottom: '1px solid #111827' }}>
                     <td style={{ padding: '4px 10px', color: '#93c5fd', whiteSpace: 'nowrap' }}>{r.cssVar}</td>
-                    <td style={{ padding: '4px 10px', color: '#64748b', whiteSpace: 'nowrap' }}>{r.chain}</td>
+                    <td style={{ padding: '4px 10px' }}><Cascade steps={r.cascade} /></td>
                     <td style={{ padding: '4px 10px' }}><Swatch v={r.figmaLight} /></td>
                     <td style={{ padding: '4px 10px' }}><Swatch v={r.figmaDark} /></td>
                     <td style={{ padding: '4px 10px', color: '#e5e7eb', whiteSpace: 'nowrap' }}><Swatch v={r.generatedResolved} /></td>
@@ -69,6 +94,27 @@ export default async function Page({ params }: { params: Promise<{ screen: strin
 }
 
 const sMain: React.CSSProperties = { padding: '20px 24px', fontFamily: 'ui-monospace, SFMono-Regular, monospace', color: '#e5e7eb', background: '#0b0e14', minHeight: '100vh' };
+const thStyle: React.CSSProperties = { padding: '4px 10px', fontWeight: 600, whiteSpace: 'nowrap' };
+
+/** Full prim→alias→semantic cascade as chips with arrows; alias hops labelled by their ref. */
+function Cascade({ steps }: { steps: CascadeStep[] }) {
+  if (!steps.length) return <span style={{ color: '#64748b' }}>—</span>;
+  return (
+    <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: 4 }}>
+      {steps.map((s, i) => (
+        <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <span style={{
+            background: s.isAlias ? '#1e293b' : '#0f2a1e', color: s.isAlias ? '#cbd5e1' : '#86efac',
+            padding: '1px 6px', borderRadius: 4, fontSize: 11, whiteSpace: 'nowrap',
+          }} title={s.isAlias ? `${s.collection}/${s.path} → ${s.raw}` : `${s.collection}/${s.path} = ${s.raw}`}>
+            <span style={{ color: '#64748b' }}>{s.collection}/</span>{s.path}{!s.isAlias && <span style={{ color: '#64748b' }}> ={s.raw}</span>}
+          </span>
+          {i < steps.length - 1 && <span style={{ color: '#475569' }}>→</span>}
+        </span>
+      ))}
+    </span>
+  );
+}
 
 function Swatch({ v }: { v: string }) {
   const isColor = /^#|^oklch\(|^rgb/.test(v);

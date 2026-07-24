@@ -1,9 +1,12 @@
 /**
  * KAI-9686 — per-screen token cascade + Figma-1:1 matching model.
  * Reads a converted run's sealed surface (Figma source + generated CSS + the run manifest),
- * verifies run integrity, filters to the tokens THIS screen actually consumes, resolves each
- * token's Figma cascade (Light + Dark) and its generated value, and produces a fail-visible
- * MATCH / DIFF / DERIVED / UNVERIFIED verdict. Read-only display half of the SSOT VariablesPanel.
+ * verifies run integrity (BOTH the Figma-source oracle AND the generated CSS hash-match the
+ * sealed manifest, plus manifest fileKey/fileVersion identity), filters to the tokens THIS
+ * screen actually consumes, resolves each token's full Figma cascade (prim→alias→semantic,
+ * Light + Dark) and its generated value, and produces a fail-visible verdict. When the run
+ * cannot be verified, every verdict is forced UNVERIFIED (fail-closed) — a run we can't trust
+ * never shows a green MATCH. Read-only display half of the SSOT VariablesPanel.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -24,11 +27,20 @@ function colorEq(a: string, b: string): boolean {
   return near(x.l, y.l) && near(x.c, y.c) && hueOk && near(x.alpha ?? 1, y.alpha ?? 1);
 }
 
-/** Generated dimensional value → px (unit-aware). rem×16; px as-is; bare number = unitless (ratio). */
-function toPx(gen: string): { px: number; unitless: boolean } | null {
-  let m = /^(-?[0-9.]+)px$/.exec(gen); if (m) return { px: parseFloat(m[1]), unitless: false };
-  m = /^(-?[0-9.]+)rem$/.exec(gen); if (m) return { px: parseFloat(m[1]) * 16, unitless: false };
-  m = /^(-?[0-9.]+)$/.exec(gen); if (m) return { px: parseFloat(m[1]), unitless: true };
+type Unit = 'px' | 'unitless' | 'percent' | 'ms';
+/**
+ * Generated dimensional/number value → a domain-tagged comparable number.
+ * rem×16 → px; s×1000 → ms; px/%/ms/bare parsed as-is. The UNIT carries the domain so a
+ * wrong-unit corruption (Figma 10px vs generated 10rem = 160px) can't false-MATCH, and the
+ * %/ms domains (percentages, durations) are covered — not just px/rem/bare.
+ */
+export function toComparable(gen: string): { n: number; unit: Unit } | null {
+  let m = /^(-?[0-9.]+)px$/.exec(gen); if (m) return { n: parseFloat(m[1]), unit: 'px' };
+  m = /^(-?[0-9.]+)rem$/.exec(gen); if (m) return { n: parseFloat(m[1]) * 16, unit: 'px' };
+  m = /^(-?[0-9.]+)%$/.exec(gen); if (m) return { n: parseFloat(m[1]), unit: 'percent' };
+  m = /^(-?[0-9.]+)ms$/.exec(gen); if (m) return { n: parseFloat(m[1]), unit: 'ms' };
+  m = /^(-?[0-9.]+)s$/.exec(gen); if (m) return { n: parseFloat(m[1]) * 1000, unit: 'ms' };
+  m = /^(-?[0-9.]+)$/.exec(gen); if (m) return { n: parseFloat(m[1]), unit: 'unitless' };
   return null;
 }
 
@@ -42,19 +54,23 @@ export function compareOne(figma: string, gen: string, type: string): Verdict {
   if (type === 'color' || /^#|^oklch\(|^rgb/.test(figma)) return colorEq(figma, gen) ? 'MATCH' : 'DIFF';
   if (type === 'float') {
     const fn = parseFloat(figma);
-    const g = toPx(gen);
-    if (g === null || !Number.isFinite(fn)) return 'DIFF';
-    // Figma stores a bare number: px for dimensions, the raw factor for unitless (ratio/opacity).
-    // A wrong UNIT (Figma 10px → generated 10rem = 160px) is now a DIFF, not a false MATCH.
-    return Math.abs(fn - g.px) < 0.01 ? 'MATCH' : 'DIFF';
+    const c = toComparable(gen);
+    if (c === null || !Number.isFinite(fn)) return 'DIFF';
+    // Figma stores a bare number; the generated UNIT names the domain (px for dimensions,
+    // % for percentages, ms for durations, unitless for ratios/opacity). A wrong unit
+    // (Figma 10px → generated 10rem = 160px) is a DIFF, not a false MATCH.
+    return Math.abs(fn - c.n) < 0.01 ? 'MATCH' : 'DIFF';
   }
   return String(figma).trim() === String(gen).trim() ? 'MATCH' : 'DIFF'; // strings, exact
 }
 
+/** One hop of the resolved Figma cascade (prim→alias→semantic), for display. */
+export type CascadeStep = { collection: string; path: string; isAlias: boolean; raw: string };
+
 export type MatchRow = {
   collection: string; name: string; cssVar: string; type: string;
   figmaLight: string; figmaDark: string; generated: string; generatedResolved: string;
-  chain: string; verdict: Verdict; consumed: boolean;
+  cascade: CascadeStep[]; verdict: Verdict; consumed: boolean;
 };
 
 function cssCategory(collectionName: string): string {
@@ -64,6 +80,7 @@ function kebab(v: string): string { return String(v).replace(/[^a-zA-Z0-9]+/g, '
 function cssVarOf(collectionName: string, tokenPath: string[]): string {
   return `--${[cssCategory(collectionName), ...tokenPath.map(kebab)].join('-')}`;
 }
+function shortColl(name: string): string { return String(name).replace(/^\.?\d+(?:\.\d+)?-/, ''); }
 function parseVars(css: string, selector: string): Map<string, string> {
   const m = new RegExp(selector.replace(/[.[\]="]/g, '\\$&') + '\\s*\\{([\\s\\S]*?)\\}').exec(css);
   const out = new Map<string, string>();
@@ -96,22 +113,53 @@ export function consumedVars(screenCss: string, rootVars: Map<string, string>): 
 }
 
 export type RunPaths = { root: string; source: string; css: string; manifest: string | null; screenCss: string | null; screen: string; run: string };
-export type RunIntegrity = { verified: boolean; reason: string; tokenCount?: number; generatorSha?: string };
+export type RunIntegrity = {
+  verified: boolean; reason: string;
+  generatorSha?: string; fileKey?: string; fileVersion?: string;
+  sourceVerified?: boolean; cssVerified?: boolean; screenScopeSha?: string;
+};
 
-/** Verify the run is a genuine sealed surface: token-surface manifest present, and the
- *  tokens.css bytes hash to the manifest's recorded artifact hash. Fail-closed otherwise. */
+function sha256File(p: string): string { return createHash('sha256').update(fs.readFileSync(p)).digest('hex'); }
+
+/**
+ * Verify the run is a genuine sealed surface. Re-hashes BOTH oracle sides, not just one:
+ *  - the Figma-source graph (`_inputs/variables-source.json`) that the generator consumed —
+ *    so a tampered source (the value the page grades AGAINST) is caught;
+ *  - the generated `tokens.css` — so a tampered output is caught.
+ * Both must equal the sealed manifest hashes, and the manifest must carry a source identity
+ * (fileKey/fileVersion). Fail-closed on any mismatch or missing piece.
+ */
 export function verifyRun(rp: RunPaths): RunIntegrity {
   if (!rp.manifest || !fs.existsSync(rp.manifest)) return { verified: false, reason: 'no token-surface manifest — cannot verify run integrity' };
+  const screenScopeSha = rp.screenCss && fs.existsSync(rp.screenCss) ? sha256File(rp.screenCss) : undefined;
   try {
     const man = JSON.parse(fs.readFileSync(rp.manifest, 'utf8'));
+    // 1) Figma-source oracle — the graph the page grades against.
+    const src = man.source as { sha256?: string; fileKey?: string; fileVersion?: string } | undefined;
+    if (!src?.sha256) return { verified: false, reason: 'manifest records no Figma-source hash', screenScopeSha };
+    if (!fs.existsSync(rp.source)) return { verified: false, reason: 'Figma-source file missing from run', screenScopeSha };
+    const srcActual = sha256File(rp.source);
+    if (srcActual !== src.sha256) {
+      return { verified: false, reason: `Figma source hash ${srcActual.slice(0, 12)} != manifest ${String(src.sha256).slice(0, 12)}`, sourceVerified: false, screenScopeSha };
+    }
+    // 2) Generated tokens.css.
     const artifacts: Array<{ role?: string; relativePath?: string; sha256?: string }> = man.artifacts ?? [];
     const cssArt = artifacts.find((a) => /tokens\.css$/.test(a.relativePath ?? '') || a.role === 'css');
-    if (!cssArt?.sha256) return { verified: false, reason: 'manifest has no tokens.css artifact hash' };
-    const actual = createHash('sha256').update(fs.readFileSync(rp.css)).digest('hex');
-    if (actual !== cssArt.sha256) return { verified: false, reason: `tokens.css hash ${actual.slice(0, 12)} != manifest ${cssArt.sha256.slice(0, 12)}` };
-    return { verified: true, reason: 'run verified against sealed token-surface manifest', generatorSha: man.generator?.gitSha };
+    if (!cssArt?.sha256) return { verified: false, reason: 'manifest has no tokens.css artifact hash', sourceVerified: true, screenScopeSha };
+    const cssActual = sha256File(rp.css);
+    if (cssActual !== cssArt.sha256) {
+      return { verified: false, reason: `tokens.css hash ${cssActual.slice(0, 12)} != manifest ${String(cssArt.sha256).slice(0, 12)}`, sourceVerified: true, cssVerified: false, screenScopeSha };
+    }
+    // 3) Manifest identity present.
+    if (!src.fileKey || !src.fileVersion) return { verified: false, reason: 'manifest source lacks fileKey/fileVersion identity', sourceVerified: true, cssVerified: true, screenScopeSha };
+    return {
+      verified: true,
+      reason: 'run verified — Figma source + tokens.css hash-match the sealed manifest',
+      generatorSha: man.generator?.gitSha, fileKey: src.fileKey, fileVersion: src.fileVersion,
+      sourceVerified: true, cssVerified: true, screenScopeSha,
+    };
   } catch (e) {
-    return { verified: false, reason: `manifest unreadable: ${(e as Error).message}` };
+    return { verified: false, reason: `manifest unreadable: ${(e as Error).message}`, screenScopeSha };
   }
 }
 
@@ -125,7 +173,10 @@ export function buildMatch(rp: RunPaths): { rows: MatchRow[]; counts: Record<str
   const darkResolveVars = new Map(rootVars);
   for (const [k, v] of darkVars) darkResolveVars.set(k, v);
   const screenCss = rp.screenCss && fs.existsSync(rp.screenCss) ? fs.readFileSync(rp.screenCss, 'utf8') : '';
-  const consumed = screenCss ? consumedVars(screenCss, rootVars) : null;
+  // per-screen closure over BOTH modes (dark can alias differently; union is complete).
+  const consumed = screenCss
+    ? new Set<string>([...consumedVars(screenCss, rootVars), ...consumedVars(screenCss, darkResolveVars)])
+    : null;
 
   const rows: MatchRow[] = [];
   for (const coll of collections) {
@@ -136,11 +187,13 @@ export function buildMatch(rp: RunPaths): { rows: MatchRow[]; counts: Record<str
       const dark = resolveChain(collections, coll.name, 'Dark', r.path);
       const figLight = light.resolved == null ? '(unresolved)' : String(light.resolved);
       const figDark = dark.resolved == null ? '(unresolved)' : String(dark.resolved);
-      const chain = light.steps.map((s) => s.collection.replace(/^\.?\d+(?:\.\d+)?-/, '')).filter((v, i, a) => a.indexOf(v) === i).join(' ← ');
+      // full cascade: every hop prim→alias→semantic, with its ref, for display.
+      const cascade: CascadeStep[] = light.steps.map((s) => ({
+        collection: shortColl(s.collection), path: s.path, isAlias: s.isAlias, raw: String(s.rawValue),
+      }));
       const genRaw = rootVars.get(cssVar);
       let verdict: Verdict; let genLight: string; let genDark: string;
       if (genRaw === undefined) {
-        // Source token with NO emitted CSS var — a dropped/missing token. Fail-visible, never skipped.
         verdict = 'UNVERIFIED'; genLight = '(missing)'; genDark = '(missing)';
       } else {
         genLight = resolveCssVar(cssVar, rootVars);
@@ -151,16 +204,17 @@ export function buildMatch(rp: RunPaths): { rows: MatchRow[]; counts: Record<str
           : (vL === 'DIFF' || vD === 'DIFF') ? 'DIFF'
           : (vL === 'DERIVED' || vD === 'DERIVED') ? 'DERIVED' : 'MATCH';
       }
+      // FAIL-CLOSED: a run we cannot verify has no trustworthy verdicts — never a green MATCH.
+      if (!integrity.verified) verdict = 'UNVERIFIED';
       const isConsumed = consumed ? consumed.has(cssVar) : true;
       rows.push({
         collection: coll.name, name: r.path.join('/'), cssVar, type: r.type,
         figmaLight: figLight, figmaDark: figDark, generated: genRaw ?? '(missing)',
         generatedResolved: genLight === genDark ? genLight : `${genLight} / ${genDark}`,
-        chain, verdict, consumed: isConsumed,
+        cascade, verdict, consumed: isConsumed,
       });
     }
   }
-  // per-screen: when the screen's module CSS is available, show only the consumed closure.
   const visible = consumed ? rows.filter((r) => r.consumed) : rows;
   const counts = visible.reduce((a, r) => { a[r.verdict] = (a[r.verdict] || 0) + 1; return a; }, {} as Record<string, number>);
   return { rows: visible, counts, integrity, consumedCount: consumed ? consumed.size : rows.length };
