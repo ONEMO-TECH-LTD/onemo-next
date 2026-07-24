@@ -32,8 +32,9 @@ const chans = (h: string): number[] => [1, 3, 5, 7].map((i) => parseInt(h.slice(
  *   DIFF    = a channel off by ≥2/255 (a real colour error).
  *
  * ORACLE (named precisely): this is culori's canonical sRGB8 serialization — it is NOT
- * "rendered browser pixels" (Chrome's raster differs; e.g. it maps both culori's `#…e6` and
- * source `#…e5` alpha to the same RGBA byte). It is also a DIFFERENT method from the generator
+ * "rendered browser pixels" (e.g. Chrome rasterizes the original CSS `oklch(0% 0 0 / 90%)` and
+ * source `#000000e5` identically to RGBA [0,0,0,229], while culori serialises that same oklch
+ * as `#000000e6`). It is also a DIFFERENT method from the generator
  * audit's manual oklch→RGB (verify-token-surface.mjs `colorEqual`, ±2 tolerance): on the full
  * graph the two disagree BIDIRECTIONALLY — 37 audit-BOUNDED rows are MATCH here (culori
  * serialises them identically) and 25 audit-MATCH rows are BOUNDED here (culori serialises them
