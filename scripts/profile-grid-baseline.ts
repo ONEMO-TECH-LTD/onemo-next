@@ -8,7 +8,7 @@ import {
 } from '../src/lib/effect/grid-s0-corpus'
 import { resolveUserLadderRecipe, resolveUserPlanRecipe } from '../src/lib/effect/grid-user'
 
-type ProfileName = 'canonical-ladder' | 'dense-live-plan'
+type ProfileName = 'canonical-ladder' | 'dense-live-plan' | 'small-contour-plan'
 
 function percentile(values: number[], fraction: number): number {
   const sorted = [...values].sort((a, b) => a - b)
@@ -23,6 +23,22 @@ function measuredProfile(name: ProfileName) {
         recipe: { kind: 'standard', shape: 'circle' },
       },
       run: () => resolveUserLadderRecipe({ kind: 'standard', shape: 'circle' }),
+    } as const
+  }
+  if (name === 'small-contour-plan') {
+    return {
+      fixture: {
+        operation: 'plan',
+        sourceKind: 'standard',
+        shape: 'square',
+        widthMM: 70,
+        heightMM: 70,
+        attachment: 'magnetic',
+      },
+      run: () => resolveUserPlanRecipe(
+        { kind: 'standard', shape: 'square', widthMM: 70, heightMM: 70 },
+        'magnetic',
+      ),
     } as const
   }
   return {
@@ -43,8 +59,8 @@ function measuredProfile(name: ProfileName) {
 }
 
 const requested = process.argv[2]
-if (requested !== 'canonical-ladder' && requested !== 'dense-live-plan') {
-  throw new Error('Usage: npm run grid:profile -- canonical-ladder|dense-live-plan')
+if (requested !== 'canonical-ladder' && requested !== 'dense-live-plan' && requested !== 'small-contour-plan') {
+  throw new Error('Usage: npm run grid:profile -- canonical-ladder|dense-live-plan|small-contour-plan')
 }
 
 const profile = measuredProfile(requested)

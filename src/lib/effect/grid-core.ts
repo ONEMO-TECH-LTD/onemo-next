@@ -14,6 +14,12 @@
 import type { Contour, Pt } from './types'
 import { pointInContour } from './polygon'
 import { insetRingMM } from './offset'
+import {
+  PreparedContourSource,
+  prepareExactContour,
+  type GridBBox as BBox,
+  type PreparedContour,
+} from './grid-prepared'
 
 /** THE 48/68 SYSTEM (§13.5d, locked): one lattice, two atoms — straight 48, diagonal 68 (=48√2).
  *  'standard' = straight rows only · 'diamond' = diagonal (68) links only · 'quincunx' (dice) = the
@@ -91,13 +97,17 @@ export interface GridResult {
   applicationPadMM: number
 }
 
-type BBox = { minX: number; minY: number; maxX: number; maxY: number }
-function bbox(pts: ReadonlyArray<Pt>): BBox {
+function dist(a: Pt, b: Pt) { return Math.hypot(a[0] - b[0], a[1] - b[1]) }
+function bboxPoints(pts: ReadonlyArray<Pt>): BBox {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-  for (const [x, y] of pts) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y }
+  for (const [x, y] of pts) {
+    if (x < minX) minX = x
+    if (x > maxX) maxX = x
+    if (y < minY) minY = y
+    if (y > maxY) maxY = y
+  }
   return { minX, minY, maxX, maxY }
 }
-function dist(a: Pt, b: Pt) { return Math.hypot(a[0] - b[0], a[1] - b[1]) }
 
 /** Shortest distance from point `p` to segment a–b. */
 function distToSeg(p: Pt, a: Pt, b: Pt): number {
@@ -126,7 +136,8 @@ function distToContour(p: Pt, contour: Contour): number {
 
 /** The most-interior point of the silhouette (pole of inaccessibility, sampled) + its distance to the edge.
  *  Used as the guaranteed single-magnet fallback when the sparse grid seats none. */
-function deepestPoint(contour: Contour, bb: BBox): { p: Pt; d: number } | null {
+function deepestPoint(prepared: PreparedContour, bb: BBox): { p: Pt; d: number } | null {
+  const contour = prepared.contour
   const step = Math.max(2, Math.min(bb.maxX - bb.minX, bb.maxY - bb.minY) / 24)
   let best: Pt | null = null, bestD = -1
   for (let x = bb.minX; x <= bb.maxX; x += step) for (let y = bb.minY; y <= bb.maxY; y += step) {
@@ -136,40 +147,6 @@ function deepestPoint(contour: Contour, bb: BBox): { p: Pt; d: number } | null {
     if (d > bestD) { bestD = d; best = p }
   }
   return best ? { p: best, d: bestD } : null
-}
-
-/** Area centroid of a polygon ring (balances material). Falls back to bbox centre if degenerate. */
-function polyCentroid(ring: ReadonlyArray<Pt>): Pt {
-  let a = 0, cx = 0, cy = 0
-  for (let i = 0, n = ring.length; i < n; i++) {
-    const [x0, y0] = ring[i], [x1, y1] = ring[(i + 1) % n]
-    const cross = x0 * y1 - x1 * y0
-    a += cross; cx += (x0 + x1) * cross; cy += (y0 + y1) * cross
-  }
-  a *= 0.5
-  if (Math.abs(a) < 1e-6) { const b = bbox(ring); return [(b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2] }
-  return [cx / (6 * a), cy / (6 * a)]
-}
-
-function ringArea(ring: ReadonlyArray<Pt>): number {
-  let twice = 0
-  for (let i = 0; i < ring.length; i++) {
-    const [x0, y0] = ring[i], [x1, y1] = ring[(i + 1) % ring.length]
-    twice += x0 * y1 - x1 * y0
-  }
-  return Math.abs(twice / 2)
-}
-
-/** Material centroid: hole area is removed regardless of ring winding. */
-function contourCentroid(contour: Contour): Pt {
-  const outerC = polyCentroid(contour.outer.pts)
-  const outerA = ringArea(contour.outer.pts)
-  let area = outerA, x = outerC[0] * outerA, y = outerC[1] * outerA
-  for (const hole of contour.holes) {
-    const holeA = ringArea(hole.pts), holeC = polyCentroid(hole.pts)
-    area -= holeA; x -= holeC[0] * holeA; y -= holeC[1] * holeA
-  }
-  return area > 1e-6 ? [x / area, y / area] : outerC
 }
 
 /** Node positions along an axis at fixed `step` with a phase offset, spanning [min, max]. */
@@ -288,13 +265,14 @@ function flapRegions(contour: Contour, seated: ReadonlyArray<Pt>, reach: number)
 /** Region-local off-lattice fallback. Among safe, spacing-valid material points that improve this flap,
  *  prefer the point covering most samples, then the deepest point in material. */
 function deepestSafePointForRegion(
-  contour: Contour,
+  prepared: PreparedContour,
   region: ReadonlyArray<Pt>,
   pad: number,
   seated: ReadonlyArray<Pt>,
 ): Pt | null {
+  const contour = prepared.contour
   if (!region.length) return null
-  const rb = bbox(region)
+  const rb = bboxPoints(region)
   const minX = rb.minX - pad, maxX = rb.maxX + pad
   const minY = rb.minY - pad, maxY = rb.maxY + pad
   const step = Math.max(1, Math.min(maxX - minX, maxY - minY) / 24)
@@ -364,6 +342,11 @@ function assignSizes(seated: Pt[], plan: MagnetPlan, effectSizeMM: number): Anch
  * fully-surrounded interior nodes (a magnetic belt). Each magnet keeps its application ring on material.
  */
 export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResult {
+  return computePreparedGrid(prepareExactContour(contourMM), cfg)
+}
+
+export function computePreparedGrid(prepared: PreparedContour, cfg: GridConfig = {}): GridResult {
+  const contourMM = prepared.contour
   const attachment: Attachment = cfg.attachment ?? 'magnetic'
   // VELCRO LAW: no grid exists — the back is a full velcro hook in the silhouette. Any shape, any
   // size; nothing to seat, nothing to cover. (Engine-owned: ladders, auto and UI all inherit.)
@@ -390,7 +373,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const perimeterOnly = pattern === 'quincunx' ? false : (cfg.perimeterOnly ?? true)
   const centerMode = cfg.center ?? 'centroid'
   const outer = contourMM.outer.pts
-  const bb = bbox(outer)
+  const bb = prepared.bbox
   const issues: string[] = []
 
   // A node is VALID = inside the silhouette AND its application zone is present. Per node against the
@@ -503,7 +486,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
           remaining = remaining.filter((p) => dist(p, rescue) > HOLD_REACH_MM)
         }
         if (remaining.length) {
-          const rescue = deepestSafePointForRegion(contourMM, remaining, pad, seated)
+          const rescue = deepestSafePointForRegion(prepared, remaining, pad, seated)
           if (rescue) { seated.push(rescue); rescues.push(rescue) }
           // No safe improving point is an honest residual flap; the final verdict stays red.
         }
@@ -525,7 +508,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   {
     const c: Pt = centerMode === 'bbox'
       ? [(bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2]
-      : contourCentroid(contourMM)
+      : prepared.centroid
     const ox0 = (((c[0] - bb.minX) % pitch) + pitch) % pitch
     const oy0 = (((c[1] - bb.minY) % pitch) + pitch) % pitch
     const h = pitch / 2
@@ -569,7 +552,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   // GUARANTEE ≥1: if the sparse grid seated nothing but the shape can still hold a magnet, drop one at the
   // deepest interior point (a single magnet has no spacing to honour, so grid phase is moot here).
   if (seated.length === 0) {
-    const dp = deepestPoint(contourMM, bb)
+    const dp = deepestPoint(prepared, bb)
     if (dp && dp.d >= pad) { seated = [dp.p]; interior = []; if (cfg.rescueCoverage) rescues = [dp.p] }
   }
   const anchors = assignSizes(seated, plan, Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY))
@@ -762,25 +745,27 @@ function semanticSteps(
     for (let s = Math.ceil(2 * padEff); s <= law.maxRungMM; s += banded ? 2 : 1) {
       let best = 0, bestTotal = s
       const bestPatterns = new Set<GridPattern>()
+      const design = makeShape(s)
+      const preparedDesign = banded ? null : prepareExactContour(design)
+      const marginVariants = banded
+        ? new PreparedContourSource((marginMM) => contourWithOuterMargin(design, marginMM))
+        : null
       for (const cb of combos) {
         const cfg: GridConfig = { pitchMM: cb.pitchMM, pattern: cb.pattern, paddingMM: padEff, perimeterOnly: cb.pattern === 'standard', strictPad: true }
         if (!banded) {
-          const g = computeGrid(makeShape(s), cfg)
+          const g = computePreparedGrid(preparedDesign!, cfg)
           if (g.flaps.length) continue
           if (g.anchors.length > best) {
             best = g.anchors.length; bestPatterns.clear(); bestPatterns.add(cb.pattern)
           } else if (g.anchors.length === best && best > 0) bestPatterns.add(cb.pattern)
         } else {
-          const design = makeShape(s)
-          const w = (m: number): Contour => contourWithOuterMargin(design, m)
-          const fit = balancedFit(w, cfg, 0, DEFAULT_MARGIN_MM)
+          const fit = balancedPreparedFit(marginVariants!, cfg, 0, DEFAULT_MARGIN_MM)
           if (fit.grid.flaps.length) continue
           if (fit.grid.anchors.length > best) {
             best = fit.grid.anchors.length
             bestPatterns.clear(); bestPatterns.add(cb.pattern)
-            const eff = w(fit.sizeMM)
-            const bb = eff.outer.pts.reduce((a, [x, y]) => [Math.min(a[0], x), Math.min(a[1], y), Math.max(a[2], x), Math.max(a[3], y)], [Infinity, Infinity, -Infinity, -Infinity])
-            bestTotal = Math.round(Math.max(bb[2] - bb[0], bb[3] - bb[1]))
+            const bb = marginVariants!.get(fit.sizeMM).bbox
+            bestTotal = Math.round(Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY))
           } else if (fit.grid.anchors.length === best && best > 0) bestPatterns.add(cb.pattern)
         }
       }
@@ -844,6 +829,13 @@ export function autoGrid(
   withMargin: (m: number) => Contour, cfg: GridConfig, fromMM: number, maxGrowMM: number,
   opts: { minN?: number; density?: GridDensity; pitchMM?: number; pattern?: GridPattern; patterns?: ReadonlyArray<GridPattern> } = {},
 ): { pitchMM: number; pattern: GridPattern } {
+  return autoPreparedGrid(new PreparedContourSource(withMargin), cfg, fromMM, maxGrowMM, opts)
+}
+
+function autoPreparedGrid(
+  withMargin: PreparedContourSource, cfg: GridConfig, fromMM: number, maxGrowMM: number,
+  opts: { minN?: number; density?: GridDensity; pitchMM?: number; pattern?: GridPattern; patterns?: ReadonlyArray<GridPattern> } = {},
+): { pitchMM: number; pattern: GridPattern } {
   const minN = opts.minN ?? TARGET_ANCHORS
   let pitches = opts.pitchMM != null ? [opts.pitchMM] : allowedPitches(opts.density ?? 'light')
   // a pinned pattern restricts the pitch search to its legal pitches (dice → 96 only)
@@ -857,7 +849,7 @@ export function autoGrid(
   let fb = { pitchMM: pitches[pitches.length - 1], pattern: patFor(pitches[pitches.length - 1]).slice(-1)[0] }
   let fbFlaps = Infinity
   for (const p of pitches) for (const pat of patFor(p)) {
-    const fit = balancedFit(withMargin, { ...cfg, pitchMM: p, pattern: pat }, fromMM, maxGrowMM)
+    const fit = balancedPreparedFit(withMargin, { ...cfg, pitchMM: p, pattern: pat }, fromMM, maxGrowMM)
     if (fit.grid.anchors.length >= minN && fit.grid.flaps.length === 0) return { pitchMM: p, pattern: pat }
     if (fit.grid.anchors.length >= MIN_ANCHORS && fit.grid.flaps.length < fbFlaps) {
       fb = { pitchMM: p, pattern: pat }; fbFlaps = fit.grid.flaps.length
@@ -884,6 +876,13 @@ export function balancedFit(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, maxGrowMM: number,
   opts: { target?: number; step?: number } = {},
 ): { sizeMM: number; grid: GridResult; grew: number } {
+  return balancedPreparedFit(new PreparedContourSource(sized), cfg, fromMM, maxGrowMM, opts)
+}
+
+function balancedPreparedFit(
+  sized: PreparedContourSource, cfg: GridConfig, fromMM: number, maxGrowMM: number,
+  opts: { target?: number; step?: number } = {},
+): { sizeMM: number; grid: GridResult; grew: number } {
   const target = opts.target ?? TARGET_ANCHORS
   const step = opts.step ?? 3
   const start = Math.round(fromMM)
@@ -891,7 +890,7 @@ export function balancedFit(
   let best: { sizeMM: number; grid: GridResult } | null = null
   let bestRank = Infinity
   for (let mm = start; mm <= end; mm += step) {
-    const grid = computeGrid(sized(mm), cfg)
+    const grid = computePreparedGrid(sized.get(mm), cfg)
     // perfect = fully covered AND ≥ target magnets → take the first (smallest) such size immediately
     if (grid.flaps.length === 0 && grid.anchors.length >= target) return { sizeMM: mm, grid, grew: mm - start }
     // otherwise rank: fewer uncovered points first, then more magnets (negated), then smaller size
@@ -899,7 +898,7 @@ export function balancedFit(
     if (rank < bestRank) { bestRank = rank; best = { sizeMM: mm, grid } }
   }
   if (best) return { ...best, grew: best.sizeMM - start }
-  const grid = computeGrid(sized(start), cfg)
+  const grid = computePreparedGrid(sized.get(start), cfg)
   return { sizeMM: start, grid, grew: 0 }
 }
 
@@ -990,7 +989,9 @@ function resolveGridPlanWithPolicy(
     ? requestedBaseMarginMM
     : Math.max(0, requestedBaseMarginMM)
   const maxGrowMM = opts.maxGrowMM ?? DEFAULT_MARGIN_MM
-  const withMargin = (marginMM: number) => contourWithOuterMargin(contourMM, marginMM)
+  const marginVariants = new PreparedContourSource(
+    (marginMM) => contourWithOuterMargin(contourMM, marginMM),
+  )
   const manualPattern = mode === 'auto' ? undefined : mode
   const patternForCoverage = manualPattern ?? 'standard'
   const cfg: GridConfig = {
@@ -1004,10 +1005,11 @@ function resolveGridPlanWithPolicy(
   }
 
   if (attachment === 'velcro' && !policy.diagnosticVelcro) {
-    const grid = computeGrid(withMargin(baseMarginMM), { ...cfg, attachment })
+    const effectContour = marginVariants.get(baseMarginMM)
+    const grid = computePreparedGrid(effectContour, { ...cfg, attachment })
     return {
       designContourMM: contourMM,
-      effectContourMM: withMargin(baseMarginMM),
+      effectContourMM: effectContour.contour,
       grid,
       pitchMM: 0,
       pattern: null,
@@ -1018,15 +1020,15 @@ function resolveGridPlanWithPolicy(
     }
   }
 
-  const selected = autoGrid(withMargin, cfg, baseMarginMM, maxGrowMM, {
+  const selected = autoPreparedGrid(marginVariants, cfg, baseMarginMM, maxGrowMM, {
     minN: opts.targetAnchors,
     density,
     pitchMM: opts.pitchMM,
     pattern: manualPattern,
     patterns: policy.autoPatterns,
   })
-  const fit = balancedFit(
-    withMargin,
+  const fit = balancedPreparedFit(
+    marginVariants,
     { ...cfg, pitchMM: selected.pitchMM, pattern: selected.pattern },
     baseMarginMM,
     maxGrowMM,
@@ -1034,7 +1036,7 @@ function resolveGridPlanWithPolicy(
   )
   return {
     designContourMM: contourMM,
-    effectContourMM: withMargin(fit.sizeMM),
+    effectContourMM: marginVariants.get(fit.sizeMM).contour,
     grid: fit.grid,
     pitchMM: selected.pitchMM,
     pattern: selected.pattern,
