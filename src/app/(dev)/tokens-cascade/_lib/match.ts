@@ -94,8 +94,9 @@ export function compareOne(figma: string, gen: string, type: string, exp: Unit |
     // Domain-pin from the Figma scope contract: a LETTER_SPACING/dimension token emitted as
     // `%`/`ms`, or an OPACITY token emitted with a dimension unit, is a DIFF even at equal
     // magnitude (`50` vs `50ms`, `200` vs `200%`). rem is normalised to the px domain.
-    // Zero is domain-agnostic (`0` == `0px` == `0%`), so it never trips the domain-pin.
-    if (exp && c.unit !== exp && c.n !== 0) return 'DIFF';
+    // Only a BARE unitless zero is domain-agnostic (`0` == `0px`); an explicit wrong-domain
+    // zero (`0ms` for a px token) is still a DIFF — 0px/0ms/0% are not interchangeable.
+    if (exp && c.unit !== exp && !(c.n === 0 && c.unit === 'unitless')) return 'DIFF';
     return Math.abs(fn - c.n) < 0.01 ? 'MATCH' : 'DIFF';
   }
   return String(figma).trim() === String(gen).trim() ? 'MATCH' : 'DIFF'; // strings, exact

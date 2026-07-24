@@ -73,9 +73,11 @@ describe('domain-pin from the Figma scope contract (KAI-9686 rework #2)', () => 
   it('no scope contract → magnitude only (page always supplies the scope)', () => {
     expect(compareOne('50', '50ms', 'float')).toBe('MATCH');
   });
-  it('zero is domain-agnostic — bare 0 for a px token is MATCH, not a false DIFF', () => {
-    expect(compareOne('0', '0', 'float', 'px')).toBe('MATCH');
-    expect(compareOne('0', '0px', 'float', 'px')).toBe('MATCH');
+  it('only BARE unitless zero is domain-agnostic; explicit wrong-domain zero is DIFF', () => {
+    expect(compareOne('0', '0', 'float', 'px')).toBe('MATCH');    // bare 0 == 0px
+    expect(compareOne('0', '0px', 'float', 'px')).toBe('MATCH');  // matching domain
+    expect(compareOne('0', '0ms', 'float', 'px')).toBe('DIFF');   // 0ms is not 0px
+    expect(compareOne('0', '0%', 'float', 'px')).toBe('DIFF');    // 0% is not 0px
   });
   it('collection fallback pins UNSCOPED tokens by DS convention', () => {
     expect(expectedUnit(['(none)'], 'Prim-Dim')).toBe('px');
