@@ -18,17 +18,6 @@ export {
 }
 export type { UserGridJob, UserGridJobResult, UserStandardShape } from '@/lib/effect/grid-user'
 
-export const USER_DOOR_IGNORED_CONTROLS = [
-  'Max auto-margin',
-  'Density',
-  'Grid pitch',
-  'Magnet padding',
-  'Base margin',
-  'Grid pattern',
-  'Grid centering',
-  'Magnet plan',
-] as const
-
 export function nearestUserWorkbenchRung(
   rungs: ReadonlyArray<SemanticRung>,
   targetMM: number,

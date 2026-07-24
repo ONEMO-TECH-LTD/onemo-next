@@ -31,7 +31,6 @@ import {
   prewarmUserCanonicalShapes,
   requestUserGridJob,
   userGridJobKey,
-  USER_DOOR_IGNORED_CONTROLS,
   type UserGridJob,
   type UserGridJobResult,
   type UserStandardShape,
@@ -432,14 +431,6 @@ export default function GridLab() {
             </div>
           )}
 
-          {panelEntry === 'user' && (
-            <div className="gl-card gl-mismatch" role="note" aria-label="User door clone-gate mismatch">
-              <b>User clone gate · factual mismatch log</b>
-              <span>Present in the full clone but not forwarded to the User grid door:</span>
-              <span>{USER_DOOR_IGNORED_CONTROLS.join(' · ')}</span>
-            </div>
-          )}
-
           {panelEntry === 'admin'
             ? <div className="gl-panel-stack" data-workbench-panel="admin"><GridWorkbenchPanel {...panelProps} /></div>
             : <GridWorkbenchUserPanel {...panelProps} />}
@@ -487,10 +478,7 @@ const CSS = `
 .gl-controls{display:flex;flex-direction:column;gap:16px}
 .gl-panel-stack{display:flex;flex-direction:column;gap:16px}
 .gl-entry-switch{padding:12px;display:flex;flex-direction:column;gap:8px}
-.gl-resolving{padding:11px 13px;display:flex;align-items:center;gap:9px;color:var(--ink-2);font:11.5px var(--mono)}
-.gl-mismatch{padding:12px 14px;display:flex;flex-direction:column;gap:5px;border-color:var(--mag8);font:11px var(--mono);line-height:1.45;color:var(--ink-2)}
-.gl-mismatch b{color:var(--mag8);font-size:11px}
-.gl-glabel{font:600 10.5px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3)}
+.gl-resolving{padding:11px 13px;display:flex;align-items:center;gap:9px;color:var(--ink-2);font:11.5px var(--mono)}.gl-glabel{font:600 10.5px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3)}
 .gl-seg{display:flex;gap:4px;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:3px}
 .gl-seg3 button,.gl-seg button{flex:1;min-width:0;font:550 12px var(--sans);color:var(--ink-2);background:none;border:0;border-radius:7px;padding:8px 4px;cursor:pointer;transition:.12s;white-space:nowrap}
 .gl-seg.gl-wrap{flex-wrap:wrap}.gl-seg.gl-wrap button{min-width:64px}

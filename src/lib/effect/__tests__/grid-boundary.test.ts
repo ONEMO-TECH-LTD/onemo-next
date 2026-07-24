@@ -106,17 +106,6 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(adminClientSource).not.toContain('UserGridJob')
   })
 
-  it('keeps the clone-gate mismatch inspectable without deciding any control', () => {
-    const pageSource = readFileSync(ADMIN_PAGE_PATH, 'utf8')
-    const userPanelSource = readFileSync(USER_PANEL_PATH, 'utf8')
-
-    expect(pageSource).toContain('User clone gate · factual mismatch log')
-    expect(userPanelSource).toContain('USER_DOOR_IGNORED_CONTROLS')
-    expect(userPanelSource).toContain("'Grid pattern'")
-    expect(userPanelSource).toContain("'Magnet plan'")
-    expect(userPanelSource).not.toMatch(/\bdisabled\s*=/)
-  })
-
   it('keeps magnetic-grid law out of every UI surface', () => {
     const pageSource = readFileSync(ADMIN_PAGE_PATH, 'utf8')
     const panelSource = readFileSync(ADMIN_PANEL_PATH, 'utf8')
