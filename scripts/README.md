@@ -18,3 +18,20 @@ Shopify API integration tools.
 | Script | Purpose |
 |---|---|
 | `convert-obj-to-glb.py` | Blender headless: OBJ → GLB (historical — superseded by KeyShot pipeline) |
+
+## Performance capability probe
+
+`perf-core-s0/index.html` is the non-production S0 browser fixture for timestamps, correlation,
+renderer-bound layout-effect commit detection, and bounded JSON export. It has no viewer,
+observers, sampling, recorder, or reusable React/worker adapter. Serve it with:
+
+```bash
+npx vite scripts/perf-core-s0 --host 0.0.0.0 --port 4178
+```
+
+After retrieving the JSON string from `window.__ONEMO_PERF_S0_EXPORT__(metadata)`, verify its exact
+sentinel and bounded payload:
+
+```bash
+node scripts/verify-perf-core-s0-export.mjs /absolute/path/to/export.json
+```
