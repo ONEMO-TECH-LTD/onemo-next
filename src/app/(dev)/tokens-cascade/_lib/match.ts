@@ -56,9 +56,22 @@ const SCOPE_UNIT: Record<string, Unit> = {
   CORNER_RADIUS: 'px', WIDTH_HEIGHT: 'px', STROKE_FLOAT: 'px', EFFECT_FLOAT: 'px',
   OPACITY: 'unitless',
 };
-/** The expected domain for a token from its Figma scopes, or null when no scope pins it. */
-export function expectedUnit(scopes?: string[]): Unit | null {
+/**
+ * Collection-name fallback for UNSCOPED tokens (primitives/aliases carry no Figma scope):
+ * an independent re-derivation of the DS domain-by-collection convention (NOT imported from
+ * the generator, to avoid the producer-as-oracle trap). Closes the same-magnitude domain
+ * swap on unscoped rows (e.g. a Prim-Dim `2.5rem` emitted as `40ms`). Order matters:
+ * motion→ms and ratio→unitless are matched before the px dimension family.
+ */
+const COLL_UNIT: Array<[RegExp, Unit]> = [
+  [/motion/i, 'ms'],
+  [/ratio/i, 'unitless'],
+  [/(dim|radii|container|breakpoint|border|effect|track)/i, 'px'],
+];
+/** Expected domain from the Figma scope contract, else the collection convention, else null. */
+export function expectedUnit(scopes?: string[], collection?: string): Unit | null {
   for (const s of scopes ?? []) if (s in SCOPE_UNIT) return SCOPE_UNIT[s];
+  for (const [re, u] of COLL_UNIT) if (re.test(collection ?? '')) return u;
   return null;
 }
 
@@ -228,8 +241,9 @@ export function buildMatch(rp: RunPaths): { rows: MatchRow[]; counts: Record<str
       const key = (cs: CascadeStep[]) => cs.map((c) => `${c.collection}/${c.path}`).join('>');
       const modesDiffer = key(cascade) !== key(cascadeDarkFull);
       const cascadeDark = modesDiffer ? cascadeDarkFull : null;
-      // expected unit-domain from the Figma scope contract (not the generated value).
-      const exp = expectedUnit(r.$scopes);
+      // expected unit-domain from the Figma scope contract, then the collection convention
+      // for unscoped tokens (not inferred from the generated value being audited).
+      const exp = expectedUnit(r.$scopes, coll.name);
       const genRaw = rootVars.get(cssVar);
       let verdict: Verdict; let genLight: string; let genDark: string;
       if (genRaw === undefined) {

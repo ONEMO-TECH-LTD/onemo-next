@@ -77,6 +77,18 @@ describe('domain-pin from the Figma scope contract (KAI-9686 rework #2)', () => 
     expect(compareOne('0', '0', 'float', 'px')).toBe('MATCH');
     expect(compareOne('0', '0px', 'float', 'px')).toBe('MATCH');
   });
+  it('collection fallback pins UNSCOPED tokens by DS convention', () => {
+    expect(expectedUnit(['(none)'], 'Prim-Dim')).toBe('px');
+    expect(expectedUnit([], 'Prim-Motion')).toBe('ms');
+    expect(expectedUnit([], 'Prim-Ratios')).toBe('unitless');
+    expect(expectedUnit([], 'Prim-Type')).toBeNull();            // strings — no float domain
+    expect(expectedUnit(['LETTER_SPACING'], 'Prim-Motion')).toBe('px'); // scope wins over collection
+  });
+  it('BITE: an unscoped Prim-Dim 2.5rem(=40px) emitted as 40ms is DIFF, not a same-magnitude MATCH', () => {
+    const exp = expectedUnit([], 'Prim-Dim');                    // 'px'
+    expect(compareOne('40', '40ms', 'float', exp)).toBe('DIFF');
+    expect(compareOne('40', '2.5rem', 'float', exp)).toBe('MATCH');
+  });
 });
 
 describe('compareOne — string / fail-visible', () => {
