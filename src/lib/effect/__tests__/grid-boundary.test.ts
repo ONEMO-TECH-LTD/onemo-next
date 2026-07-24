@@ -94,7 +94,7 @@ describe('Creator magnetic-grid module boundary', () => {
     const adminClientSource = readFileSync(ADMIN_WORKER_CLIENT_PATH, 'utf8')
 
     expect(userWorkerSource.match(/^import .* from ['"].*['"]$/gm)).toEqual([
-      "import { handleUserGridJob, type UserGridJob } from './grid-user'",
+      "import { handleUserGridWorkerJob, type UserGridJob } from './grid-user'",
     ])
     expect(adminWorkerSource.match(/^import .* from ['"].*['"]$/gm)).toEqual([
       "import { handleAdminGridJob, type AdminGridJob } from './grid-admin'",

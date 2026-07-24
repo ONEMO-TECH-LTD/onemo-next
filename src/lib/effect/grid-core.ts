@@ -1115,10 +1115,19 @@ export function resolveUserSemanticLadder(
   makeShape: (sizeMM: number) => Contour,
   law: SizeLaw = DEFAULT_LAW,
 ): SemanticRung[] {
+  return resolveUserSemanticLadderWithPlans(makeShape, law).rungs
+}
+
+/** User ladder plus the exact plans already resolved for its final emitted rungs. */
+export function resolveUserSemanticLadderWithPlans(
+  makeShape: (sizeMM: number) => Contour,
+  law: SizeLaw = DEFAULT_LAW,
+): { rungs: SemanticRung[]; plans: ResolvedGridPlan[] } {
   const userCombos = modeCombos('auto').filter(({ pattern }) => pattern !== 'quincunx')
   const candidates = semanticSteps(makeShape, law, userCombos)
   const seen = new Set<string>()
   const products: SemanticStep[] = []
+  const plans: ResolvedGridPlan[] = []
   for (const candidate of candidates) {
     const plan = resolveUserGridPlan(makeShape(candidate.sizeMM), 'magnetic')
     if (!plan.pattern || !candidate.patterns.includes(plan.pattern) || plan.grid.flaps.length) continue
@@ -1126,8 +1135,9 @@ export function resolveUserSemanticLadder(
     if (seen.has(signature)) continue
     seen.add(signature)
     products.push({ ...candidate, points: plan.grid.anchors.length })
+    plans.push(plan)
   }
-  return labelSemanticSteps(products, law)
+  return { rungs: labelSemanticSteps(products, law), plans }
 }
 
 // ─── EXACT ASYNC/CACHE CONTRACT ─────────────────────────────────────────────

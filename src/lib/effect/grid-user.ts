@@ -1,9 +1,11 @@
 import type { Contour } from './types'
+import { jsonByteLength } from './grid-cache'
 import {
   ladderShapeFromRecipe,
   nearestSemanticRung,
   planContourFromRecipe,
   resolveUserSemanticLadder,
+  resolveUserSemanticLadderWithPlans,
   resolveUserGridPlan,
   stdShapeContour,
   userLadderCacheKey,
@@ -75,7 +77,23 @@ export type UserGridJobResult =
   | { operation: 'ladder'; key: string; value: SemanticRung[] }
   | { operation: 'plan'; key: string; value: ResolvedGridPlan }
 
-/** Pure worker handler. The future User worker imports this module and therefore cannot forge Admin inputs. */
+export type UserPlanGridJob = Extract<UserGridJob, { operation: 'plan' }>
+export type UserPlanGridJobResult = Extract<UserGridJobResult, { operation: 'plan' }>
+
+export interface UserGridCacheSeed {
+  job: UserPlanGridJob
+  result: UserPlanGridJobResult
+}
+
+export interface UserGridWorkerEnvelope {
+  result: UserGridJobResult
+  cacheSeeds: UserGridCacheSeed[]
+}
+
+export const USER_GRID_CACHE_SEED_MAX_BYTES = 1024 * 1024
+export const USER_GRID_CACHE_SEED_ENVELOPE_MAX_BYTES = 4 * 1024 * 1024
+
+/** Pure direct/public handler; its outward result remains the worker scheduler's public contract. */
 export function handleUserGridJob(job: UserGridJob): UserGridJobResult {
   if (job.operation === 'ladder') {
     return {
@@ -89,6 +107,49 @@ export function handleUserGridJob(job: UserGridJob): UserGridJobResult {
     key: userPlanCacheKey(job.recipe, job.attachment),
     value: resolveUserPlanRecipe(job.recipe, job.attachment),
   }
+}
+
+function rungPlanRecipe(recipe: LadderRecipe, sizeMM: number): PlanRecipe {
+  return recipe.kind === 'standard'
+    ? { kind: 'standard', shape: recipe.shape, widthMM: sizeMM, heightMM: sizeMM }
+    : { kind: 'uniform-contour', unitContour: recipe.unitContour, longestMM: sizeMM }
+}
+
+/** Worker transport adds exact retained-rung plans without changing the public User result. */
+export function handleUserGridWorkerJob(job: UserGridJob): UserGridWorkerEnvelope {
+  if (job.operation === 'plan') {
+    return { result: handleUserGridJob(job), cacheSeeds: [] }
+  }
+
+  const { rungs, plans } = resolveUserSemanticLadderWithPlans(ladderShapeFromRecipe(job.recipe))
+  const result: UserGridJobResult = {
+    operation: 'ladder',
+    key: userLadderCacheKey(job.recipe),
+    value: rungs,
+  }
+  const cacheSeeds: UserGridCacheSeed[] = []
+  let envelopeBytes = 0
+  for (let index = 0; index < rungs.length; index++) {
+    const seedJob: UserPlanGridJob = {
+      operation: 'plan',
+      recipe: rungPlanRecipe(job.recipe, rungs[index].sizeMM),
+      attachment: 'magnetic',
+    }
+    const seed: UserGridCacheSeed = {
+      job: seedJob,
+      result: {
+        operation: 'plan',
+        key: userPlanCacheKey(seedJob.recipe, seedJob.attachment),
+        value: plans[index],
+      },
+    }
+    const seedBytes = jsonByteLength(seed)
+    if (seedBytes > USER_GRID_CACHE_SEED_MAX_BYTES) continue
+    if (envelopeBytes + seedBytes > USER_GRID_CACHE_SEED_ENVELOPE_MAX_BYTES) break
+    cacheSeeds.push(seed)
+    envelopeBytes += seedBytes
+  }
+  return { result, cacheSeeds }
 }
 
 export {

@@ -22,6 +22,21 @@ export interface GridWorkerLike {
 
 export type GridWorkerPriority = 'active' | 'background'
 
+export interface GridWorkerCacheSeed<Result> {
+  key: string
+  value: Result
+  bytes: number
+}
+
+export interface GridWorkerDecodeContext<Result> {
+  peekCached(key: string): Result | undefined
+}
+
+export interface GridWorkerDecodedResult<Result> {
+  result: Result
+  cacheSeeds?: ReadonlyArray<GridWorkerCacheSeed<Result>>
+}
+
 export class GridWorkerSupersededError extends Error {
   constructor(readonly staleKey: string, readonly latestKey: string) {
     super(`Grid worker request ${staleKey} was superseded by ${latestKey}.`)
@@ -45,17 +60,25 @@ interface PendingRequest<Job, Result> {
   reject: (error: Error) => void
 }
 
-export interface GridWorkerSchedulerOptions<Job, Result> extends BoundedResultCacheOptions {
+export interface GridWorkerSchedulerOptions<Job, Result, Transport = Result> extends BoundedResultCacheOptions {
   createWorker: () => GridWorkerLike
   keyOfJob: (job: Job) => string
   keyOfResult: (result: Result) => string
+  decodeWorkerResult?: (
+    transport: Transport,
+    context: GridWorkerDecodeContext<Result>,
+  ) => GridWorkerDecodedResult<Result>
 }
 
 /** One exact-result worker lane. Active work physically pre-empts stale CPU; background work queues. */
-export class GridWorkerScheduler<Job, Result> {
+export class GridWorkerScheduler<Job, Result, Transport = Result> {
   private readonly createWorker: () => GridWorkerLike
   private readonly keyOfJob: (job: Job) => string
   private readonly keyOfResult: (result: Result) => string
+  private readonly decodeWorkerResult: (
+    transport: Transport,
+    context: GridWorkerDecodeContext<Result>,
+  ) => GridWorkerDecodedResult<Result>
   private readonly cache: BoundedResultCache<Result>
   private readonly staticResults = new StaticResultTable<Result>()
   private readonly inFlight = new Map<string, PendingRequest<Job, Result>>()
@@ -66,10 +89,12 @@ export class GridWorkerScheduler<Job, Result> {
   private workerGeneration = 0
   private disposed = false
 
-  constructor(options: GridWorkerSchedulerOptions<Job, Result>) {
+  constructor(options: GridWorkerSchedulerOptions<Job, Result, Transport>) {
     this.createWorker = options.createWorker
     this.keyOfJob = options.keyOfJob
     this.keyOfResult = options.keyOfResult
+    this.decodeWorkerResult = options.decodeWorkerResult
+      ?? ((transport) => ({ result: transport as unknown as Result }))
     this.cache = new BoundedResultCache(options)
   }
 
@@ -186,7 +211,7 @@ export class GridWorkerScheduler<Job, Result> {
     const generation = ++this.workerGeneration
     worker.onmessage = (event: MessageEvent) => {
       if (worker !== this.worker || generation !== this.workerGeneration) return
-      this.handleMessage(event.data as GridWorkerResponse<Result>)
+      this.handleMessage(event.data as GridWorkerResponse<Transport>)
     }
     worker.onerror = (event: ErrorEvent) => {
       if (worker !== this.worker || generation !== this.workerGeneration) return
@@ -197,22 +222,45 @@ export class GridWorkerScheduler<Job, Result> {
     return worker
   }
 
-  private handleMessage(message: GridWorkerResponse<Result>): void {
+  private handleMessage(message: GridWorkerResponse<Transport>): void {
     const pending = this.current
     if (!pending || message.id !== pending.id) return
     if (!message.ok) {
       this.failCurrent(new Error(message.error))
       return
     }
-    if (this.keyOfResult(message.result) !== pending.key) {
+    let decoded: GridWorkerDecodedResult<Result>
+    try {
+      decoded = this.decodeWorkerResult(message.result, {
+        peekCached: (key) => this.cache.peek(key),
+      })
+      for (const seed of decoded.cacheSeeds ?? []) {
+        if (
+          typeof seed.key !== 'string'
+          || this.keyOfResult(seed.value) !== seed.key
+          || !Number.isFinite(seed.bytes)
+          || seed.bytes < 0
+        ) {
+          throw new Error('Grid worker returned an invalid cache seed.')
+        }
+      }
+    } catch (error) {
+      this.terminateWorker()
+      this.failCurrent(error instanceof Error ? error : new Error(String(error)))
+      return
+    }
+    if (this.keyOfResult(decoded.result) !== pending.key) {
       this.terminateWorker()
       this.failCurrent(new Error('Grid worker returned a result for the wrong cache key.'))
       return
     }
     this.current = null
     this.inFlight.delete(pending.key)
-    this.cache.set(pending.key, message.result)
-    pending.resolve(message.result)
+    for (const seed of decoded.cacheSeeds ?? []) {
+      this.cache.set(seed.key, seed.value, seed.bytes)
+    }
+    this.cache.set(pending.key, decoded.result)
+    pending.resolve(decoded.result)
     this.startNextBackground()
   }
 
