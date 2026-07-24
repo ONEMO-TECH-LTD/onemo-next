@@ -23,13 +23,18 @@ function hex8(v: string): string | null {
 const chans = (h: string): number[] => [1, 3, 5, 7].map((i) => parseInt(h.slice(i, i + 2) || 'ff', 16));
 
 /**
- * Colour verdict — decoded sRGB8 + alpha byte, mirroring the deterministic audit's taxonomy:
- *   MATCH   = byte-exact,
- *   BOUNDED = within 1/255 on every channel (the 611 1/255 OKLCH round-trip rows — e.g. an
- *             alpha the generator rounded to a whole `%`: `#…b2` vs `#…b3`) — NOT a green MATCH,
- *             but preserved as its own class so the audit distinction isn't erased,
+ * Colour verdict — compared in DECODED sRGB8 + alpha-byte space (what the browser actually
+ * paints), a three-way taxonomy analogous to (but NOT byte-identical to) the audit's:
+ *   MATCH   = byte-exact in sRGB8+alpha,
+ *   BOUNDED = within 1/255 on every channel (a sub-render 1-byte drift — e.g. an alpha the
+ *             generator rounded to a whole `%`: `#…b2` vs `#…b3`) — NOT a green MATCH, kept as
+ *             its own class so the distinction isn't erased,
  *   DIFF    = a channel off by ≥2/255 (a real colour error).
- * Non-sRGB values (absent from this Figma-hex corpus) fall back to a tight oklch compare.
+ * NOTE ON COUNT: this sRGB8-byte pass yields ~599 BOUNDED on the full graph vs the generator
+ * audit's 611 (which compares in OKLCH round-trip). The ~12-row gap is tokens that are
+ * byte-identical once rendered to sRGB8 (correctly MATCH here) but 1/255 apart in OKLCH — a
+ * comparison-SPACE difference, not a hidden false-green. Non-sRGB values (absent from this
+ * Figma-hex corpus) fall back to a tight oklch compare.
  */
 function colorVerdict(a: string, b: string): 'MATCH' | 'BOUNDED' | 'DIFF' {
   const ha = hex8(a), hb = hex8(b);
