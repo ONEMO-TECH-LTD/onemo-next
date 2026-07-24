@@ -115,6 +115,30 @@ export function compareOne(figma: string, gen: string, type: string, exp: Unit |
   return String(figma).trim() === String(gen).trim() ? 'MATCH' : 'DIFF'; // strings, exact
 }
 
+/**
+ * The single per-token verdict orchestrator shared by buildMatch (flat) and buildExplorerData
+ * (grouped) — so both surfaces grade identically and cannot drift. Given each mode's resolved
+ * Figma + generated value and the mode terminals (for the domain contract), returns the merged
+ * verdict; a missing generated var, or a run that failed integrity, is fail-closed UNVERIFIED.
+ */
+export function computeVerdict(
+  type: string, scopes: string[] | undefined,
+  figLight: string, figDark: string, genLight: string, genDark: string,
+  termL: { collection: string; path: string } | undefined,
+  termD: { collection: string; path: string } | undefined,
+  fallbackColl: string, fallbackPath: string, integrityVerified: boolean,
+): Verdict {
+  if (!integrityVerified) return 'UNVERIFIED';
+  if (genLight === '(missing)' || genDark === '(missing)') return 'UNVERIFIED';
+  const expL = expectedUnit(scopes, termL?.collection ?? fallbackColl, termL?.path ?? fallbackPath);
+  const expD = expectedUnit(scopes, termD?.collection ?? fallbackColl, termD?.path ?? fallbackPath);
+  const vL = compareOne(figLight, genLight, type, expL);
+  const vD = compareOne(figDark, genDark, type, expD);
+  return (vL === 'UNVERIFIED' || vD === 'UNVERIFIED') ? 'UNVERIFIED'
+    : (vL === 'DIFF' || vD === 'DIFF') ? 'DIFF'
+    : (vL === 'DERIVED' || vD === 'DERIVED') ? 'DERIVED' : 'MATCH';
+}
+
 /** One hop of the resolved Figma cascade (prim→alias→semantic), for display. */
 export type CascadeStep = { collection: string; path: string; isAlias: boolean; raw: string };
 
@@ -129,18 +153,18 @@ function cssCategory(collectionName: string): string {
   return String(collectionName).replace(/^\.?\d+(?:\.\d+)?-/, '').split(/[-_\s]+/).map((p) => p.toLowerCase()).filter(Boolean).join('-');
 }
 function kebab(v: string): string { return String(v).replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase(); }
-function cssVarOf(collectionName: string, tokenPath: string[]): string {
+export function cssVarOf(collectionName: string, tokenPath: string[]): string {
   return `--${[cssCategory(collectionName), ...tokenPath.map(kebab)].join('-')}`;
 }
-function shortColl(name: string): string { return String(name).replace(/^\.?\d+(?:\.\d+)?-/, ''); }
-function parseVars(css: string, selector: string): Map<string, string> {
+export function shortColl(name: string): string { return String(name).replace(/^\.?\d+(?:\.\d+)?-/, ''); }
+export function parseVars(css: string, selector: string): Map<string, string> {
   const m = new RegExp(selector.replace(/[.[\]="]/g, '\\$&') + '\\s*\\{([\\s\\S]*?)\\}').exec(css);
   const out = new Map<string, string>();
   if (!m) return out;
   for (const d of m[1].matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+);/g)) if (!out.has(d[1])) out.set(d[1], d[2].trim());
   return out;
 }
-function resolveCssVar(name: string, root: Map<string, string>, seen = new Set<string>()): string {
+export function resolveCssVar(name: string, root: Map<string, string>, seen = new Set<string>()): string {
   if (seen.has(name)) return 'CYCLE';
   const v = root.get(name);
   if (v === undefined) return '(missing)';
@@ -263,29 +287,13 @@ export function buildMatch(rp: RunPaths): { rows: MatchRow[]; counts: Record<str
       const key = (cs: CascadeStep[]) => cs.map((c) => `${c.collection}/${c.path}`).join('>');
       const modesDiffer = key(cascade) !== key(cascadeDarkFull);
       const cascadeDark = modesDiffer ? cascadeDarkFull : null;
-      // expected unit-domain driven by each mode's RESOLVED TERMINAL primitive (collection +
-      // path), scope corroborating only — derived PER MODE so a mode-divergent cascade (Light
-      // terminal a ratio factor, Dark a percent) grades each mode against its own domain.
-      const fallbackPath = r.path.join('/');
+      // verdict via the SHARED per-token orchestrator (same path buildExplorerData uses).
+      const genRaw = rootVars.get(cssVar);
+      const genLight = genRaw === undefined ? '(missing)' : resolveCssVar(cssVar, rootVars);
+      const genDark = genRaw === undefined ? '(missing)' : resolveCssVar(cssVar, darkResolveVars);
       const termL = light.steps[light.steps.length - 1];
       const termD = dark.steps[dark.steps.length - 1];
-      const expLight = expectedUnit(r.$scopes, termL?.collection ?? coll.name, termL?.path ?? fallbackPath);
-      const expDark = expectedUnit(r.$scopes, termD?.collection ?? coll.name, termD?.path ?? fallbackPath);
-      const genRaw = rootVars.get(cssVar);
-      let verdict: Verdict; let genLight: string; let genDark: string;
-      if (genRaw === undefined) {
-        verdict = 'UNVERIFIED'; genLight = '(missing)'; genDark = '(missing)';
-      } else {
-        genLight = resolveCssVar(cssVar, rootVars);
-        genDark = resolveCssVar(cssVar, darkResolveVars);
-        const vL = compareOne(figLight, genLight, r.type, expLight);
-        const vD = compareOne(figDark, genDark, r.type, expDark);
-        verdict = (vL === 'UNVERIFIED' || vD === 'UNVERIFIED') ? 'UNVERIFIED'
-          : (vL === 'DIFF' || vD === 'DIFF') ? 'DIFF'
-          : (vL === 'DERIVED' || vD === 'DERIVED') ? 'DERIVED' : 'MATCH';
-      }
-      // FAIL-CLOSED: a run we cannot verify has no trustworthy verdicts — never a green MATCH.
-      if (!integrity.verified) verdict = 'UNVERIFIED';
+      const verdict = computeVerdict(r.type, r.$scopes, figLight, figDark, genLight, genDark, termL, termD, coll.name, r.path.join('/'), integrity.verified);
       const isConsumed = consumed ? consumed.has(cssVar) : true;
       rows.push({
         collection: coll.name, name: r.path.join('/'), cssVar, type: r.type,

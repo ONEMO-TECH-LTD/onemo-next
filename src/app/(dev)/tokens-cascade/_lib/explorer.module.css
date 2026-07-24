@@ -1,0 +1,44 @@
+/* KAI-9686 explorer chrome — matches the converter's light/dark COMPUTER theme via
+   prefers-color-scheme (the app forces data-theme="light" on <html>, so we follow the OS
+   preference here, not that attribute). The tool chrome flips; the swatches/values still
+   render the actual token colours. Light defaults + dark override. */
+.explorer {
+  --ui-bg: #ffffff;
+  --ui-rail: #fcfcfd;
+  --ui-border: #e6e6e9;
+  --ui-border-strong: #d8d8dd;
+  --ui-text: #1c1c1e;
+  --ui-text-muted: #8a8a8f;
+  --ui-text-faint: #aeaeb2;
+  --ui-sel-bg: #e7f0fd;
+  --ui-sel-text: #0d62ff;
+  --ui-chip-bg: #f5f5f7;
+  --ui-chip-border: #dcdce1;
+  --ui-group-bg: #fafafb;
+  --ui-ok-bg: #eafaf1; --ui-ok-fg: #1f9d55;
+  --ui-err-bg: #fdecea; --ui-err-fg: #c0392b;
+  --ui-info-bg: #e9f2fd; --ui-info-fg: #0d62ff;
+  --ui-warn-bg: #fef6e7; --ui-warn-fg: #b7791f;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  .explorer {
+    --ui-bg: #0d1117;
+    --ui-rail: #12161d;
+    --ui-border: #262c36;
+    --ui-border-strong: #333b47;
+    --ui-text: #e6edf3;
+    --ui-text-muted: #8b949e;
+    --ui-text-faint: #6e7681;
+    --ui-sel-bg: #17324d;
+    --ui-sel-text: #58a6ff;
+    --ui-chip-bg: #1b2028;
+    --ui-chip-border: #2d333b;
+    --ui-group-bg: #12161d;
+    --ui-ok-bg: #10251b; --ui-ok-fg: #4ade80;
+    --ui-err-bg: #3a1113; --ui-err-fg: #f87171;
+    --ui-info-bg: #132030; --ui-info-fg: #7dd3fc;
+    --ui-warn-bg: #2a2410; --ui-warn-fg: #fbbf24;
+  }
+}
