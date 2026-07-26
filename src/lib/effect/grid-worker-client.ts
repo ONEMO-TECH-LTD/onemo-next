@@ -235,6 +235,11 @@ export class GridWorkerScheduler<Job, Result, Transport = Result> {
     if (cached !== undefined) {
       if (priority === 'active' && this.current && this.current.key !== key) {
         this.preemptCurrent(new GridWorkerSupersededError(this.current.key, key))
+        // A cached hit returns with no worker round-trip, so neither handleMessage nor
+        // failCurrent will run and the background queue would stay stranded.
+        // Not placed inside preemptCurrent: the duplicate branch below calls start()
+        // immediately afterwards, which would orphan a background job started there.
+        this.startNextBackground()
       }
       return Promise.resolve(cached)
     }
