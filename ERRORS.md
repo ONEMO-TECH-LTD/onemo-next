@@ -1,5 +1,16 @@
 # ERRORS
 
+## KAI-9728 Playwright browser extraction under Node 26
+
+- What did not work: `npx playwright install webkit chromium` under the active Node 26 runtime, both
+  combined and WebKit-only.
+- Symptom: the archive downloaded fully, then the extractor hung indefinitely after writing only
+  `webkit-2248/libwebrtc.dylib`.
+- What worked: run Playwright's same pinned CLI with the installed Node 20 binary:
+  `/opt/homebrew/opt/node@20/bin/node node_modules/playwright/cli.js install webkit chromium`.
+- Remember: Playwright 1.58 browser installation on this Mac must use Node 20; the built suite can
+  still run under the repo's normal Node runtime.
+
 ## S59 Playwright CLI `run-code` callback syntax
 
 - What did not work: passing top-level snippets such as `await page.title()` to the current `playwright-cli run-code`, following the bundled skill reference.

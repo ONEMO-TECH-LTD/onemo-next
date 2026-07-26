@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "grid:profile": "vite-node --script scripts/profile-grid-baseline.ts",
+    "perf:devices": "node scripts/device-performance/run.mjs",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },
@@ -63,9 +64,11 @@
     "culori": "^4.0.2",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "playwright": "^1.58.2",
     "storybook": "^10.4.6",
     "tailwindcss": "^4",
     "typescript": "^5",
+    "vite": "^5.4.21",
     "vitest": "^2.1.9"
   }
 }

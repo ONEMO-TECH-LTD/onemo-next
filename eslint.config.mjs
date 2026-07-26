@@ -31,6 +31,25 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  {
+    files: [
+      "scripts/device-performance/core/**/*.{js,mjs,ts}",
+      "scripts/device-performance/run.mjs",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/**", "**/src/**", "**/lib/effect/**"],
+              message: "The neutral device-performance runner must not import feature or engine code.",
+            },
+          ],
+        },
+      ],
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

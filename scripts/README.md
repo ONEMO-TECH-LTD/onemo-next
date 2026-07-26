@@ -19,19 +19,14 @@ Shopify API integration tools.
 |---|---|
 | `convert-obj-to-glb.py` | Blender headless: OBJ → GLB (historical — superseded by KeyShot pipeline) |
 
-## Performance capability probe
+## Automated device performance
 
-`perf-core-s0/index.html` is the non-production S0 browser fixture for timestamps, correlation,
-renderer-bound layout-effect commit detection, and bounded JSON export. It has no viewer,
-observers, sampling, recorder, or reusable React/worker adapter. Serve it with:
-
-```bash
-npx vite scripts/perf-core-s0 --host 0.0.0.0 --port 4178
-```
-
-After retrieving the JSON string from `window.__ONEMO_PERF_S0_EXPORT__(metadata)`, verify its exact
-sentinel and bounded payload:
+`device-performance/` replaces the dead cable-based phone probe. It runs the engine automatically in
+local WebKit:
 
 ```bash
-node scripts/verify-perf-core-s0-export.mjs /absolute/path/to/export.json
+npm run perf:devices
 ```
+
+See `device-performance/README.md` for the explicit CPU-emulation limitation, report location, and
+the provider-neutral paid-cloud adapter seam.

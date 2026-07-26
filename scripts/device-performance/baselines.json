@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "executor": "Node.js current engine",
+  "fixtures": {
+    "canonical-ladder": {
+      "sha256": "de539e0aa9ad09b622470950d4cd376fe42d7195e6b92671a45430ad549e3dc6",
+      "t2": {
+        "rungs": [
+          { "label": "ONE", "points": 1, "sizeMM": 23, "visible": true },
+          { "label": "S", "points": 4, "sizeMM": 71, "visible": true },
+          { "label": "M", "points": 4, "sizeMM": 90, "visible": true },
+          { "label": "L", "points": 4, "sizeMM": 130, "visible": true },
+          { "label": "XL", "points": 8, "sizeMM": 158, "visible": true },
+          { "label": "2XL", "points": 8, "sizeMM": 221, "visible": false },
+          { "label": "3XL", "points": 16, "sizeMM": 303, "visible": false }
+        ]
+      }
+    },
+    "dense-live-plan": {
+      "sha256": "de307b637e3272176a7128a5fd04a0fd3b4f185069ea38edca89b11e403f8981",
+      "t2": {
+        "anchorCount": 2,
+        "rescueCount": 0,
+        "flapCount": 0,
+        "ok": true,
+        "pitchMM": 48,
+        "pattern": "standard",
+        "nodes": [
+          { "x": "34.80", "y": "70.35", "dia": 6, "rescue": false },
+          { "x": "34.80", "y": "22.35", "dia": 6, "rescue": false }
+        ],
+        "edges": ["0-1"]
+      }
+    },
+    "small-contour-plan": {
+      "sha256": "6c3b36820b04c05f19c2a11b7bb25c380af2a0005ed246046ac261a100157ea2",
+      "t2": {
+        "anchorCount": 5,
+        "rescueCount": 4,
+        "flapCount": 0,
+        "ok": true,
+        "pitchMM": 96,
+        "pattern": "standard",
+        "nodes": [
+          { "x": "35.00", "y": "35.00", "dia": 6, "rescue": false },
+          { "x": "10.00", "y": "10.00", "dia": 6, "rescue": true },
+          { "x": "60.00", "y": "10.00", "dia": 6, "rescue": true },
+          { "x": "60.00", "y": "60.00", "dia": 6, "rescue": true },
+          { "x": "10.00", "y": "60.00", "dia": 6, "rescue": true }
+        ],
+        "edges": ["0-1", "0-2", "0-3", "0-4", "1-2", "1-3", "1-4", "2-3", "2-4", "3-4"]
+      }
+    }
+  }
+}

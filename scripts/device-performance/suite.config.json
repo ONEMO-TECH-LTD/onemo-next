@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "fixturePath": "/scripts/device-performance/fixture.html",
+  "profiles": [
+    {
+      "id": "webkit-iphone-13",
+      "provider": "local-playwright",
+      "engine": "webkit",
+      "device": "iPhone 13",
+      "truth": "local-webkit-correctness-and-timing"
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "canonical-ladder",
+      "label": "Canonical circle ladder",
+      "job": {
+        "operation": "ladder",
+        "recipe": {
+          "kind": "standard",
+          "shape": "circle"
+        }
+      }
+    },
+    {
+      "id": "dense-live-plan",
+      "label": "Dense real-AI contour plan",
+      "fixture": "dense-real-ai-corpus"
+    },
+    {
+      "id": "small-contour-plan",
+      "label": "Small square plan",
+      "job": {
+        "operation": "plan",
+        "recipe": {
+          "kind": "standard",
+          "shape": "square",
+          "widthMM": 70,
+          "heightMM": 70
+        },
+        "attachment": "magnetic"
+      }
+    }
+  ],
+  "cpuEmulation": {
+    "status": "UNSUPPORTED",
+    "scope": "Web Worker engine jobs",
+    "observedError": "Emulation.setCPUThrottlingRate: Operation is only supported for pages, not workers",
+    "verifiedEngine": "Chrome for Testing 145.0.7632.6",
+    "officialSource": "https://chromium.googlesource.com/chromium/src/+/main/third_party/blink/renderer/core/inspector/inspector_emulation_agent.cc",
+    "decision": "No OS-level substitute; real-device cloud is the only launch-truth path"
+  },
+  "cloudAdapter": {
+    "status": "pending-Dan-spend-approval",
+    "transport": "playwright-websocket",
+    "endpointEnv": "DEVICE_PERF_CLOUD_WS_ENDPOINT",
+    "decision": "No provider signup, SDK, credential handling, or paid run before Dan approval"
+  }
+}
