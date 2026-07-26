@@ -159,6 +159,36 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(pageSource).not.toContain('semanticLadder(')
   })
 
+  it('renders an accepted non-rectangle plan before ladder metadata while rectangles still wait', () => {
+    const pageSource = readFileSync(ADMIN_PAGE_PATH, 'utf8')
+    const panelSource = readFileSync(ADMIN_PANEL_PATH, 'utf8')
+    const rendererSource = readFileSync(ADMIN_RENDERER_PATH, 'utf8')
+    const preparedDesignSource = pageSource.slice(
+      pageSource.indexOf('const preparedDesign ='),
+      pageSource.indexOf('const adminPlanJob ='),
+    )
+
+    // L1 means the visible non-rect plan must not be gated by the slower semantic ladder.
+    expect(preparedDesignSource).toContain('if (!planDesign) return null')
+    expect(preparedDesignSource).not.toContain('if (!planDesign || !stdRungs.length) return null')
+    expect(preparedDesignSource)
+      .toContain('if (!stdRungs.length) return { ...planDesign, rung: null, rungH: null }')
+
+    // Rectangle axes are real ladder rungs and remain the explicit exception.
+    expect(preparedDesignSource).toContain("if (src === 'std' && geo === 'rect')")
+    expect(preparedDesignSource).toContain('if (!rectRungs) return null')
+
+    // The renderer publishes the accepted result identity after its model commits.
+    expect(pageSource).toContain('renderedPlanKey')
+    expect(pageSource).toContain('planKey: activePlanResult.key')
+    expect(rendererSource).toContain('useLayoutEffect')
+    expect(rendererSource).toContain('onRenderedPlanCommit(model?.planKey ?? null)')
+
+    // Pending ladder metadata cannot erase the already-resolved product truth.
+    expect(panelSource).toContain('model?.rung?.sizeMM')
+    expect(panelSource).toContain('seated ${model.grid.anchors.length}')
+  })
+
   it('starts only the active semantic door and stops the old door before a panel switch', () => {
     const pageSource = readFileSync(ADMIN_PAGE_PATH, 'utf8')
     const userClientSource = readFileSync(USER_WORKER_CLIENT_PATH, 'utf8')

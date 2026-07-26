@@ -1,3 +1,4 @@
+import { useLayoutEffect } from 'react'
 import type { Contour, Pt } from '@/lib/effect/types'
 
 interface GridWorkbenchAnchor {
@@ -25,6 +26,7 @@ interface GridWorkbenchNearestAnchorPair {
 }
 
 interface GridWorkbenchModel {
+  planKey: string
   contour: Contour
   design: Contour
   grid: GridWorkbenchGrid
@@ -47,6 +49,7 @@ export function GridWorkbenchStage({
   frontImg,
   emptyText,
   emptySpin,
+  onRenderedPlanCommit,
 }: {
   model: GridWorkbenchModel | null
   scale: number
@@ -56,9 +59,14 @@ export function GridWorkbenchStage({
   frontImg: string | null
   emptyText: string
   emptySpin?: boolean
+  onRenderedPlanCommit: (planKey: string | null) => void
 }) {
+  useLayoutEffect(() => {
+    onRenderedPlanCommit(model?.planKey ?? null)
+  }, [model?.planKey, onRenderedPlanCommit])
+
   return (
-    <section className="gl-card gl-stage">
+    <section className="gl-card gl-stage" data-rendered-plan-key={model?.planKey ?? ''}>
       <div className="gl-stage-head">
         <span className="gl-eye">Editor viewport · fixed {viewportPx}px</span>
         <span className="gl-eye">{model ? `1mm = ${scale.toFixed(2)} px` : '—'}</span>

@@ -54,8 +54,8 @@ interface PlanDesign {
 }
 
 interface PreparedDesign extends PlanDesign {
-  rung: SemanticRung
-  rungH: SemanticRung
+  rung: SemanticRung | null
+  rungH: SemanticRung | null
 }
 
 const requestAdminLadderJob = (job: AdminGridJob) =>
@@ -70,6 +70,7 @@ declare global {
       status: 'resolving-sizes' | 'resolving-grid' | 'ready' | 'error'
       ladderKey: string | null
       planKey: string | null
+      renderedPlanKey: string | null
       plan: ResolvedGridPlan | null
       rendered: { effectMM: number; seated: number; pitchMM: number; pattern: string } | null
     }
@@ -95,6 +96,7 @@ function normBase(vs: VShape, maskH: number): Contour | null {
 
 export default function GridLab() {
   const [panelEntry, setPanelEntry] = useState<PanelEntry>('admin')
+  const [renderedPlanKey, setRenderedPlanKey] = useState<string | null>(null)
   const [sliderTransient, setSliderTransient] = useState(false)
   const [src, setSrc] = useState<Src>('std')
   const [geo, setGeo] = useState<StdGeo>('square')
@@ -285,7 +287,7 @@ export default function GridLab() {
   }, [src, geo, preset, gen, p1, p2, sides, points, magic, rectRungs, resolvedSizeMM])
 
   const preparedDesign = useMemo<PreparedDesign | null>(() => {
-    if (!planDesign || !stdRungs.length) return null
+    if (!planDesign) return null
     if (src === 'std' && geo === 'rect') {
       if (!rectRungs) return null
       return {
@@ -294,6 +296,7 @@ export default function GridLab() {
         rungH: rectRungs.heightRung,
       }
     }
+    if (!stdRungs.length) return { ...planDesign, rung: null, rungH: null }
     const targetMM = src === 'std' ? sizeMM : planDesign.designSize
     const rung = panelEntry === 'admin'
       ? nearestSemanticRung(stdRungs, targetMM)
@@ -325,16 +328,18 @@ export default function GridLab() {
     cachedUserGridJob,
     sliderTransient,
   )
-  const resolvedPlan = panelEntry === 'admin'
-    ? adminPlanState.result?.operation === 'plan' ? adminPlanState.result.value : null
-    : userPlanState.result?.operation === 'plan' ? userPlanState.result.value : null
+  const activePlanResult = panelEntry === 'admin'
+    ? adminPlanState.result?.operation === 'plan' ? adminPlanState.result : null
+    : userPlanState.result?.operation === 'plan' ? userPlanState.result : null
+  const resolvedPlan = activePlanResult?.value ?? null
 
   const model = useMemo(() => {
-    if (!preparedDesign || !resolvedPlan) return null
+    if (!preparedDesign || !resolvedPlan || !activePlanResult) return null
     const effect = resolvedPlan.effectContourMM
     const eff = Math.round(Math.max(dim(effect, 0), dim(effect, 1)))
     const anchorPair = nearestAnchorPair(resolvedPlan.grid.anchors)
     return {
+      planKey: activePlanResult.key,
       contour: effect,
       design: preparedDesign.design,
       grid: resolvedPlan.grid,
@@ -350,7 +355,7 @@ export default function GridLab() {
       rungH: preparedDesign.rungH,
       format: preparedDesign.format,
     }
-  }, [preparedDesign, resolvedPlan])
+  }, [preparedDesign, resolvedPlan, activePlanResult])
 
   const activeLadderState = panelEntry === 'admin' ? adminLadderState : userLadderState
   const activePlanState = panelEntry === 'admin' ? adminPlanState : userPlanState
@@ -364,20 +369,22 @@ export default function GridLab() {
         : 'ready'
 
   useEffect(() => {
+    const committedModel = model?.planKey === renderedPlanKey ? model : null
     window.__GRID_LAB_PROOF__ = {
       door: panelEntry,
       status: runtimeStatus,
       ladderKey: panelEntry === 'admin' ? adminLadderKey : userLadderKey,
       planKey: panelEntry === 'admin' ? adminPlanKey : userPlanKey,
+      renderedPlanKey,
       plan: resolvedPlan,
-      rendered: model ? {
-        effectMM: model.effSize,
-        seated: model.grid.anchors.length,
-        pitchMM: model.pitch,
-        pattern: model.patternUsed,
+      rendered: committedModel ? {
+        effectMM: committedModel.effSize,
+        seated: committedModel.grid.anchors.length,
+        pitchMM: committedModel.pitch,
+        pattern: committedModel.patternUsed,
       } : null,
     }
-  }, [panelEntry, runtimeStatus, adminLadderKey, userLadderKey, adminPlanKey, userPlanKey, resolvedPlan, model])
+  }, [panelEntry, runtimeStatus, adminLadderKey, userLadderKey, adminPlanKey, userPlanKey, renderedPlanKey, resolvedPlan, model])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const panelProps: GridWorkbenchPanelProps = {
@@ -399,6 +406,7 @@ export default function GridLab() {
       data-grid-slider-transient={sliderTransient}
       data-grid-ladder-key={panelEntry === 'admin' ? adminLadderKey ?? '' : userLadderKey ?? ''}
       data-grid-plan-key={panelEntry === 'admin' ? adminPlanKey ?? '' : userPlanKey ?? ''}
+      data-grid-rendered-plan-key={renderedPlanKey ?? ''}
     >
       <style>{CSS}</style>
       <header className="gl-head">
@@ -425,6 +433,7 @@ export default function GridLab() {
                   ? magStatus.startsWith('error') ? magStatus.slice(6) : magStatus === 'downloading-model' ? 'Downloading the cut-out model…' : magStatus.startsWith('cutting') ? 'Cutting out the shape…' : 'Upload an image to cut its outline'
                   : 'shape unavailable'}
           emptySpin={runtimeStatus === 'resolving-sizes' || runtimeStatus === 'resolving-grid' || magStatus === 'downloading-model' || magStatus.startsWith('cutting')}
+          onRenderedPlanCommit={setRenderedPlanKey}
         />
 
         <aside className="gl-controls">

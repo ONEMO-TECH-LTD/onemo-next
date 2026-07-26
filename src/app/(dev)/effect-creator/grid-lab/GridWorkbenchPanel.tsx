@@ -29,8 +29,8 @@ interface GridWorkbenchPanelModel {
   magDist: number | null
   patternUsed: string
   format: string | null
-  rung: SemanticRungView
-  rungH: SemanticRungView
+  rung: SemanticRungView | null
+  rungH: SemanticRungView | null
   grid: { anchors: readonly unknown[] }
 }
 
@@ -178,7 +178,7 @@ export function GridWorkbenchPanel({
         <div className="gl-seg gl-wrap">
           {!stdRungs.length && <span className="gl-inline-resolving">Resolving…</span>}
           {stdRungs.map(r =>
-            <button key={r.sizeMM} aria-pressed={model?.rung.sizeMM === r.sizeMM}
+            <button key={r.sizeMM} aria-pressed={model?.rung?.sizeMM === r.sizeMM}
               className={r.visible ? undefined : 'gl-hidden-rung'}
               onClick={() => setSizeMM(r.sizeMM)}
               title={`${r.points} anchor point${r.points > 1 ? 's' : ''}${r.visible ? '' : ' · hidden at launch (untested)'}`}>
@@ -192,7 +192,7 @@ export function GridWorkbenchPanel({
           <div className="gl-seg gl-wrap">
             {!rectRungs && <span className="gl-inline-resolving">Resolving…</span>}
             {(rectRungs?.longOptions ?? []).map(r =>
-              <button key={'L' + r.sizeMM} aria-pressed={Math.max(model?.rung.sizeMM ?? 0, model?.rungH?.sizeMM ?? 0) === r.sizeMM}
+              <button key={'L' + r.sizeMM} aria-pressed={Math.max(model?.rung?.sizeMM ?? 0, model?.rungH?.sizeMM ?? 0) === r.sizeMM}
                 className={r.visible ? undefined : 'gl-hidden-rung'}
                 onClick={() => setLongMM(r.sizeMM)}
                 title={`${r.points} anchor points${r.visible ? '' : ' · hidden at launch (untested)'}`}>
@@ -204,7 +204,7 @@ export function GridWorkbenchPanel({
           <div className="gl-seg gl-wrap">
             {!rectRungs && <span className="gl-inline-resolving">Resolving…</span>}
             {(rectRungs?.shortOptions ?? []).map(r =>
-              <button key={'S' + r.sizeMM} aria-pressed={Math.min(model?.rung.sizeMM ?? 0, model?.rungH?.sizeMM ?? 0) === r.sizeMM}
+              <button key={'S' + r.sizeMM} aria-pressed={Math.min(model?.rung?.sizeMM ?? 0, model?.rungH?.sizeMM ?? 0) === r.sizeMM}
                 className={r.visible ? undefined : 'gl-hidden-rung'}
                 onClick={() => setShortMM(r.sizeMM)}>
                 {r.label}{r.visible ? '' : '†'}
@@ -225,7 +225,12 @@ export function GridWorkbenchPanel({
         <b className="gl-total-v">{model.effSize}<small> mm</small></b>
         <span className="gl-total-note">{model.marginMM > 0.5 ? `design ${model.designSize}mm + ${Math.round(model.marginMM)}mm margin${model.grew > 0.5 ? ` (+${Math.round(model.grew)} auto)` : ''}` : `design ${model.designSize}mm · no margin`}</span>
         <span className="gl-total-note gl-total-grid">grid {model.pitch}mm{model.magDist != null ? ` · magnets ${Math.round(model.magDist)}mm apart${Math.abs(model.magDist - model.pitch * Math.SQRT2) < 1.5 ? ` · grid diagonal (${model.pitch}×√2)` : Math.abs(model.magDist - model.pitch * Math.SQRT2 / 2) < 1.5 ? ` · dice half-diagonal` : ''}` : ''}</span>
-        <span className="gl-total-note">{model.format ? `${model.rung.sizeMM}×${model.rungH.sizeMM} · ${model.format}` : `${model.designSize === model.rung.sizeMM ? 'size' : 'nearest'} ${model.rung.label} · tier ${model.rung.points}pt · seated ${model.grid.anchors.length}`}{model.rung.visible && model.rungH.visible ? '' : ' · HIDDEN (untested)'}</span>
+        <span className="gl-total-note">{model.format
+          ? model.rung && model.rungH
+            ? `${model.rung.sizeMM}×${model.rungH.sizeMM} · ${model.format}`
+            : `seated ${model.grid.anchors.length}`
+          : `${model.rung ? `${model.designSize === model.rung.sizeMM ? 'size' : 'nearest'} ${model.rung.label} · tier ${model.rung.points}pt · ` : ''}seated ${model.grid.anchors.length}`}
+        {model.rung && model.rungH && (!model.rung.visible || !model.rungH.visible) ? ' · HIDDEN (untested)' : ''}</span>
       </div>}
       <div className="gl-field"><span>Density</span>
         <div className="gl-seg">
