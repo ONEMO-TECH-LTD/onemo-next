@@ -8,7 +8,7 @@ import {
   contourWithOuterMargin,
   stdShapeContour,
   type GridConfig,
-} from '../grid-admin'
+} from '../grid'
 import type { Contour } from '../types'
 
 function withMargin(contour: Contour): (marginMM: number) => Contour {
@@ -18,9 +18,9 @@ function withMargin(contour: Contour): (marginMM: number) => Contour {
 describe('S1c winning balanced-fit reuse', () => {
   it.each([
     {
-      name: 'default user target',
+      name: 'default target',
       contour: stdShapeContour('circle', 180),
-      cfg: { paddingMM: 10, perimeterOnly: true, sparseThin: true, rescueCoverage: true },
+      cfg: { paddingMM: 10, perimeterOnly: true, sparseThin: true },
       minN: undefined,
     },
     {
@@ -50,8 +50,8 @@ describe('S1c winning balanced-fit reuse', () => {
 
   it('keeps the production resolver from re-solving after auto selection', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/lib/effect/grid-core.ts'), 'utf8')
-    const start = source.indexOf('function resolveGridPlanWithPolicy(')
-    const end = source.indexOf('/** Product-safe resolver:', start)
+    const start = source.indexOf('export function resolveGridPlan(')
+    const end = source.indexOf('// ─── EXACT ASYNC/CACHE CONTRACT', start)
     const resolver = source.slice(start, end)
 
     expect(resolver).toContain('const fit = selected.fit')

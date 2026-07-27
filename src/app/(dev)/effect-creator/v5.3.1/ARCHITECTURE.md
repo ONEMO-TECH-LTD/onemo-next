@@ -1,38 +1,33 @@
 # Creator — As-Built Technical Architecture
 
 **Status:** As-built (what the code *is*, not the blueprint's intent)
-**Version:** v5.5 (foundation Phases 2–3) — the v5.3.1 baseline re-cut into the **UI-agnostic Layer-2 seam**: the `useCreator` macro is decomposed into flow-blind **primitives** + flow-owned **transaction services** (Phase 2) and formalized as the named, swappable **`v53Flow`** behind the **`CreatorFlow`** contract (Phase 3). Session 59 additionally ringfences the magnetic-grid user/admin boundary and gives the user door its perimeter-first product law, described below. (v5.3.1 drift already removed: v1/v2, the prototype/shaped/studio routes, old `studio/`, `/dev/tokens`, the A/B scaffolding; the scene-format is the **live** studio-v2 → Creator `.onemo` bridge — DEC-v5-08, §8/§9.)
+**Version:** v5.5 (foundation Phases 2–3) — the v5.3.1 baseline re-cut into the **UI-agnostic Layer-2 seam**: the `useCreator` macro is decomposed into flow-blind **primitives** + flow-owned **transaction services** (Phase 2) and formalized as the named, swappable **`v53Flow`** behind the **`CreatorFlow`** contract (Phase 3). Session 59 exposes one neutral magnetic-grid engine and worker lane. (v5.3.1 drift already removed: v1/v2, the prototype/shaped/studio routes, old `studio/`, `/dev/tokens`, the A/B scaffolding; the scene-format is the **live** studio-v2 → Creator `.onemo` bridge — DEC-v5-08, §8/§9.)
 **Scope:** `src/app/(dev)/effect-creator/v5.3.1/` + `src/lib/effect/` + the kernels (`vector-core`, `outline-core` live half, `shape-library`, `export`). Logic/architecture only — `.module.css` styling files are excluded.
 **Provenance:** branch `session58-task/kai-9205-creator-v53flow` off `origin/staging` (Phase 2 merged @ `b60e52f`; Phase 3 `v53Flow` @ `2deda75`; dead route barrels killed @ `7e0b1c0`). Re-derived from a full code read per §11 rule-2 (KAI-9266).
 **Companion:** the forward blueprint lives at `onemo-ssot-global/_ssot-workbench/v5/` — that is *to-be*; this is *as-is*. On conflict, the code (and this doc) win.
 
 **Phase 4 (KAI-9207, branch `s58-phase4`):** the editor + image/filter tools are now PER-TOOL DESCRIPTOR modules (`editor/descriptors/*`) composed by **`useEditor`** (the composer + editor controller). `OutlineEditor` (886→349) and `FiltersSurface` are thin, **store-free CLIENTS** that bind `{state, actions}` and render `state.tools` through the generic `tool-sheet.tsx` (+ `useImageFilters` for the hero). Adding/removing a tool = a descriptor file + its `TOOL_REGISTRY` line; disabling = a runtime `?disable=` flag — **zero shared-controller edit** (the §0a bundling test, spanning both surfaces). F8/F12/F16 folded; the 3 hardcoded sheets + the monoblock controller + `useEditorAdjustments` are deleted. §3.4 below reflects this.
 
-**Session 59 engine seam:** `lib/effect/grid-core.ts` owns the 48/96 magnetic-grid planning law. The constrained
-`grid-user.ts` door exposes `resolveUserPlan(finalContourMM, { attachment })` to Creator through
-`core/primitives.computeAttachmentGrid`. Its auto set is Standard + Diamond only; it always resolves a perimeter
-belt, then adds the minimum safe lattice/off-lattice anchors needed to rescue uncovered outline regions. Its default
-semantic ladder keeps only candidates selected by that resolver, then collapses equal translation-invariant
-final-product signatures (normalized topology/adjacency, diameters, rescue membership), keeping the smallest size.
-Dice and full-grid controls remain available only through `grid-admin.ts` for the bench and standing audit. No product
-law is reimplemented in UI: the original grid-lab page hosts a full Admin panel and a full User-panel clone over one
-shared renderer. Admin resolves through `grid-admin.ts`; `GridWorkbenchUserPanel.tsx` is ringfenced to `grid-user.ts`.
-The A4 `(store)/create` presentation was deleted rather than treated as canonical. Control stay/go remains a
-hands-on product gate; the current full User clone deliberately preserves every control. The legacy
+**Session 59 engine seam:** `lib/effect/grid-core.ts` owns the 48/96 magnetic-grid planning law.
+`grid.ts` exposes one UI-independent plan/ladder job contract, while `grid-client.ts` and `grid.worker.ts`
+provide its optional browser worker lane. Creator calls the same neutral `resolveGridPlan` operation through
+`core/primitives.computeAttachmentGrid`. No product law is reimplemented in UI: the original grid-lab page
+hosts one complete control panel and one shared renderer. The A4 `(store)/create` presentation was deleted
+rather than treated as canonical. Control stay/go remains a separate hands-on product gate. The legacy
 54mm `validateAttachment` remains only for the dormant payload contract
 pending an approved retirement migration.
 
-**Session 59 performance path (E1–E3):** the engine doors also expose exact serializable
-ladder/plan recipes, engine-versioned canonical cache keys, and pure User/Admin job handlers.
+**Session 59 performance path (E1–E3):** the engine exposes exact serializable
+ladder/plan recipes, engine-versioned canonical cache keys, and one pure job handler.
 `grid-cache.ts` provides a pinned one-generation static table plus a byte/entry-bounded dynamic LRU.
-Oracle tests prove direct engine versus handler/structured-clone JSON bytes across the door matrix.
-Separate User/Admin module workers preserve the semantic wall, and `grid-worker-client.ts` owns exact-result
+Oracle tests prove direct engine versus handler/structured-clone JSON bytes across the neutral job matrix.
+`grid-worker-client.ts` owns exact-result
 coalescing/cache reuse, request-ID publication, background queuing, and physical terminate/recreate pre-emption.
-Actual-browser worker oracles prove both doors preserve direct-engine JSON bytes. The original grid-lab now requests
-both ladders and plans asynchronously through those clients, hides superseded results, and keeps its controls present
-behind an honest `Resolving sizes…` / `Resolving grid…` state. Runtime prewarming fills the exact static table for
-canonical shape ladders, current-size plans, and emitted-rung plans; arbitrary contours retain the square-reference
-ladder and use the bounded dynamic cache. A pure cache peek publishes a warm exact result in the current render while
+Actual-browser worker oracles prove the neutral worker preserves direct-engine JSON bytes. The original grid-lab now
+requests ladders and plans asynchronously through that client, hides superseded results, and keeps its controls present
+behind an honest `Resolving sizes…` / `Resolving grid…` state. Ladder responses atomically seed exact emitted-rung
+plans into the byte/entry-bounded dynamic cache; arbitrary contours retain the square-reference ladder. A pure cache
+peek publishes a warm exact result in the current render while
 the active request still runs to pre-empt stale worker CPU. No formula candidate, low-resolution scan, early exit,
 resampling, or committed output manifest changes engine results.
 
@@ -161,7 +156,7 @@ its matte feeds the editor's Blend preview on any shape.
 | `composite.ts` (172) | The image bake (P2 cross-browser SVG engine). `composeFront(orig, subj, blurPx, fxFilter?, vignette, tint)` async. `svgFilterBake` via `URL.createObjectURL(Blob)` (Safari-safe; data-URL renders empty on WebKit). `cssColorFilterToSvg`. `PRESET_FILTER`/`presetFilter`/`PRESET_LABELS`. | One bake feeds 3D + print. Zero `ctx.filter`. |
 | `outline-resolve.ts` (263) | The shape engine. `resolve(source, adjustments)→VShape`: all-off=exact source; globalPass (straighten→simplify→smooth→radius) + localPass (curve+per-corner radius), fold-guarded. | Kernels: Paper (smooth/simplify/per-corner radius) + Clipper2 (straighten/whole radius) + in-house curve. |
 | `geometry-truth.ts` (106) | The single geometry pipeline. `contourFromShape(v)` @ `MANUFACTURING_TOLERANCE_MM` (0.05). `assertContourCuttable`. `vectorShapeHash`. | Tolerances: mfg 0.05, display 0.004, min-feature 5mm, anchor-sep 1.5mm. |
-| `grid-core.ts` · `grid-user.ts` · `grid-admin.ts` | Session 59 pure-mm magnetic-grid engine plus its enforced module boundary: core owns the 48/96 law; user exposes the canonical standard-contour recipe, resolves a final `Contour` + attachment, and returns the distinct default semantic ladder; admin exposes the low-level bench/audit controls. | Creator user code cannot import admin/core or rederive standard contours in UI. User auto cannot select Dice, resolves perimeter-first with explicit minimum coverage rescue, and deduplicates ladder rungs by final-product signature; admin modes retain Dice/full-grid experiments. |
+| `grid-core.ts` · `grid.ts` · `grid-client.ts` · `grid.worker.ts` | Session 59 pure-mm magnetic-grid engine plus one neutral serializable job and browser-worker lane. | Any caller supplies a contour/recipe and explicit options; caller identity never changes engine policy, cache identity, or output. |
 | `polygon.ts` | Neutral polygon/contour containment shared by the grid engine and the dormant legacy validator. | Prevents the replacement grid engine from depending on `attachment.ts`. |
 | `mesh.ts` (212) | `buildShapedGeometry(contour, opts)` — custom BufferGeometry: front cap + rounded edge lip + back cap. 3 material groups (0 front / 1 edge / 2 back). UV0=image, UV1=world-XY suede. Canonical winding (outer CCW / holes CW). | Edge = same front image rolled over the lip. |
 | `build-mesh.ts` (46) | `buildMeshFromSpec(geometryMM, opts, composite, edgeComposite)` → geometry + 2 CanvasTextures. | The only three.js touch besides mesh.ts. |
@@ -258,10 +253,8 @@ The full contract exists, is pure + unit-tested, and is **not wired** to an acti
 - `attachment.ts` — magnet/velcro validators (invented defaults, coupon-pending).
 - `sizes.ts` — interim scale band (s70 base) for the payload path; mock pricing removed (Dan s59/P2); real sizes come from the grid semantic ladder at the Creator attach.
 
-The `grid-user.ts` planner door is live through the User-panel clone on the original grid-lab page. The full clone
-keeps every Admin-bench control visible for Dan's hands-on stay/go gate, but only the final contour and attachment
-cross the User door; ignored controls are logged visibly beside the panel. Admin and User feed the same shared
-renderer. `attachment.ts` is not a valid fallback: it is the superseded 54mm
+The neutral `grid.ts` planner is live through the single grid-lab control panel and shared renderer.
+`attachment.ts` is not a valid fallback: it is the superseded 54mm
 payload-era validator and remains only until the payload contract receives an approved migration.
 
 The only live manufacturing output is `page.onExport` (`?internal=1`): mm-true SVG cutline via `toManufacturingSVG` (laser profile by default — red 0.1mm stroke, kerf applied by the cutter), feasibility-gated by `contourFromShape` + `assertContourCuttable`. Wiring the save/order flow + the 4 artifacts is the open manufacturing work.

@@ -35,7 +35,7 @@ export type Attachment = 'magnetic' | 'twinfix' | 'velcro'
 /** 'auto' (DEFAULT — the §10.7 law): magnet size is SIZE-DRIVEN, never a knob. ≤100mm effects run
  *  all-6mm (light); above 100mm the FOCAL anchors (radial extremes — where peel starts) take 8mm and
  *  the rest stay 6mm; from 200mm the focal window widens (proportional ramp — more 8mm as size/weight
- *  grows). Manual all6/all8/corners8 remain admin experiments. */
+ *  grows). Manual all6/all8/corners8 remain explicit experiments. */
 export type MagnetPlan = 'auto' | 'all6' | 'all8' | 'corners8'
 export type MagnetDia = 6 | 8
 
@@ -76,9 +76,6 @@ export interface GridConfig {
    *  per axis keep the ends + alternate inward, always keeping the central pair → 96/48/96 gaps.
    *  A 262 (48×6) light row becomes 1·3·4·6. Applied only at pitch 48 with ≥5 lines. */
   sparseThin?: boolean
-  /** User product law: after the final perimeter belt, add only the minimum safe anchors that improve
-   *  an uncovered outline region. Admin experiments leave this off. */
-  rescueCoverage?: boolean
 }
 
 export interface Anchor { p: Pt; dia: MagnetDia }
@@ -88,7 +85,6 @@ export interface GridResult {
   /** twin-fix: the effect ships as a PAIR — this grid is also its mirror counterpart's grid. */
   twinRequired: boolean
   anchors: Anchor[]
-  rescueAnchors: Pt[] // omitted lattice/off-lattice anchors added only to recover uncovered material
   candidates: Pt[]      // interior points dropped by perimeter mode (faint viz)
   flaps: Pt[]
   ok: boolean
@@ -99,16 +95,6 @@ export interface GridResult {
 }
 
 function dist(a: Pt, b: Pt) { return Math.hypot(a[0] - b[0], a[1] - b[1]) }
-function bboxPoints(pts: ReadonlyArray<Pt>): BBox {
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-  for (const [x, y] of pts) {
-    if (x < minX) minX = x
-    if (x > maxX) maxX = x
-    if (y < minY) minY = y
-    if (y > maxY) maxY = y
-  }
-  return { minX, minY, maxX, maxY }
-}
 
 /** The most-interior point of the silhouette (pole of inaccessibility, sampled) + its distance to the edge.
  *  Used as the guaranteed single-magnet fallback when the sparse grid seats none. */
@@ -202,70 +188,6 @@ function flapVerts(contour: Contour, seated: ReadonlyArray<Pt>, reach: number): 
   return out
 }
 
-/** Contiguous uncovered samples on each closed outline ring. The wrap merge makes one region when a
- *  flap crosses a ring's array boundary, so rescue is per physical gap rather than per vertex index. */
-function flapRegions(contour: Contour, seated: ReadonlyArray<Pt>, reach: number): Pt[][] {
-  const step = reach / 2
-  const uncovered = (p: Pt) => seated.every((a) => dist(p, a) > reach)
-  const out: Pt[][] = []
-  for (const ring of [contour.outer, ...contour.holes]) {
-    const samples: Pt[] = []
-    const pts = ring.pts
-    for (let i = 0; i < pts.length; i++) {
-      const a = pts[i], b = pts[(i + 1) % pts.length]
-      samples.push(a)
-      const segLen = dist(a, b)
-      const k = Math.floor(segLen / step)
-      for (let j = 1; j <= k; j++) {
-        const t = (j * step) / segLen
-        samples.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t])
-      }
-    }
-    const groups: Pt[][] = []
-    let current: Pt[] = []
-    for (const p of samples) {
-      if (uncovered(p)) current.push(p)
-      else if (current.length) { groups.push(current); current = [] }
-    }
-    if (current.length) groups.push(current)
-    if (groups.length > 1 && samples.length && uncovered(samples[0]) && uncovered(samples[samples.length - 1])) {
-      groups[0] = [...groups[groups.length - 1], ...groups[0]]
-      groups.pop()
-    }
-    out.push(...groups)
-  }
-  return out
-}
-
-/** Region-local off-lattice fallback. Among safe, spacing-valid material points that improve this flap,
- *  prefer the point covering most samples, then the deepest point in material. */
-function deepestSafePointForRegion(
-  prepared: PreparedContour,
-  region: ReadonlyArray<Pt>,
-  pad: number,
-  seated: ReadonlyArray<Pt>,
-): Pt | null {
-  if (!region.length) return null
-  const rb = bboxPoints(region)
-  const minX = rb.minX - pad, maxX = rb.maxX + pad
-  const minY = rb.minY - pad, maxY = rb.maxY + pad
-  const step = Math.max(1, Math.min(maxX - minX, maxY - minY) / 24)
-  let best: Pt | null = null, bestGain = 0, bestDepth = -1
-  for (let x = minX; x <= maxX; x += step) for (let y = minY; y <= maxY; y += step) {
-    const p: Pt = [x, y]
-    if (!pointInPreparedContour(p, prepared)) continue
-    const depth = distanceToPreparedContour(p, prepared)
-    if (depth < pad) continue
-    if (seated.some((a) => dist(p, a) < 2 * pad - 1e-6)) continue
-    let gain = 0
-    for (const flap of region) if (dist(p, flap) <= HOLD_REACH_MM) gain++
-    if (gain > bestGain || (gain === bestGain && gain > 0 && depth > bestDepth)) {
-      best = p; bestGain = gain; bestDepth = depth
-    }
-  }
-  return best
-}
-
 /** Perimeter split: a node is INTERIOR when it has seated neighbours on all four sides (within `step`).
  *  Returns [perimeter, interior]. Thin shapes have no fully-surrounded node → everything is perimeter. */
 function splitPerimeter(seated: ReadonlyArray<Pt>, step: number): { belt: Pt[]; interior: Pt[] } {
@@ -326,7 +248,7 @@ export function computePreparedGrid(prepared: PreparedContour, cfg: GridConfig =
   // size; nothing to seat, nothing to cover. (Engine-owned: ladders, auto and UI all inherit.)
   if (attachment === 'velcro') {
     return {
-      attachment, twinRequired: false, anchors: [], rescueAnchors: [], candidates: [], flaps: [], ok: true,
+      attachment, twinRequired: false, anchors: [], candidates: [], flaps: [], ok: true,
       issues: [], pitchCentreMM: 0, edgeRangeMM: [0, 0], applicationPadMM: 0,
     }
   }
@@ -373,35 +295,32 @@ export function computePreparedGrid(prepared: PreparedContour, cfg: GridConfig =
     return d >= pad - PAD_CORNER_TOL_MM && ringCoverage(p) >= RING_COVERAGE_MIN
   }
 
-  // FINALIZE a candidate seed into the layout the user actually gets: coverage-verified perimeter belt
+  // FINALIZE a candidate seed into the delivered layout: coverage-verified perimeter belt
   // + light 1·3·4·6 thinning. Placement parities are judged on THIS final layout (not the raw seed) —
   // the old raw-seat-count scoring let a 5-node cross beat a 4-node box, and after the belt dropped the
-  // cross's centre the user saw a diamond-arranged result under the STANDARD pattern.
-  const finalize = (seed: Pt[]): { seated: Pt[]; interior: Pt[]; rescues: Pt[] } => {
+  // cross's centre the result read as a diamond arrangement under the STANDARD pattern.
+  const finalize = (seed: Pt[]): { seated: Pt[]; interior: Pt[] } => {
     let seated = seed
     let interior: Pt[] = []
-    const rescues: Pt[] = []
     if (perimeterOnly && seated.length > 4) {
       const split = splitPerimeter(seated, neighbourStep(pitch, pattern))
-      if (split.belt.length >= MIN_ANCHORS || cfg.rescueCoverage) {
+      if (split.belt.length >= MIN_ANCHORS) {
         // COVERAGE-VERIFIED belt (shape-agnostic): dropping an "interior" node must never uncover the
         // rim — on curved/concave shapes a surrounded node can still be the closest cover for a dip.
         const belt = split.belt.slice()
         const pool = split.interior.slice()
-        if (!cfg.rescueCoverage) {
-          let uncovered = flapVerts(contourMM, belt, HOLD_REACH_MM)
-          const fullUncovered = flapVerts(contourMM, seed, HOLD_REACH_MM).length
-          while (uncovered.length > fullUncovered && pool.length) {
-            let bi = -1, bestGain = 0
-            for (let i = 0; i < pool.length; i++) {
-              let gain = 0
-              for (const v of uncovered) if (dist(v, pool[i]) <= HOLD_REACH_MM) gain++
-              if (gain > bestGain) { bestGain = gain; bi = i }
-            }
-            if (bi < 0) break // no interior node can help — residual is a genuine size/pitch problem
-            belt.push(pool[bi]); pool.splice(bi, 1)
-            uncovered = flapVerts(contourMM, belt, HOLD_REACH_MM)
+        let uncovered = flapVerts(contourMM, belt, HOLD_REACH_MM)
+        const fullUncovered = flapVerts(contourMM, seed, HOLD_REACH_MM).length
+        while (uncovered.length > fullUncovered && pool.length) {
+          let bi = -1, bestGain = 0
+          for (let i = 0; i < pool.length; i++) {
+            let gain = 0
+            for (const v of uncovered) if (dist(v, pool[i]) <= HOLD_REACH_MM) gain++
+            if (gain > bestGain) { bestGain = gain; bi = i }
           }
+          if (bi < 0) break // no interior node can help — residual is a genuine size/pitch problem
+          belt.push(pool[bi]); pool.splice(bi, 1)
+          uncovered = flapVerts(contourMM, belt, HOLD_REACH_MM)
         }
         seated = belt; interior = pool
       }
@@ -438,36 +357,7 @@ export function computePreparedGrid(prepared: PreparedContour, cfg: GridConfig =
         if (thinned.length >= MIN_ANCHORS) seated = thinned
       }
     }
-    if (cfg.rescueCoverage && perimeterOnly && seated.length) {
-      // The rescue pool is every safe lattice node omitted from the final belt (interior drop or Light
-      // thinning). Each original uncovered region is solved greedily with the minimum improving nodes.
-      const same = (a: Pt, b: Pt) => Math.abs(a[0] - b[0]) < 1e-6 && Math.abs(a[1] - b[1]) < 1e-6
-      const pool = seed.filter((p) => !seated.some((a) => same(a, p)))
-      const regions = flapRegions(contourMM, seated, HOLD_REACH_MM)
-      for (const region of regions) {
-        let remaining = region.filter((p) => seated.every((a) => dist(p, a) > HOLD_REACH_MM))
-        while (remaining.length && pool.length) {
-          let bi = -1, bestGain = 0
-          for (let i = 0; i < pool.length; i++) {
-            if (seated.some((a) => dist(pool[i], a) < 2 * pad - 1e-6)) continue
-            let gain = 0
-            for (const flap of remaining) if (dist(flap, pool[i]) <= HOLD_REACH_MM) gain++
-            if (gain > bestGain) { bi = i; bestGain = gain }
-          }
-          if (bi < 0) break
-          const rescue = pool.splice(bi, 1)[0]
-          seated.push(rescue); rescues.push(rescue)
-          remaining = remaining.filter((p) => dist(p, rescue) > HOLD_REACH_MM)
-        }
-        if (remaining.length) {
-          const rescue = deepestSafePointForRegion(prepared, remaining, pad, seated)
-          if (rescue) { seated.push(rescue); rescues.push(rescue) }
-          // No safe improving point is an honest residual flap; the final verdict stays red.
-        }
-      }
-      interior = pool
-    }
-    return { seated, interior, rescues }
+    return { seated, interior }
   }
 
   // CENTER the fixed grid on the shape — balanced by construction (the grid translates as a rigid bulk).
@@ -478,7 +368,6 @@ export function computePreparedGrid(prepared: PreparedContour, cfg: GridConfig =
   // never a rotated/diamond arrangement) → most seated → best centred.
   let seated: Pt[] = []
   let interior: Pt[] = []
-  let rescues: Pt[] = []
   {
     const c: Pt = centerMode === 'bbox'
       ? [(bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2]
@@ -491,7 +380,7 @@ export function computePreparedGrid(prepared: PreparedContour, cfg: GridConfig =
     const minSpacing = 2 * pad
     const checkers = pattern === 'diamond' ? [0, 1] : [0] // diamond: try both checkerboard halves
     const expectedMp = neighbourStep(pitch, pattern)
-    type Cand = { fin: { seated: Pt[]; interior: Pt[]; rescues: Pt[] }; flapN: number; conform: number; bal: number }
+    type Cand = { fin: { seated: Pt[]; interior: Pt[] }; flapN: number; conform: number; bal: number }
     const cands: Cand[] = []
     for (const px of oxs) for (const py of oys) for (const ck of checkers) {
       const nodes = latticeAt(bb, pitch, pattern, px, py, ck)
@@ -519,7 +408,7 @@ export function computePreparedGrid(prepared: PreparedContour, cfg: GridConfig =
       const key: [number, number, number, number] = [k.flapN, -k.conform, -k.fin.seated.length, k.bal]
       const better = !bestKey || key[0] < bestKey[0] || (key[0] === bestKey[0] && (key[1] < bestKey[1]
         || (key[1] === bestKey[1] && (key[2] < bestKey[2] || (key[2] === bestKey[2] && key[3] < bestKey[3])))))
-      if (better) { bestKey = key; seated = k.fin.seated; interior = k.fin.interior; rescues = k.fin.rescues }
+      if (better) { bestKey = key; seated = k.fin.seated; interior = k.fin.interior }
     }
   }
 
@@ -527,7 +416,7 @@ export function computePreparedGrid(prepared: PreparedContour, cfg: GridConfig =
   // deepest interior point (a single magnet has no spacing to honour, so grid phase is moot here).
   if (seated.length === 0) {
     const dp = deepestPoint(prepared, bb)
-    if (dp && dp.d >= pad) { seated = [dp.p]; interior = []; if (cfg.rescueCoverage) rescues = [dp.p] }
+    if (dp && dp.d >= pad) { seated = [dp.p]; interior = [] }
   }
   const anchors = assignSizes(seated, plan, Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY))
 
@@ -541,7 +430,7 @@ export function computePreparedGrid(prepared: PreparedContour, cfg: GridConfig =
   if (anchors.length === 0) { minD = 6; maxD = 6 }
 
   return {
-    attachment, twinRequired: attachment === 'twinfix', anchors, rescueAnchors: rescues, candidates: interior, flaps,
+    attachment, twinRequired: attachment === 'twinfix', anchors, candidates: interior, flaps,
     ok: issues.length === 0,
     issues,
     pitchCentreMM: pitch,
@@ -552,7 +441,7 @@ export function computePreparedGrid(prepared: PreparedContour, cfg: GridConfig =
 
 
 // ─── LAUNCH LAW (§13, locked 2026-07-21) — 48-family only, procedural zero-point ladder ──────────────
-// Launch pitches = 48/96 exclusively. Retired 24/72 pitches have no launch or admin exception.
+// Launch pitches = 48/96 exclusively. Retired 24/72 pitches have no exception.
 /** Grid density preference: 'light' tries the coarse 96 first (sparse, uncrowded — the garment
  *  aesthetic); 'standard' tries 48 first (denser, firmer hold). Same family either way. */
 export type GridDensity = 'standard' | 'light'
@@ -571,7 +460,7 @@ export function legalPatterns(pitchMM: number): GridPattern[] {
   if (pitchMM === 48) return ['standard', 'diamond']
   return []
 }
-/** The admin LAW INPUTS that generate every size procedurally — no hand-picked numbers. */
+/** The LAW INPUTS that generate every size procedurally — no hand-picked numbers. */
 export interface SizeLaw {
   paddingMM: number   // mag-safe radius from magnet centre (default 10)
   frameMM: number     // frame stroke per side (default 1; 0 = frameless… padding then absorbs it)
@@ -623,7 +512,7 @@ export function stdShapeContour(shape: StdShape, wMM: number, hMM: number = wMM)
 
 
 
-/** GRID MODE — the four user-facing modes (§ goal 2026-07-21):
+/** GRID MODE — the four exposed modes (§ goal 2026-07-21):
  *  auto = everything legal + a deepest-material fallback for irregular shapes · standard = straight (48-atom)
  *  links only · quincunx (dice) = the standard+diamond mix (96 pitch) · diamond = diagonal (68-atom)
  *  links only. */
@@ -642,7 +531,7 @@ function modeCombos(mode: GridMode): { pitchMM: number; pattern: GridPattern }[]
 export interface SemanticRung { label: string; points: number; sizeMM: number; visible: boolean }
 export type SemanticRungTieBreak = 'higher' | 'first'
 
-/** Select the closest semantic rung. Exact ties are explicit so each semantic door cannot drift. */
+/** Select the closest semantic rung. Exact ties are explicit so callers cannot drift. */
 export function nearestSemanticRung(
   rungs: ReadonlyArray<SemanticRung>,
   targetMM: number,
@@ -929,6 +818,8 @@ export interface GridPlanOptions {
   maxGrowMM?: number
   pitchMM?: number
   targetAnchors?: number
+  signedBaseMargin?: boolean
+  diagnosticVelcro?: boolean
 }
 
 /** Complete engine verdict. A caller renders these facts; it does not reimplement their laws. */
@@ -980,25 +871,15 @@ export function nearestAnchorPair(anchors: ReadonlyArray<Anchor>): NearestAnchor
  * mode legality, density/coverage, pitch selection, padding, margin adaptation, and truthful resolved
  * measurements live here once. Creator flows call one operation and render the returned facts.
  */
-interface ResolverPolicy {
-  autoPatterns?: ReadonlyArray<GridPattern>
-  perimeterOnly?: boolean
-  rescueCoverage?: boolean
-  sparseThin?: boolean
-  signedBaseMargin?: boolean
-  diagnosticVelcro?: boolean
-}
-
-function resolveGridPlanWithPolicy(
+export function resolveGridPlan(
   contourMM: Contour,
-  opts: GridPlanOptions,
-  policy: ResolverPolicy,
+  opts: GridPlanOptions = {},
 ): ResolvedGridPlan {
   const attachment = opts.attachment ?? 'magnetic'
   const mode = opts.mode ?? 'auto'
   const density = opts.density ?? 'light'
   const requestedBaseMarginMM = opts.baseMarginMM ?? 0
-  const baseMarginMM = policy.signedBaseMargin
+  const baseMarginMM = opts.signedBaseMargin
     ? requestedBaseMarginMM
     : Math.max(0, requestedBaseMarginMM)
   const maxGrowMM = opts.maxGrowMM ?? DEFAULT_MARGIN_MM
@@ -1012,12 +893,11 @@ function resolveGridPlanWithPolicy(
     paddingMM: opts.paddingMM ?? PADDING_FLOOR_MM,
     plan: opts.plan ?? 'auto',
     center: opts.center ?? 'centroid',
-    perimeterOnly: policy.perimeterOnly ?? perimeterForDensity(density, patternForCoverage),
-    sparseThin: policy.sparseThin ?? density === 'light',
-    rescueCoverage: policy.rescueCoverage,
+    perimeterOnly: perimeterForDensity(density, patternForCoverage),
+    sparseThin: density === 'light',
   }
 
-  if (attachment === 'velcro' && !policy.diagnosticVelcro) {
+  if (attachment === 'velcro' && !opts.diagnosticVelcro) {
     const effectContour = marginVariants.get(baseMarginMM)
     const grid = computePreparedGrid(effectContour, { ...cfg, attachment })
     return {
@@ -1038,7 +918,6 @@ function resolveGridPlanWithPolicy(
     density,
     pitchMM: opts.pitchMM,
     pattern: manualPattern,
-    patterns: policy.autoPatterns,
   })
   const fit = selected.fit
   return {
@@ -1052,92 +931,6 @@ function resolveGridPlanWithPolicy(
     grewMM: fit.grew,
     nearestAnchorMM: nearestAnchorPair(fit.grid.anchors)?.distanceMM ?? null,
   }
-}
-
-/** Product-safe resolver: signed inward margins are clamped and Velcro has no diagnostic grid. */
-export function resolveGridPlan(contourMM: Contour, opts: GridPlanOptions = {}): ResolvedGridPlan {
-  return resolveGridPlanWithPolicy(contourMM, opts, {})
-}
-
-/** Full Admin resolver: preserves signed offsets and Velcro's diagnostic pitch/pattern preview. */
-export function resolveAdminGridPlan(contourMM: Contour, opts: GridPlanOptions = {}): ResolvedGridPlan {
-  return resolveGridPlanWithPolicy(contourMM, opts, {
-    signedBaseMargin: true,
-    diagnosticVelcro: true,
-  })
-}
-
-/** Internal core operation behind the constrained user door. Dice is absent by construction; the final
- *  Light belt adds only coverage-improving rescue anchors. */
-export function resolveUserGridPlan(contourMM: Contour, attachment: Attachment): ResolvedGridPlan {
-  return resolveGridPlanWithPolicy(contourMM, { attachment }, {
-    autoPatterns: ['standard', 'diamond'],
-    perimeterOnly: true,
-    rescueCoverage: true,
-    sparseThin: true,
-  })
-}
-
-/** Translation-invariant identity of the manufactured magnetic product. Positions are centred and
- *  quantized to quarter-lattice units: enough to preserve lattice topology while ignoring harmless
- *  off-lattice rescue drift between near-identical sizes. Attributed nodes carry magnet diameter and
- *  rescue membership; the edge set records local adjacency. */
-export function finalProductSignature(plan: ResolvedGridPlan): string {
-  const anchors = plan.grid.anchors
-  if (!anchors.length || !plan.pitchMM) {
-    return `${plan.grid.attachment}|${plan.pattern ?? 'none'}|${plan.pitchMM}|[]|[]`
-  }
-  const pitch = plan.pitchMM
-  const cx = anchors.reduce((sum, anchor) => sum + anchor.p[0], 0) / anchors.length
-  const cy = anchors.reduce((sum, anchor) => sum + anchor.p[1], 0) / anchors.length
-  const isRescue = (p: Pt) => plan.grid.rescueAnchors.some((rescue) => dist(p, rescue) < 1e-4)
-  const nodes = anchors.map((anchor) => ({
-    x: Math.round(((anchor.p[0] - cx) / pitch) * 4),
-    y: Math.round(((anchor.p[1] - cy) / pitch) * 4),
-    dia: anchor.dia,
-    rescue: isRescue(anchor.p) ? 1 : 0,
-  })).sort((a, b) => a.x - b.x || a.y - b.y || a.dia - b.dia || a.rescue - b.rescue)
-  const edges: string[] = []
-  for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
-    const dx = nodes[j].x - nodes[i].x, dy = nodes[j].y - nodes[i].y
-    const quarterLinks = Math.round(Math.hypot(dx, dy))
-    if (quarterLinks <= 6) edges.push(`${i}-${j}:${quarterLinks}`) // local adjacency ≤ 1.5 pitches
-  }
-  const nodeKey = nodes.map((node) => `${node.x},${node.y},${node.dia},${node.rescue}`).join(';')
-  return `${plan.grid.attachment}|${plan.pattern ?? 'none'}|${pitch}|${nodeKey}|${edges.join(';')}`
-}
-
-/** Constrained user ladder. Candidate discovery remains the existing exhaustive zero-point scan; only
- *  Standard/Diamond candidates are admitted. Each candidate is then resolved through the real user
- *  door, rejected when its theoretical winning pattern is not the product-selected pattern, and
- *  deduplicated by final-product identity. Candidate order is ascending, so the smallest survives. */
-export function resolveUserSemanticLadder(
-  makeShape: (sizeMM: number) => Contour,
-  law: SizeLaw = DEFAULT_LAW,
-): SemanticRung[] {
-  return resolveUserSemanticLadderWithPlans(makeShape, law).rungs
-}
-
-/** User ladder plus the exact plans already resolved for its final emitted rungs. */
-export function resolveUserSemanticLadderWithPlans(
-  makeShape: (sizeMM: number) => Contour,
-  law: SizeLaw = DEFAULT_LAW,
-): { rungs: SemanticRung[]; plans: ResolvedGridPlan[] } {
-  const userCombos = modeCombos('auto').filter(({ pattern }) => pattern !== 'quincunx')
-  const candidates = semanticSteps(makeShape, law, userCombos)
-  const seen = new Set<string>()
-  const products: SemanticStep[] = []
-  const plans: ResolvedGridPlan[] = []
-  for (const candidate of candidates) {
-    const plan = resolveUserGridPlan(makeShape(candidate.sizeMM), 'magnetic')
-    if (!plan.pattern || !candidate.patterns.includes(plan.pattern) || plan.grid.flaps.length) continue
-    const signature = finalProductSignature(plan)
-    if (seen.has(signature)) continue
-    seen.add(signature)
-    products.push({ ...candidate, points: plan.grid.anchors.length })
-    plans.push(plan)
-  }
-  return { rungs: labelSemanticSteps(products, law), plans }
 }
 
 // ─── EXACT ASYNC/CACHE CONTRACT ─────────────────────────────────────────────
@@ -1234,17 +1027,6 @@ const GRID_ENGINE_POLICY_CONTRACT = {
     quincunx: modeCombos('quincunx'),
     diamond: modeCombos('diamond'),
   },
-  user: {
-    autoPatterns: ['standard', 'diamond'],
-    perimeterOnly: true,
-    rescueCoverage: true,
-    sparseThin: true,
-    ladderAttachment: 'magnetic',
-  },
-  admin: {
-    signedBaseMargin: true,
-    diagnosticVelcro: true,
-  },
 } as const
 
 /** Engine-owned law/policy identity; UI and worker clients never reconstruct it. */
@@ -1259,36 +1041,25 @@ function normalizedLaw(law: SizeLaw = DEFAULT_LAW): SizeLaw {
   }
 }
 
-function gridCacheKey(door: 'user' | 'admin', operation: 'ladder' | 'plan', body: unknown): string {
+function gridCacheKey(operation: 'ladder' | 'plan', body: unknown): string {
   return canonicalGridCacheValue({
     body,
     cacheVersion: GRID_ENGINE_CACHE_VERSION,
-    door,
     operation,
     policy: GRID_ENGINE_POLICY_SIGNATURE,
   })
 }
 
-export function userLadderCacheKey(recipe: LadderRecipe): string {
-  ladderShapeFromRecipe(recipe) // validate before admitting a recipe to the cache
-  return gridCacheKey('user', 'ladder', { law: normalizedLaw(), recipe })
-}
-
-export function adminLadderCacheKey(
+export function gridLadderCacheKey(
   recipe: LadderRecipe,
   law: SizeLaw = DEFAULT_LAW,
   mode: GridMode = 'auto',
 ): string {
   ladderShapeFromRecipe(recipe)
-  return gridCacheKey('admin', 'ladder', { law: normalizedLaw(law), mode, recipe })
+  return gridCacheKey('ladder', { law: normalizedLaw(law), mode, recipe })
 }
 
-export function userPlanCacheKey(recipe: PlanRecipe, attachment: Attachment): string {
-  planContourFromRecipe(recipe)
-  return gridCacheKey('user', 'plan', { attachment, recipe })
-}
-
-function effectiveAdminPlanOptions(opts: GridPlanOptions = {}) {
+function effectiveGridPlanOptions(opts: GridPlanOptions = {}) {
   return {
     attachment: opts.attachment ?? 'magnetic',
     mode: opts.mode ?? 'auto',
@@ -1300,10 +1071,12 @@ function effectiveAdminPlanOptions(opts: GridPlanOptions = {}) {
     maxGrowMM: Math.max(0, opts.maxGrowMM ?? DEFAULT_MARGIN_MM),
     pitchMM: opts.pitchMM ?? null,
     targetAnchors: opts.targetAnchors ?? TARGET_ANCHORS,
+    signedBaseMargin: opts.signedBaseMargin ?? false,
+    diagnosticVelcro: opts.diagnosticVelcro ?? false,
   }
 }
 
-export function adminPlanCacheKey(recipe: PlanRecipe, opts: GridPlanOptions = {}): string {
+export function gridPlanCacheKey(recipe: PlanRecipe, opts: GridPlanOptions = {}): string {
   planContourFromRecipe(recipe)
-  return gridCacheKey('admin', 'plan', { options: effectiveAdminPlanOptions(opts), recipe })
+  return gridCacheKey('plan', { options: effectiveGridPlanOptions(opts), recipe })
 }

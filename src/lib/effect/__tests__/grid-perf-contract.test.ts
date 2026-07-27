@@ -4,11 +4,11 @@ import {
   DEFAULT_LAW,
   GRID_ENGINE_CACHE_VERSION,
   GRID_ENGINE_POLICY_SIGNATURE,
-  adminLadderCacheKey,
-  adminPlanCacheKey,
+  gridLadderCacheKey,
+  gridPlanCacheKey,
   canonicalGridCacheValue,
-  handleAdminGridJob,
-  resolveAdminGridPlan,
+  handleGridJob,
+  resolveGridPlan,
   scaleContour,
   semanticLadder,
   stdShapeContour,
@@ -19,15 +19,8 @@ import {
   type LadderRecipe,
   type PlanRecipe,
   type SizeLaw,
-} from '../grid-admin'
+} from '../grid'
 import { BoundedResultCache, StaticResultTable } from '../grid-cache'
-import {
-  handleUserGridJob,
-  resolveUserPlan,
-  semanticLadder as userSemanticLadder,
-  userLadderCacheKey,
-  userPlanCacheKey,
-} from '../grid-user'
 import type { Contour } from '../types'
 
 const STANDARD_SHAPES = ['square', 'diamondShape', 'triangle', 'circle'] as const
@@ -45,47 +38,38 @@ function expectByteIdentical(actual: unknown, direct: unknown): void {
 }
 
 describe('exact grid recipe handlers', () => {
-  it.each(STANDARD_SHAPES)('keeps the User %s ladder byte-identical', (shape) => {
-    const recipe: LadderRecipe = { kind: 'standard', shape }
-    const direct = userSemanticLadder((sizeMM) => stdShapeContour(shape, sizeMM, sizeMM))
-    const handled = handleUserGridJob({ operation: 'ladder', recipe })
-
-    expect(handled.operation).toBe('ladder')
-    expect(handled.key).toBe(userLadderCacheKey(recipe))
-    expectByteIdentical(handled.value, direct)
-  }, 20_000)
-
   for (const shape of STANDARD_SHAPES) for (const mode of MODES) {
-    it(`keeps the Admin ${shape}/${mode} ladder byte-identical`, () => {
+    it(`keeps the neutral ${shape}/${mode} ladder byte-identical`, () => {
       const recipe: LadderRecipe = { kind: 'standard', shape }
       const direct = semanticLadder(
         (sizeMM) => stdShapeContour(shape, sizeMM, sizeMM),
         DEFAULT_LAW,
         mode,
       )
-      const handled = handleAdminGridJob({ operation: 'ladder', recipe, law: DEFAULT_LAW, mode })
+      const handled = handleGridJob({ operation: 'ladder', recipe, law: DEFAULT_LAW, mode })
 
       expect(handled.operation).toBe('ladder')
-      expect(handled.key).toBe(adminLadderCacheKey(recipe, DEFAULT_LAW, mode))
+      expect(handled.key).toBe(gridLadderCacheKey(recipe, DEFAULT_LAW, mode))
       expectByteIdentical(handled.value, direct)
     }, 20_000)
   }
 
   for (const shape of STANDARD_SHAPES) for (const attachment of ATTACHMENTS) {
-    it(`keeps the User ${shape}/${attachment} plan byte-identical`, () => {
+    it(`keeps the default ${shape}/${attachment} plan byte-identical`, () => {
       const recipe: PlanRecipe = { kind: 'standard', shape, widthMM: 118, heightMM: 118 }
-      const direct = resolveUserPlan(stdShapeContour(shape, 118, 118), { attachment })
-      const handled = handleUserGridJob({ operation: 'plan', recipe, attachment })
+      const options = { attachment }
+      const direct = resolveGridPlan(stdShapeContour(shape, 118, 118), options)
+      const handled = handleGridJob({ operation: 'plan', recipe, options })
 
       expect(handled.operation).toBe('plan')
-      expect(handled.key).toBe(userPlanCacheKey(recipe, attachment))
+      expect(handled.key).toBe(gridPlanCacheKey(recipe, options))
       expectByteIdentical(handled.value, direct)
     }, 20_000)
   }
 
   for (const shape of STANDARD_SHAPES) for (const mode of MODES) {
     for (const density of DENSITIES) for (const attachment of ATTACHMENTS) {
-      it(`keeps the Admin ${shape}/${mode}/${density}/${attachment} plan byte-identical`, () => {
+      it(`keeps the neutral ${shape}/${mode}/${density}/${attachment} plan byte-identical`, () => {
         const recipe: PlanRecipe = { kind: 'standard', shape, widthMM: 118, heightMM: 118 }
         const options: GridPlanOptions = {
           attachment,
@@ -96,12 +80,14 @@ describe('exact grid recipe handlers', () => {
           center: 'centroid',
           baseMarginMM: 0,
           maxGrowMM: 0,
+          signedBaseMargin: true,
+          diagnosticVelcro: true,
         }
-        const direct = resolveAdminGridPlan(stdShapeContour(shape, 118, 118), options)
-        const handled = handleAdminGridJob({ operation: 'plan', recipe, options })
+        const direct = resolveGridPlan(stdShapeContour(shape, 118, 118), options)
+        const handled = handleGridJob({ operation: 'plan', recipe, options })
 
         expect(handled.operation).toBe('plan')
-        expect(handled.key).toBe(adminPlanCacheKey(recipe, options))
+        expect(handled.key).toBe(gridPlanCacheKey(recipe, options))
         expectByteIdentical(handled.value, direct)
       }, 20_000)
     }
@@ -123,9 +109,15 @@ describe('exact grid recipe handlers', () => {
       ] }],
     }
     const recipe: PlanRecipe = { kind: 'uniform-contour', unitContour, longestMM: 118.125 }
-    const options: GridPlanOptions = { mode: 'standard', density: 'light', maxGrowMM: 0 }
-    const direct = resolveAdminGridPlan(scaleContour(unitContour, 118.125), options)
-    const handled = handleAdminGridJob({ operation: 'plan', recipe, options })
+    const options: GridPlanOptions = {
+      mode: 'standard',
+      density: 'light',
+      maxGrowMM: 0,
+      signedBaseMargin: true,
+      diagnosticVelcro: true,
+    }
+    const direct = resolveGridPlan(scaleContour(unitContour, 118.125), options)
+    const handled = handleGridJob({ operation: 'plan', recipe, options })
 
     expect(handled.operation).toBe('plan')
     expectByteIdentical(handled.value, direct)
@@ -142,8 +134,9 @@ describe('exact grid recipe handlers', () => {
     }
     const recipe: PlanRecipe = { kind: 'final-contour', contourMM }
     const attachment: Attachment = 'magnetic'
-    const direct = resolveUserPlan(contourMM, { attachment })
-    const handled = handleUserGridJob({ operation: 'plan', recipe, attachment })
+    const options = { attachment }
+    const direct = resolveGridPlan(contourMM, options)
+    const handled = handleGridJob({ operation: 'plan', recipe, options })
 
     expect(handled.operation).toBe('plan')
     expectByteIdentical(handled.value, direct)
@@ -163,41 +156,41 @@ describe('exact grid cache identity', () => {
   })
 
   it('rejects non-finite coordinates and degenerate rings before cache admission', () => {
-    expect(() => userPlanCacheKey({
+    expect(() => gridPlanCacheKey({
       kind: 'final-contour',
       contourMM: { outer: { pts: [[0, 0], [1, 0], [Number.NaN, 1]] }, holes: [] },
-    }, 'magnetic')).toThrow('finite coordinates')
-    expect(() => userLadderCacheKey({
+    }, { attachment: 'magnetic' })).toThrow('finite coordinates')
+    expect(() => gridLadderCacheKey({
       kind: 'uniform-contour',
       unitContour: { outer: { pts: [[0, 0], [1, 0]] }, holes: [] },
     })).toThrow('at least three points')
   })
 
-  it('changes the User identity only for consumed ladder/plan inputs', () => {
-    expect(userLadderCacheKey(squareLadder)).toBe(userLadderCacheKey({ ...squareLadder }))
-    expect(userLadderCacheKey(squareLadder))
-      .not.toBe(userLadderCacheKey({ kind: 'standard', shape: 'circle' }))
-    expect(userPlanCacheKey(squarePlan, 'magnetic'))
-      .not.toBe(userPlanCacheKey(squarePlan, 'twinfix'))
+  it('changes the neutral identity only for consumed ladder/plan inputs', () => {
+    expect(gridLadderCacheKey(squareLadder)).toBe(gridLadderCacheKey({ ...squareLadder }))
+    expect(gridLadderCacheKey(squareLadder))
+      .not.toBe(gridLadderCacheKey({ kind: 'standard', shape: 'circle' }))
+    expect(gridPlanCacheKey(squarePlan, { attachment: 'magnetic' }))
+      .not.toBe(gridPlanCacheKey(squarePlan, { attachment: 'twinfix' }))
   })
 
-  it('changes the Admin ladder key for every mutable ladder input', () => {
+  it('changes the ladder key for every mutable ladder input', () => {
     const baseLaw = { ...DEFAULT_LAW }
-    const base = adminLadderCacheKey(squareLadder, baseLaw, 'auto')
+    const base = gridLadderCacheKey(squareLadder, baseLaw, 'auto')
     const mutations: SizeLaw[] = [
       { ...baseLaw, paddingMM: 11 },
       { ...baseLaw, frameMM: 2 },
       { ...baseLaw, maxTestedMM: 215 },
       { ...baseLaw, maxRungMM: 309 },
     ]
-    for (const law of mutations) expect(adminLadderCacheKey(squareLadder, law, 'auto')).not.toBe(base)
-    expect(adminLadderCacheKey(squareLadder, baseLaw, 'standard')).not.toBe(base)
+    for (const law of mutations) expect(gridLadderCacheKey(squareLadder, law, 'auto')).not.toBe(base)
+    expect(gridLadderCacheKey(squareLadder, baseLaw, 'standard')).not.toBe(base)
   })
 
-  it('changes the Admin plan key for every consumed option and normalizes effective defaults', () => {
-    const defaults = adminPlanCacheKey(squarePlan)
-    expect(adminPlanCacheKey(squarePlan, {})).toBe(defaults)
-    expect(adminPlanCacheKey(squarePlan, {
+  it('changes the plan key for every consumed option and normalizes effective defaults', () => {
+    const defaults = gridPlanCacheKey(squarePlan)
+    expect(gridPlanCacheKey(squarePlan, {})).toBe(defaults)
+    expect(gridPlanCacheKey(squarePlan, {
       attachment: 'magnetic',
       mode: 'auto',
       density: 'light',
@@ -220,15 +213,17 @@ describe('exact grid cache identity', () => {
       { maxGrowMM: 13 },
       { pitchMM: 48 },
       { targetAnchors: 5 },
+      { signedBaseMargin: true },
+      { diagnosticVelcro: true },
     ]
-    for (const options of mutations) expect(adminPlanCacheKey(squarePlan, options)).not.toBe(defaults)
+    for (const options of mutations) expect(gridPlanCacheKey(squarePlan, options)).not.toBe(defaults)
   })
 
   it('includes the explicit engine version and engine-owned policy signature', () => {
     expect(GRID_ENGINE_CACHE_VERSION).toBe(1)
-    expect(GRID_ENGINE_POLICY_SIGNATURE).toContain('"autoPatterns"')
-    expect(GRID_ENGINE_POLICY_SIGNATURE).toContain('"diagnosticVelcro":true')
-    expect(userLadderCacheKey(squareLadder)).toContain(`"cacheVersion":${GRID_ENGINE_CACHE_VERSION}`)
+    expect(GRID_ENGINE_POLICY_SIGNATURE).not.toContain('"user"')
+    expect(GRID_ENGINE_POLICY_SIGNATURE).not.toContain('"admin"')
+    expect(gridLadderCacheKey(squareLadder)).toContain(`"cacheVersion":${GRID_ENGINE_CACHE_VERSION}`)
   })
 })
 

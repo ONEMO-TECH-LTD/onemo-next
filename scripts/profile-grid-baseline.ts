@@ -6,7 +6,12 @@ import {
   DENSE_REAL_AI_GRID_CONTOUR,
   REAL_AI_GRID_CORPUS,
 } from '../src/lib/effect/grid-s0-corpus'
-import { resolveUserLadderRecipe, resolveUserPlanRecipe } from '../src/lib/effect/grid-user'
+import {
+  ladderShapeFromRecipe,
+  planContourFromRecipe,
+  resolveGridPlan,
+  semanticLadder,
+} from '../src/lib/effect/grid'
 
 type ProfileName = 'canonical-ladder' | 'dense-live-plan' | 'small-contour-plan'
 
@@ -22,7 +27,7 @@ function measuredProfile(name: ProfileName) {
         operation: 'ladder',
         recipe: { kind: 'standard', shape: 'circle' },
       },
-      run: () => resolveUserLadderRecipe({ kind: 'standard', shape: 'circle' }),
+      run: () => semanticLadder(ladderShapeFromRecipe({ kind: 'standard', shape: 'circle' })),
     } as const
   }
   if (name === 'small-contour-plan') {
@@ -35,9 +40,9 @@ function measuredProfile(name: ProfileName) {
         heightMM: 70,
         attachment: 'magnetic',
       },
-      run: () => resolveUserPlanRecipe(
-        { kind: 'standard', shape: 'square', widthMM: 70, heightMM: 70 },
-        'magnetic',
+      run: () => resolveGridPlan(
+        planContourFromRecipe({ kind: 'standard', shape: 'square', widthMM: 70, heightMM: 70 }),
+        { attachment: 'magnetic' },
       ),
     } as const
   }
@@ -51,9 +56,9 @@ function measuredProfile(name: ProfileName) {
       densification: '8 exact collinear segments per manufacturing edge',
       attachment: 'magnetic',
     },
-    run: () => resolveUserPlanRecipe(
-      { kind: 'final-contour', contourMM: DENSE_REAL_AI_GRID_CONTOUR },
-      'magnetic',
+    run: () => resolveGridPlan(
+      planContourFromRecipe({ kind: 'final-contour', contourMM: DENSE_REAL_AI_GRID_CONTOUR }),
+      { attachment: 'magnetic' },
     ),
   } as const
 }
@@ -95,7 +100,7 @@ const report = {
   schemaVersion: 1,
   measuredAt: new Date().toISOString(),
   profile: requested,
-  execution: 'same-process direct User door',
+  execution: 'same-process direct neutral engine',
   warmSamples: 5,
   fixture: profile.fixture,
   output: {

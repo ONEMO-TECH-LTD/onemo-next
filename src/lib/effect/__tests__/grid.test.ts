@@ -7,38 +7,20 @@ import {
   computeGrid,
   contourWithOuterMargin,
   DEFAULT_LAW,
-  finalProductSignature,
   nearestAnchorPair,
   nearestSemanticRung,
-  resolveAdminGridPlan,
-  resolveDesignSizeMM,
   resolveGridPlan,
+  resolveDesignSizeMM,
   resolveRectangleRungs,
   scaleContour,
   semanticLadder,
   stdShapeContour,
-} from '../grid-admin'
-import {
-  nearestUserSemanticRung,
-  resolveUserPlan,
-  semanticLadder as userSemanticLadder,
-  standardShapeContour,
-} from '../grid-user'
+} from '../grid'
 import type { Contour } from '../types'
 
 const donut: Contour = {
   outer: { pts: [[0, 0], [214, 0], [214, 214], [0, 214]] },
   holes: [{ pts: [[70, 70], [144, 70], [144, 144], [70, 144]] }],
-}
-
-// A large pad-valid body plus a 22mm pad-valid lobe joined by a thin neck. The fixed lattice seats
-// the body but misses the lobe entirely; the user law must add one local rescue anchor there.
-const asymmetricDumbbell: Contour = {
-  outer: { pts: [
-    [0, 0], [100, 0], [100, 16], [130, 16], [130, 10], [152, 10],
-    [152, 32], [130, 32], [130, 26], [100, 26], [100, 120], [0, 120],
-  ] },
-  holes: [],
 }
 
 describe('resolveGridPlan — production engine seam', () => {
@@ -85,54 +67,6 @@ describe('resolveGridPlan — production engine seam', () => {
     expect([48, 96]).toContain(plan.pitchMM)
   })
 
-  it('keeps Dice admin-only while user auto stays perimeter-first on the reported large shapes', () => {
-    for (const [shape, sizeMM, pitchMM, seated, rescues] of [
-      ['circle', 303, 48, 16, 8],
-      ['diamondShape', 310, 96, 12, 6],
-    ] as const) {
-      const contour = stdShapeContour(shape, sizeMM)
-      const user = resolveUserPlan(contour, { attachment: 'magnetic' })
-      const adminDice = resolveGridPlan(contour, {
-        mode: 'quincunx', density: 'light', maxGrowMM: 12,
-      })
-
-      expect(user.pattern).toBe('standard')
-      expect(user.pitchMM).toBe(pitchMM)
-      expect(user.grid.anchors).toHaveLength(seated)
-      expect(user.grid.rescueAnchors).toHaveLength(rescues)
-      expect(user.grid.flaps).toHaveLength(0)
-      expect(user.grid.anchors.length).toBeLessThan(adminDice.grid.anchors.length)
-      expect(adminDice.pattern).toBe('quincunx')
-      expect(adminDice.pitchMM).toBe(96)
-      expect(adminDice.grid.rescueAnchors).toEqual([])
-    }
-  })
-
-  it('adds a minimum local rescue when a safe lobe has no lattice anchor', () => {
-    const plan = resolveUserPlan(asymmetricDumbbell, { attachment: 'magnetic' })
-
-    expect(plan.grid.rescueAnchors).toHaveLength(1)
-    expect(plan.grid.rescueAnchors[0][0]).toBeGreaterThanOrEqual(130)
-    expect(plan.grid.flaps).toHaveLength(0)
-    for (let i = 0; i < plan.grid.anchors.length; i++) for (let j = i + 1; j < plan.grid.anchors.length; j++) {
-      expect(Math.hypot(
-        plan.grid.anchors[i].p[0] - plan.grid.anchors[j].p[0],
-        plan.grid.anchors[i].p[1] - plan.grid.anchors[j].p[1],
-      )).toBeGreaterThanOrEqual(2 * plan.grid.applicationPadMM - 1e-6)
-    }
-  })
-
-  it('keeps an honest red verdict when no safe rescue point exists', () => {
-    const tooThinFrame: Contour = {
-      outer: { pts: [[0, 0], [100, 0], [100, 100], [0, 100]] },
-      holes: [{ pts: [[5, 5], [95, 5], [95, 95], [5, 95]] }],
-    }
-    const plan = resolveUserPlan(tooThinFrame, { attachment: 'magnetic' })
-
-    expect(plan.grid.rescueAnchors).toEqual([])
-    expect(plan.grid.ok).toBe(false)
-    expect(plan.grid.issues.join(' ')).toContain('No room for a magnet')
-  })
 })
 
 describe('engine-owned workbench selections', () => {
@@ -142,9 +76,8 @@ describe('engine-owned workbench selections', () => {
     { label: 'M', points: 4, sizeMM: 118, visible: true },
   ]
 
-  it('preserves the existing Admin-up and User-first exact-tie policies without blending them', () => {
+  it('uses the canonical higher-rung exact-tie policy', () => {
     expect(nearestSemanticRung(rungs, 94).sizeMM).toBe(118)
-    expect(nearestUserSemanticRung(rungs, 94).sizeMM).toBe(70)
   })
 
   it('owns rectangle option legality, fallback, and orientation', () => {
@@ -204,13 +137,14 @@ describe('engine-owned workbench selections', () => {
     expect(resolveDesignSizeMM(1, 'std', { ...DEFAULT_LAW, paddingMM: 20 })).toBe(42)
   })
 
-  it('preserves signed-offset and Velcro diagnostics only through the Admin entry', () => {
+  it('exposes signed-offset and Velcro diagnostics only through explicit options', () => {
     const contour = stdShapeContour('square', 70)
-    const signed = resolveAdminGridPlan(contour, {
+    const signed = resolveGridPlan(contour, {
       attachment: 'magnetic',
       density: 'light',
       baseMarginMM: -15,
       maxGrowMM: 12,
+      signedBaseMargin: true,
     })
     expect({
       pitch: signed.pitchMM,
@@ -219,17 +153,18 @@ describe('engine-owned workbench selections', () => {
       anchors: signed.grid.anchors.length,
     }).toEqual({ pitch: 48, pattern: 'diamond', margin: -15, anchors: 1 })
 
-    const adminVelcro = resolveAdminGridPlan(contour, {
+    const diagnosticVelcro = resolveGridPlan(contour, {
       attachment: 'velcro',
       density: 'light',
       baseMarginMM: 0,
       maxGrowMM: 12,
+      diagnosticVelcro: true,
     })
     expect({
-      pitch: adminVelcro.pitchMM,
-      pattern: adminVelcro.pattern,
-      gridPitch: adminVelcro.grid.pitchCentreMM,
-      anchors: adminVelcro.grid.anchors.length,
+      pitch: diagnosticVelcro.pitchMM,
+      pattern: diagnosticVelcro.pattern,
+      gridPitch: diagnosticVelcro.grid.pitchCentreMM,
+      anchors: diagnosticVelcro.grid.anchors.length,
     }).toEqual({ pitch: 48, pattern: 'diamond', gridPitch: 0, anchors: 0 })
 
     const productVelcro = resolveGridPlan(contour, {
@@ -262,12 +197,6 @@ describe('contour transforms preserve the declared Contour contract', () => {
 })
 
 describe('semantic ladder stays inside its product contract', () => {
-  it('keeps the Create-page standard contour facade identical to the audited canonical recipe', () => {
-    for (const shape of ['square', 'circle', 'diamondShape', 'triangle'] as const) {
-      expect(standardShapeContour(shape, 180)).toEqual(stdShapeContour(shape, 180))
-    }
-  })
-
   it('keeps every legal circle rung even when its sequential labels continue past 3XL', () => {
     const auto = semanticLadder((sizeMM) => stdShapeContour('circle', sizeMM), DEFAULT_LAW, 'auto')
     const standard = semanticLadder((sizeMM) => stdShapeContour('circle', sizeMM), DEFAULT_LAW, 'standard')
@@ -285,34 +214,4 @@ describe('semantic ladder stays inside its product contract', () => {
     }
   })
 
-  it('deduplicates the circle by constrained final product and keeps the smallest equivalent rung', () => {
-    const makeCircle = (sizeMM: number) => standardShapeContour('circle', sizeMM)
-    const ladder = userSemanticLadder(makeCircle)
-
-    expect(ladder.map((rung) => rung.sizeMM)).toEqual([23, 71, 90, 130, 158, 221, 303])
-    expect(ladder.some((rung) => rung.sizeMM === 215)).toBe(false)
-    expect(ladder.some((rung) => rung.sizeMM === 226)).toBe(false)
-    for (const rung of ladder) {
-      const product = resolveUserPlan(makeCircle(rung.sizeMM), { attachment: 'magnetic' })
-      expect(rung.points).toBe(product.grid.anchors.length)
-    }
-  })
-
-  it('signs final products by topology, independent of contour translation', () => {
-    const shiftedCircle = (sizeMM: number, dx: number, dy: number): Contour => {
-      const contour = stdShapeContour('circle', sizeMM)
-      return {
-        outer: { pts: contour.outer.pts.map(([x, y]) => [x + dx, y + dy]) },
-        holes: [],
-      }
-    }
-    const plan221 = resolveUserPlan(stdShapeContour('circle', 221), { attachment: 'magnetic' })
-    const shifted221 = resolveUserPlan(shiftedCircle(221, 337, -125), { attachment: 'magnetic' })
-    const plan226 = resolveUserPlan(stdShapeContour('circle', 226), { attachment: 'magnetic' })
-    const plan215 = resolveUserPlan(stdShapeContour('circle', 215), { attachment: 'magnetic' })
-
-    expect(finalProductSignature(shifted221)).toBe(finalProductSignature(plan221))
-    expect(finalProductSignature(plan226)).toBe(finalProductSignature(plan221))
-    expect(finalProductSignature(plan215)).not.toBe(finalProductSignature(plan221))
-  })
 })

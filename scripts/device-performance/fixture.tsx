@@ -3,17 +3,17 @@ import { createRoot } from 'react-dom/client'
 import suiteConfig from './suite.config.json'
 import { DENSE_REAL_AI_GRID_CONTOUR } from '../../src/lib/effect/grid-s0-corpus'
 import {
-  handleUserGridJob,
+  handleGridJob,
   type ResolvedGridPlan,
-  type UserGridJob,
-  type UserGridJobResult,
-} from '../../src/lib/effect/grid-user'
-import { createUserGridWorkerClient } from '../../src/lib/effect/grid-user-client'
+  type GridJob,
+  type GridJobResult,
+} from '../../src/lib/effect/grid'
+import { createGridWorkerClient } from '../../src/lib/effect/grid-client'
 
 interface ScenarioConfig {
   id: string
   label: string
-  job?: UserGridJob
+  job?: GridJob
   fixture?: 'dense-real-ai-corpus'
 }
 
@@ -50,8 +50,8 @@ declare global {
   }
 }
 
-const clients = new Map<string, ReturnType<typeof createUserGridWorkerClient>>()
-const coldResults = new Map<string, UserGridJobResult>()
+const clients = new Map<string, ReturnType<typeof createGridWorkerClient>>()
+const coldResults = new Map<string, GridJobResult>()
 let nextRunId = 0
 let resolveCommit: ((observation: CommitObservation) => void) | null = null
 let resolveCommitHostReady: (() => void) | null = null
@@ -59,17 +59,17 @@ const commitHostReady = new Promise<void>((resolve) => {
   resolveCommitHostReady = resolve
 })
 
-function resultValue(result: UserGridJobResult) {
+function resultValue(result: GridJobResult) {
   return result.value
 }
 
-function jobForScenario(scenario: ScenarioConfig): UserGridJob {
+function jobForScenario(scenario: ScenarioConfig): GridJob {
   if (scenario.job) return scenario.job
   if (scenario.fixture === 'dense-real-ai-corpus') {
     return {
       operation: 'plan',
       recipe: { kind: 'final-contour', contourMM: DENSE_REAL_AI_GRID_CONTOUR },
-      attachment: 'magnetic',
+      options: { attachment: 'magnetic' },
     }
   }
   throw new Error(`Scenario ${scenario.id} has no executable input.`)
@@ -77,14 +77,10 @@ function jobForScenario(scenario: ScenarioConfig): UserGridJob {
 
 function planT2(plan: ResolvedGridPlan) {
   const quantize = (value: number) => (Math.round(value / 0.05) * 0.05).toFixed(2)
-  const rescued = (x: number, y: number) => plan.grid.rescueAnchors.some(
-    ([rx, ry]) => Math.hypot(x - rx, y - ry) < 0.05,
-  )
   const nodes = plan.grid.anchors.map(({ p: [x, y], dia }) => ({
     x: quantize(x),
     y: quantize(y),
     dia,
-    rescue: rescued(x, y),
   }))
   const edges: string[] = []
   for (let left = 0; left < nodes.length; left += 1) {
@@ -98,7 +94,6 @@ function planT2(plan: ResolvedGridPlan) {
   }
   return {
     anchorCount: nodes.length,
-    rescueCount: plan.grid.rescueAnchors.length,
     flapCount: plan.grid.flaps.length,
     ok: plan.grid.ok,
     pitchMM: plan.pitchMM,
@@ -108,7 +103,7 @@ function planT2(plan: ResolvedGridPlan) {
   }
 }
 
-function t2ForResult(result: UserGridJobResult) {
+function t2ForResult(result: GridJobResult) {
   if (result.operation === 'ladder') {
     return {
       rungs: result.value.map(({ label, points, sizeMM, visible }) => ({
@@ -202,7 +197,7 @@ async function runScenario(
   const job = jobForScenario(scenario)
   if (temperature === 'cold') {
     clients.get(scenarioId)?.dispose()
-    clients.set(scenarioId, createUserGridWorkerClient())
+    clients.set(scenarioId, createGridWorkerClient())
   }
   const client = clients.get(scenarioId)
   if (!client || (temperature === 'warm' && !coldResults.has(scenarioId))) {
@@ -221,7 +216,7 @@ async function runScenario(
   if (!commit.matched) throw new Error(`${scenarioId} committed stale or mismatched evidence.`)
 
   if (temperature === 'cold') coldResults.set(scenarioId, result)
-  const direct = handleUserGridJob(job)
+  const direct = handleGridJob(job)
   const directWorkerByteEqual = JSON.stringify(direct) === JSON.stringify(result)
   const value = resultValue(result)
   return {

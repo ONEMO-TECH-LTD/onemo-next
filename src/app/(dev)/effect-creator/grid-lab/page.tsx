@@ -5,7 +5,7 @@
 //   • Presets    — shape-library getShape() (baked vector data)
 //   • Generators — generateShapeRing() (blob / clover / daisy / pinwheel)
 //   • AI Magic   — image upload → prepareShaped() → u2netp lightweight cut-out → outline
-// Every source yields a VShape → final mm contour consumed by the selected Admin/User grid door.
+// Every source yields a VShape → final mm contour consumed by the neutral grid engine.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getShape, hasVectorDef, type VectorShapeKind } from '@/lib/shape-library'
@@ -14,27 +14,15 @@ import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import { contourFromShape } from '@/lib/effect/geometry-truth'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { nearestAnchorPair, nearestSemanticRung, resolveDesignSizeMM, resolveRectangleRungs, scaleContour, stdShapeContour, rectFormat, minEffectMM, maxDesignMM, DEFAULT_MARGIN_MM, DEFAULT_LAW, type AdminGridJob, type AdminGridJobResult, type GridPattern, type GridPlanOptions, type MagnetPlan, type GridDensity, type GridMode, type PlanRecipe, type ResolvedGridPlan, type SemanticRung, type StdShape, type Attachment } from '@/lib/effect/grid-admin'
+import { nearestAnchorPair, nearestSemanticRung, resolveDesignSizeMM, resolveRectangleRungs, scaleContour, stdShapeContour, rectFormat, minEffectMM, maxDesignMM, DEFAULT_MARGIN_MM, DEFAULT_LAW, type GridJob, type GridJobResult, type GridPattern, type GridPlanOptions, type MagnetPlan, type GridDensity, type GridMode, type PlanRecipe, type ResolvedGridPlan, type SemanticRung, type StandardLadderShape, type StdShape, type Attachment } from '@/lib/effect/grid'
 import { requestGridWorkerJobInBackground } from '@/lib/effect/grid-worker-client'
 import {
-  adminGridJobKey,
-  cachedAdminGridJob,
-  requestAdminGridJob,
-  suspendAdminGridWork,
-} from '@/lib/effect/grid-admin-client'
+  cachedGridJob,
+  gridJobKey,
+  requestGridJob,
+} from '@/lib/effect/grid-client'
 import { GridWorkbenchPanel, type GridWorkbenchPanelProps } from './GridWorkbenchPanel'
 import { contourDimension as dim, GridWorkbenchReadouts, GridWorkbenchStage } from './GridWorkbenchRenderer'
-import {
-  cachedUserGridJob,
-  GridWorkbenchUserPanel,
-  nearestUserWorkbenchRung,
-  requestUserGridJob,
-  suspendUserGridWork,
-  userGridJobKey,
-  type UserGridJob,
-  type UserGridJobResult,
-  type UserStandardShape,
-} from './GridWorkbenchUserPanel'
 import { useGridWorkerJob } from './useGridWorkerJob'
 
 const IMG = 1000
@@ -44,8 +32,6 @@ const FIT = 0.86
 type Src = 'std' | 'preset' | 'gen' | 'magic'
 type StdGeo = StdShape
 type MagicState = { vshape: VShape; maskH: number; adapter: string; imgUrl: string } | null
-type PanelEntry = 'admin' | 'user'
-
 interface PlanDesign {
   design: Contour
   recipe: PlanRecipe
@@ -58,15 +44,12 @@ interface PreparedDesign extends PlanDesign {
   rungH: SemanticRung | null
 }
 
-const requestAdminLadderJob = (job: AdminGridJob) =>
-  requestGridWorkerJobInBackground(job, requestAdminGridJob)
-const requestUserLadderJob = (job: UserGridJob) =>
-  requestGridWorkerJobInBackground(job, requestUserGridJob)
+const requestLadderJob = (job: GridJob) =>
+  requestGridWorkerJobInBackground(job, requestGridJob)
 
 declare global {
   interface Window {
     __GRID_LAB_PROOF__?: {
-      door: PanelEntry
       status: 'resolving-sizes' | 'resolving-grid' | 'ready' | 'error'
       ladderKey: string | null
       planKey: string | null
@@ -95,7 +78,6 @@ function normBase(vs: VShape, maskH: number): Contour | null {
 }
 
 export default function GridLab() {
-  const [panelEntry, setPanelEntry] = useState<PanelEntry>('admin')
   const [renderedPlanKey, setRenderedPlanKey] = useState<string | null>(null)
   const [sliderTransient, setSliderTransient] = useState(false)
   const [src, setSrc] = useState<Src>('std')
@@ -123,7 +105,7 @@ export default function GridLab() {
   // NOTE: frame is NOT a control — it is a fixed engine law (DEFAULT_LAW.frameMM = 1, always baked into
   // minEffectMM + semanticLadder). The 1mm suede edge always renders (it also carries the flap-risk signal);
   // there is no user toggle, because a toggle here would only hide the drawn border while the manufactured
-  // size keeps the frame — a lying control. Frame thickness, if ever tunable, belongs in the Admin law inputs.
+  // size keeps the frame — a lying control. Frame thickness, if ever tunable, belongs in the engine law inputs.
   const [front, setFront] = useState(false) // front-face overlay: magnets shown over the design/art
   const [centerMode, setCenterMode] = useState<'centroid' | 'bbox'>('centroid')
   const [maxGrowMM, setMaxGrowMM] = useState(DEFAULT_MARGIN_MM) // engine law default
@@ -131,13 +113,6 @@ export default function GridLab() {
   const [magic, setMagic] = useState<MagicState>(null)
   const [magStatus, setMagStatus] = useState<string>('')   // '', 'downloading-model', 'cutting', 'error:...'
   const fileRef = useRef<HTMLInputElement>(null)
-
-  function selectPanelEntry(next: PanelEntry) {
-    if (next === panelEntry) return
-    if (next === 'admin') suspendUserGridWork()
-    else suspendAdminGridWork()
-    setPanelEntry(next)
-  }
 
   function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return
@@ -153,9 +128,8 @@ export default function GridLab() {
   }
 
   const sizeMax = maxDesignMM(src === 'std' ? 'std' : src, DEFAULT_LAW) // engine law: per-source max
-  const adminLaw = useMemo(() => ({ ...DEFAULT_LAW, paddingMM: pad }), [pad])
-  const activeLaw = panelEntry === 'admin' ? adminLaw : DEFAULT_LAW
-  const sizeMin = minEffectMM(activeLaw) // user door keeps its default product padding
+  const activeLaw = useMemo(() => ({ ...DEFAULT_LAW, paddingMM: pad }), [pad])
+  const sizeMin = minEffectMM(activeLaw)
   const resolvedSizeMM = resolveDesignSizeMM(
     sizeMM,
     src === 'std' ? 'std' : src,
@@ -166,16 +140,15 @@ export default function GridLab() {
   // recipe (padding/frame/pattern law) — square 70/118/…, circle and triangle their own. Rect derives
   // per-axis from the square ladder.
   // SEMANTIC SIZES: every shape's own T-shirt ladder (2XS=1pt · XS=2 · S=3 · M=4 · L/XL/2XL/3XL …).
-  // Admin uses its live padding/mode inputs; User uses the constrained door's product defaults.
   const gridMode: GridMode = patternAuto ? 'auto' : pattern
-  const ladderShape: UserStandardShape = src === 'std'
+  const ladderShape: StandardLadderShape = src === 'std'
     ? (geo === 'rect' ? 'square' : geo)
     : 'square'
   const ladderRecipe = useMemo(
     () => ({ kind: 'standard', shape: ladderShape } as const),
     [ladderShape],
   )
-  const adminPlanOptions = useMemo<GridPlanOptions>(() => ({
+  const planOptions = useMemo<GridPlanOptions>(() => ({
     attachment,
     mode: gridMode,
     density,
@@ -185,37 +158,29 @@ export default function GridLab() {
     baseMarginMM: offsetMM,
     maxGrowMM,
     pitchMM: pitchAuto ? undefined : pitch,
+    signedBaseMargin: true,
+    diagnosticVelcro: true,
   }), [attachment, gridMode, density, pad, plan, centerMode, offsetMM, maxGrowMM, pitchAuto, pitch])
 
-  const adminLadderJob = useMemo<AdminGridJob | null>(() => panelEntry === 'admin'
-    ? { operation: 'ladder', recipe: ladderRecipe, law: adminLaw, mode: gridMode }
-    : null, [panelEntry, ladderRecipe, adminLaw, gridMode])
-  const userLadderJob = useMemo<UserGridJob | null>(() => panelEntry === 'user'
-    ? { operation: 'ladder', recipe: ladderRecipe }
-    : null, [panelEntry, ladderRecipe])
-  const adminLadderKey = adminLadderJob ? adminGridJobKey(adminLadderJob) : null
-  const userLadderKey = userLadderJob ? userGridJobKey(userLadderJob) : null
-  const adminLadderState = useGridWorkerJob<AdminGridJob, AdminGridJobResult>(
-    adminLadderJob,
-    adminLadderKey,
-    requestAdminLadderJob,
-    cachedAdminGridJob,
+  const ladderJob = useMemo<GridJob>(() => ({
+    operation: 'ladder',
+    recipe: ladderRecipe,
+    law: activeLaw,
+    mode: gridMode,
+    options: planOptions,
+  }), [ladderRecipe, activeLaw, gridMode, planOptions])
+  const ladderKey = gridJobKey(ladderJob)
+  const ladderState = useGridWorkerJob<GridJob, GridJobResult>(
+    ladderJob,
+    ladderKey,
+    requestLadderJob,
+    cachedGridJob,
     sliderTransient,
   )
-  const userLadderState = useGridWorkerJob<UserGridJob, UserGridJobResult>(
-    userLadderJob,
-    userLadderKey,
-    requestUserLadderJob,
-    cachedUserGridJob,
-    sliderTransient,
+  const stdRungs = useMemo(
+    () => ladderState.result?.operation === 'ladder' ? ladderState.result.value : [],
+    [ladderState.result],
   )
-  const adminRungs = adminLadderState.result?.operation === 'ladder'
-    ? adminLadderState.result.value
-    : []
-  const userRungs = userLadderState.result?.operation === 'ladder'
-    ? userLadderState.result.value
-    : []
-  const stdRungs = panelEntry === 'admin' ? adminRungs : userRungs
 
   const rectRungs = useMemo(
     () => stdRungs.length
@@ -298,39 +263,22 @@ export default function GridLab() {
     }
     if (!stdRungs.length) return { ...planDesign, rung: null, rungH: null }
     const targetMM = src === 'std' ? sizeMM : planDesign.designSize
-    const rung = panelEntry === 'admin'
-      ? nearestSemanticRung(stdRungs, targetMM)
-      : nearestUserWorkbenchRung(stdRungs, targetMM)
+    const rung = nearestSemanticRung(stdRungs, targetMM)
     return { ...planDesign, rung, rungH: rung }
-  }, [planDesign, stdRungs, src, geo, rectRungs, sizeMM, panelEntry])
+  }, [planDesign, stdRungs, src, geo, rectRungs, sizeMM])
 
-  const adminPlanJob = useMemo<AdminGridJob | null>(() =>
-    panelEntry === 'admin' && planDesign
-      ? { operation: 'plan', recipe: planDesign.recipe, options: adminPlanOptions }
-      : null, [panelEntry, planDesign, adminPlanOptions])
-  const userPlanJob = useMemo<UserGridJob | null>(() =>
-    panelEntry === 'user' && planDesign
-      ? { operation: 'plan', recipe: planDesign.recipe, attachment }
-      : null, [panelEntry, planDesign, attachment])
-  const adminPlanKey = adminPlanJob ? adminGridJobKey(adminPlanJob) : null
-  const userPlanKey = userPlanJob ? userGridJobKey(userPlanJob) : null
-  const adminPlanState = useGridWorkerJob<AdminGridJob, AdminGridJobResult>(
-    adminPlanJob,
-    adminPlanKey,
-    requestAdminGridJob,
-    cachedAdminGridJob,
+  const planJob = useMemo<GridJob | null>(() => planDesign
+    ? { operation: 'plan', recipe: planDesign.recipe, options: planOptions }
+    : null, [planDesign, planOptions])
+  const planKey = planJob ? gridJobKey(planJob) : null
+  const planState = useGridWorkerJob<GridJob, GridJobResult>(
+    planJob,
+    planKey,
+    requestGridJob,
+    cachedGridJob,
     sliderTransient,
   )
-  const userPlanState = useGridWorkerJob<UserGridJob, UserGridJobResult>(
-    userPlanJob,
-    userPlanKey,
-    requestUserGridJob,
-    cachedUserGridJob,
-    sliderTransient,
-  )
-  const activePlanResult = panelEntry === 'admin'
-    ? adminPlanState.result?.operation === 'plan' ? adminPlanState.result : null
-    : userPlanState.result?.operation === 'plan' ? userPlanState.result : null
+  const activePlanResult = planState.result?.operation === 'plan' ? planState.result : null
   const resolvedPlan = activePlanResult?.value ?? null
 
   const model = useMemo(() => {
@@ -357,24 +305,21 @@ export default function GridLab() {
     }
   }, [preparedDesign, resolvedPlan, activePlanResult])
 
-  const activeLadderState = panelEntry === 'admin' ? adminLadderState : userLadderState
-  const activePlanState = panelEntry === 'admin' ? adminPlanState : userPlanState
-  const runtimeError = activeLadderState.error ?? activePlanState.error
+  const runtimeError = ladderState.error ?? planState.error
   const runtimeStatus = runtimeError
     ? 'error'
-    : planDesign && activePlanState.pending
+    : planDesign && planState.pending
       ? 'resolving-grid'
-      : activeLadderState.pending
+      : ladderState.pending
         ? 'resolving-sizes'
         : 'ready'
 
   useEffect(() => {
     const committedModel = model?.planKey === renderedPlanKey ? model : null
     window.__GRID_LAB_PROOF__ = {
-      door: panelEntry,
       status: runtimeStatus,
-      ladderKey: panelEntry === 'admin' ? adminLadderKey : userLadderKey,
-      planKey: panelEntry === 'admin' ? adminPlanKey : userPlanKey,
+      ladderKey,
+      planKey,
       renderedPlanKey,
       plan: resolvedPlan,
       rendered: committedModel ? {
@@ -384,7 +329,7 @@ export default function GridLab() {
         pattern: committedModel.patternUsed,
       } : null,
     }
-  }, [panelEntry, runtimeStatus, adminLadderKey, userLadderKey, adminPlanKey, userPlanKey, renderedPlanKey, resolvedPlan, model])
+  }, [runtimeStatus, ladderKey, planKey, renderedPlanKey, resolvedPlan, model])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const panelProps: GridWorkbenchPanelProps = {
@@ -402,10 +347,9 @@ export default function GridLab() {
     <div
       className="gl"
       data-grid-runtime-status={runtimeStatus}
-      data-grid-door={panelEntry}
       data-grid-slider-transient={sliderTransient}
-      data-grid-ladder-key={panelEntry === 'admin' ? adminLadderKey ?? '' : userLadderKey ?? ''}
-      data-grid-plan-key={panelEntry === 'admin' ? adminPlanKey ?? '' : userPlanKey ?? ''}
+      data-grid-ladder-key={ladderKey}
+      data-grid-plan-key={planKey ?? ''}
       data-grid-rendered-plan-key={renderedPlanKey ?? ''}
     >
       <style>{CSS}</style>
@@ -437,14 +381,6 @@ export default function GridLab() {
         />
 
         <aside className="gl-controls">
-          <div className="gl-card gl-entry-switch">
-            <span className="gl-glabel">Engine entry</span>
-            <div className="gl-seg" role="group" aria-label="Grid engine entry">
-              <button type="button" aria-pressed={panelEntry === 'admin'} onClick={() => selectPanelEntry('admin')}>Admin</button>
-              <button type="button" aria-pressed={panelEntry === 'user'} onClick={() => selectPanelEntry('user')}>User</button>
-            </div>
-          </div>
-
           {runtimeStatus !== 'ready' && (
             <div className="gl-card gl-resolving" role="status">
               {!runtimeError && <span className="gl-spin" />}
@@ -456,9 +392,7 @@ export default function GridLab() {
             </div>
           )}
 
-          {panelEntry === 'admin'
-            ? <div className="gl-panel-stack" data-workbench-panel="admin"><GridWorkbenchPanel {...panelProps} /></div>
-            : <GridWorkbenchUserPanel {...panelProps} />}
+          <div className="gl-panel-stack"><GridWorkbenchPanel {...panelProps} /></div>
 
           {model && <GridWorkbenchReadouts model={model} scale={scale} />}
         </aside>
@@ -502,7 +436,6 @@ const CSS = `
 .gl-legend span{display:inline-flex;align-items:center;gap:5px}.gl-legend i{width:10px;height:10px;border-radius:3px}
 .gl-controls{display:flex;flex-direction:column;gap:16px}
 .gl-panel-stack{display:flex;flex-direction:column;gap:16px}
-.gl-entry-switch{padding:12px;display:flex;flex-direction:column;gap:8px}
 .gl-resolving{padding:11px 13px;display:flex;align-items:center;gap:9px;color:var(--ink-2);font:11.5px var(--mono)}.gl-glabel{font:600 10.5px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3)}
 .gl-seg{display:flex;gap:4px;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:3px}
 .gl-seg3 button,.gl-seg button{flex:1;min-width:0;font:550 12px var(--sans);color:var(--ink-2);background:none;border:0;border-radius:7px;padding:8px 4px;cursor:pointer;transition:.12s;white-space:nowrap}

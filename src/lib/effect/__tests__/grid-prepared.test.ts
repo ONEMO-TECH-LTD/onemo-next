@@ -7,7 +7,7 @@ import {
   contourWithOuterMargin,
   stdShapeContour,
   type GridConfig,
-} from '../grid-admin'
+} from '../grid'
 import {
   PreparedContourSource,
   prepareExactContour,
@@ -57,7 +57,7 @@ describe('S1a exact prepared-contour representation', () => {
     const fixtures: ReadonlyArray<{ contour: Contour; config: GridConfig }> = [
       {
         contour: stdShapeContour('square', 70),
-        config: { pitchMM: 48, pattern: 'standard', rescueCoverage: true },
+        config: { pitchMM: 48, pattern: 'standard' },
       },
       {
         contour: DENSE_REAL_AI_GRID_CONTOUR,

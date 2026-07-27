@@ -1,25 +1,19 @@
 import {
   DEFAULT_LAW,
-  adminLadderCacheKey,
-  adminPlanCacheKey,
+  gridLadderCacheKey,
+  gridPlanCacheKey,
+  handleGridJob,
   ladderShapeFromRecipe,
   planContourFromRecipe,
-  resolveAdminGridPlan,
+  resolveGridPlan,
   semanticLadder,
-  type AdminGridJobResult,
+  type Attachment,
+  type GridJobResult,
   type GridPlanOptions,
   type LadderRecipe,
   type PlanRecipe,
-} from '../grid-admin'
-import { createAdminGridWorkerClient } from '../grid-admin-client'
-import {
-  resolveUserLadderRecipe,
-  resolveUserPlanRecipe,
-  userLadderCacheKey,
-  userPlanCacheKey,
-  type UserGridJobResult,
-} from '../grid-user'
-import { createUserGridWorkerClient } from '../grid-user-client'
+} from '../grid'
+import { createGridWorkerClient } from '../grid-client'
 import { GridWorkerSupersededError } from '../grid-worker-client'
 import type { Contour } from '../types'
 
@@ -43,51 +37,43 @@ function assertBytes(label: string, actual: unknown, expected: unknown): void {
 
 async function run(): Promise<string[]> {
   const cases: string[] = []
-  const user = createUserGridWorkerClient()
-  const admin = createAdminGridWorkerClient()
+  const client = createGridWorkerClient()
   try {
-    const userLadderRecipe: LadderRecipe = { kind: 'standard', shape: 'square' }
-    const userLadderExpected: UserGridJobResult = {
+    const squareRecipe: LadderRecipe = { kind: 'standard', shape: 'square' }
+    const squareExpected: GridJobResult = {
       operation: 'ladder',
-      key: userLadderCacheKey(userLadderRecipe),
-      value: resolveUserLadderRecipe(userLadderRecipe),
+      key: gridLadderCacheKey(squareRecipe),
+      value: semanticLadder(ladderShapeFromRecipe(squareRecipe)),
     }
-    const userLadderActual = await user.request({ operation: 'ladder', recipe: userLadderRecipe })
-    assertBytes('User standard ladder', userLadderActual, userLadderExpected)
-    cases.push('User standard ladder')
+    const squareActual = await client.request({ operation: 'ladder', recipe: squareRecipe })
+    assertBytes('Neutral standard ladder', squareActual, squareExpected)
+    cases.push('Neutral standard ladder')
 
     const holedContour: Contour = {
       outer: { pts: [[0.125, 0.25], [118.875, 0.25], [118.875, 118.625], [0.125, 118.625]] },
       holes: [{ pts: [[42.375, 42.5], [76.625, 42.5], [76.625, 76.75], [42.375, 76.75]] }],
     }
-    const userPlanRecipe: PlanRecipe = { kind: 'final-contour', contourMM: holedContour }
-    const userPlanExpected: UserGridJobResult = {
-      operation: 'plan',
-      key: userPlanCacheKey(userPlanRecipe, 'magnetic'),
-      value: resolveUserPlanRecipe(userPlanRecipe, 'magnetic'),
-    }
-    const userPlanActual = await user.request({
-      operation: 'plan',
-      recipe: userPlanRecipe,
-      attachment: 'magnetic',
-    })
-    assertBytes('User holed plan', userPlanActual, userPlanExpected)
-    cases.push('User holed plan')
+    const holedRecipe: PlanRecipe = { kind: 'final-contour', contourMM: holedContour }
+    const holedOptions: GridPlanOptions = { attachment: 'magnetic' }
+    const holedExpected = handleGridJob({ operation: 'plan', recipe: holedRecipe, options: holedOptions })
+    const holedActual = await client.request({ operation: 'plan', recipe: holedRecipe, options: holedOptions })
+    assertBytes('Neutral holed plan', holedActual, holedExpected)
+    cases.push('Neutral holed plan')
 
-    const adminLadderRecipe: LadderRecipe = { kind: 'standard', shape: 'diamondShape' }
-    const adminLadderExpected: AdminGridJobResult = {
+    const diamondRecipe: LadderRecipe = { kind: 'standard', shape: 'diamondShape' }
+    const diamondExpected: GridJobResult = {
       operation: 'ladder',
-      key: adminLadderCacheKey(adminLadderRecipe, DEFAULT_LAW, 'diamond'),
-      value: semanticLadder(ladderShapeFromRecipe(adminLadderRecipe), DEFAULT_LAW, 'diamond'),
+      key: gridLadderCacheKey(diamondRecipe, DEFAULT_LAW, 'diamond'),
+      value: semanticLadder(ladderShapeFromRecipe(diamondRecipe), DEFAULT_LAW, 'diamond'),
     }
-    const adminLadderActual = await admin.request({
+    const diamondActual = await client.request({
       operation: 'ladder',
-      recipe: adminLadderRecipe,
+      recipe: diamondRecipe,
       law: DEFAULT_LAW,
       mode: 'diamond',
     })
-    assertBytes('Admin diamond ladder', adminLadderActual, adminLadderExpected)
-    cases.push('Admin diamond ladder')
+    assertBytes('Neutral diamond ladder', diamondActual, diamondExpected)
+    cases.push('Neutral diamond ladder')
 
     const freeformContour: Contour = {
       outer: { pts: [
@@ -96,29 +82,62 @@ async function run(): Promise<string[]> {
       ] },
       holes: [],
     }
-    const adminPlanRecipe: PlanRecipe = { kind: 'final-contour', contourMM: freeformContour }
-    const adminOptions: GridPlanOptions = {
+    const diagnosticRecipe: PlanRecipe = { kind: 'final-contour', contourMM: freeformContour }
+    const diagnosticOptions: GridPlanOptions = {
       attachment: 'velcro',
       mode: 'standard',
       density: 'light',
       paddingMM: 10,
       baseMarginMM: -3,
       maxGrowMM: 0,
+      signedBaseMargin: true,
+      diagnosticVelcro: true,
     }
-    const adminPlanExpected: AdminGridJobResult = {
+    const diagnosticExpected: GridJobResult = {
       operation: 'plan',
-      key: adminPlanCacheKey(adminPlanRecipe, adminOptions),
-      value: resolveAdminGridPlan(planContourFromRecipe(adminPlanRecipe), adminOptions),
+      key: gridPlanCacheKey(diagnosticRecipe, diagnosticOptions),
+      value: resolveGridPlan(planContourFromRecipe(diagnosticRecipe), diagnosticOptions),
     }
-    const adminPlanActual = await admin.request({
+    const diagnosticActual = await client.request({
       operation: 'plan',
-      recipe: adminPlanRecipe,
-      options: adminOptions,
+      recipe: diagnosticRecipe,
+      options: diagnosticOptions,
     })
-    assertBytes('Admin signed-margin Velcro diagnostic', adminPlanActual, adminPlanExpected)
-    cases.push('Admin signed-margin Velcro diagnostic')
+    assertBytes('Neutral signed-margin Velcro diagnostic', diagnosticActual, diagnosticExpected)
+    cases.push('Neutral signed-margin Velcro diagnostic')
 
-    const preemptionClient = createUserGridWorkerClient()
+    const seededAttachments: Attachment[] = ['magnetic', 'twinfix', 'velcro']
+    for (const attachment of seededAttachments) {
+      const seededClient = createGridWorkerClient()
+      try {
+        const options: GridPlanOptions = { attachment }
+        const seededRecipe: LadderRecipe = { kind: 'standard', shape: 'circle' }
+        const ladder = await seededClient.request({
+          operation: 'ladder',
+          recipe: seededRecipe,
+          options,
+        })
+        if (ladder.operation !== 'ladder' || !ladder.value.length) {
+          throw new Error(`Neutral ${attachment} seed ladder returned no rungs.`)
+        }
+        const sizeMM = ladder.value[0].sizeMM
+        const planRecipe: PlanRecipe = {
+          kind: 'standard',
+          shape: 'circle',
+          widthMM: sizeMM,
+          heightMM: sizeMM,
+        }
+        const planJob = { operation: 'plan' as const, recipe: planRecipe, options }
+        const cached = seededClient.peek(planJob)
+        const expected = handleGridJob(planJob)
+        assertBytes(`Neutral ${attachment} seeded cache hit`, cached, expected)
+      } finally {
+        seededClient.dispose()
+      }
+    }
+    cases.push('Neutral seeded plan cache hits · all attachments')
+
+    const preemptionClient = createGridWorkerClient()
     try {
       const slow = preemptionClient.request({
         operation: 'ladder',
@@ -127,9 +146,9 @@ async function run(): Promise<string[]> {
       const slowRejected = slow.catch((error) => error)
       const latest = await preemptionClient.request({
         operation: 'ladder',
-        recipe: userLadderRecipe,
+        recipe: squareRecipe,
       })
-      assertBytes('Real-worker physical pre-emption', latest, userLadderExpected)
+      assertBytes('Real-worker physical pre-emption', latest, squareExpected)
       const slowError = await slowRejected
       if (!(slowError instanceof GridWorkerSupersededError)) {
         throw new Error('Real-worker physical pre-emption did not reject the stale request.')
@@ -140,8 +159,7 @@ async function run(): Promise<string[]> {
     }
     return cases
   } finally {
-    user.dispose()
-    admin.dispose()
+    client.dispose()
   }
 }
 
@@ -150,7 +168,7 @@ const details = document.querySelector<HTMLElement>('#details')!
 
 run().then((cases) => {
   window.__GRID_WORKER_ORACLE__ = { status: 'PASS', cases }
-  status.textContent = `PASS · ${cases.length}/5 actual-worker oracles`
+  status.textContent = `PASS · ${cases.length}/6 actual-worker oracles`
   details.textContent = cases.join('\n')
 }).catch((error) => {
   const message = String((error as Error)?.stack ?? error)

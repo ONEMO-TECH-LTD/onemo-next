@@ -1,14 +1,14 @@
 import {
-  USER_GRID_CACHE_SEED_ENVELOPE_MAX_BYTES,
-  USER_GRID_CACHE_SEED_MAX_BYTES,
-  userLadderCacheKey,
-  userPlanCacheKey,
-  type UserGridJob,
-  type UserGridJobResult,
-  type UserGridWorkerEnvelope,
-  type UserPlanGridJob,
-  type UserPlanGridJobResult,
-} from './grid-user'
+  GRID_CACHE_SEED_ENVELOPE_MAX_BYTES,
+  GRID_CACHE_SEED_MAX_BYTES,
+  gridLadderCacheKey,
+  gridPlanCacheKey,
+  type GridJob,
+  type GridJobResult,
+  type GridPlanJob,
+  type GridPlanJobResult,
+  type GridWorkerEnvelope,
+} from './grid'
 import { gridJsonBytes } from './grid-byte-oracle'
 import { jsonByteLength } from './grid-cache'
 import {
@@ -19,26 +19,26 @@ import {
   type GridWorkerPriority,
 } from './grid-worker-client'
 
-let sharedClient: GridWorkerScheduler<UserGridJob, UserGridJobResult, UserGridWorkerEnvelope> | null = null
+let sharedClient: GridWorkerScheduler<GridJob, GridJobResult, GridWorkerEnvelope> | null = null
 
-export function userGridJobKey(job: UserGridJob): string {
+export function gridJobKey(job: GridJob): string {
+  // Ladder output is independent of seed-only plan options, so they never fragment this key.
   return job.operation === 'ladder'
-    ? userLadderCacheKey(job.recipe)
-    : userPlanCacheKey(job.recipe, job.attachment)
+    ? gridLadderCacheKey(job.recipe, job.law, job.mode)
+    : gridPlanCacheKey(job.recipe, job.options)
 }
 
-/** Create the constrained User worker lane. No Admin job shape or module crosses this boundary. */
-export function createUserGridWorkerClient(): GridWorkerScheduler<UserGridJob, UserGridJobResult, UserGridWorkerEnvelope> {
+export function createGridWorkerClient(): GridWorkerScheduler<GridJob, GridJobResult, GridWorkerEnvelope> {
   return new GridWorkerScheduler({
-    createWorker: () => new Worker(new URL('./grid-user.worker.ts', import.meta.url), { type: 'module' }),
-    keyOfJob: userGridJobKey,
+    createWorker: () => new Worker(new URL('./grid.worker.ts', import.meta.url), { type: 'module' }),
+    keyOfJob: gridJobKey,
     keyOfResult: (result) => result.key,
-    decodeWorkerResult: decodeUserGridWorkerResult,
+    decodeWorkerResult: decodeGridWorkerResult,
   })
 }
 
-function client(): GridWorkerScheduler<UserGridJob, UserGridJobResult, UserGridWorkerEnvelope> {
-  if (!sharedClient) sharedClient = createUserGridWorkerClient()
+function client(): GridWorkerScheduler<GridJob, GridJobResult, GridWorkerEnvelope> {
+  if (!sharedClient) sharedClient = createGridWorkerClient()
   return sharedClient
 }
 
@@ -46,12 +46,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
-function isPlanJob(value: unknown): value is UserPlanGridJob {
+function isPlanJob(value: unknown): value is GridPlanJob {
   if (!isRecord(value) || value.operation !== 'plan' || !isRecord(value.recipe)) return false
-  return value.attachment === 'magnetic'
+  if (value.options === undefined) return true
+  if (!isRecord(value.options)) return false
+  const attachment = value.options.attachment
+  return attachment === undefined
+    || attachment === 'magnetic'
+    || attachment === 'twinfix'
+    || attachment === 'velcro'
 }
 
-function isPlanResult(value: unknown): value is UserPlanGridJobResult {
+function isPlanResult(value: unknown): value is GridPlanJobResult {
   if (!isRecord(value) || value.operation !== 'plan' || typeof value.key !== 'string') return false
   const plan = value.value
   if (!isRecord(plan) || !isRecord(plan.grid)) return false
@@ -59,7 +65,6 @@ function isPlanResult(value: unknown): value is UserPlanGridJobResult {
     isRecord(plan.designContourMM)
     && isRecord(plan.effectContourMM)
     && Array.isArray(plan.grid.anchors)
-    && Array.isArray(plan.grid.rescueAnchors)
     && Array.isArray(plan.grid.flaps)
     && typeof plan.pitchMM === 'number'
     && typeof plan.baseMarginMM === 'number'
@@ -69,29 +74,29 @@ function isPlanResult(value: unknown): value is UserPlanGridJobResult {
 }
 
 function duplicateMismatch(label: string): Error {
-  return new Error(`User grid cache seed ${label} is not byte-identical.`)
+  return new Error(`Grid cache seed ${label} is not byte-identical.`)
 }
 
 /** Validate the complete worker seed batch before returning one atomic LRU commit list. */
-export function decodeUserGridWorkerResult(
-  transport: UserGridWorkerEnvelope,
-  context: GridWorkerDecodeContext<UserGridJobResult>,
-): GridWorkerDecodedResult<UserGridJobResult> {
+export function decodeGridWorkerResult(
+  transport: GridWorkerEnvelope,
+  context: GridWorkerDecodeContext<GridJobResult>,
+): GridWorkerDecodedResult<GridJobResult> {
   if (!isRecord(transport) || !isRecord(transport.result) || !Array.isArray(transport.cacheSeeds)) {
-    throw new Error('User grid worker returned a malformed transport envelope.')
+    throw new Error('Grid worker returned a malformed transport envelope.')
   }
 
   const seen = new Map<string, string>()
-  const commits: GridWorkerCacheSeed<UserGridJobResult>[] = []
+  const commits: GridWorkerCacheSeed<GridJobResult>[] = []
   let envelopeBytes = 0
   let envelopeFull = false
   for (const rawSeed of transport.cacheSeeds as unknown[]) {
     if (!isRecord(rawSeed) || !isPlanJob(rawSeed.job) || !isPlanResult(rawSeed.result)) {
-      throw new Error('User grid worker returned a malformed cache seed.')
+      throw new Error('Grid worker returned a malformed cache seed.')
     }
-    const recomputedKey = userPlanCacheKey(rawSeed.job.recipe, rawSeed.job.attachment)
+    const recomputedKey = gridPlanCacheKey(rawSeed.job.recipe, rawSeed.job.options)
     if (rawSeed.result.key !== recomputedKey) {
-      throw new Error('User grid worker returned a cache seed for the wrong key.')
+      throw new Error('Grid worker returned a cache seed for the wrong key.')
     }
 
     const resultBytes = gridJsonBytes(rawSeed.result)
@@ -109,8 +114,8 @@ export function decodeUserGridWorkerResult(
     }
 
     const seedBytes = jsonByteLength(rawSeed)
-    if (seedBytes > USER_GRID_CACHE_SEED_MAX_BYTES) continue
-    if (envelopeFull || envelopeBytes + seedBytes > USER_GRID_CACHE_SEED_ENVELOPE_MAX_BYTES) {
+    if (seedBytes > GRID_CACHE_SEED_MAX_BYTES) continue
+    if (envelopeFull || envelopeBytes + seedBytes > GRID_CACHE_SEED_ENVELOPE_MAX_BYTES) {
       envelopeFull = true
       continue
     }
@@ -121,20 +126,20 @@ export function decodeUserGridWorkerResult(
       bytes: jsonByteLength(rawSeed.result),
     })
   }
-  return { result: transport.result as UserGridJobResult, cacheSeeds: commits }
+  return { result: transport.result as GridJobResult, cacheSeeds: commits }
 }
 
-export function requestUserGridJob(
-  job: UserGridJob,
+export function requestGridJob(
+  job: GridJob,
   priority: GridWorkerPriority = 'active',
-): Promise<UserGridJobResult> {
+): Promise<GridJobResult> {
   return client().request(job, priority)
 }
 
-export function cachedUserGridJob(job: UserGridJob): UserGridJobResult | undefined {
+export function cachedGridJob(job: GridJob): GridJobResult | undefined {
   return client().peek(job)
 }
 
-export function suspendUserGridWork(): void {
+export function suspendGridWork(): void {
   sharedClient?.cancelPending()
 }

@@ -38,7 +38,9 @@
           "widthMM": 70,
           "heightMM": 70
         },
-        "attachment": "magnetic"
+        "options": {
+          "attachment": "magnetic"
+        }
       }
     }
   ],

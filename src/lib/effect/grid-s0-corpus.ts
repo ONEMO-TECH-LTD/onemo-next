@@ -1,6 +1,6 @@
 import aiCorpusJson from './__fixtures__/grid-real-ai-corpus.json'
 import type { Contour } from './types'
-import type { UserGridJob } from './grid-user'
+import type { GridJob } from './grid'
 
 interface RealAiCorpus {
   schemaVersion: number
@@ -64,7 +64,7 @@ export const DENSE_REAL_AI_GRID_CONTOUR = subdivideContour(
 
 export const GRID_S0_ORACLE_CORPUS: ReadonlyArray<{
   name: string
-  job: UserGridJob
+  job: GridJob
 }> = [
   {
     name: 'canonical-square-ladder',
@@ -75,7 +75,7 @@ export const GRID_S0_ORACLE_CORPUS: ReadonlyArray<{
     job: {
       operation: 'plan',
       recipe: { kind: 'standard', shape: 'circle', widthMM: 303, heightMM: 303 },
-      attachment: 'magnetic',
+      options: { attachment: 'magnetic' },
     },
   },
   {
@@ -83,7 +83,7 @@ export const GRID_S0_ORACLE_CORPUS: ReadonlyArray<{
     job: {
       operation: 'plan',
       recipe: { kind: 'final-contour', contourMM: DENSE_REAL_AI_GRID_CONTOUR },
-      attachment: 'magnetic',
+      options: { attachment: 'magnetic' },
     },
   },
   {
@@ -97,7 +97,7 @@ export const GRID_S0_ORACLE_CORPUS: ReadonlyArray<{
           holes: [{ pts: [[40, 40], [40, 78], [78, 78], [78, 40]] }],
         },
       },
-      attachment: 'magnetic',
+      options: { attachment: 'magnetic' },
     },
   },
 ]

@@ -3,21 +3,22 @@ import { describe, expect, it } from 'vitest'
 import { gridJsonBytes } from '../grid-byte-oracle'
 import { jsonByteLength } from '../grid-cache'
 import {
-  USER_GRID_CACHE_SEED_ENVELOPE_MAX_BYTES,
-  USER_GRID_CACHE_SEED_MAX_BYTES,
-  handleUserGridJob,
-  handleUserGridWorkerJob,
-  userPlanCacheKey,
-  type UserGridCacheSeed,
-  type UserGridJob,
-  type UserGridJobResult,
-  type UserGridWorkerEnvelope,
+  GRID_CACHE_SEED_ENVELOPE_MAX_BYTES,
+  GRID_CACHE_SEED_MAX_BYTES,
+  handleGridJob,
+  handleGridWorkerJob,
+  gridPlanCacheKey,
+  type GridCacheSeed,
+  type GridJob,
+  type GridJobResult,
+  type GridWorkerEnvelope,
+  type Attachment,
   type LadderRecipe,
-} from '../grid-user'
+} from '../grid'
 import {
-  decodeUserGridWorkerResult,
-  userGridJobKey,
-} from '../grid-user-client'
+  decodeGridWorkerResult,
+  gridJobKey,
+} from '../grid-client'
 import {
   GridWorkerScheduler,
   type GridWorkerLike,
@@ -25,23 +26,23 @@ import {
   type GridWorkerResponse,
 } from '../grid-worker-client'
 
-class ManualUserWorker implements GridWorkerLike {
+class ManualGridWorker implements GridWorkerLike {
   onmessage: ((event: MessageEvent) => void) | null = null
   onerror: ((event: ErrorEvent) => void) | null = null
-  readonly requests: GridWorkerRequest<UserGridJob>[] = []
+  readonly requests: GridWorkerRequest<GridJob>[] = []
   terminated = false
 
   postMessage(message: unknown): void {
-    this.requests.push(message as GridWorkerRequest<UserGridJob>)
+    this.requests.push(message as GridWorkerRequest<GridJob>)
   }
 
   terminate(): void {
     this.terminated = true
   }
 
-  emit(result: UserGridWorkerEnvelope): void {
+  emit(result: GridWorkerEnvelope): void {
     const request = this.requests.at(-1)!
-    const response: GridWorkerResponse<UserGridWorkerEnvelope> = {
+    const response: GridWorkerResponse<GridWorkerEnvelope> = {
       id: request.id,
       ok: true,
       result,
@@ -51,25 +52,25 @@ class ManualUserWorker implements GridWorkerLike {
 }
 
 function fixture() {
-  const workers: ManualUserWorker[] = []
-  const scheduler = new GridWorkerScheduler<UserGridJob, UserGridJobResult, UserGridWorkerEnvelope>({
+  const workers: ManualGridWorker[] = []
+  const scheduler = new GridWorkerScheduler<GridJob, GridJobResult, GridWorkerEnvelope>({
     createWorker: () => {
-      const worker = new ManualUserWorker()
+      const worker = new ManualGridWorker()
       workers.push(worker)
       return worker
     },
-    keyOfJob: userGridJobKey,
+    keyOfJob: gridJobKey,
     keyOfResult: (result) => result.key,
-    decodeWorkerResult: decodeUserGridWorkerResult,
+    decodeWorkerResult: decodeGridWorkerResult,
   })
   return { scheduler, workers }
 }
 
-function cloneSeed(seed: UserGridCacheSeed): UserGridCacheSeed {
+function cloneSeed(seed: GridCacheSeed): GridCacheSeed {
   return structuredClone(seed)
 }
 
-describe('S1d exact User ladder cache seeds', () => {
+describe('S1d exact neutral ladder cache seeds', () => {
   const ladderRecipes: LadderRecipe[] = [
     { kind: 'standard', shape: 'square' },
     {
@@ -81,10 +82,14 @@ describe('S1d exact User ladder cache seeds', () => {
     },
   ]
 
-  it.each(ladderRecipes)('keeps the outward $kind ladder byte-identical and seeds only emitted magnetic rungs', (recipe) => {
-    const job: UserGridJob = { operation: 'ladder', recipe }
-    const direct = handleUserGridJob(job)
-    const transport = handleUserGridWorkerJob(job)
+  const attachments: Attachment[] = ['magnetic', 'twinfix', 'velcro']
+
+  it.each(ladderRecipes.flatMap((recipe) => attachments.map((attachment) => ({ recipe, attachment }))))(
+    'keeps the outward $recipe.kind ladder byte-identical and seeds emitted $attachment rungs',
+    ({ recipe, attachment }) => {
+    const job: GridJob = { operation: 'ladder', recipe, options: { attachment } }
+    const direct = handleGridJob(job)
+    const transport = handleGridWorkerJob(job)
 
     expect(gridJsonBytes(transport.result)).toBe(gridJsonBytes(direct))
     expect(transport.result.operation).toBe('ladder')
@@ -92,21 +97,21 @@ describe('S1d exact User ladder cache seeds', () => {
       transport.result.operation === 'ladder' ? transport.result.value.length : 0,
     )
     for (const seed of transport.cacheSeeds) {
-      expect(seed.job.attachment).toBe('magnetic')
-      expect(gridJsonBytes(seed.result)).toBe(gridJsonBytes(handleUserGridJob(seed.job)))
-      expect(jsonByteLength(seed)).toBeLessThanOrEqual(USER_GRID_CACHE_SEED_MAX_BYTES)
+      expect(seed.job.options?.attachment).toBe(attachment)
+      expect(gridJsonBytes(seed.result)).toBe(gridJsonBytes(handleGridJob(seed.job)))
+      expect(jsonByteLength(seed)).toBeLessThanOrEqual(GRID_CACHE_SEED_MAX_BYTES)
     }
     expect(transport.cacheSeeds.reduce((sum, seed) => sum + jsonByteLength(seed), 0))
-      .toBeLessThanOrEqual(USER_GRID_CACHE_SEED_ENVELOPE_MAX_BYTES)
+      .toBeLessThanOrEqual(GRID_CACHE_SEED_ENVELOPE_MAX_BYTES)
   }, 20_000)
 
   it('unwraps only the original ladder result and serves seeded rung plans from the existing LRU', async () => {
     const { scheduler, workers } = fixture()
-    const ladderJob: UserGridJob = {
+    const ladderJob: GridJob = {
       operation: 'ladder',
       recipe: { kind: 'standard', shape: 'square' },
     }
-    const transport = handleUserGridWorkerJob(ladderJob)
+    const transport = handleGridWorkerJob(ladderJob)
     const request = scheduler.request(ladderJob)
     workers[0].emit(transport)
 
@@ -120,11 +125,11 @@ describe('S1d exact User ladder cache seeds', () => {
 
   it('fails a late malformed seed without partially mutating the LRU', async () => {
     const { scheduler, workers } = fixture()
-    const ladderJob: UserGridJob = {
+    const ladderJob: GridJob = {
       operation: 'ladder',
       recipe: { kind: 'standard', shape: 'square' },
     }
-    const transport = handleUserGridWorkerJob(ladderJob)
+    const transport = handleGridWorkerJob(ladderJob)
     const firstSeed = transport.cacheSeeds[0]
     const malformed = cloneSeed(transport.cacheSeeds.at(-1)!)
     malformed.result.key = `${malformed.result.key}-wrong`
@@ -142,11 +147,11 @@ describe('S1d exact User ladder cache seeds', () => {
 
   it('fails a non-byte-identical duplicate before any cache insertion', async () => {
     const { scheduler, workers } = fixture()
-    const ladderJob: UserGridJob = {
+    const ladderJob: GridJob = {
       operation: 'ladder',
       recipe: { kind: 'standard', shape: 'square' },
     }
-    const transport = handleUserGridWorkerJob(ladderJob)
+    const transport = handleGridWorkerJob(ladderJob)
     const firstSeed = transport.cacheSeeds[0]
     const conflicting = cloneSeed(firstSeed)
     conflicting.result.value.nearestAnchorMM = (conflicting.result.value.nearestAnchorMM ?? 0) + 1
@@ -161,28 +166,30 @@ describe('S1d exact User ladder cache seeds', () => {
     scheduler.dispose()
   }, 20_000)
 
-  it('rejects a cross-attachment seed even when its recomputed key matches', () => {
-    const transport = handleUserGridWorkerJob({
+  it.each(attachments)('accepts a correctly keyed %s seed', (attachment) => {
+    const transport = handleGridWorkerJob({
       operation: 'ladder',
       recipe: { kind: 'standard', shape: 'square' },
+      options: { attachment },
     })
-    const forged = cloneSeed(transport.cacheSeeds[0])
-    forged.job.attachment = 'twinfix'
-    forged.result.key = userPlanCacheKey(forged.job.recipe, forged.job.attachment)
-
-    expect(() => decodeUserGridWorkerResult(
-      { result: transport.result, cacheSeeds: [forged] },
+    const seed = cloneSeed(transport.cacheSeeds[0])
+    expect(decodeGridWorkerResult(
+      { result: transport.result, cacheSeeds: [seed] },
       { peekCached: () => undefined },
-    )).toThrow('malformed cache seed')
+    ).cacheSeeds).toEqual([{
+      key: seed.result.key,
+      value: seed.result,
+      bytes: jsonByteLength(seed.result),
+    }])
   }, 20_000)
 
   it('accepts an identical existing value but fails a conflicting existing cache value', () => {
-    const transport = handleUserGridWorkerJob({
+    const transport = handleGridWorkerJob({
       operation: 'ladder',
       recipe: { kind: 'standard', shape: 'square' },
     })
     const seed = transport.cacheSeeds[0]
-    const identical = decodeUserGridWorkerResult(
+    const identical = decodeGridWorkerResult(
       { result: transport.result, cacheSeeds: [seed] },
       { peekCached: () => seed.result },
     )
@@ -190,20 +197,20 @@ describe('S1d exact User ladder cache seeds', () => {
     conflicting.result.value.nearestAnchorMM = (conflicting.result.value.nearestAnchorMM ?? 0) + 1
 
     expect(identical.cacheSeeds).toEqual([])
-    expect(() => decodeUserGridWorkerResult(
+    expect(() => decodeGridWorkerResult(
       { result: transport.result, cacheSeeds: [seed] },
       { peekCached: () => conflicting.result },
     )).toThrow('not byte-identical')
   }, 20_000)
 
   it('skips an oversized seed without changing or rejecting the outward ladder result', () => {
-    const transport = handleUserGridWorkerJob({
+    const transport = handleGridWorkerJob({
       operation: 'ladder',
       recipe: { kind: 'standard', shape: 'square' },
     })
     const oversized = cloneSeed(transport.cacheSeeds[0])
-    oversized.result.value.grid.issues.push('x'.repeat(USER_GRID_CACHE_SEED_MAX_BYTES))
-    const decoded = decodeUserGridWorkerResult(
+    oversized.result.value.grid.issues.push('x'.repeat(GRID_CACHE_SEED_MAX_BYTES))
+    const decoded = decodeGridWorkerResult(
       { result: transport.result, cacheSeeds: [oversized] },
       { peekCached: () => undefined },
     )
@@ -213,7 +220,7 @@ describe('S1d exact User ladder cache seeds', () => {
   }, 20_000)
 
   it('keeps a deterministic seed prefix within the total envelope budget', () => {
-    const transport = handleUserGridWorkerJob({
+    const transport = handleGridWorkerJob({
       operation: 'ladder',
       recipe: { kind: 'standard', shape: 'square' },
     })
@@ -225,11 +232,11 @@ describe('S1d exact User ladder cache seeds', () => {
         widthMM: 70 + index,
         heightMM: 70 + index,
       }
-      seed.result.key = userPlanCacheKey(seed.job.recipe, seed.job.attachment)
+      seed.result.key = gridPlanCacheKey(seed.job.recipe, seed.job.options)
       seed.result.value.grid.issues.push(String(index).repeat(900 * 1024))
       return seed
     })
-    const decoded = decodeUserGridWorkerResult(
+    const decoded = decodeGridWorkerResult(
       { result: transport.result, cacheSeeds: seeds },
       { peekCached: () => undefined },
     )

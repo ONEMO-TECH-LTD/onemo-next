@@ -3,13 +3,15 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
-  resolveUserLadderRecipe,
-  resolveUserPlanRecipe,
-  handleUserGridJob,
-  userLadderCacheKey,
-  userPlanCacheKey,
-  type UserGridJob,
-} from '../grid-user'
+  handleGridJob,
+  gridLadderCacheKey,
+  gridPlanCacheKey,
+  ladderShapeFromRecipe,
+  planContourFromRecipe,
+  resolveGridPlan,
+  semanticLadder,
+  type GridJob,
+} from '../grid'
 import { assertGridJsonByteEqual, gridJsonBytes } from '../grid-byte-oracle'
 import {
   DENSE_REAL_AI_GRID_CONTOUR,
@@ -17,17 +19,17 @@ import {
   REAL_AI_GRID_CORPUS,
 } from '../grid-s0-corpus'
 
-function directUserJob(job: UserGridJob) {
+function directGridJob(job: GridJob) {
   return job.operation === 'ladder'
     ? {
         operation: 'ladder' as const,
-        key: userLadderCacheKey(job.recipe),
-        value: resolveUserLadderRecipe(job.recipe),
+        key: gridLadderCacheKey(job.recipe, job.law, job.mode),
+        value: semanticLadder(ladderShapeFromRecipe(job.recipe), job.law, job.mode),
       }
     : {
         operation: 'plan' as const,
-        key: userPlanCacheKey(job.recipe, job.attachment),
-        value: resolveUserPlanRecipe(job.recipe, job.attachment),
+        key: gridPlanCacheKey(job.recipe, job.options),
+        value: resolveGridPlan(planContourFromRecipe(job.recipe), job.options),
       }
 }
 
@@ -41,8 +43,8 @@ describe('S0 full-JSON byte oracle and corpus', () => {
   })
 
   it.each(GRID_S0_ORACLE_CORPUS)('$name is full-JSON byte-identical direct, handled, and cloned', ({ name, job }) => {
-    const direct = directUserJob(job)
-    const handled = handleUserGridJob(job)
+    const direct = directGridJob(job)
+    const handled = handleGridJob(job)
     const cloned = structuredClone(handled)
 
     expect(() => assertGridJsonByteEqual(handled, direct, `${name} handled`)).not.toThrow()

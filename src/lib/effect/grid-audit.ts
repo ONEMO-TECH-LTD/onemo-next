@@ -3,8 +3,7 @@
 // Covers the launch laws across representative contour families: 48/68 vocabulary, mode purity,
 // coverage semantics, ring spacing, focal-8 radial extremes, padding monotonicity, centering,
 // semantic ladders (ONE + sequential labels, ascending sizes), caps/floors/format laws.
-import { computeGrid, autoGrid, balancedFit, finalProductSignature, resolveGridPlan, semanticLadder, stdShapeContour, maxDesignMM, minEffectMM, rectFormat, legalPatterns, DEFAULT_LAW } from './grid-admin'
-import { resolveUserPlan, semanticLadder as userSemanticLadder } from './grid-user'
+import { computeGrid, autoGrid, balancedFit, semanticLadder, stdShapeContour, maxDesignMM, minEffectMM, rectFormat, legalPatterns, DEFAULT_LAW } from './grid'
 import { insetRingMM } from './offset'
 import type { Contour, Pt } from './types'
 
@@ -41,7 +40,7 @@ for (const [nm, mk] of SH) {
     const lad = semanticLadder((s) => mk(s), DEFAULT_LAW, mode)
     if (!lad.length) flag(`${nm}/${mode}: EMPTY ladder`)
     if (lad.length && lad[0].label !== 'ONE') flag(`${nm}/${mode}: first rung not ONE`)
-    // multi-point sizes are required in AUTO (the mode the user sees — union of all legal layouts);
+    // multi-point sizes are required in AUTO (the default mode — union of all legal layouts);
     // strict sub-modes may legitimately express fewer (a triangle's 60° tips can't take dice/diamond)
     if (mode === 'auto' && ['square', 'diamond', 'circle', 'triangle'].includes(nm) && !lad.some(r => r.points >= 2)) flag(`${nm}/auto: no multi-point sizes`)
     let li = -2
@@ -67,16 +66,6 @@ for (const [nm, mk] of SH) {
   }
   for (const cm of ['centroid', 'bbox'] as const) if (computeGrid(d, { pitchMM: 48, paddingMM: 10, perimeterOnly: true, center: cm }).anchors.length < 1) flag(`${nm}: ${cm} seats 0`)
 }
-// STANDING DEFAULT-LADDER LAW (Dan): no two emitted user sizes may resolve to the same final product.
-// Equality is the engine signature — never an invented minimum-mm gap.
-for (const [nm, mk] of SH.slice(0, 5)) {
-  const ladder = userSemanticLadder(mk)
-  if (!ladder.length || ladder[0].label !== 'ONE') flag(`${nm}/user: invalid default ladder start`)
-  const signatures = ladder.map((rung) => finalProductSignature(
-    resolveUserPlan(mk(rung.sizeMM), { attachment: 'magnetic' }),
-  ))
-  if (new Set(signatures).size !== signatures.length) flag(`${nm}/user: duplicate final product in default ladder`)
-}
 // ATTACHMENT LAW: velcro = no grid & ok; twin-fix = identical grid to magnetic + twinRequired
 for (const [nm, mk] of SH.slice(0, 4)) {
   const d = mk(140)
@@ -86,29 +75,6 @@ for (const [nm, mk] of SH.slice(0, 4)) {
   if (v.anchors.length !== 0 || !v.ok || v.twinRequired) flag(`${nm}: velcro law broken`)
   if (t.anchors.length !== m.anchors.length || !t.twinRequired) flag(`${nm}: twin-fix law broken`)
   if (m.twinRequired) flag(`${nm}: magnetic flagged twinRequired`)
-}
-// USER PRODUCT LAW: auto never selects admin-only Dice; large Light shapes are perimeter-first; a
-// pad-valid region missed by the lattice receives one local rescue instead of staying silently empty.
-for (const [nm, contour, pitch, anchors, rescues] of [
-  ['circle303', stdShapeContour('circle', 303), 48, 16, 8],
-  ['diamond310', stdShapeContour('diamondShape', 310), 96, 12, 6],
-] as const) {
-  const user = resolveUserPlan(contour, { attachment: 'magnetic' })
-  const dice = resolveGridPlan(contour, { mode: 'quincunx', density: 'light' })
-  if (user.pattern !== 'standard' || user.pitchMM !== pitch) flag(`${nm}: user auto pattern/pitch drifted`)
-  if (user.grid.anchors.length !== anchors || user.grid.rescueAnchors.length !== rescues) flag(`${nm}: user belt/rescue count drifted`)
-  if (user.grid.flaps.length) flag(`${nm}: user perimeter rescue left uncovered material`)
-  if (user.grid.anchors.length >= dice.grid.anchors.length) flag(`${nm}: user belt not sparser than Dice`)
-  if (dice.pattern !== 'quincunx' || dice.pitchMM !== 96) flag(`${nm}: admin Dice unavailable`)
-}
-{
-  const dumbbell: Contour = { outer: { pts: [
-    [0, 0], [100, 0], [100, 16], [130, 16], [130, 10], [152, 10],
-    [152, 32], [130, 32], [130, 26], [100, 26], [100, 120], [0, 120],
-  ] }, holes: [] }
-  const user = resolveUserPlan(dumbbell, { attachment: 'magnetic' })
-  if (user.grid.rescueAnchors.length !== 1 || user.grid.rescueAnchors[0][0] < 130) flag('user rescue: pad-valid lobe missed')
-  if (user.grid.flaps.length) flag('user rescue: pad-valid lobe remains uncovered')
 }
 // FOCAL-RAMP LAW (auto plan default): <=100mm all-6; >100mm 8mm at radial extremes (+6 rest when
 // interior anchors exist); ramp widens >=200

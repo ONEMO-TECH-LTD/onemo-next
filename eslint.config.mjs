@@ -7,32 +7,6 @@ const eslintConfig = defineConfig([
   ...nextTs,
   {
     files: [
-      "src/app/(dev)/effect-creator/grid-lab/GridWorkbenchUserPanel*.{ts,tsx}",
-      "src/app/(dev)/effect-creator/v5.3.1/**/*.{ts,tsx}",
-    ],
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          patterns: [
-            {
-              group: [
-                "@/lib/effect/grid-admin",
-                "@/lib/effect/grid-core",
-                "@/lib/effect/grid",
-                "**/lib/effect/grid-admin",
-                "**/lib/effect/grid-core",
-                "**/lib/effect/grid",
-              ],
-              message: "Creator user code must use @/lib/effect/grid-user; admin and core grid modules are ringfenced.",
-            },
-          ],
-        },
-      ],
-    },
-  },
-  {
-    files: [
       "scripts/device-performance/core/**/*.{js,mjs,ts}",
       "scripts/device-performance/run.mjs",
     ],
