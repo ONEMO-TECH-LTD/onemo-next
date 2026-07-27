@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 1,
+  "authority": "The entry path set is authoritative. No migration gate may substitute a remembered file count.",
+  "entries": [
+    {
+      "path": "scripts/device-performance/fixture.tsx",
+      "classification": "tooling",
+      "migratingTask": "KAI-9757",
+      "disposition": "Migrate the device-performance fixture to the neutral lane."
+    },
+    {
+      "path": "scripts/grid-remediation/t1-contract.ts",
+      "classification": "tooling",
+      "migratingTask": "KAI-9763",
+      "disposition": "At final revalidation, replace door-specific evidence access with the neutral entry while preserving the frozen T1 artifact."
+    },
+    {
+      "path": "scripts/grid-remediation/t1-expected-red.ts",
+      "classification": "tooling-red-fixture",
+      "migratingTask": "KAI-9763",
+      "disposition": "Retain as isolated historical reproduction until final revalidation replaces it with the post-removal green guard."
+    },
+    {
+      "path": "scripts/grid-remediation/t1-lattice.ts",
+      "classification": "tooling",
+      "migratingTask": "KAI-9763",
+      "disposition": "At final revalidation, run the same oracle through the neutral entry and remove the User-door comparison path."
+    },
+    {
+      "path": "scripts/profile-grid-baseline.ts",
+      "classification": "tooling",
+      "migratingTask": "KAI-9757",
+      "disposition": "Migrate the baseline profiler to the neutral lane; preserve unrelated generic evidence."
+    },
+    {
+      "path": "src/app/(dev)/effect-creator/grid-lab/GridWorkbenchUserPanel.tsx",
+      "classification": "ui",
+      "migratingTask": "KAI-9759",
+      "disposition": "Delete the obsolete User wrapper after its consumer is on the neutral lane."
+    },
+    {
+      "path": "src/app/(dev)/effect-creator/grid-lab/page.tsx",
+      "classification": "ui",
+      "migratingTask": "KAI-9757 then KAI-9759",
+      "disposition": "Migrate jobs to the neutral lane, then remove caller-selected engine/job/key/tie-break forks."
+    },
+    {
+      "path": "src/app/(dev)/effect-creator/v5.3.1/core/primitives.ts",
+      "classification": "adapter",
+      "migratingTask": "KAI-9757",
+      "disposition": "Migrate the existing Creator adapter to the neutral entry."
+    },
+    {
+      "path": "src/lib/effect/__tests__/grid-boundary.test.ts",
+      "classification": "boundary-test",
+      "migratingTask": "KAI-9764 then KAI-9757 then KAI-9759 then KAI-9758",
+      "disposition": "Add neutral containment alongside the door guard; retire only invalidated source assertions during migration; replace the remaining door rule when the modules are deleted."
+    },
+    {
+      "path": "src/lib/effect/__tests__/grid-perf-contract.test.ts",
+      "classification": "test",
+      "migratingTask": "KAI-9757",
+      "disposition": "Migrate performance contracts to the neutral lane without changing their exact-output assertions."
+    },
+    {
+      "path": "src/lib/effect/__tests__/grid-prepared.test.ts",
+      "classification": "test",
+      "migratingTask": "KAI-9757",
+      "disposition": "Migrate the prepared-contour parity test to the neutral entry."
+    },
+    {
+      "path": "src/lib/effect/__tests__/grid-s0-contract.test.ts",
+      "classification": "test",
+      "migratingTask": "KAI-9757",
+      "disposition": "Migrate S0 evidence calls to the neutral lane; rebaseline only drift-dependent evidence at KAI-9763."
+    },
+    {
+      "path": "src/lib/effect/__tests__/grid-sources.test.ts",
+      "classification": "test",
+      "migratingTask": "KAI-9757",
+      "disposition": "Migrate source fixtures to the neutral entry and preserve generic assertions."
+    },
+    {
+      "path": "src/lib/effect/__tests__/grid-user-cache-seed.test.ts",
+      "classification": "test",
+      "migratingTask": "KAI-9764 then KAI-9757",
+      "disposition": "Port the cache-seed contract to the caller-neutral envelope, then migrate the test."
+    },
+    {
+      "path": "src/lib/effect/__tests__/grid-winning-fit.test.ts",
+      "classification": "test",
+      "migratingTask": "KAI-9757",
+      "disposition": "Migrate the winning-fit proof to the neutral entry."
+    },
+    {
+      "path": "src/lib/effect/__tests__/grid-worker-browser-oracle.ts",
+      "classification": "test",
+      "migratingTask": "KAI-9757",
+      "disposition": "Migrate the real-worker browser oracle to the neutral worker/client."
+    },
+    {
+      "path": "src/lib/effect/__tests__/grid.test.ts",
+      "classification": "test",
+      "migratingTask": "KAI-9757",
+      "disposition": "Split preserved generic capability assertions from drift-specific expected-red history and migrate the active assertions."
+    },
+    {
+      "path": "src/lib/effect/grid-admin-client.ts",
+      "classification": "transport",
+      "migratingTask": "KAI-9758",
+      "disposition": "Delete after every consumer has migrated to the neutral client."
+    },
+    {
+      "path": "src/lib/effect/grid-admin.ts",
+      "classification": "transport",
+      "migratingTask": "KAI-9758",
+      "disposition": "Delete the Admin door after explicit signed-margin and Velcro-diagnostic capability is reachable through the neutral entry."
+    },
+    {
+      "path": "src/lib/effect/grid-admin.worker.ts",
+      "classification": "transport",
+      "migratingTask": "KAI-9758",
+      "disposition": "Delete after the neutral worker is live and all consumers are migrated."
+    },
+    {
+      "path": "src/lib/effect/grid-audit.ts",
+      "classification": "tooling",
+      "migratingTask": "KAI-9757",
+      "disposition": "Migrate the standing audit to the neutral entry; retire only drift-specific assertions."
+    },
+    {
+      "path": "src/lib/effect/grid-s0-corpus.ts",
+      "classification": "tooling",
+      "migratingTask": "KAI-9757",
+      "disposition": "Migrate corpus job types to the neutral serializable job."
+    },
+    {
+      "path": "src/lib/effect/grid-user-client.ts",
+      "classification": "transport",
+      "migratingTask": "KAI-9758",
+      "disposition": "Delete only after its cache-seed validation has been ported and consumers have migrated."
+    },
+    {
+      "path": "src/lib/effect/grid-user.ts",
+      "classification": "transport",
+      "migratingTask": "KAI-9758",
+      "disposition": "Delete the User-only resolver, ladder, key, handler and policy door after migration."
+    },
+    {
+      "path": "src/lib/effect/grid-user.worker.ts",
+      "classification": "transport",
+      "migratingTask": "KAI-9758",
+      "disposition": "Delete after the neutral worker is live and all consumers are migrated."
+    }
+  ]
+}

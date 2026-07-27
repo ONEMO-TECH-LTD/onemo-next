@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "manifestPath": "scripts/grid-remediation/door-consumers.manifest.json",
+  "redFixturePaths": [
+    "scripts/grid-remediation/t1-expected-red.ts",
+    "scripts/grid-remediation/fixtures/user-lattice-violation.json",
+    "scripts/grid-remediation/fixtures/acceptance-bypass.json"
+  ],
+  "quarantineSymbols": [
+    "ResolverPolicy",
+    "resolveUserGridPlan",
+    "resolveAdminGridPlan",
+    "rescueCoverage",
+    "rescueAnchors",
+    "flapRegions",
+    "deepestSafePointForRegion"
+  ],
+  "acceptanceBypassSourceNeedle": "split.belt.length >= MIN_ANCHORS || cfg.rescueCoverage",
+  "classifications": {
+    "transport": [
+      "src/lib/effect/grid-user.ts",
+      "src/lib/effect/grid-admin.ts",
+      "src/lib/effect/grid-user-client.ts",
+      "src/lib/effect/grid-admin-client.ts",
+      "src/lib/effect/grid-user.worker.ts",
+      "src/lib/effect/grid-admin.worker.ts"
+    ],
+    "tooling": [
+      "scripts/device-performance/fixture.tsx",
+      "scripts/profile-grid-baseline.ts",
+      "scripts/grid-remediation/t1-contract.ts",
+      "scripts/grid-remediation/t1-lattice.ts",
+      "scripts/grid-remediation/t1-expected-red.ts",
+      "src/lib/effect/grid-audit.ts",
+      "src/lib/effect/grid-s0-corpus.ts",
+      "src/lib/effect/__tests__/grid-boundary.test.ts",
+      "src/lib/effect/__tests__/grid-perf-contract.test.ts",
+      "src/lib/effect/__tests__/grid-prepared.test.ts",
+      "src/lib/effect/__tests__/grid-s0-contract.test.ts",
+      "src/lib/effect/__tests__/grid-sources.test.ts",
+      "src/lib/effect/__tests__/grid-user-cache-seed.test.ts",
+      "src/lib/effect/__tests__/grid-winning-fit.test.ts",
+      "src/lib/effect/__tests__/grid-worker-browser-oracle.ts",
+      "src/lib/effect/__tests__/grid.test.ts"
+    ]
+  },
+  "consumerDiscovery": {
+    "roots": ["src", "scripts"],
+    "extensions": [".ts", ".tsx", ".mts", ".mjs"],
+    "excludedDefinitionPaths": ["src/lib/effect/grid-core.ts"],
+    "markers": [
+      "grid-user",
+      "grid-admin",
+      "resolveUserGridPlan",
+      "resolveAdminGridPlan",
+      "resolveUserPlan",
+      "resolveUserSemanticLadder",
+      "handleUserGridJob",
+      "handleAdminGridJob",
+      "requestUserGridJob",
+      "requestAdminGridJob",
+      "cachedUserGridJob",
+      "cachedAdminGridJob",
+      "suspendUserGridWork",
+      "suspendAdminGridWork"
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "id": "user-square-70-off-lattice",
+  "purpose": "Expected-red reproduction of the User-only placement drift.",
+  "input": {
+    "shape": "square",
+    "sizeMM": 70,
+    "attachment": "magnetic"
+  },
+  "expected": {
+    "pitchMM": 96,
+    "pattern": "standard",
+    "anchors": 5,
+    "rescueAnchors": 4,
+    "oneLegalLattice": false
+  }
+}
