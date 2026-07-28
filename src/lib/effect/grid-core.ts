@@ -365,7 +365,7 @@ export function computePreparedGrid(prepared: PreparedContour, cfg: GridConfig =
   // Each parity's FINAL layout is scored by: coverage (fewest uncovered outline points) → PATTERN
   // CONFORMANCE (nearest-neighbour spacing must match the pattern's own geometry: standard = pitch,
   // quincunx = pitch/√2, diamond = pitch·√2 — a standard grid must read as straight pitch-spaced rows,
-  // never a rotated/diamond arrangement) → most seated → best centred.
+  // never a rotated/diamond arrangement) → EDGE REGISTRATION → most seated → best centred.
   let seated: Pt[] = []
   let interior: Pt[] = []
   {
@@ -380,7 +380,46 @@ export function computePreparedGrid(prepared: PreparedContour, cfg: GridConfig =
     const minSpacing = 2 * pad
     const checkers = pattern === 'diamond' ? [0, 1] : [0] // diamond: try both checkerboard halves
     const expectedMp = neighbourStep(pitch, pattern)
-    type Cand = { fin: { seated: Pt[]; interior: Pt[] }; flapN: number; conform: number; bal: number }
+    // EDGE REGISTRATION (Dan, 2026-07-28): "the size is optimal when we follow square logic pretty
+    // much everywhere — magnets side to side along the edges, with margins encoded between magnet and
+    // edge of the effect." Within the LADDER DOMAIN the same edge length registers the same way: a
+    // rectangle's 214 side takes the layout a 214 square's side takes. The claim is bounded on
+    // purpose — a rung is the size whose surface exactly wraps its magnet array plus both encoded
+    // margins (Dan), so a NON-rung size has no zero-point to register on and nothing is claimed for
+    // it; off-ladder behaviour is recorded in KAI-9793, not pinned. The term itself is shape- and
+    // size-agnostic and runs for every input: it is the CLAIM that is bounded, not the code path.
+    // Slack = how far each side's
+    // outermost anchor sits BEYOND the application pad — zero means the row reaches its zero-point.
+    // Ranked AFTER coverage and conformance (registration never buys edge contact with a flap or a
+    // rotated arrangement) and BEFORE count, which is what previously let an inset 8-anchor phase
+    // beat the edge-registered 6-anchor one. Shape-agnostic: symmetric shapes tie and are unaffected.
+    // ALL-OR-NOTHING, and that is the whole point. Summed distance-to-the-floor looks equivalent but
+    // is WRONG for shapes whose material does not reach the bbox: on a circle it rewards a phase that
+    // buys edge contact on two sides by dropping anchors and going asymmetric (166 fell 8 -> 6 with
+    // x on 35/83/131 and y on 11/59/107/155 — absurd on a disc). A layout either registers on EVERY
+    // side, which is what "magnets side to side along the edges" means, or it earns nothing and the
+    // existing count/balance ranking decides exactly as before. Rectangles reach the floor on all
+    // four sides and win; circles reach it on none or some, tie, and stay untouched.
+    const fullyRegistered = (pts: ReadonlyArray<Pt>): boolean => {
+      if (!pts.length) return false
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+      for (const p of pts) {
+        if (p[0] < minX) minX = p[0]; if (p[0] > maxX) maxX = p[0]
+        if (p[1] < minY) minY = p[1]; if (p[1] > maxY) maxY = p[1]
+      }
+      // The floor is the application pad; a frame/rounding allowance rides on the same corner
+      // tolerance the seating law already uses, so no new tunable is introduced here.
+      const atFloor = (inset: number) => inset <= pad + PAD_CORNER_TOL_MM
+      return atFloor(minX - bb.minX) && atFloor(bb.maxX - maxX)
+        && atFloor(minY - bb.minY) && atFloor(bb.maxY - maxY)
+    }
+    type Cand = {
+      fin: { seated: Pt[]; interior: Pt[] }
+      flapN: number
+      conform: number
+      registered: number
+      bal: number
+    }
     const cands: Cand[] = []
     for (const px of oxs) for (const py of oys) for (const ck of checkers) {
       const nodes = latticeAt(bb, pitch, pattern, px, py, ck)
@@ -392,9 +431,10 @@ export function computePreparedGrid(prepared: PreparedContour, cfg: GridConfig =
         const d = dist(fin.seated[i], fin.seated[j]); if (d < mp) mp = d
       }
       const conform = fin.seated.length < 2 ? 1 : Math.abs(mp - expectedMp) < 2 ? 1 : 0
+      const registered = fullyRegistered(fin.seated) ? 1 : 0
       let sx = 0, sy = 0; for (const p of fin.seated) { sx += p[0]; sy += p[1] }
       const bal = fin.seated.length ? Math.hypot(sx / fin.seated.length - c[0], sy / fin.seated.length - c[1]) : 1e9
-      cands.push({ fin, flapN, conform, bal })
+      cands.push({ fin, flapN, conform, registered, bal })
     }
     // STANDARD and DIAMOND are HARD conformance laws (Dan): standard shows straight pitch-spaced rows
     // or nothing; diamond shows 68-atom (pitch·√2) links or nothing — neither may quietly resolve into
@@ -403,11 +443,17 @@ export function computePreparedGrid(prepared: PreparedContour, cfg: GridConfig =
     const pool = (pattern === 'standard' || pattern === 'diamond') && cands.some((k) => k.conform === 1 && k.fin.seated.length >= MIN_ANCHORS)
       ? cands.filter((k) => k.conform === 1)
       : cands
-    let bestKey: [number, number, number, number] | null = null
+    let bestKey: number[] | null = null
     for (const k of pool) {
-      const key: [number, number, number, number] = [k.flapN, -k.conform, -k.fin.seated.length, k.bal]
-      const better = !bestKey || key[0] < bestKey[0] || (key[0] === bestKey[0] && (key[1] < bestKey[1]
-        || (key[1] === bestKey[1] && (key[2] < bestKey[2] || (key[2] === bestKey[2] && key[3] < bestKey[3])))))
+      const key = [k.flapN, -k.conform, -k.registered, -k.fin.seated.length, k.bal]
+      let better = !bestKey
+      if (bestKey) {
+        for (let i = 0; i < key.length; i++) {
+          if (key[i] === bestKey[i]) continue
+          better = key[i] < bestKey[i]
+          break
+        }
+      }
       if (better) { bestKey = key; seated = k.fin.seated; interior = k.fin.interior }
     }
   }
