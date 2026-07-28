@@ -9,6 +9,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { pullComponentRelease } from '../../../../scripts/components/pull-release.mjs';
 // @ts-ignore — independent verifier is plain ESM shared with the CLI.
 import { verifyPulledGenerated } from '../../../../scripts/components/verify-release.mjs';
+// @ts-ignore — API compatibility is independently derived by the app verifier.
+import { compareApi } from '../../../../scripts/components/verify-release.mjs';
 
 const roots: string[] = [];
 const sha256 = (bytes: string | Buffer) => createHash('sha256').update(bytes).digest('hex');
@@ -16,6 +18,15 @@ const png = Buffer.from(
   '89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6360000000020001e221bc330000000049454e44ae426082',
   'hex',
 );
+
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if (value && typeof value === "object") {
+    const row = value as Record<string, unknown>;
+    return `{${Object.keys(row).sort().map((key) => `${JSON.stringify(key)}:${canonical(row[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
 
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => fs.rm(root, { recursive: true, force: true })));
@@ -51,11 +62,11 @@ async function fixture() {
 }
 
 async function release(root: string, tokens: string, {
-  releaseId = '111111111111111111111111',
   labelType = 'string',
   marker = 'one',
 } = {}) {
-  const dir = path.join(root, releaseId);
+  const stage = path.join(root, `.release-${marker}`);
+  const dir = stage;
   const component = path.join(dir, 'components', 'Thing');
   const evidence = path.join(component, 'evidence');
   await fs.mkdir(evidence, { recursive: true });
@@ -112,7 +123,6 @@ export default function Thing({ label = 'Default' }: ThingProps) {
   };
   const manifest = {
     schemaVersion: 1,
-    releaseId,
     authority: {
       fileKey: 'file',
       fileVersion: 'version',
@@ -125,11 +135,50 @@ export default function Thing({ label = 'Default' }: ThingProps) {
     components: [componentRecord],
     artifacts,
   };
+  const releaseId = sha256(canonical(manifest));
+  Object.assign(manifest, { releaseId });
   await fs.writeFile(path.join(dir, 'component-release.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-  return dir;
+  const destination = path.join(root, releaseId);
+  await fs.rename(stage, destination);
+  return destination;
 }
 
 describe('component release pull transaction', () => {
+  it('classifies removed components, defaults, required props and variants as breaking', () => {
+    const prop = {
+      authoredKey: 'State#1:1',
+      propName: 'state',
+      type: 'VARIANT',
+      defaultValue: 'Default',
+      variantOptions: ['Default', 'Active'],
+      emittedType: "'Default' | 'Active'",
+    };
+    const previous = {
+      components: [
+        { figmaId: 'thing:1', codeName: 'Thing', api: [prop] },
+        { figmaId: 'gone:1', codeName: 'Gone', api: [] },
+      ],
+    };
+    const next = {
+      components: [{
+        figmaId: 'thing:1',
+        codeName: 'Thing',
+        api: [{
+          ...prop,
+          defaultValue: 'Active',
+          required: true,
+          variantOptions: ['Active'],
+        }],
+      }],
+    };
+    expect(compareApi(previous, next)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ component: 'Gone', reason: 'component-removed' }),
+      expect.objectContaining({ component: 'Thing', reason: 'default-changed' }),
+      expect.objectContaining({ component: 'Thing', reason: 'new-required' }),
+      expect.objectContaining({ component: 'Thing', reason: 'variant-removed' }),
+    ]));
+  });
+
   it('pulls atomically with a real wrapper and preserves its bytes', async () => {
     const { root, app, wrapper, wrapperBytes, tokens } = await fixture();
     const releaseDir = await release(root, tokens);
@@ -147,7 +196,6 @@ describe('component release pull transaction', () => {
     await pullComponentRelease({ releaseDir: await release(root, tokens), appRoot: app });
     const before = await fs.readFile(path.join(app, 'src', 'components', 'generated', 'provenance.json'), 'utf8');
     const changed = await release(root, tokens, {
-      releaseId: '222222222222222222222222',
       labelType: 'number',
       marker: 'two',
     });
@@ -166,7 +214,6 @@ describe('component release pull transaction', () => {
       sha256(await fs.readFile(path.join(generated, file))),
     ])));
     const next = await release(root, tokens, {
-      releaseId: '333333333333333333333333',
       marker: 'three',
     });
     await expect(pullComponentRelease({ releaseDir: next, appRoot: app, failAt: 'after-swap' }))

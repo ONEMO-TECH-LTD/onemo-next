@@ -55,6 +55,11 @@ function canonical(value) {
   return JSON.stringify(value);
 }
 
+function expectedReleaseId(manifest) {
+  const { releaseId: _releaseId, ...payload } = manifest;
+  return sha256(canonical(payload));
+}
+
 function syntaxClass(value) {
   const text = String(value).trim();
   if (/^var\(/.test(text)) return 'alias';
@@ -72,6 +77,9 @@ export async function verifyPublishedRelease(releaseDir) {
   if (manifest?.schemaVersion !== 1 || path.basename(releaseDir) !== manifest.releaseId
     || !manifest.artifacts || !Array.isArray(manifest.components)) {
     return { status: 'unverified', reason: 'release manifest incomplete', manifest };
+  }
+  if (expectedReleaseId(manifest) !== manifest.releaseId) {
+    return { status: 'fail', reason: 'release id does not seal canonical manifest payload', manifest };
   }
   const actual = (await filesOf(releaseDir)).filter((file) => file !== 'component-release.json');
   const claimed = Object.keys(manifest.artifacts).sort();
@@ -97,17 +105,42 @@ export async function verifyPublishedRelease(releaseDir) {
 export function compareApi(previous, next) {
   const failures = [];
   const beforeById = new Map((previous?.components ?? []).map((component) => [component.figmaId, component]));
+  const nextById = new Map((next?.components ?? []).map((component) => [component.figmaId, component]));
+  for (const component of previous?.components ?? []) {
+    if (!nextById.has(component.figmaId)) {
+      failures.push({ component: component.codeName, prop: '*', reason: 'component-removed' });
+    }
+  }
   for (const component of next.components ?? []) {
     const before = beforeById.get(component.figmaId);
     if (!before) continue;
     const nextProps = new Map(component.api.map((prop) => [prop.authoredKey, prop]));
     for (const prop of before.api) {
       const replacement = nextProps.get(prop.authoredKey);
-      if (!replacement) failures.push({ component: component.codeName, prop: prop.authoredKey, reason: 'removed' });
-      else if (replacement.propName !== prop.propName)
+      if (!replacement) {
+        failures.push({ component: component.codeName, prop: prop.authoredKey, reason: 'removed' });
+        continue;
+      }
+      if (replacement.propName !== prop.propName)
         failures.push({ component: component.codeName, prop: prop.authoredKey, reason: 'renamed' });
-      else if (replacement.emittedType !== prop.emittedType)
+      if (replacement.type !== prop.type || replacement.emittedType !== prop.emittedType)
         failures.push({ component: component.codeName, prop: prop.authoredKey, reason: 'type-changed' });
+      if (canonical(replacement.defaultValue) !== canonical(prop.defaultValue))
+        failures.push({ component: component.codeName, prop: prop.authoredKey, reason: 'default-changed' });
+      if (replacement.required === true && prop.required !== true)
+        failures.push({ component: component.codeName, prop: prop.authoredKey, reason: 'new-required' });
+      if (prop.type === 'VARIANT') {
+        const nextOptions = new Set(replacement.variantOptions ?? []);
+        for (const option of prop.variantOptions ?? []) {
+          if (!nextOptions.has(option)) {
+            failures.push({
+              component: component.codeName,
+              prop: `${prop.authoredKey}=${option}`,
+              reason: 'variant-removed',
+            });
+          }
+        }
+      }
     }
   }
   return failures;

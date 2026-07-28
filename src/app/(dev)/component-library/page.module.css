@@ -1,0 +1,84 @@
+.page {
+  min-height: 100dvh;
+  padding: 24px;
+  overflow: auto;
+  background: var(--sem-col-bg-app-primary);
+  color: var(--sem-col-text-primary-default);
+}
+
+.header {
+  position: sticky;
+  z-index: 10;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 16px;
+  border: 1px solid var(--sem-col-border-primary-default);
+  border-radius: 16px;
+  background: var(--sem-col-bg-app-primary);
+}
+
+.header h1 {
+  font-size: 24px;
+}
+
+.eyebrow {
+  color: var(--sem-col-text-primary-subtle);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.themes {
+  display: flex;
+  gap: 8px;
+}
+
+.themes button {
+  padding: 8px 12px;
+  border: 1px solid var(--sem-col-border-primary-default);
+  border-radius: 999px;
+  background: var(--sem-col-bg-app-secondary);
+  color: inherit;
+  cursor: pointer;
+}
+
+.themes button[aria-pressed="true"] {
+  background: var(--sem-col-bg-max-default);
+  color: var(--sem-col-text-max-default-contrast);
+}
+
+.library {
+  margin-top: 24px;
+}
+
+.library :global(main[data-component-library-proof="true"]) {
+  display: grid;
+  gap: 24px;
+}
+
+.library :global(section[data-component-id]) {
+  width: max-content;
+  min-width: 100%;
+  padding: 16px;
+  border: 1px solid var(--sem-col-border-primary-default);
+  border-radius: 16px;
+}
+
+.library :global(section[data-component-id] h2) {
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.library :global([data-scenario]) {
+  display: inline-flex;
+  align-items: center;
+  margin: 8px;
+}
+
+.library :global(section[data-icon-root="true"] [data-scenario]:first-of-type svg) {
+  width: 48px;
+  height: 48px;
+}

@@ -91,12 +91,16 @@ export async function pullComponentRelease({
   const tokensPath = path.join(appRoot, 'src', 'app', 'tokens', 'tokens.css');
   const previous = await readPrevious(generatedDir);
   const wrappers = await wrapperSources(appRoot, generatedDir);
-  const liveConsumers = manifest.components.flatMap((component) => consumersFor(component, wrappers));
+  const knownComponents = new Map([
+    ...(previous?.components ?? []).map((component) => [component.figmaId, component]),
+    ...manifest.components.map((component) => [component.figmaId, component]),
+  ]);
+  const liveConsumers = [...knownComponents.values()].flatMap((component) => consumersFor(component, wrappers));
   if (!liveConsumers.length) throw new Error('component pull: no app-owned generated-component consumer exists');
   const apiFailures = compareApi(previous, manifest);
   if (apiFailures.length) {
     const affected = [...new Set(apiFailures.flatMap((failure) => {
-      const component = manifest.components.find((row) => row.codeName === failure.component);
+      const component = [...knownComponents.values()].find((row) => row.codeName === failure.component);
       return component ? consumersFor(component, wrappers) : [];
     }))];
     throw new Error(`component pull: breaking API change (${apiFailures.map((row) =>
