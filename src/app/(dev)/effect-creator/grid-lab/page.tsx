@@ -21,6 +21,7 @@ import {
   gridJobKey,
   requestGridJob,
 } from '@/lib/effect/grid-client'
+import { GridWorkbenchAdminPanel, type GridWorkbenchAdminPanelProps } from './GridWorkbenchAdminPanel'
 import { GridWorkbenchPanel, type GridWorkbenchPanelProps } from './GridWorkbenchPanel'
 import { contourDimension as dim, GridWorkbenchReadouts, GridWorkbenchStage } from './GridWorkbenchRenderer'
 import { useGridWorkerJob } from './useGridWorkerJob'
@@ -80,6 +81,7 @@ function normBase(vs: VShape, maskH: number): Contour | null {
 export default function GridLab() {
   const [renderedPlanKey, setRenderedPlanKey] = useState<string | null>(null)
   const [sliderTransient, setSliderTransient] = useState(false)
+  const [showUntestedRungs, setShowUntestedRungs] = useState(false)
   const [src, setSrc] = useState<Src>('std')
   const [geo, setGeo] = useState<StdGeo>('square')
   // rect system A: long side rung → short side rung (< long) → orientation
@@ -335,11 +337,16 @@ export default function GridLab() {
   const panelProps: GridWorkbenchPanelProps = {
     src, setSrc, geo, setGeo, setLongMM, setShortMM, orient, setOrient,
     preset, setPreset, gen, setGen, p1, setP1, p2, setP2, sides, setSides, points, setPoints,
-    setSizeMM, pitch, setPitch, pitchAuto, setPitchAuto, attachment, setAttachment,
-    density, setDensity, pad, setPad, offsetMM, setOffsetMM, pattern, setPattern,
-    patternAuto, setPatternAuto, plan, setPlan, front, setFront, centerMode, setCenterMode,
-    maxGrowMM, setMaxGrowMM, magic, magStatus, fileRef, onFile, sizeMax, sizeMin, resolvedSizeMM,
-    maxRungMM: DEFAULT_LAW.maxRungMM, gridMode, stdRungs, rectRungs, model,
+    setSizeMM, attachment, setAttachment,
+    magic, magStatus, fileRef, onFile, sizeMax, sizeMin, resolvedSizeMM,
+    maxRungMM: DEFAULT_LAW.maxRungMM, gridMode, stdRungs, rectRungs, showUntestedRungs, model,
+    onSliderInteractionChange: setSliderTransient,
+  }
+  const adminPanelProps: GridWorkbenchAdminPanelProps = {
+    pitch, setPitch, pitchAuto, setPitchAuto, density, setDensity, pad, setPad,
+    offsetMM, setOffsetMM, pattern, setPattern, patternAuto, setPatternAuto,
+    plan, setPlan, front, setFront, centerMode, setCenterMode, maxGrowMM, setMaxGrowMM,
+    showUntestedRungs, setShowUntestedRungs, model,
     onSliderInteractionChange: setSliderTransient,
   }
 
@@ -360,6 +367,10 @@ export default function GridLab() {
       </header>
 
       <div className="gl-body">
+        <aside className="gl-controls">
+          <div className="gl-panel-stack"><GridWorkbenchAdminPanel {...adminPanelProps} /></div>
+        </aside>
+
         <GridWorkbenchStage
           model={model}
           scale={scale}
@@ -413,7 +424,7 @@ const CSS = `
 .gl-head h1{font-size:20px;font-weight:640;letter-spacing:-.01em;margin:0 0 5px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
 .gl-tag{font:600 11px var(--mono);color:var(--accent);background:var(--accent-soft);padding:3px 9px;border-radius:20px;letter-spacing:.02em}
 .gl-head p{color:var(--ink-2);font-size:13.5px;margin:0;max-width:74ch;line-height:1.55}
-.gl-body{max-width:1060px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) 336px;gap:20px;align-items:start}
+.gl-body{max-width:1436px;margin:0 auto;display:grid;grid-template-columns:336px minmax(0,1fr) 336px;gap:20px;align-items:start}
 @media (max-width:840px){.gl-body{grid-template-columns:1fr}}
 .gl-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
 .gl-pad{padding:18px;display:flex;flex-direction:column;gap:15px}
