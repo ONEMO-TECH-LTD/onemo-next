@@ -1,5 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs'
+import { createElement, type ComponentProps } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
+import { GridWorkbenchPanel } from '@/app/(dev)/effect-creator/grid-lab/GridWorkbenchPanel'
 
 const CREATE_PAGE_PATH = 'src/app/(store)/create/page.tsx'
 const HOME_PAGE_PATH = 'src/app/page.tsx'
@@ -92,6 +95,78 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(adminPanelSource).not.toContain('stdRungs.map')
     expect(adminPanelSource).not.toContain('rectRungs?.longOptions')
     expect(adminPanelSource).not.toContain('rectRungs?.shortOptions')
+  })
+
+  it('keeps every untested rung out of product tiers until the admin toggle reveals it', () => {
+    const noop = () => {}
+    const baseProps: ComponentProps<typeof GridWorkbenchPanel> = {
+      src: 'std',
+      setSrc: noop,
+      geo: 'square',
+      setGeo: noop,
+      setLongMM: noop,
+      setShortMM: noop,
+      orient: 'landscape',
+      setOrient: noop,
+      preset: 'squircle',
+      setPreset: noop,
+      gen: 'blob',
+      setGen: noop,
+      p1: 50,
+      setP1: noop,
+      p2: 7,
+      setP2: noop,
+      sides: 6,
+      setSides: noop,
+      points: 5,
+      setPoints: noop,
+      setSizeMM: noop,
+      attachment: 'magnetic',
+      setAttachment: noop,
+      magic: null,
+      magStatus: '',
+      fileRef: { current: null },
+      onFile: noop,
+      sizeMax: 310,
+      sizeMin: 22,
+      resolvedSizeMM: 70,
+      maxRungMM: 310,
+      gridMode: 'auto',
+      stdRungs: [
+        { label: 'VISIBLE_STD', points: 4, sizeMM: 70, visible: true },
+        { label: 'HIDDEN_STD', points: 8, sizeMM: 118, visible: false },
+      ],
+      rectRungs: {
+        longOptions: [
+          { label: 'VISIBLE_LONG', points: 4, sizeMM: 70, visible: true },
+          { label: 'HIDDEN_LONG', points: 8, sizeMM: 118, visible: false },
+        ],
+        shortOptions: [
+          { label: 'VISIBLE_SHORT', points: 1, sizeMM: 22, visible: true },
+          { label: 'HIDDEN_SHORT', points: 4, sizeMM: 70, visible: false },
+        ],
+      },
+      showUntestedRungs: false,
+      model: null,
+      onSliderInteractionChange: noop,
+    }
+    const render = (props: Partial<ComponentProps<typeof GridWorkbenchPanel>>) =>
+      renderToStaticMarkup(createElement(GridWorkbenchPanel, { ...baseProps, ...props }))
+
+    const standardHidden = render({ showUntestedRungs: false })
+    const standardRevealed = render({ showUntestedRungs: true })
+    expect(standardHidden).toContain('VISIBLE_STD')
+    expect(standardHidden).not.toContain('HIDDEN_STD')
+    expect(standardRevealed).toContain('HIDDEN_STD')
+
+    const rectangleHidden = render({ geo: 'rect', showUntestedRungs: false })
+    const rectangleRevealed = render({ geo: 'rect', showUntestedRungs: true })
+    expect(rectangleHidden).toContain('VISIBLE_LONG')
+    expect(rectangleHidden).toContain('VISIBLE_SHORT')
+    expect(rectangleHidden).not.toContain('HIDDEN_LONG')
+    expect(rectangleHidden).not.toContain('HIDDEN_SHORT')
+    expect(rectangleRevealed).toContain('HIDDEN_LONG')
+    expect(rectangleRevealed).toContain('HIDDEN_SHORT')
   })
 
   it('keeps the serializable handler, worker, and client behind one neutral entry', () => {

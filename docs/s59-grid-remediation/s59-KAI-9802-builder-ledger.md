@@ -80,8 +80,13 @@ control. The accepted minimal exception is one page boolean:
 - Mutation: renamed the admin `Show untested rungs` label to collide with
   `Attachment`; the exact-once ownership test failed and named the missing admin
   control. Restored: 9/9 passed.
+- QA rework F1 added a render-level regression for the only new behaviour. With
+  `showUntestedRungs=false`, hidden standard, rectangle-long, and rectangle-short
+  rungs are absent; with it `true`, all three are present.
+- F1 mutation: removed the filter from rectangle short-side only. The new test failed
+  exactly on `HIDDEN_SHORT`; restored: targeted boundary suite 10/10 passed.
 - TypeScript: exit 0.
-- Full Vitest suite: 418 passed, 10 skipped.
+- Full Vitest suite: 419 passed, 10 skipped after the F1 regression was added.
 - ESLint: exit 0, 0 errors; 214 pre-existing warnings.
 - Production build: exit 0.
 - `git diff --check`: clean.
