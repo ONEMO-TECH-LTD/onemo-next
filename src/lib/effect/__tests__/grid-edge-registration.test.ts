@@ -127,10 +127,16 @@ describe('edge-registration law — every edge registers on its own zero-point',
     }
   })
 
-  it('pins the COMPLETE set of layouts this law moves — exactly two', () => {
-    // Measured against pre-law staging by swapping the engine file, not by stashing (a stash after
-    // commit is a silent no-op and is how the blast radius was first undercounted as one case).
-    // Both are light density and both are the same 35mm -> 11mm correction.
+  it('pins every layout this law moves in the REACHABLE rectangle space — exactly two', () => {
+    // SCOPE, and it is load-bearing: a rectangle's two axes are each snapped to a ladder rung
+    // (resolveRectangleRungs -> nearestSemanticRung), so the product can only ever ask for a
+    // rung x rung pair — 42 of them. Off-ladder dimensions (209x70, 214x143) are NOT product
+    // inputs; a rung is by definition the size whose surface exactly wraps its magnet array plus
+    // the encoded margins, so a non-rung size has no zero-point to register on and asking whether
+    // it registers is a category error. Measured across the full reachable matrix, both densities,
+    // against pre-law staging by SWAPPING the engine file — never by stashing (a stash after commit
+    // is a silent no-op, and is how the blast radius was first undercounted as one case).
+    // Both movers are light density and both are the same 35mm -> 11mm correction.
     const moved: Array<[number, number, number, number[]]> = [
       [214, 70, 6, [11, 107, 203]],
       [214, 166, 10, [11, 107, 203]],
