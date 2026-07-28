@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { createElement, type ComponentProps } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
+import { GridWorkbenchAdminPanel } from '@/app/(dev)/effect-creator/grid-lab/GridWorkbenchAdminPanel'
 import { GridWorkbenchPanel } from '@/app/(dev)/effect-creator/grid-lab/GridWorkbenchPanel'
 
 const CREATE_PAGE_PATH = 'src/app/(store)/create/page.tsx'
@@ -49,6 +50,7 @@ describe('Creator magnetic-grid module boundary', () => {
   })
 
   it('renders every control exactly once in its product or admin panel', () => {
+    const pageSource = readFileSync(PAGE_PATH, 'utf8')
     const panelSource = readFileSync(PANEL_PATH, 'utf8')
     const adminPanelSource = readFileSync(ADMIN_PANEL_PATH, 'utf8')
     const combined = `${panelSource}\n${adminPanelSource}`
@@ -60,9 +62,6 @@ describe('Creator magnetic-grid module boundary', () => {
       '<Slider label="Points"',
       '<button className="gl-upload"',
       '<div className="gl-field"><span>Attachment</span>',
-      `<div className="gl-field"><span>Size ·`,
-      '<div className="gl-field"><span>Long side · size</span>',
-      '<div className="gl-field"><span>Short side · size</span>',
       '<div className="gl-field"><span>Orientation</span>',
       '<Slider label={`Design size · longest side',
       '<span className="gl-total-k">Total effect size</span>',
@@ -77,7 +76,6 @@ describe('Creator magnetic-grid module boundary', () => {
       '<div className="gl-field"><span>Grid centering · A/B</span>',
       '<div className="gl-field"><span>Magnet plan</span>',
       '<label className="gl-toggle"><span>Front face · magnet overlay</span>',
-      '<label className="gl-toggle"><span>Show untested rungs</span>',
     ]
 
     for (const control of productControls) {
@@ -91,15 +89,28 @@ describe('Creator magnetic-grid module boundary', () => {
       expect(combined.split(control)).toHaveLength(2)
     }
 
-    expect(panelSource).toContain('.filter(r => r.visible || showUntestedRungs)')
-    expect(adminPanelSource).not.toContain('stdRungs.map')
-    expect(adminPanelSource).not.toContain('rectRungs?.longOptions')
-    expect(adminPanelSource).not.toContain('rectRungs?.shortOptions')
+    expect(panelSource.match(/\.filter\(r => r\.visible\)/g)).toHaveLength(3)
+    expect(adminPanelSource.match(/\.filter\(r => !r\.visible\)/g)).toHaveLength(3)
+    expect(`${pageSource}\n${panelSource}\n${adminPanelSource}`).not.toContain('showUntestedRungs')
   })
 
-  it('keeps every untested rung out of product tiers until the admin toggle reveals it', () => {
+  it('keeps visible rungs product-only and untested rungs admin-only across every tier group', () => {
     const noop = () => {}
-    const baseProps: ComponentProps<typeof GridWorkbenchPanel> = {
+    const stdRungs = [
+      { label: 'VISIBLE_STD', points: 4, sizeMM: 70, visible: true },
+      { label: 'HIDDEN_STD', points: 8, sizeMM: 118, visible: false },
+    ]
+    const rectRungs = {
+      longOptions: [
+        { label: 'VISIBLE_LONG', points: 4, sizeMM: 70, visible: true },
+        { label: 'HIDDEN_LONG', points: 8, sizeMM: 118, visible: false },
+      ],
+      shortOptions: [
+        { label: 'VISIBLE_SHORT', points: 1, sizeMM: 22, visible: true },
+        { label: 'HIDDEN_SHORT', points: 4, sizeMM: 70, visible: false },
+      ],
+    }
+    const baseProductProps: ComponentProps<typeof GridWorkbenchPanel> = {
       src: 'std',
       setSrc: noop,
       geo: 'square',
@@ -132,41 +143,67 @@ describe('Creator magnetic-grid module boundary', () => {
       resolvedSizeMM: 70,
       maxRungMM: 310,
       gridMode: 'auto',
-      stdRungs: [
-        { label: 'VISIBLE_STD', points: 4, sizeMM: 70, visible: true },
-        { label: 'HIDDEN_STD', points: 8, sizeMM: 118, visible: false },
-      ],
-      rectRungs: {
-        longOptions: [
-          { label: 'VISIBLE_LONG', points: 4, sizeMM: 70, visible: true },
-          { label: 'HIDDEN_LONG', points: 8, sizeMM: 118, visible: false },
-        ],
-        shortOptions: [
-          { label: 'VISIBLE_SHORT', points: 1, sizeMM: 22, visible: true },
-          { label: 'HIDDEN_SHORT', points: 4, sizeMM: 70, visible: false },
-        ],
-      },
-      showUntestedRungs: false,
+      stdRungs,
+      rectRungs,
       model: null,
       onSliderInteractionChange: noop,
     }
-    const render = (props: Partial<ComponentProps<typeof GridWorkbenchPanel>>) =>
-      renderToStaticMarkup(createElement(GridWorkbenchPanel, { ...baseProps, ...props }))
+    const baseAdminProps: ComponentProps<typeof GridWorkbenchAdminPanel> = {
+      src: 'std',
+      geo: 'square',
+      setLongMM: noop,
+      setShortMM: noop,
+      setSizeMM: noop,
+      gridMode: 'auto',
+      stdRungs,
+      rectRungs,
+      pitch: 48,
+      setPitch: noop,
+      pitchAuto: true,
+      setPitchAuto: noop,
+      density: 'light',
+      setDensity: noop,
+      pad: 10,
+      setPad: noop,
+      offsetMM: 0,
+      setOffsetMM: noop,
+      pattern: 'standard',
+      setPattern: noop,
+      patternAuto: true,
+      setPatternAuto: noop,
+      plan: 'auto',
+      setPlan: noop,
+      front: false,
+      setFront: noop,
+      centerMode: 'centroid',
+      setCenterMode: noop,
+      maxGrowMM: 12,
+      setMaxGrowMM: noop,
+      model: null,
+      onSliderInteractionChange: noop,
+    }
+    const renderProduct = (props: Partial<ComponentProps<typeof GridWorkbenchPanel>>) =>
+      renderToStaticMarkup(createElement(GridWorkbenchPanel, { ...baseProductProps, ...props }))
+    const renderAdmin = (props: Partial<ComponentProps<typeof GridWorkbenchAdminPanel>>) =>
+      renderToStaticMarkup(createElement(GridWorkbenchAdminPanel, { ...baseAdminProps, ...props }))
 
-    const standardHidden = render({ showUntestedRungs: false })
-    const standardRevealed = render({ showUntestedRungs: true })
-    expect(standardHidden).toContain('VISIBLE_STD')
-    expect(standardHidden).not.toContain('HIDDEN_STD')
-    expect(standardRevealed).toContain('HIDDEN_STD')
+    const productStandard = renderProduct({})
+    const adminStandard = renderAdmin({})
+    expect(productStandard).toContain('VISIBLE_STD')
+    expect(productStandard).not.toContain('HIDDEN_STD')
+    expect(adminStandard).not.toContain('VISIBLE_STD')
+    expect(adminStandard).toContain('HIDDEN_STD')
 
-    const rectangleHidden = render({ geo: 'rect', showUntestedRungs: false })
-    const rectangleRevealed = render({ geo: 'rect', showUntestedRungs: true })
-    expect(rectangleHidden).toContain('VISIBLE_LONG')
-    expect(rectangleHidden).toContain('VISIBLE_SHORT')
-    expect(rectangleHidden).not.toContain('HIDDEN_LONG')
-    expect(rectangleHidden).not.toContain('HIDDEN_SHORT')
-    expect(rectangleRevealed).toContain('HIDDEN_LONG')
-    expect(rectangleRevealed).toContain('HIDDEN_SHORT')
+    const productRectangle = renderProduct({ geo: 'rect' })
+    const adminRectangle = renderAdmin({ geo: 'rect' })
+    expect(productRectangle).toContain('VISIBLE_LONG')
+    expect(productRectangle).toContain('VISIBLE_SHORT')
+    expect(productRectangle).not.toContain('HIDDEN_LONG')
+    expect(productRectangle).not.toContain('HIDDEN_SHORT')
+    expect(adminRectangle).not.toContain('VISIBLE_LONG')
+    expect(adminRectangle).not.toContain('VISIBLE_SHORT')
+    expect(adminRectangle).toContain('HIDDEN_LONG')
+    expect(adminRectangle).toContain('HIDDEN_SHORT')
   })
 
   it('keeps the serializable handler, worker, and client behind one neutral entry', () => {

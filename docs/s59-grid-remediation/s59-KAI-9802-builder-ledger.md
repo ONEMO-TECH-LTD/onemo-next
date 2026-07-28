@@ -37,7 +37,7 @@ All affected files and this ledger were read back in full after the implementati
 
 ### Left / admin-diagnostic
 
-- Show untested rungs.
+- Untested `†` tier buttons.
 - Density.
 - Grid pitch.
 - Magnet padding.
@@ -53,14 +53,16 @@ a BOM/placement strategy. Both therefore belong to the admin panel.
 
 ## Hidden-rung decision
 
-Hidden rungs live inside the same semantic tier groups as visible rungs, including
-both rectangle rows. Splitting those groups would duplicate or fracture one product
-control. The accepted minimal exception is one page boolean:
+META rejected the interim visibility toggle because it introduced page state and
+could render admin-only buttons inside the product panel. The final split is
+state-independent and follows the clone/delete method literally:
 
-- the admin panel owns `Show untested rungs`;
-- the product panel owns every intact tier group;
-- the product panel renders `r.visible || showUntestedRungs`;
-- no engine state, store, or second plan path exists.
+- the product panel clones retain only `r.visible` buttons;
+- the admin panel clones retain only `!r.visible` buttons;
+- standard, rectangle-long, and rectangle-short groups are covered separately;
+- each rung button renders exactly once across the two panels;
+- clicking either panel still drives the same existing size state;
+- there is no visibility boolean, prop, setter, store, or second engine path.
 
 ## Minimal implementation
 
@@ -80,11 +82,17 @@ control. The accepted minimal exception is one page boolean:
 - Mutation: renamed the admin `Show untested rungs` label to collide with
   `Attachment`; the exact-once ownership test failed and named the missing admin
   control. Restored: 9/9 passed.
-- QA rework F1 added a render-level regression for the only new behaviour. With
-  `showUntestedRungs=false`, hidden standard, rectangle-long, and rectangle-short
-  rungs are absent; with it `true`, all three are present.
-- F1 mutation: removed the filter from rectangle short-side only. The new test failed
-  exactly on `HIDDEN_SHORT`; restored: targeted boundary suite 10/10 passed.
+- QA rework F1 added a render-level regression across standard, rectangle-long, and
+  rectangle-short groups.
+- META rework replaced the rejected toggle design. The regression now proves visible
+  rungs render only in the product panel and untested rungs only in the admin panel.
+- Product short-side mutation: removed its `r.visible` filter. The structural guard
+  fell from three filters to two and the render test exposed `HIDDEN_SHORT` on the
+  product panel.
+- Admin short-side mutation: removed its `!r.visible` filter. The structural guard
+  fell from three filters to two and the render test exposed `VISIBLE_SHORT` on the
+  admin panel.
+- Both mutations were restored; targeted boundary suite passed 10/10.
 - TypeScript: exit 0.
 - Full Vitest suite: 419 passed, 10 skipped after the F1 regression was added.
 - ESLint: exit 0, 0 errors; 214 pre-existing warnings.
@@ -100,7 +108,9 @@ control. The accepted minimal exception is one page boolean:
   verification screen remains isolated on the landed `edge-registration` worktree.
 - Playwright exercised 52 interactions across both panels:
   - every admin mode and slider;
-  - hidden-rung reveal, selection, and hide;
+  - admin-only untested square and rectangle rung selection;
+  - zero untested rung buttons in the product panel;
+  - zero visible rung buttons duplicated in the admin panel;
   - every product source, generator, geometry, attachment, visible tier, rectangle
     orientation/tier group, and design-size slider;
   - AI upload control presence;

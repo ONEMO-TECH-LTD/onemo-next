@@ -71,7 +71,6 @@ export interface GridWorkbenchPanelProps {
   gridMode: GridMode
   stdRungs: SemanticRungView[]
   rectRungs: RectangleRungsView | null
-  showUntestedRungs: boolean
   model: GridWorkbenchPanelModel | null
   onSliderInteractionChange: (transient: boolean) => void
 }
@@ -81,7 +80,7 @@ export function GridWorkbenchPanel({
   preset, setPreset, gen, setGen, p1, setP1, p2, setP2, sides, setSides, points, setPoints,
   setSizeMM, attachment, setAttachment,
   magic, magStatus, fileRef, onFile, sizeMax, sizeMin, resolvedSizeMM, maxRungMM,
-  gridMode, stdRungs, rectRungs, showUntestedRungs, model, onSliderInteractionChange,
+  gridMode, stdRungs, rectRungs, model, onSliderInteractionChange,
 }: GridWorkbenchPanelProps) {
   const genParams = {
     blob: [['Waviness', '%'], ['Seed', '']], form: [['Pinch', '%'], ['Lobes', '']],
@@ -151,7 +150,7 @@ export function GridWorkbenchPanel({
       {!(src === 'std' && geo === 'rect') && <div className="gl-field"><span>Size · {src === 'std' ? 'this shape' : 'square ref'} · {gridMode === 'quincunx' ? 'dice' : gridMode}</span>
         <div className="gl-seg gl-wrap">
           {!stdRungs.length && <span className="gl-inline-resolving">Resolving…</span>}
-          {stdRungs.filter(r => r.visible || showUntestedRungs).map(r =>
+          {stdRungs.filter(r => r.visible).map(r =>
             <button key={r.sizeMM} aria-pressed={model?.rung?.sizeMM === r.sizeMM}
               className={r.visible ? undefined : 'gl-hidden-rung'}
               onClick={() => setSizeMM(r.sizeMM)}
@@ -165,7 +164,7 @@ export function GridWorkbenchPanel({
         <div className="gl-field"><span>Long side · size</span>
           <div className="gl-seg gl-wrap">
             {!rectRungs && <span className="gl-inline-resolving">Resolving…</span>}
-            {(rectRungs?.longOptions ?? []).filter(r => r.visible || showUntestedRungs).map(r =>
+            {(rectRungs?.longOptions ?? []).filter(r => r.visible).map(r =>
               <button key={'L' + r.sizeMM} aria-pressed={Math.max(model?.rung?.sizeMM ?? 0, model?.rungH?.sizeMM ?? 0) === r.sizeMM}
                 className={r.visible ? undefined : 'gl-hidden-rung'}
                 onClick={() => setLongMM(r.sizeMM)}
@@ -177,7 +176,7 @@ export function GridWorkbenchPanel({
         <div className="gl-field"><span>Short side · size</span>
           <div className="gl-seg gl-wrap">
             {!rectRungs && <span className="gl-inline-resolving">Resolving…</span>}
-            {(rectRungs?.shortOptions ?? []).filter(r => r.visible || showUntestedRungs).map(r =>
+            {(rectRungs?.shortOptions ?? []).filter(r => r.visible).map(r =>
               <button key={'S' + r.sizeMM} aria-pressed={Math.min(model?.rung?.sizeMM ?? 0, model?.rungH?.sizeMM ?? 0) === r.sizeMM}
                 className={r.visible ? undefined : 'gl-hidden-rung'}
                 onClick={() => setShortMM(r.sizeMM)}>

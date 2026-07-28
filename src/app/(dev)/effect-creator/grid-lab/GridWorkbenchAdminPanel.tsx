@@ -1,13 +1,38 @@
 type GridDensity = 'standard' | 'light'
 type GridPattern = 'standard' | 'quincunx' | 'diamond'
 type MagnetPlan = 'auto' | 'all6' | 'all8' | 'corners8'
+type Src = 'std' | 'preset' | 'gen' | 'magic'
+type StdGeo = 'square' | 'diamondShape' | 'rect' | 'circle' | 'triangle'
+type GridMode = 'auto' | 'standard' | 'quincunx' | 'diamond'
+
+interface SemanticRungView {
+  label: string
+  points: number
+  sizeMM: number
+  visible: boolean
+}
+
+interface RectangleRungsView {
+  longOptions: SemanticRungView[]
+  shortOptions: SemanticRungView[]
+}
 
 interface GridWorkbenchAdminPanelModel {
   pitch: number
   patternUsed: string
+  rung: SemanticRungView | null
+  rungH: SemanticRungView | null
 }
 
 export interface GridWorkbenchAdminPanelProps {
+  src: Src
+  geo: StdGeo
+  setLongMM: (value: number) => void
+  setShortMM: (value: number) => void
+  setSizeMM: (value: number) => void
+  gridMode: GridMode
+  stdRungs: SemanticRungView[]
+  rectRungs: RectangleRungsView | null
   pitch: number
   setPitch: (value: number) => void
   pitchAuto: boolean
@@ -30,24 +55,56 @@ export interface GridWorkbenchAdminPanelProps {
   setCenterMode: (value: 'centroid' | 'bbox') => void
   maxGrowMM: number
   setMaxGrowMM: (value: number) => void
-  showUntestedRungs: boolean
-  setShowUntestedRungs: (value: boolean) => void
   model: GridWorkbenchAdminPanelModel | null
   onSliderInteractionChange: (transient: boolean) => void
 }
 
 export function GridWorkbenchAdminPanel({
+  src, geo, setLongMM, setShortMM, setSizeMM, gridMode, stdRungs, rectRungs,
   pitch, setPitch, pitchAuto, setPitchAuto,
   density, setDensity, pad, setPad, offsetMM, setOffsetMM, pattern, setPattern,
   patternAuto, setPatternAuto, plan, setPlan, front, setFront, centerMode, setCenterMode,
-  maxGrowMM, setMaxGrowMM, showUntestedRungs, setShowUntestedRungs,
-  model, onSliderInteractionChange,
+  maxGrowMM, setMaxGrowMM, model, onSliderInteractionChange,
 }: GridWorkbenchAdminPanelProps) {
   return <>
     <div className="gl-card gl-pad">
-      <label className="gl-toggle"><span>Show untested rungs</span>
-        <input type="checkbox" checked={showUntestedRungs} onChange={e => setShowUntestedRungs(e.target.checked)} />
-      </label>
+      {!(src === 'std' && geo === 'rect') && <div className="gl-field"><span>Size · {src === 'std' ? 'this shape' : 'square ref'} · {gridMode === 'quincunx' ? 'dice' : gridMode}</span>
+        <div className="gl-seg gl-wrap">
+          {!stdRungs.length && <span className="gl-inline-resolving">Resolving…</span>}
+          {stdRungs.filter(r => !r.visible).map(r =>
+            <button key={r.sizeMM} aria-pressed={model?.rung?.sizeMM === r.sizeMM}
+              className={r.visible ? undefined : 'gl-hidden-rung'}
+              onClick={() => setSizeMM(r.sizeMM)}
+              title={`${r.points} anchor point${r.points > 1 ? 's' : ''}${r.visible ? '' : ' · hidden at launch (untested)'}`}>
+              {r.label}{r.visible ? '' : '†'}
+            </button>)}
+        </div>
+      </div>}
+      {src === 'std' && geo === 'rect' && <>
+        <div className="gl-field"><span>Long side · size</span>
+          <div className="gl-seg gl-wrap">
+            {!rectRungs && <span className="gl-inline-resolving">Resolving…</span>}
+            {(rectRungs?.longOptions ?? []).filter(r => !r.visible).map(r =>
+              <button key={'L' + r.sizeMM} aria-pressed={Math.max(model?.rung?.sizeMM ?? 0, model?.rungH?.sizeMM ?? 0) === r.sizeMM}
+                className={r.visible ? undefined : 'gl-hidden-rung'}
+                onClick={() => setLongMM(r.sizeMM)}
+                title={`${r.points} anchor points${r.visible ? '' : ' · hidden at launch (untested)'}`}>
+                {r.label}{r.visible ? '' : '†'}
+              </button>)}
+          </div>
+        </div>
+        <div className="gl-field"><span>Short side · size</span>
+          <div className="gl-seg gl-wrap">
+            {!rectRungs && <span className="gl-inline-resolving">Resolving…</span>}
+            {(rectRungs?.shortOptions ?? []).filter(r => !r.visible).map(r =>
+              <button key={'S' + r.sizeMM} aria-pressed={Math.min(model?.rung?.sizeMM ?? 0, model?.rungH?.sizeMM ?? 0) === r.sizeMM}
+                className={r.visible ? undefined : 'gl-hidden-rung'}
+                onClick={() => setShortMM(r.sizeMM)}>
+                {r.label}{r.visible ? '' : '†'}
+              </button>)}
+          </div>
+        </div>
+      </>}
       <div className="gl-field"><span>Density</span>
         <div className="gl-seg">
           <button aria-pressed={density === 'standard'} onClick={() => setDensity('standard')} title="dense — fine grid, full coverage, firmer hold">Standard</button>

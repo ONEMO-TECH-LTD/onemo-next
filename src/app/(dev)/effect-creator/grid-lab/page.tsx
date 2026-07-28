@@ -81,7 +81,6 @@ function normBase(vs: VShape, maskH: number): Contour | null {
 export default function GridLab() {
   const [renderedPlanKey, setRenderedPlanKey] = useState<string | null>(null)
   const [sliderTransient, setSliderTransient] = useState(false)
-  const [showUntestedRungs, setShowUntestedRungs] = useState(false)
   const [src, setSrc] = useState<Src>('std')
   const [geo, setGeo] = useState<StdGeo>('square')
   // rect system A: long side rung → short side rung (< long) → orientation
@@ -339,14 +338,15 @@ export default function GridLab() {
     preset, setPreset, gen, setGen, p1, setP1, p2, setP2, sides, setSides, points, setPoints,
     setSizeMM, attachment, setAttachment,
     magic, magStatus, fileRef, onFile, sizeMax, sizeMin, resolvedSizeMM,
-    maxRungMM: DEFAULT_LAW.maxRungMM, gridMode, stdRungs, rectRungs, showUntestedRungs, model,
+    maxRungMM: DEFAULT_LAW.maxRungMM, gridMode, stdRungs, rectRungs, model,
     onSliderInteractionChange: setSliderTransient,
   }
   const adminPanelProps: GridWorkbenchAdminPanelProps = {
+    src, geo, setLongMM, setShortMM, setSizeMM, gridMode, stdRungs, rectRungs,
     pitch, setPitch, pitchAuto, setPitchAuto, density, setDensity, pad, setPad,
     offsetMM, setOffsetMM, pattern, setPattern, patternAuto, setPatternAuto,
     plan, setPlan, front, setFront, centerMode, setCenterMode, maxGrowMM, setMaxGrowMM,
-    showUntestedRungs, setShowUntestedRungs, model,
+    model,
     onSliderInteractionChange: setSliderTransient,
   }
 
