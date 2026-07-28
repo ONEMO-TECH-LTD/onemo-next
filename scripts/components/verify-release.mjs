@@ -104,6 +104,8 @@ export async function verifyPublishedRelease(releaseDir) {
 
 export function compareApi(previous, next) {
   const failures = [];
+  const isEmitted = (prop) => prop.emitted ?? Boolean(prop.emittedType);
+  const scopeMasters = (prop) => new Set((prop.bindingScope ?? []).map(({ masterId }) => masterId));
   const beforeById = new Map((previous?.components ?? []).map((component) => [component.figmaId, component]));
   const nextById = new Map((next?.components ?? []).map((component) => [component.figmaId, component]));
   for (const component of previous?.components ?? []) {
@@ -118,7 +120,20 @@ export function compareApi(previous, next) {
     for (const prop of before.api) {
       const replacement = nextProps.get(prop.authoredKey);
       if (!replacement) {
+        if (isEmitted(prop))
+          failures.push({ component: component.codeName, prop: prop.authoredKey, reason: 'removed' });
+        continue;
+      }
+      const beforeEmitted = isEmitted(prop);
+      const afterEmitted = isEmitted(replacement);
+      if (beforeEmitted && !afterEmitted) {
         failures.push({ component: component.codeName, prop: prop.authoredKey, reason: 'removed' });
+        continue;
+      }
+      if (!beforeEmitted) {
+        if (afterEmitted && replacement.required === true) {
+          failures.push({ component: component.codeName, prop: prop.authoredKey, reason: 'new-required' });
+        }
         continue;
       }
       if (replacement.propName !== prop.propName)
@@ -129,6 +144,17 @@ export function compareApi(previous, next) {
         failures.push({ component: component.codeName, prop: prop.authoredKey, reason: 'default-changed' });
       if (replacement.required === true && prop.required !== true)
         failures.push({ component: component.codeName, prop: prop.authoredKey, reason: 'new-required' });
+      const nextScope = scopeMasters(replacement);
+      for (const masterId of scopeMasters(prop)) {
+        if (!nextScope.has(masterId)) {
+          failures.push({
+            component: component.codeName,
+            prop: prop.authoredKey,
+            reason: 'binding-scope-removed',
+          });
+          break;
+        }
+      }
       if (prop.type === 'VARIANT') {
         const nextOptions = new Set(replacement.variantOptions ?? []);
         for (const option of prop.variantOptions ?? []) {

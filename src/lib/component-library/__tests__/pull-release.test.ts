@@ -103,6 +103,11 @@ export default function Thing({ label = 'Default' }: ThingProps) {
       type: 'TEXT',
       defaultValue: 'Default',
       variantOptions: null,
+      bindingScope: [{
+        masterId: 'master:1',
+        sites: [{ nodeId: 'label:1', field: 'characters' }],
+      }],
+      emitted: true,
       emittedType: labelType,
     }],
     masters: [{
@@ -151,6 +156,8 @@ describe('component release pull transaction', () => {
       type: 'VARIANT',
       defaultValue: 'Default',
       variantOptions: ['Default', 'Active'],
+      bindingScope: [],
+      emitted: true,
       emittedType: "'Default' | 'Active'",
     };
     const previous = {
@@ -177,6 +184,51 @@ describe('component release pull transaction', () => {
       expect.objectContaining({ component: 'Thing', reason: 'new-required' }),
       expect.objectContaining({ component: 'Thing', reason: 'variant-removed' }),
     ]));
+  });
+
+  it('treats declared-unbound props as metadata, additive binding as compatible and binding removal as breaking', () => {
+    const unbound = {
+      authoredKey: 'Icons#8050:5',
+      propName: 'icons',
+      type: 'INSTANCE_SWAP',
+      defaultValue: '6110:54836',
+      bindingScope: [],
+      emitted: false,
+      emittedType: null,
+    };
+    const bound = {
+      ...unbound,
+      bindingScope: [{
+        masterId: '8018:28194',
+        sites: [{ nodeId: 'slot:1', field: 'mainComponent' }],
+      }],
+      emitted: true,
+      emittedType: 'typeof IconHexagon',
+    };
+    const component = (api: Array<Record<string, unknown>>) => ({
+      components: [{ figmaId: '8050:6894', codeName: 'Dial_8050_6894', api }],
+    });
+    expect(compareApi(component([unbound]), component([bound]))).toEqual([]);
+    expect(compareApi(component([unbound]), component([]))).toEqual([]);
+    expect(compareApi(component([unbound]), component([{ ...bound, required: true }]))).toEqual([
+      expect.objectContaining({ reason: 'new-required' }),
+    ]);
+    expect(compareApi(component([bound]), component([unbound]))).toEqual([
+      expect.objectContaining({
+        component: 'Dial_8050_6894',
+        prop: 'Icons#8050:5',
+        reason: 'removed',
+      }),
+    ]);
+
+    const narrowed = {
+      ...bound,
+      bindingScope: [],
+      emitted: true,
+    };
+    expect(compareApi(component([bound]), component([narrowed]))).toEqual([
+      expect.objectContaining({ reason: 'binding-scope-removed' }),
+    ]);
   });
 
   it('pulls atomically with a real wrapper and preserves its bytes', async () => {
