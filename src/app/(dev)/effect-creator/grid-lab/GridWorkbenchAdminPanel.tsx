@@ -66,12 +66,16 @@ export function GridWorkbenchAdminPanel({
   patternAuto, setPatternAuto, plan, setPlan, front, setFront, centerMode, setCenterMode,
   maxGrowMM, setMaxGrowMM, model, onSliderInteractionChange,
 }: GridWorkbenchAdminPanelProps) {
+  const hiddenStdRungs = stdRungs.filter(r => !r.visible)
+  const hiddenLongRungs = (rectRungs?.longOptions ?? []).filter(r => !r.visible)
+  const hiddenShortRungs = (rectRungs?.shortOptions ?? []).filter(r => !r.visible)
+
   return <>
     <div className="gl-card gl-pad">
-      {!(src === 'std' && geo === 'rect') && <div className="gl-field"><span>Size · {src === 'std' ? 'this shape' : 'square ref'} · {gridMode === 'quincunx' ? 'dice' : gridMode}</span>
+      {!(src === 'std' && geo === 'rect') && (!stdRungs.length || hiddenStdRungs.length > 0) && <div className="gl-field"><span>Size · {src === 'std' ? 'this shape' : 'square ref'} · {gridMode === 'quincunx' ? 'dice' : gridMode}</span>
         <div className="gl-seg gl-wrap">
           {!stdRungs.length && <span className="gl-inline-resolving">Resolving…</span>}
-          {stdRungs.filter(r => !r.visible).map(r =>
+          {hiddenStdRungs.map(r =>
             <button key={r.sizeMM} aria-pressed={model?.rung?.sizeMM === r.sizeMM}
               className={r.visible ? undefined : 'gl-hidden-rung'}
               onClick={() => setSizeMM(r.sizeMM)}
@@ -81,10 +85,10 @@ export function GridWorkbenchAdminPanel({
         </div>
       </div>}
       {src === 'std' && geo === 'rect' && <>
-        <div className="gl-field"><span>Long side · size</span>
+        {(!rectRungs || hiddenLongRungs.length > 0) && <div className="gl-field"><span>Long side · size</span>
           <div className="gl-seg gl-wrap">
             {!rectRungs && <span className="gl-inline-resolving">Resolving…</span>}
-            {(rectRungs?.longOptions ?? []).filter(r => !r.visible).map(r =>
+            {hiddenLongRungs.map(r =>
               <button key={'L' + r.sizeMM} aria-pressed={Math.max(model?.rung?.sizeMM ?? 0, model?.rungH?.sizeMM ?? 0) === r.sizeMM}
                 className={r.visible ? undefined : 'gl-hidden-rung'}
                 onClick={() => setLongMM(r.sizeMM)}
@@ -92,18 +96,18 @@ export function GridWorkbenchAdminPanel({
                 {r.label}{r.visible ? '' : '†'}
               </button>)}
           </div>
-        </div>
-        <div className="gl-field"><span>Short side · size</span>
+        </div>}
+        {(!rectRungs || hiddenShortRungs.length > 0) && <div className="gl-field"><span>Short side · size</span>
           <div className="gl-seg gl-wrap">
             {!rectRungs && <span className="gl-inline-resolving">Resolving…</span>}
-            {(rectRungs?.shortOptions ?? []).filter(r => !r.visible).map(r =>
+            {hiddenShortRungs.map(r =>
               <button key={'S' + r.sizeMM} aria-pressed={Math.min(model?.rung?.sizeMM ?? 0, model?.rungH?.sizeMM ?? 0) === r.sizeMM}
                 className={r.visible ? undefined : 'gl-hidden-rung'}
                 onClick={() => setShortMM(r.sizeMM)}>
                 {r.label}{r.visible ? '' : '†'}
               </button>)}
           </div>
-        </div>
+        </div>}
       </>}
       <div className="gl-field"><span>Density</span>
         <div className="gl-seg">

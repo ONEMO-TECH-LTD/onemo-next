@@ -204,6 +204,31 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(adminRectangle).not.toContain('VISIBLE_SHORT')
     expect(adminRectangle).toContain('HIDDEN_LONG')
     expect(adminRectangle).toContain('HIDDEN_SHORT')
+
+    const adminWithoutHiddenStandard = renderAdmin({
+      stdRungs: stdRungs.filter(r => r.visible),
+    })
+    expect(adminWithoutHiddenStandard).not.toContain('Size · this shape')
+
+    const adminWithoutHiddenLong = renderAdmin({
+      geo: 'rect',
+      rectRungs: {
+        longOptions: rectRungs.longOptions.filter(r => r.visible),
+        shortOptions: rectRungs.shortOptions,
+      },
+    })
+    expect(adminWithoutHiddenLong).not.toContain('Long side · size')
+    expect(adminWithoutHiddenLong).toContain('Short side · size')
+
+    const adminWithoutHiddenShort = renderAdmin({
+      geo: 'rect',
+      rectRungs: {
+        longOptions: rectRungs.longOptions,
+        shortOptions: rectRungs.shortOptions.filter(r => r.visible),
+      },
+    })
+    expect(adminWithoutHiddenShort).toContain('Long side · size')
+    expect(adminWithoutHiddenShort).not.toContain('Short side · size')
   })
 
   it('keeps the serializable handler, worker, and client behind one neutral entry', () => {

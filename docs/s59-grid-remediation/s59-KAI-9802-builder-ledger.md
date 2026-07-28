@@ -93,6 +93,10 @@ state-independent and follows the clone/delete method literally:
   fell from three filters to two and the render test exposed `VISIBLE_SHORT` on the
   admin panel.
 - Both mutations were restored; targeted boundary suite passed 10/10.
+- QA rework F2 guards each admin tier group independently. Once its resolved list
+  contains no untested rungs, neither the empty button row nor its label renders.
+- F2 mutation: forced the empty rectangle short-side group to render. The regression
+  failed on the exposed `Short side · size` label; restored: targeted suite 10/10.
 - TypeScript: exit 0.
 - Full Vitest suite: 419 passed, 10 skipped after the F1 regression was added.
 - ESLint: exit 0, 0 errors; 214 pre-existing warnings.
@@ -119,8 +123,10 @@ state-independent and follows the clone/delete method literally:
   `data-grid-runtime-status="ready"`.
 - `data-grid-slider-transient` returned to `false` after every slider interaction.
 - Browser page errors: 0. Console errors: 0.
+- F2 visual: rectangle `262×70` renders only the populated admin long-side group;
+  the empty short-side group and heading are absent.
 - Screenshot:
-  `output/playwright/kai-9802/kai-9802-two-panels.png`.
+  `output/playwright/kai-9802/kai-9802-empty-groups-fixed.png`.
 
 ## Operational note
 
