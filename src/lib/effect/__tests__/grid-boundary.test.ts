@@ -89,12 +89,14 @@ describe('Creator magnetic-grid module boundary', () => {
       expect(combined.split(control)).toHaveLength(2)
     }
 
-    expect(panelSource.match(/\.filter\(r => r\.visible\)/g)).toHaveLength(3)
-    expect(adminPanelSource.match(/\.filter\(r => !r\.visible\)/g)).toHaveLength(3)
+    expect(panelSource).not.toContain('.filter(r => r.visible)')
+    expect(adminPanelSource).not.toContain('Size ·')
+    expect(adminPanelSource).not.toContain('Long side · size')
+    expect(adminPanelSource).not.toContain('Short side · size')
     expect(`${pageSource}\n${panelSource}\n${adminPanelSource}`).not.toContain('showUntestedRungs')
   })
 
-  it('keeps visible rungs product-only and untested rungs admin-only across every tier group', () => {
+  it('keeps every size tier in the product panel and none in the admin panel', () => {
     const noop = () => {}
     const stdRungs = [
       { label: 'VISIBLE_STD', points: 4, sizeMM: 70, visible: true },
@@ -149,14 +151,6 @@ describe('Creator magnetic-grid module boundary', () => {
       onSliderInteractionChange: noop,
     }
     const baseAdminProps: ComponentProps<typeof GridWorkbenchAdminPanel> = {
-      src: 'std',
-      geo: 'square',
-      setLongMM: noop,
-      setShortMM: noop,
-      setSizeMM: noop,
-      gridMode: 'auto',
-      stdRungs,
-      rectRungs,
       pitch: 48,
       setPitch: noop,
       pitchAuto: true,
@@ -190,45 +184,20 @@ describe('Creator magnetic-grid module boundary', () => {
     const productStandard = renderProduct({})
     const adminStandard = renderAdmin({})
     expect(productStandard).toContain('VISIBLE_STD')
-    expect(productStandard).not.toContain('HIDDEN_STD')
+    expect(productStandard).toContain('HIDDEN_STD')
     expect(adminStandard).not.toContain('VISIBLE_STD')
-    expect(adminStandard).toContain('HIDDEN_STD')
+    expect(adminStandard).not.toContain('HIDDEN_STD')
 
     const productRectangle = renderProduct({ geo: 'rect' })
-    const adminRectangle = renderAdmin({ geo: 'rect' })
+    const adminRectangle = renderAdmin({})
     expect(productRectangle).toContain('VISIBLE_LONG')
     expect(productRectangle).toContain('VISIBLE_SHORT')
-    expect(productRectangle).not.toContain('HIDDEN_LONG')
-    expect(productRectangle).not.toContain('HIDDEN_SHORT')
+    expect(productRectangle).toContain('HIDDEN_LONG')
+    expect(productRectangle).toContain('HIDDEN_SHORT')
     expect(adminRectangle).not.toContain('VISIBLE_LONG')
     expect(adminRectangle).not.toContain('VISIBLE_SHORT')
-    expect(adminRectangle).toContain('HIDDEN_LONG')
-    expect(adminRectangle).toContain('HIDDEN_SHORT')
-
-    const adminWithoutHiddenStandard = renderAdmin({
-      stdRungs: stdRungs.filter(r => r.visible),
-    })
-    expect(adminWithoutHiddenStandard).not.toContain('Size · this shape')
-
-    const adminWithoutHiddenLong = renderAdmin({
-      geo: 'rect',
-      rectRungs: {
-        longOptions: rectRungs.longOptions.filter(r => r.visible),
-        shortOptions: rectRungs.shortOptions,
-      },
-    })
-    expect(adminWithoutHiddenLong).not.toContain('Long side · size')
-    expect(adminWithoutHiddenLong).toContain('Short side · size')
-
-    const adminWithoutHiddenShort = renderAdmin({
-      geo: 'rect',
-      rectRungs: {
-        longOptions: rectRungs.longOptions,
-        shortOptions: rectRungs.shortOptions.filter(r => r.visible),
-      },
-    })
-    expect(adminWithoutHiddenShort).toContain('Long side · size')
-    expect(adminWithoutHiddenShort).not.toContain('Short side · size')
+    expect(adminRectangle).not.toContain('HIDDEN_LONG')
+    expect(adminRectangle).not.toContain('HIDDEN_SHORT')
   })
 
   it('keeps the serializable handler, worker, and client behind one neutral entry', () => {

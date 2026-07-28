@@ -342,7 +342,6 @@ export default function GridLab() {
     onSliderInteractionChange: setSliderTransient,
   }
   const adminPanelProps: GridWorkbenchAdminPanelProps = {
-    src, geo, setLongMM, setShortMM, setSizeMM, gridMode, stdRungs, rectRungs,
     pitch, setPitch, pitchAuto, setPitchAuto, density, setDensity, pad, setPad,
     offsetMM, setOffsetMM, pattern, setPattern, patternAuto, setPatternAuto,
     plan, setPlan, front, setFront, centerMode, setCenterMode, maxGrowMM, setMaxGrowMM,
