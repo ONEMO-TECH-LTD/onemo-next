@@ -18,3 +18,15 @@ Shopify API integration tools.
 | Script | Purpose |
 |---|---|
 | `convert-obj-to-glb.py` | Blender headless: OBJ → GLB (historical — superseded by KeyShot pipeline) |
+
+## Automated device performance
+
+`device-performance/` replaces the dead cable-based phone probe. It runs the engine automatically in
+local WebKit:
+
+```bash
+npm run perf:devices
+```
+
+See `device-performance/README.md` for the explicit CPU-emulation limitation, report location, and
+the provider-neutral paid-cloud adapter seam.

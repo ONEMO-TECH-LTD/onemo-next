@@ -1,6 +1,6 @@
-// ⚠ DORMANT CONTRACT (Creator v5 · R6) — pure + unit-tested, but NOT wired into the active /create
+// ⚠ DORMANT CONTRACT (Creator v5 · R6) — pure + unit-tested, but NOT wired into an active product
 // flow: validateAttachment has no product caller yet. The attachment system becomes first-class in
-// /create in Phase 2 (attachment system in the creator). Validator defaults below are INVENTED
+// a later production Creator phase. Validator defaults below are INVENTED
 // (coupon-pending) — keep out of product claims until physically confirmed. Foundation, not active
 // product flow (audit §7).
 //
@@ -27,6 +27,11 @@
 
 import { contentHash, stableStringify } from '@/lib/outline-core/math'
 import type { Contour, Pt } from './types'
+import { pointInPolygon } from './polygon'
+
+// Compatibility export for the dormant validator's existing tests/callers. New engines import the
+// neutral polygon primitive directly and do not depend on this superseded 54mm attachment contract.
+export { pointInPolygon } from './polygon'
 
 export type AttachmentSystem = 'magnet' | 'velcro'
 
@@ -44,21 +49,6 @@ export interface AttachmentResult {
   issues: string[]     // failure reasons (empty when ok)
   locators: Pt[]       // mm points the UI highlights — uncovered/flap-risk silhouette vertices (§11-A9)
   result_hash: string  // deterministic, float-free verdict hash (rides in the payload, §11)
-}
-
-/**
- * Ray-casting point-in-polygon (even-odd rule). `ring` = a closed polygon (no duplicated last point).
- * THE footprint-containment primitive: a magnet anchor counts only if it lands inside the silhouette.
- */
-export function pointInPolygon(p: Pt, ring: ReadonlyArray<Pt>): boolean {
-  let inside = false
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-    const [xi, yi] = ring[i]
-    const [xj, yj] = ring[j]
-    const crosses = (yi > p[1]) !== (yj > p[1]) && p[0] < ((xj - xi) * (p[1] - yi)) / (yj - yi) + xi
-    if (crosses) inside = !inside
-  }
-  return inside
 }
 
 function bbox(pts: ReadonlyArray<Pt>) {

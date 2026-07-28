@@ -1,0 +1,23 @@
+{
+  "id": "user-square-166-coverage-patching",
+  "purpose": "Expected-red reproduction of the rescueCoverage acceptance bypass selecting a patched coarse result.",
+  "input": {
+    "shape": "square",
+    "sizeMM": 166,
+    "attachment": "magnetic"
+  },
+  "expected": {
+    "generic": {
+      "pitchMM": 48,
+      "pattern": "standard",
+      "anchors": 12,
+      "rescueAnchors": 0
+    },
+    "user": {
+      "pitchMM": 96,
+      "pattern": "standard",
+      "anchors": 12,
+      "rescueAnchors": 8
+    }
+  }
+}

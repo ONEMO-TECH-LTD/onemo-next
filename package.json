@@ -9,8 +9,11 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
+    "grid:profile": "vite-node --script scripts/profile-grid-baseline.ts",
+    "perf:devices": "node scripts/device-performance/run.mjs",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "perf:page": "browsertime --browser chrome -n 3 --cpu --visualMetrics false"
   },
   "dependencies": {
     "@countertype/clipper2-ts": "^1.5.4",
@@ -59,12 +62,18 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "ajv": "^8.20.0",
+    "browsertime": "^28.2.0",
     "culori": "^4.0.2",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "playwright": "^1.58.2",
     "storybook": "^10.4.6",
     "tailwindcss": "^4",
     "typescript": "^5",
+    "vite": "^5.4.21",
     "vitest": "^2.1.9"
+  },
+  "overrides": {
+    "tar": "^7.5.22"
   }
 }

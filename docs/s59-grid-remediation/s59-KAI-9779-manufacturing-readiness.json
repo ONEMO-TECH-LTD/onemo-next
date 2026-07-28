@@ -1,0 +1,276 @@
+{
+  "schemaVersion": 1,
+  "verdict": "READY",
+  "verdictScope": "ResolvedGridPlan manufacturing-spec projection for grid-bearing standard, rectangular, arbitrary final-contour, and holed final-contour families.",
+  "source": {
+    "manufacturedContour": "effectContourMM",
+    "reason": "The engine fits anchors against the margin-resolved effect contour; designContourMM remains the unexpanded artwork boundary.",
+    "toleranceImport": "MANUFACTURING_TOLERANCE_MM from src/lib/effect/geometry-truth.ts",
+    "toleranceMM": 0.05,
+    "gridCoreSha256": "07bb4756bb61f92736cfa1438128e0a9d89d82085a70afec20e1b8061f4efb9e"
+  },
+  "engine": {
+    "cacheVersion": 1,
+    "policySignature": "{\"defaultLaw\":{\"frameMM\":1,\"maxRungMM\":310,\"maxTestedMM\":214,\"paddingMM\":10},\"defaultMarginMM\":12,\"focalRamp2MM\":200,\"focalSizeMM\":100,\"holdReachMM\":48,\"minAnchors\":2,\"modes\":{\"auto\":[{\"pattern\":\"standard\",\"pitchMM\":48},{\"pattern\":\"standard\",\"pitchMM\":96},{\"pattern\":\"diamond\",\"pitchMM\":48},{\"pattern\":\"diamond\",\"pitchMM\":96},{\"pattern\":\"quincunx\",\"pitchMM\":96}],\"diamond\":[{\"pattern\":\"diamond\",\"pitchMM\":48},{\"pattern\":\"diamond\",\"pitchMM\":96}],\"quincunx\":[{\"pattern\":\"quincunx\",\"pitchMM\":96}],\"standard\":[{\"pattern\":\"standard\",\"pitchMM\":48},{\"pattern\":\"standard\",\"pitchMM\":96}]},\"padCornerToleranceMM\":1.5,\"paddingFloorMM\":10,\"pitchesMM\":[48,96],\"randomShapeMaxMM\":180,\"ringCoverageMin\":0.7,\"targetAnchors\":4}"
+  },
+  "fieldMap": {
+    "eligibility": "Emit a manufacturing spec only for grid.ok plans with at least two anchors; single-anchor and Velcro/no-grid outcomes remain classified boundaries.",
+    "manufacturedContourMM": "effectContourMM outer ring plus holes, in real millimetres",
+    "attachment": "grid.attachment; twinRequired identifies the mirrored Twin-fix counterpart",
+    "pattern": "plan.pattern: standard, diamond, or quincunx",
+    "pitchAndBasisMM": "plan.pitchMM plus the explicit two-vector pattern basis",
+    "originMM": "lexicographically smallest delivered anchor, in engine millimetres",
+    "anchorRows": "[indexFirst, indexSecond, xMM, yMM, diameterMM]; indices are signed whole-number pairs and positions preserve grid.anchors[].p exactly",
+    "marginsMM": "baseMarginMM, resolvedMarginMM, and grewMM",
+    "engineVersion": "GRID_ENGINE_CACHE_VERSION plus GRID_ENGINE_POLICY_SIGNATURE"
+  },
+  "coverage": {
+    "projectionNote": "Every multi-anchor result is projected, including engine-rejected plans; the four emitted specimens are accepted grid.ok plans.",
+    "fixtures": 47,
+    "plans": 1880,
+    "projectedPlans": 1188,
+    "projectedAnchors": 8818,
+    "invalidPlans": 1332,
+    "classifiedExclusions": {
+      "zeroAnchorPlans": 0,
+      "singleAnchorPlans": 692,
+      "noGridPlans": 47
+    },
+    "byPattern": {
+      "standard": {
+        "plans": 532,
+        "anchors": 4334,
+        "maxErrorMM": 5.684341886080802e-14
+      },
+      "diamond": {
+        "plans": 396,
+        "anchors": 2428,
+        "maxErrorMM": 2.842170943040401e-14
+      },
+      "quincunx": {
+        "plans": 260,
+        "anchors": 2056,
+        "maxErrorMM": 2.929642751054232e-14
+      }
+    },
+    "maxRoundTripErrorMM": 5.684341886080802e-14,
+    "corpusSha256": "2a92b36419e1f605a2142608a2ad35c2176e0da2b2603d0867cb49e5eeff507a",
+    "offLatticeMutationRejected": true
+  },
+  "specimens": [
+    {
+      "id": "standard-square",
+      "spec": {
+        "schemaVersion": 1,
+        "manufacturedContourSource": "effectContourMM",
+        "manufacturedContourMM": {
+          "outer": {
+            "pts": [[0, 0], [118, 0], [118, 118], [0, 118]]
+          },
+          "holes": []
+        },
+        "attachment": "magnetic",
+        "twinRequired": false,
+        "pattern": "standard",
+        "pitchMM": 48,
+        "lattice": {
+          "originMM": [11, 11],
+          "basisMM": [[48, 0], [0, 48]],
+          "indexEncoding": "signed whole-number pair",
+          "rule": "axis-aligned pitch lattice"
+        },
+        "anchorColumns": ["indexFirst", "indexSecond", "xMM", "yMM", "diameterMM"],
+        "anchors": [
+          [1, 1, 59, 59, 6],
+          [0, 1, 11, 59, 6],
+          [1, 0, 59, 11, 6],
+          [1, 2, 59, 107, 6],
+          [2, 1, 107, 59, 6],
+          [0, 0, 11, 11, 8],
+          [0, 2, 11, 107, 8],
+          [2, 0, 107, 11, 8],
+          [2, 2, 107, 107, 8]
+        ],
+        "marginsMM": {
+          "base": 0,
+          "resolved": 0,
+          "grown": 0
+        }
+      }
+    },
+    {
+      "id": "diamond-square",
+      "spec": {
+        "schemaVersion": 1,
+        "manufacturedContourSource": "effectContourMM",
+        "manufacturedContourMM": {
+          "outer": {
+            "pts": [[0, 0], [214, 0], [214, 214], [0, 214]]
+          },
+          "holes": []
+        },
+        "attachment": "twinfix",
+        "twinRequired": true,
+        "pattern": "diamond",
+        "pitchMM": 48,
+        "lattice": {
+          "originMM": [11, 11],
+          "basisMM": [[48, 48], [48, -48]],
+          "indexEncoding": "signed whole-number pair",
+          "rule": "one checkerboard parity of the pitch lattice"
+        },
+        "anchorColumns": ["indexFirst", "indexSecond", "xMM", "yMM", "diameterMM"],
+        "anchors": [
+          [2, 0, 107, 107, 6],
+          [1, 0, 59, 59, 6],
+          [2, -1, 59, 155, 6],
+          [2, 1, 155, 59, 6],
+          [3, 0, 155, 155, 6],
+          [1, -1, 11, 107, 6],
+          [1, 1, 107, 11, 6],
+          [3, -1, 107, 203, 6],
+          [3, 1, 203, 107, 6],
+          [0, 0, 11, 11, 8],
+          [2, -2, 11, 203, 8],
+          [2, 2, 203, 11, 8],
+          [4, 0, 203, 203, 8]
+        ],
+        "marginsMM": {
+          "base": 0,
+          "resolved": 0,
+          "grown": 0
+        }
+      }
+    },
+    {
+      "id": "quincunx-square",
+      "spec": {
+        "schemaVersion": 1,
+        "manufacturedContourSource": "effectContourMM",
+        "manufacturedContourMM": {
+          "outer": {
+            "pts": [[0, 0], [214, 0], [214, 214], [0, 214]]
+          },
+          "holes": []
+        },
+        "attachment": "magnetic",
+        "twinRequired": false,
+        "pattern": "quincunx",
+        "pitchMM": 96,
+        "lattice": {
+          "originMM": [11, 11],
+          "basisMM": [[96, 0], [48, 48]],
+          "indexEncoding": "signed whole-number pair",
+          "rule": "main pitch lattice plus the legal half-pitch diagonal offset"
+        },
+        "anchorColumns": ["indexFirst", "indexSecond", "xMM", "yMM", "diameterMM"],
+        "anchors": [
+          [0, 2, 107, 107, 6],
+          [0, 1, 59, 59, 6],
+          [-1, 3, 59, 155, 6],
+          [1, 1, 155, 59, 6],
+          [0, 3, 155, 155, 6],
+          [-1, 2, 11, 107, 6],
+          [1, 0, 107, 11, 6],
+          [-1, 4, 107, 203, 6],
+          [1, 2, 203, 107, 6],
+          [0, 0, 11, 11, 8],
+          [-2, 4, 11, 203, 8],
+          [2, 0, 203, 11, 8],
+          [0, 4, 203, 203, 8]
+        ],
+        "marginsMM": {
+          "base": 0,
+          "resolved": 0,
+          "grown": 0
+        }
+      }
+    },
+    {
+      "id": "standard-holed",
+      "spec": {
+        "schemaVersion": 1,
+        "manufacturedContourSource": "effectContourMM",
+        "manufacturedContourMM": {
+          "outer": {
+            "pts": [[0, 0], [214, 0], [214, 214], [0, 214]]
+          },
+          "holes": [
+            {
+              "pts": [[95, 95], [95, 119], [119, 119], [119, 95]]
+            }
+          ]
+        },
+        "attachment": "magnetic",
+        "twinRequired": false,
+        "pattern": "standard",
+        "pitchMM": 48,
+        "lattice": {
+          "originMM": [11, 11],
+          "basisMM": [[48, 0], [0, 48]],
+          "indexEncoding": "signed whole-number pair",
+          "rule": "axis-aligned pitch lattice"
+        },
+        "anchorColumns": ["indexFirst", "indexSecond", "xMM", "yMM", "diameterMM"],
+        "anchors": [
+          [1, 1, 59, 59, 6],
+          [1, 3, 59, 155, 6],
+          [3, 1, 155, 59, 6],
+          [3, 3, 155, 155, 6],
+          [1, 2, 59, 107, 6],
+          [2, 1, 107, 59, 6],
+          [2, 3, 107, 155, 6],
+          [3, 2, 155, 107, 6],
+          [0, 2, 11, 107, 6],
+          [2, 0, 107, 11, 6],
+          [2, 4, 107, 203, 6],
+          [4, 2, 203, 107, 6],
+          [0, 1, 11, 59, 8],
+          [0, 3, 11, 155, 8],
+          [1, 0, 59, 11, 8],
+          [1, 4, 59, 203, 8],
+          [3, 0, 155, 11, 8],
+          [3, 4, 155, 203, 8],
+          [4, 1, 203, 59, 8],
+          [4, 3, 203, 155, 8],
+          [0, 0, 11, 11, 8],
+          [0, 4, 11, 203, 8],
+          [4, 0, 203, 11, 8],
+          [4, 4, 203, 203, 8]
+        ],
+        "marginsMM": {
+          "base": 0,
+          "resolved": 0,
+          "grown": 0
+        }
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "id": "live-export-not-wired-to-grid-plan",
+      "blockingForThisProjection": false,
+      "finding": "The live mm-SVG exporter consumes the vector shape, not ResolvedGridPlan; save/order payload wiring remains dormant."
+    },
+    {
+      "id": "multi-ring-shape-producer",
+      "blockingForThisProjection": false,
+      "finding": "ResolvedGridPlan preserves supplied holes, but contourFromShape currently warns and drops secondary VShape paths before they reach the grid engine."
+    },
+    {
+      "id": "size-list-product-solver-mismatch",
+      "blockingForThisProjection": false,
+      "finding": "Report-only deferred finding; this task does not change the ladder or engine."
+    },
+    {
+      "id": "non-monotonic-anchor-counts",
+      "blockingForThisProjection": false,
+      "finding": "Observed signed density/selection behaviour; this task does not reinterpret it as a spec-projection failure."
+    },
+    {
+      "id": "catalog-hold-metric",
+      "blockingForThisProjection": false,
+      "finding": "The catalog metric defect remains a separate task; no catalog is regenerated here."
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "normalisation": {
+    "rule": "Delete only grid.rescueAnchors from the current plan. Preserve all remaining JSON property order; do not sort, round, resample, or rewrite.",
+    "preservesKeyOrder": true
+  },
+  "parity960": {
+    "cases": 960,
+    "identical": 960,
+    "different": 0,
+    "missingRescueCases": 0,
+    "nonEmptyRescueCases": 0,
+    "corpusSha256": "c60f4d789eaf4acd7ff3d3fc3b00ecbf0c3355ad3da9236756539882931953fb"
+  },
+  "userVsGeneric552": {
+    "cases": 552,
+    "identical": 264,
+    "different": 288,
+    "differentWithoutRescue": 0,
+    "corpusSha256": "8736fc2420da935cbd969a62ed0893ee5d11c21befa4553e0dc34e405c8c9cd7"
+  },
+  "latticeReproduction": {
+    "generic": {
+      "cases": 448,
+      "pass": 448,
+      "violations": 0
+    },
+    "user": {
+      "cases": 448,
+      "pass": 120,
+      "violations": 328,
+      "densityDimensionIsDuplicated": true
+    }
+  },
+  "classifiedLatticeOracle": {
+    "generic": {
+      "cases": 672,
+      "multiAnchorPass": 412,
+      "violations": 0,
+      "singleAnchorExclusions": 36,
+      "noGridExclusions": 224,
+      "corpusSha256": "3047c1cd152ab24f43022b0c0059a46b187f23d7129d0d9b47a8d5058d540e45"
+    },
+    "user": {
+      "cases": 336,
+      "multiAnchorPass": 48,
+      "violations": 164,
+      "singleAnchorExclusions": 12,
+      "noGridExclusions": 112,
+      "corpusSha256": "f2a1884dba84b1949592aad4760f3b069640ba6af727c6b3566e7d43cbd06a71"
+    }
+  }
+}

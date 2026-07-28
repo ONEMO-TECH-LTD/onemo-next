@@ -1,8 +1,8 @@
-// ⚠ DORMANT CONTRACT (Creator v5 · R6) — pure + unit-tested, but NOT wired into the active /create
+// ⚠ DORMANT CONTRACT (Creator v5 · R6) — pure + unit-tested, but NOT wired into an active product
 // flow: nothing in effect-creator/v5.3.1 calls buildApprovedEffectPayload (no save/order surface this
 // wave). This is the manufacturing/proof CONTRACT that Phase 2 (manufacturing readiness) will wire to
 // a real save/order → manufacturing pipeline. Foundation, not active product flow — do not cite it as
-// evidence that /create is "manufacturing-ready" (audit §7).
+// evidence that the current workbench is "manufacturing-ready" (audit §7).
 //
 // payload.ts — the immutable ApprovedEffectPayload / LockedPayload (lean-spec §11).
 //
@@ -123,7 +123,6 @@ export interface ApprovedEffectPayload {
     band_id: EffectSize
     longest_side_mm: number
     scale: number
-    price_multiplier: number
     final_bbox: FinalBBox
   }
   artwork: {
@@ -149,10 +148,10 @@ export interface ApprovedEffectPayload {
 type EffectSpecGenerator = PreparedEffect['spec']['generator']
 
 /**
- * The canonical MANUFACTURING-identity subset that `payload_hash` is computed over (F3). It deliberately
- * differs from the full record in two ways, both load-bearing:
- *  • EXCLUDES commerce — `size.price_multiplier` is dropped, so the SAME physical effect at a different
- *    price yields the SAME manufacturing hash (price is not a manufacturing fact).
+ * The canonical MANUFACTURING-identity subset that `payload_hash` is computed over (F3). Two contract
+ * invariants, both load-bearing:
+ *  • NO COMMERCE — pricing exists nowhere in the payload (the mock price field was removed, Dan s59/P2;
+ *    price is not a manufacturing fact), so identity can never vary by price.
  *  • FULLY FLOAT-FREE — EVERY residual mm / unit-ratio is quantized to integer micro-units (§11
  *    "integer microns, no floats"): `size.{scale, longest_side_mm, final_bbox}`,
  *    `artwork.source_px_to_shape_mm`, `appearance.{thickness_mm, edge_profile.radiusMm}`. Geometry is
@@ -164,8 +163,7 @@ type EffectSpecGenerator = PreparedEffect['spec']['generator']
  */
 export function canonicalHashBody(p: ApprovedEffectPayload) {
   const q = (n: number) => Math.round(n * MICRO) // mm / unit-ratio → integer micro-units
-  const { price_multiplier, scale, longest_side_mm, final_bbox, ...sizeRest } = p.size
-  void price_multiplier // commerce is deliberately EXCLUDED from the manufacturing-identity hash
+  const { scale, longest_side_mm, final_bbox, ...sizeRest } = p.size // floats → int-micro below; no commerce field exists (removed, Dan s59/P2)
   const { source_px_to_shape_mm, ...artworkRest } = p.artwork
   const { thickness_mm, edge_profile, ...appearanceRest } = p.appearance
   return {
@@ -239,7 +237,6 @@ export function buildApprovedEffectPayload(prepared: PreparedEffect, opts: Build
     band_id: opts.size,
     longest_side_mm: band.longestSideMm,
     scale: final.scale,
-    price_multiplier: band.priceMultiplier,
     final_bbox: final.finalBBox,
   }
 
@@ -295,8 +292,8 @@ export function buildApprovedEffectPayload(prepared: PreparedEffect, opts: Build
     generator: spec.generator,
   }
 
-  // The full record (commerce + display included). The manufacturing IDENTITY hash, however, is computed
-  // over the CANONICAL subset (canonicalHashBody): commerce excluded + residual floats quantized (F3).
+  // The full record (display metadata included; NO commerce — removed, Dan s59/P2). The manufacturing
+  // IDENTITY hash is computed over the CANONICAL subset (canonicalHashBody): residual floats quantized (F3).
   const record = { version: 1 as const, schema_version: SCHEMA_VERSION, source, geometry, size, artwork, appearance, attachment, gates, build }
   // contentHash = cyrb53 → a 16-hex digest. The 16-hex width is INTENTIONAL (F4): deterministic +
   // cross-platform (no crypto/BigInt), ample space for a per-design identity. An identity/integrity

@@ -1,5 +1,30 @@
 # ERRORS
 
+## KAI-9728 Playwright browser extraction under Node 26
+
+- What did not work: `npx playwright install webkit chromium` under the active Node 26 runtime, both
+  combined and WebKit-only.
+- Symptom: the archive downloaded fully, then the extractor hung indefinitely after writing only
+  `webkit-2248/libwebrtc.dylib`.
+- What worked: run Playwright's same pinned CLI with the installed Node 20 binary:
+  `/opt/homebrew/opt/node@20/bin/node node_modules/playwright/cli.js install webkit chromium`.
+- Remember: Playwright 1.58 browser installation on this Mac must use Node 20; the built suite can
+  still run under the repo's normal Node runtime.
+
+## S59 Playwright CLI `run-code` callback syntax
+
+- What did not work: passing top-level snippets such as `await page.title()` to the current `playwright-cli run-code`, following the bundled skill reference.
+- Symptom: every invocation failed with `SyntaxError: Unexpected identifier 'page'`.
+- What worked: `run-code` requires a JavaScript function receiving `page`, e.g. `async (page) => await page.title()`; confirmed by `run-code --help`.
+- Remember: on this installed CLI, wrap all `run-code` input in a `(page) => ...` or `async (page) => ...` function.
+
+## S59 deleted route leaves stale Next type stubs
+
+- What did not work: deleting `(store)/create/page.tsx`, then relying on `next typegen` to remove the old `.next` page stubs.
+- Symptom: `tsc --noEmit` still imported the deleted source from `.next/dev/types/app/(store)/create/page.ts` and `.next/types/app/(store)/create/page.ts`.
+- What worked: move those two ignored generated stubs to `/tmp`, then rerun typecheck; the regenerated route map stayed current and TypeScript passed.
+- Remember: after deleting an App Router page while a dev server is live, `next typegen` may update validators without pruning stale per-page stubs.
+
 ## KAI-8318 Studio v2 preview asset collision
 
 - What did not work: copying product assets into `studio-v2/dist/assets` while Vite also emitted bundled JS/CSS chunks into `dist/assets`.
@@ -55,3 +80,36 @@
 - Symptoms: macOS `nl` returned usage text instead of file contents; three parallel read commands failed the same way.
 - What worked: run `nl -ba` one file at a time, or use a shell loop only when explicit per-file headers are needed.
 - Remember: for full-read hydration, do not batch multiple file operands into `nl`; one file per command keeps coverage auditable.
+
+## S59 persistent browser-control connection
+
+- What did not work: connecting to the already-running Chrome extension surface twice, then selecting the in-app browser for `localhost:3970`.
+- Symptoms: Chrome was running and the ChatGPT Chrome Extension plus native host both passed installation checks, but browser selection returned `Browser is not available: extension`; the in-app browser returned `No browser is available`.
+- What worked: preserve the persistent server/Chrome state, verify HTTP and engine parity locally, and request the existing Chrome-owning QA lane to stage the required live screenshots instead of launching another server or browser.
+- Remember: do not disturb Dan's persistent Chrome or start a second grid-lab server when the control channel is unavailable; use the owning lane for visual evidence and keep code/runtime proof separate.
+- A4 recurrence: the required in-app `browser-client` bootstrap failed before tab creation (`agent.browser` unavailable, then `Cannot redefine property: process` even after a kernel reset). The same owning-lane fallback produced the live `/create` verification without disturbing port 3970.
+
+## S59 E3 shared grid-lab hydration failure
+
+- What did not work: opening the shared Next dev server through `127.0.0.1:3970` for the pre-E3 interactive baseline.
+- Symptoms: the port returned 200 SSR HTML and JavaScript chunks, but controls only received focus; state never changed, DOM nodes had no React fiber/props, and the Next HMR WebSocket failed with `ERR_INVALID_HTTP_RESPONSE`.
+- What worked: use the authoritative `http://localhost:3970` origin. React fiber/props were present, HMR connected, and the User toggle changed `aria-pressed` from false to true.
+- Remember: this project binds Next HMR to `localhost`; `127.0.0.1` can produce an inert SSR-only QA artifact. Verify hydration plus one state-changing control before collecting performance evidence.
+
+## S59 grid-audit runner under orchestration
+
+- What did not work: invoking `grid-audit.ts` through `vite-node --script`, then wrapping `npx --no-install tsx` inside the orchestration helper.
+- Symptoms: both calls completed without the audit's final law verdict; the script's explicit `process.exit()` did not surface a reliable result through that wrapper.
+- What worked: run `npx tsx src/lib/effect/grid-audit.ts` directly in a PTY command and poll the returned session until exit.
+- Remember: the standing magnetic-grid audit is a script with an explicit exit; execute it directly with `npx tsx` when an auditable verdict is required.
+
+## S59 peer scratchpad path transcription
+
+- What did not work: manually reconstructing Kai's long
+  `/private/tmp/claude-501/-Users-.../scratchpad/` path in repeated read commands.
+- Symptom: the path was mistyped by inserting a real `/Dev/onemo-dev/` segment
+  inside the encoded directory name, producing repeated “No such file” errors.
+- What worked: copy the exact path from the peer message/tool output and reuse it
+  verbatim.
+- Remember: treat peer scratchpad paths as opaque identifiers; never normalize
+  or reconstruct their encoded directory segments.

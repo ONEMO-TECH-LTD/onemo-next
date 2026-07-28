@@ -3,7 +3,7 @@
  * old studio/ into ./scene-format/ during the v5.3.1 cleanup).
  *
  * parseOnemoConfig() — lightweight, no renderer needed. Extracts ViewerConfig from studio.json
- * + GLB as a blob URL. Loads the golden scene via AdminViewer (live on /create). The Studio-only
+ * + GLB as a blob URL. Loads the golden scene via AdminViewer (live on /effect-creator/v5.3.1). The Studio-only
  * full-deserialization path (loadOnemoTemplate) was removed in the v5.5.1 de-slop (dead leftover).
  */
 
