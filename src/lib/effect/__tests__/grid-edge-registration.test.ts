@@ -1,6 +1,16 @@
-// EDGE-REGISTRATION LAW (Dan, 2026-07-28): the same edge length must produce the same layout on
-// every shape. "The size is optimal when we follow square logic pretty much everywhere — magnets
+// EDGE-REGISTRATION LAW (Dan, 2026-07-28): within the LADDER DOMAIN, the same edge length produces
+// the same layout. "The size is optimal when we follow square logic pretty much everywhere — magnets
 // side to side along the edges, with margins encoded between magnet and edge of the effect."
+//
+// DOMAIN — this bounds every claim below. Dan, 2026-07-28: "rungs is the case of perfect match
+// sizing of the effect surface is precisely covering magnets 4/6/8 etc that takes into account
+// magnet outer margin and surface margin encoded by the system." A rung is therefore the size whose
+// surface exactly wraps its magnet array plus both encoded margins. A NON-rung size has no
+// zero-point, so asking whether it registers on one is a category error, not a failure. Rectangle
+// snaps both axes to rungs (resolveRectangleRungs -> nearestSemanticRung), so the product domain is
+// the rung matrix and nothing else. Engine behaviour off-ladder is deliberately unpinned here and
+// recorded in KAI-9793: 88 integer bands move, and off-ladder layouts can seat tighter than the
+// floor (down to pad - corner tolerance) on a straight edge.
 //
 // The grid box is NOT always square: it is whatever set of 48-lattice nodes the shape hosts, chosen
 // per axis. A square is the case where both axes agree. A rectangle's long edge must therefore
@@ -11,7 +21,7 @@
 // internals, so a future re-implementation stays free as long as edges register.
 
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_LAW, resolveGridPlan, stdShapeContour } from '../grid'
+import { DEFAULT_LAW, resolveGridPlan, semanticLadder, stdShapeContour } from '../grid'
 import type { ResolvedGridPlan } from '../grid'
 
 /** The zero-point inset every outermost anchor must sit at: padding floor + frame. */
@@ -153,6 +163,40 @@ describe('edge-registration law — every edge registers on its own zero-point',
       const plan = resolveGridPlan(stdShapeContour('rect', longMM, shortMM), LIGHT)
       expect(plan.grid.anchors.length, `${longMM}x${shortMM} must be unchanged`).toBe(anchors)
     }
+  })
+
+  it('registers EVERY reachable rectangle on all four sides — the whole rung matrix, executable', () => {
+    // THE PROPERTY GATE. The pinned-cases test above records the blast radius; this one enforces the
+    // law itself over the entire product domain, so the surrounding prose is checked rather than
+    // asserted. Enumerates the live ladder (never a hardcoded rung list — if the ladder moves, this
+    // moves with it), takes every ORDERED pair so both orientations are covered, and crosses it with
+    // both densities. 7 rungs -> 42 oriented pairs -> 84 plans.
+    const rungs = semanticLadder((sizeMM: number) => stdShapeContour('rect', sizeMM, sizeMM))
+    const sizes = rungs.map((r) => r.sizeMM)
+    // The single-anchor ONE rung cannot register: at 22mm the shape is exactly 2x(pad+frame) wide,
+    // so its one column sits at the floor on one axis while the long axis has no second node to
+    // reach the far edge. Dan's minimum-anchor ruling deletes this rung entirely (KAI-9784) — when
+    // it lands, these two entries disappear and this exception list must go with them.
+    const ONE_RUNG_MM = Math.min(...sizes)
+    const unregistered: string[] = []
+    let checked = 0
+    for (const density of ['light', 'standard'] as const) {
+      for (const wMM of sizes) {
+        for (const hMM of sizes) {
+          if (wMM === hMM) continue // a square, not a rectangle — covered by the canon test above
+          const plan = resolveGridPlan(stdShapeContour('rect', wMM, hMM), { ...LIGHT, density })
+          const a = axes(plan)
+          checked++
+          const registered = [a.left, a.right, a.top, a.bottom].every((i) => i <= FLOOR_MM + 1.5)
+          if (!registered) unregistered.push(`${density} ${wMM}x${hMM} [${[a.left, a.right, a.top, a.bottom].map((v) => v.toFixed(1))}]`)
+        }
+      }
+    }
+    expect(checked).toBe(sizes.length * (sizes.length - 1) * 2)
+    expect(unregistered.sort()).toEqual([
+      `light 214x${ONE_RUNG_MM} [35.0,35.0,11.0,11.0]`,
+      `light ${ONE_RUNG_MM}x214 [11.0,11.0,35.0,35.0]`,
+    ])
   })
 
   it('keeps a disc symmetric — the exact failure of the rejected summed-slack variant', () => {

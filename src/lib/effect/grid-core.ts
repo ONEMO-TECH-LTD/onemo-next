@@ -382,8 +382,13 @@ export function computePreparedGrid(prepared: PreparedContour, cfg: GridConfig =
     const expectedMp = neighbourStep(pitch, pattern)
     // EDGE REGISTRATION (Dan, 2026-07-28): "the size is optimal when we follow square logic pretty
     // much everywhere — magnets side to side along the edges, with margins encoded between magnet and
-    // edge of the effect." The same edge length must register the same way on ANY shape: a
-    // rectangle's 214 side takes the layout a 214 square's side takes. Slack = how far each side's
+    // edge of the effect." Within the LADDER DOMAIN the same edge length registers the same way: a
+    // rectangle's 214 side takes the layout a 214 square's side takes. The claim is bounded on
+    // purpose — a rung is the size whose surface exactly wraps its magnet array plus both encoded
+    // margins (Dan), so a NON-rung size has no zero-point to register on and nothing is claimed for
+    // it; off-ladder behaviour is recorded in KAI-9793, not pinned. The term itself is shape- and
+    // size-agnostic and runs for every input: it is the CLAIM that is bounded, not the code path.
+    // Slack = how far each side's
     // outermost anchor sits BEYOND the application pad — zero means the row reaches its zero-point.
     // Ranked AFTER coverage and conformance (registration never buys edge contact with a flap or a
     // rotated arrangement) and BEFORE count, which is what previously let an inset 8-anchor phase
