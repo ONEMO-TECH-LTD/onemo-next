@@ -7,7 +7,7 @@
     "reason": "The engine fits anchors against the margin-resolved effect contour; designContourMM remains the unexpanded artwork boundary.",
     "toleranceImport": "MANUFACTURING_TOLERANCE_MM from src/lib/effect/geometry-truth.ts",
     "toleranceMM": 0.05,
-    "gridCoreSha256": "07bb4756bb61f92736cfa1438128e0a9d89d82085a70afec20e1b8061f4efb9e"
+    "gridCoreSha256": "9bddcf1addc92e0914dd3c5fc4dc842b628324461884ce472492c3986a6a2299"
   },
   "engine": {
     "cacheVersion": 1,
