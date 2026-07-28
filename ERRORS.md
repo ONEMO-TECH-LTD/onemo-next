@@ -102,3 +102,14 @@
 - Symptoms: both calls completed without the audit's final law verdict; the script's explicit `process.exit()` did not surface a reliable result through that wrapper.
 - What worked: run `npx tsx src/lib/effect/grid-audit.ts` directly in a PTY command and poll the returned session until exit.
 - Remember: the standing magnetic-grid audit is a script with an explicit exit; execute it directly with `npx tsx` when an auditable verdict is required.
+
+## S59 peer scratchpad path transcription
+
+- What did not work: manually reconstructing Kai's long
+  `/private/tmp/claude-501/-Users-.../scratchpad/` path in repeated read commands.
+- Symptom: the path was mistyped by inserting a real `/Dev/onemo-dev/` segment
+  inside the encoded directory name, producing repeated “No such file” errors.
+- What worked: copy the exact path from the peer message/tool output and reuse it
+  verbatim.
+- Remember: treat peer scratchpad paths as opaque identifiers; never normalize
+  or reconstruct their encoded directory segments.
