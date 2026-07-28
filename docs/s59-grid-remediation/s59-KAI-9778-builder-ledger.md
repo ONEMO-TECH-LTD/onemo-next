@@ -90,9 +90,11 @@ The production build is served from this worktree on
 
 ### Direct runtime observation
 
-In a fresh Playwright Chromium page, `Worker` was wrapped before application
-code loaded so every real `postMessage` could be counted. After each ladder
-settled, a size was clicked:
+In a fresh Playwright Chromium session, `Worker` was wrapped before application
+code loaded so every real `postMessage` could be counted. Each attachment was
+made active when a **fresh ladder identity was first requested**: magnetic on
+Square, twin-fix on Circle, and Velcro on Triangle. After that ladder settled,
+a size was clicked:
 
 | attachment | interaction | matching-render commit | worker dispatch delta |
 | --- | --- | ---: | ---: |
@@ -100,7 +102,10 @@ settled, a size was clicked:
 | twin-fix | Circle → S | 21 ms | **0** |
 | Velcro | Triangle → L | 19 ms | **0** |
 
-All three are observed cache hits, not inferred hits.
+All three are observed cache hits under that first-request protocol, not
+inferred hits. This does **not** mean an attachment switch on an already-seeded
+ladder identity is warm: that switch is cold until a fresh ladder identity is
+requested under the new attachment.
 
 A real pointer drag across the design-size slider caused one settled **plan**
 dispatch and **zero ladder dispatches**. The transient window therefore
@@ -131,16 +136,30 @@ for the cold measurement and 45/46/47 ms for the warm measurement.
 
 Evidence:
 
-- `output/browsertime/kai-9778-final/browsertime.json`
-- `output/browsertime/kai-9778-final/browsertime.har`
+- tracked harness:
+  `scripts/grid-remediation/browsertime-grid-cache.mjs`;
+- tracked compact result:
+  `docs/s59-grid-remediation/s59-KAI-9778-browsertime-summary.json`;
+- regenerable raw run artifacts:
+  `output/browsertime/kai-9778-final/browsertime.json` and
+  `output/browsertime/kai-9778-final/browsertime.har`.
+
+The raw Browsertime JSON/HAR remain local run output rather than source
+artifacts. The committed harness and compact result retain the method,
+command, samples, statistics, environment, and regeneration paths needed to
+reproduce them. A one-iteration smoke run from the tracked path completed with
+exit 0 and emitted both custom metrics (`55.29 ms` cold and `16.92 ms` warm);
+those smoke values do not replace the three-iteration result above.
 
 ### Honest residual
 
 Seeds are produced for the option set that first requests a ladder identity.
 A later request with different options can hit the cached ladder without
-receiving fresh seeds. That causes a missed warm-up only; the seed is committed
-under its own complete plan key, so it cannot return a wrong plan. This matches
-the pre-existing coverage property and was not changed in T3.
+receiving fresh seeds. A mid-session attachment switch on that identity is
+therefore cold until the ladder identity changes. That causes a missed warm-up
+only; the seed is committed under its own complete plan key, so it cannot
+return a wrong plan. This matches the pre-existing coverage property and was
+not changed in T3.
 
 ## Gate B — visual
 
@@ -174,7 +193,9 @@ Screenshots:
 Every named KAI-9778 gate was executed by the builder. The post-remediation
 product remains byte-identical to the pre-split engine on the pinned corpus,
 the lattice law remains green, the real Worker fast path remains green, all
-three attachments use warm seeded plans at runtime with zero dispatch, the
-slider does not repeat ladder work, and the clean one-panel bench is live on
-`:3980`. No product code changed in this task; this ledger is the only tracked
-artifact.
+three attachments produced zero-dispatch warm hits when each was the active
+option set for a freshly requested ladder identity, the slider does not repeat
+ladder work, and the clean one-panel bench is live on `:3980`. Switching the
+attachment on an already-seeded identity remains cold until a fresh identity
+is requested. No product code changed in this task; the ledger, reproducible
+Browsertime harness, and compact result are the only tracked artifacts.

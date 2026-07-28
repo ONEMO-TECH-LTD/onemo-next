@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "task": "KAI-9778",
+  "sourceCommit": "a0312d6e4e2d4de8e156529724fd6c591ea6d20b",
+  "generatedAt": "2026-07-28T11:40:25+01:00",
+  "tool": {
+    "name": "browsertime",
+    "version": "28.2.0",
+    "browser": "Chrome Headless 150.0.7871.187",
+    "iterations": 3,
+    "cpu": true
+  },
+  "target": "http://localhost:3980/effect-creator/grid-lab",
+  "harness": "scripts/grid-remediation/browsertime-grid-cache.mjs",
+  "command": "npx browsertime scripts/grid-remediation/browsertime-grid-cache.mjs --gridLabUrl http://localhost:3980/effect-creator/grid-lab --browser chrome -n 3 --cpu --visualMetrics false --resultDir output/browsertime/kai-9778-final",
+  "metric": {
+    "name": "matchingRenderCommitProxyMs",
+    "clock": "page performance.now",
+    "closeSignal": "renderer-owned committed plan key changed",
+    "coldCircle": {
+      "samples": [55.25500011444092, 58.46500015258789, 57.13499999046326],
+      "median": 57.13,
+      "mean": 56.95,
+      "standardDeviation": 1.32,
+      "relativeStandardDeviationPercent": 2.3122649176777785
+    },
+    "warmSeededOne": {
+      "samples": [14.789999961853027, 15.40499997138977, 15.34000015258789],
+      "median": 15.34,
+      "mean": 15.18,
+      "standardDeviation": 0.28,
+      "relativeStandardDeviationPercent": 1.817540747241788
+    }
+  },
+  "pageLoad": {
+    "loadEventEndMedianMs": 250,
+    "firstContentfulPaintMedianMs": 265,
+    "largestContentfulPaintMedianMs": 265,
+    "cumulativeLayoutShiftMedian": 0.0517,
+    "totalBlockingTimeMedianMs": 0
+  },
+  "cpuBenchmarkSamplesMs": {
+    "cold": [48, 49, 48],
+    "warm": [45, 46, 47]
+  },
+  "regenerationOutputs": [
+    "output/browsertime/kai-9778-final/browsertime.json",
+    "output/browsertime/kai-9778-final/browsertime.har"
+  ]
+}
