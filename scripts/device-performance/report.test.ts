@@ -1,6 +1,14 @@
+import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { DENSE_REAL_AI_GRID_CONTOUR } from '../../src/lib/effect/grid-s0-corpus'
+import {
+  handleGridJob,
+  type GridJob,
+  type GridJobResult,
+  type ResolvedGridPlan,
+} from '../../src/lib/effect/grid'
 import { resolveCloudEndpoint } from './core/browser-provider.mjs'
 import {
   assertColdWarmReport,
@@ -8,6 +16,59 @@ import {
 } from './core/report.mjs'
 
 const scriptRoot = join(process.cwd(), 'scripts/device-performance')
+
+function fixtureJob(scenario: { job?: GridJob; fixture?: string }): GridJob {
+  if (scenario.job) return scenario.job
+  if (scenario.fixture === 'dense-real-ai-corpus') {
+    return {
+      operation: 'plan',
+      recipe: { kind: 'final-contour', contourMM: DENSE_REAL_AI_GRID_CONTOUR },
+      options: { attachment: 'magnetic' },
+    }
+  }
+  throw new Error(`Scenario has no executable input: ${JSON.stringify(scenario)}`)
+}
+
+function planT2(plan: ResolvedGridPlan) {
+  const quantize = (value: number) => (Math.round(value / 0.05) * 0.05).toFixed(2)
+  const nodes = plan.grid.anchors.map(({ p: [x, y], dia }) => ({
+    x: quantize(x),
+    y: quantize(y),
+    dia,
+  }))
+  const edges: string[] = []
+  for (let left = 0; left < nodes.length; left += 1) {
+    for (let right = left + 1; right < nodes.length; right += 1) {
+      const distance = Math.hypot(
+        Number(nodes[left].x) - Number(nodes[right].x),
+        Number(nodes[left].y) - Number(nodes[right].y),
+      )
+      if (distance <= plan.pitchMM * 1.5 + 0.05) edges.push(`${left}-${right}`)
+    }
+  }
+  return {
+    anchorCount: nodes.length,
+    flapCount: plan.grid.flaps.length,
+    ok: plan.grid.ok,
+    pitchMM: plan.pitchMM,
+    pattern: plan.pattern,
+    nodes,
+    edges,
+  }
+}
+
+function t2ForResult(result: GridJobResult) {
+  return result.operation === 'ladder'
+    ? {
+        rungs: result.value.map(({ label, points, sizeMM, visible }) => ({
+          label,
+          points,
+          sizeMM,
+          visible,
+        })),
+      }
+    : planT2(result.value)
+}
 
 describe('device-performance suite contract', () => {
   it('keeps scenario selection in data and the neutral core outside feature code', () => {
@@ -80,4 +141,19 @@ describe('device-performance suite contract', () => {
     expect(formatReportTable(valid)).toContain('| Cold ms')
     expect(formatReportTable(valid)).toContain('| Warm ms')
   })
+
+  it('pins every baseline to the current neutral engine and rescue-free T2 schema', () => {
+    const config = JSON.parse(readFileSync(join(scriptRoot, 'suite.config.json'), 'utf8'))
+    const baselines = JSON.parse(readFileSync(join(scriptRoot, 'baselines.json'), 'utf8'))
+
+    for (const scenario of config.scenarios) {
+      const result = handleGridJob(fixtureJob(scenario))
+      const sha256 = createHash('sha256').update(JSON.stringify(result.value)).digest('hex')
+      expect(baselines.fixtures[scenario.id], scenario.id).toEqual({
+        sha256,
+        t2: t2ForResult(result),
+      })
+      expect(JSON.stringify(baselines.fixtures[scenario.id])).not.toMatch(/rescue/)
+    }
+  }, 20_000)
 })
