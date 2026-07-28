@@ -87,7 +87,7 @@ export default function Thing({ label = 'Default' }: ThingProps) {
     fs.writeFile(path.join(evidence, 'dark.png'), png),
     fs.writeFile(path.join(dir, 'authority', 'tokens.css'), tokens),
   ]);
-  const files = (await filesOf(dir)).filter((file) => file !== 'component-release.json');
+  const files = (await filesOf(dir)).filter((file) => file !== 'manifest.json');
   const artifacts = Object.fromEntries(await Promise.all(files.map(async (file) => {
     const bytes = await fs.readFile(path.join(dir, file));
     return [file, { bytes: bytes.length, sha256: sha256(bytes) }];
@@ -137,7 +137,7 @@ export default function Thing({ label = 'Default' }: ThingProps) {
   };
   const releaseId = sha256(canonical(manifest));
   Object.assign(manifest, { releaseId });
-  await fs.writeFile(path.join(dir, 'component-release.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+  await fs.writeFile(path.join(dir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
   const destination = path.join(root, releaseId);
   await fs.rename(stage, destination);
   return destination;

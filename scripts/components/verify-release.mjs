@@ -72,8 +72,8 @@ function syntaxClass(value) {
 
 export async function verifyPublishedRelease(releaseDir) {
   let manifest;
-  try { manifest = JSON.parse(await fs.readFile(path.join(releaseDir, 'component-release.json'), 'utf8')); }
-  catch { return { status: 'unverified', reason: 'component-release.json unavailable' }; }
+  try { manifest = JSON.parse(await fs.readFile(path.join(releaseDir, 'manifest.json'), 'utf8')); }
+  catch { return { status: 'unverified', reason: 'manifest.json unavailable' }; }
   if (manifest?.schemaVersion !== 1 || path.basename(releaseDir) !== manifest.releaseId
     || !manifest.artifacts || !Array.isArray(manifest.components)) {
     return { status: 'unverified', reason: 'release manifest incomplete', manifest };
@@ -81,7 +81,7 @@ export async function verifyPublishedRelease(releaseDir) {
   if (expectedReleaseId(manifest) !== manifest.releaseId) {
     return { status: 'fail', reason: 'release id does not seal canonical manifest payload', manifest };
   }
-  const actual = (await filesOf(releaseDir)).filter((file) => file !== 'component-release.json');
+  const actual = (await filesOf(releaseDir)).filter((file) => file !== 'manifest.json');
   const claimed = Object.keys(manifest.artifacts).sort();
   if (actual.join('\0') !== claimed.join('\0')) return { status: 'fail', reason: 'release file inventory mismatch', manifest };
   for (const relative of claimed) {

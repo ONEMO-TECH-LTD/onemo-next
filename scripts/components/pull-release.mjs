@@ -79,6 +79,13 @@ async function wrapperSources(appRoot, generatedDir) {
   return rows;
 }
 
+/**
+ * @param {{
+ *   releaseDir: string,
+ *   appRoot: string,
+ *   failAt?: 'before-swap' | 'after-swap' | null,
+ * }} options
+ */
 export async function pullComponentRelease({
   releaseDir,
   appRoot,
@@ -130,7 +137,7 @@ export async function pullComponentRelease({
       relative,
       await digest(path.join(stage, relative)),
     ])));
-    const releaseBytes = await fs.readFile(path.join(releaseDir, 'component-release.json'));
+    const releaseBytes = await fs.readFile(path.join(releaseDir, 'manifest.json'));
     const provenance = {
       schemaVersion: 1,
       releaseId: manifest.releaseId,
