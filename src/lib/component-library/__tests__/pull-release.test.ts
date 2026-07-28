@@ -1,0 +1,190 @@
+import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { promises as fs } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
+
+// @ts-ignore — the production transaction is deliberately import-safe ESM.
+import { pullComponentRelease } from '../../../../scripts/components/pull-release.mjs';
+// @ts-ignore — independent verifier is plain ESM shared with the CLI.
+import { verifyPulledGenerated } from '../../../../scripts/components/verify-release.mjs';
+
+const roots: string[] = [];
+const sha256 = (bytes: string | Buffer) => createHash('sha256').update(bytes).digest('hex');
+const png = Buffer.from(
+  '89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6360000000020001e221bc330000000049454e44ae426082',
+  'hex',
+);
+
+afterEach(async () => {
+  await Promise.all(roots.splice(0).map((root) => fs.rm(root, { recursive: true, force: true })));
+});
+
+async function filesOf(root: string, dir = root): Promise<string[]> {
+  const out: string[] = [];
+  for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
+    const target = path.join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...await filesOf(root, target));
+    else if (entry.isFile()) out.push(path.relative(root, target).split(path.sep).join('/'));
+  }
+  return out.sort();
+}
+
+async function fixture() {
+  const root = await fs.mkdtemp(path.join(tmpdir(), 'pull-release-'));
+  roots.push(root);
+  const app = path.join(root, 'app');
+  await fs.mkdir(path.join(app, 'src', 'app', 'tokens'), { recursive: true });
+  await fs.mkdir(path.join(app, 'src', 'components', 'ds'), { recursive: true });
+  const tokens = ':root {\n  --sem-col-fg: var(--al-col-fg);\n  --al-col-fg: #111111;\n}\n';
+  await fs.writeFile(path.join(app, 'src', 'app', 'tokens', 'tokens.css'), tokens);
+  const wrapper = path.join(app, 'src', 'components', 'ds', 'ThingWrapper.tsx');
+  const wrapperBytes = "import Thing from '@/components/generated/Thing/Thing';\nexport default function ThingWrapper() { return <Thing label=\"App\" />; }\n";
+  await fs.writeFile(wrapper, wrapperBytes);
+  execFileSync('git', ['init', '-q'], { cwd: app });
+  execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: app });
+  execFileSync('git', ['config', 'user.name', 'Test'], { cwd: app });
+  execFileSync('git', ['add', '.'], { cwd: app });
+  execFileSync('git', ['commit', '-qm', 'fixture'], { cwd: app });
+  return { root, app, wrapper, wrapperBytes, tokens };
+}
+
+async function release(root: string, tokens: string, {
+  releaseId = '111111111111111111111111',
+  labelType = 'string',
+  marker = 'one',
+} = {}) {
+  const dir = path.join(root, releaseId);
+  const component = path.join(dir, 'components', 'Thing');
+  const evidence = path.join(component, 'evidence');
+  await fs.mkdir(evidence, { recursive: true });
+  await fs.mkdir(path.join(dir, 'authority'), { recursive: true });
+  await Promise.all([
+    fs.writeFile(path.join(component, 'Thing.tsx'), `import styles from './thing.module.css';
+export type ThingProps = {
+  label?: ${labelType};
+};
+export default function Thing({ label = 'Default' }: ThingProps) {
+  return <span className={styles.thing} data-marker="${marker}">{label}</span>;
+}
+`),
+    fs.writeFile(path.join(component, 'thing.module.css'), '.thing {\n  color: var(--sem-col-fg);\n}\n'),
+    fs.writeFile(path.join(evidence, 'fidelity.json'),
+      '{"masterId":"master:1","status":"pass","mismatchPct":0.2,"deltaThreshold":32}\n'),
+    fs.writeFile(path.join(evidence, 'light.png'), png),
+    fs.writeFile(path.join(evidence, 'dark.png'), png),
+    fs.writeFile(path.join(dir, 'authority', 'tokens.css'), tokens),
+  ]);
+  const files = (await filesOf(dir)).filter((file) => file !== 'component-release.json');
+  const artifacts = Object.fromEntries(await Promise.all(files.map(async (file) => {
+    const bytes = await fs.readFile(path.join(dir, file));
+    return [file, { bytes: bytes.length, sha256: sha256(bytes) }];
+  })));
+  const componentRecord = {
+    figmaId: 'thing:1',
+    sourceName: 'Thing',
+    codeName: 'Thing',
+    artifactRoot: 'components/Thing',
+    api: [{
+      authoredKey: 'Label#1:1',
+      propName: 'label',
+      type: 'TEXT',
+      defaultValue: 'Default',
+      variantOptions: null,
+      emittedType: labelType,
+    }],
+    masters: [{
+      figmaId: 'master:1',
+      fidelity: {
+        json: 'components/Thing/evidence/fidelity.json',
+        light: 'components/Thing/evidence/light.png',
+        dark: 'components/Thing/evidence/dark.png',
+      },
+    }],
+    tokenDependencies: {
+      roots: ['--sem-col-fg'],
+      closure: [
+        { token: '--al-col-fg', value: '#111111' },
+        { token: '--sem-col-fg', value: 'var(--al-col-fg)' },
+      ],
+    },
+  };
+  const manifest = {
+    schemaVersion: 1,
+    releaseId,
+    authority: {
+      fileKey: 'file',
+      fileVersion: 'version',
+      boardId: 'board',
+      boardContentHash: 'board-hash',
+      converterSha: 'converter',
+      tokensHash: sha256(tokens),
+    },
+    counts: { artifacts: 1, masters: 1 },
+    components: [componentRecord],
+    artifacts,
+  };
+  await fs.writeFile(path.join(dir, 'component-release.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+  return dir;
+}
+
+describe('component release pull transaction', () => {
+  it('pulls atomically with a real wrapper and preserves its bytes', async () => {
+    const { root, app, wrapper, wrapperBytes, tokens } = await fixture();
+    const releaseDir = await release(root, tokens);
+    const result = await pullComponentRelease({ releaseDir, appRoot: app });
+    expect(result.provenance.releaseId).toBe(path.basename(releaseDir));
+    expect(await fs.readFile(wrapper, 'utf8')).toBe(wrapperBytes);
+    expect((await verifyPulledGenerated({
+      generatedDir: path.join(app, 'src', 'components', 'generated'),
+      appTokensPath: path.join(app, 'src', 'app', 'tokens', 'tokens.css'),
+    })).status).toBe('pass');
+  });
+
+  it('refuses a breaking API before writes and names the wrapper', async () => {
+    const { root, app, wrapper, wrapperBytes, tokens } = await fixture();
+    await pullComponentRelease({ releaseDir: await release(root, tokens), appRoot: app });
+    const before = await fs.readFile(path.join(app, 'src', 'components', 'generated', 'provenance.json'), 'utf8');
+    const changed = await release(root, tokens, {
+      releaseId: '222222222222222222222222',
+      labelType: 'number',
+      marker: 'two',
+    });
+    await expect(pullComponentRelease({ releaseDir: changed, appRoot: app }))
+      .rejects.toThrow(/Thing\.Label#1:1:type-changed.*ThingWrapper\.tsx/);
+    expect(await fs.readFile(path.join(app, 'src', 'components', 'generated', 'provenance.json'), 'utf8')).toBe(before);
+    expect(await fs.readFile(wrapper, 'utf8')).toBe(wrapperBytes);
+  });
+
+  it('restores generated bytes and wrapper bytes after an injected mid-transaction failure', async () => {
+    const { root, app, wrapper, wrapperBytes, tokens } = await fixture();
+    await pullComponentRelease({ releaseDir: await release(root, tokens), appRoot: app });
+    const generated = path.join(app, 'src', 'components', 'generated');
+    const before = Object.fromEntries(await Promise.all((await filesOf(generated)).map(async (file) => [
+      file,
+      sha256(await fs.readFile(path.join(generated, file))),
+    ])));
+    const next = await release(root, tokens, {
+      releaseId: '333333333333333333333333',
+      marker: 'three',
+    });
+    await expect(pullComponentRelease({ releaseDir: next, appRoot: app, failAt: 'after-swap' }))
+      .rejects.toThrow(/injected component pull failure/);
+    const after = Object.fromEntries(await Promise.all((await filesOf(generated)).map(async (file) => [
+      file,
+      sha256(await fs.readFile(path.join(generated, file))),
+    ])));
+    expect(after).toEqual(before);
+    expect(await fs.readFile(wrapper, 'utf8')).toBe(wrapperBytes);
+  });
+
+  it('refuses a vacuous zero-consumer app before writes', async () => {
+    const { root, app, wrapper, tokens } = await fixture();
+    await fs.rm(wrapper);
+    const releaseDir = await release(root, tokens);
+    await expect(pullComponentRelease({ releaseDir, appRoot: app }))
+      .rejects.toThrow(/no app-owned generated-component consumer/);
+    await expect(fs.access(path.join(app, 'src', 'components', 'generated'))).rejects.toThrow();
+  });
+});
