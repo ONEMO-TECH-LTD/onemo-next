@@ -20,6 +20,23 @@ async function digest(file) {
   return { bytes: bytes.length, sha256: sha256(bytes) };
 }
 
+async function directInternalImports(appRoot, generatedDir) {
+  const src = path.join(appRoot, 'src');
+  const generatedRelative = path.relative(src, generatedDir).split(path.sep).join('/');
+  const findings = [];
+  for (const relative of await filesOf(src)) {
+    if (relative === generatedRelative || relative.startsWith(`${generatedRelative}/`)) continue;
+    if (!/\.(?:ts|tsx|js|jsx)$/.test(relative)) continue;
+    const source = await fs.readFile(path.join(src, relative), 'utf8');
+    for (const match of source.matchAll(/['"]([^'"\n]+)['"]/g)) {
+      if (/(?:^|\/)generated\/.+\/internal(?:\/|$)/.test(match[1])) {
+        findings.push({ file: relative, specifier: match[1] });
+      }
+    }
+  }
+  return findings;
+}
+
 function definitions(css) {
   const out = new Map();
   for (const match of css.matchAll(/(--[A-Za-z0-9_-]+)\s*:\s*([^;]+);/g)) {
@@ -187,7 +204,8 @@ export function compareTokenClosure(component, appTokensCss) {
   return { failures, valueDrift: actual.filter((row) => beforeByToken.get(row.token) !== row.value) };
 }
 
-export async function verifyPulledGenerated({ generatedDir, appTokensPath }) {
+export async function verifyPulledGenerated({ generatedDir, appTokensPath, appRoot }) {
+  if (!appRoot) return { status: 'unverified', reason: 'app import authority unavailable' };
   let provenance;
   try { provenance = JSON.parse(await fs.readFile(path.join(generatedDir, 'provenance.json'), 'utf8')); }
   catch { return { status: 'unverified', reason: 'generated provenance unavailable' }; }
@@ -217,6 +235,16 @@ export async function verifyPulledGenerated({ generatedDir, appTokensPath }) {
     const result = compareTokenClosure(component, appTokens);
     if (result.failures.length)
       return { status: 'fail', reason: `${component.codeName} token compatibility failed`, findings: result.failures, provenance };
+  }
+  const directImports = await directInternalImports(appRoot, generatedDir);
+  if (directImports.length) {
+    return {
+      status: 'fail',
+      reason: `direct generated-internal import: ${directImports
+        .map(({ file, specifier }) => `${file}:${specifier}`).join(', ')}`,
+      findings: directImports,
+      provenance,
+    };
   }
   return { status: 'pass', provenance };
 }

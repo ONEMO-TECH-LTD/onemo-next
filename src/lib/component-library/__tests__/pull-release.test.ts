@@ -240,6 +240,7 @@ describe('component release pull transaction', () => {
     expect((await verifyPulledGenerated({
       generatedDir: path.join(app, 'src', 'components', 'generated'),
       appTokensPath: path.join(app, 'src', 'app', 'tokens', 'tokens.css'),
+      appRoot: app,
     })).status).toBe('pass');
   });
 
@@ -312,7 +313,20 @@ describe('component release pull transaction', () => {
     expect((await verifyPulledGenerated({
       generatedDir,
       appTokensPath: path.join(app, 'src', 'app', 'tokens', 'tokens.css'),
+      appRoot: app,
     })).status).toBe('unverified');
+  });
+
+  it('refuses direct app imports of generated internal render entries', async () => {
+    const { root, app, wrapper, tokens } = await fixture();
+    await fs.appendFile(
+      wrapper,
+      "\nimport Secret from '@/components/generated/Thing/internal/Secret';\n",
+    );
+    const releaseDir = await release(root, tokens);
+    await expect(pullComponentRelease({ releaseDir, appRoot: app }))
+      .rejects.toThrow(/direct generated-internal import.*ThingWrapper\.tsx/);
+    await expect(fs.access(path.join(app, 'src', 'components', 'generated'))).rejects.toThrow();
   });
 
   it('refuses a vacuous zero-consumer app before writes', async () => {

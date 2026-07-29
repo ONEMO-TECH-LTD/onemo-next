@@ -162,7 +162,7 @@ export async function pullComponentRelease({
     if (JSON.stringify(beforeWrappers) !== JSON.stringify(afterWrappers)) {
       throw new Error('component pull: app-owned wrapper bytes changed');
     }
-    const verified = await verifyPulledGenerated({ generatedDir, appTokensPath: tokensPath });
+    const verified = await verifyPulledGenerated({ generatedDir, appTokensPath: tokensPath, appRoot });
     if (verified.status !== 'pass') throw new Error(`component pull: generated verification ${verified.status}: ${verified.reason}`);
     await fs.rm(backup, { recursive: true, force: true });
     return { generatedDir, provenance, valueDrift };
