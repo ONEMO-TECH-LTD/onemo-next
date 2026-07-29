@@ -4,6 +4,7 @@
   align-items: stretch;
   padding: 0 var(--sem-dim-fluid-standard-2l) var(--sem-dim-fluid-standard-m);
   width: 402px;
+  box-sizing: border-box;
 }
 
 .tabBarColourTunedIcons {

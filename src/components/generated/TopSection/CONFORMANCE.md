@@ -22,8 +22,8 @@
 
 ## RAW values — bind-token worklist
 - .topSection · `width: 402px` (css:8)
-- .buttonHomeLogo · `height: 24px` (css:20)
-- .styleEffect · `font-weight: 500` (css:38)
+- .buttonHomeLogo · `height: 24px` (css:21)
+- .styleEffect · `font-weight: 500` (css:39)
 
 ## REFUSED — design cleanup worklist
 

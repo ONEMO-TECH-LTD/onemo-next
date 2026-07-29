@@ -27,70 +27,70 @@
       "className": "tab",
       "prop": "width",
       "value": "71.6px",
-      "line": 18,
+      "line": 19,
       "candidates": []
     },
     {
       "className": "tab",
       "prop": "height",
       "value": "38px",
-      "line": 19,
+      "line": 20,
       "candidates": []
     },
     {
       "className": "tab2",
       "prop": "width",
       "value": "71.6px",
-      "line": 24,
-      "candidates": []
-    },
-    {
-      "className": "tab2",
-      "prop": "height",
-      "value": "38px",
       "line": 25,
       "candidates": []
     },
     {
-      "className": "tab3",
-      "prop": "width",
-      "value": "71.6px",
-      "line": 30,
+      "className": "tab2",
+      "prop": "height",
+      "value": "38px",
+      "line": 26,
       "candidates": []
     },
     {
       "className": "tab3",
-      "prop": "height",
-      "value": "38px",
+      "prop": "width",
+      "value": "71.6px",
       "line": 31,
       "candidates": []
     },
     {
-      "className": "tab4",
-      "prop": "width",
-      "value": "71.6px",
-      "line": 36,
+      "className": "tab3",
+      "prop": "height",
+      "value": "38px",
+      "line": 32,
       "candidates": []
     },
     {
       "className": "tab4",
-      "prop": "height",
-      "value": "38px",
+      "prop": "width",
+      "value": "71.6px",
       "line": 37,
       "candidates": []
     },
     {
+      "className": "tab4",
+      "prop": "height",
+      "value": "38px",
+      "line": 38,
+      "candidates": []
+    },
+    {
       "className": "tab5",
       "prop": "width",
       "value": "71.6px",
-      "line": 42,
+      "line": 43,
       "candidates": []
     },
     {
       "className": "tab5",
       "prop": "height",
       "value": "38px",
-      "line": 43,
+      "line": 44,
       "candidates": []
     }
   ],

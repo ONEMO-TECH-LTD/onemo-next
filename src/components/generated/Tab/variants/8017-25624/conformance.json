@@ -53,21 +53,21 @@
       "className": "iconBasket",
       "prop": "width",
       "value": "22px",
-      "line": 24,
+      "line": 25,
       "candidates": []
     },
     {
       "className": "iconBasket",
       "prop": "height",
       "value": "22px",
-      "line": 25,
+      "line": 26,
       "candidates": []
     },
     {
       "className": "label",
       "prop": "font-weight",
       "value": "500",
-      "line": 35,
+      "line": 36,
       "candidates": []
     }
   ],

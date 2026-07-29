@@ -25,9 +25,9 @@
 - .statePassive · `height: 38px` (css:7)
 - .iconBox · `gap: 10px` (css:15) → candidates: `--prim-track-pos-10`
 - .iconBox · `padding: 0 1px` (css:16)
-- .iconBasket · `width: 22px` (css:24)
-- .iconBasket · `height: 22px` (css:25)
-- .label · `font-weight: 500` (css:35)
+- .iconBasket · `width: 22px` (css:25)
+- .iconBasket · `height: 22px` (css:26)
+- .label · `font-weight: 500` (css:36)
 
 ## REFUSED — design cleanup worklist
 

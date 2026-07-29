@@ -53,182 +53,182 @@
       "className": "magneticGridSM",
       "prop": "width",
       "value": "252px",
-      "line": 25,
+      "line": 26,
       "candidates": []
     },
     {
       "className": "magneticGridSM",
       "prop": "height",
       "value": "252px",
-      "line": 26,
+      "line": 27,
       "candidates": []
     },
     {
       "className": "magnetBump",
       "prop": "width",
-      "value": "24px",
-      "line": 39,
-      "candidates": []
-    },
-    {
-      "className": "magnetBump",
-      "prop": "height",
       "value": "24px",
       "line": 40,
       "candidates": []
     },
     {
-      "className": "magnetBump2",
-      "prop": "width",
+      "className": "magnetBump",
+      "prop": "height",
       "value": "24px",
-      "line": 45,
+      "line": 41,
       "candidates": []
     },
     {
       "className": "magnetBump2",
-      "prop": "height",
+      "prop": "width",
       "value": "24px",
       "line": 46,
       "candidates": []
     },
     {
-      "className": "magnetBump3",
-      "prop": "width",
+      "className": "magnetBump2",
+      "prop": "height",
       "value": "24px",
-      "line": 51,
+      "line": 47,
       "candidates": []
     },
     {
       "className": "magnetBump3",
-      "prop": "height",
+      "prop": "width",
       "value": "24px",
       "line": 52,
       "candidates": []
     },
     {
-      "className": "magnetBump4",
-      "prop": "width",
+      "className": "magnetBump3",
+      "prop": "height",
       "value": "24px",
-      "line": 57,
+      "line": 53,
       "candidates": []
     },
     {
       "className": "magnetBump4",
-      "prop": "height",
+      "prop": "width",
       "value": "24px",
       "line": 58,
       "candidates": []
     },
     {
-      "className": "magnetBump5",
-      "prop": "width",
+      "className": "magnetBump4",
+      "prop": "height",
       "value": "24px",
-      "line": 70,
+      "line": 59,
       "candidates": []
     },
     {
       "className": "magnetBump5",
-      "prop": "height",
+      "prop": "width",
       "value": "24px",
       "line": 71,
       "candidates": []
     },
     {
-      "className": "magnetBump6",
-      "prop": "width",
+      "className": "magnetBump5",
+      "prop": "height",
       "value": "24px",
-      "line": 76,
+      "line": 72,
       "candidates": []
     },
     {
       "className": "magnetBump6",
-      "prop": "height",
+      "prop": "width",
       "value": "24px",
       "line": 77,
       "candidates": []
     },
     {
-      "className": "magnetBump7",
-      "prop": "width",
+      "className": "magnetBump6",
+      "prop": "height",
       "value": "24px",
-      "line": 89,
+      "line": 78,
       "candidates": []
     },
     {
       "className": "magnetBump7",
-      "prop": "height",
+      "prop": "width",
       "value": "24px",
       "line": 90,
       "candidates": []
     },
     {
-      "className": "magnetBump8",
-      "prop": "width",
+      "className": "magnetBump7",
+      "prop": "height",
       "value": "24px",
-      "line": 95,
+      "line": 91,
       "candidates": []
     },
     {
       "className": "magnetBump8",
-      "prop": "height",
+      "prop": "width",
       "value": "24px",
       "line": 96,
       "candidates": []
     },
     {
-      "className": "magnetBump9",
-      "prop": "width",
+      "className": "magnetBump8",
+      "prop": "height",
       "value": "24px",
-      "line": 108,
+      "line": 97,
       "candidates": []
     },
     {
       "className": "magnetBump9",
-      "prop": "height",
+      "prop": "width",
       "value": "24px",
       "line": 109,
       "candidates": []
     },
     {
-      "className": "magnetBump10",
-      "prop": "width",
+      "className": "magnetBump9",
+      "prop": "height",
       "value": "24px",
-      "line": 114,
+      "line": 110,
       "candidates": []
     },
     {
       "className": "magnetBump10",
-      "prop": "height",
+      "prop": "width",
       "value": "24px",
       "line": 115,
       "candidates": []
     },
     {
-      "className": "ellipse15",
-      "prop": "width",
+      "className": "magnetBump10",
+      "prop": "height",
       "value": "24px",
-      "line": 120,
+      "line": 116,
       "candidates": []
     },
     {
       "className": "ellipse15",
-      "prop": "height",
+      "prop": "width",
       "value": "24px",
       "line": 121,
       "candidates": []
     },
     {
+      "className": "ellipse15",
+      "prop": "height",
+      "value": "24px",
+      "line": 122,
+      "candidates": []
+    },
+    {
       "className": "magnetBump11",
       "prop": "width",
       "value": "24px",
-      "line": 126,
+      "line": 127,
       "candidates": []
     },
     {
       "className": "magnetBump11",
       "prop": "height",
       "value": "24px",
-      "line": 127,
+      "line": 128,
       "candidates": []
     }
   ],

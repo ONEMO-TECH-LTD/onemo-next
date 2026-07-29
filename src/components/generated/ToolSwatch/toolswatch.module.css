@@ -4,6 +4,7 @@
   align-items: stretch;
   padding: var(--sem-dim-fluid-nano-xl) 0 0;
   height: 76px;
+  box-sizing: border-box;
 }
 
 .toolSwatches {

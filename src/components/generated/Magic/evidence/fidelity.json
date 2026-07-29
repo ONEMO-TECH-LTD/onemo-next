@@ -8,5 +8,17 @@
   "diagnosticBudgetPct": 10,
   "viewportWidth": 402,
   "layoutWidth": 20,
-  "renderWidth": 20
+  "renderWidth": 20,
+  "backdrop": {
+    "sourceNodeId": "6103:679",
+    "r": 214,
+    "g": 214,
+    "b": 214,
+    "alpha": 1
+  },
+  "referenceRoute": "isolated-export",
+  "qualifyingSourcePath": null,
+  "referenceReason": "no visible non-NORMAL blend without internal opaque backing",
+  "cropBounds": null,
+  "referenceSha256": "8c156dc10d8f49b569a6cd2f2f63c4913f67fba9b8bc1324b001d9aeb0b3ac52"
 }

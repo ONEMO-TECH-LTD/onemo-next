@@ -22,16 +22,16 @@
 
 ## RAW values — bind-token worklist
 - .selectedEdit · `width: 402px` (css:6)
-- .tab · `width: 71.6px` (css:18)
-- .tab · `height: 38px` (css:19)
-- .tab2 · `width: 71.6px` (css:24)
-- .tab2 · `height: 38px` (css:25)
-- .tab3 · `width: 71.6px` (css:30)
-- .tab3 · `height: 38px` (css:31)
-- .tab4 · `width: 71.6px` (css:36)
-- .tab4 · `height: 38px` (css:37)
-- .tab5 · `width: 71.6px` (css:42)
-- .tab5 · `height: 38px` (css:43)
+- .tab · `width: 71.6px` (css:19)
+- .tab · `height: 38px` (css:20)
+- .tab2 · `width: 71.6px` (css:25)
+- .tab2 · `height: 38px` (css:26)
+- .tab3 · `width: 71.6px` (css:31)
+- .tab3 · `height: 38px` (css:32)
+- .tab4 · `width: 71.6px` (css:37)
+- .tab4 · `height: 38px` (css:38)
+- .tab5 · `width: 71.6px` (css:43)
+- .tab5 · `height: 38px` (css:44)
 
 ## REFUSED — design cleanup worklist
 

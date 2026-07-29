@@ -1,12 +1,24 @@
 {
   "masterId": "8019:1146",
   "status": "measured",
-  "mismatch": 4368,
+  "mismatch": 0,
   "pixels": 51456,
-  "mismatchPct": 8.488805970149253,
+  "mismatchPct": 0,
   "deltaThreshold": 32,
   "diagnosticBudgetPct": 10,
   "viewportWidth": 402,
   "layoutWidth": 402,
-  "renderWidth": 402
+  "renderWidth": 402,
+  "backdrop": {
+    "sourceNodeId": "6103:679",
+    "r": 214,
+    "g": 214,
+    "b": 214,
+    "alpha": 1
+  },
+  "referenceRoute": "isolated-export",
+  "qualifyingSourcePath": null,
+  "referenceReason": "no visible non-NORMAL blend without internal opaque backing",
+  "cropBounds": null,
+  "referenceSha256": "92dc8a3aff963648dc59b6828dcc13e9373015776e1cf9f2eb00232a5eb94ebd"
 }

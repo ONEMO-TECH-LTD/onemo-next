@@ -17,6 +17,7 @@
   overflow: hidden;
   width: var(--sem-dim-fluid-standard-xl);
   height: var(--sem-dim-fluid-standard-xl);
+  box-sizing: border-box;
   flex-shrink: 0;
 }
 

@@ -4,6 +4,7 @@
   align-items: center;
   padding: var(--sem-dim-fluid-standard-xs) 0 0;
   width: 402px;
+  box-sizing: border-box;
 }
 
 .sideIndicator {

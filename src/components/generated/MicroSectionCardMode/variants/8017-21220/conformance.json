@@ -27,14 +27,14 @@
       "className": "sideIndicator",
       "prop": "width",
       "value": "32px",
-      "line": 10,
+      "line": 11,
       "candidates": []
     },
     {
       "className": "sideIndicator",
       "prop": "height",
       "value": "8px",
-      "line": 11,
+      "line": 12,
       "candidates": [
         {
           "token": "--prim-track-pos-8",

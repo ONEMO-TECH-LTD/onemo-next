@@ -22,8 +22,8 @@
 
 ## RAW values — bind-token worklist
 - .stateBackside · `width: 402px` (css:6)
-- .sideIndicator · `width: 32px` (css:10)
-- .sideIndicator · `height: 8px` (css:11) → candidates: `--prim-track-pos-8`
+- .sideIndicator · `width: 32px` (css:11)
+- .sideIndicator · `height: 8px` (css:12) → candidates: `--prim-track-pos-8`
 
 ## REFUSED — design cleanup worklist
 

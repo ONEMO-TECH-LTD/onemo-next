@@ -21,7 +21,7 @@
 
 
 ## RAW values — bind-token worklist
-- .l · `font-weight: 500` (css:18)
+- .l · `font-weight: 500` (css:19)
 
 ## REFUSED — design cleanup worklist
 

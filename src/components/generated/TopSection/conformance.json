@@ -27,14 +27,14 @@
       "className": "buttonHomeLogo",
       "prop": "height",
       "value": "24px",
-      "line": 20,
+      "line": 21,
       "candidates": []
     },
     {
       "className": "styleEffect",
       "prop": "font-weight",
       "value": "500",
-      "line": 38,
+      "line": 39,
       "candidates": []
     }
   ],

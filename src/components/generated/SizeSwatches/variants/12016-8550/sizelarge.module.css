@@ -5,6 +5,7 @@
   padding: var(--sem-dim-fluid-nano-m) var(--sem-dim-fluid-nano-xl);
   width: var(--sem-dim-fluid-big-s);
   height: var(--sem-dim-fluid-big-s);
+  box-sizing: border-box;
   background-color: var(--sem-col-bg-brand-tertiary-solid);
   box-shadow: 0 0 0 var(--sem-border-micro-s) var(--sem-col-border-primary-subtle), 0 4px 4px var(--effects-shadow-regular);
   border-radius: var(--sem-radii-full);

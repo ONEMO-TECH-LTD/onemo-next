@@ -6,6 +6,7 @@
   padding: var(--sem-dim-fluid-nano-s);
   width: var(--sem-dim-fluid-standard-xl);
   height: var(--sem-dim-fluid-standard-xl);
+  box-sizing: border-box;
   box-shadow: 0 0 0 var(--sem-border-standard-s) var(--sem-col-border-primary-strong);
   border-radius: var(--sem-radii-full);
 }

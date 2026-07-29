@@ -6,6 +6,7 @@
   gap: var(--sem-dim-fluid-standard-m);
   padding: var(--sem-dim-fluid-nano-xl) var(--sem-dim-fluid-standard-m);
   width: 402px;
+  box-sizing: border-box;
 }
 
 .titleAndControls {

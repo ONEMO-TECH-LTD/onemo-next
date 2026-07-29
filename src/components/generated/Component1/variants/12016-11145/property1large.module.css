@@ -5,6 +5,7 @@
   padding: 18px;
   width: 288px;
   height: 288px;
+  box-sizing: border-box;
   position: relative;
 }
 

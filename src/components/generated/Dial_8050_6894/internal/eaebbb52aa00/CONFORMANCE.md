@@ -22,7 +22,7 @@
 
 ## RAW values — bind-token worklist
 - .dial · `gap: 10px` (css:5) → candidates: `--prim-track-pos-10`
-- .swatch · `background-color: #232323` (css:20)
+- .swatch · `background-color: #232323` (css:21)
 
 ## REFUSED — design cleanup worklist
 
