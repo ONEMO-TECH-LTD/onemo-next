@@ -149,6 +149,23 @@ The latter two reproduce unchanged at clean staging `a83e0ac`, before this
 task's edits. They were not edited to manufacture green; KAI-9828 owns the
 permanent audit rebuild after the remaining engine work.
 
+## Live bench observation
+
+The profiled Chrome extension was installed and enabled in its selected profile,
+and its native host was valid, but the browser channel remained unavailable
+after the required retry. The standing fallback was therefore used and is not
+misreported as Chrome evidence.
+
+Playwright observed `http://localhost:3970/effect-creator/grid-lab` from source
+commit `271fbd6`:
+
+- server PID `38475`, cwd = the `grid-lab` worktree;
+- Circle S rendered at `71mm`, standard/48, `tier 2pt · seated 2`;
+- the curve was visibly smooth, both panels rendered, and the page returned no
+  console errors or warnings;
+- screenshot:
+  `.playwright-cli/page-2026-07-29T19-37-19-971Z.png`.
+
 ## Gates
 
 - [x] executable approximation inventory — PASS;
@@ -162,4 +179,5 @@ permanent audit rebuild after the remaining engine work.
   uncovered millimetres;
 - [x] post-edit self-audit — every changed source, test, script and this ledger
   re-read in full;
-- [ ] live bench observation on `:3970` from the named commit.
+- [x] live bench observation on `:3970` from named source commit `271fbd6` —
+  Playwright fallback, explicitly not profiled-Chrome evidence.
