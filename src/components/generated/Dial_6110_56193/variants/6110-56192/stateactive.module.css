@@ -19,6 +19,7 @@
   align-items: center;
   width: var(--sem-dim-fluid-big-m);
   height: var(--sem-dim-fluid-big-m);
+  box-sizing: border-box;
   flex-shrink: 0;
   z-index: 0;
   border: var(--sem-border-micro-m) solid var(--sem-col-border-primary-strong);

@@ -1,6 +1,5 @@
 .lockOpen {
   width: var(--fc-icon-w, 16px);
   height: var(--fc-icon-h, 16px);
-  transform: scaleX(-1);
   color: var(--sem-col-fg-primary-default);
 }

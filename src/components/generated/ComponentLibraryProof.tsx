@@ -842,7 +842,7 @@ export const componentProofInventory = [
 
 export default function ComponentLibraryProof() {
   return (
-    <main data-component-library-proof="true">
+    <main data-component-library-proof="true" style={{ backgroundColor: "rgb(214 214 214)" }}>
       <section data-component-id={"12002:17702"} data-code-name={"RatioLock"} data-icon-root={false}>
         <h2>{"Ratio-Lock"}</h2>
         <div data-scenario={"variant-1"}><RatioLock state={"Locked"} /></div>

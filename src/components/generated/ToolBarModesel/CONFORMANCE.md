@@ -28,9 +28,9 @@
 - .frame9 · `width: 402px` (css:36)
 - .modes · `width: 402px` (css:49)
 - .modes · `height: 24px` (css:50)
-- .label2 · `font-weight: 500` (css:78)
-- .label4 · `font-weight: 500` (css:104)
-- .label6 · `font-weight: 500` (css:130)
+- .label2 · `font-weight: 500` (css:79)
+- .label4 · `font-weight: 500` (css:105)
+- .label6 · `font-weight: 500` (css:131)
 
 ## REFUSED — design cleanup worklist
 

@@ -10,6 +10,7 @@
 .effectCard {
   width: 288px;
   height: 288px;
+  box-sizing: border-box;
   flex-shrink: 0;
   background-image: url('./assets/5a6a0ff38f4c992038fcb46fa2b7719f30e1160f.png'), linear-gradient(197.89deg, #5a6169 1.67%, #26292c 104.22%);
   background-size: 104.44% 139.51%, auto;

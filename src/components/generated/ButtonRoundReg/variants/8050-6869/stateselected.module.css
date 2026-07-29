@@ -4,6 +4,7 @@
   align-items: center;
   width: var(--sem-dim-fluid-big-m);
   height: var(--sem-dim-fluid-big-m);
+  box-sizing: border-box;
   border: var(--sem-border-micro-s) solid var(--sem-col-border-brand-primary);
   border-radius: var(--sem-radii-full);
 }

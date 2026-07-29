@@ -1,6 +1,5 @@
 .blob {
   width: var(--fc-icon-w, var(--sem-dim-fluid-standard-l));
   height: var(--fc-icon-h, var(--sem-dim-fluid-standard-l));
-  transform: scaleY(-1);
   color: var(--sem-col-fg-primary-default);
 }

@@ -1,17 +1,17 @@
 {
   "schemaVersion": 1,
-  "releaseId": "09313770f62ae874471fc693cdd560cc656098893f2df9255c4c8696b5195df1",
-  "releaseHash": "2c3a26a2296cf2b805618913ffe5ba7dd8ee1d1a31064db71a8afe66989470a4",
+  "releaseId": "03aacca7b040540231ab427a55986c85f29076c4b3bb9700a6ce82582adf3a2b",
+  "releaseHash": "7170a2bddbd24ebb0da4d3a2fc2df3e1a4845266754469dc0c5c1c9af9257a05",
   "source": {
     "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
     "fileVersion": "2381318852839647833",
     "boardId": "6103:679",
     "boardContentHash": "869a631977ed5581652942516da0dbc112bb60c7f373cef8bd9884518c029a55",
-    "converterSha": "654016464d62a10ea87a2176a8278227fcff6d02",
+    "converterSha": "095fff30bc4e46c92edd758d3545adfde8a66b71",
     "tokensHash": "72ce13bed4b38793b40176126c6f5f327aa516de7290e6ba6255eba836efbbcf",
     "variablesHash": "1931a4eff66a7efe1687d5fb8bb5bbf5c6708e7ec0f24d56248c01aa16a99242"
   },
-  "appBase": "0e877693d267a0ab3f109a2ac67e10e818987284",
+  "appBase": "07d5b9aa3e6a680013025b73f1ce4dec860e167e",
   "components": [
     {
       "figmaId": "12002:17702",
@@ -34,6 +34,7 @@
           "emittedType": "'Locked' | 'Open' | 'disabled'"
         }
       ],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "12002:17701",
@@ -220,6 +221,7 @@
           "emittedType": "'SMALL' | 'Medium' | 'LARGE'"
         }
       ],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8051:20699",
@@ -371,6 +373,7 @@
           "emittedType": "'Default' | 'Pressed'"
         }
       ],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "6105:18342",
@@ -433,6 +436,12 @@
               }
             }
           ],
+          "productVisibleDifference": {
+            "status": "known-product-visible-difference",
+            "summary": "Pressed state visibly differs from Figma at the fifth button contact ring.",
+            "openQuestion": "Whether the emitted stacking context unnecessarily severs the backdrop chain and is emit-fixable remains open.",
+            "evidence": "evidence/diagnostics/pressed/disposition.json"
+          },
           "fidelity": {
             "json": "components/ButtonPillSpec/variants/8018-28069/evidence/fidelity.json",
             "figma": "components/ButtonPillSpec/variants/8018-28069/evidence/figma.png",
@@ -611,6 +620,7 @@
           "emittedType": "'Default' | 'Selected'"
         }
       ],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "6108:53400",
@@ -791,6 +801,7 @@
           "emittedType": "'Active' | 'New value'"
         }
       ],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "6110:56191",
@@ -971,6 +982,7 @@
           "emittedType": "'Small' | 'Center'"
         }
       ],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8014:3388",
@@ -1113,6 +1125,25 @@
           "emittedType": "'Selected' | 'Default'"
         }
       ],
+      "apiDisclosures": [
+        {
+          "status": "declared-but-unbound",
+          "summary": "Declared in Figma, bound to no node; not emitted because an unbound property would be inert.",
+          "properties": [
+            {
+              "authoredKey": "Icons#8050:5",
+              "propName": "icons",
+              "type": "INSTANCE_SWAP"
+            },
+            {
+              "authoredKey": "Value#8050:6",
+              "propName": "value",
+              "type": "TEXT"
+            }
+          ],
+          "evidence": "evidence/diagnostics/api/8050-6894/disposition.json"
+        }
+      ],
       "masters": [
         {
           "figmaId": "8018:28194",
@@ -1248,6 +1279,7 @@
           "emittedType": "'Magnetic' | 'Sticky'"
         }
       ],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8017:20929",
@@ -1547,6 +1579,7 @@
           "emittedType": "'Active' | 'Passive'"
         }
       ],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "12002:3882",
@@ -1744,6 +1777,7 @@
           "emittedType": "'2' | '1' | '3'"
         }
       ],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "12002:3902",
@@ -2027,6 +2061,7 @@
           "emittedType": "'Frontside' | 'Backside'"
         }
       ],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8017:20998",
@@ -2255,6 +2290,7 @@
           "emittedType": "'Frontside' | 'Backside'"
         }
       ],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8017:21218",
@@ -2373,6 +2409,7 @@
           "emittedType": "'Active' | 'Passive'"
         }
       ],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8017:21679",
@@ -2532,6 +2569,7 @@
           "emittedType": "'Default' | 'Shape' | 'Add' | 'Style' | 'Tune' | 'Edit'"
         }
       ],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8017:25975",
@@ -6891,6 +6929,7 @@
           "emittedType": "'Face' | 'Back' | 'Face-Modify-frame1'"
         }
       ],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8017:27662",
@@ -7060,6 +7099,7 @@
           "emittedType": "'Default' | 'Selected'"
         }
       ],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "12016:8556",
@@ -7211,6 +7251,7 @@
           "emittedType": "'Large' | 'Small' | 'Medium' | 'Custom'"
         }
       ],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "12016:11252",
@@ -7534,6 +7575,7 @@
           "emittedType": "'Small' | 'Medium' | 'SIze3'"
         }
       ],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "12016:10919",
@@ -7602,6 +7644,7 @@
           "emittedType": "'LARGE' | 'MEDIUM' | 'SMALL' | 'Variant4'"
         }
       ],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "12016:11147",
@@ -8220,6 +8263,7 @@
           "emittedType": "'Freeform' | 'Medium' | 'Small' | 'Large' | 'None'"
         }
       ],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "12016:8539",
@@ -8495,6 +8539,7 @@
       "codeName": "IconBasket",
       "artifactRoot": "components/IconBasket",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8017:21672",
@@ -8519,6 +8564,7 @@
       "codeName": "IconShop",
       "artifactRoot": "components/IconShop",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8017:21674",
@@ -8543,6 +8589,7 @@
       "codeName": "IconCreate",
       "artifactRoot": "components/IconCreate",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8017:21671",
@@ -8567,6 +8614,7 @@
       "codeName": "IconLibrary",
       "artifactRoot": "components/IconLibrary",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8017:21673",
@@ -8591,6 +8639,7 @@
       "codeName": "IconProfile",
       "artifactRoot": "components/IconProfile",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8017:21675",
@@ -8615,6 +8664,7 @@
       "codeName": "IconAdd",
       "artifactRoot": "components/IconAdd",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8017:21534",
@@ -8646,6 +8696,7 @@
       "codeName": "IconShape",
       "artifactRoot": "components/IconShape",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8017:21535",
@@ -8677,6 +8728,7 @@
       "codeName": "IconStyle",
       "artifactRoot": "components/IconStyle",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8017:21536",
@@ -8708,6 +8760,7 @@
       "codeName": "IconTune",
       "artifactRoot": "components/IconTune",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8017:21537",
@@ -8739,6 +8792,7 @@
       "codeName": "IconEdit",
       "artifactRoot": "components/IconEdit",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8017:21538",
@@ -8770,6 +8824,7 @@
       "codeName": "Frame_8068_4571",
       "artifactRoot": "components/Frame_8068_4571",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8068:4571",
@@ -8794,6 +8849,7 @@
       "codeName": "Grid_8068_4670",
       "artifactRoot": "components/Grid_8068_4670",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8068:4670",
@@ -8818,6 +8874,7 @@
       "codeName": "Size_8069_4107",
       "artifactRoot": "components/Size_8069_4107",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8069:4107",
@@ -8842,6 +8899,7 @@
       "codeName": "Frame_10006_4085",
       "artifactRoot": "components/Frame_10006_4085",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "10006:4085",
@@ -8866,6 +8924,7 @@
       "codeName": "Frame_10007_4146",
       "artifactRoot": "components/Frame_10007_4146",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "10007:4146",
@@ -8890,6 +8949,7 @@
       "codeName": "Grid2",
       "artifactRoot": "components/Grid2",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "10007:4176",
@@ -8914,6 +8974,7 @@
       "codeName": "LockClosed",
       "artifactRoot": "components/LockClosed",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "12002:17690",
@@ -8953,6 +9014,7 @@
       "codeName": "LockOpen",
       "artifactRoot": "components/LockOpen",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "12002:17696",
@@ -8992,6 +9054,7 @@
       "codeName": "Images",
       "artifactRoot": "components/Images",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8063:3191",
@@ -9031,6 +9094,7 @@
       "codeName": "Blob",
       "artifactRoot": "components/Blob",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "6108:54771",
@@ -9075,6 +9139,7 @@
       "codeName": "Hexagon",
       "artifactRoot": "components/Hexagon",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "6110:54836",
@@ -9119,6 +9184,7 @@
       "codeName": "Diamond",
       "artifactRoot": "components/Diamond",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "6110:54839",
@@ -9163,6 +9229,7 @@
       "codeName": "Sparkle",
       "artifactRoot": "components/Sparkle",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "6110:54842",
@@ -9207,6 +9274,7 @@
       "codeName": "Shuffle",
       "artifactRoot": "components/Shuffle",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "12002:17774",
@@ -9246,6 +9314,7 @@
       "codeName": "Circle",
       "artifactRoot": "components/Circle",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "6108:52031",
@@ -9285,6 +9354,7 @@
       "codeName": "Triangle",
       "artifactRoot": "components/Triangle",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "6108:52032",
@@ -9324,6 +9394,7 @@
       "codeName": "Star",
       "artifactRoot": "components/Star",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "6108:52033",
@@ -9363,6 +9434,7 @@
       "codeName": "Heart",
       "artifactRoot": "components/Heart",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "6108:52034",
@@ -9402,6 +9474,7 @@
       "codeName": "Upload",
       "artifactRoot": "components/Upload",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "6108:52035",
@@ -9441,6 +9514,7 @@
       "codeName": "Square",
       "artifactRoot": "components/Square",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "6137:652",
@@ -9485,6 +9559,7 @@
       "codeName": "RectangleLandscape",
       "artifactRoot": "components/RectangleLandscape",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "14027:8364",
@@ -9509,6 +9584,7 @@
       "codeName": "RectanglePortrait",
       "artifactRoot": "components/RectanglePortrait",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "14027:8371",
@@ -9533,6 +9609,7 @@
       "codeName": "Blend",
       "artifactRoot": "components/Blend",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8001:1144",
@@ -9572,6 +9649,7 @@
       "codeName": "Exposure",
       "artifactRoot": "components/Exposure",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8001:1142",
@@ -9611,6 +9689,7 @@
       "codeName": "Brightness",
       "artifactRoot": "components/Brightness",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8001:1141",
@@ -9650,6 +9729,7 @@
       "codeName": "Contrast",
       "artifactRoot": "components/Contrast",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8001:1140",
@@ -9689,6 +9769,7 @@
       "codeName": "Saturation",
       "artifactRoot": "components/Saturation",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8001:1143",
@@ -9728,6 +9809,7 @@
       "codeName": "Temp",
       "artifactRoot": "components/Temp",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8001:1138",
@@ -9767,6 +9849,7 @@
       "codeName": "Vignette",
       "artifactRoot": "components/Vignette",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8001:1139",
@@ -9806,6 +9889,7 @@
       "codeName": "Tile",
       "artifactRoot": "components/Tile",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "12015:7443",
@@ -9845,6 +9929,7 @@
       "codeName": "Fix",
       "artifactRoot": "components/Fix",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "12015:7447",
@@ -9884,6 +9969,7 @@
       "codeName": "Offset",
       "artifactRoot": "components/Offset",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8001:1151",
@@ -9923,6 +10009,7 @@
       "codeName": "Definition",
       "artifactRoot": "components/Definition",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8001:1150",
@@ -9962,6 +10049,7 @@
       "codeName": "Radius",
       "artifactRoot": "components/Radius",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8001:1148",
@@ -10001,6 +10089,7 @@
       "codeName": "Bend",
       "artifactRoot": "components/Bend",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8001:1147",
@@ -10049,6 +10138,7 @@
       "codeName": "Smooth",
       "artifactRoot": "components/Smooth",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8001:1146",
@@ -10088,6 +10178,7 @@
       "codeName": "Snap",
       "artifactRoot": "components/Snap",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8001:1145",
@@ -10127,6 +10218,7 @@
       "codeName": "Sharpen",
       "artifactRoot": "components/Sharpen",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8001:1149",
@@ -10166,6 +10258,7 @@
       "codeName": "Sticky_8001_1158",
       "artifactRoot": "components/Sticky_8001_1158",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8001:1158",
@@ -10205,6 +10298,7 @@
       "codeName": "Swatch_8001_1157",
       "artifactRoot": "components/Swatch_8001_1157",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8001:1157",
@@ -10244,6 +10338,7 @@
       "codeName": "Material",
       "artifactRoot": "components/Material",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8001:1156",
@@ -10283,6 +10378,7 @@
       "codeName": "Size_8001_1154",
       "artifactRoot": "components/Size_8001_1154",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8001:1154",
@@ -10322,6 +10418,7 @@
       "codeName": "Grid_8001_1155",
       "artifactRoot": "components/Grid_8001_1155",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8001:1155",
@@ -10361,6 +10458,7 @@
       "codeName": "Magnetic",
       "artifactRoot": "components/Magnetic",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8001:1153",
@@ -10426,6 +10524,7 @@
       "codeName": "Sticky_8001_1347",
       "artifactRoot": "components/Sticky_8001_1347",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8001:1347",
@@ -10496,6 +10595,7 @@
       "codeName": "Menu",
       "artifactRoot": "components/Menu",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "6105:687",
@@ -10544,6 +10644,7 @@
       "codeName": "Rotate",
       "artifactRoot": "components/Rotate",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "6105:18352",
@@ -10588,6 +10689,7 @@
       "codeName": "Magic",
       "artifactRoot": "components/Magic",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "6108:48035",
@@ -10632,6 +10734,7 @@
       "codeName": "UndoMini",
       "artifactRoot": "components/UndoMini",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8018:27923",
@@ -10671,6 +10774,7 @@
       "codeName": "RedoMini",
       "artifactRoot": "components/RedoMini",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8018:27921",
@@ -10710,6 +10814,7 @@
       "codeName": "FlipVMini",
       "artifactRoot": "components/FlipVMini",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8018:27922",
@@ -10749,6 +10854,7 @@
       "codeName": "FlipHMini",
       "artifactRoot": "components/FlipHMini",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8018:27920",
@@ -10788,6 +10894,7 @@
       "codeName": "ResetMini",
       "artifactRoot": "components/ResetMini",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8018:27919",
@@ -10827,6 +10934,7 @@
       "codeName": "ToolTitle",
       "artifactRoot": "components/ToolTitle",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "12010:22538",
@@ -10988,6 +11096,7 @@
           "emittedType": "boolean"
         }
       ],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "6103:702",
@@ -11446,6 +11555,7 @@
           "emittedType": "typeof UndoMini | typeof UndoMiniInternal_fb60d4f2971d"
         }
       ],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "6104:641",
@@ -11556,6 +11666,7 @@
       "codeName": "ButtonPillReg",
       "artifactRoot": "components/ButtonPillReg",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "6103:707",
@@ -11701,6 +11812,7 @@
           "emittedType": "typeof Magic"
         }
       ],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "6108:48040",
@@ -11785,6 +11897,7 @@
       "codeName": "ButtonPillSpecLabeled",
       "artifactRoot": "components/ButtonPillSpecLabeled",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8017:21076",
@@ -11899,6 +12012,7 @@
       "codeName": "MenuToolFrostAssembled",
       "artifactRoot": "components/MenuToolFrostAssembled",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8018:28072",
@@ -11954,6 +12068,7 @@
       "codeName": "ToolSwatches",
       "artifactRoot": "components/ToolSwatches",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8019:1146",
@@ -12248,6 +12363,7 @@
       "codeName": "ToolSwatch",
       "artifactRoot": "components/ToolSwatch",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8019:1593",
@@ -12293,6 +12409,7 @@
       "codeName": "ToolRuller",
       "artifactRoot": "components/ToolRuller",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8001:998",
@@ -13575,6 +13692,7 @@
       "codeName": "ToolBarModesel",
       "artifactRoot": "components/ToolBarModesel",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "6138:953",
@@ -13712,6 +13830,7 @@
           "emittedType": "string"
         }
       ],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8018:27668",
@@ -13826,6 +13945,7 @@
       "codeName": "ToolNav",
       "artifactRoot": "components/ToolNav",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "8019:1640",
@@ -13909,6 +14029,7 @@
       "codeName": "FrameEffectSelection",
       "artifactRoot": "components/FrameEffectSelection",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "12007:18284",
@@ -14018,6 +14139,7 @@
       "codeName": "VectorMode",
       "artifactRoot": "components/VectorMode",
       "api": [],
+      "apiDisclosures": [],
       "masters": [
         {
           "figmaId": "12007:18281",
@@ -14636,8 +14758,8 @@
       "sha256": "bc5723133791921ea183ccd2bc70b0e01862f2469d0ac70b041e1972874b1f4b"
     },
     "Blob/blob.module.css": {
-      "bytes": 200,
-      "sha256": "bc604d10e1bdf22a09e1770ec8d670e3d055711eee4d4c68faabd5da13814a73"
+      "bytes": 175,
+      "sha256": "b4dba2c0fde15753fb656f9852211a72442929231edb9f035039c02008b6b1d5"
     },
     "Blob/conformance.json": {
       "bytes": 1408,
@@ -14648,20 +14770,20 @@
       "sha256": "071c7acea42fa076960d224a124fe61e59931af60fd2811852bc6a04827f32d4"
     },
     "Blob/evidence/dark.png": {
-      "bytes": 755,
-      "sha256": "45500a047df33b79fa25c2ddb9767a4228a79aaa7f84945200ab0d881216fcdc"
+      "bytes": 764,
+      "sha256": "26db4eff45da7e54a9cad5ffaf193f995e10e5ca7ce10cf2def754174fe221b8"
     },
     "Blob/evidence/fidelity.json": {
-      "bytes": 612,
-      "sha256": "925d66bc13375867858a5059a8d0e93e6dfa0dfe5b4efdbb994a53e030e68590"
+      "bytes": 623,
+      "sha256": "b75905f4002cfd5a1b65bd9c6776064236903bce9230fde1b82af128b5c6aa19"
     },
     "Blob/evidence/figma.png": {
       "bytes": 830,
       "sha256": "2612e9d55bf8686b10080d1683810841f81363eaa8257439cecd149554e0e37e"
     },
     "Blob/evidence/light.png": {
-      "bytes": 842,
-      "sha256": "3fcfc4598a75de47627fd92fd910cc894183e91e0cb09a0d9b0acc199d814585"
+      "bytes": 846,
+      "sha256": "e8ee4a2ef4dc08e2b34d53162b7ff1a81124159d3c5e89811b90f0764ee10251"
     },
     "Blob/page.tsx": {
       "bytes": 161,
@@ -15133,7 +15255,7 @@
     },
     "ButtonRoundReg/variants/6108-53400/CONFORMANCE.md": {
       "bytes": 1894,
-      "sha256": "81c9ea87c86752d98673235c36950e7aa0fbd746a9d1915b59fc820f5034f99e"
+      "sha256": "f3593c6dd8ac12c72a5cfba3f44ddb82a0c1df4a7ff18f0d89e550f4a53ade99"
     },
     "ButtonRoundReg/variants/6108-53400/StateDefault.tsx": {
       "bytes": 489,
@@ -15153,39 +15275,39 @@
     },
     "ButtonRoundReg/variants/6108-53400/conformance.json": {
       "bytes": 1668,
-      "sha256": "ebe5eada143c1cccf5ff1841625b28f44a9097cd9ec918140f3524347c437c3b"
+      "sha256": "17f9bc1331a7ec97e83df10d9f580c2fd87ea10c864b18af8f2d4cc97140f809"
     },
     "ButtonRoundReg/variants/6108-53400/convert-run.json": {
       "bytes": 7190,
       "sha256": "06eeedb8143a9cebbee6f5d41480870c1cf3a174f4d87aa7031e3d910f352717"
     },
     "ButtonRoundReg/variants/6108-53400/evidence/dark.png": {
-      "bytes": 2619,
-      "sha256": "1b5f1e42fcd30ed42fbe52e0bd8f586cefcca6e5c083b623817ffd21721c3049"
+      "bytes": 2650,
+      "sha256": "63ffb396204716881524833f77f078e5594b9a5625aef39a47188d2290981db1"
     },
     "ButtonRoundReg/variants/6108-53400/evidence/fidelity.json": {
-      "bytes": 616,
-      "sha256": "38ce2f424995223be0b72139cd2e98de91cc5b1cecde9dfb7b03fe95acb81c9e"
+      "bytes": 622,
+      "sha256": "51b06fcd58fa148baca3f4308af56e1a885d82aa7475b846b8593153708f585e"
     },
     "ButtonRoundReg/variants/6108-53400/evidence/figma.png": {
       "bytes": 3207,
       "sha256": "daf33762cc866bc1f2ece826b713ce186e5dade9869605c9dbb6842d290871bf"
     },
     "ButtonRoundReg/variants/6108-53400/evidence/light.png": {
-      "bytes": 2588,
-      "sha256": "0a5fbd83bf4d07b4ca327309c7240f5ea052179a1d0124054a9e403b1bacfc83"
+      "bytes": 2711,
+      "sha256": "b8c3649ea6369cfd4a64f97049196a7a65b7ad37952b092bd59ebf6388cff728"
     },
     "ButtonRoundReg/variants/6108-53400/page.tsx": {
       "bytes": 185,
       "sha256": "1169ea18736217c14aa8622cb7d977b0c8736eb8033da5828f92824a2cabd73c"
     },
     "ButtonRoundReg/variants/6108-53400/statedefault.module.css": {
-      "bytes": 342,
-      "sha256": "d580f830a5e22355377332f68aad4c5438c6a30ccf258dd0ae474e41b3c56a8c"
+      "bytes": 368,
+      "sha256": "00284727026520b36a0af555f9bbe1e9eb3befba0d50c39c8614d509e5a04efd"
     },
     "ButtonRoundReg/variants/8050-6869/CONFORMANCE.md": {
       "bytes": 1893,
-      "sha256": "6f59eb03b125039d8ec2087d2e0851a1db31646f367e5e0c13968fbd56fdda17"
+      "sha256": "75683d3c058b7dc0cf782a5cef8c8f0e45e9a31867e77d6a55f45026bee90e52"
     },
     "ButtonRoundReg/variants/8050-6869/StateSelected.tsx": {
       "bytes": 494,
@@ -15205,35 +15327,35 @@
     },
     "ButtonRoundReg/variants/8050-6869/conformance.json": {
       "bytes": 1667,
-      "sha256": "c4479e1d5d807d839cac2cbd73508470170b3ce664f4f4ff43e65e116cbf29dc"
+      "sha256": "dfc9a12f8dfffdcf8413efc7a54ea20b8dd73fff949b51ae9367ff2071ee45de"
     },
     "ButtonRoundReg/variants/8050-6869/convert-run.json": {
       "bytes": 7186,
       "sha256": "1623cdf78fe202a65d67678c0504725d6878bb0225130ea9bfacf6c9b197256c"
     },
     "ButtonRoundReg/variants/8050-6869/evidence/dark.png": {
-      "bytes": 2582,
-      "sha256": "d3f4a3f9147914ced46dbd9274176cfb9b0bbf0d2b0eb0c85c4f32814195f99f"
+      "bytes": 2660,
+      "sha256": "47b7c9f72139a149b3a508dd459c3f0754c571fbbe0cb1d400b9ec4345bc0306"
     },
     "ButtonRoundReg/variants/8050-6869/evidence/fidelity.json": {
-      "bytes": 622,
-      "sha256": "842c3c9b7784be27a1bb682f4a548d383385e89bca3f7265bcd647b998235f4c"
+      "bytes": 621,
+      "sha256": "745de09b0b247c6a53584d5091b765dacabbce8245648068eb2183952ac8c78b"
     },
     "ButtonRoundReg/variants/8050-6869/evidence/figma.png": {
       "bytes": 3036,
       "sha256": "43d3d3b751db8a8ee2f582dd08e8b1fe02c03f404cd50f35c55dde27e83c9995"
     },
     "ButtonRoundReg/variants/8050-6869/evidence/light.png": {
-      "bytes": 2514,
-      "sha256": "a7770483cb34844bcef309d67372b7dacfe1d5466768d8909d55b8d5fe0c922f"
+      "bytes": 2667,
+      "sha256": "d04946952aafe24929ffe762a024b0bc56f4326e18b91dc183133abe3022d89b"
     },
     "ButtonRoundReg/variants/8050-6869/page.tsx": {
       "bytes": 188,
       "sha256": "618aea9914d72718d295ca4dd511dc1f0497b01209b58063226191e23300c617"
     },
     "ButtonRoundReg/variants/8050-6869/stateselected.module.css": {
-      "bytes": 342,
-      "sha256": "4f1191bec20a754273278edf832388dbf57aa3eaeb661bf9958685b53e95e490"
+      "bytes": 368,
+      "sha256": "4b25fee9bfabcebf24736dd3df930dd824d6f1b839ff301c9cd17b807926960d"
     },
     "ButtonRoundSpec/ButtonRoundSpec.tsx": {
       "bytes": 492,
@@ -15241,7 +15363,7 @@
     },
     "ButtonRoundSpec/CONFORMANCE.md": {
       "bytes": 1965,
-      "sha256": "69237e55dba912309d455e77f5bfc0552c9089026a3bb87250a64c71e26b1375"
+      "sha256": "c1f19546360c82fd05aa5d6e1de8fdc658884ff053beb74b4890592e3a64246c"
     },
     "ButtonRoundSpec/_inputs/nodes.json": {
       "bytes": 33239,
@@ -15256,32 +15378,32 @@
       "sha256": "bc5723133791921ea183ccd2bc70b0e01862f2469d0ac70b041e1972874b1f4b"
     },
     "ButtonRoundSpec/buttonroundspec.module.css": {
-      "bytes": 505,
-      "sha256": "1c051936607efc484b1046cf2811d2c9b99f6a607b7d613baea97d208f09691e"
+      "bytes": 531,
+      "sha256": "224b0186627e48d37c84b1d0709cb102e27e9c191ead40adcae3efb1c6531fbf"
     },
     "ButtonRoundSpec/conformance.json": {
       "bytes": 1832,
-      "sha256": "11404b3f3b886566cae1e60687621b594ffd3480ab55173b7ad7d3689bbf7273"
+      "sha256": "ad7ec941ea35008e7b3d4a0ee770583f2edc91e964ceca3f63a2097b20ccf31a"
     },
     "ButtonRoundSpec/convert-run.json": {
       "bytes": 2625,
       "sha256": "b148374ca2d80ed7eb76d35eff7b8cd8f54e565b400b2ed22a51fb60f7911d53"
     },
     "ButtonRoundSpec/evidence/dark.png": {
-      "bytes": 3964,
-      "sha256": "70da20fdf70f7ebb2e86ecad43663ac6ee14e89ca49d24cd44732e716d92449d"
+      "bytes": 4119,
+      "sha256": "82605e84e8f5069d3c48ace9eb8b3416b12d931f429f62d484a721dd3a002582"
     },
     "ButtonRoundSpec/evidence/fidelity.json": {
-      "bytes": 625,
-      "sha256": "ab0614f25b881bde5ec4bb182831588b272932d7012634a35d180c59f80a4635"
+      "bytes": 623,
+      "sha256": "9dc13d5c7911764c7aef8a938021305cae4106f166e17100878f2387e3840a1a"
     },
     "ButtonRoundSpec/evidence/figma.png": {
       "bytes": 8364,
       "sha256": "3f3d97379b4805f5694eeeb64a15ddf33c9d6527a38a7e60e3df8056eb5cc494"
     },
     "ButtonRoundSpec/evidence/light.png": {
-      "bytes": 3964,
-      "sha256": "70da20fdf70f7ebb2e86ecad43663ac6ee14e89ca49d24cd44732e716d92449d"
+      "bytes": 4119,
+      "sha256": "82605e84e8f5069d3c48ace9eb8b3416b12d931f429f62d484a721dd3a002582"
     },
     "ButtonRoundSpec/page.tsx": {
       "bytes": 194,
@@ -15308,8 +15430,8 @@
       "sha256": "bc5723133791921ea183ccd2bc70b0e01862f2469d0ac70b041e1972874b1f4b"
     },
     "Circle/circle.module.css": {
-      "bytes": 148,
-      "sha256": "02cb6dc4a7f1ee895f306362ad6e31d22b3369a496ecffc468fac764048753ab"
+      "bytes": 123,
+      "sha256": "c9d2ebb8f00f73725b564e8f33c0e21028f862f8baf4332dff44ec3040e8e480"
     },
     "Circle/conformance.json": {
       "bytes": 1407,
@@ -15320,8 +15442,8 @@
       "sha256": "52109beb7409c0225d7da291b1b5fd98f228c24558a0803f9177932d27977b7c"
     },
     "Circle/evidence/dark.png": {
-      "bytes": 770,
-      "sha256": "13383904000350e8767302033c59be1689fe664e5d6c783a57a5c5d7e206cccb"
+      "bytes": 779,
+      "sha256": "be34a1c6e150b378ef6c2eea5751d4d1d2ad9bfdf35c96d062882e24259c645a"
     },
     "Circle/evidence/fidelity.json": {
       "bytes": 611,
@@ -15332,8 +15454,8 @@
       "sha256": "400ca1d9b678f7936ab3bc5ec412643c86b3de284d105b64bcb65b507403778a"
     },
     "Circle/evidence/light.png": {
-      "bytes": 845,
-      "sha256": "488ee49d19418e30fd274e0738fa9a3a930a44d58a3f2daaff9280bc0b688834"
+      "bytes": 822,
+      "sha256": "f0054db4f56eabfd951be2cbc3d36c37904a000fb39e55eaa453560da7e41ebb"
     },
     "Circle/page.tsx": {
       "bytes": 167,
@@ -15552,8 +15674,8 @@
       "sha256": "6ed6ca4df13d135e9e18f4ec5f414dc82fd7816572400cb39d3da8bf409a2531"
     },
     "ComponentLibraryProof.tsx": {
-      "bytes": 43154,
-      "sha256": "777c377b18bdeeaaf494e41fe0769c96c4645bb0d38f2448356ceac612a85c87"
+      "bytes": 43202,
+      "sha256": "8165fcf554ba42096a1c3199b0fb433a27ce75a970c496f2e8168c3301c7a333"
     },
     "Contrast/CONFORMANCE.md": {
       "bytes": 1873,
@@ -15665,7 +15787,7 @@
     },
     "Dial_6110_56193/variants/6110-56191/CONFORMANCE.md": {
       "bytes": 2139,
-      "sha256": "a19ffef852e44fb0ff15d25729fa29fd28160c408352d47dc42d66eb5365520d"
+      "sha256": "bf2419c57b4b358a02d0acfd00e5817126bc9b455b1a1ba49a737d6c6b94e4be"
     },
     "Dial_6110_56193/variants/6110-56191/StateNewValue.tsx": {
       "bytes": 1191,
@@ -15685,39 +15807,39 @@
     },
     "Dial_6110_56193/variants/6110-56191/conformance.json": {
       "bytes": 2851,
-      "sha256": "afd75ea7c6a55348d9a672b0bc0020a52b15fa6d9a6765e507d554cfc7aa62dd"
+      "sha256": "13cfe1d81da04a540b7aafa405c9991b51ccbbdd6ba8caabb0e206b049ae7c67"
     },
     "Dial_6110_56193/variants/6110-56191/convert-run.json": {
       "bytes": 3093,
       "sha256": "3c4244dffe3d1ab41576bee6a726e8915967bd4619cc99e4372a8d12aabf63f6"
     },
     "Dial_6110_56193/variants/6110-56191/evidence/dark.png": {
-      "bytes": 2840,
-      "sha256": "c2c4f4eba6f040324182861924afa2563b5b121c4dc7fa98982c52c570e396ec"
+      "bytes": 2811,
+      "sha256": "e8c3a3f8534ff49627a1ed551c59d87f2c097d72150c3779ae77c9d4c2a0781f"
     },
     "Dial_6110_56193/variants/6110-56191/evidence/fidelity.json": {
-      "bytes": 623,
-      "sha256": "bf0d04b977ac8b93a9adf9b3a4c10181d6c8c575e94ec5a007f3cf81847f84ee"
+      "bytes": 624,
+      "sha256": "b4b158acfe2b688a5f2fb4b51661a52c72963ea84cd98bcdaf715cd9700ad37d"
     },
     "Dial_6110_56193/variants/6110-56191/evidence/figma.png": {
       "bytes": 2821,
       "sha256": "c1d4ffa51a4d0027f5293085f373849ddf491de742b570d9e7140fa4ea80ca54"
     },
     "Dial_6110_56193/variants/6110-56191/evidence/light.png": {
-      "bytes": 2780,
-      "sha256": "207f396978d23927688d7f7f1a78c5501feefd08600d8692e95e0ff2be9d0932"
+      "bytes": 2820,
+      "sha256": "54c9dbc66408af83a4e4f91727cd331f61bbab37a30823a327217bc3e3cd4d0d"
     },
     "Dial_6110_56193/variants/6110-56191/page.tsx": {
       "bytes": 188,
       "sha256": "3c187e69548b9a740831e59355068b2e51a3fe50cbbe92de6349bc29811dfe86"
     },
     "Dial_6110_56193/variants/6110-56191/statenewvalue.module.css": {
-      "bytes": 774,
-      "sha256": "168dd6c65924c23cc9306258d4e28cd7f9c44d6ab19a031e33c676ea1b72e6d2"
+      "bytes": 800,
+      "sha256": "661f3f101b6fadee3a02a9cbfc2d8bcaa986e733ce686593a0a6f1a29c924ffb"
     },
     "Dial_6110_56193/variants/6110-56192/CONFORMANCE.md": {
       "bytes": 2177,
-      "sha256": "15ac33c14205037153c90a1edf63eb08cbee379f9fd96390a67823c89427d9e9"
+      "sha256": "2fc195ead96b1fd3ce6760e148928c1b25776a9f48a7b139ba519037a5d16c6f"
     },
     "Dial_6110_56193/variants/6110-56192/StateActive.tsx": {
       "bytes": 1142,
@@ -15737,35 +15859,35 @@
     },
     "Dial_6110_56193/variants/6110-56192/conformance.json": {
       "bytes": 2996,
-      "sha256": "36f22a4261dae56acf487577796ada195c4db94933027566da8467068ce4d5d6"
+      "sha256": "a9e92600986c2060fe1144ff4fb71fd9501f6bfe7cb339ca2a99487ad5de00b1"
     },
     "Dial_6110_56193/variants/6110-56192/convert-run.json": {
       "bytes": 2518,
       "sha256": "45c6b5fab505f452d67cb2002d01d48996af6cae1e035b2e9b29736a1f70beae"
     },
     "Dial_6110_56193/variants/6110-56192/evidence/dark.png": {
-      "bytes": 3008,
-      "sha256": "9b7ba48b5ff94c7d985f8052160eba01317fc56944979c1e77d51c37b5f6752f"
+      "bytes": 2970,
+      "sha256": "30d930c12130c4c261ba98ff7a83f82fbabfbe636a1e19d240d357a9644d4d99"
     },
     "Dial_6110_56193/variants/6110-56192/evidence/fidelity.json": {
-      "bytes": 623,
-      "sha256": "27ada381295ab8a93d9b54a55af42dceb275e4664e54303cdc57d605b9d4b407"
+      "bytes": 624,
+      "sha256": "1fff38dee37e2e2eda0654bee124b0ea8224ee3705b4c45d069a41f10faf80b3"
     },
     "Dial_6110_56193/variants/6110-56192/evidence/figma.png": {
       "bytes": 2918,
       "sha256": "bc932d61302a58964f20f9d27086f1fcd56bb69349e90c8c4844f0cb62f24cf0"
     },
     "Dial_6110_56193/variants/6110-56192/evidence/light.png": {
-      "bytes": 3185,
-      "sha256": "e93cc648954f1c2d3e27e61926c3d7520fb56d57c1cf0e3e0ae50898de983f4a"
+      "bytes": 3202,
+      "sha256": "724e1c09d0d1bea632b4c7a326c73fada7cc1c946859e9989948ff771bc525d0"
     },
     "Dial_6110_56193/variants/6110-56192/page.tsx": {
       "bytes": 182,
       "sha256": "cc095557b4723079acf4f2d99b0e44061605bb8bdbab110674c30e20b0f6d2e9"
     },
     "Dial_6110_56193/variants/6110-56192/stateactive.module.css": {
-      "bytes": 1335,
-      "sha256": "84b6c5dc23d069b0e30ec568070fc60189832ace6ff41e491c98f310c605fb92"
+      "bytes": 1361,
+      "sha256": "1b04fb4a0348f6c0e4c57a60993d1fb3a35575e0e9633c17a4ad147c576c0a99"
     },
     "Dial_8050_6894/Dial_8050_6894.tsx": {
       "bytes": 413,
@@ -16744,28 +16866,28 @@
       "sha256": "c50cc16d5c4608d533d12b9282de9765c39fd899131fa956750be91e3fc16b8e"
     },
     "EffectCard/variants/12002-5763/evidence/dark.png": {
-      "bytes": 363877,
-      "sha256": "faaa7fc892f8606375786432a206bfe484d2001b9cc08b400a1ec3236010c5f9"
+      "bytes": 337010,
+      "sha256": "af9467f68d4d49356f7887ad09aa4db84ff69f2a80f2490136f890a6c9e3287f"
     },
     "EffectCard/variants/12002-5763/evidence/fidelity.json": {
-      "bytes": 631,
-      "sha256": "8281a0e62a4bccabe26ea0790db8914eff0a482821a38ccf928cf9549266872c"
+      "bytes": 628,
+      "sha256": "e47d7def1f52e5f4a994037865e169afbf28499fb7068dc7945c2e716068b1dd"
     },
     "EffectCard/variants/12002-5763/evidence/figma.png": {
       "bytes": 428049,
       "sha256": "22580707a062b99362632335c847ae247480c520b9265afdbe63c4fece8bd9f9"
     },
     "EffectCard/variants/12002-5763/evidence/light.png": {
-      "bytes": 363877,
-      "sha256": "faaa7fc892f8606375786432a206bfe484d2001b9cc08b400a1ec3236010c5f9"
+      "bytes": 337010,
+      "sha256": "af9467f68d4d49356f7887ad09aa4db84ff69f2a80f2490136f890a6c9e3287f"
     },
     "EffectCard/variants/12002-5763/page.tsx": {
       "bytes": 173,
       "sha256": "ad16c00eae21004cf302f9e9e0760ad425495d67eee45ce85c8180b613cedeca"
     },
     "EffectCard/variants/12002-5763/sideface.module.css": {
-      "bytes": 1775,
-      "sha256": "a5dd860e1299729038d20d9d476338ec9079224f2ba1542aff59c073d40de49c"
+      "bytes": 1801,
+      "sha256": "7423f319ab9af8dda79c7cc384ef81afea129732b45c30a9cb699fbc595816d5"
     },
     "EffectCard/variants/8017-27662/CONFORMANCE.md": {
       "bytes": 2098,
@@ -16796,28 +16918,28 @@
       "sha256": "306a162b1401110c739a6a9cccbbb4041f8b4ef1701524e4ee195928bceb0683"
     },
     "EffectCard/variants/8017-27662/evidence/dark.png": {
-      "bytes": 365591,
-      "sha256": "4a4cf2b2fa0b2d43859bb460c016e7159c210a644c4a59bf594a37719091c213"
+      "bytes": 338989,
+      "sha256": "a13ccf5945e2b722b4e9ccb682810ab076d60c2c7adeb3462aa2e4fd899ae3e8"
     },
     "EffectCard/variants/8017-27662/evidence/fidelity.json": {
-      "bytes": 630,
-      "sha256": "a9263b5617983f8420b9e47dc4dd1b2f21731fbf0667930e177f6b1298890a85"
+      "bytes": 629,
+      "sha256": "d220a81128118592f1ea84ffe7fbb5105e47f934555f6493b76968357d966e6c"
     },
     "EffectCard/variants/8017-27662/evidence/figma.png": {
       "bytes": 433490,
       "sha256": "c0991f2c54170ff075ded329e9583f20830151f0b37d0f02fa7a9c6542875fa7"
     },
     "EffectCard/variants/8017-27662/evidence/light.png": {
-      "bytes": 365534,
-      "sha256": "825550e08eaed84d838d7a0f92fc1c0f85f9ec81f800c55dda34bcc5de3934c9"
+      "bytes": 338875,
+      "sha256": "9ff7d9736513b613b711edaf5e72d8e40513b8e66cd1a46911b9430d6696b10d"
     },
     "EffectCard/variants/8017-27662/page.tsx": {
       "bytes": 209,
       "sha256": "5a4c747f9fda1a472e07432ae39d4826142816ba089f2dfdd393d268bccc68e8"
     },
     "EffectCard/variants/8017-27662/sidefacemodifyframe1.module.css": {
-      "bytes": 2164,
-      "sha256": "7fe4851a85d6c1599690fcffd037c1925f0a79f03ceb6a4bf968d5ee226abff9"
+      "bytes": 2190,
+      "sha256": "3fc79c8aa972eb89e5eecc6b1553673dd88c9475d209f9f087441377f401ae83"
     },
     "EffectCard/variants/8054-4017/CONFORMANCE.md": {
       "bytes": 2006,
@@ -18200,24 +18322,24 @@
       "sha256": "f8fb61cf5ac09926350ee13c0b128cdb8bde4bd2a1dcf7382e63dfc2777be94a"
     },
     "LockOpen/evidence/dark.png": {
-      "bytes": 584,
-      "sha256": "976e1b832bb3576f86104b695e88355e74afb999d46852aa60a0b5636d7f38b9"
+      "bytes": 574,
+      "sha256": "8f9d420cf088b4d4bf69d6b1aea15a3778efe8c9126c091ec87aa6d2bbba5b72"
     },
     "LockOpen/evidence/fidelity.json": {
-      "bytes": 613,
-      "sha256": "b792376dd5a204a3ac900ffb4c4bca0a2587359f340e1a5e770a1ab769663415"
+      "bytes": 615,
+      "sha256": "b5f8bf37ae318185ef97db4cfc0501adc2fa72321db374602f04068bbc00638d"
     },
     "LockOpen/evidence/figma.png": {
       "bytes": 477,
       "sha256": "879c45a33bceca911da454354ca84caf3cf74b041c32afab28f0582dce766231"
     },
     "LockOpen/evidence/light.png": {
-      "bytes": 614,
-      "sha256": "a2eb14dc79d3d60c004408b03fb505ff14feb21f37bafa12c71678dc6e46c889"
+      "bytes": 617,
+      "sha256": "f5abdcd4a06371950fc060df39b50d3609169640a157605ef705f5bac0a370aa"
     },
     "LockOpen/lockopen.module.css": {
-      "bytes": 150,
-      "sha256": "8e50c47b9e001aeef49bbd7bdc679ec0eb51e2485c6ace7f5b5b52ce4f2a67e2"
+      "bytes": 125,
+      "sha256": "cedf6c9f8973c339f673de2157feaff66c9f71fcd099ab8009851cc0248988c4"
     },
     "LockOpen/page.tsx": {
       "bytes": 173,
@@ -19260,20 +19382,20 @@
       "sha256": "3489598ae2507bd609eecb6259ff211ea4405b270cae752d3c9c61863fc0f106"
     },
     "RatioLock/variants/12002-17703/evidence/dark.png": {
-      "bytes": 1777,
-      "sha256": "d1b4bcdfddad9ed05bd080356d7e7e34c9ab5ac2e66f934d47b0f9e7b808a9e0"
+      "bytes": 1785,
+      "sha256": "cac32f5e136a90bd934cd6393bce5e09627d918b5e6e76145729f8b9618f837c"
     },
     "RatioLock/variants/12002-17703/evidence/fidelity.json": {
-      "bytes": 617,
-      "sha256": "cf98ed2e48449b5998960473fe4eb5b641d38dde2f48172d4f8f6473083044ae"
+      "bytes": 615,
+      "sha256": "bdc3c62c752005e8bfb05a34e9a0b9b116685693f87ea3bdd46474804b513a16"
     },
     "RatioLock/variants/12002-17703/evidence/figma.png": {
       "bytes": 1843,
       "sha256": "ac07b791801dbcbbec2420ec791727b06d423ea97f03cf0d2e13ac50fdc01e90"
     },
     "RatioLock/variants/12002-17703/evidence/light.png": {
-      "bytes": 1534,
-      "sha256": "1a4f7074b4d9760302abd2c36f633878d9b90c39878e5cf5616407bf2593066d"
+      "bytes": 1537,
+      "sha256": "f36b35b2942b92e13fb541ef83a76427bd99a661728635b8d16160070d903f07"
     },
     "RatioLock/variants/12002-17703/page.tsx": {
       "bytes": 176,
@@ -19572,28 +19694,28 @@
       "sha256": "c89957a9b581e796eb4b7e2bd0668d828b1dee11d57d76c1df94d442e387a09d"
     },
     "Rotate/evidence/dark.png": {
-      "bytes": 716,
-      "sha256": "c3f248684fbde0ff14a7899a52d1eb8f55a010d2a6bd5454af0abda80f5deb08"
+      "bytes": 691,
+      "sha256": "d4e7c7e56ca3bfa6fea953fd7b114abe8b4231f5292159858b87832add1a63e3"
     },
     "Rotate/evidence/fidelity.json": {
-      "bytes": 611,
-      "sha256": "6603ec13eff428cf76e72977ff1cdf86d1f06c698048bf8f99a66e2c7d97a164"
+      "bytes": 605,
+      "sha256": "7c871d6df9e64841bb32e4e7b7a77ef26f4f3286e64ca221b18e20c3512f1fa3"
     },
     "Rotate/evidence/figma.png": {
       "bytes": 648,
       "sha256": "bcd63580ca63011f578cc62d0e945220a33c5d2178551115716ab444eeb3e2db"
     },
     "Rotate/evidence/light.png": {
-      "bytes": 716,
-      "sha256": "c3f248684fbde0ff14a7899a52d1eb8f55a010d2a6bd5454af0abda80f5deb08"
+      "bytes": 691,
+      "sha256": "d4e7c7e56ca3bfa6fea953fd7b114abe8b4231f5292159858b87832add1a63e3"
     },
     "Rotate/page.tsx": {
       "bytes": 167,
       "sha256": "44d37f9a531adc6ef2d2ebee24b8298d19cce543c74673119a1040519ef220a7"
     },
     "Rotate/rotate.module.css": {
-      "bytes": 217,
-      "sha256": "1088a6c012792c797cc98577507b32b29838947fdb4436eb8f8d803ec27922dd"
+      "bytes": 192,
+      "sha256": "bad4cc87e573737af556762c0e338596f46f75df6a3aef51c29b0eae94a292d1"
     },
     "S/S.tsx": {
       "bytes": 459,
@@ -21553,7 +21675,7 @@
     },
     "ToolBarModesel/CONFORMANCE.md": {
       "bytes": 2236,
-      "sha256": "dac30c79c5dd0c8097872a09b9bebb4f80539b2ceb1b463660409b6618a90a03"
+      "sha256": "715c430e1d2bc106e9671ec3a40989edcb5bd6a85800efaeab7f50efa451797d"
     },
     "ToolBarModesel/ToolBarModesel.tsx": {
       "bytes": 1059,
@@ -21573,35 +21695,35 @@
     },
     "ToolBarModesel/conformance.json": {
       "bytes": 2767,
-      "sha256": "d3862037148b4a9206656b2a954f83940ebbbdfcf34746ac928c6208cd47657d"
+      "sha256": "851ed2b93126adbfbf00978fa6609cdc53488e4d153e75f63ca151c9a34daa08"
     },
     "ToolBarModesel/convert-run.json": {
       "bytes": 1753,
       "sha256": "9094f571cd5fe494865b7b24c94021d517bcbf56fdf7575e078b4575ee6e4c40"
     },
     "ToolBarModesel/evidence/dark.png": {
-      "bytes": 4049,
-      "sha256": "da3b62ea76a4c8d89280abf292d8e29c6ddf8a1e15d6399b2134efc56848091b"
+      "bytes": 4497,
+      "sha256": "3eb92266a80ab0589f7c4eaf211862f14d795949d6bf30857235cb838c4d8549"
     },
     "ToolBarModesel/evidence/fidelity.json": {
-      "bytes": 626,
-      "sha256": "e0894eb84f7b1d403ee3726b131a2b74df93239f4f91ccb09a9a6fe442d79e7d"
+      "bytes": 627,
+      "sha256": "403f10a6f39e908ba4d45f9884aacd990420503758daace00231f5de688a203c"
     },
     "ToolBarModesel/evidence/figma.png": {
       "bytes": 8056,
       "sha256": "9e22a2861f4543c919e9bccf89210f94ce23cbad1b521609b42cd66b7d044abd"
     },
     "ToolBarModesel/evidence/light.png": {
-      "bytes": 5968,
-      "sha256": "2aee399e52577bfb18d8049ec13089eaeb667f77842ab6c59cd7cd57487362d2"
+      "bytes": 6412,
+      "sha256": "a6038b3152f354621b5598595ea3899a15d58ac18c2a774c2dc472851438122f"
     },
     "ToolBarModesel/page.tsx": {
       "bytes": 191,
       "sha256": "22f9e3101499074450829d937d454fd5e3aadffd9807cd56d56244e619d3e515"
     },
     "ToolBarModesel/toolbarmodesel.module.css": {
-      "bytes": 3192,
-      "sha256": "4500e63972d2881a3489b2d3346d26cae8e483fc57babaaff1ee6582957c9922"
+      "bytes": 3218,
+      "sha256": "2900424a4bea2449a2bcd51976ef64748f88317b0f0899fdf557e9c6a8c14dcc"
     },
     "ToolNav/CONFORMANCE.md": {
       "bytes": 1874,

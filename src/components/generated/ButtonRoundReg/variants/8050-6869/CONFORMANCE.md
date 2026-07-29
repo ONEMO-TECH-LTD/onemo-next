@@ -21,8 +21,8 @@
 
 
 ## RAW values — bind-token worklist
-- .circle · `width: 20px` (css:12)
-- .circle · `height: 20px` (css:13)
+- .circle · `width: 20px` (css:13)
+- .circle · `height: 20px` (css:14)
 
 ## REFUSED — design cleanup worklist
 

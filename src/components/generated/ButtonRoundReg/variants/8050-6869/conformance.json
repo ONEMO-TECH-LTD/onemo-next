@@ -20,14 +20,14 @@
       "className": "circle",
       "prop": "width",
       "value": "20px",
-      "line": 12,
+      "line": 13,
       "candidates": []
     },
     {
       "className": "circle",
       "prop": "height",
       "value": "20px",
-      "line": 13,
+      "line": 14,
       "candidates": []
     }
   ],

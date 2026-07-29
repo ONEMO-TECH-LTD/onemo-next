@@ -23,9 +23,9 @@
 ## RAW values — bind-token worklist
 - .stateActive · `width: 48px` (css:2)
 - .stateActive · `height: 48px` (css:3)
-- .el8 · `font-weight: 500` (css:46)
-- .dialFill · `width: 24px` (css:54)
-- .dialFill · `height: 38.11px` (css:55)
+- .el8 · `font-weight: 500` (css:47)
+- .dialFill · `width: 24px` (css:55)
+- .dialFill · `height: 38.11px` (css:56)
 
 ## REFUSED — design cleanup worklist
 
