@@ -13,6 +13,8 @@ import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import { contourFromShape } from '@/lib/effect/geometry-truth'
+import { DEFAULT_ROUNDED_SQUARE_CALIBRATION } from '@/lib/effect/effect-calibration'
+import { roundedSquareContourMM } from '@/lib/effect/rounded-square'
 import type { Contour, Pt } from '@/lib/effect/types'
 import { nearestAnchorPair, nearestSemanticRung, nextSemanticRung, resolveDesignSizeMM, resolveRectangleRungs, scaleContour, stdShapeContour, rectFormat, minEffectMM, maxDesignMM, DEFAULT_MARGIN_MM, DEFAULT_LAW, type GridJob, type GridJobResult, type GridPattern, type GridPlanOptions, type LadderRecipe, type MagnetPlan, type GridDensity, type GridMode, type PlanRecipe, type ResolvedGridPlan, type SemanticRung, type StandardLadderShape, type StdShape, type Attachment } from '@/lib/effect/grid'
 import { requestGridWorkerJobInBackground } from '@/lib/effect/grid-worker-client'
@@ -103,6 +105,9 @@ export default function GridLab() {
   const [p2, setP2] = useState(7)  // seed / lobes / petals / blades
   const [sides, setSides] = useState(6)
   const [points, setPoints] = useState(5)
+  const [roundedSquareRadiusMM, setRoundedSquareRadiusMM] = useState<number>(
+    DEFAULT_ROUNDED_SQUARE_CALIBRATION.radiusMM,
+  )
   const [sizeMM, setSizeMM] = useState(70)
   const [pitch, setPitch] = useState(48)
   const [pitchAuto, setPitchAuto] = useState(true)
@@ -177,13 +182,27 @@ export default function GridLab() {
     [src, magic],
   )
   const sourceUnitContour = presetUnitContour ?? generatedUnitContour ?? magicUnitContour
+  const isRoundedSquarePreset = src === 'preset' && preset === 'squircle'
   const ladderRecipe = useMemo<LadderRecipe>(
-    () => presetUnitContour
+    () => isRoundedSquarePreset
+      ? {
+          kind: 'rounded-square',
+          radiusMM: roundedSquareRadiusMM,
+          minimumAnchors: DEFAULT_ROUNDED_SQUARE_CALIBRATION.minimumAnchors,
+        }
+      : presetUnitContour
       ? { kind: 'uniform-contour', unitContour: presetUnitContour }
       : snapToGrid && sourceUnitContour
         ? { kind: 'uniform-contour', unitContour: sourceUnitContour }
       : { kind: 'standard', shape: ladderShape },
-    [ladderShape, presetUnitContour, snapToGrid, sourceUnitContour],
+    [
+      isRoundedSquarePreset,
+      ladderShape,
+      presetUnitContour,
+      roundedSquareRadiusMM,
+      snapToGrid,
+      sourceUnitContour,
+    ],
   )
   const planOptions = useMemo<GridPlanOptions>(() => ({
     attachment,
@@ -270,6 +289,23 @@ export default function GridLab() {
           format: null,
         }
       }
+      if (isRoundedSquarePreset) {
+        const design = roundedSquareContourMM(
+          gridDerivedSizeMM,
+          gridDerivedSizeMM,
+          roundedSquareRadiusMM,
+        )
+        return {
+          design,
+          recipe: {
+            kind: 'rounded-square',
+            sizeMM: gridDerivedSizeMM,
+            radiusMM: roundedSquareRadiusMM,
+          },
+          designSize: gridDerivedSizeMM,
+          format: null,
+        }
+      }
       // base contour normalized so longest side = 1mm (scale-free); scaleContour() sizes it in mm
       const base = sourceUnitContour
       if (!base || base.outer.pts.length < 3) return null
@@ -287,6 +323,7 @@ export default function GridLab() {
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
   }, [
     src, geo, sourceUnitContour, rectRungs, gridDerivedSizeMM,
+    isRoundedSquarePreset, roundedSquareRadiusMM,
     snapToGrid, effectiveTestSizeMM, longMM, shortMM, orient,
   ])
 
@@ -389,6 +426,10 @@ export default function GridLab() {
     pitch, setPitch, pitchAuto, setPitchAuto, density, setDensity, pad, setPad,
     offsetMM, setOffsetMM, pattern, setPattern, patternAuto, setPatternAuto,
     plan, setPlan, front, setFront, centerMode, setCenterMode, maxGrowMM, setMaxGrowMM,
+    roundedSquareRadiusMM,
+    setRoundedSquareRadiusMM,
+    roundedSquareRadiusMaxMM: DEFAULT_ROUNDED_SQUARE_CALIBRATION.sideMM / 2,
+    showRoundedSquareRadius: isRoundedSquarePreset,
     testSizeMM: effectiveTestSizeMM,
     setTestSizeMM: value => {
       if (src === 'std' && geo === 'rect') setLongMM(value)

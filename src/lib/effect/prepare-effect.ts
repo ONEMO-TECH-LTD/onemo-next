@@ -43,10 +43,9 @@ import { rdpClosed, type Vec2Px } from '@/lib/outline-core/math'
 // REBUILD-PLAN-v2 §B1 — truth at birth: geometry is born as ONE VShape; the manufacturing contour
 // is DERIVED from it. Shaped generation emits the RAW marching-squares straight polygon (no Stage B).
 import { contourFromShape, MIN_FEATURE_MM } from './geometry-truth'
+import { DEFAULT_ROUNDED_SQUARE_CALIBRATION } from './effect-calibration'
+import { roundedSquareShape } from './rounded-square'
 import { type VShape } from '@/lib/vector-core'
-// L6: the standard-square 8mm corners round via the Paper kernel — one fillet engine (same as the
-// editor Radius tool), no in-house duplicate. Imported directly so Paper stays in the create bundle.
-import { roundShapePaper } from '@/lib/vector-core/paper-kernel'
 // RAW-TRACE simplification floor (Dan 2026-06-15): the sub-pixel marching-squares-staircase floor.
 // The ACTUAL trace simplification is mm-floored to the manufacturing minimum-feature size
 // (MIN_FEATURE_MM, see geometry-truth) so a clean object traces as a clean straight-faceted polygon;
@@ -78,7 +77,7 @@ export const EFFECT_BUILD_CONFIG: ShapeBuildConfig = {
   paddingMM: 1.5,
   minCornerAngleDeg: 135, // unused (rounding via outline-core) — kept for ShapeBuildConfig compat
   cornerRadiusMM: 24, // unused (rounding via outline-core) — kept for ShapeBuildConfig compat
-  squareCornerMM: 8, // ONEMO square 8mm corners
+  squareCornerMM: DEFAULT_ROUNDED_SQUARE_CALIBRATION.radiusMM,
 }
 
 export interface PreparedEffect {
@@ -96,19 +95,19 @@ export interface PreparedEffect {
 
 /**
  * STANDARD BIRTH (pure, directly testable — KAI-8975/P2): the ONEMO square is the WHOLE photo —
- * a full-image rectangle with the 8mm corner fillet, true vector from birth. This is THE one
+ * a full-image rectangle with the released corner-radius calibration, true vector from birth. This is THE one
  * construction: prepareEffect's standard branch AND the editor's Reset both call it (the
  * shape-library 'square' is the editor's centered 72% seed, NOT product birth — substituting it
  * shipped a zoomed photo, Dan's 2026-06-11 catch).
  */
 export function standardBirthShape(widthPx: number, heightPx: number, cfg: ShapeBuildConfig = EFFECT_BUILD_CONFIG): { vectorShape: VShape; mmPerPx: number; radiusPx: number } {
   const mmPerPx = cfg.longestSideMM / Math.max(widthPx, heightPx, 1)
-  const base: VShape = { paths: [{ anchors: [
-    { p: { x: 0, y: 0 }, corner: true }, { p: { x: widthPx, y: 0 }, corner: true },
-    { p: { x: widthPx, y: heightPx }, corner: true }, { p: { x: 0, y: heightPx }, corner: true },
-  ] }] }
-  const radiusPx = Math.min(Math.round(cfg.squareCornerMM / mmPerPx), Math.floor(Math.min(widthPx, heightPx) / 2))
-  return { vectorShape: roundShapePaper(base, radiusPx), mmPerPx, radiusPx }
+  const radiusPx = Math.min(cfg.squareCornerMM / mmPerPx, Math.min(widthPx, heightPx) / 2)
+  return {
+    vectorShape: roundedSquareShape(widthPx, heightPx, radiusPx),
+    mmPerPx,
+    radiusPx,
+  }
 }
 
 function bbox(pts: ReadonlyArray<Pt | Vec2Px>) {
@@ -216,7 +215,7 @@ export async function prepareEffect(
     subjCanvas = mlMatte ? subjectFromOriginal(origCanvas, imageDataToCanvas(texImage)) : imageDataToCanvas(texImage)
     defaultBlurPx = Math.max(6, Math.round(fw / 50))
   } else {
-    // square: the full-image rectangle; outline-core rounds the 8mm corners (one engine, no pre-rounding)
+    // square: the full-image rectangle; one radius-parameterised construction owns its rounded corners
     W = fw; H = fh
     mmPerPx = cfg.longestSideMM / Math.max(fw, fh, 1)
     ringPx = [[0, 0], [fw, 0], [fw, fh], [0, fh]]

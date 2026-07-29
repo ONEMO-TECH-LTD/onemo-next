@@ -123,11 +123,7 @@ export function roundCornersPaper(path: VPath, radiusPx: number, pick: (i: numbe
   }
 }
 
-/**
- * L6 — round EVERY corner of a shape (the standard-square birth's 8mm corners + any whole-shape
- * round). One engine: the same Paper true-arc round as the editor's Radius tool, so there is no second
- * fillet implementation. Replaces the in-house filletShape on the production birth path.
- */
+/** Round every corner through Paper's true-arc kernel for editor/local radius operations. */
 export function roundShapePaper(shape: VShape, radiusPx: number): VShape {
   return { paths: shape.paths.map((p) => roundCornersPaper(p, radiusPx, () => true)) }
 }

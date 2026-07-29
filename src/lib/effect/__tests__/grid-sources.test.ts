@@ -6,11 +6,10 @@ import { shapePickDescriptor } from '@/app/(dev)/effect-creator/v5.3.1/user/edit
 import type { EditorCtx } from '@/app/(dev)/effect-creator/v5.3.1/user/editor/descriptors/types'
 import { generateShapeRing, type ShapeKind } from '@/app/(dev)/effect-creator/v5.3.1/user/shapes'
 import { contourFromShape, MANUFACTURING_TOLERANCE_MM } from '../geometry-truth'
+import { DEFAULT_ROUNDED_SQUARE_CALIBRATION } from '../effect-calibration'
 import { distanceToPreparedContour, prepareExactContour } from '../grid-prepared'
 import { GLOBAL_OFF, resolve, type OutlineAdjustments, type OutlineSource } from '../outline-resolve'
 import {
-  DEFAULT_LAW,
-  DEFAULT_PITCH_MM,
   resolveGridPlan,
   scaleContour,
   stdShapeContour,
@@ -54,10 +53,13 @@ function exercise(name: string, contour: Contour) {
   }
 }
 
-function pickedShape(kind: string): { shape: VShape; adjustments?: OutlineAdjustments } {
+function pickedShape(
+  kind: string,
+  mmPerPx = 1,
+): { shape: VShape; adjustments?: OutlineAdjustments } {
   const installations: Array<{ source: OutlineSource; adjustments?: OutlineAdjustments }> = []
   const ctx = {
-    getSpec: () => null,
+    getSpec: () => ({ maskWidthPx: 1000, maskHeightPx: 1000, mmPerPx }),
     getSource: () => null,
     installSource: (source: OutlineSource, adjustments: OutlineAdjustments | undefined) => {
       installations.push({ source, adjustments })
@@ -82,10 +84,11 @@ describe('actual Creator source families share one engine contract', () => {
       getShape('squircle', 1000, 1000),
       { mmPerPx: 1, maskHeightPx: 1000 },
     )
-    const picked = pickedShape('squircle')
+    const mmPerPx = DEFAULT_ROUNDED_SQUARE_CALIBRATION.sideMM / 720
+    const picked = pickedShape('squircle', mmPerPx)
     const picker = contourFromShape(
       picked.shape,
-      { mmPerPx: 1, maskHeightPx: 1000 },
+      { mmPerPx, maskHeightPx: 1000 },
     )
     if (!library || !picker) throw new Error('rounded-square producer returned no contour')
     const library70 = scaleContour(normalized(library), 70)
@@ -96,9 +99,7 @@ describe('actual Creator source families share one engine contract', () => {
       ...library70.outer.pts.map((point) => distanceToPreparedContour(point, preparedPicker)),
       ...picker70.outer.pts.map((point) => distanceToPreparedContour(point, preparedLibrary)),
     )
-    const sizingInsetMM = DEFAULT_LAW.paddingMM + DEFAULT_LAW.frameMM
-    const canonicalSideMM = DEFAULT_PITCH_MM + 2 * sizingInsetMM
-    const expectedPickerRadiusPx = 720 * (sizingInsetMM / canonicalSideMM)
+    const expectedPickerRadiusPx = DEFAULT_ROUNDED_SQUARE_CALIBRATION.radiusMM / mmPerPx
 
     expect(picked.adjustments?.global.radius).toBeCloseTo(expectedPickerRadiusPx, 9)
     expect(maxProducerDeltaMM).toBeLessThanOrEqual(MANUFACTURING_TOLERANCE_MM)

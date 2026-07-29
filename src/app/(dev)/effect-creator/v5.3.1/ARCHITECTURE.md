@@ -152,7 +152,7 @@ its matte feeds the editor's Blend preview on any shape.
 
 | File | Role | Key contract |
 |---|---|---|
-| `prepare-effect.ts` (292) | The ONE 2D engine. `standardBirthShape` (full rect + 8mm corners via Paper). `prepareEffect(url, type, cfg, onProgress, preseg)`. | `EFFECT_BUILD_CONFIG`: 70mm base, 1mm body, edgeRadius 0.2mm, padding 1.5mm, texDim 2400. Shaped = raw marching-squares + RDP at `minFeatureMM` (5mm floor), NO fairing/fit. `frontSrc` = re-bake source. |
+| `prepare-effect.ts` (292) | The ONE 2D engine. `standardBirthShape` (full rect + calibrated radius input). `prepareEffect(url, type, cfg, onProgress, preseg)`. | `EFFECT_BUILD_CONFIG`: 70mm base, 1mm body, edgeRadius 0.2mm, padding 1.5mm, texDim 2400. Shaped = raw marching-squares + RDP at `minFeatureMM` (5mm floor), NO fairing/fit. `frontSrc` = re-bake source. |
 | `composite.ts` (172) | The image bake (P2 cross-browser SVG engine). `composeFront(orig, subj, blurPx, fxFilter?, vignette, tint)` async. `svgFilterBake` via `URL.createObjectURL(Blob)` (Safari-safe; data-URL renders empty on WebKit). `cssColorFilterToSvg`. `PRESET_FILTER`/`presetFilter`/`PRESET_LABELS`. | One bake feeds 3D + print. Zero `ctx.filter`. |
 | `outline-resolve.ts` (263) | The shape engine. `resolve(source, adjustments)→VShape`: all-off=exact source; globalPass (straighten→simplify→smooth→radius) + localPass (curve+per-corner radius), fold-guarded. | Kernels: Paper (smooth/simplify/per-corner radius) + Clipper2 (straighten/whole radius) + in-house curve. |
 | `geometry-truth.ts` (106) | The single geometry pipeline. `contourFromShape(v)` @ `MANUFACTURING_TOLERANCE_MM` (0.05). `assertContourCuttable`. `vectorShapeHash`. | Tolerances: mfg 0.05, display 0.004, min-feature 5mm, anchor-sep 1.5mm. |

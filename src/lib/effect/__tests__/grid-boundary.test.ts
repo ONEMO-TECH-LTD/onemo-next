@@ -75,6 +75,7 @@ describe('Creator magnetic-grid module boundary', () => {
       '<Slider label="Magnet padding · per spot · min 10"',
       '<Slider label="Base margin · outward offset"',
       '<Slider label="Max auto-margin · balance"',
+      'label="Rounded-square corner radius"',
       '<div className="gl-field"><span>Grid pattern ·',
       '<div className="gl-field"><span>Grid centering · A/B</span>',
       '<div className="gl-field"><span>Magnet plan</span>',
@@ -178,6 +179,10 @@ describe('Creator magnetic-grid module boundary', () => {
       setCenterMode: noop,
       maxGrowMM: 12,
       setMaxGrowMM: noop,
+      roundedSquareRadiusMM: 10,
+      setRoundedSquareRadiusMM: noop,
+      roundedSquareRadiusMaxMM: 35,
+      showRoundedSquareRadius: false,
       testSizeMM: 143,
       setTestSizeMM: noop,
       testSizeMin: 22,
@@ -219,6 +224,9 @@ describe('Creator magnetic-grid module boundary', () => {
     const pageSource = readFileSync(PAGE_PATH, 'utf8')
     expect(pageSource).toContain("maxGrowMM: src === 'gen' || src === 'magic' ? maxGrowMM : 0")
     expect(pageSource).toContain("{ kind: 'uniform-contour', unitContour: presetUnitContour }")
+    expect(pageSource).toContain("kind: 'rounded-square'")
+    expect(pageSource).toContain('radiusMM: roundedSquareRadiusMM')
+    expect(pageSource).toContain('minimumAnchors: DEFAULT_ROUNDED_SQUARE_CALIBRATION.minimumAnchors')
 
     const continuousAdmin = renderAdmin({})
     expect(continuousAdmin).toContain('data-grid-size-snap="off"')
@@ -231,6 +239,11 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(snappedAdmin).toContain('min="0"')
     expect(snappedAdmin).toContain('max="2"')
     expect(snappedAdmin).toContain('value="1"')
+
+    const roundedAdmin = renderAdmin({ showRoundedSquareRadius: true })
+    expect(roundedAdmin).toContain('Rounded-square corner radius')
+    expect(roundedAdmin).toContain('max="35"')
+    expect(roundedAdmin).toContain('value="10"')
   })
 
   it('keeps the serializable handler, worker, and client behind one neutral entry', () => {

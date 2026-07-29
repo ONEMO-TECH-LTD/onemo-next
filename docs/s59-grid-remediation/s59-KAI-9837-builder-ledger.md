@@ -1,118 +1,119 @@
 # KAI-9837 builder ledger
 
-## Authority and bounded outcome
+## Authority and outcome
 
-- Current authority: merged `grid-laws.md` at SSOT commit `3af459e`, especially
-  laws 2.1, 2.2, 2.8, 3.1, 3.3, 3.5, 5.9, and 9.2.
-- Dan's explicit product requirement: the 70mm sharp and rounded squares both
-  carry four corner magnets by default.
-- The 70mm size remains unchanged. The earlier 72mm compensation is rejected.
-- Catalogue sizing remains `padding + frame = 11mm`; the delivered hard floor
-  remains `padding = 10mm`. They answer different questions and are not merged.
-- The rounded-square corner is derived from the complete 11mm sizing inset.
-- Exact tangency is inclusive. Polygonal contour approximation is bounded by an
-  engine-owned epsilon derived from the source manufacturing tolerance.
-- No pattern, pitch, ladder algorithm, cache protocol, or unrelated shape
-  algorithm changed; only the rounded-square catalogue output moves.
+- Laws: 2.2 hard 10mm delivery floor; 3.5 canonical sizing inset
+  `padding + frame = 11mm`; 3.21 rounded 70mm default carries four corner
+  magnets; 3.22 radius is user-controlled and may grow the canonical size;
+  8.7 output-affecting values are derived or supplied as released calibration.
+- Current Dan ruling supersedes both the abandoned 72mm compensation and the
+  abandoned fixed-radius interpretation. Radius is a serialized input. The
+  released starting values are 70mm side, 10mm radius, and four minimum
+  anchors; they live in one calibration input, not in grid geometry.
+- Growth is driven by the 11mm canonical sizing inset, not the four-anchor
+  minimum. At radius 12, a 70mm shape already delivers four anchors at
+  10.586mm from the contour, but it is not a zero-point rung because
+  `10.586 < 11`; the first canonical construction is 71mm.
+- The 10mm value remains the inclusive delivery floor and never substitutes
+  for the 11mm catalogue target.
 
-## Full reads
+## Full reads and bounded implementation
 
-Before writing, every affected source, its immediate consumers, the current law
-book, the relevant tests, and `ERRORS.md` were read in full. After writing, all
-ten changed source/test files and `ERRORS.md` were read back in full, followed by
-the complete diff and `git diff --check`.
+Before writing, I read the current law/brief sources, `ERRORS.md`, every affected
+source file, its immediate callers, and the relevant tests in full. The
+post-change audit covered the complete diff against `e371e25`, every newly
+introduced export and caller, and `git diff --check`.
 
-## RED first
+Minimal implementation:
 
-At base `e371e25fdea109d2b29eac3798cc08b64185362e`:
-
-- exact 10mm rounded-corner tangency seated 2 anchors instead of 4;
-- exact 11mm catalogue tangency seated 1 anchor instead of 4;
-- the real rounded-square preset published `S 71mm / 2 anchors`, not
-  `S 70mm / 4 anchors`;
-- the Creator picker used `half * 0.42`, which produced a 151.2px radius in the
-  720px source box instead of the law-derived 113.142857px;
-- the shape library used a separately baked superellipse, so the two rounded-
-  square producers had no shared construction.
-
-## Minimal implementation
-
-1. Added one `roundedSquareDefaultRadius(side)` derivation in the shape library.
-   It converts the 11mm canonical inset into the producer's coordinate system;
-   no styling fraction remains.
-2. Both rounded-square producers consume that derivation:
-   the live shape-library preset uses circular arcs, while the Creator picker
-   applies the same radius to its reversible square-plus-radius source.
-3. Removed the retired baked superellipse source and its offline bake recipe.
-4. Bounded prepared-contour chord sagitta with
-   `MANUFACTURING_TOLERANCE_MM / 10`. The value is derived, engine-owned, and
-   included in `GRID_ENGINE_POLICY_SIGNATURE`; it is not a product padding
+1. One `roundedSquareShape(width, height, radius)` construction owns physical
+   rounded-square geometry. Its millimetre materializer is used by serialized
+   ladder and plan recipes; the shape-library preview and standard birth use
+   the same construction. The Creator picker keeps its existing reversible
+   Radius adjustment but consumes the same released radius input, with
+   producer parity enforced at manufacturing tolerance.
+2. `LadderRecipe` and `PlanRecipe` carry radius explicitly. The rounded ladder
+   also carries the released minimum-anchor input, so both output constraints
+   participate in cache identity. `semanticLadderFromRecipe` executes the
+   complete serialized semantics; direct legacy ladders retain their existing
+   ONE/two-anchor behavior.
+3. The admin bench exposes radius `0..35` only for the rounded-square preset.
+   The upper bound is derived from half of the 70mm released side: fully round.
+   It feeds the same recipe as tests and worker transport. The existing v5.3.1
+   Radius adjustment remains the product user control.
+4. The old proportional `half * 0.42`, baked squircle data, and standard-birth
+   `8mm` source are removed. The released default is the only source value;
+   arbitrary radius inputs still flow through every producer.
+5. Exact tangency uses `MANUFACTURING_TOLERANCE_MM / 10`, a derived chord-error
+   epsilon included in the engine policy signature. It is not a product
    tolerance.
-5. Added RED-first regressions for 10mm and 11mm tangency, the real 70mm preset,
-   the sharp-square canon, cross-producer geometry, and cache-policy identity.
 
-## Mutation evidence
+## RED-first and mutation evidence
 
-- Reduced the derived engine epsilon to `1e-6`: the real rounded-square preset
-  regressed from four anchors to two. Restored: green.
-- Replaced the radius derivation with the old `0.21 * side`: the producer and
-  70mm rung regressions failed. Restored: green.
-- Restored only the Creator picker's old `half * 0.42`: the actual descriptor-
-  driven producer parity test failed. Restored: green.
+Base: `e371e25fdea109d2b29eac3798cc08b64185362e`.
 
-Each mutation changed the intended source line before its failure was trusted.
+- Exact 10mm delivery tangency seated 2 anchors; exact 11mm sizing tangency
+  seated 1. With the derived epsilon both seat 4.
+- The rounded 70mm default resolved to 2 anchors instead of Dan's required 4.
+- The picker used `half * 0.42`; standard birth used 8mm; the library used a
+  separately baked superellipse.
 
-## Before / after catalogue
+Mutations were applied to real production lines and confirmed in the diff
+before trusting the failures:
 
-Conditions: Auto mode, light density, zero growth, current 10mm delivery floor.
-The detached before tree was the immutable base commit above.
+- `GRID_ARITHMETIC_EPSILON_MM → 0`: the 10mm tangency test fell 4→2 and the
+  11mm sizing tangency fell 4→1. Restored: green.
+- Catalogue inset `padding + frame → padding`: radius 10/12/14 shifted
+  70/71/72 → 69/70/71; the dedicated 11-vs-10 witness failed. Restored: green.
+- Removed `minimumAnchors` from the ladder cache body: the min-2/min-4 cache
+  identity assertion failed. Restored: green.
+- Forced recipe execution to ignore the released four-anchor minimum: its
+  regression failed because ONE/sub-four constructions returned. Restored:
+  green.
 
-- Sharp square: byte-identical ladder
+## Before / after
+
+All measurements are Standard/48, light density, zero adaptive growth.
+
+| Radius input | First released rung | Seated | Canonical minimum |
+|---:|---:|---:|---:|
+| 10mm | 70mm | 4 | 11mm |
+| 12mm | 71mm | 4 | 11mm |
+| 14mm | 72mm | 4 | 11mm |
+
+- Sharp-square canon stays byte-identical:
   `22 · 70 · 118 · 166 · 214 · 262 · 310`.
-- Circle, triangle, and rotated-diamond: byte-identical rung/output tables.
-- Rounded square before:
-  `ONE 23/1 · S 71/2 · M 119/6 · L 167/8 · XL 215/12 · 2XL 269/16`.
-- Rounded square after:
-  `ONE 22/1 · S 70/4 · M 118/6 · L 166/8 · XL 214/12 · 2XL 262/16 · 3XL 310/24`.
-- Every after-state rounded-square multi-anchor rung resolves `ok:true` with
-  zero uncovered intervals.
-- At `S 70`, the ladder and delivered plan both seat four Standard/48 corner
-  magnets. The flattened contour reports 10.996673mm at the sizing centre; the
-  source curve is exact 11mm tangency and the 0.005mm representation bound
-  covers the 0.003327mm chord sagitta.
-
-The only catalogue movement is the intended rounded-square correction. `ONE`
-remains the classified single-anchor boundary and is not presented as a
-multi-anchor hold construction.
+- Circle keeps its lawful 5.8 witness: `S 71mm / 2 anchors`, vertical span
+  48mm. A first generic 2→4 implementation deleted this tier; the full suite
+  caught it and that implementation was removed.
+- The device-performance canonical ladder hash stays unchanged.
+- Standard-birth calibration 8→10 intentionally changes
+  `EFFECT_BUILD_CONFIG.config_hash`; the payload schema is unchanged and its
+  golden moves `10c7ecbb4623739c → 50be46dc3e00b0f1`.
 
 ## Executed gates
 
-- Targeted `grid.test.ts` + `grid-sources.test.ts`: 33 passed, 1 todo.
+- Focused rounded/worker/cache/boundary/payload/performance suites: green.
+- Full Vitest before the final recipe-coupling refactor:
+  47 files passed, 1 skipped; 447 passed, 10 skipped, 1 todo.
 - TypeScript: exit 0.
-- Full Vitest: 46 passed files, 1 skipped file; 437 passed, 10 skipped, 1 todo.
 - ESLint: exit 0, 0 errors; 214 pre-existing warnings.
 - `git diff --check`: clean.
-- Stale-source sweep: zero `half * 0.42` and zero `SQUIRCLE_ANCHORS`.
+- Final full-suite rerun, live visual, and screenshot: pending after the
+  replacement source commit.
 
 ## Live visual
 
-- Surface: `http://localhost:3970/effect-creator/grid-lab`.
-- Serving process cwd was verified as this `grid-lab` worktree.
-- Playwright Chromium observed the live preset path:
-  `squircle · S · 70mm · tier 4pt · seated 4 · Standard/48`.
-- The centre view visibly shows four corner magnets and the 11mm circles aligned
-  with the rounded corner curve; no page error was observed.
-- Capture:
-  `.playwright-cli/page-2026-07-29T17-09-28-488Z.png`.
-- The old physical-product photo under `~/Downloads` was not readable from this
-  process because macOS denied that directory. I therefore do not claim a
-  direct photo-to-render comparison. The rendered geometry was checked against
-  the source law and Dan's stated physical construction; Designer QA should
-  perform the photo comparison on its permitted visual surface.
+Pending on the committed replacement head:
 
-## Outcome
+- `http://localhost:3970/effect-creator/grid-lab`
+- radius 10 → 70mm / 4 seated
+- radius 12 → 71mm / 4 seated
+- radius 14 → 72mm / 4 seated
+- no verdict banner; serving cwd and commit recorded with the capture.
 
-The 70mm rounded-square default is fixed forward to four lawful corner seats
-without moving the product size or restoring the deleted corner tolerance.
-Unrelated shapes, the sharp-square canon, and the 10/11 layer distinction remain
-untouched.
+## Scope kept
+
+No pattern law, pitch law, scheduler invariant, worker key check, sharp-square
+canon, Circle gravity behavior, or unrelated source family changed. The
+remaining grid-first solver work is not claimed complete by this task.

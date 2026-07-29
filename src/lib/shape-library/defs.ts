@@ -7,7 +7,8 @@
 // Blueprint: v3/blueprint/modules/shape-library.md.
 
 import type { VAnchor, VShape } from '@/lib/vector-core'
-import { DEFAULT_LAW, DEFAULT_PITCH_MM } from '@/lib/effect/grid-core'
+import { DEFAULT_ROUNDED_SQUARE_CALIBRATION } from '@/lib/effect/effect-calibration'
+import { roundedSquareShape } from '@/lib/effect/rounded-square'
 import {
   PINCHED_ANCHORS, SPARKLE_ANCHORS, TEARDROP_ANCHORS,
   ASTERISK_ANCHORS, BOWTIE_ANCHORS,
@@ -30,14 +31,6 @@ function circleDef(): VShape {
 /** Exact square: 4 corner anchors, no handles — straight lines by construction. */
 function squareDef(): VShape {
   return cornersDef([[-1, -1], [1, -1], [1, 1], [-1, 1]])
-}
-
-/** The rounded-square default is the sharp 48mm zero-point with its corner arc derived from the
- * complete sizing inset. At the canonical 70mm side this yields an 11mm radius, never a styling ratio. */
-export function roundedSquareDefaultRadius(side: number): number {
-  const sizingInsetMM = DEFAULT_LAW.paddingMM + DEFAULT_LAW.frameMM
-  const canonicalSideMM = DEFAULT_PITCH_MM + 2 * sizingInsetMM
-  return side * (sizingInsetMM / canonicalSideMM)
 }
 
 /**
@@ -88,15 +81,8 @@ function starDef(points: number, spikiness01: number): VShape {
 }
 
 /** One circular arc as cubics (≤90° per cubic — kappa-exact), CCW in y-down screen space. */
-function arcAnchors(
-  cx: number,
-  cy: number,
-  r: number,
-  a0: number,
-  a1: number,
-  maxArcRadians = Math.PI / 2,
-): VAnchor[] {
-  const steps = Math.max(1, Math.ceil(Math.abs(a1 - a0) / maxArcRadians))
+function arcAnchors(cx: number, cy: number, r: number, a0: number, a1: number): VAnchor[] {
+  const steps = Math.max(1, Math.ceil(Math.abs(a1 - a0) / (Math.PI / 2)))
   const out: VAnchor[] = []
   for (let s = 0; s <= steps; s++) {
     const a = a0 + ((a1 - a0) * s) / steps
@@ -115,16 +101,10 @@ function arcAnchors(
   return out
 }
 
-/** Circular-arc rounded square using the same derived radius consumed by the Creator picker. */
+/** Canonical library preview; physical grid recipes carry radius in millimetres instead of scaling it. */
 function squircleDef(): VShape {
-  const r = roundedSquareDefaultRadius(2)
-  const anchors = [
-    ...arcAnchors(1 - r, -1 + r, r, -Math.PI / 2, 0, Math.PI / 8),
-    ...arcAnchors(1 - r, 1 - r, r, 0, Math.PI / 2, Math.PI / 8),
-    ...arcAnchors(-1 + r, 1 - r, r, Math.PI / 2, Math.PI, Math.PI / 8),
-    ...arcAnchors(-1 + r, -1 + r, r, Math.PI, (3 * Math.PI) / 2, Math.PI / 8),
-  ]
-  return { paths: [{ anchors }] }
+  const { sideMM, radiusMM } = DEFAULT_ROUNDED_SQUARE_CALIBRATION
+  return roundedSquareShape(2, 2, (2 * radiusMM) / sideMM, -1, -1)
 }
 
 /** leaf: rounded square with ONE sharp corner (3 exact quarter arcs + 1 corner). */

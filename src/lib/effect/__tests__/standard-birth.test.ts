@@ -6,6 +6,7 @@
 import { describe, it, expect } from 'vitest'
 import { standardBirthShape, EFFECT_BUILD_CONFIG } from '../prepare-effect'
 import { contourFromShape } from '../geometry-truth'
+import { DEFAULT_ROUNDED_SQUARE_CALIBRATION } from '../effect-calibration'
 import { shapeBBox } from '@/lib/vector-core'
 import { getShape } from '@/lib/shape-library'
 
@@ -32,8 +33,10 @@ describe('standard birth (KAI-8975/P2)', () => {
     expect(maxY - minY).toBeCloseTo(52.5, 1)
   })
 
-  it('the 8mm corner radius is applied AFTER full-image birth (true arcs, 8mm absolute)', () => {
-    expect(birth.radiusPx).toBe(Math.round(EFFECT_BUILD_CONFIG.squareCornerMM / birth.mmPerPx))
+  it('the calibrated corner radius is applied AFTER full-image birth as an absolute input', () => {
+    expect(EFFECT_BUILD_CONFIG.squareCornerMM)
+      .toBe(DEFAULT_ROUNDED_SQUARE_CALIBRATION.radiusMM)
+    expect(birth.radiusPx).toBeCloseTo(EFFECT_BUILD_CONFIG.squareCornerMM / birth.mmPerPx, 9)
     const anchors = birth.vectorShape.paths[0].anchors
     expect(anchors.length).toBeGreaterThan(4) // filleted — arcs replaced the sharp rect corners
     for (const a of anchors) {
@@ -42,6 +45,14 @@ describe('standard birth (KAI-8975/P2)', () => {
         expect(Math.hypot(a.p.x - cx, a.p.y - cy)).toBeGreaterThan(birth.radiusPx * 0.25)
       }
     }
+  })
+
+  it('accepts a released radius calibration without changing the birth mechanism', () => {
+    const calibrated = standardBirthShape(W, H, {
+      ...EFFECT_BUILD_CONFIG,
+      squareCornerMM: 14,
+    })
+    expect(calibrated.radiusPx).toBeCloseTo(14 / calibrated.mmPerPx, 9)
   })
 
   it('the radius clamps to the inscribable max on tiny images (never inverts the shape)', () => {

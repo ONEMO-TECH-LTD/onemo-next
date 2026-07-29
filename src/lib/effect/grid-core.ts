@@ -16,6 +16,7 @@
 
 import type { Contour, Pt } from './types'
 import { MANUFACTURING_TOLERANCE_MM } from './geometry-truth'
+import { roundedSquareContourMM } from './rounded-square'
 import { insetRingMM } from './offset'
 import {
   PreparedContourSource,
@@ -800,6 +801,7 @@ function semanticSteps(
   makeShape: (sizeMM: number) => Contour,
   law: SizeLaw,
   combos: ReadonlyArray<{ pitchMM: number; pattern: GridPattern }>,
+  minimumAnchors: number,
 ): SemanticStep[] {
   const padEff = law.paddingMM + law.frameMM
   // A published size is an exact grid extent: at that size, with zero added margin and strict padding,
@@ -830,7 +832,7 @@ function semanticSteps(
       })
       // Law 3.19: an uncovered construction is calibration evidence, never a published rung.
       // Continue the scan until this lattice extent has a fully covered construction.
-      if (grid.flaps.length > 0) continue
+      if (grid.flaps.length > 0 || grid.anchors.length < minimumAnchors) continue
       const gridExtentMM = anchorGridExtentMM(grid.anchors, padEff)
       const gravitySpanMM = twoAnchorGravitySpanMM(grid.anchors)
       if (
@@ -918,7 +920,10 @@ export function semanticLadder(
   makeShape: (sizeMM: number) => Contour, law: SizeLaw = DEFAULT_LAW, mode: GridMode = 'auto',
   options: Pick<GridPlanOptions, 'pitchMM'> = {},
 ): SemanticRung[] {
-  return labelSemanticSteps(semanticSteps(makeShape, law, modeCombos(mode, options.pitchMM)), law)
+  return labelSemanticSteps(
+    semanticSteps(makeShape, law, modeCombos(mode, options.pitchMM), 1),
+    law,
+  )
 }
 
 export interface BalancedGridFit {
@@ -1213,11 +1218,13 @@ export type StandardLadderShape = Exclude<StdShape, 'rect'>
 /** Serializable size-family identity. No function/closure crosses the worker boundary. */
 export type LadderRecipe =
   | { kind: 'standard'; shape: StandardLadderShape }
+  | { kind: 'rounded-square'; radiusMM: number; minimumAnchors: number }
   | { kind: 'uniform-contour'; unitContour: Contour }
 
 /** Serializable identity of one exact contour to resolve. */
 export type PlanRecipe =
   | { kind: 'standard'; shape: StdShape; widthMM: number; heightMM: number }
+  | { kind: 'rounded-square'; sizeMM: number; radiusMM: number }
   | { kind: 'uniform-contour'; unitContour: Contour; longestMM: number }
   | { kind: 'final-contour'; contourMM: Contour }
 
@@ -1240,8 +1247,31 @@ function exactContourCopy(contour: Contour, label: string): Contour {
 /** Reconstruct the exact size→Contour closure inside the engine/worker. */
 export function ladderShapeFromRecipe(recipe: LadderRecipe): (sizeMM: number) => Contour {
   if (recipe.kind === 'standard') return (sizeMM) => stdShapeContour(recipe.shape, sizeMM, sizeMM)
+  if (recipe.kind === 'rounded-square') {
+    if (!Number.isFinite(recipe.radiusMM) || recipe.radiusMM < 0) {
+      throw new RangeError('Rounded-square ladder radius must be a non-negative finite number.')
+    }
+    if (!Number.isInteger(recipe.minimumAnchors) || recipe.minimumAnchors < 1) {
+      throw new RangeError('Rounded-square ladder minimum anchors must be a positive integer.')
+    }
+    return (sizeMM) => roundedSquareContourMM(sizeMM, sizeMM, recipe.radiusMM)
+  }
   const unitContour = exactContourCopy(recipe.unitContour, 'Ladder recipe')
   return (sizeMM) => scaleContour(unitContour, sizeMM)
+}
+
+/** Execute the complete serialized ladder recipe so output constraints cannot drift outside its key. */
+export function semanticLadderFromRecipe(
+  recipe: LadderRecipe,
+  law: SizeLaw = DEFAULT_LAW,
+  mode: GridMode = 'auto',
+  options: Pick<GridPlanOptions, 'pitchMM'> = {},
+): SemanticRung[] {
+  const minimumAnchors = recipe.kind === 'rounded-square' ? recipe.minimumAnchors : 1
+  return labelSemanticSteps(
+    semanticSteps(ladderShapeFromRecipe(recipe), law, modeCombos(mode, options.pitchMM), minimumAnchors),
+    law,
+  )
 }
 
 /** Reconstruct one exact final contour inside the engine/worker. */
@@ -1251,6 +1281,9 @@ export function planContourFromRecipe(recipe: PlanRecipe): Contour {
       throw new RangeError('Standard plan recipe dimensions must be finite.')
     }
     return stdShapeContour(recipe.shape, recipe.widthMM, recipe.heightMM)
+  }
+  if (recipe.kind === 'rounded-square') {
+    return roundedSquareContourMM(recipe.sizeMM, recipe.sizeMM, recipe.radiusMM)
   }
   if (recipe.kind === 'uniform-contour') {
     if (!Number.isFinite(recipe.longestMM)) {
