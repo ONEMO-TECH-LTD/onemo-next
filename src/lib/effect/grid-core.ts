@@ -644,9 +644,12 @@ export const DEFAULT_LAW: SizeLaw = {
 
 /** LAW: random/AI-cut silhouettes are capped below the preset range until physically tested. */
 export const RANDOM_SHAPE_MAX_MM = 180
+/** Shape-source semantics. Standard geometries and curated presets use the predictable product
+ * catalogue; generators and AI outlines retain the adaptive pattern search required by freeform. */
+export type GridSource = 'std' | 'preset' | 'gen' | 'magic'
 /** LAW: the max design size per shape SOURCE — standard geometries and curated presets span the full
  *  system range (maxRungMM); only generated/AI-cut randoms carry the untested cap. */
-export function maxDesignMM(source: 'std' | 'preset' | 'gen' | 'magic', law: SizeLaw = DEFAULT_LAW): number {
+export function maxDesignMM(source: GridSource, law: SizeLaw = DEFAULT_LAW): number {
   return source === 'gen' || source === 'magic' ? RANDOM_SHAPE_MAX_MM : law.maxRungMM
 }
 /** LAW: the default adaptive-plan margin allowance — the outward band a freeform plan may add to seek
@@ -657,7 +660,7 @@ export function minEffectMM(law: SizeLaw = DEFAULT_LAW): number { return 2 * (la
 /** LAW: resolve a requested design size against the selected source's complete product bounds. */
 export function resolveDesignSizeMM(
   requestedMM: number,
-  source: 'std' | 'preset' | 'gen' | 'magic',
+  source: GridSource,
   law: SizeLaw = DEFAULT_LAW,
 ): number {
   return Math.max(minEffectMM(law), Math.min(requestedMM, maxDesignMM(source, law)))
@@ -695,15 +698,28 @@ export function stdShapeContour(shape: StdShape, wMM: number, hMM: number = wMM)
 
 
 /** GRID MODE — the four exposed modes (§ goal 2026-07-21):
- *  auto = everything legal + a deepest-material fallback for irregular shapes · standard = straight (48-atom)
- *  links only · quincunx (dice) = the standard+diamond mix (96 pitch) · diamond = diagonal (68-atom)
- *  links only. */
+ *  auto = source-aware: standard only for product geometries/presets, every legal pattern for
+ *  freeform generators/AI · standard = straight (48-atom) links only · quincunx (dice) = the
+ *  standard+diamond mix (96 pitch) · diamond = diagonal (68-atom) links only. */
 export type GridMode = 'auto' | GridPattern
-function modeCombos(mode: GridMode, pinnedPitchMM?: number): { pitchMM: number; pattern: GridPattern }[] {
+function automaticPatternsForSource(source: GridSource): ReadonlyArray<GridPattern> {
+  return source === 'gen' || source === 'magic'
+    ? ['standard', 'diamond', 'quincunx']
+    : ['standard']
+}
+function modeCombos(
+  mode: GridMode,
+  pinnedPitchMM?: number,
+  source: GridSource = 'std',
+): { pitchMM: number; pattern: GridPattern }[] {
   const std = [{ pitchMM: 48, pattern: 'standard' as GridPattern }, { pitchMM: 96, pattern: 'standard' as GridPattern }]
   const dia = [{ pitchMM: 48, pattern: 'diamond' as GridPattern }, { pitchMM: 96, pattern: 'diamond' as GridPattern }]
   const dice = [{ pitchMM: 96, pattern: 'quincunx' as GridPattern }]
-  const combos = mode === 'standard' ? std : mode === 'diamond' ? dia : mode === 'quincunx' ? dice : [...std, ...dia, ...dice]
+  const automatic = automaticPatternsForSource(source)
+  const combos = mode === 'standard' ? std
+    : mode === 'diamond' ? dia
+      : mode === 'quincunx' ? dice
+        : [...std, ...dia, ...dice].filter(({ pattern }) => automatic.includes(pattern))
   if (pinnedPitchMM == null) return combos
   if (!(LAUNCH_PITCHES_MM as readonly number[]).includes(pinnedPitchMM)) {
     throw new RangeError(`Unsupported magnetic-grid pitch ${pinnedPitchMM}mm; launch pitches are 48mm and 96mm.`)
@@ -929,10 +945,10 @@ function labelSemanticSteps(steps: ReadonlyArray<SemanticStep>, law: SizeLaw): S
 
 export function semanticLadder(
   makeShape: (sizeMM: number) => Contour, law: SizeLaw = DEFAULT_LAW, mode: GridMode = 'auto',
-  options: Pick<GridPlanOptions, 'pitchMM'> = {},
+  options: Pick<GridPlanOptions, 'pitchMM' | 'source'> = {},
 ): SemanticRung[] {
   return labelSemanticSteps(
-    semanticSteps(makeShape, law, modeCombos(mode, options.pitchMM), 1),
+    semanticSteps(makeShape, law, modeCombos(mode, options.pitchMM, options.source), 1),
     law,
   )
 }
@@ -1095,6 +1111,9 @@ function balancedPreparedFit(
 /** UI-agnostic inputs for resolving one final attachment grid from a real-mm contour. */
 export interface GridPlanOptions {
   attachment?: Attachment
+  /** Engine-owned automatic-pattern policy derives from shape source. Curated product sources use
+   * standard only; freeform generators/AI retain the complete adaptive search. */
+  source?: GridSource
   mode?: GridMode
   density?: GridDensity
   paddingMM?: number
@@ -1162,6 +1181,7 @@ export function resolveGridPlan(
   opts: GridPlanOptions = {},
 ): ResolvedGridPlan {
   const attachment = opts.attachment ?? 'magnetic'
+  const source = opts.source ?? 'std'
   const mode = opts.mode ?? 'auto'
   const density = opts.density ?? 'light'
   const requestedBaseMarginMM = opts.baseMarginMM ?? 0
@@ -1204,6 +1224,7 @@ export function resolveGridPlan(
     density,
     pitchMM: opts.pitchMM,
     pattern: manualPattern,
+    patterns: mode === 'auto' ? automaticPatternsForSource(source) : undefined,
   })
   const fit = selected.fit
   return {
@@ -1222,7 +1243,7 @@ export function resolveGridPlan(
 // ─── EXACT ASYNC/CACHE CONTRACT ─────────────────────────────────────────────
 
 /** Manual cache contract version. Bump whenever an output-affecting engine algorithm or policy changes. */
-export const GRID_ENGINE_CACHE_VERSION = 4
+export const GRID_ENGINE_CACHE_VERSION = 5
 
 export type StandardLadderShape = Exclude<StdShape, 'rect'>
 
@@ -1276,11 +1297,16 @@ export function semanticLadderFromRecipe(
   recipe: LadderRecipe,
   law: SizeLaw = DEFAULT_LAW,
   mode: GridMode = 'auto',
-  options: Pick<GridPlanOptions, 'pitchMM'> = {},
+  options: Pick<GridPlanOptions, 'pitchMM' | 'source'> = {},
 ): SemanticRung[] {
   const minimumAnchors = recipe.kind === 'rounded-square' ? recipe.minimumAnchors : 1
   return labelSemanticSteps(
-    semanticSteps(ladderShapeFromRecipe(recipe), law, modeCombos(mode, options.pitchMM), minimumAnchors),
+    semanticSteps(
+      ladderShapeFromRecipe(recipe),
+      law,
+      modeCombos(mode, options.pitchMM, options.source),
+      minimumAnchors,
+    ),
     law,
   )
 }
@@ -1337,7 +1363,10 @@ const GRID_ENGINE_POLICY_CONTRACT = {
   defaultMarginMM: DEFAULT_MARGIN_MM,
   randomShapeMaxMM: RANDOM_SHAPE_MAX_MM,
   modes: {
-    auto: modeCombos('auto'),
+    autoBySource: {
+      product: modeCombos('auto', undefined, 'std'),
+      freeform: modeCombos('auto', undefined, 'gen'),
+    },
     standard: modeCombos('standard'),
     quincunx: modeCombos('quincunx'),
     diamond: modeCombos('diamond'),
@@ -1369,13 +1398,16 @@ export function gridLadderCacheKey(
   recipe: LadderRecipe,
   law: SizeLaw = DEFAULT_LAW,
   mode: GridMode = 'auto',
-  options: Pick<GridPlanOptions, 'pitchMM'> = {},
+  options: Pick<GridPlanOptions, 'pitchMM' | 'source'> = {},
 ): string {
   ladderShapeFromRecipe(recipe)
   return gridCacheKey('ladder', {
     law: normalizedLaw(law),
     mode,
-    options: { pitchMM: options.pitchMM ?? null },
+    options: {
+      pitchMM: options.pitchMM ?? null,
+      source: options.source ?? 'std',
+    },
     recipe,
   })
 }
@@ -1383,6 +1415,7 @@ export function gridLadderCacheKey(
 function effectiveGridPlanOptions(opts: GridPlanOptions = {}) {
   return {
     attachment: opts.attachment ?? 'magnetic',
+    source: opts.source ?? 'std',
     mode: opts.mode ?? 'auto',
     density: opts.density ?? 'light',
     paddingMM: Math.max(PADDING_FLOOR_MM, opts.paddingMM ?? PADDING_FLOOR_MM),
