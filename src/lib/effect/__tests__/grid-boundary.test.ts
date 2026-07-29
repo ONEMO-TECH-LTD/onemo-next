@@ -16,6 +16,7 @@ const ENTRY_PATH = 'src/lib/effect/grid.ts'
 const WORKER_PATH = 'src/lib/effect/grid.worker.ts'
 const CLIENT_PATH = 'src/lib/effect/grid-client.ts'
 const WORKER_HOOK_PATH = 'src/app/(dev)/effect-creator/grid-lab/useGridWorkerJob.ts'
+const SHAPED_MODEL_PATH = 'src/app/(dev)/effect-creator/v5.3.1/core/shaped/ShapedModel.tsx'
 
 describe('Creator magnetic-grid module boundary', () => {
   it('removes the A4 Create route and sends the root to the original Grid Lab', () => {
@@ -278,6 +279,15 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(panelSource).not.toContain('Math.max(sizeMin')
     expect(rendererSource).not.toMatch(/Math\.hypot\(/)
     expect(combined).not.toMatch(/grid-(?:user|admin|core)/)
+  })
+
+  it('derives render tessellation from the physical display tolerance, never a pixel floor', () => {
+    const shapedModelSource = readFileSync(SHAPED_MODEL_PATH, 'utf8')
+
+    expect(shapedModelSource).toContain('DISPLAY_TOLERANCE_MM / k')
+    expect(shapedModelSource).not.toContain(
+      'Math.max(0.01, DISPLAY_TOLERANCE_MM / k)',
+    )
   })
 
   it('publishes only matching async worker results with an honest resolving surface', () => {

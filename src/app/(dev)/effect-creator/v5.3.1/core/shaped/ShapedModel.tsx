@@ -85,7 +85,7 @@ function vectorTrueContour(fallback: Contour, vs: VShape | null | undefined, sp:
   if (!vs) return fallback
   const k = sp.mmPerPx || 1
   try {
-    const ring = flattenShape(vs, Math.max(0.01, DISPLAY_TOLERANCE_MM / k))[0]
+    const ring = flattenShape(vs, DISPLAY_TOLERANCE_MM / k)[0]
     if (!ring || ring.length < 3) return fallback
     const H = sp.maskHeightPx
     return { outer: { pts: ring.map((pt) => [pt.x * k, (H - pt.y) * k] as Pt).reverse() }, holes: [] }

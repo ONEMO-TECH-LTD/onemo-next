@@ -3,8 +3,10 @@
 
 import { describe, test, expect } from 'vitest'
 import { buildShapedGeometry } from '../mesh'
-import { flattenPath } from '@/lib/vector-core'
+import { cubicPoint, flattenPath, segments } from '@/lib/vector-core'
 import { getShape, unitShape } from '@/lib/shape-library'
+import { DISPLAY_TOLERANCE_MM } from '../geometry-truth'
+import { distanceToPreparedContour, prepareExactContour } from '../grid-prepared'
 import type { Contour, Pt } from '../types'
 
 const OPTS = { thicknessMM: 1, edgeRadiusMM: 0.15, edgeSegments: 14, mmPerPx: 0.1, imgW: 600, imgH: 600 }
@@ -67,14 +69,35 @@ describe('mesh — vector-true tessellation cost (KAI-8951 report)', () => {
   test('display-grade flatten cost on the heart: points and vertex estimate, reported', () => {
     const heart = getShape('heart', 800, 600) // editor-px space, k = 0.0875 → mm
     const k = 0.0875
-    const manufacturing = flattenPath(heart.paths[0], Math.max(0.05, 0.05 / k)).length
-    const display = flattenPath(heart.paths[0], Math.max(0.01, 0.004 / k)).length
+    const manufacturing = flattenPath(heart.paths[0], 0.05 / k).length
+    const displayRing = flattenPath(heart.paths[0], DISPLAY_TOLERANCE_MM / k)
+    const display = displayRing.length
     const profileSamples = 2 * (OPTS.edgeSegments + 1) + 2
     const vertsDisplay = display * (profileSamples - 1) * 6 + display * 6 // edge quads + ~caps
-    console.log(`[KAI-8951 cost] heart contour: ${manufacturing} pts @0.05mm → ${display} pts @0.004mm; est. mesh verts ≈ ${vertsDisplay}`)
+    const prepared = prepareExactContour({
+      outer: { pts: displayRing.map((point) => [point.x * k, point.y * k] as Pt) },
+      holes: [],
+    })
+    let maxDisplayErrorMM = 0
+    for (const segment of segments(heart.paths[0])) {
+      for (let i = 0; i < 4096; i++) {
+        const t = i / 4096
+        const point = segment.c1 && segment.c2
+          ? cubicPoint(segment.a, segment.c1, segment.c2, segment.b, t)
+          : {
+              x: segment.a.x + (segment.b.x - segment.a.x) * t,
+              y: segment.a.y + (segment.b.y - segment.a.y) * t,
+            }
+        maxDisplayErrorMM = Math.max(
+          maxDisplayErrorMM,
+          distanceToPreparedContour([point.x * k, point.y * k], prepared),
+        )
+      }
+    }
+    console.log(`[KAI-8951 cost] heart contour: ${manufacturing} pts @0.05mm → ${display} pts @${DISPLAY_TOLERANCE_MM}mm; max display error ${maxDisplayErrorMM}mm; est. mesh verts ≈ ${vertsDisplay}`)
     expect(display).toBeGreaterThan(manufacturing) // finer, as designed
     expect(vertsDisplay).toBeLessThan(600_000) // sanity ceiling for mobile (one static mesh)
-    // smoothness: the display flatten's chord sagitta is ≤0.004mm by construction (adaptive flatten proof in kernel)
+    expect(maxDisplayErrorMM).toBeLessThanOrEqual(DISPLAY_TOLERANCE_MM)
     expect(unitShape('heart').paths[0].anchors).toHaveLength(6) // source stays the true vector
   })
 })

@@ -6,11 +6,13 @@
 // never depends on float bézier booleans (DEC-v5-02): Clipper64 works in scaled integers.
 
 import { Clipper, JoinType, EndType } from '@countertype/clipper2-ts'
+import { MANUFACTURING_TOLERANCE_MM } from './geometry-truth'
 import type { Pt } from './types'
 
 // mm → integer microns. Clipper64 is integer-robust; 1000 = micron precision, far below the 0.05 mm
 // manufacturing tolerance.
 const SCALE = 1000
+export const MANUFACTURING_OFFSET_ARC_TOLERANCE_MM = MANUFACTURING_TOLERANCE_MM / 2
 
 /** Offset corner join — the editor Offset tool's user choice (KAI-9128). */
 export type OffsetJoin = 'round' | 'sharp' | 'bevel'
@@ -27,7 +29,15 @@ export function insetRingMM(ringMM: ReadonlyArray<Pt>, deltaMM: number, joinStyl
   const flat: number[] = []
   for (const [x, y] of ringMM) flat.push(Math.round(x * SCALE), Math.round(y * SCALE))
   const join = joinStyle === 'sharp' ? JoinType.Miter : joinStyle === 'bevel' ? JoinType.Bevel : JoinType.Round
-  const sol = Clipper.inflatePaths([Clipper.makePath(flat)], deltaMM * SCALE, join, EndType.Polygon)
+  const sol = Clipper.inflatePaths(
+    [Clipper.makePath(flat)],
+    deltaMM * SCALE,
+    join,
+    EndType.Polygon,
+    2,
+    // Reserve half the physical budget for Clipper's integer-micron projection.
+    MANUFACTURING_OFFSET_ARC_TOLERANCE_MM * SCALE,
+  )
   if (!sol || sol.length === 0) return null
   // keep the largest ring (guards against an offset that splits a concave shape into slivers)
   let best = sol[0]
