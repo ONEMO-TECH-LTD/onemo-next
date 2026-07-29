@@ -243,6 +243,21 @@ describe('component release pull transaction', () => {
     })).status).toBe('pass');
   });
 
+  it('refuses an incompatible token closure before writes but ignores unrelated token additions', async () => {
+    const { root, app, tokens } = await fixture();
+    const releaseDir = await release(root, tokens);
+    const tokensPath = path.join(app, 'src', 'app', 'tokens', 'tokens.css');
+    await fs.writeFile(tokensPath, `${tokens}\n:root { --unrelated-token: 1px; }\n`);
+    await expect(pullComponentRelease({ releaseDir, appRoot: app })).resolves.toBeDefined();
+
+    const generated = path.join(app, 'src', 'components', 'generated');
+    const before = await fs.readFile(path.join(generated, 'provenance.json'), 'utf8');
+    await fs.writeFile(tokensPath, ':root { --sem-col-fg: var(--al-col-fg); --al-col-fg: 1px; }\n');
+    await expect(pullComponentRelease({ releaseDir, appRoot: app }))
+      .rejects.toThrow(/token incompatibility.*syntax-changed/);
+    expect(await fs.readFile(path.join(generated, 'provenance.json'), 'utf8')).toBe(before);
+  });
+
   it('refuses a breaking API before writes and names the wrapper', async () => {
     const { root, app, wrapper, wrapperBytes, tokens } = await fixture();
     await pullComponentRelease({ releaseDir: await release(root, tokens), appRoot: app });
@@ -276,6 +291,28 @@ describe('component release pull transaction', () => {
     ])));
     expect(after).toEqual(before);
     expect(await fs.readFile(wrapper, 'utf8')).toBe(wrapperBytes);
+  });
+
+  it('leaves no generated tree when failure is injected before the first swap', async () => {
+    const { root, app, tokens } = await fixture();
+    const releaseDir = await release(root, tokens);
+    await expect(pullComponentRelease({ releaseDir, appRoot: app, failAt: 'before-swap' }))
+      .rejects.toThrow(/injected component pull failure before swap/);
+    await expect(fs.access(path.join(app, 'src', 'components', 'generated'))).rejects.toThrow();
+  });
+
+  it('marks incomplete generated provenance unverified', async () => {
+    const { root, app, tokens } = await fixture();
+    await pullComponentRelease({ releaseDir: await release(root, tokens), appRoot: app });
+    const generatedDir = path.join(app, 'src', 'components', 'generated');
+    const provenancePath = path.join(generatedDir, 'provenance.json');
+    const provenance = JSON.parse(await fs.readFile(provenancePath, 'utf8'));
+    delete provenance.source;
+    await fs.writeFile(provenancePath, `${JSON.stringify(provenance, null, 2)}\n`);
+    expect((await verifyPulledGenerated({
+      generatedDir,
+      appTokensPath: path.join(app, 'src', 'app', 'tokens', 'tokens.css'),
+    })).status).toBe('unverified');
   });
 
   it('refuses a vacuous zero-consumer app before writes', async () => {

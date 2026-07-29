@@ -191,7 +191,16 @@ export async function verifyPulledGenerated({ generatedDir, appTokensPath }) {
   let provenance;
   try { provenance = JSON.parse(await fs.readFile(path.join(generatedDir, 'provenance.json'), 'utf8')); }
   catch { return { status: 'unverified', reason: 'generated provenance unavailable' }; }
-  if (!provenance.releaseId || !provenance.releaseHash || !Array.isArray(provenance.components)) {
+  if (provenance.schemaVersion !== 1
+    || !provenance.releaseId
+    || !provenance.releaseHash
+    || !provenance.source?.fileKey
+    || !provenance.source?.fileVersion
+    || !provenance.source?.converterSha
+    || !provenance.appBase
+    || !Array.isArray(provenance.components)
+    || !provenance.artifacts
+    || Array.isArray(provenance.artifacts)) {
     return { status: 'unverified', reason: 'generated provenance incomplete', provenance };
   }
   const files = (await filesOf(generatedDir)).filter((file) => file !== 'provenance.json');
