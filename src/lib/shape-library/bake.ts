@@ -39,10 +39,6 @@ const SOURCES: Record<string, { ring: Vec2[]; cornerDeg: number }> = {
     ring: normalize(Array.from({ length: N }, (_, i) => { const t = (2 * Math.PI * i) / N; return { x: Math.sin(t) * Math.pow(Math.sin(t / 2), 2), y: -Math.cos(t) } })),
     cornerDeg: 30,
   },
-  squircle: {
-    ring: (() => { const e = 2 / 5; return Array.from({ length: N }, (_, i) => { const t = (2 * Math.PI * i) / N, ct = Math.cos(t), st = Math.sin(t); return { x: Math.sign(ct) * Math.pow(Math.abs(ct), e), y: Math.sign(st) * Math.pow(Math.abs(st), e) } }) })(),
-    cornerDeg: 60,
-  },
   asterisk: { ring: normalize(polar((t) => 0.34 + 0.66 * Math.pow(Math.abs(Math.cos(3 * t)), 1.1))), cornerDeg: 35 },
   bowtie: { ring: normalize(polar((t) => 0.34 + 0.66 * Math.pow(Math.abs(Math.cos(t)), 1.35))).map((p) => ({ x: p.x, y: p.y * 0.9 })), cornerDeg: 45 },
 }

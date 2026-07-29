@@ -73,6 +73,7 @@ function cloneSeed(seed: GridCacheSeed): GridCacheSeed {
 describe('S1d exact neutral ladder cache seeds', () => {
   const ladderRecipes: LadderRecipe[] = [
     { kind: 'standard', shape: 'square' },
+    { kind: 'rounded-square', radiusMM: 10, minimumAnchors: 4 },
     {
       kind: 'uniform-contour',
       unitContour: {

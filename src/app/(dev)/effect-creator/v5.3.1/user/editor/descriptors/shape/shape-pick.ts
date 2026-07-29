@@ -8,6 +8,7 @@
 import type { PickerDescriptor, PickerParamSpec, PickerParams, EditorCtx } from '../types'
 import type { CommitResult } from '../../../outlineStore'
 import { mintIds, type OutlineSource, type OutlineAdjustments } from '@/lib/effect/outline-resolve'
+import { DEFAULT_ROUNDED_SQUARE_CALIBRATION } from '@/lib/effect/effect-calibration'
 import { shapeBBox, type VShape } from '@/lib/vector-core'
 import { getShape, hasVectorDef } from '@/lib/shape-library'
 import { vshapeFromSVG, fitShapeToBox } from '@/lib/export'
@@ -52,7 +53,9 @@ function buildSource(kind: ShapeKind, params: PickerParams, d: Dims): { source: 
     }
     const bb = shapeBBox(base, 1)
     const half = Math.min(bb.maxX - bb.minX, bb.maxY - bb.minY) / 2
-    const r = kind === 'squircle' ? Math.round(half * 0.42) : Math.round(half) // pill: full short-end round → stadium
+    const r = kind === 'squircle'
+      ? DEFAULT_ROUNDED_SQUARE_CALIBRATION.radiusMM / d.mmPerPx
+      : Math.round(half) // pill: full short-end round → stadium
     return { source: { ...wrap(base, d) }, adjustments: cornerRadiusAdjustments(base, r) }
   }
   // vector-def kinds (square/circle/polygon/star/heart/diamond/sparkle/pinched/…) — true Bézier from the library.

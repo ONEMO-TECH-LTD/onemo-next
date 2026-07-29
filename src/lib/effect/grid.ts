@@ -3,10 +3,9 @@ import { jsonByteLength } from './grid-cache'
 import {
   gridLadderCacheKey,
   gridPlanCacheKey,
-  ladderShapeFromRecipe,
   planContourFromRecipe,
   resolveGridPlan,
-  semanticLadder,
+  semanticLadderFromRecipe,
   type GridMode,
   type GridPlanOptions,
   type LadderRecipe,
@@ -48,7 +47,7 @@ export function handleGridJob(job: GridJob): GridJobResult {
     return {
       operation: 'ladder',
       key: gridLadderCacheKey(job.recipe, job.law, job.mode, job.options),
-      value: semanticLadder(ladderShapeFromRecipe(job.recipe), job.law, job.mode, job.options),
+      value: semanticLadderFromRecipe(job.recipe, job.law, job.mode, job.options),
     }
   }
   return {
@@ -59,9 +58,13 @@ export function handleGridJob(job: GridJob): GridJobResult {
 }
 
 function rungPlanRecipe(recipe: LadderRecipe, sizeMM: number): PlanRecipe {
-  return recipe.kind === 'standard'
-    ? { kind: 'standard', shape: recipe.shape, widthMM: sizeMM, heightMM: sizeMM }
-    : { kind: 'uniform-contour', unitContour: recipe.unitContour, longestMM: sizeMM }
+  if (recipe.kind === 'standard') {
+    return { kind: 'standard', shape: recipe.shape, widthMM: sizeMM, heightMM: sizeMM }
+  }
+  if (recipe.kind === 'rounded-square') {
+    return { kind: 'rounded-square', sizeMM, radiusMM: recipe.radiusMM }
+  }
+  return { kind: 'uniform-contour', unitContour: recipe.unitContour, longestMM: sizeMM }
 }
 
 /** Worker transport adds exact retained-rung plans without changing the public result. */

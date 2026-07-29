@@ -4,7 +4,13 @@
 
 import type { VShape } from '@/lib/vector-core'
 import { transformShape } from '@/lib/vector-core'
-import { hasVectorDef, unitShape, SHAPE_ASPECT, type VectorShapeKind, type VectorShapeParams } from './defs'
+import {
+  hasVectorDef,
+  unitShape,
+  SHAPE_ASPECT,
+  type VectorShapeKind,
+  type VectorShapeParams,
+} from './defs'
 
 export { hasVectorDef, unitShape }
 export type { VectorShapeKind, VectorShapeParams }

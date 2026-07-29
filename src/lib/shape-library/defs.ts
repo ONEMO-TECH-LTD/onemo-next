@@ -7,9 +7,11 @@
 // Blueprint: v3/blueprint/modules/shape-library.md.
 
 import type { VAnchor, VShape } from '@/lib/vector-core'
+import { DEFAULT_ROUNDED_SQUARE_CALIBRATION } from '@/lib/effect/effect-calibration'
+import { roundedSquareShape } from '@/lib/effect/rounded-square'
 import {
   PINCHED_ANCHORS, SPARKLE_ANCHORS, TEARDROP_ANCHORS,
-  SQUIRCLE_ANCHORS, ASTERISK_ANCHORS, BOWTIE_ANCHORS,
+  ASTERISK_ANCHORS, BOWTIE_ANCHORS,
 } from './baked'
 
 /** Exact circle: 4 smooth anchors, the standard kappa construction (max radial error ~0.027%). */
@@ -97,6 +99,12 @@ function arcAnchors(cx: number, cy: number, r: number, a0: number, a1: number): 
     })
   }
   return out
+}
+
+/** Canonical library preview; physical grid recipes carry radius in millimetres instead of scaling it. */
+function squircleDef(): VShape {
+  const { sideMM, radiusMM } = DEFAULT_ROUNDED_SQUARE_CALIBRATION
+  return roundedSquareShape(2, 2, (2 * radiusMM) / sideMM, -1, -1)
 }
 
 /** leaf: rounded square with ONE sharp corner (3 exact quarter arcs + 1 corner). */
@@ -193,7 +201,7 @@ const DEFS: Record<VectorShapeKind, (p: VectorShapeParams) => VShape> = {
   pinched: fromBaked(PINCHED_ANCHORS),
   sparkle: fromBaked(SPARKLE_ANCHORS),
   teardrop: fromBaked(TEARDROP_ANCHORS),
-  squircle: fromBaked(SQUIRCLE_ANCHORS),
+  squircle: () => squircleDef(),
   asterisk: fromBaked(ASTERISK_ANCHORS),
   bowtie: fromBaked(BOWTIE_ANCHORS),
 }

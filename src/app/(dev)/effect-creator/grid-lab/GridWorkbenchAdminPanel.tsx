@@ -30,6 +30,10 @@ export interface GridWorkbenchAdminPanelProps {
   setCenterMode: (value: 'centroid' | 'bbox') => void
   maxGrowMM: number
   setMaxGrowMM: (value: number) => void
+  roundedSquareRadiusMM: number
+  setRoundedSquareRadiusMM: (value: number) => void
+  roundedSquareRadiusMaxMM: number
+  showRoundedSquareRadius: boolean
   testSizeMM: number
   setTestSizeMM: (value: number) => void
   testSizeMin: number
@@ -46,6 +50,8 @@ export function GridWorkbenchAdminPanel({
   density, setDensity, pad, setPad, offsetMM, setOffsetMM, pattern, setPattern,
   patternAuto, setPatternAuto, plan, setPlan, front, setFront, centerMode, setCenterMode,
   maxGrowMM, setMaxGrowMM,
+  roundedSquareRadiusMM, setRoundedSquareRadiusMM, roundedSquareRadiusMaxMM,
+  showRoundedSquareRadius,
   testSizeMM, setTestSizeMM, testSizeMin, testSizeMax,
   snapToGrid, setSnapToGrid, snapSizesMM,
   model, onSliderInteractionChange,
@@ -69,6 +75,15 @@ export function GridWorkbenchAdminPanel({
       <Slider label="Magnet padding · per spot · min 10" unit="mm" v={pad} set={setPad} min={10} max={30} onInteractionChange={onSliderInteractionChange} />
       <Slider label="Base margin · outward offset" unit="mm" v={offsetMM} set={setOffsetMM} min={-15} max={15} onInteractionChange={onSliderInteractionChange} />
       <Slider label="Max auto-margin · balance" unit="mm" v={maxGrowMM} set={setMaxGrowMM} min={0} max={80} onInteractionChange={onSliderInteractionChange} />
+      {showRoundedSquareRadius && <Slider
+        label="Rounded-square corner radius"
+        unit="mm"
+        v={roundedSquareRadiusMM}
+        set={setRoundedSquareRadiusMM}
+        min={0}
+        max={roundedSquareRadiusMaxMM}
+        onInteractionChange={onSliderInteractionChange}
+      />}
       <label className="gl-toggle"><span>Snap test size to grid</span>
         <input type="checkbox" checked={snapToGrid} onChange={e => setSnapToGrid(e.target.checked)} />
       </label>

@@ -2,9 +2,21 @@
 
 import { describe, expect, it } from 'vitest'
 import { getShape, type VectorShapeKind } from '@/lib/shape-library'
+import { shapePickDescriptor } from '@/app/(dev)/effect-creator/v5.3.1/user/editor/descriptors/shape/shape-pick'
+import type { EditorCtx } from '@/app/(dev)/effect-creator/v5.3.1/user/editor/descriptors/types'
 import { generateShapeRing, type ShapeKind } from '@/app/(dev)/effect-creator/v5.3.1/user/shapes'
-import { contourFromShape } from '../geometry-truth'
-import { resolveGridPlan, scaleContour, stdShapeContour, type GridDensity, type GridMode } from '../grid'
+import { contourFromShape, MANUFACTURING_TOLERANCE_MM } from '../geometry-truth'
+import { DEFAULT_ROUNDED_SQUARE_CALIBRATION } from '../effect-calibration'
+import { distanceToPreparedContour, prepareExactContour } from '../grid-prepared'
+import { GLOBAL_OFF, resolve, type OutlineAdjustments, type OutlineSource } from '../outline-resolve'
+import {
+  resolveGridPlan,
+  scaleContour,
+  stdShapeContour,
+  type GridDensity,
+  type GridMode,
+} from '../grid'
+import type { VShape } from '@/lib/vector-core'
 import type { Contour, Pt } from '../types'
 
 const PRESETS: VectorShapeKind[] = [
@@ -41,7 +53,58 @@ function exercise(name: string, contour: Contour) {
   }
 }
 
+function pickedShape(
+  kind: string,
+  mmPerPx = 1,
+): { shape: VShape; adjustments?: OutlineAdjustments } {
+  const installations: Array<{ source: OutlineSource; adjustments?: OutlineAdjustments }> = []
+  const ctx = {
+    getSpec: () => ({ maskWidthPx: 1000, maskHeightPx: 1000, mmPerPx }),
+    getSource: () => null,
+    installSource: (source: OutlineSource, adjustments: OutlineAdjustments | undefined) => {
+      installations.push({ source, adjustments })
+      return { ok: true }
+    },
+  } as unknown as EditorCtx
+  shapePickDescriptor.apply(kind, {}, ctx)
+  const installed = installations[0]
+  if (!installed) throw new Error(`${kind} did not install a source`)
+  return {
+    shape: resolve(
+      installed.source,
+      installed.adjustments ?? { global: { ...GLOBAL_OFF }, local: {} },
+    ),
+    adjustments: installed.adjustments,
+  }
+}
+
 describe('actual Creator source families share one engine contract', () => {
+  it('derives one rounded-square default geometry for the preset library and Creator picker', () => {
+    const library = contourFromShape(
+      getShape('squircle', 1000, 1000),
+      { mmPerPx: 1, maskHeightPx: 1000 },
+    )
+    const mmPerPx = DEFAULT_ROUNDED_SQUARE_CALIBRATION.sideMM / 720
+    const picked = pickedShape('squircle', mmPerPx)
+    const picker = contourFromShape(
+      picked.shape,
+      { mmPerPx, maskHeightPx: 1000 },
+    )
+    if (!library || !picker) throw new Error('rounded-square producer returned no contour')
+    const library70 = scaleContour(normalized(library), 70)
+    const picker70 = scaleContour(normalized(picker), 70)
+    const preparedLibrary = prepareExactContour(library70)
+    const preparedPicker = prepareExactContour(picker70)
+    const maxProducerDeltaMM = Math.max(
+      ...library70.outer.pts.map((point) => distanceToPreparedContour(point, preparedPicker)),
+      ...picker70.outer.pts.map((point) => distanceToPreparedContour(point, preparedLibrary)),
+    )
+    const expectedPickerRadiusPx = DEFAULT_ROUNDED_SQUARE_CALIBRATION.radiusMM / mmPerPx
+
+    expect(picked.adjustments?.global.radius).toBeCloseTo(expectedPickerRadiusPx, 9)
+    expect(maxProducerDeltaMM).toBeLessThanOrEqual(MANUFACTURING_TOLERANCE_MM)
+  })
+
   it('covers every standard geometry in every mode and density', () => {
     for (const shape of ['square', 'rect', 'circle', 'triangle', 'diamondShape'] as const) {
       exercise(`standard:${shape}`, stdShapeContour(shape, 180, shape === 'rect' ? 118 : 180))

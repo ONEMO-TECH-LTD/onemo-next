@@ -12,7 +12,7 @@
 | `maxImageDim` | 1200 | mask/contour resolution cap |
 | `textureDim` | 2400 | front-texture cap (G2: colour pixels come from the ORIGINAL at this res) |
 | `paddingMM` | 1.5 | flat margin around the subject |
-| `squareCornerMM` | 8 | standard-square corner radius (engine-internal rounding) |
+| `squareCornerMM` | calibrated input (brand default 10) | standard-square corner radius |
 
 ## Segmentation (DEC-v5-01 — self-hosted free trio)
 - Cut-out engine: **u2netp** (4.6 MB, primary, preloaded) → **silueta** (44 MB, LAZY — fetched only

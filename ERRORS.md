@@ -133,3 +133,16 @@
   `npx next dev -p 3970 --webpack`, then verify through `http://localhost:3970`.
 - Remember: after a production build in a live dev worktree, restart that dev
   server before visual QA; this repo's hydrated dev origin is `localhost`.
+
+## 2026-07-29 — dense-arc probe accidentally ran through the full ladder scan
+
+- Failed: the first KAI-9837 probe passed a bare point ring instead of a
+  `Contour`; the corrected probe then used 4,096 points per corner inside
+  `semanticLadder`, multiplying that dense geometry across every 1mm candidate
+  and requiring an interrupt.
+- Worked: keep the 4,096-segment contour only for the single exact-tangency
+  measurement, and use a low-resolution construction for exploratory ladder
+  scans. The committed regression test uses dense geometry only for the two
+  bounded tangency calls.
+- Remember: never put a proof-density contour inside a 22–310mm scanner; isolate
+  the exact geometry assertion from catalogue enumeration.
