@@ -183,6 +183,20 @@ describe('S1d exact neutral ladder cache seeds', () => {
     }])
   }, 20_000)
 
+  it('rejects a seed missing the physical coverage severity', () => {
+    const transport = handleGridWorkerJob({
+      operation: 'ladder',
+      recipe: { kind: 'standard', shape: 'square' },
+    })
+    const malformed = cloneSeed(transport.cacheSeeds[0])
+    delete (malformed.result.value.grid as unknown as Record<string, unknown>).uncoveredMM
+
+    expect(() => decodeGridWorkerResult(
+      { result: transport.result, cacheSeeds: [malformed] },
+      { peekCached: () => undefined },
+    )).toThrow('malformed cache seed')
+  }, 20_000)
+
   it('accepts an identical existing value but fails a conflicting existing cache value', () => {
     const transport = handleGridWorkerJob({
       operation: 'ladder',

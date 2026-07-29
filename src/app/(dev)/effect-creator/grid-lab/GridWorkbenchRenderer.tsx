@@ -7,13 +7,9 @@ interface GridWorkbenchAnchor {
 }
 
 interface GridWorkbenchGrid {
-  attachment: string
-  twinRequired: boolean
   anchors: GridWorkbenchAnchor[]
   candidates: Pt[]
   flaps: Pt[]
-  ok: boolean
-  issues: string[]
   pitchCentreMM: number
   edgeRangeMM: [number, number]
   applicationPadMM: number
@@ -75,7 +71,6 @@ export function GridWorkbenchStage({
         {model ? <Stage contour={model.contour} design={model.design} grid={model.grid} anchorPair={model.anchorPair} front={front} frontImg={frontImg} viewportPx={viewportPx} fit={fit} />
           : <Empty text={emptyText} spin={emptySpin} />}
       </div>
-      {model && <Verdict grid={model.grid} />}
       <div className="gl-legend">
         <span><i style={{ background: 'var(--magnet)' }} />6mm magnet</span>
         <span><i style={{ background: 'var(--mag8)' }} />8mm magnet</span>
@@ -178,20 +173,6 @@ function Stage({ contour, design, grid, anchorPair, front, frontImg, viewportPx,
         </g>
       })()}
     </svg>
-  )
-}
-
-function Verdict({ grid }: { grid: GridWorkbenchGrid }) {
-  const head = grid.attachment === 'velcro'
-    ? 'Velcro — full-surface hook, any shape and size, no grid'
-    : grid.ok
-      ? `Holds — ${grid.anchors.length} magnets seated${grid.twinRequired ? ' · ships as a TWIN pair (mirror grid clamps the fabric)' : ', spread across material'}`
-      : "Won't hold reliably"
-  return (
-    <div className={`gl-verdict ${grid.ok ? 'ok' : 'bad'}`}>
-      <div className="gl-vrow"><span className="gl-dot" /><b>{head}</b></div>
-      {grid.issues.map((s, i) => <div key={i} className="gl-issue">{s}</div>)}
-    </div>
   )
 }
 

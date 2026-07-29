@@ -14,7 +14,7 @@ import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import { contourFromShape } from '@/lib/effect/geometry-truth'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { nearestAnchorPair, nearestSemanticRung, resolveDesignSizeMM, resolveRectangleRungs, scaleContour, stdShapeContour, rectFormat, minEffectMM, maxDesignMM, DEFAULT_MARGIN_MM, DEFAULT_LAW, type GridJob, type GridJobResult, type GridPattern, type GridPlanOptions, type MagnetPlan, type GridDensity, type GridMode, type PlanRecipe, type ResolvedGridPlan, type SemanticRung, type StandardLadderShape, type StdShape, type Attachment } from '@/lib/effect/grid'
+import { nearestAnchorPair, nearestSemanticRung, nextSemanticRung, resolveDesignSizeMM, resolveRectangleRungs, scaleContour, stdShapeContour, rectFormat, minEffectMM, maxDesignMM, DEFAULT_MARGIN_MM, DEFAULT_LAW, type GridJob, type GridJobResult, type GridPattern, type GridPlanOptions, type LadderRecipe, type MagnetPlan, type GridDensity, type GridMode, type PlanRecipe, type ResolvedGridPlan, type SemanticRung, type StandardLadderShape, type StdShape, type Attachment } from '@/lib/effect/grid'
 import { requestGridWorkerJobInBackground } from '@/lib/effect/grid-worker-client'
 import {
   cachedGridJob,
@@ -78,12 +78,22 @@ function normBase(vs: VShape, maskH: number): Contour | null {
   return { outer: { pts: c.outer.pts.map(([x, y]) => [x / L, y / L] as Pt) }, holes: [] }
 }
 
+function normGeneratedRing(ring: ReadonlyArray<Pt>): Contour | null {
+  if (ring.length < 3) return null
+  const bb = bboxOf(ring.map(([x, y]) => ({ x, y })))
+  const L = Math.max(bb.w, bb.h, 1)
+  return {
+    outer: { pts: ring.map(([x, y]) => [x / L, (IMG - y) / L] as Pt) },
+    holes: [],
+  }
+}
+
 export default function GridLab() {
   const [renderedPlanKey, setRenderedPlanKey] = useState<string | null>(null)
   const [sliderTransient, setSliderTransient] = useState(false)
   const [src, setSrc] = useState<Src>('std')
   const [geo, setGeo] = useState<StdGeo>('square')
-  // rect system A: long side rung → short side rung (< long) → orientation
+  // rect system A: two legal axis rungs (equal = square) → orientation
   const [longMM, setLongMM] = useState(118)
   const [shortMM, setShortMM] = useState(70)
   const [orient, setOrient] = useState<'landscape' | 'portrait'>('landscape')
@@ -110,6 +120,7 @@ export default function GridLab() {
   const [front, setFront] = useState(false) // front-face overlay: magnets shown over the design/art
   const [centerMode, setCenterMode] = useState<'centroid' | 'bbox'>('centroid')
   const [maxGrowMM, setMaxGrowMM] = useState(DEFAULT_MARGIN_MM) // engine law default
+  const [snapToGrid, setSnapToGrid] = useState(true)
 
   const [magic, setMagic] = useState<MagicState>(null)
   const [magStatus, setMagStatus] = useState<string>('')   // '', 'downloading-model', 'cutting', 'error:...'
@@ -145,9 +156,34 @@ export default function GridLab() {
   const ladderShape: StandardLadderShape = src === 'std'
     ? (geo === 'rect' ? 'square' : geo)
     : 'square'
-  const ladderRecipe = useMemo(
-    () => ({ kind: 'standard', shape: ladderShape } as const),
-    [ladderShape],
+  const presetUnitContour = useMemo(
+    () => src === 'preset' && hasVectorDef(preset)
+      ? normBase(getShape(preset, IMG, IMG, { sides, points }), IMG)
+      : null,
+    [src, preset, sides, points],
+  )
+  const generatedUnitContour = useMemo(() => {
+    if (src !== 'gen') return null
+    const params = gen === 'blob' ? { kind: gen, waviness: p1, seed: p2 }
+      : gen === 'form' ? { kind: gen, pinch: p1, lobes: p2 }
+      : gen === 'daisy' ? { kind: gen, depth: p1, petals: p2 }
+      : { kind: gen, swirl: p1, blades: p2 }
+    return normGeneratedRing(
+      generateShapeRing(params as Parameters<typeof generateShapeRing>[0], IMG, IMG),
+    )
+  }, [src, gen, p1, p2])
+  const magicUnitContour = useMemo(
+    () => src === 'magic' && magic ? normBase(magic.vshape, magic.maskH) : null,
+    [src, magic],
+  )
+  const sourceUnitContour = presetUnitContour ?? generatedUnitContour ?? magicUnitContour
+  const ladderRecipe = useMemo<LadderRecipe>(
+    () => presetUnitContour
+      ? { kind: 'uniform-contour', unitContour: presetUnitContour }
+      : snapToGrid && sourceUnitContour
+        ? { kind: 'uniform-contour', unitContour: sourceUnitContour }
+      : { kind: 'standard', shape: ladderShape },
+    [ladderShape, presetUnitContour, snapToGrid, sourceUnitContour],
   )
   const planOptions = useMemo<GridPlanOptions>(() => ({
     attachment,
@@ -157,11 +193,13 @@ export default function GridLab() {
     plan,
     center: centerMode,
     baseMarginMM: offsetMM,
-    maxGrowMM,
+    // Catalogue rungs already are exact zero-margin grid extents. Adaptive growth is an explicit
+    // freeform-only tool; applying it to a rung would silently invent a second product size.
+    maxGrowMM: src === 'gen' || src === 'magic' ? maxGrowMM : 0,
     pitchMM: pitchAuto ? undefined : pitch,
     signedBaseMargin: true,
     diagnosticVelcro: true,
-  }), [attachment, gridMode, density, pad, plan, centerMode, offsetMM, maxGrowMM, pitchAuto, pitch])
+  }), [attachment, gridMode, density, pad, plan, centerMode, offsetMM, maxGrowMM, pitchAuto, pitch, src])
 
   const ladderJob = useMemo<GridJob>(() => ({
     operation: 'ladder',
@@ -189,59 +227,56 @@ export default function GridLab() {
       : null,
     [stdRungs, longMM, shortMM, orient],
   )
+  const snapRungs = useMemo(
+    () => stdRungs.filter((rung) => rung.sizeMM >= sizeMin && rung.sizeMM <= sizeMax),
+    [stdRungs, sizeMin, sizeMax],
+  )
+  const rectangleSnapRungs = useMemo(
+    () => snapRungs.filter((rung) => rung.points >= 2 && rung.sizeMM >= shortMM),
+    [snapRungs, shortMM],
+  )
+  const rawTestSizeMM = src === 'std' && geo === 'rect' ? longMM : resolvedSizeMM
+  const activeSnapRungs = src === 'std' && geo === 'rect' ? rectangleSnapRungs : snapRungs
+  const effectiveTestSizeMM = snapToGrid && activeSnapRungs.length
+    ? nextSemanticRung(activeSnapRungs, rawTestSizeMM).sizeMM
+    : rawTestSizeMM
+  const gridDerivedSizeMM = snapToGrid ? effectiveTestSizeMM : resolvedSizeMM
 
   const planDesign = useMemo<PlanDesign | null>(() => {
     try {
-      // ── STANDARD GEOMETRIES (D12–D15): drawn directly in mm, each axis snapped to its own rung ──
+      // ── STANDARD GEOMETRIES (D12–D15): drawn directly in mm; grid snap is explicit and shared ──
       if (src === 'std') {
-        // DUAL SIZING LAW (every shape): the slider is CONTINUOUS/adaptive — the engine adapts any size
-        // exactly like generators/AI cuts; the semantic buttons are quick-sets to the pre-calculated
-        // optimal variants. Rectangle alone remains ladder-dependent because both axes are actual rungs.
+        // Product buttons remain catalogue sizes; the admin test slider can explicitly inspect a
+        // continuous size or advance it to the next engine-derived rung.
         if (geo === 'rect') {
           if (!rectRungs) return null
-          const rungW = rectRungs.widthRung
-          const rungH = rectRungs.heightRung
-          const design = stdShapeContour(geo, rungW.sizeMM, rungH.sizeMM)
+          const longSizeMM = snapToGrid ? effectiveTestSizeMM : longMM
+          const shortSizeMM = snapToGrid ? rectRungs.shortRung.sizeMM : shortMM
+          const widthMM = orient === 'landscape' ? longSizeMM : shortSizeMM
+          const heightMM = orient === 'landscape' ? shortSizeMM : longSizeMM
+          const design = stdShapeContour(geo, widthMM, heightMM)
           return {
             design,
-            recipe: { kind: 'standard', shape: geo, widthMM: rungW.sizeMM, heightMM: rungH.sizeMM },
-            designSize: rungW.sizeMM,
-            format: rectFormat(rungW.sizeMM, rungH.sizeMM),
+            recipe: { kind: 'standard', shape: geo, widthMM, heightMM },
+            designSize: widthMM,
+            format: rectFormat(widthMM, heightMM),
           }
         }
-        const design = stdShapeContour(geo, resolvedSizeMM, resolvedSizeMM)
+        const design = stdShapeContour(geo, gridDerivedSizeMM, gridDerivedSizeMM)
         return {
           design,
-          recipe: { kind: 'standard', shape: geo, widthMM: resolvedSizeMM, heightMM: resolvedSizeMM },
-          designSize: resolvedSizeMM,
+          recipe: { kind: 'standard', shape: geo, widthMM: gridDerivedSizeMM, heightMM: gridDerivedSizeMM },
+          designSize: gridDerivedSizeMM,
           format: null,
         }
       }
       // base contour normalized so longest side = 1mm (scale-free); scaleContour() sizes it in mm
-      let base: Contour | null = null
-      if (src === 'magic') {
-        if (!magic) return null
-        base = normBase(magic.vshape, magic.maskH)
-      } else if (src === 'preset' && hasVectorDef(preset)) {
-        base = normBase(getShape(preset, IMG, IMG, { sides, points }), IMG)
-      } else {
-        const params = gen === 'blob' ? { kind: gen, waviness: p1, seed: p2 }
-          : gen === 'form' ? { kind: gen, pinch: p1, lobes: p2 }
-          : gen === 'daisy' ? { kind: gen, depth: p1, petals: p2 }
-          : { kind: gen, swirl: p1, blades: p2 }
-        const ring = generateShapeRing(params as Parameters<typeof generateShapeRing>[0], IMG, IMG)
-        const bb = bboxOf(ring.map(([x, y]) => ({ x, y }))); const L = Math.max(bb.w, bb.h, 1)
-        base = { outer: { pts: ring.map(([x, y]) => [x / L, (IMG - y) / L] as Pt) }, holes: [] }
-      }
+      const base = sourceUnitContour
       if (!base || base.outer.pts.length < 3) return null
       const b = base
-      // DESIGN stays fixed at the set size. Auto-grow adds an outward MARGIN (offset) around it — the border
-      // the magnets' padding uses. Manual "offset" is the starting margin. Total effect = design + 2×margin.
-      // random shapes (AI Magic / generators) are capped at 180mm; curated presets use the full ladder.
-      // ADAPTIVE sizing (Dan's law, restored): the slider is CONTINUOUS — free shapes take any size and
-      // the engine adapts (auto-margin snaps coverage to the 48-family grid dynamically). The rung
-      // buttons are quick-sets for the rigid standard sizes; `rung` below is the nearest reference only.
-      const dSize = resolvedSizeMM
+      // Every contour uses the effective test size. Grid snap is on by default; disabling it is an
+      // explicit continuous calibration mode. Only generators/AI may add adaptive outer margin.
+      const dSize = gridDerivedSizeMM
       const design = scaleContour(b, dSize)
       return {
         design,
@@ -250,7 +285,10 @@ export default function GridLab() {
         format: null,
       }
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
-  }, [src, geo, preset, gen, p1, p2, sides, points, magic, rectRungs, resolvedSizeMM])
+  }, [
+    src, geo, sourceUnitContour, rectRungs, gridDerivedSizeMM,
+    snapToGrid, effectiveTestSizeMM, longMM, shortMM, orient,
+  ])
 
   const preparedDesign = useMemo<PreparedDesign | null>(() => {
     if (!planDesign) return null
@@ -263,10 +301,15 @@ export default function GridLab() {
       }
     }
     if (!stdRungs.length) return { ...planDesign, rung: null, rungH: null }
-    const targetMM = src === 'std' ? sizeMM : planDesign.designSize
+    const targetMM = snapToGrid
+      ? effectiveTestSizeMM
+      : src === 'std' ? sizeMM : planDesign.designSize
     const rung = nearestSemanticRung(stdRungs, targetMM)
     return { ...planDesign, rung, rungH: rung }
-  }, [planDesign, stdRungs, src, geo, rectRungs, sizeMM])
+  }, [
+    planDesign, stdRungs, src, geo, rectRungs, sizeMM,
+    snapToGrid, effectiveTestSizeMM,
+  ])
 
   const planJob = useMemo<GridJob | null>(() => planDesign
     ? { operation: 'plan', recipe: planDesign.recipe, options: planOptions }
@@ -337,7 +380,8 @@ export default function GridLab() {
     src, setSrc, geo, setGeo, setLongMM, setShortMM, orient, setOrient,
     preset, setPreset, gen, setGen, p1, setP1, p2, setP2, sides, setSides, points, setPoints,
     setSizeMM, attachment, setAttachment,
-    magic, magStatus, fileRef, onFile, sizeMax, sizeMin, resolvedSizeMM,
+    magic, magStatus, fileRef, onFile, sizeMax, sizeMin,
+    resolvedSizeMM: snapToGrid ? effectiveTestSizeMM : resolvedSizeMM,
     maxRungMM: DEFAULT_LAW.maxRungMM, gridMode, stdRungs, rectRungs, model,
     onSliderInteractionChange: setSliderTransient,
   }
@@ -345,6 +389,15 @@ export default function GridLab() {
     pitch, setPitch, pitchAuto, setPitchAuto, density, setDensity, pad, setPad,
     offsetMM, setOffsetMM, pattern, setPattern, patternAuto, setPatternAuto,
     plan, setPlan, front, setFront, centerMode, setCenterMode, maxGrowMM, setMaxGrowMM,
+    testSizeMM: effectiveTestSizeMM,
+    setTestSizeMM: value => {
+      if (src === 'std' && geo === 'rect') setLongMM(value)
+      else setSizeMM(value)
+    },
+    testSizeMin: src === 'std' && geo === 'rect' ? Math.max(sizeMin, shortMM) : sizeMin,
+    testSizeMax: sizeMax,
+    snapToGrid, setSnapToGrid,
+    snapSizesMM: activeSnapRungs.map((rung) => rung.sizeMM),
     model,
     onSliderInteractionChange: setSliderTransient,
   }
@@ -414,7 +467,7 @@ export default function GridLab() {
 const CSS = `
 .gl{--bg:#eef1f5;--panel:#fff;--panel-2:#f6f8fb;--line:#dbe1ea;--ink:#18202e;--ink-2:#5a6577;--ink-3:#93a0b3;
   --accent:#2f6bff;--accent-soft:#2f6bff18;--grid:#9fb0cc;--suede:#ccd0d7;--margin:#aeb4bf;--suede-edge:#8a919c;--magnet:#20242c;
-  --magnet-hi:#6b7280;--mag8:#c98a12;--pass:#1a9e4b;--fail:#e5484d;--shadow:0 1px 2px #18202e0d,0 10px 26px #18202e0f;
+  --magnet-hi:#6b7280;--mag8:#c98a12;--fail:#e5484d;--shadow:0 1px 2px #18202e0d,0 10px 26px #18202e0f;
   --mono:ui-monospace,"SF Mono",Menlo,monospace;--sans:system-ui,-apple-system,"Segoe UI",sans-serif;
   background:var(--bg);color:var(--ink);font-family:var(--sans);min-height:100vh;padding:26px 20px 70px;-webkit-font-smoothing:antialiased}
 @media (prefers-color-scheme:dark){.gl:not([data-theme]){--bg:#0f141b;--panel:#161c25;--panel-2:#12171f;--line:#232c3a;--ink:#e6edf3;--ink-2:#9aa6b6;--ink-3:#66717f;--accent:#4d84ff;--accent-soft:#4d84ff20;--grid:#3d4a60;--suede:#3a3e46;--margin:#4d535e;--suede-edge:#22262d;--magnet:#0b0e12;--magnet-hi:#4a515c;--shadow:0 1px 2px #0005,0 12px 30px #0006}}
@@ -436,12 +489,6 @@ const CSS = `
 .gl-empty{display:flex;align-items:center;gap:9px;color:var(--ink-3);font:12.5px var(--mono);text-align:center;padding:20px;max-width:80%}
 .gl-spin{width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:gspin .8s linear infinite;flex:none}
 @keyframes gspin{to{transform:rotate(360deg)}}
-.gl-verdict{padding:10px 13px;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);font-size:13px}
-.gl-vrow{display:flex;align-items:center;gap:9px}
-.gl-dot{width:9px;height:9px;border-radius:50%;flex:none}
-.gl-verdict.ok .gl-dot{background:var(--pass)}.gl-verdict.ok b{color:var(--pass)}
-.gl-verdict.bad .gl-dot{background:var(--fail)}.gl-verdict.bad b{color:var(--fail)}
-.gl-issue{font:11.5px var(--mono);color:var(--ink-2);margin-top:6px;padding-left:18px}
 .gl-legend{display:flex;flex-wrap:wrap;gap:13px;font:11px var(--mono);color:var(--ink-2)}
 .gl-legend span{display:inline-flex;align-items:center;gap:5px}.gl-legend i{width:10px;height:10px;border-radius:3px}
 .gl-controls{display:flex;flex-direction:column;gap:16px}
@@ -452,8 +499,6 @@ const CSS = `
 .gl-seg.gl-wrap{flex-wrap:wrap}.gl-seg.gl-wrap button{min-width:64px}
 .gl-seg button:hover{color:var(--ink)}
 .gl-seg button[aria-pressed=true]{background:var(--accent);color:#fff;box-shadow:0 1px 2px #0002}
-.gl-seg button.gl-hidden-rung{color:var(--mag8);font-style:italic}
-.gl-seg button.gl-hidden-rung[aria-pressed=true]{background:var(--mag8);color:#fff;font-style:normal}
 .gl-inline-resolving{width:100%;padding:6px 8px;color:var(--ink-3);font:11px var(--mono);text-align:center;text-transform:none;letter-spacing:0}
 .gl-field{display:flex;flex-direction:column;gap:8px;font:600 10.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
 .gl-field select{font:500 13px var(--sans);color:var(--ink);background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:9px;cursor:pointer}

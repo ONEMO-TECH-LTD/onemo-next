@@ -22,9 +22,10 @@ import {
 let sharedClient: GridWorkerScheduler<GridJob, GridJobResult, GridWorkerEnvelope> | null = null
 
 export function gridJobKey(job: GridJob): string {
-  // Ladder output is independent of seed-only plan options, so they never fragment this key.
+  // Only pinned pitch changes ladder identity; every other plan option is seed-only and must not
+  // fragment the ladder cache.
   return job.operation === 'ladder'
-    ? gridLadderCacheKey(job.recipe, job.law, job.mode)
+    ? gridLadderCacheKey(job.recipe, job.law, job.mode, job.options)
     : gridPlanCacheKey(job.recipe, job.options)
 }
 
@@ -66,6 +67,7 @@ function isPlanResult(value: unknown): value is GridPlanJobResult {
     && isRecord(plan.effectContourMM)
     && Array.isArray(plan.grid.anchors)
     && Array.isArray(plan.grid.flaps)
+    && typeof plan.grid.uncoveredMM === 'number'
     && typeof plan.pitchMM === 'number'
     && typeof plan.baseMarginMM === 'number'
     && typeof plan.resolvedMarginMM === 'number'

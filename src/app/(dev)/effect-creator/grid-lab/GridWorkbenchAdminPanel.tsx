@@ -30,6 +30,13 @@ export interface GridWorkbenchAdminPanelProps {
   setCenterMode: (value: 'centroid' | 'bbox') => void
   maxGrowMM: number
   setMaxGrowMM: (value: number) => void
+  testSizeMM: number
+  setTestSizeMM: (value: number) => void
+  testSizeMin: number
+  testSizeMax: number
+  snapToGrid: boolean
+  setSnapToGrid: (value: boolean) => void
+  snapSizesMM: number[]
   model: GridWorkbenchAdminPanelModel | null
   onSliderInteractionChange: (transient: boolean) => void
 }
@@ -38,8 +45,12 @@ export function GridWorkbenchAdminPanel({
   pitch, setPitch, pitchAuto, setPitchAuto,
   density, setDensity, pad, setPad, offsetMM, setOffsetMM, pattern, setPattern,
   patternAuto, setPatternAuto, plan, setPlan, front, setFront, centerMode, setCenterMode,
-  maxGrowMM, setMaxGrowMM, model, onSliderInteractionChange,
+  maxGrowMM, setMaxGrowMM,
+  testSizeMM, setTestSizeMM, testSizeMin, testSizeMax,
+  snapToGrid, setSnapToGrid, snapSizesMM,
+  model, onSliderInteractionChange,
 }: GridWorkbenchAdminPanelProps) {
+  const snapIndex = Math.max(0, snapSizesMM.indexOf(testSizeMM))
   return <>
     <div className="gl-card gl-pad">
       <div className="gl-field"><span>Density</span>
@@ -58,6 +69,24 @@ export function GridWorkbenchAdminPanel({
       <Slider label="Magnet padding · per spot · min 10" unit="mm" v={pad} set={setPad} min={10} max={30} onInteractionChange={onSliderInteractionChange} />
       <Slider label="Base margin · outward offset" unit="mm" v={offsetMM} set={setOffsetMM} min={-15} max={15} onInteractionChange={onSliderInteractionChange} />
       <Slider label="Max auto-margin · balance" unit="mm" v={maxGrowMM} set={setMaxGrowMM} min={0} max={80} onInteractionChange={onSliderInteractionChange} />
+      <label className="gl-toggle"><span>Snap test size to grid</span>
+        <input type="checkbox" checked={snapToGrid} onChange={e => setSnapToGrid(e.target.checked)} />
+      </label>
+      <div data-grid-size-snap={snapToGrid ? 'on' : 'off'}>
+        <Slider
+          label="Test size · longest side"
+          unit="mm"
+          v={snapToGrid ? snapIndex : testSizeMM}
+          displayV={testSizeMM}
+          set={value => {
+            const sizeMM = snapToGrid ? snapSizesMM[Math.round(value)] : value
+            if (sizeMM != null) setTestSizeMM(sizeMM)
+          }}
+          min={snapToGrid ? 0 : testSizeMin}
+          max={snapToGrid ? Math.max(0, snapSizesMM.length - 1) : testSizeMax}
+          onInteractionChange={onSliderInteractionChange}
+        />
+      </div>
 
       <div className="gl-field"><span>Grid pattern · {patternAuto && model ? `auto → ${model.patternUsed === 'quincunx' ? 'dice-5' : model.patternUsed}` : 'manual'}</span>
         <div className="gl-seg">
@@ -87,9 +116,10 @@ export function GridWorkbenchAdminPanel({
 
 const SLIDER_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'])
 
-function Slider({ label, v, set, min, max, unit, onInteractionChange }: {
+function Slider({ label, v, displayV = v, set, min, max, unit, onInteractionChange }: {
   label: string
   v: number
+  displayV?: number
   set: (n: number) => void
   min: number
   max: number
@@ -98,7 +128,7 @@ function Slider({ label, v, set, min, max, unit, onInteractionChange }: {
 }) {
   return (
     <label className="gl-slider">
-      <div className="gl-slider-row"><span>{label}</span><b>{v}{unit ? ' ' + unit : ''}</b></div>
+      <div className="gl-slider-row"><span>{label}</span><b>{displayV}{unit ? ' ' + unit : ''}</b></div>
       <input
         type="range"
         min={min}

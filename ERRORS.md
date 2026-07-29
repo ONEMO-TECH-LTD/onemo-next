@@ -113,3 +113,23 @@
   verbatim.
 - Remember: treat peer scratchpad paths as opaque identifiers; never normalize
   or reconstruct their encoded directory segments.
+## 2026-07-29 — Playwright CLI ambiguous control labels
+
+- Failed: unscoped `getByRole('button', { name: 'Standard' })` matched density,
+  pattern, and source controls; `click "Triangle"` treated the text as a target
+  reference rather than a role locator.
+- Worked: `run-code` with the admin `aside` scoped first, exact roles, and an
+  explicit `nth(1)` only for the duplicated Standard pattern label.
+- Remember: use snapshot refs or scoped role locators on this two-panel bench;
+  never assume a visible label is unique.
+
+## 2026-07-29 — production build invalidated the same-tree dev server
+
+- Failed: running `next build` while `:3970` was served by `next dev` from the
+  same worktree, then probing the page through `127.0.0.1`.
+- Symptoms: the page stayed at `resolving-grid`; the old dev process returned
+  invalid HMR handshakes, and Next rejected the `127.0.0.1` dev origin.
+- Worked: restart only `:3970` from the grid-lab worktree with
+  `npx next dev -p 3970 --webpack`, then verify through `http://localhost:3970`.
+- Remember: after a production build in a live dev worktree, restart that dev
+  server before visual QA; this repo's hydrated dev origin is `localhost`.

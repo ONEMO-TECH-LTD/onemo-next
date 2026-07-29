@@ -47,8 +47,8 @@ export function handleGridJob(job: GridJob): GridJobResult {
   if (job.operation === 'ladder') {
     return {
       operation: 'ladder',
-      key: gridLadderCacheKey(job.recipe, job.law, job.mode),
-      value: semanticLadder(ladderShapeFromRecipe(job.recipe), job.law, job.mode),
+      key: gridLadderCacheKey(job.recipe, job.law, job.mode, job.options),
+      value: semanticLadder(ladderShapeFromRecipe(job.recipe), job.law, job.mode, job.options),
     }
   }
   return {
