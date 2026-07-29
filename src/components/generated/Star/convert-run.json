@@ -1,0 +1,34 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "6108:52033",
+  "fileVersion": "2381318852839647833",
+  "contentHash": "28da532ff11fb8f99c456dbda8f7a965bbd0ee3ce8bc31eb307b3ceb140b18e5",
+  "targetKind": "component",
+  "iconRoot": true,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "6108:52033",
+      "class": "star",
+      "kind": "svg"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [],
+  "componentProperties": [],
+  "refusals": [],
+  "notes": [
+    {
+      "nodeId": "6108:52033",
+      "kind": "svg-descendant-semantics",
+      "visual": false,
+      "liveColorBindings": 1,
+      "residualBindings": 0,
+      "residualLayouts": 0,
+      "findings": [],
+      "note": "svg descendants: 1 live colour binding(s), no residual semantics"
+    }
+  ]
+}

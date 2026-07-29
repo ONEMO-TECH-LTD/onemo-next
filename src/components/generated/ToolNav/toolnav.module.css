@@ -1,0 +1,25 @@
+.toolNav {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 0 16px var(--sem-dim-fluid-nano-xl);
+}
+
+.toggleCombo {
+  flex-shrink: 0;
+}
+
+.controlCombo {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  flex-shrink: 0;
+}
+
+.buttonFBFlip {
+  flex-shrink: 0;
+}
+
+.buttonPillSpecLabeled {
+  flex-shrink: 0;
+}

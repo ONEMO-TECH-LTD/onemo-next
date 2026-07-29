@@ -1,0 +1,120 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "8018:27668",
+  "fileVersion": "2381318852839647833",
+  "contentHash": "d9064806cb398094ea858f2daa193acb0df73302223a205bd3075ab2367a8fb3",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "8018:27668",
+      "class": "topSection",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:4661",
+      "class": "titleAndControls",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:4662",
+      "class": "buttonHomeLogo",
+      "kind": "svg"
+    },
+    {
+      "figmaId": "8017:25737",
+      "class": "screenTitle",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8017:25738",
+      "class": "styleEffect",
+      "kind": "text",
+      "propertyRefs": {
+        "characters": "Title#8018:33"
+      }
+    },
+    {
+      "figmaId": "8015:4822",
+      "class": "buttonPillReg",
+      "kind": "element"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [
+    {
+      "instanceId": "8015:4822",
+      "targetId": "6103:707",
+      "props": {},
+      "layout": {
+        "height": 24,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "HUG",
+        "layoutSizingVertical": "HUG",
+        "width": 60
+      }
+    }
+  ],
+  "componentProperties": [
+    {
+      "authoredKey": "Title#8018:33",
+      "propName": "title",
+      "type": "TEXT",
+      "defaultValue": "Style Effect",
+      "bindingScope": [
+        {
+          "masterId": "8018:27668",
+          "sites": [
+            {
+              "nodeId": "8017:25738",
+              "field": "characters"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "refusals": [],
+  "notes": [
+    {
+      "nodeId": "8014:4662",
+      "kind": "svg-descendant-semantics",
+      "visual": false,
+      "liveColorBindings": 1,
+      "residualBindings": 2,
+      "residualLayouts": 1,
+      "findings": [
+        {
+          "descendantId": "8014:4663",
+          "descendantName": "ONEMO BRAND X",
+          "propertyPath": "size.x",
+          "variableIds": [
+            "VariableID:2018:4402"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "8014:4663",
+          "descendantName": "ONEMO BRAND X",
+          "propertyPath": "size.y",
+          "variableIds": [
+            "VariableID:2018:4402"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "8014:4662",
+          "descendantName": "Button-Home-Logo",
+          "propertyPath": "layoutMode",
+          "category": "baked-auto-layout",
+          "detail": "HORIZONTAL"
+        }
+      ],
+      "note": "svg descendants: 1 live colour binding(s), 2 unsupported binding(s), 1 baked auto-layout frame(s)"
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "12002:5763",
+  "fileVersion": "2381318852839647833",
+  "contentHash": "0f52242111a3bfa8ac7cd5cd791859a21899058eba0c69d9e1fe951eb310b93e",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "12002:5763",
+      "class": "sideFace",
+      "kind": "element"
+    },
+    {
+      "figmaId": "12002:5764",
+      "class": "effectCard",
+      "kind": "element"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [],
+  "componentProperties": [
+    {
+      "authoredKey": "Side",
+      "propName": "side",
+      "type": "VARIANT",
+      "defaultValue": "Face-Modify-frame1",
+      "variantOptions": [
+        "Face",
+        "Back",
+        "Face-Modify-frame1"
+      ],
+      "bindingScope": []
+    }
+  ],
+  "refusals": [],
+  "notes": [
+    {
+      "nodeId": "12002:5764",
+      "kind": "approximation",
+      "note": "inner-shadow token(s) baked into the SVG filter — a CSS var() cannot cross into a data-URI SVG (value exact; token link not carried)"
+    }
+  ]
+}

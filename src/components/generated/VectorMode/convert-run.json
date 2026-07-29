@@ -1,0 +1,493 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "12007:18281",
+  "fileVersion": "2381318852839647833",
+  "contentHash": "6b1b7770ea8a058e599e70d61e4b397173110cb9f1b210ff49fcdb3c31754d69",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 3,
+  "figmaAbsoluteCount": 3,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "12007:18281",
+      "class": "vectorMode",
+      "kind": "element"
+    },
+    {
+      "figmaId": "12007:18261",
+      "class": "outline",
+      "kind": "element"
+    },
+    {
+      "figmaId": "12007:18262",
+      "class": "anchors",
+      "kind": "svg"
+    },
+    {
+      "figmaId": "12007:18275",
+      "class": "radius",
+      "kind": "svg"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [],
+  "componentProperties": [],
+  "refusals": [],
+  "notes": [
+    {
+      "nodeId": "12007:18262",
+      "kind": "svg-descendant-semantics",
+      "visual": false,
+      "liveColorBindings": 2,
+      "residualBindings": 36,
+      "residualLayouts": 0,
+      "findings": [
+        {
+          "descendantId": "12007:18263",
+          "descendantName": "Anchor",
+          "propertyPath": "strokeWeight",
+          "variableIds": [
+            "VariableID:6103:569"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18263",
+          "descendantName": "Anchor",
+          "propertyPath": "size.x",
+          "variableIds": [
+            "VariableID:2018:4399"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18263",
+          "descendantName": "Anchor",
+          "propertyPath": "size.y",
+          "variableIds": [
+            "VariableID:2018:4399"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18264",
+          "descendantName": "Anchor",
+          "propertyPath": "strokeWeight",
+          "variableIds": [
+            "VariableID:6103:569"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18264",
+          "descendantName": "Anchor",
+          "propertyPath": "size.x",
+          "variableIds": [
+            "VariableID:2018:4399"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18264",
+          "descendantName": "Anchor",
+          "propertyPath": "size.y",
+          "variableIds": [
+            "VariableID:2018:4399"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18265",
+          "descendantName": "Anchor",
+          "propertyPath": "strokeWeight",
+          "variableIds": [
+            "VariableID:6103:569"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18265",
+          "descendantName": "Anchor",
+          "propertyPath": "size.x",
+          "variableIds": [
+            "VariableID:2018:4399"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18265",
+          "descendantName": "Anchor",
+          "propertyPath": "size.y",
+          "variableIds": [
+            "VariableID:2018:4399"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18266",
+          "descendantName": "Anchor",
+          "propertyPath": "strokeWeight",
+          "variableIds": [
+            "VariableID:6103:569"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18266",
+          "descendantName": "Anchor",
+          "propertyPath": "size.x",
+          "variableIds": [
+            "VariableID:2018:4399"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18266",
+          "descendantName": "Anchor",
+          "propertyPath": "size.y",
+          "variableIds": [
+            "VariableID:2018:4399"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18267",
+          "descendantName": "Anchor",
+          "propertyPath": "strokeWeight",
+          "variableIds": [
+            "VariableID:6103:569"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18267",
+          "descendantName": "Anchor",
+          "propertyPath": "size.x",
+          "variableIds": [
+            "VariableID:2018:4399"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18267",
+          "descendantName": "Anchor",
+          "propertyPath": "size.y",
+          "variableIds": [
+            "VariableID:2018:4399"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18268",
+          "descendantName": "Anchor",
+          "propertyPath": "strokeWeight",
+          "variableIds": [
+            "VariableID:6103:569"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18268",
+          "descendantName": "Anchor",
+          "propertyPath": "size.x",
+          "variableIds": [
+            "VariableID:2018:4399"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18268",
+          "descendantName": "Anchor",
+          "propertyPath": "size.y",
+          "variableIds": [
+            "VariableID:2018:4399"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18269",
+          "descendantName": "Anchor",
+          "propertyPath": "strokeWeight",
+          "variableIds": [
+            "VariableID:6103:569"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18269",
+          "descendantName": "Anchor",
+          "propertyPath": "size.x",
+          "variableIds": [
+            "VariableID:2018:4399"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18269",
+          "descendantName": "Anchor",
+          "propertyPath": "size.y",
+          "variableIds": [
+            "VariableID:2018:4399"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18270",
+          "descendantName": "Anchor",
+          "propertyPath": "strokeWeight",
+          "variableIds": [
+            "VariableID:6103:569"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18270",
+          "descendantName": "Anchor",
+          "propertyPath": "size.x",
+          "variableIds": [
+            "VariableID:2018:4399"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18270",
+          "descendantName": "Anchor",
+          "propertyPath": "size.y",
+          "variableIds": [
+            "VariableID:2018:4399"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18271",
+          "descendantName": "Anchor",
+          "propertyPath": "strokeWeight",
+          "variableIds": [
+            "VariableID:6103:569"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18271",
+          "descendantName": "Anchor",
+          "propertyPath": "size.x",
+          "variableIds": [
+            "VariableID:2018:4399"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18271",
+          "descendantName": "Anchor",
+          "propertyPath": "size.y",
+          "variableIds": [
+            "VariableID:2018:4399"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18272",
+          "descendantName": "Anchor",
+          "propertyPath": "strokeWeight",
+          "variableIds": [
+            "VariableID:6103:569"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18272",
+          "descendantName": "Anchor",
+          "propertyPath": "size.x",
+          "variableIds": [
+            "VariableID:2018:4399"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18272",
+          "descendantName": "Anchor",
+          "propertyPath": "size.y",
+          "variableIds": [
+            "VariableID:2018:4399"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18273",
+          "descendantName": "Anchor",
+          "propertyPath": "strokeWeight",
+          "variableIds": [
+            "VariableID:6103:569"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18273",
+          "descendantName": "Anchor",
+          "propertyPath": "size.x",
+          "variableIds": [
+            "VariableID:2018:4399"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18273",
+          "descendantName": "Anchor",
+          "propertyPath": "size.y",
+          "variableIds": [
+            "VariableID:2018:4399"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18274",
+          "descendantName": "Anchor-Selected",
+          "propertyPath": "strokeWeight",
+          "variableIds": [
+            "VariableID:6103:569"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18274",
+          "descendantName": "Anchor-Selected",
+          "propertyPath": "size.x",
+          "variableIds": [
+            "VariableID:2018:4400"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18274",
+          "descendantName": "Anchor-Selected",
+          "propertyPath": "size.y",
+          "variableIds": [
+            "VariableID:2018:4400"
+          ],
+          "category": "unsupported-node-binding"
+        }
+      ],
+      "note": "svg descendants: 2 live colour binding(s), 36 unsupported binding(s), 0 baked auto-layout frame(s)"
+    },
+    {
+      "nodeId": "12007:18275",
+      "kind": "svg-descendant-semantics",
+      "visual": false,
+      "liveColorBindings": 8,
+      "residualBindings": 12,
+      "residualLayouts": 0,
+      "findings": [
+        {
+          "descendantId": "12007:18276",
+          "descendantName": "Radius-Anchor",
+          "propertyPath": "strokeWeight",
+          "variableIds": [
+            "VariableID:2017:4365"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18276",
+          "descendantName": "Radius-Anchor",
+          "propertyPath": "size.x",
+          "variableIds": [
+            "VariableID:2018:4400"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18276",
+          "descendantName": "Radius-Anchor",
+          "propertyPath": "size.y",
+          "variableIds": [
+            "VariableID:2018:4400"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18277",
+          "descendantName": "Radius-Anchor",
+          "propertyPath": "strokeWeight",
+          "variableIds": [
+            "VariableID:2017:4365"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18277",
+          "descendantName": "Radius-Anchor",
+          "propertyPath": "size.x",
+          "variableIds": [
+            "VariableID:2018:4400"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18277",
+          "descendantName": "Radius-Anchor",
+          "propertyPath": "size.y",
+          "variableIds": [
+            "VariableID:2018:4400"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18278",
+          "descendantName": "Radius-Anchor",
+          "propertyPath": "strokeWeight",
+          "variableIds": [
+            "VariableID:2017:4365"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18278",
+          "descendantName": "Radius-Anchor",
+          "propertyPath": "size.x",
+          "variableIds": [
+            "VariableID:2018:4400"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18278",
+          "descendantName": "Radius-Anchor",
+          "propertyPath": "size.y",
+          "variableIds": [
+            "VariableID:2018:4400"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18279",
+          "descendantName": "Radius-Anchor",
+          "propertyPath": "strokeWeight",
+          "variableIds": [
+            "VariableID:2017:4365"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18279",
+          "descendantName": "Radius-Anchor",
+          "propertyPath": "size.x",
+          "variableIds": [
+            "VariableID:2018:4400"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "12007:18279",
+          "descendantName": "Radius-Anchor",
+          "propertyPath": "size.y",
+          "variableIds": [
+            "VariableID:2018:4400"
+          ],
+          "category": "unsupported-node-binding"
+        }
+      ],
+      "note": "svg descendants: 8 live colour binding(s), 12 unsupported binding(s), 0 baked auto-layout frame(s)"
+    }
+  ]
+}

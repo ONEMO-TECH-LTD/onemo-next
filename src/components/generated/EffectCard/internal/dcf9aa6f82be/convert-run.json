@@ -1,0 +1,345 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "12016:11346",
+  "fileVersion": "2381318852839647833",
+  "contentHash": "62b76587cf0013199e94f15aa4ed0ae50484fb277fc59cc1eb99f8d865b47c0b",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 1,
+  "figmaAbsoluteCount": 1,
+  "helperAbsoluteCount": 1,
+  "idMap": [
+    {
+      "figmaId": "12016:11346",
+      "class": "effectCard",
+      "kind": "element"
+    },
+    {
+      "figmaId": "I12016:11346;8054:4018",
+      "class": "effectCard2",
+      "kind": "element"
+    }
+  ],
+  "helperMap": [
+    {
+      "ownerFigmaId": "I12016:11346;8054:4018",
+      "role": "fill:0",
+      "sourceIndex": 0,
+      "class": "fcPaint1Fill",
+      "order": 0
+    }
+  ],
+  "componentSurface": [],
+  "componentProperties": [
+    {
+      "authoredKey": "Side",
+      "propName": "side",
+      "type": "VARIANT",
+      "defaultValue": "Face-Modify-frame1",
+      "variantOptions": [
+        "Face",
+        "Back",
+        "Face-Modify-frame1"
+      ],
+      "bindingScope": []
+    }
+  ],
+  "internalEntry": {
+    "id": "dcf9aa6f82be",
+    "public": false,
+    "localName": "EffectCardInternal_dcf9aa6f82be",
+    "ownerMasterId": "12016:11345",
+    "instanceId": "12016:11346",
+    "targetId": "8054:4017",
+    "targetArtifactId": "8054:4016",
+    "targetMasterId": "8054:4017",
+    "targetCodeName": "EffectCard",
+    "relativePath": "EffectCard/internal/dcf9aa6f82be/EffectCardInternal_dcf9aa6f82be.tsx",
+    "pinned": [
+      {
+        "nodeId": "I12016:11346;8054:4018",
+        "sourceNodeId": "8054:4018",
+        "path": [
+          "8054:4018"
+        ],
+        "field": "effects",
+        "value": [
+          {
+            "blendMode": "NORMAL",
+            "boundVariables": {
+              "color": {
+                "id": "VariableID:6057:31308",
+                "type": "VARIABLE_ALIAS"
+              },
+              "offsetY": {
+                "id": "VariableID:6057:31285",
+                "type": "VARIABLE_ALIAS"
+              },
+              "radius": {
+                "id": "VariableID:74:36407",
+                "type": "VARIABLE_ALIAS"
+              },
+              "spread": {
+                "id": "VariableID:6057:31285",
+                "type": "VARIABLE_ALIAS"
+              }
+            },
+            "color": {
+              "a": 0.30000001192092896,
+              "b": 0.07450980693101883,
+              "g": 0.062745101749897,
+              "r": 0.027450980618596077
+            },
+            "offset": {
+              "x": 0,
+              "y": 4
+            },
+            "radius": 8,
+            "showShadowBehindNode": false,
+            "spread": 4,
+            "type": "DROP_SHADOW",
+            "visible": true
+          },
+          {
+            "blendMode": "NORMAL",
+            "boundVariables": {
+              "radius": {
+                "id": "VariableID:74:36407",
+                "type": "VARIABLE_ALIAS"
+              },
+              "spread": {
+                "id": "VariableID:6057:31272",
+                "type": "VARIABLE_ALIAS"
+              }
+            },
+            "color": {
+              "a": 0.5,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "offset": {
+              "x": 0,
+              "y": 0
+            },
+            "radius": 8,
+            "spread": 2,
+            "type": "INNER_SHADOW",
+            "visible": true
+          }
+        ],
+        "sourceValue": [
+          {
+            "blendMode": "NORMAL",
+            "boundVariables": {
+              "color": {
+                "id": "VariableID:6057:31308",
+                "type": "VARIABLE_ALIAS"
+              },
+              "offsetY": {
+                "id": "VariableID:6057:31285",
+                "type": "VARIABLE_ALIAS"
+              },
+              "radius": {
+                "id": "VariableID:74:36407",
+                "type": "VARIABLE_ALIAS"
+              },
+              "spread": {
+                "id": "VariableID:6057:31285",
+                "type": "VARIABLE_ALIAS"
+              }
+            },
+            "color": {
+              "a": 0.30000001192092896,
+              "b": 0.07450980693101883,
+              "g": 0.062745101749897,
+              "r": 0.027450980618596077
+            },
+            "offset": {
+              "x": 0,
+              "y": 4
+            },
+            "radius": 8,
+            "showShadowBehindNode": false,
+            "spread": 4,
+            "type": "DROP_SHADOW",
+            "visible": true
+          },
+          {
+            "blendMode": "NORMAL",
+            "boundVariables": {
+              "radius": {
+                "id": "VariableID:74:36407",
+                "type": "VARIABLE_ALIAS"
+              },
+              "spread": {
+                "id": "VariableID:74:36407",
+                "type": "VARIABLE_ALIAS"
+              }
+            },
+            "color": {
+              "a": 0.5,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "offset": {
+              "x": 0,
+              "y": 0
+            },
+            "radius": 8,
+            "spread": 8,
+            "type": "INNER_SHADOW",
+            "visible": true
+          }
+        ]
+      },
+      {
+        "nodeId": "I12016:11346;8054:4018",
+        "sourceNodeId": "8054:4018",
+        "path": [
+          "8054:4018"
+        ],
+        "field": "fills",
+        "value": [
+          {
+            "blendMode": "NORMAL",
+            "filters": {
+              "exposure": -0.41999998688697815
+            },
+            "imageRef": "279f910f370a2325793fad0360f98b53eb0c69cd",
+            "imageTransform": [
+              [
+                0.9574775695800781,
+                0,
+                0.021261222660541534
+              ],
+              [
+                0,
+                0.716819167137146,
+                0.07715941965579987
+              ]
+            ],
+            "scaleMode": "STRETCH",
+            "type": "IMAGE"
+          }
+        ],
+        "sourceValue": [
+          {
+            "blendMode": "NORMAL",
+            "filters": {
+              "exposure": 0.07999999821186066
+            },
+            "imageRef": "279f910f370a2325793fad0360f98b53eb0c69cd",
+            "imageTransform": [
+              [
+                0.9574775695800781,
+                0,
+                0.021261222660541534
+              ],
+              [
+                0,
+                0.716819167137146,
+                0.07715941965579987
+              ]
+            ],
+            "scaleMode": "STRETCH",
+            "type": "IMAGE"
+          }
+        ]
+      },
+      {
+        "nodeId": "I12016:11346;8054:4018",
+        "sourceNodeId": "8054:4018",
+        "path": [
+          "8054:4018"
+        ],
+        "field": "strokes",
+        "value": [
+          {
+            "blendMode": "NORMAL",
+            "gradientHandlePositions": [
+              {
+                "x": 0.8710937119767538,
+                "y": -0.0195312701671361
+              },
+              {
+                "x": 0.4746093256267143,
+                "y": 1.2089843904905142
+              },
+              {
+                "x": 0.2568358816479286,
+                "y": -0.21777346334215583
+              }
+            ],
+            "gradientStops": [
+              {
+                "color": {
+                  "a": 1,
+                  "b": 0.4117647111415863,
+                  "g": 0.3803921639919281,
+                  "r": 0.3529411852359772
+                },
+                "position": 0
+              },
+              {
+                "color": {
+                  "a": 1,
+                  "b": 0.17230768501758575,
+                  "g": 0.15917949378490448,
+                  "r": 0.14769230782985687
+                },
+                "position": 1
+              }
+            ],
+            "type": "GRADIENT_LINEAR",
+            "visible": false
+          }
+        ],
+        "sourceValue": [
+          {
+            "blendMode": "NORMAL",
+            "gradientHandlePositions": [
+              {
+                "x": 0.8710937119767538,
+                "y": -0.0195312701671361
+              },
+              {
+                "x": 0.4746093256267143,
+                "y": 1.2089843904905142
+              },
+              {
+                "x": 0.2568358816479286,
+                "y": -0.21777346334215583
+              }
+            ],
+            "gradientStops": [
+              {
+                "color": {
+                  "a": 1,
+                  "b": 0.4117647111415863,
+                  "g": 0.3803921639919281,
+                  "r": 0.3529411852359772
+                },
+                "position": 0
+              },
+              {
+                "color": {
+                  "a": 1,
+                  "b": 0.17230768501758575,
+                  "g": 0.15917949378490448,
+                  "r": 0.14769230782985687
+                },
+                "position": 1
+              }
+            ],
+            "type": "GRADIENT_LINEAR"
+          }
+        ]
+      }
+    ],
+    "childEntryIds": []
+  },
+  "refusals": [],
+  "notes": []
+}

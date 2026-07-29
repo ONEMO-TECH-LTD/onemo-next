@@ -1,0 +1,56 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "8017:27662",
+  "fileVersion": "2381318852839647833",
+  "contentHash": "49ece9869deabedb242259203190af524f98bf9e69a5f7071fb33786b2ca22b2",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 1,
+  "idMap": [
+    {
+      "figmaId": "8017:27662",
+      "class": "sideFaceModifyFrame1",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:4707",
+      "class": "effectCard",
+      "kind": "element"
+    }
+  ],
+  "helperMap": [
+    {
+      "ownerFigmaId": "8017:27662",
+      "role": "stroke",
+      "sourceIndex": null,
+      "class": "fcPaint1Stroke",
+      "order": 0,
+      "technique": "live-dash-svg"
+    }
+  ],
+  "componentSurface": [],
+  "componentProperties": [
+    {
+      "authoredKey": "Side",
+      "propName": "side",
+      "type": "VARIANT",
+      "defaultValue": "Face-Modify-frame1",
+      "variantOptions": [
+        "Face",
+        "Back",
+        "Face-Modify-frame1"
+      ],
+      "bindingScope": []
+    }
+  ],
+  "refusals": [],
+  "notes": [
+    {
+      "nodeId": "8014:4707",
+      "kind": "approximation",
+      "note": "inner-shadow token(s) baked into the SVG filter — a CSS var() cannot cross into a data-URI SVG (value exact; token link not carried)"
+    }
+  ]
+}

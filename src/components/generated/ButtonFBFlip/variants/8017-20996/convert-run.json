@@ -1,0 +1,74 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "8017:20996",
+  "fileVersion": "2381318852839647833",
+  "contentHash": "256dbf3c45407ebee6b04ef98dca28e26f7b5d140f03f61f51c29d8dd33ee361",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "8017:20996",
+      "class": "stateBackside",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8017:20990",
+      "class": "buttonRoundFrostSmall",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8017:20991",
+      "class": "rotate",
+      "kind": "svg"
+    },
+    {
+      "figmaId": "8017:20993",
+      "class": "label",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8017:20994",
+      "class": "front",
+      "kind": "text"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [],
+  "componentProperties": [
+    {
+      "authoredKey": "State",
+      "propName": "state",
+      "type": "VARIANT",
+      "defaultValue": "Backside",
+      "variantOptions": [
+        "Frontside",
+        "Backside"
+      ],
+      "bindingScope": []
+    }
+  ],
+  "refusals": [],
+  "notes": [
+    {
+      "nodeId": "8017:20991",
+      "kind": "svg-descendant-semantics",
+      "visual": false,
+      "liveColorBindings": 1,
+      "residualBindings": 0,
+      "residualLayouts": 1,
+      "findings": [
+        {
+          "descendantId": "8017:20991",
+          "descendantName": "Rotate",
+          "propertyPath": "layoutMode",
+          "category": "baked-auto-layout",
+          "detail": "HORIZONTAL"
+        }
+      ],
+      "note": "svg descendants: 1 live colour binding(s), 0 unsupported binding(s), 1 baked auto-layout frame(s)"
+    }
+  ]
+}

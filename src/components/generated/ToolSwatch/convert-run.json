@@ -1,0 +1,42 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "8019:1593",
+  "fileVersion": "2381318852839647833",
+  "contentHash": "4d0b6645a0ddd113336bba4f9c9ea428b922abd874a44eba3042062fe1593215",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "8019:1593",
+      "class": "toolSwatch",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8019:1570",
+      "class": "toolSwatches",
+      "kind": "element"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [
+    {
+      "instanceId": "8019:1570",
+      "targetId": "8019:1146",
+      "props": {},
+      "layout": {
+        "height": 32,
+        "layoutAlign": "STRETCH",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FILL",
+        "layoutSizingVertical": "HUG",
+        "width": 945
+      }
+    }
+  ],
+  "componentProperties": [],
+  "refusals": [],
+  "notes": []
+}

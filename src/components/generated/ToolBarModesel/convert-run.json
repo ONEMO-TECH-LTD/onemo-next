@@ -1,0 +1,88 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "6138:953",
+  "fileVersion": "2381318852839647833",
+  "contentHash": "a88413e7b92280595cf165a2ab989a4eaeab34aea62eac3df177826dbdd7fb2e",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 3,
+  "figmaAbsoluteCount": 3,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "6138:953",
+      "class": "toolBarModesel",
+      "kind": "element"
+    },
+    {
+      "figmaId": "6123:57140",
+      "class": "modeSelector",
+      "kind": "element"
+    },
+    {
+      "figmaId": "6127:57185",
+      "class": "maskGroup",
+      "kind": "element"
+    },
+    {
+      "figmaId": "6127:57184",
+      "class": "frame9",
+      "kind": "element"
+    },
+    {
+      "figmaId": "6122:57037",
+      "class": "modes",
+      "kind": "element"
+    },
+    {
+      "figmaId": "6123:57120",
+      "class": "segment",
+      "kind": "element"
+    },
+    {
+      "figmaId": "6123:57121",
+      "class": "label",
+      "kind": "element"
+    },
+    {
+      "figmaId": "6123:57122",
+      "class": "label2",
+      "kind": "text"
+    },
+    {
+      "figmaId": "6123:57123",
+      "class": "segment2",
+      "kind": "element"
+    },
+    {
+      "figmaId": "6123:57124",
+      "class": "label3",
+      "kind": "element"
+    },
+    {
+      "figmaId": "6123:57125",
+      "class": "label4",
+      "kind": "text"
+    },
+    {
+      "figmaId": "6123:57142",
+      "class": "segment3",
+      "kind": "element"
+    },
+    {
+      "figmaId": "6123:57143",
+      "class": "label5",
+      "kind": "element"
+    },
+    {
+      "figmaId": "6123:57144",
+      "class": "label6",
+      "kind": "text"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [],
+  "componentProperties": [],
+  "refusals": [],
+  "notes": []
+}

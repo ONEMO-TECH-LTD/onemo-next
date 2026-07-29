@@ -1,0 +1,61 @@
+.stateActive {
+  width: 48px;
+  height: 48px;
+  position: relative;
+}
+
+.dialBox {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.dialReg {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: var(--sem-dim-fluid-big-m);
+  height: var(--sem-dim-fluid-big-m);
+  flex-shrink: 0;
+  z-index: 0;
+  border: var(--sem-border-micro-m) solid var(--sem-col-border-primary-strong);
+  border-radius: var(--sem-radii-full);
+}
+
+.dialLable {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  width: var(--sem-dim-fluid-standard-l);
+  height: var(--sem-dim-fluid-standard-l);
+  flex-shrink: 0;
+}
+
+.el8 {
+  width: var(--sem-dim-fluid-standard-l);
+  height: var(--sem-dim-fluid-standard-l);
+  flex-shrink: 0;
+  color: var(--sem-col-text-primary-default);
+  font-family: var(--sem-type-fluid-label-m-font);
+  font-size: var(--sem-type-fluid-label-m-size);
+  font-weight: 500;
+  line-height: var(--sem-type-fluid-label-m-line-height);
+  letter-spacing: var(--sem-type-fluid-label-m-letter-spacing);
+  text-align: center;
+  align-content: center;
+}
+
+.dialFill {
+  width: 24px;
+  height: 38.11px;
+  position: absolute;
+  left: 24px;
+  top: 0;
+  z-index: 1;
+  color: var(--sem-col-border-max-default);
+}

@@ -1,0 +1,970 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "8018:27932",
+  "fileVersion": "2381318852839647833",
+  "contentHash": "d4cc6d89f2f751f5690e9a6758e9c9882b3a376b7a89af3d0b05f3620f0cefe8",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "8018:27932",
+      "class": "menuToolFrostSingleTemplate",
+      "kind": "element"
+    },
+    {
+      "figmaId": "I8018:27932;6103:642",
+      "class": "container",
+      "kind": "element"
+    },
+    {
+      "figmaId": "I8018:27932;6104:642",
+      "class": "buttonRoundFrostMini",
+      "kind": "element"
+    },
+    {
+      "figmaId": "I8018:27932;6105:32434",
+      "class": "buttonRoundFrostMini2",
+      "kind": "element",
+      "propertyRefs": {
+        "visible": "Button 2#6105:3"
+      }
+    },
+    {
+      "figmaId": "I8018:27932;6105:32437",
+      "class": "buttonRoundFrostMini3",
+      "kind": "element",
+      "propertyRefs": {
+        "visible": "Button 3#6105:4"
+      }
+    },
+    {
+      "figmaId": "I8018:27932;6105:32440",
+      "class": "buttonRoundFrostMini4",
+      "kind": "element",
+      "propertyRefs": {
+        "visible": "Button 4#6105:5"
+      }
+    },
+    {
+      "figmaId": "I8018:27932;6105:32443",
+      "class": "buttonRoundFrostMini5",
+      "kind": "element",
+      "propertyRefs": {
+        "visible": "Button 5#6105:6"
+      }
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [
+    {
+      "instanceId": "I8018:27932;6104:642",
+      "targetId": "6104:641",
+      "props": {
+        "Icons#6104:1": {
+          "preferredValues": [
+            {
+              "key": "793d88c14c978af066f1179248060dcfc7c4a3c9",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "a8cb8f0e78bfed63a67db4675747baa8ff717fe3",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "fa1220224598fcf20358f9a48c0a2d99212b99ea",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "f6326317d82666a67f92a446b63bf620371c9c68",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "1460470e6301acd2835739e9c400b261e03e2e86",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "a74a299f791aa638bc4957d10a5fd04ace1bd600",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "f4164ac11b5fc7deade064da1b9907573a4f86a4",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "490749882fa69c9f03db08a44857d10cb544fd27",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "854a3341e1f1552957688393a16554b6f981ccfc",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "79d7d500f90fbd77de719fc1eb7c3fe3d00fcc46",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "0377e27be1912459cf39f8e989e3f12573b0fa5d",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "6d697d805b2b5bc92a69244522240c1e8b848a23",
+              "type": "COMPONENT"
+            }
+          ],
+          "type": "INSTANCE_SWAP",
+          "value": "8018:27923"
+        }
+      },
+      "layout": {
+        "height": 32,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "HUG",
+        "layoutSizingVertical": "HUG",
+        "width": 32
+      }
+    },
+    {
+      "instanceId": "I8018:27932;6105:32434",
+      "targetId": "6104:641",
+      "props": {
+        "Icons#6104:1": {
+          "preferredValues": [
+            {
+              "key": "793d88c14c978af066f1179248060dcfc7c4a3c9",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "a8cb8f0e78bfed63a67db4675747baa8ff717fe3",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "fa1220224598fcf20358f9a48c0a2d99212b99ea",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "f6326317d82666a67f92a446b63bf620371c9c68",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "1460470e6301acd2835739e9c400b261e03e2e86",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "a74a299f791aa638bc4957d10a5fd04ace1bd600",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "f4164ac11b5fc7deade064da1b9907573a4f86a4",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "490749882fa69c9f03db08a44857d10cb544fd27",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "854a3341e1f1552957688393a16554b6f981ccfc",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "79d7d500f90fbd77de719fc1eb7c3fe3d00fcc46",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "0377e27be1912459cf39f8e989e3f12573b0fa5d",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "6d697d805b2b5bc92a69244522240c1e8b848a23",
+              "type": "COMPONENT"
+            }
+          ],
+          "type": "INSTANCE_SWAP",
+          "value": "8018:27921"
+        }
+      },
+      "layout": {
+        "height": 32,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "HUG",
+        "layoutSizingVertical": "HUG",
+        "width": 32
+      }
+    },
+    {
+      "instanceId": "I8018:27932;6105:32437",
+      "targetId": "6104:641",
+      "props": {
+        "Icons#6104:1": {
+          "preferredValues": [
+            {
+              "key": "793d88c14c978af066f1179248060dcfc7c4a3c9",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "a8cb8f0e78bfed63a67db4675747baa8ff717fe3",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "fa1220224598fcf20358f9a48c0a2d99212b99ea",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "f6326317d82666a67f92a446b63bf620371c9c68",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "1460470e6301acd2835739e9c400b261e03e2e86",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "a74a299f791aa638bc4957d10a5fd04ace1bd600",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "f4164ac11b5fc7deade064da1b9907573a4f86a4",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "490749882fa69c9f03db08a44857d10cb544fd27",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "854a3341e1f1552957688393a16554b6f981ccfc",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "79d7d500f90fbd77de719fc1eb7c3fe3d00fcc46",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "0377e27be1912459cf39f8e989e3f12573b0fa5d",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "6d697d805b2b5bc92a69244522240c1e8b848a23",
+              "type": "COMPONENT"
+            }
+          ],
+          "type": "INSTANCE_SWAP",
+          "value": "8018:27922"
+        }
+      },
+      "layout": {
+        "height": 32,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "HUG",
+        "layoutSizingVertical": "HUG",
+        "width": 32
+      }
+    },
+    {
+      "instanceId": "I8018:27932;6105:32440",
+      "targetId": "6104:641",
+      "props": {
+        "Icons#6104:1": {
+          "preferredValues": [
+            {
+              "key": "793d88c14c978af066f1179248060dcfc7c4a3c9",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "a8cb8f0e78bfed63a67db4675747baa8ff717fe3",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "fa1220224598fcf20358f9a48c0a2d99212b99ea",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "f6326317d82666a67f92a446b63bf620371c9c68",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "1460470e6301acd2835739e9c400b261e03e2e86",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "a74a299f791aa638bc4957d10a5fd04ace1bd600",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "f4164ac11b5fc7deade064da1b9907573a4f86a4",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "490749882fa69c9f03db08a44857d10cb544fd27",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "854a3341e1f1552957688393a16554b6f981ccfc",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "79d7d500f90fbd77de719fc1eb7c3fe3d00fcc46",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "0377e27be1912459cf39f8e989e3f12573b0fa5d",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "6d697d805b2b5bc92a69244522240c1e8b848a23",
+              "type": "COMPONENT"
+            }
+          ],
+          "type": "INSTANCE_SWAP",
+          "value": "8018:27920"
+        }
+      },
+      "layout": {
+        "height": 32,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "HUG",
+        "layoutSizingVertical": "HUG",
+        "width": 32
+      }
+    },
+    {
+      "instanceId": "I8018:27932;6105:32443",
+      "targetId": "6104:641",
+      "props": {
+        "Icons#6104:1": {
+          "preferredValues": [
+            {
+              "key": "793d88c14c978af066f1179248060dcfc7c4a3c9",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "a8cb8f0e78bfed63a67db4675747baa8ff717fe3",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "fa1220224598fcf20358f9a48c0a2d99212b99ea",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "f6326317d82666a67f92a446b63bf620371c9c68",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "1460470e6301acd2835739e9c400b261e03e2e86",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "a74a299f791aa638bc4957d10a5fd04ace1bd600",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "f4164ac11b5fc7deade064da1b9907573a4f86a4",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "490749882fa69c9f03db08a44857d10cb544fd27",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "854a3341e1f1552957688393a16554b6f981ccfc",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "79d7d500f90fbd77de719fc1eb7c3fe3d00fcc46",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "0377e27be1912459cf39f8e989e3f12573b0fa5d",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "6d697d805b2b5bc92a69244522240c1e8b848a23",
+              "type": "COMPONENT"
+            }
+          ],
+          "type": "INSTANCE_SWAP",
+          "value": "8018:27919"
+        }
+      },
+      "layout": {
+        "height": 32,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "HUG",
+        "layoutSizingVertical": "HUG",
+        "width": 32
+      }
+    }
+  ],
+  "componentProperties": [
+    {
+      "authoredKey": "Button 2#6105:3",
+      "propName": "button2",
+      "type": "BOOLEAN",
+      "defaultValue": false,
+      "bindingScope": [
+        {
+          "masterId": "6103:702",
+          "sites": [
+            {
+              "nodeId": "6105:32434",
+              "field": "visible"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "authoredKey": "Button 3#6105:4",
+      "propName": "button3",
+      "type": "BOOLEAN",
+      "defaultValue": false,
+      "bindingScope": [
+        {
+          "masterId": "6103:702",
+          "sites": [
+            {
+              "nodeId": "6105:32437",
+              "field": "visible"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "authoredKey": "Button 4#6105:5",
+      "propName": "button4",
+      "type": "BOOLEAN",
+      "defaultValue": false,
+      "bindingScope": [
+        {
+          "masterId": "6103:702",
+          "sites": [
+            {
+              "nodeId": "6105:32440",
+              "field": "visible"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "authoredKey": "Button 5#6105:6",
+      "propName": "button5",
+      "type": "BOOLEAN",
+      "defaultValue": false,
+      "bindingScope": [
+        {
+          "masterId": "6103:702",
+          "sites": [
+            {
+              "nodeId": "6105:32443",
+              "field": "visible"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "internalEntry": {
+    "id": "3c20120468c5",
+    "public": false,
+    "localName": "MenuToolFrostSingleTemplateInternal_3c20120468c5",
+    "ownerMasterId": "8018:28072",
+    "instanceId": "8018:27932",
+    "targetId": "6103:702",
+    "targetArtifactId": "6103:702",
+    "targetMasterId": "6103:702",
+    "targetCodeName": "MenuToolFrostSingleTemplate",
+    "relativePath": "MenuToolFrostSingleTemplate/internal/3c20120468c5/MenuToolFrostSingleTemplateInternal_3c20120468c5.tsx",
+    "pinned": [
+      {
+        "nodeId": "I8018:27932;6105:32434",
+        "sourceNodeId": "6105:32434",
+        "path": [
+          "6105:32434"
+        ],
+        "field": "componentProperties",
+        "value": {
+          "Icons#6104:1": {
+            "preferredValues": [
+              {
+                "key": "793d88c14c978af066f1179248060dcfc7c4a3c9",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "a8cb8f0e78bfed63a67db4675747baa8ff717fe3",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "fa1220224598fcf20358f9a48c0a2d99212b99ea",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "f6326317d82666a67f92a446b63bf620371c9c68",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "1460470e6301acd2835739e9c400b261e03e2e86",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "a74a299f791aa638bc4957d10a5fd04ace1bd600",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "f4164ac11b5fc7deade064da1b9907573a4f86a4",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "490749882fa69c9f03db08a44857d10cb544fd27",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "854a3341e1f1552957688393a16554b6f981ccfc",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "79d7d500f90fbd77de719fc1eb7c3fe3d00fcc46",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "0377e27be1912459cf39f8e989e3f12573b0fa5d",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "6d697d805b2b5bc92a69244522240c1e8b848a23",
+                "type": "COMPONENT"
+              }
+            ],
+            "type": "INSTANCE_SWAP",
+            "value": "8018:27921"
+          }
+        },
+        "sourceValue": {
+          "Icons#6104:1": {
+            "preferredValues": [
+              {
+                "key": "793d88c14c978af066f1179248060dcfc7c4a3c9",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "a8cb8f0e78bfed63a67db4675747baa8ff717fe3",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "fa1220224598fcf20358f9a48c0a2d99212b99ea",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "f6326317d82666a67f92a446b63bf620371c9c68",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "1460470e6301acd2835739e9c400b261e03e2e86",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "a74a299f791aa638bc4957d10a5fd04ace1bd600",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "f4164ac11b5fc7deade064da1b9907573a4f86a4",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "490749882fa69c9f03db08a44857d10cb544fd27",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "854a3341e1f1552957688393a16554b6f981ccfc",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "79d7d500f90fbd77de719fc1eb7c3fe3d00fcc46",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "0377e27be1912459cf39f8e989e3f12573b0fa5d",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "6d697d805b2b5bc92a69244522240c1e8b848a23",
+                "type": "COMPONENT"
+              }
+            ],
+            "type": "INSTANCE_SWAP",
+            "value": "8018:27923"
+          }
+        }
+      },
+      {
+        "nodeId": "I8018:27932;6105:32437",
+        "sourceNodeId": "6105:32437",
+        "path": [
+          "6105:32437"
+        ],
+        "field": "componentProperties",
+        "value": {
+          "Icons#6104:1": {
+            "preferredValues": [
+              {
+                "key": "793d88c14c978af066f1179248060dcfc7c4a3c9",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "a8cb8f0e78bfed63a67db4675747baa8ff717fe3",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "fa1220224598fcf20358f9a48c0a2d99212b99ea",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "f6326317d82666a67f92a446b63bf620371c9c68",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "1460470e6301acd2835739e9c400b261e03e2e86",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "a74a299f791aa638bc4957d10a5fd04ace1bd600",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "f4164ac11b5fc7deade064da1b9907573a4f86a4",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "490749882fa69c9f03db08a44857d10cb544fd27",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "854a3341e1f1552957688393a16554b6f981ccfc",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "79d7d500f90fbd77de719fc1eb7c3fe3d00fcc46",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "0377e27be1912459cf39f8e989e3f12573b0fa5d",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "6d697d805b2b5bc92a69244522240c1e8b848a23",
+                "type": "COMPONENT"
+              }
+            ],
+            "type": "INSTANCE_SWAP",
+            "value": "8018:27922"
+          }
+        },
+        "sourceValue": {
+          "Icons#6104:1": {
+            "preferredValues": [
+              {
+                "key": "793d88c14c978af066f1179248060dcfc7c4a3c9",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "a8cb8f0e78bfed63a67db4675747baa8ff717fe3",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "fa1220224598fcf20358f9a48c0a2d99212b99ea",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "f6326317d82666a67f92a446b63bf620371c9c68",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "1460470e6301acd2835739e9c400b261e03e2e86",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "a74a299f791aa638bc4957d10a5fd04ace1bd600",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "f4164ac11b5fc7deade064da1b9907573a4f86a4",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "490749882fa69c9f03db08a44857d10cb544fd27",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "854a3341e1f1552957688393a16554b6f981ccfc",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "79d7d500f90fbd77de719fc1eb7c3fe3d00fcc46",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "0377e27be1912459cf39f8e989e3f12573b0fa5d",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "6d697d805b2b5bc92a69244522240c1e8b848a23",
+                "type": "COMPONENT"
+              }
+            ],
+            "type": "INSTANCE_SWAP",
+            "value": "8018:27923"
+          }
+        }
+      },
+      {
+        "nodeId": "I8018:27932;6105:32440",
+        "sourceNodeId": "6105:32440",
+        "path": [
+          "6105:32440"
+        ],
+        "field": "componentProperties",
+        "value": {
+          "Icons#6104:1": {
+            "preferredValues": [
+              {
+                "key": "793d88c14c978af066f1179248060dcfc7c4a3c9",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "a8cb8f0e78bfed63a67db4675747baa8ff717fe3",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "fa1220224598fcf20358f9a48c0a2d99212b99ea",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "f6326317d82666a67f92a446b63bf620371c9c68",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "1460470e6301acd2835739e9c400b261e03e2e86",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "a74a299f791aa638bc4957d10a5fd04ace1bd600",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "f4164ac11b5fc7deade064da1b9907573a4f86a4",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "490749882fa69c9f03db08a44857d10cb544fd27",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "854a3341e1f1552957688393a16554b6f981ccfc",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "79d7d500f90fbd77de719fc1eb7c3fe3d00fcc46",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "0377e27be1912459cf39f8e989e3f12573b0fa5d",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "6d697d805b2b5bc92a69244522240c1e8b848a23",
+                "type": "COMPONENT"
+              }
+            ],
+            "type": "INSTANCE_SWAP",
+            "value": "8018:27920"
+          }
+        },
+        "sourceValue": {
+          "Icons#6104:1": {
+            "preferredValues": [
+              {
+                "key": "793d88c14c978af066f1179248060dcfc7c4a3c9",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "a8cb8f0e78bfed63a67db4675747baa8ff717fe3",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "fa1220224598fcf20358f9a48c0a2d99212b99ea",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "f6326317d82666a67f92a446b63bf620371c9c68",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "1460470e6301acd2835739e9c400b261e03e2e86",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "a74a299f791aa638bc4957d10a5fd04ace1bd600",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "f4164ac11b5fc7deade064da1b9907573a4f86a4",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "490749882fa69c9f03db08a44857d10cb544fd27",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "854a3341e1f1552957688393a16554b6f981ccfc",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "79d7d500f90fbd77de719fc1eb7c3fe3d00fcc46",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "0377e27be1912459cf39f8e989e3f12573b0fa5d",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "6d697d805b2b5bc92a69244522240c1e8b848a23",
+                "type": "COMPONENT"
+              }
+            ],
+            "type": "INSTANCE_SWAP",
+            "value": "8018:27923"
+          }
+        }
+      },
+      {
+        "nodeId": "I8018:27932;6105:32443",
+        "sourceNodeId": "6105:32443",
+        "path": [
+          "6105:32443"
+        ],
+        "field": "componentProperties",
+        "value": {
+          "Icons#6104:1": {
+            "preferredValues": [
+              {
+                "key": "793d88c14c978af066f1179248060dcfc7c4a3c9",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "a8cb8f0e78bfed63a67db4675747baa8ff717fe3",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "fa1220224598fcf20358f9a48c0a2d99212b99ea",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "f6326317d82666a67f92a446b63bf620371c9c68",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "1460470e6301acd2835739e9c400b261e03e2e86",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "a74a299f791aa638bc4957d10a5fd04ace1bd600",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "f4164ac11b5fc7deade064da1b9907573a4f86a4",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "490749882fa69c9f03db08a44857d10cb544fd27",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "854a3341e1f1552957688393a16554b6f981ccfc",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "79d7d500f90fbd77de719fc1eb7c3fe3d00fcc46",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "0377e27be1912459cf39f8e989e3f12573b0fa5d",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "6d697d805b2b5bc92a69244522240c1e8b848a23",
+                "type": "COMPONENT"
+              }
+            ],
+            "type": "INSTANCE_SWAP",
+            "value": "8018:27919"
+          }
+        },
+        "sourceValue": {
+          "Icons#6104:1": {
+            "preferredValues": [
+              {
+                "key": "793d88c14c978af066f1179248060dcfc7c4a3c9",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "a8cb8f0e78bfed63a67db4675747baa8ff717fe3",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "fa1220224598fcf20358f9a48c0a2d99212b99ea",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "f6326317d82666a67f92a446b63bf620371c9c68",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "1460470e6301acd2835739e9c400b261e03e2e86",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "a74a299f791aa638bc4957d10a5fd04ace1bd600",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "f4164ac11b5fc7deade064da1b9907573a4f86a4",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "490749882fa69c9f03db08a44857d10cb544fd27",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "854a3341e1f1552957688393a16554b6f981ccfc",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "79d7d500f90fbd77de719fc1eb7c3fe3d00fcc46",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "0377e27be1912459cf39f8e989e3f12573b0fa5d",
+                "type": "COMPONENT"
+              },
+              {
+                "key": "6d697d805b2b5bc92a69244522240c1e8b848a23",
+                "type": "COMPONENT"
+              }
+            ],
+            "type": "INSTANCE_SWAP",
+            "value": "8018:27923"
+          }
+        }
+      }
+    ],
+    "childEntryIds": []
+  },
+  "refusals": [],
+  "notes": []
+}

@@ -1,0 +1,1293 @@
+// Generated component-library proof inventory. Do not hand-edit.
+import RatioLock from './RatioLock/RatioLock';
+import S from './S/S';
+import ButtonPillSpec from './ButtonPillSpec/ButtonPillSpec';
+import ButtonRoundReg from './ButtonRoundReg/ButtonRoundReg';
+import Dial_6110_56193 from './Dial_6110_56193/Dial_6110_56193';
+import TickMark from './TickMark/TickMark';
+import Dial_8050_6894 from './Dial_8050_6894/Dial_8050_6894';
+import ToggleCombo from './ToggleCombo/ToggleCombo';
+import Badge from './Badge/Badge';
+import ModeSelector from './ModeSelector/ModeSelector';
+import ButtonFBFlip from './ButtonFBFlip/ButtonFBFlip';
+import MicroSectionCardMode from './MicroSectionCardMode/MicroSectionCardMode';
+import Tab from './Tab/Tab';
+import Dock from './Dock/Dock';
+import EffectCard from './EffectCard/EffectCard';
+import Swatch_12016_8557 from './Swatch_12016_8557/Swatch_12016_8557';
+import SizeIndicator from './SizeIndicator/SizeIndicator';
+import MagnetBump from './MagnetBump/MagnetBump';
+import Component1 from './Component1/Component1';
+import SizeSwatches from './SizeSwatches/SizeSwatches';
+import IconBasket from './IconBasket/IconBasket';
+import IconShop from './IconShop/IconShop';
+import IconCreate from './IconCreate/IconCreate';
+import IconLibrary from './IconLibrary/IconLibrary';
+import IconProfile from './IconProfile/IconProfile';
+import IconAdd from './IconAdd/IconAdd';
+import IconShape from './IconShape/IconShape';
+import IconStyle from './IconStyle/IconStyle';
+import IconTune from './IconTune/IconTune';
+import IconEdit from './IconEdit/IconEdit';
+import Frame_8068_4571 from './Frame_8068_4571/Frame_8068_4571';
+import Grid_8068_4670 from './Grid_8068_4670/Grid_8068_4670';
+import Size_8069_4107 from './Size_8069_4107/Size_8069_4107';
+import Frame_10006_4085 from './Frame_10006_4085/Frame_10006_4085';
+import Frame_10007_4146 from './Frame_10007_4146/Frame_10007_4146';
+import Grid2 from './Grid2/Grid2';
+import LockClosed from './LockClosed/LockClosed';
+import LockOpen from './LockOpen/LockOpen';
+import Images from './Images/Images';
+import Blob from './Blob/Blob';
+import Hexagon from './Hexagon/Hexagon';
+import Diamond from './Diamond/Diamond';
+import Sparkle from './Sparkle/Sparkle';
+import Shuffle from './Shuffle/Shuffle';
+import Circle from './Circle/Circle';
+import Triangle from './Triangle/Triangle';
+import Star from './Star/Star';
+import Heart from './Heart/Heart';
+import Upload from './Upload/Upload';
+import Square from './Square/Square';
+import RectangleLandscape from './RectangleLandscape/RectangleLandscape';
+import RectanglePortrait from './RectanglePortrait/RectanglePortrait';
+import Blend from './Blend/Blend';
+import Exposure from './Exposure/Exposure';
+import Brightness from './Brightness/Brightness';
+import Contrast from './Contrast/Contrast';
+import Saturation from './Saturation/Saturation';
+import Temp from './Temp/Temp';
+import Vignette from './Vignette/Vignette';
+import Tile from './Tile/Tile';
+import Fix from './Fix/Fix';
+import Offset from './Offset/Offset';
+import Definition from './Definition/Definition';
+import Radius from './Radius/Radius';
+import Bend from './Bend/Bend';
+import Smooth from './Smooth/Smooth';
+import Snap from './Snap/Snap';
+import Sharpen from './Sharpen/Sharpen';
+import Sticky_8001_1158 from './Sticky_8001_1158/Sticky_8001_1158';
+import Swatch_8001_1157 from './Swatch_8001_1157/Swatch_8001_1157';
+import Material from './Material/Material';
+import Size_8001_1154 from './Size_8001_1154/Size_8001_1154';
+import Grid_8001_1155 from './Grid_8001_1155/Grid_8001_1155';
+import Magnetic from './Magnetic/Magnetic';
+import Sticky_8001_1347 from './Sticky_8001_1347/Sticky_8001_1347';
+import Menu from './Menu/Menu';
+import Rotate from './Rotate/Rotate';
+import Magic from './Magic/Magic';
+import UndoMini from './UndoMini/UndoMini';
+import RedoMini from './RedoMini/RedoMini';
+import FlipVMini from './FlipVMini/FlipVMini';
+import FlipHMini from './FlipHMini/FlipHMini';
+import ResetMini from './ResetMini/ResetMini';
+import ToolTitle from './ToolTitle/ToolTitle';
+import MenuToolFrostSingleTemplate from './MenuToolFrostSingleTemplate/MenuToolFrostSingleTemplate';
+import ButtonRoundFrostMini from './ButtonRoundFrostMini/ButtonRoundFrostMini';
+import ButtonPillReg from './ButtonPillReg/ButtonPillReg';
+import ButtonRoundSpec from './ButtonRoundSpec/ButtonRoundSpec';
+import ButtonPillSpecLabeled from './ButtonPillSpecLabeled/ButtonPillSpecLabeled';
+import MenuToolFrostAssembled from './MenuToolFrostAssembled/MenuToolFrostAssembled';
+import ToolSwatches from './ToolSwatches/ToolSwatches';
+import ToolSwatch from './ToolSwatch/ToolSwatch';
+import ToolRuller from './ToolRuller/ToolRuller';
+import ToolBarModesel from './ToolBarModesel/ToolBarModesel';
+import TopSection from './TopSection/TopSection';
+import ToolNav from './ToolNav/ToolNav';
+import FrameEffectSelection from './FrameEffectSelection/FrameEffectSelection';
+import VectorMode from './VectorMode/VectorMode';
+
+export const componentProofInventory = [
+  {
+    "figmaId": "12002:17702",
+    "codeName": "RatioLock",
+    "scenarios": [
+      "variant-1",
+      "variant-2",
+      "variant-3"
+    ]
+  },
+  {
+    "figmaId": "8053:2721",
+    "codeName": "S",
+    "scenarios": [
+      "variant-1",
+      "variant-2",
+      "variant-3"
+    ]
+  },
+  {
+    "figmaId": "8018:28068",
+    "codeName": "ButtonPillSpec",
+    "scenarios": [
+      "variant-1",
+      "variant-2",
+      "swap-icon-6105:18342-6105:687",
+      "swap-icon-8018:28069-6105:687"
+    ]
+  },
+  {
+    "figmaId": "8050:6868",
+    "codeName": "ButtonRoundReg",
+    "scenarios": [
+      "variant-1",
+      "variant-2",
+      "swap-icons-6108:53400-6108:52031",
+      "swap-icons-8050:6869-6108:52031"
+    ]
+  },
+  {
+    "figmaId": "6110:56193",
+    "codeName": "Dial_6110_56193",
+    "scenarios": [
+      "variant-1",
+      "variant-2",
+      "text-value-6110:56192",
+      "swap-icons-6110:56191-6110:54836"
+    ]
+  },
+  {
+    "figmaId": "8014:3389",
+    "codeName": "TickMark",
+    "scenarios": [
+      "variant-1",
+      "variant-2"
+    ]
+  },
+  {
+    "figmaId": "8050:6894",
+    "codeName": "Dial_8050_6894",
+    "scenarios": [
+      "variant-1",
+      "variant-2"
+    ]
+  },
+  {
+    "figmaId": "8017:20931",
+    "codeName": "ToggleCombo",
+    "scenarios": [
+      "variant-1",
+      "variant-2"
+    ]
+  },
+  {
+    "figmaId": "12002:3885",
+    "codeName": "Badge",
+    "scenarios": [
+      "variant-1",
+      "variant-2"
+    ]
+  },
+  {
+    "figmaId": "12002:4329",
+    "codeName": "ModeSelector",
+    "scenarios": [
+      "variant-1",
+      "variant-2",
+      "variant-3"
+    ]
+  },
+  {
+    "figmaId": "8017:20997",
+    "codeName": "ButtonFBFlip",
+    "scenarios": [
+      "variant-1",
+      "variant-2"
+    ]
+  },
+  {
+    "figmaId": "8017:21219",
+    "codeName": "MicroSectionCardMode",
+    "scenarios": [
+      "variant-1",
+      "variant-2"
+    ]
+  },
+  {
+    "figmaId": "8017:25623",
+    "codeName": "Tab",
+    "scenarios": [
+      "variant-1",
+      "variant-2",
+      "text-label-8017:21679",
+      "text-label-8017:25624",
+      "swap-instance-8017:21679-8017:21672",
+      "swap-instance-8017:25624-8017:21672"
+    ]
+  },
+  {
+    "figmaId": "8017:26135",
+    "codeName": "Dock",
+    "scenarios": [
+      "variant-1",
+      "variant-2",
+      "variant-3",
+      "variant-4",
+      "variant-5",
+      "variant-6"
+    ]
+  },
+  {
+    "figmaId": "8054:4016",
+    "codeName": "EffectCard",
+    "scenarios": [
+      "variant-1",
+      "variant-2",
+      "variant-3"
+    ]
+  },
+  {
+    "figmaId": "12016:8557",
+    "codeName": "Swatch_12016_8557",
+    "scenarios": [
+      "variant-1",
+      "variant-2"
+    ]
+  },
+  {
+    "figmaId": "12016:11253",
+    "codeName": "SizeIndicator",
+    "scenarios": [
+      "variant-1",
+      "variant-2",
+      "variant-3",
+      "variant-4"
+    ]
+  },
+  {
+    "figmaId": "12016:10932",
+    "codeName": "MagnetBump",
+    "scenarios": [
+      "variant-1",
+      "variant-2",
+      "variant-3"
+    ]
+  },
+  {
+    "figmaId": "12016:11148",
+    "codeName": "Component1",
+    "scenarios": [
+      "variant-1",
+      "variant-2",
+      "variant-3",
+      "variant-4"
+    ]
+  },
+  {
+    "figmaId": "12016:8545",
+    "codeName": "SizeSwatches",
+    "scenarios": [
+      "variant-1",
+      "variant-2",
+      "variant-3",
+      "variant-4",
+      "variant-5"
+    ]
+  },
+  {
+    "figmaId": "8017:21672",
+    "codeName": "IconBasket",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8017:21674",
+    "codeName": "IconShop",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8017:21671",
+    "codeName": "IconCreate",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8017:21673",
+    "codeName": "IconLibrary",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8017:21675",
+    "codeName": "IconProfile",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8017:21534",
+    "codeName": "IconAdd",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8017:21535",
+    "codeName": "IconShape",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8017:21536",
+    "codeName": "IconStyle",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8017:21537",
+    "codeName": "IconTune",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8017:21538",
+    "codeName": "IconEdit",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8068:4571",
+    "codeName": "Frame_8068_4571",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8068:4670",
+    "codeName": "Grid_8068_4670",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8069:4107",
+    "codeName": "Size_8069_4107",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "10006:4085",
+    "codeName": "Frame_10006_4085",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "10007:4146",
+    "codeName": "Frame_10007_4146",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "10007:4176",
+    "codeName": "Grid2",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "12002:17690",
+    "codeName": "LockClosed",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "12002:17696",
+    "codeName": "LockOpen",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8063:3191",
+    "codeName": "Images",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "6108:54771",
+    "codeName": "Blob",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "6110:54836",
+    "codeName": "Hexagon",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "6110:54839",
+    "codeName": "Diamond",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "6110:54842",
+    "codeName": "Sparkle",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "12002:17774",
+    "codeName": "Shuffle",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "6108:52031",
+    "codeName": "Circle",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "6108:52032",
+    "codeName": "Triangle",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "6108:52033",
+    "codeName": "Star",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "6108:52034",
+    "codeName": "Heart",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "6108:52035",
+    "codeName": "Upload",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "6137:652",
+    "codeName": "Square",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "14027:8364",
+    "codeName": "RectangleLandscape",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "14027:8371",
+    "codeName": "RectanglePortrait",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8001:1144",
+    "codeName": "Blend",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8001:1142",
+    "codeName": "Exposure",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8001:1141",
+    "codeName": "Brightness",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8001:1140",
+    "codeName": "Contrast",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8001:1143",
+    "codeName": "Saturation",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8001:1138",
+    "codeName": "Temp",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8001:1139",
+    "codeName": "Vignette",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "12015:7443",
+    "codeName": "Tile",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "12015:7447",
+    "codeName": "Fix",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8001:1151",
+    "codeName": "Offset",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8001:1150",
+    "codeName": "Definition",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8001:1148",
+    "codeName": "Radius",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8001:1147",
+    "codeName": "Bend",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8001:1146",
+    "codeName": "Smooth",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8001:1145",
+    "codeName": "Snap",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8001:1149",
+    "codeName": "Sharpen",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8001:1158",
+    "codeName": "Sticky_8001_1158",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8001:1157",
+    "codeName": "Swatch_8001_1157",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8001:1156",
+    "codeName": "Material",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8001:1154",
+    "codeName": "Size_8001_1154",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8001:1155",
+    "codeName": "Grid_8001_1155",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8001:1153",
+    "codeName": "Magnetic",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8001:1347",
+    "codeName": "Sticky_8001_1347",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "6105:687",
+    "codeName": "Menu",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "6105:18352",
+    "codeName": "Rotate",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "6108:48035",
+    "codeName": "Magic",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8018:27923",
+    "codeName": "UndoMini",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8018:27921",
+    "codeName": "RedoMini",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8018:27922",
+    "codeName": "FlipVMini",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8018:27920",
+    "codeName": "FlipHMini",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8018:27919",
+    "codeName": "ResetMini",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "12010:22538",
+    "codeName": "ToolTitle",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "6103:702",
+    "codeName": "MenuToolFrostSingleTemplate",
+    "scenarios": [
+      "variant-1",
+      "boolean-button2-6103:702",
+      "boolean-button3-6103:702",
+      "boolean-button4-6103:702",
+      "boolean-button5-6103:702"
+    ]
+  },
+  {
+    "figmaId": "6104:641",
+    "codeName": "ButtonRoundFrostMini",
+    "scenarios": [
+      "variant-1",
+      "swap-icons-6104:641-8018:27923"
+    ]
+  },
+  {
+    "figmaId": "6103:707",
+    "codeName": "ButtonPillReg",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "6108:48040",
+    "codeName": "ButtonRoundSpec",
+    "scenarios": [
+      "variant-1",
+      "swap-icons-6108:48040-6108:48035"
+    ]
+  },
+  {
+    "figmaId": "8017:21076",
+    "codeName": "ButtonPillSpecLabeled",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8018:28072",
+    "codeName": "MenuToolFrostAssembled",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8019:1146",
+    "codeName": "ToolSwatches",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8019:1593",
+    "codeName": "ToolSwatch",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8001:998",
+    "codeName": "ToolRuller",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "6138:953",
+    "codeName": "ToolBarModesel",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "8018:27668",
+    "codeName": "TopSection",
+    "scenarios": [
+      "variant-1",
+      "text-title-8018:27668"
+    ]
+  },
+  {
+    "figmaId": "8019:1640",
+    "codeName": "ToolNav",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "12007:18284",
+    "codeName": "FrameEffectSelection",
+    "scenarios": [
+      "variant-1"
+    ]
+  },
+  {
+    "figmaId": "12007:18281",
+    "codeName": "VectorMode",
+    "scenarios": [
+      "variant-1"
+    ]
+  }
+] as const;
+
+export default function ComponentLibraryProof() {
+  return (
+    <main data-component-library-proof="true">
+      <section data-component-id={"12002:17702"} data-code-name={"RatioLock"} data-icon-root={false}>
+        <h2>{"Ratio-Lock"}</h2>
+        <div data-scenario={"variant-1"}><RatioLock state={"Locked"} /></div>
+        <div data-scenario={"variant-2"}><RatioLock state={"Open"} /></div>
+        <div data-scenario={"variant-3"}><RatioLock state={"disabled"} /></div>
+      </section>
+      <section data-component-id={"8053:2721"} data-code-name={"S"} data-icon-root={false}>
+        <h2>{"S"}</h2>
+        <div data-scenario={"variant-1"}><S size={"SMALL"} /></div>
+        <div data-scenario={"variant-2"}><S size={"Medium"} /></div>
+        <div data-scenario={"variant-3"}><S size={"LARGE"} /></div>
+      </section>
+      <section data-component-id={"8018:28068"} data-code-name={"ButtonPillSpec"} data-icon-root={false}>
+        <h2>{"Button-Pill-Spec"}</h2>
+        <div data-scenario={"variant-1"}><ButtonPillSpec state={"Default"} /></div>
+        <div data-scenario={"variant-2"}><ButtonPillSpec state={"Pressed"} /></div>
+        <div data-scenario={"swap-icon-6105:18342-6105:687"}><ButtonPillSpec state={"Default"} icon={Menu} /></div>
+        <div data-scenario={"swap-icon-8018:28069-6105:687"}><ButtonPillSpec state={"Pressed"} icon={Menu} /></div>
+      </section>
+      <section data-component-id={"8050:6868"} data-code-name={"ButtonRoundReg"} data-icon-root={false}>
+        <h2>{"Button-Round-Reg"}</h2>
+        <div data-scenario={"variant-1"}><ButtonRoundReg state={"Default"} /></div>
+        <div data-scenario={"variant-2"}><ButtonRoundReg state={"Selected"} /></div>
+        <div data-scenario={"swap-icons-6108:53400-6108:52031"}><ButtonRoundReg state={"Default"} icons={Circle} /></div>
+        <div data-scenario={"swap-icons-8050:6869-6108:52031"}><ButtonRoundReg state={"Selected"} icons={Circle} /></div>
+      </section>
+      <section data-component-id={"6110:56193"} data-code-name={"Dial_6110_56193"} data-icon-root={false}>
+        <h2>{"Dial"}</h2>
+        <div data-scenario={"variant-1"}><Dial_6110_56193 state={"Active"} /></div>
+        <div data-scenario={"variant-2"}><Dial_6110_56193 state={"New value"} /></div>
+        <div data-scenario={"text-value-6110:56192"}><Dial_6110_56193 state={"Active"} value={"Proof Dial"} /></div>
+        <div data-scenario={"swap-icons-6110:56191-6110:54836"}><Dial_6110_56193 state={"New value"} icons={Hexagon} /></div>
+      </section>
+      <section data-component-id={"8014:3389"} data-code-name={"TickMark"} data-icon-root={false}>
+        <h2>{"Tick-mark"}</h2>
+        <div data-scenario={"variant-1"}><TickMark size={"Small"} /></div>
+        <div data-scenario={"variant-2"}><TickMark size={"Center"} /></div>
+      </section>
+      <section data-component-id={"8050:6894"} data-code-name={"Dial_8050_6894"} data-icon-root={false}>
+        <h2>{"Dial"}</h2>
+        <div data-scenario={"variant-1"}><Dial_8050_6894 state={"Selected"} /></div>
+        <div data-scenario={"variant-2"}><Dial_8050_6894 state={"Default"} /></div>
+      </section>
+      <section data-component-id={"8017:20931"} data-code-name={"ToggleCombo"} data-icon-root={false}>
+        <h2>{"Toggle-Combo"}</h2>
+        <div data-scenario={"variant-1"}><ToggleCombo mode={"Magnetic"} /></div>
+        <div data-scenario={"variant-2"}><ToggleCombo mode={"Sticky"} /></div>
+      </section>
+      <section data-component-id={"12002:3885"} data-code-name={"Badge"} data-icon-root={false}>
+        <h2>{"Badge"}</h2>
+        <div data-scenario={"variant-1"}><Badge state={"Active"} /></div>
+        <div data-scenario={"variant-2"}><Badge state={"Passive"} /></div>
+      </section>
+      <section data-component-id={"12002:4329"} data-code-name={"ModeSelector"} data-icon-root={false}>
+        <h2>{"Mode-selector"}</h2>
+        <div data-scenario={"variant-1"}><ModeSelector mode={"2"} /></div>
+        <div data-scenario={"variant-2"}><ModeSelector mode={"1"} /></div>
+        <div data-scenario={"variant-3"}><ModeSelector mode={"3"} /></div>
+      </section>
+      <section data-component-id={"8017:20997"} data-code-name={"ButtonFBFlip"} data-icon-root={false}>
+        <h2>{"Button-F-B-flip"}</h2>
+        <div data-scenario={"variant-1"}><ButtonFBFlip state={"Frontside"} /></div>
+        <div data-scenario={"variant-2"}><ButtonFBFlip state={"Backside"} /></div>
+      </section>
+      <section data-component-id={"8017:21219"} data-code-name={"MicroSectionCardMode"} data-icon-root={false}>
+        <h2>{"Micro-section-card-mode"}</h2>
+        <div data-scenario={"variant-1"}><MicroSectionCardMode state={"Frontside"} /></div>
+        <div data-scenario={"variant-2"}><MicroSectionCardMode state={"Backside"} /></div>
+      </section>
+      <section data-component-id={"8017:25623"} data-code-name={"Tab"} data-icon-root={false}>
+        <h2>{"Tab"}</h2>
+        <div data-scenario={"variant-1"}><Tab state={"Active"} /></div>
+        <div data-scenario={"variant-2"}><Tab state={"Passive"} /></div>
+        <div data-scenario={"text-label-8017:21679"}><Tab state={"Active"} label={"Proof Tab"} /></div>
+        <div data-scenario={"text-label-8017:25624"}><Tab state={"Passive"} label={"Proof Tab"} /></div>
+        <div data-scenario={"swap-instance-8017:21679-8017:21672"}><Tab state={"Active"} instance={IconBasket} /></div>
+        <div data-scenario={"swap-instance-8017:25624-8017:21672"}><Tab state={"Passive"} instance={IconBasket} /></div>
+      </section>
+      <section data-component-id={"8017:26135"} data-code-name={"Dock"} data-icon-root={false}>
+        <h2>{"Dock"}</h2>
+        <div data-scenario={"variant-1"}><Dock selected={"Default"} /></div>
+        <div data-scenario={"variant-2"}><Dock selected={"Shape"} /></div>
+        <div data-scenario={"variant-3"}><Dock selected={"Add"} /></div>
+        <div data-scenario={"variant-4"}><Dock selected={"Style"} /></div>
+        <div data-scenario={"variant-5"}><Dock selected={"Tune"} /></div>
+        <div data-scenario={"variant-6"}><Dock selected={"Edit"} /></div>
+      </section>
+      <section data-component-id={"8054:4016"} data-code-name={"EffectCard"} data-icon-root={false}>
+        <h2>{"Effect Card"}</h2>
+        <div data-scenario={"variant-1"}><EffectCard side={"Face"} /></div>
+        <div data-scenario={"variant-2"}><EffectCard side={"Back"} /></div>
+        <div data-scenario={"variant-3"}><EffectCard side={"Face-Modify-frame1"} /></div>
+      </section>
+      <section data-component-id={"12016:8557"} data-code-name={"Swatch_12016_8557"} data-icon-root={false}>
+        <h2>{"Swatch"}</h2>
+        <div data-scenario={"variant-1"}><Swatch_12016_8557 state={"Default"} /></div>
+        <div data-scenario={"variant-2"}><Swatch_12016_8557 state={"Selected"} /></div>
+      </section>
+      <section data-component-id={"12016:11253"} data-code-name={"SizeIndicator"} data-icon-root={false}>
+        <h2>{"Size-Indicator"}</h2>
+        <div data-scenario={"variant-1"}><SizeIndicator size={"Large"} /></div>
+        <div data-scenario={"variant-2"}><SizeIndicator size={"Small"} /></div>
+        <div data-scenario={"variant-3"}><SizeIndicator size={"Medium"} /></div>
+        <div data-scenario={"variant-4"}><SizeIndicator size={"Custom"} /></div>
+      </section>
+      <section data-component-id={"12016:10932"} data-code-name={"MagnetBump"} data-icon-root={true}>
+        <h2>{"Magnet Bump"}</h2>
+        <div data-scenario={"variant-1"}><MagnetBump size={"Small"} /></div>
+        <div data-scenario={"variant-2"}><MagnetBump size={"Medium"} /></div>
+        <div data-scenario={"variant-3"}><MagnetBump size={"SIze3"} /></div>
+      </section>
+      <section data-component-id={"12016:11148"} data-code-name={"Component1"} data-icon-root={false}>
+        <h2>{"Component 1"}</h2>
+        <div data-scenario={"variant-1"}><Component1 property1={"LARGE"} /></div>
+        <div data-scenario={"variant-2"}><Component1 property1={"MEDIUM"} /></div>
+        <div data-scenario={"variant-3"}><Component1 property1={"SMALL"} /></div>
+        <div data-scenario={"variant-4"}><Component1 property1={"Variant4"} /></div>
+      </section>
+      <section data-component-id={"12016:8545"} data-code-name={"SizeSwatches"} data-icon-root={false}>
+        <h2>{"Size-swatches"}</h2>
+        <div data-scenario={"variant-1"}><SizeSwatches size={"Freeform"} /></div>
+        <div data-scenario={"variant-2"}><SizeSwatches size={"Medium"} /></div>
+        <div data-scenario={"variant-3"}><SizeSwatches size={"Small"} /></div>
+        <div data-scenario={"variant-4"}><SizeSwatches size={"Large"} /></div>
+        <div data-scenario={"variant-5"}><SizeSwatches size={"None"} /></div>
+      </section>
+      <section data-component-id={"8017:21672"} data-code-name={"IconBasket"} data-icon-root={true}>
+        <h2>{"Icon-Basket"}</h2>
+        <div data-scenario={"variant-1"}><IconBasket /></div>
+      </section>
+      <section data-component-id={"8017:21674"} data-code-name={"IconShop"} data-icon-root={true}>
+        <h2>{"Icon-Shop"}</h2>
+        <div data-scenario={"variant-1"}><IconShop /></div>
+      </section>
+      <section data-component-id={"8017:21671"} data-code-name={"IconCreate"} data-icon-root={true}>
+        <h2>{"Icon-Create"}</h2>
+        <div data-scenario={"variant-1"}><IconCreate /></div>
+      </section>
+      <section data-component-id={"8017:21673"} data-code-name={"IconLibrary"} data-icon-root={true}>
+        <h2>{"Icon-Library"}</h2>
+        <div data-scenario={"variant-1"}><IconLibrary /></div>
+      </section>
+      <section data-component-id={"8017:21675"} data-code-name={"IconProfile"} data-icon-root={true}>
+        <h2>{"Icon-profile"}</h2>
+        <div data-scenario={"variant-1"}><IconProfile /></div>
+      </section>
+      <section data-component-id={"8017:21534"} data-code-name={"IconAdd"} data-icon-root={true}>
+        <h2>{"Icon-Add"}</h2>
+        <div data-scenario={"variant-1"}><IconAdd /></div>
+      </section>
+      <section data-component-id={"8017:21535"} data-code-name={"IconShape"} data-icon-root={true}>
+        <h2>{"Icon-Shape"}</h2>
+        <div data-scenario={"variant-1"}><IconShape /></div>
+      </section>
+      <section data-component-id={"8017:21536"} data-code-name={"IconStyle"} data-icon-root={true}>
+        <h2>{"Icon-Style"}</h2>
+        <div data-scenario={"variant-1"}><IconStyle /></div>
+      </section>
+      <section data-component-id={"8017:21537"} data-code-name={"IconTune"} data-icon-root={true}>
+        <h2>{"Icon-Tune"}</h2>
+        <div data-scenario={"variant-1"}><IconTune /></div>
+      </section>
+      <section data-component-id={"8017:21538"} data-code-name={"IconEdit"} data-icon-root={true}>
+        <h2>{"Icon-Edit"}</h2>
+        <div data-scenario={"variant-1"}><IconEdit /></div>
+      </section>
+      <section data-component-id={"8068:4571"} data-code-name={"Frame_8068_4571"} data-icon-root={true}>
+        <h2>{"Frame"}</h2>
+        <div data-scenario={"variant-1"}><Frame_8068_4571 /></div>
+      </section>
+      <section data-component-id={"8068:4670"} data-code-name={"Grid_8068_4670"} data-icon-root={true}>
+        <h2>{"Grid"}</h2>
+        <div data-scenario={"variant-1"}><Grid_8068_4670 /></div>
+      </section>
+      <section data-component-id={"8069:4107"} data-code-name={"Size_8069_4107"} data-icon-root={true}>
+        <h2>{"Size"}</h2>
+        <div data-scenario={"variant-1"}><Size_8069_4107 /></div>
+      </section>
+      <section data-component-id={"10006:4085"} data-code-name={"Frame_10006_4085"} data-icon-root={true}>
+        <h2>{"Frame"}</h2>
+        <div data-scenario={"variant-1"}><Frame_10006_4085 /></div>
+      </section>
+      <section data-component-id={"10007:4146"} data-code-name={"Frame_10007_4146"} data-icon-root={true}>
+        <h2>{"Frame"}</h2>
+        <div data-scenario={"variant-1"}><Frame_10007_4146 /></div>
+      </section>
+      <section data-component-id={"10007:4176"} data-code-name={"Grid2"} data-icon-root={true}>
+        <h2>{"Grid2"}</h2>
+        <div data-scenario={"variant-1"}><Grid2 /></div>
+      </section>
+      <section data-component-id={"12002:17690"} data-code-name={"LockClosed"} data-icon-root={true}>
+        <h2>{"lock-closed"}</h2>
+        <div data-scenario={"variant-1"}><LockClosed /></div>
+      </section>
+      <section data-component-id={"12002:17696"} data-code-name={"LockOpen"} data-icon-root={true}>
+        <h2>{"Lock-open"}</h2>
+        <div data-scenario={"variant-1"}><LockOpen /></div>
+      </section>
+      <section data-component-id={"8063:3191"} data-code-name={"Images"} data-icon-root={true}>
+        <h2>{"Images"}</h2>
+        <div data-scenario={"variant-1"}><Images /></div>
+      </section>
+      <section data-component-id={"6108:54771"} data-code-name={"Blob"} data-icon-root={true}>
+        <h2>{"Blob"}</h2>
+        <div data-scenario={"variant-1"}><Blob /></div>
+      </section>
+      <section data-component-id={"6110:54836"} data-code-name={"Hexagon"} data-icon-root={true}>
+        <h2>{"Hexagon"}</h2>
+        <div data-scenario={"variant-1"}><Hexagon /></div>
+      </section>
+      <section data-component-id={"6110:54839"} data-code-name={"Diamond"} data-icon-root={true}>
+        <h2>{"Diamond"}</h2>
+        <div data-scenario={"variant-1"}><Diamond /></div>
+      </section>
+      <section data-component-id={"6110:54842"} data-code-name={"Sparkle"} data-icon-root={true}>
+        <h2>{"Sparkle"}</h2>
+        <div data-scenario={"variant-1"}><Sparkle /></div>
+      </section>
+      <section data-component-id={"12002:17774"} data-code-name={"Shuffle"} data-icon-root={true}>
+        <h2>{"Shuffle"}</h2>
+        <div data-scenario={"variant-1"}><Shuffle /></div>
+      </section>
+      <section data-component-id={"6108:52031"} data-code-name={"Circle"} data-icon-root={true}>
+        <h2>{"Circle"}</h2>
+        <div data-scenario={"variant-1"}><Circle /></div>
+      </section>
+      <section data-component-id={"6108:52032"} data-code-name={"Triangle"} data-icon-root={true}>
+        <h2>{"Triangle"}</h2>
+        <div data-scenario={"variant-1"}><Triangle /></div>
+      </section>
+      <section data-component-id={"6108:52033"} data-code-name={"Star"} data-icon-root={true}>
+        <h2>{"Star"}</h2>
+        <div data-scenario={"variant-1"}><Star /></div>
+      </section>
+      <section data-component-id={"6108:52034"} data-code-name={"Heart"} data-icon-root={true}>
+        <h2>{"Heart"}</h2>
+        <div data-scenario={"variant-1"}><Heart /></div>
+      </section>
+      <section data-component-id={"6108:52035"} data-code-name={"Upload"} data-icon-root={true}>
+        <h2>{"Upload"}</h2>
+        <div data-scenario={"variant-1"}><Upload /></div>
+      </section>
+      <section data-component-id={"6137:652"} data-code-name={"Square"} data-icon-root={true}>
+        <h2>{"Square"}</h2>
+        <div data-scenario={"variant-1"}><Square /></div>
+      </section>
+      <section data-component-id={"14027:8364"} data-code-name={"RectangleLandscape"} data-icon-root={true}>
+        <h2>{"Rectangle-Landscape"}</h2>
+        <div data-scenario={"variant-1"}><RectangleLandscape /></div>
+      </section>
+      <section data-component-id={"14027:8371"} data-code-name={"RectanglePortrait"} data-icon-root={true}>
+        <h2>{"Rectangle-Portrait"}</h2>
+        <div data-scenario={"variant-1"}><RectanglePortrait /></div>
+      </section>
+      <section data-component-id={"8001:1144"} data-code-name={"Blend"} data-icon-root={true}>
+        <h2>{"Blend"}</h2>
+        <div data-scenario={"variant-1"}><Blend /></div>
+      </section>
+      <section data-component-id={"8001:1142"} data-code-name={"Exposure"} data-icon-root={true}>
+        <h2>{"Exposure"}</h2>
+        <div data-scenario={"variant-1"}><Exposure /></div>
+      </section>
+      <section data-component-id={"8001:1141"} data-code-name={"Brightness"} data-icon-root={true}>
+        <h2>{"Brightness"}</h2>
+        <div data-scenario={"variant-1"}><Brightness /></div>
+      </section>
+      <section data-component-id={"8001:1140"} data-code-name={"Contrast"} data-icon-root={true}>
+        <h2>{"Contrast"}</h2>
+        <div data-scenario={"variant-1"}><Contrast /></div>
+      </section>
+      <section data-component-id={"8001:1143"} data-code-name={"Saturation"} data-icon-root={true}>
+        <h2>{"Saturation"}</h2>
+        <div data-scenario={"variant-1"}><Saturation /></div>
+      </section>
+      <section data-component-id={"8001:1138"} data-code-name={"Temp"} data-icon-root={true}>
+        <h2>{"Temp"}</h2>
+        <div data-scenario={"variant-1"}><Temp /></div>
+      </section>
+      <section data-component-id={"8001:1139"} data-code-name={"Vignette"} data-icon-root={true}>
+        <h2>{"Vignette"}</h2>
+        <div data-scenario={"variant-1"}><Vignette /></div>
+      </section>
+      <section data-component-id={"12015:7443"} data-code-name={"Tile"} data-icon-root={true}>
+        <h2>{"Tile"}</h2>
+        <div data-scenario={"variant-1"}><Tile /></div>
+      </section>
+      <section data-component-id={"12015:7447"} data-code-name={"Fix"} data-icon-root={true}>
+        <h2>{"Fix"}</h2>
+        <div data-scenario={"variant-1"}><Fix /></div>
+      </section>
+      <section data-component-id={"8001:1151"} data-code-name={"Offset"} data-icon-root={true}>
+        <h2>{"Offset"}</h2>
+        <div data-scenario={"variant-1"}><Offset /></div>
+      </section>
+      <section data-component-id={"8001:1150"} data-code-name={"Definition"} data-icon-root={true}>
+        <h2>{"Definition"}</h2>
+        <div data-scenario={"variant-1"}><Definition /></div>
+      </section>
+      <section data-component-id={"8001:1148"} data-code-name={"Radius"} data-icon-root={true}>
+        <h2>{"Radius"}</h2>
+        <div data-scenario={"variant-1"}><Radius /></div>
+      </section>
+      <section data-component-id={"8001:1147"} data-code-name={"Bend"} data-icon-root={true}>
+        <h2>{"Bend"}</h2>
+        <div data-scenario={"variant-1"}><Bend /></div>
+      </section>
+      <section data-component-id={"8001:1146"} data-code-name={"Smooth"} data-icon-root={true}>
+        <h2>{"Smooth"}</h2>
+        <div data-scenario={"variant-1"}><Smooth /></div>
+      </section>
+      <section data-component-id={"8001:1145"} data-code-name={"Snap"} data-icon-root={true}>
+        <h2>{"Snap"}</h2>
+        <div data-scenario={"variant-1"}><Snap /></div>
+      </section>
+      <section data-component-id={"8001:1149"} data-code-name={"Sharpen"} data-icon-root={true}>
+        <h2>{"Sharpen"}</h2>
+        <div data-scenario={"variant-1"}><Sharpen /></div>
+      </section>
+      <section data-component-id={"8001:1158"} data-code-name={"Sticky_8001_1158"} data-icon-root={true}>
+        <h2>{"Sticky"}</h2>
+        <div data-scenario={"variant-1"}><Sticky_8001_1158 /></div>
+      </section>
+      <section data-component-id={"8001:1157"} data-code-name={"Swatch_8001_1157"} data-icon-root={true}>
+        <h2>{"Swatch"}</h2>
+        <div data-scenario={"variant-1"}><Swatch_8001_1157 /></div>
+      </section>
+      <section data-component-id={"8001:1156"} data-code-name={"Material"} data-icon-root={true}>
+        <h2>{"Material"}</h2>
+        <div data-scenario={"variant-1"}><Material /></div>
+      </section>
+      <section data-component-id={"8001:1154"} data-code-name={"Size_8001_1154"} data-icon-root={true}>
+        <h2>{"Size"}</h2>
+        <div data-scenario={"variant-1"}><Size_8001_1154 /></div>
+      </section>
+      <section data-component-id={"8001:1155"} data-code-name={"Grid_8001_1155"} data-icon-root={true}>
+        <h2>{"Grid"}</h2>
+        <div data-scenario={"variant-1"}><Grid_8001_1155 /></div>
+      </section>
+      <section data-component-id={"8001:1153"} data-code-name={"Magnetic"} data-icon-root={true}>
+        <h2>{"Magnetic"}</h2>
+        <div data-scenario={"variant-1"}><Magnetic /></div>
+      </section>
+      <section data-component-id={"8001:1347"} data-code-name={"Sticky_8001_1347"} data-icon-root={true}>
+        <h2>{"Sticky"}</h2>
+        <div data-scenario={"variant-1"}><Sticky_8001_1347 /></div>
+      </section>
+      <section data-component-id={"6105:687"} data-code-name={"Menu"} data-icon-root={true}>
+        <h2>{"Menu"}</h2>
+        <div data-scenario={"variant-1"}><Menu /></div>
+      </section>
+      <section data-component-id={"6105:18352"} data-code-name={"Rotate"} data-icon-root={true}>
+        <h2>{"Rotate"}</h2>
+        <div data-scenario={"variant-1"}><Rotate /></div>
+      </section>
+      <section data-component-id={"6108:48035"} data-code-name={"Magic"} data-icon-root={true}>
+        <h2>{"Magic"}</h2>
+        <div data-scenario={"variant-1"}><Magic /></div>
+      </section>
+      <section data-component-id={"8018:27923"} data-code-name={"UndoMini"} data-icon-root={true}>
+        <h2>{"Undo-mini"}</h2>
+        <div data-scenario={"variant-1"}><UndoMini /></div>
+      </section>
+      <section data-component-id={"8018:27921"} data-code-name={"RedoMini"} data-icon-root={true}>
+        <h2>{"Redo-mini"}</h2>
+        <div data-scenario={"variant-1"}><RedoMini /></div>
+      </section>
+      <section data-component-id={"8018:27922"} data-code-name={"FlipVMini"} data-icon-root={true}>
+        <h2>{"Flip-V-mini"}</h2>
+        <div data-scenario={"variant-1"}><FlipVMini /></div>
+      </section>
+      <section data-component-id={"8018:27920"} data-code-name={"FlipHMini"} data-icon-root={true}>
+        <h2>{"Flip-H-mini"}</h2>
+        <div data-scenario={"variant-1"}><FlipHMini /></div>
+      </section>
+      <section data-component-id={"8018:27919"} data-code-name={"ResetMini"} data-icon-root={true}>
+        <h2>{"Reset-Mini"}</h2>
+        <div data-scenario={"variant-1"}><ResetMini /></div>
+      </section>
+      <section data-component-id={"12010:22538"} data-code-name={"ToolTitle"} data-icon-root={false}>
+        <h2>{"Tool-title"}</h2>
+        <div data-scenario={"variant-1"}><ToolTitle /></div>
+      </section>
+      <section data-component-id={"6103:702"} data-code-name={"MenuToolFrostSingleTemplate"} data-icon-root={false}>
+        <h2>{"Menu-Tool-Frost-single template"}</h2>
+        <div data-scenario={"variant-1"}><MenuToolFrostSingleTemplate /></div>
+        <div data-scenario={"boolean-button2-6103:702"}><MenuToolFrostSingleTemplate button2={true} /></div>
+        <div data-scenario={"boolean-button3-6103:702"}><MenuToolFrostSingleTemplate button3={true} /></div>
+        <div data-scenario={"boolean-button4-6103:702"}><MenuToolFrostSingleTemplate button4={true} /></div>
+        <div data-scenario={"boolean-button5-6103:702"}><MenuToolFrostSingleTemplate button5={true} /></div>
+      </section>
+      <section data-component-id={"6104:641"} data-code-name={"ButtonRoundFrostMini"} data-icon-root={false}>
+        <h2>{"Button-Round-Frost-mini"}</h2>
+        <div data-scenario={"variant-1"}><ButtonRoundFrostMini /></div>
+        <div data-scenario={"swap-icons-6104:641-8018:27923"}><ButtonRoundFrostMini icons={UndoMini} /></div>
+      </section>
+      <section data-component-id={"6103:707"} data-code-name={"ButtonPillReg"} data-icon-root={false}>
+        <h2>{"Button-pill-reg"}</h2>
+        <div data-scenario={"variant-1"}><ButtonPillReg /></div>
+      </section>
+      <section data-component-id={"6108:48040"} data-code-name={"ButtonRoundSpec"} data-icon-root={false}>
+        <h2>{"Button-Round-Spec"}</h2>
+        <div data-scenario={"variant-1"}><ButtonRoundSpec /></div>
+        <div data-scenario={"swap-icons-6108:48040-6108:48035"}><ButtonRoundSpec icons={Magic} /></div>
+      </section>
+      <section data-component-id={"8017:21076"} data-code-name={"ButtonPillSpecLabeled"} data-icon-root={false}>
+        <h2>{"Button-Pill-Spec-Labeled"}</h2>
+        <div data-scenario={"variant-1"}><ButtonPillSpecLabeled /></div>
+      </section>
+      <section data-component-id={"8018:28072"} data-code-name={"MenuToolFrostAssembled"} data-icon-root={false}>
+        <h2>{"Menu-Tool-Frost-assembled"}</h2>
+        <div data-scenario={"variant-1"}><MenuToolFrostAssembled /></div>
+      </section>
+      <section data-component-id={"8019:1146"} data-code-name={"ToolSwatches"} data-icon-root={false}>
+        <h2>{"Tool-Swatches"}</h2>
+        <div data-scenario={"variant-1"}><ToolSwatches /></div>
+      </section>
+      <section data-component-id={"8019:1593"} data-code-name={"ToolSwatch"} data-icon-root={false}>
+        <h2>{"Tool-Swatch"}</h2>
+        <div data-scenario={"variant-1"}><ToolSwatch /></div>
+      </section>
+      <section data-component-id={"8001:998"} data-code-name={"ToolRuller"} data-icon-root={false}>
+        <h2>{"Tool-Ruller"}</h2>
+        <div data-scenario={"variant-1"}><ToolRuller /></div>
+      </section>
+      <section data-component-id={"6138:953"} data-code-name={"ToolBarModesel"} data-icon-root={false}>
+        <h2>{"Tool-Bar-ModeSel"}</h2>
+        <div data-scenario={"variant-1"}><ToolBarModesel /></div>
+      </section>
+      <section data-component-id={"8018:27668"} data-code-name={"TopSection"} data-icon-root={false}>
+        <h2>{"Top Section"}</h2>
+        <div data-scenario={"variant-1"}><TopSection /></div>
+        <div data-scenario={"text-title-8018:27668"}><TopSection title={"Proof Top Section"} /></div>
+      </section>
+      <section data-component-id={"8019:1640"} data-code-name={"ToolNav"} data-icon-root={false}>
+        <h2>{"Tool-Nav"}</h2>
+        <div data-scenario={"variant-1"}><ToolNav /></div>
+      </section>
+      <section data-component-id={"12007:18284"} data-code-name={"FrameEffectSelection"} data-icon-root={false}>
+        <h2>{"Frame-Effect selection"}</h2>
+        <div data-scenario={"variant-1"}><FrameEffectSelection /></div>
+      </section>
+      <section data-component-id={"12007:18281"} data-code-name={"VectorMode"} data-icon-root={false}>
+        <h2>{"Vector mode"}</h2>
+        <div data-scenario={"variant-1"}><VectorMode /></div>
+      </section>
+    </main>
+  );
+}

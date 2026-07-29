@@ -1,0 +1,106 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "8050:6869",
+  "fileVersion": "2381318852839647833",
+  "elements": 2,
+  "evidence": {
+    "raw": {
+      "status": "pass"
+    },
+    "paint": {
+      "status": "pass"
+    }
+  },
+  "tokenCoveragePct": 83,
+  "tokenDecls": 5,
+  "styleableDecls": 6,
+  "unresolved": [],
+  "raws": [
+    {
+      "className": "circle",
+      "prop": "width",
+      "value": "20px",
+      "line": 12,
+      "candidates": []
+    },
+    {
+      "className": "circle",
+      "prop": "height",
+      "value": "20px",
+      "line": 13,
+      "candidates": []
+    }
+  ],
+  "refusals": [],
+  "approximations": [],
+  "valueParity": [
+    {
+      "className": "stateSelected",
+      "prop": "width",
+      "token": "--sem-dim-fluid-big-m",
+      "figma": 48,
+      "resolved": 47.37,
+      "line": 5
+    },
+    {
+      "className": "stateSelected",
+      "prop": "height",
+      "token": "--sem-dim-fluid-big-m",
+      "figma": 48,
+      "resolved": 47.37,
+      "line": 6
+    }
+  ],
+  "fonts": [],
+  "missingAssets": [],
+  "paintParity": [],
+  "effectParity": [],
+  "cascade": [],
+  "nativeCarrierFindings": [],
+  "svgDescendantFindings": [],
+  "matrix": {
+    "tokens": {
+      "unresolved": 0,
+      "status": "pass"
+    },
+    "numeric": {
+      "drift": 2,
+      "status": "warn"
+    },
+    "paint": {
+      "mismatches": 0,
+      "status": "pass"
+    },
+    "effects": {
+      "mismatches": 0,
+      "status": "pass"
+    },
+    "cascade": {
+      "broken": 0,
+      "status": "pass"
+    },
+    "nativeCarriers": {
+      "status": "pass",
+      "counts": {
+        "stroke": 1,
+        "opacity": 0,
+        "backgroundBlur": 0,
+        "alphaMaskHeight": 0
+      },
+      "findings": []
+    },
+    "svgDescendants": {
+      "status": "pass",
+      "blockingStatus": "pass",
+      "roots": 0,
+      "liveColorBindings": 0,
+      "residualBindings": 0,
+      "residualLayouts": 0,
+      "findings": []
+    },
+    "status": "pass",
+    "pass": true
+  },
+  "status": "pass",
+  "pass": true
+}

@@ -1,0 +1,5 @@
+.flipHMini {
+  width: var(--fc-icon-w, 16px);
+  height: var(--fc-icon-h, 16px);
+  color: var(--sem-col-fg-primary-default);
+}

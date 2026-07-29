@@ -1,0 +1,44 @@
+.stateBackside {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sem-dim-fluid-nano-m);
+}
+
+.buttonRoundFrostSmall {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: var(--sem-dim-fluid-nano-l);
+  flex-shrink: 0;
+  background-color: var(--sem-col-bg-brand-primary-strong);
+  box-shadow: inset 0 0 0 var(--sem-border-micro-m) var(--sem-col-border-brand-primary);
+  backdrop-filter: blur(calc(var(--effects-blur-dense) / 2));
+  border-radius: var(--sem-radii-full);
+}
+
+.rotate {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--sem-col-fg-brand-primary);
+}
+
+.label {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  width: 52px;
+  flex-shrink: 0;
+}
+
+.front {
+  flex-shrink: 0;
+  color: var(--sem-col-text-brand-primary);
+  font-family: var(--sem-type-fluid-label-2xs-font);
+  font-size: var(--sem-type-fluid-label-2xs-size);
+  font-weight: 500;
+  line-height: var(--sem-type-fluid-label-2xs-line-height);
+  letter-spacing: var(--sem-type-fluid-label-2xs-letter-spacing);
+  text-align: center;
+}

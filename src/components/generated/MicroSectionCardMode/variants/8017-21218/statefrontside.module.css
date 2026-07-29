@@ -1,0 +1,13 @@
+.stateFrontside {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--sem-dim-fluid-standard-xs) 0 0;
+  width: 402px;
+}
+
+.sideIndicator {
+  width: 32px;
+  height: 8px;
+  flex-shrink: 0;
+}

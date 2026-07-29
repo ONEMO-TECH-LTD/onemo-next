@@ -1,0 +1,15 @@
+.tickMark {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xl);
+  position: relative;
+}
+
+.tickMark2 {
+  width: 2px;
+  height: var(--sem-dim-fluid-standard-xl);
+  position: absolute;
+  left: 0;
+  top: 0;
+  background-color: var(--sem-col-fg-brand-primary-subtle);
+  border-radius: var(--sem-radii-full);
+}

@@ -1,0 +1,131 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "8017:21679",
+  "fileVersion": "2381318852839647833",
+  "elements": 4,
+  "evidence": {
+    "raw": {
+      "status": "pass"
+    },
+    "paint": {
+      "status": "pass"
+    }
+  },
+  "tokenCoveragePct": 53,
+  "tokenDecls": 8,
+  "styleableDecls": 15,
+  "unresolved": [],
+  "raws": [
+    {
+      "className": "stateActive",
+      "prop": "width",
+      "value": "71.6px",
+      "line": 6,
+      "candidates": []
+    },
+    {
+      "className": "stateActive",
+      "prop": "height",
+      "value": "38px",
+      "line": 7,
+      "candidates": []
+    },
+    {
+      "className": "iconBox",
+      "prop": "gap",
+      "value": "10px",
+      "line": 14,
+      "candidates": [
+        {
+          "token": "--prim-track-pos-10",
+          "exact": true
+        }
+      ]
+    },
+    {
+      "className": "iconBox",
+      "prop": "padding",
+      "value": "0 1px",
+      "line": 15,
+      "candidates": []
+    },
+    {
+      "className": "iconBasket",
+      "prop": "width",
+      "value": "22px",
+      "line": 23,
+      "candidates": []
+    },
+    {
+      "className": "iconBasket",
+      "prop": "height",
+      "value": "22px",
+      "line": 24,
+      "candidates": []
+    },
+    {
+      "className": "label",
+      "prop": "font-weight",
+      "value": "500",
+      "line": 34,
+      "candidates": []
+    }
+  ],
+  "refusals": [],
+  "approximations": [],
+  "valueParity": [],
+  "fonts": [
+    "Chillax"
+  ],
+  "missingAssets": [],
+  "paintParity": [],
+  "effectParity": [],
+  "cascade": [],
+  "nativeCarrierFindings": [],
+  "svgDescendantFindings": [],
+  "matrix": {
+    "tokens": {
+      "unresolved": 0,
+      "status": "pass"
+    },
+    "numeric": {
+      "drift": 0,
+      "status": "pass"
+    },
+    "paint": {
+      "mismatches": 0,
+      "status": "pass"
+    },
+    "effects": {
+      "mismatches": 0,
+      "status": "pass"
+    },
+    "cascade": {
+      "broken": 0,
+      "status": "pass"
+    },
+    "nativeCarriers": {
+      "status": "pass",
+      "counts": {
+        "stroke": 0,
+        "opacity": 0,
+        "backgroundBlur": 0,
+        "alphaMaskHeight": 0
+      },
+      "findings": []
+    },
+    "svgDescendants": {
+      "status": "pass",
+      "blockingStatus": "pass",
+      "roots": 0,
+      "liveColorBindings": 0,
+      "residualBindings": 0,
+      "residualLayouts": 0,
+      "findings": []
+    },
+    "status": "pass",
+    "pass": true
+  },
+  "status": "pass",
+  "pass": true
+}

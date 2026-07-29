@@ -1,0 +1,73 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "12002:4331",
+  "fileVersion": "2381318852839647833",
+  "contentHash": "54ff79e4faf86d26364c0a5508289d1d5a6153e7478973a7a8f62e10e9b4c5e1",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 1,
+  "idMap": [
+    {
+      "figmaId": "12002:4331",
+      "class": "badge",
+      "kind": "element"
+    },
+    {
+      "figmaId": "I12002:4331;12002:3880",
+      "class": "label",
+      "kind": "text"
+    }
+  ],
+  "helperMap": [
+    {
+      "ownerFigmaId": "12002:4331",
+      "role": "fill:0",
+      "sourceIndex": 0,
+      "class": "fcPaint1Fill",
+      "order": 0
+    }
+  ],
+  "componentSurface": [],
+  "componentProperties": [
+    {
+      "authoredKey": "State",
+      "propName": "state",
+      "type": "VARIANT",
+      "defaultValue": "Active",
+      "variantOptions": [
+        "Active",
+        "Passive"
+      ],
+      "bindingScope": []
+    }
+  ],
+  "internalEntry": {
+    "id": "3c588bf42df7",
+    "public": false,
+    "localName": "BadgeInternal_3c588bf42df7",
+    "ownerMasterId": "12002:4330",
+    "instanceId": "12002:4331",
+    "targetId": "12002:3882",
+    "targetArtifactId": "12002:3885",
+    "targetMasterId": "12002:3882",
+    "targetCodeName": "Badge",
+    "relativePath": "Badge/internal/3c588bf42df7/BadgeInternal_3c588bf42df7.tsx",
+    "pinned": [
+      {
+        "nodeId": "I12002:4331;12002:3880",
+        "sourceNodeId": "12002:3880",
+        "path": [
+          "12002:3880"
+        ],
+        "field": "characters",
+        "value": "Preset",
+        "sourceValue": "Label"
+      }
+    ],
+    "childEntryIds": []
+  },
+  "refusals": [],
+  "notes": []
+}

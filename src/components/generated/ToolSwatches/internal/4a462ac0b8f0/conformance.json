@@ -1,0 +1,257 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "8019:1570",
+  "fileVersion": "2381318852839647833",
+  "elements": 13,
+  "evidence": {
+    "raw": {
+      "status": "pass"
+    },
+    "paint": {
+      "status": "pass"
+    }
+  },
+  "tokenCoveragePct": 87,
+  "tokenDecls": 22,
+  "styleableDecls": 23,
+  "unresolved": [],
+  "raws": [
+    {
+      "className": "swatchMasked",
+      "prop": "width",
+      "value": "402px",
+      "line": 8,
+      "candidates": []
+    },
+    {
+      "className": "swatchMasked",
+      "prop": "height",
+      "value": "32px",
+      "line": 9,
+      "candidates": []
+    },
+    {
+      "className": "alpha",
+      "prop": "width",
+      "value": "402px",
+      "line": 23,
+      "candidates": []
+    }
+  ],
+  "refusals": [],
+  "approximations": [],
+  "valueParity": [
+    {
+      "className": "alpha",
+      "prop": "height",
+      "token": "--sem-dim-fluid-big-xs",
+      "figma": 32,
+      "resolved": 34.09,
+      "line": 24
+    },
+    {
+      "className": "swatchRow",
+      "prop": "gap",
+      "token": "--sem-dim-fluid-standard-m",
+      "figma": 16,
+      "resolved": 17.05,
+      "line": 35
+    },
+    {
+      "className": "dial",
+      "prop": "width",
+      "token": "--sem-dim-fluid-standard-xl",
+      "figma": 24,
+      "resolved": 26.09,
+      "line": 42
+    },
+    {
+      "className": "dial",
+      "prop": "height",
+      "token": "--sem-dim-fluid-standard-xl",
+      "figma": 24,
+      "resolved": 26.09,
+      "line": 43
+    },
+    {
+      "className": "dial2",
+      "prop": "width",
+      "token": "--sem-dim-fluid-standard-xl",
+      "figma": 24,
+      "resolved": 26.09,
+      "line": 48
+    },
+    {
+      "className": "dial2",
+      "prop": "height",
+      "token": "--sem-dim-fluid-standard-xl",
+      "figma": 24,
+      "resolved": 26.09,
+      "line": 49
+    },
+    {
+      "className": "dial3",
+      "prop": "width",
+      "token": "--sem-dim-fluid-standard-xl",
+      "figma": 24,
+      "resolved": 26.09,
+      "line": 54
+    },
+    {
+      "className": "dial3",
+      "prop": "height",
+      "token": "--sem-dim-fluid-standard-xl",
+      "figma": 24,
+      "resolved": 26.09,
+      "line": 55
+    },
+    {
+      "className": "dial4",
+      "prop": "width",
+      "token": "--sem-dim-fluid-standard-xl",
+      "figma": 24,
+      "resolved": 26.09,
+      "line": 60
+    },
+    {
+      "className": "dial4",
+      "prop": "height",
+      "token": "--sem-dim-fluid-standard-xl",
+      "figma": 24,
+      "resolved": 26.09,
+      "line": 61
+    },
+    {
+      "className": "dial5",
+      "prop": "width",
+      "token": "--sem-dim-fluid-standard-xl",
+      "figma": 24,
+      "resolved": 26.09,
+      "line": 66
+    },
+    {
+      "className": "dial5",
+      "prop": "height",
+      "token": "--sem-dim-fluid-standard-xl",
+      "figma": 24,
+      "resolved": 26.09,
+      "line": 67
+    },
+    {
+      "className": "dial6",
+      "prop": "width",
+      "token": "--sem-dim-fluid-standard-xl",
+      "figma": 24,
+      "resolved": 26.09,
+      "line": 72
+    },
+    {
+      "className": "dial6",
+      "prop": "height",
+      "token": "--sem-dim-fluid-standard-xl",
+      "figma": 24,
+      "resolved": 26.09,
+      "line": 73
+    },
+    {
+      "className": "dial7",
+      "prop": "width",
+      "token": "--sem-dim-fluid-standard-xl",
+      "figma": 24,
+      "resolved": 26.09,
+      "line": 78
+    },
+    {
+      "className": "dial7",
+      "prop": "height",
+      "token": "--sem-dim-fluid-standard-xl",
+      "figma": 24,
+      "resolved": 26.09,
+      "line": 79
+    },
+    {
+      "className": "dial8",
+      "prop": "width",
+      "token": "--sem-dim-fluid-standard-xl",
+      "figma": 24,
+      "resolved": 26.09,
+      "line": 84
+    },
+    {
+      "className": "dial8",
+      "prop": "height",
+      "token": "--sem-dim-fluid-standard-xl",
+      "figma": 24,
+      "resolved": 26.09,
+      "line": 85
+    },
+    {
+      "className": "dial9",
+      "prop": "width",
+      "token": "--sem-dim-fluid-standard-xl",
+      "figma": 24,
+      "resolved": 26.09,
+      "line": 90
+    },
+    {
+      "className": "dial9",
+      "prop": "height",
+      "token": "--sem-dim-fluid-standard-xl",
+      "figma": 24,
+      "resolved": 26.09,
+      "line": 91
+    }
+  ],
+  "fonts": [],
+  "missingAssets": [],
+  "paintParity": [],
+  "effectParity": [],
+  "cascade": [],
+  "nativeCarrierFindings": [],
+  "svgDescendantFindings": [],
+  "matrix": {
+    "tokens": {
+      "unresolved": 0,
+      "status": "pass"
+    },
+    "numeric": {
+      "drift": 20,
+      "status": "warn"
+    },
+    "paint": {
+      "mismatches": 0,
+      "status": "pass"
+    },
+    "effects": {
+      "mismatches": 0,
+      "status": "pass"
+    },
+    "cascade": {
+      "broken": 0,
+      "status": "pass"
+    },
+    "nativeCarriers": {
+      "status": "pass",
+      "counts": {
+        "stroke": 0,
+        "opacity": 0,
+        "backgroundBlur": 0,
+        "alphaMaskHeight": 1
+      },
+      "findings": []
+    },
+    "svgDescendants": {
+      "status": "pass",
+      "blockingStatus": "pass",
+      "roots": 0,
+      "liveColorBindings": 0,
+      "residualBindings": 0,
+      "residualLayouts": 0,
+      "findings": []
+    },
+    "status": "pass",
+    "pass": true
+  },
+  "status": "pass",
+  "pass": true
+}

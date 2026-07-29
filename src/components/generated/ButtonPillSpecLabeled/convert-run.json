@@ -1,0 +1,72 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "8017:21076",
+  "fileVersion": "2381318852839647833",
+  "contentHash": "73b48b80c197a26abfd54fb06d4eafe10602e10c7e7d62a0f31f32a3c74091de",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "8017:21076",
+      "class": "buttonPillSpecLabeled",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8017:20965",
+      "class": "buttonPillSpec",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8017:20966",
+      "class": "label",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8017:20967",
+      "class": "menu",
+      "kind": "text"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [
+    {
+      "instanceId": "8017:20965",
+      "targetId": "6105:18342",
+      "props": {
+        "Icon#8018:34": {
+          "preferredValues": [
+            {
+              "key": "f4164ac11b5fc7deade064da1b9907573a4f86a4",
+              "type": "COMPONENT"
+            },
+            {
+              "key": "a74a299f791aa638bc4957d10a5fd04ace1bd600",
+              "type": "COMPONENT"
+            }
+          ],
+          "type": "INSTANCE_SWAP",
+          "value": "6105:687"
+        },
+        "State": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Default"
+        }
+      },
+      "layout": {
+        "height": 28,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "HUG",
+        "layoutSizingVertical": "HUG",
+        "width": 52
+      }
+    }
+  ],
+  "componentProperties": [],
+  "refusals": [],
+  "notes": []
+}

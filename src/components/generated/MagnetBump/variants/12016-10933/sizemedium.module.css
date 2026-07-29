@@ -1,0 +1,4 @@
+.sizeMedium {
+  width: var(--fc-icon-w, 28px);
+  height: var(--fc-icon-h, 28px);
+}

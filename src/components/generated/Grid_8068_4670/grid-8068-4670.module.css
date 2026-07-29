@@ -1,0 +1,4 @@
+.grid {
+  width: var(--fc-icon-w, 22px);
+  height: var(--fc-icon-h, 22px);
+}

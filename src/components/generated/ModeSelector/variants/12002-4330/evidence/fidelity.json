@@ -1,0 +1,12 @@
+{
+  "masterId": "12002:4330",
+  "status": "measured",
+  "mismatch": 372,
+  "pixels": 19936,
+  "mismatchPct": 1.8659711075441412,
+  "deltaThreshold": 32,
+  "diagnosticBudgetPct": 10,
+  "viewportWidth": 402,
+  "layoutWidth": 176,
+  "renderWidth": 178
+}

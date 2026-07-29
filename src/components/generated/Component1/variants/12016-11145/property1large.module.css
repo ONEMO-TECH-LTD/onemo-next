@@ -1,0 +1,129 @@
+.property1Large {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px;
+  width: 288px;
+  height: 288px;
+  position: relative;
+}
+
+.effectCard {
+  width: var(--sem-container-effect-frame-big);
+  height: var(--sem-container-effect-frame-big);
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 0;
+}
+
+.magneticGridSM {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: stretch;
+  width: 252px;
+  height: 252px;
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.magnetBump {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.magnetBump2 {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.magnetBump3 {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.magnetBump4 {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.magnetBump5 {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.magnetBump6 {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.bottom2 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.magnetBump7 {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.magnetBump8 {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.bottom3 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.magnetBump9 {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.magnetBump10 {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.ellipse15 {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.magnetBump11 {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}

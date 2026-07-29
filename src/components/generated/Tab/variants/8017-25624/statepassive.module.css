@@ -1,0 +1,39 @@
+.statePassive {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sem-dim-fluid-nano-m);
+  width: 71.6px;
+  height: 38px;
+  opacity: var(--sem-motion-opacity-inactive);
+}
+
+.iconBox {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  padding: 0 1px;
+  overflow: hidden;
+  width: var(--sem-dim-fluid-standard-xl);
+  height: var(--sem-dim-fluid-standard-xl);
+  flex-shrink: 0;
+}
+
+.iconBasket {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.label {
+  flex-shrink: 0;
+  align-self: stretch;
+  color: var(--sem-col-text-primary-default);
+  font-family: var(--sem-type-fluid-label-xs-font);
+  font-size: var(--sem-type-fluid-label-xs-size);
+  font-weight: 500;
+  line-height: var(--sem-type-fluid-label-xs-line-height);
+  letter-spacing: var(--sem-type-fluid-label-xs-letter-spacing);
+  text-align: center;
+}

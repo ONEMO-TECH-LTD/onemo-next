@@ -1,0 +1,1599 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "8001:998",
+  "fileVersion": "2381318852839647833",
+  "contentHash": "0ebe506bed3bc724d9549fd343418cc938cecb8dd368ed3fe5b7f403a6377203",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 2,
+  "figmaAbsoluteCount": 2,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "8001:998",
+      "class": "toolRuller",
+      "kind": "element"
+    },
+    {
+      "figmaId": "6136:3457",
+      "class": "rulerMasked",
+      "kind": "element"
+    },
+    {
+      "figmaId": "6136:3458",
+      "class": "frame9",
+      "kind": "element"
+    },
+    {
+      "figmaId": "6136:3459",
+      "class": "ruller",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3578",
+      "class": "tickMark",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3572",
+      "class": "tickMark2",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3569",
+      "class": "tickMark3",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3560",
+      "class": "tickMark4",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3542",
+      "class": "tickMark5",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3548",
+      "class": "tickMark6",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3566",
+      "class": "tickMark7",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3584",
+      "class": "tickMark8",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3581",
+      "class": "tickMark9",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3539",
+      "class": "tickMark10",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3533",
+      "class": "tickMark11",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3530",
+      "class": "tickMark12",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3521",
+      "class": "tickMark13",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3554",
+      "class": "tickMark14",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3518",
+      "class": "tickMark15",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3515",
+      "class": "tickMark16",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3506",
+      "class": "tickMark17",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3503",
+      "class": "tickMark18",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3500",
+      "class": "tickMark19",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3527",
+      "class": "tickMark20",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3497",
+      "class": "tickMark21",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3494",
+      "class": "tickMark22",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3482",
+      "class": "tickMark23",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3479",
+      "class": "tickMark24",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3509",
+      "class": "tickMark25",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3470",
+      "class": "tickMark26",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3467",
+      "class": "tickMark27",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3461",
+      "class": "tickMark28",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3488",
+      "class": "tickMark29",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3455",
+      "class": "tickMark30",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3473",
+      "class": "tickMark31",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3452",
+      "class": "tickMark32",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3464",
+      "class": "tickMark33",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3449",
+      "class": "tickMark34",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3536",
+      "class": "tickMark35",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3446",
+      "class": "tickMark36",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3443",
+      "class": "tickMark37",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3440",
+      "class": "tickMark38",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3545",
+      "class": "tickMark39",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3437",
+      "class": "tickMark40",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3434",
+      "class": "tickMark41",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3431",
+      "class": "tickMark42",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3428",
+      "class": "tickMark43",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3575",
+      "class": "tickMark44",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3557",
+      "class": "tickMark45",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3425",
+      "class": "tickMark46",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3422",
+      "class": "tickMark47",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3419",
+      "class": "tickMark48",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3416",
+      "class": "tickMark49",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3413",
+      "class": "tickMark50",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3410",
+      "class": "tickMark51",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3476",
+      "class": "tickMark52",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3551",
+      "class": "tickMark53",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3563",
+      "class": "tickMark54",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3512",
+      "class": "tickMark55",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3458",
+      "class": "tickMark56",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3524",
+      "class": "tickMark57",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3491",
+      "class": "tickMark58",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3407",
+      "class": "tickMark59",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3401",
+      "class": "tickMark60",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3404",
+      "class": "tickMark61",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3398",
+      "class": "tickMark62",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3485",
+      "class": "tickMark63",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3395",
+      "class": "tickMark64",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:3392",
+      "class": "tickMark65",
+      "kind": "element"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [
+    {
+      "instanceId": "8014:3578",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3572",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3569",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3560",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3542",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3548",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3566",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3584",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3581",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3539",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3533",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3530",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3521",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3554",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3518",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3515",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3506",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3503",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3500",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3527",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3497",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3494",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3482",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3479",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3509",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3470",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3467",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3461",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3488",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3455",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3473",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3452",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3464",
+      "targetId": "8014:3390",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Center"
+        }
+      },
+      "layout": {
+        "height": 24,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3449",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3536",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3446",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3443",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3440",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3545",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3437",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3434",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3431",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3428",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3575",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3557",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3425",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3422",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3419",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3416",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3413",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3410",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3476",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3551",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3563",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3512",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3458",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3524",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3491",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3407",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3401",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3404",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3398",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3485",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3395",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    },
+    {
+      "instanceId": "8014:3392",
+      "targetId": "8014:3388",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Small"
+        }
+      },
+      "layout": {
+        "height": 12,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 2
+      }
+    }
+  ],
+  "componentProperties": [],
+  "refusals": [],
+  "notes": []
+}

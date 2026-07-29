@@ -1,0 +1,94 @@
+.toolSwatches {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 402px;
+}
+
+.swatchMasked {
+  width: 402px;
+  height: 32px;
+  flex-shrink: 0;
+  position: relative;
+  -webkit-mask-image: linear-gradient(89.03deg, rgba(0, 0, 0, 0) 3.86%, #000000 17.23%, #000000 50.34%, #000000 83.29%, rgba(0, 0, 0, 0) 96.26%);
+  mask-image: linear-gradient(89.03deg, rgba(0, 0, 0, 0) 3.86%, #000000 17.23%, #000000 50.34%, #000000 83.29%, rgba(0, 0, 0, 0) 96.26%);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: 0px 0px;
+  mask-position: 0px 0px;
+  -webkit-mask-size: 402px var(--sem-dim-fluid-big-xs);
+  mask-size: 402px var(--sem-dim-fluid-big-xs);
+}
+
+.alpha {
+  width: 402px;
+  height: var(--sem-dim-fluid-big-xs);
+  position: absolute;
+  left: 0;
+  top: 0;
+  visibility: hidden;
+  background-image: linear-gradient(89.03deg, rgba(0, 0, 0, 0) 3.86%, #000000 17.23%, #000000 50.34%, #000000 83.29%, rgba(0, 0, 0, 0) 96.26%);
+}
+
+.swatchRow {
+  display: flex;
+  align-items: center;
+  gap: var(--sem-dim-fluid-standard-m);
+  position: absolute;
+  left: 29px;
+  top: 4px;
+}
+
+.dial {
+  width: var(--sem-dim-fluid-standard-xl);
+  height: var(--sem-dim-fluid-standard-xl);
+  flex-shrink: 0;
+}
+
+.dial2 {
+  width: var(--sem-dim-fluid-standard-xl);
+  height: var(--sem-dim-fluid-standard-xl);
+  flex-shrink: 0;
+}
+
+.dial3 {
+  width: var(--sem-dim-fluid-standard-xl);
+  height: var(--sem-dim-fluid-standard-xl);
+  flex-shrink: 0;
+}
+
+.dial4 {
+  width: var(--sem-dim-fluid-standard-xl);
+  height: var(--sem-dim-fluid-standard-xl);
+  flex-shrink: 0;
+}
+
+.dial5 {
+  width: var(--sem-dim-fluid-standard-xl);
+  height: var(--sem-dim-fluid-standard-xl);
+  flex-shrink: 0;
+}
+
+.dial6 {
+  width: var(--sem-dim-fluid-standard-xl);
+  height: var(--sem-dim-fluid-standard-xl);
+  flex-shrink: 0;
+}
+
+.dial7 {
+  width: var(--sem-dim-fluid-standard-xl);
+  height: var(--sem-dim-fluid-standard-xl);
+  flex-shrink: 0;
+}
+
+.dial8 {
+  width: var(--sem-dim-fluid-standard-xl);
+  height: var(--sem-dim-fluid-standard-xl);
+  flex-shrink: 0;
+}
+
+.dial9 {
+  width: var(--sem-dim-fluid-standard-xl);
+  height: var(--sem-dim-fluid-standard-xl);
+  flex-shrink: 0;
+}

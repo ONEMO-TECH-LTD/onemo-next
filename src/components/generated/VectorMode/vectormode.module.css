@@ -1,0 +1,31 @@
+.vectorMode {
+  width: 296px;
+  height: 296px;
+  position: relative;
+}
+
+.outline {
+  width: 288px;
+  height: 288px;
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  box-shadow: 0 0 0 calc(var(--sem-border-standard-xs) / 2) var(--sem-col-border-max-default-contrast-perma), inset 0 0 0 calc(var(--sem-border-standard-xs) / 2) var(--sem-col-border-max-default-contrast-perma);
+  border-radius: var(--sem-radii-product-effect-card-default);
+}
+
+.anchors {
+  width: 296px;
+  height: 296px;
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.radius {
+  width: 228px;
+  height: 228px;
+  position: absolute;
+  left: 35px;
+  top: 35px;
+}

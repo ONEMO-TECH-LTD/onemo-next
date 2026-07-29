@@ -1,0 +1,46 @@
+.topSection {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+  gap: var(--sem-dim-fluid-standard-m);
+  padding: var(--sem-dim-fluid-nano-xl) var(--sem-dim-fluid-standard-m);
+  width: 402px;
+}
+
+.titleAndControls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.buttonHomeLogo {
+  width: var(--sem-dim-fluid-big-xl);
+  height: 24px;
+  flex-shrink: 0;
+  color: var(--sem-col-fg-primary-default);
+}
+
+.screenTitle {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: var(--sem-dim-fluid-nano-s) var(--sem-dim-fluid-nano-xl);
+  flex-shrink: 0;
+}
+
+.styleEffect {
+  flex-shrink: 0;
+  color: var(--sem-col-text-primary-default);
+  font-family: var(--sem-type-fluid-title-product-secondary-font);
+  font-size: var(--sem-type-fluid-title-product-secondary-size);
+  font-weight: 500;
+  line-height: var(--sem-type-fluid-title-product-secondary-line-height);
+  letter-spacing: var(--sem-type-fluid-title-product-secondary-letter-spacing);
+  text-align: center;
+}
+
+.buttonPillReg {
+  flex-shrink: 0;
+}

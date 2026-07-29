@@ -1,0 +1,42 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "6105:18352",
+  "fileVersion": "2381318852839647833",
+  "contentHash": "96fbf38cd4db684f92dcfa75ae2e643a3645ae3d96babe5b2b8fad685a0f3e42",
+  "targetKind": "component",
+  "iconRoot": true,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "6105:18352",
+      "class": "rotate",
+      "kind": "svg"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [],
+  "componentProperties": [],
+  "refusals": [],
+  "notes": [
+    {
+      "nodeId": "6105:18352",
+      "kind": "svg-descendant-semantics",
+      "visual": false,
+      "liveColorBindings": 1,
+      "residualBindings": 0,
+      "residualLayouts": 1,
+      "findings": [
+        {
+          "descendantId": "6105:18352",
+          "descendantName": "Rotate",
+          "propertyPath": "layoutMode",
+          "category": "baked-auto-layout",
+          "detail": "HORIZONTAL"
+        }
+      ],
+      "note": "svg descendants: 1 live colour binding(s), 0 unsupported binding(s), 1 baked auto-layout frame(s)"
+    }
+  ]
+}

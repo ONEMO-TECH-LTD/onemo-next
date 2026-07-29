@@ -1,0 +1,22 @@
+.sizeLarge {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: var(--sem-dim-fluid-nano-m) var(--sem-dim-fluid-nano-xl);
+  width: var(--sem-dim-fluid-big-s);
+  height: var(--sem-dim-fluid-big-s);
+  background-color: var(--sem-col-bg-brand-tertiary-solid);
+  box-shadow: 0 0 0 var(--sem-border-micro-s) var(--sem-col-border-primary-subtle), 0 4px 4px var(--effects-shadow-regular);
+  border-radius: var(--sem-radii-full);
+}
+
+.l {
+  flex-shrink: 0;
+  color: var(--sem-col-text-max-default-contrast);
+  font-family: var(--sem-type-fluid-label-m-font);
+  font-size: var(--sem-type-fluid-label-m-size);
+  font-weight: 500;
+  line-height: var(--sem-type-fluid-label-m-line-height);
+  letter-spacing: var(--sem-type-fluid-label-m-letter-spacing);
+  text-align: center;
+}

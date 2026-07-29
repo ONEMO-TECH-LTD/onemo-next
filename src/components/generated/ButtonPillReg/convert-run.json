@@ -1,0 +1,33 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "6103:707",
+  "fileVersion": "2381318852839647833",
+  "contentHash": "0b5369052194cdc0866512cb173f868e82c1a1ffd538ae8356b321105abb63ea",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "6103:707",
+      "class": "buttonPillReg",
+      "kind": "element"
+    },
+    {
+      "figmaId": "6103:704",
+      "class": "label",
+      "kind": "element"
+    },
+    {
+      "figmaId": "6103:705",
+      "class": "label2",
+      "kind": "text"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [],
+  "componentProperties": [],
+  "refusals": [],
+  "notes": []
+}

@@ -1,0 +1,55 @@
+.frameEffectSelection {
+  display: flex;
+  align-items: center;
+  padding: var(--sem-dim-fluid-nano-m);
+  position: relative;
+  border-radius: var(--sem-radii-xs);
+}
+
+.fcPaint1Stroke {
+  position: absolute;
+  left: calc(0px - var(--sem-border-standard-s));
+  top: calc(0px - var(--sem-border-standard-s));
+  width: calc(100% + var(--sem-border-standard-s) + var(--sem-border-standard-s));
+  height: calc(100% + var(--sem-border-standard-s) + var(--sem-border-standard-s));
+  overflow: visible;
+  pointer-events: none;
+}
+
+.maskGroup {
+  width: 279px;
+  height: 282px;
+  flex-shrink: 0;
+  position: relative;
+  -webkit-mask-image: linear-gradient(#d9d9d9, #d9d9d9);
+  mask-image: linear-gradient(#d9d9d9, #d9d9d9);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: 0px 0px;
+  mask-position: 0px 0px;
+  -webkit-mask-size: 279px 282px;
+  mask-size: 279px 282px;
+  box-shadow: 0 var(--effects-blur-soft) var(--effects-blur-mild) var(--effects-blur-soft) var(--effects-shadow-regular);
+  border-radius: 0;
+}
+
+.ellipse14 {
+  width: 279px;
+  height: 282px;
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.effectCard {
+  width: 282px;
+  height: 386px;
+  position: absolute;
+  left: -2px;
+  top: -55px;
+  background-image: url('./assets/5a6a0ff38f4c992038fcb46fa2b7719f30e1160f.png');
+  background-size: 103.3% 100%;
+  background-position: 93.26% 0;
+  background-repeat: no-repeat;
+  border-radius: var(--sem-radii-product-effect-card-default);
+}

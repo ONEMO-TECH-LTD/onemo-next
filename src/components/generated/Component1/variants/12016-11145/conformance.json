@@ -1,0 +1,290 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "12016:11145",
+  "fileVersion": "2381318852839647833",
+  "elements": 19,
+  "evidence": {
+    "raw": {
+      "status": "pass"
+    },
+    "paint": {
+      "status": "pass"
+    }
+  },
+  "tokenCoveragePct": 6,
+  "tokenDecls": 2,
+  "styleableDecls": 32,
+  "unresolved": [],
+  "raws": [
+    {
+      "className": "property1Large",
+      "prop": "gap",
+      "value": "10px",
+      "line": 4,
+      "candidates": [
+        {
+          "token": "--prim-track-pos-10",
+          "exact": true
+        }
+      ]
+    },
+    {
+      "className": "property1Large",
+      "prop": "padding",
+      "value": "18px",
+      "line": 5,
+      "candidates": []
+    },
+    {
+      "className": "property1Large",
+      "prop": "width",
+      "value": "288px",
+      "line": 6,
+      "candidates": []
+    },
+    {
+      "className": "property1Large",
+      "prop": "height",
+      "value": "288px",
+      "line": 7,
+      "candidates": []
+    },
+    {
+      "className": "magneticGridSM",
+      "prop": "width",
+      "value": "252px",
+      "line": 25,
+      "candidates": []
+    },
+    {
+      "className": "magneticGridSM",
+      "prop": "height",
+      "value": "252px",
+      "line": 26,
+      "candidates": []
+    },
+    {
+      "className": "magnetBump",
+      "prop": "width",
+      "value": "24px",
+      "line": 39,
+      "candidates": []
+    },
+    {
+      "className": "magnetBump",
+      "prop": "height",
+      "value": "24px",
+      "line": 40,
+      "candidates": []
+    },
+    {
+      "className": "magnetBump2",
+      "prop": "width",
+      "value": "24px",
+      "line": 45,
+      "candidates": []
+    },
+    {
+      "className": "magnetBump2",
+      "prop": "height",
+      "value": "24px",
+      "line": 46,
+      "candidates": []
+    },
+    {
+      "className": "magnetBump3",
+      "prop": "width",
+      "value": "24px",
+      "line": 51,
+      "candidates": []
+    },
+    {
+      "className": "magnetBump3",
+      "prop": "height",
+      "value": "24px",
+      "line": 52,
+      "candidates": []
+    },
+    {
+      "className": "magnetBump4",
+      "prop": "width",
+      "value": "24px",
+      "line": 57,
+      "candidates": []
+    },
+    {
+      "className": "magnetBump4",
+      "prop": "height",
+      "value": "24px",
+      "line": 58,
+      "candidates": []
+    },
+    {
+      "className": "magnetBump5",
+      "prop": "width",
+      "value": "24px",
+      "line": 70,
+      "candidates": []
+    },
+    {
+      "className": "magnetBump5",
+      "prop": "height",
+      "value": "24px",
+      "line": 71,
+      "candidates": []
+    },
+    {
+      "className": "magnetBump6",
+      "prop": "width",
+      "value": "24px",
+      "line": 76,
+      "candidates": []
+    },
+    {
+      "className": "magnetBump6",
+      "prop": "height",
+      "value": "24px",
+      "line": 77,
+      "candidates": []
+    },
+    {
+      "className": "magnetBump7",
+      "prop": "width",
+      "value": "24px",
+      "line": 89,
+      "candidates": []
+    },
+    {
+      "className": "magnetBump7",
+      "prop": "height",
+      "value": "24px",
+      "line": 90,
+      "candidates": []
+    },
+    {
+      "className": "magnetBump8",
+      "prop": "width",
+      "value": "24px",
+      "line": 95,
+      "candidates": []
+    },
+    {
+      "className": "magnetBump8",
+      "prop": "height",
+      "value": "24px",
+      "line": 96,
+      "candidates": []
+    },
+    {
+      "className": "magnetBump9",
+      "prop": "width",
+      "value": "24px",
+      "line": 108,
+      "candidates": []
+    },
+    {
+      "className": "magnetBump9",
+      "prop": "height",
+      "value": "24px",
+      "line": 109,
+      "candidates": []
+    },
+    {
+      "className": "magnetBump10",
+      "prop": "width",
+      "value": "24px",
+      "line": 114,
+      "candidates": []
+    },
+    {
+      "className": "magnetBump10",
+      "prop": "height",
+      "value": "24px",
+      "line": 115,
+      "candidates": []
+    },
+    {
+      "className": "ellipse15",
+      "prop": "width",
+      "value": "24px",
+      "line": 120,
+      "candidates": []
+    },
+    {
+      "className": "ellipse15",
+      "prop": "height",
+      "value": "24px",
+      "line": 121,
+      "candidates": []
+    },
+    {
+      "className": "magnetBump11",
+      "prop": "width",
+      "value": "24px",
+      "line": 126,
+      "candidates": []
+    },
+    {
+      "className": "magnetBump11",
+      "prop": "height",
+      "value": "24px",
+      "line": 127,
+      "candidates": []
+    }
+  ],
+  "refusals": [],
+  "approximations": [],
+  "valueParity": [],
+  "fonts": [],
+  "missingAssets": [],
+  "paintParity": [],
+  "effectParity": [],
+  "cascade": [],
+  "nativeCarrierFindings": [],
+  "svgDescendantFindings": [],
+  "matrix": {
+    "tokens": {
+      "unresolved": 0,
+      "status": "pass"
+    },
+    "numeric": {
+      "drift": 0,
+      "status": "pass"
+    },
+    "paint": {
+      "mismatches": 0,
+      "status": "pass"
+    },
+    "effects": {
+      "mismatches": 0,
+      "status": "pass"
+    },
+    "cascade": {
+      "broken": 0,
+      "status": "pass"
+    },
+    "nativeCarriers": {
+      "status": "pass",
+      "counts": {
+        "stroke": 0,
+        "opacity": 0,
+        "backgroundBlur": 0,
+        "alphaMaskHeight": 0
+      },
+      "findings": []
+    },
+    "svgDescendants": {
+      "status": "pass",
+      "blockingStatus": "pass",
+      "roots": 1,
+      "liveColorBindings": 0,
+      "residualBindings": 0,
+      "residualLayouts": 0,
+      "findings": []
+    },
+    "status": "pass",
+    "pass": true
+  },
+  "status": "pass",
+  "pass": true
+}

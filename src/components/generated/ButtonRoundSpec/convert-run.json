@@ -1,0 +1,108 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "6108:48040",
+  "fileVersion": "2381318852839647833",
+  "contentHash": "6f79028a9ba3e78d80ca4891b543dfcba363e93727032161bf757c5ef82b2afd",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "6108:48040",
+      "class": "buttonRoundSpec",
+      "kind": "element"
+    },
+    {
+      "figmaId": "6108:49362",
+      "class": "magic",
+      "kind": "element",
+      "propertyRefs": {
+        "mainComponent": "Icons#6108:7"
+      }
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [
+    {
+      "instanceId": "6108:49362",
+      "targetId": "6108:48035",
+      "props": {},
+      "layout": {
+        "height": 20,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 20
+      }
+    }
+  ],
+  "componentProperties": [
+    {
+      "authoredKey": "Icons#6108:7",
+      "propName": "icons",
+      "type": "INSTANCE_SWAP",
+      "defaultValue": "6108:48035",
+      "preferredValues": [
+        {
+          "type": "COMPONENT",
+          "key": "f76b7d21fa2282165a4e05fe446a58d398cf9575"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "793d88c14c978af066f1179248060dcfc7c4a3c9"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "a8cb8f0e78bfed63a67db4675747baa8ff717fe3"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "fa1220224598fcf20358f9a48c0a2d99212b99ea"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "f6326317d82666a67f92a446b63bf620371c9c68"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "1460470e6301acd2835739e9c400b261e03e2e86"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "a74a299f791aa638bc4957d10a5fd04ace1bd600"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "f4164ac11b5fc7deade064da1b9907573a4f86a4"
+        }
+      ],
+      "bindingScope": [
+        {
+          "masterId": "6108:48040",
+          "sites": [
+            {
+              "nodeId": "6108:49362",
+              "field": "mainComponent"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "refusals": [],
+  "notes": [
+    {
+      "nodeId": "6108:49362",
+      "kind": "svg-descendant-semantics",
+      "visual": false,
+      "liveColorBindings": 0,
+      "residualBindings": 0,
+      "residualLayouts": 0,
+      "findings": [],
+      "note": "svg descendants: 0 live colour binding(s), no residual semantics"
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "12016:11282",
+  "fileVersion": "2381318852839647833",
+  "contentHash": "fb5ad4d2dc8db4c0daab45c1ba1e4a44ce3132c0df72e9fc91a67d75e1a12ae9",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "12016:11282",
+      "class": "sizeCustom",
+      "kind": "element"
+    },
+    {
+      "figmaId": "12016:11283",
+      "class": "size",
+      "kind": "element"
+    },
+    {
+      "figmaId": "12016:11284",
+      "class": "f",
+      "kind": "element"
+    },
+    {
+      "figmaId": "12016:11285",
+      "class": "f2",
+      "kind": "text"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [],
+  "componentProperties": [
+    {
+      "authoredKey": "Size",
+      "propName": "size",
+      "type": "VARIANT",
+      "defaultValue": "Small",
+      "variantOptions": [
+        "Large",
+        "Small",
+        "Medium",
+        "Custom"
+      ],
+      "bindingScope": []
+    }
+  ],
+  "refusals": [],
+  "notes": []
+}

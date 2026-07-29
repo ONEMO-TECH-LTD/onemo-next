@@ -1,0 +1,27 @@
+.toolTitle {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 0 0 var(--sem-dim-fluid-standard-xl);
+}
+
+.frame12 {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  width: 50px;
+  flex-shrink: 0;
+}
+
+.small {
+  width: 50px;
+  flex-shrink: 0;
+  color: var(--sem-col-text-primary-default);
+  font-family: var(--sem-type-fluid-label-m-font);
+  font-size: var(--sem-type-fluid-label-m-size);
+  font-weight: 500;
+  line-height: var(--sem-type-fluid-label-m-line-height);
+  letter-spacing: var(--sem-type-fluid-label-m-letter-spacing);
+  text-align: center;
+}

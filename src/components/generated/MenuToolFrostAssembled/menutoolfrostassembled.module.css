@@ -1,0 +1,9 @@
+.menuToolFrostAssembled {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.menuToolFrostSingleTemplate {
+  flex-shrink: 0;
+}
