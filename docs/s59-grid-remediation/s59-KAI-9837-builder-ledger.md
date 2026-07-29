@@ -94,23 +94,29 @@ All measurements are Standard/48, light density, zero adaptive growth.
 ## Executed gates
 
 - Focused rounded/worker/cache/boundary/payload/performance suites: green.
-- Full Vitest before the final recipe-coupling refactor:
-  47 files passed, 1 skipped; 447 passed, 10 skipped, 1 todo.
+- Final full Vitest after recipe coupling:
+  47 files passed, 1 skipped; 448 passed, 10 skipped, 1 todo.
 - TypeScript: exit 0.
 - ESLint: exit 0, 0 errors; 214 pre-existing warnings.
 - `git diff --check`: clean.
-- Final full-suite rerun, live visual, and screenshot: pending after the
-  replacement source commit.
+- Four landed production-line mutations each failed their named regression and
+  were restored before the final full-suite run.
 
 ## Live visual
 
-Pending on the committed replacement head:
+Observed in headed Playwright Chromium at
+`http://localhost:3970/effect-creator/grid-lab`. PID `38475` served from
+`onemo-next/.claude/worktrees/grid-lab`; the source head was
+`5973e95cb60ef94dde0ef9d858f8c96fe3f50fd9`.
 
-- `http://localhost:3970/effect-creator/grid-lab`
-- radius 10 → 70mm / 4 seated
-- radius 12 → 71mm / 4 seated
-- radius 14 → 72mm / 4 seated
-- no verdict banner; serving cwd and commit recorded with the capture.
+| Radius control | Test size | Product tier | Screenshot |
+|---:|---:|---:|---|
+| 10mm | 70mm | S · 4pt · seated 4 | `.playwright-cli/page-2026-07-29T17-56-33-202Z.png` |
+| 12mm | 71mm | S · 4pt · seated 4 | `.playwright-cli/page-2026-07-29T17-56-49-183Z.png` |
+| 14mm | 72mm | S · 4pt · seated 4 | `.playwright-cli/page-2026-07-29T17-56-02-243Z.png` |
+
+All three stayed Standard/48 with no product verdict banner. Playwright
+reported zero console errors.
 
 ## Scope kept
 
