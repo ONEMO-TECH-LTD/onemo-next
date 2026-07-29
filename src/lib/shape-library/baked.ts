@@ -69,32 +69,6 @@ export const TEARDROP_ANCHORS: VAnchor[] = [
     { p: { x: -0.0337, y: -0.8655 }, hIn: { x: -0.0667, y: -0.7754 }, hOut: { x: -0.0185, y: -0.907 }, corner: false },
 ]
 
-// squircle: 22 anchors (0 corners), tol 0.0015
-export const SQUIRCLE_ANCHORS: VAnchor[] = [
-    { p: { x: 1, y: 0 }, hIn: { x: 1, y: -0.0717 }, hOut: { x: 1, y: 0.0717 }, corner: false },
-    { p: { x: 0.9999, y: 0.2152 }, hIn: { x: 1.0001, y: 0.1434 }, hOut: { x: 0.9998, y: 0.2646 }, corner: false },
-    { p: { x: 0.9987, y: 0.3635 }, hIn: { x: 0.9996, y: 0.3141 }, hOut: { x: 0.9958, y: 0.5279 }, corner: false },
-    { p: { x: 0.864, y: 0.8769 }, hIn: { x: 0.9943, y: 0.7541 }, hOut: { x: 0.7265, y: 1.0066 }, corner: false },
-    { p: { x: 0.2839, y: 0.9996 }, hIn: { x: 0.4569, y: 0.9985 }, hOut: { x: 0.2222, y: 1 }, corner: false },
-    { p: { x: 0.0988, y: 1 }, hIn: { x: 0.1605, y: 1 }, hOut: { x: -0.0387, y: 1 }, corner: false },
-    { p: { x: -0.3139, y: 0.9994 }, hIn: { x: -0.1763, y: 1.0007 }, hOut: { x: -0.4022, y: 0.9985 }, corner: false },
-    { p: { x: -0.5788, y: 0.9867 }, hIn: { x: -0.491, y: 0.9971 }, hOut: { x: -0.6382, y: 0.9796 }, corner: false },
-    { p: { x: -0.7535, y: 0.9459 }, hIn: { x: -0.6979, y: 0.9683 }, hOut: { x: -0.9341, y: 0.8731 }, corner: false },
-    { p: { x: -0.9915, y: 0.5296 }, hIn: { x: -0.977, y: 0.7083 }, hOut: { x: -0.9984, y: 0.4452 }, corner: false },
-    { p: { x: -0.9997, y: 0.2756 }, hIn: { x: -0.9992, y: 0.3603 }, hOut: { x: -1.0002, y: 0.1837 }, corner: false },
-    { p: { x: -1, y: 0 }, hIn: { x: -1, y: 0.0919 }, hOut: { x: -1, y: -0.0717 }, corner: false },
-    { p: { x: -0.9999, y: -0.2152 }, hIn: { x: -1.0001, y: -0.1434 }, hOut: { x: -0.9998, y: -0.2646 }, corner: false },
-    { p: { x: -0.9987, y: -0.3635 }, hIn: { x: -0.9996, y: -0.3141 }, hOut: { x: -0.996, y: -0.5205 }, corner: false },
-    { p: { x: -0.882, y: -0.8585 }, hIn: { x: -0.9943, y: -0.7334 }, hOut: { x: -0.7476, y: -1.0082 }, corner: false },
-    { p: { x: -0.2839, y: -0.9996 }, hIn: { x: -0.4645, y: -0.9985 }, hOut: { x: -0.2222, y: -1 }, corner: false },
-    { p: { x: -0.0988, y: -1 }, hIn: { x: -0.1605, y: -1 }, hOut: { x: 0.041, y: -1 }, corner: false },
-    { p: { x: 0.3207, y: -0.9993 }, hIn: { x: 0.1809, y: -1.0008 }, hOut: { x: 0.4187, y: -0.9983 }, corner: false },
-    { p: { x: 0.6146, y: -0.9818 }, hIn: { x: 0.5176, y: -0.9967 }, hOut: { x: 0.6809, y: -0.9716 }, corner: false },
-    { p: { x: 0.806, y: -0.9202 }, hIn: { x: 0.7478, y: -0.9545 }, hOut: { x: 0.9953, y: -0.8088 }, corner: false },
-    { p: { x: 0.9988, y: -0.3579 }, hIn: { x: 0.9957, y: -0.5502 }, hOut: { x: 0.9996, y: -0.3103 }, corner: false },
-    { p: { x: 0.9999, y: -0.2152 }, hIn: { x: 0.9998, y: -0.2627 }, hOut: { x: 1.0001, y: -0.1434 }, corner: false },
-]
-
 // asterisk: 50 anchors (6 corners), tol 0.0015
 export const ASTERISK_ANCHORS: VAnchor[] = [
     { p: { x: 0.2953, y: 0.1709 }, hIn: { x: 0.3035, y: 0.1696 }, hOut: { x: 0.3286, y: 0.2037 }, corner: true },
@@ -172,4 +146,3 @@ export const BOWTIE_ANCHORS: VAnchor[] = [
     { p: { x: 0.2828, y: -0.4625 }, hIn: { x: 0.2124, y: -0.443 }, hOut: { x: 0.5183, y: -0.5274 }, corner: false },
     { p: { x: 0.9314, y: -0.2347 }, hIn: { x: 0.7978, y: -0.4479 }, hOut: { x: 0.9753, y: -0.1646 }, corner: false },
 ]
-

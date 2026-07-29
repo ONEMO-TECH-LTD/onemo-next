@@ -253,6 +253,7 @@ describe('exact grid cache identity', () => {
     expect(GRID_ENGINE_CACHE_VERSION).toBe(3)
     expect(GRID_ENGINE_POLICY_SIGNATURE).not.toContain('"user"')
     expect(GRID_ENGINE_POLICY_SIGNATURE).not.toContain('"admin"')
+    expect(GRID_ENGINE_POLICY_SIGNATURE).toContain('"preparedContourEpsilonMM"')
     expect(gridLadderCacheKey(squareLadder)).toContain(`"cacheVersion":${GRID_ENGINE_CACHE_VERSION}`)
   })
 })

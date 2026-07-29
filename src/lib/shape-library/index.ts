@@ -4,9 +4,16 @@
 
 import type { VShape } from '@/lib/vector-core'
 import { transformShape } from '@/lib/vector-core'
-import { hasVectorDef, unitShape, SHAPE_ASPECT, type VectorShapeKind, type VectorShapeParams } from './defs'
+import {
+  hasVectorDef,
+  roundedSquareDefaultRadius,
+  unitShape,
+  SHAPE_ASPECT,
+  type VectorShapeKind,
+  type VectorShapeParams,
+} from './defs'
 
-export { hasVectorDef, unitShape }
+export { hasVectorDef, roundedSquareDefaultRadius, unitShape }
 export type { VectorShapeKind, VectorShapeParams }
 
 /** Instantiate a preset into image-px space (y-down), centered, longest side = min(imgW,imgH)·0.72. */

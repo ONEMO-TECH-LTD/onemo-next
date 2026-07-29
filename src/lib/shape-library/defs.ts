@@ -7,9 +7,10 @@
 // Blueprint: v3/blueprint/modules/shape-library.md.
 
 import type { VAnchor, VShape } from '@/lib/vector-core'
+import { DEFAULT_LAW, DEFAULT_PITCH_MM } from '@/lib/effect/grid-core'
 import {
   PINCHED_ANCHORS, SPARKLE_ANCHORS, TEARDROP_ANCHORS,
-  SQUIRCLE_ANCHORS, ASTERISK_ANCHORS, BOWTIE_ANCHORS,
+  ASTERISK_ANCHORS, BOWTIE_ANCHORS,
 } from './baked'
 
 /** Exact circle: 4 smooth anchors, the standard kappa construction (max radial error ~0.027%). */
@@ -29,6 +30,14 @@ function circleDef(): VShape {
 /** Exact square: 4 corner anchors, no handles — straight lines by construction. */
 function squareDef(): VShape {
   return cornersDef([[-1, -1], [1, -1], [1, 1], [-1, 1]])
+}
+
+/** The rounded-square default is the sharp 48mm zero-point with its corner arc derived from the
+ * complete sizing inset. At the canonical 70mm side this yields an 11mm radius, never a styling ratio. */
+export function roundedSquareDefaultRadius(side: number): number {
+  const sizingInsetMM = DEFAULT_LAW.paddingMM + DEFAULT_LAW.frameMM
+  const canonicalSideMM = DEFAULT_PITCH_MM + 2 * sizingInsetMM
+  return side * (sizingInsetMM / canonicalSideMM)
 }
 
 /**
@@ -79,8 +88,15 @@ function starDef(points: number, spikiness01: number): VShape {
 }
 
 /** One circular arc as cubics (≤90° per cubic — kappa-exact), CCW in y-down screen space. */
-function arcAnchors(cx: number, cy: number, r: number, a0: number, a1: number): VAnchor[] {
-  const steps = Math.max(1, Math.ceil(Math.abs(a1 - a0) / (Math.PI / 2)))
+function arcAnchors(
+  cx: number,
+  cy: number,
+  r: number,
+  a0: number,
+  a1: number,
+  maxArcRadians = Math.PI / 2,
+): VAnchor[] {
+  const steps = Math.max(1, Math.ceil(Math.abs(a1 - a0) / maxArcRadians))
   const out: VAnchor[] = []
   for (let s = 0; s <= steps; s++) {
     const a = a0 + ((a1 - a0) * s) / steps
@@ -97,6 +113,18 @@ function arcAnchors(cx: number, cy: number, r: number, a0: number, a1: number): 
     })
   }
   return out
+}
+
+/** Circular-arc rounded square using the same derived radius consumed by the Creator picker. */
+function squircleDef(): VShape {
+  const r = roundedSquareDefaultRadius(2)
+  const anchors = [
+    ...arcAnchors(1 - r, -1 + r, r, -Math.PI / 2, 0, Math.PI / 8),
+    ...arcAnchors(1 - r, 1 - r, r, 0, Math.PI / 2, Math.PI / 8),
+    ...arcAnchors(-1 + r, 1 - r, r, Math.PI / 2, Math.PI, Math.PI / 8),
+    ...arcAnchors(-1 + r, -1 + r, r, Math.PI, (3 * Math.PI) / 2, Math.PI / 8),
+  ]
+  return { paths: [{ anchors }] }
 }
 
 /** leaf: rounded square with ONE sharp corner (3 exact quarter arcs + 1 corner). */
@@ -193,7 +221,7 @@ const DEFS: Record<VectorShapeKind, (p: VectorShapeParams) => VShape> = {
   pinched: fromBaked(PINCHED_ANCHORS),
   sparkle: fromBaked(SPARKLE_ANCHORS),
   teardrop: fromBaked(TEARDROP_ANCHORS),
-  squircle: fromBaked(SQUIRCLE_ANCHORS),
+  squircle: () => squircleDef(),
   asterisk: fromBaked(ASTERISK_ANCHORS),
   bowtie: fromBaked(BOWTIE_ANCHORS),
 }

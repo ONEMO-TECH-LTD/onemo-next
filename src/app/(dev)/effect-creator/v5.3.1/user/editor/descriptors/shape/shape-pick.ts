@@ -9,7 +9,7 @@ import type { PickerDescriptor, PickerParamSpec, PickerParams, EditorCtx } from 
 import type { CommitResult } from '../../../outlineStore'
 import { mintIds, type OutlineSource, type OutlineAdjustments } from '@/lib/effect/outline-resolve'
 import { shapeBBox, type VShape } from '@/lib/vector-core'
-import { getShape, hasVectorDef } from '@/lib/shape-library'
+import { getShape, hasVectorDef, roundedSquareDefaultRadius } from '@/lib/shape-library'
 import { vshapeFromSVG, fitShapeToBox } from '@/lib/export'
 import { GEN_VECTOR_KINDS, vecFromGenerator, vecFromImageFile, shapePreviewD } from '../../producers'
 import { cornerRadiusAdjustments } from '../../seed-defaults'
@@ -52,7 +52,7 @@ function buildSource(kind: ShapeKind, params: PickerParams, d: Dims): { source: 
     }
     const bb = shapeBBox(base, 1)
     const half = Math.min(bb.maxX - bb.minX, bb.maxY - bb.minY) / 2
-    const r = kind === 'squircle' ? Math.round(half * 0.42) : Math.round(half) // pill: full short-end round → stadium
+    const r = kind === 'squircle' ? roundedSquareDefaultRadius(2 * half) : Math.round(half) // pill: full short-end round → stadium
     return { source: { ...wrap(base, d) }, adjustments: cornerRadiusAdjustments(base, r) }
   }
   // vector-def kinds (square/circle/polygon/star/heart/diamond/sparkle/pinched/…) — true Bézier from the library.

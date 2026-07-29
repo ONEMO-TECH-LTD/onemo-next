@@ -2,7 +2,9 @@
 
 import { describe, expect, it } from 'vitest'
 import { computeAttachmentGrid } from '@/app/(dev)/effect-creator/v5.3.1/core/primitives'
+import { getShape } from '@/lib/shape-library'
 import { pointInPolygon } from '../polygon'
+import { contourFromShape } from '../geometry-truth'
 import {
   distanceToPreparedContour,
   prepareExactContour,
@@ -24,11 +26,40 @@ import {
   semanticLadder,
   stdShapeContour,
 } from '../grid'
-import type { Contour } from '../types'
+import type { Contour, Pt } from '../types'
 
 const donut: Contour = {
   outer: { pts: [[0, 0], [214, 0], [214, 214], [0, 214]] },
   holes: [{ pts: [[70, 70], [144, 70], [144, 144], [70, 144]] }],
+}
+
+function roundedSquareContour(sizeMM: number, radiusMM: number, segmentsPerCorner = 4096): Contour {
+  const corners = [
+    { cx: sizeMM - radiusMM, cy: radiusMM, start: -Math.PI / 2 },
+    { cx: sizeMM - radiusMM, cy: sizeMM - radiusMM, start: 0 },
+    { cx: radiusMM, cy: sizeMM - radiusMM, start: Math.PI / 2 },
+    { cx: radiusMM, cy: radiusMM, start: Math.PI },
+  ]
+  const pts = corners.flatMap(({ cx, cy, start }) =>
+    Array.from({ length: segmentsPerCorner }, (_, i) => {
+      const angle = start + (i / segmentsPerCorner) * (Math.PI / 2)
+      return [cx + Math.cos(angle) * radiusMM, cy + Math.sin(angle) * radiusMM] as Pt
+    }),
+  )
+  return { outer: { pts }, holes: [] }
+}
+
+function normalizedPresetContour(kind: Parameters<typeof getShape>[0]): Contour {
+  const shape = getShape(kind, 1000, 1000)
+  const contour = contourFromShape(shape, { mmPerPx: 1, maskHeightPx: 1000 })
+  if (!contour) throw new Error(`${kind} did not produce a contour`)
+  const xs = contour.outer.pts.map(([x]) => x)
+  const ys = contour.outer.pts.map(([, y]) => y)
+  const longestMM = Math.max(
+    Math.max(...xs) - Math.min(...xs),
+    Math.max(...ys) - Math.min(...ys),
+  )
+  return scaleContour(contour, 1 / longestMM)
 }
 
 describe('resolveGridPlan — production engine seam', () => {
@@ -290,6 +321,62 @@ describe('contour transforms preserve the declared Contour contract', () => {
 })
 
 describe('semantic ladder stays inside its product contract', () => {
+  it('accepts exact 10mm rounded-corner tangency and seats all four 70mm corners', () => {
+    const sizeMM = 70
+    const insetMM = DEFAULT_LAW.paddingMM + DEFAULT_LAW.frameMM
+    const radiusMM =
+      (Math.SQRT2 * insetMM - DEFAULT_LAW.paddingMM) /
+      (Math.SQRT2 - 1)
+    const contour = roundedSquareContour(sizeMM, radiusMM)
+    const plan = resolveGridPlan(contour, {
+      mode: 'standard',
+      pitchMM: 48,
+      density: 'light',
+      paddingMM: DEFAULT_LAW.paddingMM,
+      maxGrowMM: 0,
+    })
+    const prepared = prepareExactContour(contour)
+    const seats = plan.grid.anchors.map(
+      (anchor) => distanceToPreparedContour(anchor.p, prepared),
+    )
+
+    expect(plan.grid.anchors).toHaveLength(4)
+    expect(Math.min(...seats)).toBeCloseTo(DEFAULT_LAW.paddingMM, 6)
+  })
+
+  it('accepts exact 11mm zero-point tangency in the catalogue sizing solve', () => {
+    const sizingInsetMM = DEFAULT_LAW.paddingMM + DEFAULT_LAW.frameMM
+    const grid = computeGrid(roundedSquareContour(70, sizingInsetMM), {
+      pitchMM: 48,
+      pattern: 'standard',
+      paddingMM: sizingInsetMM,
+      perimeterOnly: true,
+      sparseThin: true,
+    })
+
+    expect(grid.anchors).toHaveLength(4)
+  })
+
+  it('keeps the real rounded-square preset on the same 70mm four-corner default as sharp square', () => {
+    const roundedAt = (sizeMM: number) => scaleContour(normalizedPresetContour('squircle'), sizeMM)
+    const roundedRung = nextSemanticRung(semanticLadder(roundedAt), 70)
+    const roundedPlan = resolveGridPlan(roundedAt(roundedRung.sizeMM), {
+      mode: 'standard',
+      pitchMM: 48,
+      density: 'light',
+      paddingMM: DEFAULT_LAW.paddingMM,
+      maxGrowMM: 0,
+    })
+    const sharpRung = nextSemanticRung(
+      semanticLadder((sizeMM) => stdShapeContour('square', sizeMM)),
+      70,
+    )
+
+    expect(roundedRung).toMatchObject({ label: 'S', sizeMM: 70, points: 4 })
+    expect(roundedPlan.grid.anchors).toHaveLength(4)
+    expect(sharpRung).toMatchObject({ label: 'S', sizeMM: 70, points: 4 })
+  })
+
   it('keeps every light-grid node that physically faces a sloped contour', () => {
     const contour = stdShapeContour('triangle', 290)
     const prepared = prepareExactContour(contour)

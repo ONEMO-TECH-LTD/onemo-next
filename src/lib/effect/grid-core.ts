@@ -15,6 +15,7 @@
 //     top-to-bottom support span.
 
 import type { Contour, Pt } from './types'
+import { MANUFACTURING_TOLERANCE_MM } from './geometry-truth'
 import { insetRingMM } from './offset'
 import {
   PreparedContourSource,
@@ -47,6 +48,10 @@ export const LAUNCH_PITCHES_MM = [48, 96] as const
 export const PADDING_FLOOR_MM = 10
 export const MIN_ANCHORS = 2
 export const TARGET_ANCHORS = 4
+/** Prepared contours approximate curves with straight chords. At the 70mm zero-point, the 0.05mm
+ * manufacturing flatten produces 0.00333mm chord sagitta on the R=11 corner; one tenth of the source
+ * tolerance bounds it. This is an internal representation epsilon, never a product padding tolerance. */
+const GRID_ARITHMETIC_EPSILON_MM = MANUFACTURING_TOLERANCE_MM / 10
 /** How far a magnet holds material down before an edge would lift — a PHYSICAL distance, independent of
  *  the chosen grid pitch. Tunable after coupon testing. */
 export const HOLD_REACH_MM = 48
@@ -399,7 +404,7 @@ export function computePreparedGrid(prepared: PreparedContour, cfg: GridConfig =
   // contour. The same physical floor governs sizing and delivery; no corner-specific rescue exists.
   const valid = (p: Pt) => {
     if (!pointInPreparedContour(p, prepared)) return false
-    return distanceToPreparedContour(p, prepared) >= pad
+    return distanceToPreparedContour(p, prepared) + GRID_ARITHMETIC_EPSILON_MM >= pad
   }
 
   // FINALIZE a candidate seed into the delivered layout: contour-facing belt + light 1·3·4·6
@@ -1278,6 +1283,7 @@ const GRID_ENGINE_POLICY_CONTRACT = {
   paddingFloorMM: PADDING_FLOOR_MM,
   minAnchors: MIN_ANCHORS,
   targetAnchors: TARGET_ANCHORS,
+  preparedContourEpsilonMM: GRID_ARITHMETIC_EPSILON_MM,
   holdReachMM: HOLD_REACH_MM,
   focalSizeMM: FOCAL_SIZE_MM,
   focalRamp2MM: FOCAL_RAMP2_MM,
