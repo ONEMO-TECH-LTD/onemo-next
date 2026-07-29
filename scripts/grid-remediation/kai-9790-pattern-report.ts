@@ -9,6 +9,7 @@ import {
   stdShapeContour,
   type GridDensity,
   type GridMode,
+  type GridSource,
   type StandardLadderShape,
 } from '../../src/lib/effect/grid'
 import type { Contour, Pt } from '../../src/lib/effect/types'
@@ -18,8 +19,8 @@ const PRESETS: VectorShapeKind[] = [
   'squircle', 'square', 'circle', 'pill', 'heart', 'star', 'polygon', 'diamond', 'plus',
   'teardrop', 'leaf', 'lens', 'bolt', 'sparkle', 'pinched', 'asterisk', 'bowtie',
 ]
-const DENSITIES: GridDensity[] = ['light', 'standard']
-const MODES: GridMode[] = ['auto', 'standard']
+const DENSITIES = ['light', 'standard'] as const satisfies readonly GridDensity[]
+const MODES = ['auto', 'standard'] as const satisfies readonly GridMode[]
 const IMG = 1000
 
 function presetUnitContour(preset: VectorShapeKind): Contour {
@@ -40,9 +41,10 @@ function presetUnitContour(preset: VectorShapeKind): Contour {
   }
 }
 
-function planSummary(contour: Contour, mode: GridMode, density: GridDensity) {
+function planSummary(contour: Contour, mode: GridMode, density: GridDensity, source: GridSource) {
   const plan = resolveGridPlan(contour, {
     attachment: 'magnetic',
+    source,
     mode,
     density,
     paddingMM: DEFAULT_LAW.paddingMM,
@@ -64,6 +66,7 @@ function standardShapeRows(shape: StandardLadderShape, mode: GridMode) {
     (sizeMM) => stdShapeContour(shape, sizeMM, sizeMM),
     DEFAULT_LAW,
     mode,
+    { source: 'std' },
   )
   return rungs.map((rung) => ({
     label: rung.label,
@@ -72,7 +75,7 @@ function standardShapeRows(shape: StandardLadderShape, mode: GridMode) {
     visible: rung.visible,
     densities: Object.fromEntries(DENSITIES.map((density) => [
       density,
-      planSummary(stdShapeContour(shape, rung.sizeMM, rung.sizeMM), mode, density),
+      planSummary(stdShapeContour(shape, rung.sizeMM, rung.sizeMM), mode, density, 'std'),
     ])),
   }))
 }
@@ -83,6 +86,7 @@ function presetRows(preset: VectorShapeKind, mode: GridMode) {
     (sizeMM) => stdShapeContour('square', sizeMM, sizeMM),
     DEFAULT_LAW,
     mode,
+    { source: 'preset' },
   )
   return referenceRungs.map((rung) => ({
     label: rung.label,
@@ -91,7 +95,7 @@ function presetRows(preset: VectorShapeKind, mode: GridMode) {
     visible: rung.visible,
     densities: Object.fromEntries(DENSITIES.map((density) => [
       density,
-      planSummary(scaleContour(unit, rung.sizeMM), mode, density),
+      planSummary(scaleContour(unit, rung.sizeMM), mode, density, 'preset'),
     ])),
   }))
 }
@@ -121,6 +125,13 @@ const presets = Object.fromEntries(PRESETS.map((preset) => {
   }]
 }))
 
+const visibleProductRows = STANDARD_SHAPES.flatMap((shape) =>
+  standardShapeRows(shape, 'auto')
+    .filter(({ visible }) => visible)
+    .map((row) => ({ shape, ...row })))
+const nonStandardProductRows = visibleProductRows.filter(({ densities }) =>
+  Object.values(densities).some(({ pattern }) => pattern !== 'standard'))
+
 const report = {
   schemaVersion: 1,
   measurement: {
@@ -132,8 +143,26 @@ const report = {
     presetSuitability: 'every multi-anchor standard plan is ok, zero-flap, and standard-pattern',
     oneAnchor: 'classified boundary; never counted as a pass',
   },
+  productAutoGate: {
+    visibleRungs: visibleProductRows.length,
+    nonStandardRungs: nonStandardProductRows.length,
+    offenders: nonStandardProductRows.map(({ shape, label, sizeMM }) =>
+      `${shape}/${label}/${sizeMM}`),
+  },
   standardShapes,
   presets,
 }
 
 console.log(JSON.stringify(report, null, 2))
+
+if (process.argv.includes('--verify')) {
+  if (visibleProductRows.length !== 18) {
+    throw new Error(`Expected 18 visible product rungs; received ${visibleProductRows.length}.`)
+  }
+  if (nonStandardProductRows.length) {
+    throw new Error(
+      `Product Auto selected admin-only patterns on ${nonStandardProductRows.length}/18 rungs: `
+      + report.productAutoGate.offenders.join(', '),
+    )
+  }
+}

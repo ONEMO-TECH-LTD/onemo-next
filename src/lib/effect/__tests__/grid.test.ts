@@ -275,7 +275,7 @@ describe('engine-owned workbench selections', () => {
       pattern: signed.pattern,
       margin: signed.resolvedMarginMM,
       anchors: signed.grid.anchors.length,
-    }).toEqual({ pitch: 48, pattern: 'diamond', margin: -15, anchors: 1 })
+    }).toEqual({ pitch: 48, pattern: 'standard', margin: -15, anchors: 1 })
 
     const diagnosticVelcro = resolveGridPlan(contour, {
       attachment: 'velcro',
@@ -289,7 +289,7 @@ describe('engine-owned workbench selections', () => {
       pattern: diagnosticVelcro.pattern,
       gridPitch: diagnosticVelcro.grid.pitchCentreMM,
       anchors: diagnosticVelcro.grid.anchors.length,
-    }).toEqual({ pitch: 48, pattern: 'diamond', gridPitch: 0, anchors: 0 })
+    }).toEqual({ pitch: 48, pattern: 'standard', gridPitch: 0, anchors: 0 })
 
     const productVelcro = resolveGridPlan(contour, {
       attachment: 'velcro',
@@ -321,6 +321,58 @@ describe('contour transforms preserve the declared Contour contract', () => {
 })
 
 describe('semantic ladder stays inside its product contract', () => {
+  it('keeps every visible geometric product rung on the standard pattern in Auto', () => {
+    const nonStandardRungs = new Set<string>()
+    let visibleRungs = 0
+
+    for (const shape of ['square', 'circle', 'triangle', 'diamondShape'] as const) {
+      const contourAt = (sizeMM: number) => stdShapeContour(shape, sizeMM)
+      for (const rung of semanticLadder(contourAt).filter(({ visible }) => visible)) {
+        visibleRungs++
+        for (const density of ['light', 'standard'] as const) {
+          const plan = resolveGridPlan(contourAt(rung.sizeMM), {
+            mode: 'auto',
+            density,
+            paddingMM: DEFAULT_LAW.paddingMM,
+            maxGrowMM: 0,
+          })
+          if (plan.pattern !== 'standard') {
+            nonStandardRungs.add(`${shape}/${rung.label}/${rung.sizeMM}`)
+          }
+        }
+      }
+    }
+
+    expect(visibleRungs).toBe(18)
+    expect([...nonStandardRungs]).toEqual([])
+  })
+
+  it('retains adaptive patterns for freeform and explicit admin modes', () => {
+    const contour = stdShapeContour('circle', 119)
+    const product = resolveGridPlan(contour, {
+      source: 'std',
+      mode: 'auto',
+      density: 'light',
+      maxGrowMM: 0,
+    })
+    const freeform = resolveGridPlan(contour, {
+      source: 'gen',
+      mode: 'auto',
+      density: 'light',
+      maxGrowMM: 0,
+    })
+    const explicitAdmin = resolveGridPlan(contour, {
+      source: 'std',
+      mode: 'diamond',
+      density: 'light',
+      maxGrowMM: 0,
+    })
+
+    expect(product.pattern).toBe('standard')
+    expect(freeform.pattern).toBe('quincunx')
+    expect(explicitAdmin.pattern).toBe('diamond')
+  })
+
   it('accepts exact 10mm rounded-corner tangency and seats all four 70mm corners', () => {
     const sizeMM = 70
     const insetMM = DEFAULT_LAW.paddingMM + DEFAULT_LAW.frameMM

@@ -199,3 +199,90 @@
 - Operational incident surfaced and resolved: running `next build` invalidated the same-tree dev
   server. The failed probe stayed at `resolving-grid`; restarting only `:3970` with
   `npx next dev -p 3970 --webpack` restored the live surface. `:3980` was untouched.
+
+## KAI-9790 resumed — source-owned automatic pattern policy
+
+### Authority and mechanism
+
+- Re-read `grid-laws.md` (859 lines), `briefs.md` (1,409 lines), the complete neutral engine,
+  page, panels, renderer, transport/cache callers, and affected suites before writing.
+- Law 4.1: standard is the automatic product pattern; diamond and dice are explicit admin
+  experiments. Generators and AI are the only freeform sources and retain the adaptive search.
+- RED at staging `d8a3a26`: exactly 9/18 visible product rungs selected a non-standard pattern:
+  `square/ONE/22`, `circle/ONE/23`, `circle/M/119`, `circle/XL/215`,
+  `triangle/ONE/39`, `diamondShape/ONE/32`, `diamondShape/M/128`,
+  `diamondShape/L/176`, `diamondShape/XL/224`.
+- Root cause: `modeCombos('auto')` supplied standard + diamond + dice to every source. The engine
+  had no input distinguishing curated product geometry from freeform.
+- Correction: `GridPlanOptions.source` carries the already-existing source category into the neutral
+  engine. `modeCombos` and `resolveGridPlan` restrict `std`/`preset` Auto to standard while
+  `gen`/`magic` retain every legal pattern. Explicit manual diamond/dice remains unchanged.
+  `semanticSteps` is untouched; KAI-9843 replaces it next.
+- Source participates in ladder and plan cache identity; cache contract version advances 4 → 5.
+
+### Before → after table
+
+Each plan cell is `pattern/pitch/seated`; Light then Standard.
+
+| Shape | Rung | Before | After |
+|---|---|---|---|
+| square | ONE 22/1 | diamond/48/1 · quincunx/96/1 | standard/48/1 · standard/96/1 |
+| square | S 70/4 | standard/48/4 · standard/48/4 | unchanged |
+| square | M 118/8 | standard/96/4 · standard/48/9 | unchanged |
+| square | L 166/12 | standard/48/12 · standard/48/16 | unchanged |
+| square | XL 214/16 | standard/96/8 · standard/48/25 | unchanged |
+| circle | ONE 23/1 | diamond/48/1 · quincunx/96/1 | standard/48/1 · standard/96/1 |
+| circle | M 119/4 | quincunx/96/4 · standard/48/5 | M 130/6 · standard/48/6 · standard/48/6 |
+| circle | XL 215/9 | diamond/96/4 · standard/48/13 | XL 220/10 · standard/48/8 · standard/48/16 |
+| triangle | ONE 39/1 | diamond/48/1 · quincunx/96/1 | standard/48/1 · standard/96/1 |
+| diamond shape | ONE 32/1 | diamond/48/1 · quincunx/96/1 | standard/48/1 · standard/96/1 |
+| diamond shape | M 128/5 | quincunx/96/4 · standard/48/5 | standard/48/5 · standard/48/5 |
+| diamond shape | L 176/8 | quincunx/96/4 · standard/48/8 | standard/48/8 · standard/48/8 |
+| diamond shape | XL 224/12 | diamond/96/4 · standard/48/13 | standard/48/12 · standard/48/13 |
+
+- Unlisted visible rungs are byte/value unchanged in the audit.
+- Final product-pattern result: **0/18 non-standard**, both densities measured.
+- Square catalogue stays `22 · 70 · 118 · 166 · 214`; every shown square rung and population is
+  unchanged. Circle M and XL re-derive because their prior sizes were certified by admin-only
+  pattern populations.
+
+### Necessity result
+
+- KAI-9788 survives but drops below the product blocker: explicit admin `light + quincunx` still
+  reaches the dead dice-full-grid exemption in `perimeterForDensity`; law 4.5 remains a separate
+  engine correction.
+- KAI-9819 is not built separately. The pattern-family half is fixed here, while the remaining
+  rung/delivery construction identity is absorbed by KAI-9843, the grid-first solver.
+
+### Executable evidence
+
+- `scripts/grid-remediation/kai-9790-pattern-report.ts --verify` now fails loud unless the
+  visible four-shape table is exactly 18 rungs and 0 use an admin-only automatic pattern.
+- Mutation: restored the old all-pattern automatic set; the new regression failed with the exact
+  original 9 offenders. Restored source policy returned green.
+- Device baseline RED: the baseline guard rejected the old Circle Auto ladder at exactly the two
+  re-derived rungs (`M 119/4 -> 130/6`, `XL 215/9 -> 220/10`). The intentional re-baseline changes
+  only `canonical-ladder`, to SHA-256
+  `9a54d89319c63fa7dd40ce5f164bcf46da4c5a521ade16d37d2279901555f161`;
+  dense and small-square fixtures are unchanged.
+- Real WebKit 26.0 device run: all three scenarios direct-Worker byte-equal and T1/T2 PASS.
+  Cold/warm timings: Circle `624/0ms`, dense real-AI `70/1ms`, small square `32/0ms`.
+- Real Chromium Worker oracle: PASS `6/6` — standard ladder, holed plan, explicit diamond ladder,
+  signed-margin Velcro, all-attachment seed hits, and physical pre-emption.
+- Full Vitest: 47 files passed / 1 skipped; 454 passed / 10 skipped / 1 explicit law-3.1 todo.
+  Typecheck exit 0. Lint exit 0 with 214 pre-existing warnings and zero errors. Production build
+  exit 0. `git diff --check` clean.
+
+### Live visual at the working tree
+
+- `http://localhost:3970/effect-creator/grid-lab` served from the grid-lab worktree at staging
+  `d8a3a26` plus this bounded delta; HTTP 200 before and after the production build.
+- Product Auto observations: Circle M `130mm / standard / 6 seated`; Circle XL
+  `220mm / standard / 8 seated`; Triangle M `231mm / standard / 5 seated`; rotated-diamond XL
+  `224mm / standard / 12 seated`.
+- Explicit admin Diamond remains live: rotated-diamond 224mm resolved Diamond/96 with 4 seated.
+  Generator Blob Auto remained adaptive and selected Dice-5/96 with 4 seated.
+- Screenshots:
+  `output/playwright/kai-9790-product-auto-standard.png` and
+  `output/playwright/kai-9790-freeform-auto-adaptive.png`. `output/` remains disposable and
+  untracked; the executable audit and all acceptance assertions are tracked.

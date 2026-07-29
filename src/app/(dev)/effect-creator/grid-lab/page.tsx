@@ -206,6 +206,7 @@ export default function GridLab() {
   )
   const planOptions = useMemo<GridPlanOptions>(() => ({
     attachment,
+    source: src,
     mode: gridMode,
     density,
     paddingMM: pad,

@@ -271,6 +271,7 @@ describe('Creator magnetic-grid module boundary', () => {
 
     expect(pageSource).toContain('resolveRectangleRungs(')
     expect(pageSource).toContain('nearestAnchorPair(')
+    expect(pageSource).toContain('source: src')
     expect(panelSource).toContain('rectRungs?.shortOptions')
     expect(rendererSource).toContain('anchorPair.distanceMM')
     expect(combined).not.toMatch(/\b(?:autoGrid|balancedFit|perimeterForDensity|insetRingMM)\s*\(/)

@@ -215,6 +215,7 @@ describe('exact grid cache identity', () => {
     ]
     for (const law of mutations) expect(gridLadderCacheKey(squareLadder, law, 'auto')).not.toBe(base)
     expect(gridLadderCacheKey(squareLadder, baseLaw, 'standard')).not.toBe(base)
+    expect(gridLadderCacheKey(squareLadder, baseLaw, 'auto', { source: 'gen' })).not.toBe(base)
   })
 
   it('changes the plan key for every consumed option and normalizes effective defaults', () => {
@@ -234,6 +235,7 @@ describe('exact grid cache identity', () => {
 
     const mutations: GridPlanOptions[] = [
       { attachment: 'twinfix' },
+      { source: 'gen' },
       { mode: 'standard' },
       { density: 'standard' },
       { paddingMM: 11 },
@@ -250,7 +252,7 @@ describe('exact grid cache identity', () => {
   })
 
   it('includes the explicit engine version and engine-owned policy signature', () => {
-    expect(GRID_ENGINE_CACHE_VERSION).toBe(4)
+    expect(GRID_ENGINE_CACHE_VERSION).toBe(5)
     expect(GRID_ENGINE_POLICY_SIGNATURE).not.toContain('"user"')
     expect(GRID_ENGINE_POLICY_SIGNATURE).not.toContain('"admin"')
     expect(GRID_ENGINE_POLICY_SIGNATURE).toContain('"preparedContourEpsilonMM"')

@@ -18,6 +18,7 @@ import {
   stdShapeContour,
   type GridDensity,
   type GridMode,
+  type GridSource,
 } from '../grid'
 import type { VShape } from '@/lib/vector-core'
 import type { Contour, Pt } from '../types'
@@ -46,11 +47,14 @@ function normalized(contour: Contour): Contour {
   return { outer: { pts: shift(contour.outer.pts) }, holes: contour.holes.map((h) => ({ pts: shift(h.pts) })) }
 }
 
-function exercise(name: string, contour: Contour) {
+function exercise(name: string, contour: Contour, source: GridSource) {
   for (const mode of MODES) for (const density of DENSITIES) {
-    const plan = resolveGridPlan(contour, { mode, density, maxGrowMM: 12 })
+    const plan = resolveGridPlan(contour, { source, mode, density, maxGrowMM: 12 })
     expect([48, 96], `${name}/${mode}/${density}`).toContain(plan.pitchMM)
     if (mode !== 'auto') expect(plan.pattern, `${name}/${mode}/${density}`).toBe(mode)
+    if (mode === 'auto' && (source === 'std' || source === 'preset')) {
+      expect(plan.pattern, `${name}/${mode}/${density}`).toBe('standard')
+    }
     if (mode === 'quincunx') expect(plan.pitchMM, `${name}/${mode}/${density}`).toBe(96)
     expect(plan.resolvedMarginMM, `${name}/${mode}/${density}`).toBeGreaterThanOrEqual(0)
   }
@@ -141,7 +145,7 @@ describe('actual Creator source families share one engine contract', () => {
 
   it('covers every standard geometry in every mode and density', () => {
     for (const shape of ['square', 'rect', 'circle', 'triangle', 'diamondShape'] as const) {
-      exercise(`standard:${shape}`, stdShapeContour(shape, 180, shape === 'rect' ? 118 : 180))
+      exercise(`standard:${shape}`, stdShapeContour(shape, 180, shape === 'rect' ? 118 : 180), 'std')
     }
   })
 
@@ -149,7 +153,7 @@ describe('actual Creator source families share one engine contract', () => {
     for (const preset of PRESETS) {
       const contour = contourFromShape(getShape(preset, 1000, 1000), { mmPerPx: 1, maskHeightPx: 1000 })
       expect(contour, preset).not.toBeNull()
-      exercise(`preset:${preset}`, scaleContour(normalized(contour!), 180))
+      exercise(`preset:${preset}`, scaleContour(normalized(contour!), 180), 'preset')
     }
   })
 
@@ -157,7 +161,7 @@ describe('actual Creator source families share one engine contract', () => {
     for (const { kind, params } of GENERATORS) {
       const ring = generateShapeRing({ kind, ...params } as Parameters<typeof generateShapeRing>[0], 1000, 1000)
       const contour: Contour = { outer: { pts: ring.map(([x, y]) => [x, 1000 - y] as Pt) }, holes: [] }
-      exercise(`generator:${kind}`, scaleContour(normalized(contour), 180))
+      exercise(`generator:${kind}`, scaleContour(normalized(contour), 180), 'gen')
     }
   })
 
@@ -166,6 +170,6 @@ describe('actual Creator source families share one engine contract', () => {
       outer: { pts: [[0, 0], [180, 0], [180, 60], [110, 60], [110, 180], [0, 180]] },
       holes: [],
     }
-    exercise('freeform:outline', contour)
+    exercise('freeform:outline', contour, 'magic')
   })
 })
