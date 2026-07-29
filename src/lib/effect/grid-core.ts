@@ -666,13 +666,23 @@ export function rectFormat(wMM: number, hMM: number): 'strip' | 'panoramic' | 'b
   const r = Math.max(wMM, hMM) / Math.min(wMM, hMM)
   return r >= 2.5 ? 'strip' : r >= 1.6 ? 'panoramic' : 'block'
 }
+function circleTessellationPoints(diameterMM: number): number {
+  const radiusMM = diameterMM / 2
+  // Exact inverse of the sagitta bound. It agrees with law 9.2(b)'s square-root
+  // derivation across the catalogue while proving the imported tolerance directly.
+  const required = Math.ceil(
+    Math.PI / Math.acos(1 - MANUFACTURING_TOLERANCE_MM / radiusMM),
+  )
+  return Math.max(96, required)
+}
 /** LAW: the standard geometry recipes (product shape definitions — square, its rotated diamond twin,
  *  circle, equilateral triangle, rectangle). Drawn directly in mm; app + bench share these. */
 export type StdShape = 'square' | 'rect' | 'circle' | 'triangle' | 'diamondShape'
 export function stdShapeContour(shape: StdShape, wMM: number, hMM: number = wMM): Contour {
   if (shape === 'circle') {
     const r = wMM / 2, pts: Pt[] = []
-    for (let i = 0; i < 96; i++) { const t = (i / 96) * Math.PI * 2; pts.push([r + r * Math.cos(t), r + r * Math.sin(t)]) }
+    const pointCount = circleTessellationPoints(wMM)
+    for (let i = 0; i < pointCount; i++) { const t = (i / pointCount) * Math.PI * 2; pts.push([r + r * Math.cos(t), r + r * Math.sin(t)]) }
     return { outer: { pts }, holes: [] }
   }
   if (shape === 'triangle') return { outer: { pts: [[0, 0], [wMM, 0], [wMM / 2, wMM * Math.sqrt(3) / 2]] as Pt[] }, holes: [] }
@@ -1211,7 +1221,7 @@ export function resolveGridPlan(
 // ─── EXACT ASYNC/CACHE CONTRACT ─────────────────────────────────────────────
 
 /** Manual cache contract version. Bump whenever an output-affecting engine algorithm or policy changes. */
-export const GRID_ENGINE_CACHE_VERSION = 3
+export const GRID_ENGINE_CACHE_VERSION = 4
 
 export type StandardLadderShape = Exclude<StdShape, 'rect'>
 

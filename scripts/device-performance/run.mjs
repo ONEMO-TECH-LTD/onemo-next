@@ -23,6 +23,7 @@ if (!selectedProfiles.length) throw new Error(`Unknown DEVICE_PERF_PROFILE: ${re
 const vite = await createServer({
   root: repoRoot,
   logLevel: 'error',
+  resolve: { alias: { '@': join(repoRoot, 'src') } },
   server: { host: '127.0.0.1', port: 0, strictPort: false },
 })
 await vite.listen()

@@ -79,6 +79,35 @@ function pickedShape(
 }
 
 describe('actual Creator source families share one engine contract', () => {
+  it('refines the true-circle tessellation only when physical sagitta exceeds manufacturing tolerance', () => {
+    const catalogue = [
+      { diameterMM: 70, points: 96 },
+      { diameterMM: 130, points: 96 },
+      { diameterMM: 174, points: 96 },
+      { diameterMM: 214, points: 103 },
+      { diameterMM: 262, points: 114 },
+      { diameterMM: 310, points: 124 },
+    ]
+
+    for (const { diameterMM, points } of catalogue) {
+      const contour = stdShapeContour('circle', diameterMM)
+      const radiusMM = diameterMM / 2
+      const sagittaMM = radiusMM * (1 - Math.cos(Math.PI / contour.outer.pts.length))
+
+      expect(contour.outer.pts, `circle Ø${diameterMM} point budget`).toHaveLength(points)
+      expect(sagittaMM, `circle Ø${diameterMM} radial sagitta`).toBeLessThanOrEqual(
+        MANUFACTURING_TOLERANCE_MM,
+      )
+      if (points > 96) {
+        const onePointFewerSagittaMM = radiusMM * (1 - Math.cos(Math.PI / (points - 1)))
+        expect(
+          onePointFewerSagittaMM,
+          `circle Ø${diameterMM} uses the smallest lawful refined budget`,
+        ).toBeGreaterThan(MANUFACTURING_TOLERANCE_MM)
+      }
+    }
+  })
+
   it('derives one rounded-square default geometry for the preset library and Creator picker', () => {
     const library = contourFromShape(
       getShape('squircle', 1000, 1000),
