@@ -7,8 +7,9 @@ import { contourFromShape, assertContourCuttable, vectorShapeHash, MANUFACTURING
 import { vectoriseTrace } from './geometry-truth.legacy' // R4: retired trace-fit, test-only
 import { fairingFromDetail, BEN_DEFAULT_DETAIL } from '@/lib/outline-core'
 import { getShape } from '@/lib/shape-library'
-import { flattenShape, type VShape } from '@/lib/vector-core'
+import { cubicPoint, flattenShape, segments, type VShape } from '@/lib/vector-core'
 import { filletShape } from '@/lib/vector-core/__tests__/fillet-fixtures' // test fixture (moved out of production path.ts)
+import { distanceToPreparedContour, prepareExactContour } from '../grid-prepared'
 import type { Pt } from '../types'
 
 const FAIRING = fairingFromDetail(BEN_DEFAULT_DETAIL)
@@ -73,6 +74,37 @@ describe('contourFromShape — the one manufacturing flatten', () => {
   it('fails loud (null) on a degenerate shape', () => {
     const line: VShape = { paths: [{ anchors: [{ p: { x: 0, y: 0 }, corner: true }, { p: { x: 10, y: 0 }, corner: true }] }] }
     expect(contourFromShape(line, { mmPerPx: 1, maskHeightPx: 100 })).toBeNull()
+  })
+
+  it('keeps the physical flatten error within manufacturing tolerance for a coarse-pixel source', () => {
+    const maskPx = 100
+    const diameterMM = 310
+    const mmPerPx = diameterMM / (maskPx * 0.72)
+    const shape = getShape('circle', maskPx, maskPx)
+    const contour = contourFromShape(shape, { mmPerPx, maskHeightPx: maskPx })!
+    const prepared = prepareExactContour(contour)
+    let maxErrorMM = 0
+
+    for (const segment of segments(shape.paths[0])) {
+      for (let i = 0; i < 4096; i++) {
+        const t = i / 4096
+        const point = segment.c1 && segment.c2
+          ? cubicPoint(segment.a, segment.c1, segment.c2, segment.b, t)
+          : {
+              x: segment.a.x + (segment.b.x - segment.a.x) * t,
+              y: segment.a.y + (segment.b.y - segment.a.y) * t,
+            }
+        maxErrorMM = Math.max(
+          maxErrorMM,
+          distanceToPreparedContour(
+            [point.x * mmPerPx, (maskPx - point.y) * mmPerPx],
+            prepared,
+          ),
+        )
+      }
+    }
+
+    expect(maxErrorMM).toBeLessThanOrEqual(MANUFACTURING_TOLERANCE_MM)
   })
 })
 

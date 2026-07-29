@@ -15,9 +15,10 @@
 //     top-to-bottom support span.
 
 import type { Contour, Pt } from './types'
+import { DEFAULT_CIRCLE_TESSELLATION_CALIBRATION } from './effect-calibration'
 import { MANUFACTURING_TOLERANCE_MM } from './geometry-truth'
 import { roundedSquareContourMM } from './rounded-square'
-import { insetRingMM } from './offset'
+import { insetRingMM, MANUFACTURING_OFFSET_ARC_TOLERANCE_MM } from './offset'
 import {
   PreparedContourSource,
   distanceToPreparedContour,
@@ -673,7 +674,7 @@ function circleTessellationPoints(diameterMM: number): number {
   const required = Math.ceil(
     Math.PI / Math.acos(1 - MANUFACTURING_TOLERANCE_MM / radiusMM),
   )
-  return Math.max(96, required)
+  return Math.max(DEFAULT_CIRCLE_TESSELLATION_CALIBRATION.minimumPoints, required)
 }
 /** LAW: the standard geometry recipes (product shape definitions — square, its rotated diamond twin,
  *  circle, equilateral triangle, rectangle). Drawn directly in mm; app + bench share these. */
@@ -1327,6 +1328,8 @@ const GRID_ENGINE_POLICY_CONTRACT = {
   minAnchors: MIN_ANCHORS,
   targetAnchors: TARGET_ANCHORS,
   preparedContourEpsilonMM: GRID_ARITHMETIC_EPSILON_MM,
+  circleTessellation: DEFAULT_CIRCLE_TESSELLATION_CALIBRATION,
+  manufacturingOffsetArcToleranceMM: MANUFACTURING_OFFSET_ARC_TOLERANCE_MM,
   holdReachMM: HOLD_REACH_MM,
   focalSizeMM: FOCAL_SIZE_MM,
   focalRamp2MM: FOCAL_RAMP2_MM,

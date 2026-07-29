@@ -6,7 +6,10 @@ import { shapePickDescriptor } from '@/app/(dev)/effect-creator/v5.3.1/user/edit
 import type { EditorCtx } from '@/app/(dev)/effect-creator/v5.3.1/user/editor/descriptors/types'
 import { generateShapeRing, type ShapeKind } from '@/app/(dev)/effect-creator/v5.3.1/user/shapes'
 import { contourFromShape, MANUFACTURING_TOLERANCE_MM } from '../geometry-truth'
-import { DEFAULT_ROUNDED_SQUARE_CALIBRATION } from '../effect-calibration'
+import {
+  DEFAULT_CIRCLE_TESSELLATION_CALIBRATION,
+  DEFAULT_ROUNDED_SQUARE_CALIBRATION,
+} from '../effect-calibration'
 import { distanceToPreparedContour, prepareExactContour } from '../grid-prepared'
 import { GLOBAL_OFF, resolve, type OutlineAdjustments, type OutlineSource } from '../outline-resolve'
 import {
@@ -80,10 +83,12 @@ function pickedShape(
 
 describe('actual Creator source families share one engine contract', () => {
   it('refines the true-circle tessellation only when physical sagitta exceeds manufacturing tolerance', () => {
+    const minimumPoints = DEFAULT_CIRCLE_TESSELLATION_CALIBRATION.minimumPoints
+    expect(minimumPoints).toBe(96)
     const catalogue = [
-      { diameterMM: 70, points: 96 },
-      { diameterMM: 130, points: 96 },
-      { diameterMM: 174, points: 96 },
+      { diameterMM: 70, points: minimumPoints },
+      { diameterMM: 130, points: minimumPoints },
+      { diameterMM: 174, points: minimumPoints },
       { diameterMM: 214, points: 103 },
       { diameterMM: 262, points: 114 },
       { diameterMM: 310, points: 124 },

@@ -49,7 +49,7 @@ const MICRO_PER_PX = 1000
  */
 export function contourFromShape(v: VShape, ctx: { mmPerPx: number; maskHeightPx: number }): Contour | null {
   const k = ctx.mmPerPx || 1
-  const tolPx = Math.max(0.05, MANUFACTURING_TOLERANCE_MM / k)
+  const tolPx = MANUFACTURING_TOLERANCE_MM / k
   const rings = flattenShape(v, tolPx)
   // KAI-9086 (Phase-2 guard): multi-ring shapes (holes / secondary paths) are NOT yet in scope. The mm
   // contour keeps only the OUTER ring while the SVG exporter serializes ALL paths — a silent divergence
