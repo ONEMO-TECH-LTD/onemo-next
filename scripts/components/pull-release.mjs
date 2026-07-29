@@ -129,8 +129,8 @@ export async function pullComponentRelease({
   }
 
   const beforeWrappers = await wrapperHashes(appRoot, generatedDir);
-  const stage = path.join(appRoot, 'src', 'components', `.generated-stage-${process.pid}`);
-  const backup = path.join(appRoot, 'src', 'components', `.generated-backup-${process.pid}`);
+  const stage = path.join(appRoot, `.component-release-stage-${process.pid}`);
+  const backup = path.join(appRoot, `.component-release-backup-${process.pid}`);
   await fs.rm(stage, { recursive: true, force: true });
   await fs.rm(backup, { recursive: true, force: true });
   let swapped = false;

@@ -242,6 +242,15 @@ describe('component release pull transaction', () => {
       appTokensPath: path.join(app, 'src', 'app', 'tokens', 'tokens.css'),
       appRoot: app,
     })).status).toBe('pass');
+
+    const nextRelease = await release(root, tokens, { marker: 'two' });
+    const nextResult = await pullComponentRelease({ releaseDir: nextRelease, appRoot: app });
+    expect(nextResult.provenance.releaseId).toBe(path.basename(nextRelease));
+    expect(await fs.readFile(wrapper, 'utf8')).toBe(wrapperBytes);
+    expect(await fs.readFile(
+      path.join(app, 'src', 'components', 'generated', 'Thing', 'Thing.tsx'),
+      'utf8',
+    )).toContain('data-marker="two"');
   });
 
   it('accepts the app-owned proof route as a non-vacuous generated-barrel consumer', async () => {
